@@ -1,6 +1,6 @@
 //! Word spelling, grammar, and language auto-detection proofing-state PLCFs.
 
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 
 const SPELLING_FIB_INDEX: usize = 55;
@@ -10,8 +10,8 @@ const LANGUAGE_DETECTION_FIB_INDEX: usize = 98;
 const MAX_PROOFING_ENTRIES: usize = 1_000_000;
 const MAX_PROOFING_TABLE_BYTES: usize = 4 + MAX_PROOFING_ENTRIES * 6;
 
-fn corrupted(message: impl Into<String>) -> DocError {
-    DocError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }
 
 fn read_u16(data: &[u8], offset: usize, field: &str) -> Result<u16> {

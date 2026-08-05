@@ -1,6 +1,6 @@
 //! Word `SttbfAssoc` associated-document string table.
 
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 
 const FIB_INDEX: usize = 32;
@@ -9,8 +9,8 @@ const MAX_GENERAL_UNITS: usize = 255;
 const MAX_PASSWORD_UNITS: usize = 15;
 const MAX_TABLE_BYTES: usize = 6 + 17 * (2 + MAX_GENERAL_UNITS * 2) + (2 + MAX_PASSWORD_UNITS * 2);
 
-fn corrupted(message: impl Into<String>) -> DocError {
-    DocError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }
 
 fn read_u16(data: &[u8], offset: usize, field: &str) -> Result<u16> {

@@ -5,7 +5,7 @@
 //! `fcPlcfTch`). Its data elements are `Tch` structures (MS-DOC 2.9.320);
 //! the cache is read strictly for metadata but never acted upon.
 
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 
 /// Table-pointer index of `fcPlcfTch`/`lcbPlcfTch` (MS-DOC 2.5.7 FibRgFcLcb2000).
@@ -14,8 +14,8 @@ const MAX_TCH_ENTRIES: usize = 1_000_000;
 /// CPs are signed 31-bit positions (MS-DOC 2.2.1).
 const MAX_CP: u32 = i32::MAX as u32;
 
-fn corrupted(message: impl Into<String>) -> DocError {
-    DocError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }
 
 fn read_u32(data: &[u8], offset: usize, field: &str) -> Result<u32> {

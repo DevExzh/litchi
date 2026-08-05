@@ -29,23 +29,20 @@ fn opens_apache_poi_binary_rc4_document() {
     let path = poi_fixture("password_tika_binaryrc4.doc");
 
     let mut package = Package::open(&path).unwrap();
-    assert!(matches!(
-        package.document(),
-        Err(DocError::PasswordRequired)
-    ));
+    assert!(matches!(package.document(), Err(Error::PasswordRequired)));
 
     let mut package = Package::open(&path).unwrap();
     assert!(matches!(
-        package.document_with_options(DocOpenOptions {
+        package.document_with_options(OpenOptions {
             password: Some("wrong"),
             ..Default::default()
         }),
-        Err(DocError::InvalidPassword)
+        Err(Error::InvalidPassword)
     ));
 
     let mut package = Package::open(path).unwrap();
     let document = package
-        .document_with_options(DocOpenOptions {
+        .document_with_options(OpenOptions {
             password: Some("tika"),
             ..Default::default()
         })
@@ -58,23 +55,20 @@ fn opens_apache_poi_cryptoapi_document() {
     let path = poi_fixture("password_password_cryptoapi.doc");
 
     let mut package = Package::open(&path).unwrap();
-    assert!(matches!(
-        package.document(),
-        Err(DocError::PasswordRequired)
-    ));
+    assert!(matches!(package.document(), Err(Error::PasswordRequired)));
 
     let mut package = Package::open(&path).unwrap();
     assert!(matches!(
-        package.document_with_options(DocOpenOptions {
+        package.document_with_options(OpenOptions {
             password: Some("wrong"),
             ..Default::default()
         }),
-        Err(DocError::InvalidPassword)
+        Err(Error::InvalidPassword)
     ));
 
     let mut package = Package::open(path).unwrap();
     let document = package
-        .document_with_options(DocOpenOptions {
+        .document_with_options(OpenOptions {
             password: Some("password"),
             ..Default::default()
         })

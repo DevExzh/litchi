@@ -18,7 +18,7 @@
 //! resolved, contacted, or executed, and no merge is ever performed.
 
 use super::fib::{FileInformationBlock, WORD_97_NFIB};
-use crate::package::{DocError, Result};
+use crate::package::{Error as PackageError, Result};
 
 /// Table-pointer index of `fcPms`/`lcbPms`.
 const FC_PMS: usize = 44;
@@ -144,8 +144,8 @@ const LIST_SIZE_OVERFLOW: u16 = 0xFFFF;
 /// (MS-DOC 2.9.162).
 const FIELD_MAP_COUNT: u32 = 30;
 
-fn corrupted(message: impl Into<String>) -> DocError {
-    DocError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }
 
 /// A bounds-checked cursor over one structure's byte range.

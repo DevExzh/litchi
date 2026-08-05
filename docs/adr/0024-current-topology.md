@@ -61,6 +61,13 @@ folders preserve their existing public owner paths while making model, codec,
 package, and test responsibilities explicit. The PPTX notes writer retains
 the same layered ownership and now emits quoted namespace attributes.
 
+The latest continuation adds the same boundaries to PPT writer core and
+Escher, PPTX ChartEx, XLSB conditional formatting and workbook codecs, ODT
+fields, ODS content, DOCX document writing, XLSX worksheet snapshot editing,
+DOC PAP/TAP, and XLS pivot tables. The DOC package facade exposes contextual
+`OpenOptions`, `EncryptionKind`, and `Error` names without compatibility
+aliases; section-border validation is surfaced separately as `BorderError`.
+
 ## OLE2 and legacy binary formats
 
 The current legacy container and shared-object layers are:
@@ -80,6 +87,8 @@ and the manifests for [`litchi-doc`](../../crates/litchi-doc/Cargo.toml),
 format-neutral validated OLE2 structures, including the typed `property_set`
 model/codec/editor shared by DOC, PPT, and XLS; host metadata and
 format-specific semantic records remain in the concrete legacy format crates.
+The property-set editor keys staged mutations by complete CFB stream paths, so
+equal leaf names in different storage trees remain distinct during rewrites.
 
 The current legacy owners also use nested semantic folders: DOC fields, PPT
 animation parser/types/writer, XLS list objects, and ODraw properties expose
@@ -108,7 +117,9 @@ similarly exposes the primary ODF families through its `odf` facade feature.
 ODT's field, builder, and mutable owners and ODS's content codec are layered
 inside their family crates. The ODS content owner is parser-only and therefore
 does not own package assembly; package ownership remains with the family
-facade.
+facade. The OOXML-common web-extension codec is likewise layered into
+semantic, XML, relationship, and package owners while preserving the compact
+public web facade.
 
 ## Historical terminology
 

@@ -5,7 +5,7 @@
 /// - The actual text bytes are in the WordDocument stream
 /// - A "Piece Table" (CLX structure) in the Table stream maps character positions to file positions
 /// - Text can be in either 8-bit (Windows-1252) or 16-bit (UTF-16LE) format
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 use litchi_core::binary::{read_u16_le, read_u32_le};
 
@@ -131,7 +131,7 @@ impl TextExtractor {
         // CLX is at FibRgFcLcb index 33 (fcClx, lcbClx) according to Apache POI's FIBFieldHandler
         let (clx_offset, clx_length) = fib
             .get_table_pointer(33)
-            .ok_or_else(|| DocError::Corrupted("CLX pointer not found in FIB".to_string()))?;
+            .ok_or_else(|| PackageError::Corrupted("CLX pointer not found in FIB".to_string()))?;
 
         if clx_length == 0 {
             // No piece table means text starts at offset 0x200 or 0x800
@@ -144,7 +144,7 @@ impl TextExtractor {
         let clx_length = clx_length as usize;
 
         if clx_offset >= table_stream.len() {
-            return Err(DocError::Corrupted(format!(
+            return Err(PackageError::Corrupted(format!(
                 "CLX offset {} is beyond table stream length {}",
                 clx_offset,
                 table_stream.len()
@@ -152,7 +152,7 @@ impl TextExtractor {
         }
 
         if clx_offset + clx_length > table_stream.len() {
-            return Err(DocError::Corrupted(format!(
+            return Err(PackageError::Corrupted(format!(
                 "CLX extends beyond table stream: offset={}, length={}, stream_len={}",
                 clx_offset,
                 clx_length,
@@ -185,7 +185,7 @@ impl TextExtractor {
         // Skip GRPPR L sections (type 0x01) until we find the piece table
         while offset < clx_data.len() {
             if offset >= clx_data.len() {
-                return Err(DocError::Corrupted(
+                return Err(PackageError::Corrupted(
                     "Unexpected end of CLX data".to_string(),
                 ));
             }
@@ -197,7 +197,9 @@ impl TextExtractor {
                 0x01 => {
                     // GRPPR L section - skip it
                     if offset + 2 > clx_data.len() {
-                        return Err(DocError::Corrupted("GRPPR L section truncated".to_string()));
+                        return Err(PackageError::Corrupted(
+                            "GRPPR L section truncated".to_string(),
+                        ));
                     }
 
                     let size = read_u16_le(clx_data, offset).unwrap_or(0) as usize;
@@ -206,7 +208,7 @@ impl TextExtractor {
                 0x02 => {
                     // TEXT_PIECE_TABLE_TYPE - this is the piece table
                     if offset + 4 > clx_data.len() {
-                        return Err(DocError::Corrupted(
+                        return Err(PackageError::Corrupted(
                             "Piece table size field truncated".to_string(),
                         ));
                     }
@@ -215,7 +217,7 @@ impl TextExtractor {
                     offset += 4;
 
                     if offset + piece_table_size > clx_data.len() {
-                        return Err(DocError::Corrupted(
+                        return Err(PackageError::Corrupted(
                             "Piece table data truncated".to_string(),
                         ));
                     }
@@ -231,7 +233,7 @@ impl TextExtractor {
                 0x14 => {
                     // Document Properties Descriptor - contains document-wide properties
                     if offset + 2 > clx_data.len() {
-                        return Err(DocError::Corrupted(
+                        return Err(PackageError::Corrupted(
                             "Document Properties section truncated".to_string(),
                         ));
                     }
@@ -245,7 +247,7 @@ impl TextExtractor {
                         let size = read_u16_le(clx_data, offset).unwrap_or(0) as usize;
                         offset += 2 + size;
                     } else {
-                        return Err(DocError::Corrupted(format!(
+                        return Err(PackageError::Corrupted(format!(
                             "Unexpected CLX section type 0x{:02X} at end of data",
                             section_type
                         )));
@@ -282,7 +284,7 @@ impl TextExtractor {
         // Validate size
         let expected_size = 4 + num_pieces * (4 + PIECE_DESCRIPTOR_SIZE);
         if plex_data.len() < expected_size {
-            return Err(DocError::Corrupted(format!(
+            return Err(PackageError::Corrupted(format!(
                 "PlexOfCps truncated: expected {} bytes, got {}",
                 expected_size,
                 plex_data.len()
@@ -305,7 +307,7 @@ impl TextExtractor {
             let offset = struct_offset + i * PIECE_DESCRIPTOR_SIZE;
 
             if offset + PIECE_DESCRIPTOR_SIZE > plex_data.len() {
-                return Err(DocError::Corrupted(format!(
+                return Err(PackageError::Corrupted(format!(
                     "PieceDescriptor {} truncated",
                     i
                 )));

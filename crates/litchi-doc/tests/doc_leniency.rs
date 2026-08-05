@@ -1,6 +1,6 @@
 //! Opt-in tolerance for non-structural DOC stylesheet defects.
 
-use litchi_doc::{DocLeniency, DocOpenOptions, DocStylesheetDefect, Package};
+use litchi_doc::{DocLeniency, DocStylesheetDefect, OpenOptions, Package};
 use std::path::PathBuf;
 
 fn fixture(name: &str) -> PathBuf {
@@ -31,7 +31,7 @@ fn opting_in_recovers_the_document_and_records_the_repair() {
     let mut package = Package::open(fixture("duplicate-style-names.doc")).expect("container opens");
 
     let document = package
-        .document_with_options(DocOpenOptions {
+        .document_with_options(OpenOptions {
             leniency: DocLeniency::TolerateStylesheetDefects,
             ..Default::default()
         })
@@ -74,7 +74,7 @@ fn structural_defects_stay_fatal_when_tolerating_stylesheet_defects() {
 
     assert!(
         package
-            .document_with_options(DocOpenOptions {
+            .document_with_options(OpenOptions {
                 leniency: DocLeniency::TolerateStylesheetDefects,
                 ..Default::default()
             })
@@ -89,7 +89,7 @@ fn a_conforming_document_records_no_repairs() {
     for leniency in [DocLeniency::Strict, DocLeniency::TolerateStylesheetDefects] {
         let mut package = Package::open(fixture("Lists.doc")).expect("container opens");
         let document = package
-            .document_with_options(DocOpenOptions {
+            .document_with_options(OpenOptions {
                 leniency,
                 ..Default::default()
             })

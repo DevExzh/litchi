@@ -86,7 +86,7 @@ pub use header_footer::HeaderFooter;
 pub use hyperlink::Hyperlink;
 pub use image::{Image, ImageError};
 pub use leniency::{DocLeniency, DocStylesheetDefect, DocToleranceReport, DocToleratedDefect};
-pub use package::{DocEncryptionKind, DocError, DocOpenOptions, Package, Result};
+pub use package::{EncryptionKind, Error, OpenOptions, Package, Result};
 pub use paragraph::{Paragraph, Run};
 pub use parts::associated_strings::{AssociatedStringSlot, DocumentAssociatedStrings};
 pub use parts::auto_summary::{AutoSummaryRange, DocumentAutoSummary};
@@ -229,7 +229,9 @@ pub use revision::{
     DisplayFieldRevisionMark, NumberingRevisionMark, RevisionKind, RevisionMark, RevisionReason,
     SectionRevisionMark,
 };
-pub use section::borders::{ApplyTo, Art, Border, Borders, Color, Depth, Error, Offset, Style};
+pub use section::borders::{
+    ApplyTo, Art, Border, Borders, Color, Depth, Error as BorderError, Offset, Style,
+};
 pub use section::{
     Behavior, BreakKind, ChapterNumberSeparator, DocSection, FootnotePosition, LineNumberRestart,
     LineNumbering, Margins, NoteNumberRestart, NoteSettings, PageGrid, PageGridMode, PageLayout,

@@ -3,7 +3,7 @@ use crate::comment::Comment;
 use crate::footnote::Footnote;
 use crate::header_footer::HeaderFooter;
 use crate::hyperlink::Hyperlink;
-use crate::package::{DocError, Result};
+use crate::package::{Error as PackageError, Result};
 use crate::paragraph::{Paragraph, Run};
 use crate::parts::associated_strings::DocumentAssociatedStrings;
 use crate::parts::auto_summary::DocumentAutoSummary;
@@ -315,7 +315,7 @@ impl Document {
     pub fn proofing_tables(&self) -> Result<&ProofingTables> {
         self.proofing_tables
             .as_ref()
-            .map_err(|error| DocError::Corrupted(format!("invalid proofing metadata: {error}")))
+            .map_err(|error| PackageError::Corrupted(format!("invalid proofing metadata: {error}")))
     }
 
     /// Strictly access current and legacy grammar-checker cookie tables.
@@ -324,7 +324,7 @@ impl Document {
     /// primary text from opening. Cookie payloads remain opaque and are never interpreted.
     pub fn grammar_cookie_tables(&self) -> Result<&GrammarCookieTables> {
         self.grammar_cookies.as_ref().map_err(|error| {
-            DocError::Corrupted(format!("invalid grammar cookie metadata: {error}"))
+            PackageError::Corrupted(format!("invalid grammar cookie metadata: {error}"))
         })
     }
 
@@ -337,7 +337,9 @@ impl Document {
         self.table_char_cache
             .as_ref()
             .map(Option::as_ref)
-            .map_err(|error| DocError::Corrupted(format!("invalid table character cache: {error}")))
+            .map_err(|error| {
+                PackageError::Corrupted(format!("invalid table character cache: {error}"))
+            })
     }
 
     /// Strictly access the main and header textbox break tables.
@@ -347,7 +349,7 @@ impl Document {
     /// bits are producer caches and are never interpreted.
     pub fn textbox_break_tables(&self) -> Result<&TextBoxBreakTables> {
         self.textbox_breaks.as_ref().map_err(|error| {
-            DocError::Corrupted(format!("invalid textbox break metadata: {error}"))
+            PackageError::Corrupted(format!("invalid textbox break metadata: {error}"))
         })
     }
 
@@ -358,7 +360,7 @@ impl Document {
     /// opaque and are never interpreted.
     pub fn text_services_tables(&self) -> Result<&TextServicesTables> {
         self.text_services.as_ref().map_err(|error| {
-            DocError::Corrupted(format!("invalid text services metadata: {error}"))
+            PackageError::Corrupted(format!("invalid text services metadata: {error}"))
         })
     }
 
@@ -369,7 +371,7 @@ impl Document {
     pub fn saved_by_table(&self) -> Result<&SavedByTable> {
         self.saved_by_table
             .as_ref()
-            .map_err(|error| DocError::Corrupted(format!("invalid saved-by metadata: {error}")))
+            .map_err(|error| PackageError::Corrupted(format!("invalid saved-by metadata: {error}")))
     }
 
     /// Strictly access the caption label and AutoCaption tables.
@@ -380,7 +382,7 @@ impl Document {
     pub fn caption_tables(&self) -> Result<&CaptionTables> {
         self.caption_tables
             .as_ref()
-            .map_err(|error| DocError::Corrupted(format!("invalid caption metadata: {error}")))
+            .map_err(|error| PackageError::Corrupted(format!("invalid caption metadata: {error}")))
     }
 
     /// Strictly access the repair-bookmark tables recorded when Word repaired
@@ -394,7 +396,7 @@ impl Document {
             .as_ref()
             .map(Option::as_ref)
             .map_err(|error| {
-                DocError::Corrupted(format!("invalid repair bookmark metadata: {error}"))
+                PackageError::Corrupted(format!("invalid repair bookmark metadata: {error}"))
             })
     }
 
@@ -406,7 +408,7 @@ impl Document {
         self.glossary_metadata
             .as_ref()
             .map(Option::as_ref)
-            .map_err(|error| DocError::Corrupted(format!("invalid glossary metadata: {error}")))
+            .map_err(|error| PackageError::Corrupted(format!("invalid glossary metadata: {error}")))
     }
 
     /// Get one glossary entry's content without its structural final character.
@@ -435,7 +437,7 @@ impl Document {
         self.attached_glossary
             .as_ref()
             .map(Option::as_ref)
-            .map_err(|error| DocError::Corrupted(format!("invalid attached glossary: {error}")))
+            .map_err(|error| PackageError::Corrupted(format!("invalid attached glossary: {error}")))
     }
 
     /// Get access to the fields table (if parsed).
@@ -1436,20 +1438,20 @@ impl Document {
 
     fn field_story_text(&self, story: FieldStory, start: u32, end: u32) -> Result<String> {
         if start > end {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "field text range has its start after its end".to_string(),
             ));
         }
 
         let (story_start, story_end) = self.field_story_range(story)?;
-        let start = story_start
-            .checked_add(start)
-            .ok_or_else(|| DocError::Corrupted("field text range start overflows".to_string()))?;
+        let start = story_start.checked_add(start).ok_or_else(|| {
+            PackageError::Corrupted("field text range start overflows".to_string())
+        })?;
         let end = story_start
             .checked_add(end)
-            .ok_or_else(|| DocError::Corrupted("field text range end overflows".to_string()))?;
+            .ok_or_else(|| PackageError::Corrupted("field text range end overflows".to_string()))?;
         if end > story_end {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "field text range exceeds its document story".to_string(),
             ));
         }
@@ -1464,7 +1466,7 @@ impl Document {
     fn field_story_range(&self, story: FieldStory) -> Result<(u32, u32)> {
         let range = self.field_story_range_if_present(story);
         range.ok_or_else(|| {
-            DocError::Corrupted(format!(
+            PackageError::Corrupted(format!(
                 "field table refers to absent {} story",
                 match story {
                     FieldStory::Main => "main document",
@@ -1781,14 +1783,12 @@ impl Document {
     pub fn comments(&self) -> Result<Vec<Comment>> {
         let mut result = Vec::with_capacity(self.comments_table.count());
         for reference in self.comments_table.references() {
-            let reference_end = reference
-                .reference_cp
-                .checked_add(1)
-                .ok_or_else(|| DocError::Corrupted("comment reference CP overflows".to_string()))?;
-            let marker_end = reference
-                .marker_cp
-                .checked_add(1)
-                .ok_or_else(|| DocError::Corrupted("comment marker CP overflows".to_string()))?;
+            let reference_end = reference.reference_cp.checked_add(1).ok_or_else(|| {
+                PackageError::Corrupted("comment reference CP overflows".to_string())
+            })?;
+            let marker_end = reference.marker_cp.checked_add(1).ok_or_else(|| {
+                PackageError::Corrupted("comment marker CP overflows".to_string())
+            })?;
             if self
                 .text_extractor
                 .text_at_range(reference.reference_cp, reference_end)
@@ -1798,7 +1798,7 @@ impl Document {
                     .text_at_range(reference.marker_cp, marker_end)
                     != "\u{5}"
             {
-                return Err(DocError::Corrupted(
+                return Err(PackageError::Corrupted(
                     "comment reference or story does not begin with U+0005".to_string(),
                 ));
             }
@@ -1810,24 +1810,23 @@ impl Document {
                         .runs_in_range(reference.marker_cp, marker_end)
                         .any(|run| run.properties.is_spec))
             {
-                return Err(DocError::Corrupted(
+                return Err(PackageError::Corrupted(
                     "comment reference or story marker is missing sprmCFSpec".to_string(),
                 ));
             }
 
             let body_start = reference.marker_cp.checked_add(1).ok_or_else(|| {
-                DocError::Corrupted("comment body start CP overflows".to_string())
+                PackageError::Corrupted("comment body start CP overflows".to_string())
             })?;
-            let paragraph_mark_cp = reference
-                .text_end_cp
-                .checked_sub(1)
-                .ok_or_else(|| DocError::Corrupted("comment story range is empty".to_string()))?;
+            let paragraph_mark_cp = reference.text_end_cp.checked_sub(1).ok_or_else(|| {
+                PackageError::Corrupted("comment story range is empty".to_string())
+            })?;
             if self
                 .text_extractor
                 .text_at_range(paragraph_mark_cp, reference.text_end_cp)
                 != "\r"
             {
-                return Err(DocError::Corrupted(
+                return Err(PackageError::Corrupted(
                     "comment story does not end with a paragraph mark".to_string(),
                 ));
             }

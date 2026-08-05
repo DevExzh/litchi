@@ -7,7 +7,7 @@
 //! Both tables are metadata only: labels are never rendered and objects are
 //! never activated.
 
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 
 /// Table-pointer index of `fcSttbfCaption`/`lcbSttbfCaption` (MS-DOC 2.5.6 FibRgFcLcb97).
@@ -23,8 +23,8 @@ const MAX_LABEL_UNITS: usize = 40;
 /// Size cap mirroring the other STTB readers; far beyond any conforming table.
 const MAX_TABLE_BYTES: usize = 16 * 1024 * 1024;
 
-fn corrupted(message: impl Into<String>) -> DocError {
-    DocError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }
 
 fn read_u16(data: &[u8], offset: usize, field: &str) -> Result<u16> {

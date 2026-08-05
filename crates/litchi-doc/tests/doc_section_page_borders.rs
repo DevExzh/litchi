@@ -1,5 +1,5 @@
 use litchi_doc::{
-    ApplyTo, Art, Border, Borders, Color, Depth, DocWriter, Error, Offset, Package, Style,
+    ApplyTo, Art, Border, BorderError, Borders, Color, Depth, DocWriter, Offset, Package, Style,
 };
 use std::io::Cursor;
 
@@ -72,15 +72,18 @@ fn setter_is_atomic_and_rejects_out_of_range_spacing() {
         }),
         ..valid
     };
-    assert_eq!(invalid.validate().unwrap_err(), Error::InvalidSpacing(32));
+    assert_eq!(
+        invalid.validate().unwrap_err(),
+        BorderError::InvalidSpacing(32)
+    );
     assert!(writer.set_section_page_borders(invalid).is_err());
     assert_eq!(writer.section_page_borders(), Some(&valid));
 }
 
 #[test]
 fn art_codes_report_typed_validation_errors() {
-    assert_eq!(Art::try_from(0x3F), Err(Error::InvalidArt(0x3F)));
-    assert_eq!(Art::try_from(0xE4), Err(Error::InvalidArt(0xE4)));
+    assert_eq!(Art::try_from(0x3F), Err(BorderError::InvalidArt(0x3F)));
+    assert_eq!(Art::try_from(0xE4), Err(BorderError::InvalidArt(0xE4)));
 }
 
 #[test]

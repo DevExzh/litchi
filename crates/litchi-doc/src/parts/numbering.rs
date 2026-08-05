@@ -5,7 +5,7 @@
 /// - List Format Override (LFO) structures
 /// - List Format (LF) structures
 /// - List Level Format (LVL) structures
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 use litchi_core::binary;
 
@@ -379,18 +379,18 @@ impl ListLevel {
 
     fn parse_with_size(data: &[u8], level: u8) -> Result<(Self, usize)> {
         if data.len() < 28 {
-            return Err(DocError::InvalidFormat("LVLF too short".to_string()));
+            return Err(PackageError::InvalidFormat("LVLF too short".to_string()));
         }
         if level > 8 {
-            return Err(DocError::InvalidFormat(
+            return Err(PackageError::InvalidFormat(
                 "list level index exceeds 8".to_string(),
             ));
         }
 
         let start_at = binary::read_u32_le(data, 0)
-            .map_err(|e| DocError::InvalidFormat(format!("Failed to read start_at: {}", e)))?;
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read start_at: {}", e)))?;
         let number_format = NumberFormat::try_from(data[4]).map_err(|invalid| {
-            DocError::InvalidFormat(format!("LVLF has invalid MSONFC value {invalid:#04x}"))
+            PackageError::InvalidFormat(format!("LVLF has invalid MSONFC value {invalid:#04x}"))
         })?;
         if matches!(
             number_format,
@@ -399,7 +399,7 @@ impl ListLevel {
                 | NumberFormat::DecimalHalfWidth
                 | NumberFormat::DecimalFullWidth2
         ) {
-            return Err(DocError::InvalidFormat(format!(
+            return Err(PackageError::InvalidFormat(format!(
                 "LVLF forbids MSONFC value {:#04x}",
                 number_format as u8
             )));
@@ -408,46 +408,47 @@ impl ListLevel {
             && number_format != NumberFormat::None
             && start_at > 0x7FFF
         {
-            return Err(DocError::InvalidFormat(format!(
+            return Err(PackageError::InvalidFormat(format!(
                 "LVLF start value {start_at} exceeds 32767"
             )));
         }
         let alignment = ListAlignment::try_from(data[5] & 0x03).map_err(|invalid| {
-            DocError::InvalidFormat(format!("LVLF has invalid alignment {invalid}"))
+            PackageError::InvalidFormat(format!("LVLF has invalid alignment {invalid}"))
         })?;
         let follow_char = data[15];
         if follow_char > 2 {
-            return Err(DocError::InvalidFormat(format!(
+            return Err(PackageError::InvalidFormat(format!(
                 "LVLF has invalid follow character {follow_char}"
             )));
         }
-        let indent_left = binary::read_i32_le(data, 16)
-            .map_err(|e| DocError::InvalidFormat(format!("Failed to read indent_left: {}", e)))?;
+        let indent_left = binary::read_i32_le(data, 16).map_err(|e| {
+            PackageError::InvalidFormat(format!("Failed to read indent_left: {}", e))
+        })?;
         let cb_chpx = data[24] as usize;
         let cb_papx = data[25] as usize;
         let text_offset = 28usize
             .checked_add(cb_papx)
             .and_then(|offset| offset.checked_add(cb_chpx))
-            .ok_or_else(|| DocError::InvalidFormat("LVL size overflows".to_string()))?;
+            .ok_or_else(|| PackageError::InvalidFormat("LVL size overflows".to_string()))?;
         let cch_end = text_offset
             .checked_add(2)
-            .ok_or_else(|| DocError::InvalidFormat("LVL XST offset overflows".to_string()))?;
+            .ok_or_else(|| PackageError::InvalidFormat("LVL XST offset overflows".to_string()))?;
         if cch_end > data.len() {
-            return Err(DocError::InvalidFormat(
+            return Err(PackageError::InvalidFormat(
                 "LVL is missing its XST length".to_string(),
             ));
         }
         let text_len = binary::read_u16_le(data, text_offset)
-            .map_err(|e| DocError::InvalidFormat(format!("Failed to read XST length: {e}")))?
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read XST length: {e}")))?
             as usize;
         let text_bytes_len = text_len
             .checked_mul(2)
-            .ok_or_else(|| DocError::InvalidFormat("LVL XST size overflows".to_string()))?;
+            .ok_or_else(|| PackageError::InvalidFormat("LVL XST size overflows".to_string()))?;
         let total_size = cch_end
             .checked_add(text_bytes_len)
-            .ok_or_else(|| DocError::InvalidFormat("LVL size overflows".to_string()))?;
+            .ok_or_else(|| PackageError::InvalidFormat("LVL size overflows".to_string()))?;
         if total_size > data.len() {
-            return Err(DocError::InvalidFormat(
+            return Err(PackageError::InvalidFormat(
                 "LVL XST extends beyond the table stream".to_string(),
             ));
         }
@@ -511,13 +512,14 @@ impl ListStructure {
     /// Parse a list structure from LST
     pub fn from_bytes(data: &[u8]) -> Result<Self> {
         if data.len() < 28 {
-            return Err(DocError::InvalidFormat("LST too short".to_string()));
+            return Err(PackageError::InvalidFormat("LST too short".to_string()));
         }
 
         let list_id = binary::read_u32_le(data, 0)
-            .map_err(|e| DocError::InvalidFormat(format!("Failed to read list_id: {}", e)))?;
-        let template_id = binary::read_u32_le(data, 4)
-            .map_err(|e| DocError::InvalidFormat(format!("Failed to read template_id: {}", e)))?;
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read list_id: {}", e)))?;
+        let template_id = binary::read_u32_le(data, 4).map_err(|e| {
+            PackageError::InvalidFormat(format!("Failed to read template_id: {}", e))
+        })?;
 
         // Flags byte at offset 26
         let flags = data[26];
@@ -570,14 +572,14 @@ impl ListFormatOverride {
 
     fn from_bytes_with_id(data: &[u8], lfo_id: u32) -> Result<Self> {
         if data.len() < 16 {
-            return Err(DocError::InvalidFormat("LFO too short".to_string()));
+            return Err(PackageError::InvalidFormat("LFO too short".to_string()));
         }
 
         let list_id = binary::read_u32_le(data, 0)
-            .map_err(|e| DocError::InvalidFormat(format!("Failed to read list_id: {}", e)))?;
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read list_id: {}", e)))?;
         let override_count = data[12];
         if override_count > 9 {
-            return Err(DocError::InvalidFormat(
+            return Err(PackageError::InvalidFormat(
                 "LFO override count exceeds 9".to_string(),
             ));
         }
@@ -681,10 +683,10 @@ impl ListTables {
         {
             let offset = offset as usize;
             let header_end = offset.checked_add(length as usize).ok_or_else(|| {
-                DocError::InvalidFormat("PlfLst table range overflows".to_string())
+                PackageError::InvalidFormat("PlfLst table range overflows".to_string())
             })?;
             if header_end > table_stream.len() {
-                return Err(DocError::InvalidFormat(
+                return Err(PackageError::InvalidFormat(
                     "PlfLst header extends beyond the table stream".to_string(),
                 ));
             }
@@ -694,7 +696,7 @@ impl ListTables {
                 .filter(|&lfo_offset| lfo_offset >= header_end)
                 .unwrap_or(table_stream.len());
             if level_end > table_stream.len() {
-                return Err(DocError::InvalidFormat(
+                return Err(PackageError::InvalidFormat(
                     "PlfLst level range extends beyond the table stream".to_string(),
                 ));
             }
@@ -734,10 +736,11 @@ impl ListTables {
         let mut metadata = ListTablesMetadata::default();
         if let Some((offset, length)) = fib.get_table_pointer(73).filter(|(_, length)| *length > 0)
         {
-            let start = usize::try_from(offset)
-                .map_err(|_| DocError::InvalidFormat("PlfLst offset exceeds usize".to_string()))?;
+            let start = usize::try_from(offset).map_err(|_| {
+                PackageError::InvalidFormat("PlfLst offset exceeds usize".to_string())
+            })?;
             let header_end = start.checked_add(length as usize).ok_or_else(|| {
-                DocError::InvalidFormat("PlfLst metadata range overflows".to_string())
+                PackageError::InvalidFormat("PlfLst metadata range overflows".to_string())
             })?;
             let level_end = fib
                 .get_table_pointer(74)
@@ -745,10 +748,10 @@ impl ListTables {
                 .filter(|&offset| offset >= header_end)
                 .unwrap_or(table_stream.len());
             let header = table_stream.get(start..header_end).ok_or_else(|| {
-                DocError::InvalidFormat("PlfLst metadata header is truncated".to_string())
+                PackageError::InvalidFormat("PlfLst metadata header is truncated".to_string())
             })?;
             let levels = table_stream.get(header_end..level_end).ok_or_else(|| {
-                DocError::InvalidFormat("PlfLst metadata levels are truncated".to_string())
+                PackageError::InvalidFormat("PlfLst metadata levels are truncated".to_string())
             })?;
             let mut level_offset = 0usize;
             for (index, structure) in structures.iter().enumerate() {
@@ -759,7 +762,7 @@ impl ListTables {
                     definition.style_links[style] = match raw {
                         0x0FFF | 0xFFFF => None,
                         value => Some(ListStyleIndex::new(value).map_err(|invalid| {
-                            DocError::InvalidFormat(format!(
+                            PackageError::InvalidFormat(format!(
                                 "LSTF has invalid linked style index {invalid:#06x}"
                             ))
                         })?),
@@ -776,13 +779,15 @@ impl ListTables {
                 for level in &structure.levels {
                     let (parsed, size) = Self::parse_level_metadata(
                         levels.get(level_offset..).ok_or_else(|| {
-                            DocError::InvalidFormat("LVL metadata offset is invalid".to_string())
+                            PackageError::InvalidFormat(
+                                "LVL metadata offset is invalid".to_string(),
+                            )
                         })?,
                         level.level,
                         level.number_format,
                     )?;
                     level_offset = level_offset.checked_add(size).ok_or_else(|| {
-                        DocError::InvalidFormat("LVL metadata size overflows".to_string())
+                        PackageError::InvalidFormat("LVL metadata size overflows".to_string())
                     })?;
                     level_metadata.push(parsed);
                 }
@@ -796,24 +801,26 @@ impl ListTables {
             let data = table_stream
                 .get(start..start.saturating_add(length as usize))
                 .ok_or_else(|| {
-                    DocError::InvalidFormat("PlfLfo metadata is truncated".to_string())
+                    PackageError::InvalidFormat("PlfLfo metadata is truncated".to_string())
                 })?;
             let mut data_offset = 4usize
                 .checked_add(overrides.len().checked_mul(16).ok_or_else(|| {
-                    DocError::InvalidFormat("PlfLfo metadata count overflows".to_string())
+                    PackageError::InvalidFormat("PlfLfo metadata count overflows".to_string())
                 })?)
-                .ok_or_else(|| DocError::InvalidFormat("PlfLfo metadata overflows".to_string()))?;
+                .ok_or_else(|| {
+                    PackageError::InvalidFormat("PlfLfo metadata overflows".to_string())
+                })?;
             for (index, lfo) in overrides.iter().enumerate() {
                 let raw = &data[4 + index * 16..4 + (index + 1) * 16];
                 let first_cp = binary::read_u32_le(data, data_offset).map_err(|e| {
-                    DocError::InvalidFormat(format!("Failed to read LFOData CP: {e}"))
+                    PackageError::InvalidFormat(format!("Failed to read LFOData CP: {e}"))
                 })?;
                 data_offset += 4;
                 let mut parsed = ListFormatOverrideMetadata {
                     unused1: u32::from_le_bytes(raw[4..8].try_into().expect("LFO unused1")),
                     unused2: u32::from_le_bytes(raw[8..12].try_into().expect("LFO unused2")),
                     field: AutomaticNumberingField::try_from(raw[13]).map_err(|invalid| {
-                        DocError::InvalidFormat(format!(
+                        PackageError::InvalidFormat(format!(
                             "LFO has invalid automatic-number field {invalid:#04x}"
                         ))
                     })?,
@@ -824,7 +831,7 @@ impl ListTables {
                 };
                 for level_override in &lfo.level_overrides {
                     let flags = binary::read_u32_le(data, data_offset + 4).map_err(|e| {
-                        DocError::InvalidFormat(format!("Failed to read LFOLVL flags: {e}"))
+                        PackageError::InvalidFormat(format!("Failed to read LFOLVL flags: {e}"))
                     })?;
                     data_offset += 8;
                     let formatting = if let Some(level) = level_override.format.as_ref() {
@@ -841,7 +848,7 @@ impl ListTables {
                     parsed.levels.push(ListLevelOverrideMetadata {
                         unused_start_at: if flags & 0x10 == 0 {
                             binary::read_u32_le(data, data_offset - 8).map_err(|e| {
-                                DocError::InvalidFormat(format!(
+                                PackageError::InvalidFormat(format!(
                                     "Failed to read LFOLVL ignored start: {e}"
                                 ))
                             })?
@@ -867,7 +874,7 @@ impl ListTables {
         number_format: NumberFormat,
     ) -> Result<(ListLevelMetadata, usize)> {
         if data.len() < 30 {
-            return Err(DocError::InvalidFormat(
+            return Err(PackageError::InvalidFormat(
                 "LVL metadata is truncated".to_string(),
             ));
         }
@@ -877,30 +884,32 @@ impl ListTables {
         let text_offset = 28usize
             .checked_add(cb_papx)
             .and_then(|value| value.checked_add(cb_chpx))
-            .ok_or_else(|| DocError::InvalidFormat("LVL metadata size overflows".to_string()))?;
+            .ok_or_else(|| {
+                PackageError::InvalidFormat("LVL metadata size overflows".to_string())
+            })?;
         let text_len = usize::from(binary::read_u16_le(data, text_offset).map_err(|e| {
-            DocError::InvalidFormat(format!("Failed to read LVL metadata XST: {e}"))
+            PackageError::InvalidFormat(format!("Failed to read LVL metadata XST: {e}"))
         })?);
         let total = text_offset
             .checked_add(2)
             .and_then(|value| value.checked_add(text_len.checked_mul(2)?))
-            .ok_or_else(|| DocError::InvalidFormat("LVL metadata XST overflows".to_string()))?;
+            .ok_or_else(|| PackageError::InvalidFormat("LVL metadata XST overflows".to_string()))?;
         if total > data.len() {
-            return Err(DocError::InvalidFormat(
+            return Err(PackageError::InvalidFormat(
                 "LVL metadata XST is truncated".to_string(),
             ));
         }
         let placeholders: [u8; 9] = data[6..15].try_into().expect("LVLF placeholders");
         for position in placeholders.into_iter().filter(|position| *position != 0) {
             if usize::from(position) > text_len {
-                return Err(DocError::InvalidFormat(format!(
+                return Err(PackageError::InvalidFormat(format!(
                     "LVLF placeholder position {position} exceeds XST length {text_len}"
                 )));
             }
             let offset = text_offset + 2 + (usize::from(position) - 1) * 2;
             let placeholder = u16::from_le_bytes([data[offset], data[offset + 1]]);
             if placeholder > u16::from(level) {
-                return Err(DocError::InvalidFormat(format!(
+                return Err(PackageError::InvalidFormat(format!(
                     "LVL placeholder level {placeholder} exceeds level {level}"
                 )));
             }
@@ -908,14 +917,14 @@ impl ListTables {
         if number_format == NumberFormat::Bullet
             && (text_len != 1 || placeholders.iter().any(|position| *position != 0))
         {
-            return Err(DocError::InvalidFormat(
+            return Err(PackageError::InvalidFormat(
                 "bullet LVL must contain one character and no placeholders".to_string(),
             ));
         }
         let no_restart = flags & 0x08 != 0;
         let restart = data[26];
         if no_restart && restart > level {
-            return Err(DocError::InvalidFormat(format!(
+            return Err(PackageError::InvalidFormat(format!(
                 "LVLF restart limit {restart} exceeds level {level}"
             )));
         }
@@ -936,7 +945,9 @@ impl ListTables {
                 ignored_flags: flags & 0x40,
                 placeholder_positions: placeholders,
                 follow_character: ListFollowCharacter::try_from(data[15]).map_err(|invalid| {
-                    DocError::InvalidFormat(format!("LVLF has invalid follow character {invalid}"))
+                    PackageError::InvalidFormat(format!(
+                        "LVLF has invalid follow character {invalid}"
+                    ))
                 })?,
                 unused_value: u32::from_le_bytes(data[20..24].try_into().expect("LVLF unused2")),
                 restart_limit: no_restart.then_some(restart),
@@ -952,19 +963,21 @@ impl ListTables {
     /// Parse PlfLst (List Table)
     fn parse_plflst(header_data: &[u8], level_data: &[u8]) -> Result<Vec<ListStructure>> {
         if header_data.len() < 2 {
-            return Err(DocError::InvalidFormat("PlfLst is too short".to_string()));
+            return Err(PackageError::InvalidFormat(
+                "PlfLst is too short".to_string(),
+            ));
         }
 
         let count = binary::read_u16_le(header_data, 0)
-            .map_err(|e| DocError::InvalidFormat(format!("Failed to read count: {}", e)))?
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read count: {}", e)))?
             as usize;
         let expected_header_len = 2usize
             .checked_add(count.checked_mul(28).ok_or_else(|| {
-                DocError::InvalidFormat("PlfLst structure count overflows".to_string())
+                PackageError::InvalidFormat("PlfLst structure count overflows".to_string())
             })?)
-            .ok_or_else(|| DocError::InvalidFormat("PlfLst size overflows".to_string()))?;
+            .ok_or_else(|| PackageError::InvalidFormat("PlfLst size overflows".to_string()))?;
         if header_data.len() != expected_header_len {
-            return Err(DocError::InvalidFormat(format!(
+            return Err(PackageError::InvalidFormat(format!(
                 "PlfLst header length is {}, expected {expected_header_len}",
                 header_data.len()
             )));
@@ -985,12 +998,12 @@ impl ListTables {
             for level in 0..level_count {
                 let (parsed, size) = ListLevel::parse_with_size(
                     level_data.get(level_offset..).ok_or_else(|| {
-                        DocError::InvalidFormat("PlfLst LVL offset is invalid".to_string())
+                        PackageError::InvalidFormat("PlfLst LVL offset is invalid".to_string())
                     })?,
                     level as u8,
                 )?;
                 level_offset = level_offset.checked_add(size).ok_or_else(|| {
-                    DocError::InvalidFormat("PlfLst LVL size overflows".to_string())
+                    PackageError::InvalidFormat("PlfLst LVL size overflows".to_string())
                 })?;
                 structure.levels.push(parsed);
             }
@@ -1006,17 +1019,17 @@ impl ListTables {
         }
 
         let count = binary::read_u32_le(data, 0)
-            .map_err(|e| DocError::InvalidFormat(format!("Failed to read count: {}", e)))?
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read count: {}", e)))?
             as usize;
         let mut overrides = Vec::with_capacity(count);
         let lfo_bytes = count
             .checked_mul(16)
-            .ok_or_else(|| DocError::InvalidFormat("PlfLfo count overflows".to_string()))?;
+            .ok_or_else(|| PackageError::InvalidFormat("PlfLfo count overflows".to_string()))?;
         let lfo_data_start = 4usize
             .checked_add(lfo_bytes)
-            .ok_or_else(|| DocError::InvalidFormat("PlfLfo size overflows".to_string()))?;
+            .ok_or_else(|| PackageError::InvalidFormat("PlfLfo size overflows".to_string()))?;
         if lfo_data_start > data.len() {
-            return Err(DocError::InvalidFormat(
+            return Err(PackageError::InvalidFormat(
                 "PlfLfo LFO array is truncated".to_string(),
             ));
         }
@@ -1025,8 +1038,9 @@ impl ListTables {
         for index in 0..count {
             overrides.push(ListFormatOverride::from_bytes_with_id(
                 &data[offset..offset + 16],
-                u32::try_from(index + 1)
-                    .map_err(|_| DocError::InvalidFormat("PlfLfo index exceeds u32".to_string()))?,
+                u32::try_from(index + 1).map_err(|_| {
+                    PackageError::InvalidFormat("PlfLfo index exceeds u32".to_string())
+                })?,
             )?);
             offset += 16;
         }
@@ -1043,30 +1057,32 @@ impl ListTables {
         let mut data_offset = lfo_data_start;
         for lfo in &mut overrides {
             data_offset = data_offset.checked_add(4).ok_or_else(|| {
-                DocError::InvalidFormat("PlfLfo LFOData size overflows".to_string())
+                PackageError::InvalidFormat("PlfLfo LFOData size overflows".to_string())
             })?;
             if data_offset > data.len() {
-                return Err(DocError::InvalidFormat(
+                return Err(PackageError::InvalidFormat(
                     "PlfLfo LFOData array is truncated".to_string(),
                 ));
             }
             for _ in 0..lfo.override_count {
-                let base_end = data_offset
-                    .checked_add(8)
-                    .ok_or_else(|| DocError::InvalidFormat("LFOLVL size overflows".to_string()))?;
+                let base_end = data_offset.checked_add(8).ok_or_else(|| {
+                    PackageError::InvalidFormat("LFOLVL size overflows".to_string())
+                })?;
                 if base_end > data.len() {
-                    return Err(DocError::InvalidFormat("LFOLVL is truncated".to_string()));
+                    return Err(PackageError::InvalidFormat(
+                        "LFOLVL is truncated".to_string(),
+                    ));
                 }
                 let start_at = binary::read_u32_le(data, data_offset).map_err(|e| {
-                    DocError::InvalidFormat(format!("Failed to read LFOLVL iStartAt: {e}"))
+                    PackageError::InvalidFormat(format!("Failed to read LFOLVL iStartAt: {e}"))
                 })?;
                 let flags = binary::read_u32_le(data, data_offset + 4).map_err(|e| {
-                    DocError::InvalidFormat(format!("Failed to read LFOLVL flags: {e}"))
+                    PackageError::InvalidFormat(format!("Failed to read LFOLVL flags: {e}"))
                 })?;
                 data_offset = base_end;
                 let level = (flags & LFOLVL_ILVL_MASK) as u8;
                 if level > 8 {
-                    return Err(DocError::InvalidFormat(format!(
+                    return Err(PackageError::InvalidFormat(format!(
                         "LFOLVL has invalid iLvl {level}"
                     )));
                 }
@@ -1080,13 +1096,13 @@ impl ListTables {
                 if overrides_formatting {
                     let (parsed, size) = ListLevel::parse_with_size(&data[data_offset..], level)?;
                     data_offset = data_offset.checked_add(size).ok_or_else(|| {
-                        DocError::InvalidFormat("LFOLVL formatting size overflows".to_string())
+                        PackageError::InvalidFormat("LFOLVL formatting size overflows".to_string())
                     })?;
                     level_override.format = Some(parsed);
                 } else if overrides_start_at {
                     // iStartAt is only meaningful when fFormatting is clear.
                     if start_at > LFOLVL_MAX_START_AT {
-                        return Err(DocError::InvalidFormat(format!(
+                        return Err(PackageError::InvalidFormat(format!(
                             "LFOLVL start value {start_at} exceeds 32767"
                         )));
                     }
@@ -1096,7 +1112,7 @@ impl ListTables {
             }
         }
         if data_offset != data.len() {
-            return Err(DocError::InvalidFormat(format!(
+            return Err(PackageError::InvalidFormat(format!(
                 "PlfLfo has {} trailing bytes",
                 data.len() - data_offset
             )));

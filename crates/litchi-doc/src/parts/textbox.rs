@@ -5,7 +5,7 @@
 //! are FTXBXS structures ([MS-DOC] 2.9.106); the last one is a reusable spare
 //! and carries no shape.
 
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 
 /// Size of one FTXBXS structure in bytes.
 pub const FTXBXS_LEN: usize = 22;
@@ -50,7 +50,7 @@ pub fn parse_plcf_txbx_txt(data: &[u8]) -> Result<Vec<TextBoxEntry>> {
     // Standard PLC: n+1 CPs, n FTXBXS structures of FTXBXS_LEN bytes.
     let stride = 4 + FTXBXS_LEN;
     if data.len() < 4 || !(data.len() - 4).is_multiple_of(stride) {
-        return Err(DocError::InvalidFormat(
+        return Err(PackageError::InvalidFormat(
             "Invalid PlcftxbxTxt length".to_string(),
         ));
     }

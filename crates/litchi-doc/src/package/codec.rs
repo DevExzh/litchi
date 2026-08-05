@@ -1,4 +1,4 @@
-use super::model::{DocError, DocOpenOptions, Package, Result};
+use super::model::{Error, OpenOptions, Package, Result};
 use crate::document::Document;
 use litchi_cfb::{OleError, OleFile};
 use litchi_ole_common::property_set::{
@@ -51,7 +51,7 @@ impl<R: Read + Seek> Package<R> {
 
         // Verify it's a Word document by checking for the WordDocument stream
         if !ole.exists(&["WordDocument"]) {
-            return Err(DocError::InvalidFormat(
+            return Err(Error::InvalidFormat(
                 "Not a valid Word document: WordDocument stream not found".to_string(),
             ));
         }
@@ -83,7 +83,7 @@ impl<R: Read + Seek> Package<R> {
     pub fn from_ole_file(ole: OleFile<R>) -> Result<Self> {
         // Verify it's a Word document by checking for the WordDocument stream
         if !ole.exists(&["WordDocument"]) {
-            return Err(DocError::InvalidFormat(
+            return Err(Error::InvalidFormat(
                 "Not a valid Word document: WordDocument stream not found".to_string(),
             ));
         }
@@ -110,7 +110,7 @@ impl<R: Read + Seek> Package<R> {
     }
 
     /// Get the main document using explicit password-to-open options.
-    pub fn document_with_options(&mut self, options: DocOpenOptions<'_>) -> Result<Document> {
+    pub fn document_with_options(&mut self, options: OpenOptions<'_>) -> Result<Document> {
         Document::from_ole_with_options(&mut self.ole, options)
     }
 

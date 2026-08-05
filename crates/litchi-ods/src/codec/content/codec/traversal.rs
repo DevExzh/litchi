@@ -1,8 +1,8 @@
-//! Streaming XML codec for ODS `content.xml`.
+//! Namespace-aware streaming traversal of ODS `content.xml`.
 
-use super::model::{CellBuilder, RowBuilder, SheetBuilder};
+use super::super::model::{CellBuilder, RowBuilder, SheetBuilder};
 
-use super::super::{
+use super::super::super::{
     Cell, CellDetective, CellMatrixSpan, CellMerge, CellRangeSource, CellTextContent, CellValue,
     ColorTransformationType, Column, ConditionalColorScale, ConditionalColorScaleEntry,
     ConditionalCustomIcon, ConditionalDataBar, ConditionalDataBarEntry, ConditionalDateIs,
@@ -673,7 +673,7 @@ impl Parser {
                                 reader.decoder(),
                                 &document_namespaces,
                             )?;
-                            sheet.column_structure.begin_group(display)?;
+                            sheet.begin_column_group(display)?;
                         }
                     } else if current_row.is_none()
                         && Self::element_name_is(
@@ -684,7 +684,7 @@ impl Parser {
                         )
                     {
                         if let Some(sheet) = current_sheet.as_mut() {
-                            sheet.column_structure.begin_header(sheet.columns.len())?;
+                            sheet.begin_column_header()?;
                         }
                     } else if current_row.is_none()
                         && Self::element_name_is(
@@ -761,7 +761,7 @@ impl Parser {
                         let mut cell_builder =
                             Self::parse_cell_attributes(e, reader.decoder(), &document_namespaces)?;
                         if covered {
-                            cell_builder.merge = CellMerge::Covered;
+                            cell_builder.mark_covered();
                         }
                         current_cell = Some(cell_builder);
                         text_content.clear();
@@ -781,12 +781,7 @@ impl Parser {
                             reader.decoder(),
                             &document_namespaces,
                         )?;
-                        if cell.range_source.replace(source).is_some() {
-                            return Err(Error::InvalidFormat(
-                                "table cell contains multiple table:cell-range-source elements"
-                                    .to_string(),
-                            ));
-                        }
+                        cell.set_range_source(source)?;
                     } else if let Some(cell) = current_cell.as_mut()
                         && Self::element_name_is(
                             e.name().as_ref(),
@@ -795,11 +790,7 @@ impl Parser {
                             "detective",
                         )
                     {
-                        if cell.detective.is_some() {
-                            return Err(Error::InvalidFormat(
-                                "table cell contains multiple table:detective elements".to_string(),
-                            ));
-                        }
+                        cell.begin_detective()?;
                         detective_builder = Some(CellDetective::new());
                     } else if current_cell.is_some()
                         && Self::element_name_is(
@@ -1183,7 +1174,7 @@ impl Parser {
                             Builder::new(e, reader.decoder(), document_namespaces.clone())?
                                 .finish()?;
                         if let Some(cell) = current_cell.as_mut() {
-                            cell.annotation = Some(annotation);
+                            cell.set_annotation(annotation);
                         }
                     } else if text_element_depth > 0 {
                         rich_text_builder
@@ -1207,7 +1198,7 @@ impl Parser {
                             let position = text_content.len();
                             link.set_range(position..position);
                             if let Some(cell) = current_cell.as_mut() {
-                                cell.hyperlinks.push(link);
+                                cell.push_hyperlink(link);
                             }
                         } else {
                             Self::push_text_empty_element(
@@ -1245,12 +1236,7 @@ impl Parser {
                             reader.decoder(),
                             &document_namespaces,
                         )?;
-                        if cell.range_source.replace(source).is_some() {
-                            return Err(Error::InvalidFormat(
-                                "table cell contains multiple table:cell-range-source elements"
-                                    .to_string(),
-                            ));
-                        }
+                        cell.set_range_source(source)?;
                     } else if let Some(cell) = current_cell.as_mut()
                         && Self::element_name_is(
                             e.name().as_ref(),
@@ -1259,11 +1245,7 @@ impl Parser {
                             "detective",
                         )
                     {
-                        if cell.detective.replace(CellDetective::new()).is_some() {
-                            return Err(Error::InvalidFormat(
-                                "table cell contains multiple table:detective elements".to_string(),
-                            ));
-                        }
+                        cell.set_detective(CellDetective::new())?;
                     } else if current_sheet.is_some()
                         && current_row.is_none()
                         && Self::element_name_is(
@@ -1372,7 +1354,7 @@ impl Parser {
                         let mut cell_builder =
                             Self::parse_cell_attributes(e, reader.decoder(), &document_namespaces)?;
                         if covered {
-                            cell_builder.merge = CellMerge::Covered;
+                            cell_builder.mark_covered();
                         }
                         if let Some(row) = current_row.as_mut() {
                             row.add_repeated_cells(&cell_builder, "", None)?;
@@ -1387,7 +1369,7 @@ impl Parser {
                     {
                         let row_builder =
                             RowBuilder::from_element(e, reader.decoder(), &document_namespaces)?;
-                        let repeated = row_builder.repeated;
+                        let repeated = row_builder.repeated();
                         if let Some(sheet) = current_sheet.as_mut() {
                             sheet.add_repeated_row(row_builder.build(), repeated)?;
                         }
@@ -1699,12 +1681,7 @@ impl Parser {
                                     "table:detective must be contained in a table cell".to_string(),
                                 )
                             })?;
-                            if cell.detective.replace(detective).is_some() {
-                                return Err(Error::InvalidFormat(
-                                    "table cell contains multiple table:detective elements"
-                                        .to_string(),
-                                ));
-                            }
+                            cell.set_detective(detective)?;
                         }
                         Self::pop_namespace_scope(&mut document_namespaces, namespace_scopes.pop());
                         buf.clear();
@@ -1718,7 +1695,7 @@ impl Parser {
                                 .expect("annotation builder was checked")
                                 .finish()?;
                             if let Some(cell) = current_cell.as_mut() {
-                                cell.annotation = Some(annotation);
+                                cell.set_annotation(annotation);
                             }
                         } else {
                             annotation_builder
@@ -1752,7 +1729,7 @@ impl Parser {
                                 .to_string();
                             link.set_range(range);
                             if let Some(cell) = current_cell.as_mut() {
-                                cell.hyperlinks.push(link);
+                                cell.push_hyperlink(link);
                             }
                         }
                         text_element_depth -= 1;
@@ -1808,7 +1785,7 @@ impl Parser {
                         "table-row",
                     ) {
                         if let Some(row_builder) = current_row.take() {
-                            let repeated = row_builder.repeated;
+                            let repeated = row_builder.repeated();
                             let row = row_builder.build();
                             if let Some(ref mut sheet_builder) = current_sheet {
                                 sheet_builder.add_repeated_row(row, repeated)?;
@@ -1821,7 +1798,7 @@ impl Parser {
                         "table-column-group",
                     ) {
                         if let Some(sheet) = current_sheet.as_mut() {
-                            sheet.column_structure.end_group()?;
+                            sheet.end_column_group()?;
                         }
                     } else if Self::element_name_is(
                         e.name().as_ref(),
@@ -1830,7 +1807,7 @@ impl Parser {
                         "table-header-columns",
                     ) {
                         if let Some(sheet) = current_sheet.as_mut() {
-                            sheet.column_structure.end_header(sheet.columns.len())?;
+                            sheet.end_column_header()?;
                         }
                     } else if Self::element_name_is(
                         e.name().as_ref(),
@@ -1885,51 +1862,7 @@ impl Parser {
             ));
         }
 
-        let images = crate::media::scan_content_images(xml_content)?;
-        let mut sheet_indices = std::collections::HashMap::with_capacity(sheets.len());
-        for (index, sheet) in sheets.iter().enumerate() {
-            if sheet_indices.insert(sheet.name.clone(), index).is_some() {
-                return Err(Error::InvalidFormat(format!(
-                    "duplicate table name '{}' prevents sheet-image association",
-                    sheet.name
-                )));
-            }
-        }
-        for image in images {
-            let Some(frame) = image.frame.as_ref().filter(|frame| frame.sheet_shape) else {
-                continue;
-            };
-            let sheet_name = frame.sheet_name.as_deref().ok_or_else(|| {
-                Error::InvalidFormat("sheet image has no containing table name".to_string())
-            })?;
-            let index = *sheet_indices.get(sheet_name).ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "sheet image references unknown table '{sheet_name}'"
-                ))
-            })?;
-            super::super::sheet_image::validate_sheet_image(&image)?;
-            sheets[index].images.push(image);
-        }
-        for sheet in &sheets {
-            super::super::sheet_image::validate_sheet_images(&sheet.images)?;
-        }
-
-        let shape_tables = crate::odp::OdpParser::parse_sheet_shape_tables(xml_content)?;
-        if shape_tables.len() != sheets.len() {
-            return Err(Error::InvalidFormat(format!(
-                "spreadsheet table structure changed during shape parsing: {} shape container(s) for {} table(s)",
-                shape_tables.len(),
-                sheets.len()
-            )));
-        }
-        for (sheet, shapes) in sheets.iter_mut().zip(shape_tables) {
-            for shape in shapes {
-                if let Some(sheet_shape) = super::super::shape::sheet_shape_from_parsed(shape)? {
-                    sheet.shapes.push(sheet_shape);
-                }
-            }
-            super::super::shape::validate_sheet_shapes(&sheet.shapes)?;
-        }
+        super::super::package::attach_content_assets(xml_content, &mut sheets)?;
         Ok(sheets)
     }
 
@@ -3104,14 +3037,14 @@ impl Parser {
             }
         }
 
-        Ok(CellBuilder {
+        Ok(CellBuilder::from_parts(
             value_type,
             value_str,
             currency,
             formula,
             validation_name,
             style_name,
-            matrix_span: if matrix_row_span.is_some() || matrix_column_span.is_some() {
+            if matrix_row_span.is_some() || matrix_column_span.is_some() {
                 Some(CellMatrixSpan::new(
                     matrix_row_span.unwrap_or(1),
                     matrix_column_span.unwrap_or(1),
@@ -3122,7 +3055,7 @@ impl Parser {
             protect,
             protected,
             repeated,
-            merge: if row_span == 1 && column_span == 1 {
+            if row_span == 1 && column_span == 1 {
                 CellMerge::None
             } else {
                 CellMerge::Span {
@@ -3131,11 +3064,7 @@ impl Parser {
                         .expect("positive column span was checked"),
                 }
             },
-            annotation: None,
-            hyperlinks: Vec::new(),
-            range_source: None,
-            detective: None,
-        })
+        ))
     }
 
     fn parse_bool_attribute(
@@ -3832,14 +3761,11 @@ impl RowBuilder {
             Parser::parse_repeated(element, decoder, namespaces, "number-rows-repeated")?;
         let (style_name, default_cell_style_name, visibility) =
             Parser::parse_structural_attributes(element, decoder, namespaces)?;
-        Ok(Self {
-            cells: Vec::new(),
+        Ok(Self::from_parts(
             repeated,
             style_name,
             default_cell_style_name,
             visibility,
-            deferred_blank_cells: 0,
-            deferred_blank_cell: None,
-        })
+        ))
     }
 }

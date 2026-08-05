@@ -1,4 +1,4 @@
-use litchi_doc::{DocEncryptionProfile, DocOpenOptions, DocWriter, Package};
+use litchi_doc::{DocEncryptionProfile, DocWriter, OpenOptions, Package};
 use litchi_vba::{
     Limits,
     build::{Module, Project},
@@ -74,7 +74,7 @@ fn project_storage_remains_clear_when_document_streams_are_encrypted() {
     assert_eq!(project.modules()[0].name(), "Module1");
 
     let document = package
-        .document_with_options(DocOpenOptions {
+        .document_with_options(OpenOptions {
             password: Some("secret"),
             ..Default::default()
         })

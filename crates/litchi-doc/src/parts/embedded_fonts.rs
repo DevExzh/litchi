@@ -4,7 +4,7 @@
 //! as inert metadata: the font data itself stays in the `WordDocument` stream
 //! and is never loaded, installed, or executed.
 
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 
 /// Table-pointer index of `fcSttbTtmbd`/`lcbSttbTtmbd`.
@@ -22,8 +22,8 @@ const WHOLE_FONT: u32 = 0xFFFF_FFFF;
 /// Largest possible table: a full `u16` `brgbst` plus 64 `Ttmbd` elements.
 const MAX_TABLE_BYTES: usize = u16::MAX as usize + MAX_EMBEDDED_FONTS * TTMBD_LEN;
 
-fn corrupted(message: impl Into<String>) -> DocError {
-    DocError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }
 
 fn read_u16(data: &[u8], offset: usize, field: &str) -> Result<u16> {

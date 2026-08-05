@@ -3,7 +3,7 @@
 use super::fib::FileInformationBlock;
 use super::numbering::NumberFormat;
 use super::revisions::RevisionAuthorTable;
-use crate::package::{DocError, Result};
+use crate::package::{Error as PackageError, Result};
 use crate::revision::{SectionRevisionMark, decode_dttm};
 use crate::section::borders::{self, Borders};
 use crate::section::columns::{Column, Layout};
@@ -40,14 +40,14 @@ impl SectionsTable {
             return Ok(Self::default());
         }
         let start = usize::try_from(offset)
-            .map_err(|_| DocError::Corrupted("PlcfSed offset is too large".to_string()))?;
+            .map_err(|_| PackageError::Corrupted("PlcfSed offset is too large".to_string()))?;
         let length = usize::try_from(length)
-            .map_err(|_| DocError::Corrupted("PlcfSed length is too large".to_string()))?;
+            .map_err(|_| PackageError::Corrupted("PlcfSed length is too large".to_string()))?;
         let end = start
             .checked_add(length)
-            .ok_or_else(|| DocError::Corrupted("PlcfSed range overflows".to_string()))?;
+            .ok_or_else(|| PackageError::Corrupted("PlcfSed range overflows".to_string()))?;
         let data = table_stream.get(start..end).ok_or_else(|| {
-            DocError::Corrupted("PlcfSed extends beyond the table stream".to_string())
+            PackageError::Corrupted("PlcfSed extends beyond the table stream".to_string())
         })?;
         Self::parse_data(data, word_document, authors)
     }
@@ -58,20 +58,20 @@ impl SectionsTable {
         authors: &RevisionAuthorTable,
     ) -> Result<Self> {
         if data.len() < 20 || !(data.len() - 4).is_multiple_of(16) {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "PlcfSed does not contain complete CP and SED arrays".to_string(),
             ));
         }
         let section_count = (data.len() - 4) / 16;
         let sed_offset = (section_count + 1)
             .checked_mul(4)
-            .ok_or_else(|| DocError::Corrupted("PlcfSed SED offset overflows".to_string()))?;
+            .ok_or_else(|| PackageError::Corrupted("PlcfSed SED offset overflows".to_string()))?;
         let mut cps = Vec::with_capacity(section_count + 1);
         for index in 0..=section_count {
             cps.push(read_u32(data, index * 4, "PlcfSed CP")?);
         }
         if cps.windows(2).any(|pair| pair[0] >= pair[1]) {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "PlcfSed character positions must be strictly increasing".to_string(),
             ));
         }
@@ -81,10 +81,10 @@ impl SectionsTable {
         for index in 0..section_count {
             let record_offset = sed_offset
                 .checked_add(index.checked_mul(12).ok_or_else(|| {
-                    DocError::Corrupted("PlcfSed record offset overflows".to_string())
+                    PackageError::Corrupted("PlcfSed record offset overflows".to_string())
                 })?)
                 .ok_or_else(|| {
-                    DocError::Corrupted("PlcfSed record offset overflows".to_string())
+                    PackageError::Corrupted("PlcfSed record offset overflows".to_string())
                 })?;
             let fc_sepx = read_i32(data, record_offset + 2, "Sed.fcSepx")?;
             let mut properties = Properties::default();
@@ -92,35 +92,35 @@ impl SectionsTable {
 
             if fc_sepx != -1 {
                 if fc_sepx < 0 {
-                    return Err(DocError::Corrupted(
+                    return Err(PackageError::Corrupted(
                         "Sed.fcSepx contains an invalid negative offset".to_string(),
                     ));
                 }
                 let sepx_offset = usize::try_from(fc_sepx)
-                    .map_err(|_| DocError::Corrupted("Sed.fcSepx is too large".to_string()))?;
-                let size_end = sepx_offset
-                    .checked_add(2)
-                    .ok_or_else(|| DocError::Corrupted("SEPX size range overflows".to_string()))?;
+                    .map_err(|_| PackageError::Corrupted("Sed.fcSepx is too large".to_string()))?;
+                let size_end = sepx_offset.checked_add(2).ok_or_else(|| {
+                    PackageError::Corrupted("SEPX size range overflows".to_string())
+                })?;
                 let size_bytes = word_document.get(sepx_offset..size_end).ok_or_else(|| {
-                    DocError::Corrupted("SEPX size extends beyond WordDocument".to_string())
+                    PackageError::Corrupted("SEPX size extends beyond WordDocument".to_string())
                 })?;
                 let grpprl_len = i16::from_le_bytes([size_bytes[0], size_bytes[1]]);
                 if grpprl_len < 0 {
-                    return Err(DocError::Corrupted(
+                    return Err(PackageError::Corrupted(
                         "SEPX contains a negative grpprl size".to_string(),
                     ));
                 }
                 let grpprl_len = usize::from(grpprl_len as u16);
                 let grpprl_end = size_end
                     .checked_add(grpprl_len)
-                    .ok_or_else(|| DocError::Corrupted("SEPX range overflows".to_string()))?;
+                    .ok_or_else(|| PackageError::Corrupted("SEPX range overflows".to_string()))?;
                 let grpprl = word_document.get(size_end..grpprl_end).ok_or_else(|| {
-                    DocError::Corrupted("SEPX extends beyond WordDocument".to_string())
+                    PackageError::Corrupted("SEPX extends beyond WordDocument".to_string())
                 })?;
                 let sprms = parse_sprms(grpprl)?;
                 let consumed = sprms.last().map_or(0, |sprm| sprm.offset + sprm.size);
                 if consumed != grpprl.len() {
-                    return Err(DocError::Corrupted(
+                    return Err(PackageError::Corrupted(
                         "SEPX does not contain a whole number of SPRMs".to_string(),
                     ));
                 }
@@ -505,7 +505,7 @@ impl Properties {
                 self.column_spacing_twips,
                 self.line_between,
             )
-            .map_err(|error| DocError::Corrupted(error.to_string()))?
+            .map_err(|error| PackageError::Corrupted(error.to_string()))?
         } else {
             let count = usize::from(self.column_count);
             if self.column_widths[count..].iter().any(Option::is_some)
@@ -520,13 +520,13 @@ impl Properties {
             let mut columns = Vec::with_capacity(count);
             for index in 0..count {
                 let width_twips = self.column_widths[index].ok_or_else(|| {
-                    DocError::Corrupted(format!(
+                    PackageError::Corrupted(format!(
                         "unequal column {index} is missing sprmSDxaColWidth"
                     ))
                 })?;
                 let spacing_after_twips = if index + 1 < count {
                     Some(self.column_spacings[index].ok_or_else(|| {
-                        DocError::Corrupted(format!(
+                        PackageError::Corrupted(format!(
                             "unequal column {index} is missing sprmSDxaColSpacing"
                         ))
                     })?)
@@ -535,11 +535,11 @@ impl Properties {
                 };
                 columns.push(
                     Column::from_parts(index, width_twips, spacing_after_twips)
-                        .map_err(|error| DocError::Corrupted(error.to_string()))?,
+                        .map_err(|error| PackageError::Corrupted(error.to_string()))?,
                 );
             }
             Layout::unequal(columns, self.line_between)
-                .map_err(|error| DocError::Corrupted(error.to_string()))?
+                .map_err(|error| PackageError::Corrupted(error.to_string()))?
         };
         Ok(DocSection {
             start_cp,
@@ -574,10 +574,12 @@ fn parse_revision(
         1 => {
             let signed_author = i16::from_le_bytes([operand[1], operand[2]]);
             let author_index = u16::try_from(signed_author).map_err(|_| {
-                DocError::Corrupted("sprmSPropRMark author index is negative".to_string())
+                PackageError::Corrupted("sprmSPropRMark author index is negative".to_string())
             })?;
             let author = authors.get(author_index).ok_or_else(|| {
-                DocError::Corrupted("sprmSPropRMark author index is outside SttbfRMark".to_string())
+                PackageError::Corrupted(
+                    "sprmSPropRMark author index is outside SttbfRMark".to_string(),
+                )
             })?;
             let timestamp = u32::from_le_bytes(operand[3..7].try_into().unwrap());
             Ok(Some(SectionRevisionMark {
@@ -624,16 +626,16 @@ fn dword_operand(sprm: &Sprm, name: &str) -> Result<u32> {
 fn number_format8(sprm: &Sprm, name: &str) -> Result<NumberFormat> {
     let raw = byte_operand(sprm, name)?;
     NumberFormat::try_from(raw)
-        .map_err(|_| DocError::Corrupted(format!("{name} contains unknown MSONFC {raw:#04x}")))
+        .map_err(|_| PackageError::Corrupted(format!("{name} contains unknown MSONFC {raw:#04x}")))
 }
 
 fn number_format16(sprm: &Sprm, name: &str) -> Result<NumberFormat> {
     let raw = word_operand(sprm, name)?;
     let value = u8::try_from(raw).map_err(|_| {
-        DocError::Corrupted(format!("{name} contains invalid 16-bit MSONFC {raw:#06x}"))
+        PackageError::Corrupted(format!("{name} contains invalid 16-bit MSONFC {raw:#06x}"))
     })?;
     NumberFormat::try_from(value)
-        .map_err(|_| DocError::Corrupted(format!("{name} contains unknown MSONFC {raw:#04x}")))
+        .map_err(|_| PackageError::Corrupted(format!("{name} contains unknown MSONFC {raw:#04x}")))
 }
 
 fn note_restart(sprm: &Sprm, name: &str, allow_each_page: bool) -> Result<NoteNumberRestart> {
@@ -694,16 +696,16 @@ fn column_operand(sprm: &Sprm, name: &str) -> Result<(usize, u16)> {
 }
 
 fn corrupted<T>(message: &str) -> Result<T> {
-    Err(DocError::Corrupted(message.to_string()))
+    Err(PackageError::Corrupted(message.to_string()))
 }
 
 fn read_u32(data: &[u8], offset: usize, field: &str) -> Result<u32> {
     let end = offset
         .checked_add(4)
-        .ok_or_else(|| DocError::Corrupted(format!("{field} range overflows")))?;
+        .ok_or_else(|| PackageError::Corrupted(format!("{field} range overflows")))?;
     let bytes = data
         .get(offset..end)
-        .ok_or_else(|| DocError::Corrupted(format!("{field} is truncated")))?;
+        .ok_or_else(|| PackageError::Corrupted(format!("{field} is truncated")))?;
     Ok(u32::from_le_bytes(bytes.try_into().unwrap()))
 }
 
@@ -714,7 +716,7 @@ fn read_i32(data: &[u8], offset: usize, field: &str) -> Result<i32> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DocOpenOptions, Package};
+    use crate::{OpenOptions, Package};
     use std::path::{Path, PathBuf};
 
     fn fixed_sprm(opcode: u16, operand: &[u8]) -> Vec<u8> {
@@ -1090,7 +1092,7 @@ mod tests {
         ] {
             let mut package = Package::open(poi_fixture(name)).unwrap();
             let document = package
-                .document_with_options(DocOpenOptions {
+                .document_with_options(OpenOptions {
                     password: Some(password),
                     ..Default::default()
                 })

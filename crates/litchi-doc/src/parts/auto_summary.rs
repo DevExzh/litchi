@@ -3,7 +3,7 @@
 //! The PLCF assigns every main-document text range a priority for automatic
 //! summarization. It is parsed as inert metadata: no summary is generated.
 
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 use crate::plcf::Plcf;
 
@@ -14,8 +14,8 @@ const ASUMY_SIZE: usize = 4;
 /// Implementation limit on the number of AutoSummary ranges.
 const MAX_ASUMY_ENTRIES: usize = 1_000_000;
 
-fn corrupted(message: impl Into<String>) -> DocError {
-    DocError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }
 
 /// One main-document text range and its AutoSummary priority.

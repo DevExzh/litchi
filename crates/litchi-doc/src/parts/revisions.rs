@@ -1,6 +1,6 @@
 //! Revision-mark author table parsing for Word 97+ documents.
 
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 
 /// Parsed `SttbfRMark` author names.
@@ -17,26 +17,26 @@ impl RevisionAuthorTable {
             return Ok(Self::default());
         };
         let start = usize::try_from(offset)
-            .map_err(|_| DocError::Corrupted("SttbfRMark offset is too large".to_string()))?;
+            .map_err(|_| PackageError::Corrupted("SttbfRMark offset is too large".to_string()))?;
         let length = usize::try_from(length)
-            .map_err(|_| DocError::Corrupted("SttbfRMark length is too large".to_string()))?;
+            .map_err(|_| PackageError::Corrupted("SttbfRMark length is too large".to_string()))?;
         let end = start
             .checked_add(length)
-            .ok_or_else(|| DocError::Corrupted("SttbfRMark range overflows".to_string()))?;
+            .ok_or_else(|| PackageError::Corrupted("SttbfRMark range overflows".to_string()))?;
         let data = table_stream.get(start..end).ok_or_else(|| {
-            DocError::Corrupted("SttbfRMark extends beyond the table stream".to_string())
+            PackageError::Corrupted("SttbfRMark extends beyond the table stream".to_string())
         })?;
         if data.len() < 6
             || read_u16(data, 0, "SttbfRMark fExtend")? != 0xFFFF
             || read_u16(data, 4, "SttbfRMark cbExtra")? != 0
         {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "SttbfRMark has an invalid header".to_string(),
             ));
         }
         let count = usize::from(read_u16(data, 2, "SttbfRMark count")?);
         if count == 0 {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "SttbfRMark must begin with the Unknown author".to_string(),
             ));
         }
@@ -45,28 +45,28 @@ impl RevisionAuthorTable {
         for _ in 0..count {
             let char_count = usize::from(read_u16(data, offset, "revision author length")?);
             offset = offset.checked_add(2).ok_or_else(|| {
-                DocError::Corrupted("revision author offset overflows".to_string())
+                PackageError::Corrupted("revision author offset overflows".to_string())
             })?;
             let byte_count = char_count.checked_mul(2).ok_or_else(|| {
-                DocError::Corrupted("revision author length overflows".to_string())
+                PackageError::Corrupted("revision author length overflows".to_string())
             })?;
             let author_end = offset.checked_add(byte_count).ok_or_else(|| {
-                DocError::Corrupted("revision author range overflows".to_string())
+                PackageError::Corrupted("revision author range overflows".to_string())
             })?;
-            let author_data = data
-                .get(offset..author_end)
-                .ok_or_else(|| DocError::Corrupted("revision author is truncated".to_string()))?;
+            let author_data = data.get(offset..author_end).ok_or_else(|| {
+                PackageError::Corrupted("revision author is truncated".to_string())
+            })?;
             let units = author_data
                 .chunks_exact(2)
                 .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
                 .collect::<Vec<_>>();
             authors.push(String::from_utf16(&units).map_err(|_| {
-                DocError::Corrupted("revision author contains invalid UTF-16".to_string())
+                PackageError::Corrupted("revision author contains invalid UTF-16".to_string())
             })?);
             offset = author_end;
         }
         if offset != data.len() || authors.first().map(String::as_str) != Some("Unknown") {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "SttbfRMark has trailing bytes or does not begin with Unknown".to_string(),
             ));
         }
@@ -93,7 +93,7 @@ impl RevisionAuthorTable {
 
 fn read_u16(data: &[u8], offset: usize, field: &str) -> Result<u16> {
     litchi_core::binary::read_u16_le(data, offset)
-        .map_err(|error| DocError::Corrupted(format!("invalid {field}: {error}")))
+        .map_err(|error| PackageError::Corrupted(format!("invalid {field}: {error}")))
 }
 
 #[cfg(test)]

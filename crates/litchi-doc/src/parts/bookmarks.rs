@@ -1,7 +1,7 @@
 //! Standard bookmark tables for Word 97+ binary documents.
 
 use super::super::bookmark::Bookmark;
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 use crate::plcf::Plcf;
 use std::collections::HashSet;
@@ -24,7 +24,7 @@ impl BookmarksTable {
             return Ok(Self::default());
         }
         if lengths.contains(&0) {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "standard bookmark tables must be present together".to_string(),
             ));
         }
@@ -32,34 +32,35 @@ impl BookmarksTable {
         let names = parse_names(required_slice(fib, table_stream, 21, "SttbfBkmk")?)?;
         let starts_data = required_slice(fib, table_stream, 22, "PlcfBkf")?;
         if starts_data.len() < 4 || (starts_data.len() - 4) % 8 != 0 {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "PlcfBkf has an invalid byte length".to_string(),
             ));
         }
         let starts = Plcf::parse(starts_data, 4)
-            .ok_or_else(|| DocError::Corrupted("PlcfBkf is malformed".to_string()))?;
+            .ok_or_else(|| PackageError::Corrupted("PlcfBkf is malformed".to_string()))?;
         if starts.count() != names.len() {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "SttbfBkmk and PlcfBkf counts do not match".to_string(),
             ));
         }
 
         let document_end = fib.get_document_parts_end().ok_or_else(|| {
-            DocError::Corrupted("document-part character counts overflow".to_string())
+            PackageError::Corrupted("document-part character counts overflow".to_string())
         })?;
         validate_cps(&starts, document_end, "PlcfBkf")?;
 
         let ends_data = required_slice(fib, table_stream, 23, "PlcfBkl")?;
         if ends_data.len() != (names.len() + 1) * 4 {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "PlcfBkl count does not match PlcfBkf".to_string(),
             ));
         }
         let mut ends = Vec::with_capacity(names.len() + 1);
         for offset in (0..ends_data.len()).step_by(4) {
             ends.push(
-                litchi_core::binary::read_u32_le(ends_data, offset)
-                    .map_err(|error| DocError::Corrupted(format!("invalid PlcfBkl CP: {error}")))?,
+                litchi_core::binary::read_u32_le(ends_data, offset).map_err(|error| {
+                    PackageError::Corrupted(format!("invalid PlcfBkl CP: {error}"))
+                })?,
             );
         }
         // The final CP of a bookmark PLC is ignored per [MS-DOC] 2.8.10;
@@ -70,7 +71,7 @@ impl BookmarksTable {
                 .windows(2)
                 .any(|pair| pair[0] > pair[1])
         {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "PlcfBkl has invalid or non-monotonic CPs".to_string(),
             ));
         }
@@ -80,25 +81,25 @@ impl BookmarksTable {
         for (index, name) in names.into_iter().enumerate() {
             let property = starts
                 .property(index)
-                .ok_or_else(|| DocError::Corrupted("PlcfBkf is missing an FBKF".to_string()))?;
+                .ok_or_else(|| PackageError::Corrupted("PlcfBkf is missing an FBKF".to_string()))?;
             let end_index = usize::from(read_u16(property, 0, "bookmark ibkl")?);
             if end_index >= ends.len() - 1 || !used_end_indexes.insert(end_index) {
-                return Err(DocError::Corrupted(
+                return Err(PackageError::Corrupted(
                     "bookmark ibkl values must be unique and in range".to_string(),
                 ));
             }
             let bkc = read_u16(property, 2, "bookmark BKC")?;
             if bkc & 0x0080 != 0 {
-                return Err(DocError::Corrupted(
+                return Err(PackageError::Corrupted(
                     "bookmark BKC fPub must be zero".to_string(),
                 ));
             }
-            let start = starts
-                .position(index)
-                .ok_or_else(|| DocError::Corrupted("PlcfBkf is missing a start CP".to_string()))?;
+            let start = starts.position(index).ok_or_else(|| {
+                PackageError::Corrupted("PlcfBkf is missing a start CP".to_string())
+            })?;
             let end = ends[end_index];
             if start > end {
-                return Err(DocError::Corrupted(
+                return Err(PackageError::Corrupted(
                     "bookmark start CP exceeds its end CP".to_string(),
                 ));
             }
@@ -106,7 +107,7 @@ impl BookmarksTable {
                 let first = (bkc & 0x007F) as u8;
                 let limit = ((bkc >> 8) & 0x003F) as u8;
                 if first >= limit {
-                    return Err(DocError::Corrupted(
+                    return Err(PackageError::Corrupted(
                         "bookmark BKC column range is empty or reversed".to_string(),
                     ));
                 }
@@ -137,13 +138,13 @@ fn parse_names(data: &[u8]) -> Result<Vec<String>> {
         || read_u16(data, 0, "SttbfBkmk fExtend")? != 0xFFFF
         || read_u16(data, 4, "SttbfBkmk cbExtra")? != 0
     {
-        return Err(DocError::Corrupted(
+        return Err(PackageError::Corrupted(
             "SttbfBkmk has an invalid header".to_string(),
         ));
     }
     let count = usize::from(read_u16(data, 2, "SttbfBkmk count")?);
     if count > 0x3FFB {
-        return Err(DocError::Corrupted(
+        return Err(PackageError::Corrupted(
             "SttbfBkmk contains too many names".to_string(),
         ));
     }
@@ -153,30 +154,30 @@ fn parse_names(data: &[u8]) -> Result<Vec<String>> {
     for _ in 0..count {
         let length = usize::from(read_u16(data, offset, "bookmark name length")?);
         if length == 0 || length >= 40 {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "bookmark names must contain 1 through 39 UTF-16 characters".to_string(),
             ));
         }
         offset = offset
             .checked_add(2)
-            .ok_or_else(|| DocError::Corrupted("bookmark name offset overflows".to_string()))?;
+            .ok_or_else(|| PackageError::Corrupted("bookmark name offset overflows".to_string()))?;
         let byte_length = length
             .checked_mul(2)
-            .ok_or_else(|| DocError::Corrupted("bookmark name length overflows".to_string()))?;
+            .ok_or_else(|| PackageError::Corrupted("bookmark name length overflows".to_string()))?;
         let end = offset
             .checked_add(byte_length)
-            .ok_or_else(|| DocError::Corrupted("bookmark name range overflows".to_string()))?;
+            .ok_or_else(|| PackageError::Corrupted("bookmark name range overflows".to_string()))?;
         let bytes = data
             .get(offset..end)
-            .ok_or_else(|| DocError::Corrupted("bookmark name is truncated".to_string()))?;
+            .ok_or_else(|| PackageError::Corrupted("bookmark name is truncated".to_string()))?;
         let units = bytes
             .chunks_exact(2)
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
         let name = String::from_utf16(&units)
-            .map_err(|_| DocError::Corrupted("bookmark name is invalid UTF-16".to_string()))?;
+            .map_err(|_| PackageError::Corrupted("bookmark name is invalid UTF-16".to_string()))?;
         if !unique.insert(name.clone()) {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "bookmark names must be unique".to_string(),
             ));
         }
@@ -184,7 +185,7 @@ fn parse_names(data: &[u8]) -> Result<Vec<String>> {
         offset = end;
     }
     if offset != data.len() {
-        return Err(DocError::Corrupted(
+        return Err(PackageError::Corrupted(
             "SttbfBkmk contains trailing bytes".to_string(),
         ));
     }
@@ -199,9 +200,9 @@ fn validate_cps(plcf: &Plcf<'_>, document_end: u32, name: &str) -> Result<()> {
     for index in 0..plcf.count() {
         let cp = plcf
             .position(index)
-            .ok_or_else(|| DocError::Corrupted(format!("{name} is missing a CP")))?;
+            .ok_or_else(|| PackageError::Corrupted(format!("{name} is missing a CP")))?;
         if cp > document_end || previous.is_some_and(|value| value > cp) {
-            return Err(DocError::Corrupted(format!(
+            return Err(PackageError::Corrupted(format!(
                 "{name} has out-of-range or non-monotonic CPs"
             )));
         }
@@ -219,22 +220,22 @@ fn required_slice<'a>(
     let (offset, length) = fib
         .get_table_pointer(index)
         .filter(|(_, length)| *length != 0)
-        .ok_or_else(|| DocError::Corrupted(format!("{name} is missing")))?;
+        .ok_or_else(|| PackageError::Corrupted(format!("{name} is missing")))?;
     let start = usize::try_from(offset)
-        .map_err(|_| DocError::Corrupted(format!("{name} offset is too large")))?;
+        .map_err(|_| PackageError::Corrupted(format!("{name} offset is too large")))?;
     let length = usize::try_from(length)
-        .map_err(|_| DocError::Corrupted(format!("{name} length is too large")))?;
+        .map_err(|_| PackageError::Corrupted(format!("{name} length is too large")))?;
     let end = start
         .checked_add(length)
-        .ok_or_else(|| DocError::Corrupted(format!("{name} range overflows")))?;
+        .ok_or_else(|| PackageError::Corrupted(format!("{name} range overflows")))?;
     table_stream
         .get(start..end)
-        .ok_or_else(|| DocError::Corrupted(format!("{name} extends beyond the table stream")))
+        .ok_or_else(|| PackageError::Corrupted(format!("{name} extends beyond the table stream")))
 }
 
 fn read_u16(data: &[u8], offset: usize, field: &str) -> Result<u16> {
     litchi_core::binary::read_u16_le(data, offset)
-        .map_err(|error| DocError::Corrupted(format!("invalid {field}: {error}")))
+        .map_err(|error| PackageError::Corrupted(format!("invalid {field}: {error}")))
 }
 
 #[cfg(test)]

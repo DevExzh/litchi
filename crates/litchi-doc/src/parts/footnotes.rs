@@ -2,7 +2,7 @@
 ///
 /// Based on Apache POI's FootnotesTables and LibreOffice's implementation.
 /// Footnotes and endnotes are stored in separate subdocuments with references in the main text.
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 use crate::plcf::Plcf;
 
@@ -132,13 +132,13 @@ impl FootnotesTable {
         // Parse text PLCF with element_size = 0 (just CPs)
         // Manually parse since `Plcf` expects element_size > 0.
         if !txt_plcf_data.len().is_multiple_of(4) {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "note text PLCF contains a partial CP".to_string(),
             ));
         }
         let cp_count = txt_plcf_data.len() / 4;
         if cp_count != ref_plcf.count() + 2 {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "note text PLCF count does not match its reference PLCF".to_string(),
             ));
         }
@@ -150,9 +150,9 @@ impl FootnotesTable {
             }
         }
 
-        let subdoc_len = subdoc_end
-            .checked_sub(subdoc_start)
-            .ok_or_else(|| DocError::Corrupted("note subdocument range is reversed".to_string()))?;
+        let subdoc_len = subdoc_end.checked_sub(subdoc_start).ok_or_else(|| {
+            PackageError::Corrupted("note subdocument range is reversed".to_string())
+        })?;
         if subdoc_len == 0
             || text_cps[..text_cps.len() - 1]
                 .iter()
@@ -161,12 +161,12 @@ impl FootnotesTable {
                 .windows(2)
                 .any(|pair| pair[0] >= pair[1])
         {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "note text PLCF has invalid character positions".to_string(),
             ));
         }
         if text_cps[text_cps.len() - 2] != subdoc_len - 1 {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "note text PLCF terminator must equal subdocument length minus one".to_string(),
             ));
         }
@@ -178,11 +178,11 @@ impl FootnotesTable {
                 && let Some(descriptor) = FootnoteDescriptor::from_bytes(desc_data)
             {
                 let text_start = subdoc_start.checked_add(text_cps[i]).ok_or_else(|| {
-                    DocError::Corrupted("note text start CP overflows".to_string())
+                    PackageError::Corrupted("note text start CP overflows".to_string())
                 })?;
-                let text_end = subdoc_start
-                    .checked_add(text_cps[i + 1])
-                    .ok_or_else(|| DocError::Corrupted("note text end CP overflows".to_string()))?;
+                let text_end = subdoc_start.checked_add(text_cps[i + 1]).ok_or_else(|| {
+                    PackageError::Corrupted("note text end CP overflows".to_string())
+                })?;
 
                 references.push(FootnoteReference::new(
                     ref_cp, text_start, text_end, descriptor,
@@ -191,7 +191,7 @@ impl FootnotesTable {
         }
 
         if references.len() != ref_plcf.count() {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "note reference PLCF contains an invalid descriptor".to_string(),
             ));
         }
@@ -199,7 +199,7 @@ impl FootnotesTable {
             .windows(2)
             .any(|pair| pair[0].ref_cp >= pair[1].ref_cp)
         {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "note reference PLCF character positions are not unique and increasing".to_string(),
             ));
         }

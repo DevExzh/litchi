@@ -3,7 +3,7 @@
 /// Based on Apache POI's HeaderStories and LibreOffice's implementation.
 /// Headers and footers in DOC files are stored as a subdocument with character positions
 /// defined in the FIB, and their mapping to sections is defined in a PLCF structure.
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 
 /// Header/Footer types based on section properties
@@ -144,7 +144,7 @@ impl HeadersTable {
         // Parse as PLCF with element_size = 0 (only CPs, no properties)
         // We need to manually parse this since PlcfParser expects element_size > 0
         if data.len() < 56 || !data.len().is_multiple_of(4) {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "PlcfHdd must contain the six separator and six section story ranges".to_string(),
             ));
         }
@@ -152,7 +152,7 @@ impl HeadersTable {
         // Count of CPs = data.len() / 4
         let cp_count = data.len() / 4;
         if cp_count < 14 || !(cp_count - 8).is_multiple_of(6) {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "PlcfHdd story count is inconsistent with its section groups".to_string(),
             ));
         }
@@ -167,22 +167,22 @@ impl HeadersTable {
         }
 
         let subdoc_len = subdoc_end.checked_sub(subdoc_start).ok_or_else(|| {
-            DocError::Corrupted("header subdocument range is reversed".to_string())
+            PackageError::Corrupted("header subdocument range is reversed".to_string())
         })?;
         for pair in cps[..cps.len() - 1].windows(2) {
             if pair[0] > pair[1] {
-                return Err(DocError::Corrupted(
+                return Err(PackageError::Corrupted(
                     "PlcfHdd character positions are not monotonic".to_string(),
                 ));
             }
         }
         if subdoc_len == 0 || cps[..cps.len() - 1].iter().any(|&cp| cp >= subdoc_len) {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "PlcfHdd character position exceeds the header subdocument".to_string(),
             ));
         }
         if cps[cps.len() - 2] != subdoc_len - 1 {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "PlcfHdd story terminator must equal ccpHdd - 1".to_string(),
             ));
         }
@@ -196,10 +196,10 @@ impl HeadersTable {
 
             // Convert relative CPs to absolute CPs in the text stream
             let abs_start = subdoc_start.checked_add(start).ok_or_else(|| {
-                DocError::Corrupted("PlcfHdd start character position overflows".to_string())
+                PackageError::Corrupted("PlcfHdd start character position overflows".to_string())
             })?;
             let abs_end = subdoc_start.checked_add(end).ok_or_else(|| {
-                DocError::Corrupted("PlcfHdd end character position overflows".to_string())
+                PackageError::Corrupted("PlcfHdd end character position overflows".to_string())
             })?;
 
             let story_type = match (i - 6) % 6 {

@@ -5,7 +5,7 @@
 
 use super::Limits;
 use super::model::{Editor, FieldMarker, Info, RawPiece, Reference, WriteOptions};
-use crate::package::{DocError, Result};
+use crate::package::{Error as PackageError, Result};
 use crate::writer::ChpxFkpBuilder;
 use litchi_cfb::consts::STGTY_STORAGE;
 use litchi_cfb::{OleError, OleFile, OleWriter};
@@ -86,7 +86,7 @@ fn word(data: &[u8], offset: usize) -> Result<u16> {
 impl Editor {
     pub fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         let (targets, object_pool_exists) = discover_targets(&bytes, limits)?;
-        let package = ObjectEditor::open(bytes, targets, limits).map_err(DocError::from)?;
+        let package = ObjectEditor::open(bytes, targets, limits).map_err(PackageError::from)?;
         let word_path = vec!["WordDocument".to_string()];
         let word = package
             .stream(&word_path)
@@ -223,21 +223,21 @@ impl Editor {
         candidate
             .package
             .put_stream(&candidate.word_path, candidate.word.clone())
-            .map_err(DocError::from)?;
+            .map_err(PackageError::from)?;
         candidate
             .package
             .put_stream(&candidate.table_path, candidate.table.clone())
-            .map_err(DocError::from)?;
+            .map_err(PackageError::from)?;
         if candidate.package.stream(&candidate.data_path).is_some() {
             candidate
                 .package
                 .put_stream(&candidate.data_path, candidate.data.clone())
-                .map_err(DocError::from)?;
+                .map_err(PackageError::from)?;
         } else {
             candidate
                 .package
                 .add_stream(candidate.data_path.clone(), candidate.data.clone())
-                .map_err(DocError::from)?;
+                .map_err(PackageError::from)?;
         }
         let limits = candidate.limits;
         candidate.add_object_storage(target, options.compound_file, limits)?;
@@ -294,11 +294,11 @@ impl Editor {
         candidate
             .package
             .put_stream(&candidate.word_path, candidate.word.clone())
-            .map_err(DocError::from)?;
+            .map_err(PackageError::from)?;
         candidate
             .package
             .put_stream(&candidate.table_path, candidate.table.clone())
-            .map_err(DocError::from)?;
+            .map_err(PackageError::from)?;
         let target = candidate
             .package
             .targets()
@@ -308,7 +308,7 @@ impl Editor {
         candidate
             .package
             .remove_storage(target.key())
-            .map_err(DocError::from)?;
+            .map_err(PackageError::from)?;
         candidate.changed = true;
         *self = candidate;
         Ok(object)
@@ -395,18 +395,18 @@ impl Editor {
         candidate
             .package
             .put_stream(&candidate.word_path, candidate.word.clone())
-            .map_err(DocError::from)?;
+            .map_err(PackageError::from)?;
         candidate
             .package
             .put_stream(&candidate.table_path, candidate.table.clone())
-            .map_err(DocError::from)?;
+            .map_err(PackageError::from)?;
         candidate.changed = true;
         *self = candidate;
         Ok(())
     }
 
     pub fn finish(self) -> Result<Vec<u8>> {
-        self.package.finish().map_err(DocError::from)
+        self.package.finish().map_err(PackageError::from)
     }
 
     fn add_object_storage(
@@ -418,18 +418,19 @@ impl Editor {
         if self.object_pool_exists {
             self.package
                 .add_storage(target, compound_file)
-                .map_err(DocError::from)?;
+                .map_err(PackageError::from)?;
             return Ok(());
         }
 
-        let object_pool_target = Target::new(OBJECT_POOL, [OBJECT_POOL]).map_err(DocError::from)?;
+        let object_pool_target =
+            Target::new(OBJECT_POOL, [OBJECT_POOL]).map_err(PackageError::from)?;
         let wrapped = wrap_object_storage(target.key(), compound_file, limits)?;
         self.package
             .add_storage(object_pool_target, wrapped)
-            .map_err(DocError::from)?;
-        let bytes = self.package.clone().finish().map_err(DocError::from)?;
+            .map_err(PackageError::from)?;
+        let bytes = self.package.clone().finish().map_err(PackageError::from)?;
         let (targets, _) = discover_targets(&bytes, limits)?;
-        self.package = ObjectEditor::open(bytes, targets, limits).map_err(DocError::from)?;
+        self.package = ObjectEditor::open(bytes, targets, limits).map_err(PackageError::from)?;
         self.object_pool_exists = true;
         Ok(())
     }
@@ -466,7 +467,7 @@ impl Editor {
         if result_fc + 2 < byte_end {
             builder.add_entry(result_fc + 2, byte_end, Vec::new());
         }
-        let pages = builder.generate_pages().map_err(DocError::from)?;
+        let pages = builder.generate_pages().map_err(PackageError::from)?;
         if pages.pages.len() != 1 {
             return Err(corrupted("object CHPX unexpectedly spans multiple FKPs"));
         }
@@ -503,11 +504,11 @@ impl Editor {
 }
 
 pub(super) fn discover_targets(bytes: &[u8], limits: Limits) -> Result<(Targets, bool)> {
-    let ole = OleFile::open(Cursor::new(bytes)).map_err(DocError::from)?;
+    let ole = OleFile::open(Cursor::new(bytes)).map_err(PackageError::from)?;
     let entries = match ole.list_directory_entries(&[OBJECT_POOL]) {
         Ok(entries) => entries,
         Err(OleError::StreamNotFound) => return Ok((Targets::default(), false)),
-        Err(error) => return Err(DocError::from(error)),
+        Err(error) => return Err(PackageError::from(error)),
     };
     let mut targets = Targets::default();
     for entry in entries {
@@ -521,8 +522,8 @@ pub(super) fn discover_targets(bytes: &[u8], limits: Limits) -> Result<(Targets,
             entry.name.clone(),
             [OBJECT_POOL.to_owned(), entry.name.clone()],
         )
-        .map_err(DocError::from)?;
-        targets.push(target).map_err(DocError::from)?;
+        .map_err(PackageError::from)?;
+        targets.push(target).map_err(PackageError::from)?;
     }
     Ok((targets, true))
 }
@@ -532,7 +533,7 @@ fn object_target(storage_id: u32) -> Result<Target> {
         return Err(corrupted("storage ID must be a positive signed integer"));
     }
     let name = format!("_{storage_id}");
-    Target::new(name.clone(), [OBJECT_POOL.to_owned(), name]).map_err(DocError::from)
+    Target::new(name.clone(), [OBJECT_POOL.to_owned(), name]).map_err(PackageError::from)
 }
 
 pub(super) fn is_object_storage_name(name: &str) -> bool {
@@ -551,18 +552,18 @@ fn wrap_object_storage(
     if compound_file.len() as u64 > limits.max_object_size {
         return Err(corrupted("embedded object exceeds resource limit"));
     }
-    let mut source = OleFile::open(Cursor::new(compound_file)).map_err(DocError::from)?;
+    let mut source = OleFile::open(Cursor::new(compound_file)).map_err(PackageError::from)?;
     let mut writer = OleWriter::new();
     writer
         .create_storage(&[storage_name])
-        .map_err(DocError::from)?;
+        .map_err(PackageError::from)?;
     if let Some(clsid) = source
         .root_entry()
         .and_then(|entry| parse_clsid(&entry.clsid))
     {
         writer
             .set_storage_clsid(&[storage_name], clsid)
-            .map_err(DocError::from)?;
+            .map_err(PackageError::from)?;
     }
     let mut budget = ObjectCopyBudget::default();
     copy_object_contents(
@@ -574,7 +575,7 @@ fn wrap_object_storage(
         limits,
     )?;
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).map_err(DocError::from)?;
+    writer.write_to(&mut output).map_err(PackageError::from)?;
     Ok(output.into_inner())
 }
 
@@ -613,7 +614,7 @@ fn copy_object_contents<R: Read + Seek>(
 ) -> Result<()> {
     let entries = source
         .list_directory_entries(&path_refs(source_path))
-        .map_err(DocError::from)?
+        .map_err(PackageError::from)?
         .into_iter()
         .cloned()
         .collect::<Vec<_>>();
@@ -632,11 +633,11 @@ fn copy_object_contents<R: Read + Seek>(
                 let destination_refs = path_refs(&destination_child);
                 writer
                     .create_storage(&destination_refs)
-                    .map_err(DocError::from)?;
+                    .map_err(PackageError::from)?;
                 if let Some(clsid) = parse_clsid(&entry.clsid) {
                     writer
                         .set_storage_clsid(&destination_refs, clsid)
-                        .map_err(DocError::from)?;
+                        .map_err(PackageError::from)?;
                 }
                 copy_object_contents(
                     source,
@@ -653,7 +654,7 @@ fn copy_object_contents<R: Read + Seek>(
                 }
                 let data = source
                     .open_stream(&path_refs(&source_child))
-                    .map_err(DocError::from)?;
+                    .map_err(PackageError::from)?;
                 if data.len() as u64 != entry.size {
                     return Err(corrupted(
                         "embedded object stream size changed during capture",
@@ -662,7 +663,7 @@ fn copy_object_contents<R: Read + Seek>(
                 budget.charge(entry.size, limits)?;
                 writer
                     .create_stream_owned(&path_refs(&destination_child), data)
-                    .map_err(DocError::from)?;
+                    .map_err(PackageError::from)?;
             },
             _ => {},
         }
@@ -1170,6 +1171,6 @@ fn align512(value: usize) -> Result<usize> {
         .map(|v| v & !511)
         .ok_or_else(|| corrupted("alignment overflow"))
 }
-fn corrupted(message: impl Into<String>) -> DocError {
-    DocError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }

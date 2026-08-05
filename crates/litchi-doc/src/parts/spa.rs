@@ -6,7 +6,7 @@
 //! Document table is referenced by `fcPlcSpaMom` and the Header Document
 //! table by `fcPlcSpaHdr` in the FIB.
 
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 
 /// Size of one Spa structure in bytes ([MS-DOC] 2.9.253).
 pub const SPA_LEN: usize = 26;
@@ -35,7 +35,7 @@ impl ShapeHorizontalOrigin {
             1 => Self::Page,
             2 => Self::Column,
             other => {
-                return Err(DocError::InvalidFormat(format!(
+                return Err(PackageError::InvalidFormat(format!(
                     "Invalid SPA horizontal origin: {other}"
                 )));
             },
@@ -61,7 +61,7 @@ impl ShapeVerticalOrigin {
             1 => Self::Page,
             2 => Self::Paragraph,
             other => {
-                return Err(DocError::InvalidFormat(format!(
+                return Err(PackageError::InvalidFormat(format!(
                     "Invalid SPA vertical origin: {other}"
                 )));
             },
@@ -96,7 +96,7 @@ impl ShapeTextWrap {
             4 => Self::Tight,
             5 => Self::Through,
             other => {
-                return Err(DocError::InvalidFormat(format!(
+                return Err(PackageError::InvalidFormat(format!(
                     "Invalid SPA text wrap style: {other}"
                 )));
             },
@@ -125,7 +125,7 @@ impl ShapeWrapSide {
             2 => Self::Right,
             3 => Self::Largest,
             other => {
-                return Err(DocError::InvalidFormat(format!(
+                return Err(PackageError::InvalidFormat(format!(
                     "Invalid SPA wrap side: {other}"
                 )));
             },
@@ -172,7 +172,7 @@ impl Spa {
     /// Parse one 26-byte Spa structure.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < SPA_LEN {
-            return Err(DocError::InvalidFormat(
+            return Err(PackageError::InvalidFormat(
                 "Spa structure too short".to_string(),
             ));
         }
@@ -261,7 +261,7 @@ pub fn parse_plcf_spa(data: &[u8]) -> Result<Vec<ShapeAnchor>> {
     // lcb = 4 * (n + 1) + SPA_LEN * n  =>  n = (lcb - 4) / (4 + SPA_LEN)
     let stride = 4 + SPA_LEN;
     if data.len() < 4 || !(data.len() - 4).is_multiple_of(stride) {
-        return Err(DocError::InvalidFormat(
+        return Err(PackageError::InvalidFormat(
             "Invalid PlcfSpa length".to_string(),
         ));
     }

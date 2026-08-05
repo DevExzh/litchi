@@ -3,7 +3,7 @@
 use super::Limits;
 use super::codec::*;
 use super::model::*;
-use crate::package::{DocError, Result};
+use crate::package::{Error as PackageError, Result};
 use crate::sprm_operations::*;
 use crate::writer::ChpxFkpBuilder;
 use litchi_ole_common::object::{Editor as ObjectEditor, Targets};
@@ -27,7 +27,7 @@ pub struct DocTrackedRevisionEditor {
 impl DocTrackedRevisionEditor {
     pub fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         let package =
-            ObjectEditor::open(bytes, Targets::default(), limits).map_err(DocError::from)?;
+            ObjectEditor::open(bytes, Targets::default(), limits).map_err(PackageError::from)?;
         let word_path = vec!["WordDocument".to_string()];
         let word = package
             .stream(&word_path)
@@ -378,7 +378,7 @@ impl DocTrackedRevisionEditor {
     }
 
     pub fn finish(self) -> Result<Vec<u8>> {
-        self.package.finish().map_err(DocError::from)
+        self.package.finish().map_err(PackageError::from)
     }
 
     fn delete_revision_text(&mut self, revision: &DocTrackedRevision) -> Result<()> {
@@ -615,7 +615,7 @@ impl DocTrackedRevisionEditor {
         for run in &self.chpx {
             builder.add_entry(run.start, run.end, run.grpprl.clone());
         }
-        let pages = builder.generate_pages().map_err(DocError::from)?;
+        let pages = builder.generate_pages().map_err(PackageError::from)?;
         let base = align512(self.word.len())?;
         self.word.resize(base, 0);
         let mut pns = Vec::new();
@@ -736,10 +736,10 @@ impl DocTrackedRevisionEditor {
     fn commit(&mut self) -> Result<()> {
         self.package
             .put_stream(&self.word_path, self.word.clone())
-            .map_err(DocError::from)?;
+            .map_err(PackageError::from)?;
         self.package
             .put_stream(&self.table_path, self.table.clone())
-            .map_err(DocError::from)?;
+            .map_err(PackageError::from)?;
         self.changed = true;
         Ok(())
     }

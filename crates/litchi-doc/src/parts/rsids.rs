@@ -5,7 +5,7 @@
 //! drive revision behavior.
 
 use super::fib::FileInformationBlock;
-use crate::package::{DocError, Result};
+use crate::package::{Error as PackageError, Result};
 
 /// Table-pointer index of `fcPlrsid`/`lcbPlrsid`.
 const PLRSID: usize = 113;
@@ -20,8 +20,8 @@ const RESERVED1: u32 = 229;
 /// Size in bytes of one RSID element.
 const RSID_LEN: usize = 4;
 
-fn corrupted(message: impl Into<String>) -> DocError {
-    DocError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }
 
 /// The revision-save identifiers assigned in a document (MS-DOC 2.9.203).

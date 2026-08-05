@@ -1,6 +1,6 @@
 //! Word 97/2000 `SttbSavedBy` save-history parsing.
 
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 
 const SAVED_BY_FIB_INDEX: usize = 71;
@@ -8,8 +8,8 @@ const MAX_SAVED_BY_STRINGS: usize = 20;
 /// Exact maximum for the header plus 20 maximum-length UTF-16 STTB strings.
 const MAX_SAVED_BY_BYTES: usize = 6 + MAX_SAVED_BY_STRINGS * (2 + u16::MAX as usize * 2);
 
-fn corrupted(message: impl Into<String>) -> DocError {
-    DocError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }
 
 fn read_u16(data: &[u8], offset: usize, field: &str) -> Result<u16> {

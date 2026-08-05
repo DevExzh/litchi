@@ -2,7 +2,7 @@
 //! `SttbProtUser`.
 
 use super::model::{Mode, Range, Ranges, Reserved, Role, Selector, User};
-use crate::package::{DocError, Result};
+use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
 use std::collections::HashSet;
 
@@ -406,6 +406,6 @@ fn read_u32(data: &[u8], offset: usize, name: &str) -> Result<u32> {
     Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
 }
 
-fn corrupted(message: impl Into<String>) -> DocError {
-    DocError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }

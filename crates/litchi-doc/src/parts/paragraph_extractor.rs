@@ -501,7 +501,7 @@ pub(crate) fn cascade_character_properties_with_table(
     let sprms = parse_sprms(direct_grpprl)?;
     let consumed = sprms.last().map_or(0, |sprm| sprm.offset + sprm.size);
     if consumed != direct_grpprl.len() {
-        return Err(super::super::package::DocError::Corrupted(
+        return Err(super::super::package::Error::Corrupted(
             "CHPX grpprl does not contain a whole number of SPRMs".to_string(),
         ));
     }
@@ -511,7 +511,7 @@ pub(crate) fn cascade_character_properties_with_table(
         }
         if sprm.opcode == SPRM_C_ISTD {
             let requested = sprm.operand_word().ok_or_else(|| {
-                super::super::package::DocError::Corrupted(
+                super::super::package::Error::Corrupted(
                     "sprmCIstd is missing its style index".to_string(),
                 )
             })?;

@@ -1,6 +1,6 @@
 //! Word `SttbListNames` table for named `LISTNUM` list definitions.
 
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 use std::collections::HashSet;
 
@@ -9,8 +9,8 @@ const MAX_NAME_UNITS: usize = 255;
 const MAX_NAME_COUNT: usize = u16::MAX as usize;
 const MAX_TABLE_BYTES: usize = 6 + MAX_NAME_COUNT * (2 + MAX_NAME_UNITS * 2);
 
-fn corrupted(message: impl Into<String>) -> DocError {
-    DocError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }
 
 fn read_u16(data: &[u8], offset: usize, field: &str) -> Result<u16> {

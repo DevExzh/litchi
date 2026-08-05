@@ -4,7 +4,7 @@
 /// Images in DOC files can be:
 /// - Inline pictures (in character runs with picf special character 0x01)
 /// - Floating pictures (in Data stream with Escher BLIP records)
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use litchi_core::binary;
 
 /// Picture format types
@@ -121,7 +121,7 @@ impl PictureDescriptor {
     /// Parse PICF structure from binary data
     pub fn from_bytes(data: &[u8]) -> Result<Self> {
         if data.len() < 68 {
-            return Err(DocError::InvalidFormat("PICF too short".to_string()));
+            return Err(PackageError::InvalidFormat("PICF too short".to_string()));
         }
 
         // PICF structure layout (from MS-DOC):
@@ -139,23 +139,25 @@ impl PictureDescriptor {
         // 0x2A: dyaCropBottom (2 bytes)
 
         let width = binary::read_i16_le(data, 0x1C)
-            .map_err(|e| DocError::InvalidFormat(format!("Failed to read width: {}", e)))?
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read width: {}", e)))?
             as i32;
         let height = binary::read_i16_le(data, 0x1E)
-            .map_err(|e| DocError::InvalidFormat(format!("Failed to read height: {}", e)))?
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read height: {}", e)))?
             as i32;
         let mx = binary::read_i16_le(data, 0x20)
-            .map_err(|e| DocError::InvalidFormat(format!("Failed to read mx: {}", e)))?;
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read mx: {}", e)))?;
         let my = binary::read_i16_le(data, 0x22)
-            .map_err(|e| DocError::InvalidFormat(format!("Failed to read my: {}", e)))?;
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read my: {}", e)))?;
         let crop_left = binary::read_i16_le(data, 0x24)
-            .map_err(|e| DocError::InvalidFormat(format!("Failed to read crop_left: {}", e)))?;
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read crop_left: {}", e)))?;
         let crop_top = binary::read_i16_le(data, 0x26)
-            .map_err(|e| DocError::InvalidFormat(format!("Failed to read crop_top: {}", e)))?;
-        let crop_right = binary::read_i16_le(data, 0x28)
-            .map_err(|e| DocError::InvalidFormat(format!("Failed to read crop_right: {}", e)))?;
-        let crop_bottom = binary::read_i16_le(data, 0x2A)
-            .map_err(|e| DocError::InvalidFormat(format!("Failed to read crop_bottom: {}", e)))?;
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read crop_top: {}", e)))?;
+        let crop_right = binary::read_i16_le(data, 0x28).map_err(|e| {
+            PackageError::InvalidFormat(format!("Failed to read crop_right: {}", e))
+        })?;
+        let crop_bottom = binary::read_i16_le(data, 0x2A).map_err(|e| {
+            PackageError::InvalidFormat(format!("Failed to read crop_bottom: {}", e))
+        })?;
 
         Ok(Self {
             mx,

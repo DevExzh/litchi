@@ -3,7 +3,7 @@
 //! Comments use references in the main document (`PlcfandRef`), ranges in the
 //! comment subdocument (`PlcfandTxt`), and a separate array of author names.
 
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::super::{CommentDateTime, CommentExtendedMetadata};
 use super::fib::FileInformationBlock;
 use crate::plcf::Plcf;
@@ -26,40 +26,40 @@ pub struct CommentDescriptor {
 impl CommentDescriptor {
     fn parse(data: &[u8], author_count: usize) -> Result<Self> {
         if data.len() != ATRD_PRE10_SIZE {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "ATRDPre10 must be exactly 30 bytes".to_string(),
             ));
         }
 
         let initials_len = usize::from(read_u16(data, 0, "ATRDPre10 initials length")?);
         if initials_len > 9 {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "ATRDPre10 initials exceed nine UTF-16 characters".to_string(),
             ));
         }
         let initials = decode_utf16(&data[2..2 + initials_len * 2], "comment initials")?;
         let author_index = read_u16(data, 20, "ATRDPre10 author index")?;
         if usize::from(author_index) >= author_count {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "ATRDPre10 author index exceeds the comment-owner array".to_string(),
             ));
         }
         if read_u16(data, 22, "ATRDPre10 unused bits")? != 0
             || read_u16(data, 24, "ATRDPre10 unused flags")? != 0
         {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "ATRDPre10 reserved fields must be zero".to_string(),
             ));
         }
 
         let raw_tag = litchi_core::binary::read_i32_le(data, 26).map_err(|error| {
-            DocError::Corrupted(format!("invalid ATRDPre10 bookmark tag: {error}"))
+            PackageError::Corrupted(format!("invalid ATRDPre10 bookmark tag: {error}"))
         })?;
         let bookmark_tag = match raw_tag {
             -1 => None,
             value if value >= 0 => Some(value as u32),
             _ => {
-                return Err(DocError::Corrupted(
+                return Err(PackageError::Corrupted(
                     "ATRDPre10 bookmark tag is less than -1".to_string(),
                 ));
             },
@@ -114,28 +114,28 @@ impl CommentsTable {
             "comment-owner array",
         )?)?;
         if owners.is_empty() {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "a document with comments must define at least one owner".to_string(),
             ));
         }
 
         let ref_data = required_table_slice(fib, table_stream, 4, "PlcfandRef")?;
         if ref_data.len() < 4 || (ref_data.len() - 4) % (4 + ATRD_PRE10_SIZE) != 0 {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "PlcfandRef has an invalid byte length".to_string(),
             ));
         }
         let ref_plcf = Plcf::parse(ref_data, ATRD_PRE10_SIZE)
-            .ok_or_else(|| DocError::Corrupted("PlcfandRef is malformed".to_string()))?;
+            .ok_or_else(|| PackageError::Corrupted("PlcfandRef is malformed".to_string()))?;
         if ref_plcf.count() == 0 {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "a nonempty comment subdocument has no references".to_string(),
             ));
         }
 
         let txt_data = required_table_slice(fib, table_stream, 5, "PlcfandTxt")?;
         let subdoc_len = subdoc_end.checked_sub(subdoc_start).ok_or_else(|| {
-            DocError::Corrupted("comment subdocument range is reversed".to_string())
+            PackageError::Corrupted("comment subdocument range is reversed".to_string())
         })?;
         let text_cps = parse_text_cps(txt_data, ref_plcf.count(), subdoc_len)?;
 
@@ -144,14 +144,14 @@ impl CommentsTable {
         for index in 0..ref_plcf.count() {
             let descriptor = CommentDescriptor::parse(
                 ref_plcf.property(index).ok_or_else(|| {
-                    DocError::Corrupted("PlcfandRef is missing an ATRDPre10".to_string())
+                    PackageError::Corrupted("PlcfandRef is missing an ATRDPre10".to_string())
                 })?,
                 owners.len(),
             )?;
             if let Some(tag) = descriptor.bookmark_tag
                 && !referenced_tags.insert(tag)
             {
-                return Err(DocError::Corrupted(
+                return Err(PackageError::Corrupted(
                     "multiple comments reference the same annotation bookmark tag".to_string(),
                 ));
             }
@@ -164,10 +164,10 @@ impl CommentsTable {
         let mut previous_ref = None;
         for index in 0..ref_plcf.count() {
             let reference_cp = ref_plcf.position(index).ok_or_else(|| {
-                DocError::Corrupted("PlcfandRef is missing a character position".to_string())
+                PackageError::Corrupted("PlcfandRef is missing a character position".to_string())
             })?;
             if reference_cp >= main_end || previous_ref.is_some_and(|cp| cp >= reference_cp) {
-                return Err(DocError::Corrupted(
+                return Err(PackageError::Corrupted(
                     "PlcfandRef CPs must be unique, increasing, and inside the main document"
                         .to_string(),
                 ));
@@ -176,17 +176,19 @@ impl CommentsTable {
 
             let descriptor = descriptors[index].clone();
             let marker_cp = subdoc_start.checked_add(text_cps[index]).ok_or_else(|| {
-                DocError::Corrupted("comment story start CP overflows".to_string())
+                PackageError::Corrupted("comment story start CP overflows".to_string())
             })?;
             let text_end_cp = subdoc_start
                 .checked_add(text_cps[index + 1])
-                .ok_or_else(|| DocError::Corrupted("comment story end CP overflows".to_string()))?;
+                .ok_or_else(|| {
+                    PackageError::Corrupted("comment story end CP overflows".to_string())
+                })?;
             let author = owners[usize::from(descriptor.author_index)].clone();
             let range = descriptor
                 .bookmark_tag
                 .map(|tag| {
                     ranges.get(&tag).copied().ok_or_else(|| {
-                        DocError::Corrupted(
+                        PackageError::Corrupted(
                             "ATRDPre10 references an unknown annotation bookmark tag".to_string(),
                         )
                     })
@@ -239,7 +241,7 @@ fn parse_extended_metadata(
     }
     let data = required_table_slice(fib, table_stream, 112, "AtrdExtra")?;
     if data.len() != comment_count * ATRD_POST10_SIZE {
-        return Err(DocError::Corrupted(
+        return Err(PackageError::Corrupted(
             "AtrdExtra count does not match PlcfandRef".to_string(),
         ));
     }
@@ -247,24 +249,26 @@ fn parse_extended_metadata(
     let mut metadata = Vec::with_capacity(comment_count);
     let mut parent_deltas = Vec::with_capacity(comment_count);
     for record in data.chunks_exact(ATRD_POST10_SIZE) {
-        let packed_time = litchi_core::binary::read_u32_le(record, 0)
-            .map_err(|error| DocError::Corrupted(format!("invalid ATRDPost10 DTTM: {error}")))?;
+        let packed_time = litchi_core::binary::read_u32_le(record, 0).map_err(|error| {
+            PackageError::Corrupted(format!("invalid ATRDPost10 DTTM: {error}"))
+        })?;
         let modified_at = parse_dttm(packed_time)?;
         if read_u16(record, 4, "ATRDPost10 padding1")? != 0 {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "ATRDPost10 padding1 must be zero".to_string(),
             ));
         }
         let depth = litchi_core::binary::read_u32_le(record, 6).map_err(|error| {
-            DocError::Corrupted(format!("invalid ATRDPost10 comment depth: {error}"))
+            PackageError::Corrupted(format!("invalid ATRDPost10 comment depth: {error}"))
         })?;
         let parent_delta = litchi_core::binary::read_i32_le(record, 10).map_err(|error| {
-            DocError::Corrupted(format!("invalid ATRDPost10 parent offset: {error}"))
+            PackageError::Corrupted(format!("invalid ATRDPost10 parent offset: {error}"))
         })?;
-        let flags = litchi_core::binary::read_u32_le(record, 14)
-            .map_err(|error| DocError::Corrupted(format!("invalid ATRDPost10 flags: {error}")))?;
+        let flags = litchi_core::binary::read_u32_le(record, 14).map_err(|error| {
+            PackageError::Corrupted(format!("invalid ATRDPost10 flags: {error}"))
+        })?;
         if flags & !0x2 != 0 {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "ATRDPost10 reserved flag bits must be zero".to_string(),
             ));
         }
@@ -280,10 +284,10 @@ fn parse_extended_metadata(
     let mut active_ancestors = Vec::<usize>::new();
     for index in 0..metadata.len() {
         let depth = usize::try_from(metadata[index].depth).map_err(|_| {
-            DocError::Corrupted("ATRDPost10 comment depth is too large".to_string())
+            PackageError::Corrupted("ATRDPost10 comment depth is too large".to_string())
         })?;
         if depth > active_ancestors.len() {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "AtrdExtra comment depths are not in pre-order".to_string(),
             ));
         }
@@ -292,7 +296,7 @@ fn parse_extended_metadata(
         let parent_delta = parent_deltas[index];
         if depth == 0 {
             if parent_delta != 0 {
-                return Err(DocError::Corrupted(
+                return Err(PackageError::Corrupted(
                     "a top-level ATRDPost10 must have no parent".to_string(),
                 ));
             }
@@ -300,13 +304,13 @@ fn parse_extended_metadata(
             let parent = index
                 .checked_add_signed(parent_delta as isize)
                 .ok_or_else(|| {
-                    DocError::Corrupted("ATRDPost10 parent offset is out of range".to_string())
+                    PackageError::Corrupted("ATRDPost10 parent offset is out of range".to_string())
                 })?;
             let expected_parent = active_ancestors.get(depth - 1).copied().ok_or_else(|| {
-                DocError::Corrupted("AtrdExtra comment tree is malformed".to_string())
+                PackageError::Corrupted("AtrdExtra comment tree is malformed".to_string())
             })?;
             if parent != expected_parent || metadata[parent].depth + 1 != metadata[index].depth {
-                return Err(DocError::Corrupted(
+                return Err(PackageError::Corrupted(
                     "ATRDPost10 parent and depth do not describe a pre-order tree".to_string(),
                 ));
             }
@@ -326,7 +330,7 @@ fn parse_dttm(value: u32) -> Result<Option<CommentDateTime>> {
     let year = ((value >> 20) & 0x01FF) as u16 + 1900;
     let weekday = ((value >> 29) & 0x07) as u8;
     if minute > 59 || hour > 23 || day > 31 || month > 12 || weekday > 6 {
-        return Err(DocError::Corrupted(
+        return Err(PackageError::Corrupted(
             "ATRDPost10 contains an invalid DTTM".to_string(),
         ));
     }
@@ -356,7 +360,7 @@ fn parse_annotation_ranges(
     });
     if referenced_tags.is_empty() {
         if pointer_lengths.iter().any(|&length| length != 0) {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "point comments must not define annotation bookmark tables".to_string(),
             ));
         }
@@ -367,14 +371,14 @@ fn parse_annotation_ranges(
     let tags = parse_annotation_bookmark_tags(bookmark_names)?;
     let starts_data = required_table_slice(fib, table_stream, 42, "PlcfAtnBkf")?;
     if starts_data.len() < 4 || (starts_data.len() - 4) % 8 != 0 {
-        return Err(DocError::Corrupted(
+        return Err(PackageError::Corrupted(
             "PlcfAtnBkf has an invalid byte length".to_string(),
         ));
     }
     let starts = Plcf::parse(starts_data, 4)
-        .ok_or_else(|| DocError::Corrupted("PlcfAtnBkf is malformed".to_string()))?;
+        .ok_or_else(|| PackageError::Corrupted("PlcfAtnBkf is malformed".to_string()))?;
     if starts.count() != tags.len() {
-        return Err(DocError::Corrupted(
+        return Err(PackageError::Corrupted(
             "PlcfAtnBkf and SttbfAtnBkmk counts do not match".to_string(),
         ));
     }
@@ -383,7 +387,7 @@ fn parse_annotation_ranges(
 
     let ends_data = required_table_slice(fib, table_stream, 43, "PlcfAtnBkl")?;
     if ends_data.len() != (tags.len() + 1) * 4 {
-        return Err(DocError::Corrupted(
+        return Err(PackageError::Corrupted(
             "PlcfAtnBkl count does not match PlcfAtnBkf".to_string(),
         ));
     }
@@ -391,7 +395,7 @@ fn parse_annotation_ranges(
     for offset in (0..ends_data.len()).step_by(4) {
         ends.push(
             litchi_core::binary::read_u32_le(ends_data, offset).map_err(|error| {
-                DocError::Corrupted(format!("invalid PlcfAtnBkl character position: {error}"))
+                PackageError::Corrupted(format!("invalid PlcfAtnBkl character position: {error}"))
             })?,
         );
     }
@@ -403,7 +407,7 @@ fn parse_annotation_ranges(
             .windows(2)
             .any(|pair| pair[0] > pair[1])
     {
-        return Err(DocError::Corrupted(
+        return Err(PackageError::Corrupted(
             "PlcfAtnBkl has invalid or non-monotonic character positions".to_string(),
         ));
     }
@@ -413,25 +417,25 @@ fn parse_annotation_ranges(
     for (index, tag) in tags.into_iter().enumerate() {
         let property = starts
             .property(index)
-            .ok_or_else(|| DocError::Corrupted("PlcfAtnBkf is missing an FBKF".to_string()))?;
+            .ok_or_else(|| PackageError::Corrupted("PlcfAtnBkf is missing an FBKF".to_string()))?;
         let end_index = usize::from(read_u16(property, 0, "annotation bookmark ibkl")?);
         let bookmark_flags = read_u16(property, 2, "annotation bookmark BKC")?;
         if bookmark_flags & 0x8080 != 0 {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "annotation bookmark BKC has fPub or fCol set".to_string(),
             ));
         }
         if end_index >= ends.len() - 1 || !used_end_indexes.insert(end_index) {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "annotation bookmark ibkl values must be unique and in range".to_string(),
             ));
         }
-        let start = starts
-            .position(index)
-            .ok_or_else(|| DocError::Corrupted("PlcfAtnBkf is missing a start CP".to_string()))?;
+        let start = starts.position(index).ok_or_else(|| {
+            PackageError::Corrupted("PlcfAtnBkf is missing a start CP".to_string())
+        })?;
         let end = ends[end_index];
         if start > end {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "annotation bookmark start CP exceeds its end CP".to_string(),
             ));
         }
@@ -440,7 +444,7 @@ fn parse_annotation_ranges(
     if ranges.len() != referenced_tags.len()
         || referenced_tags.iter().any(|tag| !ranges.contains_key(tag))
     {
-        return Err(DocError::Corrupted(
+        return Err(PackageError::Corrupted(
             "annotation bookmark tags do not match ranged comments".to_string(),
         ));
     }
@@ -449,7 +453,7 @@ fn parse_annotation_ranges(
 
 fn parse_annotation_bookmark_tags(data: &[u8]) -> Result<Vec<u32>> {
     if data.len() < 6 {
-        return Err(DocError::Corrupted(
+        return Err(PackageError::Corrupted(
             "SttbfAtnBkmk is missing its header".to_string(),
         ));
     }
@@ -459,7 +463,7 @@ fn parse_annotation_bookmark_tags(data: &[u8]) -> Result<Vec<u32>> {
         || read_u16(data, 4, "SttbfAtnBkmk cbExtra")? != 10
         || data.len() != 6 + count * 12
     {
-        return Err(DocError::Corrupted(
+        return Err(PackageError::Corrupted(
             "SttbfAtnBkmk has invalid header fields or byte length".to_string(),
         ));
     }
@@ -470,17 +474,19 @@ fn parse_annotation_bookmark_tags(data: &[u8]) -> Result<Vec<u32>> {
         if read_u16(data, offset, "SttbfAtnBkmk string length")? != 0
             || read_u16(data, offset + 2, "ATNBE bookmark class")? != 0x0100
             || litchi_core::binary::read_i32_le(data, offset + 8).map_err(|error| {
-                DocError::Corrupted(format!("invalid ATNBE legacy tag: {error}"))
+                PackageError::Corrupted(format!("invalid ATNBE legacy tag: {error}"))
             })? != -1
         {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "SttbfAtnBkmk contains an invalid ATNBE".to_string(),
             ));
         }
         let tag = litchi_core::binary::read_u32_le(data, offset + 4)
-            .map_err(|error| DocError::Corrupted(format!("invalid ATNBE tag: {error}")))?;
+            .map_err(|error| PackageError::Corrupted(format!("invalid ATNBE tag: {error}")))?;
         if !unique.insert(tag) {
-            return Err(DocError::Corrupted("ATNBE tags must be unique".to_string()));
+            return Err(PackageError::Corrupted(
+                "ATNBE tags must be unique".to_string(),
+            ));
         }
         tags.push(tag);
     }
@@ -495,9 +501,9 @@ fn validate_bookmark_cps(plcf: &Plcf<'_>, main_end: u32, name: &str) -> Result<(
     for index in 0..plcf.count() {
         let cp = plcf
             .position(index)
-            .ok_or_else(|| DocError::Corrupted(format!("{name} is missing a CP")))?;
+            .ok_or_else(|| PackageError::Corrupted(format!("{name} is missing a CP")))?;
         if cp > main_end || previous.is_some_and(|value| value > cp) {
-            return Err(DocError::Corrupted(format!(
+            return Err(PackageError::Corrupted(format!(
                 "{name} has out-of-range or non-monotonic CPs"
             )));
         }
@@ -515,17 +521,17 @@ fn required_table_slice<'a>(
     let (offset, length) = fib
         .get_table_pointer(index)
         .filter(|(_, length)| *length != 0)
-        .ok_or_else(|| DocError::Corrupted(format!("{name} is missing")))?;
+        .ok_or_else(|| PackageError::Corrupted(format!("{name} is missing")))?;
     let start = usize::try_from(offset)
-        .map_err(|_| DocError::Corrupted(format!("{name} offset is too large")))?;
+        .map_err(|_| PackageError::Corrupted(format!("{name} offset is too large")))?;
     let length = usize::try_from(length)
-        .map_err(|_| DocError::Corrupted(format!("{name} length is too large")))?;
+        .map_err(|_| PackageError::Corrupted(format!("{name} length is too large")))?;
     let end = start
         .checked_add(length)
-        .ok_or_else(|| DocError::Corrupted(format!("{name} range overflows")))?;
+        .ok_or_else(|| PackageError::Corrupted(format!("{name} range overflows")))?;
     table_stream
         .get(start..end)
-        .ok_or_else(|| DocError::Corrupted(format!("{name} extends beyond the table stream")))
+        .ok_or_else(|| PackageError::Corrupted(format!("{name} extends beyond the table stream")))
 }
 
 fn parse_owners(data: &[u8]) -> Result<Vec<String>> {
@@ -534,24 +540,25 @@ fn parse_owners(data: &[u8]) -> Result<Vec<String>> {
     while offset < data.len() {
         let length = usize::from(read_u16(data, offset, "comment-owner XST length")?);
         if length >= 56 {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "comment-owner name contains 56 or more UTF-16 characters".to_string(),
             ));
         }
         let byte_length = length
             .checked_mul(2)
-            .ok_or_else(|| DocError::Corrupted("comment-owner XST overflows".to_string()))?;
+            .ok_or_else(|| PackageError::Corrupted("comment-owner XST overflows".to_string()))?;
         let start = offset + 2;
         let end = start
             .checked_add(byte_length)
-            .ok_or_else(|| DocError::Corrupted("comment-owner XST overflows".to_string()))?;
+            .ok_or_else(|| PackageError::Corrupted("comment-owner XST overflows".to_string()))?;
         let owner = decode_utf16(
-            data.get(start..end)
-                .ok_or_else(|| DocError::Corrupted("comment-owner XST is truncated".to_string()))?,
+            data.get(start..end).ok_or_else(|| {
+                PackageError::Corrupted("comment-owner XST is truncated".to_string())
+            })?,
             "comment-owner name",
         )?;
         if owners.iter().any(|existing| existing == &owner) {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "comment-owner names must be unique".to_string(),
             ));
         }
@@ -559,7 +566,7 @@ fn parse_owners(data: &[u8]) -> Result<Vec<String>> {
         offset = end;
     }
     if owners.len() > 0x7FFF {
-        return Err(DocError::Corrupted(
+        return Err(PackageError::Corrupted(
             "comment-owner array exceeds 0x7FFF entries".to_string(),
         ));
     }
@@ -568,7 +575,7 @@ fn parse_owners(data: &[u8]) -> Result<Vec<String>> {
 
 fn parse_text_cps(data: &[u8], comment_count: usize, subdoc_len: u32) -> Result<Vec<u32>> {
     if !data.len().is_multiple_of(4) || data.len() / 4 != comment_count + 2 {
-        return Err(DocError::Corrupted(
+        return Err(PackageError::Corrupted(
             "PlcfandTxt CP count does not match PlcfandRef".to_string(),
         ));
     }
@@ -576,7 +583,7 @@ fn parse_text_cps(data: &[u8], comment_count: usize, subdoc_len: u32) -> Result<
     for offset in (0..data.len()).step_by(4) {
         cps.push(
             litchi_core::binary::read_u32_le(data, offset).map_err(|error| {
-                DocError::Corrupted(format!("invalid PlcfandTxt character position: {error}"))
+                PackageError::Corrupted(format!("invalid PlcfandTxt character position: {error}"))
             })?,
         );
     }
@@ -589,13 +596,13 @@ fn parse_text_cps(data: &[u8], comment_count: usize, subdoc_len: u32) -> Result<
             .windows(2)
             .any(|pair| pair[1] - pair[0] < 2)
     {
-        return Err(DocError::Corrupted(
+        return Err(PackageError::Corrupted(
             "PlcfandTxt CPs must be unique, increasing, and inside the comment subdocument"
                 .to_string(),
         ));
     }
     if cps[cps.len() - 2] != subdoc_len - 1 {
-        return Err(DocError::Corrupted(
+        return Err(PackageError::Corrupted(
             "PlcfandTxt terminator must equal ccpAtn - 1".to_string(),
         ));
     }
@@ -604,12 +611,12 @@ fn parse_text_cps(data: &[u8], comment_count: usize, subdoc_len: u32) -> Result<
 
 fn read_u16(data: &[u8], offset: usize, field: &str) -> Result<u16> {
     litchi_core::binary::read_u16_le(data, offset)
-        .map_err(|error| DocError::Corrupted(format!("invalid {field}: {error}")))
+        .map_err(|error| PackageError::Corrupted(format!("invalid {field}: {error}")))
 }
 
 fn decode_utf16(data: &[u8], field: &str) -> Result<String> {
     if !data.len().is_multiple_of(2) {
-        return Err(DocError::Corrupted(format!(
+        return Err(PackageError::Corrupted(format!(
             "{field} contains a partial UTF-16 code unit"
         )));
     }
@@ -618,7 +625,7 @@ fn decode_utf16(data: &[u8], field: &str) -> Result<String> {
         .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
         .collect::<Vec<_>>();
     String::from_utf16(&units)
-        .map_err(|_| DocError::Corrupted(format!("{field} contains invalid UTF-16")))
+        .map_err(|_| PackageError::Corrupted(format!("{field} contains invalid UTF-16")))
 }
 
 #[cfg(test)]

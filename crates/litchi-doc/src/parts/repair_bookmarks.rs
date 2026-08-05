@@ -8,7 +8,7 @@
 //! as inert metadata: descriptions are never evaluated and no repair is ever
 //! applied or reverted.
 
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 use std::collections::HashSet;
 
@@ -43,8 +43,8 @@ const BKC_ITC_FIRST_MASK: u16 = 0x007F;
 const BKC_ITC_LIM_SHIFT: u16 = 8;
 const BKC_ITC_LIM_MASK: u16 = 0x003F;
 
-fn corrupted(message: impl Into<String>) -> DocError {
-    DocError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }
 
 fn read_u16(data: &[u8], offset: usize, field: &str) -> Result<u16> {

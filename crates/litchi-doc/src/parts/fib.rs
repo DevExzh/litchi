@@ -6,7 +6,7 @@
 /// - Which table stream to use (0Table or 1Table)
 /// - Pointers to various data structures
 /// - Document flags and properties
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use zerocopy::{FromBytes, LE, U16, U32};
 
 /// Minimum FIB size in bytes (the base FIB structure)
@@ -74,12 +74,12 @@ impl FileInformationBlock {
     /// rather than copying the prefix that precedes it.
     pub fn parse_at(word_document: &[u8], offset: usize) -> Result<Self> {
         let data = word_document.get(offset..).ok_or_else(|| {
-            DocError::Corrupted(format!(
+            PackageError::Corrupted(format!(
                 "FIB offset {offset} is beyond the WordDocument stream"
             ))
         })?;
         if data.len() < FIB_BASE_SIZE {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "WordDocument stream too short for FIB".to_string(),
             ));
         }
@@ -104,7 +104,7 @@ impl FileInformationBlock {
         // Validate magic number
         if magic != 0xA5EC && magic != 0xA5DC {
             // 0xA5DC for Word 6.0/95, 0xA5EC for Word 97+
-            return Err(DocError::InvalidFormat(format!(
+            return Err(PackageError::InvalidFormat(format!(
                 "Invalid FIB magic number: 0x{:04X}",
                 magic
             )));

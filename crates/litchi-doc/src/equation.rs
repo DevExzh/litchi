@@ -6,7 +6,7 @@
 //! separate concern and is intentionally not approximated here.
 
 use super::embedded_object::{Editor, Reference, WriteOptions};
-use super::package::{DocError, Result};
+use super::package::{Error as PackageError, Result};
 use super::writer::images::{DocPicture, write_picture_block};
 use litchi_cfb::OleWriter;
 use std::io::Cursor;
@@ -145,7 +145,7 @@ impl Editor {
     pub fn add_mtef_equation(&mut self, options: DocMtefEquationWriteOptions) -> Result<Reference> {
         let mut picture_data = Vec::new();
         write_picture_block(&options.preview, options.storage_id, &mut picture_data)
-            .map_err(|error| DocError::Corrupted(error.to_string()))?;
+            .map_err(|error| PackageError::Corrupted(error.to_string()))?;
         let compound_file = equation_compound_file(options.equation)?;
         self.add(WriteOptions {
             storage_id: options.storage_id,
@@ -202,6 +202,6 @@ fn validate_mtef_payload(payload: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn invalid(message: impl Into<String>) -> DocError {
-    DocError::InvalidFormat(message.into())
+fn invalid(message: impl Into<String>) -> PackageError {
+    PackageError::InvalidFormat(message.into())
 }

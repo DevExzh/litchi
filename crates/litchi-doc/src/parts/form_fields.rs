@@ -18,7 +18,7 @@
 //! mandated length of zero ([MS-DOC] §2.5), so no table-stream fallback path
 //! exists to parse.
 
-use crate::package::{DocError, Result};
+use crate::package::{Error as PackageError, Result};
 
 /// `NilPICFAndBinData.cbHeader`: the mandated offset of `binData`.
 const CB_HEADER: u16 = 0x0044;
@@ -64,8 +64,8 @@ const MAX_DROPDOWN_ITEMS: u16 = 25;
 /// STTB `fExtend` marker for Unicode strings.
 const STTB_EXTENDED: u16 = 0xFFFF;
 
-fn corrupted(message: impl Into<String>) -> DocError {
-    DocError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }
 
 /// The stored kind of a legacy form field (`FFDataBits.iType`, MS-DOC 2.9.79).

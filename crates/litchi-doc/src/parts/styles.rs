@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use super::super::leniency::{DocLeniency, DocStylesheetDefect, DocToleranceReport};
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 use super::tap::TableProperties;
 use crate::sprm_operations::{get_sprm_operation, get_sprm_type};
@@ -201,7 +201,9 @@ impl StyleSheet {
         let (stream_offset, length) = fib
             .get_table_pointer(STSH_POINTER_INDEX)
             .filter(|(_, length)| *length != 0)
-            .ok_or_else(|| DocError::Corrupted("FIB does not contain a stylesheet".to_string()))?;
+            .ok_or_else(|| {
+                PackageError::Corrupted("FIB does not contain a stylesheet".to_string())
+            })?;
         let start = usize::try_from(stream_offset)
             .map_err(|_| corrupted("stylesheet offset is too large"))?;
         let length =
@@ -1061,8 +1063,8 @@ fn read_u32(data: &[u8], offset: usize, field: &str) -> Result<u32> {
         .map_err(|error| corrupted(&format!("invalid {field}: {error}")))
 }
 
-fn corrupted(message: &str) -> DocError {
-    DocError::Corrupted(format!("invalid stylesheet: {message}"))
+fn corrupted(message: &str) -> PackageError {
+    PackageError::Corrupted(format!("invalid stylesheet: {message}"))
 }
 
 #[cfg(test)]

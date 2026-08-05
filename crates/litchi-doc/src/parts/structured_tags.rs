@@ -9,7 +9,7 @@
 //! no placeholder is rendered, and no document content is modified.
 
 use super::fib::FileInformationBlock;
-use crate::package::{DocError, Result};
+use crate::package::{Error as PackageError, Result};
 use std::collections::HashSet;
 
 /// Table-pointer index of `fcSttbfBkmkSdt`/`lcbSttbfBkmkSdt`.
@@ -469,8 +469,8 @@ fn read_u32(data: &[u8], offset: usize, field: &str) -> Result<u32> {
         .map_err(|error| corrupted(format!("invalid {field}: {error}")))
 }
 
-fn corrupted(message: impl Into<String>) -> DocError {
-    DocError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }
 
 #[cfg(test)]

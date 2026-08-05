@@ -1,5 +1,5 @@
 use super::comment::CommentDateTime;
-use super::package::{DocError, Result};
+use super::package::{Error as PackageError, Result};
 
 /// Kind of tracked text revision.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -117,7 +117,7 @@ pub(crate) fn decode_dttm(value: u32) -> Result<Option<CommentDateTime>> {
     let year = ((value >> 20) & 0x01FF) as u16 + 1900;
     let weekday = ((value >> 29) & 0x07) as u8;
     if minute > 59 || hour > 23 || day > 31 || month > 12 || weekday > 6 {
-        return Err(DocError::Corrupted(
+        return Err(PackageError::Corrupted(
             "revision contains an invalid DTTM".to_string(),
         ));
     }

@@ -9,7 +9,7 @@ use std::collections::HashSet;
 
 use litchi_core::binary::{read_u16_le, read_u32_le};
 
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::fkp::{PapxFkp, ParagraphHeight};
 use super::pap::ParagraphProperties;
 use super::piece_table::PieceTable;
@@ -76,7 +76,7 @@ impl PapBinTable {
         for index in 0..page_count {
             let pn_raw =
                 read_u32_le(plcf_bte_papx_data, pn_array_offset + index * 4).map_err(|error| {
-                    DocError::Corrupted(format!("invalid PAP bin-table page: {error}"))
+                    PackageError::Corrupted(format!("invalid PAP bin-table page: {error}"))
                 })?;
             let page_number = pn_raw & 0x003f_ffff;
             if page_number == 0 {
@@ -84,20 +84,22 @@ impl PapBinTable {
             }
             let page_offset = (page_number as usize)
                 .checked_mul(FKP_PAGE_SIZE)
-                .ok_or_else(|| DocError::Corrupted("PAP FKP page offset overflowed".to_string()))?;
-            let page_end = page_offset
-                .checked_add(FKP_PAGE_SIZE)
-                .ok_or_else(|| DocError::Corrupted("PAP FKP page range overflowed".to_string()))?;
+                .ok_or_else(|| {
+                    PackageError::Corrupted("PAP FKP page offset overflowed".to_string())
+                })?;
+            let page_end = page_offset.checked_add(FKP_PAGE_SIZE).ok_or_else(|| {
+                PackageError::Corrupted("PAP FKP page range overflowed".to_string())
+            })?;
             let page = word_document.get(page_offset..page_end).ok_or_else(|| {
-                DocError::Corrupted("PAP FKP page extends beyond WordDocument".to_string())
+                PackageError::Corrupted("PAP FKP page extends beyond WordDocument".to_string())
             })?;
             let fkp = PapxFkp::parse(page, data_stream.unwrap_or_default())
-                .ok_or_else(|| DocError::Corrupted("PAP FKP page is malformed".to_string()))?;
+                .ok_or_else(|| PackageError::Corrupted("PAP FKP page is malformed".to_string()))?;
 
             for entry_index in 0..fkp.count() {
-                let entry = fkp
-                    .entry(entry_index)
-                    .ok_or_else(|| DocError::Corrupted("PAP FKP entry is malformed".to_string()))?;
+                let entry = fkp.entry(entry_index).ok_or_else(|| {
+                    PackageError::Corrupted("PAP FKP entry is malformed".to_string())
+                })?;
                 for (start_cp, end_cp) in piece_table.fc_range_to_cp_ranges(entry.fc, entry.end_fc)
                 {
                     let piece_modifier = piece_table
@@ -185,7 +187,7 @@ impl PapBinTable {
                     SPRM_P_HUGE_PAPX | SPRM_P_TABLE_PROPS | SPRM_P_TABLE_PROPS_LEGACY
                 )
             }) {
-                return Err(DocError::Corrupted(
+                return Err(PackageError::Corrupted(
                     "PAPX data indirection requires a Data Stream".to_string(),
                 ));
             }
@@ -213,7 +215,7 @@ impl PapBinTable {
         depth: usize,
     ) -> Result<Option<Vec<u8>>> {
         if depth >= MAX_DATA_INDIRECTION_DEPTH {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "PAPX data indirection exceeds the depth limit".to_string(),
             ));
         }
@@ -231,32 +233,32 @@ impl PapBinTable {
             }
 
             let data_offset = sprm.operand_dword().ok_or_else(|| {
-                DocError::Corrupted("PAPX data indirection lacks an offset".to_string())
+                PackageError::Corrupted("PAPX data indirection lacks an offset".to_string())
             })?;
             if !visited.insert(data_offset) {
-                return Err(DocError::Corrupted(
+                return Err(PackageError::Corrupted(
                     "PAPX data indirection contains a cycle".to_string(),
                 ));
             }
             let offset = usize::try_from(data_offset).map_err(|_| {
-                DocError::Corrupted("PAPX data offset does not fit in memory".to_string())
+                PackageError::Corrupted("PAPX data offset does not fit in memory".to_string())
             })?;
             let size = usize::from(read_u16_le(data_stream, offset).map_err(|error| {
-                DocError::Corrupted(format!("invalid PAPX PrcData length: {error}"))
+                PackageError::Corrupted(format!("invalid PAPX PrcData length: {error}"))
             })?);
             if size < 10 {
-                return Err(DocError::Corrupted(
+                return Err(PackageError::Corrupted(
                     "PAPX PrcData is shorter than 10 bytes".to_string(),
                 ));
             }
-            let content_start = offset
-                .checked_add(2)
-                .ok_or_else(|| DocError::Corrupted("PAPX PrcData start overflowed".to_string()))?;
-            let content_end = content_start
-                .checked_add(size)
-                .ok_or_else(|| DocError::Corrupted("PAPX PrcData range overflowed".to_string()))?;
+            let content_start = offset.checked_add(2).ok_or_else(|| {
+                PackageError::Corrupted("PAPX PrcData start overflowed".to_string())
+            })?;
+            let content_end = content_start.checked_add(size).ok_or_else(|| {
+                PackageError::Corrupted("PAPX PrcData range overflowed".to_string())
+            })?;
             let referenced = data_stream.get(content_start..content_end).ok_or_else(|| {
-                DocError::Corrupted("PAPX PrcData extends beyond the Data Stream".to_string())
+                PackageError::Corrupted("PAPX PrcData extends beyond the Data Stream".to_string())
             })?;
 
             let nested =

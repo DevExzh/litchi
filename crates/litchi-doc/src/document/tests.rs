@@ -29,7 +29,7 @@ mod owned_mtef_tests {
     }
 }
 
-use crate::package::{DocError, Package};
+use crate::package::{Error as PackageError, Package};
 use crate::parts::fib::WORD_97_NFIB;
 use crate::{Image, ImageError};
 use std::path::Path;
@@ -101,7 +101,7 @@ fn word_6_documents_report_their_version_not_a_missing_stream() {
     let mut package = Package::open(&path).expect("the CFB container opens");
 
     match package.document() {
-        Err(DocError::UnsupportedVersion { nfib, name }) => {
+        Err(PackageError::UnsupportedVersion { nfib, name }) => {
             assert!(
                 nfib < WORD_97_NFIB,
                 "expected a pre-Word-97 nFib, got {nfib:#06x}"

@@ -4,7 +4,7 @@ use std::io::{self, Read, Seek};
 
 /// Options controlling how a legacy Word document is opened.
 #[derive(Debug, Clone, Copy, Default)]
-pub struct DocOpenOptions<'a> {
+pub struct OpenOptions<'a> {
     /// Password used for password-to-open encryption.
     pub password: Option<&'a str>,
     /// How non-structural stylesheet defects are treated.
@@ -15,7 +15,7 @@ pub struct DocOpenOptions<'a> {
 
 /// Password-to-open encryption schemes identified in a DOC file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DocEncryptionKind {
+pub enum EncryptionKind {
     /// Legacy Word XOR obfuscation.
     XorObfuscation,
     /// Office CryptoAPI encryption.
@@ -31,7 +31,7 @@ pub enum DocEncryptionKind {
 
 /// Error types for DOC file parsing.
 #[derive(Debug)]
-pub enum DocError {
+pub enum Error {
     /// IO error
     Io(io::Error),
     /// OLE file error
@@ -47,7 +47,7 @@ pub enum DocError {
     /// The supplied password did not validate.
     InvalidPassword,
     /// The document uses a recognized but unsupported encryption scheme.
-    UnsupportedEncryption(DocEncryptionKind),
+    UnsupportedEncryption(EncryptionKind),
     /// The clear encryption header is malformed.
     MalformedEncryptionHeader(String),
     /// The file predates the Word 97 binary format this reader implements.
@@ -63,41 +63,41 @@ pub enum DocError {
     },
 }
 
-impl From<io::Error> for DocError {
+impl From<io::Error> for Error {
     fn from(err: io::Error) -> Self {
-        DocError::Io(err)
+        Error::Io(err)
     }
 }
 
-impl From<OleError> for DocError {
+impl From<OleError> for Error {
     fn from(err: OleError) -> Self {
-        DocError::Ole(err)
+        Error::Ole(err)
     }
 }
 
-impl From<crate::sprm::Error> for DocError {
+impl From<crate::sprm::Error> for Error {
     fn from(error: crate::sprm::Error) -> Self {
-        DocError::Corrupted(format!("malformed SPRM sequence: {error}"))
+        Error::Corrupted(format!("malformed SPRM sequence: {error}"))
     }
 }
 
-impl std::fmt::Display for DocError {
+impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DocError::Io(e) => write!(f, "IO error: {}", e),
-            DocError::Ole(e) => write!(f, "OLE error: {}", e),
-            DocError::InvalidFormat(s) => write!(f, "Invalid format: {}", s),
-            DocError::StreamNotFound(s) => write!(f, "Stream not found: {}", s),
-            DocError::Corrupted(s) => write!(f, "Corrupted file: {}", s),
-            DocError::PasswordRequired => write!(f, "a password is required to open this document"),
-            DocError::InvalidPassword => write!(f, "the document password is invalid"),
-            DocError::UnsupportedEncryption(kind) => {
+            Error::Io(e) => write!(f, "IO error: {}", e),
+            Error::Ole(e) => write!(f, "OLE error: {}", e),
+            Error::InvalidFormat(s) => write!(f, "Invalid format: {}", s),
+            Error::StreamNotFound(s) => write!(f, "Stream not found: {}", s),
+            Error::Corrupted(s) => write!(f, "Corrupted file: {}", s),
+            Error::PasswordRequired => write!(f, "a password is required to open this document"),
+            Error::InvalidPassword => write!(f, "the document password is invalid"),
+            Error::UnsupportedEncryption(kind) => {
                 write!(f, "unsupported DOC encryption: {kind:?}")
             },
-            DocError::MalformedEncryptionHeader(s) => {
+            Error::MalformedEncryptionHeader(s) => {
                 write!(f, "malformed DOC encryption header: {s}")
             },
-            DocError::UnsupportedVersion { nfib, name } => write!(
+            Error::UnsupportedVersion { nfib, name } => write!(
                 f,
                 "{name} documents (nFib {nfib:#06x}) predate the Word 97 binary format and are not supported"
             ),
@@ -105,10 +105,10 @@ impl std::fmt::Display for DocError {
     }
 }
 
-impl std::error::Error for DocError {}
+impl std::error::Error for Error {}
 
 /// Result type for DOC operations.
-pub type Result<T> = std::result::Result<T, DocError>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 /// A Word (.doc) package.
 ///
@@ -136,27 +136,27 @@ pub struct Package<R: Read + Seek = File> {
     pub(super) ole: OleFile<R>,
 }
 
-impl From<DocError> for litchi_core::Error {
-    fn from(err: DocError) -> Self {
+impl From<Error> for litchi_core::Error {
+    fn from(err: Error) -> Self {
         match err {
-            DocError::Io(e) => litchi_core::Error::Io(e),
-            DocError::Ole(ole_err) => litchi_core::Error::from(ole_err),
-            DocError::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
-            DocError::StreamNotFound(s) => litchi_core::Error::ComponentNotFound(s),
-            DocError::Corrupted(s) => litchi_core::Error::CorruptedFile(s),
-            DocError::PasswordRequired => {
+            Error::Io(e) => litchi_core::Error::Io(e),
+            Error::Ole(ole_err) => litchi_core::Error::from(ole_err),
+            Error::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
+            Error::StreamNotFound(s) => litchi_core::Error::ComponentNotFound(s),
+            Error::Corrupted(s) => litchi_core::Error::CorruptedFile(s),
+            Error::PasswordRequired => {
                 litchi_core::Error::InvalidFormat("DOC password required".to_string())
             },
-            DocError::InvalidPassword => {
+            Error::InvalidPassword => {
                 litchi_core::Error::InvalidFormat("invalid DOC password".to_string())
             },
-            DocError::UnsupportedEncryption(kind) => {
+            Error::UnsupportedEncryption(kind) => {
                 litchi_core::Error::InvalidFormat(format!("unsupported DOC encryption: {kind:?}"))
             },
-            DocError::MalformedEncryptionHeader(s) => litchi_core::Error::CorruptedFile(s),
-            DocError::UnsupportedVersion { nfib, name } => litchi_core::Error::InvalidFormat(
-                format!("{name} documents (nFib {nfib:#06x}) are not supported"),
-            ),
+            Error::MalformedEncryptionHeader(s) => litchi_core::Error::CorruptedFile(s),
+            Error::UnsupportedVersion { nfib, name } => litchi_core::Error::InvalidFormat(format!(
+                "{name} documents (nFib {nfib:#06x}) are not supported"
+            )),
         }
     }
 }

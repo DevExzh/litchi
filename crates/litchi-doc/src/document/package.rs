@@ -2,7 +2,7 @@
 
 use super::model::Document;
 use crate::encryption::decrypt_document_streams;
-use crate::package::{DocError, DocOpenOptions, Result};
+use crate::package::{Error as PackageError, OpenOptions, Result};
 use crate::parts::associated_strings::DocumentAssociatedStrings;
 use crate::parts::auto_summary::DocumentAutoSummary;
 use crate::parts::bookmarks::BookmarksTable;
@@ -48,18 +48,18 @@ impl Document {
     ///
     /// This is typically called internally by `Package::document()`.
     pub(crate) fn from_ole<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Self> {
-        Self::from_ole_with_options(ole, DocOpenOptions::default())
+        Self::from_ole_with_options(ole, OpenOptions::default())
     }
 
     /// Create a new Document from an OLE file with password-to-open options.
     pub(crate) fn from_ole_with_options<R: Read + Seek>(
         ole: &mut OleFile<R>,
-        options: DocOpenOptions<'_>,
+        options: OpenOptions<'_>,
     ) -> Result<Self> {
         // Read the WordDocument stream (main document stream)
         let mut word_document = ole
             .open_stream(&["WordDocument"])
-            .map_err(|_| DocError::StreamNotFound("WordDocument".to_string()))?;
+            .map_err(|_| PackageError::StreamNotFound("WordDocument".to_string()))?;
 
         // Parse the File Information Block (FIB) from the start of WordDocument
         let mut fib = FileInformationBlock::parse(&word_document)?;
@@ -78,12 +78,12 @@ impl Document {
         // caller than reporting a missing stream.
         let mut table_stream = ole.open_stream(&[table_stream_name]).map_err(|_| {
             if fib.version() < WORD_97_NFIB {
-                DocError::UnsupportedVersion {
+                PackageError::UnsupportedVersion {
                     nfib: fib.version(),
                     name: fib.version_name(),
                 }
             } else {
-                DocError::StreamNotFound(table_stream_name.to_string())
+                PackageError::StreamNotFound(table_stream_name.to_string())
             }
         })?;
 

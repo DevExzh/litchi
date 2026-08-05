@@ -1,6 +1,6 @@
 //! Passive AutoText and formatted AutoCorrect metadata for legacy DOC files.
 
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::super::paragraph::{Paragraph, Run};
 use super::chp_bin_table::ChpBinTable;
 use super::fib::FileInformationBlock;
@@ -22,8 +22,8 @@ const MAX_STYLE_USE_COUNT: u8 = 0x32;
 const MAX_TABLE_BYTES: usize = 16 * 1024 * 1024;
 const FIB_PAGE_BYTES: usize = 512;
 
-fn corrupted(message: impl Into<String>) -> DocError {
-    DocError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }
 
 fn read_u16(data: &[u8], offset: usize, field: &str) -> Result<u16> {

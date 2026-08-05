@@ -1,6 +1,6 @@
 //! Word `SttbRgtplc` table for list-level template codes.
 
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 use std::collections::HashSet;
 
@@ -11,8 +11,8 @@ const ENTRY_CODE_UNITS: u16 = 0x12;
 const ENTRY_BYTES: usize = LEVEL_COUNT * 4;
 const MAX_TABLE_BYTES: usize = 6 + MAX_ENTRY_COUNT * (2 + ENTRY_BYTES);
 
-fn corrupted(message: impl Into<String>) -> DocError {
-    DocError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }
 
 fn read_u16(data: &[u8], offset: usize, field: &str) -> Result<u16> {

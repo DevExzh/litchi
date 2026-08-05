@@ -1,7 +1,7 @@
 //! Word 97 `Brc80` and `SPgbProp` codecs for section page borders.
 
 use super::model::{ApplyTo, Art, Border, Borders, Color, Depth, Error, Offset, Style};
-use crate::package::{DocError, Result};
+use crate::package::{Error as PackageError, Result};
 use crate::sprm::Sprm;
 
 /// Decode one fixed-size `Brc80` section-border operand.
@@ -37,7 +37,7 @@ pub(crate) fn decode_brc80(sprm: &Sprm, name: &str) -> Result<Option<Border>> {
         0x18 => Some(Style::ThreeDEmboss),
         0x19 => Some(Style::ThreeDEngrave),
         code => Some(Style::Art(Art::try_from(code).map_err(|error| {
-            DocError::Corrupted(format!(
+            PackageError::Corrupted(format!(
                 "{name} contains invalid Brc80 border type {code:#04x}: {error}"
             ))
         })?)),
@@ -222,5 +222,5 @@ fn encode_pgb_prop(output: &mut Vec<u8>, borders: &Borders) {
 }
 
 fn corrupted<T>(message: &str) -> Result<T> {
-    Err(DocError::Corrupted(message.to_string()))
+    Err(PackageError::Corrupted(message.to_string()))
 }

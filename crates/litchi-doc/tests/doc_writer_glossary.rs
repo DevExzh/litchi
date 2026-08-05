@@ -4,7 +4,7 @@ use litchi_doc::writer::{
     ParagraphFormatting, Shape as DrawingShape,
 };
 use litchi_doc::{
-    DocOpenOptions, DocWriter, GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle,
+    DocWriter, GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle, OpenOptions,
     Package,
 };
 use std::io::Cursor;
@@ -424,7 +424,7 @@ fn attached_glossary_round_trips_inside_encrypted_template() {
     template.write_to(&mut output).unwrap();
     let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
     let document = package
-        .document_with_options(DocOpenOptions {
+        .document_with_options(OpenOptions {
             password: Some("secret"),
             ..Default::default()
         })

@@ -4,7 +4,7 @@
 //! download URL, or external schema is executed or contacted.
 
 use super::fib::FileInformationBlock;
-use crate::package::{DocError, Result};
+use crate::package::{Error as PackageError, Result};
 use litchi_codepage::Ansi;
 use litchi_ole_common::smart_tags::{Limits, PropertyBag, PropertyBagStore, Type};
 use std::collections::{BTreeMap, HashSet};
@@ -511,8 +511,8 @@ fn read_u32(data: &[u8], offset: usize, name: &str) -> Result<u32> {
     Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
 }
 
-fn corrupted(message: impl Into<String>) -> DocError {
-    DocError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }
 
 fn ansi_for_lcid(lcid: u16) -> Option<Ansi> {

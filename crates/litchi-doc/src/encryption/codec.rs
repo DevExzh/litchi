@@ -1,7 +1,7 @@
 //! Binary codecs for legacy Word encryption headers and streams.
 
 use super::model::DocEncryptionProfile;
-use crate::package::{DocEncryptionKind, DocError, Result};
+use crate::package::{EncryptionKind, Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
 use encoding_rs::{
     BIG5, EUC_KR, Encoding, GBK, SHIFT_JIS, WINDOWS_874, WINDOWS_1250, WINDOWS_1251, WINDOWS_1252,
@@ -235,14 +235,14 @@ pub(crate) fn decrypt_document_streams(
 ) -> Result<()> {
     if fib.is_obfuscated() {
         if word_document.len() < FIB_BASE_LEN {
-            return Err(DocError::Corrupted(format!(
+            return Err(PackageError::Corrupted(format!(
                 "obfuscated WordDocument stream is shorter than the {FIB_BASE_LEN}-byte clear FIB base"
             )));
         }
-        let password = password.ok_or(DocError::PasswordRequired)?;
+        let password = password.ok_or(PackageError::PasswordRequired)?;
         let context =
             verify_xor_password(fib.xor_obfuscation_verifier(), password, fib.language_id())
-                .ok_or(DocError::InvalidPassword)?;
+                .ok_or(PackageError::InvalidPassword)?;
         apply_xor_stream(&mut word_document[FIB_BASE_LEN..], FIB_BASE_LEN, &context)?;
         apply_xor_stream(table_stream, 0, &context)?;
         if let Some(data_stream) = data_stream {
@@ -252,18 +252,18 @@ pub(crate) fn decrypt_document_streams(
     }
 
     let header_len = usize::try_from(fib.encryption_header_size()).map_err(|_| {
-        DocError::MalformedEncryptionHeader(
+        PackageError::MalformedEncryptionHeader(
             "encryption header size does not fit in memory".to_string(),
         )
     })?;
     if header_len > table_stream.len() {
-        return Err(DocError::MalformedEncryptionHeader(format!(
+        return Err(PackageError::MalformedEncryptionHeader(format!(
             "encryption header is {header_len} bytes but the table stream is only {} bytes",
             table_stream.len()
         )));
     }
     if header_len < 4 {
-        return Err(DocError::MalformedEncryptionHeader(
+        return Err(PackageError::MalformedEncryptionHeader(
             "encryption header is missing its version".to_string(),
         ));
     }
@@ -272,11 +272,11 @@ pub(crate) fn decrypt_document_streams(
     let major = u16::from_le_bytes([header[0], header[1]]);
     let minor = u16::from_le_bytes([header[2], header[3]]);
     if matches!((major, minor), (2..=4, 2)) {
-        let password = password.ok_or(DocError::PasswordRequired)?;
+        let password = password.ok_or(PackageError::PasswordRequired)?;
         let parsed = office_rc4::parse_header(header).map_err(map_crypto_error)?;
         let context = office_rc4::verify(&parsed, password)
             .map_err(map_crypto_error)?
-            .ok_or(DocError::InvalidPassword)?;
+            .ok_or(PackageError::InvalidPassword)?;
         apply_cryptoapi_stream(&mut word_document[FIB_BASE_LEN..], FIB_BASE_LEN, &context)?;
         apply_cryptoapi_stream(&mut table_stream[header_len..], header_len, &context)?;
         if let Some(data_stream) = data_stream {
@@ -286,19 +286,19 @@ pub(crate) fn decrypt_document_streams(
     }
     if (major, minor) != (1, 1) {
         let kind = if matches!((major, minor), (2..=4, 2)) {
-            DocEncryptionKind::CryptoApi
+            EncryptionKind::CryptoApi
         } else {
-            DocEncryptionKind::Unknown { major, minor }
+            EncryptionKind::Unknown { major, minor }
         };
-        return Err(DocError::UnsupportedEncryption(kind));
+        return Err(PackageError::UnsupportedEncryption(kind));
     }
     if header_len != BINARY_RC4_HEADER_LEN {
-        return Err(DocError::MalformedEncryptionHeader(format!(
+        return Err(PackageError::MalformedEncryptionHeader(format!(
             "binary RC4 encryption header must contain exactly {BINARY_RC4_HEADER_LEN} bytes, found {header_len}"
         )));
     }
     if word_document.len() < FIB_BASE_LEN {
-        return Err(DocError::Corrupted(format!(
+        return Err(PackageError::Corrupted(format!(
             "encrypted WordDocument stream is shorter than the {FIB_BASE_LEN}-byte clear FIB base"
         )));
     }
@@ -315,8 +315,8 @@ pub(crate) fn decrypt_document_streams(
         encrypted_verifier_hash,
     };
 
-    let password = password.ok_or(DocError::PasswordRequired)?;
-    let secret = verify(&header, password)?.ok_or(DocError::InvalidPassword)?;
+    let password = password.ok_or(PackageError::PasswordRequired)?;
+    let secret = verify(&header, password)?.ok_or(PackageError::InvalidPassword)?;
 
     apply_stream_cipher(&mut word_document[FIB_BASE_LEN..], FIB_BASE_LEN, &secret)?;
     apply_stream_cipher(&mut table_stream[header_len..], header_len, &secret)?;
@@ -462,7 +462,7 @@ pub(super) fn apply_xor_stream(
     for (index, byte) in data.iter_mut().enumerate() {
         let absolute = absolute_offset
             .checked_add(index)
-            .ok_or_else(|| DocError::Corrupted("DOC XOR stream offset overflow".to_string()))?;
+            .ok_or_else(|| PackageError::Corrupted("DOC XOR stream offset overflow".to_string()))?;
         let transformed = *byte ^ context.array[absolute & 0x0f];
         if *byte != 0 && transformed != 0 {
             *byte = transformed;
@@ -471,14 +471,14 @@ pub(super) fn apply_xor_stream(
     Ok(())
 }
 
-fn map_crypto_error(error: Error) -> DocError {
+fn map_crypto_error(error: Error) -> PackageError {
     match error {
-        Error::Malformed(message) => DocError::MalformedEncryptionHeader(message),
+        Error::Malformed(message) => PackageError::MalformedEncryptionHeader(message),
         Error::UnsupportedVersion { major, minor } => {
-            DocError::UnsupportedEncryption(DocEncryptionKind::Unknown { major, minor })
+            PackageError::UnsupportedEncryption(EncryptionKind::Unknown { major, minor })
         },
         Error::UnsupportedAlgorithm => {
-            DocError::UnsupportedEncryption(DocEncryptionKind::CryptoApi)
+            PackageError::UnsupportedEncryption(EncryptionKind::CryptoApi)
         },
     }
 }
@@ -490,7 +490,9 @@ pub(super) fn apply_cryptoapi_stream(
 ) -> Result<()> {
     while !data.is_empty() {
         let block = u32::try_from(absolute_offset / BINARY_RC4_BLOCK_SIZE).map_err(|_| {
-            DocError::Corrupted("encrypted DOC stream is too large for CryptoAPI RC4".to_string())
+            PackageError::Corrupted(
+                "encrypted DOC stream is too large for CryptoAPI RC4".to_string(),
+            )
         })?;
         let block_offset = absolute_offset % BINARY_RC4_BLOCK_SIZE;
         let count = data
@@ -535,7 +537,7 @@ fn verify(header: &BinaryRc4Header, password: &str) -> Result<Option<Zeroizing<[
     let secret = derive_secret(password, &header.salt);
     let key = derive_block_key(&secret, 0);
     let mut cipher = Rc4::new_from_slice(key.as_ref()).map_err(|_| {
-        DocError::MalformedEncryptionHeader("invalid binary RC4 key length".to_string())
+        PackageError::MalformedEncryptionHeader("invalid binary RC4 key length".to_string())
     })?;
     let mut verifier = Zeroizing::new(header.encrypted_verifier);
     let mut verifier_hash = Zeroizing::new(header.encrypted_verifier_hash);
@@ -556,12 +558,12 @@ pub(super) fn apply_stream_cipher(
 ) -> Result<()> {
     while !data.is_empty() {
         let block = u32::try_from(absolute_offset / BINARY_RC4_BLOCK_SIZE).map_err(|_| {
-            DocError::Corrupted("encrypted DOC stream is too large for binary RC4".to_string())
+            PackageError::Corrupted("encrypted DOC stream is too large for binary RC4".to_string())
         })?;
         let block_offset = absolute_offset % BINARY_RC4_BLOCK_SIZE;
         let key = derive_block_key(secret, block);
         let mut cipher = Rc4::new_from_slice(key.as_ref()).map_err(|_| {
-            DocError::MalformedEncryptionHeader("invalid binary RC4 key length".to_string())
+            PackageError::MalformedEncryptionHeader("invalid binary RC4 key length".to_string())
         })?;
         if block_offset != 0 {
             let mut discarded = Zeroizing::new([0u8; BINARY_RC4_BLOCK_SIZE]);

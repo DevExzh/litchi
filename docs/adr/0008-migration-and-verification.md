@@ -5221,6 +5221,34 @@ is migration evidence, not a claim of complete `[MS-DOC]`, `[MS-ODRAW]`,
 `[MS-OGRAPH]`, `[MS-OSHARED]`, `[MS-PPT]`, `[MS-XLS]`, RTF, OOXML, or ODF
 conformance.
 
+## Layered OLE2 and OOXML facade continuation
+
+This slice continues the breaking, prefix-free migration through the next
+large legacy and OOXML owners. PPT writer core and Escher, PPTX ChartEx,
+XLSB conditional-formatting and workbook codecs, ODT fields, ODS content,
+DOCX document writing, XLSX worksheet snapshot editing, DOC PAP/TAP, and
+XLS pivot tables now expose contextual facades over separated semantic model,
+binary/XML codec, package, validation, and test seams. The DOC package facade
+also uses the unprefixed `OpenOptions`, `EncryptionKind`, and `Error` names;
+the section-border error remains explicitly `BorderError` to keep the two
+semantic error domains unambiguous. No compatibility aliases were added.
+
+Shared OLE Property Set parsing/editing is layered in `litchi-ole-common`,
+including full CFB stream-path staging so nested streams with equal leaf names
+are not lost during a metadata edit. Shared OOXML web-extension handling is
+similarly split into semantic, XML, relationship, and package owners under
+`litchi-ooxml-common`. These changes preserve typed snapshots, atomic edits,
+lossless unknown content, and package-graph validation at their existing
+facades; they do not claim complete Office-specification conformance.
+
+The affected all-target `cargo check` matrix passes under the workspace lint
+policy and with lint capping. The affected library-test matrix passes, as do
+the DOC border and writer/encryption/leniency/VBA/glossary integrations, the
+PPTX notes CRUD regression suite, the umbrella `litchi` suite (162 tests plus
+three integration targets), formatting, diff, and the 46-package boundary
+check. The known malformed Apache POI DOC fixture remains a separate
+integration limitation recorded above.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

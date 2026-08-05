@@ -6,7 +6,7 @@
 //! (MS-DOC 2.9.198). The service-provided payloads remain opaque blobs in the
 //! Table Stream and are never interpreted.
 
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 
 /// Table-pointer index of `fcPlcfuim`/`lcbPlcfuim` (MS-DOC 2.5.8 FibRgFcLcb2002).
@@ -21,8 +21,8 @@ const GUID_SIZE: usize = 16;
 /// Serialized stride per PLC entry: one CP plus one `UIM`.
 const ENTRY_STRIDE: usize = 4 + Uim::SIZE;
 
-fn corrupted(message: impl Into<String>) -> DocError {
-    DocError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }
 
 fn read_i16(data: &[u8], offset: usize, field: &str) -> Result<i16> {

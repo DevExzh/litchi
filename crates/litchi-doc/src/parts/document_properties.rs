@@ -1,6 +1,6 @@
 //! Typed legacy Word Document Properties (`Dop`) metadata.
 
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 
 const FIB_INDEX: usize = 31;
@@ -13,8 +13,8 @@ const INCLUDE_HEADER_MASK: u16 = 0x1000;
 const INCLUDE_FOOTER_MASK: u16 = 0x2000;
 const EMBED_FACTOIDS_MASK: u16 = 0x0008;
 
-fn corrupted(message: impl Into<String>) -> DocError {
-    DocError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }
 
 fn u16_at(data: &[u8], offset: usize) -> u16 {

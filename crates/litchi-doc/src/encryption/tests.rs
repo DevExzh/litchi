@@ -1,5 +1,5 @@
 use super::codec::*;
-use crate::package::DocError;
+use crate::package::Error as PackageError;
 use crate::parts::fib::FileInformationBlock;
 use litchi_crypto::rc4 as office_rc4;
 use zeroize::Zeroizing;
@@ -56,14 +56,14 @@ fn xor_decrypts_all_streams_at_absolute_offsets_after_verification() {
 
     assert!(matches!(
         decrypt_document_streams(&fib, &mut word, &mut table, Some(&mut data), None),
-        Err(DocError::PasswordRequired)
+        Err(PackageError::PasswordRequired)
     ));
     assert_eq!(word, encrypted_word);
     assert_eq!(table, encrypted_table);
     assert_eq!(data, encrypted_data);
     assert!(matches!(
         decrypt_document_streams(&fib, &mut word, &mut table, Some(&mut data), Some("wrong"),),
-        Err(DocError::InvalidPassword)
+        Err(PackageError::InvalidPassword)
     ));
     assert_eq!(word, encrypted_word);
     assert_eq!(table, encrypted_table);

@@ -2,7 +2,7 @@
 
 use super::model::*;
 use crate::CommentDateTime;
-use crate::package::{DocError, Result};
+use crate::package::{Error as PackageError, Result};
 use crate::parts::fkp::{ChpxFkp, PapxFkp, ParagraphHeight};
 use crate::sprm::parse_sprms;
 use crate::sprm_operations::*;
@@ -1132,6 +1132,6 @@ pub(super) fn align512(v: usize) -> Result<usize> {
         .map(|n| n & !511)
         .ok_or_else(|| corrupted("alignment overflow"))
 }
-pub(super) fn corrupted(message: impl Into<String>) -> DocError {
-    DocError::Corrupted(message.into())
+pub(super) fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }

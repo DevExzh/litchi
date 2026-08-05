@@ -3,7 +3,7 @@ use super::codec::{
     parse_table_of_authorities_entry_field_parts, parse_table_of_contents_entry_field_parts,
     private_field_opaque_instructions,
 };
-use crate::package::{DocError, Result};
+use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
 
 pub(super) const FLD_SIZE: usize = 2;
@@ -4745,6 +4745,6 @@ impl MailMergeRecipientField {
     }
 }
 
-pub(super) fn corrupted(message: impl Into<String>) -> DocError {
-    DocError::Corrupted(message.into())
+pub(super) fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }

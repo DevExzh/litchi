@@ -4,7 +4,7 @@ use super::model::Document;
 #[cfg(feature = "formula")]
 use crate::mtef_extractor::MtefExtractor;
 #[cfg(feature = "formula")]
-use crate::package::DocError;
+use crate::package::Error as PackageError;
 use crate::package::Result;
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::piece_table::PieceTable;
@@ -23,8 +23,9 @@ impl Document {
         ole: &mut OleFile<R>,
     ) -> Result<HashMap<String, Vec<u8>>> {
         // Extract all MTEF formulas from ObjectPool (the primary location for embedded equations)
-        let mtef_data = MtefExtractor::extract_all_mtef_from_objectpool(ole)
-            .map_err(|e| DocError::InvalidFormat(format!("Failed to extract MTEF data: {}", e)))?;
+        let mtef_data = MtefExtractor::extract_all_mtef_from_objectpool(ole).map_err(|e| {
+            PackageError::InvalidFormat(format!("Failed to extract MTEF data: {}", e))
+        })?;
 
         // Also try direct stream names for compatibility with older formats
         let mut all_mtef = mtef_data;
@@ -125,7 +126,7 @@ impl Document {
                     Ok(nodes) if !nodes.is_empty() => {
                         let mut converter = litchi_formula::LatexConverter::new();
                         let rendered = converter.convert_nodes(&nodes).map_err(|error| {
-                            DocError::InvalidFormat(format!(
+                            PackageError::InvalidFormat(format!(
                                 "Failed to render MTEF formula {stream_name}: {error}"
                             ))
                         })?;

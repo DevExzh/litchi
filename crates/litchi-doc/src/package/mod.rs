@@ -5,4 +5,4 @@ mod model;
 #[cfg(test)]
 mod tests;
 
-pub use model::{DocEncryptionKind, DocError, DocOpenOptions, Package, Result};
+pub use model::{EncryptionKind, Error, OpenOptions, Package, Result};

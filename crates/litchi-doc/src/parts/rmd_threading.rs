@@ -6,7 +6,7 @@
 //! contacted, opened, or rendered.
 
 use super::super::CommentDateTime;
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::super::revision::decode_dttm;
 use super::fib::FileInformationBlock;
 
@@ -19,8 +19,8 @@ const MDP_SIZE: u16 = 8;
 /// `cbExtra` of the author/message attribute STTBs: one author index.
 const ATTRIB_EXTRA_SIZE: u16 = 2;
 
-fn corrupted(message: impl Into<String>) -> DocError {
-    DocError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> PackageError {
+    PackageError::Corrupted(message.into())
 }
 
 fn read_u16(data: &[u8], offset: usize, field: &str) -> Result<u16> {

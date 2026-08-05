@@ -8,7 +8,7 @@
 /// - Embedded objects and pictures
 ///
 /// Based on Apache POI's CharacterSprmUncompressor and CharacterProperties.
-use super::super::package::{DocError, Result};
+use super::super::package::{Error as PackageError, Result};
 use super::tap::TableStyleCondition;
 use crate::sprm::{Sprm, parse_sprms};
 use crate::sprm_operations::*;
@@ -164,7 +164,7 @@ impl CharacterPosition {
     /// Construct a validated vertical position in half-points.
     pub fn new(half_points: i16) -> Result<Self> {
         if !(-3168..=3168).contains(&half_points) {
-            return Err(DocError::Corrupted(format!(
+            return Err(PackageError::Corrupted(format!(
                 "sprmCHpsPos value {half_points} is outside -3168..=3168"
             )));
         }
@@ -215,7 +215,7 @@ impl HyphenationMode {
             4 => Ok(Self::DeleteBefore),
             5 => Ok(Self::ChangeAfter),
             6 => Ok(Self::DeleteAndChange),
-            _ => Err(DocError::Corrupted(format!(
+            _ => Err(PackageError::Corrupted(format!(
                 "sprmCHresi has invalid Hres mode {value}"
             ))),
         }
@@ -241,12 +241,12 @@ impl HresiOperand {
     /// Construct a non-normal word-breaking operand with a printable ASCII byte.
     pub fn with_character(mode: HyphenationMode, replacement_character: u8) -> Result<Self> {
         if mode == HyphenationMode::Normal {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "normal HresiOperand cannot have a replacement character".to_string(),
             ));
         }
         if !replacement_character.is_ascii_graphic() && replacement_character != b' ' {
-            return Err(DocError::Corrupted(format!(
+            return Err(PackageError::Corrupted(format!(
                 "sprmCHresi ChHres byte 0x{replacement_character:02X} is not printable ASCII"
             )));
         }
@@ -260,7 +260,7 @@ impl HresiOperand {
         let mode = HyphenationMode::from_raw(mode)?;
         if mode == HyphenationMode::Normal {
             if replacement_character != 0 {
-                return Err(DocError::Corrupted(
+                return Err(PackageError::Corrupted(
                     "normal sprmCHresi requires ChHres 0x00".to_string(),
                 ));
             }
@@ -313,7 +313,7 @@ pub enum TextEffect {
 }
 
 impl TryFrom<u8> for TextEffect {
-    type Error = DocError;
+    type Error = PackageError;
 
     fn try_from(value: u8) -> Result<Self> {
         match value {
@@ -324,7 +324,7 @@ impl TryFrom<u8> for TextEffect {
             4 => Ok(Self::MarchingBlackAnts),
             5 => Ok(Self::MarchingRedAnts),
             6 => Ok(Self::Shimmer),
-            _ => Err(DocError::Corrupted(format!(
+            _ => Err(PackageError::Corrupted(format!(
                 "sprmCSfxText has invalid text effect {value}"
             ))),
         }
@@ -717,7 +717,7 @@ impl CharacterProperties {
         let sprms = parse_sprms(grpprl)?;
         let consumed = sprms.last().map_or(0, |sprm| sprm.offset + sprm.size);
         if consumed != grpprl.len() {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "CHP grpprl does not contain a whole number of SPRMs".to_string(),
             ));
         }
@@ -770,7 +770,7 @@ impl CharacterProperties {
             // Operation 0x05: sprmCDttmRMark - Revision mark date/time
             0x05 => {
                 chp.revision_timestamp = Some(sprm.operand_dword().ok_or_else(|| {
-                    DocError::Corrupted("sprmCDttmRMark is missing its DTTM".to_string())
+                    PackageError::Corrupted("sprmCDttmRMark is missing its DTTM".to_string())
                 })?);
             },
             // Operation 0x06: sprmCFData - Data flag
@@ -838,19 +838,19 @@ impl CharacterProperties {
             0x15 => {
                 // sprmCRsidProp - Revision save ID property
                 chp.formatting_revision_save_id = Some(sprm.operand_dword().ok_or_else(|| {
-                    DocError::Corrupted("sprmCRsidProp is missing its RSID".to_string())
+                    PackageError::Corrupted("sprmCRsidProp is missing its RSID".to_string())
                 })?);
             },
             0x16 => {
                 // sprmCRsidText - Revision save ID text
                 chp.insertion_revision_save_id = Some(sprm.operand_dword().ok_or_else(|| {
-                    DocError::Corrupted("sprmCRsidText is missing its RSID".to_string())
+                    PackageError::Corrupted("sprmCRsidText is missing its RSID".to_string())
                 })?);
             },
             0x17 => {
                 // sprmCRsidRMDel - Revision save ID deletion
                 chp.deletion_revision_save_id = Some(sprm.operand_dword().ok_or_else(|| {
-                    DocError::Corrupted("sprmCRsidRMDel is missing its RSID".to_string())
+                    PackageError::Corrupted("sprmCRsidRMDel is missing its RSID".to_string())
                 })?);
             },
             0x18 => {
@@ -1042,7 +1042,7 @@ impl CharacterProperties {
             // Operation 0x45: sprmCHpsPos - Superscript/subscript position
             0x45 => {
                 let position = sprm.operand_i16().ok_or_else(|| {
-                    DocError::Corrupted("sprmCHpsPos is missing its signed operand".to_string())
+                    PackageError::Corrupted("sprmCHpsPos is missing its signed operand".to_string())
                 })?;
                 chp.position = CharacterPosition::new(position)?;
             },
@@ -1100,7 +1100,7 @@ impl CharacterProperties {
             // Operation 0x4E: sprmCHresi - Hyphenation
             0x4E => {
                 let operand = sprm.operand_word().ok_or_else(|| {
-                    DocError::Corrupted("sprmCHresi is missing its HresiOperand".to_string())
+                    PackageError::Corrupted("sprmCHresi is missing its HresiOperand".to_string())
                 })?;
                 chp.hyphenation = HresiOperand::from_bytes(operand as u8, (operand >> 8) as u8)?;
             },
@@ -1164,7 +1164,7 @@ impl CharacterProperties {
             // Operation 0x59: sprmCSfxtText - Text animation
             0x59 => {
                 let effect = sprm.operand_byte().ok_or_else(|| {
-                    DocError::Corrupted("sprmCSfxText is missing its byte operand".to_string())
+                    PackageError::Corrupted("sprmCSfxText is missing its byte operand".to_string())
                 })?;
                 chp.text_effect = TextEffect::try_from(effect)?;
             },
@@ -1258,7 +1258,7 @@ impl CharacterProperties {
             },
             0x64 => {
                 chp.deletion_timestamp = Some(sprm.operand_dword().ok_or_else(|| {
-                    DocError::Corrupted("sprmCDttmRMarkDel is missing its DTTM".to_string())
+                    PackageError::Corrupted("sprmCDttmRMarkDel is missing its DTTM".to_string())
                 })?);
             },
             0x67 => {
@@ -1279,7 +1279,7 @@ impl CharacterProperties {
         match sprm.operand_byte() {
             Some(0) => Ok(false),
             Some(1) => Ok(true),
-            _ => Err(DocError::Corrupted(format!(
+            _ => Err(PackageError::Corrupted(format!(
                 "{name} must contain a Boolean8 value"
             ))),
         }
@@ -1289,7 +1289,7 @@ impl CharacterProperties {
         match sprm.operand_byte() {
             Some(0) => Ok(false),
             Some(1) => Ok(true),
-            _ => Err(DocError::Corrupted(format!(
+            _ => Err(PackageError::Corrupted(format!(
                 "{name} must contain a Boolean8 value"
             ))),
         }
@@ -1298,13 +1298,13 @@ impl CharacterProperties {
     fn parse_conditional_formatting(sprm: &Sprm) -> Result<CharacterConditionalFormatting> {
         let operand = sprm.operand_bytes();
         if operand.len() < 2 {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "sprmCCnf must contain a 2-byte condition".to_string(),
             ));
         }
         let code = u16::from_le_bytes([operand[0], operand[1]]);
         let condition = TableStyleCondition::from_code(code).ok_or_else(|| {
-            DocError::Corrupted(format!("sprmCCnf contains invalid condition {code:#06x}"))
+            PackageError::Corrupted(format!("sprmCCnf contains invalid condition {code:#06x}"))
         })?;
         let raw_grpprl = operand[2..].to_vec();
         let nested = parse_sprms(&raw_grpprl)?;
@@ -1312,12 +1312,12 @@ impl CharacterProperties {
             .last()
             .map_or(0, |nested| nested.offset + nested.size);
         if consumed != raw_grpprl.len() {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "sprmCCnf nested grpprl is truncated".to_string(),
             ));
         }
         if nested.iter().any(|nested| nested.opcode == SPRM_C_CNF) {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "sprmCCnf cannot be nested inside another sprmCCnf".to_string(),
             ));
         }
@@ -1325,7 +1325,7 @@ impl CharacterProperties {
             .iter()
             .any(|nested| get_sprm_type(nested.opcode) != 2)
         {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "sprmCCnf can contain only character SPRMs".to_string(),
             ));
         }
@@ -1338,19 +1338,19 @@ impl CharacterProperties {
     }
 
     fn revision_author(sprm: &Sprm, name: &str) -> Result<u16> {
-        let value = sprm
-            .operand_i16()
-            .ok_or_else(|| DocError::Corrupted(format!("{name} is missing its author index")))?;
+        let value = sprm.operand_i16().ok_or_else(|| {
+            PackageError::Corrupted(format!("{name} is missing its author index"))
+        })?;
         u16::try_from(value)
-            .map_err(|_| DocError::Corrupted(format!("{name} author index is negative")))
+            .map_err(|_| PackageError::Corrupted(format!("{name} author index is negative")))
     }
 
     fn revision_reason(sprm: &Sprm, name: &str) -> Result<u16> {
         let value = sprm
             .operand_word()
-            .ok_or_else(|| DocError::Corrupted(format!("{name} is missing its reason code")))?;
+            .ok_or_else(|| PackageError::Corrupted(format!("{name} is missing its reason code")))?;
         if value > super::super::revision::RevisionReason::MAX_VALUE {
-            return Err(DocError::Corrupted(format!(
+            return Err(PackageError::Corrupted(format!(
                 "{name} contains an undefined reason code"
             )));
         }
@@ -1360,7 +1360,7 @@ impl CharacterProperties {
     fn apply_property_revision(chp: &mut CharacterProperties, sprm: &Sprm) -> Result<()> {
         let operand = sprm.operand_bytes();
         if operand.len() != 7 {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "sprmCPropRMark operand must contain exactly 7 bytes".to_string(),
             ));
         }
@@ -1368,14 +1368,14 @@ impl CharacterProperties {
             0 => false,
             1 => true,
             _ => {
-                return Err(DocError::Corrupted(
+                return Err(PackageError::Corrupted(
                     "sprmCPropRMark must begin with a Boolean8 value".to_string(),
                 ));
             },
         });
         let author = i16::from_le_bytes([operand[1], operand[2]]);
         chp.formatting_revision_author_index = Some(u16::try_from(author).map_err(|_| {
-            DocError::Corrupted("sprmCPropRMark author index is negative".to_string())
+            PackageError::Corrupted("sprmCPropRMark author index is negative".to_string())
         })?);
         chp.formatting_revision_timestamp = Some(u32::from_le_bytes([
             operand[3], operand[4], operand[5], operand[6],
@@ -1386,7 +1386,7 @@ impl CharacterProperties {
     fn parse_display_field_revision(sprm: &Sprm) -> Result<DisplayFieldRevisionProperties> {
         let operand = sprm.operand_bytes();
         if operand.len() != 39 {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "sprmCDispFldRMark operand must contain exactly 39 bytes".to_string(),
             ));
         }
@@ -1395,7 +1395,7 @@ impl CharacterProperties {
         let timestamp = u32::from_le_bytes([operand[3], operand[4], operand[5], operand[6]]);
         let string_length = usize::from(u16::from_le_bytes([operand[7], operand[8]]));
         if string_length > 15 {
-            return Err(DocError::Corrupted(
+            return Err(PackageError::Corrupted(
                 "LISTNUM previous result exceeds its 15-code-unit XST".to_string(),
             ));
         }
@@ -1406,7 +1406,7 @@ impl CharacterProperties {
             })
             .collect::<Vec<_>>();
         let previous_result = String::from_utf16(&units).map_err(|_| {
-            DocError::Corrupted("LISTNUM previous result is invalid UTF-16".to_string())
+            PackageError::Corrupted("LISTNUM previous result is invalid UTF-16".to_string())
         })?;
         Ok(DisplayFieldRevisionProperties {
             active,

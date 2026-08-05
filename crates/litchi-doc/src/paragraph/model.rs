@@ -164,7 +164,7 @@ impl Paragraph {
                 .formatting_revision_author_index
                 .unwrap_or(0);
             let author = authors.get(author_index).ok_or_else(|| {
-                crate::package::DocError::Corrupted(
+                crate::package::Error::Corrupted(
                     "paragraph revision author index exceeds SttbfRMark".to_string(),
                 )
             })?;
@@ -185,7 +185,7 @@ impl Paragraph {
         }
         if let Some(revision) = &self.properties.numbering_revision {
             let author = authors.get(revision.author_index).ok_or_else(|| {
-                crate::package::DocError::Corrupted(
+                crate::package::Error::Corrupted(
                     "numbering revision author index exceeds SttbfRMark".to_string(),
                 )
             })?;
@@ -206,7 +206,7 @@ impl Paragraph {
                 .table_formatting_revision_author_index
                 .unwrap_or(0);
             let author = authors.get(author_index).ok_or_else(|| {
-                crate::package::DocError::Corrupted(
+                crate::package::Error::Corrupted(
                     "table-row revision author index exceeds SttbfRMark".to_string(),
                 )
             })?;
@@ -515,7 +515,7 @@ impl Run {
             && revision.active
         {
             let author = authors.get(revision.author_index).ok_or_else(|| {
-                crate::package::DocError::Corrupted(
+                crate::package::Error::Corrupted(
                     "display-field revision author index exceeds SttbfRMark".to_string(),
                 )
             })?;
@@ -538,9 +538,7 @@ impl Run {
         authors: &RevisionAuthorTable,
     ) -> Result<RevisionMark> {
         let author = authors.get(author_index).ok_or_else(|| {
-            crate::package::DocError::Corrupted(
-                "revision author index exceeds SttbfRMark".to_string(),
-            )
+            crate::package::Error::Corrupted("revision author index exceeds SttbfRMark".to_string())
         })?;
         Ok(RevisionMark {
             kind,
