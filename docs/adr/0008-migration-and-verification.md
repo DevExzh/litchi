@@ -4645,6 +4645,19 @@ affected-crate compilation pass; the ODS all-target suite passes 73 tests.
 This is a structural inventory extraction; it makes no new ODF conformance or
 native Office interoperability claim.
 
+## ODF common lexical and family validation
+
+Neutral bounded lexical contracts now live in
+`litchi-odf-common::datatype::lexical`: finite numbers, `#RRGGBB` colors, and
+caller-owned byte limits are shared by ODS conditional formats and sparklines.
+Feature-specific limits and diagnostic contexts remain in ODS. The common
+`core::validate_content_part` contract likewise centralizes content-size and
+family-body-marker validation for detached builders; ODG consumes it while
+retaining its own MIME and package facade.
+
+No duplicate helper bodies or compatibility aliases remain. The affected
+common, ODS, and ODG suites, formatting, and boundary checks pass.
+
 ## Shared BIFF framing and legacy binary owner migration
 
 The legacy binary migration now has a neutral physical-record owner:
