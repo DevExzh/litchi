@@ -18,9 +18,9 @@ const MAX_AGGREGATE_BYTES: usize = 16 * 1_048_576;
 
 /// ODF `length` lexical value used by a footnote separator.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct FootnoteSeparatorLength(String);
+pub struct Length(String);
 
-impl FootnoteSeparatorLength {
+impl Length {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         validate_measure(&value, false)?;
@@ -30,12 +30,12 @@ impl FootnoteSeparatorLength {
         &self.0
     }
 }
-impl fmt::Display for FootnoteSeparatorLength {
+impl fmt::Display for Length {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.0)
     }
 }
-impl FromStr for FootnoteSeparatorLength {
+impl FromStr for Length {
     type Err = Error;
     fn from_str(value: &str) -> Result<Self> {
         Self::new(value)
@@ -44,9 +44,9 @@ impl FromStr for FootnoteSeparatorLength {
 
 /// ODF `percent` lexical value used by `style:rel-width`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct FootnoteSeparatorPercent(String);
+pub struct Percent(String);
 
-impl FootnoteSeparatorPercent {
+impl Percent {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         validate_measure(&value, true)?;
@@ -56,12 +56,12 @@ impl FootnoteSeparatorPercent {
         &self.0
     }
 }
-impl fmt::Display for FootnoteSeparatorPercent {
+impl fmt::Display for Percent {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.0)
     }
 }
-impl FromStr for FootnoteSeparatorPercent {
+impl FromStr for Percent {
     type Err = Error;
     fn from_str(value: &str) -> Result<Self> {
         Self::new(value)
@@ -69,7 +69,7 @@ impl FromStr for FootnoteSeparatorPercent {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum FootnoteSeparatorLineStyle {
+pub enum LineStyle {
     None,
     Solid,
     Dotted,
@@ -79,7 +79,7 @@ pub enum FootnoteSeparatorLineStyle {
     DotDotDash,
     Wave,
 }
-impl FootnoteSeparatorLineStyle {
+impl LineStyle {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "none" => Ok(Self::None),
@@ -108,12 +108,12 @@ impl FootnoteSeparatorLineStyle {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum FootnoteSeparatorAdjustment {
+pub enum Adjustment {
     Left,
     Center,
     Right,
 }
-impl FootnoteSeparatorAdjustment {
+impl Adjustment {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "left" => Ok(Self::Left),
@@ -133,17 +133,17 @@ impl FootnoteSeparatorAdjustment {
 
 /// One optional footnote-separator rule in `style:page-layout-properties`.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub struct StyleFootnoteSeparator {
-    pub width: Option<FootnoteSeparatorLength>,
-    pub relative_width: Option<FootnoteSeparatorPercent>,
+pub struct Separator {
+    pub width: Option<Length>,
+    pub relative_width: Option<Percent>,
     pub color: Option<(u8, u8, u8)>,
-    pub line_style: Option<FootnoteSeparatorLineStyle>,
-    pub adjustment: Option<FootnoteSeparatorAdjustment>,
-    pub distance_before: Option<FootnoteSeparatorLength>,
-    pub distance_after: Option<FootnoteSeparatorLength>,
+    pub line_style: Option<LineStyle>,
+    pub adjustment: Option<Adjustment>,
+    pub distance_before: Option<Length>,
+    pub distance_after: Option<Length>,
 }
 
-impl StyleFootnoteSeparator {
+impl Separator {
     pub fn validate(&self) -> Result<()> {
         for value in [&self.width, &self.distance_before, &self.distance_after]
             .into_iter()
@@ -202,10 +202,9 @@ impl StyleFootnoteSeparator {
 }
 
 impl crate::OpenDocumentPackage {
-    pub fn style_footnote_separators(&self) -> Result<Vec<StyleFootnoteSeparator>> {
-        let mut values =
-            parse_style_footnote_separators(self.styles_xml()?.as_deref().unwrap_or_default())?;
-        values.extend(parse_style_footnote_separators(&self.content_xml()?)?);
+    pub fn style_footnote_separators(&self) -> Result<Vec<Separator>> {
+        let mut values = parse(self.styles_xml()?.as_deref().unwrap_or_default())?;
+        values.extend(parse(&self.content_xml()?)?);
         if values.len() > MAX_SEPARATORS {
             return invalid("package exceeds 65536 style:footnote-sep values");
         }
@@ -214,8 +213,8 @@ impl crate::OpenDocumentPackage {
 }
 
 impl crate::FlatOpenDocument {
-    pub fn style_footnote_separators(&self) -> Result<Vec<StyleFootnoteSeparator>> {
-        parse_style_footnote_separators(self.xml())
+    pub fn style_footnote_separators(&self) -> Result<Vec<Separator>> {
+        parse(self.xml())
     }
 }
 
@@ -233,12 +232,12 @@ struct Frame {
 }
 struct Active {
     depth: usize,
-    value: StyleFootnoteSeparator,
+    value: Separator,
 }
 type Attributes = HashMap<(Ns, String), String>;
 
 /// Parse all typed page-layout footnote separators in one ODF XML part.
-pub fn parse_style_footnote_separators(xml: &str) -> Result<Vec<StyleFootnoteSeparator>> {
+pub fn parse(xml: &str) -> Result<Vec<Separator>> {
     if !xml.contains("footnote-sep") {
         return Ok(Vec::new());
     }
@@ -328,11 +327,9 @@ pub fn parse_style_footnote_separators(xml: &str) -> Result<Vec<StyleFootnoteSep
     Ok(values)
 }
 
-pub(crate) fn parse_page_layout_property_footnote_separators(
-    xml: &str,
-) -> Result<Vec<StyleFootnoteSeparator>> {
+pub(crate) fn parse_page_layout_property_footnote_separators(xml: &str) -> Result<Vec<Separator>> {
     let (wrapped, _, _) = crate::style::columns::scoped_property_xml(xml)?;
-    parse_style_footnote_separators(&wrapped)
+    parse(&wrapped)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -343,7 +340,7 @@ fn start(
     local: &str,
     stack: &mut [Frame],
     active: &mut Option<Active>,
-    values: &mut Vec<StyleFootnoteSeparator>,
+    values: &mut Vec<Separator>,
     aggregate: &mut usize,
     empty: bool,
 ) -> Result<()> {
@@ -379,29 +376,27 @@ fn parse_separator(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
-) -> Result<StyleFootnoteSeparator> {
+) -> Result<Separator> {
     let mut values = attributes(reader, element, aggregate)?;
-    let result = StyleFootnoteSeparator {
-        width: take(&mut values, "width")
-            .map(FootnoteSeparatorLength::new)
-            .transpose()?,
+    let result = Separator {
+        width: take(&mut values, "width").map(Length::new).transpose()?,
         relative_width: take(&mut values, "rel-width")
-            .map(FootnoteSeparatorPercent::new)
+            .map(Percent::new)
             .transpose()?,
         color: take(&mut values, "color")
             .map(|value| parse_color(&value))
             .transpose()?,
         line_style: take(&mut values, "line-style")
-            .map(|value| FootnoteSeparatorLineStyle::parse(&value))
+            .map(|value| LineStyle::parse(&value))
             .transpose()?,
         adjustment: take(&mut values, "adjustment")
-            .map(|value| FootnoteSeparatorAdjustment::parse(&value))
+            .map(|value| Adjustment::parse(&value))
             .transpose()?,
         distance_before: take(&mut values, "distance-before-sep")
-            .map(FootnoteSeparatorLength::new)
+            .map(Length::new)
             .transpose()?,
         distance_after: take(&mut values, "distance-after-sep")
-            .map(FootnoteSeparatorLength::new)
+            .map(Length::new)
             .transpose()?,
     };
     if let Some(((namespace, local), _)) = values.iter().next() {
@@ -454,7 +449,7 @@ fn attributes(
 
 pub(crate) fn replace_page_layout_footnote_separator(
     layout: &crate::PageLayout,
-    separator: &StyleFootnoteSeparator,
+    separator: &Separator,
 ) -> Result<String> {
     separator.validate()?;
     let fragment = separator.to_xml_fragment()?;
@@ -534,10 +529,7 @@ fn replace_first(xml: &str, replacement: &str) -> Result<String> {
     }
 }
 
-fn push_value(
-    values: &mut Vec<StyleFootnoteSeparator>,
-    value: StyleFootnoteSeparator,
-) -> Result<()> {
+fn push_value(values: &mut Vec<Separator>, value: Separator) -> Result<()> {
     if values.len() >= MAX_SEPARATORS {
         return invalid("XML exceeds 65536 style:footnote-sep values");
     }

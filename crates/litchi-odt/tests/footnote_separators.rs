@@ -1,26 +1,23 @@
-use litchi_odt::footnote_separator::{
-    FootnoteSeparatorAdjustment, FootnoteSeparatorLength, FootnoteSeparatorLineStyle,
-    FootnoteSeparatorPercent, StyleFootnoteSeparator, parse_style_footnote_separators,
-};
+use litchi_odt::footnote_separator::{Adjustment, Length, LineStyle, Percent, Separator, parse};
 use litchi_odt::{Builder, Document};
 use std::io::Cursor;
 
-fn sample() -> StyleFootnoteSeparator {
-    StyleFootnoteSeparator {
-        width: Some(FootnoteSeparatorLength::new("0.018cm").unwrap()),
-        relative_width: Some(FootnoteSeparatorPercent::new("25%").unwrap()),
+fn sample() -> Separator {
+    Separator {
+        width: Some(Length::new("0.018cm").unwrap()),
+        relative_width: Some(Percent::new("25%").unwrap()),
         color: Some((0, 0, 0)),
-        line_style: Some(FootnoteSeparatorLineStyle::Solid),
-        adjustment: Some(FootnoteSeparatorAdjustment::Left),
-        distance_before: Some(FootnoteSeparatorLength::new("0.101cm").unwrap()),
-        distance_after: Some(FootnoteSeparatorLength::new("0.101cm").unwrap()),
+        line_style: Some(LineStyle::Solid),
+        adjustment: Some(Adjustment::Left),
+        distance_before: Some(Length::new("0.101cm").unwrap()),
+        distance_after: Some(Length::new("0.101cm").unwrap()),
     }
 }
 
 #[test]
 fn parses_aliases_and_writes_a_deterministic_self_contained_fragment() {
     let xml = r##"<s:page-layout-properties xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><s:footnote-sep s:distance-after-sep="0.101cm" s:color="#000000" s:adjustment="left" s:line-style="solid" s:rel-width="25%" s:width="0.018cm" s:distance-before-sep="0.101cm"/></s:page-layout-properties>"##;
-    let parsed = parse_style_footnote_separators(xml).unwrap();
+    let parsed = parse(xml).unwrap();
     assert_eq!(parsed, [sample()]);
     assert_eq!(
         parsed[0].to_xml_fragment().unwrap(),
@@ -92,13 +89,10 @@ fn rejects_wrong_scope_namespace_cardinality_content_and_values() {
         r#"<s:footnote-sep s:adjustment="start"/>"#,
     ] {
         let xml = format!("{PREFIX}{fragment}{SUFFIX}");
-        assert!(
-            parse_style_footnote_separators(&xml).is_err(),
-            "accepted {fragment}"
-        );
+        assert!(parse(&xml).is_err(), "accepted {fragment}");
     }
     let misplaced = r#"<s:style xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><s:footnote-sep/></s:style>"#;
-    assert!(parse_style_footnote_separators(misplaced).is_err());
+    assert!(parse(misplaced).is_err());
     let dtd = format!("<!DOCTYPE x>{PREFIX}<s:footnote-sep/>{SUFFIX}");
-    assert!(parse_style_footnote_separators(&dtd).is_err());
+    assert!(parse(&dtd).is_err());
 }
