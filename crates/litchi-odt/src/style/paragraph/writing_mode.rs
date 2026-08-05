@@ -57,7 +57,7 @@ fn bool_value(value: &str, field: &str) -> Result<bool> {
 
 /// The `style:writing-mode` value of a paragraph.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ParagraphWritingMode {
+pub enum WritingMode {
     LrTb,
     RlTb,
     TbRl,
@@ -67,7 +67,7 @@ pub enum ParagraphWritingMode {
     Tb,
     Page,
 }
-impl ParagraphWritingMode {
+impl WritingMode {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "lr-tb" => Ok(Self::LrTb),
@@ -98,13 +98,13 @@ impl ParagraphWritingMode {
 /// The writing-mode attribute group of one `style:paragraph-properties`
 /// element.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ParagraphWritingModeProperties {
-    pub writing_mode: Option<ParagraphWritingMode>,
+pub struct Properties {
+    pub writing_mode: Option<WritingMode>,
     pub writing_mode_automatic: Option<bool>,
     pub register_true: Option<bool>,
     pub join_border: Option<bool>,
 }
-impl ParagraphWritingModeProperties {
+impl Properties {
     pub fn new() -> Self {
         Self::default()
     }
@@ -140,17 +140,14 @@ impl ParagraphWritingModeProperties {
 
 /// A named or default paragraph style and its writing-mode properties.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParagraphStyleWritingMode {
+pub struct Style {
     pub name: Option<String>,
     pub parent_style_name: Option<String>,
     pub is_default_style: bool,
-    pub properties: Option<ParagraphWritingModeProperties>,
+    pub properties: Option<Properties>,
 }
-impl ParagraphStyleWritingMode {
-    pub fn named(
-        name: impl Into<String>,
-        properties: Option<ParagraphWritingModeProperties>,
-    ) -> Result<Self> {
+impl Style {
+    pub fn named(name: impl Into<String>, properties: Option<Properties>) -> Result<Self> {
         let result = Self {
             name: Some(name.into()),
             parent_style_name: None,
@@ -160,7 +157,7 @@ impl ParagraphStyleWritingMode {
         result.validate()?;
         Ok(result)
     }
-    pub fn default_style(properties: Option<ParagraphWritingModeProperties>) -> Self {
+    pub fn default_style(properties: Option<Properties>) -> Self {
         Self {
             name: None,
             parent_style_name: None,
@@ -215,16 +212,16 @@ impl ParagraphStyleWritingMode {
 
 /// All paragraph styles of a styles part that carry writing-mode properties.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ParagraphStyleWritingModeSet {
-    pub styles: Vec<ParagraphStyleWritingMode>,
+pub struct Styles {
+    pub styles: Vec<Style>,
 }
-impl ParagraphStyleWritingModeSet {
-    pub fn get(&self, name: &str) -> Option<&ParagraphStyleWritingMode> {
+impl Styles {
+    pub fn get(&self, name: &str) -> Option<&Style> {
         self.styles
             .iter()
             .find(|style| style.name.as_deref() == Some(name))
     }
-    pub fn default_style(&self) -> Option<&ParagraphStyleWritingMode> {
+    pub fn default_style(&self) -> Option<&Style> {
         self.styles.iter().find(|style| style.is_default_style)
     }
 }
@@ -261,7 +258,7 @@ fn style_attributes(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<Option<ParagraphStyleWritingMode>> {
+) -> Result<Option<Style>> {
     let mut name = None;
     let mut parent = None;
     let mut family = None;
@@ -293,7 +290,7 @@ fn style_attributes(
     if family.as_deref() != Some("paragraph") {
         return Ok(None);
     }
-    let result = ParagraphStyleWritingMode {
+    let result = Style {
         name,
         parent_style_name: parent,
         is_default_style: start.local_name().as_ref() == b"default-style",
@@ -307,8 +304,8 @@ fn writing_mode_attributes(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<ParagraphWritingModeProperties> {
-    let mut properties = ParagraphWritingModeProperties::new();
+) -> Result<Properties> {
+    let mut properties = Properties::new();
     let mut seen = HashSet::new();
     let mut count = 0;
     for attribute in start.attributes().with_checks(true) {
@@ -333,7 +330,7 @@ fn writing_mode_attributes(
         }
         match (namespace, local.as_ref()) {
             (Ns::Style, b"writing-mode") => {
-                properties.writing_mode = Some(ParagraphWritingMode::parse(&value)?);
+                properties.writing_mode = Some(WritingMode::parse(&value)?);
             },
             (Ns::Style, b"writing-mode-automatic") => {
                 properties.writing_mode_automatic =
@@ -353,11 +350,7 @@ fn writing_mode_attributes(
     Ok(properties)
 }
 
-fn push_style(
-    styles: &mut Vec<ParagraphStyleWritingMode>,
-    style: ParagraphStyleWritingMode,
-    total: &mut usize,
-) -> Result<()> {
+fn push_style(styles: &mut Vec<Style>, style: Style, total: &mut usize) -> Result<()> {
     if styles.len() >= MAX_STYLES {
         return Err(bad("too many paragraph styles"));
     }
@@ -385,17 +378,17 @@ fn is_paragraph_style(current: &(Ns, Vec<u8>), parent: Option<&(Ns, Vec<u8>)>) -
 
 struct Active {
     depth: usize,
-    style: ParagraphStyleWritingMode,
+    style: Style,
     seen_properties: bool,
 }
 
 /// Parse paragraph styles and their writing-mode properties from a styles part.
-pub fn parse_paragraph_style_writing_modes(xml: &str) -> Result<ParagraphStyleWritingModeSet> {
+pub fn parse(xml: &str) -> Result<Styles> {
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
     }
     if !xml.contains("paragraph-properties") {
-        return Ok(ParagraphStyleWritingModeSet::default());
+        return Ok(Styles::default());
     }
     let mut reader = NsReader::from_reader(xml.as_bytes());
     reader.config_mut().trim_text(false);
@@ -483,7 +476,7 @@ pub fn parse_paragraph_style_writing_modes(xml: &str) -> Result<ParagraphStyleWr
     if !stack.is_empty() || active.is_some() {
         return Err(bad("truncated styles XML"));
     }
-    Ok(ParagraphStyleWritingModeSet { styles })
+    Ok(Styles { styles })
 }
 
 #[derive(Default)]
@@ -552,10 +545,7 @@ fn missing_style_ns(reader: &NsReader<&[u8]>) -> bool {
 /// Losslessly replace, insert, or remove this module's writing-mode attributes
 /// on one existing paragraph style's `style:paragraph-properties` element.
 /// Attributes owned by sibling modules and child elements are preserved.
-pub fn set_paragraph_style_writing_mode_xml(
-    xml: &str,
-    requested: &ParagraphStyleWritingMode,
-) -> Result<String> {
+pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
     requested.validate()?;
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
@@ -690,7 +680,7 @@ pub fn set_paragraph_style_writing_mode_xml(
     let insert = requested
         .properties
         .as_ref()
-        .map(ParagraphWritingModeProperties::attributes_xml)
+        .map(Properties::attributes_xml)
         .unwrap_or_default();
     if let Some(properties) = &spans.properties {
         let raw = &xml[properties.start..properties.end];
@@ -723,15 +713,13 @@ pub fn set_paragraph_style_writing_mode_xml(
 }
 
 impl OpenDocumentPackage {
-    pub fn paragraph_style_writing_modes(&self) -> Result<ParagraphStyleWritingModeSet> {
-        self.styles_xml()?.map_or_else(
-            || Ok(ParagraphStyleWritingModeSet::default()),
-            |xml| parse_paragraph_style_writing_modes(&xml),
-        )
+    pub fn paragraph_style_writing_modes(&self) -> Result<Styles> {
+        self.styles_xml()?
+            .map_or_else(|| Ok(Styles::default()), |xml| parse(&xml))
     }
 }
 impl FlatOpenDocument {
-    pub fn paragraph_style_writing_modes(&self) -> Result<ParagraphStyleWritingModeSet> {
-        parse_paragraph_style_writing_modes(self.xml())
+    pub fn paragraph_style_writing_modes(&self) -> Result<Styles> {
+        parse(self.xml())
     }
 }
