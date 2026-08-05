@@ -115,6 +115,7 @@ impl Editor {
             Collection {
                 id_seed: 1,
                 objects: Vec::new(),
+                unknown_records: Vec::new(),
             },
         )
     }

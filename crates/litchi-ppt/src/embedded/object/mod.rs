@@ -523,6 +523,7 @@ impl Definition {
 pub struct Collection {
     pub id_seed: u32,
     pub objects: Vec<ExternalObject>,
+    unknown_records: Vec<UnknownRecord>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -554,6 +555,69 @@ impl ExternalObject {
     }
 }
 
+/// A bounded, lossless child of `ExObjList` that this crate does not model.
+///
+/// The record header and payload are retained so a typed OLE edit does not
+/// discard unrelated media, hyperlink, or future-version records. The record
+/// is exposed through borrowed accessors; callers never need to clone its
+/// payload merely to inspect it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UnknownRecord {
+    record: PptRecord,
+    object_index: usize,
+}
+
+impl UnknownRecord {
+    /// The original raw record type value.
+    pub fn record_type(&self) -> u16 {
+        self.record.record_type_raw
+    }
+
+    /// The original record version.
+    pub fn version(&self) -> u16 {
+        self.record.version
+    }
+
+    /// The original record instance.
+    pub fn instance(&self) -> u16 {
+        self.record.instance
+    }
+
+    /// The original record payload, borrowed from this collection snapshot.
+    pub fn data(&self) -> &[u8] {
+        &self.record.data
+    }
+
+    /// Reconstructs the exact header and payload retained by this record.
+    pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
+        record_bytes_raw(
+            self.record.version,
+            self.record.instance,
+            self.record.record_type_raw,
+            &self.record.data,
+        )
+    }
+
+    fn from_record(record: &PptRecord, object_index: usize) -> Self {
+        Self {
+            record: record.clone(),
+            object_index,
+        }
+    }
+
+    fn validate_for(&self, object_count: usize) -> Result<()> {
+        if self.object_index > object_count {
+            return corrupted("unknown ExObjList record has an invalid source slot");
+        }
+        let expected_length = usize::try_from(self.record.data_length)
+            .map_err(|_| PptError::Corrupted("unknown ExObjList record size overflows".into()))?;
+        if expected_length != self.record.data.len() {
+            return corrupted("unknown ExObjList record has inconsistent payload length");
+        }
+        self.to_record_bytes().map(|_| ())
+    }
+}
+
 impl Collection {
     pub fn parse(root: &PptRecord) -> Result<Option<Self>> {
         let mut lists = Vec::new();
@@ -582,6 +646,7 @@ impl Collection {
         let id_seed = signed_seed as u32;
         let mut ids = HashSet::new();
         let mut objects = Vec::new();
+        let mut unknown_records = Vec::new();
         for child in &children[1..] {
             if !matches!(
                 child.record_type,
@@ -589,6 +654,7 @@ impl Collection {
                     | PptRecordType::ExternalOleLink
                     | PptRecordType::ExternalOleControl
             ) {
+                unknown_records.push(UnknownRecord::from_record(child, objects.len()));
                 continue;
             }
             if objects.len() >= MAX_OLE_OBJECTS {
@@ -632,7 +698,11 @@ impl Collection {
         }) {
             return corrupted("external-object list reuses an ID for OLE objects and hyperlinks");
         }
-        Ok(Some(Self { id_seed, objects }))
+        Ok(Some(Self {
+            id_seed,
+            objects,
+            unknown_records,
+        }))
     }
 
     pub fn get(&self, id: u32) -> Option<&ExternalObject> {
@@ -643,11 +713,22 @@ impl Collection {
         self.get(id)
     }
 
+    /// Unmodeled `ExObjList` children retained in source order.
+    pub fn unknown_records(&self) -> &[UnknownRecord] {
+        &self.unknown_records
+    }
+
     pub fn add(&mut self, object: ExternalObject) -> Result<()> {
-        let mut candidate = self.objects.clone();
-        candidate.push(object);
-        validate_collection(self.id_seed, &candidate)?;
-        self.objects = candidate;
+        let mut candidate = self.clone();
+        let insertion_index = candidate.objects.len();
+        candidate.objects.push(object);
+        for record in &mut candidate.unknown_records {
+            if record.object_index >= insertion_index {
+                record.object_index += 1;
+            }
+        }
+        validate_collection(candidate.id_seed, &candidate.objects)?;
+        *self = candidate;
         Ok(())
     }
 
@@ -655,36 +736,46 @@ impl Collection {
     where
         F: FnOnce(&mut ExternalObject) -> Result<()>,
     {
-        let mut candidate = self.objects.clone();
+        let mut candidate = self.clone();
         let object = candidate
+            .objects
             .iter_mut()
             .find(|object| object.id() == id)
             .ok_or_else(|| PptError::Corrupted(format!("OLE object ID {id} was not found")))?;
         edit(object)?;
-        validate_collection(self.id_seed, &candidate)?;
-        self.objects = candidate;
+        validate_collection(candidate.id_seed, &candidate.objects)?;
+        *self = candidate;
         Ok(())
     }
 
     pub fn replace(&mut self, id: u32, replacement: ExternalObject) -> Result<ExternalObject> {
-        let mut candidate = self.objects.clone();
+        let mut candidate = self.clone();
         let index = candidate
-            .iter()
-            .position(|object| object.id() == id)
-            .ok_or_else(|| PptError::Corrupted(format!("OLE object ID {id} was not found")))?;
-        let previous = std::mem::replace(&mut candidate[index], replacement);
-        validate_collection(self.id_seed, &candidate)?;
-        self.objects = candidate;
-        Ok(previous)
-    }
-
-    pub fn remove(&mut self, id: u32) -> Result<ExternalObject> {
-        let index = self
             .objects
             .iter()
             .position(|object| object.id() == id)
             .ok_or_else(|| PptError::Corrupted(format!("OLE object ID {id} was not found")))?;
-        Ok(self.objects.remove(index))
+        let previous = std::mem::replace(&mut candidate.objects[index], replacement);
+        validate_collection(candidate.id_seed, &candidate.objects)?;
+        *self = candidate;
+        Ok(previous)
+    }
+
+    pub fn remove(&mut self, id: u32) -> Result<ExternalObject> {
+        let mut candidate = self.clone();
+        let index = candidate
+            .objects
+            .iter()
+            .position(|object| object.id() == id)
+            .ok_or_else(|| PptError::Corrupted(format!("OLE object ID {id} was not found")))?;
+        let removed = candidate.objects.remove(index);
+        for record in &mut candidate.unknown_records {
+            if record.object_index > index {
+                record.object_index -= 1;
+            }
+        }
+        *self = candidate;
+        Ok(removed)
     }
 
     pub fn reorder(&mut self, ids: &[u32]) -> Result<()> {
@@ -708,7 +799,8 @@ impl Collection {
     }
 
     pub fn validate(&self) -> Result<()> {
-        validate_collection(self.id_seed, &self.objects)
+        validate_collection(self.id_seed, &self.objects)?;
+        self.validate_unknown_records()
     }
 
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
@@ -716,8 +808,17 @@ impl Collection {
         let seed = i32::try_from(self.id_seed)
             .map_err(|_| PptError::Corrupted("ExObjList identifier seed exceeds i32".into()))?;
         let mut children = record_bytes(0, 0, PptRecordType::ExObjListAtom, &seed.to_le_bytes())?;
-        for object in &self.objects {
-            children.extend_from_slice(&object.to_record_bytes()?);
+        for object_index in 0..=self.objects.len() {
+            for record in self
+                .unknown_records
+                .iter()
+                .filter(|record| record.object_index == object_index)
+            {
+                children.extend_from_slice(&record.to_record_bytes()?);
+            }
+            if let Some(object) = self.objects.get(object_index) {
+                children.extend_from_slice(&object.to_record_bytes()?);
+            }
         }
         record_bytes(0x0f, 0, PptRecordType::ExObjList, &children)
     }
@@ -728,6 +829,13 @@ impl Collection {
             if mapping.get_offset(id).is_none() {
                 return corrupted(format!("OLE object references missing persist ID {id}"));
             }
+        }
+        Ok(())
+    }
+
+    fn validate_unknown_records(&self) -> Result<()> {
+        for record in &self.unknown_records {
+            record.validate_for(self.objects.len())?;
         }
         Ok(())
     }
@@ -921,11 +1029,18 @@ fn require_atom(
 }
 
 fn record_bytes(version: u16, instance: u16, kind: PptRecordType, data: &[u8]) -> Result<Vec<u8>> {
+    record_bytes_raw(version, instance, kind.as_u16(), data)
+}
+
+fn record_bytes_raw(version: u16, instance: u16, kind: u16, data: &[u8]) -> Result<Vec<u8>> {
+    if version > 0x000f || instance > 0x0fff {
+        return corrupted("PowerPoint record header exceeds its encoded domain");
+    }
     let length = u32::try_from(data.len())
         .map_err(|_| PptError::Corrupted("PowerPoint record payload exceeds u32".into()))?;
     let mut bytes = Vec::with_capacity(8usize.saturating_add(data.len()));
     bytes.extend_from_slice(&((instance << 4) | version).to_le_bytes());
-    bytes.extend_from_slice(&kind.as_u16().to_le_bytes());
+    bytes.extend_from_slice(&kind.to_le_bytes());
     bytes.extend_from_slice(&length.to_le_bytes());
     bytes.extend_from_slice(data);
     Ok(bytes)
@@ -1099,13 +1214,97 @@ mod tests {
     }
 
     fn external_object_list(seed: i32, objects: &[Vec<u8>]) -> PptRecord {
-        let mut children =
+        external_object_list_with_children(seed, objects).0
+    }
+
+    fn external_object_list_with_children(seed: i32, children: &[Vec<u8>]) -> (PptRecord, Vec<u8>) {
+        let mut child_bytes =
             record_bytes(0, 0, PptRecordType::ExObjListAtom, &seed.to_le_bytes()).unwrap();
-        for object in objects {
-            children.extend_from_slice(object);
+        for child in children {
+            child_bytes.extend_from_slice(child);
         }
-        let bytes = record_bytes(0x0f, 0, PptRecordType::ExObjList, &children).unwrap();
-        PptRecord::parse(&bytes, 0).unwrap().0
+        let bytes = record_bytes(0x0f, 0, PptRecordType::ExObjList, &child_bytes).unwrap();
+        (PptRecord::parse(&bytes, 0).unwrap().0, bytes)
+    }
+
+    #[test]
+    fn ole_collection_preserves_unknown_children_and_source_slots() {
+        let value = definition(ContainerKind::Embedded(EmbedPreferences {
+            color_follow: ColorFollow::None,
+            cannot_lock_server: false,
+            dimension_policy: DimensionPolicy::Send,
+            is_word_table: false,
+            unused: 0,
+        }));
+        let first_unknown = record_bytes_raw(0, 7, 0x7777, b"before").unwrap();
+        let second_unknown = record_bytes_raw(0, 9, 0x8888, b"after").unwrap();
+        let (root, original) = external_object_list_with_children(
+            value.object.id as i32,
+            &[
+                first_unknown.clone(),
+                value.to_record_bytes().unwrap(),
+                second_unknown.clone(),
+            ],
+        );
+
+        let collection = Collection::parse(&root).unwrap().unwrap();
+        assert_eq!(collection.unknown_records().len(), 2);
+        assert_eq!(collection.unknown_records()[0].record_type(), 0x7777);
+        assert_eq!(collection.unknown_records()[0].data(), b"before");
+        assert_eq!(collection.unknown_records()[1].record_type(), 0x8888);
+        assert_eq!(collection.unknown_records()[1].data(), b"after");
+        assert_eq!(collection.to_record_bytes().unwrap(), original);
+        assert_eq!(
+            collection.unknown_records()[0].to_record_bytes().unwrap(),
+            first_unknown
+        );
+        assert_eq!(
+            collection.unknown_records()[1].to_record_bytes().unwrap(),
+            second_unknown
+        );
+    }
+
+    #[test]
+    fn ole_collection_reorders_typed_objects_without_losing_unknown_slots() {
+        let kind = ContainerKind::Embedded(EmbedPreferences {
+            color_follow: ColorFollow::None,
+            cannot_lock_server: false,
+            dimension_policy: DimensionPolicy::Send,
+            is_word_table: false,
+            unused: 0,
+        });
+        let mut first = definition(kind);
+        first.object.id = 1;
+        let mut second = first.clone();
+        second.object.id = 2;
+        second.object.persist_id = 10;
+        let first_unknown = record_bytes_raw(0, 1, 0x7777, b"slot-0").unwrap();
+        let middle_unknown = record_bytes_raw(0, 2, 0x8888, b"slot-1").unwrap();
+        let last_unknown = record_bytes_raw(0, 3, 0x9999, b"slot-2").unwrap();
+        let (root, _) = external_object_list_with_children(
+            2,
+            &[
+                first_unknown.clone(),
+                first.to_record_bytes().unwrap(),
+                middle_unknown.clone(),
+                second.to_record_bytes().unwrap(),
+                last_unknown.clone(),
+            ],
+        );
+
+        let mut collection = Collection::parse(&root).unwrap().unwrap();
+        collection.reorder(&[2, 1]).unwrap();
+        let (_, reordered) = external_object_list_with_children(
+            2,
+            &[
+                first_unknown,
+                second.to_record_bytes().unwrap(),
+                middle_unknown,
+                first.to_record_bytes().unwrap(),
+                last_unknown,
+            ],
+        );
+        assert_eq!(collection.to_record_bytes().unwrap(), reordered);
     }
 
     #[test]

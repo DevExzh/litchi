@@ -213,7 +213,8 @@ pub use document_structure::{PowerPointCustomTableStylesPlacement, PowerPointDoc
 pub use embedded::object::Editor;
 pub use embedded::object::{
     Collection, ColorFollow, ContainerKind, Control, Definition, DimensionPolicy, DrawAspect,
-    EmbedPreferences, ExternalObject, LinkInfo, Metadata, ObjectSubtype, ObjectType, UpdateMode,
+    EmbedPreferences, ExternalObject, LinkInfo, Metadata, ObjectSubtype, ObjectType, UnknownRecord,
+    UpdateMode,
 };
 pub use embedded::reference::{Reference, Target};
 pub use envelope::PowerPointEnvelopeSettings;
