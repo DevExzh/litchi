@@ -92,6 +92,18 @@ mutation remain in `litchi-iwa`; no archive type or facade-wide error enters
 the semantic leaf, and the former `TextColumn*` names are removed rather than
 aliased.
 
+Numbers cell display formats use the focused
+`litchi_numbers::cell::data_format` API. `DataFormat` is the typed sum over
+checked number, currency, percentage, scientific, fraction, numeral-system,
+date/time, duration, checkbox, star-rating, slider, stepper, pop-up, text, and
+custom values. Child modules validate finite/range/bounded text inputs before
+allocation and use boxed slices only where the semantic value is inherently
+variable-sized. The IWA adapter alone maps native format-table identifiers,
+control-cell metadata, custom UUID registries, BNC scalar state, protobuf
+fields, and transactional package changes. The old `TableCell*` semantic
+owners and facade aliases are removed; Pages and Keynote use the Numbers leaf
+types directly.
+
 Pages document state follows the same raw/semantic split:
 `litchi_pages::document::{Root, Body, Document}` owns an immutable, bounded
 semantic snapshot, while `litchi-iwa` decodes native root and body payloads

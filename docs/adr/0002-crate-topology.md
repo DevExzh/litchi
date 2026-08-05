@@ -162,6 +162,17 @@ slice. `litchi-iwa` retains `ColumnsArchive` decoding, native presence checks,
 protobuf construction, and format-specific error mapping in its private text
 adapter. The former flat `TextColumn*` definitions and facade reexports are
 removed rather than retained as compatibility aliases.
+The Numbers table-cell display-format vocabulary now follows the same boundary
+at `litchi-numbers::cell::data_format`. `DataFormat` and its focused child
+modules own checked number, currency, percentage, scientific, fraction,
+numeral-system, date/time, duration, control, pop-up, text, and custom values;
+the semantic crate contains no protobuf, registry identifier, archive, or
+package state. `litchi-iwa` retains the native format-table/control codecs,
+custom-format UUID registry, BNC scalar coordination, unknown-field
+preservation, and transactional package publication. Pages, Numbers, and
+Keynote table APIs consume the Numbers leaf directly, and the former flat
+`litchi-iwa::table_cell_data_format` and `table_cell_number_format` owners are
+deleted rather than retained as compatibility aliases.
 The common color leaf now owns `color::{RgbColorSpace, Rgba}` and its typed
 `color::Error`; native protobuf conversion remains in the IWA shape adapter.
 `Rgba` is a fixed-size, copyable value that validates all four finite channels

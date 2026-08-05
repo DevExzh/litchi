@@ -6192,10 +6192,14 @@ matrix remains the authoritative verification for serialized packages.
 The Numbers cell display-format seam is also complete for this migration
 slice. `litchi-numbers::cell::data_format` now owns the archive-free checked
 format values, while the IWA adapter retains native registry IDs, protobuf
-codec details, and package mutation. Its 63 leaf tests, the 1,505-test IWA
-library suite, and strict no-dependency Clippy passed after the adapter
-conversion; no native application claim is made for this ownership-only
-change.
+codec details, BNC/control coordination, custom UUID registry handling, and
+transactional package mutation. The focused Numbers leaf filter passed 15
+tests, the IWA data-format filter passed 20 tests, strict no-dependency
+Clippy and the IWA library check passed, and the regenerated verification
+example compiled and ran. Native Numbers and Keynote opened the resulting
+`table-number-formats.numbers` and `.key` files without repair prompts; their
+accessibility trees exposed the expected formatted values, controls, and
+custom formats.
 
 The shared text-column ownership slice is complete. The archive-free
 `litchi-iwa-text::columns` module now owns the focused `Columns`, `Count`,
@@ -6207,11 +6211,10 @@ Numbers, Keynote, shape-style tests, and all three text-box creation examples
 consume the leaf directly. The former flat `TextColumn*` owners and facade
 reexports are gone. This structural slice is verified by the focused leaf and
 library/example checks, strict no-dependency Clippy, and the crate-boundary
-checks; the IWA library test target currently cannot compile because an
-unrelated pre-existing Numbers conditional-highlighting test passes the old
-`TableCellCheckboxFormat` to the new `Checkbox` API, so that file was left
-untouched. No additional native iWork claim is made because serialized column
-semantics are unchanged.
+checks; the migrated conditional-highlighting test and table-number-format
+example now use the canonical Numbers leaf markers. No additional native
+iWork claim is needed for this ownership-only column change because serialized
+column semantics are unchanged.
 
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
