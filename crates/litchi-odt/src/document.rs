@@ -577,10 +577,10 @@ impl Document {
     ///
     /// These are styles metadata only. This API does not apply styles to
     /// headings, generate labels, or update tables of contents.
-    pub fn outline_styles(&self) -> Result<crate::OutlineStyles> {
+    pub fn outline_styles(&self) -> Result<crate::outline_style::Styles> {
         self.styles.as_ref().map_or_else(
             || Ok(Default::default()),
-            |styles| crate::parse_outline_styles(styles.xml_content()),
+            |styles| crate::outline_style::parse_outline_styles(styles.xml_content()),
         )
     }
 
@@ -1031,10 +1031,10 @@ impl Document {
     }
 
     /// Inspect classic forms without executing bindings, events, or external resources.
-    pub fn forms(&self) -> Result<crate::Forms> {
-        let mut parts = vec![(self.content.xml_content(), crate::FormPart::Content)];
+    pub fn forms(&self) -> Result<crate::form::Forms> {
+        let mut parts = vec![(self.content.xml_content(), crate::form::Part::Content)];
         if let Some(styles) = self.styles.as_ref().map(Styles::xml_content) {
-            parts.push((styles, crate::FormPart::Styles));
+            parts.push((styles, crate::form::Part::Styles));
         }
         crate::form::parse_form_parts(&parts)
     }
@@ -1094,7 +1094,11 @@ impl Document {
         Ok(())
     }
 
-    pub fn add_form(&mut self, group_index: usize, form: &crate::AuthoredForm) -> Result<usize> {
+    pub fn add_form(
+        &mut self,
+        group_index: usize,
+        form: &crate::package::forms::AuthoredForm,
+    ) -> Result<usize> {
         let (bytes, index) = crate::package::forms::add_form(
             &self.package,
             self.content.xml_content(),
@@ -1110,7 +1114,7 @@ impl Document {
     pub fn add_nested_form(
         &mut self,
         parent_form: usize,
-        form: &crate::AuthoredForm,
+        form: &crate::package::forms::AuthoredForm,
     ) -> Result<usize> {
         let (bytes, index) = crate::package::forms::add_form(
             &self.package,
@@ -1124,7 +1128,11 @@ impl Document {
         *self = Self::from_bytes(bytes)?;
         Ok(index)
     }
-    pub fn replace_form(&mut self, index: usize, form: &crate::AuthoredForm) -> Result<()> {
+    pub fn replace_form(
+        &mut self,
+        index: usize,
+        form: &crate::package::forms::AuthoredForm,
+    ) -> Result<()> {
         let bytes = crate::package::forms::replace_form(
             &self.package,
             self.content.xml_content(),
@@ -1159,7 +1167,7 @@ impl Document {
     pub fn add_form_control(
         &mut self,
         form_index: usize,
-        control: &crate::AuthoredFormControl,
+        control: &crate::package::forms::AuthoredFormControl,
     ) -> Result<usize> {
         let (bytes, index) = crate::package::forms::add_control(
             &self.package,
@@ -1174,7 +1182,7 @@ impl Document {
     pub fn replace_form_control(
         &mut self,
         index: usize,
-        control: &crate::AuthoredFormControl,
+        control: &crate::package::forms::AuthoredFormControl,
     ) -> Result<()> {
         let bytes = crate::package::forms::replace_control(
             &self.package,
