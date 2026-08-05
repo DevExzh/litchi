@@ -15,14 +15,13 @@
 pub mod consts;
 mod directory_name;
 mod file;
-mod metadata;
+pub mod metadata;
 pub mod writer;
 
 pub use file::{DirectoryEntry, OleError, OleFile, is_ole_file};
 pub use metadata::{
-    CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, OleMetadata, OlePropertySetEditor, PropertySet,
-    PropertySetGuid, PropertySetStream, PropertyValue, SUMMARY_INFORMATION_FMTID,
-    StandardPropertySet, USER_DEFINED_PROPERTIES_FMTID,
+    CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Editor, Guid, Metadata,
+    SUMMARY_INFORMATION_FMTID, Section, Standard, Stream, USER_DEFINED_PROPERTIES_FMTID, Value,
 };
 pub use writer::OleWriter;
 

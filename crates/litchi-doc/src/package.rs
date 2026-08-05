@@ -303,7 +303,7 @@ impl<R: Read + Seek> Package<R> {
         litchi_ole_common::custom_xml::inspect(&mut self.ole)
     }
 
-    pub fn summary_information(&mut self) -> Result<Option<litchi_cfb::PropertySetStream>> {
+    pub fn summary_information(&mut self) -> Result<Option<litchi_cfb::Stream>> {
         match self
             .ole
             .property_set_stream(&["\u{0005}SummaryInformation"])
@@ -328,9 +328,7 @@ impl<R: Read + Seek> Package<R> {
         litchi_sign::cfb::verify(&mut self.ole, litchi_sign::cfb::Format::Doc, policy)
     }
 
-    pub fn document_summary_information(
-        &mut self,
-    ) -> Result<Option<litchi_cfb::PropertySetStream>> {
+    pub fn document_summary_information(&mut self) -> Result<Option<litchi_cfb::Stream>> {
         match self
             .ole
             .property_set_stream(&["\u{0005}DocumentSummaryInformation"])
@@ -341,7 +339,7 @@ impl<R: Read + Seek> Package<R> {
         }
     }
 
-    pub fn user_defined_properties(&mut self) -> Result<Option<litchi_cfb::PropertySet>> {
+    pub fn user_defined_properties(&mut self) -> Result<Option<litchi_cfb::Section>> {
         Ok(self.document_summary_information()?.and_then(|stream| {
             stream
                 .section(litchi_cfb::USER_DEFINED_PROPERTIES_FMTID)

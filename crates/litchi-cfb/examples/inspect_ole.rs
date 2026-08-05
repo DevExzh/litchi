@@ -3,7 +3,7 @@
 //! This example verifies the file signature with [`is_ole_file`], opens it
 //! with [`OleFile::open`], walks the directory tree printing each entry's
 //! name, type, and size, and prints summary properties from
-//! [`OleMetadata`] when available.
+//! [`Metadata`] when available.
 //!
 //! Run with:
 //! ```bash
@@ -15,7 +15,7 @@
 //!
 //! [`is_ole_file`]: litchi_cfb::is_ole_file
 //! [`OleFile::open`]: litchi_cfb::OleFile::open
-//! [`OleMetadata`]: litchi_cfb::OleMetadata
+//! [`Metadata`]: litchi_cfb::Metadata
 
 use std::fs::File;
 use std::io::Read;
@@ -125,7 +125,7 @@ fn describe_type(t: u8) -> &'static str {
     }
 }
 
-fn print_metadata(meta: &litchi_cfb::OleMetadata) {
+fn print_metadata(meta: &litchi_cfb::Metadata) {
     let mut printed = false;
     let mut row = |label: &str, value: Option<&str>| {
         if let Some(v) = value

@@ -1,10 +1,7 @@
 use std::io::Cursor;
 use std::path::PathBuf;
 
-use litchi_cfb::{
-    CodePage, OleFile, OlePropertySetEditor, OleWriter, PropertySetGuid, PropertyValue,
-    StandardPropertySet,
-};
+use litchi_cfb::{CodePage, Editor, Guid, OleFile, OleWriter, Standard, Value};
 
 fn ole_with_streams(streams: &[(&str, &[u8])]) -> Vec<u8> {
     let mut writer = OleWriter::new();
@@ -20,37 +17,31 @@ fn ole_with_streams(streams: &[(&str, &[u8])]) -> Vec<u8> {
 fn generated_property_sets_round_trip_all_office_value_families() {
     let payload = b"untouched payload".to_vec();
     let original = ole_with_streams(&[("Payload", &payload)]);
-    let mut editor = OlePropertySetEditor::new(original).unwrap();
+    let mut editor = Editor::new(original).unwrap();
     editor
-        .update(StandardPropertySet::SummaryInformation, |section| {
+        .update(Standard::SummaryInformation, |section| {
             section.set_page(CodePage::WINDOWS_1252);
-            section.add(2, PropertyValue::Lpstr("Title".into()))?;
-            section.add(3, PropertyValue::I4(-42))?;
-            section.add(4, PropertyValue::UI8(u64::MAX - 1))?;
-            section.add(5, PropertyValue::Bool(true))?;
-            section.add(6, PropertyValue::Filetime(116_444_736_000_000_000))?;
-            section.add(
-                7,
-                PropertyValue::Clsid(PropertySetGuid::from_bytes([7; 16])),
-            )?;
-            section.add(8, PropertyValue::Blob(vec![1, 2, 3]))?;
+            section.add(2, Value::Lpstr("Title".into()))?;
+            section.add(3, Value::I4(-42))?;
+            section.add(4, Value::UI8(u64::MAX - 1))?;
+            section.add(5, Value::Bool(true))?;
+            section.add(6, Value::Filetime(116_444_736_000_000_000))?;
+            section.add(7, Value::Clsid(Guid::from_bytes([7; 16])))?;
+            section.add(8, Value::Blob(vec![1, 2, 3]))?;
             section.add(
                 9,
-                PropertyValue::Clipboard {
+                Value::Clipboard {
                     format: 13,
                     data: vec![4, 5, 6],
                 },
             )?;
             section.add(
                 10,
-                PropertyValue::Vector(vec![
-                    PropertyValue::I4(1),
-                    PropertyValue::Lpwstr("two".into()),
-                ]),
+                Value::Vector(vec![Value::I4(1), Value::Lpwstr("two".into())]),
             )?;
             section.add(
                 11,
-                PropertyValue::Unknown {
+                Value::Unknown {
                     variant_type: 0x7777,
                     data: vec![9, 8, 7, 6],
                 },
@@ -59,10 +50,10 @@ fn generated_property_sets_round_trip_all_office_value_families() {
         })
         .unwrap();
     editor
-        .update(StandardPropertySet::UserDefinedProperties, |section| {
+        .update(Standard::UserDefinedProperties, |section| {
             section.set_page(CodePage::Utf16Le);
-            section.add_named(2, "担当者".into(), PropertyValue::Lpwstr("山田".into()))?;
-            section.add_named(3, "Enabled".into(), PropertyValue::Bool(false))?;
+            section.add_named(2, "担当者".into(), Value::Lpwstr("山田".into()))?;
+            section.add_named(3, "Enabled".into(), Value::Bool(false))?;
             Ok(())
         })
         .unwrap();
@@ -75,18 +66,18 @@ fn generated_property_sets_round_trip_all_office_value_families() {
         .unwrap();
     assert_eq!(
         summary.sections[0].property(2),
-        Some(&PropertyValue::Lpstr("Title".into()))
+        Some(&Value::Lpstr("Title".into()))
     );
     assert_eq!(
         summary.sections[0].property(10),
-        Some(&PropertyValue::Vector(vec![
-            PropertyValue::I4(1),
-            PropertyValue::Lpwstr("two".into())
+        Some(&Value::Vector(vec![
+            Value::I4(1),
+            Value::Lpwstr("two".into())
         ]))
     );
     assert_eq!(
         summary.sections[0].property(11),
-        Some(&PropertyValue::Unknown {
+        Some(&Value::Unknown {
             variant_type: 0x7777,
             data: vec![9, 8, 7, 6]
         })
@@ -101,13 +92,13 @@ fn generated_property_sets_round_trip_all_office_value_families() {
         .unwrap();
     assert_eq!(
         custom.find_named("担当者").unwrap().1,
-        &PropertyValue::Lpwstr("山田".into())
+        &Value::Lpwstr("山田".into())
     );
 
-    let mut editor = OlePropertySetEditor::new(bytes).unwrap();
+    let mut editor = Editor::new(bytes).unwrap();
     editor
-        .update(StandardPropertySet::SummaryInformation, |section| {
-            section.update(2, PropertyValue::Lpstr("Changed".into()))?;
+        .update(Standard::SummaryInformation, |section| {
+            section.update(2, Value::Lpstr("Changed".into()))?;
             Ok(())
         })
         .unwrap();
@@ -117,7 +108,7 @@ fn generated_property_sets_round_trip_all_office_value_families() {
         .unwrap();
     assert_eq!(
         summary.sections[0].property(11),
-        Some(&PropertyValue::Unknown {
+        Some(&Value::Unknown {
             variant_type: 0x7777,
             data: vec![9, 8, 7, 6]
         })
@@ -128,34 +119,31 @@ fn generated_property_sets_round_trip_all_office_value_families() {
 fn mutations_are_atomic_ordered_and_noops_are_byte_exact() {
     let original = ole_with_streams(&[("Payload", b"same")]);
     assert_eq!(
-        OlePropertySetEditor::new(original.clone())
-            .unwrap()
-            .finish()
-            .unwrap(),
+        Editor::new(original.clone()).unwrap().finish().unwrap(),
         original
     );
 
-    let mut editor = OlePropertySetEditor::new(original.clone()).unwrap();
-    let error = editor.update(StandardPropertySet::UserDefinedProperties, |section| {
+    let mut editor = Editor::new(original.clone()).unwrap();
+    let error = editor.update(Standard::UserDefinedProperties, |section| {
         section.set_page(CodePage::Utf16Le);
-        section.add_named(2, "Name".into(), PropertyValue::I4(1))?;
-        section.add_named(3, "name".into(), PropertyValue::I4(2))
+        section.add_named(2, "Name".into(), Value::I4(1))?;
+        section.add_named(3, "name".into(), Value::I4(2))
     });
     assert!(error.is_err());
     assert_eq!(editor.finish().unwrap(), original);
 
-    let mut editor = OlePropertySetEditor::new(original).unwrap();
+    let mut editor = Editor::new(original).unwrap();
     editor
-        .update(StandardPropertySet::SummaryInformation, |section| {
+        .update(Standard::SummaryInformation, |section| {
             section.set_page(CodePage::WINDOWS_1252);
-            section.add(4, PropertyValue::I4(4))?;
-            section.add(2, PropertyValue::I4(2))?;
+            section.add(4, Value::I4(4))?;
+            section.add(2, Value::I4(2))?;
             section.reorder(&[1, 2, 4])?;
             Ok(())
         })
         .unwrap();
     let mut section = editor
-        .property_set(StandardPropertySet::SummaryInformation)
+        .property_set(Standard::SummaryInformation)
         .unwrap()
         .unwrap();
     assert_eq!(section.property_ids().collect::<Vec<_>>(), vec![1, 2, 4]);
@@ -165,7 +153,7 @@ fn mutations_are_atomic_ordered_and_noops_are_byte_exact() {
 #[test]
 fn signed_and_encrypted_containers_are_rejected_without_execution() {
     for name in ["EncryptionInfo", "\u{0005}DigitalSignature"] {
-        assert!(OlePropertySetEditor::new(ole_with_streams(&[(name, b"opaque")])).is_err());
+        assert!(Editor::new(ole_with_streams(&[(name, b"opaque")])).is_err());
     }
 }
 
@@ -178,12 +166,6 @@ fn poi_and_libreoffice_fixtures_preserve_exact_noop_bytes() {
         "test-data/ole/doc/documentProperties.doc",
     ] {
         let bytes = std::fs::read(root.join(relative)).unwrap();
-        assert_eq!(
-            OlePropertySetEditor::new(bytes.clone())
-                .unwrap()
-                .finish()
-                .unwrap(),
-            bytes
-        );
+        assert_eq!(Editor::new(bytes.clone()).unwrap().finish().unwrap(), bytes);
     }
 }
