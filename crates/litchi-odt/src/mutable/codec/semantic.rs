@@ -1,6 +1,6 @@
-//! Content and styles XML snapshots and lossless mutable edits.
+//! Typed semantic reads and lossless mutable edits for ODT snapshots.
 
-use super::model::MutableDocument;
+use super::super::model::MutableDocument;
 use crate::BookmarkTarget;
 use crate::ReferenceMark;
 use crate::TextIndex;
@@ -1627,22 +1627,6 @@ impl MutableDocument {
             },
         }
         Ok(Some(old))
-    }
-
-    pub(super) fn with_content_xml<T>(
-        &self,
-        operation: impl FnOnce(&str) -> Result<T>,
-    ) -> Result<T> {
-        if let Some(xml) = self.content_xml.as_deref() {
-            operation(xml)
-        } else {
-            let xml = self.generate_content_xml();
-            operation(&xml)
-        }
-    }
-
-    pub(super) fn invalidate_content_xml(&mut self) {
-        self.content_xml = None;
     }
 
     /// Return declarations, policy, and marker-correlated content from current XML.

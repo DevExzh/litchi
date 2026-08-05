@@ -5310,6 +5310,34 @@ the crate-boundary policy. This remains bounded `[MS-DOC]` implementation and
 API evidence, not a claim of complete Word routing workflow or Office
 conformance.
 
+## OLE2, OOXML, and ODF owner-wave continuation
+
+The next owner wave extends the same layered topology across the remaining
+large format-specific files. DOC now exposes inert, typed `[MS-DOC]`
+`OcxInfo`/`RgxOcxInfo` records under `parts::ole_controls`, preserving
+undefined handles and reserved bits while validating story domains, field
+indices, cookie uniqueness, fixed record sizes, counts, and FIB table bounds.
+It deliberately does not activate controls or promise an ActiveX lifecycle.
+
+DOCX document-package, web-extension, and section-writing owners now separate
+facades from semantic models, XML/package codecs, validation, relationships,
+and focused tests. PPT writer-core model data and PPTX ChartEx semantic data
+received the same treatment. XLS revision records, XLSB host cell reading,
+XLSX pivot reading, ODS content traversal, and ODT mutable editing now use
+nested owners with preserved typed APIs, snapshot/lossless behavior, and
+package seams where applicable.
+
+The affected all-target check passes both under the workspace lint policy and
+with lint capping. Library tests pass for DOC (841 with two ignored), DOCX
+(644), ODS (67), ODT (512), PPT (882 with one ignored), PPTX (305), XLS (844),
+XLSB (413), and XLSX (645). Focused OcxInfo, web, section, pivot, revision,
+and mutation tests also pass; formatting, diff, and the 46-package boundary
+policy remain clean. ODS content tests outside the library target retain the
+pre-existing orphaned-owner/path limitation reported by that owner. This is
+bounded implementation and topology evidence, not a claim of complete
+`[MS-DOC]`, `[MS-ODRAW]`, `[MS-OGRAPH]`, `[MS-OSHARED]`, `[MS-PPT]`,
+`[MS-XLS]`, OOXML, or ODF conformance.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

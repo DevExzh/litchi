@@ -1,328 +1,31 @@
-//! Semantic state and authoring operations for the legacy PPT writer.
+//! Contextual authoring operations for the PPT semantic writer model.
 
-use super::super::blip::{Id as PictureId, Kind as PictureKind, Pictures};
-use super::super::chart::{Chart, ChartPlan, PositionedChart};
-use super::super::comments::SlideComment;
-use super::super::custom_shows::CustomShow;
-use super::super::escher::FreeformGeometry;
-use super::super::hyperlink::{Hyperlink, HyperlinkCollection};
-use super::super::notes::NotesPage;
-use super::super::persist::PersistPtrBuilder;
-use super::super::records::{RecordBuilder, record_type};
-use super::super::shape_style::{ArrowStyle, FillStyle, LineStyleConfig, ShadowStyle, ShapeStyle};
-use super::super::slide_timing::SlideTiming;
-use super::super::smart_tags::{SmartTagDefinition, SmartTagIndex};
-use super::super::spec::Tag10;
-use super::super::table::{PositionedTable, Table};
-use super::super::text_format::{FontEntity, Paragraph, TextAlign};
-use super::codec::{interaction_for_hyperlink, shape_text_unit_count, sound_collection_error};
-use crate::animation::AnimationInfo;
-use crate::encryption::{
-    EncryptionProfile, WriterEncryptionMaterial, prepare_writer_encryption,
-    validate_writer_password,
+use super::{
+    HyperlinkCollection, Pictures, ShapeProperties, ShapeType, TextAlignment, WritableShape,
+    WritableSlide, WriteError, Writer, WriterEncryption, WriterModifyPassword,
 };
+use crate::animation::AnimationInfo;
+use crate::encryption::{EncryptionProfile, validate_writer_password};
 use crate::header_footer::{
     HeaderFooter, HeaderFooterParent, HeaderFooterParentOrdinal, HeaderFooterScope,
 };
 use crate::modify_password::{ModifyPassword, validate_value as validate_modify_password};
-use crate::view_info::{SlideViewInfo, ViewKind};
+use crate::writer::blip::{Id as PictureId, Kind as PictureKind};
+use crate::writer::chart::Chart;
+use crate::writer::comments::SlideComment;
+use crate::writer::core::codec::sound_collection_error;
+use crate::writer::custom_shows::CustomShow;
+use crate::writer::escher::FreeformGeometry;
+use crate::writer::hyperlink::Hyperlink;
+use crate::writer::notes::NotesPage;
+use crate::writer::shape_style::{ArrowStyle, FillStyle, LineStyleConfig, ShapeStyle};
+use crate::writer::slide_timing::SlideTiming;
+use crate::writer::smart_tags::{SmartTagDefinition, SmartTagIndex};
+use crate::writer::table::{PositionedTable, Table};
+use crate::writer::text_format::{FontEntity, Paragraph, TextAlign};
 use litchi_core::unit::pt_to_emu_i32;
 use std::collections::{BTreeMap, HashMap};
 use zeroize::Zeroizing;
-
-/// Error type for PPT writing
-#[derive(Debug)]
-pub enum WriteError {
-    /// I/O error
-    Io(std::io::Error),
-    /// Invalid data
-    InvalidData(String),
-    /// OLE error
-    Ole(litchi_cfb::OleError),
-    /// MS-OVBA project authoring error
-    Vba(litchi_vba::Error),
-    /// Host-neutral Office Graph authoring error.
-    Graph(litchi_ograph::Error),
-}
-impl From<std::io::Error> for WriteError {
-    fn from(err: std::io::Error) -> Self {
-        WriteError::Io(err)
-    }
-}
-
-impl From<litchi_cfb::OleError> for WriteError {
-    fn from(err: litchi_cfb::OleError) -> Self {
-        WriteError::Ole(err)
-    }
-}
-
-impl From<litchi_vba::Error> for WriteError {
-    fn from(err: litchi_vba::Error) -> Self {
-        WriteError::Vba(err)
-    }
-}
-
-impl From<litchi_ograph::Error> for WriteError {
-    fn from(err: litchi_ograph::Error) -> Self {
-        Self::Graph(err)
-    }
-}
-
-impl std::fmt::Display for WriteError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            WriteError::Io(e) => write!(f, "I/O error: {}", e),
-            WriteError::InvalidData(s) => write!(f, "Invalid data: {}", s),
-            WriteError::Ole(e) => write!(f, "OLE error: {}", e),
-            WriteError::Vba(e) => write!(f, "VBA project error: {}", e),
-            WriteError::Graph(e) => write!(f, "Office Graph error: {e}"),
-        }
-    }
-}
-
-impl std::error::Error for WriteError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::Io(error) => Some(error),
-            Self::Ole(error) => Some(error),
-            Self::Vba(error) => Some(error),
-            Self::Graph(error) => Some(error),
-            Self::InvalidData(_) => None,
-        }
-    }
-}
-
-/// Shape type (legacy - use ShapeKind from shapes module for new code)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ShapeType {
-    /// Rectangle
-    Rectangle,
-    /// Text box
-    TextBox,
-    /// Placeholder
-    Placeholder,
-    /// Line
-    Line,
-    /// Ellipse
-    Ellipse,
-    /// Rounded rectangle
-    RoundRectangle,
-    /// Diamond
-    Diamond,
-    /// Triangle
-    Triangle,
-    /// Arrow (block arrow shape)
-    Arrow,
-    /// Star
-    Star,
-    /// Heart
-    Heart,
-    /// Picture frame
-    Picture,
-    /// Custom/freeform shape with explicit OfficeArt geometry
-    Freeform,
-}
-
-/// Text alignment
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TextAlignment {
-    /// Left-aligned
-    Left,
-    /// Center-aligned
-    Center,
-    /// Right-aligned
-    Right,
-    /// Justified
-    Justify,
-}
-
-impl From<TextAlignment> for TextAlign {
-    fn from(value: TextAlignment) -> Self {
-        match value {
-            TextAlignment::Left => Self::Left,
-            TextAlignment::Center => Self::Center,
-            TextAlignment::Right => Self::Right,
-            TextAlignment::Justify => Self::Justify,
-        }
-    }
-}
-
-/// Shape properties (extended with styling support)
-#[derive(Debug, Clone)]
-pub struct ShapeProperties {
-    /// Shape type
-    pub shape_type: ShapeType,
-    /// X position (in EMUs - English Metric Units, 914400 EMUs = 1 inch)
-    pub x: i32,
-    /// Y position (in EMUs)
-    pub y: i32,
-    /// Width (in EMUs)
-    pub width: i32,
-    /// Height (in EMUs)
-    pub height: i32,
-    /// Text content (if applicable)
-    pub text: Option<String>,
-    /// Rich text paragraphs (alternative to plain text)
-    pub paragraphs: Option<Vec<Paragraph>>,
-    /// Text alignment
-    pub alignment: TextAlignment,
-    /// Fill style
-    pub fill: Option<FillStyle>,
-    /// Line style
-    pub line: Option<LineStyleConfig>,
-    /// Shadow style
-    pub shadow: Option<ShadowStyle>,
-    /// Rotation in degrees
-    pub rotation: f32,
-    /// Shape-specific adjustment values, at indices 0 through 9.
-    pub adjust_values: Vec<i32>,
-    /// Flip horizontal
-    pub flip_h: bool,
-    /// Flip vertical
-    pub flip_v: bool,
-    /// Picture BLIP index (for Picture type)
-    pub picture_index: Option<PictureId>,
-    /// Explicit geometry for a custom/freeform shape.
-    pub freeform_geometry: Option<FreeformGeometry>,
-    /// Hyperlink attached to shape
-    pub hyperlink_id: Option<u32>,
-    /// Typed click and mouse-over actions attached to the shape.
-    pub interactions: Vec<crate::Interaction>,
-    /// Typed actions attached to UTF-16 ranges in the shape text.
-    pub text_interactions: Vec<crate::TextInteraction>,
-}
-
-/// Represents a shape on a slide
-#[derive(Debug, Clone)]
-pub(super) struct WritableShape {
-    /// Shape properties
-    pub(super) properties: ShapeProperties,
-    /// Animation info for this shape
-    pub(super) animation_info: Option<AnimationInfo>,
-}
-
-impl Default for ShapeProperties {
-    fn default() -> Self {
-        Self {
-            shape_type: ShapeType::Rectangle,
-            x: 0,
-            y: 0,
-            width: 914400,  // 1 inch
-            height: 914400, // 1 inch
-            text: None,
-            paragraphs: None,
-            alignment: TextAlignment::Left,
-            fill: None,
-            line: None,
-            shadow: None,
-            rotation: 0.0,
-            adjust_values: Vec::new(),
-            flip_h: false,
-            flip_v: false,
-            picture_index: None,
-            freeform_geometry: None,
-            hyperlink_id: None,
-            interactions: Vec::new(),
-            text_interactions: Vec::new(),
-        }
-    }
-}
-
-/// Represents a slide
-#[derive(Debug, Clone)]
-pub(super) struct WritableSlide {
-    /// Shapes on this slide
-    pub(super) shapes: Vec<WritableShape>,
-    /// Tables on this slide
-    pub(super) tables: Vec<PositionedTable>,
-    /// Native charts on this slide
-    pub(super) charts: Vec<PositionedChart>,
-    /// Slide notes text (simple)
-    pub(super) notes: Option<String>,
-    /// Rich notes page
-    pub(super) notes_page: Option<NotesPage>,
-    /// Slide comments
-    pub(super) comments: Vec<SlideComment>,
-    /// Per-slide timing (auto-advance, hidden, etc.)
-    pub(super) timing: Option<SlideTiming>,
-    /// Optional header/footer override attached directly to this slide.
-    pub(super) header_footer: Option<HeaderFooter>,
-}
-
-pub(super) struct SerializedHeaderFooters {
-    pub(super) presentation_slides: Option<Vec<u8>>,
-    pub(super) notes_and_handouts: Option<Vec<u8>>,
-    pub(super) main_master: Option<Vec<u8>>,
-    pub(super) slides: Vec<Option<Vec<u8>>>,
-}
-
-impl WritableSlide {
-    /// Number of OfficeArt shapes in this slide's drawing, including the
-    /// group patriarch, the background shape, and every table group/cell.
-    pub(super) fn escher_shape_count(&self) -> u32 {
-        let table_shapes: u32 = self.tables.iter().map(|t| t.table.shape_count()).sum();
-        2 + self.shapes.len() as u32 + table_shapes + self.charts.len() as u32
-    }
-}
-pub struct Writer {
-    /// Slides in the presentation
-    pub(super) slides: Vec<WritableSlide>,
-    /// Presentation properties
-    pub(super) properties: HashMap<String, String>,
-    /// Slide width in EMUs (default: Letter size)
-    pub(super) slide_width: i32,
-    /// Slide height in EMUs (default: Letter size)
-    pub(super) slide_height: i32,
-    /// Picture/BLIP storage
-    pub(super) blip_store: Pictures,
-    /// Hyperlink collection
-    pub(super) hyperlinks: HyperlinkCollection,
-    /// Font collection
-    pub(super) fonts: Vec<FontEntity>,
-    /// Explicit embedded sound resources keyed by writer-local IDs.
-    pub(super) sound_resources: BTreeMap<u32, crate::animation::SoundType>,
-    /// Next writer-local sound ID; built-in catalog IDs occupy 1 through 20.
-    pub(super) next_sound_resource_id: u32,
-    /// Custom slide shows (named shows)
-    pub(super) custom_shows: Vec<CustomShow>,
-    /// Document-wide PowerPoint 11 smart-tag property bags.
-    pub(super) smart_tags: Vec<SmartTagDefinition>,
-    /// Optional typed override for the slide editing view.
-    pub(super) slide_view_info: Option<SlideViewInfo>,
-    /// Optional typed notes editing view.
-    pub(super) notes_view_info: Option<SlideViewInfo>,
-    /// Presentation-wide defaults for ordinary slides.
-    pub(super) presentation_header_footer: Option<HeaderFooter>,
-    /// Presentation-wide defaults for notes pages and handouts.
-    pub(super) notes_and_handouts_header_footer: Option<HeaderFooter>,
-    /// Header/footer defaults attached directly to the main master.
-    pub(super) main_master_header_footer: Option<HeaderFooter>,
-    /// Password-to-open settings, including a password wiped on replacement or drop.
-    encryption: Option<WriterEncryption>,
-    /// Inert modify password, wiped on replacement, clear, or drop.
-    modify_password: Option<WriterModifyPassword>,
-    /// Standalone CFB project wrapped for a persisted `VbaProjectStg`.
-    pub(super) vba_project: Option<crate::embedded::storage::Storage>,
-}
-
-struct WriterEncryption {
-    profile: EncryptionProfile,
-    password: Zeroizing<String>,
-}
-
-struct WriterModifyPassword {
-    password: Zeroizing<String>,
-}
-
-impl std::fmt::Debug for WriterModifyPassword {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter
-            .debug_struct("WriterModifyPassword")
-            .field("utf16_units", &self.password.encode_utf16().count())
-            .field("password", &"[REDACTED]")
-            .finish()
-    }
-}
 
 impl Writer {
     /// Create a new PPT writer with standard 4:3 slide dimensions
@@ -492,12 +195,12 @@ impl Writer {
     /// Add a document-wide PowerPoint 11 smart tag and return its zero-based index.
     ///
     /// The returned index can be attached to one or more rich-text runs with
-    /// [`super::super::text_format::TextRun::with_smart_tag`].
+    /// [`crate::writer::text_format::TextRun::with_smart_tag`].
     pub fn add_smart_tag(
         &mut self,
         definition: SmartTagDefinition,
     ) -> Result<SmartTagIndex, WriteError> {
-        super::super::smart_tags::validate_definition(&definition)?;
+        crate::writer::smart_tags::validate_definition(&definition)?;
         let index = u32::try_from(self.smart_tags.len()).map_err(|_| {
             WriteError::InvalidData("PowerPoint smart-tag count exceeds u32".to_string())
         })?;
@@ -517,93 +220,9 @@ impl Writer {
                 .expect("stored modify password was validated before assignment")
         })
     }
+}
 
-    pub(super) fn validate_encryption(&self) -> Result<(), WriteError> {
-        if self.modify_password.is_some() && self.encryption.is_none() {
-            return Err(WriteError::InvalidData(
-                "PowerPoint modify-password output requires password-to-open encryption"
-                    .to_string(),
-            ));
-        }
-        if let Some(value) = &self.encryption {
-            validate_writer_password(value.profile, value.password.as_str())
-                .map_err(WriteError::InvalidData)?;
-        }
-        if let Some(value) = &self.modify_password {
-            validate_modify_password(value.password.as_str())
-                .map_err(|error| WriteError::InvalidData(error.to_string()))?;
-        }
-        Ok(())
-    }
-
-    pub(super) fn validate_smart_tag_references(&self) -> Result<(), WriteError> {
-        let smart_tag_count = u32::try_from(self.smart_tags.len()).map_err(|_| {
-            WriteError::InvalidData("PowerPoint smart-tag count exceeds u32".to_string())
-        })?;
-        for run in self
-            .slides
-            .iter()
-            .flat_map(|slide| &slide.shapes)
-            .filter_map(|shape| shape.properties.paragraphs.as_ref())
-            .flatten()
-            .flat_map(|paragraph| &paragraph.runs)
-            .filter(|run| !run.smart_tag_indices.is_empty())
-        {
-            if run.text.is_empty() {
-                return Err(WriteError::InvalidData(
-                    "PowerPoint smart tags cannot be attached to an empty text run".to_string(),
-                ));
-            }
-            for index in &run.smart_tag_indices {
-                if index.as_u32() >= smart_tag_count {
-                    return Err(WriteError::InvalidData(format!(
-                        "PowerPoint text run references missing smart tag {}",
-                        index.as_u32()
-                    )));
-                }
-            }
-        }
-        Ok(())
-    }
-
-    pub(super) fn build_modify_password_programmable_tag(
-        &self,
-    ) -> Result<Option<Vec<u8>>, WriteError> {
-        let Some(value) = &self.modify_password else {
-            return Ok(None);
-        };
-        validate_modify_password(value.password.as_str())
-            .map_err(|error| WriteError::InvalidData(error.to_string()))?;
-
-        let mut atom = RecordBuilder::new(0x00, 3, record_type::CSTRING);
-        let atom_data = value
-            .password
-            .encode_utf16()
-            .flat_map(u16::to_le_bytes)
-            .collect::<Vec<_>>();
-        atom.write_data(&atom_data);
-        let mut blob = RecordBuilder::new(0x00, 0, record_type::BINARY_TAG_DATA);
-        blob.write_child(&atom.build()?);
-        let mut binary_tag = RecordBuilder::new(0x0f, 0, record_type::PROG_BINARY_TAG);
-        let mut name = RecordBuilder::new(0x00, 0, record_type::CSTRING);
-        name.write_data(&Tag10::to_bytes());
-        binary_tag.write_child(&name.build()?);
-        binary_tag.write_child(&blob.build()?);
-        let mut tags = RecordBuilder::new(0x0f, 0, record_type::PROG_TAGS);
-        tags.write_child(&binary_tag.build()?);
-        Ok(Some(tags.build()?))
-    }
-
-    pub(super) fn prepare_encryption(
-        &self,
-    ) -> Result<Option<WriterEncryptionMaterial>, WriteError> {
-        self.encryption
-            .as_ref()
-            .map(|value| prepare_writer_encryption(value.profile, value.password.as_str()))
-            .transpose()
-            .map_err(WriteError::InvalidData)
-    }
-
+impl Writer {
     /// Add a new blank slide
     ///
     /// # Returns
@@ -679,56 +298,9 @@ impl Writer {
             }
         }
     }
+}
 
-    pub(super) fn serialize_header_footers(&self) -> Result<SerializedHeaderFooters, WriteError> {
-        let serialize = |value: Option<&HeaderFooter>, scope| {
-            value
-                .map(|value| {
-                    let mut value = value.clone();
-                    value.scope = scope;
-                    value
-                        .to_record_bytes()
-                        .map_err(|error| WriteError::InvalidData(error.to_string()))
-                })
-                .transpose()
-        };
-        let presentation_slides = serialize(
-            self.presentation_header_footer.as_ref(),
-            HeaderFooterScope::PresentationSlides,
-        )?;
-        let notes_and_handouts = serialize(
-            self.notes_and_handouts_header_footer.as_ref(),
-            HeaderFooterScope::NotesAndHandouts,
-        )?;
-        let main_master = serialize(
-            self.main_master_header_footer.as_ref(),
-            HeaderFooterScope::Local {
-                parent: HeaderFooterParent::MainMaster,
-                parent_ordinal: HeaderFooterParentOrdinal::new(0),
-            },
-        )?;
-        let slides = self
-            .slides
-            .iter()
-            .enumerate()
-            .map(|(index, slide)| {
-                serialize(
-                    slide.header_footer.as_ref(),
-                    HeaderFooterScope::Local {
-                        parent: HeaderFooterParent::Slide,
-                        parent_ordinal: HeaderFooterParentOrdinal::new(index),
-                    },
-                )
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(SerializedHeaderFooters {
-            presentation_slides,
-            notes_and_handouts,
-            main_master,
-            slides,
-        })
-    }
-
+impl Writer {
     /// Set presentation-wide header/footer defaults for ordinary slides.
     pub fn set_presentation_header_footer(
         &mut self,
@@ -1248,10 +820,10 @@ impl Writer {
         })?;
         chart.validate()?;
         let total: usize = self.slides.iter().map(|slide| slide.charts.len()).sum();
-        if total >= super::super::chart::MAX_CHART_OBJECTS {
+        if total >= crate::writer::chart::MAX_CHART_OBJECTS {
             return Err(WriteError::InvalidData(format!(
                 "presentation exceeds {} chart objects",
-                super::super::chart::MAX_CHART_OBJECTS
+                crate::writer::chart::MAX_CHART_OBJECTS
             )));
         }
         self.slides
@@ -1262,40 +834,9 @@ impl Writer {
         }
         .into())
     }
+}
 
-    /// Assign external-object and persist identifiers to every chart.
-    ///
-    /// Chart object identifiers continue above the hyperlink identifier seed
-    /// because both share the `ExObjId` namespace ([MS-PPT] 2.10.1).
-    pub(super) fn plan_charts(
-        &self,
-        persist_builder: &mut PersistPtrBuilder,
-    ) -> Result<Vec<ChartPlan>, WriteError> {
-        let total: usize = self.slides.iter().map(|slide| slide.charts.len()).sum();
-        if total > super::super::chart::MAX_CHART_OBJECTS {
-            return Err(WriteError::InvalidData(format!(
-                "presentation exceeds {} chart objects",
-                super::super::chart::MAX_CHART_OBJECTS
-            )));
-        }
-        let mut next_id = self.hyperlinks.id_seed();
-        let mut plans = Vec::with_capacity(total);
-        for (slide_index, slide) in self.slides.iter().enumerate() {
-            for chart_index in 0..slide.charts.len() {
-                next_id = next_id.checked_add(1).ok_or_else(|| {
-                    WriteError::InvalidData("external-object ID space exhausted".to_string())
-                })?;
-                plans.push(ChartPlan {
-                    slide: slide_index,
-                    chart: chart_index,
-                    ex_obj_id: next_id,
-                    persist_id: persist_builder.allocate_id(),
-                });
-            }
-        }
-        Ok(plans)
-    }
-
+impl Writer {
     /// Add a picture to a slide
     ///
     /// # Arguments
@@ -1414,238 +955,9 @@ impl Writer {
     pub fn add_hyperlink(&mut self, hyperlink: Hyperlink) -> u32 {
         self.hyperlinks.add(hyperlink)
     }
+}
 
-    /// Attach a hyperlink to the last shape added on a slide
-    pub fn set_last_shape_hyperlink(
-        &mut self,
-        slide: usize,
-        hyperlink_id: u32,
-    ) -> Result<(), WriteError> {
-        let interaction =
-            interaction_for_hyperlink(hyperlink_id, &self.hyperlinks).ok_or_else(|| {
-                WriteError::InvalidData(format!("Hyperlink {hyperlink_id} does not exist"))
-            })?;
-        self.set_last_shape_interaction(slide, interaction)
-    }
-
-    /// Add or replace one typed click or mouse-over action on the last shape.
-    ///
-    /// Validation is atomic. Hyperlink references must identify an existing
-    /// writer hyperlink, and a shape can carry at most one action per trigger.
-    pub fn set_last_shape_interaction(
-        &mut self,
-        slide: usize,
-        interaction: crate::Interaction,
-    ) -> Result<(), WriteError> {
-        self.set_last_shape_interaction_with_limits(
-            slide,
-            interaction,
-            crate::InteractionLimits::default(),
-        )
-    }
-
-    /// Add or replace one shape action with explicit record and name limits.
-    pub fn set_last_shape_interaction_with_limits(
-        &mut self,
-        slide: usize,
-        interaction: crate::Interaction,
-        limits: crate::InteractionLimits,
-    ) -> Result<(), WriteError> {
-        interaction
-            .validate_with_limits(limits)
-            .map_err(|error| WriteError::InvalidData(error.to_string()))?;
-        if interaction.hyperlink_id != 0 && self.hyperlinks.get(interaction.hyperlink_id).is_none()
-        {
-            return Err(WriteError::InvalidData(format!(
-                "Hyperlink {} does not exist",
-                interaction.hyperlink_id
-            )));
-        }
-        let slide_data = self
-            .slides
-            .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
-
-        if let Some(shape) = slide_data.shapes.last_mut() {
-            shape.properties.hyperlink_id = None;
-            if let Some(existing) = shape
-                .properties
-                .interactions
-                .iter_mut()
-                .find(|existing| existing.trigger == interaction.trigger)
-            {
-                *existing = interaction;
-            } else {
-                shape.properties.interactions.push(interaction);
-                shape.properties.interactions.sort_by_key(|interaction| {
-                    match interaction.trigger {
-                        crate::InteractionTrigger::Click => 0,
-                        crate::InteractionTrigger::MouseOver => 1,
-                    }
-                });
-            }
-            Ok(())
-        } else {
-            Err(WriteError::InvalidData("No shapes on slide".to_string()))
-        }
-    }
-
-    /// Remove one trigger from the last shape, returning whether it was present.
-    pub fn clear_last_shape_interaction(
-        &mut self,
-        slide: usize,
-        trigger: crate::InteractionTrigger,
-    ) -> Result<bool, WriteError> {
-        let slide_data = self
-            .slides
-            .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
-        let shape = slide_data
-            .shapes
-            .last_mut()
-            .ok_or_else(|| WriteError::InvalidData("No shapes on slide".to_string()))?;
-        if trigger == crate::InteractionTrigger::Click {
-            shape.properties.hyperlink_id = None;
-        }
-        let old_len = shape.properties.interactions.len();
-        shape
-            .properties
-            .interactions
-            .retain(|interaction| interaction.trigger != trigger);
-        Ok(shape.properties.interactions.len() != old_len)
-    }
-
-    /// Attach a registered hyperlink to one UTF-16 range in the last shape's text.
-    pub fn set_last_shape_text_hyperlink(
-        &mut self,
-        slide: usize,
-        range: crate::TextRange,
-        hyperlink_id: u32,
-    ) -> Result<(), WriteError> {
-        let interaction =
-            interaction_for_hyperlink(hyperlink_id, &self.hyperlinks).ok_or_else(|| {
-                WriteError::InvalidData(format!("Hyperlink {hyperlink_id} does not exist"))
-            })?;
-        self.set_last_shape_text_interaction(
-            slide,
-            crate::TextInteraction::new(range, interaction)
-                .map_err(|error| WriteError::InvalidData(error.to_string()))?,
-        )
-    }
-
-    /// Add or replace one trigger/range pair on the last shape's text.
-    ///
-    /// Text positions are UTF-16 code units. Validation occurs before mutation.
-    pub fn set_last_shape_text_interaction(
-        &mut self,
-        slide: usize,
-        interaction: crate::TextInteraction,
-    ) -> Result<(), WriteError> {
-        self.set_last_shape_text_interaction_with_limits(
-            slide,
-            interaction,
-            crate::TextInteractionLimits::default(),
-        )
-    }
-
-    /// Add or replace a text action with explicit resource limits.
-    pub fn set_last_shape_text_interaction_with_limits(
-        &mut self,
-        slide: usize,
-        interaction: crate::TextInteraction,
-        limits: crate::TextInteractionLimits,
-    ) -> Result<(), WriteError> {
-        if interaction.interaction.hyperlink_id != 0
-            && self
-                .hyperlinks
-                .get(interaction.interaction.hyperlink_id)
-                .is_none()
-        {
-            return Err(WriteError::InvalidData(format!(
-                "Hyperlink {} does not exist",
-                interaction.interaction.hyperlink_id
-            )));
-        }
-        let slide_data = self
-            .slides
-            .get(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
-        let shape = slide_data
-            .shapes
-            .last()
-            .ok_or_else(|| WriteError::InvalidData("No shapes on slide".to_string()))?;
-        let text_units = shape_text_unit_count(&shape.properties)?;
-        interaction
-            .validate_for_text(text_units, limits)
-            .map_err(|error| WriteError::InvalidData(error.to_string()))?;
-        let replace_index = shape
-            .properties
-            .text_interactions
-            .iter()
-            .position(|existing| {
-                existing.range == interaction.range
-                    && existing.interaction.trigger == interaction.interaction.trigger
-            });
-        let prospective_len = shape
-            .properties
-            .text_interactions
-            .len()
-            .checked_add(usize::from(replace_index.is_none()))
-            .ok_or_else(|| {
-                WriteError::InvalidData("Shape text interaction count overflows".to_string())
-            })?;
-        if prospective_len > limits.max_interactions {
-            return Err(WriteError::InvalidData(
-                "Shape exceeds the configured text interaction count".to_string(),
-            ));
-        }
-
-        let shape = self
-            .slides
-            .get_mut(slide)
-            .and_then(|slide| slide.shapes.last_mut())
-            .ok_or_else(|| WriteError::InvalidData("No shapes on slide".to_string()))?;
-        if let Some(index) = replace_index {
-            shape.properties.text_interactions[index] = interaction;
-        } else {
-            shape.properties.text_interactions.push(interaction);
-            shape.properties.text_interactions.sort_by_key(|value| {
-                (
-                    value.range.begin(),
-                    value.range.end(),
-                    match value.interaction.trigger {
-                        crate::InteractionTrigger::Click => 0,
-                        crate::InteractionTrigger::MouseOver => 1,
-                    },
-                )
-            });
-        }
-        Ok(())
-    }
-
-    /// Remove one trigger/range pair from the last shape.
-    pub fn clear_last_shape_text_interaction(
-        &mut self,
-        slide: usize,
-        range: crate::TextRange,
-        trigger: crate::InteractionTrigger,
-    ) -> Result<bool, WriteError> {
-        let slide_data = self
-            .slides
-            .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
-        let shape = slide_data
-            .shapes
-            .last_mut()
-            .ok_or_else(|| WriteError::InvalidData("No shapes on slide".to_string()))?;
-        let old_len = shape.properties.text_interactions.len();
-        shape
-            .properties
-            .text_interactions
-            .retain(|value| value.range != range || value.interaction.trigger != trigger);
-        Ok(shape.properties.text_interactions.len() != old_len)
-    }
-
+impl Writer {
     /// Set the rotation of the last shape on a slide, in degrees.
     pub fn set_last_shape_rotation(
         &mut self,
@@ -1822,7 +1134,7 @@ impl Writer {
         data: Vec<u8>,
     ) -> Result<std::num::NonZeroU32, WriteError> {
         if self.sound_resources.len()
-            >= super::super::sound_collection::SoundCollectionLimits::default().max_sounds
+            >= crate::writer::sound_collection::SoundCollectionLimits::default().max_sounds
         {
             return Err(WriteError::InvalidData(
                 "sound collection exceeds the configured sound count".to_string(),
@@ -1838,8 +1150,8 @@ impl Writer {
             name: name.into(),
             data,
         };
-        let mut validator = super::super::sound_collection::SoundCollectionBuilder::new(
-            super::super::sound_collection::SoundCollectionLimits::default(),
+        let mut validator = crate::writer::sound_collection::SoundCollectionBuilder::new(
+            crate::writer::sound_collection::SoundCollectionLimits::default(),
         );
         validator
             .register(id.get(), &sound_type)
@@ -1867,8 +1179,8 @@ impl Writer {
             name: name.into(),
             data,
         };
-        let mut validator = super::super::sound_collection::SoundCollectionBuilder::new(
-            super::super::sound_collection::SoundCollectionLimits::default(),
+        let mut validator = crate::writer::sound_collection::SoundCollectionBuilder::new(
+            crate::writer::sound_collection::SoundCollectionLimits::default(),
         );
         validator
             .register(id.get(), &sound_type)
@@ -1937,54 +1249,9 @@ impl Writer {
     pub fn custom_show_count(&self) -> usize {
         self.custom_shows.len()
     }
+}
 
-    fn validate_view_info_kind(view: &SlideViewInfo, expected: ViewKind) -> Result<(), WriteError> {
-        view.to_bytes()
-            .map_err(|error| WriteError::InvalidData(error.to_string()))?;
-        if view.kind() != expected {
-            return Err(WriteError::InvalidData(format!(
-                "editing-view kind {:?} does not match {:?}",
-                view.kind(),
-                expected
-            )));
-        }
-        Ok(())
-    }
-
-    /// Set the presentation's slide editing-view preferences, zoom, and guides.
-    pub fn set_slide_view_info(&mut self, view: SlideViewInfo) -> Result<(), WriteError> {
-        Self::validate_view_info_kind(&view, ViewKind::Slide)?;
-        self.slide_view_info = Some(view);
-        Ok(())
-    }
-
-    /// Restore the writer's canonical default slide editing view.
-    pub fn clear_slide_view_info(&mut self) {
-        self.slide_view_info = None;
-    }
-
-    /// Return the explicit slide editing-view override, if present.
-    pub fn slide_view_info(&self) -> Option<&SlideViewInfo> {
-        self.slide_view_info.as_ref()
-    }
-
-    /// Set the presentation's notes editing-view preferences, zoom, and guides.
-    pub fn set_notes_view_info(&mut self, view: SlideViewInfo) -> Result<(), WriteError> {
-        Self::validate_view_info_kind(&view, ViewKind::Notes)?;
-        self.notes_view_info = Some(view);
-        Ok(())
-    }
-
-    /// Remove the optional notes editing-view record.
-    pub fn clear_notes_view_info(&mut self) {
-        self.notes_view_info = None;
-    }
-
-    /// Return the explicit notes editing-view, if present.
-    pub fn notes_view_info(&self) -> Option<&SlideViewInfo> {
-        self.notes_view_info.as_ref()
-    }
-
+impl Writer {
     /// Set a presentation property
     ///
     /// # Arguments

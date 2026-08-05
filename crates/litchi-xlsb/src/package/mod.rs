@@ -16,7 +16,7 @@ use crate::writer::{MutableWorksheet, WorkbookWriter};
 
 #[path = "../host/cell.rs"]
 pub(crate) mod cell;
-#[path = "../host/cells_reader.rs"]
+#[path = "../host/cells_reader/mod.rs"]
 #[allow(dead_code, unreachable_pub)]
 pub(crate) mod cells_reader;
 #[path = "../host/chart_resources.rs"]

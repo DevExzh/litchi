@@ -73,7 +73,7 @@ shared Office codecs are counted only where the DOC API exposes them.
 | Document variables, attached-template and web-export metadata | 🟡 | ✅ | ✅ | Stored settings and relationship-like metadata are available where exposed; templates and web targets are not loaded and web layout is not generated |
 | Mail-merge settings, sources, filters, and recipients (Pms, Pmfs, Rfs, ODSO) | 🟡 | ✅ | ✅ | Word 97 and Word 2002+ source descriptors, SQL/connection text, recipient filtering, sorting, inclusion, and field mappings are typed bounded metadata; data sources are never contacted and no merge is run |
 | Legacy form fields and FFData | ✅ | ✅ | ✅ | Text, checkbox, dropdown, defaults, selections, help/status text, and verbatim entry/exit macro names are typed; macros and host form behavior are inert |
-| ActiveX/OCX control semantics | ❌ | ❌ | ❌ | [MS-DOC] OcxInfo/RgxOcxInfo records and ObjectPool payloads do not have a public control lifecycle, property, event, or rendering API |
+| ActiveX/OCX control semantics | ❌ | ❌ | ❌ | Inert [MS-DOC] OcxInfo/RgxOcxInfo metadata is available through `parts::ole_controls`; ObjectPool payloads still have no public control lifecycle, property, event, or rendering API |
 | Document protection settings and range-level protected bookmarks | 🟡 | ✅ | ✅ | Protection modes, hashes, SttbfBkmkProt ranges, editor assignments, and usernames are typed; editing policy is not enforced |
 | Document statistics and DOP version metadata | ✅ | ✅ | ✅ | Word/character/paragraph/line/page counts where stored, versioned DOP records, compatibility options, typography, macro-security metadata, and related state are exposed within bounded models |
 

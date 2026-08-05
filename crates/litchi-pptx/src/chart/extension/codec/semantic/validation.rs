@@ -1,50 +1,13 @@
-//! Typed ChartEx graph conversion and semantic validation.
+//! ChartEx XML graph parsing and semantic validation.
 
-use super::super::super::style::{ColorDocument, Document as StyleDocument};
-use super::super::model::*;
-use super::limits::*;
-use super::xml::*;
+use super::super::super::model::*;
+use super::super::limits::*;
+use super::super::xml::*;
+use super::model::ParsedDataGraph;
 use crate::Result;
 use std::collections::HashSet;
 
-impl Document {
-    pub fn info(&self) -> &Info {
-        &self.info
-    }
-
-    pub fn external_data_target(&self) -> Option<&ExternalDataTarget> {
-        self.external_data_target.as_ref()
-    }
-
-    pub fn fallback_image_part_name(&self) -> Option<&str> {
-        self.fallback_image_part_name.as_deref()
-    }
-
-    pub fn chart_style(&self) -> Option<&StyleDocument> {
-        self.chart_style.as_ref()
-    }
-
-    pub fn chart_color_style(&self) -> Option<&ColorDocument> {
-        self.chart_color_style.as_ref()
-    }
-
-    /// Return the validated source XML unchanged.
-    pub fn to_xml(&self) -> Vec<u8> {
-        self.xml.clone()
-    }
-}
-
-pub(super) type ParsedDataGraph = (
-    Vec<DataSet>,
-    Vec<SeriesDataReference>,
-    Vec<Axis>,
-    bool,
-    Chart,
-    PlotArea,
-    ChartSpaceFormatting,
-);
-
-pub(super) fn parse_data_graph(
+pub(in crate::chart::extension::codec) fn parse_data_graph(
     xml: &[u8],
     version: &str,
     features: &[String],

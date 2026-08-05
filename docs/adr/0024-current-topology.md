@@ -116,6 +116,10 @@ errors use the same prefix-free rule. DOC also has a nested
 FIB/table-stream parser and serializer are exposed without claiming Document
 lifecycle integration or protection-policy enforcement.
 
+The OLE2 owner now also has `parts/ole_controls`, which layers the inert
+`OcxInfo`/`RgxOcxInfo` metadata model, binary codec, FIB/table-stream seam, and
+tests without creating a control runtime or activation API.
+
 ## ODF
 
 [`litchi-odf-common`](../../crates/litchi-odf-common/Cargo.toml) is the shared
@@ -143,9 +147,13 @@ semantic, XML, relationship, and package owners while preserving the compact
 public web facade.
 
 ODP's parser and ODT's index writer now follow the same semantic/XML/
-validation/package/test organization. These changes are source topology and
-ownership evidence only; they do not broaden the format conformance claims in
-ADR 0023.
+validation/package/test organization. The current continuation layers ODS
+content traversal and ODT mutable editing under nested semantic/validation or
+snapshot/package codec facades. The same wave layers DOCX document packages,
+web extensions, and section writing; PPT writer-core models; PPTX ChartEx
+semantic records; XLS revision records; XLSB host cell reading; and XLSX pivot
+reading. These changes are source topology and ownership evidence only; they
+do not broaden the format conformance claims in ADR 0023.
 
 ## Historical terminology
 
