@@ -1,10 +1,10 @@
 //! Immutable workbook snapshots and selector-first sheet lookup.
 
-mod edit;
+pub mod edit;
 
 pub use edit::{
     ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DefaultsEdit, Edit, JoinError,
-    JoinFailure, NewSheet, PackageChange, Patch, RowEdit, SheetEdit, State, TabEdit,
+    JoinFailure, NewSheet, PackageChange, Patch, RowEdit, State, TabEdit, WorksheetEdit,
 };
 
 use std::collections::HashMap;
@@ -13,9 +13,9 @@ use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
-use litchi_core::Selector;
+use litchi_core::Selector as CoreSelector;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
+use litchi_opc::{OpcPackage, PackURI, Part};
 use litchi_sheet::{Area, At, ColumnAt, Rect, RowAt};
 use once_cell::sync::OnceCell;
 
@@ -26,6 +26,8 @@ use crate::error::{Error, Result, invalid};
 use crate::raw;
 use crate::style::StyleLineage;
 use crate::{Cells, Column, Columns, LocalStyle, Row, Rows, Style, Styles};
+#[cfg(test)]
+use litchi_opc::{BlobPart, TargetMode};
 
 const CHARTSHEET_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
@@ -46,7 +48,7 @@ const CHARTSHEET_CONTENT_TYPE: &str =
 /// Names and checked zero-based positions are the ordinary entry points. The
 /// uninhabited identity variant reserves room for a future lineage-checked
 /// durable selector without exposing native SpreadsheetML IDs.
-pub type SheetSelector<'a> = litchi_sheet::SheetSelector<'a, Infallible>;
+pub type Selector<'a> = litchi_sheet::SheetSelector<'a, Infallible>;
 
 /// Runtime workbook flavor derived from the main-part content type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -89,7 +91,7 @@ pub enum DateSystem {
 /// Semantic sheet kind resolved from the workbook relationship.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SheetKind {
+pub enum WorksheetKind {
     Worksheet,
     Chart,
     Dialog,
@@ -97,7 +99,7 @@ pub enum SheetKind {
     Unknown,
 }
 
-/// Sheet visibility retained without approximating producer extensions.
+/// Worksheet visibility retained without approximating producer extensions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Visibility {
@@ -140,7 +142,7 @@ struct SheetData {
     position: usize,
     name: String,
     name_key: Box<str>,
-    kind: SheetKind,
+    kind: WorksheetKind,
     visibility: Visibility,
     part_uri: PackURI,
     cells: OnceLock<Store>,
@@ -179,73 +181,12 @@ pub struct Workbook {
 impl Workbook {
     /// Create a deterministic minimal workbook with one visible worksheet.
     pub fn new() -> Result<Self> {
-        let mut package = OpcPackage::new();
-        let workbook_uri = PackURI::new("/xl/workbook.xml").map_err(invalid)?;
-        let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml").map_err(invalid)?;
-        let styles_uri = PackURI::new("/xl/styles.xml").map_err(invalid)?;
+        Self::from_package(crate::package::build_minimal_package()?)
+    }
 
-        let mut workbook = BlobPart::new(
-            workbook_uri,
-            ct::SML_SHEET_MAIN.to_string(),
-            concat!(
-                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
-                r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" "#,
-                r#"xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">"#,
-                r#"<sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets>"#,
-                r#"</workbook>"#
-            )
-            .as_bytes()
-            .to_vec(),
-        );
-        workbook.rels_mut().try_add_relationship(
-            rt::WORKSHEET.to_owned(),
-            "worksheets/sheet1.xml".to_owned(),
-            "rId1".to_owned(),
-            TargetMode::Internal,
-        )?;
-        workbook.rels_mut().try_add_relationship(
-            rt::STYLES.to_owned(),
-            "styles.xml".to_owned(),
-            "rId2".to_owned(),
-            TargetMode::Internal,
-        )?;
-        package.try_add_part(Box::new(workbook))?;
-        package.try_add_part(Box::new(BlobPart::new(
-            worksheet_uri,
-            ct::SML_WORKSHEET.to_string(),
-            concat!(
-                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
-                r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#,
-                r#"<dimension ref="A1"/><sheetData/></worksheet>"#
-            )
-            .as_bytes()
-            .to_vec(),
-        )))?;
-        package.try_add_part(Box::new(BlobPart::new(
-            styles_uri,
-            ct::SML_STYLES.to_string(),
-            concat!(
-                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
-                r#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#,
-                r#"<fonts count="1"><font/></fonts>"#,
-                r#"<fills count="2"><fill><patternFill patternType="none"/></fill>"#,
-                r#"<fill><patternFill patternType="gray125"/></fill></fills>"#,
-                r#"<borders count="1"><border/></borders>"#,
-                r#"<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>"#,
-                r#"<cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs>"#,
-                r#"<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>"#,
-                r#"</styleSheet>"#
-            )
-            .as_bytes()
-            .to_vec(),
-        )))?;
-        package.rels_mut().try_add_relationship(
-            rt::OFFICE_DOCUMENT.to_owned(),
-            "xl/workbook.xml".to_owned(),
-            "rId1".to_owned(),
-            TargetMode::Internal,
-        )?;
-        Self::from_package(package)
+    /// Create a deterministic minimal workbook with one visible worksheet.
+    pub fn create() -> Result<Self> {
+        Self::new()
     }
 
     /// Open an XLSX-family package from a filesystem path.
@@ -273,6 +214,11 @@ impl Workbook {
     /// ordinary sheet APIs.
     pub fn from_package(package: OpcPackage) -> Result<Self> {
         Self::from_package_with_styles(package, None)
+    }
+
+    /// Adopt a parsed OPC package after validating its SpreadsheetML graph.
+    pub fn from_opc(package: OpcPackage) -> Result<Self> {
+        Self::from_package(package)
     }
 
     fn from_package_with_styles(package: OpcPackage, source: Option<&Workbook>) -> Result<Self> {
@@ -379,18 +325,18 @@ impl Workbook {
     }
 
     /// Iterate lightweight sheet handles in workbook order.
-    pub fn sheets(&self) -> impl ExactSizeIterator<Item = Sheet> + DoubleEndedIterator + '_ {
-        self.inner.sheets.iter().cloned().map(|data| Sheet {
+    pub fn sheets(&self) -> impl ExactSizeIterator<Item = Worksheet> + DoubleEndedIterator + '_ {
+        self.inner.sheets.iter().cloned().map(|data| Worksheet {
             owner: Arc::clone(&self.inner),
             data,
         })
     }
 
     /// Look up a sheet by developer-facing name or checked zero-based position.
-    pub fn sheet<'a>(&self, selector: impl Into<SheetSelector<'a>>) -> Result<Option<Sheet>> {
+    pub fn sheet<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Option<Worksheet>> {
         let data = match selector.into() {
-            Selector::Position(position) => self.inner.sheets.get(position.get()).cloned(),
-            Selector::Name(name) => {
+            CoreSelector::Position(position) => self.inner.sheets.get(position.get()).cloned(),
+            CoreSelector::Name(name) => {
                 let key = crate::sheet::key(&name);
                 self.inner
                     .sheets
@@ -398,23 +344,23 @@ impl Workbook {
                     .find(|sheet| sheet.name_key == key)
                     .cloned()
             },
-            Selector::Id(never) => match never {},
+            CoreSelector::Id(never) => match never {},
             _ => return Err(Error::UnsupportedSelector),
         };
-        Ok(data.map(|data| Sheet {
+        Ok(data.map(|data| Worksheet {
             owner: Arc::clone(&self.inner),
             data,
         }))
     }
 
     /// Return the active sheet when the workbook contains sheets.
-    pub fn active_sheet(&self) -> Option<Sheet> {
+    pub fn active_sheet(&self) -> Option<Worksheet> {
         let data = self
             .inner
             .active_sheet
             .and_then(|position| self.inner.sheets.get(position))
             .cloned()?;
-        Some(Sheet {
+        Some(Worksheet {
             owner: Arc::clone(&self.inner),
             data,
         })
@@ -455,7 +401,7 @@ impl Workbook {
 
     /// Serialize the immutable package snapshot to bytes.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        Ok(PackageWriter::to_bytes(&self.inner.package)?)
+        Ok(crate::writer::to_bytes(&self.inner.package)?)
     }
 
     /// Stream a finalized workbook to any sequential sink without seeking.
@@ -463,7 +409,7 @@ impl Workbook {
     /// A sink failure can leave caller-owned output incomplete. Use [`Self::save`]
     /// for atomic filesystem replacement.
     pub fn write_to(&self, writer: impl Write) -> Result<()> {
-        Ok(PackageWriter::write_to_stream(writer, &self.inner.package)?)
+        Ok(crate::writer::write_to(&self.inner.package, writer)?)
     }
 
     /// Atomically save through a finalized sibling temporary artifact.
@@ -472,7 +418,7 @@ impl Workbook {
     /// destination is replaced. Existing symbolic-link destinations are
     /// refused instead of being followed or silently replaced.
     pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
-        Ok(PackageWriter::write(path, &self.inner.package)?)
+        Ok(crate::writer::save(&self.inner.package, path)?)
     }
 
     /// Start an isolated semantic transaction over this immutable snapshot.
@@ -488,12 +434,12 @@ impl Workbook {
 
 /// Lightweight lifetime-free handle to one sheet in a workbook snapshot.
 #[derive(Debug, Clone)]
-pub struct Sheet {
+pub struct Worksheet {
     owner: Arc<Inner>,
     data: Arc<SheetData>,
 }
 
-impl Sheet {
+impl Worksheet {
     /// Developer-facing sheet name.
     pub fn name(&self) -> &str {
         &self.data.name
@@ -505,7 +451,7 @@ impl Sheet {
     }
 
     /// Semantic sheet kind resolved from its relationship.
-    pub fn kind(&self) -> SheetKind {
+    pub fn kind(&self) -> WorksheetKind {
         self.data.kind
     }
 
@@ -530,7 +476,7 @@ impl Sheet {
     /// the immutable sheet snapshot. Non-worksheet handles return a typed
     /// error instead of attempting to interpret another sheet kind as XML.
     pub fn web_bindings(&self) -> Result<&crate::web::Bindings> {
-        if self.data.kind != SheetKind::Worksheet {
+        if self.data.kind != WorksheetKind::Worksheet {
             return Err(Error::NotWorksheet {
                 sheet: self.data.name.clone(),
             });
@@ -686,7 +632,7 @@ impl Sheet {
     }
 
     fn store(&self) -> Result<&Store> {
-        if self.data.kind != SheetKind::Worksheet {
+        if self.data.kind != WorksheetKind::Worksheet {
             return Err(Error::NotWorksheet {
                 sheet: self.data.name.clone(),
             });
@@ -809,10 +755,10 @@ impl Inner {
         self.require_style(key)?;
         let mut count = 0usize;
         for data in &self.sheets {
-            if data.kind != SheetKind::Worksheet {
+            if data.kind != WorksheetKind::Worksheet {
                 continue;
             }
-            let sheet = Sheet {
+            let sheet = Worksheet {
                 owner: Arc::clone(self),
                 data: Arc::clone(data),
             };
@@ -832,7 +778,7 @@ impl Inner {
 }
 
 struct SheetPart {
-    kind: SheetKind,
+    kind: WorksheetKind,
     uri: PackURI,
 }
 
@@ -861,15 +807,15 @@ fn validate_sheet_graph(
         let kind = match relationship.reltype() {
             rt::WORKSHEET | rt::STRICT_WORKSHEET => {
                 require_content_type(sheet, part.content_type(), ct::SML_WORKSHEET)?;
-                SheetKind::Worksheet
+                WorksheetKind::Worksheet
             },
             CHARTSHEET_REL | STRICT_CHARTSHEET_REL => {
                 require_content_type(sheet, part.content_type(), CHARTSHEET_CONTENT_TYPE)?;
-                SheetKind::Chart
+                WorksheetKind::Chart
             },
-            DIALOGSHEET_REL | STRICT_DIALOGSHEET_REL => SheetKind::Dialog,
-            MACROSHEET_REL | INTL_MACROSHEET_REL => SheetKind::Macro,
-            _ => SheetKind::Unknown,
+            DIALOGSHEET_REL | STRICT_DIALOGSHEET_REL => WorksheetKind::Dialog,
+            MACROSHEET_REL | INTL_MACROSHEET_REL => WorksheetKind::Macro,
+            _ => WorksheetKind::Unknown,
         };
         let uri = part.partname().clone();
         if let Some(previous) = targets.insert(uri.clone(), position) {
@@ -1031,7 +977,7 @@ mod tests {
         assert_eq!(by_name.name(), "Sheet1");
         assert_eq!(by_position.position(), 0);
         assert!(by_name.same_workbook(&by_position));
-        assert!(matches!(by_name.kind(), SheetKind::Worksheet));
+        assert!(matches!(by_name.kind(), WorksheetKind::Worksheet));
         assert!(matches!(by_name.visibility(), Visibility::Visible));
         assert!(first.sheet(1usize).expect("lookup").is_none());
         let extents = by_name.extents().expect("empty extents");
@@ -1052,7 +998,7 @@ mod tests {
     fn clones_share_the_snapshot_and_handles_pin_it() {
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<Workbook>();
-        assert_send_sync::<Sheet>();
+        assert_send_sync::<Worksheet>();
         assert_send_sync::<Style>();
         assert_send_sync::<Styles>();
         assert_send_sync::<crate::StyleKey>();

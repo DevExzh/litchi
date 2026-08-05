@@ -39,7 +39,7 @@ pub enum Cell {
 ///
 /// A covered coordinate is reported before any producer-stored follower cell,
 /// because the merge anchor owns its visible content. Sparse stored traversal
-/// remains available through [`crate::Sheet::cells`].
+/// remains available through [`crate::Worksheet::cells`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum View<'a> {
@@ -217,7 +217,7 @@ macro_rules! exact_integer_value {
 
 exact_integer_value!(i8, i16, i32, u8, u16, u32);
 
-/// Primary payload accepted by [`crate::SheetEdit::set`].
+/// Primary payload accepted by [`crate::WorksheetEdit::set`].
 ///
 /// Plain strings are always inert text. Formula interpretation requires an
 /// explicit checked [`Formula`].

@@ -10,7 +10,7 @@ use litchi_sheet::{
     Area, At, Cell as Address, Column as ColumnIndex, ColumnAt, Rect, Row as RowIndex, RowAt,
 };
 
-use super::{Sheet, SheetKind, SheetSelector, Visibility, Workbook};
+use super::{Selector, Visibility, Workbook, Worksheet, WorksheetKind};
 use crate::cell::{Cell, Content, Stored};
 use crate::chain;
 use crate::column::{
@@ -2008,7 +2008,7 @@ impl Edit {
     pub fn add_before<'e, 's, T>(
         &'e mut self,
         name: T,
-        anchor: impl Into<SheetSelector<'s>>,
+        anchor: impl Into<Selector<'s>>,
     ) -> Result<Option<NewSheet<'e>>>
     where
         T: TryInto<Name>,
@@ -2031,7 +2031,7 @@ impl Edit {
     pub fn add_after<'e, 's, T>(
         &'e mut self,
         name: T,
-        anchor: impl Into<SheetSelector<'s>>,
+        anchor: impl Into<Selector<'s>>,
     ) -> Result<Option<NewSheet<'e>>>
     where
         T: TryInto<Name>,
@@ -2050,8 +2050,8 @@ impl Edit {
     /// Select a worksheet for short transaction-scoped operations.
     pub fn sheet<'e, 's>(
         &'e mut self,
-        selector: impl Into<SheetSelector<'s>>,
-    ) -> Result<Option<SheetEdit<'e>>> {
+        selector: impl Into<Selector<'s>>,
+    ) -> Result<Option<WorksheetEdit<'e>>> {
         if !self.removed.is_empty() {
             return Err(self.remove_block(RemoveBlock::MixedEdit, "transaction"));
         }
@@ -2059,13 +2059,13 @@ impl Edit {
         let Some(sheet) = sheet else {
             return Ok(None);
         };
-        if sheet.kind() != SheetKind::Worksheet {
+        if sheet.kind() != WorksheetKind::Worksheet {
             return Err(Error::NotWorksheet {
                 sheet: sheet.name().to_owned(),
             });
         }
         let position = sheet.position();
-        Ok(Some(SheetEdit {
+        Ok(Some(WorksheetEdit {
             edit: self,
             position,
         }))
@@ -2077,7 +2077,7 @@ impl Edit {
     /// the workbook catalog rather than worksheet cell storage.
     pub fn tab<'e, 's>(
         &'e mut self,
-        selector: impl Into<SheetSelector<'s>>,
+        selector: impl Into<Selector<'s>>,
     ) -> Result<Option<TabEdit<'e>>> {
         if !self.removed.is_empty() {
             return Err(self.remove_block(RemoveBlock::MixedEdit, "transaction"));
@@ -2096,8 +2096,8 @@ impl Edit {
     /// remain available for import and positional workflows.
     pub fn move_before<'a, 'b>(
         &mut self,
-        sheet: impl Into<SheetSelector<'a>>,
-        anchor: impl Into<SheetSelector<'b>>,
+        sheet: impl Into<Selector<'a>>,
+        anchor: impl Into<Selector<'b>>,
     ) -> Result<Option<&mut Self>> {
         if !self.removed.is_empty() {
             return Err(self.remove_block(RemoveBlock::MixedEdit, "transaction"));
@@ -2117,8 +2117,8 @@ impl Edit {
     /// `Ok(None)` means either selector did not resolve in the source snapshot.
     pub fn move_after<'a, 'b>(
         &mut self,
-        sheet: impl Into<SheetSelector<'a>>,
-        anchor: impl Into<SheetSelector<'b>>,
+        sheet: impl Into<Selector<'a>>,
+        anchor: impl Into<Selector<'b>>,
     ) -> Result<Option<&mut Self>> {
         if !self.removed.is_empty() {
             return Err(self.remove_block(RemoveBlock::MixedEdit, "transaction"));
@@ -2140,7 +2140,7 @@ impl Edit {
     /// stable semantic anchor is available.
     pub fn move_to<'a>(
         &mut self,
-        sheet: impl Into<SheetSelector<'a>>,
+        sheet: impl Into<Selector<'a>>,
         position: usize,
     ) -> Result<Option<&mut Self>> {
         if !self.removed.is_empty() {
@@ -2163,14 +2163,11 @@ impl Edit {
     /// live formulas, unmodeled producer references, VBA projects, additional
     /// incoming relationships, and mixed mutation plans. Multiple independent
     /// worksheet removals may be collected in one atomic transaction.
-    pub fn remove<'a>(
-        &mut self,
-        selector: impl Into<SheetSelector<'a>>,
-    ) -> Result<Option<&mut Self>> {
+    pub fn remove<'a>(&mut self, selector: impl Into<Selector<'a>>) -> Result<Option<&mut Self>> {
         let Some(sheet) = self.base.sheet(selector)? else {
             return Ok(None);
         };
-        if sheet.kind() != SheetKind::Worksheet {
+        if sheet.kind() != WorksheetKind::Worksheet {
             return Err(Error::NotWorksheet {
                 sheet: sheet.name().to_owned(),
             });
@@ -2364,7 +2361,7 @@ impl Edit {
         };
         if let Some(refs) = &web_refs {
             for (position, data) in base.inner.sheets.iter().enumerate() {
-                if data.kind != SheetKind::Worksheet {
+                if data.kind != WorksheetKind::Worksheet {
                     continue;
                 }
                 if let Some(bindings) = sheets
@@ -2373,7 +2370,7 @@ impl Edit {
                 {
                     check_web_bindings(refs, &data.name, bindings)?;
                 } else {
-                    let sheet = Sheet {
+                    let sheet = Worksheet {
                         owner: Arc::clone(&base.inner),
                         data: Arc::clone(data),
                     };
@@ -2725,12 +2722,12 @@ impl Edit {
             {
                 continue;
             }
-            if data.kind != SheetKind::Worksheet {
+            if data.kind != WorksheetKind::Worksheet {
                 return Err(Error::NotWorksheet {
                     sheet: data.name.clone(),
                 });
             }
-            let sheet = Sheet {
+            let sheet = Worksheet {
                 owner: Arc::clone(&base.inner),
                 data: Arc::clone(&data),
             };
@@ -2996,7 +2993,7 @@ impl Edit {
                     base.inner.sheets.get(old_active).ok_or_else(|| {
                         invalid("previous active sheet disappeared during tab edit")
                     })?;
-                if data.kind == SheetKind::Unknown {
+                if data.kind == WorksheetKind::Unknown {
                     return Err(Error::TabEditBlocked {
                         sheet: data.name.clone(),
                         position: old_active,
@@ -3022,7 +3019,7 @@ impl Edit {
                     .sheets
                     .get(new_active)
                     .ok_or_else(|| invalid("new active sheet disappeared during tab edit"))?;
-                if data.kind == SheetKind::Unknown {
+                if data.kind == WorksheetKind::Unknown {
                     return Err(Error::TabEditBlocked {
                         sheet: data.name.clone(),
                         position: new_active,
@@ -3706,12 +3703,12 @@ impl Edit {
                 .get(position)
                 .cloned()
                 .ok_or_else(|| invalid("web-binding target disappeared"))?;
-            if data.kind != SheetKind::Worksheet {
+            if data.kind != WorksheetKind::Worksheet {
                 return Err(Error::NotWorksheet {
                     sheet: data.name.clone(),
                 });
             }
-            let sheet = Sheet {
+            let sheet = Worksheet {
                 owner: Arc::clone(&self.base.inner),
                 data,
             };
@@ -4134,12 +4131,12 @@ impl TabEdit<'_> {
 
 /// Borrowed worksheet editor tied to one transaction.
 #[derive(Debug)]
-pub struct SheetEdit<'a> {
+pub struct WorksheetEdit<'a> {
     edit: &'a mut Edit,
     position: usize,
 }
 
-impl SheetEdit<'_> {
+impl WorksheetEdit<'_> {
     /// Replace all worksheet Office Add-in range bindings by moving one
     /// already-validated collection into the transaction.
     pub fn set_bindings(&mut self, bindings: WebBindings) -> &mut Self {
@@ -4244,7 +4241,7 @@ impl SheetEdit<'_> {
                 .get(self.position)
                 .cloned()
                 .ok_or_else(|| invalid("unmerge target disappeared"))?;
-            let sheet = Sheet {
+            let sheet = Worksheet {
                 owner: Arc::clone(&self.edit.base.inner),
                 data,
             };
@@ -4949,7 +4946,7 @@ fn commit_removals(edit: Edit) -> Result<Commit> {
             .sheets
             .get(*position)
             .ok_or_else(|| invalid("removed worksheet position disappeared"))?;
-        if sheet.kind != SheetKind::Worksheet {
+        if sheet.kind != WorksheetKind::Worksheet {
             return Err(Error::NotWorksheet {
                 sheet: sheet.name.clone(),
             });
@@ -5674,10 +5671,10 @@ fn validate_web_integrity(workbook: &Workbook) -> Result<()> {
         None => crate::web::Refs::new(std::iter::empty::<&str>())?,
     };
     for data in &workbook.inner.sheets {
-        if data.kind != SheetKind::Worksheet {
+        if data.kind != WorksheetKind::Worksheet {
             continue;
         }
-        let sheet = Sheet {
+        let sheet = Worksheet {
             owner: Arc::clone(&workbook.inner),
             data: Arc::clone(data),
         };
@@ -7970,7 +7967,7 @@ mod tests {
 
     #[test]
     fn tab_visibility_is_selector_first_reversible_and_active_safe() {
-        let source = two_sheet_workbook(SheetKind::Worksheet);
+        let source = two_sheet_workbook(WorksheetKind::Worksheet);
         let source_bytes = source.to_bytes().expect("source bytes");
         assert_eq!(
             source.active_sheet().map(|sheet| sheet.name().to_owned()),
@@ -8071,7 +8068,7 @@ mod tests {
 
     #[test]
     fn active_tab_is_selector_first_reversible_and_composable() {
-        for kind in [SheetKind::Worksheet, SheetKind::Chart] {
+        for kind in [WorksheetKind::Worksheet, WorksheetKind::Chart] {
             let source = two_sheet_workbook(kind);
             let source_bytes = source.to_bytes().expect("source bytes");
             assert!(
@@ -8126,7 +8123,7 @@ mod tests {
             assert!(no_op.commit().expect("no-op commit").patch().is_empty());
         }
 
-        let source = two_sheet_workbook(SheetKind::Worksheet);
+        let source = two_sheet_workbook(WorksheetKind::Worksheet);
         let mut cell = source.edit().expect("cell edit");
         cell.sheet("Sheet2")
             .expect("lookup")
@@ -8181,7 +8178,7 @@ mod tests {
 
     #[test]
     fn active_tab_requires_final_visibility_and_conflicts_globally() {
-        let source = two_sheet_workbook(SheetKind::Worksheet);
+        let source = two_sheet_workbook(WorksheetKind::Worksheet);
         let mut hide = source.edit().expect("hide edit");
         hide.tab("Sheet2").expect("lookup").expect("tab").hide();
         let hidden = hide.commit().expect("hidden source");
@@ -8560,7 +8557,7 @@ mod tests {
 
     #[test]
     fn worksheet_insert_join_preserves_explicit_edit_order() {
-        let source = two_sheet_workbook(SheetKind::Worksheet);
+        let source = two_sheet_workbook(WorksheetKind::Worksheet);
         let mut left = source.edit().expect("left");
         left.add_before("Left", "Sheet2")
             .expect("lookup")
@@ -9249,7 +9246,7 @@ mod tests {
 
     #[test]
     fn tab_rename_validates_names_collisions_swaps_and_join_facets() {
-        let source = two_sheet_workbook(SheetKind::Worksheet);
+        let source = two_sheet_workbook(WorksheetKind::Worksheet);
         let mut invalid = source.edit().expect("invalid edit");
         let error = invalid
             .tab("Sheet1")
@@ -9402,7 +9399,7 @@ mod tests {
         assert_eq!(restored.workbook().to_bytes().expect("bytes"), source_bytes);
         assert_eq!(source.to_bytes().expect("source unchanged"), source_bytes);
 
-        let chart_source = two_sheet_workbook(SheetKind::Chart);
+        let chart_source = two_sheet_workbook(WorksheetKind::Chart);
         let chart_bytes = chart_source.to_bytes().expect("chart source bytes");
         let mut chart_edit = chart_source.edit().expect("chart edit");
         chart_edit
@@ -9415,7 +9412,10 @@ mod tests {
             .sheet(0usize)
             .expect("lookup")
             .expect("tab");
-        assert_eq!((first.name(), first.kind()), ("Sheet2", SheetKind::Chart));
+        assert_eq!(
+            (first.name(), first.kind()),
+            ("Sheet2", WorksheetKind::Chart)
+        );
         assert_eq!(
             chart
                 .workbook()
@@ -9506,7 +9506,7 @@ mod tests {
         assert_eq!(conflicts.len(), 1);
         assert!(conflicts.conflicts()[0].is_order());
 
-        let source = two_sheet_workbook(SheetKind::Worksheet);
+        let source = two_sheet_workbook(WorksheetKind::Worksheet);
         let mut same_position = source.edit().expect("same-position edit");
         same_position
             .move_before("Sheet2", "Sheet1")
@@ -9743,7 +9743,7 @@ mod tests {
 
     #[test]
     fn tab_visibility_composes_with_cells_and_conflicts_by_facet() {
-        let source = two_sheet_workbook(SheetKind::Worksheet);
+        let source = two_sheet_workbook(WorksheetKind::Worksheet);
         let mut cell = source.edit().expect("cell edit");
         cell.sheet("Sheet2")
             .expect("lookup")
@@ -9788,14 +9788,14 @@ mod tests {
 
     #[test]
     fn tab_visibility_applies_to_non_worksheet_sheet_kinds() {
-        let source = two_sheet_workbook(SheetKind::Chart);
+        let source = two_sheet_workbook(WorksheetKind::Chart);
         assert_eq!(
             source
                 .sheet("Sheet2")
                 .expect("lookup")
                 .expect("chart sheet")
                 .kind(),
-            SheetKind::Chart
+            WorksheetKind::Chart
         );
         let mut edit = source.edit().expect("edit");
         edit.tab("Sheet2")
@@ -9816,7 +9816,7 @@ mod tests {
 
     #[test]
     fn active_relocation_synchronizes_worksheet_and_chart_view_selection() {
-        for kind in [SheetKind::Worksheet, SheetKind::Chart] {
+        for kind in [WorksheetKind::Worksheet, WorksheetKind::Chart] {
             let source = active_second_sheet_workbook(kind);
             let source_bytes = source.to_bytes().expect("source bytes");
             assert_eq!(
@@ -9872,7 +9872,7 @@ mod tests {
 
     #[test]
     fn tab_visibility_blocks_protected_workbook_structure() {
-        let source = two_sheet_workbook(SheetKind::Worksheet);
+        let source = two_sheet_workbook(WorksheetKind::Worksheet);
         let mut package = source.inner.package.clone();
         package
             .get_part_mut(&source.inner.workbook_uri)
@@ -9912,7 +9912,7 @@ mod tests {
 
     #[test]
     fn showing_an_unknown_producer_state_repairs_it_explicitly() {
-        let source = two_sheet_workbook(SheetKind::Worksheet);
+        let source = two_sheet_workbook(WorksheetKind::Worksheet);
         let mut package = source.inner.package.clone();
         package
             .get_part_mut(&source.inner.workbook_uri)
@@ -10593,7 +10593,7 @@ mod tests {
     }
 
     fn rename_reference_workbook() -> Workbook {
-        let source = two_sheet_workbook(SheetKind::Worksheet);
+        let source = two_sheet_workbook(WorksheetKind::Worksheet);
         let mut package = source.inner.package.clone();
         package
             .get_part_mut(&source.inner.workbook_uri)
@@ -10728,7 +10728,7 @@ mod tests {
         Workbook::from_package(package).expect("merged workbook")
     }
 
-    fn two_sheet_workbook(second_kind: SheetKind) -> Workbook {
+    fn two_sheet_workbook(second_kind: WorksheetKind) -> Workbook {
         let baseline = Workbook::new().expect("baseline");
         let mut package = baseline.inner.package.clone();
         package
@@ -10738,12 +10738,12 @@ mod tests {
                 br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/><sheet name="Sheet2" sheetId="2" r:id="rIdTab2"/></sheets></workbook>"#.to_vec(),
             );
         let (relationship_type, content_type, part_xml) = match second_kind {
-            SheetKind::Worksheet => (
+            WorksheetKind::Worksheet => (
                 litchi_opc::constants::relationship_type::WORKSHEET,
                 litchi_opc::constants::content_type::SML_WORKSHEET,
                 br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1"/><sheetData/></worksheet>"#.as_slice(),
             ),
-            SheetKind::Chart => (
+            WorksheetKind::Chart => (
                 "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml",
                 br#"<chartsheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#.as_slice(),
@@ -10757,8 +10757,8 @@ mod tests {
             .try_add_relationship(
                 relationship_type.to_owned(),
                 match second_kind {
-                    SheetKind::Worksheet => "worksheets/sheet2.xml",
-                    SheetKind::Chart => "chartsheets/sheet2.xml",
+                    WorksheetKind::Worksheet => "worksheets/sheet2.xml",
+                    WorksheetKind::Chart => "chartsheets/sheet2.xml",
                     _ => unreachable!("guarded above"),
                 }
                 .to_owned(),
@@ -10767,8 +10767,8 @@ mod tests {
             )
             .expect("second sheet relationship");
         let part_uri = match second_kind {
-            SheetKind::Worksheet => "/xl/worksheets/sheet2.xml",
-            SheetKind::Chart => "/xl/chartsheets/sheet2.xml",
+            WorksheetKind::Worksheet => "/xl/worksheets/sheet2.xml",
+            WorksheetKind::Chart => "/xl/chartsheets/sheet2.xml",
             _ => unreachable!("guarded above"),
         };
         package
@@ -10782,7 +10782,7 @@ mod tests {
     }
 
     fn three_sheet_workbook() -> Workbook {
-        let source = two_sheet_workbook(SheetKind::Worksheet);
+        let source = two_sheet_workbook(WorksheetKind::Worksheet);
         let mut package = source.inner.package.clone();
         package
             .get_part_mut(&source.inner.workbook_uri)
@@ -10823,7 +10823,7 @@ mod tests {
         Workbook::from_package(package).expect("three-sheet workbook")
     }
 
-    fn active_second_sheet_workbook(second_kind: SheetKind) -> Workbook {
+    fn active_second_sheet_workbook(second_kind: WorksheetKind) -> Workbook {
         let source = two_sheet_workbook(second_kind);
         let mut package = source.inner.package.clone();
         package
@@ -10839,8 +10839,8 @@ mod tests {
                 br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1"/><sheetViews><sheetView workbookViewId="0"/></sheetViews><sheetData/></worksheet>"#.to_vec(),
             );
         let second_xml = match second_kind {
-            SheetKind::Worksheet => br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1"/><sheetViews><sheetView tabSelected="1" workbookViewId="0"/></sheetViews><sheetData/></worksheet>"#.as_slice(),
-            SheetKind::Chart => br#"<chartsheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView tabSelected="1" workbookViewId="0"/></sheetViews></chartsheet>"#.as_slice(),
+            WorksheetKind::Worksheet => br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1"/><sheetViews><sheetView tabSelected="1" workbookViewId="0"/></sheetViews><sheetData/></worksheet>"#.as_slice(),
+            WorksheetKind::Chart => br#"<chartsheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView tabSelected="1" workbookViewId="0"/></sheetViews></chartsheet>"#.as_slice(),
             _ => unreachable!("test helper only models worksheet and chart tabs"),
         };
         package

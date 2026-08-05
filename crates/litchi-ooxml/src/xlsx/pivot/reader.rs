@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 
-use crate::pivot::{PivotAxis, PivotDataField, PivotFieldRole, PivotTable, PivotValueFunction};
 use crate::xlsx::parsers::workbook_parser;
 use litchi_core::sheet::Result as SheetResult;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI};
+use litchi_xlsx::pivot::{
+    PivotAxis, PivotDataField, PivotFieldRole, PivotTable, PivotValueFunction,
+};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, ResolveResult};

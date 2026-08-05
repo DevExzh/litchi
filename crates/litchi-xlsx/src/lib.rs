@@ -19,6 +19,7 @@ pub mod connections;
 pub mod custom_data;
 pub mod data_consolidation;
 pub mod data_validation;
+pub mod edit;
 mod error;
 pub mod external_links;
 pub mod formula;
@@ -29,9 +30,11 @@ pub mod merge;
 pub mod named_sheet_view;
 mod outline;
 pub mod outline_properties;
+pub mod package;
 pub mod page_margins;
 pub mod page_setup;
 pub mod phonetic_properties;
+pub mod pivot;
 pub mod print_options;
 pub mod query_table;
 pub mod raw;
@@ -50,8 +53,9 @@ pub mod timelines;
 pub mod views;
 pub mod volatile_dependencies;
 pub mod web;
-mod workbook;
+pub mod workbook;
 pub mod workbook_metadata;
+pub mod writer;
 pub mod xml_maps;
 
 pub use active_x::{
@@ -122,6 +126,7 @@ pub use named_sheet_view::{
 };
 pub use outline::{Outline, OutlineAt};
 pub use outline_properties::{OutlineProperties, parse_outline_properties};
+pub use package::Package;
 pub use page_margins::{Margins, PageMargin, parse_page_margins};
 pub use page_setup::{
     Comments, Copies, Dpi, ErrorMode, FirstPage, Fit, LexicalError, Measure, Order, Orientation,
@@ -146,6 +151,7 @@ pub use scenarios::{
     InputCell, Scenario, ScenarioCellReference, ScenarioRangeReference, Scenarios,
     parse_worksheet_scenarios, write_worksheet_scenarios,
 };
+pub use sheet::{Name, NameError};
 pub use sheet_protection::{
     Metadata, ProtectedRange, ProtectedRangeCollection, ProtectedRangeSource, Protection,
     ProtectionPasswordVerifier, ProtectionRangeReference, ProtectionRangeReferenceKind,
@@ -178,8 +184,8 @@ pub use views::{
 };
 pub use workbook::{
     ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DateSystem, DefaultsEdit, Edit,
-    Flavor, JoinError, JoinFailure, NewSheet, PackageChange, Patch, RowEdit, Sheet, SheetEdit,
-    SheetKind, SheetSelector, State, TabEdit, Visibility, Workbook,
+    Flavor, JoinError, JoinFailure, NewSheet, PackageChange, Patch, RowEdit, Selector, State,
+    TabEdit, Visibility, Workbook, Worksheet, WorksheetEdit, WorksheetKind,
 };
 pub use workbook_metadata::{
     FutureMetadata, MetadataBehavior, MetadataBlock, MetadataRecord, MetadataType,

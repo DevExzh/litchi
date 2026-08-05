@@ -16,7 +16,6 @@
 //! rebuild, and no rendering.
 
 use crate::error::{OoxmlError, Result};
-use crate::pivot::PivotTable;
 use crate::xlsx::drawing::parse_drawing_xml;
 use crate::xlsx::parsers::workbook_parser;
 use crate::xlsx::pivot::read_pivot_tables;
@@ -26,6 +25,7 @@ use litchi_ooxml_common::xml::{
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI, Part};
+use litchi_xlsx::pivot::PivotTable;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -1708,7 +1708,7 @@ mod tests {
     }
 
     fn workbook_with_pivot_table() -> crate::xlsx::Workbook {
-        use crate::pivot::{
+        use litchi_xlsx::pivot::{
             PivotAxis, PivotDataField, PivotFieldRole, PivotTable, PivotValueFunction,
         };
 

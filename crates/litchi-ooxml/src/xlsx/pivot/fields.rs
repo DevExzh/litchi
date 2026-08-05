@@ -1,5 +1,5 @@
 use super::{AxisType, ItemType, SortType};
-use crate::pivot::PivotValueFunction;
+use litchi_xlsx::pivot::PivotValueFunction;
 
 #[derive(Debug, Clone)]
 pub struct FieldItem {

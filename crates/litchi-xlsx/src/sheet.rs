@@ -11,6 +11,8 @@ use caseless::Caseless;
 use thiserror::Error;
 use unicode_normalization::UnicodeNormalization;
 
+pub use crate::workbook::{Selector, Visibility, Worksheet, WorksheetKind};
+
 /// Maximum number of Unicode scalar values Office accepts in a sheet name.
 pub const MAX_NAME_CHARS: usize = 31;
 

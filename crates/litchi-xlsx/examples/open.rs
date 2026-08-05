@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::io;
 
-use litchi_xlsx::{Rect, SheetKind, Workbook};
+use litchi_xlsx::{Rect, Workbook, WorksheetKind};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let path = std::env::args_os().nth(1).ok_or_else(|| {
@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             sheet.visibility(),
             sheet.is_active()
         );
-        if sheet.kind() == SheetKind::Worksheet {
+        if sheet.kind() == WorksheetKind::Worksheet {
             if let Some(defaults) = sheet.defaults()? {
                 println!(
                     "  defaults: base_width={}, stored_base_width={:?}, width={:?}, height={}, descent={:?}, custom_height={}, hidden={}, thick_top={}, thick_bottom={}, row_outline={}, column_outline={}",

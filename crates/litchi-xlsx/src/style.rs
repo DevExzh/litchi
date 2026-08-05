@@ -103,7 +103,7 @@ impl Styles {
 
     /// Checked zero-based physical-position lookup for diagnostics and import.
     ///
-    /// Copying a style obtained from [`crate::Sheet::style`] is the preferred
+    /// Copying a style obtained from [`crate::Worksheet::style`] is the preferred
     /// semantic entry point.
     pub fn get(&self, position: usize) -> Option<Style> {
         let key = u32::try_from(position).ok().filter(|key| *key < self.len)?;

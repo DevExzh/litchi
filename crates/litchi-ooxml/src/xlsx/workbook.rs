@@ -5,7 +5,6 @@
 
 #[cfg(feature = "encryption")]
 use crate::encryption::{Limits, Mode};
-use crate::pivot::PivotTable;
 use crate::xlsx::active_x::{
     ControlSet, load_from_worksheet as load_worksheet_active_x,
     remove_from_worksheet as remove_worksheet_active_x,
@@ -61,6 +60,7 @@ use litchi_ooxml_common::ribbon;
 use litchi_ooxml_common::web;
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_xlsx::chain::{self, Chain, Conformance as ChainConformance};
+use litchi_xlsx::pivot::PivotTable;
 use litchi_xlsx::raw::web as raw_web;
 use litchi_xlsx::threaded_comments::{Comment, Comments, People, write_comments, write_persons};
 use litchi_xlsx::web::{Bindings, Refs};

@@ -1,9 +1,9 @@
 //! Workbook data structure for XLSX.
-use crate::pivot::{PivotDataField, PivotFieldRole, PivotTable, PivotValueFunction};
 use crate::xlsx::Cell;
 use litchi_core::sheet::CellValue;
 use litchi_core::sheet::Result as SheetResult;
 use litchi_core::xml::escape_xml;
+use litchi_xlsx::pivot::{PivotDataField, PivotFieldRole, PivotTable, PivotValueFunction};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Write as FmtWrite;

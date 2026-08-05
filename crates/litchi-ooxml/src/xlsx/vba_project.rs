@@ -4,8 +4,8 @@
 //! does not inspect, parse, decompress, or execute VBA project bytes.
 
 use crate::error::{OoxmlError, Result};
-use crate::vba_package::{
-    VbaPackageHost, read_project_part, remove_vba_project_graph, store_vba_project_graph,
+use litchi_ooxml_common::vba::{
+    Host, read_project_part, remove_project_graph, store_project_graph,
 };
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::{OpcPackage, PackURI, Part};
@@ -120,7 +120,7 @@ pub(crate) fn store_vba_project(
     payload: Payload,
 ) -> Result<VbaProject> {
     let payload = Arc::new(payload.into_bytes());
-    store_vba_project_graph(package, source, VbaPackageHost::Excel, payload, None)?;
+    store_project_graph(package, source, Host::Excel, payload, None)?;
     let source = package.get_part(source)?;
     discover_vba_project(package, source)?.ok_or_else(|| {
         OoxmlError::InvalidFormat("stored Excel VBA project was not discoverable".to_string())
@@ -128,7 +128,7 @@ pub(crate) fn store_vba_project(
 }
 
 pub(crate) fn remove_vba_project(package: &mut OpcPackage, source: &PackURI) -> Result<bool> {
-    remove_vba_project_graph(package, source, VbaPackageHost::Excel)
+    remove_project_graph(package, source, Host::Excel)
 }
 
 #[cfg(test)]
@@ -228,7 +228,9 @@ mod tests {
         };
         assert!(matches!(
             metadata.project_with(reopened.opc_package(), &too_small),
-            Err(OoxmlError::Vba(litchi_vba::Error::LimitExceeded { .. }))
+            Err(OoxmlError::Common(litchi_ooxml_common::Error::Vba(
+                litchi_vba::Error::LimitExceeded { .. },
+            )))
         ));
 
         let limits = Limits::default();
