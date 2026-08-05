@@ -143,6 +143,7 @@
       "xml-minifier"
     ],
     "litchi-ograph": [
+      "litchi-biff",
       "litchi-cfb",
       "litchi-core"
     ],
@@ -206,6 +207,7 @@
       "litchi-core"
     ],
     "litchi-xls": [
+      "litchi-biff",
       "litchi-cfb",
       "litchi-codepage",
       "litchi-core",
