@@ -1,17 +1,17 @@
-//! Transactional writer infrastructure for supported DOC embedded-object fields.
+//! MS-DOC embedded-object field and ObjectPool codec.
 //!
-//! The editor accepts only Word 97+ single-generation CLX layouts. It appends
-//! new physical structures and retargets FIB entries; existing physical text,
-//! FKPs, table structures, and unknown bytes are not relocated.
+//! This layer owns FIB/CLX/CHPX/PlcfFldMom rewrites and the OLE2 package
+//! transaction. The public semantic values remain in the model module.
 
-use super::package::{DocError, Result};
-use super::writer::ChpxFkpBuilder;
+use super::Limits;
+use super::model::{Editor, FieldMarker, Info, RawPiece, Reference, WriteOptions};
+use crate::package::{DocError, Result};
+use crate::writer::ChpxFkpBuilder;
 use litchi_cfb::consts::STGTY_STORAGE;
 use litchi_cfb::{OleError, OleFile, OleWriter};
 use litchi_ole_common::object::{Editor as ObjectEditor, Object, Target, Targets};
+use std::collections::HashSet;
 use std::io::{Cursor, Read, Seek};
-
-pub use litchi_ole_common::object::Limits;
 
 const FIB_CCP_TEXT: usize = 76;
 const FIB_FC_LCB: usize = 154;
@@ -25,26 +25,8 @@ const SPRM_C_F_OBJ: u16 = 0x0856;
 const MAX_PIECES: usize = 65_536;
 const MAX_FIELDS: usize = 65_536;
 const MAX_PICF: usize = 128 * 1024 * 1024;
-const OBJECT_POOL: &str = "ObjectPool";
+pub(super) const OBJECT_POOL: &str = "ObjectPool";
 const OBJ_INFO_STREAM: &str = "\u{3}ObjInfo";
-
-/// Typed MS-DOC `ObjInfo` metadata for an embedded-object storage.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Info {
-    pub default_handler: bool,
-    pub linked: bool,
-    pub display_as_icon: bool,
-    pub ole1: bool,
-    pub manual_update: bool,
-    pub recompose_on_resize: bool,
-    pub activex: bool,
-    pub stream_control: bool,
-    pub view_object: bool,
-    pub enhanced_metafile: bool,
-    pub queried_enhanced_metafile: bool,
-    pub stored_as_enhanced_metafile: bool,
-    pub clipboard_format: u16,
-}
 
 impl Info {
     pub fn read(data: &[u8]) -> Result<Self> {
@@ -101,71 +83,7 @@ fn word(data: &[u8], offset: usize) -> Result<u16> {
     Ok(u16::from_le_bytes(bytes))
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DocEmbeddedObjectWriteOptions {
-    pub storage_id: u32,
-    pub instruction: String,
-    /// Complete PICFAndOfficeArtData block for the Data stream.
-    pub picture_data: Vec<u8>,
-    /// Standalone CFB to install as `ObjectPool/_<storage_id>`.
-    pub compound_file: Vec<u8>,
-}
-
-impl DocEmbeddedObjectWriteOptions {
-    pub fn new(storage_id: u32, compound_file: Vec<u8>, picture_data: Vec<u8>) -> Self {
-        Self {
-            storage_id,
-            instruction: format!(" EMBED LITCHI_OBJECT _{storage_id} "),
-            picture_data,
-            compound_file,
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DocEmbeddedObjectReference {
-    pub storage_id: u32,
-    pub storage_name: String,
-    pub start_cp: u32,
-    pub separator_cp: u32,
-    pub end_cp: u32,
-    pub data_offset: u32,
-}
-
-#[derive(Clone, Debug)]
-struct RawPiece {
-    start: u32,
-    end: u32,
-    fc: u32,
-    unicode: bool,
-    pcd_prefix: [u8; 2],
-    prm: [u8; 2],
-}
-
-#[derive(Clone, Debug)]
-struct FieldMarker {
-    cp: u32,
-    descriptor: [u8; 2],
-}
-
-#[derive(Clone)]
-pub struct DocEmbeddedObjectEditor {
-    package: ObjectEditor,
-    object_pool_exists: bool,
-    limits: Limits,
-    word_path: Vec<String>,
-    table_path: Vec<String>,
-    data_path: Vec<String>,
-    word: Vec<u8>,
-    table: Vec<u8>,
-    data: Vec<u8>,
-    pieces: Vec<RawPiece>,
-    fields: Vec<FieldMarker>,
-    main_ccp: u32,
-    changed: bool,
-}
-
-impl DocEmbeddedObjectEditor {
+impl Editor {
     pub fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         let (targets, object_pool_exists) = discover_targets(&bytes, limits)?;
         let package = ObjectEditor::open(bytes, targets, limits).map_err(DocError::from)?;
@@ -223,16 +141,13 @@ impl DocEmbeddedObjectEditor {
         self.changed
     }
 
-    pub fn objects(&self) -> Result<Vec<DocEmbeddedObjectReference>> {
+    pub fn objects(&self) -> Result<Vec<Reference>> {
         managed_objects(&self.word, &self.pieces, &self.fields)
     }
 
     /// Adds an object at the main-story boundary. No existing logical range is shifted
     /// outside the main story; subsequent story piece CPs are shifted consistently.
-    pub fn add(
-        &mut self,
-        options: DocEmbeddedObjectWriteOptions,
-    ) -> Result<DocEmbeddedObjectReference> {
+    pub fn add(&mut self, options: WriteOptions) -> Result<Reference> {
         validate_options(&options, self)?;
         let mut candidate = self.clone();
         let target = object_target(options.storage_id)?;
@@ -328,7 +243,7 @@ impl DocEmbeddedObjectEditor {
         candidate.add_object_storage(target, options.compound_file, limits)?;
         candidate.changed = true;
         *self = candidate;
-        Ok(DocEmbeddedObjectReference {
+        Ok(Reference {
             storage_id: options.storage_id,
             storage_name,
             start_cp,
@@ -338,7 +253,7 @@ impl DocEmbeddedObjectEditor {
         })
     }
 
-    pub fn remove(&mut self, storage_id: u32) -> Result<DocEmbeddedObjectReference> {
+    pub fn remove(&mut self, storage_id: u32) -> Result<Reference> {
         let object = self
             .objects()?
             .into_iter()
@@ -587,7 +502,7 @@ impl DocEmbeddedObjectEditor {
     }
 }
 
-fn discover_targets(bytes: &[u8], limits: Limits) -> Result<(Targets, bool)> {
+pub(super) fn discover_targets(bytes: &[u8], limits: Limits) -> Result<(Targets, bool)> {
     let ole = OleFile::open(Cursor::new(bytes)).map_err(DocError::from)?;
     let entries = match ole.list_directory_entries(&[OBJECT_POOL]) {
         Ok(entries) => entries,
@@ -620,7 +535,7 @@ fn object_target(storage_id: u32) -> Result<Target> {
     Target::new(name.clone(), [OBJECT_POOL.to_owned(), name]).map_err(DocError::from)
 }
 
-fn is_object_storage_name(name: &str) -> bool {
+pub(super) fn is_object_storage_name(name: &str) -> bool {
     let Some(decimal) = name.strip_prefix('_') else {
         return false;
     };
@@ -785,13 +700,11 @@ fn hex(value: u8) -> Option<u8> {
     }
 }
 
-use std::collections::HashSet;
-
 fn managed_objects(
     word: &[u8],
     pieces: &[RawPiece],
     fields: &[FieldMarker],
-) -> Result<Vec<DocEmbeddedObjectReference>> {
+) -> Result<Vec<Reference>> {
     let mut stack: Vec<(u32, u8, Option<u32>)> = Vec::new();
     let mut output = Vec::new();
     for marker in fields {
@@ -824,7 +737,7 @@ fn managed_objects(
                     .iter()
                     .any(|piece| piece.start == start && piece.end == end + 1)
                 {
-                    output.push(DocEmbeddedObjectReference {
+                    output.push(Reference {
                         storage_id,
                         storage_name: format!("_{storage_id}"),
                         start_cp: start,
@@ -1035,10 +948,7 @@ fn validate_existing_fields(fields: &[FieldMarker], main_ccp: u32) -> Result<()>
     Ok(())
 }
 
-fn validate_options(
-    value: &DocEmbeddedObjectWriteOptions,
-    editor: &DocEmbeddedObjectEditor,
-) -> Result<()> {
+fn validate_options(value: &WriteOptions, editor: &Editor) -> Result<()> {
     if value.storage_id == 0 || value.storage_id > i32::MAX as u32 {
         return Err(corrupted("storage ID must be a positive signed integer"));
     }
@@ -1262,53 +1172,4 @@ fn align512(value: usize) -> Result<usize> {
 }
 fn corrupted(message: impl Into<String>) -> DocError {
     DocError::Corrupted(message.into())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn object_pool_target_names_follow_decimal_storage_form() {
-        assert!(is_object_storage_name("_0"));
-        assert!(is_object_storage_name("_00042"));
-        assert!(is_object_storage_name("_-1"));
-        assert!(!is_object_storage_name("Object"));
-        assert!(!is_object_storage_name("_"));
-        assert!(!is_object_storage_name("_+1"));
-        assert!(!is_object_storage_name("_42x"));
-    }
-
-    #[test]
-    fn target_discovery_keeps_exact_object_pool_storage_names() {
-        let mut writer = OleWriter::new();
-        writer.create_storage(&[OBJECT_POOL, "_00042"]).unwrap();
-        writer.create_storage(&[OBJECT_POOL, "_-1"]).unwrap();
-        writer.create_storage(&[OBJECT_POOL, "not-an-id"]).unwrap();
-        let mut bytes = Cursor::new(Vec::new());
-        writer.write_to(&mut bytes).unwrap();
-
-        let (targets, object_pool_exists) =
-            discover_targets(&bytes.into_inner(), Limits::default())
-                .expect("ObjectPool target discovery should succeed");
-        assert!(object_pool_exists);
-        assert_eq!(targets.len(), 2);
-        assert!(targets.get("_00042").is_some_and(|target| {
-            target.path() == [OBJECT_POOL.to_owned(), "_00042".to_owned()]
-        }));
-        assert!(
-            targets.get("_-1").is_some_and(|target| {
-                target.path() == [OBJECT_POOL.to_owned(), "_-1".to_owned()]
-            })
-        );
-    }
-
-    #[test]
-    fn obj_info_reads_the_doc_opaque_stream_shape() {
-        let info = Info::read(&[0x00, 0x82, 0x03, 0x00, 0x00, 0x00]).unwrap();
-        assert!(info.recompose_on_resize);
-        assert!(info.view_object);
-        assert_eq!(info.clipboard_format, 3);
-        assert!(Info::read(&[0x00, 0x04, 0x00, 0x00]).is_err());
-    }
 }

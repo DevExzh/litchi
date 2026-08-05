@@ -1,7 +1,7 @@
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_doc::embedded_object::Limits;
 use litchi_doc::writer::DocWriter;
-use litchi_doc::{DocEmbeddedObjectEditor, DocEmbeddedObjectWriteOptions, Package};
+use litchi_doc::{Editor, Package, WriteOptions};
 use std::fs;
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -29,14 +29,14 @@ fn inert_picf(marker: u32) -> Vec<u8> {
     value
 }
 
-fn options(id: u32) -> DocEmbeddedObjectWriteOptions {
-    DocEmbeddedObjectWriteOptions::new(id, object_cfb(&id.to_le_bytes()), inert_picf(id))
+fn options(id: u32) -> WriteOptions {
+    WriteOptions::new(id, object_cfb(&id.to_le_bytes()), inert_picf(id))
 }
 
 #[test]
 fn managed_objects_add_reorder_remove_and_reopen_transactionally() {
     let original = base_doc();
-    let mut editor = DocEmbeddedObjectEditor::open(original, Limits::default()).unwrap();
+    let mut editor = Editor::open(original, Limits::default()).unwrap();
     editor.add(options(11)).unwrap();
     editor.add(options(22)).unwrap();
     assert_eq!(
@@ -60,7 +60,7 @@ fn managed_objects_add_reorder_remove_and_reopen_transactionally() {
     );
     let bytes = editor.finish().unwrap();
 
-    let mut reopened = DocEmbeddedObjectEditor::open(bytes, Limits::default()).unwrap();
+    let mut reopened = Editor::open(bytes, Limits::default()).unwrap();
     assert_eq!(
         reopened
             .objects()
@@ -82,7 +82,7 @@ fn managed_objects_add_reorder_remove_and_reopen_transactionally() {
 
 #[test]
 fn malformed_add_and_reorder_leave_editor_state_unchanged() {
-    let mut editor = DocEmbeddedObjectEditor::open(base_doc(), Limits::default()).unwrap();
+    let mut editor = Editor::open(base_doc(), Limits::default()).unwrap();
     editor.add(options(1)).unwrap();
     editor.add(options(2)).unwrap();
     let before = editor.objects().unwrap();
@@ -104,13 +104,12 @@ fn producer_fixtures_append_only_when_their_layout_is_supported() {
     let mut rejected = 0usize;
     for (ordinal, path) in fixtures.into_iter().enumerate() {
         let original = fs::read(&path).unwrap();
-        match DocEmbeddedObjectEditor::open(original.clone(), Limits::default()) {
+        match Editor::open(original.clone(), Limits::default()) {
             Ok(mut editor) => {
                 let id = 2_000_000 + ordinal as u32;
                 editor.add(options(id)).unwrap();
                 let output = editor.finish().unwrap();
-                let reopened =
-                    DocEmbeddedObjectEditor::open(output.clone(), Limits::default()).unwrap();
+                let reopened = Editor::open(output.clone(), Limits::default()).unwrap();
                 assert!(
                     reopened
                         .objects()

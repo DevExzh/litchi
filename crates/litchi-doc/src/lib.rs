@@ -78,9 +78,7 @@ pub mod writer;
 pub use bookmark::Bookmark;
 pub use comment::{Comment, CommentDateTime, CommentExtendedMetadata};
 pub use document::Document;
-pub use embedded_object::{
-    DocEmbeddedObjectEditor, DocEmbeddedObjectReference, DocEmbeddedObjectWriteOptions,
-};
+pub use embedded_object::{Editor, WriteOptions};
 pub use encryption::DocEncryptionProfile;
 pub use equation::{DocMtefEquationWriteOptions, EQUATION_3_CLSID, MtefEquation};
 pub use footnote::{Endnote, Footnote};
@@ -199,9 +197,7 @@ pub use parts::proofing::{
     ProofingEntry, ProofingFeature, ProofingRange, ProofingState, ProofingStateTable,
     ProofingStatus, ProofingTables,
 };
-pub use parts::protection::{
-    DocumentProtectedRanges, ProtectedRange, ProtectionUser, ProtectionUserRole, UidSel,
-};
+pub use parts::protection::{Mode, Range, Ranges, Reserved, Role, Selector, User};
 pub use parts::repair_bookmarks::{DocumentRepairBookmarks, RepairBookmark};
 pub use parts::rmd_threading::{DocumentRmdThreading, MessageDisplayProperties, ThreadingMessage};
 pub use parts::rsids::DocumentRsids;

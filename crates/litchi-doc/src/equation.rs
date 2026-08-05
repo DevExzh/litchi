@@ -5,9 +5,7 @@
 //! EMBED field and bitmap presentation. Formula-AST-to-MTEF conversion is a
 //! separate concern and is intentionally not approximated here.
 
-use super::embedded_object::{
-    DocEmbeddedObjectEditor, DocEmbeddedObjectReference, DocEmbeddedObjectWriteOptions,
-};
+use super::embedded_object::{Editor, Reference, WriteOptions};
 use super::package::{DocError, Result};
 use super::writer::images::{DocPicture, write_picture_block};
 use litchi_cfb::OleWriter;
@@ -142,17 +140,14 @@ impl DocMtefEquationWriteOptions {
     }
 }
 
-impl DocEmbeddedObjectEditor {
+impl Editor {
     /// Append a native Equation.3 EMBED field with a real PICF bitmap preview.
-    pub fn add_mtef_equation(
-        &mut self,
-        options: DocMtefEquationWriteOptions,
-    ) -> Result<DocEmbeddedObjectReference> {
+    pub fn add_mtef_equation(&mut self, options: DocMtefEquationWriteOptions) -> Result<Reference> {
         let mut picture_data = Vec::new();
         write_picture_block(&options.preview, options.storage_id, &mut picture_data)
             .map_err(|error| DocError::Corrupted(error.to_string()))?;
         let compound_file = equation_compound_file(options.equation)?;
-        self.add(DocEmbeddedObjectWriteOptions {
+        self.add(WriteOptions {
             storage_id: options.storage_id,
             instruction: format!(" EMBED Equation.3 _{} ", options.storage_id),
             picture_data,

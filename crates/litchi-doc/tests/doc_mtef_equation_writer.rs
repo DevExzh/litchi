@@ -1,10 +1,8 @@
 use litchi_cfb::OleFile;
 use litchi_doc::embedded_object::{Info, Limits};
 use litchi_doc::writer::{DocPicture, DocWriter};
-use litchi_doc::{
-    DocEmbeddedObjectEditor, DocMtefEquationWriteOptions, EQUATION_3_CLSID, MtefEquation, Package,
-};
-use litchi_ole_common::object::{Editor, Limits as ObjectLimits, Target, Targets};
+use litchi_doc::{DocMtefEquationWriteOptions, EQUATION_3_CLSID, Editor, MtefEquation, Package};
+use litchi_ole_common::object::{Editor as ObjectEditor, Limits as ObjectLimits, Target, Targets};
 use std::io::Cursor;
 
 const MINIMAL_MTEF_HEX: &str =
@@ -47,7 +45,7 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
     let equation = MtefEquation::from_mtef_payload(payload.clone()).unwrap();
     assert_eq!(equation.mtef_payload(), payload);
     let preview = DocPicture::new(preview_png()).unwrap();
-    let mut editor = DocEmbeddedObjectEditor::open(base_doc(), Limits::default()).unwrap();
+    let mut editor = Editor::open(base_doc(), Limits::default()).unwrap();
     let reference = editor
         .add_mtef_equation(DocMtefEquationWriteOptions::new(314_159, equation, preview))
         .unwrap();
@@ -78,7 +76,7 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
 
     let target = Target::new("_314159", ["ObjectPool", "_314159"]).unwrap();
     let objects =
-        Editor::open(bytes.clone(), Targets::one(target), ObjectLimits::default()).unwrap();
+        ObjectEditor::open(bytes.clone(), Targets::one(target), ObjectLimits::default()).unwrap();
     let object = objects.objects().get("_314159").unwrap();
     assert_eq!(object.path(), ["ObjectPool", "_314159"]);
     assert_eq!(object.storage().clsid(), Some(storage.clsid.as_str()));
@@ -102,7 +100,7 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
             .equation_native()
     );
 
-    let reopened = DocEmbeddedObjectEditor::open(bytes.clone(), Limits::default()).unwrap();
+    let reopened = Editor::open(bytes.clone(), Limits::default()).unwrap();
     assert_eq!(
         reopened
             .objects()
