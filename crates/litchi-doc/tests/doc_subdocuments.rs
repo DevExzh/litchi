@@ -5,7 +5,7 @@
 //! non-zero `lcbPlcfWkb` or `lcbSttbFnm` (the one hit elsewhere,
 //! `3rdparty/libreoffice-core/sw/qa/extras/ww8export/data/tdf59896.doc`, holds
 //! a garbage `lcbSttbFnm` and no table stream at all), so table content is
-//! covered by the synthesized unit tests in `doc::parts::subdocuments`; these
+//! covered by the synthesized unit tests in `parts::subdocuments`; these
 //! tests pin down that ordinary documents parse cleanly and report `None`.
 
 use litchi_cfb::OleFile;
