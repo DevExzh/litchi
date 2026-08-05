@@ -1,22 +1,11 @@
 //! Chart content validation.
 
-use litchi_core::{Error, Result};
-
-const BODY_MARKER: &str = "<office:chart";
-const MAX_CONTENT_BYTES: usize = 256 * 1024 * 1024;
+use litchi_core::Result;
+use litchi_odf_common::chart::read;
 
 /// Validate a UTF-8 content part before authoring it into a package.
 pub(crate) fn validate(xml: &str) -> Result<()> {
-    if xml.len() > MAX_CONTENT_BYTES {
-        return Err(Error::InvalidFormat(
-            "content.xml exceeds the family limit".to_string(),
-        ));
-    }
-    if !xml.contains(BODY_MARKER) {
-        return Err(Error::InvalidFormat(
-            "content.xml has no chart body".to_string(),
-        ));
-    }
+    let _ = read(xml)?;
     Ok(())
 }
 
@@ -26,7 +15,14 @@ mod tests {
 
     #[test]
     fn requires_family_body() {
-        assert!(validate("<office:chart/>").is_ok());
+        assert!(validate(
+            r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0"><office:body><office:chart><chart:chart/></office:chart></office:body></office:document-content>"#
+        )
+        .is_err());
+        assert!(validate(
+            r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0"><office:body><office:chart><chart:chart><chart:plot-area/></chart:chart></office:chart></office:body></office:document-content>"#
+        )
+        .is_ok());
         assert!(validate("<office:text/>").is_err());
     }
 }

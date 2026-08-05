@@ -1,7 +1,7 @@
-//! Chart legend placement.
+//! Legend semantic values.
 
-/// A chart legend position.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// The standard ODF chart legend placement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Position {
     Start,
     End,

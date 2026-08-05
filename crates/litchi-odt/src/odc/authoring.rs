@@ -1,10 +1,10 @@
 //! Typed creation and canonical serialization for standalone ODF charts.
 
-use super::document::{Document, Element, parse_chart_content};
-use super::semantic::{DataSourceLabels, Dimension, GridClass, LegendPosition};
+use super::document::Document;
 use crate::{constants, core::PackageWriter};
 use litchi_core::{Error, Result};
 use litchi_odf_common::calculation::{Settings, write};
+use litchi_odf_common::chart::{Class, Dimension, Element, Labels, Position, read};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 pub(crate) const OFFICE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -84,7 +84,7 @@ impl Text {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LegendSpec {
-    pub position: LegendPosition,
+    pub position: Position,
     pub style_name: Option<String>,
     pub title: Option<String>,
     pub x: Option<String>,
@@ -97,7 +97,7 @@ pub struct LegendSpec {
 impl Default for LegendSpec {
     fn default() -> Self {
         Self {
-            position: LegendPosition::End,
+            position: Position::End,
             style_name: None,
             title: None,
             x: None,
@@ -117,7 +117,7 @@ pub struct StyleElement {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GridSpec {
-    pub class: GridClass,
+    pub class: Class,
     pub style_name: Option<String>,
     pub extensions: Extensions,
 }
@@ -218,7 +218,7 @@ impl AxisSpec {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PlotAreaSpec {
     pub cell_range_address: Option<String>,
-    pub data_source_labels: Option<DataSourceLabels>,
+    pub data_source_labels: Option<Labels>,
     pub style_name: Option<String>,
     pub x: Option<String>,
     pub y: Option<String>,
@@ -388,7 +388,7 @@ impl Document {
     /// Replace the typed chart content while preserving safe package entries.
     pub fn set_definition(&mut self, definition: &Definition) -> Result<()> {
         let content = serialize_chart_content(definition)?;
-        let parsed = parse_chart_content(&content)?;
+        let parsed = read(&content)?;
         self.package.replace_content_xml(content)?;
         self.chart = parsed;
         Ok(())
@@ -1447,30 +1447,30 @@ fn axis_dimension(value: Dimension) -> &'static str {
         Dimension::Z => "z",
     }
 }
-fn grid_class(value: GridClass) -> &'static str {
+fn grid_class(value: Class) -> &'static str {
     match value {
-        GridClass::Major => "major",
-        GridClass::Minor => "minor",
+        Class::Major => "major",
+        Class::Minor => "minor",
     }
 }
-fn data_source_labels(value: DataSourceLabels) -> &'static str {
+fn data_source_labels(value: Labels) -> &'static str {
     match value {
-        DataSourceLabels::None => "none",
-        DataSourceLabels::Row => "row",
-        DataSourceLabels::Column => "column",
-        DataSourceLabels::Both => "both",
+        Labels::None => "none",
+        Labels::Row => "row",
+        Labels::Column => "column",
+        Labels::Both => "both",
     }
 }
-fn legend_position(value: LegendPosition) -> &'static str {
+fn legend_position(value: Position) -> &'static str {
     match value {
-        LegendPosition::Start => "start",
-        LegendPosition::End => "end",
-        LegendPosition::Top => "top",
-        LegendPosition::Bottom => "bottom",
-        LegendPosition::TopStart => "top-start",
-        LegendPosition::TopEnd => "top-end",
-        LegendPosition::BottomStart => "bottom-start",
-        LegendPosition::BottomEnd => "bottom-end",
+        Position::Start => "start",
+        Position::End => "end",
+        Position::Top => "top",
+        Position::Bottom => "bottom",
+        Position::TopStart => "top-start",
+        Position::TopEnd => "top-end",
+        Position::BottomStart => "bottom-start",
+        Position::BottomEnd => "bottom-end",
     }
 }
 
@@ -1488,7 +1488,7 @@ mod tests {
         let mut y = AxisSpec::new(Dimension::Y);
         y.name = Some("y-axis".to_string());
         y.grids.push(GridSpec {
-            class: GridClass::Major,
+            class: Class::Major,
             style_name: None,
             extensions: Extensions::default(),
         });

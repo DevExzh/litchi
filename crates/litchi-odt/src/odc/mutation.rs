@@ -2,8 +2,8 @@
 
 use super::authoring::{serialize_chart_axis_fragment, serialize_chart_series_fragment};
 use super::{Axis, AxisSpec, Dimension, Document, Series, SeriesSpec};
-use crate::odc::document::parse_chart_content;
 use litchi_core::{Error, Result, xml::escape_xml};
+use litchi_odf_common::chart::read;
 use quick_xml::{
     Reader,
     events::{BytesStart, Event},
@@ -268,7 +268,7 @@ impl Document {
     }
 
     fn commit_chart_xml(&mut self, xml: String) -> Result<()> {
-        let parsed = parse_chart_content(&xml)?;
+        let parsed = read(&xml)?;
         scan_plot(&xml)?;
         self.package.replace_content_xml(xml)?;
         self.chart = parsed;

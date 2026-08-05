@@ -203,11 +203,11 @@ pub(crate) use media::{Image, ImageFrame, ImagePart, ImageSource};
     reason = "ODT facade exposes ODF chart models for embedded charts"
 )]
 pub(crate) use odc::{
-    Attribute, Axis, AxisSpec, AxisUpdate, CachedCell, CachedRow, CachedTable, CachedValue,
-    DataLabelSpec, DataPoint, DataPointSpec, DataSourceLabels, Definition, Dimension, DomainSpec,
-    Element, ElementKind, EquationSpec, ExtensionAttribute, ExtensionElement, Extensions, Grid,
-    GridClass, GridSpec, Legend, LegendPosition, LegendSpec, PlotArea, PlotAreaSpec,
-    RegressionSpec, Series, SeriesSpec, SeriesUpdate, StyleElement, Text, serialize_chart_content,
+    Attribute, Axis, AxisSpec, AxisUpdate, CachedCell, CachedRow, CachedTable, CachedValue, Class,
+    DataLabelSpec, DataPoint, DataPointSpec, Definition, Dimension, DomainSpec, Element,
+    EquationSpec, ExtensionAttribute, ExtensionElement, Extensions, Grid, GridSpec, Labels, Legend,
+    LegendSpec, PlotArea, PlotAreaSpec, RegressionSpec, Series, SeriesSpec, SeriesUpdate,
+    StyleElement, Text, serialize_chart_content,
 };
 #[allow(
     unused_imports,
