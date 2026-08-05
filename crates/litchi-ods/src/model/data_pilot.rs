@@ -1,7 +1,7 @@
 //! ODF data-pilot (pivot-table) declarations.
 
 use super::{
-    Filter, Source,
+    Filter,
     database_range::{
         parse_filter, parse_source_query, parse_source_sql, parse_source_table, validate_filter,
         write_database_source, write_filter,
@@ -65,57 +65,57 @@ macro_rules! string_enum {
 
 string_enum! {
     /// Which grand totals a data-pilot table displays.
-    pub enum DataPilotGrandTotal {
+    pub enum GrandTotal {
         None => "none", Row => "row", Column => "column", Both => "both"
     }
 }
 
 string_enum! {
     /// Orientation of a LibreOffice named grand-total extension element.
-    pub enum DataPilotGrandTotalOrientation {
+    pub enum GrandTotalOrientation {
         Row => "row", Column => "column", Both => "both"
     }
 }
 
 /// LibreOffice's inert named grand-total extension metadata.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DataPilotGrandTotalElement {
-    pub orientation: DataPilotGrandTotalOrientation,
+pub struct GrandTotalElement {
+    pub orientation: GrandTotalOrientation,
     pub display: bool,
     pub display_name: Option<String>,
 }
 
 string_enum! {
     /// Placement of a data-pilot field.
-    pub enum DataPilotOrientation {
+    pub enum Orientation {
         Row => "row", Column => "column", Data => "data", Hidden => "hidden", Page => "page"
     }
 }
 
 string_enum! {
     /// Automatic member display direction.
-    pub enum DataPilotDisplayMemberMode {
+    pub enum DisplayMemberMode {
         FromTop => "from-top", FromBottom => "from-bottom"
     }
 }
 
 string_enum! {
     /// Member sorting policy.
-    pub enum DataPilotSortMode {
+    pub enum SortMode {
         None => "none", Manual => "manual", Name => "name", Data => "data"
     }
 }
 
 string_enum! {
     /// Sort direction.
-    pub enum DataPilotSortOrder {
+    pub enum SortOrder {
         Ascending => "ascending", Descending => "descending"
     }
 }
 
 string_enum! {
     /// Field layout policy.
-    pub enum DataPilotLayoutMode {
+    pub enum LayoutMode {
         Tabular => "tabular-layout",
         OutlineSubtotalsTop => "outline-subtotals-top",
         OutlineSubtotalsBottom => "outline-subtotals-bottom"
@@ -124,14 +124,14 @@ string_enum! {
 
 string_enum! {
     /// The member used by a data-field reference.
-    pub enum DataPilotReferenceMemberType {
+    pub enum ReferenceMemberType {
         Named => "named", Previous => "previous", Next => "next"
     }
 }
 
 string_enum! {
     /// Calculation performed relative to another pivot member or total.
-    pub enum DataPilotReferenceType {
+    pub enum ReferenceType {
         None => "none",
         MemberDifference => "member-difference",
         MemberPercentage => "member-percentage",
@@ -146,7 +146,7 @@ string_enum! {
 
 string_enum! {
     /// Calendar unit used for automatic grouping.
-    pub enum DataPilotGroupBy {
+    pub enum GroupBy {
         Seconds => "seconds", Minutes => "minutes", Hours => "hours", Days => "days",
         Months => "months", Quarters => "quarters", Years => "years"
     }
@@ -154,7 +154,7 @@ string_enum! {
 
 /// An inclusive automatic-grouping boundary.
 #[derive(Clone, Debug, PartialEq)]
-pub enum DataPilotGroupBoundary {
+pub enum GroupBoundary {
     /// Let the spreadsheet consumer determine a numeric boundary.
     AutomaticNumber,
     /// Let the spreadsheet consumer determine a date boundary.
@@ -167,9 +167,9 @@ pub enum DataPilotGroupBoundary {
 
 /// An inert data source for a data-pilot table.
 #[derive(Clone, Debug, PartialEq)]
-pub enum DataPilotSource {
+pub enum Source {
     /// SQL, database table, or database query metadata. Litchi never executes it.
-    Database(Source),
+    Database(super::database_range::Source),
     /// Application service metadata. Litchi never invokes the service.
     Service {
         name: String,
@@ -189,25 +189,25 @@ pub enum DataPilotSource {
 
 /// One explicitly grouped pivot member.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DataPilotGroup {
+pub struct Group {
     pub name: String,
     pub members: Vec<String>,
 }
 
 /// Grouping configuration for a pivot field.
 #[derive(Clone, Debug, PartialEq)]
-pub struct DataPilotGroups {
+pub struct Groups {
     pub source_field_name: String,
-    pub start: DataPilotGroupBoundary,
-    pub end: DataPilotGroupBoundary,
+    pub start: GroupBoundary,
+    pub end: GroupBoundary,
     pub step: f64,
-    pub grouped_by: DataPilotGroupBy,
-    pub groups: Vec<DataPilotGroup>,
+    pub grouped_by: GroupBy,
+    pub groups: Vec<Group>,
 }
 
 /// Visibility settings for one pivot member.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DataPilotMember {
+pub struct Member {
     pub name: String,
     pub display: Option<bool>,
     pub show_details: Option<bool>,
@@ -215,69 +215,69 @@ pub struct DataPilotMember {
 
 /// Automatic top/bottom member display settings.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DataPilotDisplayInfo {
+pub struct DisplayInfo {
     pub enabled: bool,
     pub data_field: String,
     pub member_count: u64,
-    pub mode: DataPilotDisplayMemberMode,
+    pub mode: DisplayMemberMode,
 }
 
 /// Sort settings for a field level.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DataPilotSortInfo {
-    pub mode: DataPilotSortMode,
+pub struct SortInfo {
+    pub mode: SortMode,
     pub data_field: Option<String>,
-    pub order: DataPilotSortOrder,
+    pub order: SortOrder,
 }
 
 /// Layout settings for a field level.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DataPilotLayoutInfo {
-    pub mode: DataPilotLayoutMode,
+pub struct LayoutInfo {
+    pub mode: LayoutMode,
     pub add_empty_lines: bool,
 }
 
 /// Member presentation and aggregation details for a pivot field.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct DataPilotLevel {
+pub struct Level {
     pub show_empty: Option<bool>,
     /// LibreOffice `calcext:repeat-item-labels`; retained but never evaluated.
     pub repeat_item_labels: Option<bool>,
     /// Standard or implementation-defined aggregation names.
     pub subtotals: Vec<String>,
-    pub members: Vec<DataPilotMember>,
-    pub display: Option<DataPilotDisplayInfo>,
-    pub sort: Option<DataPilotSortInfo>,
-    pub layout: Option<DataPilotLayoutInfo>,
+    pub members: Vec<Member>,
+    pub display: Option<DisplayInfo>,
+    pub sort: Option<SortInfo>,
+    pub layout: Option<LayoutInfo>,
 }
 
 /// Relative calculation settings for a data field.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DataPilotFieldReference {
+pub struct FieldReference {
     pub field_name: String,
-    pub member_type: DataPilotReferenceMemberType,
+    pub member_type: ReferenceMemberType,
     pub member_name: Option<String>,
-    pub reference_type: DataPilotReferenceType,
+    pub reference_type: ReferenceType,
 }
 
 /// One field in a data-pilot table.
 #[derive(Clone, Debug, PartialEq)]
-pub struct DataPilotField {
+pub struct Field {
     pub source_field_name: String,
-    pub orientation: DataPilotOrientation,
+    pub orientation: Orientation,
     pub selected_page: Option<String>,
     pub is_data_layout_field: Option<String>,
     /// Standard or implementation-defined aggregation name.
     pub function: Option<String>,
     pub used_hierarchy: Option<i64>,
-    pub level: Option<DataPilotLevel>,
-    pub reference: Option<DataPilotFieldReference>,
-    pub groups: Option<DataPilotGroups>,
+    pub level: Option<Level>,
+    pub reference: Option<FieldReference>,
+    pub groups: Option<Groups>,
 }
 
-impl DataPilotField {
+impl Field {
     /// Create a field in the requested orientation.
-    pub fn new(source_field_name: impl Into<String>, orientation: DataPilotOrientation) -> Self {
+    pub fn new(source_field_name: impl Into<String>, orientation: Orientation) -> Self {
         Self {
             source_field_name: source_field_name.into(),
             orientation,
@@ -292,19 +292,19 @@ impl DataPilotField {
     }
 
     pub fn validate(&self) -> Result<()> {
-        if self.orientation == DataPilotOrientation::Page && self.selected_page.is_none() {
+        if self.orientation == Orientation::Page && self.selected_page.is_none() {
             return Err(Error::InvalidFormat(
                 "page-oriented data-pilot field requires table:selected-page".to_string(),
             ));
         }
-        if self.orientation != DataPilotOrientation::Page && self.selected_page.is_some() {
+        if self.orientation != Orientation::Page && self.selected_page.is_some() {
             return Err(Error::InvalidFormat(
                 "table:selected-page is valid only for a page-oriented data-pilot field"
                     .to_string(),
             ));
         }
         if let Some(reference) = &self.reference {
-            let named = reference.member_type == DataPilotReferenceMemberType::Named;
+            let named = reference.member_type == ReferenceMemberType::Named;
             if named != reference.member_name.is_some() {
                 return Err(Error::InvalidFormat(
                     "named data-pilot field references require exactly one member name".to_string(),
@@ -313,7 +313,7 @@ impl DataPilotField {
         }
         if let Some(level) = &self.level
             && let Some(sort) = &level.sort
-            && (sort.mode == DataPilotSortMode::Data) != sort.data_field.is_some()
+            && (sort.mode == SortMode::Data) != sort.data_field.is_some()
         {
             return Err(Error::InvalidFormat(
                 "data-pilot data sorting requires exactly one data field".to_string(),
@@ -326,7 +326,7 @@ impl DataPilotField {
                 ));
             }
             for boundary in [&groups.start, &groups.end] {
-                if matches!(boundary, DataPilotGroupBoundary::Number(value) if !value.is_finite()) {
+                if matches!(boundary, GroupBoundary::Number(value) if !value.is_finite()) {
                     return Err(Error::InvalidFormat(
                         "data-pilot grouping boundaries must be finite".to_string(),
                     ));
@@ -346,10 +346,10 @@ impl DataPilotField {
 
 /// A complete ODF data-pilot (pivot-table) declaration.
 #[derive(Clone, Debug, PartialEq)]
-pub struct DataPilotTable {
+pub struct Table {
     pub name: String,
     pub application_data: Option<String>,
-    pub grand_total: Option<DataPilotGrandTotal>,
+    pub grand_total: Option<GrandTotal>,
     pub ignore_empty_rows: Option<bool>,
     pub identify_categories: Option<bool>,
     pub target_range_address: String,
@@ -357,12 +357,12 @@ pub struct DataPilotTable {
     pub show_filter_button: Option<bool>,
     pub drill_down_on_double_click: Option<bool>,
     /// LibreOffice named grand-total extension elements in schema position.
-    pub grand_totals: Vec<DataPilotGrandTotalElement>,
-    pub source: Option<DataPilotSource>,
-    pub fields: Vec<DataPilotField>,
+    pub grand_totals: Vec<GrandTotalElement>,
+    pub source: Option<Source>,
+    pub fields: Vec<Field>,
 }
 
-impl DataPilotTable {
+impl Table {
     /// Create a pivot declaration. At least one field must be added before writing.
     pub fn new(name: impl Into<String>, target_range_address: impl Into<String>) -> Self {
         Self {
@@ -416,7 +416,7 @@ impl DataPilotTable {
                 "data-pilot field count exceeds the {MAX_DATA_PILOT_FIELDS} field safety limit"
             )));
         }
-        if let Some(DataPilotSource::CellRange {
+        if let Some(Source::CellRange {
             name,
             cell_range_address,
             filter,
@@ -435,7 +435,7 @@ impl DataPilotTable {
                 validate_filter(filter)?;
             }
         }
-        if let Some(DataPilotSource::Service {
+        if let Some(Source::Service {
             name,
             source_name,
             object_name,
@@ -453,9 +453,9 @@ impl DataPilotTable {
                 validate_string("data-pilot service source", value, true)?;
             }
         }
-        if let Some(DataPilotSource::Database(source)) = &self.source {
+        if let Some(Source::Database(source)) = &self.source {
             match source {
-                Source::Sql {
+                super::database_range::Source::Sql {
                     database_name,
                     statement,
                     ..
@@ -463,14 +463,14 @@ impl DataPilotTable {
                     validate_string("data-pilot database name", database_name, false)?;
                     validate_string("data-pilot SQL statement", statement, false)?;
                 },
-                Source::Table {
+                super::database_range::Source::Table {
                     database_name,
                     table_name,
                 } => {
                     validate_string("data-pilot database name", database_name, false)?;
                     validate_string("data-pilot database table", table_name, false)?;
                 },
-                Source::Query {
+                super::database_range::Source::Query {
                     database_name,
                     query_name,
                 } => {
@@ -479,7 +479,7 @@ impl DataPilotTable {
                 },
             }
         }
-        self.fields.iter().try_for_each(DataPilotField::validate)?;
+        self.fields.iter().try_for_each(Field::validate)?;
         let field_names: std::collections::HashSet<&str> = self
             .fields
             .iter()
@@ -555,7 +555,7 @@ impl DataPilotTable {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ParsedDataPilotRange {
+pub(crate) struct ParsedRange {
     pub sheet: String,
     pub start_column: usize,
     pub start_row: usize,
@@ -563,7 +563,7 @@ pub(crate) struct ParsedDataPilotRange {
     pub end_row: usize,
 }
 
-pub(crate) fn parse_data_pilot_range(value: &str) -> Result<ParsedDataPilotRange> {
+pub(crate) fn parse_data_pilot_range(value: &str) -> Result<ParsedRange> {
     validate_string("data-pilot cell range", value, false)?;
     let mut quoted = false;
     let mut separator = None;
@@ -597,7 +597,7 @@ pub(crate) fn parse_data_pilot_range(value: &str) -> Result<ParsedDataPilotRange
             "data-pilot cell range is reversed or crosses sheets",
         ));
     }
-    Ok(ParsedDataPilotRange {
+    Ok(ParsedRange {
         sheet,
         start_column,
         start_row,
@@ -675,7 +675,7 @@ fn normalize_sheet_name(value: &str) -> Result<String> {
     }
 }
 
-pub(crate) fn validate_data_pilot_tables(tables: &[DataPilotTable]) -> Result<()> {
+pub(crate) fn validate_data_pilot_tables(tables: &[Table]) -> Result<()> {
     if tables.len() > MAX_DATA_PILOT_TABLES {
         return Err(invalid_message(
             "data-pilot table count exceeds safety limit",
@@ -705,7 +705,7 @@ pub(crate) fn validate_data_pilot_tables(tables: &[DataPilotTable]) -> Result<()
     Ok(())
 }
 
-fn ranges_overlap(left: &ParsedDataPilotRange, right: &ParsedDataPilotRange) -> bool {
+fn ranges_overlap(left: &ParsedRange, right: &ParsedRange) -> bool {
     left.sheet == right.sheet
         && left.start_column <= right.end_column
         && right.start_column <= left.end_column
@@ -731,7 +731,7 @@ fn validate_string(label: &str, value: &str, allow_empty: bool) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn parse_data_pilot_tables(xml: &str) -> Result<Vec<DataPilotTable>> {
+pub(crate) fn parse_data_pilot_tables(xml: &str) -> Result<Vec<Table>> {
     let mut reader = NsReader::from_str(xml);
     let mut buf = Vec::new();
     let mut depth = 0usize;
@@ -810,12 +810,12 @@ pub(crate) fn parse_data_pilot_tables(xml: &str) -> Result<Vec<DataPilotTable>> 
     Ok(tables)
 }
 
-fn parse_table(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<DataPilotTable> {
-    let mut table = DataPilotTable {
+fn parse_table(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Table> {
+    let mut table = Table {
         name: required_attr(reader, start, b"name")?,
         application_data: optional_attr(reader, start, b"application-data")?,
         grand_total: optional_attr(reader, start, b"grand-total")?
-            .map(|value| DataPilotGrandTotal::parse(&value))
+            .map(|value| GrandTotal::parse(&value))
             .transpose()?,
         ignore_empty_rows: optional_bool(reader, start, b"ignore-empty-rows")?,
         identify_categories: optional_bool(reader, start, b"identify-categories")?,
@@ -863,7 +863,7 @@ fn parse_table(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<D
                 }
                 set_once(
                     &mut table.source,
-                    DataPilotSource::Database(parse_source_sql(reader, element)?),
+                    Source::Database(parse_source_sql(reader, element)?),
                     "data-pilot source",
                 )?;
             },
@@ -875,7 +875,7 @@ fn parse_table(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<D
                 }
                 set_once(
                     &mut table.source,
-                    DataPilotSource::Database(parse_source_table(reader, element)?),
+                    Source::Database(parse_source_table(reader, element)?),
                     "data-pilot source",
                 )?;
             },
@@ -887,7 +887,7 @@ fn parse_table(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<D
                 }
                 set_once(
                     &mut table.source,
-                    DataPilotSource::Database(parse_source_query(reader, element)?),
+                    Source::Database(parse_source_query(reader, element)?),
                     "data-pilot source",
                 )?;
             },
@@ -897,7 +897,7 @@ fn parse_table(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<D
                 if fields_started {
                     return Err(invalid_message("data-pilot source must precede all fields"));
                 }
-                let source = DataPilotSource::Service {
+                let source = Source::Service {
                     name: required_attr(reader, element, b"name")?,
                     source_name: required_attr(reader, element, b"source-name")?,
                     object_name: required_attr(reader, element, b"object-name")?,
@@ -917,7 +917,7 @@ fn parse_table(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<D
                 if fields_started {
                     return Err(invalid_message("data-pilot source must precede all fields"));
                 }
-                let source = DataPilotSource::CellRange {
+                let source = Source::CellRange {
                     name: optional_attr(reader, element, b"name")?,
                     cell_range_address: required_attr(reader, element, b"cell-range-address")?,
                     filter: None,
@@ -960,10 +960,7 @@ fn parse_table(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<D
     Ok(table)
 }
 
-fn parse_cell_range_source(
-    reader: &mut NsReader<&[u8]>,
-    start: &BytesStart<'_>,
-) -> Result<DataPilotSource> {
+fn parse_cell_range_source(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Source> {
     let address = required_attr(reader, start, b"cell-range-address")?;
     let name = optional_attr(reader, start, b"name")?;
     let mut filter = None;
@@ -987,16 +984,16 @@ fn parse_cell_range_source(
         }
         buf.clear();
     }
-    Ok(DataPilotSource::CellRange {
+    Ok(Source::CellRange {
         name,
         cell_range_address: address,
         filter,
     })
 }
 
-fn field_from_start(reader: &NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<DataPilotField> {
-    let orientation = DataPilotOrientation::parse(&required_attr(reader, start, b"orientation")?)?;
-    Ok(DataPilotField {
+fn field_from_start(reader: &NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Field> {
+    let orientation = Orientation::parse(&required_attr(reader, start, b"orientation")?)?;
+    Ok(Field {
         source_field_name: required_attr(reader, start, b"source-field-name")?,
         orientation,
         selected_page: optional_attr(reader, start, b"selected-page")?,
@@ -1009,7 +1006,7 @@ fn field_from_start(reader: &NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<
     })
 }
 
-fn parse_field(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<DataPilotField> {
+fn parse_field(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Field> {
     let mut field = field_from_start(reader, start)?;
     let mut buf = Vec::new();
     loop {
@@ -1061,8 +1058,8 @@ fn parse_field(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<D
     Ok(field)
 }
 
-fn level_from_start(reader: &NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<DataPilotLevel> {
-    Ok(DataPilotLevel {
+fn level_from_start(reader: &NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Level> {
+    Ok(Level {
         show_empty: optional_bool(reader, start, b"show-empty")?,
         repeat_item_labels: optional_ns_bool(
             reader,
@@ -1074,7 +1071,7 @@ fn level_from_start(reader: &NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<
     })
 }
 
-fn parse_level(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<DataPilotLevel> {
+fn parse_level(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Level> {
     let mut level = level_from_start(reader, start)?;
     let mut subtotals_seen = false;
     let mut members_seen = false;
@@ -1157,7 +1154,7 @@ fn parse_subtotals(reader: &mut NsReader<&[u8]>) -> Result<Vec<String>> {
     )
 }
 
-fn parse_members(reader: &mut NsReader<&[u8]>) -> Result<Vec<DataPilotMember>> {
+fn parse_members(reader: &mut NsReader<&[u8]>) -> Result<Vec<Member>> {
     let mut members = Vec::new();
     let mut buf = Vec::new();
     loop {
@@ -1168,7 +1165,7 @@ fn parse_members(reader: &mut NsReader<&[u8]>) -> Result<Vec<DataPilotMember>> {
             Event::Start(ref element) | Event::Empty(ref element)
                 if is_table(&namespace, element, b"data-pilot-member") =>
             {
-                members.push(DataPilotMember {
+                members.push(Member {
                     name: required_attr(reader, element, b"name")?,
                     display: optional_bool(reader, element, b"display")?,
                     show_details: optional_bool(reader, element, b"show-details")?,
@@ -1188,54 +1185,40 @@ fn parse_members(reader: &mut NsReader<&[u8]>) -> Result<Vec<DataPilotMember>> {
     Ok(members)
 }
 
-fn parse_display(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
-) -> Result<DataPilotDisplayInfo> {
-    Ok(DataPilotDisplayInfo {
+fn parse_display(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<DisplayInfo> {
+    Ok(DisplayInfo {
         enabled: required_bool(reader, element, b"enabled")?,
         data_field: required_attr(reader, element, b"data-field")?,
         member_count: required_u64(reader, element, b"member-count")?,
-        mode: DataPilotDisplayMemberMode::parse(&required_attr(
-            reader,
-            element,
-            b"display-member-mode",
-        )?)?,
+        mode: DisplayMemberMode::parse(&required_attr(reader, element, b"display-member-mode")?)?,
     })
 }
 
-fn parse_sort(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<DataPilotSortInfo> {
-    Ok(DataPilotSortInfo {
-        mode: DataPilotSortMode::parse(&required_attr(reader, element, b"sort-mode")?)?,
+fn parse_sort(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<SortInfo> {
+    Ok(SortInfo {
+        mode: SortMode::parse(&required_attr(reader, element, b"sort-mode")?)?,
         data_field: optional_attr(reader, element, b"data-field")?,
-        order: DataPilotSortOrder::parse(&required_attr(reader, element, b"order")?)?,
+        order: SortOrder::parse(&required_attr(reader, element, b"order")?)?,
     })
 }
 
-fn parse_layout(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<DataPilotLayoutInfo> {
-    Ok(DataPilotLayoutInfo {
-        mode: DataPilotLayoutMode::parse(&required_attr(reader, element, b"layout-mode")?)?,
+fn parse_layout(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<LayoutInfo> {
+    Ok(LayoutInfo {
+        mode: LayoutMode::parse(&required_attr(reader, element, b"layout-mode")?)?,
         add_empty_lines: required_bool(reader, element, b"add-empty-lines")?,
     })
 }
 
-fn parse_reference(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
-) -> Result<DataPilotFieldReference> {
-    Ok(DataPilotFieldReference {
+fn parse_reference(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<FieldReference> {
+    Ok(FieldReference {
         field_name: required_attr(reader, element, b"field-name")?,
-        member_type: DataPilotReferenceMemberType::parse(&required_attr(
-            reader,
-            element,
-            b"member-type",
-        )?)?,
+        member_type: ReferenceMemberType::parse(&required_attr(reader, element, b"member-type")?)?,
         member_name: optional_attr(reader, element, b"member-name")?,
-        reference_type: DataPilotReferenceType::parse(&required_attr(reader, element, b"type")?)?,
+        reference_type: ReferenceType::parse(&required_attr(reader, element, b"type")?)?,
     })
 }
 
-fn parse_groups(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<DataPilotGroups> {
+fn parse_groups(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Groups> {
     let start_boundary = parse_boundary(reader, start, b"start", b"date-start")?;
     let end_boundary = parse_boundary(reader, start, b"end", b"date-end")?;
     let mut groups = Vec::new();
@@ -1256,18 +1239,18 @@ fn parse_groups(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<
         }
         buf.clear();
     }
-    Ok(DataPilotGroups {
+    Ok(Groups {
         source_field_name: required_attr(reader, start, b"source-field-name")?,
         start: start_boundary,
         end: end_boundary,
         step: required_f64(reader, start, b"step")?,
-        grouped_by: DataPilotGroupBy::parse(&required_attr(reader, start, b"grouped-by")?)?,
+        grouped_by: GroupBy::parse(&required_attr(reader, start, b"grouped-by")?)?,
         groups,
     })
 }
 
-fn parse_group(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<DataPilotGroup> {
-    Ok(DataPilotGroup {
+fn parse_group(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Group> {
+    Ok(Group {
         name: required_attr(reader, start, b"name")?,
         members: parse_empty_children(
             reader,
@@ -1313,7 +1296,7 @@ fn parse_boundary(
     element: &BytesStart<'_>,
     numeric: &[u8],
     date: &[u8],
-) -> Result<DataPilotGroupBoundary> {
+) -> Result<GroupBoundary> {
     match (
         optional_attr(reader, element, numeric)?,
         optional_attr(reader, element, date)?,
@@ -1321,20 +1304,17 @@ fn parse_boundary(
         (Some(_), Some(_)) | (None, None) => Err(invalid_message(
             "data-pilot grouping requires exactly one boundary attribute",
         )),
-        (Some(value), None) if value == "auto" => Ok(DataPilotGroupBoundary::AutomaticNumber),
+        (Some(value), None) if value == "auto" => Ok(GroupBoundary::AutomaticNumber),
         (Some(value), None) => value
             .parse::<f64>()
-            .map(DataPilotGroupBoundary::Number)
+            .map(GroupBoundary::Number)
             .map_err(|_| invalid("group boundary", &value)),
-        (None, Some(value)) if value == "auto" => Ok(DataPilotGroupBoundary::AutomaticDate),
-        (None, Some(value)) => Ok(DataPilotGroupBoundary::Date(value)),
+        (None, Some(value)) if value == "auto" => Ok(GroupBoundary::AutomaticDate),
+        (None, Some(value)) => Ok(GroupBoundary::Date(value)),
     }
 }
 
-pub(crate) fn write_data_pilot_tables(
-    output: &mut String,
-    tables: &[DataPilotTable],
-) -> Result<()> {
+pub(crate) fn write_data_pilot_tables(output: &mut String, tables: &[Table]) -> Result<()> {
     if tables.is_empty() {
         return Ok(());
     }
@@ -1351,13 +1331,13 @@ pub(crate) fn write_data_pilot_tables(
     Ok(())
 }
 
-pub(crate) fn write_data_pilot_table_fragment(table: &DataPilotTable) -> Result<String> {
+pub(crate) fn write_data_pilot_table_fragment(table: &Table) -> Result<String> {
     let mut output = String::new();
     write_table(&mut output, table)?;
     Ok(output)
 }
 
-fn write_table(out: &mut String, table: &DataPilotTable) -> Result<()> {
+fn write_table(out: &mut String, table: &Table) -> Result<()> {
     table.validate()?;
     out.push_str(
         "<table:data-pilot-table xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\"",
@@ -1371,7 +1351,7 @@ fn write_table(out: &mut String, table: &DataPilotTable) -> Result<()> {
     attr(
         out,
         "table:grand-total",
-        table.grand_total.map(DataPilotGrandTotal::as_str),
+        table.grand_total.map(GrandTotal::as_str),
     );
     bool_attr(out, "table:ignore-empty-rows", table.ignore_empty_rows);
     bool_attr(out, "table:identify-categories", table.identify_categories);
@@ -1405,10 +1385,10 @@ fn write_table(out: &mut String, table: &DataPilotTable) -> Result<()> {
     Ok(())
 }
 
-fn write_source(out: &mut String, source: &DataPilotSource) {
+fn write_source(out: &mut String, source: &Source) {
     match source {
-        DataPilotSource::Database(source) => write_database_source(out, source),
-        DataPilotSource::Service {
+        Source::Database(source) => write_database_source(out, source),
+        Source::Service {
             name,
             source_name,
             object_name,
@@ -1423,7 +1403,7 @@ fn write_source(out: &mut String, source: &DataPilotSource) {
             attr(out, "table:password", password.as_deref());
             out.push_str("/>");
         },
-        DataPilotSource::CellRange {
+        Source::CellRange {
             name,
             cell_range_address,
             filter,
@@ -1442,7 +1422,7 @@ fn write_source(out: &mut String, source: &DataPilotSource) {
     }
 }
 
-fn write_field(out: &mut String, field: &DataPilotField) -> Result<()> {
+fn write_field(out: &mut String, field: &Field) -> Result<()> {
     field.validate()?;
     out.push_str("<table:data-pilot-field");
     attr(
@@ -1486,7 +1466,7 @@ fn write_field(out: &mut String, field: &DataPilotField) -> Result<()> {
     Ok(())
 }
 
-fn write_level(out: &mut String, level: &DataPilotLevel) {
+fn write_level(out: &mut String, level: &Level) {
     out.push_str("<table:data-pilot-level");
     bool_attr(out, "table:show-empty", level.show_empty);
     if level.repeat_item_labels.is_some() {
@@ -1547,7 +1527,7 @@ fn write_level(out: &mut String, level: &DataPilotLevel) {
     out.push_str("</table:data-pilot-level>");
 }
 
-fn write_groups(out: &mut String, groups: &DataPilotGroups) {
+fn write_groups(out: &mut String, groups: &Groups) {
     out.push_str("<table:data-pilot-groups");
     attr(
         out,
@@ -1573,20 +1553,18 @@ fn write_groups(out: &mut String, groups: &DataPilotGroups) {
     out.push_str("</table:data-pilot-groups>");
 }
 
-fn write_boundary(out: &mut String, suffix: &str, boundary: &DataPilotGroupBoundary) {
+fn write_boundary(out: &mut String, suffix: &str, boundary: &GroupBoundary) {
     match boundary {
-        DataPilotGroupBoundary::AutomaticNumber => {
+        GroupBoundary::AutomaticNumber => {
             attr(out, &format!("table:{suffix}"), Some("auto"));
         },
-        DataPilotGroupBoundary::AutomaticDate => {
+        GroupBoundary::AutomaticDate => {
             attr(out, &format!("table:date-{suffix}"), Some("auto"));
         },
-        DataPilotGroupBoundary::Number(value) => {
+        GroupBoundary::Number(value) => {
             attr(out, &format!("table:{suffix}"), Some(&value.to_string()))
         },
-        DataPilotGroupBoundary::Date(value) => {
-            attr(out, &format!("table:date-{suffix}"), Some(value))
-        },
+        GroupBoundary::Date(value) => attr(out, &format!("table:date-{suffix}"), Some(value)),
     }
 }
 
@@ -1609,9 +1587,9 @@ fn is_table_namespace(namespace: &ResolveResult<'_>) -> bool {
 fn parse_grand_total(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-) -> Result<DataPilotGrandTotalElement> {
-    Ok(DataPilotGrandTotalElement {
-        orientation: DataPilotGrandTotalOrientation::parse(&required_attr(
+) -> Result<GrandTotalElement> {
+    Ok(GrandTotalElement {
+        orientation: GrandTotalOrientation::parse(&required_attr(
             reader,
             element,
             b"orientation",
@@ -1868,7 +1846,7 @@ mod tests {
         assert_eq!(tables.len(), 1);
         let table = &tables[0];
         assert_eq!(table.name, "Pivot & One");
-        assert_eq!(table.grand_total, Some(DataPilotGrandTotal::Both));
+        assert_eq!(table.grand_total, Some(GrandTotal::Both));
         assert_eq!(table.fields.len(), 2);
         assert_eq!(table.fields[0].level.as_ref().unwrap().subtotals, ["sum"]);
         assert_eq!(
@@ -1880,7 +1858,7 @@ mod tests {
                 .as_ref()
                 .unwrap()
                 .mode,
-            DataPilotSortMode::Data
+            SortMode::Data
         );
         assert_eq!(
             table.fields[0].groups.as_ref().unwrap().groups[0].members,
@@ -1888,7 +1866,7 @@ mod tests {
         );
         assert!(matches!(
             table.source,
-            Some(DataPilotSource::CellRange {
+            Some(Source::CellRange {
                 filter: Some(_),
                 ..
             })
