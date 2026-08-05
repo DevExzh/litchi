@@ -1,9 +1,7 @@
 use litchi_odt::Builder;
 use litchi_odt::line_numbering::NonNegativeLength;
 use litchi_odt::style::paragraph::border::{
-    ParagraphBackgroundTransparency, ParagraphBorder, ParagraphBorderProperties,
-    ParagraphBorderWidth, ParagraphBorderWidths, ParagraphStyleBorder,
-    parse_paragraph_style_borders, set_paragraph_style_border_xml,
+    BackgroundTransparency, Border, Properties, Style, Width, Widths, parse, set_xml,
 };
 use litchi_odt::style::table::{row, table};
 use std::io::Cursor;
@@ -24,7 +22,7 @@ fn full_properties() -> &'static str {
 
 #[test]
 fn parses_all_border_attributes() {
-    let set = parse_paragraph_style_borders(&wrap(full_properties())).unwrap();
+    let set = parse(&wrap(full_properties())).unwrap();
     let style = set.get("P1").unwrap();
     let p = style.properties.as_ref().unwrap();
     assert_eq!(p.border.as_ref().unwrap().as_str(), "0.74pt solid #808080");
@@ -50,7 +48,7 @@ fn parses_all_border_attributes() {
     assert_eq!(p.background_color.as_ref().unwrap().as_str(), "#FFCC00");
     assert_eq!(
         p.background_transparency,
-        Some(ParagraphBackgroundTransparency::new("25%").unwrap())
+        Some(BackgroundTransparency::new("25%").unwrap())
     );
     let image = p.background_image.as_ref().unwrap();
     assert_eq!(image.repeat, Some(row::Repeat::NoRepeat));
@@ -66,16 +64,16 @@ fn parses_all_border_attributes() {
 
 #[test]
 fn round_trip_serialize_reparse() {
-    let set = parse_paragraph_style_borders(&wrap(full_properties())).unwrap();
+    let set = parse(&wrap(full_properties())).unwrap();
     let style = set.get("P1").unwrap();
     let fragment = style.to_xml_fragment().unwrap();
-    let reparsed = parse_paragraph_style_borders(&wrap(&fragment)).unwrap();
+    let reparsed = parse(&wrap(&fragment)).unwrap();
     assert_eq!(reparsed.get("P1"), Some(style));
     // Embedded binary-data round trip.
     let embedded = wrap(
         r#"<s:default-style s:family="paragraph"><s:paragraph-properties f:padding="0cm"><s:background-image><o:binary-data>AQIDBA==</o:binary-data></s:background-image></s:paragraph-properties></s:default-style>"#,
     );
-    let set = parse_paragraph_style_borders(&embedded).unwrap();
+    let set = parse(&embedded).unwrap();
     assert_eq!(
         set.default_style()
             .unwrap()
@@ -89,10 +87,7 @@ fn round_trip_serialize_reparse() {
         row::BackgroundSource::Embedded(vec![1, 2, 3, 4])
     );
     let fragment = set.default_style().unwrap().to_xml_fragment().unwrap();
-    assert_eq!(
-        parse_paragraph_style_borders(&wrap(&fragment)).unwrap(),
-        set
-    );
+    assert_eq!(parse(&wrap(&fragment)).unwrap(), set);
 }
 
 #[test]
@@ -100,9 +95,9 @@ fn ignores_sibling_owned_attributes_and_children() {
     let xml = wrap(
         r#"<s:style s:name="P" s:family="paragraph"><s:paragraph-properties f:margin-left="1cm" f:line-height="200%"><s:tab-stops><s:tab-stop s:position="2cm"/></s:tab-stops><s:drop-cap s:length="2"/></s:paragraph-properties></s:style>"#,
     );
-    let set = parse_paragraph_style_borders(&xml).unwrap();
+    let set = parse(&xml).unwrap();
     let p = set.get("P").unwrap().properties.as_ref().unwrap();
-    assert_eq!(p, &ParagraphBorderProperties::default());
+    assert_eq!(p, &Properties::default());
 }
 
 #[test]
@@ -170,35 +165,32 @@ fn rejects_malformed_values_and_duplicates() {
         ),
     ];
     for xml in bad {
-        assert!(
-            parse_paragraph_style_borders(&xml).is_err(),
-            "accepted {xml}"
-        );
+        assert!(parse(&xml).is_err(), "accepted {xml}");
     }
-    assert!(ParagraphBorderWidth::new("1em").is_err());
-    assert!(ParagraphBackgroundTransparency::new("-5%").is_err());
+    assert!(Width::new("1em").is_err());
+    assert!(BackgroundTransparency::new("-5%").is_err());
 }
 
 #[test]
 fn mutation_replaces_inserts_and_removes() {
     let xml = wrap(full_properties());
     // Replace: owned attributes rewritten, sibling attributes and tab-stops survive.
-    let changed = ParagraphStyleBorder::named(
+    let changed = Style::named(
         "P1",
-        Some(ParagraphBorderProperties {
-            border: Some(ParagraphBorder::new("none").unwrap()),
+        Some(Properties {
+            border: Some(Border::new("none").unwrap()),
             padding: Some(NonNegativeLength::new("0.1cm").unwrap()),
             ..Default::default()
         }),
     )
     .unwrap();
-    let updated = set_paragraph_style_border_xml(&xml, &changed).unwrap();
+    let updated = set_xml(&xml, &changed).unwrap();
     assert!(updated.contains(r#"fo:border="none""#));
     assert!(!updated.contains("border-line-width"));
     assert!(!updated.contains("background-image"));
     assert!(updated.contains(r#"f:margin-left="1cm""#));
     assert!(updated.contains(r#"f:line-height="115%""#));
-    let reparsed = parse_paragraph_style_borders(&updated).unwrap();
+    let reparsed = parse(&updated).unwrap();
     assert_eq!(
         reparsed.get("P1").unwrap().properties.as_ref().unwrap(),
         changed.properties.as_ref().unwrap()
@@ -207,9 +199,9 @@ fn mutation_replaces_inserts_and_removes() {
     let empty = wrap(
         r#"<s:style s:name="E" s:family="paragraph"><s:paragraph-properties f:margin-left="1cm"/></s:style>"#,
     );
-    let with_image = ParagraphStyleBorder::named(
+    let with_image = Style::named(
         "E",
-        Some(ParagraphBorderProperties {
+        Some(Properties {
             background_image: Some(row::BackgroundImage {
                 repeat: None,
                 position: None,
@@ -225,23 +217,23 @@ fn mutation_replaces_inserts_and_removes() {
         }),
     )
     .unwrap();
-    let updated = set_paragraph_style_border_xml(&empty, &with_image).unwrap();
+    let updated = set_xml(&empty, &with_image).unwrap();
     assert!(updated.contains(r#"f:margin-left="1cm""#));
-    let reparsed = parse_paragraph_style_borders(&updated).unwrap();
+    let reparsed = parse(&updated).unwrap();
     assert_eq!(
         reparsed.get("E").unwrap().properties.as_ref().unwrap(),
         with_image.properties.as_ref().unwrap()
     );
     // Insert a whole properties element into a bare style.
     let bare = wrap(r#"<s:style s:name="B" s:family="paragraph"/>"#);
-    let updated = set_paragraph_style_border_xml(&bare, &with_image_named("B")).unwrap();
-    let reparsed = parse_paragraph_style_borders(&updated).unwrap();
+    let updated = set_xml(&bare, &with_image_named("B")).unwrap();
+    let reparsed = parse(&updated).unwrap();
     assert!(reparsed.get("B").unwrap().properties.is_some());
     // Strip: None removes owned attributes and the background image.
-    fn with_image_named(name: &str) -> ParagraphStyleBorder {
-        ParagraphStyleBorder::named(
+    fn with_image_named(name: &str) -> Style {
+        Style::named(
             name,
-            Some(ParagraphBorderProperties {
+            Some(Properties {
                 shadow: Some(table::Shadow::new("none").unwrap()),
                 background_color: Some(row::BackgroundColor::new("transparent").unwrap()),
                 ..Default::default()
@@ -249,30 +241,28 @@ fn mutation_replaces_inserts_and_removes() {
         )
         .unwrap()
     }
-    let stripped = ParagraphStyleBorder::named("P1", None).unwrap();
-    let updated = set_paragraph_style_border_xml(&xml, &stripped).unwrap();
+    let stripped = Style::named("P1", None).unwrap();
+    let updated = set_xml(&xml, &stripped).unwrap();
     assert!(!updated.contains("fo:border"));
     assert!(!updated.contains("background-image"));
     assert!(updated.contains(r#"f:margin-left="1cm""#));
     // Missing target is an error.
-    assert!(set_paragraph_style_border_xml(&xml, &with_image_named("Missing")).is_err());
+    assert!(set_xml(&xml, &with_image_named("Missing")).is_err());
     // Nothing to change on a bare style: unchanged.
-    let unchanged =
-        set_paragraph_style_border_xml(&bare, &ParagraphStyleBorder::named("B", None).unwrap())
-            .unwrap();
+    let unchanged = set_xml(&bare, &Style::named("B", None).unwrap()).unwrap();
     assert_eq!(unchanged, bare);
 }
 
 #[test]
 fn builder_package_round_trip() {
-    let style = ParagraphStyleBorder::named(
+    let style = Style::named(
         "Box",
-        Some(ParagraphBorderProperties {
-            border: Some(ParagraphBorder::new("0.74pt solid #808080").unwrap()),
-            border_line_width: Some(ParagraphBorderWidths {
-                inner_width: ParagraphBorderWidth::new("0.002cm").unwrap(),
-                space: ParagraphBorderWidth::new("0.07cm").unwrap(),
-                outer_width: ParagraphBorderWidth::new("0.002cm").unwrap(),
+        Some(Properties {
+            border: Some(Border::new("0.74pt solid #808080").unwrap()),
+            border_line_width: Some(Widths {
+                inner_width: Width::new("0.002cm").unwrap(),
+                space: Width::new("0.07cm").unwrap(),
+                outer_width: Width::new("0.002cm").unwrap(),
             }),
             padding: Some(NonNegativeLength::new("0cm").unwrap()),
             background_color: Some(row::BackgroundColor::new("transparent").unwrap()),
@@ -284,7 +274,7 @@ fn builder_package_round_trip() {
     builder.add_paragraph_border_style(style.clone()).unwrap();
     assert!(
         builder
-            .add_paragraph_border_style(ParagraphStyleBorder::named("Box", None).unwrap())
+            .add_paragraph_border_style(Style::named("Box", None).unwrap())
             .is_err()
     );
     builder.add_paragraph("x").unwrap();

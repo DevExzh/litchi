@@ -76,7 +76,7 @@ pub struct Builder {
     list_level_label_alignments: Vec<crate::ListStyleLevelLabelAlignment>,
     paragraph_flow_styles: Vec<crate::ParagraphStyleFlow>,
     paragraph_margin_styles: Vec<crate::ParagraphStyleMargins>,
-    paragraph_border_styles: Vec<crate::ParagraphStyleBorder>,
+    paragraph_border_styles: Vec<crate::style::paragraph::border::Style>,
     paragraph_alignment_styles: Vec<crate::style::paragraph::alignment::Style>,
     paragraph_break_styles: Vec<crate::ParagraphStyleBreaks>,
     paragraph_writing_mode_styles: Vec<crate::ParagraphStyleWritingMode>,
@@ -410,7 +410,7 @@ impl Builder {
     /// background properties.
     pub fn add_paragraph_border_style(
         &mut self,
-        style: crate::ParagraphStyleBorder,
+        style: crate::style::paragraph::border::Style,
     ) -> Result<&mut Self> {
         style.validate()?;
         if self.paragraph_border_styles.len() >= 4096

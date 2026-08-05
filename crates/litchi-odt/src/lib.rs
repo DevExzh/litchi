@@ -330,15 +330,6 @@ pub(crate) use settings::{
 };
 #[allow(
     unused_imports,
-    reason = "ODT facade exposes paragraph style semantics"
-)]
-pub(crate) use style::paragraph::border::{
-    ParagraphBackgroundTransparency, ParagraphBorder, ParagraphBorderProperties,
-    ParagraphBorderWidth, ParagraphBorderWidths, ParagraphStyleBorder, ParagraphStyleBorderSet,
-    parse_paragraph_style_borders, set_paragraph_style_border_xml,
-};
-#[allow(
-    unused_imports,
     reason = "ODT facade exposes paragraph break semantics"
 )]
 pub(crate) use style::paragraph::breaks::{

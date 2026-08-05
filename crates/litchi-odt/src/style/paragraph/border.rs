@@ -119,8 +119,8 @@ fn positive_length(value: &str) -> bool {
 
 /// An `fo:border*` border description.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParagraphBorder(String);
-impl ParagraphBorder {
+pub struct Border(String);
+impl Border {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         safe(&value, "paragraph border", false)?;
@@ -133,8 +133,8 @@ impl ParagraphBorder {
 
 /// One positive border line width component.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParagraphBorderWidth(String);
-impl ParagraphBorderWidth {
+pub struct Width(String);
+impl Width {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         if value.len() > MAX_VALUE || !positive_length(&value) {
@@ -151,21 +151,21 @@ impl ParagraphBorderWidth {
 
 /// A three-part border line width: inner line, space between lines, outer line.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParagraphBorderWidths {
-    pub inner_width: ParagraphBorderWidth,
-    pub space: ParagraphBorderWidth,
-    pub outer_width: ParagraphBorderWidth,
+pub struct Widths {
+    pub inner_width: Width,
+    pub space: Width,
+    pub outer_width: Width,
 }
-impl ParagraphBorderWidths {
+impl Widths {
     fn parse(value: &str) -> Result<Self> {
         let words: Vec<_> = value.split_ascii_whitespace().collect();
         let [inner, space, outer] = words.as_slice() else {
             return Err(bad("border line width needs exactly three lengths"));
         };
         Ok(Self {
-            inner_width: ParagraphBorderWidth::new(*inner)?,
-            space: ParagraphBorderWidth::new(*space)?,
-            outer_width: ParagraphBorderWidth::new(*outer)?,
+            inner_width: Width::new(*inner)?,
+            space: Width::new(*space)?,
+            outer_width: Width::new(*outer)?,
         })
     }
     fn xml(&self) -> String {
@@ -180,8 +180,8 @@ impl ParagraphBorderWidths {
 
 /// The `style:background-transparency` value: a percent between 0 and 100.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParagraphBackgroundTransparency(String);
-impl ParagraphBackgroundTransparency {
+pub struct BackgroundTransparency(String);
+impl BackgroundTransparency {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         let Some(number) = value.strip_suffix('%') else {
@@ -206,17 +206,17 @@ impl ParagraphBackgroundTransparency {
 /// The border, padding, shadow, and background group of one
 /// `style:paragraph-properties` element.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ParagraphBorderProperties {
-    pub border: Option<ParagraphBorder>,
-    pub border_top: Option<ParagraphBorder>,
-    pub border_bottom: Option<ParagraphBorder>,
-    pub border_left: Option<ParagraphBorder>,
-    pub border_right: Option<ParagraphBorder>,
-    pub border_line_width: Option<ParagraphBorderWidths>,
-    pub border_line_width_top: Option<ParagraphBorderWidths>,
-    pub border_line_width_bottom: Option<ParagraphBorderWidths>,
-    pub border_line_width_left: Option<ParagraphBorderWidths>,
-    pub border_line_width_right: Option<ParagraphBorderWidths>,
+pub struct Properties {
+    pub border: Option<Border>,
+    pub border_top: Option<Border>,
+    pub border_bottom: Option<Border>,
+    pub border_left: Option<Border>,
+    pub border_right: Option<Border>,
+    pub border_line_width: Option<Widths>,
+    pub border_line_width_top: Option<Widths>,
+    pub border_line_width_bottom: Option<Widths>,
+    pub border_line_width_left: Option<Widths>,
+    pub border_line_width_right: Option<Widths>,
     pub padding: Option<NonNegativeLength>,
     pub padding_top: Option<NonNegativeLength>,
     pub padding_bottom: Option<NonNegativeLength>,
@@ -224,10 +224,10 @@ pub struct ParagraphBorderProperties {
     pub padding_right: Option<NonNegativeLength>,
     pub shadow: Option<Shadow>,
     pub background_color: Option<BackgroundColor>,
-    pub background_transparency: Option<ParagraphBackgroundTransparency>,
+    pub background_transparency: Option<BackgroundTransparency>,
     pub background_image: Option<BackgroundImage>,
 }
-impl ParagraphBorderProperties {
+impl Properties {
     pub fn new() -> Self {
         Self::default()
     }
@@ -316,17 +316,14 @@ impl ParagraphBorderProperties {
 
 /// A named or default paragraph style and its border and background properties.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParagraphStyleBorder {
+pub struct Style {
     pub name: Option<String>,
     pub parent_style_name: Option<String>,
     pub is_default_style: bool,
-    pub properties: Option<ParagraphBorderProperties>,
+    pub properties: Option<Properties>,
 }
-impl ParagraphStyleBorder {
-    pub fn named(
-        name: impl Into<String>,
-        properties: Option<ParagraphBorderProperties>,
-    ) -> Result<Self> {
+impl Style {
+    pub fn named(name: impl Into<String>, properties: Option<Properties>) -> Result<Self> {
         let result = Self {
             name: Some(name.into()),
             parent_style_name: None,
@@ -336,7 +333,7 @@ impl ParagraphStyleBorder {
         result.validate()?;
         Ok(result)
     }
-    pub fn default_style(properties: Option<ParagraphBorderProperties>) -> Self {
+    pub fn default_style(properties: Option<Properties>) -> Self {
         Self {
             name: None,
             parent_style_name: None,
@@ -391,16 +388,16 @@ impl ParagraphStyleBorder {
 
 /// All paragraph styles of a styles part that carry border or background properties.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ParagraphStyleBorderSet {
-    pub styles: Vec<ParagraphStyleBorder>,
+pub struct Styles {
+    pub styles: Vec<Style>,
 }
-impl ParagraphStyleBorderSet {
-    pub fn get(&self, name: &str) -> Option<&ParagraphStyleBorder> {
+impl Styles {
+    pub fn get(&self, name: &str) -> Option<&Style> {
         self.styles
             .iter()
             .find(|style| style.name.as_deref() == Some(name))
     }
-    pub fn default_style(&self) -> Option<&ParagraphStyleBorder> {
+    pub fn default_style(&self) -> Option<&Style> {
         self.styles.iter().find(|style| style.is_default_style)
     }
 }
@@ -472,12 +469,12 @@ fn style_header(
     version: XmlVersion,
     start: &BytesStart<'_>,
     default: bool,
-) -> Result<Option<ParagraphStyleBorder>> {
+) -> Result<Option<Style>> {
     let mut attrs = attributes(reader, version, start)?;
     if take(&mut attrs, Ns::Style, b"family").as_deref() != Some("paragraph") {
         return Ok(None);
     }
-    let value = ParagraphStyleBorder {
+    let value = Style {
         name: take(&mut attrs, Ns::Style, b"name"),
         parent_style_name: take(&mut attrs, Ns::Style, b"parent-style-name"),
         is_default_style: default,
@@ -491,16 +488,14 @@ fn border_properties(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<ParagraphBorderProperties> {
+) -> Result<Properties> {
     let mut attrs = attributes(reader, version, start)?;
     let border = |attrs: &mut Vec<(Ns, Vec<u8>, String)>, local: &[u8]| {
-        take(attrs, Ns::Fo, local)
-            .map(ParagraphBorder::new)
-            .transpose()
+        take(attrs, Ns::Fo, local).map(Border::new).transpose()
     };
     let widths = |attrs: &mut Vec<(Ns, Vec<u8>, String)>, local: &[u8]| {
         take(attrs, Ns::Style, local)
-            .map(|x| ParagraphBorderWidths::parse(&x))
+            .map(|x| Widths::parse(&x))
             .transpose()
     };
     let padding = |attrs: &mut Vec<(Ns, Vec<u8>, String)>, local: &[u8]| {
@@ -508,7 +503,7 @@ fn border_properties(
             .map(NonNegativeLength::new)
             .transpose()
     };
-    let value = ParagraphBorderProperties {
+    let value = Properties {
         border: border(&mut attrs, b"border")?,
         border_top: border(&mut attrs, b"border-top")?,
         border_bottom: border(&mut attrs, b"border-bottom")?,
@@ -531,7 +526,7 @@ fn border_properties(
             .map(BackgroundColor::new)
             .transpose()?,
         background_transparency: take(&mut attrs, Ns::Style, b"background-transparency")
-            .map(ParagraphBackgroundTransparency::new)
+            .map(BackgroundTransparency::new)
             .transpose()?,
         background_image: None,
     };
@@ -632,11 +627,7 @@ fn image_attributes(
     Ok(ParsedImage { image, linked })
 }
 
-fn push_style(
-    styles: &mut Vec<ParagraphStyleBorder>,
-    style: ParagraphStyleBorder,
-    total: &mut usize,
-) -> Result<()> {
+fn push_style(styles: &mut Vec<Style>, style: Style, total: &mut usize) -> Result<()> {
     if styles.len() >= MAX_STYLES {
         return Err(bad("too many paragraph styles"));
     }
@@ -663,7 +654,7 @@ fn is_paragraph_style(current: &(Ns, Vec<u8>), parent: Option<&(Ns, Vec<u8>)>) -
 
 struct Active {
     depth: usize,
-    style: ParagraphStyleBorder,
+    style: Style,
     seen_properties: bool,
     properties_depth: Option<usize>,
     image_depth: Option<usize>,
@@ -672,7 +663,7 @@ struct Active {
     image_linked: bool,
 }
 impl Active {
-    fn properties_mut(&mut self) -> &mut ParagraphBorderProperties {
+    fn properties_mut(&mut self) -> &mut Properties {
         self.style
             .properties
             .as_mut()
@@ -682,12 +673,12 @@ impl Active {
 
 /// Parse paragraph styles and their border and background properties from a
 /// styles part.
-pub fn parse_paragraph_style_borders(xml: &str) -> Result<ParagraphStyleBorderSet> {
+pub fn parse(xml: &str) -> Result<Styles> {
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
     }
     if !xml.contains("paragraph-properties") {
-        return Ok(ParagraphStyleBorderSet::default());
+        return Ok(Styles::default());
     }
     let mut reader = NsReader::from_reader(xml.as_bytes());
     reader.config_mut().trim_text(false);
@@ -874,7 +865,7 @@ pub fn parse_paragraph_style_borders(xml: &str) -> Result<ParagraphStyleBorderSe
     if !stack.is_empty() || active.is_some() {
         return Err(bad("truncated styles XML"));
     }
-    Ok(ParagraphStyleBorderSet { styles })
+    Ok(Styles { styles })
 }
 
 #[derive(Default)]
@@ -962,10 +953,7 @@ fn qualify_insert(insert: &str, missing: (bool, bool)) -> String {
 /// attributes (and the `style:background-image` child) on one existing
 /// paragraph style's `style:paragraph-properties` element. Attributes owned by
 /// sibling modules and other child elements are preserved.
-pub fn set_paragraph_style_border_xml(
-    xml: &str,
-    requested: &ParagraphStyleBorder,
-) -> Result<String> {
+pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
     requested.validate()?;
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
@@ -1131,7 +1119,7 @@ pub fn set_paragraph_style_border_xml(
     let insert = requested
         .properties
         .as_ref()
-        .map(ParagraphBorderProperties::attributes_xml)
+        .map(Properties::attributes_xml)
         .unwrap_or_default();
     let image = requested
         .properties
@@ -1229,15 +1217,13 @@ fn base64_decode(value: &str) -> Result<Vec<u8>> {
 }
 
 impl OpenDocumentPackage {
-    pub fn paragraph_style_borders(&self) -> Result<ParagraphStyleBorderSet> {
-        self.styles_xml()?.map_or_else(
-            || Ok(ParagraphStyleBorderSet::default()),
-            |xml| parse_paragraph_style_borders(&xml),
-        )
+    pub fn paragraph_style_borders(&self) -> Result<Styles> {
+        self.styles_xml()?
+            .map_or_else(|| Ok(Styles::default()), |xml| parse(&xml))
     }
 }
 impl FlatOpenDocument {
-    pub fn paragraph_style_borders(&self) -> Result<ParagraphStyleBorderSet> {
-        parse_paragraph_style_borders(self.xml())
+    pub fn paragraph_style_borders(&self) -> Result<Styles> {
+        parse(self.xml())
     }
 }
