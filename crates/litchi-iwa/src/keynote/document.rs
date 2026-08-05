@@ -874,7 +874,7 @@ mod tests {
         };
         assert_eq!(
             transition_effect(&attributes),
-            Effect::Unknown("com.example.future-transition".to_owned())
+            Effect::Unknown("com.example.future-transition".to_owned().into_boxed_str())
         );
     }
 

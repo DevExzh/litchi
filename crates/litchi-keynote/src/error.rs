@@ -30,6 +30,12 @@ pub enum Error {
     /// A semantic transition string contained a NUL byte.
     #[error("Keynote transition strings cannot contain NUL")]
     NulString,
+    /// A transition identifier exceeded the bounded semantic storage budget.
+    #[error("Keynote transition identifier exceeds the semantic byte budget")]
+    IdentifierTooLarge,
+    /// An opaque transition payload exceeded the bounded semantic storage budget.
+    #[error("Keynote transition opaque payload exceeds the semantic byte budget")]
+    PayloadTooLarge,
     /// A native identifier required for lossless decoding was empty.
     #[error("Keynote animation identifier cannot be empty")]
     EmptyIdentifier,

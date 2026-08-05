@@ -16,6 +16,11 @@ const BY_CHARACTER_DELIVERY: i32 = 3;
 const BY_LINE_DELIVERY: i32 = 4;
 const TIMING_CURVE_SLOT_COUNT: usize = 3;
 
+/// Maximum UTF-8 byte length of a transition identifier or theme name.
+pub const MAX_IDENTIFIER_BYTES: usize = 64 * 1024;
+/// Maximum size of one opaque color or timing-curve payload.
+pub const MAX_OPAQUE_PAYLOAD_BYTES: usize = 4 * 1024 * 1024;
+
 /// A slide-transition effect understood by Keynote.
 ///
 /// Named variants cover identifiers verified in native Keynote documents.
@@ -95,6 +100,12 @@ impl Effect {
     /// [`Error::NonCanonicalEffect`] when an unknown value shadows a named
     /// native effect.
     pub fn validate(&self) -> Result<()> {
+        if self.identifier().is_empty() {
+            return Err(Error::EmptyIdentifier);
+        }
+        if self.identifier().len() > MAX_IDENTIFIER_BYTES {
+            return Err(Error::IdentifierTooLarge);
+        }
         if self.identifier().contains('\0') {
             return Err(Error::NulString);
         }
@@ -357,12 +368,33 @@ impl AnimationParameters {
             return Err(Error::InvalidDetail);
         }
         if self
+            .color_payload
+            .as_deref()
+            .is_some_and(|payload| payload.len() > MAX_OPAQUE_PAYLOAD_BYTES)
+            || self
+                .timing_curve_payloads
+                .iter()
+                .flatten()
+                .any(|payload| payload.len() > MAX_OPAQUE_PAYLOAD_BYTES)
+        {
+            return Err(Error::PayloadTooLarge);
+        }
+        if self
             .timing_curve_theme_names
             .iter()
             .flatten()
-            .any(|name| name.contains('\0'))
+            .any(|name| name.len() > MAX_IDENTIFIER_BYTES || name.contains('\0'))
         {
-            return Err(Error::NulString);
+            return if self
+                .timing_curve_theme_names
+                .iter()
+                .flatten()
+                .any(|name| name.len() > MAX_IDENTIFIER_BYTES)
+            {
+                Err(Error::IdentifierTooLarge)
+            } else {
+                Err(Error::NulString)
+            };
         }
         Ok(())
     }
@@ -478,9 +510,17 @@ impl Settings {
         if self
             .animation_type
             .as_deref()
-            .is_some_and(|value| value.contains('\0'))
+            .is_some_and(|value| value.len() > MAX_IDENTIFIER_BYTES || value.contains('\0'))
         {
-            return Err(Error::NulString);
+            return if self
+                .animation_type
+                .as_deref()
+                .is_some_and(|value| value.len() > MAX_IDENTIFIER_BYTES)
+            {
+                Err(Error::IdentifierTooLarge)
+            } else {
+                Err(Error::NulString)
+            };
         }
         if let Some(effect) = &self.effect {
             effect.validate()?;
@@ -597,6 +637,20 @@ mod tests {
         settings.effect = None;
         settings.animation_parameters.timing_curve_theme_names[2] = Some("bad\0name".into());
         assert_eq!(settings.validate(), Err(Error::NulString));
+    }
+
+    #[test]
+    fn transition_owned_storage_is_bounded_before_publication() {
+        assert_eq!(Effect::unknown(""), Err(Error::EmptyIdentifier),);
+
+        let mut settings = Settings::default();
+        settings.animation_type = Some("x".repeat(super::MAX_IDENTIFIER_BYTES + 1).into());
+        assert_eq!(settings.validate(), Err(Error::IdentifierTooLarge));
+
+        settings.animation_type = None;
+        settings.animation_parameters.color_payload =
+            Some(vec![0; super::MAX_OPAQUE_PAYLOAD_BYTES + 1].into_boxed_slice());
+        assert_eq!(settings.validate(), Err(Error::PayloadTooLarge));
     }
 
     #[test]

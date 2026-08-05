@@ -2,7 +2,9 @@
 
 use super::transition::{settings_from_native, validate_transition_settings};
 use super::*;
-use litchi_keynote::transition::{Effect, Settings as TransitionSettings};
+use litchi_keynote::transition::{
+    Effect, MAX_OPAQUE_PAYLOAD_BYTES, Settings as TransitionSettings,
+};
 
 const SLIDE_TRANSITION_FIELD: u32 = 4;
 const TRANSITION_ATTRIBUTES_FIELD: u32 = 2;
@@ -44,6 +46,18 @@ const fn custom_path(field: u32) -> [u32; 3] {
     [SLIDE_TRANSITION_FIELD, TRANSITION_ATTRIBUTES_FIELD, field]
 }
 
+fn boxed_payload(payload: Option<&[u8]>, name: &str) -> Result<Option<Box<[u8]>>> {
+    let Some(payload) = payload else {
+        return Ok(None);
+    };
+    if payload.len() > MAX_OPAQUE_PAYLOAD_BYTES {
+        return Err(Error::ParseError(format!(
+            "Keynote transition {name} payload exceeds {MAX_OPAQUE_PAYLOAD_BYTES} bytes"
+        )));
+    }
+    Ok(Some(payload.to_vec().into_boxed_slice()))
+}
+
 pub(super) fn transition_settings_from_wire(
     original: &[u8],
     attributes: &kn::TransitionAttributesArchive,
@@ -66,13 +80,15 @@ pub(super) fn transition_settings_from_wire(
         ANIMATION_ATTRIBUTES_FIELD,
         "Keynote modern transition attributes",
     )?;
-    settings.animation_parameters.color_payload =
-        optional_length_delimited_payload(animation, COLOR_FIELD)?
-            .map(|payload| payload.into_boxed_slice());
+    settings.animation_parameters.color_payload = boxed_payload(
+        optional_length_delimited_payload(animation, COLOR_FIELD)?,
+        "color",
+    )?;
     for (index, field_number) in TIMING_CURVE_FIELDS.into_iter().enumerate() {
-        settings.animation_parameters.timing_curve_payloads[index] =
-            optional_length_delimited_payload(animation, field_number)?
-                .map(|payload| payload.into_boxed_slice());
+        settings.animation_parameters.timing_curve_payloads[index] = boxed_payload(
+            optional_length_delimited_payload(animation, field_number)?,
+            "timing curve",
+        )?;
     }
     validate_transition_settings(&settings)?;
     Ok(Some(settings))
