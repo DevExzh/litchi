@@ -100,12 +100,15 @@ are migrated. The facade's private `wire.rs` is a callback/error adapter and
 does not copy parsed fields or maintain a second wire representation.
 
 The archive-neutral package-entry substrate now lives in
-`litchi-iwa-package`. It owns only ordered, uniquely named entry storage and
-its fallible name index; it has no ZIP, Snappy, protobuf, graph, or application
-dependency. `litchi-iwa` depends downward on this leaf while retaining
-`IWorkPackage`'s ZIP ingress, IWA decoding, resource policy, and transactional
-snapshot facade. This staged boundary lets the eventual Pages, Numbers, and
-Keynote package owners share entry storage without making the package leaf
+`litchi-iwa-package`. It owns only ordered, uniquely named entry storage, its
+fallible name index, and source-checked reversible entry patches; it has no
+ZIP, Snappy, protobuf, graph, or application dependency. `EntryStore` and
+patch clones are copy-on-write handles, so applying a patch shares payload
+allocations rather than materializing a second package. `litchi-iwa` depends
+downward on this leaf while retaining `IWorkPackage`'s ZIP ingress, IWA
+decoding, resource policy, and transactional snapshot validation. This staged
+boundary lets the eventual Pages, Numbers, and Keynote package owners share
+entry storage and raw package transactions without making the package leaf
 depend on a concrete format or leaking application message IDs upward.
 
 Pages-specific package-root and body-storage protobuf interpretation now lives

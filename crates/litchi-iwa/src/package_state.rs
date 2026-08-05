@@ -102,6 +102,14 @@ pub(crate) fn entry_store_error(error: EntryStoreError) -> Error {
     }
 }
 
+pub(crate) fn package_patch_error(error: EntryStoreError) -> Error {
+    if matches!(error, EntryStoreError::PatchSourceMismatch) {
+        Error::InvalidFormat("iWork package patch source does not match".to_owned())
+    } else {
+        entry_store_error(error)
+    }
+}
+
 impl Clone for PackageState {
     fn clone(&self) -> Self {
         let ready = self
@@ -127,11 +135,15 @@ impl Clone for PackageState {
 impl PackageState {
     pub(crate) fn from_entries(entries: Vec<Entry>, archive_limits: ArchiveLimits) -> Result<Self> {
         let entries = EntryStore::try_from_entries(entries).map_err(entry_store_error)?;
-        Ok(Self {
+        Ok(Self::from_store(entries, archive_limits))
+    }
+
+    pub(crate) fn from_store(entries: EntryStore, archive_limits: ArchiveLimits) -> Self {
+        Self {
             entries,
             archive_limits,
             parsed_archive: Mutex::new(ArchiveCache::default()),
-        })
+        }
     }
 
     pub(crate) fn position(&self, name: &str) -> Option<usize> {
