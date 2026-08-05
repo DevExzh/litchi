@@ -943,6 +943,7 @@ use litchi_iwa::keynote::{
     KeynoteHorizontalBuildDirection, KeynoteKeyboardDirection, KeynoteRotationDirection,
     KeynoteSlideTextRole, KeynoteSwooshDirection,
 };
+use litchi_keynote::transition::{Acceleration, Effect, TextDelivery};
 
 let mut numbers = NumbersEditor::open("input.numbers")?;
 let table = numbers.tables()?.remove(0);
@@ -1139,12 +1140,12 @@ let layout = keynote.default_slide_layout()?;
 let fresh = keynote.add_slide(layout)?;
 keynote.set_slide_title(fresh.index, "New from theme")?;
 let mut transition = keynote.slides()?[0].transition.clone().expect("transition");
-transition.effect = Some(litchi_iwa::keynote::Effect::Dissolve);
+transition.effect = Some(Effect::Dissolve);
 transition.duration = Some(1.5);
 transition.custom_parameters.acceleration =
-    Some(litchi_iwa::keynote::Acceleration::EaseInOut);
+    Some(Acceleration::EaseInOut);
 transition.custom_parameters.text_delivery =
-    Some(litchi_iwa::keynote::TextDelivery::ByWord);
+    Some(TextDelivery::ByWord);
 keynote.set_slide_transition(0, transition)?;
 keynote.clear_slide_transition(0)?;
 let mut show = keynote.show_settings()?;

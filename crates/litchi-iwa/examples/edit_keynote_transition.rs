@@ -2,7 +2,8 @@
 
 use std::env;
 
-use litchi_iwa::keynote::{Acceleration, KeynoteEditor, TextDelivery};
+use litchi_iwa::keynote::KeynoteEditor;
+use litchi_keynote::transition::{Acceleration, TextDelivery};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);

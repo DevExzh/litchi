@@ -1,9 +1,7 @@
 //! Create a Keynote presentation containing typed transition vocabulary.
 
-use litchi_iwa::keynote::{
-    Acceleration, Direction, Effect, KeynoteDocumentBuilder, KeynoteEditor, MosaicType,
-    TextDelivery,
-};
+use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
+use litchi_keynote::transition::{Acceleration, Direction, Effect, MosaicType, TextDelivery};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
