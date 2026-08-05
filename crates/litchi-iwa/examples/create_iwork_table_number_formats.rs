@@ -365,7 +365,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         PERCENTAGE_COLUMN,
-        percentage_format()?,
+        numbers_percentage_format()?,
     )?;
     editor.set_table_cell(
         table_id,
@@ -373,7 +373,12 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         CURRENCY_COLUMN,
         CellValue::Number(CURRENCY_VALUE),
     )?;
-    editor.set_table_cell_currency_format(table_id, ROW, CURRENCY_COLUMN, currency_format()?)?;
+    editor.set_table_cell_currency_format(
+        table_id,
+        ROW,
+        CURRENCY_COLUMN,
+        numbers_currency_format()?,
+    )?;
     editor.set_table_cell(
         table_id,
         ROW,
@@ -384,7 +389,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         SCIENTIFIC_COLUMN,
-        scientific_format()?,
+        numbers_scientific_format()?,
     )?;
     editor.set_table_cell(
         table_id,
@@ -392,7 +397,12 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         FRACTION_COLUMN,
         CellValue::Number(FRACTION_VALUE),
     )?;
-    editor.set_table_cell_fraction_format(table_id, ROW, FRACTION_COLUMN, fraction_format())?;
+    editor.set_table_cell_fraction_format(
+        table_id,
+        ROW,
+        FRACTION_COLUMN,
+        numbers_fraction_format(),
+    )?;
     editor.set_table_cell(
         table_id,
         ROW,
@@ -403,7 +413,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         NUMERAL_SYSTEM_COLUMN,
-        numeral_system_format()?,
+        numbers_numeral_system_format()?,
     )?;
     editor.set_table_cell(
         table_id,
@@ -411,52 +421,57 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         DATE_TIME_COLUMN,
         CellValue::Date(DATE_TIME_VALUE),
     )?;
-    editor.set_table_cell_date_time_format(table_id, ROW, DATE_TIME_COLUMN, date_time_format())?;
+    editor.set_table_cell_date_time_format(
+        table_id,
+        ROW,
+        DATE_TIME_COLUMN,
+        numbers_date_time_format(),
+    )?;
     editor.set_table_cell(
         table_id,
         ROW,
         DURATION_COLUMN,
         CellValue::Duration(DURATION_VALUE),
     )?;
-    editor.set_table_cell_duration_format(table_id, ROW, DURATION_COLUMN, duration_format())?;
-    editor.set_table_cell(table_id, ROW, CHECKBOX_COLUMN, CellValue::Boolean(true))?;
-    editor.set_table_cell_checkbox_format(
+    editor.set_table_cell_duration_format(
         table_id,
         ROW,
-        CHECKBOX_COLUMN,
-        TableCellCheckboxFormat,
+        DURATION_COLUMN,
+        numbers_duration_format(),
     )?;
+    editor.set_table_cell(table_id, ROW, CHECKBOX_COLUMN, CellValue::Boolean(true))?;
+    editor.set_table_cell_checkbox_format(table_id, ROW, CHECKBOX_COLUMN, Checkbox)?;
     editor.set_table_cell(
         table_id,
         ROW,
         STAR_RATING_COLUMN,
         CellValue::Number(STAR_RATING_VALUE),
     )?;
-    editor.set_table_cell_star_rating_format(
-        table_id,
-        ROW,
-        STAR_RATING_COLUMN,
-        TableCellStarRatingFormat,
-    )?;
+    editor.set_table_cell_star_rating_format(table_id, ROW, STAR_RATING_COLUMN, StarRating)?;
     editor.set_table_cell(
         table_id,
         ROW,
         SLIDER_COLUMN,
         CellValue::Number(SLIDER_VALUE),
     )?;
-    editor.set_table_cell_slider_format(table_id, ROW, SLIDER_COLUMN, slider_format()?)?;
+    editor.set_table_cell_slider_format(table_id, ROW, SLIDER_COLUMN, numbers_slider_format()?)?;
     editor.set_table_cell(
         table_id,
         ROW,
         STEPPER_COLUMN,
         CellValue::Number(STEPPER_VALUE),
     )?;
-    editor.set_table_cell_stepper_format(table_id, ROW, STEPPER_COLUMN, stepper_format()?)?;
+    editor.set_table_cell_stepper_format(
+        table_id,
+        ROW,
+        STEPPER_COLUMN,
+        numbers_stepper_format()?,
+    )?;
     editor.set_table_cell_pop_up_menu_format(
         table_id,
         ROW,
         POP_UP_MENU_COLUMN,
-        pop_up_menu_format()?,
+        numbers_pop_up_menu_format()?,
     )?;
     editor.set_table_cell(
         table_id,
@@ -475,7 +490,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         CUSTOM_NUMBER_COLUMN,
-        custom_number_format()?,
+        numbers_custom_number_format()?,
     )?;
     editor.set_table_cell(
         table_id,
@@ -487,7 +502,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         CUSTOM_DATE_TIME_COLUMN,
-        custom_date_time_format()?,
+        numbers_custom_date_time_format()?,
     )?;
     editor.set_table_cell(
         table_id,
@@ -499,7 +514,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         CUSTOM_TEXT_COLUMN,
-        custom_text_format()?,
+        numbers_custom_text_format()?,
     )?;
     editor.save(output)?;
     Ok(())
@@ -546,7 +561,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         PERCENTAGE_COLUMN,
-        percentage_format()?,
+        numbers_percentage_format()?,
     )?;
     editor.set_slide_table_cell(
         0,
@@ -560,7 +575,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         CURRENCY_COLUMN,
-        currency_format()?,
+        numbers_currency_format()?,
     )?;
     editor.set_slide_table_cell(
         0,
@@ -574,7 +589,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         SCIENTIFIC_COLUMN,
-        scientific_format()?,
+        numbers_scientific_format()?,
     )?;
     editor.set_slide_table_cell(
         0,
@@ -588,7 +603,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         FRACTION_COLUMN,
-        fraction_format(),
+        numbers_fraction_format(),
     )?;
     editor.set_slide_table_cell(
         0,
@@ -602,7 +617,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         NUMERAL_SYSTEM_COLUMN,
-        numeral_system_format()?,
+        numbers_numeral_system_format()?,
     )?;
     editor.set_slide_table_cell(
         0,
@@ -616,7 +631,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         DATE_TIME_COLUMN,
-        date_time_format(),
+        numbers_date_time_format(),
     )?;
     editor.set_slide_table_cell(
         0,
@@ -630,7 +645,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         DURATION_COLUMN,
-        duration_format(),
+        numbers_duration_format(),
     )?;
     editor.set_slide_table_cell(
         0,
@@ -644,7 +659,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         CHECKBOX_COLUMN,
-        TableCellCheckboxFormat,
+        Checkbox,
     )?;
     editor.set_slide_table_cell(
         0,
@@ -658,7 +673,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         STAR_RATING_COLUMN,
-        TableCellStarRatingFormat,
+        StarRating,
     )?;
     editor.set_slide_table_cell(
         0,
@@ -672,7 +687,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         SLIDER_COLUMN,
-        slider_format()?,
+        numbers_slider_format()?,
     )?;
     editor.set_slide_table_cell(
         0,
@@ -686,14 +701,14 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         STEPPER_COLUMN,
-        stepper_format()?,
+        numbers_stepper_format()?,
     )?;
     editor.set_slide_table_cell_pop_up_menu_format(
         0,
         table.model_object_id,
         ROW,
         POP_UP_MENU_COLUMN,
-        pop_up_menu_format()?,
+        numbers_pop_up_menu_format()?,
     )?;
     editor.set_slide_table_cell(
         0,
@@ -707,17 +722,17 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         (
             CUSTOM_NUMBER_COLUMN,
             CellValue::Number(NUMBER_VALUE),
-            custom_number_format()?,
+            numbers_custom_number_format()?,
         ),
         (
             CUSTOM_DATE_TIME_COLUMN,
             CellValue::Date(DATE_TIME_VALUE),
-            custom_date_time_format()?,
+            numbers_custom_date_time_format()?,
         ),
         (
             CUSTOM_TEXT_COLUMN,
             CellValue::Text("Invoice 001".to_owned()),
-            custom_text_format()?,
+            numbers_custom_text_format()?,
         ),
     ] {
         editor.set_slide_table_cell(0, table.model_object_id, ROW, column, value)?;
