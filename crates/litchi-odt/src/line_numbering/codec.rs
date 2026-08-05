@@ -10,14 +10,11 @@ use quick_xml::{
     reader::NsReader,
 };
 
-use crate::{FlatDocument, Package};
-
-const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
-const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
-const STYLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
-const MAX_DOCUMENT_XML_BYTES: usize = 32 * 1024 * 1024;
-const MAX_VALUE_BYTES: usize = 64 * 1024;
-const MAX_XML_DEPTH: usize = 128;
+use super::model::{Configuration, Format, NonNegativeLength, Position, Separator, validate_value};
+use super::{
+    MAX_DOCUMENT_XML_BYTES, MAX_VALUE_BYTES, MAX_XML_DEPTH, OFFICE_NAMESPACE, STYLE_NAMESPACE,
+    TEXT_NAMESPACE, invalid,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum NamespaceKind {
@@ -27,148 +24,7 @@ enum NamespaceKind {
     Other,
 }
 
-/// Numbering format for line numbers.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Format {
-    Empty,
-    Arabic,
-    LowerRoman,
-    UpperRoman,
-    LowerAlpha,
-    UpperAlpha,
-    Custom(String),
-}
-
-impl Format {
-    pub fn parse(value: impl Into<String>) -> Result<Self> {
-        let value = value.into();
-        if value.len() > MAX_VALUE_BYTES {
-            return invalid(format!(
-                "style:num-format exceeds the {MAX_VALUE_BYTES} byte limit"
-            ));
-        }
-        Ok(match value.as_str() {
-            "" => Self::Empty,
-            "1" => Self::Arabic,
-            "i" => Self::LowerRoman,
-            "I" => Self::UpperRoman,
-            "a" => Self::LowerAlpha,
-            "A" => Self::UpperAlpha,
-            _ => Self::Custom(value),
-        })
-    }
-
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Empty => "",
-            Self::Arabic => "1",
-            Self::LowerRoman => "i",
-            Self::UpperRoman => "I",
-            Self::LowerAlpha => "a",
-            Self::UpperAlpha => "A",
-            Self::Custom(value) => value,
-        }
-    }
-
-    fn permits_letter_sync(&self) -> bool {
-        matches!(self, Self::LowerAlpha | Self::UpperAlpha)
-    }
-}
-
-/// Placement of line numbers relative to the text area.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Position {
-    Left,
-    Right,
-    Inner,
-    Outer,
-}
-
-impl Position {
-    fn parse(value: &str) -> Result<Self> {
-        match value {
-            "left" => Ok(Self::Left),
-            "right" => Ok(Self::Right),
-            "inner" => Ok(Self::Inner),
-            "outer" => Ok(Self::Outer),
-            _ => invalid(format!("unsupported text:number-position '{value}'")),
-        }
-    }
-
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Left => "left",
-            Self::Right => "right",
-            Self::Inner => "inner",
-            Self::Outer => "outer",
-        }
-    }
-}
-
-/// A validated ODF nonnegative length.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NonNegativeLength(String);
-
-impl NonNegativeLength {
-    pub fn new(value: impl Into<String>) -> Result<Self> {
-        let value = value.into();
-        validate_nonnegative_length(&value)?;
-        Ok(Self(value))
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-/// Optional separator emitted after every configured number of lines.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Separator {
-    pub increment: Option<u64>,
-    pub text: String,
-}
-
-/// One standard `text:linenumbering-configuration` declaration.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Configuration {
-    pub number_lines: Option<bool>,
-    pub number_format: Option<Format>,
-    pub letter_sync: Option<bool>,
-    pub style_name: Option<String>,
-    pub increment: Option<u64>,
-    pub number_position: Option<Position>,
-    pub offset: Option<NonNegativeLength>,
-    pub count_empty_lines: Option<bool>,
-    pub count_in_text_boxes: Option<bool>,
-    pub restart_on_page: Option<bool>,
-    pub separator: Option<Separator>,
-}
-
 impl Configuration {
-    pub fn validate(&self) -> Result<()> {
-        if self.letter_sync.is_some()
-            && !self
-                .number_format
-                .as_ref()
-                .is_some_and(Format::permits_letter_sync)
-        {
-            return invalid("style:num-letter-sync requires style:num-format 'a' or 'A'");
-        }
-        if let Some(format) = &self.number_format {
-            validate_value(format.as_str(), "style:num-format", true)?;
-        }
-        if let Some(style_name) = &self.style_name {
-            validate_value(style_name, "text:style-name", false)?;
-        }
-        if let Some(offset) = &self.offset {
-            validate_nonnegative_length(offset.as_str())?;
-        }
-        if let Some(separator) = &self.separator {
-            validate_value(&separator.text, "text:linenumbering-separator", true)?;
-        }
-        Ok(())
-    }
-
     /// Serialize a namespace-complete line-numbering configuration element.
     pub fn to_xml(&self) -> Result<String> {
         self.validate()?;
@@ -462,27 +318,6 @@ pub(crate) fn remove_xml(xml: &str) -> Result<String> {
     Ok(format!("{}{}", &xml[..span.start], &xml[span.end..]))
 }
 
-impl Package {
-    /// Return stored document line-numbering configuration from styles XML.
-    ///
-    /// The declaration is presentation metadata only. It is never used to
-    /// paginate a document or generate line numbers.
-    pub fn line_numbering_configuration(&self) -> Result<Option<Configuration>> {
-        self.styles_xml()?
-            .map_or_else(|| Ok(None), |xml| parse(&xml))
-    }
-}
-
-impl FlatDocument {
-    /// Return stored document line-numbering configuration from flat ODF XML.
-    ///
-    /// The declaration is presentation metadata only. It is never used to
-    /// paginate a document or generate line numbers.
-    pub fn line_numbering_configuration(&self) -> Result<Option<Configuration>> {
-        parse(self.xml())
-    }
-}
-
 fn parse_attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Configuration> {
     let mut configuration = Configuration::default();
     let mut seen = HashSet::new();
@@ -678,28 +513,6 @@ fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {
     }
 }
 
-fn validate_nonnegative_length(value: &str) -> Result<()> {
-    let Some(number) = ["cm", "mm", "in", "pt", "pc", "px"]
-        .iter()
-        .find_map(|unit| value.strip_suffix(unit))
-    else {
-        return invalid(format!("invalid nonnegative ODF length '{value}'"));
-    };
-    let mut dots = 0usize;
-    let mut digits = 0usize;
-    for byte in number.bytes() {
-        match byte {
-            b'.' => dots += 1,
-            b'0'..=b'9' => digits += 1,
-            _ => return invalid(format!("invalid nonnegative ODF length '{value}'")),
-        }
-    }
-    if number.is_empty() || number == "." || dots > 1 || digits == 0 {
-        return invalid(format!("invalid nonnegative ODF length '{value}'"));
-    }
-    validate_value(value, "text:offset", false)
-}
-
 fn parse_bool(value: &str, name: &str) -> Result<bool> {
     match value {
         "true" | "1" => Ok(true),
@@ -728,16 +541,6 @@ fn append_separator_text(output: &mut String, value: &str) -> Result<()> {
         ));
     }
     output.push_str(value);
-    Ok(())
-}
-
-fn validate_value(value: &str, name: &str, allow_empty: bool) -> Result<()> {
-    if !allow_empty && value.is_empty() {
-        return invalid(format!("{name} must not be empty"));
-    }
-    if value.len() > MAX_VALUE_BYTES {
-        return invalid(format!("{name} exceeds the {MAX_VALUE_BYTES} byte limit"));
-    }
     Ok(())
 }
 
@@ -797,134 +600,5 @@ fn escape_text(output: &mut String, value: &str) {
             '>' => output.push_str("&gt;"),
             _ => output.push(character),
         }
-    }
-}
-
-fn xml_error(error: impl std::fmt::Display) -> Error {
-    Error::InvalidFormat(format!("invalid ODF line-numbering XML: {error}"))
-}
-
-fn invalid<T>(message: impl Into<String>) -> Result<T> {
-    Err(Error::InvalidFormat(message.into()))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
-    const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
-    const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
-
-    fn styles(body: &str) -> String {
-        format!(
-            r#"<o:document-styles xmlns:o="{OFFICE}" xmlns:t="{TEXT}" xmlns:s="{STYLE}"><o:styles>{body}</o:styles><o:automatic-styles/><o:master-styles/></o:document-styles>"#
-        )
-    }
-
-    #[test]
-    fn parses_and_round_trips_complete_line_numbering() {
-        // ODF 1.2/1.3 text:linenumbering-configuration grammar. LibreOffice
-        // writes the same configuration in office:styles.
-        let xml = styles(
-            r#"<t:linenumbering-configuration t:number-lines="1" s:num-format="A" s:num-letter-sync="false" t:style-name="Line &amp; Number" t:increment="5" t:number-position="outer" t:offset="0.25in" t:count-empty-lines="true" t:count-in-text-boxes="0" t:restart-on-page="false"><t:linenumbering-separator t:increment="10"> / &amp; </t:linenumbering-separator></t:linenumbering-configuration>"#,
-        );
-        let configuration = parse(&xml).unwrap().unwrap();
-        assert_eq!(configuration.number_lines, Some(true));
-        assert_eq!(configuration.number_format, Some(Format::UpperAlpha));
-        assert_eq!(configuration.number_position, Some(Position::Outer));
-        assert_eq!(configuration.offset.as_ref().unwrap().as_str(), "0.25in");
-        assert_eq!(configuration.separator.as_ref().unwrap().text, " / & ");
-
-        let serialized = configuration.to_xml().unwrap();
-        let reparsed = parse(&styles(&serialized)).unwrap().unwrap();
-        assert_eq!(reparsed, configuration);
-    }
-
-    #[test]
-    fn preserves_empty_and_custom_number_formats() {
-        for format in [Format::Empty, Format::Custom("一, 二, 三".to_string())] {
-            let configuration = Configuration {
-                number_format: Some(format.clone()),
-                ..Configuration::default()
-            };
-            let parsed = parse(&styles(&configuration.to_xml().unwrap()))
-                .unwrap()
-                .unwrap();
-            assert_eq!(parsed.number_format, Some(format));
-        }
-    }
-
-    #[test]
-    fn rejects_malformed_or_misplaced_configurations() {
-        for body in [
-            r#"<t:linenumbering-configuration t:number-lines="yes"/>"#,
-            r#"<t:linenumbering-configuration s:num-format="1" s:num-letter-sync="true"/>"#,
-            r#"<t:linenumbering-configuration t:number-position="center"/>"#,
-            r#"<t:linenumbering-configuration t:offset="-1cm"/>"#,
-            r#"<t:linenumbering-configuration t:increment="-1"/>"#,
-            r#"<t:linenumbering-configuration><t:linenumbering-separator/><t:linenumbering-separator/></t:linenumbering-configuration>"#,
-            r#"<t:linenumbering-configuration><t:linenumbering-separator><t:span/></t:linenumbering-separator></t:linenumbering-configuration>"#,
-        ] {
-            assert!(parse(&styles(body)).is_err(), "{body}");
-        }
-        let misplaced = format!(
-            r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TEXT}"><o:body><t:linenumbering-configuration/></o:body></o:document-content>"#
-        );
-        assert!(parse(&misplaced).is_err());
-        assert!(
-            parse(&styles(
-                r#"<t:linenumbering-configuration/><t:linenumbering-configuration/>"#
-            ))
-            .is_err()
-        );
-    }
-
-    #[test]
-    fn replaces_inserts_and_removes_configuration_without_rewriting_other_styles() {
-        let original = styles(
-            r#"<s:style s:name="Preserved"/><t:linenumbering-configuration t:number-lines="false" s:num-format="1"/>"#,
-        );
-        let configuration = Configuration {
-            number_lines: Some(true),
-            number_format: Some(Format::LowerAlpha),
-            letter_sync: Some(true),
-            style_name: Some("LineNumbers".to_string()),
-            increment: Some(3),
-            number_position: Some(Position::Outer),
-            offset: Some(NonNegativeLength::new("0.25in").unwrap()),
-            count_empty_lines: Some(true),
-            count_in_text_boxes: Some(false),
-            restart_on_page: Some(true),
-            separator: Some(Separator {
-                increment: Some(6),
-                text: " · ".to_string(),
-            }),
-        };
-
-        let replaced = set_xml(&original, &configuration).unwrap();
-        assert!(replaced.contains(r#"<s:style s:name="Preserved"/>"#));
-        assert_eq!(parse(&replaced).unwrap(), Some(configuration.clone()));
-
-        let removed = remove_xml(&replaced).unwrap();
-        assert!(removed.contains(r#"<s:style s:name="Preserved"/>"#));
-        assert_eq!(parse(&removed).unwrap(), None);
-
-        let empty_styles = format!(
-            r#"<o:document-styles xmlns:o="{OFFICE}" xmlns:t="{TEXT}" xmlns:s="{STYLE}"><o:styles/><o:automatic-styles/><o:master-styles/></o:document-styles>"#
-        );
-        let inserted = set_xml(&empty_styles, &configuration).unwrap();
-        assert!(inserted.contains("<o:styles>"));
-        assert_eq!(parse(&inserted).unwrap(), Some(configuration.clone()));
-
-        let flat_xml = format!(
-            r#"<o:document xmlns:o="{OFFICE}" xmlns:t="{TEXT}" xmlns:s="{STYLE}" o:mimetype="application/vnd.oasis.opendocument.text" o:version="1.3"><o:styles>{}</o:styles><o:body><o:text/></o:body></o:document>"#,
-            configuration.to_xml().unwrap()
-        );
-        let flat = FlatDocument::from_bytes(flat_xml.into_bytes()).unwrap();
-        assert_eq!(
-            flat.line_numbering_configuration().unwrap(),
-            Some(configuration)
-        );
     }
 }
