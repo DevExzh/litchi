@@ -547,7 +547,7 @@ impl Document {
             #[cfg(feature = "ooxml")]
             DocumentImpl::Docx(package, _) => {
                 use super::DocumentElement;
-                use litchi_ooxml::docx::Element;
+                use crate::ooxml::docx::Element;
                 let raw = package
                     .document()
                     .and_then(|document| document.elements())

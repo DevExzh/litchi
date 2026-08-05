@@ -330,8 +330,20 @@ pub mod drawing {
 /// **Note**: This requires the `ooxml` feature to be enabled.
 #[cfg(feature = "ooxml")]
 pub mod ooxml {
-    pub use litchi_ooxml::*;
+    /// WordprocessingML (`.docx`) package and semantic APIs.
+    pub use litchi_docx as docx;
+    /// PresentationML (`.pptx`) package and semantic APIs.
+    pub use litchi_pptx as pptx;
+    /// SpreadsheetML (`.xlsx`) package and semantic APIs.
+    pub use litchi_xlsx as xlsx;
+    /// Binary SpreadsheetML (`.xlsb`) package and semantic APIs.
+    pub use litchi_xlsb as xlsb;
+    /// Open Packaging Conventions package graph.
+    pub use litchi_opc as opc;
+    /// Host-neutral OOXML vocabulary and package services.
     pub use litchi_ooxml_common::{custom, custom_xml, embedded, ribbon, web};
+
+    pub use litchi_opc::{OpcPackage, PackURI};
 }
 
 /// Runtime-neutral Microsoft Office cryptography.
