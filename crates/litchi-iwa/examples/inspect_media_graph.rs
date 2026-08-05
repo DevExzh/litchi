@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::env;
 
 use litchi_iwa::IWorkPackage;
-use litchi_iwa::protobuf::tsp::{DataMetadataMap, PackageMetadata};
+use litchi_iwa_protos::tsp::{DataMetadataMap, PackageMetadata};
 use prost::Message;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|archive| archive.object(1))
         .and_then(|object| object.messages.first())
         .and_then(|message| {
-            litchi_iwa::protobuf::tn::DocumentArchive::decode(message.data.as_slice()).ok()
+            litchi_iwa_protos::tn::DocumentArchive::decode(message.data.as_slice()).ok()
         })
     {
         println!(

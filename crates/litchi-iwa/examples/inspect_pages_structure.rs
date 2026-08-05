@@ -3,10 +3,10 @@ use std::env;
 
 use litchi_iwa::IWorkPackage;
 use litchi_iwa::archive::ArchiveObject;
-use litchi_iwa::protobuf::tp::{
+use litchi_iwa_protos::tp::{
     DocumentArchive, SectionArchive, SectionTemplateArchive, SettingsArchive,
 };
-use litchi_iwa::protobuf::tswp::StorageArchive;
+use litchi_iwa_protos::tswp::StorageArchive;
 use litchi_pages::page_layout::Orientation;
 use litchi_pages::section::{PageNumber, PageNumbering, Start};
 use prost::Message;

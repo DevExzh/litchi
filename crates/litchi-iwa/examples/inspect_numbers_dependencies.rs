@@ -1,7 +1,7 @@
 use std::env;
 
 use litchi_iwa::IWorkPackage;
-use litchi_iwa::protobuf::tsce;
+use litchi_iwa_protos::tsce;
 use prost::Message;
 
 fn print_record(record: &tsce::CellRecordExpandedArchive, indent: &str) {

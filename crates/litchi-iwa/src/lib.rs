@@ -141,7 +141,7 @@ pub(crate) mod media_playback;
 pub mod object_index;
 pub mod package;
 mod package_metadata;
-pub mod protobuf;
+pub(crate) mod protobuf;
 pub mod ref_graph;
 pub mod registry;
 pub mod snappy;

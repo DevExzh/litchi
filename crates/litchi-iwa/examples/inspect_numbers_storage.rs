@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::env;
 
 use litchi_iwa::IWorkPackage;
-use litchi_iwa::protobuf::{tsd, tst};
+use litchi_iwa_protos::{tsd, tst};
 use prost::Message;
 
 const BNC_COMMENT_FLAG: u32 = 0x080000;
@@ -700,7 +700,7 @@ fn print_aggregate_node(node: &tst::group_by_archive::AggNodeArchive, path: &mut
     }
 }
 
-fn compact_cell_value(value: &litchi_iwa::protobuf::tsce::CellValueArchive) -> String {
+fn compact_cell_value(value: &litchi_iwa_protos::tsce::CellValueArchive) -> String {
     if let Some(string) = &value.string_value {
         return format!("string:{:?}", string.value);
     }

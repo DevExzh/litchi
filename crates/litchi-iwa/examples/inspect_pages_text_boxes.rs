@@ -4,8 +4,8 @@ use std::env;
 
 use litchi_iwa::IWorkPackage;
 use litchi_iwa::pages::PagesEditor;
-use litchi_iwa::protobuf::tp::{DocumentArchive, DrawablesZOrderArchive, FloatingDrawablesArchive};
-use litchi_iwa::protobuf::tswp::{DrawableAttachmentArchive, ShapeInfoArchive, StorageArchive};
+use litchi_iwa_protos::tp::{DocumentArchive, DrawablesZOrderArchive, FloatingDrawablesArchive};
+use litchi_iwa_protos::tswp::{DrawableAttachmentArchive, ShapeInfoArchive, StorageArchive};
 use prost::Message;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

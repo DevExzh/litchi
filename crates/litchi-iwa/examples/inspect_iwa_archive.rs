@@ -5,23 +5,23 @@ use std::env;
 use litchi_iwa::IWorkPackage;
 use litchi_iwa::IWorkThemeArchive;
 use litchi_iwa::charts::IWorkChartArchive;
-use litchi_iwa::protobuf::kn;
-use litchi_iwa::protobuf::tn;
-use litchi_iwa::protobuf::tp::{
+use litchi_iwa_protos::kn;
+use litchi_iwa_protos::tn;
+use litchi_iwa_protos::tp::{
     DocumentArchive, SectionArchive, SectionTemplateArchive, UserDefinedGuideMapArchive,
 };
-use litchi_iwa::protobuf::tsce::{CalculationEngineArchive, NamedReferenceManagerArchive};
-use litchi_iwa::protobuf::tsd::CommentStorageArchive;
-use litchi_iwa::protobuf::tsd::GuideStorageArchive;
-use litchi_iwa::protobuf::tsk::{AnnotationAuthorArchive, AnnotationAuthorStorageArchive};
-use litchi_iwa::protobuf::tsp::{ObjectContainer, PackageMetadata};
-use litchi_iwa::protobuf::tss::StylesheetArchive;
-use litchi_iwa::protobuf::tst::{
+use litchi_iwa_protos::tsce::{CalculationEngineArchive, NamedReferenceManagerArchive};
+use litchi_iwa_protos::tsd::CommentStorageArchive;
+use litchi_iwa_protos::tsd::GuideStorageArchive;
+use litchi_iwa_protos::tsk::{AnnotationAuthorArchive, AnnotationAuthorStorageArchive};
+use litchi_iwa_protos::tsp::{ObjectContainer, PackageMetadata};
+use litchi_iwa_protos::tss::StylesheetArchive;
+use litchi_iwa_protos::tst::{
     CellStyleArchive, ColumnRowUidMapArchive, HeaderNameMgrArchive, HiddenStateFormulaOwnerArchive,
     TableDataList, TableInfoArchive, TableModelArchive, TableStyleArchive,
     TableStyleNetworkArchive, TableStylePresetArchive,
 };
-use litchi_iwa::protobuf::tswp::{
+use litchi_iwa_protos::tswp::{
     BookmarkFieldArchive, CharacterStyleArchive, ColumnStyleArchive, DateTimeSmartFieldArchive,
     DrawableAttachmentArchive, DropCapStyleArchive, HighlightArchive, HyperlinkFieldArchive,
     ListStyleArchive, ParagraphStyleArchive, ShapeInfoArchive, ShapeStyleArchive, StorageArchive,
@@ -254,7 +254,7 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
                 println!("  keynote_show={show:#?}");
             }
             if message.type_ == 601
-                && let Ok(state) = litchi_iwa::protobuf::tsa::FunctionBrowserStateArchive::decode(
+                && let Ok(state) = litchi_iwa_protos::tsa::FunctionBrowserStateArchive::decode(
                     message.data.as_slice(),
                 )
             {
@@ -375,10 +375,9 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
                 println!("  header_name_manager={manager:#?}");
             }
             if message.type_ == 4_008
-                && let Ok(owner) =
-                    litchi_iwa::protobuf::tsce::FormulaOwnerDependenciesArchive::decode(
-                        message.data.as_slice(),
-                    )
+                && let Ok(owner) = litchi_iwa_protos::tsce::FormulaOwnerDependenciesArchive::decode(
+                    message.data.as_slice(),
+                )
             {
                 println!("  formula_owner_dependencies={owner:#?}");
             }
@@ -394,7 +393,7 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
             }
             if message.type_ == 6_220
                 && let Ok(filter) =
-                    litchi_iwa::protobuf::tst::FilterSetArchive::decode(message.data.as_slice())
+                    litchi_iwa_protos::tst::FilterSetArchive::decode(message.data.as_slice())
             {
                 println!("  filter_set={filter:#?}");
             }
@@ -412,7 +411,7 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
             }
             if message.type_ == 6_373
                 && let Ok(group) =
-                    litchi_iwa::protobuf::tst::GroupByArchive::decode(message.data.as_slice())
+                    litchi_iwa_protos::tst::GroupByArchive::decode(message.data.as_slice())
             {
                 println!("  group_by={group:#?}");
             }
