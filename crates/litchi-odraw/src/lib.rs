@@ -4,6 +4,10 @@
 //! runtime-neutral writing helpers shared by the legacy Office formats.
 
 #![forbid(unsafe_code)]
+#![allow(
+    non_ascii_idents,
+    reason = "zerocopy's wire-layout derives emit compiler-generated identifiers"
+)]
 
 mod container;
 mod error;

@@ -7,7 +7,7 @@ use std::{
 
 use zerocopy::{
     IntoBytes as _,
-    byteorder::little_endian::{U16, U32},
+    byteorder::little_endian::{U16 as LeU16, U32 as LeU32},
 };
 use zerocopy_derive::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
@@ -276,9 +276,9 @@ impl Container {
 #[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
 #[repr(C)]
 pub struct Header {
-    ver_inst: U16,
-    kind: U16,
-    len: U32,
+    ver_inst: LeU16,
+    kind: LeU16,
+    len: LeU32,
 }
 
 impl Header {
@@ -291,9 +291,9 @@ impl Header {
         }
         let ver_inst = u16::from(version) | (instance << 4);
         Ok(Self {
-            ver_inst: U16::new(ver_inst),
-            kind: U16::new(raw_kind),
-            len: U32::new(len),
+            ver_inst: LeU16::new(ver_inst),
+            kind: LeU16::new(raw_kind),
+            len: LeU32::new(len),
         })
     }
 
@@ -337,16 +337,16 @@ impl Header {
 #[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
 #[repr(C)]
 pub struct Sp {
-    id: U32,
-    flags: U32,
+    id: LeU32,
+    flags: LeU32,
 }
 
 impl Sp {
     /// Creates a shape payload from typed flags.
     pub const fn new(id: u32, flags: Flags) -> Self {
         Self {
-            id: U32::new(id),
-            flags: U32::new(flags.bits()),
+            id: LeU32::new(id),
+            flags: LeU32::new(flags.bits()),
         }
     }
 
@@ -365,16 +365,16 @@ impl Sp {
 #[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
 #[repr(C, packed)]
 pub struct Property {
-    id: U16,
-    value: U32,
+    id: LeU16,
+    value: LeU32,
 }
 
 impl Property {
     /// Creates a raw property-table entry.
     pub const fn new(id: Id, value: u32) -> Self {
         Self {
-            id: U16::new(id.raw()),
-            value: U32::new(value),
+            id: LeU16::new(id.raw()),
+            value: LeU32::new(value),
         }
     }
 
@@ -717,6 +717,7 @@ fn invalid_input(message: &'static str) -> io::Error {
 mod tests {
     use super::*;
     use crate::{Record, RecordKind};
+    use std::mem::size_of;
 
     #[test]
     fn header_is_little_endian_and_checked() {
@@ -726,7 +727,7 @@ mod tests {
         assert!(Header::atom(0x1000, Atom::Sp, 0).is_err());
         assert!(Ext::new(RecordKind::Sp.raw()).is_err());
         assert!(Ext::new(0x1234).is_err());
-        assert_eq!(core::mem::size_of::<Property>(), 6);
+        assert_eq!(size_of::<Property>(), 6);
     }
 
     #[test]

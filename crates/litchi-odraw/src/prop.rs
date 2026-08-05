@@ -1442,7 +1442,7 @@ impl Anchor {
         self.bottom.checked_sub(self.top)
     }
 
-    pub fn from_child_anchor(anchor: &Record) -> Option<Self> {
+    pub fn from_child_anchor(anchor: &Record<'_>) -> Option<Self> {
         if anchor.kind() != RecordKind::ChildAnchor || anchor.data().len() != 16 {
             return None;
         }
