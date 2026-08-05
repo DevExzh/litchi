@@ -5105,7 +5105,6 @@ pub use slide_tables::{
     KeynoteTableSortOrder, KeynoteTableSortRowRange, KeynoteTableSortRule, KeynoteTableSortScope,
     KeynoteTableTitleSettings, RemovedKeynoteSlideTable,
 };
-pub use soundtrack::{KeynoteSoundtrackMode, KeynoteSoundtrackSettings};
 pub use soundtrack_items::KeynoteSoundtrackItemInfo;
 use transition_wire::{transition_settings_from_wire, validate_transition_wire};
 #[cfg(test)]

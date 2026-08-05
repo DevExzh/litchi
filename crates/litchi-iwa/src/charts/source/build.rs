@@ -120,20 +120,14 @@ pub(crate) fn source_chart_objects(
     };
     let mut chart_references = ids.chart_references();
     chart_references.push(paragraph_style_id);
-    let mut preset_references = vec![
-        ids.chart_style,
-        ids.legend_style,
-        ids.value_axis_styles[0],
-        ids.value_axis_styles[1],
-        ids.category_axis_style,
-        ids.series_styles[0],
-        ids.series_styles[1],
-        ids.series_styles[2],
-        ids.series_styles[3],
-        ids.series_styles[4],
-        ids.series_styles[5],
-    ];
+    let mut preset_references = vec![ids.chart_style, ids.legend_style];
+    preset_references.extend(ids.value_axis_styles);
+    preset_references.push(ids.category_axis_style);
+    preset_references.extend(ids.series_styles);
     preset_references.push(paragraph_style_id);
+
+    let [primary_value_axis_style, secondary_value_axis_style] = ids.value_axis_styles;
+    let [primary_value_axis_non_style, secondary_value_axis_non_style] = ids.value_axis_non_styles;
 
     let mut objects = Vec::with_capacity(ids.all().len());
     objects.push(chart_object(
@@ -227,7 +221,7 @@ pub(crate) fn source_chart_objects(
             &[],
         )?,
         extension_style_object(
-            ids.value_axis_styles[0],
+            primary_value_axis_style,
             AXIS_STYLE_MESSAGE_TYPE,
             tsch::ChartAxisStyleArchive {
                 super_: Some(source_style(stylesheet_id)),
@@ -236,7 +230,7 @@ pub(crate) fn source_chart_objects(
             &[SUPPORTS_PRIMARY_FEATURE_FIELD],
         )?,
         extension_style_object(
-            ids.value_axis_styles[1],
+            secondary_value_axis_style,
             AXIS_STYLE_MESSAGE_TYPE,
             tsch::ChartAxisStyleArchive {
                 super_: Some(source_style(stylesheet_id)),
@@ -245,7 +239,7 @@ pub(crate) fn source_chart_objects(
             &[SUPPORTS_PRIMARY_FEATURE_FIELD],
         )?,
         extension_style_object(
-            ids.value_axis_non_styles[0],
+            primary_value_axis_non_style,
             AXIS_NON_STYLE_MESSAGE_TYPE,
             tsch::ChartAxisNonStyleArchive {
                 super_: Some(source_style(stylesheet_id)),
@@ -257,7 +251,7 @@ pub(crate) fn source_chart_objects(
             ],
         )?,
         extension_style_object(
-            ids.value_axis_non_styles[1],
+            secondary_value_axis_non_style,
             AXIS_NON_STYLE_MESSAGE_TYPE,
             tsch::ChartAxisNonStyleArchive {
                 super_: Some(source_style(stylesheet_id)),
@@ -327,7 +321,13 @@ fn chart_object(
             data,
         }],
     )?;
-    let info = &mut object.archive_info.message_infos[0];
+    let info = object
+        .archive_info
+        .message_infos
+        .first_mut()
+        .ok_or_else(|| {
+            Error::InvalidFormat("source-built chart object has no message metadata".to_owned())
+        })?;
     info.versions = versions.to_vec();
     info.object_references = references.to_vec();
     Ok(object)
@@ -432,7 +432,11 @@ fn default_series_style(index: usize) -> Result<tsch::generated::ChartSeriesStyl
         (0.72, 0.25, 0.23),
         (0.62, 0.25, 0.55),
     ];
-    let (red, green, blue) = COLORS[index % COLORS.len()];
+    let (red, green, blue) = COLORS.get(index).copied().ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "source-built chart series style index {index} exceeds {SERIES_STYLE_COUNT}"
+        ))
+    })?;
     let color = RgbaColor::new(red, green, blue, 1.0, RgbColorSpace::Srgb)?;
     let fill = tsd::FillArchive {
         color: Some(tsp::Color {
@@ -504,5 +508,15 @@ fn default_number_formatter() -> tsk::FormatStructArchive {
         negative_style: Some(DEFAULT_CHART_NEGATIVE_STYLE),
         show_thousands_separator: Some(true),
         ..Default::default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn series_style_index_is_checked() {
+        assert!(default_series_style(SERIES_STYLE_COUNT).is_err());
     }
 }

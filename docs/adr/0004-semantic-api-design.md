@@ -469,6 +469,16 @@ move-first recovery path, so cloning a resource does not copy its bytes.
 Bounded canonical `p:extLst` content is retained as inert XML rather than
 discarded or interpreted as executable markup.
 
+Keynote soundtrack playback uses the focused archive-free
+`litchi_keynote::soundtrack::{Mode, Settings}` API. `Mode` preserves unknown
+native discriminants losslessly and rejects known values disguised as
+`Unknown`; `Settings` validates finite volume in the native `0.0..=1.0`
+domain. The current native soundtrack schema has no string or time fields, so
+the semantic owner does not invent filename or duration state. Protobuf
+presence, media references, package IDs, unknown bytes, graph lookup, and
+transactional edits remain in `litchi-iwa`, where changing playback settings
+cannot reorder or rebuild the media collection.
+
 The DrawingML diagram data model uses `Id::{Number(i32), Guid([u8; 16])}` for
 the complete `ST_ModelId` union and the concise `Point`, `PointType`,
 `Connection`, and `ConnectionType` names inside `diagram::data`. Transition and

@@ -298,6 +298,15 @@ fields inside graph, axis, item, style, sparse-reference, reference, and UUID
 messages instead of rebuilding those messages through Prost.
 The former flat `ChartReferenceLine*` model is removed rather than kept as an
 alias.
+
+The Keynote soundtrack leaf follows the same boundary at
+`litchi_keynote::soundtrack::{Mode, Settings}`. `Mode` is a compact semantic
+enum that round-trips unknown native discriminants, while `Settings` validates
+finite playback volume and canonical known modes without importing protobuf,
+archive, graph, package-ID, media-reference, or transaction state. The IWA
+adapter retains native `KN.Soundtrack` decoding, optional-field presence,
+unknown-field preservation, soundtrack media references and their metadata,
+and atomic package edits; no long `KeynoteSoundtrack*` semantic aliases remain.
 The existing `litchi-iwa` package reader temporarily consumes these leaf values
 through private migration adapters. The direct edges are present in the
 canonical boundary graph because the adapters are already dependency-safe;

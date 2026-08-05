@@ -11,6 +11,7 @@ use litchi_keynote::transition::{
     TextDelivery,
 };
 use litchi_keynote::slide::media::MovieKind;
+use litchi_keynote::soundtrack::{Mode as SoundtrackMode, Settings as SoundtrackSettings};
 use std::time::Duration;
 
 const TEST_SLIDE_MESSAGE_TYPE: u32 = 5;
@@ -3106,29 +3107,38 @@ fn show_settings_and_skip_state_are_transactional() {
 #[test]
 fn soundtrack_settings_are_typed_transactional_and_wire_exact() {
     let mut editor = KeynoteEditor::from_package(test_package_with_soundtrack()).unwrap();
-    let original = KeynoteSoundtrackSettings {
+    let original = SoundtrackSettings {
         volume: Some(1.0),
-        mode: Some(KeynoteSoundtrackMode::PlayOnce),
-        media_item_count: TEST_SOUNDTRACK_MEDIA_IDS.len(),
+        mode: Some(SoundtrackMode::PlayOnce),
     };
     assert_eq!(editor.soundtrack_settings().unwrap(), Some(original));
     let original_bytes = editor.to_bytes().unwrap();
+    let original_graph = ObjectGraph::read(editor.package()).unwrap();
+    let original_wire = original_graph
+        .message_data_type(
+            TEST_SOUNDTRACK_ID,
+            TEST_SOUNDTRACK_MESSAGE_TYPE,
+            "KN.Soundtrack",
+        )
+        .unwrap();
+    let original_unknown = crate::wire::parse_wire_fields(original_wire)
+        .unwrap()
+        .into_iter()
+        .find(|field| field.number() == 99)
+        .map(|field| original_wire[field.start()..field.end()].to_vec())
+        .unwrap();
 
     for invalid in [
-        KeynoteSoundtrackSettings {
+        SoundtrackSettings {
             volume: Some(f64::NAN),
             ..original
         },
-        KeynoteSoundtrackSettings {
+        SoundtrackSettings {
             volume: Some(1.01),
             ..original
         },
-        KeynoteSoundtrackSettings {
-            mode: Some(KeynoteSoundtrackMode::Unknown(TEST_SOUNDTRACK_LOOP_MODE)),
-            ..original
-        },
-        KeynoteSoundtrackSettings {
-            media_item_count: 1,
+        SoundtrackSettings {
+            mode: Some(SoundtrackMode::Unknown(TEST_SOUNDTRACK_LOOP_MODE)),
             ..original
         },
     ] {
@@ -3136,9 +3146,9 @@ fn soundtrack_settings_are_typed_transactional_and_wire_exact() {
         assert_eq!(editor.to_bytes().unwrap(), original_bytes);
     }
 
-    let changed = KeynoteSoundtrackSettings {
+    let changed = SoundtrackSettings {
         volume: Some(0.35),
-        mode: Some(KeynoteSoundtrackMode::Loop),
+        mode: Some(SoundtrackMode::Loop),
         ..original
     };
     editor.set_soundtrack_settings(changed).unwrap();
@@ -3162,9 +3172,33 @@ fn soundtrack_settings_are_typed_transactional_and_wire_exact() {
             .collect::<Vec<_>>(),
         TEST_SOUNDTRACK_MEDIA_IDS
     );
+    let changed_wire = graph
+        .message_data_type(
+            TEST_SOUNDTRACK_ID,
+            TEST_SOUNDTRACK_MESSAGE_TYPE,
+            "KN.Soundtrack",
+        )
+        .unwrap();
+    let changed_unknown = crate::wire::parse_wire_fields(changed_wire)
+        .unwrap()
+        .into_iter()
+        .find(|field| field.number() == 99)
+        .map(|field| changed_wire[field.start()..field.end()].to_vec())
+        .unwrap();
+    assert_eq!(changed_unknown, original_unknown);
+    let archive = editor.package().archive("Index/Document.iwa").unwrap();
+    assert_eq!(
+        archive
+            .object(TEST_SOUNDTRACK_ID)
+            .unwrap()
+            .archive_info
+            .message_infos[0]
+            .data_references,
+        TEST_SOUNDTRACK_MEDIA_IDS
+    );
 
-    let future = KeynoteSoundtrackSettings {
-        mode: Some(KeynoteSoundtrackMode::Unknown(19)),
+    let future = SoundtrackSettings {
+        mode: Some(SoundtrackMode::Unknown(19)),
         ..changed
     };
     editor.set_soundtrack_settings(future).unwrap();
@@ -3180,10 +3214,9 @@ fn soundtrack_settings_handle_absent_and_malformed_objects_transactionally() {
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
-            .set_soundtrack_settings(KeynoteSoundtrackSettings {
+            .set_soundtrack_settings(SoundtrackSettings {
                 volume: Some(1.0),
-                mode: Some(KeynoteSoundtrackMode::PlayOnce),
-                media_item_count: 0,
+                mode: Some(SoundtrackMode::PlayOnce),
             })
             .is_err()
     );
@@ -3207,10 +3240,9 @@ fn soundtrack_settings_handle_absent_and_malformed_objects_transactionally() {
     assert!(editor.soundtrack_settings().is_err());
     assert!(
         editor
-            .set_soundtrack_settings(KeynoteSoundtrackSettings {
+            .set_soundtrack_settings(SoundtrackSettings {
                 volume: Some(0.5),
-                mode: Some(KeynoteSoundtrackMode::Loop),
-                media_item_count: TEST_SOUNDTRACK_MEDIA_IDS.len(),
+                mode: Some(SoundtrackMode::Loop),
             })
             .is_err()
     );
@@ -3234,10 +3266,9 @@ fn soundtrack_settings_handle_absent_and_malformed_objects_transactionally() {
     assert!(editor.soundtrack_settings().is_err());
     assert!(
         editor
-            .set_soundtrack_settings(KeynoteSoundtrackSettings {
+            .set_soundtrack_settings(SoundtrackSettings {
                 volume: Some(0.5),
-                mode: Some(KeynoteSoundtrackMode::Loop),
-                media_item_count: TEST_SOUNDTRACK_MEDIA_IDS.len(),
+                mode: Some(SoundtrackMode::Loop),
             })
             .is_err()
     );

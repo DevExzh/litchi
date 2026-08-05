@@ -14,6 +14,7 @@ pub mod build;
 pub mod document;
 pub mod show;
 pub mod slide;
+pub mod soundtrack;
 pub mod transition;
 
 pub use background::{Angle, Background, Gradient, Kind, Opaque, Stop};

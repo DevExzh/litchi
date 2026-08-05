@@ -4482,6 +4482,17 @@ the four affected crates, all features and targets, followed by the
 no-default-features `litchi-ooxml` host suite. Formatting, diff checks, and
 the workspace crate-boundary audit also pass.
 
+The Keynote soundtrack semantic migration moves playback values into the
+archive-free `litchi_keynote::soundtrack::{Mode, Settings}` module. The IWA
+adapter alone retains `KN.Soundtrack` decoding, object-graph and package-ID
+selection, optional protobuf presence, unknown-field and media-reference
+preservation, and failure-atomic edits. The focused gates are the semantic
+crate's discriminant/volume validation tests and the IWA fixture tests for
+unknown-field preservation, native media-reference stability, malformed graph
+rejection, no-op byte stability, and transactional rollback. The old
+`KeynoteSoundtrackMode` and `KeynoteSoundtrackSettings` owners and aliases are
+deleted rather than retained as compatibility shims.
+
 ## OOXML common relationships, ODF common vocabulary, and owner migration
 
 This slice makes the common/format-specific boundary explicit:

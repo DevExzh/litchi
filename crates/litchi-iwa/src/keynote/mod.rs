@@ -49,7 +49,7 @@ pub use editor::{
     KeynoteSlideInfo, KeynoteSlideLayoutId, KeynoteSlideLayoutInfo, KeynoteSlideMovieInfo,
     KeynoteSlideMovieOptions, KeynoteSlideShapeInfo, KeynoteSlideShapeKind, KeynoteSlideTable,
     KeynoteSlideTableInfo, KeynoteSlideTextInfo, KeynoteSlideTextPlaceholder, KeynoteSlideTextRole,
-    KeynoteSoundtrackItemInfo, KeynoteSoundtrackMode, KeynoteSoundtrackSettings,
+    KeynoteSoundtrackItemInfo,
     KeynoteSwooshDirection, KeynoteTableCellCheckboxFormat, KeynoteTableCellCurrencyFormat,
     KeynoteTableCellDataFormat, KeynoteTableCellDateTimeFormat, KeynoteTableCellDecimalPlaces,
     KeynoteTableCellDurationFormat, KeynoteTableCellDurationStyle, KeynoteTableCellDurationUnit,

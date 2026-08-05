@@ -1149,6 +1149,12 @@ let mut show = keynote.show_settings()?;
 show.set_loop_presentation(Some(true));
 show.set_mode(Some(litchi_iwa::keynote::Mode::SelfPlaying))?;
 keynote.set_show_settings(show)?;
+let mut soundtrack = keynote
+    .soundtrack_settings()?
+    .ok_or("presentation has no soundtrack object")?;
+soundtrack.mode = Some(litchi_keynote::soundtrack::Mode::Loop);
+soundtrack.volume = Some(0.8);
+keynote.set_soundtrack_settings(soundtrack)?;
 if let Some(drawable) = keynote.slide_drawables(0)?.first() {
     keynote.set_slide_drawable_comment(0, drawable.object_id, "Review this slide object")?;
     let _comment = keynote.slide_drawable_comment(0, drawable.object_id)?;
@@ -1467,6 +1473,13 @@ timing-curve payloads, random seeds, effect detail, curve theme names, and
 right-to-left writing direction are writable as well. Unknown nested transition
 extensions remain byte-exact at the slide, transition, transition-attributes,
 and animation-attributes levels.
+Soundtrack playback values are owned by the archive-free
+`litchi_keynote::soundtrack::{Mode, Settings}` module. `Mode` preserves future
+native discriminants and `Settings` validates finite `0.0..=1.0` volume values;
+the IWA editor keeps soundtrack media references, package identifiers,
+unknown fields, and transactional wire replacement private to the package
+adapter. Settings edits therefore never rebuild or reorder the media
+collection.
 Slide-owned `TSWP.ShapeInfoArchive` storages are enumerated in drawable order
 and classified as title, body, or ordinary text boxes. Their content supports
 UTF-16 range replacement, whole-value update, and clear operations while

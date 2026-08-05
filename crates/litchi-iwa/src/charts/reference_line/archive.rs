@@ -11,7 +11,7 @@ use prost::Message;
 
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::charts::IWorkChartArchive;
-use crate::charts::source::CHART_MESSAGE_TYPE;
+use crate::charts::source::{CHART_MESSAGE_TYPE, checked_single_message_index};
 use crate::charts::unique_chart_object_archive_name;
 use crate::package_metadata::{
     add_component_object_uuids, component_identifier_for_entry, component_uuid_identifiers,
@@ -66,10 +66,12 @@ pub(crate) fn chart_reference_line_objects(
         return Ok(Vec::new());
     };
     let mut objects = Vec::new();
+    let mut identifiers = HashSet::new();
     for axis in reference_lines.reference_line_non_styles_map {
         objects.extend(axis.reference_line_non_style_items.into_iter().map(|item| {
+            let identifier = item.non_style.identifier;
             (
-                item.non_style.identifier,
+                identifier,
                 REFERENCE_LINE_NON_STYLE_MESSAGE_TYPE,
                 "reference-line non-style",
             )
@@ -81,13 +83,23 @@ pub(crate) fn chart_reference_line_objects(
                 .into_iter()
                 .flat_map(|styles| styles.entries)
                 .map(|entry| {
+                    let identifier = entry.reference.identifier;
                     (
-                        entry.reference.identifier,
+                        identifier,
                         REFERENCE_LINE_STYLE_MESSAGE_TYPE,
                         "reference-line style",
                     )
                 }),
         );
+    }
+    if objects
+        .iter()
+        .any(|(identifier, _, _)| *identifier == 0 || !identifiers.insert(*identifier))
+    {
+        return Err(Error::InvalidFormat(
+            "chart reference-line metadata contains a zero or repeated object identifier"
+                .to_owned(),
+        ));
     }
     Ok(objects)
 }
@@ -123,6 +135,29 @@ pub(crate) fn set_chart_reference_lines(
     u32::try_from(expected.len())
         .map_err(|_| Error::InvalidFormat("chart reference-line count exceeds u32".to_owned()))?;
 
+    // All package mutations happen on a copy-on-write staging package. A
+    // malformed graph or a failed dependency update therefore cannot publish
+    // a partially edited chart.
+    let mut staged = package.clone();
+    set_chart_reference_lines_staged(
+        &mut staged,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+        expected,
+    )?;
+    staged.validate()?;
+    *package = staged;
+    Ok(())
+}
+
+fn set_chart_reference_lines_staged(
+    package: &mut IWorkPackage,
+    chart_archive_name: &str,
+    drawable_object_id: u64,
+    drawable_label: &str,
+    expected: &[Line],
+) -> Result<()> {
     let graph = reference_line_graph(
         package,
         chart_archive_name,
@@ -139,9 +174,11 @@ pub(crate) fn set_chart_reference_lines(
     }
 
     let retained_count = graph.slots.len().min(expected.len());
-    for (slot, replacement) in graph.slots[..retained_count]
+    for (slot, replacement) in graph
+        .slots
         .iter()
-        .zip(&expected[..retained_count])
+        .take(retained_count)
+        .zip(expected.iter().take(retained_count))
     {
         if &slot.value == replacement {
             continue;
@@ -156,7 +193,7 @@ pub(crate) fn set_chart_reference_lines(
         replace_slot_data(package, slot, patch_reference_line(&data, replacement)?)?;
     }
 
-    let removed = graph.slots[retained_count..].to_vec();
+    let removed: Vec<_> = graph.slots.iter().skip(retained_count).cloned().collect();
     for slot in &removed {
         ensure_reference_line_exclusive(
             package,
@@ -170,7 +207,7 @@ pub(crate) fn set_chart_reference_lines(
     let mut additions = Vec::new();
     let mut next_identifier = next_object_identifier(package)?;
     let mut existing_uuids = reference_line_uuids(package)?;
-    for replacement in &expected[retained_count..] {
+    for replacement in expected.iter().skip(retained_count) {
         let identifier = next_identifier;
         next_identifier = next_identifier
             .checked_add(1)
@@ -199,8 +236,10 @@ pub(crate) fn set_chart_reference_lines(
         })?;
     }
 
-    let retained = graph.slots[..retained_count]
+    let retained = graph
+        .slots
         .iter()
+        .take(retained_count)
         .map(|slot| (slot.object_id, slot.uuid))
         .chain(created_items)
         .collect::<Vec<_>>();
@@ -240,50 +279,35 @@ fn reference_line_graph(
             "{drawable_label} chart {drawable_object_id} is missing"
         ))
     })?;
-    let mut messages = object
-        .messages
-        .iter()
-        .enumerate()
-        .filter(|(_, message)| message.type_ == CHART_MESSAGE_TYPE);
-    let Some((chart_message_index, message)) = messages.next() else {
+    let Some(chart_message_index) =
+        checked_single_message_index(&object.messages, CHART_MESSAGE_TYPE)?
+    else {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} chart {drawable_object_id} must have exactly one chart payload"
         )));
     };
-    if messages.next().is_some() {
-        return Err(Error::InvalidFormat(format!(
-            "{drawable_label} chart {drawable_object_id} must have exactly one chart payload"
-        )));
-    }
+    let message = object.messages.get(chart_message_index).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "{drawable_label} chart {drawable_object_id} chart payload index changed"
+        ))
+    })?;
     let chart = IWorkChartArchive::decode(message.data.as_slice())?;
     let reference_lines = chart.reference_lines()?;
-    let target_axis_index = reference_lines.as_ref().and_then(|reference_lines| {
-        reference_lines
-            .reference_line_non_styles_map
-            .iter()
-            .position(|axis| is_primary_value_axis(axis.axis_id))
-    });
-    if reference_lines.as_ref().is_some_and(|reference_lines| {
-        reference_lines
-            .reference_line_non_styles_map
-            .iter()
-            .filter(|axis| is_primary_value_axis(axis.axis_id))
-            .count()
-            > 1
-    }) {
-        return Err(Error::InvalidFormat(format!(
-            "{drawable_label} chart {drawable_object_id} has duplicate primary value-axis reference-line maps"
-        )));
-    }
+    let target_axis_index =
+        primary_value_axis_index(reference_lines.as_ref(), drawable_object_id, drawable_label)?;
 
-    let items = target_axis_index
-        .and_then(|index| {
-            reference_lines
-                .as_ref()
-                .map(|reference_lines| &reference_lines.reference_line_non_styles_map[index])
-        })
-        .map(|axis| axis.reference_line_non_style_items.as_slice())
-        .unwrap_or_default();
+    let items = match (reference_lines.as_ref(), target_axis_index) {
+        (Some(reference_lines), Some(index)) => reference_lines
+            .reference_line_non_styles_map
+            .get(index)
+            .map(|axis| axis.reference_line_non_style_items.as_slice())
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "{drawable_label} chart {drawable_object_id} primary value-axis index changed"
+                ))
+            })?,
+        _ => &[],
+    };
     if items.len() > MAX_REFERENCE_LINE_COUNT {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} chart {drawable_object_id} has more than {MAX_REFERENCE_LINE_COUNT} reference lines"
@@ -300,7 +324,16 @@ fn reference_line_graph(
                 "{drawable_label} chart {drawable_object_id} has an invalid or repeated reference line"
             )));
         }
-        if object.archive_info.message_infos[chart_message_index]
+        let chart_info = object
+            .archive_info
+            .message_infos
+            .get(chart_message_index)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "{drawable_label} chart {drawable_object_id} has no metadata for chart payload"
+                ))
+            })?;
+        if chart_info
             .object_references
             .iter()
             .filter(|candidate| **candidate == identifier)
@@ -384,6 +417,30 @@ fn validate_reference_line_collection(reference_lines: &[Line]) -> Result<()> {
 
 fn is_primary_value_axis(axis_id: tsch::ChartAxisIdArchive) -> bool {
     axis_id.axis_type == Some(tsch::AxisType::Y as i32) && axis_id.ordinal.unwrap_or_default() == 0
+}
+
+fn primary_value_axis_index(
+    reference_lines: Option<&tsch::ChartReferenceLinesArchive>,
+    drawable_object_id: u64,
+    drawable_label: &str,
+) -> Result<Option<usize>> {
+    let Some(reference_lines) = reference_lines else {
+        return Ok(None);
+    };
+    let mut matches = reference_lines
+        .reference_line_non_styles_map
+        .iter()
+        .enumerate()
+        .filter(|(_, axis)| is_primary_value_axis(axis.axis_id));
+    let Some((index, _)) = matches.next() else {
+        return Ok(None);
+    };
+    if matches.next().is_some() {
+        return Err(Error::InvalidFormat(format!(
+            "{drawable_label} chart {drawable_object_id} has duplicate primary value-axis reference-line maps"
+        )));
+    }
+    Ok(Some(index))
 }
 
 fn validate_reference_line_styles(
@@ -527,9 +584,22 @@ fn patch_reference_line_graph(
         .collect::<Vec<_>>();
     match (graph.target_axis_index, items.is_empty()) {
         (Some(index), false) => {
-            next.reference_line_non_styles_map[index].reference_line_non_style_items = items;
+            let axis = next
+                .reference_line_non_styles_map
+                .get_mut(index)
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "{drawable_label} chart {drawable_object_id} primary value-axis index changed"
+                    ))
+                })?;
+            axis.reference_line_non_style_items = items;
         },
         (Some(index), true) => {
+            if next.reference_line_non_styles_map.get(index).is_none() {
+                return Err(Error::InvalidFormat(format!(
+                    "{drawable_label} chart {drawable_object_id} primary value-axis index changed"
+                )));
+            }
             next.reference_line_non_styles_map.remove(index);
         },
         (None, false) => {
@@ -577,8 +647,16 @@ fn patch_reference_line_graph(
                 data: chart.encode()?,
             },
         )?;
-        let metadata =
-            &mut object.archive_info.message_infos[graph.chart_message_index].object_references;
+        let metadata = &mut object
+            .archive_info
+            .message_infos
+            .get_mut(graph.chart_message_index)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "{drawable_label} chart {drawable_object_id} has no metadata for chart payload"
+                ))
+            })?
+            .object_references;
         metadata.retain(|identifier| !previous_references.contains(identifier));
         for identifier in next_references {
             if !metadata.contains(&identifier) {
@@ -618,6 +696,15 @@ fn trim_primary_value_axis_styles(
         }
     }
     if let Some(index) = remove_axis {
+        if reference_lines
+            .reference_line_styles_map
+            .get(index)
+            .is_none()
+        {
+            return Err(Error::InvalidFormat(
+                "chart reference-line style axis index changed".to_owned(),
+            ));
+        }
         reference_lines.reference_line_styles_map.remove(index);
     }
     Ok(())
@@ -795,7 +882,16 @@ fn reference_line_object(identifier: u64, reference_line: &Line) -> Result<Archi
             data: canonical_reference_line(reference_line)?,
         }],
     )?;
-    object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec();
+    object
+        .archive_info
+        .message_infos
+        .first_mut()
+        .ok_or_else(|| {
+            Error::InvalidFormat(
+                "reference-line object has no message metadata after construction".to_owned(),
+            )
+        })?
+        .versions = STANDARD_MESSAGE_VERSION.to_vec();
     Ok(object)
 }
 
@@ -1233,5 +1329,45 @@ mod tests {
             .is_ok()
         );
         assert!(validate_reference_line_collection(&[Line::average(), Line::average(),]).is_err());
+    }
+
+    #[test]
+    fn primary_value_axis_lookup_rejects_ambiguous_metadata() {
+        let axis = tsch::ChartAxisReferenceLineNonStylesArchive {
+            axis_id: primary_value_axis_id(),
+            ..Default::default()
+        };
+        let reference_lines = tsch::ChartReferenceLinesArchive {
+            reference_line_non_styles_map: vec![axis.clone(), axis],
+            ..Default::default()
+        };
+        assert!(primary_value_axis_index(Some(&reference_lines), 17, "test").is_err());
+    }
+
+    #[test]
+    fn primary_value_axis_lookup_reports_absence_without_indexing() {
+        let reference_lines = tsch::ChartReferenceLinesArchive {
+            reference_line_non_styles_map: vec![tsch::ChartAxisReferenceLineNonStylesArchive {
+                axis_id: tsch::ChartAxisIdArchive {
+                    axis_type: Some(tsch::AxisType::X as i32),
+                    ordinal: Some(0),
+                },
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        assert_eq!(
+            primary_value_axis_index(Some(&reference_lines), 17, "test").unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn missing_generated_payload_is_a_typed_error() {
+        let data = tsch::ReferenceLineNonStyleArchive {
+            super_: Some(tss::StyleArchive::default()),
+        }
+        .encode_to_vec();
+        assert!(read_reference_line(&data).is_err());
     }
 }

@@ -56,7 +56,7 @@ pub(super) fn decode_soundtrack(data: &[u8]) -> Result<kn::Soundtrack> {
 pub(super) fn patch_soundtrack_wire(
     original: &[u8],
     soundtrack: &kn::Soundtrack,
-    settings: &KeynoteSoundtrackSettings,
+    settings: &litchi_keynote::soundtrack::Settings,
 ) -> Result<Vec<u8>> {
     let data = patch_fixed64_field(
         original,

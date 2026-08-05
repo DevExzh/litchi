@@ -66,6 +66,30 @@ pub(crate) fn single_message_index(messages: &[RawMessage], message_type: u32) -
     index
 }
 
+/// Return the unique payload index for a message type.
+///
+/// A missing payload is distinct from an ambiguous container. Callers that
+/// operate on malformed archives must not collapse those states into the same
+/// `None` branch.
+pub(crate) fn checked_single_message_index(
+    messages: &[RawMessage],
+    message_type: u32,
+) -> Result<Option<usize>> {
+    let mut index = None;
+    for (candidate, message) in messages.iter().enumerate() {
+        if message.type_ != message_type {
+            continue;
+        }
+        if index.is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "message type {message_type} occurs more than once"
+            )));
+        }
+        index = Some(candidate);
+    }
+    Ok(index)
+}
+
 const CURRENT_STYLE_EXTENSION_FIELD: u32 = 10_000;
 const CHART_SCENE_DEPTH_EXTENSION_FIELD: u32 = 10_002;
 const CHART_APPEARANCE_PRESERVED_EXTENSION_FIELD: u32 = 10_023;
@@ -262,6 +286,29 @@ mod tests {
                 CHART_MESSAGE_TYPE,
             ),
             None
+        );
+    }
+
+    #[test]
+    fn checked_single_message_index_distinguishes_missing_and_duplicate() {
+        assert_eq!(
+            checked_single_message_index(&[], CHART_MESSAGE_TYPE).unwrap(),
+            None
+        );
+        assert_eq!(
+            checked_single_message_index(
+                &[message(CHART_MESSAGE_TYPE), message(STANDIN_MESSAGE_TYPE)],
+                CHART_MESSAGE_TYPE,
+            )
+            .unwrap(),
+            Some(0)
+        );
+        assert!(
+            checked_single_message_index(
+                &[message(CHART_MESSAGE_TYPE), message(CHART_MESSAGE_TYPE)],
+                CHART_MESSAGE_TYPE,
+            )
+            .is_err()
         );
     }
 }
