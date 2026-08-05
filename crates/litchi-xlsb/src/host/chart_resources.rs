@@ -700,7 +700,7 @@ fn limit(what: &str) -> Error {
 mod tests {
     use super::*;
     use crate::package::xlsx::{Chart, ChartAnchor};
-    use litchi_drawingml::chart::ChartExternalData;
+    use litchi_drawingml::chart::ExternalData;
 
     #[test]
     fn reader_refuses_missing_external_data_relationship() {
@@ -711,7 +711,7 @@ mod tests {
             ChartAnchor::new(0, 0, 5, 5),
         )
         .unwrap();
-        worksheet_chart.chart.external_data = Some(ChartExternalData::new("rId1"));
+        worksheet_chart.chart.external_data = Some(ExternalData::new("rId1"));
         let xml = crate::package::xlsx::chart::generate_chart_xml(&worksheet_chart.chart).unwrap();
         let uri = PackURI::new("/xl/charts/chart1.xml").unwrap();
         let mut package = OpcPackage::new();

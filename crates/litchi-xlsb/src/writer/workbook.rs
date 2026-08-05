@@ -3277,7 +3277,7 @@ mod tests {
             Chart, ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget,
             ChartUserShapesPart, Relationship, RelationshipTarget,
         };
-        use litchi_drawingml::chart::{ChartExtensionList, ChartShapeProperties};
+        use litchi_drawingml::chart::{ExtensionList, ShapeProperties};
 
         let mut worksheet_chart = Chart::bar_chart(
             "Resources",
@@ -3287,13 +3287,13 @@ mod tests {
         )
         .unwrap();
         worksheet_chart.chart.shape_properties = Some(
-            ChartShapeProperties::from_xml(
+            ShapeProperties::from_xml(
                 br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blipFill><a:blip r:embed="rId9"/></a:blipFill></c:spPr>"#.to_vec(),
             )
             .unwrap(),
         );
         worksheet_chart.chart.extension_list = Some(
-            ChartExtensionList::from_xml(
+            ExtensionList::from_xml(
                 br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:example"><c:ext uri="resources"><x:reference r:id="rId1" r:link="rId10"/></c:ext></c:extLst>"#.to_vec(),
             )
             .unwrap(),
@@ -3434,7 +3434,7 @@ mod tests {
 
         let mut mismatched_external_data = valid.clone();
         mismatched_external_data.chart.external_data =
-            Some(litchi_drawingml::chart::ChartExternalData::pending());
+            Some(litchi_drawingml::chart::ExternalData::pending());
         assert!(sheet.add_chart(mismatched_external_data).is_err());
         assert_eq!(sheet.charts().len(), 1);
 

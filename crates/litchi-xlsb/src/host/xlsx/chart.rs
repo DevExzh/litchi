@@ -15,8 +15,8 @@ use litchi_drawingml::chart::{
     },
     series::Series,
     types::{
-        AxisPosition, BarDirection, BarGrouping, ChartType as ChartModelType, LegendPosition,
-        ScatterStyle,
+        AxisPosition, BarDirection, BarGrouping, LegendPosition, ScatterStyle,
+        Type as ChartModelType,
     },
 };
 use quick_xml::XmlVersion;
@@ -357,7 +357,7 @@ impl Chart {
 
     /// Attach an embedded OOXML workbook as the chart's external data.
     pub fn with_embedded_workbook(mut self, data: Vec<u8>) -> Self {
-        self.chart.external_data = Some(litchi_drawingml::chart::ChartExternalData::pending());
+        self.chart.external_data = Some(litchi_drawingml::chart::ExternalData::pending());
         self.external_data_part = Some(ChartExternalDataPart::embedded_workbook(data));
         self
     }
@@ -368,7 +368,7 @@ impl Chart {
         part: ChartExternalDataPart,
         auto_update: Option<bool>,
     ) -> Self {
-        let mut metadata = litchi_drawingml::chart::ChartExternalData::pending();
+        let mut metadata = litchi_drawingml::chart::ExternalData::pending();
         metadata.auto_update = auto_update;
         self.chart.external_data = Some(metadata);
         self.external_data_part = Some(part);
@@ -377,7 +377,7 @@ impl Chart {
 
     /// Attach a chart user-shapes drawing part.
     pub fn with_user_shapes_part(mut self, part: ChartUserShapesPart) -> Self {
-        self.chart.user_shapes = Some(litchi_drawingml::chart::ChartUserShapes::pending());
+        self.chart.user_shapes = Some(litchi_drawingml::chart::UserShapes::pending());
         self.user_shapes_part = Some(part);
         self
     }
@@ -406,7 +406,7 @@ impl Chart {
             pivot_table_name,
             crate::package::xlsx::pivot_chart::DEFAULT_PIVOT_CHART_FORMAT_ID,
         ));
-        let extension = litchi_drawingml::chart::ChartExtensionList::from_xml(
+        let extension = litchi_drawingml::chart::ExtensionList::from_xml(
             crate::package::xlsx::pivot_chart::default_pivot_options_extension_xml(),
         )?;
         for_each_series_mut(&mut self.chart, |series| {
@@ -943,7 +943,7 @@ pub(crate) fn chart_user_shapes_relationship_ids(xml: &[u8]) -> Result<HashSet<S
 
 fn append_chart_line_fragment<'a>(
     fragments: &mut Vec<&'a [u8]>,
-    lines: Option<&'a litchi_drawingml::chart::ChartLines>,
+    lines: Option<&'a litchi_drawingml::chart::Lines>,
 ) {
     if let Some(shape_properties) = lines.and_then(|lines| lines.shape_properties.as_ref()) {
         fragments.push(shape_properties.as_xml());
@@ -1017,107 +1017,107 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
             chart
                 .shape_properties
                 .as_ref()
-                .map(litchi_drawingml::chart::ChartShapeProperties::as_xml),
+                .map(litchi_drawingml::chart::ShapeProperties::as_xml),
             chart
                 .text_properties
                 .as_ref()
-                .map(litchi_drawingml::chart::ChartTextProperties::as_xml),
+                .map(litchi_drawingml::chart::TextProperties::as_xml),
             chart
                 .extension_list
                 .as_ref()
-                .map(litchi_drawingml::chart::ChartExtensionList::as_xml),
+                .map(litchi_drawingml::chart::ExtensionList::as_xml),
             chart
                 .chart_extension_list
                 .as_ref()
-                .map(litchi_drawingml::chart::ChartExtensionList::as_xml),
+                .map(litchi_drawingml::chart::ExtensionList::as_xml),
             chart
                 .title
                 .as_ref()
                 .and(chart.title_shape_properties.as_ref())
-                .map(litchi_drawingml::chart::ChartShapeProperties::as_xml),
+                .map(litchi_drawingml::chart::ShapeProperties::as_xml),
             chart
                 .title
                 .as_ref()
                 .and(chart.title_text_properties.as_ref())
-                .map(litchi_drawingml::chart::ChartTextProperties::as_xml),
+                .map(litchi_drawingml::chart::TextProperties::as_xml),
             chart
                 .title
                 .as_ref()
                 .and(chart.title_extension_list.as_ref())
-                .map(litchi_drawingml::chart::ChartExtensionList::as_xml),
+                .map(litchi_drawingml::chart::ExtensionList::as_xml),
             chart
                 .plot_area
                 .shape_properties
                 .as_ref()
-                .map(litchi_drawingml::chart::ChartShapeProperties::as_xml),
+                .map(litchi_drawingml::chart::ShapeProperties::as_xml),
             chart
                 .plot_area
                 .extension_list
                 .as_ref()
-                .map(litchi_drawingml::chart::ChartExtensionList::as_xml),
+                .map(litchi_drawingml::chart::ExtensionList::as_xml),
             chart
                 .plot_area
                 .data_table
                 .as_ref()
                 .and_then(|table| table.shape_properties.as_ref())
-                .map(litchi_drawingml::chart::ChartShapeProperties::as_xml),
+                .map(litchi_drawingml::chart::ShapeProperties::as_xml),
             chart
                 .plot_area
                 .data_table
                 .as_ref()
                 .and_then(|table| table.text_properties.as_ref())
-                .map(litchi_drawingml::chart::ChartTextProperties::as_xml),
+                .map(litchi_drawingml::chart::TextProperties::as_xml),
             chart
                 .plot_area
                 .data_table
                 .as_ref()
                 .and_then(|table| table.extension_list.as_ref())
-                .map(litchi_drawingml::chart::ChartExtensionList::as_xml),
+                .map(litchi_drawingml::chart::ExtensionList::as_xml),
             chart
                 .floor
                 .as_ref()
                 .and_then(|surface| surface.shape_properties.as_ref())
-                .map(litchi_drawingml::chart::ChartShapeProperties::as_xml),
+                .map(litchi_drawingml::chart::ShapeProperties::as_xml),
             chart
                 .back_wall
                 .as_ref()
                 .and_then(|surface| surface.shape_properties.as_ref())
-                .map(litchi_drawingml::chart::ChartShapeProperties::as_xml),
+                .map(litchi_drawingml::chart::ShapeProperties::as_xml),
             chart
                 .side_wall
                 .as_ref()
                 .and_then(|surface| surface.shape_properties.as_ref())
-                .map(litchi_drawingml::chart::ChartShapeProperties::as_xml),
+                .map(litchi_drawingml::chart::ShapeProperties::as_xml),
             chart
                 .floor
                 .as_ref()
                 .and_then(|surface| surface.extension_list.as_ref())
-                .map(litchi_drawingml::chart::ChartExtensionList::as_xml),
+                .map(litchi_drawingml::chart::ExtensionList::as_xml),
             chart
                 .back_wall
                 .as_ref()
                 .and_then(|surface| surface.extension_list.as_ref())
-                .map(litchi_drawingml::chart::ChartExtensionList::as_xml),
+                .map(litchi_drawingml::chart::ExtensionList::as_xml),
             chart
                 .side_wall
                 .as_ref()
                 .and_then(|surface| surface.extension_list.as_ref())
-                .map(litchi_drawingml::chart::ChartExtensionList::as_xml),
+                .map(litchi_drawingml::chart::ExtensionList::as_xml),
             chart
                 .legend
                 .as_ref()
                 .and_then(|legend| legend.shape_properties.as_ref())
-                .map(litchi_drawingml::chart::ChartShapeProperties::as_xml),
+                .map(litchi_drawingml::chart::ShapeProperties::as_xml),
             chart
                 .legend
                 .as_ref()
                 .and_then(|legend| legend.text_properties.as_ref())
-                .map(litchi_drawingml::chart::ChartTextProperties::as_xml),
+                .map(litchi_drawingml::chart::TextProperties::as_xml),
             chart
                 .legend
                 .as_ref()
                 .and_then(|legend| legend.extension_list.as_ref())
-                .map(litchi_drawingml::chart::ChartExtensionList::as_xml),
+                .map(litchi_drawingml::chart::ExtensionList::as_xml),
         ]
         .into_iter()
         .flatten(),
@@ -1129,11 +1129,11 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                     entry
                         .text_properties
                         .as_ref()
-                        .map(litchi_drawingml::chart::ChartTextProperties::as_xml),
+                        .map(litchi_drawingml::chart::TextProperties::as_xml),
                     entry
                         .extension_list
                         .as_ref()
-                        .map(litchi_drawingml::chart::ChartExtensionList::as_xml),
+                        .map(litchi_drawingml::chart::ExtensionList::as_xml),
                 ]
                 .into_iter()
                 .flatten(),
@@ -1147,25 +1147,25 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                     format
                         .shape_properties
                         .as_ref()
-                        .map(litchi_drawingml::chart::ChartShapeProperties::as_xml),
+                        .map(litchi_drawingml::chart::ShapeProperties::as_xml),
                     format
                         .text_properties
                         .as_ref()
-                        .map(litchi_drawingml::chart::ChartTextProperties::as_xml),
+                        .map(litchi_drawingml::chart::TextProperties::as_xml),
                     format
                         .extension_list
                         .as_ref()
-                        .map(litchi_drawingml::chart::ChartExtensionList::as_xml),
+                        .map(litchi_drawingml::chart::ExtensionList::as_xml),
                     format
                         .marker
                         .as_ref()
                         .and_then(|marker| marker.shape_properties.as_ref())
-                        .map(litchi_drawingml::chart::ChartShapeProperties::as_xml),
+                        .map(litchi_drawingml::chart::ShapeProperties::as_xml),
                     format
                         .marker
                         .as_ref()
                         .and_then(|marker| marker.extension_list.as_ref())
-                        .map(litchi_drawingml::chart::ChartExtensionList::as_xml),
+                        .map(litchi_drawingml::chart::ExtensionList::as_xml),
                 ]
                 .into_iter()
                 .flatten(),
@@ -1181,43 +1181,43 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                     .title
                     .as_ref()
                     .and(common.title_shape_properties.as_ref())
-                    .map(litchi_drawingml::chart::ChartShapeProperties::as_xml),
+                    .map(litchi_drawingml::chart::ShapeProperties::as_xml),
                 common
                     .title
                     .as_ref()
                     .and(common.title_text_properties.as_ref())
-                    .map(litchi_drawingml::chart::ChartTextProperties::as_xml),
+                    .map(litchi_drawingml::chart::TextProperties::as_xml),
                 common
                     .title
                     .as_ref()
                     .and(common.title_extension_list.as_ref())
-                    .map(litchi_drawingml::chart::ChartExtensionList::as_xml),
+                    .map(litchi_drawingml::chart::ExtensionList::as_xml),
                 common
                     .major_gridlines
                     .as_ref()
                     .and_then(|lines| lines.shape_properties.as_ref())
-                    .map(litchi_drawingml::chart::ChartShapeProperties::as_xml),
+                    .map(litchi_drawingml::chart::ShapeProperties::as_xml),
                 common
                     .minor_gridlines
                     .as_ref()
                     .and_then(|lines| lines.shape_properties.as_ref())
-                    .map(litchi_drawingml::chart::ChartShapeProperties::as_xml),
+                    .map(litchi_drawingml::chart::ShapeProperties::as_xml),
                 common
                     .shape_properties
                     .as_ref()
-                    .map(litchi_drawingml::chart::ChartShapeProperties::as_xml),
+                    .map(litchi_drawingml::chart::ShapeProperties::as_xml),
                 common
                     .text_properties
                     .as_ref()
-                    .map(litchi_drawingml::chart::ChartTextProperties::as_xml),
+                    .map(litchi_drawingml::chart::TextProperties::as_xml),
                 common
                     .scaling_extension_list
                     .as_ref()
-                    .map(litchi_drawingml::chart::ChartExtensionList::as_xml),
+                    .map(litchi_drawingml::chart::ExtensionList::as_xml),
                 common
                     .extension_list
                     .as_ref()
-                    .map(litchi_drawingml::chart::ChartExtensionList::as_xml),
+                    .map(litchi_drawingml::chart::ExtensionList::as_xml),
             ]
             .into_iter()
             .flatten(),
@@ -1230,15 +1230,15 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                     display_units
                         .label_shape_properties
                         .as_ref()
-                        .map(litchi_drawingml::chart::ChartShapeProperties::as_xml),
+                        .map(litchi_drawingml::chart::ShapeProperties::as_xml),
                     display_units
                         .label_text_properties
                         .as_ref()
-                        .map(litchi_drawingml::chart::ChartTextProperties::as_xml),
+                        .map(litchi_drawingml::chart::TextProperties::as_xml),
                     display_units
                         .extension_list
                         .as_ref()
-                        .map(litchi_drawingml::chart::ChartExtensionList::as_xml),
+                        .map(litchi_drawingml::chart::ExtensionList::as_xml),
                 ]
                 .into_iter()
                 .flatten(),
@@ -1302,19 +1302,19 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                     series
                         .shape_properties
                         .as_ref()
-                        .map(litchi_drawingml::chart::ChartShapeProperties::as_xml),
+                        .map(litchi_drawingml::chart::ShapeProperties::as_xml),
                     series
                         .extension_list
                         .as_ref()
-                        .map(litchi_drawingml::chart::ChartExtensionList::as_xml),
+                        .map(litchi_drawingml::chart::ExtensionList::as_xml),
                     series
                         .marker_shape_properties
                         .as_ref()
-                        .map(litchi_drawingml::chart::ChartShapeProperties::as_xml),
+                        .map(litchi_drawingml::chart::ShapeProperties::as_xml),
                     series
                         .marker_extension_list
                         .as_ref()
-                        .map(litchi_drawingml::chart::ChartExtensionList::as_xml),
+                        .map(litchi_drawingml::chart::ExtensionList::as_xml),
                 ]
                 .into_iter()
                 .flatten(),
@@ -1334,23 +1334,23 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                         trendline
                             .shape_properties
                             .as_ref()
-                            .map(litchi_drawingml::chart::ChartShapeProperties::as_xml),
+                            .map(litchi_drawingml::chart::ShapeProperties::as_xml),
                         trendline
                             .label_shape_properties
                             .as_ref()
-                            .map(litchi_drawingml::chart::ChartShapeProperties::as_xml),
+                            .map(litchi_drawingml::chart::ShapeProperties::as_xml),
                         trendline
                             .label_text_properties
                             .as_ref()
-                            .map(litchi_drawingml::chart::ChartTextProperties::as_xml),
+                            .map(litchi_drawingml::chart::TextProperties::as_xml),
                         trendline
                             .label_extension_list
                             .as_ref()
-                            .map(litchi_drawingml::chart::ChartExtensionList::as_xml),
+                            .map(litchi_drawingml::chart::ExtensionList::as_xml),
                         trendline
                             .extension_list
                             .as_ref()
-                            .map(litchi_drawingml::chart::ChartExtensionList::as_xml),
+                            .map(litchi_drawingml::chart::ExtensionList::as_xml),
                     ]
                     .into_iter()
                     .flatten(),
@@ -1362,19 +1362,19 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                         point
                             .shape_properties
                             .as_ref()
-                            .map(litchi_drawingml::chart::ChartShapeProperties::as_xml),
+                            .map(litchi_drawingml::chart::ShapeProperties::as_xml),
                         point
                             .extension_list
                             .as_ref()
-                            .map(litchi_drawingml::chart::ChartExtensionList::as_xml),
+                            .map(litchi_drawingml::chart::ExtensionList::as_xml),
                         point
                             .marker_shape_properties
                             .as_ref()
-                            .map(litchi_drawingml::chart::ChartShapeProperties::as_xml),
+                            .map(litchi_drawingml::chart::ShapeProperties::as_xml),
                         point
                             .marker_extension_list
                             .as_ref()
-                            .map(litchi_drawingml::chart::ChartExtensionList::as_xml),
+                            .map(litchi_drawingml::chart::ExtensionList::as_xml),
                     ]
                     .into_iter()
                     .flatten(),
