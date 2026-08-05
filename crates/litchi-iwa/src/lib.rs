@@ -136,8 +136,8 @@ pub mod identity;
 mod image_adjustments;
 mod image_caption;
 pub mod media;
-/// Shared movie and audio playback settings.
-pub mod media_playback;
+/// Native movie and audio playback wire adapter.
+pub(crate) mod media_playback;
 pub mod object_index;
 pub mod package;
 mod package_metadata;
@@ -185,16 +185,11 @@ pub mod shapes;
 /// Re-export commonly used types
 pub use archive::{ArchiveInfo, MessageInfo};
 pub use bundle::{Bundle, BundleMetadata, PropertyMap, PropertyValue};
-pub use comments::{
-    DrawableCommentInfo, DrawableCommentReplyInfo, IWorkComment, IWorkCommentUuid,
-    IWorkDrawableCommentEditor, IWorkDrawableInfo, IWorkTableCellCommentInfo,
-    IWorkTableCellCommentReplyInfo,
-};
+pub use comments::IWorkDrawableCommentEditor;
 pub use document::Document;
 pub use drawable_order::DrawableLayerMove;
 pub use identity::IWorkDocumentIdentity;
 pub use media::{EmbeddedMediaAsset, IWorkMediaEditor, MediaAsset, MediaManager, MediaStats};
-pub use media_playback::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
 pub use package::IWorkPackage;
 pub use ref_graph::ReferenceGraph;
 pub use shapes::DrawableTitleCaption;

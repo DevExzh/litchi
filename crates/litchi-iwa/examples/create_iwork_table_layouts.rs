@@ -759,32 +759,32 @@ const fn keynote_text_decorations() -> TextDecorations {
 
 fn numbers_baseline_shift() -> Result<TextBaselineShift, litchi_iwa::Error> {
     const POINTS: f32 = 1.0;
-    TextBaselineShift::from_points(POINTS)
+    Ok(TextBaselineShift::from_points(POINTS)?)
 }
 
 fn pages_baseline_shift() -> Result<TextBaselineShift, litchi_iwa::Error> {
     const POINTS: f32 = -1.0;
-    TextBaselineShift::from_points(POINTS)
+    Ok(TextBaselineShift::from_points(POINTS)?)
 }
 
 fn keynote_baseline_shift() -> Result<TextBaselineShift, litchi_iwa::Error> {
     const POINTS: f32 = 2.0;
-    TextBaselineShift::from_points(POINTS)
+    Ok(TextBaselineShift::from_points(POINTS)?)
 }
 
 fn numbers_character_spacing() -> Result<TextCharacterSpacing, litchi_iwa::Error> {
     const PERCENT: f32 = 10.0;
-    TextCharacterSpacing::from_percent(PERCENT)
+    Ok(TextCharacterSpacing::from_percent(PERCENT)?)
 }
 
 fn pages_character_spacing() -> Result<TextCharacterSpacing, litchi_iwa::Error> {
     const PERCENT: f32 = 6.0;
-    TextCharacterSpacing::from_percent(PERCENT)
+    Ok(TextCharacterSpacing::from_percent(PERCENT)?)
 }
 
 fn keynote_character_spacing() -> Result<TextCharacterSpacing, litchi_iwa::Error> {
     const PERCENT: f32 = 12.0;
-    TextCharacterSpacing::from_percent(PERCENT)
+    Ok(TextCharacterSpacing::from_percent(PERCENT)?)
 }
 
 const fn numbers_paragraph_line_spacing() -> ParagraphLineSpacing {

@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::keynote::{KeynoteEditor, Mode};
+use litchi_iwa::keynote::{KeynoteEditor, Mode, Size};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut editor = KeynoteEditor::open(input)?;
     let mut settings = editor.show_settings()?;
-    settings.set_size(width, height)?;
+    settings.set_size(Size::new(width, height)?);
     settings.set_mode(Some(mode))?;
     settings.set_loop_presentation(Some(loop_presentation));
     settings.set_automatically_plays_upon_open(Some(autoplay));

@@ -231,9 +231,10 @@ mod tests {
             stroke
         );
         assert!(
-            !editor
+            editor
                 .body_chart_axis_minor_gridlines_visible(chart.drawable_object_id, Axis::Value,)
                 .unwrap()
+                .is_hidden()
         );
         editor
             .set_body_chart_axis_gridline_stroke(

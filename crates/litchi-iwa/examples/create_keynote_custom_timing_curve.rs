@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             KeynoteMotionPathPoint::new(0.18, 0.04),
             KeynoteMotionPathPoint::new(0.82, 0.96),
         ))?;
-    keynote.add_slide_build(0, drawable.object_id, settings)?;
+    keynote.add_slide_build(0, drawable.id.get(), settings)?;
     keynote.save(output)?;
     Ok(())
 }

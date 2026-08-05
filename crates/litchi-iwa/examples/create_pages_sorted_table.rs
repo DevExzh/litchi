@@ -58,7 +58,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let moved_reply_id = editor
         .table_cell_comment_replies(table_id, 4, 1)?
         .first()
-        .map(|reply| reply.storage_object_id);
+        .map(|reply| reply.storage_id.get());
     if moved.comment.text != "Zebra comment follows its sorted row"
         || moved_reply_id != Some(reply_id)
     {

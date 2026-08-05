@@ -275,13 +275,14 @@ mod tests {
             stroke
         );
         assert!(
-            !editor
+            editor
                 .slide_chart_axis_major_gridlines_visible(
                     0,
                     chart.drawable_object_id,
                     Axis::Category,
                 )
                 .unwrap()
+                .is_hidden()
         );
         editor
             .set_slide_chart_axis_gridline_stroke(

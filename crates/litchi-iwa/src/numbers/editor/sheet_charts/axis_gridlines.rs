@@ -272,6 +272,7 @@ mod tests {
                     Axis::Value,
                 )
                 .unwrap()
+                .is_visible()
         );
         editor
             .set_sheet_chart_axis_gridline_stroke(

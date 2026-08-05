@@ -5,6 +5,7 @@ use std::path::Path;
 
 use litchi_iwa::pages::{PagesEditor, PagesImageOptions};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa_common::comment::DrawableId;
 
 const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 96.0, y: 144.0 };
 const IMAGE_SIZE: DrawableSize = DrawableSize {
@@ -37,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         PagesImageOptions::new(IMAGE_POSITION, IMAGE_SIZE),
     )?;
     let duplicate = editor.duplicate_body_image(
-        source.drawable_object_id,
+        DrawableId::from_raw(source.drawable_object_id)?,
         editor.body_text()?.encode_utf16().count(),
     )?;
     editor.save(output)?;

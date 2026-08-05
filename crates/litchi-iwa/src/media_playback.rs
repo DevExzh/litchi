@@ -17,8 +17,11 @@ const POSTER_TIME_FIELD: u32 = 5;
 const LEGACY_LOOP_MODE_FIELD: u32 = 6;
 const VOLUME_FIELD: u32 = 7;
 const LOOP_MODE_FIELD: u32 = 24;
+#[cfg(test)]
 const NO_LOOP_MODE: i32 = 0;
+#[cfg(test)]
 const REPEAT_LOOP_MODE: i32 = 1;
+#[cfg(test)]
 const BACK_AND_FORTH_LOOP_MODE: i32 = 2;
 
 impl From<litchi_iwa_common::media::playback::Error> for Error {
@@ -186,10 +189,6 @@ fn movie_loop_mode(movie: &tsd::MovieArchive) -> Result<Option<MediaLoopMode>> {
 
 fn legacy_loop_mode_value(loop_mode: Option<MediaLoopMode>) -> Result<Option<u64>> {
     Ok(loop_mode.map(|mode| u64::from(u32::from_le_bytes(mode.as_raw().to_le_bytes()))))
-}
-
-fn canonical_duration(value: Duration, context: &str) -> Result<Duration> {
-    duration_from_seconds(duration_as_seconds(value, context)?, context)
 }
 
 fn duration_as_seconds(value: Duration, context: &str) -> Result<f32> {

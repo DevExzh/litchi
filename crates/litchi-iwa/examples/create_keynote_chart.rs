@@ -9,10 +9,10 @@ use litchi_iwa_common::chart::gaps::{Percentage, Spacing};
 use litchi_iwa::charts::{
     Bound, Bounds, ChartAxisGridline, ChartAxisGridlineStroke, ChartCornerRadius, ChartData,
     ChartErrorBarDirection, ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont,
-    ChartFontSize, ChartLegendFill, ChartLegendFont,
-    ChartLegendFontSize, ChartLegendShadow, ChartLegendStroke, ChartRoundedCorners,
-    ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesStroke, ChartSeriesStrokePattern,
-    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesValueLabelAutoFit,
+    ChartFontSize, ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendShadow,
+    ChartLegendStroke, ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars,
+    ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
+    ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesValueLabelAutoFit,
     ChartSeriesValueLabelLocation, ChartShadow, DecimalPlaces, Kind, LabelAffixes, MajorStepCount,
     MinorStepCount, NegativeStyle, NumberFormat, Scale, Steps, Visibility,
 };
@@ -151,7 +151,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         0,
         chart.drawable_object_id,
         Axis::Category,
-        false,
+        AxisVisibility::Hidden,
     )?;
     editor.set_slide_chart_axis_tick_mark_location(
         0,
