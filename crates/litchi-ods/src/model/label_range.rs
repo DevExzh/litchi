@@ -28,14 +28,14 @@ impl HasLocalName for BytesEnd<'_> {
 
 /// Whether labels identify spreadsheet rows or columns.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum LabelRangeOrientation {
+pub enum Orientation {
     /// Labels identify columns in the associated data range.
     Column,
     /// Labels identify rows in the associated data range.
     Row,
 }
 
-impl LabelRangeOrientation {
+impl Orientation {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "column" => Ok(Self::Column),
@@ -56,21 +56,21 @@ impl LabelRangeOrientation {
 
 /// A cell range whose values label rows or columns in another cell range.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct LabelRange {
+pub struct Range {
     /// ODF address of the cells containing labels.
     pub label_cell_range_address: String,
     /// ODF address of the cells to which the labels apply.
     pub data_cell_range_address: String,
     /// Whether the labels identify rows or columns.
-    pub orientation: LabelRangeOrientation,
+    pub orientation: Orientation,
 }
 
-impl LabelRange {
+impl Range {
     /// Create a validated label range.
     pub fn new(
         label_cell_range_address: impl Into<String>,
         data_cell_range_address: impl Into<String>,
-        orientation: LabelRangeOrientation,
+        orientation: Orientation,
     ) -> Result<Self> {
         let range = Self {
             label_cell_range_address: label_cell_range_address.into(),
@@ -88,7 +88,7 @@ impl LabelRange {
     }
 }
 
-pub(crate) fn parse_label_ranges(xml: &str) -> Result<Vec<LabelRange>> {
+pub(crate) fn parse(xml: &str) -> Result<Vec<Range>> {
     let mut reader = NsReader::from_str(xml);
     let mut buf = Vec::new();
     let mut ranges = Vec::new();
@@ -164,7 +164,7 @@ fn ensure_container_location(is_spreadsheet_child: bool, seen: bool) -> Result<(
     Ok(())
 }
 
-fn parse_container(reader: &mut NsReader<&[u8]>) -> Result<Vec<LabelRange>> {
+fn parse_container(reader: &mut NsReader<&[u8]>) -> Result<Vec<Range>> {
     let mut ranges = Vec::new();
     let mut buf = Vec::new();
     loop {
@@ -249,8 +249,8 @@ fn parse_range_attributes(
     resolver: &NamespaceResolver,
     decoder: quick_xml::encoding::Decoder,
     element: &BytesStart<'_>,
-) -> Result<LabelRange> {
-    let range = LabelRange {
+) -> Result<Range> {
+    let range = Range {
         label_cell_range_address: required_attribute(
             resolver,
             decoder,
@@ -263,7 +263,7 @@ fn parse_range_attributes(
             element,
             b"data-cell-range-address",
         )?,
-        orientation: LabelRangeOrientation::parse(&required_attribute(
+        orientation: Orientation::parse(&required_attribute(
             resolver,
             decoder,
             element,
@@ -300,7 +300,7 @@ fn required_attribute(
     )))
 }
 
-pub(crate) fn write_label_ranges(out: &mut String, ranges: &[LabelRange]) -> Result<()> {
+pub(crate) fn write(out: &mut String, ranges: &[Range]) -> Result<()> {
     if ranges.is_empty() {
         return Ok(());
     }
@@ -369,16 +369,13 @@ mod tests {
             "t:data-cell-range-address=\"Sheet1.B1:C2\" t:orientation=\"row\"></t:label-range>",
             "</t:label-ranges></o:spreadsheet></o:body></o:document-content>"
         );
-        let parsed = parse_label_ranges(xml).unwrap();
+        let parsed = parse(xml).unwrap();
         assert_eq!(
             parsed,
-            vec![
-                LabelRange::new("Sheet1.A1:A2", "Sheet1.B1:C2", LabelRangeOrientation::Row)
-                    .unwrap()
-            ]
+            vec![Range::new("Sheet1.A1:A2", "Sheet1.B1:C2", Orientation::Row).unwrap()]
         );
         assert!(
-            parse_label_ranges(&format!("{PREFIX}<table:label-ranges/>{SUFFIX}"))
+            parse(&format!("{PREFIX}<table:label-ranges/>{SUFFIX}"))
                 .unwrap()
                 .is_empty()
         );
@@ -396,7 +393,7 @@ mod tests {
             "<table:label-ranges><table:label-range table:label-cell-range-address=\"A1:A2\" table:data-cell-range-address=\"B1:B2\" table:orientation=\"column\"><table:x/></table:label-range></table:label-ranges>",
         ] {
             assert!(
-                parse_label_ranges(&format!("{PREFIX}{fragment}{SUFFIX}")).is_err(),
+                parse(&format!("{PREFIX}{fragment}{SUFFIX}")).is_err(),
                 "accepted {fragment}"
             );
         }
@@ -404,25 +401,18 @@ mod tests {
 
     #[test]
     fn writer_escapes_addresses() {
-        let range =
-            LabelRange::new("'A&B'.A1:A2", "'A&B'.B1:B2", LabelRangeOrientation::Column).unwrap();
+        let range = Range::new("'A&B'.A1:A2", "'A&B'.B1:B2", Orientation::Column).unwrap();
         let mut xml = String::new();
-        write_label_ranges(&mut xml, &[range]).unwrap();
+        write(&mut xml, &[range]).unwrap();
         assert!(xml.contains("&amp;"));
-        let parsed = parse_label_ranges(&format!("{PREFIX}{xml}{SUFFIX}")).unwrap();
+        let parsed = parse(&format!("{PREFIX}{xml}{SUFFIX}")).unwrap();
         assert_eq!(parsed[0].label_cell_range_address, "'A&B'.A1:A2");
     }
 
     #[test]
     fn round_trips_through_builder_and_mutable_packages() {
-        let first =
-            LabelRange::new("Sheet1.A1:A2", "Sheet1.B1:D2", LabelRangeOrientation::Row).unwrap();
-        let second = LabelRange::new(
-            "Sheet1.A1:D1",
-            "Sheet1.A2:D4",
-            LabelRangeOrientation::Column,
-        )
-        .unwrap();
+        let first = Range::new("Sheet1.A1:A2", "Sheet1.B1:D2", Orientation::Row).unwrap();
+        let second = Range::new("Sheet1.A1:D1", "Sheet1.A2:D4", Orientation::Column).unwrap();
 
         let mut builder = Builder::new();
         builder.add_sheet("Sheet1").unwrap();

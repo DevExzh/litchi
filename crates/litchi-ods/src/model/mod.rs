@@ -10,8 +10,8 @@ mod data_pilot;
 mod data_validation;
 mod database_range;
 mod detective;
-mod hyperlink;
-mod label_range;
+pub mod hyperlink;
+pub mod label_range;
 pub mod names;
 mod protection;
 mod source;
@@ -37,8 +37,6 @@ pub use detective::{
     CellDetective, DetectiveDirection, DetectiveHighlightedRange, DetectiveOperation,
     DetectiveOperationKind,
 };
-pub use hyperlink::{CellHyperlink, HyperlinkActuate, HyperlinkShow};
-pub use label_range::{LabelRange, LabelRangeOrientation};
 pub use litchi_odf_common::calculation::{Iteration, IterationStatus, NullDate, Settings};
 pub use litchi_odf_common::rdf::{Graph, Object, Subject, Triple};
 pub use protection::{Protection, ProtectionKey, SheetProtection, SheetProtectionOptions};

@@ -10,12 +10,12 @@ use std::ops::Range;
 
 /// Window behavior requested by an inert cell hyperlink.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HyperlinkShow {
+pub enum Show {
     New,
     Replace,
 }
 
-impl HyperlinkShow {
+impl Show {
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::New => "new",
@@ -34,11 +34,11 @@ impl HyperlinkShow {
 
 /// Activation behavior requested by an inert cell hyperlink.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HyperlinkActuate {
+pub enum Actuate {
     OnRequest,
 }
 
-impl HyperlinkActuate {
+impl Actuate {
     pub(crate) const fn as_str(self) -> &'static str {
         "onRequest"
     }
@@ -52,7 +52,7 @@ impl HyperlinkActuate {
 /// The hyperlink is inert metadata: the target IRI is preserved verbatim and
 /// is never dereferenced by this crate.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CellHyperlink {
+pub struct Link {
     /// Target IRI from the mandatory `xlink:href` attribute.
     pub href: String,
     /// Plain text of the link (character content of the `text:a` subtree).
@@ -70,16 +70,16 @@ pub struct CellHyperlink {
     /// Optional `office:target-frame-name` attribute.
     pub target_frame_name: Option<String>,
     /// Optional `xlink:show` behavior.
-    pub show: Option<HyperlinkShow>,
+    pub show: Option<Show>,
     /// Optional explicit `xlink:actuate` behavior.
-    pub actuate: Option<HyperlinkActuate>,
+    pub actuate: Option<Actuate>,
     /// Optional `text:style-name` applied to the unvisited link.
     pub style_name: Option<String>,
     /// Optional `text:visited-style-name` applied to the visited link.
     pub visited_style_name: Option<String>,
 }
 
-impl CellHyperlink {
+impl Link {
     /// Create a hyperlink with the mandatory target IRI and empty metadata.
     pub fn new(href: impl Into<String>) -> Self {
         Self {
@@ -228,7 +228,7 @@ mod tests {
 
     #[test]
     fn new_hyperlink_keeps_href_and_defaults_metadata() {
-        let link = CellHyperlink::new("https://example.com/");
+        let link = Link::new("https://example.com/");
         assert_eq!(link.href(), "https://example.com/");
         assert_eq!(link.text(), "");
         assert_eq!(link.range(), 0..0);
@@ -243,12 +243,12 @@ mod tests {
 
     #[test]
     fn authoring_validates_and_serializes_complete_hyperlink_metadata() {
-        let mut link = CellHyperlink::with_text("https://example.test/a?x=1&y=2", "A & B").unwrap();
+        let mut link = Link::with_text("https://example.test/a?x=1&y=2", "A & B").unwrap();
         link.name = Some("example-link".to_string());
         link.title = Some("Example & more".to_string());
         link.target_frame_name = Some("_blank".to_string());
-        link.show = Some(HyperlinkShow::New);
-        link.actuate = Some(HyperlinkActuate::OnRequest);
+        link.show = Some(Show::New);
+        link.actuate = Some(Actuate::OnRequest);
         link.style_name = Some("Internet_20_link".to_string());
         link.visited_style_name = Some("Visited_20_Internet_20_link".to_string());
         link.validate().unwrap();
@@ -263,12 +263,12 @@ mod tests {
         assert!(xml.ends_with(">A &amp; B</text:a>"));
 
         assert_eq!(
-            CellHyperlink::with_text("https://example.test/", "A & B")
+            Link::with_text("https://example.test/", "A & B")
                 .unwrap()
                 .range(),
             0..5
         );
-        assert!(CellHyperlink::with_text("", "missing target").is_err());
-        assert!(CellHyperlink::with_text("https://example.test/\nnext", "unsafe").is_err());
+        assert!(Link::with_text("", "missing target").is_err());
+        assert!(Link::with_text("https://example.test/\nnext", "unsafe").is_err());
     }
 }

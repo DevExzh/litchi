@@ -1,7 +1,8 @@
 //! Structure-preserving mixed text content for spreadsheet cells.
 
+use super::hyperlink::Link;
 use super::{
-    AnnotationElement, AnnotationNode, CellHyperlink,
+    AnnotationElement, AnnotationNode,
     annotation::{decode_reference, parse_element, standard_namespace_uri},
 };
 use litchi_core::{Error, Result, xml::escape_xml};
@@ -53,7 +54,7 @@ impl CellTextContent {
             .join("\n")
     }
 
-    pub(crate) fn from_hyperlink(hyperlink: &CellHyperlink) -> Result<Self> {
+    pub(crate) fn from_hyperlink(hyperlink: &Link) -> Result<Self> {
         let mut paragraph = AnnotationElement::new("text:p")?;
         paragraph
             .children
@@ -90,7 +91,7 @@ impl CellTextContent {
     pub(crate) fn wrap_hyperlink(
         &mut self,
         range: Range<usize>,
-        hyperlink: &CellHyperlink,
+        hyperlink: &Link,
     ) -> Result<()> {
         let mut offset = 0usize;
         for paragraph in &mut self.paragraphs {
@@ -187,10 +188,10 @@ impl CellTextContent {
         }
     }
 
-    pub(crate) fn synchronize_hyperlinks(&mut self, hyperlinks: &[CellHyperlink]) -> bool {
+    pub(crate) fn synchronize_hyperlinks(&mut self, hyperlinks: &[Link]) -> bool {
         fn synchronize(
             nodes: &mut [AnnotationNode],
-            hyperlinks: &[CellHyperlink],
+            hyperlinks: &[Link],
             index: &mut usize,
             namespaces: &BTreeMap<String, String>,
         ) -> bool {
@@ -366,7 +367,7 @@ fn element_plain_text(
 }
 
 fn hyperlink_element(
-    hyperlink: &CellHyperlink,
+    hyperlink: &Link,
     children: Vec<AnnotationNode>,
 ) -> Result<AnnotationElement> {
     let mut element = AnnotationElement::new("text:a")?;

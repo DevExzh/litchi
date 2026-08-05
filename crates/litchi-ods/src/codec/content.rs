@@ -1,7 +1,7 @@
 //! ODS-specific parsing utilities.
 
 use super::{
-    Cell, CellDetective, CellHyperlink, CellMatrixSpan, CellMerge, CellRangeSource,
+    Cell, CellDetective, CellMatrixSpan, CellMerge, CellRangeSource,
     CellTextContent, CellValue, ColorTransformationType, Column, ConditionalColorScale,
     ConditionalColorScaleEntry, ConditionalCustomIcon, ConditionalDataBar, ConditionalDataBarEntry,
     ConditionalDateIs, ConditionalDateType, ConditionalFormat, ConditionalFormatCondition,
@@ -33,6 +33,7 @@ use super::{
         split_cell_range_addresses,
     },
 };
+use crate::model::hyperlink::Link;
 use crate::elements::text::{TextHyperlinkActuate, TextHyperlinkShow};
 use litchi_core::{Error, Result};
 use quick_xml::Reader;
@@ -62,7 +63,7 @@ const MAX_TRAILING_EMPTY_ROWS: usize = 4_096;
 /// A `text:a` hyperlink whose text content is still being collected.
 struct PendingHyperlink {
     /// The hyperlink parsed from the element's attributes.
-    link: CellHyperlink,
+    link: Link,
     /// Byte offset into the cell text where the link text begins.
     text_start: usize,
     /// The `text_element_depth` value assigned to the `text:a` element.
@@ -2549,7 +2550,7 @@ impl Parser {
         element: &BytesStart<'_>,
         decoder: Decoder,
         namespaces: &BTreeMap<String, String>,
-    ) -> Result<CellHyperlink> {
+    ) -> Result<Link> {
         let mut href = None;
         let mut name = None;
         let mut title = None;
@@ -2637,7 +2638,7 @@ impl Parser {
         let href = href.ok_or_else(|| {
             Error::InvalidFormat("text:a hyperlink requires xlink:href".to_string())
         })?;
-        Ok(CellHyperlink {
+        Ok(Link {
             href,
             text: String::new(),
             range: 0..0,
@@ -4414,7 +4415,7 @@ pub(crate) struct CellBuilder {
     repeated: usize,
     merge: CellMerge,
     annotation: Option<super::CellAnnotation>,
-    hyperlinks: Vec<CellHyperlink>,
+    hyperlinks: Vec<Link>,
     range_source: Option<CellRangeSource>,
     detective: Option<CellDetective>,
 }

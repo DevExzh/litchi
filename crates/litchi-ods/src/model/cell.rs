@@ -1,6 +1,7 @@
 //! Cell data structures for ODS spreadsheets.
 
-use super::{CellAnnotation, CellDetective, CellHyperlink, CellRangeSource, CellTextContent, Row};
+use super::hyperlink::Link;
+use super::{CellAnnotation, CellDetective, CellRangeSource, CellTextContent, Row};
 use litchi_core::{Result, xml::escape_xml};
 use std::{num::NonZeroUsize, ops::Range};
 
@@ -88,7 +89,7 @@ pub struct Cell {
     pub annotation: Option<CellAnnotation>,
     /// Hyperlinks (`text:a`) contained in the cell's text content, in
     /// document order.
-    pub hyperlinks: Vec<CellHyperlink>,
+    pub hyperlinks: Vec<Link>,
     /// Retained mixed paragraph content for parsed rich-text cells.
     pub(crate) rich_text: Option<CellTextContent>,
     /// Optional inert metadata for an externally imported rectangular range.
@@ -198,12 +199,12 @@ impl Cell {
     }
 
     /// Return all hyperlinks in the cell's text content, in document order.
-    pub fn hyperlinks(&self) -> &[CellHyperlink] {
+    pub fn hyperlinks(&self) -> &[Link] {
         &self.hyperlinks
     }
 
     /// Return the first hyperlink in the cell's text content, if any.
-    pub fn hyperlink(&self) -> Option<&CellHyperlink> {
+    pub fn hyperlink(&self) -> Option<&Link> {
         self.hyperlinks.first()
     }
 
@@ -224,7 +225,7 @@ impl Cell {
     ///
     /// The operation clears a formula and stores a string value. To retain
     /// existing plain text outside an anchor, use [`Self::add_hyperlink`].
-    pub fn set_hyperlink(&mut self, mut hyperlink: CellHyperlink) -> Result<()> {
+    pub fn set_hyperlink(&mut self, mut hyperlink: Link) -> Result<()> {
         if self.merge == CellMerge::Covered {
             return Err(litchi_core::Error::InvalidFormat(
                 "cannot author a hyperlink in a covered cell".to_string(),
@@ -251,7 +252,7 @@ impl Cell {
     pub fn add_hyperlink(
         &mut self,
         range: Range<usize>,
-        mut hyperlink: CellHyperlink,
+        mut hyperlink: Link,
     ) -> Result<()> {
         if self.merge == CellMerge::Covered {
             return Err(litchi_core::Error::InvalidFormat(
@@ -289,7 +290,7 @@ impl Cell {
     }
 
     /// Remove every parsed or authored hyperlink while preserving the cell text.
-    pub fn clear_hyperlinks(&mut self) -> Vec<CellHyperlink> {
+    pub fn clear_hyperlinks(&mut self) -> Vec<Link> {
         if let Some(rich_text) = self.rich_text.as_mut() {
             rich_text.clear_hyperlinks();
         }
@@ -297,7 +298,7 @@ impl Cell {
     }
 
     /// Remove and return one hyperlink by its document-order index.
-    pub fn remove_hyperlink(&mut self, index: usize) -> Option<CellHyperlink> {
+    pub fn remove_hyperlink(&mut self, index: usize) -> Option<Link> {
         if index >= self.hyperlinks.len() {
             return None;
         }
@@ -910,7 +911,7 @@ fn write_cell_text_content(output: &mut String, cell: &Cell) {
     output.push_str("</text:p>");
 }
 
-fn validate_hyperlink_ranges(text: &str, hyperlinks: &[CellHyperlink]) -> Result<()> {
+fn validate_hyperlink_ranges(text: &str, hyperlinks: &[Link]) -> Result<()> {
     let mut previous_end = 0usize;
     for hyperlink in hyperlinks {
         hyperlink.validate()?;
@@ -972,7 +973,7 @@ mod tests {
     fn set_hyperlink_replaces_the_complete_displayed_value() {
         let mut cell = Cell::new(CellValue::Number(42.0), "42", 0, 0);
         cell.formula = Some("of:=42".to_string());
-        let hyperlink = CellHyperlink::with_text("https://example.test/", "Example").unwrap();
+        let hyperlink = Link::with_text("https://example.test/", "Example").unwrap();
         cell.set_hyperlink(hyperlink.clone()).unwrap();
 
         assert_eq!(cell.value, CellValue::Text("Example".to_string()));
@@ -995,12 +996,12 @@ mod tests {
 
         cell.add_hyperlink(
             second_range.clone(),
-            CellHyperlink::with_text("#Sheet2.B10", "第二").unwrap(),
+            Link::with_text("#Sheet2.B10", "第二").unwrap(),
         )
         .unwrap();
         cell.add_hyperlink(
             link_range.clone(),
-            CellHyperlink::with_text("https://example.test/", "link").unwrap(),
+            Link::with_text("https://example.test/", "link").unwrap(),
         )
         .unwrap();
 
@@ -1017,7 +1018,7 @@ mod tests {
         assert!(
             cell.add_hyperlink(
                 link_start + 1..link_start + 2,
-                CellHyperlink::with_text("https://overlap.example/", "i").unwrap(),
+                Link::with_text("https://overlap.example/", "i").unwrap(),
             )
             .is_err()
         );
@@ -1026,7 +1027,7 @@ mod tests {
             unicode
                 .add_hyperlink(
                     1..2,
-                    CellHyperlink::with_text("https://example.test/", "").unwrap(),
+                    Link::with_text("https://example.test/", "").unwrap(),
                 )
                 .is_err()
         );
