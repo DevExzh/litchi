@@ -39,7 +39,7 @@ use super::parts::list_names::ListNamesTable;
 use super::parts::list_templates::ListTemplateTable;
 use super::parts::mail_merge::DocumentMailMerge;
 use super::parts::numbering::{ListTables, ParagraphListBinding};
-use super::parts::ole_controls::DocumentOleControls;
+use super::parts::ole::controls::Controls;
 use super::parts::pap_bin_table::PapBinTable;
 use super::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
 use super::parts::piece_table::PieceTable;
@@ -140,7 +140,7 @@ pub struct Document {
     /// Custom XML save transform path (`fcCustomXForm`).
     custom_xml_transform_path: Option<String>,
     /// OLE controls recorded in the document.
-    ole_controls: Option<DocumentOleControls>,
+    ole_controls: Option<Controls>,
     /// Mail-merge data-source state (`Pms` and the ODSO property set).
     mail_merge: Option<DocumentMailMerge>,
     /// Master-document subdocument directory and referenced-file name table.
@@ -314,7 +314,7 @@ impl Document {
         let xml_schemas = DocumentXmlSchemas::parse(&fib, &table_stream)?;
         let custom_xml_transform_path =
             super::parts::xml_schemas::parse_custom_xml_transform(&fib, &table_stream)?;
-        let ole_controls = DocumentOleControls::parse(&fib, &table_stream)?;
+        let ole_controls = Controls::parse(&fib, &table_stream)?;
         let mail_merge = DocumentMailMerge::parse(&fib, &table_stream)?;
         let subdocuments = DocumentSubdocuments::parse(&fib, &table_stream)?;
         let revision_authors = RevisionAuthorTable::parse(&fib, &table_stream)?;
@@ -2151,7 +2151,7 @@ impl Document {
     ///
     /// The data is inert: no control is instantiated or activated and no
     /// control code is executed.
-    pub fn ole_controls(&self) -> Option<&DocumentOleControls> {
+    pub fn ole_controls(&self) -> Option<&Controls> {
         self.ole_controls.as_ref()
     }
 

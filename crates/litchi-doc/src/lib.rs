@@ -193,7 +193,7 @@ pub use parts::mail_merge::{
     RecipientInfo, Rfs, SortColumnAndDirection, SortDirection, SttbfRfs, Wpms,
 };
 pub use parts::numbering::{ListLevel, ListTables, NumberFormat, ParagraphListBinding};
-pub use parts::ole_controls::{DocumentOleControls, OleControlInfo};
+pub use parts::ole::controls::{Control, Controls};
 pub use parts::pap::ParagraphConditionalFormatting;
 pub use parts::proofing::{
     ProofingEntry, ProofingFeature, ProofingRange, ProofingState, ProofingStateTable,
