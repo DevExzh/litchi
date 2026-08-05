@@ -14,7 +14,7 @@ use crate::charts::number_format::{
     DualNumberFormatFields, clear_dual_number_format, patch_dual_number_format,
     read_dual_number_format,
 };
-use crate::charts::{Axis, ChartNumberFormat};
+use crate::charts::{Axis, NumberFormat};
 use crate::protobuf::tsch;
 use crate::wire::patch_length_delimited_field;
 use crate::{Error, IWorkPackage, Result};
@@ -33,7 +33,7 @@ pub(crate) fn chart_axis_number_format(
     drawable_object_id: u64,
     drawable_label: &str,
     axis: Axis,
-) -> Result<ChartNumberFormat> {
+) -> Result<NumberFormat> {
     axis_non_style_slot(
         package,
         chart_archive_name,
@@ -51,7 +51,7 @@ pub(crate) fn set_chart_axis_number_format(
     drawable_object_id: u64,
     drawable_label: &str,
     axis: Axis,
-    format: ChartNumberFormat,
+    format: NumberFormat,
 ) -> Result<()> {
     let slot = axis_non_style_slot(
         package,
@@ -74,7 +74,7 @@ pub(crate) fn set_chart_axis_number_format(
     Ok(())
 }
 
-pub(super) fn read_axis_number_format(data: &[u8]) -> Result<ChartNumberFormat> {
+pub(super) fn read_axis_number_format(data: &[u8]) -> Result<NumberFormat> {
     let extension = generated_axis_non_style_extension(data)?;
     if let Some(extension) = extension {
         tsch::generated::ChartAxisNonStyleArchive::decode(extension)?;
@@ -82,29 +82,26 @@ pub(super) fn read_axis_number_format(data: &[u8]) -> Result<ChartNumberFormat> 
     read_dual_number_format(
         extension,
         AXIS_NUMBER_FORMAT_FIELDS,
-        ChartNumberFormat::AXIS_NATIVE_DEFAULT,
+        NumberFormat::AXIS_NATIVE_DEFAULT,
         FORMAT_CONTEXT,
     )
 }
 
-pub(super) fn patch_axis_number_format(
-    data: &[u8],
-    expected: ChartNumberFormat,
-) -> Result<Vec<u8>> {
+pub(super) fn patch_axis_number_format(data: &[u8], expected: NumberFormat) -> Result<Vec<u8>> {
     let existing_extension = generated_axis_non_style_extension(data)?;
-    if existing_extension.is_none() && expected == ChartNumberFormat::AXIS_NATIVE_DEFAULT {
+    if existing_extension.is_none() && expected == NumberFormat::AXIS_NATIVE_DEFAULT {
         return Ok(data.to_vec());
     }
     let extension = existing_extension.unwrap_or_default();
     tsch::generated::ChartAxisNonStyleArchive::decode(extension)?;
-    let patched_extension = if expected == ChartNumberFormat::AXIS_NATIVE_DEFAULT {
+    let patched_extension = if expected == NumberFormat::AXIS_NATIVE_DEFAULT {
         clear_dual_number_format(extension, AXIS_NUMBER_FORMAT_FIELDS, FORMAT_CONTEXT)?
     } else {
         patch_dual_number_format(
             extension,
             AXIS_NUMBER_FORMAT_FIELDS,
             expected,
-            ChartNumberFormat::AXIS_NATIVE_DEFAULT,
+            NumberFormat::AXIS_NATIVE_DEFAULT,
             FORMAT_CONTEXT,
         )?
     };
@@ -128,17 +125,17 @@ pub(super) fn patch_axis_number_format(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::{ChartDecimalPlaces, ChartNegativeStyle};
+    use crate::charts::{DecimalPlaces, NegativeStyle};
     use crate::protobuf::tss;
     use crate::wire::{append_length_delimited_field, append_varint_field, parse_wire_fields};
 
     const UNKNOWN_OUTER_FIELD: u32 = 4_096;
     const UNKNOWN_GENERATED_FIELD: u32 = 4_097;
 
-    fn custom_format() -> ChartNumberFormat {
-        ChartNumberFormat::new(
-            ChartDecimalPlaces::fixed(2).unwrap(),
-            ChartNegativeStyle::Parentheses,
+    fn custom_format() -> NumberFormat {
+        NumberFormat::new(
+            DecimalPlaces::fixed(2).unwrap(),
+            NegativeStyle::Parentheses,
             true,
         )
     }
@@ -174,7 +171,7 @@ mod tests {
         let original = axis_non_style_with_unknown_fields();
         let customized = patch_axis_number_format(&original, custom_format()).unwrap();
         let reset =
-            patch_axis_number_format(&customized, ChartNumberFormat::AXIS_NATIVE_DEFAULT).unwrap();
+            patch_axis_number_format(&customized, NumberFormat::AXIS_NATIVE_DEFAULT).unwrap();
         assert_eq!(reset, original);
     }
 

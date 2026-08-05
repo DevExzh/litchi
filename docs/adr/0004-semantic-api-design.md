@@ -111,6 +111,18 @@ return module-owned typed errors for finite/range validation; unknown native
 integer values remain explicit in the enum variants rather than being silently
 mapped to defaults.
 
+Chart number formatting uses the focused
+`litchi_iwa_common::chart::number_format` vocabulary:
+`FixedDecimalPlaces`, `DecimalPlaces`, `NegativeStyle`, `NumberFormat`, and
+`LabelAffixes`. Fixed decimal places are checked at construction, the packed
+`NumberFormat` occupies one byte, and `LabelAffixes::new` returns a typed error
+before accepting more than its bounded UTF-8 budget. Affixes expose borrowed
+prefix/suffix views over one allocation. There is no ambiguous generic format
+default: callers select the explicit axis or series native default because
+those defaults differ on thousands separators. Native field IDs, protobuf
+decoding, dual-field conflict checks, and wire-preserving patching remain
+outside the semantic module.
+
 PresentationML implements this rule as `litchi-pptx::shape::{Scene, Shape}`.
 `Scene` is a bounded semantic index over one slide-like owner, not a vector of
 detached XML allocations. Shapes are visited in depth-first pre-order, while a

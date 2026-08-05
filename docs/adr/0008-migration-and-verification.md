@@ -5945,6 +5945,19 @@ and Keynote exposed Value (Y) `Logarithmic`, `Max 30`, `Min 1`, and `Right
 Diagonal` in the native Axis formatter; Pages exposed the same 2D chart with
 numeric Y and categorical X axes. The native gate makes no resave claim, and
 all three applications were quit after inspection.
+The chart number-format ownership slice is complete as well:
+`litchi-iwa-common::chart::number_format` now owns the compact
+`FixedDecimalPlaces`, `DecimalPlaces`, `NegativeStyle`, `NumberFormat`, and
+`LabelAffixes` values. The common suite passed 45 tests and the IWA library
+suite passed all 1,502 tests; focused number-format and affix examples
+compiled, their generated Numbers, Pages, and Keynote packages passed ZIP
+validation, and the changed Rust files passed formatting and strict Clippy.
+Native Computer Use opened both fixture families in all three iWork apps
+without repair prompts. Numbers and Keynote exposed Number, parentheses (or
+minus sign), thousands separator, two decimals, and the authored prefix and
+suffix fields. Pages visibly rendered `14,000.00`, `(2,800.00)`, and `USD …
+net` axis labels. No native-resave claim is made; Numbers, Pages, and Keynote
+were quit after inspection.
 The BorderSide ownership slice
 is complete: the dependency-neutral table-cell edge selector now lives at
 `litchi-iwa-common::table::cell::BorderSide`; `Borders` and `ShapeStroke` remain

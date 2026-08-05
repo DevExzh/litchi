@@ -9,10 +9,9 @@ use litchi_iwa::charts::{
     ChartLegendFont, ChartLegendFontSize, ChartLegendShadow, ChartLegendStroke,
     ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesStroke,
     ChartSeriesStrokePattern, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
-    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
-    ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
-    ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
-    MajorStepCount, MinorStepCount, Scale, Steps, TickMarkLocation,
+    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelLocation, ChartSeriesValueLabelVisibility,
+    ChartShadow, DecimalPlaces, LabelAffixes, MajorStepCount, MinorStepCount, NegativeStyle,
+    NumberFormat, Scale, Steps, TickMarkLocation,
 };
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{
@@ -238,24 +237,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         0,
         chart.drawable_object_id,
         &[
-            ChartSeriesValueLabelAffixes::new("$", " USD"),
-            ChartSeriesValueLabelAffixes::new("€", " EUR"),
+            LabelAffixes::new("$", " USD").unwrap(),
+            LabelAffixes::new("€", " EUR").unwrap(),
         ],
     )?;
     editor.set_slide_chart_series_value_label_number_formats(
         0,
         chart.drawable_object_id,
         &[
-            ChartSeriesValueLabelNumberFormat::new(
-                ChartSeriesValueLabelDecimalPlaces::fixed(2)?,
-                ChartSeriesValueLabelNegativeStyle::Parentheses,
-                false,
-            ),
-            ChartSeriesValueLabelNumberFormat::new(
-                ChartSeriesValueLabelDecimalPlaces::fixed(1)?,
-                ChartSeriesValueLabelNegativeStyle::MinusSign,
-                true,
-            ),
+            NumberFormat::new(DecimalPlaces::fixed(2)?, NegativeStyle::Parentheses, false),
+            NumberFormat::new(DecimalPlaces::fixed(1)?, NegativeStyle::MinusSign, true),
         ],
     )?;
     editor.set_slide_chart_series_value_label_auto_fits(

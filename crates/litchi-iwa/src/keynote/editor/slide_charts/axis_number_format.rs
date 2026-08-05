@@ -5,7 +5,7 @@ use crate::charts::axis_number_format::{
     chart_axis_number_format as read_native_chart_axis_number_format,
     set_chart_axis_number_format as set_native_chart_axis_number_format,
 };
-use crate::charts::{Axis, ChartNumberFormat};
+use crate::charts::{Axis, NumberFormat};
 
 impl KeynoteEditor {
     /// Read the decimal-number format of one native slide-chart axis.
@@ -14,7 +14,7 @@ impl KeynoteEditor {
         slide_index: usize,
         drawable_object_id: u64,
         axis: Axis,
-    ) -> Result<ChartNumberFormat> {
+    ) -> Result<NumberFormat> {
         slide_chart_axis_number_format(self, slide_index, drawable_object_id, axis)
     }
 
@@ -24,7 +24,7 @@ impl KeynoteEditor {
         slide_index: usize,
         drawable_object_id: u64,
         axis: Axis,
-        format: ChartNumberFormat,
+        format: NumberFormat,
     ) -> Result<()> {
         set_slide_chart_axis_number_format(self, slide_index, drawable_object_id, axis, format)
     }
@@ -35,7 +35,7 @@ fn slide_chart_axis_number_format(
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
-) -> Result<ChartNumberFormat> {
+) -> Result<NumberFormat> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     read_native_chart_axis_number_format(
         editor.package(),
@@ -51,7 +51,7 @@ fn set_slide_chart_axis_number_format(
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
-    format: ChartNumberFormat,
+    format: NumberFormat,
 ) -> Result<()> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let mut staged = editor.package().clone();
@@ -76,7 +76,7 @@ fn set_slide_chart_axis_number_format(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::{ChartData, ChartDecimalPlaces, ChartKind, ChartNegativeStyle};
+    use crate::charts::{ChartData, ChartKind, DecimalPlaces, NegativeStyle};
     use crate::keynote::KeynoteDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
@@ -99,16 +99,16 @@ mod tests {
     }
 
     fn exercise(editor: &mut KeynoteEditor, chart_id: u64) {
-        let expected = ChartNumberFormat::new(
-            ChartDecimalPlaces::fixed(2).unwrap(),
-            ChartNegativeStyle::Parentheses,
+        let expected = NumberFormat::new(
+            DecimalPlaces::fixed(2).unwrap(),
+            NegativeStyle::Parentheses,
             true,
         );
         assert_eq!(
             editor
                 .slide_chart_axis_number_format(0, chart_id, Axis::Value)
                 .unwrap(),
-            ChartNumberFormat::AXIS_NATIVE_DEFAULT
+            NumberFormat::AXIS_NATIVE_DEFAULT
         );
         let baseline = editor.to_bytes().unwrap();
         editor
@@ -126,7 +126,7 @@ mod tests {
                 0,
                 chart_id,
                 Axis::Value,
-                ChartNumberFormat::AXIS_NATIVE_DEFAULT,
+                NumberFormat::AXIS_NATIVE_DEFAULT,
             )
             .unwrap();
         assert_eq!(reopened.to_bytes().unwrap(), baseline);

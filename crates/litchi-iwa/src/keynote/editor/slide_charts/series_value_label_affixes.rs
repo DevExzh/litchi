@@ -6,7 +6,7 @@ use crate::charts::series_value_label_affixes::{
     chart_series_value_label_affixes as read_native_affixes,
     set_chart_series_value_label_affixes as set_native_affixes,
 };
-use crate::charts::{ChartSeriesIndex, ChartSeriesValueLabelAffixes};
+use crate::charts::{ChartSeriesIndex, LabelAffixes};
 
 impl KeynoteEditor {
     /// Read every series' value-label affixes in native series order.
@@ -14,7 +14,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<Vec<ChartSeriesValueLabelAffixes>> {
+    ) -> Result<Vec<LabelAffixes>> {
         slide_chart_series_value_label_affixes(self, slide_index, drawable_object_id)
     }
 
@@ -24,7 +24,7 @@ impl KeynoteEditor {
         slide_index: usize,
         drawable_object_id: u64,
         series: ChartSeriesIndex,
-    ) -> Result<ChartSeriesValueLabelAffixes> {
+    ) -> Result<LabelAffixes> {
         let affixes =
             slide_chart_series_value_label_affixes(self, slide_index, drawable_object_id)?;
         affixes
@@ -38,7 +38,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        affixes: &[ChartSeriesValueLabelAffixes],
+        affixes: &[LabelAffixes],
     ) -> Result<()> {
         set_slide_chart_series_value_label_affixes(self, slide_index, drawable_object_id, affixes)
     }
@@ -49,7 +49,7 @@ impl KeynoteEditor {
         slide_index: usize,
         drawable_object_id: u64,
         series: ChartSeriesIndex,
-        affixes: ChartSeriesValueLabelAffixes,
+        affixes: LabelAffixes,
     ) -> Result<()> {
         let mut values =
             slide_chart_series_value_label_affixes(self, slide_index, drawable_object_id)?;
@@ -69,7 +69,7 @@ fn slide_chart_series_value_label_affixes(
     editor: &KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-) -> Result<Vec<ChartSeriesValueLabelAffixes>> {
+) -> Result<Vec<LabelAffixes>> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let series_count = value_label_series_count(
         graph.info.kind,
@@ -92,7 +92,7 @@ fn set_slide_chart_series_value_label_affixes(
     editor: &mut KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    affixes: &[ChartSeriesValueLabelAffixes],
+    affixes: &[LabelAffixes],
 ) -> Result<()> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let series_count = value_label_series_count(

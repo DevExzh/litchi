@@ -13,11 +13,10 @@ use crate::charts::{
     ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit,
     ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke, ChartSeriesStrokePattern,
     ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
-    ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
-    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
-    ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
-    ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
-    MajorStepCount, MinorStepCount, Scale, Steps, TickMarkLocation,
+    ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAutoFit,
+    ChartSeriesValueLabelLocation, ChartSeriesValueLabelVisibility, ChartShadow, DecimalPlaces,
+    LabelAffixes, MajorStepCount, MinorStepCount, NegativeStyle, NumberFormat, Scale, Steps,
+    TickMarkLocation,
 };
 use crate::keynote::KeynoteDocumentBuilder;
 use crate::shapes::{
@@ -3168,10 +3167,10 @@ fn scratch_presentation_supports_native_series_value_label_affix_crud() {
     let source = editor
         .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
-    let defaults = vec![ChartSeriesValueLabelAffixes::default(); 2];
+    let defaults = vec![LabelAffixes::default(); 2];
     let customized = vec![
-        ChartSeriesValueLabelAffixes::new("$", " USD"),
-        ChartSeriesValueLabelAffixes::new("€", " net"),
+        LabelAffixes::new("$", " USD").unwrap(),
+        LabelAffixes::new("€", " net").unwrap(),
     ];
 
     assert_eq!(
@@ -3208,7 +3207,7 @@ fn scratch_presentation_supports_native_series_value_label_affix_crud() {
             0,
             source.drawable_object_id,
             ChartSeriesIndex::from_zero_based(0),
-            ChartSeriesValueLabelAffixes::default(),
+            LabelAffixes::default(),
         )
         .unwrap();
     editor
@@ -3216,7 +3215,7 @@ fn scratch_presentation_supports_native_series_value_label_affix_crud() {
             0,
             source.drawable_object_id,
             ChartSeriesIndex::from_zero_based(1),
-            ChartSeriesValueLabelAffixes::default(),
+            LabelAffixes::default(),
         )
         .unwrap();
 
@@ -3269,13 +3268,13 @@ fn scratch_presentation_supports_native_series_value_label_number_format_crud() 
     let source = editor
         .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
-    let defaults = vec![ChartSeriesValueLabelNumberFormat::NATIVE_DEFAULT; 2];
-    let fixed_two = ChartSeriesValueLabelNumberFormat::new(
-        ChartSeriesValueLabelDecimalPlaces::fixed(2).unwrap(),
-        ChartSeriesValueLabelNegativeStyle::Parentheses,
+    let defaults = vec![NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT; 2];
+    let fixed_two = NumberFormat::new(
+        DecimalPlaces::fixed(2).unwrap(),
+        NegativeStyle::Parentheses,
         false,
     );
-    let customized = vec![fixed_two, ChartSeriesValueLabelNumberFormat::NATIVE_DEFAULT];
+    let customized = vec![fixed_two, NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT];
 
     assert_eq!(
         editor
@@ -3314,7 +3313,7 @@ fn scratch_presentation_supports_native_series_value_label_number_format_crud() 
             0,
             source.drawable_object_id,
             ChartSeriesIndex::from_zero_based(0),
-            ChartSeriesValueLabelNumberFormat::NATIVE_DEFAULT,
+            NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
         )
         .unwrap();
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();

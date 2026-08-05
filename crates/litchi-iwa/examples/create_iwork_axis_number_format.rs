@@ -3,9 +3,7 @@
 use std::env;
 use std::path::Path;
 
-use litchi_iwa::charts::{
-    Axis, ChartData, ChartDecimalPlaces, ChartKind, ChartNegativeStyle, ChartNumberFormat,
-};
+use litchi_iwa::charts::{Axis, ChartData, ChartKind, DecimalPlaces, NegativeStyle, NumberFormat};
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::pages::PagesDocumentBuilder;
@@ -40,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     numbers.set_sheet_chart_title(sheet_id, chart.drawable_object_id, "Axis number format")?;
     assert_eq!(
         numbers.sheet_chart_axis_number_format(sheet_id, chart.drawable_object_id, Axis::Value,)?,
-        ChartNumberFormat::AXIS_NATIVE_DEFAULT
+        NumberFormat::AXIS_NATIVE_DEFAULT
     );
     numbers.set_sheet_chart_axis_number_format(
         sheet_id,
@@ -69,7 +67,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     pages.set_body_chart_title(chart.drawable_object_id, "Axis number format")?;
     assert_eq!(
         pages.body_chart_axis_number_format(chart.drawable_object_id, Axis::Value)?,
-        ChartNumberFormat::AXIS_NATIVE_DEFAULT
+        NumberFormat::AXIS_NATIVE_DEFAULT
     );
     pages.set_body_chart_axis_number_format(chart.drawable_object_id, Axis::Value, format)?;
     assert_eq!(
@@ -94,7 +92,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     keynote.set_slide_chart_title(0, chart.drawable_object_id, "Axis number format")?;
     assert_eq!(
         keynote.slide_chart_axis_number_format(0, chart.drawable_object_id, Axis::Value)?,
-        ChartNumberFormat::AXIS_NATIVE_DEFAULT
+        NumberFormat::AXIS_NATIVE_DEFAULT
     );
     keynote.set_slide_chart_axis_number_format(0, chart.drawable_object_id, Axis::Value, format)?;
     assert_eq!(
@@ -107,10 +105,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn axis_format() -> Result<ChartNumberFormat, Box<dyn std::error::Error>> {
-    Ok(ChartNumberFormat::new(
-        ChartDecimalPlaces::fixed(2)?,
-        ChartNegativeStyle::Parentheses,
+fn axis_format() -> Result<NumberFormat, Box<dyn std::error::Error>> {
+    Ok(NumberFormat::new(
+        DecimalPlaces::fixed(2)?,
+        NegativeStyle::Parentheses,
         true,
     ))
 }

@@ -107,11 +107,10 @@ pub use litchi_iwa_common::chart::axis::{
     Axis, Bound, Bounds, LabelAngle, LabelPosition3d, MajorStepCount, MinorStepCount, Scale, Steps,
     TickMarkLocation,
 };
-pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};
-pub use number_format::{
-    ChartDecimalPlaces, ChartFixedDecimalPlaces, ChartLabelAffixes, ChartNegativeStyle,
-    ChartNumberFormat,
+pub use litchi_iwa_common::chart::number_format::{
+    DecimalPlaces, FixedDecimalPlaces, LabelAffixes, NegativeStyle, NumberFormat,
 };
+pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};
 pub use pie_label_distance::ChartPieLabelDistance;
 pub use pie_labels::ChartPieLabelVisibility;
 pub use pie_leader_lines::ChartPieLeaderLineVisibility;
@@ -142,13 +141,8 @@ pub use series_trendline::{
     ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
     ChartSeriesTrendlinePolynomialOrder, ChartSeriesTrendlineType,
 };
-pub use series_value_label_affixes::ChartSeriesValueLabelAffixes;
 pub use series_value_label_auto_fit::ChartSeriesValueLabelAutoFit;
 pub use series_value_label_location::ChartSeriesValueLabelLocation;
-pub use series_value_label_number_format::{
-    ChartSeriesValueLabelDecimalPlaces, ChartSeriesValueLabelFixedDecimalPlaces,
-    ChartSeriesValueLabelNegativeStyle, ChartSeriesValueLabelNumberFormat,
-};
 pub use series_value_labels::{ChartSeriesIndex, ChartSeriesValueLabelVisibility};
 pub use shadow::ChartShadow;
 
@@ -166,6 +160,12 @@ impl From<litchi_iwa_common::chart::axis::label_angle::Error> for crate::Error {
 
 impl From<litchi_iwa_common::chart::axis::steps::Error> for crate::Error {
     fn from(error: litchi_iwa_common::chart::axis::steps::Error) -> Self {
+        Self::InvalidFormat(error.to_string())
+    }
+}
+
+impl From<litchi_iwa_common::chart::number_format::Error> for crate::Error {
+    fn from(error: litchi_iwa_common::chart::number_format::Error) -> Self {
         Self::InvalidFormat(error.to_string())
     }
 }

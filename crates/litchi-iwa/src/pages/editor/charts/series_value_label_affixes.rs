@@ -6,14 +6,14 @@ use crate::charts::series_value_label_affixes::{
     chart_series_value_label_affixes as read_native_affixes,
     set_chart_series_value_label_affixes as set_native_affixes,
 };
-use crate::charts::{ChartSeriesIndex, ChartSeriesValueLabelAffixes};
+use crate::charts::{ChartSeriesIndex, LabelAffixes};
 
 impl PagesEditor {
     /// Read every series' value-label affixes in native series order.
     pub fn body_chart_series_value_label_affixes(
         &self,
         drawable_object_id: u64,
-    ) -> Result<Vec<ChartSeriesValueLabelAffixes>> {
+    ) -> Result<Vec<LabelAffixes>> {
         body_chart_series_value_label_affixes(self, drawable_object_id)
     }
 
@@ -22,7 +22,7 @@ impl PagesEditor {
         &self,
         drawable_object_id: u64,
         series: ChartSeriesIndex,
-    ) -> Result<ChartSeriesValueLabelAffixes> {
+    ) -> Result<LabelAffixes> {
         let affixes = body_chart_series_value_label_affixes(self, drawable_object_id)?;
         affixes
             .get(series.zero_based())
@@ -34,7 +34,7 @@ impl PagesEditor {
     pub fn set_body_chart_series_value_label_affixes(
         &mut self,
         drawable_object_id: u64,
-        affixes: &[ChartSeriesValueLabelAffixes],
+        affixes: &[LabelAffixes],
     ) -> Result<()> {
         set_body_chart_series_value_label_affixes(self, drawable_object_id, affixes)
     }
@@ -44,7 +44,7 @@ impl PagesEditor {
         &mut self,
         drawable_object_id: u64,
         series: ChartSeriesIndex,
-        affixes: ChartSeriesValueLabelAffixes,
+        affixes: LabelAffixes,
     ) -> Result<()> {
         let mut values = body_chart_series_value_label_affixes(self, drawable_object_id)?;
         let count = values.len();
@@ -62,7 +62,7 @@ impl PagesEditor {
 fn body_chart_series_value_label_affixes(
     editor: &PagesEditor,
     drawable_object_id: u64,
-) -> Result<Vec<ChartSeriesValueLabelAffixes>> {
+) -> Result<Vec<LabelAffixes>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let series_count = value_label_series_count(
         graph.info.kind,
@@ -84,7 +84,7 @@ fn body_chart_series_value_label_affixes(
 fn set_body_chart_series_value_label_affixes(
     editor: &mut PagesEditor,
     drawable_object_id: u64,
-    affixes: &[ChartSeriesValueLabelAffixes],
+    affixes: &[LabelAffixes],
 ) -> Result<()> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let series_count = value_label_series_count(

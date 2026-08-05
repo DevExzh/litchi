@@ -5,7 +5,7 @@ use crate::charts::axis_number_format::{
     chart_axis_number_format as read_native_chart_axis_number_format,
     set_chart_axis_number_format as set_native_chart_axis_number_format,
 };
-use crate::charts::{Axis, ChartNumberFormat};
+use crate::charts::{Axis, NumberFormat};
 
 impl NumbersEditor {
     /// Read the decimal-number format of one native sheet-chart axis.
@@ -14,7 +14,7 @@ impl NumbersEditor {
         sheet_id: u64,
         drawable_object_id: u64,
         axis: Axis,
-    ) -> Result<ChartNumberFormat> {
+    ) -> Result<NumberFormat> {
         sheet_chart_axis_number_format(self, sheet_id, drawable_object_id, axis)
     }
 
@@ -24,7 +24,7 @@ impl NumbersEditor {
         sheet_id: u64,
         drawable_object_id: u64,
         axis: Axis,
-        format: ChartNumberFormat,
+        format: NumberFormat,
     ) -> Result<()> {
         set_sheet_chart_axis_number_format(self, sheet_id, drawable_object_id, axis, format)
     }
@@ -35,7 +35,7 @@ fn sheet_chart_axis_number_format(
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
-) -> Result<ChartNumberFormat> {
+) -> Result<NumberFormat> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     read_native_chart_axis_number_format(
         &editor.package,
@@ -51,7 +51,7 @@ fn set_sheet_chart_axis_number_format(
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
-    format: ChartNumberFormat,
+    format: NumberFormat,
 ) -> Result<()> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     let mut staged = editor.package.clone();
@@ -76,7 +76,7 @@ fn set_sheet_chart_axis_number_format(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::{ChartData, ChartDecimalPlaces, ChartKind, ChartNegativeStyle};
+    use crate::charts::{ChartData, ChartKind, DecimalPlaces, NegativeStyle};
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
@@ -96,16 +96,16 @@ mod tests {
                 },
             )
             .unwrap();
-        let expected = ChartNumberFormat::new(
-            ChartDecimalPlaces::fixed(2).unwrap(),
-            ChartNegativeStyle::Parentheses,
+        let expected = NumberFormat::new(
+            DecimalPlaces::fixed(2).unwrap(),
+            NegativeStyle::Parentheses,
             true,
         );
         assert_eq!(
             editor
                 .sheet_chart_axis_number_format(sheet_id, chart.drawable_object_id, Axis::Value,)
                 .unwrap(),
-            ChartNumberFormat::AXIS_NATIVE_DEFAULT
+            NumberFormat::AXIS_NATIVE_DEFAULT
         );
         let baseline = editor.to_bytes().unwrap();
         editor
@@ -128,7 +128,7 @@ mod tests {
                 sheet_id,
                 chart.drawable_object_id,
                 Axis::Value,
-                ChartNumberFormat::AXIS_NATIVE_DEFAULT,
+                NumberFormat::AXIS_NATIVE_DEFAULT,
             )
             .unwrap();
         assert_eq!(reopened.to_bytes().unwrap(), baseline);

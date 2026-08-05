@@ -6,14 +6,14 @@ use crate::charts::series_value_label_number_format::{
     chart_series_value_label_number_formats as read_native_formats,
     set_chart_series_value_label_number_formats as set_native_formats,
 };
-use crate::charts::{ChartSeriesIndex, ChartSeriesValueLabelNumberFormat};
+use crate::charts::{ChartSeriesIndex, NumberFormat};
 
 impl PagesEditor {
     /// Read every series' value-label number format in native series order.
     pub fn body_chart_series_value_label_number_formats(
         &self,
         drawable_object_id: u64,
-    ) -> Result<Vec<ChartSeriesValueLabelNumberFormat>> {
+    ) -> Result<Vec<NumberFormat>> {
         body_chart_series_value_label_number_formats(self, drawable_object_id)
     }
 
@@ -22,7 +22,7 @@ impl PagesEditor {
         &self,
         drawable_object_id: u64,
         series: ChartSeriesIndex,
-    ) -> Result<ChartSeriesValueLabelNumberFormat> {
+    ) -> Result<NumberFormat> {
         let formats = body_chart_series_value_label_number_formats(self, drawable_object_id)?;
         formats
             .get(series.zero_based())
@@ -34,7 +34,7 @@ impl PagesEditor {
     pub fn set_body_chart_series_value_label_number_formats(
         &mut self,
         drawable_object_id: u64,
-        formats: &[ChartSeriesValueLabelNumberFormat],
+        formats: &[NumberFormat],
     ) -> Result<()> {
         set_body_chart_series_value_label_number_formats(self, drawable_object_id, formats)
     }
@@ -44,7 +44,7 @@ impl PagesEditor {
         &mut self,
         drawable_object_id: u64,
         series: ChartSeriesIndex,
-        format: ChartSeriesValueLabelNumberFormat,
+        format: NumberFormat,
     ) -> Result<()> {
         let mut formats = body_chart_series_value_label_number_formats(self, drawable_object_id)?;
         let count = formats.len();
@@ -62,7 +62,7 @@ impl PagesEditor {
 fn body_chart_series_value_label_number_formats(
     editor: &PagesEditor,
     drawable_object_id: u64,
-) -> Result<Vec<ChartSeriesValueLabelNumberFormat>> {
+) -> Result<Vec<NumberFormat>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let series_count = value_label_series_count(
         graph.info.kind,
@@ -84,7 +84,7 @@ fn body_chart_series_value_label_number_formats(
 fn set_body_chart_series_value_label_number_formats(
     editor: &mut PagesEditor,
     drawable_object_id: u64,
-    formats: &[ChartSeriesValueLabelNumberFormat],
+    formats: &[NumberFormat],
 ) -> Result<()> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let series_count = value_label_series_count(

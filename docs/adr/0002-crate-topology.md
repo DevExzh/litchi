@@ -162,6 +162,16 @@ same owner: `axis::bounds::{Bound, Bounds}`, `axis::label_angle::LabelAngle`,
 native field numbers, protobuf conversion, chart-kind capability checks,
 archive lookup, and lossless wire mutation; no axis value module depends on
 the facade or protobuf crates.
+Chart label number-format values now follow the same ownership boundary at
+`litchi-iwa-common::chart::number_format`: `FixedDecimalPlaces`,
+`DecimalPlaces`, `NegativeStyle`, `NumberFormat`, and `LabelAffixes` are
+archive-free semantic values with concise names. The scalar format is packed
+into one byte, while affixes share one bounded allocation. IWA retains
+`DualNumberFormatFields`, native field identifiers, protobuf decoding, strict
+legacy/current reconciliation, and lossless wire patching. Axis and series
+defaults remain explicit because their native thousands-separator defaults
+differ; the former long `Chart*` number-format names are removed rather than
+kept as compatibility aliases.
 The leaf's `transition::Effect` owns the lossless native transition-effect
 identifier vocabulary, including canonical known variants and lossless unknown
 identifiers; IWA retains transition archive decoding, wire patching, and
