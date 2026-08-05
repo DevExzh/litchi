@@ -6,7 +6,7 @@ use crate::charts::series_trendline::{
     chart_series_trendlines as read_native_trendlines,
     set_chart_series_trendlines as set_native_trendlines,
 };
-use crate::charts::{ChartSeriesIndex, ChartSeriesTrendline};
+use crate::charts::{ChartSeriesTrendline, Index};
 
 impl KeynoteEditor {
     /// Read every series' trendline in native series order.
@@ -23,7 +23,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<ChartSeriesTrendline> {
         let trendlines = slide_chart_series_trendlines(self, slide_index, drawable_object_id)?;
         trendlines.get(series.zero_based()).cloned().ok_or_else(|| {
@@ -46,7 +46,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         trendline: ChartSeriesTrendline,
     ) -> Result<()> {
         let mut trendlines = slide_chart_series_trendlines(self, slide_index, drawable_object_id)?;
@@ -136,7 +136,7 @@ fn set_slide_chart_series_trendlines(
 fn trendline_index_error(
     suite: &str,
     drawable_object_id: u64,
-    series: ChartSeriesIndex,
+    series: Index,
     count: usize,
 ) -> Error {
     Error::InvalidFormat(format!(

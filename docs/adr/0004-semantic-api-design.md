@@ -219,6 +219,18 @@ IDs or archives leak upward. The IWA adapter is limited to native/protobuf
 decoding, payload structural validation, wire patching, graph lookup, and
 transactions, and opaque payload decoding remains at that boundary.
 
+Chart series value-label selectors use the focused
+`litchi_iwa_common::chart::series_labels::{Visibility, Index}` module.
+`Visibility` is a compact two-state value with boolean conversion, while
+`Index` is a copyable zero-based series-position value. Visibility does not
+provide an ambiguous common default: native defaults are chart-family-specific
+(pie is visible; other supported families are hidden). The IWA adapter retains
+chart-kind field selection, generated extension decoding, canonical boolean
+validation, sparse default insertion/removal, unknown-field preservation, and
+package mutation. Unsupported chart kinds remain typed failures, and the former
+`ChartSeriesValueLabelVisibility` and `ChartSeriesIndex` owners are removed
+rather than retained as aliases.
+
 Pie and donut label settings use the focused
 `litchi_iwa_common::chart::pie` vocabulary. `LabelVisibility` packs the two
 independent label toggles into one byte with explicit native defaults;

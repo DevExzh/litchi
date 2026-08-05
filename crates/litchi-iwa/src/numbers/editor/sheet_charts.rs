@@ -700,13 +700,12 @@ mod tests {
         ChartGapPercentage, ChartGapSpacing, ChartLegendFill, ChartLegendFont, ChartLegendFontSize,
         ChartLegendFrame, ChartLegendRect, ChartLegendShadow, ChartLegendStroke,
         ChartPieLabelDistance, ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex,
-        ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex,
-        ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
-        ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
-        ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelLocation,
-        ChartSeriesValueLabelVisibility, ChartShadow, DecimalPlaces, LabelAffixes, LabelVisibility,
-        LeaderLineVisibility, MajorStepCount, MinorStepCount, NegativeStyle, NumberFormat, Scale,
-        Steps, TickMarkLocation,
+        ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesStroke,
+        ChartSeriesStrokePattern, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
+        ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAutoFit,
+        ChartSeriesValueLabelLocation, ChartShadow, DecimalPlaces, Index, LabelAffixes,
+        LabelVisibility, LeaderLineVisibility, MajorStepCount, MinorStepCount, NegativeStyle,
+        NumberFormat, Scale, Steps, TickMarkLocation, Visibility,
     };
     use crate::numbers::NumbersDocumentBuilder;
     use crate::package_metadata::{component_identifier_for_entry, component_uuid_identifiers};
@@ -3314,8 +3313,8 @@ mod tests {
             .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-        let first = ChartSeriesIndex::from_zero_based(0);
-        let second = ChartSeriesIndex::from_zero_based(1);
+        let first = Index::from_zero_based(0);
+        let second = Index::from_zero_based(1);
         editor
             .set_sheet_chart_series_fill(
                 sheet_id,
@@ -3400,8 +3399,8 @@ mod tests {
             .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-        let first = ChartSeriesIndex::from_zero_based(0);
-        let second = ChartSeriesIndex::from_zero_based(1);
+        let first = Index::from_zero_based(0);
+        let second = Index::from_zero_based(1);
         let rounded = chart_series_stroke(ChartSeriesStrokePattern::RoundedDash, 3.5);
         let medium = chart_series_stroke(ChartSeriesStrokePattern::MediumDash, 2.0);
         editor
@@ -4213,11 +4212,8 @@ mod tests {
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
-        let defaults = [ChartSeriesValueLabelVisibility::Hidden; 2];
-        let customized = [
-            ChartSeriesValueLabelVisibility::Visible,
-            ChartSeriesValueLabelVisibility::Hidden,
-        ];
+        let defaults = [Visibility::Hidden; 2];
+        let customized = [Visibility::Visible, Visibility::Hidden];
 
         assert_eq!(
             editor
@@ -4247,10 +4243,10 @@ mod tests {
                 .sheet_chart_series_value_label_visibility(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartSeriesIndex::from_zero_based(0),
+                    Index::from_zero_based(0),
                 )
                 .unwrap(),
-            ChartSeriesValueLabelVisibility::Visible
+            Visibility::Visible
         );
         editor
             .set_sheet_chart_series_value_label_visibilities(
@@ -4275,8 +4271,8 @@ mod tests {
             .set_sheet_chart_series_value_label_visibility(
                 sheet_id,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(0),
-                ChartSeriesValueLabelVisibility::Hidden,
+                Index::from_zero_based(0),
+                Visibility::Hidden,
             )
             .unwrap();
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -4311,7 +4307,7 @@ mod tests {
                 .sheet_chart_series_value_label_visibility(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartSeriesIndex::from_zero_based(2),
+                    Index::from_zero_based(2),
                 )
                 .is_err()
         );
@@ -4366,7 +4362,7 @@ mod tests {
                 .sheet_chart_series_value_label_location(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartSeriesIndex::from_zero_based(0),
+                    Index::from_zero_based(0),
                 )
                 .unwrap(),
             ChartSeriesValueLabelLocation::Outside
@@ -4394,7 +4390,7 @@ mod tests {
             .set_sheet_chart_series_value_label_location(
                 sheet_id,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(0),
+                Index::from_zero_based(0),
                 ChartSeriesValueLabelLocation::Top,
             )
             .unwrap();
@@ -4427,7 +4423,7 @@ mod tests {
                 .sheet_chart_series_value_label_location(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartSeriesIndex::from_zero_based(2),
+                    Index::from_zero_based(2),
                 )
                 .is_err()
         );
@@ -4482,7 +4478,7 @@ mod tests {
                 .sheet_chart_series_value_label_affix(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartSeriesIndex::from_zero_based(1),
+                    Index::from_zero_based(1),
                 )
                 .unwrap()
                 .prefix(),
@@ -4496,7 +4492,7 @@ mod tests {
                 .set_sheet_chart_series_value_label_affix(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartSeriesIndex::from_zero_based(series),
+                    Index::from_zero_based(series),
                     LabelAffixes::default(),
                 )
                 .unwrap();
@@ -4531,7 +4527,7 @@ mod tests {
                 .sheet_chart_series_value_label_affix(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartSeriesIndex::from_zero_based(2),
+                    Index::from_zero_based(2),
                 )
                 .is_err()
         );
@@ -4587,7 +4583,7 @@ mod tests {
                 .sheet_chart_series_value_label_number_format(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartSeriesIndex::from_zero_based(0),
+                    Index::from_zero_based(0),
                 )
                 .unwrap(),
             fixed_two
@@ -4600,7 +4596,7 @@ mod tests {
             .set_sheet_chart_series_value_label_number_format(
                 sheet_id,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(0),
+                Index::from_zero_based(0),
                 NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
             )
             .unwrap();
@@ -4636,7 +4632,7 @@ mod tests {
                 .sheet_chart_series_value_label_number_format(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartSeriesIndex::from_zero_based(2),
+                    Index::from_zero_based(2),
                 )
                 .is_err()
         );
@@ -4690,7 +4686,7 @@ mod tests {
                 .sheet_chart_series_value_label_auto_fit(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartSeriesIndex::from_zero_based(0),
+                    Index::from_zero_based(0),
                 )
                 .unwrap(),
             ChartSeriesValueLabelAutoFit::Disabled
@@ -4703,7 +4699,7 @@ mod tests {
             .set_sheet_chart_series_value_label_auto_fit(
                 sheet_id,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(0),
+                Index::from_zero_based(0),
                 ChartSeriesValueLabelAutoFit::Enabled,
             )
             .unwrap();
@@ -4736,7 +4732,7 @@ mod tests {
                 .sheet_chart_series_value_label_auto_fit(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartSeriesIndex::from_zero_based(2),
+                    Index::from_zero_based(2),
                 )
                 .is_err()
         );
@@ -4792,7 +4788,7 @@ mod tests {
                 .sheet_chart_series_trendline(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartSeriesIndex::from_zero_based(1),
+                    Index::from_zero_based(1),
                 )
                 .unwrap(),
             customized[1]
@@ -4806,7 +4802,7 @@ mod tests {
                 .set_sheet_chart_series_trendline(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartSeriesIndex::from_zero_based(series),
+                    Index::from_zero_based(series),
                     ChartSeriesTrendline::none(),
                 )
                 .unwrap();
@@ -4840,7 +4836,7 @@ mod tests {
                 .sheet_chart_series_trendline(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartSeriesIndex::from_zero_based(2),
+                    Index::from_zero_based(2),
                 )
                 .is_err()
         );
@@ -4912,7 +4908,7 @@ mod tests {
                 .sheet_chart_series_error_bar(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartSeriesIndex::from_zero_based(1),
+                    Index::from_zero_based(1),
                 )
                 .unwrap(),
             customized[1]
@@ -4922,7 +4918,7 @@ mod tests {
                 .sheet_chart_series_error_bar_auto_fit(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartSeriesIndex::from_zero_based(0),
+                    Index::from_zero_based(0),
                 )
                 .unwrap(),
             ChartSeriesErrorBarAutoFit::Disabled
@@ -4936,7 +4932,7 @@ mod tests {
                 .set_sheet_chart_series_error_bar(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartSeriesIndex::from_zero_based(series),
+                    Index::from_zero_based(series),
                     ChartSeriesErrorBars::None,
                 )
                 .unwrap();
@@ -4998,7 +4994,7 @@ mod tests {
                 .sheet_chart_series_error_bar(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartSeriesIndex::from_zero_based(2),
+                    Index::from_zero_based(2),
                 )
                 .is_err()
         );

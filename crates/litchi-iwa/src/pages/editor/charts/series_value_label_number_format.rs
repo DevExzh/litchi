@@ -6,7 +6,7 @@ use crate::charts::series_value_label_number_format::{
     chart_series_value_label_number_formats as read_native_formats,
     set_chart_series_value_label_number_formats as set_native_formats,
 };
-use crate::charts::{ChartSeriesIndex, NumberFormat};
+use crate::charts::{Index, NumberFormat};
 
 impl PagesEditor {
     /// Read every series' value-label number format in native series order.
@@ -21,7 +21,7 @@ impl PagesEditor {
     pub fn body_chart_series_value_label_number_format(
         &self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<NumberFormat> {
         let formats = body_chart_series_value_label_number_formats(self, drawable_object_id)?;
         formats
@@ -43,7 +43,7 @@ impl PagesEditor {
     pub fn set_body_chart_series_value_label_number_format(
         &mut self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         format: NumberFormat,
     ) -> Result<()> {
         let mut formats = body_chart_series_value_label_number_formats(self, drawable_object_id)?;
@@ -131,12 +131,7 @@ fn set_body_chart_series_value_label_number_formats(
     Ok(())
 }
 
-fn format_index_error(
-    suite: &str,
-    drawable_object_id: u64,
-    series: ChartSeriesIndex,
-    count: usize,
-) -> Error {
+fn format_index_error(suite: &str, drawable_object_id: u64, series: Index, count: usize) -> Error {
     Error::InvalidFormat(format!(
         "{suite} chart {drawable_object_id} series index {} exceeds series count {count}",
         series.zero_based()

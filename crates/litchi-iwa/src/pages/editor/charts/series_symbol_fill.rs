@@ -8,7 +8,7 @@ use crate::charts::series_symbol_fill::{
     set_chart_series_symbol_fills as set_native,
     set_chart_series_symbol_image_fill_data as set_native_image,
 };
-use crate::charts::{ChartSeriesIndex, ChartSeriesSymbolFill};
+use crate::charts::{ChartSeriesSymbolFill, Index};
 use crate::shapes::{RgbaColor, ShapeImageFill, ShapeImageFillTechnique};
 
 impl PagesEditor {
@@ -22,7 +22,7 @@ impl PagesEditor {
     pub fn body_chart_series_symbol_fill(
         &self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<ChartSeriesSymbolFill> {
         let values = read(self, drawable_object_id)?;
         values
@@ -42,7 +42,7 @@ impl PagesEditor {
     pub fn set_body_chart_series_symbol_fill(
         &mut self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         fill: ChartSeriesSymbolFill,
     ) -> Result<()> {
         let mut values = read(self, drawable_object_id)?;
@@ -60,7 +60,7 @@ impl PagesEditor {
     pub fn reset_body_chart_series_symbol_fill(
         &mut self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<ChartSeriesSymbolFill> {
         let graph = body_chart_graph(self, drawable_object_id)?;
         let count = series_count(&graph, drawable_object_id)?;
@@ -88,7 +88,7 @@ impl PagesEditor {
     pub fn set_body_chart_series_symbol_image_fill(
         &mut self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         preferred_filename: &str,
         data: &[u8],
         technique: ShapeImageFillTechnique,
@@ -180,7 +180,7 @@ fn series_count(graph: &BodyChartGraph, drawable_object_id: u64) -> Result<usize
     )
 }
 
-fn index_error(drawable_object_id: u64, series: ChartSeriesIndex, count: usize) -> Error {
+fn index_error(drawable_object_id: u64, series: Index, count: usize) -> Error {
     Error::InvalidFormat(format!(
         "Pages chart {drawable_object_id} has {count} series, not series {}",
         series.zero_based() + 1

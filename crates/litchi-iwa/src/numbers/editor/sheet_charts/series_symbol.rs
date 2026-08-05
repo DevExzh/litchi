@@ -5,7 +5,7 @@ use super::*;
 use crate::charts::series_symbol::{
     chart_series_symbols as read_native_symbols, set_chart_series_symbols as set_native_symbols,
 };
-use crate::charts::{ChartSeriesIndex, ChartSeriesSymbol};
+use crate::charts::{ChartSeriesSymbol, Index};
 
 impl NumbersEditor {
     pub fn sheet_chart_series_symbols(
@@ -20,7 +20,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<Option<ChartSeriesSymbol>> {
         let symbols = self.sheet_chart_series_symbols(sheet_id, drawable_object_id)?;
         symbols
@@ -42,7 +42,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         symbol: Option<ChartSeriesSymbol>,
     ) -> Result<()> {
         let mut symbols = self.sheet_chart_series_symbols(sheet_id, drawable_object_id)?;
@@ -118,7 +118,7 @@ fn set_sheet_chart_series_symbols(
 fn symbol_index_error(
     application: &str,
     drawable_object_id: u64,
-    series: ChartSeriesIndex,
+    series: Index,
     count: usize,
 ) -> Error {
     Error::InvalidFormat(format!(

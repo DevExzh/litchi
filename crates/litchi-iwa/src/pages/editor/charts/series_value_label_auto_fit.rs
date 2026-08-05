@@ -6,7 +6,7 @@ use crate::charts::series_value_label_auto_fit::{
     chart_series_value_label_auto_fits as read_native_auto_fits,
     set_chart_series_value_label_auto_fits as set_native_auto_fits,
 };
-use crate::charts::{ChartSeriesIndex, ChartSeriesValueLabelAutoFit};
+use crate::charts::{ChartSeriesValueLabelAutoFit, Index};
 
 impl PagesEditor {
     /// Read every series' value-label Auto-Fit setting in native series order.
@@ -21,7 +21,7 @@ impl PagesEditor {
     pub fn body_chart_series_value_label_auto_fit(
         &self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<ChartSeriesValueLabelAutoFit> {
         let values = body_chart_series_value_label_auto_fits(self, drawable_object_id)?;
         values
@@ -43,7 +43,7 @@ impl PagesEditor {
     pub fn set_body_chart_series_value_label_auto_fit(
         &mut self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         value: ChartSeriesValueLabelAutoFit,
     ) -> Result<()> {
         let mut values = body_chart_series_value_label_auto_fits(self, drawable_object_id)?;
@@ -131,7 +131,7 @@ fn set_body_chart_series_value_label_auto_fits(
 fn auto_fit_index_error(
     suite: &str,
     drawable_object_id: u64,
-    series: ChartSeriesIndex,
+    series: Index,
     count: usize,
 ) -> Error {
     Error::InvalidFormat(format!(

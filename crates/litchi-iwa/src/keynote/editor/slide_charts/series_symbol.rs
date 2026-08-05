@@ -5,7 +5,7 @@ use super::*;
 use crate::charts::series_symbol::{
     chart_series_symbols as read_native_symbols, set_chart_series_symbols as set_native_symbols,
 };
-use crate::charts::{ChartSeriesIndex, ChartSeriesSymbol};
+use crate::charts::{ChartSeriesSymbol, Index};
 
 impl KeynoteEditor {
     pub fn slide_chart_series_symbols(
@@ -20,7 +20,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<Option<ChartSeriesSymbol>> {
         let symbols = self.slide_chart_series_symbols(slide_index, drawable_object_id)?;
         symbols
@@ -42,7 +42,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         symbol: Option<ChartSeriesSymbol>,
     ) -> Result<()> {
         let mut symbols = self.slide_chart_series_symbols(slide_index, drawable_object_id)?;
@@ -118,7 +118,7 @@ fn set_slide_chart_series_symbols(
 fn symbol_index_error(
     application: &str,
     drawable_object_id: u64,
-    series: ChartSeriesIndex,
+    series: Index,
     count: usize,
 ) -> Error {
     Error::InvalidFormat(format!(

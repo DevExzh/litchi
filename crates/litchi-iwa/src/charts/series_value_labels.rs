@@ -15,6 +15,7 @@ use crate::charts::series_non_style::{
 use crate::protobuf::tsch;
 use crate::wire::{parse_wire_fields, patch_varint_field};
 use crate::{Error, IWorkPackage, Result};
+use litchi_iwa_common::chart::series_labels::Visibility;
 
 const AREA_VALUE_LABELS_FIELD: u32 = 38;
 const BAR_VALUE_LABELS_FIELD: u32 = 39;
@@ -25,48 +26,6 @@ const PIE_VALUE_LABELS_FIELD: u32 = 44;
 const SCATTER_VALUE_LABELS_FIELD: u32 = 45;
 const RADAR_VALUE_LABELS_FIELD: u32 = 162;
 
-/// Visibility of one chart series' data value labels.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ChartSeriesValueLabelVisibility {
-    Hidden,
-    Visible,
-}
-
-impl ChartSeriesValueLabelVisibility {
-    /// Return whether value labels are visible.
-    pub const fn is_visible(self) -> bool {
-        matches!(self, Self::Visible)
-    }
-}
-
-impl From<bool> for ChartSeriesValueLabelVisibility {
-    fn from(visible: bool) -> Self {
-        if visible { Self::Visible } else { Self::Hidden }
-    }
-}
-
-impl From<ChartSeriesValueLabelVisibility> for bool {
-    fn from(visibility: ChartSeriesValueLabelVisibility) -> Self {
-        visibility.is_visible()
-    }
-}
-
-/// Zero-based index of one series in native chart-series order.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ChartSeriesIndex(usize);
-
-impl ChartSeriesIndex {
-    /// Construct a zero-based series index.
-    pub const fn from_zero_based(index: usize) -> Self {
-        Self(index)
-    }
-
-    /// Return the zero-based series index.
-    pub const fn zero_based(self) -> usize {
-        self.0
-    }
-}
-
 /// Read value-label visibility for every series in native series order.
 pub(crate) fn chart_series_value_label_visibilities(
     package: &IWorkPackage,
@@ -75,7 +34,7 @@ pub(crate) fn chart_series_value_label_visibilities(
     drawable_label: &str,
     kind: Kind,
     series_count: usize,
-) -> Result<Vec<ChartSeriesValueLabelVisibility>> {
+) -> Result<Vec<Visibility>> {
     let storage = ValueLabelStorage::for_kind(kind)?;
     chart_series_non_style_values(
         package,
@@ -95,7 +54,7 @@ pub(crate) fn set_chart_series_value_label_visibilities(
     drawable_object_id: u64,
     drawable_label: &str,
     kind: Kind,
-    expected: &[ChartSeriesValueLabelVisibility],
+    expected: &[Visibility],
 ) -> Result<()> {
     let storage = ValueLabelStorage::for_kind(kind)?;
     set_chart_series_non_style_values(
@@ -165,16 +124,16 @@ impl ValueLabelStorage {
         }
     }
 
-    const fn default_visibility(self) -> ChartSeriesValueLabelVisibility {
+    const fn default_visibility(self) -> Visibility {
         match self {
-            Self::Pie => ChartSeriesValueLabelVisibility::Visible,
+            Self::Pie => Visibility::Visible,
             Self::Area
             | Self::Bar
             | Self::Bubble
             | Self::Line
             | Self::Mixed
             | Self::Radar
-            | Self::Scatter => ChartSeriesValueLabelVisibility::Hidden,
+            | Self::Scatter => Visibility::Hidden,
         }
     }
 }
@@ -182,20 +141,20 @@ impl ValueLabelStorage {
 fn read_series_value_label_visibility(
     data: &[u8],
     storage: ValueLabelStorage,
-) -> Result<ChartSeriesValueLabelVisibility> {
+) -> Result<Visibility> {
     let Some(extension) = generated_chart_series_non_style_extension(data)? else {
         return Ok(storage.default_visibility());
     };
     tsch::generated::ChartSeriesNonStyleArchive::decode(extension)?;
     Ok(strict_optional_bool(extension, storage.field_number())?
-        .map(ChartSeriesValueLabelVisibility::from)
+        .map(Visibility::from)
         .unwrap_or_else(|| storage.default_visibility()))
 }
 
 fn patch_series_value_label_visibility(
     data: &[u8],
     storage: ValueLabelStorage,
-    visibility: ChartSeriesValueLabelVisibility,
+    visibility: Visibility,
 ) -> Result<Vec<u8>> {
     let field_number = storage.field_number();
     let Some(extension) = generated_chart_series_non_style_extension(data)? else {
@@ -261,7 +220,7 @@ fn strict_optional_bool(data: &[u8], field_number: u32) -> Result<Option<bool>> 
 fn validate_patched_visibility(
     data: &[u8],
     storage: ValueLabelStorage,
-    expected: ChartSeriesValueLabelVisibility,
+    expected: Visibility,
 ) -> Result<()> {
     if read_series_value_label_visibility(data, storage)? != expected {
         return Err(Error::InvalidFormat(
@@ -302,13 +261,13 @@ mod tests {
         let original = canonical_empty_chart_series_non_style_data().unwrap();
         assert_eq!(
             read_series_value_label_visibility(&original, ValueLabelStorage::Bar).unwrap(),
-            ChartSeriesValueLabelVisibility::Hidden
+            Visibility::Hidden
         );
         assert_eq!(
             patch_series_value_label_visibility(
                 &original,
                 ValueLabelStorage::Bar,
-                ChartSeriesValueLabelVisibility::Hidden,
+                Visibility::Hidden,
             )
             .unwrap(),
             original
@@ -317,18 +276,18 @@ mod tests {
         let visible = patch_series_value_label_visibility(
             &original,
             ValueLabelStorage::Bar,
-            ChartSeriesValueLabelVisibility::Visible,
+            Visibility::Visible,
         )
         .unwrap();
         assert_eq!(
             read_series_value_label_visibility(&visible, ValueLabelStorage::Bar).unwrap(),
-            ChartSeriesValueLabelVisibility::Visible
+            Visibility::Visible
         );
         assert_eq!(
             patch_series_value_label_visibility(
                 &visible,
                 ValueLabelStorage::Bar,
-                ChartSeriesValueLabelVisibility::Hidden,
+                Visibility::Hidden,
             )
             .unwrap(),
             original
@@ -340,23 +299,23 @@ mod tests {
         let original = canonical_empty_chart_series_non_style_data().unwrap();
         assert_eq!(
             read_series_value_label_visibility(&original, ValueLabelStorage::Pie).unwrap(),
-            ChartSeriesValueLabelVisibility::Visible
+            Visibility::Visible
         );
         let hidden = patch_series_value_label_visibility(
             &original,
             ValueLabelStorage::Pie,
-            ChartSeriesValueLabelVisibility::Hidden,
+            Visibility::Hidden,
         )
         .unwrap();
         assert_eq!(
             read_series_value_label_visibility(&hidden, ValueLabelStorage::Pie).unwrap(),
-            ChartSeriesValueLabelVisibility::Hidden
+            Visibility::Hidden
         );
         assert_eq!(
             patch_series_value_label_visibility(
                 &hidden,
                 ValueLabelStorage::Pie,
-                ChartSeriesValueLabelVisibility::Visible,
+                Visibility::Visible,
             )
             .unwrap(),
             original
@@ -380,7 +339,7 @@ mod tests {
         let visible = patch_series_value_label_visibility(
             &original,
             ValueLabelStorage::Bar,
-            ChartSeriesValueLabelVisibility::Visible,
+            Visibility::Visible,
         )
         .unwrap();
         let extension = generated_chart_series_non_style_extension(&visible)
@@ -424,10 +383,7 @@ mod tests {
         assert!(read_with_extension(&base, &non_canonical).is_err());
     }
 
-    fn read_with_extension(
-        base: &[u8],
-        extension: &[u8],
-    ) -> Result<ChartSeriesValueLabelVisibility> {
+    fn read_with_extension(base: &[u8], extension: &[u8]) -> Result<Visibility> {
         let data = patch_length_delimited_field(
             base,
             GENERATED_CHART_SERIES_NON_STYLE_EXTENSION_FIELD,

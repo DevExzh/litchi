@@ -6,7 +6,7 @@ use crate::charts::series_value_label_affixes::{
     chart_series_value_label_affixes as read_native_affixes,
     set_chart_series_value_label_affixes as set_native_affixes,
 };
-use crate::charts::{ChartSeriesIndex, LabelAffixes};
+use crate::charts::{Index, LabelAffixes};
 
 impl KeynoteEditor {
     /// Read every series' value-label affixes in native series order.
@@ -23,7 +23,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<LabelAffixes> {
         let affixes =
             slide_chart_series_value_label_affixes(self, slide_index, drawable_object_id)?;
@@ -48,7 +48,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         affixes: LabelAffixes,
     ) -> Result<()> {
         let mut values =
@@ -140,12 +140,7 @@ fn set_slide_chart_series_value_label_affixes(
     Ok(())
 }
 
-fn affix_index_error(
-    suite: &str,
-    drawable_object_id: u64,
-    series: ChartSeriesIndex,
-    count: usize,
-) -> Error {
+fn affix_index_error(suite: &str, drawable_object_id: u64, series: Index, count: usize) -> Error {
     Error::InvalidFormat(format!(
         "{suite} chart {drawable_object_id} series index {} exceeds series count {count}",
         series.zero_based()

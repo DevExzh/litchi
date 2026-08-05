@@ -6,7 +6,7 @@ use crate::charts::series_value_label_affixes::{
     chart_series_value_label_affixes as read_native_affixes,
     set_chart_series_value_label_affixes as set_native_affixes,
 };
-use crate::charts::{ChartSeriesIndex, LabelAffixes};
+use crate::charts::{Index, LabelAffixes};
 
 impl NumbersEditor {
     /// Read every series' value-label affixes in native series order.
@@ -23,7 +23,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<LabelAffixes> {
         let affixes = sheet_chart_series_value_label_affixes(self, sheet_id, drawable_object_id)?;
         affixes
@@ -47,7 +47,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         affixes: LabelAffixes,
     ) -> Result<()> {
         let mut values =
@@ -138,12 +138,7 @@ fn set_sheet_chart_series_value_label_affixes(
     Ok(())
 }
 
-fn affix_index_error(
-    suite: &str,
-    drawable_object_id: u64,
-    series: ChartSeriesIndex,
-    count: usize,
-) -> Error {
+fn affix_index_error(suite: &str, drawable_object_id: u64, series: Index, count: usize) -> Error {
     Error::InvalidFormat(format!(
         "{suite} chart {drawable_object_id} series index {} exceeds series count {count}",
         series.zero_based()

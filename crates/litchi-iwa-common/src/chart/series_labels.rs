@@ -30,6 +30,7 @@ impl From<Visibility> for bool {
 }
 
 /// Zero-based index of one series in native chart-series order.
+#[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Index(usize);
 
@@ -55,6 +56,7 @@ mod tests {
 
     #[test]
     fn visibility_round_trips_to_boolean() {
+        assert_eq!(size_of::<Visibility>(), 1);
         assert!(!Visibility::Hidden.is_visible());
         assert!(Visibility::Visible.is_visible());
         assert_eq!(Visibility::from(false), Visibility::Hidden);

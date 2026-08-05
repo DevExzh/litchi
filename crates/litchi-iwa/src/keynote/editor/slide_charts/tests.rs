@@ -10,12 +10,12 @@ use crate::charts::{
     ChartGapSpacing, ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendFrame,
     ChartLegendRect, ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance,
     ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners,
-    ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke,
-    ChartSeriesStrokePattern, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
+    ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesStroke, ChartSeriesStrokePattern,
+    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
     ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAutoFit,
-    ChartSeriesValueLabelLocation, ChartSeriesValueLabelVisibility, ChartShadow, DecimalPlaces,
-    LabelAffixes, LabelVisibility, LeaderLineVisibility, MajorStepCount, MinorStepCount,
-    NegativeStyle, NumberFormat, Scale, Steps, TickMarkLocation,
+    ChartSeriesValueLabelLocation, ChartShadow, DecimalPlaces, Index, LabelAffixes,
+    LabelVisibility, LeaderLineVisibility, MajorStepCount, MinorStepCount, NegativeStyle,
+    NumberFormat, Scale, Steps, TickMarkLocation, Visibility,
 };
 use crate::keynote::KeynoteDocumentBuilder;
 use crate::shapes::{
@@ -2145,8 +2145,8 @@ fn scratch_presentation_supports_inherited_series_fill_crud() {
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-    let first = ChartSeriesIndex::from_zero_based(0);
-    let second = ChartSeriesIndex::from_zero_based(1);
+    let first = Index::from_zero_based(0);
+    let second = Index::from_zero_based(1);
     editor
         .set_slide_chart_series_fill(0, source.drawable_object_id, first, &ShapeFill::None)
         .unwrap();
@@ -2225,8 +2225,8 @@ fn scratch_presentation_supports_inherited_series_stroke_crud() {
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-    let first = ChartSeriesIndex::from_zero_based(0);
-    let second = ChartSeriesIndex::from_zero_based(1);
+    let first = Index::from_zero_based(0);
+    let second = Index::from_zero_based(1);
     let rounded = chart_series_stroke(ChartSeriesStrokePattern::RoundedDash, 3.5);
     let medium = chart_series_stroke(ChartSeriesStrokePattern::MediumDash, 2.0);
     editor
@@ -2968,11 +2968,8 @@ fn scratch_presentation_supports_native_series_value_label_crud() {
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
-    let defaults = [ChartSeriesValueLabelVisibility::Hidden; 2];
-    let customized = [
-        ChartSeriesValueLabelVisibility::Visible,
-        ChartSeriesValueLabelVisibility::Hidden,
-    ];
+    let defaults = [Visibility::Hidden; 2];
+    let customized = [Visibility::Visible, Visibility::Hidden];
 
     assert_eq!(
         editor
@@ -2994,10 +2991,10 @@ fn scratch_presentation_supports_native_series_value_label_crud() {
             .slide_chart_series_value_label_visibility(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(0),
+                Index::from_zero_based(0),
             )
             .unwrap(),
-        ChartSeriesValueLabelVisibility::Visible
+        Visibility::Visible
     );
     editor
         .set_slide_chart_series_value_label_visibilities(0, source.drawable_object_id, &defaults)
@@ -3014,8 +3011,8 @@ fn scratch_presentation_supports_native_series_value_label_crud() {
         .set_slide_chart_series_value_label_visibility(
             0,
             source.drawable_object_id,
-            ChartSeriesIndex::from_zero_based(0),
-            ChartSeriesValueLabelVisibility::Hidden,
+            Index::from_zero_based(0),
+            Visibility::Hidden,
         )
         .unwrap();
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -3047,7 +3044,7 @@ fn scratch_presentation_supports_native_series_value_label_crud() {
             .slide_chart_series_value_label_visibility(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(2),
+                Index::from_zero_based(2),
             )
             .is_err()
     );
@@ -3093,7 +3090,7 @@ fn scratch_presentation_supports_native_series_value_label_location_crud() {
             .slide_chart_series_value_label_location(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(0),
+                Index::from_zero_based(0),
             )
             .unwrap(),
         ChartSeriesValueLabelLocation::Outside
@@ -3113,7 +3110,7 @@ fn scratch_presentation_supports_native_series_value_label_location_crud() {
         .set_slide_chart_series_value_label_location(
             0,
             source.drawable_object_id,
-            ChartSeriesIndex::from_zero_based(0),
+            Index::from_zero_based(0),
             ChartSeriesValueLabelLocation::Top,
         )
         .unwrap();
@@ -3146,7 +3143,7 @@ fn scratch_presentation_supports_native_series_value_label_location_crud() {
             .slide_chart_series_value_label_location(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(2),
+                Index::from_zero_based(2),
             )
             .is_err()
     );
@@ -3192,7 +3189,7 @@ fn scratch_presentation_supports_native_series_value_label_affix_crud() {
             .slide_chart_series_value_label_affix(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(0),
+                Index::from_zero_based(0),
             )
             .unwrap()
             .prefix(),
@@ -3205,7 +3202,7 @@ fn scratch_presentation_supports_native_series_value_label_affix_crud() {
         .set_slide_chart_series_value_label_affix(
             0,
             source.drawable_object_id,
-            ChartSeriesIndex::from_zero_based(0),
+            Index::from_zero_based(0),
             LabelAffixes::default(),
         )
         .unwrap();
@@ -3213,7 +3210,7 @@ fn scratch_presentation_supports_native_series_value_label_affix_crud() {
         .set_slide_chart_series_value_label_affix(
             0,
             source.drawable_object_id,
-            ChartSeriesIndex::from_zero_based(1),
+            Index::from_zero_based(1),
             LabelAffixes::default(),
         )
         .unwrap();
@@ -3247,7 +3244,7 @@ fn scratch_presentation_supports_native_series_value_label_affix_crud() {
             .slide_chart_series_value_label_affix(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(2),
+                Index::from_zero_based(2),
             )
             .is_err()
     );
@@ -3298,7 +3295,7 @@ fn scratch_presentation_supports_native_series_value_label_number_format_crud() 
             .slide_chart_series_value_label_number_format(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(0),
+                Index::from_zero_based(0),
             )
             .unwrap(),
         fixed_two
@@ -3311,7 +3308,7 @@ fn scratch_presentation_supports_native_series_value_label_number_format_crud() 
         .set_slide_chart_series_value_label_number_format(
             0,
             source.drawable_object_id,
-            ChartSeriesIndex::from_zero_based(0),
+            Index::from_zero_based(0),
             NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
         )
         .unwrap();
@@ -3344,7 +3341,7 @@ fn scratch_presentation_supports_native_series_value_label_number_format_crud() 
             .slide_chart_series_value_label_number_format(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(2),
+                Index::from_zero_based(2),
             )
             .is_err()
     );
@@ -3389,7 +3386,7 @@ fn scratch_presentation_supports_native_series_value_label_auto_fit_crud() {
             .slide_chart_series_value_label_auto_fit(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(0),
+                Index::from_zero_based(0),
             )
             .unwrap(),
         ChartSeriesValueLabelAutoFit::Disabled
@@ -3402,7 +3399,7 @@ fn scratch_presentation_supports_native_series_value_label_auto_fit_crud() {
         .set_slide_chart_series_value_label_auto_fit(
             0,
             source.drawable_object_id,
-            ChartSeriesIndex::from_zero_based(0),
+            Index::from_zero_based(0),
             ChartSeriesValueLabelAutoFit::Enabled,
         )
         .unwrap();
@@ -3435,7 +3432,7 @@ fn scratch_presentation_supports_native_series_value_label_auto_fit_crud() {
             .slide_chart_series_value_label_auto_fit(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(2),
+                Index::from_zero_based(2),
             )
             .is_err()
     );
@@ -3487,11 +3484,7 @@ fn scratch_presentation_supports_native_series_trendline_crud() {
         .unwrap();
     assert_eq!(
         editor
-            .slide_chart_series_trendline(
-                0,
-                source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(1),
-            )
+            .slide_chart_series_trendline(0, source.drawable_object_id, Index::from_zero_based(1),)
             .unwrap(),
         customized[1]
     );
@@ -3504,7 +3497,7 @@ fn scratch_presentation_supports_native_series_trendline_crud() {
             .set_slide_chart_series_trendline(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(series),
+                Index::from_zero_based(series),
                 ChartSeriesTrendline::none(),
             )
             .unwrap();
@@ -3531,11 +3524,7 @@ fn scratch_presentation_supports_native_series_trendline_crud() {
     );
     assert!(
         reopened
-            .slide_chart_series_trendline(
-                0,
-                source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(2),
-            )
+            .slide_chart_series_trendline(0, source.drawable_object_id, Index::from_zero_based(2),)
             .is_err()
     );
     assert!(ChartSeriesTrendline::unsupported(1).is_err());
@@ -3602,11 +3591,7 @@ fn scratch_presentation_supports_native_series_error_bar_crud() {
         .unwrap();
     assert_eq!(
         editor
-            .slide_chart_series_error_bar(
-                0,
-                source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(1),
-            )
+            .slide_chart_series_error_bar(0, source.drawable_object_id, Index::from_zero_based(1),)
             .unwrap(),
         customized[1]
     );
@@ -3615,7 +3600,7 @@ fn scratch_presentation_supports_native_series_error_bar_crud() {
             .slide_chart_series_error_bar_auto_fit(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(0),
+                Index::from_zero_based(0),
             )
             .unwrap(),
         ChartSeriesErrorBarAutoFit::Disabled
@@ -3629,7 +3614,7 @@ fn scratch_presentation_supports_native_series_error_bar_crud() {
             .set_slide_chart_series_error_bar(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(series),
+                Index::from_zero_based(series),
                 ChartSeriesErrorBars::None,
             )
             .unwrap();
@@ -3684,11 +3669,7 @@ fn scratch_presentation_supports_native_series_error_bar_crud() {
     );
     assert!(
         reopened
-            .slide_chart_series_error_bar(
-                0,
-                source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(2),
-            )
+            .slide_chart_series_error_bar(0, source.drawable_object_id, Index::from_zero_based(2),)
             .is_err()
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected);

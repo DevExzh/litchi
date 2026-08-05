@@ -5,7 +5,7 @@ use super::*;
 use crate::charts::series_connection_line::{
     chart_series_connection_lines as read_native, set_chart_series_connection_lines as set_native,
 };
-use crate::charts::{ChartSeriesConnectionLine, ChartSeriesIndex};
+use crate::charts::{ChartSeriesConnectionLine, Index};
 
 impl NumbersEditor {
     /// Read connection geometry in native series order.
@@ -22,7 +22,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<ChartSeriesConnectionLine> {
         let values = read(self, sheet_id, drawable_object_id)?;
         values
@@ -46,7 +46,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         value: ChartSeriesConnectionLine,
     ) -> Result<()> {
         let mut values = read(self, sheet_id, drawable_object_id)?;
@@ -122,7 +122,7 @@ fn set(
     Ok(())
 }
 
-fn index_error(drawable_object_id: u64, series: ChartSeriesIndex, count: usize) -> Error {
+fn index_error(drawable_object_id: u64, series: Index, count: usize) -> Error {
     Error::InvalidFormat(format!(
         "Numbers chart {drawable_object_id} has {count} series, not series {}",
         series.zero_based() + 1

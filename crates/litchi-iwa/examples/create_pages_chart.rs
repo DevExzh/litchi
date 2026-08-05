@@ -9,9 +9,8 @@ use litchi_iwa::charts::{
     ChartLegendFontSize, ChartLegendShadow, ChartLegendStroke, ChartRoundedCorners,
     ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesStroke, ChartSeriesStrokePattern,
     ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesValueLabelAutoFit,
-    ChartSeriesValueLabelLocation, ChartSeriesValueLabelVisibility, ChartShadow, DecimalPlaces,
-    Kind, LabelAffixes, MajorStepCount, MinorStepCount, NegativeStyle, NumberFormat, Scale, Steps,
-    TickMarkLocation,
+    ChartSeriesValueLabelLocation, ChartShadow, DecimalPlaces, Kind, LabelAffixes, MajorStepCount,
+    MinorStepCount, NegativeStyle, NumberFormat, Scale, Steps, TickMarkLocation, Visibility,
 };
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{
@@ -199,7 +198,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.set_body_chart_series_value_label_visibilities(
         chart.drawable_object_id,
-        &[ChartSeriesValueLabelVisibility::Visible; 2],
+        &[Visibility::Visible; 2],
     )?;
     editor.set_body_chart_series_value_label_locations(
         chart.drawable_object_id,

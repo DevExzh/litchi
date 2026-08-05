@@ -6,7 +6,7 @@ use crate::charts::series_value_label_auto_fit::{
     chart_series_value_label_auto_fits as read_native_auto_fits,
     set_chart_series_value_label_auto_fits as set_native_auto_fits,
 };
-use crate::charts::{ChartSeriesIndex, ChartSeriesValueLabelAutoFit};
+use crate::charts::{ChartSeriesValueLabelAutoFit, Index};
 
 impl KeynoteEditor {
     /// Read every series' value-label Auto-Fit setting in native series order.
@@ -23,7 +23,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<ChartSeriesValueLabelAutoFit> {
         let values =
             slide_chart_series_value_label_auto_fits(self, slide_index, drawable_object_id)?;
@@ -47,7 +47,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         value: ChartSeriesValueLabelAutoFit,
     ) -> Result<()> {
         let mut values =
@@ -140,7 +140,7 @@ fn set_slide_chart_series_value_label_auto_fits(
 fn auto_fit_index_error(
     suite: &str,
     drawable_object_id: u64,
-    series: ChartSeriesIndex,
+    series: Index,
     count: usize,
 ) -> Error {
     Error::InvalidFormat(format!(

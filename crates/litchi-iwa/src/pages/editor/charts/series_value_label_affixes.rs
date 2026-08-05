@@ -6,7 +6,7 @@ use crate::charts::series_value_label_affixes::{
     chart_series_value_label_affixes as read_native_affixes,
     set_chart_series_value_label_affixes as set_native_affixes,
 };
-use crate::charts::{ChartSeriesIndex, LabelAffixes};
+use crate::charts::{Index, LabelAffixes};
 
 impl PagesEditor {
     /// Read every series' value-label affixes in native series order.
@@ -21,7 +21,7 @@ impl PagesEditor {
     pub fn body_chart_series_value_label_affix(
         &self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<LabelAffixes> {
         let affixes = body_chart_series_value_label_affixes(self, drawable_object_id)?;
         affixes
@@ -43,7 +43,7 @@ impl PagesEditor {
     pub fn set_body_chart_series_value_label_affix(
         &mut self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         affixes: LabelAffixes,
     ) -> Result<()> {
         let mut values = body_chart_series_value_label_affixes(self, drawable_object_id)?;
@@ -131,12 +131,7 @@ fn set_body_chart_series_value_label_affixes(
     Ok(())
 }
 
-fn affix_index_error(
-    suite: &str,
-    drawable_object_id: u64,
-    series: ChartSeriesIndex,
-    count: usize,
-) -> Error {
+fn affix_index_error(suite: &str, drawable_object_id: u64, series: Index, count: usize) -> Error {
     Error::InvalidFormat(format!(
         "{suite} chart {drawable_object_id} series index {} exceeds series count {count}",
         series.zero_based()

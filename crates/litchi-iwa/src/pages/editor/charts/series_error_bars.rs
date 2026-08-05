@@ -6,7 +6,7 @@ use crate::charts::series_error_bars::{
     chart_series_error_bars as read_native_error_bars,
     set_chart_series_error_bars as set_native_error_bars,
 };
-use crate::charts::{ChartSeriesErrorBars, ChartSeriesIndex};
+use crate::charts::{ChartSeriesErrorBars, Index};
 
 impl PagesEditor {
     /// Read every body chart series' error bars in native series order.
@@ -21,7 +21,7 @@ impl PagesEditor {
     pub fn body_chart_series_error_bar(
         &self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<ChartSeriesErrorBars> {
         let values = body_chart_series_error_bars(self, drawable_object_id)?;
         values
@@ -43,7 +43,7 @@ impl PagesEditor {
     pub fn set_body_chart_series_error_bar(
         &mut self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         value: ChartSeriesErrorBars,
     ) -> Result<()> {
         let mut values = body_chart_series_error_bars(self, drawable_object_id)?;
@@ -131,7 +131,7 @@ fn set_body_chart_series_error_bars(
 fn error_bar_index_error(
     drawable_label: &str,
     drawable_object_id: u64,
-    series: ChartSeriesIndex,
+    series: Index,
     series_count: usize,
 ) -> Error {
     Error::InvalidFormat(format!(

@@ -6,7 +6,7 @@ use crate::charts::series_error_bars::{
     chart_series_error_bars as read_native_error_bars,
     set_chart_series_error_bars as set_native_error_bars,
 };
-use crate::charts::{ChartSeriesErrorBars, ChartSeriesIndex};
+use crate::charts::{ChartSeriesErrorBars, Index};
 
 impl KeynoteEditor {
     /// Read every series' error bars in native series order.
@@ -23,7 +23,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<ChartSeriesErrorBars> {
         let values = slide_chart_series_error_bars(self, slide_index, drawable_object_id)?;
         values.get(series.zero_based()).cloned().ok_or_else(|| {
@@ -46,7 +46,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         value: ChartSeriesErrorBars,
     ) -> Result<()> {
         let mut values = slide_chart_series_error_bars(self, slide_index, drawable_object_id)?;
@@ -136,7 +136,7 @@ fn set_slide_chart_series_error_bars(
 fn error_bar_index_error(
     drawable_label: &str,
     drawable_object_id: u64,
-    series: ChartSeriesIndex,
+    series: Index,
     series_count: usize,
 ) -> Error {
     Error::InvalidFormat(format!(

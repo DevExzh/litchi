@@ -10,9 +10,7 @@ use crate::charts::series_value_labels::{
     chart_series_value_label_visibilities as read_native_value_labels,
     set_chart_series_value_label_visibilities as set_native_value_labels,
 };
-use crate::charts::{
-    ChartSeriesIndex, ChartSeriesValueLabelLocation, ChartSeriesValueLabelVisibility,
-};
+use crate::charts::{ChartSeriesValueLabelLocation, Index, Visibility};
 
 impl NumbersEditor {
     /// Read every series' value-label visibility in native series order.
@@ -20,7 +18,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<Vec<ChartSeriesValueLabelVisibility>> {
+    ) -> Result<Vec<Visibility>> {
         sheet_chart_series_value_label_visibilities(self, sheet_id, drawable_object_id)
     }
 
@@ -29,8 +27,8 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
-    ) -> Result<ChartSeriesValueLabelVisibility> {
+        series: Index,
+    ) -> Result<Visibility> {
         let visibilities =
             sheet_chart_series_value_label_visibilities(self, sheet_id, drawable_object_id)?;
         visibilities
@@ -46,7 +44,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        visibilities: &[ChartSeriesValueLabelVisibility],
+        visibilities: &[Visibility],
     ) -> Result<()> {
         set_sheet_chart_series_value_label_visibilities(
             self,
@@ -61,8 +59,8 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
-        visibility: ChartSeriesValueLabelVisibility,
+        series: Index,
+        visibility: Visibility,
     ) -> Result<()> {
         let mut visibilities =
             sheet_chart_series_value_label_visibilities(self, sheet_id, drawable_object_id)?;
@@ -96,7 +94,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<ChartSeriesValueLabelLocation> {
         let locations =
             sheet_chart_series_value_label_locations(self, sheet_id, drawable_object_id)?;
@@ -120,7 +118,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         location: ChartSeriesValueLabelLocation,
     ) -> Result<()> {
         let mut locations =
@@ -141,7 +139,7 @@ fn sheet_chart_series_value_label_visibilities(
     editor: &NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-) -> Result<Vec<ChartSeriesValueLabelVisibility>> {
+) -> Result<Vec<Visibility>> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     let series_count = value_label_series_count(
         graph.info.kind,
@@ -164,7 +162,7 @@ fn set_sheet_chart_series_value_label_visibilities(
     editor: &mut NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    visibilities: &[ChartSeriesValueLabelVisibility],
+    visibilities: &[Visibility],
 ) -> Result<()> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     let series_count = value_label_series_count(
@@ -302,7 +300,7 @@ pub(super) fn value_label_series_count(
 fn value_label_index_error(
     drawable_label: &str,
     drawable_object_id: u64,
-    series: ChartSeriesIndex,
+    series: Index,
     series_count: usize,
 ) -> Error {
     Error::InvalidFormat(format!(

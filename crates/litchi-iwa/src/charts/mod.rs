@@ -110,6 +110,7 @@ pub use litchi_iwa_common::chart::number_format::{
 pub use litchi_iwa_common::chart::pie::{
     LabelVisibility, LeaderLineVisibility, LeaderLineVisibilityKind,
 };
+pub use litchi_iwa_common::chart::series_labels::{Index, Visibility};
 pub use litchi_iwa_common::chart::{Direction, DirectionKind};
 pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};
 pub use pie_label_distance::ChartPieLabelDistance;
@@ -141,7 +142,6 @@ pub use series_trendline::{
 };
 pub use series_value_label_auto_fit::ChartSeriesValueLabelAutoFit;
 pub use series_value_label_location::ChartSeriesValueLabelLocation;
-pub use series_value_labels::{ChartSeriesIndex, ChartSeriesValueLabelVisibility};
 pub use shadow::ChartShadow;
 
 impl From<litchi_iwa_common::chart::axis::bounds::Error> for crate::Error {
