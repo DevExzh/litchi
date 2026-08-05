@@ -1,7 +1,4 @@
-use litchi_odt::style::paragraph::drop_cap::{
-    DropCapDistance, DropCapLength, ParagraphDropCap, ParagraphStyleDropCap,
-    parse_paragraph_style_drop_caps,
-};
+use litchi_odt::style::paragraph::drop_cap::{Distance, DropCap, Length, Style, parse};
 use litchi_odt::style::paragraph::tab_stop::{
     ParagraphStyleTabStops, ParagraphTabStop, ParagraphTabStops, TabStopPosition,
 };
@@ -20,16 +17,16 @@ fn parses_aliases_all_values_inheritance_and_round_trip() {
         r#"<s:style s:name="Parent" s:family="paragraph"><s:paragraph-properties><s:drop-cap s:style-name="Drop Character" s:distance="0.15in" s:lines="3" s:length="word"></s:drop-cap></s:paragraph-properties></s:style>"#,
         r#"<s:style s:name="Child" s:family="paragraph" s:parent-style-name="Parent"/>"#
     ));
-    let parsed = parse_paragraph_style_drop_caps(&xml).unwrap();
+    let parsed = parse(&xml).unwrap();
     assert_eq!(parsed.styles.len(), 3);
     let parent = parsed.get("Parent").unwrap();
     let cap = parent.drop_cap.as_ref().unwrap();
-    assert_eq!(cap.length, Some(DropCapLength::Word));
+    assert_eq!(cap.length, Some(Length::Word));
     assert_eq!(cap.lines, Some(3));
     assert_eq!(cap.distance.as_ref().unwrap().as_str(), "0.15in");
     assert_eq!(parsed.resolved_drop_cap("Child").unwrap(), Some(cap));
     let fragment = parent.to_xml_fragment().unwrap();
-    let reparsed = parse_paragraph_style_drop_caps(&wrap(&fragment)).unwrap();
+    let reparsed = parse(&wrap(&fragment)).unwrap();
     assert_eq!(reparsed.get("Parent"), Some(parent));
 }
 
@@ -45,7 +42,7 @@ fn parses_real_libreoffice_fixture() {
         style
             .drop_cap
             .as_ref()
-            .is_some_and(|cap| cap.lines == Some(3) && cap.length == Some(DropCapLength::Word))
+            .is_some_and(|cap| cap.lines == Some(3) && cap.length == Some(Length::Word))
     }));
 }
 
@@ -85,22 +82,19 @@ fn rejects_malformed_namespace_structure_cardinality_and_values() {
         ),
     ];
     for xml in invalid {
-        assert!(
-            parse_paragraph_style_drop_caps(&xml).is_err(),
-            "accepted {xml}"
-        );
+        assert!(parse(&xml).is_err(), "accepted {xml}");
     }
 }
 
 #[test]
 fn builder_package_composition_and_mutation_round_trip() {
-    let cap = ParagraphDropCap {
-        length: Some(DropCapLength::Characters(1)),
+    let cap = DropCap {
+        length: Some(Length::Characters(1)),
         lines: Some(3),
-        distance: Some(DropCapDistance::new("0.2cm").unwrap()),
+        distance: Some(Distance::new("0.2cm").unwrap()),
         style_name: Some("DropLetter".into()),
     };
-    let mut drop_style = ParagraphStyleDropCap::named("Opening", Some(cap)).unwrap();
+    let mut drop_style = Style::named("Opening", Some(cap)).unwrap();
     drop_style.parent_style_name = Some("Standard".into());
     let stops = ParagraphTabStops::try_from_vec(vec![ParagraphTabStop::new(
         TabStopPosition::new("2cm").unwrap(),
@@ -130,8 +124,8 @@ fn builder_package_composition_and_mutation_round_trip() {
     let mut mutable =
         litchi_odt::mutable::MutableDocument::from_document(Document::from_bytes(bytes).unwrap())
             .unwrap();
-    let replacement = ParagraphDropCap {
-        length: Some(DropCapLength::Word),
+    let replacement = DropCap {
+        length: Some(Length::Word),
         lines: Some(4),
         distance: None,
         style_name: None,

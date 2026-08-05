@@ -32,11 +32,11 @@ fn name_ok(value: &str, field: &str) -> Result<()> {
 
 /// ODF `style:length`: the first word or a positive number of characters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DropCapLength {
+pub enum Length {
     Word,
     Characters(u32),
 }
-impl DropCapLength {
+impl Length {
     fn parse(value: &str) -> Result<Self> {
         if value == "word" {
             return Ok(Self::Word);
@@ -61,8 +61,8 @@ impl DropCapLength {
 
 /// Valid ODF physical length lexical value for `style:distance`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DropCapDistance(String);
-impl DropCapDistance {
+pub struct Distance(String);
+impl Distance {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         if value.len() > MAX_VALUE || !physical_length(&value) {
@@ -99,13 +99,13 @@ fn physical_length(value: &str) -> bool {
 
 /// Complete empty `style:drop-cap` element.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ParagraphDropCap {
-    pub length: Option<DropCapLength>,
+pub struct DropCap {
+    pub length: Option<Length>,
     pub lines: Option<u32>,
-    pub distance: Option<DropCapDistance>,
+    pub distance: Option<Distance>,
     pub style_name: Option<String>,
 }
-impl ParagraphDropCap {
+impl DropCap {
     pub fn new() -> Self {
         Self::default()
     }
@@ -141,8 +141,8 @@ impl ParagraphDropCap {
         }
         if let Some(value) = self.length {
             let value = match value {
-                DropCapLength::Word => "word".to_owned(),
-                DropCapLength::Characters(value) => value.to_string(),
+                Length::Word => "word".to_owned(),
+                Length::Characters(value) => value.to_string(),
             };
             xml.push_str(&format!(r#" style:length="{value}""#));
         }
@@ -159,14 +159,14 @@ impl ParagraphDropCap {
 
 /// A named or default paragraph style and its direct optional drop cap.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParagraphStyleDropCap {
+pub struct Style {
     pub name: Option<String>,
     pub parent_style_name: Option<String>,
     pub is_default_style: bool,
-    pub drop_cap: Option<ParagraphDropCap>,
+    pub drop_cap: Option<DropCap>,
 }
-impl ParagraphStyleDropCap {
-    pub fn named(name: impl Into<String>, drop_cap: Option<ParagraphDropCap>) -> Result<Self> {
+impl Style {
+    pub fn named(name: impl Into<String>, drop_cap: Option<DropCap>) -> Result<Self> {
         let result = Self {
             name: Some(name.into()),
             parent_style_name: None,
@@ -176,7 +176,7 @@ impl ParagraphStyleDropCap {
         result.validate()?;
         Ok(result)
     }
-    pub fn default_style(drop_cap: Option<ParagraphDropCap>) -> Self {
+    pub fn default_style(drop_cap: Option<DropCap>) -> Self {
         Self {
             name: None,
             parent_style_name: None,
@@ -231,19 +231,19 @@ impl ParagraphStyleDropCap {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ParagraphStyleDropCapSet {
-    pub styles: Vec<ParagraphStyleDropCap>,
+pub struct Styles {
+    pub styles: Vec<Style>,
 }
-impl ParagraphStyleDropCapSet {
-    pub fn get(&self, name: &str) -> Option<&ParagraphStyleDropCap> {
+impl Styles {
+    pub fn get(&self, name: &str) -> Option<&Style> {
         self.styles
             .iter()
             .find(|style| style.name.as_deref() == Some(name))
     }
-    pub fn default_style(&self) -> Option<&ParagraphStyleDropCap> {
+    pub fn default_style(&self) -> Option<&Style> {
         self.styles.iter().find(|style| style.is_default_style)
     }
-    pub fn resolved_drop_cap(&self, name: &str) -> Result<Option<&ParagraphDropCap>> {
+    pub fn resolved_drop_cap(&self, name: &str) -> Result<Option<&DropCap>> {
         let mut current = self.get(name);
         let mut seen = HashSet::new();
         while let Some(style) = current {
@@ -298,7 +298,7 @@ fn style_attrs(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<Option<ParagraphStyleDropCap>> {
+) -> Result<Option<Style>> {
     let mut name = None;
     let mut parent = None;
     let mut family = None;
@@ -326,7 +326,7 @@ fn style_attrs(
     if family.as_deref() != Some("paragraph") {
         return Ok(None);
     }
-    let result = ParagraphStyleDropCap {
+    let result = Style {
         name,
         parent_style_name: parent,
         is_default_style: start.local_name().as_ref() == b"default-style",
@@ -339,8 +339,8 @@ fn cap_attrs(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<ParagraphDropCap> {
-    let mut cap = ParagraphDropCap::new();
+) -> Result<DropCap> {
+    let mut cap = DropCap::new();
     let mut seen = HashSet::new();
     for attr in start.attributes().with_checks(true) {
         let attr = attr.map_err(|error| bad(format!("invalid drop-cap attribute: {error}")))?;
@@ -356,14 +356,14 @@ fn cap_attrs(
             return Err(bad("style:drop-cap attribute is too large"));
         }
         match local.as_ref() {
-            b"length" => cap.length = Some(DropCapLength::parse(&value)?),
+            b"length" => cap.length = Some(Length::parse(&value)?),
             b"lines" => {
                 let lines = value
                     .parse::<u32>()
                     .map_err(|_| bad("style:lines must be a positive integer"))?;
                 cap.lines = Some(lines);
             },
-            b"distance" => cap.distance = Some(DropCapDistance::new(value)?),
+            b"distance" => cap.distance = Some(Distance::new(value)?),
             b"style-name" => {
                 name_ok(&value, "style:style-name")?;
                 cap.style_name = Some(value);
@@ -376,16 +376,12 @@ fn cap_attrs(
 }
 struct Active {
     depth: usize,
-    style: ParagraphStyleDropCap,
+    style: Style,
     properties: bool,
     cap: bool,
     open_cap: Option<usize>,
 }
-fn push_style(
-    styles: &mut Vec<ParagraphStyleDropCap>,
-    style: ParagraphStyleDropCap,
-    total: &mut usize,
-) -> Result<()> {
+fn push_style(styles: &mut Vec<Style>, style: Style, total: &mut usize) -> Result<()> {
     if styles.len() >= MAX_STYLES {
         return Err(bad("too many paragraph styles"));
     }
@@ -415,12 +411,12 @@ fn text_is_empty(text: &quick_xml::events::BytesText<'_>) -> bool {
 }
 
 /// Parse ODF paragraph styles and the optional direct `style:drop-cap` child.
-pub fn parse_paragraph_style_drop_caps(xml: &str) -> Result<ParagraphStyleDropCapSet> {
+pub fn parse(xml: &str) -> Result<Styles> {
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
     }
     if !xml.contains("drop-cap") {
-        return Ok(ParagraphStyleDropCapSet::default());
+        return Ok(Styles::default());
     }
     let mut reader = NsReader::from_reader(xml.as_bytes());
     reader.config_mut().trim_text(false);
@@ -576,19 +572,13 @@ pub fn parse_paragraph_style_drop_caps(xml: &str) -> Result<ParagraphStyleDropCa
     if !stack.is_empty() || active.is_some() {
         return Err(bad("truncated styles XML"));
     }
-    Ok(ParagraphStyleDropCapSet { styles })
+    Ok(Styles { styles })
 }
 
-pub(crate) fn same_style_identity(
-    cap: &ParagraphStyleDropCap,
-    tabs: &ParagraphStyleTabStops,
-) -> bool {
+pub(crate) fn same_style_identity(cap: &Style, tabs: &ParagraphStyleTabStops) -> bool {
     cap.is_default_style == tabs.is_default_style && cap.name == tabs.name
 }
-pub(crate) fn merge_with_tab_style(
-    tabs: &ParagraphStyleTabStops,
-    cap: &ParagraphStyleDropCap,
-) -> Result<String> {
+pub(crate) fn merge_with_tab_style(tabs: &ParagraphStyleTabStops, cap: &Style) -> Result<String> {
     tabs.validate()?;
     cap.validate()?;
     if !same_style_identity(cap, tabs) || cap.parent_style_name != tabs.parent_style_name {
@@ -651,10 +641,7 @@ fn expand(xml: &str, span: &Span, value: &str) -> Result<String> {
     ))
 }
 
-pub(crate) fn set_paragraph_style_drop_cap_xml(
-    xml: &str,
-    requested: &ParagraphStyleDropCap,
-) -> Result<String> {
+pub(crate) fn set_xml(xml: &str, requested: &Style) -> Result<String> {
     requested.validate()?;
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
@@ -812,7 +799,7 @@ pub(crate) fn set_paragraph_style_drop_cap_xml(
     let replacement = requested
         .drop_cap
         .as_ref()
-        .map(ParagraphDropCap::to_xml_fragment)
+        .map(DropCap::to_xml_fragment)
         .transpose()?;
     if let Some(cap) = &spans.cap {
         return Ok(replace(xml, cap, replacement.as_deref().unwrap_or("")));
@@ -840,15 +827,13 @@ pub(crate) fn set_paragraph_style_drop_cap_xml(
 }
 
 impl OpenDocumentPackage {
-    pub fn paragraph_style_drop_caps(&self) -> Result<ParagraphStyleDropCapSet> {
-        self.styles_xml()?.map_or_else(
-            || Ok(ParagraphStyleDropCapSet::default()),
-            |xml| parse_paragraph_style_drop_caps(&xml),
-        )
+    pub fn paragraph_style_drop_caps(&self) -> Result<Styles> {
+        self.styles_xml()?
+            .map_or_else(|| Ok(Styles::default()), |xml| parse(&xml))
     }
 }
 impl FlatOpenDocument {
-    pub fn paragraph_style_drop_caps(&self) -> Result<ParagraphStyleDropCapSet> {
-        parse_paragraph_style_drop_caps(self.xml())
+    pub fn paragraph_style_drop_caps(&self) -> Result<Styles> {
+        parse(self.xml())
     }
 }
