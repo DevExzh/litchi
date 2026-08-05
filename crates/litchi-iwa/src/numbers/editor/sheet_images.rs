@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use litchi_iwa_common::media::Type as MediaType;
 
 use super::*;
-use crate::ImageAdjustments;
 use litchi_iwa_common::comment::DrawableId;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
@@ -18,6 +17,7 @@ use crate::shapes::{
     ShapeImageDataIdentifier, flip_drawable_geometry, offset_drawable_geometry,
     restore_drawable_original_size,
 };
+use litchi_iwa_common::shape::image::ImageAdjustments;
 
 mod graph;
 
@@ -818,7 +818,7 @@ mod tests {
 
     use super::*;
     use crate::numbers::NumbersDocumentBuilder;
-    use crate::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
+    use litchi_iwa_common::shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 
     const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 180.0 };
     const IMAGE_SIZE: DrawableSize = DrawableSize {
