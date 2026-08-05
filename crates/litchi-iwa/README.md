@@ -360,14 +360,14 @@ style inheritance, and UUID graph are all source-built:
 
 ```rust
 use litchi_iwa::pages::PagesEditor;
-use litchi_iwa::shapes::{DrawablePoint, LineEndpoint, LineEndpoints};
+use litchi_iwa::shapes::{DrawablePoint, Endpoint, Endpoints};
 
 let mut pages = PagesEditor::create_with_text("Built without a template")?;
 let line = pages.add_body_line_with_endpoints(
     pages.body_text()?.encode_utf16().count(),
     DrawablePoint { x: 180.0, y: 240.0 },
     DrawablePoint { x: 480.0, y: 390.0 },
-    LineEndpoints::new(LineEndpoint::OpenCircle, LineEndpoint::FilledArrow),
+    Endpoints::new(Endpoint::OpenCircle, Endpoint::FilledArrow),
 )?;
 pages.set_body_line_segment(
     line.drawable_object_id,
@@ -376,7 +376,7 @@ pages.set_body_line_segment(
 )?;
 assert_eq!(
     pages.body_line_endpoints(line.drawable_object_id)?.end,
-    LineEndpoint::FilledArrow,
+    Endpoint::FilledArrow,
 );
 // pages.reset_body_line_endpoints(line.drawable_object_id)?; // delete decorations
 pages.save("created-with-line.pages")?;
@@ -550,7 +550,7 @@ inheritance, and UUID graph are emitted without a source package:
 
 ```rust
 use litchi_iwa::numbers::NumbersDocumentBuilder;
-use litchi_iwa::shapes::{DrawablePoint, LineEndpoint, LineEndpoints};
+use litchi_iwa::shapes::{DrawablePoint, Endpoint, Endpoints};
 
 let mut numbers = NumbersDocumentBuilder::new().build()?;
 let sheet_id = numbers.sheets()?[0].object_id;
@@ -558,7 +558,7 @@ let line = numbers.add_sheet_line_with_endpoints(
     sheet_id,
     DrawablePoint { x: 420.0, y: 300.0 },
     DrawablePoint { x: 720.0, y: 450.0 },
-    LineEndpoints::new(LineEndpoint::FilledCircle, LineEndpoint::SimpleArrow),
+    Endpoints::new(Endpoint::FilledCircle, Endpoint::SimpleArrow),
 )?;
 numbers.set_sheet_line_segment(
     sheet_id,
@@ -570,7 +570,7 @@ assert_eq!(
     numbers
         .sheet_line_endpoints(sheet_id, line.drawable_object_id)?
         .start,
-    LineEndpoint::FilledCircle,
+    Endpoint::FilledCircle,
 );
 // numbers.reset_sheet_line_endpoints(sheet_id, line.drawable_object_id)?;
 numbers.save("created-with-line.numbers")?;
@@ -782,14 +782,14 @@ stand-ins, ownership, z-order, style inheritance, and UUIDs are source-built:
 
 ```rust
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::shapes::{DrawablePoint, LineEndpoint, LineEndpoints};
+use litchi_iwa::shapes::{DrawablePoint, Endpoint, Endpoints};
 
 let mut keynote = KeynoteDocumentBuilder::new().build()?;
 let line = keynote.add_slide_line_with_endpoints(
     0,
     DrawablePoint { x: 720.0, y: 660.0 },
     DrawablePoint { x: 1_200.0, y: 900.0 },
-    LineEndpoints::new(LineEndpoint::OpenSquare, LineEndpoint::FilledDiamond),
+    Endpoints::new(Endpoint::OpenSquare, Endpoint::FilledDiamond),
 )?;
 keynote.set_slide_line_segment(
     0,
@@ -801,7 +801,7 @@ assert_eq!(
     keynote
         .slide_line_endpoints(0, line.drawable_object_id)?
         .end,
-    LineEndpoint::FilledDiamond,
+    Endpoint::FilledDiamond,
 );
 // keynote.reset_slide_line_endpoints(0, line.drawable_object_id)?;
 keynote.save("created-with-line.key")?;

@@ -8,10 +8,10 @@ use crate::package_metadata::{
     remove_component_external_references_to_object,
 };
 use crate::shapes::{
-    DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
-    LineEndpoints, LineSegment, LineStyle, RgbaColor, ShapeFill, ShapeImageFill,
-    ShapeImageFillTechnique, ShapePathKind, ShapeShadow, ShapeStroke, flip_drawable_geometry,
-    line_geometry, line_path_source, line_segments_match, reset_shape_effects, reset_shape_fill,
+    DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, Endpoints,
+    LineSegment, LineStyle, RgbaColor, ShapeFill, ShapeImageFill, ShapeImageFillTechnique,
+    ShapePathKind, ShapeShadow, ShapeStroke, flip_drawable_geometry, line_geometry,
+    line_path_source, line_segments_match, reset_shape_effects, reset_shape_fill,
     reset_shape_shadow, reset_shape_stroke, reset_shape_text_layout, set_shape_effects,
     set_shape_fill, set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
     set_shape_line_segment, set_shape_preset, set_shape_shadow, set_shape_stroke,
@@ -47,7 +47,7 @@ pub struct PagesBodyShapeInfo {
     /// Document-space endpoints when this shape is a native straight line.
     pub line_segment: Option<LineSegment>,
     /// Directed start/end decorations when this shape is a native straight line.
-    pub line_endpoints: Option<LineEndpoints>,
+    pub line_endpoints: Option<Endpoints>,
     pub storage: TextStorageInfo,
     pub geometry: DrawableGeometry,
     pub properties: DrawableProperties,
@@ -153,7 +153,7 @@ impl PagesEditor {
         anchor_character_index: usize,
         start: DrawablePoint,
         end: DrawablePoint,
-        endpoints: LineEndpoints,
+        endpoints: Endpoints,
     ) -> Result<PagesBodyShapeInfo> {
         let created = self.add_body_line(anchor_character_index, start, end)?;
         self.set_body_line_endpoints(created.drawable_object_id, endpoints)?;
@@ -297,7 +297,7 @@ impl PagesEditor {
     }
 
     /// Read the directed start and end decorations of one native straight line.
-    pub fn body_line_endpoints(&self, drawable_object_id: u64) -> Result<LineEndpoints> {
+    pub fn body_line_endpoints(&self, drawable_object_id: u64) -> Result<Endpoints> {
         let source = body_shape_graph(self, drawable_object_id)?;
         source.info.line_endpoints.ok_or_else(|| {
             Error::ParseError(format!(
@@ -310,7 +310,7 @@ impl PagesEditor {
     pub fn set_body_line_endpoints(
         &mut self,
         drawable_object_id: u64,
-        endpoints: LineEndpoints,
+        endpoints: Endpoints,
     ) -> Result<()> {
         let source = body_shape_graph(self, drawable_object_id)?;
         if source.info.line_segment.is_none() {
@@ -340,10 +340,10 @@ impl PagesEditor {
     /// Returns `true` when decorations were reset and `false` when the line was
     /// already undecorated.
     pub fn reset_body_line_endpoints(&mut self, drawable_object_id: u64) -> Result<bool> {
-        if self.body_line_endpoints(drawable_object_id)? == LineEndpoints::default() {
+        if self.body_line_endpoints(drawable_object_id)? == Endpoints::default() {
             return Ok(false);
         }
-        self.set_body_line_endpoints(drawable_object_id, LineEndpoints::default())?;
+        self.set_body_line_endpoints(drawable_object_id, Endpoints::default())?;
         Ok(true)
     }
 
@@ -928,9 +928,9 @@ mod tests {
 
     use super::*;
     use crate::shapes::{
-        LineEndpoint, RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeGradient, ShapeGradientAngle,
-        ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset,
-        ShapeShadowOpacity, StrokePattern, StrokeWidth,
+        Endpoint, RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeShadowAngle,
+        ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity,
+        StrokePattern, StrokeWidth,
     };
     use crate::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
     use litchi_iwa_common::shape::effects::{Effects, Opacity, Reflection, ReflectionOpacity};
@@ -1223,7 +1223,7 @@ mod tests {
             StrokeWidth::new(3.5).unwrap(),
             StrokePattern::MediumDash,
         );
-        let endpoints = LineEndpoints::new(LineEndpoint::OpenCircle, LineEndpoint::FilledArrow);
+        let endpoints = Endpoints::new(Endpoint::OpenCircle, Endpoint::FilledArrow);
         let created = editor
             .add_body_line_with_style(
                 4,
@@ -1674,15 +1674,12 @@ mod tests {
                 4,
                 LINE_START,
                 LINE_END,
-                LineEndpoints::new(LineEndpoint::OpenCircle, LineEndpoint::FilledArrow),
+                Endpoints::new(Endpoint::OpenCircle, Endpoint::FilledArrow),
             )
             .unwrap();
         assert_eq!(
             created.line_endpoints,
-            Some(LineEndpoints::new(
-                LineEndpoint::OpenCircle,
-                LineEndpoint::FilledArrow
-            ))
+            Some(Endpoints::new(Endpoint::OpenCircle, Endpoint::FilledArrow))
         );
         let object_count_after_create = editor
             .package()
@@ -1691,7 +1688,7 @@ mod tests {
             .sum::<usize>();
 
         let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-        let replacement = LineEndpoints::new(LineEndpoint::Line, LineEndpoint::SimpleArrow);
+        let replacement = Endpoints::new(Endpoint::Line, Endpoint::SimpleArrow);
         reopened
             .set_body_line_endpoints(created.drawable_object_id, replacement)
             .unwrap();
@@ -1726,7 +1723,7 @@ mod tests {
             reopened
                 .body_line_endpoints(created.drawable_object_id)
                 .unwrap(),
-            LineEndpoints::default()
+            Endpoints::default()
         );
         let object_count_after_reset = reopened
             .package()

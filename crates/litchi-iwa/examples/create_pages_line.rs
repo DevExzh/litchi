@@ -4,7 +4,7 @@ use std::env;
 
 use litchi_iwa::pages::PagesEditor;
 use litchi_iwa::shapes::{
-    DrawablePoint, LineEndpoint, LineEndpoints, LineStyle, RgbColorSpace, RgbaColor, ShapeStroke,
+    DrawablePoint, Endpoint, Endpoints, LineStyle, RgbColorSpace, RgbaColor, ShapeStroke,
     StrokePattern, StrokeWidth,
 };
 
@@ -28,10 +28,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         body.encode_utf16().count(),
         DrawablePoint { x: 180.0, y: 240.0 },
         DrawablePoint { x: 480.0, y: 390.0 },
-        LineStyle::new(stroke).with_endpoints(LineEndpoints::new(
-            LineEndpoint::OpenCircle,
-            LineEndpoint::FilledArrow,
-        )),
+        LineStyle::new(stroke)
+            .with_endpoints(Endpoints::new(Endpoint::OpenCircle, Endpoint::FilledArrow)),
     )?;
     editor.set_body_line_segment(
         created.drawable_object_id,

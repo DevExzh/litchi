@@ -4,7 +4,7 @@ use std::env;
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{
-    DrawablePoint, LineEndpoint, LineEndpoints, LineStyle, RgbColorSpace, RgbaColor, ShapeStroke,
+    DrawablePoint, Endpoint, Endpoints, LineStyle, RgbColorSpace, RgbaColor, ShapeStroke,
     StrokePattern, StrokeWidth,
 };
 
@@ -33,9 +33,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             x: 1_200.0,
             y: 900.0,
         },
-        LineStyle::new(stroke).with_endpoints(LineEndpoints::new(
-            LineEndpoint::OpenSquare,
-            LineEndpoint::FilledDiamond,
+        LineStyle::new(stroke).with_endpoints(Endpoints::new(
+            Endpoint::OpenSquare,
+            Endpoint::FilledDiamond,
         )),
     )?;
     editor.set_slide_line_segment(

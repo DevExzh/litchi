@@ -2,7 +2,7 @@
 
 use crate::{Error, Result};
 
-use super::LineEndpoints;
+use super::Endpoints;
 #[cfg(test)]
 use super::color::RgbColorSpace;
 use super::color::RgbaColor;
@@ -101,18 +101,18 @@ pub struct ShapeStroke {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LineStyle {
     pub stroke: ShapeStroke,
-    pub endpoints: LineEndpoints,
+    pub endpoints: Endpoints,
 }
 
 impl LineStyle {
     pub const fn new(stroke: ShapeStroke) -> Self {
         Self {
             stroke,
-            endpoints: LineEndpoints::new(super::LineEndpoint::None, super::LineEndpoint::None),
+            endpoints: Endpoints::new(super::Endpoint::None, super::Endpoint::None),
         }
     }
 
-    pub const fn with_endpoints(mut self, endpoints: LineEndpoints) -> Self {
+    pub const fn with_endpoints(mut self, endpoints: Endpoints) -> Self {
         self.endpoints = endpoints;
         self
     }

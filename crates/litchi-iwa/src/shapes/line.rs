@@ -11,6 +11,8 @@ use crate::wire::{
 };
 use crate::{Error, Result};
 
+pub use litchi_iwa_common::shape::line::{Endpoint, Endpoints};
+
 use super::geometry::{
     DrawableGeometry, DrawablePoint, DrawableSize, geometry_from_drawable, patch_drawable_geometry,
 };

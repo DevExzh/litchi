@@ -4,7 +4,7 @@ use std::env;
 
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{
-    DrawablePoint, LineEndpoint, LineEndpoints, LineStyle, RgbColorSpace, RgbaColor, ShapeStroke,
+    DrawablePoint, Endpoint, Endpoints, LineStyle, RgbColorSpace, RgbaColor, ShapeStroke,
     StrokePattern, StrokeWidth,
 };
 
@@ -31,9 +31,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         sheet_id,
         DrawablePoint { x: 420.0, y: 300.0 },
         DrawablePoint { x: 720.0, y: 450.0 },
-        LineStyle::new(stroke).with_endpoints(LineEndpoints::new(
-            LineEndpoint::FilledCircle,
-            LineEndpoint::SimpleArrow,
+        LineStyle::new(stroke).with_endpoints(Endpoints::new(
+            Endpoint::FilledCircle,
+            Endpoint::SimpleArrow,
         )),
     )?;
     editor.set_sheet_line_segment(

@@ -17,7 +17,7 @@ use crate::wire::{
 use crate::{Error, IWorkPackage, Result};
 
 use super::{
-    LineEndpoint, LineEndpoints, SHAPE_INFO_MESSAGE_TYPE, SHAPE_STYLE_MESSAGE_TYPE, reference,
+    Endpoint, Endpoints, SHAPE_INFO_MESSAGE_TYPE, SHAPE_STYLE_MESSAGE_TYPE, reference,
     shape_line_endpoints,
 };
 
@@ -281,24 +281,22 @@ pub(crate) fn shape_style_is_exclusive(package: &IWorkPackage, style_id: u64) ->
     Ok(shape_count == 1)
 }
 
-pub(crate) fn endpoint_from_archive(
-    endpoint: Option<&tsd::LineEndArchive>,
-) -> Result<LineEndpoint> {
+pub(crate) fn endpoint_from_archive(endpoint: Option<&tsd::LineEndArchive>) -> Result<Endpoint> {
     let Some(endpoint) = endpoint else {
-        return Ok(LineEndpoint::None);
+        return Ok(Endpoint::None);
     };
     match endpoint.identifier.as_deref().unwrap_or("none") {
-        "none" => Ok(LineEndpoint::None),
-        "simple arrow" => Ok(LineEndpoint::SimpleArrow),
-        "filled circle" => Ok(LineEndpoint::FilledCircle),
-        "filled diamond" => Ok(LineEndpoint::FilledDiamond),
-        "open arrow" => Ok(LineEndpoint::OpenArrow),
-        "filled arrow" => Ok(LineEndpoint::FilledArrow),
-        "filled square" => Ok(LineEndpoint::FilledSquare),
-        "open square" => Ok(LineEndpoint::OpenSquare),
-        "open circle" => Ok(LineEndpoint::OpenCircle),
-        "inverted arrow" => Ok(LineEndpoint::InvertedArrow),
-        "line" => Ok(LineEndpoint::Line),
+        "none" => Ok(Endpoint::None),
+        "simple arrow" => Ok(Endpoint::SimpleArrow),
+        "filled circle" => Ok(Endpoint::FilledCircle),
+        "filled diamond" => Ok(Endpoint::FilledDiamond),
+        "open arrow" => Ok(Endpoint::OpenArrow),
+        "filled arrow" => Ok(Endpoint::FilledArrow),
+        "filled square" => Ok(Endpoint::FilledSquare),
+        "open square" => Ok(Endpoint::OpenSquare),
+        "open circle" => Ok(Endpoint::OpenCircle),
+        "inverted arrow" => Ok(Endpoint::InvertedArrow),
+        "line" => Ok(Endpoint::Line),
         identifier => Err(Error::InvalidFormat(format!(
             "unsupported native iWork line endpoint {identifier:?}"
         ))),
@@ -550,9 +548,7 @@ pub(crate) fn collapse_line_end_variation(
     let drawable_id = location.drawable_id;
     let mut staged = package.clone();
     collapse_style_variation(&mut staged, location)?;
-    if shape_line_endpoints(&staged, &drawable_archive_name, drawable_id)?
-        != LineEndpoints::default()
-    {
+    if shape_line_endpoints(&staged, &drawable_archive_name, drawable_id)? != Endpoints::default() {
         return Err(Error::InvalidFormat(
             "iWork line endpoint-style reset failed validation".to_owned(),
         ));

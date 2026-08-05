@@ -6,10 +6,10 @@ use std::ops::Range;
 use super::*;
 use crate::image_caption::DrawableCaptionKind;
 use crate::shapes::{
-    DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
-    LineEndpoints, LineSegment, LineStyle, RgbaColor, ShapeFill, ShapeImageFill,
-    ShapeImageFillTechnique, ShapePathKind, ShapeShadow, ShapeStroke, flip_drawable_geometry,
-    line_geometry, line_path_source, line_segments_match, reset_shape_effects, reset_shape_fill,
+    DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, Endpoints,
+    LineSegment, LineStyle, RgbaColor, ShapeFill, ShapeImageFill, ShapeImageFillTechnique,
+    ShapePathKind, ShapeShadow, ShapeStroke, flip_drawable_geometry, line_geometry,
+    line_path_source, line_segments_match, reset_shape_effects, reset_shape_fill,
     reset_shape_shadow, reset_shape_stroke, reset_shape_text_layout, set_shape_effects,
     set_shape_fill, set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
     set_shape_line_segment, set_shape_preset, set_shape_shadow, set_shape_stroke,
@@ -50,7 +50,7 @@ pub struct KeynoteSlideShapeInfo {
     /// Slide-space endpoints when this shape is a native straight line.
     pub line_segment: Option<LineSegment>,
     /// Directed start/end decorations when this shape is a native straight line.
-    pub line_endpoints: Option<LineEndpoints>,
+    pub line_endpoints: Option<Endpoints>,
     pub storage: TextStorageInfo,
     pub geometry: DrawableGeometry,
     pub properties: DrawableProperties,
@@ -159,7 +159,7 @@ impl KeynoteEditor {
         slide_index: usize,
         start: DrawablePoint,
         end: DrawablePoint,
-        endpoints: LineEndpoints,
+        endpoints: Endpoints,
     ) -> Result<KeynoteSlideShapeInfo> {
         let created = self.add_slide_line(slide_index, start, end)?;
         self.set_slide_line_endpoints(slide_index, created.drawable_object_id, endpoints)?;
@@ -299,7 +299,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<LineEndpoints> {
+    ) -> Result<Endpoints> {
         let source = shape_graph(self, slide_index, drawable_object_id)?;
         source.info.line_endpoints.ok_or_else(|| {
             Error::ParseError(format!(
@@ -313,7 +313,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        endpoints: LineEndpoints,
+        endpoints: Endpoints,
     ) -> Result<()> {
         let source = shape_graph(self, slide_index, drawable_object_id)?;
         if source.info.line_segment.is_none() {
@@ -347,10 +347,10 @@ impl KeynoteEditor {
         slide_index: usize,
         drawable_object_id: u64,
     ) -> Result<bool> {
-        if self.slide_line_endpoints(slide_index, drawable_object_id)? == LineEndpoints::default() {
+        if self.slide_line_endpoints(slide_index, drawable_object_id)? == Endpoints::default() {
             return Ok(false);
         }
-        self.set_slide_line_endpoints(slide_index, drawable_object_id, LineEndpoints::default())?;
+        self.set_slide_line_endpoints(slide_index, drawable_object_id, Endpoints::default())?;
         Ok(true)
     }
 
@@ -1247,9 +1247,7 @@ mod tests {
     use super::*;
     use crate::keynote::KeynoteDocumentBuilder;
     use crate::shapes::{
-        LineEndpoint, RgbColorSpace, RgbaColor, ShapeCurvedShadow, ShapeGradient,
-        ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity, ShapeGradientStop,
-        ShapeGradientStopMidpoint, ShapeGradientStopPosition, ShapeShadowAngle,
+        Endpoint, RgbColorSpace, RgbaColor, ShapeCurvedShadow, ShapeShadowAngle,
         ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowCurve, ShapeShadowOffset,
         ShapeShadowOpacity, StrokePattern, StrokeWidth,
     };
@@ -1541,7 +1539,7 @@ mod tests {
             StrokeWidth::new(5.0).unwrap(),
             StrokePattern::ShortDash,
         );
-        let endpoints = LineEndpoints::new(LineEndpoint::FilledDiamond, LineEndpoint::SimpleArrow);
+        let endpoints = Endpoints::new(Endpoint::FilledDiamond, Endpoint::SimpleArrow);
         let created = editor
             .add_slide_line_with_style(
                 0,
@@ -1837,19 +1835,19 @@ mod tests {
                 0,
                 LINE_START,
                 LINE_END,
-                LineEndpoints::new(LineEndpoint::OpenSquare, LineEndpoint::FilledDiamond),
+                Endpoints::new(Endpoint::OpenSquare, Endpoint::FilledDiamond),
             )
             .unwrap();
         assert_eq!(
             created.line_endpoints,
-            Some(LineEndpoints::new(
-                LineEndpoint::OpenSquare,
-                LineEndpoint::FilledDiamond
+            Some(Endpoints::new(
+                Endpoint::OpenSquare,
+                Endpoint::FilledDiamond
             ))
         );
 
         let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-        let replacement = LineEndpoints::new(LineEndpoint::SimpleArrow, LineEndpoint::OpenCircle);
+        let replacement = Endpoints::new(Endpoint::SimpleArrow, Endpoint::OpenCircle);
         reopened
             .set_slide_line_endpoints(0, created.drawable_object_id, replacement)
             .unwrap();
@@ -1868,7 +1866,7 @@ mod tests {
             reopened
                 .slide_line_endpoints(0, created.drawable_object_id)
                 .unwrap(),
-            LineEndpoints::default()
+            Endpoints::default()
         );
     }
 

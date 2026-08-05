@@ -3,4 +3,5 @@
 pub mod effects;
 pub mod fill;
 pub mod geometry;
+pub mod line;
 pub mod path;

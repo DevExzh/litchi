@@ -12,7 +12,7 @@ mod color;
 mod effects;
 mod fill;
 mod geometry;
-mod line;
+pub mod line;
 mod line_end;
 mod path;
 mod properties;
@@ -42,7 +42,7 @@ pub(crate) use line::{
     line_geometry, line_path_source, line_segments_match, set_shape_line_segment,
     shape_line_segment,
 };
-pub use line_end::{LineEndpoint, LineEndpoints};
+pub use line_end::{Endpoint, Endpoints};
 pub(crate) use line_end::{
     insert_style_variation, remove_style_variation, set_shape_line_endpoints, shape_line_endpoints,
 };

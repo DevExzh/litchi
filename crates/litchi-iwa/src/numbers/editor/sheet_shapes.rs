@@ -6,10 +6,10 @@ use std::ops::Range;
 use super::*;
 use crate::image_caption::DrawableCaptionKind;
 use crate::shapes::{
-    DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
-    LineEndpoints, LineSegment, LineStyle, RgbaColor, ShapeFill, ShapeImageFill,
-    ShapeImageFillTechnique, ShapePathKind, ShapeShadow, ShapeStroke, flip_drawable_geometry,
-    line_geometry, line_path_source, line_segments_match, reset_shape_effects, reset_shape_fill,
+    DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, Endpoints,
+    LineSegment, LineStyle, RgbaColor, ShapeFill, ShapeImageFill, ShapeImageFillTechnique,
+    ShapePathKind, ShapeShadow, ShapeStroke, flip_drawable_geometry, line_geometry,
+    line_path_source, line_segments_match, reset_shape_effects, reset_shape_fill,
     reset_shape_shadow, reset_shape_stroke, reset_shape_text_layout, set_shape_effects,
     set_shape_fill, set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
     set_shape_line_segment, set_shape_preset, set_shape_shadow, set_shape_stroke,
@@ -52,7 +52,7 @@ pub struct NumbersSheetShapeInfo {
     /// Sheet-space endpoints when this shape is a native straight line.
     pub line_segment: Option<LineSegment>,
     /// Directed start/end decorations when this shape is a native straight line.
-    pub line_endpoints: Option<LineEndpoints>,
+    pub line_endpoints: Option<Endpoints>,
     pub storage: TextStorageInfo,
     pub geometry: DrawableGeometry,
     pub properties: DrawableProperties,
@@ -161,7 +161,7 @@ impl NumbersEditor {
         sheet_id: u64,
         start: DrawablePoint,
         end: DrawablePoint,
-        endpoints: LineEndpoints,
+        endpoints: Endpoints,
     ) -> Result<NumbersSheetShapeInfo> {
         let created = self.add_sheet_line(sheet_id, start, end)?;
         self.set_sheet_line_endpoints(sheet_id, created.drawable_object_id, endpoints)?;
@@ -303,7 +303,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<LineEndpoints> {
+    ) -> Result<Endpoints> {
         let source = shape_graph(self, sheet_id, drawable_object_id)?;
         source.info.line_endpoints.ok_or_else(|| {
             Error::ParseError(format!(
@@ -317,7 +317,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        endpoints: LineEndpoints,
+        endpoints: Endpoints,
     ) -> Result<()> {
         let source = shape_graph(self, sheet_id, drawable_object_id)?;
         if source.info.line_segment.is_none() {
@@ -351,10 +351,10 @@ impl NumbersEditor {
         sheet_id: u64,
         drawable_object_id: u64,
     ) -> Result<bool> {
-        if self.sheet_line_endpoints(sheet_id, drawable_object_id)? == LineEndpoints::default() {
+        if self.sheet_line_endpoints(sheet_id, drawable_object_id)? == Endpoints::default() {
             return Ok(false);
         }
-        self.set_sheet_line_endpoints(sheet_id, drawable_object_id, LineEndpoints::default())?;
+        self.set_sheet_line_endpoints(sheet_id, drawable_object_id, Endpoints::default())?;
         Ok(true)
     }
 
@@ -1371,12 +1371,13 @@ mod tests {
     use super::*;
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{
-        LineEndpoint, RgbColorSpace, RgbaColor, ShapeContactShadow, ShapeGradient,
-        ShapeGradientAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset,
-        ShapeShadowOpacity, ShapeShadowPerspective, StrokePattern, StrokeWidth,
+        Endpoint, RgbColorSpace, RgbaColor, ShapeContactShadow, ShapeShadowAppearance,
+        ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity, ShapeShadowPerspective,
+        StrokePattern, StrokeWidth,
     };
     use crate::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
     use litchi_iwa_common::shape::effects::{Effects, Opacity, Reflection, ReflectionOpacity};
+    use litchi_iwa_common::shape::fill::{Angle, Gradient};
     use litchi_iwa_common::shape::path::CornerRadius;
 
     const POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 300.0 };
@@ -1672,7 +1673,7 @@ mod tests {
             StrokeWidth::new(4.0).unwrap(),
             StrokePattern::RoundedDash,
         );
-        let endpoints = LineEndpoints::new(LineEndpoint::FilledCircle, LineEndpoint::OpenArrow);
+        let endpoints = Endpoints::new(Endpoint::FilledCircle, Endpoint::OpenArrow);
         let created = editor
             .add_sheet_line_with_style(
                 sheet_id,
@@ -1947,7 +1948,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_typed_line_endpoint_crud() {
-        use crate::shapes::{LineEndpoint, LineEndpoints};
+        use crate::shapes::{Endpoint, Endpoints};
 
         let mut editor = NumbersDocumentBuilder::new()
             .sheet_name("Endpoint Styles")
@@ -1960,20 +1961,16 @@ mod tests {
                 sheet_id,
                 LINE_START,
                 LINE_END,
-                LineEndpoints::new(LineEndpoint::FilledSquare, LineEndpoint::OpenArrow),
+                Endpoints::new(Endpoint::FilledSquare, Endpoint::OpenArrow),
             )
             .unwrap();
         assert_eq!(
             created.line_endpoints,
-            Some(LineEndpoints::new(
-                LineEndpoint::FilledSquare,
-                LineEndpoint::OpenArrow
-            ))
+            Some(Endpoints::new(Endpoint::FilledSquare, Endpoint::OpenArrow))
         );
 
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-        let replacement =
-            LineEndpoints::new(LineEndpoint::InvertedArrow, LineEndpoint::FilledCircle);
+        let replacement = Endpoints::new(Endpoint::InvertedArrow, Endpoint::FilledCircle);
         reopened
             .set_sheet_line_endpoints(sheet_id, created.drawable_object_id, replacement)
             .unwrap();
@@ -1992,7 +1989,7 @@ mod tests {
             reopened
                 .sheet_line_endpoints(sheet_id, created.drawable_object_id)
                 .unwrap(),
-            LineEndpoints::default()
+            Endpoints::default()
         );
     }
 
