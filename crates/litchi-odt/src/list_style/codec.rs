@@ -1,8 +1,14 @@
-//! Typed ODF `text:list-style` declarations (numbered, bullet, and image levels).
+//! XML codecs for ODF `text:list-style` declarations.
 
+use super::{
+    MAX_BINARY, MAX_DEPTH, MAX_LEVEL, MAX_STYLES, MAX_TOTAL, MAX_VALUE, MAX_XML, bad,
+    model::{
+        BulletRelativeSize, BulletStyle, ImageSource, Kind, LevelStyle, NumberStyle, Style, Styles,
+    },
+    name_ok, parse_bool,
+};
 use crate::outline_style::{NumberFormat, PositiveInteger};
-use crate::{FlatDocument, Package};
-use litchi_core::{Error, Result, xml::escape_xml};
+use litchi_core::{Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
     events::{BytesStart, Event},
@@ -19,189 +25,8 @@ const STYLE_STR: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 const TEXT_STR: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const OFFICE_STR: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const XLINK_STR: &str = "http://www.w3.org/1999/xlink";
-const MAX_XML: usize = 64 * 1024 * 1024;
-const MAX_DEPTH: usize = 256;
-const MAX_STYLES: usize = 65_536;
-const MAX_VALUE: usize = 4_096;
-const MAX_TOTAL: usize = 16 * 1024 * 1024;
-const MAX_BINARY: usize = 8 * 1024 * 1024;
-/// Maximum `text:level` of a list level (ODF 1.2 allows deep lists).
-pub const MAX_LEVEL: u16 = 1_024;
 
-fn bad(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
-}
-fn name_ok(value: &str, field: &str) -> Result<()> {
-    if value.is_empty() || value.len() > MAX_VALUE || value.chars().any(char::is_control) {
-        return Err(bad(format!("invalid {field}")));
-    }
-    Ok(())
-}
-fn parse_bool(value: &str, field: &str) -> Result<bool> {
-    match value {
-        "true" | "1" => Ok(true),
-        "false" | "0" => Ok(false),
-        _ => Err(bad(format!("{field} must be an XML Schema boolean"))),
-    }
-}
-fn percent(value: &str) -> bool {
-    if value.len() > MAX_VALUE {
-        return false;
-    }
-    let Some(number) = value.strip_suffix('%') else {
-        return false;
-    };
-    let mut split = number.split('.');
-    let whole = split.next().unwrap_or_default();
-    let fraction = split.next();
-    if split.next().is_some() {
-        return false;
-    }
-    let digits = |part: &str| part.bytes().all(|byte| byte.is_ascii_digit());
-    match fraction {
-        None => !whole.is_empty() && digits(whole),
-        Some(fraction) => {
-            digits(whole) && digits(fraction) && (!whole.is_empty() || !fraction.is_empty())
-        },
-    }
-}
-
-/// Valid ODF non-negative `percent` lexical value for `text:bullet-relative-size`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BulletRelativeSize(String);
-impl BulletRelativeSize {
-    pub fn new(value: impl Into<String>) -> Result<Self> {
-        let value = value.into();
-        if !percent(&value) {
-            return Err(bad("text:bullet-relative-size must be an ODF percent"));
-        }
-        Ok(Self(value))
-    }
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-/// Level numbering decoration of a `text:list-level-style-number`.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct NumberStyle {
-    pub format: Option<NumberFormat>,
-    pub prefix: Option<String>,
-    pub suffix: Option<String>,
-    pub letter_sync: Option<bool>,
-    pub display_levels: Option<PositiveInteger>,
-    pub start_value: Option<PositiveInteger>,
-}
-impl NumberStyle {
-    pub fn validate(&self) -> Result<()> {
-        if self.letter_sync.is_some()
-            && !self
-                .format
-                .as_ref()
-                .is_some_and(|format| matches!(format.as_str(), "a" | "A"))
-        {
-            return Err(bad(
-                "style:num-letter-sync requires style:num-format 'a' or 'A'",
-            ));
-        }
-        if let Some(value) = &self.prefix {
-            name_ok(value, "style:num-prefix")?;
-        }
-        if let Some(value) = &self.suffix {
-            name_ok(value, "style:num-suffix")?;
-        }
-        Ok(())
-    }
-}
-
-/// Bullet decoration of a `text:list-level-style-bullet`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BulletStyle {
-    pub bullet_char: char,
-    pub relative_size: Option<BulletRelativeSize>,
-    pub prefix: Option<String>,
-    pub suffix: Option<String>,
-}
-impl BulletStyle {
-    pub fn new(bullet_char: char) -> Result<Self> {
-        let result = Self {
-            bullet_char,
-            relative_size: None,
-            prefix: None,
-            suffix: None,
-        };
-        result.validate()?;
-        Ok(result)
-    }
-    pub fn validate(&self) -> Result<()> {
-        if self.bullet_char.is_control() {
-            return Err(bad("text:bullet-char must not be a control character"));
-        }
-        if let Some(value) = &self.prefix {
-            name_ok(value, "style:num-prefix")?;
-        }
-        if let Some(value) = &self.suffix {
-            name_ok(value, "style:num-suffix")?;
-        }
-        Ok(())
-    }
-}
-
-/// Image source of a `text:list-level-style-image`: linked or embedded binary data.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ImageSource {
-    /// `xlink:href` reference to an image resource.
-    Linked(String),
-    /// Base64 content of an `office:binary-data` child.
-    Embedded(String),
-}
-impl ImageSource {
-    fn validate(&self) -> Result<()> {
-        match self {
-            Self::Linked(href) => name_ok(href, "xlink:href"),
-            Self::Embedded(data) => {
-                if data.len() > MAX_BINARY
-                    || !data.bytes().all(|byte| {
-                        byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'/' | b'=')
-                    })
-                {
-                    return Err(bad("office:binary-data must be base64 text"));
-                }
-                Ok(())
-            },
-        }
-    }
-}
-
-/// The level-specific decoration of one list level.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Kind {
-    Number(NumberStyle),
-    Bullet(BulletStyle),
-    Image(ImageSource),
-}
-
-/// One `text:list-level-style-*` declaration of a list style.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LevelStyle {
-    pub level: u16,
-    pub style_name: Option<String>,
-    pub kind: Kind,
-}
 impl LevelStyle {
-    pub fn validate(&self) -> Result<()> {
-        if !(1..=MAX_LEVEL).contains(&self.level) {
-            return Err(bad("text:level is outside the supported range"));
-        }
-        if let Some(value) = &self.style_name {
-            name_ok(value, "text:style-name")?;
-        }
-        match &self.kind {
-            Kind::Number(number) => number.validate(),
-            Kind::Bullet(bullet) => bullet.validate(),
-            Kind::Image(source) => source.validate(),
-        }
-    }
     fn to_xml_fragment(&self) -> Result<String> {
         self.validate()?;
         let tag = match &self.kind {
@@ -281,42 +106,7 @@ impl LevelStyle {
     }
 }
 
-/// One `text:list-style` declaration.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Style {
-    pub name: String,
-    pub display_name: Option<String>,
-    pub consecutive_numbering: Option<bool>,
-    pub levels: Vec<LevelStyle>,
-}
 impl Style {
-    pub fn new(name: impl Into<String>) -> Result<Self> {
-        let result = Self {
-            name: name.into(),
-            display_name: None,
-            consecutive_numbering: None,
-            levels: Vec::new(),
-        };
-        result.validate()?;
-        Ok(result)
-    }
-    pub fn level(&self, level: u16) -> Option<&LevelStyle> {
-        self.levels.iter().find(|entry| entry.level == level)
-    }
-    pub fn validate(&self) -> Result<()> {
-        name_ok(&self.name, "list style name")?;
-        if let Some(value) = &self.display_name {
-            name_ok(value, "style:display-name")?;
-        }
-        let mut seen = HashSet::new();
-        for level in &self.levels {
-            level.validate()?;
-            if !seen.insert(level.level) {
-                return Err(bad("duplicate list level"));
-            }
-        }
-        Ok(())
-    }
     pub fn to_xml_fragment(&self) -> Result<String> {
         self.validate()?;
         let mut xml = format!(
@@ -339,17 +129,6 @@ impl Style {
         }
         xml.push_str("</text:list-style>");
         Ok(xml)
-    }
-}
-
-/// All `text:list-style` declarations of one styles part.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Styles {
-    pub styles: Vec<Style>,
-}
-impl Styles {
-    pub fn get(&self, name: &str) -> Option<&Style> {
-        self.styles.iter().find(|style| style.name == name)
     }
 }
 
@@ -863,18 +642,4 @@ pub fn parse(xml: &str) -> Result<Styles> {
         return Err(bad("truncated styles XML"));
     }
     Ok(Styles { styles })
-}
-
-impl Package {
-    /// Parse the `text:list-style` declarations of the package `styles.xml`.
-    pub fn styles(&self) -> Result<Styles> {
-        self.styles_xml()?
-            .map_or_else(|| Ok(Styles::default()), |xml| parse(&xml))
-    }
-}
-impl FlatDocument {
-    /// Parse the `text:list-style` declarations of a flat XML document.
-    pub fn styles(&self) -> Result<Styles> {
-        parse(self.xml())
-    }
 }
