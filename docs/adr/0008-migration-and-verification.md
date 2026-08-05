@@ -5338,6 +5338,35 @@ bounded implementation and topology evidence, not a claim of complete
 `[MS-DOC]`, `[MS-ODRAW]`, `[MS-OGRAPH]`, `[MS-OSHARED]`, `[MS-PPT]`,
 `[MS-XLS]`, OOXML, or ODF conformance.
 
+## Layered OLE2, OOXML, ODF, and shared-codec owner continuation
+
+This owner wave continues the breaking, prefix-free topology migration through
+the next dense semantic facades. DOC mail-merge, stylesheet, and TAP writer
+owners; DOCX package ownership; ODraw shapes; OGraph chart models; PPT slide
+types; PPTX animation XML and table styles; XLSB formula codecs; and XLSX raw
+worksheets and workbook edits now separate contextual facades from typed
+models, wire/XML codecs, validation, and focused tests. ODS data-pilot and ODT
+graphic-property models receive the same nested organization. Existing public
+owner paths remain ergonomic, with no compatibility aliases or repeated
+format prefixes.
+
+The shared `litchi-ole-common::toolbar` owner adds bounded, inert
+`[MS-OSHARED]` `WString`, toolbar-header, control-header, flag, type, and
+dimension codecs. It preserves borrowed UTF-16 payloads, reserved bits, and
+deterministic serialization while deliberately not executing commands, macros,
+icons, or UI behavior. DOC/PPT/XLS format-specific CTB/Customization lifecycle
+integration remains a separate follow-up.
+
+Strict and lint-capped all-target checks pass for the affected DOC, DOCX, ODS,
+ODT, OLE common, ODraw, OGraph, PPT, PPTX, XLSB, and XLSX crates. The
+lint-capped library matrix passes DOC (841 with two ignored), DOCX (644), ODraw
+(59), ODS (67), ODT (512), OGraph (40), OLE common (32), PPT (882 with one
+ignored), PPTX (305), XLSB (413), and XLSX (645). Formatting, diff, and the
+46-package boundary check pass. This remains bounded migration and
+specification evidence, not a claim of complete `[MS-DOC]`, `[MS-ODRAW]`,
+`[MS-OGRAPH]`, `[MS-OSHARED]`, `[MS-PPT]`, `[MS-XLS]`, OOXML, or ODF
+conformance.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

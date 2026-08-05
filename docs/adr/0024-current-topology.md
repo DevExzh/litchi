@@ -120,6 +120,12 @@ The OLE2 owner now also has `parts/ole_controls`, which layers the inert
 `OcxInfo`/`RgxOcxInfo` metadata model, binary codec, FIB/table-stream seam, and
 tests without creating a control runtime or activation API.
 
+The shared `litchi-ole-common::toolbar` owner now layers the bounded,
+format-neutral `[MS-OSHARED]` `WString`, toolbar/control headers, flags, and
+dimensions into model and codec seams. It preserves borrowed payloads and
+reserved bits and remains inert: DOC/PPT/XLS command-bar lifecycle wiring and
+macro/UI execution are intentionally outside this common owner.
+
 ## ODF
 
 [`litchi-odf-common`](../../crates/litchi-odf-common/Cargo.toml) is the shared
@@ -154,6 +160,12 @@ web extensions, and section writing; PPT writer-core models; PPTX ChartEx
 semantic records; XLS revision records; XLSB host cell reading; and XLSX pivot
 reading. These changes are source topology and ownership evidence only; they
 do not broaden the format conformance claims in ADR 0023.
+
+The latest dense-owner pass additionally layers ODS data-pilot and ODT
+graphic-property models, OGraph chart models, and the DOC/DOCX/PPT/PPTX/XLSB/
+XLSX owners listed in ADR 0008. Their facades retain typed snapshots and
+format-specific ownership while moving semantic, wire/XML, validation, and
+test responsibilities into contextual folders.
 
 ## Historical terminology
 
