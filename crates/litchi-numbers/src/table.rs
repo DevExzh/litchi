@@ -8,6 +8,8 @@
 
 /// Checked row, column, and point-size values.
 pub mod dimension;
+/// Compact, archive-free cell coordinates and A1 selectors.
+pub mod coordinate;
 /// Checked, bounded plans for applying multiple cell mutations.
 pub mod edit;
 /// Checked, archive-free table sort semantics.
@@ -20,46 +22,15 @@ pub mod topology;
 use crate::cell::Value;
 use std::fmt;
 
-/// A checked zero-based table coordinate.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Position {
-    row: u32,
-    column: u32,
-}
+pub use coordinate::{AddressError, CellPosition, CellRange, Error as CoordinateError};
 
-impl Position {
-    /// Creates a zero-based coordinate.
-    #[must_use]
-    pub const fn new(row: u32, column: u32) -> Self {
-        Self { row, column }
-    }
+/// Narrow migration name for [`CellPosition`] used by existing archive
+/// adapters. New semantic code should use the focused name.
+pub type Position = CellPosition;
 
-    /// Converts platform-sized coordinates without truncation.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::CoordinateOverflow`] if either coordinate does not
-    /// fit in the compact representation.
-    pub fn try_from_usize(row: usize, column: usize) -> Result<Self> {
-        let compact_row =
-            u32::try_from(row).map_err(|_conversion| Error::CoordinateOverflow { row, column })?;
-        let compact_column = u32::try_from(column)
-            .map_err(|_conversion| Error::CoordinateOverflow { row, column })?;
-        Ok(Self::new(compact_row, compact_column))
-    }
-
-    /// Returns the zero-based row.
-    #[must_use]
-    pub const fn row(self) -> u32 {
-        self.row
-    }
-
-    /// Returns the zero-based column.
-    #[must_use]
-    pub const fn column(self) -> u32 {
-        self.column
-    }
-}
+/// Narrow migration name for [`CellRange`] used by existing archive adapters.
+/// New semantic code should use the focused name.
+pub type Range = CellRange;
 
 /// The declared addressable extent of a table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -118,7 +89,7 @@ impl Dimensions {
     ///
     /// Returns an error when the range is inverted or extends beyond this
     /// table's declared extent.
-    pub fn range(self, start: Position, end: Position) -> Result<Range> {
+    pub fn range(self, start: CellPosition, end: CellPosition) -> Result<CellRange> {
         let range = Range::new(start, end)?;
         if end.row > self.rows || end.column > self.columns {
             return Err(Error::OutOfBounds {
@@ -129,71 +100,29 @@ impl Dimensions {
         Ok(range)
     }
 
-    fn contains(self, position: Position) -> bool {
-        position.row < self.rows && position.column < self.columns
-    }
-}
-
-/// A zero-based, half-open rectangular table range.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Range {
-    start: Position,
-    end: Position,
-}
-
-impl Range {
-    /// Creates a range without a table-bound check.
+    /// Parses and validates a human-readable A1 range against this extent.
+    ///
+    /// A single A1 cell selects one cell; a range such as `B2:D4` is
+    /// interpreted as an inclusive A1 rectangle and returned as a half-open
+    /// semantic range.
     ///
     /// # Errors
     ///
-    /// Returns [`Error::InvalidRange`] if the end coordinate precedes the
-    /// start coordinate on either axis.
-    pub fn new(start: Position, end: Position) -> Result<Self> {
-        if start.row > end.row || start.column > end.column {
-            return Err(Error::InvalidRange { start, end });
+    /// Returns a typed address error for malformed syntax or
+    /// [`Error::OutOfBounds`] when the parsed range exceeds this extent.
+    pub fn range_a1(self, address: &str) -> Result<CellRange> {
+        let range = CellRange::from_a1(address)?;
+        if range.end.row > self.rows || range.end.column > self.columns {
+            return Err(Error::OutOfBounds {
+                position: range.end,
+                dimensions: self,
+            });
         }
-        Ok(Self { start, end })
+        Ok(range)
     }
 
-    /// Returns the inclusive start and exclusive end coordinates.
-    #[must_use]
-    pub const fn bounds(self) -> (Position, Position) {
-        (self.start, self.end)
-    }
-
-    /// Returns the first coordinate.
-    #[must_use]
-    pub const fn start(self) -> Position {
-        self.start
-    }
-
-    /// Returns the exclusive end coordinate.
-    #[must_use]
-    pub const fn end(self) -> Position {
-        self.end
-    }
-
-    /// Returns whether the range contains no cells.
-    #[must_use]
-    pub const fn is_empty(self) -> bool {
-        self.start.row == self.end.row || self.start.column == self.end.column
-    }
-
-    /// Returns the number of cells when it fits in `usize`.
-    #[must_use]
-    pub const fn area(self) -> Option<usize> {
-        let rows = (self.end.row - self.start.row) as usize;
-        let columns = (self.end.column - self.start.column) as usize;
-        rows.checked_mul(columns)
-    }
-
-    /// Returns whether a coordinate belongs to the range.
-    #[must_use]
-    pub const fn contains(self, position: Position) -> bool {
-        position.row >= self.start.row
-            && position.row < self.end.row
-            && position.column >= self.start.column
-            && position.column < self.end.column
+    fn contains(self, position: CellPosition) -> bool {
+        position.row < self.rows && position.column < self.columns
     }
 }
 
@@ -248,6 +177,13 @@ pub enum View<'a> {
 /// Errors returned by checked sparse table operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
+    /// An A1 selector is malformed.
+    InvalidAddress {
+        /// Syntax or domain failure.
+        kind: AddressError,
+        /// Byte offset at which parsing stopped.
+        index: usize,
+    },
     /// A coordinate is outside the table's declared extent.
     OutOfBounds {
         /// Requested coordinate.
@@ -298,6 +234,9 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::InvalidAddress { kind, index } => {
+                write!(formatter, "invalid A1 address at byte {index}: {kind}")
+            },
             Self::OutOfBounds {
                 position,
                 dimensions,
@@ -335,6 +274,18 @@ impl fmt::Display for Error {
                     "table allocation failed for {resource}: {amount}"
                 )
             },
+        }
+    }
+}
+
+impl From<CoordinateError> for Error {
+    fn from(error: CoordinateError) -> Self {
+        match error {
+            CoordinateError::InvalidRange { start, end } => Self::InvalidRange { start, end },
+            CoordinateError::CoordinateOverflow { row, column } => {
+                Self::CoordinateOverflow { row, column }
+            },
+            CoordinateError::InvalidAddress { kind, index } => Self::InvalidAddress { kind, index },
         }
     }
 }
@@ -512,6 +463,25 @@ impl Table {
         }
     }
 
+    /// Looks up a materialized value by a checked A1 selector.
+    ///
+    /// A syntactically valid but out-of-grid selector is an error; an
+    /// in-grid coordinate with no stored value returns `Ok(None)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed address error or [`Error::OutOfBounds`].
+    pub fn get_a1(&self, address: &str) -> Result<Option<&Value>> {
+        let position = CellPosition::from_a1(address)?;
+        if !self.dimensions.contains(position) {
+            return Err(Error::OutOfBounds {
+                position,
+                dimensions: self.dimensions,
+            });
+        }
+        Ok(self.get(position))
+    }
+
     /// Returns the compact stored/missing view for a coordinate.
     #[must_use]
     pub fn view(&self, position: Position) -> View<'_> {
@@ -536,6 +506,16 @@ impl Table {
         Ok(self.cells[first..]
             .iter()
             .take_while(move |cell| checked_range.contains(cell.position())))
+    }
+
+    /// Iterates over sparse cells selected by a checked A1 range.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed address error or [`Error::OutOfBounds`].
+    pub fn cells_a1(&self, address: &str) -> Result<impl Iterator<Item = &Cell> + '_> {
+        let range = self.dimensions.range_a1(address)?;
+        self.cells(range)
     }
 
     /// Iterates over all materialized sparse cells in row-major order.
@@ -798,6 +778,27 @@ impl Builder {
             },
         }
         Ok(())
+    }
+
+    /// Replaces or inserts one value selected by a checked A1 address.
+    ///
+    /// The rejected value is returned for both parse and allocation failures,
+    /// preserving transactional ownership at the semantic boundary.
+    ///
+    /// # Errors
+    ///
+    /// Returns the rejected value with a typed address, bounds, or allocation
+    /// error.
+    pub fn set_a1(
+        &mut self,
+        address: &str,
+        value: Value,
+    ) -> std::result::Result<(), InsertError<Value>> {
+        let position = match CellPosition::from_a1(address) {
+            Ok(position) => position,
+            Err(error) => return Err(InsertError::new(error.into(), value)),
+        };
+        self.set(position, value)
     }
 
     /// Appends a cell for high-throughput archive ingestion.
@@ -1079,11 +1080,53 @@ mod tests {
         ));
         assert!(matches!(
             Range::new(Position::new(1, 0), Position::new(0, 1)),
-            Err(Error::InvalidRange { .. })
+            Err(CoordinateError::InvalidRange { .. })
         ));
         assert!(matches!(
             Position::try_from_usize(usize::MAX, 0),
-            Err(Error::CoordinateOverflow { .. })
+            Err(CoordinateError::CoordinateOverflow { .. })
         ));
+    }
+
+    #[test]
+    fn a1_selectors_are_checked_at_the_table_boundary() {
+        let mut builder = Builder::new("Test", Dimensions::new(3, 3));
+        assert!(
+            builder
+                .set_a1("$b$2", Value::Text("stored".to_owned()))
+                .is_ok()
+        );
+        let table = builder
+            .finish()
+            .unwrap_or_else(|error| panic!("unexpected table error: {error}"));
+
+        assert_eq!(
+            table.get_a1("B2"),
+            Ok(Some(&Value::Text("stored".to_owned())))
+        );
+        assert_eq!(table.get_a1("C3"), Ok(None));
+        let cells = table
+            .cells_a1("A1:C3")
+            .unwrap_or_else(|error| panic!("unexpected cell range error: {error}"));
+        assert_eq!(cells.count(), 1);
+        assert!(matches!(table.get_a1("D1"), Err(Error::OutOfBounds { .. })));
+    }
+
+    #[test]
+    fn builder_preserves_values_when_a1_parsing_fails() {
+        let mut builder = Builder::new("Test", Dimensions::new(1, 1));
+        let rejected = builder
+            .set_a1("A0", Value::Number(7.0))
+            .err()
+            .unwrap_or_else(|| panic!("invalid A1 address was accepted"));
+        assert!(matches!(
+            rejected.error(),
+            Error::InvalidAddress {
+                kind: AddressError::ZeroRow,
+                ..
+            }
+        ));
+        let (_error, value) = rejected.into_parts();
+        assert_eq!(value, Value::Number(7.0));
     }
 }
