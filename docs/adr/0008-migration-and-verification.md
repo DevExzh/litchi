@@ -4830,11 +4830,13 @@ the shared text-body structures in the checked-in `[MS-ODRAWXML]` and
 
 XLSX and XLSB retain their SpreadsheetDrawing anchors, bounded XML state
 machines, worksheet/BrtDrawing package wiring, and authoring emission around
-the common model. XML parser/writer extraction and PPTX `p:txBody` wrappers are
-separate follow-up layers, so this slice does not claim complete DrawingML
-text conformance. No compatibility aliases were retained.
+the common model. The shared `text::body::writer` now owns neutral body,
+property, paragraph, and run XML emission; host writers only supply their
+package-specific shape context. XML parser extraction and PPTX `p:txBody`
+wrappers remain separate follow-up layers, so this slice does not claim
+complete DrawingML text conformance. No compatibility aliases were retained.
 
-Focused verification passes 87 DrawingML tests, 621 XLSX library/integration
+Focused verification passes 89 DrawingML tests, 621 XLSX library/integration
 tests, 408 XLSB library/integration tests, formatting, and boundary policy
 checks.
 
