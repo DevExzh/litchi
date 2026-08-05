@@ -1,15 +1,13 @@
 //! ODS row and column structural metadata.
 
 use litchi_core::{Error, Result, xml::escape_xml};
-use std::ops::Range;
-
 pub(crate) const MAX_EXPANDED_ROWS_PER_SHEET: usize = 1_048_576;
 pub(crate) const MAX_EXPANDED_COLUMNS_PER_SHEET: usize = 1_048_576;
 pub(crate) const MAX_TABLE_STRUCTURE_DEPTH: usize = 256;
 
 /// Visibility state shared by ODF table rows and columns.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum TableVisibility {
+pub enum Visibility {
     /// Display normally (the ODF default).
     #[default]
     Visible,
@@ -19,7 +17,7 @@ pub enum TableVisibility {
     Filter,
 }
 
-impl TableVisibility {
+impl Visibility {
     pub(crate) fn parse(value: &str) -> Result<Self> {
         match value {
             "visible" => Ok(Self::Visible),
@@ -50,12 +48,12 @@ pub struct Column {
     /// Default table-cell style for cells in this column.
     pub default_cell_style_name: Option<String>,
     /// Column visibility.
-    pub visibility: TableVisibility,
+    pub visibility: Visibility,
 }
 
 /// Optional style-selection flags associated with an ODF table template.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct SheetStyleUsage {
+pub struct StyleUsage {
     /// Apply the template's first-row style.
     pub use_first_row_styles: Option<bool>,
     /// Apply the template's last-row style.
@@ -72,25 +70,25 @@ pub struct SheetStyleUsage {
 
 /// Sheet-level table style and template references.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct SheetStyle {
+pub struct Style {
     /// Direct table-style reference.
     pub style_name: Option<String>,
     /// Table-template reference.
     pub template_name: Option<String>,
     /// Optional template component selection flags.
-    pub usage: SheetStyleUsage,
+    pub usage: StyleUsage,
 }
 
 /// Sheet printing controls and ODF cell-range addresses.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SheetPrintSettings {
+pub struct PrintSettings {
     /// Whether the sheet participates in printing.
     pub printable: bool,
     /// ODF cell-range addresses printed for this sheet.
     pub ranges: Vec<String>,
 }
 
-impl Default for SheetPrintSettings {
+impl Default for PrintSettings {
     fn default() -> Self {
         Self {
             printable: true,
@@ -99,7 +97,7 @@ impl Default for SheetPrintSettings {
     }
 }
 
-impl SheetPrintSettings {
+impl PrintSettings {
     /// Create validated sheet printing settings.
     pub fn new(printable: bool, ranges: Vec<String>) -> Result<Self> {
         validate_cell_range_addresses(&ranges)?;
@@ -107,14 +105,14 @@ impl SheetPrintSettings {
     }
 }
 
-pub(crate) fn validate_sheet_print_settings(settings: &SheetPrintSettings) -> Result<()> {
+pub(crate) fn validate_sheet_print_settings(settings: &PrintSettings) -> Result<()> {
     validate_cell_range_addresses(&settings.ranges)
 }
 
 pub(crate) fn write_sheet_formatting_attributes(
     out: &mut String,
-    style: &SheetStyle,
-    print: &SheetPrintSettings,
+    style: &Style,
+    print: &PrintSettings,
 ) -> Result<()> {
     if let Some(value) = &style.style_name {
         write_escaped_attribute(out, "table:style-name", value);
@@ -224,14 +222,14 @@ fn write_optional_bool_attribute(out: &mut String, name: &str, value: Option<boo
 
 /// A half-open range of logical rows or columns.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct TableRange {
+pub struct Range {
     /// First included zero-based logical index.
     pub start: usize,
     /// First excluded zero-based logical index.
     pub end: usize,
 }
 
-impl TableRange {
+impl Range {
     /// Create a non-empty half-open table range.
     pub fn new(start: usize, end: usize) -> Result<Self> {
         if start >= end {
@@ -242,29 +240,29 @@ impl TableRange {
         Ok(Self { start, end })
     }
 
-    fn as_range(self) -> Range<usize> {
+    fn as_range(self) -> std::ops::Range<usize> {
         self.start..self.end
     }
 }
 
 /// A recursively nested group of adjacent rows or columns.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct TableGroup {
+pub struct Group {
     /// Whether the group is expanded/displayed.
     pub display: bool,
     /// Ordered ranges and nested groups contained by this group.
-    pub children: Vec<TableStructure>,
+    pub children: Vec<Structure>,
 }
 
 /// One structural run in an ODF table's row or column layout.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum TableStructure {
+pub enum Structure {
     /// An ordinary run of direct rows or columns.
-    Range(TableRange),
+    Range(Range),
     /// A run repeated as table headers when the table is printed.
-    Header(TableRange),
+    Header(Range),
     /// A potentially collapsed nested group.
-    Group(TableGroup),
+    Group(Group),
 }
 
 #[derive(Clone, Copy)]
@@ -291,10 +289,10 @@ impl TableStructureAxis {
 
 pub(crate) fn write_table_structure(
     out: &mut String,
-    structure: &[TableStructure],
+    structure: &[Structure],
     total: usize,
     axis: TableStructureAxis,
-    mut write_range: impl FnMut(&mut String, Range<usize>),
+    mut write_range: impl FnMut(&mut String, std::ops::Range<usize>),
 ) -> Result<()> {
     let mut cursor = 0usize;
     for entry in structure {
@@ -317,7 +315,7 @@ pub(crate) fn write_table_structure(
 }
 
 pub(crate) fn validate_table_structure(
-    structure: &[TableStructure],
+    structure: &[Structure],
     axis: TableStructureAxis,
 ) -> Result<usize> {
     let total = structure.iter().try_fold(0usize, |maximum, entry| {
@@ -327,11 +325,11 @@ pub(crate) fn validate_table_structure(
     Ok(total)
 }
 
-fn structure_declared_end(entry: &TableStructure, depth: usize) -> Result<usize> {
+fn structure_declared_end(entry: &Structure, depth: usize) -> Result<usize> {
     ensure_structure_depth(depth)?;
     match entry {
-        TableStructure::Range(range) | TableStructure::Header(range) => Ok(range.end),
-        TableStructure::Group(group) => group
+        Structure::Range(range) | Structure::Header(range) => Ok(range.end),
+        Structure::Group(group) => group
             .children
             .last()
             .ok_or_else(|| {
@@ -343,16 +341,16 @@ fn structure_declared_end(entry: &TableStructure, depth: usize) -> Result<usize>
 
 fn write_structure_entry(
     out: &mut String,
-    entry: &TableStructure,
+    entry: &Structure,
     total: usize,
     axis: TableStructureAxis,
     depth: usize,
-    write_range: &mut impl FnMut(&mut String, Range<usize>),
+    write_range: &mut impl FnMut(&mut String, std::ops::Range<usize>),
 ) -> Result<()> {
     ensure_structure_depth(depth)?;
     match entry {
-        TableStructure::Range(range) => write_range(out, range.as_range()),
-        TableStructure::Header(range) => {
+        Structure::Range(range) => write_range(out, range.as_range()),
+        Structure::Header(range) => {
             let tag = axis.header_tag();
             out.push('<');
             out.push_str(tag);
@@ -362,7 +360,7 @@ fn write_structure_entry(
             out.push_str(tag);
             out.push('>');
         },
-        TableStructure::Group(group) => {
+        Structure::Group(group) => {
             let tag = axis.group_tag();
             out.push('<');
             out.push_str(tag);
@@ -389,10 +387,10 @@ fn write_structure_entry(
     Ok(())
 }
 
-fn structure_bounds(entry: &TableStructure, total: usize, depth: usize) -> Result<(usize, usize)> {
+fn structure_bounds(entry: &Structure, total: usize, depth: usize) -> Result<(usize, usize)> {
     ensure_structure_depth(depth)?;
     match entry {
-        TableStructure::Range(range) | TableStructure::Header(range) => {
+        Structure::Range(range) | Structure::Header(range) => {
             if range.start >= range.end || range.end > total {
                 return Err(Error::InvalidFormat(format!(
                     "table structure range {}..{} exceeds logical size {total}",
@@ -401,7 +399,7 @@ fn structure_bounds(entry: &TableStructure, total: usize, depth: usize) -> Resul
             }
             Ok((range.start, range.end))
         },
-        TableStructure::Group(group) => {
+        Structure::Group(group) => {
             let first = group.children.first().ok_or_else(|| {
                 Error::InvalidFormat("table groups must contain at least one item".to_string())
             })?;
@@ -450,7 +448,7 @@ pub(crate) fn write_columns(out: &mut String, columns: &[Column]) {
             out.push_str(&escape_xml(style_name));
             out.push('"');
         }
-        if column.visibility != TableVisibility::Visible {
+        if column.visibility != Visibility::Visible {
             out.push_str(" table:visibility=\"");
             out.push_str(column.visibility.as_str());
             out.push('"');
@@ -464,7 +462,7 @@ pub(crate) fn write_row_attributes(
     out: &mut String,
     style_name: Option<&str>,
     default_cell_style_name: Option<&str>,
-    visibility: TableVisibility,
+    visibility: Visibility,
 ) {
     if let Some(style_name) = style_name {
         out.push_str(" table:style-name=\"");
@@ -476,7 +474,7 @@ pub(crate) fn write_row_attributes(
         out.push_str(&escape_xml(style_name));
         out.push('"');
     }
-    if visibility != TableVisibility::Visible {
+    if visibility != Visibility::Visible {
         out.push_str(" table:visibility=\"");
         out.push_str(visibility.as_str());
         out.push('"');
@@ -493,7 +491,7 @@ mod tests {
             index: 0,
             style_name: Some("Col&One".to_string()),
             default_cell_style_name: Some("Cell\"Default".to_string()),
-            visibility: TableVisibility::Collapse,
+            visibility: Visibility::Collapse,
         };
         let mut xml = String::new();
         write_columns(&mut xml, &[column.clone(), Column { index: 1, ..column }]);
@@ -523,17 +521,16 @@ mod tests {
 
     #[test]
     fn writes_sheet_style_and_print_attributes_safely() {
-        let style = SheetStyle {
+        let style = Style {
             style_name: Some("Sheet&Style".to_string()),
             template_name: Some("Template\"One".to_string()),
-            usage: SheetStyleUsage {
+            usage: StyleUsage {
                 use_first_row_styles: Some(true),
                 use_banding_column_styles: Some(false),
-                ..SheetStyleUsage::default()
+                ..StyleUsage::default()
             },
         };
-        let print =
-            SheetPrintSettings::new(false, vec!["'Q1 Sales'.$A$1:$B$2".to_string()]).unwrap();
+        let print = PrintSettings::new(false, vec!["'Q1 Sales'.$A$1:$B$2".to_string()]).unwrap();
         let mut xml = String::new();
         write_sheet_formatting_attributes(&mut xml, &style, &print).unwrap();
         assert!(xml.contains(r#"table:style-name="Sheet&amp;Style""#));
