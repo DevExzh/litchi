@@ -53,6 +53,7 @@ use crate::wire::{
 };
 use crate::{EmbeddedMediaAsset, Error, IWorkMediaEditor, IWorkPackage, Result};
 use litchi_iwa_graph::ObjectId;
+use litchi_keynote::build as semantic_build;
 pub use litchi_keynote::build::{Acceleration as BuildAcceleration, Start as BuildStart};
 use litchi_keynote::transition::Settings as TransitionSettings;
 
@@ -528,44 +529,121 @@ impl KeynoteBuildCustomParameters {
 /// preserves effects introduced by newer Keynote releases.
 #[derive(Debug, Clone, PartialEq)]
 pub struct KeynoteBuildSettings {
-    pub delivery: String,
-    pub animation_type: String,
-    pub effect: String,
-    pub duration: f64,
+    pub(crate) delivery: String,
+    pub(crate) animation_type: String,
+    pub(crate) effect: String,
+    pub(crate) duration: f64,
     /// Delay before an `AfterTransition` or `AfterPrevious` build starts.
-    pub delay: f64,
-    pub start: BuildStart,
-    pub direction: Option<u32>,
+    pub(crate) delay: f64,
+    pub(crate) start: BuildStart,
+    pub(crate) direction: Option<u32>,
     /// Raw `BuildAttributesTextDelivery` value for forward compatibility.
-    pub text_delivery: Option<i32>,
+    pub(crate) text_delivery: Option<i32>,
     /// Raw `BuildAttributesDeliveryOption` value for forward compatibility.
-    pub delivery_option: Option<i32>,
-    pub event_trigger: Option<u32>,
+    pub(crate) delivery_option: Option<i32>,
+    pub(crate) event_trigger: Option<u32>,
     /// Present for Keynote's native `apple:action-rotation` action effect.
-    pub rotation: Option<KeynoteRotationAction>,
+    pub(crate) rotation: Option<KeynoteRotationAction>,
     /// Present for Keynote's native `apple:action-scale` action effect.
-    pub scale: Option<KeynoteScaleAction>,
+    pub(crate) scale: Option<KeynoteScaleAction>,
     /// Present for Keynote's native `apple:action-opacity` action effect.
-    pub opacity: Option<KeynoteOpacityAction>,
+    pub(crate) opacity: Option<KeynoteOpacityAction>,
     /// Present for Keynote's native `apple:action-motion-path` action effect.
-    pub move_action: Option<KeynoteMoveAction>,
+    pub(crate) move_action: Option<KeynoteMoveAction>,
     /// Present for Keynote's Blink/Bounce/Flip/Jiggle/Pop/Pulse actions.
-    pub emphasis: Option<KeynoteEmphasisAction>,
+    pub(crate) emphasis: Option<KeynoteEmphasisAction>,
     /// Present for Keynote's native `apple:keyboard` build-in/build-out effect.
-    pub keyboard: Option<KeynoteKeyboardBuild>,
+    pub(crate) keyboard: Option<KeynoteKeyboardBuild>,
     /// Present for typed Dissolve, Shimmer, Skid, Swoosh, and Trace builds.
-    pub object_effect: Option<KeynoteObjectBuildEffect>,
+    pub(crate) object_effect: Option<KeynoteObjectBuildEffect>,
     /// Inline curve for a typed action whose acceleration is
     /// [`BuildAcceleration::Custom`].
     ///
     /// `None` preserves an opaque app-native custom curve while updating an
     /// existing build. New custom-curve actions require `Some`.
-    pub timing_curve: Option<KeynoteBuildTimingCurve>,
+    pub(crate) timing_curve: Option<KeynoteBuildTimingCurve>,
     /// Raw parameters for native effects without a dedicated typed model.
-    pub custom_parameters: KeynoteBuildCustomParameters,
+    pub(crate) custom_parameters: KeynoteBuildCustomParameters,
 }
 
 impl KeynoteBuildSettings {
+    /// Project the native adapter state into the bounded archive-free model.
+    ///
+    /// Native identifiers, presence bits, and opaque parameter fields stay in
+    /// this crate; callers receive only the validated semantic build value.
+    pub fn semantic(&self) -> Result<semantic_build::Settings> {
+        builds::semantic_settings(self)
+    }
+
+    /// Return the semantic effect after validation.
+    pub fn effect(&self) -> Result<semantic_build::Effect> {
+        self.semantic().map(|settings| settings.effect().clone())
+    }
+
+    /// Return the semantic start relationship.
+    pub fn start(&self) -> Result<BuildStart> {
+        self.semantic().map(|settings| settings.start())
+    }
+
+    /// Return the semantic duration.
+    pub fn duration(&self) -> Result<litchi_keynote::Seconds> {
+        self.semantic().map(|settings| settings.duration())
+    }
+
+    /// Return the semantic delay.
+    pub fn delay(&self) -> Result<litchi_keynote::Seconds> {
+        self.semantic().map(|settings| settings.delay())
+    }
+
+    /// Replace the start relationship transactionally.
+    pub fn set_start(&mut self, start: BuildStart) -> Result<()> {
+        let mut candidate = self.semantic()?;
+        candidate.set_start(start).map_err(|error| {
+            Error::ParseError(format!("invalid Keynote build start relationship: {error}"))
+        })?;
+        self.start = start;
+        Ok(())
+    }
+
+    /// Replace the delay transactionally.
+    pub fn set_delay(&mut self, delay: litchi_keynote::Seconds) -> Result<()> {
+        let mut candidate = self.semantic()?;
+        candidate.set_delay(delay).map_err(|error| {
+            Error::ParseError(format!("invalid Keynote build delay: {error}"))
+        })?;
+        self.delay = delay.as_f64();
+        Ok(())
+    }
+
+    /// Replace the duration with a validated semantic value.
+    pub fn set_duration(&mut self, duration: litchi_keynote::Seconds) -> Result<()> {
+        let mut candidate = self.semantic()?;
+        candidate.set_duration(duration);
+        candidate.validate().map_err(|error| {
+            Error::ParseError(format!("invalid Keynote build duration: {error}"))
+        })?;
+        self.duration = duration.as_f64();
+        Ok(())
+    }
+
+    /// Replace the start relationship in a consuming builder step.
+    pub fn with_start(mut self, start: BuildStart) -> Result<Self> {
+        self.set_start(start)?;
+        Ok(self)
+    }
+
+    /// Replace the delay in a consuming builder step.
+    pub fn with_delay(mut self, delay: litchi_keynote::Seconds) -> Result<Self> {
+        self.set_delay(delay)?;
+        Ok(self)
+    }
+
+    /// Replace the duration in a consuming builder step.
+    pub fn with_duration(mut self, duration: litchi_keynote::Seconds) -> Result<Self> {
+        self.set_duration(duration)?;
+        Ok(self)
+    }
+
     /// Native playback trigger attached to a newly inserted audio clip.
     pub(crate) fn audio_start() -> Self {
         Self {

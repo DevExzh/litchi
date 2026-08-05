@@ -615,6 +615,32 @@ fn edits_title_and_body_by_slide_index() {
 }
 
 #[test]
+fn build_settings_project_to_semantic_values_and_validate_transactionally() {
+    let settings = KeynoteBuildSettings::appear_in();
+    let semantic = settings.semantic().unwrap();
+    assert_eq!(semantic.effect(), &litchi_keynote::build::Effect::Appear);
+    assert_eq!(semantic.duration().as_f64(), 1.0);
+
+    let before = settings.clone();
+    let mut invalid = settings;
+    assert!(invalid
+        .set_delay(litchi_keynote::Seconds::new(0.25).unwrap())
+        .is_err());
+    assert_eq!(invalid, before);
+
+    assert!(invalid.set_duration(litchi_keynote::Seconds::ZERO).is_err());
+    assert_eq!(invalid, before);
+
+    invalid.set_start(BuildStart::AfterPrevious).unwrap();
+    invalid
+        .set_delay(litchi_keynote::Seconds::new(0.25).unwrap())
+        .unwrap();
+    let semantic = invalid.semantic().unwrap();
+    assert_eq!(semantic.start(), BuildStart::AfterPrevious);
+    assert_eq!(semantic.delay().as_f64(), 0.25);
+}
+
+#[test]
 fn slide_build_crud_is_transactional_and_updates_native_caches() {
     let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
     assert!(editor.slide_builds(0).unwrap().is_empty());

@@ -1,7 +1,211 @@
 //! Build and transition validation, conversion, and wire patching.
 
 use super::*;
+
+fn semantic_error(error: impl std::fmt::Display) -> Error {
+    Error::ParseError(format!("invalid Keynote build semantics: {error}"))
+}
+
+/// Convert the private native adapter state into the bounded public model.
+///
+/// The conversion intentionally dispatches exact native effect identifiers
+/// before falling back to `Unknown`; substring matching here would silently
+/// turn a future producer effect into a different typed action.
+pub(super) fn semantic_settings(
+    settings: &KeynoteBuildSettings,
+) -> Result<litchi_keynote::build::Settings> {
+    let duration = litchi_keynote::Seconds::new(settings.duration).map_err(semantic_error)?;
+    let mut semantic = litchi_keynote::build::Settings::new(semantic_effect(settings)?, duration);
+    semantic
+        .set_start(settings.start)
+        .map_err(semantic_error)?;
+    semantic
+        .set_delay(litchi_keynote::Seconds::new(settings.delay).map_err(semantic_error)?)
+        .map_err(semantic_error)?;
+    semantic.validate().map_err(semantic_error)?;
+    Ok(semantic)
+}
+
+fn semantic_effect(
+    settings: &KeynoteBuildSettings,
+) -> Result<litchi_keynote::build::Effect> {
+    use litchi_keynote::build::{
+        Action, Effect, Emphasis, FlipDirection, HorizontalDirection, Keyboard, KeyboardDirection,
+        Motion, ObjectEffect, Opacity, Rotation, RotationDirection, Scale, SwooshDirection,
+    };
+
+    let effect = settings.effect.as_str();
+    let typed = match effect {
+        ROTATE_ACTION_EFFECT => {
+            let action = settings.rotation.as_ref().ok_or_else(|| {
+                Error::ParseError("Keynote Rotate is missing its typed parameters".to_owned())
+            })?;
+            Effect::action(Action::Rotate(
+                Rotation::new(
+                    action.total_degrees,
+                    match action.direction {
+                        KeynoteRotationDirection::Clockwise => RotationDirection::Clockwise,
+                        KeynoteRotationDirection::Counterclockwise => {
+                            RotationDirection::Counterclockwise
+                        },
+                    },
+                    action.acceleration,
+                )
+                .map_err(semantic_error)?,
+            ))
+        },
+        SCALE_ACTION_EFFECT => {
+            let action = settings.scale.as_ref().ok_or_else(|| {
+                Error::ParseError("Keynote Scale is missing its typed parameters".to_owned())
+            })?;
+            Effect::action(Action::Scale(
+                Scale::new(action.scale_factor, action.acceleration).map_err(semantic_error)?,
+            ))
+        },
+        OPACITY_ACTION_EFFECT => {
+            let action = settings.opacity.as_ref().ok_or_else(|| {
+                Error::ParseError("Keynote Opacity is missing its typed parameters".to_owned())
+            })?;
+            Effect::action(Action::Opacity(
+                Opacity::new(action.opacity_percent, action.acceleration)
+                    .map_err(semantic_error)?,
+            ))
+        },
+        MOVE_ACTION_EFFECT => {
+            let action = settings.move_action.as_ref().ok_or_else(|| {
+                Error::ParseError("Keynote Move is missing its typed parameters".to_owned())
+            })?;
+            Effect::action(Action::Move(Motion::new(
+                semantic_path(&action.path)?,
+                action.align_to_path,
+                action.acceleration,
+            )))
+        },
+        BLINK_ACTION_EFFECT | BOUNCE_ACTION_EFFECT | FLIP_ACTION_EFFECT | JIGGLE_ACTION_EFFECT
+        | POP_ACTION_EFFECT | PULSE_ACTION_EFFECT => {
+            let action = settings.emphasis.ok_or_else(|| {
+                Error::ParseError("Keynote emphasis is missing its typed parameters".to_owned())
+            })?;
+            let emphasis = match action {
+                KeynoteEmphasisAction::Blink { repeat_count, fade } => {
+                    Emphasis::blink(repeat_count, fade)
+                },
+                KeynoteEmphasisAction::Bounce {
+                    repeat_count,
+                    decay,
+                } => Emphasis::bounce(repeat_count, decay),
+                KeynoteEmphasisAction::Flip {
+                    repeat_count,
+                    direction,
+                } => Emphasis::flip(
+                    repeat_count,
+                    match direction {
+                        KeynoteFlipDirection::LeftToRight => FlipDirection::LeftToRight,
+                        KeynoteFlipDirection::RightToLeft => FlipDirection::RightToLeft,
+                    },
+                ),
+                KeynoteEmphasisAction::Jiggle { intensity } => Ok(Emphasis::jiggle(match intensity {
+                    KeynoteJiggleIntensity::Small => litchi_keynote::build::JiggleIntensity::Small,
+                    KeynoteJiggleIntensity::Medium => {
+                        litchi_keynote::build::JiggleIntensity::Medium
+                    },
+                    KeynoteJiggleIntensity::Large => litchi_keynote::build::JiggleIntensity::Large,
+                })),
+                KeynoteEmphasisAction::Pop { scale_percent } => Emphasis::pop(scale_percent),
+                KeynoteEmphasisAction::Pulse {
+                    repeat_count,
+                    scale_percent,
+                } => Emphasis::pulse(repeat_count, scale_percent),
+            }
+            .map_err(semantic_error)?;
+            Effect::emphasis(emphasis)
+        },
+        KEYBOARD_BUILD_EFFECT => {
+            let keyboard = settings.keyboard.ok_or_else(|| {
+                Error::ParseError("Keynote Keyboard is missing its typed parameters".to_owned())
+            })?;
+            Effect::keyboard(Keyboard::new(
+                match keyboard.direction {
+                    KeynoteKeyboardDirection::Forward => KeyboardDirection::Forward,
+                    KeynoteKeyboardDirection::Backward => KeyboardDirection::Backward,
+                },
+                keyboard.show_cursor,
+            ))
+        },
+        DISSOLVE_BUILD_EFFECT | SHIMMER_BUILD_EFFECT | SKID_BUILD_EFFECT | SWOOSH_BUILD_EFFECT
+        | TRACE_BUILD_EFFECT => {
+            let object = settings.object_effect.ok_or_else(|| {
+                Error::ParseError("Keynote object build is missing its typed parameters".to_owned())
+            })?;
+            Effect::object(match object {
+                KeynoteObjectBuildEffect::Dissolve => ObjectEffect::Dissolve,
+                KeynoteObjectBuildEffect::Shimmer => ObjectEffect::Shimmer,
+                KeynoteObjectBuildEffect::Skid { direction } => ObjectEffect::Skid(match direction {
+                    KeynoteHorizontalBuildDirection::LeftToRight => HorizontalDirection::LeftToRight,
+                    KeynoteHorizontalBuildDirection::RightToLeft => HorizontalDirection::RightToLeft,
+                }),
+                KeynoteObjectBuildEffect::Swoosh { direction } => ObjectEffect::Swoosh(match direction {
+                    KeynoteSwooshDirection::Center => SwooshDirection::Center,
+                    KeynoteSwooshDirection::FromLeft => SwooshDirection::FromLeft,
+                    KeynoteSwooshDirection::FromRight => SwooshDirection::FromRight,
+                }),
+                KeynoteObjectBuildEffect::Trace { direction } => ObjectEffect::Trace(match direction {
+                    KeynoteHorizontalBuildDirection::LeftToRight => HorizontalDirection::LeftToRight,
+                    KeynoteHorizontalBuildDirection::RightToLeft => HorizontalDirection::RightToLeft,
+                }),
+            })
+        },
+        "apple:bc-appear" | "appear" => Effect::Appear,
+        "apple:bc-dissolve" | "dissolve" => Effect::Dissolve,
+        "apple:bc-move" | "move" => Effect::MoveIn,
+        "apple:bc-scale" | "scale" => Effect::Scale,
+        "apple:bc-fade-scale" | "fade-scale" => Effect::FadeAndScale,
+        _ => Effect::unknown(effect.to_owned()).map_err(semantic_error)?,
+    };
+    Ok(typed)
+}
+
+fn semantic_path(path: &KeynoteMotionPath) -> Result<litchi_keynote::build::Path> {
+    use litchi_keynote::build::{Node, NodeKind, Point, Subpath};
+
+    let subpaths = path
+        .subpaths
+        .iter()
+        .map(|subpath| {
+            let nodes = subpath
+                .nodes
+                .iter()
+                .map(|node| {
+                    let point = |point: KeynoteMotionPathPoint| {
+                        Point::new(f64::from(point.x), f64::from(point.y)).map_err(semantic_error)
+                    };
+                    Ok(Node::new(
+                        point(node.in_control_point)?,
+                        point(node.point)?,
+                        point(node.out_control_point)?,
+                        match node.node_type {
+                            KeynoteMotionPathNodeType::Sharp => NodeKind::Sharp,
+                            KeynoteMotionPathNodeType::Bezier => NodeKind::Bezier,
+                            KeynoteMotionPathNodeType::Smooth => NodeKind::Smooth,
+                        },
+                    ))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            Subpath::new(nodes.into_boxed_slice(), subpath.closed).map_err(semantic_error)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    litchi_keynote::build::Path::new(
+        subpaths.into_boxed_slice(),
+        f64::from(path.natural_width),
+        f64::from(path.natural_height),
+        path.horizontal_flip,
+        path.vertical_flip,
+    )
+    .map_err(semantic_error)
+}
+
 pub(super) fn validate_build_settings(settings: &KeynoteBuildSettings) -> Result<()> {
+    semantic_settings(settings)?;
     for (label, value) in [
         ("delivery", settings.delivery.as_str()),
         ("animation type", settings.animation_type.as_str()),

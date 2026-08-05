@@ -1226,6 +1226,19 @@ impl Settings {
         &self.effect
     }
 
+    /// Replace the effect after validating the candidate value.
+    pub fn set_effect(&mut self, effect: Effect) -> Result<()> {
+        effect.validate()?;
+        self.effect = effect;
+        Ok(())
+    }
+
+    /// Replace the effect in a consuming builder step.
+    pub fn with_effect(mut self, effect: Effect) -> Result<Self> {
+        self.set_effect(effect)?;
+        Ok(self)
+    }
+
     /// Return the start relationship.
     #[must_use]
     pub const fn start(&self) -> Start {
@@ -1242,6 +1255,18 @@ impl Settings {
     #[must_use]
     pub const fn delay(&self) -> Seconds {
         self.delay
+    }
+
+    /// Replace the duration with an already validated semantic value.
+    pub const fn set_duration(&mut self, duration: Seconds) {
+        self.duration = duration;
+    }
+
+    /// Replace the duration in a consuming builder step.
+    #[must_use]
+    pub const fn with_duration(mut self, duration: Seconds) -> Self {
+        self.set_duration(duration);
+        self
     }
 
     /// Replace the start relationship while preserving valid delay rules.
@@ -1277,6 +1302,9 @@ impl Settings {
     /// Validate the complete semantic combination before native publication.
     pub fn validate(&self) -> Result<()> {
         self.effect.validate()?;
+        if self.duration == Seconds::ZERO {
+            return Err(Error::InvalidBuildValue);
+        }
         if matches!(self.start, Start::OnClick | Start::WithPrevious) && self.delay != Seconds::ZERO
         {
             return Err(Error::InvalidBuildValue);
@@ -1424,5 +1452,11 @@ mod tests {
         );
         assert_eq!(settings.start(), Start::AfterPrevious);
         Ok(())
+    }
+
+    #[test]
+    fn settings_reject_zero_duration_before_publication() {
+        let settings = Settings::new(Effect::Appear, Seconds::ZERO);
+        assert_eq!(settings.validate(), Err(Error::InvalidBuildValue));
     }
 }
