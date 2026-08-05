@@ -6,11 +6,11 @@ and `.odb` files.
 
 ## Overview
 
-`litchi-odf` provides detection, common ODF vocabulary, and an optional facade
-over independently selectable family crates. For the smallest dependency and
-memory footprint, depend directly on the family crate you need. Each family
-keeps its API contextual: for example, `litchi_odg::Builder` and
-`litchi_oth::{Builder, Template}`.
+`litchi-odf` provides detection and an optional facade over independently
+selectable family crates. For the smallest dependency and memory footprint,
+depend directly on the family crate you need. Each family keeps its API
+contextual and layered: for example, `litchi_odt::Document`,
+`litchi_ods::names::{Definition, Range}`, and `litchi_odp::slide::Slide`.
 
 ## Usage
 
@@ -29,14 +29,16 @@ let sheet = ods::Spreadsheet::open("data.ods")?;
 let csv = sheet.to_csv()?;
 
 let pres = odp::Presentation::open("slides.odp")?;
-let slides = pres.slide_count()?;
+let slide_values: Vec<odp::slide::Slide> = pres.slides()?;
+let slide_count = pres.slide_count()?;
 # Ok::<(), litchi_core::Error>(())
 ```
 
 The umbrella root intentionally exposes only detection and the selected family
 modules. Shared vocabulary and package primitives remain under the separate
-`litchi-odf-common` crate, so applications that need only one family can keep
-their dependency and memory footprint minimal.
+`litchi-odf-common` crate. The default umbrella features are `odt`, `ods`, and
+`odp`; `--no-default-features` enables detection only, while `all` opts into
+every family module.
 
 ## Features
 
@@ -46,7 +48,8 @@ their dependency and memory footprint minimal.
 - Read and write standalone drawings (`.odg`), charts (`.odc`), images (`.odi`),
   master documents (`.odm`), web templates (`.oth`), and database front ends
   (`.odb`) through their optional family facades
-- Metadata extraction (title, author, statistics) for all three formats
+- Metadata extraction (title, author, statistics) through the selected family
+  modules
 
 ## License
 

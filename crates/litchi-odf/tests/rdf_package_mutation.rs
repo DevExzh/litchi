@@ -169,7 +169,7 @@ fn ods_and_odp_facades_roundtrip_blank_nodes_and_datatypes() {
             language: None,
         },
     };
-    let mut sheet = ods::Spreadsheet::from_bytes(package(
+    let mut sheet = ods::facade::Spreadsheet::from_bytes(package(
         constants::ODF_SPREADSHEET,
         "spreadsheet",
         &[],
@@ -183,7 +183,7 @@ fn ods_and_odp_facades_roundtrip_blank_nodes_and_datatypes() {
     sheet.replace_rdf_graph("manifest.rdf", &[]).unwrap();
     assert!(sheet.rdf_graphs().unwrap()[0].triples.is_empty());
 
-    let mut slides = odp::Presentation::from_bytes(package(
+    let mut slides = odp::facade::Presentation::from_bytes(package(
         constants::ODF_PRESENTATION,
         "presentation",
         &[],

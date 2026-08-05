@@ -1,6 +1,6 @@
 [package]
 name        = "litchi-odf"
-description = "OpenDocument Format (ODF) parser for the Litchi office-formats library."
+description = "OpenDocument detection and feature-gated family facades for the Litchi office-formats library."
 version.workspace      = true
 edition.workspace      = true
 authors.workspace      = true
@@ -36,7 +36,4 @@ litchi-odt = { workspace = true, optional = true }
 litchi-oth = { workspace = true, optional = true }
 
 [dev-dependencies]
-litchi-eval = { workspace = true }
 tempfile = { workspace = true }
-tokio = { workspace = true }
-zip      = { version = "8", default-features = false, features = ["deflate"] }

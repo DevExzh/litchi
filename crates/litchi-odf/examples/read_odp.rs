@@ -2,8 +2,8 @@
 //! and dump per-slide title and text content.
 //!
 //! If a path argument is supplied, that file is opened. Otherwise the example
-//! creates a small ODP in a tempfile via [`litchi_odp::Builder`] and reads it
-//! back.
+//! creates a small ODP in a tempfile via the umbrella's
+//! [`litchi_odf::odp::Builder`] and reads it back.
 //!
 //! Run with:
 //! ```bash
@@ -13,16 +13,16 @@
 
 use std::path::PathBuf;
 
-use litchi_odp::{Builder, Presentation};
+use litchi_odf::odp;
 use tempfile::NamedTempFile;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (path, _tempfile_guard): (PathBuf, Option<NamedTempFile>) = match std::env::args().nth(1) {
         Some(arg) => (PathBuf::from(arg), None),
         None => {
-            println!("No path provided; creating a fresh ODP via litchi_odp::Builder...");
+            println!("No path provided; creating a fresh ODP via litchi_odf::odp::Builder...");
             let tmp = NamedTempFile::with_suffix(".odp")?;
-            let mut builder = Builder::new();
+            let mut builder = odp::Builder::new();
             builder.add_slide_with_title(
                 "litchi-odf example",
                 "This presentation was created by the read_odp example.",
@@ -40,12 +40,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     println!("Opening: {}", path.display());
-    let pres = Presentation::open(&path)?;
+    let pres = odp::Presentation::open(&path)?;
 
     let slide_count = pres.slide_count()?;
     println!("Slide count: {}", slide_count);
 
-    let slides = pres.slides()?;
+    let slides: Vec<odp::slide::Slide> = pres.slides()?;
     for slide in &slides {
         let title = slide.title()?.unwrap_or("<untitled>");
         let body = slide.text()?;
