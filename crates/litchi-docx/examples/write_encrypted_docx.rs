@@ -4,9 +4,9 @@
 use std::path::PathBuf;
 
 #[cfg(feature = "encryption")]
-use litchi_ooxml::docx::Package;
+use litchi_docx::Package;
 #[cfg(feature = "encryption")]
-use litchi_ooxml::encryption::Mode;
+use litchi_docx::encryption::Mode;
 
 #[cfg(feature = "encryption")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -60,5 +60,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 #[cfg(not(feature = "encryption"))]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    Err(std::io::Error::other("enable the litchi-ooxml `encryption` feature").into())
+    Err(std::io::Error::other("enable the litchi-docx `encryption` feature").into())
 }

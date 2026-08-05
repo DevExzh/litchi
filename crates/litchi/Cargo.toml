@@ -160,6 +160,10 @@ name = "docx_with_fonts"
 required-features = ["ooxml", "fonts"]
 
 [[example]]
+name = "core_props_office"
+required-features = ["ooxml"]
+
+[[example]]
 name = "minimal_font_test"
 required-features = ["ooxml", "fonts"]
 

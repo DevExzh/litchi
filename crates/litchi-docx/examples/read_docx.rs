@@ -4,8 +4,8 @@
 //! Run with:
 //!
 //! ```sh
-//! cargo run -p litchi-ooxml --example read_docx --all-features
-//! cargo run -p litchi-ooxml --example read_docx --all-features -- path/to/file.docx
+//! cargo run -p litchi-docx --example read_docx
+//! cargo run -p litchi-docx --example read_docx -- path/to/file.docx
 //! ```
 //!
 //! Default input: `test-data/ooxml/docx/documentProperties.docx` (relative to
@@ -13,7 +13,7 @@
 
 use std::env;
 
-use litchi_ooxml::docx::Package;
+use litchi_docx::Package;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();

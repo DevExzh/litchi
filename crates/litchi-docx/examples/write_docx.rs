@@ -4,13 +4,11 @@
 //! Run with:
 //!
 //! ```sh
-//! cargo run -p litchi-ooxml --example write_docx --all-features
+//! cargo run -p litchi-docx --example write_docx
 //! ```
 
-use litchi_ooxml::{
-    Props,
-    docx::{Package, ParagraphAlignment},
-};
+use litchi_docx::{Package, ParagraphAlignment};
+use litchi_ooxml_common::Props;
 use tempfile::NamedTempFile;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -21,8 +19,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Set core properties.
     let _ = pkg.put_props(
         Props::new()
-            .title("litchi-ooxml example")
-            .creator("litchi-ooxml write_docx example")
+            .title("litchi-docx example")
+            .creator("litchi-docx write_docx example")
             .subject("Round-trip demo"),
     );
 

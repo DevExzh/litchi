@@ -1,5 +1,5 @@
 [package]
-name = "litchi-ooxml-fuzz"
+name = "litchi-docx-fuzz"
 version = "0.0.0"
 edition = "2024"
 publish = false
@@ -11,7 +11,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-litchi-ooxml = { path = ".." }
+litchi-docx = { path = ".." }
 
 [[bin]]
 name = "parse_docx"

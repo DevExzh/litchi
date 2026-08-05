@@ -43,5 +43,9 @@ optional = true
 [dev-dependencies]
 tempfile = { workspace = true }
 
+[[example]]
+name = "write_encrypted_docx"
+required-features = ["encryption"]
+
 [lints]
 workspace = true

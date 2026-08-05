@@ -6,8 +6,8 @@
 
 use std::path::PathBuf;
 
+use litchi_docx::Package;
 use litchi_docx::alt::{Data, Import};
-use litchi_ooxml::docx::Package;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = std::env::args_os()

@@ -48,6 +48,11 @@ pub enum Error {
     #[error("VBA error: {0}")]
     Vba(#[from] litchi_vba::Error),
 
+    /// Runtime-neutral OOXML encryption failed.
+    #[cfg(feature = "encryption")]
+    #[error("OOXML encryption error: {0}")]
+    Encryption(#[from] litchi_crypto::ooxml::Error),
+
     /// A shared host-neutral OOXML service failed.
     #[error("shared OOXML error: {0}")]
     Common(#[from] litchi_ooxml_common::Error),

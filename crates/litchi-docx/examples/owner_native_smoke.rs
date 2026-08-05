@@ -1,26 +1,23 @@
-//! Generate DOCX web-settings/glossary and PPTX table-style artifacts for native Office checks.
+//! Generate DOCX web-settings and glossary artifacts for native Office checks.
 //!
 //! Run with:
 //!
 //! ```sh
-//! cargo run -p litchi-ooxml --example owner_native_smoke --all-features -- \
+//! cargo run -p litchi-docx --example owner_native_smoke -- \
 //!     target/office-owner-smoke
 //! ```
 
 use std::io;
 use std::path::{Path, PathBuf};
 
+use litchi_docx::Package;
 use litchi_docx::glossary::{
     Catalog, Category, Conformance as GlossaryConformance, Entry, Gallery, Id as GlossaryId,
     Insert, Kind, Name, Props,
 };
 use litchi_docx::web::{Div, Id as DivId, Screen};
-use litchi_ooxml::{docx, pptx};
-use litchi_pptx::table::style::{Def, Id, Parts};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
-
-const TABLE_STYLE: &str = "{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}";
 
 fn main() -> Result<()> {
     let directory = std::env::args_os()
@@ -35,8 +32,6 @@ fn main() -> Result<()> {
     if word_round_trip.exists() {
         verify_glossary_docx(&word_round_trip)?;
     }
-    create_pptx(&directory)?;
-
     println!("{}", directory.canonicalize()?.display());
     Ok(())
 }
@@ -46,7 +41,7 @@ fn create_glossary_docx(directory: &Path) -> Result<()> {
     const BUILDING_BLOCK_TEXT: &str = "Litchi reusable native building block";
 
     let destination = directory.join("glossary-owner.dotx");
-    let mut package = docx::Package::new_template()?;
+    let mut package = Package::new_template()?;
     package
         .document_mut()?
         .add_heading("Litchi DOCX glossary owner", 1)?;
@@ -76,7 +71,7 @@ fn create_glossary_docx(directory: &Path) -> Result<()> {
 fn verify_glossary_docx(path: &Path) -> Result<()> {
     const BUILDING_BLOCK_TEXT: &str = "Litchi reusable native building block";
 
-    let reopened = docx::Package::open(path)?;
+    let reopened = Package::open(path)?;
     let (catalog, conformance) = reopened
         .glossary()?
         .ok_or_else(|| missing("DOCX glossary catalog"))?;
@@ -96,7 +91,7 @@ fn verify_glossary_docx(path: &Path) -> Result<()> {
 
 fn create_docx(directory: &Path) -> Result<()> {
     let destination = directory.join("web-settings-owner.docx");
-    let mut package = docx::Package::new()?;
+    let mut package = Package::new()?;
     package
         .document_mut()?
         .add_heading("Litchi DOCX web-settings owner", 1)?;
@@ -121,7 +116,7 @@ fn create_docx(directory: &Path) -> Result<()> {
     let _ = package.put_web(settings, conformance)?;
     package.save(&destination)?;
 
-    let reopened = docx::Package::open(&destination)?;
+    let reopened = Package::open(&destination)?;
     let (settings, _) = reopened
         .web()?
         .ok_or_else(|| missing("DOCX web settings"))?;
@@ -131,46 +126,6 @@ fn create_docx(directory: &Path) -> Result<()> {
         || settings.get(quote_id)?.is_none()
     {
         return Err(missing("round-tripped DOCX web-settings values").into());
-    }
-    Ok(())
-}
-
-fn create_pptx(directory: &Path) -> Result<()> {
-    let destination = directory.join("table-style-owner.pptx");
-    let mut package = pptx::Package::new()?;
-    let slide = package.presentation_mut()?.add_slide()?;
-    slide.set_title("Litchi PPTX table-style owner");
-    slide.add_table(
-        vec![
-            vec!["Capability".to_owned(), "Status".to_owned()],
-            vec!["Typed style catalog".to_owned(), "Verified".to_owned()],
-        ],
-        914_400,
-        4_000_000,
-        7_315_200,
-        1_828_800,
-    );
-
-    let id = Id::parse(TABLE_STYLE)?;
-    let mut styles = package
-        .styles()?
-        .ok_or_else(|| missing("PPTX table-style catalog"))?;
-    let mut definition = Def::new(id, "Litchi native smoke")?;
-    let expected = Parts::BACKGROUND | Parts::WHOLE | Parts::FIRST_ROW;
-    let _ = definition.reset_parts(expected);
-    styles.add(definition)?;
-    let _ = package.put_styles(styles)?;
-    package.save(&destination)?;
-
-    let reopened = pptx::Package::open(&destination)?;
-    let styles = reopened
-        .styles()?
-        .ok_or_else(|| missing("round-tripped PPTX table-style catalog"))?;
-    if !styles
-        .get(id)
-        .is_some_and(|style| style.parts() == expected)
-    {
-        return Err(missing("round-tripped PPTX table-style definition").into());
     }
     Ok(())
 }
