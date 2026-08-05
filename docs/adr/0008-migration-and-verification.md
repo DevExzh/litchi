@@ -5823,6 +5823,14 @@ models plus bounded/strict font construction, owned-input consumption, default
 semantics, and named identity. The scoped IWA example check passes with a
 Numbers fixture that writes `CourierNewPSMT` through the public table-cell
 font operation; native Numbers verification is recorded below.
+The neutral color ownership slice is now complete: dependency-free
+`litchi-iwa-common::color::{RgbColorSpace, Rgba}` owns the fixed-size validated
+RGBA value and typed `color::Error`; IWA retains only protobuf conversion and a
+facade error adapter. The common color tests cover compact representation,
+opaque/transparent defaults, valid Display P3 values, and strict channel
+validation. The existing Pages shape authoring example compiles through the
+new common value and is the native artifact used for this slice's Computer Use
+check.
 The BorderSide ownership slice
 is complete: the dependency-neutral table-cell edge selector now lives at
 `litchi-iwa-common::table::cell::BorderSide`; `Borders` and `ShapeStroke` remain

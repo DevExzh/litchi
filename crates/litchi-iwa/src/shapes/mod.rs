@@ -23,7 +23,7 @@ pub mod text_extractor;
 mod text_layout;
 
 pub use caption::DrawableTitleCaption;
-pub use color::{RgbColorSpace, RgbaColor};
+pub use color::{RgbColorSpace, Rgba, RgbaColor};
 pub(crate) use color::{color_from_native, color_to_native};
 pub use effects::{ShapeEffects, ShapeOpacity, ShapeReflection, ShapeReflectionOpacity};
 pub(crate) use effects::{reset_shape_effects, set_shape_effects, shape_effects};

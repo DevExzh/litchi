@@ -1,99 +1,21 @@
-//! Validated iWork colors and native RGB conversion.
+//! Native RGB conversion for the shared validated color value.
 
 use crate::protobuf::tsp;
 use crate::{Error, Result};
 
-/// RGB color space used by native iWork colors.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub enum RgbColorSpace {
-    #[default]
-    Srgb,
-    DisplayP3,
-}
+use litchi_iwa_common::color::Error as ColorError;
+pub use litchi_iwa_common::color::{RgbColorSpace, Rgba};
 
-/// Validated normalized red, green, blue, and alpha channels.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct RgbaColor {
-    red: f32,
-    green: f32,
-    blue: f32,
-    alpha: f32,
-    color_space: RgbColorSpace,
-}
+/// The facade spelling for the shared RGBA value.
+pub type RgbaColor = Rgba;
 
-impl RgbaColor {
-    /// Construct a color whose channels are finite and in the inclusive range 0–1.
-    pub fn new(
-        red: f32,
-        green: f32,
-        blue: f32,
-        alpha: f32,
-        color_space: RgbColorSpace,
-    ) -> Result<Self> {
-        for (name, value) in [
-            ("red", red),
-            ("green", green),
-            ("blue", blue),
-            ("alpha", alpha),
-        ] {
-            if !value.is_finite() || !(0.0..=1.0).contains(&value) {
-                return Err(Error::ParseError(format!(
-                    "iWork {name} color channel must be finite and between 0 and 1"
-                )));
-            }
-        }
-        Ok(Self {
-            red,
-            green,
-            blue,
-            alpha,
-            color_space,
-        })
-    }
-
-    pub const fn red(self) -> f32 {
-        self.red
-    }
-
-    pub const fn green(self) -> f32 {
-        self.green
-    }
-
-    pub const fn blue(self) -> f32 {
-        self.blue
-    }
-
-    pub const fn alpha(self) -> f32 {
-        self.alpha
-    }
-
-    pub const fn color_space(self) -> RgbColorSpace {
-        self.color_space
-    }
-
-    pub const fn black() -> Self {
-        Self {
-            red: 0.0,
-            green: 0.0,
-            blue: 0.0,
-            alpha: 1.0,
-            color_space: RgbColorSpace::Srgb,
-        }
-    }
-
-    /// Transparent sRGB black used by iWork's standard text-outline stroke.
-    pub const fn transparent_black() -> Self {
-        Self {
-            red: 0.0,
-            green: 0.0,
-            blue: 0.0,
-            alpha: 0.0,
-            color_space: RgbColorSpace::Srgb,
-        }
+impl From<ColorError> for crate::Error {
+    fn from(error: ColorError) -> Self {
+        Self::ParseError(error.to_string())
     }
 }
 
-pub(crate) fn color_from_native(color: &tsp::Color) -> Result<RgbaColor> {
+pub(crate) fn color_from_native(color: &tsp::Color) -> Result<Rgba> {
     if color.model != tsp::color::ColorModel::Rgb as i32
         || color.c.is_some()
         || color.m.is_some()
@@ -117,7 +39,7 @@ pub(crate) fn color_from_native(color: &tsp::Color) -> Result<RgbaColor> {
                 ));
             },
         };
-    RgbaColor::new(
+    Ok(Rgba::new(
         color.r.ok_or_else(|| {
             Error::InvalidFormat("native iWork color has no red channel".to_owned())
         })?,
@@ -129,10 +51,10 @@ pub(crate) fn color_from_native(color: &tsp::Color) -> Result<RgbaColor> {
         })?,
         color.a.unwrap_or(1.0),
         color_space,
-    )
+    )?)
 }
 
-pub(crate) fn color_to_native(color: RgbaColor) -> tsp::Color {
+pub(crate) fn color_to_native(color: Rgba) -> tsp::Color {
     tsp::Color {
         model: tsp::color::ColorModel::Rgb as i32,
         r: Some(color.red()),
@@ -153,13 +75,13 @@ mod tests {
 
     #[test]
     fn invalid_channels_are_rejected() {
-        assert!(RgbaColor::new(-0.1, 0.0, 0.0, 1.0, RgbColorSpace::Srgb).is_err());
-        assert!(RgbaColor::new(0.0, f32::NAN, 0.0, 1.0, RgbColorSpace::Srgb).is_err());
+        assert!(Rgba::new(-0.1, 0.0, 0.0, 1.0, RgbColorSpace::Srgb).is_err());
+        assert!(Rgba::new(0.0, f32::NAN, 0.0, 1.0, RgbColorSpace::Srgb).is_err());
     }
 
     #[test]
     fn native_rgb_round_trips() {
-        let color = RgbaColor::new(0.1, 0.2, 0.3, 0.4, RgbColorSpace::DisplayP3).unwrap();
+        let color = Rgba::new(0.1, 0.2, 0.3, 0.4, RgbColorSpace::DisplayP3).unwrap();
         assert_eq!(color_from_native(&color_to_native(color)).unwrap(), color);
     }
 }

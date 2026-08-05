@@ -63,7 +63,7 @@ family crate.
 
 The IWA subtree follows the same downward-only rule. `litchi-iwa-common` is
 the foundational, dependency-neutral layer for bounded varint and protobuf
-wire primitives plus neutral table vocabulary; `litchi-iwa` and future
+wire primitives plus neutral table and color vocabulary; `litchi-iwa` and future
 `litchi-pages`, `litchi-numbers`, and `litchi-keynote` owners may depend on it.
 The common crate must not depend on an archive, graph, facade, or concrete
 iWork format crate, and concrete format owners retain their own object-model
@@ -102,6 +102,11 @@ native archive adapters. `Name` stores one boxed UTF-8 identifier, validates
 before allocating borrowed input, and consumes owned `String` input directly.
 The leaf therefore remains archive-free while Pages, Numbers, and Keynote use
 one canonical font model instead of maintaining format-local copies.
+The common color leaf now owns `color::{RgbColorSpace, Rgba}` and its typed
+`color::Error`; native protobuf conversion remains in the IWA shape adapter.
+`Rgba` is a fixed-size, copyable value that validates all four finite channels
+before construction, so format owners do not allocate or import archive error
+state merely to exchange a color.
 The leaf's `transition::Effect` owns the lossless native transition-effect
 identifier vocabulary, including canonical known variants and lossless unknown
 identifiers; IWA retains transition archive decoding, wire patching, and

@@ -6,6 +6,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod color;
 pub mod table;
 pub mod varint;
 pub mod wire;

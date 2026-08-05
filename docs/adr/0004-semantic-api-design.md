@@ -47,6 +47,13 @@ allocation-bearing model or publish a flat `TextFontName` implementation in
 each application owner. `Name` validates before allocating borrowed input and
 stores exactly one boxed identifier; no unchecked font-name constructor exists.
 
+The same focused-module rule applies to neutral visual values:
+`litchi_iwa_common::color::{RgbColorSpace, Rgba}` owns the validated RGBA
+model and `color::Error`. The value has no protobuf or archive dependency, stores
+only fixed-size channel data, and rejects non-finite or out-of-range channels
+before a caller can publish it. Concrete IWA modules retain only native color
+conversion and map the leaf error at their archive boundary.
+
 PresentationML implements this rule as `litchi-pptx::shape::{Scene, Shape}`.
 `Scene` is a bounded semantic index over one slide-like owner, not a vector of
 detached XML allocations. Shapes are visited in depth-first pre-order, while a

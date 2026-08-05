@@ -214,23 +214,23 @@ fn effective_radar_color(slot: &ChartSeriesStyleSlot, package: &IWorkPackage) ->
 }
 
 fn opaque(color: RgbaColor) -> Result<RgbaColor> {
-    RgbaColor::new(
+    Ok(RgbaColor::new(
         color.red(),
         color.green(),
         color.blue(),
         1.0,
         color.color_space(),
-    )
+    )?)
 }
 
 fn with_alpha(color: RgbaColor, alpha: f32) -> Result<RgbaColor> {
-    RgbaColor::new(
+    Ok(RgbaColor::new(
         color.red(),
         color.green(),
         color.blue(),
         alpha,
         color.color_space(),
-    )
+    )?)
 }
 
 fn read_local_radar_fill(data: &[u8]) -> Result<Option<ShapeFill>> {
