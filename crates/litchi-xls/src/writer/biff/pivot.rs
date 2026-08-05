@@ -1249,7 +1249,7 @@ fn write_sxdbb<W: Write>(
         .filter(|field| field.is_source_field && !field.items.is_empty())
         .count();
     if indices.len() != expected {
-        return Err(crate::XlsError::InvalidData(
+        return Err(XlsError::InvalidData(
             "PivotCache row shared-index cardinality mismatch".to_string(),
         ));
     }
@@ -1259,12 +1259,12 @@ fn write_sxdbb<W: Write>(
         .try_fold(0usize, |size, field| {
             size.checked_add(if field.items.len() >= 0x100 { 2 } else { 1 })
         })
-        .ok_or_else(|| crate::XlsError::InvalidData("SXINDEXLIST size overflow".to_string()))?;
+        .ok_or_else(|| XlsError::InvalidData("SXINDEXLIST size overflow".to_string()))?;
     write_record_header(
         writer,
         0x00C8,
         u16::try_from(size).map_err(|_| {
-            crate::XlsError::InvalidData("SXINDEXLIST exceeds BIFF record size".to_string())
+            XlsError::InvalidData("SXINDEXLIST exceeds BIFF record size".to_string())
         })?,
     )?;
     let mut index_iter = indices.iter();
@@ -1277,7 +1277,7 @@ fn write_sxdbb<W: Write>(
             writer.write_all(&index.to_le_bytes())?;
         } else {
             writer.write_all(&[u8::try_from(index).map_err(|_| {
-                crate::XlsError::InvalidData("SXINDEXLIST 8-bit index overflow".to_string())
+                XlsError::InvalidData("SXINDEXLIST 8-bit index overflow".to_string())
             })?])?;
         }
     }
@@ -1417,9 +1417,7 @@ pub(crate) fn generate_pivot_cache_stream(info: &PivotCacheStreamInfo<'_>) -> Xl
                     write_sxinteger(
                         &mut buf,
                         i16::try_from(value.step).map_err(|_| {
-                            crate::XlsError::InvalidData(
-                                "date grouping step exceeds i16".to_string(),
-                            )
+                            XlsError::InvalidData("date grouping step exceeds i16".to_string())
                         })?,
                     )?;
                 },

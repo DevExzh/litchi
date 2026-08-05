@@ -1245,11 +1245,11 @@ mod tests {
 
     #[test]
     fn exact_domains_use_narrow_checked_storage() {
-        assert_eq!(std::mem::size_of::<Rw12>(), 4);
-        assert_eq!(std::mem::size_of::<Col12>(), 2);
-        assert_eq!(std::mem::size_of::<Row>(), 4);
-        assert_eq!(std::mem::size_of::<Col>(), 2);
-        assert_eq!(std::mem::size_of::<Range>(), 12);
+        assert_eq!(size_of::<Rw12>(), 4);
+        assert_eq!(size_of::<Col12>(), 2);
+        assert_eq!(size_of::<Row>(), 4);
+        assert_eq!(size_of::<Col>(), 2);
+        assert_eq!(size_of::<Range>(), 12);
 
         let range = Range::new(0..=MAX_ROW_INDEX, 0..=MAX_COLUMN_INDEX).unwrap();
         assert_eq!(range.first_row().index(), 0);

@@ -461,7 +461,7 @@ mod tests {
             assert!(Point::cell(0, 0).offset(255, 1024).is_err());
         });
         assert!(outcome.is_ok());
-        assert_eq!(std::mem::size_of::<Point>(), 6);
+        assert_eq!(size_of::<Point>(), 6);
     }
 
     #[test]

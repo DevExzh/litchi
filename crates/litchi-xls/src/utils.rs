@@ -110,7 +110,10 @@ pub(crate) enum StringRecordDecode {
 /// encoding may switch between compressed and UTF-16 at record boundaries.
 /// Returns [`StringRecordDecode::NeedContinue`] when the declared characters
 /// extend past every supplied payload.
-pub(crate) fn decode_string_record(first: &[u8], continues: &[Vec<u8>]) -> XlsResult<StringRecordDecode> {
+pub(crate) fn decode_string_record(
+    first: &[u8],
+    continues: &[Vec<u8>],
+) -> XlsResult<StringRecordDecode> {
     if first.len() < 3 {
         return Err(XlsError::InvalidLength {
             expected: 3,

@@ -173,7 +173,7 @@ pub struct XlsWorkbook<R: Read + Seek> {
     book_ext: Option<crate::book_ext::XlsBookExt>,
     style_extensions: Vec<crate::style_ext::XlsStyleExt>,
     theme: Option<crate::theme::XlsTheme>,
-    write_access: crate::XlsResult<Option<crate::access::XlsWriteAccess>>,
+    write_access: XlsResult<Option<crate::access::XlsWriteAccess>>,
     table_styles: Option<crate::table_styles::XlsTableStyles>,
     shared_string_index: XlsResult<Option<crate::shared_string_index::XlsSharedStringIndex>>,
     workbook_view: crate::workbook_view::XlsWorkbookView,
@@ -456,7 +456,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             }
             let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
             let data = self.ole_file.open_stream(&refs)?;
-            let cache = crate::pivot_table::parse_pivot_cache_stream(&data)?;
+            let cache = pivot_table::parse_pivot_cache_stream(&data)?;
             if cache.stream_id() != expected_stream_id {
                 return Err(XlsError::InvalidRecord {
                     record_type: 0x00C6,
@@ -470,7 +470,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             pivot_caches.push(cache);
         }
         self.pivot_caches = pivot_caches;
-        crate::pivot_table::validate_pivot_cache_links(
+        pivot_table::validate_pivot_cache_links(
             &self.worksheets,
             &self.pivot_caches,
             &self.pivot_cache_stream_ids,
@@ -853,7 +853,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         encoding: &XlsEncoding,
         name: &str,
         shared_strings: Arc<Vec<String>>,
-        shared_string_properties: Arc<Vec<Option<Box<crate::records::SharedStringProperties>>>>,
+        shared_string_properties: Arc<Vec<Option<Box<SharedStringProperties>>>>,
         formula_context: Option<&FormulaContext>,
         formatting: Arc<XlsFormatting>,
     ) -> XlsResult<XlsWorksheet> {
@@ -1430,29 +1430,26 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     /// Resolves a worksheet PivotTable's global cache link.
     pub fn pivot_cache_for_table(
         &self,
-        table: &crate::pivot_table::PivotTable,
+        table: &pivot_table::PivotTable,
     ) -> XlsResult<&crate::PivotCache> {
         let stream_id = *self
             .pivot_cache_stream_ids
             .get(usize::from(table.cache_index()))
             .ok_or_else(|| XlsError::InvalidRecord {
-                record_type: crate::pivot_table::SXVIEW_TYPE,
+                record_type: pivot_table::SXVIEW_TYPE,
                 message: "PivotTable global cache index is out of range".to_string(),
             })?;
         self.pivot_caches
             .iter()
             .find(|cache| cache.stream_id() == stream_id)
             .ok_or_else(|| XlsError::InvalidRecord {
-                record_type: crate::pivot_table::SXVIEW_TYPE,
+                record_type: pivot_table::SXVIEW_TYPE,
                 message: "PivotTable SXStreamID has no matching cache storage".to_string(),
             })
     }
 
     /// Parsed PivotTables on one worksheet.
-    pub fn worksheet_pivot_tables(
-        &self,
-        index: usize,
-    ) -> XlsResult<&[crate::pivot_table::PivotTable]> {
+    pub fn worksheet_pivot_tables(&self, index: usize) -> XlsResult<&[pivot_table::PivotTable]> {
         Ok(self.xls_worksheet(index)?.pivot_tables())
     }
 
@@ -1660,7 +1657,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     /// Resolves the global Font record referenced by an XF record.
     pub fn extended_format_font(
         &self,
-        format: &crate::number_format::XlsExtendedFormat,
+        format: &XlsExtendedFormat,
     ) -> Option<&crate::font::XlsFont> {
         self.font(format.font_index())
     }
@@ -1700,10 +1697,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     /// Its rendered formula describes the AutoFilter cell range.
     pub fn filter_database_name(&self, sheet_index: usize) -> Option<&XlsDefinedName> {
         self.defined_names.iter().find(|defined_name| {
-            defined_name.kind
-                == crate::defined_names::XlsDefinedNameKind::BuiltIn(
-                    crate::defined_names::XlsBuiltInName::FilterDatabase,
-                )
+            defined_name.kind == XlsDefinedNameKind::BuiltIn(XlsBuiltInName::FilterDatabase)
                 && defined_name.scope == XlsNameScope::Worksheet(sheet_index)
         })
     }

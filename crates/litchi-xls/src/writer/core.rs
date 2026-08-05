@@ -980,7 +980,7 @@ impl XlsFunctionGroupOptions {
                 "function category count exceeds 256".to_string(),
             ));
         }
-        let mut unique = std::collections::HashSet::with_capacity(self.custom_categories.len());
+        let mut unique = HashSet::with_capacity(self.custom_categories.len());
         for name in &self.custom_categories {
             if name.encode_utf16().count() > 32 {
                 return Err(XlsError::InvalidData(
@@ -1226,8 +1226,8 @@ fn validate_list_object_relationships(
         crate::XlsDefinedNameFutureRecords,
     )],
 ) -> XlsResult<()> {
-    let mut ids = std::collections::HashSet::new();
-    let mut names = std::collections::HashSet::new();
+    let mut ids = HashSet::new();
+    let mut names = HashSet::new();
     let defined_names = defined_names
         .iter()
         .map(|name| name.name.to_lowercase())
@@ -1236,7 +1236,7 @@ fn validate_list_object_relationships(
                 .iter()
                 .map(|(name, _)| name.name.to_lowercase()),
         )
-        .collect::<std::collections::HashSet<_>>();
+        .collect::<HashSet<_>>();
     for worksheet in worksheets {
         for (index, table) in worksheet.list_objects.iter().enumerate() {
             table.validate()?;
@@ -2741,7 +2741,7 @@ impl XlsWriter {
         future: crate::XlsDefinedNameFutureRecords,
     ) -> XlsResult<usize> {
         options.validate(self.worksheets.len())?;
-        self::named_range::validate_future_records(&future, options.serialized_name())?;
+        named_range::validate_future_records(&future, options.serialized_name())?;
         if self.defined_names.len() + self.defined_name_records.len() >= usize::from(u16::MAX) {
             return Err(XlsError::InvalidData(
                 "defined name count exceeds BIFF8 bound".to_string(),
@@ -3185,7 +3185,7 @@ impl XlsWriter {
             .conditional_formats12
             .iter()
             .flat_map(|existing| existing.rules.iter().map(|rule| rule.priority))
-            .collect::<std::collections::HashSet<_>>();
+            .collect::<HashSet<_>>();
         for rule in &group.rules {
             if rule.priority == 0 || !priorities.insert(rule.priority) {
                 return Err(XlsError::InvalidData(
@@ -4199,10 +4199,7 @@ fn collect_reserved_object_ids(
 }
 
 /// Reserve the requested OBJ identifier or the first free canonical one.
-fn assign_object_id(
-    reserved: &mut std::collections::HashSet<u16>,
-    requested: Option<u16>,
-) -> XlsResult<u16> {
+fn assign_object_id(reserved: &mut HashSet<u16>, requested: Option<u16>) -> XlsResult<u16> {
     let object_id = match requested {
         Some(object_id) => object_id,
         None => (1..u16::MAX)
@@ -5010,7 +5007,7 @@ mod tests {
     #[test]
     fn test_writableworksheet_merge_cells() {
         let mut ws = WritableWorksheet::new("Sheet1".to_string());
-        ws.add_merged_range(super::MergedRange::try_new(0, 1, 0, 2).unwrap()); // Merge A1:C2
+        ws.add_merged_range(MergedRange::try_new(0, 1, 0, 2).unwrap()); // Merge A1:C2
         assert_eq!(ws.merged_ranges.len(), 1);
         assert_eq!(ws.merged_ranges[0].fields(), (0, 1, 0, 2));
     }
@@ -5033,7 +5030,7 @@ mod tests {
             last_row: 10,
             first_col: 0,
             last_col: 0,
-            format_type: super::XlsConditionalFormatType::Formula {
+            format_type: XlsConditionalFormatType::Formula {
                 formula: "A1>100".to_string(),
             },
             pattern: None,
@@ -5047,7 +5044,7 @@ mod tests {
         let mut ws = WritableWorksheet::new("Sheet1".to_string());
         let dv = XlsDataValidation {
             range: XlsDataValidationRange::new(0, 10, 0, 0).unwrap(),
-            validation_type: super::XlsDataValidationType::List {
+            validation_type: XlsDataValidationType::List {
                 values: vec!["Option1".to_string(), "Option2".to_string()],
             },
             show_input_message: true,
@@ -5070,7 +5067,7 @@ mod tests {
     #[test]
     fn test_writableworksheet_add_hyperlink() {
         let mut ws = WritableWorksheet::new("Sheet1".to_string());
-        let link = super::XlsHyperlink {
+        let link = XlsHyperlink {
             first_row: 0,
             last_row: 0,
             first_col: 0,

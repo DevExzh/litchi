@@ -36,7 +36,11 @@ fn write_continue<W: Write>(writer: &mut W, data: &[u8]) -> XlsResult<()> {
 ///
 /// This implementation properly handles string splitting across CONTINUE boundaries,
 /// based on Apache POI's SSTSerializer.
-pub(crate) fn write_sst<W: Write>(writer: &mut W, strings: &[String], cst_total: u32) -> XlsResult<()> {
+pub(crate) fn write_sst<W: Write>(
+    writer: &mut W,
+    strings: &[String],
+    cst_total: u32,
+) -> XlsResult<()> {
     const MAX_RECORD_DATA: usize = 8224; // max data payload per record
 
     // We'll build each record's payload into a local buffer, then flush with the header

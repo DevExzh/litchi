@@ -711,7 +711,7 @@ mod tests {
 
     #[test]
     fn display_options_share_one_biff_word() {
-        assert_eq!(std::mem::size_of::<Flags>(), std::mem::size_of::<u16>());
+        assert_eq!(size_of::<Flags>(), size_of::<u16>());
         let mut view = View::default();
         view.formulas(true)
             .gridlines(false)

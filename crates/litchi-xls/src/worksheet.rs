@@ -704,8 +704,9 @@ impl Worksheet for XlsWorksheet {
 
     fn cell_by_coordinate(&self, coordinate: &str) -> Result<Box<dyn SheetCell + '_>> {
         let (row, col) = crate::utils::parse_cell_reference(coordinate).ok_or_else(|| {
-            Box::new(XlsError::InvalidCellReference(coordinate.to_string()))
-                as Box<dyn std::error::Error + Send + Sync>
+            let error: Box<dyn std::error::Error + Send + Sync> =
+                Box::new(XlsError::InvalidCellReference(coordinate.to_string()));
+            error
         })?;
         self.cell(row, col)
     }
