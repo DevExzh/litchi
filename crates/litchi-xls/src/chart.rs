@@ -17,11 +17,12 @@ use litchi_ole_common::object::{
     Editor as ObjectEditor, Format as ObjectFormat, Limits as ObjectLimits,
 };
 
+use litchi_biff::MAX_RECORD_BYTES;
+use litchi_biff::{Encoder as GraphEncoder, Kind as RecordKind, Limits as BiffLimits, Records};
+use litchi_ograph::Limits as GraphLimits;
 use litchi_ograph::chart::{Kind as GraphChartKind, Ref as GraphChartRef, Refs as GraphCharts};
 pub use litchi_ograph::chart::{format, group};
-use litchi_ograph::raw::{Encoder as GraphEncoder, Kind as RecordKind, Records};
 pub use litchi_ograph::record::{chart3d, frame, line, marker, pie, series};
-use litchi_ograph::{Limits as GraphLimits, MAX_BIFF_RECORD_BYTES};
 
 use super::{XlsError, XlsResult};
 
@@ -117,7 +118,7 @@ impl Default for Limits {
             max_series: 255,
             max_groups: 10,
             max_axes: 6,
-            max_formula_bytes: MAX_BIFF_RECORD_BYTES - 8,
+            max_formula_bytes: MAX_RECORD_BYTES - 8,
             max_cached_values: 32_000,
             max_unknown_bytes: 16 * 1024 * 1024,
         }
@@ -780,7 +781,7 @@ impl Chart {
             return invalid(CHART, "opaque chart data exceeds limit");
         }
         for record in &self.unknown_records {
-            if record.data.len() > MAX_BIFF_RECORD_BYTES {
+            if record.data.len() > MAX_RECORD_BYTES {
                 return invalid(
                     record.record_type,
                     "opaque BIFF record exceeds maximum length",
@@ -2887,16 +2888,16 @@ fn bindings(input: &[u8]) -> XlsResult<(Vec<(usize, usize)>, Vec<Sheet>)> {
     ))
 }
 fn ranges(input: &[u8]) -> XlsResult<Vec<Range>> {
-    ranges_with(input, GraphLimits::default().max_records)
+    ranges_with(input, BiffLimits::default().max_records)
 }
 fn ranges_with(input: &[u8], max_records: usize) -> XlsResult<Vec<Range>> {
     let mut out = Vec::new();
-    let graph_limits = GraphLimits {
-        max_workbook_bytes: input.len().max(1),
+    let biff_limits = BiffLimits {
         max_records,
-        ..GraphLimits::default()
+        max_input_bytes: input.len().max(1),
+        ..BiffLimits::default()
     };
-    let records = Records::with_limits(input, graph_limits)
+    let records = Records::with_limits(input, biff_limits)
         .map_err(|error| XlsError::InvalidData(error.to_string()))?;
     for record in records {
         let record = record.map_err(|error| XlsError::InvalidData(error.to_string()))?;
@@ -3137,33 +3138,45 @@ fn chart_scan_limits(limits: Limits) -> GraphLimits {
         max_workbook_bytes: limits.max_workbook_bytes,
         max_charts: limits.max_charts,
         max_chart_records: limits.max_records_per_chart,
-        max_output_bytes: limits.max_workbook_bytes,
+        max_series: limits.max_series,
+        max_groups: limits.max_groups,
+        max_axes: limits.max_axes,
+        max_formula_bytes: limits.max_formula_bytes,
+        max_cached_values: limits.max_cached_values,
+        max_unknown_bytes: limits.max_unknown_bytes,
+        biff: BiffLimits {
+            max_records: limits.max_records_per_chart,
+            max_input_bytes: limits.max_workbook_bytes,
+            max_output_bytes: limits.max_workbook_bytes,
+            ..BiffLimits::default()
+        },
         ..GraphLimits::default()
     }
 }
 #[cfg(test)]
 fn chart_encoder(limits: Limits) -> XlsResult<GraphEncoder> {
-    GraphEncoder::with_limits(GraphLimits {
+    GraphEncoder::with_limits(BiffLimits {
         max_records: limits.max_records_per_chart,
-        ..chart_scan_limits(limits)
+        max_output_bytes: limits.max_workbook_bytes,
+        ..BiffLimits::default()
     })
-    .map_err(|error| graph_error(CHART, error))
+    .map_err(|error| frame_error(CHART, error))
 }
 fn push_record(out: &mut GraphEncoder, kind: u16, data: &[u8]) -> XlsResult<()> {
-    out.push(RecordKind::new(kind), data)
-        .map_err(|error| graph_error(kind, error))
+    out.push(RecordKind::from_wire(kind), data)
+        .map_err(|error| frame_error(kind, error))
 }
 fn record(kind: u16, data: &[u8]) -> XlsResult<Vec<u8>> {
     let output_bytes = data
         .len()
         .checked_add(4)
         .ok_or_else(|| XlsError::InvalidData("BIFF record size overflow".into()))?;
-    let limits = GraphLimits {
+    let limits = BiffLimits {
         max_records: 1,
         max_output_bytes: output_bytes.max(1),
-        ..GraphLimits::default()
+        ..BiffLimits::default()
     };
-    let mut out = GraphEncoder::with_limits(limits).map_err(|error| graph_error(kind, error))?;
+    let mut out = GraphEncoder::with_limits(limits).map_err(|error| frame_error(kind, error))?;
     push_record(&mut out, kind, data)?;
     Ok(out.finish())
 }
@@ -3289,6 +3302,9 @@ fn invalid_error(kind: u16, message: impl Into<String>) -> XlsError {
     }
 }
 fn graph_error(kind: u16, error: litchi_ograph::Error) -> XlsError {
+    invalid_error(kind, error.to_string())
+}
+fn frame_error(kind: u16, error: litchi_biff::Error) -> XlsError {
     invalid_error(kind, error.to_string())
 }
 fn invalid<T>(kind: u16, message: impl Into<String>) -> XlsResult<T> {

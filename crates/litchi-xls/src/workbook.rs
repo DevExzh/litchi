@@ -818,23 +818,17 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         let worksheet_position = usize::try_from(bound_sheet.position).map_err(|_| {
             XlsError::InvalidData("worksheet position does not fit in usize".to_string())
         })?;
-        let mut records = Records::new(workbook_data);
+        let worksheet_data = workbook_data.get(worksheet_position..).ok_or_else(|| {
+            XlsError::InvalidData("BoundSheet8 points outside the Workbook stream".to_string())
+        })?;
+        let mut records = Records::new(worksheet_data);
 
-        // Consume the borrowed stream until the exact worksheet BOF offset.
-        let bof = loop {
-            let Some(record_result) = records.next() else {
-                return Err(XlsError::Eof("Expected BOF record for worksheet"));
-            };
-            let record = record_result?;
-            if record.offset() < worksheet_position {
-                continue;
-            }
-            if record.offset() != worksheet_position {
-                return Err(XlsError::InvalidData(
-                    "BoundSheet8 points into the middle of a BIFF record".to_string(),
-                ));
-            }
-            break record;
+        // Start directly at the worksheet BOF. The borrowed BIFF iterator
+        // reports offsets relative to this slice; the absolute base is passed
+        // below for row-block indexing.
+        let bof = match records.next() {
+            Some(record_result) => record_result?,
+            None => return Err(XlsError::Eof("Expected BOF record for worksheet")),
         };
 
         if bof.kind().get() != 0x0809 {
@@ -853,10 +847,15 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             .shared_string_properties
             .clone()
             .unwrap_or_else(|| Arc::new(Vec::new()));
+        let worksheet_position = worksheet_position as u64;
+        let current_position = worksheet_position
+            .checked_add(bof.encoded().len() as u64)
+            .ok_or_else(|| XlsError::InvalidData("worksheet position overflows".to_string()))?;
         Self::parse_worksheet_records(
             &mut records,
             workbook_data.len() as u64,
-            bof.offset() as u64 + bof.encoded().len() as u64,
+            worksheet_position,
+            current_position,
             encoding,
             &bound_sheet.name,
             shared_strings,
@@ -870,6 +869,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     fn parse_worksheet_records(
         records_iter: &mut Records<'_>,
         stream_len: u64,
+        base_position: u64,
         current_position: u64,
         encoding: &XlsEncoding,
         name: &str,
@@ -915,7 +915,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
 
         while let Some(record_result) = records_iter.next() {
             let record = record_result?;
-            let record_position = record.offset() as u64;
+            let record_position = base_position + record.offset() as u64;
             sheet_layout_collector.feed_record(record.kind().get(), record.payload())?;
             comment_collector.feed_record(record.kind().get(), record.payload())?;
             hyperlink_collector.feed_record(record.kind().get(), record.payload())?;
@@ -2039,6 +2039,7 @@ mod tests {
             &mut records,
             stream.len() as u64,
             0,
+            0,
             &XlsEncoding::Utf16Le,
             "Sheet1",
             Arc::new(Vec::new()),
@@ -2079,6 +2080,7 @@ mod tests {
             &mut records,
             stream.len() as u64,
             0,
+            0,
             &XlsEncoding::Utf16Le,
             "Sheet1",
             Arc::new(Vec::new()),
@@ -2106,6 +2108,7 @@ mod tests {
         let result = XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
             &mut records,
             stream.len() as u64,
+            0,
             0,
             &XlsEncoding::Utf16Le,
             "Sheet1",
@@ -2144,6 +2147,7 @@ mod tests {
         let worksheet = XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
             &mut records,
             stream.len() as u64,
+            0,
             0,
             &XlsEncoding::Utf16Le,
             "Sheet1",
@@ -2187,6 +2191,7 @@ mod tests {
             &mut records,
             stream.len() as u64,
             0,
+            0,
             &XlsEncoding::Utf16Le,
             "Sheet1",
             Arc::new(Vec::new()),
@@ -2228,6 +2233,7 @@ mod tests {
             &mut records,
             stream.len() as u64,
             0,
+            0,
             &XlsEncoding::Utf16Le,
             "Sheet1",
             Arc::new(Vec::new()),
@@ -2259,6 +2265,7 @@ mod tests {
             &mut records,
             stream.len() as u64,
             0,
+            0,
             &XlsEncoding::Utf16Le,
             "Sheet1",
             Arc::new(Vec::new()),
@@ -2288,6 +2295,7 @@ mod tests {
             XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
                 &mut records,
                 stream.len() as u64,
+                0,
                 0,
                 &XlsEncoding::Utf16Le,
                 "Sheet1",
@@ -2406,6 +2414,7 @@ mod tests {
                     &mut records,
                     stream.len() as u64,
                     0,
+                    0,
                     &XlsEncoding::Utf16Le,
                     "Sheet1",
                     Arc::new(Vec::new()),
@@ -2441,6 +2450,7 @@ mod tests {
         let worksheet = XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
             &mut records,
             stream.len() as u64,
+            0,
             0,
             &XlsEncoding::Utf16Le,
             "Sheet1",
@@ -2481,6 +2491,7 @@ mod tests {
         let worksheet = XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
             &mut records,
             stream.len() as u64,
+            0,
             0,
             &XlsEncoding::Utf16Le,
             "Sheet1",
