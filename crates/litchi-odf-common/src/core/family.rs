@@ -6,6 +6,22 @@ use std::{fs, path::Path};
 
 const MAX_CONTENT_BYTES: usize = 256 * 1024 * 1024;
 
+/// Validate the bounded, family-specific `content.xml` contract shared by
+/// package facades and detached family builders.
+pub fn validate_content_part(xml: &str, body_marker: &str, family_name: &str) -> Result<()> {
+    if xml.len() > MAX_CONTENT_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "{family_name} content.xml exceeds the family limit"
+        )));
+    }
+    if !xml.contains(body_marker) {
+        return Err(Error::InvalidFormat(format!(
+            "{family_name} content.xml has no expected body"
+        )));
+    }
+    Ok(())
+}
+
 /// A validated immutable ODF package with the standard XML parts decoded once.
 ///
 /// Concrete family crates retain a small contextual wrapper around this type
@@ -76,17 +92,10 @@ impl FamilyPackage {
         }
 
         let content_bytes = archive.get_file("content.xml")?;
-        if content_bytes.len() > MAX_CONTENT_BYTES {
-            return Err(Error::InvalidFormat(format!(
-                "{family_name} content.xml exceeds the family limit"
-            )));
-        }
+        let content_xml = std::str::from_utf8(&content_bytes)
+            .map_err(|_| Error::InvalidFormat(format!("{family_name} content.xml is not UTF-8")))?;
+        validate_content_part(content_xml, body_marker, family_name)?;
         let content = Content::from_bytes(&content_bytes)?;
-        if !content.xml_content().contains(body_marker) {
-            return Err(Error::InvalidFormat(format!(
-                "{family_name} content.xml has no expected body"
-            )));
-        }
 
         let styles = archive
             .has_file("styles.xml")?
@@ -149,7 +158,7 @@ impl FamilyPackage {
 
 #[cfg(test)]
 mod tests {
-    use super::{FamilyPackage, OwnedPackage};
+    use super::{FamilyPackage, OwnedPackage, validate_content_part};
     use std::io::{Cursor, Write};
 
     const MIMETYPE: &str = "application/vnd.oasis.opendocument.presentation";
@@ -205,5 +214,14 @@ mod tests {
                 .is_err()
         );
         assert!(FamilyPackage::from_bytes(bytes, MIMETYPE, "<office:text", "ODP").is_err());
+    }
+
+    #[test]
+    fn validates_detached_content_with_the_same_family_contract() {
+        assert!(validate_content_part("<office:drawing/>", "<office:drawing", "ODG").is_ok());
+        let error = validate_content_part("<office:text/>", "<office:drawing", "ODG")
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("ODG content.xml has no expected body"));
     }
 }

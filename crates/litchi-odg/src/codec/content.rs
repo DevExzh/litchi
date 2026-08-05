@@ -1,23 +1,13 @@
 //! Drawing content validation.
 
-use litchi_core::{Error, Result};
+use litchi_core::Result;
+use litchi_odf_common::core::validate_content_part;
 
 const BODY_MARKER: &str = "<office:drawing";
-const MAX_CONTENT_BYTES: usize = 256 * 1024 * 1024;
 
 /// Validate a UTF-8 content part before authoring it into a package.
 pub(crate) fn validate(xml: &str) -> Result<()> {
-    if xml.len() > MAX_CONTENT_BYTES {
-        return Err(Error::InvalidFormat(
-            "content.xml exceeds the family limit".to_string(),
-        ));
-    }
-    if !xml.contains(BODY_MARKER) {
-        return Err(Error::InvalidFormat(
-            "content.xml has no drawing body".to_string(),
-        ));
-    }
-    Ok(())
+    validate_content_part(xml, BODY_MARKER, "ODG")
 }
 
 #[cfg(test)]
