@@ -19,7 +19,7 @@ const OFFICE_EXT_NAMESPACE: &[u8] = b"http://openoffice.org/2009/office";
 /// These values are password verifiers, not encryption keys. Litchi preserves
 /// them verbatim and does not attempt to recover or verify a password.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct ProtectionKey {
+pub struct Key {
     pub value: Option<String>,
     pub digest_algorithm: Option<String>,
     /// LibreOffice's secondary digest URI for legacy Excel-compatible hashes.
@@ -31,12 +31,12 @@ pub struct ProtectionKey {
 pub struct Protection {
     /// `None` preserves an omitted attribute; `Some(false)` preserves an explicit false value.
     pub structure_protected: Option<bool>,
-    pub key: ProtectionKey,
+    pub key: Key,
 }
 
 /// Granular edit permissions used by LibreOffice's table-protection extension.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct SheetProtectionOptions {
+pub struct Options {
     pub select_protected_cells: Option<bool>,
     pub select_unprotected_cells: Option<bool>,
     pub insert_columns: Option<bool>,
@@ -47,7 +47,7 @@ pub struct SheetProtectionOptions {
     pub use_pivot: Option<bool>,
 }
 
-impl SheetProtectionOptions {
+impl Options {
     pub(crate) fn is_empty(&self) -> bool {
         self.select_protected_cells.is_none()
             && self.select_unprotected_cells.is_none()
@@ -62,19 +62,19 @@ impl SheetProtectionOptions {
 
 /// Protection metadata on a `table:table` sheet.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct SheetProtection {
+pub struct Sheet {
     pub protected: Option<bool>,
-    pub key: ProtectionKey,
-    pub options: SheetProtectionOptions,
+    pub key: Key,
+    pub options: Options,
 }
 
-pub(crate) fn parse_protection(xml: &str) -> Result<(Protection, Vec<SheetProtection>)> {
+pub(crate) fn parse_protection(xml: &str) -> Result<(Protection, Vec<Sheet>)> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut spreadsheet = Protection::default();
     let mut spreadsheet_seen = false;
     let mut sheets = Vec::new();
-    let mut current_sheet: Option<SheetProtection> = None;
+    let mut current_sheet: Option<Sheet> = None;
     let mut element_depth = 0usize;
     let mut spreadsheet_depth = None;
     let mut current_sheet_depth = None;
@@ -196,19 +196,16 @@ fn parse_spreadsheet_attributes(
     })
 }
 
-fn parse_sheet_attributes(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
-) -> Result<SheetProtection> {
-    Ok(SheetProtection {
+fn parse_sheet_attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Sheet> {
+    Ok(Sheet {
         protected: optional_bool_attribute(reader, element, TABLE_NAMESPACE, b"protected")?,
         key: parse_key(reader, element)?,
-        options: SheetProtectionOptions::default(),
+        options: Options::default(),
     })
 }
 
-fn parse_key(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<ProtectionKey> {
-    Ok(ProtectionKey {
+fn parse_key(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Key> {
+    Ok(Key {
         value: optional_attribute(reader, element, TABLE_NAMESPACE, b"protection-key")?,
         digest_algorithm: optional_attribute(
             reader,
@@ -225,11 +222,8 @@ fn parse_key(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Prote
     })
 }
 
-fn parse_sheet_options(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
-) -> Result<SheetProtectionOptions> {
-    Ok(SheetProtectionOptions {
+fn parse_sheet_options(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Options> {
+    Ok(Options {
         select_protected_cells: optional_extension_bool(
             reader,
             element,
@@ -267,12 +261,12 @@ pub(crate) fn write_spreadsheet_attributes(out: &mut String, value: &Protection)
     write_key_attributes(out, &value.key);
 }
 
-pub(crate) fn write_sheet_attributes(out: &mut String, value: &SheetProtection) {
+pub(crate) fn write_sheet_attributes(out: &mut String, value: &Sheet) {
     write_bool_attribute(out, "table:protected", value.protected);
     write_key_attributes(out, &value.key);
 }
 
-pub(crate) fn write_sheet_options(out: &mut String, value: &SheetProtectionOptions) {
+pub(crate) fn write_sheet_options(out: &mut String, value: &Options) {
     if value.is_empty() {
         return;
     }
@@ -298,7 +292,7 @@ pub(crate) fn write_sheet_options(out: &mut String, value: &SheetProtectionOptio
 
 pub(crate) fn has_extensions<'a>(
     spreadsheet: &Protection,
-    mut sheets: impl Iterator<Item = &'a SheetProtection>,
+    mut sheets: impl Iterator<Item = &'a Sheet>,
 ) -> bool {
     spreadsheet.key.secondary_digest_algorithm.is_some()
         || sheets.any(|sheet| {
@@ -306,7 +300,7 @@ pub(crate) fn has_extensions<'a>(
         })
 }
 
-fn write_key_attributes(out: &mut String, key: &ProtectionKey) {
+fn write_key_attributes(out: &mut String, key: &Key) {
     write_attribute(out, "table:protection-key", key.value.as_deref());
     write_attribute(
         out,
