@@ -10,6 +10,10 @@
     reason = "The public Image* names identify the native inspector controls while staying concise at the shape::image boundary"
 )]
 
+const EXPOSURE_PRESENT: u8 = 1 << 0;
+const SATURATION_PRESENT: u8 = 1 << 1;
+const ENHANCEMENT_PRESENT: u8 = 1 << 2;
+
 /// Validation failures for normalized image-adjustment values.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum Error {
@@ -23,10 +27,6 @@ pub enum Error {
 
 /// Result type for image-adjustment value construction.
 pub type Result<T> = std::result::Result<T, Error>;
-
-const EXPOSURE_PRESENT: u8 = 1 << 0;
-const SATURATION_PRESENT: u8 = 1 << 1;
-const ENHANCEMENT_PRESENT: u8 = 1 << 2;
 
 /// A normalized native image-adjustment amount.
 ///
