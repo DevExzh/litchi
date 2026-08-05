@@ -5025,6 +5025,38 @@ and typed-object-model increment, not a claim of complete OLE2, OOXML,
 DrawingML, or legacy Office conformance; the malformed Apache POI DOC fixture
 remains the previously recorded external integration debt.
 
+## Layered OLE2 and OOXML owner continuation
+
+This turn extends the same breaking, prefix-free owner pattern across the OLE2
+and OOXML migration hosts. CFB property-set metadata now lives under
+`metadata::{model,codec,tests}` with the contextual `Metadata`, `Stream`,
+`Section`, `Value`, `Standard`, and `Editor` facade. DOCX header/footer stories,
+XLS BIFF8 comments, XLSX auto-filters, and XLSX external links now each have
+separate semantic model, bounded codec, package/orchestration, and regression
+layers. Their public values no longer repeat the owner name, and direct callers
+were migrated without compatibility aliases.
+
+The migrated XLSX filter owner keeps unknown attributes/elements and source
+ordering when it is meaningful, but normalizes canonical known-child ordering
+out of the semantic snapshot. It accepts Office-produced sort-condition ranges
+whose scope differs from `sortState@ref` while retaining checked range geometry.
+The shared DrawingML chart reader now handles the normative formula-plus-cache
+shape of series titles (`strRef` with `strCache`) and typed rich titles; the
+DOCX POI/LibreOffice chart round-trip fixture passes again. The OOXML MCE owner
+is layered under `litchi-ooxml-common::mce::{model,codec,tests}` and all its
+callers use the shared common facade.
+
+The affected crates pass combined all-target compilation. Focused tests pass
+for CFB, DOCX, OOXML-common, PPT, XLS, XLSB, and XLSX; XLSX passes 640 library
+tests plus all integration targets, DOC passes 830 library tests with two
+ignored, and the DOCX chart fixture plus its 643-test library suite pass. The
+full DOC all-target command still reports only the previously recorded malformed
+Apache POI fixture (`FAT entry 52 beyond the physical file is not FREESECT`).
+Formatting, metadata, diff, and 46-package boundary-policy checks pass. This
+batch is a typed, bounded, lossless structural increment, not a claim of full
+`[MS-DOC]`, `[MS-ODRAW]`, `[MS-OGRAPH]`, `[MS-OSHARED]`, `[MS-PPT]`, `[MS-XLS]`,
+or OOXML conformance.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:
