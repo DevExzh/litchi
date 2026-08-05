@@ -1139,7 +1139,7 @@ mod tests {
             .headers()
             .unwrap()
             .into_iter()
-            .map(|(_, header)| header.image_watermarks().unwrap())
+            .map(|header| header.image_watermarks().unwrap())
             .collect::<Vec<_>>();
         assert_eq!(anchors.len(), 3);
         assert_eq!(anchors[0][0].dimensions_pt(), (180.0, 90.0));

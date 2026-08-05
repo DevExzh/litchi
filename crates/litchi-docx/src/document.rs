@@ -16,8 +16,7 @@ use crate::field::{
     ToaEntry, Toc, TocEntry, UserIdentity, Variable,
 };
 use crate::footnote::Note;
-use crate::header_footer::HeaderFooter;
-use crate::header_footer::Kind;
+use crate::header_footer::{Kind, Story};
 use crate::mail_merge::{Recipients, extract_recipients, is_settings_relationship};
 use crate::numbering::parse_part;
 use crate::numbering::{Collection, Suffix};
@@ -815,8 +814,8 @@ impl<'a> Document<'a> {
 
     /// Get all headers in the document.
     ///
-    /// Returns a vector of tuples containing the header type and the header itself.
-    /// Headers can be of three types: Primary (default), FirstPage, and EvenPage.
+    /// Returns header stories in WordprocessingML section-reference order.
+    /// Each story carries its typed [`Kind`].
     ///
     /// # Examples
     ///
@@ -826,53 +825,23 @@ impl<'a> Document<'a> {
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
     ///
-    /// for (hdr_type, header) in doc.headers()? {
-    ///     println!("{:?} header: {}", hdr_type, header.text()?);
+    /// for header in doc.headers()? {
+    ///     println!("{:?} header: {}", header.kind(), header.text()?);
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn headers(&self) -> Result<Vec<(Kind, HeaderFooter)>> {
-        let main_part = self.opc.main_document_part()?;
-        let rels = main_part.rels();
-
-        let mut headers = Vec::new();
-
-        // Iterate through all relationships looking for header parts
-        for rel in rels.iter() {
-            if rel.reltype() == relationship_type::HEADER {
-                // Determine header type from the target name
-                let target = rel.target_partname()?;
-                let target_str = target.as_str();
-
-                let hdr_type = if target_str.contains("header1.xml")
-                    || target_str.contains("Header1.xml")
-                {
-                    Kind::Primary
-                } else if target_str.contains("header2.xml") || target_str.contains("Header2.xml") {
-                    Kind::FirstPage
-                } else if target_str.contains("header3.xml") || target_str.contains("Header3.xml") {
-                    Kind::EvenPage
-                } else {
-                    // Default to Primary if we can't determine
-                    Kind::Primary
-                };
-
-                let header_part = self.opc.get_part(&target)?;
-                headers.push((hdr_type, HeaderFooter::from_part(header_part, hdr_type)?));
-            }
-        }
-
-        Ok(headers)
+    pub fn headers(&self) -> Result<Vec<Story>> {
+        crate::header_footer::load_headers(self.opc, &self.part)
     }
 
     /// Return distinct standard VML text watermarks from document headers.
     ///
     /// Word commonly repeats the same watermark in default, first-page, and
-    /// even-page headers; equivalent copies are returned once in relationship
-    /// order.
+    /// even-page headers; equivalent copies are returned once in section
+    /// reference order.
     pub fn watermarks(&self) -> Result<Vec<Watermark>> {
         let mut watermarks = Vec::new();
-        for (_, header) in self.headers()? {
+        for header in self.headers()? {
             for watermark in header.watermarks()? {
                 if !watermarks.contains(&watermark) {
                     watermarks.push(watermark);
@@ -889,51 +858,23 @@ impl<'a> Document<'a> {
     /// the relationship-resolved media part name and payload bytes. The
     /// payload is an inert byte view; it is never decoded or displayed.
     pub fn image_watermarks(&self) -> Result<Vec<ImageWatermarkPart<'_>>> {
-        let main_part = self.opc.main_document_part()?;
         let mut parts = Vec::new();
-        for rel in main_part.rels().iter() {
-            if rel.reltype() != relationship_type::HEADER {
-                continue;
-            }
-            let target = rel.target_partname()?;
-            let header_part = self.opc.get_part(&target)?;
-            let header = HeaderFooter::from_part(header_part, Kind::Primary)?;
-            for anchor in header.image_watermarks()? {
-                let image_rel = header_part
-                    .rels()
-                    .get(anchor.relationship_id())
-                    .ok_or_else(|| {
-                        Error::InvalidFormat(format!(
-                            "watermark image relationship '{}' is missing from {}",
-                            anchor.relationship_id(),
-                            target.as_str()
-                        ))
-                    })?;
-                if image_rel.is_external() {
-                    return Err(Error::InvalidFormat(
-                        "external watermark image relationship is rejected".to_string(),
-                    ));
-                }
-                let image_target = image_rel.target_partname().map_err(|error| {
-                    Error::InvalidFormat(format!("invalid watermark image target: {error}"))
-                })?;
-                let image_part = self.opc.get_part(&image_target)?;
-                parts.push(ImageWatermarkPart {
-                    source_header_name: target.as_str().to_owned(),
-                    relationship_id: anchor.relationship_id().to_owned(),
-                    part_name: image_target.as_str().to_owned(),
-                    content_type: image_part.content_type(),
-                    bytes: image_part.blob(),
-                });
-            }
+        for image in crate::header_footer::image_watermarks(self.opc, &self.part)? {
+            parts.push(ImageWatermarkPart {
+                source_header_name: image.source_header_name,
+                relationship_id: image.relationship_id,
+                part_name: image.part_name,
+                content_type: image.content_type,
+                bytes: image.bytes,
+            });
         }
         Ok(parts)
     }
 
     /// Get all footers in the document.
     ///
-    /// Returns a vector of tuples containing the footer type and the footer itself.
-    /// Footers can be of three types: Primary (default), FirstPage, and EvenPage.
+    /// Returns footer stories in WordprocessingML section-reference order.
+    /// Each story carries its typed [`Kind`].
     ///
     /// # Examples
     ///
@@ -943,43 +884,13 @@ impl<'a> Document<'a> {
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
     ///
-    /// for (ftr_type, footer) in doc.footers()? {
-    ///     println!("{:?} footer: {}", ftr_type, footer.text()?);
+    /// for footer in doc.footers()? {
+    ///     println!("{:?} footer: {}", footer.kind(), footer.text()?);
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn footers(&self) -> Result<Vec<(Kind, HeaderFooter)>> {
-        let main_part = self.opc.main_document_part()?;
-        let rels = main_part.rels();
-
-        let mut footers = Vec::new();
-
-        // Iterate through all relationships looking for footer parts
-        for rel in rels.iter() {
-            if rel.reltype() == relationship_type::FOOTER {
-                // Determine footer type from the target name
-                let target = rel.target_partname()?;
-                let target_str = target.as_str();
-
-                let ftr_type = if target_str.contains("footer1.xml")
-                    || target_str.contains("Footer1.xml")
-                {
-                    Kind::Primary
-                } else if target_str.contains("footer2.xml") || target_str.contains("Footer2.xml") {
-                    Kind::FirstPage
-                } else if target_str.contains("footer3.xml") || target_str.contains("Footer3.xml") {
-                    Kind::EvenPage
-                } else {
-                    // Default to Primary if we can't determine
-                    Kind::Primary
-                };
-
-                let footer_part = self.opc.get_part(&target)?;
-                footers.push((ftr_type, HeaderFooter::from_part(footer_part, ftr_type)?));
-            }
-        }
-
-        Ok(footers)
+    pub fn footers(&self) -> Result<Vec<Story>> {
+        crate::header_footer::load_footers(self.opc, &self.part)
     }
 
     /// Get a specific header by type.
@@ -1000,12 +911,11 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn header(&self, hdr_type: Kind) -> Result<Option<HeaderFooter>> {
+    pub fn header(&self, hdr_type: Kind) -> Result<Option<Story>> {
         let headers = self.headers()?;
         Ok(headers
             .into_iter()
-            .find(|(t, _)| *t == hdr_type)
-            .map(|(_, h)| h))
+            .find(|header| header.kind() == hdr_type))
     }
 
     /// Get a specific footer by type.
@@ -1026,12 +936,11 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn footer(&self, ftr_type: Kind) -> Result<Option<HeaderFooter>> {
+    pub fn footer(&self, ftr_type: Kind) -> Result<Option<Story>> {
         let footers = self.footers()?;
         Ok(footers
             .into_iter()
-            .find(|(t, _)| *t == ftr_type)
-            .map(|(_, f)| f))
+            .find(|footer| footer.kind() == ftr_type))
     }
 
     /// Get all `<w:hyperlink>` element hyperlinks in the document.
@@ -2467,10 +2376,10 @@ impl<'a> Document<'a> {
     ///
     /// Returns every classic DrawingML chart anchored in the main document
     /// body together with its style, color-style, and embedded-workbook
-    /// companion parts. See [`crate::chart::load_chart_graph`].
-    pub fn chart_graph(&self) -> Result<crate::chart::ChartGraph> {
+    /// companion parts. See [`crate::chart::load`].
+    pub fn chart_graph(&self) -> Result<crate::chart::Graph> {
         let main = self.opc.main_document_part()?.partname().clone();
-        crate::chart::load_chart_graph(self.opc, &main)
+        crate::chart::load(self.opc, &main)
     }
 
     /// Get document variables.
