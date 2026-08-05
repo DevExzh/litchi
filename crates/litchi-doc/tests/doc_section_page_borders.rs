@@ -3,7 +3,7 @@ use litchi_doc::{
 };
 use std::io::Cursor;
 
-fn round_trip(writer: &mut DocWriter) -> litchi_doc::DocSection {
+fn round_trip(writer: &mut DocWriter) -> litchi_doc::Section {
     writer.add_paragraph("Borders").unwrap();
     let mut cursor = Cursor::new(Vec::new());
     writer.write_to(&mut cursor).unwrap();

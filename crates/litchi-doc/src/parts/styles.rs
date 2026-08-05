@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use super::super::leniency::{DocLeniency, DocStylesheetDefect, DocToleranceReport};
+use super::super::leniency::{Leniency, StylesheetDefect, ToleranceReport};
 use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 use super::tap::TableProperties;
@@ -170,7 +170,7 @@ impl StyleDefinition {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StyleSheet {
     /// Non-structural defects repaired during a lenient parse.
-    tolerance: DocToleranceReport,
+    tolerance: ToleranceReport,
     header: StyleSheetHeader,
     styles: Vec<Option<StyleDefinition>>,
     stshi_tail: Vec<u8>,
@@ -179,24 +179,24 @@ pub struct StyleSheet {
 impl StyleSheet {
     /// Non-structural defects a lenient parse repaired.
     ///
-    /// Always empty after a [`DocLeniency::Strict`] parse.
+    /// Always empty after a [`Leniency::Strict`] parse.
     #[inline]
-    pub fn tolerance_report(&self) -> &DocToleranceReport {
+    pub fn tolerance_report(&self) -> &ToleranceReport {
         &self.tolerance
     }
 
     /// Parse the mandatory Word 97+ stylesheet at FIB pointer index 1.
     pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Self> {
-        Self::parse_with_leniency(fib, table_stream, DocLeniency::Strict)
+        Self::parse_with_leniency(fib, table_stream, Leniency::Strict)
     }
 
     /// Parse the stylesheet, optionally repairing non-structural defects.
     ///
-    /// Under [`DocLeniency::Strict`] this behaves exactly like [`Self::parse`].
+    /// Under [`Leniency::Strict`] this behaves exactly like [`Self::parse`].
     pub fn parse_with_leniency(
         fib: &FileInformationBlock,
         table_stream: &[u8],
-        leniency: DocLeniency,
+        leniency: Leniency,
     ) -> Result<Self> {
         let (stream_offset, length) = fib
             .get_table_pointer(STSH_POINTER_INDEX)
@@ -457,7 +457,7 @@ impl StyleSheet {
     pub(crate) fn parse_data(
         data: &[u8],
         stream_offset: usize,
-        leniency: DocLeniency,
+        leniency: Leniency,
     ) -> Result<Self> {
         let cb_stshi = usize::from(read_u16(data, 0, "cbStshi")?);
         if cb_stshi < STSHIF_SIZE {
@@ -539,7 +539,7 @@ impl StyleSheet {
             return Err(corrupted("stylesheet has trailing bytes"));
         }
 
-        let mut tolerance = DocToleranceReport::default();
+        let mut tolerance = ToleranceReport::default();
         validate_styles(&styles, leniency, &mut tolerance)?;
         Ok(Self {
             header,
@@ -974,8 +974,8 @@ pub(crate) fn validate_table_style_sprms(
 
 fn validate_styles(
     styles: &[Option<StyleDefinition>],
-    leniency: DocLeniency,
-    tolerance: &mut DocToleranceReport,
+    leniency: Leniency,
+    tolerance: &mut ToleranceReport,
 ) -> Result<()> {
     for required_empty in [13usize, 14] {
         if styles.get(required_empty).is_some_and(Option::is_some) {
@@ -1012,7 +1012,7 @@ fn validate_styles(
                 if !leniency.tolerates_stylesheet_defects() {
                     return Err(corrupted("style names and aliases must be unique"));
                 }
-                tolerance.record(DocStylesheetDefect::DuplicateStyleName, style.index);
+                tolerance.record(StylesheetDefect::DuplicateStyleName, style.index);
             }
         }
         if let Some(base) = style.base_style
@@ -1072,7 +1072,7 @@ mod tests {
     use super::*;
 
     fn parse(data: &[u8]) -> Result<StyleSheet> {
-        StyleSheet::parse_data(data, 0, DocLeniency::Strict)
+        StyleSheet::parse_data(data, 0, Leniency::Strict)
     }
 
     fn std_record(

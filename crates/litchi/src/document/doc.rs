@@ -533,17 +533,15 @@ impl Document {
             #[cfg(feature = "doc")]
             DocumentImpl::Doc(doc, _) => {
                 use super::DocumentElement;
-                use litchi_doc::DocElement;
+                use litchi_doc::Element;
                 let raw = doc.elements().map_err(Error::from)?;
                 Ok(raw
                     .into_iter()
                     .map(|el| match el {
-                        DocElement::Paragraph(p) => {
+                        Element::Paragraph(p) => {
                             DocumentElement::Paragraph(Box::new(super::Paragraph::Doc(*p)))
                         },
-                        DocElement::Table(t) => {
-                            DocumentElement::Table(Box::new(super::Table::Doc(t)))
-                        },
+                        Element::Table(t) => DocumentElement::Table(Box::new(super::Table::Doc(t))),
                     })
                     .collect())
             },

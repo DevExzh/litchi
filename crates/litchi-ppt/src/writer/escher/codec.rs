@@ -6,12 +6,13 @@
 use zerocopy::IntoBytes;
 
 use litchi_core::unit::emu_i32_to_ppt_master_i16_round;
+use litchi_odraw::shape::Flags;
+use litchi_odraw::write::{COMPLEX, Header, Property, Sp, record_type, shape_type};
 
 use super::{
     BG_SHAPE_PROPERTIES, DGG_DEFAULT_PROPERTIES, Error, EscherDgData, EscherDggHeader,
-    EscherHeader, EscherProperty, EscherRecordHeader, EscherSpData, EscherSpgrData, FileIdCluster,
-    PROPERTY_FLAG_COMPLEX, ShapeFlags, SplitMenuColors, UserShapeData, header_version,
-    ppt_prop_value, ppt_record_type, prop_id, record_type, shape_type,
+    EscherHeader, EscherSpgrData, FileIdCluster, SplitMenuColors, UserShapeData, header_version,
+    ppt_prop_value, ppt_record_type, prop_id,
 };
 
 /// Escher record builder
@@ -283,7 +284,7 @@ pub(crate) fn create_dg_container_with_charts(
         shape_type::NOT_PRIMITIVE,
         record_type::SP,
     );
-    sp.add_data(EscherSpData::group_patriarch(group_spid).as_bytes());
+    sp.add_data(Sp::group_patriarch(group_spid).as_bytes());
     group_sp_container.add_data(&sp.build()?);
 
     spgr_container.add_data(&group_sp_container.build()?);
@@ -321,7 +322,7 @@ pub(crate) fn create_dg_container_with_charts(
         EscherBuilder::new(header_version::CONTAINER, 0, record_type::SP_CONTAINER);
 
     let mut bg_sp = EscherBuilder::new(header_version::SP, shape_type::RECTANGLE, record_type::SP);
-    bg_sp.add_data(EscherSpData::background(bg_spid).as_bytes());
+    bg_sp.add_data(Sp::background(bg_spid).as_bytes());
     bg_sp_container.add_data(&bg_sp.build()?);
 
     let mut opt = EscherBuilder::new(
@@ -357,22 +358,22 @@ pub(crate) fn create_user_shape_container(
     let mut container = EscherBuilder::new(header_version::CONTAINER, 0, record_type::SP_CONTAINER);
 
     // Shape flags
-    let mut flags = ShapeFlags::HAVE_ANCHOR | ShapeFlags::HAVE_SPT;
+    let mut flags = Flags::HAVE_ANCHOR | Flags::HAVE_SPT;
     if shape.flip_h {
-        flags |= ShapeFlags::FLIP_H;
+        flags |= Flags::FLIP_H;
     }
     if shape.flip_v {
-        flags |= ShapeFlags::FLIP_V;
+        flags |= Flags::FLIP_V;
     }
 
     // SP record
     let mut sp = EscherBuilder::new(header_version::SP, shape.shape_type, record_type::SP);
-    sp.add_data(EscherSpData::with_flags(shape_id, flags).as_bytes());
+    sp.add_data(Sp::with_flags(shape_id, flags).as_bytes());
     container.add_data(&sp.build()?);
 
     // OPT record with shape properties (sorted by property number, not full ID)
     // Per POI: sort by getPropertyNumber() which masks out flags (id & 0x3FFF)
-    let mut properties: Vec<(EscherProperty, Option<Vec<u8>>)> = build_shape_properties(shape)
+    let mut properties: Vec<(Property, Option<Vec<u8>>)> = build_shape_properties(shape)
         .into_iter()
         .map(|property| (property, None))
         .collect();
@@ -380,43 +381,28 @@ pub(crate) fn create_user_shape_container(
         let rect = geometry.coordinate_space();
         let (vertices, segments) = geometry.encode_arrays()?;
         properties.extend([
+            (Property::new(prop_id::GEOM_LEFT, rect.left as u32), None),
+            (Property::new(prop_id::GEOM_TOP, rect.top as u32), None),
+            (Property::new(prop_id::GEOM_RIGHT, rect.right as u32), None),
             (
-                EscherProperty::new(prop_id::GEOM_LEFT, rect.left as u32),
+                Property::new(prop_id::GEOM_BOTTOM, rect.bottom as u32),
                 None,
             ),
             (
-                EscherProperty::new(prop_id::GEOM_TOP, rect.top as u32),
+                Property::new(prop_id::SHAPE_PATH, geometry.path_type() as u32),
                 None,
             ),
             (
-                EscherProperty::new(prop_id::GEOM_RIGHT, rect.right as u32),
-                None,
-            ),
-            (
-                EscherProperty::new(prop_id::GEOM_BOTTOM, rect.bottom as u32),
-                None,
-            ),
-            (
-                EscherProperty::new(prop_id::SHAPE_PATH, geometry.path_type() as u32),
-                None,
-            ),
-            (
-                EscherProperty::new(
-                    prop_id::VERTICES | PROPERTY_FLAG_COMPLEX,
-                    vertices.len() as u32,
-                ),
+                Property::new(prop_id::VERTICES | COMPLEX, vertices.len() as u32),
                 Some(vertices),
             ),
             (
-                EscherProperty::new(
-                    prop_id::SEGMENT_INFO | PROPERTY_FLAG_COMPLEX,
-                    segments.len() as u32,
-                ),
+                Property::new(prop_id::SEGMENT_INFO | COMPLEX, segments.len() as u32),
                 Some(segments),
             ),
         ]);
     }
-    properties.sort_by_key(|(property, _)| ({ property.prop_id }) & 0x3FFF);
+    properties.sort_by_key(|(property, _)| property.raw_id() & 0x3FFF);
     let mut opt = EscherBuilder::new(
         header_version::OPT,
         properties.len() as u16,
@@ -693,14 +679,14 @@ pub(crate) fn build_client_data_with_placeholder(placeholder_type: u8) -> Result
 
 /// Build shape properties for OPT record
 /// Based on Apache POI HSLFTextBox.createSpContainer() defaults
-pub(crate) fn build_shape_properties(shape: &UserShapeData) -> Vec<EscherProperty> {
+pub(crate) fn build_shape_properties(shape: &UserShapeData) -> Vec<Property> {
     let mut props = Vec::with_capacity(16);
 
     if let Some(rotation) = shape.rotation {
-        props.push(EscherProperty::new(prop_id::ROTATION, rotation as u32));
+        props.push(Property::new(prop_id::ROTATION, rotation as u32));
     }
     for (index, &value) in shape.adjust_values.iter().enumerate() {
-        props.push(EscherProperty::new(
+        props.push(Property::new(
             prop_id::ADJUST_VALUE + index as u16,
             value as u32,
         ));
@@ -709,16 +695,16 @@ pub(crate) fn build_shape_properties(shape: &UserShapeData) -> Vec<EscherPropert
     // Picture shapes have special handling - BLIP reference only, no fill/line
     if let Some(picture_index) = shape.picture_index {
         // PROTECTION__LOCKAGAINSTGROUPING (0x007F) = 0x800080 per POI
-        props.push(EscherProperty::new(0x007F, 0x0080_0080));
+        props.push(Property::new(0x007F, 0x0080_0080));
         // BLIP__BLIPTODISPLAY (0x4104) - with isBlipId flag (0x4000 + 0x0104)
-        props.push(EscherProperty::new(0x4104, picture_index));
+        props.push(Property::new(0x4104, picture_index));
         // No fill for pictures (picture IS the fill)
-        props.push(EscherProperty::new(
+        props.push(Property::new(
             prop_id::NO_FILL_HIT_TEST,
             ppt_prop_value::FILL_STYLE_DISABLED,
         ));
         // No line for pictures
-        props.push(EscherProperty::new(prop_id::LINE_STYLE_BOOL, 0x0008_0000));
+        props.push(Property::new(prop_id::LINE_STYLE_BOOL, 0x0008_0000));
         return props;
     }
 
@@ -726,136 +712,133 @@ pub(crate) fn build_shape_properties(shape: &UserShapeData) -> Vec<EscherPropert
     if let Some(fill_color) = shape.fill_color {
         // Fill type (0=solid, 4=shade/gradient) - MUST be first
         if let Some(fill_type) = shape.fill_type {
-            props.push(EscherProperty::new(prop_id::FILL_TYPE, fill_type));
+            props.push(Property::new(prop_id::FILL_TYPE, fill_type));
         }
 
         // Fill color
-        props.push(EscherProperty::new(prop_id::FILL_COLOR, fill_color));
+        props.push(Property::new(prop_id::FILL_COLOR, fill_color));
 
         // Back color (for gradients) - before angle
         if let Some(back_color) = shape.fill_back_color {
-            props.push(EscherProperty::new(prop_id::FILL_BACK_COLOR, back_color));
+            props.push(Property::new(prop_id::FILL_BACK_COLOR, back_color));
         }
 
         // Gradient angle (for gradient fills) - MUST be before opacity
         if let Some(angle) = shape.fill_angle {
-            props.push(EscherProperty::new(prop_id::FILL_ANGLE, angle as u32));
+            props.push(Property::new(prop_id::FILL_ANGLE, angle as u32));
         }
 
         // Fill opacity (after angle)
         if let Some(opacity) = shape.fill_opacity {
-            props.push(EscherProperty::new(prop_id::FILL_OPACITY, opacity));
+            props.push(Property::new(prop_id::FILL_OPACITY, opacity));
         }
 
         // Match POI setForegroundColor: filled=true, fillShape=false,
         // and noFillHitTest=true, with all three use bits set.
-        props.push(EscherProperty::new(
+        props.push(Property::new(
             prop_id::NO_FILL_HIT_TEST,
             ppt_prop_value::FILL_STYLE_ENABLED,
         ));
     } else {
         // Default: scheme fill colors with no-fill flag
-        props.push(EscherProperty::new(prop_id::FILL_COLOR, 0x0800_0004)); // scheme fill
-        props.push(EscherProperty::new(prop_id::FILL_BACK_COLOR, 0x0800_0000));
-        props.push(EscherProperty::new(
+        props.push(Property::new(prop_id::FILL_COLOR, 0x0800_0004)); // scheme fill
+        props.push(Property::new(prop_id::FILL_BACK_COLOR, 0x0800_0000));
+        props.push(Property::new(
             prop_id::NO_FILL_HIT_TEST,
             ppt_prop_value::FILL_STYLE_DISABLED,
         ));
     }
 
     if let Some(blip_index) = shape.fill_blip_index {
-        props.push(EscherProperty::new(prop_id::FILL_BLIP, blip_index));
+        props.push(Property::new(prop_id::FILL_BLIP, blip_index));
     }
 
     // Line properties (based on POI HSLFSimpleShape)
     if let Some(line_color) = shape.line_color {
-        props.push(EscherProperty::new(prop_id::LINE_COLOR, line_color));
+        props.push(Property::new(prop_id::LINE_COLOR, line_color));
         if let Some(opacity) = shape.line_opacity {
-            props.push(EscherProperty::new(prop_id::LINE_OPACITY, opacity));
+            props.push(Property::new(prop_id::LINE_OPACITY, opacity));
         }
         if let Some(width) = shape.line_width {
-            props.push(EscherProperty::new(prop_id::LINE_WIDTH, width as u32));
+            props.push(Property::new(prop_id::LINE_WIDTH, width as u32));
         }
         if let Some(style) = shape.line_style {
-            props.push(EscherProperty::new(prop_id::LINE_STYLE, style));
+            props.push(Property::new(prop_id::LINE_STYLE, style));
         }
         // Line dash style
         if let Some(dash) = shape.line_dash_style {
-            props.push(EscherProperty::new(prop_id::LINE_DASH_STYLE, dash));
+            props.push(Property::new(prop_id::LINE_DASH_STYLE, dash));
         }
         // Line start arrow
         if let Some(arrow) = shape.line_start_arrow {
-            props.push(EscherProperty::new(prop_id::LINE_START_ARROW, arrow));
-            props.push(EscherProperty::new(
+            props.push(Property::new(prop_id::LINE_START_ARROW, arrow));
+            props.push(Property::new(
                 prop_id::LINE_START_ARROW_WIDTH,
                 shape.line_start_arrow_width.unwrap_or(1),
             ));
-            props.push(EscherProperty::new(
+            props.push(Property::new(
                 prop_id::LINE_START_ARROW_LENGTH,
                 shape.line_start_arrow_length.unwrap_or(1),
             ));
         }
         // Line end arrow
         if let Some(arrow) = shape.line_end_arrow {
-            props.push(EscherProperty::new(prop_id::LINE_END_ARROW, arrow));
-            props.push(EscherProperty::new(
+            props.push(Property::new(prop_id::LINE_END_ARROW, arrow));
+            props.push(Property::new(
                 prop_id::LINE_END_ARROW_WIDTH,
                 shape.line_end_arrow_width.unwrap_or(1),
             ));
-            props.push(EscherProperty::new(
+            props.push(Property::new(
                 prop_id::LINE_END_ARROW_LENGTH,
                 shape.line_end_arrow_length.unwrap_or(1),
             ));
         }
         if let Some(join_style) = shape.line_join_style {
-            props.push(EscherProperty::new(prop_id::LINE_JOIN_STYLE, join_style));
+            props.push(Property::new(prop_id::LINE_JOIN_STYLE, join_style));
         }
         if let Some(end_cap_style) = shape.line_end_cap_style {
-            props.push(EscherProperty::new(
-                prop_id::LINE_END_CAP_STYLE,
-                end_cap_style,
-            ));
+            props.push(Property::new(prop_id::LINE_END_CAP_STYLE, end_cap_style));
         }
         // Enable line: 0x180018 = line visible
-        props.push(EscherProperty::new(prop_id::LINE_STYLE_BOOL, 0x0018_0018));
+        props.push(Property::new(prop_id::LINE_STYLE_BOOL, 0x0018_0018));
     } else {
         // No line: POI uses 0x80000 for no line
-        props.push(EscherProperty::new(prop_id::LINE_COLOR, 0x0800_0001)); // scheme line
-        props.push(EscherProperty::new(prop_id::LINE_STYLE_BOOL, 0x0008_0000));
+        props.push(Property::new(prop_id::LINE_COLOR, 0x0800_0001)); // scheme line
+        props.push(Property::new(prop_id::LINE_STYLE_BOOL, 0x0008_0000));
     }
 
     // Shadow properties
     if shape.has_shadow {
         // Offset shadow is the specified default and is required for the offsets below.
-        props.push(EscherProperty::new(
+        props.push(Property::new(
             prop_id::SHADOW_TYPE,
             shape.shadow_type.unwrap_or(0),
         ));
 
         // Shadow color
         let shadow_color = shape.shadow_color.unwrap_or(0x0800_0002); // default: scheme shadow
-        props.push(EscherProperty::new(prop_id::SHADOW_COLOR, shadow_color));
+        props.push(Property::new(prop_id::SHADOW_COLOR, shadow_color));
 
         // Shadow offsets
         let offset_x = shape.shadow_offset_x.unwrap_or(25400) as u32; // default: 2pt
         let offset_y = shape.shadow_offset_y.unwrap_or(25400) as u32; // default: 2pt
-        props.push(EscherProperty::new(prop_id::SHADOW_OFFSET_X, offset_x));
-        props.push(EscherProperty::new(prop_id::SHADOW_OFFSET_Y, offset_y));
+        props.push(Property::new(prop_id::SHADOW_OFFSET_X, offset_x));
+        props.push(Property::new(prop_id::SHADOW_OFFSET_Y, offset_y));
 
         // Shadow opacity
         if let Some(opacity) = shape.shadow_opacity {
-            props.push(EscherProperty::new(prop_id::SHADOW_OPACITY, opacity));
+            props.push(Property::new(prop_id::SHADOW_OPACITY, opacity));
         }
 
         // Enable shadow boolean
-        props.push(EscherProperty::new(
+        props.push(Property::new(
             prop_id::SHADOW_BOOL,
             ppt_prop_value::SHADOW_STYLE_ENABLED,
         ));
     } else {
         // No shadow - still set scheme color for consistency
-        props.push(EscherProperty::new(prop_id::SHADOW_COLOR, 0x0800_0002));
-        props.push(EscherProperty::new(
+        props.push(Property::new(prop_id::SHADOW_COLOR, 0x0800_0002));
+        props.push(Property::new(
             prop_id::SHADOW_BOOL,
             ppt_prop_value::SHADOW_STYLE_DISABLED,
         ));
@@ -923,7 +906,7 @@ pub(crate) fn build_client_textbox_with_interactions(
         crate::TextInteractionLimits::default(),
     )?;
 
-    let header = EscherRecordHeader::new(0x0F, 0, 0xF00D, ppt_content.len() as u32);
+    let header = Header::new(0x0F, 0, 0xF00D, ppt_content.len() as u32);
     result.extend_from_slice(header.as_bytes());
     result.extend_from_slice(&ppt_content);
 
@@ -986,7 +969,7 @@ fn build_client_textbox_formatted_with_interactions(
         crate::TextInteractionLimits::default(),
     )?;
 
-    let header = EscherRecordHeader::new(0x0F, 0, 0xF00D, ppt_content.len() as u32);
+    let header = Header::new(0x0F, 0, 0xF00D, ppt_content.len() as u32);
     result.extend_from_slice(header.as_bytes());
     result.extend_from_slice(&ppt_content);
 

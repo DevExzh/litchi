@@ -8,6 +8,8 @@ use crate::shapes::geometry::{
 };
 use crate::writer::text_format::{Paragraph, TextRun};
 use litchi_odraw::prop::Props;
+use litchi_odraw::shape::Flags;
+use litchi_odraw::write::{Header, Property, Sp};
 use litchi_odraw::{Container, Record, RecordKind};
 use zerocopy::IntoBytes;
 
@@ -22,19 +24,15 @@ fn test_escher_header() {
 
 #[test]
 fn test_escher_record_header() {
-    let header = EscherRecordHeader::new(0x0F, 0, record_type::DG_CONTAINER, 100);
-    // Fields are ver_inst, rec_type, length - copy to locals to avoid unaligned access
-    let ver_inst = header.ver_inst;
-    let rec_type = header.rec_type;
-    let length = header.length;
-    assert_eq!(ver_inst, 0x000F); // version 0x0F in low 4 bits
-    assert_eq!(rec_type, record_type::DG_CONTAINER);
-    assert_eq!(length, 100);
+    let header = Header::new(0x0F, 0, record_type::DG_CONTAINER, 100);
+    assert_eq!(header.version(), 0x0F);
+    assert_eq!(header.kind().raw(), record_type::DG_CONTAINER);
+    assert_eq!(header.len(), 100);
 }
 
 #[test]
 fn test_escher_record_header_as_bytes() {
-    let header = EscherRecordHeader::new(0x0F, 1, record_type::SP_CONTAINER, 50);
+    let header = Header::new(0x0F, 1, record_type::SP_CONTAINER, 50);
     let bytes = header.as_bytes();
     assert_eq!(bytes.len(), 8);
 
@@ -86,7 +84,7 @@ fn test_escher_dg_data() {
 
 #[test]
 fn test_escher_sp_data() {
-    let sp_data = EscherSpData::with_flags(0x0401, ShapeFlags::HAVE_ANCHOR | ShapeFlags::HAVE_SPT);
+    let sp_data = Sp::with_flags(0x0401, Flags::HAVE_ANCHOR | Flags::HAVE_SPT);
     let bytes = sp_data.as_bytes();
     assert_eq!(bytes.len(), 8);
 
@@ -94,10 +92,7 @@ fn test_escher_sp_data() {
     let spid = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
     let flags = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
     assert_eq!(spid, 0x0401);
-    assert_eq!(
-        flags,
-        (ShapeFlags::HAVE_ANCHOR | ShapeFlags::HAVE_SPT).bits()
-    );
+    assert_eq!(flags, (Flags::HAVE_ANCHOR | Flags::HAVE_SPT).bits());
 }
 
 #[test]
@@ -125,7 +120,7 @@ fn test_escher_spgr_data() {
 
 #[test]
 fn test_escher_property() {
-    let prop = EscherProperty::new(0x0181, 0x00FF0000);
+    let prop = Property::new(0x0181, 0x00FF0000);
     let bytes = prop.as_bytes();
     assert_eq!(bytes.len(), 6);
 
@@ -138,11 +133,11 @@ fn test_escher_property() {
 
 #[test]
 fn test_shape_flags() {
-    let flags = ShapeFlags::HAVE_ANCHOR | ShapeFlags::HAVE_SPT;
+    let flags = Flags::HAVE_ANCHOR | Flags::HAVE_SPT;
     let value: u32 = flags.bits();
     assert_eq!(value, 0x0A00);
 
-    let flags2 = ShapeFlags::FLIP_H | ShapeFlags::FLIP_V;
+    let flags2 = Flags::FLIP_H | Flags::FLIP_V;
     let value2: u32 = flags2.bits();
     assert_eq!(value2, 0x00C0);
 }
@@ -255,8 +250,8 @@ fn test_build_shape_properties_rectangle() {
     // Should have fill and line properties
     assert!(props.len() >= 4);
     assert!(props.iter().any(|property| {
-        property.prop_id == prop_id::NO_FILL_HIT_TEST
-            && property.value == ppt_prop_value::FILL_STYLE_ENABLED
+        property.raw_id() == prop_id::NO_FILL_HIT_TEST
+            && property.value() == ppt_prop_value::FILL_STYLE_ENABLED
     }));
 }
 
@@ -270,8 +265,8 @@ fn test_build_shape_properties_no_fill() {
     let props = build_shape_properties(&shape);
     // Should have scheme fill with no-fill flag
     let has_no_fill = props.iter().any(|property| {
-        property.prop_id == prop_id::NO_FILL_HIT_TEST
-            && property.value == ppt_prop_value::FILL_STYLE_DISABLED
+        property.raw_id() == prop_id::NO_FILL_HIT_TEST
+            && property.value() == ppt_prop_value::FILL_STYLE_DISABLED
     });
     assert!(has_no_fill);
 }
@@ -288,11 +283,11 @@ fn test_build_shape_properties_with_shadow() {
     assert!(
         props
             .iter()
-            .any(|property| { property.prop_id == prop_id::SHADOW_TYPE && property.value == 0 })
+            .any(|property| { property.raw_id() == prop_id::SHADOW_TYPE && property.value() == 0 })
     );
     assert!(props.iter().any(|property| {
-        property.prop_id == prop_id::SHADOW_BOOL
-            && property.value == ppt_prop_value::SHADOW_STYLE_ENABLED
+        property.raw_id() == prop_id::SHADOW_BOOL
+            && property.value() == ppt_prop_value::SHADOW_STYLE_ENABLED
     }));
 }
 
@@ -304,8 +299,8 @@ fn test_build_shape_properties_without_shadow_disables_inheritance() {
     });
 
     assert!(props.iter().any(|property| {
-        property.prop_id == prop_id::SHADOW_BOOL
-            && property.value == ppt_prop_value::SHADOW_STYLE_DISABLED
+        property.raw_id() == prop_id::SHADOW_BOOL
+            && property.value() == ppt_prop_value::SHADOW_STYLE_DISABLED
     }));
 }
 
@@ -318,7 +313,7 @@ fn test_build_shape_properties_picture() {
     };
     let props = build_shape_properties(&shape);
     // Should have BLIP property
-    let has_blip = props.iter().any(|p| p.prop_id == 0x4104);
+    let has_blip = props.iter().any(|p| p.raw_id() == 0x4104);
     assert!(has_blip);
 }
 
@@ -333,7 +328,7 @@ fn test_picture_shape_preserves_rotation_property() {
     let properties = build_shape_properties(&shape);
 
     assert!(properties.iter().any(|property| {
-        property.prop_id == prop_id::ROTATION && property.value == (-90i32 * 65536) as u32
+        property.raw_id() == prop_id::ROTATION && property.value() == (-90i32 * 65536) as u32
     }));
 }
 
@@ -347,10 +342,10 @@ fn test_shape_properties_preserve_all_ten_adjustments() {
     let adjustments: Vec<(u16, u32)> = properties
         .iter()
         .filter_map(|property| {
-            let id = { property.prop_id };
+            let id = { property.raw_id() };
             (prop_id::ADJUST_VALUE..=0x0150)
                 .contains(&id)
-                .then_some((id, { property.value }))
+                .then_some((id, { property.value() }))
         })
         .collect();
 
@@ -379,7 +374,7 @@ fn test_build_shape_properties_with_arrows() {
     };
     let props = build_shape_properties(&shape);
     // Should have arrow properties
-    let has_arrow = props.iter().any(|p| p.prop_id == prop_id::LINE_END_ARROW);
+    let has_arrow = props.iter().any(|p| p.raw_id() == prop_id::LINE_END_ARROW);
     assert!(has_arrow);
 }
 
@@ -404,8 +399,8 @@ fn test_shape_properties_preserve_extended_line_style() {
     let value = |id| {
         properties
             .iter()
-            .find(|property| property.prop_id == id)
-            .map(|property| property.value)
+            .find(|property| property.raw_id() == id)
+            .map(|property| property.value())
     };
 
     assert_eq!(value(prop_id::LINE_OPACITY), Some(32768));
@@ -430,9 +425,9 @@ fn test_build_shape_properties_gradient_fill() {
     };
     let props = build_shape_properties(&shape);
     // Should have fill type and back color
-    let has_fill_type = props.iter().any(|p| p.prop_id == prop_id::FILL_TYPE);
-    let has_back_color = props.iter().any(|p| p.prop_id == prop_id::FILL_BACK_COLOR);
-    let has_fill_angle = props.iter().any(|p| p.prop_id == 0x018B && p.value == 0);
+    let has_fill_type = props.iter().any(|p| p.raw_id() == prop_id::FILL_TYPE);
+    let has_back_color = props.iter().any(|p| p.raw_id() == prop_id::FILL_BACK_COLOR);
+    let has_fill_angle = props.iter().any(|p| p.raw_id() == 0x018B && p.value() == 0);
     assert!(has_fill_type);
     assert!(has_back_color);
     assert!(has_fill_angle);
@@ -451,7 +446,7 @@ fn test_shape_properties_preserve_fill_blip_reference() {
     assert!(
         properties
             .iter()
-            .any(|property| { property.prop_id == prop_id::FILL_BLIP && property.value == 2 })
+            .any(|property| { property.raw_id() == prop_id::FILL_BLIP && property.value() == 2 })
     );
     assert_eq!(prop_id::FILL_BLIP, 0x4186);
 }
@@ -718,14 +713,14 @@ fn test_prop_id_constants() {
 #[test]
 fn test_default_and_background_boolean_property_groups() {
     let dgg_line_bool = DGG_DEFAULT_PROPERTIES[6];
-    let dgg_line_bool_id = { dgg_line_bool.prop_id };
-    let dgg_line_bool_value = { dgg_line_bool.value };
+    let dgg_line_bool_id = { dgg_line_bool.raw_id() };
+    let dgg_line_bool_value = { dgg_line_bool.value() };
     assert_eq!(dgg_line_bool_id, 0x01FF);
     assert_eq!(dgg_line_bool_value, 0x0008_0008);
 
     let actual: Vec<(u16, u32)> = BG_SHAPE_PROPERTIES
         .iter()
-        .map(|property| ({ property.prop_id }, { property.value }))
+        .map(|property| ({ property.raw_id() }, { property.value() }))
         .collect();
     assert_eq!(
         actual,
@@ -869,7 +864,7 @@ fn test_shape_properties_with_line_width() {
         ..Default::default()
     };
     let props = build_shape_properties(&shape);
-    let has_width = props.iter().any(|p| p.prop_id == prop_id::LINE_WIDTH);
+    let has_width = props.iter().any(|p| p.raw_id() == prop_id::LINE_WIDTH);
     assert!(has_width);
 }
 

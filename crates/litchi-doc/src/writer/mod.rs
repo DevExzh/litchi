@@ -83,7 +83,7 @@ mod glossary;
 mod attached_glossary;
 
 // Re-export public types
-pub use crate::encryption::DocEncryptionProfile;
+pub use crate::encryption::EncryptionProfile;
 pub use crate::parts::chp::{CharacterPosition, HresiOperand, HyphenationMode, TextEffect};
 pub use crate::parts::pap::{
     AutoNumberAlignment, Border as ParagraphBorder, BorderStyle as ParagraphBorderStyle,

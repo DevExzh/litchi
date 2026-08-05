@@ -36,6 +36,12 @@ bitflags! {
     }
 }
 
+impl From<u32> for Flags {
+    fn from(bits: u32) -> Self {
+        Self::from_bits_retain(bits)
+    }
+}
+
 /// A format-neutral OfficeArt shape family.
 ///
 /// Host applications project `ClientData` and `ClientTextbox` records into
@@ -102,6 +108,12 @@ impl Native {
     /// Returns the exact native wire value.
     pub const fn raw(self) -> u16 {
         self.0
+    }
+}
+
+impl From<u16> for Native {
+    fn from(raw: u16) -> Self {
+        Self::from_raw(raw)
     }
 }
 

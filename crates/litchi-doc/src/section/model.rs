@@ -5,7 +5,7 @@ use crate::NumberFormat;
 
 /// A section and the character-position range to which its properties apply.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DocSection {
+pub struct Section {
     /// Inclusive start character position in the main document story.
     pub start_cp: u32,
     /// Exclusive end character position in the main document story.

@@ -8,10 +8,10 @@
 //! document: its text, tables, and everything else, over metadata that only
 //! affects how a style is labelled.
 //!
-//! [`DocLeniency::TolerateStylesheetDefects`] trades strict conformance for
+//! [`Leniency::TolerateStylesheetDefects`] trades strict conformance for
 //! reach. Every repair substitutes the value documented on the corresponding
-//! [`DocStylesheetDefect`] variant and is *recorded*, so a caller can enumerate
-//! exactly what was tolerated through [`DocToleranceReport`]. Nothing is
+//! [`StylesheetDefect`] variant and is *recorded*, so a caller can enumerate
+//! exactly what was tolerated through [`ToleranceReport`]. Nothing is
 //! swallowed silently, and nothing outside that enumeration changes: piece
 //! tables, FIB structure, stream grammar, and encryption remain hard errors
 //! under every variant.
@@ -23,7 +23,7 @@
 ///
 /// A hostile or merely enormous stylesheet must not be able to make the report
 /// grow without limit. Defects beyond this bound are counted, not stored; see
-/// [`DocToleranceReport::unrecorded`].
+/// [`ToleranceReport::unrecorded`].
 const MAX_RECORDED_DEFECTS: usize = 1024;
 
 /// How the reader treats non-structural stylesheet defects.
@@ -32,32 +32,32 @@ const MAX_RECORDED_DEFECTS: usize = 1024;
 /// grammar, or unsupported/absent decryption material — are hard errors under
 /// every variant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub enum DocLeniency {
+pub enum Leniency {
     /// Every deviation from MS-DOC is a hard error.
     ///
     /// This is the default and the historical behaviour: a document either
     /// parses exactly as specified or it does not parse at all.
     #[default]
     Strict,
-    /// Repair and record the defects listed by [`DocStylesheetDefect`].
+    /// Repair and record the defects listed by [`StylesheetDefect`].
     TolerateStylesheetDefects,
 }
 
-impl DocLeniency {
+impl Leniency {
     /// Whether stylesheet defects are repaired rather than rejected.
     #[inline]
     pub fn tolerates_stylesheet_defects(self) -> bool {
-        matches!(self, DocLeniency::TolerateStylesheetDefects)
+        matches!(self, Self::TolerateStylesheetDefects)
     }
 }
 
 /// The class of stylesheet defect a lenient read is allowed to repair.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of what
-/// [`DocLeniency::TolerateStylesheetDefects`] may change about a document.
+/// [`Leniency::TolerateStylesheetDefects`] may change about a document.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum DocStylesheetDefect {
+pub enum StylesheetDefect {
     /// A style name or alias repeats one already used in the stylesheet.
     ///
     /// MS-DOC 2.9 requires uniqueness. The duplicate is kept as-is on the style
@@ -67,22 +67,20 @@ pub enum DocStylesheetDefect {
     DuplicateStyleName,
 }
 
-impl DocStylesheetDefect {
+impl StylesheetDefect {
     /// A short, stable description of what a lenient read did.
     pub const fn repair(self) -> &'static str {
         match self {
-            DocStylesheetDefect::DuplicateStyleName => {
-                "kept the duplicated name; styles are resolved by index"
-            },
+            Self::DuplicateStyleName => "kept the duplicated name; styles are resolved by index",
         }
     }
 }
 
 /// One repaired defect, with enough context to locate it in the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct DocToleratedDefect {
+pub struct ToleratedDefect {
     /// Which defect class was repaired.
-    pub defect: DocStylesheetDefect,
+    pub defect: StylesheetDefect,
     /// Index of the style within the stylesheet that carried the defect.
     pub style_index: u16,
 }
@@ -90,14 +88,14 @@ pub struct DocToleratedDefect {
 /// Everything a lenient read repaired, in the order the defects were found.
 ///
 /// An empty report means the document conformed and no substitution was made,
-/// which is always the case after a [`DocLeniency::Strict`] read.
+/// which is always the case after a [`Leniency::Strict`] read.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct DocToleranceReport {
-    defects: Vec<DocToleratedDefect>,
+pub struct ToleranceReport {
+    defects: Vec<ToleratedDefect>,
     unrecorded: u32,
 }
 
-impl DocToleranceReport {
+impl ToleranceReport {
     /// Whether the document parsed without any repair.
     #[inline]
     pub fn is_clean(&self) -> bool {
@@ -106,7 +104,7 @@ impl DocToleranceReport {
 
     /// The individually recorded defects, in discovery order.
     #[inline]
-    pub fn defects(&self) -> &[DocToleratedDefect] {
+    pub fn defects(&self) -> &[ToleratedDefect] {
         &self.defects
     }
 
@@ -123,9 +121,9 @@ impl DocToleranceReport {
     }
 
     /// Record one repair, saturating at [`MAX_RECORDED_DEFECTS`] stored entries.
-    pub(crate) fn record(&mut self, defect: DocStylesheetDefect, style_index: u16) {
+    pub(crate) fn record(&mut self, defect: StylesheetDefect, style_index: u16) {
         if self.defects.len() < MAX_RECORDED_DEFECTS {
-            self.defects.push(DocToleratedDefect {
+            self.defects.push(ToleratedDefect {
                 defect,
                 style_index,
             });
@@ -141,13 +139,13 @@ mod tests {
 
     #[test]
     fn strict_is_the_default() {
-        assert_eq!(DocLeniency::default(), DocLeniency::Strict);
-        assert!(!DocLeniency::default().tolerates_stylesheet_defects());
+        assert_eq!(Leniency::default(), Leniency::Strict);
+        assert!(!Leniency::default().tolerates_stylesheet_defects());
     }
 
     #[test]
     fn a_fresh_report_is_clean() {
-        let report = DocToleranceReport::default();
+        let report = ToleranceReport::default();
         assert!(report.is_clean());
         assert_eq!(report.total(), 0);
         assert!(report.defects().is_empty());
@@ -155,9 +153,9 @@ mod tests {
 
     #[test]
     fn recorded_defects_are_returned_in_discovery_order() {
-        let mut report = DocToleranceReport::default();
-        report.record(DocStylesheetDefect::DuplicateStyleName, 15);
-        report.record(DocStylesheetDefect::DuplicateStyleName, 42);
+        let mut report = ToleranceReport::default();
+        report.record(StylesheetDefect::DuplicateStyleName, 15);
+        report.record(StylesheetDefect::DuplicateStyleName, 42);
 
         assert!(!report.is_clean());
         assert_eq!(report.total(), 2);
@@ -174,9 +172,9 @@ mod tests {
     /// A hostile stylesheet must not be able to grow the report without limit.
     #[test]
     fn defects_past_the_bound_are_counted_not_stored() {
-        let mut report = DocToleranceReport::default();
+        let mut report = ToleranceReport::default();
         for index in 0..(MAX_RECORDED_DEFECTS + 5) {
-            report.record(DocStylesheetDefect::DuplicateStyleName, index as u16);
+            report.record(StylesheetDefect::DuplicateStyleName, index as u16);
         }
 
         assert_eq!(report.defects().len(), MAX_RECORDED_DEFECTS);

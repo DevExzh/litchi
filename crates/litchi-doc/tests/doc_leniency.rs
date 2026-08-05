@@ -1,6 +1,6 @@
 //! Opt-in tolerance for non-structural DOC stylesheet defects.
 
-use litchi_doc::{DocLeniency, DocStylesheetDefect, OpenOptions, Package};
+use litchi_doc::{Leniency, OpenOptions, Package, StylesheetDefect};
 use std::path::PathBuf;
 
 fn fixture(name: &str) -> PathBuf {
@@ -32,7 +32,7 @@ fn opting_in_recovers_the_document_and_records_the_repair() {
 
     let document = package
         .document_with_options(OpenOptions {
-            leniency: DocLeniency::TolerateStylesheetDefects,
+            leniency: Leniency::TolerateStylesheetDefects,
             ..Default::default()
         })
         .expect("a duplicated style name is repairable");
@@ -53,7 +53,7 @@ fn opting_in_recovers_the_document_and_records_the_repair() {
         report
             .defects()
             .iter()
-            .any(|d| d.defect == DocStylesheetDefect::DuplicateStyleName),
+            .any(|d| d.defect == StylesheetDefect::DuplicateStyleName),
         "expected a duplicate-style-name defect, got {:?}",
         report.defects()
     );
@@ -75,7 +75,7 @@ fn structural_defects_stay_fatal_when_tolerating_stylesheet_defects() {
     assert!(
         package
             .document_with_options(OpenOptions {
-                leniency: DocLeniency::TolerateStylesheetDefects,
+                leniency: Leniency::TolerateStylesheetDefects,
                 ..Default::default()
             })
             .is_err(),
@@ -86,7 +86,7 @@ fn structural_defects_stay_fatal_when_tolerating_stylesheet_defects() {
 /// A conforming document reports a clean slate under either contract.
 #[test]
 fn a_conforming_document_records_no_repairs() {
-    for leniency in [DocLeniency::Strict, DocLeniency::TolerateStylesheetDefects] {
+    for leniency in [Leniency::Strict, Leniency::TolerateStylesheetDefects] {
         let mut package = Package::open(fixture("Lists.doc")).expect("container opens");
         let document = package
             .document_with_options(OpenOptions {

@@ -2,7 +2,7 @@
 
 /// Password-to-open encryption profile used by [`crate::DocWriter`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DocEncryptionProfile {
+pub enum EncryptionProfile {
     /// Legacy Word XOR obfuscation with an ANSI password of at most 15 characters.
     WordXorObfuscation,
     /// Office 97 binary RC4 with a 40-bit password-derived secret.
@@ -14,7 +14,7 @@ pub enum DocEncryptionProfile {
     },
 }
 
-impl DocEncryptionProfile {
+impl EncryptionProfile {
     pub(crate) fn validate(self) -> Result<(), String> {
         if let Self::CryptoApiRc4 { key_bits } = self
             && (!(40..=128).contains(&key_bits) || key_bits % 8 != 0)

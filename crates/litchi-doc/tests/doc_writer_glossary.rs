@@ -1,6 +1,6 @@
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_doc::writer::{
-    CharacterFormatting, DocEncryptionProfile, DocPicture, FloatingPosition, Kind as DrawingKind,
+    CharacterFormatting, DocPicture, EncryptionProfile, FloatingPosition, Kind as DrawingKind,
     ParagraphFormatting, Shape as DrawingShape,
 };
 use litchi_doc::{
@@ -417,7 +417,7 @@ fn attached_glossary_round_trips_inside_encrypted_template() {
     template.add_paragraph("Protected template").unwrap();
     template.set_attached_glossary(writer()).unwrap();
     template
-        .set_password("secret", DocEncryptionProfile::OfficeBinaryRc4)
+        .set_password("secret", EncryptionProfile::OfficeBinaryRc4)
         .unwrap();
 
     let mut output = Cursor::new(Vec::new());

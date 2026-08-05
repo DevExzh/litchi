@@ -10,7 +10,9 @@ use zerocopy_derive::{Immutable, IntoBytes, KnownLayout};
 
 use crate::shapes::geometry::{GeometryRect, ShapePathType};
 
-use super::{Error, EscherProperty, EscherRecordHeader, EscherSpData, ShapeFlags, shape_type};
+use litchi_odraw::write::{Header, Property, shape_type};
+
+use super::Error;
 
 // =============================================================================
 // Property IDs (MS-ODRAW 2.3.1)
@@ -78,7 +80,7 @@ pub(crate) mod prop_id {
 
 /// PPT-specific property values (extends shared prop_value)
 pub(crate) mod ppt_prop_value {
-    pub(crate) use crate::officeart_wire::prop_value::*;
+    pub(crate) use litchi_odraw::write::prop_value::*;
 
     /// Background fill color
     pub(crate) const BG_FILL_COLOR: u32 = 134_217_728; // 0x0800_0000
@@ -169,8 +171,7 @@ impl EscherHeader {
 
     /// Write header to writer
     pub(crate) fn write<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
-        let raw =
-            EscherRecordHeader::new(self.version, self.instance, self.record_type, self.length);
+        let raw = Header::new(self.version, self.instance, self.record_type, self.length);
         writer.write_all(raw.as_bytes())?;
         Ok(())
     }
@@ -263,56 +264,34 @@ impl EscherSpgrData {
     };
 }
 
-// =============================================================================
-// PPT-Specific EscherSpData Extensions
-// =============================================================================
-
-impl EscherSpData {
-    pub(crate) const fn group_patriarch(spid: u32) -> Self {
-        Self {
-            spid,
-            flags: ShapeFlags::GROUP.bits() | ShapeFlags::PATRIARCH.bits(),
-        }
-    }
-
-    pub(crate) const fn background(spid: u32) -> Self {
-        Self {
-            spid,
-            flags: ShapeFlags::BACKGROUND.bits() | ShapeFlags::HAVE_SPT.bits(),
-        }
-    }
-}
-
-// Re-use EscherProperty from shared module
-
 /// Default drawing group properties (8 properties = 48 bytes)
-pub(crate) const DGG_DEFAULT_PROPERTIES: [EscherProperty; 8] = [
-    EscherProperty::new(prop_id::FILL_COLOR, ppt_prop_value::SCHEME_FILL),
-    EscherProperty::new(prop_id::FILL_BACK_COLOR, ppt_prop_value::SCHEME_FILL_BACK),
-    EscherProperty::new(prop_id::FILL_BLIP, 0),
-    EscherProperty::new(
+pub(crate) const DGG_DEFAULT_PROPERTIES: [Property; 8] = [
+    Property::new(prop_id::FILL_COLOR, ppt_prop_value::SCHEME_FILL),
+    Property::new(prop_id::FILL_BACK_COLOR, ppt_prop_value::SCHEME_FILL_BACK),
+    Property::new(prop_id::FILL_BLIP, 0),
+    Property::new(
         prop_id::NO_FILL_HIT_TEST,
         ppt_prop_value::LINE_STYLE_DEFAULT,
     ),
-    EscherProperty::new(prop_id::LINE_COLOR, ppt_prop_value::SCHEME_LINE),
-    EscherProperty::new(prop_id::LINE_BLIP, 0),
-    EscherProperty::new(
+    Property::new(prop_id::LINE_COLOR, ppt_prop_value::SCHEME_LINE),
+    Property::new(prop_id::LINE_BLIP, 0),
+    Property::new(
         prop_id::LINE_STYLE_BOOL,
         ppt_prop_value::LINE_STYLE_BOOL_DEFAULT,
     ),
-    EscherProperty::new(prop_id::SHADOW_COLOR, ppt_prop_value::SCHEME_SHADOW),
+    Property::new(prop_id::SHADOW_COLOR, ppt_prop_value::SCHEME_SHADOW),
 ];
 
 /// Background shape properties (8 properties = 48 bytes)
-pub(crate) const BG_SHAPE_PROPERTIES: [EscherProperty; 8] = [
-    EscherProperty::new(prop_id::FILL_COLOR, ppt_prop_value::BG_FILL_COLOR),
-    EscherProperty::new(prop_id::FILL_BACK_COLOR, ppt_prop_value::BG_FILL_BACK_COLOR),
-    EscherProperty::new(prop_id::FILL_RECT_RIGHT, ppt_prop_value::SLIDE_WIDTH_EMU),
-    EscherProperty::new(prop_id::FILL_RECT_BOTTOM, ppt_prop_value::SLIDE_HEIGHT_EMU),
-    EscherProperty::new(prop_id::NO_FILL_HIT_TEST, ppt_prop_value::NO_FILL_HIT_TEST),
-    EscherProperty::new(prop_id::LINE_STYLE_BOOL, ppt_prop_value::NO_LINE_DRAW_DASH),
-    EscherProperty::new(prop_id::BW_MODE, ppt_prop_value::BW_MODE_AUTO),
-    EscherProperty::new(prop_id::BACKGROUND_SHAPE, ppt_prop_value::BACKGROUND_SHAPE),
+pub(crate) const BG_SHAPE_PROPERTIES: [Property; 8] = [
+    Property::new(prop_id::FILL_COLOR, ppt_prop_value::BG_FILL_COLOR),
+    Property::new(prop_id::FILL_BACK_COLOR, ppt_prop_value::BG_FILL_BACK_COLOR),
+    Property::new(prop_id::FILL_RECT_RIGHT, ppt_prop_value::SLIDE_WIDTH_EMU),
+    Property::new(prop_id::FILL_RECT_BOTTOM, ppt_prop_value::SLIDE_HEIGHT_EMU),
+    Property::new(prop_id::NO_FILL_HIT_TEST, ppt_prop_value::NO_FILL_HIT_TEST),
+    Property::new(prop_id::LINE_STYLE_BOOL, ppt_prop_value::NO_LINE_DRAW_DASH),
+    Property::new(prop_id::BW_MODE, ppt_prop_value::BW_MODE_AUTO),
+    Property::new(prop_id::BACKGROUND_SHAPE, ppt_prop_value::BACKGROUND_SHAPE),
 ];
 
 /// Child anchor with full coordinates (16 bytes)

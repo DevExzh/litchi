@@ -11,8 +11,8 @@ pub mod columns;
 mod model;
 
 pub use model::{
-    Behavior, BreakKind, ChapterNumberSeparator, DocSection, FootnotePosition, LineNumberRestart,
+    Behavior, BreakKind, ChapterNumberSeparator, FootnotePosition, LineNumberRestart,
     LineNumbering, Margins, NoteNumberRestart, NoteSettings, PageGrid, PageGridMode, PageLayout,
-    PageNumbering, PageOrientation, PaperSettings, Protection, TextFlow, VerticalJustification,
-    VerticalMargin,
+    PageNumbering, PageOrientation, PaperSettings, Protection, Section, TextFlow,
+    VerticalJustification, VerticalMargin,
 };

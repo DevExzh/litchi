@@ -8,10 +8,10 @@ use crate::revision::{SectionRevisionMark, decode_dttm};
 use crate::section::borders::{self, Borders};
 use crate::section::columns::{Column, Layout};
 use crate::section::{
-    Behavior, BreakKind, ChapterNumberSeparator, DocSection, FootnotePosition, LineNumberRestart,
+    Behavior, BreakKind, ChapterNumberSeparator, FootnotePosition, LineNumberRestart,
     LineNumbering, Margins, NoteNumberRestart, NoteSettings, PageGrid, PageGridMode, PageLayout,
-    PageNumbering, PageOrientation, PaperSettings, Protection, TextFlow, VerticalJustification,
-    VerticalMargin,
+    PageNumbering, PageOrientation, PaperSettings, Protection, Section, TextFlow,
+    VerticalJustification, VerticalMargin,
 };
 use crate::sprm::{Sprm, parse_sprms};
 
@@ -21,7 +21,7 @@ const MAX_VERTICAL_MARGIN_TWIPS: i16 = 31_665;
 /// Parsed section ranges, layout, and property revision marks in document order.
 #[derive(Debug, Clone, Default)]
 pub struct SectionsTable {
-    sections: Vec<DocSection>,
+    sections: Vec<Section>,
     revisions: Vec<SectionRevisionMark>,
 }
 
@@ -146,12 +146,12 @@ impl SectionsTable {
     }
 
     /// Sections in main-document character-position order.
-    pub fn sections(&self) -> &[DocSection] {
+    pub fn sections(&self) -> &[Section] {
         &self.sections
     }
 
     /// Find the section containing `cp` using half-open section ranges.
-    pub fn section_at_cp(&self, cp: u32) -> Option<&DocSection> {
+    pub fn section_at_cp(&self, cp: u32) -> Option<&Section> {
         let index = self
             .sections
             .partition_point(|section| section.end_cp <= cp);
@@ -493,7 +493,7 @@ impl Properties {
         Ok(())
     }
 
-    fn finish(self, start_cp: u32, end_cp: u32) -> Result<DocSection> {
+    fn finish(self, start_cp: u32, end_cp: u32) -> Result<Section> {
         if self.page_grid.mode != PageGridMode::Disabled
             && self.page_grid.line_pitch_twips.is_none()
         {
@@ -541,7 +541,7 @@ impl Properties {
             Layout::unequal(columns, self.line_between)
                 .map_err(|error| PackageError::Corrupted(error.to_string()))?
         };
-        Ok(DocSection {
+        Ok(Section {
             start_cp,
             end_cp,
             break_kind: self.break_kind,

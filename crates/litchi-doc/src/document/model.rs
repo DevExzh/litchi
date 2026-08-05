@@ -1766,12 +1766,12 @@ impl Document {
     }
 
     /// Get sections in main-document character-position order.
-    pub fn sections(&self) -> &[crate::section::DocSection] {
+    pub fn sections(&self) -> &[crate::section::Section] {
         self.sections.sections()
     }
 
     /// Find the section containing `cp` using half-open section ranges.
-    pub fn section_at_cp(&self, cp: u32) -> Option<&crate::section::DocSection> {
+    pub fn section_at_cp(&self, cp: u32) -> Option<&crate::section::Section> {
         self.sections.section_at_cp(cp)
     }
 
@@ -2357,7 +2357,7 @@ impl Document {
     ///
     /// ```rust,no_run
     /// use litchi_doc::Package;
-    /// use litchi_doc::DocElement as DocumentElement;
+    /// use litchi_doc::Element as DocumentElement;
     ///
     /// let mut pkg = Package::open("document.doc")?;
     /// let doc = pkg.document()?;
@@ -2380,8 +2380,8 @@ impl Document {
     /// This method is optimized to extract paragraphs only once and identify tables
     /// by scanning paragraph properties, which is significantly faster than calling
     /// `paragraphs()` and `tables()` separately.
-    pub fn elements(&self) -> Result<Vec<crate::DocElement>> {
-        use crate::DocElement;
+    pub fn elements(&self) -> Result<Vec<crate::Element>> {
+        use crate::Element;
 
         // Extract all paragraphs once
         let paragraphs = self.paragraphs()?;
@@ -2421,11 +2421,11 @@ impl Document {
                     } else {
                         Table::new(rows)
                     };
-                    elements.push(DocElement::Table(Box::new(table)));
+                    elements.push(Element::Table(Box::new(table)));
                 }
             } else if !props.in_table {
                 // This is a regular paragraph (not in a table)
-                elements.push(DocElement::Paragraph(Box::new(para.clone())));
+                elements.push(Element::Paragraph(Box::new(para.clone())));
                 i += 1;
             } else {
                 // This paragraph is in a nested table (level > 1), skip it

@@ -11,11 +11,13 @@
 pub(crate) type Error = std::io::Error;
 
 // Shared OfficeArt wire vocabulary. The record grammar itself remains owned by
-// the format-neutral OfficeArt substrate.
-pub(crate) use crate::officeart_wire::{
-    EscherProperty, EscherRecordHeader, EscherSpData, PROPERTY_FLAG_COMPLEX,
+// the format-neutral OfficeArt substrate. The aliases are PPT-internal facade
+// names retained only for the other PPT writer modules.
+pub(crate) use litchi_odraw::shape::Flags as ShapeFlags;
+pub(crate) use litchi_odraw::write::{
+    COMPLEX as PROPERTY_FLAG_COMPLEX, Property as EscherProperty, Sp as EscherSpData, record_type,
+    shape_type,
 };
-pub(crate) use crate::officeart_wire::{ShapeFlags, record_type, shape_type};
 
 /// PPT-specific record types embedded in Escher.
 pub(crate) mod ppt_record_type {

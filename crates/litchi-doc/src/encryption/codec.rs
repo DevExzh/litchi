@@ -1,6 +1,6 @@
 //! Binary codecs for legacy Word encryption headers and streams.
 
-use super::model::DocEncryptionProfile;
+use super::model::EncryptionProfile;
 use crate::package::{EncryptionKind, Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
 use encoding_rs::{
@@ -21,7 +21,7 @@ const BINARY_RC4_BLOCK_SIZE: usize = 512;
 const CRYPTO_API_VERIFIER_LEN: usize = 60;
 const CRYPTO_API_PROVIDER: &str = "Microsoft Enhanced Cryptographic Provider v1.0";
 
-impl DocEncryptionProfile {
+impl EncryptionProfile {
     pub(crate) fn table_header_len(self) -> std::result::Result<usize, String> {
         self.validate()?;
         match self {
@@ -40,7 +40,7 @@ impl DocEncryptionProfile {
 }
 
 pub(crate) fn validate_writer_password(
-    profile: DocEncryptionProfile,
+    profile: EncryptionProfile,
     password: &str,
 ) -> std::result::Result<(), String> {
     profile.validate()?;
@@ -49,8 +49,8 @@ pub(crate) fn validate_writer_password(
         return Err("DOC password-to-open password must not be empty".to_string());
     }
     let maximum = match profile {
-        DocEncryptionProfile::WordXorObfuscation => 15,
-        DocEncryptionProfile::OfficeBinaryRc4 | DocEncryptionProfile::CryptoApiRc4 { .. } => 255,
+        EncryptionProfile::WordXorObfuscation => 15,
+        EncryptionProfile::OfficeBinaryRc4 | EncryptionProfile::CryptoApiRc4 { .. } => 255,
     };
     if units > maximum {
         return Err(format!(
@@ -61,7 +61,7 @@ pub(crate) fn validate_writer_password(
 }
 
 pub(crate) fn encrypt_document_streams_for_write(
-    profile: DocEncryptionProfile,
+    profile: EncryptionProfile,
     password: &str,
     word_document: &mut [u8],
     table_stream: &mut [u8],
@@ -86,7 +86,7 @@ pub(crate) fn encrypt_document_streams_for_write(
     }
 
     match profile {
-        DocEncryptionProfile::WordXorObfuscation => {
+        EncryptionProfile::WordXorObfuscation => {
             let password_bytes = ansi_password_bytes(password, 0x0409);
             let verifier = xor_password_verifier(&password_bytes);
             patch_fib_encryption(word_document, true, verifier);
@@ -98,7 +98,7 @@ pub(crate) fn encrypt_document_streams_for_write(
             apply_xor_stream(table_stream, 0, &context).map_err(|error| error.to_string())?;
             apply_xor_stream(data_stream, 0, &context).map_err(|error| error.to_string())?;
         },
-        DocEncryptionProfile::OfficeBinaryRc4 => {
+        EncryptionProfile::OfficeBinaryRc4 => {
             let mut salt = Zeroizing::new([0u8; 16]);
             let mut verifier = Zeroizing::new([0u8; 16]);
             fill_random(salt.as_mut(), "binary RC4 salt")?;
@@ -112,7 +112,7 @@ pub(crate) fn encrypt_document_streams_for_write(
                 .map_err(|error| error.to_string())?;
             apply_stream_cipher(data_stream, 0, &secret).map_err(|error| error.to_string())?;
         },
-        DocEncryptionProfile::CryptoApiRc4 { key_bits } => {
+        EncryptionProfile::CryptoApiRc4 { key_bits } => {
             let mut salt = Zeroizing::new([0u8; 16]);
             let mut verifier = Zeroizing::new([0u8; 16]);
             fill_random(salt.as_mut(), "CryptoAPI salt")?;

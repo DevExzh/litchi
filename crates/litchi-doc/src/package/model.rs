@@ -9,8 +9,8 @@ pub struct OpenOptions<'a> {
     pub password: Option<&'a str>,
     /// How non-structural stylesheet defects are treated.
     ///
-    /// Defaults to [`crate::DocLeniency::Strict`], which is the historical behaviour.
-    pub leniency: crate::leniency::DocLeniency,
+    /// Defaults to [`crate::Leniency::Strict`], which is the historical behaviour.
+    pub leniency: crate::leniency::Leniency,
 }
 
 /// Password-to-open encryption schemes identified in a DOC file.

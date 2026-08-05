@@ -48,6 +48,39 @@ pub mod prop_value {
     pub const SHADOW_STYLE_ENABLED: u32 = 0x0002_0002;
 }
 
+/// Canonical OfficeArt record identifiers.
+pub mod record_type {
+    use crate::RecordKind;
+
+    pub const DGG_CONTAINER: u16 = RecordKind::DggContainer.raw();
+    pub const DG_CONTAINER: u16 = RecordKind::DgContainer.raw();
+    pub const SPGR_CONTAINER: u16 = RecordKind::SpgrContainer.raw();
+    pub const SP_CONTAINER: u16 = RecordKind::SpContainer.raw();
+    pub const DGG: u16 = RecordKind::Dgg.raw();
+    pub const DG: u16 = RecordKind::Dg.raw();
+    pub const SPGR: u16 = RecordKind::Spgr.raw();
+    pub const SP: u16 = RecordKind::Sp.raw();
+    pub const OPT: u16 = RecordKind::Opt.raw();
+    pub const CLIENT_TEXTBOX: u16 = RecordKind::ClientTextbox.raw();
+    pub const CHILD_ANCHOR: u16 = RecordKind::ChildAnchor.raw();
+    pub const CLIENT_ANCHOR: u16 = RecordKind::ClientAnchor.raw();
+    pub const CLIENT_DATA: u16 = RecordKind::ClientData.raw();
+    pub const SPLIT_MENU_COLORS: u16 = RecordKind::SplitMenuColors.raw();
+}
+
+/// Frequently used native `MSOSPT` values.
+pub mod shape_type {
+    use crate::shape::Native;
+
+    pub const NOT_PRIMITIVE: u16 = Native::FREEFORM.raw();
+    pub const RECTANGLE: u16 = Native::RECTANGLE.raw();
+    pub const ROUND_RECTANGLE: u16 = Native::ROUND_RECTANGLE.raw();
+    pub const ELLIPSE: u16 = Native::ELLIPSE.raw();
+    pub const DIAMOND: u16 = Native::DIAMOND.raw();
+    pub const LINE: u16 = Native::LINE.raw();
+    pub const TEXT_BOX: u16 = Native::TEXT_BOX.raw();
+}
+
 /// A validated OfficeArt extension record type.
 ///
 /// Known record types have dedicated variants on [`Atom`] or [`Container`];
@@ -282,6 +315,20 @@ pub struct Header {
 }
 
 impl Header {
+    /// Constructs a raw header while applying the OfficeArt bit-field masks.
+    ///
+    /// This constructor is intentionally infallible for low-level replay and
+    /// fixture builders. Checked typed constructors remain available through
+    /// [`Header::atom`] and [`Header::container`].
+    pub const fn new(version: u8, instance: u16, raw_kind: u16, len: u32) -> Self {
+        let ver_inst = ((version as u16) & 0x000F) | ((instance & 0x0FFF) << 4);
+        Self {
+            ver_inst: LeU16::new(ver_inst),
+            kind: LeU16::new(raw_kind),
+            len: LeU32::new(len),
+        }
+    }
+
     fn from_parts(version: u8, instance: u16, raw_kind: u16, len: u32) -> io::Result<Self> {
         if version > 0x0F {
             return Err(invalid_input("record version exceeds four bits"));
@@ -289,12 +336,7 @@ impl Header {
         if instance > 0x0FFF {
             return Err(invalid_input("record instance exceeds twelve bits"));
         }
-        let ver_inst = u16::from(version) | (instance << 4);
-        Ok(Self {
-            ver_inst: LeU16::new(ver_inst),
-            kind: LeU16::new(raw_kind),
-            len: LeU32::new(len),
-        })
+        Ok(Self::new(version, instance, raw_kind, len))
     }
 
     /// Constructs a typed atom header with the kind's required version.
@@ -350,6 +392,21 @@ impl Sp {
         }
     }
 
+    /// Creates a shape payload using the historical builder vocabulary.
+    pub const fn with_flags(id: u32, flags: Flags) -> Self {
+        Self::new(id, flags)
+    }
+
+    /// Creates a group patriarch shape payload.
+    pub const fn group_patriarch(id: u32) -> Self {
+        Self::new(id, Flags::GROUP.union(Flags::PATRIARCH))
+    }
+
+    /// Creates a background shape payload.
+    pub const fn background(id: u32) -> Self {
+        Self::new(id, Flags::BACKGROUND.union(Flags::HAVE_SPT))
+    }
+
     /// Returns the shape identifier.
     pub fn id(self) -> u32 {
         self.id.get()
@@ -370,15 +427,25 @@ pub struct Property {
 }
 
 impl Property {
-    /// Creates a raw property-table entry.
-    pub const fn new(id: Id, value: u32) -> Self {
+    /// Creates a raw property-table entry, retaining all flag bits.
+    pub const fn new(raw_id: u16, value: u32) -> Self {
         Self {
-            id: LeU16::new(id.raw()),
+            id: LeU16::new(raw_id),
             value: LeU32::new(value),
         }
     }
 
-    /// Returns the raw property identifier and flags.
+    /// Creates a property-table entry from a typed, unflagged identifier.
+    pub const fn from_id(id: Id, value: u32) -> Self {
+        Self::new(id.raw(), value)
+    }
+
+    /// Returns the exact property identifier, including `fBid`/`fComplex`.
+    pub const fn raw_id(self) -> u16 {
+        self.id.get()
+    }
+
+    /// Returns the typed property identifier without wire flag bits.
     pub fn id(self) -> Id {
         Id::from(self.id.get())
     }
@@ -397,6 +464,52 @@ pub fn atom_header<W: Write>(
     len: u32,
 ) -> io::Result<()> {
     writer.write_all(Header::atom(instance, kind, len)?.as_bytes())
+}
+
+/// Writes a raw OfficeArt record header for producer-specific replay helpers.
+pub fn raw_header<W: Write>(
+    writer: &mut W,
+    version: u8,
+    instance: u16,
+    raw_kind: u16,
+    len: u32,
+) -> io::Result<()> {
+    writer.write_all(Header::new(version, instance, raw_kind, len).as_bytes())
+}
+
+/// Writes a raw version-15 container without interpreting its child records.
+pub fn raw_container<W: Write>(
+    writer: &mut W,
+    instance: u16,
+    raw_kind: u16,
+    children: &[u8],
+) -> io::Result<()> {
+    raw_header(
+        writer,
+        0x0F,
+        instance,
+        raw_kind,
+        wire_len(children.len(), "container payload")?,
+    )?;
+    writer.write_all(children)
+}
+
+/// Writes a raw OfficeArt atom without interpreting its record kind.
+pub fn raw_atom<W: Write>(
+    writer: &mut W,
+    version: u8,
+    instance: u16,
+    raw_kind: u16,
+    data: &[u8],
+) -> io::Result<()> {
+    raw_header(
+        writer,
+        version,
+        instance,
+        raw_kind,
+        wire_len(data.len(), "atom payload")?,
+    )?;
+    writer.write_all(data)
 }
 
 /// Writes one typed container header without its child sequence.
@@ -528,6 +641,24 @@ enum BuiltValue<'data> {
     Complex(Cow<'data, [u8]>),
 }
 
+/// Input accepted by the raw property-table builder.
+pub trait PropertyKey {
+    /// Returns the exact property identifier, including any wire flags.
+    fn raw(self) -> u16;
+}
+
+impl PropertyKey for Id {
+    fn raw(self) -> u16 {
+        Id::raw(self)
+    }
+}
+
+impl PropertyKey for u16 {
+    fn raw(self) -> u16 {
+        self
+    }
+}
+
 /// Move-or-borrow builder for an OfficeArt Opt property table.
 ///
 /// Owned complex values are moved into the builder and borrowed values retain
@@ -535,7 +666,7 @@ enum BuiltValue<'data> {
 /// preventing an accidental deep copy of owned complex property bytes.
 #[derive(Debug, Default)]
 pub struct PropertyBuilder<'data> {
-    properties: Vec<(Id, BuiltValue<'data>)>,
+    properties: Vec<(u16, BuiltValue<'data>)>,
 }
 
 impl<'data> PropertyBuilder<'data> {
@@ -547,23 +678,25 @@ impl<'data> PropertyBuilder<'data> {
     }
 
     /// Appends a simple property.
-    pub fn add_simple(&mut self, id: Id, value: i32) -> &mut Self {
-        self.properties.push((id, BuiltValue::Simple(value)));
+    pub fn add_simple<K: PropertyKey>(&mut self, id: K, value: i32) -> &mut Self {
+        self.properties.push((id.raw(), BuiltValue::Simple(value)));
         self
     }
 
     /// Appends a BLIP-store identifier property.
-    pub fn add_blip_id(&mut self, id: Id, value: i32) -> &mut Self {
-        self.properties.push((id, BuiltValue::Blip(value)));
+    pub fn add_blip_id<K: PropertyKey>(&mut self, id: K, value: i32) -> &mut Self {
+        self.properties.push((id.raw(), BuiltValue::Blip(value)));
         self
     }
 
     /// Appends a complex property by borrowing a slice or moving an owned vector.
-    pub fn add_complex<D>(&mut self, id: Id, data: D) -> &mut Self
+    pub fn add_complex<K, D>(&mut self, id: K, data: D) -> &mut Self
     where
+        K: PropertyKey,
         D: Into<Cow<'data, [u8]>>,
     {
-        self.properties.push((id, BuiltValue::Complex(data.into())));
+        self.properties
+            .push((id.raw(), BuiltValue::Complex(data.into())));
         self
     }
 
@@ -610,12 +743,12 @@ impl<'data> PropertyBuilder<'data> {
 
         for (id, value) in &self.properties {
             let (raw_id, raw_value) = match value {
-                BuiltValue::Simple(value) => (id.raw(), *value),
-                BuiltValue::Blip(value) => (id.raw() | BLIP_ID, *value),
+                BuiltValue::Simple(value) => (*id, *value),
+                BuiltValue::Blip(value) => (*id | BLIP_ID, *value),
                 BuiltValue::Complex(data) => {
                     let len = i32::try_from(data.len())
                         .map_err(|_| invalid_input("complex property exceeds i32::MAX"))?;
-                    (id.raw() | COMPLEX, len)
+                    (*id | COMPLEX, len)
                 },
             };
             writer.write_all(&raw_id.to_le_bytes())?;
@@ -640,17 +773,17 @@ pub struct ShapeBuilder {
 
 impl ShapeBuilder {
     /// Creates a shape builder with no flags.
-    pub const fn new(kind: Native, id: u32) -> Self {
+    pub fn new<K: Into<Native>>(kind: K, id: u32) -> Self {
         Self {
-            kind,
+            kind: kind.into(),
             id,
             flags: Flags::empty(),
         }
     }
 
     /// Sets typed shape flags.
-    pub const fn with_flags(mut self, flags: Flags) -> Self {
-        self.flags = flags;
+    pub fn with_flags<F: Into<Flags>>(mut self, flags: F) -> Self {
+        self.flags = flags.into();
         self
     }
 

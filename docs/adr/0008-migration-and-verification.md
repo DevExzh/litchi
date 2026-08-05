@@ -5249,6 +5249,40 @@ three integration targets), formatting, diff, and the 46-package boundary
 check. The known malformed Apache POI DOC fixture remains a separate
 integration limitation recorded above.
 
+## Layered OLE2, OOXML, ODF, and shared-codec continuation
+
+This slice completes another breaking structural pass over the remaining
+dense owners without retaining compatibility aliases or format-name prefixes
+inside contextual modules. DOC now layers character properties, fields, and
+writer package assembly; the public facade uses the concise `Leniency`,
+`ToleranceReport`, `StylesheetDefect`, `EncryptionProfile`, `Element`, and
+`Section` names. DOCX settings, DrawingML chart reading, ODP parsing, ODT
+index writing, OGraph chart records, PPTX animations, XLS list objects and
+writer core, XLSB worksheet writing, and XLSX catalog editing now expose the
+same facade/model/codec/package/validation/test seams where applicable.
+
+RTF's lexer, parser, and writer are now organized beneath semantic codec
+facades. IWA media and Numbers editing received corresponding model/codec/
+package seams. The format-neutral OfficeArt wire vocabulary and helpers moved
+from PPT into `litchi-odraw`; PPT's Escher owner now consumes the shared typed
+wire model. These moves preserve typed snapshots, deterministic output,
+lossless unknown content, and existing ergonomic owner paths while reducing
+format-local duplication.
+
+The lint-capped affected all-target check passes for the complete migration
+matrix, and strict checks pass for every affected crate except the known
+pre-existing RTF workspace-lint backlog. Library tests pass for DOC (832 with
+two ignored), DOCX (643), DrawingML (92), IWA (1,529), ODraw (59), ODP (103),
+ODT (512), OGraph (40), PPT (882 with one ignored), PPTX (305), RTF (287), XLS
+(844), XLSB (413), and XLSX (645). The DOC facade integration targets pass,
+the umbrella library passes 162 tests, formatting/diff checks pass, and the
+crate-boundary policy remains clean. Root example linking was not used as a
+gate because the environment's parallel `rust-lld` link crashed with SIGBUS;
+that is an infrastructure limit, not a source diagnostic. This remains
+migration evidence, not a claim of complete `[MS-DOC]`, `[MS-ODRAW]`,
+`[MS-OGRAPH]`, `[MS-OSHARED]`, `[MS-PPT]`, `[MS-XLS]`, OOXML, or ODF
+conformance.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

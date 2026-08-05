@@ -478,7 +478,7 @@ pub fn generate_stylesheet(
             stsh.extend_from_slice(&0u16.to_le_bytes());
         }
     }
-    StyleSheet::parse_data(&stsh, 0, crate::DocLeniency::Strict)
+    StyleSheet::parse_data(&stsh, 0, crate::Leniency::Strict)
         .map_err(|error| invalid(format!("generated DOC stylesheet is invalid: {error}")))?;
     Ok(stsh)
 }
@@ -508,7 +508,7 @@ mod tests {
     #[test]
     fn minimal_stylesheet_round_trips() {
         let bytes = generate_minimal_stylesheet();
-        let parsed = StyleSheet::parse_data(&bytes, 0, crate::DocLeniency::Strict).unwrap();
+        let parsed = StyleSheet::parse_data(&bytes, 0, crate::Leniency::Strict).unwrap();
         assert_eq!(parsed.styles().len(), 15);
         assert_eq!(parsed.get(0).unwrap().name, "Normal");
         assert_eq!(parsed.get(10).unwrap().name, "Default Paragraph Font");
@@ -544,7 +544,7 @@ mod tests {
             });
 
         let bytes = generate_stylesheet(&[style], None).unwrap();
-        let parsed = StyleSheet::parse_data(&bytes, 0, crate::DocLeniency::Strict).unwrap();
+        let parsed = StyleSheet::parse_data(&bytes, 0, crate::Leniency::Strict).unwrap();
         assert_eq!(parsed.header().stdf_size, 18);
         let style = parsed.get(15).unwrap();
         assert_eq!(style.aliases, ["Accent Grid"]);
@@ -590,7 +590,7 @@ mod tests {
         let authors = HashMap::from([("Style Editor".to_string(), 3u16)]);
 
         let bytes = generate_stylesheet(&[style], Some(&authors)).unwrap();
-        let parsed = StyleSheet::parse_data(&bytes, 0, crate::DocLeniency::Strict).unwrap();
+        let parsed = StyleSheet::parse_data(&bytes, 0, crate::Leniency::Strict).unwrap();
         let style = parsed.get(15).unwrap();
         assert!(style.post_2000.as_ref().unwrap().has_original_style);
         assert_eq!(style.property_sets.len(), 3);
@@ -614,7 +614,7 @@ mod tests {
         let authors = HashMap::from([("Style Editor".to_string(), 1u16)]);
 
         let bytes = generate_stylesheet(&[style], Some(&authors)).unwrap();
-        let parsed = StyleSheet::parse_data(&bytes, 0, crate::DocLeniency::Strict).unwrap();
+        let parsed = StyleSheet::parse_data(&bytes, 0, crate::Leniency::Strict).unwrap();
         let revision = parsed.get(15).unwrap().revision.as_ref().unwrap();
         assert_eq!(revision.author_index, 1);
         assert_eq!(revision.paragraph_properties, None);

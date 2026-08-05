@@ -1,7 +1,7 @@
 //! Writer-facing document state, input models, and authoring methods.
 
 use crate::CommentDateTime;
-use crate::encryption::{DocEncryptionProfile, validate_writer_password};
+use crate::encryption::{EncryptionProfile, validate_writer_password};
 use crate::parts::pap::{
     Borders as ParagraphBorders, DropCap, FontAlignment, FrameAnchor, FrameHeight,
     FrameHorizontalPosition, FrameTextFlow, FrameTextWrap, FrameVerticalPosition,
@@ -874,7 +874,7 @@ pub struct DocWriter {
 }
 
 pub(super) struct DocWriterEncryption {
-    pub(super) profile: DocEncryptionProfile,
+    pub(super) profile: EncryptionProfile,
     pub(super) password: Zeroizing<String>,
 }
 
@@ -934,7 +934,7 @@ impl DocWriter {
     pub fn set_password(
         &mut self,
         password: impl Into<String>,
-        profile: DocEncryptionProfile,
+        profile: EncryptionProfile,
     ) -> Result<(), DocWriteError> {
         let password = Zeroizing::new(password.into());
         validate_writer_password(profile, password.as_str()).map_err(DocWriteError::InvalidData)?;
@@ -948,7 +948,7 @@ impl DocWriter {
     }
 
     /// Return the configured password-to-open profile without exposing the password.
-    pub fn encryption_profile(&self) -> Option<DocEncryptionProfile> {
+    pub fn encryption_profile(&self) -> Option<EncryptionProfile> {
         self.encryption.as_ref().map(|value| value.profile)
     }
 

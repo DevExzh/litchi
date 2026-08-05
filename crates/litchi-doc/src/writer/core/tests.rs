@@ -611,8 +611,8 @@ fn tables_round_trip_through_both_output_paths() {
             .unwrap()
             .into_iter()
             .find_map(|element| match element {
-                crate::DocElement::Table(table) => Some(table),
-                crate::DocElement::Paragraph(_) => None,
+                crate::Element::Table(table) => Some(table),
+                crate::Element::Paragraph(_) => None,
             })
             .unwrap();
         assert_eq!(

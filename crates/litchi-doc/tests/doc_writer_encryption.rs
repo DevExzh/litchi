@@ -1,9 +1,9 @@
 use litchi_cfb::OleFile;
-use litchi_doc::writer::{DocEncryptionProfile, DocWriter, FootnoteEntry};
+use litchi_doc::writer::{DocWriter, EncryptionProfile, FootnoteEntry};
 use litchi_doc::{Error, OpenOptions, Package};
 use std::io::Cursor;
 
-fn encrypted_document(profile: DocEncryptionProfile, password: &str) -> Vec<u8> {
+fn encrypted_document(profile: EncryptionProfile, password: &str) -> Vec<u8> {
     let mut writer = DocWriter::new();
     writer.add_paragraph("Main 文本").unwrap();
     writer.set_odd_header("Header");
@@ -23,7 +23,7 @@ fn streams(file: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
     )
 }
 
-fn assert_round_trip(profile: DocEncryptionProfile, password: &str) -> Vec<u8> {
+fn assert_round_trip(profile: EncryptionProfile, password: &str) -> Vec<u8> {
     let bytes = encrypted_document(profile, password);
     let mut package = Package::from_reader(Cursor::new(bytes.clone())).unwrap();
     assert!(matches!(package.document(), Err(Error::PasswordRequired)));
@@ -51,7 +51,7 @@ fn assert_round_trip(profile: DocEncryptionProfile, password: &str) -> Vec<u8> {
 
 #[test]
 fn all_profiles_round_trip_all_document_streams_and_exact_headers() {
-    let xor = assert_round_trip(DocEncryptionProfile::WordXorObfuscation, "abc");
+    let xor = assert_round_trip(EncryptionProfile::WordXorObfuscation, "abc");
     let (word, table, data) = streams(&xor);
     assert_eq!(
         u16::from_le_bytes(word[10..12].try_into().unwrap()) & 0x8100,
@@ -64,17 +64,14 @@ fn all_profiles_round_trip_all_document_streams_and_exact_headers() {
     assert!(table.iter().any(|byte| *byte != 0));
     assert_eq!(data, vec![0u8; data.len()]);
 
-    let binary = assert_round_trip(DocEncryptionProfile::OfficeBinaryRc4, "密码🔐");
+    let binary = assert_round_trip(EncryptionProfile::OfficeBinaryRc4, "密码🔐");
     let (word, table, data) = streams(&binary);
     assert_eq!(&table[..4], &[1, 0, 1, 0]);
     assert_eq!(u32::from_le_bytes(word[14..18].try_into().unwrap()), 52);
     assert!(data.iter().any(|byte| *byte != 0));
 
     for key_bits in [40, 56, 120, 128] {
-        let bytes = assert_round_trip(
-            DocEncryptionProfile::CryptoApiRc4 { key_bits },
-            "Unicode 密码",
-        );
+        let bytes = assert_round_trip(EncryptionProfile::CryptoApiRc4 { key_bits }, "Unicode 密码");
         let (word, table, data) = streams(&bytes);
         let header_len = u32::from_le_bytes(word[14..18].try_into().unwrap()) as usize;
         assert_eq!(&table[..8], &[2, 0, 2, 0, 4, 0, 0, 0]);
@@ -92,34 +89,34 @@ fn all_profiles_round_trip_all_document_streams_and_exact_headers() {
 
 #[test]
 fn salts_are_nondeterministic_and_setter_validation_is_atomic() {
-    let first = encrypted_document(DocEncryptionProfile::OfficeBinaryRc4, "secret");
-    let second = encrypted_document(DocEncryptionProfile::OfficeBinaryRc4, "secret");
+    let first = encrypted_document(EncryptionProfile::OfficeBinaryRc4, "secret");
+    let second = encrypted_document(EncryptionProfile::OfficeBinaryRc4, "secret");
     let (_, first_table, _) = streams(&first);
     let (_, second_table, _) = streams(&second);
     assert_ne!(&first_table[4..20], &second_table[4..20]);
 
     let mut writer = DocWriter::new();
     writer
-        .set_password("kept", DocEncryptionProfile::OfficeBinaryRc4)
+        .set_password("kept", EncryptionProfile::OfficeBinaryRc4)
         .unwrap();
     assert!(
         writer
-            .set_password("", DocEncryptionProfile::WordXorObfuscation)
+            .set_password("", EncryptionProfile::WordXorObfuscation)
             .is_err()
     );
     assert!(
         writer
-            .set_password("abcdefghijklmnop", DocEncryptionProfile::WordXorObfuscation,)
+            .set_password("abcdefghijklmnop", EncryptionProfile::WordXorObfuscation,)
             .is_err()
     );
     assert!(
         writer
-            .set_password("bad", DocEncryptionProfile::CryptoApiRc4 { key_bits: 41 })
+            .set_password("bad", EncryptionProfile::CryptoApiRc4 { key_bits: 41 })
             .is_err()
     );
     assert_eq!(
         writer.encryption_profile(),
-        Some(DocEncryptionProfile::OfficeBinaryRc4)
+        Some(EncryptionProfile::OfficeBinaryRc4)
     );
     writer.clear_password();
     assert_eq!(writer.encryption_profile(), None);

@@ -1,4 +1,4 @@
-use litchi_doc::{DocEncryptionProfile, DocWriter, OpenOptions, Package};
+use litchi_doc::{DocWriter, EncryptionProfile, OpenOptions, Package};
 use litchi_vba::{
     Limits,
     build::{Module, Project},
@@ -65,7 +65,7 @@ fn project_storage_remains_clear_when_document_streams_are_encrypted() {
     ));
     writer.set_vba(project).unwrap();
     writer
-        .set_password("secret", DocEncryptionProfile::OfficeBinaryRc4)
+        .set_password("secret", EncryptionProfile::OfficeBinaryRc4)
         .unwrap();
 
     let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();

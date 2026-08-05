@@ -1,0 +1,609 @@
+use super::*;
+
+impl<'a> Parser<'a> {
+    /// Parse header or footer content.
+    pub(super) fn parse_header_footer_content(&mut self) -> RtfResult<()> {
+        let hf_type = self
+            .current_hf_type
+            .ok_or_else(|| RtfError::MalformedDocument("Header/footer type not set".to_string()))?;
+
+        let mut hf = super::super::super::section::HeaderFooter::new(hf_type);
+        self.current_hf_shapes.clear();
+        self.current_hf_shape_groups.clear();
+        self.current_hf_drawing_order.clear();
+        self.current_hf_story_events.clear();
+        self.current_hf_story_offset = 0;
+        let mut text_buffer = SmallVec::<[u8; 256]>::new();
+        let mut pending_paragraph_break = false;
+        let default_state = State::default();
+        let mut inert_section_format = false;
+
+        while let Some(token) = self.tokens.get(self.pos) {
+            match token {
+                Token::CloseBrace => {
+                    if !text_buffer.is_empty() {
+                        if let Ok(text) = std::str::from_utf8(&text_buffer) {
+                            let state = self.current_state().ok().unwrap_or(&default_state);
+                            let text_alloc = self.arena.alloc_str(text);
+                            let para = super::super::super::section::HeaderFooterParagraph::new(
+                                Cow::Borrowed(text_alloc),
+                                state.formatting,
+                                state.paragraph,
+                            );
+                            hf.add_paragraph(para);
+                        }
+                        text_buffer.clear();
+                    }
+                    self.pos += 1;
+                    break;
+                },
+                Token::OpenBrace => {
+                    inert_section_format = false;
+                    self.parse_header_footer_group(
+                        &mut hf,
+                        &mut text_buffer,
+                        &mut pending_paragraph_break,
+                    )?;
+                },
+                Token::Control(ControlWord::Par | ControlWord::Line) => {
+                    inert_section_format = false;
+                    self.pos += 1;
+                    if pending_paragraph_break {
+                        self.current_hf_story_offset =
+                            self.current_hf_story_offset.saturating_add(1);
+                    }
+                    let text = std::str::from_utf8(&text_buffer).map_err(|error| {
+                        RtfError::InvalidUnicode(format!(
+                            "invalid UTF-8 in header/footer story: {error}"
+                        ))
+                    })?;
+                    let state = self.current_state().ok().unwrap_or(&default_state);
+                    let text_alloc = self.arena.alloc_str(text);
+                    hf.add_paragraph(super::super::super::section::HeaderFooterParagraph::new(
+                        Cow::Borrowed(text_alloc),
+                        state.formatting,
+                        state.paragraph,
+                    ));
+                    text_buffer.clear();
+                    pending_paragraph_break = true;
+                },
+                Token::Control(ControlWord::Page(param)) => {
+                    require_parameterless(*param, "page")?;
+                    self.pos += 1;
+                    if pending_paragraph_break {
+                        self.current_hf_story_offset =
+                            self.current_hf_story_offset.saturating_add(1);
+                        pending_paragraph_break = false;
+                    }
+                    self.current_hf_story_events
+                        .push(crate::StoryEvent::PageBreak(crate::PageBreak::new(
+                            self.current_hf_story_offset,
+                        )));
+                },
+                Token::Control(ControlWord::Tab) => {
+                    inert_section_format = false;
+                    self.pos += 1;
+                    if pending_paragraph_break {
+                        self.current_hf_story_offset =
+                            self.current_hf_story_offset.saturating_add(1);
+                        pending_paragraph_break = false;
+                    }
+                    text_buffer.push(b'\t');
+                    self.current_hf_story_offset = self.current_hf_story_offset.saturating_add(1);
+                },
+                Token::Control(ControlWord::Unicode(code)) => {
+                    inert_section_format = false;
+                    if pending_paragraph_break {
+                        self.current_hf_story_offset =
+                            self.current_hf_story_offset.saturating_add(1);
+                        pending_paragraph_break = false;
+                    }
+                    let decoded = self.parse_destination_unicode_sequence(*code)?;
+                    text_buffer.extend_from_slice(decoded.as_bytes());
+                    self.current_hf_story_offset =
+                        self.current_hf_story_offset.saturating_add(decoded.len());
+                },
+                Token::Control(control) if control_symbol_text(control).is_some() => {
+                    inert_section_format = false;
+                    self.pos += 1;
+                    if pending_paragraph_break {
+                        self.current_hf_story_offset =
+                            self.current_hf_story_offset.saturating_add(1);
+                        pending_paragraph_break = false;
+                    }
+                    text_buffer.extend_from_slice(
+                        control_symbol_text(control).unwrap_or_default().as_bytes(),
+                    );
+                    self.current_hf_story_offset = self
+                        .current_hf_story_offset
+                        .saturating_add(control_symbol_text(control).unwrap_or_default().len());
+                },
+                Token::Control(ControlWord::SectionDefault) => {
+                    self.pos += 1;
+                    inert_section_format = true;
+                },
+                Token::Control(ControlWord::SectionBreak) if inert_section_format => {
+                    self.pos += 1;
+                    inert_section_format = false;
+                },
+                Token::Control(control) if inert_section_format && is_section_control(control) => {
+                    self.pos += 1;
+                },
+                Token::Control(control) => {
+                    self.pos += 1;
+                    self.apply_control_word(control)?;
+                },
+                Token::Text(text) => {
+                    let decoded = self.decode_transport_text(text)?;
+                    self.pos += 1;
+                    if !decoded.is_empty() {
+                        inert_section_format = false;
+                        if pending_paragraph_break {
+                            self.current_hf_story_offset =
+                                self.current_hf_story_offset.saturating_add(1);
+                            pending_paragraph_break = false;
+                        }
+                    }
+                    text_buffer.extend_from_slice(decoded.as_bytes());
+                    self.current_hf_story_offset =
+                        self.current_hf_story_offset.saturating_add(decoded.len());
+                },
+                _ => {
+                    self.pos += 1;
+                },
+            }
+        }
+
+        while hf.text().len() < self.current_hf_story_offset {
+            hf.add_paragraph(super::super::super::section::HeaderFooterParagraph::new(
+                Cow::Borrowed(""),
+                default_state.formatting,
+                default_state.paragraph,
+            ));
+        }
+        hf.shapes = std::mem::take(&mut self.current_hf_shapes);
+        hf.shape_groups = std::mem::take(&mut self.current_hf_shape_groups);
+        hf.drawing_order = std::mem::take(&mut self.current_hf_drawing_order);
+        hf.story_events = std::mem::take(&mut self.current_hf_story_events);
+        crate::field::validate_story_events(
+            &hf.text(),
+            &hf.shapes,
+            &hf.shape_groups,
+            &hf.drawing_order,
+            &hf.story_events,
+            "header/footer",
+        )?;
+
+        // Headers and footers attach to the section currently being defined.
+        if !self.section_properties_active {
+            self.begin_section()?;
+        }
+        self.sections
+            .last_mut()
+            .ok_or_else(|| RtfError::MalformedDocument("no active RTF section".to_string()))?
+            .add_header_footer(hf);
+
+        self.current_hf_type = None;
+        Ok(())
+    }
+
+    pub(super) fn parse_header_footer_group(
+        &mut self,
+        hf: &mut super::super::super::section::HeaderFooter<'a>,
+        text_buffer: &mut SmallVec<[u8; 256]>,
+        pending_paragraph_break: &mut bool,
+    ) -> RtfResult<()> {
+        self.reject_non_body_custom_xml_markup_group()?;
+        if self.is_root_drawing_group() {
+            if *pending_paragraph_break {
+                self.current_hf_story_offset = self.current_hf_story_offset.saturating_add(1);
+                *pending_paragraph_break = false;
+            }
+            return self.parse_group();
+        }
+        if matches!(
+            self.tokens.get(self.pos + 1),
+            Some(Token::Control(ControlWord::Field))
+        ) {
+            if *pending_paragraph_break {
+                self.current_hf_story_offset = self.current_hf_story_offset.saturating_add(1);
+                *pending_paragraph_break = false;
+            }
+            self.pos += 1;
+            self.parse_field()?;
+            return self.skip_until_close_brace();
+        }
+        if matches!(
+            self.tokens.get(self.pos..self.pos + 3),
+            Some([
+                Token::OpenBrace,
+                Token::Control(ControlWord::IgnorableDestination),
+                Token::Control(ControlWord::LegacyDrawingObject),
+            ])
+        ) {
+            return self.parse_group();
+        }
+        if matches!(
+            self.tokens.get(self.pos + 1),
+            Some(Token::Control(ControlWord::IgnorableDestination))
+        ) {
+            return self.skip_group();
+        }
+        let state = self.current_state()?.clone();
+        self.states.push(state);
+        self.pos += 1;
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Some(Token::OpenBrace) => {
+                    self.parse_header_footer_group(hf, text_buffer, pending_paragraph_break)?
+                },
+                Some(Token::Control(ControlWord::Tab)) => {
+                    self.pos += 1;
+                    if *pending_paragraph_break {
+                        self.current_hf_story_offset =
+                            self.current_hf_story_offset.saturating_add(1);
+                        *pending_paragraph_break = false;
+                    }
+                    text_buffer.push(b'\t');
+                    self.current_hf_story_offset += 1;
+                },
+                Some(Token::Control(ControlWord::Par | ControlWord::Line)) => {
+                    self.pos += 1;
+                    if *pending_paragraph_break {
+                        self.current_hf_story_offset =
+                            self.current_hf_story_offset.saturating_add(1);
+                    }
+                    let text = std::str::from_utf8(text_buffer).map_err(|error| {
+                        RtfError::InvalidUnicode(format!(
+                            "invalid UTF-8 in header/footer story: {error}"
+                        ))
+                    })?;
+                    let state = self.current_state()?.clone();
+                    let text_alloc = self.arena.alloc_str(text);
+                    hf.add_paragraph(super::super::super::section::HeaderFooterParagraph::new(
+                        Cow::Borrowed(text_alloc),
+                        state.formatting,
+                        state.paragraph,
+                    ));
+                    text_buffer.clear();
+                    *pending_paragraph_break = true;
+                },
+                Some(Token::Control(ControlWord::Page(param))) => {
+                    require_parameterless(*param, "page")?;
+                    self.pos += 1;
+                    if *pending_paragraph_break {
+                        self.current_hf_story_offset =
+                            self.current_hf_story_offset.saturating_add(1);
+                        *pending_paragraph_break = false;
+                    }
+                    self.current_hf_story_events
+                        .push(crate::StoryEvent::PageBreak(crate::PageBreak::new(
+                            self.current_hf_story_offset,
+                        )));
+                },
+                Some(Token::Control(ControlWord::Unicode(code))) => {
+                    if *pending_paragraph_break {
+                        self.current_hf_story_offset =
+                            self.current_hf_story_offset.saturating_add(1);
+                        *pending_paragraph_break = false;
+                    }
+                    let code = *code;
+                    let decoded = self.parse_destination_unicode_sequence(code)?;
+                    text_buffer.extend_from_slice(decoded.as_bytes());
+                    self.current_hf_story_offset += decoded.len();
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    if *pending_paragraph_break {
+                        self.current_hf_story_offset =
+                            self.current_hf_story_offset.saturating_add(1);
+                        *pending_paragraph_break = false;
+                    }
+                    let value = control_symbol_text(control).unwrap_or_default();
+                    text_buffer.extend_from_slice(value.as_bytes());
+                    self.current_hf_story_offset += value.len();
+                    self.pos += 1;
+                },
+                Some(Token::Control(control)) => {
+                    let control = *control;
+                    self.pos += 1;
+                    self.apply_control_word(&control)?;
+                },
+                Some(Token::Text(text)) => {
+                    let decoded = self.decode_transport_text(text)?;
+                    self.pos += 1;
+                    if !decoded.is_empty() && *pending_paragraph_break {
+                        self.current_hf_story_offset =
+                            self.current_hf_story_offset.saturating_add(1);
+                        *pending_paragraph_break = false;
+                    }
+                    text_buffer.extend_from_slice(decoded.as_bytes());
+                    self.current_hf_story_offset += decoded.len();
+                },
+                Some(Token::Binary(_)) => {
+                    self.states.pop();
+                    return Err(RtfError::MalformedDocument(
+                        "RTF header/footer story cannot contain direct binary data".to_string(),
+                    ));
+                },
+                None => {
+                    self.states.pop();
+                    return Err(RtfError::UnexpectedEof);
+                },
+            }
+        }
+    }
+
+    pub(super) fn parse_destination_unicode_sequence(
+        &mut self,
+        first_code: i32,
+    ) -> RtfResult<String> {
+        let skip_count = self.current_state()?.unicode_skip.max(0) as usize;
+        let mut utf16 = SmallVec::<[u16; 4]>::new();
+        utf16.push(first_code as u16);
+        self.pos += 1;
+        while let Some(Token::Control(ControlWord::Unicode(code))) = self.tokens.get(self.pos) {
+            utf16.push(*code as u16);
+            self.pos += 1;
+        }
+
+        let mut fallback_skip = skip_count.saturating_mul(utf16.len());
+        let mut remainder = String::new();
+        while fallback_skip > 0 && self.pos < self.tokens.len() {
+            match self.tokens.get(self.pos) {
+                Some(Token::Text(text)) => {
+                    let count = text.chars().count();
+                    if count <= fallback_skip {
+                        fallback_skip -= count;
+                    } else {
+                        remainder.extend(text.chars().skip(fallback_skip));
+                        fallback_skip = 0;
+                    }
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Unicode(_))) => break,
+                Some(_) => {
+                    fallback_skip = fallback_skip.saturating_sub(1);
+                    self.pos += 1;
+                },
+                None => break,
+            }
+        }
+        let mut decoded = String::from_utf16(&utf16).map_err(|error| {
+            RtfError::InvalidUnicode(format!("invalid destination Unicode: {error}"))
+        })?;
+        decoded.push_str(&self.decode_transport_text(&remainder)?);
+        Ok(decoded)
+    }
+
+    /// Parse footnote or endnote content.
+    pub(super) fn parse_note(&mut self, is_footnote: bool) -> RtfResult<()> {
+        if self.notes.len() >= super::super::super::section::MAX_NOTES {
+            return Err(RtfError::MalformedDocument(
+                "RTF note count exceeds the safety limit".to_string(),
+            ));
+        }
+        self.current_note_buffer.clear();
+        self.current_note_shapes.clear();
+        self.current_note_shape_groups.clear();
+        self.current_note_drawing_order.clear();
+        self.current_note_story_events.clear();
+        let mut reference = String::from(if is_footnote { "1" } else { "i" });
+
+        while let Some(token) = self.tokens.get(self.pos) {
+            match token {
+                Token::CloseBrace => {
+                    self.pos += 1;
+                    break;
+                },
+                Token::OpenBrace => {
+                    self.parse_note_group()?;
+                },
+                Token::Control(ControlWord::FootnoteNumber(n)) => {
+                    self.pos += 1;
+                    reference = n.to_string();
+                },
+                Token::Control(ControlWord::Tab) => {
+                    self.pos += 1;
+                    self.current_note_buffer.push(b'\t');
+                },
+                Token::Control(ControlWord::Par | ControlWord::Line) => {
+                    self.pos += 1;
+                    self.current_note_buffer.push(b'\n');
+                },
+                Token::Control(ControlWord::Page(param)) => {
+                    require_parameterless(*param, "page")?;
+                    self.pos += 1;
+                    self.current_note_story_events
+                        .push(crate::StoryEvent::PageBreak(crate::PageBreak::new(
+                            self.current_note_buffer.len(),
+                        )));
+                },
+                Token::Control(ControlWord::Unicode(code)) => {
+                    let decoded = self.parse_destination_unicode_sequence(*code)?;
+                    self.current_note_buffer
+                        .extend_from_slice(decoded.as_bytes());
+                },
+                Token::Control(control) if control_symbol_text(control).is_some() => {
+                    self.pos += 1;
+                    self.current_note_buffer.extend_from_slice(
+                        control_symbol_text(control).unwrap_or_default().as_bytes(),
+                    );
+                },
+                Token::Control(control) => {
+                    self.pos += 1;
+                    self.apply_control_word(control)?;
+                },
+                Token::Text(text) => {
+                    let decoded = self.decode_transport_text(text)?;
+                    self.pos += 1;
+                    self.current_note_buffer
+                        .extend_from_slice(decoded.as_bytes());
+                },
+                _ => {
+                    self.pos += 1;
+                },
+            }
+            if self.current_note_buffer.len() > super::super::super::section::MAX_NOTE_BODY_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF note body exceeds the safety limit".to_string(),
+                ));
+            }
+        }
+
+        let content = std::str::from_utf8(&self.current_note_buffer)
+            .map_err(|error| RtfError::InvalidUnicode(format!("invalid note Unicode: {error}")))?;
+        let content_alloc = self.arena.alloc_str(content);
+        let mut note = if is_footnote {
+            super::super::super::section::Note::footnote(
+                Cow::Owned(reference),
+                Cow::Borrowed(content_alloc),
+            )
+        } else {
+            super::super::super::section::Note::endnote(
+                Cow::Owned(reference),
+                Cow::Borrowed(content_alloc),
+            )
+        };
+        note.position = self.body_text_len;
+        note.shapes = std::mem::take(&mut self.current_note_shapes);
+        note.shape_groups = std::mem::take(&mut self.current_note_shape_groups);
+        note.drawing_order = std::mem::take(&mut self.current_note_drawing_order);
+        note.story_events = std::mem::take(&mut self.current_note_story_events);
+
+        if let Ok(state) = self.current_state() {
+            note.formatting = state.formatting;
+        }
+
+        let aggregate = note.text_bytes().and_then(|initial| {
+            self.notes.iter().try_fold(initial, |size, existing| {
+                size.checked_add(existing.text_bytes()?)
+            })
+        });
+        if aggregate
+            .is_none_or(|size| size > super::super::super::section::MAX_NOTE_TEXT_TOTAL_BYTES)
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF note aggregate text exceeds the safety limit".to_string(),
+            ));
+        }
+        note.validate()?;
+        let index = self.notes.len();
+        self.notes.push(note);
+        self.body_story_events
+            .push(ParsedBodyStoryEvent::Resolved(crate::BodyStoryEvent::Note(
+                index,
+            )));
+
+        Ok(())
+    }
+
+    pub(super) fn parse_note_group(&mut self) -> RtfResult<()> {
+        self.reject_non_body_custom_xml_markup_group()?;
+        if self.is_root_drawing_group() {
+            return self.parse_group();
+        }
+        if matches!(
+            self.tokens.get(self.pos + 1),
+            Some(Token::Control(ControlWord::Field))
+        ) {
+            self.pos += 1;
+            self.parse_field()?;
+            return self.skip_until_close_brace();
+        }
+        if !matches!(self.tokens.get(self.pos), Some(Token::OpenBrace)) {
+            return Err(RtfError::MalformedDocument(
+                "RTF note nested-group parser is not at an opening brace".to_string(),
+            ));
+        }
+        if matches!(
+            self.tokens.get(self.pos + 1),
+            Some(Token::Control(ControlWord::IgnorableDestination))
+        ) {
+            return self.skip_group();
+        }
+        if self.states.len() >= MAX_STORY_GROUP_DEPTH {
+            return Err(RtfError::MalformedDocument(
+                "RTF note-story group nesting exceeds the safety limit".to_string(),
+            ));
+        }
+        let state = self.current_state()?.clone();
+        self.states.push(state);
+        self.pos += 1;
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Some(Token::OpenBrace) => self.parse_note_group()?,
+                Some(Token::Control(ControlWord::Tab)) => {
+                    self.pos += 1;
+                    self.current_note_buffer.push(b'\t');
+                },
+                Some(Token::Control(ControlWord::Par | ControlWord::Line)) => {
+                    self.pos += 1;
+                    self.current_note_buffer.push(b'\n');
+                },
+                Some(Token::Control(ControlWord::Page(param))) => {
+                    require_parameterless(*param, "page")?;
+                    self.pos += 1;
+                    self.current_note_story_events
+                        .push(crate::StoryEvent::PageBreak(crate::PageBreak::new(
+                            self.current_note_buffer.len(),
+                        )));
+                },
+                Some(Token::Control(ControlWord::Unicode(code))) => {
+                    let code = *code;
+                    let decoded = self.parse_destination_unicode_sequence(code)?;
+                    self.current_note_buffer
+                        .extend_from_slice(decoded.as_bytes());
+                },
+                Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
+                    self.current_note_buffer.extend_from_slice(
+                        control_symbol_text(control).unwrap_or_default().as_bytes(),
+                    );
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Footnote | ControlWord::Endnote)) => {
+                    self.states.pop();
+                    return Err(RtfError::MalformedDocument(
+                        "RTF note story cannot contain a nested note destination".to_string(),
+                    ));
+                },
+                Some(Token::Control(control)) => {
+                    let control = *control;
+                    self.pos += 1;
+                    self.apply_control_word(&control)?;
+                },
+                Some(Token::Text(text)) => {
+                    let decoded = self.decode_transport_text(text)?;
+                    self.pos += 1;
+                    self.current_note_buffer
+                        .extend_from_slice(decoded.as_bytes());
+                },
+                Some(Token::Binary(_)) => {
+                    self.states.pop();
+                    return Err(RtfError::MalformedDocument(
+                        "RTF note story cannot contain direct binary data".to_string(),
+                    ));
+                },
+                None => {
+                    self.states.pop();
+                    return Err(RtfError::UnexpectedEof);
+                },
+            }
+            if self.current_note_buffer.len() > super::super::super::section::MAX_NOTE_BODY_BYTES {
+                self.states.pop();
+                return Err(RtfError::MalformedDocument(
+                    "RTF note body exceeds the safety limit".to_string(),
+                ));
+            }
+        }
+    }
+}

@@ -95,6 +95,17 @@ animation parser/types/writer, XLS list objects, and ODraw properties expose
 facades over model/codec/package/test seams. These are source-organization and
 ownership boundaries; they do not imply a broader compatibility promise.
 
+The latest owner pass adds nested `parts/chp`, `parts/fields/codec`, and
+`writer/core/package` seams to DOC; moves the shared OfficeArt wire model into
+ODraw; and layers RTF lexer/parser/writer, IWA media and Numbers editor,
+DrawingML chart reader, OGraph chart records, PPTX animations, XLS list and
+writer codecs, XLSB worksheet writing, and XLSX catalog editing. Each owner
+keeps a small contextual facade while separating semantic models, wire/XML or
+binary codecs, package operations, validation, and focused tests. The public
+surface remains prefix-free within each format context: DOC exports concise
+`Leniency`, `ToleranceReport`, `StylesheetDefect`, `EncryptionProfile`,
+`Element`, and `Section` names without compatibility aliases.
+
 ## ODF
 
 [`litchi-odf-common`](../../crates/litchi-odf-common/Cargo.toml) is the shared
@@ -120,6 +131,11 @@ does not own package assembly; package ownership remains with the family
 facade. The OOXML-common web-extension codec is likewise layered into
 semantic, XML, relationship, and package owners while preserving the compact
 public web facade.
+
+ODP's parser and ODT's index writer now follow the same semantic/XML/
+validation/package/test organization. These changes are source topology and
+ownership evidence only; they do not broaden the format conformance claims in
+ADR 0023.
 
 ## Historical terminology
 

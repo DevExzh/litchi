@@ -79,13 +79,13 @@ pub use bookmark::Bookmark;
 pub use comment::{Comment, CommentDateTime, CommentExtendedMetadata};
 pub use document::Document;
 pub use embedded_object::{Editor, WriteOptions};
-pub use encryption::DocEncryptionProfile;
+pub use encryption::EncryptionProfile;
 pub use equation::{DocMtefEquationWriteOptions, EQUATION_3_CLSID, MtefEquation};
 pub use footnote::{Endnote, Footnote};
 pub use header_footer::HeaderFooter;
 pub use hyperlink::Hyperlink;
 pub use image::{Image, ImageError};
-pub use leniency::{DocLeniency, DocStylesheetDefect, DocToleranceReport, DocToleratedDefect};
+pub use leniency::{Leniency, StylesheetDefect, ToleranceReport, ToleratedDefect};
 pub use package::{EncryptionKind, Error, OpenOptions, Package, Result};
 pub use paragraph::{Paragraph, Run};
 pub use parts::associated_strings::{AssociatedStringSlot, DocumentAssociatedStrings};
@@ -233,10 +233,10 @@ pub use section::borders::{
     ApplyTo, Art, Border, Borders, Color, Depth, Error as BorderError, Offset, Style,
 };
 pub use section::{
-    Behavior, BreakKind, ChapterNumberSeparator, DocSection, FootnotePosition, LineNumberRestart,
+    Behavior, BreakKind, ChapterNumberSeparator, FootnotePosition, LineNumberRestart,
     LineNumbering, Margins, NoteNumberRestart, NoteSettings, PageGrid, PageGridMode, PageLayout,
-    PageNumbering, PageOrientation, PaperSettings, Protection, TextFlow, VerticalJustification,
-    VerticalMargin,
+    PageNumbering, PageOrientation, PaperSettings, Protection, Section, TextFlow,
+    VerticalJustification, VerticalMargin,
 };
 pub use shape::{Bounds, Kind as ShapeKind, Shape, UnknownRecord};
 pub use shape::{count_shapes, extract_drawing_shapes, extract_shape_text, extract_shapes};
@@ -265,7 +265,7 @@ pub use writer::{
 /// variants. Keeping it crate-local avoids a reverse dependency from
 /// `litchi-doc` back to the umbrella's `document` types.
 #[derive(Debug, Clone)]
-pub enum DocElement {
+pub enum Element {
     /// A paragraph element.
     Paragraph(Box<Paragraph>),
     /// A table element.
