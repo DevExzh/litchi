@@ -3,9 +3,10 @@
 use std::collections::HashSet;
 
 use prost::Message;
+use litchi_iwa_common::comment::Uuid;
 
 use crate::archive::{Archive, ArchiveObject, RawMessage};
-use crate::comments::{IWorkCommentUuid, fresh_comment_storage_uuid, insert_comment_storage};
+use crate::comments::{fresh_comment_storage_uuid, insert_comment_storage};
 use crate::protobuf::{tsd, tsp, tswp};
 use crate::wire::patch_length_delimited_field;
 use crate::{Error, IWorkPackage, Result};
@@ -19,7 +20,7 @@ pub(super) struct AnnotationReplyGraph {
     pub(super) body: String,
     pub(super) creation_date_seconds: Option<f64>,
     pub(super) author_id: Option<u64>,
-    pub(super) storage_uuid: IWorkCommentUuid,
+    pub(super) storage_uuid: Uuid,
 }
 
 #[derive(Debug, Clone)]
@@ -28,7 +29,7 @@ pub(super) struct AnnotationGraph {
     pub(super) body: String,
     pub(super) creation_date_seconds: Option<f64>,
     pub(super) author_id: Option<u64>,
-    pub(super) storage_uuid: IWorkCommentUuid,
+    pub(super) storage_uuid: Uuid,
     pub(super) replies: Vec<AnnotationReplyGraph>,
 }
 
@@ -48,7 +49,7 @@ struct CommentNode {
     body: String,
     creation_date_seconds: Option<f64>,
     author_id: Option<u64>,
-    storage_uuid: IWorkCommentUuid,
+    storage_uuid: Uuid,
     reply_ids: Vec<u64>,
 }
 
@@ -247,10 +248,7 @@ fn validate_comment_node(
         body,
         creation_date_seconds,
         author_id,
-        storage_uuid: IWorkCommentUuid {
-            lower: uuid.lower,
-            upper: uuid.upper,
-        },
+        storage_uuid: Uuid::from_parts(uuid.lower, uuid.upper)?,
         reply_ids,
     })
 }

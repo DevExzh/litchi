@@ -12,12 +12,10 @@ use litchi_pages::footnote::{
 use litchi_pages::page_layout::{Layout as PageLayout, Orientation as PageOrientation};
 use litchi_pages::section::{Background, Opaque, PageNumber, PageNumbering, Settings, Start};
 use prost::Message;
+use litchi_iwa_common::comment::{DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId};
 
 use crate::archive::{ArchiveObject, RawMessage};
-use crate::comments::{
-    CommentStorageId, DrawableCommentInfo, DrawableCommentReplyInfo, DrawableObjectId,
-    IWorkDrawableCommentEditor, IWorkDrawableInfo,
-};
+use crate::comments::IWorkDrawableCommentEditor;
 use crate::media::reachable_embedded_assets;
 use crate::package_metadata::{
     add_component_external_reference, add_component_object_uuids, component_identifier_for_entry,
@@ -160,14 +158,14 @@ impl PagesEditor {
     }
 
     /// List supported direct-comment drawables reachable from the Pages root.
-    pub fn drawables(&self) -> Result<Vec<IWorkDrawableInfo>> {
+    pub fn drawables(&self) -> Result<Vec<DrawableInfo>> {
         let reachable = self.reachable_drawable_ids()?;
         let mut drawables = IWorkDrawableCommentEditor::from_package(self.package().clone())?
             .drawables()?
             .into_iter()
-            .filter(|drawable| reachable.contains(&drawable.object_id.object_id()))
+            .filter(|drawable| reachable.contains(&drawable.id.get()))
             .collect::<Vec<_>>();
-        drawables.sort_by_key(|drawable| drawable.object_id.object_id());
+        drawables.sort_by_key(|drawable| drawable.id.get());
         Ok(drawables)
     }
 
@@ -184,21 +182,21 @@ impl PagesEditor {
                 continue;
             };
             if let Some(previous_drawable) =
-                storage_owners.insert(storage_id, drawable.object_id.object_id())
+                storage_owners.insert(storage_id, drawable.id.get())
             {
                 return Err(Error::InvalidFormat(format!(
                     "Pages drawables {previous_drawable} and {} share owned text storage {storage_id}",
-                    drawable.object_id
+                    drawable.id
                 )));
             }
             let storage = self.text.storage(storage_id).map_err(|error| {
                 Error::InvalidFormat(format!(
                     "Pages drawable {} owns invalid text storage {storage_id}: {error}",
-                    drawable.object_id
+                    drawable.id
                 ))
             })?;
             result.push(PagesDrawableTextInfo {
-                drawable_object_id: drawable.object_id.object_id(),
+                drawable_object_id: drawable.id.get(),
                 storage,
             });
         }
@@ -2245,7 +2243,7 @@ impl PagesEditor {
             })?;
 
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.clear_comment(DrawableObjectId::from_object_id(drawable_object_id)?)?;
+        comments.clear_comment(DrawableId::from_raw(drawable_object_id)?)?;
         let mut text_editor = IWorkTextEditor::from_package(comments.into_package());
         let anchor = graph.anchor_character_index as usize;
         text_editor.replace_text(self.body_storage_id, anchor..anchor + 1, "")?;
@@ -2277,7 +2275,7 @@ impl PagesEditor {
         if verified
             .drawables()?
             .iter()
-            .any(|drawable| drawable.object_id.object_id() == drawable_object_id)
+            .any(|drawable| drawable.id.get() == drawable_object_id)
         {
             return Err(Error::InvalidFormat(
                 "Pages text-box deletion failed validation".to_owned(),
@@ -2291,10 +2289,10 @@ impl PagesEditor {
     }
 
     /// Read a comment attached directly to a reachable Pages drawable.
-    pub fn drawable_comment(&self, drawable_object_id: u64) -> Result<Option<DrawableCommentInfo>> {
+    pub fn drawable_comment(&self, drawable_object_id: u64) -> Result<Option<DrawableComment>> {
         self.require_drawable(drawable_object_id)?;
         IWorkDrawableCommentEditor::from_package(self.package().clone())?
-            .comment(DrawableObjectId::from_object_id(drawable_object_id)?)
+            .comment(DrawableId::from_raw(drawable_object_id)?)
     }
 
     /// Create or replace a direct comment on a reachable Pages drawable.
@@ -2305,7 +2303,7 @@ impl PagesEditor {
     ) -> Result<()> {
         self.require_drawable(drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.set_comment(DrawableObjectId::from_object_id(drawable_object_id)?, text)?;
+        comments.set_comment(DrawableId::from_raw(drawable_object_id)?, text)?;
         *self = Self::from_package(comments.into_package())?;
         Ok(())
     }
@@ -2314,7 +2312,7 @@ impl PagesEditor {
     pub fn clear_drawable_comment(&mut self, drawable_object_id: u64) -> Result<()> {
         self.require_drawable(drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.clear_comment(DrawableObjectId::from_object_id(drawable_object_id)?)?;
+        comments.clear_comment(DrawableId::from_raw(drawable_object_id)?)?;
         *self = Self::from_package(comments.into_package())?;
         Ok(())
     }
@@ -2322,9 +2320,9 @@ impl PagesEditor {
     /// Read the direct replies in a reachable Pages drawable comment thread.
     pub fn drawable_comment_replies(
         &self,
-        drawable_object_id: DrawableObjectId,
-    ) -> Result<Vec<DrawableCommentReplyInfo>> {
-        self.require_drawable(drawable_object_id.object_id())?;
+        drawable_object_id: DrawableId,
+    ) -> Result<Vec<DrawableReply>> {
+        self.require_drawable(drawable_object_id.get())?;
         IWorkDrawableCommentEditor::from_package(self.package().clone())?
             .replies(drawable_object_id)
     }
@@ -2332,10 +2330,10 @@ impl PagesEditor {
     /// Add a reply to a reachable Pages drawable comment.
     pub fn add_drawable_comment_reply(
         &mut self,
-        drawable_object_id: DrawableObjectId,
+        drawable_object_id: DrawableId,
         text: impl Into<String>,
-    ) -> Result<CommentStorageId> {
-        self.require_drawable(drawable_object_id.object_id())?;
+    ) -> Result<StorageId> {
+        self.require_drawable(drawable_object_id.get())?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
         let reply_id = comments.add_reply(drawable_object_id, text)?;
         *self = Self::from_package(comments.into_package())?;
@@ -2345,11 +2343,11 @@ impl PagesEditor {
     /// Update a direct reply, returning its current storage identifier.
     pub fn set_drawable_comment_reply(
         &mut self,
-        drawable_object_id: DrawableObjectId,
-        reply_storage_object_id: CommentStorageId,
+        drawable_object_id: DrawableId,
+        reply_storage_object_id: StorageId,
         text: impl Into<String>,
-    ) -> Result<CommentStorageId> {
-        self.require_drawable(drawable_object_id.object_id())?;
+    ) -> Result<StorageId> {
+        self.require_drawable(drawable_object_id.get())?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
         let reply_id = comments.set_reply(drawable_object_id, reply_storage_object_id, text)?;
         *self = Self::from_package(comments.into_package())?;
@@ -2359,10 +2357,10 @@ impl PagesEditor {
     /// Remove a direct reply from a reachable Pages drawable comment.
     pub fn remove_drawable_comment_reply(
         &mut self,
-        drawable_object_id: DrawableObjectId,
-        reply_storage_object_id: CommentStorageId,
+        drawable_object_id: DrawableId,
+        reply_storage_object_id: StorageId,
     ) -> Result<()> {
-        self.require_drawable(drawable_object_id.object_id())?;
+        self.require_drawable(drawable_object_id.get())?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
         comments.remove_reply(drawable_object_id, reply_storage_object_id)?;
         *self = Self::from_package(comments.into_package())?;
@@ -2853,7 +2851,7 @@ impl PagesEditor {
         if !self
             .drawables()?
             .iter()
-            .any(|drawable| drawable.object_id.object_id() == drawable_object_id)
+            .any(|drawable| drawable.id.get() == drawable_object_id)
         {
             return Err(Error::ParseError(format!(
                 "drawable object {drawable_object_id} is not reachable from the Pages document"
@@ -3863,7 +3861,7 @@ fn patch_pages_zorder(
 
 fn drawable_owned_text_storage(
     package: &IWorkPackage,
-    drawable: &IWorkDrawableInfo,
+    drawable: &DrawableInfo,
 ) -> Result<Option<u64>> {
     if !matches!(
         drawable.message_type,
@@ -3875,13 +3873,13 @@ fn drawable_owned_text_storage(
     let mut owned_storage = None;
     for name in package.iwa_entry_names() {
         let archive = package.archive(name)?;
-        let Some(object) = archive.object(drawable.object_id.object_id()) else {
+        let Some(object) = archive.object(drawable.id.get()) else {
             continue;
         };
         if owned_storage.is_some() {
             return Err(Error::InvalidFormat(format!(
                 "drawable object {} occurs in more than one Pages component",
-                drawable.object_id
+                drawable.id
             )));
         }
         let payload = &object
@@ -3891,7 +3889,7 @@ fn drawable_owned_text_storage(
             .ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Pages drawable {} has no type-{} payload",
-                    drawable.object_id, drawable.message_type
+                    drawable.id, drawable.message_type
                 ))
             })?
             .data;
@@ -3911,7 +3909,7 @@ fn drawable_owned_text_storage(
         .ok_or_else(|| {
             Error::InvalidFormat(format!(
                 "Pages drawable object {} is missing",
-                drawable.object_id
+                drawable.id
             ))
         })
         .map(|storage| storage.map(|reference| reference.identifier))
@@ -4676,8 +4674,7 @@ pub use charts::{PagesBodyChartInfo, RemovedPagesBodyChart};
 pub use images::{PagesImageInfo, PagesImageOptions, RemovedPagesImage};
 pub use movies::{PagesMovieInfo, PagesMovieOptions, RemovedPagesMovie};
 pub use tables::{
-    PagesCellValue, PagesTable, PagesTableCellCheckboxFormat, PagesTableCellComment,
-    PagesTableCellCommentInfo, PagesTableCellCommentReplyInfo,
+    PagesCellValue, PagesTable, PagesTableCellCheckboxFormat,
     PagesTableCellConditionalHighlightInfo, PagesTableCellCurrencyFormat, PagesTableCellDataFormat,
     PagesTableCellDateTimeFormat, PagesTableCellDecimalPlaces, PagesTableCellDurationFormat,
     PagesTableCellDurationStyle, PagesTableCellDurationUnit, PagesTableCellDurationUnitRange,
@@ -4721,25 +4718,25 @@ mod strict_selector_tests {
 
     #[test]
     fn direct_comment_reply_api_uses_semantic_ids() {
-        let drawable = DrawableObjectId::from_object_id(7).unwrap();
-        let reply = CommentStorageId::from_object_id(9).unwrap();
+        let drawable = DrawableId::from_raw(7).unwrap();
+        let reply = StorageId::from_raw(9).unwrap();
 
-        assert_eq!(drawable.object_id(), 7);
-        assert_eq!(reply.object_id(), 9);
-        assert_eq!(DrawableObjectId::new(0), None);
-        assert_eq!(CommentStorageId::new(0), None);
+        assert_eq!(drawable.get(), 7);
+        assert_eq!(reply.get(), 9);
+        assert_eq!(DrawableId::new(0), None);
+        assert_eq!(StorageId::new(0), None);
 
-        let _: fn(&PagesEditor, DrawableObjectId) -> Result<Vec<DrawableCommentReplyInfo>> =
+        let _: fn(&PagesEditor, DrawableId) -> Result<Vec<DrawableReply>> =
             PagesEditor::drawable_comment_replies;
-        let _: fn(&mut PagesEditor, DrawableObjectId, String) -> Result<CommentStorageId> =
+        let _: fn(&mut PagesEditor, DrawableId, String) -> Result<StorageId> =
             PagesEditor::add_drawable_comment_reply;
         let _: fn(
             &mut PagesEditor,
-            DrawableObjectId,
-            CommentStorageId,
+            DrawableId,
+            StorageId,
             String,
-        ) -> Result<CommentStorageId> = PagesEditor::set_drawable_comment_reply;
-        let _: fn(&mut PagesEditor, DrawableObjectId, CommentStorageId) -> Result<()> =
+        ) -> Result<StorageId> = PagesEditor::set_drawable_comment_reply;
+        let _: fn(&mut PagesEditor, DrawableId, StorageId) -> Result<()> =
             PagesEditor::remove_drawable_comment_reply;
     }
 }

@@ -1,13 +1,7 @@
 //! Transactional comment-thread CRUD for Keynote slide-table cells.
 
 use super::*;
-
-/// A comment attached to a Keynote table cell.
-pub type KeynoteTableCellComment = crate::comments::IWorkComment;
-/// Address and storage identity of a Keynote table-cell comment.
-pub type KeynoteTableCellCommentInfo = crate::comments::IWorkTableCellCommentInfo;
-/// A resolved direct reply in a Keynote table-cell comment thread.
-pub type KeynoteTableCellCommentReplyInfo = crate::comments::IWorkTableCellCommentReplyInfo;
+use litchi_iwa_common::comment::{TableCellComment, TableCellReply};
 
 impl KeynoteEditor {
     /// Read the comment attached to a reachable slide-table cell.
@@ -17,7 +11,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<KeynoteTableCellCommentInfo>> {
+    ) -> Result<Option<TableCellComment>> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_comment_in_package(
             self.package(),
@@ -97,7 +91,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Vec<KeynoteTableCellCommentReplyInfo>> {
+    ) -> Result<Vec<TableCellReply>> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_comment_replies_in_package(
             self.package(),
@@ -198,7 +192,7 @@ impl KeynoteEditor {
         if verified
             .slide_table_cell_comment_replies(slide_index, model_object_id, row, column)?
             .iter()
-            .any(|reply| reply.storage_object_id == reply_storage_object_id)
+            .any(|reply| reply.storage_id.get() == reply_storage_object_id)
         {
             return Err(Error::InvalidFormat(
                 "Keynote table comment reply deletion failed validation".to_owned(),
@@ -222,7 +216,7 @@ fn require_reply(
     let valid = editor
         .slide_table_cell_comment_replies(slide_index, model_object_id, row, column)?
         .iter()
-        .any(|reply| reply.storage_object_id == reply_id && reply.comment.text == text);
+        .any(|reply| reply.storage_id.get() == reply_id && reply.comment.text == text);
     if valid {
         Ok(())
     } else {

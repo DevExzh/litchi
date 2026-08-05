@@ -84,7 +84,7 @@ fn sheet_owned_drawable_comment_crud_is_guarded_and_byte_exact() {
             .sheet_drawables(2)
             .unwrap()
             .into_iter()
-            .map(|drawable| drawable.object_id.object_id())
+            .map(|drawable| drawable.id.get())
             .collect::<Vec<_>>(),
         vec![50]
     );
@@ -107,7 +107,7 @@ fn sheet_owned_drawable_comment_crud_is_guarded_and_byte_exact() {
         .set_sheet_drawable_comment(2, 50, "Sheet annotation")
         .unwrap();
     let comment = editor.sheet_drawable_comment(2, 50).unwrap().unwrap();
-    assert_eq!(comment.drawable_object_id.object_id(), 50);
+    assert_eq!(comment.drawable_id.get(), 50);
     assert_eq!(comment.comment.text, "Sheet annotation");
     assert_eq!(
         editor.sheet_text_boxes(2).unwrap()[0].storage.text,
@@ -1439,8 +1439,8 @@ fn cell_comment_crud_preserves_value_and_comment_metadata() {
     let original = editor.cell_comment(10, 0, 1).unwrap().unwrap();
     assert_eq!(original.comment.text, "Original comment");
     assert_eq!(original.comment.creation_date_seconds, Some(123.5));
-    assert_eq!(original.comment.reply_object_ids, [70]);
-    assert_eq!(original.comment.storage_uuid.unwrap().lower, 61);
+    assert_eq!(original.comment.reply_ids.as_ref(), [StorageId::new(70).unwrap()]);
+    assert_eq!(original.comment.storage_uuid.unwrap().lower(), 61);
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let reader_comment = document.sheets().unwrap()[0].tables[0]
         .get_comment(0, 1)
@@ -1452,7 +1452,7 @@ fn cell_comment_crud_preserves_value_and_comment_metadata() {
         .set_cell_comment(10, 0, 1, "Updated comment")
         .unwrap();
     let updated = editor.cell_comment(10, 0, 1).unwrap().unwrap();
-    assert_eq!(updated.storage_object_id, original.storage_object_id);
+    assert_eq!(updated.storage_id, original.storage_id);
     assert_eq!(updated.comment.text, "Updated comment");
     assert_eq!(updated.comment.creation_date_seconds, Some(123.5));
     assert_eq!(updated.comment.storage_uuid, original.comment.storage_uuid);
@@ -1492,12 +1492,15 @@ fn cell_comment_reply_crud_is_copy_on_write_and_transactional() {
         .add_cell_comment_reply(10, 0, 1, "Second reply")
         .unwrap();
     let after_add = editor.cell_comment(10, 0, 1).unwrap().unwrap();
-    assert_ne!(after_add.storage_object_id, original_root.storage_object_id);
+    assert_ne!(after_add.storage_id, original_root.storage_id);
     assert_eq!(
         after_add.comment.storage_uuid,
         original_root.comment.storage_uuid
     );
-    assert_eq!(after_add.comment.reply_object_ids, [70, added_id]);
+    assert_eq!(
+        after_add.comment.reply_ids.as_ref(),
+        [StorageId::new(70).unwrap(), StorageId::new(added_id).unwrap()]
+    );
     let replies = editor.cell_comment_replies(10, 0, 1).unwrap();
     assert_eq!(replies[1].comment.text, "Second reply");
     assert!(replies[1].comment.creation_date_seconds.is_some());
@@ -1520,7 +1523,7 @@ fn cell_comment_reply_crud_is_copy_on_write_and_transactional() {
     assert_eq!(
         replies
             .iter()
-            .map(|reply| reply.storage_object_id)
+            .map(|reply| reply.storage_id.get())
             .collect::<Vec<_>>(),
         [70, updated_id]
     );
@@ -1539,7 +1542,7 @@ fn cell_comment_reply_crud_is_copy_on_write_and_transactional() {
         .unwrap();
     let replies = editor.cell_comment_replies(10, 0, 1).unwrap();
     assert_eq!(replies.len(), 1);
-    assert_eq!(replies[0].storage_object_id, 70);
+    assert_eq!(replies[0].storage_id.get(), 70);
     assert_eq!(
         editor.cell_comment(10, 0, 1).unwrap().unwrap().comment.text,
         "Original comment"
@@ -1567,15 +1570,16 @@ fn shared_segmented_comments_use_copy_on_write_and_cleanup() {
         .cell_comment(10, 0, 1)
         .unwrap()
         .unwrap()
-        .storage_object_id;
+        .storage_id
+        .get();
 
     editor
         .set_cell_comment(10, 0, 1, "Independent comment")
         .unwrap();
     let first = editor.cell_comment(10, 0, 1).unwrap().unwrap();
     let second = editor.cell_comment(10, 0, 2).unwrap().unwrap();
-    assert_ne!(first.storage_object_id, original_storage);
-    assert_eq!(second.storage_object_id, original_storage);
+    assert_ne!(first.storage_id.get(), original_storage);
+    assert_eq!(second.storage_id.get(), original_storage);
     assert_eq!(first.comment.text, "Independent comment");
     assert_eq!(second.comment.text, "Original comment");
 
@@ -1622,10 +1626,10 @@ fn comment_updates_and_copy_on_write_preserve_unknown_storage_fields() {
     let mut editor = NumbersEditor::from_package(package).unwrap();
     editor.set_cell_comment(10, 0, 1, "Wire-safe copy").unwrap();
     let cloned = editor.cell_comment(10, 0, 1).unwrap().unwrap();
-    assert_ne!(cloned.storage_object_id, 61);
+    assert_ne!(cloned.storage_id.get(), 61);
     let archive = editor.package().archive("Index/Document.iwa").unwrap();
     assert!(
-        archive.object(cloned.storage_object_id).unwrap().messages[0]
+        archive.object(cloned.storage_id.get()).unwrap().messages[0]
             .data
             .ends_with(&unknown)
     );
@@ -1644,7 +1648,7 @@ fn creates_comment_table_and_comment_only_cell_when_missing() {
         .unwrap();
     let info = editor.cell_comment(10, 1, 2).unwrap().unwrap();
     assert_eq!(info.comment.text, "Created comment");
-    assert_eq!(info.list_identifier, 2);
+    assert_eq!(info.list_id.get(), 2);
     assert!(info.comment.creation_date_seconds.is_some());
     assert!(info.comment.storage_uuid.is_some());
 
@@ -1669,7 +1673,7 @@ fn creates_comment_table_and_comment_only_cell_when_missing() {
             .package()
             .archive("Index/Document.iwa")
             .unwrap()
-            .object(info.storage_object_id)
+            .object(info.storage_id.get())
             .is_none()
     );
 }
@@ -1695,7 +1699,7 @@ fn empty_native_author_storage_supports_cell_comment_creation() {
         .unwrap();
     let comment = editor.cell_comment(10, 1, 2).unwrap().unwrap();
     assert_eq!(comment.comment.text, "Generated local author");
-    assert!(comment.comment.author_object_id.is_some());
+    assert!(comment.comment.author_id.is_some());
 
     let archive = editor.package().archive("Index/Document.iwa").unwrap();
     let model =
@@ -6073,7 +6077,8 @@ fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
         .cell_comment(table_id, 2, 1)
         .unwrap()
         .unwrap()
-        .storage_object_id;
+        .storage_id
+        .get();
     let order = NumbersTableSortOrder::selected_rows([NumbersTableSortRule::new(
         NumbersTableSortColumnIndex::new(1).unwrap(),
         NumbersTableSortDirection::Descending,
@@ -6137,11 +6142,12 @@ fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
             .cell_comment(table_id, 4, 1)
             .unwrap()
             .unwrap()
-            .storage_object_id,
+            .storage_id
+            .get(),
         comment_id
     );
     assert_eq!(
-        editor.cell_comment_replies(table_id, 4, 1).unwrap()[0].storage_object_id,
+        editor.cell_comment_replies(table_id, 4, 1).unwrap()[0].storage_id.get(),
         reply_id
     );
 
@@ -6445,7 +6451,7 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
         .unwrap();
     let original_comment = editor.cell_comment(table_id, 2, 1).unwrap().unwrap();
     let original_reply = editor.cell_comment_replies(table_id, 2, 1).unwrap()[0].clone();
-    assert_eq!(original_reply.storage_object_id, reply_id);
+    assert_eq!(original_reply.storage_id.get(), reply_id);
     let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
         NumbersTableSortColumnIndex::new(1).unwrap(),
         NumbersTableSortDirection::Ascending,
@@ -6491,19 +6497,19 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
     assert_eq!(moved_comment.row, 1);
     assert_eq!(moved_comment.column, original_comment.column);
     assert_eq!(
-        moved_comment.storage_object_id,
-        original_comment.storage_object_id
+        moved_comment.storage_id,
+        original_comment.storage_id
     );
     assert_eq!(moved_comment.comment, original_comment.comment);
     let moved_replies = editor.cell_comment_replies(table_id, 1, 1).unwrap();
     assert_eq!(moved_replies.len(), 1);
     assert_eq!(
-        moved_replies[0].root_storage_object_id,
-        original_reply.root_storage_object_id
+        moved_replies[0].root_storage_id,
+        original_reply.root_storage_id
     );
     assert_eq!(
-        moved_replies[0].storage_object_id,
-        original_reply.storage_object_id
+        moved_replies[0].storage_id,
+        original_reply.storage_id
     );
     assert_eq!(moved_replies[0].comment, original_reply.comment);
     let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -6514,11 +6520,11 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
             .cell_comment(table_id, 1, 1)
             .unwrap()
             .unwrap()
-            .storage_object_id,
-        original_comment.storage_object_id
+            .storage_id,
+        original_comment.storage_id
     );
     assert_eq!(
-        reopened.cell_comment_replies(table_id, 1, 1).unwrap()[0].storage_object_id,
+        reopened.cell_comment_replies(table_id, 1, 1).unwrap()[0].storage_id.get(),
         reply_id
     );
 }

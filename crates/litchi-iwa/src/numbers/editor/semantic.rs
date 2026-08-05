@@ -23,10 +23,11 @@ use prost::Message;
 use super::super::cell::{CellValue, TableCellUpdate};
 use super::super::formula::{FormulaCachedValue, FormulaExpression, FormulaPivotCategoryReference};
 use crate::archive::RawMessage;
-use crate::comments::{
-    DrawableCommentInfo, DrawableCommentReplyInfo, IWorkDrawableCommentEditor, IWorkDrawableInfo,
-    IWorkTableCellCommentInfo, IWorkTableCellCommentReplyInfo,
+use litchi_iwa_common::comment::{
+    Comment, DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId,
+    TableCellComment, TableCellReply,
 };
+use crate::comments::IWorkDrawableCommentEditor;
 use crate::media::reachable_embedded_assets;
 use crate::package_metadata::{
     component_identifier_for_entry, component_uuid_identifiers, release_package_identifier_suffix,

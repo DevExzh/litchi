@@ -6,7 +6,7 @@ use litchi_iwa_common::media::Type as MediaType;
 use litchi_iwa_common::shape::image::ImageAdjustments;
 
 use super::*;
-use crate::comments::DrawableObjectId;
+use litchi_iwa_common::comment::DrawableId;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
@@ -201,9 +201,9 @@ impl PagesEditor {
     /// Read geometry for one body-anchored image.
     pub fn body_image_geometry(
         &self,
-        drawable_object_id: DrawableObjectId,
+        drawable_object_id: DrawableId,
     ) -> Result<DrawableGeometry> {
-        Ok(body_image_graph(self, drawable_object_id.object_id())?
+        Ok(body_image_graph(self, drawable_object_id.get())?
             .info
             .geometry)
     }
@@ -215,9 +215,9 @@ impl PagesEditor {
     /// original-size metadata.
     pub fn restore_body_image_original_size(
         &mut self,
-        drawable_object_id: DrawableObjectId,
+        drawable_object_id: DrawableId,
     ) -> Result<DrawableGeometry> {
-        let raw_drawable_object_id = drawable_object_id.object_id();
+        let raw_drawable_object_id = drawable_object_id.get();
         let source = body_image_graph(self, raw_drawable_object_id)?;
         let original_size = source.info.original_size.ok_or_else(|| {
             Error::InvalidFormat(format!(
@@ -248,10 +248,10 @@ impl PagesEditor {
     /// Pages Flip Horizontally or Flip Vertically command.
     pub fn flip_body_image(
         &mut self,
-        drawable_object_id: DrawableObjectId,
+        drawable_object_id: DrawableId,
         axis: DrawableFlipAxis,
     ) -> Result<DrawableGeometry> {
-        let raw_drawable_object_id = drawable_object_id.object_id();
+        let raw_drawable_object_id = drawable_object_id.get();
         let source = body_image_graph(self, raw_drawable_object_id)?;
         let geometry = flip_drawable_geometry(source.info.geometry, axis)?;
         let mut staged = self.package().clone();
@@ -274,10 +274,10 @@ impl PagesEditor {
     /// Update body-image geometry while preserving unknown image fields.
     pub fn set_body_image_geometry(
         &mut self,
-        drawable_object_id: DrawableObjectId,
+        drawable_object_id: DrawableId,
         geometry: DrawableGeometry,
     ) -> Result<()> {
-        let raw_drawable_object_id = drawable_object_id.object_id();
+        let raw_drawable_object_id = drawable_object_id.get();
         let source = body_image_graph(self, raw_drawable_object_id)?;
         let mut staged = self.package().clone();
         set_image_geometry(
@@ -299,9 +299,9 @@ impl PagesEditor {
     /// Read shared drawable properties for one body-anchored image.
     pub fn body_image_properties(
         &self,
-        drawable_object_id: DrawableObjectId,
+        drawable_object_id: DrawableId,
     ) -> Result<DrawableProperties> {
-        Ok(body_image_graph(self, drawable_object_id.object_id())?
+        Ok(body_image_graph(self, drawable_object_id.get())?
             .info
             .properties)
     }
@@ -312,10 +312,10 @@ impl PagesEditor {
     /// clearing a property with `None` and encoding explicit boolean defaults.
     pub fn set_body_image_properties(
         &mut self,
-        drawable_object_id: DrawableObjectId,
+        drawable_object_id: DrawableId,
         properties: DrawableProperties,
     ) -> Result<()> {
-        let raw_drawable_object_id = drawable_object_id.object_id();
+        let raw_drawable_object_id = drawable_object_id.get();
         let source = body_image_graph(self, raw_drawable_object_id)?;
         let mut staged = self.package().clone();
         set_image_properties(
@@ -337,15 +337,15 @@ impl PagesEditor {
     /// Read the native title and caption attached to one body image.
     pub fn body_image_title_caption(
         &self,
-        drawable_object_id: DrawableObjectId,
+        drawable_object_id: DrawableId,
     ) -> Result<crate::DrawableTitleCaption> {
-        image_title_caption(self, drawable_object_id.object_id())
+        image_title_caption(self, drawable_object_id.get())
     }
 
     /// Create or replace one body image's native title.
     pub fn set_body_image_title(
         &mut self,
-        drawable_object_id: DrawableObjectId,
+        drawable_object_id: DrawableId,
         title: &str,
     ) -> Result<()> {
         set_body_image_caption(self, drawable_object_id, title, DrawableCaptionKind::Title)
@@ -357,7 +357,7 @@ impl PagesEditor {
     /// prior title graph for undo history and attaches a fresh empty stand-in.
     pub fn remove_body_image_title(
         &mut self,
-        drawable_object_id: DrawableObjectId,
+        drawable_object_id: DrawableId,
     ) -> Result<bool> {
         remove_body_image_caption(self, drawable_object_id, DrawableCaptionKind::Title)
     }
@@ -365,7 +365,7 @@ impl PagesEditor {
     /// Create or replace one body image's native caption.
     pub fn set_body_image_caption(
         &mut self,
-        drawable_object_id: DrawableObjectId,
+        drawable_object_id: DrawableId,
         caption: &str,
     ) -> Result<()> {
         set_body_image_caption(
@@ -383,7 +383,7 @@ impl PagesEditor {
     /// stand-in.
     pub fn remove_body_image_caption(
         &mut self,
-        drawable_object_id: DrawableObjectId,
+        drawable_object_id: DrawableId,
     ) -> Result<bool> {
         remove_body_image_caption(self, drawable_object_id, DrawableCaptionKind::Caption)
     }
@@ -391,9 +391,9 @@ impl PagesEditor {
     /// Read the basic controls in iWork's Image inspector for one body image.
     pub fn body_image_adjustments(
         &self,
-        drawable_object_id: DrawableObjectId,
+        drawable_object_id: DrawableId,
     ) -> Result<ImageAdjustments> {
-        Ok(body_image_graph(self, drawable_object_id.object_id())?
+        Ok(body_image_graph(self, drawable_object_id.get())?
             .info
             .image_adjustments)
     }
@@ -402,10 +402,10 @@ impl PagesEditor {
     /// and unknown native adjustment fields.
     pub fn set_body_image_adjustments(
         &mut self,
-        drawable_object_id: DrawableObjectId,
+        drawable_object_id: DrawableId,
         adjustments: ImageAdjustments,
     ) -> Result<()> {
-        let raw_drawable_object_id = drawable_object_id.object_id();
+        let raw_drawable_object_id = drawable_object_id.get();
         let source = body_image_graph(self, raw_drawable_object_id)?;
         let mut staged = self.package().clone();
         let expected = replace_image_adjustments(
@@ -434,10 +434,10 @@ impl PagesEditor {
     /// replacing either image's data updates both images.
     pub fn duplicate_body_image(
         &mut self,
-        source_drawable_object_id: DrawableObjectId,
+        source_drawable_object_id: DrawableId,
         anchor_character_index: usize,
     ) -> Result<PagesImageInfo> {
-        let raw_source_drawable_object_id = source_drawable_object_id.object_id();
+        let raw_source_drawable_object_id = source_drawable_object_id.get();
         let source = body_image_graph(self, raw_source_drawable_object_id)?;
         let mut staged = self.package().clone();
         let first_identifier = next_object_identifier(&staged)?;
@@ -569,19 +569,19 @@ impl PagesEditor {
     /// observe this replacement together, matching Pages' native behavior.
     pub fn replace_body_image_data(
         &mut self,
-        drawable_object_id: DrawableObjectId,
+        drawable_object_id: DrawableId,
         replacement: &[u8],
     ) -> Result<Vec<u8>> {
-        let source = body_image_graph(self, drawable_object_id.object_id())?;
+        let source = body_image_graph(self, drawable_object_id.get())?;
         self.replace_media(source.info.image_data_identifier, replacement)
     }
 
     /// Remove a body-anchored image, its private graph, and unshared assets.
     pub fn remove_body_image(
         &mut self,
-        drawable_object_id: DrawableObjectId,
+        drawable_object_id: DrawableId,
     ) -> Result<RemovedPagesImage> {
-        let raw_drawable_object_id = drawable_object_id.object_id();
+        let raw_drawable_object_id = drawable_object_id.get();
         let source = body_image_graph(self, raw_drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
         comments.clear_comment(drawable_object_id)?;
@@ -663,11 +663,11 @@ impl PagesEditor {
 
 fn set_body_image_caption(
     editor: &mut PagesEditor,
-    drawable_object_id: DrawableObjectId,
+    drawable_object_id: DrawableId,
     text: &str,
     kind: DrawableCaptionKind,
 ) -> Result<()> {
-    let raw_drawable_object_id = drawable_object_id.object_id();
+    let raw_drawable_object_id = drawable_object_id.get();
     let source = body_image_graph(editor, raw_drawable_object_id)?;
     let slot = image_caption_slot(editor, raw_drawable_object_id, kind)?;
     let before = image_title_caption(editor, raw_drawable_object_id)?;
@@ -725,10 +725,10 @@ fn set_body_image_caption(
 
 fn remove_body_image_caption(
     editor: &mut PagesEditor,
-    drawable_object_id: DrawableObjectId,
+    drawable_object_id: DrawableId,
     kind: DrawableCaptionKind,
 ) -> Result<bool> {
-    let raw_drawable_object_id = drawable_object_id.object_id();
+    let raw_drawable_object_id = drawable_object_id.get();
     let source = body_image_graph(editor, raw_drawable_object_id)?;
     let slot = image_caption_slot(editor, raw_drawable_object_id, kind)?;
     if slot.storage_id.is_none() {
@@ -791,50 +791,50 @@ mod tests {
         PagesImageOptions::new(IMAGE_POSITION, IMAGE_SIZE).with_natural_size(NATURAL_IMAGE_SIZE)
     }
 
-    fn selector(image: &PagesImageInfo) -> DrawableObjectId {
-        DrawableObjectId::from_object_id(image.drawable_object_id).unwrap()
+    fn selector(image: &PagesImageInfo) -> DrawableId {
+        DrawableId::from_raw(image.drawable_object_id).unwrap()
     }
 
-    fn missing_selector() -> DrawableObjectId {
-        DrawableObjectId::from_object_id(999).unwrap()
+    fn missing_selector() -> DrawableId {
+        DrawableId::from_raw(999).unwrap()
     }
 
     #[test]
     fn image_selectors_use_drawable_object_id() {
-        let _: fn(&PagesEditor, DrawableObjectId) -> Result<DrawableGeometry> =
+        let _: fn(&PagesEditor, DrawableId) -> Result<DrawableGeometry> =
             PagesEditor::body_image_geometry;
-        let _: fn(&mut PagesEditor, DrawableObjectId) -> Result<DrawableGeometry> =
+        let _: fn(&mut PagesEditor, DrawableId) -> Result<DrawableGeometry> =
             PagesEditor::restore_body_image_original_size;
         let _: fn(
             &mut PagesEditor,
-            DrawableObjectId,
+            DrawableId,
             DrawableFlipAxis,
         ) -> Result<DrawableGeometry> = PagesEditor::flip_body_image;
-        let _: fn(&mut PagesEditor, DrawableObjectId, DrawableGeometry) -> Result<()> =
+        let _: fn(&mut PagesEditor, DrawableId, DrawableGeometry) -> Result<()> =
             PagesEditor::set_body_image_geometry;
-        let _: fn(&PagesEditor, DrawableObjectId) -> Result<DrawableProperties> =
+        let _: fn(&PagesEditor, DrawableId) -> Result<DrawableProperties> =
             PagesEditor::body_image_properties;
-        let _: fn(&mut PagesEditor, DrawableObjectId, DrawableProperties) -> Result<()> =
+        let _: fn(&mut PagesEditor, DrawableId, DrawableProperties) -> Result<()> =
             PagesEditor::set_body_image_properties;
-        let _: fn(&PagesEditor, DrawableObjectId) -> Result<crate::DrawableTitleCaption> =
+        let _: fn(&PagesEditor, DrawableId) -> Result<crate::DrawableTitleCaption> =
             PagesEditor::body_image_title_caption;
-        let _: fn(&mut PagesEditor, DrawableObjectId, &str) -> Result<()> =
+        let _: fn(&mut PagesEditor, DrawableId, &str) -> Result<()> =
             PagesEditor::set_body_image_title;
-        let _: fn(&mut PagesEditor, DrawableObjectId) -> Result<bool> =
+        let _: fn(&mut PagesEditor, DrawableId) -> Result<bool> =
             PagesEditor::remove_body_image_title;
-        let _: fn(&mut PagesEditor, DrawableObjectId, &str) -> Result<()> =
+        let _: fn(&mut PagesEditor, DrawableId, &str) -> Result<()> =
             PagesEditor::set_body_image_caption;
-        let _: fn(&mut PagesEditor, DrawableObjectId) -> Result<bool> =
+        let _: fn(&mut PagesEditor, DrawableId) -> Result<bool> =
             PagesEditor::remove_body_image_caption;
-        let _: fn(&PagesEditor, DrawableObjectId) -> Result<ImageAdjustments> =
+        let _: fn(&PagesEditor, DrawableId) -> Result<ImageAdjustments> =
             PagesEditor::body_image_adjustments;
-        let _: fn(&mut PagesEditor, DrawableObjectId, ImageAdjustments) -> Result<()> =
+        let _: fn(&mut PagesEditor, DrawableId, ImageAdjustments) -> Result<()> =
             PagesEditor::set_body_image_adjustments;
-        let _: fn(&mut PagesEditor, DrawableObjectId, usize) -> Result<PagesImageInfo> =
+        let _: fn(&mut PagesEditor, DrawableId, usize) -> Result<PagesImageInfo> =
             PagesEditor::duplicate_body_image;
-        let _: fn(&mut PagesEditor, DrawableObjectId, &[u8]) -> Result<Vec<u8>> =
+        let _: fn(&mut PagesEditor, DrawableId, &[u8]) -> Result<Vec<u8>> =
             PagesEditor::replace_body_image_data;
-        let _: fn(&mut PagesEditor, DrawableObjectId) -> Result<RemovedPagesImage> =
+        let _: fn(&mut PagesEditor, DrawableId) -> Result<RemovedPagesImage> =
             PagesEditor::remove_body_image;
     }
 

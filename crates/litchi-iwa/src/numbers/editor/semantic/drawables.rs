@@ -6,14 +6,14 @@ use super::*;
 
 impl NumbersEditor {
     /// List supported direct-comment drawables owned by one reachable sheet.
-    pub fn sheet_drawables(&self, sheet_id: u64) -> Result<Vec<IWorkDrawableInfo>> {
+    pub fn sheet_drawables(&self, sheet_id: u64) -> Result<Vec<DrawableInfo>> {
         let owned = self.sheet_owned_drawable_ids(sheet_id)?;
         let mut drawables = IWorkDrawableCommentEditor::from_package(self.package.clone())?
             .drawables()?
             .into_iter()
-            .filter(|drawable| owned.contains(&drawable.object_id.object_id()))
+            .filter(|drawable| owned.contains(&drawable.id.get()))
             .collect::<Vec<_>>();
-        drawables.sort_by_key(|drawable| drawable.object_id.object_id());
+        drawables.sort_by_key(|drawable| drawable.id.get());
         Ok(drawables)
     }
 
@@ -22,10 +22,10 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<Option<DrawableCommentInfo>> {
+    ) -> Result<Option<DrawableComment>> {
         self.require_sheet_drawable(sheet_id, drawable_object_id)?;
         IWorkDrawableCommentEditor::from_package(self.package.clone())?.comment(
-            crate::comments::DrawableObjectId::from_object_id(drawable_object_id)?,
+            DrawableId::from_raw(drawable_object_id)?,
         )
     }
 
@@ -39,7 +39,7 @@ impl NumbersEditor {
         self.require_sheet_drawable(sheet_id, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
         comments.set_comment(
-            crate::comments::DrawableObjectId::from_object_id(drawable_object_id)?,
+            DrawableId::from_raw(drawable_object_id)?,
             text,
         )?;
         *self = Self::from_package(comments.into_package())?;
@@ -54,9 +54,7 @@ impl NumbersEditor {
     ) -> Result<()> {
         self.require_sheet_drawable(sheet_id, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
-        comments.clear_comment(crate::comments::DrawableObjectId::from_object_id(
-            drawable_object_id,
-        )?)?;
+        comments.clear_comment(DrawableId::from_raw(drawable_object_id)?)?;
         *self = Self::from_package(comments.into_package())?;
         Ok(())
     }
@@ -66,10 +64,10 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<Vec<DrawableCommentReplyInfo>> {
+    ) -> Result<Vec<DrawableReply>> {
         self.require_sheet_drawable(sheet_id, drawable_object_id)?;
         IWorkDrawableCommentEditor::from_package(self.package.clone())?.replies(
-            crate::comments::DrawableObjectId::from_object_id(drawable_object_id)?,
+            DrawableId::from_raw(drawable_object_id)?,
         )
     }
 
@@ -83,11 +81,11 @@ impl NumbersEditor {
         self.require_sheet_drawable(sheet_id, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
         let reply_id = comments.add_reply(
-            crate::comments::DrawableObjectId::from_object_id(drawable_object_id)?,
+            DrawableId::from_raw(drawable_object_id)?,
             text,
         )?;
         *self = Self::from_package(comments.into_package())?;
-        Ok(reply_id.object_id())
+        Ok(reply_id.get())
     }
 
     /// Update a direct reply, returning its current storage identifier.
@@ -101,12 +99,12 @@ impl NumbersEditor {
         self.require_sheet_drawable(sheet_id, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
         let reply_id = comments.set_reply(
-            crate::comments::DrawableObjectId::from_object_id(drawable_object_id)?,
-            crate::comments::CommentStorageId::from_object_id(reply_storage_object_id)?,
+            DrawableId::from_raw(drawable_object_id)?,
+            StorageId::from_raw(reply_storage_object_id)?,
             text,
         )?;
         *self = Self::from_package(comments.into_package())?;
-        Ok(reply_id.object_id())
+        Ok(reply_id.get())
     }
 
     /// Remove a direct reply from a comment on one sheet drawable.
@@ -119,8 +117,8 @@ impl NumbersEditor {
         self.require_sheet_drawable(sheet_id, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
         comments.remove_reply(
-            crate::comments::DrawableObjectId::from_object_id(drawable_object_id)?,
-            crate::comments::CommentStorageId::from_object_id(reply_storage_object_id)?,
+            DrawableId::from_raw(drawable_object_id)?,
+            StorageId::from_raw(reply_storage_object_id)?,
         )?;
         *self = Self::from_package(comments.into_package())?;
         Ok(())

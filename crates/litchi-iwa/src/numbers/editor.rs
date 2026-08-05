@@ -21,14 +21,16 @@ use super::formula::{
     ExternalFormulaTable, ExternalPivotCategory, FormulaCachedValue, FormulaExpression,
     FormulaPivotCategoryReference, FormulaUuid, PivotFormulaKey, compile_formula,
 };
-use super::table::{NumbersCellComment, NumbersCommentUuid};
+use litchi_iwa_common::comment::{
+    AuthorId, Comment, DrawableComment, DrawableId, DrawableInfo, DrawableReply, ListId,
+    StorageId, TableCellComment, TableCellReply, Uuid,
+};
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::comments::{
-    DrawableCommentInfo, DrawableCommentReplyInfo, IWorkDrawableCommentEditor, IWorkDrawableInfo,
-    IWorkTableCellCommentInfo, IWorkTableCellCommentReplyInfo, advance_save_tokens_for_entries,
-    clone_comment_storage_exact, current_apple_reference_date, fresh_comment_storage_uuid,
-    insert_comment_storage, preferred_or_ensure_table_annotation_author,
-    remove_generated_annotation_author_if_unused, update_comment_reply_reference,
+    IWorkDrawableCommentEditor, advance_save_tokens_for_entries, clone_comment_storage_exact,
+    current_apple_reference_date, fresh_comment_storage_uuid, insert_comment_storage,
+    preferred_or_ensure_table_annotation_author, remove_generated_annotation_author_if_unused,
+    update_comment_reply_reference,
 };
 use crate::package_metadata::{
     add_component_external_reference, add_component_object_uuids, component_identifier_for_entry,

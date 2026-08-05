@@ -8,6 +8,7 @@
 
 pub mod chart;
 pub mod color;
+pub mod comment;
 pub mod media;
 pub mod shape;
 pub mod table;

@@ -1,9 +1,9 @@
 use std::fs;
 
-use litchi_iwa::comments::DrawableObjectId;
 use litchi_iwa::pages::{PagesEditor, PagesImageOptions};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa_common::shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
+use litchi_iwa_common::comment::DrawableId;
 
 const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 96.0, y: 144.0 };
 const IMAGE_SIZE: DrawableSize = DrawableSize {
@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &image,
         PagesImageOptions::new(IMAGE_POSITION, IMAGE_SIZE),
     )?;
-    let drawable_object_id = DrawableObjectId::from_object_id(created.drawable_object_id)?;
+    let drawable_object_id = DrawableId::from_raw(created.drawable_object_id)?;
     let mut properties = editor.body_image_properties(drawable_object_id)?;
     properties.accessibility_description = Some(format!("Embedded image: {filename}"));
     editor.set_body_image_properties(drawable_object_id, properties)?;

@@ -1,9 +1,9 @@
 //! Native back-to-front ordering for Pages document drawables.
 
 use prost::Message;
+use litchi_iwa_common::comment::DrawableId;
 
 use super::*;
-use crate::comments::DrawableObjectId;
 use crate::drawable_order::{
     DrawableLayerMove, move_drawable_layer, reorder_reference_field, validate_unique_drawables,
 };
@@ -13,7 +13,7 @@ const DRAWABLES_Z_ORDER_REFERENCES_FIELD: u32 = 1;
 
 impl PagesEditor {
     /// List document drawable identifiers from the back-most to the front-most layer.
-    pub fn body_drawable_order(&self) -> Result<Vec<DrawableObjectId>> {
+    pub fn body_drawable_order(&self) -> Result<Vec<DrawableId>> {
         pages_drawable_order(self.package())
     }
 
@@ -23,7 +23,7 @@ impl PagesEditor {
     /// Reference payloads and unrelated native wire fields are retained verbatim.
     pub fn set_body_drawable_order(
         &mut self,
-        ordered_drawable_ids: &[DrawableObjectId],
+        ordered_drawable_ids: &[DrawableId],
     ) -> Result<()> {
         let current = self.body_drawable_order()?;
         if current == ordered_drawable_ids {
@@ -47,7 +47,7 @@ impl PagesEditor {
     /// boundary; otherwise the changed order is committed transactionally.
     pub fn move_body_drawable(
         &mut self,
-        drawable_object_id: DrawableObjectId,
+        drawable_object_id: DrawableId,
         movement: DrawableLayerMove,
     ) -> Result<bool> {
         let current = self.body_drawable_order()?;
@@ -59,7 +59,7 @@ impl PagesEditor {
     }
 }
 
-fn pages_drawable_order(package: &IWorkPackage) -> Result<Vec<DrawableObjectId>> {
+fn pages_drawable_order(package: &IWorkPackage) -> Result<Vec<DrawableId>> {
     let document = root_document(package)?;
     let z_order_id = document.drawables_zorder.ok_or_else(|| {
         Error::InvalidFormat("Pages document has no drawable z-order object".to_owned())
@@ -87,16 +87,15 @@ fn pages_drawable_order(package: &IWorkPackage) -> Result<Vec<DrawableObjectId>>
     let ordered = z_order
         .drawables
         .iter()
-        .map(|reference| DrawableObjectId::from_object_id(reference.identifier))
-        .collect::<Vec<_>>();
-    let ordered = ordered.into_iter().collect::<Result<Vec<_>>>()?;
+        .map(|reference| DrawableId::from_raw(reference.identifier).map_err(crate::Error::from))
+        .collect::<Result<Vec<_>>>()?;
     validate_unique_drawables(&ordered, "Pages drawable order")?;
     Ok(ordered)
 }
 
 fn replace_pages_drawable_order(
     package: &mut IWorkPackage,
-    ordered_drawable_ids: &[DrawableObjectId],
+    ordered_drawable_ids: &[DrawableId],
 ) -> Result<()> {
     let document = root_document(package)?;
     let z_order_id = document.drawables_zorder.ok_or_else(|| {
@@ -129,15 +128,15 @@ fn replace_pages_drawable_order(
         let current = previous
             .drawables
             .iter()
-            .map(|reference| DrawableObjectId::from_object_id(reference.identifier))
+            .map(|reference| DrawableId::from_raw(reference.identifier).map_err(crate::Error::from))
             .collect::<Result<Vec<_>>>()?;
         let current_raw = current
             .iter()
-            .map(|identifier| identifier.object_id())
+            .map(|identifier| identifier.get())
             .collect::<Vec<_>>();
         let requested_raw = ordered_drawable_ids
             .iter()
-            .map(|identifier| identifier.object_id())
+            .map(|identifier| identifier.get())
             .collect::<Vec<_>>();
         let data = reorder_reference_field(
             original,
@@ -149,7 +148,7 @@ fn replace_pages_drawable_order(
         let verified = verified
             .drawables
             .iter()
-            .map(|reference| DrawableObjectId::from_object_id(reference.identifier))
+            .map(|reference| DrawableId::from_raw(reference.identifier).map_err(crate::Error::from))
             .collect::<Result<Vec<_>>>()?;
         if verified != ordered_drawable_ids {
             return Err(Error::InvalidFormat(
@@ -224,9 +223,9 @@ mod tests {
         );
     }
 
-    fn append_rectangle(editor: &mut PagesEditor, text: &str) -> DrawableObjectId {
+    fn append_rectangle(editor: &mut PagesEditor, text: &str) -> DrawableId {
         let anchor = editor.body_text().unwrap().encode_utf16().count();
-        DrawableObjectId::from_object_id(
+        DrawableId::from_raw(
             editor
                 .add_body_rectangle(anchor, text, OVERLAP_POSITION, OVERLAP_SIZE)
                 .unwrap()

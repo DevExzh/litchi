@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for reply in editor.replies(drawable_id)? {
         println!(
             "reply={} author={:?} text={:?}",
-            reply.storage_object_id, reply.comment.author_object_id, reply.comment.text
+            reply.storage_id, reply.comment.author_id, reply.comment.text
         );
     }
     Ok(())

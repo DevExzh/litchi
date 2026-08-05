@@ -1,6 +1,6 @@
 //! Strict public types for native ranged iWork text comments.
 
-use crate::comments::IWorkCommentUuid;
+use litchi_iwa_common::comment::Uuid;
 use crate::{Error, Result};
 
 use super::position::TextRange;
@@ -133,7 +133,7 @@ pub struct TextComment {
     /// Annotation-author object identifier, when stored.
     pub author_object_id: Option<u64>,
     /// Stable UUID of the owned root comment storage.
-    pub storage_uuid: IWorkCommentUuid,
+    pub storage_uuid: Uuid,
     /// Number of direct replies preserved by updates and reclaimed by deletion.
     pub reply_count: usize,
 }
@@ -152,7 +152,7 @@ pub struct TextCommentReply {
     /// Annotation-author object identifier, when stored.
     pub author_object_id: Option<u64>,
     /// Stable UUID of the reply comment storage.
-    pub storage_uuid: IWorkCommentUuid,
+    pub storage_uuid: Uuid,
 }
 
 #[cfg(test)]

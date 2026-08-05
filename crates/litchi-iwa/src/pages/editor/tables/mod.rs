@@ -17,9 +17,6 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
-pub use comments::{
-    PagesTableCellComment, PagesTableCellCommentInfo, PagesTableCellCommentReplyInfo,
-};
 pub use conditional_highlight::PagesTableCellConditionalHighlightInfo;
 pub use formula::{
     PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,

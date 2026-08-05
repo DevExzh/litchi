@@ -2458,7 +2458,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<NumbersCellCommentInfo>> {
+    ) -> Result<Option<TableCellComment>> {
         cell_comment_in_package(&self.package, table_id, row, column)
     }
 
@@ -2572,7 +2572,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Vec<NumbersCellCommentReplyInfo>> {
+    ) -> Result<Vec<TableCellReply>> {
         cell_comment_replies_in_package(&self.package, table_id, row, column)
     }
 

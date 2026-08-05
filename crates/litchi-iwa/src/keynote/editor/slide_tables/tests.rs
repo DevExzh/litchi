@@ -1189,7 +1189,7 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
         .slide_table_cell_comment(0, model_id, 1, 1)
         .unwrap()
         .unwrap()
-        .storage_object_id;
+            .storage_id;
     let hidden = HiddenAxes::new([AxisIndex::row(2)]).unwrap();
     editor
         .set_slide_table_hidden_axes(0, model_id, &hidden)
@@ -1246,15 +1246,15 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
             .slide_table_cell_comment(0, model_id, 4, 1)
             .unwrap()
             .unwrap()
-            .storage_object_id,
+            .storage_id,
         comment_id
     );
     assert_eq!(
         editor
             .slide_table_cell_comment_replies(0, model_id, 4, 1)
             .unwrap()[0]
-            .storage_object_id,
-        reply_id
+            .storage_id,
+        StorageId::new(reply_id).unwrap()
     );
     assert_eq!(editor.slide_table_hidden_axes(0, model_id).unwrap(), hidden);
 
@@ -1268,15 +1268,15 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
             .slide_table_cell_comment(0, model_id, 4, 1)
             .unwrap()
             .unwrap()
-            .storage_object_id,
+            .storage_id,
         comment_id
     );
     assert_eq!(
         reopened
             .slide_table_cell_comment_replies(0, model_id, 4, 1)
             .unwrap()[0]
-            .storage_object_id,
-        reply_id
+            .storage_id,
+        StorageId::new(reply_id).unwrap()
     );
     assert_eq!(
         reopened.slide_table_hidden_axes(0, model_id).unwrap(),
@@ -1353,15 +1353,15 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
             .slide_table_cell_comment(0, model_id, 2, 1)
             .unwrap()
             .unwrap()
-            .storage_object_id,
+            .storage_id,
         comment_id
     );
     assert_eq!(
         reopened
             .slide_table_cell_comment_replies(0, model_id, 2, 1)
             .unwrap()[0]
-            .storage_object_id,
-        reply_id
+            .storage_id,
+        StorageId::new(reply_id).unwrap()
     );
     assert_eq!(
         reopened.slide_table_hidden_axes(0, model_id).unwrap(),

@@ -573,7 +573,7 @@ impl NumbersEditor {
     ) -> Result<RemovedNumbersSheetMovie> {
         let source = movie_graph(self, sheet_id, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
-        comments.clear_comment(crate::comments::DrawableObjectId::from_object_id(
+        comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
             drawable_object_id,
         )?)?;
         let mut staged = comments.into_package();

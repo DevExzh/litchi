@@ -1,7 +1,7 @@
 use super::{
     TextNumberAttachmentKind, TextNumberAttachmentSettings, TextNumberAttachmentText, TextPosition,
 };
-use crate::comments::DrawableObjectId;
+use litchi_iwa_common::comment::DrawableId;
 use crate::pages::PagesEditor;
 use crate::shapes::{DrawablePoint, DrawableSize};
 
@@ -130,7 +130,7 @@ fn scratch_pages_text_box_number_attachments_round_trip() {
         )
         .unwrap();
     let pages_box = pages.add_text_box(5, PREFIX, POSITION, SIZE).unwrap();
-    let pages_box_id = DrawableObjectId::from_object_id(pages_box.drawable_object_id).unwrap();
+    let pages_box_id = DrawableId::from_raw(pages_box.drawable_object_id).unwrap();
     let pages_attachment = pages
         .insert_text_box_number_attachment(
             pages_box_id,

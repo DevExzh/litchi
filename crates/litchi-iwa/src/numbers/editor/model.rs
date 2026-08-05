@@ -3926,7 +3926,7 @@ pub(super) fn comment_entry_location(
 pub(super) fn read_comment_storage(
     package: &IWorkPackage,
     entry: &CommentEntryLocation,
-) -> Result<NumbersCellComment> {
+) -> Result<Comment> {
     read_comment_storage_object(package, &entry.storage_archive, entry.storage_id)
 }
 
@@ -3934,7 +3934,7 @@ pub(super) fn read_comment_storage_object(
     package: &IWorkPackage,
     archive_name: &str,
     storage_id: u64,
-) -> Result<NumbersCellComment> {
+) -> Result<Comment> {
     let archive = package.archive(archive_name)?;
     let object = archive.object(storage_id).ok_or_else(|| {
         Error::InvalidFormat(format!(
@@ -3952,19 +3952,23 @@ pub(super) fn read_comment_storage_object(
         )));
     }
     let comment = tsd::CommentStorageArchive::decode(messages[0].data.as_slice())?;
-    Ok(NumbersCellComment {
+    Ok(Comment {
         text: comment.text.unwrap_or_default(),
         creation_date_seconds: comment.creation_date.map(|date| date.seconds),
-        author_object_id: comment.author.map(|author| author.identifier),
-        reply_object_ids: comment
+        author_id: comment
+            .author
+            .map(|author| AuthorId::from_raw(author.identifier))
+            .transpose()?,
+        reply_ids: comment
             .replies
             .into_iter()
-            .map(|reply| reply.identifier)
-            .collect(),
-        storage_uuid: comment.storage_uuid.map(|uuid| NumbersCommentUuid {
-            lower: uuid.lower,
-            upper: uuid.upper,
-        }),
+            .map(|reply| StorageId::from_raw(reply.identifier).map_err(crate::Error::from))
+            .collect::<Result<Vec<_>>>()?
+            .into_boxed_slice(),
+        storage_uuid: comment
+            .storage_uuid
+            .map(|uuid| Uuid::from_parts(uuid.lower, uuid.upper))
+            .transpose()?,
     })
 }
 
@@ -3972,7 +3976,7 @@ pub(super) fn read_comment_storage_by_id(
     package: &IWorkPackage,
     locations: &HashMap<u64, String>,
     storage_id: u64,
-) -> Result<NumbersCellComment> {
+) -> Result<Comment> {
     let archive_name = locations.get(&storage_id).ok_or_else(|| {
         Error::InvalidFormat(format!(
             "Numbers comment storage object {storage_id} is missing"
@@ -3986,7 +3990,7 @@ pub(super) fn cell_comment_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<NumbersCellCommentInfo>> {
+) -> Result<Option<TableCellComment>> {
     let location = locate_cell(package, table_id, row, column)?;
     cell_comment_at_location(package, location, table_id, row, column)
 }
@@ -3996,7 +4000,7 @@ pub(super) fn attached_cell_comment_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<NumbersCellCommentInfo>> {
+) -> Result<Option<TableCellComment>> {
     let location = locate_attached_cell(package, table_id, row, column)?;
     cell_comment_at_location(package, location, table_id, row, column)
 }
@@ -4007,7 +4011,7 @@ fn cell_comment_at_location(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<NumbersCellCommentInfo>> {
+) -> Result<Option<TableCellComment>> {
     let Some(cell) = read_tile_cell(
         package,
         &location.tile_archive,
@@ -4028,12 +4032,12 @@ fn cell_comment_at_location(
         identifier,
     )?;
     let comment = read_comment_storage(package, &entry)?;
-    Ok(Some(NumbersCellCommentInfo {
-        table_id,
+    Ok(Some(TableCellComment {
+        table_id: DrawableId::from_raw(table_id)?,
         row,
         column,
-        list_identifier: identifier,
-        storage_object_id: entry.storage_id,
+        list_id: ListId::from_raw(identifier)?,
+        storage_id: StorageId::from_raw(entry.storage_id)?,
         comment,
     }))
 }
@@ -4043,7 +4047,7 @@ pub(super) fn cell_comment_replies_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Vec<NumbersCellCommentReplyInfo>> {
+) -> Result<Vec<TableCellReply>> {
     let location = locate_cell(package, table_id, row, column)?;
     cell_comment_replies_at_location(package, location, table_id, row, column)
 }
@@ -4053,7 +4057,7 @@ pub(super) fn attached_cell_comment_replies_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Vec<NumbersCellCommentReplyInfo>> {
+) -> Result<Vec<TableCellReply>> {
     let location = locate_attached_cell(package, table_id, row, column)?;
     cell_comment_replies_at_location(package, location, table_id, row, column)
 }
@@ -4064,7 +4068,7 @@ fn cell_comment_replies_at_location(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Vec<NumbersCellCommentReplyInfo>> {
+) -> Result<Vec<TableCellReply>> {
     let root =
         cell_comment_at_location(package, location, table_id, row, column)?.ok_or_else(|| {
             Error::ParseError(format!(
@@ -4072,17 +4076,18 @@ fn cell_comment_replies_at_location(
             ))
         })?;
     let locations = object_locations(package)?;
-    validate_cell_comment_reply_graph(package, &locations, root.storage_object_id, &root.comment)?;
+    validate_cell_comment_reply_graph(package, &locations, root.storage_id.get(), &root.comment)?;
     root.comment
-        .reply_object_ids
+        .reply_ids
         .into_iter()
-        .map(|storage_object_id| {
-            Ok(NumbersCellCommentReplyInfo {
-                table_id,
+        .map(|storage_id| {
+            let storage_object_id = storage_id.get();
+            Ok(TableCellReply {
+                table_id: DrawableId::from_raw(table_id)?,
                 row,
                 column,
-                root_storage_object_id: root.storage_object_id,
-                storage_object_id,
+                root_storage_id: root.storage_id,
+                storage_id,
                 comment: read_comment_storage_by_id(package, &locations, storage_object_id)?,
             })
         })
@@ -4093,23 +4098,24 @@ pub(super) fn validate_cell_comment_reply_graph(
     package: &IWorkPackage,
     locations: &HashMap<u64, String>,
     root_storage_id: u64,
-    root: &NumbersCellComment,
+    root: &Comment,
 ) -> Result<()> {
     let mut seen = HashSet::new();
-    for reply_id in &root.reply_object_ids {
-        if *reply_id == root_storage_id || !seen.insert(*reply_id) {
+    for reply_id in &root.reply_ids {
+        let reply_id = reply_id.get();
+        if reply_id == root_storage_id || !seen.insert(reply_id) {
             return Err(Error::InvalidFormat(format!(
                 "Numbers comment storage {root_storage_id} contains a duplicate or cyclic reply reference to {reply_id}"
             )));
         }
-        read_comment_storage_by_id(package, locations, *reply_id)?;
+        read_comment_storage_by_id(package, locations, reply_id)?;
     }
     Ok(())
 }
 
 pub(super) fn validate_cell_comment_reply_reference(
     root_storage_id: u64,
-    root: &NumbersCellComment,
+    root: &Comment,
     reply_storage_id: u64,
 ) -> Result<()> {
     if root_storage_id == reply_storage_id {
@@ -4118,9 +4124,9 @@ pub(super) fn validate_cell_comment_reply_reference(
         )));
     }
     match root
-        .reply_object_ids
+        .reply_ids
         .iter()
-        .filter(|identifier| **identifier == reply_storage_id)
+        .filter(|identifier| identifier.get() == reply_storage_id)
         .count()
     {
         1 => Ok(()),
@@ -4593,16 +4599,16 @@ fn set_cell_comment_at_location(
         )?;
         if old_comment.text == text
             && old_comment.creation_date_seconds.is_some()
-            && old_comment.author_object_id.is_some()
+            && old_comment.author_id.is_some()
             && old_comment.storage_uuid.is_some()
         {
             return Ok(());
         }
         let (author_id, author_component_entry, created_author) =
-            if old_comment.author_object_id.is_none() {
+            if old_comment.author_id.is_none() {
                 preferred_or_ensure_table_annotation_author(package)?
             } else {
-                (old_comment.author_object_id, None, false)
+                (old_comment.author_id.map(AuthorId::get), None, false)
             };
         if entry.refcount == 1 {
             let text_changed = old_comment.text != text;
@@ -4720,7 +4726,7 @@ fn required_cell_comment_root_at_location(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<(CellLocation, u32, CommentEntryLocation, NumbersCellComment)> {
+) -> Result<(CellLocation, u32, CommentEntryLocation, Comment)> {
     let identifier = read_tile_cell(
         package,
         &location.tile_archive,

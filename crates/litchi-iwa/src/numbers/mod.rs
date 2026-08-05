@@ -60,8 +60,8 @@ impl From<litchi_numbers::cell::wire::Error> for crate::Error {
 pub use creation::NumbersDocumentBuilder;
 pub use document::NumbersDocument;
 pub use editor::{
-    Dimension, Direction, IWorkTableCellRegion, NumbersCellCommentInfo,
-    NumbersCellCommentReplyInfo, NumbersEditor, NumbersPivotCategoryInfo, NumbersSheetAudioInfo,
+    Dimension, Direction, IWorkTableCellRegion, NumbersEditor, NumbersPivotCategoryInfo,
+    NumbersSheetAudioInfo,
     NumbersSheetAudioOptions, NumbersSheetChartInfo, NumbersSheetImageInfo,
     NumbersSheetImageOptions, NumbersSheetInfo, NumbersSheetMovieInfo, NumbersSheetMovieOptions,
     NumbersSheetShapeInfo, NumbersSheetShapeKind, NumbersTableCellParagraphIndents,
@@ -92,5 +92,5 @@ pub use formula::{
 };
 pub use litchi_numbers::cell::{APPLE_EPOCH_UNIX_OFFSET_SECONDS, Type, Update, Value};
 pub use sheet::NumbersSheet;
-pub use table::{NumbersCellComment, NumbersCommentUuid, NumbersTable};
+pub use table::NumbersTable;
 pub use table_extractor::TableDataExtractor;

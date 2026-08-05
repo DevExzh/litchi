@@ -31,11 +31,12 @@
 
 use super::bnc::read_decimal128_le;
 use super::cell::CellValue;
-use super::table::{NumbersCellComment, NumbersCommentUuid, NumbersTable};
+use super::table::NumbersTable;
 use crate::bundle::Bundle;
 use crate::object_index::{ObjectIndex, ResolvedObjectRef};
 use crate::protobuf::{tn, tsce, tsd, tst};
 use crate::{Error, Result};
+use litchi_iwa_common::comment::{AuthorId, Comment, StorageId, Uuid};
 use prost::Message;
 use std::collections::{HashMap, HashSet};
 
@@ -43,7 +44,7 @@ type CompactTable<T> = Box<[(u32, T)]>;
 type StringTable = CompactTable<String>;
 type FormulaTable = CompactTable<tsce::FormulaArchive>;
 type FormulaErrorTable = CompactTable<String>;
-type CommentTable = CompactTable<NumbersCellComment>;
+type CommentTable = CompactTable<Comment>;
 type FormulaOwnerKey = [u32; 4];
 type FormulaCategoryKey = [u64; 2];
 
@@ -478,22 +479,25 @@ impl<'a> TableDataExtractor<'a> {
                 .map_err(|_| allocation_error("Numbers comment sidecar", result.len() + 1))?;
             result.push((
                 entry.key,
-                NumbersCellComment {
+                Comment {
                     text: comment.text.clone().unwrap_or_default(),
                     creation_date_seconds: comment.creation_date.as_ref().map(|date| date.seconds),
-                    author_object_id: comment.author.as_ref().map(|author| author.identifier),
-                    reply_object_ids: comment
+                    author_id: comment
+                        .author
+                        .as_ref()
+                        .map(|author| AuthorId::from_raw(author.identifier))
+                        .transpose()?,
+                    reply_ids: comment
                         .replies
                         .iter()
-                        .map(|reply| reply.identifier)
-                        .collect(),
+                        .map(|reply| StorageId::from_raw(reply.identifier).map_err(crate::Error::from))
+                        .collect::<Result<Vec<_>>>()?
+                        .into_boxed_slice(),
                     storage_uuid: comment
                         .storage_uuid
                         .as_ref()
-                        .map(|uuid| NumbersCommentUuid {
-                            lower: uuid.lower,
-                            upper: uuid.upper,
-                        }),
+                        .map(|uuid| Uuid::from_parts(uuid.lower, uuid.upper))
+                        .transpose()?,
                 },
             ));
         }

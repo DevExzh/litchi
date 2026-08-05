@@ -1,10 +1,10 @@
 //! Native page-number/page-count attachment CRUD for Pages text storage.
 //!
-//! Text-box selectors use [`DrawableObjectId`] as their canonical type.
+//! Text-box selectors use [`DrawableId`] as their canonical type.
 
 use super::PagesEditor;
 use crate::Result;
-use crate::comments::DrawableObjectId;
+use litchi_iwa_common::comment::DrawableId;
 use crate::text::{
     TextNumberAttachment, TextNumberAttachmentId, TextNumberAttachmentSettings, TextPosition,
 };
@@ -90,20 +90,20 @@ impl PagesEditor {
     /// Read every number attachment in one ordinary Pages text box.
     pub fn text_box_number_attachments(
         &self,
-        drawable_object_id: DrawableObjectId,
+        drawable_object_id: DrawableId,
     ) -> Result<Vec<TextNumberAttachment>> {
-        let graph = self.text_box_graph(drawable_object_id.object_id())?;
+        let graph = self.text_box_graph(drawable_object_id.get())?;
         self.text.text_number_attachments(graph.storage_id)
     }
 
     /// Atomically insert a number attachment in an ordinary Pages text box.
     pub fn insert_text_box_number_attachment(
         &mut self,
-        drawable_object_id: DrawableObjectId,
+        drawable_object_id: DrawableId,
         position: TextPosition,
         settings: TextNumberAttachmentSettings,
     ) -> Result<TextNumberAttachment> {
-        let graph = self.text_box_graph(drawable_object_id.object_id())?;
+        let graph = self.text_box_graph(drawable_object_id.get())?;
         let mut staged = self.text.clone();
         let attachment =
             staged.insert_text_number_attachment(graph.storage_id, position, settings)?;
@@ -114,11 +114,11 @@ impl PagesEditor {
     /// Atomically update a Pages text-box number attachment.
     pub fn update_text_box_number_attachment(
         &mut self,
-        drawable_object_id: DrawableObjectId,
+        drawable_object_id: DrawableId,
         id: TextNumberAttachmentId,
         settings: TextNumberAttachmentSettings,
     ) -> Result<TextNumberAttachment> {
-        let graph = self.text_box_graph(drawable_object_id.object_id())?;
+        let graph = self.text_box_graph(drawable_object_id.get())?;
         let mut staged = self.text.clone();
         let attachment = staged.update_text_number_attachment(graph.storage_id, id, settings)?;
         *self = Self::from_package(staged.into_package())?;
@@ -128,10 +128,10 @@ impl PagesEditor {
     /// Delete a Pages text-box number attachment and its placeholder.
     pub fn remove_text_box_number_attachment(
         &mut self,
-        drawable_object_id: DrawableObjectId,
+        drawable_object_id: DrawableId,
         id: TextNumberAttachmentId,
     ) -> Result<TextNumberAttachment> {
-        let graph = self.text_box_graph(drawable_object_id.object_id())?;
+        let graph = self.text_box_graph(drawable_object_id.get())?;
         let mut staged = self.text.clone();
         let attachment = staged.remove_text_number_attachment(graph.storage_id, id)?;
         *self = Self::from_package(staged.into_package())?;
@@ -151,10 +151,10 @@ mod tests {
         height: 72.0,
     };
 
-    fn pages_with_text_box() -> (PagesEditor, DrawableObjectId) {
+    fn pages_with_text_box() -> (PagesEditor, DrawableId) {
         let mut pages = PagesEditor::create_with_text("Body").unwrap();
         let text_box = pages.add_text_box(4, "Box", POSITION, SIZE).unwrap();
-        let selector = DrawableObjectId::try_from(text_box.drawable_object_id).unwrap();
+        let selector = DrawableId::try_from(text_box.drawable_object_id).unwrap();
         (pages, selector)
     }
 
@@ -212,9 +212,9 @@ mod tests {
         let (mut pages, selector) = pages_with_text_box();
         let baseline = pages.to_bytes().unwrap();
 
-        assert!(DrawableObjectId::from_object_id(0).is_err());
+        assert!(DrawableId::from_raw(0).is_err());
         assert_eq!(pages.to_bytes().unwrap(), baseline);
-        let missing_selector = DrawableObjectId::try_from(999_999_u64).unwrap();
+        let missing_selector = DrawableId::try_from(999_999_u64).unwrap();
         assert!(pages.text_box_number_attachments(missing_selector).is_err());
         assert_eq!(pages.to_bytes().unwrap(), baseline);
 

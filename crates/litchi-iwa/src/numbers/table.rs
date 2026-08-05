@@ -3,14 +3,9 @@
 //! Tables in Numbers contain cells organized in rows and columns.
 
 use super::cell::CellValue;
+use litchi_iwa_common::comment::Comment;
 use litchi_numbers::table::{Builder as TableBuilder, Dimensions, Error as TableError, Position};
 use std::collections::HashMap;
-
-/// Stable UUID stored on a Numbers comment archive.
-pub type NumbersCommentUuid = crate::comments::IWorkCommentUuid;
-
-/// A comment attached to a Numbers table cell.
-pub type NumbersCellComment = crate::comments::IWorkComment;
 
 pub(crate) fn map_table_error(error: TableError) -> crate::Error {
     match error {
@@ -25,7 +20,7 @@ pub(crate) fn map_table_error(error: TableError) -> crate::Error {
 #[derive(Debug, Clone)]
 pub struct NumbersTable {
     model: TableBuilder,
-    comments: HashMap<(usize, usize), NumbersCellComment>,
+    comments: HashMap<(usize, usize), Comment>,
     dynamic_dimensions: bool,
 }
 
@@ -173,14 +168,14 @@ impl NumbersTable {
     }
 
     /// Get the comment attached to a cell, if any.
-    pub fn get_comment(&self, row: usize, col: usize) -> Option<&NumbersCellComment> {
+    pub fn get_comment(&self, row: usize, col: usize) -> Option<&Comment> {
         self.comments.get(&(row, col))
     }
 
     /// Iterate over cell comments without exposing the backing map.
     pub fn iter_comments(
         &self,
-    ) -> impl Iterator<Item = ((usize, usize), &NumbersCellComment)> + '_ {
+    ) -> impl Iterator<Item = ((usize, usize), &Comment)> + '_ {
         self.comments
             .iter()
             .map(|(position, comment)| (*position, comment))
@@ -201,7 +196,7 @@ impl NumbersTable {
         &mut self,
         row: usize,
         col: usize,
-        comment: NumbersCellComment,
+        comment: Comment,
     ) -> crate::Result<()> {
         self.try_set_comment(row, col, comment)
     }
@@ -211,7 +206,7 @@ impl NumbersTable {
         &mut self,
         row: usize,
         col: usize,
-        comment: NumbersCellComment,
+        comment: Comment,
     ) -> crate::Result<()> {
         self.ensure_coordinate(row, col)?;
         self.comments.try_reserve(1).map_err(|_| {
@@ -225,7 +220,7 @@ impl NumbersTable {
     }
 
     /// Remove an in-memory comment and return it.
-    pub fn clear_comment(&mut self, row: usize, col: usize) -> Option<NumbersCellComment> {
+    pub fn clear_comment(&mut self, row: usize, col: usize) -> Option<Comment> {
         self.comments.remove(&(row, col))
     }
 
@@ -319,7 +314,7 @@ impl NumbersTable {
         self,
     ) -> crate::Result<(
         litchi_numbers::Table,
-        Box<[((usize, usize), NumbersCellComment)]>,
+        Box<[((usize, usize), Comment)]>,
     )> {
         let Self {
             model, comments, ..

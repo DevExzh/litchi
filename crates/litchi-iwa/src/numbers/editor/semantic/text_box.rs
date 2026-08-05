@@ -2091,9 +2091,7 @@ impl NumbersEditor {
             })?;
 
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
-        comments.clear_comment(crate::comments::DrawableObjectId::from_object_id(
-            drawable_object_id,
-        )?)?;
+        comments.clear_comment(DrawableId::from_raw(drawable_object_id)?)?;
         let mut staged = comments.into_package();
         patch_numbers_sheet_drawable_reference(
             &mut staged,

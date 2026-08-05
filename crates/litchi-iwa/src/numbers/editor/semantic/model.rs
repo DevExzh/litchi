@@ -46,11 +46,6 @@ pub struct NumbersPivotCategoryInfo {
     pub label: Option<String>,
 }
 
-/// Address and storage identity of a comment attached to a Numbers cell.
-pub type NumbersCellCommentInfo = IWorkTableCellCommentInfo;
-
-/// A resolved direct reply in a Numbers cell-comment thread.
-pub type NumbersCellCommentReplyInfo = IWorkTableCellCommentReplyInfo;
 /// Horizontal text alignment shared by native Numbers table cells.
 pub type NumbersTableCellTextAlignment = TextAlignment;
 /// Typed first-line, left, and right indents for a Numbers table cell.

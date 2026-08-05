@@ -24,9 +24,7 @@ mod storage;
 mod title;
 mod topology;
 
-pub use comments::{
-    KeynoteTableCellComment, KeynoteTableCellCommentInfo, KeynoteTableCellCommentReplyInfo,
-};
+use litchi_iwa_common::comment::Comment;
 pub use conditional_highlight::KeynoteTableCellConditionalHighlightInfo;
 pub use formula::{
     KeynoteTableFormulaAxisReference, KeynoteTableFormulaBinaryOperator,
@@ -161,7 +159,7 @@ pub struct KeynoteSlideTableInfo {
 pub struct KeynoteSlideTable {
     pub info: KeynoteSlideTableInfo,
     semantic_table: litchi_numbers::Table,
-    comments: Box<[((usize, usize), KeynoteTableCellComment)]>,
+    comments: Box<[((usize, usize), Comment)]>,
     merges: Vec<KeynoteTableCellRegion>,
 }
 
@@ -192,7 +190,7 @@ impl KeynoteSlideTable {
     }
 
     /// Borrow the comment attached to a materialized cell, if any.
-    pub fn get_comment(&self, row: usize, column: usize) -> Option<&KeynoteTableCellComment> {
+    pub fn get_comment(&self, row: usize, column: usize) -> Option<&Comment> {
         self.comments
             .binary_search_by_key(&(row, column), |(position, _comment)| *position)
             .ok()
@@ -202,7 +200,7 @@ impl KeynoteSlideTable {
     /// Iterate over cell comments without exposing the backing map.
     pub fn iter_comments(
         &self,
-    ) -> impl Iterator<Item = ((usize, usize), &KeynoteTableCellComment)> + '_ {
+    ) -> impl Iterator<Item = ((usize, usize), &Comment)> + '_ {
         self.comments
             .iter()
             .map(|(position, comment)| (*position, comment))

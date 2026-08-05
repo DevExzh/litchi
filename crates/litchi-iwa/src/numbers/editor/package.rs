@@ -1241,7 +1241,7 @@ pub(crate) fn table_cell_comment_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<NumbersCellCommentInfo>> {
+    ) -> Result<Option<TableCellComment>> {
     model::attached_cell_comment_in_package(package, table_id, row, column)
 }
 
@@ -1306,7 +1306,7 @@ pub(crate) fn table_cell_comment_replies_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Vec<NumbersCellCommentReplyInfo>> {
+    ) -> Result<Vec<TableCellReply>> {
     model::attached_cell_comment_replies_in_package(package, table_id, row, column)
 }
 

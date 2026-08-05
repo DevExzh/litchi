@@ -866,7 +866,7 @@ impl PagesEditor {
     pub fn remove_body_shape(&mut self, drawable_object_id: u64) -> Result<RemovedPagesBodyShape> {
         let graph = body_shape_graph(self, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.clear_comment(crate::comments::DrawableObjectId::from_object_id(
+        comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
             drawable_object_id,
         )?)?;
         let mut text_editor = IWorkTextEditor::from_package(comments.into_package());

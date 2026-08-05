@@ -6,12 +6,12 @@ use crate::protobuf::tswp::StorageArchive;
 use crate::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa_common::media::playback::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
 use litchi_iwa_common::shape::fill::{Opacity, StopMidpoint, StopPosition};
+use litchi_keynote::slide::media::MovieKind;
+use litchi_keynote::soundtrack::{Mode as SoundtrackMode, Settings as SoundtrackSettings};
 use litchi_keynote::transition::{
     Acceleration, AnimationParameters, CustomParameters, Direction, Effect, MosaicType, Settings,
     TextDelivery,
 };
-use litchi_keynote::slide::media::MovieKind;
-use litchi_keynote::soundtrack::{Mode as SoundtrackMode, Settings as SoundtrackSettings};
 use std::time::Duration;
 
 const TEST_SLIDE_MESSAGE_TYPE: u32 = 5;
@@ -5449,7 +5449,7 @@ fn slide_owned_drawable_comment_crud_is_reachability_guarded() {
             .slide_drawables(0)
             .unwrap()
             .into_iter()
-            .map(|drawable| drawable.object_id.object_id())
+            .map(|drawable| drawable.id.get())
             .collect::<Vec<_>>(),
         vec![5, 6]
     );

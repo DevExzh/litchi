@@ -6,7 +6,7 @@ use litchi_iwa_common::media::Type as MediaType;
 
 use super::*;
 use crate::ImageAdjustments;
-use crate::comments::DrawableObjectId;
+use litchi_iwa_common::comment::DrawableId;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
@@ -601,10 +601,10 @@ impl NumbersEditor {
     pub fn replace_sheet_image_data(
         &mut self,
         sheet_id: ObjectId,
-        drawable_object_id: DrawableObjectId,
+        drawable_object_id: DrawableId,
         replacement: &[u8],
     ) -> Result<Vec<u8>> {
-        let source = image_graph(self, sheet_id.get(), drawable_object_id.object_id())?;
+        let source = image_graph(self, sheet_id.get(), drawable_object_id.get())?;
         let image_data_identifier =
             ShapeImageDataIdentifier::new(source.info.image_data_identifier)?;
         self.replace_media(image_data_identifier.get(), replacement)
@@ -618,7 +618,7 @@ impl NumbersEditor {
     ) -> Result<RemovedNumbersSheetImage> {
         let source = image_graph(self, sheet_id, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
-        comments.clear_comment(crate::comments::DrawableObjectId::from_object_id(
+        comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
             drawable_object_id,
         )?)?;
         let mut staged = comments.into_package();
@@ -840,14 +840,14 @@ mod tests {
         ObjectId::try_from(raw).expect("fixture sheet identifiers are non-zero")
     }
 
-    fn drawable_selector(raw: u64) -> DrawableObjectId {
-        DrawableObjectId::from_object_id(raw).expect("fixture drawable identifiers are non-zero")
+    fn drawable_selector(raw: u64) -> DrawableId {
+        DrawableId::from_raw(raw).expect("fixture drawable identifiers are non-zero")
     }
 
     #[test]
     fn replace_image_selector_types_reject_null_wire_identifiers() {
         assert!(ObjectId::try_from(0).is_err());
-        assert!(DrawableObjectId::new(0).is_none());
+        assert!(DrawableId::new(0).is_none());
         assert!(ShapeImageDataIdentifier::new(0).is_err());
     }
 
