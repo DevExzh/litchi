@@ -92,7 +92,7 @@ pub enum PunctuationWrap {
     Hanging,
 }
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ParagraphFlowProperties {
+pub struct Properties {
     pub keep_together: Option<Keep>,
     pub keep_with_next: Option<Keep>,
     pub widows: Option<u32>,
@@ -102,7 +102,7 @@ pub struct ParagraphFlowProperties {
     pub line_break: Option<LineBreak>,
     pub punctuation_wrap: Option<PunctuationWrap>,
 }
-impl ParagraphFlowProperties {
+impl Properties {
     pub fn validate(&self) -> Result<()> {
         for (n, k) in [(self.widows, "fo:widows"), (self.orphans, "fo:orphans")] {
             if let Some(n) = n
@@ -168,17 +168,14 @@ impl ParagraphFlowProperties {
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParagraphStyleFlow {
+pub struct Style {
     pub name: Option<String>,
     pub parent_style_name: Option<String>,
     pub is_default_style: bool,
-    pub properties: Option<ParagraphFlowProperties>,
+    pub properties: Option<Properties>,
 }
-impl ParagraphStyleFlow {
-    pub fn named(
-        name: impl Into<String>,
-        properties: Option<ParagraphFlowProperties>,
-    ) -> Result<Self> {
+impl Style {
+    pub fn named(name: impl Into<String>, properties: Option<Properties>) -> Result<Self> {
         let x = Self {
             name: Some(name.into()),
             parent_style_name: None,
@@ -188,7 +185,7 @@ impl ParagraphStyleFlow {
         x.validate()?;
         Ok(x)
     }
-    pub fn default_style(properties: Option<ParagraphFlowProperties>) -> Self {
+    pub fn default_style(properties: Option<Properties>) -> Self {
         Self {
             name: None,
             parent_style_name: None,
@@ -238,14 +235,14 @@ impl ParagraphStyleFlow {
     }
 }
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ParagraphStyleFlowSet {
-    pub styles: Vec<ParagraphStyleFlow>,
+pub struct Styles {
+    pub styles: Vec<Style>,
 }
-impl ParagraphStyleFlowSet {
-    pub fn get(&self, n: &str) -> Option<&ParagraphStyleFlow> {
+impl Styles {
+    pub fn get(&self, n: &str) -> Option<&Style> {
         self.styles.iter().find(|x| x.name.as_deref() == Some(n))
     }
-    pub fn default_style(&self) -> Option<&ParagraphStyleFlow> {
+    pub fn default_style(&self) -> Option<&Style> {
         self.styles.iter().find(|x| x.is_default_style)
     }
 }
@@ -301,11 +298,7 @@ fn take(a: &mut Vec<(Ns, Vec<u8>, String)>, n: Ns, l: &[u8]) -> Option<String> {
         .position(|x| x.0 == n && x.1 == l)
         .map(|i| a.remove(i).2)
 }
-fn properties(
-    r: &NsReader<&[u8]>,
-    v: XmlVersion,
-    e: &BytesStart<'_>,
-) -> Result<ParagraphFlowProperties> {
+fn properties(r: &NsReader<&[u8]>, v: XmlVersion, e: &BytesStart<'_>) -> Result<Properties> {
     let mut a = attrs(r, v, e)?;
     let num = |x: Option<String>, n: &str| -> Result<Option<u32>> {
         x.map(|x| {
@@ -317,7 +310,7 @@ fn properties(
         })
         .transpose()
     };
-    let p = ParagraphFlowProperties {
+    let p = Properties {
         keep_together: take(&mut a, Ns::F, b"keep-together")
             .map(|x| Keep::parse(&x))
             .transpose()?,
@@ -350,7 +343,7 @@ fn properties(
     p.validate()?;
     Ok(p)
 }
-pub fn parse_paragraph_style_flows(xml: &str) -> Result<ParagraphStyleFlowSet> {
+pub fn parse(xml: &str) -> Result<Styles> {
     if xml.len() > MAX_XML {
         return Err(bad("XML too large"));
     }
@@ -372,7 +365,7 @@ pub fn parse_paragraph_style_flows(xml: &str) -> Result<ParagraphStyleFlowSet> {
     let mut r = NsReader::from_reader(xml.as_bytes());
     let mut v = XmlVersion::Implicit1_0;
     let mut stack: Vec<(Ns, Vec<u8>)> = Vec::new();
-    let mut active: Option<(usize, ParagraphStyleFlow, bool)> = None;
+    let mut active: Option<(usize, Style, bool)> = None;
     let mut out = Vec::new();
     let mut total = 0;
     loop {
@@ -398,7 +391,7 @@ pub fn parse_paragraph_style_flows(xml: &str) -> Result<ParagraphStyleFlowSet> {
                     let mut a = attrs(&r, v, &e)?;
                     if take(&mut a, Ns::S, b"family").as_deref() == Some("paragraph") {
                         let default = c.1 == b"default-style";
-                        let style = ParagraphStyleFlow {
+                        let style = Style {
                             name: take(&mut a, Ns::S, b"name"),
                             parent_style_name: take(&mut a, Ns::S, b"parent-style-name"),
                             is_default_style: default,
@@ -442,7 +435,7 @@ pub fn parse_paragraph_style_flows(xml: &str) -> Result<ParagraphStyleFlowSet> {
                     if out.len() >= MAX_STYLES || total > MAX_TOTAL {
                         return Err(bad("too many paragraph flow styles"));
                     }
-                    if out.iter().any(|x: &ParagraphStyleFlow| {
+                    if out.iter().any(|x: &Style| {
                         x.name == s.name && x.is_default_style == s.is_default_style
                     }) {
                         return Err(bad("duplicate paragraph style identity"));
@@ -459,18 +452,16 @@ pub fn parse_paragraph_style_flows(xml: &str) -> Result<ParagraphStyleFlowSet> {
             Err(e) => return Err(bad(format!("invalid XML: {e}"))),
         }
     }
-    Ok(ParagraphStyleFlowSet { styles: out })
+    Ok(Styles { styles: out })
 }
 impl OpenDocumentPackage {
-    pub fn paragraph_style_flows(&self) -> Result<ParagraphStyleFlowSet> {
-        self.styles_xml()?.map_or_else(
-            || Ok(Default::default()),
-            |x| parse_paragraph_style_flows(&x),
-        )
+    pub fn paragraph_style_flows(&self) -> Result<Styles> {
+        self.styles_xml()?
+            .map_or_else(|| Ok(Default::default()), |x| parse(&x))
     }
 }
 impl FlatOpenDocument {
-    pub fn paragraph_style_flows(&self) -> Result<ParagraphStyleFlowSet> {
-        parse_paragraph_style_flows(self.xml())
+    pub fn paragraph_style_flows(&self) -> Result<Styles> {
+        parse(self.xml())
     }
 }
