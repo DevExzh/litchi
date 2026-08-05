@@ -1,8 +1,5 @@
-//! Migration-only PPTX shape helpers.
+//! Removed host-side shape helpers.
 //!
-//! The public borrowed scene and data-bearing shape enum live in
-//! [`crate::pptx::shape`]. Table and rich-text parsing remain here temporarily
-//! until their shared DrawingML owners absorb them.
-
-pub mod table;
-pub mod textframe;
+//! PresentationML shape semantics now live in `litchi-pptx::shape` and its
+//! focused child modules. This private module remains empty until the host
+//! crate itself is removed.

@@ -1,9 +1,6 @@
 //! DrawingML table content in PowerPoint graphic frames.
 //!
-//! Shape discovery lives in [`crate::pptx::shape`]. After matching
-//! [`crate::pptx::shape::Shape::Table`], this module parses the borrowed frame
-//! XML into its focused table model.
+//! The owner is `litchi-pptx::table::shape`; this module is a temporary host
+//! path only and contains no parsing or package logic.
 
-pub use super::shapes::table::{
-    Table, TableCell as Cell, TableProperties as Props, TableRow as Row,
-};
+pub use super::shapes::table::{Cell, Props, Row, Table};

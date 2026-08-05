@@ -14,9 +14,11 @@ bitflags = { workspace = true }
 caseless = { workspace = true }
 chrono = { workspace = true }
 litchi-core = { workspace = true }
+litchi-drawingml = { workspace = true }
 litchi-ooxml-common = { workspace = true }
 litchi-opc = { workspace = true }
 litchi-sheet = { workspace = true }
+memchr = { workspace = true }
 once_cell = { workspace = true }
 quick-xml = { workspace = true }
 smallvec = { workspace = true }
@@ -28,4 +30,3 @@ tempfile = { workspace = true }
 
 [lints]
 workspace = true
-memchr = { workspace = true }

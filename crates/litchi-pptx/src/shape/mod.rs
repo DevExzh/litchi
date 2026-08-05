@@ -21,6 +21,9 @@
 //! # }
 //! ```
 
+pub mod diagram;
+pub mod theme;
+
 mod model;
 mod reader;
 
