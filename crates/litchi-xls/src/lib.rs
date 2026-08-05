@@ -284,10 +284,9 @@ pub mod pivot_table;
 pub use pivot_editor::XlsPivotViewEditor;
 pub mod ole_object;
 pub use ole_object::{
-    XlsCheckState, XlsDropDownStyle, XlsEditBoxValidation, XlsFormControl, XlsFtCblsData, XlsFtCmo,
-    XlsFtEdoData, XlsFtGboData, XlsFtLbsData, XlsFtPictFmla, XlsFtPioGrbit, XlsFtRboData, XlsFtSbs,
-    XlsLbsDropData, XlsLbsItem, XlsListBehaviorClass, XlsListSelectionType, XlsObjSubrecord,
-    XlsObjectType, XlsOleObjectEditor, XlsOleObjectRecord,
+    CheckState, DropDownStyle, EditBoxValidation, Editor, FormControl, FtCblsData, FtCmo,
+    FtEdoData, FtGboData, FtLbsData, FtPictFmla, FtPioGrbit, FtRboData, FtSbs, LbsDropData,
+    LbsItem, ListBehaviorClass, ListSelectionType, ObjSubrecord, ObjectType, OleObjectRecord,
 };
 pub use pivot_table::{
     PageFieldEntry, PivotAdditionalExtension, PivotAxis, PivotAxisField, PivotCache,

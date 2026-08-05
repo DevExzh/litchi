@@ -1,9 +1,9 @@
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_xls::ole_object::Limits;
 use litchi_xls::{
-    XlsCheckState, XlsDropDownStyle, XlsEditBoxValidation, XlsFormControl, XlsFtCmo, XlsFtPictFmla,
-    XlsFtPioGrbit, XlsListBehaviorClass, XlsListSelectionType, XlsObjSubrecord, XlsObjectType,
-    XlsOleObjectEditor, XlsOleObjectRecord,
+    CheckState, DropDownStyle, EditBoxValidation, Editor, FormControl, FtCmo, FtPictFmla,
+    FtPioGrbit, LbsItem, ListBehaviorClass, ListSelectionType, ObjSubrecord, ObjectType,
+    OleObjectRecord,
 };
 use std::io::Cursor;
 
@@ -46,9 +46,9 @@ fn xl_string(text: &str) -> Vec<u8> {
     value
 }
 
-fn form_control(record: &[u8]) -> XlsFormControl {
+fn form_control(record: &[u8]) -> FormControl {
     let body_len = u16::from_le_bytes([record[2], record[3]]) as usize;
-    XlsFormControl::parse(&record[4..4 + body_len], None).expect("form control parses")
+    FormControl::parse(&record[4..4 + body_len], None).expect("form control parses")
 }
 
 fn round_trip(record: &[u8]) {
@@ -73,9 +73,9 @@ fn parses_checkbox_data() {
     let record = checkbox_obj(5, 1, 1);
     let control = form_control(&record);
     assert_eq!(control.object_id(), 5);
-    assert_eq!(control.control_type(), Some(XlsObjectType::CheckBox));
+    assert_eq!(control.control_type(), Some(ObjectType::CheckBox));
     let data = control.check_box_data().unwrap();
-    assert_eq!(data.state, XlsCheckState::Checked);
+    assert_eq!(data.state, CheckState::Checked);
     assert_eq!(data.accelerator, 0);
     assert!(data.no_3d());
     round_trip(&record);
@@ -83,7 +83,7 @@ fn parses_checkbox_data() {
 
 #[test]
 fn parses_mixed_and_unchecked_states() {
-    for (code, state) in [(0u16, XlsCheckState::Unchecked), (2, XlsCheckState::Mixed)] {
+    for (code, state) in [(0u16, CheckState::Unchecked), (2, CheckState::Mixed)] {
         let control = form_control(&checkbox_obj(1, code, 0));
         assert_eq!(control.check_box_data().unwrap().state, state);
     }
@@ -99,7 +99,7 @@ fn parses_radio_button_data() {
         subrecord(FT_END, &[]),
     ]);
     let control = form_control(&record);
-    assert_eq!(control.control_type(), Some(XlsObjectType::RadioButton));
+    assert_eq!(control.control_type(), Some(ObjectType::RadioButton));
     let data = control.radio_button_data().unwrap();
     assert_eq!(data.next_radio_button_id, 9);
     assert!(data.first_in_group);
@@ -118,9 +118,9 @@ fn parses_edit_box_data() {
         subrecord(FT_END, &[]),
     ]);
     let control = form_control(&record);
-    assert_eq!(control.control_type(), Some(XlsObjectType::EditBox));
+    assert_eq!(control.control_type(), Some(ObjectType::EditBox));
     let data = control.edit_box_data().unwrap();
-    assert_eq!(data.validation, XlsEditBoxValidation::Number);
+    assert_eq!(data.validation, EditBoxValidation::Number);
     assert!(data.multi_line);
     assert!(!data.vertical_scroll_bar);
     assert_eq!(data.list_control_id, 7);
@@ -138,7 +138,7 @@ fn parses_group_box_data() {
         subrecord(FT_END, &[]),
     ]);
     let control = form_control(&record);
-    assert_eq!(control.control_type(), Some(XlsObjectType::GroupBox));
+    assert_eq!(control.control_type(), Some(ObjectType::GroupBox));
     let data = control.group_box_data().unwrap();
     assert_eq!(data.accelerator, 0x41);
     assert!(data.no_3d());
@@ -160,7 +160,7 @@ fn parses_scroll_bar_data() {
         subrecord(FT_END, &[]),
     ]);
     let control = form_control(&record);
-    assert_eq!(control.control_type(), Some(XlsObjectType::ScrollBar));
+    assert_eq!(control.control_type(), Some(ObjectType::ScrollBar));
     let data = control.scroll_bar_data().unwrap();
     assert_eq!(data.reserved, [0xEE; 4]);
     assert_eq!((data.value, data.minimum, data.maximum), (-5, -10, 10));
@@ -169,6 +169,37 @@ fn parses_scroll_bar_data() {
     assert_eq!(data.scroll_width, 16);
     assert!(data.draw() && data.draw_slider_only() && data.track_elevator() && data.no_3d());
     round_trip(&record);
+}
+
+#[test]
+fn preserves_invalid_scroll_bar_ranges_as_unknown() {
+    for values in [
+        [6i16, 0, 5, 1, 1, 1],
+        [0, 5, 4, 1, 1, 1],
+        [0, 0, 5, -1, 1, 1],
+        [0, 0, 5, 1, -1, 1],
+        [0, 0, 5, 1, 1, -1],
+    ] {
+        let mut sbs = vec![0xEE; 4];
+        for value in values[..5].iter().copied() {
+            sbs.extend_from_slice(&value.to_le_bytes());
+        }
+        sbs.extend_from_slice(&0u16.to_le_bytes());
+        sbs.extend_from_slice(&values[5].to_le_bytes());
+        sbs.extend_from_slice(&0u16.to_le_bytes());
+        let record = obj_record(&[
+            cmo(0x0011, 2),
+            subrecord(FT_SBS, &sbs),
+            subrecord(FT_END, &[]),
+        ]);
+        let control = form_control(&record);
+        assert!(control.scroll_bar_data().is_none());
+        assert!(matches!(
+            &control.subrecords[1],
+            ObjSubrecord::Unknown { kind: FT_SBS, data } if data == &sbs
+        ));
+        round_trip(&record);
+    }
 }
 
 #[test]
@@ -190,7 +221,7 @@ fn parses_list_box_data_with_items_and_selection() {
         subrecord(FT_END, &[]),
     ]);
     let control = form_control(&record);
-    assert_eq!(control.control_type(), Some(XlsObjectType::List));
+    assert_eq!(control.control_type(), Some(ObjectType::List));
     let data = control.list_box_data().unwrap();
     assert_eq!(data.formula, [0xAA, 0xBB, 0xCC, 0xDD]);
     assert_eq!(data.entry_count, 3);
@@ -198,8 +229,8 @@ fn parses_list_box_data_with_items_and_selection() {
     assert!(data.has_item_strings());
     assert!(!data.has_behavior_class());
     assert!(!data.no_3d());
-    assert_eq!(data.selection_type(), XlsListSelectionType::Multi);
-    assert_eq!(data.behavior_class(), XlsListBehaviorClass::Regular);
+    assert_eq!(data.selection_type(), ListSelectionType::Multi);
+    assert_eq!(data.behavior_class(), ListBehaviorClass::Regular);
     assert!(data.drop_down.is_none());
     assert_eq!(
         data.items()
@@ -237,14 +268,14 @@ fn parses_dropdown_data() {
         subrecord(FT_END, &[]),
     ]);
     let control = form_control(&record);
-    assert_eq!(control.control_type(), Some(XlsObjectType::DropDown));
+    assert_eq!(control.control_type(), Some(ObjectType::DropDown));
     let data = control.list_box_data().unwrap();
-    assert_eq!(data.selection_type(), XlsListSelectionType::CtrlMulti);
-    assert_eq!(data.behavior_class(), XlsListBehaviorClass::DataValidation);
+    assert_eq!(data.selection_type(), ListSelectionType::CtrlMulti);
+    assert_eq!(data.behavior_class(), ListBehaviorClass::DataValidation);
     assert_eq!(data.edit_box_id, 5);
     assert!(data.has_edit_box());
     let drop_down = data.drop_down.as_ref().unwrap();
-    assert_eq!(drop_down.style(), XlsDropDownStyle::ComboEdit);
+    assert_eq!(drop_down.style(), DropDownStyle::ComboEdit);
     assert!(drop_down.filtered());
     assert_eq!((drop_down.line_count, drop_down.min_width), (8, 100));
     assert_eq!(drop_down.text(), "abcd");
@@ -276,6 +307,35 @@ fn vacant_lbs_data_round_trips_empty() {
 }
 
 #[test]
+fn preserves_invalid_list_header_as_unknown() {
+    for (entry_count, selected_index) in [(2u16, 3u16), (0x8000, 0)] {
+        let mut lbs = 0u16.to_le_bytes().to_vec();
+        lbs.extend_from_slice(&entry_count.to_le_bytes());
+        lbs.extend_from_slice(&selected_index.to_le_bytes());
+        lbs.extend_from_slice(&0u16.to_le_bytes());
+        lbs.extend_from_slice(&0u16.to_le_bytes());
+        let record = obj_record(&[
+            cmo(0x0012, 6),
+            subrecord(FT_LBS_DATA, &lbs),
+            subrecord(FT_END, &[]),
+        ]);
+        let control = form_control(&record);
+        assert!(control.list_box_data().is_none());
+        assert!(matches!(
+            &control.subrecords[1],
+            ObjSubrecord::Unknown { kind: FT_LBS_DATA, data } if data == &lbs
+        ));
+        round_trip(&record);
+    }
+}
+
+#[test]
+fn list_item_authoring_respects_ms_xls_character_limit() {
+    assert!(LbsItem::new(&"x".repeat(255)).is_some());
+    assert!(LbsItem::new(&"x".repeat(256)).is_none());
+}
+
+#[test]
 fn malformed_subrecords_fall_back_to_unknown() {
     // Wrong length.
     let record = obj_record(&[
@@ -287,7 +347,7 @@ fn malformed_subrecords_fall_back_to_unknown() {
     assert!(control.check_box_data().is_none());
     assert!(matches!(
         &control.subrecords[1],
-        XlsObjSubrecord::Unknown { kind: FT_CBLS_DATA, data } if data == &[0; 7]
+        ObjSubrecord::Unknown { kind: FT_CBLS_DATA, data } if data == &[0; 7]
     ));
     round_trip(&record);
 
@@ -297,7 +357,7 @@ fn malformed_subrecords_fall_back_to_unknown() {
     assert!(control.check_box_data().is_none());
     assert!(matches!(
         &control.subrecords[1],
-        XlsObjSubrecord::Unknown { .. }
+        ObjSubrecord::Unknown { .. }
     ));
     round_trip(&record);
 
@@ -406,28 +466,31 @@ fn non_control_objects_are_not_form_controls() {
     // A picture Obj (ot = 0x08) without the OLE-specific subrecords.
     let picture = obj_record(&[cmo(0x0008, 1), subrecord(FT_END, &[])]);
     let body = &picture[4..];
-    assert!(XlsFormControl::parse(body, None).is_none());
+    assert!(FormControl::parse(body, None).is_none());
     // A note Obj (ot = 0x19).
     let note = obj_record(&[cmo(0x0019, 1), subrecord(FT_END, &[])]);
-    assert!(XlsFormControl::parse(&note[4..], None).is_none());
+    assert!(FormControl::parse(&note[4..], None).is_none());
+    // 0x000A is reserved between Polygon and Checkbox in cmo.ot.
+    let reserved = obj_record(&[cmo(0x000A, 1), subrecord(FT_END, &[])]);
+    assert!(FormControl::parse(&reserved[4..], None).is_none());
 }
 
-fn ole_object(id: u16, storage: u32) -> XlsOleObjectRecord {
-    XlsOleObjectRecord {
+fn ole_object(id: u16, storage: u32) -> OleObjectRecord {
+    OleObjectRecord {
         subrecords: vec![
-            XlsObjSubrecord::Common(XlsFtCmo {
+            ObjSubrecord::Common(FtCmo {
                 object_type: 8,
                 object_id: id,
                 flags: 0,
                 reserved: [0; 12],
             }),
-            XlsObjSubrecord::PictureFlags(XlsFtPioGrbit { raw: 0 }),
-            XlsObjSubrecord::PictureFormula(XlsFtPictFmla {
+            ObjSubrecord::PictureFlags(FtPioGrbit { raw: 0 }),
+            ObjSubrecord::PictureFormula(FtPictFmla {
                 formula: vec![1, 2, 3],
                 storage_position: Some(storage),
                 control_buffer_size: Some(0),
             }),
-            XlsObjSubrecord::End,
+            ObjSubrecord::End,
         ],
         text_object: None,
     }
@@ -493,22 +556,22 @@ fn editor_enumerates_form_controls_and_preserves_them_on_rewrite() {
     let ole = ole_object(1, 42).to_record_bytes().unwrap();
     let bytes = xls(&[ole, checkbox.clone(), radio], &[42]);
 
-    let editor = XlsOleObjectEditor::new(bytes.clone(), Limits::default()).unwrap();
+    let editor = Editor::new(bytes.clone(), Limits::default()).unwrap();
     assert_eq!(editor.objects(0).unwrap().len(), 1);
     let controls = editor.form_controls(0).unwrap();
     assert_eq!(controls.len(), 2);
-    assert_eq!(controls[0].control_type(), Some(XlsObjectType::CheckBox));
+    assert_eq!(controls[0].control_type(), Some(ObjectType::CheckBox));
     assert_eq!(
         controls[0].check_box_data().unwrap().state,
-        XlsCheckState::Checked
+        CheckState::Checked
     );
-    assert_eq!(controls[1].control_type(), Some(XlsObjectType::RadioButton));
+    assert_eq!(controls[1].control_type(), Some(ObjectType::RadioButton));
     assert!(controls[1].radio_button_data().unwrap().first_in_group);
     assert!(editor.form_controls(9).is_err());
 
     // Rewriting the workbook for an unrelated OLE edit keeps the form
     // control Obj records byte-identical.
-    let mut editor = XlsOleObjectEditor::new(bytes, Limits::default()).unwrap();
+    let mut editor = Editor::new(bytes, Limits::default()).unwrap();
     editor.remove(0, 1).unwrap();
     let bytes = editor.finish().unwrap();
     let mut ole_file = OleFile::open(Cursor::new(bytes.clone())).unwrap();
@@ -519,12 +582,12 @@ fn editor_enumerates_form_controls_and_preserves_them_on_rewrite() {
             .any(|window| window == checkbox)
     );
 
-    let editor = XlsOleObjectEditor::new(bytes, Limits::default()).unwrap();
+    let editor = Editor::new(bytes, Limits::default()).unwrap();
     let controls = editor.form_controls(0).unwrap();
     assert_eq!(controls.len(), 2);
     assert_eq!(
         controls[0].check_box_data().unwrap().state,
-        XlsCheckState::Checked
+        CheckState::Checked
     );
     assert_eq!(controls[0].to_record_bytes().unwrap(), checkbox);
 }

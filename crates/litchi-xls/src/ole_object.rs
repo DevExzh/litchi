@@ -51,12 +51,8 @@ const XL_STRING_EXT: u8 = 0x04;
 const XL_STRING_RICH: u8 = 0x08;
 /// Size in bytes of one formatting run in a rich XLUnicodeString.
 const FORMATTING_RUN_SIZE: usize = 4;
-/// `cmo.ot` values that identify worksheet form controls (MS-XLS 2.5.143).
-const OBJECT_TYPE_CHECK_BOX: u16 = 0x000B;
-const OBJECT_TYPE_DROP_DOWN: u16 = 0x0014;
-
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct XlsFtCmo {
+pub struct FtCmo {
     pub object_type: u16,
     pub object_id: u16,
     pub flags: u16,
@@ -64,11 +60,11 @@ pub struct XlsFtCmo {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct XlsFtPioGrbit {
+pub struct FtPioGrbit {
     pub raw: u16,
 }
 
-impl XlsFtPioGrbit {
+impl FtPioGrbit {
     pub fn is_dde(self) -> bool {
         self.raw & 2 != 0
     }
@@ -102,7 +98,7 @@ impl XlsFtPioGrbit {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct XlsFtPictFmla {
+pub struct FtPictFmla {
     pub formula: Vec<u8>,
     pub storage_position: Option<u32>,
     pub control_buffer_size: Option<u32>,
@@ -110,7 +106,7 @@ pub struct XlsFtPictFmla {
 
 /// Type of object represented by an Obj record (MS-XLS 2.5.143 `cmo.ot`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum XlsObjectType {
+pub enum ObjectType {
     Group,
     Line,
     Rectangle,
@@ -135,7 +131,24 @@ pub enum XlsObjectType {
     OfficeArt,
 }
 
-impl XlsObjectType {
+impl ObjectType {
+    /// Whether this object type is represented by the form-control view.
+    pub const fn is_form_control(self) -> bool {
+        matches!(
+            self,
+            Self::CheckBox
+                | Self::RadioButton
+                | Self::EditBox
+                | Self::Label
+                | Self::DialogBox
+                | Self::SpinControl
+                | Self::ScrollBar
+                | Self::List
+                | Self::GroupBox
+                | Self::DropDown
+        )
+    }
+
     fn from_code(value: u16) -> Option<Self> {
         Some(match value {
             0x0000 => Self::Group,
@@ -165,23 +178,23 @@ impl XlsObjectType {
     }
 }
 
-impl XlsFtCmo {
+impl FtCmo {
     /// The object type decoded per MS-XLS 2.5.143, or `None` for a value the
     /// specification does not define.
-    pub fn object_kind(&self) -> Option<XlsObjectType> {
-        XlsObjectType::from_code(self.object_type)
+    pub fn object_kind(&self) -> Option<ObjectType> {
+        ObjectType::from_code(self.object_type)
     }
 }
 
 /// State of a checkbox or radio button control (MS-XLS 2.5.141 `fChecked`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum XlsCheckState {
+pub enum CheckState {
     Unchecked,
     Checked,
     Mixed,
 }
 
-impl XlsCheckState {
+impl CheckState {
     fn from_code(value: u16) -> Option<Self> {
         Some(match value {
             0x0000 => Self::Unchecked,
@@ -201,7 +214,7 @@ impl XlsCheckState {
 
 /// Input data validation expected by an edit box (MS-XLS 2.5.144 `ivtEdit`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum XlsEditBoxValidation {
+pub enum EditBoxValidation {
     AnyString,
     Integer,
     Number,
@@ -209,7 +222,7 @@ pub enum XlsEditBoxValidation {
     Formula,
 }
 
-impl XlsEditBoxValidation {
+impl EditBoxValidation {
     fn from_code(value: u16) -> Option<Self> {
         Some(match value {
             0x0000 => Self::AnyString,
@@ -233,7 +246,7 @@ impl XlsEditBoxValidation {
 
 /// Selection behavior of a list control (MS-XLS 2.5.147 `wListSelType`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum XlsListSelectionType {
+pub enum ListSelectionType {
     /// Only one item can be selected.
     Single,
     /// Multiple items can be selected by clicking each item.
@@ -246,7 +259,7 @@ pub enum XlsListSelectionType {
 
 /// Behavior class of a list control (MS-XLS 2.5.147 `lct`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum XlsListBehaviorClass {
+pub enum ListBehaviorClass {
     /// Regular sheet dropdown control.
     Regular,
     PivotPageField,
@@ -261,7 +274,7 @@ pub enum XlsListBehaviorClass {
 
 /// Visual style of a dropdown control (MS-XLS 2.5.171 `wStyle`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum XlsDropDownStyle {
+pub enum DropDownStyle {
     Combo,
     ComboEdit,
     Simple,
@@ -271,8 +284,8 @@ pub enum XlsDropDownStyle {
 
 /// FtCblsData (MS-XLS 2.5.141): checkbox or radio button properties.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct XlsFtCblsData {
-    pub state: XlsCheckState,
+pub struct FtCblsData {
+    pub state: CheckState,
     /// Unicode character of the accelerator key; 0 means none.
     pub accelerator: u16,
     pub reserved: u16,
@@ -280,7 +293,7 @@ pub struct XlsFtCblsData {
     pub flags: u16,
 }
 
-impl XlsFtCblsData {
+impl FtCblsData {
     /// Whether the control is drawn without three-dimensional effects.
     pub fn no_3d(&self) -> bool {
         self.flags & NO_3D != 0
@@ -289,7 +302,7 @@ impl XlsFtCblsData {
 
 /// FtGboData (MS-XLS 2.5.145): group box properties.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct XlsFtGboData {
+pub struct FtGboData {
     /// Unicode character of the accelerator key; 0 means none.
     pub accelerator: u16,
     pub reserved: u16,
@@ -297,7 +310,7 @@ pub struct XlsFtGboData {
     pub flags: u16,
 }
 
-impl XlsFtGboData {
+impl FtGboData {
     /// Whether the control is drawn without three-dimensional effects.
     pub fn no_3d(&self) -> bool {
         self.flags & NO_3D != 0
@@ -306,8 +319,8 @@ impl XlsFtGboData {
 
 /// FtEdoData (MS-XLS 2.5.144): edit box properties.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct XlsFtEdoData {
-    pub validation: XlsEditBoxValidation,
+pub struct FtEdoData {
+    pub validation: EditBoxValidation,
     pub multi_line: bool,
     pub vertical_scroll_bar: bool,
     /// Identifier of the associated list control; 0 means none.
@@ -316,7 +329,7 @@ pub struct XlsFtEdoData {
 
 /// FtRboData (MS-XLS 2.5.153): radio button grouping.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct XlsFtRboData {
+pub struct FtRboData {
     /// Identifier of the next radio button in the group; 0 means none.
     pub next_radio_button_id: u16,
     /// Whether this is the first radio button of its group.
@@ -325,7 +338,7 @@ pub struct XlsFtRboData {
 
 /// FtSbs (MS-XLS 2.5.154): scroll bar or spin control properties.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct XlsFtSbs {
+pub struct FtSbs {
     /// `unused1`, preserved verbatim.
     pub reserved: [u8; 4],
     pub value: i16,
@@ -342,7 +355,26 @@ pub struct XlsFtSbs {
     pub flags: u16,
 }
 
-impl XlsFtSbs {
+impl FtSbs {
+    /// Validate the range and non-negative increments required by MS-XLS
+    /// 2.5.154. Parsed records that fail this check remain lossless unknown
+    /// subrecords; authored typed values fail before serialization.
+    pub fn validate(&self) -> XlsResult<()> {
+        if self.minimum > self.maximum {
+            return Err(invalid(FT_SBS, "FtSbs minimum exceeds maximum"));
+        }
+        if !(self.minimum..=self.maximum).contains(&self.value) {
+            return Err(invalid(FT_SBS, "FtSbs value is outside its range"));
+        }
+        if self.increment < 0 || self.page_increment < 0 || self.scroll_width < 0 {
+            return Err(invalid(
+                FT_SBS,
+                "FtSbs increments and scroll width must be non-negative",
+            ));
+        }
+        Ok(())
+    }
+
     /// Whether the control is displayed (`fDraw`).
     pub fn draw(&self) -> bool {
         self.flags & SBS_DRAW != 0
@@ -364,13 +396,16 @@ impl XlsFtSbs {
 /// A list item string that retains its original XLUnicodeString encoding, so a
 /// read-write round-trip stays byte-identical.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct XlsLbsItem {
+pub struct LbsItem {
     text: String,
     encoded: Vec<u8>,
 }
 
-impl XlsLbsItem {
+impl LbsItem {
     fn parse(encoded: Vec<u8>) -> Option<Self> {
+        if u16_at(&encoded, 0)? > 0x00FF {
+            return None;
+        }
         let text = decode_xl_unicode_string(&encoded)?;
         Some(Self { text, encoded })
     }
@@ -382,12 +417,18 @@ impl XlsLbsItem {
         let mut encoded = Vec::new();
         if text.chars().all(|value| u32::from(value) <= 0xFF) {
             let count = u16::try_from(text.chars().count()).ok()?;
+            if count > 0x00FF {
+                return None;
+            }
             encoded.extend_from_slice(&count.to_le_bytes());
             encoded.push(0);
             encoded.extend(text.chars().map(|value| value as u8));
         } else {
             let units = text.encode_utf16().collect::<Vec<_>>();
             let count = u16::try_from(units.len()).ok()?;
+            if count > 0x00FF {
+                return None;
+            }
             encoded.extend_from_slice(&count.to_le_bytes());
             encoded.push(XL_STRING_HIGH_BYTE);
             encoded.extend(units.iter().flat_map(|unit| unit.to_le_bytes()));
@@ -411,7 +452,7 @@ impl XlsLbsItem {
 
 /// LbsDropData (MS-XLS 2.5.171): dropdown-specific list box properties.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct XlsLbsDropData {
+pub struct LbsDropData {
     /// Raw `wStyle`/`fFiltered` bitfield; the unused bits are preserved verbatim.
     pub flags: u16,
     /// Number of lines displayed in the dropdown (`cLine`).
@@ -419,20 +460,31 @@ pub struct XlsLbsDropData {
     /// Smallest width in pixels allowed for the dropdown window (`dxMin`).
     pub min_width: u16,
     /// Current string value of the dropdown (`str`).
-    text: XlsLbsItem,
+    text: LbsItem,
     /// Trailing undefined byte, present iff `str` occupies an odd number of
     /// bytes (`unused3`); preserved verbatim.
     pub padding: Option<u8>,
 }
 
-impl XlsLbsDropData {
+impl LbsDropData {
+    /// Validate the bounded dropdown dimensions required by MS-XLS 2.5.171.
+    pub fn validate(&self) -> XlsResult<()> {
+        if self.line_count > 0x7FFF || self.min_width > 0x7FFF {
+            return Err(invalid(
+                FT_LBS_DATA,
+                "LbsDropData dimensions exceed the MS-XLS limit",
+            ));
+        }
+        Ok(())
+    }
+
     /// The dropdown's visual style (`wStyle`).
-    pub fn style(&self) -> XlsDropDownStyle {
+    pub fn style(&self) -> DropDownStyle {
         match self.flags & DROP_STYLE_MASK {
-            0 => XlsDropDownStyle::Combo,
-            1 => XlsDropDownStyle::ComboEdit,
-            2 => XlsDropDownStyle::Simple,
-            _ => XlsDropDownStyle::Reserved,
+            0 => DropDownStyle::Combo,
+            1 => DropDownStyle::ComboEdit,
+            2 => DropDownStyle::Simple,
+            _ => DropDownStyle::Reserved,
         }
     }
     /// Whether the displayed data has been filtered (`fFiltered`).
@@ -451,7 +503,7 @@ impl XlsLbsDropData {
 /// portion present in the Obj record itself is typed; `items` and
 /// `multi_selection` then hold fewer than `entry_count` elements.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct XlsFtLbsData {
+pub struct FtLbsData {
     /// Raw ObjFmla payload (the `fmla` bytes following the `cbFmla` prefix)
     /// naming the range that fills the list.
     pub formula: Vec<u8>,
@@ -464,16 +516,35 @@ pub struct XlsFtLbsData {
     /// Identifier of the associated edit box (`idEdit`); 0 means none.
     pub edit_box_id: u16,
     /// Dropdown properties; present iff the containing Obj is a dropdown.
-    pub drop_down: Option<XlsLbsDropData>,
+    pub drop_down: Option<LbsDropData>,
     /// List item strings (`rgLines`), each in its original encoding.
-    items: Vec<XlsLbsItem>,
+    items: Vec<LbsItem>,
     /// Per-item multiple-selection state (`bsels`).
     pub multi_selection: Vec<bool>,
     /// Bytes following the typed portion, preserved verbatim on write.
     pub trailing: Vec<u8>,
 }
 
-impl XlsFtLbsData {
+impl FtLbsData {
+    /// Validate the list header and any dropdown dimensions required by
+    /// MS-XLS 2.5.147 and 2.5.171. Item and selection arrays may be partial
+    /// because the owning Obj can continue into later Continue records.
+    pub fn validate(&self) -> XlsResult<()> {
+        if self.entry_count > 0x7FFF {
+            return Err(invalid(FT_LBS_DATA, "FtLbsData entry count exceeds 0x7FFF"));
+        }
+        if self.selected_index > self.entry_count {
+            return Err(invalid(
+                FT_LBS_DATA,
+                "FtLbsData selected index exceeds entry count",
+            ));
+        }
+        if let Some(drop_down) = &self.drop_down {
+            drop_down.validate()?;
+        }
+        Ok(())
+    }
+
     /// Whether the `lct` behavior class is meaningful (`fUseCB`).
     pub fn has_behavior_class(&self) -> bool {
         self.flags & LBS_USE_CB != 0
@@ -491,33 +562,33 @@ impl XlsFtLbsData {
         self.flags & LBS_NO_3D != 0
     }
     /// The selection behavior of the list control (`wListSelType`).
-    pub fn selection_type(&self) -> XlsListSelectionType {
+    pub fn selection_type(&self) -> ListSelectionType {
         match (self.flags >> LBS_SELECTION_TYPE_SHIFT) & LBS_SELECTION_TYPE_MASK {
-            0 => XlsListSelectionType::Single,
-            1 => XlsListSelectionType::Multi,
-            2 => XlsListSelectionType::CtrlMulti,
-            _ => XlsListSelectionType::Reserved,
+            0 => ListSelectionType::Single,
+            1 => ListSelectionType::Multi,
+            2 => ListSelectionType::CtrlMulti,
+            _ => ListSelectionType::Reserved,
         }
     }
     /// The behavior class of the list (`lct`).
-    pub fn behavior_class(&self) -> XlsListBehaviorClass {
+    pub fn behavior_class(&self) -> ListBehaviorClass {
         match (self.flags >> LBS_BEHAVIOR_CLASS_SHIFT) as u8 {
-            0x00 => XlsListBehaviorClass::Regular,
-            0x01 => XlsListBehaviorClass::PivotPageField,
-            0x03 => XlsListBehaviorClass::AutoFilter,
-            0x05 => XlsListBehaviorClass::AutoComplete,
-            0x06 => XlsListBehaviorClass::DataValidation,
-            0x07 => XlsListBehaviorClass::PivotField,
-            0x09 => XlsListBehaviorClass::TotalRow,
-            value => XlsListBehaviorClass::Unknown(value),
+            0x00 => ListBehaviorClass::Regular,
+            0x01 => ListBehaviorClass::PivotPageField,
+            0x03 => ListBehaviorClass::AutoFilter,
+            0x05 => ListBehaviorClass::AutoComplete,
+            0x06 => ListBehaviorClass::DataValidation,
+            0x07 => ListBehaviorClass::PivotField,
+            0x09 => ListBehaviorClass::TotalRow,
+            value => ListBehaviorClass::Unknown(value),
         }
     }
     /// The list item strings.
-    pub fn items(&self) -> &[XlsLbsItem] {
+    pub fn items(&self) -> &[LbsItem] {
         &self.items
     }
     /// Replace the list item strings.
-    pub fn set_items(&mut self, items: Vec<XlsLbsItem>) {
+    pub fn set_items(&mut self, items: Vec<LbsItem>) {
         self.items = items;
     }
 
@@ -535,29 +606,29 @@ impl XlsFtLbsData {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum XlsObjSubrecord {
-    Common(XlsFtCmo),
+pub enum ObjSubrecord {
+    Common(FtCmo),
     ClipboardFormat(Vec<u8>),
-    PictureFlags(XlsFtPioGrbit),
-    PictureFormula(XlsFtPictFmla),
-    CheckBoxData(XlsFtCblsData),
-    RadioButtonData(XlsFtRboData),
-    EditBoxData(XlsFtEdoData),
-    GroupBoxData(XlsFtGboData),
-    ScrollBarData(XlsFtSbs),
-    ListBoxData(XlsFtLbsData),
+    PictureFlags(FtPioGrbit),
+    PictureFormula(FtPictFmla),
+    CheckBoxData(FtCblsData),
+    RadioButtonData(FtRboData),
+    EditBoxData(FtEdoData),
+    GroupBoxData(FtGboData),
+    ScrollBarData(FtSbs),
+    ListBoxData(FtLbsData),
     Unknown { kind: u16, data: Vec<u8> },
     End,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct XlsOleObjectRecord {
-    pub subrecords: Vec<XlsObjSubrecord>,
+pub struct OleObjectRecord {
+    pub subrecords: Vec<ObjSubrecord>,
     /// Complete adjacent TxO record, retained byte-for-byte.
     pub text_object: Option<Vec<u8>>,
 }
 
-impl XlsOleObjectRecord {
+impl OleObjectRecord {
     pub fn parse(data: &[u8], text_object: Option<Vec<u8>>) -> XlsResult<Self> {
         let value = Self {
             subrecords: parse_subrecords(data)?,
@@ -571,7 +642,7 @@ impl XlsOleObjectRecord {
         self.subrecords
             .iter()
             .find_map(|value| match value {
-                XlsObjSubrecord::Common(value) => Some(value.object_id),
+                ObjSubrecord::Common(value) => Some(value.object_id),
                 _ => None,
             })
             .unwrap_or(0)
@@ -579,7 +650,7 @@ impl XlsOleObjectRecord {
 
     pub fn storage_position(&self) -> Option<u32> {
         self.subrecords.iter().find_map(|value| match value {
-            XlsObjSubrecord::PictureFormula(value) => value.storage_position,
+            ObjSubrecord::PictureFormula(value) => value.storage_position,
             _ => None,
         })
     }
@@ -590,7 +661,7 @@ impl XlsOleObjectRecord {
             .subrecords
             .iter()
             .find_map(|value| match value {
-                XlsObjSubrecord::PictureFlags(value) => Some(value.is_dde()),
+                ObjSubrecord::PictureFlags(value) => Some(value.is_dde()),
                 _ => None,
             })
             .unwrap_or(false);
@@ -609,14 +680,14 @@ impl XlsOleObjectRecord {
             .subrecords
             .iter()
             .filter_map(|value| match value {
-                XlsObjSubrecord::Common(value) => Some(value),
+                ObjSubrecord::Common(value) => Some(value),
                 _ => None,
             })
             .collect::<Vec<_>>();
         if common.len() != 1
             || common[0].object_type != 8
             || common[0].object_id == 0
-            || !matches!(self.subrecords.first(), Some(XlsObjSubrecord::Common(_)))
+            || !matches!(self.subrecords.first(), Some(ObjSubrecord::Common(_)))
         {
             return Err(invalid(
                 OBJ,
@@ -627,7 +698,7 @@ impl XlsOleObjectRecord {
             .subrecords
             .iter()
             .filter_map(|value| match value {
-                XlsObjSubrecord::PictureFlags(value) => Some(*value),
+                ObjSubrecord::PictureFlags(value) => Some(*value),
                 _ => None,
             })
             .collect::<Vec<_>>();
@@ -635,16 +706,22 @@ impl XlsOleObjectRecord {
             return Err(invalid(OBJ, "OLE Obj requires one FtPioGrbit"));
         }
         pio[0].validate()?;
+        if pio[0].is_control() || pio[0].uses_control_stream() {
+            return Err(invalid(
+                OBJ,
+                "OLE Obj data must be in an embedding or link storage",
+            ));
+        }
         if self
             .subrecords
             .iter()
-            .filter(|value| matches!(value, XlsObjSubrecord::PictureFormula(_)))
+            .filter(|value| matches!(value, ObjSubrecord::PictureFormula(_)))
             .count()
             > 1
         {
             return Err(invalid(OBJ, "duplicate FtPictFmla"));
         }
-        if !matches!(self.subrecords.last(), Some(XlsObjSubrecord::End)) {
+        if !matches!(self.subrecords.last(), Some(ObjSubrecord::End)) {
             return Err(invalid(OBJ, "OLE Obj must end with FtEnd"));
         }
         Ok(())
@@ -659,29 +736,31 @@ impl XlsOleObjectRecord {
 /// A worksheet form control (checkbox, radio button, edit box, group box,
 /// spin/scroll bar, list box, or dropdown) backed by an Obj record.
 ///
-/// Unlike [`XlsOleObjectRecord`], which enforces the strict OLE-object shape,
+/// Unlike [`OleObjectRecord`], which enforces the strict OLE-object shape,
 /// this view accepts any Obj whose `cmo.ot` names a form control and types its
 /// control-specific subrecords per MS-XLS 2.5.141-2.5.154.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct XlsFormControl {
+pub struct FormControl {
     /// Complete Obj subrecord list; the first entry is always
-    /// [`XlsObjSubrecord::Common`].
-    pub subrecords: Vec<XlsObjSubrecord>,
+    /// [`ObjSubrecord::Common`].
+    pub subrecords: Vec<ObjSubrecord>,
     /// Complete adjacent TxO record, retained byte-for-byte.
     pub text_object: Option<Vec<u8>>,
 }
 
-impl XlsFormControl {
+impl FormControl {
     /// Parse a form-control Obj record body. Returns `None` when the record is
     /// not a worksheet form control (picture, chart, note, ...) or its framing
     /// is broken; such records keep flowing through untouched.
     pub fn parse(data: &[u8], text_object: Option<Vec<u8>>) -> Option<Self> {
         let subrecords = parse_subrecords(data).ok()?;
         let common = match subrecords.first() {
-            Some(XlsObjSubrecord::Common(value)) => value,
+            Some(ObjSubrecord::Common(value)) => value,
             _ => return None,
         };
-        let control = (OBJECT_TYPE_CHECK_BOX..=OBJECT_TYPE_DROP_DOWN).contains(&common.object_type);
+        let control = common
+            .object_kind()
+            .is_some_and(ObjectType::is_form_control);
         control.then_some(Self {
             subrecords,
             text_object,
@@ -694,54 +773,54 @@ impl XlsFormControl {
     }
 
     /// The kind of form control, decoded from `cmo.ot`.
-    pub fn control_type(&self) -> Option<XlsObjectType> {
-        self.common().and_then(XlsFtCmo::object_kind)
+    pub fn control_type(&self) -> Option<ObjectType> {
+        self.common().and_then(FtCmo::object_kind)
     }
 
     /// Checkbox or radio button state, when present.
-    pub fn check_box_data(&self) -> Option<&XlsFtCblsData> {
+    pub fn check_box_data(&self) -> Option<&FtCblsData> {
         self.find(|value| match value {
-            XlsObjSubrecord::CheckBoxData(value) => Some(value),
+            ObjSubrecord::CheckBoxData(value) => Some(value),
             _ => None,
         })
     }
 
     /// Radio button grouping, when present.
-    pub fn radio_button_data(&self) -> Option<&XlsFtRboData> {
+    pub fn radio_button_data(&self) -> Option<&FtRboData> {
         self.find(|value| match value {
-            XlsObjSubrecord::RadioButtonData(value) => Some(value),
+            ObjSubrecord::RadioButtonData(value) => Some(value),
             _ => None,
         })
     }
 
     /// Edit box properties, when present.
-    pub fn edit_box_data(&self) -> Option<&XlsFtEdoData> {
+    pub fn edit_box_data(&self) -> Option<&FtEdoData> {
         self.find(|value| match value {
-            XlsObjSubrecord::EditBoxData(value) => Some(value),
+            ObjSubrecord::EditBoxData(value) => Some(value),
             _ => None,
         })
     }
 
     /// Group box properties, when present.
-    pub fn group_box_data(&self) -> Option<&XlsFtGboData> {
+    pub fn group_box_data(&self) -> Option<&FtGboData> {
         self.find(|value| match value {
-            XlsObjSubrecord::GroupBoxData(value) => Some(value),
+            ObjSubrecord::GroupBoxData(value) => Some(value),
             _ => None,
         })
     }
 
     /// Scroll bar or spin control properties, when present.
-    pub fn scroll_bar_data(&self) -> Option<&XlsFtSbs> {
+    pub fn scroll_bar_data(&self) -> Option<&FtSbs> {
         self.find(|value| match value {
-            XlsObjSubrecord::ScrollBarData(value) => Some(value),
+            ObjSubrecord::ScrollBarData(value) => Some(value),
             _ => None,
         })
     }
 
     /// List box or dropdown properties, when present.
-    pub fn list_box_data(&self) -> Option<&XlsFtLbsData> {
+    pub fn list_box_data(&self) -> Option<&FtLbsData> {
         self.find(|value| match value {
-            XlsObjSubrecord::ListBoxData(value) => Some(value),
+            ObjSubrecord::ListBoxData(value) => Some(value),
             _ => None,
         })
     }
@@ -751,28 +830,28 @@ impl XlsFormControl {
         record(OBJ, &serialize_subrecords(&self.subrecords)?)
     }
 
-    fn common(&self) -> Option<&XlsFtCmo> {
+    fn common(&self) -> Option<&FtCmo> {
         self.find(|value| match value {
-            XlsObjSubrecord::Common(value) => Some(value),
+            ObjSubrecord::Common(value) => Some(value),
             _ => None,
         })
     }
 
-    fn find<'a, T>(&'a self, pick: impl Fn(&'a XlsObjSubrecord) -> Option<&'a T>) -> Option<&'a T> {
+    fn find<'a, T>(&'a self, pick: impl Fn(&'a ObjSubrecord) -> Option<&'a T>) -> Option<&'a T> {
         self.subrecords.iter().find_map(pick)
     }
 }
 
 #[derive(Clone)]
-pub struct XlsOleObjectEditor {
+pub struct Editor {
     package: ObjectEditor,
     workbook_path: Vec<String>,
     workbook: Vec<u8>,
-    sheets: Vec<Vec<XlsOleObjectRecord>>,
-    form_controls: Vec<Vec<XlsFormControl>>,
+    sheets: Vec<Vec<OleObjectRecord>>,
+    form_controls: Vec<Vec<FormControl>>,
 }
 
-impl XlsOleObjectEditor {
+impl Editor {
     pub fn new(bytes: Vec<u8>, limits: Limits) -> XlsResult<Self> {
         // Workbook metadata is XLS-owned. Read and parse it before handing
         // the original CFB bytes to the neutral object editor so the target
@@ -790,7 +869,7 @@ impl XlsOleObjectEditor {
         })
     }
 
-    pub fn objects(&self, worksheet: usize) -> XlsResult<&[XlsOleObjectRecord]> {
+    pub fn objects(&self, worksheet: usize) -> XlsResult<&[OleObjectRecord]> {
         self.sheets
             .get(worksheet)
             .map(Vec::as_slice)
@@ -799,7 +878,7 @@ impl XlsOleObjectEditor {
 
     /// Form controls (checkboxes, list boxes, scroll bars, ...) anchored in a
     /// worksheet, in Obj record order.
-    pub fn form_controls(&self, worksheet: usize) -> XlsResult<&[XlsFormControl]> {
+    pub fn form_controls(&self, worksheet: usize) -> XlsResult<&[FormControl]> {
         self.form_controls
             .get(worksheet)
             .map(Vec::as_slice)
@@ -809,7 +888,7 @@ impl XlsOleObjectEditor {
     pub fn add(
         &mut self,
         worksheet: usize,
-        object: XlsOleObjectRecord,
+        object: OleObjectRecord,
         compound_file: Vec<u8>,
     ) -> XlsResult<()> {
         object.validate()?;
@@ -837,7 +916,7 @@ impl XlsOleObjectEditor {
         Ok(())
     }
 
-    pub fn remove(&mut self, worksheet: usize, object_id: u16) -> XlsResult<XlsOleObjectRecord> {
+    pub fn remove(&mut self, worksheet: usize, object_id: u16) -> XlsResult<OleObjectRecord> {
         let mut candidate = self.clone();
         let sheet = candidate
             .sheets
@@ -958,7 +1037,7 @@ fn target_for_storage(storage: String) -> XlsResult<Target> {
     Ok(Target::new(storage.clone(), [storage])?)
 }
 
-fn targets_for_sheets(sheets: &[Vec<XlsOleObjectRecord>]) -> XlsResult<Targets> {
+fn targets_for_sheets(sheets: &[Vec<OleObjectRecord>]) -> XlsResult<Targets> {
     let mut seen = HashSet::new();
     let mut targets = Vec::new();
     for object in sheets.iter().flatten() {
@@ -972,7 +1051,7 @@ fn targets_for_sheets(sheets: &[Vec<XlsOleObjectRecord>]) -> XlsResult<Targets> 
     Ok(Targets::new(targets)?)
 }
 
-fn parse_formula(body: &[u8]) -> XlsResult<XlsFtPictFmla> {
+fn parse_formula(body: &[u8]) -> XlsResult<FtPictFmla> {
     if body.len() < 2 {
         return Err(invalid(OBJ, "FtPictFmla is truncated"));
     }
@@ -993,14 +1072,14 @@ fn parse_formula(body: &[u8]) -> XlsResult<XlsFtPictFmla> {
         ),
         _ => return Err(invalid(OBJ, "unsupported FtPictFmla trailing layout")),
     };
-    Ok(XlsFtPictFmla {
+    Ok(FtPictFmla {
         formula,
         storage_position,
         control_buffer_size,
     })
 }
 
-fn parse_subrecords(data: &[u8]) -> XlsResult<Vec<XlsObjSubrecord>> {
+fn parse_subrecords(data: &[u8]) -> XlsResult<Vec<ObjSubrecord>> {
     let mut offset = 0usize;
     let mut control_type = None;
     let mut subrecords = Vec::new();
@@ -1017,41 +1096,42 @@ fn parse_subrecords(data: &[u8]) -> XlsResult<Vec<XlsObjSubrecord>> {
         let body = data
             .get(offset..end)
             .ok_or_else(|| invalid(OBJ, "truncated Obj subrecord"))?;
-        let value = match (kind, len) {
-            (FT_CMO, 18) => XlsObjSubrecord::Common(XlsFtCmo {
-                object_type: u16::from_le_bytes([body[0], body[1]]),
-                object_id: u16::from_le_bytes([body[2], body[3]]),
-                flags: u16::from_le_bytes([body[4], body[5]]),
-                reserved: array_at(body, 6)
-                    .ok_or_else(|| invalid(OBJ, "FtCmo reserved bytes are truncated"))?,
-            }),
-            (FT_CMO, _) => return Err(invalid(OBJ, "FtCmo must contain 18 bytes")),
-            (FT_CF, _) => XlsObjSubrecord::ClipboardFormat(body.to_vec()),
-            (FT_PIO, 2) => XlsObjSubrecord::PictureFlags(XlsFtPioGrbit {
-                raw: u16::from_le_bytes([body[0], body[1]]),
-            }),
-            (FT_PIO, _) => return Err(invalid(OBJ, "FtPioGrbit must contain 2 bytes")),
-            (FT_PICT_FMLA, _) => XlsObjSubrecord::PictureFormula(parse_formula(body)?),
-            // Form-control data subrecords fall back to raw preservation when
-            // their contents do not match the MS-XLS layout.
-            (FT_CBLS_DATA, _) => parse_cbls_data(body)
-                .map_or_else(|| unknown(kind, body), XlsObjSubrecord::CheckBoxData),
-            (FT_RBO_DATA, _) => parse_rbo_data(body)
-                .map_or_else(|| unknown(kind, body), XlsObjSubrecord::RadioButtonData),
-            (FT_EDO_DATA, _) => parse_edo_data(body)
-                .map_or_else(|| unknown(kind, body), XlsObjSubrecord::EditBoxData),
-            (FT_GBO_DATA, _) => parse_gbo_data(body)
-                .map_or_else(|| unknown(kind, body), XlsObjSubrecord::GroupBoxData),
-            (FT_SBS, _) => {
-                parse_sbs(body).map_or_else(|| unknown(kind, body), XlsObjSubrecord::ScrollBarData)
-            },
-            (FT_LBS_DATA, _) => parse_lbs_data(body, control_type)
-                .map_or_else(|| unknown(kind, body), XlsObjSubrecord::ListBoxData),
-            (FT_END, 0) => XlsObjSubrecord::End,
-            (FT_END, _) => return Err(invalid(OBJ, "FtEnd must be empty")),
-            _ => unknown(kind, body),
-        };
-        if let XlsObjSubrecord::Common(common) = &value {
+        let value =
+            match (kind, len) {
+                (FT_CMO, 18) => ObjSubrecord::Common(FtCmo {
+                    object_type: u16::from_le_bytes([body[0], body[1]]),
+                    object_id: u16::from_le_bytes([body[2], body[3]]),
+                    flags: u16::from_le_bytes([body[4], body[5]]),
+                    reserved: array_at(body, 6)
+                        .ok_or_else(|| invalid(OBJ, "FtCmo reserved bytes are truncated"))?,
+                }),
+                (FT_CMO, _) => return Err(invalid(OBJ, "FtCmo must contain 18 bytes")),
+                (FT_CF, _) => ObjSubrecord::ClipboardFormat(body.to_vec()),
+                (FT_PIO, 2) => ObjSubrecord::PictureFlags(FtPioGrbit {
+                    raw: u16::from_le_bytes([body[0], body[1]]),
+                }),
+                (FT_PIO, _) => return Err(invalid(OBJ, "FtPioGrbit must contain 2 bytes")),
+                (FT_PICT_FMLA, _) => ObjSubrecord::PictureFormula(parse_formula(body)?),
+                // Form-control data subrecords fall back to raw preservation when
+                // their contents do not match the MS-XLS layout.
+                (FT_CBLS_DATA, _) => parse_cbls_data(body)
+                    .map_or_else(|| unknown(kind, body), ObjSubrecord::CheckBoxData),
+                (FT_RBO_DATA, _) => parse_rbo_data(body)
+                    .map_or_else(|| unknown(kind, body), ObjSubrecord::RadioButtonData),
+                (FT_EDO_DATA, _) => parse_edo_data(body)
+                    .map_or_else(|| unknown(kind, body), ObjSubrecord::EditBoxData),
+                (FT_GBO_DATA, _) => parse_gbo_data(body)
+                    .map_or_else(|| unknown(kind, body), ObjSubrecord::GroupBoxData),
+                (FT_SBS, _) => {
+                    parse_sbs(body).map_or_else(|| unknown(kind, body), ObjSubrecord::ScrollBarData)
+                },
+                (FT_LBS_DATA, _) => parse_lbs_data(body, control_type)
+                    .map_or_else(|| unknown(kind, body), ObjSubrecord::ListBoxData),
+                (FT_END, 0) => ObjSubrecord::End,
+                (FT_END, _) => return Err(invalid(OBJ, "FtEnd must be empty")),
+                _ => unknown(kind, body),
+            };
+        if let ObjSubrecord::Common(common) = &value {
             control_type = Some(common.object_type);
         }
         subrecords.push(value);
@@ -1060,8 +1140,8 @@ fn parse_subrecords(data: &[u8]) -> XlsResult<Vec<XlsObjSubrecord>> {
     Ok(subrecords)
 }
 
-fn unknown(kind: u16, body: &[u8]) -> XlsObjSubrecord {
-    XlsObjSubrecord::Unknown {
+fn unknown(kind: u16, body: &[u8]) -> ObjSubrecord {
+    ObjSubrecord::Unknown {
         kind,
         data: body.to_vec(),
     }
@@ -1088,56 +1168,56 @@ fn bool_at(data: &[u8], offset: usize) -> Option<bool> {
     }
 }
 
-fn parse_cbls_data(body: &[u8]) -> Option<XlsFtCblsData> {
+fn parse_cbls_data(body: &[u8]) -> Option<FtCblsData> {
     if body.len() != 8 {
         return None;
     }
-    Some(XlsFtCblsData {
-        state: XlsCheckState::from_code(u16_at(body, 0)?)?,
+    Some(FtCblsData {
+        state: CheckState::from_code(u16_at(body, 0)?)?,
         accelerator: u16_at(body, 2)?,
         reserved: u16_at(body, 4)?,
         flags: u16_at(body, 6)?,
     })
 }
 
-fn parse_rbo_data(body: &[u8]) -> Option<XlsFtRboData> {
+fn parse_rbo_data(body: &[u8]) -> Option<FtRboData> {
     if body.len() != 4 {
         return None;
     }
-    Some(XlsFtRboData {
+    Some(FtRboData {
         next_radio_button_id: u16_at(body, 0)?,
         first_in_group: bool_at(body, 2)?,
     })
 }
 
-fn parse_edo_data(body: &[u8]) -> Option<XlsFtEdoData> {
+fn parse_edo_data(body: &[u8]) -> Option<FtEdoData> {
     if body.len() != 8 {
         return None;
     }
-    Some(XlsFtEdoData {
-        validation: XlsEditBoxValidation::from_code(u16_at(body, 0)?)?,
+    Some(FtEdoData {
+        validation: EditBoxValidation::from_code(u16_at(body, 0)?)?,
         multi_line: bool_at(body, 2)?,
         vertical_scroll_bar: bool_at(body, 4)?,
         list_control_id: u16_at(body, 6)?,
     })
 }
 
-fn parse_gbo_data(body: &[u8]) -> Option<XlsFtGboData> {
+fn parse_gbo_data(body: &[u8]) -> Option<FtGboData> {
     if body.len() != 6 {
         return None;
     }
-    Some(XlsFtGboData {
+    Some(FtGboData {
         accelerator: u16_at(body, 0)?,
         reserved: u16_at(body, 2)?,
         flags: u16_at(body, 4)?,
     })
 }
 
-fn parse_sbs(body: &[u8]) -> Option<XlsFtSbs> {
+fn parse_sbs(body: &[u8]) -> Option<FtSbs> {
     if body.len() != 20 {
         return None;
     }
-    Some(XlsFtSbs {
+    let value = FtSbs {
         reserved: array_at(body, 0)?,
         value: i16::from_le_bytes(array_at(body, 4)?),
         minimum: i16::from_le_bytes(array_at(body, 6)?),
@@ -1147,12 +1227,14 @@ fn parse_sbs(body: &[u8]) -> Option<XlsFtSbs> {
         horizontal: bool_at(body, 14)?,
         scroll_width: i16::from_le_bytes(array_at(body, 16)?),
         flags: u16_at(body, 18)?,
-    })
+    };
+    value.validate().ok()?;
+    Some(value)
 }
 
-fn parse_lbs_data(body: &[u8], control_type: Option<u16>) -> Option<XlsFtLbsData> {
+fn parse_lbs_data(body: &[u8], control_type: Option<u16>) -> Option<FtLbsData> {
     if body.is_empty() {
-        return Some(XlsFtLbsData::default());
+        return Some(FtLbsData::default());
     }
     let formula_len = usize::from(u16_at(body, 0)?);
     let formula_end = 2usize.checked_add(formula_len)?;
@@ -1161,16 +1243,17 @@ fn parse_lbs_data(body: &[u8], control_type: Option<u16>) -> Option<XlsFtLbsData
     if body.len() < header_end {
         return None;
     }
-    let mut data = XlsFtLbsData {
+    let mut data = FtLbsData {
         formula,
         entry_count: u16_at(body, formula_end)?,
         selected_index: u16_at(body, formula_end + 2)?,
         flags: u16_at(body, formula_end + 4)?,
         edit_box_id: u16_at(body, formula_end + 6)?,
-        ..XlsFtLbsData::default()
+        ..FtLbsData::default()
     };
+    data.validate().ok()?;
     let mut offset = header_end;
-    if control_type == Some(OBJECT_TYPE_DROP_DOWN) {
+    if control_type.and_then(ObjectType::from_code) == Some(ObjectType::DropDown) {
         let drop_header_end = offset.checked_add(6)?;
         if body.len() < drop_header_end {
             return None;
@@ -1180,7 +1263,7 @@ fn parse_lbs_data(body: &[u8], control_type: Option<u16>) -> Option<XlsFtLbsData
         let min_width = u16_at(body, offset + 4)?;
         offset = drop_header_end;
         let text_len = xl_unicode_string_size(body.get(offset..)?)?;
-        let text = XlsLbsItem::parse(body.get(offset..offset + text_len)?.to_vec())?;
+        let text = LbsItem::parse(body.get(offset..offset + text_len)?.to_vec())?;
         offset += text_len;
         let padding = if text_len % 2 == 1 {
             let value = *body.get(offset)?;
@@ -1189,13 +1272,14 @@ fn parse_lbs_data(body: &[u8], control_type: Option<u16>) -> Option<XlsFtLbsData
         } else {
             None
         };
-        data.drop_down = Some(XlsLbsDropData {
+        data.drop_down = Some(LbsDropData {
             flags,
             line_count,
             min_width,
             text,
             padding,
         });
+        data.validate().ok()?;
     }
     // rgLines: parse up to `entry_count` item strings. A record continued into
     // Continue records holds fewer strings here; a defective string stops the
@@ -1204,7 +1288,7 @@ fn parse_lbs_data(body: &[u8], control_type: Option<u16>) -> Option<XlsFtLbsData
     while items.len() < usize::from(data.entry_count) && offset < body.len() {
         match xl_unicode_string_size(&body[offset..]) {
             Some(size) if offset + size <= body.len() => {
-                items.push(XlsLbsItem::parse(body[offset..offset + size].to_vec())?);
+                items.push(LbsItem::parse(body[offset..offset + size].to_vec())?);
                 offset += size;
             },
             _ => break,
@@ -1215,15 +1299,16 @@ fn parse_lbs_data(body: &[u8], control_type: Option<u16>) -> Option<XlsFtLbsData
         let multiple = (data.flags >> LBS_SELECTION_TYPE_SHIFT) & LBS_SELECTION_TYPE_MASK != 0;
         if multiple {
             let count = usize::from(data.entry_count).min(body.len() - offset);
-            data.multi_selection = body[offset..offset + count]
-                .iter()
-                .map(|value| *value != 0)
-                .collect();
-            offset += count;
+            let selection = &body[offset..offset + count];
+            if selection.iter().all(|value| *value <= 1) {
+                data.multi_selection = selection.iter().map(|value| *value != 0).collect();
+                offset += count;
+            }
         }
         data.trailing = body[offset..].to_vec();
     }
     data.set_items(items);
+    data.validate().ok()?;
     Some(data)
 }
 
@@ -1293,7 +1378,7 @@ fn decode_xl_unicode_string(encoded: &[u8]) -> Option<String> {
     }
 }
 
-fn serialize_subrecords(subrecords: &[XlsObjSubrecord]) -> XlsResult<Vec<u8>> {
+fn serialize_subrecords(subrecords: &[ObjSubrecord]) -> XlsResult<Vec<u8>> {
     let mut output = Vec::new();
     for value in subrecords {
         let (kind, body) = serialize_subrecord(value)?;
@@ -1306,9 +1391,9 @@ fn serialize_subrecords(subrecords: &[XlsObjSubrecord]) -> XlsResult<Vec<u8>> {
     Ok(output)
 }
 
-fn serialize_subrecord(value: &XlsObjSubrecord) -> XlsResult<(u16, Vec<u8>)> {
+fn serialize_subrecord(value: &ObjSubrecord) -> XlsResult<(u16, Vec<u8>)> {
     Ok(match value {
-        XlsObjSubrecord::Common(value) => {
+        ObjSubrecord::Common(value) => {
             let mut body = Vec::with_capacity(18);
             body.extend_from_slice(&value.object_type.to_le_bytes());
             body.extend_from_slice(&value.object_id.to_le_bytes());
@@ -1316,9 +1401,9 @@ fn serialize_subrecord(value: &XlsObjSubrecord) -> XlsResult<(u16, Vec<u8>)> {
             body.extend_from_slice(&value.reserved);
             (FT_CMO, body)
         },
-        XlsObjSubrecord::ClipboardFormat(data) => (FT_CF, data.clone()),
-        XlsObjSubrecord::PictureFlags(value) => (FT_PIO, value.raw.to_le_bytes().to_vec()),
-        XlsObjSubrecord::PictureFormula(value) => {
+        ObjSubrecord::ClipboardFormat(data) => (FT_CF, data.clone()),
+        ObjSubrecord::PictureFlags(value) => (FT_PIO, value.raw.to_le_bytes().to_vec()),
+        ObjSubrecord::PictureFormula(value) => {
             let len = u16::try_from(value.formula.len())
                 .map_err(|_| invalid(OBJ, "formula exceeds u16"))?;
             let mut body = len.to_le_bytes().to_vec();
@@ -1338,7 +1423,7 @@ fn serialize_subrecord(value: &XlsObjSubrecord) -> XlsResult<(u16, Vec<u8>)> {
             }
             (FT_PICT_FMLA, body)
         },
-        XlsObjSubrecord::CheckBoxData(value) => {
+        ObjSubrecord::CheckBoxData(value) => {
             let mut body = Vec::with_capacity(8);
             body.extend_from_slice(&value.state.code().to_le_bytes());
             body.extend_from_slice(&value.accelerator.to_le_bytes());
@@ -1346,13 +1431,13 @@ fn serialize_subrecord(value: &XlsObjSubrecord) -> XlsResult<(u16, Vec<u8>)> {
             body.extend_from_slice(&value.flags.to_le_bytes());
             (FT_CBLS_DATA, body)
         },
-        XlsObjSubrecord::RadioButtonData(value) => {
+        ObjSubrecord::RadioButtonData(value) => {
             let mut body = Vec::with_capacity(4);
             body.extend_from_slice(&value.next_radio_button_id.to_le_bytes());
             body.extend_from_slice(&u16::from(value.first_in_group).to_le_bytes());
             (FT_RBO_DATA, body)
         },
-        XlsObjSubrecord::EditBoxData(value) => {
+        ObjSubrecord::EditBoxData(value) => {
             let mut body = Vec::with_capacity(8);
             body.extend_from_slice(&value.validation.code().to_le_bytes());
             body.extend_from_slice(&u16::from(value.multi_line).to_le_bytes());
@@ -1360,14 +1445,15 @@ fn serialize_subrecord(value: &XlsObjSubrecord) -> XlsResult<(u16, Vec<u8>)> {
             body.extend_from_slice(&value.list_control_id.to_le_bytes());
             (FT_EDO_DATA, body)
         },
-        XlsObjSubrecord::GroupBoxData(value) => {
+        ObjSubrecord::GroupBoxData(value) => {
             let mut body = Vec::with_capacity(6);
             body.extend_from_slice(&value.accelerator.to_le_bytes());
             body.extend_from_slice(&value.reserved.to_le_bytes());
             body.extend_from_slice(&value.flags.to_le_bytes());
             (FT_GBO_DATA, body)
         },
-        XlsObjSubrecord::ScrollBarData(value) => {
+        ObjSubrecord::ScrollBarData(value) => {
+            value.validate()?;
             let mut body = Vec::with_capacity(20);
             body.extend_from_slice(&value.reserved);
             body.extend_from_slice(&value.value.to_le_bytes());
@@ -1380,7 +1466,8 @@ fn serialize_subrecord(value: &XlsObjSubrecord) -> XlsResult<(u16, Vec<u8>)> {
             body.extend_from_slice(&value.flags.to_le_bytes());
             (FT_SBS, body)
         },
-        XlsObjSubrecord::ListBoxData(value) => {
+        ObjSubrecord::ListBoxData(value) => {
+            value.validate()?;
             if value.is_vacant() {
                 (FT_LBS_DATA, Vec::new())
             } else {
@@ -1414,15 +1501,13 @@ fn serialize_subrecord(value: &XlsObjSubrecord) -> XlsResult<(u16, Vec<u8>)> {
                 (FT_LBS_DATA, body)
             }
         },
-        XlsObjSubrecord::Unknown { kind, data } => (*kind, data.clone()),
-        XlsObjSubrecord::End => (FT_END, Vec::new()),
+        ObjSubrecord::Unknown { kind, data } => (*kind, data.clone()),
+        ObjSubrecord::End => (FT_END, Vec::new()),
     })
 }
 
 #[allow(clippy::type_complexity)]
-fn parse_workbook(
-    input: &[u8],
-) -> XlsResult<(Vec<Vec<XlsOleObjectRecord>>, Vec<Vec<XlsFormControl>>)> {
+fn parse_workbook(input: &[u8]) -> XlsResult<(Vec<Vec<OleObjectRecord>>, Vec<Vec<FormControl>>)> {
     let (_, starts) = bindings(input)?;
     let mut sheets = Vec::new();
     let mut form_controls = Vec::new();
@@ -1439,7 +1524,7 @@ fn parse_workbook(
     Ok((sheets, form_controls))
 }
 
-fn parse_sheet(input: &[u8]) -> XlsResult<(Vec<XlsOleObjectRecord>, Vec<XlsFormControl>)> {
+fn parse_sheet(input: &[u8]) -> XlsResult<(Vec<OleObjectRecord>, Vec<FormControl>)> {
     let records = ranges(input)?;
     let mut objects = Vec::new();
     let mut controls = Vec::new();
@@ -1463,16 +1548,16 @@ fn parse_sheet(input: &[u8]) -> XlsResult<(Vec<XlsOleObjectRecord>, Vec<XlsFormC
             None
         };
         let body = &input[value.3..value.4];
-        if let Ok(object) = XlsOleObjectRecord::parse(body, txo.clone()) {
+        if let Ok(object) = OleObjectRecord::parse(body, txo.clone()) {
             objects.push(object);
-        } else if let Some(control) = XlsFormControl::parse(body, txo) {
+        } else if let Some(control) = FormControl::parse(body, txo) {
             controls.push(control);
         }
     }
     Ok((objects, controls))
 }
 
-fn validate_objects(sheets: &[Vec<XlsOleObjectRecord>]) -> XlsResult<()> {
+fn validate_objects(sheets: &[Vec<OleObjectRecord>]) -> XlsResult<()> {
     let mut ids = HashSet::new();
     for (index, object) in sheets.iter().flatten().enumerate() {
         if index >= 4_096 {
@@ -1486,7 +1571,7 @@ fn validate_objects(sheets: &[Vec<XlsOleObjectRecord>]) -> XlsResult<()> {
     Ok(())
 }
 
-fn rewrite_workbook(input: &[u8], sheets: &[Vec<XlsOleObjectRecord>]) -> XlsResult<Vec<u8>> {
+fn rewrite_workbook(input: &[u8], sheets: &[Vec<OleObjectRecord>]) -> XlsResult<Vec<u8>> {
     let (refs, starts) = bindings(input)?;
     let first = starts.first().map_or(input.len(), |value| value.0);
     let mut output = input[..first].to_vec();
@@ -1523,7 +1608,7 @@ fn rewrite_workbook(input: &[u8], sheets: &[Vec<XlsOleObjectRecord>]) -> XlsResu
     Ok(output)
 }
 
-fn rewrite_sheet(input: &[u8], objects: &[XlsOleObjectRecord]) -> XlsResult<Vec<u8>> {
+fn rewrite_sheet(input: &[u8], objects: &[OleObjectRecord]) -> XlsResult<Vec<u8>> {
     let records = ranges(input)?;
     let mut output = Vec::new();
     let mut next = 0usize;
@@ -1533,7 +1618,7 @@ fn rewrite_sheet(input: &[u8], objects: &[XlsOleObjectRecord]) -> XlsResult<Vec<
             skip_txo = false;
             continue;
         }
-        if value.2 == OBJ && XlsOleObjectRecord::parse(&input[value.3..value.4], None).is_ok() {
+        if value.2 == OBJ && OleObjectRecord::parse(&input[value.3..value.4], None).is_ok() {
             if let Some(object) = objects.get(next) {
                 output.extend_from_slice(&object.to_record_bytes()?);
                 if let Some(txo) = &object.text_object {
@@ -1652,24 +1737,24 @@ mod tests {
     use super::*;
     use litchi_cfb::OleWriter;
 
-    fn object(id: u16, position: u32, dde: bool) -> XlsOleObjectRecord {
-        XlsOleObjectRecord {
+    fn object(id: u16, position: u32, dde: bool) -> OleObjectRecord {
+        OleObjectRecord {
             subrecords: vec![
-                XlsObjSubrecord::Common(XlsFtCmo {
+                ObjSubrecord::Common(FtCmo {
                     object_type: 8,
                     object_id: id,
                     flags: 0,
                     reserved: [0; 12],
                 }),
-                XlsObjSubrecord::PictureFlags(XlsFtPioGrbit {
+                ObjSubrecord::PictureFlags(FtPioGrbit {
                     raw: if dde { 0x0002 } else { 0 },
                 }),
-                XlsObjSubrecord::PictureFormula(XlsFtPictFmla {
+                ObjSubrecord::PictureFormula(FtPictFmla {
                     formula: vec![0x05, 0, 0, 0, 0],
                     storage_position: Some(position),
                     control_buffer_size: Some(0),
                 }),
-                XlsObjSubrecord::End,
+                ObjSubrecord::End,
             ],
             text_object: None,
         }

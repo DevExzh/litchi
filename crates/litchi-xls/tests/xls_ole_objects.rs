@@ -1,8 +1,6 @@
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_xls::ole_object::Limits;
-use litchi_xls::{
-    XlsFtCmo, XlsFtPictFmla, XlsFtPioGrbit, XlsObjSubrecord, XlsOleObjectEditor, XlsOleObjectRecord,
-};
+use litchi_xls::{Editor, FtCmo, FtPictFmla, FtPioGrbit, ObjSubrecord, OleObjectRecord};
 use std::io::Cursor;
 
 fn record(kind: u16, body: &[u8]) -> Vec<u8> {
@@ -12,39 +10,39 @@ fn record(kind: u16, body: &[u8]) -> Vec<u8> {
     value
 }
 
-fn object(id: u16, storage: u32, unknown: u8) -> XlsOleObjectRecord {
-    XlsOleObjectRecord {
+fn object(id: u16, storage: u32, unknown: u8) -> OleObjectRecord {
+    OleObjectRecord {
         subrecords: vec![
-            XlsObjSubrecord::Common(XlsFtCmo {
+            ObjSubrecord::Common(FtCmo {
                 object_type: 8,
                 object_id: id,
                 flags: 0,
                 reserved: [0; 12],
             }),
-            XlsObjSubrecord::ClipboardFormat(vec![2, 0]),
-            XlsObjSubrecord::PictureFlags(XlsFtPioGrbit { raw: 0 }),
-            XlsObjSubrecord::Unknown {
+            ObjSubrecord::ClipboardFormat(vec![2, 0]),
+            ObjSubrecord::PictureFlags(FtPioGrbit { raw: 0 }),
+            ObjSubrecord::Unknown {
                 kind: 0x7777,
                 data: vec![unknown],
             },
-            XlsObjSubrecord::PictureFormula(XlsFtPictFmla {
+            ObjSubrecord::PictureFormula(FtPictFmla {
                 formula: vec![1, 2, 3],
                 storage_position: Some(storage),
                 control_buffer_size: Some(0),
             }),
-            XlsObjSubrecord::End,
+            ObjSubrecord::End,
         ],
         text_object: None,
     }
 }
 
-fn linked_object(id: u16, storage: u32, unknown: u8) -> XlsOleObjectRecord {
+fn linked_object(id: u16, storage: u32, unknown: u8) -> OleObjectRecord {
     let mut value = object(id, storage, unknown);
     let flags = value
         .subrecords
         .iter_mut()
         .find_map(|subrecord| match subrecord {
-            XlsObjSubrecord::PictureFlags(flags) => Some(flags),
+            ObjSubrecord::PictureFlags(flags) => Some(flags),
             _ => None,
         })
         .expect("test OLE object should contain FtPioGrbit");
@@ -60,7 +58,7 @@ fn nested_cfb(marker: &[u8]) -> Vec<u8> {
     output.into_inner()
 }
 
-fn workbook_stream(objects: &[XlsOleObjectRecord]) -> Vec<u8> {
+fn workbook_stream(objects: &[OleObjectRecord]) -> Vec<u8> {
     let bof = record(0x0809, &[0; 16]);
     let eof = record(0x000A, &[]);
     let mut bound_body = vec![0; 8];
@@ -82,12 +80,12 @@ fn workbook_stream(objects: &[XlsOleObjectRecord]) -> Vec<u8> {
     output
 }
 
-fn xls(objects: &[XlsOleObjectRecord], storages: &[u32]) -> Vec<u8> {
+fn xls(objects: &[OleObjectRecord], storages: &[u32]) -> Vec<u8> {
     let names = storages.iter().map(|id| ("MBD", *id)).collect::<Vec<_>>();
     xls_named(objects, &names)
 }
 
-fn xls_named(objects: &[XlsOleObjectRecord], storages: &[(&str, u32)]) -> Vec<u8> {
+fn xls_named(objects: &[OleObjectRecord], storages: &[(&str, u32)]) -> Vec<u8> {
     let workbook = workbook_stream(objects);
     let payloads = storages
         .iter()
@@ -112,19 +110,19 @@ fn xls_named(objects: &[XlsOleObjectRecord], storages: &[(&str, u32)]) -> Vec<u8
 #[test]
 fn opens_link_storage_from_dde_obj_reference() {
     let bytes = xls_named(&[linked_object(1, 42, 1)], &[("LNK", 42)]);
-    let editor = XlsOleObjectEditor::new(bytes, Limits::default()).unwrap();
+    let editor = Editor::new(bytes, Limits::default()).unwrap();
     assert_eq!(editor.objects(0).unwrap().len(), 1);
 }
 
 #[test]
 fn removes_shared_storage_only_after_last_reference() {
     let bytes = xls(&[object(1, 42, 1), object(2, 42, 2)], &[42]);
-    let mut editor = XlsOleObjectEditor::new(bytes, Limits::default()).unwrap();
+    let mut editor = Editor::new(bytes, Limits::default()).unwrap();
     editor.remove(0, 1).unwrap();
     let bytes = editor.finish().unwrap();
     let ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
     assert!(ole.exists(&["MBD0000002A"]));
-    let mut editor = XlsOleObjectEditor::new(bytes, Limits::default()).unwrap();
+    let mut editor = Editor::new(bytes, Limits::default()).unwrap();
     editor.remove(0, 2).unwrap();
     let bytes = editor.finish().unwrap();
     let ole = OleFile::open(Cursor::new(bytes)).unwrap();
@@ -134,19 +132,19 @@ fn removes_shared_storage_only_after_last_reference() {
 #[test]
 fn add_and_reorder_repairs_sheet_offset_and_preserves_unknown_data() {
     let bytes = xls(&[object(1, 1, 0xA1)], &[1]);
-    let mut editor = XlsOleObjectEditor::new(bytes, Limits::default()).unwrap();
+    let mut editor = Editor::new(bytes, Limits::default()).unwrap();
     editor
         .add(0, object(2, 2, 0xB2), nested_cfb(b"second"))
         .unwrap();
     editor.reorder(0, &[2, 1]).unwrap();
     let bytes = editor.finish().unwrap();
-    let editor = XlsOleObjectEditor::new(bytes.clone(), Limits::default()).unwrap();
+    let editor = Editor::new(bytes.clone(), Limits::default()).unwrap();
     assert_eq!(
         editor
             .objects(0)
             .unwrap()
             .iter()
-            .map(XlsOleObjectRecord::object_id)
+            .map(OleObjectRecord::object_id)
             .collect::<Vec<_>>(),
         vec![2, 1]
     );
@@ -163,26 +161,28 @@ fn add_and_reorder_repairs_sheet_offset_and_preserves_unknown_data() {
             .subrecords
             .iter()
             .any(|value| {
-                matches!(value, XlsObjSubrecord::Unknown { kind: 0x7777, data } if data == &[0xB2])
+                matches!(value, ObjSubrecord::Unknown { kind: 0x7777, data } if data == &[0xB2])
             })
     );
 }
 
 #[test]
 fn invalid_flags_and_reorder_are_atomic() {
-    let mut invalid_object = object(1, 1, 0);
-    invalid_object.subrecords[2] = XlsObjSubrecord::PictureFlags(XlsFtPioGrbit { raw: 0x12 });
-    assert!(invalid_object.validate().is_err());
+    for raw in [0x0010, 0x0020, 0x0012] {
+        let mut invalid_object = object(1, 1, 0);
+        invalid_object.subrecords[2] = ObjSubrecord::PictureFlags(FtPioGrbit { raw });
+        assert!(invalid_object.validate().is_err());
+    }
 
     let bytes = xls(&[object(1, 1, 1), object(2, 2, 2)], &[1, 2]);
-    let mut editor = XlsOleObjectEditor::new(bytes, Limits::default()).unwrap();
+    let mut editor = Editor::new(bytes, Limits::default()).unwrap();
     assert!(editor.reorder(0, &[1, 1]).is_err());
     assert_eq!(
         editor
             .objects(0)
             .unwrap()
             .iter()
-            .map(XlsOleObjectRecord::object_id)
+            .map(OleObjectRecord::object_id)
             .collect::<Vec<_>>(),
         vec![1, 2]
     );
