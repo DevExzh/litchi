@@ -4947,6 +4947,56 @@ all-target compilation, workspace formatting, metadata, diff, and boundary
 policy checks pass. These additions improve typed extraction and lossless
 preservation but do not claim complete legacy Office conformance.
 
+## Legacy OLE and OOXML owner migration
+
+The following batch continues the same breaking, contextual-owner migration
+through the OLE2 and OOXML verticals. Word OLE-control metadata is now owned by
+`parts::ole::controls::{Control,Controls}` in the layered
+`parts/ole/controls/{model,codec,tests}` tree. Its codec retains the inert
+`RgxOcxInfo` cookies, padded `OcxInfo` strides, uniqueness checks, and FIB
+range validation from `[MS-DOC]` 2.9.161 and 2.9.229; the old
+`DocumentOleControls` and `OleControlInfo` names were removed without aliases.
+
+Legacy chart FRT records now belong to `litchi-xls::chart::frt`, with
+`info`, `label`, `blocks`, `wrapper`, and `continuation` ownership. The
+contextual `Info`, `Version`, `RecordRange`, `CatLab`, `StartBlock`,
+`EndBlock`, `StartObject`, `EndObject`, `Wrapper`, and `CrtMlFrt` values retain
+reserved bytes, FRT-header checks, version-dependent ranges, and continuation
+chains specified by `[MS-XLS]`. PPT animation now exposes contextual
+`animation::{Editor,Scope,Timeline,Hash10,LinkedSlide,SlideTime,Flags}` values
+and removes the redundant `PowerPointAnimation*`/`PowerPoint10Slide*` public
+prefixes while retaining the typed parser/writer and resource limits.
+
+The shared OLE Custom XML datastore moved from the flat
+`custom_xml_data` module to `litchi-ole-common::custom_xml`, exposing
+`Store`, `Item`, `Properties`, `ItemId`, `RootName`, `Promotion`, and bounded
+`inspect`/`write` operations. The OLE2 model remains inert: GUID and UTF-16
+validation, promotion-marker rules, schema-reference retention, XML payload
+validation, and allocation limits are shared by DOC, PPT, XLS, and the
+crypto/DataSpaces graph. Downstream callers were migrated directly; no old
+module facade remains. OOXML custom properties likewise moved to the layered
+`litchi-ooxml-common::custom::{model,codec,package,schema}` owner.
+
+DOCX drawing inventory is layered under `drawing::{model,codec}` with
+contextual `Object`, `Kind`, and `Anchor` values. XLSX SpreadsheetDrawing,
+ordinary chart integration, and pivot-chart integration now have separate
+layered owners. Their namespace-aware codecs reuse `litchi-drawingml`, retain
+unknown/inert relationship payloads, enforce worksheet/chart resource limits,
+and distinguish the host anchor/package graph from shared chart and text
+models. Pivot-chart `Source`, `Binding`, `Options`, `Series`, and sheet
+inventory values no longer carry redundant `PivotChart` prefixes.
+
+The affected owners pass combined all-target compilation. Focused suites pass
+24 OLE-common unit tests plus its integration targets, 163 OOXML-common unit
+tests plus integration targets, 654 DOCX tests, 881 PPT library tests plus
+integration targets, 842 XLS tests plus integration targets, and 635 XLSX
+tests plus integration targets. DOC's 829 library tests pass (two ignored);
+one existing Apache POI integration fixture still fails before parsing because
+its FAT entry 52 is beyond the physical file. This batch establishes typed,
+bounded, lossless owner seams; it does not claim complete `[MS-DOC]`,
+`[MS-ODRAW]`, `[MS-OGRAPH]`, `[MS-OSHARED]`, `[MS-PPT]`, or `[MS-XLS]`
+conformance.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:
