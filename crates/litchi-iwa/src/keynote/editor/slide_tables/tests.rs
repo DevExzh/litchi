@@ -1,6 +1,6 @@
 use super::*;
 use crate::keynote::KeynoteDocumentBuilder;
-use crate::numbers::CellValue;
+use crate::numbers::cell::CellValue;
 use crate::table_cell_conditional_highlight::{
     TableCellConditionalHighlightCondition, TableCellConditionalHighlightRule,
     TableCellConditionalHighlightStyle, TableCellConditionalHighlightText,

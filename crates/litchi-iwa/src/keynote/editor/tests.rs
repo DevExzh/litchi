@@ -3860,10 +3860,10 @@ fn transition_custom_parameter_crud_is_lossless_and_transactional() {
     invalid.custom_parameters.travel_distance = Some(f32::INFINITY);
     assert!(editor.set_slide_transition(0, invalid).is_err());
     let mut invalid = settings.clone();
-    invalid.custom_parameters.acceleration = Some(Acceleration::from_native(5));
+    invalid.effect = Some(Effect::Unknown("apple:dissolve".to_owned()));
     assert!(editor.set_slide_transition(0, invalid).is_err());
     let mut invalid = settings.clone();
-    invalid.custom_parameters.text_delivery = Some(TextDelivery::from_native(3));
+    invalid.animation_type = Some("invalid\0transition".to_owned());
     assert!(editor.set_slide_transition(0, invalid).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before_invalid);
 

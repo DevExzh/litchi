@@ -300,7 +300,17 @@ impl NumbersTable {
     /// remain available through the adapter while the document readers and
     /// editors migrate to the canonical leaf model.
     pub(crate) fn into_semantic(self) -> crate::Result<litchi_numbers::Table> {
-        self.into_semantic_parts().map(|(table, _comments)| table)
+        self.into_semantic_table()
+    }
+
+    /// Consume the archive adapter without allocating a comment sidecar.
+    ///
+    /// Structured extraction only needs the canonical sparse table. Keeping
+    /// this path separate from [`Self::into_semantic_parts`] avoids sorting
+    /// and boxing native comments that would otherwise be discarded.
+    pub(crate) fn into_semantic_table(self) -> crate::Result<litchi_numbers::Table> {
+        let Self { model, .. } = self;
+        model.finish().map_err(map_table_error)
     }
 
     /// Consume the archive adapter while moving its canonical sparse table
@@ -325,31 +335,6 @@ impl NumbersTable {
         sorted_comments.extend(comments);
         sorted_comments.sort_unstable_by_key(|(position, _comment)| *position);
         Ok((table, sorted_comments.into_boxed_slice()))
-    }
-
-    /// Move the materialized values and comments to another crate-internal
-    /// table view without cloning either sparse map.
-    pub(crate) fn into_parts(
-        self,
-    ) -> (
-        HashMap<(usize, usize), CellValue>,
-        HashMap<(usize, usize), NumbersCellComment>,
-    ) {
-        let cells = self
-            .model
-            .into_cells()
-            .into_iter()
-            .map(|cell| {
-                (
-                    (
-                        cell.position().row() as usize,
-                        cell.position().column() as usize,
-                    ),
-                    cell.into_value(),
-                )
-            })
-            .collect();
-        (cells, self.comments)
     }
 }
 

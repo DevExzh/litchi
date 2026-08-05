@@ -171,10 +171,10 @@ impl PagesDocument {
                 })?;
                 let storage =
                     Self::decode_body_storage(&object.messages, identifier, max_text_bytes)?;
-                Some(
-                    litchi_pages::Body::with_max_text_bytes(vec![storage], max_text_bytes)
-                        .map_err(|error| Error::InvalidFormat(error.to_string()))?,
-                )
+                Some(litchi_pages::Body::with_max_text_bytes(
+                    vec![storage],
+                    max_text_bytes,
+                )?)
             },
             None => {
                 let mut extractor = TextExtractor::new();
@@ -183,16 +183,16 @@ impl PagesDocument {
                 if storages.is_empty() {
                     None
                 } else {
-                    Some(
-                        litchi_pages::Body::with_max_text_bytes(storages, max_text_bytes)
-                            .map_err(|error| Error::InvalidFormat(error.to_string()))?,
-                    )
+                    Some(litchi_pages::Body::with_max_text_bytes(
+                        storages,
+                        max_text_bytes,
+                    )?)
                 }
             },
         };
         let root = body.map_or_else(litchi_pages::Root::empty, litchi_pages::Root::with_body);
         litchi_pages::Document::from_root_with_max_text_bytes(root, max_text_bytes)
-            .map_err(|error| Error::InvalidFormat(error.to_string()))
+            .map_err(Into::into)
     }
 
     fn decode_body_storage(

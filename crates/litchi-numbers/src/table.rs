@@ -551,6 +551,46 @@ impl Table {
             .count()
     }
 
+    /// Projects the sparse table to RFC 4180-compatible CSV text.
+    ///
+    /// The projection walks only the declared addressable extent and never
+    /// materializes a dense intermediate grid. Values use their canonical
+    /// Numbers display representation, including CSV quoting where needed.
+    #[must_use]
+    pub fn to_csv(&self) -> String {
+        let mut csv = String::new();
+        if !self.column_headers.is_empty() {
+            for (index, header) in self.column_headers.iter().enumerate() {
+                if index > 0 {
+                    csv.push(',');
+                }
+                write_csv_field(&mut csv, header);
+            }
+            csv.push('\n');
+        }
+
+        for row in 0..self.row_count() {
+            let row_index = row as usize;
+            if let Some(header) = self.row_headers.get(row_index)
+                && !header.is_empty()
+            {
+                write_csv_field(&mut csv, header);
+                csv.push(',');
+            }
+
+            for column in 0..self.column_count() {
+                if column > 0 {
+                    csv.push(',');
+                }
+                if let Some(value) = self.get(Position::new(row, column)) {
+                    csv.push_str(&value.to_string());
+                }
+            }
+            csv.push('\n');
+        }
+        csv
+    }
+
     /// Iterates over column headers in native order.
     #[must_use]
     pub fn column_headers(&self) -> impl ExactSizeIterator<Item = &str> + '_ {
@@ -879,6 +919,24 @@ impl Builder {
     }
 }
 
+fn write_csv_field(output: &mut String, value: &str) {
+    if value
+        .bytes()
+        .any(|byte| matches!(byte, b',' | b'"' | b'\n' | b'\r'))
+    {
+        output.push('"');
+        for character in value.chars() {
+            if character == '"' {
+                output.push('"');
+            }
+            output.push(character);
+        }
+        output.push('"');
+    } else {
+        output.push_str(value);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -977,6 +1035,31 @@ mod tests {
             table.grid(range, GridBudget::new(usize::MAX)),
             Err(Error::OutOfBounds { .. })
         ));
+    }
+
+    #[test]
+    fn csv_projection_preserves_sparse_values_and_headers() {
+        let mut builder = Builder::new("Test", Dimensions::new(2, 2));
+        assert!(
+            builder
+                .set_column_headers(["Name, value", "Value\" "])
+                .is_ok()
+        );
+        assert!(builder.set_row_headers(["first\nrow"]).is_ok());
+        assert!(
+            builder
+                .set(Position::new(0, 0), Value::Text("A, B".to_owned()))
+                .is_ok()
+        );
+        assert!(builder.set(Position::new(1, 1), Value::Number(2.0)).is_ok());
+        let table = builder
+            .finish()
+            .unwrap_or_else(|error| panic!("unexpected table error: {error}"));
+
+        assert_eq!(
+            table.to_csv(),
+            "\"Name, value\",\"Value\"\" \"\n\"first\nrow\",\"A, B\",\n,2\n"
+        );
     }
 
     #[test]

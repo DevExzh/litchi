@@ -1457,7 +1457,8 @@ fn number_format_from_native(native: &FormatStructArchive) -> Result<TableCellNu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::numbers::{CellValue, NumbersDocument, NumbersDocumentBuilder, NumbersEditor};
+    use crate::numbers::cell::CellValue;
+    use crate::numbers::{NumbersDocument, NumbersDocumentBuilder, NumbersEditor};
     use crate::table_cell_data_format::{
         TableCellCustomDateTimeFormat, TableCellCustomDateTimePattern, TableCellCustomFormat,
         TableCellCustomFormatName, TableCellCustomNumberCondition,

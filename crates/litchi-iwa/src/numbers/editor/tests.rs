@@ -1730,8 +1730,9 @@ fn malformed_comment_storage_fails_transactionally() {
     let before = editor.to_bytes().unwrap();
     assert!(editor.set_cell_comment(10, 0, 1, "Rejected").is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
-    let document = NumbersDocument::from_bytes(&before).unwrap();
-    assert!(document.sheets().is_err());
+    // Semantic Numbers data is validated at ingress, so malformed native
+    // comment storage is rejected before an archive-backed document exists.
+    assert!(NumbersDocument::from_bytes(&before).is_err());
 }
 
 #[test]

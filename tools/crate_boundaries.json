@@ -188,8 +188,6 @@
       "soapberry-zip"
     ],
     "litchi-pages": [
-      "litchi-iwa-core",
-      "litchi-iwa-protos",
       "litchi-iwa-text"
     ],
     "litchi-oth": [

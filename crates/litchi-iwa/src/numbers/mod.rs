@@ -54,7 +54,6 @@ impl From<litchi_numbers::cell::wire::Error> for crate::Error {
     }
 }
 
-pub(crate) use cell::CellValue;
 pub use creation::NumbersDocumentBuilder;
 pub use document::NumbersDocument;
 pub use editor::{

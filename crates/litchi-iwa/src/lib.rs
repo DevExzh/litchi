@@ -146,7 +146,7 @@ pub mod protobuf;
 pub mod ref_graph;
 pub mod registry;
 pub mod snappy;
-pub mod structured;
+mod structured;
 /// Typed copy-on-write appearance controls shared by Pages, Numbers, and Keynote.
 pub mod table_appearance;
 /// Typed conditional-highlight rules shared by native iWork table cells.
@@ -202,7 +202,7 @@ pub use package::IWorkPackage;
 pub use ref_graph::ReferenceGraph;
 pub use shapes::DrawableTitleCaption;
 pub use snappy::SnappyStream;
-pub use structured::{CellValue, StructuredData, Table};
+pub use structured::StructuredData;
 pub use text::{
     ParagraphStyle, TextDecorations, TextExtractor, TextFragment, TextPointSize, TextStorage,
     TextStrikethrough, TextStyle, TextUnderline,
@@ -253,7 +253,7 @@ pub enum Error {
     IwaCommon(#[from] litchi_iwa_common::Error),
 
     #[error(transparent)]
-    Pages(#[from] litchi_pages::package::Error),
+    PagesSemantic(#[from] litchi_pages::Error),
 
     #[error("Invalid IWA format: {0}")]
     InvalidFormat(String),

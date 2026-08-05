@@ -1337,8 +1337,9 @@ fn solid_fill() -> tsd::FillArchive {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::numbers::cell::CellValue;
     use crate::numbers::{
-        CellValue, FormulaBinaryOperator, FormulaCellReference, FormulaExpression, NumbersDocument,
+        FormulaBinaryOperator, FormulaCellReference, FormulaExpression, NumbersDocument,
     };
 
     #[test]

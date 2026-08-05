@@ -111,12 +111,15 @@ boundary lets the eventual Pages, Numbers, and Keynote package owners share
 entry storage and raw package transactions without making the package leaf
 depend on a concrete format or leaking application message IDs upward.
 
-Pages-specific package-root and body-storage protobuf interpretation now lives
-in `litchi-pages::package`; the IWA facade retains ZIP ingress, object lookup,
-and generic text fallback. Keynote presentation settings follow the same
-boundary at `litchi-keynote::show::{Mode, Settings}`: the semantic crate owns
-validated dimensions and playback values, while `litchi-iwa` retains only the
-native `KN.ShowArchive` wire adapter and transactional publication.
+Pages package-root and body-storage protobuf interpretation remains in the IWA
+format adapter: `litchi-pages` is now archive-free and owns only its bounded
+semantic document, body, and section values. The IWA facade retains ZIP
+ingress, object lookup, native protobuf decoding, and generic text fallback;
+semantic construction failures cross that boundary through the typed
+`litchi_pages::Error`. Keynote presentation settings follow the same boundary
+at `litchi-keynote::show::{Mode, Settings}`: the semantic crate owns validated
+dimensions and playback values, while `litchi-iwa` retains only the native
+`KN.ShowArchive` wire adapter and transactional publication.
 
 Physical organization follows the same ownership rule inside format crates:
 the Numbers text-box API is isolated in the private

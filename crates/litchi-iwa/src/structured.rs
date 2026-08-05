@@ -5,151 +5,13 @@
 //! - Slides from Keynote presentations  
 //! - Sections and paragraphs from Pages documents
 
-use std::collections::HashMap;
-
 use crate::Result;
 use crate::bundle::Bundle;
-use crate::charts::metadata_extractor::ChartMetadataExtractor;
 use crate::numbers::table_extractor::TableDataExtractor;
 use crate::object_index::ObjectIndex;
-use crate::shapes::text_extractor::ShapeTextExtractor;
 use litchi_keynote::Slide;
+use litchi_numbers::Table;
 use litchi_pages::{Section, SectionType};
-
-/// Represents a table extracted from a Numbers document
-#[derive(Debug, Clone)]
-pub struct Table {
-    name: String,
-    row_count: usize,
-    column_count: usize,
-    cells: HashMap<(usize, usize), CellValue>,
-}
-
-impl Table {
-    /// Create a new empty table
-    pub fn new(name: impl Into<String>) -> Self {
-        Self {
-            name: name.into(),
-            row_count: 0,
-            column_count: 0,
-            cells: HashMap::new(),
-        }
-    }
-
-    /// Create a table with dimensions declared by the source document.
-    fn with_dimensions(name: impl Into<String>, row_count: usize, column_count: usize) -> Self {
-        Self {
-            name: name.into(),
-            row_count,
-            column_count,
-            cells: HashMap::new(),
-        }
-    }
-
-    /// Borrow the table name.
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    /// Return the number of addressable rows.
-    pub const fn row_count(&self) -> usize {
-        self.row_count
-    }
-
-    /// Return the number of addressable columns.
-    pub const fn column_count(&self) -> usize {
-        self.column_count
-    }
-
-    /// Return the table dimensions as `(rows, columns)`.
-    pub const fn dimensions(&self) -> (usize, usize) {
-        (self.row_count, self.column_count)
-    }
-
-    /// Get a cell value at the specified position
-    pub fn get_cell(&self, row: usize, col: usize) -> Option<&CellValue> {
-        self.cells.get(&(row, col))
-    }
-
-    /// Iterate over materialized cells without exposing the backing map.
-    pub fn iter_cells(&self) -> impl Iterator<Item = ((usize, usize), &CellValue)> + '_ {
-        self.cells
-            .iter()
-            .map(|(position, value)| (*position, value))
-    }
-
-    /// Return the number of materialized cells, including explicit empty cells.
-    pub fn cell_count(&self) -> usize {
-        self.cells.len()
-    }
-
-    /// Set a cell value at the specified position
-    pub fn set_cell(&mut self, row: usize, col: usize, value: CellValue) {
-        self.cells.insert((row, col), value);
-        self.row_count = self.row_count.max(row + 1);
-        self.column_count = self.column_count.max(col + 1);
-    }
-
-    /// Convert table to CSV format
-    pub fn to_csv(&self) -> String {
-        let mut csv = String::new();
-        for row in 0..self.row_count {
-            for col in 0..self.column_count {
-                if col > 0 {
-                    csv.push(',');
-                }
-                if let Some(cell) = self.get_cell(row, col) {
-                    csv.push_str(&cell.to_string());
-                }
-            }
-            csv.push('\n');
-        }
-        csv
-    }
-}
-
-/// Represents a cell value in a table
-#[derive(Debug, Clone)]
-pub enum CellValue {
-    /// Text/string value
-    Text(String),
-    /// Numeric value
-    Number(f64),
-    /// Boolean value
-    Boolean(bool),
-    /// Seconds since Numbers' 2001-01-01 UTC epoch.
-    Date(f64),
-    /// Duration in seconds.
-    Duration(f64),
-    /// Formula (stored as string)
-    Formula(String),
-    /// Spreadsheet error value.
-    Error(String),
-    /// Empty cell
-    Empty,
-}
-
-impl CellValue {
-    /// Check if cell is empty
-    pub fn is_empty(&self) -> bool {
-        matches!(self, CellValue::Empty)
-    }
-}
-
-impl std::fmt::Display for CellValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CellValue::Text(s) => write!(f, "{}", s),
-            CellValue::Number(n) => write!(f, "{}", n),
-            CellValue::Boolean(b) => write!(f, "{}", b),
-            CellValue::Date(d) => write!(f, "{}", d),
-            CellValue::Duration(d) => write!(f, "{}", d),
-            CellValue::Formula(formula) => write!(f, "{}", formula),
-            CellValue::Error(error) => write!(f, "ERROR: {}", error),
-            CellValue::Empty => Ok(()),
-        }
-    }
-}
 
 /// Extract tables from a Numbers document
 ///
@@ -159,42 +21,10 @@ pub fn extract_tables(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec
     let extractor = TableDataExtractor::new(bundle, object_index);
     let numbers_tables = extractor.extract_all_tables()?;
 
-    // Convert NumbersTable to our Table type for compatibility
-    let tables = numbers_tables
+    numbers_tables
         .into_iter()
-        .map(|nt| {
-            let (row_count, column_count) = nt.dimensions();
-            let table_name = nt.name().to_owned();
-            let (cells, _) = nt.into_parts();
-            let mut table = Table::with_dimensions(table_name, row_count, column_count);
-
-            // Convert cells from NumbersTable format to our CellValue format
-            for ((row, col), cell) in cells {
-                let cell_value = convert_numbers_cell_to_structured(cell);
-                table.set_cell(row, col, cell_value);
-            }
-
-            table
-        })
-        .collect();
-
-    Ok(tables)
-}
-
-/// Convert Numbers CellValue to structured CellValue
-fn convert_numbers_cell_to_structured(cell: crate::numbers::CellValue) -> CellValue {
-    use crate::numbers::CellValue as NC;
-
-    match cell {
-        NC::Empty => CellValue::Empty,
-        NC::Text(s) => CellValue::Text(s),
-        NC::Number(n) => CellValue::Number(n),
-        NC::Boolean(b) => CellValue::Boolean(b),
-        NC::Date(d) => CellValue::Date(d),
-        NC::Duration(value) => CellValue::Duration(value),
-        NC::Formula(f) => CellValue::Formula(f),
-        NC::Error(e) => CellValue::Error(e),
-    }
+        .map(crate::numbers::table::NumbersTable::into_semantic_table)
+        .collect()
 }
 
 /// Extract slides from a Keynote presentation
@@ -408,10 +238,9 @@ pub fn extract_sections(bundle: &Bundle, object_index: &ObjectIndex) -> Result<V
 
 /// Extract all structured data from a document based on its type
 ///
-/// This function uses specialized extractors for each content type:
-/// - TableDataExtractor for Numbers tables with full cell parsing
-/// - ShapeTextExtractor for text in shapes and text boxes
-/// - ChartMetadataExtractor for chart data
+/// This function uses specialized extractors for Numbers tables, Keynote
+/// slides, and Pages sections. Shape and chart readers remain separate
+/// format-facing modules because they require native archive context.
 pub fn extract_all(bundle: &Bundle, object_index: &ObjectIndex) -> Result<StructuredData> {
     let tables = extract_tables(bundle, object_index)?;
     let slides = extract_slides(bundle, object_index)?;
@@ -422,27 +251,6 @@ pub fn extract_all(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Struct
         slides,
         sections,
     })
-}
-
-/// Extract text from shapes and text boxes
-///
-/// This extracts text content from TSD.ShapeArchive objects, including
-/// text boxes, callouts, and grouped shapes.
-pub fn extract_shape_text(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec<String>> {
-    let extractor = ShapeTextExtractor::new(bundle, object_index);
-    extractor.extract_all_shape_text()
-}
-
-/// Extract chart metadata
-///
-/// Returns metadata from all charts in the document, including titles,
-/// row/column names, and data series information.
-pub fn extract_chart_metadata(
-    bundle: &Bundle,
-    object_index: &ObjectIndex,
-) -> Result<Vec<crate::charts::ChartMetadata>> {
-    let extractor = ChartMetadataExtractor::new(bundle, object_index);
-    extractor.extract_all_charts()
 }
 
 /// Container for all structured data extracted from a document
@@ -501,19 +309,48 @@ mod tests {
 
     #[test]
     fn test_table_creation() {
-        let mut table = Table::new("Test Table".to_string());
+        let mut builder = Table::builder("Test Table", litchi_numbers::Dimensions::new(2, 2));
+        assert_eq!(builder.name(), "Test Table");
+
+        assert!(
+            builder
+                .set(
+                    litchi_numbers::Position::new(0, 0),
+                    litchi_numbers::cell::Value::Text("Header 1".to_owned())
+                )
+                .is_ok()
+        );
+        assert!(
+            builder
+                .set(
+                    litchi_numbers::Position::new(0, 1),
+                    litchi_numbers::cell::Value::Text("Header 2".to_owned())
+                )
+                .is_ok()
+        );
+        assert!(
+            builder
+                .set(
+                    litchi_numbers::Position::new(1, 0),
+                    litchi_numbers::cell::Value::Number(42.0)
+                )
+                .is_ok()
+        );
+        assert!(
+            builder
+                .set(
+                    litchi_numbers::Position::new(1, 1),
+                    litchi_numbers::cell::Value::Boolean(true)
+                )
+                .is_ok()
+        );
+
+        let table = builder.finish().expect("valid table builder");
         assert_eq!(table.name(), "Test Table");
-        assert_eq!(table.row_count(), 0);
-        assert_eq!(table.column_count(), 0);
-
-        table.set_cell(0, 0, CellValue::Text("Header 1".to_string()));
-        table.set_cell(0, 1, CellValue::Text("Header 2".to_string()));
-        table.set_cell(1, 0, CellValue::Number(42.0));
-        table.set_cell(1, 1, CellValue::Boolean(true));
-
         assert_eq!(table.row_count(), 2);
         assert_eq!(table.column_count(), 2);
-        assert_eq!(table.dimensions(), (2, 2));
+        assert_eq!(table.dimensions().rows(), 2);
+        assert_eq!(table.dimensions().columns(), 2);
         assert_eq!(table.cell_count(), 4);
         assert_eq!(table.iter_cells().count(), 4);
 
@@ -524,15 +361,15 @@ mod tests {
 
     #[test]
     fn test_cell_value() {
-        let text_cell = CellValue::Text("Hello".to_string());
+        let text_cell = litchi_numbers::cell::Value::Text("Hello".to_owned());
         assert_eq!(text_cell.to_string(), "Hello");
         assert!(!text_cell.is_empty());
 
-        let empty_cell = CellValue::Empty;
+        let empty_cell = litchi_numbers::cell::Value::Empty;
         assert_eq!(empty_cell.to_string(), "");
         assert!(empty_cell.is_empty());
 
-        let number_cell = CellValue::Number(std::f64::consts::PI);
+        let number_cell = litchi_numbers::cell::Value::Number(std::f64::consts::PI);
         assert_eq!(number_cell.to_string(), "3.141592653589793");
     }
 
@@ -570,8 +407,16 @@ mod tests {
 
     #[test]
     fn test_structured_data() {
-        let mut table = Table::new("Data".to_string());
-        table.set_cell(0, 0, CellValue::Text("A".to_string()));
+        let mut table_builder = Table::builder("Data", litchi_numbers::Dimensions::new(1, 1));
+        assert!(
+            table_builder
+                .set(
+                    litchi_numbers::Position::new(0, 0),
+                    litchi_numbers::cell::Value::Text("A".to_owned())
+                )
+                .is_ok()
+        );
+        let table = table_builder.finish().expect("valid table builder");
 
         let mut slide_builder = Slide::builder(0);
         slide_builder.set_title(Some("Title".to_string()));

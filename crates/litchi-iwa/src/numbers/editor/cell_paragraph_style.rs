@@ -1522,7 +1522,8 @@ fn verify_property(
 mod tests {
     use super::*;
     use crate::keynote::KeynoteDocumentBuilder;
-    use crate::numbers::{CellValue, NumbersDocumentBuilder};
+    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers::cell::CellValue;
     use crate::pages::PagesDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
     use crate::text::{
