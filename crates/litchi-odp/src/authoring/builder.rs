@@ -38,8 +38,8 @@ pub struct Builder {
     media_files: BTreeMap<String, EmbeddedMedia>,
     settings: Option<crate::Settings>,
     declarations: Option<crate::Declarations>,
-    page_metadata: Option<crate::PageMetadataCollection>,
-    page_layouts: crate::Layouts,
+    page_metadata: Option<crate::model::page_metadata::Collection>,
+    page_layouts: crate::model::page_layout::Collection,
 }
 
 fn encode_text_content(text: &str) -> String {
@@ -394,24 +394,27 @@ impl Builder {
             settings: None,
             declarations: None,
             page_metadata: None,
-            page_layouts: crate::Layouts::default(),
+            page_layouts: crate::model::page_layout::Collection::default(),
         }
     }
 
     /// Return validated page-layout definitions that will be written to `styles.xml`.
-    pub fn page_layouts(&self) -> &crate::Layouts {
+    pub fn layouts(&self) -> &crate::model::page_layout::Collection {
         &self.page_layouts
     }
 
     /// Replace all custom page-layout definitions written by this builder.
-    pub fn set_page_layouts(&mut self, layouts: crate::Layouts) -> Result<&mut Self> {
+    pub fn set_layouts(
+        &mut self,
+        layouts: crate::model::page_layout::Collection,
+    ) -> Result<&mut Self> {
         layouts.validate()?;
         self.page_layouts = layouts;
         Ok(self)
     }
 
     /// Add one custom page layout without changing existing builder behavior.
-    pub fn add_page_layout(&mut self, layout: crate::PageLayout) -> Result<&mut Self> {
+    pub fn add_layout(&mut self, layout: crate::model::page_layout::Layout) -> Result<&mut Self> {
         let mut layouts = self.page_layouts.clone();
         layouts.layouts.push(layout);
         layouts.validate()?;
@@ -451,14 +454,14 @@ impl Builder {
     }
 
     /// Return static page names, IDs, and layout/master references.
-    pub fn page_metadata(&self) -> Option<&crate::PageMetadataCollection> {
+    pub fn pages(&self) -> Option<&crate::model::page_metadata::Collection> {
         self.page_metadata.as_ref()
     }
 
     /// Set or clear validated static page metadata.
-    pub fn set_page_metadata(
+    pub fn set_pages(
         &mut self,
-        metadata: Option<crate::PageMetadataCollection>,
+        metadata: Option<crate::model::page_metadata::Collection>,
     ) -> Result<&mut Self> {
         if let Some(metadata) = &metadata {
             metadata.validate()?;
@@ -1209,7 +1212,7 @@ impl Builder {
         // Add styles.xml
         let mut styles_xml = Structure::default_styles_xml();
         for layout in &self.page_layouts.layouts {
-            styles_xml = crate::set_page_layout_xml(&styles_xml, layout)?;
+            styles_xml = crate::model::page_layout::set_xml(&styles_xml, layout)?;
         }
         writer.add_file("styles.xml", styles_xml.as_bytes())?;
 

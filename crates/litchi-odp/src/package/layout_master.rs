@@ -4,7 +4,7 @@ use super::page_layout_definition::{
     parse_page_layouts, remove_page_layout_xml,
     set_page_layout_xml,
 };
-use super::{Presentation, PageLayout};
+use super::{Presentation, Layout};
 use crate::core::PackageWriter;
 use crate::odt::MasterPage as SharedMasterPage;
 use crate::odt::header_footer::parse_master_pages;
@@ -180,7 +180,7 @@ impl Presentation {
         masters_from_xml(required_styles(self)?)
     }
 
-    pub fn add_page_layout(&mut self, layout: &PageLayout) -> Result<()> {
+    pub fn add_layout(&mut self, layout: &Layout) -> Result<()> {
         layout.validate()?;
         let styles = required_styles(self)?.to_string();
         if definitions(&styles, STYLE, "presentation-page-layout", STYLE, "name")?
@@ -197,7 +197,7 @@ impl Presentation {
 
     pub fn replace_page_layout(
         &mut self,
-        layout: &PageLayout,
+        layout: &Layout,
     ) -> Result<()> {
         layout.validate()?;
         let styles = required_styles(self)?.to_string();
@@ -253,7 +253,7 @@ impl Presentation {
         self.commit_design(styles, content)
     }
 
-    pub fn reorder_page_layouts(&mut self, names: &[String]) -> Result<()> {
+    pub fn reorder_layouts(&mut self, names: &[String]) -> Result<()> {
         let styles = reorder(
             required_styles(self)?,
             STYLE,

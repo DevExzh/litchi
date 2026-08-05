@@ -57,7 +57,7 @@ pub struct MutablePresentation {
     /// Inert header/footer/date-time declarations and page bindings.
     declarations: Option<crate::Declarations>,
     /// Static page names, IDs, and layout/master references.
-    page_metadata: Option<crate::PageMetadataCollection>,
+    page_metadata: Option<crate::model::page_metadata::Collection>,
     /// Verbatim fragments of the source `content.xml`, when one was opened.
     ///
     /// Slides the caller never touched are re-emitted from these fragments so
@@ -69,7 +69,7 @@ pub struct MutablePresentation {
     /// Declarations exactly as parsed; changing them rewrites every page.
     source_declarations: Option<crate::Declarations>,
     /// Page metadata exactly as parsed; changing it rewrites every page.
-    source_page_metadata: Option<crate::PageMetadataCollection>,
+    source_page_metadata: Option<crate::model::page_metadata::Collection>,
 }
 
 /// Largest source slide count that is linearly rescanned for a match.
@@ -129,7 +129,7 @@ impl MutablePresentation {
         let metadata = presentation.metadata()?;
         let settings = presentation.settings()?;
         let declarations = presentation.declarations()?;
-        let page_metadata = presentation.page_metadata()?;
+        let page_metadata = presentation.pages()?;
         let mimetype = "application/vnd.oasis.opendocument.presentation".to_string();
 
         let styles_xml = presentation.styles_xml().map(str::to_owned);
@@ -301,21 +301,19 @@ impl MutablePresentation {
     }
 
     /// Return static page names, IDs, and layout/master references.
-    pub fn page_metadata(&self) -> Option<&crate::PageMetadataCollection> {
+    pub fn pages(&self) -> Option<&crate::model::page_metadata::Collection> {
         self.page_metadata.as_ref()
     }
 
     /// Mutably access static page metadata.
-    pub fn page_metadata_mut(
-        &mut self,
-    ) -> Option<&mut crate::PageMetadataCollection> {
+    pub fn pages_mut(&mut self) -> Option<&mut crate::model::page_metadata::Collection> {
         self.page_metadata.as_mut()
     }
 
     /// Set or clear validated static page metadata.
-    pub fn set_page_metadata(
+    pub fn set_pages(
         &mut self,
-        metadata: Option<crate::PageMetadataCollection>,
+        metadata: Option<crate::model::page_metadata::Collection>,
     ) -> Result<()> {
         if let Some(metadata) = &metadata {
             metadata.validate()?;

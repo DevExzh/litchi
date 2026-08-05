@@ -23,7 +23,7 @@ const MAX_AGGREGATE_BYTES: usize = 16 * 1_048_576;
 /// Standard placeholder role from the ODF `presentation-classes` vocabulary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum PlaceholderClass {
+pub enum Role {
     Title,
     Outline,
     Subtitle,
@@ -42,7 +42,7 @@ pub enum PlaceholderClass {
     PageNumber,
 }
 
-impl PlaceholderClass {
+impl Role {
     fn parse(value: &str) -> Result<Self> {
         Ok(match value {
             "title" => Self::Title,
@@ -181,7 +181,7 @@ impl fmt::Display for Measure {
 /// One required placeholder rectangle in a named presentation page layout.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Placeholder {
-    pub class: PlaceholderClass,
+    pub role: Role,
     pub x: Measure,
     pub y: Measure,
     pub width: Measure,
@@ -189,15 +189,9 @@ pub struct Placeholder {
 }
 
 impl Placeholder {
-    pub fn new(
-        class: PlaceholderClass,
-        x: Measure,
-        y: Measure,
-        width: Measure,
-        height: Measure,
-    ) -> Self {
+    pub fn new(role: Role, x: Measure, y: Measure, width: Measure, height: Measure) -> Self {
         Self {
-            class,
+            role,
             x,
             y,
             width,
@@ -208,13 +202,13 @@ impl Placeholder {
 
 /// A named custom presentation layout and its ordered placeholders.
 #[derive(Clone, Debug, PartialEq)]
-pub struct PageLayout {
+pub struct Layout {
     pub name: String,
     pub display_name: Option<String>,
     pub placeholders: Vec<Placeholder>,
 }
 
-impl PageLayout {
+impl Layout {
     pub fn new(name: impl Into<String>) -> Result<Self> {
         let value = Self {
             name: name.into(),
@@ -248,12 +242,12 @@ impl PageLayout {
 
 /// Ordered presentation page-layout definitions from `office:styles`.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct Layouts {
-    pub layouts: Vec<PageLayout>,
+pub struct Collection {
+    pub layouts: Vec<Layout>,
 }
 
-impl Layouts {
-    pub fn get(&self, name: &str) -> Option<&PageLayout> {
+impl Collection {
+    pub fn get(&self, name: &str) -> Option<&Layout> {
         self.layouts.iter().find(|layout| layout.name == name)
     }
 
@@ -309,7 +303,7 @@ struct Frame {
 
 struct ActiveLayout {
     depth: usize,
-    value: PageLayout,
+    value: Layout,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -325,9 +319,9 @@ enum NamespaceKind {
 type Attributes = HashMap<(NamespaceKind, String), String>;
 
 /// Parse page-layout definitions from an ODF styles or flat-document XML part.
-pub fn parse(xml: &str) -> Result<Layouts> {
+pub fn parse(xml: &str) -> Result<Collection> {
     if !xml.contains("presentation-page-layout") {
-        return Ok(Layouts::default());
+        return Ok(Collection::default());
     }
     if xml.len() > MAX_XML_BYTES {
         return invalid("presentation page-layout XML exceeds 64 MiB");
@@ -338,7 +332,7 @@ pub fn parse(xml: &str) -> Result<Layouts> {
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
     let mut active: Option<ActiveLayout> = None;
-    let mut layouts = Layouts::default();
+    let mut layouts = Collection::default();
 
     loop {
         let (resolved, event) = reader
@@ -459,12 +453,12 @@ fn ensure_location(stack: &[Frame]) -> Result<()> {
     Ok(())
 }
 
-fn parse_layout(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<PageLayout> {
+fn parse_layout(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Layout> {
     let mut attributes = attributes(reader, element)?;
     let name = take_required(&mut attributes, NamespaceKind::Style, "name", "style:name")?;
     let display_name = attributes.remove(&(NamespaceKind::Style, "display-name".to_string()));
     reject_attributes(&attributes, "style:presentation-page-layout")?;
-    let value = PageLayout {
+    let value = Layout {
         name,
         display_name,
         placeholders: Vec::new(),
@@ -475,7 +469,7 @@ fn parse_layout(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Pa
 
 fn parse_placeholder(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Placeholder> {
     let mut attributes = attributes(reader, element)?;
-    let class = PlaceholderClass::parse(&take_required(
+    let role = Role::parse(&take_required(
         &mut attributes,
         NamespaceKind::Presentation,
         "object",
@@ -486,7 +480,7 @@ fn parse_placeholder(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Resu
     let width = take_measure(&mut attributes, "width", "svg:width")?;
     let height = take_measure(&mut attributes, "height", "svg:height")?;
     reject_attributes(&attributes, "presentation:placeholder")?;
-    Ok(Placeholder::new(class, x, y, width, height))
+    Ok(Placeholder::new(role, x, y, width, height))
 }
 
 fn take_measure(attributes: &mut Attributes, local: &str, context: &str) -> Result<Measure> {
@@ -681,7 +675,7 @@ fn mutation_sites(xml: &str, name: &str) -> Result<(Option<XmlSpan>, StylesSite)
 }
 
 /// Insert or replace one page-layout definition while preserving unrelated XML bytes.
-pub fn set_xml(xml: &str, layout: &PageLayout) -> Result<String> {
+pub fn set_xml(xml: &str, layout: &Layout) -> Result<String> {
     layout.validate()?;
     let (target, styles_site) = mutation_sites(xml, &layout.name)?;
     let fragment = layout.to_xml_fragment()?;
@@ -724,7 +718,7 @@ pub fn remove_xml(xml: &str, name: &str) -> Result<String> {
     Ok(format!("{}{}", &xml[..span.start], &xml[span.end..]))
 }
 
-fn write_layout(output: &mut String, layout: &PageLayout, standalone: bool) {
+fn write_layout(output: &mut String, layout: &Layout, standalone: bool) {
     output.push_str("<style:presentation-page-layout");
     if standalone {
         output.push_str(
@@ -742,7 +736,7 @@ fn write_layout(output: &mut String, layout: &PageLayout, standalone: bool) {
     output.push('>');
     for placeholder in &layout.placeholders {
         output.push_str("<presentation:placeholder");
-        push_attribute(output, "presentation:object", placeholder.class.as_str());
+        push_attribute(output, "presentation:object", placeholder.role.as_str());
         push_attribute(output, "svg:x", &placeholder.x.to_string());
         push_attribute(output, "svg:y", &placeholder.y.to_string());
         push_attribute(output, "svg:width", &placeholder.width.to_string());
@@ -898,27 +892,27 @@ mod tests {
     #[test]
     fn exhausts_classes_and_geometry_lexicals() {
         let classes = [
-            PlaceholderClass::Title,
-            PlaceholderClass::Outline,
-            PlaceholderClass::Subtitle,
-            PlaceholderClass::Text,
-            PlaceholderClass::Graphic,
-            PlaceholderClass::Object,
-            PlaceholderClass::Chart,
-            PlaceholderClass::Table,
-            PlaceholderClass::OrganizationChart,
-            PlaceholderClass::Page,
-            PlaceholderClass::Notes,
-            PlaceholderClass::Handout,
-            PlaceholderClass::Header,
-            PlaceholderClass::Footer,
-            PlaceholderClass::DateTime,
-            PlaceholderClass::PageNumber,
+            Role::Title,
+            Role::Outline,
+            Role::Subtitle,
+            Role::Text,
+            Role::Graphic,
+            Role::Object,
+            Role::Chart,
+            Role::Table,
+            Role::OrganizationChart,
+            Role::Page,
+            Role::Notes,
+            Role::Handout,
+            Role::Header,
+            Role::Footer,
+            Role::DateTime,
+            Role::PageNumber,
         ];
-        let mut layout = PageLayout::new("_all.classes").unwrap();
-        for class in classes {
+        let mut layout = Layout::new("_all.classes").unwrap();
+        for role in classes {
             layout.placeholders.push(Placeholder::new(
-                class,
+                role,
                 "-.5cm".parse().unwrap(),
                 "1.cm".parse().unwrap(),
                 "-0.25%".parse().unwrap(),
@@ -931,10 +925,7 @@ mod tests {
         ))
         .unwrap();
         assert_eq!(parsed.layouts[0].placeholders.len(), 16);
-        assert_eq!(
-            parsed.layouts[0].placeholders[15].class,
-            PlaceholderClass::PageNumber
-        );
+        assert_eq!(parsed.layouts[0].placeholders[15].role, Role::PageNumber);
         for value in [".5cm", "1.cm", "-.5%", "-0px", "01.00pt"] {
             assert!(value.parse::<Measure>().is_ok(), "rejected {value}");
         }
@@ -946,15 +937,15 @@ mod tests {
     #[test]
     fn rejects_identity_duplicates_and_caps() {
         for name in ["", "1layout", "bad:name", "two words"] {
-            assert!(PageLayout::new(name).is_err(), "accepted {name}");
+            assert!(Layout::new(name).is_err(), "accepted {name}");
         }
         let aliased_duplicate = format!(
             r#"{PREFIX}<style:presentation-page-layout xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" style:name="a" s:name="b"/>{SUFFIX}"#
         );
         assert!(parse(&aliased_duplicate).is_err());
-        let mut capped = PageLayout::new("cap").unwrap();
+        let mut capped = Layout::new("cap").unwrap();
         let placeholder = Placeholder::new(
-            PlaceholderClass::Text,
+            Role::Text,
             "0cm".parse().unwrap(),
             "0cm".parse().unwrap(),
             "1cm".parse().unwrap(),
@@ -962,13 +953,13 @@ mod tests {
         );
         capped.placeholders = vec![placeholder; MAX_PLACEHOLDERS + 1];
         assert!(capped.validate().is_err());
-        assert!(PageLayout::new("x".repeat(MAX_VALUE_BYTES + 1)).is_err());
+        assert!(Layout::new("x".repeat(MAX_VALUE_BYTES + 1)).is_err());
     }
 
     #[test]
     fn losslessly_inserts_replaces_and_removes() {
         let original = format!(r#"{PREFIX}<!--keep--><style:style style:name="other"/>{SUFFIX}"#);
-        let mut layout = PageLayout::new("layout1").unwrap();
+        let mut layout = Layout::new("layout1").unwrap();
         layout.display_name = Some("First".to_string());
         let inserted = set_xml(&original, &layout).unwrap();
         assert!(inserted.contains(
@@ -985,18 +976,18 @@ mod tests {
     #[test]
     fn builder_writes_page_layouts() {
         let mut builder = crate::Builder::new();
-        let mut layout = PageLayout::new("builder_layout").unwrap();
+        let mut layout = Layout::new("builder_layout").unwrap();
         layout.placeholders.push(Placeholder::new(
-            PlaceholderClass::Title,
+            Role::Title,
             "1cm".parse().unwrap(),
             "2cm".parse().unwrap(),
             "20cm".parse().unwrap(),
             "3cm".parse().unwrap(),
         ));
-        builder.add_page_layout(layout).unwrap();
+        builder.add_layout(layout).unwrap();
         let presentation = crate::Presentation::from_bytes(builder.build().unwrap()).unwrap();
         assert_eq!(
-            presentation.page_layouts().unwrap().layouts[0].name,
+            presentation.layouts().unwrap().layouts[0].name,
             "builder_layout"
         );
     }

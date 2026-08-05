@@ -1,6 +1,5 @@
 use litchi_odp::{
-    CustomShow, MutablePresentation, Presentation, Builder,
-    PageMetadata, PageMetadataCollection, Settings,
+    Builder, Collection, CustomShow, MutablePresentation, Page, Presentation, Settings,
 };
 
 fn settings(start: &str, pages: &[&str]) -> Settings {
@@ -18,13 +17,13 @@ fn settings(start: &str, pages: &[&str]) -> Settings {
     }
 }
 
-fn metadata(names: &[&str]) -> PageMetadataCollection {
-    PageMetadataCollection::new(
+fn metadata(names: &[&str]) -> Collection {
+    Collection::new(
         names
             .iter()
             .enumerate()
             .map(|(slide_index, name)| {
-                let mut page = PageMetadata::new(slide_index);
+                let mut page = Page::new(slide_index);
                 page.name = Some((*name).to_string());
                 page
             })
@@ -58,12 +57,10 @@ fn builder_rejects_dangling_and_ambiguous_references_but_allows_repeats() {
 
     let mut builder = Builder::new();
     builder.add_slide("one").unwrap();
-    builder
-        .set_page_metadata(Some(metadata(&["duplicate"])))
-        .unwrap();
+    builder.set_pages(Some(metadata(&["duplicate"]))).unwrap();
     builder.add_slide("two").unwrap();
     builder
-        .set_page_metadata(Some(metadata(&["duplicate", "duplicate"])))
+        .set_pages(Some(metadata(&["duplicate", "duplicate"])))
         .unwrap();
     builder
         .set_settings(Some(settings("duplicate", &["duplicate"])))
@@ -85,7 +82,7 @@ fn direct_settings_and_metadata_edits_fail_only_at_final_serialization() {
     assert!(mutable.to_bytes().is_err());
     mutable.settings_mut().unwrap().start_page = Some("page2".to_string());
     mutable
-        .set_page_metadata(Some(metadata(&["page1", "renamed"])))
+        .set_pages(Some(metadata(&["page1", "renamed"])))
         .unwrap();
     assert!(mutable.to_bytes().is_err());
     assert_eq!(mutable.slides().len(), 2);
@@ -103,7 +100,7 @@ fn fallback_insert_remove_preserves_identity_and_rejects_referenced_removal() {
 
     mutable.insert_slide(1, "inserted", "new").unwrap();
     let names = mutable
-        .page_metadata()
+        .pages()
         .unwrap()
         .pages()
         .iter()
@@ -132,7 +129,7 @@ fn fallback_insert_remove_preserves_identity_and_rejects_referenced_removal() {
         Some("inserted")
     );
     let names = mutable
-        .page_metadata()
+        .pages()
         .unwrap()
         .pages()
         .iter()
@@ -155,8 +152,8 @@ fn explicit_metadata_reindexes_without_losing_page_identity() {
     let mut records = pages.pages().to_vec();
     records[1].xml_id = Some("beta-id".to_string());
     records[1].draw_id = Some("beta-id".to_string());
-    pages = PageMetadataCollection::new(records).unwrap();
-    builder.set_page_metadata(Some(pages)).unwrap();
+    pages = Collection::new(records).unwrap();
+    builder.set_pages(Some(pages)).unwrap();
     builder
         .set_settings(Some(settings("Beta", &["Alpha", "Beta"])))
         .unwrap();
@@ -164,7 +161,7 @@ fn explicit_metadata_reindexes_without_losing_page_identity() {
     let mut mutable = MutablePresentation::from_presentation(presentation).unwrap();
     mutable.insert_slide(0, "new", "new").unwrap();
 
-    let pages = mutable.page_metadata().unwrap().pages();
+    let pages = mutable.pages().unwrap().pages();
     assert_eq!(pages[1].name.as_deref(), Some("Alpha"));
     assert_eq!(pages[2].name.as_deref(), Some("Beta"));
     assert_eq!(pages[2].xml_id.as_deref(), Some("beta-id"));
@@ -172,7 +169,7 @@ fn explicit_metadata_reindexes_without_losing_page_identity() {
         mutable.remove_slide(0).unwrap().title.as_deref(),
         Some("new")
     );
-    let pages = mutable.page_metadata().unwrap().pages();
+    let pages = mutable.pages().unwrap().pages();
     assert_eq!(pages[0].name.as_deref(), Some("Alpha"));
     assert_eq!(pages[1].name.as_deref(), Some("Beta"));
     assert_eq!(pages[1].xml_id.as_deref(), Some("beta-id"));
@@ -184,9 +181,7 @@ fn libreoffice_and_odfpy_lexical_fixtures_parse_save_and_reopen() {
         include_str!("fixtures/libreoffice-presentation-settings.xml"),
         include_str!("fixtures/odfpy-presentation-settings.xml"),
     ] {
-        let parsed = litchi_odp::parse_settings(fixture)
-            .unwrap()
-            .unwrap();
+        let parsed = litchi_odp::parse_settings(fixture).unwrap().unwrap();
         assert_eq!(parsed.custom_shows[0].pages.len(), 3);
         assert_eq!(
             parsed.custom_shows[0].pages[0],
@@ -202,9 +197,7 @@ fn libreoffice_and_odfpy_lexical_fixtures_parse_save_and_reopen() {
         for name in page_names {
             builder.add_slide(name).unwrap();
         }
-        builder
-            .set_page_metadata(Some(metadata(&page_names)))
-            .unwrap();
+        builder.set_pages(Some(metadata(&page_names))).unwrap();
         builder.set_settings(Some(parsed.clone())).unwrap();
         let reopened = Presentation::from_bytes(builder.build().unwrap()).unwrap();
         assert_eq!(reopened.settings().unwrap(), Some(parsed));

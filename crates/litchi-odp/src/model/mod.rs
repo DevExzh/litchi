@@ -20,11 +20,6 @@ pub use declaration::{
 };
 pub use legacy_animation::{LegacyAnimationKind, LegacyAnimationNode};
 pub use media::{Actuate, Parameter, Reference, Show};
-pub use page_layout::{
-    Layouts, Measure, PageLayout, Placeholder, PlaceholderClass, Unit, parse as parse_page_layouts,
-    remove_xml as remove_page_layout_xml, set_xml as set_page_layout_xml,
-};
-pub use page_metadata::{PageMetadata, PageMetadataCollection, parse as parse_page_metadata};
 pub use settings::{CustomShow, FeatureState, Settings, parse as parse_settings};
 pub use slide::{
     DrawingAttribute, DrawingAttributeNamespace, DrawingShapeKind, EnhancedGeometry,

@@ -3,8 +3,7 @@
 use crate::codec::Parser;
 use crate::core::FamilyPackage;
 use crate::model::{
-    Declarations, Layouts, PageMetadataCollection, Reference, Settings, Slide, declaration,
-    page_layout, page_metadata, settings,
+    Declarations, Reference, Settings, Slide, declaration, page_layout, page_metadata, settings,
 };
 use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::constants::ODF_PRESENTATION;
@@ -155,15 +154,15 @@ impl Presentation {
     }
 
     /// Inspect static page names, IDs, and layout/master references.
-    pub fn page_metadata(&self) -> Result<PageMetadataCollection> {
+    pub fn pages(&self) -> Result<page_metadata::Collection> {
         page_metadata::parse(self.package.content_xml())
     }
 
     /// Inspect named presentation page layouts and their typed placeholders.
-    pub fn page_layouts(&self) -> Result<Layouts> {
+    pub fn layouts(&self) -> Result<page_layout::Collection> {
         match self.package.styles_xml() {
             Some(styles) => page_layout::parse(styles),
-            None => Ok(Layouts::default()),
+            None => Ok(page_layout::Collection::default()),
         }
     }
 
