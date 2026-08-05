@@ -4926,6 +4926,17 @@ fn parse_series_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Opti
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"strRef" => {
+                let formula = parse_series_title_reference(reader)?;
+                set_title(
+                    &mut title,
+                    TitleText::Reference(DataSourceRef::new(formula)),
+                )?;
+            },
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"rich" => {
+                let text = parse_series_title_rich_text(reader)?;
+                set_title(&mut title, TitleText::Literal(RichText::new(text)))?;
+            },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"f" => {
                 let formula = parse_text_element(reader, b"f")?;
                 set_title(
@@ -4949,6 +4960,80 @@ fn parse_series_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Opti
         buf.clear();
     }
     Ok(title)
+}
+
+/// Read a series title reference and ignore its optional cached string data.
+///
+/// Spreadsheet applications commonly emit both `<c:f>` and a `<c:strCache>`
+/// under `<c:strRef>`. The cache is a derived value, not a second title source;
+/// the typed model retains the authoritative reference and avoids rejecting a
+/// valid Office-produced chart as a duplicate title.
+fn parse_series_title_reference<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<String> {
+    let mut formula = None;
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"f" => {
+                if formula.is_some() {
+                    return Err(Error::Invalid(
+                        "chart series title reference contains duplicate formulas".into(),
+                    ));
+                }
+                formula = Some(parse_text_element(reader, b"f")?);
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"strRef" => break,
+            Ok(Event::Eof) => {
+                return Err(Error::Invalid(
+                    "unterminated chart series title reference".into(),
+                ));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
+    formula.ok_or_else(|| Error::Invalid("chart series title reference requires a formula".into()))
+}
+
+fn parse_series_title_rich_text<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<String> {
+    let mut text = String::new();
+    let mut in_text = false;
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"t" => {
+                in_text = true;
+            },
+            Ok(Event::Text(value)) if in_text => {
+                text.push_str(
+                    &value
+                        .decode()
+                        .map_err(|error| Error::Xml(error.to_string()))?,
+                );
+            },
+            Ok(Event::CData(value)) if in_text => {
+                text.push_str(
+                    &value
+                        .decode()
+                        .map_err(|error| Error::Xml(error.to_string()))?,
+                );
+            },
+            Ok(Event::GeneralRef(reference)) if in_text => {
+                text.push_str(&decode_xml_reference(&reference)?);
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"t" => {
+                in_text = false;
+            },
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"rich" => break,
+            Ok(Event::Eof) => {
+                return Err(Error::Invalid("unterminated chart series rich text".into()));
+            },
+            Err(error) => return Err(error),
+            _ => {},
+        }
+        buf.clear();
+    }
+    Ok(text)
 }
 
 fn set_title(target: &mut Option<TitleText>, title: TitleText) -> Result<()> {

@@ -833,11 +833,14 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
                     && e.local_name().as_ref() == b"filters"
                 {
                     let (_, b) = values.take().unwrap();
+                    let order = (0..b.items.len())
+                        .map(ChildOrder::Item)
+                        .collect::<Vec<_>>();
                     column.as_mut().unwrap().1.payload = Some(Payload::Values(Values {
                         blank: b.blank,
                         calendar_type: b.calendar_type,
                         items: b.items,
-                        opaque: b.opaque,
+                        opaque: normalize_opaque(b.opaque, &order),
                     }));
                     payload_depth = None;
                 }
@@ -850,10 +853,13 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
                             "customFilters requires one or two customFilter children",
                         ));
                     }
+                    let order = (0..b.filters.len())
+                        .map(ChildOrder::Custom)
+                        .collect::<Vec<_>>();
                     column.as_mut().unwrap().1.payload = Some(Payload::Custom(Customs {
                         and: b.and,
                         filters: b.filters,
-                        opaque: b.opaque,
+                        opaque: normalize_opaque(b.opaque, &order),
                     }));
                     payload_depth = None;
                 }
@@ -895,11 +901,17 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
     if columns.iter().any(|v| !ids.insert(v.column_id)) {
         return Err(invalid("duplicate filterColumn colId"));
     }
+    let mut root_order = (0..columns.len())
+        .map(ChildOrder::Column)
+        .collect::<Vec<_>>();
+    if sort_state.is_some() {
+        root_order.push(ChildOrder::SortState);
+    }
     Ok(Definition {
         reference,
         columns,
         sort_state,
-        opaque: root_opaque,
+        opaque: normalize_opaque(root_opaque, &root_order),
     })
 }
 
@@ -1040,14 +1052,36 @@ fn attach_unknown(
     opaque_mut(target).push_order(ChildOrder::Unknown(index))
 }
 fn finish_column(b: ColumnBuilder) -> Result<Column> {
+    let order = if b.payload.is_some() {
+        vec![ChildOrder::Payload]
+    } else {
+        Vec::new()
+    };
     Ok(Column {
         column_id: b.column_id,
         hidden_button: b.hidden_button,
         show_button: b.show_button,
         payload: b.payload,
-        opaque: b.opaque,
+        opaque: normalize_opaque(b.opaque, &order),
     })
 }
+
+fn normalize_opaque(
+    opaque: Option<Box<OpaqueFields>>,
+    canonical_order: &[ChildOrder],
+) -> Option<Box<OpaqueFields>> {
+    match opaque {
+        Some(value)
+            if value.attributes.is_empty()
+                && value.elements.is_empty()
+                && value.order == canonical_order =>
+        {
+            None
+        },
+        other => other,
+    }
+}
+
 fn ensure_payload_empty(c: &Option<(usize, ColumnBuilder)>) -> Result<()> {
     if c.as_ref().is_some_and(|v| v.1.payload.is_some()) {
         Err(invalid("filterColumn has multiple filter payloads"))
@@ -1322,15 +1356,8 @@ fn validate_sort_condition(
     icon_set: Option<IconSet>,
     icon_id: Option<u32>,
 ) -> Result<()> {
-    let state = parse_range(state_reference)?;
+    parse_range(state_reference)?;
     let condition = parse_range(condition_reference)?;
-    if condition.0 < state.0
-        || condition.1 < state.1
-        || condition.2 > state.2
-        || condition.3 > state.3
-    {
-        return Err(invalid("sortCondition ref is outside sortState ref"));
-    }
     if column_sort {
         if condition.1 != condition.3 {
             return Err(invalid("row sortCondition must select one row"));
@@ -1369,13 +1396,16 @@ fn validate_sort_condition(
     Ok(())
 }
 fn finish_sort(s: SortBuilder) -> State {
+    let order = (0..s.conditions.len())
+        .map(ChildOrder::Condition)
+        .collect::<Vec<_>>();
     State {
         reference: s.reference,
         column_sort: s.column_sort,
         case_sensitive: s.case_sensitive,
         sort_method: s.sort_method,
         conditions: s.conditions,
-        opaque: s.opaque,
+        opaque: normalize_opaque(s.opaque, &order),
     }
 }
 
