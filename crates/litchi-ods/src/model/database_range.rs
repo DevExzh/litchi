@@ -84,14 +84,14 @@ pub enum Source {
 
 /// Sort order for keys and subtotal groups.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SortOrder {
+pub enum Order {
     /// Ascending order.
     Ascending,
     /// Descending order.
     Descending,
 }
 
-impl SortOrder {
+impl Order {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "ascending" => Ok(Self::Ascending),
@@ -140,16 +140,16 @@ impl EmbeddedNumberBehavior {
 
 /// One field in a database-range sort specification.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SortKey {
+pub struct Key {
     /// Zero-based field number.
     pub field_number: u64,
     /// Standard or application-defined sort data type.
     pub data_type: Option<String>,
     /// Optional explicit order.
-    pub order: Option<SortOrder>,
+    pub order: Option<Order>,
 }
 
-impl SortKey {
+impl Key {
     /// Create a sort key for a zero-based field number.
     pub fn new(field_number: u64) -> Self {
         Self {
@@ -182,19 +182,19 @@ pub struct Sort {
     /// Embedded-number comparison behavior.
     pub embedded_number_behavior: Option<EmbeddedNumberBehavior>,
     /// Ordered sort keys. ODF requires at least one.
-    pub keys: Vec<SortKey>,
+    pub keys: Vec<Key>,
 }
 
 /// Source used to obtain filter conditions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FilterConditionSource {
+pub enum ConditionSource {
     /// Conditions are contained in the filter itself.
     SelfContained,
     /// Conditions come from another cell range.
     CellRange,
 }
 
-impl FilterConditionSource {
+impl ConditionSource {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "self" => Ok(Self::SelfContained),
@@ -213,14 +213,14 @@ impl FilterConditionSource {
 
 /// Standard filter comparison data type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FilterDataType {
+pub enum DataType {
     /// Text comparison.
     Text,
     /// Numeric comparison.
     Number,
 }
 
-impl FilterDataType {
+impl DataType {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "text" => Ok(Self::Text),
@@ -239,7 +239,7 @@ impl FilterDataType {
 
 /// A leaf filter comparison.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FilterCondition {
+pub struct Condition {
     /// Zero-based field number.
     pub field_number: u64,
     /// Comparison value.
@@ -249,12 +249,12 @@ pub struct FilterCondition {
     /// Optional case-sensitivity override.
     pub case_sensitive: Option<bool>,
     /// Optional comparison data type.
-    pub data_type: Option<FilterDataType>,
+    pub data_type: Option<DataType>,
     /// Values in a set-membership condition.
     pub set_items: Vec<String>,
 }
 
-impl FilterCondition {
+impl Condition {
     /// Create a filter condition.
     pub fn new(field_number: u64, operator: impl Into<String>, value: impl Into<String>) -> Self {
         Self {
@@ -270,13 +270,13 @@ impl FilterCondition {
 
 /// Recursive filter expression.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FilterExpression {
+pub enum Expression {
     /// A leaf comparison.
-    Condition(FilterCondition),
+    Condition(Condition),
     /// All child expressions must match. Children may be conditions or OR groups.
-    And(Vec<FilterExpression>),
+    And(Vec<Expression>),
     /// At least one child expression must match. Children may be conditions or AND groups.
-    Or(Vec<FilterExpression>),
+    Or(Vec<Expression>),
 }
 
 /// Filter configuration attached to a database range.
@@ -285,27 +285,27 @@ pub struct Filter {
     /// Optional destination range.
     pub target_range_address: Option<String>,
     /// Optional condition source.
-    pub condition_source: Option<FilterConditionSource>,
+    pub condition_source: Option<ConditionSource>,
     /// Range containing conditions when `condition_source` is `CellRange`.
     pub condition_source_range_address: Option<String>,
     /// Whether duplicate rows remain visible.
     pub display_duplicates: Option<bool>,
     /// Root filter expression.
-    pub expression: FilterExpression,
+    pub expression: Expression,
 }
 
 /// Sort configuration for subtotal groups.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct SubtotalSortGroups {
+pub struct SortGroups {
     /// Standard or application-defined data type.
     pub data_type: Option<String>,
     /// Optional explicit order.
-    pub order: Option<SortOrder>,
+    pub order: Option<Order>,
 }
 
 /// A field aggregated by a subtotal rule.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SubtotalField {
+pub struct Field {
     /// Zero-based field number.
     pub field_number: u64,
     /// Standard or application-defined aggregation function.
@@ -314,16 +314,16 @@ pub struct SubtotalField {
 
 /// One subtotal grouping rule.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SubtotalRule {
+pub struct Rule {
     /// Zero-based grouping field number.
     pub group_by_field_number: u64,
     /// Fields aggregated for the group.
-    pub fields: Vec<SubtotalField>,
+    pub fields: Vec<Field>,
 }
 
 /// Subtotal rules attached to a database range.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct SubtotalRules {
+pub struct Rules {
     /// Whether styles remain bound to content.
     pub bind_styles_to_content: Option<bool>,
     /// Whether grouping comparisons are case-sensitive.
@@ -331,9 +331,9 @@ pub struct SubtotalRules {
     /// Whether to insert page breaks when a group changes.
     pub page_breaks_on_group_change: Option<bool>,
     /// Optional group sorting.
-    pub sort_groups: Option<SubtotalSortGroups>,
+    pub sort_groups: Option<SortGroups>,
     /// Ordered subtotal rules.
-    pub rules: Vec<SubtotalRule>,
+    pub rules: Vec<Rule>,
 }
 
 /// A spreadsheet database range and its non-executing query/filter metadata.
@@ -366,7 +366,7 @@ pub struct Range {
     /// Optional sorting.
     pub sort: Option<Sort>,
     /// Optional subtotal rules.
-    pub subtotals: Option<SubtotalRules>,
+    pub subtotals: Option<Rules>,
 }
 
 impl Range {
@@ -536,7 +536,7 @@ fn too_many(label: &str) -> Result<()> {
 
 pub(crate) fn validate_filter(filter: &Filter) -> Result<()> {
     validate_filter_expression(&filter.expression, 0, None)?;
-    if filter.condition_source == Some(FilterConditionSource::CellRange)
+    if filter.condition_source == Some(ConditionSource::CellRange)
         && filter.condition_source_range_address.is_none()
     {
         return Err(Error::InvalidFormat(
@@ -553,7 +553,7 @@ enum FilterParent {
 }
 
 fn validate_filter_expression(
-    expression: &FilterExpression,
+    expression: &Expression,
     depth: usize,
     parent: Option<FilterParent>,
 ) -> Result<()> {
@@ -563,7 +563,7 @@ fn validate_filter_expression(
         ));
     }
     let (children, kind) = match expression {
-        FilterExpression::Condition(condition) => {
+        Expression::Condition(condition) => {
             validate_text("filter operator", Some(&condition.operator), true)?;
             validate_text("filter value", Some(&condition.value), false)?;
             if condition.set_items.len() > MAX_DATABASE_ITEMS {
@@ -574,8 +574,8 @@ fn validate_filter_expression(
             }
             return Ok(());
         },
-        FilterExpression::And(children) => (children, FilterParent::And),
-        FilterExpression::Or(children) => (children, FilterParent::Or),
+        Expression::And(children) => (children, FilterParent::And),
+        Expression::Or(children) => (children, FilterParent::Or),
     };
     if children.is_empty() {
         return Err(Error::InvalidFormat(
@@ -690,7 +690,7 @@ fn parse_database_range(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) ->
             },
             Event::Empty(ref element) if is_table(&namespace, element, b"subtotal-rules") => {
                 ensure_absent(&range.subtotals, "subtotal rules")?;
-                range.subtotals = Some(SubtotalRules::default());
+                range.subtotals = Some(Rules::default());
             },
             Event::End(ref element) if is_table(&namespace, element, b"database-range") => break,
             Event::Eof => return Err(unexpected_eof("table:database-range")),
@@ -761,7 +761,7 @@ pub(crate) fn parse_source_query(
 pub(crate) fn parse_filter(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Filter> {
     let target_range_address = optional_attr(reader, start, b"target-range-address")?;
     let condition_source = optional_attr(reader, start, b"condition-source")?
-        .map(|value| FilterConditionSource::parse(&value))
+        .map(|value| ConditionSource::parse(&value))
         .transpose()?;
     let condition_source_range_address =
         optional_attr(reader, start, b"condition-source-range-address")?;
@@ -775,13 +775,11 @@ pub(crate) fn parse_filter(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>)
         match event {
             Event::Start(ref element) if is_table(&namespace, element, b"filter-condition") => {
                 ensure_absent(&expression, "filter root expression")?;
-                expression = Some(FilterExpression::Condition(parse_condition(
-                    reader, element,
-                )?));
+                expression = Some(Expression::Condition(parse_condition(reader, element)?));
             },
             Event::Empty(ref element) if is_table(&namespace, element, b"filter-condition") => {
                 ensure_absent(&expression, "filter root expression")?;
-                expression = Some(FilterExpression::Condition(condition_from_start(
+                expression = Some(Expression::Condition(condition_from_start(
                     reader, element,
                 )?));
             },
@@ -813,7 +811,7 @@ fn parse_filter_group(
     reader: &mut NsReader<&[u8]>,
     kind: FilterParent,
     depth: usize,
-) -> Result<FilterExpression> {
+) -> Result<Expression> {
     if depth > MAX_FILTER_DEPTH {
         return Err(Error::InvalidFormat(
             "filter expression exceeds the supported nesting limit".to_string(),
@@ -827,12 +825,10 @@ fn parse_filter_group(
             .map_err(xml_error)?;
         match event {
             Event::Start(ref element) if is_table(&namespace, element, b"filter-condition") => {
-                children.push(FilterExpression::Condition(parse_condition(
-                    reader, element,
-                )?));
+                children.push(Expression::Condition(parse_condition(reader, element)?));
             },
             Event::Empty(ref element) if is_table(&namespace, element, b"filter-condition") => {
-                children.push(FilterExpression::Condition(condition_from_start(
+                children.push(Expression::Condition(condition_from_start(
                     reader, element,
                 )?));
             },
@@ -872,15 +868,12 @@ fn parse_filter_group(
         ));
     }
     Ok(match kind {
-        FilterParent::And => FilterExpression::And(children),
-        FilterParent::Or => FilterExpression::Or(children),
+        FilterParent::And => Expression::And(children),
+        FilterParent::Or => Expression::Or(children),
     })
 }
 
-fn parse_condition(
-    reader: &mut NsReader<&[u8]>,
-    start: &BytesStart<'_>,
-) -> Result<FilterCondition> {
+fn parse_condition(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Condition> {
     let mut condition = condition_from_start(reader, start)?;
     let mut buf = Vec::new();
     loop {
@@ -904,17 +897,14 @@ fn parse_condition(
     Ok(condition)
 }
 
-fn condition_from_start(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
-) -> Result<FilterCondition> {
-    Ok(FilterCondition {
+fn condition_from_start(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Condition> {
+    Ok(Condition {
         field_number: required_u64(reader, element, b"field-number")?,
         value: required_attr(reader, element, b"value")?,
         operator: required_attr(reader, element, b"operator")?,
         case_sensitive: optional_bool(reader, element, b"case-sensitive")?,
         data_type: optional_attr(reader, element, b"data-type")?
-            .map(|value| FilterDataType::parse(&value))
+            .map(|value| DataType::parse(&value))
             .transpose()?,
         set_items: Vec::new(),
     })
@@ -944,11 +934,11 @@ fn parse_sort(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<So
             Event::Empty(ref element) | Event::Start(ref element)
                 if is_table(&namespace, element, b"sort-by") =>
             {
-                sort.keys.push(SortKey {
+                sort.keys.push(Key {
                     field_number: required_u64(reader, element, b"field-number")?,
                     data_type: optional_attr(reader, element, b"data-type")?,
                     order: optional_attr(reader, element, b"order")?
-                        .map(|value| SortOrder::parse(&value))
+                        .map(|value| Order::parse(&value))
                         .transpose()?,
                 });
             },
@@ -966,8 +956,8 @@ fn parse_sort(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<So
     Ok(sort)
 }
 
-fn parse_subtotals(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<SubtotalRules> {
-    let mut subtotals = SubtotalRules {
+fn parse_subtotals(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Rules> {
+    let mut subtotals = Rules {
         bind_styles_to_content: optional_bool(reader, start, b"bind-styles-to-content")?,
         case_sensitive: optional_bool(reader, start, b"case-sensitive")?,
         page_breaks_on_group_change: optional_bool(reader, start, b"page-breaks-on-group-change")?,
@@ -984,10 +974,10 @@ fn parse_subtotals(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Resu
                 if is_table(&namespace, element, b"sort-groups") =>
             {
                 ensure_absent(&subtotals.sort_groups, "subtotal sort-groups")?;
-                subtotals.sort_groups = Some(SubtotalSortGroups {
+                subtotals.sort_groups = Some(SortGroups {
                     data_type: optional_attr(reader, element, b"data-type")?,
                     order: optional_attr(reader, element, b"order")?
-                        .map(|value| SortOrder::parse(&value))
+                        .map(|value| Order::parse(&value))
                         .transpose()?,
                 });
             },
@@ -995,7 +985,7 @@ fn parse_subtotals(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Resu
                 subtotals.rules.push(parse_subtotal_rule(reader, element)?);
             },
             Event::Empty(ref element) if is_table(&namespace, element, b"subtotal-rule") => {
-                subtotals.rules.push(SubtotalRule {
+                subtotals.rules.push(Rule {
                     group_by_field_number: required_u64(reader, element, b"group-by-field-number")?,
                     fields: Vec::new(),
                 });
@@ -1009,11 +999,8 @@ fn parse_subtotals(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Resu
     Ok(subtotals)
 }
 
-fn parse_subtotal_rule(
-    reader: &mut NsReader<&[u8]>,
-    start: &BytesStart<'_>,
-) -> Result<SubtotalRule> {
-    let mut rule = SubtotalRule {
+fn parse_subtotal_rule(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Rule> {
+    let mut rule = Rule {
         group_by_field_number: required_u64(reader, start, b"group-by-field-number")?,
         fields: Vec::new(),
     };
@@ -1026,7 +1013,7 @@ fn parse_subtotal_rule(
             Event::Empty(ref element) | Event::Start(ref element)
                 if is_table(&namespace, element, b"subtotal-field") =>
             {
-                rule.fields.push(SubtotalField {
+                rule.fields.push(Field {
                     field_number: required_u64(reader, element, b"field-number")?,
                     function: required_attr(reader, element, b"function")?,
                 });
@@ -1175,7 +1162,7 @@ pub(crate) fn write_filter(output: &mut String, filter: &Filter) {
     attr(
         output,
         "table:condition-source",
-        filter.condition_source.map(FilterConditionSource::as_str),
+        filter.condition_source.map(ConditionSource::as_str),
     );
     attr(
         output,
@@ -1192,9 +1179,9 @@ pub(crate) fn write_filter(output: &mut String, filter: &Filter) {
     output.push_str("</table:filter>");
 }
 
-fn write_filter_expression(output: &mut String, expression: &FilterExpression) {
+fn write_filter_expression(output: &mut String, expression: &Expression) {
     match expression {
-        FilterExpression::Condition(condition) => {
+        Expression::Condition(condition) => {
             output.push_str("<table:filter-condition");
             u64_attr(output, "table:field-number", condition.field_number);
             attr(output, "table:value", Some(&condition.value));
@@ -1203,7 +1190,7 @@ fn write_filter_expression(output: &mut String, expression: &FilterExpression) {
             attr(
                 output,
                 "table:data-type",
-                condition.data_type.map(FilterDataType::as_str),
+                condition.data_type.map(DataType::as_str),
             );
             if condition.set_items.is_empty() {
                 output.push_str("/>");
@@ -1217,14 +1204,14 @@ fn write_filter_expression(output: &mut String, expression: &FilterExpression) {
                 output.push_str("</table:filter-condition>");
             }
         },
-        FilterExpression::And(children) => {
+        Expression::And(children) => {
             output.push_str("<table:filter-and>");
             children
                 .iter()
                 .for_each(|child| write_filter_expression(output, child));
             output.push_str("</table:filter-and>");
         },
-        FilterExpression::Or(children) => {
+        Expression::Or(children) => {
             output.push_str("<table:filter-or>");
             children
                 .iter()
@@ -1267,13 +1254,13 @@ fn write_sort(output: &mut String, sort: &Sort) {
         output.push_str("<table:sort-by");
         u64_attr(output, "table:field-number", key.field_number);
         attr(output, "table:data-type", key.data_type.as_deref());
-        attr(output, "table:order", key.order.map(SortOrder::as_str));
+        attr(output, "table:order", key.order.map(Order::as_str));
         output.push_str("/>");
     }
     output.push_str("</table:sort>");
 }
 
-fn write_subtotals(output: &mut String, subtotals: &SubtotalRules) {
+fn write_subtotals(output: &mut String, subtotals: &Rules) {
     output.push_str("<table:subtotal-rules");
     bool_attr(
         output,
@@ -1294,7 +1281,7 @@ fn write_subtotals(output: &mut String, subtotals: &SubtotalRules) {
     if let Some(groups) = &subtotals.sort_groups {
         output.push_str("<table:sort-groups");
         attr(output, "table:data-type", groups.data_type.as_deref());
-        attr(output, "table:order", groups.order.map(SortOrder::as_str));
+        attr(output, "table:order", groups.order.map(Order::as_str));
         output.push_str("/>");
     }
     for rule in &subtotals.rules {
@@ -1539,9 +1526,9 @@ mod tests {
 
     #[test]
     fn rejects_invalid_filter_shapes_and_required_values() {
-        let same_group = FilterExpression::And(vec![FilterExpression::And(vec![
-            FilterExpression::Condition(FilterCondition::new(0, "=", "x")),
-        ])]);
+        let same_group = Expression::And(vec![Expression::And(vec![Expression::Condition(
+            Condition::new(0, "=", "x"),
+        )])]);
         assert!(validate_filter_expression(&same_group, 0, None).is_err());
 
         let xml = r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><t:database-range t:target-range-address="A1:B2"><t:sort/></t:database-range></t:database-ranges></s>"#;
@@ -1573,35 +1560,35 @@ mod tests {
         });
         range.filter = Some(Filter {
             target_range_address: None,
-            condition_source: Some(FilterConditionSource::SelfContained),
+            condition_source: Some(ConditionSource::SelfContained),
             condition_source_range_address: None,
             display_duplicates: Some(false),
-            expression: FilterExpression::And(vec![
-                FilterExpression::Condition(FilterCondition::new(0, "=", "East")),
-                FilterExpression::Or(vec![
-                    FilterExpression::Condition(FilterCondition::new(1, ">", "100")),
-                    FilterExpression::Condition(FilterCondition::new(2, "=", "Open")),
+            expression: Expression::And(vec![
+                Expression::Condition(Condition::new(0, "=", "East")),
+                Expression::Or(vec![
+                    Expression::Condition(Condition::new(1, ">", "100")),
+                    Expression::Condition(Condition::new(2, "=", "Open")),
                 ]),
             ]),
         });
         range.sort = Some(Sort {
             embedded_number_behavior: Some(EmbeddedNumberBehavior::Integer),
-            keys: vec![SortKey {
+            keys: vec![Key {
                 field_number: 1,
                 data_type: Some("number".to_string()),
-                order: Some(SortOrder::Descending),
+                order: Some(Order::Descending),
             }],
             ..Sort::default()
         });
-        range.subtotals = Some(SubtotalRules {
-            rules: vec![SubtotalRule {
+        range.subtotals = Some(Rules {
+            rules: vec![Rule {
                 group_by_field_number: 0,
-                fields: vec![SubtotalField {
+                fields: vec![Field {
                     field_number: 1,
                     function: "sum".to_string(),
                 }],
             }],
-            ..SubtotalRules::default()
+            ..Rules::default()
         });
 
         let mut builder = Builder::new();
@@ -1612,7 +1599,7 @@ mod tests {
         assert_eq!(spreadsheet.database_ranges(), &[range.clone()]);
 
         let mut mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet).unwrap();
-        let FilterExpression::And(expressions) = &mut mutable.database_ranges_mut()[0]
+        let Expression::And(expressions) = &mut mutable.database_ranges_mut()[0]
             .filter
             .as_mut()
             .unwrap()
@@ -1620,19 +1607,18 @@ mod tests {
         else {
             panic!("expected AND filter")
         };
-        let FilterExpression::Condition(condition) = &mut expressions[0] else {
+        let Expression::Condition(condition) = &mut expressions[0] else {
             panic!("expected filter condition")
         };
         condition.value = "West & Central".to_string();
 
         let reopened = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
         let reopened_range = &reopened.database_ranges()[0];
-        let FilterExpression::And(expressions) =
-            &reopened_range.filter.as_ref().unwrap().expression
+        let Expression::And(expressions) = &reopened_range.filter.as_ref().unwrap().expression
         else {
             panic!("expected AND filter")
         };
-        let FilterExpression::Condition(condition) = &expressions[0] else {
+        let Expression::Condition(condition) = &expressions[0] else {
             panic!("expected filter condition")
         };
         assert_eq!(condition.value, "West & Central");
