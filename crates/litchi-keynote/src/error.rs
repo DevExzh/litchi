@@ -18,6 +18,9 @@ pub enum Error {
     /// A native identifier required for lossless decoding was empty.
     #[error("Keynote animation identifier cannot be empty")]
     EmptyIdentifier,
+    /// An opaque background payload cannot be empty.
+    #[error("Keynote opaque background payload cannot be empty")]
+    EmptyBackgroundPayload,
 }
 
 /// Result type for semantic Keynote operations.

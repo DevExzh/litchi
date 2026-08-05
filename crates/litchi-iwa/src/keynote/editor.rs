@@ -5020,7 +5020,6 @@ mod show_settings;
 mod slide_audio;
 mod slide_background;
 mod slide_background_color;
-mod slide_background_gradient;
 mod slide_background_gradient_wire;
 mod slide_background_reset;
 mod slide_background_wire;
@@ -5048,17 +5047,14 @@ mod transition_lifecycle;
 mod transition_wire;
 
 use builds::*;
+pub use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+pub use litchi_keynote::background::{Angle, Background, Gradient, Kind, Opaque, Stop};
 pub use litchi_keynote::transition::Effect;
 pub use litchi_keynote::transition::{
     Acceleration, AccelerationKind, Direction, MosaicType, TextDelivery, TextDeliveryKind,
 };
 pub use litchi_keynote::{Mode, Seconds, Settings, Size};
 pub use slide_audio::{KeynoteSlideAudioInfo, KeynoteSlideAudioOptions, RemovedKeynoteSlideAudio};
-pub use slide_background::KeynoteSlideBackground;
-pub use slide_background_color::{KeynoteRgbColorSpace, KeynoteRgbaColor};
-pub use slide_background_gradient::{
-    KeynoteGradient, KeynoteGradientAngle, KeynoteGradientKind, KeynoteGradientStop,
-};
 pub use slide_charts::{KeynoteSlideChartInfo, RemovedKeynoteSlideChart};
 use slide_graph::*;
 pub use slide_images::{

@@ -5,6 +5,7 @@ use crate::protobuf::tsp::{ComponentInfo, ObjectUuidMapEntry, PackageMetadata, R
 use crate::protobuf::tswp::StorageArchive;
 use crate::shapes::{DrawablePoint, DrawableSize};
 use crate::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
+use litchi_iwa_common::shape::fill::{Opacity, StopMidpoint, StopPosition};
 use std::time::Duration;
 
 const TEST_SLIDE_MESSAGE_TYPE: u32 = 5;
@@ -36,24 +37,12 @@ const TEST_MOVIE_POSTER_REPLACEMENT: &[u8] = b"\x89PNG\r\n\x1a\nreplacement";
 #[test]
 fn slide_background_crud_inherits_and_culls_native_variations() {
     let mut editor = KeynoteEditor::from_package(test_package_with_slide_background()).unwrap();
-    let white = KeynoteSlideBackground::Solid(KeynoteRgbaColor {
-        red: 1.0,
-        green: 1.0,
-        blue: 1.0,
-        alpha: 1.0,
-        color_space: KeynoteRgbColorSpace::Srgb,
-    });
+    let white = Background::Solid(Rgba::new(1.0, 1.0, 1.0, 1.0, RgbColorSpace::Srgb).unwrap());
     assert_eq!(editor.slide_background(0).unwrap(), white);
     assert_eq!(editor.slide_background(1).unwrap(), white);
     assert_eq!(editor.slide_background_override(0).unwrap(), None);
 
-    let red = KeynoteSlideBackground::Solid(KeynoteRgbaColor {
-        red: 0.9,
-        green: 0.2,
-        blue: 0.1,
-        alpha: 0.75,
-        color_space: KeynoteRgbColorSpace::DisplayP3,
-    });
+    let red = Background::Solid(Rgba::new(0.9, 0.2, 0.1, 0.75, RgbColorSpace::DisplayP3).unwrap());
     editor.set_slide_background(0, red.clone()).unwrap();
     assert_eq!(editor.slide_background(0).unwrap(), red);
     assert_eq!(
@@ -75,13 +64,7 @@ fn slide_background_crud_inherits_and_culls_native_variations() {
     editor.set_slide_background(0, red).unwrap();
     assert_eq!(editor.to_bytes().unwrap(), no_op);
 
-    let green = KeynoteSlideBackground::Solid(KeynoteRgbaColor {
-        red: 0.1,
-        green: 0.8,
-        blue: 0.3,
-        alpha: 1.0,
-        color_space: KeynoteRgbColorSpace::Srgb,
-    });
+    let green = Background::Solid(Rgba::new(0.1, 0.8, 0.3, 1.0, RgbColorSpace::Srgb).unwrap());
     editor.set_slide_background(0, green.clone()).unwrap();
     assert_eq!(editor.slide_background(0).unwrap(), green);
     let graph = ObjectGraph::read(editor.package()).unwrap();
@@ -107,13 +90,8 @@ fn slide_background_crud_inherits_and_culls_native_variations() {
         vec![second_variation]
     );
 
-    editor
-        .set_slide_background(0, KeynoteSlideBackground::None)
-        .unwrap();
-    assert_eq!(
-        editor.slide_background(0).unwrap(),
-        KeynoteSlideBackground::None
-    );
+    editor.set_slide_background(0, Background::None).unwrap();
+    assert_eq!(editor.slide_background(0).unwrap(), Background::None);
     let graph = ObjectGraph::read(editor.package()).unwrap();
     assert!(!graph.objects.contains_key(&second_variation));
     let slide: kn::SlideArchive = graph.decode_type(4, 5, "KN.SlideArchive").unwrap();
@@ -144,36 +122,33 @@ fn slide_background_crud_inherits_and_culls_native_variations() {
 #[test]
 fn slide_background_gradient_crud_round_trips_native_semantics() {
     let mut editor = KeynoteEditor::from_package(test_package_with_slide_background()).unwrap();
-    let cyan = KeynoteRgbaColor {
-        red: 0.337_592_3,
-        green: 0.757_728_4,
-        blue: 0.999_999_94,
-        alpha: 1.0,
-        color_space: KeynoteRgbColorSpace::Srgb,
-    };
-    let blue = KeynoteRgbaColor {
-        red: 3.419_328e-7,
-        green: 0.462_459_27,
-        blue: 0.729_136_77,
-        alpha: 1.0,
-        color_space: KeynoteRgbColorSpace::Srgb,
-    };
-    let simple = KeynoteGradient::linear(
-        cyan,
-        blue,
-        KeynoteGradientAngle::from_degrees(270.0).unwrap(),
+    let cyan = Rgba::new(
+        0.337_592_3,
+        0.757_728_4,
+        0.999_999_94,
+        1.0,
+        RgbColorSpace::Srgb,
     )
     .unwrap();
+    let blue = Rgba::new(
+        3.419_328e-7,
+        0.462_459_27,
+        0.729_136_77,
+        1.0,
+        RgbColorSpace::Srgb,
+    )
+    .unwrap();
+    let simple = Gradient::linear(cyan, blue, Angle::from_degrees(270.0).unwrap());
     editor
-        .set_slide_background(0, KeynoteSlideBackground::Gradient(simple.clone()))
+        .set_slide_background(0, Background::Gradient(simple.clone()))
         .unwrap();
     assert_eq!(
         editor.slide_background(0).unwrap(),
-        KeynoteSlideBackground::Gradient(simple.clone())
+        Background::Gradient(simple.clone())
     );
     assert_eq!(
         editor.slide_background_override(0).unwrap(),
-        Some(KeynoteSlideBackground::Gradient(simple))
+        Some(Background::Gradient(simple))
     );
 
     let graph = ObjectGraph::read(editor.package()).unwrap();
@@ -197,38 +172,35 @@ fn slide_background_gradient_crud_round_trips_native_semantics() {
         Some(3.0 * std::f32::consts::FRAC_PI_2)
     );
 
-    let advanced = KeynoteGradient::advanced(
-        KeynoteGradientKind::Radial,
+    let advanced = Gradient::advanced(
+        Kind::Radial,
         vec![
-            KeynoteGradientStop::new(cyan, 0.0, 0.35).unwrap(),
-            KeynoteGradientStop::new(
-                KeynoteRgbaColor {
-                    red: 0.4,
-                    green: 0.2,
-                    blue: 0.8,
-                    alpha: 0.9,
-                    color_space: KeynoteRgbColorSpace::DisplayP3,
-                },
-                0.4,
-                0.6,
-            )
-            .unwrap(),
-            KeynoteGradientStop::new(blue, 1.0, 0.5).unwrap(),
+            Stop::new(
+                cyan,
+                StopPosition::new(0.0).unwrap(),
+                StopMidpoint::new(0.35).unwrap(),
+            ),
+            Stop::new(
+                Rgba::new(0.4, 0.2, 0.8, 0.9, RgbColorSpace::DisplayP3).unwrap(),
+                StopPosition::new(0.4).unwrap(),
+                StopMidpoint::new(0.6).unwrap(),
+            ),
+            Stop::new(blue, StopPosition::new(1.0).unwrap(), StopMidpoint::CENTER),
         ],
-        0.75,
-        KeynoteGradientAngle::from_degrees(315.0).unwrap(),
+        Opacity::new(0.75).unwrap(),
+        Angle::from_degrees(315.0).unwrap(),
     )
     .unwrap();
     editor
-        .set_slide_background(0, KeynoteSlideBackground::Gradient(advanced.clone()))
+        .set_slide_background(0, Background::Gradient(advanced.clone()))
         .unwrap();
     assert_eq!(
         editor.slide_background(0).unwrap(),
-        KeynoteSlideBackground::Gradient(advanced.clone())
+        Background::Gradient(advanced.clone())
     );
     let no_op = editor.to_bytes().unwrap();
     editor
-        .set_slide_background(0, KeynoteSlideBackground::Gradient(advanced))
+        .set_slide_background(0, Background::Gradient(advanced))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), no_op);
     let graph = ObjectGraph::read(editor.package()).unwrap();
@@ -240,40 +212,20 @@ fn slide_background_gradient_crud_round_trips_native_semantics() {
 
 #[test]
 fn slide_background_gradient_validation_and_unknown_wire_are_lossless() {
-    assert!(KeynoteGradientAngle::from_degrees(-1.0).is_err());
-    assert!(KeynoteGradientAngle::from_degrees(360.0).is_err());
-    assert!(KeynoteGradientAngle::from_degrees(f32::NAN).is_err());
+    assert!(Angle::from_degrees(-1.0).is_err());
+    assert!(Angle::from_degrees(360.0).is_err());
+    assert!(Angle::from_degrees(f32::NAN).is_err());
 
-    let black = KeynoteRgbaColor {
-        red: 0.0,
-        green: 0.0,
-        blue: 0.0,
-        alpha: 1.0,
-        color_space: KeynoteRgbColorSpace::Srgb,
-    };
-    let white = KeynoteRgbaColor {
-        red: 1.0,
-        green: 1.0,
-        blue: 1.0,
-        alpha: 1.0,
-        color_space: KeynoteRgbColorSpace::Srgb,
-    };
-    let angle = KeynoteGradientAngle::from_degrees(90.0).unwrap();
-    let gradient = KeynoteGradient::linear(black, white, angle).unwrap();
-    assert!(KeynoteGradientStop::new(black, f32::NAN, 0.5).is_err());
-    assert!(
-        KeynoteGradient::advanced(
-            KeynoteGradientKind::Linear,
-            gradient.stops.clone(),
-            1.1,
-            angle,
-        )
-        .is_err()
-    );
+    let black = Rgba::new(0.0, 0.0, 0.0, 1.0, RgbColorSpace::Srgb).unwrap();
+    let white = Rgba::new(1.0, 1.0, 1.0, 1.0, RgbColorSpace::Srgb).unwrap();
+    let angle = Angle::from_degrees(90.0).unwrap();
+    let gradient = Gradient::linear(black, white, angle);
+    assert!(StopPosition::new(f32::NAN).is_err());
+    assert!(Opacity::new(1.1).is_err());
     let fill = slide_background_gradient_wire::gradient_to_fill(&gradient);
     assert_eq!(
         slide_background::background_from_fill(&fill).unwrap(),
-        KeynoteSlideBackground::Gradient(gradient.clone())
+        Background::Gradient(gradient.clone())
     );
     let future = transform_length_delimited_field(&fill, 2, |payload| {
         let mut payload = payload.to_vec();
@@ -283,68 +235,47 @@ fn slide_background_gradient_validation_and_unknown_wire_are_lossless() {
     .unwrap();
     assert_eq!(
         slide_background::background_from_fill(&future).unwrap(),
-        KeynoteSlideBackground::Opaque(future.clone())
+        Background::Opaque(Opaque::from_slice(&future).unwrap())
     );
 
     let mut editor = KeynoteEditor::from_package(test_package_with_slide_background()).unwrap();
     editor
-        .set_slide_background(0, KeynoteSlideBackground::Opaque(future.clone()))
+        .set_slide_background(0, Background::Opaque(Opaque::from_slice(&future).unwrap()))
         .unwrap();
     assert_eq!(
         editor.slide_background(0).unwrap(),
-        KeynoteSlideBackground::Opaque(future)
+        Background::Opaque(Opaque::from_slice(&future).unwrap())
     );
     let before = editor.to_bytes().unwrap();
-    let invalid = KeynoteGradient {
-        kind: KeynoteGradientKind::Radial,
-        stops: gradient.stops.clone(),
-        opacity: 1.0,
-        is_advanced: false,
-        angle,
-    };
     assert!(
-        editor
-            .set_slide_background(0, KeynoteSlideBackground::Gradient(invalid))
-            .is_err()
+        Gradient::from_parts(
+            Kind::Radial,
+            gradient.stops().to_vec(),
+            litchi_iwa_common::shape::fill::Opacity::OPAQUE,
+            false,
+            angle,
+        )
+        .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
 
-    let unordered = KeynoteGradient {
-        kind: KeynoteGradientKind::Linear,
-        stops: vec![
-            KeynoteGradientStop {
-                color: black,
-                position: 0.8,
-                midpoint: 0.5,
-            },
-            KeynoteGradientStop {
-                color: white,
-                position: 0.2,
-                midpoint: 0.5,
-            },
+    let unordered = Gradient::advanced(
+        Kind::Linear,
+        vec![
+            Stop::new(black, StopPosition::new(0.8).unwrap(), StopMidpoint::CENTER),
+            Stop::new(white, StopPosition::new(0.2).unwrap(), StopMidpoint::CENTER),
         ],
-        opacity: 1.0,
-        is_advanced: true,
+        Opacity::OPAQUE,
         angle,
-    };
-    assert!(
-        editor
-            .set_slide_background(0, KeynoteSlideBackground::Gradient(unordered))
-            .is_err()
     );
+    assert!(unordered.is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
 #[test]
 fn slide_background_reset_preserves_combined_and_unknown_style_properties() {
     let mut editor = KeynoteEditor::from_package(test_package_with_slide_background()).unwrap();
-    let red = KeynoteSlideBackground::Solid(KeynoteRgbaColor {
-        red: 0.9,
-        green: 0.2,
-        blue: 0.1,
-        alpha: 1.0,
-        color_space: KeynoteRgbColorSpace::Srgb,
-    });
+    let red = Background::Solid(Rgba::new(0.9, 0.2, 0.1, 1.0, RgbColorSpace::Srgb).unwrap());
     editor.set_slide_background(0, red).unwrap();
     let mut package = editor.into_package();
     let graph = ObjectGraph::read(&package).unwrap();
@@ -389,13 +320,7 @@ fn slide_background_reset_preserves_combined_and_unknown_style_properties() {
     assert_eq!(editor.slide_background_override(0).unwrap(), None);
     assert_eq!(
         editor.slide_background(0).unwrap(),
-        KeynoteSlideBackground::Solid(KeynoteRgbaColor {
-            red: 1.0,
-            green: 1.0,
-            blue: 1.0,
-            alpha: 1.0,
-            color_space: KeynoteRgbColorSpace::Srgb,
-        })
+        Background::Solid(Rgba::new(1.0, 1.0, 1.0, 1.0, RgbColorSpace::Srgb).unwrap())
     );
     let graph = ObjectGraph::read(editor.package()).unwrap();
     let slide: kn::SlideArchive = graph.decode_type(4, 5, "KN.SlideArchive").unwrap();
@@ -431,13 +356,7 @@ fn slide_background_reset_preserves_combined_and_unknown_style_properties() {
 #[test]
 fn slide_background_reset_preserves_shared_background_variations() {
     let mut editor = KeynoteEditor::from_package(test_package_with_slide_background()).unwrap();
-    let red = KeynoteSlideBackground::Solid(KeynoteRgbaColor {
-        red: 0.9,
-        green: 0.2,
-        blue: 0.1,
-        alpha: 1.0,
-        color_space: KeynoteRgbColorSpace::Srgb,
-    });
+    let red = Background::Solid(Rgba::new(0.9, 0.2, 0.1, 1.0, RgbColorSpace::Srgb).unwrap());
     editor.set_slide_background(0, red.clone()).unwrap();
     let mut package = editor.into_package();
     let graph = ObjectGraph::read(&package).unwrap();
@@ -481,13 +400,7 @@ fn slide_background_reset_preserves_shared_background_variations() {
 #[test]
 fn slide_background_reset_copy_on_writes_shared_combined_variations() {
     let mut editor = KeynoteEditor::from_package(test_package_with_slide_background()).unwrap();
-    let red = KeynoteSlideBackground::Solid(KeynoteRgbaColor {
-        red: 0.9,
-        green: 0.2,
-        blue: 0.1,
-        alpha: 1.0,
-        color_space: KeynoteRgbColorSpace::Srgb,
-    });
+    let red = Background::Solid(Rgba::new(0.9, 0.2, 0.1, 1.0, RgbColorSpace::Srgb).unwrap());
     editor.set_slide_background(0, red.clone()).unwrap();
     let mut package = editor.into_package();
     let graph = ObjectGraph::read(&package).unwrap();
@@ -553,20 +466,8 @@ fn slide_background_reset_copy_on_writes_shared_combined_variations() {
 
 #[test]
 fn slide_background_reset_and_update_reject_or_preserve_future_style_wire() {
-    let red = KeynoteSlideBackground::Solid(KeynoteRgbaColor {
-        red: 0.9,
-        green: 0.2,
-        blue: 0.1,
-        alpha: 1.0,
-        color_space: KeynoteRgbColorSpace::Srgb,
-    });
-    let green = KeynoteSlideBackground::Solid(KeynoteRgbaColor {
-        red: 0.1,
-        green: 0.8,
-        blue: 0.3,
-        alpha: 1.0,
-        color_space: KeynoteRgbColorSpace::Srgb,
-    });
+    let red = Background::Solid(Rgba::new(0.9, 0.2, 0.1, 1.0, RgbColorSpace::Srgb).unwrap());
+    let green = Background::Solid(Rgba::new(0.1, 0.8, 0.3, 1.0, RgbColorSpace::Srgb).unwrap());
     let mut editor = KeynoteEditor::from_package(test_package_with_slide_background()).unwrap();
     editor.set_slide_background(0, red.clone()).unwrap();
     let mut package = editor.into_package();
@@ -621,7 +522,7 @@ fn slide_background_preserves_opaque_fills_and_unknown_solid_fields() {
     append_unknown_varint(&mut future_fill, 100, 73);
     assert_eq!(
         slide_background::background_from_fill(&future_fill).unwrap(),
-        KeynoteSlideBackground::Opaque(future_fill)
+        Background::Opaque(Opaque::from_slice(&future_fill).unwrap())
     );
 
     let mut editor = KeynoteEditor::from_package(test_package_with_slide_background()).unwrap();
@@ -630,7 +531,7 @@ fn slide_background_preserves_opaque_fills_and_unknown_solid_fields() {
         ..Default::default()
     }
     .encode_to_vec();
-    let background = KeynoteSlideBackground::Opaque(opaque.clone());
+    let background = Background::Opaque(Opaque::from_slice(&opaque).unwrap());
     editor.set_slide_background(0, background.clone()).unwrap();
     assert_eq!(editor.slide_background(0).unwrap(), background);
     let graph = ObjectGraph::read(editor.package()).unwrap();
@@ -645,13 +546,7 @@ fn slide_background_preserves_opaque_fills_and_unknown_solid_fields() {
     );
 
     let mut editor = KeynoteEditor::from_package(test_package_with_slide_background()).unwrap();
-    let blue = KeynoteSlideBackground::Solid(KeynoteRgbaColor {
-        red: 0.2,
-        green: 0.4,
-        blue: 0.8,
-        alpha: 1.0,
-        color_space: KeynoteRgbColorSpace::Srgb,
-    });
+    let blue = Background::Solid(Rgba::new(0.2, 0.4, 0.8, 1.0, RgbColorSpace::Srgb).unwrap());
     editor.set_slide_background(0, blue).unwrap();
     let graph = ObjectGraph::read(editor.package()).unwrap();
     let slide: kn::SlideArchive = graph.decode_type(4, 5, "KN.SlideArchive").unwrap();
@@ -667,26 +562,18 @@ fn slide_background_preserves_opaque_fills_and_unknown_solid_fields() {
 fn slide_background_rejects_invalid_inputs_transactionally() {
     let mut editor = KeynoteEditor::from_package(test_package_with_slide_background()).unwrap();
     let before = editor.to_bytes().unwrap();
-    let invalid = KeynoteSlideBackground::Solid(KeynoteRgbaColor {
-        red: f32::NAN,
-        green: 0.0,
-        blue: 0.0,
-        alpha: 1.0,
-        color_space: KeynoteRgbColorSpace::Srgb,
-    });
-    assert!(editor.set_slide_background(0, invalid).is_err());
+    assert!(Rgba::new(f32::NAN, 0.0, 0.0, 1.0, RgbColorSpace::Srgb).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
     assert!(
         editor
-            .set_slide_background(0, KeynoteSlideBackground::Opaque(vec![0x0a, 0xff]))
+            .set_slide_background(
+                0,
+                Background::Opaque(Opaque::from_slice(&[0x0a, 0xff]).unwrap()),
+            )
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
-    assert!(
-        editor
-            .set_slide_background(0, KeynoteSlideBackground::Opaque(Vec::new()))
-            .is_err()
-    );
+    assert!(Opaque::from_slice(&[]).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
     assert!(editor.slide_background(2).is_err());
 }

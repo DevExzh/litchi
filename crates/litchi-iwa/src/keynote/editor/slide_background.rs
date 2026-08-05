@@ -1,46 +1,31 @@
 //! Semantic Keynote slide-background access.
 
-use super::slide_background_color::{color_from_native, validate_color};
-use super::slide_background_gradient::{KeynoteGradient, validate_gradient};
+use litchi_keynote::background::{Background, Opaque};
+
+use super::slide_background_color::color_from_native;
 use super::slide_background_gradient_wire::gradient_from_fill;
 use super::*;
 
 const SLIDE_MESSAGE_TYPE: u32 = 5;
 const SLIDE_STYLE_MESSAGE_TYPE: u32 = 9;
 
-/// Effective background of one Keynote slide.
-#[derive(Debug, Clone, PartialEq)]
-pub enum KeynoteSlideBackground {
-    /// Native explicit “No Fill”.
-    None,
-    /// Native RGB color fill.
-    Solid(super::slide_background_color::KeynoteRgbaColor),
-    /// Native simple or advanced linear/radial gradient fill.
-    Gradient(KeynoteGradient),
-    /// Byte-exact native fill for images and future or extended fill kinds.
-    Opaque(Vec<u8>),
-}
-
 pub(super) struct ResolvedSlideBackground {
-    pub(super) background: KeynoteSlideBackground,
+    pub(super) background: Background,
     pub(super) fill_payload: Vec<u8>,
 }
 
 impl KeynoteEditor {
     /// Read the effective background, following the native slide-style parent chain.
-    pub fn slide_background(&self, slide_index: usize) -> Result<KeynoteSlideBackground> {
+    pub fn slide_background(&self, slide_index: usize) -> Result<Background> {
         Ok(resolve_slide_background(self, slide_index)?.background)
     }
 
     /// Read the background stored directly on the slide's variation style.
     ///
     /// `None` means the slide inherits its effective background from its
-    /// layout style. This is distinct from [`KeynoteSlideBackground::None`],
+    /// layout style. This is distinct from [`Background::None`],
     /// which is an explicit native “No Fill” override.
-    pub fn slide_background_override(
-        &self,
-        slide_index: usize,
-    ) -> Result<Option<KeynoteSlideBackground>> {
+    pub fn slide_background_override(&self, slide_index: usize) -> Result<Option<Background>> {
         direct_slide_background_override(self, slide_index)
     }
 
@@ -48,9 +33,8 @@ impl KeynoteEditor {
     pub fn set_slide_background(
         &mut self,
         slide_index: usize,
-        background: KeynoteSlideBackground,
+        background: Background,
     ) -> Result<()> {
-        validate_background(&background)?;
         let resolved = resolve_slide_background(self, slide_index)?;
         if resolved.background == background {
             return Ok(());
@@ -79,7 +63,7 @@ impl KeynoteEditor {
 fn direct_slide_background_override(
     editor: &KeynoteEditor,
     slide_index: usize,
-) -> Result<Option<KeynoteSlideBackground>> {
+) -> Result<Option<Background>> {
     let slides = editor.slides()?;
     let slide = slides.get(slide_index).ok_or_else(|| {
         Error::ParseError(format!(
@@ -171,7 +155,7 @@ pub(super) fn resolve_slide_background(
         }
         let Some(parent) = style.super_.parent else {
             return Ok(ResolvedSlideBackground {
-                background: KeynoteSlideBackground::None,
+                background: Background::None,
                 fill_payload: Vec::new(),
             });
         };
@@ -179,46 +163,35 @@ pub(super) fn resolve_slide_background(
     }
 }
 
-pub(super) fn background_from_fill(fill_payload: &[u8]) -> Result<KeynoteSlideBackground> {
+pub(super) fn background_from_fill(fill_payload: &[u8]) -> Result<Background> {
     let fill = tsd::FillArchive::decode(fill_payload)?;
     if fill_payload.is_empty()
         && fill.color.is_none()
         && fill.gradient.is_none()
         && fill.image.is_none()
     {
-        return Ok(KeynoteSlideBackground::None);
+        return Ok(Background::None);
     }
     if fill.color.is_none() && fill.gradient.is_some() && fill.image.is_none() {
         return Ok(match gradient_from_fill(fill_payload)? {
-            Some(gradient) => KeynoteSlideBackground::Gradient(gradient),
-            None => KeynoteSlideBackground::Opaque(fill_payload.to_vec()),
+            Some(gradient) => Background::Gradient(gradient),
+            None => opaque_background(fill_payload)?,
         });
     }
     let Some(color) = fill.color.as_ref() else {
-        return Ok(KeynoteSlideBackground::Opaque(fill_payload.to_vec()));
+        return opaque_background(fill_payload);
     };
     if fill.gradient.is_some() || fill.image.is_some() {
-        return Ok(KeynoteSlideBackground::Opaque(fill_payload.to_vec()));
+        return opaque_background(fill_payload);
     }
     Ok(match color_from_native(color) {
-        Some(color) => KeynoteSlideBackground::Solid(color),
-        None => KeynoteSlideBackground::Opaque(fill_payload.to_vec()),
+        Some(color) => Background::Solid(color),
+        None => return opaque_background(fill_payload),
     })
 }
 
-pub(super) fn validate_background(background: &KeynoteSlideBackground) -> Result<()> {
-    match background {
-        KeynoteSlideBackground::None => Ok(()),
-        KeynoteSlideBackground::Solid(color) => validate_color(*color, "Keynote slide-background"),
-        KeynoteSlideBackground::Gradient(gradient) => validate_gradient(gradient),
-        KeynoteSlideBackground::Opaque(payload) => {
-            if payload.is_empty() {
-                return Err(Error::ParseError(
-                    "an opaque Keynote slide background cannot encode native No Fill".to_owned(),
-                ));
-            }
-            tsd::FillArchive::decode(payload.as_slice())?;
-            Ok(())
-        },
-    }
+fn opaque_background(fill_payload: &[u8]) -> Result<Background> {
+    Opaque::from_slice(fill_payload)
+        .map(Background::Opaque)
+        .map_err(|error| Error::ParseError(error.to_string()))
 }
