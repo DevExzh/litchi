@@ -84,6 +84,10 @@ pub enum ImageEnhancement {
     Enabled,
 }
 
+const EXPOSURE_PRESENT: u8 = 1 << 0;
+const SATURATION_PRESENT: u8 = 1 << 1;
+const ENHANCEMENT_PRESENT: u8 = 1 << 2;
+
 /// The basic controls in iWork's Image inspector.
 ///
 /// Each optional field preserves native presence. For example,
@@ -99,10 +103,6 @@ pub struct ImageAdjustments {
     enhancement: ImageEnhancement,
     present: u8,
 }
-
-const EXPOSURE_PRESENT: u8 = 1 << 0;
-const SATURATION_PRESENT: u8 = 1 << 1;
-const ENHANCEMENT_PRESENT: u8 = 1 << 2;
 
 impl ImageAdjustments {
     /// Construct adjustments with every basic control omitted.
@@ -149,15 +149,12 @@ impl ImageAdjustments {
     /// Return adjustments with the optional exposure control replaced.
     #[must_use]
     pub const fn with_exposure(mut self, exposure: Option<ImageAdjustment>) -> Self {
-        match exposure {
-            Some(exposure) => {
-                self.exposure = exposure.value();
-                self.present |= EXPOSURE_PRESENT;
-            },
-            None => {
-                self.exposure = 0.0;
-                self.present &= !EXPOSURE_PRESENT;
-            },
+        if let Some(adjustment) = exposure {
+            self.exposure = adjustment.value();
+            self.present |= EXPOSURE_PRESENT;
+        } else {
+            self.exposure = 0.0;
+            self.present &= !EXPOSURE_PRESENT;
         }
         self
     }
@@ -165,15 +162,12 @@ impl ImageAdjustments {
     /// Return adjustments with the optional saturation control replaced.
     #[must_use]
     pub const fn with_saturation(mut self, saturation: Option<ImageAdjustment>) -> Self {
-        match saturation {
-            Some(saturation) => {
-                self.saturation = saturation.value();
-                self.present |= SATURATION_PRESENT;
-            },
-            None => {
-                self.saturation = 0.0;
-                self.present &= !SATURATION_PRESENT;
-            },
+        if let Some(adjustment) = saturation {
+            self.saturation = adjustment.value();
+            self.present |= SATURATION_PRESENT;
+        } else {
+            self.saturation = 0.0;
+            self.present &= !SATURATION_PRESENT;
         }
         self
     }
@@ -182,15 +176,12 @@ impl ImageAdjustments {
     /// replaced.
     #[must_use]
     pub const fn with_enhancement(mut self, enhancement: Option<ImageEnhancement>) -> Self {
-        match enhancement {
-            Some(enhancement) => {
-                self.enhancement = enhancement;
-                self.present |= ENHANCEMENT_PRESENT;
-            },
-            None => {
-                self.enhancement = ImageEnhancement::Disabled;
-                self.present &= !ENHANCEMENT_PRESENT;
-            },
+        if let Some(state) = enhancement {
+            self.enhancement = state;
+            self.present |= ENHANCEMENT_PRESENT;
+        } else {
+            self.enhancement = ImageEnhancement::Disabled;
+            self.present &= !ENHANCEMENT_PRESENT;
         }
         self
     }
