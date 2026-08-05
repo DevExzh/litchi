@@ -5831,6 +5831,24 @@ opaque/transparent defaults, valid Display P3 values, and strict channel
 validation. The existing Pages shape authoring example compiles through the
 new common value and is the native artifact used for this slice's Computer Use
 check.
+For the table-appearance ownership slice, the fresh generated
+`/tmp/litchi-iwa-appearance.G82gPP/table-appearance.numbers` opened in native
+Numbers without a repair prompt. Selecting its `Appearance` table exposed
+the authored alternating-row and row-fit controls in the table formatter.
+The matching `table-appearance.key` opened in Keynote without repair and
+displayed the six-by-three table; selecting it exposed the same alternating-row
+and resize-to-fit controls. The Pages artifact reported that it was damaged;
+the warning was dismissed without repair or save, matching the existing Pages
+limitation for this generated table family. ZIP integrity passed for all three
+artifacts, and Numbers, Pages, and Keynote were quit after the check.
+The table-appearance ownership slice is now complete: dependency-free
+`litchi-iwa-common::table::appearance::{Appearance, Banding, RowSizing,
+GridlineVisibility, Gridlines}` owns the compact semantic value, including its
+native-default representation. IWA retains only the archive adapter: strict
+wire override decoding, bounded style inheritance, native bool conversion,
+and transactional copy-on-write style mutation. Existing Numbers, Pages, and
+Keynote CRUD surfaces continue to use contextual facade aliases while the
+duplicate value implementation is removed from the monolith.
 The BorderSide ownership slice
 is complete: the dependency-neutral table-cell edge selector now lives at
 `litchi-iwa-common::table::cell::BorderSide`; `Borders` and `ShapeStroke` remain

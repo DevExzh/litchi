@@ -17,6 +17,21 @@ use crate::wire::patch_length_delimited_field;
 use crate::{Error, IWorkPackage, Result};
 use wire::{TableAppearanceOverrides, table_appearance_overrides};
 
+pub use litchi_iwa_common::table::appearance::{
+    Appearance, Banding, GridlineVisibility, Gridlines, RowSizing,
+};
+
+/// Facade-local name for the shared table appearance value.
+pub type TableAppearance = Appearance;
+/// Facade-local name for the shared alternating-row setting.
+pub type TableRowBanding = Banding;
+/// Facade-local name for the shared row-sizing setting.
+pub type TableRowSizing = RowSizing;
+/// Facade-local name for the shared gridline visibility setting.
+pub type TableGridlineVisibility = GridlineVisibility;
+/// Facade-local name for the shared per-region gridline settings.
+pub type TableGridlines = Gridlines;
+
 const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
 const TABLE_STYLE_MESSAGE_TYPE: u32 = 6_003;
 const TABLE_STYLE_PRESET_MESSAGE_TYPE: u32 = 6_008;
@@ -25,94 +40,40 @@ const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
 const TABLE_STYLE_REFERENCE_FIELD: u32 = 3;
 const MAX_STYLE_INHERITANCE_DEPTH: usize = 64;
 
-/// Whether native iWork applies its alternating fill to body rows.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub enum TableRowBanding {
-    /// Use the same fill for adjacent body rows.
-    #[default]
-    Disabled,
-    /// Apply the table style's alternating-row fill.
-    Enabled,
-}
-
-impl TableRowBanding {
-    fn from_native(value: bool) -> Self {
-        if value { Self::Enabled } else { Self::Disabled }
-    }
-
-    fn native(self) -> bool {
-        matches!(self, Self::Enabled)
+fn banding_from_native(value: bool) -> TableRowBanding {
+    if value {
+        Banding::Enabled
+    } else {
+        Banding::Disabled
     }
 }
 
-/// Whether row heights automatically expand to fit their cell contents.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub enum TableRowSizing {
-    /// Preserve explicit or style-provided row heights.
-    #[default]
-    Fixed,
-    /// Automatically expand rows to fit their cell contents.
-    FitCellContents,
-}
-
-impl TableRowSizing {
-    fn from_native(value: bool) -> Self {
-        if value {
-            Self::FitCellContents
-        } else {
-            Self::Fixed
-        }
-    }
-
-    fn native(self) -> bool {
-        matches!(self, Self::FitCellContents)
+fn row_sizing_from_native(value: bool) -> TableRowSizing {
+    if value {
+        RowSizing::FitCellContents
+    } else {
+        RowSizing::Fixed
     }
 }
 
-/// Whether one family of native table gridlines is drawn.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub enum TableGridlineVisibility {
-    /// Do not draw this gridline family.
-    Hidden,
-    /// Draw this gridline family using the table style's strokes.
-    #[default]
-    Visible,
-}
-
-impl TableGridlineVisibility {
-    fn from_native(value: bool) -> Self {
-        if value { Self::Visible } else { Self::Hidden }
-    }
-
-    fn native(self) -> bool {
-        matches!(self, Self::Visible)
+fn gridline_visibility_from_native(value: bool) -> TableGridlineVisibility {
+    if value {
+        GridlineVisibility::Visible
+    } else {
+        GridlineVisibility::Hidden
     }
 }
 
-/// Gridline visibility for each native iWork table region.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct TableGridlines {
-    /// Horizontal lines between body rows, excluding header-column lines.
-    pub body_horizontal: TableGridlineVisibility,
-    /// Horizontal lines between rows inside the header-column region.
-    pub header_columns_horizontal: TableGridlineVisibility,
-    /// Vertical lines between body columns, excluding header-row and footer lines.
-    pub body_vertical: TableGridlineVisibility,
-    /// Vertical lines between columns inside the header-row region.
-    pub header_rows_vertical: TableGridlineVisibility,
-    /// Vertical lines between columns inside the footer-row region.
-    pub footer_rows_vertical: TableGridlineVisibility,
+const fn banding_to_native(value: TableRowBanding) -> bool {
+    matches!(value, Banding::Enabled)
 }
 
-/// Effective appearance settings backed by a native table-style inheritance chain.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct TableAppearance {
-    /// Alternating body-row fill behavior.
-    pub row_banding: TableRowBanding,
-    /// Automatic row-height behavior.
-    pub row_sizing: TableRowSizing,
-    /// Horizontal and vertical gridline visibility by table region.
-    pub gridlines: TableGridlines,
+const fn row_sizing_to_native(value: TableRowSizing) -> bool {
+    matches!(value, RowSizing::FitCellContents)
+}
+
+const fn gridline_visibility_to_native(value: TableGridlineVisibility) -> bool {
+    matches!(value, GridlineVisibility::Visible)
 }
 
 pub(crate) fn table_appearance(
@@ -276,22 +237,22 @@ fn inherited_table_appearance(
     for _ in 0..MAX_STYLE_INHERITANCE_DEPTH {
         let Some(identifier) = style_id else {
             return Ok(TableAppearance {
-                row_banding: TableRowBanding::from_native(banded_rows.unwrap_or(false)),
-                row_sizing: TableRowSizing::from_native(auto_resize.unwrap_or(false)),
+                row_banding: banding_from_native(banded_rows.unwrap_or(false)),
+                row_sizing: row_sizing_from_native(auto_resize.unwrap_or(false)),
                 gridlines: TableGridlines {
-                    body_horizontal: TableGridlineVisibility::from_native(
+                    body_horizontal: gridline_visibility_from_native(
                         horizontal_gridlines.unwrap_or(true),
                     ),
-                    header_columns_horizontal: TableGridlineVisibility::from_native(
+                    header_columns_horizontal: gridline_visibility_from_native(
                         header_column_gridlines.unwrap_or(true),
                     ),
-                    body_vertical: TableGridlineVisibility::from_native(
+                    body_vertical: gridline_visibility_from_native(
                         vertical_gridlines.unwrap_or(true),
                     ),
-                    header_rows_vertical: TableGridlineVisibility::from_native(
+                    header_rows_vertical: gridline_visibility_from_native(
                         header_row_gridlines.unwrap_or(true),
                     ),
-                    footer_rows_vertical: TableGridlineVisibility::from_native(
+                    footer_rows_vertical: gridline_visibility_from_native(
                         footer_row_gridlines.unwrap_or(true),
                     ),
                 },
@@ -329,20 +290,16 @@ fn inherited_table_appearance(
             footer_row_gridlines,
         ) {
             return Ok(TableAppearance {
-                row_banding: TableRowBanding::from_native(banded_rows),
-                row_sizing: TableRowSizing::from_native(auto_resize),
+                row_banding: banding_from_native(banded_rows),
+                row_sizing: row_sizing_from_native(auto_resize),
                 gridlines: TableGridlines {
-                    body_horizontal: TableGridlineVisibility::from_native(horizontal_gridlines),
-                    header_columns_horizontal: TableGridlineVisibility::from_native(
+                    body_horizontal: gridline_visibility_from_native(horizontal_gridlines),
+                    header_columns_horizontal: gridline_visibility_from_native(
                         header_column_gridlines,
                     ),
-                    body_vertical: TableGridlineVisibility::from_native(vertical_gridlines),
-                    header_rows_vertical: TableGridlineVisibility::from_native(
-                        header_row_gridlines,
-                    ),
-                    footer_rows_vertical: TableGridlineVisibility::from_native(
-                        footer_row_gridlines,
-                    ),
+                    body_vertical: gridline_visibility_from_native(vertical_gridlines),
+                    header_rows_vertical: gridline_visibility_from_native(header_row_gridlines),
+                    footer_rows_vertical: gridline_visibility_from_native(footer_row_gridlines),
                 },
             });
         }
@@ -401,13 +358,23 @@ fn table_style_variation(
         },
         override_count: Some(7),
         table_properties: Some(tst::TableStylePropertiesArchive {
-            banded_rows: Some(appearance.row_banding.native()),
-            auto_resize: Some(appearance.row_sizing.native()),
-            h_strokes_visible: Some(appearance.gridlines.body_horizontal.native()),
-            v_strokes_visible: Some(appearance.gridlines.body_vertical.native()),
-            table_hc_divider_visible: Some(appearance.gridlines.header_columns_horizontal.native()),
-            table_hr_divider_visible: Some(appearance.gridlines.header_rows_vertical.native()),
-            table_footer_divider_visible: Some(appearance.gridlines.footer_rows_vertical.native()),
+            banded_rows: Some(banding_to_native(appearance.row_banding)),
+            auto_resize: Some(row_sizing_to_native(appearance.row_sizing)),
+            h_strokes_visible: Some(gridline_visibility_to_native(
+                appearance.gridlines.body_horizontal,
+            )),
+            v_strokes_visible: Some(gridline_visibility_to_native(
+                appearance.gridlines.body_vertical,
+            )),
+            table_hc_divider_visible: Some(gridline_visibility_to_native(
+                appearance.gridlines.header_columns_horizontal,
+            )),
+            table_hr_divider_visible: Some(gridline_visibility_to_native(
+                appearance.gridlines.header_rows_vertical,
+            )),
+            table_footer_divider_visible: Some(gridline_visibility_to_native(
+                appearance.gridlines.footer_rows_vertical,
+            )),
             ..Default::default()
         }),
     }

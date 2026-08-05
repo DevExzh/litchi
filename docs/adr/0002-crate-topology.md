@@ -107,6 +107,13 @@ The common color leaf now owns `color::{RgbColorSpace, Rgba}` and its typed
 `Rgba` is a fixed-size, copyable value that validates all four finite channels
 before construction, so format owners do not allocate or import archive error
 state merely to exchange a color.
+The shared table-appearance value now follows the same boundary at
+`litchi-iwa-common::table::appearance::{Appearance, Banding, RowSizing,
+GridlineVisibility, Gridlines}`. These compact, fixed-size values contain no
+style inheritance, protobuf, or package state. `litchi-iwa` retains the native
+bool conversion, bounded style-inheritance walk, wire decoder, and
+copy-on-write style mutation as the concrete archive adapter; its contextual
+`Table*` names are only migration-facing facade aliases.
 The leaf's `transition::Effect` owns the lossless native transition-effect
 identifier vocabulary, including canonical known variants and lossless unknown
 identifiers; IWA retains transition archive decoding, wire patching, and

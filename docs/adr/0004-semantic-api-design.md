@@ -54,6 +54,14 @@ only fixed-size channel data, and rejects non-finite or out-of-range channels
 before a caller can publish it. Concrete IWA modules retain only native color
 conversion and map the leaf error at their archive boundary.
 
+The same focused-module rule applies to table appearance:
+`litchi_iwa_common::table::appearance::{Appearance, Banding, RowSizing,
+GridlineVisibility, Gridlines}` owns the compact semantic value. The common
+module uses short names in its table context and stores no archive state;
+native style inheritance and protobuf conversion remain in the IWA adapter.
+Contextual `Table*` aliases are migration adapters for the concrete facade,
+not duplicate value owners.
+
 PresentationML implements this rule as `litchi-pptx::shape::{Scene, Shape}`.
 `Scene` is a bounded semantic index over one slide-like owner, not a vector of
 detached XML allocations. Shapes are visited in depth-first pre-order, while a
