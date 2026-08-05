@@ -3,7 +3,7 @@
 use std::env;
 
 use litchi_iwa::charts::{
-    ChartData, ChartDonutInnerRadius, Kind, ChartPieLabelDistance, LabelVisibility,
+    ChartData, ChartDonutInnerRadius, ChartPieLabelDistance, Kind, LabelVisibility,
 };
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};

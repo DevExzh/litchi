@@ -77,7 +77,7 @@ use crate::charts::source::{
     validate_chart_styles_registered,
 };
 use crate::charts::{
-    ChartArrangement, ChartData, ChartKind, Direction, DirectionKind, IWorkChartArchive,
+    ChartArrangement, ChartData, Kind, Direction, DirectionKind, IWorkChartArchive,
 };
 use crate::data_reference_registry::{
     clone_component_data_references, remove_component_data_references_for_objects,
@@ -95,7 +95,7 @@ const NUMBERS_THEME_MESSAGE_TYPE: u32 = 12_009;
 pub struct NumbersSheetChartInfo {
     pub sheet_id: u64,
     pub drawable_object_id: u64,
-    pub kind: ChartKind,
+    pub kind: Kind,
     pub direction: Direction,
     pub data: ChartData,
     pub geometry: DrawableGeometry,
@@ -145,7 +145,7 @@ impl NumbersEditor {
     pub fn add_sheet_chart(
         &mut self,
         sheet_id: u64,
-        kind: ChartKind,
+        kind: Kind,
         data: ChartData,
         position: DrawablePoint,
         size: DrawableSize,
@@ -267,7 +267,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        kind: ChartKind,
+        kind: Kind,
     ) -> Result<()> {
         require_creatable_kind(kind)?;
         self.update_sheet_chart(sheet_id, drawable_object_id, |chart| {
@@ -279,7 +279,7 @@ impl NumbersEditor {
                         "Numbers chart {drawable_object_id} has no chart payload"
                     ))
                 })?
-                .chart_type = Some(kind.into_raw());
+                .chart_type = Some(kind.native_value());
             Ok(())
         })?;
         if chart_graph(self, sheet_id, drawable_object_id)?.info.kind != kind {
@@ -927,9 +927,9 @@ mod tests {
         let baseline = editor.to_bytes().unwrap();
 
         let created = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
-        assert_eq!(created.kind, ChartKind::Column2d);
+        assert_eq!(created.kind, Kind::Column2d);
         assert_eq!(created.direction, Direction::Rows);
         assert_eq!(created.data, sample_data());
 
@@ -940,7 +940,7 @@ mod tests {
         )
         .unwrap();
         editor
-            .set_sheet_chart_kind(sheet_id, created.drawable_object_id, ChartKind::Bar2d)
+            .set_sheet_chart_kind(sheet_id, created.drawable_object_id, Kind::Bar2d)
             .unwrap();
         editor
             .set_sheet_chart_data(sheet_id, created.drawable_object_id, replacement.clone())
@@ -963,7 +963,7 @@ mod tests {
 
         let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let chart = &reopened.sheet_charts(sheet_id).unwrap()[0];
-        assert_eq!(chart.kind, ChartKind::Bar2d);
+        assert_eq!(chart.kind, Kind::Bar2d);
         assert_eq!(chart.direction, Direction::Columns);
         assert_eq!(chart.data, replacement);
         assert_eq!(chart.geometry, changed_geometry);
@@ -985,7 +985,7 @@ mod tests {
             editor
                 .add_sheet_chart(
                     sheet_id,
-                    ChartKind::Undefined,
+                    Kind::Undefined,
                     sample_data(),
                     POSITION,
                     SIZE
@@ -996,7 +996,7 @@ mod tests {
             editor
                 .add_sheet_chart(
                     sheet_id,
-                    ChartKind::Column2d,
+                    Kind::Column2d,
                     sample_data(),
                     POSITION,
                     DrawableSize {
@@ -1015,12 +1015,12 @@ mod tests {
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let baseline = editor.to_bytes().unwrap();
         let first = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let second = editor
             .add_sheet_chart(
                 sheet_id,
-                ChartKind::Column2d,
+                Kind::Column2d,
                 sample_data(),
                 DrawablePoint {
                     x: POSITION.x + SIZE.width,
@@ -1053,7 +1053,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let source_graph = chart_graph(&editor, sheet_id, source.drawable_object_id).unwrap();
         let baseline = editor.to_bytes().unwrap();
@@ -1130,7 +1130,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
 
         assert_eq!(
@@ -1207,7 +1207,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
 
         assert_eq!(
@@ -1292,7 +1292,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
 
         for axis in [Axis::Category, Axis::Value] {
@@ -1425,7 +1425,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let automatic = Bounds::automatic();
         let fixed = Bounds::fixed(Bound::new(-10.0).unwrap(), Bound::new(40.0).unwrap()).unwrap();
@@ -1498,7 +1498,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let defaults = Steps::fixed(
             MajorStepCount::new(5).unwrap(),
@@ -1581,7 +1581,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
 
         assert!(
@@ -1666,7 +1666,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
 
         assert!(
@@ -1751,7 +1751,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
 
         for axis in [Axis::Category, Axis::Value] {
@@ -1843,7 +1843,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
 
         for axis in [Axis::Category, Axis::Value] {
@@ -1899,7 +1899,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
 
         assert!(
@@ -2014,7 +2014,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
 
         for axis in [Axis::Category, Axis::Value] {
@@ -2103,7 +2103,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
 
         for axis in [Axis::Category, Axis::Value] {
@@ -2219,7 +2219,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
 
         for axis in [Axis::Category, Axis::Value] {
@@ -2370,7 +2370,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
 
         assert!(
@@ -2440,7 +2440,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let chart = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let object_id = chart.drawable_object_id;
         let baseline = editor.to_bytes().unwrap();
@@ -2483,7 +2483,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let chart = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let object_id = chart.drawable_object_id;
         let baseline = editor.to_bytes().unwrap();
@@ -2524,7 +2524,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let chart = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let object_id = chart.drawable_object_id;
         let graph = chart_graph(&editor, sheet_id, object_id).unwrap();
@@ -2612,7 +2612,7 @@ mod tests {
             .unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let chart = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let object_id = chart.drawable_object_id;
         let baseline = editor.to_bytes().unwrap();
@@ -2689,7 +2689,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let chart = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let object_id = chart.drawable_object_id;
         let baseline = editor.to_bytes().unwrap();
@@ -2732,7 +2732,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let chart = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let object_id = chart.drawable_object_id;
         let baseline = editor.to_bytes().unwrap();
@@ -2779,7 +2779,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
 
         assert!(
@@ -2859,7 +2859,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         editor
             .set_sheet_chart_caption(sheet_id, source.drawable_object_id, "Revenue by region")
@@ -2903,7 +2903,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
 
         assert_eq!(
@@ -2971,7 +2971,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
 
         assert!(
@@ -3031,7 +3031,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let rounded = ChartRoundedCorners::new(ChartCornerRadius::new(20.0).unwrap(), true);
         let changed = ChartRoundedCorners::new(ChartCornerRadius::new(35.0).unwrap(), false);
@@ -3102,7 +3102,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let customized = gap_spacing(25.0, 70.0);
         let changed = gap_spacing(30.0, 60.0);
@@ -3166,7 +3166,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let default = ShapeStroke::new(RgbaColor::black(), StrokeWidth::ONE, StrokePattern::Solid);
         let customized = chart_stroke(StrokePattern::MediumDash, 3.0);
@@ -3231,7 +3231,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let native_default = editor
             .sheet_chart_background_fill(sheet_id, source.drawable_object_id)
@@ -3302,7 +3302,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let defaults = editor
             .sheet_chart_series_fills(sheet_id, source.drawable_object_id)
@@ -3391,7 +3391,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let defaults = vec![None, None];
         assert_eq!(
@@ -3462,7 +3462,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let native_default = ChartShadow::native_default();
         assert_eq!(
@@ -3524,7 +3524,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Pie2d, pie_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Pie2d, pie_data(), POSITION, SIZE)
             .unwrap();
         assert_eq!(
             editor
@@ -3550,7 +3550,7 @@ mod tests {
             .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
             .unwrap();
         editor
-            .set_sheet_chart_kind(sheet_id, duplicate.drawable_object_id, ChartKind::Donut2d)
+            .set_sheet_chart_kind(sheet_id, duplicate.drawable_object_id, Kind::Donut2d)
             .unwrap();
         assert_eq!(
             editor
@@ -3588,7 +3588,7 @@ mod tests {
             .unwrap();
 
         let column = reopened
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let before_rejected_update = reopened.to_bytes().unwrap();
         assert!(
@@ -3624,7 +3624,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Donut2d, pie_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Donut2d, pie_data(), POSITION, SIZE)
             .unwrap();
         assert_eq!(
             editor
@@ -3656,7 +3656,7 @@ mod tests {
             customized
         );
         editor
-            .set_sheet_chart_kind(sheet_id, duplicate.drawable_object_id, ChartKind::Pie2d)
+            .set_sheet_chart_kind(sheet_id, duplicate.drawable_object_id, Kind::Pie2d)
             .unwrap();
         let before_rejected_update = editor.to_bytes().unwrap();
         assert!(
@@ -3675,7 +3675,7 @@ mod tests {
         );
         assert_eq!(editor.to_bytes().unwrap(), before_rejected_update);
         editor
-            .set_sheet_chart_kind(sheet_id, duplicate.drawable_object_id, ChartKind::Donut3d)
+            .set_sheet_chart_kind(sheet_id, duplicate.drawable_object_id, Kind::Donut3d)
             .unwrap();
 
         editor
@@ -3719,7 +3719,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Pie2d, pie_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Pie2d, pie_data(), POSITION, SIZE)
             .unwrap();
         let zeros = vec![ChartPieWedgeExplosion::ZERO; 3];
         assert_eq!(
@@ -3770,7 +3770,7 @@ mod tests {
             .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
             .unwrap();
         editor
-            .set_sheet_chart_kind(sheet_id, duplicate.drawable_object_id, ChartKind::Donut2d)
+            .set_sheet_chart_kind(sheet_id, duplicate.drawable_object_id, Kind::Donut2d)
             .unwrap();
         assert_eq!(
             editor
@@ -3829,7 +3829,7 @@ mod tests {
         assert_eq!(reopened.to_bytes().unwrap(), before_rejected_updates);
 
         let column = reopened
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let before_wrong_kind = reopened.to_bytes().unwrap();
         assert!(
@@ -3865,7 +3865,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Pie2d, pie_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Pie2d, pie_data(), POSITION, SIZE)
             .unwrap();
         let defaults = vec![LabelVisibility::DEFAULT; 3];
         let customized = [
@@ -3945,7 +3945,7 @@ mod tests {
             .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
             .unwrap();
         editor
-            .set_sheet_chart_kind(sheet_id, duplicate.drawable_object_id, ChartKind::Donut2d)
+            .set_sheet_chart_kind(sheet_id, duplicate.drawable_object_id, Kind::Donut2d)
             .unwrap();
         editor
             .set_sheet_chart_pie_label_visibility(
@@ -3987,7 +3987,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Pie2d, pie_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Pie2d, pie_data(), POSITION, SIZE)
             .unwrap();
         let defaults = vec![ChartPieLabelDistance::DEFAULT; 3];
         let customized = [
@@ -4124,7 +4124,7 @@ mod tests {
             .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
             .unwrap();
         editor
-            .set_sheet_chart_kind(sheet_id, duplicate.drawable_object_id, ChartKind::Donut2d)
+            .set_sheet_chart_kind(sheet_id, duplicate.drawable_object_id, Kind::Donut2d)
             .unwrap();
         editor
             .set_sheet_chart_pie_label_distance(
@@ -4217,7 +4217,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let defaults = [ChartSeriesValueLabelVisibility::Hidden; 2];
         let customized = [
@@ -4336,7 +4336,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let defaults = [ChartSeriesValueLabelLocation::Top; 2];
         let customized = [
@@ -4452,7 +4452,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let defaults = vec![LabelAffixes::default(); 2];
         let customized = vec![
@@ -4556,7 +4556,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let defaults = vec![NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT; 2];
         let fixed_two = NumberFormat::new(
@@ -4661,7 +4661,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let defaults = vec![ChartSeriesValueLabelAutoFit::Enabled; 2];
         let customized = vec![
@@ -4761,7 +4761,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let defaults = vec![ChartSeriesTrendline::none(); 2];
         let customized = vec![
@@ -4867,7 +4867,7 @@ mod tests {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
-            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         let defaults = vec![ChartSeriesErrorBars::None; 2];
         let customized = vec![

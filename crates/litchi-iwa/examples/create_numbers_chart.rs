@@ -5,13 +5,13 @@ use std::env;
 use litchi_iwa::charts::{
     Axis, Bound, Bounds, ChartAxisGridline, ChartAxisGridlineStroke, ChartCornerRadius, ChartData,
     ChartErrorBarDirection, ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont,
-    ChartFontSize, ChartGapPercentage, ChartGapSpacing, Kind, ChartLegendFill,
-    ChartLegendFont, ChartLegendFontSize, ChartLegendShadow, ChartLegendStroke,
-    ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesStroke,
-    ChartSeriesStrokePattern, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
-    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelLocation, ChartSeriesValueLabelVisibility,
-    ChartShadow, DecimalPlaces, LabelAffixes, MajorStepCount, MinorStepCount, NegativeStyle,
-    NumberFormat, Scale, Steps, TickMarkLocation,
+    ChartFontSize, ChartGapPercentage, ChartGapSpacing, ChartLegendFill, ChartLegendFont,
+    ChartLegendFontSize, ChartLegendShadow, ChartLegendStroke, ChartRoundedCorners,
+    ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesStroke, ChartSeriesStrokePattern,
+    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesValueLabelAutoFit,
+    ChartSeriesValueLabelLocation, ChartSeriesValueLabelVisibility, ChartShadow, DecimalPlaces,
+    Kind, LabelAffixes, MajorStepCount, MinorStepCount, NegativeStyle, NumberFormat, Scale, Steps,
+    TickMarkLocation,
 };
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{

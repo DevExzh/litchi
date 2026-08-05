@@ -4,8 +4,8 @@ use std::env;
 use std::path::Path;
 
 use litchi_iwa::charts::{
-    Axis, Bound, Bounds, ChartData, Kind, Direction, LabelAngle, MajorStepCount,
-    MinorStepCount, Scale, Steps,
+    Axis, Bound, Bounds, ChartData, Direction, Kind, LabelAngle, MajorStepCount, MinorStepCount,
+    Scale, Steps,
 };
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::NumbersDocumentBuilder;

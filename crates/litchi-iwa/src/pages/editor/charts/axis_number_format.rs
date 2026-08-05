@@ -72,7 +72,7 @@ fn set_body_chart_axis_number_format(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::{ChartData, Kind, DecimalPlaces, NegativeStyle};
+    use crate::charts::{ChartData, DecimalPlaces, Kind, NegativeStyle};
     use crate::pages::PagesDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize};
 

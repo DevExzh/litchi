@@ -76,7 +76,7 @@ fn set_sheet_chart_axis_number_format(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::{ChartData, Kind, DecimalPlaces, NegativeStyle};
+    use crate::charts::{ChartData, DecimalPlaces, Kind, NegativeStyle};
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize};
 

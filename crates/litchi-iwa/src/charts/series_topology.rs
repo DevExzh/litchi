@@ -5,7 +5,7 @@
 //! and `X + Y + size`, while their multi-data forms switch datasets
 //! interactively instead of displaying multiple series at once.
 
-use crate::charts::{ChartData, Kind, Direction, DirectionKind};
+use crate::charts::{ChartData, Direction, DirectionKind, Kind};
 use crate::{Error, Result};
 
 const SCATTER_COMPONENT_COUNT: usize = 2;
@@ -92,25 +92,12 @@ mod tests {
             6
         );
         assert_eq!(
-            chart_series_count(
-                Kind::MultiDataScatter2d,
-                Direction::Rows,
-                &data,
-                "test",
-                1
-            )
-            .unwrap(),
+            chart_series_count(Kind::MultiDataScatter2d, Direction::Rows, &data, "test", 1)
+                .unwrap(),
             1
         );
         assert_eq!(
-            chart_series_count(
-                Kind::MultiDataBubble2d,
-                Direction::Rows,
-                &data,
-                "test",
-                1
-            )
-            .unwrap(),
+            chart_series_count(Kind::MultiDataBubble2d, Direction::Rows, &data, "test", 1).unwrap(),
             1
         );
     }
@@ -181,19 +168,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            chart_series_count(Kind::Line2d, Direction::Rows, &rectangular, "test", 1)
-                .unwrap(),
+            chart_series_count(Kind::Line2d, Direction::Rows, &rectangular, "test", 1).unwrap(),
             2
         );
         assert_eq!(
-            chart_series_count(
-                Kind::Line2d,
-                Direction::Columns,
-                &rectangular,
-                "test",
-                1,
-            )
-            .unwrap(),
+            chart_series_count(Kind::Line2d, Direction::Columns, &rectangular, "test", 1,).unwrap(),
             3
         );
 

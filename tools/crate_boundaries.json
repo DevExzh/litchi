@@ -102,6 +102,7 @@
     "litchi-iwa-protos": [],
     "litchi-iwa-text": [],
     "litchi-keynote": [
+      "litchi-iwa-common",
       "litchi-iwa-text"
     ],
     "litchi-markdown": [

@@ -76,7 +76,7 @@ use crate::charts::source::{
     validate_chart_styles_registered,
 };
 use crate::charts::{
-    ChartArrangement, ChartData, ChartKind, Direction, DirectionKind, IWorkChartArchive,
+    ChartArrangement, ChartData, Kind, Direction, DirectionKind, IWorkChartArchive,
 };
 use crate::data_reference_registry::{
     clone_component_data_references, remove_component_data_references_for_objects,
@@ -95,7 +95,7 @@ pub struct KeynoteSlideChartInfo {
     pub slide_index: usize,
     pub slide_id: u64,
     pub drawable_object_id: u64,
-    pub kind: ChartKind,
+    pub kind: Kind,
     pub direction: Direction,
     pub data: ChartData,
     pub geometry: DrawableGeometry,
@@ -138,7 +138,7 @@ impl KeynoteEditor {
     pub fn add_slide_chart(
         &mut self,
         slide_index: usize,
-        kind: ChartKind,
+        kind: Kind,
         data: ChartData,
         position: DrawablePoint,
         size: DrawableSize,
@@ -247,7 +247,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        kind: ChartKind,
+        kind: Kind,
     ) -> Result<()> {
         require_creatable_kind(kind)?;
         self.update_slide_chart(slide_index, drawable_object_id, |chart| {
@@ -259,7 +259,7 @@ impl KeynoteEditor {
                         "Keynote chart {drawable_object_id} has no chart payload"
                     ))
                 })?
-                .chart_type = Some(kind.into_raw());
+                .chart_type = Some(kind.native_value());
             Ok(())
         })?;
         if chart_graph(self, slide_index, drawable_object_id)?

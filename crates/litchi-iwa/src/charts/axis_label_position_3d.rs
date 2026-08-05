@@ -70,11 +70,7 @@ pub(crate) fn set_chart_3d_value_axis_label_position(
     Ok(())
 }
 
-fn require_supported_kind(
-    kind: Kind,
-    drawable_object_id: u64,
-    drawable_label: &str,
-) -> Result<()> {
+fn require_supported_kind(kind: Kind, drawable_object_id: u64, drawable_label: &str) -> Result<()> {
     if !kind.supports_3d_value_axis_label_position() {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} chart {drawable_object_id} kind {kind:?} has no 3D value-axis label position"

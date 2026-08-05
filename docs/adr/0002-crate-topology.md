@@ -220,6 +220,18 @@ boxed slice without protobuf or package dependencies. `litchi-iwa` retains
 its fill adapter alone decodes and writes `GradientArchive` while preserving
 strict validation. The former `ShapeGradient*` owners are removed rather than
 retained as compatibility aliases.
+
+Native straight-line decorations follow the same boundary at
+`litchi-iwa-common::shape::line::{Endpoint, Endpoints}`. The two-byte value
+stores directed start and end decorations without native line-end archives;
+`litchi-iwa` retains endpoint inheritance, style variation, and wire updates.
+The concrete Pages, Numbers, and Keynote editors consume the common value
+directly, and the former `LineEndpoint*` names are removed.
+
+Chart kinds follow the same boundary at `litchi-iwa-common::chart::kind::Kind`.
+This fixed-size value preserves every native integer, exposes only archive-free
+capability predicates, and keeps protobuf conversion in `litchi-iwa`. The old
+protobuf-coupled `ChartKind` owner is removed rather than retained as an alias.
 Chart-axis selectors and tick-mark values now follow the same boundary at
 `litchi-iwa-common::chart::axis::{Axis, TickMarkLocation}`. `Axis` is a
 one-byte category/value selector, while `TickMarkLocation` is a compact

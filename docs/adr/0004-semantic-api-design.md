@@ -160,6 +160,12 @@ state. `ShapeFill` remains the IWA boundary aggregate because image fills and
 native data references are format-specific; the former `ShapeGradient*`
 semantic owners are removed rather than retained as aliases.
 
+Shape line endpoints and chart kinds use the same focused common-value rule:
+`litchi_iwa_common::shape::line::{Endpoint, Endpoints}` and
+`litchi_iwa_common::chart::kind::Kind` are compact, lossless, archive-free
+inputs. Native endpoint inheritance, field numbers, protobuf conversion, and
+wire-preserving mutation remain private to `litchi-iwa`.
+
 Chart axis controls use the focused `litchi_iwa_common::chart::axis` module.
 `Axis::{Category, Value}` is the compact semantic selector shared by all three
 iWork owners, and `TickMarkLocation` models the exclusive formatter choices

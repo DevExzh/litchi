@@ -76,7 +76,7 @@ use crate::charts::source::{
     validate_chart_styles_registered,
 };
 use crate::charts::{
-    ChartArrangement, ChartData, ChartKind, Direction, DirectionKind, IWorkChartArchive,
+    ChartArrangement, ChartData, Kind, Direction, DirectionKind, IWorkChartArchive,
 };
 use crate::data_reference_registry::{
     clone_component_data_references, remove_component_data_references_for_objects,
@@ -95,7 +95,7 @@ pub struct PagesBodyChartInfo {
     /// UTF-16 index of the object-replacement character in the body text.
     pub anchor_character_index: u32,
     pub drawable_object_id: u64,
-    pub kind: ChartKind,
+    pub kind: Kind,
     pub direction: Direction,
     pub data: ChartData,
     pub geometry: DrawableGeometry,
@@ -122,7 +122,7 @@ impl PagesEditor {
     pub fn add_body_chart(
         &mut self,
         anchor_character_index: usize,
-        kind: ChartKind,
+        kind: Kind,
         data: ChartData,
         position: DrawablePoint,
         size: DrawableSize,
@@ -264,7 +264,7 @@ impl PagesEditor {
     }
 
     /// Change one body chart's native kind while preserving its data.
-    pub fn set_body_chart_kind(&mut self, drawable_object_id: u64, kind: ChartKind) -> Result<()> {
+    pub fn set_body_chart_kind(&mut self, drawable_object_id: u64, kind: Kind) -> Result<()> {
         require_creatable_kind(kind)?;
         self.update_body_chart(drawable_object_id, |chart| {
             chart
@@ -275,7 +275,7 @@ impl PagesEditor {
                         "Pages chart {drawable_object_id} has no chart payload"
                     ))
                 })?
-                .chart_type = Some(kind.into_raw());
+                .chart_type = Some(kind.native_value());
             Ok(())
         })?;
         if body_chart_graph(self, drawable_object_id)?.info.kind != kind {

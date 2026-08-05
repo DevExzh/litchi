@@ -4,7 +4,7 @@ use std::env;
 use std::path::Path;
 
 use litchi_iwa::charts::{
-    ChartData, Kind, ChartPieLabelDistance, LabelVisibility, LeaderLineVisibility,
+    ChartData, ChartPieLabelDistance, Kind, LabelVisibility, LeaderLineVisibility,
 };
 use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};

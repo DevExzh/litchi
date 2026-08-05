@@ -3,7 +3,7 @@
 use std::env;
 use std::path::Path;
 
-use litchi_iwa::charts::{Axis, ChartData, Kind, DecimalPlaces, NegativeStyle, NumberFormat};
+use litchi_iwa::charts::{Axis, ChartData, DecimalPlaces, Kind, NegativeStyle, NumberFormat};
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::pages::PagesDocumentBuilder;

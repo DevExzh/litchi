@@ -58,12 +58,8 @@ impl ChartSeriesFillKind {
     pub fn for_chart_kind(kind: Kind) -> Result<Self> {
         match kind {
             Kind::Area2d | Kind::StackedArea2d => Ok(Self::Area2d),
-            Kind::Bar2d | Kind::StackedBar2d | Kind::MultiDataBar2d => {
-                Ok(Self::Bar2d)
-            },
-            Kind::Column2d | Kind::StackedColumn2d | Kind::MultiDataColumn2d => {
-                Ok(Self::Column2d)
-            },
+            Kind::Bar2d | Kind::StackedBar2d | Kind::MultiDataBar2d => Ok(Self::Bar2d),
+            Kind::Column2d | Kind::StackedColumn2d | Kind::MultiDataColumn2d => Ok(Self::Column2d),
             Kind::Pie2d | Kind::Donut2d => Ok(Self::Pie2d),
             Kind::Radar2d => Ok(Self::Radar2d),
             Kind::Area3d | Kind::StackedArea3d => Ok(Self::Area3d),

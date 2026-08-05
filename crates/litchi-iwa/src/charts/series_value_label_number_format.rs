@@ -74,7 +74,7 @@ pub(crate) fn set_chart_series_value_label_number_formats(
 }
 
 fn ensure_supported_kind(kind: Kind) -> Result<()> {
-    if matches!(kind, Kind::Undefined | Kind::Unsupported(_)) {
+    if kind == Kind::Undefined || kind.is_unsupported() {
         return Err(Error::InvalidFormat(format!(
             "chart kind {kind:?} has no supported series value-label number format"
         )));
