@@ -1,18 +1,18 @@
 use std::io::Cursor;
 
+use litchi_biff::{Kind, RecordRef, Records};
 use litchi_cfb::consts::STGTY_STREAM;
 use litchi_cfb::{DirectoryEntry, OleFile};
 
 use crate::chart;
 use crate::limits::as_u64;
-use crate::raw::{Kind, RecordRef, Records};
 use crate::{Error, Limits, Result};
 
 const WORKBOOK: &str = "Workbook";
 const COMP_OBJ: &str = "\u{1}CompObj";
 const OLE: &str = "\u{1}Ole";
-const BOF: Kind = Kind::new(0x0809);
-const EOF: Kind = Kind::new(0x000A);
+const BOF: Kind = Kind::from_wire(0x0809);
+const EOF: Kind = Kind::from_wire(0x000A);
 const BOF_BYTES: usize = 16;
 const OGRAPH_VERSION: u16 = 0x0680;
 const GLOBALS: u16 = 0x0005;
@@ -425,7 +425,7 @@ fn validate_workbook(bytes: &[u8], limits: Limits) -> Result<WorkbookLayout> {
     let mut chart_start = None;
     let mut chart_end = None;
     let mut chart_records = 0usize;
-    for item in Records::with_limits(bytes, limits)? {
+    for item in Records::with_limits(bytes, limits.biff)? {
         let record = item?;
         state = match state {
             StreamState::GlobalsBof => {
@@ -634,7 +634,7 @@ mod tests {
     use litchi_cfb::OleWriter;
 
     use super::*;
-    use crate::raw::Encoder;
+    use litchi_biff::Encoder;
 
     fn bof(doc_type: u16) -> [u8; BOF_BYTES] {
         let mut payload = [0; BOF_BYTES];
@@ -652,13 +652,13 @@ mod tests {
     }
 
     fn workbook_with_bofs(globals: [u8; BOF_BYTES], chart: [u8; BOF_BYTES]) -> Vec<u8> {
-        let mut out = Encoder::new();
+        let mut out = Encoder::with_limits(Limits::default().biff).expect("BIFF limits");
         out.push(BOF, &globals).expect("globals BOF");
-        out.push(Kind::new(0x7777), &[1, 2, 3])
+        out.push(Kind::from_wire(0x7777), &[1, 2, 3])
             .expect("unknown record");
         out.push(EOF, &[]).expect("globals EOF");
         out.push(BOF, &chart).expect("chart BOF");
-        out.push(Kind::new(0x7778), &[4, 5])
+        out.push(Kind::from_wire(0x7778), &[4, 5])
             .expect("unknown record");
         out.push(EOF, &[]).expect("chart EOF");
         out.finish()
@@ -732,7 +732,7 @@ mod tests {
 
     #[test]
     fn rejects_wrong_substream_shape_and_trailing_records() {
-        let mut wrong = Encoder::new();
+        let mut wrong = Encoder::with_limits(Limits::default().biff).expect("BIFF limits");
         wrong.push(BOF, &bof(GLOBALS)).expect("BOF");
         wrong.push(EOF, &[]).expect("EOF");
         wrong.push(BOF, &bof(GLOBALS)).expect("wrong BOF");
