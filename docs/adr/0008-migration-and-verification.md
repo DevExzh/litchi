@@ -4627,15 +4627,23 @@ trait, so common scanners do not depend on an ODT package implementation.
 
 ODT now exposes these common inventories through its ergonomic document
 facades. ODT-specific package placement, cleanup overlays, object paths,
-manifest mutation, and byte replacement remain in the ODT owner; ODS and the
-other ODF families can adopt the same scanners without inheriting ODT
-mechanics. No compatibility aliases or duplicated scanner model are kept,
-and authoring/mutation remains separate from this read-only inventory layer.
+manifest mutation, and byte replacement remain in the ODT owner. ODS now
+activates the same inventory through layered `drawing`, `media`, and
+`embedded` facades, including safe package-local image extraction; the other
+ODF families can adopt the scanners without inheriting ODT mechanics. No
+compatibility aliases or duplicated scanner model are kept, and
+authoring/mutation remains separate from this read-only inventory layer.
+
+The format-neutral ODT facade also removes redundant `OpenDocument` prefixes:
+`generic::{Family,Package,FlatDocument}` are the contextual owners, with all
+internal and exercised deferred consumers migrated to those names. This
+keeps the public path ergonomic while preserving the layered module context.
 
 The common ODF all-target suite (178 unit tests plus integration targets),
 ODT library suite (525 tests), boundary policy checks, formatting, and
-affected-crate compilation pass. This is a structural inventory extraction;
-it makes no new ODF conformance or native Office interoperability claim.
+affected-crate compilation pass; the ODS all-target suite passes 73 tests.
+This is a structural inventory extraction; it makes no new ODF conformance or
+native Office interoperability claim.
 
 ## Shared BIFF framing and legacy binary owner migration
 
