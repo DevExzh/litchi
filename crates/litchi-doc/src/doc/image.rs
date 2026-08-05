@@ -1,4 +1,6 @@
 use super::parts::chp::CharacterProperties;
+use std::mem::size_of;
+
 use zerocopy_derive::{FromBytes, Immutable, KnownLayout};
 
 const BLOCK_TYPE_OFFSET: usize = 0xE;
@@ -195,7 +197,7 @@ impl PictureFields {
 }
 
 const _: () = {
-    assert!(std::mem::size_of::<PictureFields>() == 0x44);
+    assert!(size_of::<PictureFields>() == 0x44);
 };
 
 // ============================================================================
@@ -253,7 +255,7 @@ impl Image {
             .ok_or(ImageError::InvalidPictureLength(pic_fields.lcb))?;
 
         let mut offset = base
-            .checked_add(std::mem::size_of::<PictureFields>())
+            .checked_add(size_of::<PictureFields>())
             .filter(|offset| *offset <= block_end)
             .ok_or(ImageError::InvalidPictureLength(pic_fields.lcb))?;
 
@@ -368,7 +370,7 @@ mod tests {
     #[test]
     fn image_data_rejects_negative_or_out_of_bounds_block_lengths() {
         let image = Image::new(0);
-        let mut data = vec![0; std::mem::size_of::<PictureFields>()];
+        let mut data = vec![0; size_of::<PictureFields>()];
         data[..4].copy_from_slice(&(-1i32).to_le_bytes());
         assert!(matches!(
             image.data(&data, &[]),
