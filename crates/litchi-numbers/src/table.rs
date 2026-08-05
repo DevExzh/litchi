@@ -8,6 +8,8 @@
 
 /// Checked, bounded plans for applying multiple cell mutations.
 pub mod edit;
+/// Checked, archive-free table sort semantics.
+pub mod sort;
 
 use crate::cell::Value;
 use std::fmt;

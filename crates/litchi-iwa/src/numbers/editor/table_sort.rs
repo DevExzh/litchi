@@ -1,11 +1,16 @@
 //! Typed sort-rule configuration and execution for Numbers tables.
 
-use std::collections::BTreeSet;
-
 use super::*;
+use litchi_numbers::table::sort::{self, ColumnIndex, Direction, Order, RowRange, Rule, Scope};
 
 mod apply;
 mod wire;
+
+pub use litchi_numbers::table::sort::{
+    ColumnIndex as NumbersTableSortColumnIndex, Direction as NumbersTableSortDirection,
+    Order as NumbersTableSortOrder, RowRange as NumbersTableSortRowRange,
+    Rule as NumbersTableSortRule, Scope as NumbersTableSortScope,
+};
 
 use apply::apply_attached_table_sort_order;
 use wire::{
@@ -13,303 +18,42 @@ use wire::{
     write_table_sort_order_wire,
 };
 
-const NATIVE_ENTIRE_TABLE_SORT: i32 = tst::table_sort_order_archive::SortType::EntireTable as i32;
-const NATIVE_ROW_RANGE_SORT: i32 = tst::table_sort_order_archive::SortType::RowRange as i32;
-
-/// Rows targeted by a persisted Numbers table sort configuration.
-///
-/// Numbers stores this scope with the rules. For [`Self::SelectedRows`], the
-/// actual selected row interval belongs to document view state and is
-/// therefore supplied explicitly when the sort is executed.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub enum NumbersTableSortScope {
-    /// Apply the rules to every body row, excluding headers and footers.
-    #[default]
-    EntireTable,
-    /// Apply the rules to the rows selected in the document view.
-    SelectedRows,
+fn invalid_stored_sort(error: sort::Error) -> Error {
+    Error::InvalidFormat(format!(
+        "Numbers table has an invalid stored sort order: {error}"
+    ))
 }
 
-impl NumbersTableSortScope {
-    const fn as_native(self) -> i32 {
-        match self {
-            Self::EntireTable => NATIVE_ENTIRE_TABLE_SORT,
-            Self::SelectedRows => NATIVE_ROW_RANGE_SORT,
-        }
+fn order_from_native(sort: &tst::TableSortOrderArchive) -> Result<Option<Order>> {
+    if sort.rules.is_empty() {
+        return Ok(None);
     }
-
-    fn from_native(value: i32) -> Result<Self> {
-        match tst::table_sort_order_archive::SortType::try_from(value) {
-            Ok(tst::table_sort_order_archive::SortType::EntireTable) => Ok(Self::EntireTable),
-            Ok(tst::table_sort_order_archive::SortType::RowRange) => Ok(Self::SelectedRows),
-            Err(_) => Err(Error::InvalidFormat(format!(
-                "Numbers table sort order has unknown scope {value}"
-            ))),
-        }
-    }
-}
-
-/// A non-empty, body-relative half-open row range for selected-row sorting.
-///
-/// `start` is inclusive and `end` is exclusive. Header and footer rows are
-/// deliberately outside this coordinate system, so callers cannot
-/// accidentally move them through a selected-row sort.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct NumbersTableSortRowRange {
-    start: usize,
-    end: usize,
-}
-
-impl NumbersTableSortRowRange {
-    /// Construct a non-empty body-relative range `[start, end)`.
-    pub fn new(start: usize, end: usize) -> Result<Self> {
-        if start >= end {
-            return Err(Error::ParseError(
-                "Numbers selected-row sort range must be non-empty".to_owned(),
-            ));
-        }
-        Ok(Self { start, end })
-    }
-
-    /// Return the inclusive body-relative start row.
-    #[must_use]
-    pub const fn start(self) -> usize {
-        self.start
-    }
-
-    /// Return the exclusive body-relative end row.
-    #[must_use]
-    pub const fn end(self) -> usize {
-        self.end
-    }
-
-    /// Return the number of selected body rows.
-    #[must_use]
-    pub const fn len(self) -> usize {
-        self.end - self.start
-    }
-
-    /// Return whether this range is empty.
-    ///
-    /// Construction rejects empty ranges, so this is always `false`; the
-    /// method makes the type convenient in generic range-oriented code.
-    #[must_use]
-    pub const fn is_empty(self) -> bool {
-        false
-    }
-}
-
-/// A validated zero-based physical column index used by a Numbers sort rule.
-///
-/// The index is checked against a table's current column count when an order
-/// is assigned. Constructing this type also rejects values that do not fit
-/// Numbers' native `uint32` representation.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct NumbersTableSortColumnIndex(usize);
-
-impl NumbersTableSortColumnIndex {
-    /// Construct a native-compatible zero-based column index.
-    pub fn new(index: usize) -> Result<Self> {
-        u32::try_from(index).map_err(|_| {
-            Error::ParseError(
-                "Numbers table sort column index exceeds the native u32 range".to_owned(),
-            )
-        })?;
-        Ok(Self(index))
-    }
-
-    /// Return the zero-based column index.
-    #[must_use]
-    pub const fn get(self) -> usize {
-        self.0
-    }
-
-    pub(super) fn as_native(self) -> Result<u32> {
-        u32::try_from(self.0).map_err(|_| {
-            Error::InvalidFormat(
-                "Numbers table sort column index exceeds the native u32 range".to_owned(),
-            )
+    let scope = Scope::from_native(sort.r#type).map_err(invalid_stored_sort)?;
+    let rules = sort
+        .rules
+        .iter()
+        .map(|rule| {
+            let direction = Direction::from_native(rule.direction).map_err(invalid_stored_sort)?;
+            let column = ColumnIndex::from_native(rule.index).map_err(invalid_stored_sort)?;
+            Ok(Rule::new(column, direction))
         })
-    }
-
-    pub(super) fn from_native(index: u32) -> Result<Self> {
-        Self::new(usize::try_from(index).map_err(|_| {
-            Error::InvalidFormat("Numbers table sort column index exceeds usize".to_owned())
-        })?)
-        .map_err(|_| {
-            Error::InvalidFormat(
-                "Numbers table sort column index exceeds the native u32 range".to_owned(),
-            )
-        })
-    }
-}
-
-impl TryFrom<usize> for NumbersTableSortColumnIndex {
-    type Error = Error;
-
-    fn try_from(index: usize) -> Result<Self> {
-        Self::new(index)
-    }
-}
-
-impl From<NumbersTableSortColumnIndex> for usize {
-    fn from(index: NumbersTableSortColumnIndex) -> Self {
-        index.get()
-    }
-}
-
-/// Sort direction for one Numbers table column.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum NumbersTableSortDirection {
-    /// Sort low-to-high, alphabetically A-to-Z, or oldest-to-newest.
-    Ascending,
-    /// Sort high-to-low, alphabetically Z-to-A, or newest-to-oldest.
-    Descending,
-}
-
-/// One full-table sort-configuration rule in priority order.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct NumbersTableSortRule {
-    column: NumbersTableSortColumnIndex,
-    direction: NumbersTableSortDirection,
-}
-
-impl NumbersTableSortRule {
-    /// Construct a rule for one physical table column.
-    #[must_use]
-    pub const fn new(
-        column: NumbersTableSortColumnIndex,
-        direction: NumbersTableSortDirection,
-    ) -> Self {
-        Self { column, direction }
-    }
-
-    /// Return the column selected by this rule.
-    #[must_use]
-    pub const fn column(self) -> NumbersTableSortColumnIndex {
-        self.column
-    }
-
-    /// Return this rule's direction.
-    #[must_use]
-    pub const fn direction(self) -> NumbersTableSortDirection {
-        self.direction
-    }
-}
-
-/// An ordered, non-empty Numbers sort-rule configuration.
-///
-/// Rules are evaluated in slice order. Numbers does not accept the same
-/// column more than once, so construction rejects duplicate columns.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct NumbersTableSortOrder {
-    scope: NumbersTableSortScope,
-    rules: Vec<NumbersTableSortRule>,
-}
-
-impl NumbersTableSortOrder {
-    /// Construct a native full-table sort-rule configuration.
-    pub fn new(rules: impl IntoIterator<Item = NumbersTableSortRule>) -> Result<Self> {
-        Self::with_scope(NumbersTableSortScope::EntireTable, rules)
-    }
-
-    /// Construct a native selected-row sort-rule configuration.
-    ///
-    /// The selected interval is not persisted in the table archive. Supply a
-    /// [`NumbersTableSortRowRange`] to
-    /// [`NumbersEditor::apply_table_sort_order_to_rows`] when executing it.
-    pub fn selected_rows(rules: impl IntoIterator<Item = NumbersTableSortRule>) -> Result<Self> {
-        Self::with_scope(NumbersTableSortScope::SelectedRows, rules)
-    }
-
-    /// Construct a native sort-rule configuration with an explicit scope.
-    pub fn with_scope(
-        scope: NumbersTableSortScope,
-        rules: impl IntoIterator<Item = NumbersTableSortRule>,
-    ) -> Result<Self> {
-        let rules = rules.into_iter().collect::<Vec<_>>();
-        if rules.is_empty() {
-            return Err(Error::ParseError(
-                "Numbers table sort order must contain at least one rule".to_owned(),
-            ));
-        }
-        let mut columns = BTreeSet::new();
-        if rules.iter().any(|rule| !columns.insert(rule.column)) {
-            return Err(Error::ParseError(
-                "Numbers table sort order cannot contain the same column more than once".to_owned(),
-            ));
-        }
-        Ok(Self { scope, rules })
-    }
-
-    /// Return the persisted sort scope.
-    #[must_use]
-    pub const fn scope(&self) -> NumbersTableSortScope {
-        self.scope
-    }
-
-    /// Return the rules in native evaluation order without cloning them.
-    #[must_use]
-    pub fn rules(&self) -> &[NumbersTableSortRule] {
-        &self.rules
-    }
-
-    fn from_native(sort: &tst::TableSortOrderArchive) -> Result<Option<Self>> {
-        if sort.rules.is_empty() {
-            return Ok(None);
-        }
-        let scope = NumbersTableSortScope::from_native(sort.r#type)?;
-        Self::with_scope(scope, sort.rules.iter().map(|rule| {
-            let direction = match tst::table_sort_order_archive::sort_rule_archive::Direction::try_from(
-                rule.direction,
-            ) {
-                Ok(tst::table_sort_order_archive::sort_rule_archive::Direction::Ascending) => {
-                    NumbersTableSortDirection::Ascending
-                },
-                Ok(tst::table_sort_order_archive::sort_rule_archive::Direction::Descending) => {
-                    NumbersTableSortDirection::Descending
-                },
-                Err(_) => {
-                    return Err(Error::InvalidFormat(
-                        "Numbers table sort rule has an unknown direction".to_owned(),
-                    ));
-                },
-            };
-            Ok(NumbersTableSortRule::new(
-                NumbersTableSortColumnIndex::from_native(rule.index)?,
-                direction,
-            ))
-        })
-        .collect::<Result<Vec<_>>>()?)
+        .collect::<Result<Vec<_>>>()?;
+    Order::with_scope(scope, rules)
         .map(Some)
-        .map_err(|error| {
-            Error::InvalidFormat(format!("Numbers table has an invalid stored sort order: {error}"))
-        })
-    }
+        .map_err(invalid_stored_sort)
+}
 
-    fn as_native(&self) -> Result<tst::TableSortOrderArchive> {
-        Ok(tst::TableSortOrderArchive {
-            r#type: self.scope.as_native(),
-            rules: self
-                .rules
-                .iter()
-                .map(|rule| {
-                    Ok(tst::table_sort_order_archive::SortRuleArchive {
-                        index: rule.column.as_native()?,
-                        direction: match rule.direction {
-                            NumbersTableSortDirection::Ascending => {
-                                tst::table_sort_order_archive::sort_rule_archive::Direction::Ascending
-                                    as i32
-                            },
-                            NumbersTableSortDirection::Descending => {
-                                tst::table_sort_order_archive::sort_rule_archive::Direction::Descending
-                                    as i32
-                            },
-                        },
-                    })
-                })
-                .collect::<Result<Vec<_>>>()?,
-        })
+fn order_as_native(order: &Order) -> tst::TableSortOrderArchive {
+    tst::TableSortOrderArchive {
+        r#type: order.scope().native_value(),
+        rules: order
+            .rules()
+            .iter()
+            .map(|rule| tst::table_sort_order_archive::SortRuleArchive {
+                index: rule.column().native_value(),
+                direction: rule.direction().native_value(),
+            })
+            .collect(),
     }
 }
 
@@ -318,9 +62,9 @@ impl NumbersEditor {
     ///
     /// An empty native order is reported as `None`, matching the state shown
     /// by Numbers after its last sort rule is removed. Selected-row orders
-    /// expose their persisted [`NumbersTableSortScope::SelectedRows`] scope;
+    /// expose their persisted [`Scope::SelectedRows`] scope;
     /// their view-state selected interval is intentionally not guessed.
-    pub fn table_sort_order(&self, table_id: u64) -> Result<Option<NumbersTableSortOrder>> {
+    pub fn table_sort_order(&self, table_id: u64) -> Result<Option<Order>> {
         table_sort_order_in_package(&self.package, table_id)
     }
 
@@ -331,11 +75,7 @@ impl NumbersEditor {
     /// entirely by this crate. This operation configures the native rule; it
     /// does not execute it or reorder stored rows. Numbers exposes that
     /// separate action as **Sort Now**.
-    pub fn set_table_sort_order(
-        &mut self,
-        table_id: u64,
-        order: NumbersTableSortOrder,
-    ) -> Result<()> {
+    pub fn set_table_sort_order(&mut self, table_id: u64, order: Order) -> Result<()> {
         let mut staged = self.package.clone();
         set_table_sort_order_in_package(&mut staged, table_id, &order)?;
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
@@ -393,7 +133,7 @@ impl NumbersEditor {
                 "Cannot execute a Numbers sort without a configured table sort order".to_owned(),
             )
         })?;
-        if order.scope() != NumbersTableSortScope::EntireTable {
+        if order.scope() != Scope::EntireTable {
             return Err(Error::ParseError(
                 "Cannot execute a selected-row Numbers sort without an explicit row range; use apply_table_sort_order_to_rows"
                     .to_owned(),
@@ -426,14 +166,14 @@ impl NumbersEditor {
     pub fn apply_table_sort_order_to_rows(
         &mut self,
         table_id: u64,
-        rows: NumbersTableSortRowRange,
+        rows: RowRange,
     ) -> Result<bool> {
         let order = self.table_sort_order(table_id)?.ok_or_else(|| {
             Error::ParseError(
                 "Cannot execute a Numbers sort without a configured table sort order".to_owned(),
             )
         })?;
-        if order.scope() != NumbersTableSortScope::SelectedRows {
+        if order.scope() != Scope::SelectedRows {
             return Err(Error::ParseError(
                 "Cannot execute an entire-table Numbers sort through a selected-row range"
                     .to_owned(),
@@ -458,7 +198,7 @@ impl NumbersEditor {
 pub(crate) fn table_sort_order_in_package(
     package: &IWorkPackage,
     table_id: u64,
-) -> Result<Option<NumbersTableSortOrder>> {
+) -> Result<Option<Order>> {
     read_attached_table_sort_order(package, table_id)
 }
 
@@ -466,7 +206,7 @@ pub(crate) fn table_sort_order_in_package(
 pub(crate) fn set_table_sort_order_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    order: &NumbersTableSortOrder,
+    order: &Order,
 ) -> Result<()> {
     set_attached_table_sort_order(package, table_id, order)
 }
@@ -489,7 +229,7 @@ pub(crate) fn clear_table_sort_order_in_package(
 pub(crate) fn apply_table_sort_order_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    order: &NumbersTableSortOrder,
+    order: &Order,
 ) -> Result<bool> {
     apply_attached_table_sort_order(package, table_id, order)
 }
@@ -498,8 +238,8 @@ pub(crate) fn apply_table_sort_order_in_package(
 pub(crate) fn apply_table_sort_order_to_rows_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    order: &NumbersTableSortOrder,
-    rows: NumbersTableSortRowRange,
+    order: &Order,
+    rows: RowRange,
 ) -> Result<bool> {
     apply::apply_attached_table_sort_order_to_rows(package, table_id, order, rows)
 }
@@ -507,12 +247,12 @@ pub(crate) fn apply_table_sort_order_to_rows_in_package(
 pub(super) fn read_attached_table_sort_order(
     package: &IWorkPackage,
     table_id: u64,
-) -> Result<Option<NumbersTableSortOrder>> {
+) -> Result<Option<Order>> {
     let descriptor = attached_table_descriptor(package, table_id)?;
     let native = read_native_table_sort_order(package, &descriptor)?;
     native
         .as_ref()
-        .map(NumbersTableSortOrder::from_native)
+        .map(order_from_native)
         .transpose()
         .map(Option::flatten)
 }
@@ -520,14 +260,14 @@ pub(super) fn read_attached_table_sort_order(
 fn set_attached_table_sort_order(
     package: &mut IWorkPackage,
     table_id: u64,
-    order: &NumbersTableSortOrder,
+    order: &Order,
 ) -> Result<()> {
     let descriptor = attached_table_descriptor(package, table_id)?;
     validate_sort_order(&descriptor.model, order)?;
     let current = read_native_table_sort_order(package, &descriptor)?;
     if current
         .as_ref()
-        .map(NumbersTableSortOrder::from_native)
+        .map(order_from_native)
         .transpose()?
         .flatten()
         .as_ref()
@@ -607,13 +347,13 @@ where
     })
 }
 
-fn validate_sort_order(model: &TableModelArchive, order: &NumbersTableSortOrder) -> Result<()> {
+fn validate_sort_order(model: &TableModelArchive, order: &Order) -> Result<()> {
     let columns = model.number_of_columns as usize;
     for rule in order.rules() {
-        if rule.column.get() >= columns {
+        if rule.column().get() >= columns {
             return Err(Error::ParseError(format!(
                 "Numbers table sort column {} is outside the table's {columns} columns",
-                rule.column.get()
+                rule.column().get()
             )));
         }
     }
@@ -629,10 +369,10 @@ pub(super) fn validate_table_sort_order_for_topology(
     let Some(native) = read_native_table_sort_order(package, &descriptor)? else {
         return Ok(());
     };
-    let Some(order) = NumbersTableSortOrder::from_native(&native)? else {
+    let Some(order) = order_from_native(&native)? else {
         return Ok(());
     };
-    if order.scope() == NumbersTableSortScope::SelectedRows {
+    if order.scope() == Scope::SelectedRows {
         return Err(Error::ParseError(
             "Cannot yet edit table topology while a selected-row sort order is configured"
                 .to_owned(),
@@ -683,37 +423,34 @@ mod tests {
 
     #[test]
     fn sort_column_index_rejects_values_outside_native_range() {
-        assert_eq!(NumbersTableSortColumnIndex::new(0).unwrap().get(), 0);
+        assert_eq!(ColumnIndex::new(0).unwrap().get(), 0);
         if let Ok(too_large) = usize::try_from(u64::from(u32::MAX) + 1) {
-            assert!(NumbersTableSortColumnIndex::new(too_large).is_err());
+            assert!(ColumnIndex::new(too_large).is_err());
         }
     }
 
     #[test]
     fn sort_order_requires_non_empty_unique_rules() {
-        assert!(NumbersTableSortOrder::new([]).is_err());
-        let column = NumbersTableSortColumnIndex::new(1).unwrap();
-        let duplicate = NumbersTableSortOrder::new([
-            NumbersTableSortRule::new(column, NumbersTableSortDirection::Ascending),
-            NumbersTableSortRule::new(column, NumbersTableSortDirection::Descending),
+        assert!(Order::new([]).is_err());
+        let column = ColumnIndex::new(1).unwrap();
+        let duplicate = Order::new([
+            Rule::new(column, Direction::Ascending),
+            Rule::new(column, Direction::Descending),
         ]);
         assert!(duplicate.is_err());
     }
 
     #[test]
     fn sort_scope_and_selected_row_range_are_strict_typed() {
-        let rule = NumbersTableSortRule::new(
-            NumbersTableSortColumnIndex::new(0).unwrap(),
-            NumbersTableSortDirection::Ascending,
-        );
-        let entire = NumbersTableSortOrder::new([rule]).unwrap();
-        assert_eq!(entire.scope(), NumbersTableSortScope::EntireTable);
-        let selected = NumbersTableSortOrder::selected_rows([rule]).unwrap();
-        assert_eq!(selected.scope(), NumbersTableSortScope::SelectedRows);
+        let rule = Rule::new(ColumnIndex::new(0).unwrap(), Direction::Ascending);
+        let entire = Order::new([rule]).unwrap();
+        assert_eq!(entire.scope(), Scope::EntireTable);
+        let selected = Order::selected_rows([rule]).unwrap();
+        assert_eq!(selected.scope(), Scope::SelectedRows);
 
-        assert!(NumbersTableSortRowRange::new(0, 0).is_err());
-        assert!(NumbersTableSortRowRange::new(2, 1).is_err());
-        let range = NumbersTableSortRowRange::new(2, 5).unwrap();
+        assert!(RowRange::new(0, 0).is_err());
+        assert!(RowRange::new(2, 1).is_err());
+        let range = RowRange::new(2, 5).unwrap();
         assert_eq!(range.start(), 2);
         assert_eq!(range.end(), 5);
         assert_eq!(range.len(), 3);
@@ -727,15 +464,9 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        let initial = NumbersTableSortOrder::new([
-            NumbersTableSortRule::new(
-                NumbersTableSortColumnIndex::new(1).unwrap(),
-                NumbersTableSortDirection::Ascending,
-            ),
-            NumbersTableSortRule::new(
-                NumbersTableSortColumnIndex::new(3).unwrap(),
-                NumbersTableSortDirection::Descending,
-            ),
+        let initial = Order::new([
+            Rule::new(ColumnIndex::new(1).unwrap(), Direction::Ascending),
+            Rule::new(ColumnIndex::new(3).unwrap(), Direction::Descending),
         ])
         .unwrap();
         editor
@@ -756,9 +487,9 @@ mod tests {
         editor
             .remove_table_column(table_id, TableColumnDeletion::body(0))
             .unwrap();
-        let remaining = NumbersTableSortOrder::new([NumbersTableSortRule::new(
-            NumbersTableSortColumnIndex::new(3).unwrap(),
-            NumbersTableSortDirection::Descending,
+        let remaining = Order::new([Rule::new(
+            ColumnIndex::new(3).unwrap(),
+            Direction::Descending,
         )])
         .unwrap();
         assert_eq!(editor.table_sort_order(table_id).unwrap(), Some(remaining));
