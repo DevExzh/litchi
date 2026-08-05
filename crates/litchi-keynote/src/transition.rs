@@ -487,6 +487,12 @@ pub struct Settings {
 }
 
 impl Settings {
+    /// Return whether this setting describes a visible transition effect.
+    #[must_use]
+    pub fn has_effect(&self) -> bool {
+        !matches!(self.effect, None | Some(Effect::None))
+    }
+
     /// Validate every semantic field without decoding opaque payloads.
     ///
     /// # Errors

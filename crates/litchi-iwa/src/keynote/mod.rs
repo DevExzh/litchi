@@ -84,11 +84,10 @@ pub use editor::{
     KeynoteTableHeaderSettings, KeynoteTablePoints, KeynoteTableRowDeletion,
     KeynoteTableRowInsertion, KeynoteTableSortColumnIndex, KeynoteTableSortDirection,
     KeynoteTableSortOrder, KeynoteTableSortRowRange, KeynoteTableSortRule, KeynoteTableSortScope,
-    KeynoteTableTitleSettings, Kind, Opaque, RemovedKeynoteSlideAudio, RemovedKeynoteSlideChart,
-    RemovedKeynoteSlideImage, RemovedKeynoteSlideMovie, RemovedKeynoteSlideShape,
-    RemovedKeynoteSlideTable, RemovedKeynoteTextBox, RgbColorSpace, Rgba, Stop,
-    KeynoteTransitionAnimationParameters, KeynoteTransitionCustomParameters,
-    KeynoteTransitionSettings, MovieKind,
+    KeynoteTableTitleSettings, Kind, MovieKind, Opaque, RemovedKeynoteSlideAudio,
+    RemovedKeynoteSlideChart, RemovedKeynoteSlideImage, RemovedKeynoteSlideMovie,
+    RemovedKeynoteSlideShape, RemovedKeynoteSlideTable, RemovedKeynoteTextBox, RgbColorSpace, Rgba,
+    Stop,
 };
 pub use litchi_keynote::transition::{
     Acceleration, AccelerationKind, AnimationParameters, CustomParameters, Direction, MosaicType,
