@@ -10,6 +10,7 @@ use litchi_opc::{OpcPackage, PackageWriter};
 
 use crate::parts::PresentationPart;
 use crate::presentation::Presentation;
+use crate::resources;
 use crate::writer::MutablePresentation;
 use crate::{Error, Result};
 
@@ -17,6 +18,10 @@ const PRESENTATION_PART: &str = "/ppt/presentation.xml";
 const MASTER_PART: &str = "/ppt/slideMasters/slideMaster1.xml";
 const LAYOUT_PART: &str = "/ppt/slideLayouts/slideLayout1.xml";
 const THEME_PART: &str = "/ppt/theme/theme1.xml";
+const VIEW_PROPERTIES_PART: &str = "/ppt/viewProps.xml";
+const PRESENTATION_PROPERTIES_PART: &str = "/ppt/presProps.xml";
+const CORE_PROPERTIES_PART: &str = "/docProps/core.xml";
+const EXTENDED_PROPERTIES_PART: &str = "/docProps/app.xml";
 
 const STALE_PRESENTATION_GRAPH_REASON: &str = "the mutable presentation model has unflushed changes; save and reopen before reading the canonical package graph";
 
@@ -34,20 +39,24 @@ impl Package {
         let master_name = pack_uri(MASTER_PART)?;
         let layout_name = pack_uri(LAYOUT_PART)?;
         let theme_name = pack_uri(THEME_PART)?;
+        let view_properties_name = pack_uri(VIEW_PROPERTIES_PART)?;
+        let presentation_properties_name = pack_uri(PRESENTATION_PROPERTIES_PART)?;
+        let core_properties_name = pack_uri(CORE_PROPERTIES_PART)?;
+        let extended_properties_name = pack_uri(EXTENDED_PROPERTIES_PART)?;
 
         let mut presentation = BlobPart::new(
             presentation_name.clone(),
             ct::PML_PRESENTATION_MAIN.to_string(),
-            MutablePresentation::new()
-                .generate_presentation_xml()?
-                .into_bytes(),
+            resources::PRESENTATION.as_bytes().to_vec(),
         );
         presentation.relate_to("slideMasters/slideMaster1.xml", rt::SLIDE_MASTER);
+        presentation.relate_to("viewProps.xml", rt::VIEW_PROPS);
+        presentation.relate_to("presProps.xml", rt::PRES_PROPS);
 
         let mut master = BlobPart::new(
             master_name,
             ct::PML_SLIDE_MASTER.to_string(),
-            default_slide_master_xml().as_bytes().to_vec(),
+            resources::SLIDE_MASTER.as_bytes().to_vec(),
         );
         master.relate_to("../slideLayouts/slideLayout1.xml", rt::SLIDE_LAYOUT);
         master.relate_to("../theme/theme1.xml", rt::THEME);
@@ -55,21 +64,48 @@ impl Package {
         let mut layout = BlobPart::new(
             layout_name,
             ct::PML_SLIDE_LAYOUT.to_string(),
-            default_slide_layout_xml().as_bytes().to_vec(),
+            resources::SLIDE_LAYOUT.as_bytes().to_vec(),
         );
         layout.relate_to("../slideMasters/slideMaster1.xml", rt::SLIDE_MASTER);
 
         let theme = BlobPart::new(
             theme_name,
             ct::OFC_THEME.to_string(),
-            default_theme_xml().as_bytes().to_vec(),
+            resources::THEME.as_bytes().to_vec(),
+        );
+
+        let view_properties = BlobPart::new(
+            view_properties_name,
+            ct::PML_VIEW_PROPS.to_string(),
+            resources::VIEW_PROPERTIES.as_bytes().to_vec(),
+        );
+        let presentation_properties = BlobPart::new(
+            presentation_properties_name,
+            ct::PML_PRES_PROPS.to_string(),
+            resources::PRESENTATION_PROPERTIES.as_bytes().to_vec(),
+        );
+        let core_properties = BlobPart::new(
+            core_properties_name,
+            ct::OPC_CORE_PROPERTIES.to_string(),
+            resources::CORE_PROPERTIES.as_bytes().to_vec(),
+        );
+        let extended_properties = BlobPart::new(
+            extended_properties_name,
+            ct::OFC_EXTENDED_PROPERTIES.to_string(),
+            resources::EXTENDED_PROPERTIES.as_bytes().to_vec(),
         );
 
         package.relate_to("ppt/presentation.xml", rt::OFFICE_DOCUMENT);
+        package.relate_to("docProps/core.xml", rt::CORE_PROPERTIES);
+        package.relate_to("docProps/app.xml", rt::EXTENDED_PROPERTIES);
         package.add_part(Box::new(presentation));
         package.add_part(Box::new(master));
         package.add_part(Box::new(layout));
         package.add_part(Box::new(theme));
+        package.add_part(Box::new(view_properties));
+        package.add_part(Box::new(presentation_properties));
+        package.add_part(Box::new(core_properties));
+        package.add_part(Box::new(extended_properties));
 
         Ok(Self {
             opc: package,
@@ -249,18 +285,6 @@ impl Package {
 
 fn pack_uri(value: &str) -> Result<PackURI> {
     PackURI::new(value).map_err(Error::Uri)
-}
-
-fn default_slide_master_xml() -> &'static str {
-    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sldMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld name="Office Theme"><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld><p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/><p:sldLayoutIdLst><p:sldLayoutId id="1" r:id="rId1"/></p:sldLayoutIdLst><p:txStyles/></p:sldMaster>"#
-}
-
-fn default_slide_layout_xml() -> &'static str {
-    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sldLayout xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" type="obj" preserve="1"><p:cSld name="Title and Content"><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>"#
-}
-
-fn default_theme_xml() -> &'static str {
-    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Office Theme"><a:themeElements><a:clrScheme name="Office"><a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1><a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="1F497D"/></a:dk2><a:lt2><a:srgbClr val="EEECE1"/></a:lt2><a:accent1><a:srgbClr val="4F81BD"/></a:accent1><a:accent2><a:srgbClr val="C0504D"/></a:accent2><a:accent3><a:srgbClr val="9BBB59"/></a:accent3><a:accent4><a:srgbClr val="8064A2"/></a:accent4><a:accent5><a:srgbClr val="4BACC6"/></a:accent5><a:accent6><a:srgbClr val="F79646"/></a:accent6><a:hlink><a:srgbClr val="0000FF"/></a:hlink><a:folHlink><a:srgbClr val="800080"/></a:folHlink></a:clrScheme><a:fontScheme name="Office"><a:majorFont><a:latin typeface="Arial"/></a:majorFont><a:minorFont><a:latin typeface="Arial"/></a:minorFont></a:fontScheme><a:fmtScheme name="Office"><a:fillStyleLst/><a:lnStyleLst/><a:effectStyleLst/><a:bgFillStyleLst/></a:fmtScheme></a:themeElements></a:theme>"#
 }
 
 #[cfg(test)]

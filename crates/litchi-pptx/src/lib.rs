@@ -26,6 +26,7 @@ pub mod media_parts;
 pub mod modern_comments;
 
 pub mod master_layout;
+pub(crate) mod namespace;
 pub mod notes;
 pub mod package;
 pub mod parts;
@@ -39,6 +40,8 @@ pub mod time;
 pub mod transition;
 pub mod view_properties;
 pub mod writer;
+
+pub(crate) mod resources;
 
 pub use actions::{Jump, Kind, Setting, Target, Trigger};
 pub use animations::*;
