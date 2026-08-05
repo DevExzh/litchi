@@ -4,16 +4,17 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteSlideMovieOptions};
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa_common::shape::geometry::{Point, Size};
+use litchi_keynote::slide::movie::Options as SlideMovieOptions;
 
 const MOVIE_DURATION: Duration = Duration::from_secs(8);
-const MOVIE_POSITION: DrawablePoint = DrawablePoint { x: 720.0, y: 405.0 };
-const DISPLAYED_MOVIE_SIZE: DrawableSize = DrawableSize {
+const MOVIE_POSITION: Point = Point { x: 720.0, y: 405.0 };
+const DISPLAYED_MOVIE_SIZE: Size = Size {
     width: 240.0,
     height: 135.0,
 };
-const ORIGINAL_MOVIE_SIZE: DrawableSize = DrawableSize {
+const ORIGINAL_MOVIE_SIZE: Size = Size {
     width: 480.0,
     height: 270.0,
 };
@@ -48,8 +49,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &movie,
         poster_filename,
         &poster,
-        KeynoteSlideMovieOptions::new(MOVIE_POSITION, DISPLAYED_MOVIE_SIZE, MOVIE_DURATION)
-            .with_natural_size(ORIGINAL_MOVIE_SIZE),
+        SlideMovieOptions::new(MOVIE_POSITION, DISPLAYED_MOVIE_SIZE, MOVIE_DURATION)?
+            .with_natural_size(ORIGINAL_MOVIE_SIZE)?,
     )?;
     editor.restore_slide_movie_original_size(0, created.drawable_object_id)?;
     editor.save(output)?;

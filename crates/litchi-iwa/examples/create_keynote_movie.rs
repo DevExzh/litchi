@@ -5,9 +5,10 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteSlideMovieOptions};
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
+use litchi_iwa_common::shape::geometry::{Point, Size};
+use litchi_keynote::slide::movie::Options as SlideMovieOptions;
 
 const SLIDE_WIDTH_POINTS: f32 = 1_920.0;
 const SLIDE_HEIGHT_POINTS: f32 = 1_080.0;
@@ -29,8 +30,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let poster_filename = filename(&poster_path)?;
     let movie = fs::read(&movie_path)?;
     let poster = fs::read(&poster_path)?;
-    let size = DrawableSize { width, height };
-    let position = DrawablePoint {
+    let size = Size { width, height };
+    let position = Point {
         x: (SLIDE_WIDTH_POINTS - width) / 2.0,
         y: (SLIDE_HEIGHT_POINTS - height) / 2.0,
     };
@@ -45,11 +46,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &movie,
         poster_filename,
         &poster,
-        KeynoteSlideMovieOptions::new(
+        SlideMovieOptions::new(
             position,
             size,
             Duration::try_from_secs_f64(duration_seconds)?,
-        ),
+        )?,
     )?;
     let mut properties = editor.slide_movie_properties(0, created.drawable_object_id)?;
     properties.accessibility_description = Some(format!("Embedded movie: {movie_filename}"));

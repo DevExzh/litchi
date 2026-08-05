@@ -847,8 +847,9 @@ build and timing chunk are generated from typed values:
 ```rust
 use std::fs;
 use std::time::Duration;
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteSlideMovieOptions};
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa_common::shape::geometry::{Point, Size};
+use litchi_keynote::slide::movie::Options as SlideMovieOptions;
 
 let movie = fs::read("demo.mov")?;
 let poster = fs::read("demo-poster.png")?;
@@ -859,11 +860,11 @@ let source = keynote.add_slide_movie(
     &movie,
     "demo-poster.png",
     &poster,
-    KeynoteSlideMovieOptions::new(
-        DrawablePoint { x: 640.0, y: 360.0 },
-        DrawableSize { width: 640.0, height: 360.0 },
+    SlideMovieOptions::new(
+        Point { x: 640.0, y: 360.0 },
+        Size { width: 640.0, height: 360.0 },
         Duration::from_secs(8),
-    ),
+    )?,
 )?;
 let duplicate = keynote.duplicate_slide_movie(0, source.drawable_object_id)?;
 assert_eq!(duplicate.movie_data_identifier, source.movie_data_identifier);

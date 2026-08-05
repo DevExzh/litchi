@@ -18,6 +18,15 @@ pub enum Error {
     /// A slide-audio duration was zero or outside finite `f32` seconds.
     #[error("Keynote slide-audio duration must be positive and fit in finite f32 seconds")]
     InvalidAudioDuration,
+    /// A slide-movie position contained a non-finite coordinate.
+    #[error("Keynote slide-movie position must have finite coordinates")]
+    InvalidMoviePosition,
+    /// A slide-movie displayed or natural size was not finite and strictly positive.
+    #[error("Keynote slide-movie dimensions must be finite and greater than zero")]
+    InvalidMovieSize,
+    /// A slide-movie duration was zero or outside finite `f32` seconds.
+    #[error("Keynote slide-movie duration must be positive and fit in finite f32 seconds")]
+    InvalidMovieDuration,
     /// A transition delay was not finite and non-negative.
     #[error("Keynote transition delay must be finite and non-negative")]
     InvalidDelay,

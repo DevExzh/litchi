@@ -46,7 +46,7 @@ pub use editor::{
     KeynoteMoveAction, KeynoteObjectBuildEffect, KeynoteOpacityAction, KeynoteRotationAction,
     KeynoteRotationDirection, KeynoteScaleAction, KeynoteSlideAudioInfo, KeynoteSlideChartInfo,
     KeynoteSlideImageInfo, KeynoteSlideImageKind, KeynoteSlideImageOptions, KeynoteSlideInfo,
-    KeynoteSlideLayoutId, KeynoteSlideLayoutInfo, KeynoteSlideMovieInfo, KeynoteSlideMovieOptions,
+    KeynoteSlideLayoutId, KeynoteSlideLayoutInfo, KeynoteSlideMovieInfo,
     KeynoteSlideShapeInfo, KeynoteSlideShapeKind, KeynoteSlideTable, KeynoteSlideTableInfo,
     KeynoteSlideTextInfo, KeynoteSlideTextPlaceholder, KeynoteSlideTextRole,
     KeynoteSoundtrackItemInfo, KeynoteSwooshDirection, KeynoteTableCellParagraphIndents,

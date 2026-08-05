@@ -2,6 +2,7 @@
 
 use litchi_iwa_common::media::Type as MediaType;
 use litchi_keynote::slide::media::MovieKind;
+use litchi_keynote::slide::movie::Options as SlideMovieOptions;
 
 use super::*;
 use crate::data_reference_registry::{
@@ -10,11 +11,10 @@ use crate::data_reference_registry::{
 use crate::media_playback::media_playback_settings;
 use crate::media_playback::replace_movie_playback_settings;
 use crate::shapes::{
-    DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
-    flip_drawable_geometry, geometry_from_drawable, restore_drawable_original_size,
+    DrawableFlipAxis, DrawableGeometry, DrawableProperties, DrawableSize, flip_drawable_geometry,
+    geometry_from_drawable, restore_drawable_original_size,
 };
 use litchi_iwa_common::media::playback::MediaPlaybackSettings;
-use std::time::Duration;
 
 mod builds;
 mod caption;
@@ -48,38 +48,6 @@ pub struct KeynoteSlideMovieInfo {
     pub playback: Option<MediaPlaybackSettings>,
     pub original_size: Option<DrawableSize>,
     pub natural_size: Option<DrawableSize>,
-}
-
-/// Typed layout and playback metadata for a newly created Keynote movie.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct KeynoteSlideMovieOptions {
-    /// Top-left position of the movie on the slide, in points.
-    pub position: DrawablePoint,
-    /// Displayed movie size on the slide, in points.
-    pub size: DrawableSize,
-    /// Untransformed media dimensions reported to Keynote, in points.
-    pub natural_size: DrawableSize,
-    /// Playable duration of the source movie.
-    pub duration: Duration,
-}
-
-impl KeynoteSlideMovieOptions {
-    /// Create options whose displayed and natural dimensions are identical.
-    pub const fn new(position: DrawablePoint, size: DrawableSize, duration: Duration) -> Self {
-        Self {
-            position,
-            size,
-            natural_size: size,
-            duration,
-        }
-    }
-
-    /// Set dimensions independent of the displayed size.
-    #[must_use]
-    pub const fn with_natural_size(mut self, natural_size: DrawableSize) -> Self {
-        self.natural_size = natural_size;
-        self
-    }
 }
 
 /// Result of removing one slide-owned movie and its private object graph.
@@ -154,7 +122,7 @@ impl KeynoteEditor {
         movie_data: &[u8],
         preferred_poster_filename: &str,
         poster_data: &[u8],
-        options: KeynoteSlideMovieOptions,
+        options: SlideMovieOptions,
     ) -> Result<KeynoteSlideMovieInfo> {
         let (geometry, duration_seconds) = movie_creation_values(options)?;
         let context = movie_creation_context(self, slide_index)?;
@@ -184,7 +152,7 @@ impl KeynoteEditor {
             movie_asset.data_identifier,
             poster_asset.data_identifier,
             geometry,
-            options.natural_size,
+            options.natural_size(),
             duration_seconds,
         )?;
         staged.update_archive(&context.archive_name, |archive| {
@@ -230,8 +198,8 @@ impl KeynoteEditor {
             || created.movie_data_identifier != Some(movie_asset.data_identifier)
             || created.poster_image_data_identifier != Some(poster_asset.data_identifier)
             || created.geometry != geometry
-            || created.original_size != Some(options.natural_size)
-            || created.natural_size != Some(options.natural_size)
+            || created.original_size != Some(options.natural_size())
+            || created.natural_size != Some(options.natural_size())
             || created_graph.object_ids != ids.all()
             || verified.extract_media(movie_asset.data_identifier)? != movie_data
             || verified.extract_media(poster_asset.data_identifier)? != poster_data
@@ -987,7 +955,9 @@ fn take_movie_identifier(next: &mut u64) -> Result<u64> {
 mod tests {
     use super::*;
     use crate::keynote::KeynoteDocumentBuilder;
+    use crate::shapes::DrawablePoint;
     use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
+    use std::time::Duration;
 
     const MOVIE: &[u8] = b"\0\0\0\x18ftypqt  source-built-movie";
     const REPLACEMENT_MOVIE: &[u8] = b"\0\0\0\x18ftypqt  replacement-movie";
@@ -1004,9 +974,11 @@ mod tests {
         height: 720.0,
     };
 
-    fn options() -> KeynoteSlideMovieOptions {
-        KeynoteSlideMovieOptions::new(POSITION, DISPLAY_SIZE, Duration::from_millis(1_250))
+    fn options() -> SlideMovieOptions {
+        SlideMovieOptions::new(POSITION, DISPLAY_SIZE, Duration::from_millis(1_250))
+            .unwrap()
             .with_natural_size(NATURAL_SIZE)
+            .unwrap()
     }
 
     fn properties(description: &str) -> DrawableProperties {
@@ -1321,29 +1293,23 @@ mod tests {
                 options(),
             ),
             editor.add_slide_movie(1, "movie.mov", MOVIE, "poster.png", POSTER, options()),
-            editor.add_slide_movie(
-                0,
-                "movie.mov",
-                MOVIE,
-                "poster.png",
-                POSTER,
-                KeynoteSlideMovieOptions::new(POSITION, DISPLAY_SIZE, Duration::ZERO),
-            ),
-            editor.add_slide_movie(
-                0,
-                "movie.mov",
-                MOVIE,
-                "poster.png",
-                POSTER,
-                options().with_natural_size(DrawableSize {
-                    width: f32::NAN,
-                    height: 720.0,
-                }),
-            ),
         ] {
             assert!(result.is_err());
             assert_eq!(editor.to_bytes().unwrap(), baseline);
         }
+
+        assert_eq!(
+            SlideMovieOptions::new(POSITION, DISPLAY_SIZE, Duration::ZERO),
+            Err(litchi_keynote::Error::InvalidMovieDuration)
+        );
+        assert_eq!(
+            options().with_natural_size(DrawableSize {
+                width: f32::NAN,
+                height: 720.0,
+            }),
+            Err(litchi_keynote::Error::InvalidMovieSize)
+        );
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
 
         let created = editor
             .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())

@@ -5064,7 +5064,7 @@ pub use slide_images::{
     KeynoteSlideImageInfo, KeynoteSlideImageKind, KeynoteSlideImageOptions,
     RemovedKeynoteSlideImage,
 };
-pub use slide_movies::{KeynoteSlideMovieInfo, KeynoteSlideMovieOptions, RemovedKeynoteSlideMovie};
+pub use slide_movies::{KeynoteSlideMovieInfo, RemovedKeynoteSlideMovie};
 pub use slide_shapes::{KeynoteSlideShapeInfo, KeynoteSlideShapeKind, RemovedKeynoteSlideShape};
 pub use slide_tables::{
     KeynoteSlideTable, KeynoteSlideTableInfo, KeynoteTableCellConditionalHighlightInfo,

@@ -196,9 +196,12 @@ deleted rather than aliased.
 Keynote slide movie classification uses the focused
 `litchi_keynote::slide::media::MovieKind` value. Its compact, non-exhaustive
 variants (`File`, `Audio`, `Placeholder`, and `LiveVideo`) contain no
-archive, package, or native media identifiers. `litchi-iwa` retains
-`KeynoteSlideMovieInfo`/options, graph-aware CRUD, native media identifiers,
-and the mapping from native movie flags to this product value.
+archive, package, or native media identifiers. Movie creation uses the adjacent
+`litchi_keynote::slide::movie::Options` value, which validates finite placement,
+strictly positive displayed and natural dimensions, and a positive duration in
+the native finite `f32`-seconds domain. `litchi-iwa` retains
+`KeynoteSlideMovieInfo`, graph-aware CRUD, native media identifiers, and the
+mapping from native movie flags to this product value.
 
 Keynote slide-audio creation uses the focused
 `litchi_keynote::slide::audio::Options` value. The fields are private, and

@@ -4,12 +4,14 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteSlideMovieOptions};
-use litchi_iwa::shapes::{DrawableFlipAxis, DrawablePoint, DrawableSize};
+use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::shapes::DrawableFlipAxis;
+use litchi_iwa_common::shape::geometry::{Point, Size};
+use litchi_keynote::slide::movie::Options as SlideMovieOptions;
 
 const MOVIE_DURATION: Duration = Duration::from_secs(8);
-const MOVIE_POSITION: DrawablePoint = DrawablePoint { x: 800.0, y: 450.0 };
-const MOVIE_SIZE: DrawableSize = DrawableSize {
+const MOVIE_POSITION: Point = Point { x: 800.0, y: 450.0 };
+const MOVIE_SIZE: Size = Size {
     width: 320.0,
     height: 180.0,
 };
@@ -44,7 +46,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &movie,
         poster_filename,
         &poster,
-        KeynoteSlideMovieOptions::new(MOVIE_POSITION, MOVIE_SIZE, MOVIE_DURATION),
+        SlideMovieOptions::new(MOVIE_POSITION, MOVIE_SIZE, MOVIE_DURATION)?,
     )?;
     editor.flip_slide_movie(0, created.drawable_object_id, DrawableFlipAxis::Horizontal)?;
     editor.save(output)?;
