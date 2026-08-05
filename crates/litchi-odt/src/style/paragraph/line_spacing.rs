@@ -194,7 +194,7 @@ impl TextAlignLast {
 
 /// The line-spacing attribute group of one `style:paragraph-properties` element.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ParagraphLineSpacing {
+pub struct LineSpacing {
     pub line_height: Option<LineHeight>,
     pub line_spacing: Option<LineSpacingLength>,
     pub line_height_at_least: Option<NonNegativeLength>,
@@ -206,7 +206,7 @@ pub struct ParagraphLineSpacing {
     pub tab_stop_distance: Option<NonNegativeLength>,
     pub text_align_last: Option<TextAlignLast>,
 }
-impl ParagraphLineSpacing {
+impl LineSpacing {
     pub fn new() -> Self {
         Self::default()
     }
@@ -269,17 +269,14 @@ impl ParagraphLineSpacing {
 
 /// A named or default paragraph style and its line-spacing properties.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParagraphStyleLineSpacing {
+pub struct Style {
     pub name: Option<String>,
     pub parent_style_name: Option<String>,
     pub is_default_style: bool,
-    pub properties: Option<ParagraphLineSpacing>,
+    pub properties: Option<LineSpacing>,
 }
-impl ParagraphStyleLineSpacing {
-    pub fn named(
-        name: impl Into<String>,
-        properties: Option<ParagraphLineSpacing>,
-    ) -> Result<Self> {
+impl Style {
+    pub fn named(name: impl Into<String>, properties: Option<LineSpacing>) -> Result<Self> {
         let result = Self {
             name: Some(name.into()),
             parent_style_name: None,
@@ -289,7 +286,7 @@ impl ParagraphStyleLineSpacing {
         result.validate()?;
         Ok(result)
     }
-    pub fn default_style(properties: Option<ParagraphLineSpacing>) -> Self {
+    pub fn default_style(properties: Option<LineSpacing>) -> Self {
         Self {
             name: None,
             parent_style_name: None,
@@ -318,21 +315,21 @@ impl ParagraphStyleLineSpacing {
 
 /// All paragraph styles of a styles part that carry line-spacing properties.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ParagraphStyleLineSpacingSet {
-    pub styles: Vec<ParagraphStyleLineSpacing>,
+pub struct Styles {
+    pub styles: Vec<Style>,
 }
-impl ParagraphStyleLineSpacingSet {
-    pub fn get(&self, name: &str) -> Option<&ParagraphStyleLineSpacing> {
+impl Styles {
+    pub fn get(&self, name: &str) -> Option<&Style> {
         self.styles
             .iter()
             .find(|style| style.name.as_deref() == Some(name))
     }
-    pub fn default_style(&self) -> Option<&ParagraphStyleLineSpacing> {
+    pub fn default_style(&self) -> Option<&Style> {
         self.styles.iter().find(|style| style.is_default_style)
     }
     /// Resolve a style's line-spacing properties through its parent chain,
     /// falling back to the default paragraph style.
-    pub fn resolved(&self, name: &str) -> Result<Option<&ParagraphLineSpacing>> {
+    pub fn resolved(&self, name: &str) -> Result<Option<&LineSpacing>> {
         let mut current = self.get(name);
         let mut seen = HashSet::new();
         while let Some(style) = current {
@@ -390,7 +387,7 @@ fn style_attrs(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<Option<ParagraphStyleLineSpacing>> {
+) -> Result<Option<Style>> {
     let mut name = None;
     let mut parent = None;
     let mut family = None;
@@ -416,7 +413,7 @@ fn style_attrs(
     if family.as_deref() != Some("paragraph") {
         return Ok(None);
     }
-    let result = ParagraphStyleLineSpacing {
+    let result = Style {
         name,
         parent_style_name: parent,
         is_default_style: start.local_name().as_ref() == b"default-style",
@@ -430,8 +427,8 @@ fn property_attrs(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<ParagraphLineSpacing> {
-    let mut properties = ParagraphLineSpacing::new();
+) -> Result<LineSpacing> {
+    let mut properties = LineSpacing::new();
     let mut seen = HashSet::new();
     for attr in start.attributes().with_checks(true) {
         let attr = attr.map_err(|error| bad(format!("invalid property attribute: {error}")))?;
@@ -489,15 +486,11 @@ fn property_attrs(
 
 struct Active {
     depth: usize,
-    style: ParagraphStyleLineSpacing,
+    style: Style,
     properties: bool,
 }
 
-fn push_style(
-    styles: &mut Vec<ParagraphStyleLineSpacing>,
-    style: ParagraphStyleLineSpacing,
-    total: &mut usize,
-) -> Result<()> {
+fn push_style(styles: &mut Vec<Style>, style: Style, total: &mut usize) -> Result<()> {
     if styles.len() >= MAX_STYLES {
         return Err(bad("too many paragraph styles"));
     }
@@ -524,12 +517,12 @@ fn is_paragraph_style(current: &(Ns, Vec<u8>), parent: Option<&(Ns, Vec<u8>)>) -
 }
 
 /// Parse paragraph styles and their line-spacing properties from a styles part.
-pub fn parse_paragraph_style_line_spacings(xml: &str) -> Result<ParagraphStyleLineSpacingSet> {
+pub fn parse(xml: &str) -> Result<Styles> {
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
     }
     if !xml.contains("paragraph-properties") {
-        return Ok(ParagraphStyleLineSpacingSet::default());
+        return Ok(Styles::default());
     }
     let mut reader = NsReader::from_reader(xml.as_bytes());
     reader.config_mut().trim_text(false);
@@ -622,21 +615,19 @@ pub fn parse_paragraph_style_line_spacings(xml: &str) -> Result<ParagraphStyleLi
     if !stack.is_empty() || active.is_some() {
         return Err(bad("truncated styles XML"));
     }
-    Ok(ParagraphStyleLineSpacingSet { styles })
+    Ok(Styles { styles })
 }
 
 impl OpenDocumentPackage {
     /// Parse the paragraph line-spacing properties of the package `styles.xml`.
-    pub fn paragraph_style_line_spacings(&self) -> Result<ParagraphStyleLineSpacingSet> {
-        self.styles_xml()?.map_or_else(
-            || Ok(ParagraphStyleLineSpacingSet::default()),
-            |xml| parse_paragraph_style_line_spacings(&xml),
-        )
+    pub fn paragraph_style_line_spacings(&self) -> Result<Styles> {
+        self.styles_xml()?
+            .map_or_else(|| Ok(Styles::default()), |xml| parse(&xml))
     }
 }
 impl FlatOpenDocument {
     /// Parse the paragraph line-spacing properties of a flat XML document.
-    pub fn paragraph_style_line_spacings(&self) -> Result<ParagraphStyleLineSpacingSet> {
-        parse_paragraph_style_line_spacings(self.xml())
+    pub fn paragraph_style_line_spacings(&self) -> Result<Styles> {
+        parse(self.xml())
     }
 }

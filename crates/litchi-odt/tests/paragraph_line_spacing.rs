@@ -1,7 +1,7 @@
 use litchi_odt::line_numbering::NonNegativeLength;
 use litchi_odt::style::paragraph::line_spacing::{
-    LineHeight, LineHeightPercent, LineSpacingLength, ParagraphLineSpacing, TextAlignLast,
-    TextAutospace, parse_paragraph_style_line_spacings,
+    LineHeight, LineHeightPercent, LineSpacing, LineSpacingLength, TextAlignLast, TextAutospace,
+    parse,
 };
 use std::io::Cursor;
 const O: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -17,7 +17,7 @@ fn full_properties() -> &'static str {
 
 #[test]
 fn parses_all_line_spacing_attributes() {
-    let set = parse_paragraph_style_line_spacings(&wrap(full_properties())).unwrap();
+    let set = parse(&wrap(full_properties())).unwrap();
     let style = set.get("P1").unwrap();
     let p = style.properties.as_ref().unwrap();
     assert_eq!(
@@ -49,7 +49,7 @@ fn parses_normal_and_length_line_heights() {
     let x = wrap(
         r#"<s:style s:name="N" s:family="paragraph"><s:paragraph-properties f:line-height="normal"/></s:style><s:style s:name="L" s:family="paragraph"><s:paragraph-properties f:line-height="0.6cm"/></s:style>"#,
     );
-    let set = parse_paragraph_style_line_spacings(&x).unwrap();
+    let set = parse(&x).unwrap();
     assert_eq!(
         set.get("N")
             .unwrap()
@@ -75,7 +75,7 @@ fn resolves_through_parent_and_default_style() {
     let x = wrap(
         r#"<s:default-style s:family="paragraph"><s:paragraph-properties s:tab-stop-distance="1cm"/></s:default-style><s:style s:name="Base" s:family="paragraph"><s:paragraph-properties f:text-align-last="justify"/></s:style><s:style s:name="Child" s:family="paragraph" s:parent-style-name="Base"/>"#,
     );
-    let set = parse_paragraph_style_line_spacings(&x).unwrap();
+    let set = parse(&x).unwrap();
     let resolved = set.resolved("Child").unwrap().unwrap();
     assert_eq!(resolved.text_align_last, Some(TextAlignLast::Justify));
     let default = set.resolved("Missing").unwrap().unwrap();
@@ -87,7 +87,7 @@ fn resolves_through_parent_and_default_style() {
 
 #[test]
 fn fragment_round_trip() {
-    let mut p = ParagraphLineSpacing::new();
+    let mut p = LineSpacing::new();
     p.line_height = Some(LineHeight::Normal);
     p.text_autospace = Some(TextAutospace::None);
     p.justify_single_word = Some(true);
@@ -99,7 +99,7 @@ fn fragment_round_trip() {
     assert!(fragment.contains(r#"fo:text-align-last="start""#));
 
     let style = format!(r#"<s:style s:name="RT" s:family="paragraph">{fragment}</s:style>"#);
-    let set = parse_paragraph_style_line_spacings(&wrap(&style)).unwrap();
+    let set = parse(&wrap(&style)).unwrap();
     assert_eq!(set.get("RT").unwrap().properties.as_ref(), Some(&p));
 }
 
@@ -108,7 +108,7 @@ fn styles_without_line_spacing_yield_no_properties() {
     let x = wrap(
         r#"<s:style s:name="Plain" s:family="paragraph"><s:paragraph-properties f:margin-left="1cm"/></s:style><s:style s:name="T" s:family="text"><s:paragraph-properties f:line-height="normal"/></s:style>"#,
     );
-    let set = parse_paragraph_style_line_spacings(&x).unwrap();
+    let set = parse(&x).unwrap();
     assert!(set.get("Plain").unwrap().properties.is_none());
     assert!(set.get("T").is_none());
 }
@@ -116,7 +116,7 @@ fn styles_without_line_spacing_yield_no_properties() {
 #[test]
 fn parses_flat_fixtures() {
     let odfdo = include_str!("../../../test-data/odfdo/tests/samples/example.xml");
-    let set = parse_paragraph_style_line_spacings(odfdo).unwrap();
+    let set = parse(odfdo).unwrap();
     assert!(
         set.styles
             .iter()
@@ -155,27 +155,27 @@ fn rejects_invalid_values() {
     let x = wrap(
         r#"<s:style s:name="E1" s:family="paragraph"><s:paragraph-properties s:text-autospace="wide"/></s:style>"#,
     );
-    assert!(parse_paragraph_style_line_spacings(&x).is_err());
+    assert!(parse(&x).is_err());
     // Bad boolean.
     let x = wrap(
         r#"<s:style s:name="E2" s:family="paragraph"><s:paragraph-properties s:auto-text-indent="yes"/></s:style>"#,
     );
-    assert!(parse_paragraph_style_line_spacings(&x).is_err());
+    assert!(parse(&x).is_err());
     // Bad length.
     let x = wrap(
         r#"<s:style s:name="E3" s:family="paragraph"><s:paragraph-properties s:line-spacing="tall"/></s:style>"#,
     );
-    assert!(parse_paragraph_style_line_spacings(&x).is_err());
+    assert!(parse(&x).is_err());
     // Negative non-negative length.
     let x = wrap(
         r#"<s:style s:name="E4" s:family="paragraph"><s:paragraph-properties s:tab-stop-distance="-1cm"/></s:style>"#,
     );
-    assert!(parse_paragraph_style_line_spacings(&x).is_err());
+    assert!(parse(&x).is_err());
     // Duplicate paragraph-properties.
     let x = wrap(
         r#"<s:style s:name="E5" s:family="paragraph"><s:paragraph-properties f:line-height="normal"/><s:paragraph-properties f:line-height="normal"/></s:style>"#,
     );
-    assert!(parse_paragraph_style_line_spacings(&x).is_err());
+    assert!(parse(&x).is_err());
 }
 
 #[test]
