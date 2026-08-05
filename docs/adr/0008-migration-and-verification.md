@@ -4654,6 +4654,31 @@ contextual enum paths. The next compiled prefix boundary is the nested
 `Chart*` vocabulary in `litchi-drawingml::chart`; its host consumers should
 continue to depend only on the neutral chart owner.
 
+## DrawingML chart vocabulary layering
+
+The shared DrawingML chart owner now follows its semantic module context. The
+`litchi-drawingml::chart` facade retains the root `Chart` value and exposes
+`HeaderFooter`, `PageMargins`, `PageOrientation`, `PageSetup`, `PrintSettings`,
+`Protection`, `ExternalData`, `UserShapes`, `ShapeProperties`,
+`TextProperties`, `ExtensionList`, `Lines`, and `types::Type` without repeated
+`Chart` prefixes. These values model the chart schema structures described by
+the checked-in `[MS-ODRAWXML]` chart schemas and the `[MS-OI29500]` chart
+conformance material; host-specific package resources such as
+`ChartExternalDataPart` remain in their XLSX/XLSB owners because their
+relationship and storage semantics are not neutral.
+
+The reader, writer, model, axis, legend, plot-area, series, and type modules
+were migrated together, so XML names, defaults, validation, and lossless
+extension handling are unchanged. XLSX and XLSB consumers now import the
+neutral contextual vocabulary directly; DOCX and PPTX required no shared-model
+adaptation. No compatibility aliases were retained.
+
+Focused verification passes 38 DrawingML chart tests, 48 XLSX tests, 21 XLSB
+tests, and the affected default-feature DOCX/PPTX all-target suites (704 and
+441 tests respectively). Formatting and affected-crate checks pass. The
+all-feature aggregate remains environment-blocked by the missing system
+`pkg-config`/Fontconfig dependency, as recorded above.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:
