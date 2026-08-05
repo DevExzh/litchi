@@ -246,7 +246,7 @@ fn patch_local_outline(
 mod tests {
     use super::*;
     use crate::protobuf::tss;
-    use crate::shapes::{RgbColorSpace, RgbaColor, StrokeWidth};
+    use crate::shapes::{RgbColorSpace, RgbaColor, Width};
     use crate::wire::{append_varint_field, parse_wire_fields};
 
     const UNKNOWN_OUTER_FIELD: u32 = 4_096;
@@ -280,7 +280,7 @@ mod tests {
         let original = style_with_unknown_fields();
         let outline = ChartSeriesStroke::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-            StrokeWidth::new(3.5).unwrap(),
+            Width::new(3.5).unwrap(),
             crate::charts::ChartSeriesStrokePattern::RoundedDash,
         );
         let visible = patch_local_outline(

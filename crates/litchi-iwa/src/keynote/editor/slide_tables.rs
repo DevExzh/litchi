@@ -3865,7 +3865,7 @@ impl KeynoteEditor {
         row: usize,
         column: usize,
         side: BorderSide,
-        stroke: crate::shapes::ShapeStroke,
+        stroke: crate::shapes::Stroke,
     ) -> Result<()> {
         self.update_slide_table_cell_border(
             slide_index,
@@ -3896,7 +3896,7 @@ impl KeynoteEditor {
         row: usize,
         column: usize,
         side: BorderSide,
-        stroke: Option<crate::shapes::ShapeStroke>,
+        stroke: Option<crate::shapes::Stroke>,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();

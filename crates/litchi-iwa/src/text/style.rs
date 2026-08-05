@@ -14,10 +14,9 @@ use super::paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
 };
 use crate::shapes::{
-    RgbaColor, ShapeDropShadow, ShapeShadow, ShapeShadowAngle, ShapeShadowAppearance,
-    ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity, ShapeStroke, StrokeCap,
-    StrokeJoin, StrokePattern, StrokeWidth,
+    Appearance, BlurRadius, Cap, Drop, Join, Offset, Pattern, RgbaColor, Shadow, Stroke, Width,
 };
+use litchi_iwa_common::shape::shadow::{Angle, Opacity};
 
 /// Effective outline applied to uniformly styled text.
 ///
@@ -31,16 +30,16 @@ pub enum TextOutline {
     #[default]
     None,
     /// Render text using a standard native stroke.
-    Stroke(ShapeStroke),
+    Stroke(Stroke),
 }
 
 impl TextOutline {
     /// Construct the exact outline written by current iWork applications.
     pub fn standard() -> Self {
-        Self::Stroke(ShapeStroke::new(
+        Self::Stroke(Stroke::new(
             RgbaColor::transparent_black(),
-            StrokeWidth::ONE,
-            StrokePattern::Solid,
+            Width::ONE,
+            Pattern::Solid,
         ))
     }
 }
@@ -56,35 +55,35 @@ pub enum TextShadow {
     #[default]
     None,
     /// Render text with a typed native drop shadow.
-    Drop(ShapeDropShadow),
+    Drop(Drop),
 }
 
 impl TextShadow {
     /// Construct the exact shadow written by current iWork applications.
     pub const fn standard() -> Self {
-        Self::Drop(ShapeDropShadow::new(
-            ShapeShadowAppearance::new(
+        Self::Drop(Drop::new(
+            Appearance::new(
                 RgbaColor::black(),
-                ShapeShadowBlurRadius::ONE_POINT,
-                ShapeShadowOffset::FIVE_POINTS,
-                ShapeShadowOpacity::OPAQUE,
+                BlurRadius::ONE_POINT,
+                Offset::FIVE_POINTS,
+                Opacity::OPAQUE,
             ),
-            ShapeShadowAngle::FORTY_FIVE_DEGREES,
+            Angle::FORTY_FIVE_DEGREES,
         ))
     }
 
-    pub(crate) const fn into_shape_shadow(self) -> ShapeShadow {
+    pub(crate) const fn into_shape_shadow(self) -> Shadow {
         match self {
-            Self::None => ShapeShadow::Disabled,
-            Self::Drop(shadow) => ShapeShadow::Drop(shadow),
+            Self::None => Shadow::Disabled,
+            Self::Drop(shadow) => Shadow::Drop(shadow),
         }
     }
 
-    pub(crate) fn from_shape_shadow(shadow: ShapeShadow) -> crate::Result<Self> {
+    pub(crate) fn from_shape_shadow(shadow: Shadow) -> crate::Result<Self> {
         match shadow {
-            ShapeShadow::Disabled => Ok(Self::None),
-            ShapeShadow::Drop(shadow) => Ok(Self::Drop(shadow)),
-            ShapeShadow::Contact(_) | ShapeShadow::Curved(_) => Err(crate::Error::InvalidFormat(
+            Shadow::Disabled => Ok(Self::None),
+            Shadow::Drop(shadow) => Ok(Self::Drop(shadow)),
+            Shadow::Contact(_) | Shadow::Curved(_) => Err(crate::Error::InvalidFormat(
                 "native iWork text uses a non-drop shadow".to_owned(),
             )),
         }
@@ -231,8 +230,8 @@ impl Default for ParagraphBorderOffset {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ParagraphBorder {
     color: RgbaColor,
-    width: StrokeWidth,
-    pattern: StrokePattern,
+    width: Width,
+    pattern: Pattern,
     sides: ParagraphBorderSides,
     offset: ParagraphBorderOffset,
     rounded_corners: bool,
@@ -242,8 +241,8 @@ impl ParagraphBorder {
     /// Construct a paragraph border accepted by the native iWork inspector.
     pub fn new(
         color: RgbaColor,
-        width: StrokeWidth,
-        pattern: StrokePattern,
+        width: Width,
+        pattern: Pattern,
         sides: ParagraphBorderSides,
         offset: ParagraphBorderOffset,
         rounded_corners: bool,
@@ -272,11 +271,11 @@ impl ParagraphBorder {
         self.color
     }
 
-    pub const fn width(self) -> StrokeWidth {
+    pub const fn width(self) -> Width {
         self.width
     }
 
-    pub const fn pattern(self) -> StrokePattern {
+    pub const fn pattern(self) -> Pattern {
         self.pattern
     }
 
@@ -292,10 +291,10 @@ impl ParagraphBorder {
         self.rounded_corners
     }
 
-    pub(crate) fn native_stroke(self) -> ShapeStroke {
-        ShapeStroke::new(self.color, self.width, self.pattern)
-            .with_cap(StrokeCap::Round)
-            .with_join(StrokeJoin::Round)
+    pub(crate) fn native_stroke(self) -> Stroke {
+        Stroke::new(self.color, self.width, self.pattern)
+            .with_cap(Cap::Round)
+            .with_join(Join::Round)
     }
 }
 
@@ -612,12 +611,12 @@ mod tests {
         assert!(top_left.contains(ParagraphBorderSides::LEFT));
         assert!(!top_left.contains(ParagraphBorderSides::RIGHT));
 
-        let width = StrokeWidth::new(3.0).unwrap();
+        let width = Width::new(3.0).unwrap();
         assert!(
             ParagraphBorder::new(
                 RgbaColor::black(),
                 width,
-                StrokePattern::Solid,
+                Pattern::Solid,
                 ParagraphBorderSides::NONE,
                 ParagraphBorderOffset::DEFAULT,
                 false,
@@ -628,7 +627,7 @@ mod tests {
             ParagraphBorder::new(
                 RgbaColor::black(),
                 width,
-                StrokePattern::Solid,
+                Pattern::Solid,
                 ParagraphBorderSides::TOP,
                 ParagraphBorderOffset::DEFAULT,
                 true,
@@ -639,7 +638,7 @@ mod tests {
             ParagraphBorder::new(
                 RgbaColor::black(),
                 width,
-                StrokePattern::Solid,
+                Pattern::Solid,
                 ParagraphBorderSides::ALL,
                 ParagraphBorderOffset::from_points(9.0).unwrap(),
                 true,

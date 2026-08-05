@@ -446,10 +446,10 @@ fn default_series_style(index: usize) -> Result<tsch::generated::ChartSeriesStyl
         }),
         ..Default::default()
     };
-    let radar_stroke = stroke_to_native(ShapeStroke::new(
+    let radar_stroke = stroke_to_native(Stroke::new(
         color,
-        StrokeWidth::new(NATIVE_RADAR_STROKE_WIDTH_POINTS)?,
-        StrokePattern::Solid,
+        Width::new(NATIVE_RADAR_STROKE_WIDTH_POINTS)?,
+        Pattern::Solid,
     ));
     Ok(tsch::generated::ChartSeriesStyleArchive {
         tschchartseriesdefaultfill: Some(fill.clone()),

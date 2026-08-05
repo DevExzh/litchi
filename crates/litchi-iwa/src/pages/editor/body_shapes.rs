@@ -9,11 +9,11 @@ use crate::package_metadata::{
 };
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, Endpoints,
-    LineSegment, LineStyle, RgbaColor, ShapeFill, ShapeImageFill, ShapeImageFillTechnique,
-    ShapePathKind, ShapeShadow, ShapeStroke, flip_drawable_geometry, line_geometry,
-    line_path_source, line_segments_match, reset_shape_effects, reset_shape_fill,
-    reset_shape_shadow, reset_shape_stroke, reset_shape_text_layout, set_shape_effects,
-    set_shape_fill, set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
+    LineSegment, LineStyle, RgbaColor, Shadow, ShapeFill, ShapeImageFill, ShapeImageFillTechnique,
+    ShapePathKind, Stroke, flip_drawable_geometry, line_geometry, line_path_source,
+    line_segments_match, reset_shape_effects, reset_shape_fill, reset_shape_shadow,
+    reset_shape_stroke, reset_shape_text_layout, set_shape_effects, set_shape_fill,
+    set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
     set_shape_line_segment, set_shape_preset, set_shape_shadow, set_shape_stroke,
     set_shape_text_layout, shape_effects, shape_fill, shape_line_endpoints, shape_path_source,
     shape_shadow, shape_stroke, shape_text_layout,
@@ -348,17 +348,13 @@ impl PagesEditor {
     }
 
     /// Read the effective standard stroke of one ordinary body shape.
-    pub fn body_shape_stroke(&self, drawable_object_id: u64) -> Result<Option<ShapeStroke>> {
+    pub fn body_shape_stroke(&self, drawable_object_id: u64) -> Result<Option<Stroke>> {
         let source = body_shape_graph(self, drawable_object_id)?;
         shape_stroke(self.package(), &source.archive_name, drawable_object_id)
     }
 
     /// Replace one shape's stroke transactionally, using copy-on-write for shared styles.
-    pub fn set_body_shape_stroke(
-        &mut self,
-        drawable_object_id: u64,
-        stroke: ShapeStroke,
-    ) -> Result<()> {
+    pub fn set_body_shape_stroke(&mut self, drawable_object_id: u64, stroke: Stroke) -> Result<()> {
         let source = body_shape_graph(self, drawable_object_id)?;
         let mut staged = self.package().clone();
         set_shape_stroke(
@@ -498,17 +494,13 @@ impl PagesEditor {
     }
 
     /// Read the effective drop, contact, curved, or disabled shadow state.
-    pub fn body_shape_shadow(&self, drawable_object_id: u64) -> Result<ShapeShadow> {
+    pub fn body_shape_shadow(&self, drawable_object_id: u64) -> Result<Shadow> {
         let source = body_shape_graph(self, drawable_object_id)?;
         shape_shadow(self.package(), &source.archive_name, drawable_object_id)
     }
 
     /// Replace the shadow while preserving fill, stroke, opacity, and reflection.
-    pub fn set_body_shape_shadow(
-        &mut self,
-        drawable_object_id: u64,
-        shadow: ShapeShadow,
-    ) -> Result<()> {
+    pub fn set_body_shape_shadow(&mut self, drawable_object_id: u64, shadow: Shadow) -> Result<()> {
         let source = body_shape_graph(self, drawable_object_id)?;
         let staged = set_shape_shadow(
             self.package().clone(),
@@ -927,14 +919,13 @@ mod tests {
     use std::{fs, path::PathBuf};
 
     use super::*;
-    use crate::shapes::{
-        Endpoint, RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeShadowAngle,
-        ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity,
-        StrokePattern, StrokeWidth,
-    };
+    use crate::shapes::{Appearance, BlurRadius, Drop, Endpoint, Offset, Pattern, RgbColorSpace,
+        RgbaColor, Width};
     use crate::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
-    use litchi_iwa_common::shape::effects::{Effects, Opacity, Reflection, ReflectionOpacity};
+    use litchi_iwa_common::shape::effects::{Effects, Opacity as EffectsOpacity, Reflection,
+        ReflectionOpacity};
     use litchi_iwa_common::shape::fill::{Angle, Gradient};
+    use litchi_iwa_common::shape::shadow::{Angle as ShadowAngle, Opacity as ShadowOpacity};
     use litchi_iwa_common::shape::path::CornerRadius;
 
     const POSITION: DrawablePoint = DrawablePoint { x: 180.0, y: 240.0 };
@@ -1008,10 +999,10 @@ mod tests {
         editor
             .set_body_shape_properties(created.drawable_object_id, properties.clone())
             .unwrap();
-        let rectangle_stroke = ShapeStroke::new(
+        let rectangle_stroke = Stroke::new(
             RgbaColor::new(0.2, 0.7, 0.3, 1.0, RgbColorSpace::Srgb).unwrap(),
-            StrokeWidth::new(2.0).unwrap(),
-            StrokePattern::Solid,
+            Width::new(2.0).unwrap(),
+            Pattern::Solid,
         );
         editor
             .set_body_shape_stroke(created.drawable_object_id, rectangle_stroke)
@@ -1218,10 +1209,10 @@ mod tests {
     #[test]
     fn scratch_document_supports_typed_shape_stroke_crud() {
         let mut editor = PagesEditor::create_with_text("Body").unwrap();
-        let stroke = ShapeStroke::new(
+        let stroke = Stroke::new(
             RgbaColor::new(0.8, 0.1, 0.2, 0.9, RgbColorSpace::DisplayP3).unwrap(),
-            StrokeWidth::new(3.5).unwrap(),
-            StrokePattern::MediumDash,
+            Width::new(3.5).unwrap(),
+            Pattern::MediumDash,
         );
         let endpoints = Endpoints::new(Endpoint::OpenCircle, Endpoint::FilledArrow);
         let created = editor
@@ -1250,10 +1241,10 @@ mod tests {
             .map(|name| editor.package().archive(name).unwrap().objects.len())
             .sum::<usize>();
 
-        let replacement = ShapeStroke::new(
+        let replacement = Stroke::new(
             RgbaColor::new(0.1, 0.3, 0.9, 1.0, RgbColorSpace::Srgb).unwrap(),
-            StrokeWidth::new(2.25).unwrap(),
-            StrokePattern::LongDash,
+            Width::new(2.25).unwrap(),
+            Pattern::LongDash,
         );
         editor
             .set_body_shape_stroke(created.drawable_object_id, replacement)
@@ -1342,11 +1333,7 @@ mod tests {
             fill
         );
 
-        let stroke = ShapeStroke::new(
-            RgbaColor::black(),
-            StrokeWidth::new(2.0).unwrap(),
-            StrokePattern::Solid,
-        );
+        let stroke = Stroke::new(RgbaColor::black(), Width::new(2.0).unwrap(), Pattern::Solid);
         editor
             .set_body_shape_stroke(created.drawable_object_id, stroke)
             .unwrap();
@@ -1482,7 +1469,7 @@ mod tests {
             .body_shape_effects(created.drawable_object_id)
             .unwrap();
         let effects = Effects::new(
-            Opacity::new(0.72).unwrap(),
+            EffectsOpacity::new(0.72).unwrap(),
             Reflection::Enabled(ReflectionOpacity::new(0.35).unwrap()),
         );
         editor
@@ -1499,7 +1486,7 @@ mod tests {
             fill
         );
 
-        let replacement = Effects::new(Opacity::new(0.48).unwrap(), Reflection::Disabled);
+        let replacement = Effects::new(EffectsOpacity::new(0.48).unwrap(), Reflection::Disabled);
         editor
             .set_body_shape_effects(created.drawable_object_id, replacement)
             .unwrap();
@@ -1546,14 +1533,14 @@ mod tests {
         let effects = editor
             .body_shape_effects(created.drawable_object_id)
             .unwrap();
-        let shadow = ShapeShadow::Drop(ShapeDropShadow::new(
-            ShapeShadowAppearance::new(
+        let shadow = Shadow::Drop(Drop::new(
+            Appearance::new(
                 RgbaColor::black(),
-                ShapeShadowBlurRadius::from_points(7).unwrap(),
-                ShapeShadowOffset::from_points(11.0).unwrap(),
-                ShapeShadowOpacity::new(0.42).unwrap(),
+                BlurRadius::from_points(7).unwrap(),
+                Offset::from_points(11.0).unwrap(),
+                ShadowOpacity::new(0.42).unwrap(),
             ),
-            ShapeShadowAngle::from_degrees(135.0).unwrap(),
+            ShadowAngle::from_degrees(135.0).unwrap(),
         ));
         editor
             .set_body_shape_shadow(created.drawable_object_id, shadow)
@@ -1573,13 +1560,13 @@ mod tests {
             effects
         );
         reopened
-            .set_body_shape_shadow(created.drawable_object_id, ShapeShadow::Disabled)
+            .set_body_shape_shadow(created.drawable_object_id, Shadow::Disabled)
             .unwrap();
         assert_eq!(
             reopened
                 .body_shape_shadow(created.drawable_object_id)
                 .unwrap(),
-            ShapeShadow::Disabled
+            Shadow::Disabled
         );
         assert!(
             reopened
@@ -1608,14 +1595,14 @@ mod tests {
         let inherited = editor
             .body_shape_text_layout(created.drawable_object_id)
             .unwrap();
-        let shadow = ShapeShadow::Drop(ShapeDropShadow::new(
-            ShapeShadowAppearance::new(
+        let shadow = Shadow::Drop(Drop::new(
+            Appearance::new(
                 RgbaColor::black(),
-                ShapeShadowBlurRadius::from_points(7).unwrap(),
-                ShapeShadowOffset::from_points(11.0).unwrap(),
-                ShapeShadowOpacity::new(0.42).unwrap(),
+                BlurRadius::from_points(7).unwrap(),
+                Offset::from_points(11.0).unwrap(),
+                ShadowOpacity::new(0.42).unwrap(),
             ),
-            ShapeShadowAngle::from_degrees(135.0).unwrap(),
+            ShadowAngle::from_degrees(135.0).unwrap(),
         ));
         editor
             .set_body_shape_shadow(created.drawable_object_id, shadow)

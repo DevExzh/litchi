@@ -7,11 +7,11 @@ use super::*;
 use crate::image_caption::DrawableCaptionKind;
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, Endpoints,
-    LineSegment, LineStyle, RgbaColor, ShapeFill, ShapeImageFill, ShapeImageFillTechnique,
-    ShapePathKind, ShapeShadow, ShapeStroke, flip_drawable_geometry, line_geometry,
-    line_path_source, line_segments_match, reset_shape_effects, reset_shape_fill,
-    reset_shape_shadow, reset_shape_stroke, reset_shape_text_layout, set_shape_effects,
-    set_shape_fill, set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
+    LineSegment, LineStyle, RgbaColor, Shadow, ShapeFill, ShapeImageFill, ShapeImageFillTechnique,
+    ShapePathKind, Stroke, flip_drawable_geometry, line_geometry, line_path_source,
+    line_segments_match, reset_shape_effects, reset_shape_fill, reset_shape_shadow,
+    reset_shape_stroke, reset_shape_text_layout, set_shape_effects, set_shape_fill,
+    set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
     set_shape_line_segment, set_shape_preset, set_shape_shadow, set_shape_stroke,
     set_shape_text_layout, shape_effects, shape_fill, shape_line_endpoints, shape_line_segment,
     shape_path_kind, shape_path_source, shape_preset, shape_shadow, shape_stroke,
@@ -363,7 +363,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<Option<ShapeStroke>> {
+    ) -> Result<Option<Stroke>> {
         let source = shape_graph(self, sheet_id, drawable_object_id)?;
         shape_stroke(&self.package, &source.archive_name, drawable_object_id)
     }
@@ -373,7 +373,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        stroke: ShapeStroke,
+        stroke: Stroke,
     ) -> Result<()> {
         let source = shape_graph(self, sheet_id, drawable_object_id)?;
         let mut staged = self.package.clone();
@@ -535,11 +535,7 @@ impl NumbersEditor {
     }
 
     /// Read the effective drop, contact, curved, or disabled shadow state.
-    pub fn sheet_shape_shadow(
-        &self,
-        sheet_id: u64,
-        drawable_object_id: u64,
-    ) -> Result<ShapeShadow> {
+    pub fn sheet_shape_shadow(&self, sheet_id: u64, drawable_object_id: u64) -> Result<Shadow> {
         let source = shape_graph(self, sheet_id, drawable_object_id)?;
         shape_shadow(&self.package, &source.archive_name, drawable_object_id)
     }
@@ -549,7 +545,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        shadow: ShapeShadow,
+        shadow: Shadow,
     ) -> Result<()> {
         let source = shape_graph(self, sheet_id, drawable_object_id)?;
         let staged = set_shape_shadow(
@@ -1371,13 +1367,14 @@ mod tests {
     use super::*;
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{
-        Endpoint, RgbColorSpace, RgbaColor, ShapeContactShadow, ShapeShadowAppearance,
-        ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity, ShapeShadowPerspective,
-        StrokePattern, StrokeWidth,
+        Appearance, BlurRadius, Contact, Endpoint, Offset, Pattern, RgbColorSpace, RgbaColor,
+        Width,
     };
     use crate::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
-    use litchi_iwa_common::shape::effects::{Effects, Opacity, Reflection, ReflectionOpacity};
+    use litchi_iwa_common::shape::effects::{Effects, Opacity as EffectsOpacity, Reflection,
+        ReflectionOpacity};
     use litchi_iwa_common::shape::fill::{Angle, Gradient};
+    use litchi_iwa_common::shape::shadow::{Opacity as ShadowOpacity, Perspective};
     use litchi_iwa_common::shape::path::CornerRadius;
 
     const POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 300.0 };
@@ -1668,10 +1665,10 @@ mod tests {
             .build()
             .unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
-        let stroke = ShapeStroke::new(
+        let stroke = Stroke::new(
             RgbaColor::new(0.15, 0.55, 0.85, 1.0, RgbColorSpace::Srgb).unwrap(),
-            StrokeWidth::new(4.0).unwrap(),
-            StrokePattern::RoundedDash,
+            Width::new(4.0).unwrap(),
+            Pattern::RoundedDash,
         );
         let endpoints = Endpoints::new(Endpoint::FilledCircle, Endpoint::OpenArrow);
         let created = editor
@@ -1824,7 +1821,7 @@ mod tests {
             .sheet_shape_effects(sheet_id, created.drawable_object_id)
             .unwrap();
         let effects = Effects::new(
-            Opacity::new(0.84).unwrap(),
+            EffectsOpacity::new(0.84).unwrap(),
             Reflection::Enabled(ReflectionOpacity::new(0.65).unwrap()),
         );
         editor
@@ -1865,14 +1862,14 @@ mod tests {
         let inherited = editor
             .sheet_shape_shadow(sheet_id, created.drawable_object_id)
             .unwrap();
-        let shadow = ShapeShadow::Contact(ShapeContactShadow::new(
-            ShapeShadowAppearance::new(
+        let shadow = Shadow::Contact(Contact::new(
+            Appearance::new(
                 RgbaColor::black(),
-                ShapeShadowBlurRadius::from_points(18).unwrap(),
-                ShapeShadowOffset::from_points(6.0).unwrap(),
-                ShapeShadowOpacity::new(0.58).unwrap(),
+                BlurRadius::from_points(18).unwrap(),
+                Offset::from_points(6.0).unwrap(),
+                ShadowOpacity::new(0.58).unwrap(),
             ),
-            ShapeShadowPerspective::from_degrees(23.0).unwrap(),
+            Perspective::from_degrees(23.0).unwrap(),
         ));
         editor
             .set_sheet_shape_shadow(sheet_id, created.drawable_object_id, shadow)

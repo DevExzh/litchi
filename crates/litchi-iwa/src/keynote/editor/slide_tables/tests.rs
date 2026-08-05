@@ -111,11 +111,11 @@ fn source_built_table_roundtrips_cell_border_crud() {
     let table = editor
         .add_slide_table(0, "Borders", 3, 3, position, size)
         .unwrap();
-    let stroke = crate::shapes::ShapeStroke::new(
+    let stroke = crate::shapes::Stroke::new(
         crate::shapes::RgbaColor::new(0.9, 0.2, 0.1, 1.0, crate::shapes::RgbColorSpace::Srgb)
             .unwrap(),
-        crate::shapes::StrokeWidth::new(3.0).unwrap(),
-        crate::shapes::StrokePattern::Solid,
+        crate::shapes::Width::new(3.0).unwrap(),
+        crate::shapes::Pattern::Solid,
     );
     editor
         .set_slide_table_cell_border(0, table.model_object_id, 2, 1, BorderSide::Top, stroke)

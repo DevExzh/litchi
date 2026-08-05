@@ -23,10 +23,10 @@ use crate::package_metadata::{
 };
 use crate::pages::PagesDocumentBuilder;
 use crate::shapes::{
-    RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeFill, ShapeImageFillTechnique,
-    ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset,
-    ShapeShadowOpacity, ShapeStroke, StrokePattern, StrokeWidth,
+    Appearance, BlurRadius, Drop, Offset, Pattern, RgbColorSpace, RgbaColor, ShapeFill,
+    ShapeImageFillTechnique, Stroke, Width,
 };
+use litchi_iwa_common::shape::shadow::{Angle, Opacity};
 
 const POSITION: DrawablePoint = DrawablePoint { x: 96.0, y: 144.0 };
 const SIZE: DrawableSize = DrawableSize {
@@ -62,10 +62,10 @@ fn gap_spacing(between_items: f32, between_sets: f32) -> ChartGapSpacing {
     )
 }
 
-fn chart_stroke(pattern: StrokePattern, width: f32) -> ShapeStroke {
-    ShapeStroke::new(
+fn chart_stroke(pattern: Pattern, width: f32) -> Stroke {
+    Stroke::new(
         RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-        StrokeWidth::new(width).unwrap(),
+        Width::new(width).unwrap(),
         pattern,
     )
 }
@@ -73,7 +73,7 @@ fn chart_stroke(pattern: StrokePattern, width: f32) -> ShapeStroke {
 fn chart_series_stroke(pattern: ChartSeriesStrokePattern, width: f32) -> ChartSeriesStroke {
     ChartSeriesStroke::new(
         RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-        StrokeWidth::new(width).unwrap(),
+        Width::new(width).unwrap(),
         pattern,
     )
 }
@@ -83,14 +83,14 @@ fn chart_background_fill() -> ShapeFill {
 }
 
 fn chart_shadow() -> ChartShadow {
-    ChartShadow::Grouped(ShapeDropShadow::new(
-        ShapeShadowAppearance::new(
+    ChartShadow::Grouped(Drop::new(
+        Appearance::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-            ShapeShadowBlurRadius::from_points(15).unwrap(),
-            ShapeShadowOffset::from_points(8.0).unwrap(),
-            ShapeShadowOpacity::new(0.6).unwrap(),
+            BlurRadius::from_points(15).unwrap(),
+            Offset::from_points(8.0).unwrap(),
+            Opacity::new(0.6).unwrap(),
         ),
-        ShapeShadowAngle::from_degrees(60.0).unwrap(),
+        Angle::from_degrees(60.0).unwrap(),
     ))
 }
 
@@ -1968,10 +1968,10 @@ fn scratch_document_supports_exact_chart_legend_stroke_crud() {
         editor.body_chart_legend_stroke(object_id).unwrap(),
         ChartLegendStroke::Inherited
     );
-    let stroke = ChartLegendStroke::Stroke(ShapeStroke::new(
+    let stroke = ChartLegendStroke::Stroke(Stroke::new(
         RgbaColor::new(0.8, 0.2, 0.15, 1.0, RgbColorSpace::Srgb).unwrap(),
-        StrokeWidth::new(1.5).unwrap(),
-        StrokePattern::RoundedDash,
+        Width::new(1.5).unwrap(),
+        Pattern::RoundedDash,
     ));
     editor
         .set_body_chart_legend_stroke(object_id, stroke)
@@ -2009,14 +2009,14 @@ fn scratch_document_supports_exact_chart_legend_shadow_crud() {
         editor.body_chart_legend_shadow(object_id).unwrap(),
         ChartLegendShadow::Inherited
     );
-    let shadow = ChartLegendShadow::Shadow(ShapeDropShadow::new(
-        ShapeShadowAppearance::new(
+    let shadow = ChartLegendShadow::Shadow(Drop::new(
+        Appearance::new(
             RgbaColor::black(),
-            ShapeShadowBlurRadius::from_points(11).unwrap(),
-            ShapeShadowOffset::from_points(7.0).unwrap(),
-            ShapeShadowOpacity::new(0.55).unwrap(),
+            BlurRadius::from_points(11).unwrap(),
+            Offset::from_points(7.0).unwrap(),
+            Opacity::new(0.55).unwrap(),
         ),
-        ShapeShadowAngle::from_degrees(25.0).unwrap(),
+        Angle::from_degrees(25.0).unwrap(),
     ));
     editor
         .set_body_chart_legend_shadow(object_id, shadow)
@@ -2119,9 +2119,9 @@ fn scratch_document_supports_native_chart_border_stroke_crud() {
             SIZE,
         )
         .unwrap();
-    let default = ShapeStroke::new(RgbaColor::black(), StrokeWidth::ONE, StrokePattern::Solid);
-    let customized = chart_stroke(StrokePattern::MediumDash, 3.0);
-    let changed = chart_stroke(StrokePattern::RoundedDash, 2.0);
+    let default = Stroke::new(RgbaColor::black(), Width::ONE, Pattern::Solid);
+    let customized = chart_stroke(Pattern::MediumDash, 3.0);
+    let changed = chart_stroke(Pattern::RoundedDash, 2.0);
 
     assert_eq!(
         editor

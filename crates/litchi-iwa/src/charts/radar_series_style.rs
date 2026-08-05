@@ -15,8 +15,8 @@ use crate::charts::series_style::{
 };
 use crate::protobuf::tsch;
 use crate::shapes::{
-    RgbaColor, ShapeFill, ShapeStroke, StrokePattern, StrokeWidth, fill_from_native,
-    fill_to_native, stroke_from_native, stroke_to_native,
+    Pattern, RgbaColor, ShapeFill, Stroke, Width, fill_from_native, fill_to_native,
+    stroke_from_native, stroke_to_native,
 };
 use crate::wire::{
     parse_wire_fields, patch_fixed32_field, patch_length_delimited_field, patch_varint_field,
@@ -159,7 +159,7 @@ fn effective_radar_style(
 
 fn classify_radar_style(
     fill: &ShapeFill,
-    stroke: Option<&ShapeStroke>,
+    stroke: Option<&Stroke>,
     uses_stroke: bool,
 ) -> Result<ChartRadarSeriesStyle> {
     let has_fill = !matches!(fill, ShapeFill::None);
@@ -246,7 +246,7 @@ fn read_local_radar_fill(data: &[u8]) -> Result<Option<ShapeFill>> {
         .transpose()
 }
 
-fn read_local_radar_stroke(data: &[u8]) -> Result<Option<Option<ShapeStroke>>> {
+fn read_local_radar_stroke(data: &[u8]) -> Result<Option<Option<Stroke>>> {
     let Some(extension) = generated_chart_series_style_extension(data)? else {
         return Ok(None);
     };
@@ -346,10 +346,10 @@ fn patch_local_radar_style(
     let stroke = if style == ChartRadarSeriesStyle::Fill {
         None
     } else {
-        let stroke = ShapeStroke::new(
+        let stroke = Stroke::new(
             color,
-            StrokeWidth::new(NATIVE_RADAR_STROKE_WIDTH_POINTS)?,
-            StrokePattern::Solid,
+            Width::new(NATIVE_RADAR_STROKE_WIDTH_POINTS)?,
+            Pattern::Solid,
         );
         Some(stroke_to_native(stroke).encode_to_vec())
     };

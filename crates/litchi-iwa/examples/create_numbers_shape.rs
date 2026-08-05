@@ -4,14 +4,15 @@ use std::{env, fs, path::Path};
 
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeContactShadow, ShapeFill,
-    ShapeImageFillTechnique, ShapeShadow, ShapeShadowAppearance, ShapeShadowBlurRadius,
-    ShapeShadowOffset, ShapeShadowOpacity, ShapeShadowPerspective,
+    Appearance, BlurRadius, Contact, DrawablePoint, DrawableSize, Offset, Perspective,
+    RgbColorSpace, RgbaColor, Shadow, ShapeFill, ShapeImageFillTechnique,
 };
 use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
-use litchi_iwa_common::shape::effects::{Effects, Opacity, Reflection, ReflectionOpacity};
+use litchi_iwa_common::shape::effects::{Effects, Opacity as EffectsOpacity, Reflection,
+    ReflectionOpacity};
 use litchi_iwa_common::shape::fill::{Angle, Gradient};
 use litchi_iwa_common::shape::path::Preset;
+use litchi_iwa_common::shape::shadow::Opacity as ShadowOpacity;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -61,21 +62,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         sheet_id,
         created.drawable_object_id,
         Effects::new(
-            Opacity::new(0.84)?,
+            EffectsOpacity::new(0.84)?,
             Reflection::Enabled(ReflectionOpacity::new(0.65)?),
         ),
     )?;
     editor.set_sheet_shape_shadow(
         sheet_id,
         created.drawable_object_id,
-        ShapeShadow::Contact(ShapeContactShadow::new(
-            ShapeShadowAppearance::new(
+        Shadow::Contact(Contact::new(
+            Appearance::new(
                 RgbaColor::black(),
-                ShapeShadowBlurRadius::from_points(18)?,
-                ShapeShadowOffset::from_points(6.0)?,
-                ShapeShadowOpacity::new(0.58)?,
+                BlurRadius::from_points(18)?,
+                Offset::from_points(6.0)?,
+                ShadowOpacity::new(0.58)?,
             ),
-            ShapeShadowPerspective::from_degrees(23.0)?,
+            Perspective::from_degrees(23.0)?,
         )),
     )?;
     editor.set_sheet_shape_text_layout(

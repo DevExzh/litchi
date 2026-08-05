@@ -3,10 +3,8 @@
 use crate::protobuf::tsd;
 use crate::{Error, Result};
 
-use super::super::color::{color_from_native, color_to_native};
-use super::{
-    RgbaColor, ShapeStroke, StrokeCap, StrokeJoin, StrokeMiterLimit, StrokePattern, StrokeWidth,
-};
+use super::super::color::{RgbaColor, color_from_native, color_to_native};
+use super::{Cap, Join, MiterLimit, Pattern, Stroke, Width};
 
 const DEFAULT_MITER_LIMIT: f32 = 4.0;
 const SHORT_DASH_LENGTH: f32 = 1.0;
@@ -16,7 +14,7 @@ const ROUNDED_DOT_LENGTH: f32 = 0.001;
 const ROUNDED_DOT_GAP: f32 = 2.0;
 const NATIVE_PATTERN_CAPACITY: usize = 6;
 
-pub(crate) fn stroke_from_native(stroke: &tsd::StrokeArchive) -> Result<Option<ShapeStroke>> {
+pub(crate) fn stroke_from_native(stroke: &tsd::StrokeArchive) -> Result<Option<Stroke>> {
     if stroke.smart_stroke.is_some() || stroke.frame.is_some() || stroke.patterned_stroke.is_some()
     {
         return Err(Error::InvalidFormat(
@@ -37,7 +35,7 @@ pub(crate) fn stroke_from_native(stroke: &tsd::StrokeArchive) -> Result<Option<S
         return Ok(None);
     }
     let typed_pattern = match pattern_type {
-        tsd::stroke_pattern_archive::StrokePatternType::TsdSolidPattern => StrokePattern::Solid,
+        tsd::stroke_pattern_archive::StrokePatternType::TsdSolidPattern => Pattern::Solid,
         tsd::stroke_pattern_archive::StrokePatternType::TsdPattern => {
             let used = usize::try_from(pattern.count.unwrap_or_default()).map_err(|_| {
                 Error::InvalidFormat("native iWork stroke pattern count is too large".to_owned())
@@ -46,10 +44,10 @@ pub(crate) fn stroke_from_native(stroke: &tsd::StrokeArchive) -> Result<Option<S
                 Error::InvalidFormat("native iWork stroke pattern is truncated".to_owned())
             })?;
             match values {
-                [SHORT_DASH_LENGTH, SHORT_DASH_LENGTH] => StrokePattern::ShortDash,
-                [MEDIUM_DASH_LENGTH, MEDIUM_DASH_LENGTH] => StrokePattern::MediumDash,
-                [LONG_DASH_LENGTH, LONG_DASH_LENGTH] => StrokePattern::LongDash,
-                [ROUNDED_DOT_LENGTH, ROUNDED_DOT_GAP] => StrokePattern::RoundedDash,
+                [SHORT_DASH_LENGTH, SHORT_DASH_LENGTH] => Pattern::ShortDash,
+                [MEDIUM_DASH_LENGTH, MEDIUM_DASH_LENGTH] => Pattern::MediumDash,
+                [LONG_DASH_LENGTH, LONG_DASH_LENGTH] => Pattern::LongDash,
+                [ROUNDED_DOT_LENGTH, ROUNDED_DOT_GAP] => Pattern::RoundedDash,
                 _ => {
                     return Err(Error::InvalidFormat(format!(
                         "unsupported native iWork stroke pattern {values:?}"
@@ -65,15 +63,15 @@ pub(crate) fn stroke_from_native(stroke: &tsd::StrokeArchive) -> Result<Option<S
             .as_ref()
             .ok_or_else(|| Error::InvalidFormat("native iWork stroke has no color".to_owned()))?,
     )?;
-    let width = StrokeWidth::new(
+    let width = Width::new(
         stroke
             .width
             .ok_or_else(|| Error::InvalidFormat("native iWork stroke has no width".to_owned()))?,
     )?;
     let cap = match tsd::stroke_archive::LineCap::try_from(stroke.cap.unwrap_or_default()) {
-        Ok(tsd::stroke_archive::LineCap::ButtCap) => StrokeCap::Butt,
-        Ok(tsd::stroke_archive::LineCap::RoundCap) => StrokeCap::Round,
-        Ok(tsd::stroke_archive::LineCap::SquareCap) => StrokeCap::Square,
+        Ok(tsd::stroke_archive::LineCap::ButtCap) => Cap::Butt,
+        Ok(tsd::stroke_archive::LineCap::RoundCap) => Cap::Round,
+        Ok(tsd::stroke_archive::LineCap::SquareCap) => Cap::Square,
         Err(_) => {
             return Err(Error::InvalidFormat(
                 "unknown native iWork stroke cap".to_owned(),
@@ -81,17 +79,17 @@ pub(crate) fn stroke_from_native(stroke: &tsd::StrokeArchive) -> Result<Option<S
         },
     };
     let join = match tsd::LineJoin::try_from(stroke.join.unwrap_or_default()) {
-        Ok(tsd::LineJoin::MiterJoin) => StrokeJoin::Miter,
-        Ok(tsd::LineJoin::RoundJoin) => StrokeJoin::Round,
-        Ok(tsd::LineJoin::BevelJoin) => StrokeJoin::Bevel,
+        Ok(tsd::LineJoin::MiterJoin) => Join::Miter,
+        Ok(tsd::LineJoin::RoundJoin) => Join::Round,
+        Ok(tsd::LineJoin::BevelJoin) => Join::Bevel,
         Err(_) => {
             return Err(Error::InvalidFormat(
                 "unknown native iWork stroke join".to_owned(),
             ));
         },
     };
-    let miter_limit = StrokeMiterLimit::new(stroke.miter_limit.unwrap_or(DEFAULT_MITER_LIMIT))?;
-    Ok(Some(ShapeStroke {
+    let miter_limit = MiterLimit::new(stroke.miter_limit.unwrap_or(DEFAULT_MITER_LIMIT))?;
+    Ok(Some(Stroke {
         color,
         width,
         pattern: typed_pattern,
@@ -101,19 +99,19 @@ pub(crate) fn stroke_from_native(stroke: &tsd::StrokeArchive) -> Result<Option<S
     }))
 }
 
-pub(crate) fn stroke_to_native(stroke: ShapeStroke) -> tsd::StrokeArchive {
+pub(crate) fn stroke_to_native(stroke: Stroke) -> tsd::StrokeArchive {
     tsd::StrokeArchive {
         color: Some(color_to_native(stroke.color)),
         width: Some(stroke.width.points()),
         cap: Some(match stroke.cap {
-            StrokeCap::Butt => tsd::stroke_archive::LineCap::ButtCap as i32,
-            StrokeCap::Round => tsd::stroke_archive::LineCap::RoundCap as i32,
-            StrokeCap::Square => tsd::stroke_archive::LineCap::SquareCap as i32,
+            Cap::Butt => tsd::stroke_archive::LineCap::ButtCap as i32,
+            Cap::Round => tsd::stroke_archive::LineCap::RoundCap as i32,
+            Cap::Square => tsd::stroke_archive::LineCap::SquareCap as i32,
         }),
         join: Some(match stroke.join {
-            StrokeJoin::Miter => tsd::LineJoin::MiterJoin as i32,
-            StrokeJoin::Round => tsd::LineJoin::RoundJoin as i32,
-            StrokeJoin::Bevel => tsd::LineJoin::BevelJoin as i32,
+            Join::Miter => tsd::LineJoin::MiterJoin as i32,
+            Join::Round => tsd::LineJoin::RoundJoin as i32,
+            Join::Bevel => tsd::LineJoin::BevelJoin as i32,
         }),
         miter_limit: Some(stroke.miter_limit.ratio()),
         pattern: Some(pattern_to_native(stroke.pattern)),
@@ -122,11 +120,7 @@ pub(crate) fn stroke_to_native(stroke: ShapeStroke) -> tsd::StrokeArchive {
 }
 
 pub(crate) fn empty_stroke_archive() -> tsd::StrokeArchive {
-    let mut stroke = stroke_to_native(ShapeStroke::new(
-        RgbaColor::black(),
-        StrokeWidth(1.0),
-        StrokePattern::Solid,
-    ));
+    let mut stroke = stroke_to_native(Stroke::new(RgbaColor::black(), Width::ONE, Pattern::Solid));
     stroke.pattern = Some(tsd::StrokePatternArchive {
         r#type: Some(tsd::stroke_pattern_archive::StrokePatternType::TsdEmptyPattern as i32),
         phase: Some(0.0),
@@ -136,33 +130,33 @@ pub(crate) fn empty_stroke_archive() -> tsd::StrokeArchive {
     stroke
 }
 
-pub(super) fn pattern_to_native(pattern: StrokePattern) -> tsd::StrokePatternArchive {
+pub(super) fn pattern_to_native(pattern: Pattern) -> tsd::StrokePatternArchive {
     let (pattern_type, count, first, second) = match pattern {
-        StrokePattern::Solid => (
+        Pattern::Solid => (
             tsd::stroke_pattern_archive::StrokePatternType::TsdSolidPattern,
             0,
             0.0,
             0.0,
         ),
-        StrokePattern::ShortDash => (
+        Pattern::ShortDash => (
             tsd::stroke_pattern_archive::StrokePatternType::TsdPattern,
             2,
             SHORT_DASH_LENGTH,
             SHORT_DASH_LENGTH,
         ),
-        StrokePattern::MediumDash => (
+        Pattern::MediumDash => (
             tsd::stroke_pattern_archive::StrokePatternType::TsdPattern,
             2,
             MEDIUM_DASH_LENGTH,
             MEDIUM_DASH_LENGTH,
         ),
-        StrokePattern::LongDash => (
+        Pattern::LongDash => (
             tsd::stroke_pattern_archive::StrokePatternType::TsdPattern,
             2,
             LONG_DASH_LENGTH,
             LONG_DASH_LENGTH,
         ),
-        StrokePattern::RoundedDash => (
+        Pattern::RoundedDash => (
             tsd::stroke_pattern_archive::StrokePatternType::TsdPattern,
             2,
             ROUNDED_DOT_LENGTH,

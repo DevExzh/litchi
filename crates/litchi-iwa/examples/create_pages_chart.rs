@@ -15,11 +15,11 @@ use litchi_iwa::charts::{
 };
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeFill,
-    ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset,
-    ShapeShadowOpacity, ShapeStroke, StrokePattern, StrokeWidth,
+    Appearance, BlurRadius, DrawablePoint, DrawableSize, Drop, Offset, Pattern, RgbColorSpace,
+    RgbaColor, ShapeFill, Stroke, Width,
 };
 use litchi_iwa_common::shape::fill::{Angle, Gradient};
+use litchi_iwa_common::shape::shadow::{Angle as ShadowAngle, Opacity};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -71,12 +71,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &[
             Some(ChartSeriesStroke::new(
                 RgbaColor::black(),
-                StrokeWidth::new(3.5)?,
+                Width::new(3.5)?,
                 ChartSeriesStrokePattern::RoundedDash,
             )),
             Some(ChartSeriesStroke::new(
                 RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb)?,
-                StrokeWidth::new(2.0)?,
+                Width::new(2.0)?,
                 ChartSeriesStrokePattern::MediumDash,
             )),
         ],
@@ -84,10 +84,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_body_chart_border_visible(chart.drawable_object_id, true)?;
     editor.set_body_chart_border_stroke(
         chart.drawable_object_id,
-        Some(ShapeStroke::new(
+        Some(Stroke::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb)?,
-            StrokeWidth::new(3.0)?,
-            StrokePattern::MediumDash,
+            Width::new(3.0)?,
+            Pattern::MediumDash,
         )),
     )?;
     editor.set_body_chart_rounded_corners(
@@ -103,14 +103,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.set_body_chart_shadow(
         chart.drawable_object_id,
-        ChartShadow::Grouped(ShapeDropShadow::new(
-            ShapeShadowAppearance::new(
+        ChartShadow::Grouped(Drop::new(
+            Appearance::new(
                 RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb)?,
-                ShapeShadowBlurRadius::from_points(15)?,
-                ShapeShadowOffset::from_points(8.0)?,
-                ShapeShadowOpacity::new(0.6)?,
+                BlurRadius::from_points(15)?,
+                Offset::from_points(8.0)?,
+                Opacity::new(0.6)?,
             ),
-            ShapeShadowAngle::from_degrees(60.0)?,
+            ShadowAngle::from_degrees(60.0)?,
         )),
     )?;
     editor.set_body_chart_axis_title(chart.drawable_object_id, Axis::Category, "Quarter")?;
@@ -152,10 +152,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         chart.drawable_object_id,
         Axis::Value,
         ChartAxisGridline::Minor,
-        ChartAxisGridlineStroke::Stroke(ShapeStroke::new(
+        ChartAxisGridlineStroke::Stroke(Stroke::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb)?,
-            StrokeWidth::new(2.0)?,
-            StrokePattern::MediumDash,
+            Width::new(2.0)?,
+            Pattern::MediumDash,
         )),
     )?;
     editor.set_body_chart_legend_visible(chart.drawable_object_id, true)?;
@@ -179,22 +179,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.set_body_chart_legend_stroke(
         chart.drawable_object_id,
-        ChartLegendStroke::Stroke(ShapeStroke::new(
+        ChartLegendStroke::Stroke(Stroke::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb)?,
-            StrokeWidth::new(2.5)?,
-            StrokePattern::MediumDash,
+            Width::new(2.5)?,
+            Pattern::MediumDash,
         )),
     )?;
     editor.set_body_chart_legend_shadow(
         chart.drawable_object_id,
-        ChartLegendShadow::Shadow(ShapeDropShadow::new(
-            ShapeShadowAppearance::new(
+        ChartLegendShadow::Shadow(Drop::new(
+            Appearance::new(
                 RgbaColor::black(),
-                ShapeShadowBlurRadius::from_points(12)?,
-                ShapeShadowOffset::from_points(8.0)?,
-                ShapeShadowOpacity::new(0.6)?,
+                BlurRadius::from_points(12)?,
+                Offset::from_points(8.0)?,
+                Opacity::new(0.6)?,
             ),
-            ShapeShadowAngle::from_degrees(30.0)?,
+            ShadowAngle::from_degrees(30.0)?,
         )),
     )?;
     editor.set_body_chart_series_value_label_visibilities(

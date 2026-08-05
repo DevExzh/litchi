@@ -12,8 +12,7 @@ use crate::charts::style::{
 };
 use crate::protobuf::tsch;
 use crate::shapes::{
-    RgbaColor, ShapeStroke, StrokePattern, StrokeWidth, empty_stroke_archive, stroke_from_native,
-    stroke_to_native,
+    Pattern, RgbaColor, Stroke, Width, empty_stroke_archive, stroke_from_native, stroke_to_native,
 };
 use crate::wire::patch_length_delimited_field;
 use crate::{Error, IWorkPackage, Result};
@@ -22,8 +21,8 @@ use crate::{Error, IWorkPackage, Result};
 const CHART_BORDER_STROKE_FIELD: u32 = 12;
 
 /// The solid, black, one-point stroke used by a newly inserted native chart.
-pub(crate) fn native_default_chart_border_stroke() -> ShapeStroke {
-    ShapeStroke::new(RgbaColor::black(), StrokeWidth::ONE, StrokePattern::Solid)
+pub(crate) fn native_default_chart_border_stroke() -> Stroke {
+    Stroke::new(RgbaColor::black(), Width::ONE, Pattern::Solid)
 }
 
 /// Read the chart-area border stroke, or `None` when the native style is empty.
@@ -32,7 +31,7 @@ pub(crate) fn chart_border_stroke(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-) -> Result<Option<ShapeStroke>> {
+) -> Result<Option<Stroke>> {
     chart_style_slot(
         package,
         chart_archive_name,
@@ -48,7 +47,7 @@ pub(crate) fn set_chart_border_stroke(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    stroke: Option<ShapeStroke>,
+    stroke: Option<Stroke>,
 ) -> Result<()> {
     let slot = chart_style_slot(
         package,
@@ -69,7 +68,7 @@ pub(crate) fn set_chart_border_stroke(
     Ok(())
 }
 
-fn read_chart_border_stroke(data: &[u8]) -> Result<Option<ShapeStroke>> {
+fn read_chart_border_stroke(data: &[u8]) -> Result<Option<Stroke>> {
     let Some(extension) = generated_chart_style_extension(data)? else {
         return Ok(Some(native_default_chart_border_stroke()));
     };
@@ -82,7 +81,7 @@ fn read_chart_border_stroke(data: &[u8]) -> Result<Option<ShapeStroke>> {
         .map(|stroke| stroke.unwrap_or_else(|| Some(native_default_chart_border_stroke())))
 }
 
-fn patch_chart_border_stroke(data: &[u8], stroke: Option<ShapeStroke>) -> Result<Vec<u8>> {
+fn patch_chart_border_stroke(data: &[u8], stroke: Option<Stroke>) -> Result<Vec<u8>> {
     let Some(extension) = generated_chart_style_extension(data)? else {
         if stroke == Some(native_default_chart_border_stroke()) {
             return Ok(data.to_vec());
@@ -122,11 +121,11 @@ fn patch_chart_border_stroke(data: &[u8], stroke: Option<ShapeStroke>) -> Result
     Ok(patched)
 }
 
-fn native_stroke(stroke: Option<ShapeStroke>) -> crate::protobuf::tsd::StrokeArchive {
+fn native_stroke(stroke: Option<Stroke>) -> crate::protobuf::tsd::StrokeArchive {
     stroke.map_or_else(empty_stroke_archive, stroke_to_native)
 }
 
-fn validate_patched_chart_border_stroke(data: &[u8], expected: Option<ShapeStroke>) -> Result<()> {
+fn validate_patched_chart_border_stroke(data: &[u8], expected: Option<Stroke>) -> Result<()> {
     if read_chart_border_stroke(data)? != expected {
         return Err(Error::InvalidFormat(
             "chart border stroke wire patch failed validation".to_owned(),
@@ -152,7 +151,7 @@ mod tests {
             super_: Some(tss::StyleArchive::default()),
         }
         .encode_to_vec();
-        let replacement = test_stroke(StrokePattern::MediumDash, 3.0);
+        let replacement = test_stroke(Pattern::MediumDash, 3.0);
 
         assert_eq!(
             read_chart_border_stroke(&original).unwrap(),
@@ -177,8 +176,8 @@ mod tests {
 
     #[test]
     fn border_stroke_patch_retains_other_style_fields_and_unmapped_data() {
-        let original_stroke = test_stroke(StrokePattern::Solid, 2.0);
-        let replacement = test_stroke(StrokePattern::RoundedDash, 4.0);
+        let original_stroke = test_stroke(Pattern::Solid, 2.0);
+        let replacement = test_stroke(Pattern::RoundedDash, 4.0);
         let original = style_with_unknown_fields(tsch::generated::ChartStyleArchive {
             tschchartinfodefaultborderstroke: Some(stroke_to_native(original_stroke)),
             tschchartinfodefaultshowborder: Some(true),
@@ -209,7 +208,7 @@ mod tests {
     fn resetting_border_stroke_retains_other_style_fields() {
         let original = style_with_unknown_fields(tsch::generated::ChartStyleArchive {
             tschchartinfodefaultborderstroke: Some(stroke_to_native(test_stroke(
-                StrokePattern::MediumDash,
+                Pattern::MediumDash,
                 3.0,
             ))),
             tschchartinfodefaultshowborder: Some(true),
@@ -234,10 +233,10 @@ mod tests {
         assert_unknown_fields_retained(&original, &reset);
     }
 
-    fn test_stroke(pattern: StrokePattern, width: f32) -> ShapeStroke {
-        ShapeStroke::new(
+    fn test_stroke(pattern: Pattern, width: f32) -> Stroke {
+        Stroke::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-            StrokeWidth::new(width).unwrap(),
+            Width::new(width).unwrap(),
             pattern,
         )
     }

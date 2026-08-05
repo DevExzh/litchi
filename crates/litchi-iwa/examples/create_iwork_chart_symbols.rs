@@ -10,9 +10,7 @@ use litchi_iwa::charts::{
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::pages::PagesDocumentBuilder;
-use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill, StrokeWidth,
-};
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill, Width};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -46,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let outlines = [
         Some(ChartSeriesStroke::new(
             RgbaColor::black(),
-            StrokeWidth::new(2.5)?,
+            Width::new(2.5)?,
             ChartSeriesStrokePattern::RoundedDash,
         )),
         None,

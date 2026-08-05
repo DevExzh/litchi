@@ -233,7 +233,7 @@ fn validate_patched_chart_background_fill(data: &[u8], expected: &ShapeFill) -> 
 mod tests {
     use super::*;
     use crate::protobuf::tss;
-    use crate::shapes::StrokePattern;
+    use crate::shapes::Pattern;
     use crate::wire::{append_length_delimited_field, append_varint_field, parse_wire_fields};
 
     const UNMAPPED_OUTER_FIELD: u32 = 4_096;
@@ -304,10 +304,10 @@ mod tests {
             tschchartinfodefaultgridbackgroundfill: Some(fill_to_native(&solid_fill())),
             tschchartinfodefaultshowborder: Some(true),
             tschchartinfodefaultborderstroke: Some(crate::shapes::stroke_to_native(
-                crate::shapes::ShapeStroke::new(
+                crate::shapes::Stroke::new(
                     RgbaColor::black(),
-                    crate::shapes::StrokeWidth::ONE,
-                    StrokePattern::Solid,
+                    crate::shapes::Width::ONE,
+                    Pattern::Solid,
                 ),
             )),
             ..Default::default()

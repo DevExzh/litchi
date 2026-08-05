@@ -4,8 +4,7 @@ use std::env;
 
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{
-    DrawablePoint, Endpoint, Endpoints, LineStyle, RgbColorSpace, RgbaColor, ShapeStroke,
-    StrokePattern, StrokeWidth,
+    DrawablePoint, Endpoint, Endpoints, LineStyle, Pattern, RgbColorSpace, RgbaColor, Stroke, Width,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -22,10 +21,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .table_name("Source Data")
         .build()?;
     let sheet_id = editor.sheets()?[0].object_id;
-    let stroke = ShapeStroke::new(
+    let stroke = Stroke::new(
         RgbaColor::new(0.1, 0.45, 0.9, 1.0, RgbColorSpace::Srgb)?,
-        StrokeWidth::new(4.0)?,
-        StrokePattern::RoundedDash,
+        Width::new(4.0)?,
+        Pattern::RoundedDash,
     );
     let created = editor.add_sheet_line_with_style(
         sheet_id,

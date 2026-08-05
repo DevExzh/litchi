@@ -4,14 +4,15 @@ use std::{env, fs, path::Path};
 
 use litchi_iwa::pages::PagesEditor;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeFill,
-    ShapeImageFillTechnique, ShapeShadow, ShapeShadowAngle, ShapeShadowAppearance,
-    ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity,
+    Appearance, BlurRadius, DrawablePoint, DrawableSize, Drop, Offset, RgbColorSpace, RgbaColor,
+    Shadow, ShapeFill, ShapeImageFillTechnique,
 };
 use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
-use litchi_iwa_common::shape::effects::{Effects, Opacity, Reflection, ReflectionOpacity};
+use litchi_iwa_common::shape::effects::{Effects, Opacity as EffectsOpacity, Reflection,
+    ReflectionOpacity};
 use litchi_iwa_common::shape::fill::{Angle, Gradient};
 use litchi_iwa_common::shape::path::Preset;
+use litchi_iwa_common::shape::shadow::{Angle as ShadowAngle, Opacity as ShadowOpacity};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -56,20 +57,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_body_shape_effects(
         created.drawable_object_id,
         Effects::new(
-            Opacity::new(0.72)?,
+            EffectsOpacity::new(0.72)?,
             Reflection::Enabled(ReflectionOpacity::new(0.35)?),
         ),
     )?;
     editor.set_body_shape_shadow(
         created.drawable_object_id,
-        ShapeShadow::Drop(ShapeDropShadow::new(
-            ShapeShadowAppearance::new(
+        Shadow::Drop(Drop::new(
+            Appearance::new(
                 RgbaColor::black(),
-                ShapeShadowBlurRadius::from_points(7)?,
-                ShapeShadowOffset::from_points(11.0)?,
-                ShapeShadowOpacity::new(0.42)?,
+                BlurRadius::from_points(7)?,
+                Offset::from_points(11.0)?,
+                ShadowOpacity::new(0.42)?,
             ),
-            ShapeShadowAngle::from_degrees(135.0)?,
+            ShadowAngle::from_degrees(135.0)?,
         )),
     )?;
     editor.set_body_shape_text_layout(

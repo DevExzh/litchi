@@ -77,7 +77,7 @@ use crate::charts::source::{
     validate_chart_styles_registered,
 };
 use crate::charts::{
-    ChartArrangement, ChartData, Kind, Direction, DirectionKind, IWorkChartArchive,
+    ChartArrangement, ChartData, Direction, DirectionKind, IWorkChartArchive, Kind,
 };
 use crate::data_reference_registry::{
     clone_component_data_references, remove_component_data_references_for_objects,
@@ -712,10 +712,10 @@ mod tests {
     use crate::package_metadata::{component_identifier_for_entry, component_uuid_identifiers};
     use crate::protobuf::tsch;
     use crate::shapes::{
-        RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeFill, ShapeImageFillTechnique,
-        ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset,
-        ShapeShadowOpacity, ShapeStroke, StrokePattern, StrokeWidth,
+        Appearance, BlurRadius, Drop, Offset, Pattern, RgbColorSpace, RgbaColor, ShapeFill,
+        ShapeImageFillTechnique, Stroke, Width,
     };
+    use litchi_iwa_common::shape::shadow::{Angle, Opacity};
 
     const POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 120.0 };
     const SIZE: DrawableSize = DrawableSize {
@@ -879,10 +879,10 @@ mod tests {
         )
     }
 
-    fn chart_stroke(pattern: StrokePattern, width: f32) -> ShapeStroke {
-        ShapeStroke::new(
+    fn chart_stroke(pattern: Pattern, width: f32) -> Stroke {
+        Stroke::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-            StrokeWidth::new(width).unwrap(),
+            Width::new(width).unwrap(),
             pattern,
         )
     }
@@ -890,7 +890,7 @@ mod tests {
     fn chart_series_stroke(pattern: ChartSeriesStrokePattern, width: f32) -> ChartSeriesStroke {
         ChartSeriesStroke::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-            StrokeWidth::new(width).unwrap(),
+            Width::new(width).unwrap(),
             pattern,
         )
     }
@@ -900,14 +900,14 @@ mod tests {
     }
 
     fn chart_shadow() -> ChartShadow {
-        ChartShadow::Grouped(ShapeDropShadow::new(
-            ShapeShadowAppearance::new(
+        ChartShadow::Grouped(Drop::new(
+            Appearance::new(
                 RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-                ShapeShadowBlurRadius::from_points(15).unwrap(),
-                ShapeShadowOffset::from_points(8.0).unwrap(),
-                ShapeShadowOpacity::new(0.6).unwrap(),
+                BlurRadius::from_points(15).unwrap(),
+                Offset::from_points(8.0).unwrap(),
+                Opacity::new(0.6).unwrap(),
             ),
-            ShapeShadowAngle::from_degrees(60.0).unwrap(),
+            Angle::from_degrees(60.0).unwrap(),
         ))
     }
 
@@ -983,13 +983,7 @@ mod tests {
 
         assert!(
             editor
-                .add_sheet_chart(
-                    sheet_id,
-                    Kind::Undefined,
-                    sample_data(),
-                    POSITION,
-                    SIZE
-                )
+                .add_sheet_chart(sheet_id, Kind::Undefined, sample_data(), POSITION, SIZE)
                 .is_err()
         );
         assert!(
@@ -2561,10 +2555,10 @@ mod tests {
             original_bytes
         );
 
-        let stroke = ChartLegendStroke::Stroke(ShapeStroke::new(
+        let stroke = ChartLegendStroke::Stroke(Stroke::new(
             RgbaColor::new(0.8, 0.2, 0.1, 1.0, RgbColorSpace::Srgb).unwrap(),
-            StrokeWidth::new(2.0).unwrap(),
-            StrokePattern::Solid,
+            Width::new(2.0).unwrap(),
+            Pattern::Solid,
         ));
         editor
             .set_sheet_chart_legend_stroke(sheet_id, object_id, stroke)
@@ -2700,10 +2694,10 @@ mod tests {
                 .unwrap(),
             ChartLegendStroke::Inherited
         );
-        let stroke = ChartLegendStroke::Stroke(ShapeStroke::new(
+        let stroke = ChartLegendStroke::Stroke(Stroke::new(
             RgbaColor::new(0.15, 0.7, 0.35, 1.0, RgbColorSpace::Srgb).unwrap(),
-            StrokeWidth::new(3.0).unwrap(),
-            StrokePattern::Solid,
+            Width::new(3.0).unwrap(),
+            Pattern::Solid,
         ));
         editor
             .set_sheet_chart_legend_stroke(sheet_id, object_id, stroke)
@@ -2743,14 +2737,14 @@ mod tests {
                 .unwrap(),
             ChartLegendShadow::Inherited
         );
-        let shadow = ChartLegendShadow::Shadow(ShapeDropShadow::new(
-            ShapeShadowAppearance::new(
+        let shadow = ChartLegendShadow::Shadow(Drop::new(
+            Appearance::new(
                 RgbaColor::black(),
-                ShapeShadowBlurRadius::from_points(9).unwrap(),
-                ShapeShadowOffset::from_points(5.0).unwrap(),
-                ShapeShadowOpacity::new(0.5).unwrap(),
+                BlurRadius::from_points(9).unwrap(),
+                Offset::from_points(5.0).unwrap(),
+                Opacity::new(0.5).unwrap(),
             ),
-            ShapeShadowAngle::from_degrees(60.0).unwrap(),
+            Angle::from_degrees(60.0).unwrap(),
         ));
         editor
             .set_sheet_chart_legend_shadow(sheet_id, object_id, shadow)
@@ -3168,9 +3162,9 @@ mod tests {
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
-        let default = ShapeStroke::new(RgbaColor::black(), StrokeWidth::ONE, StrokePattern::Solid);
-        let customized = chart_stroke(StrokePattern::MediumDash, 3.0);
-        let changed = chart_stroke(StrokePattern::RoundedDash, 2.0);
+        let default = Stroke::new(RgbaColor::black(), Width::ONE, Pattern::Solid);
+        let customized = chart_stroke(Pattern::MediumDash, 3.0);
+        let changed = chart_stroke(Pattern::RoundedDash, 2.0);
 
         assert_eq!(
             editor

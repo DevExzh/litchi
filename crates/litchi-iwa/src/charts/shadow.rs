@@ -16,10 +16,9 @@ use crate::charts::style::{
     GENERATED_CHART_STYLE_EXTENSION_FIELD, chart_style_slot, generated_chart_style_extension,
 };
 use crate::protobuf::tsch;
+use litchi_iwa_common::shape::shadow::{Angle, Opacity};
 use crate::shapes::{
-    RgbaColor, ShapeDropShadow, ShapeShadow, ShapeShadowAngle, ShapeShadowAppearance,
-    ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity, shadow_from_native,
-    shadow_to_native,
+    Appearance, BlurRadius, Drop, Offset, RgbaColor, Shadow, shadow_from_native, shadow_to_native,
 };
 use crate::wire::{patch_length_delimited_field, patch_varint_field};
 use crate::{Error, IWorkPackage, Result};
@@ -37,21 +36,21 @@ pub enum ChartShadow {
     /// Render no chart shadow.
     None,
     /// Draw the shadow independently for every series.
-    IndividualSeries(ShapeDropShadow),
+    IndividualSeries(Drop),
     /// Draw one shadow around each grouped series set.
-    Grouped(ShapeDropShadow),
+    Grouped(Drop),
 }
 
 impl ChartShadow {
     /// Shadow shown for a newly inserted native chart.
-    pub const NATIVE_DEFAULT: Self = Self::IndividualSeries(ShapeDropShadow::new(
-        ShapeShadowAppearance::new(
+    pub const NATIVE_DEFAULT: Self = Self::IndividualSeries(Drop::new(
+        Appearance::new(
             RgbaColor::black(),
-            ShapeShadowBlurRadius::TEN_POINTS,
-            ShapeShadowOffset::SIX_POINTS,
-            ShapeShadowOpacity::THREE_QUARTERS,
+            BlurRadius::TEN_POINTS,
+            Offset::SIX_POINTS,
+            Opacity::THREE_QUARTERS,
         ),
-        ShapeShadowAngle::FORTY_FIVE_DEGREES,
+        Angle::FORTY_FIVE_DEGREES,
     ));
 
     /// Construct the shadow shown for a newly inserted native chart.
@@ -60,7 +59,7 @@ impl ChartShadow {
     }
 
     /// Return the enabled drop-shadow appearance, if any.
-    pub const fn drop_shadow(self) -> Option<ShapeDropShadow> {
+    pub const fn drop_shadow(self) -> Option<Drop> {
         match self {
             Self::None => None,
             Self::IndividualSeries(shadow) | Self::Grouped(shadow) => Some(shadow),
@@ -152,8 +151,8 @@ pub(crate) fn set_chart_shadow(
     chart_slot.update(package, |data| patch_chart_shadow_scope(data, shadow))?;
     let series_shadow = shadow
         .drop_shadow()
-        .map(ShapeShadow::Drop)
-        .unwrap_or(ShapeShadow::Disabled);
+        .map(Shadow::Drop)
+        .unwrap_or(Shadow::Disabled);
     for slot in &series_slots {
         slot.update(package, |data| {
             patch_chart_series_shadow(data, series_shadow)
@@ -181,12 +180,12 @@ fn read_chart_shadow_scope(data: &[u8]) -> Result<bool> {
     Ok(generated.tschchartinfodefaultcombinelayers.unwrap_or(false))
 }
 
-fn read_chart_series_shadow(data: &[u8]) -> Result<ShapeShadow> {
+fn read_chart_series_shadow(data: &[u8]) -> Result<Shadow> {
     let native_default = ChartShadow::native_default().drop_shadow().ok_or_else(|| {
         Error::InvalidFormat("native chart-shadow default is disabled".to_owned())
     })?;
     let Some(extension) = generated_chart_series_style_extension(data)? else {
-        return Ok(ShapeShadow::Drop(native_default));
+        return Ok(Shadow::Drop(native_default));
     };
     let generated = tsch::generated::ChartSeriesStyleArchive::decode(extension)?;
     generated
@@ -194,21 +193,21 @@ fn read_chart_series_shadow(data: &[u8]) -> Result<ShapeShadow> {
         .as_ref()
         .map(shadow_from_native)
         .transpose()
-        .map(|shadow| shadow.unwrap_or(ShapeShadow::Drop(native_default)))
+        .map(|shadow| shadow.unwrap_or(Shadow::Drop(native_default)))
 }
 
-fn chart_shadow_from_native(shadow: ShapeShadow, combined: bool) -> Result<ChartShadow> {
+fn chart_shadow_from_native(shadow: Shadow, combined: bool) -> Result<ChartShadow> {
     match shadow {
-        ShapeShadow::Disabled if !combined => Ok(ChartShadow::None),
-        ShapeShadow::Drop(shadow) => Ok(if combined {
+        Shadow::Disabled if !combined => Ok(ChartShadow::None),
+        Shadow::Drop(shadow) => Ok(if combined {
             ChartShadow::Grouped(shadow)
         } else {
             ChartShadow::IndividualSeries(shadow)
         }),
-        ShapeShadow::Disabled => Err(Error::InvalidFormat(
+        Shadow::Disabled => Err(Error::InvalidFormat(
             "disabled chart shadow unexpectedly combines series layers".to_owned(),
         )),
-        ShapeShadow::Contact(_) | ShapeShadow::Curved(_) => Err(Error::InvalidFormat(
+        Shadow::Contact(_) | Shadow::Curved(_) => Err(Error::InvalidFormat(
             "native chart uses a non-drop shadow".to_owned(),
         )),
     }
@@ -259,14 +258,14 @@ fn patch_chart_shadow_scope(data: &[u8], shadow: ChartShadow) -> Result<Vec<u8>>
     Ok(patched)
 }
 
-fn patch_chart_series_shadow(data: &[u8], shadow: ShapeShadow) -> Result<Vec<u8>> {
+fn patch_chart_series_shadow(data: &[u8], shadow: Shadow) -> Result<Vec<u8>> {
     let native_default = ChartShadow::native_default().drop_shadow().ok_or_else(|| {
         Error::InvalidFormat("native chart-shadow default is disabled".to_owned())
     })?;
     let native = match shadow {
-        ShapeShadow::Drop(drop) if drop == native_default => None,
-        ShapeShadow::Disabled | ShapeShadow::Drop(_) => Some(shadow_to_native(shadow)),
-        ShapeShadow::Contact(_) | ShapeShadow::Curved(_) => {
+        Shadow::Drop(drop) if drop == native_default => None,
+        Shadow::Disabled | Shadow::Drop(_) => Some(shadow_to_native(shadow)),
+        Shadow::Contact(_) | Shadow::Curved(_) => {
             return Err(Error::InvalidFormat(
                 "chart series cannot use a non-drop shadow".to_owned(),
             ));
@@ -320,7 +319,7 @@ fn validate_patched_chart_shadow_scope(data: &[u8], expected: bool) -> Result<()
     Ok(())
 }
 
-fn validate_patched_chart_series_shadow(data: &[u8], expected: ShapeShadow) -> Result<()> {
+fn validate_patched_chart_series_shadow(data: &[u8], expected: Shadow) -> Result<()> {
     if read_chart_series_shadow(data)? != expected {
         return Err(Error::InvalidFormat(
             "chart series-shadow wire patch failed validation".to_owned(),
@@ -355,41 +354,38 @@ mod tests {
         assert!(!read_chart_shadow_scope(&chart_style).unwrap());
         assert_eq!(
             read_chart_series_shadow(&series_style).unwrap(),
-            ShapeShadow::Drop(native_default)
+            Shadow::Drop(native_default)
         );
         assert_eq!(
             patch_chart_shadow_scope(&chart_style, ChartShadow::native_default()).unwrap(),
             chart_style
         );
         assert_eq!(
-            patch_chart_series_shadow(&series_style, ShapeShadow::Drop(native_default)).unwrap(),
+            patch_chart_series_shadow(&series_style, Shadow::Drop(native_default)).unwrap(),
             series_style
         );
 
-        let none = patch_chart_series_shadow(&series_style, ShapeShadow::Disabled).unwrap();
-        assert_eq!(
-            read_chart_series_shadow(&none).unwrap(),
-            ShapeShadow::Disabled
-        );
+        let none = patch_chart_series_shadow(&series_style, Shadow::Disabled).unwrap();
+        assert_eq!(read_chart_series_shadow(&none).unwrap(), Shadow::Disabled);
         let grouped =
             patch_chart_shadow_scope(&chart_style, ChartShadow::Grouped(custom_shadow())).unwrap();
         let customized =
-            patch_chart_series_shadow(&series_style, ShapeShadow::Drop(custom_shadow())).unwrap();
+            patch_chart_series_shadow(&series_style, Shadow::Drop(custom_shadow())).unwrap();
         assert!(read_chart_shadow_scope(&grouped).unwrap());
         assert_eq!(
             read_chart_series_shadow(&customized).unwrap(),
-            ShapeShadow::Drop(custom_shadow())
+            Shadow::Drop(custom_shadow())
         );
     }
 
     #[test]
     fn chart_shadow_patch_retains_other_style_fields_and_unmapped_data() {
         let original_shadow = custom_shadow();
-        let replacement_shadow = ShapeDropShadow::new(
+        let replacement_shadow = Drop::new(
             original_shadow
                 .appearance()
-                .with_opacity(ShapeShadowOpacity::new(0.42).unwrap()),
-            ShapeShadowAngle::from_degrees(135.0).unwrap(),
+                .with_opacity(Opacity::new(0.42).unwrap()),
+            Angle::from_degrees(135.0).unwrap(),
         );
         let original_chart = chart_style_with_unknown_fields(tsch::generated::ChartStyleArchive {
             tschchartinfodefaultcombinelayers: Some(true),
@@ -399,9 +395,7 @@ mod tests {
         });
         let original_series =
             series_style_with_unknown_fields(tsch::generated::ChartSeriesStyleArchive {
-                tschchartseriesdefaultshadow: Some(shadow_to_native(ShapeShadow::Drop(
-                    original_shadow,
-                ))),
+                tschchartseriesdefaultshadow: Some(shadow_to_native(Shadow::Drop(original_shadow))),
                 tschchartseriesdefaultopacity: Some(0.8),
                 ..Default::default()
             });
@@ -412,12 +406,11 @@ mod tests {
         )
         .unwrap();
         let patched_series =
-            patch_chart_series_shadow(&original_series, ShapeShadow::Drop(replacement_shadow))
-                .unwrap();
+            patch_chart_series_shadow(&original_series, Shadow::Drop(replacement_shadow)).unwrap();
         assert!(!read_chart_shadow_scope(&patched_chart).unwrap());
         assert_eq!(
             read_chart_series_shadow(&patched_series).unwrap(),
-            ShapeShadow::Drop(replacement_shadow)
+            Shadow::Drop(replacement_shadow)
         );
         let generated = tsch::generated::ChartStyleArchive::decode(
             generated_chart_style_extension(&patched_chart)
@@ -441,7 +434,7 @@ mod tests {
             patch_chart_shadow_scope(&patched_chart, ChartShadow::Grouped(original_shadow))
                 .unwrap();
         let restored_series =
-            patch_chart_series_shadow(&patched_series, ShapeShadow::Drop(original_shadow)).unwrap();
+            patch_chart_series_shadow(&patched_series, Shadow::Drop(original_shadow)).unwrap();
         assert_eq!(restored_chart, original_chart);
         assert_eq!(restored_series, original_series);
     }
@@ -455,9 +448,7 @@ mod tests {
         });
         let original_series =
             series_style_with_unknown_fields(tsch::generated::ChartSeriesStyleArchive {
-                tschchartseriesdefaultshadow: Some(shadow_to_native(ShapeShadow::Drop(
-                    custom_shadow(),
-                ))),
+                tschchartseriesdefaultshadow: Some(shadow_to_native(Shadow::Drop(custom_shadow()))),
                 tschchartseriesdefaultopacity: Some(0.8),
                 ..Default::default()
             });
@@ -466,11 +457,11 @@ mod tests {
         let reset_chart =
             patch_chart_shadow_scope(&original_chart, ChartShadow::native_default()).unwrap();
         let reset_series =
-            patch_chart_series_shadow(&original_series, ShapeShadow::Drop(default_shadow)).unwrap();
+            patch_chart_series_shadow(&original_series, Shadow::Drop(default_shadow)).unwrap();
         assert!(!read_chart_shadow_scope(&reset_chart).unwrap());
         assert_eq!(
             read_chart_series_shadow(&reset_series).unwrap(),
-            ShapeShadow::Drop(default_shadow)
+            Shadow::Drop(default_shadow)
         );
         let generated = tsch::generated::ChartStyleArchive::decode(
             generated_chart_style_extension(&reset_chart)
@@ -495,10 +486,10 @@ mod tests {
     #[test]
     fn malformed_native_chart_shadows_are_rejected() {
         let contact = series_style_with_unknown_fields(tsch::generated::ChartSeriesStyleArchive {
-            tschchartseriesdefaultshadow: Some(shadow_to_native(ShapeShadow::Contact(
-                crate::shapes::ShapeContactShadow::new(
+            tschchartseriesdefaultshadow: Some(shadow_to_native(Shadow::Contact(
+                crate::shapes::Contact::new(
                     custom_shadow().appearance(),
-                    crate::shapes::ShapeShadowPerspective::LEVEL,
+                    crate::shapes::Perspective::LEVEL,
                 ),
             ))),
             ..Default::default()
@@ -508,20 +499,20 @@ mod tests {
         );
 
         assert!(
-            chart_shadow_from_native(ShapeShadow::Disabled, true).is_err(),
+            chart_shadow_from_native(Shadow::Disabled, true).is_err(),
             "disabled grouped shadows must remain invalid"
         );
     }
 
-    fn custom_shadow() -> ShapeDropShadow {
-        ShapeDropShadow::new(
-            ShapeShadowAppearance::new(
+    fn custom_shadow() -> Drop {
+        Drop::new(
+            Appearance::new(
                 RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-                ShapeShadowBlurRadius::from_points(15).unwrap(),
-                ShapeShadowOffset::from_points(8.0).unwrap(),
-                ShapeShadowOpacity::new(0.6).unwrap(),
+                BlurRadius::from_points(15).unwrap(),
+                Offset::from_points(8.0).unwrap(),
+                Opacity::new(0.6).unwrap(),
             ),
-            ShapeShadowAngle::from_degrees(60.0).unwrap(),
+            Angle::from_degrees(60.0).unwrap(),
         )
     }
 

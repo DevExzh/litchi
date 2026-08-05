@@ -7,7 +7,7 @@ use crate::charts::axis_style::{
     GENERATED_CHART_AXIS_STYLE_EXTENSION_FIELD, axis_style_slot, generated_axis_style_extension,
 };
 use crate::protobuf::{tsch, tsd};
-use crate::shapes::{ShapeStroke, empty_stroke_archive, stroke_from_native, stroke_to_native};
+use crate::shapes::{Stroke, empty_stroke_archive, stroke_from_native, stroke_to_native};
 use crate::wire::patch_length_delimited_field;
 use crate::{Error, IWorkPackage, Result};
 
@@ -86,7 +86,7 @@ pub enum ChartAxisGridlineStroke {
     #[default]
     Inherited,
     NoStroke,
-    Stroke(ShapeStroke),
+    Stroke(Stroke),
 }
 
 /// Read the exact native gridline stroke state for one chart axis.
@@ -238,7 +238,7 @@ fn validate_patched_axis_gridline_stroke(
 mod tests {
     use super::*;
     use crate::protobuf::tss;
-    use crate::shapes::{RgbColorSpace, RgbaColor, StrokePattern, StrokeWidth};
+    use crate::shapes::{Pattern, RgbColorSpace, RgbaColor, Width};
     use crate::wire::{append_length_delimited_field, append_varint_field, parse_wire_fields};
 
     const UNMAPPED_OUTER_FIELD: u32 = 4_096;
@@ -247,8 +247,8 @@ mod tests {
 
     #[test]
     fn gridline_strokes_are_exact_and_preserve_unknown_fields() {
-        let original_stroke = test_stroke(StrokePattern::Solid, 1.0);
-        let replacement = test_stroke(StrokePattern::MediumDash, 3.0);
+        let original_stroke = test_stroke(Pattern::Solid, 1.0);
+        let replacement = test_stroke(Pattern::MediumDash, 3.0);
         let mut extension = tsch::generated::ChartAxisStyleArchive {
             tschchartaxiscategorymajorgridlinestroke: Some(stroke_to_native(original_stroke)),
             tschchartaxiscategoryshowmajorgridlines: Some(true),
@@ -317,10 +317,10 @@ mod tests {
         );
     }
 
-    fn test_stroke(pattern: StrokePattern, width: f32) -> ShapeStroke {
-        ShapeStroke::new(
+    fn test_stroke(pattern: Pattern, width: f32) -> Stroke {
+        Stroke::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-            StrokeWidth::new(width).unwrap(),
+            Width::new(width).unwrap(),
             pattern,
         )
     }

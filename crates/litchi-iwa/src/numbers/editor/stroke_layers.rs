@@ -258,7 +258,7 @@ pub(crate) fn set_cell_border(
     row: usize,
     column: usize,
     public_side: BorderSide,
-    stroke: Option<crate::shapes::ShapeStroke>,
+    stroke: Option<crate::shapes::Stroke>,
 ) -> Result<()> {
     let descriptor = attached_table_descriptor(package, table_id)?;
     let (row, column, dimensions) = validated_cell_coordinates(&descriptor.model, row, column)?;

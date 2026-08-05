@@ -13,8 +13,8 @@ use crate::charts::series_style::{
 };
 use crate::protobuf::{tsch, tsd};
 use crate::shapes::{
-    RgbaColor, ShapeStroke, StrokeJoin, StrokePattern, StrokeWidth, empty_stroke_archive,
-    stroke_from_native, stroke_to_native,
+    Join, Pattern, RgbaColor, Stroke, Width, empty_stroke_archive, stroke_from_native,
+    stroke_to_native,
 };
 use crate::wire::patch_length_delimited_field;
 use crate::{Error, IWorkPackage, Result};
@@ -40,16 +40,12 @@ pub enum ChartSeriesStrokePattern {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ChartSeriesStroke {
     pub color: RgbaColor,
-    pub width: StrokeWidth,
+    pub width: Width,
     pub pattern: ChartSeriesStrokePattern,
 }
 
 impl ChartSeriesStroke {
-    pub const fn new(
-        color: RgbaColor,
-        width: StrokeWidth,
-        pattern: ChartSeriesStrokePattern,
-    ) -> Self {
+    pub const fn new(color: RgbaColor, width: Width, pattern: ChartSeriesStrokePattern) -> Self {
         Self {
             color,
             width,
@@ -62,10 +58,10 @@ impl ChartSeriesStroke {
             return Ok(None);
         };
         let pattern = match stroke.pattern {
-            StrokePattern::Solid => ChartSeriesStrokePattern::Solid,
-            StrokePattern::MediumDash => ChartSeriesStrokePattern::MediumDash,
-            StrokePattern::RoundedDash => ChartSeriesStrokePattern::RoundedDash,
-            StrokePattern::ShortDash | StrokePattern::LongDash => {
+            Pattern::Solid => ChartSeriesStrokePattern::Solid,
+            Pattern::MediumDash => ChartSeriesStrokePattern::MediumDash,
+            Pattern::RoundedDash => ChartSeriesStrokePattern::RoundedDash,
+            Pattern::ShortDash | Pattern::LongDash => {
                 return Err(Error::InvalidFormat(format!(
                     "unsupported native chart series stroke pattern {:?}",
                     stroke.pattern
@@ -77,13 +73,11 @@ impl ChartSeriesStroke {
 
     pub(crate) fn to_native(self) -> tsd::StrokeArchive {
         let pattern = match self.pattern {
-            ChartSeriesStrokePattern::Solid => StrokePattern::Solid,
-            ChartSeriesStrokePattern::MediumDash => StrokePattern::MediumDash,
-            ChartSeriesStrokePattern::RoundedDash => StrokePattern::RoundedDash,
+            ChartSeriesStrokePattern::Solid => Pattern::Solid,
+            ChartSeriesStrokePattern::MediumDash => Pattern::MediumDash,
+            ChartSeriesStrokePattern::RoundedDash => Pattern::RoundedDash,
         };
-        stroke_to_native(
-            ShapeStroke::new(self.color, self.width, pattern).with_join(StrokeJoin::Miter),
-        )
+        stroke_to_native(Stroke::new(self.color, self.width, pattern).with_join(Join::Miter))
     }
 }
 
@@ -325,7 +319,7 @@ fn patch_local_stroke(
 mod tests {
     use super::*;
     use crate::protobuf::tss;
-    use crate::shapes::{RgbColorSpace, RgbaColor, StrokeWidth};
+    use crate::shapes::{RgbColorSpace, RgbaColor, Width};
     use crate::wire::{append_varint_field, parse_wire_fields};
 
     const UNKNOWN_OUTER_FIELD: u32 = 4_096;
@@ -369,7 +363,7 @@ mod tests {
         let original = style_with_unknown_fields();
         let stroke = ChartSeriesStroke::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-            StrokeWidth::new(3.5).unwrap(),
+            Width::new(3.5).unwrap(),
             ChartSeriesStrokePattern::RoundedDash,
         );
         let visible = patch_local_stroke(

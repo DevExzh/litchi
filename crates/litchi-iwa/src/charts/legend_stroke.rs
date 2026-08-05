@@ -10,7 +10,7 @@ use crate::charts::legend_style::{
     GENERATED_LEGEND_STYLE_EXTENSION_FIELD, generated_legend_style_extension, legend_style_slot,
 };
 use crate::protobuf::tsch;
-use crate::shapes::{ShapeStroke, empty_stroke_archive, stroke_from_native, stroke_to_native};
+use crate::shapes::{Stroke, empty_stroke_archive, stroke_from_native, stroke_to_native};
 use crate::wire::patch_length_delimited_field;
 use crate::{Error, IWorkPackage, Result};
 
@@ -26,7 +26,7 @@ pub enum ChartLegendStroke {
     /// A direct empty stroke (the applications display “None”).
     NoStroke,
     /// A direct typed line stroke.
-    Stroke(ShapeStroke),
+    Stroke(Stroke),
 }
 
 /// Read the exact direct legend-stroke state of one native chart.
@@ -156,9 +156,7 @@ fn validate_patched_legend_stroke(data: &[u8], expected: ChartLegendStroke) -> R
 mod tests {
     use super::*;
     use crate::protobuf::tss;
-    use crate::shapes::{
-        RgbColorSpace, RgbaColor, ShapeFill, StrokePattern, StrokeWidth, fill_to_native,
-    };
+    use crate::shapes::{Pattern, RgbColorSpace, RgbaColor, ShapeFill, Width, fill_to_native};
     use crate::wire::{append_length_delimited_field, append_varint_field, parse_wire_fields};
 
     const UNMAPPED_OUTER_FIELD: u32 = 4_096;
@@ -192,10 +190,10 @@ mod tests {
             read_legend_stroke(&original).unwrap(),
             ChartLegendStroke::Inherited
         );
-        let stroke = ChartLegendStroke::Stroke(ShapeStroke::new(
+        let stroke = ChartLegendStroke::Stroke(Stroke::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-            StrokeWidth::new(2.5).unwrap(),
-            StrokePattern::MediumDash,
+            Width::new(2.5).unwrap(),
+            Pattern::MediumDash,
         ));
         let stroked = patch_legend_stroke(&original, stroke).unwrap();
         assert_eq!(read_legend_stroke(&stroked).unwrap(), stroke);

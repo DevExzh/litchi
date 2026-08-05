@@ -3,9 +3,7 @@
 use std::env;
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, StrokePattern, StrokeWidth,
-};
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Pattern, RgbColorSpace, RgbaColor, Width};
 use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
 use litchi_iwa::text::{
     DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
@@ -136,8 +134,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         created.drawable_object_id,
         ParagraphBorders::Bordered(ParagraphBorder::new(
             RgbaColor::black(),
-            StrokeWidth::new(3.0)?,
-            StrokePattern::Solid,
+            Width::new(3.0)?,
+            Pattern::Solid,
             ParagraphBorderSides::ALL,
             ParagraphBorderOffset::from_points(9.0)?,
             true,

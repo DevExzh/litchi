@@ -3411,11 +3411,11 @@ fn table_cell_border_crud_allocates_sparse_layers_and_round_trips() {
     let side = BorderSide::Bottom;
     assert_eq!(editor.table_cell_borders(10, 1, 2).unwrap().get(side), None);
 
-    let stroke = crate::shapes::ShapeStroke::new(
+    let stroke = crate::shapes::Stroke::new(
         crate::shapes::RgbaColor::new(0.8, 0.1, 0.2, 1.0, crate::shapes::RgbColorSpace::Srgb)
             .unwrap(),
-        crate::shapes::StrokeWidth::new(2.5).unwrap(),
-        crate::shapes::StrokePattern::MediumDash,
+        crate::shapes::Width::new(2.5).unwrap(),
+        crate::shapes::Pattern::MediumDash,
     );
     editor
         .set_table_cell_border(10, 1, 2, side, stroke)
@@ -3570,10 +3570,10 @@ fn table_cell_layout_rejects_invalid_coordinates_transactionally() {
 fn table_cell_border_rejects_invalid_coordinates_transactionally() {
     let mut editor = NumbersEditor::from_package(test_package()).unwrap();
     let before = editor.to_bytes().unwrap();
-    let stroke = crate::shapes::ShapeStroke::new(
+    let stroke = crate::shapes::Stroke::new(
         crate::shapes::RgbaColor::black(),
-        crate::shapes::StrokeWidth::ONE,
-        crate::shapes::StrokePattern::Solid,
+        crate::shapes::Width::ONE,
+        crate::shapes::Pattern::Solid,
     );
     assert!(
         editor
@@ -3632,10 +3632,10 @@ fn table_cell_border_update_preserves_unknown_sidecar_layer_and_run_fields() {
             1,
             1,
             BorderSide::Top,
-            crate::shapes::ShapeStroke::new(
+            crate::shapes::Stroke::new(
                 crate::shapes::RgbaColor::black(),
-                crate::shapes::StrokeWidth::ONE,
-                crate::shapes::StrokePattern::Solid,
+                crate::shapes::Width::ONE,
+                crate::shapes::Pattern::Solid,
             ),
         )
         .unwrap();

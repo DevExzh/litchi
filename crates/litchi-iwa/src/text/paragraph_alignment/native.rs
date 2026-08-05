@@ -8,8 +8,8 @@ use prost::Message;
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::protobuf::{tsd, tsp, tss, tswp};
 use crate::shapes::{
-    RgbaColor, StrokeCap, StrokeJoin, color_from_native, color_to_native, shadow_from_native,
-    shadow_to_native, stroke_from_native, stroke_to_native,
+    Cap, Join, RgbaColor, color_from_native, color_to_native, shadow_from_native, shadow_to_native,
+    stroke_from_native, stroke_to_native,
 };
 use crate::text::storage_wire::update_parsed_archive;
 use crate::wire::{
@@ -1188,7 +1188,7 @@ pub(crate) fn variation_object(
                 .shadow
                 .map(TextShadow::into_shape_shadow)
                 .and_then(|shadow| match shadow {
-                    crate::shapes::ShapeShadow::Disabled => None,
+                    crate::shapes::Shadow::Disabled => None,
                     enabled => Some(shadow_to_native(enabled)),
                 }),
             background_color_null: matches!(overrides.background, Some(TextBackground::None))
@@ -2029,7 +2029,7 @@ pub(super) fn paragraph_borders_from_properties(
     let stroke = native_stroke.ok_or_else(|| {
         Error::InvalidFormat("native paragraph border has sides but no visible stroke".to_owned())
     })?;
-    if stroke.cap != StrokeCap::Round || stroke.join != StrokeJoin::Round {
+    if stroke.cap != Cap::Round || stroke.join != Join::Round {
         return Err(Error::InvalidFormat(
             "native paragraph border does not use app-standard round stroke geometry".to_owned(),
         ));

@@ -24,8 +24,8 @@ use super::{ChartData, ChartGapSpacing, IWorkChartArchive, Kind};
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::protobuf::{tn, tsch, tsd, tsk, tsp, tss};
 use crate::shapes::{
-    DrawableGeometry, DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeStroke,
-    StrokePattern, StrokeWidth, stroke_to_native,
+    DrawableGeometry, DrawablePoint, DrawableSize, Pattern, RgbColorSpace, RgbaColor, Stroke,
+    Width, stroke_to_native,
 };
 use crate::wire::{
     append_length_delimited_field, append_varint_field, patch_varint_field,

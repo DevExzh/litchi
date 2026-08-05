@@ -4,8 +4,7 @@ use std::env;
 
 use litchi_iwa::pages::PagesEditor;
 use litchi_iwa::shapes::{
-    DrawablePoint, Endpoint, Endpoints, LineStyle, RgbColorSpace, RgbaColor, ShapeStroke,
-    StrokePattern, StrokeWidth,
+    DrawablePoint, Endpoint, Endpoints, LineStyle, Pattern, RgbColorSpace, RgbaColor, Stroke, Width,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,10 +18,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let body = "Pages line created entirely by litchi-iwa";
     let mut editor = PagesEditor::create_with_text(body)?;
-    let stroke = ShapeStroke::new(
+    let stroke = Stroke::new(
         RgbaColor::new(0.85, 0.12, 0.2, 1.0, RgbColorSpace::Srgb)?,
-        StrokeWidth::new(3.5)?,
-        StrokePattern::MediumDash,
+        Width::new(3.5)?,
+        Pattern::MediumDash,
     );
     let created = editor.add_body_line_with_style(
         body.encode_utf16().count(),

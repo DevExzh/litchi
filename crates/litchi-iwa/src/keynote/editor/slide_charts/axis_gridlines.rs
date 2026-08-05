@@ -220,8 +220,7 @@ mod tests {
     use crate::charts::{ChartData, Kind};
     use crate::keynote::KeynoteDocumentBuilder;
     use crate::shapes::{
-        DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeStroke, StrokePattern,
-        StrokeWidth,
+        DrawablePoint, DrawableSize, Pattern, RgbColorSpace, RgbaColor, Stroke, Width,
     };
 
     #[test]
@@ -312,11 +311,11 @@ mod tests {
         .unwrap()
     }
 
-    fn test_stroke() -> ShapeStroke {
-        ShapeStroke::new(
+    fn test_stroke() -> Stroke {
+        Stroke::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-            StrokeWidth::new(3.0).unwrap(),
-            StrokePattern::MediumDash,
+            Width::new(3.0).unwrap(),
+            Pattern::MediumDash,
         )
     }
 }

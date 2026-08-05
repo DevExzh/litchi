@@ -17,7 +17,7 @@ use super::super::line_end::{
     patch_shape_style_reference, replace_style_variation, shape_payload, shape_style,
     shape_style_is_exclusive, shape_style_message, shape_style_variation_object,
 };
-use super::ShapeShadow;
+use super::Shadow;
 use super::native::{shadow_from_native, shadow_to_native};
 
 const MAX_STYLE_INHERITANCE_DEPTH: usize = 64;
@@ -26,7 +26,7 @@ pub(crate) fn shape_shadow(
     package: &IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
-) -> Result<ShapeShadow> {
+) -> Result<Shadow> {
     let style_id = shape_payload(package, archive_name, drawable_id)?
         .super_
         .style
@@ -40,7 +40,7 @@ pub(crate) fn set_shape_shadow(
     mut package: IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
-    shadow: ShapeShadow,
+    shadow: Shadow,
 ) -> Result<IWorkPackage> {
     if shape_shadow(&package, archive_name, drawable_id)? == shadow {
         return Ok(package);
@@ -160,7 +160,7 @@ pub(crate) fn reset_shape_shadow(
     Ok((package, true))
 }
 
-fn shadow_overrides(shadow: ShapeShadow) -> ShapeStyleOverrides {
+fn shadow_overrides(shadow: Shadow) -> ShapeStyleOverrides {
     ShapeStyleOverrides {
         shadow: Some(shadow_to_native(shadow)),
         ..Default::default()
@@ -179,7 +179,7 @@ fn insert_shadow_variation(
     mut package: IWorkPackage,
     location: ShadowVariationLocation<'_>,
     overrides: ShapeStyleOverrides,
-    expected: ShapeShadow,
+    expected: Shadow,
 ) -> Result<IWorkPackage> {
     let ShadowVariationLocation {
         drawable_archive_name,
@@ -229,7 +229,7 @@ fn validate_shadow(
     package: &IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
-    expected: ShapeShadow,
+    expected: Shadow,
 ) -> Result<()> {
     if shape_shadow(package, archive_name, drawable_id)? != expected {
         return Err(Error::InvalidFormat(
@@ -276,12 +276,12 @@ fn parent_style_id(style_id: u64, style: &tswp::ShapeStyleArchive) -> Result<u64
         })
 }
 
-fn inherited_shape_shadow(package: &IWorkPackage, first_style_id: u64) -> Result<ShapeShadow> {
+fn inherited_shape_shadow(package: &IWorkPackage, first_style_id: u64) -> Result<Shadow> {
     let mut visited = HashSet::new();
     let mut style_id = Some(first_style_id);
     for _ in 0..MAX_STYLE_INHERITANCE_DEPTH {
         let Some(identifier) = style_id else {
-            return Ok(ShapeShadow::Disabled);
+            return Ok(Shadow::Disabled);
         };
         if !visited.insert(identifier) {
             return Err(Error::InvalidFormat(format!(
