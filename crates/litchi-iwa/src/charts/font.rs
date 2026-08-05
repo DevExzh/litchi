@@ -29,8 +29,8 @@ impl ChartFont {
     }
 
     /// Construct a named chart font from a validated PostScript identifier.
-    pub fn named(name: impl Into<String>) -> Result<Self> {
-        TextFont::named(name).map(Self::new)
+    pub fn named(name: impl AsRef<str>) -> Result<Self> {
+        Ok(Self::new(TextFont::named(name.as_ref())?))
     }
 
     /// Borrow the effective font identity.

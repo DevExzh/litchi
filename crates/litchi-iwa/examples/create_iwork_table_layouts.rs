@@ -660,15 +660,15 @@ fn keynote_text_style() -> Result<TextStyle, litchi_iwa::Error> {
 }
 
 fn numbers_text_font() -> Result<TextFont, litchi_iwa::Error> {
-    TextFont::named(NUMBERS_FONT_NAME)
+    Ok(TextFont::named(NUMBERS_FONT_NAME)?)
 }
 
 fn pages_text_font() -> Result<TextFont, litchi_iwa::Error> {
-    TextFont::named(PAGES_FONT_NAME)
+    Ok(TextFont::named(PAGES_FONT_NAME)?)
 }
 
 fn keynote_text_font() -> Result<TextFont, litchi_iwa::Error> {
-    TextFont::named(KEYNOTE_FONT_NAME)
+    Ok(TextFont::named(KEYNOTE_FONT_NAME)?)
 }
 
 fn numbers_text_color() -> Result<RgbaColor, litchi_iwa::Error> {

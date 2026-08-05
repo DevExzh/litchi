@@ -39,6 +39,14 @@ before emitting wire nodes. The formula compiler also validates arity for the
 known fixed-arity functions; recognized functions without arity metadata and
 unknown functions fail closed as typed parse errors.
 
+The same focused-module rule applies to the dependency-free iWork text leaf:
+`litchi_iwa_text::font::{Font, Name}` owns the shared font identity, while
+`NameError` reports its bounded validation failures. Format crates may expose
+contextual aliases at their archive boundary, but they do not duplicate the
+allocation-bearing model or publish a flat `TextFontName` implementation in
+each application owner. `Name` validates before allocating borrowed input and
+stores exactly one boxed identifier; no unchecked font-name constructor exists.
+
 PresentationML implements this rule as `litchi-pptx::shape::{Scene, Shape}`.
 `Scene` is a bounded semantic index over one slide-like owner, not a vector of
 detached XML allocations. Shapes are visited in depth-first pre-order, while a

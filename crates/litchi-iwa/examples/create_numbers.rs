@@ -4,6 +4,7 @@ use litchi_iwa::numbers::{
     FormulaCachedValue, FormulaCellReference, FormulaExpression, NumbersDocumentBuilder,
     NumbersTableHeaderCount, NumbersTableHeaderSettings, TableRowInsertion,
 };
+use litchi_iwa::text::{Font, TextStyle};
 use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -31,6 +32,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ]);
     }
     editor.set_cells(table_id, updates)?;
+    editor.set_table_cell_text_style(table_id, 1, 0, TextStyle::default().with_bold(true))?;
+    editor.set_table_cell_text_font(table_id, 1, 0, Font::named("CourierNewPSMT")?)?;
     editor.set_table_header_settings(
         table_id,
         NumbersTableHeaderSettings {

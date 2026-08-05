@@ -1837,7 +1837,11 @@ pub(super) fn text_font_from_character(
     properties
         .font_name
         .as_deref()
-        .map(|name| TextFontName::new(name).map(TextFont::Named))
+        .map(|name| {
+            TextFontName::new(name)
+                .map(TextFont::Named)
+                .map_err(crate::Error::from)
+        })
         .transpose()
 }
 

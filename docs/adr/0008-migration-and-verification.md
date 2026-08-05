@@ -5745,6 +5745,15 @@ formula to `246`, saved, closed, and reopened the archive. The reopened document
 retained both `43` and `246`; the archive passed ZIP integrity checks, and the
 Numbers application was closed after verification.
 
+For the shared font ownership slice, the existing native table-layout generator
+created a fresh `/tmp/litchi-iwa-font-layouts.5zsTwA/table-layouts.numbers`
+artifact using `CourierNewPSMT` through the extracted public font value. Native
+Numbers opened it without a repair prompt and rendered the multi-line styled
+cell. A real UI edit changed that cell to `Native font round trip`; the file was
+saved, closed, reopened, and the edited text was retained. The generator's
+reader-side verification also recovered the authored font and layout values;
+Numbers was quit after the native check.
+
 The worksheet parser also matches checked-in Apache POI and LibreOffice shared-
 formula fixtures, including translated follower expressions and stored cached
 results. Synthetic tests cover missing versus explicit empty cells, grid-bound
@@ -5806,6 +5815,14 @@ compilation performs an iterative preflight for bounded depth, AST nodes,
 function arguments, and aggregate precedents before the recursive wire walk;
 known fixed-arity functions and unary constructors are covered by focused
 tests, while functions without validated arity metadata fail closed.
+The rich-text font ownership slice is now complete: dependency-free
+`litchi-iwa-text::font::{Font, Name}` owns the validated, one-allocation font
+identity and typed `NameError`; IWA retains only a contextual alias and the
+native archive adapter. The leaf's eight tests cover the existing storage
+models plus bounded/strict font construction, owned-input consumption, default
+semantics, and named identity. The scoped IWA example check passes with a
+Numbers fixture that writes `CourierNewPSMT` through the public table-cell
+font operation; native Numbers verification is recorded below.
 The BorderSide ownership slice
 is complete: the dependency-neutral table-cell edge selector now lives at
 `litchi-iwa-common::table::cell::BorderSide`; `Borders` and `ShapeStroke` remain

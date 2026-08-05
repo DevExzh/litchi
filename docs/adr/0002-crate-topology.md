@@ -96,6 +96,12 @@ the allocation-bearing rich-text values shared by the format leaves. It has no
 archive, protobuf, or application dependency. `litchi-pages` owns the concise
 `Section`/`SectionType` vocabulary, and `litchi-keynote` owns `Slide`, `Show`,
 build, and transition values; both depend downward on `litchi-iwa-text` only.
+The shared text leaf now also owns the strict `font::{Font, Name}` vocabulary
+and its typed `NameError`; the IWA facade keeps only a thin error conversion and
+native archive adapters. `Name` stores one boxed UTF-8 identifier, validates
+before allocating borrowed input, and consumes owned `String` input directly.
+The leaf therefore remains archive-free while Pages, Numbers, and Keynote use
+one canonical font model instead of maintaining format-local copies.
 The leaf's `transition::Effect` owns the lossless native transition-effect
 identifier vocabulary, including canonical known variants and lossless unknown
 identifiers; IWA retains transition archive decoding, wire patching, and

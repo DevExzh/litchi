@@ -7,6 +7,10 @@
 
 #![forbid(unsafe_code)]
 
+pub mod font;
+
+pub use font::{Font, Name, NameError};
+
 /// A contiguous rich-text storage value.
 #[derive(Debug, Clone, Default)]
 pub struct TextStorage {
@@ -156,7 +160,7 @@ mod tests {
     }
 
     #[test]
-    fn text_fragments_are_borrowed() {
+    fn text_fragments_are_borrowed() -> Result<(), &'static str> {
         let mut storage = TextStorage::from_text("Hello World".to_owned());
         storage.runs = vec![
             TextRun {
@@ -172,8 +176,8 @@ mod tests {
         ];
 
         let mut fragments = storage.iter_fragments();
-        let first = fragments.next().expect("first fragment");
-        let second = fragments.next().expect("second fragment");
+        let first = fragments.next().ok_or("first fragment")?;
+        let second = fragments.next().ok_or("second fragment")?;
 
         assert_eq!(first.text, "Hello");
         assert_eq!(first.style, Some(1));
@@ -185,6 +189,7 @@ mod tests {
             second.text.as_ptr(),
             storage.text.as_ptr().wrapping_add(6)
         ));
+        Ok(())
     }
 
     #[test]

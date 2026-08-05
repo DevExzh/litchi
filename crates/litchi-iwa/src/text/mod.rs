@@ -82,7 +82,7 @@ pub use drop_cap::{
     ParagraphDropCapPlacement, ParagraphStart,
 };
 pub use editor::{IWorkTextEditor, TextStorageInfo};
-pub use font::{TextFont, TextFontName};
+pub use font::{Font, Name, NameError, TextFont, TextFontName};
 pub use highlight_types::{TextHighlight, TextHighlightId};
 pub use hyperlink_types::{TextHyperlink, TextHyperlinkId, TextHyperlinkTarget};
 pub use language_types::{TextLanguage, TextLanguageRun, TextLanguageTag};
@@ -145,3 +145,9 @@ pub use style::{
     TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures, TextOutline,
     TextPointSize, TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
 };
+
+impl From<litchi_iwa_text::NameError> for crate::Error {
+    fn from(error: litchi_iwa_text::NameError) -> Self {
+        Self::InvalidFormat(error.to_string())
+    }
+}
