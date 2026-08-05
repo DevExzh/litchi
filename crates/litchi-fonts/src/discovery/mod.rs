@@ -4,16 +4,17 @@ use font_kit::properties::{Properties, Style as FontStyle, Weight};
 use font_kit::source::SystemSource;
 use std::sync::Arc;
 
-use crate::{
+use crate::model::{
     Charset, Family, FontData, FontError, FontProperties, License, Panose, Pitch, Request,
     Signature,
 };
 
-pub struct FontLoader {
+/// Resolves a typed family/style request against the host system font source.
+pub struct Loader {
     source: SystemSource,
 }
 
-impl FontLoader {
+impl Loader {
     pub fn new() -> Self {
         Self {
             source: SystemSource::new(),
@@ -253,7 +254,7 @@ fn charset_from_code_pages(code_pages: [u32; 2]) -> Option<Charset> {
     selected
 }
 
-impl Default for FontLoader {
+impl Default for Loader {
     fn default() -> Self {
         Self::new()
     }
@@ -351,10 +352,10 @@ mod tests {
         let restricted = os2_table(3, 0x0002, 1 << 17, 2);
         let collection = ttc(&installable, &restricted);
 
-        let first = FontLoader::extract_font_properties(&collection, 0)
+        let first = Loader::extract_font_properties(&collection, 0)
             .expect("first face")
             .expect("first OS/2 table");
-        let second = FontLoader::extract_font_properties(&collection, 1)
+        let second = Loader::extract_font_properties(&collection, 1)
             .expect("second face")
             .expect("second OS/2 table");
 
@@ -365,13 +366,13 @@ mod tests {
         assert_eq!(second.charset(), Some(Charset::SHIFT_JIS));
         assert_eq!(second.panose().bytes()[2], 2);
         assert!(matches!(
-            FontLoader::extract_font_properties(&collection, 2),
+            Loader::extract_font_properties(&collection, 2),
             Err(FontError::InvalidFaceIndex(2))
         ));
 
         let single = sfnt(&installable);
         assert!(matches!(
-            FontLoader::extract_font_properties(&single, 1),
+            Loader::extract_font_properties(&single, 1),
             Err(FontError::InvalidFaceIndex(1))
         ));
     }

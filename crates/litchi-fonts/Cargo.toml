@@ -1,6 +1,6 @@
 [package]
 name        = "litchi-fonts"
-description = "Font discovery, loading, and subsetting for the Litchi office-formats library."
+description = "Font discovery, OpenType metadata, glyph subsetting, Office embedding, and obfuscation for Litchi."
 version.workspace      = true
 edition.workspace      = true
 authors.workspace      = true

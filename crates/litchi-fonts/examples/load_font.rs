@@ -11,7 +11,7 @@
 //! exits cleanly with an explanatory message rather than panicking — useful
 //! for CI environments that may not have all fonts installed.
 
-use litchi_fonts::{FontData, FontError, FontLoader};
+use litchi_fonts::{FontData, FontError, Loader};
 
 /// Common font families that are usually available on at least one of the
 /// major desktop / CI platforms (macOS, Windows, Linux distros with the
@@ -25,7 +25,7 @@ const CANDIDATE_FAMILIES: &[&str] = &[
     "Sans",
 ];
 
-fn try_load(loader: &FontLoader, families: &[&str]) -> Option<FontData> {
+fn try_load(loader: &Loader, families: &[&str]) -> Option<FontData> {
     for family in families {
         match loader.load_system_font(family) {
             Ok(font) => {
@@ -44,7 +44,7 @@ fn try_load(loader: &FontLoader, families: &[&str]) -> Option<FontData> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let loader = FontLoader::new();
+    let loader = Loader::new();
 
     let Some(font) = try_load(&loader, CANDIDATE_FAMILIES) else {
         println!(

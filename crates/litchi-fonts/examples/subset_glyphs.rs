@@ -12,14 +12,13 @@
 //!      show how callers integrate with the trait,
 //!   3. Builds a typed `Glyphs` set from the sample's Unicode scalars,
 //!   4. Maps a handful of code points to glyph IDs and runs the
-//!      concrete `AllsortsSubsetter` to produce a smaller font blob.
+//!      concrete `Allsorts` subsetter to produce a smaller font blob.
 //!
 //! Like `load_font.rs`, the example exits cleanly when no candidate font
 //! is available on the host so it remains usable in CI.
 
 use litchi_fonts::{
-    AllsortsSubsetter, CollectGlyphs, FontData, FontError, FontLoader, FontSubsetter, GlyphMap,
-    Request,
+    Allsorts, CollectGlyphs, FontData, FontError, GlyphMap, Loader, Request, Subsetter,
 };
 
 const CANDIDATE_FAMILIES: &[&str] = &[
@@ -51,7 +50,7 @@ impl CollectGlyphs for SimpleDocument<'_> {
     }
 }
 
-fn try_load(loader: &FontLoader, families: &[&str]) -> Option<FontData> {
+fn try_load(loader: &Loader, families: &[&str]) -> Option<FontData> {
     for family in families {
         match loader.load_system_font(family) {
             Ok(font) => {
@@ -88,7 +87,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // 2. Try to load a real system font for the subsetting demo.
-    let loader = FontLoader::new();
+    let loader = Loader::new();
     let Some(font) = try_load(&loader, CANDIDATE_FAMILIES) else {
         println!();
         println!(
@@ -110,7 +109,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 4. Run the concrete subsetter. The `Pdf` subset profile inside the
     //    impl is permissive enough to work with most TrueType/OpenType
     //    fonts; if it fails we report and exit gracefully.
-    let subsetter = AllsortsSubsetter::new();
+    let subsetter = Allsorts::new();
     match subsetter.subset(&font, &glyph_ids) {
         Ok(subset_bytes) => {
             println!(

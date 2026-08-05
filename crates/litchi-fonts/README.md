@@ -1,15 +1,25 @@
 # litchi-fonts
 
-Font discovery, loading, and subsetting for the Litchi office-formats library.
+Font discovery, OpenType metadata, glyph subsetting, Office embedding, and
+OOXML font obfuscation for the Litchi office-formats library.
 
 ## Overview
 
-`litchi-fonts` provides the font-handling layer used when generating Office
-documents that need to embed or subset typefaces. It wraps `font-kit` for
-system font enumeration, `allsorts` for OpenType table parsing, and
-`roaring` bitmaps for compact glyph-coverage tracking. It is consumed by
-the OOXML writer (`docx`/`pptx` font embedding) inside the
+`litchi-fonts` provides the format-independent font-handling layer used when
+generating Office documents that need to embed or subset typefaces. It wraps
+`font-kit` for system font enumeration, `allsorts` for OpenType table parsing,
+and `roaring` bitmaps for compact glyph-coverage tracking. It is consumed by
+the document-family writers (`docx`/`pptx` font embedding) inside the
 [Litchi](https://github.com/DevExzh/litchi) workspace.
+
+The API is organized by ownership:
+
+- `discovery::Loader` resolves system faces and extracts typed metadata.
+- `subset::mapping` maps Unicode requests to glyph IDs; `Allsorts` reduces
+  OpenType programs.
+- `embedding::prepare` creates owned, validated font programs, while
+  `embedding::powerpoint::data` publishes the EOT wrapper.
+- `obfuscation::apply` and `obfuscation::remove` implement the OOXML transform.
 
 ## System Dependencies
 
@@ -27,10 +37,10 @@ litchi-fonts = "0.0.1"
 ```
 
 ```rust
-use litchi_fonts::{FontLoader, FontError};
+use litchi_fonts::{FontError, Loader};
 
 fn load(family: &str) -> Result<usize, FontError> {
-    let loader = FontLoader::new();
+    let loader = Loader::new();
     let font = loader.load_system_font(family)?;
     Ok(font.data.len())
 }
@@ -38,10 +48,12 @@ fn load(family: &str) -> Result<usize, FontError> {
 
 ## Features
 
-- System font discovery via `FontLoader`
+- System font discovery via `discovery::Loader`
 - OpenType property extraction (panose, charset, family, pitch, Unicode signature)
 - Glyph-set collection through the `CollectGlyphs` trait, backed by `RoaringBitmap`
-- Pluggable font subsetting via the `FontSubsetter` trait
+- Unicode-to-glyph mapping and pluggable font subsetting via the `subset` module
+- Owned, license-checked font preparation and PowerPoint EOT publication
+- SIMD-accelerated OOXML font obfuscation
 
 ## License
 
