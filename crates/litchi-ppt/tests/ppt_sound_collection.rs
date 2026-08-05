@@ -1,5 +1,5 @@
 use litchi_ppt::writer::build_sound_collection;
-use litchi_ppt::{sound_collection::Collection, Package, PptRecord};
+use litchi_ppt::{Package, PptRecord, sound_collection::Collection};
 use std::collections::HashSet;
 
 #[test]

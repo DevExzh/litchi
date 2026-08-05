@@ -1,8 +1,8 @@
 use litchi_ppt::animation::{AnimationInfo, AnimationSound, BuiltinSound};
 use litchi_ppt::writer::PptWriter;
 use litchi_ppt::{
-    Interaction, InteractionAction, InteractionLinkTarget, InteractionTrigger, Package,
-    BuiltinId, PowerPointTextInteraction, PowerPointTextRange,
+    BuiltinId, Interaction, InteractionAction, InteractionLinkTarget, InteractionTrigger, Package,
+    PowerPointTextInteraction, PowerPointTextRange,
 };
 use std::{io::Cursor, num::NonZeroU32};
 
@@ -60,19 +60,13 @@ fn action_only_builtin_sounds_are_collected_remapped_and_repeatable() {
     let shape = &slide.shape_interactions().unwrap()[0].interactions[0];
     let shape_sound = shape.sound(&sounds).unwrap();
     assert_eq!(shape_sound.name, "Click");
-    assert_eq!(
-        shape_sound.builtin_id,
-        Some(BuiltinId::Click)
-    );
+    assert_eq!(shape_sound.builtin_id, Some(BuiltinId::Click));
     shape.validate_sound_collection(&sounds).unwrap();
 
     let text = &slide.shape_text_interactions().unwrap()[0].interactions[0].interaction;
     let text_sound = text.sound(&sounds).unwrap();
     assert_eq!(text_sound.name, "Whoosh");
-    assert_eq!(
-        text_sound.builtin_id,
-        Some(BuiltinId::Whoosh)
-    );
+    assert_eq!(text_sound.builtin_id, Some(BuiltinId::Whoosh));
     text.validate_sound_collection(&sounds).unwrap();
 }
 

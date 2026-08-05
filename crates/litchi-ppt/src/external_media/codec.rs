@@ -390,10 +390,7 @@ impl Collection {
     }
 
     /// Validate every non-null embedded WAV reference without decoding sound data.
-    pub fn validate_sound_collection(
-        &self,
-        sounds: Option<&SoundCollection<'_>>,
-    ) -> Result<()> {
+    pub fn validate_sound_collection(&self, sounds: Option<&SoundCollection<'_>>) -> Result<()> {
         for object in &self.objects {
             let Object::EmbeddedWav(value) = object else {
                 continue;
