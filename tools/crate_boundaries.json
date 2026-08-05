@@ -138,6 +138,7 @@
     ],
     "litchi-odt": [
       "litchi-core",
+      "litchi-odc",
       "litchi-odf-common",
       "soapberry-zip",
       "xml-minifier"
