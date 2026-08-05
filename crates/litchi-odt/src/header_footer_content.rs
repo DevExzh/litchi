@@ -30,13 +30,13 @@ pub(super) const MAX_EXPANDED_SPACES: usize = 1_000_000;
 /// `style:region-left`, `style:region-center`, and `style:region-right`
 /// wrappers, each containing the paragraphs of that column.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum HeaderFooterColumnRegion {
+pub enum ColumnRegion {
     Left,
     Center,
     Right,
 }
 
-impl HeaderFooterColumnRegion {
+impl ColumnRegion {
     fn parse(local_name: &[u8]) -> Option<Self> {
         match local_name {
             b"region-left" => Some(Self::Left),
@@ -58,29 +58,29 @@ impl HeaderFooterColumnRegion {
 
 /// One paragraph or heading in a header/footer region.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct HeaderFooterBlock {
+pub struct Block {
     /// The paragraph's `text:style-name`, when present.
     pub style_name: Option<String>,
     /// The column region containing this block, for multi-column headers/footers.
-    pub column_region: Option<HeaderFooterColumnRegion>,
+    pub column_region: Option<ColumnRegion>,
     /// Inline content in document order.
-    pub content: Vec<HeaderFooterInline>,
+    pub content: Vec<Inline>,
 }
 
 /// Ordered inline header/footer content.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum HeaderFooterInline {
+pub enum Inline {
     Text(String),
     Space { count: usize },
     Tab,
     LineBreak,
-    Field(HeaderFooterField),
+    Field(Field),
 }
 
 /// A dynamic ODF text field without evaluating its value.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct HeaderFooterField {
-    pub kind: HeaderFooterFieldKind,
+pub struct Field {
+    pub kind: FieldKind,
     /// Cached/displayed child text stored in the document.
     pub displayed_text: String,
     pub fixed: Option<bool>,
@@ -95,7 +95,7 @@ pub struct HeaderFooterField {
 /// content, or invokes macros. Unknown text-namespace fields remain typed and
 /// lossless.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum HeaderFooterFieldKind {
+pub enum FieldKind {
     PageNumber,
     PageCount,
     PageContinuation,
@@ -163,7 +163,7 @@ pub enum HeaderFooterFieldKind {
     EditingDuration,
     UserDefined,
     /// A sender identity or contact field defined by ODF's `text:sender-*` elements.
-    Sender(HeaderFooterSenderFieldKind),
+    Sender(SenderFieldKind),
     /// Inert `text:script` metadata. Its URI and payload are never opened or executed.
     Script,
     /// Inert `text:execute-macro` metadata. Its named macro is never invoked.
@@ -176,7 +176,7 @@ pub enum HeaderFooterFieldKind {
 
 /// One of the ODF sender identity/contact fields available in header/footer content.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum HeaderFooterSenderFieldKind {
+pub enum SenderFieldKind {
     FirstName,
     LastName,
     Initials,
@@ -194,7 +194,7 @@ pub enum HeaderFooterSenderFieldKind {
     StateOrProvince,
 }
 
-impl HeaderFooterSenderFieldKind {
+impl SenderFieldKind {
     /// The local name of the corresponding ODF `text:sender-*` element.
     pub const fn element_name(self) -> &'static str {
         match self {
@@ -226,7 +226,7 @@ struct Region {
     master_name: String,
     kind: HeaderFooterKind,
     depth: usize,
-    blocks: Vec<HeaderFooterBlock>,
+    blocks: Vec<Block>,
     block: Option<ActiveBlock>,
     field: Option<ActiveField>,
     column_region: Option<ActiveColumnRegion>,
@@ -239,22 +239,22 @@ struct Region {
 
 struct ActiveBlock {
     depth: usize,
-    block: HeaderFooterBlock,
+    block: Block,
 }
 
 struct ActiveColumnRegion {
-    kind: HeaderFooterColumnRegion,
+    kind: ColumnRegion,
     depth: usize,
 }
 
 struct ActiveField {
     depth: usize,
-    field: HeaderFooterField,
+    field: Field,
 }
 
 pub(super) fn parse_header_footer_blocks(
     xml: &str,
-) -> Result<HashMap<(String, HeaderFooterKind), Vec<HeaderFooterBlock>>> {
+) -> Result<HashMap<(String, HeaderFooterKind), Vec<Block>>> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -417,7 +417,7 @@ impl Region {
         let local = element.local_name();
         if self.block.is_none()
             && namespace == Some(STYLE_NAMESPACE)
-            && let Some(kind) = HeaderFooterColumnRegion::parse(local.as_ref())
+            && let Some(kind) = ColumnRegion::parse(local.as_ref())
         {
             self.start_column_region(kind, depth, empty)?;
             return Ok(());
@@ -448,7 +448,7 @@ impl Region {
             }
             self.block = Some(ActiveBlock {
                 depth,
-                block: HeaderFooterBlock {
+                block: Block {
                     style_name: namespaced_attr(reader, element, TEXT_NAMESPACE, b"style-name")?,
                     column_region,
                     content: Vec::new(),
@@ -473,10 +473,10 @@ impl Region {
                 b"s" => {
                     let count = text_space_count(reader, element)?.unwrap_or(1);
                     self.add_spaces(count)?;
-                    self.push_token(HeaderFooterInline::Space { count })?;
+                    self.push_token(Inline::Space { count })?;
                 },
-                b"tab" => self.push_token(HeaderFooterInline::Tab)?,
-                b"line-break" => self.push_token(HeaderFooterInline::LineBreak)?,
+                b"tab" => self.push_token(Inline::Tab)?,
+                b"line-break" => self.push_token(Inline::LineBreak)?,
                 local if field_kind(local).is_some() || is_unknown_field(local) => {
                     self.field_count = self
                         .field_count
@@ -487,7 +487,7 @@ impl Region {
                     }
                     let field = parse_field(reader, element, local)?;
                     if empty {
-                        self.push_token(HeaderFooterInline::Field(field))?;
+                        self.push_token(Inline::Field(field))?;
                     } else {
                         self.field = Some(ActiveField { depth, field });
                     }
@@ -498,12 +498,7 @@ impl Region {
         Ok(())
     }
 
-    fn start_column_region(
-        &mut self,
-        kind: HeaderFooterColumnRegion,
-        depth: usize,
-        empty: bool,
-    ) -> Result<()> {
+    fn start_column_region(&mut self, kind: ColumnRegion, depth: usize, empty: bool) -> Result<()> {
         if self.column_region.is_some() {
             return Err(Error::InvalidFormat(
                 "nested style:region-* column regions".to_string(),
@@ -536,7 +531,7 @@ impl Region {
             .is_some_and(|field| field.depth == depth)
         {
             let field = self.field.take().expect("checked header/footer field");
-            self.push_token(HeaderFooterInline::Field(field.field))?;
+            self.push_token(Inline::Field(field.field))?;
         }
         if self
             .block
@@ -561,7 +556,7 @@ impl Region {
             .is_some_and(|region| region.depth == depth)
         {
             if namespace != Some(STYLE_NAMESPACE)
-                || HeaderFooterColumnRegion::parse(local)
+                || ColumnRegion::parse(local)
                     != Some(self.column_region.as_ref().expect("checked region").kind)
             {
                 return Err(Error::InvalidFormat(
@@ -596,11 +591,11 @@ impl Region {
             return Ok(());
         }
         let content = &mut self.block.as_mut().expect("checked block").block.content;
-        if let Some(HeaderFooterInline::Text(existing)) = content.last_mut() {
+        if let Some(Inline::Text(existing)) = content.last_mut() {
             existing.push_str(text);
             return Ok(());
         }
-        self.push_token(HeaderFooterInline::Text(text.to_string()))
+        self.push_token(Inline::Text(text.to_string()))
     }
 
     fn append_field_control(
@@ -649,7 +644,7 @@ impl Region {
         Ok(())
     }
 
-    fn push_token(&mut self, token: HeaderFooterInline) -> Result<()> {
+    fn push_token(&mut self, token: Inline) -> Result<()> {
         self.token_count = self
             .token_count
             .checked_add(1)
@@ -667,11 +662,7 @@ impl Region {
     }
 }
 
-fn parse_field(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
-    local: &[u8],
-) -> Result<HeaderFooterField> {
+fn parse_field(reader: &NsReader<&[u8]>, element: &BytesStart<'_>, local: &[u8]) -> Result<Field> {
     let mut attributes = Vec::new();
     let mut fixed = None;
     let mut data_style_name = None;
@@ -699,8 +690,8 @@ fn parse_field(
         }
         attributes.push((key, value));
     }
-    Ok(HeaderFooterField {
-        kind: field_kind(local).unwrap_or_else(|| HeaderFooterFieldKind::Unknown {
+    Ok(Field {
+        kind: field_kind(local).unwrap_or_else(|| FieldKind::Unknown {
             namespace: String::from_utf8_lossy(TEXT_NAMESPACE).into_owned(),
             local_name: String::from_utf8_lossy(local).into_owned(),
         }),
@@ -711,95 +702,85 @@ fn parse_field(
     })
 }
 
-fn field_kind(local: &[u8]) -> Option<HeaderFooterFieldKind> {
+fn field_kind(local: &[u8]) -> Option<FieldKind> {
     Some(match local {
-        b"page-number" => HeaderFooterFieldKind::PageNumber,
-        b"page-count" => HeaderFooterFieldKind::PageCount,
-        b"page-continuation" => HeaderFooterFieldKind::PageContinuation,
-        b"page-variable-set" => HeaderFooterFieldKind::PageVariableSet,
-        b"page-variable-get" => HeaderFooterFieldKind::PageVariableGet,
-        b"paragraph-count" => HeaderFooterFieldKind::ParagraphCount,
-        b"word-count" => HeaderFooterFieldKind::WordCount,
-        b"character-count" => HeaderFooterFieldKind::CharacterCount,
-        b"table-count" => HeaderFooterFieldKind::TableCount,
-        b"image-count" => HeaderFooterFieldKind::ImageCount,
-        b"object-count" => HeaderFooterFieldKind::ObjectCount,
-        b"reference-ref" => HeaderFooterFieldKind::Reference,
-        b"sequence-ref" => HeaderFooterFieldKind::SequenceReference,
-        b"bookmark-ref" => HeaderFooterFieldKind::BookmarkReference,
-        b"note-ref" => HeaderFooterFieldKind::NoteReference,
-        b"variable-set" => HeaderFooterFieldKind::VariableSet,
-        b"variable-get" => HeaderFooterFieldKind::VariableGet,
-        b"variable-input" => HeaderFooterFieldKind::VariableInput,
-        b"user-field-get" => HeaderFooterFieldKind::UserFieldGet,
-        b"user-field-input" => HeaderFooterFieldKind::UserFieldInput,
-        b"sequence" => HeaderFooterFieldKind::Sequence,
-        b"expression" => HeaderFooterFieldKind::Expression,
-        b"text-input" => HeaderFooterFieldKind::TextInput,
-        b"placeholder" => HeaderFooterFieldKind::Placeholder,
-        b"conditional-text" => HeaderFooterFieldKind::ConditionalText,
-        b"hidden-text" => HeaderFooterFieldKind::HiddenText,
-        b"hidden-paragraph" => HeaderFooterFieldKind::HiddenParagraph,
-        b"dde-connection" => HeaderFooterFieldKind::DdeConnection,
-        b"measure" => HeaderFooterFieldKind::Measure,
-        b"table-formula" => HeaderFooterFieldKind::TableFormula,
-        b"meta-field" => HeaderFooterFieldKind::MetaField,
-        b"database-display" => HeaderFooterFieldKind::DatabaseDisplay,
-        b"database-next" => HeaderFooterFieldKind::DatabaseNext,
-        b"database-row-select" => HeaderFooterFieldKind::DatabaseRowSelect,
-        b"database-row-number" => HeaderFooterFieldKind::DatabaseRowNumber,
-        b"database-name" => HeaderFooterFieldKind::DatabaseName,
-        b"title" => HeaderFooterFieldKind::Title,
-        b"subject" => HeaderFooterFieldKind::Subject,
-        b"author-name" => HeaderFooterFieldKind::AuthorName,
-        b"author-initials" => HeaderFooterFieldKind::AuthorInitials,
-        b"date" => HeaderFooterFieldKind::Date,
-        b"time" => HeaderFooterFieldKind::Time,
-        b"file-name" => HeaderFooterFieldKind::FileName,
-        b"template-name" => HeaderFooterFieldKind::TemplateName,
-        b"sheet-name" => HeaderFooterFieldKind::SheetName,
-        b"chapter" => HeaderFooterFieldKind::Chapter,
-        b"initial-creator" => HeaderFooterFieldKind::InitialCreator,
-        b"description" => HeaderFooterFieldKind::Description,
-        b"printed-by" => HeaderFooterFieldKind::PrintedBy,
-        b"keywords" => HeaderFooterFieldKind::Keywords,
-        b"creator" => HeaderFooterFieldKind::Creator,
-        b"creation-date" => HeaderFooterFieldKind::CreationDate,
-        b"creation-time" => HeaderFooterFieldKind::CreationTime,
-        b"modification-date" => HeaderFooterFieldKind::ModificationDate,
-        b"modification-time" => HeaderFooterFieldKind::ModificationTime,
-        b"print-date" => HeaderFooterFieldKind::PrintDate,
-        b"print-time" => HeaderFooterFieldKind::PrintTime,
-        b"editing-cycles" => HeaderFooterFieldKind::EditingCycles,
-        b"editing-duration" => HeaderFooterFieldKind::EditingDuration,
-        b"user-defined" => HeaderFooterFieldKind::UserDefined,
-        b"sender-firstname" => {
-            HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::FirstName)
-        },
-        b"sender-lastname" => HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::LastName),
-        b"sender-initials" => HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::Initials),
-        b"sender-title" => HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::Title),
-        b"sender-position" => HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::Position),
-        b"sender-email" => HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::Email),
-        b"sender-phone-private" => {
-            HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::PrivatePhone)
-        },
-        b"sender-fax" => HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::Fax),
-        b"sender-company" => HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::Company),
-        b"sender-phone-work" => {
-            HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::WorkPhone)
-        },
-        b"sender-street" => HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::Street),
-        b"sender-city" => HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::City),
-        b"sender-postal-code" => {
-            HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::PostalCode)
-        },
-        b"sender-country" => HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::Country),
-        b"sender-state-or-province" => {
-            HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::StateOrProvince)
-        },
-        b"script" => HeaderFooterFieldKind::Script,
-        b"execute-macro" => HeaderFooterFieldKind::ExecuteMacro,
+        b"page-number" => FieldKind::PageNumber,
+        b"page-count" => FieldKind::PageCount,
+        b"page-continuation" => FieldKind::PageContinuation,
+        b"page-variable-set" => FieldKind::PageVariableSet,
+        b"page-variable-get" => FieldKind::PageVariableGet,
+        b"paragraph-count" => FieldKind::ParagraphCount,
+        b"word-count" => FieldKind::WordCount,
+        b"character-count" => FieldKind::CharacterCount,
+        b"table-count" => FieldKind::TableCount,
+        b"image-count" => FieldKind::ImageCount,
+        b"object-count" => FieldKind::ObjectCount,
+        b"reference-ref" => FieldKind::Reference,
+        b"sequence-ref" => FieldKind::SequenceReference,
+        b"bookmark-ref" => FieldKind::BookmarkReference,
+        b"note-ref" => FieldKind::NoteReference,
+        b"variable-set" => FieldKind::VariableSet,
+        b"variable-get" => FieldKind::VariableGet,
+        b"variable-input" => FieldKind::VariableInput,
+        b"user-field-get" => FieldKind::UserFieldGet,
+        b"user-field-input" => FieldKind::UserFieldInput,
+        b"sequence" => FieldKind::Sequence,
+        b"expression" => FieldKind::Expression,
+        b"text-input" => FieldKind::TextInput,
+        b"placeholder" => FieldKind::Placeholder,
+        b"conditional-text" => FieldKind::ConditionalText,
+        b"hidden-text" => FieldKind::HiddenText,
+        b"hidden-paragraph" => FieldKind::HiddenParagraph,
+        b"dde-connection" => FieldKind::DdeConnection,
+        b"measure" => FieldKind::Measure,
+        b"table-formula" => FieldKind::TableFormula,
+        b"meta-field" => FieldKind::MetaField,
+        b"database-display" => FieldKind::DatabaseDisplay,
+        b"database-next" => FieldKind::DatabaseNext,
+        b"database-row-select" => FieldKind::DatabaseRowSelect,
+        b"database-row-number" => FieldKind::DatabaseRowNumber,
+        b"database-name" => FieldKind::DatabaseName,
+        b"title" => FieldKind::Title,
+        b"subject" => FieldKind::Subject,
+        b"author-name" => FieldKind::AuthorName,
+        b"author-initials" => FieldKind::AuthorInitials,
+        b"date" => FieldKind::Date,
+        b"time" => FieldKind::Time,
+        b"file-name" => FieldKind::FileName,
+        b"template-name" => FieldKind::TemplateName,
+        b"sheet-name" => FieldKind::SheetName,
+        b"chapter" => FieldKind::Chapter,
+        b"initial-creator" => FieldKind::InitialCreator,
+        b"description" => FieldKind::Description,
+        b"printed-by" => FieldKind::PrintedBy,
+        b"keywords" => FieldKind::Keywords,
+        b"creator" => FieldKind::Creator,
+        b"creation-date" => FieldKind::CreationDate,
+        b"creation-time" => FieldKind::CreationTime,
+        b"modification-date" => FieldKind::ModificationDate,
+        b"modification-time" => FieldKind::ModificationTime,
+        b"print-date" => FieldKind::PrintDate,
+        b"print-time" => FieldKind::PrintTime,
+        b"editing-cycles" => FieldKind::EditingCycles,
+        b"editing-duration" => FieldKind::EditingDuration,
+        b"user-defined" => FieldKind::UserDefined,
+        b"sender-firstname" => FieldKind::Sender(SenderFieldKind::FirstName),
+        b"sender-lastname" => FieldKind::Sender(SenderFieldKind::LastName),
+        b"sender-initials" => FieldKind::Sender(SenderFieldKind::Initials),
+        b"sender-title" => FieldKind::Sender(SenderFieldKind::Title),
+        b"sender-position" => FieldKind::Sender(SenderFieldKind::Position),
+        b"sender-email" => FieldKind::Sender(SenderFieldKind::Email),
+        b"sender-phone-private" => FieldKind::Sender(SenderFieldKind::PrivatePhone),
+        b"sender-fax" => FieldKind::Sender(SenderFieldKind::Fax),
+        b"sender-company" => FieldKind::Sender(SenderFieldKind::Company),
+        b"sender-phone-work" => FieldKind::Sender(SenderFieldKind::WorkPhone),
+        b"sender-street" => FieldKind::Sender(SenderFieldKind::Street),
+        b"sender-city" => FieldKind::Sender(SenderFieldKind::City),
+        b"sender-postal-code" => FieldKind::Sender(SenderFieldKind::PostalCode),
+        b"sender-country" => FieldKind::Sender(SenderFieldKind::Country),
+        b"sender-state-or-province" => FieldKind::Sender(SenderFieldKind::StateOrProvince),
+        b"script" => FieldKind::Script,
+        b"execute-macro" => FieldKind::ExecuteMacro,
         _ => return None,
     })
 }
@@ -840,10 +821,10 @@ fn is_unknown_field(local: &[u8]) -> bool {
 }
 
 fn insert_region(
-    regions: &mut HashMap<(String, HeaderFooterKind), Vec<HeaderFooterBlock>>,
+    regions: &mut HashMap<(String, HeaderFooterKind), Vec<Block>>,
     master_name: String,
     kind: HeaderFooterKind,
-    blocks: Vec<HeaderFooterBlock>,
+    blocks: Vec<Block>,
 ) -> Result<()> {
     if regions
         .insert((master_name.clone(), kind), blocks)
@@ -964,14 +945,11 @@ mod tests {
         let blocks = &regions[&(String::from("A"), HeaderFooterKind::Header)];
         assert_eq!(blocks.len(), 2);
         assert_eq!(blocks[0].style_name.as_deref(), Some("Header"));
-        assert_eq!(
-            blocks[0].content[0],
-            HeaderFooterInline::Text("Page ".into())
-        );
-        let HeaderFooterInline::Field(page) = &blocks[0].content[1] else {
+        assert_eq!(blocks[0].content[0], Inline::Text("Page ".into()));
+        let Inline::Field(page) = &blocks[0].content[1] else {
             panic!("expected page field");
         };
-        assert_eq!(page.kind, HeaderFooterFieldKind::PageNumber);
+        assert_eq!(page.kind, FieldKind::PageNumber);
         assert_eq!(page.displayed_text, "7");
         assert_eq!(page.fixed, Some(false));
         assert_eq!(page.data_style_name.as_deref(), Some("N1"));
@@ -979,57 +957,42 @@ mod tests {
             page.attributes
                 .contains(&("text:page-adjust".into(), "2".into()))
         );
-        assert_eq!(blocks[0].content[2], HeaderFooterInline::Space { count: 2 });
-        assert_eq!(blocks[0].content[3], HeaderFooterInline::Tab);
-        assert_eq!(blocks[0].content[4], HeaderFooterInline::LineBreak);
-        let HeaderFooterInline::Field(sender) = &blocks[0].content[5] else {
+        assert_eq!(blocks[0].content[2], Inline::Space { count: 2 });
+        assert_eq!(blocks[0].content[3], Inline::Tab);
+        assert_eq!(blocks[0].content[4], Inline::LineBreak);
+        let Inline::Field(sender) = &blocks[0].content[5] else {
             panic!("expected sender field");
         };
-        assert_eq!(
-            sender.kind,
-            HeaderFooterFieldKind::Sender(HeaderFooterSenderFieldKind::Company)
-        );
+        assert_eq!(sender.kind, FieldKind::Sender(SenderFieldKind::Company));
         assert_eq!(sender.displayed_text, "Example");
         assert_eq!(sender.fixed, Some(true));
-        assert_eq!(
-            blocks[1].content,
-            vec![HeaderFooterInline::Text("Heading".into())]
-        );
+        assert_eq!(blocks[1].content, vec![Inline::Text("Heading".into())]);
     }
 
     #[test]
     fn classifies_all_standard_sender_field_names() {
         let cases = [
-            ("sender-firstname", HeaderFooterSenderFieldKind::FirstName),
-            ("sender-lastname", HeaderFooterSenderFieldKind::LastName),
-            ("sender-initials", HeaderFooterSenderFieldKind::Initials),
-            ("sender-title", HeaderFooterSenderFieldKind::Title),
-            ("sender-position", HeaderFooterSenderFieldKind::Position),
-            ("sender-email", HeaderFooterSenderFieldKind::Email),
-            (
-                "sender-phone-private",
-                HeaderFooterSenderFieldKind::PrivatePhone,
-            ),
-            ("sender-fax", HeaderFooterSenderFieldKind::Fax),
-            ("sender-company", HeaderFooterSenderFieldKind::Company),
-            ("sender-phone-work", HeaderFooterSenderFieldKind::WorkPhone),
-            ("sender-street", HeaderFooterSenderFieldKind::Street),
-            ("sender-city", HeaderFooterSenderFieldKind::City),
-            (
-                "sender-postal-code",
-                HeaderFooterSenderFieldKind::PostalCode,
-            ),
-            ("sender-country", HeaderFooterSenderFieldKind::Country),
-            (
-                "sender-state-or-province",
-                HeaderFooterSenderFieldKind::StateOrProvince,
-            ),
+            ("sender-firstname", SenderFieldKind::FirstName),
+            ("sender-lastname", SenderFieldKind::LastName),
+            ("sender-initials", SenderFieldKind::Initials),
+            ("sender-title", SenderFieldKind::Title),
+            ("sender-position", SenderFieldKind::Position),
+            ("sender-email", SenderFieldKind::Email),
+            ("sender-phone-private", SenderFieldKind::PrivatePhone),
+            ("sender-fax", SenderFieldKind::Fax),
+            ("sender-company", SenderFieldKind::Company),
+            ("sender-phone-work", SenderFieldKind::WorkPhone),
+            ("sender-street", SenderFieldKind::Street),
+            ("sender-city", SenderFieldKind::City),
+            ("sender-postal-code", SenderFieldKind::PostalCode),
+            ("sender-country", SenderFieldKind::Country),
+            ("sender-state-or-province", SenderFieldKind::StateOrProvince),
         ];
 
         for (local_name, sender_kind) in cases {
             assert_eq!(
                 field_kind(local_name.as_bytes()),
-                Some(HeaderFooterFieldKind::Sender(sender_kind))
+                Some(FieldKind::Sender(sender_kind))
             );
             assert_eq!(sender_kind.element_name(), local_name);
         }
@@ -1044,19 +1007,19 @@ mod tests {
             .content
             .iter()
             .filter_map(|inline| match inline {
-                HeaderFooterInline::Field(field) => Some(field),
+                Inline::Field(field) => Some(field),
                 _ => None,
             })
             .collect();
 
         assert_eq!(fields.len(), 2);
-        assert_eq!(fields[0].kind, HeaderFooterFieldKind::Script);
+        assert_eq!(fields[0].kind, FieldKind::Script);
         assert_eq!(fields[0].displayed_text, "payload");
         assert!(fields[0].attributes.contains(&(
             "{http://www.w3.org/1999/xlink}href".into(),
             "https://example.invalid/never-open".into(),
         )));
-        assert_eq!(fields[1].kind, HeaderFooterFieldKind::ExecuteMacro);
+        assert_eq!(fields[1].kind, FieldKind::ExecuteMacro);
         assert_eq!(fields[1].displayed_text, "button");
         assert!(
             fields[1]
@@ -1074,7 +1037,7 @@ mod tests {
             .content
             .iter()
             .filter_map(|inline| match inline {
-                HeaderFooterInline::Field(field) => Some(field),
+                Inline::Field(field) => Some(field),
                 _ => None,
             })
             .collect();
@@ -1082,21 +1045,21 @@ mod tests {
         assert_eq!(
             fields.iter().map(|field| &field.kind).collect::<Vec<_>>(),
             vec![
-                &HeaderFooterFieldKind::AuthorInitials,
-                &HeaderFooterFieldKind::TemplateName,
-                &HeaderFooterFieldKind::SheetName,
-                &HeaderFooterFieldKind::InitialCreator,
-                &HeaderFooterFieldKind::Description,
-                &HeaderFooterFieldKind::PrintedBy,
-                &HeaderFooterFieldKind::Keywords,
-                &HeaderFooterFieldKind::Creator,
-                &HeaderFooterFieldKind::CreationDate,
-                &HeaderFooterFieldKind::CreationTime,
-                &HeaderFooterFieldKind::ModificationTime,
-                &HeaderFooterFieldKind::PrintDate,
-                &HeaderFooterFieldKind::PrintTime,
-                &HeaderFooterFieldKind::EditingCycles,
-                &HeaderFooterFieldKind::EditingDuration,
+                &FieldKind::AuthorInitials,
+                &FieldKind::TemplateName,
+                &FieldKind::SheetName,
+                &FieldKind::InitialCreator,
+                &FieldKind::Description,
+                &FieldKind::PrintedBy,
+                &FieldKind::Keywords,
+                &FieldKind::Creator,
+                &FieldKind::CreationDate,
+                &FieldKind::CreationTime,
+                &FieldKind::ModificationTime,
+                &FieldKind::PrintDate,
+                &FieldKind::PrintTime,
+                &FieldKind::EditingCycles,
+                &FieldKind::EditingDuration,
             ]
         );
         assert_eq!(fields[8].displayed_text, "2026-07-22");
@@ -1118,7 +1081,7 @@ mod tests {
             .content
             .iter()
             .filter_map(|inline| match inline {
-                HeaderFooterInline::Field(field) => Some(field),
+                Inline::Field(field) => Some(field),
                 _ => None,
             })
             .collect();
@@ -1126,15 +1089,15 @@ mod tests {
         assert_eq!(
             fields.iter().map(|field| &field.kind).collect::<Vec<_>>(),
             vec![
-                &HeaderFooterFieldKind::PageContinuation,
-                &HeaderFooterFieldKind::PageVariableSet,
-                &HeaderFooterFieldKind::PageVariableGet,
-                &HeaderFooterFieldKind::ParagraphCount,
-                &HeaderFooterFieldKind::WordCount,
-                &HeaderFooterFieldKind::CharacterCount,
-                &HeaderFooterFieldKind::TableCount,
-                &HeaderFooterFieldKind::ImageCount,
-                &HeaderFooterFieldKind::ObjectCount,
+                &FieldKind::PageContinuation,
+                &FieldKind::PageVariableSet,
+                &FieldKind::PageVariableGet,
+                &FieldKind::ParagraphCount,
+                &FieldKind::WordCount,
+                &FieldKind::CharacterCount,
+                &FieldKind::TableCount,
+                &FieldKind::ImageCount,
+                &FieldKind::ObjectCount,
             ]
         );
         assert_eq!(fields[0].displayed_text, "Prev");
@@ -1164,7 +1127,7 @@ mod tests {
             .content
             .iter()
             .filter_map(|inline| match inline {
-                HeaderFooterInline::Field(field) => Some(field),
+                Inline::Field(field) => Some(field),
                 _ => None,
             })
             .collect();
@@ -1172,18 +1135,18 @@ mod tests {
         assert_eq!(
             fields.iter().map(|field| &field.kind).collect::<Vec<_>>(),
             vec![
-                &HeaderFooterFieldKind::Reference,
-                &HeaderFooterFieldKind::SequenceReference,
-                &HeaderFooterFieldKind::BookmarkReference,
-                &HeaderFooterFieldKind::NoteReference,
-                &HeaderFooterFieldKind::VariableSet,
-                &HeaderFooterFieldKind::VariableGet,
-                &HeaderFooterFieldKind::VariableInput,
-                &HeaderFooterFieldKind::UserFieldGet,
-                &HeaderFooterFieldKind::UserFieldInput,
-                &HeaderFooterFieldKind::Sequence,
-                &HeaderFooterFieldKind::Expression,
-                &HeaderFooterFieldKind::TextInput,
+                &FieldKind::Reference,
+                &FieldKind::SequenceReference,
+                &FieldKind::BookmarkReference,
+                &FieldKind::NoteReference,
+                &FieldKind::VariableSet,
+                &FieldKind::VariableGet,
+                &FieldKind::VariableInput,
+                &FieldKind::UserFieldGet,
+                &FieldKind::UserFieldInput,
+                &FieldKind::Sequence,
+                &FieldKind::Expression,
+                &FieldKind::TextInput,
             ]
         );
         assert_eq!(fields[0].displayed_text, "Reference");
@@ -1213,7 +1176,7 @@ mod tests {
             .content
             .iter()
             .filter_map(|inline| match inline {
-                HeaderFooterInline::Field(field) => Some(field),
+                Inline::Field(field) => Some(field),
                 _ => None,
             })
             .collect();
@@ -1221,14 +1184,14 @@ mod tests {
         assert_eq!(
             fields.iter().map(|field| &field.kind).collect::<Vec<_>>(),
             vec![
-                &HeaderFooterFieldKind::Placeholder,
-                &HeaderFooterFieldKind::ConditionalText,
-                &HeaderFooterFieldKind::HiddenText,
-                &HeaderFooterFieldKind::HiddenParagraph,
-                &HeaderFooterFieldKind::DdeConnection,
-                &HeaderFooterFieldKind::Measure,
-                &HeaderFooterFieldKind::TableFormula,
-                &HeaderFooterFieldKind::MetaField,
+                &FieldKind::Placeholder,
+                &FieldKind::ConditionalText,
+                &FieldKind::HiddenText,
+                &FieldKind::HiddenParagraph,
+                &FieldKind::DdeConnection,
+                &FieldKind::Measure,
+                &FieldKind::TableFormula,
+                &FieldKind::MetaField,
             ]
         );
         assert!(
@@ -1258,7 +1221,7 @@ mod tests {
             .content
             .iter()
             .filter_map(|inline| match inline {
-                HeaderFooterInline::Field(field) => Some(field),
+                Inline::Field(field) => Some(field),
                 _ => None,
             })
             .collect();
@@ -1266,11 +1229,11 @@ mod tests {
         assert_eq!(
             fields.iter().map(|field| &field.kind).collect::<Vec<_>>(),
             vec![
-                &HeaderFooterFieldKind::DatabaseDisplay,
-                &HeaderFooterFieldKind::DatabaseNext,
-                &HeaderFooterFieldKind::DatabaseRowSelect,
-                &HeaderFooterFieldKind::DatabaseRowNumber,
-                &HeaderFooterFieldKind::DatabaseName,
+                &FieldKind::DatabaseDisplay,
+                &FieldKind::DatabaseNext,
+                &FieldKind::DatabaseRowSelect,
+                &FieldKind::DatabaseRowNumber,
+                &FieldKind::DatabaseName,
             ]
         );
         assert_eq!(fields[0].displayed_text, "Ada");
@@ -1303,19 +1266,17 @@ mod tests {
             .content
             .iter()
             .filter_map(|inline| match inline {
-                HeaderFooterInline::Field(field) => {
-                    Some((&field.kind, field.displayed_text.as_str()))
-                },
+                Inline::Field(field) => Some((&field.kind, field.displayed_text.as_str())),
                 _ => None,
             })
             .collect();
         assert_eq!(
             fields,
             vec![
-                (&HeaderFooterFieldKind::Subject, "mysubject"),
-                (&HeaderFooterFieldKind::Title, "mytitle"),
-                (&HeaderFooterFieldKind::UserDefined, "1.1"),
-                (&HeaderFooterFieldKind::ModificationDate, "May 18, 2021"),
+                (&FieldKind::Subject, "mysubject"),
+                (&FieldKind::Title, "mytitle"),
+                (&FieldKind::UserDefined, "1.1"),
+                (&FieldKind::ModificationDate, "May 18, 2021"),
             ]
         );
     }
@@ -1351,26 +1312,12 @@ mod tests {
         let regions = parse_header_footer_blocks(&xml).unwrap();
         let blocks = &regions[&(String::from("A"), HeaderFooterKind::Header)];
         assert_eq!(blocks.len(), 4);
-        assert_eq!(
-            blocks[0].column_region,
-            Some(HeaderFooterColumnRegion::Left)
-        );
+        assert_eq!(blocks[0].column_region, Some(ColumnRegion::Left));
         assert_eq!(blocks[0].style_name.as_deref(), Some("Left"));
-        assert_eq!(
-            blocks[1].column_region,
-            Some(HeaderFooterColumnRegion::Center)
-        );
-        assert_eq!(
-            blocks[2].column_region,
-            Some(HeaderFooterColumnRegion::Center)
-        );
-        assert_eq!(
-            blocks[3].column_region,
-            Some(HeaderFooterColumnRegion::Right)
-        );
-        assert!(
-            matches!(&blocks[1].content[0], HeaderFooterInline::Text(text) if text == "Center")
-        );
+        assert_eq!(blocks[1].column_region, Some(ColumnRegion::Center));
+        assert_eq!(blocks[2].column_region, Some(ColumnRegion::Center));
+        assert_eq!(blocks[3].column_region, Some(ColumnRegion::Right));
+        assert!(matches!(&blocks[1].content[0], Inline::Text(text) if text == "Center"));
     }
 
     #[test]
@@ -1380,10 +1327,7 @@ mod tests {
         let regions = parse_header_footer_blocks(&xml).unwrap();
         let blocks = &regions[&(String::from("A"), HeaderFooterKind::Header)];
         assert_eq!(blocks.len(), 1);
-        assert_eq!(
-            blocks[0].column_region,
-            Some(HeaderFooterColumnRegion::Right)
-        );
+        assert_eq!(blocks[0].column_region, Some(ColumnRegion::Right));
     }
 
     #[test]
