@@ -2,7 +2,7 @@
 
 use super::hyperlink::Link;
 use super::{
-    AnnotationElement, AnnotationNode,
+    Element, Node,
     annotation::{decode_reference, parse_element, standard_namespace_uri},
 };
 use litchi_core::{Error, Result, xml::escape_xml};
@@ -30,13 +30,13 @@ fn invalid(message: impl Into<String>) -> Error {
 /// elements when a parsed spreadsheet is saved. Hyperlinks remain inert.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CellTextContent {
-    paragraphs: Vec<AnnotationElement>,
+    paragraphs: Vec<Element>,
     namespaces: BTreeMap<String, String>,
 }
 
 impl CellTextContent {
     /// Return the retained top-level `text:p` elements.
-    pub fn paragraphs(&self) -> &[AnnotationElement] {
+    pub fn paragraphs(&self) -> &[Element] {
         &self.paragraphs
     }
 
@@ -55,12 +55,12 @@ impl CellTextContent {
     }
 
     pub(crate) fn from_hyperlink(hyperlink: &Link) -> Result<Self> {
-        let mut paragraph = AnnotationElement::new("text:p")?;
+        let mut paragraph = Element::new("text:p")?;
         paragraph
             .children
-            .push(AnnotationNode::Element(hyperlink_element(
+            .push(Node::Element(hyperlink_element(
                 hyperlink,
-                vec![AnnotationNode::Text(hyperlink.text.clone())],
+                vec![Node::Text(hyperlink.text.clone())],
             )?));
         Ok(Self {
             paragraphs: vec![paragraph],
@@ -69,12 +69,12 @@ impl CellTextContent {
     }
 
     pub(crate) fn hyperlink_count(&self) -> usize {
-        fn count(nodes: &[AnnotationNode], namespaces: &BTreeMap<String, String>) -> usize {
+        fn count(nodes: &[Node], namespaces: &BTreeMap<String, String>) -> usize {
             nodes
                 .iter()
                 .map(|node| match node {
-                    AnnotationNode::Text(_) => 0,
-                    AnnotationNode::Element(element) => {
+                    Node::Text(_) => 0,
+                    Node::Element(element) => {
                         let scoped = scoped_namespaces(element, namespaces);
                         usize::from(is_text_anchor(element, &scoped))
                             + count(&element.children, &scoped)
@@ -106,7 +106,7 @@ impl CellTextContent {
                 let (selected, after) =
                     split_nodes_at(&remainder, local.end - local.start, &self.namespaces)?;
                 let mut children = before;
-                children.push(AnnotationNode::Element(hyperlink_element(
+                children.push(Node::Element(hyperlink_element(
                     hyperlink, selected,
                 )?));
                 children.extend(after);
@@ -124,7 +124,7 @@ impl CellTextContent {
 
     pub(crate) fn remove_hyperlink(&mut self, index: usize) -> bool {
         fn remove(
-            nodes: &mut Vec<AnnotationNode>,
+            nodes: &mut Vec<Node>,
             target: usize,
             seen: &mut usize,
             namespaces: &BTreeMap<String, String>,
@@ -133,12 +133,12 @@ impl CellTextContent {
             while index_in_parent < nodes.len() {
                 let is_anchor = matches!(
                     &nodes[index_in_parent],
-                    AnnotationNode::Element(element)
+                    Node::Element(element)
                         if is_text_anchor(element, &scoped_namespaces(element, namespaces))
                 );
                 if is_anchor {
                     if *seen == target {
-                        let AnnotationNode::Element(element) = nodes.remove(index_in_parent) else {
+                        let Node::Element(element) = nodes.remove(index_in_parent) else {
                             unreachable!("checked element node");
                         };
                         nodes.splice(index_in_parent..index_in_parent, element.children);
@@ -146,7 +146,7 @@ impl CellTextContent {
                     }
                     *seen += 1;
                 }
-                if let AnnotationNode::Element(element) = &mut nodes[index_in_parent] {
+                if let Node::Element(element) = &mut nodes[index_in_parent] {
                     let scoped = scoped_namespaces(element, namespaces);
                     if remove(&mut element.children, target, seen, &scoped) {
                         return true;
@@ -164,21 +164,21 @@ impl CellTextContent {
     }
 
     pub(crate) fn clear_hyperlinks(&mut self) {
-        fn unwrap(nodes: &mut Vec<AnnotationNode>, namespaces: &BTreeMap<String, String>) {
+        fn unwrap(nodes: &mut Vec<Node>, namespaces: &BTreeMap<String, String>) {
             let mut output = Vec::with_capacity(nodes.len());
             for node in std::mem::take(nodes) {
                 match node {
-                    AnnotationNode::Element(mut element) => {
+                    Node::Element(mut element) => {
                         let scoped = scoped_namespaces(&element, namespaces);
                         let anchor = is_text_anchor(&element, &scoped);
                         unwrap(&mut element.children, &scoped);
                         if anchor {
                             output.extend(element.children);
                         } else {
-                            output.push(AnnotationNode::Element(element));
+                            output.push(Node::Element(element));
                         }
                     },
-                    AnnotationNode::Text(text) => output.push(AnnotationNode::Text(text)),
+                    Node::Text(text) => output.push(Node::Text(text)),
                 }
             }
             *nodes = output;
@@ -190,13 +190,13 @@ impl CellTextContent {
 
     pub(crate) fn synchronize_hyperlinks(&mut self, hyperlinks: &[Link]) -> bool {
         fn synchronize(
-            nodes: &mut [AnnotationNode],
+            nodes: &mut [Node],
             hyperlinks: &[Link],
             index: &mut usize,
             namespaces: &BTreeMap<String, String>,
         ) -> bool {
             for node in nodes {
-                let AnnotationNode::Element(element) = node else {
+                let Node::Element(element) = node else {
                     continue;
                 };
                 let scoped = scoped_namespaces(element, namespaces);
@@ -246,12 +246,12 @@ impl CellTextContent {
     }
 }
 
-fn is_text_anchor(element: &AnnotationElement, namespaces: &BTreeMap<String, String>) -> bool {
+fn is_text_anchor(element: &Element, namespaces: &BTreeMap<String, String>) -> bool {
     is_text_element(element, "a", namespaces)
 }
 
 fn is_text_element(
-    element: &AnnotationElement,
+    element: &Element,
     expected_local: &str,
     namespaces: &BTreeMap<String, String>,
 ) -> bool {
@@ -262,7 +262,7 @@ fn is_text_element(
 }
 
 fn namespace_uri<'a>(
-    element: &'a AnnotationElement,
+    element: &'a Element,
     prefix: &str,
     namespaces: &'a BTreeMap<String, String>,
 ) -> Option<&'a str> {
@@ -280,7 +280,7 @@ fn namespace_uri<'a>(
 }
 
 fn scoped_namespaces<'a>(
-    element: &AnnotationElement,
+    element: &Element,
     namespaces: &'a BTreeMap<String, String>,
 ) -> Cow<'a, BTreeMap<String, String>> {
     let declarations = element.attributes.iter().filter_map(|(name, value)| {
@@ -327,7 +327,7 @@ fn is_managed_hyperlink_attribute(name: &str, namespaces: &BTreeMap<String, Stri
 }
 
 fn element_plain_text(
-    element: &AnnotationElement,
+    element: &Element,
     namespaces: &BTreeMap<String, String>,
 ) -> String {
     let scoped = scoped_namespaces(element, namespaces);
@@ -357,8 +357,8 @@ fn element_plain_text(
     let mut text = String::new();
     for child in &element.children {
         match child {
-            AnnotationNode::Text(value) => text.push_str(value),
-            AnnotationNode::Element(element) => {
+            Node::Text(value) => text.push_str(value),
+            Node::Element(element) => {
                 text.push_str(&element_plain_text(element, &scoped));
             },
         }
@@ -368,9 +368,9 @@ fn element_plain_text(
 
 fn hyperlink_element(
     hyperlink: &Link,
-    children: Vec<AnnotationNode>,
-) -> Result<AnnotationElement> {
-    let mut element = AnnotationElement::new("text:a")?;
+    children: Vec<Node>,
+) -> Result<Element> {
+    let mut element = Element::new("text:a")?;
     element.set_attribute("xlink:type", "simple")?;
     element.set_attribute("xlink:href", hyperlink.href.clone())?;
     for (name, value) in [
@@ -403,10 +403,10 @@ fn hyperlink_element(
 }
 
 fn split_nodes_at(
-    nodes: &[AnnotationNode],
+    nodes: &[Node],
     offset: usize,
     namespaces: &BTreeMap<String, String>,
-) -> Result<(Vec<AnnotationNode>, Vec<AnnotationNode>)> {
+) -> Result<(Vec<Node>, Vec<Node>)> {
     let total = nodes
         .iter()
         .try_fold(0usize, |sum, node| {
@@ -445,10 +445,10 @@ fn split_nodes_at(
 }
 
 fn split_node_at(
-    node: &AnnotationNode,
+    node: &Node,
     offset: usize,
     namespaces: &BTreeMap<String, String>,
-) -> Result<(Option<AnnotationNode>, Option<AnnotationNode>)> {
+) -> Result<(Option<Node>, Option<Node>)> {
     let length = node_plain_len(node, namespaces);
     if offset == 0 {
         return Ok((None, Some(node.clone())));
@@ -457,18 +457,18 @@ fn split_node_at(
         return Ok((Some(node.clone()), None));
     }
     match node {
-        AnnotationNode::Text(text) => {
+        Node::Text(text) => {
             if !text.is_char_boundary(offset) {
                 return Err(invalid(
                     "cell hyperlink range is not on a UTF-8 character boundary",
                 ));
             }
             Ok((
-                Some(AnnotationNode::Text(text[..offset].to_string())),
-                Some(AnnotationNode::Text(text[offset..].to_string())),
+                Some(Node::Text(text[..offset].to_string())),
+                Some(Node::Text(text[offset..].to_string())),
             ))
         },
-        AnnotationNode::Element(element) => {
+        Node::Element(element) => {
             let scoped = scoped_namespaces(element, namespaces);
             if is_text_anchor(element, &scoped) {
                 return Err(invalid(
@@ -486,23 +486,23 @@ fn split_node_at(
             let mut right_element = element.clone();
             right_element.children = right;
             Ok((
-                Some(AnnotationNode::Element(left_element)),
-                Some(AnnotationNode::Element(right_element)),
+                Some(Node::Element(left_element)),
+                Some(Node::Element(right_element)),
             ))
         },
     }
 }
 
-fn node_plain_len(node: &AnnotationNode, namespaces: &BTreeMap<String, String>) -> usize {
+fn node_plain_len(node: &Node, namespaces: &BTreeMap<String, String>) -> usize {
     match node {
-        AnnotationNode::Text(text) => text.len(),
-        AnnotationNode::Element(element) => element_plain_text(element, namespaces).len(),
+        Node::Text(text) => text.len(),
+        Node::Element(element) => element_plain_text(element, namespaces).len(),
     }
 }
 
 fn write_top_level_element(
     output: &mut String,
-    element: &AnnotationElement,
+    element: &Element,
     namespaces: &BTreeMap<String, String>,
 ) {
     output.push('<');
@@ -529,8 +529,8 @@ fn write_top_level_element(
     output.push('>');
     for child in &element.children {
         match child {
-            AnnotationNode::Text(text) => output.push_str(&escape_xml(text)),
-            AnnotationNode::Element(element) => element.write_xml(output),
+            Node::Text(text) => output.push_str(&escape_xml(text)),
+            Node::Element(element) => element.write_xml(output),
         }
     }
     output.push_str("</");
@@ -548,7 +548,7 @@ fn write_attribute(output: &mut String, name: &str, value: &str) {
 
 pub(crate) struct CellTextContentBuilder {
     content: CellTextContent,
-    stack: Vec<AnnotationElement>,
+    stack: Vec<Element>,
     nodes: usize,
     text_bytes: usize,
 }
@@ -624,7 +624,7 @@ impl CellTextContentBuilder {
             return Err(invalid("cell rich text exceeds the text-size limit"));
         }
         if let Some(parent) = self.stack.last_mut() {
-            parent.children.push(AnnotationNode::Text(text));
+            parent.children.push(Node::Text(text));
         }
         Ok(())
     }
@@ -640,9 +640,9 @@ impl CellTextContentBuilder {
         Ok(())
     }
 
-    fn add_element(&mut self, element: AnnotationElement) -> Result<()> {
+    fn add_element(&mut self, element: Element) -> Result<()> {
         if let Some(parent) = self.stack.last_mut() {
-            parent.children.push(AnnotationNode::Element(element));
+            parent.children.push(Node::Element(element));
         } else {
             self.content.paragraphs.push(element);
         }

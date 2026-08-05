@@ -185,8 +185,6 @@ pub(crate) use graphic_properties::{
     Child, ChildKind, Kind, Namespace, Properties, Property, Value, parse_graphic_style_properties,
     set_graphic_style_properties_xml,
 };
-#[allow(unused_imports, reason = "ODT facade exposes annotation semantics")]
-pub(crate) use litchi_odf_common::annotation::{AnnotationElement, AnnotationNode, CellAnnotation};
 #[allow(unused_imports, reason = "ODT facade exposes shared drawing context")]
 pub(crate) use litchi_odf_common::drawing::{Frame, Part};
 #[allow(

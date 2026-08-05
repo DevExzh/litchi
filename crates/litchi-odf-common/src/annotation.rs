@@ -1,4 +1,4 @@
-//! Spreadsheet cell annotations (comments/notes).
+//! ODF `office:annotation` mixed-content vocabulary.
 
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
@@ -9,26 +9,26 @@ use std::collections::{BTreeMap, BTreeSet};
 
 /// One ordered node in an annotation's rich text content.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum AnnotationNode {
+pub enum Node {
     /// Character data. It is always XML-escaped when serialized.
     Text(String),
     /// A nested ODF text or extension element.
-    Element(AnnotationElement),
+    Element(Element),
 }
 
-/// A lossless, ordered XML element within a cell annotation.
+/// A lossless, ordered XML element within an ODF annotation.
 ///
 /// This representation is intentionally generic: ODF permits the full text
 /// paragraph and list content model in annotations, including spans, links,
 /// fields, tabs, line breaks, and implementation-defined extension elements.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct AnnotationElement {
+pub struct Element {
     pub(crate) name: String,
     pub(crate) attributes: BTreeMap<String, String>,
-    pub(crate) children: Vec<AnnotationNode>,
+    pub(crate) children: Vec<Node>,
 }
 
-impl AnnotationElement {
+impl Element {
     /// Create an annotation content element with a validated XML qualified name.
     pub fn new(name: impl Into<String>) -> Result<Self> {
         let name = name.into();
@@ -78,19 +78,19 @@ impl AnnotationElement {
     }
 
     /// Return the ordered mixed-content nodes.
-    pub fn children(&self) -> &[AnnotationNode] {
+    pub fn children(&self) -> &[Node] {
         &self.children
     }
 
     /// Append escaped character data.
     pub fn push_text(&mut self, text: impl Into<String>) -> &mut Self {
-        self.children.push(AnnotationNode::Text(text.into()));
+        self.children.push(Node::Text(text.into()));
         self
     }
 
     /// Append a nested rich-content element.
-    pub fn push_element(&mut self, element: AnnotationElement) -> &mut Self {
-        self.children.push(AnnotationNode::Element(element));
+    pub fn push_element(&mut self, element: Element) -> &mut Self {
+        self.children.push(Node::Element(element));
         self
     }
 
@@ -115,8 +115,8 @@ impl AnnotationElement {
         let mut text = String::new();
         for child in &self.children {
             match child {
-                AnnotationNode::Text(value) => text.push_str(value),
-                AnnotationNode::Element(element) => text.push_str(&element.plain_text()),
+                Node::Text(value) => text.push_str(value),
+                Node::Element(element) => text.push_str(&element.plain_text()),
             }
         }
         text
@@ -134,8 +134,8 @@ impl AnnotationElement {
         output.push('>');
         for child in &self.children {
             match child {
-                AnnotationNode::Text(text) => output.push_str(&escape_xml(text)),
-                AnnotationNode::Element(element) => element.write_xml(output),
+                Node::Text(text) => output.push_str(&escape_xml(text)),
+                Node::Element(element) => element.write_xml(output),
             }
         }
         output.push_str("</");
@@ -149,7 +149,7 @@ impl AnnotationElement {
             collect_prefix(name, prefixes);
         }
         for child in &self.children {
-            if let AnnotationNode::Element(element) = child {
+            if let Node::Element(element) = child {
                 element.collect_prefixes(prefixes);
             }
         }
@@ -162,26 +162,26 @@ impl AnnotationElement {
             }
         }
         for child in &self.children {
-            if let AnnotationNode::Element(element) = child {
+            if let Node::Element(element) = child {
                 element.collect_namespace_declarations(prefixes);
             }
         }
     }
 }
 
-/// An ODF `office:annotation` attached to a spreadsheet cell.
+/// An ODF `office:annotation` with typed metadata and retained rich content.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CellAnnotation {
+pub struct Annotation {
     attributes: BTreeMap<String, String>,
-    children: Vec<AnnotationElement>,
+    children: Vec<Element>,
     namespaces: BTreeMap<String, String>,
 }
 
-impl CellAnnotation {
-    /// Create a plain-text cell annotation containing one `text:p` element.
+impl Annotation {
+    /// Create a plain-text annotation containing one `text:p` element.
     pub fn new(text: impl Into<String>) -> Self {
         let mut paragraph =
-            AnnotationElement::new("text:p").expect("the built-in text:p qualified name is valid");
+            Element::new("text:p").expect("the built-in text:p qualified name is valid");
         paragraph.push_text(text);
         Self {
             attributes: BTreeMap::new(),
@@ -356,7 +356,7 @@ impl CellAnnotation {
                     "creator-initials" | "sender-initials"
                 )
             })
-            .map(AnnotationElement::plain_text)
+            .map(Element::plain_text)
     }
 
     /// Set or clear canonical ODF 1.3 `meta:creator-initials` metadata.
@@ -368,7 +368,7 @@ impl CellAnnotation {
             )
         });
         let Some(initials) = initials else { return };
-        let mut element = AnnotationElement::new("meta:creator-initials")
+        let mut element = Element::new("meta:creator-initials")
             .expect("the built-in creator-initials name is valid");
         element.push_text(initials);
         let insertion = self
@@ -380,12 +380,12 @@ impl CellAnnotation {
     }
 
     /// Return all ordered child elements, including metadata and rich content.
-    pub fn children(&self) -> &[AnnotationElement] {
+    pub fn children(&self) -> &[Element] {
         &self.children
     }
 
     /// Return the rich body elements without creator/date/initials metadata.
-    pub fn body_elements(&self) -> Vec<&AnnotationElement> {
+    pub fn body_elements(&self) -> Vec<&Element> {
         self.children
             .iter()
             .filter(|child| !is_metadata_element(child))
@@ -393,7 +393,7 @@ impl CellAnnotation {
     }
 
     /// Replace the rich body while retaining typed metadata and its schema order.
-    pub fn replace_body(&mut self, body: Vec<AnnotationElement>) -> Result<&mut Self> {
+    pub fn replace_body(&mut self, body: Vec<Element>) -> Result<&mut Self> {
         if body.len() > 65_536 {
             return Err(Error::InvalidFormat(
                 "annotation body exceeds element limit".to_string(),
@@ -414,14 +414,14 @@ impl CellAnnotation {
     /// Append a plain-text paragraph.
     pub fn push_paragraph(&mut self, text: impl Into<String>) -> &mut Self {
         let mut paragraph =
-            AnnotationElement::new("text:p").expect("the built-in text:p qualified name is valid");
+            Element::new("text:p").expect("the built-in text:p qualified name is valid");
         paragraph.push_text(text);
         self.children.push(paragraph);
         self
     }
 
     /// Append a rich paragraph, list, or extension element.
-    pub fn push_element(&mut self, element: AnnotationElement) -> &mut Self {
+    pub fn push_element(&mut self, element: Element) -> &mut Self {
         self.children.push(element);
         self
     }
@@ -431,7 +431,7 @@ impl CellAnnotation {
         self.children
             .iter()
             .filter(|child| !is_metadata_element(child))
-            .map(AnnotationElement::plain_text)
+            .map(Element::plain_text)
             .collect::<Vec<_>>()
             .join("\n")
     }
@@ -466,7 +466,7 @@ impl CellAnnotation {
         self.children
             .iter()
             .find(|child| local_name(child.name()) == wanted_local_name)
-            .map(AnnotationElement::plain_text)
+            .map(Element::plain_text)
     }
 
     fn equivalent_attribute_key(&self, requested: &str) -> Option<&str> {
@@ -497,8 +497,8 @@ impl CellAnnotation {
             .retain(|child| local_name(child.name()) != local);
         let Some(value) = value else { return };
 
-        let mut element = AnnotationElement::new(name)
-            .expect("built-in annotation metadata qualified names are valid");
+        let mut element =
+            Element::new(name).expect("built-in annotation metadata qualified names are valid");
         element.push_text(value);
         let insertion = self
             .children
@@ -537,25 +537,25 @@ impl CellAnnotation {
     }
 }
 
-impl Default for CellAnnotation {
+impl Default for Annotation {
     fn default() -> Self {
         Self::new("")
     }
 }
 
-pub struct AnnotationBuilder {
-    annotation: CellAnnotation,
-    stack: Vec<AnnotationElement>,
+pub struct Builder {
+    annotation: Annotation,
+    stack: Vec<Element>,
 }
 
-impl AnnotationBuilder {
+impl Builder {
     pub fn new(
         start: &BytesStart<'_>,
         decoder: Decoder,
         namespaces: BTreeMap<String, String>,
     ) -> Result<Self> {
         Ok(Self {
-            annotation: CellAnnotation {
+            annotation: Annotation {
                 attributes: parse_attributes(start, decoder, false)?,
                 children: Vec::new(),
                 namespaces,
@@ -578,9 +578,7 @@ impl AnnotationBuilder {
             .xml_content(XmlVersion::Explicit1_0)
             .map_err(|error| Error::InvalidFormat(format!("invalid annotation text: {error}")))?;
         if let Some(parent) = self.stack.last_mut() {
-            parent
-                .children
-                .push(AnnotationNode::Text(decoded.into_owned()));
+            parent.children.push(Node::Text(decoded.into_owned()));
         }
         Ok(())
     }
@@ -588,7 +586,7 @@ impl AnnotationBuilder {
     pub fn reference(&mut self, reference: &BytesRef<'_>) -> Result<()> {
         let value = decode_reference(reference)?;
         if let Some(parent) = self.stack.last_mut() {
-            parent.children.push(AnnotationNode::Text(value));
+            parent.children.push(Node::Text(value));
         }
         Ok(())
     }
@@ -598,32 +596,31 @@ impl AnnotationBuilder {
             .xml_content(XmlVersion::Explicit1_0)
             .map_err(|error| Error::InvalidFormat(format!("invalid annotation CDATA: {error}")))?;
         if let Some(parent) = self.stack.last_mut() {
-            parent
-                .children
-                .push(AnnotationNode::Text(decoded.into_owned()));
+            parent.children.push(Node::Text(decoded.into_owned()));
         }
         Ok(())
     }
 
     pub fn end_element(&mut self) -> Result<()> {
-        let element = self.stack.pop().ok_or_else(|| {
-            Error::InvalidFormat("unbalanced element in cell annotation".to_string())
-        })?;
+        let element = self
+            .stack
+            .pop()
+            .ok_or_else(|| Error::InvalidFormat("unbalanced element in annotation".to_string()))?;
         self.add_element(element)
     }
 
-    pub fn finish(self) -> Result<CellAnnotation> {
+    pub fn finish(self) -> Result<Annotation> {
         if !self.stack.is_empty() {
             return Err(Error::InvalidFormat(
-                "unclosed element in cell annotation".to_string(),
+                "unclosed element in annotation".to_string(),
             ));
         }
         Ok(self.annotation)
     }
 
-    fn add_element(&mut self, element: AnnotationElement) -> Result<()> {
+    fn add_element(&mut self, element: Element) -> Result<()> {
         if let Some(parent) = self.stack.last_mut() {
-            parent.children.push(AnnotationNode::Element(element));
+            parent.children.push(Node::Element(element));
         } else {
             self.annotation.children.push(element);
         }
@@ -652,12 +649,12 @@ pub(crate) fn decode_reference(reference: &BytesRef<'_>) -> Result<String> {
     }
 }
 
-pub(crate) fn parse_element(start: &BytesStart<'_>, decoder: Decoder) -> Result<AnnotationElement> {
+pub(crate) fn parse_element(start: &BytesStart<'_>, decoder: Decoder) -> Result<Element> {
     let name = std::str::from_utf8(start.name().as_ref())
         .map_err(|_| Error::InvalidFormat("invalid UTF-8 in annotation element name".to_string()))?
         .to_string();
     validate_qname(&name)?;
-    Ok(AnnotationElement {
+    Ok(Element {
         name,
         attributes: parse_attributes(start, decoder, true)?,
         children: Vec::new(),
@@ -672,7 +669,7 @@ fn parse_attributes(
     let mut attributes = BTreeMap::new();
     for attribute in start.attributes() {
         let attribute = attribute.map_err(|error| {
-            Error::InvalidFormat(format!("invalid cell annotation attribute: {error}"))
+            Error::InvalidFormat(format!("invalid annotation attribute: {error}"))
         })?;
         let name = std::str::from_utf8(attribute.key.as_ref())
             .map_err(|_| {
@@ -685,7 +682,7 @@ fn parse_attributes(
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
             .map_err(|error| {
-                Error::InvalidFormat(format!("invalid cell annotation attribute value: {error}"))
+                Error::InvalidFormat(format!("invalid annotation attribute value: {error}"))
             })?
             .into_owned();
         attributes.insert(name, value);
@@ -715,7 +712,7 @@ fn set_optional_attribute(
     }
 }
 
-fn metadata_order(element: &AnnotationElement) -> Option<usize> {
+fn metadata_order(element: &Element) -> Option<usize> {
     match local_name(element.name()) {
         "creator" => Some(0),
         "date" => Some(1),
@@ -725,7 +722,7 @@ fn metadata_order(element: &AnnotationElement) -> Option<usize> {
     }
 }
 
-fn is_metadata_element(element: &AnnotationElement) -> bool {
+fn is_metadata_element(element: &Element) -> bool {
     metadata_order(element).is_some()
 }
 
@@ -791,17 +788,17 @@ mod tests {
 
     #[test]
     fn builds_rich_annotation_and_escapes_values() {
-        let mut annotation = CellAnnotation::new("first & <line>");
+        let mut annotation = Annotation::new("first & <line>");
         annotation.set_creator(Some("A&B"));
         annotation.set_display(Some(true));
         annotation.set_attribute("svg:width", "3\" & 4cm").unwrap();
 
-        let mut span = AnnotationElement::new("text:span").unwrap();
+        let mut span = Element::new("text:span").unwrap();
         span.set_attribute("text:style-name", "Strong").unwrap();
         span.push_text("bold");
-        let mut paragraph = AnnotationElement::new("text:p").unwrap();
+        let mut paragraph = Element::new("text:p").unwrap();
         paragraph.push_element(span);
-        paragraph.push_element(AnnotationElement::new("text:line-break").unwrap());
+        paragraph.push_element(Element::new("text:line-break").unwrap());
         paragraph.push_text("after");
         annotation.push_element(paragraph);
 
@@ -821,16 +818,16 @@ mod tests {
 
     #[test]
     fn rejects_names_that_could_inject_xml() {
-        assert!(AnnotationElement::new("text:p><evil").is_err());
-        let mut annotation = CellAnnotation::default();
+        assert!(Element::new("text:p><evil").is_err());
+        let mut annotation = Annotation::default();
         assert!(annotation.set_attribute("x\" y", "value").is_err());
         assert!(annotation.set_attribute("xmlns:evil", "urn:evil").is_err());
     }
 
     #[test]
     fn validates_custom_extension_namespaces() {
-        let mut annotation = CellAnnotation::new("root");
-        annotation.push_element(AnnotationElement::new("vendor:thread").unwrap());
+        let mut annotation = Annotation::new("root");
+        annotation.push_element(Element::new("vendor:thread").unwrap());
         assert!(annotation.validate().is_err());
 
         annotation
@@ -845,7 +842,7 @@ mod tests {
 
     #[test]
     fn reads_legacy_annotation_metadata_attributes() {
-        let mut annotation = CellAnnotation::default();
+        let mut annotation = Annotation::default();
         annotation
             .set_attribute("office:author", "Legacy Author")
             .unwrap();

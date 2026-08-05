@@ -12,7 +12,7 @@ use super::{
     SheetTableSource, Sparkline, SparklineAxisType, SparklineColorTransformation,
     SparklineComplexColor, SparklineEmptyCells, SparklineGroup, SparklineType, TableGroup,
     TableRange, TableSourceMode, TableStructure, TableVisibility, ThemeColorType,
-    annotation::{AnnotationBuilder, decode_reference},
+    annotation::{Builder, decode_reference},
     conditional_format::{
         CALCEXT_NAMESPACE_URI, DATA_BAR_ENTRY_COUNT, MAX_CONDITIONAL_FORMATS_PER_SHEET,
         MAX_ENTRIES_PER_RULE, MAX_RULES_PER_FORMAT, validate_color_scale_entry, validate_condition,
@@ -180,7 +180,7 @@ impl Parser {
         let mut text_element_depth = 0usize;
         let mut text_content = String::new();
         let mut rich_text_builder: Option<CellTextContentBuilder> = None;
-        let mut annotation_builder: Option<AnnotationBuilder> = None;
+        let mut annotation_builder: Option<Builder> = None;
         let mut annotation_depth = 0usize;
         let mut pending_hyperlink: Option<PendingHyperlink> = None;
         let mut detective_builder: Option<CellDetective> = None;
@@ -553,7 +553,7 @@ impl Parser {
                     } else if current_cell.is_some()
                         && Self::is_office_annotation(e, &document_namespaces)
                     {
-                        annotation_builder = Some(AnnotationBuilder::new(
+                        annotation_builder = Some(Builder::new(
                             e,
                             reader.decoder(),
                             document_namespaces.clone(),
@@ -1185,7 +1185,7 @@ impl Parser {
                     } else if current_cell.is_some()
                         && Self::is_office_annotation(e, &document_namespaces)
                     {
-                        let annotation = AnnotationBuilder::new(
+                        let annotation = Builder::new(
                             e,
                             reader.decoder(),
                             document_namespaces.clone(),
@@ -4414,7 +4414,7 @@ pub(crate) struct CellBuilder {
     protected: Option<bool>,
     repeated: usize,
     merge: CellMerge,
-    annotation: Option<super::CellAnnotation>,
+    annotation: Option<super::Annotation>,
     hyperlinks: Vec<Link>,
     range_source: Option<CellRangeSource>,
     detective: Option<CellDetective>,

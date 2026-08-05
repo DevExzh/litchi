@@ -1,7 +1,7 @@
 //! Cell data structures for ODS spreadsheets.
 
 use super::hyperlink::Link;
-use super::{CellAnnotation, CellDetective, CellRangeSource, CellTextContent, Row};
+use super::{Annotation, CellDetective, CellRangeSource, CellTextContent, Row};
 use litchi_core::{Result, xml::escape_xml};
 use std::{num::NonZeroUsize, ops::Range};
 
@@ -86,7 +86,7 @@ pub struct Cell {
     /// The formula in the cell (if any), in ODF format
     pub formula: Option<String>,
     /// The optional ODF annotation (comment/note) attached to the cell.
-    pub annotation: Option<CellAnnotation>,
+    pub annotation: Option<Annotation>,
     /// Hyperlinks (`text:a`) contained in the cell's text content, in
     /// document order.
     pub hyperlinks: Vec<Link>,
@@ -174,22 +174,22 @@ impl Cell {
     }
 
     /// Return the cell annotation, if present.
-    pub fn annotation(&self) -> Option<&CellAnnotation> {
+    pub fn annotation(&self) -> Option<&Annotation> {
         self.annotation.as_ref()
     }
 
     /// Return a mutable cell annotation, if present.
-    pub fn annotation_mut(&mut self) -> Option<&mut CellAnnotation> {
+    pub fn annotation_mut(&mut self) -> Option<&mut Annotation> {
         self.annotation.as_mut()
     }
 
     /// Attach or replace the cell annotation.
-    pub fn set_annotation(&mut self, annotation: CellAnnotation) {
+    pub fn set_annotation(&mut self, annotation: Annotation) {
         self.annotation = Some(annotation);
     }
 
     /// Remove and return the cell annotation.
-    pub fn take_annotation(&mut self) -> Option<CellAnnotation> {
+    pub fn take_annotation(&mut self) -> Option<Annotation> {
         self.annotation.take()
     }
 

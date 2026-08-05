@@ -3,7 +3,7 @@
 use crate::core::OwnedPackage;
 use crate::package::charts::rebuild_package;
 use litchi_core::{Error, Result, xml::escape_xml};
-use litchi_odf_common::annotation::{AnnotationBuilder, CellAnnotation};
+use litchi_odf_common::annotation::Builder;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -29,7 +29,7 @@ const MAX_ANNOTATIONS: usize = 65_536;
 const MAX_EVENTS: usize = 1_000_000;
 
 /// Rich annotation value shared by ODT, ODS, and ODP.
-pub type Annotation = CellAnnotation;
+pub use litchi_odf_common::annotation::Annotation;
 
 /// A schema location to which an annotation is attached.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -170,7 +170,7 @@ struct Frame {
 
 struct ActiveBuilder {
     record: usize,
-    builder: AnnotationBuilder,
+    builder: Builder,
 }
 
 pub(crate) fn annotations(content: &str, host: AnnotationHost) -> Result<Vec<AnnotationInfo>> {
@@ -337,14 +337,14 @@ fn replace_xml(
         .get(index)
         .ok_or_else(|| bounds(index, scan.records.len()))?;
     if record.end.is_some()
-        && record.annotation.as_ref().and_then(CellAnnotation::name) != annotation.name()
+        && record.annotation.as_ref().and_then(Annotation::name) != annotation.name()
     {
         return invalid("replacing a ranged annotation cannot change its office:name");
     }
     if let Some(name) = annotation.name() {
         for (other_index, other) in scan.records.iter().enumerate() {
             if other_index != index
-                && other.annotation.as_ref().and_then(CellAnnotation::name) == Some(name)
+                && other.annotation.as_ref().and_then(Annotation::name) == Some(name)
             {
                 return invalid(format!("duplicate annotation name '{name}'"));
             }
@@ -482,11 +482,7 @@ fn scan(xml: &str, host: AnnotationHost) -> Result<Scan> {
                     });
                     builders.push(ActiveBuilder {
                         record,
-                        builder: AnnotationBuilder::new(
-                            &element,
-                            reader.decoder(),
-                            namespaces.clone(),
-                        )?,
+                        builder: Builder::new(&element, reader.decoder(), namespaces.clone())?,
                     });
                     frames.push(Frame {
                         start,
@@ -534,8 +530,7 @@ fn scan(xml: &str, host: AnnotationHost) -> Result<Scan> {
                         return invalid("document exceeds annotation limit");
                     }
                     let anchor = current_position(&frames, &sites, host)?;
-                    let builder =
-                        AnnotationBuilder::new(&element, reader.decoder(), namespaces.clone())?;
+                    let builder = Builder::new(&element, reader.decoder(), namespaces.clone())?;
                     records.push(Record {
                         span: Span {
                             start,
@@ -891,7 +886,7 @@ fn current_page(frames: &[Frame]) -> Option<usize> {
 fn pair_ranges(records: &mut [Record], ends: Vec<EndMarker>) -> Result<()> {
     let mut starts = HashMap::new();
     for (index, record) in records.iter().enumerate() {
-        if let Some(name) = record.annotation.as_ref().and_then(CellAnnotation::name) {
+        if let Some(name) = record.annotation.as_ref().and_then(Annotation::name) {
             if name.is_empty() {
                 return invalid("annotation office:name cannot be empty");
             }
@@ -958,7 +953,7 @@ fn validate_new_name(scan: &Scan, name: Option<&str>) -> Result<()> {
     if scan
         .records
         .iter()
-        .any(|record| record.annotation.as_ref().and_then(CellAnnotation::name) == Some(name))
+        .any(|record| record.annotation.as_ref().and_then(Annotation::name) == Some(name))
     {
         return invalid(format!("duplicate annotation name '{name}'"));
     }
