@@ -29,7 +29,7 @@ pub use generated::{
 
 #[cfg(test)]
 mod tests {
-    use prost::Message;
+    use prost::{Message, Name};
 
     #[test]
     fn generated_messages_round_trip_without_runtime_names() -> Result<(), prost::DecodeError> {
@@ -42,5 +42,18 @@ mod tests {
         let decoded = super::tsp::ArchiveInfo::decode(encoded.as_slice())?;
         assert_eq!(decoded, input);
         Ok(())
+    }
+
+    #[test]
+    fn generated_schema_names_remain_available() {
+        assert_eq!(super::tsp::ArchiveInfo::full_name(), "TSP.ArchiveInfo");
+        assert_eq!(
+            super::tp::DocumentArchive::full_name(),
+            "TP.DocumentArchive"
+        );
+        assert_eq!(
+            super::tsch::pre_uff::ChartInfoArchive::full_name(),
+            "TSCH.PreUFF.ChartInfoArchive"
+        );
     }
 }
