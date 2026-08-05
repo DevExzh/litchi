@@ -35,7 +35,7 @@ impl Table {
             #[cfg(feature = "doc")]
             Table::Doc(t) => t.row_count().map_err(Error::from),
             #[cfg(feature = "ooxml")]
-            Table::Docx(t) => t.row_count().map_err(Error::from),
+            Table::Docx(t) => t.row_count().map_err(crate::ooxml::map_ooxml_error),
             #[cfg(feature = "rtf")]
             Table::Rtf(t) => Ok(t.row_count()),
             #[cfg(feature = "odf")]
@@ -61,7 +61,7 @@ impl Table {
             },
             #[cfg(feature = "ooxml")]
             Table::Docx(t) => {
-                let rows = t.rows().map_err(Error::from)?;
+                let rows = t.rows().map_err(crate::ooxml::map_ooxml_error)?;
                 Ok(rows.into_iter().map(|r| Row::Docx(Box::new(r))).collect())
             },
             #[cfg(feature = "rtf")]
@@ -101,7 +101,7 @@ impl Table {
             },
             #[cfg(feature = "ooxml")]
             Table::Docx(t) => {
-                let rows = t.rows().map_err(Error::from)?;
+                let rows = t.rows().map_err(crate::ooxml::map_ooxml_error)?;
                 Ok(rows.get(index).cloned().map(|r| Row::Docx(Box::new(r))))
             },
             #[cfg(feature = "rtf")]
@@ -140,7 +140,7 @@ impl Row {
             #[cfg(feature = "doc")]
             Row::Doc(r) => r.cell_count().map_err(Error::from),
             #[cfg(feature = "ooxml")]
-            Row::Docx(r) => r.cell_count().map_err(Error::from),
+            Row::Docx(r) => r.cell_count().map_err(crate::ooxml::map_ooxml_error),
             #[cfg(feature = "rtf")]
             Row::Rtf(r) => Ok(r.cell_count()),
             #[cfg(feature = "odf")]
@@ -158,12 +158,12 @@ impl Row {
         match self {
             #[cfg(feature = "doc")]
             Row::Doc(r) => {
-                let cells = r.cells().map_err(Error::from)?;
+                let cells = r.cells().map_err(crate::ooxml::map_ooxml_error)?;
                 Ok(cells.into_iter().map(Cell::Doc).collect())
             },
             #[cfg(feature = "ooxml")]
             Row::Docx(r) => {
-                let cells = r.cells().map_err(Error::from)?;
+                let cells = r.cells().map_err(crate::ooxml::map_ooxml_error)?;
                 Ok(cells.into_iter().map(Cell::Docx).collect())
             },
             #[cfg(feature = "rtf")]
@@ -196,7 +196,7 @@ impl Row {
             },
             #[cfg(feature = "ooxml")]
             Row::Docx(r) => {
-                let cells = r.cells().map_err(Error::from)?;
+                let cells = r.cells().map_err(crate::ooxml::map_ooxml_error)?;
                 Ok(cells.get(index).cloned().map(Cell::Docx))
             },
             #[cfg(feature = "rtf")]
@@ -273,7 +273,10 @@ impl Cell {
             #[cfg(feature = "doc")]
             Cell::Doc(c) => c.text().map(|s| s.to_string()).map_err(Error::from),
             #[cfg(feature = "ooxml")]
-            Cell::Docx(c) => c.text().map(|s| s.to_string()).map_err(Error::from),
+            Cell::Docx(c) => c
+                .text()
+                .map(|s| s.to_string())
+                .map_err(crate::ooxml::map_ooxml_error),
             #[cfg(feature = "rtf")]
             Cell::Rtf(c) => Ok(c.text().to_string()),
             #[cfg(feature = "odf")]
@@ -301,7 +304,7 @@ impl Cell {
             #[cfg(feature = "doc")]
             Cell::Doc(_) => Ok(1),
             #[cfg(feature = "ooxml")]
-            Cell::Docx(c) => c.grid_span().map_err(Error::from),
+            Cell::Docx(c) => c.grid_span().map_err(crate::ooxml::map_ooxml_error),
             // RTF `\clmgf`/`\clmrg` are roles, not counts; see `Row::grid_span_at`.
             #[cfg(feature = "rtf")]
             Cell::Rtf(_) => Ok(1),
@@ -344,7 +347,9 @@ impl Cell {
             // A `w:gridSpan` above 1 absorbs the covered columns outright, so a
             // DOCX cell is either the owner of a range or unmerged.
             #[cfg(feature = "ooxml")]
-            Cell::Docx(c) => Ok(span_merge(c.grid_span().map_err(Error::from)?)),
+            Cell::Docx(c) => Ok(span_merge(
+                c.grid_span().map_err(crate::ooxml::map_ooxml_error)?,
+            )),
             #[cfg(feature = "rtf")]
             Cell::Rtf(c) => Ok(rtf_merge(c.merge().horizontal)),
             // ODF covered cells are `table:covered-table-cell` elements, which
@@ -366,7 +371,7 @@ impl Cell {
                 .map(vertical_doc_merge)
                 .unwrap_or_default()),
             #[cfg(feature = "ooxml")]
-            Cell::Docx(c) => Ok(match c.v_merge().map_err(Error::from)? {
+            Cell::Docx(c) => Ok(match c.v_merge().map_err(crate::ooxml::map_ooxml_error)? {
                 None => CellMerge::None,
                 Some(crate::ooxml::docx::VMergeState::Restart) => CellMerge::Start,
                 Some(crate::ooxml::docx::VMergeState::Continue) => CellMerge::Continuation,
@@ -388,7 +393,7 @@ impl Cell {
         match self {
             #[cfg(feature = "doc")]
             Cell::Doc(_) => Ok(None),
-            Cell::Docx(c) => c.v_merge().map_err(Error::from),
+            Cell::Docx(c) => c.v_merge().map_err(crate::ooxml::map_ooxml_error),
             #[cfg(feature = "rtf")]
             Cell::Rtf(_) => Ok(None),
             #[cfg(feature = "odf")]

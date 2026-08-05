@@ -18,7 +18,7 @@ pub(super) enum WorkbookImpl {
 
     // OOXML-based formats
     #[cfg(feature = "ooxml")]
-    Xlsx(crate::ooxml::xlsx::Workbook),
+    Xlsx(super::adapters::Workbook),
     #[cfg(feature = "ooxml")]
     Xlsb(crate::ooxml::xlsb::Workbook),
 

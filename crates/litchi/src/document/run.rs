@@ -33,7 +33,10 @@ impl Run {
             #[cfg(feature = "doc")]
             Run::Doc(r) => r.text().map(|s| s.to_string()).map_err(Error::from),
             #[cfg(feature = "ooxml")]
-            Run::Docx(r) => r.text().map(|s| s.to_string()).map_err(Error::from),
+            Run::Docx(r) => r
+                .text()
+                .map(|s| s.to_string())
+                .map_err(crate::ooxml::map_ooxml_error),
             #[cfg(feature = "iwa")]
             Run::Pages(text) => Ok(text.clone()),
             #[cfg(feature = "rtf")]
@@ -51,7 +54,7 @@ impl Run {
             #[cfg(feature = "doc")]
             Run::Doc(r) => Ok(r.bold()),
             #[cfg(feature = "ooxml")]
-            Run::Docx(r) => r.bold().map_err(Error::from),
+            Run::Docx(r) => r.bold().map_err(crate::ooxml::map_ooxml_error),
             #[cfg(feature = "iwa")]
             Run::Pages(_) => Ok(None), // Pages doesn't support run-level formatting in the current API
             #[cfg(feature = "rtf")]
@@ -67,7 +70,7 @@ impl Run {
             #[cfg(feature = "doc")]
             Run::Doc(r) => Ok(r.italic()),
             #[cfg(feature = "ooxml")]
-            Run::Docx(r) => r.italic().map_err(Error::from),
+            Run::Docx(r) => r.italic().map_err(crate::ooxml::map_ooxml_error),
             #[cfg(feature = "iwa")]
             Run::Pages(_) => Ok(None), // Pages doesn't support run-level formatting in the current API
             #[cfg(feature = "rtf")]
@@ -83,7 +86,7 @@ impl Run {
             #[cfg(feature = "doc")]
             Run::Doc(r) => Ok(r.strikethrough()),
             #[cfg(feature = "ooxml")]
-            Run::Docx(r) => r.strikethrough().map_err(Error::from),
+            Run::Docx(r) => r.strikethrough().map_err(crate::ooxml::map_ooxml_error),
             #[cfg(feature = "iwa")]
             Run::Pages(_) => Ok(None), // Pages doesn't support run-level formatting in the current API
             #[cfg(feature = "rtf")]
@@ -115,7 +118,10 @@ impl Run {
             #[cfg(feature = "ooxml")]
             Run::Docx(r) => {
                 // Now ooxml::docx::Run also uses litchi_core::VerticalPosition
-                match r.vertical_position().map_err(Error::from)? {
+                match r
+                    .vertical_position()
+                    .map_err(crate::ooxml::map_ooxml_error)?
+                {
                     Some(VerticalPosition::Superscript) => Ok(Some(VerticalPosition::Superscript)),
                     Some(VerticalPosition::Subscript) => Ok(Some(VerticalPosition::Subscript)),
                     Some(VerticalPosition::Normal) | None => Ok(None),

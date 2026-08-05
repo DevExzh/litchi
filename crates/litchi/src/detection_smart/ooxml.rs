@@ -44,7 +44,7 @@ pub fn detect_zip_format(_bytes: &[u8]) -> Option<FileFormat> {
 #[cfg(feature = "ooxml")]
 pub fn detect_zip_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileFormat> {
     // Try to open as OOXML package - this will validate the format and structure
-    let package = match crate::ooxml::OpcPackage::from_reader(reader) {
+    let package = match crate::ooxml::opc::OpcPackage::from_reader(reader) {
         Ok(pkg) => pkg,
         Err(_) => return None,
     };
@@ -59,7 +59,9 @@ pub fn detect_zip_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<F
 /// # Note
 /// This function requires the `ooxml` feature to be enabled.
 #[cfg(feature = "ooxml")]
-pub fn detect_ooxml_format_from_package(package: &crate::ooxml::OpcPackage) -> Option<FileFormat> {
+pub fn detect_ooxml_format_from_package(
+    package: &crate::ooxml::opc::OpcPackage,
+) -> Option<FileFormat> {
     fn is_word_main(content_type: &str) -> bool {
         content_type.contains("wordprocessingml.document.main")
             || content_type.contains("wordprocessingml.template.main")

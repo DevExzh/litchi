@@ -48,6 +48,7 @@
 pub mod eval {
     pub use litchi_eval::*;
 }
+mod adapters;
 pub mod functions;
 pub mod text;
 pub use litchi_core::sheet::traits;

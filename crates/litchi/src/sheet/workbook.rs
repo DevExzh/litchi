@@ -131,26 +131,33 @@ impl Workbook {
             #[cfg(feature = "ooxml")]
             DetectedFormat::Xlsx(opc_package) => {
                 // OPC package already parsed - reuse it!
-                let xlsx = crate::ooxml::xlsx::Workbook::new(opc_package)?;
-                let metadata = xlsx
-                    .props()
-                    .cloned()
+                let metadata = crate::ooxml::common::properties::read(&opc_package)
+                    .map_err(crate::ooxml::map_ooxml_error)?
                     .map(litchi_core::Metadata::from)
                     .unwrap_or_default();
-                (WorkbookImpl::Xlsx(xlsx), metadata)
+                let xlsx = crate::ooxml::xlsx::Package::from_opc(opc_package)
+                    .map_err(crate::ooxml::map_ooxml_error)?
+                    .into_workbook()
+                    .map_err(crate::ooxml::map_ooxml_error)?;
+                (
+                    WorkbookImpl::Xlsx(super::adapters::Workbook::new(xlsx)),
+                    metadata,
+                )
             },
 
             #[cfg(feature = "ooxml")]
             DetectedFormat::Xlsb(opc_package) => {
                 // OPC package already parsed - reuse it!
-                let metadata = litchi_ooxml_common::properties::read(&opc_package)
+                let metadata = crate::ooxml::common::properties::read(&opc_package)
                     .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)?
                     .map(litchi_core::Metadata::from)
                     .unwrap_or_default();
 
                 // Create XLSB workbook directly from the parsed OPC package
-                let xlsb = crate::ooxml::xlsb::Workbook::from_opc_package(opc_package)
-                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+                let xlsb = crate::ooxml::xlsb::Package::from_opc(opc_package)
+                    .map_err(crate::ooxml::map_ooxml_error)?
+                    .into_workbook()
+                    .map_err(crate::ooxml::map_ooxml_error)?;
                 (WorkbookImpl::Xlsb(xlsb), metadata)
             },
 

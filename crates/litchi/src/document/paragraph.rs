@@ -34,7 +34,10 @@ impl Paragraph {
             #[cfg(feature = "doc")]
             Paragraph::Doc(p) => p.text().map(|s| s.to_string()).map_err(Error::from),
             #[cfg(feature = "ooxml")]
-            Paragraph::Docx(p) => p.text().map(|s| s.to_string()).map_err(Error::from),
+            Paragraph::Docx(p) => p
+                .text()
+                .map(|s| s.to_string())
+                .map_err(crate::ooxml::map_ooxml_error),
             #[cfg(feature = "iwa")]
             Paragraph::Pages(text) => Ok(text.clone()),
             #[cfg(feature = "rtf")]
@@ -56,7 +59,7 @@ impl Paragraph {
             },
             #[cfg(feature = "ooxml")]
             Paragraph::Docx(p) => {
-                let runs = p.runs().map_err(Error::from)?;
+                let runs = p.runs().map_err(crate::ooxml::map_ooxml_error)?;
                 Ok(runs.into_iter().map(Run::Docx).collect())
             },
             #[cfg(feature = "iwa")]
