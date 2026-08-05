@@ -12,22 +12,24 @@ pub use litchi_pptx::media_parts::{
     Resource, Transform, Trim,
 };
 
-fn map_media_error(error: litchi_pptx::Error) -> OoxmlError {
+pub(crate) fn map_pptx_error(error: litchi_pptx::Error) -> OoxmlError {
     match error {
         litchi_pptx::Error::Opc(error) => OoxmlError::Opc(error),
         litchi_pptx::Error::Xml(message) => OoxmlError::Xml(message),
         litchi_pptx::Error::Invalid(message) => OoxmlError::InvalidFormat(message),
-        litchi_pptx::Error::Limit { resource, limit }
-            if resource == "slide media serialized XML bytes" =>
-        {
+        litchi_pptx::Error::Limit { resource, limit } => {
             OoxmlError::Pptx(litchi_pptx::Error::Limit { resource, limit })
-        },
-        litchi_pptx::Error::Limit { resource, .. } => {
-            OoxmlError::InvalidFormat(format!("{resource} limit exceeded"))
         },
         litchi_pptx::Error::Allocation { resource, source } => {
             OoxmlError::Allocation { resource, source }
         },
+        litchi_pptx::Error::ContentType { expected, actual } => OoxmlError::InvalidContentType {
+            expected,
+            got: actual,
+        },
+        litchi_pptx::Error::Relationship(message) => OoxmlError::InvalidRelationship(message),
+        litchi_pptx::Error::PartNotFound(message) => OoxmlError::PartNotFound(message),
+        litchi_pptx::Error::Uri(message) => OoxmlError::InvalidUri(message),
         litchi_pptx::Error::MarkupCompatibility(error) => {
             OoxmlError::Common(litchi_ooxml_common::Error::Mce(error))
         },
@@ -40,17 +42,16 @@ fn map_media_error(error: litchi_pptx::Error) -> OoxmlError {
 
 /// Parse all audio/video pictures from a complete Slide part.
 pub fn parse_slide_media(xml: &[u8]) -> Result<List> {
-    litchi_pptx::media_parts::parse_slide_media(xml).map_err(map_media_error)
+    litchi_pptx::media_parts::parse_slide_media(xml).map_err(map_pptx_error)
 }
 /// Serialize audio/video pictures for insertion into a Slide part.
 pub fn write_slide_media_pictures(value: &List, conformance: Conformance) -> Result<Vec<u8>> {
-    litchi_pptx::media_parts::write_slide_media_pictures(value, conformance)
-        .map_err(map_media_error)
+    litchi_pptx::media_parts::write_slide_media_pictures(value, conformance).map_err(map_pptx_error)
 }
 
 /// Load media pictures and validate their complete internal OPC resource graph.
 pub fn load_slide_media(package: &OpcPackage, slide_name: &PackURI) -> Result<List> {
-    litchi_pptx::media_parts::load_slide_media(package, slide_name).map_err(map_media_error)
+    litchi_pptx::media_parts::load_slide_media(package, slide_name).map_err(map_pptx_error)
 }
 
 /// Add media pictures and their inert internal resources to a Slide part.
@@ -61,7 +62,7 @@ pub fn store_slide_media(
     conformance: Conformance,
 ) -> Result<()> {
     litchi_pptx::media_parts::store_slide_media(package, slide_name, value, conformance)
-        .map_err(map_media_error)
+        .map_err(map_pptx_error)
 }
 
 #[cfg(test)]
