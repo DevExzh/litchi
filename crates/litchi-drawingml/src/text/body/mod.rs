@@ -5,5 +5,6 @@
 //! semantics while this module owns the reusable body model.
 
 mod model;
+pub mod writer;
 
 pub use model::{Body, Insets, Paragraph, Properties, Run};

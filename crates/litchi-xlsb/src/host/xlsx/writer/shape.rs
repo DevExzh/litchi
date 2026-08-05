@@ -24,10 +24,11 @@ use std::fmt::Write as _;
 
 use litchi_core::xml::escape::escape_xml;
 use litchi_drawingml::geom::Preset;
+use litchi_drawingml::text::body::writer::write_contents as write_text_body_contents;
 
 use crate::package::xlsx::shapes::{
-    Autofit, CellMarker, Columns, Direction, EditAs, EmuExtent, EmuOffset, Geometry,
-    GroupTransform, Paragraph, Properties, Run, ShapeAnchor, VerticalAnchor, Wrap,
+    CellMarker, EditAs, EmuExtent, EmuOffset, Geometry, GroupTransform, Paragraph, Properties, Run,
+    ShapeAnchor,
 };
 use litchi_drawingml::geometry::writer::write_custom_geometry;
 use litchi_drawingml::geometry::{CustomGeometry, validate_custom_geometry};
@@ -798,77 +799,6 @@ fn write_shape_xml(xml: &mut String, spec: &ShapeSpec, id: u32) {
         },
     }
     xml.push_str("</xdr:spPr><xdr:txBody>");
-    write_properties(xml, &spec.properties);
-    xml.push_str("<a:lstStyle/>");
-    for paragraph in &spec.paragraphs {
-        xml.push_str("<a:p>");
-        for run in &paragraph.runs {
-            xml.push_str("<a:r>");
-            write_run_properties(xml, run);
-            let _ = write!(xml, "<a:t>{}</a:t>", escape_xml(&run.text));
-            xml.push_str("</a:r>");
-        }
-        xml.push_str("</a:p>");
-    }
+    write_text_body_contents(xml, &spec.properties, &spec.paragraphs);
     xml.push_str("</xdr:txBody></xdr:sp>");
-}
-
-fn write_properties(xml: &mut String, body: &Properties) {
-    xml.push_str("<a:bodyPr");
-    let _ = write!(
-        xml,
-        r#" lIns="{}" tIns="{}" rIns="{}" bIns="{}""#,
-        body.insets.left, body.insets.top, body.insets.right, body.insets.bottom
-    );
-    let anchor =
-        (body.vertical_anchor != VerticalAnchor::Top).then(|| body.vertical_anchor.token());
-    if let Some(token) = anchor {
-        let _ = write!(xml, r#" anchor="{token}""#);
-    }
-    if body.anchor_center {
-        xml.push_str(r#" anchorCtr="1""#);
-    }
-    let direction = (body.direction != Direction::Horizontal).then(|| body.direction.token());
-    if let Some(token) = direction {
-        let _ = write!(xml, r#" vert="{token}""#);
-    }
-    if body.wrap == Wrap::None {
-        xml.push_str(r#" wrap="none""#);
-    }
-    if body.column_count != Columns::ONE {
-        let _ = write!(xml, r#" numCol="{}""#, body.column_count);
-    }
-    if body.space_first_last_paragraph {
-        xml.push_str(r#" spcFirstLastPara="1""#);
-    }
-    match body.autofit {
-        Autofit::None => xml.push_str("><a:noAutofit/></a:bodyPr>"),
-        Autofit::Shape => xml.push_str("><a:spAutoFit/></a:bodyPr>"),
-        Autofit::Normal => xml.push_str("><a:normAutofit/></a:bodyPr>"),
-    }
-}
-
-fn write_run_properties(xml: &mut String, run: &Run) {
-    if run.bold.is_none()
-        && run.italic.is_none()
-        && run.underline.is_none()
-        && run.font_size.is_none()
-    {
-        xml.push_str("<a:rPr/>");
-        return;
-    }
-    xml.push_str("<a:rPr");
-    if let Some(size) = run.font_size {
-        let _ = write!(xml, r#" sz="{size}""#);
-    }
-    if let Some(bold) = run.bold {
-        xml.push_str(if bold { r#" b="1""# } else { r#" b="0""# });
-    }
-    if let Some(italic) = run.italic {
-        xml.push_str(if italic { r#" i="1""# } else { r#" i="0""# });
-    }
-    if let Some(underline) = run.underline {
-        let _ = write!(xml, r#" u="{}""#, underline.dml());
-    }
-    xml.push_str("/>");
 }
