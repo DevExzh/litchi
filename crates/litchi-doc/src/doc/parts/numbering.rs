@@ -1887,15 +1887,12 @@ mod tests {
     fn parses_split_plflst_header_and_level_array() {
         let mut writer = crate::doc::writer::numbering::NumberingWriter::new();
         let mut list = crate::doc::writer::numbering::ListStructure::new(42);
-        let mut first = crate::doc::writer::numbering::ListLevel::new(
-            3,
-            crate::doc::writer::numbering::NumberFormat::Decimal,
-        );
+        let mut first = crate::doc::writer::numbering::ListLevel::new(3, NumberFormat::Decimal);
         first.number_text = "%1.😀".to_string();
         list.add_level(first);
         list.add_level(crate::doc::writer::numbering::ListLevel::new(
             1,
-            crate::doc::writer::numbering::NumberFormat::LowerLetter,
+            NumberFormat::LowerLetter,
         ));
         writer.add_list(list);
         let (header, levels) = writer.build_plflst().unwrap();

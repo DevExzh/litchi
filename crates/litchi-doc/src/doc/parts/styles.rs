@@ -803,7 +803,7 @@ fn flatten_conditional_style_sprms(
 ) -> Result<Vec<u8>> {
     let sprms = validate_style_sprms(
         properties,
-        crate::sprm_operations::get_sprm_type(conditional_opcode),
+        get_sprm_type(conditional_opcode),
         "conditional table-style property set",
     )?;
     let mut flattened = Vec::with_capacity(properties.len());
@@ -837,7 +837,7 @@ fn validate_style_sprms(
     if consumed != properties.len()
         || sprms
             .iter()
-            .any(|sprm| crate::sprm_operations::get_sprm_type(sprm.opcode) != expected_type)
+            .any(|sprm| get_sprm_type(sprm.opcode) != expected_type)
     {
         return Err(corrupted(&format!(
             "{structure} contains malformed or wrong-type SPRMs"

@@ -1493,7 +1493,7 @@ mod tests {
         assert_eq!(tap.cell_properties[0].padding_right, Some(240));
         assert_eq!(
             tap.cell_properties[0].preferred_width.unwrap().width_type,
-            crate::doc::parts::tap::WidthType::Twips
+            WidthType::Twips
         );
     }
 

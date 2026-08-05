@@ -5548,7 +5548,7 @@ mod tests {
 
     #[test]
     fn writes_revision_marked_style_and_author_table() {
-        let timestamp = crate::doc::CommentDateTime {
+        let timestamp = CommentDateTime {
             year: 2026,
             month: 7,
             day: 16,
@@ -6936,7 +6936,7 @@ mod tests {
             CommentEntry::new(1, "Review 🦀", "Alice 😀", "A😀")
                 .with_range(2, 6)
                 .with_extended_metadata(crate::doc::CommentExtendedMetadata {
-                    modified_at: Some(crate::doc::CommentDateTime {
+                    modified_at: Some(CommentDateTime {
                         year: 2026,
                         month: 7,
                         day: 15,
@@ -6985,7 +6985,7 @@ mod tests {
         assert_eq!(first_metadata.parent_index, None);
         assert_eq!(
             first_metadata.modified_at,
-            Some(crate::doc::CommentDateTime {
+            Some(CommentDateTime {
                 year: 2026,
                 month: 7,
                 day: 15,
@@ -7054,7 +7054,7 @@ mod tests {
         let error = write_error(
             CommentEntry::new(0, "Body", "Author", "A").with_extended_metadata(
                 crate::doc::CommentExtendedMetadata {
-                    modified_at: Some(crate::doc::CommentDateTime {
+                    modified_at: Some(CommentDateTime {
                         year: 2026,
                         month: 13,
                         day: 1,
@@ -7137,12 +7137,12 @@ mod tests {
                 .with_property("city", "Paris"),
         );
         writer.add_smart_tag(DocSmartTagEntry::new(5, 5, "urn:example:point", "cursor"));
-        writer.add_smart_tag_recognizer_range(crate::doc::SmartTagRecognizerRange {
+        writer.add_smart_tag_recognizer_range(SmartTagRecognizerRange {
             start: 0,
             end: 5,
             state: crate::doc::SmartTagRecognizerState::Dirty,
         });
-        writer.add_smart_tag_recognizer_range(crate::doc::SmartTagRecognizerRange {
+        writer.add_smart_tag_recognizer_range(SmartTagRecognizerRange {
             start: 5,
             end: 20,
             state: crate::doc::SmartTagRecognizerState::Clean,
@@ -7224,7 +7224,7 @@ mod tests {
 
     #[test]
     fn tracked_text_revisions_round_trip_through_both_output_paths() {
-        let timestamp = crate::doc::CommentDateTime {
+        let timestamp = CommentDateTime {
             year: 2026,
             month: 7,
             day: 15,
@@ -7566,23 +7566,21 @@ mod tests {
         assert!(error_for(conflicting_formatting_reason).contains("insertion and formatting"));
 
         let invalid_time = CharacterFormatting {
-            insertion_revision: Some(TextRevision::new("Alice").with_timestamp(
-                crate::doc::CommentDateTime {
-                    year: 2026,
-                    month: 13,
-                    day: 1,
-                    hour: 0,
-                    minute: 0,
-                    weekday: 0,
-                },
-            )),
+            insertion_revision: Some(TextRevision::new("Alice").with_timestamp(CommentDateTime {
+                year: 2026,
+                month: 13,
+                day: 1,
+                hour: 0,
+                minute: 0,
+                weekday: 0,
+            })),
             ..CharacterFormatting::default()
         };
         assert!(error_for(invalid_time).contains("timestamp"));
 
         let mut writer = DocWriter::new();
         writer.set_section_formatting_revision(FormattingRevision::new("Editor").with_timestamp(
-            crate::doc::CommentDateTime {
+            CommentDateTime {
                 year: 2026,
                 month: 0,
                 day: 1,
@@ -7628,27 +7626,18 @@ mod tests {
     #[test]
     fn list_tables_round_trip_through_fib_indices() {
         let mut writer = DocWriter::new();
-        let mut list = crate::doc::writer::numbering::ListStructure::new(42);
-        let mut level = crate::doc::writer::numbering::ListLevel::new(
-            3,
-            crate::doc::writer::numbering::NumberFormat::Decimal,
-        );
+        let mut list = ListStructure::new(42);
+        let mut level = crate::doc::writer::numbering::ListLevel::new(3, NumberFormat::Decimal);
         level.number_text = "%1.😀".to_string();
         list.add_level(level);
         writer.add_list(list);
-        writer.add_list_override(crate::doc::writer::numbering::ListFormatOverride::new(
-            42, 1,
-        ));
-        writer.set_list_names(
-            crate::doc::ListNamesTable::try_new(vec!["Outline".to_string()]).unwrap(),
-        );
+        writer.add_list_override(ListFormatOverride::new(42, 1));
+        writer.set_list_names(ListNamesTable::try_new(vec!["Outline".to_string()]).unwrap());
         let template = crate::doc::ListTemplateCode::BuiltIn {
             format: crate::doc::BuiltInListTemplate::ArabicPeriod,
             language: crate::doc::ListTemplateLanguageId::new(0x0409),
         };
-        writer.set_list_templates(
-            crate::doc::ListTemplateTable::try_new(vec![Some([template; 9])]).unwrap(),
-        );
+        writer.set_list_templates(ListTemplateTable::try_new(vec![Some([template; 9])]).unwrap());
         writer
             .add_paragraph_runs(
                 vec![("List item".to_string(), CharacterFormatting::default())],
