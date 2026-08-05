@@ -15,24 +15,32 @@ pub struct Target {
 
 impl Target {
     /// Creates a target from a host-owned key and exact CFB storage path.
-    pub fn new<S, I>(key: impl Into<String>, path: I) -> Result<Self, OleError>
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the key or path contains an empty/repeated part.
+    pub fn new<S, I>(key_source: impl Into<String>, path_source: I) -> Result<Self, OleError>
     where
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
-        let key = key.into();
-        let path = path.into_iter().map(Into::into).collect::<Vec<_>>();
+        let key = key_source.into();
+        let path = path_source.into_iter().map(Into::into).collect::<Vec<_>>();
         validate_parts(&key, &path)?;
         Ok(Self { key, path })
     }
 
     /// Creates a target whose key is the final storage name.
-    pub fn from_path<I, S>(path: I) -> Result<Self, OleError>
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the path is empty or contains an invalid part.
+    pub fn from_path<I, S>(path_source: I) -> Result<Self, OleError>
     where
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
-        let path = path.into_iter().map(Into::into).collect::<Vec<_>>();
+        let path = path_source.into_iter().map(Into::into).collect::<Vec<_>>();
         let key = path
             .last()
             .cloned()
@@ -61,6 +69,10 @@ pub struct Targets {
 
 impl Targets {
     /// Creates a target collection and rejects duplicate or overlapping paths.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a target key is repeated or target paths overlap.
     pub fn new<I>(targets: I) -> Result<Self, OleError>
     where
         I: IntoIterator<Item = Target>,
@@ -84,6 +96,12 @@ impl Targets {
     #[must_use]
     pub fn as_slice(&self) -> &[Target] {
         &self.targets
+    }
+
+    /// Borrows the targets in caller-provided order.
+    #[must_use]
+    pub fn iter(&self) -> std::slice::Iter<'_, Target> {
+        self.targets.iter()
     }
 
     /// Returns the number of selected storages.
@@ -111,6 +129,11 @@ impl Targets {
     }
 
     /// Adds one target after checking key, path, and prefix uniqueness.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the target key is repeated or its path overlaps
+    /// an existing target path.
     pub fn push(&mut self, target: Target) -> Result<(), OleError> {
         if self.targets.iter().any(|value| value.key == target.key) {
             return Err(OleError::InvalidFormat(format!(

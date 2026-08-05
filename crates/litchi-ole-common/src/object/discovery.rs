@@ -7,6 +7,11 @@ use litchi_cfb::{OleError, OleFile};
 use std::io::{Read, Seek};
 
 /// Captures exactly the host-selected CFB storages.
+///
+/// # Errors
+///
+/// Returns an error when the CFB is malformed or protected, a target is
+/// missing/invalid, or a configured resource limit is exceeded.
 pub fn discover<R: Read + Seek>(
     ole: &mut OleFile<R>,
     targets: &Targets,

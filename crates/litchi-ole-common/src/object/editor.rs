@@ -21,6 +21,11 @@ pub struct Editor {
 
 impl Editor {
     /// Opens a CFB package with an explicit host-resolved target catalog.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the CFB is malformed or protected, a target is
+    /// missing/invalid, or a configured resource limit is exceeded.
     pub fn open(bytes: Vec<u8>, targets: Targets, limits: Limits) -> Result<Self, OleError> {
         limits.validate()?;
         if targets.len() > limits.max_objects {
@@ -77,6 +82,11 @@ impl Editor {
     }
 
     /// Applies a fallible replacement to one selected object's standalone CFB.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selected target is missing, the callback
+    /// rejects the replacement, or the replacement fails CFB validation.
     pub fn update<F>(&mut self, key: &str, edit: F) -> Result<(), OleError>
     where
         F: FnOnce(&mut Vec<u8>) -> Result<(), OleError>,
@@ -92,6 +102,11 @@ impl Editor {
     }
 
     /// Replaces one selected storage with a validated standalone CFB file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the target or replacement is invalid, protected,
+    /// oversized, or cannot be committed atomically.
     pub fn replace(&mut self, key: &str, compound_file: Vec<u8>) -> Result<(), OleError> {
         if compound_file.len() as u64 > self.limits.max_object_size {
             return Err(OleError::InvalidFormat(
@@ -117,11 +132,21 @@ impl Editor {
     }
 
     /// Replaces an existing opaque package stream atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the stream is missing, oversized, or the rendered
+    /// package fails validation.
     pub fn put_stream(&mut self, path: &[String], data: Vec<u8>) -> Result<(), OleError> {
         self.put_stream_shared(path, data.into())
     }
 
     /// Replaces an existing stream while retaining the caller's allocation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the stream is missing, oversized, or the rendered
+    /// package fails validation.
     pub fn put_stream_shared(&mut self, path: &[String], data: Arc<[u8]>) -> Result<(), OleError> {
         if self
             .stream(path)
@@ -136,6 +161,11 @@ impl Editor {
     }
 
     /// Adds an opaque package stream below an existing CFB storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the path or data exceeds the configured bounds,
+    /// the parent is missing, or the rendered package fails validation.
     pub fn add_stream(&mut self, path: Vec<String>, data: Vec<u8>) -> Result<(), OleError> {
         let mut candidate = self.clone();
         candidate
@@ -146,6 +176,11 @@ impl Editor {
     }
 
     /// Adds a target-selected storage after the host has staged its reference.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the target or replacement CFB is invalid, the
+    /// target already exists, or the rendered package fails validation.
     pub fn add_storage(&mut self, target: Target, compound_file: Vec<u8>) -> Result<(), OleError> {
         if compound_file.len() as u64 > self.limits.max_object_size {
             return Err(OleError::InvalidFormat(
@@ -165,6 +200,11 @@ impl Editor {
     }
 
     /// Removes a selected storage after the host has removed its references.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the target is missing or the rendered package
+    /// fails validation.
     pub fn remove_storage(&mut self, key: &str) -> Result<Arc<[u8]>, OleError> {
         let object = self
             .objects
@@ -181,6 +221,10 @@ impl Editor {
     }
 
     /// Finishes the edit, returning the original bytes for a true no-op.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the edited CFB cannot be rendered.
     pub fn finish(self) -> Result<Vec<u8>, OleError> {
         if self.changed {
             self.package.render()

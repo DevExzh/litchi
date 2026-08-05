@@ -31,7 +31,7 @@ impl Package {
             streams: Vec::new(),
         };
         let mut budget = Budget::new(limits.max_streams, limits.max_total_size);
-        capture_container(ole, Vec::new(), &mut package, &mut budget, limits)?;
+        capture_container(ole, &[], &mut package, &mut budget, limits)?;
         Ok(package)
     }
 
@@ -48,14 +48,7 @@ impl Package {
             streams: Vec::new(),
         };
         let mut budget = Budget::new(limits.max_streams_per_object, limits.max_object_size);
-        capture_subtree(
-            ole,
-            target.path(),
-            Vec::new(),
-            &mut package,
-            &mut budget,
-            limits,
-        )?;
+        capture_subtree(ole, target.path(), &[], &mut package, &mut budget, limits)?;
         package.object_from_root(target.clone(), storage, limits)
     }
 
@@ -284,10 +277,8 @@ impl Package {
         for storage in &storages {
             let refs = path_refs(storage.path());
             writer.create_storage(&refs)?;
-            if let Some(clsid) = storage.clsid() {
-                if let Some(bytes) = parse_clsid_string(clsid) {
-                    writer.set_storage_clsid(&refs, bytes)?;
-                }
+            if let Some(bytes) = storage.clsid().and_then(parse_clsid_string) {
+                writer.set_storage_clsid(&refs, bytes)?;
             }
         }
         for stream in &self.streams {
@@ -395,7 +386,7 @@ impl Budget {
 
 fn capture_container<R: Read + Seek>(
     ole: &mut OleFile<R>,
-    path: Vec<String>,
+    path: &[String],
     package: &mut Package,
     budget: &mut Budget,
     limits: Limits,
@@ -406,7 +397,7 @@ fn capture_container<R: Read + Seek>(
         .cloned()
         .collect::<Vec<_>>();
     for entry in entries {
-        let mut child = path.clone();
+        let mut child = path.to_vec();
         child.push(entry.name);
         match entry.entry_type {
             STORAGE => {
@@ -419,7 +410,7 @@ fn capture_container<R: Read + Seek>(
                     child.clone(),
                     parse_clsid_string(&entry.clsid).map(format_clsid),
                 ));
-                capture_container(ole, child, package, budget, limits)?;
+                capture_container(ole, &child, package, budget, limits)?;
             },
             STREAM => {
                 if entry.size > limits.max_stream_size {
@@ -447,7 +438,7 @@ fn capture_container<R: Read + Seek>(
 fn capture_subtree<R: Read + Seek>(
     ole: &mut OleFile<R>,
     absolute: &[String],
-    relative: Vec<String>,
+    relative: &[String],
     package: &mut Package,
     budget: &mut Budget,
     limits: Limits,
@@ -464,7 +455,7 @@ fn capture_subtree<R: Read + Seek>(
         .cloned()
         .collect::<Vec<_>>();
     for entry in entries {
-        let mut child = relative.clone();
+        let mut child = relative.to_vec();
         child.push(entry.name);
         match entry.entry_type {
             STORAGE => {
@@ -477,7 +468,7 @@ fn capture_subtree<R: Read + Seek>(
                     child.clone(),
                     parse_clsid_string(&entry.clsid).map(format_clsid),
                 ));
-                capture_subtree(ole, absolute, child, package, budget, limits)?;
+                capture_subtree(ole, absolute, &child, package, budget, limits)?;
             },
             STREAM => {
                 if entry.size > limits.max_stream_size {
@@ -551,8 +542,8 @@ fn join(left: &[String], right: &[String]) -> Vec<String> {
     left.iter().chain(right).cloned().collect()
 }
 
-fn parse_clsid_string(value: &str) -> Option<[u8; 16]> {
-    let value = value
+fn parse_clsid_string(input: &str) -> Option<[u8; 16]> {
+    let value = input
         .trim_matches(|c| c == '{' || c == '}')
         .replace('-', "");
     let bytes = value.as_bytes();
