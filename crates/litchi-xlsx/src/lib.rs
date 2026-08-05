@@ -192,9 +192,7 @@ pub use timelines::{
     store_timeline_caches, store_worksheet_timelines, write_timeline_cache_definition,
     write_timelines,
 };
-pub use views::{
-    SheetPane, SheetPanePosition, SheetPaneState, SheetSelection, SheetView, SheetViewType,
-};
+pub use views::{Pane, PanePosition, PaneState, Selection, ViewType};
 pub use workbook::{
     ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DateSystem, DefaultsEdit, Edit,
     Flavor, JoinError, JoinFailure, NewSheet, PackageChange, Patch, RowEdit, Selector, State,

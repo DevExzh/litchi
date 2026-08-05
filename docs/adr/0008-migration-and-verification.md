@@ -5161,6 +5161,37 @@ run remains limited by the previously recorded malformed Apache POI fixture
 (`FAT entry 52 beyond the physical file is not FREESECT`). Formatting, diff,
 and 46-package boundary checks pass.
 
+## Layered OLE2, OOXML, and ODF owner continuation
+
+This slice continues the same breaking migration through the largest remaining
+flat owners. DOC field parts, PPT animation parser/types/writer, XLS list
+objects, and XLSB workbooks now have contextual facades over separated model,
+codec, package, and test seams. DOCX document and paragraph owners, PPTX
+presentation, and XLSX transaction/edit owners follow the same structure. The
+XLSX worksheet-view values are also isolated behind a small facade and model
+test owner. ODT field elements, builder, and mutable authoring owners; ODS XML
+content; and DrawingML's OLE property owner use the same nested organization.
+The parser-only ODS content owner intentionally has no package layer because it
+does not own package assembly.
+
+Existing public owner paths remain intact, while the new folders keep typed
+semantic values separate from binary/XML conversion, package graph work, and
+tests. The changes do not add compatibility aliases or redundant format
+prefixes, and unknown/lossless payload handling remains in the codec seams.
+
+The combined all-target compile passed for DOC, DOCX, ODT, ODS, ODraw, PPT,
+PPTX, XLS, XLSB, and XLSX. The reduced post-clean test matrix passed DOC's 832
+library tests with two ignored, DOCX's 643, ODT's 512, ODS's 67, ODraw's 59,
+PPT's 882 with one ignored, XLS's 844, XLSB's 408, and XLSX's 642. PPTX had
+303 passing library tests and the two previously observed `notes` failures;
+its four notes CRUD integration failures have the same malformed synthetic XML
+(`attribute value not closed`) and do not touch these migrated owners. DOC
+integration targets that consume the malformed Apache POI Word fixture likewise
+retain the known CFB error (`FAT entry 52 beyond the physical file is not
+FREESECT`); other DOC integration targets passed. Formatting, diff, and
+46-package boundary checks pass. This remains a structural migration slice,
+not a claim of complete Office-specification conformance.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

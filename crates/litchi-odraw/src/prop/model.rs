@@ -1,0 +1,1082 @@
+use crate::{Error, Result};
+
+use super::{IS_BLIP, IS_COMPLEX, PROPERTY_ID_MASK};
+
+/// A property identifier not assigned by the OfficeArt specification known to
+/// this crate.
+///
+/// The numeric value is private so an `UnknownId` can never contain flag bits
+/// or alias one of the typed [`Id`] variants.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct UnknownId(u16);
+
+impl UnknownId {
+    /// Returns the exact 14-bit identifier read from the wire.
+    pub const fn raw(self) -> u16 {
+        self.0
+    }
+}
+
+/// Comprehensive OfficeArt property identifier from [MS-ODRAW].
+///
+/// [MS-ODRAW]: https://learn.microsoft.com/openspecs/office_file_formats/ms-odraw/
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Id {
+    Rotation,
+    LockRotation,
+    LockAspectRatio,
+    LockPosition,
+    LockAgainstSelect,
+    LockCropping,
+    LockVertices,
+    LockText,
+    LockAdjustHandles,
+    LockAgainstGrouping,
+    TextId,
+    TextLeft,
+    TextTop,
+    TextRight,
+    TextBottom,
+    WrapText,
+    UnusedText134,
+    AnchorText,
+    TextFlow,
+    FontRotation,
+    IdOfNextShape,
+    TextDirection,
+    SelectText,
+    AutoTextMargin,
+    UnusedTextBoolean189,
+    FitShapeToText,
+    TextBooleanProperties,
+    GeoTextUnicode,
+    GeoTextRtf,
+    GeoTextAlignmentOnCurve,
+    GeoTextDefaultPointSize,
+    GeoTextSpacing,
+    GeoTextFontFamilyName,
+    GeoTextBoldFont,
+    GeoTextItalicFont,
+    GeoTextUnderlineFont,
+    GeoTextShadowFont,
+    GeoTextSmallCapsFont,
+    GeoTextStrikethroughFont,
+    BlipCropFromTop,
+    BlipCropFromBottom,
+    BlipCropFromLeft,
+    BlipCropFromRight,
+    BlipToDisplay,
+    PictureFileName,
+    BlipFlags,
+    TransparentColor,
+    PictureContrast,
+    PictureBrightness,
+    PictureGamma,
+    PictureId,
+    DoubleMod,
+    PictureFillMod,
+    PictureLine,
+    PrintBlip,
+    PrintBlipFilename,
+    PrintFlags,
+    NoHitTestPicture,
+    PictureGray,
+    PictureBilevel,
+    PictureActive,
+    GeomLeft,
+    GeomTop,
+    GeomRight,
+    GeomBottom,
+    ShapePath,
+    Vertices,
+    SegmentInfo,
+    AdjustValue,
+    Adjust2Value,
+    Adjust3Value,
+    Adjust4Value,
+    Adjust5Value,
+    Adjust6Value,
+    Adjust7Value,
+    Adjust8Value,
+    Adjust9Value,
+    Adjust10Value,
+    ConnectionSites,
+    ConnectionSitesDir,
+    XLimo,
+    YLimo,
+    AdjustHandles,
+    Guides,
+    Inscribe,
+    Cxk,
+    Fragments,
+    ShadowOk,
+    ThreeDOk,
+    LineOk,
+    GeoTextOk,
+    FillShadeShapeOk,
+    FillOk,
+    FillType,
+    FillColor,
+    FillOpacity,
+    FillBackColor,
+    FillBackOpacity,
+    FillCrMod,
+    FillBlip,
+    FillBlipName,
+    FillBlipFlags,
+    FillWidth,
+    FillHeight,
+    FillAngle,
+    FillFocus,
+    FillToLeft,
+    FillToTop,
+    FillToRight,
+    FillToBottom,
+    FillRectLeft,
+    FillRectTop,
+    FillRectRight,
+    FillRectBottom,
+    FillDzType,
+    FillShadePreset,
+    FillShadeColors,
+    FillOriginX,
+    FillOriginY,
+    FillShapeOriginX,
+    FillShapeOriginY,
+    FillShadeType,
+    Filled,
+    HitTestFill,
+    FillShape,
+    UseRect,
+    NoFillHitTest,
+    LineColor,
+    LineOpacity,
+    LineBackColor,
+    LineCrMod,
+    LineType,
+    LineFillBlip,
+    LineFillBlipName,
+    LineFillBlipFlags,
+    LineFillWidth,
+    LineFillHeight,
+    LineFillDzType,
+    LineWidth,
+    LineMiterLimit,
+    LineStyle,
+    LineDashing,
+    LineDashStyle,
+    LineStartArrowhead,
+    LineEndArrowhead,
+    LineStartArrowWidth,
+    LineStartArrowLength,
+    LineEndArrowWidth,
+    LineEndArrowLength,
+    LineJoinStyle,
+    LineEndCapStyle,
+    ArrowheadsOk,
+    AnyLine,
+    HitTestLine,
+    LineFillShape,
+    NoLineDrawDash,
+    ShadowType,
+    ShadowColor,
+    ShadowHighlight,
+    ShadowCrMod,
+    ShadowOpacity,
+    ShadowOffsetX,
+    ShadowOffsetY,
+    ShadowSecondOffsetX,
+    ShadowSecondOffsetY,
+    ShadowScaleXToX,
+    ShadowScaleYToX,
+    ShadowScaleXToY,
+    ShadowScaleYToY,
+    ShadowPerspectiveX,
+    ShadowPerspectiveY,
+    ShadowWeight,
+    ShadowOriginX,
+    ShadowOriginY,
+    Shadow,
+    ShadowObscured,
+    PerspectiveType,
+    PerspectiveOffsetX,
+    PerspectiveOffsetY,
+    PerspectiveScaleXToX,
+    PerspectiveScaleYToX,
+    PerspectiveScaleXToY,
+    PerspectiveScaleYToY,
+    PerspectivePerspectiveX,
+    PerspectivePerspectiveY,
+    PerspectiveWeight,
+    PerspectiveOriginX,
+    PerspectiveOriginY,
+    PerspectiveOn,
+    ThreeDSpecularAmount,
+    ThreeDDiffuseAmount,
+    ThreeDShininess,
+    ThreeDEdgeThickness,
+    ThreeDExtrudeForward,
+    ThreeDExtrudeBackward,
+    ThreeDExtrusionColor,
+    ThreeDCrMod,
+    ThreeDExtrusionColorExt,
+    ThreeDEffect,
+    ThreeDMetallic,
+    ThreeDUseExtrusionColor,
+    ThreeDLightFace,
+    ThreeDStyleYRotationAngle,
+    ThreeDStyleXRotationAngle,
+    ThreeDStyleRotationAxisX,
+    ThreeDStyleRotationAxisY,
+    ThreeDStyleRotationAxisZ,
+    ThreeDStyleRotationAngle,
+    ThreeDStyleRotationCenterX,
+    ThreeDStyleRotationCenterY,
+    ThreeDStyleRotationCenterZ,
+    ThreeDStyleRenderMode,
+    ThreeDStyleTolerance,
+    ThreeDStyleXViewpoint,
+    ThreeDStyleYViewpoint,
+    ThreeDStyleZViewpoint,
+    ThreeDStyleOriginX,
+    ThreeDStyleOriginY,
+    ThreeDStyleSkewAngle,
+    ThreeDStyleSkewAmount,
+    ThreeDStyleAmbientIntensity,
+    ThreeDStyleKeyX,
+    ThreeDStyleKeyY,
+    ThreeDStyleKeyZ,
+    ThreeDStyleKeyIntensity,
+    ThreeDStyleFillX,
+    ThreeDStyleFillY,
+    ThreeDStyleFillZ,
+    ThreeDStyleFillIntensity,
+    ShapeMaster,
+    ShapeConnectorStyle,
+    ShapeBlackAndWhiteSettings,
+    ShapeWModePureBw,
+    ShapeWModeBw,
+    ShapeOleIcon,
+    ShapePreferRelativeResize,
+    ShapeLockShapeType,
+    ShapeDeleteAttachedObject,
+    ShapeBackgroundShape,
+    CalloutType,
+    CalloutXYGap,
+    CalloutAngle,
+    CalloutDropType,
+    CalloutDrop,
+    CalloutLength,
+    GroupName,
+    GroupDescription,
+    Hyperlink,
+    GroupTableProperties,
+    GroupTableRowProperties,
+    DiagramType,
+    DiagramStyle,
+    Unknown(UnknownId),
+}
+
+impl From<u16> for Id {
+    fn from(value: u16) -> Self {
+        let prop_num = value & PROPERTY_ID_MASK;
+        match prop_num {
+            0x0004 => Self::Rotation,
+            0x0077 => Self::LockRotation,
+            0x0078 => Self::LockAspectRatio,
+            0x0079 => Self::LockPosition,
+            0x007A => Self::LockAgainstSelect,
+            0x007B => Self::LockCropping,
+            0x007C => Self::LockVertices,
+            0x007D => Self::LockText,
+            0x007E => Self::LockAdjustHandles,
+            0x007F => Self::LockAgainstGrouping,
+            0x0080 => Self::TextId,
+            0x0081 => Self::TextLeft,
+            0x0082 => Self::TextTop,
+            0x0083 => Self::TextRight,
+            0x0084 => Self::TextBottom,
+            0x0085 => Self::WrapText,
+            0x0086 => Self::UnusedText134,
+            0x0087 => Self::AnchorText,
+            0x0088 => Self::TextFlow,
+            0x0089 => Self::FontRotation,
+            0x008A => Self::IdOfNextShape,
+            0x008B => Self::TextDirection,
+            0x00BB => Self::SelectText,
+            0x00BC => Self::AutoTextMargin,
+            0x00BD => Self::UnusedTextBoolean189,
+            0x00BE => Self::FitShapeToText,
+            0x00BF => Self::TextBooleanProperties,
+            0x00C0 => Self::GeoTextUnicode,
+            0x00C1 => Self::GeoTextRtf,
+            0x00C2 => Self::GeoTextAlignmentOnCurve,
+            0x00C3 => Self::GeoTextDefaultPointSize,
+            0x00C4 => Self::GeoTextSpacing,
+            0x00C5 => Self::GeoTextFontFamilyName,
+            0x00FA => Self::GeoTextBoldFont,
+            0x00FB => Self::GeoTextItalicFont,
+            0x00FC => Self::GeoTextUnderlineFont,
+            0x00FD => Self::GeoTextShadowFont,
+            0x00FE => Self::GeoTextSmallCapsFont,
+            0x00FF => Self::GeoTextStrikethroughFont,
+            0x0100 => Self::BlipCropFromTop,
+            0x0101 => Self::BlipCropFromBottom,
+            0x0102 => Self::BlipCropFromLeft,
+            0x0103 => Self::BlipCropFromRight,
+            0x0104 => Self::BlipToDisplay,
+            0x0105 => Self::PictureFileName,
+            0x0106 => Self::BlipFlags,
+            0x0107 => Self::TransparentColor,
+            0x0108 => Self::PictureContrast,
+            0x0109 => Self::PictureBrightness,
+            0x010A => Self::PictureGamma,
+            0x010B => Self::PictureId,
+            0x010C => Self::DoubleMod,
+            0x010D => Self::PictureFillMod,
+            0x010E => Self::PictureLine,
+            0x010F => Self::PrintBlip,
+            0x0110 => Self::PrintBlipFilename,
+            0x0111 => Self::PrintFlags,
+            0x013C => Self::NoHitTestPicture,
+            0x013D => Self::PictureGray,
+            0x013E => Self::PictureBilevel,
+            0x013F => Self::PictureActive,
+            0x0140 => Self::GeomLeft,
+            0x0141 => Self::GeomTop,
+            0x0142 => Self::GeomRight,
+            0x0143 => Self::GeomBottom,
+            0x0144 => Self::ShapePath,
+            0x0145 => Self::Vertices,
+            0x0146 => Self::SegmentInfo,
+            0x0147 => Self::AdjustValue,
+            0x0148 => Self::Adjust2Value,
+            0x0149 => Self::Adjust3Value,
+            0x014A => Self::Adjust4Value,
+            0x014B => Self::Adjust5Value,
+            0x014C => Self::Adjust6Value,
+            0x014D => Self::Adjust7Value,
+            0x014E => Self::Adjust8Value,
+            0x014F => Self::Adjust9Value,
+            0x0150 => Self::Adjust10Value,
+            0x0151 => Self::ConnectionSites,
+            0x0152 => Self::ConnectionSitesDir,
+            0x0153 => Self::XLimo,
+            0x0154 => Self::YLimo,
+            0x0155 => Self::AdjustHandles,
+            0x0156 => Self::Guides,
+            0x0157 => Self::Inscribe,
+            0x0158 => Self::Cxk,
+            0x0159 => Self::Fragments,
+            0x017A => Self::ShadowOk,
+            0x017B => Self::ThreeDOk,
+            0x017C => Self::LineOk,
+            0x017D => Self::GeoTextOk,
+            0x017E => Self::FillShadeShapeOk,
+            0x017F => Self::FillOk,
+            0x0180 => Self::FillType,
+            0x0181 => Self::FillColor,
+            0x0182 => Self::FillOpacity,
+            0x0183 => Self::FillBackColor,
+            0x0184 => Self::FillBackOpacity,
+            0x0185 => Self::FillCrMod,
+            0x0186 => Self::FillBlip,
+            0x0187 => Self::FillBlipName,
+            0x0188 => Self::FillBlipFlags,
+            0x0189 => Self::FillWidth,
+            0x018A => Self::FillHeight,
+            0x018B => Self::FillAngle,
+            0x018C => Self::FillFocus,
+            0x018D => Self::FillToLeft,
+            0x018E => Self::FillToTop,
+            0x018F => Self::FillToRight,
+            0x0190 => Self::FillToBottom,
+            0x0191 => Self::FillRectLeft,
+            0x0192 => Self::FillRectTop,
+            0x0193 => Self::FillRectRight,
+            0x0194 => Self::FillRectBottom,
+            0x0195 => Self::FillDzType,
+            0x0196 => Self::FillShadePreset,
+            0x0197 => Self::FillShadeColors,
+            0x0198 => Self::FillOriginX,
+            0x0199 => Self::FillOriginY,
+            0x019A => Self::FillShapeOriginX,
+            0x019B => Self::FillShapeOriginY,
+            0x019C => Self::FillShadeType,
+            0x01BB => Self::Filled,
+            0x01BC => Self::HitTestFill,
+            0x01BD => Self::FillShape,
+            0x01BE => Self::UseRect,
+            0x01BF => Self::NoFillHitTest,
+            0x01C0 => Self::LineColor,
+            0x01C1 => Self::LineOpacity,
+            0x01C2 => Self::LineBackColor,
+            0x01C3 => Self::LineCrMod,
+            0x01C4 => Self::LineType,
+            0x01C5 => Self::LineFillBlip,
+            0x01C6 => Self::LineFillBlipName,
+            0x01C7 => Self::LineFillBlipFlags,
+            0x01C8 => Self::LineFillWidth,
+            0x01C9 => Self::LineFillHeight,
+            0x01CA => Self::LineFillDzType,
+            0x01CB => Self::LineWidth,
+            0x01CC => Self::LineMiterLimit,
+            0x01CD => Self::LineStyle,
+            0x01CE => Self::LineDashing,
+            0x01CF => Self::LineDashStyle,
+            0x01D0 => Self::LineStartArrowhead,
+            0x01D1 => Self::LineEndArrowhead,
+            0x01D2 => Self::LineStartArrowWidth,
+            0x01D3 => Self::LineStartArrowLength,
+            0x01D4 => Self::LineEndArrowWidth,
+            0x01D5 => Self::LineEndArrowLength,
+            0x01D6 => Self::LineJoinStyle,
+            0x01D7 => Self::LineEndCapStyle,
+            0x01FB => Self::ArrowheadsOk,
+            0x01FC => Self::AnyLine,
+            0x01FD => Self::HitTestLine,
+            0x01FE => Self::LineFillShape,
+            0x01FF => Self::NoLineDrawDash,
+            0x0200 => Self::ShadowType,
+            0x0201 => Self::ShadowColor,
+            0x0202 => Self::ShadowHighlight,
+            0x0203 => Self::ShadowCrMod,
+            0x0204 => Self::ShadowOpacity,
+            0x0205 => Self::ShadowOffsetX,
+            0x0206 => Self::ShadowOffsetY,
+            0x0207 => Self::ShadowSecondOffsetX,
+            0x0208 => Self::ShadowSecondOffsetY,
+            0x0209 => Self::ShadowScaleXToX,
+            0x020A => Self::ShadowScaleYToX,
+            0x020B => Self::ShadowScaleXToY,
+            0x020C => Self::ShadowScaleYToY,
+            0x020D => Self::ShadowPerspectiveX,
+            0x020E => Self::ShadowPerspectiveY,
+            0x020F => Self::ShadowWeight,
+            0x0210 => Self::ShadowOriginX,
+            0x0211 => Self::ShadowOriginY,
+            0x023E => Self::Shadow,
+            0x023F => Self::ShadowObscured,
+            0x0240 => Self::PerspectiveType,
+            0x0241 => Self::PerspectiveOffsetX,
+            0x0242 => Self::PerspectiveOffsetY,
+            0x0243 => Self::PerspectiveScaleXToX,
+            0x0244 => Self::PerspectiveScaleYToX,
+            0x0245 => Self::PerspectiveScaleXToY,
+            0x0246 => Self::PerspectiveScaleYToY,
+            0x0247 => Self::PerspectivePerspectiveX,
+            0x0248 => Self::PerspectivePerspectiveY,
+            0x0249 => Self::PerspectiveWeight,
+            0x024A => Self::PerspectiveOriginX,
+            0x024B => Self::PerspectiveOriginY,
+            0x027F => Self::PerspectiveOn,
+            0x0280 => Self::ThreeDSpecularAmount,
+            0x0281 => Self::ThreeDDiffuseAmount,
+            0x0282 => Self::ThreeDShininess,
+            0x0283 => Self::ThreeDEdgeThickness,
+            0x0284 => Self::ThreeDExtrudeForward,
+            0x0285 => Self::ThreeDExtrudeBackward,
+            0x0287 => Self::ThreeDExtrusionColor,
+            0x0288 => Self::ThreeDCrMod,
+            0x0289 => Self::ThreeDExtrusionColorExt,
+            0x02BC => Self::ThreeDEffect,
+            0x02BD => Self::ThreeDMetallic,
+            0x02BE => Self::ThreeDUseExtrusionColor,
+            0x02BF => Self::ThreeDLightFace,
+            0x02C0 => Self::ThreeDStyleYRotationAngle,
+            0x02C1 => Self::ThreeDStyleXRotationAngle,
+            0x02C2 => Self::ThreeDStyleRotationAxisX,
+            0x02C3 => Self::ThreeDStyleRotationAxisY,
+            0x02C4 => Self::ThreeDStyleRotationAxisZ,
+            0x02C5 => Self::ThreeDStyleRotationAngle,
+            0x02C6 => Self::ThreeDStyleRotationCenterX,
+            0x02C7 => Self::ThreeDStyleRotationCenterY,
+            0x02C8 => Self::ThreeDStyleRotationCenterZ,
+            0x02C9 => Self::ThreeDStyleRenderMode,
+            0x02CA => Self::ThreeDStyleTolerance,
+            0x02CB => Self::ThreeDStyleXViewpoint,
+            0x02CC => Self::ThreeDStyleYViewpoint,
+            0x02CD => Self::ThreeDStyleZViewpoint,
+            0x02CE => Self::ThreeDStyleOriginX,
+            0x02CF => Self::ThreeDStyleOriginY,
+            0x02D0 => Self::ThreeDStyleSkewAngle,
+            0x02D1 => Self::ThreeDStyleSkewAmount,
+            0x02D2 => Self::ThreeDStyleAmbientIntensity,
+            0x02D3 => Self::ThreeDStyleKeyX,
+            0x02D4 => Self::ThreeDStyleKeyY,
+            0x02D5 => Self::ThreeDStyleKeyZ,
+            0x02D6 => Self::ThreeDStyleKeyIntensity,
+            0x02D7 => Self::ThreeDStyleFillX,
+            0x02D8 => Self::ThreeDStyleFillY,
+            0x02D9 => Self::ThreeDStyleFillZ,
+            0x02DA => Self::ThreeDStyleFillIntensity,
+            0x0301 => Self::ShapeMaster,
+            0x0303 => Self::ShapeConnectorStyle,
+            0x0304 => Self::ShapeBlackAndWhiteSettings,
+            0x0305 => Self::ShapeWModePureBw,
+            0x0306 => Self::ShapeWModeBw,
+            0x033A => Self::ShapeOleIcon,
+            0x033B => Self::ShapePreferRelativeResize,
+            0x033C => Self::ShapeLockShapeType,
+            0x033E => Self::ShapeDeleteAttachedObject,
+            0x033F => Self::ShapeBackgroundShape,
+            0x0340 => Self::CalloutType,
+            0x0341 => Self::CalloutXYGap,
+            0x0342 => Self::CalloutAngle,
+            0x0343 => Self::CalloutDropType,
+            0x0344 => Self::CalloutDrop,
+            0x0345 => Self::CalloutLength,
+            0x0380 => Self::GroupName,
+            0x0381 => Self::GroupDescription,
+            0x0382 => Self::Hyperlink,
+            0x039F => Self::GroupTableProperties,
+            0x03A0 => Self::GroupTableRowProperties,
+            0x0500 => Self::DiagramType,
+            0x0501 => Self::DiagramStyle,
+            raw => Self::Unknown(UnknownId(raw)),
+        }
+    }
+}
+
+impl Id {
+    /// Constructs an unassigned identifier after validating its invariant.
+    ///
+    /// Returns `None` when `raw` contains property flags or is already modeled
+    /// by a typed variant.
+    pub fn unknown(raw: u16) -> Option<Self> {
+        if raw > PROPERTY_ID_MASK {
+            return None;
+        }
+        match Self::from(raw) {
+            id @ Self::Unknown(_) => Some(id),
+            _ => None,
+        }
+    }
+
+    /// Returns this property's exact wire identifier without flag bits.
+    pub const fn raw(self) -> u16 {
+        match self {
+            Self::Rotation => 0x0004,
+            Self::LockRotation => 0x0077,
+            Self::LockAspectRatio => 0x0078,
+            Self::LockPosition => 0x0079,
+            Self::LockAgainstSelect => 0x007A,
+            Self::LockCropping => 0x007B,
+            Self::LockVertices => 0x007C,
+            Self::LockText => 0x007D,
+            Self::LockAdjustHandles => 0x007E,
+            Self::LockAgainstGrouping => 0x007F,
+            Self::TextId => 0x0080,
+            Self::TextLeft => 0x0081,
+            Self::TextTop => 0x0082,
+            Self::TextRight => 0x0083,
+            Self::TextBottom => 0x0084,
+            Self::WrapText => 0x0085,
+            Self::UnusedText134 => 0x0086,
+            Self::AnchorText => 0x0087,
+            Self::TextFlow => 0x0088,
+            Self::FontRotation => 0x0089,
+            Self::IdOfNextShape => 0x008A,
+            Self::TextDirection => 0x008B,
+            Self::SelectText => 0x00BB,
+            Self::AutoTextMargin => 0x00BC,
+            Self::UnusedTextBoolean189 => 0x00BD,
+            Self::FitShapeToText => 0x00BE,
+            Self::TextBooleanProperties => 0x00BF,
+            Self::GeoTextUnicode => 0x00C0,
+            Self::GeoTextRtf => 0x00C1,
+            Self::GeoTextAlignmentOnCurve => 0x00C2,
+            Self::GeoTextDefaultPointSize => 0x00C3,
+            Self::GeoTextSpacing => 0x00C4,
+            Self::GeoTextFontFamilyName => 0x00C5,
+            Self::GeoTextBoldFont => 0x00FA,
+            Self::GeoTextItalicFont => 0x00FB,
+            Self::GeoTextUnderlineFont => 0x00FC,
+            Self::GeoTextShadowFont => 0x00FD,
+            Self::GeoTextSmallCapsFont => 0x00FE,
+            Self::GeoTextStrikethroughFont => 0x00FF,
+            Self::BlipCropFromTop => 0x0100,
+            Self::BlipCropFromBottom => 0x0101,
+            Self::BlipCropFromLeft => 0x0102,
+            Self::BlipCropFromRight => 0x0103,
+            Self::BlipToDisplay => 0x0104,
+            Self::PictureFileName => 0x0105,
+            Self::BlipFlags => 0x0106,
+            Self::TransparentColor => 0x0107,
+            Self::PictureContrast => 0x0108,
+            Self::PictureBrightness => 0x0109,
+            Self::PictureGamma => 0x010A,
+            Self::PictureId => 0x010B,
+            Self::DoubleMod => 0x010C,
+            Self::PictureFillMod => 0x010D,
+            Self::PictureLine => 0x010E,
+            Self::PrintBlip => 0x010F,
+            Self::PrintBlipFilename => 0x0110,
+            Self::PrintFlags => 0x0111,
+            Self::NoHitTestPicture => 0x013C,
+            Self::PictureGray => 0x013D,
+            Self::PictureBilevel => 0x013E,
+            Self::PictureActive => 0x013F,
+            Self::GeomLeft => 0x0140,
+            Self::GeomTop => 0x0141,
+            Self::GeomRight => 0x0142,
+            Self::GeomBottom => 0x0143,
+            Self::ShapePath => 0x0144,
+            Self::Vertices => 0x0145,
+            Self::SegmentInfo => 0x0146,
+            Self::AdjustValue => 0x0147,
+            Self::Adjust2Value => 0x0148,
+            Self::Adjust3Value => 0x0149,
+            Self::Adjust4Value => 0x014A,
+            Self::Adjust5Value => 0x014B,
+            Self::Adjust6Value => 0x014C,
+            Self::Adjust7Value => 0x014D,
+            Self::Adjust8Value => 0x014E,
+            Self::Adjust9Value => 0x014F,
+            Self::Adjust10Value => 0x0150,
+            Self::ConnectionSites => 0x0151,
+            Self::ConnectionSitesDir => 0x0152,
+            Self::XLimo => 0x0153,
+            Self::YLimo => 0x0154,
+            Self::AdjustHandles => 0x0155,
+            Self::Guides => 0x0156,
+            Self::Inscribe => 0x0157,
+            Self::Cxk => 0x0158,
+            Self::Fragments => 0x0159,
+            Self::ShadowOk => 0x017A,
+            Self::ThreeDOk => 0x017B,
+            Self::LineOk => 0x017C,
+            Self::GeoTextOk => 0x017D,
+            Self::FillShadeShapeOk => 0x017E,
+            Self::FillOk => 0x017F,
+            Self::FillType => 0x0180,
+            Self::FillColor => 0x0181,
+            Self::FillOpacity => 0x0182,
+            Self::FillBackColor => 0x0183,
+            Self::FillBackOpacity => 0x0184,
+            Self::FillCrMod => 0x0185,
+            Self::FillBlip => 0x0186,
+            Self::FillBlipName => 0x0187,
+            Self::FillBlipFlags => 0x0188,
+            Self::FillWidth => 0x0189,
+            Self::FillHeight => 0x018A,
+            Self::FillAngle => 0x018B,
+            Self::FillFocus => 0x018C,
+            Self::FillToLeft => 0x018D,
+            Self::FillToTop => 0x018E,
+            Self::FillToRight => 0x018F,
+            Self::FillToBottom => 0x0190,
+            Self::FillRectLeft => 0x0191,
+            Self::FillRectTop => 0x0192,
+            Self::FillRectRight => 0x0193,
+            Self::FillRectBottom => 0x0194,
+            Self::FillDzType => 0x0195,
+            Self::FillShadePreset => 0x0196,
+            Self::FillShadeColors => 0x0197,
+            Self::FillOriginX => 0x0198,
+            Self::FillOriginY => 0x0199,
+            Self::FillShapeOriginX => 0x019A,
+            Self::FillShapeOriginY => 0x019B,
+            Self::FillShadeType => 0x019C,
+            Self::Filled => 0x01BB,
+            Self::HitTestFill => 0x01BC,
+            Self::FillShape => 0x01BD,
+            Self::UseRect => 0x01BE,
+            Self::NoFillHitTest => 0x01BF,
+            Self::LineColor => 0x01C0,
+            Self::LineOpacity => 0x01C1,
+            Self::LineBackColor => 0x01C2,
+            Self::LineCrMod => 0x01C3,
+            Self::LineType => 0x01C4,
+            Self::LineFillBlip => 0x01C5,
+            Self::LineFillBlipName => 0x01C6,
+            Self::LineFillBlipFlags => 0x01C7,
+            Self::LineFillWidth => 0x01C8,
+            Self::LineFillHeight => 0x01C9,
+            Self::LineFillDzType => 0x01CA,
+            Self::LineWidth => 0x01CB,
+            Self::LineMiterLimit => 0x01CC,
+            Self::LineStyle => 0x01CD,
+            Self::LineDashing => 0x01CE,
+            Self::LineDashStyle => 0x01CF,
+            Self::LineStartArrowhead => 0x01D0,
+            Self::LineEndArrowhead => 0x01D1,
+            Self::LineStartArrowWidth => 0x01D2,
+            Self::LineStartArrowLength => 0x01D3,
+            Self::LineEndArrowWidth => 0x01D4,
+            Self::LineEndArrowLength => 0x01D5,
+            Self::LineJoinStyle => 0x01D6,
+            Self::LineEndCapStyle => 0x01D7,
+            Self::ArrowheadsOk => 0x01FB,
+            Self::AnyLine => 0x01FC,
+            Self::HitTestLine => 0x01FD,
+            Self::LineFillShape => 0x01FE,
+            Self::NoLineDrawDash => 0x01FF,
+            Self::ShadowType => 0x0200,
+            Self::ShadowColor => 0x0201,
+            Self::ShadowHighlight => 0x0202,
+            Self::ShadowCrMod => 0x0203,
+            Self::ShadowOpacity => 0x0204,
+            Self::ShadowOffsetX => 0x0205,
+            Self::ShadowOffsetY => 0x0206,
+            Self::ShadowSecondOffsetX => 0x0207,
+            Self::ShadowSecondOffsetY => 0x0208,
+            Self::ShadowScaleXToX => 0x0209,
+            Self::ShadowScaleYToX => 0x020A,
+            Self::ShadowScaleXToY => 0x020B,
+            Self::ShadowScaleYToY => 0x020C,
+            Self::ShadowPerspectiveX => 0x020D,
+            Self::ShadowPerspectiveY => 0x020E,
+            Self::ShadowWeight => 0x020F,
+            Self::ShadowOriginX => 0x0210,
+            Self::ShadowOriginY => 0x0211,
+            Self::Shadow => 0x023E,
+            Self::ShadowObscured => 0x023F,
+            Self::PerspectiveType => 0x0240,
+            Self::PerspectiveOffsetX => 0x0241,
+            Self::PerspectiveOffsetY => 0x0242,
+            Self::PerspectiveScaleXToX => 0x0243,
+            Self::PerspectiveScaleYToX => 0x0244,
+            Self::PerspectiveScaleXToY => 0x0245,
+            Self::PerspectiveScaleYToY => 0x0246,
+            Self::PerspectivePerspectiveX => 0x0247,
+            Self::PerspectivePerspectiveY => 0x0248,
+            Self::PerspectiveWeight => 0x0249,
+            Self::PerspectiveOriginX => 0x024A,
+            Self::PerspectiveOriginY => 0x024B,
+            Self::PerspectiveOn => 0x027F,
+            Self::ThreeDSpecularAmount => 0x0280,
+            Self::ThreeDDiffuseAmount => 0x0281,
+            Self::ThreeDShininess => 0x0282,
+            Self::ThreeDEdgeThickness => 0x0283,
+            Self::ThreeDExtrudeForward => 0x0284,
+            Self::ThreeDExtrudeBackward => 0x0285,
+            Self::ThreeDExtrusionColor => 0x0287,
+            Self::ThreeDCrMod => 0x0288,
+            Self::ThreeDExtrusionColorExt => 0x0289,
+            Self::ThreeDEffect => 0x02BC,
+            Self::ThreeDMetallic => 0x02BD,
+            Self::ThreeDUseExtrusionColor => 0x02BE,
+            Self::ThreeDLightFace => 0x02BF,
+            Self::ThreeDStyleYRotationAngle => 0x02C0,
+            Self::ThreeDStyleXRotationAngle => 0x02C1,
+            Self::ThreeDStyleRotationAxisX => 0x02C2,
+            Self::ThreeDStyleRotationAxisY => 0x02C3,
+            Self::ThreeDStyleRotationAxisZ => 0x02C4,
+            Self::ThreeDStyleRotationAngle => 0x02C5,
+            Self::ThreeDStyleRotationCenterX => 0x02C6,
+            Self::ThreeDStyleRotationCenterY => 0x02C7,
+            Self::ThreeDStyleRotationCenterZ => 0x02C8,
+            Self::ThreeDStyleRenderMode => 0x02C9,
+            Self::ThreeDStyleTolerance => 0x02CA,
+            Self::ThreeDStyleXViewpoint => 0x02CB,
+            Self::ThreeDStyleYViewpoint => 0x02CC,
+            Self::ThreeDStyleZViewpoint => 0x02CD,
+            Self::ThreeDStyleOriginX => 0x02CE,
+            Self::ThreeDStyleOriginY => 0x02CF,
+            Self::ThreeDStyleSkewAngle => 0x02D0,
+            Self::ThreeDStyleSkewAmount => 0x02D1,
+            Self::ThreeDStyleAmbientIntensity => 0x02D2,
+            Self::ThreeDStyleKeyX => 0x02D3,
+            Self::ThreeDStyleKeyY => 0x02D4,
+            Self::ThreeDStyleKeyZ => 0x02D5,
+            Self::ThreeDStyleKeyIntensity => 0x02D6,
+            Self::ThreeDStyleFillX => 0x02D7,
+            Self::ThreeDStyleFillY => 0x02D8,
+            Self::ThreeDStyleFillZ => 0x02D9,
+            Self::ThreeDStyleFillIntensity => 0x02DA,
+            Self::ShapeMaster => 0x0301,
+            Self::ShapeConnectorStyle => 0x0303,
+            Self::ShapeBlackAndWhiteSettings => 0x0304,
+            Self::ShapeWModePureBw => 0x0305,
+            Self::ShapeWModeBw => 0x0306,
+            Self::ShapeOleIcon => 0x033A,
+            Self::ShapePreferRelativeResize => 0x033B,
+            Self::ShapeLockShapeType => 0x033C,
+            Self::ShapeDeleteAttachedObject => 0x033E,
+            Self::ShapeBackgroundShape => 0x033F,
+            Self::CalloutType => 0x0340,
+            Self::CalloutXYGap => 0x0341,
+            Self::CalloutAngle => 0x0342,
+            Self::CalloutDropType => 0x0343,
+            Self::CalloutDrop => 0x0344,
+            Self::CalloutLength => 0x0345,
+            Self::GroupName => 0x0380,
+            Self::GroupDescription => 0x0381,
+            Self::Hyperlink => 0x0382,
+            Self::GroupTableProperties => 0x039F,
+            Self::GroupTableRowProperties => 0x03A0,
+            Self::DiagramType => 0x0500,
+            Self::DiagramStyle => 0x0501,
+            Self::Unknown(raw) => raw.raw(),
+        }
+    }
+
+    /// Returns whether this property is encoded as an `IMsoArray`.
+    ///
+    /// Classification is based on the property identifier, never on whether
+    /// arbitrary complex bytes happen to resemble an array header.
+    ///
+    pub const fn is_array(self) -> bool {
+        matches!(
+            self.raw(),
+            0x0145 // pVertices
+                | 0x0146 // pSegmentInfo
+                | 0x0151 // pConnectionSites
+                | 0x0152 // pConnectionSitesDir
+                | 0x0155 // pAdjustHandles
+                | 0x0156 // pGuides
+                | 0x0157 // pInscribe
+                | 0x0197 // fillShadeColors
+                | 0x01CF // lineDashStyle
+                | 0x0383 // pWrapPolygonVertices
+                | 0x03A0 // tableRowProperties
+                | 0x0504 // pRelationTbl
+                | 0x0508 // dgmConstrainBounds
+                | 0x054F // lineLeftDashStyle
+                | 0x058F // lineTopDashStyle
+                | 0x05CF // lineRightDashStyle
+                | 0x060F // lineBottomDashStyle
+        )
+    }
+}
+
+/// A lossless OfficeArt color reference.
+///
+/// Indirect palette, scheme, and system colors retain their exact bit pattern.
+/// Call [`Self::rgb`] only when direct RGB semantics are required.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ColorRef(u32);
+
+impl ColorRef {
+    const FLAGS_MASK: u32 = 0xFF00_0000;
+
+    /// Wraps an exact `OfficeArtCOLORREF` value.
+    pub const fn from_raw(raw: u32) -> Self {
+        Self(raw)
+    }
+
+    /// Returns the exact value read from the wire.
+    pub const fn raw(self) -> u32 {
+        self.0
+    }
+
+    /// Returns the high-byte flags without interpreting producer extensions.
+    pub const fn flags(self) -> u8 {
+        (self.0 >> 24) as u8
+    }
+
+    /// Returns an RGB triple only for a direct, unflagged color.
+    ///
+    /// `OfficeArtCOLORREF` stores red in the low byte, followed by green and
+    /// blue. Flagged values are palette, scheme, or system references and are
+    /// deliberately not flattened here.
+    pub const fn rgb(self) -> Option<(u8, u8, u8)> {
+        if self.0 & Self::FLAGS_MASK != 0 {
+            return None;
+        }
+        Some((
+            (self.0 & 0xFF) as u8,
+            ((self.0 >> 8) & 0xFF) as u8,
+            ((self.0 >> 16) & 0xFF) as u8,
+        ))
+    }
+}
+
+/// A decoded property value that continues to borrow complex bytes.
+#[derive(Debug)]
+pub enum Value<'data> {
+    /// A four-byte scalar, retaining its signed wire representation.
+    Simple(i32),
+    /// Property-specific complex bytes.
+    Complex(&'data [u8]),
+    /// A validated `IMsoArray`.
+    Array(Array<'data>),
+}
+
+/// A validated, zero-copy `IMsoArray` view.
+#[derive(Debug, Clone, Copy)]
+pub struct Array<'data> {
+    data: &'data [u8],
+}
+
+impl<'data> Array<'data> {
+    /// Validates an entire `IMsoArray`, including its exact payload extent.
+    pub fn new(data: &'data [u8]) -> Result<Self> {
+        let header = data.get(..6).ok_or(Error::MalformedProperties {
+            reason: "array property is shorter than its six-byte header",
+        })?;
+        let count = u16::from_le_bytes([header[0], header[1]]);
+        let allocated = u16::from_le_bytes([header[2], header[3]]);
+        if allocated < count {
+            return Err(Error::MalformedProperties {
+                reason: "array allocation count is smaller than its element count",
+            });
+        }
+
+        let raw_size = u16::from_le_bytes([header[4], header[5]]);
+        let size = if raw_size == 0xFFF0 {
+            4
+        } else {
+            usize::from(raw_size)
+        };
+        let payload_len =
+            usize::from(count)
+                .checked_mul(size)
+                .ok_or(Error::ArithmeticOverflow {
+                    context: "array-property payload length",
+                })?;
+        let expected = 6usize
+            .checked_add(payload_len)
+            .ok_or(Error::ArithmeticOverflow {
+                context: "array-property extent",
+            })?;
+        if data.len() != expected {
+            return Err(Error::MalformedProperties {
+                reason: "array property does not have its exact declared extent",
+            });
+        }
+        Ok(Self { data })
+    }
+
+    /// Returns the number of encoded elements.
+    #[inline]
+    pub fn element_count(&self) -> u16 {
+        u16::from_le_bytes([self.data[0], self.data[1]])
+    }
+
+    /// Returns the maximum number of elements the producer allocated.
+    #[inline]
+    pub fn element_count_in_memory(&self) -> u16 {
+        u16::from_le_bytes([self.data[2], self.data[3]])
+    }
+
+    /// Returns the exact unsigned `cbElem` field.
+    #[inline]
+    pub fn raw_element_size(&self) -> u16 {
+        u16::from_le_bytes([self.data[4], self.data[5]])
+    }
+
+    /// Returns the number of encoded bytes per element.
+    #[inline]
+    pub fn element_size(&self) -> usize {
+        match self.raw_element_size() {
+            0xFFF0 => 4,
+            size => usize::from(size),
+        }
+    }
+
+    /// Borrows one encoded element.
+    #[inline]
+    pub fn get_element(&self, index: usize) -> Option<&'data [u8]> {
+        if index >= usize::from(self.element_count()) {
+            return None;
+        }
+        let size = self.element_size();
+        let start = index.checked_mul(size)?.checked_add(6)?;
+        let end = start.checked_add(size)?;
+        self.data.get(start..end)
+    }
+
+    /// Iterates over every encoded element in order.
+    pub fn elements(&self) -> impl Iterator<Item = &'data [u8]> {
+        let count = usize::from(self.element_count());
+        let array = *self;
+        let mut index = 0;
+        std::iter::from_fn(move || {
+            if index == count {
+                return None;
+            }
+            let element = array.get_element(index);
+            index += 1;
+            element
+        })
+    }
+
+    /// Returns the complete encoded array, including its header.
+    #[inline]
+    pub fn raw_data(&self) -> &'data [u8] {
+        self.data
+    }
+}
+
+/// One ordered, lossless property-table descriptor and its decoded value.
+#[derive(Debug)]
+pub struct Prop<'data> {
+    pub(super) id: Id,
+    pub(super) raw_id: u16,
+    pub(super) blip: bool,
+    pub(super) complex: bool,
+    pub(super) raw_value: i32,
+    pub(super) value: Value<'data>,
+}
+
+impl<'data> Prop<'data> {
+    /// Returns the typed identifier.
+    pub const fn id(&self) -> Id {
+        self.id
+    }
+
+    /// Returns the exact 14-bit identifier without flags.
+    pub const fn raw_id(&self) -> u16 {
+        self.raw_id
+    }
+
+    /// Reassembles the exact 16-bit identifier-and-flags field.
+    pub const fn raw_opid(&self) -> u16 {
+        self.raw_id
+            | if self.blip { IS_BLIP } else { 0 }
+            | if self.complex { IS_COMPLEX } else { 0 }
+    }
+
+    /// Returns whether `fBid` was set on the wire.
+    pub const fn is_blip(&self) -> bool {
+        self.blip
+    }
+
+    /// Returns whether `fComplex` was set on the wire.
+    pub const fn is_complex(&self) -> bool {
+        self.complex
+    }
+
+    /// Returns the exact signed four-byte `op` value.
+    pub const fn raw_value(&self) -> i32 {
+        self.raw_value
+    }
+
+    /// Borrows the decoded value.
+    pub const fn value(&self) -> &Value<'data> {
+        &self.value
+    }
+}
+
+/// Shape anchor (position and size).
+#[derive(Debug, Clone, Copy)]
+pub struct Anchor {
+    pub left: i32,
+    pub top: i32,
+    pub right: i32,
+    pub bottom: i32,
+}
+
+impl Anchor {
+    #[inline]
+    pub const fn new(left: i32, top: i32, right: i32, bottom: i32) -> Self {
+        Self {
+            left,
+            top,
+            right,
+            bottom,
+        }
+    }
+
+    #[inline]
+    pub const fn width(&self) -> Option<i32> {
+        self.right.checked_sub(self.left)
+    }
+
+    #[inline]
+    pub const fn height(&self) -> Option<i32> {
+        self.bottom.checked_sub(self.top)
+    }
+}

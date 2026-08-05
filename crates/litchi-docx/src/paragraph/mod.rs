@@ -1,0 +1,20 @@
+//! Layered WordprocessingML paragraph and run models.
+//!
+//! The semantic XML-backed values live in [`model`], streaming WordprocessingML
+//! parsing lives in [`codec`], and relationship-backed hyperlink resolution
+//! lives in [`package`]. This module remains the historical `crate::paragraph`
+//! facade.
+
+mod codec;
+mod model;
+mod package;
+
+#[cfg(test)]
+mod tests;
+
+pub use model::{
+    Paragraph, Run, RunBreak, RunBreakClear, RunBreakType, RunProperties, RunUnderline,
+    RunUnderlineColor,
+};
+
+pub(crate) use codec::extract_word_text;

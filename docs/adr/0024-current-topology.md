@@ -1,7 +1,7 @@
 # ADR 0024: Current post-migration workspace topology
 
 - Status: Accepted — current-state inventory
-- Date: 2026-08-05
+- Date: 2026-08-06
 - Scope: Documentation only; this record does not rewrite historical migration
   slices.
 
@@ -46,6 +46,13 @@ The root [`litchi` manifest](../../crates/litchi/Cargo.toml) retains an
 that facade re-exports the standalone owners; it is not a replacement package
 named `litchi-ooxml`.
 
+Within the concrete owners, large package and semantic domains are layered
+under contextual folders rather than kept as one source file. DOCX now has
+`document` and `paragraph` owners; PPTX has `presentation`; and XLSX has
+`workbook::{edit,worksheet,data_model,comments}` plus `views`. Each facade
+keeps its semantic model separate from XML/package codecs and focused tests.
+XLSB's workbook owner follows the same structure.
+
 ## OLE2 and legacy binary formats
 
 The current legacy container and shared-object layers are:
@@ -66,6 +73,11 @@ format-neutral validated OLE2 structures, including the typed `property_set`
 model/codec/editor shared by DOC, PPT, and XLS; host metadata and
 format-specific semantic records remain in the concrete legacy format crates.
 
+The current legacy owners also use nested semantic folders: DOC fields, PPT
+animation parser/types/writer, XLS list objects, and ODraw properties expose
+facades over model/codec/package/test seams. These are source-organization and
+ownership boundaries; they do not imply a broader compatibility promise.
+
 ## ODF
 
 [`litchi-odf-common`](../../crates/litchi-odf-common/Cargo.toml) is the shared
@@ -85,6 +97,11 @@ feature-gated family re-exports only; family package, model, and authoring
 ownership remains in the dedicated crates. The top-level [`litchi` manifest](../../crates/litchi/Cargo.toml)
 similarly exposes the primary ODF families through its `odf` facade feature.
 
+ODT's field, builder, and mutable owners and ODS's content codec are layered
+inside their family crates. The ODS content owner is parser-only and therefore
+does not own package assembly; package ownership remains with the family
+facade.
+
 ## Historical terminology
 
 References to `litchi-ooxml` in ADR 0002, ADR 0008, ADR 0011, ADR 0013, ADR
@@ -98,4 +115,5 @@ the current terminology without deleting or rewriting those records.
 The audit used current workspace manifests, `cargo metadata --no-deps
 --format-version 1`, focused reference searches, and the existing topology
 decisions in [ADR 0002](0002-crate-topology.md) and
-[ADR 0023](0023-odf-family-crate-split.md). No source files were changed.
+[ADR 0023](0023-odf-family-crate-split.md). The layered owner paths are
+verified by the affected-crate all-target compile and boundary-policy check.
