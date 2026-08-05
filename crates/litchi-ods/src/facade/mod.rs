@@ -40,6 +40,38 @@ impl Spreadsheet {
         self.package.styles_xml()
     }
 
+    /// Discover package, inline, missing, and inert linked images.
+    pub fn images(&self) -> Result<Vec<crate::media::Image>> {
+        let package = self.package.package().package()?;
+        crate::media::scan_package(
+            self.package.content_xml(),
+            self.package.styles_xml(),
+            &package,
+        )
+    }
+
+    /// Discover package, inline, missing, and inert linked embedded objects.
+    pub fn embedded_objects(&self) -> Result<Vec<crate::embedded::Object>> {
+        let package = self.package.package().package()?;
+        crate::embedded::scan_package(
+            self.package.content_xml(),
+            self.package.styles_xml(),
+            &package,
+        )
+    }
+
+    /// Return bytes only for inline or verified package-contained images.
+    /// Linked and missing images remain inert and are never fetched.
+    pub fn image_bytes(&self, image: &crate::media::Image) -> Result<Option<Vec<u8>>> {
+        match &image.source {
+            crate::media::Source::Inline { bytes, .. } => Ok(Some(bytes.clone())),
+            crate::media::Source::PackagePart { path, .. } => {
+                self.package.package().get_file(path).map(Some)
+            },
+            _ => Ok(None),
+        }
+    }
+
     pub fn into_bytes(self) -> Vec<u8> {
         self.package.into_bytes()
     }
@@ -186,5 +218,40 @@ mod tests {
         let bytes = Builder::new().build().unwrap();
         let spreadsheet = Spreadsheet::from_bytes(bytes).unwrap();
         assert!(spreadsheet.content_xml().contains("office:spreadsheet"));
+    }
+
+    #[test]
+    fn shared_resource_inventory_is_available_from_spreadsheet() {
+        let bytes = Builder::new()
+            .content_xml(
+                r#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.3">
+  <office:body><office:spreadsheet>
+    <draw:frame draw:name="Photo">
+      <draw:image><office:binary-data>AQID</office:binary-data></draw:image>
+    </draw:frame>
+    <draw:object xlink:href="https://example.invalid/object" xlink:type="simple"/>
+  </office:spreadsheet></office:body>
+</office:document-content>"#,
+            )
+            .build()
+            .unwrap();
+        let spreadsheet = Spreadsheet::from_bytes(bytes).unwrap();
+
+        let images = spreadsheet.images().unwrap();
+        assert_eq!(images.len(), 1);
+        assert_eq!(images[0].inline_bytes(), Some(&[1, 2, 3][..]));
+        assert_eq!(
+            spreadsheet.image_bytes(&images[0]).unwrap(),
+            Some(vec![1, 2, 3])
+        );
+
+        let objects = spreadsheet.embedded_objects().unwrap();
+        assert_eq!(objects.len(), 1);
+        assert!(matches!(
+            objects[0].source,
+            crate::embedded::Source::Linked { ref href }
+                if href == "https://example.invalid/object"
+        ));
     }
 }

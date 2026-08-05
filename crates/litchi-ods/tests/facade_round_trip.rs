@@ -1,6 +1,7 @@
 use litchi_odf_common::constants;
 use litchi_ods::rdf::{Object, Subject, Triple};
 use litchi_ods::{Builder, Spreadsheet};
+use std::io::{Cursor, Write};
 
 #[test]
 fn builder_and_package_facade_round_trip() {
@@ -33,4 +34,100 @@ fn spreadsheet_facade_owns_rdf_crud() {
         constants::ODF_SPREADSHEET,
         "application/vnd.oasis.opendocument.spreadsheet"
     );
+}
+
+#[test]
+fn spreadsheet_facade_discovers_resources_and_extracts_local_images() {
+    let spreadsheet = Spreadsheet::from_bytes(resource_package()).unwrap();
+
+    let images = spreadsheet.images().unwrap();
+    assert_eq!(images.len(), 2);
+    assert_eq!(images[0].part, litchi_ods::Part::Content);
+    let frame = images[0].frame.as_ref().unwrap();
+    assert_eq!(frame.sheet_name.as_deref(), Some("Sheet1"));
+    assert!(frame.sheet_shape);
+    assert!(matches!(
+        images[0].source,
+        litchi_ods::media::Source::PackagePart {
+            ref path,
+            manifest_media_type: Some(ref media_type),
+            ..
+        } if path == "Pictures/photo.png" && media_type == "image/png"
+    ));
+    assert_eq!(
+        spreadsheet.image_bytes(&images[0]).unwrap(),
+        Some(vec![1, 2, 3])
+    );
+    assert!(matches!(
+        images[1].source,
+        litchi_ods::media::Source::Linked { ref href }
+            if href == "https://example.invalid/photo.png"
+    ));
+    assert_eq!(spreadsheet.image_bytes(&images[1]).unwrap(), None);
+
+    let objects = spreadsheet.embedded_objects().unwrap();
+    assert_eq!(objects.len(), 1);
+    assert_eq!(objects[0].kind, litchi_ods::Kind::Object);
+    assert!(matches!(
+        objects[0].source,
+        litchi_ods::embedded::Source::PackageFile {
+            ref path,
+            manifest_media_type: Some(ref media_type),
+            ..
+        } if path == "Objects/widget.bin" && media_type == "application/octet-stream"
+    ));
+}
+
+fn resource_package() -> Vec<u8> {
+    let mimetype = "application/vnd.oasis.opendocument.spreadsheet";
+    let content = r#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content
+    xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+    xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
+    xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+    xmlns:xlink="http://www.w3.org/1999/xlink"
+    office:version="1.3">
+  <office:body>
+    <office:spreadsheet>
+      <table:table table:name="Sheet1">
+        <table:shapes>
+          <draw:frame draw:name="Resources" svg:width="2cm" svg:height="1cm" table:end-cell-address="B2">
+            <draw:image xlink:href="Pictures/photo.png" xlink:type="simple"/>
+            <draw:image xlink:href="https://example.invalid/photo.png" xlink:type="simple"/>
+            <draw:object xlink:href="Objects/widget.bin" xlink:type="simple"/>
+          </draw:frame>
+        </table:shapes>
+      </table:table>
+    </office:spreadsheet>
+  </office:body>
+</office:document-content>"#;
+    let manifest = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest:manifest
+    xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"
+    manifest:version="1.3">
+  <manifest:file-entry manifest:full-path="/" manifest:media-type="{mimetype}"/>
+  <manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>
+  <manifest:file-entry manifest:full-path="Pictures/photo.png" manifest:media-type="image/png"/>
+  <manifest:file-entry manifest:full-path="Objects/widget.bin" manifest:media-type="application/octet-stream"/>
+</manifest:manifest>"#
+    );
+
+    let mut output = Cursor::new(Vec::new());
+    let mut zip = zip::ZipWriter::new(&mut output);
+    let options =
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    zip.start_file("mimetype", options).unwrap();
+    zip.write_all(mimetype.as_bytes()).unwrap();
+    zip.start_file("META-INF/manifest.xml", options).unwrap();
+    zip.write_all(manifest.as_bytes()).unwrap();
+    zip.start_file("content.xml", options).unwrap();
+    zip.write_all(content.as_bytes()).unwrap();
+    zip.start_file("Pictures/photo.png", options).unwrap();
+    zip.write_all(&[1, 2, 3]).unwrap();
+    zip.start_file("Objects/widget.bin", options).unwrap();
+    zip.write_all(&[9, 8, 7]).unwrap();
+    zip.finish().unwrap();
+    output.into_inner()
 }
