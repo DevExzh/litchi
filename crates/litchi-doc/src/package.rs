@@ -299,10 +299,8 @@ impl<R: Read + Seek> Package<R> {
     /// Read the legacy Custom XML Data Storage without resolving schema URIs.
     pub fn custom_xml_data_store(
         &mut self,
-    ) -> litchi_ole_common::custom_xml_data::Result<
-        Option<litchi_ole_common::custom_xml_data::MsoDataStore>,
-    > {
-        litchi_ole_common::custom_xml_data::inspect_mso_data_store(&mut self.ole)
+    ) -> litchi_ole_common::custom_xml::Result<Option<litchi_ole_common::custom_xml::Store>> {
+        litchi_ole_common::custom_xml::inspect(&mut self.ole)
     }
 
     pub fn summary_information(&mut self) -> Result<Option<litchi_cfb::PropertySetStream>> {

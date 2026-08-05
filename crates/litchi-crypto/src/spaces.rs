@@ -24,9 +24,7 @@ use super::integrity::{
     SUMMARY_STREAM,
 };
 use super::labels::{self, List};
-use litchi_ole_common::custom_xml_data::{
-    DataStorePromotion, MsoDataStore, inspect_mso_data_store,
-};
+use litchi_ole_common::custom_xml::{Promotion, Store, inspect as inspect_custom_xml};
 
 const HEADER_LENGTH: u32 = 8;
 const TRANSFORM_TYPE: u32 = 1;
@@ -214,7 +212,7 @@ pub struct Graph {
     /// Integrity metadata for the public DocumentSummaryInformation property stream.
     pub document_summary_information_integrity: Option<Integrity>,
     /// Public legacy Custom XML mirror and its IRM promotion semantics.
-    pub custom_xml_data_store: Option<MsoDataStore>,
+    pub custom_xml_data_store: Option<Store>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -518,7 +516,7 @@ pub fn write_license(value: &License) -> Result<Vec<u8>, Error> {
 
 /// Inspect and cross-validate a complete DataSpaces graph in an OLE file.
 pub fn inspect<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Option<Graph>, Error> {
-    let custom_xml_data_store = inspect_mso_data_store(ole)
+    let custom_xml_data_store = inspect_custom_xml(ole)
         .map_err(|error| invalid(format!("MsoDataStore validation failed: {error}")))?;
     if !ole.exists(&[STORAGE]) {
         validate_custom_xml_promotion(custom_xml_data_store.as_ref(), None)?;
@@ -688,13 +686,8 @@ pub fn inspect<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Option<Graph>, Er
     }))
 }
 
-fn validate_custom_xml_promotion(
-    store: Option<&MsoDataStore>,
-    irm: Option<&Irm>,
-) -> Result<(), Error> {
-    if store.is_some_and(|store| store.promotion != DataStorePromotion::Unspecified)
-        && irm.is_none()
-    {
+fn validate_custom_xml_promotion(store: Option<&Store>, irm: Option<&Irm>) -> Result<(), Error> {
+    if store.is_some_and(|store| store.promotion != Promotion::Unspecified) && irm.is_none() {
         return Err(invalid(
             "MsoDataStore promotion marker requires an IRM data space",
         ));
@@ -1504,7 +1497,7 @@ mod tests {
             .unwrap();
         let label_info = format!(
             "<?xml version=\"1.0\" encoding=\"utf-8\"?><clbl:labelList xmlns:clbl=\"{}\"><clbl:label id=\"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\" enabled=\"1\" method=\"Standard\" siteId=\"12345678-1234-5678-90ab-1234567890ab\" contentBits=\"8\" removed=\"0\"/></clbl:labelList>",
-            crate::labels::NAMESPACE
+            labels::NAMESPACE
         );
         writer
             .create_stream(
@@ -1519,26 +1512,22 @@ mod tests {
         writer
             .create_stream(
                 &[SUMMARY_HASH_STREAM],
-                &crate::integrity::write(crate::integrity::crc32(summary_information), &[]),
+                &integrity::write(integrity::crc32(summary_information), &[]),
             )
             .unwrap();
-        let custom_properties = litchi_ole_common::custom_xml_data::CustomXmlDataProperties {
+        let custom_properties = litchi_ole_common::custom_xml::Properties {
             item_id: "{11111111-2222-3333-4444-555555555555}".parse().unwrap(),
             schema_references: vec!["urn:test".to_string()],
         };
-        let custom_item = litchi_ole_common::custom_xml_data::CustomXmlDataItem::new(
+        let custom_item = litchi_ole_common::custom_xml::Item::new(
             custom_properties.item_id.storage_name(),
             br#"<test xmlns="urn:test"/>"#.to_vec(),
             custom_properties,
         )
         .unwrap();
-        litchi_ole_common::custom_xml_data::write_mso_data_store(
+        litchi_ole_common::custom_xml::write(
             &mut writer,
-            &litchi_ole_common::custom_xml_data::MsoDataStore::new(
-                litchi_ole_common::custom_xml_data::DataStorePromotion::Modified,
-                vec![custom_item],
-            )
-            .unwrap(),
+            &Store::new(Promotion::Modified, vec![custom_item]).unwrap(),
         )
         .unwrap();
         let mut bytes = Cursor::new(Vec::new());
@@ -1557,10 +1546,7 @@ mod tests {
         );
         assert!(graph.document_summary_information_integrity.is_none());
         let custom_xml = graph.custom_xml_data_store.unwrap();
-        assert_eq!(
-            custom_xml.promotion,
-            litchi_ole_common::custom_xml_data::DataStorePromotion::Modified
-        );
+        assert_eq!(custom_xml.promotion, Promotion::Modified);
         assert_eq!(custom_xml.items().len(), 1);
     }
 
@@ -1638,21 +1624,17 @@ mod tests {
 
     #[test]
     fn rejects_custom_xml_promotion_without_irm() {
-        let store = litchi_ole_common::custom_xml_data::MsoDataStore::new(
-            litchi_ole_common::custom_xml_data::DataStorePromotion::Redundant,
-            Vec::new(),
-        )
-        .unwrap();
+        let store = Store::new(Promotion::Redundant, Vec::new()).unwrap();
         assert!(validate_custom_xml_promotion(Some(&store), None).is_err());
 
         let mut writer = OleWriter::new();
-        litchi_ole_common::custom_xml_data::write_mso_data_store(&mut writer, &store).unwrap();
+        litchi_ole_common::custom_xml::write(&mut writer, &store).unwrap();
         let mut bytes = Cursor::new(Vec::new());
         writer.write_to(&mut bytes).unwrap();
         let mut ole = OleFile::open(Cursor::new(bytes.into_inner())).unwrap();
         assert!(inspect(&mut ole).is_err());
 
-        let unspecified = litchi_ole_common::custom_xml_data::MsoDataStore::default();
+        let unspecified = Store::default();
         assert!(validate_custom_xml_promotion(Some(&unspecified), None).is_ok());
     }
 }
