@@ -1,5 +1,10 @@
 # litchi-ooxml — Workspace-Split Behavioral-Parity Audit
 
+> Historical audit record. This report preserves the package and source paths
+> observed during the initial workspace extraction; current OOXML ownership is
+> split across `litchi-opc`, `litchi-ooxml-common`, `litchi-docx`, `litchi-pptx`,
+> `litchi-xlsx`, `litchi-xlsb`, and `litchi-fonts`.
+
 ## 1. Scope
 
 Compare `crates/litchi-ooxml/` (current `refactor/workspace-split`) against

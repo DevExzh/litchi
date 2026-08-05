@@ -24,6 +24,13 @@ A high-performance Rust library for parsing Microsoft Office file formats (OLE2 
 - **Memory Efficient** - Direct byte buffer support with zero-copy parsing where possible
 - **High Performance** - SIMD optimizations, minimal allocations, efficient memory layout
 
+OOXML ownership is split by responsibility: `litchi-opc` owns the package graph,
+`litchi-ooxml-common` owns shared OOXML vocabulary and package services,
+`litchi-docx`, `litchi-pptx`, `litchi-xlsx`, and `litchi-xlsb` own their format
+semantics, and `litchi-fonts` owns font discovery, subsetting, embedding, and
+obfuscation. The `litchi::ooxml` facade exposes these namespaces when the
+`ooxml` feature is enabled.
+
 ## Quick Start
 
 ### Reading Documents

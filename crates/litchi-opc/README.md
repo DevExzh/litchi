@@ -7,8 +7,9 @@ Open Packaging Conventions (OPC) implementation: the ZIP-based container layer u
 OPC defines how `.docx`, `.xlsx`, `.pptx`, and other Office Open XML documents
 are packaged: parts, content types, and relationships inside a ZIP archive.
 This crate provides the package model, `PackURI` resolution, and reader/writer
-plumbing on top of `soapberry-zip` and `quick-xml`. It is the foundation that
-`litchi-ooxml` builds on.
+plumbing on top of `soapberry-zip` and `quick-xml`. It is consumed directly by
+`litchi-docx`, `litchi-pptx`, `litchi-xlsx`, and `litchi-xlsb`; shared OOXML
+vocabulary and graph services live in `litchi-ooxml-common`.
 
 ## Usage
 

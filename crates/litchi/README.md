@@ -4,7 +4,7 @@ High-performance Rust library for parsing Microsoft Office, OpenDocument, and Ap
 
 ## Overview
 
-`litchi` is the user-facing umbrella crate of the [Litchi workspace](https://github.com/DevExzh/litchi). It auto-detects file formats and delegates parsing to independently owned format crates (`litchi-doc`, `litchi-ppt`, `litchi-xls`, `litchi-ooxml`, `litchi-odf`, `litchi-iwa`, `litchi-rtf`, and friends). Most users should depend on this crate rather than the format-specific ones. Canonical low-level legacy-format entry points are `litchi::doc`, `litchi::ppt`, and `litchi::xls`; there is no compatibility facade nesting them under an OLE module.
+`litchi` is the user-facing umbrella crate of the [Litchi workspace](https://github.com/DevExzh/litchi). It auto-detects file formats and delegates parsing to independently owned format crates (`litchi-doc`, `litchi-ppt`, `litchi-xls`, `litchi-docx`, `litchi-pptx`, `litchi-xlsb`, `litchi-xlsx`, `litchi-opc`, `litchi-ooxml-common`, `litchi-odf`, `litchi-iwa`, `litchi-rtf`, and friends). Most users should depend on this crate rather than the format-specific ones. Canonical low-level legacy-format entry points are `litchi::doc`, `litchi::ppt`, and `litchi::xls`; there is no compatibility facade nesting them under an OLE module.
 
 Shared OOXML chart and SmartArt grammar is available through the concise
 `litchi::drawing::{chart, diagram}` facade when the `ooxml` feature is enabled.

@@ -21,12 +21,33 @@ Litchi provides a comprehensive, high-performance API for working with Microsoft
 - **Type-safe**: Leveraging Rust's type system for correctness
 - **Production-ready**: Fast, safe, and well-tested
 
+Format-specific OOXML package APIs are owned directly by `litchi-docx`,
+`litchi-pptx`, `litchi-xlsx`, and `litchi-xlsb`. `litchi-opc` owns the package
+graph, `litchi-ooxml-common` owns shared OOXML vocabulary and package services,
+and `litchi-fonts` owns font discovery, subsetting, embedding, and obfuscation.
+Use `litchi` for format detection and unified document, presentation, and
+workbook facades.
+
+Standalone examples below assume the corresponding owner crates are listed in
+your `Cargo.toml`:
+
+```toml
+[dependencies]
+litchi-docx = "0.0.1"
+litchi-pptx = "0.0.1"
+litchi-xlsx = "0.0.1"
+litchi-xlsb = "0.0.1"
+litchi-opc = "0.0.1"
+litchi-ooxml-common = "0.0.1"
+litchi-drawingml = "0.0.1"
+```
+
 ## Word Documents (DOCX)
 
 ### Creating Documents
 
 ```rust
-use litchi::ooxml::docx::Package;
+use litchi_docx::Package;
 
 // Create a new document
 let mut pkg = Package::new()?;
@@ -64,7 +85,7 @@ pkg.save("output.docx")?;
 ### Reading Documents
 
 ```rust
-use litchi::ooxml::docx::Package;
+use litchi_docx::Package;
 
 // Open document
 let pkg = Package::open("document.docx")?;
@@ -108,7 +129,7 @@ println!("Found in {} paragraphs", matches.len());
 ### Updating Documents
 
 ```rust
-use litchi::ooxml::docx::Package;
+use litchi_docx::Package;
 
 // Open existing document
 let mut pkg = Package::open("document.docx")?;
@@ -133,8 +154,8 @@ original spelling is preserved. Insert is fallible so invalid names, values,
 or resource limits cannot be bypassed.
 
 ```rust
-use litchi::ooxml::custom::Value;
-use litchi::ooxml::docx::Package;
+use litchi_ooxml_common::custom::Value;
+use litchi_docx::Package;
 
 let mut pkg = Package::open("document.docx")?;
 pkg.custom_props_mut().insert("Project", "Litchi")?;
@@ -154,8 +175,8 @@ immutable OPC storage internally, so repeated relationships do not duplicate
 the XML allocation.
 
 ```rust
-use litchi::ooxml::custom_xml::Conformance;
-use litchi::ooxml::docx::{NewStore, Package};
+use litchi_ooxml_common::custom_xml::Conformance;
+use litchi_docx::{NewStore, Package};
 
 let mut pkg = Package::open("document.docx")?;
 let item = pkg.add_custom_xml(NewStore {
@@ -180,8 +201,8 @@ relationship occurrences without opening nested files, activating OLE, or
 fetching external targets.
 
 ```rust
-use litchi::ooxml::embedded::Target;
-use litchi::ooxml::docx::Package;
+use litchi_ooxml_common::embedded::Target;
+use litchi_docx::Package;
 
 let pkg = Package::open("document.docx")?;
 for entry in pkg.embedded()? {
@@ -240,7 +261,7 @@ SmartArt diagrams and DrawingML text boxes are exposed as typed, inert
 inventories in both transitional and Strict namespace dialects:
 
 ```rust
-use litchi::ooxml::docx::Package;
+use litchi_docx::Package;
 
 let pkg = Package::open("document.docx")?;
 
@@ -267,9 +288,9 @@ can be authored through the mutable document and round-trip through the
 read inventories above:
 
 ```rust
-use litchi::ooxml::docx::{MutableTextBox, MutableOleObject, MutableSmartArt, MutableVmlShape, VmlShapeKind};
-use litchi::drawing::diagram::{DiagramType, SmartArtBuilder};
-use litchi::ooxml::docx::Package;
+use litchi_docx::{MutableTextBox, MutableOleObject, MutableSmartArt, MutableVmlShape, VmlShapeKind};
+use litchi_drawingml::diagram::{DiagramType, SmartArtBuilder};
+use litchi_docx::Package;
 
 let mut pkg = Package::new()?;
 let mut doc = pkg.document_mut()?;
@@ -304,7 +325,7 @@ pkg.save("output.docx")?;
 ### Creating Workbooks
 
 ```rust
-use litchi::ooxml::xlsx::Workbook;
+use litchi_xlsx::Workbook;
 
 // Create new workbook
 let mut wb = Workbook::create()?;
@@ -343,7 +364,7 @@ wb.save("output.xlsx")?;
 ### Reading Workbooks
 
 ```rust
-use litchi::ooxml::xlsx::Workbook;
+use litchi_xlsx::Workbook;
 
 // Open workbook
 let wb = Workbook::open("workbook.xlsx")?;
@@ -387,7 +408,7 @@ println!("Found in {} cells", matches.len());
 ### Updating Workbooks
 
 ```rust
-use litchi::ooxml::xlsx::Workbook;
+use litchi_xlsx::Workbook;
 
 // Open existing workbook
 let mut wb = Workbook::open("workbook.xlsx")?;
@@ -442,7 +463,7 @@ validated graph; XLSB workbooks additionally expose their PivotCache
 definition streams:
 
 ```rust
-use litchi::ooxml::xlsx::Workbook;
+use litchi_xlsx::Workbook;
 
 let wb = Workbook::open("report.xlsx")?;
 
@@ -453,7 +474,7 @@ for chart in wb.pivot_charts_on_sheet("Sheet1")? {
         chart.part_name, chart.pivot_table.name);
 }
 
-// XLSB PivotCache definitions (via litchi::ooxml::xlsb::Workbook):
+// XLSB PivotCache definitions (via litchi_xlsb::Workbook):
 // refresh metadata, sources, cache fields, shared items, grouping,
 // OLAP hierarchies, and calculated members.
 ```
@@ -463,7 +484,7 @@ for chart in wb.pivot_charts_on_sheet("Sheet1")? {
 ### Creating Presentations
 
 ```rust
-use litchi::ooxml::pptx::Package;
+use litchi_pptx::Package;
 
 // Create new presentation
 let mut pkg = Package::new()?;
@@ -502,7 +523,7 @@ pkg.save("output.pptx")?;
 ### Reading Presentations
 
 ```rust
-use litchi::ooxml::pptx::Package;
+use litchi_pptx::Package;
 
 // Open presentation
 let pkg = Package::open("presentation.pptx")?;
@@ -532,7 +553,7 @@ for (idx, slide) in pres.slides()?.iter().enumerate() {
 ### Updating Presentations
 
 ```rust
-use litchi::ooxml::pptx::Package;
+use litchi_pptx::Package;
 
 // Open existing presentation
 let mut pkg = Package::open("presentation.pptx")?;
@@ -589,7 +610,7 @@ are authored at the package level and re-validated against the read-side
 graph rules:
 
 ```rust
-use litchi::ooxml::pptx::{Package, SlideLayoutKind, ThemeColorScheme, ThemeColorSlot, ThemeColorValue, ThemeFontScheme, ThemeFontFace};
+use litchi_pptx::{Package, SlideLayoutKind, ThemeColorScheme, ThemeColorSlot, ThemeColorValue, ThemeFontScheme, ThemeFontFace};
 
 let mut pkg = Package::new()?;
 
@@ -615,17 +636,23 @@ pkg.save("branded.pptx")?;
 
 ## Unified API
 
-For simpler operations, use the unified helper API:
+For format detection and common read operations, use the umbrella facade:
 
 ```rust
-use litchi::ooxml::api::helpers;
+use litchi::{Document, Presentation, Workbook};
 
-// Extract text from any Office format
-let text = helpers::extract_text("document.docx")?;
+// The format is detected from the input bytes and package signature.
+let document = Document::open("document.docx")?;
+let text = document.text()?;
 println!("{}", text);
 
-// Get metadata from any format
-let props = helpers::get_properties("document.docx")?;
+let presentation = Presentation::open("slides.pptx")?;
+println!("slides: {}", presentation.slide_count()?);
+
+let workbook = Workbook::open("workbook.xlsx")?;
+println!("sheets: {}", workbook.worksheet_count());
+
+let props = document.metadata()?;
 if let Some(title) = props.title {
     println!("Title: {}", title);
 }
@@ -665,22 +692,23 @@ for para in doc.paragraphs()? {
 
 ## Error Handling
 
-All operations return `Result` types with descriptive errors:
+Format-specific operations return their owner crate's `Result` type. For
+example, DOCX errors are defined by `litchi-docx`:
 
 ```rust
-use litchi::ooxml::error::OoxmlError;
+use litchi_docx::{Error, Package};
 
 match Package::open("document.docx") {
     Ok(pkg) => {
         // Process document
     }
-    Err(OoxmlError::IoError(e)) => {
+    Err(Error::Io(e)) => {
         eprintln!("IO error: {}", e);
     }
-    Err(OoxmlError::InvalidFormat(msg)) => {
+    Err(Error::InvalidFormat(msg)) => {
         eprintln!("Invalid format: {}", msg);
     }
-    Err(OoxmlError::PartNotFound(part)) => {
+    Err(Error::PartNotFound(part)) => {
         eprintln!("Missing part: {}", part);
     }
     Err(e) => {

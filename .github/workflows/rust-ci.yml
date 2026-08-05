@@ -11,6 +11,10 @@ on:
       - '.pre-commit-config.yaml'
       - 'rustfmt.toml'
       - '.github/workflows/rust-ci.yml'
+      - 'README.md'
+      - 'crates/**/README.md'
+      - 'docs/FEATURE_MATRIX.md'
+      - 'docs/OFFICE_API_GUIDE.md'
       - 'docs/adr/**'
       - 'tools/check_crate_boundaries.py'
       - 'tools/crate_boundaries.json'
@@ -27,6 +31,10 @@ on:
       - '.pre-commit-config.yaml'
       - 'rustfmt.toml'
       - '.github/workflows/rust-ci.yml'
+      - 'README.md'
+      - 'crates/**/README.md'
+      - 'docs/FEATURE_MATRIX.md'
+      - 'docs/OFFICE_API_GUIDE.md'
       - 'docs/adr/**'
       - 'tools/check_crate_boundaries.py'
       - 'tools/crate_boundaries.json'
@@ -84,18 +92,23 @@ jobs:
           -p litchi-core
           -p litchi-crypto
           -p litchi-doc
+          -p litchi-docx
           -p litchi-drawingml
+          -p litchi-fonts
           -p litchi-odraw
           -p litchi-ograph
           -p litchi-ole-common
+          -p litchi-opc
           -p litchi-ooxml-common
           -p litchi-ppt
+          -p litchi-pptx
           -p litchi-sheet
           -p litchi-sign
           -p litchi-slide
           -p litchi-vba
           -p litchi-word
           -p litchi-xls
+          -p litchi-xlsb
           -p litchi-xlsx
 
   check-and-clippy:
