@@ -46,6 +46,26 @@ pub(crate) const AXIS_NON_STYLE_MESSAGE_TYPE: u32 = 5_027;
 pub(crate) const SERIES_STYLE_MESSAGE_TYPE: u32 = 5_028;
 pub(crate) const SERIES_NON_STYLE_MESSAGE_TYPE: u32 = 5_029;
 
+/// Return the only message index of `message_type`, or `None` when the
+/// container is missing it or contains duplicates.
+///
+/// The scan intentionally keeps no collection of matching indexes. Callers
+/// use the result as an exact-one precondition before decoding or invoking a
+/// mutation callback, so malformed containers cannot cause partial edits.
+pub(crate) fn single_message_index(messages: &[RawMessage], message_type: u32) -> Option<usize> {
+    let mut index = None;
+    for (candidate, message) in messages.iter().enumerate() {
+        if message.type_ != message_type {
+            continue;
+        }
+        if index.is_some() {
+            return None;
+        }
+        index = Some(candidate);
+    }
+    index
+}
+
 const CURRENT_STYLE_EXTENSION_FIELD: u32 = 10_000;
 const CHART_SCENE_DEPTH_EXTENSION_FIELD: u32 = 10_002;
 const CHART_APPEARANCE_PRESERVED_EXTENSION_FIELD: u32 = 10_023;
@@ -209,4 +229,39 @@ fn collect_preset_references(identifiers: &mut HashSet<u64>, references: &[tsp::
 fn deterministic_uuid(seed: u64) -> String {
     let suffix = seed & 0x0000_ffff_ffff_ffff;
     format!("00000000-0000-4000-8000-{suffix:012X}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn message(type_: u32) -> RawMessage {
+        RawMessage {
+            type_,
+            data: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn single_message_index_requires_exactly_one_match() {
+        assert_eq!(single_message_index(&[], CHART_MESSAGE_TYPE), None);
+        assert_eq!(
+            single_message_index(
+                &[message(STANDIN_MESSAGE_TYPE), message(CHART_MESSAGE_TYPE)],
+                CHART_MESSAGE_TYPE,
+            ),
+            Some(1)
+        );
+        assert_eq!(
+            single_message_index(
+                &[
+                    message(CHART_MESSAGE_TYPE),
+                    message(STANDIN_MESSAGE_TYPE),
+                    message(CHART_MESSAGE_TYPE),
+                ],
+                CHART_MESSAGE_TYPE,
+            ),
+            None
+        );
+    }
 }

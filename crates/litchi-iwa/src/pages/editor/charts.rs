@@ -72,7 +72,8 @@ use crate::charts::source::{
     SERIES_NON_STYLE_MESSAGE_TYPE, SERIES_STYLE_MESSAGE_TYPE, STANDIN_MESSAGE_TYPE,
     SourceChartObjectIds, chart_data, chart_geometry, chart_grid, drawable_geometry,
     geometry_archive, reference, register_chart_styles, require_creatable_kind,
-    source_chart_objects, unregister_chart_styles, validate_chart_styles_registered,
+    single_message_index, source_chart_objects, unregister_chart_styles,
+    validate_chart_styles_registered,
 };
 use crate::charts::{
     ChartArrangement, ChartData, ChartKind, Direction, DirectionKind, IWorkChartArchive,
@@ -708,21 +709,15 @@ fn update_chart_payload(
         let object = archive.object_mut(drawable_object_id).ok_or_else(|| {
             Error::InvalidFormat(format!("Pages chart {drawable_object_id} is missing"))
         })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter_map(|(index, message)| (message.type_ == CHART_MESSAGE_TYPE).then_some(index))
-            .collect::<Vec<_>>();
-        let [message_index] = indexes.as_slice() else {
+        let Some(message_index) = single_message_index(&object.messages, CHART_MESSAGE_TYPE) else {
             return Err(Error::InvalidFormat(format!(
                 "Pages chart {drawable_object_id} must contain exactly one chart payload"
             )));
         };
-        let mut chart = IWorkChartArchive::decode(&object.messages[*message_index].data)?;
+        let mut chart = IWorkChartArchive::decode(&object.messages[message_index].data)?;
         update(&mut chart)?;
         object.replace_message(
-            *message_index,
+            message_index,
             RawMessage {
                 type_: CHART_MESSAGE_TYPE,
                 data: chart.encode()?,

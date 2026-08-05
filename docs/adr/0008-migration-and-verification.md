@@ -6078,6 +6078,18 @@ a tracked Numbers chart-fixture limitation rather than native support evidence.
 No native-resave claim is made, and Pages, Numbers, and Keynote were quit after
 inspection.
 
+The follow-on wire and payload-discovery hardening keeps the same ownership and
+wire contract. Recognized reference-line fields now use the common checked
+`WireField` payload and canonical key/length views, while unknown fields remain
+permissive and wire-preserving. Pages, Numbers, and Keynote chart editors share
+one allocation-free exact-one message-index scan, so malformed zero- or
+duplicate-payload containers fail before chart decoding or mutation callbacks.
+The common suite passed 53 tests, the focused reference-line suite passed 11
+tests, and the exact-one scanner regression covers zero, one, and two matching
+payloads. Formatting, diff, and scoped lint checks are the applicable gates for
+this structural/performance slice; no additional native application run was
+needed because serialized chart semantics were unchanged.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

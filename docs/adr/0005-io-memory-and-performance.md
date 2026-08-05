@@ -64,6 +64,16 @@ metadata is disabled because no production path consumes it. This reduces
 generated code and static-data footprint without changing the wire format or
 the typed schema boundary.
 
+Borrowed IWA wire readers use the common checked field views when interpreting
+recognized fields: payload ranges are sliced through validated offsets and
+schema-owned key/length framing can be required without changing the
+permissive unknown-field parser. Source-built Pages, Numbers, and Keynote
+chart updates also locate their single chart payload with one linear scan and
+no temporary index allocation before decoding or invoking a mutation callback.
+These are allocation-shape and safety improvements; representative allocation,
+latency, and throughput measurements remain governed by the measurement
+contract above and are not claimed by this slice.
+
 Instrumentation is an opt-in runtime-neutral observer with optional tracing and
 profiling adapters. It never records document content, credentials, or sensitive
 paths by default.

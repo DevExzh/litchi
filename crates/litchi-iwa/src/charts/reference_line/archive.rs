@@ -996,8 +996,8 @@ fn strict_optional_varint(data: &[u8], field_number: u32) -> Result<Option<u64>>
             "chart reference-line field {field_number} is not a varint"
         )));
     }
-    validate_canonical_field(field, false)?;
-    let payload = &data[field.payload_start()..field.end()];
+    validate_canonical_field(data, field, false)?;
+    let payload = field.checked_payload(data)?;
     let (value, consumed) =
         litchi_iwa_common::varint::decode_varint_from_bytes(payload).map_err(|error| {
             Error::InvalidFormat(format!(
@@ -1028,8 +1028,8 @@ fn strict_optional_message(data: &[u8], field_number: u32) -> Result<Option<&[u8
             "chart reference-line field {field_number} is not length-delimited"
         )));
     }
-    validate_canonical_field(field, true)?;
-    Ok(Some(&data[field.payload_start()..field.end()]))
+    validate_canonical_field(data, field, true)?;
+    Ok(Some(field.checked_payload(data)?))
 }
 
 fn read_custom_value(data: &[u8]) -> Result<Value> {
@@ -1056,8 +1056,8 @@ fn strict_optional_fixed64(data: &[u8], field_number: u32) -> Result<Option<u64>
             "chart reference-line field {field_number} is not fixed64"
         )));
     }
-    validate_canonical_field(field, false)?;
-    let payload = &data[field.payload_start()..field.end()];
+    validate_canonical_field(data, field, false)?;
+    let payload = field.checked_payload(data)?;
     let bytes: [u8; 8] = payload.try_into().map_err(|_| {
         Error::InvalidFormat(format!(
             "chart reference-line field {field_number} has an invalid fixed64 payload"
@@ -1066,27 +1066,10 @@ fn strict_optional_fixed64(data: &[u8], field_number: u32) -> Result<Option<u64>
     Ok(Some(u64::from_le_bytes(bytes)))
 }
 
-fn validate_canonical_field(field: &WireField, length_delimited: bool) -> Result<()> {
-    let key = (u64::from(field.number()) << 3) | u64::from(field.wire_type());
-    let key_length = field.key_end() - field.start();
-    if litchi_iwa_common::varint::encoded_len(key) != key_length {
-        return Err(Error::InvalidFormat(format!(
-            "chart reference-line field {} has a noncanonical key",
-            field.number()
-        )));
-    }
+fn validate_canonical_field(data: &[u8], field: &WireField, length_delimited: bool) -> Result<()> {
+    field.validate_canonical_key(data)?;
     if length_delimited {
-        let length = field.end() - field.payload_start();
-        let length_prefix = field.payload_start() - field.key_end();
-        let length = u64::try_from(length).map_err(|_| {
-            Error::InvalidFormat("reference-line field length exceeds u64".to_owned())
-        })?;
-        if litchi_iwa_common::varint::encoded_len(length) != length_prefix {
-            return Err(Error::InvalidFormat(format!(
-                "chart reference-line field {} has a noncanonical length",
-                field.number()
-            )));
-        }
+        field.validate_canonical_length(data)?;
     }
     Ok(())
 }
@@ -1145,6 +1128,68 @@ mod tests {
         )
         .unwrap();
         assert!(read_reference_line(&malformed).is_err());
+    }
+
+    #[test]
+    fn recognized_reference_line_fields_require_canonical_framing() {
+        let encoded = canonical_reference_line(&Line::average()).unwrap();
+
+        let noncanonical_key = [0x88, 0x00, NATIVE_AVERAGE as u8];
+        let malformed = patch_length_delimited_field(
+            &encoded,
+            GENERATED_REFERENCE_LINE_NON_STYLE_EXTENSION_FIELD,
+            true,
+            Some(&noncanonical_key),
+        )
+        .unwrap();
+        assert!(read_reference_line(&malformed).is_err());
+
+        let mut noncanonical_length = Vec::new();
+        crate::wire::append_varint_field(
+            &mut noncanonical_length,
+            TYPE_FIELD,
+            NATIVE_AVERAGE as u64,
+        )
+        .unwrap();
+        noncanonical_length.extend([0x2a, 0x87, 0x00]);
+        noncanonical_length.extend_from_slice(b"Average");
+        let malformed = patch_length_delimited_field(
+            &encoded,
+            GENERATED_REFERENCE_LINE_NON_STYLE_EXTENSION_FIELD,
+            true,
+            Some(&noncanonical_length),
+        )
+        .unwrap();
+        assert!(read_reference_line(&malformed).is_err());
+    }
+
+    #[test]
+    fn unknown_reference_line_fields_remain_permissive_and_preserved() {
+        let original = canonical_reference_line(&Line::average()).unwrap();
+        let extension = generated_reference_line_extension(&original)
+            .unwrap()
+            .unwrap();
+        // Field 99 uses an intentionally overlong key varint. Unknown fields
+        // remain opaque and permissive even while recognized fields are strict.
+        let unknown = [0x98, 0x86, 0x00, 7];
+        let mut extension_with_unknown = extension.to_vec();
+        extension_with_unknown.extend(unknown);
+        let input = patch_length_delimited_field(
+            &original,
+            GENERATED_REFERENCE_LINE_NON_STYLE_EXTENSION_FIELD,
+            true,
+            Some(&extension_with_unknown),
+        )
+        .unwrap();
+
+        assert_eq!(read_reference_line(&input).unwrap(), Line::average());
+        let replacement = Line::average().with_name_visibility(false);
+        let output = patch_reference_line(&input, &replacement).unwrap();
+        let output_extension = generated_reference_line_extension(&output)
+            .unwrap()
+            .unwrap();
+        assert!(output_extension.ends_with(&unknown));
+        assert_eq!(read_reference_line(&output).unwrap(), replacement);
     }
 
     #[test]
