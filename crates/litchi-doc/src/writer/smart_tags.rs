@@ -4,8 +4,7 @@ use super::core::DocWriteError;
 use crate::{SmartTagOrigin, SmartTagRecognizerRange, SmartTagRecognizerState};
 use litchi_codepage::Ansi;
 use litchi_ole_common::smart_tags::{
-    PropertyBagStore, PropertyBagString, PropertyBagStringEncoding, SmartTagProperty,
-    SmartTagPropertyBag, SmartTagType,
+    Property, PropertyBag, PropertyBagStore, PropertyBagString, PropertyBagStringEncoding, Type,
 };
 use std::collections::{BTreeMap, HashMap};
 
@@ -328,7 +327,7 @@ fn build_factoid_data(
                 DocWriteError::InvalidData("DOC smart-tag type count exceeds 65535".to_string())
             })?;
             type_ids.insert(type_key, id);
-            types.push(SmartTagType {
+            types.push(Type {
                 id,
                 namespace_uri: unicode_string(&entry.namespace_uri),
                 tag_name: unicode_string(&entry.tag_name),
@@ -340,12 +339,12 @@ fn build_factoid_data(
         for (key, value) in &entry.properties {
             let key_index = intern_string(key, &mut string_indexes, &mut strings)?;
             let value_index = intern_string(value, &mut string_indexes, &mut strings)?;
-            properties.push(SmartTagProperty {
+            properties.push(Property {
                 key_index,
                 value_index,
             });
         }
-        bags.push(SmartTagPropertyBag {
+        bags.push(PropertyBag {
             type_id,
             properties,
         });

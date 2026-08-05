@@ -4,7 +4,7 @@ use super::package::{PptError, Result};
 use super::records::PptRecord;
 use crate::consts::PptRecordType;
 use litchi_codepage::Ansi;
-use litchi_ole_common::smart_tags::{PropertyBagStore, SmartTagLimits};
+use litchi_ole_common::smart_tags::{Limits, PropertyBagStore};
 
 /// One smart-tag type declared by the shared property-bag store.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -101,7 +101,7 @@ fn parse_store(record: &PptRecord, ansi: Ansi) -> Result<PowerPointSmartTagStore
         bag_count_bytes[3],
     ]))
     .map_err(|_| PptError::Corrupted("smart-tag bag count overflows usize".to_string()))?;
-    let limits = SmartTagLimits::default();
+    let limits = Limits::default();
     let (shared, consumed) = PropertyBagStore::parse_prefix(&data[4..], ansi, limits)
         .map_err(|error| PptError::Corrupted(error.to_string()))?;
     let bags_start = 4usize

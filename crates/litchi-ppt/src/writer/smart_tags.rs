@@ -5,8 +5,7 @@ use super::records::{RecordBuilder, record_type};
 use crate::consts::PptRecordType;
 use litchi_codepage::Ansi;
 use litchi_ole_common::smart_tags::{
-    PropertyBagStore, PropertyBagString, PropertyBagStringEncoding, SmartTagProperty,
-    SmartTagPropertyBag, SmartTagType,
+    Property, PropertyBag, PropertyBagStore, PropertyBagString, PropertyBagStringEncoding, Type,
 };
 use std::collections::HashMap;
 
@@ -103,7 +102,7 @@ pub(crate) fn build_document_binary_tag(
                 )
             })?;
             type_ids.insert(type_key, id);
-            types.push(SmartTagType {
+            types.push(Type {
                 id,
                 namespace_uri: unicode_string(&entry.namespace_uri),
                 tag_name: unicode_string(&entry.tag_name),
@@ -114,12 +113,12 @@ pub(crate) fn build_document_binary_tag(
 
         let mut properties = Vec::with_capacity(entry.properties.len());
         for (key, value) in &entry.properties {
-            properties.push(SmartTagProperty {
+            properties.push(Property {
                 key_index: intern_string(key, &mut string_indexes, &mut strings)?,
                 value_index: intern_string(value, &mut string_indexes, &mut strings)?,
             });
         }
-        bags.push(SmartTagPropertyBag {
+        bags.push(PropertyBag {
             type_id,
             properties,
         });

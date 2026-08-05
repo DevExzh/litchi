@@ -6,7 +6,7 @@
 use super::fib::FileInformationBlock;
 use crate::package::{DocError, Result};
 use litchi_codepage::Ansi;
-use litchi_ole_common::smart_tags::{PropertyBagStore, SmartTagLimits, SmartTagPropertyBag};
+use litchi_ole_common::smart_tags::{Limits, PropertyBag, PropertyBagStore, Type};
 use std::collections::{BTreeMap, HashSet};
 
 const STTBF_BKMK_FACTOID: usize = 114;
@@ -42,7 +42,7 @@ pub struct DocumentSmartTag {
     pub is_native: bool,
     pub column_range: Option<(u8, u8)>,
     pub info: SmartTagBookmarkInfo,
-    pub property_bag: SmartTagPropertyBag,
+    pub property_bag: PropertyBag,
 }
 
 /// Recognizer processing state for one CP range.
@@ -148,7 +148,7 @@ impl DocumentSmartTags {
         validate_positions(&starts, document_end, "PlcfBkfFactoid")?;
         validate_positions(&ends, document_end, "PlcfBklFactoid")?;
 
-        let limits = SmartTagLimits::default();
+        let limits = Limits::default();
         let (store, bags) = if let Some(factoid_data) = factoid_data {
             let ansi = ansi
                 .or_else(|| ansi_for_lcid(fib.language_id()))
@@ -220,10 +220,7 @@ impl DocumentSmartTags {
     }
 
     /// Resolve the type declaration associated with a tag.
-    pub fn tag_type(
-        &self,
-        tag: &DocumentSmartTag,
-    ) -> Option<&litchi_ole_common::smart_tags::SmartTagType> {
+    pub fn tag_type(&self, tag: &DocumentSmartTag) -> Option<&Type> {
         self.store.as_ref()?.tag_type(tag.property_bag.type_id)
     }
 }
@@ -664,7 +661,7 @@ mod tests {
                 is_sub_entity: false,
                 origin: SmartTagOrigin::Unknown,
             },
-            property_bag: SmartTagPropertyBag {
+            property_bag: PropertyBag {
                 type_id: 0,
                 properties: Vec::new(),
             },
