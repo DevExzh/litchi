@@ -2504,7 +2504,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<Vec<TableCellConditionalHighlightRule>>> {
+    ) -> Result<Option<Vec<Rule>>> {
         conditional_highlight::rules_in_package(&self.package, table_id, row, column)
     }
 
@@ -2536,7 +2536,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        rules: &[TableCellConditionalHighlightRule],
+        rules: &[Rule],
     ) -> Result<TableCellConditionalHighlightInfo> {
         let mut staged = self.package.clone();
         conditional_highlight::set_in_package(&mut staged, table_id, row, column, rules)?;

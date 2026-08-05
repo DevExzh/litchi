@@ -6,9 +6,9 @@ use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
-use litchi_iwa::table_cell_conditional_highlight::{
-    TableCellConditionalHighlightCondition, TableCellConditionalHighlightRule,
-    TableCellConditionalHighlightStyle, TableCellConditionalHighlightText,
+use litchi_iwa_common::table::cell::conditional_highlight::{
+    Condition, Rule,
+    Style, Text,
 };
 use litchi_numbers::cell::Value as CellValue;
 
@@ -33,29 +33,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn highlight_rules() -> Result<Vec<TableCellConditionalHighlightRule>, Box<dyn std::error::Error>> {
+fn highlight_rules() -> Result<Vec<Rule>, Box<dyn std::error::Error>> {
     let style = highlight_style()?;
-    let text = |value| TableCellConditionalHighlightText::new(value);
+    let text = |value| Text::new(value);
     Ok([
-        TableCellConditionalHighlightCondition::CellIsBlank,
-        TableCellConditionalHighlightCondition::CellIsNotBlank,
-        TableCellConditionalHighlightCondition::TextEqualTo(text("organic grain")?),
-        TableCellConditionalHighlightCondition::TextNotEqualTo(text("dairy")?),
-        TableCellConditionalHighlightCondition::TextStartsWith(text("organic")?),
-        TableCellConditionalHighlightCondition::TextDoesNotStartWith(text("dairy")?),
-        TableCellConditionalHighlightCondition::TextEndsWith(text("grain")?),
-        TableCellConditionalHighlightCondition::TextDoesNotEndWith(text("rice")?),
-        TableCellConditionalHighlightCondition::TextContains(text("nic gr")?),
-        TableCellConditionalHighlightCondition::TextDoesNotContain(text("rice")?),
+        Condition::CellIsBlank,
+        Condition::CellIsNotBlank,
+        Condition::TextEqualTo(text("organic grain")?),
+        Condition::TextNotEqualTo(text("dairy")?),
+        Condition::TextStartsWith(text("organic")?),
+        Condition::TextDoesNotStartWith(text("dairy")?),
+        Condition::TextEndsWith(text("grain")?),
+        Condition::TextDoesNotEndWith(text("rice")?),
+        Condition::TextContains(text("nic gr")?),
+        Condition::TextDoesNotContain(text("rice")?),
     ]
     .into_iter()
-    .map(|condition| TableCellConditionalHighlightRule::new(condition, style))
+    .map(|condition| Rule::new(condition, style))
     .collect())
 }
 
-fn highlight_style() -> Result<TableCellConditionalHighlightStyle, Box<dyn std::error::Error>> {
+fn highlight_style() -> Result<Style, Box<dyn std::error::Error>> {
     let red = RgbaColor::new(0.96, 0.22, 0.18, 1.0, RgbColorSpace::Srgb)?;
-    Ok(TableCellConditionalHighlightStyle::new(
+    Ok(Style::new(
         Some(red),
         None,
         true,
@@ -63,9 +63,9 @@ fn highlight_style() -> Result<TableCellConditionalHighlightStyle, Box<dyn std::
 }
 
 fn highlight_rule(
-    condition: TableCellConditionalHighlightCondition,
-) -> Result<TableCellConditionalHighlightRule, Box<dyn std::error::Error>> {
-    Ok(TableCellConditionalHighlightRule::new(
+    condition: Condition,
+) -> Result<Rule, Box<dyn std::error::Error>> {
+    Ok(Rule::new(
         condition,
         highlight_style()?,
     ))
@@ -97,14 +97,14 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let rules = highlight_rules()?;
     editor.set_cell_conditional_highlighting(table_id, HIGHLIGHT_ROW, HIGHLIGHT_COLUMN, &rules)?;
-    let positive_rule = highlight_rule(TableCellConditionalHighlightCondition::NumberIsPositive)?;
+    let positive_rule = highlight_rule(Condition::NumberIsPositive)?;
     editor.set_cell_conditional_highlighting(
         table_id,
         SIGN_HIGHLIGHT_ROW,
         POSITIVE_HIGHLIGHT_COLUMN,
         std::slice::from_ref(&positive_rule),
     )?;
-    let negative_rule = highlight_rule(TableCellConditionalHighlightCondition::NumberIsNegative)?;
+    let negative_rule = highlight_rule(Condition::NumberIsNegative)?;
     editor.set_cell_conditional_highlighting(
         table_id,
         SIGN_HIGHLIGHT_ROW,
@@ -170,14 +170,14 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         HIGHLIGHT_COLUMN,
         &rules,
     )?;
-    let positive_rule = highlight_rule(TableCellConditionalHighlightCondition::NumberIsPositive)?;
+    let positive_rule = highlight_rule(Condition::NumberIsPositive)?;
     editor.set_table_cell_conditional_highlighting(
         table_id,
         SIGN_HIGHLIGHT_ROW,
         POSITIVE_HIGHLIGHT_COLUMN,
         std::slice::from_ref(&positive_rule),
     )?;
-    let negative_rule = highlight_rule(TableCellConditionalHighlightCondition::NumberIsNegative)?;
+    let negative_rule = highlight_rule(Condition::NumberIsNegative)?;
     editor.set_table_cell_conditional_highlighting(
         table_id,
         SIGN_HIGHLIGHT_ROW,
@@ -256,7 +256,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         HIGHLIGHT_COLUMN,
         &rules,
     )?;
-    let positive_rule = highlight_rule(TableCellConditionalHighlightCondition::NumberIsPositive)?;
+    let positive_rule = highlight_rule(Condition::NumberIsPositive)?;
     editor.set_slide_table_cell_conditional_highlighting(
         0,
         table.model_object_id,
@@ -264,7 +264,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         POSITIVE_HIGHLIGHT_COLUMN,
         std::slice::from_ref(&positive_rule),
     )?;
-    let negative_rule = highlight_rule(TableCellConditionalHighlightCondition::NumberIsNegative)?;
+    let negative_rule = highlight_rule(Condition::NumberIsNegative)?;
     editor.set_slide_table_cell_conditional_highlighting(
         0,
         table.model_object_id,

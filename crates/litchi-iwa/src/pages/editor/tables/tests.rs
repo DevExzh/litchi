@@ -4,9 +4,8 @@ use super::*;
 use crate::archive::RawMessage;
 use crate::numbers::CellValue;
 use crate::pages::PagesDocumentBuilder;
-use crate::table_cell_conditional_highlight::{
-    TableCellConditionalHighlightCondition, TableCellConditionalHighlightRule,
-    TableCellConditionalHighlightStyle, TableCellConditionalHighlightText,
+use litchi_iwa_common::table::cell::conditional_highlight::{
+    Condition, Rule, Style, Text,
 };
 use crate::table_cell_data_format::{
     TableCellCurrencyCode, TableCellCurrencyStyle, TableCellCustomFormatName,
@@ -68,11 +67,11 @@ fn source_built_table_creates_and_replaces_conditional_highlighting() {
     editor
         .set_table_cell(model_id, 1, 1, CellValue::Text("Organic Grain".to_owned()))
         .unwrap();
-    let rule = TableCellConditionalHighlightRule::new(
-        TableCellConditionalHighlightCondition::TextContains(
-            TableCellConditionalHighlightText::new("grain").unwrap(),
+    let rule = Rule::new(
+        Condition::TextContains(
+            Text::new("grain").unwrap(),
         ),
-        TableCellConditionalHighlightStyle::with_fill(
+        Style::with_fill(
             crate::shapes::RgbaColor::new(0.9, 0.1, 0.1, 1.0, crate::shapes::RgbColorSpace::Srgb)
                 .unwrap(),
         ),

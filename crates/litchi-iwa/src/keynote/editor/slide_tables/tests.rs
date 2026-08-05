@@ -1,9 +1,8 @@
 use super::*;
 use crate::keynote::KeynoteDocumentBuilder;
 use crate::numbers::cell::CellValue;
-use crate::table_cell_conditional_highlight::{
-    TableCellConditionalHighlightCondition, TableCellConditionalHighlightRule,
-    TableCellConditionalHighlightStyle, TableCellConditionalHighlightText,
+use litchi_iwa_common::table::cell::conditional_highlight::{
+    Condition, Rule, Style, Text,
 };
 use crate::table_cell_data_format::{
     TableCellCurrencyCode, TableCellCurrencyStyle, TableCellCustomFormatName,
@@ -66,11 +65,11 @@ fn source_built_table_creates_and_replaces_conditional_highlighting() {
             CellValue::Text("Organic Grain".to_owned()),
         )
         .unwrap();
-    let rule = TableCellConditionalHighlightRule::new(
-        TableCellConditionalHighlightCondition::TextContains(
-            TableCellConditionalHighlightText::new("grain").unwrap(),
+    let rule = Rule::new(
+        Condition::TextContains(
+            Text::new("grain").unwrap(),
         ),
-        TableCellConditionalHighlightStyle::with_text_color(
+        Style::with_text_color(
             crate::shapes::RgbaColor::new(0.1, 0.6, 0.2, 1.0, crate::shapes::RgbColorSpace::Srgb)
                 .unwrap(),
         ),

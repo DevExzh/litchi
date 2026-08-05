@@ -41,7 +41,7 @@ use crate::shapes::{
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
 use crate::table_appearance::TableAppearance;
-use crate::table_cell_conditional_highlight::TableCellConditionalHighlightRule;
+use litchi_iwa_common::table::cell::conditional_highlight::Rule;
 use crate::table_lock::TableLockState;
 use crate::text::{
     IWorkTextEditor, ParagraphBackground, ParagraphBorders, ParagraphDecimalTabCharacter,

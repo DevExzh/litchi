@@ -6,9 +6,9 @@ use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
-use litchi_iwa::table_cell_conditional_highlight::{
-    TableCellConditionalHighlightCondition, TableCellConditionalHighlightRule,
-    TableCellConditionalHighlightStyle,
+use litchi_iwa_common::table::cell::conditional_highlight::{
+    Condition, Rule,
+    Style,
 };
 use litchi_iwa::table_cell_data_format::TableCellCheckboxFormat;
 use litchi_numbers::cell::Value as CellValue;
@@ -30,16 +30,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn checkbox_rules() -> Result<[TableCellConditionalHighlightRule; 2], Box<dyn std::error::Error>> {
+fn checkbox_rules() -> Result<[Rule; 2], Box<dyn std::error::Error>> {
     let red = RgbaColor::new(0.96, 0.22, 0.18, 1.0, RgbColorSpace::Srgb)?;
-    let style = TableCellConditionalHighlightStyle::new(Some(red), None, true)?;
+    let style = Style::new(Some(red), None, true)?;
     Ok([
-        TableCellConditionalHighlightRule::new(
-            TableCellConditionalHighlightCondition::CheckboxIsChecked,
+        Rule::new(
+            Condition::CheckboxIsChecked,
             style,
         ),
-        TableCellConditionalHighlightRule::new(
-            TableCellConditionalHighlightCondition::CheckboxIsNotChecked,
+        Rule::new(
+            Condition::CheckboxIsNotChecked,
             style,
         ),
     ])

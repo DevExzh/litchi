@@ -30,7 +30,7 @@ impl PagesEditor {
         row: usize,
         column: usize,
     ) -> Result<
-        Option<Vec<crate::table_cell_conditional_highlight::TableCellConditionalHighlightRule>>,
+        Option<Vec<litchi_iwa_common::table::cell::conditional_highlight::Rule>>,
     > {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_conditional_highlight_rules_in_package(
@@ -75,7 +75,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        rules: &[crate::table_cell_conditional_highlight::TableCellConditionalHighlightRule],
+        rules: &[litchi_iwa_common::table::cell::conditional_highlight::Rule],
     ) -> Result<PagesTableCellConditionalHighlightInfo> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();

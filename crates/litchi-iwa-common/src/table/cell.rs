@@ -1,5 +1,6 @@
 //! Cell-level table vocabulary independent of archive and application models.
 
+pub mod conditional_highlight;
 pub mod layout;
 
 /// One edge of a native table cell.

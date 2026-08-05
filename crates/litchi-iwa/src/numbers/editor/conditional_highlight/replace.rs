@@ -13,7 +13,7 @@ pub(super) fn try_at_location(
     location: &CellLocation,
     row: usize,
     column: usize,
-    rules: &[TableCellConditionalHighlightRule],
+    rules: &[Rule],
 ) -> Result<bool> {
     let Some(cell) = read_tile_cell(
         package,
@@ -130,7 +130,7 @@ fn copy_on_write(
     location: &CellLocation,
     row: usize,
     column: usize,
-    rules: &[TableCellConditionalHighlightRule],
+    rules: &[Rule],
     resolved: &ResolvedTableDataList,
     entry: &LocatedTableDataListEntry,
 ) -> Result<bool> {

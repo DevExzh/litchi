@@ -9,6 +9,7 @@ repository.workspace   = true
 rust-version.workspace = true
 
 [dependencies]
+chrono = { workspace = true }
 thiserror = { workspace = true }
 
 [lints]

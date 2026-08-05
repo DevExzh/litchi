@@ -7,9 +7,9 @@ use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
-use litchi_iwa::table_cell_conditional_highlight::{
-    TableCellConditionalHighlightCondition, TableCellConditionalHighlightRule,
-    TableCellConditionalHighlightStyle,
+use litchi_iwa_common::table::cell::conditional_highlight::{
+    Condition, Rule,
+    Style,
 };
 use litchi_numbers::cell::Value as CellValue;
 
@@ -31,30 +31,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn date_cases()
--> Result<[(CellValue, TableCellConditionalHighlightRule); 3], Box<dyn std::error::Error>> {
+-> Result<[(CellValue, Rule); 3], Box<dyn std::error::Error>> {
     let today = local_today_in_apple_seconds();
     let midday = SECONDS_PER_DAY / 2.0;
     let fill = RgbaColor::new(0.96, 0.22, 0.18, 1.0, RgbColorSpace::Srgb)?;
-    let style = TableCellConditionalHighlightStyle::new(Some(fill), None, true)?;
+    let style = Style::new(Some(fill), None, true)?;
     Ok([
         (
             CellValue::Date(today - SECONDS_PER_DAY + midday),
-            TableCellConditionalHighlightRule::new(
-                TableCellConditionalHighlightCondition::DateIsYesterday,
+            Rule::new(
+                Condition::DateIsYesterday,
                 style,
             ),
         ),
         (
             CellValue::Date(today + midday),
-            TableCellConditionalHighlightRule::new(
-                TableCellConditionalHighlightCondition::DateIsToday,
+            Rule::new(
+                Condition::DateIsToday,
                 style,
             ),
         ),
         (
             CellValue::Date(today + SECONDS_PER_DAY + midday),
-            TableCellConditionalHighlightRule::new(
-                TableCellConditionalHighlightCondition::DateIsTomorrow,
+            Rule::new(
+                Condition::DateIsTomorrow,
                 style,
             ),
         ),

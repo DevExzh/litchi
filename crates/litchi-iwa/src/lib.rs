@@ -148,8 +148,6 @@ pub mod snappy;
 mod structured;
 /// Typed copy-on-write appearance controls shared by Pages, Numbers, and Keynote.
 pub mod table_appearance;
-/// Typed conditional-highlight rules shared by native iWork table cells.
-pub mod table_cell_conditional_highlight;
 /// Typed cell data formats shared by native iWork tables.
 pub mod table_cell_data_format;
 /// Typed text-layout controls shared by native iWork table cells.

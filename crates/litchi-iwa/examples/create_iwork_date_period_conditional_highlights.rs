@@ -7,11 +7,11 @@ use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
-use litchi_iwa::table_cell_conditional_highlight::{
-    TableCellConditionalHighlightCondition, TableCellConditionalHighlightDateOffset,
-    TableCellConditionalHighlightDateOffsetDirection, TableCellConditionalHighlightDatePeriod,
-    TableCellConditionalHighlightDatePeriodUnit, TableCellConditionalHighlightRule,
-    TableCellConditionalHighlightStyle,
+use litchi_iwa_common::table::cell::conditional_highlight::{
+    Condition, Offset,
+    OffsetDirection, Period,
+    PeriodUnit, Rule,
+    Style,
 };
 use litchi_numbers::cell::Value as CellValue;
 
@@ -34,21 +34,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn date_cases()
--> Result<[(CellValue, TableCellConditionalHighlightRule); 4], Box<dyn std::error::Error>> {
-    use TableCellConditionalHighlightDateOffsetDirection as Direction;
-    use TableCellConditionalHighlightDatePeriodUnit as Unit;
+-> Result<[(CellValue, Rule); 4], Box<dyn std::error::Error>> {
+    use OffsetDirection as Direction;
+    use PeriodUnit as Unit;
 
     let today = Local::now().date_naive();
-    let two_days = TableCellConditionalHighlightDatePeriod::new(2, Unit::Days)?;
-    let two_weeks = TableCellConditionalHighlightDatePeriod::new(2, Unit::Weeks)?;
-    let one_month = TableCellConditionalHighlightDatePeriod::new(1, Unit::Months)?;
-    let one_quarter = TableCellConditionalHighlightDatePeriod::new(1, Unit::Quarters)?;
+    let two_days = Period::new(2, Unit::Days)?;
+    let two_weeks = Period::new(2, Unit::Weeks)?;
+    let one_month = Period::new(1, Unit::Months)?;
+    let one_quarter = Period::new(1, Unit::Quarters)?;
     let fill = RgbaColor::new(0.96, 0.22, 0.18, 1.0, RgbColorSpace::Srgb)?;
-    let style = TableCellConditionalHighlightStyle::new(Some(fill), None, true)?;
+    let style = Style::new(Some(fill), None, true)?;
     let case = |date, condition| {
         (
             CellValue::Date(date_in_apple_seconds(date) + SECONDS_PER_DAY / 2.0),
-            TableCellConditionalHighlightRule::new(condition, style),
+            Rule::new(condition, style),
         )
     };
     Ok([
@@ -56,28 +56,28 @@ fn date_cases()
             today
                 .checked_add_days(Days::new(2))
                 .ok_or("date overflow")?,
-            TableCellConditionalHighlightCondition::DateIsInNext(two_days),
+            Condition::DateIsInNext(two_days),
         ),
         case(
             today
                 .checked_sub_days(Days::new(14))
                 .ok_or("date overflow")?,
-            TableCellConditionalHighlightCondition::DateIsInLast(two_weeks),
+            Condition::DateIsInLast(two_weeks),
         ),
         case(
             today
                 .checked_add_months(Months::new(1))
                 .ok_or("date overflow")?,
-            TableCellConditionalHighlightCondition::DateIsOffsetFromToday(
-                TableCellConditionalHighlightDateOffset::new(one_month, Direction::FromNow),
+            Condition::DateIsOffsetFromToday(
+                Offset::new(one_month, Direction::FromNow),
             ),
         ),
         case(
             today
                 .checked_sub_months(Months::new(3))
                 .ok_or("date overflow")?,
-            TableCellConditionalHighlightCondition::DateIsOffsetFromToday(
-                TableCellConditionalHighlightDateOffset::new(one_quarter, Direction::Ago),
+            Condition::DateIsOffsetFromToday(
+                Offset::new(one_quarter, Direction::Ago),
             ),
         ),
     ])

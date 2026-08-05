@@ -1259,7 +1259,7 @@ pub(crate) fn table_cell_conditional_highlight_rules_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<Vec<TableCellConditionalHighlightRule>>> {
+) -> Result<Option<Vec<Rule>>> {
     conditional_highlight::attached_rules_in_package(package, table_id, row, column)
 }
 
@@ -1277,7 +1277,7 @@ pub(crate) fn set_table_cell_conditional_highlighting_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    rules: &[TableCellConditionalHighlightRule],
+    rules: &[Rule],
 ) -> Result<()> {
     conditional_highlight::set_attached_in_package(package, table_id, row, column, rules)
 }
