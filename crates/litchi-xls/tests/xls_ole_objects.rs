@@ -38,6 +38,20 @@ fn object(id: u16, storage: u32, unknown: u8) -> XlsOleObjectRecord {
     }
 }
 
+fn linked_object(id: u16, storage: u32, unknown: u8) -> XlsOleObjectRecord {
+    let mut value = object(id, storage, unknown);
+    let flags = value
+        .subrecords
+        .iter_mut()
+        .find_map(|subrecord| match subrecord {
+            XlsObjSubrecord::PictureFlags(flags) => Some(flags),
+            _ => None,
+        })
+        .expect("test OLE object should contain FtPioGrbit");
+    flags.raw = 0x0002;
+    value
+}
+
 fn nested_cfb(marker: &[u8]) -> Vec<u8> {
     let mut writer = OleWriter::new();
     writer.create_stream(&["CONTENTS"], marker).unwrap();
@@ -69,15 +83,20 @@ fn workbook_stream(objects: &[XlsOleObjectRecord]) -> Vec<u8> {
 }
 
 fn xls(objects: &[XlsOleObjectRecord], storages: &[u32]) -> Vec<u8> {
+    let names = storages.iter().map(|id| ("MBD", *id)).collect::<Vec<_>>();
+    xls_named(objects, &names)
+}
+
+fn xls_named(objects: &[XlsOleObjectRecord], storages: &[(&str, u32)]) -> Vec<u8> {
     let workbook = workbook_stream(objects);
     let payloads = storages
         .iter()
-        .map(|id| (*id, nested_cfb(&id.to_le_bytes())))
+        .map(|(prefix, id)| ((*prefix, *id), nested_cfb(&id.to_le_bytes())))
         .collect::<Vec<_>>();
     let mut writer = OleWriter::new();
     writer.create_stream(&["Workbook"], &workbook).unwrap();
-    for (id, payload) in &payloads {
-        let name = format!("MBD{id:08X}");
+    for ((prefix, id), payload) in &payloads {
+        let name = format!("{prefix}{id:08X}");
         writer.create_storage(&[&name]).unwrap();
         let mut nested = OleFile::open(Cursor::new(payload)).unwrap();
         let contents = nested.open_stream(&["CONTENTS"]).unwrap();
@@ -88,6 +107,13 @@ fn xls(objects: &[XlsOleObjectRecord], storages: &[u32]) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
     output.into_inner()
+}
+
+#[test]
+fn opens_link_storage_from_dde_obj_reference() {
+    let bytes = xls_named(&[linked_object(1, 42, 1)], &[("LNK", 42)]);
+    let editor = XlsOleObjectEditor::new(bytes, Limits::default()).unwrap();
+    assert_eq!(editor.objects(0).unwrap().len(), 1);
 }
 
 #[test]

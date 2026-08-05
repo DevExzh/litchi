@@ -24,6 +24,8 @@ const FT_RBO_DATA: u16 = 0x0011;
 const FT_CBLS_DATA: u16 = 0x0012;
 const FT_LBS_DATA: u16 = 0x0013;
 const FT_END: u16 = 0;
+/// MS-CFB directory-entry type for a user stream.
+const CFB_STREAM: u8 = 0x02;
 
 /// MS-XLS 2.5.141/2.5.145 `fNo3d`: the control is drawn without 3-D effects.
 const NO_3D: u16 = 0x0001;
@@ -775,7 +777,7 @@ impl XlsOleObjectEditor {
         // Workbook metadata is XLS-owned. Read and parse it before handing
         // the original CFB bytes to the neutral object editor so the target
         // catalog can be derived solely from Obj/FtPictFmla records.
-        let (workbook_path, workbook) = read_workbook(&bytes)?;
+        let (workbook_path, workbook) = read_workbook(&bytes, limits)?;
         let (sheets, form_controls) = parse_workbook(&workbook)?;
         let targets = targets_for_sheets(&sheets)?;
         let package = ObjectEditor::open(bytes, targets, limits)?;
@@ -919,14 +921,35 @@ impl XlsOleObjectEditor {
     }
 }
 
-fn read_workbook(bytes: &[u8]) -> XlsResult<(Vec<String>, Vec<u8>)> {
+fn read_workbook(bytes: &[u8], limits: Limits) -> XlsResult<(Vec<String>, Vec<u8>)> {
+    let max_size = limits.max_stream_size.min(limits.max_total_size);
+    if max_size == 0 {
+        return Err(XlsError::InvalidData(
+            "Workbook stream limits must be non-zero".into(),
+        ));
+    }
     let mut ole = OleFile::open(Cursor::new(bytes))?;
+    let entries = ole.list_directory_entries(&[])?;
     for name in ["Workbook", "Book"] {
-        match ole.open_stream(&[name]) {
-            Ok(workbook) => return Ok((vec![name.to_owned()], workbook)),
-            Err(litchi_cfb::OleError::StreamNotFound) => continue,
-            Err(error) => return Err(error.into()),
+        let Some((actual_name, declared_size)) = entries
+            .iter()
+            .find(|entry| entry.entry_type == CFB_STREAM && entry.name.eq_ignore_ascii_case(name))
+            .map(|entry| (entry.name.clone(), entry.size))
+        else {
+            continue;
+        };
+        if declared_size > max_size {
+            return Err(XlsError::InvalidData(format!(
+                "{actual_name} stream exceeds configured read limit"
+            )));
         }
+        let workbook = ole.open_stream(&[actual_name.as_str()])?;
+        if workbook.len() as u64 > max_size {
+            return Err(XlsError::InvalidData(format!(
+                "{actual_name} stream exceeds configured read limit"
+            )));
+        }
+        return Ok((vec![actual_name], workbook));
     }
     Err(XlsError::InvalidData("Workbook stream not found".into()))
 }
@@ -1621,5 +1644,68 @@ fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
     XlsError::InvalidRecord {
         record_type,
         message: message.into(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use litchi_cfb::OleWriter;
+
+    fn object(id: u16, position: u32, dde: bool) -> XlsOleObjectRecord {
+        XlsOleObjectRecord {
+            subrecords: vec![
+                XlsObjSubrecord::Common(XlsFtCmo {
+                    object_type: 8,
+                    object_id: id,
+                    flags: 0,
+                    reserved: [0; 12],
+                }),
+                XlsObjSubrecord::PictureFlags(XlsFtPioGrbit {
+                    raw: if dde { 0x0002 } else { 0 },
+                }),
+                XlsObjSubrecord::PictureFormula(XlsFtPictFmla {
+                    formula: vec![0x05, 0, 0, 0, 0],
+                    storage_position: Some(position),
+                    control_buffer_size: Some(0),
+                }),
+                XlsObjSubrecord::End,
+            ],
+            text_object: None,
+        }
+    }
+
+    #[test]
+    fn derives_deduplicated_mbd_and_lnk_targets_from_obj_records() {
+        let targets = targets_for_sheets(&[vec![
+            object(1, 0x2A, false),
+            object(2, 0x2A, false),
+            object(3, 0x2A, true),
+        ]])
+        .expect("BIFF references should produce valid targets");
+
+        assert_eq!(targets.len(), 2);
+        let mbd = targets.get("MBD0000002A").expect("MBD target");
+        assert_eq!(mbd.path(), &["MBD0000002A".to_owned()]);
+        let lnk = targets.get("LNK0000002A").expect("LNK target");
+        assert_eq!(lnk.path(), &["LNK0000002A".to_owned()]);
+    }
+
+    #[test]
+    fn bounds_workbook_read_before_stream_materialization() {
+        let mut writer = OleWriter::new();
+        writer
+            .create_stream(&["Workbook"], &[0; 128])
+            .expect("test stream should be created");
+        let mut output = Cursor::new(Vec::new());
+        writer
+            .write_to(&mut output)
+            .expect("test compound file should be written");
+
+        let mut limits = Limits::default();
+        limits.max_stream_size = 64;
+        let error = read_workbook(&output.into_inner(), limits)
+            .expect_err("oversized Workbook must be rejected before reading");
+        assert!(matches!(error, XlsError::InvalidData(message) if message.contains("read limit")));
     }
 }
