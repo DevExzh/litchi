@@ -8,35 +8,35 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt;
 
-use super::xldm::{XldmStorage, classify_xldm_generated_path};
-use super::xldm_native::{XldmHashIndexFile, XldmIdfFile, parse_xldm_hash_index, parse_xldm_idf};
+use super::native::{HashIndexFile, IdfFile, parse_hash_index, parse_idf};
+use super::{Storage, classify_generated_path};
 
 const MAX_SYSTEM_GENERATED_FILES: usize = 65_536;
 
 /// A section 2.4 structural validation error.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmGeneratedDataError(String);
+pub struct GeneratedDataError(String);
 
-impl XldmGeneratedDataError {
+impl GeneratedDataError {
     fn new(message: impl Into<String>) -> Self {
         Self(message.into())
     }
 }
 
-impl fmt::Display for XldmGeneratedDataError {
+impl fmt::Display for GeneratedDataError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.0)
     }
 }
 
-impl Error for XldmGeneratedDataError {}
+impl Error for GeneratedDataError {}
 
 /// Result type for section 2.4 generated-file inspection.
-pub type XldmGeneratedDataResult<T> = Result<T, XldmGeneratedDataError>;
+pub type GeneratedDataResult<T> = Result<T, GeneratedDataError>;
 
 /// The semantic role encoded by a section 2.4 generated filename.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum XldmSystemGeneratedKind {
+pub enum SystemGeneratedKind {
     PositionToIdentifier,
     IdentifierToPosition,
     RelationshipIndex,
@@ -48,48 +48,48 @@ pub enum XldmSystemGeneratedKind {
 
 /// Compression state required by the selected section 2.4 representation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum XldmSystemGeneratedCompression {
+pub enum SystemGeneratedCompression {
     XmReNoSplit,
     Uncompressed,
 }
 
 /// The shared binary layout selected by the generated filename.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum XldmSystemGeneratedData<'a> {
-    Idf(XldmIdfFile<'a>),
-    HashIndex(XldmHashIndexFile<'a>),
+pub enum SystemGeneratedData<'a> {
+    Idf(IdfFile<'a>),
+    HashIndex(HashIndexFile<'a>),
 }
 
-impl XldmSystemGeneratedData<'_> {
-    pub fn expected_compression(&self) -> XldmSystemGeneratedCompression {
+impl SystemGeneratedData<'_> {
+    pub fn expected_compression(&self) -> SystemGeneratedCompression {
         match self {
-            Self::Idf(_) => XldmSystemGeneratedCompression::XmReNoSplit,
-            Self::HashIndex(_) => XldmSystemGeneratedCompression::Uncompressed,
+            Self::Idf(_) => SystemGeneratedCompression::XmReNoSplit,
+            Self::HashIndex(_) => SystemGeneratedCompression::Uncompressed,
         }
     }
 }
 
 /// A borrowed, typed system-generated storage member.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmSystemGeneratedFile<'a> {
+pub struct SystemGeneratedFile<'a> {
     pub storage_path: &'a str,
-    pub kind: XldmSystemGeneratedKind,
+    pub kind: SystemGeneratedKind,
     pub object_key: String,
     pub version: u64,
     pub bytes: &'a [u8],
-    pub data: XldmSystemGeneratedData<'a>,
+    pub data: SystemGeneratedData<'a>,
 }
 
-impl XldmSystemGeneratedFile<'_> {
-    pub fn expected_compression(&self) -> XldmSystemGeneratedCompression {
+impl SystemGeneratedFile<'_> {
+    pub fn expected_compression(&self) -> SystemGeneratedCompression {
         self.data.expected_compression()
     }
 }
 
 /// All recognized section 2.4 files in a validated MS-XLDM storage object.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmSystemGeneratedModel<'a> {
-    pub files: Vec<XldmSystemGeneratedFile<'a>>,
+pub struct SystemGeneratedModel<'a> {
+    pub files: Vec<SystemGeneratedFile<'a>>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -100,7 +100,7 @@ enum Layout {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct GeneratedName {
-    kind: XldmSystemGeneratedKind,
+    kind: SystemGeneratedKind,
     object_key: String,
     version: u64,
     layout: Layout,
@@ -108,51 +108,49 @@ struct GeneratedName {
 
 /// Parse one path/payload pair if its filename denotes a section 2.4 file.
 /// Non-section-2.4 generated files return `Ok(None)`.
-pub fn parse_xldm_system_generated_file<'a>(
+pub fn parse_system_generated_file<'a>(
     storage_path: &'a str,
     bytes: &'a [u8],
-) -> XldmGeneratedDataResult<Option<XldmSystemGeneratedFile<'a>>> {
-    classify_xldm_generated_path(storage_path).map_err(|error| {
-        XldmGeneratedDataError::new(format!("invalid generated path {storage_path}: {error}"))
+) -> GeneratedDataResult<Option<SystemGeneratedFile<'a>>> {
+    classify_generated_path(storage_path).map_err(|error| {
+        GeneratedDataError::new(format!("invalid generated path {storage_path}: {error}"))
     })?;
     let Some(name) = parse_generated_name(storage_path)? else {
         return Ok(None);
     };
     let data = match (name.kind, name.layout) {
-        (XldmSystemGeneratedKind::RelationshipIndex, Layout::Idf) => {
-            let idf = parse_xldm_idf(bytes);
-            let hash = parse_xldm_hash_index(bytes);
+        (SystemGeneratedKind::RelationshipIndex, Layout::Idf) => {
+            let idf = parse_idf(bytes);
+            let hash = parse_hash_index(bytes);
             match (idf, hash) {
-                (Ok(idf), Err(_)) => XldmSystemGeneratedData::Idf(idf),
-                (Err(_), Ok(hash)) => XldmSystemGeneratedData::HashIndex(hash),
+                (Ok(idf), Err(_)) => SystemGeneratedData::Idf(idf),
+                (Err(_), Ok(hash)) => SystemGeneratedData::HashIndex(hash),
                 (Ok(_), Ok(_)) => {
-                    return Err(XldmGeneratedDataError::new(format!(
+                    return Err(GeneratedDataError::new(format!(
                         "ambiguous relationship index payload layout for {storage_path}"
                     )));
                 },
                 (Err(idf), Err(hash)) => {
-                    return Err(XldmGeneratedDataError::new(format!(
+                    return Err(GeneratedDataError::new(format!(
                         "invalid relationship index as .idf ({idf}) and .hidx ({hash})"
                     )));
                 },
             }
         },
-        (_, Layout::Idf) => {
-            XldmSystemGeneratedData::Idf(parse_xldm_idf(bytes).map_err(|error| {
-                XldmGeneratedDataError::new(format!(
-                    "invalid generated .idf member {storage_path}: {error}"
-                ))
-            })?)
-        },
+        (_, Layout::Idf) => SystemGeneratedData::Idf(parse_idf(bytes).map_err(|error| {
+            GeneratedDataError::new(format!(
+                "invalid generated .idf member {storage_path}: {error}"
+            ))
+        })?),
         (_, Layout::HashIndex) => {
-            XldmSystemGeneratedData::HashIndex(parse_xldm_hash_index(bytes).map_err(|error| {
-                XldmGeneratedDataError::new(format!(
+            SystemGeneratedData::HashIndex(parse_hash_index(bytes).map_err(|error| {
+                GeneratedDataError::new(format!(
                     "invalid generated .hidx member {storage_path}: {error}"
                 ))
             })?)
         },
     };
-    Ok(Some(XldmSystemGeneratedFile {
+    Ok(Some(SystemGeneratedFile {
         storage_path,
         kind: name.kind,
         object_key: name.object_key,
@@ -164,9 +162,9 @@ pub fn parse_xldm_system_generated_file<'a>(
 
 /// Discover section 2.4 members from the validated backup log, resolve each
 /// path through the validated virtual directory, and enforce cross-file sets.
-pub fn inspect_xldm_system_generated<'a>(
-    storage: &'a XldmStorage<'a>,
-) -> XldmGeneratedDataResult<XldmSystemGeneratedModel<'a>> {
+pub fn inspect_system_generated<'a>(
+    storage: &'a Storage<'a>,
+) -> GeneratedDataResult<SystemGeneratedModel<'a>> {
     let mut files = Vec::new();
     for group in &storage.backup_log.file_groups {
         for logged in &group.files {
@@ -175,7 +173,7 @@ pub fn inspect_xldm_system_generated<'a>(
                 continue;
             }
             if files.len() == MAX_SYSTEM_GENERATED_FILES {
-                return Err(XldmGeneratedDataError::new(
+                return Err(GeneratedDataError::new(
                     "too many system-generated data files",
                 ));
             }
@@ -184,29 +182,29 @@ pub fn inspect_xldm_system_generated<'a>(
                 .iter()
                 .position(|entry| entry.path == path)
                 .ok_or_else(|| {
-                    XldmGeneratedDataError::new(format!(
+                    GeneratedDataError::new(format!(
                         "logged generated member {path} is absent from the directory"
                     ))
                 })?;
             let bytes = storage.file_payload(directory_index).ok_or_else(|| {
-                XldmGeneratedDataError::new(format!("cannot resolve generated member {path}"))
+                GeneratedDataError::new(format!("cannot resolve generated member {path}"))
             })?;
-            let file = parse_xldm_system_generated_file(path, bytes)?.ok_or_else(|| {
-                XldmGeneratedDataError::new("generated member classification changed")
+            let file = parse_system_generated_file(path, bytes)?.ok_or_else(|| {
+                GeneratedDataError::new("generated member classification changed")
             })?;
             files.push(file);
         }
     }
-    validate_xldm_system_generated_files(&files)?;
-    Ok(XldmSystemGeneratedModel { files })
+    validate_system_generated_files(&files)?;
+    Ok(SystemGeneratedModel { files })
 }
 
 /// Validate section 2.4 relationships between already parsed generated files.
-pub fn validate_xldm_system_generated_files(
-    files: &[XldmSystemGeneratedFile<'_>],
-) -> XldmGeneratedDataResult<()> {
+pub fn validate_system_generated_files(
+    files: &[SystemGeneratedFile<'_>],
+) -> GeneratedDataResult<()> {
     if files.len() > MAX_SYSTEM_GENERATED_FILES {
-        return Err(XldmGeneratedDataError::new(
+        return Err(GeneratedDataError::new(
             "too many system-generated data files",
         ));
     }
@@ -214,49 +212,49 @@ pub fn validate_xldm_system_generated_files(
     let mut hierarchies: HashMap<&str, (u64, u8)> = HashMap::new();
     for file in files {
         match file.kind {
-            XldmSystemGeneratedKind::RelationshipIndex => {
+            SystemGeneratedKind::RelationshipIndex => {
                 if !relationships.insert(file.object_key.as_str()) {
-                    return Err(XldmGeneratedDataError::new(format!(
+                    return Err(GeneratedDataError::new(format!(
                         "relationship {} has multiple index representations",
                         file.object_key
                     )));
                 }
             },
-            XldmSystemGeneratedKind::UserHierarchyChildCount
-            | XldmSystemGeneratedKind::UserHierarchyFirstChildPosition
-            | XldmSystemGeneratedKind::UserHierarchyMultilevelIdentifier
-            | XldmSystemGeneratedKind::UserHierarchyParentPosition => {
+            SystemGeneratedKind::UserHierarchyChildCount
+            | SystemGeneratedKind::UserHierarchyFirstChildPosition
+            | SystemGeneratedKind::UserHierarchyMultilevelIdentifier
+            | SystemGeneratedKind::UserHierarchyParentPosition => {
                 let bit = match file.kind {
-                    XldmSystemGeneratedKind::UserHierarchyChildCount => 0b0001,
-                    XldmSystemGeneratedKind::UserHierarchyFirstChildPosition => 0b0010,
-                    XldmSystemGeneratedKind::UserHierarchyMultilevelIdentifier => 0b0100,
-                    XldmSystemGeneratedKind::UserHierarchyParentPosition => 0b1000,
+                    SystemGeneratedKind::UserHierarchyChildCount => 0b0001,
+                    SystemGeneratedKind::UserHierarchyFirstChildPosition => 0b0010,
+                    SystemGeneratedKind::UserHierarchyMultilevelIdentifier => 0b0100,
+                    SystemGeneratedKind::UserHierarchyParentPosition => 0b1000,
                     _ => unreachable!(),
                 };
                 let entry = hierarchies
                     .entry(file.object_key.as_str())
                     .or_insert((file.version, 0));
                 if entry.0 != file.version {
-                    return Err(XldmGeneratedDataError::new(format!(
+                    return Err(GeneratedDataError::new(format!(
                         "user hierarchy {} uses inconsistent file versions",
                         file.object_key
                     )));
                 }
                 if entry.1 & bit != 0 {
-                    return Err(XldmGeneratedDataError::new(format!(
+                    return Err(GeneratedDataError::new(format!(
                         "user hierarchy {} duplicates a generated role",
                         file.object_key
                     )));
                 }
                 entry.1 |= bit;
             },
-            XldmSystemGeneratedKind::PositionToIdentifier
-            | XldmSystemGeneratedKind::IdentifierToPosition => {},
+            SystemGeneratedKind::PositionToIdentifier
+            | SystemGeneratedKind::IdentifierToPosition => {},
         }
     }
     for (key, (_, roles)) in hierarchies {
         if roles != 0b1111 {
-            return Err(XldmGeneratedDataError::new(format!(
+            return Err(GeneratedDataError::new(format!(
                 "user hierarchy {key} does not contain exactly all four generated files"
             )));
         }
@@ -265,64 +263,62 @@ pub fn validate_xldm_system_generated_files(
 }
 
 /// Reparse an inspected member and return its exact original bytes.
-pub fn write_xldm_system_generated_file(
-    file: &XldmSystemGeneratedFile<'_>,
-) -> XldmGeneratedDataResult<Vec<u8>> {
-    let reparsed = parse_xldm_system_generated_file(file.storage_path, file.bytes)?
-        .ok_or_else(|| XldmGeneratedDataError::new("file is not section 2.4 generated data"))?;
+pub fn write_system_generated_file(file: &SystemGeneratedFile<'_>) -> GeneratedDataResult<Vec<u8>> {
+    let reparsed = parse_system_generated_file(file.storage_path, file.bytes)?
+        .ok_or_else(|| GeneratedDataError::new("file is not section 2.4 generated data"))?;
     if reparsed.kind != file.kind
         || reparsed.object_key != file.object_key
         || reparsed.version != file.version
     {
-        return Err(XldmGeneratedDataError::new(
+        return Err(GeneratedDataError::new(
             "generated filename metadata was mutated",
         ));
     }
     Ok(file.bytes.to_vec())
 }
 
-fn parse_generated_name(path: &str) -> XldmGeneratedDataResult<Option<GeneratedName>> {
+fn parse_generated_name(path: &str) -> GeneratedDataResult<Option<GeneratedName>> {
     let basename = path.rsplit('/').next().unwrap_or(path);
     let candidates = [
         (
             ".FIRST_CHILD_POS.",
-            XldmSystemGeneratedKind::UserHierarchyFirstChildPosition,
+            SystemGeneratedKind::UserHierarchyFirstChildPosition,
             "U$",
             false,
         ),
         (
             ".MULTI_LEVEL_ID.",
-            XldmSystemGeneratedKind::UserHierarchyMultilevelIdentifier,
+            SystemGeneratedKind::UserHierarchyMultilevelIdentifier,
             "U$",
             false,
         ),
         (
             ".CHILD_COUNT.",
-            XldmSystemGeneratedKind::UserHierarchyChildCount,
+            SystemGeneratedKind::UserHierarchyChildCount,
             "U$",
             false,
         ),
         (
             ".PARENT_POS.",
-            XldmSystemGeneratedKind::UserHierarchyParentPosition,
+            SystemGeneratedKind::UserHierarchyParentPosition,
             "U$",
             false,
         ),
         (
             ".POS_TO_ID.",
-            XldmSystemGeneratedKind::PositionToIdentifier,
+            SystemGeneratedKind::PositionToIdentifier,
             "H$",
             false,
         ),
         (
             ".ID_TO_POS.",
-            XldmSystemGeneratedKind::IdentifierToPosition,
+            SystemGeneratedKind::IdentifierToPosition,
             "H$",
             false,
         ),
         (
             ".INDEX.",
-            XldmSystemGeneratedKind::RelationshipIndex,
+            SystemGeneratedKind::RelationshipIndex,
             "R$",
             false,
         ),
@@ -335,26 +331,26 @@ fn parse_generated_name(path: &str) -> XldmGeneratedDataResult<Option<GeneratedN
             (version, Layout::Idf)
         } else if allow_hash {
             let Some(version) = suffix.strip_suffix(".hidx") else {
-                return Err(XldmGeneratedDataError::new(format!(
+                return Err(GeneratedDataError::new(format!(
                     "invalid extension for section 2.4 role in {path}"
                 )));
             };
             (version, Layout::HashIndex)
         } else {
-            return Err(XldmGeneratedDataError::new(format!(
+            return Err(GeneratedDataError::new(format!(
                 "section 2.4 role requires an .idf file in {path}"
             )));
         };
         if version_text.is_empty() || !version_text.bytes().all(|byte| byte.is_ascii_digit()) {
-            return Err(XldmGeneratedDataError::new(format!(
+            return Err(GeneratedDataError::new(format!(
                 "invalid generated file version in {path}"
             )));
         }
         let version = version_text.parse::<u64>().map_err(|_| {
-            XldmGeneratedDataError::new(format!("generated file version overflows in {path}"))
+            GeneratedDataError::new(format!("generated file version overflows in {path}"))
         })?;
         let Some((ordinal, identity)) = prefix.split_once('.') else {
-            return Err(XldmGeneratedDataError::new(format!(
+            return Err(GeneratedDataError::new(format!(
                 "missing generated ordinal in {path}"
             )));
         };
@@ -362,7 +358,7 @@ fn parse_generated_name(path: &str) -> XldmGeneratedDataResult<Option<GeneratedN
             || !ordinal.bytes().all(|byte| byte.is_ascii_digit())
             || !identity.starts_with(identity_marker)
         {
-            return Err(XldmGeneratedDataError::new(format!(
+            return Err(GeneratedDataError::new(format!(
                 "invalid section 2.4 object identity in {path}"
             )));
         }
@@ -411,7 +407,7 @@ mod tests {
         bytes
     }
 
-    fn hierarchy_files<'a>(idf: &'a [u8]) -> Vec<XldmSystemGeneratedFile<'a>> {
+    fn hierarchy_files<'a>(idf: &'a [u8]) -> Vec<SystemGeneratedFile<'a>> {
         [
             "Model.1.db/Table.0.dim/8.U$Table1$Geography.CHILD_COUNT.0.idf",
             "Model.1.db/Table.0.dim/8.U$Table1$Geography.FIRST_CHILD_POS.0.idf",
@@ -419,11 +415,7 @@ mod tests {
             "Model.1.db/Table.0.dim/8.U$Table1$Geography.PARENT_POS.0.idf",
         ]
         .into_iter()
-        .map(|path| {
-            parse_xldm_system_generated_file(path, idf)
-                .unwrap()
-                .unwrap()
-        })
+        .map(|path| parse_system_generated_file(path, idf).unwrap().unwrap())
         .collect()
     }
 
@@ -433,56 +425,54 @@ mod tests {
         let cases = [
             (
                 "Model.1.db/Table.0.dim/1.H$Table1$Label.POS_TO_ID.0.idf",
-                XldmSystemGeneratedKind::PositionToIdentifier,
+                SystemGeneratedKind::PositionToIdentifier,
             ),
             (
                 "Model.1.db/Table.0.dim/1.H$Table1$Label.ID_TO_POS.0.idf",
-                XldmSystemGeneratedKind::IdentifierToPosition,
+                SystemGeneratedKind::IdentifierToPosition,
             ),
             (
                 "Model.1.db/Table.0.dim/73.R$Table1$c4047114-e5d3-4730-ab46-478baf7ae64f.INDEX.0.idf",
-                XldmSystemGeneratedKind::RelationshipIndex,
+                SystemGeneratedKind::RelationshipIndex,
             ),
             (
                 "Model.1.db/Table.0.dim/8.U$Table1$Geography.CHILD_COUNT.0.idf",
-                XldmSystemGeneratedKind::UserHierarchyChildCount,
+                SystemGeneratedKind::UserHierarchyChildCount,
             ),
             (
                 "Model.1.db/Table.0.dim/8.U$Table1$Geography.FIRST_CHILD_POS.0.idf",
-                XldmSystemGeneratedKind::UserHierarchyFirstChildPosition,
+                SystemGeneratedKind::UserHierarchyFirstChildPosition,
             ),
             (
                 "Model.1.db/Table.0.dim/8.U$Table1$Geography.MULTI_LEVEL_ID.0.idf",
-                XldmSystemGeneratedKind::UserHierarchyMultilevelIdentifier,
+                SystemGeneratedKind::UserHierarchyMultilevelIdentifier,
             ),
             (
                 "Model.1.db/Table.0.dim/8.U$Table1$Geography.PARENT_POS.0.idf",
-                XldmSystemGeneratedKind::UserHierarchyParentPosition,
+                SystemGeneratedKind::UserHierarchyParentPosition,
             ),
         ];
         for (path, expected) in cases {
-            let file = parse_xldm_system_generated_file(path, &idf)
-                .unwrap()
-                .unwrap();
+            let file = parse_system_generated_file(path, &idf).unwrap().unwrap();
             assert_eq!(file.kind, expected);
             assert_eq!(
                 file.expected_compression(),
-                XldmSystemGeneratedCompression::XmReNoSplit
+                SystemGeneratedCompression::XmReNoSplit
             );
             assert!(std::ptr::eq(file.bytes.as_ptr(), idf.as_ptr()));
-            assert_eq!(write_xldm_system_generated_file(&file).unwrap(), idf);
+            assert_eq!(write_system_generated_file(&file).unwrap(), idf);
         }
         let hidx = valid_hash_index();
-        let file = parse_xldm_system_generated_file(
+        let file = parse_system_generated_file(
             "Model.1.db/Table.0.dim/73.R$Table1$c4047114-e5d3-4730-ab46-478baf7ae64f.INDEX.0.idf",
             &hidx,
         )
         .unwrap()
         .unwrap();
-        assert!(matches!(file.data, XldmSystemGeneratedData::HashIndex(_)));
+        assert!(matches!(file.data, SystemGeneratedData::HashIndex(_)));
         assert_eq!(
             file.expected_compression(),
-            XldmSystemGeneratedCompression::Uncompressed
+            SystemGeneratedCompression::Uncompressed
         );
     }
 
@@ -490,30 +480,26 @@ mod tests {
     fn validates_complete_hierarchy_sets_and_relationship_alternatives() {
         let idf = one_segment_idf();
         let complete = hierarchy_files(&idf);
-        validate_xldm_system_generated_files(&complete).unwrap();
+        validate_system_generated_files(&complete).unwrap();
 
         for missing in 0..4 {
             let mut incomplete = complete.clone();
             incomplete.remove(missing);
-            assert!(validate_xldm_system_generated_files(&incomplete).is_err());
+            assert!(validate_system_generated_files(&incomplete).is_err());
         }
 
-        let relationship_idf = parse_xldm_system_generated_file(
-            "Model.1.db/Table.0.dim/73.R$Table1$Rel.INDEX.0.idf",
-            &idf,
-        )
-        .unwrap()
-        .unwrap();
+        let relationship_idf =
+            parse_system_generated_file("Model.1.db/Table.0.dim/73.R$Table1$Rel.INDEX.0.idf", &idf)
+                .unwrap()
+                .unwrap();
         let hidx = valid_hash_index();
-        let relationship_hidx = parse_xldm_system_generated_file(
+        let relationship_hidx = parse_system_generated_file(
             "Model.1.db/Table.0.dim/73.R$Table1$Rel.INDEX.0.idf",
             &hidx,
         )
         .unwrap()
         .unwrap();
-        assert!(
-            validate_xldm_system_generated_files(&[relationship_idf, relationship_hidx,]).is_err()
-        );
+        assert!(validate_system_generated_files(&[relationship_idf, relationship_hidx,]).is_err());
     }
 
     #[test]
@@ -527,10 +513,10 @@ mod tests {
             "x.H$Table$Column.ID_TO_POS.0.idf",
             "8.U$Table$Hierarchy.CHILD_COUNT.18446744073709551616.idf",
         ] {
-            assert!(parse_xldm_system_generated_file(path, &idf).is_err());
+            assert!(parse_system_generated_file(path, &idf).is_err());
         }
         assert!(
-            parse_xldm_system_generated_file(
+            parse_system_generated_file(
                 "Model.1.db/Table.0.dim/1.H$Table$Column.POS_TO_ID.0.idf",
                 &[1, 2, 3],
             )
@@ -543,10 +529,10 @@ mod tests {
         let idf = one_segment_idf();
         let mut files = hierarchy_files(&idf);
         files.push(files[0].clone());
-        assert!(validate_xldm_system_generated_files(&files).is_err());
+        assert!(validate_system_generated_files(&files).is_err());
 
         let mut files = hierarchy_files(&idf);
         files[3].version = 1;
-        assert!(validate_xldm_system_generated_files(&files).is_err());
+        assert!(validate_system_generated_files(&files).is_err());
     }
 }

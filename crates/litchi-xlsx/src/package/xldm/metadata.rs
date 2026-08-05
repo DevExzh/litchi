@@ -12,14 +12,12 @@ use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::Reader;
 
-use super::xldm::{XldmGeneratedNameKind, XldmStorage, classify_xldm_generated_path};
-use super::xldm_generated::{
-    XldmSystemGeneratedData, XldmSystemGeneratedFile, XldmSystemGeneratedKind,
+use super::generated::{SystemGeneratedData, SystemGeneratedFile, SystemGeneratedKind};
+use super::native::{
+    DictionaryBody, DictionaryType, NativeData, NativeFile, NativeParseOptions, StringHashMode,
+    StringHashOverride, StringPageData,
 };
-use super::xldm_native::{
-    XldmDictionaryBody, XldmDictionaryType, XldmNativeData, XldmNativeFile, XldmNativeParseOptions,
-    XldmStringHashMode, XldmStringHashOverride, XldmStringPageData,
-};
+use super::{GeneratedNameKind, Storage, classify_generated_path};
 
 const MAX_METADATA_BYTES: usize = 16 * 1024 * 1024;
 const MAX_XML_NODES: usize = 500_000;
@@ -30,30 +28,30 @@ const NO_SPLIT_WIDTHS: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 16, 21, 32];
 
 /// A structural or cross-file section 2.5 validation error.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmMetadataError(String);
+pub struct MetadataError(String);
 
-impl XldmMetadataError {
+impl MetadataError {
     fn new(message: impl Into<String>) -> Self {
         Self(message.into())
     }
 }
 
-impl fmt::Display for XldmMetadataError {
+impl fmt::Display for MetadataError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.0)
     }
 }
 
-impl Error for XldmMetadataError {}
+impl Error for MetadataError {}
 
 /// Result type for section 2.5 metadata inspection.
-pub type XldmMetadataResult<T> = Result<T, XldmMetadataError>;
+pub type MetadataResult<T> = Result<T, MetadataError>;
 
 /// A validated class token from `XMObjectClassNameEnum`.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct XldmMetadataClass(String);
+pub struct MetadataClass(String);
 
-impl XldmMetadataClass {
+impl MetadataClass {
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -70,41 +68,41 @@ impl XldmMetadataClass {
 
 /// One scalar property. `value` is XML-unescaped but otherwise uninterpreted.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmMetadataProperty {
+pub struct MetadataProperty {
     pub name: String,
     pub value: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmMetadataMember {
+pub struct MetadataMember {
     pub name: String,
-    pub object: Box<XldmMetadataObject>,
+    pub object: Box<MetadataObject>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmMetadataCollection {
+pub struct MetadataCollection {
     pub name: String,
-    pub objects: Vec<XldmMetadataObject>,
+    pub objects: Vec<MetadataObject>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmMetadataDataObject {
-    pub object: Box<XldmMetadataObject>,
+pub struct MetadataDataObject {
+    pub object: Box<MetadataObject>,
 }
 
 /// The complete generic section 2.5.1 object shape.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmMetadataObject {
-    pub class: XldmMetadataClass,
+pub struct MetadataObject {
+    pub class: MetadataClass,
     pub name: Option<String>,
     pub provider_version: Option<i32>,
-    pub properties: Vec<XldmMetadataProperty>,
-    pub members: Vec<XldmMetadataMember>,
-    pub collections: Vec<XldmMetadataCollection>,
-    pub data_objects: Vec<XldmMetadataDataObject>,
+    pub properties: Vec<MetadataProperty>,
+    pub members: Vec<MetadataMember>,
+    pub collections: Vec<MetadataCollection>,
+    pub data_objects: Vec<MetadataDataObject>,
 }
 
-impl XldmMetadataObject {
+impl MetadataObject {
     pub fn property(&self, name: &str) -> Option<&str> {
         self.properties
             .iter()
@@ -112,14 +110,14 @@ impl XldmMetadataObject {
             .map(|item| item.value.as_str())
     }
 
-    pub fn member(&self, name: &str) -> Option<&XldmMetadataObject> {
+    pub fn member(&self, name: &str) -> Option<&MetadataObject> {
         self.members
             .iter()
             .find(|item| item.name == name)
             .map(|item| item.object.as_ref())
     }
 
-    pub fn collection(&self, name: &str) -> Option<&[XldmMetadataObject]> {
+    pub fn collection(&self, name: &str) -> Option<&[MetadataObject]> {
         self.collections
             .iter()
             .find(|item| item.name == name)
@@ -128,7 +126,7 @@ impl XldmMetadataObject {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum XldmMetadataFileKind {
+pub enum MetadataFileKind {
     Table,
     ColumnHierarchy,
     UserHierarchy,
@@ -137,58 +135,58 @@ pub enum XldmMetadataFileKind {
 
 /// One borrowed `.tbl.xml` file and its validated object graph.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmMetadataFile<'a> {
+pub struct MetadataFile<'a> {
     pub storage_path: &'a str,
     pub bytes: &'a [u8],
-    pub kind: XldmMetadataFileKind,
-    pub table: XldmMetadataObject,
+    pub kind: MetadataFileKind,
+    pub table: MetadataObject,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmMetadataModel<'a> {
-    pub files: Vec<XldmMetadataFile<'a>>,
-    pub columns: Vec<XldmColumnPolicy>,
-    pub relationships: Vec<XldmRelationshipPolicy>,
-    pub hierarchies: Vec<XldmHierarchyPolicy>,
+pub struct MetadataModel<'a> {
+    pub files: Vec<MetadataFile<'a>>,
+    pub columns: Vec<ColumnPolicy>,
+    pub relationships: Vec<RelationshipPolicy>,
+    pub hierarchies: Vec<HierarchyPolicy>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmDictionaryPolicy {
+pub struct DictionaryPolicy {
     pub storage_name: String,
-    pub class: XldmMetadataClass,
+    pub class: MetadataClass,
     pub dictionary_flags: Option<u16>,
     pub operating_on_32: Option<bool>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmColumnPolicy {
+pub struct ColumnPolicy {
     pub name: String,
     pub data_file: String,
     pub segment_count: usize,
     pub row_count: u64,
     pub compression_type: u8,
     pub settings: u16,
-    pub dictionary: Option<XldmDictionaryPolicy>,
+    pub dictionary: Option<DictionaryPolicy>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum XldmRelationshipIndexKind {
+pub enum RelationshipIndexKind {
     Sparse,
     Dense,
     OneTwoThree,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmRelationshipPolicy {
+pub struct RelationshipPolicy {
     pub name: Option<String>,
     pub primary_table: String,
     pub primary_column: String,
     pub foreign_column: String,
-    pub index_kind: XldmRelationshipIndexKind,
+    pub index_kind: RelationshipIndexKind,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmHierarchyPolicy {
+pub struct HierarchyPolicy {
     pub table_store: String,
     pub processed: bool,
     pub position_to_id: bool,
@@ -209,22 +207,19 @@ struct XmlNode {
 }
 
 /// Parse and validate one section 2.5 `.tbl.xml` member.
-pub fn parse_xldm_metadata_file<'a>(
-    storage_path: &'a str,
-    bytes: &'a [u8],
-) -> XldmMetadataResult<XldmMetadataFile<'a>> {
-    let generated = classify_xldm_generated_path(storage_path).map_err(|error| {
-        XldmMetadataError::new(format!(
+pub fn parse_file<'a>(storage_path: &'a str, bytes: &'a [u8]) -> MetadataResult<MetadataFile<'a>> {
+    let generated = classify_generated_path(storage_path).map_err(|error| {
+        MetadataError::new(format!(
             "invalid generated metadata path {storage_path}: {error}"
         ))
     })?;
     let kind = match generated.kind {
-        XldmGeneratedNameKind::TableMetadata => XldmMetadataFileKind::Table,
-        XldmGeneratedNameKind::ColumnHierarchyMetadata => XldmMetadataFileKind::ColumnHierarchy,
-        XldmGeneratedNameKind::UserHierarchyMetadata => XldmMetadataFileKind::UserHierarchy,
-        XldmGeneratedNameKind::TableRelationshipMetadata => XldmMetadataFileKind::TableRelationship,
+        GeneratedNameKind::TableMetadata => MetadataFileKind::Table,
+        GeneratedNameKind::ColumnHierarchyMetadata => MetadataFileKind::ColumnHierarchy,
+        GeneratedNameKind::UserHierarchyMetadata => MetadataFileKind::UserHierarchy,
+        GeneratedNameKind::TableRelationshipMetadata => MetadataFileKind::TableRelationship,
         _ => {
-            return Err(XldmMetadataError::new(
+            return Err(MetadataError::new(
                 "section 2.5 metadata requires a .tbl.xml path",
             ));
         },
@@ -232,12 +227,10 @@ pub fn parse_xldm_metadata_file<'a>(
     let node = parse_xml(bytes)?;
     let table = project_object(node)?;
     if table.class.as_str() != "XMSimpleTable" {
-        return Err(XldmMetadataError::new(
-            "a .tbl.xml root MUST be XMSimpleTable",
-        ));
+        return Err(MetadataError::new("a .tbl.xml root MUST be XMSimpleTable"));
     }
     validate_table_file_kind(kind, &table)?;
-    Ok(XldmMetadataFile {
+    Ok(MetadataFile {
         storage_path,
         bytes,
         kind,
@@ -246,9 +239,7 @@ pub fn parse_xldm_metadata_file<'a>(
 }
 
 /// Discover every logged `.tbl.xml` member and derive its section 2.3 policy.
-pub fn inspect_xldm_metadata<'a>(
-    storage: &'a XldmStorage<'a>,
-) -> XldmMetadataResult<XldmMetadataModel<'a>> {
+pub fn inspect<'a>(storage: &'a Storage<'a>) -> MetadataResult<MetadataModel<'a>> {
     let mut files = Vec::new();
     let mut seen = HashSet::new();
     for group in &storage.backup_log.file_groups {
@@ -258,30 +249,30 @@ pub fn inspect_xldm_metadata<'a>(
                 continue;
             }
             if !seen.insert(path) {
-                return Err(XldmMetadataError::new(format!(
+                return Err(MetadataError::new(format!(
                     "duplicate logged metadata member {path}"
                 )));
             }
             if files.len() == MAX_METADATA_FILES {
-                return Err(XldmMetadataError::new("too many table metadata files"));
+                return Err(MetadataError::new("too many table metadata files"));
             }
             let index = storage
                 .files
                 .iter()
                 .position(|entry| entry.path == path)
                 .ok_or_else(|| {
-                    XldmMetadataError::new(format!(
+                    MetadataError::new(format!(
                         "logged metadata member {path} is absent from the directory"
                     ))
                 })?;
             let bytes = storage.file_payload(index).ok_or_else(|| {
-                XldmMetadataError::new(format!("cannot resolve metadata member {path}"))
+                MetadataError::new(format!("cannot resolve metadata member {path}"))
             })?;
-            files.push(parse_xldm_metadata_file(path, bytes)?);
+            files.push(parse_file(path, bytes)?);
         }
     }
     let (columns, relationships, hierarchies) = derive_policies(&files)?;
-    Ok(XldmMetadataModel {
+    Ok(MetadataModel {
         files,
         columns,
         relationships,
@@ -289,37 +280,37 @@ pub fn inspect_xldm_metadata<'a>(
     })
 }
 
-impl XldmMetadataModel<'_> {
+impl MetadataModel<'_> {
     /// Section 2.5 `DictionaryFlags` bindings needed to parse string stores.
-    pub fn native_parse_options(&self) -> XldmNativeParseOptions {
+    pub fn native_parse_options(&self) -> NativeParseOptions {
         let string_hash_overrides = self
             .columns
             .iter()
             .filter_map(|column| {
                 let dictionary = column.dictionary.as_ref()?;
                 let flags = dictionary.dictionary_flags?;
-                Some(XldmStringHashOverride {
+                Some(StringHashOverride {
                     storage_path: dictionary.storage_name.clone(),
                     mode: if flags & 0x001 != 0 {
-                        XldmStringHashMode::Present
+                        StringHashMode::Present
                     } else {
-                        XldmStringHashMode::Absent
+                        StringHashMode::Absent
                     },
                 })
             })
             .collect();
-        XldmNativeParseOptions {
+        NativeParseOptions {
             string_hash_overrides,
         }
     }
 }
 
 /// Cross-check all metadata-deferred section 2.3/2.4 declarations.
-pub fn validate_xldm_metadata_files(
-    metadata: &XldmMetadataModel<'_>,
-    native: &[XldmNativeFile<'_>],
-    generated: &[XldmSystemGeneratedFile<'_>],
-) -> XldmMetadataResult<()> {
+pub fn validate_files(
+    metadata: &MetadataModel<'_>,
+    native: &[NativeFile<'_>],
+    generated: &[SystemGeneratedFile<'_>],
+) -> MetadataResult<()> {
     validate_columns(metadata, native)?;
     validate_hierarchies(metadata, native, generated)?;
     validate_relationships(metadata, generated)?;
@@ -327,17 +318,17 @@ pub fn validate_xldm_metadata_files(
 }
 
 /// Revalidate an inspected file and return its exact original XML bytes.
-pub fn write_xldm_metadata_file(file: &XldmMetadataFile<'_>) -> XldmMetadataResult<Vec<u8>> {
-    let reparsed = parse_xldm_metadata_file(file.storage_path, file.bytes)?;
+pub fn write_file(file: &MetadataFile<'_>) -> MetadataResult<Vec<u8>> {
+    let reparsed = parse_file(file.storage_path, file.bytes)?;
     if reparsed.kind != file.kind || reparsed.table != file.table {
-        return Err(XldmMetadataError::new("metadata object graph was mutated"));
+        return Err(MetadataError::new("metadata object graph was mutated"));
     }
     Ok(file.bytes.to_vec())
 }
 
-fn parse_xml(bytes: &[u8]) -> XldmMetadataResult<XmlNode> {
+fn parse_xml(bytes: &[u8]) -> MetadataResult<XmlNode> {
     if bytes.len() > MAX_METADATA_BYTES {
-        return Err(XldmMetadataError::new("metadata XML is too large"));
+        return Err(MetadataError::new("metadata XML is too large"));
     }
     let mut reader = Reader::from_reader(bytes);
     reader.config_mut().check_end_names = true;
@@ -349,16 +340,14 @@ fn parse_xml(bytes: &[u8]) -> XldmMetadataResult<XmlNode> {
         let decoder = reader.decoder();
         let event = reader
             .read_event()
-            .map_err(|error| XldmMetadataError::new(format!("invalid metadata XML: {error}")))?;
+            .map_err(|error| MetadataError::new(format!("invalid metadata XML: {error}")))?;
         match event {
             Event::Start(ref element) | Event::Empty(ref element) => {
                 nodes = nodes
                     .checked_add(1)
-                    .ok_or_else(|| XldmMetadataError::new("XML node count overflow"))?;
+                    .ok_or_else(|| MetadataError::new("XML node count overflow"))?;
                 if nodes > MAX_XML_NODES || stack.len() >= MAX_XML_DEPTH {
-                    return Err(XldmMetadataError::new(
-                        "metadata XML structure limit exceeded",
-                    ));
+                    return Err(MetadataError::new("metadata XML structure limit exceeded"));
                 }
                 let empty = matches!(event, Event::Empty(_));
                 let node = make_xml_node(element, decoder)?;
@@ -371,7 +360,7 @@ fn parse_xml(bytes: &[u8]) -> XldmMetadataResult<XmlNode> {
             Event::End(_) => {
                 let node = stack
                     .pop()
-                    .ok_or_else(|| XldmMetadataError::new("unexpected XML end element"))?;
+                    .ok_or_else(|| MetadataError::new("unexpected XML end element"))?;
                 attach_node(node, &mut stack, &mut root)?;
             },
             Event::Text(value) => {
@@ -379,27 +368,27 @@ fn parse_xml(bytes: &[u8]) -> XldmMetadataResult<XmlNode> {
                 let decoded = quick_xml::escape::unescape(&decoded).map_err(xml_error)?;
                 text_bytes = text_bytes
                     .checked_add(decoded.len())
-                    .ok_or_else(|| XldmMetadataError::new("XML text size overflow"))?;
+                    .ok_or_else(|| MetadataError::new("XML text size overflow"))?;
                 if text_bytes > MAX_TEXT_BYTES {
-                    return Err(XldmMetadataError::new("metadata XML text limit exceeded"));
+                    return Err(MetadataError::new("metadata XML text limit exceeded"));
                 }
                 if let Some(node) = stack.last_mut() {
                     node.text.push_str(&decoded);
                 } else if !decoded.trim().is_empty() {
-                    return Err(XldmMetadataError::new("text outside metadata root"));
+                    return Err(MetadataError::new("text outside metadata root"));
                 }
             },
             Event::CData(value) => {
                 let decoded = value.decode().map_err(xml_error)?;
                 text_bytes = text_bytes
                     .checked_add(decoded.len())
-                    .ok_or_else(|| XldmMetadataError::new("XML text size overflow"))?;
+                    .ok_or_else(|| MetadataError::new("XML text size overflow"))?;
                 if text_bytes > MAX_TEXT_BYTES {
-                    return Err(XldmMetadataError::new("metadata XML text limit exceeded"));
+                    return Err(MetadataError::new("metadata XML text limit exceeded"));
                 }
                 stack
                     .last_mut()
-                    .ok_or_else(|| XldmMetadataError::new("CDATA outside metadata root"))?
+                    .ok_or_else(|| MetadataError::new("CDATA outside metadata root"))?
                     .text
                     .push_str(&decoded);
             },
@@ -417,15 +406,15 @@ fn parse_xml(bytes: &[u8]) -> XldmMetadataResult<XmlNode> {
                         "quot" => Some("\"".into()),
                         _ => None,
                     })
-                    .ok_or_else(|| XldmMetadataError::new("custom XML entities are rejected"))?;
+                    .ok_or_else(|| MetadataError::new("custom XML entities are rejected"))?;
                 stack
                     .last_mut()
-                    .ok_or_else(|| XldmMetadataError::new("entity outside metadata root"))?
+                    .ok_or_else(|| MetadataError::new("entity outside metadata root"))?
                     .text
                     .push_str(&value);
             },
             Event::DocType(_) | Event::PI(_) => {
-                return Err(XldmMetadataError::new(
+                return Err(MetadataError::new(
                     "DTD and processing instructions are rejected",
                 ));
             },
@@ -434,20 +423,20 @@ fn parse_xml(bytes: &[u8]) -> XldmMetadataResult<XmlNode> {
         }
     }
     if !stack.is_empty() {
-        return Err(XldmMetadataError::new("unclosed metadata XML element"));
+        return Err(MetadataError::new("unclosed metadata XML element"));
     }
-    root.ok_or_else(|| XldmMetadataError::new("missing metadata XML root"))
+    root.ok_or_else(|| MetadataError::new("missing metadata XML root"))
 }
 
 fn make_xml_node(
     element: &BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
-) -> XldmMetadataResult<XmlNode> {
+) -> MetadataResult<XmlNode> {
     let name = std::str::from_utf8(element.name().as_ref())
         .map_err(xml_error)?
         .to_owned();
     if name.contains(':') {
-        return Err(XldmMetadataError::new(
+        return Err(MetadataError::new(
             "namespaced metadata elements are not allowed",
         ));
     }
@@ -458,12 +447,10 @@ fn make_xml_node(
             .map_err(xml_error)?
             .to_owned();
         if key == "xmlns" || key.contains(':') {
-            return Err(XldmMetadataError::new(
-                "metadata namespaces are not allowed",
-            ));
+            return Err(MetadataError::new("metadata namespaces are not allowed"));
         }
         if attributes.iter().any(|(name, _)| name == &key) {
-            return Err(XldmMetadataError::new("duplicate metadata attribute"));
+            return Err(MetadataError::new("duplicate metadata attribute"));
         }
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
@@ -483,23 +470,21 @@ fn attach_node(
     node: XmlNode,
     stack: &mut [XmlNode],
     root: &mut Option<XmlNode>,
-) -> XldmMetadataResult<()> {
+) -> MetadataResult<()> {
     if let Some(parent) = stack.last_mut() {
         parent.children.push(node);
     } else if root.replace(node).is_some() {
-        return Err(XldmMetadataError::new("multiple metadata XML roots"));
+        return Err(MetadataError::new("multiple metadata XML roots"));
     }
     Ok(())
 }
 
-fn project_object(node: XmlNode) -> XldmMetadataResult<XldmMetadataObject> {
+fn project_object(node: XmlNode) -> MetadataResult<MetadataObject> {
     if node.name != "XMObject" {
-        return Err(XldmMetadataError::new("expected XMObject"));
+        return Err(MetadataError::new("expected XMObject"));
     }
     if !node.text.trim().is_empty() {
-        return Err(XldmMetadataError::new(
-            "XMObject cannot contain direct text",
-        ));
+        return Err(MetadataError::new("XMObject cannot contain direct text"));
     }
     let mut class = None;
     let mut name = None;
@@ -510,14 +495,13 @@ fn project_object(node: XmlNode) -> XldmMetadataResult<XldmMetadataObject> {
             "name" => name = Some(value),
             "ProviderVersion" => provider_version = Some(parse_i32(&value, "ProviderVersion")?),
             _ => {
-                return Err(XldmMetadataError::new(format!(
+                return Err(MetadataError::new(format!(
                     "unknown XMObject attribute {key}"
                 )));
             },
         }
     }
-    let class =
-        class.ok_or_else(|| XldmMetadataError::new("XMObject requires a class attribute"))?;
+    let class = class.ok_or_else(|| MetadataError::new("XMObject requires a class attribute"))?;
     let mut properties = None;
     let mut members = None;
     let mut collections = None;
@@ -533,17 +517,17 @@ fn project_object(node: XmlNode) -> XldmMetadataResult<XldmMetadataObject> {
                 data_objects = Some(project_data_objects(child)?)
             },
             "Properties" | "Members" | "Collections" | "DataObjects" => {
-                return Err(XldmMetadataError::new("duplicate XMObject container"));
+                return Err(MetadataError::new("duplicate XMObject container"));
             },
             _ => {
-                return Err(XldmMetadataError::new(format!(
+                return Err(MetadataError::new(format!(
                     "unknown XMObject child {}",
                     child.name
                 )));
             },
         }
     }
-    let object = XldmMetadataObject {
+    let object = MetadataObject {
         class,
         name,
         provider_version,
@@ -556,23 +540,23 @@ fn project_object(node: XmlNode) -> XldmMetadataResult<XldmMetadataObject> {
     Ok(object)
 }
 
-fn project_properties(node: XmlNode) -> XldmMetadataResult<Vec<XldmMetadataProperty>> {
+fn project_properties(node: XmlNode) -> MetadataResult<Vec<MetadataProperty>> {
     plain_container(&node, "Properties")?;
     let mut result = Vec::new();
     for child in node.children {
         if !child.attributes.is_empty() || !child.children.is_empty() {
-            return Err(XldmMetadataError::new("metadata properties MUST be scalar"));
+            return Err(MetadataError::new("metadata properties MUST be scalar"));
         }
         if result
             .iter()
-            .any(|item: &XldmMetadataProperty| item.name == child.name)
+            .any(|item: &MetadataProperty| item.name == child.name)
         {
-            return Err(XldmMetadataError::new(format!(
+            return Err(MetadataError::new(format!(
                 "duplicate property {}",
                 child.name
             )));
         }
-        result.push(XldmMetadataProperty {
+        result.push(MetadataProperty {
             name: child.name,
             value: child.text.trim().to_owned(),
         });
@@ -580,7 +564,7 @@ fn project_properties(node: XmlNode) -> XldmMetadataResult<Vec<XldmMetadataPrope
     Ok(result)
 }
 
-fn project_members(node: XmlNode) -> XldmMetadataResult<Vec<XldmMetadataMember>> {
+fn project_members(node: XmlNode) -> MetadataResult<Vec<MetadataMember>> {
     plain_container(&node, "Members")?;
     let mut result = Vec::new();
     for child in node.children {
@@ -589,12 +573,12 @@ fn project_members(node: XmlNode) -> XldmMetadataResult<Vec<XldmMetadataMember>>
             || child.children[0].name != "Name"
             || child.children[1].name != "XMObject"
         {
-            return Err(XldmMetadataError::new(
+            return Err(MetadataError::new(
                 "Member requires Name followed by XMObject",
             ));
         }
         let name = scalar_text(&child.children[0], "Name")?;
-        result.push(XldmMetadataMember {
+        result.push(MetadataMember {
             name,
             object: Box::new(project_object(child.children[1].clone())?),
         });
@@ -602,7 +586,7 @@ fn project_members(node: XmlNode) -> XldmMetadataResult<Vec<XldmMetadataMember>>
     Ok(result)
 }
 
-fn project_collections(node: XmlNode) -> XldmMetadataResult<Vec<XldmMetadataCollection>> {
+fn project_collections(node: XmlNode) -> MetadataResult<Vec<MetadataCollection>> {
     plain_container(&node, "Collections")?;
     let mut result = Vec::new();
     for child in node.children {
@@ -612,52 +596,50 @@ fn project_collections(node: XmlNode) -> XldmMetadataResult<Vec<XldmMetadataColl
             .first()
             .is_none_or(|item| item.name != "Name")
         {
-            return Err(XldmMetadataError::new("Collection requires Name first"));
+            return Err(MetadataError::new("Collection requires Name first"));
         }
         let name = scalar_text(&child.children[0], "Name")?;
         let mut objects = Vec::new();
         for object in child.children.into_iter().skip(1) {
             objects.push(project_object(object)?);
         }
-        result.push(XldmMetadataCollection { name, objects });
+        result.push(MetadataCollection { name, objects });
     }
     Ok(result)
 }
 
-fn project_data_objects(node: XmlNode) -> XldmMetadataResult<Vec<XldmMetadataDataObject>> {
+fn project_data_objects(node: XmlNode) -> MetadataResult<Vec<MetadataDataObject>> {
     plain_container(&node, "DataObjects")?;
     let mut result = Vec::new();
     for child in node.children {
         plain_container(&child, "DataObject")?;
         if child.children.len() != 1 {
-            return Err(XldmMetadataError::new(
+            return Err(MetadataError::new(
                 "DataObject requires exactly one XMObject",
             ));
         }
-        result.push(XldmMetadataDataObject {
+        result.push(MetadataDataObject {
             object: Box::new(project_object(child.children[0].clone())?),
         });
     }
     Ok(result)
 }
 
-fn plain_container(node: &XmlNode, expected: &str) -> XldmMetadataResult<()> {
+fn plain_container(node: &XmlNode, expected: &str) -> MetadataResult<()> {
     if node.name != expected || !node.attributes.is_empty() || !node.text.trim().is_empty() {
-        return Err(XldmMetadataError::new(format!(
-            "invalid {expected} container"
-        )));
+        return Err(MetadataError::new(format!("invalid {expected} container")));
     }
     Ok(())
 }
 
-fn scalar_text(node: &XmlNode, expected: &str) -> XldmMetadataResult<String> {
+fn scalar_text(node: &XmlNode, expected: &str) -> MetadataResult<String> {
     if node.name != expected || !node.attributes.is_empty() || !node.children.is_empty() {
-        return Err(XldmMetadataError::new(format!("invalid scalar {expected}")));
+        return Err(MetadataError::new(format!("invalid scalar {expected}")));
     }
     Ok(node.text.trim().to_owned())
 }
 
-fn parse_class(value: String) -> XldmMetadataResult<XldmMetadataClass> {
+fn parse_class(value: String) -> MetadataResult<MetadataClass> {
     let fixed = [
         "XMSimpleTable",
         "XMRawColumn",
@@ -695,11 +677,11 @@ fn parse_class(value: String) -> XldmMetadataResult<XldmMetadataClass> {
         || no_split_width(&value).is_some()
         || hybrid_width(&value).is_some();
     if !valid {
-        return Err(XldmMetadataError::new(format!(
+        return Err(MetadataError::new(format!(
             "unknown XMObject class {value}"
         )));
     }
-    Ok(XldmMetadataClass(value))
+    Ok(MetadataClass(value))
 }
 
 fn no_split_width(class: &str) -> Option<u8> {
@@ -720,7 +702,7 @@ fn hybrid_width(class: &str) -> Option<u8> {
     NO_SPLIT_WIDTHS.contains(&value).then_some(value)
 }
 
-fn validate_object(object: &XldmMetadataObject) -> XldmMetadataResult<()> {
+fn validate_object(object: &MetadataObject) -> MetadataResult<()> {
     let class = object.class.as_str();
     let (properties, containers): (&[&str], u8) = match class {
         "XMSimpleTable" => (&["Version", "Settings", "RIViolationCount"], 0b0111),
@@ -847,7 +829,7 @@ fn validate_object(object: &XldmMetadataObject) -> XldmMetadataResult<()> {
         | ((!object.collections.is_empty() as u8) << 2)
         | ((!object.data_objects.is_empty() as u8) << 3);
     if actual != containers {
-        return Err(XldmMetadataError::new(format!(
+        return Err(MetadataError::new(format!(
             "{class} has invalid or missing containers"
         )));
     }
@@ -856,11 +838,11 @@ fn validate_object(object: &XldmMetadataObject) -> XldmMetadataResult<()> {
     validate_nested_constraints(object)
 }
 
-fn require_properties(object: &XldmMetadataObject, required: &[&str]) -> XldmMetadataResult<()> {
+fn require_properties(object: &MetadataObject, required: &[&str]) -> MetadataResult<()> {
     if object.properties.len() != required.len()
         || required.iter().any(|name| object.property(name).is_none())
     {
-        return Err(XldmMetadataError::new(format!(
+        return Err(MetadataError::new(format!(
             "{} has an invalid property set",
             object.class.as_str()
         )));
@@ -868,7 +850,7 @@ fn require_properties(object: &XldmMetadataObject, required: &[&str]) -> XldmMet
     Ok(())
 }
 
-fn validate_scalar_constraints(object: &XldmMetadataObject) -> XldmMetadataResult<()> {
+fn validate_scalar_constraints(object: &MetadataObject) -> MetadataResult<()> {
     let class = object.class.as_str();
     for property in &object.properties {
         let name = property.name.as_str();
@@ -878,16 +860,16 @@ fn validate_scalar_constraints(object: &XldmMetadataObject) -> XldmMetadataResul
         } else if double_property(name) {
             value
                 .parse::<f64>()
-                .map_err(|_| XldmMetadataError::new(format!("invalid double {name}")))?;
+                .map_err(|_| MetadataError::new(format!("invalid double {name}")))?;
         } else if !string_property(name) {
             parse_i64(value, name)?;
         }
     }
-    let ranged = |name, min, max| -> XldmMetadataResult<()> {
+    let ranged = |name, min, max| -> MetadataResult<()> {
         if let Some(value) = object.property(name) {
             let value = parse_i64(value, name)?;
             if value < min || value > max {
-                return Err(XldmMetadataError::new(format!(
+                return Err(MetadataError::new(format!(
                     "{class}.{name} is outside {min}..={max}"
                 )));
             }
@@ -900,7 +882,7 @@ fn validate_scalar_constraints(object: &XldmMetadataObject) -> XldmMetadataResul
             ranged("Settings", 0, 7994)?;
             ranged("ColumnFlags", 0, 63)?;
             if parse_i64(required_property(object, "ColumnFlags")?, "ColumnFlags")? & 0x8 == 0 {
-                return Err(XldmMetadataError::new(
+                return Err(MetadataError::new(
                     "XMRawColumn.ColumnFlags MUST contain 0x8",
                 ));
             }
@@ -914,33 +896,29 @@ fn validate_scalar_constraints(object: &XldmMetadataObject) -> XldmMetadataResul
             ranged("CompressionType", 0, 2)?;
             ranged("EncodingHint", 0, 2)?;
             if parse_i64(required_property(object, "RLESortOrder")?, "RLESortOrder")? != -1 {
-                return Err(XldmMetadataError::new(
-                    "XMColumnStats.RLESortOrder MUST be -1",
-                ));
+                return Err(MetadataError::new("XMColumnStats.RLESortOrder MUST be -1"));
             }
             let db = parse_i64(required_property(object, "DBType")?, "DBType")?;
             if db > 29 && db != 128 && db != 130 {
-                return Err(XldmMetadataError::new("XMColumnStats.DBType is reserved"));
+                return Err(MetadataError::new("XMColumnStats.DBType is reserved"));
             }
         },
         "XMHierarchy" => {
             let sort = parse_i64(required_property(object, "SortOrder")?, "SortOrder")?;
             if ![0, 2].contains(&sort) {
-                return Err(XldmMetadataError::new(
-                    "XMHierarchy.SortOrder MUST be 0 or 2",
-                ));
+                return Err(MetadataError::new("XMHierarchy.SortOrder MUST be 0 or 2"));
             }
             let materialization = parse_i64(
                 required_property(object, "TypeMaterialization")?,
                 "TypeMaterialization",
             )?;
             if ![-1, 0, 1, 2, 3].contains(&materialization) {
-                return Err(XldmMetadataError::new("invalid hierarchy materialization"));
+                return Err(MetadataError::new("invalid hierarchy materialization"));
             }
             if materialization == -1
                 && parse_bool(required_property(object, "IsProcessed")?, "IsProcessed")?
             {
-                return Err(XldmMetadataError::new(
+                return Err(MetadataError::new(
                     "processed hierarchy cannot have unspecified materialization",
                 ));
             }
@@ -953,9 +931,7 @@ fn validate_scalar_constraints(object: &XldmMetadataObject) -> XldmMetadataResul
                 "ColumnDataID2Position",
             )?;
             if ![-1, 0].contains(&p2i) || ![-1, 1].contains(&i2p) {
-                return Err(XldmMetadataError::new(
-                    "invalid hierarchy index declaration",
-                ));
+                return Err(MetadataError::new("invalid hierarchy index declaration"));
             }
         },
         "XMHashDataDictionary<XM_String>" => {
@@ -965,16 +941,14 @@ fn validate_scalar_constraints(object: &XldmMetadataObject) -> XldmMetadataResul
                 "DictionaryFlags",
             )?;
             if flags & !0x107 != 0 {
-                return Err(XldmMetadataError::new(
-                    "DictionaryFlags contains reserved bits",
-                ));
+                return Err(MetadataError::new("DictionaryFlags contains reserved bits"));
             }
         },
         "XMColumnSegment" => ranged("Mask", 0, 2)?,
         "XMColumnSegmentStats"
             if parse_i64(required_property(object, "RLESortOrder")?, "RLESortOrder")? != -1 =>
         {
-            return Err(XldmMetadataError::new(
+            return Err(MetadataError::new(
                 "XMColumnSegmentStats.RLESortOrder MUST be -1",
             ));
         },
@@ -984,14 +958,14 @@ fn validate_scalar_constraints(object: &XldmMetadataObject) -> XldmMetadataResul
                 "SegmentNeedsResizing",
             )? =>
         {
-            return Err(XldmMetadataError::new("SegmentNeedsResizing MUST be false"));
+            return Err(MetadataError::new("SegmentNeedsResizing MUST be false"));
         },
         _ => {},
     }
     Ok(())
 }
 
-fn validate_nested_constraints(object: &XldmMetadataObject) -> XldmMetadataResult<()> {
+fn validate_nested_constraints(object: &MetadataObject) -> MetadataResult<()> {
     let class = object.class.as_str();
     match class {
         "XMSimpleTable" => {
@@ -1037,7 +1011,7 @@ fn validate_nested_constraints(object: &XldmMetadataObject) -> XldmMetadataResul
                     .count()
                     != 1
             {
-                return Err(XldmMetadataError::new(
+                return Err(MetadataError::new(
                     "XMRawColumn requires partition and dictionary/index data objects",
                 ));
             }
@@ -1055,9 +1029,7 @@ fn validate_nested_constraints(object: &XldmMetadataObject) -> XldmMetadataResul
                 .iter()
                 .any(|item| !allowed.contains(&item.object.class.as_str()))
             {
-                return Err(XldmMetadataError::new(
-                    "invalid XMRawColumn data object class",
-                ));
+                return Err(MetadataError::new("invalid XMRawColumn data object class"));
             }
         },
         "XMRelationship"
@@ -1069,7 +1041,7 @@ fn validate_nested_constraints(object: &XldmMetadataObject) -> XldmMetadataResul
                         | "XMRelationshipIndex123DIDs"
                 )) =>
         {
-            return Err(XldmMetadataError::new(
+            return Err(MetadataError::new(
                 "XMRelationship requires one relationship index object",
             ));
         },
@@ -1109,7 +1081,7 @@ fn validate_nested_constraints(object: &XldmMetadataObject) -> XldmMetadataResul
                 sub.class.as_str() == "XMRLEGeneralCompressionInfo"
             };
             if !correct {
-                return Err(XldmMetadataError::new(
+                return Err(MetadataError::new(
                     "hybrid SubCompression does not match its outer class",
                 ));
             }
@@ -1120,11 +1092,11 @@ fn validate_nested_constraints(object: &XldmMetadataObject) -> XldmMetadataResul
 }
 
 fn require_member_classes(
-    object: &XldmMetadataObject,
+    object: &MetadataObject,
     required: &[(&str, &[&str])],
-) -> XldmMetadataResult<()> {
+) -> MetadataResult<()> {
     if object.members.len() != required.len() {
-        return Err(XldmMetadataError::new(format!(
+        return Err(MetadataError::new(format!(
             "{} has an invalid member count",
             object.class.as_str()
         )));
@@ -1134,13 +1106,13 @@ fn require_member_classes(
             .members
             .iter()
             .find(|item| item.name == *name)
-            .ok_or_else(|| XldmMetadataError::new(format!("missing member {name}")))?;
+            .ok_or_else(|| MetadataError::new(format!("missing member {name}")))?;
         let class = member.object.class.as_str();
         let valid = classes.contains(&class)
             || (classes.contains(&"@hybrid") && member.object.class.is_hybrid_compression())
             || classes.contains(&"@matching_subcompression");
         if !valid {
-            return Err(XldmMetadataError::new(format!(
+            return Err(MetadataError::new(format!(
                 "member {name} has invalid class {class}"
             )));
         }
@@ -1148,12 +1120,9 @@ fn require_member_classes(
     Ok(())
 }
 
-fn require_collections(
-    object: &XldmMetadataObject,
-    required: &[(&str, &str)],
-) -> XldmMetadataResult<()> {
+fn require_collections(object: &MetadataObject, required: &[(&str, &str)]) -> MetadataResult<()> {
     if object.collections.len() != required.len() {
-        return Err(XldmMetadataError::new(format!(
+        return Err(MetadataError::new(format!(
             "{} has an invalid collection count",
             object.class.as_str()
         )));
@@ -1163,13 +1132,13 @@ fn require_collections(
             .collections
             .iter()
             .find(|item| item.name == *name)
-            .ok_or_else(|| XldmMetadataError::new(format!("missing collection {name}")))?;
+            .ok_or_else(|| MetadataError::new(format!("missing collection {name}")))?;
         if collection
             .objects
             .iter()
             .any(|item| item.class.as_str() != *class)
         {
-            return Err(XldmMetadataError::new(format!(
+            return Err(MetadataError::new(format!(
                 "collection {name} has an invalid object class"
             )));
         }
@@ -1178,24 +1147,24 @@ fn require_collections(
 }
 
 fn require_collections_multi(
-    object: &XldmMetadataObject,
+    object: &MetadataObject,
     required: &[(&str, &[&str])],
-) -> XldmMetadataResult<()> {
+) -> MetadataResult<()> {
     if object.collections.len() != required.len() {
-        return Err(XldmMetadataError::new("invalid collection count"));
+        return Err(MetadataError::new("invalid collection count"));
     }
     for (name, classes) in required {
         let collection = object
             .collections
             .iter()
             .find(|item| item.name == *name)
-            .ok_or_else(|| XldmMetadataError::new(format!("missing collection {name}")))?;
+            .ok_or_else(|| MetadataError::new(format!("missing collection {name}")))?;
         if collection
             .objects
             .iter()
             .any(|item| !classes.contains(&item.class.as_str()))
         {
-            return Err(XldmMetadataError::new(format!(
+            return Err(MetadataError::new(format!(
                 "collection {name} has an invalid class"
             )));
         }
@@ -1203,10 +1172,7 @@ fn require_collections_multi(
     Ok(())
 }
 
-fn validate_table_file_kind(
-    kind: XldmMetadataFileKind,
-    table: &XldmMetadataObject,
-) -> XldmMetadataResult<()> {
+fn validate_table_file_kind(kind: MetadataFileKind, table: &MetadataObject) -> MetadataResult<()> {
     let columns = table.collection("Columns").expect("validated table");
     let roles: Vec<i64> = columns
         .iter()
@@ -1219,22 +1185,20 @@ fn validate_table_file_kind(
         })
         .collect::<Result<_, _>>()?;
     match kind {
-        XldmMetadataFileKind::ColumnHierarchy
-            if roles.iter().any(|role| ![5, 7].contains(role)) =>
-        {
-            return Err(XldmMetadataError::new(
+        MetadataFileKind::ColumnHierarchy if roles.iter().any(|role| ![5, 7].contains(role)) => {
+            return Err(MetadataError::new(
                 "column hierarchy metadata contains a non-index column",
             ));
         },
-        XldmMetadataFileKind::UserHierarchy
+        MetadataFileKind::UserHierarchy
             if roles.len() != 4 || ![8, 9, 16, 17].iter().all(|role| roles.contains(role)) =>
         {
-            return Err(XldmMetadataError::new(
+            return Err(MetadataError::new(
                 "user hierarchy metadata requires all four generated columns",
             ));
         },
-        XldmMetadataFileKind::TableRelationship if roles.len() != 1 => {
-            return Err(XldmMetadataError::new(
+        MetadataFileKind::TableRelationship if roles.len() != 1 => {
+            return Err(MetadataError::new(
                 "relationship metadata requires exactly one generated column",
             ));
         },
@@ -1244,11 +1208,11 @@ fn validate_table_file_kind(
 }
 
 fn derive_policies(
-    files: &[XldmMetadataFile<'_>],
-) -> XldmMetadataResult<(
-    Vec<XldmColumnPolicy>,
-    Vec<XldmRelationshipPolicy>,
-    Vec<XldmHierarchyPolicy>,
+    files: &[MetadataFile<'_>],
+) -> MetadataResult<(
+    Vec<ColumnPolicy>,
+    Vec<RelationshipPolicy>,
+    Vec<HierarchyPolicy>,
 )> {
     let mut columns = Vec::new();
     let mut relationships = Vec::new();
@@ -1274,11 +1238,11 @@ fn derive_policies(
                 .as_str()
                 .starts_with("XMHashDataDictionary")
             {
-                Some(XldmDictionaryPolicy {
+                Some(DictionaryPolicy {
                     storage_name: qualify_storage_name(
                         file.storage_path,
                         dictionary_object.name.as_deref().ok_or_else(|| {
-                            XldmMetadataError::new("hash dictionary requires its storage name")
+                            MetadataError::new("hash dictionary requires its storage name")
                         })?,
                     ),
                     class: dictionary_object.class.clone(),
@@ -1287,7 +1251,7 @@ fn derive_policies(
                         .map(|value| {
                             parse_i64(value, "DictionaryFlags").and_then(|value| {
                                 u16::try_from(value)
-                                    .map_err(|_| XldmMetadataError::new("DictionaryFlags overflow"))
+                                    .map_err(|_| MetadataError::new("DictionaryFlags overflow"))
                             })
                         })
                         .transpose()?,
@@ -1303,24 +1267,24 @@ fn derive_policies(
                 required_property(partition, "SegmentCount")?,
                 "SegmentCount",
             )?)
-            .map_err(|_| XldmMetadataError::new("negative or overflowing SegmentCount"))?;
+            .map_err(|_| MetadataError::new("negative or overflowing SegmentCount"))?;
             let row_count = u64::try_from(parse_i64(
                 required_property(stats, "RowCount")?,
                 "RowCount",
             )?)
-            .map_err(|_| XldmMetadataError::new("negative RowCount"))?;
+            .map_err(|_| MetadataError::new("negative RowCount"))?;
             let compression_type = u8::try_from(parse_i64(
                 required_property(stats, "CompressionType")?,
                 "CompressionType",
             )?)
-            .map_err(|_| XldmMetadataError::new("CompressionType overflow"))?;
+            .map_err(|_| MetadataError::new("CompressionType overflow"))?;
             let compression_param = parse_i64(
                 required_property(stats, "CompressionParam")?,
                 "CompressionParam",
             )?;
             let segments = column.collection("Segments").expect("validated raw column");
             if segments.len() != segment_count {
-                return Err(XldmMetadataError::new(
+                return Err(MetadataError::new(
                     "SegmentCount disagrees with the Segments collection",
                 ));
             }
@@ -1330,7 +1294,7 @@ fn derive_policies(
                     required_property(segment, "Records")?,
                     "Records",
                 )?)
-                .map_err(|_| XldmMetadataError::new("negative segment Records"))?;
+                .map_err(|_| MetadataError::new("negative segment Records"))?;
                 let stats = segment
                     .member("ColumnSegmentStats")
                     .expect("validated segment");
@@ -1338,15 +1302,15 @@ fn derive_policies(
                     required_property(stats, "RowCount")?,
                     "RowCount",
                 )?)
-                .map_err(|_| XldmMetadataError::new("negative segment RowCount"))?;
+                .map_err(|_| MetadataError::new("negative segment RowCount"))?;
                 if records != stats_rows {
-                    return Err(XldmMetadataError::new(
+                    return Err(MetadataError::new(
                         "segment Records disagrees with ColumnSegmentStats.RowCount",
                     ));
                 }
                 segment_rows = segment_rows
                     .checked_add(records)
-                    .ok_or_else(|| XldmMetadataError::new("segment row-count overflow"))?;
+                    .ok_or_else(|| MetadataError::new("segment row-count overflow"))?;
                 let compression = segment
                     .member("CompressionInfo")
                     .expect("validated segment")
@@ -1354,33 +1318,31 @@ fn derive_policies(
                     .as_str();
                 if compression_type == 1 {
                     let width = hybrid_width(compression).ok_or_else(|| {
-                        XldmMetadataError::new(
+                        MetadataError::new(
                             "NoSplit CompressionType requires no-split segment compression",
                         )
                     })?;
                     if compression_param != i64::from(width) {
-                        return Err(XldmMetadataError::new(
+                        return Err(MetadataError::new(
                             "CompressionParam disagrees with the no-split bit width",
                         ));
                     }
                 }
             }
             if segment_rows != row_count {
-                return Err(XldmMetadataError::new(
+                return Err(MetadataError::new(
                     "column RowCount disagrees with its segment rows",
                 ));
             }
-            columns.push(XldmColumnPolicy {
+            columns.push(ColumnPolicy {
                 name: column
                     .name
                     .clone()
-                    .ok_or_else(|| XldmMetadataError::new("XMRawColumn requires a name"))?,
+                    .ok_or_else(|| MetadataError::new("XMRawColumn requires a name"))?,
                 data_file: qualify_storage_name(
                     file.storage_path,
                     partition.name.as_deref().ok_or_else(|| {
-                        XldmMetadataError::new(
-                            "XMRawColumnPartitionDataObject requires a storage name",
-                        )
+                        MetadataError::new("XMRawColumnPartitionDataObject requires a storage name")
                     })?,
                 ),
                 segment_count,
@@ -1390,7 +1352,7 @@ fn derive_policies(
                     required_property(column, "Settings")?,
                     "Settings",
                 )?)
-                .map_err(|_| XldmMetadataError::new("Settings overflow"))?,
+                .map_err(|_| MetadataError::new("Settings overflow"))?,
                 dictionary,
             });
             let hierarchy = column
@@ -1402,7 +1364,7 @@ fn derive_policies(
                 required_property(hierarchy, "TypeMaterialization")?,
                 "TypeMaterialization",
             )?;
-            hierarchies.push(XldmHierarchyPolicy {
+            hierarchies.push(HierarchyPolicy {
                 table_store: required_property(hierarchy, "TableStore")?.to_owned(),
                 processed,
                 position_to_id: processed
@@ -1432,15 +1394,15 @@ fn derive_policies(
             .expect("validated table")
         {
             let index = relationship.data_objects[0].object.class.as_str();
-            relationships.push(XldmRelationshipPolicy {
+            relationships.push(RelationshipPolicy {
                 name: relationship.name.clone(),
                 primary_table: required_property(relationship, "PrimaryTable")?.to_owned(),
                 primary_column: required_property(relationship, "PrimaryColumn")?.to_owned(),
                 foreign_column: required_property(relationship, "ForeignColumn")?.to_owned(),
                 index_kind: match index {
-                    "XMRelationshipIndexSparseDIDs" => XldmRelationshipIndexKind::Sparse,
-                    "XMRelationshipIndexDenseDIDs" => XldmRelationshipIndexKind::Dense,
-                    _ => XldmRelationshipIndexKind::OneTwoThree,
+                    "XMRelationshipIndexSparseDIDs" => RelationshipIndexKind::Sparse,
+                    "XMRelationshipIndexDenseDIDs" => RelationshipIndexKind::Dense,
+                    _ => RelationshipIndexKind::OneTwoThree,
                 },
             });
         }
@@ -1453,7 +1415,7 @@ fn derive_policies(
                 parse_bool(required_property(hierarchy, "IsProcessed")?, "IsProcessed")?;
             let (level_ids, level_offsets) =
                 parse_user_hierarchy_store(required_property(hierarchy, "TableStore")?)?;
-            hierarchies.push(XldmHierarchyPolicy {
+            hierarchies.push(HierarchyPolicy {
                 table_store: required_property(hierarchy, "TableName")?.to_owned(),
                 processed,
                 position_to_id: false,
@@ -1467,14 +1429,11 @@ fn derive_policies(
     Ok((columns, relationships, hierarchies))
 }
 
-fn validate_columns(
-    metadata: &XldmMetadataModel<'_>,
-    native: &[XldmNativeFile<'_>],
-) -> XldmMetadataResult<()> {
+fn validate_columns(metadata: &MetadataModel<'_>, native: &[NativeFile<'_>]) -> MetadataResult<()> {
     for column in &metadata.columns {
         let data = unique_native(native, &column.data_file)?;
-        let XldmNativeData::Idf(idf) = &data.data else {
-            return Err(XldmMetadataError::new(format!(
+        let NativeData::Idf(idf) = &data.data else {
+            return Err(MetadataError::new(format!(
                 "{} is not column IDF data",
                 column.data_file
             )));
@@ -1483,17 +1442,17 @@ fn validate_columns(
             != column
                 .segment_count
                 .checked_mul(2)
-                .ok_or_else(|| XldmMetadataError::new("SegmentCount overflow"))?
+                .ok_or_else(|| MetadataError::new("SegmentCount overflow"))?
         {
-            return Err(XldmMetadataError::new(format!(
+            return Err(MetadataError::new(format!(
                 "column {} SegmentCount disagrees with its IDF",
                 column.name
             )));
         }
         if let Some(policy) = &column.dictionary {
             let file = unique_native(native, &policy.storage_name)?;
-            let XldmNativeData::Dictionary(dictionary) = &file.data else {
-                return Err(XldmMetadataError::new(format!(
+            let NativeData::Dictionary(dictionary) = &file.data else {
+                return Err(MetadataError::new(format!(
                     "{} is not a dictionary",
                     policy.storage_name
                 )));
@@ -1505,8 +1464,8 @@ fn validate_columns(
             ) {
                 (
                     "XMHashDataDictionary<XM_Long>",
-                    XldmDictionaryType::Long,
-                    XldmDictionaryBody::Numeric(values),
+                    DictionaryType::Long,
+                    DictionaryBody::Numeric(values),
                 ) => {
                     let expected = if policy.operating_on_32 == Some(true) {
                         4
@@ -1514,38 +1473,38 @@ fn validate_columns(
                         8
                     };
                     if values.element_size != expected {
-                        return Err(XldmMetadataError::new(
+                        return Err(MetadataError::new(
                             "OperatingOn32 disagrees with numeric dictionary width",
                         ));
                     }
                 },
                 (
                     "XMHashDataDictionary<XM_Real>",
-                    XldmDictionaryType::Real,
-                    XldmDictionaryBody::Numeric(values),
+                    DictionaryType::Real,
+                    DictionaryBody::Numeric(values),
                 ) if values.element_size == 8 => {},
                 (
                     "XMHashDataDictionary<XM_String>",
-                    XldmDictionaryType::String,
-                    XldmDictionaryBody::String(strings),
+                    DictionaryType::String,
+                    DictionaryBody::String(strings),
                 ) => {
                     let flags = policy.dictionary_flags.expect("string policy flags");
                     if dictionary.hash.is_some() != (flags & 0x001 != 0) {
-                        return Err(XldmMetadataError::new(
+                        return Err(MetadataError::new(
                             "DictionaryFlags lookup bit disagrees with string hash header presence",
                         ));
                     }
                     let compressed = flags & 0x002 != 0;
                     if strings.pages.iter().any(|page| {
-                        matches!(page.data, XldmStringPageData::Compressed { .. }) != compressed
+                        matches!(page.data, StringPageData::Compressed { .. }) != compressed
                     }) {
-                        return Err(XldmMetadataError::new(
+                        return Err(MetadataError::new(
                             "DictionaryFlags compression bit disagrees with string page layout",
                         ));
                     }
                 },
                 _ => {
-                    return Err(XldmMetadataError::new(
+                    return Err(MetadataError::new(
                         "dictionary metadata class disagrees with native dictionary type",
                     ));
                 },
@@ -1556,10 +1515,10 @@ fn validate_columns(
 }
 
 fn validate_hierarchies(
-    metadata: &XldmMetadataModel<'_>,
-    native: &[XldmNativeFile<'_>],
-    generated: &[XldmSystemGeneratedFile<'_>],
-) -> XldmMetadataResult<()> {
+    metadata: &MetadataModel<'_>,
+    native: &[NativeFile<'_>],
+    generated: &[SystemGeneratedFile<'_>],
+) -> MetadataResult<()> {
     for hierarchy in &metadata.hierarchies {
         if hierarchy.table_store.starts_with("U$") {
             let count = generated
@@ -1568,16 +1527,16 @@ fn validate_hierarchies(
                     file.object_key.contains(&hierarchy.table_store)
                         && matches!(
                             file.kind,
-                            XldmSystemGeneratedKind::UserHierarchyChildCount
-                                | XldmSystemGeneratedKind::UserHierarchyFirstChildPosition
-                                | XldmSystemGeneratedKind::UserHierarchyMultilevelIdentifier
-                                | XldmSystemGeneratedKind::UserHierarchyParentPosition
+                            SystemGeneratedKind::UserHierarchyChildCount
+                                | SystemGeneratedKind::UserHierarchyFirstChildPosition
+                                | SystemGeneratedKind::UserHierarchyMultilevelIdentifier
+                                | SystemGeneratedKind::UserHierarchyParentPosition
                         )
                 })
                 .count();
             let expected = if hierarchy.processed { 4 } else { 0 };
             if count != expected {
-                return Err(XldmMetadataError::new(format!(
+                return Err(MetadataError::new(format!(
                     "user hierarchy {} generated-file presence disagrees with IsProcessed",
                     hierarchy.table_store
                 )));
@@ -1587,24 +1546,24 @@ fn validate_hierarchies(
         require_generated_presence(
             generated,
             &hierarchy.table_store,
-            XldmSystemGeneratedKind::PositionToIdentifier,
+            SystemGeneratedKind::PositionToIdentifier,
             hierarchy.position_to_id,
         )?;
         require_generated_presence(
             generated,
             &hierarchy.table_store,
-            XldmSystemGeneratedKind::IdentifierToPosition,
+            SystemGeneratedKind::IdentifierToPosition,
             hierarchy.id_to_position,
         )?;
         let hash_count = native
             .iter()
             .filter(|file| {
                 basename(file.storage_path).contains(&hierarchy.table_store)
-                    && matches!(file.data, XldmNativeData::HashIndex(_))
+                    && matches!(file.data, NativeData::HashIndex(_))
             })
             .count();
         if hash_count != usize::from(hierarchy.id_to_position_hash) {
-            return Err(XldmMetadataError::new(format!(
+            return Err(MetadataError::new(format!(
                 "hierarchy {} hash-index presence disagrees with TypeMaterialization",
                 hierarchy.table_store
             )));
@@ -1614,17 +1573,17 @@ fn validate_hierarchies(
 }
 
 fn require_generated_presence(
-    files: &[XldmSystemGeneratedFile<'_>],
+    files: &[SystemGeneratedFile<'_>],
     key: &str,
-    kind: XldmSystemGeneratedKind,
+    kind: SystemGeneratedKind,
     expected: bool,
-) -> XldmMetadataResult<()> {
+) -> MetadataResult<()> {
     let count = files
         .iter()
         .filter(|file| file.kind == kind && file.object_key.contains(key))
         .count();
     if count != usize::from(expected) {
-        return Err(XldmMetadataError::new(format!(
+        return Err(MetadataError::new(format!(
             "hierarchy {key} generated-file presence is inconsistent"
         )));
     }
@@ -1632,15 +1591,15 @@ fn require_generated_presence(
 }
 
 fn validate_relationships(
-    metadata: &XldmMetadataModel<'_>,
-    generated: &[XldmSystemGeneratedFile<'_>],
-) -> XldmMetadataResult<()> {
+    metadata: &MetadataModel<'_>,
+    generated: &[SystemGeneratedFile<'_>],
+) -> MetadataResult<()> {
     let indexes: Vec<_> = generated
         .iter()
-        .filter(|file| file.kind == XldmSystemGeneratedKind::RelationshipIndex)
+        .filter(|file| file.kind == SystemGeneratedKind::RelationshipIndex)
         .collect();
     if indexes.len() != metadata.relationships.len() {
-        return Err(XldmMetadataError::new(
+        return Err(MetadataError::new(
             "relationship definition count disagrees with generated indexes",
         ));
     }
@@ -1651,18 +1610,18 @@ fn validate_relationships(
         .collect();
     for file in indexes {
         let actual = match file.data {
-            XldmSystemGeneratedData::HashIndex(_) => XldmRelationshipIndexKind::Sparse,
-            XldmSystemGeneratedData::Idf(_) => XldmRelationshipIndexKind::Dense,
+            SystemGeneratedData::HashIndex(_) => RelationshipIndexKind::Sparse,
+            SystemGeneratedData::Idf(_) => RelationshipIndexKind::Dense,
         };
         let position = remaining
             .iter()
             .position(|kind| {
                 *kind == actual
-                    || (*kind == XldmRelationshipIndexKind::OneTwoThree
-                        && actual == XldmRelationshipIndexKind::Dense)
+                    || (*kind == RelationshipIndexKind::OneTwoThree
+                        && actual == RelationshipIndexKind::Dense)
             })
             .ok_or_else(|| {
-                XldmMetadataError::new("relationship index representation disagrees with metadata")
+                MetadataError::new("relationship index representation disagrees with metadata")
             })?;
         remaining.remove(position);
     }
@@ -1670,17 +1629,17 @@ fn validate_relationships(
 }
 
 fn unique_native<'a>(
-    files: &'a [XldmNativeFile<'a>],
+    files: &'a [NativeFile<'a>],
     name: &str,
-) -> XldmMetadataResult<&'a XldmNativeFile<'a>> {
+) -> MetadataResult<&'a NativeFile<'a>> {
     let mut matches = files
         .iter()
         .filter(|file| file.storage_path == name || basename(file.storage_path) == name);
     let file = matches.next().ok_or_else(|| {
-        XldmMetadataError::new(format!("metadata-bound native file {name} is absent"))
+        MetadataError::new(format!("metadata-bound native file {name} is absent"))
     })?;
     if matches.next().is_some() {
-        return Err(XldmMetadataError::new(format!(
+        return Err(MetadataError::new(format!(
             "metadata-bound native file {name} is ambiguous"
         )));
     }
@@ -1699,15 +1658,15 @@ fn qualify_storage_name(metadata_path: &str, name: &str) -> String {
         name.to_owned()
     }
 }
-fn parse_user_hierarchy_store(value: &str) -> XldmMetadataResult<(Vec<String>, Vec<u64>)> {
+fn parse_user_hierarchy_store(value: &str) -> MetadataResult<(Vec<String>, Vec<u64>)> {
     if !value.starts_with('$') || !value.ends_with('$') {
-        return Err(XldmMetadataError::new(
+        return Err(MetadataError::new(
             "user hierarchy TableStore MUST start and end with '$'",
         ));
     }
     let parts: Vec<_> = value[1..value.len() - 1].split('$').collect();
     if parts.is_empty() || parts.len() % 2 != 0 {
-        return Err(XldmMetadataError::new(
+        return Err(MetadataError::new(
             "user hierarchy TableStore requires ID/offset pairs",
         ));
     }
@@ -1715,15 +1674,15 @@ fn parse_user_hierarchy_store(value: &str) -> XldmMetadataResult<(Vec<String>, V
     let mut offsets = Vec::new();
     for pair in parts.chunks_exact(2) {
         if pair[0].is_empty() || ids.iter().any(|id| id == pair[0]) {
-            return Err(XldmMetadataError::new(
+            return Err(MetadataError::new(
                 "user hierarchy TableStore contains an empty or duplicate level ID",
             ));
         }
         let offset = pair[1]
             .parse::<u64>()
-            .map_err(|_| XldmMetadataError::new("invalid user hierarchy offset"))?;
+            .map_err(|_| MetadataError::new("invalid user hierarchy offset"))?;
         if offsets.last().is_some_and(|previous| *previous > offset) {
-            return Err(XldmMetadataError::new(
+            return Err(MetadataError::new(
                 "user hierarchy offsets MUST be cumulative",
             ));
         }
@@ -1731,35 +1690,32 @@ fn parse_user_hierarchy_store(value: &str) -> XldmMetadataResult<(Vec<String>, V
         offsets.push(offset);
     }
     if offsets.first() != Some(&0) {
-        return Err(XldmMetadataError::new(
+        return Err(MetadataError::new(
             "the first user hierarchy offset MUST be zero",
         ));
     }
     Ok((ids, offsets))
 }
-fn required_property<'a>(
-    object: &'a XldmMetadataObject,
-    name: &str,
-) -> XldmMetadataResult<&'a str> {
+fn required_property<'a>(object: &'a MetadataObject, name: &str) -> MetadataResult<&'a str> {
     object
         .property(name)
-        .ok_or_else(|| XldmMetadataError::new(format!("missing property {name}")))
+        .ok_or_else(|| MetadataError::new(format!("missing property {name}")))
 }
-fn parse_i64(value: &str, name: &str) -> XldmMetadataResult<i64> {
+fn parse_i64(value: &str, name: &str) -> MetadataResult<i64> {
     value
         .parse()
-        .map_err(|_| XldmMetadataError::new(format!("invalid integer {name}")))
+        .map_err(|_| MetadataError::new(format!("invalid integer {name}")))
 }
-fn parse_i32(value: &str, name: &str) -> XldmMetadataResult<i32> {
+fn parse_i32(value: &str, name: &str) -> MetadataResult<i32> {
     value
         .parse()
-        .map_err(|_| XldmMetadataError::new(format!("invalid integer {name}")))
+        .map_err(|_| MetadataError::new(format!("invalid integer {name}")))
 }
-fn parse_bool(value: &str, name: &str) -> XldmMetadataResult<bool> {
+fn parse_bool(value: &str, name: &str) -> MetadataResult<bool> {
     match value {
         "true" | "1" => Ok(true),
         "false" | "0" => Ok(false),
-        _ => Err(XldmMetadataError::new(format!("invalid Boolean {name}"))),
+        _ => Err(MetadataError::new(format!("invalid Boolean {name}"))),
     }
 }
 fn bool_property(name: &str) -> bool {
@@ -1788,8 +1744,8 @@ fn string_property(name: &str) -> bool {
             | "TableStore"
     )
 }
-fn xml_error(error: impl fmt::Display) -> XldmMetadataError {
-    XldmMetadataError::new(format!("invalid metadata XML: {error}"))
+fn xml_error(error: impl fmt::Display) -> MetadataError {
+    MetadataError::new(format!("invalid metadata XML: {error}"))
 }
 
 #[cfg(test)]
@@ -1849,13 +1805,11 @@ mod tests {
     #[test]
     fn parses_borrowed_table_metadata_and_writes_exact_bytes() {
         let xml = empty_table(&[]);
-        let file =
-            parse_xldm_metadata_file("Model.1.db/Table.0.dim/Table.1.tbl.xml", xml.as_bytes())
-                .unwrap();
-        assert_eq!(file.kind, XldmMetadataFileKind::Table);
+        let file = parse_file("Model.1.db/Table.0.dim/Table.1.tbl.xml", xml.as_bytes()).unwrap();
+        assert_eq!(file.kind, MetadataFileKind::Table);
         assert_eq!(file.table.class.as_str(), "XMSimpleTable");
         assert!(std::ptr::eq(file.bytes.as_ptr(), xml.as_ptr()));
-        assert_eq!(write_xldm_metadata_file(&file).unwrap(), xml.as_bytes());
+        assert_eq!(write_file(&file).unwrap(), xml.as_bytes());
     }
 
     #[test]
@@ -1872,47 +1826,41 @@ mod tests {
             format!("{valid}<XMObject class=\"XMRelationshipIndex123DIDs\"/>"),
         ] {
             assert!(
-                parse_xldm_metadata_file(
-                    "Model.1.db/Table.0.dim/Table.1.tbl.xml",
-                    invalid.as_bytes()
-                )
-                .is_err()
+                parse_file("Model.1.db/Table.0.dim/Table.1.tbl.xml", invalid.as_bytes()).is_err()
             );
         }
-        assert!(parse_xldm_metadata_file("Model.1.db/Table.0.dim/Table.1.tbl.xml", b"<!DOCTYPE x [<!ENTITY a 'x'>]><XMObject class='XMRelationshipIndex123DIDs'>&a;</XMObject>").is_err());
+        assert!(parse_file("Model.1.db/Table.0.dim/Table.1.tbl.xml", b"<!DOCTYPE x [<!ENTITY a 'x'>]><XMObject class='XMRelationshipIndex123DIDs'>&a;</XMObject>").is_err());
     }
 
     #[test]
     fn validates_dictionary_flags_operating_width_and_relationship_layout() {
         let numeric_bytes = [1u8; 8];
-        let native = XldmNativeFile {
+        let native = NativeFile {
             storage_path: "0.Table.Value.dictionary",
             bytes: &numeric_bytes,
-            data: XldmNativeData::Dictionary(super::super::xldm_native::XldmDictionaryFile {
-                dictionary_type: XldmDictionaryType::Long,
+            data: NativeData::Dictionary(super::super::native::DictionaryFile {
+                dictionary_type: DictionaryType::Long,
                 hash: None,
-                body: XldmDictionaryBody::Numeric(
-                    super::super::xldm_native::XldmNumericDictionary {
-                        element_count: 2,
-                        element_size: 4,
-                        values: &numeric_bytes,
-                    },
-                ),
+                body: DictionaryBody::Numeric(super::super::native::NumericDictionary {
+                    element_count: 2,
+                    element_size: 4,
+                    values: &numeric_bytes,
+                }),
                 trailing_zero_padding: &[],
             }),
         };
-        let model = XldmMetadataModel {
+        let model = MetadataModel {
             files: vec![],
-            columns: vec![XldmColumnPolicy {
+            columns: vec![ColumnPolicy {
                 name: "Value".into(),
                 data_file: "data.idf".into(),
                 segment_count: 0,
                 row_count: 0,
                 compression_type: 0,
                 settings: 1,
-                dictionary: Some(XldmDictionaryPolicy {
+                dictionary: Some(DictionaryPolicy {
                     storage_name: "0.Table.Value.dictionary".into(),
-                    class: XldmMetadataClass("XMHashDataDictionary<XM_Long>".into()),
+                    class: MetadataClass("XMHashDataDictionary<XM_Long>".into()),
                     dictionary_flags: None,
                     operating_on_32: Some(true),
                 }),
@@ -1920,10 +1868,10 @@ mod tests {
             relationships: vec![],
             hierarchies: vec![],
         };
-        let idf = XldmNativeFile {
+        let idf = NativeFile {
             storage_path: "data.idf",
             bytes: &[],
-            data: XldmNativeData::Idf(super::super::xldm_native::XldmIdfFile {
+            data: NativeData::Idf(super::super::native::IdfFile {
                 segments: vec![],
                 trailing_zero_padding: &[],
             }),
@@ -1937,20 +1885,20 @@ mod tests {
     #[test]
     fn enforces_generated_file_presence_and_sparse_relationship_policy() {
         let idf_bytes = 0u64.to_le_bytes();
-        let idf = super::super::xldm_native::parse_xldm_idf(&idf_bytes).unwrap();
-        let generated = XldmSystemGeneratedFile {
+        let idf = super::super::native::parse_idf(&idf_bytes).unwrap();
+        let generated = SystemGeneratedFile {
             storage_path: "1.H$T$C.POS_TO_ID.0.idf",
-            kind: XldmSystemGeneratedKind::PositionToIdentifier,
+            kind: SystemGeneratedKind::PositionToIdentifier,
             object_key: "1.H$T$C".into(),
             version: 0,
             bytes: &idf_bytes,
-            data: XldmSystemGeneratedData::Idf(idf),
+            data: SystemGeneratedData::Idf(idf),
         };
-        let model = XldmMetadataModel {
+        let model = MetadataModel {
             files: vec![],
             columns: vec![],
             relationships: vec![],
-            hierarchies: vec![XldmHierarchyPolicy {
+            hierarchies: vec![HierarchyPolicy {
                 table_store: "H$T$C".into(),
                 processed: true,
                 position_to_id: true,

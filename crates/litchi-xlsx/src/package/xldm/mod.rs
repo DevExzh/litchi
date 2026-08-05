@@ -5,7 +5,14 @@
 //! padding, and virtual directory. Member payloads are never decompressed,
 //! decrypted, parsed as model metadata, evaluated, or used for I/O.
 
-use crate::error::{OoxmlError, Result};
+pub mod compression;
+pub mod crypt;
+pub mod generated;
+pub mod metadata;
+pub mod native;
+pub mod olap;
+
+use crate::error::{Error, Result};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::NsReader;
 use std::collections::HashMap;
@@ -26,18 +33,18 @@ const CRC_SIZE: usize = 4;
 const BOM: [u8; 2] = [0xFF, 0xFE];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XldmXmlEncoding {
+pub enum XmlEncoding {
     Utf16Le,
     Utf8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XldmCompression {
+pub enum Compression {
     Xpress,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XldmFileKind {
+pub enum FileKind {
     Partitions,
     BackupLog,
     CryptographicKey,
@@ -46,14 +53,14 @@ pub enum XldmFileKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XldmWriteAccess {
+pub enum WriteAccess {
     ReadWrite,
     ReadOnly,
     ReadOnlyExclusive,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XldmFileGroupClass {
+pub enum FileGroupClass {
     Database,
     DataSource,
     Dimension,
@@ -64,7 +71,7 @@ pub enum XldmFileGroupClass {
     MdxScript,
 }
 
-impl XldmFileGroupClass {
+impl FileGroupClass {
     pub const fn code(self) -> i32 {
         match self {
             Self::Database => 100002,
@@ -93,7 +100,7 @@ impl XldmFileGroupClass {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XldmGeneratedNameKind {
+pub enum GeneratedNameKind {
     DatabaseDefinition,
     DataSourceViewDefinition,
     CubeDefinition,
@@ -121,23 +128,23 @@ pub enum XldmGeneratedNameKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XldmGeneratedPath {
+pub struct GeneratedPath {
     pub normalized_path: String,
-    pub kind: XldmGeneratedNameKind,
+    pub kind: GeneratedNameKind,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XldmLoggedFile {
+pub struct LoggedFile {
     pub source_path: String,
     pub storage_path: String,
     pub last_write_timestamp: i64,
     pub size: u32,
-    pub generated: XldmGeneratedPath,
+    pub generated: GeneratedPath,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XldmFileGroup {
-    pub class: XldmFileGroupClass,
+pub struct FileGroup {
+    pub class: FileGroupClass,
     pub id: String,
     pub name: String,
     pub object_version: i32,
@@ -146,59 +153,59 @@ pub struct XldmFileGroup {
     /// Unused by MS-XLDM and retained without interpretation.
     pub storage_location_path: String,
     pub object_id: String,
-    pub files: Vec<XldmLoggedFile>,
+    pub files: Vec<LoggedFile>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XldmBackupLog {
+pub struct BackupLog {
     pub backup_restore_sync_version: i32,
     /// Originating filesystem root; retained as text and never accessed.
     pub server_root: String,
     pub object_name: String,
     pub object_id: String,
-    pub write_access: XldmWriteAccess,
+    pub write_access: WriteAccess,
     pub is_olap: bool,
     pub collations: Vec<String>,
     pub languages: Vec<i32>,
-    pub file_groups: Vec<XldmFileGroup>,
-    pub encoding: XldmXmlEncoding,
+    pub file_groups: Vec<FileGroup>,
+    pub encoding: XmlEncoding,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct XldmOffset(pub u64);
+pub struct Offset(pub u64);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct XldmSize(pub u64);
+pub struct Size(pub u64);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XldmHeader {
+pub struct Header {
     pub backup_restore_sync_version: i32,
     pub fault_code: u32,
     pub encryption_key_version: i32,
-    pub compression: XldmCompression,
-    pub directory_offset: XldmOffset,
-    pub directory_size: XldmSize,
+    pub compression: Compression,
+    pub directory_offset: Offset,
+    pub directory_size: Size,
     pub file_count: u32,
     pub object_id: String,
-    pub data_offset: XldmOffset,
+    pub data_offset: Offset,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XldmPartitionMarker<'a> {
+pub struct PartitionMarker<'a> {
     pub partition_count: usize,
-    pub encoding: XldmXmlEncoding,
+    pub encoding: XmlEncoding,
     /// Encoded XML is retained exactly; unused fields, including connection
     /// strings, are not projected or acted upon.
     pub encoded_xml: &'a [u8],
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XldmFileEntry {
+pub struct FileEntry {
     pub path: String,
-    pub kind: XldmFileKind,
-    pub offset: XldmOffset,
+    pub kind: FileKind,
+    pub offset: Offset,
     /// Stored size includes the four-byte CRC marker.
-    pub stored_size: XldmSize,
+    pub stored_size: Size,
     pub crc32: u32,
     pub delete: bool,
     pub created_timestamp: i64,
@@ -207,17 +214,17 @@ pub struct XldmFileEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XldmStorage<'a> {
-    pub header: XldmHeader,
-    pub header_encoding: XldmXmlEncoding,
-    pub directory_encoding: XldmXmlEncoding,
-    pub partition_marker: XldmPartitionMarker<'a>,
-    pub backup_log: XldmBackupLog,
-    pub files: Vec<XldmFileEntry>,
+pub struct Storage<'a> {
+    pub header: Header,
+    pub header_encoding: XmlEncoding,
+    pub directory_encoding: XmlEncoding,
+    pub partition_marker: PartitionMarker<'a>,
+    pub backup_log: BackupLog,
+    pub files: Vec<FileEntry>,
     bytes: &'a [u8],
 }
 
-impl XldmStorage<'_> {
+impl Storage<'_> {
     pub fn bytes(&self) -> &[u8] {
         self.bytes
     }
@@ -249,7 +256,7 @@ struct Node {
 }
 
 /// Validate and inspect the outer MS-XLDM virtual storage.
-pub fn inspect_xldm(bytes: &[u8]) -> Result<XldmStorage<'_>> {
+pub fn inspect(bytes: &[u8]) -> Result<Storage<'_>> {
     if bytes.len() > MAX_STORAGE_BYTES {
         return Err(limit("storage bytes"));
     }
@@ -337,17 +344,17 @@ pub fn inspect_xldm(bytes: &[u8]) -> Result<XldmStorage<'_>> {
     let partition_bytes = payload_slice(bytes, &files[first])?;
     let (partitions_xml, partition_encoding) = decode_xml(partition_bytes, false)?;
     let partition_count = parse_partitions(&parse_xml(&partitions_xml)?)?;
-    files[first].kind = XldmFileKind::Partitions;
+    files[first].kind = FileKind::Partitions;
     let last = *order.last().unwrap();
-    files[last].kind = XldmFileKind::BackupLog;
+    files[last].kind = FileKind::BackupLog;
     let (backup_xml, backup_encoding) = decode_xml(payload_slice(bytes, &files[last])?, false)?;
     let backup_log = parse_backup_log(&parse_xml(&backup_xml)?, backup_encoding)?;
     validate_backup_log(&backup_log, &files, first, last)?;
-    Ok(XldmStorage {
+    Ok(Storage {
         header,
         header_encoding,
         directory_encoding,
-        partition_marker: XldmPartitionMarker {
+        partition_marker: PartitionMarker {
             partition_count,
             encoding: partition_encoding,
             encoded_xml: partition_bytes,
@@ -359,13 +366,13 @@ pub fn inspect_xldm(bytes: &[u8]) -> Result<XldmStorage<'_>> {
 }
 
 /// Revalidate and return the original byte stream exactly.
-pub fn write_xldm(storage: &XldmStorage<'_>) -> Result<Vec<u8>> {
-    inspect_xldm(storage.bytes)?;
+pub fn write(storage: &Storage<'_>) -> Result<Vec<u8>> {
+    inspect(storage.bytes)?;
     Ok(storage.bytes.to_vec())
 }
 
 /// Classify and validate one section 2.2 generated storage path.
-pub fn classify_xldm_generated_path(path: &str) -> Result<XldmGeneratedPath> {
+pub fn classify_generated_path(path: &str) -> Result<GeneratedPath> {
     let normalized_path = normalize_generated_path(path)?;
     let segments: Vec<_> = normalized_path.split('/').collect();
     let file = *segments.last().unwrap();
@@ -373,13 +380,13 @@ pub fn classify_xldm_generated_path(path: &str) -> Result<XldmGeneratedPath> {
     validate_generated_hierarchy(parents)?;
     let kind = classify_generated_name(file, parents.last().copied())?;
     validate_kind_location(kind, parents)?;
-    Ok(XldmGeneratedPath {
+    Ok(GeneratedPath {
         normalized_path,
         kind,
     })
 }
 
-fn parse_backup_log(root: &Node, encoding: XldmXmlEncoding) -> Result<XldmBackupLog> {
+fn parse_backup_log(root: &Node, encoding: XmlEncoding) -> Result<BackupLog> {
     let names = [
         "BackupRestoreSyncVersion",
         "ServerRoot",
@@ -419,16 +426,16 @@ fn parse_backup_log(root: &Node, encoding: XldmXmlEncoding) -> Result<XldmBackup
     let object_name = bounded_leaf(values[7], "object name")?;
     let object_id = bounded_leaf(values[8], "object id")?;
     let write_access = match leaf_text(values[9])? {
-        "ReadWrite" => XldmWriteAccess::ReadWrite,
-        "ReadOnly" => XldmWriteAccess::ReadOnly,
-        "ReadOnlyExclusive" => XldmWriteAccess::ReadOnlyExclusive,
+        "ReadWrite" => WriteAccess::ReadWrite,
+        "ReadOnly" => WriteAccess::ReadOnly,
+        "ReadOnlyExclusive" => WriteAccess::ReadOnlyExclusive,
         _ => return Err(invalid("unknown backup-log Write value")),
     };
     let is_olap = bool_value(values[10])?;
     let collations = parse_repeated_strings(values[11], "Collations", "Collation", "collation")?;
     let languages = parse_languages(values[12])?;
     let file_groups = parse_file_groups(values[13])?;
-    Ok(XldmBackupLog {
+    Ok(BackupLog {
         backup_restore_sync_version,
         server_root,
         object_name,
@@ -498,7 +505,7 @@ fn parse_languages(node: &Node) -> Result<Vec<i32>> {
     Ok(output)
 }
 
-fn parse_file_groups(node: &Node) -> Result<Vec<XldmFileGroup>> {
+fn parse_file_groups(node: &Node) -> Result<Vec<FileGroup>> {
     if node.name != "FileGroups"
         || node.attributes != 0
         || !node.text.trim().is_empty()
@@ -525,7 +532,7 @@ fn parse_file_groups(node: &Node) -> Result<Vec<XldmFileGroup>> {
     let mut total_files = 0usize;
     for group in &node.children {
         let values = exact_children(group, "FileGroup", &names)?;
-        let class = XldmFileGroupClass::parse(i32_value(values[0])?)?;
+        let class = FileGroupClass::parse(i32_value(values[0])?)?;
         let id = bounded_leaf(values[1], "file-group ID")?;
         let name = bounded_leaf(values[2], "file-group name")?;
         let object_version = i32_value(values[3])?;
@@ -549,7 +556,7 @@ fn parse_file_groups(node: &Node) -> Result<Vec<XldmFileGroup>> {
         if total_files > MAX_FILES {
             return Err(limit("logged file count"));
         }
-        output.push(XldmFileGroup {
+        output.push(FileGroup {
             class,
             id,
             name,
@@ -564,7 +571,7 @@ fn parse_file_groups(node: &Node) -> Result<Vec<XldmFileGroup>> {
     Ok(output)
 }
 
-fn parse_logged_files(node: &Node, class: XldmFileGroupClass) -> Result<Vec<XldmLoggedFile>> {
+fn parse_logged_files(node: &Node, class: FileGroupClass) -> Result<Vec<LoggedFile>> {
     if node.name != "FileList"
         || node.attributes != 0
         || !node.text.trim().is_empty()
@@ -587,7 +594,7 @@ fn parse_logged_files(node: &Node, class: XldmFileGroupClass) -> Result<Vec<Xldm
             if signed_size < 0 {
                 return Err(invalid("logged file size cannot be negative"));
             }
-            let generated = classify_xldm_generated_path(&storage_path)?;
+            let generated = classify_generated_path(&storage_path)?;
             if !kind_allowed_for_group(generated.kind, class) {
                 return Err(invalid(format!(
                     "generated path '{}' is incompatible with file-group class {}",
@@ -595,7 +602,7 @@ fn parse_logged_files(node: &Node, class: XldmFileGroupClass) -> Result<Vec<Xldm
                     class.code()
                 )));
             }
-            Ok(XldmLoggedFile {
+            Ok(LoggedFile {
                 source_path,
                 storage_path,
                 last_write_timestamp,
@@ -607,12 +614,12 @@ fn parse_logged_files(node: &Node, class: XldmFileGroupClass) -> Result<Vec<Xldm
 }
 
 fn validate_backup_log(
-    log: &XldmBackupLog,
-    directory: &[XldmFileEntry],
+    log: &BackupLog,
+    directory: &[FileEntry],
     partitions: usize,
     backup: usize,
 ) -> Result<()> {
-    let mut expected = HashMap::<String, &XldmFileEntry>::new();
+    let mut expected = HashMap::<String, &FileEntry>::new();
     for (index, entry) in directory.iter().enumerate() {
         if index != partitions && index != backup {
             expected.insert(entry.path.clone(), entry);
@@ -768,34 +775,34 @@ fn validate_generated_hierarchy(parents: &[&str]) -> Result<()> {
     Ok(())
 }
 
-fn classify_generated_name(name: &str, parent: Option<&str>) -> Result<XldmGeneratedNameKind> {
+fn classify_generated_name(name: &str, parent: Option<&str>) -> Result<GeneratedNameKind> {
     if name == "MdxScript.0.scr.xml" {
-        return Ok(XldmGeneratedNameKind::MdxScriptMetadata);
+        return Ok(GeneratedNameKind::MdxScriptMetadata);
     }
     if let Some(prefix) = name.strip_suffix(".db.xml")
         && versioned_id(prefix)
     {
-        return Ok(XldmGeneratedNameKind::DatabaseDefinition);
+        return Ok(GeneratedNameKind::DatabaseDefinition);
     }
     if let Some(prefix) = name.strip_suffix(".dsv.xml")
         && versioned_id(prefix)
     {
-        return Ok(XldmGeneratedNameKind::DataSourceViewDefinition);
+        return Ok(GeneratedNameKind::DataSourceViewDefinition);
     }
     if let Some(prefix) = name.strip_suffix(".cub.xml")
         && versioned_id(prefix)
     {
-        return Ok(XldmGeneratedNameKind::CubeDefinition);
+        return Ok(GeneratedNameKind::CubeDefinition);
     }
     if let Some(prefix) = name.strip_suffix(".ds.xml")
         && versioned_id(prefix)
     {
-        return Ok(XldmGeneratedNameKind::DataSourceOrDimensionDefinition);
+        return Ok(GeneratedNameKind::DataSourceOrDimensionDefinition);
     }
     if let Some(prefix) = name.strip_suffix(".dim.xml")
         && versioned_id(prefix)
     {
-        return Ok(XldmGeneratedNameKind::DataSourceOrDimensionDefinition);
+        return Ok(GeneratedNameKind::DataSourceOrDimensionDefinition);
     }
     if let Some(prefix) = name
         .strip_prefix("info.")
@@ -803,23 +810,19 @@ fn classify_generated_name(name: &str, parent: Option<&str>) -> Result<XldmGener
         && digits(prefix)
     {
         return match parent {
-            Some(value) if folder(value, ".cub", true) => {
-                Ok(XldmGeneratedNameKind::CubeInformation)
-            },
+            Some(value) if folder(value, ".cub", true) => Ok(GeneratedNameKind::CubeInformation),
             Some(value) if folder(value, ".prt", false) => {
-                Ok(XldmGeneratedNameKind::PartitionInformation)
+                Ok(GeneratedNameKind::PartitionInformation)
             },
-            Some(value) if folder(value, ".dim", true) => {
-                Ok(XldmGeneratedNameKind::TableInformation)
-            },
+            Some(value) if folder(value, ".dim", true) => Ok(GeneratedNameKind::TableInformation),
             _ => Err(invalid(
                 "info file is outside a cube, partition, or dimension folder",
             )),
         };
     }
     for (suffix, kind) in [
-        (".det.xml", XldmGeneratedNameKind::MeasureGroupMetadata),
-        (".prt.xml", XldmGeneratedNameKind::PartitionMetadata),
+        (".det.xml", GeneratedNameKind::MeasureGroupMetadata),
+        (".prt.xml", GeneratedNameKind::PartitionMetadata),
     ] {
         if let Some(prefix) = name.strip_suffix(suffix)
             && versioned_id(prefix)
@@ -836,25 +839,25 @@ fn classify_generated_name(name: &str, parent: Option<&str>) -> Result<XldmGener
         }
         if let Some(value) = stem.strip_prefix("R$") {
             if dollar_ids(value, 2) {
-                return Ok(XldmGeneratedNameKind::TableRelationshipMetadata);
+                return Ok(GeneratedNameKind::TableRelationshipMetadata);
             }
         } else if let Some(value) = stem.strip_prefix("H$") {
             if dollar_ids(value, 2) {
-                return Ok(XldmGeneratedNameKind::ColumnHierarchyMetadata);
+                return Ok(GeneratedNameKind::ColumnHierarchyMetadata);
             }
         } else if let Some(value) = stem.strip_prefix("U$") {
             if dollar_ids(value, 2) {
-                return Ok(XldmGeneratedNameKind::UserHierarchyMetadata);
+                return Ok(GeneratedNameKind::UserHierarchyMetadata);
             }
         } else if valid_id(stem) {
-            return Ok(XldmGeneratedNameKind::TableMetadata);
+            return Ok(GeneratedNameKind::TableMetadata);
         }
     }
     if let Some(prefix) = name.strip_suffix(".dictionary") {
         let values: Vec<_> = prefix.split('.').collect();
         if values.len() >= 3 && digits(values[0]) && values[1..].iter().all(|value| valid_id(value))
         {
-            return Ok(XldmGeneratedNameKind::ColumnDictionary);
+            return Ok(GeneratedNameKind::ColumnDictionary);
         }
     }
     if let Some(prefix) = name.strip_suffix(".hidx") {
@@ -862,7 +865,7 @@ fn classify_generated_name(name: &str, parent: Option<&str>) -> Result<XldmGener
             return Err(invalid("invalid hidx name"));
         };
         if digits(version) && rest.starts_with("H$") && dollar_ids(&rest[2..], 2) {
-            return Ok(XldmGeneratedNameKind::ColumnHashIndex);
+            return Ok(GeneratedNameKind::ColumnHashIndex);
         }
     }
     if let Some(prefix) = name.strip_suffix(".idf") {
@@ -881,7 +884,7 @@ fn dollar_ids(value: &str, minimum: usize) -> bool {
     let values: Vec<_> = value.split('$').collect();
     values.len() >= minimum && values.iter().all(|value| valid_id(value))
 }
-fn classify_idf(value: &str) -> Result<XldmGeneratedNameKind> {
+fn classify_idf(value: &str) -> Result<GeneratedNameKind> {
     let Some((version, rest)) = value.split_once('.') else {
         return Err(invalid("invalid idf generated name"));
     };
@@ -892,12 +895,12 @@ fn classify_idf(value: &str) -> Result<XldmGeneratedNameKind> {
         && rest.ends_with(".INDEX.0")
         && dollar_ids(rest.trim_end_matches(".INDEX.0"), 2)
     {
-        return Ok(XldmGeneratedNameKind::TableRelationshipIndex);
+        return Ok(GeneratedNameKind::TableRelationshipIndex);
     }
     if let Some(rest) = rest.strip_prefix("H$") {
         for (suffix, kind) in [
-            (".POS_TO_ID.0", XldmGeneratedNameKind::ColumnPositionToId),
-            (".ID_TO_POS.0", XldmGeneratedNameKind::ColumnIdToPosition),
+            (".POS_TO_ID.0", GeneratedNameKind::ColumnPositionToId),
+            (".ID_TO_POS.0", GeneratedNameKind::ColumnIdToPosition),
         ] {
             if let Some(ids) = rest.strip_suffix(suffix)
                 && dollar_ids(ids, 2)
@@ -908,21 +911,18 @@ fn classify_idf(value: &str) -> Result<XldmGeneratedNameKind> {
     }
     if let Some(rest) = rest.strip_prefix("U$") {
         for (suffix, kind) in [
-            (
-                ".CHILD_COUNT.0",
-                XldmGeneratedNameKind::UserHierarchyChildCount,
-            ),
+            (".CHILD_COUNT.0", GeneratedNameKind::UserHierarchyChildCount),
             (
                 ".FIRST_CHILD_POS.0",
-                XldmGeneratedNameKind::UserHierarchyFirstChildPosition,
+                GeneratedNameKind::UserHierarchyFirstChildPosition,
             ),
             (
                 ".PARENT_POS.0",
-                XldmGeneratedNameKind::UserHierarchyParentPosition,
+                GeneratedNameKind::UserHierarchyParentPosition,
             ),
             (
                 ".MULTI_LEVEL_ID.0",
-                XldmGeneratedNameKind::UserHierarchyMultilevelId,
+                GeneratedNameKind::UserHierarchyMultilevelId,
             ),
         ] {
             if let Some(ids) = rest.strip_suffix(suffix)
@@ -939,25 +939,25 @@ fn classify_idf(value: &str) -> Result<XldmGeneratedNameKind> {
             .iter()
             .all(|value| valid_id(value))
     {
-        return Ok(XldmGeneratedNameKind::ColumnData);
+        return Ok(GeneratedNameKind::ColumnData);
     }
     Err(invalid("unrecognized section 2.2 idf generated name"))
 }
-fn validate_kind_location(kind: XldmGeneratedNameKind, parents: &[&str]) -> Result<()> {
+fn validate_kind_location(kind: GeneratedNameKind, parents: &[&str]) -> Result<()> {
     let valid = match kind {
-        XldmGeneratedNameKind::DatabaseDefinition => parents.is_empty(),
-        XldmGeneratedNameKind::DataSourceViewDefinition
-        | XldmGeneratedNameKind::CubeDefinition
-        | XldmGeneratedNameKind::DataSourceOrDimensionDefinition => parents.len() == 1,
-        XldmGeneratedNameKind::CubeInformation
-        | XldmGeneratedNameKind::MdxScriptMetadata
-        | XldmGeneratedNameKind::MeasureGroupMetadata => {
+        GeneratedNameKind::DatabaseDefinition => parents.is_empty(),
+        GeneratedNameKind::DataSourceViewDefinition
+        | GeneratedNameKind::CubeDefinition
+        | GeneratedNameKind::DataSourceOrDimensionDefinition => parents.len() == 1,
+        GeneratedNameKind::CubeInformation
+        | GeneratedNameKind::MdxScriptMetadata
+        | GeneratedNameKind::MeasureGroupMetadata => {
             parents.len() == 2 && folder(parents[1], ".cub", true)
         },
-        XldmGeneratedNameKind::PartitionMetadata => {
+        GeneratedNameKind::PartitionMetadata => {
             parents.len() == 3 && folder(parents[2], ".det", false)
         },
-        XldmGeneratedNameKind::PartitionInformation => {
+        GeneratedNameKind::PartitionInformation => {
             parents.len() == 4 && folder(parents[3], ".prt", false)
         },
         _ => parents.len() == 2 && folder(parents[1], ".dim", true),
@@ -970,35 +970,31 @@ fn validate_kind_location(kind: XldmGeneratedNameKind, parents: &[&str]) -> Resu
         ))
     }
 }
-fn kind_allowed_for_group(kind: XldmGeneratedNameKind, class: XldmFileGroupClass) -> bool {
+fn kind_allowed_for_group(kind: GeneratedNameKind, class: FileGroupClass) -> bool {
     match class {
-        XldmFileGroupClass::Database => kind == XldmGeneratedNameKind::DatabaseDefinition,
-        XldmFileGroupClass::DataSource => {
-            kind == XldmGeneratedNameKind::DataSourceOrDimensionDefinition
-        },
-        XldmFileGroupClass::DataSourceView => {
-            kind == XldmGeneratedNameKind::DataSourceViewDefinition
-        },
-        XldmFileGroupClass::Cube => matches!(
+        FileGroupClass::Database => kind == GeneratedNameKind::DatabaseDefinition,
+        FileGroupClass::DataSource => kind == GeneratedNameKind::DataSourceOrDimensionDefinition,
+        FileGroupClass::DataSourceView => kind == GeneratedNameKind::DataSourceViewDefinition,
+        FileGroupClass::Cube => matches!(
             kind,
-            XldmGeneratedNameKind::CubeDefinition | XldmGeneratedNameKind::CubeInformation
+            GeneratedNameKind::CubeDefinition | GeneratedNameKind::CubeInformation
         ),
-        XldmFileGroupClass::MdxScript => kind == XldmGeneratedNameKind::MdxScriptMetadata,
-        XldmFileGroupClass::MeasureGroup => kind == XldmGeneratedNameKind::MeasureGroupMetadata,
-        XldmFileGroupClass::Partition => matches!(
+        FileGroupClass::MdxScript => kind == GeneratedNameKind::MdxScriptMetadata,
+        FileGroupClass::MeasureGroup => kind == GeneratedNameKind::MeasureGroupMetadata,
+        FileGroupClass::Partition => matches!(
             kind,
-            XldmGeneratedNameKind::PartitionMetadata | XldmGeneratedNameKind::PartitionInformation
+            GeneratedNameKind::PartitionMetadata | GeneratedNameKind::PartitionInformation
         ),
-        XldmFileGroupClass::Dimension => !matches!(
+        FileGroupClass::Dimension => !matches!(
             kind,
-            XldmGeneratedNameKind::DatabaseDefinition
-                | XldmGeneratedNameKind::DataSourceViewDefinition
-                | XldmGeneratedNameKind::CubeDefinition
-                | XldmGeneratedNameKind::CubeInformation
-                | XldmGeneratedNameKind::MdxScriptMetadata
-                | XldmGeneratedNameKind::MeasureGroupMetadata
-                | XldmGeneratedNameKind::PartitionMetadata
-                | XldmGeneratedNameKind::PartitionInformation
+            GeneratedNameKind::DatabaseDefinition
+                | GeneratedNameKind::DataSourceViewDefinition
+                | GeneratedNameKind::CubeDefinition
+                | GeneratedNameKind::CubeInformation
+                | GeneratedNameKind::MdxScriptMetadata
+                | GeneratedNameKind::MeasureGroupMetadata
+                | GeneratedNameKind::PartitionMetadata
+                | GeneratedNameKind::PartitionInformation
         ),
     }
 }
@@ -1010,7 +1006,7 @@ fn bounded_leaf(node: &Node, label: &str) -> Result<String> {
     Ok(value.to_owned())
 }
 
-fn parse_header(root: &Node) -> Result<XldmHeader> {
+fn parse_header(root: &Node) -> Result<Header> {
     let names = [
         "BackupRestoreSyncVersion",
         "Fault",
@@ -1044,8 +1040,8 @@ fn parse_header(root: &Node) -> Result<XldmHeader> {
     if !bool_value(values[6])? {
         return Err(invalid("header ApplyCompression must be true"));
     }
-    let directory_offset = XldmOffset(u64_value(values[7])?);
-    let directory_size = XldmSize(u64_value(values[8])?);
+    let directory_offset = Offset(u64_value(values[7])?);
+    let directory_size = Size(u64_value(values[8])?);
     let file_count = u32_value(values[9])?;
     if file_count as usize > MAX_FILES {
         return Err(limit("file count"));
@@ -1054,12 +1050,12 @@ fn parse_header(root: &Node) -> Result<XldmHeader> {
     if !valid_upper_guid(&object_id) {
         return Err(invalid("header ObjectID must be an uppercase UUID"));
     }
-    let data_offset = XldmOffset(u64_value(values[11])?);
-    Ok(XldmHeader {
+    let data_offset = Offset(u64_value(values[11])?);
+    Ok(Header {
         backup_restore_sync_version,
         fault_code,
         encryption_key_version,
-        compression: XldmCompression::Xpress,
+        compression: Compression::Xpress,
         directory_offset,
         directory_size,
         file_count,
@@ -1068,7 +1064,7 @@ fn parse_header(root: &Node) -> Result<XldmHeader> {
     })
 }
 
-fn parse_directory(root: &Node) -> Result<Vec<XldmFileEntry>> {
+fn parse_directory(root: &Node) -> Result<Vec<FileEntry>> {
     if root.name != "VirtualDirectory" || root.attributes != 0 || !root.text.trim().is_empty() {
         return Err(invalid("expected attribute-free VirtualDirectory root"));
     }
@@ -1089,21 +1085,21 @@ fn parse_directory(root: &Node) -> Result<Vec<XldmFileEntry>> {
         .map(|child| {
             let values = exact_children(child, "BackupFile", &names)?;
             let path = leaf_text(values[0])?.to_owned();
-            let stored_size = XldmSize(u64_value(values[1])?);
-            let offset = XldmOffset(u64_value(values[2])?);
+            let stored_size = Size(u64_value(values[1])?);
+            let offset = Offset(u64_value(values[2])?);
             let delete = bool_value(values[3])?;
             let created_timestamp = i64_value(values[4])?;
             let access_timestamp = i64_value(values[5])?;
             let last_write_timestamp = i64_value(values[6])?;
             let lower = path.to_ascii_lowercase();
             let kind = if lower.ends_with("cryptkey.bin") {
-                XldmFileKind::CryptographicKey
+                FileKind::CryptographicKey
             } else if lower.ends_with(".xml") {
-                XldmFileKind::XmlMetadata
+                FileKind::XmlMetadata
             } else {
-                XldmFileKind::OpaqueBinary
+                FileKind::OpaqueBinary
             };
-            Ok(XldmFileEntry {
+            Ok(FileEntry {
                 path,
                 kind,
                 offset,
@@ -1145,7 +1141,7 @@ fn parse_partitions(root: &Node) -> Result<usize> {
     Ok(root.children.len())
 }
 
-fn validate_paths(files: &[XldmFileEntry]) -> Result<()> {
+fn validate_paths(files: &[FileEntry]) -> Result<()> {
     let mut normalized = HashSet::new();
     for file in files {
         if file.path.is_empty()
@@ -1208,7 +1204,7 @@ fn validate_allocations(
     bytes: &[u8],
     data_offset: usize,
     directory_offset: usize,
-    files: &mut [XldmFileEntry],
+    files: &mut [FileEntry],
     order: &[usize],
 ) -> Result<()> {
     let first_start = checked_usize(files[order[0]].offset.0, "file offset")?;
@@ -1280,7 +1276,7 @@ fn validate_allocations(
     Ok(())
 }
 
-fn payload_slice<'a>(bytes: &'a [u8], entry: &XldmFileEntry) -> Result<&'a [u8]> {
+fn payload_slice<'a>(bytes: &'a [u8], entry: &FileEntry) -> Result<&'a [u8]> {
     let start = checked_usize(entry.offset.0, "file offset")?;
     let size = checked_usize(entry.stored_size.0, "file size")?;
     let end = start
@@ -1464,7 +1460,7 @@ fn i32_value(node: &Node) -> Result<i32> {
         .map_err(|_| invalid(format!("{} is not a signed 32-bit integer", node.name)))
 }
 
-fn decode_xml(bytes: &[u8], require_utf16: bool) -> Result<(String, XldmXmlEncoding)> {
+fn decode_xml(bytes: &[u8], require_utf16: bool) -> Result<(String, XmlEncoding)> {
     if bytes.is_empty() {
         return Err(invalid("empty XML allocation"));
     }
@@ -1481,12 +1477,12 @@ fn decode_xml(bytes: &[u8], require_utf16: bool) -> Result<(String, XldmXmlEncod
             .collect();
         Ok((
             String::from_utf16(&words).map_err(xml_error)?,
-            XldmXmlEncoding::Utf16Le,
+            XmlEncoding::Utf16Le,
         ))
     } else {
         Ok((
             std::str::from_utf8(bytes).map_err(xml_error)?.to_owned(),
-            XldmXmlEncoding::Utf8,
+            XmlEncoding::Utf8,
         ))
     }
 }
@@ -1525,13 +1521,13 @@ fn crc32(bytes: &[u8]) -> u32 {
     }
     crc
 }
-fn xml_error(error: impl std::fmt::Display) -> OoxmlError {
-    OoxmlError::Xml(error.to_string())
+fn xml_error(error: impl std::fmt::Display) -> Error {
+    Error::Xml(litchi_ooxml_common::XmlError::Malformed(error.to_string()))
 }
-fn invalid(message: impl Into<String>) -> OoxmlError {
-    OoxmlError::InvalidFormat(message.into())
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
 }
-fn limit(name: &str) -> OoxmlError {
+fn limit(name: &str) -> Error {
     invalid(format!("MS-XLDM {name} limit exceeded"))
 }
 
@@ -1603,25 +1599,25 @@ mod tests {
     #[test]
     fn inspects_typed_storage_and_writes_byte_exactly() {
         let bytes = test_xldm_bytes();
-        let storage = inspect_xldm(&bytes).unwrap();
+        let storage = inspect(&bytes).unwrap();
         assert_eq!(storage.header.backup_restore_sync_version, 140);
         assert_eq!(storage.partition_marker.partition_count, 1);
         assert_eq!(storage.files.len(), 3);
-        assert_eq!(storage.files[0].kind, XldmFileKind::Partitions);
-        assert_eq!(storage.files[2].kind, XldmFileKind::BackupLog);
+        assert_eq!(storage.files[0].kind, FileKind::Partitions);
+        assert_eq!(storage.files[2].kind, FileKind::BackupLog);
         assert_eq!(
             storage.backup_log.file_groups[0].class,
-            XldmFileGroupClass::Database
+            FileGroupClass::Database
         );
         assert_eq!(
             storage.backup_log.file_groups[0].files[0].generated.kind,
-            XldmGeneratedNameKind::DatabaseDefinition
+            GeneratedNameKind::DatabaseDefinition
         );
         assert_eq!(
             storage.file_payload(1).unwrap(),
             b"compressed-looking model metadata"
         );
-        assert_eq!(write_xldm(&storage).unwrap(), bytes);
+        assert_eq!(write(&storage).unwrap(), bytes);
     }
 
     #[test]
@@ -1630,30 +1626,30 @@ mod tests {
         for mutation in [0usize, 4] {
             let mut bytes = base.clone();
             bytes[mutation] ^= 1;
-            assert!(inspect_xldm(&bytes).is_err());
+            assert!(inspect(&bytes).is_err());
         }
         let mut bytes = base;
         bytes[XLDM_PAGE_SIZE - 1] = 1;
-        assert!(inspect_xldm(&bytes).is_err());
+        assert!(inspect(&bytes).is_err());
     }
 
     #[test]
     fn rejects_crc_corruption_without_interpreting_payload() {
         let mut bytes = test_xldm_bytes();
-        let storage = inspect_xldm(&bytes).unwrap();
+        let storage = inspect(&bytes).unwrap();
         let offset = storage.files[1].offset.0 as usize;
         bytes[offset] ^= 1;
-        assert!(inspect_xldm(&bytes).is_err());
+        assert!(inspect(&bytes).is_err());
     }
 
     #[test]
     fn rejects_overlap_gap_and_nonzero_page_padding() {
         let mut bytes = test_xldm_bytes();
-        let storage = inspect_xldm(&bytes).unwrap();
+        let storage = inspect(&bytes).unwrap();
         let padding = storage.files.last().unwrap().offset.0 as usize
             + storage.files.last().unwrap().stored_size.0 as usize;
         bytes[padding] = 1;
-        assert!(inspect_xldm(&bytes).is_err());
+        assert!(inspect(&bytes).is_err());
     }
 
     #[test]
@@ -1681,7 +1677,7 @@ mod tests {
                 .iter()
                 .map(|(path, data)| (*path, data.as_slice()))
                 .collect();
-            assert!(inspect_xldm(&build_test_storage(&refs)).is_err());
+            assert!(inspect(&build_test_storage(&refs)).is_err());
         }
     }
 
@@ -1689,7 +1685,7 @@ mod tests {
     fn rejects_directory_count_and_partition_shape_mismatches() {
         let bad_partition = b"<Partitions><Wrong/></Partitions>";
         assert!(
-            inspect_xldm(&build_test_storage(&[
+            inspect(&build_test_storage(&[
                 ("Partitions", bad_partition),
                 ("Data", b"x"),
                 ("BackupLog", b"log")
@@ -1701,95 +1697,95 @@ mod tests {
     #[test]
     fn classifies_every_generated_filename_family() {
         let cases = [
-            ("Model.1.db.xml", XldmGeneratedNameKind::DatabaseDefinition),
+            ("Model.1.db.xml", GeneratedNameKind::DatabaseDefinition),
             (
                 "Model.1.db/View.2.dsv.xml",
-                XldmGeneratedNameKind::DataSourceViewDefinition,
+                GeneratedNameKind::DataSourceViewDefinition,
             ),
             (
                 "Model.1.db/Cube.2.cub.xml",
-                XldmGeneratedNameKind::CubeDefinition,
+                GeneratedNameKind::CubeDefinition,
             ),
             (
                 "Model.1.db/Cube.0.cub/info.3.xml",
-                XldmGeneratedNameKind::CubeInformation,
+                GeneratedNameKind::CubeInformation,
             ),
             (
                 "Model.1.db/Cube.0.cub/MdxScript.0.scr.xml",
-                XldmGeneratedNameKind::MdxScriptMetadata,
+                GeneratedNameKind::MdxScriptMetadata,
             ),
             (
                 "Model.1.db/Cube.0.cub/Table.2.det.xml",
-                XldmGeneratedNameKind::MeasureGroupMetadata,
+                GeneratedNameKind::MeasureGroupMetadata,
             ),
             (
                 "Model.1.db/Cube.0.cub/Table.2.det/Table.3.prt.xml",
-                XldmGeneratedNameKind::PartitionMetadata,
+                GeneratedNameKind::PartitionMetadata,
             ),
             (
                 "Model.1.db/Cube.0.cub/Table.2.det/Table.4.prt/info.5.xml",
-                XldmGeneratedNameKind::PartitionInformation,
+                GeneratedNameKind::PartitionInformation,
             ),
             (
                 "Model.1.db/Table.0.dim/Table.1.tbl.xml",
-                XldmGeneratedNameKind::TableMetadata,
+                GeneratedNameKind::TableMetadata,
             ),
             (
                 "Model.1.db/Table.0.dim/R$Table$Rel.1.tbl.xml",
-                XldmGeneratedNameKind::TableRelationshipMetadata,
+                GeneratedNameKind::TableRelationshipMetadata,
             ),
             (
                 "Model.1.db/Table.0.dim/H$Table$Col.1.tbl.xml",
-                XldmGeneratedNameKind::ColumnHierarchyMetadata,
+                GeneratedNameKind::ColumnHierarchyMetadata,
             ),
             (
                 "Model.1.db/Table.0.dim/U$Table$Hier.1.tbl.xml",
-                XldmGeneratedNameKind::UserHierarchyMetadata,
+                GeneratedNameKind::UserHierarchyMetadata,
             ),
             (
                 "Model.1.db/Table.0.dim/1.Table.Col.0.idf",
-                XldmGeneratedNameKind::ColumnData,
+                GeneratedNameKind::ColumnData,
             ),
             (
                 "Model.1.db/Table.0.dim/1.R$Table$Rel.INDEX.0.idf",
-                XldmGeneratedNameKind::TableRelationshipIndex,
+                GeneratedNameKind::TableRelationshipIndex,
             ),
             (
                 "Model.1.db/Table.0.dim/1.H$Table$Col.POS_TO_ID.0.idf",
-                XldmGeneratedNameKind::ColumnPositionToId,
+                GeneratedNameKind::ColumnPositionToId,
             ),
             (
                 "Model.1.db/Table.0.dim/1.H$Table$Col.ID_TO_POS.0.idf",
-                XldmGeneratedNameKind::ColumnIdToPosition,
+                GeneratedNameKind::ColumnIdToPosition,
             ),
             (
                 "Model.1.db/Table.0.dim/1.H$Table$Col.hidx",
-                XldmGeneratedNameKind::ColumnHashIndex,
+                GeneratedNameKind::ColumnHashIndex,
             ),
             (
                 "Model.1.db/Table.0.dim/1.Table.Col.dictionary",
-                XldmGeneratedNameKind::ColumnDictionary,
+                GeneratedNameKind::ColumnDictionary,
             ),
             (
                 "Model.1.db/Table.0.dim/1.U$Table$Hier.CHILD_COUNT.0.idf",
-                XldmGeneratedNameKind::UserHierarchyChildCount,
+                GeneratedNameKind::UserHierarchyChildCount,
             ),
             (
                 "Model.1.db/Table.0.dim/1.U$Table$Hier.FIRST_CHILD_POS.0.idf",
-                XldmGeneratedNameKind::UserHierarchyFirstChildPosition,
+                GeneratedNameKind::UserHierarchyFirstChildPosition,
             ),
             (
                 "Model.1.db/Table.0.dim/1.U$Table$Hier.PARENT_POS.0.idf",
-                XldmGeneratedNameKind::UserHierarchyParentPosition,
+                GeneratedNameKind::UserHierarchyParentPosition,
             ),
             (
                 "Model.1.db/Table.0.dim/1.U$Table$Hier.MULTI_LEVEL_ID.0.idf",
-                XldmGeneratedNameKind::UserHierarchyMultilevelId,
+                GeneratedNameKind::UserHierarchyMultilevelId,
             ),
         ];
         for (path, expected) in cases {
             assert_eq!(
-                classify_xldm_generated_path(path).unwrap().kind,
+                classify_generated_path(path).unwrap().kind,
                 expected,
                 "{path}"
             );
@@ -1810,7 +1806,7 @@ mod tests {
                 ("Model.1.db.xml", payload),
                 ("BackupLog", log.as_bytes()),
             ]);
-            assert!(inspect_xldm(&bytes).is_err());
+            assert!(inspect(&bytes).is_err());
         }
     }
 
@@ -1829,7 +1825,7 @@ mod tests {
                 ("Model.1.db.xml", payload),
                 ("BackupLog", log.as_bytes()),
             ]);
-            assert!(inspect_xldm(&bytes).is_err());
+            assert!(inspect(&bytes).is_err());
         }
     }
 }

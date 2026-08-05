@@ -6,7 +6,7 @@
 use std::error::Error;
 use std::fmt;
 
-use super::xldm::{XldmGeneratedNameKind, XldmStorage, classify_xldm_generated_path};
+use super::{GeneratedNameKind, Storage, classify_generated_path};
 
 const MAX_NATIVE_FILES: usize = 65_536;
 const MAX_NATIVE_ITEMS: usize = 1_048_576;
@@ -19,31 +19,31 @@ const HASH_MAGIC: u32 = 0x12B9_B6A5;
 
 /// A structural MS-XLDM section 2.3 validation error.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmNativeError(String);
+pub struct NativeError(String);
 
-impl XldmNativeError {
+impl NativeError {
     fn new(message: impl Into<String>) -> Self {
         Self(message.into())
     }
 }
 
-impl fmt::Display for XldmNativeError {
+impl fmt::Display for NativeError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.0)
     }
 }
 
-impl Error for XldmNativeError {}
+impl Error for NativeError {}
 
 /// Result type for section 2.3 inspection.
-pub type XldmNativeResult<T> = Result<T, XldmNativeError>;
+pub type NativeResult<T> = Result<T, NativeError>;
 
 /// Whether the five common hash fields precede an `XM_TYPE_STRING` store.
 ///
 /// Section 2.3.2.1.2 makes this dependent on `DictionaryFlags` in section
 /// 2.5. Use `Auto` only when the byte layout has a unique interpretation.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub enum XldmStringHashMode {
+pub enum StringHashMode {
     Present,
     Absent,
     #[default]
@@ -52,25 +52,25 @@ pub enum XldmStringHashMode {
 
 /// Per-file information that section 2.3 delegates to later XML metadata.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmStringHashOverride {
+pub struct StringHashOverride {
     pub storage_path: String,
-    pub mode: XldmStringHashMode,
+    pub mode: StringHashMode,
 }
 
 /// Options for storage-level section 2.3 inspection.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct XldmNativeParseOptions {
-    pub string_hash_overrides: Vec<XldmStringHashOverride>,
+pub struct NativeParseOptions {
+    pub string_hash_overrides: Vec<StringHashOverride>,
 }
 
-impl XldmNativeParseOptions {
-    fn string_hash_mode(&self, path: &str) -> XldmNativeResult<XldmStringHashMode> {
-        let mut result = XldmStringHashMode::Auto;
+impl NativeParseOptions {
+    fn string_hash_mode(&self, path: &str) -> NativeResult<StringHashMode> {
+        let mut result = StringHashMode::Auto;
         let mut found = false;
         for entry in &self.string_hash_overrides {
             if entry.storage_path == path {
                 if found {
-                    return Err(XldmNativeError::new(format!(
+                    return Err(NativeError::new(format!(
                         "duplicate string dictionary override for {path}"
                     )));
                 }
@@ -84,21 +84,21 @@ impl XldmNativeParseOptions {
 
 /// A borrowed segment from an `.idf` file.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmIdfSegment<'a> {
+pub struct IdfSegment<'a> {
     pub size_units: u64,
     pub bytes: &'a [u8],
 }
 
 /// The common section 2.3.1.1 layout shared by all `.idf` files.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmIdfFile<'a> {
-    pub segments: Vec<XldmIdfSegment<'a>>,
+pub struct IdfFile<'a> {
+    pub segments: Vec<IdfSegment<'a>>,
     pub trailing_zero_padding: &'a [u8],
 }
 
 /// The dictionary type stored in the first four bytes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum XldmDictionaryType {
+pub enum DictionaryType {
     Long,
     Real,
     String,
@@ -106,7 +106,7 @@ pub enum XldmDictionaryType {
 
 /// The common five hash fields from section 2.3.3.1.1.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct XldmHashHeader {
+pub struct HashHeader {
     pub algorithm: i32,
     pub entry_size: u32,
     pub bin_size: u32,
@@ -116,7 +116,7 @@ pub struct XldmHashHeader {
 
 /// A borrowed numeric dictionary vector.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmNumericDictionary<'a> {
+pub struct NumericDictionary<'a> {
     pub element_count: u64,
     pub element_size: u32,
     pub values: &'a [u8],
@@ -124,14 +124,14 @@ pub struct XldmNumericDictionary<'a> {
 
 /// Huffman character-set mode for a compressed string page.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum XldmHuffmanCharacterSetMode {
+pub enum HuffmanCharacterSetMode {
     Single,
     Multiple,
 }
 
 /// Borrowed page payload. Compressed buffers are deliberately not decoded.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum XldmStringPageData<'a> {
+pub enum StringPageData<'a> {
     Uncompressed {
         remaining_store_characters: u64,
         used_characters: u64,
@@ -140,7 +140,7 @@ pub enum XldmStringPageData<'a> {
     },
     Compressed {
         total_bits: u32,
-        character_set_mode: XldmHuffmanCharacterSetMode,
+        character_set_mode: HuffmanCharacterSetMode,
         character_set: Option<u8>,
         allocation_size: u64,
         decode_bits: u32,
@@ -151,48 +151,48 @@ pub enum XldmStringPageData<'a> {
 
 /// One page in an `XM_TYPE_STRING` dictionary.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmStringPage<'a> {
+pub struct StringPage<'a> {
     pub contains_nulls: bool,
     pub start_index: u64,
     pub string_count: u64,
-    pub data: XldmStringPageData<'a>,
+    pub data: StringPageData<'a>,
 }
 
 /// A compressed bit offset or uncompressed byte offset and its page ID.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct XldmStringRecordHandle {
+pub struct StringRecordHandle {
     pub offset: u32,
     pub page_id: u32,
 }
 
 /// A fully framed `XM_TYPE_STRING` dictionary.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmStringDictionary<'a> {
+pub struct StringDictionary<'a> {
     pub string_count: u64,
     pub longest_string_characters: u64,
-    pub pages: Vec<XldmStringPage<'a>>,
-    pub record_handles: Vec<XldmStringRecordHandle>,
+    pub pages: Vec<StringPage<'a>>,
+    pub record_handles: Vec<StringRecordHandle>,
 }
 
 /// The typed body of a dictionary file.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum XldmDictionaryBody<'a> {
-    Numeric(XldmNumericDictionary<'a>),
-    String(XldmStringDictionary<'a>),
+pub enum DictionaryBody<'a> {
+    Numeric(NumericDictionary<'a>),
+    String(StringDictionary<'a>),
 }
 
 /// A section 2.3.2 dictionary with borrowed value/string storage.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmDictionaryFile<'a> {
-    pub dictionary_type: XldmDictionaryType,
-    pub hash: Option<XldmHashHeader>,
-    pub body: XldmDictionaryBody<'a>,
+pub struct DictionaryFile<'a> {
+    pub dictionary_type: DictionaryType,
+    pub hash: Option<HashHeader>,
+    pub body: DictionaryBody<'a>,
     pub trailing_zero_padding: &'a [u8],
 }
 
 /// Optional hash statistics from section 2.3.3.1.2.1.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmHashStatistics<'a> {
+pub struct HashStatistics<'a> {
     pub element_count: u64,
     pub bin_count: u64,
     pub used_bin_count: u64,
@@ -205,19 +205,19 @@ pub struct XldmHashStatistics<'a> {
 
 /// A borrowed persisted hash bin and its used local entries.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmHashBin<'a> {
+pub struct HashBin<'a> {
     pub entry_count: u32,
     pub local_entries: &'a [u8],
 }
 
 /// A section 2.3.3.1 hash index. Hash entries remain borrowed records.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmHashIndexFile<'a> {
-    pub header: XldmHashHeader,
+pub struct HashIndexFile<'a> {
+    pub header: HashHeader,
     pub record_count: u64,
     pub current_mask: u64,
-    pub statistics: Option<XldmHashStatistics<'a>>,
-    pub bins: Vec<XldmHashBin<'a>>,
+    pub statistics: Option<HashStatistics<'a>>,
+    pub bins: Vec<HashBin<'a>>,
     pub collision_count: u64,
     pub collision_entries: &'a [u8],
     pub trailing_zero_padding: &'a [u8],
@@ -225,32 +225,32 @@ pub struct XldmHashIndexFile<'a> {
 
 /// A recognized native data member.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum XldmNativeData<'a> {
-    Idf(XldmIdfFile<'a>),
-    Dictionary(XldmDictionaryFile<'a>),
-    HashIndex(XldmHashIndexFile<'a>),
+pub enum NativeData<'a> {
+    Idf(IdfFile<'a>),
+    Dictionary(DictionaryFile<'a>),
+    HashIndex(HashIndexFile<'a>),
 }
 
 /// A generated storage member and its typed, borrowed section 2.3 view.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmNativeFile<'a> {
+pub struct NativeFile<'a> {
     pub storage_path: &'a str,
     pub bytes: &'a [u8],
-    pub data: XldmNativeData<'a>,
+    pub data: NativeData<'a>,
 }
 
 /// All section 2.3-compatible members found in a validated storage object.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XldmNativeModel<'a> {
-    pub files: Vec<XldmNativeFile<'a>>,
+pub struct NativeModel<'a> {
+    pub files: Vec<NativeFile<'a>>,
 }
 
 /// Inspect every generated `.idf`, `.dictionary`, and `.hidx` member logged by
 /// a previously validated MS-XLDM storage object.
-pub fn inspect_xldm_native<'a>(
-    storage: &'a XldmStorage<'a>,
-    options: &XldmNativeParseOptions,
-) -> XldmNativeResult<XldmNativeModel<'a>> {
+pub fn inspect<'a>(
+    storage: &'a Storage<'a>,
+    options: &NativeParseOptions,
+) -> NativeResult<NativeModel<'a>> {
     let mut files = Vec::new();
     for group in &storage.backup_log.file_groups {
         for logged in &group.files {
@@ -266,50 +266,47 @@ pub fn inspect_xldm_native<'a>(
             };
             let Some(suffix) = suffix else { continue };
             if files.len() == MAX_NATIVE_FILES {
-                return Err(XldmNativeError::new("too many native data files"));
+                return Err(NativeError::new("too many native data files"));
             }
-            let generated = classify_xldm_generated_path(path).map_err(|error| {
-                XldmNativeError::new(format!("invalid generated path {path}: {error}"))
+            let generated = classify_generated_path(path).map_err(|error| {
+                NativeError::new(format!("invalid generated path {path}: {error}"))
             })?;
             let directory_index = storage
                 .files
                 .iter()
                 .position(|entry| entry.path == path)
                 .ok_or_else(|| {
-                    XldmNativeError::new(format!(
+                    NativeError::new(format!(
                         "logged native member {path} is absent from the directory"
                     ))
                 })?;
-            let bytes = storage.file_payload(directory_index).ok_or_else(|| {
-                XldmNativeError::new(format!("cannot resolve native member {path}"))
-            })?;
+            let bytes = storage
+                .file_payload(directory_index)
+                .ok_or_else(|| NativeError::new(format!("cannot resolve native member {path}")))?;
             let data = match suffix {
-                "dictionary" => XldmNativeData::Dictionary(parse_xldm_dictionary(
+                "dictionary" => NativeData::Dictionary(parse_dictionary(
                     bytes,
                     options.string_hash_mode(path)?,
                 )?),
-                "hidx" => XldmNativeData::HashIndex(parse_xldm_hash_index(bytes)?),
-                _ => XldmNativeData::Idf(parse_storage_idf(generated.kind, bytes)?),
+                "hidx" => NativeData::HashIndex(parse_hash_index(bytes)?),
+                _ => NativeData::Idf(parse_storage_idf(generated.kind, bytes)?),
             };
-            files.push(XldmNativeFile {
+            files.push(NativeFile {
                 storage_path: path,
                 bytes,
                 data,
             });
         }
     }
-    Ok(XldmNativeModel { files })
+    Ok(NativeModel { files })
 }
 
-fn parse_storage_idf(
-    kind: XldmGeneratedNameKind,
-    bytes: &[u8],
-) -> XldmNativeResult<XldmIdfFile<'_>> {
-    let idf = parse_xldm_idf(bytes)?;
-    if kind == XldmGeneratedNameKind::ColumnData
+fn parse_storage_idf(kind: GeneratedNameKind, bytes: &[u8]) -> NativeResult<IdfFile<'_>> {
+    let idf = parse_idf(bytes)?;
+    if kind == GeneratedNameKind::ColumnData
         && (idf.segments.len() < 2 || idf.segments.len() % 2 != 0)
     {
-        return Err(XldmNativeError::new(
+        return Err(NativeError::new(
             "column data requires primary/subsegment pairs",
         ));
     }
@@ -317,31 +314,31 @@ fn parse_storage_idf(
 }
 
 /// Parse the common framing shared by all `.idf` files.
-pub fn parse_xldm_idf(bytes: &[u8]) -> XldmNativeResult<XldmIdfFile<'_>> {
+pub fn parse_idf(bytes: &[u8]) -> NativeResult<IdfFile<'_>> {
     let mut cursor = Cursor::new(bytes);
     let mut segments = Vec::new();
     while cursor.remaining() >= 8 {
         if segments.len() == MAX_NATIVE_ITEMS {
-            return Err(XldmNativeError::new("too many .idf segments"));
+            return Err(NativeError::new("too many .idf segments"));
         }
         let size_units = cursor.read_u64("segment size")?;
         let byte_len = usize_from_u64(size_units, "segment size")?
             .checked_mul(8)
-            .ok_or_else(|| XldmNativeError::new("segment size overflow"))?;
+            .ok_or_else(|| NativeError::new("segment size overflow"))?;
         let segment = cursor.take(byte_len, "segment payload")?;
-        segments.push(XldmIdfSegment {
+        segments.push(IdfSegment {
             size_units,
             bytes: segment,
         });
     }
     if segments.is_empty() {
-        return Err(XldmNativeError::new(
+        return Err(NativeError::new(
             "an .idf file requires at least one segment",
         ));
     }
     let padding = cursor.rest();
     require_zeroes(padding, ".idf trailing padding")?;
-    Ok(XldmIdfFile {
+    Ok(IdfFile {
         segments,
         trailing_zero_padding: padding,
     })
@@ -349,37 +346,35 @@ pub fn parse_xldm_idf(bytes: &[u8]) -> XldmNativeResult<XldmIdfFile<'_>> {
 
 /// Parse a dictionary file. `string_hash_mode` represents the section 2.5
 /// `DictionaryFlags` choice when the dictionary type is `XM_TYPE_STRING`.
-pub fn parse_xldm_dictionary(
+pub fn parse_dictionary(
     bytes: &[u8],
-    string_hash_mode: XldmStringHashMode,
-) -> XldmNativeResult<XldmDictionaryFile<'_>> {
+    string_hash_mode: StringHashMode,
+) -> NativeResult<DictionaryFile<'_>> {
     let mut cursor = Cursor::new(bytes);
     let dictionary_type = match cursor.read_i32("dictionary type")? {
-        0 => XldmDictionaryType::Long,
-        1 => XldmDictionaryType::Real,
-        2 => XldmDictionaryType::String,
+        0 => DictionaryType::Long,
+        1 => DictionaryType::Real,
+        2 => DictionaryType::String,
         value => {
-            return Err(XldmNativeError::new(format!(
-                "invalid dictionary type {value}"
-            )));
+            return Err(NativeError::new(format!("invalid dictionary type {value}")));
         },
     };
     match dictionary_type {
-        XldmDictionaryType::Long | XldmDictionaryType::Real => {
+        DictionaryType::Long | DictionaryType::Real => {
             parse_numeric_dictionary(cursor, dictionary_type)
         },
-        XldmDictionaryType::String => match string_hash_mode {
-            XldmStringHashMode::Present => parse_string_dictionary(cursor, true),
-            XldmStringHashMode::Absent => parse_string_dictionary(cursor, false),
-            XldmStringHashMode::Auto => {
+        DictionaryType::String => match string_hash_mode {
+            StringHashMode::Present => parse_string_dictionary(cursor, true),
+            StringHashMode::Absent => parse_string_dictionary(cursor, false),
+            StringHashMode::Auto => {
                 let present = parse_string_dictionary(cursor.clone(), true);
                 let absent = parse_string_dictionary(cursor, false);
                 match (present, absent) {
                     (Ok(value), Err(_)) | (Err(_), Ok(value)) => Ok(value),
-                    (Ok(_), Ok(_)) => Err(XldmNativeError::new(
+                    (Ok(_), Ok(_)) => Err(NativeError::new(
                         "ambiguous string dictionary hash layout; supply DictionaryFlags metadata",
                     )),
-                    (Err(with_hash), Err(without_hash)) => Err(XldmNativeError::new(format!(
+                    (Err(with_hash), Err(without_hash)) => Err(NativeError::new(format!(
                         "invalid string dictionary with hash ({with_hash}) and without hash ({without_hash})"
                     ))),
                 }
@@ -390,11 +385,11 @@ pub fn parse_xldm_dictionary(
 
 fn parse_numeric_dictionary<'a>(
     mut cursor: Cursor<'a>,
-    dictionary_type: XldmDictionaryType,
-) -> XldmNativeResult<XldmDictionaryFile<'a>> {
+    dictionary_type: DictionaryType,
+) -> NativeResult<DictionaryFile<'a>> {
     let hash = read_hash_header(&mut cursor)?;
     if hash.algorithm != -1 || hash.bin_count != -1 {
-        return Err(XldmNativeError::new(
+        return Err(NativeError::new(
             "numeric dictionaries require XM_INVALID algorithm and bin count",
         ));
     }
@@ -402,23 +397,21 @@ fn parse_numeric_dictionary<'a>(
     let element_count = cursor.read_u64("dictionary element count")?;
     let element_size = cursor.read_u32("dictionary element size")?;
     let valid_size = match dictionary_type {
-        XldmDictionaryType::Long => element_size == 4 || element_size == 8,
-        XldmDictionaryType::Real => element_size == 8,
-        XldmDictionaryType::String => false,
+        DictionaryType::Long => element_size == 4 || element_size == 8,
+        DictionaryType::Real => element_size == 8,
+        DictionaryType::String => false,
     };
     if !valid_size {
-        return Err(XldmNativeError::new(
-            "invalid numeric dictionary element size",
-        ));
+        return Err(NativeError::new("invalid numeric dictionary element size"));
     }
     let values_len = bounded_product(element_count, element_size as u64, "dictionary vector")?;
     let values = cursor.take(values_len, "dictionary values")?;
     let padding = cursor.rest();
     require_zeroes(padding, "dictionary trailing padding")?;
-    Ok(XldmDictionaryFile {
+    Ok(DictionaryFile {
         dictionary_type,
         hash: Some(hash),
-        body: XldmDictionaryBody::Numeric(XldmNumericDictionary {
+        body: DictionaryBody::Numeric(NumericDictionary {
             element_count,
             element_size,
             values,
@@ -430,11 +423,11 @@ fn parse_numeric_dictionary<'a>(
 fn parse_string_dictionary<'a>(
     mut cursor: Cursor<'a>,
     has_hash: bool,
-) -> XldmNativeResult<XldmDictionaryFile<'a>> {
+) -> NativeResult<DictionaryFile<'a>> {
     let hash = if has_hash {
         let hash = read_hash_header(&mut cursor)?;
         if !matches!(hash.algorithm, 0..=2) || hash.bin_count != -1 {
-            return Err(XldmNativeError::new(
+            return Err(NativeError::new(
                 "string dictionary hash header has invalid algorithm or bin count",
             ));
         }
@@ -455,34 +448,28 @@ fn parse_string_dictionary<'a>(
     for page_id in 0..page_count {
         let mask = cursor.read_u64("page mask")?;
         if mask > 1 {
-            return Err(XldmNativeError::new("invalid string page mask"));
+            return Err(NativeError::new("invalid string page mask"));
         }
         let contains_nulls = cursor.read_bool("page NULL flag")?;
         let start_index = cursor.read_u64("page start index")?;
         if start_index != cumulative_strings {
-            return Err(XldmNativeError::new(
-                "noncontiguous page record-handle range",
-            ));
+            return Err(NativeError::new("noncontiguous page record-handle range"));
         }
         let page_string_count = cursor.read_u64("page string count")?;
         bound_count(page_string_count, MAX_NATIVE_ITEMS, "page string count")?;
         cumulative_strings = cumulative_strings
             .checked_add(page_string_count)
-            .ok_or_else(|| XldmNativeError::new("page string count overflow"))?;
+            .ok_or_else(|| NativeError::new("page string count overflow"))?;
         if cumulative_strings > string_count {
-            return Err(XldmNativeError::new(
-                "page strings exceed store string count",
-            ));
+            return Err(NativeError::new("page strings exceed store string count"));
         }
         let compressed = cursor.read_bool("page compressed flag")?;
         if compressed != (mask == 1) {
-            return Err(XldmNativeError::new(
-                "page mask and compressed flag disagree",
-            ));
+            return Err(NativeError::new("page mask and compressed flag disagree"));
         }
         any_compressed |= compressed;
         if cursor.read_u32("string store begin mark")? != STRING_PAGE_BEGIN_MARK {
-            return Err(XldmNativeError::new("invalid string page begin mark"));
+            return Err(NativeError::new("invalid string page begin mark"));
         }
         let data = if compressed {
             parse_compressed_page(&mut cursor)?
@@ -490,10 +477,10 @@ fn parse_string_dictionary<'a>(
             parse_uncompressed_page(&mut cursor)?
         };
         if cursor.read_u32("string store end mark")? != STRING_PAGE_END_MARK {
-            return Err(XldmNativeError::new("invalid string page end mark"));
+            return Err(NativeError::new("invalid string page end mark"));
         }
         let _ = page_id;
-        pages.push(XldmStringPage {
+        pages.push(StringPage {
             contains_nulls,
             start_index,
             string_count: page_string_count,
@@ -501,28 +488,28 @@ fn parse_string_dictionary<'a>(
         });
     }
     if cumulative_strings != string_count {
-        return Err(XldmNativeError::new(
+        return Err(NativeError::new(
             "page string counts do not cover the store",
         ));
     }
     if any_compressed != store_compressed {
-        return Err(XldmNativeError::new(
+        return Err(NativeError::new(
             "store compressed flag does not match its pages",
         ));
     }
     let handle_count = cursor.read_u64("record handle count")?;
     if handle_count != string_count {
-        return Err(XldmNativeError::new(
+        return Err(NativeError::new(
             "record handle count does not match string count",
         ));
     }
     if cursor.read_u32("record handle size")? != 8 {
-        return Err(XldmNativeError::new("record handle size must be 8"));
+        return Err(NativeError::new("record handle size must be 8"));
     }
     let handle_count_usize = bound_count(handle_count, MAX_NATIVE_ITEMS, "record handle count")?;
     let mut record_handles = Vec::with_capacity(handle_count_usize);
     for _ in 0..handle_count_usize {
-        record_handles.push(XldmStringRecordHandle {
+        record_handles.push(StringRecordHandle {
             offset: cursor.read_u32("record handle offset")?,
             page_id: cursor.read_u32("record handle page ID")?,
         });
@@ -530,10 +517,10 @@ fn parse_string_dictionary<'a>(
     validate_record_handles(&pages, &record_handles)?;
     let padding = cursor.rest();
     require_zeroes(padding, "dictionary trailing padding")?;
-    Ok(XldmDictionaryFile {
-        dictionary_type: XldmDictionaryType::String,
+    Ok(DictionaryFile {
+        dictionary_type: DictionaryType::String,
         hash,
-        body: XldmDictionaryBody::String(XldmStringDictionary {
+        body: DictionaryBody::String(StringDictionary {
             string_count,
             longest_string_characters,
             pages,
@@ -543,25 +530,23 @@ fn parse_string_dictionary<'a>(
     })
 }
 
-fn parse_uncompressed_page<'a>(
-    cursor: &mut Cursor<'a>,
-) -> XldmNativeResult<XldmStringPageData<'a>> {
+fn parse_uncompressed_page<'a>(cursor: &mut Cursor<'a>) -> NativeResult<StringPageData<'a>> {
     let remaining_store_characters = cursor.read_u64("remaining store characters")?;
     let used_characters = cursor.read_u64("used store characters")?;
     let allocation_size = cursor.read_u64("uncompressed allocation size")?;
     if allocation_size > MAX_UNCOMPRESSED_STRING_PAGE_BYTES {
-        return Err(XldmNativeError::new(
+        return Err(NativeError::new(
             "uncompressed string page exceeds its byte limit",
         ));
     }
     let allocation = usize_from_u64(allocation_size, "uncompressed allocation size")?;
     if used_characters > allocation_size {
-        return Err(XldmNativeError::new(
+        return Err(NativeError::new(
             "used characters exceed the uncompressed allocation bound",
         ));
     }
     let buffer = cursor.take(allocation, "uncompressed string buffer")?;
-    Ok(XldmStringPageData::Uncompressed {
+    Ok(StringPageData::Uncompressed {
         remaining_store_characters,
         used_characters,
         allocation_size,
@@ -569,44 +554,40 @@ fn parse_uncompressed_page<'a>(
     })
 }
 
-fn parse_compressed_page<'a>(cursor: &mut Cursor<'a>) -> XldmNativeResult<XldmStringPageData<'a>> {
+fn parse_compressed_page<'a>(cursor: &mut Cursor<'a>) -> NativeResult<StringPageData<'a>> {
     let total_bits = cursor.read_u32("compressed store bit count")?;
     let character_set_mode = match cursor.read_u32("character set mode")? {
-        703_121 => XldmHuffmanCharacterSetMode::Single,
-        703_122 => XldmHuffmanCharacterSetMode::Multiple,
-        _ => return Err(XldmNativeError::new("invalid Huffman character set mode")),
+        703_121 => HuffmanCharacterSetMode::Single,
+        703_122 => HuffmanCharacterSetMode::Multiple,
+        _ => return Err(NativeError::new("invalid Huffman character set mode")),
     };
     let allocation_size = cursor.read_u64("compressed allocation size")?;
     if allocation_size > MAX_COMPRESSED_STRING_PAGE_BYTES {
-        return Err(XldmNativeError::new(
+        return Err(NativeError::new(
             "compressed string page exceeds its byte limit",
         ));
     }
     let character_set = match character_set_mode {
-        XldmHuffmanCharacterSetMode::Single => Some(cursor.read_u8("character set")?),
-        XldmHuffmanCharacterSetMode::Multiple => None,
+        HuffmanCharacterSetMode::Single => Some(cursor.read_u8("character set")?),
+        HuffmanCharacterSetMode::Multiple => None,
     };
     let decode_bits = cursor.read_u32("Huffman decode bits")?;
     if !(2..=12).contains(&decode_bits) {
-        return Err(XldmNativeError::new(
-            "Huffman decode bits must be in 2..=12",
-        ));
+        return Err(NativeError::new("Huffman decode bits must be in 2..=12"));
     }
     let encode_array = cursor.take(128, "Huffman encode array")?;
     let buffer_size = cursor.read_u64("compressed buffer size")?;
     if buffer_size != allocation_size {
-        return Err(XldmNativeError::new(
+        return Err(NativeError::new(
             "compressed buffer and allocation sizes differ",
         ));
     }
     let buffer_len = usize_from_u64(buffer_size, "compressed buffer size")?;
     if u64::from(total_bits) > buffer_size.saturating_mul(8) {
-        return Err(XldmNativeError::new(
-            "compressed bit count exceeds its buffer",
-        ));
+        return Err(NativeError::new("compressed bit count exceeds its buffer"));
     }
     let buffer = cursor.take(buffer_len, "compressed string buffer")?;
-    Ok(XldmStringPageData::Compressed {
+    Ok(StringPageData::Compressed {
         total_bits,
         character_set_mode,
         character_set,
@@ -618,44 +599,42 @@ fn parse_compressed_page<'a>(cursor: &mut Cursor<'a>) -> XldmNativeResult<XldmSt
 }
 
 fn validate_record_handles(
-    pages: &[XldmStringPage<'_>],
-    handles: &[XldmStringRecordHandle],
-) -> XldmNativeResult<()> {
+    pages: &[StringPage<'_>],
+    handles: &[StringRecordHandle],
+) -> NativeResult<()> {
     for (page_id, page) in pages.iter().enumerate() {
         let start = usize_from_u64(page.start_index, "page start index")?;
         let count = usize_from_u64(page.string_count, "page string count")?;
         let end = start
             .checked_add(count)
-            .ok_or_else(|| XldmNativeError::new("page handle range overflow"))?;
+            .ok_or_else(|| NativeError::new("page handle range overflow"))?;
         let page_handles = handles
             .get(start..end)
-            .ok_or_else(|| XldmNativeError::new("page handle range is out of bounds"))?;
+            .ok_or_else(|| NativeError::new("page handle range is out of bounds"))?;
         let mut previous = None;
         for handle in page_handles {
             if handle.page_id as usize != page_id {
-                return Err(XldmNativeError::new(
-                    "record handle references the wrong page",
-                ));
+                return Err(NativeError::new("record handle references the wrong page"));
             }
             if let Some(previous) = previous {
                 if handle.offset <= previous {
-                    return Err(XldmNativeError::new(
+                    return Err(NativeError::new(
                         "record handle offsets are not strictly increasing",
                     ));
                 }
             } else if handle.offset != 0 {
-                return Err(XldmNativeError::new(
+                return Err(NativeError::new(
                     "the first record handle on a page must start at zero",
                 ));
             }
             let limit = match &page.data {
-                XldmStringPageData::Uncompressed {
+                StringPageData::Uncompressed {
                     allocation_size, ..
                 } => *allocation_size,
-                XldmStringPageData::Compressed { total_bits, .. } => u64::from(*total_bits),
+                StringPageData::Compressed { total_bits, .. } => u64::from(*total_bits),
             };
             if u64::from(handle.offset) >= limit && page.string_count != 0 {
-                return Err(XldmNativeError::new(
+                return Err(NativeError::new(
                     "record handle offset is out of page bounds",
                 ));
             }
@@ -667,33 +646,31 @@ fn validate_record_handles(
 
 /// Parse and verify a complete `.hidx` hash index without interpreting keys as
 /// data values.
-pub fn parse_xldm_hash_index(bytes: &[u8]) -> XldmNativeResult<XldmHashIndexFile<'_>> {
+pub fn parse_hash_index(bytes: &[u8]) -> NativeResult<HashIndexFile<'_>> {
     let mut cursor = Cursor::new(bytes);
     let header = read_hash_header(&mut cursor)?;
     if header.algorithm != -1 {
-        return Err(XldmNativeError::new(
+        return Err(NativeError::new(
             "hash indexes require XM_INVALID algorithm",
         ));
     }
     if header.bin_count < 16 {
-        return Err(XldmNativeError::new("hash index bin count is below 16"));
+        return Err(NativeError::new("hash index bin count is below 16"));
     }
     let bin_count = usize_from_i64(header.bin_count, "hash bin count")?;
     if bin_count > MAX_NATIVE_ITEMS || !bin_count.is_power_of_two() {
-        return Err(XldmNativeError::new(
+        return Err(NativeError::new(
             "hash bin count is unbounded or not a power of two",
         ));
     }
     let entry_size = header.entry_size as usize;
     let bin_size = header.bin_size as usize;
     if !(8..=64).contains(&entry_size) || !matches!(bin_size, 64 | 128) {
-        return Err(XldmNativeError::new(
-            "invalid persisted hash entry or bin size",
-        ));
+        return Err(NativeError::new("invalid persisted hash entry or bin size"));
     }
     let expected_locals = (bin_size - 12) / entry_size;
     if header.local_entry_count as usize != expected_locals {
-        return Err(XldmNativeError::new(
+        return Err(NativeError::new(
             "local entry count does not match cache-aligned structure sizes",
         ));
     }
@@ -701,7 +678,7 @@ pub fn parse_xldm_hash_index(bytes: &[u8]) -> XldmNativeResult<XldmHashIndexFile
     bound_count(record_count, MAX_NATIVE_ITEMS, "hash record count")?;
     let current_mask = cursor.read_u64("hash current mask")?;
     if current_mask != header.bin_count as u64 - 1 {
-        return Err(XldmNativeError::new(
+        return Err(NativeError::new(
             "hash current mask does not equal bins minus one",
         ));
     }
@@ -713,7 +690,7 @@ pub fn parse_xldm_hash_index(bytes: &[u8]) -> XldmNativeResult<XldmHashIndexFile
     };
     let bins_len = bin_count
         .checked_mul(bin_size)
-        .ok_or_else(|| XldmNativeError::new("hash bins size overflow"))?;
+        .ok_or_else(|| NativeError::new("hash bins size overflow"))?;
     let bins_bytes = cursor.take(bins_len, "hash bins")?;
     let mut bins = Vec::with_capacity(bin_count);
     let mut summed_records = 0u64;
@@ -728,7 +705,7 @@ pub fn parse_xldm_hash_index(bytes: &[u8]) -> XldmNativeResult<XldmHashIndexFile
         let count64 = u64::from(count);
         summed_records = summed_records
             .checked_add(count64)
-            .ok_or_else(|| XldmNativeError::new("hash record total overflow"))?;
+            .ok_or_else(|| NativeError::new("hash record total overflow"))?;
         maximum_chain = maximum_chain.max(count64);
         if count != 0 {
             used_bins += 1;
@@ -742,24 +719,24 @@ pub fn parse_xldm_hash_index(bytes: &[u8]) -> XldmNativeResult<XldmHashIndexFile
         histogram_counts[count as usize] += 1;
         let local_len = local_count
             .checked_mul(entry_size)
-            .ok_or_else(|| XldmNativeError::new("local hash entry size overflow"))?;
+            .ok_or_else(|| NativeError::new("local hash entry size overflow"))?;
         let local_entries = &raw_bin[12..12 + local_len];
         for entry in local_entries.chunks_exact(entry_size) {
             validate_hash_entry(entry, index, bin_count)?;
         }
-        bins.push(XldmHashBin {
+        bins.push(HashBin {
             entry_count: count,
             local_entries,
         });
     }
     if summed_records != record_count {
-        return Err(XldmNativeError::new(
+        return Err(NativeError::new(
             "hash bin entry counts do not equal the record count",
         ));
     }
     let collision_count = cursor.read_u64("hash collision count")?;
     if collision_count != expected_collisions {
-        return Err(XldmNativeError::new(
+        return Err(NativeError::new(
             "hash collision count does not match bin overflows",
         ));
     }
@@ -792,7 +769,7 @@ pub fn parse_xldm_hash_index(bytes: &[u8]) -> XldmNativeResult<XldmHashIndexFile
     }
     let padding = cursor.rest();
     require_zeroes(padding, "hash index trailing padding")?;
-    Ok(XldmHashIndexFile {
+    Ok(HashIndexFile {
         header,
         record_count,
         current_mask,
@@ -804,8 +781,8 @@ pub fn parse_xldm_hash_index(bytes: &[u8]) -> XldmNativeResult<XldmHashIndexFile
     })
 }
 
-fn read_hash_header(cursor: &mut Cursor<'_>) -> XldmNativeResult<XldmHashHeader> {
-    Ok(XldmHashHeader {
+fn read_hash_header(cursor: &mut Cursor<'_>) -> NativeResult<HashHeader> {
+    Ok(HashHeader {
         algorithm: cursor.read_i32("hash algorithm")?,
         entry_size: cursor.read_u32("hash entry size")?,
         bin_size: cursor.read_u32("hash bin size")?,
@@ -814,20 +791,20 @@ fn read_hash_header(cursor: &mut Cursor<'_>) -> XldmNativeResult<XldmHashHeader>
     })
 }
 
-fn validate_dictionary_hash_sizes(header: XldmHashHeader) -> XldmNativeResult<()> {
+fn validate_dictionary_hash_sizes(header: HashHeader) -> NativeResult<()> {
     if header.entry_size == 0
         || header.entry_size > 64
         || !matches!(header.bin_size, 64 | 128)
         || header.local_entry_count != (header.bin_size.saturating_sub(12) / header.entry_size)
     {
-        return Err(XldmNativeError::new(
+        return Err(NativeError::new(
             "dictionary hash structure sizes are inconsistent",
         ));
     }
     Ok(())
 }
 
-fn read_hash_statistics<'a>(cursor: &mut Cursor<'a>) -> XldmNativeResult<XldmHashStatistics<'a>> {
+fn read_hash_statistics<'a>(cursor: &mut Cursor<'a>) -> NativeResult<HashStatistics<'a>> {
     let element_count = cursor.read_u64("statistics element count")?;
     let bin_count = cursor.read_u64("statistics bin count")?;
     let used_bin_count = cursor.read_u64("statistics used bin count")?;
@@ -838,7 +815,7 @@ fn read_hash_statistics<'a>(cursor: &mut Cursor<'a>) -> XldmNativeResult<XldmHas
     bound_count(histogram_count, MAX_NATIVE_ITEMS, "histogram element count")?;
     let histogram_element_size = cursor.read_u32("histogram element size")?;
     if !matches!(histogram_element_size, 1 | 2 | 4 | 8) {
-        return Err(XldmNativeError::new("invalid histogram element size"));
+        return Err(NativeError::new("invalid histogram element size"));
     }
     let histogram_len = bounded_product(
         histogram_count,
@@ -846,7 +823,7 @@ fn read_hash_statistics<'a>(cursor: &mut Cursor<'a>) -> XldmNativeResult<XldmHas
         "hash histogram",
     )?;
     let histogram = cursor.take(histogram_len, "hash histogram")?;
-    Ok(XldmHashStatistics {
+    Ok(HashStatistics {
         element_count,
         bin_count,
         used_bin_count,
@@ -860,7 +837,7 @@ fn read_hash_statistics<'a>(cursor: &mut Cursor<'a>) -> XldmNativeResult<XldmHas
 
 #[allow(clippy::too_many_arguments)]
 fn validate_hash_statistics(
-    statistics: &XldmHashStatistics<'_>,
+    statistics: &HashStatistics<'_>,
     records: u64,
     bins: u64,
     used_bins: u64,
@@ -868,7 +845,7 @@ fn validate_hash_statistics(
     locals: u64,
     maximum_chain: u64,
     expected_histogram: &[u64],
-) -> XldmNativeResult<()> {
+) -> NativeResult<()> {
     if statistics.element_count != records
         || statistics.bin_count != bins
         || statistics.used_bin_count != used_bins
@@ -876,9 +853,7 @@ fn validate_hash_statistics(
         || statistics.locals_per_bin != locals
         || statistics.maximum_chain != maximum_chain
     {
-        return Err(XldmNativeError::new(
-            "hash statistics disagree with hash bins",
-        ));
+        return Err(NativeError::new("hash statistics disagree with hash bins"));
     }
     let size = statistics.histogram_element_size as usize;
     let mut actual = Vec::new();
@@ -893,14 +868,12 @@ fn validate_hash_statistics(
             .iter()
             .any(|value| *value != 0)
     {
-        return Err(XldmNativeError::new(
-            "hash histogram disagrees with hash bins",
-        ));
+        return Err(NativeError::new("hash histogram disagrees with hash bins"));
     }
     Ok(())
 }
 
-fn validate_hash_entry(entry: &[u8], bin_index: usize, bin_count: usize) -> XldmNativeResult<()> {
+fn validate_hash_entry(entry: &[u8], bin_index: usize, bin_count: usize) -> NativeResult<()> {
     let persisted_hash = u32::from_le_bytes(entry[..4].try_into().unwrap());
     let key = u32::from_le_bytes(entry[4..8].try_into().unwrap());
     let bits = bin_count.trailing_zeros();
@@ -909,7 +882,7 @@ fn validate_hash_entry(entry: &[u8], bin_index: usize, bin_count: usize) -> Xldm
         .checked_shr(32 - bits)
         .unwrap_or(0);
     if persisted_hash != calculated || calculated as usize != bin_index {
-        return Err(XldmNativeError::new(
+        return Err(NativeError::new(
             "hash entry value or bin placement is invalid",
         ));
     }
@@ -917,21 +890,21 @@ fn validate_hash_entry(entry: &[u8], bin_index: usize, bin_count: usize) -> Xldm
 }
 
 /// Revalidate an inspected native member and return its exact original bytes.
-pub fn write_xldm_native_file(file: &XldmNativeFile<'_>) -> XldmNativeResult<Vec<u8>> {
+pub fn write_file(file: &NativeFile<'_>) -> NativeResult<Vec<u8>> {
     match &file.data {
-        XldmNativeData::Idf(_) => {
-            parse_xldm_idf(file.bytes)?;
+        NativeData::Idf(_) => {
+            parse_idf(file.bytes)?;
         },
-        XldmNativeData::Dictionary(dictionary) => {
+        NativeData::Dictionary(dictionary) => {
             let mode = if dictionary.hash.is_some() {
-                XldmStringHashMode::Present
+                StringHashMode::Present
             } else {
-                XldmStringHashMode::Absent
+                StringHashMode::Absent
             };
-            parse_xldm_dictionary(file.bytes, mode)?;
+            parse_dictionary(file.bytes, mode)?;
         },
-        XldmNativeData::HashIndex(_) => {
-            parse_xldm_hash_index(file.bytes)?;
+        NativeData::HashIndex(_) => {
+            parse_hash_index(file.bytes)?;
         },
     }
     Ok(file.bytes.to_vec())
@@ -952,44 +925,44 @@ impl<'a> Cursor<'a> {
         self.bytes.len() - self.offset
     }
 
-    fn take(&mut self, length: usize, field: &str) -> XldmNativeResult<&'a [u8]> {
+    fn take(&mut self, length: usize, field: &str) -> NativeResult<&'a [u8]> {
         let end = self
             .offset
             .checked_add(length)
-            .ok_or_else(|| XldmNativeError::new(format!("{field} range overflow")))?;
+            .ok_or_else(|| NativeError::new(format!("{field} range overflow")))?;
         let value = self
             .bytes
             .get(self.offset..end)
-            .ok_or_else(|| XldmNativeError::new(format!("truncated {field}")))?;
+            .ok_or_else(|| NativeError::new(format!("truncated {field}")))?;
         self.offset = end;
         Ok(value)
     }
 
-    fn read_u8(&mut self, field: &str) -> XldmNativeResult<u8> {
+    fn read_u8(&mut self, field: &str) -> NativeResult<u8> {
         Ok(self.take(1, field)?[0])
     }
 
-    fn read_bool(&mut self, field: &str) -> XldmNativeResult<bool> {
+    fn read_bool(&mut self, field: &str) -> NativeResult<bool> {
         match self.read_u8(field)? {
             0 => Ok(false),
             1 => Ok(true),
-            _ => Err(XldmNativeError::new(format!("invalid Boolean {field}"))),
+            _ => Err(NativeError::new(format!("invalid Boolean {field}"))),
         }
     }
 
-    fn read_u32(&mut self, field: &str) -> XldmNativeResult<u32> {
+    fn read_u32(&mut self, field: &str) -> NativeResult<u32> {
         Ok(u32::from_le_bytes(self.take(4, field)?.try_into().unwrap()))
     }
 
-    fn read_i32(&mut self, field: &str) -> XldmNativeResult<i32> {
+    fn read_i32(&mut self, field: &str) -> NativeResult<i32> {
         Ok(i32::from_le_bytes(self.take(4, field)?.try_into().unwrap()))
     }
 
-    fn read_u64(&mut self, field: &str) -> XldmNativeResult<u64> {
+    fn read_u64(&mut self, field: &str) -> NativeResult<u64> {
         Ok(u64::from_le_bytes(self.take(8, field)?.try_into().unwrap()))
     }
 
-    fn read_i64(&mut self, field: &str) -> XldmNativeResult<i64> {
+    fn read_i64(&mut self, field: &str) -> NativeResult<i64> {
         Ok(i64::from_le_bytes(self.take(8, field)?.try_into().unwrap()))
     }
 
@@ -998,37 +971,35 @@ impl<'a> Cursor<'a> {
     }
 }
 
-fn usize_from_u64(value: u64, field: &str) -> XldmNativeResult<usize> {
-    usize::try_from(value).map_err(|_| XldmNativeError::new(format!("{field} exceeds usize")))
+fn usize_from_u64(value: u64, field: &str) -> NativeResult<usize> {
+    usize::try_from(value).map_err(|_| NativeError::new(format!("{field} exceeds usize")))
 }
 
-fn usize_from_i64(value: i64, field: &str) -> XldmNativeResult<usize> {
-    usize::try_from(value).map_err(|_| XldmNativeError::new(format!("invalid {field}")))
+fn usize_from_i64(value: i64, field: &str) -> NativeResult<usize> {
+    usize::try_from(value).map_err(|_| NativeError::new(format!("invalid {field}")))
 }
 
-fn bound_count(value: u64, maximum: usize, field: &str) -> XldmNativeResult<usize> {
+fn bound_count(value: u64, maximum: usize, field: &str) -> NativeResult<usize> {
     let value = usize_from_u64(value, field)?;
     if value > maximum {
-        return Err(XldmNativeError::new(format!(
-            "{field} exceeds parser bound"
-        )));
+        return Err(NativeError::new(format!("{field} exceeds parser bound")));
     }
     Ok(value)
 }
 
-fn bounded_product(count: u64, size: u64, field: &str) -> XldmNativeResult<usize> {
+fn bounded_product(count: u64, size: u64, field: &str) -> NativeResult<usize> {
     bound_count(count, MAX_NATIVE_ITEMS, field)?;
     usize_from_u64(
         count
             .checked_mul(size)
-            .ok_or_else(|| XldmNativeError::new(format!("{field} size overflow")))?,
+            .ok_or_else(|| NativeError::new(format!("{field} size overflow")))?,
         field,
     )
 }
 
-fn require_zeroes(bytes: &[u8], field: &str) -> XldmNativeResult<()> {
+fn require_zeroes(bytes: &[u8], field: &str) -> NativeResult<()> {
     if bytes.iter().any(|byte| *byte != 0) {
-        return Err(XldmNativeError::new(format!("nonzero {field}")));
+        return Err(NativeError::new(format!("nonzero {field}")));
     }
     Ok(())
 }
@@ -1105,7 +1076,7 @@ mod tests {
         idf.extend_from_slice(&1u64.to_le_bytes());
         idf.extend_from_slice(&[7u8; 8]);
         idf.extend_from_slice(&0u64.to_le_bytes());
-        let parsed = parse_xldm_idf(&idf).unwrap();
+        let parsed = parse_idf(&idf).unwrap();
         assert_eq!(parsed.segments.len(), 2);
         assert!(std::ptr::eq(
             parsed.segments[0].bytes.as_ptr(),
@@ -1119,13 +1090,13 @@ mod tests {
         numeric.extend_from_slice(&4u32.to_le_bytes());
         numeric.extend_from_slice(&1i32.to_le_bytes());
         numeric.extend_from_slice(&2i32.to_le_bytes());
-        let parsed = parse_xldm_dictionary(&numeric, XldmStringHashMode::Auto).unwrap();
-        assert_eq!(parsed.dictionary_type, XldmDictionaryType::Long);
+        let parsed = parse_dictionary(&numeric, StringHashMode::Auto).unwrap();
+        assert_eq!(parsed.dictionary_type, DictionaryType::Long);
 
         for compressed in [false, true] {
             let bytes = valid_string_dictionary(compressed);
-            let parsed = parse_xldm_dictionary(&bytes, XldmStringHashMode::Absent).unwrap();
-            let XldmDictionaryBody::String(body) = parsed.body else {
+            let parsed = parse_dictionary(&bytes, StringHashMode::Absent).unwrap();
+            let DictionaryBody::String(body) = parsed.body else {
                 panic!()
             };
             assert_eq!(body.pages.len(), 1);
@@ -1136,44 +1107,44 @@ mod tests {
     #[test]
     fn parses_and_writes_hash_index_exactly() {
         let bytes = valid_hash_index();
-        let parsed = parse_xldm_hash_index(&bytes).unwrap();
+        let parsed = parse_hash_index(&bytes).unwrap();
         assert_eq!(parsed.record_count, 1);
         assert_eq!(parsed.bins[0].entry_count, 1);
-        let file = XldmNativeFile {
+        let file = NativeFile {
             storage_path: "1.H$T$C.hidx",
             bytes: &bytes,
-            data: XldmNativeData::HashIndex(parsed),
+            data: NativeData::HashIndex(parsed),
         };
-        assert_eq!(write_xldm_native_file(&file).unwrap(), bytes);
+        assert_eq!(write_file(&file).unwrap(), bytes);
     }
 
     #[test]
     fn rejects_truncation_counts_constants_flags_and_ranges() {
-        assert!(parse_xldm_idf(&1u64.to_le_bytes()).is_err());
+        assert!(parse_idf(&1u64.to_le_bytes()).is_err());
         let mut idf = Vec::new();
         idf.extend_from_slice(&u64::MAX.to_le_bytes());
-        assert!(parse_xldm_idf(&idf).is_err());
+        assert!(parse_idf(&idf).is_err());
 
         let mut string = valid_string_dictionary(false);
         string[4 + 8] = 2;
-        assert!(parse_xldm_dictionary(&string, XldmStringHashMode::Absent).is_err());
+        assert!(parse_dictionary(&string, StringHashMode::Absent).is_err());
         let mut string = valid_string_dictionary(false);
         let begin_mark = 4 + 8 + 1 + 8 + 8 + 8 + 1 + 8 + 8 + 1;
         string[begin_mark] ^= 1;
-        assert!(parse_xldm_dictionary(&string, XldmStringHashMode::Absent).is_err());
+        assert!(parse_dictionary(&string, StringHashMode::Absent).is_err());
 
         let mut hash = valid_hash_index();
         hash[24 + 8] ^= 1;
-        assert!(parse_xldm_hash_index(&hash).is_err());
+        assert!(parse_hash_index(&hash).is_err());
         let mut hash = valid_hash_index();
         hash[24 + 8 + 8] = 2;
-        assert!(parse_xldm_hash_index(&hash).is_err());
+        assert!(parse_hash_index(&hash).is_err());
 
         let mut uncompressed = valid_string_dictionary(false);
         uncompressed[75..83]
             .copy_from_slice(&(MAX_UNCOMPRESSED_STRING_PAGE_BYTES + 1).to_le_bytes());
         assert!(
-            parse_xldm_dictionary(&uncompressed, XldmStringHashMode::Absent)
+            parse_dictionary(&uncompressed, StringHashMode::Absent)
                 .unwrap_err()
                 .to_string()
                 .contains("byte limit")
@@ -1182,7 +1153,7 @@ mod tests {
         let mut compressed = valid_string_dictionary(true);
         compressed[67..75].copy_from_slice(&(MAX_COMPRESSED_STRING_PAGE_BYTES + 1).to_le_bytes());
         assert!(
-            parse_xldm_dictionary(&compressed, XldmStringHashMode::Absent)
+            parse_dictionary(&compressed, StringHashMode::Absent)
                 .unwrap_err()
                 .to_string()
                 .contains("byte limit")
@@ -1192,8 +1163,8 @@ mod tests {
     #[test]
     fn enforces_column_data_hybrid_pairs_at_the_storage_role_boundary() {
         let generated =
-            classify_xldm_generated_path("Model.1.db/Table.0.dim/1.Table.Col.0.idf").unwrap();
-        assert_eq!(generated.kind, XldmGeneratedNameKind::ColumnData);
+            classify_generated_path("Model.1.db/Table.0.dim/1.Table.Col.0.idf").unwrap();
+        assert_eq!(generated.kind, GeneratedNameKind::ColumnData);
 
         let one_segment = 0u64.to_le_bytes();
         assert!(parse_storage_idf(generated.kind, &one_segment).is_err());
@@ -1216,16 +1187,16 @@ mod tests {
         let mut hash = valid_hash_index();
         let bins_offset = 24 + 8 + 8 + 1;
         hash[bins_offset + 12] = 1;
-        assert!(parse_xldm_hash_index(&hash).is_err());
+        assert!(parse_hash_index(&hash).is_err());
 
         let mut hash = valid_hash_index();
         let collision_count = hash.len() - 8;
         hash[collision_count] = 1;
-        assert!(parse_xldm_hash_index(&hash).is_err());
+        assert!(parse_hash_index(&hash).is_err());
 
         let mut hash = valid_hash_index();
         hash[24 + 8 + 8] = 1;
         hash.splice(24 + 8 + 8 + 1..24 + 8 + 8 + 1, [0u8; 60]);
-        assert!(parse_xldm_hash_index(&hash).is_err());
+        assert!(parse_hash_index(&hash).is_err());
     }
 }
