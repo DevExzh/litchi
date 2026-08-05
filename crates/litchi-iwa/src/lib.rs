@@ -133,8 +133,7 @@ pub mod bundle;
 /// Typed native drawable stacking-order controls.
 pub mod drawable_order;
 pub mod identity;
-/// Typed native controls for basic image adjustments.
-pub mod image_adjustments;
+mod image_adjustments;
 mod image_caption;
 pub mod media;
 /// Shared movie and audio playback settings.
@@ -194,7 +193,6 @@ pub use comments::{
 pub use document::Document;
 pub use drawable_order::DrawableLayerMove;
 pub use identity::IWorkDocumentIdentity;
-pub use image_adjustments::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 pub use media::{EmbeddedMediaAsset, IWorkMediaEditor, MediaAsset, MediaManager, MediaStats};
 pub use media_playback::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
 pub use package::IWorkPackage;

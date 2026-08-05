@@ -2,6 +2,10 @@
 
 use prost::Message;
 
+use litchi_iwa_common::shape::image::{
+    Error as ImageAdjustmentError, ImageAdjustment, ImageAdjustments, ImageEnhancement,
+};
+
 use crate::archive::RawMessage;
 use crate::protobuf::tsd;
 use crate::wire::{
@@ -16,111 +20,9 @@ const EXPOSURE_FIELD: u32 = 1;
 const SATURATION_FIELD: u32 = 2;
 const ENHANCEMENT_FIELD: u32 = 13;
 
-/// A normalized native image-adjustment amount.
-///
-/// iWork exposes exposure and saturation as percentages. Values are represented
-/// here as a normalized multiplier in the inclusive range `-1.0..=1.0`, where
-/// `0.25` corresponds to `25%` in the native inspector.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-#[repr(transparent)]
-pub struct ImageAdjustment(f32);
-
-impl ImageAdjustment {
-    /// The lowest native adjustment amount (`-100%`).
-    pub const MINIMUM: Self = Self(-1.0);
-    /// The neutral adjustment amount (`0%`).
-    pub const NEUTRAL: Self = Self(0.0);
-    /// The highest native adjustment amount (`100%`).
-    pub const MAXIMUM: Self = Self(1.0);
-
-    /// Construct one finite native image-adjustment amount.
-    pub fn new(value: f32) -> Result<Self> {
-        if !value.is_finite() || !(Self::MINIMUM.0..=Self::MAXIMUM.0).contains(&value) {
-            return Err(Error::ParseError(
-                "image adjustment must be finite and within -1.0..=1.0".to_owned(),
-            ));
-        }
-        Ok(Self(value))
-    }
-
-    /// Return the normalized native amount.
-    pub const fn as_f32(self) -> f32 {
-        self.0
-    }
-}
-
-impl TryFrom<f32> for ImageAdjustment {
-    type Error = Error;
-
-    fn try_from(value: f32) -> Result<Self> {
-        Self::new(value)
-    }
-}
-
-/// State of iWork's native Enhance control.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ImageEnhancement {
-    /// Leave automatic enhancement disabled.
-    Disabled,
-    /// Let iWork automatically enhance the image colors.
-    Enabled,
-}
-
-impl ImageEnhancement {
-    const fn from_native(value: bool) -> Self {
-        if value { Self::Enabled } else { Self::Disabled }
-    }
-
-    const fn as_native(self) -> bool {
-        matches!(self, Self::Enabled)
-    }
-}
-
-/// The basic controls in iWork's Image inspector.
-///
-/// Optional fields preserve the native distinction between a control that was
-/// never encoded and a control explicitly set to its neutral value. Advanced
-/// native adjustment fields remain untouched by this focused API.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct ImageAdjustments {
-    /// Exposure adjustment, where `0.25` is `25%` in iWork.
-    pub exposure: Option<ImageAdjustment>,
-    /// Saturation adjustment, where `-1.0` produces grayscale output.
-    pub saturation: Option<ImageAdjustment>,
-    /// Optional state of iWork's automatic Enhance control.
-    pub enhancement: Option<ImageEnhancement>,
-}
-
-impl ImageAdjustments {
-    /// Construct adjustments with every basic control omitted.
-    #[must_use]
-    pub const fn new() -> Self {
-        Self {
-            exposure: None,
-            saturation: None,
-            enhancement: None,
-        }
-    }
-
-    /// Set or clear the optional exposure adjustment.
-    #[must_use]
-    pub const fn with_exposure(mut self, exposure: Option<ImageAdjustment>) -> Self {
-        self.exposure = exposure;
-        self
-    }
-
-    /// Set or clear the optional saturation adjustment.
-    #[must_use]
-    pub const fn with_saturation(mut self, saturation: Option<ImageAdjustment>) -> Self {
-        self.saturation = saturation;
-        self
-    }
-
-    /// Set or clear the optional automatic-enhancement state.
-    #[must_use]
-    pub const fn with_enhancement(mut self, enhancement: Option<ImageEnhancement>) -> Self {
-        self.enhancement = enhancement;
-        self
+impl From<ImageAdjustmentError> for crate::Error {
+    fn from(error: ImageAdjustmentError) -> Self {
+        Self::ParseError(error.to_string())
     }
 }
 
@@ -130,11 +32,10 @@ pub(crate) fn image_adjustments_from_archive(
     let Some(native) = image.image_adjustments.as_ref() else {
         return Ok(ImageAdjustments::default());
     };
-    Ok(ImageAdjustments {
-        exposure: adjustment_from_native(native.exposure, "exposure")?,
-        saturation: adjustment_from_native(native.saturation, "saturation")?,
-        enhancement: native.enhance.map(ImageEnhancement::from_native),
-    })
+    Ok(ImageAdjustments::new()
+        .with_exposure(adjustment_from_native(native.exposure, "exposure")?)
+        .with_saturation(adjustment_from_native(native.saturation, "saturation")?)
+        .with_enhancement(native.enhance.map(image_enhancement_from_native)))
 }
 
 pub(crate) fn replace_image_adjustments(
@@ -231,23 +132,35 @@ fn patch_image_adjustments_payload(
         original,
         EXPOSURE_FIELD,
         native.exposure.is_some(),
-        adjustments.exposure.map(|value| value.as_f32().to_bits()),
+        adjustments.exposure().map(|value| value.value().to_bits()),
     )?;
     let data = patch_fixed32_field(
         &data,
         SATURATION_FIELD,
         native.saturation.is_some(),
-        adjustments.saturation.map(|value| value.as_f32().to_bits()),
+        adjustments.saturation().map(|value| value.value().to_bits()),
     )?;
     patch_varint_field(
         &data,
         ENHANCEMENT_FIELD,
         native.enhance.is_some(),
         adjustments
-            .enhancement
-            .map(ImageEnhancement::as_native)
+            .enhancement()
+            .map(image_enhancement_to_native)
             .map(u64::from),
     )
+}
+
+const fn image_enhancement_from_native(value: bool) -> ImageEnhancement {
+    if value {
+        ImageEnhancement::Enabled
+    } else {
+        ImageEnhancement::Disabled
+    }
+}
+
+const fn image_enhancement_to_native(value: ImageEnhancement) -> bool {
+    matches!(value, ImageEnhancement::Enabled)
 }
 
 #[cfg(test)]
@@ -278,11 +191,10 @@ mod tests {
             enhance: Some(false),
             ..Default::default()
         };
-        let baseline = ImageAdjustments {
-            exposure: Some(ImageAdjustment::NEUTRAL),
-            saturation: Some(ImageAdjustment::NEUTRAL),
-            enhancement: Some(ImageEnhancement::Disabled),
-        };
+        let baseline = ImageAdjustments::new()
+            .with_exposure(Some(ImageAdjustment::NEUTRAL))
+            .with_saturation(Some(ImageAdjustment::NEUTRAL))
+            .with_enhancement(Some(ImageEnhancement::Disabled));
         let replacement = ImageAdjustments::default()
             .with_exposure(Some(ImageAdjustment::new(0.25).unwrap()))
             .with_saturation(Some(ImageAdjustment::new(-0.5).unwrap()))
@@ -294,15 +206,15 @@ mod tests {
         let changed_native = tsd::ImageAdjustmentsArchive::decode(changed.as_slice()).unwrap();
         assert_eq!(
             adjustment_from_native(changed_native.exposure, "exposure").unwrap(),
-            replacement.exposure
+            replacement.exposure()
         );
         assert_eq!(
             adjustment_from_native(changed_native.saturation, "saturation").unwrap(),
-            replacement.saturation
+            replacement.saturation()
         );
         assert_eq!(
-            changed_native.enhance.map(ImageEnhancement::from_native),
-            replacement.enhancement
+            changed_native.enhance.map(image_enhancement_from_native),
+            replacement.enhancement()
         );
         assert_eq!(changed_native.contrast, native.contrast);
         assert!(
@@ -317,6 +229,50 @@ mod tests {
     }
 
     #[test]
+    fn archive_adapter_preserves_omitted_and_explicit_neutral_presence() {
+        let omitted = tsd::ImageArchive::default();
+        let omitted_adjustments = image_adjustments_from_archive(&omitted).unwrap();
+        assert_eq!(omitted_adjustments.exposure(), None);
+        assert_eq!(omitted_adjustments.saturation(), None);
+        assert_eq!(omitted_adjustments.enhancement(), None);
+
+        let explicit = ImageAdjustments::new()
+            .with_exposure(Some(ImageAdjustment::NEUTRAL))
+            .with_saturation(Some(ImageAdjustment::NEUTRAL))
+            .with_enhancement(Some(ImageEnhancement::Disabled));
+        let payload = patch_image_adjustments_payload(
+            &[],
+            &tsd::ImageAdjustmentsArchive::default(),
+            explicit,
+        )
+        .unwrap();
+        let encoded = patch_length_delimited_field(
+            &[],
+            IMAGE_ADJUSTMENTS_FIELD,
+            false,
+            Some(payload.as_slice()),
+        )
+        .unwrap();
+        let decoded = tsd::ImageArchive::decode(encoded.as_slice()).unwrap();
+        let decoded_adjustments = image_adjustments_from_archive(&decoded).unwrap();
+        assert_eq!(decoded_adjustments, explicit);
+        assert_ne!(decoded_adjustments, omitted_adjustments);
+
+        let removed = patch_length_delimited_field(
+            encoded.as_slice(),
+            IMAGE_ADJUSTMENTS_FIELD,
+            true,
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            image_adjustments_from_archive(&tsd::ImageArchive::decode(removed.as_slice()).unwrap())
+                .unwrap(),
+            omitted_adjustments
+        );
+    }
+
+    #[test]
     fn no_op_adjustment_updates_reject_duplicate_raw_fields_transactionally() {
         let native = tsd::ImageAdjustmentsArchive {
             exposure: Some(0.25),
@@ -324,11 +280,10 @@ mod tests {
             enhance: Some(true),
             ..Default::default()
         };
-        let requested = ImageAdjustments {
-            exposure: Some(ImageAdjustment::new(0.25).unwrap()),
-            saturation: Some(ImageAdjustment::new(-0.5).unwrap()),
-            enhancement: Some(ImageEnhancement::Enabled),
-        };
+        let requested = ImageAdjustments::new()
+            .with_exposure(Some(ImageAdjustment::new(0.25).unwrap()))
+            .with_saturation(Some(ImageAdjustment::new(-0.5).unwrap()))
+            .with_enhancement(Some(ImageEnhancement::Enabled));
 
         let mut duplicate_outer = tsd::ImageArchive::default().encode_to_vec();
         let payload = native.encode_to_vec();
