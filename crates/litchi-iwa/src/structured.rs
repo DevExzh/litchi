@@ -13,6 +13,8 @@ use crate::charts::metadata_extractor::ChartMetadataExtractor;
 use crate::numbers::table_extractor::TableDataExtractor;
 use crate::object_index::ObjectIndex;
 use crate::shapes::text_extractor::ShapeTextExtractor;
+use litchi_keynote::Slide;
+use litchi_pages::{Section, SectionType};
 
 /// Represents a table extracted from a Numbers document
 #[derive(Debug, Clone)]
@@ -149,76 +151,6 @@ impl std::fmt::Display for CellValue {
     }
 }
 
-/// Represents a slide in a Keynote presentation
-#[derive(Debug, Clone)]
-pub struct Slide {
-    /// Slide index (0-based)
-    pub index: usize,
-    /// Slide title
-    pub title: Option<String>,
-    /// Text content on the slide
-    pub text_content: Vec<String>,
-    /// Notes associated with the slide
-    pub notes: Option<String>,
-}
-
-impl Slide {
-    /// Create a new slide
-    pub fn new(index: usize) -> Self {
-        Self {
-            index,
-            title: None,
-            text_content: Vec::new(),
-            notes: None,
-        }
-    }
-
-    /// Get all text from the slide (title + content + notes)
-    pub fn all_text(&self) -> Vec<String> {
-        let mut all = Vec::new();
-        if let Some(ref title) = self.title {
-            all.push(title.clone());
-        }
-        all.extend(self.text_content.clone());
-        if let Some(ref notes) = self.notes {
-            all.push(notes.clone());
-        }
-        all
-    }
-}
-
-/// Represents a section in a Pages document
-#[derive(Debug, Clone)]
-pub struct Section {
-    /// Section index (0-based)
-    pub index: usize,
-    /// Section heading
-    pub heading: Option<String>,
-    /// Paragraphs in this section
-    pub paragraphs: Vec<String>,
-}
-
-impl Section {
-    /// Create a new section
-    pub fn new(index: usize) -> Self {
-        Self {
-            index,
-            heading: None,
-            paragraphs: Vec::new(),
-        }
-    }
-
-    /// Get all text from the section
-    pub fn all_text(&self) -> Vec<String> {
-        let mut all = Vec::new();
-        if let Some(ref heading) = self.heading {
-            all.push(heading.clone());
-        }
-        all.extend(self.paragraphs.clone());
-        all
-    }
-}
-
 /// Extract tables from a Numbers document
 ///
 /// Uses the TableDataExtractor to parse complete table structures including
@@ -311,8 +243,8 @@ pub fn extract_slides(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec
         };
 
         let index = slides.len();
-        let mut slide = Slide::new(index);
-        slide.title = archive.name.filter(|name| !name.is_empty());
+        let mut slide = Slide::builder(index);
+        slide.set_title(archive.name.filter(|name| !name.is_empty()));
         let title_placeholder = archive
             .title_placeholder
             .as_ref()
@@ -325,12 +257,12 @@ pub fn extract_slides(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec
         if let Some(identifier) = title_placeholder
             && let Some(text) = drawable_text(bundle, object_index, identifier)?
         {
-            slide.title = Some(text);
+            slide.set_title(Some(text));
         }
         if let Some(identifier) = body_placeholder
             && let Some(text) = drawable_text(bundle, object_index, identifier)?
         {
-            slide.text_content.push(text);
+            slide.push_text(text);
         }
         for drawable in archive.owned_drawables {
             if Some(drawable.identifier) == title_placeholder
@@ -339,7 +271,7 @@ pub fn extract_slides(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec
                 continue;
             }
             if let Some(text) = drawable_text(bundle, object_index, drawable.identifier)? {
-                slide.text_content.push(text);
+                slide.push_text(text);
             }
         }
         if let Some(note) = archive.note
@@ -361,13 +293,13 @@ pub fn extract_slides(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec
                 {
                     let text = storage.text.concat();
                     if !text.is_empty() {
-                        slide.notes = Some(text);
+                        slide.set_notes(Some(text));
                     }
                 }
                 break;
             }
         }
-        slides.push(slide);
+        slides.push(slide.build());
     }
 
     Ok(slides)
@@ -442,7 +374,7 @@ pub fn extract_sections(bundle: &Bundle, object_index: &ObjectIndex) -> Result<V
         return Ok(Vec::new());
     };
 
-    let mut section = Section::new(0);
+    let mut section = Section::new(0, SectionType::Body);
     if let Some(reference) = document.body_storage {
         let object = object_index
             .resolve_ref_id(bundle, reference.identifier)?
@@ -606,14 +538,17 @@ mod tests {
 
     #[test]
     fn test_slide_creation() {
-        let mut slide = Slide::new(0);
-        assert_eq!(slide.index, 0);
-        assert_eq!(slide.title, None);
+        let builder = Slide::builder(0);
+        let slide = builder.build();
+        assert_eq!(slide.index(), 0);
+        assert_eq!(slide.title(), None);
 
-        slide.title = Some("Introduction".to_string());
-        slide.text_content.push("Point 1".to_string());
-        slide.text_content.push("Point 2".to_string());
-        slide.notes = Some("Speaker notes".to_string());
+        let mut builder = Slide::builder(0);
+        builder.set_title(Some("Introduction".to_string()));
+        builder.push_text("Point 1".to_string());
+        builder.push_text("Point 2".to_string());
+        builder.set_notes(Some("Speaker notes".to_string()));
+        let slide = builder.build();
 
         let all_text = slide.all_text();
         assert_eq!(all_text.len(), 4);
@@ -623,7 +558,7 @@ mod tests {
 
     #[test]
     fn test_section_creation() {
-        let mut section = Section::new(0);
+        let mut section = Section::new(0, SectionType::Body);
         section.heading = Some("Chapter 1".to_string());
         section.paragraphs.push("First paragraph.".to_string());
         section.paragraphs.push("Second paragraph.".to_string());
@@ -638,10 +573,11 @@ mod tests {
         let mut table = Table::new("Data".to_string());
         table.set_cell(0, 0, CellValue::Text("A".to_string()));
 
-        let mut slide = Slide::new(0);
-        slide.title = Some("Title".to_string());
+        let mut slide_builder = Slide::builder(0);
+        slide_builder.set_title(Some("Title".to_string()));
+        let slide = slide_builder.build();
 
-        let mut section = Section::new(0);
+        let mut section = Section::new(0, SectionType::Body);
         section.heading = Some("Heading".to_string());
 
         let data = StructuredData {

@@ -24,10 +24,11 @@ use crate::package_metadata::{
 use crate::protobuf::{kn, tsd, tsp, tss, tswp};
 use crate::ref_graph::ObjectId;
 use crate::shapes::{
-    DrawableGeometry, DrawableProperties, RgbaColor, ShapeTextLayout, reset_shape_text_columns,
+    DrawableGeometry, DrawableProperties, RgbaColor, reset_shape_text_columns,
     reset_shape_text_layout, set_shape_geometry, set_shape_properties, set_shape_text_columns,
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
+use crate::text::layout::Layout;
 use crate::text::{
     IWorkTextEditor, ParagraphBackground, ParagraphBorders, ParagraphDecimalTabCharacter,
     ParagraphDefaultTabInterval, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphFlow,
@@ -1407,7 +1408,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<ShapeTextLayout> {
+    ) -> Result<Layout> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         shape_text_layout(self.package(), &graph.archive_name, drawable_object_id)
     }
@@ -1417,7 +1418,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        layout: ShapeTextLayout,
+        layout: Layout,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let staged = set_shape_text_layout(
@@ -5070,10 +5071,10 @@ mod transition_wire;
 
 use builds::*;
 pub use litchi_keynote::transition::Effect;
-pub use litchi_keynote::{Mode, Seconds, Settings, Size};
 pub use litchi_keynote::transition::{
     Acceleration, AccelerationKind, Direction, MosaicType, TextDelivery, TextDeliveryKind,
 };
+pub use litchi_keynote::{Mode, Seconds, Settings, Size};
 pub use slide_audio::{KeynoteSlideAudioInfo, KeynoteSlideAudioOptions, RemovedKeynoteSlideAudio};
 pub use slide_background::KeynoteSlideBackground;
 pub use slide_background_color::{KeynoteRgbColorSpace, KeynoteRgbaColor};
@@ -5134,9 +5135,8 @@ pub use slide_tables::{
 pub use soundtrack::{KeynoteSoundtrackMode, KeynoteSoundtrackSettings};
 pub use soundtrack_items::KeynoteSoundtrackItemInfo;
 pub use transition::{
-    KeynoteTransitionAcceleration, KeynoteTransitionAnimationParameters,
-    KeynoteTransitionCustomParameters, KeynoteTransitionDirection, KeynoteTransitionMosaicType,
-    KeynoteTransitionSettings, KeynoteTransitionTextDelivery,
+    KeynoteTransitionAnimationParameters, KeynoteTransitionCustomParameters,
+    KeynoteTransitionSettings,
 };
 use transition_wire::{transition_settings_from_wire, validate_transition_wire};
 #[cfg(test)]

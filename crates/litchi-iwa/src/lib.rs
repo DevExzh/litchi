@@ -202,7 +202,7 @@ pub use package::IWorkPackage;
 pub use ref_graph::ReferenceGraph;
 pub use shapes::DrawableTitleCaption;
 pub use snappy::SnappyStream;
-pub use structured::{CellValue, Section, Slide, StructuredData, Table};
+pub use structured::{CellValue, StructuredData, Table};
 pub use text::{
     ParagraphStyle, TextDecorations, TextExtractor, TextFragment, TextPointSize, TextStorage,
     TextStrikethrough, TextStyle, TextUnderline,

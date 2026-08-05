@@ -78,11 +78,14 @@ impl Mode {
 
     /// Construct an unknown mode while rejecting values assigned to a named
     /// native variant.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::NonCanonicalMode`] when `raw` is already assigned to a
+    /// named mode.
     pub const fn unknown(raw: i32) -> Result<Self> {
         match raw {
-            NORMAL_MODE | SELF_PLAYING_MODE | LINKS_ONLY_MODE => {
-                Err(Error::NonCanonicalMode)
-            }
+            NORMAL_MODE | SELF_PLAYING_MODE | LINKS_ONLY_MODE => Err(Error::NonCanonicalMode),
             other => Ok(Self::Unknown(other)),
         }
     }
