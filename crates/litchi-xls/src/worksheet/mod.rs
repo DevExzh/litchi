@@ -4,7 +4,7 @@ pub mod layout;
 
 use crate::autofilter::{AutoFilterColumn, AutoFilterInfo, SortInfo};
 use crate::cell::XlsCell;
-use crate::comments::XlsComment;
+use crate::comments::Comment;
 use crate::conditional_format::XlsConditionalFormatting;
 use crate::error::XlsError;
 use crate::hyperlinks::XlsHyperlink;
@@ -41,7 +41,7 @@ pub struct XlsWorksheet {
     /// Hyperlinks (HLINK records)
     hyperlinks: Vec<XlsHyperlink>,
     /// Comments/notes (NOTE records)
-    comments: Vec<XlsComment>,
+    comments: Vec<Comment>,
     /// AutoFilter configuration (AUTOFILTERINFO + AUTOFILTER records)
     autofilter: Option<AutoFilterInfo>,
     /// Sort configuration (SORT record)
@@ -267,11 +267,11 @@ impl XlsWorksheet {
     // -- Comments --
 
     /// All comments/notes in this worksheet.
-    pub fn comments(&self) -> &[XlsComment] {
+    pub fn comments(&self) -> &[Comment] {
         &self.comments
     }
 
-    pub(crate) fn set_comments(&mut self, comments: Vec<XlsComment>) {
+    pub(crate) fn set_comments(&mut self, comments: Vec<Comment>) {
         self.comments = comments;
     }
 

@@ -317,7 +317,7 @@ pub use cell_watch::XlsCellWatch;
 pub use chart_3d::XlsChart3d;
 pub use chart_layout::{XlsCrtLayout12, XlsCrtLayout12A, XlsCrtLayout12Mode};
 pub use chart_property_stream::{XlsRichTextStream, XlsShapePropsStream, XlsTextPropsStream};
-pub use comments::CommentVisibility;
+pub use comments::Visibility;
 pub use conditional_format::{
     XlsConditionalAlignment, XlsConditionalBorder, XlsConditionalComparison,
     XlsConditionalExtension, XlsConditionalFont, XlsConditionalFormatRange,

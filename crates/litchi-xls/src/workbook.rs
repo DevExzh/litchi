@@ -1419,9 +1419,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         litchi_sign::cfb::verify(&mut self.ole_file, litchi_sign::cfb::Format::Xls, policy)
     }
 
-    pub fn document_summary_information(
-        &mut self,
-    ) -> XlsResult<Option<litchi_cfb::Stream>> {
+    pub fn document_summary_information(&mut self) -> XlsResult<Option<litchi_cfb::Stream>> {
         match self
             .ole_file
             .property_set_stream(&["\u{0005}DocumentSummaryInformation"])

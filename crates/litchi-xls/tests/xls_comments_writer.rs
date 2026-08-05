@@ -4,7 +4,7 @@ use litchi_xls::writer::shape::{Anchor, Behavior, Point};
 use litchi_xls::writer::{
     XlsCommentTextRunWrite, XlsCommentWriteOptions, XlsPivotTableConfig, XlsWriter,
 };
-use litchi_xls::{CommentVisibility, XlsWorkbook};
+use litchi_xls::{Visibility, XlsWorkbook};
 
 fn workbook_records(bytes: Vec<u8>) -> Vec<(u16, Vec<u8>)> {
     let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
@@ -61,7 +61,7 @@ fn comments_round_trip_unicode_runs_visibility_and_guid() {
     let comments = workbook.xls_worksheet(0).unwrap().comments();
     assert_eq!(comments.len(), 1);
     assert_eq!(comments[0].text(), "Hello 😀");
-    assert_eq!(comments[0].visibility(), CommentVisibility::Visible);
+    assert_eq!(comments[0].visibility(), Visibility::Visible);
     assert!(comments[0].identity().shared());
     assert_eq!(comments[0].identity().guid(), &guid);
     assert_eq!(comments[0].text_runs().len(), 1);
