@@ -8,7 +8,7 @@
 //! connectors whose `a:stCxn`/`a:endCxn` sites reference other shapes by
 //! name. All three deliberately reuse the typed read model from
 //! [`crate::package::xlsx::shapes`] (`ShapeAnchor`,
-//! `BodyProperties`, `GroupTransform`, paragraphs and runs) so
+//! `Properties`, `GroupTransform`, paragraphs and runs) so
 //! anything authored here round-trips through the shape inventory with
 //! identical semantics.
 //!
@@ -26,9 +26,8 @@ use litchi_core::xml::escape::escape_xml;
 use litchi_drawingml::geom::Preset;
 
 use crate::package::xlsx::shapes::{
-    BodyProperties, CellMarker, Columns, EditAs, EmuExtent, EmuOffset, Geometry, GroupTransform,
-    Paragraph, Run, ShapeAnchor, XlsxTextAutofit, XlsxTextDirection, XlsxTextVerticalAnchor,
-    XlsxTextWrap,
+    Autofit, CellMarker, Columns, Direction, EditAs, EmuExtent, EmuOffset, Geometry,
+    GroupTransform, Paragraph, Properties, Run, ShapeAnchor, VerticalAnchor, Wrap,
 };
 use litchi_drawingml::geometry::writer::write_custom_geometry;
 use litchi_drawingml::geometry::{CustomGeometry, validate_custom_geometry};
@@ -53,7 +52,7 @@ const MAX_GROUP_DEPTH: usize = 32;
 /// One authored DrawingML text-box shape for a worksheet drawing part.
 ///
 /// Construct with [`ShapeSpec::text_box`] (or [`ShapeSpec::shape`]
-/// for a non-text-box shape), then adjust `body_properties`, `paragraphs`,
+/// for a non-text-box shape), then adjust `properties`, `paragraphs`,
 /// or flags before handing it to `MutableWorksheet::add_shape`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ShapeSpec {
@@ -70,7 +69,7 @@ pub struct ShapeSpec {
     /// The shape's mutually exclusive preset or custom geometry.
     pub geometry: Geometry,
     /// Text-body properties (`a:bodyPr`).
-    pub body_properties: BodyProperties,
+    pub properties: Properties,
     /// The text story as paragraphs with runs.
     pub paragraphs: Vec<Paragraph>,
 }
@@ -119,7 +118,7 @@ impl ShapeSpec {
             is_text_box: false,
             anchor,
             geometry,
-            body_properties: BodyProperties::default(),
+            properties: Properties::default(),
             paragraphs,
         }
     }
@@ -799,7 +798,7 @@ fn write_shape_xml(xml: &mut String, spec: &ShapeSpec, id: u32) {
         },
     }
     xml.push_str("</xdr:spPr><xdr:txBody>");
-    write_body_properties(xml, &spec.body_properties);
+    write_properties(xml, &spec.properties);
     xml.push_str("<a:lstStyle/>");
     for paragraph in &spec.paragraphs {
         xml.push_str("<a:p>");
@@ -814,7 +813,7 @@ fn write_shape_xml(xml: &mut String, spec: &ShapeSpec, id: u32) {
     xml.push_str("</xdr:txBody></xdr:sp>");
 }
 
-fn write_body_properties(xml: &mut String, body: &BodyProperties) {
+fn write_properties(xml: &mut String, body: &Properties) {
     xml.push_str("<a:bodyPr");
     let _ = write!(
         xml,
@@ -822,19 +821,18 @@ fn write_body_properties(xml: &mut String, body: &BodyProperties) {
         body.insets.left, body.insets.top, body.insets.right, body.insets.bottom
     );
     let anchor =
-        (body.vertical_anchor != XlsxTextVerticalAnchor::Top).then(|| body.vertical_anchor.token());
+        (body.vertical_anchor != VerticalAnchor::Top).then(|| body.vertical_anchor.token());
     if let Some(token) = anchor {
         let _ = write!(xml, r#" anchor="{token}""#);
     }
     if body.anchor_center {
         xml.push_str(r#" anchorCtr="1""#);
     }
-    let direction =
-        (body.direction != XlsxTextDirection::Horizontal).then(|| body.direction.token());
+    let direction = (body.direction != Direction::Horizontal).then(|| body.direction.token());
     if let Some(token) = direction {
         let _ = write!(xml, r#" vert="{token}""#);
     }
-    if body.wrap == XlsxTextWrap::None {
+    if body.wrap == Wrap::None {
         xml.push_str(r#" wrap="none""#);
     }
     if body.column_count != Columns::ONE {
@@ -844,9 +842,9 @@ fn write_body_properties(xml: &mut String, body: &BodyProperties) {
         xml.push_str(r#" spcFirstLastPara="1""#);
     }
     match body.autofit {
-        XlsxTextAutofit::None => xml.push_str("><a:noAutofit/></a:bodyPr>"),
-        XlsxTextAutofit::Shape => xml.push_str("><a:spAutoFit/></a:bodyPr>"),
-        XlsxTextAutofit::Normal => xml.push_str("><a:normAutofit/></a:bodyPr>"),
+        Autofit::None => xml.push_str("><a:noAutofit/></a:bodyPr>"),
+        Autofit::Shape => xml.push_str("><a:spAutoFit/></a:bodyPr>"),
+        Autofit::Normal => xml.push_str("><a:normAutofit/></a:bodyPr>"),
     }
 }
 

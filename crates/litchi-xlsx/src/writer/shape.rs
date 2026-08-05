@@ -8,7 +8,7 @@
 //! connectors whose `a:stCxn`/`a:endCxn` sites reference other shapes by
 //! name. All three deliberately reuse the typed read model from
 //! [`super::shapes`] (`Anchor`,
-//! `BodyProperties`, `GroupTransform`, paragraphs and runs) so
+//! `Properties`, `GroupTransform`, paragraphs and runs) so
 //! anything authored here round-trips through the shape inventory with
 //! identical semantics.
 //!
@@ -26,8 +26,8 @@ use litchi_core::xml::escape::escape_xml;
 use litchi_drawingml::geom::Preset;
 
 use crate::shapes::{
-    Anchor, Autofit, BodyProperties, CellMarker, Columns, Direction, EditAs, EmuExtent, EmuOffset,
-    Geometry, GroupTransform, Paragraph, Run, VerticalAnchor, Wrap,
+    Anchor, Autofit, CellMarker, Columns, Direction, EditAs, EmuExtent, EmuOffset, Geometry,
+    GroupTransform, Paragraph, Properties, Run, VerticalAnchor, Wrap,
 };
 use litchi_drawingml::geometry::writer::write_custom_geometry;
 use litchi_drawingml::geometry::{CustomGeometry, validate_custom_geometry};
@@ -52,7 +52,7 @@ const MAX_GROUP_DEPTH: usize = 32;
 /// One authored DrawingML text-box shape for a worksheet drawing part.
 ///
 /// Construct with [`ShapeSpec::text_box`] (or [`ShapeSpec::shape`]
-/// for a non-text-box shape), then adjust `body_properties`, `paragraphs`,
+/// for a non-text-box shape), then adjust `properties`, `paragraphs`,
 /// or flags before handing it to `MutableWorksheet::add_shape`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ShapeSpec {
@@ -69,7 +69,7 @@ pub struct ShapeSpec {
     /// The shape's mutually exclusive preset or custom geometry.
     pub geometry: Geometry,
     /// Text-body properties (`a:bodyPr`).
-    pub body_properties: BodyProperties,
+    pub properties: Properties,
     /// The text story as paragraphs with runs.
     pub paragraphs: Vec<Paragraph>,
 }
@@ -113,7 +113,7 @@ impl ShapeSpec {
             is_text_box: false,
             anchor,
             geometry,
-            body_properties: BodyProperties::default(),
+            properties: Properties::default(),
             paragraphs,
         }
     }
@@ -805,7 +805,7 @@ fn write_shape_xml(xml: &mut String, spec: &ShapeSpec, id: u32) {
         },
     }
     xml.push_str("</xdr:spPr><xdr:txBody>");
-    write_body_properties(xml, &spec.body_properties);
+    write_properties(xml, &spec.properties);
     xml.push_str("<a:lstStyle/>");
     for paragraph in &spec.paragraphs {
         xml.push_str("<a:p>");
@@ -820,7 +820,7 @@ fn write_shape_xml(xml: &mut String, spec: &ShapeSpec, id: u32) {
     xml.push_str("</xdr:txBody></xdr:sp>");
 }
 
-fn write_body_properties(xml: &mut String, body: &BodyProperties) {
+fn write_properties(xml: &mut String, body: &Properties) {
     xml.push_str("<a:bodyPr");
     let _ = write!(
         xml,
@@ -883,7 +883,7 @@ fn write_run_properties(xml: &mut String, run: &Run) {
 #[cfg(any())]
 mod tests {
     use super::shapes::{
-        CellMarker, Coordinate32, Emu, Object, Run, TextInsets, TextSize, Underline,
+        CellMarker, Coordinate32, Emu, Insets, Object, Run, TextSize, Underline,
         parse_drawing_shapes,
     };
     use super::*;
@@ -925,8 +925,8 @@ mod tests {
         let mut spec = ShapeSpec::text_box("Box 1", two_cell(), Preset::RoundRect, "Hello");
         spec.description = Some("alt <text>".to_string());
         spec.hidden = true;
-        spec.body_properties = BodyProperties {
-            insets: TextInsets {
+        spec.properties = Properties {
+            insets: Insets {
                 left: Coordinate32::measure("0.2", Unit::Inch).unwrap(),
                 top: Coordinate32::from(91440),
                 right: Coordinate32::from(182880),
@@ -981,7 +981,7 @@ mod tests {
         assert!(shape.is_text_box);
         assert_eq!(shape.preset(), Some(Preset::RoundRect));
         let body = shape.text_body.as_ref().unwrap();
-        assert_eq!(body.body_properties, spec.body_properties);
+        assert_eq!(body.properties, spec.properties);
         assert_eq!(body.paragraphs, spec.paragraphs);
         assert_eq!(body.text(), "Bold & plain\nsecond");
     }
@@ -1022,7 +1022,7 @@ mod tests {
     }
 
     #[test]
-    fn default_body_properties_round_trip() {
+    fn default_properties_round_trip() {
         let spec = ShapeSpec::text_box("Defaults", two_cell(), Preset::Rect, "x");
         let mut xml = String::new();
         ShapeEmitter::new(2)
@@ -1033,7 +1033,7 @@ mod tests {
             panic!("expected a shape");
         };
         let body = shape.text_body.as_ref().unwrap();
-        assert_eq!(body.body_properties, BodyProperties::default());
+        assert_eq!(body.properties, Properties::default());
         // The default edit-as token is omitted from the output.
         let default_edit = Anchor::TwoCell {
             from: marker(0, 0),
@@ -1165,9 +1165,9 @@ mod tests {
                 Preset::Ellipse,
                 "fancy",
             );
-            fancy.body_properties.vertical_anchor = VerticalAnchor::Bottom;
-            fancy.body_properties.autofit = Autofit::Normal;
-            fancy.body_properties.wrap = Wrap::None;
+            fancy.properties.vertical_anchor = VerticalAnchor::Bottom;
+            fancy.properties.autofit = Autofit::Normal;
+            fancy.properties.wrap = Wrap::None;
             fancy.paragraphs[0].runs[0].bold = Some(true);
             fancy.paragraphs[0].runs[0].font_size = Some(TextSize::new(1400).unwrap());
             ws.add_shape(fancy).unwrap();
@@ -1203,9 +1203,9 @@ mod tests {
             Anchor::OneCell { .. }
         ));
         let body = fancy.text_body.as_ref().unwrap();
-        assert_eq!(body.body_properties.vertical_anchor, VerticalAnchor::Bottom);
-        assert_eq!(body.body_properties.autofit, Autofit::Normal);
-        assert_eq!(body.body_properties.wrap, Wrap::None);
+        assert_eq!(body.properties.vertical_anchor, VerticalAnchor::Bottom);
+        assert_eq!(body.properties.autofit, Autofit::Normal);
+        assert_eq!(body.properties.wrap, Wrap::None);
         assert_eq!(body.paragraphs[0].runs[0].bold, Some(true));
         assert_eq!(
             body.paragraphs[0].runs[0].font_size.map(TextSize::get),

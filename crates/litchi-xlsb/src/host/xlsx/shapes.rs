@@ -59,10 +59,10 @@ impl TryFrom<&str> for OleObjectAspect {
 }
 
 use litchi_drawingml::geom::Preset;
+pub use litchi_drawingml::text::body::{Body, Insets, Paragraph, Properties, Run};
 use litchi_drawingml::text::parse_bool;
 pub use litchi_drawingml::text::{
-    Anchor as XlsxTextVerticalAnchor, Autofit as XlsxTextAutofit, Columns, Coordinate32,
-    Direction as XlsxTextDirection, TextSize, Underline as XlsxTextUnderline, Wrap as XlsxTextWrap,
+    Anchor as VerticalAnchor, Autofit, Columns, Coordinate32, Direction, TextSize, Underline, Wrap,
 };
 use litchi_ooxml_common::xml::{
     decode_xml_reference, is_drawingml_name, unqualified_attribute_value, xsd_token_atom,
@@ -82,11 +82,6 @@ const SPREADSHEET_DRAWING_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing";
 const STRICT_SPREADSHEET_DRAWING_NAMESPACE: &[u8] =
     b"http://purl.oclc.org/ooxml/drawingml/spreadsheetDrawing";
-
-/// ECMA-376 default left/right text inset (0.1 inch) when `lIns`/`rIns` are absent.
-const DEFAULT_HORIZONTAL_INSET_EMU: i32 = 91440;
-/// ECMA-376 default top/bottom text inset (0.05 inch) when `tIns`/`bIns` are absent.
-const DEFAULT_VERTICAL_INSET_EMU: i32 = 45720;
 
 const MAX_DRAWING_PART_BYTES: usize = 32 * 1024 * 1024;
 const MAX_ANCHORS_PER_DRAWING: usize = 100_000;
@@ -272,120 +267,6 @@ impl From<CustomGeometry> for Geometry {
     }
 }
 
-/// Text insets of the shape body (`a:bodyPr` `lIns`/`tIns`/`rIns`/`bIns`).
-///
-/// Missing attributes fall back to the ECMA-376 defaults (0.1 inch horizontal,
-/// 0.05 inch vertical).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TextInsets {
-    /// Left inset.
-    pub left: Coordinate32,
-    /// Top inset.
-    pub top: Coordinate32,
-    /// Right inset.
-    pub right: Coordinate32,
-    /// Bottom inset.
-    pub bottom: Coordinate32,
-}
-
-impl Default for TextInsets {
-    fn default() -> Self {
-        Self {
-            left: Coordinate32::from(DEFAULT_HORIZONTAL_INSET_EMU),
-            top: Coordinate32::from(DEFAULT_VERTICAL_INSET_EMU),
-            right: Coordinate32::from(DEFAULT_HORIZONTAL_INSET_EMU),
-            bottom: Coordinate32::from(DEFAULT_VERTICAL_INSET_EMU),
-        }
-    }
-}
-
-/// Text-body properties of a shape (`a:bodyPr`), with ECMA-376 defaults applied.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BodyProperties {
-    /// Text insets.
-    pub insets: TextInsets,
-    /// Vertical anchoring of the text.
-    pub vertical_anchor: XlsxTextVerticalAnchor,
-    /// Whether the anchor point is horizontally centered (`anchorCtr`).
-    pub anchor_center: bool,
-    /// Text direction.
-    pub direction: XlsxTextDirection,
-    /// Text wrap behavior.
-    pub wrap: XlsxTextWrap,
-    /// Autofit behavior.
-    pub autofit: XlsxTextAutofit,
-    /// Number of text columns (`numCol`; 1 when absent).
-    pub column_count: Columns,
-    /// Whether paragraph spacing is ignored in the first and last paragraphs
-    /// (`spcFirstLastPara`).
-    pub space_first_last_paragraph: bool,
-}
-
-impl Default for BodyProperties {
-    fn default() -> Self {
-        Self {
-            insets: TextInsets::default(),
-            vertical_anchor: XlsxTextVerticalAnchor::default(),
-            anchor_center: false,
-            direction: XlsxTextDirection::default(),
-            wrap: XlsxTextWrap::default(),
-            autofit: XlsxTextAutofit::default(),
-            // ECMA-376 defaults `numCol` to a single column.
-            column_count: Columns::ONE,
-            space_first_last_paragraph: false,
-        }
-    }
-}
-
-/// A text run inside a shape-text paragraph (`a:r`).
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Run {
-    /// Run text.
-    pub text: String,
-    /// Explicit bold toggle (`a:rPr@b`), when declared.
-    pub bold: Option<bool>,
-    /// Explicit italic toggle (`a:rPr@i`), when declared.
-    pub italic: Option<bool>,
-    /// Exact underline style (`a:rPr@u`), when declared.
-    pub underline: Option<XlsxTextUnderline>,
-    /// Font size in hundredths of a point (`a:rPr@sz`), when declared.
-    pub font_size: Option<TextSize>,
-}
-
-/// A paragraph inside a shape text body (`a:p`).
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Paragraph {
-    /// The paragraph's runs in document order.
-    pub runs: Vec<Run>,
-}
-
-impl Paragraph {
-    /// Concatenated paragraph text.
-    pub fn text(&self) -> String {
-        self.runs.iter().map(|run| run.text.as_str()).collect()
-    }
-}
-
-/// The text story of a shape (`xdr:txBody`).
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct TextBody {
-    /// Text-body properties (ECMA-376 defaults when `a:bodyPr` is absent).
-    pub body_properties: BodyProperties,
-    /// The story's paragraphs in document order.
-    pub paragraphs: Vec<Paragraph>,
-}
-
-impl TextBody {
-    /// All text of the story, one line per paragraph.
-    pub fn text(&self) -> String {
-        self.paragraphs
-            .iter()
-            .map(Paragraph::text)
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
-}
-
 /// Non-visual identity shared by all drawing objects (`xdr:cNvPr` and lock flags).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct NonVisual {
@@ -411,7 +292,7 @@ pub struct Shape {
     /// Mutually exclusive preset or custom geometry, when declared.
     pub geometry: Option<Geometry>,
     /// Rich-text story (`xdr:txBody`), when present.
-    pub text_body: Option<TextBody>,
+    pub text_body: Option<Body>,
 }
 
 impl Shape {
@@ -447,7 +328,7 @@ pub struct ConnectionShape {
     /// End connection, when declared.
     pub end: Option<ConnectionEnd>,
     /// Rich-text story (`xdr:txBody`), when present.
-    pub text_body: Option<TextBody>,
+    pub text_body: Option<Body>,
 }
 
 impl ConnectionShape {
@@ -579,8 +460,8 @@ enum Context {
     Marker(MarkerTarget, MarkerField),
     Object,
     CustomGeometry(GeometryElement),
-    TextBody,
-    BodyProperties,
+    Body,
+    Properties,
     Paragraph,
     Run,
     RunProperties,
@@ -657,8 +538,8 @@ enum BuilderKind {
 }
 
 #[derive(Default)]
-struct TextBodyBuilder {
-    properties: BodyProperties,
+struct BodyBuilder {
+    properties: Properties,
     paragraphs: Vec<Paragraph>,
     paragraph: Option<Paragraph>,
     run: Option<Run>,
@@ -675,7 +556,7 @@ struct ObjectBuilder {
     end: Option<ConnectionEnd>,
     transform: GroupTransform,
     saw_transform: bool,
-    text_body: TextBodyBuilder,
+    text_body: BodyBuilder,
     children: Vec<DrawingObject>,
     ole_object: Option<DrawingOleObject>,
 }
@@ -692,7 +573,7 @@ impl ObjectBuilder {
             end: None,
             transform: GroupTransform::default(),
             saw_transform: false,
-            text_body: TextBodyBuilder::default(),
+            text_body: BodyBuilder::default(),
             children: Vec::new(),
             ole_object: None,
         }
@@ -700,8 +581,8 @@ impl ObjectBuilder {
 
     fn finish(self) -> Option<DrawingObject> {
         let text_body = if self.text_body.in_text_body {
-            Some(TextBody {
-                body_properties: self.text_body.properties,
+            Some(Body {
+                properties: self.text_body.properties,
                 paragraphs: self.text_body.paragraphs,
             })
         } else {
@@ -1066,7 +947,7 @@ impl Parser {
                         return Err(invalid("drawing shape contains duplicate text bodies"));
                     }
                     builder.text_body.in_text_body = true;
-                    return Ok(Context::TextBody);
+                    return Ok(Context::Body);
                 },
                 b"oleObject"
                     if self
@@ -1159,19 +1040,19 @@ impl Parser {
                     self.apply_group_transform(local, element, decoder)?;
                 },
                 b"bodyPr" => {
-                    self.parse_body_properties(element, decoder)?;
-                    return Ok(Context::BodyProperties);
+                    self.parse_properties(element, decoder)?;
+                    return Ok(Context::Properties);
                 },
-                b"noAutofit" if parent == Context::BodyProperties => {
-                    self.builder_mut()?.text_body.properties.autofit = XlsxTextAutofit::None;
+                b"noAutofit" if parent == Context::Properties => {
+                    self.builder_mut()?.text_body.properties.autofit = Autofit::None;
                 },
-                b"spAutoFit" if parent == Context::BodyProperties => {
-                    self.builder_mut()?.text_body.properties.autofit = XlsxTextAutofit::Shape;
+                b"spAutoFit" if parent == Context::Properties => {
+                    self.builder_mut()?.text_body.properties.autofit = Autofit::Shape;
                 },
-                b"normAutofit" if parent == Context::BodyProperties => {
-                    self.builder_mut()?.text_body.properties.autofit = XlsxTextAutofit::Normal;
+                b"normAutofit" if parent == Context::Properties => {
+                    self.builder_mut()?.text_body.properties.autofit = Autofit::Normal;
                 },
-                b"p" if parent == Context::TextBody => {
+                b"p" if parent == Context::Body => {
                     let builder = self.builder_mut()?;
                     if builder.text_body.paragraph.is_some() {
                         return Err(invalid("nested drawing text paragraphs"));
@@ -1295,7 +1176,7 @@ impl Parser {
         Ok(())
     }
 
-    fn parse_body_properties(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+    fn parse_properties(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
         let body = &mut self.builder_mut()?.text_body.properties;
         if let Some(value) = unqualified_attribute_value(element, b"lIns", decoder)? {
             body.insets.left = parse_value(&value, "left text inset")?;
@@ -1342,7 +1223,7 @@ impl Parser {
             run.italic = Some(parse_dml_bool(&value, "run italic")?);
         }
         if let Some(value) = unqualified_attribute_value(element, b"u", decoder)? {
-            run.underline = Some(XlsxTextUnderline::from_dml(&value).map_err(|error| {
+            run.underline = Some(Underline::from_dml(&value).map_err(|error| {
                 invalid(format!("invalid DrawingML underline '{value}': {error}"))
             })?);
         }

@@ -16,10 +16,9 @@ pub use chart::{
 };
 pub use litchi_drawingml::geom::Preset;
 pub use shapes::{
-    AnchoredObject, BodyProperties, CellMarker, ClientData, Columns, ConnectionEnd,
-    ConnectionShape, Coordinate32, DrawingObject, DrawingOleObject, EditAs, EditAsError, Emu,
-    EmuExtent, EmuOffset, Geometry, Group, GroupTransform, NonVisual, OleObjectAspect, Paragraph,
-    Run, Shape, ShapeAnchor, Shapes, TextBody, TextInsets, TextSize, XlsxTextAutofit,
-    XlsxTextDirection, XlsxTextUnderline, XlsxTextVerticalAnchor, XlsxTextWrap,
+    AnchoredObject, Autofit, Body, CellMarker, ClientData, Columns, ConnectionEnd, ConnectionShape,
+    Coordinate32, Direction, DrawingObject, DrawingOleObject, EditAs, EditAsError, Emu, EmuExtent,
+    EmuOffset, Geometry, Group, GroupTransform, Insets, NonVisual, OleObjectAspect, Paragraph,
+    Properties, Run, Shape, ShapeAnchor, Shapes, TextSize, Underline, VerticalAnchor, Wrap,
 };
 pub use writer::{ConnectionEndSpec, ConnectionShapeSpec, DrawingObjectSpec, GroupSpec, ShapeSpec};

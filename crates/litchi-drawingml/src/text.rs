@@ -10,6 +10,8 @@ use std::str::FromStr;
 
 use crate::coord::{Coordinate, Unit};
 
+pub mod body;
+
 /// Failure to parse or construct a DrawingML text primitive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]

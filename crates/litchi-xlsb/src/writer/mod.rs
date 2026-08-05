@@ -71,9 +71,9 @@ pub use crate::package::xlsx::writer::{
     ConnectionEndSpec, ConnectionShapeSpec, DrawingObjectSpec, Geometry, GroupSpec, ShapeSpec,
 };
 pub use crate::package::xlsx::{
-    BodyProperties, CellMarker, Chart, ChartAnchor, Columns, Coordinate32, EditAs, Emu, EmuExtent,
-    EmuOffset, GroupTransform, Paragraph, Preset, Run, ShapeAnchor, TextInsets, TextSize,
-    XlsxTextAutofit, XlsxTextDirection, XlsxTextUnderline, XlsxTextVerticalAnchor, XlsxTextWrap,
+    Autofit, Body, CellMarker, Chart, ChartAnchor, Columns, Coordinate32, Direction, EditAs, Emu,
+    EmuExtent, EmuOffset, GroupTransform, Insets, Paragraph, Preset, Properties, Run, ShapeAnchor,
+    TextSize, Underline, VerticalAnchor, Wrap,
 };
 pub use crate::pivot_view::Part;
 pub use chartsheet::MutableChartSheet;
