@@ -1,41 +1,33 @@
 //! Semantic read and delete operations for Keynote slide transitions.
 
 use super::*;
-use litchi_keynote::transition::Effect;
+use litchi_keynote::transition::{
+    AnimationParameters, CustomParameters, Effect, Settings as TransitionSettings,
+};
 
 const TRANSITION_ANIMATION_TYPE: &str = "Transition";
 const NO_EFFECT_DURATION_SECONDS: f64 = 1.0;
 
-impl KeynoteTransitionSettings {
-    /// Whether the slide has a visible transition effect.
-    pub fn has_effect(&self) -> bool {
-        !matches!(self.effect, None | Some(Effect::None))
-    }
-
-    pub(super) fn without_effect(&self) -> Self {
-        Self {
-            animation_type: Some(TRANSITION_ANIMATION_TYPE.to_owned()),
-            effect: Some(Effect::None),
-            duration: Some(NO_EFFECT_DURATION_SECONDS),
-            direction: None,
-            delay: self.delay,
-            is_automatic: self.is_automatic,
-            animation_parameters: KeynoteTransitionAnimationParameters {
-                random_number_seed: self.animation_parameters.random_number_seed,
-                writing_direction_is_rtl: self.animation_parameters.writing_direction_is_rtl,
-                ..KeynoteTransitionAnimationParameters::default()
-            },
-            custom_parameters: KeynoteTransitionCustomParameters::default(),
-        }
+fn without_effect(settings: &TransitionSettings) -> TransitionSettings {
+    TransitionSettings {
+        animation_type: Some(TRANSITION_ANIMATION_TYPE.into()),
+        effect: Some(Effect::None),
+        duration: Some(NO_EFFECT_DURATION_SECONDS),
+        direction: None,
+        delay: settings.delay,
+        is_automatic: settings.is_automatic,
+        animation_parameters: AnimationParameters {
+            random_number_seed: settings.animation_parameters.random_number_seed,
+            writing_direction_is_rtl: settings.animation_parameters.writing_direction_is_rtl,
+            ..AnimationParameters::default()
+        },
+        custom_parameters: CustomParameters::default(),
     }
 }
 
 impl KeynoteEditor {
     /// Read one slide's modern transition settings.
-    pub fn slide_transition(
-        &self,
-        slide_index: usize,
-    ) -> Result<Option<KeynoteTransitionSettings>> {
+    pub fn slide_transition(&self, slide_index: usize) -> Result<Option<TransitionSettings>> {
         let slides = self.slides()?;
         slides
             .get(slide_index)
@@ -57,7 +49,7 @@ impl KeynoteEditor {
         let Some(settings) = self.slide_transition(slide_index)? else {
             return Ok(false);
         };
-        let cleared = settings.without_effect();
+        let cleared = without_effect(&settings);
         if cleared == settings {
             return Ok(false);
         }

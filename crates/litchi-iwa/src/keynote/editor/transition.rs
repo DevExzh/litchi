@@ -2,95 +2,61 @@
 
 use super::transition_wire::{patch_transition_settings_wire, transition_settings_from_wire};
 use super::*;
-use litchi_keynote::transition::{Acceleration, Direction, Effect, MosaicType, TextDelivery};
+use litchi_keynote::transition::{
+    Acceleration, AnimationParameters, CustomParameters, Direction, Effect, MosaicType,
+    Settings as TransitionSettings, TextDelivery,
+};
 
 const SLIDE_ARCHIVE_MESSAGE_TYPE: u32 = 5;
 
-/// Modern transition fields embedded in a Keynote slide.
-#[derive(Debug, Clone, PartialEq)]
-pub struct KeynoteTransitionSettings {
-    pub animation_type: Option<String>,
-    pub effect: Option<Effect>,
-    pub duration: Option<f64>,
-    pub direction: Option<Direction>,
-    pub delay: Option<f64>,
-    pub is_automatic: Option<bool>,
-    /// Modern animation-level parameters, including byte-exact native color
-    /// and timing-curve protobuf payloads.
-    pub animation_parameters: KeynoteTransitionAnimationParameters,
-    /// Native effect-specific parameters shared by transition effects.
-    pub custom_parameters: KeynoteTransitionCustomParameters,
-}
-
-/// Lossless parameters stored inside a transition's modern animation archive.
-///
-/// Color and timing curves are kept as encoded native protobuf payloads. This
-/// permits arbitrary current and future path-source variants to round-trip
-/// without exposing private generated protobuf types in the public API.
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct KeynoteTransitionAnimationParameters {
-    pub color_payload: Option<Vec<u8>>,
-    pub timing_curve_payloads: [Option<Vec<u8>>; 3],
-    pub random_number_seed: Option<u32>,
-    pub detail: Option<f64>,
-    pub timing_curve_theme_names: [Option<String>; 3],
-    pub writing_direction_is_rtl: Option<bool>,
-}
-
-/// Lossless native parameters shared by Keynote transition effects.
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub struct KeynoteTransitionCustomParameters {
-    pub twist: Option<f32>,
-    pub mosaic_size: Option<u32>,
-    pub mosaic_type: Option<MosaicType>,
-    pub bounce: Option<bool>,
-    pub magic_move_fade_unmatched_objects: Option<bool>,
-    pub acceleration: Option<Acceleration>,
-    pub text_delivery: Option<TextDelivery>,
-    pub motion_blur: Option<bool>,
-    pub travel_distance: Option<f32>,
-}
-
-impl KeynoteTransitionSettings {
-    pub(super) fn from_native(attributes: &kn::TransitionAttributesArchive) -> Option<Self> {
-        let animation = attributes.animation_attributes.as_ref()?;
-        Some(Self {
-            animation_type: animation.animation_type.clone(),
-            effect: animation.effect.as_deref().map(Effect::from_identifier),
-            duration: animation.duration,
-            direction: animation.direction.map(Direction::from_native),
-            delay: animation.delay,
-            is_automatic: animation.is_automatic,
-            animation_parameters: KeynoteTransitionAnimationParameters {
-                color_payload: None,
-                timing_curve_payloads: [None, None, None],
-                random_number_seed: animation.random_number_seed,
-                detail: animation.custom_detail,
-                timing_curve_theme_names: [
-                    animation.custom_effect_timing_curve_theme_name_1.clone(),
-                    animation.custom_effect_timing_curve_theme_name_2.clone(),
-                    animation.custom_effect_timing_curve_theme_name_3.clone(),
-                ],
-                writing_direction_is_rtl: animation.writing_direction_is_rtl,
-            },
-            custom_parameters: KeynoteTransitionCustomParameters {
-                twist: attributes.custom_twist,
-                mosaic_size: attributes.custom_mosaic_size,
-                mosaic_type: attributes.custom_mosaic_type.map(MosaicType::from_native),
-                bounce: attributes.custom_bounce,
-                magic_move_fade_unmatched_objects: attributes
-                    .custom_magic_move_fade_unmatched_objects,
-                acceleration: attributes
-                    .custom_timing_curve
-                    .map(Acceleration::from_native),
-                text_delivery: attributes
-                    .custom_text_delivery_type
-                    .map(TextDelivery::from_native),
-                motion_blur: attributes.custom_motion_blur,
-                travel_distance: attributes.custom_travel_distance,
-            },
-        })
-    }
+pub(super) fn settings_from_native(
+    attributes: &kn::TransitionAttributesArchive,
+) -> Option<TransitionSettings> {
+    let animation = attributes.animation_attributes.as_ref()?;
+    Some(TransitionSettings {
+        animation_type: animation.animation_type.clone().map(String::into_boxed_str),
+        effect: animation.effect.as_deref().map(Effect::from_identifier),
+        duration: animation.duration,
+        direction: animation.direction.map(Direction::from_native),
+        delay: animation.delay,
+        is_automatic: animation.is_automatic,
+        animation_parameters: AnimationParameters {
+            color_payload: None,
+            timing_curve_payloads: [None, None, None],
+            random_number_seed: animation.random_number_seed,
+            detail: animation.custom_detail,
+            timing_curve_theme_names: [
+                animation
+                    .custom_effect_timing_curve_theme_name_1
+                    .clone()
+                    .map(String::into_boxed_str),
+                animation
+                    .custom_effect_timing_curve_theme_name_2
+                    .clone()
+                    .map(String::into_boxed_str),
+                animation
+                    .custom_effect_timing_curve_theme_name_3
+                    .clone()
+                    .map(String::into_boxed_str),
+            ],
+            writing_direction_is_rtl: animation.writing_direction_is_rtl,
+        },
+        custom_parameters: CustomParameters {
+            twist: attributes.custom_twist,
+            mosaic_size: attributes.custom_mosaic_size,
+            mosaic_type: attributes.custom_mosaic_type.map(MosaicType::from_native),
+            bounce: attributes.custom_bounce,
+            magic_move_fade_unmatched_objects: attributes.custom_magic_move_fade_unmatched_objects,
+            acceleration: attributes
+                .custom_timing_curve
+                .map(Acceleration::from_native),
+            text_delivery: attributes
+                .custom_text_delivery_type
+                .map(TextDelivery::from_native),
+            motion_blur: attributes.custom_motion_blur,
+            travel_distance: attributes.custom_travel_distance,
+        },
+    })
 }
 
 impl KeynoteEditor {
@@ -105,7 +71,7 @@ impl KeynoteEditor {
     pub fn set_slide_transition(
         &mut self,
         slide_index: usize,
-        settings: KeynoteTransitionSettings,
+        settings: TransitionSettings,
     ) -> Result<()> {
         validate_transition_settings(&settings)?;
         let slides = self.slides()?;
@@ -181,67 +147,13 @@ impl KeynoteEditor {
     }
 }
 
-fn validate_transition_settings(settings: &KeynoteTransitionSettings) -> Result<()> {
-    for (name, value) in [
-        ("transition duration", settings.duration),
-        ("transition delay", settings.delay),
-    ] {
-        if value.is_some_and(|value| !value.is_finite() || value < 0.0) {
-            return Err(Error::ParseError(format!(
-                "Keynote {name} must be finite and non-negative"
-            )));
-        }
-    }
-    for (name, value) in [
-        ("transition twist", settings.custom_parameters.twist),
-        (
-            "transition travel distance",
-            settings.custom_parameters.travel_distance,
-        ),
-    ] {
-        if value.is_some_and(|value| !value.is_finite()) {
-            return Err(Error::ParseError(format!("Keynote {name} must be finite")));
-        }
-    }
-    if settings
-        .animation_parameters
-        .detail
-        .is_some_and(|value| !value.is_finite())
-    {
-        return Err(Error::ParseError(
-            "Keynote transition detail must be finite".to_owned(),
-        ));
-    }
-    if settings
-        .effect
-        .as_ref()
-        .is_some_and(|effect| !effect.is_canonical())
-    {
-        return Err(Error::ParseError(
-            "Keynote transition effect must use its named variant for known native identifiers"
-                .to_owned(),
-        ));
-    }
-    if settings
-        .animation_type
-        .as_deref()
-        .into_iter()
-        .chain(settings.effect.as_ref().map(Effect::identifier))
-        .chain(
-            settings
-                .animation_parameters
-                .timing_curve_theme_names
-                .iter()
-                .filter_map(Option::as_deref),
-        )
-        .any(|value| value.contains('\0'))
-    {
-        return Err(Error::ParseError(
-            "Keynote transition strings cannot contain NUL".to_owned(),
-        ));
-    }
+pub(super) fn validate_transition_settings(settings: &TransitionSettings) -> Result<()> {
+    settings.validate().map_err(|error| {
+        Error::ParseError(format!("invalid Keynote transition settings: {error}"))
+    })?;
+
     if let Some(payload) = &settings.animation_parameters.color_payload {
-        let color = tsp::Color::decode(payload.as_slice()).map_err(|error| {
+        let color = tsp::Color::decode(payload.as_ref()).map_err(|error| {
             Error::ParseError(format!("invalid Keynote transition color payload: {error}"))
         })?;
         for component in [
@@ -260,7 +172,7 @@ fn validate_transition_settings(settings: &KeynoteTransitionSettings) -> Result<
         .iter()
         .flatten()
     {
-        tsd::PathSourceArchive::decode(payload.as_slice()).map_err(|error| {
+        tsd::PathSourceArchive::decode(payload.as_ref()).map_err(|error| {
             Error::ParseError(format!(
                 "invalid Keynote transition timing-curve payload: {error}"
             ))

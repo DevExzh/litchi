@@ -53,6 +53,7 @@ use crate::wire::{
 };
 use crate::{EmbeddedMediaAsset, Error, IWorkMediaEditor, IWorkPackage, Result};
 pub use litchi_keynote::build::{Acceleration as BuildAcceleration, Start as BuildStart};
+use litchi_keynote::transition::Settings as TransitionSettings;
 
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
 const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3_097;
@@ -107,7 +108,7 @@ pub struct KeynoteSlideInfo {
     /// `None` means the selected layout has no body placeholder. Hidden
     /// placeholders retain their storage, so [`Self::body`] remains readable.
     pub is_body_visible: Option<bool>,
-    pub transition: Option<KeynoteTransitionSettings>,
+    pub transition: Option<TransitionSettings>,
     pub title_storage_id: Option<u64>,
     pub title: Option<String>,
     pub body_storage_id: Option<u64>,
@@ -5051,7 +5052,8 @@ pub use litchi_iwa_common::color::{RgbColorSpace, Rgba};
 pub use litchi_keynote::background::{Angle, Background, Gradient, Kind, Opaque, Stop};
 pub use litchi_keynote::transition::Effect;
 pub use litchi_keynote::transition::{
-    Acceleration, AccelerationKind, Direction, MosaicType, TextDelivery, TextDeliveryKind,
+    Acceleration, AccelerationKind, AnimationParameters, CustomParameters, Direction, MosaicType,
+    TextDelivery, TextDeliveryKind,
 };
 pub use litchi_keynote::{Mode, Seconds, Settings, Size};
 pub use slide_audio::{KeynoteSlideAudioInfo, KeynoteSlideAudioOptions, RemovedKeynoteSlideAudio};
@@ -5107,10 +5109,6 @@ pub use slide_tables::{
 };
 pub use soundtrack::{KeynoteSoundtrackMode, KeynoteSoundtrackSettings};
 pub use soundtrack_items::KeynoteSoundtrackItemInfo;
-pub use transition::{
-    KeynoteTransitionAnimationParameters, KeynoteTransitionCustomParameters,
-    KeynoteTransitionSettings,
-};
 use transition_wire::{transition_settings_from_wire, validate_transition_wire};
 #[cfg(test)]
 mod operation_cache_tests;

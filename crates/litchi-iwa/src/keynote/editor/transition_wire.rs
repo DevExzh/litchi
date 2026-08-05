@@ -1,8 +1,8 @@
 //! Lossless protobuf wire handling for Keynote slide transitions.
 
-use super::transition::KeynoteTransitionSettings;
+use super::transition::{settings_from_native, validate_transition_settings};
 use super::*;
-use litchi_keynote::transition::Effect;
+use litchi_keynote::transition::{Effect, Settings as TransitionSettings};
 
 const SLIDE_TRANSITION_FIELD: u32 = 4;
 const TRANSITION_ATTRIBUTES_FIELD: u32 = 2;
@@ -47,8 +47,8 @@ const fn custom_path(field: u32) -> [u32; 3] {
 pub(super) fn transition_settings_from_wire(
     original: &[u8],
     attributes: &kn::TransitionAttributesArchive,
-) -> Result<Option<KeynoteTransitionSettings>> {
-    let Some(mut settings) = KeynoteTransitionSettings::from_native(attributes) else {
+) -> Result<Option<TransitionSettings>> {
+    let Some(mut settings) = settings_from_native(attributes) else {
         return Ok(None);
     };
     let transition = required_length_delimited_payload(
@@ -67,18 +67,21 @@ pub(super) fn transition_settings_from_wire(
         "Keynote modern transition attributes",
     )?;
     settings.animation_parameters.color_payload =
-        optional_length_delimited_payload(animation, COLOR_FIELD)?.map(Vec::from);
+        optional_length_delimited_payload(animation, COLOR_FIELD)?
+            .map(|payload| payload.into_boxed_slice());
     for (index, field_number) in TIMING_CURVE_FIELDS.into_iter().enumerate() {
         settings.animation_parameters.timing_curve_payloads[index] =
-            optional_length_delimited_payload(animation, field_number)?.map(Vec::from);
+            optional_length_delimited_payload(animation, field_number)?
+                .map(|payload| payload.into_boxed_slice());
     }
+    validate_transition_settings(&settings)?;
     Ok(Some(settings))
 }
 
 pub(super) fn patch_transition_settings_wire(
     original: &[u8],
     attributes: &kn::TransitionAttributesArchive,
-    settings: &KeynoteTransitionSettings,
+    settings: &TransitionSettings,
 ) -> Result<Vec<u8>> {
     let animation = attributes.animation_attributes.as_ref().ok_or_else(|| {
         Error::InvalidFormat("Keynote transition has no modern attributes".to_owned())
