@@ -691,13 +691,15 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
+    use litchi_iwa_common::chart::gaps::{Percentage, Spacing};
+
     use crate::charts::object_container::is_object_container_archive;
     use crate::charts::source::SERIES_NON_STYLE_MESSAGE_TYPE;
     use crate::charts::unique_chart_object_archive_name;
     use crate::charts::{
         Axis, Bound, Bounds, ChartCornerRadius, ChartDonutInnerRadius, ChartErrorBarCustomValues,
         ChartErrorBarDirection, ChartErrorBarFixedValue, ChartFont, ChartFontSize,
-        ChartGapPercentage, ChartGapSpacing, ChartLegendFill, ChartLegendFont, ChartLegendFontSize,
+        ChartLegendFill, ChartLegendFont, ChartLegendFontSize,
         ChartLegendFrame, ChartLegendRect, ChartLegendShadow, ChartLegendStroke,
         ChartPieLabelDistance, ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex,
         ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesStroke,
@@ -871,10 +873,10 @@ mod tests {
         .unwrap();
     }
 
-    fn gap_spacing(between_items: f32, between_sets: f32) -> ChartGapSpacing {
-        ChartGapSpacing::new(
-            ChartGapPercentage::new(between_items).unwrap(),
-            ChartGapPercentage::new(between_sets).unwrap(),
+    fn gap_spacing(between_items: f32, between_sets: f32) -> Spacing {
+        Spacing::new(
+            Percentage::new(between_items).unwrap(),
+            Percentage::new(between_sets).unwrap(),
         )
     }
 
@@ -3104,14 +3106,14 @@ mod tests {
             editor
                 .sheet_chart_gap_spacing(sheet_id, source.drawable_object_id)
                 .unwrap(),
-            ChartGapSpacing::NATIVE_DEFAULT
+            Spacing::DEFAULT
         );
         let baseline = editor.to_bytes().unwrap();
         editor
             .set_sheet_chart_gap_spacing(
                 sheet_id,
                 source.drawable_object_id,
-                ChartGapSpacing::NATIVE_DEFAULT,
+                Spacing::DEFAULT,
             )
             .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);

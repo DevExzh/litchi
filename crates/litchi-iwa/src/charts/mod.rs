@@ -80,6 +80,8 @@ pub(crate) mod shadow;
 pub(crate) mod source;
 pub(crate) mod style;
 
+pub use litchi_iwa_common::chart::gaps::{Percentage, Spacing};
+
 pub use archive::IWorkChartArchive;
 pub use arrangement::ChartArrangement;
 pub use axis_gridline_stroke::{ChartAxisGridline, ChartAxisGridlineStroke};
@@ -88,7 +90,6 @@ pub use data::ChartData;
 pub use depth_3d::Chart3dDepth;
 pub use donut_inner_radius::ChartDonutInnerRadius;
 pub use font::{ChartFont, ChartFontSize};
-pub use gaps::{ChartGapPercentage, ChartGapSpacing};
 pub use legend_fill::ChartLegendFill;
 pub use legend_font::{ChartLegendFont, ChartLegendFontSize};
 pub use legend_frame::{

@@ -7,6 +7,8 @@
 
 use prost::Message;
 
+use litchi_iwa_common::chart::gaps::{Percentage, Spacing};
+
 use crate::charts::style::{
     GENERATED_CHART_STYLE_EXTENSION_FIELD, chart_style_slot, generated_chart_style_extension,
 };
@@ -18,110 +20,13 @@ use crate::{Error, IWorkPackage, Result};
 const CHART_BETWEEN_ITEMS_GAP_FIELD: u32 = 16;
 /// `tschchartinfodefaultintersetgap` in `TSCH.Generated.ChartStyleArchive`.
 const CHART_BETWEEN_SETS_GAP_FIELD: u32 = 17;
-/// The smallest gap accepted by the native inspector.
-const MINIMUM_CHART_GAP_PERCENT: f32 = 0.0;
-/// The largest gap accepted by the native inspector.
-const MAXIMUM_CHART_GAP_PERCENT: f32 = 999.0;
-/// The native default between individual columns or bars.
-const DEFAULT_BETWEEN_ITEMS_GAP_PERCENT: f32 = 10.0;
-/// The native default between sets of columns or bars.
-const DEFAULT_BETWEEN_SETS_GAP_PERCENT: f32 = 40.0;
-
-/// A native chart-gap percentage.
-///
-/// The value maps directly to the whole-percentage field shown by iWork. The
-/// native archive uses an `f32`, so finite fractional percentages remain
-/// lossless even though the current macOS inspector displays whole numbers.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct ChartGapPercentage(f32);
-
-impl ChartGapPercentage {
-    /// No gap between chart elements.
-    pub const ZERO: Self = Self(MINIMUM_CHART_GAP_PERCENT);
-
-    /// The largest gap accepted by the native inspector.
-    pub const MAXIMUM: Self = Self(MAXIMUM_CHART_GAP_PERCENT);
-
-    /// Build a chart-gap percentage accepted by the native inspector.
-    pub fn new(percent: f32) -> Result<Self> {
-        if !percent.is_finite()
-            || !(MINIMUM_CHART_GAP_PERCENT..=MAXIMUM_CHART_GAP_PERCENT).contains(&percent)
-        {
-            return Err(Error::InvalidFormat(format!(
-                "chart gap must be finite and within {MINIMUM_CHART_GAP_PERCENT}%..={MAXIMUM_CHART_GAP_PERCENT}%"
-            )));
-        }
-        Ok(Self(percent))
-    }
-
-    /// Return the percentage stored and displayed by iWork.
-    pub const fn percent(self) -> f32 {
-        self.0
-    }
-
-    fn from_native(percent: f32) -> Result<Self> {
-        Self::new(percent).map_err(|_| {
-            Error::InvalidFormat(format!(
-                "native chart gap {percent} must be finite and within {MINIMUM_CHART_GAP_PERCENT}%..={MAXIMUM_CHART_GAP_PERCENT}%"
-            ))
-        })
-    }
-}
-
-impl TryFrom<f32> for ChartGapPercentage {
-    type Error = Error;
-
-    fn try_from(percent: f32) -> Result<Self> {
-        Self::new(percent)
-    }
-}
-
-/// Native spacing between bars or columns in a chart.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct ChartGapSpacing {
-    between_items: ChartGapPercentage,
-    between_sets: ChartGapPercentage,
-}
-
-impl ChartGapSpacing {
-    /// The spacing used by newly inserted native iWork charts.
-    pub const NATIVE_DEFAULT: Self = Self::new(
-        ChartGapPercentage(DEFAULT_BETWEEN_ITEMS_GAP_PERCENT),
-        ChartGapPercentage(DEFAULT_BETWEEN_SETS_GAP_PERCENT),
-    );
-
-    /// Construct spacing within a set and between adjacent sets.
-    pub const fn new(between_items: ChartGapPercentage, between_sets: ChartGapPercentage) -> Self {
-        Self {
-            between_items,
-            between_sets,
-        }
-    }
-
-    /// Return the gap between individual bars or columns within a set.
-    pub const fn between_items(self) -> ChartGapPercentage {
-        self.between_items
-    }
-
-    /// Return the gap between adjacent sets of bars or columns.
-    pub const fn between_sets(self) -> ChartGapPercentage {
-        self.between_sets
-    }
-}
-
-impl Default for ChartGapSpacing {
-    fn default() -> Self {
-        Self::NATIVE_DEFAULT
-    }
-}
-
 /// Read the gap spacing of one native chart.
 pub(crate) fn chart_gap_spacing(
     package: &IWorkPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-) -> Result<ChartGapSpacing> {
+) -> Result<Spacing> {
     chart_style_slot(
         package,
         chart_archive_name,
@@ -137,7 +42,7 @@ pub(crate) fn set_chart_gap_spacing(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    spacing: ChartGapSpacing,
+    spacing: Spacing,
 ) -> Result<()> {
     let slot = chart_style_slot(
         package,
@@ -158,36 +63,42 @@ pub(crate) fn set_chart_gap_spacing(
     Ok(())
 }
 
-fn read_chart_gap_spacing(data: &[u8]) -> Result<ChartGapSpacing> {
+fn read_chart_gap_spacing(data: &[u8]) -> Result<Spacing> {
     let Some(extension) = generated_chart_style_extension(data)? else {
-        return Ok(ChartGapSpacing::NATIVE_DEFAULT);
+        return Ok(Spacing::DEFAULT);
     };
     let generated = tsch::generated::ChartStyleArchive::decode(extension)?;
-    Ok(ChartGapSpacing::new(
+    Ok(Spacing::new(
         generated
             .tschchartinfodefaultinterbargap
-            .map(ChartGapPercentage::from_native)
+            .map(native_percentage)
             .transpose()?
-            .unwrap_or(ChartGapSpacing::NATIVE_DEFAULT.between_items()),
+            .unwrap_or(Spacing::DEFAULT.between_items()),
         generated
             .tschchartinfodefaultintersetgap
-            .map(ChartGapPercentage::from_native)
+            .map(native_percentage)
             .transpose()?
-            .unwrap_or(ChartGapSpacing::NATIVE_DEFAULT.between_sets()),
+            .unwrap_or(Spacing::DEFAULT.between_sets()),
     ))
 }
 
-fn patch_chart_gap_spacing(data: &[u8], spacing: ChartGapSpacing) -> Result<Vec<u8>> {
+fn native_percentage(value: f32) -> Result<Percentage> {
+    Percentage::new(value).map_err(|error| {
+        Error::InvalidFormat(format!("native chart gap {value} is invalid: {error}"))
+    })
+}
+
+fn patch_chart_gap_spacing(data: &[u8], spacing: Spacing) -> Result<Vec<u8>> {
     let Some(extension) = generated_chart_style_extension(data)? else {
-        if spacing == ChartGapSpacing::NATIVE_DEFAULT {
+        if spacing == Spacing::DEFAULT {
             return Ok(data.to_vec());
         }
         let generated = tsch::generated::ChartStyleArchive {
             tschchartinfodefaultinterbargap: (spacing.between_items()
-                != ChartGapSpacing::NATIVE_DEFAULT.between_items())
+                != Spacing::DEFAULT.between_items())
             .then(|| spacing.between_items().percent()),
             tschchartinfodefaultintersetgap: (spacing.between_sets()
-                != ChartGapSpacing::NATIVE_DEFAULT.between_sets())
+                != Spacing::DEFAULT.between_sets())
             .then(|| spacing.between_sets().percent()),
             ..Default::default()
         };
@@ -205,19 +116,17 @@ fn patch_chart_gap_spacing(data: &[u8], spacing: ChartGapSpacing) -> Result<Vec<
     let generated = tsch::generated::ChartStyleArchive::decode(extension)?;
     let between_items_present = generated.tschchartinfodefaultinterbargap.is_some();
     let between_sets_present = generated.tschchartinfodefaultintersetgap.is_some();
-    let between_items = if spacing == ChartGapSpacing::NATIVE_DEFAULT {
+    let between_items = if spacing == Spacing::DEFAULT {
         None
     } else {
-        (between_items_present
-            || spacing.between_items() != ChartGapSpacing::NATIVE_DEFAULT.between_items())
-        .then(|| spacing.between_items().percent().to_bits())
+        (between_items_present || spacing.between_items() != Spacing::DEFAULT.between_items())
+            .then(|| spacing.between_items().percent().to_bits())
     };
-    let between_sets = if spacing == ChartGapSpacing::NATIVE_DEFAULT {
+    let between_sets = if spacing == Spacing::DEFAULT {
         None
     } else {
-        (between_sets_present
-            || spacing.between_sets() != ChartGapSpacing::NATIVE_DEFAULT.between_sets())
-        .then(|| spacing.between_sets().percent().to_bits())
+        (between_sets_present || spacing.between_sets() != Spacing::DEFAULT.between_sets())
+            .then(|| spacing.between_sets().percent().to_bits())
     };
     let extension = patch_fixed32_field(
         extension,
@@ -241,7 +150,7 @@ fn patch_chart_gap_spacing(data: &[u8], spacing: ChartGapSpacing) -> Result<Vec<
     Ok(patched)
 }
 
-fn validate_patched_chart_gap_spacing(data: &[u8], expected: ChartGapSpacing) -> Result<()> {
+fn validate_patched_chart_gap_spacing(data: &[u8], expected: Spacing) -> Result<()> {
     if read_chart_gap_spacing(data)? != expected {
         return Err(Error::InvalidFormat(
             "chart gap wire patch failed validation".to_owned(),
@@ -259,16 +168,6 @@ mod tests {
     const UNMAPPED_OUTER_FIELD: u32 = 4_096;
     const UNMAPPED_GENERATED_FIELD: u32 = 4_097;
     const UNMAPPED_VALUE: u64 = 42;
-
-    #[test]
-    fn gap_percentages_reject_values_outside_the_native_range() {
-        assert!(ChartGapPercentage::new(f32::NAN).is_err());
-        assert!(ChartGapPercentage::new(f32::INFINITY).is_err());
-        assert!(ChartGapPercentage::new(-0.1).is_err());
-        assert!(ChartGapPercentage::new(999.1).is_err());
-        assert_eq!(ChartGapPercentage::new(12.5).unwrap().percent(), 12.5);
-        assert_eq!(ChartGapPercentage::MAXIMUM.percent(), 999.0);
-    }
 
     #[test]
     fn gap_patch_retains_other_style_fields_and_unmapped_data() {
@@ -333,12 +232,9 @@ mod tests {
         .encode_to_vec();
         let replacement = spacing(25.0, 70.0);
 
+        assert_eq!(read_chart_gap_spacing(&original).unwrap(), Spacing::DEFAULT);
         assert_eq!(
-            read_chart_gap_spacing(&original).unwrap(),
-            ChartGapSpacing::NATIVE_DEFAULT
-        );
-        assert_eq!(
-            patch_chart_gap_spacing(&original, ChartGapSpacing::NATIVE_DEFAULT).unwrap(),
+            patch_chart_gap_spacing(&original, Spacing::DEFAULT).unwrap(),
             original
         );
 
@@ -356,11 +252,8 @@ mod tests {
             ..Default::default()
         });
 
-        let reset = patch_chart_gap_spacing(&original, ChartGapSpacing::NATIVE_DEFAULT).unwrap();
-        assert_eq!(
-            read_chart_gap_spacing(&reset).unwrap(),
-            ChartGapSpacing::NATIVE_DEFAULT
-        );
+        let reset = patch_chart_gap_spacing(&original, Spacing::DEFAULT).unwrap();
+        assert_eq!(read_chart_gap_spacing(&reset).unwrap(), Spacing::DEFAULT);
         let generated = tsch::generated::ChartStyleArchive::decode(
             generated_chart_style_extension(&reset).unwrap().unwrap(),
         )
@@ -386,10 +279,10 @@ mod tests {
         assert!(read_chart_gap_spacing(&excessive).is_err());
     }
 
-    fn spacing(between_items: f32, between_sets: f32) -> ChartGapSpacing {
-        ChartGapSpacing::new(
-            ChartGapPercentage::new(between_items).unwrap(),
-            ChartGapPercentage::new(between_sets).unwrap(),
+    fn spacing(between_items: f32, between_sets: f32) -> Spacing {
+        Spacing::new(
+            Percentage::new(between_items).unwrap(),
+            Percentage::new(between_sets).unwrap(),
         )
     }
 

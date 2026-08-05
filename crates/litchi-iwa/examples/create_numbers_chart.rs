@@ -2,10 +2,12 @@
 
 use std::env;
 
+use litchi_iwa_common::chart::gaps::{Percentage, Spacing};
+
 use litchi_iwa::charts::{
     Axis, Bound, Bounds, ChartAxisGridline, ChartAxisGridlineStroke, ChartCornerRadius, ChartData,
     ChartErrorBarDirection, ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont,
-    ChartFontSize, ChartGapPercentage, ChartGapSpacing, ChartLegendFill, ChartLegendFont,
+    ChartFontSize, ChartLegendFill, ChartLegendFont,
     ChartLegendFontSize, ChartLegendShadow, ChartLegendStroke, ChartRoundedCorners,
     ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesStroke, ChartSeriesStrokePattern,
     ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesValueLabelAutoFit,
@@ -104,10 +106,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_sheet_chart_gap_spacing(
         sheet_id,
         chart.drawable_object_id,
-        ChartGapSpacing::new(
-            ChartGapPercentage::new(25.0)?,
-            ChartGapPercentage::new(70.0)?,
-        ),
+        Spacing::new(Percentage::new(25.0)?, Percentage::new(70.0)?),
     )?;
     editor.set_sheet_chart_shadow(
         sheet_id,

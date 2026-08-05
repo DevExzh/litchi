@@ -38,7 +38,7 @@ pub(crate) fn source_chart_objects(
     paragraph_style_id: u64,
     profile: ChartApplicationProfile,
 ) -> Result<Vec<ArchiveObject>> {
-    let default_gap_spacing = ChartGapSpacing::NATIVE_DEFAULT;
+    let default_gap_spacing = Spacing::DEFAULT;
     let paragraph_styles = repeated_references(profile.paragraph_style_count(), paragraph_style_id);
     let series_count =
         chart_series_count(kind, Direction::Rows, &data, "source-built", ids.drawable)?;

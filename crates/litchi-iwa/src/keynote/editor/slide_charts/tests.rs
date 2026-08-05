@@ -4,10 +4,12 @@ use std::fs;
 use std::path::PathBuf;
 
 use super::*;
+use litchi_iwa_common::chart::gaps::{Percentage, Spacing};
+
 use crate::charts::{
     Axis, Bound, Bounds, ChartCornerRadius, ChartDonutInnerRadius, ChartErrorBarDirection,
-    ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont, ChartFontSize, ChartGapPercentage,
-    ChartGapSpacing, ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendFrame,
+    ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont, ChartFontSize, ChartLegendFill,
+    ChartLegendFont, ChartLegendFontSize, ChartLegendFrame,
     ChartLegendRect, ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance,
     ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners,
     ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesStroke, ChartSeriesStrokePattern,
@@ -56,10 +58,10 @@ fn pie_data() -> ChartData {
     .unwrap()
 }
 
-fn gap_spacing(between_items: f32, between_sets: f32) -> ChartGapSpacing {
-    ChartGapSpacing::new(
-        ChartGapPercentage::new(between_items).unwrap(),
-        ChartGapPercentage::new(between_sets).unwrap(),
+fn gap_spacing(between_items: f32, between_sets: f32) -> Spacing {
+    Spacing::new(
+        Percentage::new(between_items).unwrap(),
+        Percentage::new(between_sets).unwrap(),
     )
 }
 
@@ -790,14 +792,14 @@ fn scratch_presentation_supports_native_chart_gap_crud() {
         editor
             .slide_chart_gap_spacing(0, source.drawable_object_id)
             .unwrap(),
-        ChartGapSpacing::NATIVE_DEFAULT
+        Spacing::DEFAULT
     );
     let baseline = editor.to_bytes().unwrap();
     editor
         .set_slide_chart_gap_spacing(
             0,
             source.drawable_object_id,
-            ChartGapSpacing::NATIVE_DEFAULT,
+            Spacing::DEFAULT,
         )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
