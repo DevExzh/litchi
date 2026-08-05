@@ -11,6 +11,10 @@ pub enum Error {
     #[error("invalid compound file: {0}")]
     Cfb(#[from] litchi_cfb::OleError),
 
+    /// The shared BIFF framing layer rejected the physical record stream.
+    #[error("invalid BIFF framing: {0}")]
+    Biff(#[from] litchi_biff::Error),
+
     /// A configured bound is internally inconsistent or unsupported.
     #[error("invalid {resource} limit {value}: {reason}")]
     InvalidLimit {
@@ -31,30 +35,6 @@ pub enum Error {
         observed: u64,
         /// Configured maximum.
         maximum: u64,
-    },
-
-    /// A BIFF record header was cut short.
-    #[error("truncated BIFF header at offset {offset}: only {available} byte(s) remain")]
-    TruncatedHeader {
-        /// Header offset in the stream.
-        offset: usize,
-        /// Remaining byte count.
-        available: usize,
-    },
-
-    /// A BIFF payload was shorter than its declared length.
-    #[error(
-        "truncated BIFF record {kind:#06X} at offset {offset}: declared {declared} byte(s), only {available} available"
-    )]
-    TruncatedPayload {
-        /// Header offset in the stream.
-        offset: usize,
-        /// BIFF record identifier.
-        kind: u16,
-        /// Length declared by the header.
-        declared: usize,
-        /// Bytes available after the header.
-        available: usize,
     },
 
     /// A typed decoder received a different record identifier.
@@ -123,15 +103,6 @@ pub enum Error {
     /// A BIFF chart substream is malformed or structurally incomplete.
     #[error("invalid chart substream at offset {offset}: {reason}")]
     InvalidChart {
-        /// Record offset nearest the failure.
-        offset: usize,
-        /// Static structural explanation.
-        reason: &'static str,
-    },
-
-    /// An owned raw-record input is not exactly one complete BIFF frame.
-    #[error("invalid BIFF record frame at offset {offset}: {reason}")]
-    InvalidRecordFrame {
         /// Record offset nearest the failure.
         offset: usize,
         /// Static structural explanation.

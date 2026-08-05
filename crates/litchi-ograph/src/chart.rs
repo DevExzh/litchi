@@ -7,8 +7,9 @@
 
 use std::iter::FusedIterator;
 
+use litchi_biff::{Kind as RecordKind, RecordRef, Records};
+
 use crate::limits::as_u64;
-use crate::raw::{Kind as RecordKind, RecordRef, Records as RawRecords};
 use crate::{Error, Limits, Result};
 
 pub mod axis;
@@ -25,8 +26,8 @@ pub use model::{
     ValueRef, XlValue,
 };
 
-const BOF: RecordKind = RecordKind::new(0x0809);
-const EOF: RecordKind = RecordKind::new(0x000A);
+const BOF: RecordKind = RecordKind::from_wire(0x0809);
+const EOF: RecordKind = RecordKind::from_wire(0x000A);
 const BOF_BYTES: usize = 16;
 const GRAPH_VERSION: u16 = 0x0680;
 const GRAPH_DOC_TYPE: u16 = 0x8000;
@@ -41,12 +42,6 @@ pub enum Kind {
     /// Excel-hosted chart substream (`0x0600`, `0x0020`).
     Excel,
 }
-
-/// Borrowed BIFF record in a chart substream.
-pub type Record<'a> = RecordRef<'a>;
-
-/// Ordered, allocation-free BIFF record iterator.
-pub type Records<'a> = RawRecords<'a>;
 
 /// Borrowed, lossless view of one complete chart BOF-through-EOF substream.
 #[derive(Debug, Clone, Copy)]
@@ -68,7 +63,7 @@ impl<'a> Ref<'a> {
         let limits = limits.validate()?;
         check_bytes(bytes, limits)?;
 
-        let mut refs = Refs::from_validated(bytes, limits);
+        let mut refs = Refs::with_limits(bytes, limits)?;
         let chart = refs.next().ok_or(Error::InvalidChart {
             offset: 0,
             reason: "missing chart BOF",
@@ -122,7 +117,7 @@ impl<'a> Ref<'a> {
 
     /// Traverse all records in original order without allocation.
     pub fn records(self) -> Records<'a> {
-        RawRecords::validated(self.bytes, self.limits)
+        Records::new(self.bytes)
     }
 
     /// Copies this bounded substream into an owned chart.
@@ -134,11 +129,11 @@ impl<'a> Ref<'a> {
     pub fn own_with(self, limits: Limits) -> Result<Stream> {
         let limits = limits.validate()?;
         Ref::with_limits(self.bytes, limits)?;
-        if self.bytes.len() > limits.max_output_bytes {
+        if self.bytes.len() > limits.biff.max_output_bytes {
             return Err(Error::LimitExceeded {
                 resource: "output bytes",
                 observed: as_u64(self.bytes.len()),
-                maximum: as_u64(limits.max_output_bytes),
+                maximum: as_u64(limits.biff.max_output_bytes),
             });
         }
         let mut bytes = Vec::new();
@@ -218,11 +213,11 @@ impl Stream {
     pub(crate) fn relimit(mut self, limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
         Ref::with_limits(&self.bytes, limits)?;
-        if self.bytes.len() > limits.max_output_bytes {
+        if self.bytes.len() > limits.biff.max_output_bytes {
             return Err(Error::LimitExceeded {
                 resource: "output bytes",
                 observed: as_u64(self.bytes.len()),
-                maximum: as_u64(limits.max_output_bytes),
+                maximum: as_u64(limits.biff.max_output_bytes),
             });
         }
         self.limits = limits;
@@ -311,7 +306,7 @@ impl Book {
 #[derive(Debug)]
 pub struct Refs<'a> {
     bytes: &'a [u8],
-    records: RawRecords<'a>,
+    records: Records<'a>,
     limits: Limits,
     active: Option<Active>,
     charts: usize,
@@ -335,13 +330,21 @@ impl<'a> Refs<'a> {
     pub fn with_limits(bytes: &'a [u8], limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
         check_bytes(bytes, limits)?;
-        Ok(Self::from_validated(bytes, limits))
+        let records = Records::with_limits(bytes, limits.biff)?;
+        Ok(Self {
+            bytes,
+            records,
+            limits,
+            active: None,
+            charts: 0,
+            done: false,
+        })
     }
 
     pub(crate) fn from_validated(bytes: &'a [u8], limits: Limits) -> Self {
         Self {
             bytes,
-            records: RawRecords::validated(bytes, limits),
+            records: Records::new(bytes),
             limits,
             active: None,
             charts: 0,
@@ -366,7 +369,7 @@ impl<'a> Iterator for Refs<'a> {
         loop {
             let record = match self.records.next() {
                 Some(Ok(record)) => record,
-                Some(Err(error)) => return self.fail(error),
+                Some(Err(error)) => return self.fail(error.into()),
                 None => {
                     self.done = true;
                     return self
@@ -521,9 +524,9 @@ fn chart_error<T>(offset: usize, reason: &'static str) -> Result<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::raw::{Encoder, Kind as RecordKind, Record as OwnedRecord};
+    use litchi_biff::{Encoder, Kind as RecordKind, Record as OwnedRecord, Records};
 
-    const UNKNOWN: RecordKind = RecordKind::new(0x7777);
+    const UNKNOWN: RecordKind = RecordKind::from_wire(0x7777);
 
     fn bof(version: u16, doc_type: u16, tail: u8) -> [u8; BOF_BYTES] {
         let mut bytes = [tail; BOF_BYTES];
@@ -557,14 +560,14 @@ mod tests {
         push(&mut out, BOF, &bof(EXCEL_VERSION, 0x0010, 0));
         push(&mut out, UNKNOWN, &[2, 3]);
         let first_offset = out.as_bytes().len();
-        for record in RawRecords::new(&first) {
+        for record in Records::new(&first) {
             out.push_ref(record.expect("first chart"))
                 .expect("copy first chart");
         }
         push(&mut out, UNKNOWN, &[4]);
         push(&mut out, EOF, &[]);
         let second_offset = out.as_bytes().len();
-        for record in RawRecords::new(&second) {
+        for record in Records::new(&second) {
             out.push_ref(record.expect("second chart"))
                 .expect("copy second chart");
         }
@@ -631,7 +634,7 @@ mod tests {
         assert_eq!(bytes.as_ptr(), pointer);
         assert_eq!(bytes.capacity(), capacity);
 
-        let frame = RawRecords::new(&bytes)
+        let frame = Records::new(&bytes)
             .nth(1)
             .expect("unknown frame")
             .expect("valid frame")

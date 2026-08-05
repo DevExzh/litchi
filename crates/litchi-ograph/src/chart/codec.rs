@@ -11,69 +11,70 @@ use super::model::{
     XlValue, cache_dimensions, dimensions_cover,
 };
 use super::{
-    BOF, BOF_BYTES, EOF, EXCEL_DOC_TYPE, EXCEL_VERSION, GRAPH_DOC_TYPE, GRAPH_VERSION, Kind, Ref,
+    BOF, BOF_BYTES, EOF, EXCEL_DOC_TYPE, EXCEL_VERSION, GRAPH_DOC_TYPE, GRAPH_VERSION,
+    Kind as ChartKind, Ref,
 };
 use crate::limits::as_u64;
-use crate::raw::{Encoder, Kind as RecordKind, RecordRef};
 use crate::{Error, Limits, Result};
+use litchi_biff::{Encoder, Kind as RecordKind, RecordRef};
 
-const CONTINUE: RecordKind = RecordKind::new(0x003C);
-const SCL: RecordKind = RecordKind::new(0x00A0);
-const DIMENSIONS: RecordKind = RecordKind::new(0x0200);
-const GRAPH_BLANK: RecordKind = RecordKind::new(0x0001);
-const GRAPH_NUMBER: RecordKind = RecordKind::new(0x0003);
-const EXCEL_BLANK: RecordKind = RecordKind::new(0x0201);
-const EXCEL_NUMBER: RecordKind = RecordKind::new(0x0203);
-const EXCEL_BOOL_ERR: RecordKind = RecordKind::new(0x0205);
-const CELL_LABEL: RecordKind = RecordKind::new(0x0204);
-const DATA_LAB_EXT: RecordKind = RecordKind::new(0x086A);
-const DATA_LAB_EXT_CONTENTS: RecordKind = RecordKind::new(0x086B);
-const CHART_REC: RecordKind = RecordKind::new(0x1002);
-const SERIES: RecordKind = RecordKind::new(0x1003);
-const DATA_FORMAT: RecordKind = RecordKind::new(0x1006);
-const LINE_FORMAT: RecordKind = RecordKind::new(0x1007);
-const MARKER_FORMAT: RecordKind = RecordKind::new(0x1009);
-const AREA_FORMAT: RecordKind = RecordKind::new(0x100A);
-const PIE_FORMAT: RecordKind = RecordKind::new(0x100B);
-const SERIES_TEXT: RecordKind = RecordKind::new(0x100D);
-const CHART_FORMAT: RecordKind = RecordKind::new(0x1014);
-const LEGEND: RecordKind = RecordKind::new(0x1015);
-const SERIES_LIST: RecordKind = RecordKind::new(0x1016);
-const BAR: RecordKind = RecordKind::new(0x1017);
-const LINE: RecordKind = RecordKind::new(0x1018);
-const PIE: RecordKind = RecordKind::new(0x1019);
-const AREA: RecordKind = RecordKind::new(0x101A);
-const SCATTER: RecordKind = RecordKind::new(0x101B);
-const CRT_LINE: RecordKind = RecordKind::new(0x101C);
-const AXIS: RecordKind = RecordKind::new(0x101D);
-const TICK: RecordKind = RecordKind::new(0x101E);
-const VALUE_RANGE: RecordKind = RecordKind::new(0x101F);
-const CAT_SER_RANGE: RecordKind = RecordKind::new(0x1020);
-const AXIS_LINE: RecordKind = RecordKind::new(0x1021);
-const CRT_LINK: RecordKind = RecordKind::new(0x1022);
-const DEFAULT_TEXT: RecordKind = RecordKind::new(0x1024);
-const TEXT: RecordKind = RecordKind::new(0x1025);
-const FONT_X: RecordKind = RecordKind::new(0x1026);
-const OBJECT_LINK: RecordKind = RecordKind::new(0x1027);
-const FRAME: RecordKind = RecordKind::new(0x1032);
-const BEGIN: RecordKind = RecordKind::new(0x1033);
-const END: RecordKind = RecordKind::new(0x1034);
-const PLOT_AREA: RecordKind = RecordKind::new(0x1035);
-const DROP_BAR: RecordKind = RecordKind::new(0x103D);
-const RADAR: RecordKind = RecordKind::new(0x103E);
-const SURFACE: RecordKind = RecordKind::new(0x103F);
-const RADAR_AREA: RecordKind = RecordKind::new(0x1040);
-const AXIS_PARENT: RecordKind = RecordKind::new(0x1041);
-const SHT_PROPS: RecordKind = RecordKind::new(0x1044);
-const SER_TO_CRT: RecordKind = RecordKind::new(0x1045);
-const AXES_USED: RecordKind = RecordKind::new(0x1046);
-const SER_PARENT: RecordKind = RecordKind::new(0x104A);
-const SER_AUX_TREND: RecordKind = RecordKind::new(0x104B);
-const POS: RecordKind = RecordKind::new(0x104F);
-const BRAI: RecordKind = RecordKind::new(0x1051);
-const SER_AUX_ERR_BAR: RecordKind = RecordKind::new(0x105B);
-const PLOT_GROWTH: RecordKind = RecordKind::new(0x1064);
-const SI_INDEX: RecordKind = RecordKind::new(0x1065);
+const CONTINUE: RecordKind = RecordKind::from_wire(0x003C);
+const SCL: RecordKind = RecordKind::from_wire(0x00A0);
+const DIMENSIONS: RecordKind = RecordKind::from_wire(0x0200);
+const GRAPH_BLANK: RecordKind = RecordKind::from_wire(0x0001);
+const GRAPH_NUMBER: RecordKind = RecordKind::from_wire(0x0003);
+const EXCEL_BLANK: RecordKind = RecordKind::from_wire(0x0201);
+const EXCEL_NUMBER: RecordKind = RecordKind::from_wire(0x0203);
+const EXCEL_BOOL_ERR: RecordKind = RecordKind::from_wire(0x0205);
+const CELL_LABEL: RecordKind = RecordKind::from_wire(0x0204);
+const DATA_LAB_EXT: RecordKind = RecordKind::from_wire(0x086A);
+const DATA_LAB_EXT_CONTENTS: RecordKind = RecordKind::from_wire(0x086B);
+const CHART_REC: RecordKind = RecordKind::from_wire(0x1002);
+const SERIES: RecordKind = RecordKind::from_wire(0x1003);
+const DATA_FORMAT: RecordKind = RecordKind::from_wire(0x1006);
+const LINE_FORMAT: RecordKind = RecordKind::from_wire(0x1007);
+const MARKER_FORMAT: RecordKind = RecordKind::from_wire(0x1009);
+const AREA_FORMAT: RecordKind = RecordKind::from_wire(0x100A);
+const PIE_FORMAT: RecordKind = RecordKind::from_wire(0x100B);
+const SERIES_TEXT: RecordKind = RecordKind::from_wire(0x100D);
+const CHART_FORMAT: RecordKind = RecordKind::from_wire(0x1014);
+const LEGEND: RecordKind = RecordKind::from_wire(0x1015);
+const SERIES_LIST: RecordKind = RecordKind::from_wire(0x1016);
+const BAR: RecordKind = RecordKind::from_wire(0x1017);
+const LINE: RecordKind = RecordKind::from_wire(0x1018);
+const PIE: RecordKind = RecordKind::from_wire(0x1019);
+const AREA: RecordKind = RecordKind::from_wire(0x101A);
+const SCATTER: RecordKind = RecordKind::from_wire(0x101B);
+const CRT_LINE: RecordKind = RecordKind::from_wire(0x101C);
+const AXIS: RecordKind = RecordKind::from_wire(0x101D);
+const TICK: RecordKind = RecordKind::from_wire(0x101E);
+const VALUE_RANGE: RecordKind = RecordKind::from_wire(0x101F);
+const CAT_SER_RANGE: RecordKind = RecordKind::from_wire(0x1020);
+const AXIS_LINE: RecordKind = RecordKind::from_wire(0x1021);
+const CRT_LINK: RecordKind = RecordKind::from_wire(0x1022);
+const DEFAULT_TEXT: RecordKind = RecordKind::from_wire(0x1024);
+const TEXT: RecordKind = RecordKind::from_wire(0x1025);
+const FONT_X: RecordKind = RecordKind::from_wire(0x1026);
+const OBJECT_LINK: RecordKind = RecordKind::from_wire(0x1027);
+const FRAME: RecordKind = RecordKind::from_wire(0x1032);
+const BEGIN: RecordKind = RecordKind::from_wire(0x1033);
+const END: RecordKind = RecordKind::from_wire(0x1034);
+const PLOT_AREA: RecordKind = RecordKind::from_wire(0x1035);
+const DROP_BAR: RecordKind = RecordKind::from_wire(0x103D);
+const RADAR: RecordKind = RecordKind::from_wire(0x103E);
+const SURFACE: RecordKind = RecordKind::from_wire(0x103F);
+const RADAR_AREA: RecordKind = RecordKind::from_wire(0x1040);
+const AXIS_PARENT: RecordKind = RecordKind::from_wire(0x1041);
+const SHT_PROPS: RecordKind = RecordKind::from_wire(0x1044);
+const SER_TO_CRT: RecordKind = RecordKind::from_wire(0x1045);
+const AXES_USED: RecordKind = RecordKind::from_wire(0x1046);
+const SER_PARENT: RecordKind = RecordKind::from_wire(0x104A);
+const SER_AUX_TREND: RecordKind = RecordKind::from_wire(0x104B);
+const POS: RecordKind = RecordKind::from_wire(0x104F);
+const BRAI: RecordKind = RecordKind::from_wire(0x1051);
+const SER_AUX_ERR_BAR: RecordKind = RecordKind::from_wire(0x105B);
+const PLOT_GROWTH: RecordKind = RecordKind::from_wire(0x1064);
+const SI_INDEX: RecordKind = RecordKind::from_wire(0x1065);
 
 #[derive(Clone, Copy)]
 enum PendingLine {
@@ -143,7 +144,7 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
     let mut parent_groups = 0usize;
     let mut parent_group_started = false;
     let mut pending_begin = false;
-    let strict_excel = context.kind() == Kind::Excel;
+    let strict_excel = context.kind() == ChartKind::Excel;
     let mut cache_section = None;
     let mut next_cache_section = 0usize;
     let mut zoom_seen = false;
@@ -160,11 +161,11 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
 
     for item in input.records() {
         let record = item?;
-        if record.payload().len() > limits.max_record_bytes {
+        if record.payload().len() > limits.biff.max_record_bytes {
             return limit(
                 "record bytes",
                 record.payload().len(),
-                limits.max_record_bytes,
+                limits.biff.max_record_bytes,
             );
         }
         if first {
@@ -1002,7 +1003,7 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 }
             },
             MARKER_FORMAT => {
-                let data = copy(data, "marker payload", limits.max_record_bytes)?;
+                let data = copy(data, "marker payload", limits.biff.max_record_bytes)?;
                 push(&mut chart.formats, Format::Marker { data }, "chart formats")?;
             },
             DATA_FORMAT => {
@@ -1044,7 +1045,7 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 chart.props.plot_area = true;
             },
             DATA_LAB_EXT | DATA_LAB_EXT_CONTENTS | TEXT => {
-                let data = copy(data, "data-label payload", limits.max_record_bytes)?;
+                let data = copy(data, "data-label payload", limits.biff.max_record_bytes)?;
                 push(
                     &mut chart.labels,
                     Label {
@@ -1060,7 +1061,7 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 }
                 exact(record, 14)?;
                 chart.dimensions = match context.kind() {
-                    Kind::Excel => {
+                    ChartKind::Excel => {
                         if u16_at(data, 12, record)? != 0 {
                             return invalid(record, "Excel Dimensions reserved field is nonzero");
                         }
@@ -1076,7 +1077,7 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                         })?;
                         cache::Dims::Excel(dims)
                     },
-                    Kind::Graph => {
+                    ChartKind::Graph => {
                         if u32_at(data, 0, record)? != 0
                             || u16_at(data, 8, record)? != 0
                             || u16_at(data, 12, record)? != 0
@@ -1110,7 +1111,7 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 };
                 dimensions_seen = true;
             },
-            SI_INDEX if context.kind() == Kind::Excel => {
+            SI_INDEX if context.kind() == ChartKind::Excel => {
                 if depth != 0 || !dimensions_seen {
                     return invalid(record, "SIIndex must follow Dimensions at substream level");
                 }
@@ -1146,7 +1147,7 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                     return invalid(record, "cached Number must follow Dimensions in SERIESDATA");
                 }
                 let value = match context.kind() {
-                    Kind::Graph => {
+                    ChartKind::Graph => {
                         exact(record, 15)?;
                         if byte_at(data, 4, record)? != 0 {
                             return invalid(record, "Graph Number reserved byte is nonzero");
@@ -1158,7 +1159,7 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                             record,
                         )
                     },
-                    Kind::Excel => {
+                    ChartKind::Excel => {
                         exact(record, 14)?;
                         excel_cache(
                             data,
@@ -1184,7 +1185,7 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                     return invalid(record, "cached Label must follow Dimensions in SERIESDATA");
                 }
                 let value = match context.kind() {
-                    Kind::Graph => {
+                    ChartKind::Graph => {
                         if data.len() < 9 || byte_at(data, 4, record)? != 0 {
                             return invalid(
                                 record,
@@ -1202,7 +1203,7 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                             record,
                         )
                     },
-                    Kind::Excel => {
+                    ChartKind::Excel => {
                         if data.len() < 9 {
                             return invalid(record, "Excel Label is shorter than nine bytes");
                         }
@@ -1234,7 +1235,7 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                     return invalid(record, "cached Blank must follow Dimensions in SERIESDATA");
                 }
                 let value = match context.kind() {
-                    Kind::Graph => {
+                    ChartKind::Graph => {
                         exact(record, 7)?;
                         if byte_at(data, 4, record)? != 0 {
                             return invalid(record, "Graph Blank reserved byte is nonzero");
@@ -1246,7 +1247,7 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                             record,
                         )
                     },
-                    Kind::Excel => {
+                    ChartKind::Excel => {
                         exact(record, 6)?;
                         excel_cache(
                             data,
@@ -1267,7 +1268,7 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 )?;
                 push(&mut chart.caches, value, "chart cache")?;
             },
-            EXCEL_BOOL_ERR if context.kind() == Kind::Excel => {
+            EXCEL_BOOL_ERR if context.kind() == ChartKind::Excel => {
                 if depth != 0 || !dimensions_seen {
                     return invalid(
                         record,
@@ -1354,7 +1355,7 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
             reason: "AxesUsed does not match the AxisParent collection count",
         });
     }
-    if context.kind() == Kind::Excel && next_cache_section != cache::Index::ALL.len() {
+    if context.kind() == ChartKind::Excel && next_cache_section != cache::Index::ALL.len() {
         return Err(Error::InvalidChart {
             offset: input.as_bytes().len(),
             reason: "Excel SERIESDATA does not contain exactly three SIIndex sections",
@@ -1367,7 +1368,7 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
 fn parse_link(record: RecordRef<'_>, context: Context, limits: Limits) -> Result<Link> {
     let data = record.payload();
     match context.kind() {
-        Kind::Graph => {
+        ChartKind::Graph => {
             exact(record, 8)?;
             let flags = u16_at(data, 2, record)?;
             if flags & 0x0002 == 0 || flags & !0x0003 != 0 {
@@ -1385,7 +1386,7 @@ fn parse_link(record: RecordRef<'_>, context: Context, limits: Limits) -> Result
                 row_col,
             })
         },
-        Kind::Excel => {
+        ChartKind::Excel => {
             if data.len() < 8 {
                 return invalid(record, "Excel BRAI is shorter than eight bytes");
             }
@@ -1607,7 +1608,7 @@ fn add_raw(
     let data = copy(
         record.payload(),
         "unknown chart payload",
-        limits.max_record_bytes,
+        limits.biff.max_record_bytes,
     )?;
     push(
         &mut chart.unknown,
@@ -1828,24 +1829,32 @@ fn validate(chart: &Chart, limits: Limits, require_topology: bool) -> Result<()>
     }
     for format in &chart.formats {
         if let Format::Marker { data } = format
-            && data.len() > limits.max_record_bytes
+            && data.len() > limits.biff.max_record_bytes
         {
-            return limit("record bytes", data.len(), limits.max_record_bytes);
+            return limit("record bytes", data.len(), limits.biff.max_record_bytes);
         }
     }
     for label in &chart.labels {
         if !matches!(label.kind, DATA_LAB_EXT | DATA_LAB_EXT_CONTENTS | TEXT) {
             return invalid_model("label", "record kind is not a supported data-label kind");
         }
-        if label.data.len() > limits.max_record_bytes {
-            return limit("record bytes", label.data.len(), limits.max_record_bytes);
+        if label.data.len() > limits.biff.max_record_bytes {
+            return limit(
+                "record bytes",
+                label.data.len(),
+                limits.biff.max_record_bytes,
+            );
         }
     }
 
     let mut total = 0usize;
     for raw in &chart.unknown {
-        if raw.data().len() > limits.max_record_bytes {
-            return limit("record bytes", raw.data().len(), limits.max_record_bytes);
+        if raw.data().len() > limits.biff.max_record_bytes {
+            return limit(
+                "record bytes",
+                raw.data().len(),
+                limits.biff.max_record_bytes,
+            );
         }
         total = total
             .checked_add(raw.data().len())
@@ -1861,9 +1870,9 @@ fn validate(chart: &Chart, limits: Limits, require_topology: bool) -> Result<()>
 
 fn validate_link(link: &Link, context: Context, limits: Limits) -> Result<()> {
     match (context.kind(), link) {
-        (Kind::Graph, Link::Graph { .. }) => {},
+        (ChartKind::Graph, Link::Graph { .. }) => {},
         (
-            Kind::Excel,
+            ChartKind::Excel,
             Link::Excel {
                 source,
                 formula,
@@ -1874,7 +1883,7 @@ fn validate_link(link: &Link, context: Context, limits: Limits) -> Result<()> {
             if formula.len() > limits.max_formula_bytes {
                 return limit("formula bytes", formula.len(), limits.max_formula_bytes);
             }
-            let maximum = limits.max_record_bytes.saturating_sub(8);
+            let maximum = limits.biff.max_record_bytes.saturating_sub(8);
             if formula.len() > maximum {
                 return limit("formula bytes", formula.len(), maximum);
             }
@@ -1892,10 +1901,10 @@ fn validate_link(link: &Link, context: Context, limits: Limits) -> Result<()> {
                 }
             }
         },
-        (Kind::Graph, Link::Excel { .. }) => {
+        (ChartKind::Graph, Link::Excel { .. }) => {
             return invalid_model("link", "Excel BRAI cannot be encoded in a Graph chart");
         },
-        (Kind::Excel, Link::Graph { .. }) => {
+        (ChartKind::Excel, Link::Graph { .. }) => {
             return invalid_model("link", "Graph BRAI cannot be encoded in an Excel chart");
         },
     }
@@ -1914,8 +1923,8 @@ pub(super) fn encode(chart: &Chart, limits: Limits) -> Result<Vec<u8>> {
         });
     }
     validate(chart, limits, true)?;
-    let mut out = Encoder::with_limits(limits)?;
-    out.push(BOF, &bof(chart.context.kind()))?;
+    let mut out = Encoder::with_limits(limits.biff)?;
+    push_record(&mut out, BOF, &bof(chart.context.kind()))?;
 
     let mut rect = [0u8; 16];
     rect.get_mut(0..4)
@@ -1938,16 +1947,16 @@ pub(super) fn encode(chart: &Chart, limits: Limits) -> Result<Vec<u8>> {
             resource: "Chart rectangle",
         })?
         .copy_from_slice(&chart.rect.height.to_le_bytes());
-    out.push(CHART_REC, &rect)?;
-    out.push(BEGIN, &[])?;
+    push_record(&mut out, CHART_REC, &rect)?;
+    push_record(&mut out, BEGIN, &[])?;
     let mut zoom = [0u8; 4];
     put_u16(&mut zoom, 0, chart.zoom.numerator())?;
     put_u16(&mut zoom, 2, chart.zoom.denominator())?;
-    out.push(SCL, &zoom)?;
+    push_record(&mut out, SCL, &zoom)?;
     let mut growth = [0u8; 8];
     put_i32(&mut growth, 0, chart.growth.x.raw())?;
     put_i32(&mut growth, 4, chart.growth.y.raw())?;
-    out.push(PLOT_GROWTH, &growth)?;
+    push_record(&mut out, PLOT_GROWTH, &growth)?;
 
     for series in &chart.series {
         let mut data = [0u8; 12];
@@ -1964,33 +1973,34 @@ pub(super) fn encode(chart: &Chart, limits: Limits) -> Result<Vec<u8>> {
         put_u16(&mut data, 6, series.value_count.get())?;
         put_u16(&mut data, 8, 1)?;
         put_u16(&mut data, 10, series.bubble_count.get())?;
-        out.push(SERIES, &data)?;
-        out.push(BEGIN, &[])?;
+        push_record(&mut out, SERIES, &data)?;
+        push_record(&mut out, BEGIN, &[])?;
         for binding in series.ai.ordered() {
             let data = encode_link(binding.link(), chart.context, limits)?;
-            out.push(BRAI, &data)?;
+            push_record(&mut out, BRAI, &data)?;
             if let Some(text) = binding.text() {
-                out.push(SERIES_TEXT, &short_text(text)?)?;
+                push_record(&mut out, SERIES_TEXT, &short_text(text)?)?;
             }
         }
         match &series.owner {
             Owner::Group(group) => {
-                out.push(SER_TO_CRT, &u16::from(group.get()).to_le_bytes())?;
+                push_record(&mut out, SER_TO_CRT, &u16::from(group.get()).to_le_bytes())?;
             },
             Owner::Trend { parent, data } => {
                 parent.write(&mut out)?;
-                out.push(SER_AUX_TREND, data)?;
+                push_record(&mut out, SER_AUX_TREND, data)?;
             },
             Owner::ErrorBar { parent, data } => {
                 parent.write(&mut out)?;
-                out.push(SER_AUX_ERR_BAR, data)?;
+                push_record(&mut out, SER_AUX_ERR_BAR, data)?;
             },
         }
-        out.push(END, &[])?;
+        push_record(&mut out, END, &[])?;
     }
 
-    out.push(SHT_PROPS, &chart.props.flags.to_le_bytes())?;
-    out.push(
+    push_record(&mut out, SHT_PROPS, &chart.props.flags.to_le_bytes())?;
+    push_record(
+        &mut out,
         AXES_USED,
         &u16::try_from(chart.parents.len())
             .map_err(|_| Error::SizeOverflow {
@@ -2004,8 +2014,8 @@ pub(super) fn encode(chart: &Chart, limits: Limits) -> Result<Vec<u8>> {
     })?;
     let mut parent_body = [0u8; 18];
     put_u16(&mut parent_body, 0, u16::from(parent.is_secondary()))?;
-    out.push(AXIS_PARENT, &parent_body)?;
-    out.push(BEGIN, &[])?;
+    push_record(&mut out, AXIS_PARENT, &parent_body)?;
+    push_record(&mut out, BEGIN, &[])?;
     encode_pos(&mut out, parent.pos())?;
     for axis in &chart.axes {
         encode_axis(&mut out, axis)?;
@@ -2014,7 +2024,7 @@ pub(super) fn encode(chart: &Chart, limits: Limits) -> Result<Vec<u8>> {
         encode_group(&mut out, group)?;
     }
     if chart.props.plot_area {
-        out.push(PLOT_AREA, &[])?;
+        push_record(&mut out, PLOT_AREA, &[])?;
     }
     if let Some(legend) = chart.legend {
         let mut data = [0u8; 20];
@@ -2025,25 +2035,25 @@ pub(super) fn encode(chart: &Chart, limits: Limits) -> Result<Vec<u8>> {
         put_byte(&mut data, 16, legend.position)?;
         put_byte(&mut data, 17, legend.spacing)?;
         put_u16(&mut data, 18, legend.flags)?;
-        out.push(LEGEND, &data)?;
+        push_record(&mut out, LEGEND, &data)?;
     }
     if let Some(title) = &chart.title {
-        out.push(SERIES_TEXT, &short_text(title)?)?;
+        push_record(&mut out, SERIES_TEXT, &short_text(title)?)?;
     }
     for value in &chart.formats {
         encode_format(&mut out, value)?;
     }
     for label in &chart.labels {
-        out.push(label.kind, &label.data)?;
+        push_record(&mut out, label.kind, &label.data)?;
     }
 
-    out.push(END, &[])?;
-    out.push(END, &[])?;
+    push_record(&mut out, END, &[])?;
+    push_record(&mut out, END, &[])?;
     encode_dimensions(&mut out, chart.dimensions)?;
     match chart.context.kind() {
-        Kind::Excel => {
+        ChartKind::Excel => {
             for index in cache::Index::ALL {
-                out.push(SI_INDEX, &(index as u16).to_le_bytes())?;
+                push_record(&mut out, SI_INDEX, &(index as u16).to_le_bytes())?;
                 for value in chart.caches.iter().filter(
                     |value| matches!(value, Cache::Excel { section, .. } if *section == index),
                 ) {
@@ -2051,14 +2061,19 @@ pub(super) fn encode(chart: &Chart, limits: Limits) -> Result<Vec<u8>> {
                 }
             }
         },
-        Kind::Graph => {
+        ChartKind::Graph => {
             for value in &chart.caches {
                 encode_cache(&mut out, value)?;
             }
         },
     }
-    out.push(EOF, &[])?;
+    push_record(&mut out, EOF, &[])?;
     Ok(out.finish())
+}
+
+fn push_record(out: &mut Encoder, kind: RecordKind, payload: &[u8]) -> Result<()> {
+    out.push(kind, payload)?;
+    Ok(())
 }
 
 fn encode_pos(out: &mut Encoder, pos: layout::Pos) -> Result<()> {
@@ -2069,7 +2084,7 @@ fn encode_pos(out: &mut Encoder, pos: layout::Pos) -> Result<()> {
     put_i16(&mut data, 8, pos.y())?;
     put_i16(&mut data, 12, pos.width())?;
     put_i16(&mut data, 16, pos.height())?;
-    out.push(POS, &data)
+    push_record(out, POS, &data)
 }
 
 fn encode_dimensions(out: &mut Encoder, dimensions: cache::Dims) -> Result<()> {
@@ -2086,7 +2101,7 @@ fn encode_dimensions(out: &mut Encoder, dimensions: cache::Dims) -> Result<()> {
             put_u16(&mut data, 10, u16::from(value.rows()))?;
         },
     }
-    out.push(DIMENSIONS, &data)
+    push_record(out, DIMENSIONS, &data)
 }
 
 fn encode_cache(out: &mut Encoder, cache: &Cache) -> Result<()> {
@@ -2121,7 +2136,7 @@ fn encode_excel_cache(
             put_u16(&mut data, 2, u16::from(col))?;
             put_u16(&mut data, 4, xf.get())?;
             put_f64(&mut data, 6, *number)?;
-            out.push(EXCEL_NUMBER, &data)
+            push_record(out, EXCEL_NUMBER, &data)
         },
         XlValue::Text(text) => {
             let string = xl_unicode_string(text)?;
@@ -2135,7 +2150,7 @@ fn encode_excel_cache(
             data.extend_from_slice(&u16::from(col).to_le_bytes());
             data.extend_from_slice(&xf.get().to_le_bytes());
             data.extend_from_slice(&string);
-            out.push(CELL_LABEL, &data)
+            push_record(out, CELL_LABEL, &data)
         },
         XlValue::Bool(value) => {
             let mut data = [0u8; 8];
@@ -2143,7 +2158,7 @@ fn encode_excel_cache(
             put_u16(&mut data, 2, u16::from(col))?;
             put_u16(&mut data, 4, xf.get())?;
             put_byte(&mut data, 6, u8::from(*value))?;
-            out.push(EXCEL_BOOL_ERR, &data)
+            push_record(out, EXCEL_BOOL_ERR, &data)
         },
         XlValue::Error(value) => {
             let mut data = [0u8; 8];
@@ -2152,14 +2167,14 @@ fn encode_excel_cache(
             put_u16(&mut data, 4, xf.get())?;
             put_byte(&mut data, 6, *value as u8)?;
             put_byte(&mut data, 7, 1)?;
-            out.push(EXCEL_BOOL_ERR, &data)
+            push_record(out, EXCEL_BOOL_ERR, &data)
         },
         XlValue::Blank => {
             let mut data = [0u8; 6];
             put_u16(&mut data, 0, row)?;
             put_u16(&mut data, 2, u16::from(col))?;
             put_u16(&mut data, 4, xf.get())?;
-            out.push(EXCEL_BLANK, &data)
+            push_record(out, EXCEL_BLANK, &data)
         },
     }
 }
@@ -2178,7 +2193,7 @@ fn encode_graph_cache(
             put_u16(&mut data, 2, col.get())?;
             put_u16(&mut data, 5, ifmt.get())?;
             put_f64(&mut data, 7, *number)?;
-            out.push(GRAPH_NUMBER, &data)
+            push_record(out, GRAPH_NUMBER, &data)
         },
         Value::Text(text) => {
             let string = biff_string(text)?;
@@ -2193,22 +2208,22 @@ fn encode_graph_cache(
             data.push(0);
             data.extend_from_slice(&ifmt.get().to_le_bytes());
             data.extend_from_slice(&string);
-            out.push(CELL_LABEL, &data)
+            push_record(out, CELL_LABEL, &data)
         },
         Value::Blank => {
             let mut data = [0u8; 7];
             put_u16(&mut data, 0, row.get())?;
             put_u16(&mut data, 2, col.get())?;
             put_u16(&mut data, 5, ifmt.get())?;
-            out.push(GRAPH_BLANK, &data)
+            push_record(out, GRAPH_BLANK, &data)
         },
     }
 }
 
-fn bof(kind: Kind) -> [u8; BOF_BYTES] {
+fn bof(kind: ChartKind) -> [u8; BOF_BYTES] {
     let mut data = [0u8; BOF_BYTES];
     match kind {
-        Kind::Excel => {
+        ChartKind::Excel => {
             data[0..2].copy_from_slice(&EXCEL_VERSION.to_le_bytes());
             data[2..4].copy_from_slice(&EXCEL_DOC_TYPE.to_le_bytes());
             data[4..6].copy_from_slice(&0x0DBB_u16.to_le_bytes());
@@ -2216,7 +2231,7 @@ fn bof(kind: Kind) -> [u8; BOF_BYTES] {
             data[8..12].copy_from_slice(&0x0000_0009_u32.to_le_bytes());
             data[12..16].copy_from_slice(&6u32.to_le_bytes());
         },
-        Kind::Graph => {
+        ChartKind::Graph => {
             data[0..2].copy_from_slice(&GRAPH_VERSION.to_le_bytes());
             data[2..4].copy_from_slice(&GRAPH_DOC_TYPE.to_le_bytes());
             data[4..6].copy_from_slice(&0x0DBB_u16.to_le_bytes());
@@ -2286,8 +2301,8 @@ fn encode_axis(out: &mut Encoder, axis: &Axis) -> Result<()> {
             axis::Kind::Series => 2,
         },
     )?;
-    out.push(AXIS, &body)?;
-    out.push(BEGIN, &[])?;
+    push_record(out, AXIS, &body)?;
+    push_record(out, BEGIN, &[])?;
     if let Some(scale) = axis.scale {
         let mut data = [0u8; 42];
         put_f64(&mut data, 0, scale.min)?;
@@ -2296,7 +2311,7 @@ fn encode_axis(out: &mut Encoder, axis: &Axis) -> Result<()> {
         put_f64(&mut data, 24, scale.minor)?;
         put_f64(&mut data, 32, scale.crossing)?;
         put_u16(&mut data, 40, scale.flags)?;
-        out.push(VALUE_RANGE, &data)?;
+        push_record(out, VALUE_RANGE, &data)?;
     }
     if let Some(tick) = axis.tick {
         let mut data = [0u8; 26];
@@ -2306,24 +2321,28 @@ fn encode_axis(out: &mut Encoder, axis: &Axis) -> Result<()> {
         put_byte(&mut data, 3, tick.background)?;
         put_slice(&mut data, 4, &tick.color, "Tick color")?;
         put_u16(&mut data, 24, tick.flags)?;
-        out.push(TICK, &data)?;
+        push_record(out, TICK, &data)?;
     }
     for line in &axis.lines {
-        out.push(AXIS_LINE, &u16::from(line_kind(line.kind)).to_le_bytes())?;
-        out.push(LINE_FORMAT, &line_bytes(line.format))?;
+        push_record(
+            out,
+            AXIS_LINE,
+            &u16::from(line_kind(line.kind)).to_le_bytes(),
+        )?;
+        push_record(out, LINE_FORMAT, &line_bytes(line.format))?;
     }
-    out.push(END, &[])
+    push_record(out, END, &[])
 }
 
 fn encode_group(out: &mut Encoder, group: &Group) -> Result<()> {
     let mut header = [0u8; 20];
     put_u16(&mut header, 16, u16::from(group.vary_colors))?;
     put_u16(&mut header, 18, u16::from(group.order.get()))?;
-    out.push(CHART_FORMAT, &header)?;
-    out.push(BEGIN, &[])?;
+    push_record(out, CHART_FORMAT, &header)?;
+    push_record(out, BEGIN, &[])?;
     match group.family {
-        Family::Line { flags } => out.push(LINE, &flags.to_le_bytes())?,
-        Family::Area { flags } => out.push(AREA, &flags.to_le_bytes())?,
+        Family::Line { flags } => push_record(out, LINE, &flags.to_le_bytes())?,
+        Family::Area { flags } => push_record(out, AREA, &flags.to_le_bytes())?,
         Family::Bar {
             overlap,
             gap,
@@ -2333,7 +2352,7 @@ fn encode_group(out: &mut Encoder, group: &Group) -> Result<()> {
             put_i16(&mut data, 0, overlap.get())?;
             put_u16(&mut data, 2, gap.get())?;
             put_u16(&mut data, 4, flags)?;
-            out.push(BAR, &data)?;
+            push_record(out, BAR, &data)?;
         },
         Family::Pie {
             rotation,
@@ -2344,7 +2363,7 @@ fn encode_group(out: &mut Encoder, group: &Group) -> Result<()> {
             put_u16(&mut data, 0, rotation)?;
             put_u16(&mut data, 2, hole)?;
             put_u16(&mut data, 4, flags)?;
-            out.push(PIE, &data)?;
+            push_record(out, PIE, &data)?;
         },
         Family::Scatter {
             bubble_percent,
@@ -2355,37 +2374,38 @@ fn encode_group(out: &mut Encoder, group: &Group) -> Result<()> {
             put_u16(&mut data, 0, bubble_percent.get())?;
             put_u16(&mut data, 2, bubble_kind as u16)?;
             put_u16(&mut data, 4, flags)?;
-            out.push(SCATTER, &data)?;
+            push_record(out, SCATTER, &data)?;
         },
         Family::Radar { filled, flags } => {
-            out.push(
+            push_record(
+                out,
                 if filled { RADAR_AREA } else { RADAR },
                 &flags.to_le_bytes(),
             )?;
         },
-        Family::Surface { flags } => out.push(SURFACE, &flags.to_le_bytes())?,
+        Family::Surface { flags } => push_record(out, SURFACE, &flags.to_le_bytes())?,
     }
-    out.push(CRT_LINK, &group.link.payload())?;
+    push_record(out, CRT_LINK, &group.link.payload())?;
     for line in &group.lines {
         let marker = crate::record::line::Line::new(line.kind);
-        out.push(CRT_LINE, &marker.payload())?;
-        out.push(LINE_FORMAT, &line_bytes(line.format))?;
+        push_record(out, CRT_LINE, &marker.payload())?;
+        push_record(out, LINE_FORMAT, &line_bytes(line.format))?;
     }
     for drop in &group.drop_bars {
-        out.push(DROP_BAR, &drop.gap.get().to_le_bytes())?;
-        out.push(BEGIN, &[])?;
-        out.push(LINE_FORMAT, &line_bytes(drop.line))?;
-        out.push(AREA_FORMAT, &area_bytes(drop.area))?;
-        out.push(END, &[])?;
+        push_record(out, DROP_BAR, &drop.gap.get().to_le_bytes())?;
+        push_record(out, BEGIN, &[])?;
+        push_record(out, LINE_FORMAT, &line_bytes(drop.line))?;
+        push_record(out, AREA_FORMAT, &area_bytes(drop.area))?;
+        push_record(out, END, &[])?;
     }
-    out.push(END, &[])
+    push_record(out, END, &[])
 }
 
 fn encode_format(out: &mut Encoder, value: &Format) -> Result<()> {
     match value {
-        Format::Line(value) => out.push(LINE_FORMAT, &line_bytes(*value)),
-        Format::Area(value) => out.push(AREA_FORMAT, &area_bytes(*value)),
-        Format::Marker { data } => out.push(MARKER_FORMAT, data),
+        Format::Line(value) => push_record(out, LINE_FORMAT, &line_bytes(*value)),
+        Format::Area(value) => push_record(out, AREA_FORMAT, &area_bytes(*value)),
+        Format::Marker { data } => push_record(out, MARKER_FORMAT, data),
         Format::Data {
             point,
             series,
@@ -2396,9 +2416,9 @@ fn encode_format(out: &mut Encoder, value: &Format) -> Result<()> {
             put_u16(&mut data, 2, *series)?;
             put_u16(&mut data, 4, 0)?;
             put_u16(&mut data, 6, *flags)?;
-            out.push(DATA_FORMAT, &data)
+            push_record(out, DATA_FORMAT, &data)
         },
-        Format::Pie { explosion } => out.push(PIE_FORMAT, &explosion.to_le_bytes()),
+        Format::Pie { explosion } => push_record(out, PIE_FORMAT, &explosion.to_le_bytes()),
     }
 }
 
@@ -2614,17 +2634,17 @@ fn parse_source(value: u8, record: RecordRef<'_>) -> Result<Source> {
     }
 }
 
-fn blank_kind(kind: Kind) -> RecordKind {
+fn blank_kind(kind: ChartKind) -> RecordKind {
     match kind {
-        Kind::Graph => GRAPH_BLANK,
-        Kind::Excel => EXCEL_BLANK,
+        ChartKind::Graph => GRAPH_BLANK,
+        ChartKind::Excel => EXCEL_BLANK,
     }
 }
 
-fn number_kind(kind: Kind) -> RecordKind {
+fn number_kind(kind: ChartKind) -> RecordKind {
     match kind {
-        Kind::Graph => GRAPH_NUMBER,
-        Kind::Excel => EXCEL_NUMBER,
+        ChartKind::Graph => GRAPH_NUMBER,
+        ChartKind::Excel => EXCEL_NUMBER,
     }
 }
 
@@ -2699,8 +2719,8 @@ fn check_xl_string(value: &str, limits: Limits) -> Result<()> {
         .ok_or(Error::SizeOverflow {
             resource: "cached chart string",
         })?;
-    if payload > limits.max_record_bytes {
-        return limit("record bytes", payload, limits.max_record_bytes);
+    if payload > limits.biff.max_record_bytes {
+        return limit("record bytes", payload, limits.biff.max_record_bytes);
     }
     Ok(())
 }

@@ -1,7 +1,5 @@
 use crate::{Error, Result};
-
-/// Maximum payload size of a BIFF8 record, in bytes.
-pub const MAX_BIFF_RECORD_BYTES: usize = 8_224;
+use litchi_biff::{Limits as BiffLimits, MAX_RECORD_BYTES};
 
 /// Resource bounds applied before allocation or traversal.
 ///
@@ -18,8 +16,8 @@ pub struct Limits {
     pub max_stream_bytes: usize,
     /// Maximum size of the required `Workbook` stream.
     pub max_workbook_bytes: usize,
-    /// Maximum number of BIFF records traversed or encoded.
-    pub max_records: usize,
+    /// Physical BIFF frame bounds shared with every BIFF consumer.
+    pub biff: BiffLimits,
     /// Maximum chart substreams discovered in one Workbook stream.
     pub max_charts: usize,
     /// Maximum records contained in one chart substream.
@@ -38,10 +36,6 @@ pub struct Limits {
     pub max_unknown_bytes: usize,
     /// Maximum nesting depth of Begin/End record collections.
     pub max_nesting: usize,
-    /// Maximum BIFF payload size, never greater than 8,224.
-    pub max_record_bytes: usize,
-    /// Maximum size of an encoded BIFF stream.
-    pub max_output_bytes: usize,
 }
 
 impl Limits {
@@ -51,7 +45,6 @@ impl Limits {
         nonzero("root entries", self.max_streams)?;
         nonzero("stream bytes", self.max_stream_bytes)?;
         nonzero("Workbook bytes", self.max_workbook_bytes)?;
-        nonzero("record count", self.max_records)?;
         nonzero("chart count", self.max_charts)?;
         nonzero("chart record count", self.max_chart_records)?;
         nonzero("series count", self.max_series)?;
@@ -61,16 +54,7 @@ impl Limits {
         nonzero("cached value count", self.max_cached_values)?;
         nonzero("unknown bytes", self.max_unknown_bytes)?;
         nonzero("chart nesting", self.max_nesting)?;
-        nonzero("record bytes", self.max_record_bytes)?;
-        nonzero("output bytes", self.max_output_bytes)?;
-
-        if self.max_record_bytes > MAX_BIFF_RECORD_BYTES {
-            return Err(Error::InvalidLimit {
-                resource: "record bytes",
-                value: as_u64(self.max_record_bytes),
-                reason: "BIFF8 payloads cannot exceed 8,224 bytes",
-            });
-        }
+        self.biff.validate()?;
         if self.max_groups > 10 {
             return Err(Error::InvalidLimit {
                 resource: "group count",
@@ -89,18 +73,21 @@ impl Default for Limits {
             max_streams: 3,
             max_stream_bytes: 128 * 1024 * 1024,
             max_workbook_bytes: 128 * 1024 * 1024,
-            max_records: 1_000_000,
+            biff: BiffLimits {
+                max_records: 1_000_000,
+                max_record_bytes: MAX_RECORD_BYTES,
+                max_input_bytes: 128 * 1024 * 1024,
+                max_output_bytes: 128 * 1024 * 1024,
+            },
             max_charts: 512,
             max_chart_records: 65_536,
             max_series: 255,
             max_groups: 10,
             max_axes: 6,
-            max_formula_bytes: MAX_BIFF_RECORD_BYTES - 8,
+            max_formula_bytes: MAX_RECORD_BYTES - 8,
             max_cached_values: 32_000,
             max_unknown_bytes: 16 * 1024 * 1024,
             max_nesting: 128,
-            max_record_bytes: MAX_BIFF_RECORD_BYTES,
-            max_output_bytes: 128 * 1024 * 1024,
         }
     }
 }

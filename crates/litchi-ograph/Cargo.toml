@@ -9,6 +9,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+litchi-biff = { workspace = true }
 litchi-cfb = { workspace = true }
 litchi-core = { workspace = true }
 thiserror = { workspace = true }
