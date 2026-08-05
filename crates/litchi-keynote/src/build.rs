@@ -142,16 +142,17 @@ impl AnimationType {
             return Err(Error::EmptyIdentifier);
         }
 
-        let normalized = identifier.to_ascii_lowercase();
-        let effect = if normalized == "appear" {
+        let effect = if identifier.eq_ignore_ascii_case("appear") {
             Self::Appear
-        } else if normalized == "dissolve" {
+        } else if identifier.eq_ignore_ascii_case("dissolve") {
             Self::Dissolve
-        } else if normalized.contains("move") {
+        } else if contains_ascii_case_insensitive(identifier, b"move") {
             Self::MoveIn
-        } else if normalized.contains("fade") && normalized.contains("scale") {
+        } else if contains_ascii_case_insensitive(identifier, b"fade")
+            && contains_ascii_case_insensitive(identifier, b"scale")
+        {
             Self::FadeAndScale
-        } else if normalized.contains("scale") {
+        } else if contains_ascii_case_insensitive(identifier, b"scale") {
             Self::Scale
         } else {
             Self::Unknown(identifier.to_owned())
@@ -216,6 +217,13 @@ impl Build {
     }
 }
 
+fn contains_ascii_case_insensitive(haystack: &str, needle: &[u8]) -> bool {
+    haystack
+        .as_bytes()
+        .windows(needle.len())
+        .any(|window| window.eq_ignore_ascii_case(needle))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -242,6 +250,36 @@ mod tests {
         let unknown = AnimationType::from_identifier("com.example.future")?;
         assert_eq!(unknown.identifier(), "com.example.future");
         assert_eq!(unknown.name(), "com.example.future");
+        Ok(())
+    }
+
+    #[test]
+    fn identifier_matching_is_case_insensitive_without_changing_unknown_bytes() -> Result<()> {
+        assert_eq!(
+            AnimationType::from_identifier("APPEAR")?,
+            AnimationType::Appear
+        );
+        assert_eq!(
+            AnimationType::from_identifier("Dissolve")?,
+            AnimationType::Dissolve
+        );
+        assert_eq!(
+            AnimationType::from_identifier("custom-MoVe")?,
+            AnimationType::MoveIn
+        );
+        assert_eq!(
+            AnimationType::from_identifier("FADE-and-SCALE")?,
+            AnimationType::FadeAndScale
+        );
+        assert_eq!(
+            AnimationType::from_identifier("future-SCALE")?,
+            AnimationType::Scale
+        );
+
+        let unknown = "Future-Éffect";
+        let parsed = AnimationType::from_identifier(unknown)?;
+        assert_eq!(parsed, AnimationType::Unknown(unknown.to_owned()));
+        assert_eq!(parsed.identifier(), unknown);
         Ok(())
     }
 
