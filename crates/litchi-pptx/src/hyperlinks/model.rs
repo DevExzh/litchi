@@ -87,7 +87,7 @@ impl Hyperlink {
     }
 
     /// Return the target spelling used by a writer.
-    pub(crate) fn target(&self) -> String {
+    pub fn target(&self) -> String {
         match self {
             Self::External { url, .. } => url.clone(),
             Self::Slide { slide_number, .. } => {

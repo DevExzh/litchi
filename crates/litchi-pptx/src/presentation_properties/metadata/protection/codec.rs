@@ -1,9 +1,68 @@
 //! Bounded protection XML codec.
 
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD as BASE64_ENGINE;
 use super::model::{Algorithm, Settings, Verifier};
 use crate::{Error, Result};
 use quick_xml::events::Event;
 use quick_xml::{Reader, XmlVersion};
+use rand::TryRng;
+use rand::rngs::SysRng;
+use sha2::digest::Output;
+use sha2::{Digest, Sha512};
+use zeroize::{Zeroize, Zeroizing};
+
+const SPIN_COUNT: u32 = 100_000;
+
+struct Sha512Output(Output<Sha512>);
+
+impl Zeroize for Sha512Output {
+    fn zeroize(&mut self) {
+        self.0.as_mut_slice().fill(0);
+    }
+}
+
+fn password_hash(password: &str, salt: &[u8], spin_count: u32) -> Zeroizing<Sha512Output> {
+    let mut hasher = Sha512::new();
+    for unit in password.encode_utf16() {
+        hasher.update(unit.to_le_bytes());
+    }
+    hasher.update(salt);
+    let mut hash = Zeroizing::new(Sha512Output(Output::<Sha512>::default()));
+    hasher.finalize_into(&mut hash.0);
+
+    for iteration in 0..spin_count {
+        let mut hasher = Sha512::new();
+        hasher.update(hash.0.as_slice());
+        hasher.update(iteration.to_le_bytes());
+        hasher.finalize_into(&mut hash.0);
+    }
+    hash
+}
+
+pub(crate) fn generate_verifier(password: &str) -> Result<Verifier> {
+    if password.len() > 1 << 20 {
+        return Err(Error::Limit {
+            resource: "protection password",
+            limit: 1 << 20,
+        });
+    }
+
+    let mut salt = [0u8; 16];
+    let mut rng = SysRng;
+    rng.try_fill_bytes(&mut salt).map_err(|error| {
+        Error::Invalid(format!(
+            "failed to generate random salt for modify password: {error}"
+        ))
+    })?;
+    let hash = password_hash(password, &salt, SPIN_COUNT);
+    Ok(Verifier {
+        algorithm: Algorithm::Sha512,
+        spin_count: SPIN_COUNT,
+        hash: BASE64_ENGINE.encode(hash.0.as_slice()),
+        salt: BASE64_ENGINE.encode(salt),
+    })
+}
 
 impl Settings {
     pub fn parse_xml(xml: &str) -> Result<Self> {
@@ -209,6 +268,22 @@ mod tests {
 
     #[test]
     fn password_generation_is_explicitly_dependency_bound() {
-        assert!(Settings::new().set_modify_password("secret").is_err());
+        let mut settings = Settings::new();
+        settings.set_modify_password("secret").unwrap();
+        let verifier = settings.modify().unwrap();
+        assert_eq!(verifier.algorithm(), Algorithm::Sha512);
+        assert_eq!(verifier.spins(), SPIN_COUNT);
+        assert_eq!(BASE64_ENGINE.decode(verifier.hash()).unwrap().len(), 64);
+        assert_eq!(BASE64_ENGINE.decode(verifier.salt()).unwrap().len(), 16);
+        assert!(!format!("{settings:?}").contains("secret"));
+    }
+
+    #[test]
+    fn password_hash_matches_office_password_then_salt_order() {
+        let hash = password_hash("Päss😀", &(0..16).collect::<Vec<_>>(), 2);
+        assert_eq!(
+            BASE64_ENGINE.encode(hash.0.as_slice()),
+            "3ACFcYR0/M+PsEwOXR4/mcgYsTN1VMXMunIrbpt1lY+1Kal3nCkZOJjIEw+LWRlQzI3rL5HZnVIoL87I6R8tNw=="
+        );
     }
 }

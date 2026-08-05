@@ -156,10 +156,9 @@ impl Settings {
         self.modify.as_ref()
     }
 
-    pub fn set_modify_password(&mut self, _password: &str) -> crate::Result<()> {
-        Err(crate::Error::Invalid(
-            "password verifier generation requires the PPTX crypto dependency wiring".into(),
-        ))
+    pub fn set_modify_password(&mut self, password: &str) -> crate::Result<()> {
+        self.modify = Some(super::codec::generate_verifier(password)?);
+        Ok(())
     }
 
     pub fn clear_modify_password(&mut self) {

@@ -1,6 +1,7 @@
 //! PresentationML color-map parsing and resolution.
 
 use crate::presentation_properties::metadata::is_presentationml_name;
+use crate::shape::theme::{Color as ThemeColor, Palette, Slot as ThemeSlot};
 use crate::{Error, Result};
 use litchi_ooxml_common::mce::process_ooxml;
 use litchi_ooxml_common::xml::{is_drawingml_name, unqualified_attribute_value};
@@ -137,6 +138,28 @@ impl Map {
             Slot::Hyperlink => self.hyperlink,
             Slot::FollowedHyperlink => self.followed_hyperlink,
         }
+    }
+
+    /// Resolve a mapped presentation slot against a typed DrawingML palette.
+    ///
+    /// The map and palette remain separate immutable values, so callers can
+    /// reuse one parsed theme for every slide or layout without copying color
+    /// payloads.
+    pub fn resolve<'a>(&self, palette: &'a Palette, slot: Slot) -> Option<&'a ThemeColor> {
+        palette.color(match self.color(slot) {
+            Role::Dark1 => ThemeSlot::Dark1,
+            Role::Light1 => ThemeSlot::Light1,
+            Role::Dark2 => ThemeSlot::Dark2,
+            Role::Light2 => ThemeSlot::Light2,
+            Role::Accent1 => ThemeSlot::Accent1,
+            Role::Accent2 => ThemeSlot::Accent2,
+            Role::Accent3 => ThemeSlot::Accent3,
+            Role::Accent4 => ThemeSlot::Accent4,
+            Role::Accent5 => ThemeSlot::Accent5,
+            Role::Accent6 => ThemeSlot::Accent6,
+            Role::Hyperlink => ThemeSlot::Hyperlink,
+            Role::FollowedHyperlink => ThemeSlot::FollowedHyperlink,
+        })
     }
 
     fn from_element(
@@ -428,6 +451,15 @@ mod tests {
         )
         .unwrap();
         assert_eq!(layout, Some(Override::Override(master)));
+
+        let palette = Palette::new("Office").with(
+            ThemeSlot::Light1,
+            ThemeColor::Rgb("FFFFFF".to_owned()),
+        );
+        assert!(matches!(
+            master.resolve(&palette, Slot::Background1),
+            Some(ThemeColor::Rgb(value)) if value == "FFFFFF"
+        ));
     }
 
     #[test]
