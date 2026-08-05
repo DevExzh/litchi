@@ -77,6 +77,10 @@ pub use cell_watches::{
     CellWatchConformance, CellWatchReference, CellWatches, parse_cell_watches, write_cell_watches,
 };
 pub use chart_sheet::{parse_chartsheet, validate_chartsheet, write_chartsheet};
+// Drawing, chart, shape-geometry, and pivot-chart owners are layered under
+// the chartsheet package boundary while remaining available through the
+// focused XLSX facade.
+pub use chart_sheet::{chart, drawing, pivot_chart, shape_geometry, shapes};
 pub use color::{ParseRgbError, Rgb};
 pub use column::{Column, Columns, Width, WidthAt};
 pub use conditional_formatting::{

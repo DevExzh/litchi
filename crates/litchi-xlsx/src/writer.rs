@@ -12,6 +12,10 @@ use litchi_opc::{OpcPackage, PackageWriter};
 
 use crate::error::Result;
 
+#[path = "writer/shape.rs"]
+#[allow(dead_code)]
+pub mod shape;
+
 /// Serialize a validated XLSX package into owned bytes.
 pub(crate) fn to_bytes(package: &OpcPackage) -> Result<Vec<u8>> {
     Ok(PackageWriter::to_bytes(package)?)

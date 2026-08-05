@@ -46,6 +46,6 @@ pub fn default_app_props_xml() -> &'static str {
 }
 
 /// Generate the fixed metadata part used when threaded comments are authored.
-pub(crate) fn metadata_xml() -> &'static str {
+pub fn metadata_xml() -> &'static str {
     include_str!("resources/generated/metadata.xml")
 }

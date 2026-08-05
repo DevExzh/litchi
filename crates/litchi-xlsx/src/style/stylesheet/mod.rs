@@ -44,7 +44,8 @@ pub use border::{Border, ParseRgbError, Rgb};
 pub use cell_style::CellStyle;
 pub use fill::Fill;
 pub use font::{Font, ParseError as FontParseError, Scheme, Script, Underline};
-pub use number_format::NumberFormat;
+pub use number_format::{NumberFormat, is_date_format};
+pub use parser::parse_styles;
 
 use std::collections::HashMap;
 
@@ -93,7 +94,7 @@ impl Styles {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn parse(content: &str) -> Result<Self> {
-        parser::parse_styles(content)
+        parse_styles(content)
     }
 
     /// Get a number format by ID.
