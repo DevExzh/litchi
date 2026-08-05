@@ -13,7 +13,9 @@ pub mod diagram;
 pub mod ext;
 pub mod fill;
 pub mod geom;
+pub mod geometry;
 pub mod text;
+pub mod theme;
 pub mod xfrm;
 
 use thiserror::Error;
@@ -44,6 +46,15 @@ pub enum Error {
     /// Shared OOXML entity or namespace decoding failed.
     #[error("DrawingML shared XML error: {0}")]
     Common(#[from] litchi_ooxml_common::XmlError),
+
+    /// A bounded DrawingML codec resource was exhausted.
+    #[error("DrawingML {resource} exceeds the limit of {limit}")]
+    Limit {
+        /// Resource whose configured bound was exceeded.
+        resource: &'static str,
+        /// Active upper bound.
+        limit: usize,
+    },
 }
 
 impl From<quick_xml::Error> for Error {

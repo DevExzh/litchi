@@ -210,3 +210,9 @@ impl From<quick_xml::Error> for Error {
         Self::Xml(error.to_string())
     }
 }
+
+impl From<litchi_drawingml::Error> for Error {
+    fn from(error: litchi_drawingml::Error) -> Self {
+        Self::Invalid(error.to_string())
+    }
+}

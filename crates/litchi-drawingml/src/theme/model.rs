@@ -303,21 +303,15 @@ impl FontSet {
     }
 }
 
-/// A parsed theme part.
+/// A parsed DrawingML theme document.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Part {
+pub struct Theme {
     pub name: String,
     pub colors: Palette,
     pub fonts: FontSet,
 }
 
-/// Identity of a theme part added to an OPC package.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Authored {
-    pub part_name: String,
-}
-
-/// Color/font overrides attached to a slide or layout.
+/// A theme override containing optional color and font scheme replacements.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Override {
     pub colors: Option<Palette>,

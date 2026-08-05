@@ -6,12 +6,18 @@ use litchi_opc::{OpcPackage, PackURI};
 
 use crate::{Error, Result};
 
-use super::codec;
-use super::model::{Authored, FontSet, Override, Palette, Part as ThemePart};
+use litchi_drawingml::theme::{FontSet, Override, Palette, Theme, codec};
 
 const STRICT_THEME_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/theme";
 const STRICT_OVERRIDE_REL: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/themeOverride";
+
+/// Identity of a theme part added to a PresentationML package.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Authored {
+    /// Package URI of the authored theme part.
+    pub part_name: String,
+}
 
 /// Add a validated theme part at the next free `/ppt/theme/themeN.xml` URI.
 pub fn add(
@@ -58,7 +64,7 @@ pub fn attach(package: &mut OpcPackage, master_name: &str, theme_name: &str) -> 
 }
 
 /// Read one theme part by URI.
-pub fn load(package: &OpcPackage, theme_name: &str) -> Result<ThemePart> {
+pub fn load(package: &OpcPackage, theme_name: &str) -> Result<Theme> {
     let uri = uri(theme_name, "theme part")?;
     require_type(package, &uri, ct::OFC_THEME)?;
     Ok(codec::read(package.get_part(&uri)?.blob())?)

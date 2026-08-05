@@ -1,4 +1,4 @@
-//! Bounded theme XML codecs.
+//! Bounded DrawingML theme XML codecs.
 
 use std::ops::Range;
 
@@ -10,7 +10,7 @@ use quick_xml::events::{BytesStart, Event};
 use crate::{Error, Result};
 
 use super::model::{
-    Color, Face, FontSet, Override, Palette, Part, Slot, System, validate_fonts, validate_name,
+    Color, Face, FontSet, Override, Palette, Slot, System, Theme, validate_fonts, validate_name,
     validate_palette,
 };
 
@@ -68,7 +68,7 @@ pub fn encode_override(value: &Override) -> Result<Vec<u8>> {
 }
 
 /// Parse a complete theme part.
-pub fn read(xml: &[u8]) -> Result<Part> {
+pub fn read(xml: &[u8]) -> Result<Theme> {
     let parsed = parse(xml, "theme")?;
     let colors = parsed
         .colors
@@ -76,7 +76,7 @@ pub fn read(xml: &[u8]) -> Result<Part> {
     let fonts = parsed
         .fonts
         .ok_or_else(|| invalid("theme has no font set"))?;
-    Ok(Part {
+    Ok(Theme {
         name: parsed.name.unwrap_or_default(),
         colors,
         fonts,
@@ -582,7 +582,7 @@ fn limit(resource: &'static str, limit: usize) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::shape::theme::model::{Color, Face, FontSet, Palette, Slot, System};
+    use crate::theme::model::{Color, Face, FontSet, Palette, Slot, System};
 
     fn palette() -> Palette {
         Slot::ALL
