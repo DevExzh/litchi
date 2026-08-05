@@ -6,6 +6,7 @@
 //! axis-style object, preserves both protobuf layers losslessly, and changes
 //! only the requested style switch.
 
+use litchi_iwa_common::chart::axis::style::Visibility;
 use litchi_iwa_common::chart::axis::{Axis, TickMarkLocation};
 use prost::Message;
 
@@ -176,7 +177,7 @@ pub(crate) fn chart_axis_line_visible(
     drawable_object_id: u64,
     drawable_label: &str,
     axis: Axis,
-) -> Result<bool> {
+) -> Result<Visibility> {
     chart_axis_style_switch_visible(
         package,
         chart_archive_name,
@@ -194,7 +195,7 @@ pub(crate) fn set_chart_axis_line_visible(
     drawable_object_id: u64,
     drawable_label: &str,
     axis: Axis,
-    visible: bool,
+    visible: Visibility,
 ) -> Result<()> {
     set_chart_axis_style_switch_visible(
         package,
@@ -214,7 +215,7 @@ pub(crate) fn chart_axis_major_gridlines_visible(
     drawable_object_id: u64,
     drawable_label: &str,
     axis: Axis,
-) -> Result<bool> {
+) -> Result<Visibility> {
     chart_axis_style_switch_visible(
         package,
         chart_archive_name,
@@ -232,7 +233,7 @@ pub(crate) fn set_chart_axis_major_gridlines_visible(
     drawable_object_id: u64,
     drawable_label: &str,
     axis: Axis,
-    visible: bool,
+    visible: Visibility,
 ) -> Result<()> {
     set_chart_axis_style_switch_visible(
         package,
@@ -252,7 +253,7 @@ pub(crate) fn chart_axis_minor_gridlines_visible(
     drawable_object_id: u64,
     drawable_label: &str,
     axis: Axis,
-) -> Result<bool> {
+) -> Result<Visibility> {
     chart_axis_style_switch_visible(
         package,
         chart_archive_name,
@@ -270,7 +271,7 @@ pub(crate) fn set_chart_axis_minor_gridlines_visible(
     drawable_object_id: u64,
     drawable_label: &str,
     axis: Axis,
-    visible: bool,
+    visible: Visibility,
 ) -> Result<()> {
     set_chart_axis_style_switch_visible(
         package,
@@ -290,7 +291,7 @@ pub(crate) fn chart_axis_minor_tick_marks_visible(
     drawable_object_id: u64,
     drawable_label: &str,
     axis: Axis,
-) -> Result<bool> {
+) -> Result<Visibility> {
     chart_axis_style_switch_visible(
         package,
         chart_archive_name,
@@ -308,7 +309,7 @@ pub(crate) fn set_chart_axis_minor_tick_marks_visible(
     drawable_object_id: u64,
     drawable_label: &str,
     axis: Axis,
-    visible: bool,
+    visible: Visibility,
 ) -> Result<()> {
     set_chart_axis_style_switch_visible(
         package,
@@ -377,7 +378,7 @@ pub(crate) fn chart_value_axis_minimum_label_visible(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-) -> Result<bool> {
+) -> Result<Visibility> {
     chart_axis_style_switch_visible(
         package,
         chart_archive_name,
@@ -394,7 +395,7 @@ pub(crate) fn set_chart_value_axis_minimum_label_visible(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    visible: bool,
+    visible: Visibility,
 ) -> Result<()> {
     set_chart_axis_style_switch_visible(
         package,
@@ -414,7 +415,7 @@ fn chart_axis_style_switch_visible(
     drawable_label: &str,
     axis: Axis,
     style_switch: AxisStyleSwitch,
-) -> Result<bool> {
+) -> Result<Visibility> {
     style_switch.validate_axis(axis)?;
     axis_style_slot(
         package,
@@ -426,6 +427,7 @@ fn chart_axis_style_switch_visible(
     .read(package, |data| {
         read_axis_style_switch_visibility(data, axis, style_switch)
     })
+    .map(Visibility::from)
 }
 
 fn set_chart_axis_style_switch_visible(
@@ -435,7 +437,7 @@ fn set_chart_axis_style_switch_visible(
     drawable_label: &str,
     axis: Axis,
     style_switch: AxisStyleSwitch,
-    visible: bool,
+    visible: Visibility,
 ) -> Result<()> {
     style_switch.validate_axis(axis)?;
     let slot = axis_style_slot(
@@ -447,17 +449,17 @@ fn set_chart_axis_style_switch_visible(
     )?;
     if slot.read(package, |data| {
         read_axis_style_switch_visibility(data, axis, style_switch)
-    })? == visible
+    })? == visible.is_visible()
     {
         return Ok(());
     }
     slot.ensure_exclusive(package, drawable_object_id, drawable_label)?;
     slot.update(package, |data| {
-        patch_axis_style_switch_visibility(data, axis, style_switch, visible)
+        patch_axis_style_switch_visibility(data, axis, style_switch, visible.is_visible())
     })?;
     if slot.read(package, |data| {
         read_axis_style_switch_visibility(data, axis, style_switch)
-    })? != visible
+    })? != visible.is_visible()
     {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} chart {drawable_object_id} {}-axis {} update failed validation",

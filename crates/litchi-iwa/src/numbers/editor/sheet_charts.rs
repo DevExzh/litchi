@@ -691,6 +691,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
+    use litchi_iwa_common::chart::axis::style::Visibility as AxisVisibility;
     use litchi_iwa_common::chart::gaps::{Percentage, Spacing};
 
     use crate::charts::object_container::is_object_container_archive;
@@ -1583,13 +1584,14 @@ mod tests {
             editor
                 .sheet_chart_value_axis_minimum_label_visible(sheet_id, source.drawable_object_id)
                 .unwrap()
+                .is_visible()
         );
         let baseline = editor.to_bytes().unwrap();
         editor
             .set_sheet_chart_value_axis_minimum_label_visible(
                 sheet_id,
                 source.drawable_object_id,
-                true,
+                AxisVisibility::Visible,
             )
             .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -1598,13 +1600,14 @@ mod tests {
             .set_sheet_chart_value_axis_minimum_label_visible(
                 sheet_id,
                 source.drawable_object_id,
-                false,
+                AxisVisibility::Hidden,
             )
             .unwrap();
         assert!(
             !editor
                 .sheet_chart_value_axis_minimum_label_visible(sheet_id, source.drawable_object_id)
                 .unwrap()
+                .is_visible()
         );
         let duplicate = editor
             .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
@@ -1616,13 +1619,14 @@ mod tests {
                     duplicate.drawable_object_id
                 )
                 .unwrap()
+                .is_visible()
         );
 
         editor
             .set_sheet_chart_value_axis_minimum_label_visible(
                 sheet_id,
                 source.drawable_object_id,
-                true,
+                AxisVisibility::Visible,
             )
             .unwrap();
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -1630,6 +1634,7 @@ mod tests {
             reopened
                 .sheet_chart_value_axis_minimum_label_visible(sheet_id, source.drawable_object_id)
                 .unwrap()
+                .is_visible()
         );
         assert!(
             !reopened
@@ -1638,18 +1643,20 @@ mod tests {
                     duplicate.drawable_object_id
                 )
                 .unwrap()
+                .is_visible()
         );
         reopened
             .set_sheet_chart_value_axis_minimum_label_visible(
                 sheet_id,
                 source.drawable_object_id,
-                false,
+                AxisVisibility::Hidden,
             )
             .unwrap();
         assert!(
             !reopened
                 .sheet_chart_value_axis_minimum_label_visible(sheet_id, source.drawable_object_id)
                 .unwrap()
+                .is_visible()
         );
         reopened
             .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
@@ -1846,14 +1853,21 @@ mod tests {
                 editor
                     .sheet_chart_axis_line_visible(sheet_id, source.drawable_object_id, axis)
                     .unwrap()
+                    .is_visible()
             );
             editor
-                .set_sheet_chart_axis_line_visible(sheet_id, source.drawable_object_id, axis, false)
+                .set_sheet_chart_axis_line_visible(
+                    sheet_id,
+                    source.drawable_object_id,
+                    axis,
+                    AxisVisibility::Hidden,
+                )
                 .unwrap();
             assert!(
                 !editor
                     .sheet_chart_axis_line_visible(sheet_id, source.drawable_object_id, axis)
                     .unwrap()
+                    .is_visible()
             );
         }
 
@@ -1865,9 +1879,15 @@ mod tests {
                 !editor
                     .sheet_chart_axis_line_visible(sheet_id, duplicate.drawable_object_id, axis)
                     .unwrap()
+                    .is_visible()
             );
             editor
-                .set_sheet_chart_axis_line_visible(sheet_id, source.drawable_object_id, axis, true)
+                .set_sheet_chart_axis_line_visible(
+                    sheet_id,
+                    source.drawable_object_id,
+                    axis,
+                    AxisVisibility::Visible,
+                )
                 .unwrap();
         }
 
@@ -1877,11 +1897,13 @@ mod tests {
                 reopened
                     .sheet_chart_axis_line_visible(sheet_id, source.drawable_object_id, axis)
                     .unwrap()
+                    .is_visible()
             );
             assert!(
                 !reopened
                     .sheet_chart_axis_line_visible(sheet_id, duplicate.drawable_object_id, axis)
                     .unwrap()
+                    .is_visible()
             );
         }
         reopened
@@ -1905,6 +1927,7 @@ mod tests {
                     Axis::Category,
                 )
                 .unwrap()
+                .is_visible()
         );
         assert!(
             editor
@@ -1914,6 +1937,7 @@ mod tests {
                     Axis::Value,
                 )
                 .unwrap()
+                .is_visible()
         );
         let baseline = editor.to_bytes().unwrap();
         editor
@@ -1921,7 +1945,7 @@ mod tests {
                 sheet_id,
                 source.drawable_object_id,
                 Axis::Category,
-                false,
+                AxisVisibility::Hidden,
             )
             .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -1931,7 +1955,7 @@ mod tests {
                 sheet_id,
                 source.drawable_object_id,
                 Axis::Category,
-                true,
+                AxisVisibility::Visible,
             )
             .unwrap();
         editor
@@ -1939,7 +1963,7 @@ mod tests {
                 sheet_id,
                 source.drawable_object_id,
                 Axis::Value,
-                false,
+                AxisVisibility::Hidden,
             )
             .unwrap();
 
@@ -1954,7 +1978,8 @@ mod tests {
                         duplicate.drawable_object_id,
                         axis,
                     )
-                    .unwrap(),
+                    .unwrap()
+                    .is_visible(),
                 axis == Axis::Category
             );
         }
@@ -1964,7 +1989,7 @@ mod tests {
                 sheet_id,
                 source.drawable_object_id,
                 Axis::Category,
-                false,
+                AxisVisibility::Hidden,
             )
             .unwrap();
         editor
@@ -1972,7 +1997,7 @@ mod tests {
                 sheet_id,
                 source.drawable_object_id,
                 Axis::Value,
-                true,
+                AxisVisibility::Visible,
             )
             .unwrap();
 
@@ -1985,7 +2010,8 @@ mod tests {
                         source.drawable_object_id,
                         axis,
                     )
-                    .unwrap(),
+                    .unwrap()
+                    .is_visible(),
                 axis == Axis::Value
             );
             assert_eq!(
@@ -1995,7 +2021,8 @@ mod tests {
                         duplicate.drawable_object_id,
                         axis,
                     )
-                    .unwrap(),
+                    .unwrap()
+                    .is_visible(),
                 axis == Axis::Category
             );
         }
@@ -2021,6 +2048,7 @@ mod tests {
                         axis,
                     )
                     .unwrap()
+                    .is_visible()
             );
         }
         let baseline = editor.to_bytes().unwrap();
@@ -2029,7 +2057,7 @@ mod tests {
                 sheet_id,
                 source.drawable_object_id,
                 Axis::Category,
-                false,
+                AxisVisibility::Hidden,
             )
             .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -2040,7 +2068,7 @@ mod tests {
                     sheet_id,
                     source.drawable_object_id,
                     axis,
-                    true,
+                    AxisVisibility::Visible,
                 )
                 .unwrap();
         }
@@ -2056,13 +2084,14 @@ mod tests {
                         axis,
                     )
                     .unwrap()
+                    .is_visible()
             );
             editor
                 .set_sheet_chart_axis_minor_gridlines_visible(
                     sheet_id,
                     source.drawable_object_id,
                     axis,
-                    false,
+                    AxisVisibility::Hidden,
                 )
                 .unwrap();
         }
@@ -2077,6 +2106,7 @@ mod tests {
                         axis,
                     )
                     .unwrap()
+                    .is_visible()
             );
             assert!(
                 reopened
@@ -2086,6 +2116,7 @@ mod tests {
                         axis,
                     )
                     .unwrap()
+                    .is_visible()
             );
         }
         reopened
@@ -2110,6 +2141,7 @@ mod tests {
                         axis,
                     )
                     .unwrap()
+                    .is_visible()
             );
         }
         let baseline = editor.to_bytes().unwrap();
@@ -2118,7 +2150,7 @@ mod tests {
                 sheet_id,
                 source.drawable_object_id,
                 Axis::Category,
-                true,
+                AxisVisibility::Visible,
             )
             .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -2129,7 +2161,7 @@ mod tests {
                     sheet_id,
                     source.drawable_object_id,
                     axis,
-                    false,
+                    AxisVisibility::Hidden,
                 )
                 .unwrap();
             assert!(
@@ -2140,6 +2172,7 @@ mod tests {
                         axis,
                     )
                     .unwrap()
+                    .is_visible()
             );
         }
 
@@ -2155,13 +2188,14 @@ mod tests {
                         axis,
                     )
                     .unwrap()
+                    .is_visible()
             );
             editor
                 .set_sheet_chart_axis_minor_tick_marks_visible(
                     sheet_id,
                     source.drawable_object_id,
                     axis,
-                    true,
+                    AxisVisibility::Visible,
                 )
                 .unwrap();
         }
@@ -2176,6 +2210,7 @@ mod tests {
                         axis,
                     )
                     .unwrap()
+                    .is_visible()
             );
             assert!(
                 !reopened
@@ -2185,13 +2220,14 @@ mod tests {
                         axis,
                     )
                     .unwrap()
+                    .is_visible()
             );
             reopened
                 .set_sheet_chart_axis_minor_tick_marks_visible(
                     sheet_id,
                     source.drawable_object_id,
                     axis,
-                    false,
+                    AxisVisibility::Hidden,
                 )
                 .unwrap();
             assert!(
@@ -2202,6 +2238,7 @@ mod tests {
                         axis,
                     )
                     .unwrap()
+                    .is_visible()
             );
         }
         reopened

@@ -11,7 +11,9 @@ use crate::charts::axis_style::{
     set_chart_axis_major_gridlines_visible as set_native_chart_axis_major_gridlines_visible,
     set_chart_axis_minor_gridlines_visible as set_native_chart_axis_minor_gridlines_visible,
 };
-use crate::charts::{Axis, ChartAxisGridline, ChartAxisGridlineStroke};
+use crate::charts::{ChartAxisGridline, ChartAxisGridlineStroke};
+use litchi_iwa_common::chart::axis::Axis;
+use litchi_iwa_common::chart::axis::style::Visibility;
 
 impl PagesEditor {
     /// Read whether Pages shows major gridlines for one native body-chart axis.
@@ -19,7 +21,7 @@ impl PagesEditor {
         &self,
         drawable_object_id: u64,
         axis: Axis,
-    ) -> Result<bool> {
+    ) -> Result<Visibility> {
         body_chart_axis_major_gridlines_visible(self, drawable_object_id, axis)
     }
 
@@ -28,7 +30,7 @@ impl PagesEditor {
         &mut self,
         drawable_object_id: u64,
         axis: Axis,
-        visible: bool,
+        visible: Visibility,
     ) -> Result<()> {
         set_body_chart_axis_major_gridlines_visible(self, drawable_object_id, axis, visible)
     }
@@ -38,7 +40,7 @@ impl PagesEditor {
         &self,
         drawable_object_id: u64,
         axis: Axis,
-    ) -> Result<bool> {
+    ) -> Result<Visibility> {
         body_chart_axis_minor_gridlines_visible(self, drawable_object_id, axis)
     }
 
@@ -47,7 +49,7 @@ impl PagesEditor {
         &mut self,
         drawable_object_id: u64,
         axis: Axis,
-        visible: bool,
+        visible: Visibility,
     ) -> Result<()> {
         set_body_chart_axis_minor_gridlines_visible(self, drawable_object_id, axis, visible)
     }
@@ -104,7 +106,7 @@ fn body_chart_axis_major_gridlines_visible(
     editor: &PagesEditor,
     drawable_object_id: u64,
     axis: Axis,
-) -> Result<bool> {
+) -> Result<Visibility> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_chart_axis_major_gridlines_visible(
         editor.package(),
@@ -119,7 +121,7 @@ fn set_body_chart_axis_major_gridlines_visible(
     editor: &mut PagesEditor,
     drawable_object_id: u64,
     axis: Axis,
-    visible: bool,
+    visible: Visibility,
 ) -> Result<()> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let mut staged = editor.package().clone();
@@ -145,7 +147,7 @@ fn body_chart_axis_minor_gridlines_visible(
     editor: &PagesEditor,
     drawable_object_id: u64,
     axis: Axis,
-) -> Result<bool> {
+) -> Result<Visibility> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_chart_axis_minor_gridlines_visible(
         editor.package(),
@@ -160,7 +162,7 @@ fn set_body_chart_axis_minor_gridlines_visible(
     editor: &mut PagesEditor,
     drawable_object_id: u64,
     axis: Axis,
-    visible: bool,
+    visible: Visibility,
 ) -> Result<()> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let mut staged = editor.package().clone();

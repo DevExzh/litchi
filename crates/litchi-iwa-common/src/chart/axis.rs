@@ -5,6 +5,7 @@ pub mod label_angle;
 pub mod label_position_3d;
 pub mod scale;
 pub mod steps;
+pub mod style;
 
 pub use bounds::{Bound, Bounds};
 pub use label_angle::LabelAngle;

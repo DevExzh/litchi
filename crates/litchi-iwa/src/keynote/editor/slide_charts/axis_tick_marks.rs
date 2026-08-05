@@ -7,7 +7,8 @@ use crate::charts::axis_style::{
     set_chart_axis_minor_tick_marks_visible as set_native_chart_axis_minor_tick_marks_visible,
     set_chart_axis_tick_mark_location as set_native_chart_axis_tick_mark_location,
 };
-use crate::charts::{Axis, TickMarkLocation};
+use litchi_iwa_common::chart::axis::style::Visibility;
+use litchi_iwa_common::chart::axis::{Axis, TickMarkLocation};
 
 impl KeynoteEditor {
     /// Read whether Keynote shows minor tick marks for one native slide-chart axis.
@@ -16,7 +17,7 @@ impl KeynoteEditor {
         slide_index: usize,
         drawable_object_id: u64,
         axis: Axis,
-    ) -> Result<bool> {
+    ) -> Result<Visibility> {
         slide_chart_axis_minor_tick_marks_visible(self, slide_index, drawable_object_id, axis)
     }
 
@@ -26,7 +27,7 @@ impl KeynoteEditor {
         slide_index: usize,
         drawable_object_id: u64,
         axis: Axis,
-        visible: bool,
+        visible: Visibility,
     ) -> Result<()> {
         set_slide_chart_axis_minor_tick_marks_visible(
             self,
@@ -70,7 +71,7 @@ fn slide_chart_axis_minor_tick_marks_visible(
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
-) -> Result<bool> {
+) -> Result<Visibility> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     read_native_chart_axis_minor_tick_marks_visible(
         editor.package(),
@@ -86,7 +87,7 @@ fn set_slide_chart_axis_minor_tick_marks_visible(
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
-    visible: bool,
+    visible: Visibility,
 ) -> Result<()> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let mut staged = editor.package().clone();

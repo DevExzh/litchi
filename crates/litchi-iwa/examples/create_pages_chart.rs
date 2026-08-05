@@ -2,17 +2,19 @@
 
 use std::env;
 
+use litchi_iwa_common::chart::axis::style::Visibility as AxisVisibility;
+use litchi_iwa_common::chart::axis::{Axis, TickMarkLocation};
 use litchi_iwa_common::chart::gaps::{Percentage, Spacing};
 
 use litchi_iwa::charts::{
-    Axis, Bound, Bounds, ChartAxisGridline, ChartAxisGridlineStroke, ChartCornerRadius, ChartData,
+    Bound, Bounds, ChartAxisGridline, ChartAxisGridlineStroke, ChartCornerRadius, ChartData,
     ChartErrorBarDirection, ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont,
     ChartFontSize, ChartLegendFill, ChartLegendFont,
     ChartLegendFontSize, ChartLegendShadow, ChartLegendStroke, ChartRoundedCorners,
     ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesStroke, ChartSeriesStrokePattern,
     ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesValueLabelAutoFit,
     ChartSeriesValueLabelLocation, ChartShadow, DecimalPlaces, Kind, LabelAffixes, MajorStepCount,
-    MinorStepCount, NegativeStyle, NumberFormat, Scale, Steps, TickMarkLocation, Visibility,
+    MinorStepCount, NegativeStyle, NumberFormat, Scale, Steps, Visibility,
 };
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{
@@ -122,29 +124,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         chart.drawable_object_id,
         Steps::fixed(MajorStepCount::new(6)?, MinorStepCount::new(2)?),
     )?;
-    editor.set_body_chart_value_axis_minimum_label_visible(chart.drawable_object_id, false)?;
+    editor.set_body_chart_value_axis_minimum_label_visible(
+        chart.drawable_object_id,
+        AxisVisibility::Hidden,
+    )?;
     editor.set_body_chart_category_axis_series_names_visible(chart.drawable_object_id, true)?;
     editor.set_body_chart_axis_labels_visible(chart.drawable_object_id, Axis::Category, false)?;
     editor.set_body_chart_axis_minor_tick_marks_visible(
         chart.drawable_object_id,
         Axis::Category,
-        false,
+        AxisVisibility::Hidden,
     )?;
     editor.set_body_chart_axis_tick_mark_location(
         chart.drawable_object_id,
         Axis::Category,
         TickMarkLocation::Outside,
     )?;
-    editor.set_body_chart_axis_line_visible(chart.drawable_object_id, Axis::Value, false)?;
+    editor.set_body_chart_axis_line_visible(
+        chart.drawable_object_id,
+        Axis::Value,
+        AxisVisibility::Hidden,
+    )?;
     editor.set_body_chart_axis_major_gridlines_visible(
         chart.drawable_object_id,
         Axis::Value,
-        false,
+        AxisVisibility::Hidden,
     )?;
     editor.set_body_chart_axis_minor_gridlines_visible(
         chart.drawable_object_id,
         Axis::Value,
-        true,
+        AxisVisibility::Visible,
     )?;
     editor.set_body_chart_axis_gridline_stroke(
         chart.drawable_object_id,

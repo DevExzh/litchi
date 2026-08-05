@@ -4,6 +4,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use super::*;
+use litchi_iwa_common::chart::axis::style::Visibility as AxisVisibility;
 use litchi_iwa_common::chart::gaps::{Percentage, Spacing};
 
 use crate::charts::{
@@ -1104,20 +1105,28 @@ fn scratch_document_supports_native_chart_value_axis_minimum_label_visibility_cr
         editor
             .body_chart_value_axis_minimum_label_visible(source.drawable_object_id)
             .unwrap()
+            .is_visible()
     );
     let baseline = editor.to_bytes().unwrap();
     editor
-        .set_body_chart_value_axis_minimum_label_visible(source.drawable_object_id, true)
+        .set_body_chart_value_axis_minimum_label_visible(
+            source.drawable_object_id,
+            AxisVisibility::Visible,
+        )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     editor
-        .set_body_chart_value_axis_minimum_label_visible(source.drawable_object_id, false)
+        .set_body_chart_value_axis_minimum_label_visible(
+            source.drawable_object_id,
+            AxisVisibility::Hidden,
+        )
         .unwrap();
     assert!(
         !editor
             .body_chart_value_axis_minimum_label_visible(source.drawable_object_id)
             .unwrap()
+            .is_visible()
     );
     let duplicate = editor
         .duplicate_body_chart(
@@ -1129,29 +1138,39 @@ fn scratch_document_supports_native_chart_value_axis_minimum_label_visibility_cr
         !editor
             .body_chart_value_axis_minimum_label_visible(duplicate.drawable_object_id)
             .unwrap()
+            .is_visible()
     );
 
     editor
-        .set_body_chart_value_axis_minimum_label_visible(source.drawable_object_id, true)
+        .set_body_chart_value_axis_minimum_label_visible(
+            source.drawable_object_id,
+            AxisVisibility::Visible,
+        )
         .unwrap();
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert!(
         reopened
             .body_chart_value_axis_minimum_label_visible(source.drawable_object_id)
             .unwrap()
+            .is_visible()
     );
     assert!(
         !reopened
             .body_chart_value_axis_minimum_label_visible(duplicate.drawable_object_id)
             .unwrap()
+            .is_visible()
     );
     reopened
-        .set_body_chart_value_axis_minimum_label_visible(source.drawable_object_id, false)
+        .set_body_chart_value_axis_minimum_label_visible(
+            source.drawable_object_id,
+            AxisVisibility::Hidden,
+        )
         .unwrap();
     assert!(
         !reopened
             .body_chart_value_axis_minimum_label_visible(source.drawable_object_id)
             .unwrap()
+            .is_visible()
     );
     reopened
         .remove_body_chart(duplicate.drawable_object_id)
@@ -1327,14 +1346,20 @@ fn scratch_document_supports_native_chart_axis_line_visibility_crud() {
             editor
                 .body_chart_axis_line_visible(source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         editor
-            .set_body_chart_axis_line_visible(source.drawable_object_id, axis, false)
+            .set_body_chart_axis_line_visible(
+                source.drawable_object_id,
+                axis,
+                AxisVisibility::Hidden,
+            )
             .unwrap();
         assert!(
             !editor
                 .body_chart_axis_line_visible(source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
     }
 
@@ -1349,9 +1374,14 @@ fn scratch_document_supports_native_chart_axis_line_visibility_crud() {
             !editor
                 .body_chart_axis_line_visible(duplicate.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         editor
-            .set_body_chart_axis_line_visible(source.drawable_object_id, axis, true)
+            .set_body_chart_axis_line_visible(
+                source.drawable_object_id,
+                axis,
+                AxisVisibility::Visible,
+            )
             .unwrap();
     }
 
@@ -1361,11 +1391,13 @@ fn scratch_document_supports_native_chart_axis_line_visibility_crud() {
             reopened
                 .body_chart_axis_line_visible(source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         assert!(
             !reopened
                 .body_chart_axis_line_visible(duplicate.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
     }
     reopened
@@ -1390,18 +1422,20 @@ fn scratch_document_supports_native_chart_axis_major_gridline_visibility_crud() 
         !editor
             .body_chart_axis_major_gridlines_visible(source.drawable_object_id, Axis::Category)
             .unwrap()
+            .is_visible()
     );
     assert!(
         editor
             .body_chart_axis_major_gridlines_visible(source.drawable_object_id, Axis::Value)
             .unwrap()
+            .is_visible()
     );
     let baseline = editor.to_bytes().unwrap();
     editor
         .set_body_chart_axis_major_gridlines_visible(
             source.drawable_object_id,
             Axis::Category,
-            false,
+            AxisVisibility::Hidden,
         )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -1410,11 +1444,15 @@ fn scratch_document_supports_native_chart_axis_major_gridline_visibility_crud() 
         .set_body_chart_axis_major_gridlines_visible(
             source.drawable_object_id,
             Axis::Category,
-            true,
+            AxisVisibility::Visible,
         )
         .unwrap();
     editor
-        .set_body_chart_axis_major_gridlines_visible(source.drawable_object_id, Axis::Value, false)
+        .set_body_chart_axis_major_gridlines_visible(
+            source.drawable_object_id,
+            Axis::Value,
+            AxisVisibility::Hidden,
+        )
         .unwrap();
 
     let duplicate = editor
@@ -1427,7 +1465,8 @@ fn scratch_document_supports_native_chart_axis_major_gridline_visibility_crud() 
         assert_eq!(
             editor
                 .body_chart_axis_major_gridlines_visible(duplicate.drawable_object_id, axis)
-                .unwrap(),
+                .unwrap()
+                .is_visible(),
             axis == Axis::Category
         );
     }
@@ -1436,11 +1475,15 @@ fn scratch_document_supports_native_chart_axis_major_gridline_visibility_crud() 
         .set_body_chart_axis_major_gridlines_visible(
             source.drawable_object_id,
             Axis::Category,
-            false,
+            AxisVisibility::Hidden,
         )
         .unwrap();
     editor
-        .set_body_chart_axis_major_gridlines_visible(source.drawable_object_id, Axis::Value, true)
+        .set_body_chart_axis_major_gridlines_visible(
+            source.drawable_object_id,
+            Axis::Value,
+            AxisVisibility::Visible,
+        )
         .unwrap();
 
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -1448,13 +1491,15 @@ fn scratch_document_supports_native_chart_axis_major_gridline_visibility_crud() 
         assert_eq!(
             reopened
                 .body_chart_axis_major_gridlines_visible(source.drawable_object_id, axis)
-                .unwrap(),
+                .unwrap()
+                .is_visible(),
             axis == Axis::Value
         );
         assert_eq!(
             reopened
                 .body_chart_axis_major_gridlines_visible(duplicate.drawable_object_id, axis)
-                .unwrap(),
+                .unwrap()
+                .is_visible(),
             axis == Axis::Category
         );
     }
@@ -1481,6 +1526,7 @@ fn scratch_document_supports_native_chart_axis_minor_gridline_visibility_crud() 
             !editor
                 .body_chart_axis_minor_gridlines_visible(source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
     }
     let baseline = editor.to_bytes().unwrap();
@@ -1488,14 +1534,18 @@ fn scratch_document_supports_native_chart_axis_minor_gridline_visibility_crud() 
         .set_body_chart_axis_minor_gridlines_visible(
             source.drawable_object_id,
             Axis::Category,
-            false,
+            AxisVisibility::Hidden,
         )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     for axis in [Axis::Category, Axis::Value] {
         editor
-            .set_body_chart_axis_minor_gridlines_visible(source.drawable_object_id, axis, true)
+            .set_body_chart_axis_minor_gridlines_visible(
+                source.drawable_object_id,
+                axis,
+                AxisVisibility::Visible,
+            )
             .unwrap();
     }
     let duplicate = editor
@@ -1509,9 +1559,14 @@ fn scratch_document_supports_native_chart_axis_minor_gridline_visibility_crud() 
             editor
                 .body_chart_axis_minor_gridlines_visible(duplicate.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         editor
-            .set_body_chart_axis_minor_gridlines_visible(source.drawable_object_id, axis, false)
+            .set_body_chart_axis_minor_gridlines_visible(
+                source.drawable_object_id,
+                axis,
+                AxisVisibility::Hidden,
+            )
             .unwrap();
     }
 
@@ -1521,11 +1576,13 @@ fn scratch_document_supports_native_chart_axis_minor_gridline_visibility_crud() 
             !reopened
                 .body_chart_axis_minor_gridlines_visible(source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         assert!(
             reopened
                 .body_chart_axis_minor_gridlines_visible(duplicate.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
     }
     reopened
@@ -1551,6 +1608,7 @@ fn scratch_document_supports_native_chart_axis_minor_tick_mark_visibility_crud()
             editor
                 .body_chart_axis_minor_tick_marks_visible(source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
     }
     let baseline = editor.to_bytes().unwrap();
@@ -1558,19 +1616,24 @@ fn scratch_document_supports_native_chart_axis_minor_tick_mark_visibility_crud()
         .set_body_chart_axis_minor_tick_marks_visible(
             source.drawable_object_id,
             Axis::Category,
-            true,
+            AxisVisibility::Visible,
         )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     for axis in [Axis::Category, Axis::Value] {
         editor
-            .set_body_chart_axis_minor_tick_marks_visible(source.drawable_object_id, axis, false)
+            .set_body_chart_axis_minor_tick_marks_visible(
+                source.drawable_object_id,
+                axis,
+                AxisVisibility::Hidden,
+            )
             .unwrap();
         assert!(
             !editor
                 .body_chart_axis_minor_tick_marks_visible(source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
     }
 
@@ -1585,9 +1648,14 @@ fn scratch_document_supports_native_chart_axis_minor_tick_mark_visibility_crud()
             !editor
                 .body_chart_axis_minor_tick_marks_visible(duplicate.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         editor
-            .set_body_chart_axis_minor_tick_marks_visible(source.drawable_object_id, axis, true)
+            .set_body_chart_axis_minor_tick_marks_visible(
+                source.drawable_object_id,
+                axis,
+                AxisVisibility::Visible,
+            )
             .unwrap();
     }
 
@@ -1597,19 +1665,26 @@ fn scratch_document_supports_native_chart_axis_minor_tick_mark_visibility_crud()
             reopened
                 .body_chart_axis_minor_tick_marks_visible(source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         assert!(
             !reopened
                 .body_chart_axis_minor_tick_marks_visible(duplicate.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         reopened
-            .set_body_chart_axis_minor_tick_marks_visible(source.drawable_object_id, axis, false)
+            .set_body_chart_axis_minor_tick_marks_visible(
+                source.drawable_object_id,
+                axis,
+                AxisVisibility::Hidden,
+            )
             .unwrap();
         assert!(
             !reopened
                 .body_chart_axis_minor_tick_marks_visible(source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
     }
     reopened
