@@ -1,7 +1,7 @@
 //! Paragraph implementation for Word documents.
 
 use super::Run;
-#[cfg(any(feature = "doc", feature = "ooxml", feature = "odf"))]
+#[cfg(any(feature = "doc", feature = "odf"))]
 use litchi_core::Error;
 use litchi_core::Result;
 

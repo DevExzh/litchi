@@ -1,6 +1,6 @@
 //! Table implementation for Word documents.
 
-#[cfg(any(feature = "doc", feature = "ooxml", feature = "odf"))]
+#[cfg(any(feature = "doc", feature = "odf"))]
 use litchi_core::Error;
 use litchi_core::Result;
 
@@ -158,7 +158,7 @@ impl Row {
         match self {
             #[cfg(feature = "doc")]
             Row::Doc(r) => {
-                let cells = r.cells().map_err(crate::ooxml::map_ooxml_error)?;
+                let cells = r.cells().map_err(Error::from)?;
                 Ok(cells.into_iter().map(Cell::Doc).collect())
             },
             #[cfg(feature = "ooxml")]
