@@ -1,7 +1,7 @@
 //! Three-dimensional chart primitives.
 
-use crate::raw::{Encoder, Kind, RecordRef};
 use crate::{Error, Result, record};
+use litchi_biff::{Encoder, Kind, RecordRef};
 
 /// Base shape of a 3-D bar or column data point.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,7 +65,7 @@ pub struct BarShape {
 
 impl BarShape {
     /// BIFF record identifier.
-    pub const KIND: Kind = Kind::new(0x105F);
+    pub const KIND: Kind = Kind::from_wire(0x105F);
 
     /// Creates a 3-D bar shape.
     pub const fn new(riser: Riser, taper: Taper) -> Self {
@@ -110,7 +110,8 @@ impl BarShape {
 
     /// Appends the complete record to a bounded encoder.
     pub fn write(self, out: &mut Encoder) -> Result<()> {
-        out.push(Self::KIND, &self.payload())
+        out.push(Self::KIND, &self.payload())?;
+        Ok(())
     }
 }
 

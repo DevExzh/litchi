@@ -1,7 +1,7 @@
 //! Chart-element frame (`[MS-OGRAPH]` 2.4.53).
 
-use crate::raw::{Encoder, Kind as RecordKind, RecordRef};
 use crate::{Error, Result, record};
+use litchi_biff::{Encoder, Kind as RecordKind, RecordRef};
 
 const LEN: usize = 4;
 const AUTO_SIZE: u16 = 0x0001;
@@ -42,7 +42,7 @@ pub struct Frame {
 
 impl Frame {
     /// BIFF record identifier.
-    pub const KIND: RecordKind = RecordKind::new(0x1032);
+    pub const KIND: RecordKind = RecordKind::from_wire(0x1032);
 
     /// Creates a frame with explicit size and position.
     pub const fn new(kind: Kind) -> Self {
@@ -115,7 +115,8 @@ impl Frame {
 
     /// Appends the complete record to a bounded encoder.
     pub fn write(self, out: &mut Encoder) -> Result<()> {
-        out.push(Self::KIND, &self.payload())
+        out.push(Self::KIND, &self.payload())?;
+        Ok(())
     }
 }
 

@@ -1,8 +1,8 @@
 //! Chart-group lines and their opaque link (`[MS-OGRAPH]` 2.4.32 and
 //! 2.4.33).
 
-use crate::raw::{Encoder, Kind as RecordKind, RecordRef};
 use crate::{Error, Result, record};
+use litchi_biff::{Encoder, Kind as RecordKind, RecordRef};
 
 /// Type of chart-group line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -42,7 +42,7 @@ pub struct Line {
 
 impl Line {
     /// BIFF record identifier.
-    pub const KIND: RecordKind = RecordKind::new(0x101C);
+    pub const KIND: RecordKind = RecordKind::from_wire(0x101C);
 
     /// Creates a line marker.
     pub const fn new(kind: Kind) -> Self {
@@ -77,7 +77,8 @@ impl Line {
 
     /// Appends the complete record to a bounded encoder.
     pub fn write(self, out: &mut Encoder) -> Result<()> {
-        out.push(Self::KIND, &self.payload())
+        out.push(Self::KIND, &self.payload())?;
+        Ok(())
     }
 }
 
@@ -89,7 +90,7 @@ pub struct Link {
 
 impl Link {
     /// BIFF record identifier.
-    pub const KIND: RecordKind = RecordKind::new(0x1022);
+    pub const KIND: RecordKind = RecordKind::from_wire(0x1022);
 
     /// Creates a link from the ten opaque bytes that will be preserved.
     pub const fn new(bytes: [u8; 10]) -> Self {
@@ -124,7 +125,8 @@ impl Link {
 
     /// Appends the complete record to a bounded encoder.
     pub fn write(self, out: &mut Encoder) -> Result<()> {
-        out.push(Self::KIND, &self.bytes)
+        out.push(Self::KIND, &self.bytes)?;
+        Ok(())
     }
 }
 

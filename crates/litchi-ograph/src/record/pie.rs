@@ -2,8 +2,8 @@
 
 use litchi_core::BoundedU32;
 
-use crate::raw::{Encoder, Kind, RecordRef};
 use crate::{Error, Result, record};
+use litchi_biff::{Encoder, Kind, RecordRef};
 
 const LEN: usize = 2;
 
@@ -18,7 +18,7 @@ pub struct Format {
 
 impl Format {
     /// BIFF record identifier.
-    pub const KIND: Kind = Kind::new(0x100B);
+    pub const KIND: Kind = Kind::from_wire(0x100B);
 
     /// Creates a format from an already range-proven value.
     pub const fn new(explode: Explode) -> Self {
@@ -63,7 +63,8 @@ impl Format {
 
     /// Appends the complete record to a bounded encoder.
     pub fn write(self, out: &mut Encoder) -> Result<()> {
-        out.push(Self::KIND, &self.payload())
+        out.push(Self::KIND, &self.payload())?;
+        Ok(())
     }
 }
 

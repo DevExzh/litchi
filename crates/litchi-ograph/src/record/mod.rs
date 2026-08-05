@@ -10,8 +10,8 @@ pub mod marker;
 pub mod pie;
 pub mod series;
 
-use crate::raw::{Kind, RecordRef};
 use crate::{Error, Result};
+use litchi_biff::{Kind, RecordRef};
 
 pub(crate) fn payload<'a>(record: RecordRef<'a>, expected: Kind, len: usize) -> Result<&'a [u8]> {
     if record.kind() != expected {

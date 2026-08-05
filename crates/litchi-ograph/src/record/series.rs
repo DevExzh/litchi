@@ -3,8 +3,8 @@
 
 use litchi_core::BoundedU32;
 
-use crate::raw::{Encoder, Kind, RecordRef};
 use crate::{Error, Result, record};
+use litchi_biff::{Encoder, Kind, RecordRef};
 
 const FORMAT_LEN: usize = 2;
 const SMOOTH: u16 = 0x0001;
@@ -21,7 +21,7 @@ pub struct Format {
 
 impl Format {
     /// BIFF record identifier.
-    pub const KIND: Kind = Kind::new(0x105D);
+    pub const KIND: Kind = Kind::from_wire(0x105D);
 
     /// Creates formatting with all effects disabled.
     pub const fn new() -> Self {
@@ -89,7 +89,8 @@ impl Format {
 
     /// Appends the complete record to a bounded encoder.
     pub fn write(self, out: &mut Encoder) -> Result<()> {
-        out.push(Self::KIND, &self.payload())
+        out.push(Self::KIND, &self.payload())?;
+        Ok(())
     }
 }
 
@@ -104,7 +105,7 @@ pub struct Parent {
 
 impl Parent {
     /// BIFF record identifier.
-    pub const KIND: Kind = Kind::new(0x104A);
+    pub const KIND: Kind = Kind::from_wire(0x104A);
 
     /// Creates a parent from an already range-proven series index.
     pub const fn new(series: Index) -> Self {
@@ -149,7 +150,8 @@ impl Parent {
 
     /// Appends the complete record to a bounded encoder.
     pub fn write(self, out: &mut Encoder) -> Result<()> {
-        out.push(Self::KIND, &self.payload())
+        out.push(Self::KIND, &self.payload())?;
+        Ok(())
     }
 }
 
