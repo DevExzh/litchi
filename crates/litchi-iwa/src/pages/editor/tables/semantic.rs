@@ -17,6 +17,7 @@ Total output lines: 3697
 
 use super::*;
 use crate::numbers::editor::table::cell::Borders;
+use litchi_iwa_common::comment::Comment;
 use litchi_iwa_common::table::cell::BorderSide;
 
 /// Stable identity and dimensions of one native table attached to the Pages body.
@@ -46,7 +47,7 @@ pub struct PagesTable {
     /// Stable identity and dimensions of this table.
     pub info: PagesTableInfo,
     semantic_table: litchi_numbers::Table,
-    comments: Box<[((usize, usize), PagesTableCellComment)]>,
+    comments: Box<[((usize, usize), Comment)]>,
     merges: Vec<PagesTableCellRegion>,
 }
 
@@ -76,7 +77,7 @@ impl PagesTable {
     }
 
     /// Borrow the comment attached to a materialized cell, if any.
-    pub fn get_comment(&self, row: usize, column: usize) -> Option<&PagesTableCellComment> {
+    pub fn get_comment(&self, row: usize, column: usize) -> Option<&Comment> {
         self.comments
             .binary_search_by_key(&(row, column), |(position, _comment)| *position)
             .ok()
@@ -86,7 +87,7 @@ impl PagesTable {
     /// Iterate over cell comments without exposing the backing map.
     pub fn iter_comments(
         &self,
-    ) -> impl Iterator<Item = ((usize, usize), &PagesTableCellComment)> + '_ {
+    ) -> impl Iterator<Item = ((usize, usize), &Comment)> + '_ {
         self.comments
             .iter()
             .map(|(position, comment)| (*position, comment))
@@ -269,7 +270,7 @@ impl PagesEditor {
         column: usize,
     ) -> Result<Option<PagesTableCellNumberFormat>> {
         self.require_body_table(model_object_id)?;
-        crate::numbers::editor::table_cell_number_format_in_package(
+        crate::numbers::editor::common_table_cell_number_format_in_package(
             self.package(),
             model_object_id,
             row,
@@ -287,7 +288,7 @@ impl PagesEditor {
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
-        crate::numbers::editor::set_table_cell_number_format_in_package(
+        crate::numbers::editor::set_common_table_cell_number_format_in_package(
             &mut staged,
             model_object_id,
             row,

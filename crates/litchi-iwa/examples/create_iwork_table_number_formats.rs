@@ -21,6 +21,10 @@ use litchi_iwa::table_cell_data_format::{
     TableCellSliderRange, TableCellStarRatingFormat, TableCellStepperFormat, TableCellStepperRange,
     TableCellThousandsSeparator,
 };
+use litchi_iwa_common::table::cell::number_format::{
+    DecimalPlaces as SemanticDecimalPlaces, NegativeStyle as SemanticNegativeStyle,
+    NumberFormat as SemanticNumberFormat, ThousandsSeparator as SemanticThousandsSeparator,
+};
 use litchi_numbers::cell::Value as CellValue;
 
 const ROW: usize = 1;
@@ -71,6 +75,14 @@ fn format() -> Result<TableCellNumberFormat, litchi_iwa::Error> {
         TableCellDecimalPlaces::fixed(2)?,
         TableCellNegativeNumberStyle::Parentheses,
         TableCellThousandsSeparator::Shown,
+    ))
+}
+
+fn semantic_format() -> Result<SemanticNumberFormat, litchi_iwa::Error> {
+    Ok(SemanticNumberFormat::new(
+        SemanticDecimalPlaces::fixed(2)?,
+        SemanticNegativeStyle::Parentheses,
+        SemanticThousandsSeparator::Shown,
     ))
 }
 
@@ -355,7 +367,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         NUMBER_COLUMN,
         CellValue::Number(NUMBER_VALUE),
     )?;
-    editor.set_table_cell_number_format(table_id, ROW, NUMBER_COLUMN, format()?)?;
+    editor.set_table_cell_number_format(table_id, ROW, NUMBER_COLUMN, semantic_format()?)?;
     editor.set_table_cell(
         table_id,
         ROW,
@@ -533,7 +545,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         NUMBER_COLUMN,
-        format()?,
+        semantic_format()?,
     )?;
     editor.set_slide_table_cell(
         0,

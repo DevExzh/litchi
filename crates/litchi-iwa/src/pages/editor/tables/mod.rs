@@ -100,13 +100,14 @@ pub use crate::table_cell_layout::{
     TableCellLayout as PagesTableCellLayout, TableCellTextWrap as PagesTableCellTextWrap,
     TableCellVerticalAlignment as PagesTableCellVerticalAlignment,
 };
-pub use crate::table_cell_number_format::{
+pub use crate::table_cell_data_format::{
     TableCellDecimalPlaces as PagesTableCellDecimalPlaces,
     TableCellFixedDecimalPlaces as PagesTableCellFixedDecimalPlaces,
     TableCellNegativeNumberStyle as PagesTableCellNegativeNumberStyle,
-    TableCellNumberFormat as PagesTableCellNumberFormat,
     TableCellThousandsSeparator as PagesTableCellThousandsSeparator,
 };
+pub use litchi_iwa_common::table::cell::number_format::NumberFormat
+    as PagesTableCellNumberFormat;
 pub use crate::text::ParagraphIndents as PagesTableCellParagraphIndents;
 pub use crate::text::ParagraphLineSpacing as PagesTableCellParagraphLineSpacing;
 pub use crate::text::ParagraphList as PagesTableCellParagraphList;

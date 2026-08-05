@@ -86,13 +86,14 @@ pub use crate::table_cell_data_format::{
     TableCellStepperRange as KeynoteTableCellStepperRange,
     TableCellTextFormat as KeynoteTableCellTextFormat,
 };
-pub use crate::table_cell_number_format::{
+pub use crate::table_cell_data_format::{
     TableCellDecimalPlaces as KeynoteTableCellDecimalPlaces,
     TableCellFixedDecimalPlaces as KeynoteTableCellFixedDecimalPlaces,
     TableCellNegativeNumberStyle as KeynoteTableCellNegativeNumberStyle,
-    TableCellNumberFormat as KeynoteTableCellNumberFormat,
     TableCellThousandsSeparator as KeynoteTableCellThousandsSeparator,
 };
+pub use litchi_iwa_common::table::cell::number_format::NumberFormat
+    as KeynoteTableCellNumberFormat;
 pub use crate::text::ParagraphIndents as KeynoteTableCellParagraphIndents;
 pub use crate::text::ParagraphLineSpacing as KeynoteTableCellParagraphLineSpacing;
 pub use crate::text::ParagraphList as KeynoteTableCellParagraphList;
@@ -603,7 +604,7 @@ impl KeynoteEditor {
         column: usize,
     ) -> Result<Option<KeynoteTableCellNumberFormat>> {
         require_table_model(self, slide_index, model_object_id)?;
-        crate::numbers::editor::table_cell_number_format_in_package(
+        crate::numbers::editor::common_table_cell_number_format_in_package(
             self.package(),
             model_object_id,
             row,
@@ -622,7 +623,7 @@ impl KeynoteEditor {
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
-        crate::numbers::editor::set_table_cell_number_format_in_package(
+        crate::numbers::editor::set_common_table_cell_number_format_in_package(
             &mut staged,
             model_object_id,
             row,

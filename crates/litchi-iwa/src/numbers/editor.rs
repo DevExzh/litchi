@@ -13,6 +13,7 @@ use std::ops::Range;
 use std::path::Path;
 
 pub use litchi_numbers::table::dimension::{Dimension, Points, Size};
+use litchi_iwa_common::table::cell::number_format::NumberFormat;
 use prost::Message;
 
 use super::bnc::{BncCell, CachedScalar, StoredValue};

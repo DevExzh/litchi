@@ -870,7 +870,7 @@ pub(crate) fn table_cell_number_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<crate::table_cell_number_format::TableCellNumberFormat>> {
+) -> Result<Option<crate::table_cell_data_format::TableCellNumberFormat>> {
     cell_data_format::cell_number_format(package, table_id, row, column)
 }
 
@@ -879,9 +879,31 @@ pub(crate) fn set_table_cell_number_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    format: crate::table_cell_number_format::TableCellNumberFormat,
+    format: crate::table_cell_data_format::TableCellNumberFormat,
 ) -> Result<()> {
     cell_data_format::set_cell_number_format(package, table_id, row, column, format)
+}
+
+pub(crate) fn common_table_cell_number_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<NumberFormat>> {
+    table_cell_number_format_in_package(package, table_id, row, column)?
+        .map(crate::table_cell_number_format::from_native)
+        .transpose()
+}
+
+pub(crate) fn set_common_table_cell_number_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    format: NumberFormat,
+) -> Result<()> {
+    let native = crate::table_cell_number_format::to_native(format)?;
+    set_table_cell_number_format_in_package(package, table_id, row, column, native)
 }
 
 pub(crate) fn reset_table_cell_number_format_in_package(

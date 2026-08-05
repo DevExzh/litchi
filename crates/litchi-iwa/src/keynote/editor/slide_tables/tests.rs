@@ -12,6 +12,10 @@ use crate::table_cell_data_format::{
 };
 use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
 use litchi_iwa_common::table::cell::BorderSide;
+use litchi_iwa_common::table::cell::number_format::{
+    DecimalPlaces as NumberDecimalPlaces, NegativeStyle as NumberNegativeStyle,
+    ThousandsSeparator as NumberThousandsSeparator,
+};
 
 fn table_geometry() -> (DrawablePoint, DrawableSize) {
     (
@@ -226,9 +230,9 @@ fn source_built_table_roundtrips_number_format_crud() {
         .add_slide_table(0, "Formats", 3, 3, position, size)
         .unwrap();
     let format = KeynoteTableCellNumberFormat::new(
-        KeynoteTableCellDecimalPlaces::fixed(2).unwrap(),
-        KeynoteTableCellNegativeNumberStyle::Parentheses,
-        KeynoteTableCellThousandsSeparator::Shown,
+        NumberDecimalPlaces::fixed(2).unwrap(),
+        NumberNegativeStyle::Parentheses,
+        NumberThousandsSeparator::Shown,
     );
     editor
         .set_slide_table_cell(
@@ -675,7 +679,10 @@ fn source_built_table_roundtrips_slider_format_crud() {
         .unwrap();
     let range = KeynoteTableCellSliderRange::new(-10.0, 30.0, 0.5).unwrap();
     let format =
-        KeynoteTableCellSliderFormat::new(range, KeynoteTableCellNumberFormat::default().into());
+        KeynoteTableCellSliderFormat::new(
+            range,
+            crate::table_cell_data_format::TableCellNumberFormat::default().into(),
+        );
     editor
         .set_slide_table_cell_slider_format(0, table.model_object_id, 1, 1, format.clone())
         .unwrap();
@@ -716,7 +723,10 @@ fn source_built_table_roundtrips_stepper_format_crud() {
         .unwrap();
     let range = KeynoteTableCellStepperRange::new(-10.0, 30.0, 0.5).unwrap();
     let format =
-        KeynoteTableCellStepperFormat::new(range, KeynoteTableCellNumberFormat::default().into());
+        KeynoteTableCellStepperFormat::new(
+            range,
+            crate::table_cell_data_format::TableCellNumberFormat::default().into(),
+        );
     editor
         .set_slide_table_cell_stepper_format(0, table.model_object_id, 1, 1, format.clone())
         .unwrap();

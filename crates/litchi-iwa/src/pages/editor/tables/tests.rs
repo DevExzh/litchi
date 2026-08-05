@@ -13,6 +13,10 @@ use crate::table_cell_data_format::{
     TableCellNumeralSystemFixedPlaces, TableCellNumeralSystemNegativeStyle,
     TableCellNumeralSystemPlaces,
 };
+use litchi_iwa_common::table::cell::number_format::{
+    DecimalPlaces as NumberDecimalPlaces, NegativeStyle as NumberNegativeStyle,
+    ThousandsSeparator as NumberThousandsSeparator,
+};
 
 const SOURCE_BUILT_TABLE_INFO_OBJECT_ID: u64 = 9;
 
@@ -185,9 +189,9 @@ fn source_built_table_roundtrips_number_format_crud() {
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
     let format = PagesTableCellNumberFormat::new(
-        PagesTableCellDecimalPlaces::fixed(2).unwrap(),
-        PagesTableCellNegativeNumberStyle::Parentheses,
-        PagesTableCellThousandsSeparator::Shown,
+        NumberDecimalPlaces::fixed(2).unwrap(),
+        NumberNegativeStyle::Parentheses,
+        NumberThousandsSeparator::Shown,
     );
     editor
         .set_table_cell(model_id, 1, 1, PagesCellValue::Number(1_234.5))
@@ -529,8 +533,10 @@ fn source_built_table_roundtrips_slider_format_crud() {
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
     let range = PagesTableCellSliderRange::new(-10.0, 30.0, 0.5).unwrap();
-    let format =
-        PagesTableCellSliderFormat::new(range, PagesTableCellNumberFormat::default().into());
+    let format = PagesTableCellSliderFormat::new(
+        range,
+        crate::table_cell_data_format::TableCellNumberFormat::default().into(),
+    );
     editor
         .set_table_cell_slider_format(model_id, 1, 1, format.clone())
         .unwrap();
@@ -563,8 +569,10 @@ fn source_built_table_roundtrips_stepper_format_crud() {
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
     let range = PagesTableCellStepperRange::new(-10.0, 30.0, 0.5).unwrap();
-    let format =
-        PagesTableCellStepperFormat::new(range, PagesTableCellNumberFormat::default().into());
+    let format = PagesTableCellStepperFormat::new(
+        range,
+        crate::table_cell_data_format::TableCellNumberFormat::default().into(),
+    );
     editor
         .set_table_cell_stepper_format(model_id, 1, 1, format.clone())
         .unwrap();

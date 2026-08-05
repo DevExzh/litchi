@@ -2,6 +2,7 @@
 
 pub mod conditional_highlight;
 pub mod layout;
+pub mod number_format;
 
 /// One edge of a native table cell.
 #[repr(u8)]

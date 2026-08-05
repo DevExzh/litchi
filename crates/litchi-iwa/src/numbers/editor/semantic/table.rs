@@ -128,7 +128,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_number_format::TableCellNumberFormat>> {
+    ) -> Result<Option<crate::table_cell_data_format::TableCellNumberFormat>> {
         cell_data_format::cell_number_format(&self.package, table_id, row, column)
     }
 
@@ -138,7 +138,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_number_format::TableCellNumberFormat,
+        format: crate::table_cell_data_format::TableCellNumberFormat,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
