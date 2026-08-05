@@ -76,7 +76,7 @@ fn relationship_vocabulary_keeps_external_resources_inert() {
         ExternalDataTarget::Linked { ref target } if target == "https://example.test/book.xlsx"
     ));
     assert!(is_chart_external_data_relationship_type(
-        "http://schemas.openxmlformats.org/officeDocument/relationships/package"
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package"
     ));
     assert!(is_chart_user_shapes_relationship_type(
         "http://purl.oclc.org/ooxml/officeDocument/relationships/chartUserShapes"
