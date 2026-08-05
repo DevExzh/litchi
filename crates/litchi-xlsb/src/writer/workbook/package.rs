@@ -1,0 +1,742 @@
+//! OPC package assembly for XLSB workbooks.
+
+use super::model::{SheetSlot, WorkbookWriter, XLSB_WORKSHEET_BINARY_INDEX_EMPTY};
+use crate::package::error::{Error, Result};
+use crate::package::formula::{CompilationContext, DefinedName};
+use crate::raw::Writer;
+use litchi_core::xml::escape_xml;
+use litchi_opc::constants::{content_type as ct, relationship_type as rel};
+use litchi_opc::part::Part;
+use litchi_opc::{BlobPart, OpcPackage, PackURI};
+use std::io::{Seek, Write};
+use std::sync::Arc;
+
+impl WorkbookWriter {
+    /// Save the workbook to a writer
+    ///
+    /// # Arguments
+    ///
+    /// * `writer` - A writer that implements `Write` and `Seek`
+    pub fn save<W: Write + Seek>(&mut self, writer: W) -> Result<()> {
+        self.validate_formula_metadata()?;
+        let mut package = OpcPackage::new();
+
+        // Add document properties (required by Excel)
+        self.add_doc_props(&mut package)?;
+
+        // Add theme (REQUIRED by Excel)
+        self.add_theme(&mut package)?;
+
+        // Add worksheets first so that shared_strings is fully populated before we
+        // decide whether to create a sharedStrings part and relationship.
+        let formula_sheet_ranges = self.add_worksheet_parts(&mut package)?;
+        self.add_chart_sheet_parts(&mut package)?;
+
+        // Add shared strings table only if non-empty. Excel-generated empty XLSB
+        // workbooks omit sharedStrings.bin entirely, and the corresponding
+        // relationship from the workbook.
+        if !self.shared_strings.is_empty() {
+            self.add_shared_strings_part(&mut package)?;
+        }
+
+        // Add styles
+        self.add_styles_part(&mut package)?;
+
+        // Finally add the workbook part (after worksheets / shared strings / styles)
+        // so that relationships are created with full knowledge of which parts
+        // actually exist.
+        self.add_workbook_part(&mut package, &formula_sheet_ranges)?;
+
+        for (index, link) in self.external_links.iter().enumerate() {
+            let one_based_index = index.checked_add(1).ok_or_else(|| {
+                Error::InvalidFormula("external-link part index overflow".to_string())
+            })?;
+            package.add_part(Box::new(
+                crate::package::external_link_write::author_external_link_part(
+                    link,
+                    one_based_index,
+                )?,
+            ));
+        }
+
+        if let Some(payload) = &self.vba {
+            crate::package::vba_project::store_vba_bytes(
+                &mut package,
+                &PackURI::new("/xl/workbook.bin")?,
+                Arc::clone(payload),
+            )?;
+        }
+
+        // External Data Connections part (at most one per package, related
+        // from the workbook part).
+        if let Some(connections) = &self.connections {
+            let connections_uri = PackURI::new("/xl/connections.bin")?;
+            package.add_part(Box::new(BlobPart::new(
+                connections_uri.clone(),
+                "application/vnd.ms-excel.connections".to_string(),
+                crate::package::connections::write::write_connections_part(connections)?,
+            )));
+            package
+                .get_part_mut(&PackURI::new("/xl/workbook.bin")?)?
+                .rels_mut()
+                .get_or_add(
+                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections",
+                    "connections.bin",
+                );
+        }
+
+        // PivotCache Definition parts (one per attached cache, related from
+        // the workbook part; the relationships and BrtBeginPivotCacheID
+        // records were already emitted by add_workbook_part).
+        for (index, cache) in self.pivot_caches.iter().enumerate() {
+            let cache_uri = PackURI::new(format!(
+                "/xl/pivotCache/pivotCacheDefinition{}.bin",
+                index + 1
+            ))?;
+            package.add_part(Box::new(BlobPart::new(
+                cache_uri,
+                "application/vnd.ms-excel.pivotCacheDefinition".to_string(),
+                cache.bytes.clone(),
+            )));
+        }
+
+        // Save package to output
+        package.to_stream(writer)?;
+
+        Ok(())
+    }
+
+    fn authored_pivot_tables(&self) -> Vec<(String, String)> {
+        self.worksheets
+            .iter()
+            .flat_map(|sheet| {
+                sheet
+                    .pivot_table_views()
+                    .iter()
+                    .map(move |view| (view.name().to_string(), sheet.name().to_string()))
+            })
+            .collect()
+    }
+
+    fn normalized_pivot_chart(
+        chart: &crate::package::xlsx::Chart,
+        host_sheet_name: &str,
+        authored_pivot_tables: &[(String, String)],
+    ) -> Result<crate::package::xlsx::Chart> {
+        let Some(source) = chart.chart.pivot_source.as_ref() else {
+            return Ok(chart.clone());
+        };
+        let name = crate::package::xlsx::pivot_chart::resolve_authored_pivot_source_name(
+            &source.name,
+            host_sheet_name,
+            authored_pivot_tables,
+        )
+        .map_err(|error| Error::InvalidFormula(error.to_string()))?;
+        let mut normalized = chart.clone();
+        normalized
+            .chart
+            .pivot_source
+            .as_mut()
+            .expect("pivot source presence checked above")
+            .name = name;
+        Ok(normalized)
+    }
+
+    /// Add document properties (required by Excel to open the file)
+    fn add_doc_props(&self, package: &mut OpcPackage) -> Result<()> {
+        // Add app.xml (Extended Properties)
+        let app_xml = self.create_app_xml();
+        let app_uri = PackURI::new("/docProps/app.xml")?;
+        let app_part = BlobPart::new(
+            app_uri,
+            "application/vnd.openxmlformats-officedocument.extended-properties+xml".to_string(),
+            app_xml.into_bytes(),
+        );
+        package.add_part(Box::new(app_part));
+        package.relate_to(
+            "docProps/app.xml",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties",
+        );
+
+        // Add core.xml (Core Properties)
+        let core_xml = self.create_core_xml();
+        let core_uri = PackURI::new("/docProps/core.xml")?;
+        let core_part = BlobPart::new(
+            core_uri,
+            "application/vnd.openxmlformats-package.core-properties+xml".to_string(),
+            core_xml.as_bytes().to_vec(),
+        );
+        package.add_part(Box::new(core_part));
+        package.relate_to(
+            "docProps/core.xml",
+            "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties",
+        );
+
+        Ok(())
+    }
+
+    /// Create app.xml content (Extended Properties)
+    pub(super) fn create_app_xml(&self) -> String {
+        let sheet_count = self.sheet_order.len();
+
+        // Build sheet names list
+        let mut sheet_names = String::new();
+        for slot in &self.sheet_order {
+            sheet_names.push_str(&format!(
+                "<vt:lpstr>{}</vt:lpstr>",
+                escape_xml(self.sheet_name(*slot))
+            ));
+        }
+
+        crate::package::template::app(sheet_count, &sheet_names)
+    }
+
+    /// Create core.xml content (Core Properties)
+    pub(super) fn create_core_xml(&self) -> &'static str {
+        crate::package::template::core()
+    }
+
+    /// Add theme (REQUIRED by Excel to open file)
+    fn add_theme(&self, package: &mut OpcPackage) -> Result<()> {
+        // Create minimal Office theme
+        let theme_xml = self.create_minimal_theme();
+        let theme_uri = PackURI::new("/xl/theme/theme1.xml")?;
+        let theme_part = BlobPart::new(
+            theme_uri,
+            "application/vnd.openxmlformats-officedocument.theme+xml".to_string(),
+            theme_xml.as_bytes().to_vec(),
+        );
+        package.add_part(Box::new(theme_part));
+
+        // Note: Relationship from workbook to theme will be added by workbook_part.rels_mut()
+        Ok(())
+    }
+
+    /// Create minimal Office theme XML
+    pub(super) fn create_minimal_theme(&self) -> &'static str {
+        crate::package::template::theme()
+    }
+
+    /// Add workbook part to the package
+    fn add_workbook_part(
+        &self,
+        package: &mut OpcPackage,
+        formula_sheet_ranges: &[(u32, u32)],
+    ) -> Result<()> {
+        // Create the workbook part with an empty blob first so that all
+        // relationships are attached (with concrete IDs) before the workbook
+        // stream is serialized: BrtBeginPivotCacheID records reference
+        // relationship IDs.
+        let workbook_uri = PackURI::new("/xl/workbook.bin")?;
+        let mut workbook_part = BlobPart::new(
+            workbook_uri.clone(),
+            "application/vnd.ms-excel.sheet.binary.macroEnabled.main".to_string(),
+            Vec::new(),
+        );
+
+        // Add relationships from workbook to worksheets and styles
+        let mut pivot_cache_rel_ids = Vec::with_capacity(self.pivot_caches.len());
+        let mut external_link_rel_ids = Vec::with_capacity(self.external_links.len());
+        {
+            let rels = workbook_part.rels_mut();
+            for slot in &self.sheet_order {
+                match *slot {
+                    SheetSlot::Worksheet(index) => {
+                        rels.get_or_add(
+                            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
+                            &format!("worksheets/sheet{}.bin", index + 1),
+                        );
+                    },
+                    SheetSlot::ChartSheet(index) => {
+                        rels.get_or_add(
+                            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
+                            &format!("chartsheets/sheet{}.bin", index + 1),
+                        );
+                    },
+                }
+            }
+
+            rels.get_or_add(
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
+                "styles.bin",
+            );
+
+            // Add sharedStrings relationship only when the shared strings table is
+            // non-empty. Excel omits sharedStrings.bin entirely for empty
+            // workbooks, and the relationship MUST NOT reference a non-existent
+            // part.
+            if !self.shared_strings.is_empty() {
+                rels.get_or_add(
+                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings",
+                    "sharedStrings.bin",
+                );
+            }
+
+            rels.get_or_add(
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
+                "theme/theme1.xml",
+            );
+
+            // PivotCache Definition relationships; the BrtBeginPivotCacheID
+            // records below carry these relationship IDs.
+            for (index, cache) in self.pivot_caches.iter().enumerate() {
+                let relationship = rels.get_or_add(
+                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition",
+                    &format!("pivotCache/pivotCacheDefinition{}.bin", index + 1),
+                );
+                pivot_cache_rel_ids.push((cache.id, relationship.r_id().to_string()));
+            }
+
+            for (index, _) in self.external_links.iter().enumerate() {
+                let relationship = rels.get_or_add(
+                    rel::EXTERNAL_LINK,
+                    &format!("externalLinks/externalLink{}.bin", index + 1),
+                );
+                external_link_rel_ids.push(relationship.r_id().to_string());
+            }
+        }
+
+        // Write workbook structure
+        let mut workbook_data = Vec::new();
+        let mut writer = Writer::new(&mut workbook_data);
+        self.write_workbook(
+            &mut writer,
+            formula_sheet_ranges,
+            &pivot_cache_rel_ids,
+            &external_link_rel_ids,
+        )?;
+        workbook_part.set_blob(workbook_data);
+
+        // Add part to package
+        package.add_part(Box::new(workbook_part));
+
+        // Add relationship from root to workbook
+        package.relate_to(
+            "xl/workbook.bin",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+        );
+
+        Ok(())
+    }
+
+    fn add_worksheet_parts(&mut self, package: &mut OpcPackage) -> Result<Vec<(u32, u32)>> {
+        let authored_pivot_tables = self.authored_pivot_tables();
+        let worksheet_names = self
+            .sheet_order
+            .iter()
+            .map(|slot| self.sheet_name(*slot).to_string())
+            .collect::<Vec<_>>();
+        let worksheet_sheet_indexes = self
+            .sheet_order
+            .iter()
+            .enumerate()
+            .filter_map(|(sheet_index, slot)| match slot {
+                SheetSlot::Worksheet(worksheet_index) => Some((*worksheet_index, sheet_index)),
+                SheetSlot::ChartSheet(_) => None,
+            })
+            .collect::<std::collections::HashMap<_, _>>();
+        let defined_names = self
+            .named_ranges
+            .iter()
+            .map(|named_range| DefinedName {
+                name: named_range.name.clone(),
+                sheet_id: named_range.sheet_id,
+            })
+            .collect::<Vec<_>>();
+        let formula_sheet_ranges = std::cell::RefCell::new(Vec::new());
+        let mut next_table_index = 1usize;
+        let mut next_drawing_index = 1usize;
+        let mut next_chart_index = 1usize;
+        let mut next_image_index = 1usize;
+        let mut next_pivot_table_index = 1usize;
+        for (i, worksheet) in self.worksheets.iter_mut().enumerate() {
+            // Create the worksheet part with an empty blob first so we can attach
+            // relationships (binary index + external hyperlinks) and obtain
+            // concrete relationship IDs before serializing the sheet data.
+            let sheet_uri = PackURI::new(format!("/xl/worksheets/sheet{}.bin", i + 1))?;
+            let mut sheet_part = BlobPart::new(
+                sheet_uri,
+                "application/vnd.ms-excel.worksheet".to_string(),
+                Vec::new(),
+            );
+
+            // Each worksheet MUST have a Worksheet Binary Index part. Excel adds
+            // this automatically when repairing our files. We proactively create
+            // it here and wire up the relationship so the package is valid
+            // without requiring Excel repair.
+            let binary_index_name = format!("binaryIndex{}.bin", i + 1);
+            let binary_index_uri = PackURI::new(format!("/xl/worksheets/{}", binary_index_name))?;
+            let binary_index_part = BlobPart::new(
+                binary_index_uri,
+                "application/vnd.ms-excel.binIndexWs".to_string(),
+                XLSB_WORKSHEET_BINARY_INDEX_EMPTY.to_vec(),
+            );
+
+            {
+                let rels = sheet_part.rels_mut();
+                rels.get_or_add(
+                    "http://schemas.microsoft.com/office/2006/relationships/xlBinaryIndex",
+                    &binary_index_name,
+                );
+            }
+
+            // Create external hyperlink relationships and record their rIds
+            // back into the worksheet's Hyperlink structs so that the
+            // subsequent BrtHLink records carry valid relationship IDs.
+            for hyperlink in worksheet.hyperlinks_mut() {
+                if let Some(ref target) = hyperlink.target
+                    && (target.starts_with("http://")
+                        || target.starts_with("https://")
+                        || target.starts_with("ftp://")
+                        || target.starts_with("mailto:"))
+                {
+                    let rel_id = sheet_part.relate_to_ext(target, rel::HYPERLINK);
+                    hyperlink.r_id = rel_id;
+                }
+            }
+
+            let comments_part = if worksheet.comments().is_empty() {
+                None
+            } else {
+                let comments_name = format!("comments{}.bin", i + 1);
+                sheet_part.relate_to(&format!("../{comments_name}"), rel::COMMENTS);
+                let mut comments_data = Vec::new();
+                crate::package::comments::write_comments(
+                    &mut Writer::new(&mut comments_data),
+                    worksheet.comments(),
+                )?;
+                Some(BlobPart::new(
+                    PackURI::new(format!("/xl/{comments_name}"))?,
+                    "application/vnd.ms-excel.comments".to_string(),
+                    comments_data,
+                ))
+            };
+
+            // Structured tables: one part per table, related from the
+            // worksheet so the BrtListPart records can carry valid rIds.
+            let mut table_parts = Vec::new();
+            if !worksheet.tables().is_empty() {
+                let mut rel_ids = Vec::with_capacity(worksheet.tables().len());
+                for table in worksheet.tables() {
+                    let table_name = format!("tables/table{next_table_index}.bin");
+                    next_table_index += 1;
+                    rel_ids.push(sheet_part.relate_to(&format!("../{table_name}"), rel::TABLE));
+                    table_parts.push(BlobPart::new(
+                        PackURI::new(format!("/xl/{table_name}"))?,
+                        "application/vnd.ms-excel.table".to_string(),
+                        crate::package::table::write::write_table_part(table)?,
+                    ));
+                }
+                worksheet.table_rel_ids = rel_ids;
+            }
+
+            // PivotTable definitions are related implicitly from their host
+            // worksheet and back to the exact workbook PivotCache definition.
+            let mut pivot_table_parts = Vec::new();
+            for view in worksheet.pivot_table_views() {
+                let cache_index = self
+                    .pivot_caches
+                    .iter()
+                    .position(|cache| cache.id == view.cache_id())
+                    .ok_or_else(|| {
+                        Error::InvalidFormula(format!(
+                            "PivotTable view {:?} references unknown cache {}",
+                            view.name(),
+                            view.cache_id()
+                        ))
+                    })?;
+                let cache_version_created = self.pivot_caches[cache_index].version_created;
+                if (view.version_created() >= 3) != (cache_version_created >= 3) {
+                    return Err(Error::InvalidFormula(format!(
+                        "PivotTable view {:?} functionality level {} is incompatible with cache {} level {}",
+                        view.name(),
+                        view.version_created(),
+                        view.cache_id(),
+                        cache_version_created
+                    )));
+                }
+                let pivot_name = format!("pivotTable{next_pivot_table_index}.bin");
+                next_pivot_table_index =
+                    next_pivot_table_index.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormula("PivotTable part index overflow".to_string())
+                    })?;
+                sheet_part.relate_to(&format!("../pivotTables/{pivot_name}"), rel::PIVOT_TABLE);
+                let mut part = BlobPart::new(
+                    PackURI::new(format!("/xl/pivotTables/{pivot_name}"))?,
+                    "application/vnd.ms-excel.PivotTable".to_string(),
+                    view.as_bytes().to_vec(),
+                );
+                part.relate_to(
+                    &format!("../pivotCache/pivotCacheDefinition{}.bin", cache_index + 1),
+                    rel::PIVOT_CACHE_DEFINITION,
+                );
+                pivot_table_parts.push(part);
+            }
+
+            // Worksheet images and charts use standard SpreadsheetDrawing,
+            // Image, and DrawingML Chart parts. The binary sheet carries only
+            // BrtDrawing with the relationship ID allocated here.
+            let mut drawing_part = None;
+            let mut chart_parts = Vec::new();
+            let mut image_parts = Vec::new();
+            if worksheet.has_drawing_objects() {
+                let normalized_charts = worksheet
+                    .charts()
+                    .iter()
+                    .map(|chart| {
+                        Self::normalized_pivot_chart(
+                            chart,
+                            worksheet.name(),
+                            &authored_pivot_tables,
+                        )
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                let drawing_xml = crate::package::drawing_write::serialize_drawing(
+                    worksheet.images(),
+                    &normalized_charts,
+                    worksheet.shapes(),
+                    worksheet.groups(),
+                    worksheet.connections(),
+                )?;
+                let drawing_name = format!("drawing{next_drawing_index}.xml");
+                next_drawing_index = next_drawing_index.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormula("drawing part index overflow".to_string())
+                })?;
+                let mut part = BlobPart::new(
+                    PackURI::new(format!("/xl/drawings/{drawing_name}"))?,
+                    ct::OFC_DRAWING.to_string(),
+                    drawing_xml,
+                );
+                for (image_ordinal, image) in worksheet.images().iter().enumerate() {
+                    let image_name =
+                        format!("image{next_image_index}.{}", image.format().extension());
+                    next_image_index = next_image_index.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormula("image part index overflow".to_string())
+                    })?;
+                    let relationship_id =
+                        part.relate_to(&format!("../media/{image_name}"), rel::IMAGE);
+                    let expected_relationship_id = format!("rId{}", image_ordinal + 1);
+                    if relationship_id != expected_relationship_id {
+                        return Err(Error::InvalidFormula(format!(
+                            "drawing image relationship allocation mismatch: expected {expected_relationship_id}, got {relationship_id}"
+                        )));
+                    }
+                    image_parts.push(BlobPart::new(
+                        PackURI::new(format!("/xl/media/{image_name}"))?,
+                        image.format().content_type().to_string(),
+                        image.data().to_vec(),
+                    ));
+                }
+                for (chart_ordinal, chart) in normalized_charts.iter().enumerate() {
+                    let chart_name = format!("chart{next_chart_index}.xml");
+                    let graph = crate::package::chart_resources::author_chart_graph(
+                        chart,
+                        next_chart_index,
+                    )?;
+                    next_chart_index = next_chart_index.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormula("chart part index overflow".to_string())
+                    })?;
+                    let relationship_id =
+                        part.relate_to(&format!("../charts/{chart_name}"), rel::CHART);
+                    let expected_relationship_id =
+                        format!("rId{}", worksheet.images().len() + chart_ordinal + 1);
+                    if relationship_id != expected_relationship_id {
+                        return Err(Error::InvalidFormula(format!(
+                            "drawing chart relationship allocation mismatch: expected {expected_relationship_id}, got {relationship_id}"
+                        )));
+                    }
+                    chart_parts.push(graph.chart_part);
+                    chart_parts.extend(graph.related_parts);
+                }
+                let rel_id =
+                    sheet_part.relate_to(&format!("../drawings/{drawing_name}"), rel::DRAWING);
+                worksheet.set_drawing_rel_id(Some(rel_id));
+                drawing_part = Some(part);
+            } else {
+                worksheet.set_drawing_rel_id(None);
+            }
+
+            // Now serialize the worksheet with fully-populated relationship IDs
+            // in the hyperlink records.
+            let mut sheet_data = Vec::new();
+            let current_sheet = u32::try_from(worksheet_sheet_indexes[&i])
+                .map_err(|_| Error::InvalidFormula("worksheet index overflow".to_string()))?;
+            let formula_context = CompilationContext {
+                worksheet_names: &worksheet_names,
+                defined_names: &defined_names,
+                tables: &[],
+                supporting_links: &[],
+                external_sheets: &[],
+                external_books: &[],
+                sheet_ranges: &formula_sheet_ranges,
+                current_sheet,
+            };
+            let compiled_formulas = worksheet.compile_contextual_formulas(&formula_context)?;
+            let write_result = {
+                let mut writer = Writer::new(&mut sheet_data);
+                worksheet.write(&mut writer, &mut self.shared_strings)
+            };
+            worksheet.clear_compiled_formulas(compiled_formulas);
+            write_result?;
+            sheet_part.set_blob(sheet_data);
+
+            package.add_part(Box::new(sheet_part));
+            package.add_part(Box::new(binary_index_part));
+            if let Some(part) = comments_part {
+                package.add_part(Box::new(part));
+            }
+            for part in table_parts {
+                package.add_part(Box::new(part));
+            }
+            for part in pivot_table_parts {
+                package.add_part(Box::new(part));
+            }
+            if let Some(part) = drawing_part {
+                package.add_part(Box::new(part));
+            }
+            for part in chart_parts {
+                package.add_part(Box::new(part));
+            }
+            for part in image_parts {
+                package.add_part(Box::new(part));
+            }
+        }
+
+        Ok(formula_sheet_ranges.into_inner())
+    }
+
+    /// Add binary Chart Sheet streams and their standard DrawingML graphs.
+    fn add_chart_sheet_parts(&self, package: &mut OpcPackage) -> Result<()> {
+        let mut next_drawing_index = self
+            .worksheets
+            .iter()
+            .filter(|sheet| sheet.has_drawing_objects())
+            .count()
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormula("drawing part index overflow".to_string()))?;
+        let mut next_chart_index = self
+            .worksheets
+            .iter()
+            .try_fold(1usize, |next, sheet| next.checked_add(sheet.charts().len()))
+            .ok_or_else(|| Error::InvalidFormula("chart part index overflow".to_string()))?;
+
+        for (index, sheet) in self.chart_sheets.iter().enumerate() {
+            sheet.validate()?;
+            let drawing_name = format!("drawing{next_drawing_index}.xml");
+            next_drawing_index = next_drawing_index
+                .checked_add(1)
+                .ok_or_else(|| Error::InvalidFormula("drawing part index overflow".to_string()))?;
+            let chart_index = next_chart_index;
+            let chart_name = format!("chart{chart_index}.xml");
+            next_chart_index = next_chart_index
+                .checked_add(1)
+                .ok_or_else(|| Error::InvalidFormula("chart part index overflow".to_string()))?;
+            let normalized_chart = Self::normalized_pivot_chart(
+                sheet.chart(),
+                sheet.name(),
+                &self.authored_pivot_tables(),
+            )?;
+            let graph = crate::package::chart_resources::author_chart_graph(
+                &normalized_chart,
+                chart_index,
+            )?;
+
+            let mut chart_sheet_part = BlobPart::new(
+                PackURI::new(format!("/xl/chartsheets/sheet{}.bin", index + 1))?,
+                "application/vnd.ms-excel.chartsheet".to_string(),
+                Vec::new(),
+            );
+            let drawing_rel_id =
+                chart_sheet_part.relate_to(&format!("../drawings/{drawing_name}"), rel::DRAWING);
+            if drawing_rel_id != "rId1" {
+                return Err(Error::InvalidFormula(format!(
+                    "chart-sheet drawing relationship allocation mismatch: {drawing_rel_id}"
+                )));
+            }
+
+            let mut printer_part = None;
+            let printer_rel_id = if let Some(bytes) = sheet.printer_settings() {
+                let printer_name = format!("printerSettings{}.bin", index + 1);
+                let rel_id = chart_sheet_part.relate_to(
+                    &format!("../printerSettings/{printer_name}"),
+                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
+                );
+                printer_part = Some(BlobPart::new(
+                    PackURI::new(format!("/xl/printerSettings/{printer_name}"))?,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.printerSettings"
+                        .to_string(),
+                    bytes.to_vec(),
+                ));
+                Some(rel_id)
+            } else {
+                None
+            };
+            chart_sheet_part.set_blob(crate::writer::chartsheet::write_chart_sheet(
+                sheet,
+                &drawing_rel_id,
+                printer_rel_id.as_deref(),
+            )?);
+
+            let mut drawing_part = BlobPart::new(
+                PackURI::new(format!("/xl/drawings/{drawing_name}"))?,
+                ct::OFC_DRAWING.to_string(),
+                crate::package::drawing_write::serialize_chart_sheet_drawing(sheet.name())?,
+            );
+            let chart_rel_id =
+                drawing_part.relate_to(&format!("../charts/{chart_name}"), rel::CHART);
+            if chart_rel_id != "rId1" {
+                return Err(Error::InvalidFormula(format!(
+                    "chart-sheet chart relationship allocation mismatch: {chart_rel_id}"
+                )));
+            }
+            package.add_part(Box::new(chart_sheet_part));
+            package.add_part(Box::new(drawing_part));
+            package.add_part(Box::new(graph.chart_part));
+            for part in graph.related_parts {
+                package.add_part(Box::new(part));
+            }
+            if let Some(part) = printer_part {
+                package.add_part(Box::new(part));
+            }
+        }
+        Ok(())
+    }
+
+    /// Add shared strings part to the package
+    fn add_shared_strings_part(&self, package: &mut OpcPackage) -> Result<()> {
+        let mut sst_data = Vec::new();
+        let mut writer = Writer::new(&mut sst_data);
+
+        self.shared_strings.write(&mut writer)?;
+
+        let sst_uri = PackURI::new("/xl/sharedStrings.bin")?;
+        let sst_part = BlobPart::new(
+            sst_uri,
+            "application/vnd.ms-excel.sharedStrings".to_string(),
+            sst_data,
+        );
+
+        package.add_part(Box::new(sst_part));
+
+        Ok(())
+    }
+
+    /// Add styles part to the package
+    fn add_styles_part(&self, package: &mut OpcPackage) -> Result<()> {
+        let mut styles_data = Vec::new();
+        let mut writer = Writer::new(&mut styles_data);
+
+        self.styles.write(&mut writer)?;
+
+        let styles_uri = PackURI::new("/xl/styles.bin")?;
+        let styles_part = BlobPart::new(
+            styles_uri,
+            "application/vnd.ms-excel.styles".to_string(),
+            styles_data,
+        );
+
+        package.add_part(Box::new(styles_part));
+
+        Ok(())
+    }
+}

@@ -58,11 +58,11 @@ pub fn write_text_with(conformance: Conformance, text: &str) -> Result<Vec<u8>> 
     let escaped = quick_xml::escape::escape(text);
     let prefix = [
         NOTES_XML_DECLARATION,
-        r#"<p:notes xmlns:p="#,
+        r#"<p:notes xmlns:p=""#,
         conformance.p(),
-        r#"" xmlns:a="#,
+        r#"" xmlns:a=""#,
         conformance.a(),
-        r#"" xmlns:r="#,
+        r#"" xmlns:r=""#,
         conformance.r(),
         r#"">"#,
         NOTES_XML_BODY_PREFIX,

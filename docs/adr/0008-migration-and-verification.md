@@ -5192,6 +5192,35 @@ FREESECT`); other DOC integration targets passed. Formatting, diff, and
 46-package boundary checks pass. This remains a structural migration slice,
 not a claim of complete Office-specification conformance.
 
+## Layered RTF, DrawingML, OLE2, and ODF continuation
+
+This slice continues the contextual owner migration through the remaining
+large codec and writer files. RTF now separates its lexer, parser, writer, and
+retained document model into nested `codec`/`model` facades with dedicated
+model, codec, and test seams. DrawingML chart reading and writing and OGraph
+chart records follow the same hierarchy. DOC writer core, DOCX field models,
+ODT parsing, ODS tracked changes, and ODP parsing now separate semantic state,
+format codecs, package boundaries, and focused tests. XLS writer core, XLSB
+workbook writing, and the XLSX chart-sheet package received the corresponding
+layering.
+
+The public owner paths remain ergonomic while implementation files are
+organized by responsibility. No compatibility aliases or redundant format
+prefixes were introduced. During verification, the PPTX notes serializer also
+fixed its namespace-attribute quoting defect; the notes unit suite (12 tests)
+and CRUD integration suite (4 tests) now pass.
+
+The affected-crate structural `cargo check --all-targets` matrix passes with
+lint capping, and the same matrix passes under the workspace lint policy for
+every affected crate except the pre-existing RTF strict-lint backlog. The
+lint-capped affected library-test matrix passes, the umbrella `litchi` crate
+passes 162 unit tests plus three integration targets, formatting and diff
+checks pass, and the crate-boundary policy remains clean. The known malformed
+Apache POI DOC integration fixture remains outside this structural slice. This
+is migration evidence, not a claim of complete `[MS-DOC]`, `[MS-ODRAW]`,
+`[MS-OGRAPH]`, `[MS-OSHARED]`, `[MS-PPT]`, `[MS-XLS]`, RTF, OOXML, or ODF
+conformance.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

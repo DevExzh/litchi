@@ -53,6 +53,14 @@ under contextual folders rather than kept as one source file. DOCX now has
 keeps its semantic model separate from XML/package codecs and focused tests.
 XLSB's workbook owner follows the same structure.
 
+The current continuation applies the same topology to RTF's codec and
+document owners, DrawingML chart reader/writer owners, OGraph chart records,
+DOC writer core, DOCX fields, ODT parser, ODS tracked changes, ODP parser, XLS
+writer core, XLSB workbook writing, and the XLSX chart-sheet package. These
+folders preserve their existing public owner paths while making model, codec,
+package, and test responsibilities explicit. The PPTX notes writer retains
+the same layered ownership and now emits quoted namespace attributes.
+
 ## OLE2 and legacy binary formats
 
 The current legacy container and shared-object layers are:

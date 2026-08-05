@@ -4,7 +4,8 @@
 //! standalone transaction. The model values are still constructed and
 //! validated while the source tables are published through `Workbook::edit`.
 
-use litchi_xlsx::{Number, SheetView, SheetViewType, SortCondition, SortState, Workbook};
+use litchi_xlsx::views::View;
+use litchi_xlsx::{Number, SortCondition, SortState, ViewType, Workbook};
 use std::env;
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -12,8 +13,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .nth(1)
         .unwrap_or_else(|| "page-breaks.xlsx".to_string());
 
-    let page_view = SheetView {
-        view_type: Some(SheetViewType::PageLayout),
+    let page_view = View {
+        view_type: Some(ViewType::PageLayout),
         show_grid_lines: Some(false),
         zoom_scale: Some(120),
         top_left_cell: Some("A10".to_string()),
