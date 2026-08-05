@@ -121,7 +121,7 @@ pub(crate) struct EscherRecordHeader {
 
 impl EscherRecordHeader {
     pub(crate) const fn new(version: u8, instance: u16, rec_type: u16, length: u32) -> Self {
-        let ver_inst = (u16::from(version) & 0x0F) | ((instance & 0x0FFF) << 4);
+        let ver_inst = (version as u16 & 0x0F) | ((instance & 0x0FFF) << 4);
         Self {
             ver_inst,
             rec_type,
