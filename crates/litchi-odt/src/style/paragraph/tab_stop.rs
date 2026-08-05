@@ -15,12 +15,12 @@ const MAX_DEPTH: usize = 256;
 const MAX_STYLES: usize = 65_536;
 const MAX_VALUE_BYTES: usize = 4_096;
 const MAX_AGGREGATE_BYTES: usize = 16 * 1_048_576;
-pub const MAX_PARAGRAPH_TAB_STOPS: usize = 64;
+pub const MAX_STOPS: usize = 64;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct TabStopPosition(String);
+pub struct Position(String);
 
-impl TabStopPosition {
+impl Position {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         validate_length(&value, false, "style:position")?;
@@ -31,13 +31,13 @@ impl TabStopPosition {
     }
 }
 
-impl fmt::Display for TabStopPosition {
+impl fmt::Display for Position {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)
     }
 }
 
-impl FromStr for TabStopPosition {
+impl FromStr for Position {
     type Err = Error;
     fn from_str(value: &str) -> Result<Self> {
         Self::new(value)
@@ -45,7 +45,7 @@ impl FromStr for TabStopPosition {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub enum ParagraphTabStopType {
+pub enum Type {
     #[default]
     Left,
     Center,
@@ -54,13 +54,13 @@ pub enum ParagraphTabStopType {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum ParagraphTabLeaderType {
+pub enum LeaderType {
     None,
     Single,
     Double,
 }
 
-impl ParagraphTabLeaderType {
+impl LeaderType {
     fn as_str(self) -> &'static str {
         match self {
             Self::None => "none",
@@ -71,7 +71,7 @@ impl ParagraphTabLeaderType {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum ParagraphTabLeaderStyle {
+pub enum LeaderStyle {
     None,
     Solid,
     Dotted,
@@ -82,7 +82,7 @@ pub enum ParagraphTabLeaderStyle {
     Wave,
 }
 
-impl ParagraphTabLeaderStyle {
+impl LeaderStyle {
     fn as_str(self) -> &'static str {
         match self {
             Self::None => "none",
@@ -98,9 +98,9 @@ impl ParagraphTabLeaderStyle {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct ParagraphTabLeaderWidth(String);
+pub struct LeaderWidth(String);
 
-impl ParagraphTabLeaderWidth {
+impl LeaderWidth {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         let keyword = matches!(
@@ -123,7 +123,7 @@ impl ParagraphTabLeaderWidth {
     }
 }
 
-impl FromStr for ParagraphTabLeaderWidth {
+impl FromStr for LeaderWidth {
     type Err = Error;
     fn from_str(value: &str) -> Result<Self> {
         Self::new(value)
@@ -131,12 +131,12 @@ impl FromStr for ParagraphTabLeaderWidth {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum ParagraphTabLeaderColor {
+pub enum LeaderColor {
     FontColor,
     Rgb(u8, u8, u8),
 }
 
-impl ParagraphTabLeaderColor {
+impl LeaderColor {
     fn parse(value: &str) -> Result<Self> {
         if value == "font-color" {
             return Ok(Self::FontColor);
@@ -160,22 +160,22 @@ impl ParagraphTabLeaderColor {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct ParagraphTabStop {
-    pub position: TabStopPosition,
-    pub tab_type: ParagraphTabStopType,
-    pub leader_type: Option<ParagraphTabLeaderType>,
-    pub leader_style: Option<ParagraphTabLeaderStyle>,
-    pub leader_width: Option<ParagraphTabLeaderWidth>,
-    pub leader_color: Option<ParagraphTabLeaderColor>,
+pub struct Stop {
+    pub position: Position,
+    pub tab_type: Type,
+    pub leader_type: Option<LeaderType>,
+    pub leader_style: Option<LeaderStyle>,
+    pub leader_width: Option<LeaderWidth>,
+    pub leader_color: Option<LeaderColor>,
     pub leader_text: Option<char>,
     pub leader_text_style: Option<String>,
 }
 
-impl ParagraphTabStop {
-    pub fn new(position: TabStopPosition) -> Self {
+impl Stop {
+    pub fn new(position: Position) -> Self {
         Self {
             position,
-            tab_type: ParagraphTabStopType::Left,
+            tab_type: Type::Left,
             leader_type: None,
             leader_style: None,
             leader_width: None,
@@ -195,31 +195,29 @@ impl ParagraphTabStop {
 
 /// Explicitly present `style:tab-stops`; an empty collection clears inheritance.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub struct ParagraphTabStops(Vec<ParagraphTabStop>);
+pub struct Stops(Vec<Stop>);
 
-impl ParagraphTabStops {
+impl Stops {
     pub fn new() -> Self {
         Self::default()
     }
-    pub fn try_from_vec(stops: Vec<ParagraphTabStop>) -> Result<Self> {
+    pub fn try_from_vec(stops: Vec<Stop>) -> Result<Self> {
         let result = Self(stops);
         result.validate()?;
         Ok(result)
     }
-    pub fn push(&mut self, stop: ParagraphTabStop) -> Result<()> {
-        if self.0.len() >= MAX_PARAGRAPH_TAB_STOPS {
-            return invalid(format!(
-                "paragraph style exceeds {MAX_PARAGRAPH_TAB_STOPS} tab stops"
-            ));
+    pub fn push(&mut self, stop: Stop) -> Result<()> {
+        if self.0.len() >= MAX_STOPS {
+            return invalid(format!("paragraph style exceeds {MAX_STOPS} tab stops"));
         }
         stop.validate()?;
         self.0.push(stop);
         Ok(())
     }
-    pub fn as_slice(&self) -> &[ParagraphTabStop] {
+    pub fn as_slice(&self) -> &[Stop] {
         &self.0
     }
-    pub fn iter(&self) -> impl ExactSizeIterator<Item = &ParagraphTabStop> {
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = &Stop> {
         self.0.iter()
     }
     pub fn len(&self) -> usize {
@@ -229,12 +227,10 @@ impl ParagraphTabStops {
         self.0.is_empty()
     }
     pub fn validate(&self) -> Result<()> {
-        if self.0.len() > MAX_PARAGRAPH_TAB_STOPS {
-            return invalid(format!(
-                "paragraph style exceeds {MAX_PARAGRAPH_TAB_STOPS} tab stops"
-            ));
+        if self.0.len() > MAX_STOPS {
+            return invalid(format!("paragraph style exceeds {MAX_STOPS} tab stops"));
         }
-        self.0.iter().try_for_each(ParagraphTabStop::validate)
+        self.0.iter().try_for_each(Stop::validate)
     }
     pub fn to_xml_fragment(&self) -> Result<String> {
         self.validate()?;
@@ -248,16 +244,16 @@ impl ParagraphTabStops {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ParagraphStyleTabStops {
+pub struct Style {
     pub name: Option<String>,
     pub parent_style_name: Option<String>,
     pub is_default_style: bool,
     /// `None` means inherit; `Some(empty)` explicitly clears inherited stops.
-    pub tab_stops: Option<ParagraphTabStops>,
+    pub tab_stops: Option<Stops>,
 }
 
-impl ParagraphStyleTabStops {
-    pub fn named(name: impl Into<String>, tab_stops: Option<ParagraphTabStops>) -> Result<Self> {
+impl Style {
+    pub fn named(name: impl Into<String>, tab_stops: Option<Stops>) -> Result<Self> {
         let name = name.into();
         validate_text(&name, "style:name")?;
         Ok(Self {
@@ -267,7 +263,7 @@ impl ParagraphStyleTabStops {
             tab_stops,
         })
     }
-    pub fn default_style(tab_stops: Option<ParagraphTabStops>) -> Self {
+    pub fn default_style(tab_stops: Option<Stops>) -> Self {
         Self {
             name: None,
             parent_style_name: None,
@@ -319,20 +315,20 @@ impl ParagraphStyleTabStops {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct ParagraphStyleTabStopSet {
-    pub styles: Vec<ParagraphStyleTabStops>,
+pub struct Styles {
+    pub styles: Vec<Style>,
 }
 
-impl ParagraphStyleTabStopSet {
-    pub fn get(&self, name: &str) -> Option<&ParagraphStyleTabStops> {
+impl Styles {
+    pub fn get(&self, name: &str) -> Option<&Style> {
         self.styles
             .iter()
             .find(|style| style.name.as_deref() == Some(name))
     }
-    pub fn default_style(&self) -> Option<&ParagraphStyleTabStops> {
+    pub fn default_style(&self) -> Option<&Style> {
         self.styles.iter().find(|style| style.is_default_style)
     }
-    pub fn resolved_tab_stops(&self, name: &str) -> Result<Option<&ParagraphTabStops>> {
+    pub fn resolved_tab_stops(&self, name: &str) -> Result<Option<&Stops>> {
         let mut current = self.get(name);
         let mut seen = HashSet::new();
         while let Some(style) = current {
@@ -355,14 +351,14 @@ impl ParagraphStyleTabStopSet {
 }
 
 impl crate::OpenDocumentPackage {
-    pub fn paragraph_style_tab_stops(&self) -> Result<ParagraphStyleTabStopSet> {
-        parse_paragraph_style_tab_stops(self.styles_xml()?.as_deref().unwrap_or_default())
+    pub fn paragraph_style_tab_stops(&self) -> Result<Styles> {
+        parse(self.styles_xml()?.as_deref().unwrap_or_default())
     }
 }
 
 impl crate::FlatOpenDocument {
-    pub fn paragraph_style_tab_stops(&self) -> Result<ParagraphStyleTabStopSet> {
-        parse_paragraph_style_tab_stops(self.xml())
+    pub fn paragraph_style_tab_stops(&self) -> Result<Styles> {
+        parse(self.xml())
     }
 }
 
@@ -380,7 +376,7 @@ struct Frame {
 }
 struct Active {
     depth: usize,
-    value: ParagraphStyleTabStops,
+    value: Style,
     props_depth: Option<usize>,
     saw_props: bool,
     stops_depth: Option<usize>,
@@ -389,9 +385,9 @@ struct Active {
 }
 type Attributes = HashMap<(Ns, String), String>;
 
-pub fn parse_paragraph_style_tab_stops(xml: &str) -> Result<ParagraphStyleTabStopSet> {
+pub fn parse(xml: &str) -> Result<Styles> {
     if !xml.contains("tab-stop") {
-        return Ok(ParagraphStyleTabStopSet::default());
+        return Ok(Styles::default());
     }
     if xml.len() > MAX_XML_BYTES {
         return invalid("paragraph style XML exceeds 64 MiB");
@@ -402,7 +398,7 @@ pub fn parse_paragraph_style_tab_stops(xml: &str) -> Result<ParagraphStyleTabSto
         Vec::new(),
         Vec::<Frame>::new(),
         None,
-        ParagraphStyleTabStopSet::default(),
+        Styles::default(),
         0usize,
     );
     loop {
@@ -514,7 +510,7 @@ fn start(
     local: &str,
     stack: &[Frame],
     active: &mut Option<Active>,
-    result: &mut ParagraphStyleTabStopSet,
+    result: &mut Styles,
     aggregate: &mut usize,
     empty: bool,
 ) -> Result<()> {
@@ -533,7 +529,7 @@ fn start(
         if is_default == name.is_some() {
             return invalid("invalid named/default paragraph style identity");
         }
-        let value = ParagraphStyleTabStops {
+        let value = Style {
             name,
             parent_style_name: take(&mut attrs, "parent-style-name"),
             is_default_style: is_default,
@@ -578,7 +574,7 @@ fn start(
         }
         reject(&attributes(reader, element, aggregate)?, "style:tab-stops")?;
         style.saw_stops = true;
-        style.value.tab_stops = Some(ParagraphTabStops::new());
+        style.value.tab_stops = Some(Stops::new());
         if !empty {
             style.stops_depth = Some(stack.len());
         }
@@ -604,53 +600,53 @@ fn parse_stop(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
-) -> Result<ParagraphTabStop> {
+) -> Result<Stop> {
     let mut attrs = attributes(reader, element, aggregate)?;
-    let position = TabStopPosition::new(
+    let position = Position::new(
         take(&mut attrs, "position").ok_or_else(|| error("missing style:position"))?,
     )?;
     let kind = take(&mut attrs, "type").unwrap_or_else(|| "left".into());
     let character = take(&mut attrs, "char");
     let tab_type = match kind.as_str() {
-        "left" if character.is_none() => ParagraphTabStopType::Left,
-        "center" if character.is_none() => ParagraphTabStopType::Center,
-        "right" if character.is_none() => ParagraphTabStopType::Right,
-        "char" => ParagraphTabStopType::Character(one(character, "style:char")?),
+        "left" if character.is_none() => Type::Left,
+        "center" if character.is_none() => Type::Center,
+        "right" if character.is_none() => Type::Right,
+        "char" => Type::Character(one(character, "style:char")?),
         _ => return invalid(format!("invalid style:type '{kind}'")),
     };
     let leader_type = take(&mut attrs, "leader-type")
         .map(|v| match v.as_str() {
-            "none" => Ok(ParagraphTabLeaderType::None),
-            "single" => Ok(ParagraphTabLeaderType::Single),
-            "double" => Ok(ParagraphTabLeaderType::Double),
+            "none" => Ok(LeaderType::None),
+            "single" => Ok(LeaderType::Single),
+            "double" => Ok(LeaderType::Double),
             _ => invalid(format!("invalid style:leader-type '{v}'")),
         })
         .transpose()?;
     let leader_style = take(&mut attrs, "leader-style")
         .map(|v| match v.as_str() {
-            "none" => Ok(ParagraphTabLeaderStyle::None),
-            "solid" => Ok(ParagraphTabLeaderStyle::Solid),
-            "dotted" => Ok(ParagraphTabLeaderStyle::Dotted),
-            "dash" => Ok(ParagraphTabLeaderStyle::Dash),
-            "long-dash" => Ok(ParagraphTabLeaderStyle::LongDash),
-            "dot-dash" => Ok(ParagraphTabLeaderStyle::DotDash),
-            "dot-dot-dash" => Ok(ParagraphTabLeaderStyle::DotDotDash),
-            "wave" => Ok(ParagraphTabLeaderStyle::Wave),
+            "none" => Ok(LeaderStyle::None),
+            "solid" => Ok(LeaderStyle::Solid),
+            "dotted" => Ok(LeaderStyle::Dotted),
+            "dash" => Ok(LeaderStyle::Dash),
+            "long-dash" => Ok(LeaderStyle::LongDash),
+            "dot-dash" => Ok(LeaderStyle::DotDash),
+            "dot-dot-dash" => Ok(LeaderStyle::DotDotDash),
+            "wave" => Ok(LeaderStyle::Wave),
             _ => invalid(format!("invalid style:leader-style '{v}'")),
         })
         .transpose()?;
     let leader_width = take(&mut attrs, "leader-width")
-        .map(ParagraphTabLeaderWidth::new)
+        .map(LeaderWidth::new)
         .transpose()?;
     let leader_color = take(&mut attrs, "leader-color")
-        .map(|v| ParagraphTabLeaderColor::parse(&v))
+        .map(|v| LeaderColor::parse(&v))
         .transpose()?;
     let leader_text = take(&mut attrs, "leader-text")
         .map(|v| one(Some(v), "style:leader-text"))
         .transpose()?;
     let leader_text_style = take(&mut attrs, "leader-text-style");
     reject(&attrs, "style:tab-stop")?;
-    Ok(ParagraphTabStop {
+    Ok(Stop {
         position,
         tab_type,
         leader_type,
@@ -693,7 +689,7 @@ fn attributes(
     Ok(result)
 }
 
-fn push_style(result: &mut ParagraphStyleTabStopSet, style: ParagraphStyleTabStops) -> Result<()> {
+fn push_style(result: &mut Styles, style: Style) -> Result<()> {
     if result.styles.len() >= MAX_STYLES {
         return invalid(format!("paragraph styles exceed {MAX_STYLES} entries"));
     }
@@ -800,7 +796,7 @@ fn validate_text(value: &str, name: &str) -> Result<()> {
     Ok(())
 }
 
-fn write_stop(xml: &mut String, stop: &ParagraphTabStop) {
+fn write_stop(xml: &mut String, stop: &Stop) {
     xml.push_str("<style:tab-stop");
     if let Some(value) = stop.leader_color {
         attr(xml, "style:leader-color", &value.lexical());
@@ -822,10 +818,10 @@ fn write_stop(xml: &mut String, stop: &ParagraphTabStop) {
     }
     attr(xml, "style:position", stop.position.as_str());
     match stop.tab_type {
-        ParagraphTabStopType::Left => {},
-        ParagraphTabStopType::Center => attr(xml, "style:type", "center"),
-        ParagraphTabStopType::Right => attr(xml, "style:type", "right"),
-        ParagraphTabStopType::Character(c) => {
+        Type::Left => {},
+        Type::Center => attr(xml, "style:type", "center"),
+        Type::Right => attr(xml, "style:type", "right"),
+        Type::Character(c) => {
             attr(xml, "style:char", &c.to_string());
             attr(xml, "style:type", "char");
         },

@@ -1,7 +1,5 @@
 use litchi_odt::style::paragraph::tab_stop::{
-    ParagraphStyleTabStops, ParagraphTabLeaderColor, ParagraphTabLeaderStyle,
-    ParagraphTabLeaderType, ParagraphTabLeaderWidth, ParagraphTabStop, ParagraphTabStopType,
-    ParagraphTabStops, TabStopPosition, parse_paragraph_style_tab_stops,
+    LeaderColor, LeaderStyle, LeaderType, LeaderWidth, Position, Stop, Stops, Style, Type, parse,
 };
 use litchi_odt::{Builder, Document};
 
@@ -17,19 +15,16 @@ fn parses_aliases_all_values_and_deterministic_round_trip() {
     let xml = wrap(
         r##"<s:default-style s:family="paragraph"><s:paragraph-properties><s:tab-stops><s:tab-stop s:position="1cm"/></s:tab-stops></s:paragraph-properties></s:default-style><s:style s:name="Parent" s:family="paragraph"><s:paragraph-properties><s:tab-stops><s:tab-stop s:position="8.5cm" s:type="center"/><s:tab-stop s:position="17cm" s:type="char" s:char="," s:leader-type="double" s:leader-style="dot-dash" s:leader-width="25%" s:leader-color="#a0B1c2" s:leader-text="." s:leader-text-style="Leader"/></s:tab-stops></s:paragraph-properties></s:style><s:style s:name="Child" s:family="paragraph" s:parent-style-name="Parent"/><s:style s:name="Clear" s:family="paragraph" s:parent-style-name="Parent"><s:paragraph-properties><s:tab-stops/></s:paragraph-properties></s:style>"##,
     );
-    let parsed = parse_paragraph_style_tab_stops(&xml).unwrap();
+    let parsed = parse(&xml).unwrap();
     assert_eq!(parsed.styles.len(), 4);
     let parent = parsed.get("Parent").unwrap();
     let stops = parent.tab_stops.as_ref().unwrap();
     assert_eq!(stops.len(), 2);
-    assert_eq!(stops.as_slice()[0].tab_type, ParagraphTabStopType::Center);
-    assert_eq!(
-        stops.as_slice()[1].tab_type,
-        ParagraphTabStopType::Character(',')
-    );
+    assert_eq!(stops.as_slice()[0].tab_type, Type::Center);
+    assert_eq!(stops.as_slice()[1].tab_type, Type::Character(','));
     assert_eq!(
         stops.as_slice()[1].leader_color,
-        Some(ParagraphTabLeaderColor::Rgb(160, 177, 194))
+        Some(LeaderColor::Rgb(160, 177, 194))
     );
     assert_eq!(parsed.resolved_tab_stops("Child").unwrap().unwrap(), stops);
     assert_eq!(
@@ -51,7 +46,7 @@ fn parses_aliases_all_values_and_deterministic_round_trip() {
             "</style:tab-stops></style:paragraph-properties></style:style>"
         )
     );
-    let reparsed = parse_paragraph_style_tab_stops(&wrap(&fragment)).unwrap();
+    let reparsed = parse(&wrap(&fragment)).unwrap();
     assert_eq!(reparsed.get("Parent"), Some(parent));
 }
 
@@ -61,7 +56,7 @@ fn parses_odfpy_and_libreoffice_reference_documents() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/odfpy/xml2odf/definitionlists.xml"
     ));
-    let parsed = parse_paragraph_style_tab_stops(odfpy).unwrap();
+    let parsed = parse(odfpy).unwrap();
     assert!(parsed.styles.iter().any(|style| {
         style
             .tab_stops
@@ -73,12 +68,12 @@ fn parses_odfpy_and_libreoffice_reference_documents() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/extras/source/autotext/lang/cs/template/HLC/styles.xml"
     ));
-    let parsed = parse_paragraph_style_tab_stops(libreoffice).unwrap();
+    let parsed = parse(libreoffice).unwrap();
     assert!(parsed.styles.iter().any(|style| {
         style.tab_stops.as_ref().is_some_and(|stops| {
-            stops.iter().any(|stop| {
-                stop.position.as_str() == "8.5cm" && stop.tab_type == ParagraphTabStopType::Center
-            })
+            stops
+                .iter()
+                .any(|stop| stop.position.as_str() == "8.5cm" && stop.tab_type == Type::Center)
         })
     }));
 }
@@ -110,10 +105,7 @@ fn rejects_malformed_structure_values_and_overflow() {
         ),
     ];
     for xml in invalid {
-        assert!(
-            parse_paragraph_style_tab_stops(&xml).is_err(),
-            "accepted {xml}"
-        );
+        assert!(parse(&xml).is_err(), "accepted {xml}");
     }
 
     let stops = (0..65)
@@ -122,19 +114,19 @@ fn rejects_malformed_structure_values_and_overflow() {
     let overflow = wrap(&format!(
         r#"<s:style s:name="x" s:family="paragraph"><s:paragraph-properties><s:tab-stops>{stops}</s:tab-stops></s:paragraph-properties></s:style>"#
     ));
-    assert!(parse_paragraph_style_tab_stops(&overflow).is_err());
+    assert!(parse(&overflow).is_err());
 }
 
 #[test]
 fn builder_package_and_mutable_document_preserve_typed_styles() {
-    let mut first = ParagraphTabStop::new(TabStopPosition::new("2.5cm").unwrap());
-    first.tab_type = ParagraphTabStopType::Right;
-    first.leader_type = Some(ParagraphTabLeaderType::Single);
-    first.leader_style = Some(ParagraphTabLeaderStyle::Dotted);
-    first.leader_width = Some(ParagraphTabLeaderWidth::new("thin").unwrap());
-    first.leader_color = Some(ParagraphTabLeaderColor::FontColor);
-    let stops = ParagraphTabStops::try_from_vec(vec![first]).unwrap();
-    let mut style = ParagraphStyleTabStops::named("ReportTabs", Some(stops)).unwrap();
+    let mut first = Stop::new(Position::new("2.5cm").unwrap());
+    first.tab_type = Type::Right;
+    first.leader_type = Some(LeaderType::Single);
+    first.leader_style = Some(LeaderStyle::Dotted);
+    first.leader_width = Some(LeaderWidth::new("thin").unwrap());
+    first.leader_color = Some(LeaderColor::FontColor);
+    let stops = Stops::try_from_vec(vec![first]).unwrap();
+    let mut style = Style::named("ReportTabs", Some(stops)).unwrap();
     style.parent_style_name = Some("Standard".to_owned());
 
     let mut builder = Builder::new();
