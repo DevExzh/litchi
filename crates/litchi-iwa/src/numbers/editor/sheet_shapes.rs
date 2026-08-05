@@ -8,16 +8,17 @@ use crate::image_caption::DrawableCaptionKind;
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
     LineEndpoints, LineSegment, LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill,
-    ShapeImageFillTechnique, ShapePathKind, ShapePreset, ShapeShadow, ShapeStroke,
-    flip_drawable_geometry, line_geometry, line_path_source, line_segments_match,
-    reset_shape_effects, reset_shape_fill, reset_shape_shadow, reset_shape_stroke,
-    reset_shape_text_layout, set_shape_effects, set_shape_fill, set_shape_geometry,
-    set_shape_image_fill_data, set_shape_line_endpoints, set_shape_line_segment, set_shape_preset,
-    set_shape_shadow, set_shape_stroke, set_shape_text_layout, shape_effects, shape_fill,
-    shape_line_endpoints, shape_line_segment, shape_path_kind, shape_path_source, shape_preset,
-    shape_shadow, shape_stroke, shape_text_layout,
+    ShapeImageFillTechnique, ShapePathKind, ShapeShadow, ShapeStroke, flip_drawable_geometry,
+    line_geometry, line_path_source, line_segments_match, reset_shape_effects, reset_shape_fill,
+    reset_shape_shadow, reset_shape_stroke, reset_shape_text_layout, set_shape_effects,
+    set_shape_fill, set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
+    set_shape_line_segment, set_shape_preset, set_shape_shadow, set_shape_stroke,
+    set_shape_text_layout, shape_effects, shape_fill, shape_line_endpoints, shape_line_segment,
+    shape_path_kind, shape_path_source, shape_preset, shape_shadow, shape_stroke,
+    shape_text_layout,
 };
 use crate::text::layout::Layout;
+use litchi_iwa_common::shape::path::Preset;
 
 use super::text_box_create::{
     TextBoxObjectIds, text_box_objects, text_box_storage, text_box_theme_styles,
@@ -46,7 +47,7 @@ pub struct NumbersSheetShapeInfo {
     pub drawable_object_id: u64,
     pub kind: NumbersSheetShapeKind,
     /// Source-buildable preset and its native controls, when recognized.
-    pub preset: Option<ShapePreset>,
+    pub preset: Option<Preset>,
     /// Sheet-space endpoints when this shape is a native straight line.
     pub line_segment: Option<LineSegment>,
     /// Directed start/end decorations when this shape is a native straight line.
@@ -89,7 +90,7 @@ impl NumbersEditor {
         position: DrawablePoint,
         size: DrawableSize,
     ) -> Result<NumbersSheetShapeInfo> {
-        self.add_sheet_shape(sheet_id, text, position, size, ShapePreset::Rectangle)
+        self.add_sheet_shape(sheet_id, text, position, size, Preset::Rectangle)
     }
 
     /// Add a typed preset shape with independent writable text to one sheet.
@@ -103,7 +104,7 @@ impl NumbersEditor {
         text: &str,
         position: DrawablePoint,
         size: DrawableSize,
-        preset: ShapePreset,
+        preset: Preset,
     ) -> Result<NumbersSheetShapeInfo> {
         let geometry = new_shape_geometry(position, size)?;
         self.add_sheet_shape_path(
@@ -123,7 +124,7 @@ impl NumbersEditor {
         text: &str,
         position: DrawablePoint,
         size: DrawableSize,
-        preset: ShapePreset,
+        preset: Preset,
         fill: ShapeFill,
     ) -> Result<NumbersSheetShapeInfo> {
         let created = self.add_sheet_shape(sheet_id, text, position, size, preset)?;
@@ -186,7 +187,7 @@ impl NumbersEditor {
         text: &str,
         geometry: DrawableGeometry,
         path_source: tsd::PathSourceArchive,
-        expected_preset: Option<ShapePreset>,
+        expected_preset: Option<Preset>,
         expected_line: Option<LineSegment>,
     ) -> Result<NumbersSheetShapeInfo> {
         let (archive_name, _, _) = numbers_sheet(&self.package, sheet_id)?;
@@ -678,7 +679,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<Option<ShapePreset>> {
+    ) -> Result<Option<Preset>> {
         Ok(shape_graph(self, sheet_id, drawable_object_id)?.info.preset)
     }
 
@@ -687,7 +688,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        preset: ShapePreset,
+        preset: Preset,
     ) -> Result<()> {
         let source = shape_graph(self, sheet_id, drawable_object_id)?;
         let mut staged = self.package.clone();
@@ -1373,12 +1374,13 @@ mod tests {
     use super::*;
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{
-        LineEndpoint, RgbColorSpace, RgbaColor, ShapeContactShadow, ShapeCornerRadius,
-        ShapeGradient, ShapeGradientAngle, ShapeOpacity, ShapeReflection, ShapeReflectionOpacity,
+        LineEndpoint, RgbColorSpace, RgbaColor, ShapeContactShadow, ShapeGradient,
+        ShapeGradientAngle, ShapeOpacity, ShapeReflection, ShapeReflectionOpacity,
         ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity,
         ShapeShadowPerspective, StrokePattern, StrokeWidth,
     };
     use crate::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
+    use litchi_iwa_common::shape::path::CornerRadius;
 
     const POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 300.0 };
     const SIZE: DrawableSize = DrawableSize {
@@ -1410,7 +1412,7 @@ mod tests {
             .add_sheet_rectangle(sheet_id, "Built from typed objects", POSITION, SIZE)
             .unwrap();
         assert_eq!(created.kind, NumbersSheetShapeKind::Rectangle);
-        assert_eq!(created.preset, Some(ShapePreset::Rectangle));
+        assert_eq!(created.preset, Some(Preset::Rectangle));
         assert_eq!(created.storage.text, "Built from typed objects");
         let horizontally_flipped = editor
             .flip_sheet_shape(
@@ -1487,13 +1489,7 @@ mod tests {
             .unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let created = editor
-            .add_sheet_shape(
-                sheet_id,
-                "Source shape",
-                POSITION,
-                SIZE,
-                ShapePreset::Rectangle,
-            )
+            .add_sheet_shape(sheet_id, "Source shape", POSITION, SIZE, Preset::Rectangle)
             .unwrap();
         let fill =
             ShapeFill::Solid(RgbaColor::new(0.35, 0.7, 0.25, 1.0, RgbColorSpace::Srgb).unwrap());
@@ -1734,7 +1730,7 @@ mod tests {
             ShapeGradientAngle::from_degrees(0.0).unwrap(),
         ));
         let created = editor
-            .add_sheet_shape(sheet_id, "Filled", POSITION, SIZE, ShapePreset::Rectangle)
+            .add_sheet_shape(sheet_id, "Filled", POSITION, SIZE, Preset::Rectangle)
             .unwrap();
         let inherited_fill = editor
             .sheet_shape_fill(sheet_id, created.drawable_object_id)
@@ -1772,7 +1768,7 @@ mod tests {
             .unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let created = editor
-            .add_sheet_shape(sheet_id, "Image", POSITION, SIZE, ShapePreset::Rectangle)
+            .add_sheet_shape(sheet_id, "Image", POSITION, SIZE, Preset::Rectangle)
             .unwrap();
         let inherited = editor
             .sheet_shape_fill(sheet_id, created.drawable_object_id)
@@ -1824,7 +1820,7 @@ mod tests {
             .unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let created = editor
-            .add_sheet_shape(sheet_id, "Effects", POSITION, SIZE, ShapePreset::Rectangle)
+            .add_sheet_shape(sheet_id, "Effects", POSITION, SIZE, Preset::Rectangle)
             .unwrap();
         let inherited = editor
             .sheet_shape_effects(sheet_id, created.drawable_object_id)
@@ -1866,7 +1862,7 @@ mod tests {
             .unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let created = editor
-            .add_sheet_shape(sheet_id, "Shadow", POSITION, SIZE, ShapePreset::Rectangle)
+            .add_sheet_shape(sheet_id, "Shadow", POSITION, SIZE, Preset::Rectangle)
             .unwrap();
         let inherited = editor
             .sheet_shape_shadow(sheet_id, created.drawable_object_id)
@@ -1913,7 +1909,7 @@ mod tests {
             .unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let created = editor
-            .add_sheet_shape(sheet_id, "Layout", POSITION, SIZE, ShapePreset::Rectangle)
+            .add_sheet_shape(sheet_id, "Layout", POSITION, SIZE, Preset::Rectangle)
             .unwrap();
         let inherited = editor
             .sheet_shape_text_layout(sheet_id, created.drawable_object_id)
@@ -2018,27 +2014,27 @@ mod tests {
                 "Rounded",
                 POSITION,
                 SIZE,
-                ShapePreset::ROUNDED_RECTANGLE,
+                Preset::ROUNDED_RECTANGLE,
             )
             .unwrap();
         assert_eq!(created.kind, NumbersSheetShapeKind::RoundedRectangle);
-        assert_eq!(created.preset, Some(ShapePreset::ROUNDED_RECTANGLE));
+        assert_eq!(created.preset, Some(Preset::ROUNDED_RECTANGLE));
 
         let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_shape_preset(sheet_id, created.drawable_object_id)
                 .unwrap(),
-            Some(ShapePreset::ROUNDED_RECTANGLE)
+            Some(Preset::ROUNDED_RECTANGLE)
         );
 
         for (preset, kind) in [
-            (ShapePreset::Ellipse, NumbersSheetShapeKind::Ellipse),
-            (ShapePreset::LeftArrow, NumbersSheetShapeKind::LeftArrow),
-            (ShapePreset::RightArrow, NumbersSheetShapeKind::RightArrow),
-            (ShapePreset::DoubleArrow, NumbersSheetShapeKind::DoubleArrow),
-            (ShapePreset::PENTAGON, NumbersSheetShapeKind::RegularPolygon),
-            (ShapePreset::STAR, NumbersSheetShapeKind::Star),
+            (Preset::Ellipse, NumbersSheetShapeKind::Ellipse),
+            (Preset::LeftArrow, NumbersSheetShapeKind::LeftArrow),
+            (Preset::RightArrow, NumbersSheetShapeKind::RightArrow),
+            (Preset::DoubleArrow, NumbersSheetShapeKind::DoubleArrow),
+            (Preset::PENTAGON, NumbersSheetShapeKind::RegularPolygon),
+            (Preset::STAR, NumbersSheetShapeKind::Star),
         ] {
             editor
                 .set_sheet_shape_preset(sheet_id, created.drawable_object_id, preset)
@@ -2081,8 +2077,8 @@ mod tests {
                     "invalid radius",
                     POSITION,
                     SIZE,
-                    ShapePreset::RoundedRectangle {
-                        corner_radius: ShapeCornerRadius::new(SIZE.height).unwrap(),
+                    Preset::RoundedRectangle {
+                        corner_radius: CornerRadius::new(SIZE.height).unwrap(),
                     },
                 )
                 .is_err()
@@ -2101,11 +2097,7 @@ mod tests {
         assert_eq!(editor.to_bytes().unwrap(), before);
         assert!(
             editor
-                .set_sheet_shape_preset(
-                    sheet_id,
-                    text_box.drawable_object_id,
-                    ShapePreset::Ellipse,
-                )
+                .set_sheet_shape_preset(sheet_id, text_box.drawable_object_id, Preset::Ellipse,)
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);

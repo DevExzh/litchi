@@ -3,7 +3,8 @@
 use std::env;
 
 use litchi_iwa::numbers::NumbersDocumentBuilder;
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize, ShapePreset};
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa_common::shape::path::Preset;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = env::args()
@@ -23,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             width: 300.0,
             height: 150.0,
         },
-        ShapePreset::RightArrow,
+        Preset::RightArrow,
     )?;
     let duplicate = editor.duplicate_sheet_shape(sheet_id, source.drawable_object_id)?;
     editor.set_sheet_shape_text(sheet_id, duplicate.drawable_object_id, "Independent copy")?;

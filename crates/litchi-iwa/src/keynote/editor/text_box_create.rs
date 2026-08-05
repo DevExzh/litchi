@@ -2,7 +2,8 @@
 
 use super::*;
 use crate::IWorkThemeArchive;
-use crate::shapes::{DrawablePoint, DrawableSize, ShapePreset, shape_path_source};
+use crate::shapes::{DrawablePoint, DrawableSize, shape_path_source};
+use litchi_iwa_common::shape::path::Preset;
 
 const DEFAULT_DRAWABLE_FLAGS: u32 = 3;
 const DEFAULT_TEXT_BOX_ROTATION_DEGREES: f32 = 0.0;
@@ -109,7 +110,7 @@ impl KeynoteEditor {
             styles.shape,
             geometry,
             storage,
-            shape_path_source(ShapePreset::Rectangle, size)?,
+            shape_path_source(Preset::Rectangle, size)?,
             true,
         )?;
 

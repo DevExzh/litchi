@@ -2,9 +2,8 @@
 
 use super::*;
 use crate::IWorkThemeArchive;
-use crate::shapes::{
-    DrawableGeometry, DrawablePoint, DrawableSize, ShapePreset, shape_path_source,
-};
+use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize, shape_path_source};
+use litchi_iwa_common::shape::path::Preset;
 
 const DRAWABLE_Z_ORDER_MESSAGE_TYPE: u32 = 10_015;
 const DEFAULT_DRAWABLE_FLAGS: u32 = 3;
@@ -146,7 +145,7 @@ impl PagesEditor {
             geometry,
             storage,
             root.left_margin.unwrap_or_default(),
-            shape_path_source(ShapePreset::Rectangle, size)?,
+            shape_path_source(Preset::Rectangle, size)?,
             BodyTextShapeRole::TextBox,
         )?;
         staged.update_archive(&archive_name, |archive| {

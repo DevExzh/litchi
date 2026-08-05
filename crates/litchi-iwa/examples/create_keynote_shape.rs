@@ -7,11 +7,12 @@ use litchi_iwa::shapes::{
     DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeCurvedShadow, ShapeEffects,
     ShapeFill, ShapeGradient, ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity,
     ShapeGradientStop, ShapeGradientStopMidpoint, ShapeGradientStopPosition,
-    ShapeImageFillTechnique, ShapeOpacity, ShapePreset, ShapeReflection, ShapeReflectionOpacity,
-    ShapeShadow, ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowCurve,
+    ShapeImageFillTechnique, ShapeOpacity, ShapeReflection, ShapeReflectionOpacity, ShapeShadow,
+    ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowCurve,
     ShapeShadowOffset, ShapeShadowOpacity,
 };
 use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
+use litchi_iwa_common::shape::path::Preset;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -38,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             width: 480.0,
             height: 240.0,
         },
-        ShapePreset::RightArrow,
+        Preset::RightArrow,
         ShapeFill::Gradient(ShapeGradient::advanced(
             ShapeGradientKind::Radial,
             vec![

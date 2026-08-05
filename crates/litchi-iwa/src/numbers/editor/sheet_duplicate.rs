@@ -411,10 +411,9 @@ mod tests {
         NumbersDocumentBuilder, NumbersSheetAudioOptions, NumbersSheetImageOptions,
         NumbersSheetMovieOptions,
     };
-    use crate::shapes::{
-        DrawableGeometry, DrawablePoint, DrawableSize, RgbaColor, ShapeFill, ShapePreset,
-    };
+    use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize, RgbaColor, ShapeFill};
     use crate::{MediaLoopMode, MediaVolume};
+    use litchi_iwa_common::shape::path::Preset;
 
     const AUDIO: &[u8] = b"FORM\0\0\0\x10AIFCsheet-duplicate-audio";
     const MOVIE: &[u8] = b"\0\0\0\x18ftypqt  sheet-duplicate-movie";
@@ -655,7 +654,7 @@ mod tests {
                 "Native-style shape",
                 SHAPE_POSITION,
                 SHAPE_SIZE,
-                ShapePreset::Rectangle,
+                Preset::Rectangle,
                 SOURCE_SHAPE_FILL,
             )
             .unwrap();

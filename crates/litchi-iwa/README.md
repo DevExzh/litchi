@@ -332,7 +332,7 @@ source drawable or package is copied:
 
 ```rust
 use litchi_iwa::pages::PagesEditor;
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize, ShapePreset};
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Preset};
 
 let body = "Quarterly report";
 let mut pages = PagesEditor::create_with_text(body)?;
@@ -341,10 +341,10 @@ let shape = pages.add_body_shape(
     "A fully editable shape",
     DrawablePoint { x: 180.0, y: 240.0 },
     DrawableSize { width: 300.0, height: 150.0 },
-    ShapePreset::RightArrow,
+    Preset::RightArrow,
 )?;
 pages.set_body_shape_text(shape.drawable_object_id, "Updated")?;
-pages.set_body_shape_preset(shape.drawable_object_id, ShapePreset::DoubleArrow)?;
+pages.set_body_shape_preset(shape.drawable_object_id, Preset::DoubleArrow)?;
 let duplicate = pages.duplicate_body_shape(
     shape.drawable_object_id,
     pages.body_text()?.encode_utf16().count(),
@@ -525,7 +525,7 @@ drawable or package is copied:
 
 ```rust
 use litchi_iwa::numbers::NumbersDocumentBuilder;
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize, ShapePreset};
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Preset};
 
 let mut numbers = NumbersDocumentBuilder::new().build()?;
 let sheet_id = numbers.sheets()?[0].object_id;
@@ -534,10 +534,10 @@ let shape = numbers.add_sheet_shape(
     "A fully editable shape",
     DrawablePoint { x: 420.0, y: 300.0 },
     DrawableSize { width: 300.0, height: 150.0 },
-    ShapePreset::RightArrow,
+    Preset::RightArrow,
 )?;
 numbers.set_sheet_shape_text(sheet_id, shape.drawable_object_id, "Updated")?;
-numbers.set_sheet_shape_preset(sheet_id, shape.drawable_object_id, ShapePreset::DoubleArrow)?;
+numbers.set_sheet_shape_preset(sheet_id, shape.drawable_object_id, Preset::DoubleArrow)?;
 let duplicate = numbers.duplicate_sheet_shape(sheet_id, shape.drawable_object_id)?;
 numbers.set_sheet_shape_text(sheet_id, duplicate.drawable_object_id, "Independent copy")?;
 numbers.save("created-with-shape.numbers")?;
@@ -758,7 +758,7 @@ drawable or package is copied:
 
 ```rust
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize, ShapePreset};
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Preset};
 
 let mut keynote = KeynoteDocumentBuilder::new().build()?;
 let shape = keynote.add_slide_shape(
@@ -766,10 +766,10 @@ let shape = keynote.add_slide_shape(
     "A fully editable shape",
     DrawablePoint { x: 720.0, y: 660.0 },
     DrawableSize { width: 480.0, height: 240.0 },
-    ShapePreset::RightArrow,
+    Preset::RightArrow,
 )?;
 keynote.set_slide_shape_text(0, shape.drawable_object_id, "Updated")?;
-keynote.set_slide_shape_preset(0, shape.drawable_object_id, ShapePreset::DoubleArrow)?;
+keynote.set_slide_shape_preset(0, shape.drawable_object_id, Preset::DoubleArrow)?;
 let duplicate = keynote.duplicate_slide_shape(0, shape.drawable_object_id)?;
 keynote.set_slide_shape_text(0, duplicate.drawable_object_id, "Independent copy")?;
 keynote.save("created-with-shape.key")?;

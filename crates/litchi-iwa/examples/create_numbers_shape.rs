@@ -6,10 +6,11 @@ use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{
     DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeContactShadow, ShapeEffects,
     ShapeFill, ShapeGradient, ShapeGradientAngle, ShapeImageFillTechnique, ShapeOpacity,
-    ShapePreset, ShapeReflection, ShapeReflectionOpacity, ShapeShadow, ShapeShadowAppearance,
+    ShapeReflection, ShapeReflectionOpacity, ShapeShadow, ShapeShadowAppearance,
     ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity, ShapeShadowPerspective,
 };
 use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
+use litchi_iwa_common::shape::path::Preset;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -37,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             width: 300.0,
             height: 150.0,
         },
-        ShapePreset::RightArrow,
+        Preset::RightArrow,
         ShapeFill::Gradient(ShapeGradient::linear(
             RgbaColor::new(0.08, 0.42, 0.9, 1.0, RgbColorSpace::Srgb)?,
             RgbaColor::new(0.1, 0.85, 0.78, 1.0, RgbColorSpace::Srgb)?,

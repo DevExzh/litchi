@@ -5898,6 +5898,22 @@ embedded image object in its native canvas/inspector. The CLI reported
 three ZIPs passed integrity checks, and the applications were quit after
 verification. The semantic classifier itself is exercised by the
 dependency-free suite, including complete and truncated ISO-BMFF headers.
+The shape-path ownership slice now follows the same boundary at
+`litchi-iwa-common::shape::path`. `Preset` owns the source-buildable geometry
+vocabulary while `CornerRadius`, `PolygonSides`, `StarPoints`, and
+`InnerRadiusRatio` are compact checked controls; their common tests pin scalar
+size/alignment, `Copy`, finite/domain validation, and preservation of native
+values. IWA retains structural path-family detection, native archive decoding,
+natural-size corner-radius validation, protobuf conversion, and
+wire-preserving mutation. Pages, Numbers, Keynote, and their shape examples
+import the common owner directly, and the former redundant `Shape*` value
+types are deleted rather than kept as compatibility aliases. Path-preset
+mutation preserves the path-source envelope's known metadata, unknown fields,
+and family-field position while replacing the owned family payload. Fresh generated
+shape packages for all three applications opened without repair prompts during
+the focused native gate; the matching semantic inspectors recovered the
+expected preset and path kind, and Numbers, Pages, and Keynote were quit after
+verification.
 The BorderSide ownership slice
 is complete: the dependency-neutral table-cell edge selector now lives at
 `litchi-iwa-common::table::cell::BorderSide`; `Borders` and `ShapeStroke` remain

@@ -136,6 +136,17 @@ video rule, and makes `Unknown` explicit. `litchi-iwa` retains `MediaAsset`,
 catalog traversal, package/protobuf metadata, filesystem I/O, resource limits,
 and transactional replacement; all consumers import the common type directly
 and the old facade-owned enum is removed.
+The shape-path value slice follows the same ownership boundary at
+`litchi-iwa-common::shape::path::{Preset, CornerRadius, PolygonSides,
+StarPoints, InnerRadiusRatio}`. These compact, copyable controls and the
+source-buildable preset enum contain no archive, protobuf, or package state.
+`litchi-iwa` retains structural `ShapePathKind`, native path classification,
+geometry-dependent validation, protobuf conversion, and wire-preserving path
+patching. Its path-source adapter preserves the envelope's known metadata,
+unknown fields, and family-field position while replacing the owned family
+payload. The three concrete format owners consume the common `Preset` directly;
+the former redundant `Shape*` value names are removed rather than retained as
+compatibility aliases.
 The leaf's `transition::Effect` owns the lossless native transition-effect
 identifier vocabulary, including canonical known variants and lossless unknown
 identifiers; IWA retains transition archive decoding, wire patching, and

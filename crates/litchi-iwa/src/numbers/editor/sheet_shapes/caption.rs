@@ -605,7 +605,8 @@ fn require_exact_message_count(
 mod tests {
     use super::*;
     use crate::numbers::NumbersDocumentBuilder;
-    use crate::shapes::{DrawablePoint, DrawableSize, ShapePreset};
+    use crate::shapes::{DrawablePoint, DrawableSize};
+    use litchi_iwa_common::shape::path::Preset;
 
     const POSITION: DrawablePoint = DrawablePoint { x: 300.0, y: 180.0 };
     const SIZE: DrawableSize = DrawableSize {
@@ -626,7 +627,7 @@ mod tests {
                 "Quarterly trend",
                 POSITION,
                 SIZE,
-                ShapePreset::RightArrow,
+                Preset::RightArrow,
             )
             .unwrap();
         assert_eq!(

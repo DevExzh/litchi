@@ -51,11 +51,18 @@ pub use line_end::{LineEndpoint, LineEndpoints};
 pub(crate) use line_end::{
     insert_style_variation, remove_style_variation, set_shape_line_endpoints, shape_line_endpoints,
 };
-pub use path::{
-    ShapeCornerRadius, ShapePathKind, ShapePolygonSides, ShapePreset, ShapeStarInnerRatio,
-    ShapeStarPoints,
+pub use litchi_iwa_common::shape::path::{
+    CornerRadius, InnerRadiusRatio, PolygonSides, Preset, StarPoints,
 };
+pub use path::ShapePathKind;
 pub(crate) use path::{set_shape_preset, shape_path_kind, shape_path_source, shape_preset};
+
+impl From<litchi_iwa_common::shape::path::Error> for crate::Error {
+    fn from(error: litchi_iwa_common::shape::path::Error) -> Self {
+        Self::ParseError(error.to_string())
+    }
+}
+
 pub use properties::DrawableProperties;
 pub(crate) use properties::{
     drawable_properties, patch_wrapped_drawable_properties, set_shape_properties, shape_properties,

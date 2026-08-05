@@ -8,6 +8,7 @@
 
 pub mod color;
 pub mod media;
+pub mod shape;
 pub mod table;
 pub mod text;
 pub mod varint;

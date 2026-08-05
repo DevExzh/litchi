@@ -8,17 +8,18 @@ use crate::image_caption::DrawableCaptionKind;
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
     LineEndpoints, LineSegment, LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill,
-    ShapeImageFillTechnique, ShapePathKind, ShapePreset, ShapeShadow, ShapeStroke,
-    flip_drawable_geometry, line_geometry, line_path_source, line_segments_match,
-    reset_shape_effects, reset_shape_fill, reset_shape_shadow, reset_shape_stroke,
-    reset_shape_text_layout, set_shape_effects, set_shape_fill, set_shape_geometry,
-    set_shape_image_fill_data, set_shape_line_endpoints, set_shape_line_segment, set_shape_preset,
-    set_shape_shadow, set_shape_stroke, set_shape_text_layout, shape_effects, shape_fill,
-    shape_line_endpoints, shape_line_segment, shape_path_kind, shape_path_source, shape_preset,
-    shape_shadow, shape_stroke, shape_text_layout,
+    ShapeImageFillTechnique, ShapePathKind, ShapeShadow, ShapeStroke, flip_drawable_geometry,
+    line_geometry, line_path_source, line_segments_match, reset_shape_effects, reset_shape_fill,
+    reset_shape_shadow, reset_shape_stroke, reset_shape_text_layout, set_shape_effects,
+    set_shape_fill, set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
+    set_shape_line_segment, set_shape_preset, set_shape_shadow, set_shape_stroke,
+    set_shape_text_layout, shape_effects, shape_fill, shape_line_endpoints, shape_line_segment,
+    shape_path_kind, shape_path_source, shape_preset, shape_shadow, shape_stroke,
+    shape_text_layout,
 };
 use crate::text::TextStorageInfo;
 use crate::text::layout::Layout;
+use litchi_iwa_common::shape::path::Preset;
 
 use super::text_box_create::{
     TextBoxObjectIds, slide_text_storage_template, text_box_context, text_box_objects,
@@ -44,7 +45,7 @@ pub struct KeynoteSlideShapeInfo {
     pub drawable_object_id: u64,
     pub kind: KeynoteSlideShapeKind,
     /// Source-buildable preset and its native controls, when recognized.
-    pub preset: Option<ShapePreset>,
+    pub preset: Option<Preset>,
     /// Slide-space endpoints when this shape is a native straight line.
     pub line_segment: Option<LineSegment>,
     /// Directed start/end decorations when this shape is a native straight line.
@@ -87,7 +88,7 @@ impl KeynoteEditor {
         position: DrawablePoint,
         size: DrawableSize,
     ) -> Result<KeynoteSlideShapeInfo> {
-        self.add_slide_shape(slide_index, text, position, size, ShapePreset::Rectangle)
+        self.add_slide_shape(slide_index, text, position, size, Preset::Rectangle)
     }
 
     /// Add a typed preset shape with independent writable text to one slide.
@@ -101,7 +102,7 @@ impl KeynoteEditor {
         text: &str,
         position: DrawablePoint,
         size: DrawableSize,
-        preset: ShapePreset,
+        preset: Preset,
     ) -> Result<KeynoteSlideShapeInfo> {
         let geometry = new_shape_geometry(position, size)?;
         self.add_slide_shape_path(
@@ -121,7 +122,7 @@ impl KeynoteEditor {
         text: &str,
         position: DrawablePoint,
         size: DrawableSize,
-        preset: ShapePreset,
+        preset: Preset,
         fill: ShapeFill,
     ) -> Result<KeynoteSlideShapeInfo> {
         let created = self.add_slide_shape(slide_index, text, position, size, preset)?;
@@ -184,7 +185,7 @@ impl KeynoteEditor {
         text: &str,
         geometry: DrawableGeometry,
         path_source: tsd::PathSourceArchive,
-        expected_preset: Option<ShapePreset>,
+        expected_preset: Option<Preset>,
         expected_line: Option<LineSegment>,
     ) -> Result<KeynoteSlideShapeInfo> {
         let graph = ObjectGraph::read(self.package())?;
@@ -678,7 +679,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<Option<ShapePreset>> {
+    ) -> Result<Option<Preset>> {
         Ok(shape_graph(self, slide_index, drawable_object_id)?
             .info
             .preset)
@@ -689,7 +690,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        preset: ShapePreset,
+        preset: Preset,
     ) -> Result<()> {
         let source = shape_graph(self, slide_index, drawable_object_id)?;
         let mut staged = self.package().clone();
@@ -1245,14 +1246,16 @@ mod tests {
     use super::*;
     use crate::keynote::KeynoteDocumentBuilder;
     use crate::shapes::{
-        LineEndpoint, RgbColorSpace, RgbaColor, ShapeCornerRadius, ShapeCurvedShadow,
-        ShapeGradient, ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity,
-        ShapeGradientStop, ShapeGradientStopMidpoint, ShapeGradientStopPosition, ShapeOpacity,
-        ShapePolygonSides, ShapeReflection, ShapeReflectionOpacity, ShapeShadowAngle,
-        ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowCurve, ShapeShadowOffset,
-        ShapeShadowOpacity, ShapeStarInnerRatio, ShapeStarPoints, StrokePattern, StrokeWidth,
+        LineEndpoint, RgbColorSpace, RgbaColor, ShapeCurvedShadow, ShapeGradient,
+        ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity, ShapeGradientStop,
+        ShapeGradientStopMidpoint, ShapeGradientStopPosition, ShapeOpacity, ShapeReflection,
+        ShapeReflectionOpacity, ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius,
+        ShapeShadowCurve, ShapeShadowOffset, ShapeShadowOpacity, StrokePattern, StrokeWidth,
     };
     use crate::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
+    use litchi_iwa_common::shape::path::{
+        CornerRadius, InnerRadiusRatio, PolygonSides, StarPoints,
+    };
 
     const POSITION: DrawablePoint = DrawablePoint { x: 320.0, y: 240.0 };
     const SIZE: DrawableSize = DrawableSize {
@@ -1286,7 +1289,7 @@ mod tests {
             .add_slide_rectangle(0, "Built from typed objects", POSITION, SIZE)
             .unwrap();
         assert_eq!(created.kind, KeynoteSlideShapeKind::Rectangle);
-        assert_eq!(created.preset, Some(ShapePreset::Rectangle));
+        assert_eq!(created.preset, Some(Preset::Rectangle));
         assert_eq!(created.storage.text, "Built from typed objects");
         assert_eq!(
             editor
@@ -1365,7 +1368,7 @@ mod tests {
             .build()
             .unwrap();
         let created = editor
-            .add_slide_shape(0, "Source shape", POSITION, SIZE, ShapePreset::Rectangle)
+            .add_slide_shape(0, "Source shape", POSITION, SIZE, Preset::Rectangle)
             .unwrap();
         let fill =
             ShapeFill::Solid(RgbaColor::new(0.8, 0.35, 0.2, 1.0, RgbColorSpace::Srgb).unwrap());
@@ -1604,7 +1607,7 @@ mod tests {
             .unwrap(),
         );
         let created = editor
-            .add_slide_shape(0, "Filled", POSITION, SIZE, ShapePreset::Rectangle)
+            .add_slide_shape(0, "Filled", POSITION, SIZE, Preset::Rectangle)
             .unwrap();
         let inherited_fill = editor
             .slide_shape_fill(0, created.drawable_object_id)
@@ -1641,7 +1644,7 @@ mod tests {
             .build()
             .unwrap();
         let created = editor
-            .add_slide_shape(0, "Image", POSITION, SIZE, ShapePreset::Rectangle)
+            .add_slide_shape(0, "Image", POSITION, SIZE, Preset::Rectangle)
             .unwrap();
         let inherited = editor
             .slide_shape_fill(0, created.drawable_object_id)
@@ -1694,7 +1697,7 @@ mod tests {
             .build()
             .unwrap();
         let created = editor
-            .add_slide_shape(0, "Effects", POSITION, SIZE, ShapePreset::Rectangle)
+            .add_slide_shape(0, "Effects", POSITION, SIZE, Preset::Rectangle)
             .unwrap();
         let inherited = editor
             .slide_shape_effects(0, created.drawable_object_id)
@@ -1735,7 +1738,7 @@ mod tests {
             .build()
             .unwrap();
         let created = editor
-            .add_slide_shape(0, "Shadow", POSITION, SIZE, ShapePreset::Rectangle)
+            .add_slide_shape(0, "Shadow", POSITION, SIZE, Preset::Rectangle)
             .unwrap();
         let inherited = editor
             .slide_shape_shadow(0, created.drawable_object_id)
@@ -1782,7 +1785,7 @@ mod tests {
             .build()
             .unwrap();
         let created = editor
-            .add_slide_shape(0, "Layout", POSITION, SIZE, ShapePreset::Rectangle)
+            .add_slide_shape(0, "Layout", POSITION, SIZE, Preset::Rectangle)
             .unwrap();
         let inherited = editor
             .slide_shape_text_layout(0, created.drawable_object_id)
@@ -1877,26 +1880,26 @@ mod tests {
             .unwrap();
         let baseline = editor.to_bytes().unwrap();
         let created = editor
-            .add_slide_shape(0, "Rounded", POSITION, SIZE, ShapePreset::ROUNDED_RECTANGLE)
+            .add_slide_shape(0, "Rounded", POSITION, SIZE, Preset::ROUNDED_RECTANGLE)
             .unwrap();
         assert_eq!(created.kind, KeynoteSlideShapeKind::RoundedRectangle);
-        assert_eq!(created.preset, Some(ShapePreset::ROUNDED_RECTANGLE));
+        assert_eq!(created.preset, Some(Preset::ROUNDED_RECTANGLE));
 
         let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_shape_preset(0, created.drawable_object_id)
                 .unwrap(),
-            Some(ShapePreset::ROUNDED_RECTANGLE)
+            Some(Preset::ROUNDED_RECTANGLE)
         );
 
         for (preset, kind) in [
-            (ShapePreset::Ellipse, KeynoteSlideShapeKind::Ellipse),
-            (ShapePreset::LeftArrow, KeynoteSlideShapeKind::LeftArrow),
-            (ShapePreset::RightArrow, KeynoteSlideShapeKind::RightArrow),
-            (ShapePreset::DoubleArrow, KeynoteSlideShapeKind::DoubleArrow),
-            (ShapePreset::PENTAGON, KeynoteSlideShapeKind::RegularPolygon),
-            (ShapePreset::STAR, KeynoteSlideShapeKind::Star),
+            (Preset::Ellipse, KeynoteSlideShapeKind::Ellipse),
+            (Preset::LeftArrow, KeynoteSlideShapeKind::LeftArrow),
+            (Preset::RightArrow, KeynoteSlideShapeKind::RightArrow),
+            (Preset::DoubleArrow, KeynoteSlideShapeKind::DoubleArrow),
+            (Preset::PENTAGON, KeynoteSlideShapeKind::RegularPolygon),
+            (Preset::STAR, KeynoteSlideShapeKind::Star),
         ] {
             editor
                 .set_slide_shape_preset(0, created.drawable_object_id, preset)
@@ -1931,10 +1934,10 @@ mod tests {
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
-        assert!(ShapeCornerRadius::new(f32::NAN).is_err());
-        assert!(ShapePolygonSides::new(2).is_err());
-        assert!(ShapeStarPoints::new(2).is_err());
-        assert!(ShapeStarInnerRatio::new(1.0).is_err());
+        assert!(CornerRadius::new(f32::NAN).is_err());
+        assert!(PolygonSides::new(2).is_err());
+        assert!(StarPoints::new(2).is_err());
+        assert!(InnerRadiusRatio::new(1.0).is_err());
         assert!(
             editor
                 .add_slide_shape(
@@ -1942,8 +1945,8 @@ mod tests {
                     "invalid radius",
                     POSITION,
                     SIZE,
-                    ShapePreset::RoundedRectangle {
-                        corner_radius: ShapeCornerRadius::new(SIZE.height).unwrap(),
+                    Preset::RoundedRectangle {
+                        corner_radius: CornerRadius::new(SIZE.height).unwrap(),
                     },
                 )
                 .is_err()
@@ -1961,7 +1964,7 @@ mod tests {
         assert_eq!(editor.to_bytes().unwrap(), before);
         assert!(
             editor
-                .set_slide_shape_preset(0, text_box.drawable_object_id, ShapePreset::Ellipse)
+                .set_slide_shape_preset(0, text_box.drawable_object_id, Preset::Ellipse)
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);

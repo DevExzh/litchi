@@ -521,7 +521,8 @@ fn require_exact_message_count(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::shapes::{DrawablePoint, DrawableSize, ShapePreset};
+    use crate::shapes::{DrawablePoint, DrawableSize};
+    use litchi_iwa_common::shape::path::Preset;
 
     const POSITION: DrawablePoint = DrawablePoint { x: 180.0, y: 240.0 };
     const SIZE: DrawableSize = DrawableSize {
@@ -533,13 +534,7 @@ mod tests {
     fn scratch_document_supports_native_shape_title_caption_crud() {
         let mut editor = PagesEditor::create_with_text("Shape labels").unwrap();
         let shape = editor
-            .add_body_shape(
-                0,
-                "Quarterly trend",
-                POSITION,
-                SIZE,
-                ShapePreset::RightArrow,
-            )
+            .add_body_shape(0, "Quarterly trend", POSITION, SIZE, Preset::RightArrow)
             .unwrap();
         assert_eq!(
             editor

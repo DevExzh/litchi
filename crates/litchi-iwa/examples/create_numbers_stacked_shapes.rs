@@ -2,9 +2,8 @@
 
 use litchi_iwa::DrawableLayerMove;
 use litchi_iwa::numbers::NumbersDocumentBuilder;
-use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill, ShapePreset,
-};
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill};
+use litchi_iwa_common::shape::path::Preset;
 
 const OVERLAP_POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 300.0 };
 const OVERLAP_SIZE: DrawableSize = DrawableSize {
@@ -26,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Moved to Front",
         OVERLAP_POSITION,
         OVERLAP_SIZE,
-        ShapePreset::Rectangle,
+        Preset::Rectangle,
         solid_color(0.92, 0.18, 0.16)?,
     )?;
     let second = editor.add_sheet_shape_with_fill(
@@ -34,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Originally Front",
         OVERLAP_POSITION,
         OVERLAP_SIZE,
-        ShapePreset::Ellipse,
+        Preset::Ellipse,
         solid_color(0.12, 0.38, 0.92)?,
     )?;
     editor.move_sheet_drawable(

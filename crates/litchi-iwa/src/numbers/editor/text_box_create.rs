@@ -2,7 +2,8 @@
 
 use super::*;
 use crate::IWorkThemeArchive;
-use crate::shapes::{DrawablePoint, DrawableSize, ShapePreset, shape_path_source};
+use crate::shapes::{DrawablePoint, DrawableSize, shape_path_source};
+use litchi_iwa_common::shape::path::Preset;
 
 const NUMBERS_THEME_MESSAGE_TYPE: u32 = 12_009;
 const DEFAULT_DRAWABLE_FLAGS: u32 = 3;
@@ -99,7 +100,7 @@ impl NumbersEditor {
             styles.shape,
             geometry,
             storage,
-            shape_path_source(ShapePreset::Rectangle, size)?,
+            shape_path_source(Preset::Rectangle, size)?,
             true,
         )?;
 

@@ -86,6 +86,15 @@ while an unrecognized ISO-BMFF brand remains conservatively classified as
 `Video` to match iWork replacement semantics. Archive discovery, asset
 metadata, limits, and replacement validation remain in the IWA adapter.
 
+Shape paths use the focused `litchi_iwa_common::shape::path` module. Its
+`Preset`, `CornerRadius`, `PolygonSides`, `StarPoints`, and `InnerRadiusRatio`
+names are concise in their path context, fixed-size where scalar, and
+validated before they can enter a public preset. The star control stores an
+inner-to-outer radius ratio in `[0, 1)`; it is not an archive-owned absolute
+radius. Structural `ShapePathKind`, native path-family decoding, natural-size
+constraints, and protobuf/wire mutation remain in `litchi-iwa`, so the common
+leaf stays dependency-free and allocation-free.
+
 PresentationML implements this rule as `litchi-pptx::shape::{Scene, Shape}`.
 `Scene` is a bounded semantic index over one slide-like owner, not a vector of
 detached XML allocations. Shapes are visited in depth-first pre-order, while a
