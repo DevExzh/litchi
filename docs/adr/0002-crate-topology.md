@@ -331,9 +331,11 @@ budgeted grid views, and the fallible builder-to-immutable-table transition;
 `sheet` owns the immutable table collection and duplicate-name validation.
 Neither module depends on archives, protobufs, comments, or application
 topology. `NumbersDocument::semantic_sheets` now provides the consuming IWA
-reader seam into the immutable `litchi_numbers::Sheet` model; it transfers
-finished sparse tables without rebuilding cell maps and intentionally leaves
-comments/native sidecars on the archive adapter. The dependency-free formula
+reader seam into the immutable `litchi_numbers::Sheet` model through a lazily
+cached `Arc<[Sheet]>`; it transfers finished sparse tables without rebuilding
+cell maps and intentionally leaves comments/native sidecars on the opaque
+archive adapter. The adapter's conversion is private and the semantic leaf
+remains the only archive-free Sheet owner. The dependency-free formula
 vocabulary now follows the same boundary: `litchi-numbers::formula` owns
 formula caches, references, operators, and expression construction, while
 `litchi-iwa` retains protobuf compilation and calculation-engine mutation.

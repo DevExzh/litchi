@@ -6004,12 +6004,13 @@ table/sheet semantic slice is now extracted into dependency-free
 coordinates and immutable boxed sparse storage, while builders provide
 fallible append/replace operations and checked ownership handoff. The IWA
 reader now exposes `NumbersDocument::semantic_sheets`, which moves those
-finished tables into immutable leaf sheets without rebuilding cell maps; the
-legacy archive adapter remains available for comments and native sidecars
-during the staged reader migration. Dense views remain explicitly budgeted and
-reject ranges outside the declared extent. The leaf suite has 26 cell/semantic
-tests plus 4 formula-vocabulary tests, the IWA suite has 1,504 tests, and the
-generated Numbers round trip passes. The generic structured-facade handoff
+finished tables into one lazily cached immutable `Arc<[Sheet]>` snapshot
+without rebuilding cell maps; the opaque archive adapter remains available for
+comments and native sidecars during the staged reader migration. Dense views
+remain explicitly budgeted and reject ranges outside the declared extent. The
+leaf suite has 26 cell/semantic tests plus 4 formula-vocabulary tests, the IWA
+suite has 1,504 tests, and the generated Numbers round trip passes. The generic
+structured-facade handoff
 remains the next ownership slice. Pages and Keynote table readers now borrow
 canonical sparse leaf tables
 directly while retaining their format-owned comment and merge sidecars;

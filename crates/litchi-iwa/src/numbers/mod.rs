@@ -19,11 +19,10 @@
 //! let doc = NumbersDocument::open("spreadsheet.numbers")?;
 //! let sheets = doc.sheets()?;
 //!
-//! for sheet in sheets {
-//!     println!("Sheet: {}", sheet.name);
-//!     for table in &sheet.tables {
+//! for sheet in sheets.iter() {
+//!     println!("Sheet: {}", sheet.name());
+//!     for table in sheet.tables() {
 //!         println!("  Table: {}", table.name());
-//!         println!("{}", table.to_csv());
 //!     }
 //! }
 //! # Ok::<(), Box<dyn std::error::Error>>(())
@@ -34,7 +33,7 @@ pub mod creation;
 pub mod document;
 pub mod editor;
 pub(crate) mod formula;
-pub mod sheet;
+pub(crate) mod sheet;
 pub mod table;
 pub mod table_extractor;
 

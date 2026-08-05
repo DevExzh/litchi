@@ -2,6 +2,37 @@
 
 use super::table::{Error, InsertError, InsertResult, Table};
 
+/// A checked semantic table selector.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Selector<'a> {
+    /// Select by exact producer-visible table name.
+    Name(&'a str),
+    /// Select by checked zero-based source order.
+    Index(usize),
+}
+
+/// Errors raised while resolving a semantic table selector.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SelectorError {
+    /// A malformed source exposed the same exact table name more than once.
+    DuplicateTableName { name: Box<str> },
+}
+
+impl std::fmt::Display for SelectorError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DuplicateTableName { name } => {
+                write!(formatter, "sheet contains duplicate table name {name:?}")
+            },
+        }
+    }
+}
+
+impl std::error::Error for SelectorError {}
+
+/// Result type for checked semantic sheet selectors.
+pub type Result<T> = std::result::Result<T, SelectorError>;
+
 /// An immutable Numbers sheet containing semantic tables.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Sheet {
@@ -45,10 +76,49 @@ impl Sheet {
         self.tables.iter()
     }
 
-    /// Returns a table by name.
-    #[must_use]
-    pub fn table(&self, name: &str) -> Option<&Table> {
-        self.tables.iter().find(|table| table.name() == name)
+    /// Resolves a checked table selector.
+    ///
+    /// Name lookup is exact and source-order lookup never indexes directly.
+    /// Missing tables and out-of-range positions are represented by `None`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SelectorError::DuplicateTableName`] if a malformed semantic
+    /// model contains the requested name more than once.
+    pub fn select(&self, selector: Selector<'_>) -> Result<Option<&Table>> {
+        match selector {
+            Selector::Name(name) => {
+                let mut matches = self.tables.iter().filter(|table| table.name() == name);
+                let Some(table) = matches.next() else {
+                    return Ok(None);
+                };
+                if matches.next().is_some() {
+                    return Err(SelectorError::DuplicateTableName { name: name.into() });
+                }
+                Ok(Some(table))
+            },
+            Selector::Index(index) => Ok(self.tables.get(index)),
+        }
+    }
+
+    /// Returns a table by exact name.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SelectorError::DuplicateTableName`] if a malformed semantic
+    /// model contains the requested name more than once.
+    pub fn get(&self, name: &str) -> Result<Option<&Table>> {
+        self.select(Selector::Name(name))
+    }
+
+    /// Returns a table by checked zero-based source position.
+    ///
+    /// # Errors
+    ///
+    /// This selector currently cannot fail for a valid position; the
+    /// `Result` keeps the selector boundary explicit for future validation.
+    pub fn at(&self, index: usize) -> Result<Option<&Table>> {
+        self.select(Selector::Index(index))
     }
 
     /// Returns whether the sheet has no tables.
@@ -177,6 +247,23 @@ mod tests {
         assert_eq!(sheet.table_count(), 1);
         assert_eq!(sheet.addressable_cell_count(), Some(6));
         assert_eq!(sheet.materialized_cell_count(), 1);
-        assert!(sheet.table("Table 1").is_some());
+        assert!(
+            sheet
+                .get("Table 1")
+                .unwrap_or_else(|error| panic!("unexpected selector failure: {error}"))
+                .is_some()
+        );
+        assert!(
+            sheet
+                .at(0)
+                .unwrap_or_else(|error| panic!("unexpected selector failure: {error}"))
+                .is_some()
+        );
+        assert!(
+            sheet
+                .at(1)
+                .unwrap_or_else(|error| panic!("unexpected selector failure: {error}"))
+                .is_none()
+        );
     }
 }

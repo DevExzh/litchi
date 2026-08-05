@@ -8,6 +8,7 @@ use std::error::Error;
 use std::fs;
 use std::io::Cursor;
 use std::path::Path;
+use std::sync::Arc;
 
 use litchi_iwa::Document;
 use litchi_iwa::detect::{self, Format};
@@ -113,7 +114,9 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
                 snapshot_stats.total_objects,
                 specialized_stats.total_objects
             );
-            let semantic_sheets = specialized.semantic_sheets();
+            let semantic_sheets = specialized.semantic_sheets()?;
+            let snapshot_sheets = snapshot.semantic_sheets()?;
+            assert!(Arc::ptr_eq(&semantic_sheets, &snapshot_sheets));
             assert_eq!(semantic_sheets.len(), specialized_stats.sheet_count);
             assert_eq!(
                 semantic_sheets

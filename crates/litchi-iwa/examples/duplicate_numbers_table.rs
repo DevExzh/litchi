@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sheets = document.sheets()?;
     let copied = sheets
         .iter()
-        .flat_map(|sheet| &sheet.tables)
+        .flat_map(|sheet| sheet.tables())
         .find(|table| table.name() == created.name)
         .ok_or("duplicated table was not readable after save")?;
     println!(

@@ -30,9 +30,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .collect::<Vec<_>>()
         );
     }
-    for sheet in document.sheets()? {
-        println!("sheet {}: {:?}", sheet.index, sheet.name);
-        for table in sheet.tables {
+    for sheet in document.sheets()?.iter() {
+        println!("sheet {}: {:?}", sheet.index(), sheet.name());
+        for table in sheet.tables() {
             println!(
                 "  table {:?}: {} rows x {} columns",
                 table.name(),

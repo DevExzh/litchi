@@ -23,13 +23,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sheets = document.sheets()?;
     let copied = sheets
         .get(created.index)
-        .filter(|sheet| sheet.name == created.name)
+        .filter(|sheet| sheet.name() == created.name)
         .ok_or("duplicated sheet was not readable after save")?;
     println!(
         "duplicated sheet {:?} as {:?} with {} tables",
         source.name,
-        copied.name,
-        copied.tables.len()
+        copied.name(),
+        copied.tables().len()
     );
     Ok(())
 }

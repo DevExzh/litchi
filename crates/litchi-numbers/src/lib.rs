@@ -26,7 +26,9 @@ pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,
     FormulaExpression, FormulaPivotCategoryReference, FormulaUuid,
 };
-pub use sheet::{Builder as SheetBuilder, Sheet};
+pub use sheet::{
+    Builder as SheetBuilder, Selector as SheetSelector, SelectorError as SheetSelectorError, Sheet,
+};
 pub use table::dimension::{Dimension, Points, Size};
 pub use table::title::Settings;
 pub use table::{
