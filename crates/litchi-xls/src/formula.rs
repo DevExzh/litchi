@@ -5,7 +5,7 @@
 //! bounded, inert context. Callers retain the original bytes when rendering
 //! returns `None`, so malformed or unsupported expressions remain lossless.
 
-use super::external_link::{XlsExternalLinks, XlsExternalNameBody};
+use super::external_link::{Links, NameBody};
 use std::fmt::{self, Write as _};
 
 const MAX_FORMULA_TOKEN_BYTES: usize = 1024 * 1024;
@@ -140,14 +140,14 @@ impl FormulaContext {
             .collect();
     }
 
-    pub(crate) fn set_external_links(&mut self, links: &XlsExternalLinks) {
+    pub(crate) fn set_external_links(&mut self, links: &Links) {
         self.external_names = vec![Vec::new(); links.supporting_books().len()];
         for external_name in links.external_names() {
             let name = match external_name.body() {
-                XlsExternalNameBody::ExternalDefinedName { name, .. }
-                | XlsExternalNameBody::AddInFunction { name, .. }
-                | XlsExternalNameBody::DdeOrOle { name, .. }
-                | XlsExternalNameBody::DdeStandardDocumentName { name } => name,
+                NameBody::ExternalDefinedName { name, .. }
+                | NameBody::AddInFunction { name, .. }
+                | NameBody::DdeOrOle { name, .. }
+                | NameBody::DdeStandardDocumentName { name } => name,
             };
             let Some(book_names) = self
                 .external_names

@@ -826,26 +826,26 @@ fn write_add_in_supbook<W: Write>(
     Ok(())
 }
 
-fn encode_clipboard_format(value: crate::XlsExternalClipboardFormat) -> u16 {
+fn encode_clipboard_format(value: crate::ClipboardFormat) -> u16 {
     (value.code() as u16) & 0x03ff
 }
 
-fn encode_ser_ar(value: &crate::XlsExternalCachedValue) -> XlsResult<Vec<u8>> {
+fn encode_ser_ar(value: &crate::CachedValue) -> XlsResult<Vec<u8>> {
     let mut data = Vec::new();
     match value {
-        crate::XlsExternalCachedValue::Blank => data.extend_from_slice(&[0; 9]),
-        crate::XlsExternalCachedValue::Number(value) => {
+        crate::CachedValue::Blank => data.extend_from_slice(&[0; 9]),
+        crate::CachedValue::Number(value) => {
             data.push(0x01);
             data.extend_from_slice(&value.to_le_bytes());
         },
-        crate::XlsExternalCachedValue::Text(value) => {
+        crate::CachedValue::Text(value) => {
             data.push(0x02);
             write_unicode_string(&mut data, value, true)?;
         },
-        crate::XlsExternalCachedValue::Boolean(value) => {
+        crate::CachedValue::Boolean(value) => {
             data.extend_from_slice(&[0x04, u8::from(*value), 0, 0, 0, 0, 0, 0, 0]);
         },
-        crate::XlsExternalCachedValue::Error(error) => {
+        crate::CachedValue::Error(error) => {
             data.extend_from_slice(&[0x10, error.code(), 0, 0, 0, 0, 0, 0, 0]);
         },
     }

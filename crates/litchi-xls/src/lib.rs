@@ -355,9 +355,8 @@ pub use ent_ex_u2::XlsEntExU2;
 pub use environment::{XlsLinkUpdateMode, XlsObjectDisplayMode, XlsWorkbookEnvironment};
 pub use error::{XlsEncryptionKind, XlsError, XlsResult};
 pub use external_link::{
-    XlsDdeOleValueMatrix, XlsExternalCacheRow, XlsExternalCachedError, XlsExternalCachedValue,
-    XlsExternalClipboardFormat, XlsExternalLinks, XlsExternalName, XlsExternalNameBody,
-    XlsExternalSheet, XlsExternalSheetReference, XlsExternalWorkbook, XlsSupportingBook,
+    CacheRow, CachedValue, ClipboardFormat, ErrorValue, Links, Name, NameBody, Sheet,
+    SheetReference, SupportingBook, ValueMatrix, Workbook,
 };
 pub use fbi::{XlsFbi, XlsFontScaleBasis};
 pub use font::{XlsFont, XlsFontCharset, XlsFontEscapement, XlsFontFamily, XlsFontUnderline};

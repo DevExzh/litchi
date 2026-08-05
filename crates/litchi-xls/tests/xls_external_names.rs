@@ -7,8 +7,7 @@ use litchi_xls::writer::{
     XlsExternalDefinedNameOptions, XlsExternalSheetOptions, XlsExternalWorkbookOptions, XlsWriter,
 };
 use litchi_xls::{
-    XlsDdeOleValueMatrix, XlsExternalCachedError, XlsExternalCachedValue,
-    XlsExternalClipboardFormat, XlsExternalNameBody, XlsSupportingBook, XlsWorkbook,
+    CachedValue, ClipboardFormat, ErrorValue, NameBody, SupportingBook, ValueMatrix, XlsWorkbook,
 };
 
 fn fixture(name: &str) -> PathBuf {
@@ -57,15 +56,15 @@ fn generated_external_names_round_trip_as_inert_metadata() {
                     picture: false,
                     standard_document_name: false,
                     ole_link: false,
-                    clipboard_format: XlsExternalClipboardFormat::Text,
+                    clipboard_format: ClipboardFormat::Text,
                     displayed_as_icon: false,
                     storage_id: 0,
-                    matrix: Some(XlsDdeOleValueMatrix {
+                    matrix: Some(ValueMatrix {
                         last_column: 1,
                         last_row: 0,
                         values: vec![
-                            XlsExternalCachedValue::Text("linked".to_string()),
-                            XlsExternalCachedValue::Error(XlsExternalCachedError::NotAvailable),
+                            CachedValue::Text("linked".to_string()),
+                            CachedValue::Error(ErrorValue::NotAvailable),
                         ],
                     }),
                 },
@@ -75,7 +74,7 @@ fn generated_external_names_round_trip_as_inert_metadata() {
                     picture: true,
                     standard_document_name: false,
                     ole_link: true,
-                    clipboard_format: XlsExternalClipboardFormat::EnhancedMetafile,
+                    clipboard_format: ClipboardFormat::EnhancedMetafile,
                     displayed_as_icon: true,
                     storage_id: 1,
                     matrix: None,
@@ -86,7 +85,7 @@ fn generated_external_names_round_trip_as_inert_metadata() {
                     picture: false,
                     standard_document_name: true,
                     ole_link: false,
-                    clipboard_format: XlsExternalClipboardFormat::Text,
+                    clipboard_format: ClipboardFormat::Text,
                     displayed_as_icon: false,
                     storage_id: 0,
                     matrix: None,
@@ -102,18 +101,15 @@ fn generated_external_names_round_trip_as_inert_metadata() {
     assert_eq!(links.supporting_books().len(), 3);
     assert!(matches!(
         links.supporting_books()[0],
-        XlsSupportingBook::ExternalWorkbook(_)
+        SupportingBook::ExternalWorkbook(_)
     ));
-    assert!(matches!(
-        links.supporting_books()[1],
-        XlsSupportingBook::AddIn
-    ));
+    assert!(matches!(links.supporting_books()[1], SupportingBook::AddIn));
     assert!(matches!(
         links.supporting_books()[2],
-        XlsSupportingBook::DdeOrOle { .. }
+        SupportingBook::DdeOrOle { .. }
     ));
     assert_eq!(links.external_names().len(), 5);
-    let XlsExternalNameBody::ExternalDefinedName {
+    let NameBody::ExternalDefinedName {
         name,
         sheet_index,
         formula_bytes,
@@ -124,7 +120,7 @@ fn generated_external_names_round_trip_as_inert_metadata() {
     assert_eq!(name, "RemoteName");
     assert_eq!(*sheet_index, Some(0));
     assert_eq!(formula_bytes, &[0x1c, 0x17]);
-    let XlsExternalNameBody::DdeOrOle { matrix, .. } = links.external_names()[2].body() else {
+    let NameBody::DdeOrOle { matrix, .. } = links.external_names()[2].body() else {
         panic!("expected DDE item")
     };
     assert_eq!(matrix.as_ref().unwrap().values.len(), 2);
@@ -135,7 +131,7 @@ fn generated_external_names_round_trip_as_inert_metadata() {
 fn reads_poi_external_and_add_in_names() {
     let workbook = XlsWorkbook::new(File::open(fixture("external_name.xls")).unwrap()).unwrap();
     let names = workbook.external_links().external_names();
-    let XlsExternalNameBody::ExternalDefinedName {
+    let NameBody::ExternalDefinedName {
         name,
         formula_bytes,
         ..
@@ -150,7 +146,7 @@ fn reads_poi_external_and_add_in_names() {
         XlsWorkbook::new(File::open(fixture("externalFunctionExample.xls")).unwrap()).unwrap();
     let names = workbook.external_links().external_names();
     assert_eq!(names.len(), 3);
-    let XlsExternalNameBody::AddInFunction { name, unused_data } = names[0].body() else {
+    let NameBody::AddInFunction { name, unused_data } = names[0].body() else {
         panic!("expected add-in function")
     };
     assert_eq!(name, "ISODD");

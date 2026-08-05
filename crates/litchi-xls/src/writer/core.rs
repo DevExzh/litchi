@@ -745,7 +745,7 @@ pub struct XlsFunctionGroupOptions {
 pub struct XlsExternalCacheRowOptions {
     pub row: u16,
     pub first_column: u8,
-    pub values: Vec<crate::XlsExternalCachedValue>,
+    pub values: Vec<crate::CachedValue>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -782,10 +782,10 @@ pub struct XlsDdeOrOleItemOptions {
     pub picture: bool,
     pub standard_document_name: bool,
     pub ole_link: bool,
-    pub clipboard_format: crate::XlsExternalClipboardFormat,
+    pub clipboard_format: crate::ClipboardFormat,
     pub displayed_as_icon: bool,
     pub storage_id: u32,
-    pub matrix: Option<crate::XlsDdeOleValueMatrix>,
+    pub matrix: Option<crate::ValueMatrix>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -943,14 +943,12 @@ impl XlsExternalWorkbookOptions {
                 ));
                 for value in &row.values {
                     match value {
-                        crate::XlsExternalCachedValue::Number(number) if !number.is_finite() => {
+                        crate::CachedValue::Number(number) if !number.is_finite() => {
                             return Err(XlsError::InvalidData(
                                 "external cached number must be finite".to_string(),
                             ));
                         },
-                        crate::XlsExternalCachedValue::Text(text)
-                            if text.encode_utf16().count() > 255 =>
-                        {
+                        crate::CachedValue::Text(text) if text.encode_utf16().count() > 255 => {
                             return Err(XlsError::InvalidData(
                                 "external cached string exceeds 255 UTF-16 code units".to_string(),
                             ));

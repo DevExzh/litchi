@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use litchi_xls::writer::{
     XlsExternalCacheRowOptions, XlsExternalSheetOptions, XlsExternalWorkbookOptions, XlsWriter,
 };
-use litchi_xls::{XlsExternalCachedError, XlsExternalCachedValue, XlsWorkbook};
+use litchi_xls::{CachedValue, ErrorValue, XlsWorkbook};
 
 #[test]
 fn external_workbook_cache_round_trip_is_inert() {
@@ -20,11 +20,11 @@ fn external_workbook_cache_round_trip_is_inert() {
                     row: 7,
                     first_column: 2,
                     values: vec![
-                        XlsExternalCachedValue::Blank,
-                        XlsExternalCachedValue::Number(42.5),
-                        XlsExternalCachedValue::Text("cached".to_string()),
-                        XlsExternalCachedValue::Boolean(true),
-                        XlsExternalCachedValue::Error(XlsExternalCachedError::NotAvailable),
+                        CachedValue::Blank,
+                        CachedValue::Number(42.5),
+                        CachedValue::Text("cached".to_string()),
+                        CachedValue::Boolean(true),
+                        CachedValue::Error(ErrorValue::NotAvailable),
                     ],
                 }],
             }],
@@ -43,7 +43,7 @@ fn external_workbook_cache_round_trip_is_inert() {
     assert_eq!(external.sheets()[0].cache_rows()[0].values().len(), 5);
     assert_eq!(
         external.sheets()[0].cache_rows()[0].values()[2],
-        XlsExternalCachedValue::Text("cached".to_string()),
+        CachedValue::Text("cached".to_string()),
     );
 }
 
@@ -71,7 +71,7 @@ fn reads_poi_and_libreoffice_external_caches() {
     assert_eq!(external.sheets()[0].name(), "Sheet1");
     assert_eq!(
         external.sheets()[0].cache_rows()[0].values(),
-        &[XlsExternalCachedValue::Text("external text".to_string())],
+        &[CachedValue::Text("external text".to_string())],
     );
 }
 

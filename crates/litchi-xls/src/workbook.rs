@@ -187,7 +187,7 @@ pub struct XlsWorkbook<R: Read + Seek> {
     /// Published Web pages (`WebPub` records), in record order.
     web_publications: Vec<crate::web_pub::XlsWebPub>,
     function_groups: Option<crate::function_group::XlsFunctionGroups>,
-    external_links: crate::external_link::XlsExternalLinks,
+    external_links: crate::external_link::Links,
     pivot_caches: Vec<crate::PivotCache>,
     /// SXStreamID values in global PivotCache ordinal order.
     pivot_cache_stream_ids: Vec<u16>,
@@ -252,7 +252,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             biff_version: BiffVersion::Biff8,
             is_1904_date_system: false,
             formula_context: FormulaContext::default(),
-            external_links: crate::XlsExternalLinks::default(),
+            external_links: crate::Links::default(),
             pivot_caches: Vec::new(),
             pivot_cache_stream_ids: Vec::new(),
             defined_names: Vec::new(),
@@ -311,7 +311,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             biff_version: BiffVersion::Biff8,
             is_1904_date_system: false,
             formula_context: FormulaContext::default(),
-            external_links: crate::XlsExternalLinks::default(),
+            external_links: crate::Links::default(),
             pivot_caches: Vec::new(),
             pivot_cache_stream_ids: Vec::new(),
             defined_names: Vec::new(),
@@ -1378,7 +1378,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     }
 
     /// Inert supporting-book links and cached external cell values.
-    pub fn external_links(&self) -> &crate::external_link::XlsExternalLinks {
+    pub fn external_links(&self) -> &crate::external_link::Links {
         &self.external_links
     }
 
@@ -1394,7 +1394,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         litchi_ole_common::custom_xml::inspect(&mut self.ole_file)
     }
 
-    pub fn summary_information(&mut self) -> XlsResult<Option<litchi_cfb::PropertySetStream>> {
+    pub fn summary_information(&mut self) -> XlsResult<Option<litchi_cfb::Stream>> {
         match self
             .ole_file
             .property_set_stream(&["\u{0005}SummaryInformation"])
@@ -1421,7 +1421,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
 
     pub fn document_summary_information(
         &mut self,
-    ) -> XlsResult<Option<litchi_cfb::PropertySetStream>> {
+    ) -> XlsResult<Option<litchi_cfb::Stream>> {
         match self
             .ole_file
             .property_set_stream(&["\u{0005}DocumentSummaryInformation"])
@@ -1432,7 +1432,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         }
     }
 
-    pub fn user_defined_properties(&mut self) -> XlsResult<Option<litchi_cfb::PropertySet>> {
+    pub fn user_defined_properties(&mut self) -> XlsResult<Option<litchi_cfb::Section>> {
         Ok(self.document_summary_information()?.and_then(|stream| {
             stream
                 .section(litchi_cfb::USER_DEFINED_PROPERTIES_FMTID)
