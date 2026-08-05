@@ -9,6 +9,7 @@ pub use package::{Limits, load_slide};
 
 pub(crate) const DESCRIPTOR_CONTENT_TYPE: &str = "application/vnd.ms-office.activeX+xml";
 pub(crate) const BINARY_CONTENT_TYPE: &str = "application/vnd.ms-office.activeX";
+pub(crate) const ACTIVEX_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/2006/activeX";
 pub(crate) const CONTROL_RELATIONSHIP: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/control";
 pub(crate) const STRICT_CONTROL_RELATIONSHIP: &str =

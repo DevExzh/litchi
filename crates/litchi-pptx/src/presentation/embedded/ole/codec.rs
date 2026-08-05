@@ -207,10 +207,14 @@ fn parse_frame(frame: &Node) -> Result<Option<Parsed>> {
         if child(object, "link").is_some() {
             return Err(invalid("OLE object contains both embed and link"));
         }
-        let relationship_id = attr(embed, "id", true).map(str::to_owned);
+        let relationship_id = attr(object, "id", true)
+            .or_else(|| attr(embed, "id", true))
+            .map(str::to_owned);
         (Mode::Embedded, relationship_id)
     } else if let Some(link) = child(object, "link") {
-        let relationship_id = attr(link, "id", true).map(str::to_owned);
+        let relationship_id = attr(object, "id", true)
+            .or_else(|| attr(link, "id", true))
+            .map(str::to_owned);
         (Mode::Linked, relationship_id)
     } else {
         return Err(invalid("OLE object contains neither embed nor link"));

@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use litchi_opc::{OpcPackage, PackURI, Part};
+use litchi_opc::{OpcPackage, PackURI};
 use litchi_pptx::Package;
 use quick_xml::Reader;
 use quick_xml::events::Event;
@@ -90,8 +90,6 @@ fn parse_text_styles(xml: &[u8]) -> BTreeMap<String, (bool, Vec<u8>)> {
 }
 
 fn level_number(name: &[u8]) -> Option<u8> {
-    name.strip_prefix(b"lvl")?
-        .strip_suffix(b"pPr")?
-        .parse()
-        .ok()
+    let number = name.strip_prefix(b"lvl")?.strip_suffix(b"pPr")?;
+    std::str::from_utf8(number).ok()?.parse().ok()
 }

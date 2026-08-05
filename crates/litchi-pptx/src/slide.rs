@@ -65,6 +65,28 @@ impl<'a> Slide<'a> {
         self.part.shapes()
     }
 
+    /// Read the optional direct programmable-tag list attached to this slide.
+    pub fn tags(&self) -> Result<Option<crate::tag::List>> {
+        Ok(crate::tag::load(self.package, self.part.part().partname())?
+            .map(crate::tag::Source::into_list))
+    }
+
+    /// Read the optional programmable-tag list attached to one semantic shape.
+    pub fn shape_tags<'k>(
+        &self,
+        shape: impl Into<crate::shape::Key<'k>>,
+    ) -> Result<Option<crate::tag::List>> {
+        Ok(crate::tag::shape::load(self.package, self.part.part().partname(), shape)?
+            .map(crate::tag::Source::into_list))
+    }
+
+    /// Inspect all tag relationships on this slide in stable relationship-ID
+    /// order. Shape-owned and unanchored producer markup remains visible here
+    /// but is not flattened into [`Self::tags`].
+    pub fn tag_inventory(&self) -> Result<Vec<crate::tag::Source>> {
+        crate::tag::discover(self.part.part(), self.package).map_err(Into::into)
+    }
+
     /// Resolve the ordinary charts attached to this slide.
     pub fn charts(&self) -> Result<Vec<crate::chart::Part<'a>>> {
         self.part.charts(self.package)

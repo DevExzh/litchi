@@ -2,6 +2,8 @@
 
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+use quick_xml::events::Event;
+use quick_xml::reader::NsReader;
 
 use crate::parts::{PresentationPart, SlideMasterPart, SlidePart, SlideReference};
 use crate::slide::{Key, Slide, SlideLayout, SlideMaster};
@@ -55,6 +57,59 @@ impl<'a> Presentation<'a> {
         self.part.slide_size()
     }
 
+    /// Load the optional DrawingML table-style catalog owned by this
+    /// presentation. The catalog remains a detached value so callers can
+    /// inspect it without holding a mutable package borrow.
+    pub fn styles(&self) -> Result<Option<crate::table::style::List>> {
+        crate::table::style::load(self.package)
+    }
+
+    /// Load the complete inert speaker-notes graph, when present.
+    pub fn notes(&self) -> Result<Option<crate::notes::Graph>> {
+        crate::notes::load(self.package, self.part.part().partname())
+    }
+
+    /// Discover the optional opaque VBA project relationship owned by this
+    /// presentation. The binary payload is never decoded or executed.
+    pub fn vba(&self) -> Result<Option<embedded::vba::Project>> {
+        embedded::vba::discover(self.package, self.part.part().partname())
+    }
+
+    /// Discover inert hyperlinks owned by the presentation's slides.
+    ///
+    /// Each result contains the zero-based slide position and a typed target.
+    /// Relationship targets and inline actions are parsed as values only;
+    /// they are never followed, opened, or executed.
+    pub fn hyperlinks(&self) -> Result<Vec<(usize, crate::hyperlinks::Hyperlink)>> {
+        let mut hyperlinks = Vec::new();
+        for (slide_index, slide) in self.slides()?.into_iter().enumerate() {
+            for relationship in slide.part().part().rels().iter().filter(|relationship| {
+                matches!(
+                    relationship.reltype(),
+                    rt::HYPERLINK | rt::STRICT_HYPERLINK
+                )
+            }) {
+                let target = relationship.target_ref();
+                if target.is_empty() {
+                    return Err(Error::Invalid(format!(
+                        "hyperlink relationship '{}' on slide {slide_index} has an empty target",
+                        relationship.r_id()
+                    )));
+                }
+                hyperlinks.push((
+                    slide_index,
+                    crate::hyperlinks::Hyperlink::from_xml(target, None)?,
+                ));
+            }
+            hyperlinks.extend(
+                Self::parse_inline_hyperlinks(slide.part().part().blob())?
+                    .into_iter()
+                    .map(|value| (slide_index, value)),
+            );
+        }
+        Ok(hyperlinks)
+    }
+
     /// Resolve one ordered slide by zero-based index.
     pub fn slide(&self, index: usize) -> Result<Option<Slide<'a>>> {
         let references = self.part.slide_references()?;
@@ -99,28 +154,34 @@ impl<'a> Presentation<'a> {
         Ok(slides)
     }
 
-    /// Resolve all slide masters in relationship-ID order.
+    /// Resolve the slide masters declared by `p:sldMasterIdLst` in XML order.
     pub fn slide_masters(&self) -> Result<Vec<SlideMaster<'a>>> {
-        let mut relationships: Vec<_> = self
-            .part
-            .part()
-            .rels()
-            .iter()
-            .filter(|relationship| {
-                crate::parts::is_relationship_type(
-                    relationship.reltype(),
-                    rt::SLIDE_MASTER,
-                    "slideMaster",
-                )
-            })
-            .collect();
-        relationships.sort_unstable_by(|left, right| left.r_id().cmp(right.r_id()));
-        let mut masters = Vec::with_capacity(relationships.len());
-        for relationship in relationships {
+        let relationship_ids = self.part.slide_master_references()?;
+        let mut masters = Vec::with_capacity(relationship_ids.len());
+        for relationship_id in relationship_ids {
+            let relationship = self
+                .part
+                .part()
+                .rels()
+                .get(&relationship_id)
+                .ok_or_else(|| {
+                    Error::Relationship(format!(
+                        "presentation master reference is missing relationship '{relationship_id}'"
+                    ))
+                })?;
             if relationship.is_external() {
                 return Err(Error::Relationship(
-                    "slide-master relationship cannot be external".to_string(),
+                    "slide-master relationship must be internal".to_string(),
                 ));
+            }
+            if !crate::parts::is_relationship_type(
+                relationship.reltype(),
+                rt::SLIDE_MASTER,
+                "slideMaster",
+            ) {
+                return Err(Error::Relationship(format!(
+                    "relationship '{relationship_id}' is not a slide-master relationship"
+                )));
             }
             let target = relationship.target_partname()?;
             let part = self.package.get_part(&target)?;
@@ -180,5 +241,51 @@ impl<'a> Presentation<'a> {
             ct::PML_SLIDE,
         )?;
         SlidePart::from_part(part)
+    }
+
+    fn parse_inline_hyperlinks(
+        xml: &[u8],
+    ) -> Result<Vec<crate::hyperlinks::Hyperlink>> {
+        let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
+        let mut reader = NsReader::from_reader(processed.as_ref());
+        reader.config_mut().trim_text(true);
+        let mut hyperlinks = Vec::new();
+        loop {
+            let decoder = reader.decoder();
+            let (namespace, event) = reader.read_resolved_event()?;
+            match event {
+                Event::Start(element) | Event::Empty(element)
+                    if litchi_ooxml_common::xml::is_drawingml_name(
+                        &namespace,
+                        element.name(),
+                        b"hlinkClick",
+                    ) =>
+                {
+                    let action = litchi_ooxml_common::xml::unqualified_attribute_value(
+                        &element,
+                        b"action",
+                        decoder,
+                    )?;
+                    let tooltip = litchi_ooxml_common::xml::unqualified_attribute_value(
+                        &element,
+                        b"tooltip",
+                        decoder,
+                    )?;
+                    if let Some(action) = action {
+                        if action.is_empty() {
+                            return Err(Error::Invalid(
+                                "inline hyperlink action cannot be empty".into(),
+                            ));
+                        }
+                        hyperlinks.push(crate::hyperlinks::Hyperlink::from_xml(
+                            &action, tooltip,
+                        )?);
+                    }
+                },
+                Event::Eof => break,
+                _ => {},
+            }
+        }
+        Ok(hyperlinks)
     }
 }

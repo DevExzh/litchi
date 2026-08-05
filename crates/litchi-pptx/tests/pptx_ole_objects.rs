@@ -15,10 +15,10 @@ const LOCAL_OLE_OBJECTS: &[u8] =
 fn package_inventory_reports_local_ole_objects() {
     let package = package_with_local_ole_objects();
 
-    let objects = objects(&package);
-    assert_eq!(objects.len(), 3);
+    let inventory = objects(&package);
+    assert_eq!(inventory.len(), 3);
 
-    let workbook = &objects[0];
+    let workbook = &inventory[0];
     assert_eq!(workbook.slide_index(), 0);
     assert_eq!(workbook.index(), 0);
     assert_eq!(workbook.shape_id(), Some(101));
@@ -44,7 +44,7 @@ fn package_inventory_reports_local_ole_objects() {
             && relationship_type == OLE_OBJECT
     ));
 
-    let package_object = &objects[1];
+    let package_object = &inventory[1];
     assert_eq!(package_object.index(), 1);
     assert_eq!(package_object.mode(), Mode::Embedded);
     assert_eq!(
@@ -62,7 +62,7 @@ fn package_inventory_reports_local_ole_objects() {
             && relationship_type == PACKAGE
     ));
 
-    let linked = &objects[2];
+    let linked = &inventory[2];
     assert_eq!(linked.index(), 2);
     assert_eq!(linked.mode(), Mode::Linked);
     assert_eq!(linked.kind(), Some(Kind::OleObject));
@@ -77,7 +77,7 @@ fn package_inventory_reports_local_ole_objects() {
 
     assert_eq!(
         objects(&package),
-        objects
+        inventory
     );
 }
 
@@ -120,7 +120,7 @@ fn package_inventory_ignores_non_ole_graphic_data() {
     let mut package = package_with_local_ole_objects();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
     package = edit_package(package, |opc| {
-            let slide = opc.get_part_mut(&slide_name)?;
+            let slide = opc.get_part_mut(&slide_name).unwrap();
             let xml = std::str::from_utf8(slide.blob()).unwrap();
             let updated = xml.replace(
                 "http://schemas.openxmlformats.org/presentationml/2006/ole",

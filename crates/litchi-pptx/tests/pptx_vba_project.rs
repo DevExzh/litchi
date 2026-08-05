@@ -1,8 +1,8 @@
-use litchi_ooxml::pptx::Package;
-use litchi_ooxml::{OoxmlError, PackURI};
+use litchi_opc::PackURI;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::{BlobPart, Part};
+use litchi_pptx::{Error, Package};
 
 const PRESENTATION_XML: &[u8] =
     include_bytes!("../../../test-data/ooxml/pptx/vba-project/presentation.xml");
@@ -10,7 +10,6 @@ const PRESENTATION_XML: &[u8] =
 #[test]
 fn presentation_discovers_inert_vba_project_metadata() {
     let package = package_with_vba_project(false);
-
     let project = package.presentation().unwrap().vba().unwrap().unwrap();
     assert_eq!(project.source_part_name().as_str(), "/ppt/presentation.xml");
     assert_eq!(project.relationship_id(), "rIdVbaProject");
@@ -20,10 +19,9 @@ fn presentation_discovers_inert_vba_project_metadata() {
 #[test]
 fn presentation_rejects_external_vba_project_relationships() {
     let package = package_with_vba_project(true);
-
     assert!(matches!(
         package.presentation().unwrap().vba(),
-        Err(OoxmlError::InvalidFormat(message)) if message.contains("cannot be external")
+        Err(Error::Relationship(message)) if message.contains("cannot be external")
     ));
 }
 

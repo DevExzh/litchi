@@ -1,8 +1,8 @@
-use litchi_ooxml::pptx::Package;
-use litchi_ooxml::{OoxmlError, PackURI};
+use litchi_opc::PackURI;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::{BlobPart, Part};
+use litchi_pptx::{Error, Package, load_slide_media};
 
 const PRESENTATION_XML: &[u8] =
     include_bytes!("../../../test-data/ooxml/pptx/media/presentation.xml");
@@ -11,16 +11,8 @@ const SLIDE_XML: &[u8] = include_bytes!("../../../test-data/ooxml/pptx/media/sli
 #[test]
 fn slide_loads_inert_audio_resources() {
     let package = package_with_audio(false);
-    let slide = package
-        .presentation()
-        .unwrap()
-        .slides()
-        .unwrap()
-        .into_iter()
-        .next()
-        .unwrap();
-
-    let media = slide.media().unwrap();
+    let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
+    let media = load_slide_media(package.opc().unwrap(), &slide_name).unwrap();
     assert_eq!(media.pictures.len(), 1);
     assert_eq!(media.pictures[0].shape_id, 7);
     assert_eq!(media.pictures[0].name, "clip.mp3");
@@ -38,18 +30,11 @@ fn slide_loads_inert_audio_resources() {
 #[test]
 fn slide_rejects_external_media_resources() {
     let package = package_with_audio(true);
-    let slide = package
-        .presentation()
-        .unwrap()
-        .slides()
-        .unwrap()
-        .into_iter()
-        .next()
-        .unwrap();
+    let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
 
     assert!(matches!(
-        slide.media(),
-        Err(OoxmlError::InvalidFormat(message)) if message.contains("not fetched")
+        load_slide_media(package.opc().unwrap(), &slide_name),
+        Err(Error::Invalid(message)) if message.contains("not fetched")
     ));
 }
 

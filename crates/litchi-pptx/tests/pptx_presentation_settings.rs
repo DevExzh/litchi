@@ -1,4 +1,4 @@
-use litchi_opc::{OpcPackage, PackURI, Part};
+use litchi_opc::{OpcPackage, PackURI};
 use litchi_pptx::{
     Error, Package,
     presentation_properties::{

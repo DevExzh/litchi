@@ -59,7 +59,7 @@ fn slide_tables_report_style_switches_and_references() {
     for slide in presentation.slides().unwrap() {
         for shape in slide.shapes().unwrap().iter() {
             if let Shape::Table(shape) = shape {
-                let table = Table::from_graphic_frame_xml(shape.common().xml().unwrap()).unwrap();
+                let table = Table::from_graphic_frame(shape.common().xml().unwrap()).unwrap();
                 let properties = table.properties().unwrap().unwrap();
                 found.push(properties);
             }

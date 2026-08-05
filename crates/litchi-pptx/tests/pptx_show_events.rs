@@ -1,4 +1,4 @@
-use litchi_opc::{OpcPackage, PackURI, Part};
+use litchi_opc::{OpcPackage, PackURI};
 use litchi_pptx::Error;
 use litchi_pptx::Package;
 use litchi_pptx::presentation_properties::metadata::events::{
@@ -26,9 +26,9 @@ fn event_owner_stores_the_local_show_event_inventory() {
 
     let xml = std::str::from_utf8(package.get_part(&slide_name).unwrap().blob()).unwrap();
     assert_eq!(xml.matches("<p14:").count(), 8); // showEvtLst plus seven events
-    assert!(xml.contains(r#"type="onClick" time="6950ms" objId="6""#));
-    assert!(xml.contains(r#"<p14:seekEvt time="38839ms" objId="4" seek="10379ms"/>"#));
-    assert!(xml.contains(r#"<p14:nullEvt time="50000ms" objId="4"/>"#));
+    assert!(xml.contains(r#"type="onClick" time="6950" objId="6""#));
+    assert!(xml.contains(r#"<p14:seekEvt time="38839" objId="4" seek="10379"/>"#));
+    assert!(xml.contains(r#"<p14:nullEvt time="50000" objId="4"/>"#));
     assert!(matches!(
         events[0].kind(),
         Kind::Trigger(Trigger::OnClick)

@@ -19,6 +19,10 @@ const MASTER_PART: &str = "/ppt/slideMasters/slideMaster1.xml";
 const THEME_PART: &str = "/ppt/theme/theme1.xml";
 const VIEW_PROPERTIES_PART: &str = "/ppt/viewProps.xml";
 const PRESENTATION_PROPERTIES_PART: &str = "/ppt/presProps.xml";
+const TABLE_STYLES_PART: &str = "/ppt/tableStyles.xml";
+const NOTES_THEME_PART: &str = "/ppt/theme/theme2.xml";
+const NOTES_MASTER_PART: &str = "/ppt/notesMasters/notesMaster1.xml";
+const NOTES_MASTER_RELATIONSHIP_ID: &str = "rIdNotesMaster";
 const CORE_PROPERTIES_PART: &str = "/docProps/core.xml";
 const EXTENDED_PROPERTIES_PART: &str = "/docProps/app.xml";
 
@@ -39,17 +43,42 @@ impl Package {
         let theme_name = pack_uri(THEME_PART)?;
         let view_properties_name = pack_uri(VIEW_PROPERTIES_PART)?;
         let presentation_properties_name = pack_uri(PRESENTATION_PROPERTIES_PART)?;
+        let table_styles_name = pack_uri(TABLE_STYLES_PART)?;
+        let notes_theme_name = pack_uri(NOTES_THEME_PART)?;
+        let notes_master_name = pack_uri(NOTES_MASTER_PART)?;
         let core_properties_name = pack_uri(CORE_PROPERTIES_PART)?;
         let extended_properties_name = pack_uri(EXTENDED_PROPERTIES_PART)?;
 
+        let presentation_xml = resources::PRESENTATION.replacen(
+            "</p:sldMasterIdLst>",
+            &format!(
+                "</p:sldMasterIdLst><p:notesMasterIdLst><p:notesMasterId r:id=\"{NOTES_MASTER_RELATIONSHIP_ID}\"/></p:notesMasterIdLst>"
+            ),
+            1,
+        );
         let mut presentation = BlobPart::new(
             presentation_name.clone(),
             ct::PML_PRESENTATION_MAIN.to_string(),
-            resources::PRESENTATION.as_bytes().to_vec(),
+            presentation_xml.into_bytes(),
         );
         presentation.relate_to("slideMasters/slideMaster1.xml", rt::SLIDE_MASTER);
         presentation.relate_to("viewProps.xml", rt::VIEW_PROPS);
         presentation.relate_to("presProps.xml", rt::PRES_PROPS);
+        // Keep the conventional numeric relationship IDs available to the
+        // presentation writer. The optional catalog has a semantic ID and
+        // must not shift slide relationship IDs in newly authored packages.
+        presentation.rels_mut().add_relationship(
+            rt::TABLE_STYLES.to_string(),
+            "tableStyles.xml".to_string(),
+            "rIdTableStyles".to_string(),
+            false,
+        );
+        presentation.rels_mut().add_relationship(
+            rt::NOTES_MASTER.to_string(),
+            "notesMasters/notesMaster1.xml".to_string(),
+            NOTES_MASTER_RELATIONSHIP_ID.to_string(),
+            false,
+        );
 
         let mut master = BlobPart::new(
             master_name,
@@ -69,6 +98,17 @@ impl Package {
             ct::OFC_THEME.to_string(),
             resources::THEME.as_bytes().to_vec(),
         );
+        let notes_theme = BlobPart::new(
+            notes_theme_name,
+            ct::OFC_THEME.to_string(),
+            resources::THEME.as_bytes().to_vec(),
+        );
+        let mut notes_master = BlobPart::new(
+            notes_master_name,
+            ct::PML_NOTES_MASTER.to_string(),
+            crate::notes::master_xml().as_bytes().to_vec(),
+        );
+        notes_master.relate_to("../theme/theme2.xml", rt::THEME);
 
         let view_properties = BlobPart::new(
             view_properties_name,
@@ -79,6 +119,11 @@ impl Package {
             presentation_properties_name,
             ct::PML_PRES_PROPS.to_string(),
             resources::PRESENTATION_PROPERTIES.as_bytes().to_vec(),
+        );
+        let table_styles = BlobPart::new(
+            table_styles_name,
+            ct::PML_TABLE_STYLES.to_string(),
+            crate::table::style::default_xml().as_bytes().to_vec(),
         );
         let core_properties = BlobPart::new(
             core_properties_name,
@@ -107,8 +152,11 @@ impl Package {
             package.add_part(Box::new(layout));
         }
         package.add_part(Box::new(theme));
+        package.add_part(Box::new(notes_theme));
+        package.add_part(Box::new(notes_master));
         package.add_part(Box::new(view_properties));
         package.add_part(Box::new(presentation_properties));
+        package.add_part(Box::new(table_styles));
         package.add_part(Box::new(core_properties));
         package.add_part(Box::new(extended_properties));
 
@@ -197,9 +245,100 @@ impl Package {
         operation(&self.opc)
     }
 
+    /// Read one slide's direct, inert programmable-tag list.
+    ///
+    /// Names are the ordinary selector and zero-based presentation positions
+    /// remain available for ordered repair workflows. The returned list owns
+    /// its bounded strings, so the read does not borrow the package graph.
+    pub fn tags<'a>(&self, slide: impl Into<crate::slide::Key<'a>>) -> Result<Option<crate::tag::List>> {
+        self.ensure_graph_current("tags")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        Ok(crate::tag::load(&self.opc, &slide_name)?.map(crate::tag::Source::into_list))
+    }
+
+    /// Create or replace one slide's direct programmable-tag list.
+    ///
+    /// The list is moved into the package transaction and the staged owner
+    /// relationship and part are published together.
+    pub fn put_tags<'a>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'a>>,
+        list: crate::tag::List,
+    ) -> Result<Option<crate::tag::List>> {
+        self.ensure_graph_current("put_tags")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        self.edit_typed(move |opc| crate::tag::put(opc, &slide_name, list))
+    }
+
+    /// Remove one slide's direct programmable-tag list.
+    ///
+    /// Removal is idempotent and only collects an orphaned tag part after the
+    /// package-wide inbound-edge check succeeds.
+    pub fn remove_tags<'a>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'a>>,
+    ) -> Result<Option<crate::tag::List>> {
+        self.ensure_graph_current("remove_tags")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        self.edit_typed(move |opc| crate::tag::remove(opc, &slide_name))
+    }
+
+    /// Read one semantic shape's optional programmable-tag list.
+    pub fn shape_tags<'s, 'k>(
+        &self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+    ) -> Result<Option<crate::tag::List>> {
+        self.ensure_graph_current("shape_tags")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        Ok(crate::tag::shape::load(&self.opc, &slide_name, shape)?
+            .map(crate::tag::Source::into_list))
+    }
+
+    /// Create or replace one semantic shape's programmable-tag list.
+    pub fn put_shape_tags<'s, 'k>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+        list: crate::tag::List,
+    ) -> Result<Option<crate::tag::List>> {
+        self.ensure_graph_current("put_shape_tags")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        self.edit_typed(move |opc| crate::tag::shape::put(opc, &slide_name, shape, list))
+    }
+
+    /// Remove one semantic shape's programmable-tag list.
+    pub fn remove_shape_tags<'s, 'k>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+    ) -> Result<Option<crate::tag::List>> {
+        self.ensure_graph_current("remove_shape_tags")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        self.edit_typed(move |opc| crate::tag::shape::remove(opc, &slide_name, shape))
+    }
+
+    /// Load the presentation's optional DrawingML table-style catalog.
+    pub fn styles(&self) -> Result<Option<crate::table::style::List>> {
+        // Table styles are owned by their OPC part, independently of the
+        // slide-authoring model. They remain a safe immutable read while a
+        // newly authored slide is still pending publication.
+        crate::table::style::load(&self.opc)
+    }
+
+    /// Create or replace the presentation's table-style catalog atomically.
+    pub fn put_styles(&mut self, styles: crate::table::style::List) -> Result<bool> {
+        self.edit_typed(move |opc| crate::table::style::put(opc, styles))
+    }
+
+    /// Remove the presentation's optional table-style catalog atomically.
+    pub fn remove_styles(&mut self) -> Result<Option<crate::table::style::List>> {
+        self.edit_typed(crate::table::style::remove)
+    }
+
     /// Add a slide master and update the PresentationML relationship graph.
     pub fn add_slide_master(&mut self) -> Result<crate::master_layout::AuthoredSlideMaster> {
-        self.edit_opc(crate::master_layout::add_slide_master)
+        self.edit_typed(crate::master_layout::add_slide_master)
     }
 
     /// Add a layout to an existing master and update both sides of the graph.
@@ -210,7 +349,7 @@ impl Package {
         name: &str,
         placeholders: &[crate::master_layout::PlaceholderSpec],
     ) -> Result<crate::master_layout::AuthoredSlideLayout> {
-        self.edit_opc(|opc| {
+        self.edit_typed(|opc| {
             crate::master_layout::add_slide_layout(opc, master_part_name, kind, name, placeholders)
         })
     }
@@ -221,12 +360,12 @@ impl Package {
         part_name: &PackURI,
         spec: &crate::master_layout::PlaceholderSpec,
     ) -> Result<()> {
-        self.edit_opc(|opc| crate::master_layout::store_placeholder_shape(opc, part_name, spec))
+        self.edit_typed(|opc| crate::master_layout::store_placeholder_shape(opc, part_name, spec))
     }
 
     /// Remove an unreferenced layout and its owning relationship.
     pub fn remove_slide_layout(&mut self, layout_part_name: &PackURI) -> Result<()> {
-        self.edit_opc(|opc| crate::master_layout::remove_slide_layout(opc, layout_part_name))
+        self.edit_typed(|opc| crate::master_layout::remove_slide_layout(opc, layout_part_name))
     }
 
     /// Validate every master/layout relationship reachable from the package.
@@ -246,13 +385,29 @@ impl Package {
         &mut self,
         value: &crate::presentation_properties::metadata::slide_sync::Part,
     ) -> Result<()> {
-        self.edit_opc(|opc| crate::presentation_properties::metadata::slide_sync::store(opc, value))
+        self.edit_typed(|opc| crate::presentation_properties::metadata::slide_sync::store(opc, value))
     }
 
-    /// Run one transactional low-level OPC edit for package-owned semantic
-    /// modules. This remains crate-visible so those modules can share the
-    /// package rollback boundary without exposing raw graph mutation publicly.
-    pub(crate) fn edit_opc<T>(
+    /// Run one transactional low-level OPC edit.
+    ///
+    /// The closure receives the current graph only after pending authoring
+    /// state has been published. Any error rolls the graph back to its exact
+    /// pre-edit snapshot; successful edits commit the candidate in place.
+    /// Callers that need a typed, semantic operation should prefer the
+    /// contextual methods on this facade.
+    pub fn edit_opc<T>(
+        &mut self,
+        operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
+    ) -> Result<T> {
+        let value = self.edit_typed(operation)?;
+        // A raw graph edit cannot be reflected into the lossless mutable
+        // writer. Retire that facade after publication so later authoring
+        // cannot overwrite the committed OPC graph with stale state.
+        self.mutable_pres = None;
+        Ok(value)
+    }
+
+    fn edit_typed<T>(
         &mut self,
         operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
     ) -> Result<T> {
@@ -275,6 +430,25 @@ impl Package {
             });
         }
         Ok(())
+    }
+
+    fn resolve_slide(&self, key: crate::slide::Key<'_>) -> Result<PackURI> {
+        let presentation = self.presentation()?;
+        match key {
+            crate::slide::Key::Index(index) => {
+                let length = presentation.slide_count()?;
+                let slide = presentation
+                    .slide(index)?
+                    .ok_or(Error::SlideIndexOutOfBounds { index, len: length })?;
+                Ok(slide.part().part().partname().clone())
+            },
+            crate::slide::Key::Name(name) => {
+                let slide = presentation
+                    .find_slide(name)?
+                    .ok_or_else(|| Error::SlideNameNotFound(name.to_owned()))?;
+                Ok(slide.part().part().partname().clone())
+            },
+        }
     }
 
     fn flush_presentation(&mut self) -> Result<()> {
@@ -330,6 +504,15 @@ impl Package {
         for part in old_slides {
             self.opc.remove_part(&part);
         }
+        let old_notes_slides: Vec<_> = self
+            .opc
+            .iter_parts()
+            .filter(|part| part.partname().as_str().starts_with("/ppt/notesSlides/"))
+            .map(|part| part.partname().clone())
+            .collect();
+        for part in old_notes_slides {
+            self.opc.remove_part(&part);
+        }
 
         let mut relationship_ids = Vec::with_capacity(presentation.slide_count());
         for (index, slide) in presentation.slides().iter().enumerate() {
@@ -347,7 +530,31 @@ impl Package {
                 slide.generate_slide_xml()?.into_bytes(),
             );
             slide_part.relate_to("../slideLayouts/slideLayout1.xml", rt::SLIDE_LAYOUT);
+            if slide.has_notes() {
+                slide_part.relate_to(
+                    &format!("../notesSlides/notesSlide{}.xml", index + 1),
+                    rt::NOTES_SLIDE,
+                );
+            }
             self.opc.add_part(Box::new(slide_part));
+
+            if let Some(text) = slide.notes() {
+                let notes_name = pack_uri(&format!(
+                    "/ppt/notesSlides/notesSlide{}.xml",
+                    index + 1
+                ))?;
+                let mut notes_part = BlobPart::new(
+                    notes_name,
+                    ct::PML_NOTES_SLIDE.to_string(),
+                    crate::notes::write_text(text)?,
+                );
+                notes_part.relate_to(
+                    &format!("../slides/slide{}.xml", index + 1),
+                    rt::SLIDE,
+                );
+                notes_part.relate_to("../notesMasters/notesMaster1.xml", rt::NOTES_MASTER);
+                self.opc.add_part(Box::new(notes_part));
+            }
         }
 
         let xml = presentation.generate_presentation_xml_with(&relationship_ids)?;

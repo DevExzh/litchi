@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use litchi_opc::{OpcPackage, PackURI, Part};
+use litchi_opc::{OpcPackage, PackURI};
 use litchi_pptx::Package;
 use quick_xml::Reader;
 use quick_xml::events::Event;

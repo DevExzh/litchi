@@ -1,4 +1,4 @@
-use litchi_ooxml::pptx::Package;
+use litchi_pptx::Package;
 use tempfile::NamedTempFile;
 
 #[test]

@@ -89,7 +89,7 @@ fn replace_part(package: &mut OpcPackage, part_name: &str, xml: &[u8]) {
         .set_blob(xml.to_vec());
 }
 
-fn root_bool(xml: &[u8], attribute: &str) -> Option<bool> {
+fn root_bool(xml: &[u8], attribute_name: &str) -> Option<bool> {
     let mut reader = Reader::from_reader(xml);
     loop {
         match reader.read_event().unwrap() {

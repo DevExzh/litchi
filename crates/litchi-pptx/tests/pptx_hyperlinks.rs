@@ -1,7 +1,7 @@
-use litchi_ooxml::pptx::{Hyperlink, Package};
-use litchi_ooxml::{OoxmlError, PackURI};
+use litchi_opc::PackURI;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
+use litchi_pptx::{Error, Hyperlink, Package};
 
 const PRESENTATION_XML: &[u8] =
     include_bytes!("../../../test-data/ooxml/pptx/hyperlinks/presentation.xml");
@@ -13,7 +13,7 @@ const MALFORMED_SLIDE_XML: &[u8] =
 #[test]
 fn presentation_hyperlinks_include_strict_relationships_and_inline_actions() {
     let package = package_with_hyperlinks();
-    let hyperlinks = package.presentation().unwrap().get_hyperlinks().unwrap();
+    let hyperlinks = package.presentation().unwrap().hyperlinks().unwrap();
 
     assert_eq!(hyperlinks.len(), 2);
     assert_eq!(hyperlinks[0].0, 0);
@@ -45,8 +45,8 @@ fn presentation_hyperlinks_reject_malformed_inline_xml() {
         .unwrap();
 
     assert!(matches!(
-        package.presentation().unwrap().get_hyperlinks(),
-        Err(OoxmlError::Xml(_))
+        package.presentation().unwrap().hyperlinks(),
+        Err(Error::Xml(_))
     ));
 }
 

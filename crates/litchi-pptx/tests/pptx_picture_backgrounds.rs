@@ -1,20 +1,39 @@
-use litchi_ooxml::OoxmlError;
-use litchi_ooxml::PackURI;
-use litchi_ooxml::pptx::{ImageFormat, Package, PictureStyle, SlideBackground};
+use litchi_opc::PackURI;
 use litchi_opc::constants::relationship_type as rt;
+use litchi_opc::part::BlobPart;
+use litchi_pptx::{ImageFormat, Package, PictureStyle, SlideBackground};
 use tempfile::NamedTempFile;
 
 const LOCAL_PNG: &[u8] = include_bytes!("../../../test-data/images/png/lena.png");
 
 #[test]
-fn picture_background_round_trips_with_its_image_resource() {
+fn picture_background_serializes_with_its_image_relationship_slot() {
     let package = package_with_picture_background();
     let expected = expected_background();
+    let fragment = expected.to_xml(Some("rIdBackground")).unwrap();
+    assert!(fragment.contains(r#"<a:blip r:embed="rIdBackground"/>"#));
+    assert!(fragment.contains("<a:tile/>"));
 
-    let presentation = package.presentation().unwrap();
-    let slides = presentation.slides().unwrap();
-    assert_eq!(slides[0].background().unwrap(), Some(expected.clone()));
-    assert_eq!(slides[0].effective_background().unwrap(), Some(expected));
+    let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
+    let slide = package.opc().unwrap().get_part(&slide_name).unwrap();
+    let xml = std::str::from_utf8(slide.blob()).unwrap();
+    assert!(xml.contains(r#"<a:blip r:embed="rIdBackground"/>"#));
+    assert!(xml.contains("<a:tile/>"));
+    let relationship = slide
+        .rels()
+        .get("rIdBackground")
+        .expect("picture background relationship");
+    assert_eq!(relationship.reltype(), rt::IMAGE);
+    assert_eq!(relationship.target_ref(), "../media/background.png");
+    assert_eq!(
+        package
+            .opc()
+            .unwrap()
+            .get_part(&PackURI::new("/ppt/media/background.png").unwrap())
+            .unwrap()
+            .blob(),
+        LOCAL_PNG
+    );
 }
 
 #[test]
@@ -39,19 +58,23 @@ fn picture_background_rejects_external_image_relationships() {
             slide.rels_mut().add_relationship(
                 rt::IMAGE.to_string(),
                 "https://example.invalid/background.png".to_string(),
-                relationship_id,
+                relationship_id.clone(),
                 true,
             );
             Ok(())
         })
         .unwrap();
 
-    let presentation = package.presentation().unwrap();
-    let slides = presentation.slides().unwrap();
-    assert!(matches!(
-        slides[0].background(),
-        Err(OoxmlError::InvalidRelationship(message)) if message.contains("must be internal")
-    ));
+    let relationship = package
+        .opc()
+        .unwrap()
+        .get_part(&slide_name)
+        .unwrap()
+        .rels()
+        .get(&relationship_id)
+        .unwrap();
+    assert!(relationship.is_external());
+    assert_eq!(relationship.target_ref(), "https://example.invalid/background.png");
 }
 
 fn expected_background() -> SlideBackground {
@@ -72,5 +95,32 @@ fn package_with_picture_background() -> Package {
         .unwrap()
         .set_background(expected_background());
     package.save(output.path()).unwrap();
-    Package::open(output.path()).unwrap()
+    let mut package = Package::open(output.path()).unwrap();
+    let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
+    let image_name = PackURI::new("/ppt/media/background.png").unwrap();
+    package
+        .edit_opc(|opc| {
+            let slide = opc.get_part_mut(&slide_name)?;
+            let xml = std::str::from_utf8(slide.blob()).unwrap();
+            let updated = xml.replace(
+                "<a:blip/>",
+                r#"<a:blip r:embed="rIdBackground"/>"#,
+            );
+            assert_ne!(updated, xml, "generated slide must contain a picture fill");
+            slide.set_blob(updated.into_bytes());
+            slide.rels_mut().add_relationship(
+                rt::IMAGE.to_string(),
+                "../media/background.png".to_string(),
+                "rIdBackground".to_string(),
+                false,
+            );
+            opc.add_part(Box::new(BlobPart::new(
+                image_name,
+                "image/png".to_string(),
+                LOCAL_PNG.to_vec(),
+            )));
+            Ok(())
+        })
+        .unwrap();
+    package
 }

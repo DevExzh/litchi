@@ -1,5 +1,5 @@
 use super::model::Persistence;
-use super::{MAX_CONTROLS, MAX_SLIDE_XML_BYTES};
+use super::{ACTIVEX_NAMESPACE, MAX_CONTROLS, MAX_SLIDE_XML_BYTES};
 use crate::Result;
 use crate::presentation::embedded::{
     MAX_XML_ATTRIBUTES, MAX_XML_DEPTH, bounded, increment_nodes, invalid, is_presentationml_name,
@@ -9,7 +9,7 @@ use litchi_ooxml_common::xml::unqualified_attribute_value;
 use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::NamespaceResolver;
+use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
 #[derive(Default)]
@@ -235,10 +235,29 @@ pub(crate) fn parse_descriptor(
                     if element.name().local_name().as_ref() != b"ocx" {
                         return Err(invalid("control descriptor must have an ax:ocx root"));
                     }
-                    let class_id = attribute(&element, b"classid", decoder)?
+                    let class_id = attribute(
+                        &element,
+                        b"classid",
+                        decoder,
+                        reader.resolver(),
+                        ACTIVEX_NAMESPACE,
+                    )?
                         .ok_or_else(|| invalid("control descriptor is missing ax:classid"))?;
-                    let license = attribute(&element, b"license", decoder)?;
-                    let persistence = match attribute(&element, b"persistence", decoder)?.as_deref()
+                    let license = attribute(
+                        &element,
+                        b"license",
+                        decoder,
+                        reader.resolver(),
+                        ACTIVEX_NAMESPACE,
+                    )?;
+                    let persistence = match attribute(
+                        &element,
+                        b"persistence",
+                        decoder,
+                        reader.resolver(),
+                        ACTIVEX_NAMESPACE,
+                    )?
+                    .as_deref()
                     {
                         Some("persistPropertyBag") => Persistence::PropertyBag,
                         Some("persistStream") => Persistence::Stream,
@@ -262,10 +281,29 @@ pub(crate) fn parse_descriptor(
                     if element.name().local_name().as_ref() != b"ocx" {
                         return Err(invalid("control descriptor must have an ax:ocx root"));
                     }
-                    let class_id = attribute(&element, b"classid", decoder)?
+                    let class_id = attribute(
+                        &element,
+                        b"classid",
+                        decoder,
+                        reader.resolver(),
+                        ACTIVEX_NAMESPACE,
+                    )?
                         .ok_or_else(|| invalid("control descriptor is missing ax:classid"))?;
-                    let license = attribute(&element, b"license", decoder)?;
-                    let persistence = match attribute(&element, b"persistence", decoder)?.as_deref()
+                    let license = attribute(
+                        &element,
+                        b"license",
+                        decoder,
+                        reader.resolver(),
+                        ACTIVEX_NAMESPACE,
+                    )?;
+                    let persistence = match attribute(
+                        &element,
+                        b"persistence",
+                        decoder,
+                        reader.resolver(),
+                        ACTIVEX_NAMESPACE,
+                    )?
+                    .as_deref()
                     {
                         Some("persistPropertyBag") => Persistence::PropertyBag,
                         Some("persistStream") => Persistence::Stream,
@@ -297,6 +335,36 @@ pub(crate) fn parse_descriptor(
     result.ok_or_else(|| invalid("control descriptor is empty"))
 }
 
-fn attribute(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result<Option<String>> {
-    Ok(unqualified_attribute_value(element, name, decoder)?)
+fn attribute(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+    expected_namespace: &[u8],
+) -> Result<Option<String>> {
+    let mut value = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| crate::Error::Xml(error.to_string()))?;
+        if attribute.key.local_name().as_ref() != name {
+            continue;
+        }
+        let (namespace, _) = resolver.resolve_attribute(attribute.key);
+        if !matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == *expected_namespace)
+        {
+            continue;
+        }
+        if value.is_some() {
+            return Err(invalid(format!(
+                "duplicate ActiveX attribute '{}'",
+                String::from_utf8_lossy(name)
+            )));
+        }
+        value = Some(
+            attribute
+                .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, decoder)
+                .map_err(|error| crate::Error::Xml(error.to_string()))?
+                .into_owned(),
+        );
+    }
+    Ok(value)
 }
