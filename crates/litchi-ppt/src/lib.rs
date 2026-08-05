@@ -370,10 +370,7 @@ pub mod animation;
 pub mod transition;
 
 // Re-export transition types for ergonomic read access
-pub use animation::{
-    PowerPointAnimationEditor, PowerPointAnimationEditorLimits, PowerPointAnimationScope,
-    PowerPointAnimationTimeline, PowerPointLegacyShapeAnimation,
-};
+pub use animation::{EditorLimits, LegacyShapeAnimation, Scope, Timeline};
 pub use transition::{
     AdvanceMode, SoundAction, TransitionDirection, TransitionInfo, TransitionSpeed, TransitionType,
 };

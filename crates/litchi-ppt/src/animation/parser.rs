@@ -2,22 +2,22 @@
 //!
 //! Parses PowerPoint binary animation records into structured types.
 
-use super::linked_slide::{PowerPoint10LinkedShape, PowerPoint10LinkedSlide};
-use super::slide_metadata::PowerPoint10SlideTime;
+use super::linked_slide::{LinkedShape, LinkedSlide};
+use super::slide_metadata::SlideTime;
 use super::triggers::IterationType;
 use super::types::{
     AfterEffect, AnimationInfo, BuildAtom, BuildKind, BuildList, BuildListEntry, ChartBuild,
     ChartBuildAtom, ChartBuildType, DiagramBuild, DiagramBuildAtom, DiagramBuildType,
-    ExtendedTimeNode, LegacyAnimationAtom, LegacyAnimationBuild, LegacyAnimationEffect,
+    ExtendedTimeNode, Flags, LegacyAnimationAtom, LegacyAnimationBuild, LegacyAnimationEffect,
     LegacyTextBuildSubEffect, ParagraphBuild, ParagraphBuildAtom, ParagraphBuildLevel,
-    ParagraphBuildType, PowerPoint10SlideFlags, SlideAnimationExtension, TimeAnimateBehavior,
-    TimeAnimateBehaviorAtom, TimeAnimateCalculationMode, TimeAnimateColor, TimeAnimateColorBy,
-    TimeAnimateValueType, TimeAnimationValue, TimeAnimationValueList, TimeBehavior,
-    TimeBehaviorAdditive, TimeBehaviorAtom, TimeBehaviorProperty, TimeBehaviorPropertyList,
-    TimeColorBehavior, TimeColorBehaviorAtom, TimeColorDirection, TimeColorModel,
-    TimeCommandBehavior, TimeCommandBehaviorAtom, TimeCommandBehaviorType, TimeCondition,
-    TimeConditionAtom, TimeConditionType, TimeEffectBehavior, TimeEffectBehaviorAtom,
-    TimeEffectFilter, TimeEffectNodeType, TimeEffectTransition, TimeEffectType, TimeIterateData,
+    ParagraphBuildType, SlideAnimationExtension, TimeAnimateBehavior, TimeAnimateBehaviorAtom,
+    TimeAnimateCalculationMode, TimeAnimateColor, TimeAnimateColorBy, TimeAnimateValueType,
+    TimeAnimationValue, TimeAnimationValueList, TimeBehavior, TimeBehaviorAdditive,
+    TimeBehaviorAtom, TimeBehaviorProperty, TimeBehaviorPropertyList, TimeColorBehavior,
+    TimeColorBehaviorAtom, TimeColorDirection, TimeColorModel, TimeCommandBehavior,
+    TimeCommandBehaviorAtom, TimeCommandBehaviorType, TimeCondition, TimeConditionAtom,
+    TimeConditionType, TimeEffectBehavior, TimeEffectBehaviorAtom, TimeEffectFilter,
+    TimeEffectNodeType, TimeEffectTransition, TimeEffectType, TimeIterateData,
     TimeIterateDirection, TimeIterateIntervalType, TimeIterateType, TimeMasterRelation,
     TimeModifier, TimeMotionBehavior, TimeMotionBehaviorAtom, TimeMotionOrigin, TimeNodeAtom,
     TimeNodeBehavior, TimeNodeFill, TimeNodeKind, TimeNodeProperty, TimeNodePropertyList,
@@ -633,7 +633,7 @@ pub fn parse_slide_animation_extension(data: &[u8]) -> Result<SlideAnimationExte
                         "LinkedSlide10Atom must precede its LinkedShape10Atom array".to_string(),
                     ));
                 }
-                extension.linked_slide = Some(PowerPoint10LinkedSlide::parse_record(&record)?);
+                extension.linked_slide = Some(LinkedSlide::parse_record(&record)?);
             },
             PptRecordType::LinkedShape10Atom => {
                 let linked_slide = extension.linked_slide.ok_or_else(|| {
@@ -659,7 +659,7 @@ pub fn parse_slide_animation_extension(data: &[u8]) -> Result<SlideAnimationExte
                 }
                 extension
                     .linked_shapes
-                    .push(PowerPoint10LinkedShape::parse_record(&record)?);
+                    .push(LinkedShape::parse_record(&record)?);
             },
             PptRecordType::ExtTimeNode => {
                 if extension.time_node.is_some() {
@@ -683,7 +683,7 @@ pub fn parse_slide_animation_extension(data: &[u8]) -> Result<SlideAnimationExte
                         "___PPT10 contains multiple SlideFlags10Atom records".to_string(),
                     ));
                 }
-                extension.slide_flags = Some(PowerPoint10SlideFlags::parse_record(&record)?);
+                extension.slide_flags = Some(Flags::parse_record(&record)?);
             },
             PptRecordType::SlideTime10Atom => {
                 if extension.creation_time_filetime.is_some() {
@@ -692,7 +692,7 @@ pub fn parse_slide_animation_extension(data: &[u8]) -> Result<SlideAnimationExte
                     ));
                 }
                 extension.creation_time_filetime =
-                    Some(PowerPoint10SlideTime::parse_record(&record)?.file_time());
+                    Some(SlideTime::parse_record(&record)?.file_time());
             },
             PptRecordType::HashCode10Atom => {
                 if extension.animation_hash.is_some() {
@@ -700,8 +700,7 @@ pub fn parse_slide_animation_extension(data: &[u8]) -> Result<SlideAnimationExte
                         "___PPT10 contains multiple HashCode10Atom records".to_string(),
                     ));
                 }
-                extension.animation_hash =
-                    Some(super::hash::PowerPointAnimationHash10::parse_record(&record)?.hash());
+                extension.animation_hash = Some(super::hash::Hash10::parse_record(&record)?.hash());
             },
             _ => {},
         }

@@ -1,9 +1,8 @@
 use litchi_cfb::OleWriter;
-use litchi_ppt::animation::{ExtendedTimeNode, TimeNodeAtom, TimeNodeKind};
-use litchi_ppt::writer::{PersistPtrBuilder, UserEditAtom};
-use litchi_ppt::{
-    PowerPointAnimationEditor, PowerPointAnimationEditorLimits, PowerPointAnimationScope,
+use litchi_ppt::animation::{
+    Editor, EditorLimits, ExtendedTimeNode, Scope, TimeNodeAtom, TimeNodeKind,
 };
+use litchi_ppt::writer::{PersistPtrBuilder, UserEditAtom};
 use std::io::Cursor;
 
 fn record(version: u16, kind: u16, payload: &[u8]) -> Vec<u8> {
@@ -46,19 +45,9 @@ fn generated_ppt() -> Vec<u8> {
 
 #[test]
 fn generated_timeline_add_update_reorder_remove_and_reopen() {
-    let mut editor = PowerPointAnimationEditor::open(
-        generated_ppt(),
-        PowerPointAnimationEditorLimits::default(),
-    )
-    .unwrap();
-    assert_eq!(
-        editor.find(2).unwrap().scope,
-        PowerPointAnimationScope::Slide
-    );
-    assert_eq!(
-        editor.find(3).unwrap().scope,
-        PowerPointAnimationScope::MainMaster
-    );
+    let mut editor = Editor::open(generated_ppt(), EditorLimits::default()).unwrap();
+    assert_eq!(editor.find(2).unwrap().scope, Scope::Slide);
+    assert_eq!(editor.find(3).unwrap().scope, Scope::MainMaster);
     let first = ExtendedTimeNode {
         atom: TimeNodeAtom {
             node_type: Some(TimeNodeKind::Parallel),
@@ -82,8 +71,7 @@ fn generated_timeline_add_update_reorder_remove_and_reopen() {
     editor.update(2, 0, second).unwrap();
     editor.remove(2, 1).unwrap();
     let bytes = editor.finish().unwrap();
-    let reopened =
-        PowerPointAnimationEditor::open(bytes, PowerPointAnimationEditorLimits::default()).unwrap();
+    let reopened = Editor::open(bytes, EditorLimits::default()).unwrap();
     assert_eq!(
         reopened
             .find(2)
@@ -110,11 +98,7 @@ fn generated_timeline_add_update_reorder_remove_and_reopen() {
 
 #[test]
 fn invalid_indexes_and_limits_are_atomic() {
-    let mut editor = PowerPointAnimationEditor::open(
-        generated_ppt(),
-        PowerPointAnimationEditorLimits::default(),
-    )
-    .unwrap();
+    let mut editor = Editor::open(generated_ppt(), EditorLimits::default()).unwrap();
     let before = editor.timelines();
     assert!(editor.add(2, 1, ExtendedTimeNode::default()).is_err());
     assert!(editor.reorder(2, &[0]).is_err());
@@ -129,10 +113,7 @@ fn poi_and_libreoffice_animation_fixtures_are_strictly_gated() {
         root.join("test-data/poi/test-data/slideshow/datetime.ppt"),
     ] {
         let original = std::fs::read(&path).unwrap();
-        match PowerPointAnimationEditor::open(
-            original.clone(),
-            PowerPointAnimationEditorLimits::default(),
-        ) {
+        match Editor::open(original.clone(), EditorLimits::default()) {
             Ok(editor) => {
                 let _ = editor.timelines();
                 assert_eq!(std::fs::read(&path).unwrap(), original)

@@ -10,14 +10,14 @@ const PAYLOAD_LEN: usize = 8;
 
 /// Resource bounds for linked-slide metadata.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPoint10LinkedSlideLimits {
+pub struct LinkedSlideLimits {
     /// Maximum accepted size of one complete atom, including its header.
     pub max_record_bytes: usize,
     /// Maximum accepted `LinkedShape10Atom` count.
     pub max_linked_shapes: usize,
 }
 
-impl Default for PowerPoint10LinkedSlideLimits {
+impl Default for LinkedSlideLimits {
     fn default() -> Self {
         Self {
             max_record_bytes: HEADER_LEN + PAYLOAD_LEN,
@@ -28,12 +28,12 @@ impl Default for PowerPoint10LinkedSlideLimits {
 
 /// A `LinkedSlide10Atom` containing an inert cross-document slide identifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPoint10LinkedSlide {
+pub struct LinkedSlide {
     linked_slide_id_ref: u32,
     linked_shape_count: u32,
 }
 
-impl PowerPoint10LinkedSlide {
+impl LinkedSlide {
     /// Creates an atom without resolving or opening the referenced document.
     pub fn new(linked_slide_id_ref: u32, linked_shape_count: u32) -> Result<Self> {
         if linked_shape_count > i32::MAX as u32 {
@@ -58,13 +58,10 @@ impl PowerPoint10LinkedSlide {
     }
 
     pub fn parse_record(record: &PptRecord) -> Result<Self> {
-        Self::parse_record_with_limits(record, PowerPoint10LinkedSlideLimits::default())
+        Self::parse_record_with_limits(record, LinkedSlideLimits::default())
     }
 
-    pub fn parse_record_with_limits(
-        record: &PptRecord,
-        limits: PowerPoint10LinkedSlideLimits,
-    ) -> Result<Self> {
+    pub fn parse_record_with_limits(record: &PptRecord, limits: LinkedSlideLimits) -> Result<Self> {
         let payload = validate_record(
             record,
             PptRecordType::LinkedSlide10Atom,
@@ -75,13 +72,10 @@ impl PowerPoint10LinkedSlide {
     }
 
     pub fn parse_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::parse_bytes_with_limits(bytes, PowerPoint10LinkedSlideLimits::default())
+        Self::parse_bytes_with_limits(bytes, LinkedSlideLimits::default())
     }
 
-    pub fn parse_bytes_with_limits(
-        bytes: &[u8],
-        limits: PowerPoint10LinkedSlideLimits,
-    ) -> Result<Self> {
+    pub fn parse_bytes_with_limits(bytes: &[u8], limits: LinkedSlideLimits) -> Result<Self> {
         let payload = validate_bytes(
             bytes,
             PptRecordType::LinkedSlide10Atom,
@@ -91,7 +85,7 @@ impl PowerPoint10LinkedSlide {
         Self::parse_payload(payload, limits)
     }
 
-    fn parse_payload(payload: &[u8], limits: PowerPoint10LinkedSlideLimits) -> Result<Self> {
+    fn parse_payload(payload: &[u8], limits: LinkedSlideLimits) -> Result<Self> {
         let linked_slide_id_ref = u32::from_le_bytes(payload[0..4].try_into().map_err(|_| {
             PptError::Corrupted("LinkedSlide10Atom slide identifier is truncated".to_string())
         })?);
@@ -133,12 +127,12 @@ impl PowerPoint10LinkedSlide {
 
 /// A `LinkedShape10Atom` containing two inert shape identifiers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPoint10LinkedShape {
+pub struct LinkedShape {
     shape_id_ref: u32,
     linked_shape_id_ref: u32,
 }
 
-impl PowerPoint10LinkedShape {
+impl LinkedShape {
     pub const fn new(shape_id_ref: u32, linked_shape_id_ref: u32) -> Self {
         Self {
             shape_id_ref,
@@ -155,13 +149,10 @@ impl PowerPoint10LinkedShape {
     }
 
     pub fn parse_record(record: &PptRecord) -> Result<Self> {
-        Self::parse_record_with_limits(record, PowerPoint10LinkedSlideLimits::default())
+        Self::parse_record_with_limits(record, LinkedSlideLimits::default())
     }
 
-    pub fn parse_record_with_limits(
-        record: &PptRecord,
-        limits: PowerPoint10LinkedSlideLimits,
-    ) -> Result<Self> {
+    pub fn parse_record_with_limits(record: &PptRecord, limits: LinkedSlideLimits) -> Result<Self> {
         Self::parse_payload(validate_record(
             record,
             PptRecordType::LinkedShape10Atom,
@@ -171,13 +162,10 @@ impl PowerPoint10LinkedShape {
     }
 
     pub fn parse_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::parse_bytes_with_limits(bytes, PowerPoint10LinkedSlideLimits::default())
+        Self::parse_bytes_with_limits(bytes, LinkedSlideLimits::default())
     }
 
-    pub fn parse_bytes_with_limits(
-        bytes: &[u8],
-        limits: PowerPoint10LinkedSlideLimits,
-    ) -> Result<Self> {
+    pub fn parse_bytes_with_limits(bytes: &[u8], limits: LinkedSlideLimits) -> Result<Self> {
         Self::parse_payload(validate_bytes(
             bytes,
             PptRecordType::LinkedShape10Atom,
@@ -215,19 +203,19 @@ impl PowerPoint10LinkedShape {
 }
 
 impl SlideAnimationExtension {
-    pub fn linked_slide_atom(&self) -> Option<PowerPoint10LinkedSlide> {
+    pub fn linked_slide_atom(&self) -> Option<LinkedSlide> {
         self.linked_slide
     }
 
-    pub fn set_linked_slide_atom(&mut self, linked_slide: Option<PowerPoint10LinkedSlide>) {
+    pub fn set_linked_slide_atom(&mut self, linked_slide: Option<LinkedSlide>) {
         self.linked_slide = linked_slide;
     }
 
-    pub fn linked_shape_atoms(&self) -> &[PowerPoint10LinkedShape] {
+    pub fn linked_shape_atoms(&self) -> &[LinkedShape] {
         &self.linked_shapes
     }
 
-    pub fn set_linked_shape_atoms(&mut self, linked_shapes: Vec<PowerPoint10LinkedShape>) {
+    pub fn set_linked_shape_atoms(&mut self, linked_shapes: Vec<LinkedShape>) {
         self.linked_shapes = linked_shapes;
     }
 }
@@ -235,7 +223,7 @@ impl SlideAnimationExtension {
 fn validate_record<'a>(
     record: &'a PptRecord,
     expected_type: PptRecordType,
-    limits: PowerPoint10LinkedSlideLimits,
+    limits: LinkedSlideLimits,
     name: &str,
 ) -> Result<&'a [u8]> {
     if HEADER_LEN + PAYLOAD_LEN > limits.max_record_bytes {
@@ -269,7 +257,7 @@ fn validate_record<'a>(
 fn validate_bytes<'a>(
     bytes: &'a [u8],
     expected_type: PptRecordType,
-    limits: PowerPoint10LinkedSlideLimits,
+    limits: LinkedSlideLimits,
     name: &str,
 ) -> Result<&'a [u8]> {
     if bytes.len() > limits.max_record_bytes {
@@ -334,30 +322,24 @@ fn generic_record(record_type: PptRecordType, data: Vec<u8>) -> PptRecord {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::animation::{PowerPoint10SlideFlags, parse_slide_animation_extension};
+    use crate::animation::{Flags, parse_slide_animation_extension};
 
     #[test]
     fn linked_slide_round_trips_and_enforces_signed_bounded_count() {
         for (id, count) in [(0, 0), (1, 1), (u32::MAX, 65_536)] {
-            let atom = PowerPoint10LinkedSlide::new(id, count).unwrap();
-            assert_eq!(
-                PowerPoint10LinkedSlide::parse_bytes(&atom.to_bytes()).unwrap(),
-                atom
-            );
-            assert_eq!(
-                PowerPoint10LinkedSlide::parse_record(&atom.to_record()).unwrap(),
-                atom
-            );
+            let atom = LinkedSlide::new(id, count).unwrap();
+            assert_eq!(LinkedSlide::parse_bytes(&atom.to_bytes()).unwrap(), atom);
+            assert_eq!(LinkedSlide::parse_record(&atom.to_record()).unwrap(), atom);
         }
-        assert!(PowerPoint10LinkedSlide::new(0, i32::MAX as u32 + 1).is_err());
-        let mut negative = PowerPoint10LinkedSlide::new(0, 0).unwrap().to_bytes();
+        assert!(LinkedSlide::new(0, i32::MAX as u32 + 1).is_err());
+        let mut negative = LinkedSlide::new(0, 0).unwrap().to_bytes();
         negative[12..16].copy_from_slice(&(-1i32).to_le_bytes());
-        assert!(PowerPoint10LinkedSlide::parse_bytes(&negative).is_err());
-        let over_limit = PowerPoint10LinkedSlide::new(0, 3).unwrap().to_bytes();
+        assert!(LinkedSlide::parse_bytes(&negative).is_err());
+        let over_limit = LinkedSlide::new(0, 3).unwrap().to_bytes();
         assert!(
-            PowerPoint10LinkedSlide::parse_bytes_with_limits(
+            LinkedSlide::parse_bytes_with_limits(
                 &over_limit,
-                PowerPoint10LinkedSlideLimits {
+                LinkedSlideLimits {
                     max_record_bytes: 16,
                     max_linked_shapes: 2,
                 },
@@ -369,33 +351,27 @@ mod tests {
     #[test]
     fn linked_shape_round_trips_all_identifier_bits() {
         for atom in [
-            PowerPoint10LinkedShape::new(0, 0),
-            PowerPoint10LinkedShape::new(1, 2),
-            PowerPoint10LinkedShape::new(u32::MAX, 0x8000_0000),
+            LinkedShape::new(0, 0),
+            LinkedShape::new(1, 2),
+            LinkedShape::new(u32::MAX, 0x8000_0000),
         ] {
-            assert_eq!(
-                PowerPoint10LinkedShape::parse_bytes(&atom.to_bytes()).unwrap(),
-                atom
-            );
-            assert_eq!(
-                PowerPoint10LinkedShape::parse_record(&atom.to_record()).unwrap(),
-                atom
-            );
+            assert_eq!(LinkedShape::parse_bytes(&atom.to_bytes()).unwrap(), atom);
+            assert_eq!(LinkedShape::parse_record(&atom.to_record()).unwrap(), atom);
         }
     }
 
     #[test]
     fn both_atoms_reject_headers_truncations_trailing_and_generic_children() {
         let valid_records = [
-            PowerPoint10LinkedSlide::new(0, 0).unwrap().to_bytes(),
-            PowerPoint10LinkedShape::new(0, 0).to_bytes(),
+            LinkedSlide::new(0, 0).unwrap().to_bytes(),
+            LinkedShape::new(0, 0).to_bytes(),
         ];
         for (index, valid) in valid_records.into_iter().enumerate() {
             let parse = |bytes: &[u8]| {
                 if index == 0 {
-                    PowerPoint10LinkedSlide::parse_bytes(bytes).map(|_| ())
+                    LinkedSlide::parse_bytes(bytes).map(|_| ())
                 } else {
-                    PowerPoint10LinkedShape::parse_bytes(bytes).map(|_| ())
+                    LinkedShape::parse_bytes(bytes).map(|_| ())
                 }
             };
             for end in 0..valid.len() {
@@ -414,32 +390,27 @@ mod tests {
             assert!(parse(&bad_length).is_err());
             let mut trailing = valid;
             trailing.push(0);
-            let limits = PowerPoint10LinkedSlideLimits {
+            let limits = LinkedSlideLimits {
                 max_record_bytes: 17,
-                ..PowerPoint10LinkedSlideLimits::default()
+                ..LinkedSlideLimits::default()
             };
             let result = if index == 0 {
-                PowerPoint10LinkedSlide::parse_bytes_with_limits(&trailing, limits).map(|_| ())
+                LinkedSlide::parse_bytes_with_limits(&trailing, limits).map(|_| ())
             } else {
-                PowerPoint10LinkedShape::parse_bytes_with_limits(&trailing, limits).map(|_| ())
+                LinkedShape::parse_bytes_with_limits(&trailing, limits).map(|_| ())
             };
             assert!(result.is_err());
         }
 
-        let mut record = PowerPoint10LinkedShape::new(0, 0).to_record();
-        record
-            .children
-            .push(PowerPoint10LinkedShape::new(1, 1).to_record());
-        assert!(PowerPoint10LinkedShape::parse_record(&record).is_err());
+        let mut record = LinkedShape::new(0, 0).to_record();
+        record.children.push(LinkedShape::new(1, 1).to_record());
+        assert!(LinkedShape::parse_record(&record).is_err());
     }
 
     #[test]
     fn extension_enforces_declared_count_order_and_contiguity() {
-        let linked_slide = PowerPoint10LinkedSlide::new(7, 2).unwrap();
-        let shapes = [
-            PowerPoint10LinkedShape::new(10, 20),
-            PowerPoint10LinkedShape::new(11, 21),
-        ];
+        let linked_slide = LinkedSlide::new(7, 2).unwrap();
+        let shapes = [LinkedShape::new(10, 20), LinkedShape::new(11, 21)];
         let mut bytes = linked_slide.to_bytes();
         bytes.extend_from_slice(&shapes[0].to_bytes());
         bytes.extend_from_slice(&shapes[1].to_bytes());
@@ -447,19 +418,19 @@ mod tests {
         assert_eq!(parsed.linked_slide_atom(), Some(linked_slide));
         assert_eq!(parsed.linked_shape_atoms(), &shapes);
 
-        let mut missing = PowerPoint10LinkedSlide::new(7, 2).unwrap().to_bytes();
+        let mut missing = LinkedSlide::new(7, 2).unwrap().to_bytes();
         missing.extend_from_slice(&shapes[0].to_bytes());
         assert!(parse_slide_animation_extension(&missing).is_err());
-        let mut excess = PowerPoint10LinkedSlide::new(7, 1).unwrap().to_bytes();
+        let mut excess = LinkedSlide::new(7, 1).unwrap().to_bytes();
         excess.extend_from_slice(&shapes[0].to_bytes());
         excess.extend_from_slice(&shapes[1].to_bytes());
         assert!(parse_slide_animation_extension(&excess).is_err());
         let mut before = shapes[0].to_bytes();
-        before.extend_from_slice(&PowerPoint10LinkedSlide::new(7, 1).unwrap().to_bytes());
+        before.extend_from_slice(&LinkedSlide::new(7, 1).unwrap().to_bytes());
         assert!(parse_slide_animation_extension(&before).is_err());
-        let mut split = PowerPoint10LinkedSlide::new(7, 2).unwrap().to_bytes();
+        let mut split = LinkedSlide::new(7, 2).unwrap().to_bytes();
         split.extend_from_slice(&shapes[0].to_bytes());
-        split.extend_from_slice(&PowerPoint10SlideFlags::new(false, false).to_bytes());
+        split.extend_from_slice(&Flags::new(false, false).to_bytes());
         split.extend_from_slice(&shapes[1].to_bytes());
         assert!(parse_slide_animation_extension(&split).is_err());
     }

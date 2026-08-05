@@ -10,7 +10,7 @@ use super::{
     write_extended_time_node,
 };
 use crate::consts::PptRecordType;
-use crate::embedded::object::editor::Editor;
+use crate::embedded::object::editor::Editor as ObjectEditor;
 use crate::package::{PptError, Result};
 use crate::records::PptRecord;
 use std::collections::{BTreeSet, HashSet};
@@ -20,13 +20,13 @@ const ESCHER_SP: u16 = 0xF00A;
 const ESCHER_CLIENT_DATA: u16 = 0xF011;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PowerPointAnimationScope {
+pub enum Scope {
     Slide,
     MainMaster,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PowerPointAnimationEditorLimits {
+pub struct EditorLimits {
     pub max_persist_records: usize,
     pub max_record_bytes: usize,
     pub max_timeline_nodes: usize,
@@ -35,7 +35,7 @@ pub struct PowerPointAnimationEditorLimits {
     pub max_shapes: usize,
 }
 
-impl Default for PowerPointAnimationEditorLimits {
+impl Default for EditorLimits {
     fn default() -> Self {
         Self {
             max_persist_records: 65_536,
@@ -49,16 +49,16 @@ impl Default for PowerPointAnimationEditorLimits {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct PowerPointAnimationTimeline {
+pub struct Timeline {
     pub persist_id: u32,
-    pub scope: PowerPointAnimationScope,
+    pub scope: Scope,
     pub extension: SlideAnimationExtension,
 }
 
 #[derive(Clone, Debug)]
-pub struct PowerPointLegacyShapeAnimation {
+pub struct LegacyShapeAnimation {
     pub persist_id: u32,
-    pub scope: PowerPointAnimationScope,
+    pub scope: Scope,
     pub shape_id: u32,
     pub animation: AnimationInfo,
 }
@@ -66,26 +66,26 @@ pub struct PowerPointLegacyShapeAnimation {
 #[derive(Clone)]
 struct PersistAnimation {
     persist_id: u32,
-    scope: PowerPointAnimationScope,
+    scope: Scope,
     record: Vec<u8>,
     extension_payload: Option<Vec<u8>>,
     extension: SlideAnimationExtension,
     shape_ids: BTreeSet<u32>,
-    legacy: Vec<PowerPointLegacyShapeAnimation>,
+    legacy: Vec<LegacyShapeAnimation>,
 }
 
 #[derive(Clone)]
-pub struct PowerPointAnimationEditor {
-    package: Editor,
+pub struct Editor {
+    package: ObjectEditor,
     entries: Vec<PersistAnimation>,
-    limits: PowerPointAnimationEditorLimits,
+    limits: EditorLimits,
     changed: bool,
 }
 
-impl PowerPointAnimationEditor {
-    pub fn open(bytes: Vec<u8>, limits: PowerPointAnimationEditorLimits) -> Result<Self> {
+impl Editor {
+    pub fn open(bytes: Vec<u8>, limits: EditorLimits) -> Result<Self> {
         validate_limits(limits)?;
-        let package = Editor::open_records(bytes)?;
+        let package = ObjectEditor::open_records(bytes)?;
         let ids = package.persist_ids();
         if ids.len() > limits.max_persist_records {
             return invalid("persisted-record count exceeds animation editor limit");
@@ -98,9 +98,9 @@ impl PowerPointAnimationEditor {
             }
             let kind = raw_type(&record)?;
             let scope = if kind == PptRecordType::Slide.as_u16() {
-                PowerPointAnimationScope::Slide
+                Scope::Slide
             } else if kind == PptRecordType::MainMaster.as_u16() {
-                PowerPointAnimationScope::MainMaster
+                Scope::MainMaster
             } else {
                 continue;
             };
@@ -139,10 +139,10 @@ impl PowerPointAnimationEditor {
         self.changed
     }
 
-    pub fn timelines(&self) -> Vec<PowerPointAnimationTimeline> {
+    pub fn timelines(&self) -> Vec<Timeline> {
         self.entries
             .iter()
-            .map(|entry| PowerPointAnimationTimeline {
+            .map(|entry| Timeline {
                 persist_id: entry.persist_id,
                 scope: entry.scope,
                 extension: entry.extension.clone(),
@@ -150,29 +150,25 @@ impl PowerPointAnimationEditor {
             .collect()
     }
 
-    pub fn find(&self, persist_id: u32) -> Option<PowerPointAnimationTimeline> {
+    pub fn find(&self, persist_id: u32) -> Option<Timeline> {
         self.entries
             .iter()
             .find(|entry| entry.persist_id == persist_id)
-            .map(|entry| PowerPointAnimationTimeline {
+            .map(|entry| Timeline {
                 persist_id,
                 scope: entry.scope,
                 extension: entry.extension.clone(),
             })
     }
 
-    pub fn legacy_shape_animations(&self) -> Vec<PowerPointLegacyShapeAnimation> {
+    pub fn legacy_shape_animations(&self) -> Vec<LegacyShapeAnimation> {
         self.entries
             .iter()
             .flat_map(|entry| entry.legacy.clone())
             .collect()
     }
 
-    pub fn find_shape(
-        &self,
-        persist_id: u32,
-        shape_id: u32,
-    ) -> Option<PowerPointLegacyShapeAnimation> {
+    pub fn find_shape(&self, persist_id: u32, shape_id: u32) -> Option<LegacyShapeAnimation> {
         self.entries
             .iter()
             .find(|entry| entry.persist_id == persist_id)
@@ -391,14 +387,12 @@ impl PowerPointAnimationEditor {
             .retain(|value| value.shape_id != shape_id);
         if let Some(animation) = animation {
             let scope = candidate.entries[index].scope;
-            candidate.entries[index]
-                .legacy
-                .push(PowerPointLegacyShapeAnimation {
-                    persist_id,
-                    scope,
-                    shape_id,
-                    animation,
-                });
+            candidate.entries[index].legacy.push(LegacyShapeAnimation {
+                persist_id,
+                scope,
+                shape_id,
+                animation,
+            });
             candidate.entries[index]
                 .legacy
                 .sort_by_key(|value| value.shape_id);
@@ -461,7 +455,7 @@ impl PowerPointAnimationEditor {
     }
 }
 
-fn validate_limits(limits: PowerPointAnimationEditorLimits) -> Result<()> {
+fn validate_limits(limits: EditorLimits) -> Result<()> {
     if limits.max_persist_records == 0
         || limits.max_record_bytes < 8
         || limits.max_timeline_nodes == 0
@@ -477,7 +471,7 @@ fn validate_limits(limits: PowerPointAnimationEditorLimits) -> Result<()> {
 fn validate_extension(
     extension: &SlideAnimationExtension,
     shapes: &BTreeSet<u32>,
-    limits: PowerPointAnimationEditorLimits,
+    limits: EditorLimits,
 ) -> Result<()> {
     let mut count = 0usize;
     if let Some(root) = &extension.time_node {
@@ -512,7 +506,7 @@ fn validate_node(
     depth: usize,
     count: &mut usize,
     shapes: &BTreeSet<u32>,
-    limits: PowerPointAnimationEditorLimits,
+    limits: EditorLimits,
 ) -> Result<()> {
     *count = count
         .checked_add(1)
@@ -724,10 +718,10 @@ fn rewrite_binary_tag_data(record: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
 
 fn collect_shapes_and_legacy(
     persist_id: u32,
-    scope: PowerPointAnimationScope,
+    scope: Scope,
     record: &PptRecord,
-    limits: PowerPointAnimationEditorLimits,
-) -> Result<(BTreeSet<u32>, Vec<PowerPointLegacyShapeAnimation>)> {
+    limits: EditorLimits,
+) -> Result<(BTreeSet<u32>, Vec<LegacyShapeAnimation>)> {
     let mut ids = BTreeSet::new();
     let mut legacy = Vec::new();
     for drawing in record.find_children(PptRecordType::PPDrawing) {
@@ -745,10 +739,10 @@ fn collect_shapes_and_legacy(
 fn collect_escher(
     data: &[u8],
     persist: u32,
-    scope: PowerPointAnimationScope,
+    scope: Scope,
     ids: &mut BTreeSet<u32>,
-    legacy: &mut Vec<PowerPointLegacyShapeAnimation>,
-    limits: PowerPointAnimationEditorLimits,
+    legacy: &mut Vec<LegacyShapeAnimation>,
+    limits: EditorLimits,
 ) -> Result<()> {
     let mut offset = 0;
     while offset < data.len() {
@@ -770,7 +764,7 @@ fn collect_escher(
                                     return corrupted("AnimationInfo length mismatch");
                                 }
                                 if let Some(id) = shape_id {
-                                    legacy.push(PowerPointLegacyShapeAnimation {
+                                    legacy.push(LegacyShapeAnimation {
                                         persist_id: persist,
                                         scope,
                                         shape_id: id,
@@ -1049,7 +1043,7 @@ mod tests {
                 1,
                 &mut count,
                 &BTreeSet::new(),
-                PowerPointAnimationEditorLimits {
+                EditorLimits {
                     max_timeline_depth: 1,
                     ..Default::default()
                 }
@@ -1086,13 +1080,8 @@ mod tests {
         );
         let (record, used) = PptRecord::parse(&rewritten, 0).unwrap();
         assert_eq!(used, rewritten.len());
-        let (shapes, legacy) = collect_shapes_and_legacy(
-            1,
-            PowerPointAnimationScope::Slide,
-            &record,
-            PowerPointAnimationEditorLimits::default(),
-        )
-        .unwrap();
+        let (shapes, legacy) =
+            collect_shapes_and_legacy(1, Scope::Slide, &record, EditorLimits::default()).unwrap();
         assert!(shapes.contains(&42));
         assert!(legacy.is_empty());
     }
