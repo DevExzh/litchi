@@ -28,7 +28,7 @@ impl HasLocalName for BytesEnd<'_> {
 
 /// Which source labels participate in a consolidation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ConsolidationUseLabels {
+pub enum UseLabels {
     /// Do not match source data by labels.
     None,
     /// Match row labels.
@@ -39,7 +39,7 @@ pub enum ConsolidationUseLabels {
     Both,
 }
 
-impl ConsolidationUseLabels {
+impl UseLabels {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "none" => Ok(Self::None),
@@ -68,7 +68,7 @@ impl ConsolidationUseLabels {
 /// function names and application-defined strings. This crate never evaluates
 /// the consolidation or follows links to source data.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Consolidation {
+pub struct Options {
     /// Standard or application-defined consolidation function.
     pub function: String,
     /// Ordered ODF source cell-range addresses.
@@ -76,12 +76,12 @@ pub struct Consolidation {
     /// ODF target cell address.
     pub target_cell_address: String,
     /// Optional source-label matching policy.
-    pub use_labels: Option<ConsolidationUseLabels>,
+    pub use_labels: Option<UseLabels>,
     /// Whether consumers should link results back to source data.
     pub link_to_source_data: Option<bool>,
 }
 
-impl Consolidation {
+impl Options {
     /// Create a validated inert consolidation declaration.
     pub fn new(
         function: impl Into<String>,
@@ -106,7 +106,7 @@ impl Consolidation {
     }
 }
 
-pub(crate) fn parse_consolidation(xml: &str) -> Result<Option<Consolidation>> {
+pub(crate) fn parse_consolidation(xml: &str) -> Result<Option<Options>> {
     let mut reader = NsReader::from_str(xml);
     let mut buf = Vec::new();
     let mut result = None;
@@ -217,10 +217,10 @@ fn parse_attributes(
     resolver: &NamespaceResolver,
     decoder: quick_xml::encoding::Decoder,
     element: &BytesStart<'_>,
-) -> Result<Consolidation> {
+) -> Result<Options> {
     let source_value =
         required_attribute(resolver, decoder, element, b"source-cell-range-addresses")?;
-    let consolidation = Consolidation {
+    let consolidation = Options {
         function: required_attribute(resolver, decoder, element, b"function")?,
         source_cell_range_addresses: split_cell_range_addresses(&source_value)?,
         target_cell_address: required_attribute(
@@ -230,7 +230,7 @@ fn parse_attributes(
             b"target-cell-address",
         )?,
         use_labels: optional_attribute(resolver, decoder, element, b"use-labels")?
-            .map(|value| ConsolidationUseLabels::parse(&value))
+            .map(|value| UseLabels::parse(&value))
             .transpose()?,
         link_to_source_data: optional_attribute(
             resolver,
@@ -292,10 +292,7 @@ fn parse_bool(name: &str, value: &str) -> Result<bool> {
     }
 }
 
-pub(crate) fn write_consolidation(
-    out: &mut String,
-    consolidation: Option<&Consolidation>,
-) -> Result<()> {
+pub(crate) fn write_consolidation(out: &mut String, consolidation: Option<&Options>) -> Result<()> {
     let Some(consolidation) = consolidation else {
         return Ok(());
     };
@@ -466,7 +463,7 @@ mod tests {
         let parsed = parse_consolidation(xml).unwrap().unwrap();
         assert_eq!(parsed.function, "vendor:median");
         assert_eq!(parsed.source_cell_range_addresses.len(), 2);
-        assert_eq!(parsed.use_labels, Some(ConsolidationUseLabels::Both));
+        assert_eq!(parsed.use_labels, Some(UseLabels::Both));
         assert_eq!(parsed.link_to_source_data, Some(true));
     }
 
@@ -494,13 +491,13 @@ mod tests {
 
     #[test]
     fn writer_round_trips_and_escapes() {
-        let mut consolidation = Consolidation::new(
+        let mut consolidation = Options::new(
             "vendor:&median",
             vec!["'Q1 & Q2'.A1:B9".to_string(), "Sheet2.C1:D9".to_string()],
             "Summary.A1",
         )
         .unwrap();
-        consolidation.use_labels = Some(ConsolidationUseLabels::Column);
+        consolidation.use_labels = Some(UseLabels::Column);
         consolidation.link_to_source_data = Some(false);
         let mut xml = String::new();
         write_consolidation(&mut xml, Some(&consolidation)).unwrap();
@@ -515,14 +512,14 @@ mod tests {
 
     #[test]
     fn round_trips_through_builder_and_mutable_packages() {
-        let original = Consolidation::new(
+        let original = Options::new(
             "sum",
             vec!["Sheet1.A1:B2".to_string(), "Sheet1.D1:E2".to_string()],
             "Sheet1.G1",
         )
         .unwrap();
         let replacement =
-            Consolidation::new("average", vec!["Sheet1.A1:E2".to_string()], "Sheet1.G3").unwrap();
+            Options::new("average", vec!["Sheet1.A1:E2".to_string()], "Sheet1.G3").unwrap();
 
         let mut builder = Builder::new();
         builder.add_sheet("Sheet1").unwrap();
