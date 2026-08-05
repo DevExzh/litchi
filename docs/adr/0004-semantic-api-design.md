@@ -202,14 +202,15 @@ lossless integer conversion; protobuf field mapping, archive lookup, and
 mutation remain in the IWA adapter. The long `ChartSeriesDirection` name is
 removed rather than retained as a facade alias.
 
-Keynote transition settings use the same strict leaf rule. `Direction` and
-`MosaicType` preserve native `u32` discriminators, while `Acceleration` and
-`TextDelivery` preserve signed `i32` values. Known values are ergonomic
-associated constants with `kind()` projections; unknown values remain valid
-and lossless rather than being rejected or collapsed into an `Unknown` enum
-variant. All four values are `Copy`, hashable, and four bytes wide, so the
-aggregate settings avoid enum payload overhead without weakening the archive
-boundary's validation or transactional guarantees.
+Keynote transition semantics use the focused
+`litchi_keynote::transition::{Settings, AnimationParameters, CustomParameters}`
+API. The module owns memory-conscious opaque semantic payload containers and
+retains `Effect` plus the existing `Direction`, `MosaicType`, `Acceleration`,
+and `TextDelivery` scalar values; its constructors enforce bounded ownership,
+finite numbers, NUL-free text, and canonical semantic values. No raw native
+IDs or archives leak upward. The IWA adapter is limited to native/protobuf
+decoding, payload structural validation, wire patching, graph lookup, and
+transactions, and opaque payload decoding remains at that boundary.
 
 Pie and donut label settings use the focused
 `litchi_iwa_common::chart::pie` vocabulary. `LabelVisibility` packs the two

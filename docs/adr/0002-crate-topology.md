@@ -266,17 +266,17 @@ retains protobuf field mapping, archive lookup, and mutation validation; Pages,
 Numbers, Keynote, and chart readers consume `Direction` directly. The former
 `ChartSeriesDirection` facade type and protobuf-dependent implementation are
 removed.
-The leaf's `transition::Effect` owns the lossless native transition-effect
-identifier vocabulary, including canonical known variants and lossless unknown
-identifiers; IWA retains transition archive decoding, wire patching, and
-transactional validation at the format boundary.
-The same leaf now owns Keynote's archive-free transition scalars:
-`transition::{Direction, MosaicType, Acceleration, TextDelivery}`. Each is a
-four-byte transparent, copyable value with named projections for known native
-values and lossless `from_native`/`native_value` conversion for future values.
-IWA retains the aggregate transition settings, protobuf field mapping, and
-wire-preserving transactional mutation; no protobuf or archive dependency was
-introduced into `litchi-keynote`.
+`litchi-keynote::transition` owns Keynote's archive-free transition semantics:
+the focused `Settings`, `AnimationParameters`, and `CustomParameters` values,
+their memory-conscious opaque owned semantic payload containers, and the
+existing `Effect` and scalar values
+(`Direction`, `MosaicType`, `Acceleration`, and `TextDelivery`). The semantic
+constructors enforce bounded ownership plus finite-number, NUL-free text, and
+canonical-value validation before a value is published. No raw native IDs or
+archives leak into this crate or its public API. `litchi-iwa` retains only
+native/protobuf decoding, payload structural validation, wire patching, graph
+lookup, and transactions; opaque payload decoding remains at that IWA
+boundary.
 Pie and donut label semantics follow the same focused boundary at
 `litchi-iwa-common::chart::pie::{LabelVisibility, LeaderLineVisibility}`.
 `LabelVisibility` is a one-byte bitset for data-point names and values, while
