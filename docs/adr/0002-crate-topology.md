@@ -114,6 +114,13 @@ style inheritance, protobuf, or package state. `litchi-iwa` retains the native
 bool conversion, bounded style-inheritance walk, wire decoder, and
 copy-on-write style mutation as the concrete archive adapter; its contextual
 `Table*` names are only migration-facing facade aliases.
+The archive-free table-cell text layout now follows the same ownership rule at
+`litchi-iwa-common::table::cell::layout::{TextWrap, VerticalAlignment, Inset,
+Insets, Layout}`. The common leaf owns compact fixed-size values and its
+allocation-free inset validation error; the IWA Numbers adapter retains native
+alignment identifiers, padding archives, cell-style inheritance, and
+transactional package mutation. The remaining flat facade module is a thin
+error/re-export adapter pending the concurrent root-module migration.
 The leaf's `transition::Effect` owns the lossless native transition-effect
 identifier vocabulary, including canonical known variants and lossless unknown
 identifiers; IWA retains transition archive decoding, wire patching, and

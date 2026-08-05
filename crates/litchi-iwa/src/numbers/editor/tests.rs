@@ -5,7 +5,10 @@ use crate::package_metadata::{PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_T
 use crate::protobuf::tn;
 use crate::protobuf::tsp::{ComponentInfo, ObjectUuidMapEntry, PackageMetadata, Reference, Uuid};
 use crate::shapes::{DrawablePoint, DrawableSize};
-use litchi_iwa_common::table::cell::BorderSide;
+use litchi_iwa_common::table::cell::{
+    BorderSide,
+    layout::{Inset, Insets, Layout, TextWrap, VerticalAlignment},
+};
 
 #[test]
 fn ordinary_text_box_crud_is_guarded_and_byte_exact() {
@@ -3512,14 +3515,14 @@ fn table_cell_layout_composes_with_fill_and_resets_independently() {
     let styled_object_count = storage::object_locations(editor.package()).unwrap().len();
     assert_eq!(styled_object_count, original_object_count + 1);
 
-    let layout = crate::table_cell_layout::TableCellLayout::default()
-        .with_text_wrap(crate::table_cell_layout::TableCellTextWrap::Wrapped)
-        .with_vertical_alignment(crate::table_cell_layout::TableCellVerticalAlignment::Middle)
-        .with_insets(crate::table_cell_layout::TableCellInsets::new(
-            crate::table_cell_layout::TableCellInset::from_points(1.0).unwrap(),
-            crate::table_cell_layout::TableCellInset::from_points(2.0).unwrap(),
-            crate::table_cell_layout::TableCellInset::from_points(3.0).unwrap(),
-            crate::table_cell_layout::TableCellInset::from_points(4.0).unwrap(),
+    let layout = Layout::default()
+        .with_text_wrap(TextWrap::Wrapped)
+        .with_vertical_alignment(VerticalAlignment::Middle)
+        .with_insets(Insets::new(
+            Inset::from_points(1.0).unwrap(),
+            Inset::from_points(2.0).unwrap(),
+            Inset::from_points(3.0).unwrap(),
+            Inset::from_points(4.0).unwrap(),
         ));
     editor
         .set_table_cell_layout(table_id, 1, 1, layout)
@@ -3556,12 +3559,7 @@ fn table_cell_layout_rejects_invalid_coordinates_transactionally() {
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
-            .set_table_cell_layout(
-                table_id,
-                2,
-                0,
-                crate::table_cell_layout::TableCellLayout::default(),
-            )
+            .set_table_cell_layout(table_id, 2, 0, Layout::default(),)
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);

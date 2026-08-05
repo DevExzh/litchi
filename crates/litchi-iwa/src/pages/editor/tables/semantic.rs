@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 30142)
+Total output lines: 3536
+
 Warning: truncated output (original token count: 30027)
 Total output lines: 3526
 
@@ -1783,22 +1786,7 @@ impl PagesEditor {
         Ok(())
     }
 
-    /// Restore flat numbering for one body-table list level.
-    pub fn reset_table_cell_paragraph_list_number_tiering(
-        &mut self,
-        model_object_id: u64,
-        row: usize,
-        column: usize,
-        paragraph: ParagraphStart,
-    ) -> Result<bool> {
-        self.require_body_table(model_object_id)?;
-        let mut staged = self.package().clone();
-        let changed =
-            crate::numbers::editor::reset_table_cell_paragraph_list_number_tiering_in_package(
-                &mut staged,
-                model_object_id,
-                row,
-                …27 tokens truncated… numbered body-table paragrap…1422 tokens truncated…_list_bullet_geometry(
+    /// Restore flat numbering for one body-tab…142 tokens truncated… numbered body-table paragrap…1422 tokens truncated…_list_bullet_geometry(
         &mut self,
         model_object_id: u64,
         row: usize,

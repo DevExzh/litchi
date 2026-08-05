@@ -6,9 +6,6 @@ use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
-use litchi_iwa::table_cell_layout::{
-    TableCellInset, TableCellInsets, TableCellLayout, TableCellTextWrap, TableCellVerticalAlignment,
-};
 use litchi_iwa::text::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphList, ParagraphListBullet,
@@ -23,6 +20,7 @@ use litchi_iwa::text::{
     TextCharacterSpacing, TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize,
     TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
 };
+use litchi_iwa_common::table::cell::layout::{Inset, Insets, Layout, TextWrap, VerticalAlignment};
 use litchi_numbers::cell::Value as CellValue;
 
 const ROW: usize = 1;
@@ -558,13 +556,11 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn layout(alignment: TableCellVerticalAlignment) -> Result<TableCellLayout, litchi_iwa::Error> {
-    Ok(TableCellLayout::default()
-        .with_text_wrap(TableCellTextWrap::Wrapped)
+fn layout(alignment: VerticalAlignment) -> Result<Layout, litchi_iwa::Error> {
+    Ok(Layout::default()
+        .with_text_wrap(TextWrap::Wrapped)
         .with_vertical_alignment(alignment)
-        .with_insets(TableCellInsets::uniform(TableCellInset::from_points(
-            INSET_POINTS,
-        )?)))
+        .with_insets(Insets::uniform(Inset::from_points(INSET_POINTS)?)))
 }
 
 fn mixed_paragraph_lists() -> Result<Vec<ParagraphListPlacement>, litchi_iwa::Error> {
@@ -675,21 +671,39 @@ fn numbers_text_color() -> Result<RgbaColor, litchi_iwa::Error> {
     const RED: f32 = 0.72;
     const GREEN: f32 = 0.10;
     const BLUE: f32 = 0.14;
-    RgbaColor::new(RED, GREEN, BLUE, OPAQUE, RgbColorSpace::Srgb)
+    Ok(RgbaColor::new(
+        RED,
+        GREEN,
+        BLUE,
+        OPAQUE,
+        RgbColorSpace::Srgb,
+    )?)
 }
 
 fn pages_text_color() -> Result<RgbaColor, litchi_iwa::Error> {
     const RED: f32 = 0.10;
     const GREEN: f32 = 0.32;
     const BLUE: f32 = 0.78;
-    RgbaColor::new(RED, GREEN, BLUE, OPAQUE, RgbColorSpace::Srgb)
+    Ok(RgbaColor::new(
+        RED,
+        GREEN,
+        BLUE,
+        OPAQUE,
+        RgbColorSpace::Srgb,
+    )?)
 }
 
 fn keynote_text_color() -> Result<RgbaColor, litchi_iwa::Error> {
     const RED: f32 = 0.08;
     const GREEN: f32 = 0.55;
     const BLUE: f32 = 0.28;
-    RgbaColor::new(RED, GREEN, BLUE, OPAQUE, RgbColorSpace::Srgb)
+    Ok(RgbaColor::new(
+        RED,
+        GREEN,
+        BLUE,
+        OPAQUE,
+        RgbColorSpace::Srgb,
+    )?)
 }
 
 fn numbers_text_background() -> Result<TextBackground, litchi_iwa::Error> {
@@ -906,12 +920,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
     let table_id = editor.tables()?.remove(0).object_id;
     editor.set_cell(table_id, ROW, COLUMN, CellValue::Text(CELL_TEXT.to_owned()))?;
-    editor.set_table_cell_layout(
-        table_id,
-        ROW,
-        COLUMN,
-        layout(TableCellVerticalAlignment::Middle)?,
-    )?;
+    editor.set_table_cell_layout(table_id, ROW, COLUMN, layout(VerticalAlignment::Middle)?)?;
     editor.set_table_cell_text_alignment(table_id, ROW, COLUMN, TextAlignment::Center)?;
     editor.set_table_cell_text_style(table_id, ROW, COLUMN, numbers_text_style()?)?;
     editor.set_table_cell_text_font(table_id, ROW, COLUMN, numbers_text_font()?)?;
@@ -1024,12 +1033,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
     let table_id = editor.tables()?.remove(0).model_object_id;
     editor.set_table_cell(table_id, ROW, COLUMN, CellValue::Text(CELL_TEXT.to_owned()))?;
-    editor.set_table_cell_layout(
-        table_id,
-        ROW,
-        COLUMN,
-        layout(TableCellVerticalAlignment::Bottom)?,
-    )?;
+    editor.set_table_cell_layout(table_id, ROW, COLUMN, layout(VerticalAlignment::Bottom)?)?;
     editor.set_table_cell_text_alignment(table_id, ROW, COLUMN, TextAlignment::Right)?;
     editor.set_table_cell_text_style(table_id, ROW, COLUMN, pages_text_style()?)?;
     editor.set_table_cell_text_font(table_id, ROW, COLUMN, pages_text_font()?)?;
@@ -1162,7 +1166,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         COLUMN,
-        layout(TableCellVerticalAlignment::Middle)?,
+        layout(VerticalAlignment::Middle)?,
     )?;
     editor.set_slide_table_cell_text_alignment(
         0,

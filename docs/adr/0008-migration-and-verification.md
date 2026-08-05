@@ -5849,6 +5849,25 @@ wire override decoding, bounded style inheritance, native bool conversion,
 and transactional copy-on-write style mutation. Existing Numbers, Pages, and
 Keynote CRUD surfaces continue to use contextual facade aliases while the
 duplicate value implementation is removed from the monolith.
+The table-cell layout ownership slice is now complete at
+`litchi-iwa-common::table::cell::layout::{TextWrap, VerticalAlignment, Inset,
+Insets, Layout}`. Its two-value enums and 4/16/20-byte layout components are
+archive-free and heap-free; `Inset` rejects negative, NaN, and infinite input
+with a typed allocation-free error. IWA retains only native alignment and
+padding conversion, style inheritance, and package transactions. The Numbers,
+Pages, Keynote, and layout-generator consumers now import the common owner
+directly; the old flat module is reduced to migration aliases while the
+concurrent root API change remains in progress.
+
+Native Computer Use verification of a fresh
+`/tmp/litchi-iwa-layout.ONYCvR` fixture opened `table-layouts.numbers` and
+`table-layouts.key` without repair prompts. Selecting B2 in each application's
+real text inspector reported `Wrap text in cell = 1` and `Vertical alignment =
+middle`; the rendered multi-line value retained the authored 8-point inset
+layout. `table-layouts.pages` reproduced the known generated-table damaged-file
+limitation; the warning was dismissed without repair or save. All three ZIP
+archives passed integrity checks, and Numbers, Pages, and Keynote were quit
+after verification.
 The BorderSide ownership slice
 is complete: the dependency-neutral table-cell edge selector now lives at
 `litchi-iwa-common::table::cell::BorderSide`; `Borders` and `ShapeStroke` remain

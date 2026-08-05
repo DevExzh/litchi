@@ -89,11 +89,6 @@ pub use crate::table_cell_data_format::{
     TableCellStepperRange as KeynoteTableCellStepperRange,
     TableCellTextFormat as KeynoteTableCellTextFormat,
 };
-pub use crate::table_cell_layout::{
-    TableCellInset as KeynoteTableCellInset, TableCellInsets as KeynoteTableCellInsets,
-    TableCellLayout as KeynoteTableCellLayout, TableCellTextWrap as KeynoteTableCellTextWrap,
-    TableCellVerticalAlignment as KeynoteTableCellVerticalAlignment,
-};
 pub use crate::table_cell_number_format::{
     TableCellDecimalPlaces as KeynoteTableCellDecimalPlaces,
     TableCellFixedDecimalPlaces as KeynoteTableCellFixedDecimalPlaces,
@@ -129,6 +124,11 @@ pub use crate::text::TextOutline as KeynoteTableCellTextOutline;
 pub use crate::text::TextScript as KeynoteTableCellTextScript;
 pub use crate::text::TextShadow as KeynoteTableCellTextShadow;
 pub use crate::text::TextStyle as KeynoteTableCellTextStyle;
+pub use litchi_iwa_common::table::cell::layout::{
+    Inset as KeynoteTableCellInset, Insets as KeynoteTableCellInsets,
+    Layout as KeynoteTableCellLayout, TextWrap as KeynoteTableCellTextWrap,
+    VerticalAlignment as KeynoteTableCellVerticalAlignment,
+};
 /// A validated non-zero native header or footer count.
 pub type KeynoteTableHeaderCount = crate::numbers::NumbersTableHeaderCount;
 /// Lossless header/footer configuration shared by native iWork tables.

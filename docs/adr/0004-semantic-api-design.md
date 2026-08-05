@@ -62,6 +62,13 @@ native style inheritance and protobuf conversion remain in the IWA adapter.
 Contextual `Table*` aliases are migration adapters for the concrete facade,
 not duplicate value owners.
 
+Table-cell text layout uses the same focused module:
+`litchi_iwa_common::table::cell::layout::{TextWrap, VerticalAlignment, Inset,
+Insets, Layout}`. `Inset` is a four-byte transparent value constructed only
+through finite, non-negative validation, and `Layout` is a fixed-size
+composable value. Native alignment and padding conversion remain outside this
+leaf; the facade only adapts its typed error at the archive boundary.
+
 PresentationML implements this rule as `litchi-pptx::shape::{Scene, Shape}`.
 `Scene` is a bounded semantic index over one slide-like owner, not a vector of
 detached XML allocations. Shapes are visited in depth-first pre-order, while a
