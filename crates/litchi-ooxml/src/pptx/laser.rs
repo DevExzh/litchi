@@ -1,10 +1,9 @@
-//! Host integration for the canonical inert PPTX laser-trace codec.
+//! Thin host adapter for the canonical PPTX laser-trace owner.
 
-use crate::error::{OoxmlError, Result};
-use litchi_opc::constants::content_type as ct;
+use crate::error::Result;
 use litchi_opc::part::Part;
 use litchi_opc::{OpcPackage, PackURI};
-use litchi_pptx::laser::{self, Conformance};
+use litchi_pptx::laser;
 
 pub use litchi_pptx::laser::{LASER_TRACE_EXTENSION_URI, Trace, TracePoint};
 
@@ -16,12 +15,7 @@ pub(crate) fn load_slide_laser_traces(
     slide: &dyn Part,
     limits: &mut LaserLoadLimits,
 ) -> Result<Vec<Trace>> {
-    if slide.content_type() != ct::PML_SLIDE {
-        return Err(invalid(
-            "laser-trace discovery requires a PresentationML slide part",
-        ));
-    }
-    Ok(laser::read_with(slide_index, slide.blob(), limits)?)
+    Ok(laser::load_slide_traces(slide_index, slide, limits)?)
 }
 
 /// Store one laser-pointer trace onto a slide as a PowerPoint 2010
@@ -31,41 +25,13 @@ pub fn store_slide_laser_trace(
     slide_name: &PackURI,
     points: &[TracePoint],
 ) -> Result<()> {
-    laser::validate(points)?;
-    let slide = package.get_part(slide_name)?;
-    if slide.content_type() != ct::PML_SLIDE {
-        return Err(invalid(
-            "laser-trace storage requires a PresentationML slide part",
-        ));
-    }
-    if !load_slide_laser_traces(0, slide, &mut LaserLoadLimits::default())?.is_empty() {
-        return Err(invalid(
-            "slide already contains a laser-trace extension; replacement is not supported",
-        ));
-    }
-
-    let conformance =
-        Conformance::from_namespace(crate::pptx::slide_patch::slide_dialect(slide.blob())?);
-    let fragment = laser::write(points, conformance)?;
-    let updated = crate::pptx::slide_patch::insert_extension_fragment(slide.blob(), &fragment)?;
-
-    let probe =
-        litchi_opc::BlobPart::new(slide_name.clone(), ct::PML_SLIDE.into(), updated.clone());
-    let traces = load_slide_laser_traces(0, &probe, &mut LaserLoadLimits::default())?;
-    if traces.len() != 1 || traces[0].points().len() != points.len() {
-        return Err(invalid("laser-trace storage failed read-back validation"));
-    }
-    package.get_part_mut(slide_name)?.set_blob(updated);
-    Ok(())
-}
-
-fn invalid(message: impl Into<String>) -> OoxmlError {
-    OoxmlError::InvalidFormat(message.into())
+    Ok(laser::store_slide_trace(package, slide_name, points)?)
 }
 
 #[cfg(test)]
 mod tests {
     use litchi_drawingml::coord::Coordinate;
+    use litchi_opc::constants::content_type as ct;
     use litchi_pptx::time::Offset;
 
     use super::*;

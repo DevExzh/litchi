@@ -734,3 +734,50 @@ impl Sequence {
         parse_package_slide(package, slide_part_name)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use litchi_opc::part::BlobPart;
+
+    const SLIDE: &str = "/ppt/slides/slide1.xml";
+    const SLIDE_CT: &str = "application/vnd.openxmlformats-officedocument.presentationml.slide+xml";
+    const CHART_CT: &str = "application/vnd.openxmlformats-officedocument.drawingml.chart+xml";
+    const CHART_REL: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart";
+
+    #[test]
+    fn package_layer_validates_chart_build_relationships_in_the_owner() {
+        let mut timing = Sequence::new();
+        timing.add(EffectInstance::new(5, Effect::Fade).with_group_id(GroupId::new(1)));
+        timing.add_graphic_build(GraphicBuild::chart(5, GroupId::new(1)));
+        let xml = format!(
+            r#"<p:sld xmlns:p="{P}" xmlns:a="{A}" xmlns:c="{C}" xmlns:r="{R}"><p:cSld><p:spTree><p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="5" name="Chart"/></p:nvGraphicFramePr><a:graphic><a:graphicData uri="{C}"><c:chart r:id="rIdChart"/></a:graphicData></a:graphic></p:graphicFrame></p:spTree></p:cSld>{}</p:sld>"#,
+            timing.to_xml(),
+            P = std::str::from_utf8(P_NS).unwrap(),
+            A = std::str::from_utf8(A_NS).unwrap(),
+            C = std::str::from_utf8(C_NS).unwrap(),
+            R = std::str::from_utf8(R_NS).unwrap(),
+        );
+        let slide_name = PackURI::new(SLIDE).unwrap();
+        let chart_name = PackURI::new("/ppt/charts/chart1.xml").unwrap();
+        let mut slide = BlobPart::new(slide_name.clone(), SLIDE_CT.into(), xml.into_bytes());
+        slide.rels_mut().add_relationship(
+            CHART_REL.into(),
+            "../charts/chart1.xml".into(),
+            "rIdChart".into(),
+            false,
+        );
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(slide));
+        package.add_part(Box::new(BlobPart::new(
+            chart_name,
+            CHART_CT.into(),
+            Vec::new(),
+        )));
+
+        let parsed = parse_package_slide(&package, &slide_name).unwrap();
+        assert_eq!(parsed.graphic_builds.len(), 1);
+        assert_eq!(parsed.animations.len(), 1);
+    }
+}

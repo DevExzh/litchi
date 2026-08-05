@@ -1,9 +1,10 @@
-//! Bounded, inert PowerPoint laser-pointer trace values and codec.
+//! Bounded PresentationML laser-trace XML codec.
 //!
 //! Laser traces are retained as persisted presentation data only. This module
 //! never replays, renders, interpolates, modifies, or executes slide-show
 //! events.
 
+use super::model::*;
 use crate::time::{Offset, ParseError as TimeParseError};
 use crate::{Error, Result};
 use litchi_drawingml::coord::{Coordinate, ParseError as CoordinateParseError};
@@ -18,8 +19,6 @@ use std::fmt::Write as _;
 /// The PowerPoint extension URI that contains persisted laser-pointer traces.
 pub const LASER_TRACE_EXTENSION_URI: &str = "{3A86A75C-4F4B-4683-9AE1-C65F6400EC91}";
 
-const PRESENTATIONML_NAMESPACE: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
-const STRICT_PRESENTATIONML_NAMESPACE: &str = "http://purl.oclc.org/ooxml/presentationml/main";
 const PRESENTATIONML_NAMESPACE_BYTES: &[u8] =
     b"http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT_PRESENTATIONML_NAMESPACE_BYTES: &[u8] =
@@ -33,115 +32,6 @@ const MAX_LASER_TRACES: usize = 4_096;
 const MAX_LASER_POINTS: usize = 65_536;
 const MAX_XML_NODES: usize = 250_000;
 const MAX_XML_DEPTH: usize = 128;
-
-/// The PresentationML namespace dialect used by a laser-trace writer.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
-pub enum Conformance {
-    /// The ISO Transitional PresentationML namespace.
-    #[default]
-    Transitional,
-    /// The ISO Strict PresentationML namespace.
-    Strict,
-}
-
-impl Conformance {
-    /// Return the PresentationML namespace URI used by this profile.
-    #[inline]
-    pub const fn namespace(self) -> &'static str {
-        match self {
-            Self::Transitional => PRESENTATIONML_NAMESPACE,
-            Self::Strict => STRICT_PRESENTATIONML_NAMESPACE,
-        }
-    }
-
-    /// Select the profile for a detected PresentationML namespace.
-    ///
-    /// Unknown host namespaces conservatively use the Transitional profile,
-    /// matching the host's existing dialect-preservation behavior.
-    #[inline]
-    pub fn from_namespace(namespace: &str) -> Self {
-        if namespace == STRICT_PRESENTATIONML_NAMESPACE {
-            Self::Strict
-        } else {
-            Self::Transitional
-        }
-    }
-}
-
-/// A persisted laser-pointer point from a PowerPoint slide show.
-///
-/// The represented duration is exact; its source spelling is canonicalized to
-/// a normalized typed offset.
-/// Coordinates are exact `a:ST_Coordinate` values relative to the slide's
-/// top-left corner.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TracePoint {
-    time: Offset,
-    x: Coordinate,
-    y: Coordinate,
-}
-
-impl TracePoint {
-    /// Return the exact normalized time offset relative to the slide timeline.
-    #[inline]
-    pub fn time(&self) -> &Offset {
-        &self.time
-    }
-
-    /// Return the checked horizontal DrawingML coordinate.
-    #[inline]
-    pub fn x(&self) -> &Coordinate {
-        &self.x
-    }
-
-    /// Return the checked vertical DrawingML coordinate.
-    #[inline]
-    pub fn y(&self) -> &Coordinate {
-        &self.y
-    }
-}
-
-/// A bounded, inert laser-pointer trace recorded for a presentation slide.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Trace {
-    slide_index: usize,
-    trace_index: usize,
-    points: Vec<TracePoint>,
-}
-
-impl Trace {
-    /// Return the zero-based index of the slide that owns this trace.
-    #[inline]
-    pub fn slide_index(&self) -> usize {
-        self.slide_index
-    }
-
-    /// Return the zero-based source-order index of this trace on its slide.
-    #[inline]
-    pub fn trace_index(&self) -> usize {
-        self.trace_index
-    }
-
-    /// Return the stored trace points in source order.
-    #[inline]
-    pub fn points(&self) -> &[TracePoint] {
-        &self.points
-    }
-
-    /// Return the number of stored trace points.
-    #[inline]
-    pub fn point_count(&self) -> usize {
-        self.points.len()
-    }
-}
-
-/// Aggregate resource state for reading one or more slide XML parts.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct Limits {
-    total_slide_xml_bytes: usize,
-    trace_count: usize,
-    point_count: usize,
-}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ElementKind {
@@ -580,13 +470,6 @@ fn invalid(message: impl Into<String>) -> Error {
 
 fn limit(resource: &'static str, limit: usize) -> Error {
     Error::Limit { resource, limit }
-}
-
-impl TracePoint {
-    /// Create a trace point from exact, checked time and coordinate values.
-    pub fn new(time: Offset, x: Coordinate, y: Coordinate) -> Self {
-        Self { time, x, y }
-    }
 }
 
 /// Check the bounded authoring domain for a laser trace.
