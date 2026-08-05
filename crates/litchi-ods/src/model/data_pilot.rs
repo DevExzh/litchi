@@ -1,8 +1,8 @@
 //! ODF data-pilot (pivot-table) declarations.
 
 use super::{
-    Filter,
     database_range::{
+        Filter,
         parse_filter, parse_source_query, parse_source_sql, parse_source_table, validate_filter,
         write_database_source, write_filter,
     },
