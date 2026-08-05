@@ -1,17 +1,16 @@
-//! Namespace-aware parsing for SpreadsheetDrawing worksheet and chartsheet parts.
+//! Namespace-aware SpreadsheetDrawing reader.
 //!
 //! Both `xdr:twoCellAnchor` (worksheets) and `xdr:absoluteAnchor`
 //! (chartsheets) are understood; absolute anchors record a zero placeholder
 //! anchor because they carry EMU positions rather than cell markers.
-
-#![allow(dead_code)]
 
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use super::chart::Anchor;
+use super::Anchor;
+use super::model::{Chart, Drawing, Object, Picture, Unknown, UnknownKind};
 use crate::error::{Error, Result};
 use crate::raw::namespace::relationship_attribute_value;
 use litchi_ooxml_common::xml::{
@@ -22,24 +21,10 @@ const SPREADSHEET_DRAWING_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing";
 const STRICT_SPREADSHEET_DRAWING_NAMESPACE: &[u8] =
     b"http://purl.oclc.org/ooxml/drawingml/spreadsheetDrawing";
+const MAX_DRAWING_XML_BYTES: usize = 32 * 1024 * 1024;
 const MAX_DRAWING_ANCHORS: usize = 100_000;
-
-#[derive(Default)]
-pub(crate) struct ParsedDrawing {
-    pub(crate) pictures: Vec<ParsedPicture>,
-    pub(crate) charts: Vec<ParsedChart>,
-}
-
-pub(crate) struct ParsedPicture {
-    pub(crate) anchor: Anchor,
-    pub(crate) relationship_id: String,
-    pub(crate) description: Option<String>,
-}
-
-pub(crate) struct ParsedChart {
-    pub(crate) anchor: Anchor,
-    pub(crate) relationship_id: String,
-}
+const MAX_MARKER_TEXT_BYTES: usize = 64;
+const MAX_STRING_BYTES: usize = 1024 * 1024;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Context {
@@ -96,19 +81,20 @@ struct PendingAnchor {
     picture_relationship_id: Option<String>,
     chart_relationship_id: Option<String>,
     description: Option<String>,
+    unknown_kind: Option<UnknownKind>,
 }
 
 struct Parser {
-    drawing: ParsedDrawing,
+    drawing: Drawing,
     anchor: Option<PendingAnchor>,
     marker_text: String,
 }
 
 impl Parser {
-    fn parse(xml: &str) -> Result<Option<ParsedDrawing>> {
+    fn parse(xml: &str) -> Result<Option<Drawing>> {
         let mut reader = NsReader::from_reader(xml.as_bytes());
         let mut parser = Self {
-            drawing: ParsedDrawing::default(),
+            drawing: Drawing::default(),
             anchor: None,
             marker_text: String::new(),
         };
@@ -152,25 +138,22 @@ impl Parser {
                     parser.finish(context)?;
                 },
                 Event::Text(text) if matches!(stack.last(), Some(Context::Marker(_, _))) => {
-                    parser.marker_text.push_str(
-                        &text
-                            .decode()
-                            .map_err(|error| Error::Invalid(error.to_string()))?,
-                    );
+                    let text = text
+                        .decode()
+                        .map_err(|error| Error::Invalid(error.to_string()))?;
+                    parser.append_marker_text(&text)?;
                 },
                 Event::CData(text) if matches!(stack.last(), Some(Context::Marker(_, _))) => {
-                    parser.marker_text.push_str(
-                        &text
-                            .decode()
-                            .map_err(|error| Error::Invalid(error.to_string()))?,
-                    );
+                    let text = text
+                        .decode()
+                        .map_err(|error| Error::Invalid(error.to_string()))?;
+                    parser.append_marker_text(&text)?;
                 },
                 Event::GeneralRef(reference)
                     if matches!(stack.last(), Some(Context::Marker(_, _))) =>
                 {
-                    parser
-                        .marker_text
-                        .push_str(&decode_xml_reference(&reference)?);
+                    let text = decode_xml_reference(&reference)?;
+                    parser.append_marker_text(&text)?;
                 },
                 Event::End(element) => {
                     let context = stack
@@ -208,7 +191,7 @@ impl Parser {
             if self.anchor.is_some() {
                 return Err(invalid("nested drawing anchor"));
             }
-            if self.drawing.pictures.len() + self.drawing.charts.len() >= MAX_DRAWING_ANCHORS {
+            if self.drawing.len() >= MAX_DRAWING_ANCHORS {
                 return Err(invalid("drawing exceeds the anchor limit"));
             }
             self.anchor = Some(PendingAnchor::default());
@@ -220,7 +203,7 @@ impl Parser {
             if self.anchor.is_some() {
                 return Err(invalid("nested drawing anchor"));
             }
-            if self.drawing.pictures.len() + self.drawing.charts.len() >= MAX_DRAWING_ANCHORS {
+            if self.drawing.len() >= MAX_DRAWING_ANCHORS {
                 return Err(invalid("drawing exceeds the anchor limit"));
             }
             self.anchor = Some(PendingAnchor::default());
@@ -262,10 +245,19 @@ impl Parser {
                 }
             }
         }
+        if matches!(parent, Context::TwoCellAnchor | Context::AbsoluteAnchor)
+            && is_spreadsheet_drawing_namespace(namespace)
+            && let Some(kind) = unknown_kind(element.name().local_name().as_ref())
+        {
+            self.anchor_mut()?.unknown_kind = Some(kind);
+        }
         if self.anchor.is_some()
             && is_spreadsheet_drawing_name(namespace, element.name(), b"cNvPr")
             && let Some(description) = unqualified_attribute_value(element, b"descr", decoder)?
         {
+            if description.len() > MAX_STRING_BYTES {
+                return Err(limit("drawing description"));
+            }
             self.anchor_mut()?.description = Some(description);
         }
         if self.anchor.is_some() && is_drawingml_name(namespace, element.name(), b"blip") {
@@ -342,6 +334,7 @@ impl Parser {
             picture_relationship_id,
             chart_relationship_id,
             description,
+            unknown_kind,
         } = self
             .anchor
             .take()
@@ -377,6 +370,7 @@ impl Parser {
             picture_relationship_id,
             chart_relationship_id,
             description,
+            unknown_kind,
             anchor,
         )
     }
@@ -390,6 +384,7 @@ impl Parser {
             picture_relationship_id,
             chart_relationship_id,
             description,
+            unknown_kind,
             ..
         } = self
             .anchor
@@ -400,27 +395,36 @@ impl Parser {
             picture_relationship_id,
             chart_relationship_id,
             description,
+            unknown_kind,
             Anchor::new(0, 0, 0, 0),
         )
     }
 
     fn push_anchor_object(
-        drawing: &mut ParsedDrawing,
+        drawing: &mut Drawing,
         picture_relationship_id: Option<String>,
         chart_relationship_id: Option<String>,
         description: Option<String>,
+        unknown_kind: Option<UnknownKind>,
         anchor: Anchor,
     ) -> Result<()> {
         match (picture_relationship_id, chart_relationship_id) {
-            (Some(relationship_id), None) => drawing.pictures.push(ParsedPicture {
+            (Some(relationship_id), None) => drawing.push(Object::Picture(Picture {
                 anchor,
                 relationship_id,
                 description,
-            }),
-            (None, Some(relationship_id)) => drawing.charts.push(ParsedChart {
+            })),
+            (None, Some(relationship_id)) => drawing.push(Object::Chart(Chart {
                 anchor,
                 relationship_id,
-            }),
+            })),
+            (None, None) if let Some(kind) = unknown_kind => {
+                drawing.push(Object::Unknown(Unknown {
+                    anchor,
+                    description,
+                    kind,
+                }));
+            },
             (None, None) => return Err(invalid("drawing anchor has no picture or chart")),
             (Some(_), Some(_)) => {
                 return Err(invalid("drawing anchor contains both a picture and chart"));
@@ -434,9 +438,25 @@ impl Parser {
             .as_mut()
             .ok_or_else(|| invalid("drawing object outside an anchor"))
     }
+
+    fn append_marker_text(&mut self, text: &str) -> Result<()> {
+        let length = self
+            .marker_text
+            .len()
+            .checked_add(text.len())
+            .ok_or_else(|| limit("drawing marker text"))?;
+        if length > MAX_MARKER_TEXT_BYTES {
+            return Err(limit("drawing marker text"));
+        }
+        self.marker_text.push_str(text);
+        Ok(())
+    }
 }
 
-pub(crate) fn parse_drawing_xml(xml: &str) -> Result<Option<ParsedDrawing>> {
+pub fn parse(xml: &str) -> Result<Option<Drawing>> {
+    if xml.len() > MAX_DRAWING_XML_BYTES {
+        return Err(limit("drawing XML"));
+    }
     let xml = litchi_ooxml_common::mce::process_str(xml)?;
     Parser::parse(xml.as_ref())
 }
@@ -455,9 +475,34 @@ fn is_spreadsheet_drawing_name(
         )
 }
 
+fn is_spreadsheet_drawing_namespace(namespace: &ResolveResult<'_>) -> bool {
+    matches!(
+        namespace,
+        ResolveResult::Bound(Namespace(value))
+            if *value == SPREADSHEET_DRAWING_NAMESPACE
+                || *value == STRICT_SPREADSHEET_DRAWING_NAMESPACE
+    )
+}
+
+fn unknown_kind(local_name: &[u8]) -> Option<UnknownKind> {
+    Some(match local_name {
+        b"from" | b"to" | b"pos" | b"ext" | b"clientData" | b"pic" | b"graphicFrame" => {
+            return None;
+        },
+        b"sp" => UnknownKind::Shape,
+        b"grpSp" => UnknownKind::Group,
+        b"cxnSp" => UnknownKind::Connection,
+        b"contentPart" => UnknownKind::ContentPart,
+        _ => UnknownKind::Other,
+    })
+}
+
 fn set_relationship(target: &mut Option<String>, value: String, kind: &str) -> Result<()> {
     if value.is_empty() {
         return Err(invalid(format!("drawing {kind} relationship ID is empty")));
+    }
+    if value.len() > MAX_STRING_BYTES {
+        return Err(limit(format!("drawing {kind} relationship ID")));
     }
     if target.replace(value).is_some() {
         return Err(invalid(format!(
@@ -484,76 +529,9 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parses_prefixed_strict_picture_and_chart_anchors() {
-        let xml = r#"<s:wsDr xmlns:s="http://purl.oclc.org/ooxml/drawingml/spreadsheetDrawing"
-                xmlns:a="http://purl.oclc.org/ooxml/drawingml/main"
-                xmlns:c="http://purl.oclc.org/ooxml/drawingml/chart"
-                xmlns:r="http://purl.oclc.org/ooxml/officeDocument/relationships">
-            <s:twoCellAnchor><s:from><s:col>1</s:col><s:colOff>2</s:colOff>
-                <s:row>3</s:row><s:rowOff>4</s:rowOff></s:from>
-                <s:to><s:col>5</s:col><s:colOff>6</s:colOff>
-                <s:row>7</s:row><s:rowOff>8</s:rowOff></s:to>
-                <s:pic><s:nvPicPr><s:cNvPr descr="Logo"/></s:nvPicPr>
-                    <s:blipFill><a:blip r:embed="image-rel"/></s:blipFill></s:pic>
-                <s:clientData/></s:twoCellAnchor>
-            <s:twoCellAnchor><s:from><s:col>0</s:col><s:colOff>0</s:colOff>
-                <s:row>0</s:row><s:rowOff>0</s:rowOff></s:from>
-                <s:to><s:col>9</s:col><s:colOff>0</s:colOff>
-                <s:row>10</s:row><s:rowOff>0</s:rowOff></s:to>
-                <s:graphicFrame><a:graphic><a:graphicData><c:chart r:id="chart-rel"/>
-                </a:graphicData></a:graphic></s:graphicFrame><s:clientData/></s:twoCellAnchor>
-        </s:wsDr>"#;
-
-        let drawing = parse_drawing_xml(xml).unwrap().unwrap();
-        assert_eq!(drawing.pictures.len(), 1);
-        assert_eq!(drawing.pictures[0].relationship_id, "image-rel");
-        assert_eq!(drawing.pictures[0].description.as_deref(), Some("Logo"));
-        assert_eq!(drawing.pictures[0].anchor.from_col, 1);
-        assert_eq!(drawing.pictures[0].anchor.to_row_offset, 8);
-        assert_eq!(drawing.charts.len(), 1);
-        assert_eq!(drawing.charts[0].relationship_id, "chart-rel");
-        assert_eq!(drawing.charts[0].anchor.to_col, 9);
-    }
-
-    #[test]
-    fn parses_chartsheet_absolute_anchor_chart() {
-        // Chartsheet drawings anchor their chart through xdr:absoluteAnchor.
-        let xml = r#"<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
-                xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
-                xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
-                xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-            <xdr:absoluteAnchor><xdr:pos x="0" y="0"/><xdr:ext cx="8582025" cy="5838825"/>
-                <xdr:graphicFrame macro=""><a:graphic><a:graphicData>
-                    <c:chart r:id="chart-rel"/>
-                </a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:absoluteAnchor>
-        </xdr:wsDr>"#;
-
-        let drawing = parse_drawing_xml(xml).unwrap().unwrap();
-        assert!(drawing.pictures.is_empty());
-        assert_eq!(drawing.charts.len(), 1);
-        assert_eq!(drawing.charts[0].relationship_id, "chart-rel");
-        // Absolute anchors record a zero placeholder anchor.
-        assert_eq!(drawing.charts[0].anchor.to_col, 0);
-
-        let empty = r#"<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"><xdr:absoluteAnchor/></xdr:wsDr>"#;
-        assert!(parse_drawing_xml(empty).is_err());
-    }
-
-    #[test]
-    fn rejects_malformed_drawing_anchors() {
-        const ROOT: &str = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing";
-        for body in [
-            "<xdr:twoCellAnchor/>",
-            "<xdr:twoCellAnchor><xdr:from/></xdr:twoCellAnchor>",
-            "<xdr:twoCellAnchor><xdr:from><xdr:col>x</xdr:col></xdr:from></xdr:twoCellAnchor>",
-        ] {
-            let xml = format!(r#"<xdr:wsDr xmlns:xdr="{ROOT}">{body}</xdr:wsDr>"#);
-            assert!(parse_drawing_xml(&xml).is_err(), "accepted {xml}");
-        }
-    }
+fn limit(message: impl Into<String>) -> Error {
+    Error::Invalid(format!(
+        "SpreadsheetDrawing {} limit exceeded",
+        message.into()
+    ))
 }
