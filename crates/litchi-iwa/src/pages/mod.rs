@@ -32,7 +32,6 @@
 mod creation;
 pub mod document;
 pub mod editor;
-mod section;
 
 pub use creation::PagesDocumentBuilder;
 pub use document::PagesDocument;

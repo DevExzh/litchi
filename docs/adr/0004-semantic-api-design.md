@@ -55,6 +55,14 @@ allocation-bearing model or publish a flat `TextFontName` implementation in
 each application owner. `Name` validates before allocating borrowed input and
 stores exactly one boxed identifier; no unchecked font-name constructor exists.
 
+Pages document state follows the same raw/semantic split:
+`litchi_pages::document::{Root, Body, Document}` owns an immutable, bounded
+semantic snapshot, while `litchi-iwa` decodes native root and body payloads
+before constructing it. The semantic model exposes borrowed section views and
+checked zero-based selection; native object identifiers and protobuf messages
+do not appear in its ordinary signatures. Snapshot cloning shares the IWA
+state and never reparses or mutates the source document.
+
 The same focused-module rule applies to neutral visual values:
 `litchi_iwa_common::color::{RgbColorSpace, Rgba}` owns the validated RGBA
 model and `color::Error`. The value has no protobuf or archive dependency, stores

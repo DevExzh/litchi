@@ -128,8 +128,12 @@ layer or a compatibility surface.
 The first extracted semantic value layer is `litchi-iwa-text`, which owns only
 the allocation-bearing rich-text values shared by the format leaves. It has no
 archive, protobuf, or application dependency. `litchi-pages` owns the concise
-`Section`/`SectionType` vocabulary, and `litchi-keynote` owns `Slide`, `Show`,
-build, and transition values; both depend downward on `litchi-iwa-text` only.
+`section::{Section, SectionType}` vocabulary and the archive-free
+`document::{Root, Body, Document}` snapshot model. Native root/body decoding,
+object lookup, and protobuf adaptation stay in `litchi-iwa`; the semantic crate
+never imports an `Archive` or generated schema. `litchi-keynote` owns `Slide`,
+`Show`, build, and transition values; both depend downward on
+`litchi-iwa-text` only.
 The shared text leaf now also owns the strict `font::{Font, Name}` vocabulary
 and its typed `NameError`; the IWA facade keeps only a thin error conversion and
 native archive adapters. `Name` stores one boxed UTF-8 identifier, validates
