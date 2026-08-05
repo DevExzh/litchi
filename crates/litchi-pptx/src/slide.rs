@@ -65,9 +65,35 @@ impl<'a> Slide<'a> {
         self.part.shapes()
     }
 
+    /// Resolve the ordinary charts attached to this slide.
+    pub fn charts(&self) -> Result<Vec<crate::chart::Part<'a>>> {
+        self.part.charts(self.package)
+    }
+
+    /// Resolve Microsoft ChartEx parts attached to this slide.
+    pub fn chart_extensions(&self) -> Result<Vec<crate::chart::extension::Part<'a>>> {
+        self.part.chart_extensions(self.package)
+    }
+
+    /// Resolve the optional legacy comments list attached to this slide.
+    pub fn comments(&self) -> Result<Option<crate::comments::ListPart<'a>>> {
+        self.part.comments(self.package)
+    }
+
     /// Count semantic shapes in the slide's scene.
     pub fn shape_count(&self) -> Result<usize> {
         Ok(self.shapes()?.len())
+    }
+
+    /// Return this slide's optional slide-library synchronization metadata.
+    pub fn slide_sync(
+        &self,
+    ) -> Result<Option<crate::presentation_properties::metadata::slide_sync::Properties>> {
+        let part_name = self.part.part().partname();
+        let mut matches = crate::presentation_properties::metadata::slide_sync::load(self.package)?
+            .into_iter()
+            .filter(|entry| entry.slide_part_name == *part_name);
+        Ok(matches.next().map(|entry| entry.properties))
     }
 
     /// Resolve the slide's optional layout in package context.
@@ -110,6 +136,11 @@ impl<'a> SlideLayout<'a> {
         self.part.shapes()
     }
 
+    /// Read the optional theme override attached to this layout.
+    pub fn theme_override(&self) -> Result<Option<crate::shape::theme::Override>> {
+        self.part.theme_override(self.package)
+    }
+
     /// Resolve the required master in package context.
     pub fn master(&self) -> Result<SlideMaster<'a>> {
         Ok(SlideMaster::new(
@@ -150,6 +181,11 @@ impl<'a> SlideMaster<'a> {
     /// Build the bounded borrowed scene for the master.
     pub fn shapes(&self) -> Result<Scene<'a>> {
         self.part.shapes()
+    }
+
+    /// Read the theme reached from this slide master.
+    pub fn theme(&self) -> Result<Option<crate::shape::theme::ThemeSummary>> {
+        self.part.theme(self.package)
     }
 
     /// Resolve all layouts reachable from this master.

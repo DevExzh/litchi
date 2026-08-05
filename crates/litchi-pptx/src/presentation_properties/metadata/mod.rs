@@ -17,6 +17,7 @@ pub mod handout;
 pub mod protection;
 pub mod revision;
 pub mod sections;
+pub mod slide_sync;
 pub mod structure;
 pub mod template;
 pub mod tracks;

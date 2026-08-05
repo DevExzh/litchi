@@ -16,7 +16,6 @@ use crate::{Error, Result};
 
 const PRESENTATION_PART: &str = "/ppt/presentation.xml";
 const MASTER_PART: &str = "/ppt/slideMasters/slideMaster1.xml";
-const LAYOUT_PART: &str = "/ppt/slideLayouts/slideLayout1.xml";
 const THEME_PART: &str = "/ppt/theme/theme1.xml";
 const VIEW_PROPERTIES_PART: &str = "/ppt/viewProps.xml";
 const PRESENTATION_PROPERTIES_PART: &str = "/ppt/presProps.xml";
@@ -37,7 +36,6 @@ impl Package {
         let mut package = OpcPackage::new();
         let presentation_name = pack_uri(PRESENTATION_PART)?;
         let master_name = pack_uri(MASTER_PART)?;
-        let layout_name = pack_uri(LAYOUT_PART)?;
         let theme_name = pack_uri(THEME_PART)?;
         let view_properties_name = pack_uri(VIEW_PROPERTIES_PART)?;
         let presentation_properties_name = pack_uri(PRESENTATION_PROPERTIES_PART)?;
@@ -58,15 +56,13 @@ impl Package {
             ct::PML_SLIDE_MASTER.to_string(),
             resources::SLIDE_MASTER.as_bytes().to_vec(),
         );
-        master.relate_to("../slideLayouts/slideLayout1.xml", rt::SLIDE_LAYOUT);
+        for index in 1..=resources::SLIDE_LAYOUTS.len() {
+            master.relate_to(
+                &format!("../slideLayouts/slideLayout{index}.xml"),
+                rt::SLIDE_LAYOUT,
+            );
+        }
         master.relate_to("../theme/theme1.xml", rt::THEME);
-
-        let mut layout = BlobPart::new(
-            layout_name,
-            ct::PML_SLIDE_LAYOUT.to_string(),
-            resources::SLIDE_LAYOUT.as_bytes().to_vec(),
-        );
-        layout.relate_to("../slideMasters/slideMaster1.xml", rt::SLIDE_MASTER);
 
         let theme = BlobPart::new(
             theme_name,
@@ -100,7 +96,16 @@ impl Package {
         package.relate_to("docProps/app.xml", rt::EXTENDED_PROPERTIES);
         package.add_part(Box::new(presentation));
         package.add_part(Box::new(master));
-        package.add_part(Box::new(layout));
+        for (index, xml) in resources::SLIDE_LAYOUTS.iter().enumerate() {
+            let layout_name = pack_uri(&format!("/ppt/slideLayouts/slideLayout{}.xml", index + 1))?;
+            let mut layout = BlobPart::new(
+                layout_name,
+                ct::PML_SLIDE_LAYOUT.to_string(),
+                xml.as_bytes().to_vec(),
+            );
+            layout.relate_to("../slideMasters/slideMaster1.xml", rt::SLIDE_MASTER);
+            package.add_part(Box::new(layout));
+        }
         package.add_part(Box::new(theme));
         package.add_part(Box::new(view_properties));
         package.add_part(Box::new(presentation_properties));
@@ -190,6 +195,76 @@ impl Package {
     pub fn with_opc<T>(&self, operation: impl FnOnce(&OpcPackage) -> Result<T>) -> Result<T> {
         self.ensure_graph_current("with_opc")?;
         operation(&self.opc)
+    }
+
+    /// Add a slide master and update the PresentationML relationship graph.
+    pub fn add_slide_master(&mut self) -> Result<crate::master_layout::AuthoredSlideMaster> {
+        self.edit_opc(crate::master_layout::add_slide_master)
+    }
+
+    /// Add a layout to an existing master and update both sides of the graph.
+    pub fn add_slide_layout(
+        &mut self,
+        master_part_name: &PackURI,
+        kind: crate::master_layout::SlideLayoutKind,
+        name: &str,
+        placeholders: &[crate::master_layout::PlaceholderSpec],
+    ) -> Result<crate::master_layout::AuthoredSlideLayout> {
+        self.edit_opc(|opc| {
+            crate::master_layout::add_slide_layout(opc, master_part_name, kind, name, placeholders)
+        })
+    }
+
+    /// Add or replace one master/layout placeholder shape.
+    pub fn store_placeholder_shape(
+        &mut self,
+        part_name: &PackURI,
+        spec: &crate::master_layout::PlaceholderSpec,
+    ) -> Result<()> {
+        self.edit_opc(|opc| crate::master_layout::store_placeholder_shape(opc, part_name, spec))
+    }
+
+    /// Remove an unreferenced layout and its owning relationship.
+    pub fn remove_slide_layout(&mut self, layout_part_name: &PackURI) -> Result<()> {
+        self.edit_opc(|opc| crate::master_layout::remove_slide_layout(opc, layout_part_name))
+    }
+
+    /// Validate every master/layout relationship reachable from the package.
+    pub fn validate_master_layout_graph(&self) -> Result<()> {
+        self.with_opc(crate::master_layout::validate_master_layout_graph)
+    }
+
+    /// Load all contextual slide-library synchronization metadata.
+    pub fn load_slide_sync(
+        &self,
+    ) -> Result<Vec<crate::presentation_properties::metadata::slide_sync::Part>> {
+        self.with_opc(crate::presentation_properties::metadata::slide_sync::load)
+    }
+
+    /// Attach one slide-library synchronization part transactionally.
+    pub fn store_slide_sync(
+        &mut self,
+        value: &crate::presentation_properties::metadata::slide_sync::Part,
+    ) -> Result<()> {
+        self.edit_opc(|opc| crate::presentation_properties::metadata::slide_sync::store(opc, value))
+    }
+
+    /// Run one transactional low-level OPC edit for package-owned semantic
+    /// modules. This remains crate-visible so those modules can share the
+    /// package rollback boundary without exposing raw graph mutation publicly.
+    pub(crate) fn edit_opc<T>(
+        &mut self,
+        operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
+    ) -> Result<T> {
+        self.flush_presentation()?;
+        let before = self.opc.clone();
+        match operation(&mut self.opc) {
+            Ok(value) => Ok(value),
+            Err(error) => {
+                self.opc = before;
+                Err(error)
+            },
+        }
     }
 
     fn ensure_graph_current(&self, operation: &'static str) -> Result<()> {
@@ -320,7 +395,7 @@ mod tests {
         );
         assert_eq!(slide.shape_count().expect("shape count"), 2);
         assert_eq!(presentation.slide_masters().expect("masters").len(), 1);
-        assert_eq!(presentation.slide_layouts().expect("layouts").len(), 1);
+        assert_eq!(presentation.slide_layouts().expect("layouts").len(), 11);
     }
 
     #[test]

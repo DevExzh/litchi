@@ -16,6 +16,7 @@
 pub mod actions;
 pub mod animations;
 pub mod backgrounds;
+pub mod chart;
 pub mod comments;
 mod error;
 pub mod font;
@@ -46,6 +47,7 @@ pub(crate) mod resources;
 pub use actions::{Jump, Kind, Setting, Target, Trigger};
 pub use animations::*;
 pub use backgrounds::{GradientStop, GradientType, PatternType, PictureStyle, SlideBackground};
+pub use chart::{Chart, Info as ChartInfo, Series as ChartSeries, Type as ChartType};
 pub use comments::{
     Author, Comment, Comments, Conformance, List, add_presentation_comment,
     add_presentation_comment_author, find_presentation_comment, find_presentation_comment_author,

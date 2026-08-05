@@ -6,6 +6,7 @@
 mod codec;
 mod model;
 mod package;
+pub mod part;
 
 pub use codec::{
     parse_comment_authors, parse_slide_comments, write_comment_authors, write_slide_comments,
@@ -19,6 +20,7 @@ pub use package::{
     replace_presentation_comment_author, store_presentation_comments, update_presentation_comment,
     update_presentation_comment_author,
 };
+pub use part::{AuthorListPart, ListPart};
 
 pub(crate) const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 pub(crate) const STRICT_PML: &str = "http://purl.oclc.org/ooxml/presentationml/main";

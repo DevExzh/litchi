@@ -11,8 +11,24 @@ pub(crate) const PRESENTATION: &str = include_str!("generated/presentation.xml")
 /// The default slide-master part used for a newly authored package.
 pub(crate) const SLIDE_MASTER: &str = include_str!("generated/slideMasters/slideMaster1.xml");
 
-/// The first default slide-layout part used for a newly authored package.
-pub(crate) const SLIDE_LAYOUT: &str = include_str!("generated/slideLayouts/slideLayout1.xml");
+/// The default slide-layout parts used for a newly authored package.
+///
+/// The built-in slide master carries the complete eleven-entry
+/// `p:sldLayoutIdLst`, so package construction must materialize the same
+/// relationship graph rather than retaining only the first layout.
+pub(crate) const SLIDE_LAYOUTS: [&str; 11] = [
+    include_str!("generated/slideLayouts/slideLayout1.xml"),
+    include_str!("generated/slideLayouts/slideLayout2.xml"),
+    include_str!("generated/slideLayouts/slideLayout3.xml"),
+    include_str!("generated/slideLayouts/slideLayout4.xml"),
+    include_str!("generated/slideLayouts/slideLayout5.xml"),
+    include_str!("generated/slideLayouts/slideLayout6.xml"),
+    include_str!("generated/slideLayouts/slideLayout7.xml"),
+    include_str!("generated/slideLayouts/slideLayout8.xml"),
+    include_str!("generated/slideLayouts/slideLayout9.xml"),
+    include_str!("generated/slideLayouts/slideLayout10.xml"),
+    include_str!("generated/slideLayouts/slideLayout11.xml"),
+];
 
 /// The default theme part used for a newly authored package.
 pub(crate) const THEME: &str = include_str!("generated/theme/theme1.xml");

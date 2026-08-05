@@ -38,6 +38,19 @@ pub struct Author {
     pub color_index: u32,
 }
 
+impl Author {
+    /// Create an author with the standard initial comment metadata.
+    pub fn new(id: u32, name: impl Into<String>, initials: impl Into<String>) -> Self {
+        Self {
+            id,
+            name: name.into(),
+            initials: initials.into(),
+            last_index: 0,
+            color_index: id % 6,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Comment {
     pub author_id: u32,
@@ -46,6 +59,30 @@ pub struct Comment {
     pub x: i64,
     pub y: i64,
     pub text: String,
+}
+
+impl Comment {
+    /// Create a comment with the first valid per-author index.
+    pub fn new(author_id: u32, text: impl Into<String>, x: i64, y: i64) -> Self {
+        Self {
+            author_id,
+            date_time: None,
+            index: 1,
+            x,
+            y,
+            text: text.into(),
+        }
+    }
+
+    pub fn with_date_time(mut self, value: impl Into<String>) -> Self {
+        self.date_time = Some(value.into());
+        self
+    }
+
+    pub fn with_index(mut self, value: u32) -> Self {
+        self.index = value;
+        self
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

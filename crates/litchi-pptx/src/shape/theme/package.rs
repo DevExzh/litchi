@@ -64,6 +64,13 @@ pub fn load(package: &OpcPackage, theme_name: &str) -> Result<ThemePart> {
     Ok(codec::read(package.get_part(&uri)?.blob())?)
 }
 
+/// Read the permissive summary view used by producer-facing theme inspection.
+pub fn load_summary(package: &OpcPackage, theme_name: &str) -> Result<super::part::Summary> {
+    let uri = uri(theme_name, "theme part")?;
+    require_type(package, &uri, ct::OFC_THEME)?;
+    super::part::Part::from_part(package.get_part(&uri)?)?.read()
+}
+
 /// Replace only the color palette of an existing theme part.
 pub fn put_colors(package: &mut OpcPackage, theme_name: &str, colors: &Palette) -> Result<()> {
     let uri = uri(theme_name, "theme part")?;

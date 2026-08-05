@@ -162,6 +162,14 @@ impl<'a> Presentation<'a> {
         Ok(text)
     }
 
+    /// Load the slide-library synchronization metadata reachable from this
+    /// presentation's slide graph.
+    pub fn slide_sync(
+        &self,
+    ) -> Result<Vec<crate::presentation_properties::metadata::slide_sync::Part>> {
+        crate::presentation_properties::metadata::slide_sync::load(self.package)
+    }
+
     fn slide_part(&self, reference: &SlideReference) -> Result<SlidePart<'a>> {
         let part = crate::parts::find_related_part(
             self.package,
