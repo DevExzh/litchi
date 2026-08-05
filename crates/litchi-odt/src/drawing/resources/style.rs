@@ -1,7 +1,7 @@
 //! Package and flat-document access to named drawing style resources.
 
 use crate::{
-    FlatOpenDocument, OpenDocumentPackage,
+    FlatDocument, Package,
     drawing::resources::gradient::{Collection as GradientCollection, parse_drawing_gradients},
     drawing::resources::hatch::{Collection as HatchCollection, parse_drawing_hatches},
     drawing::resources::stroke_dash::{
@@ -10,7 +10,7 @@ use crate::{
 };
 use litchi_core::Result;
 
-impl OpenDocumentPackage {
+impl Package {
     /// Return named legacy and SVG drawing gradients from `styles.xml`.
     ///
     /// This exposes stored common-style resources only. It does not resolve
@@ -45,7 +45,7 @@ impl OpenDocumentPackage {
     }
 }
 
-impl FlatOpenDocument {
+impl FlatDocument {
     /// Return named legacy and SVG drawing gradients from the flat document.
     ///
     /// This exposes stored common-style resources only. It does not resolve

@@ -11,7 +11,7 @@ use super::row::{
     HorizontalBackgroundPosition, Opacity, Repeat, VerticalBackgroundPosition,
 };
 use super::table::{Shadow, WritingMode};
-use crate::{FlatOpenDocument, OpenDocumentPackage};
+use crate::{FlatDocument, Package};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
@@ -1420,13 +1420,13 @@ fn base64_decode(value: &str) -> Result<Vec<u8>> {
     Ok(out)
 }
 
-impl OpenDocumentPackage {
+impl Package {
     pub fn cell_style_properties(&self) -> Result<Styles> {
         self.styles_xml()?
             .map_or_else(|| Ok(Default::default()), |xml| parse(&xml))
     }
 }
-impl FlatOpenDocument {
+impl FlatDocument {
     pub fn cell_style_properties(&self) -> Result<Styles> {
         parse(self.xml())
     }

@@ -31,7 +31,7 @@ fn parses_real_odfdo_and_libreoffice() {
     let lo = include_bytes!(
         "../../../test-data/libreoffice-core/xmloff/qa/unit/data/scale-width-redline.fodt"
     );
-    let flat = litchi_odt::generic::FlatOpenDocument::from_reader(Cursor::new(lo)).unwrap();
+    let flat = litchi_odt::generic::FlatDocument::from_reader(Cursor::new(lo)).unwrap();
     assert!(!flat.paragraph_style_flows().unwrap().styles.is_empty());
 }
 #[test]
@@ -50,7 +50,7 @@ fn builder_package_round_trip() {
     let mut b = Builder::new();
     b.add_paragraph_flow_style(style.clone()).unwrap();
     b.add_paragraph("x").unwrap();
-    let package = litchi_odt::generic::OpenDocumentPackage::from_bytes(b.build().unwrap()).unwrap();
+    let package = litchi_odt::generic::Package::from_bytes(b.build().unwrap()).unwrap();
     assert_eq!(
         package.paragraph_style_flows().unwrap().get("Flow"),
         Some(&style)

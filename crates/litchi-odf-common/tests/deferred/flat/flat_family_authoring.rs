@@ -4,8 +4,8 @@
 
 use litchi_odf::{
     CellValue, DrawingLayer, DrawingPageProperties, DrawingShapeKind, FlatChartDocument,
-    FlatDrawingDocument, FlatOpenDocument, FlatPresentation, FlatSpreadsheet, FlatTextDocument,
-    OpenDocumentFamily, Shape,
+    FlatDrawingDocument, FlatDocument, FlatPresentation, FlatSpreadsheet, FlatTextDocument,
+    Family, Shape,
 };
 
 const FLAT_TEXT: &str = include_str!(
@@ -62,8 +62,8 @@ fn flat_text_paragraph_edit_round_trips() {
     let output = String::from_utf8(bytes.clone()).unwrap();
 
     // The splice output is a valid flat document of the same family.
-    let flat = FlatOpenDocument::from_bytes(bytes.clone()).unwrap();
-    assert_eq!(flat.family(), OpenDocumentFamily::Text);
+    let flat = FlatDocument::from_bytes(bytes.clone()).unwrap();
+    assert_eq!(flat.family(), Family::Text);
     // Sections the mutation did not touch keep their original content.
     assert!(output.contains("<office:settings>"));
     assert!(output.contains("<office:master-styles>"));
@@ -117,8 +117,8 @@ fn flat_spreadsheet_cell_edit_round_trips() {
 
     let bytes = mutable.to_bytes().unwrap();
     let output = String::from_utf8(bytes.clone()).unwrap();
-    let flat = FlatOpenDocument::from_bytes(bytes.clone()).unwrap();
-    assert_eq!(flat.family(), OpenDocumentFamily::Spreadsheet);
+    let flat = FlatDocument::from_bytes(bytes.clone()).unwrap();
+    assert_eq!(flat.family(), Family::Spreadsheet);
     // The linked image stays inert stored metadata; it is never fetched.
     assert!(output.contains("tracking-pixel.png"));
 
@@ -159,7 +159,7 @@ fn flat_spreadsheet_odfpy_fixture_edit_round_trips() {
     // `to_mutable` leaves the original wrapper usable.
     assert_eq!(
         document.flat_document().family(),
-        OpenDocumentFamily::Spreadsheet
+        Family::Spreadsheet
     );
 
     let mut reopened = FlatSpreadsheet::from_bytes(bytes).unwrap();
@@ -189,8 +189,8 @@ fn flat_presentation_slide_edit_round_trips() {
         .unwrap();
 
     let bytes = mutable.to_bytes().unwrap();
-    let flat = FlatOpenDocument::from_bytes(bytes.clone()).unwrap();
-    assert_eq!(flat.family(), OpenDocumentFamily::Presentation);
+    let flat = FlatDocument::from_bytes(bytes.clone()).unwrap();
+    assert_eq!(flat.family(), Family::Presentation);
 
     let reopened = FlatPresentation::from_bytes(bytes).unwrap();
     let slides = reopened.presentation().slides().unwrap();
@@ -251,8 +251,8 @@ fn flat_drawing_page_and_shape_authoring_round_trips() {
 
     let bytes = mutable.to_bytes().unwrap();
     let output = String::from_utf8(bytes.clone()).unwrap();
-    let flat = FlatOpenDocument::from_bytes(bytes.clone()).unwrap();
-    assert_eq!(flat.family(), OpenDocumentFamily::Drawing);
+    let flat = FlatDocument::from_bytes(bytes.clone()).unwrap();
+    assert_eq!(flat.family(), Family::Drawing);
     assert!(output.contains("libreoffice_5f_0"));
 
     let reopened = FlatDrawingDocument::from_bytes(bytes).unwrap();
@@ -291,8 +291,8 @@ fn flat_chart_axis_update_round_trips() {
 
     let bytes = mutable.to_bytes().unwrap();
     let output = String::from_utf8(bytes.clone()).unwrap();
-    let flat = FlatOpenDocument::from_bytes(bytes.clone()).unwrap();
-    assert_eq!(flat.family(), OpenDocumentFamily::Chart);
+    let flat = FlatDocument::from_bytes(bytes.clone()).unwrap();
+    assert_eq!(flat.family(), Family::Chart);
     assert!(output.contains("keep-me"));
 
     let reopened = FlatChartDocument::from_bytes(bytes).unwrap();

@@ -39,7 +39,7 @@ fn round_trip(bytes: Vec<u8>) -> Vec<u8> {
 
 /// The saved `content.xml` of a presentation package.
 fn saved_content_xml(bytes: Vec<u8>) -> String {
-    let package = litchi_odp::OpenDocumentPackage::from_bytes(bytes).expect("open package");
+    let package = litchi_odp::Package::from_bytes(bytes).expect("open package");
     String::from_utf8(package.get_file("content.xml").expect("content.xml")).expect("utf-8")
 }
 

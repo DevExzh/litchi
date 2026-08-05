@@ -438,14 +438,14 @@ pub fn parse_image_maps(xml: &str) -> Result<Vec<ImageMap>> {
     Ok(maps)
 }
 
-impl crate::OpenDocumentPackage {
+impl crate::Package {
     /// Every `draw:image-map` in packaged `content.xml`, in document order.
     pub fn image_maps(&self) -> Result<Vec<ImageMap>> {
         parse_image_maps(&self.content_xml()?)
     }
 }
 
-impl crate::FlatOpenDocument {
+impl crate::FlatDocument {
     /// Every `draw:image-map` in a flat OpenDocument, in document order.
     pub fn image_maps(&self) -> Result<Vec<ImageMap>> {
         parse_image_maps(self.xml())

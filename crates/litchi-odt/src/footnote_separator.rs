@@ -201,7 +201,7 @@ impl Separator {
     }
 }
 
-impl crate::OpenDocumentPackage {
+impl crate::Package {
     pub fn style_footnote_separators(&self) -> Result<Vec<Separator>> {
         let mut values = parse(self.styles_xml()?.as_deref().unwrap_or_default())?;
         values.extend(parse(&self.content_xml()?)?);
@@ -212,7 +212,7 @@ impl crate::OpenDocumentPackage {
     }
 }
 
-impl crate::FlatOpenDocument {
+impl crate::FlatDocument {
     pub fn style_footnote_separators(&self) -> Result<Vec<Separator>> {
         parse(self.xml())
     }

@@ -2,7 +2,7 @@
 //! save-as-template conversion, and edit round-trips through the reader.
 
 use litchi_odf::{
-    Document, DocumentBuilder, MutableWebDocument, OpenDocumentFamily, OpenDocumentPackage,
+    Document, DocumentBuilder, MutableWebDocument, Family, Package,
     OwnedPackage, WebDocument, WebDocumentBuilder, constants,
 };
 
@@ -27,8 +27,8 @@ fn assert_web_package_sanity(bytes: &[u8]) {
     );
 
     // The format-neutral reader classifies it as a Web template.
-    let generic = OpenDocumentPackage::from_bytes(bytes.to_vec()).unwrap();
-    assert_eq!(generic.family(), OpenDocumentFamily::Web);
+    let generic = Package::from_bytes(bytes.to_vec()).unwrap();
+    assert_eq!(generic.family(), Family::Web);
     assert!(generic.is_template());
 }
 

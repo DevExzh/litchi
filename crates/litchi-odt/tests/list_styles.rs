@@ -120,7 +120,7 @@ fn linked_image_round_trip() {
 #[test]
 fn parses_flat_odt_fixture() {
     let bytes = include_bytes!("../../../test-data/odf/odt/note-ordinary-numbering.fodt");
-    let flat = litchi_odt::generic::FlatOpenDocument::from_reader(Cursor::new(bytes)).unwrap();
+    let flat = litchi_odt::generic::FlatDocument::from_reader(Cursor::new(bytes)).unwrap();
     let set = flat.styles().unwrap();
     let l1 = set.get("L1").expect("fixture declares list style L1");
     let Kind::Number(number) = &l1.level(1).unwrap().kind else {
@@ -140,7 +140,7 @@ fn parses_libreoffice_list_style_fixture() {
     let bytes = include_bytes!(
         "../../../test-data/libreoffice-core/xmloff/qa/unit/data/differentListStylesInOneList.fodt"
     );
-    let flat = litchi_odt::generic::FlatOpenDocument::from_reader(Cursor::new(bytes)).unwrap();
+    let flat = litchi_odt::generic::FlatDocument::from_reader(Cursor::new(bytes)).unwrap();
     let set = flat.styles().unwrap();
     let one = set
         .get("ListStyleOne")

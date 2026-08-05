@@ -4,7 +4,7 @@ use super::row::{
     BackgroundColor, BackgroundImage, BackgroundPosition, BackgroundSource, Break,
     HorizontalBackgroundPosition, KeepTogether, Opacity, Repeat, VerticalBackgroundPosition,
 };
-use crate::{FlatOpenDocument, OpenDocumentPackage};
+use crate::{FlatDocument, Package};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
@@ -1180,13 +1180,13 @@ pub fn set_xml(xml: &str, want: &Style) -> Result<String> {
     out.insert_str(s.style.end_start, &value);
     Ok(out)
 }
-impl OpenDocumentPackage {
+impl Package {
     pub fn table_style_properties(&self) -> Result<Styles> {
         self.styles_xml()?
             .map_or_else(|| Ok(Default::default()), |x| parse(&x))
     }
 }
-impl FlatOpenDocument {
+impl FlatDocument {
     pub fn table_style_properties(&self) -> Result<Styles> {
         parse(self.xml())
     }

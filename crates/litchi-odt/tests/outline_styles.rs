@@ -45,7 +45,7 @@ fn flat_document_exposes_outline_styles_without_interpreting_headings() {
     let xml = document(
         r#"<t:outline-style s:name="Outline"><t:outline-level-style t:level="1" s:num-format="1"/></t:outline-style>"#,
     );
-    let document = litchi_odt::generic::FlatOpenDocument::from_bytes(xml.into_bytes()).unwrap();
+    let document = litchi_odt::generic::FlatDocument::from_bytes(xml.into_bytes()).unwrap();
     assert_eq!(document.outline_styles().unwrap().styles.len(), 1);
 }
 

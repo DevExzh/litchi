@@ -1,6 +1,6 @@
 use litchi_ods::{
     CellValue, Image, ImageFrame, ImagePart, ImageSource, MutableSpreadsheet, OdfLength,
-    OpenDocumentPackage, OwnedPackage, Spreadsheet, Builder,
+    Package, OwnedPackage, Spreadsheet, Builder,
 };
 use std::io::{Cursor, Write};
 
@@ -182,7 +182,7 @@ fn insert_image_round_trips_discoverable_package_pictures() {
     );
 
     // The media-level scan discovers the frames with sheet attribution.
-    let generic = OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
+    let generic = Package::from_bytes(bytes.clone()).unwrap();
     let scanned = generic.images().unwrap();
     assert_eq!(scanned.len(), 3);
     let data_frames: Vec<_> = scanned

@@ -7,7 +7,7 @@
 //! the `true` and `false` tokens. All other sibling-owned attributes are
 //! ignored. Duplicates and malformed owned values are rejected.
 
-use crate::{FlatOpenDocument, OpenDocumentPackage, style::paragraph::margin::rewrite_start_tag};
+use crate::{FlatDocument, Package, style::paragraph::margin::rewrite_start_tag};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
@@ -712,13 +712,13 @@ pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
     Ok(out)
 }
 
-impl OpenDocumentPackage {
+impl Package {
     pub fn paragraph_style_writing_modes(&self) -> Result<Styles> {
         self.styles_xml()?
             .map_or_else(|| Ok(Styles::default()), |xml| parse(&xml))
     }
 }
-impl FlatOpenDocument {
+impl FlatDocument {
     pub fn paragraph_style_writing_modes(&self) -> Result<Styles> {
         parse(self.xml())
     }

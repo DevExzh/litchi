@@ -11,7 +11,7 @@ use quick_xml::{
 };
 
 use crate::line_numbering::Format;
-use crate::{FlatOpenDocument, OpenDocumentPackage};
+use crate::{FlatDocument, Package};
 
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
@@ -793,14 +793,14 @@ pub fn remove_xml(xml: &str, note_class: Class) -> Result<String> {
     Ok(format!("{}{}", &xml[..span.start], &xml[span.end..]))
 }
 
-impl OpenDocumentPackage {
+impl Package {
     pub fn notes_configurations(&self) -> Result<Configurations> {
         self.styles_xml()?
             .map_or_else(|| Ok(Configurations::default()), |xml| parse(&xml))
     }
 }
 
-impl FlatOpenDocument {
+impl FlatDocument {
     pub fn notes_configurations(&self) -> Result<Configurations> {
         parse(self.xml())
     }
@@ -1126,7 +1126,7 @@ mod tests {
             real.endnote.as_ref().unwrap().number_format,
             Some(Format::LowerRoman)
         );
-        let flat = FlatOpenDocument::from_bytes(fixture.as_bytes().to_vec()).unwrap();
+        let flat = FlatDocument::from_bytes(fixture.as_bytes().to_vec()).unwrap();
         assert_eq!(flat.notes_configurations().unwrap(), real);
     }
 
@@ -1170,7 +1170,7 @@ mod tests {
 
         let mut builder = Builder::new();
         builder.set_notes_configuration(value.clone()).unwrap();
-        let package = OpenDocumentPackage::from_bytes(builder.build().unwrap()).unwrap();
+        let package = Package::from_bytes(builder.build().unwrap()).unwrap();
         assert_eq!(
             package.notes_configurations().unwrap().footnote,
             Some(value)

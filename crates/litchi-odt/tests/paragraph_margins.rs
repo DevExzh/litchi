@@ -198,8 +198,7 @@ fn builder_package_round_trip() {
             .is_err()
     );
     builder.add_paragraph("x").unwrap();
-    let package =
-        litchi_odt::generic::OpenDocumentPackage::from_bytes(builder.build().unwrap()).unwrap();
+    let package = litchi_odt::generic::Package::from_bytes(builder.build().unwrap()).unwrap();
     assert_eq!(
         package.paragraph_style_margins().unwrap().get("Body"),
         Some(&style)
@@ -217,7 +216,7 @@ fn parses_real_odfdo_fixture() {
             .filter_map(|x| x.properties.as_ref())
             .any(|p| p.contextual_spacing == Some(false) && p.margin_bottom.is_some())
     );
-    let flat = litchi_odt::generic::FlatOpenDocument::from_reader(Cursor::new(xml)).unwrap();
+    let flat = litchi_odt::generic::FlatDocument::from_reader(Cursor::new(xml)).unwrap();
     assert_eq!(
         flat.paragraph_style_margins().unwrap().styles.len(),
         set.styles.len()

@@ -1,6 +1,6 @@
 use litchi_odt::{
-    ChartDocument, Document, DrawingDocument, FlatOpenDocument, MasterDocument,
-    OdfVariableDeclaration, OdfVariableKind, OdfVariableValue, OpenDocumentPackage, Presentation,
+    ChartDocument, Document, DrawingDocument, FlatDocument, MasterDocument,
+    OdfVariableDeclaration, OdfVariableKind, OdfVariableValue, Package, Presentation,
     Spreadsheet,
 };
 use std::io::{Cursor, Write};
@@ -69,7 +69,7 @@ fn parses_ordered_typed_inert_declarations_and_sequence_defaults() {
         r##"<t:sequence-decls><t:sequence-decl t:name="Figure" t:display-outline-level="3" t:separation-character="#"/><t:sequence-decl t:name="Table" t:display-outline-level="2"/></t:sequence-decls>"##,
         r#"<t:p><t:variable-get t:name="simple">1</t:variable-get><t:user-field-get t:name="string">hello</t:user-field-get><t:sequence t:name="Figure" t:formula="ooow:Figure+1">1</t:sequence></t:p>"#,
     ));
-    let declarations = FlatOpenDocument::from_bytes(xml)
+    let declarations = FlatDocument::from_bytes(xml)
         .unwrap()
         .variable_declarations()
         .unwrap();
@@ -120,7 +120,7 @@ fn rejects_malformed_spoofed_active_and_ambiguous_declarations() {
         r#"<t:variable-get t:name="late"/><t:variable-decls><t:variable-decl t:name="late" o:value-type="float"/></t:variable-decls>"#,
         r#"<t:user-field-get t:name="missing"/>"#,
     ] {
-        let document = FlatOpenDocument::from_bytes(flat(inner)).unwrap();
+        let document = FlatDocument::from_bytes(flat(inner)).unwrap();
         assert!(document.variable_declarations().is_err(), "{inner}");
     }
     let spoofed = format!(
@@ -128,7 +128,7 @@ fn rejects_malformed_spoofed_active_and_ambiguous_declarations() {
     )
     .into_bytes();
     assert!(
-        FlatOpenDocument::from_bytes(spoofed)
+        FlatDocument::from_bytes(spoofed)
             .unwrap()
             .variable_declarations()
             .is_err()
@@ -149,7 +149,7 @@ fn packaged_content_styles_and_every_specialized_facade_expose_declarations() {
         &text_content,
         Some(&styles),
     );
-    let generic = OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
+    let generic = Package::from_bytes(bytes.clone()).unwrap();
     let declarations = generic.variable_declarations().unwrap();
     assert_eq!(declarations.groups.len(), 2);
     assert!(declarations.find(OdfVariableKind::User, "header").is_some());
@@ -252,7 +252,7 @@ fn parses_bundled_flat_fixtures() {
         if !path.exists() {
             continue;
         }
-        let document = FlatOpenDocument::from_bytes(std::fs::read(path).unwrap()).unwrap();
+        let document = FlatDocument::from_bytes(std::fs::read(path).unwrap()).unwrap();
         let declarations = document
             .variable_declarations()
             .unwrap_or_else(|error| panic!("failed declaration scan for {fixture}: {error}"));
@@ -282,7 +282,7 @@ fn parses_bundled_odfpy_and_odfdo_package_oracles() {
     if example.exists() {
         let xml = std::fs::read_to_string(example).unwrap();
         let bytes = package("application/vnd.oasis.opendocument.text", &xml, None);
-        let declarations = OpenDocumentPackage::from_bytes(bytes)
+        let declarations = Package::from_bytes(bytes)
             .unwrap()
             .variable_declarations()
             .unwrap();
@@ -297,7 +297,7 @@ fn parses_bundled_odfpy_and_odfdo_package_oracles() {
 #[test]
 fn enforces_name_count_depth_and_aggregate_limits() {
     let oversized_name = "n".repeat(65_537);
-    let document = FlatOpenDocument::from_bytes(flat(&format!(
+    let document = FlatDocument::from_bytes(flat(&format!(
         r#"<t:variable-decls><t:variable-decl t:name="{oversized_name}" o:value-type="float"/></t:variable-decls>"#
     )))
     .unwrap();
@@ -310,7 +310,7 @@ fn enforces_name_count_depth_and_aggregate_limits() {
         ));
     }
     many.push_str("</t:variable-decls>");
-    let document = FlatOpenDocument::from_bytes(flat(&many)).unwrap();
+    let document = FlatDocument::from_bytes(flat(&many)).unwrap();
     assert!(document.variable_declarations().is_err());
 
     let mut deep = String::new();
@@ -320,7 +320,7 @@ fn enforces_name_count_depth_and_aggregate_limits() {
     for _ in 0..260 {
         deep.push_str("</t:span>");
     }
-    let document = FlatOpenDocument::from_bytes(flat(&deep)).unwrap();
+    let document = FlatDocument::from_bytes(flat(&deep)).unwrap();
     assert!(document.variable_declarations().is_err());
 
     let chunk = "x".repeat(1_000_000);
@@ -331,6 +331,6 @@ fn enforces_name_count_depth_and_aggregate_limits() {
         ));
     }
     aggregate.push_str("</t:user-field-decls>");
-    let document = FlatOpenDocument::from_bytes(flat(&aggregate)).unwrap();
+    let document = FlatDocument::from_bytes(flat(&aggregate)).unwrap();
     assert!(document.variable_declarations().is_err());
 }

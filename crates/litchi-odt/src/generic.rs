@@ -12,7 +12,7 @@ use std::path::Path;
 /// Standard packaged OpenDocument document family.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum OpenDocumentFamily {
+pub enum Family {
     /// Text document or template.
     Text,
     /// Spreadsheet document or template.
@@ -40,9 +40,9 @@ pub enum OpenDocumentFamily {
 /// This provides lossless package access for every standard OpenDocument
 /// family, including document types that do not yet have a specialized object
 /// model. Saving an unmodified package returns the original bytes exactly.
-pub struct OpenDocumentPackage {
+pub struct Package {
     package: OwnedPackage,
-    family: OpenDocumentFamily,
+    family: Family,
     template: bool,
     mimetype: String,
 }
@@ -54,13 +54,13 @@ pub struct OpenDocumentPackage {
 /// `.fodp`, `.fodg`, `.fodc`, or `.fodi`. The `.fodf` extension is also
 /// accepted for compatibility with odfdo's non-standard `office:formula`
 /// convention; conforming packaged `.odf` formulas use a direct MathML root.
-pub struct FlatOpenDocument {
+pub struct FlatDocument {
     xml: String,
-    family: OpenDocumentFamily,
+    family: Family,
     mimetype: String,
 }
 
-impl FlatOpenDocument {
+impl FlatDocument {
     /// Parses the optional flat-document `office:settings` inventory.
     pub fn settings(&self) -> Result<crate::Settings> {
         crate::settings::parse_settings(self.xml(), crate::settings::SettingsDocumentKind::Flat)
@@ -86,12 +86,7 @@ impl FlatOpenDocument {
         let (family, template) = classify_mimetype(&mimetype).ok_or_else(|| {
             Error::InvalidFormat(format!("unsupported OpenDocument mimetype '{mimetype}'"))
         })?;
-        if template
-            || matches!(
-                family,
-                OpenDocumentFamily::Master | OpenDocumentFamily::Web | OpenDocumentFamily::Database
-            )
-        {
+        if template || matches!(family, Family::Master | Family::Web | Family::Database) {
             return Err(Error::InvalidFormat(format!(
                 "mimetype '{mimetype}' has no standard flat OpenDocument form"
             )));
@@ -107,7 +102,7 @@ impl FlatOpenDocument {
     }
 
     /// Return the document family.
-    pub fn family(&self) -> OpenDocumentFamily {
+    pub fn family(&self) -> Family {
         self.family
     }
 
@@ -119,14 +114,14 @@ impl FlatOpenDocument {
     /// Return the conventional flat OpenDocument extension.
     pub fn extension(&self) -> &'static str {
         match self.family {
-            OpenDocumentFamily::Text => "fodt",
-            OpenDocumentFamily::Spreadsheet => "fods",
-            OpenDocumentFamily::Presentation => "fodp",
-            OpenDocumentFamily::Drawing => "fodg",
-            OpenDocumentFamily::Chart => "fodc",
-            OpenDocumentFamily::Formula => "fodf",
-            OpenDocumentFamily::Image => "fodi",
-            OpenDocumentFamily::Master | OpenDocumentFamily::Web | OpenDocumentFamily::Database => {
+            Family::Text => "fodt",
+            Family::Spreadsheet => "fods",
+            Family::Presentation => "fodp",
+            Family::Drawing => "fodg",
+            Family::Chart => "fodc",
+            Family::Formula => "fodf",
+            Family::Image => "fodi",
+            Family::Master | Family::Web | Family::Database => {
                 unreachable!("master and web flat documents are rejected")
             },
         }
@@ -175,7 +170,7 @@ impl FlatOpenDocument {
     ) -> Result<Option<crate::variable_declaration::Group>> {
         if group.part != crate::variable_declaration::Part::Flat {
             return Err(Error::InvalidFormat(
-                "FlatOpenDocument requires Part::Flat".to_string(),
+                "FlatDocument requires Part::Flat".to_string(),
             ));
         }
         let current = self.variable_declarations()?;
@@ -249,7 +244,7 @@ impl FlatOpenDocument {
     }
 }
 
-fn validate_flat_document(xml: &str, family: OpenDocumentFamily) -> Result<()> {
+fn validate_flat_document(xml: &str, family: Family) -> Result<()> {
     const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 
     let mut reader = NsReader::from_str(xml);
@@ -260,14 +255,14 @@ fn validate_flat_document(xml: &str, family: OpenDocumentFamily) -> Result<()> {
     let mut body_seen = false;
     let mut family_body_seen = false;
     let expected_body = match family {
-        OpenDocumentFamily::Text => b"text".as_slice(),
-        OpenDocumentFamily::Spreadsheet => b"spreadsheet".as_slice(),
-        OpenDocumentFamily::Presentation => b"presentation".as_slice(),
-        OpenDocumentFamily::Drawing => b"drawing".as_slice(),
-        OpenDocumentFamily::Chart => b"chart".as_slice(),
-        OpenDocumentFamily::Formula => b"formula".as_slice(),
-        OpenDocumentFamily::Image => b"image".as_slice(),
-        OpenDocumentFamily::Master | OpenDocumentFamily::Web | OpenDocumentFamily::Database => {
+        Family::Text => b"text".as_slice(),
+        Family::Spreadsheet => b"spreadsheet".as_slice(),
+        Family::Presentation => b"presentation".as_slice(),
+        Family::Drawing => b"drawing".as_slice(),
+        Family::Chart => b"chart".as_slice(),
+        Family::Formula => b"formula".as_slice(),
+        Family::Image => b"image".as_slice(),
+        Family::Master | Family::Web | Family::Database => {
             unreachable!()
         },
     };
@@ -353,7 +348,7 @@ fn validate_flat_document(xml: &str, family: OpenDocumentFamily) -> Result<()> {
     Ok(())
 }
 
-impl OpenDocumentPackage {
+impl Package {
     pub fn owned_package(&self) -> &OwnedPackage {
         &self.package
     }
@@ -385,7 +380,7 @@ impl OpenDocumentPackage {
             &[constants::ODF_SETTINGS.to_string()],
             &[],
         )?;
-        OpenDocumentPackage::from_bytes(writer.finish_to_bytes()?)
+        Package::from_bytes(writer.finish_to_bytes()?)
     }
 
     /// Replace `content.xml` while preserving optional core parts and every
@@ -459,7 +454,7 @@ impl OpenDocumentPackage {
     }
 
     /// Return the standard document family.
-    pub fn family(&self) -> OpenDocumentFamily {
+    pub fn family(&self) -> Family {
         self.family
     }
 
@@ -591,7 +586,7 @@ impl OpenDocumentPackage {
     ) -> Result<Option<crate::variable_declaration::Group>> {
         if group.part == crate::variable_declaration::Part::Flat {
             return Err(Error::InvalidFormat(
-                "OpenDocumentPackage cannot write Part::Flat".to_string(),
+                "Package cannot write Part::Flat".to_string(),
             ));
         }
 
@@ -641,7 +636,7 @@ impl OpenDocumentPackage {
     ) -> Result<Option<crate::variable_declaration::Group>> {
         if part == crate::variable_declaration::Part::Flat {
             return Err(Error::InvalidFormat(
-                "OpenDocumentPackage cannot remove Part::Flat".to_string(),
+                "Package cannot remove Part::Flat".to_string(),
             ));
         }
 
@@ -705,7 +700,7 @@ impl OpenDocumentPackage {
             writer.add_file(constants::ODF_META, &bytes)?;
         }
         writer.copy_auxiliary_files_from(&self.package)?;
-        let replacement = OpenDocumentPackage::from_bytes(writer.finish_to_bytes()?)?;
+        let replacement = Package::from_bytes(writer.finish_to_bytes()?)?;
         *self = replacement;
         Ok(old)
     }
@@ -756,26 +751,26 @@ fn decode_xml_part(bytes: Vec<u8>, path: &str) -> Result<String> {
     String::from_utf8(bytes).map_err(|_| Error::InvalidFormat(format!("invalid UTF-8 in {path}")))
 }
 
-fn classify_mimetype(mimetype: &str) -> Option<(OpenDocumentFamily, bool)> {
+fn classify_mimetype(mimetype: &str) -> Option<(Family, bool)> {
     Some(match mimetype {
-        constants::ODF_TEXT => (OpenDocumentFamily::Text, false),
-        constants::ODF_TEXT_TEMPLATE => (OpenDocumentFamily::Text, true),
-        constants::ODF_SPREADSHEET => (OpenDocumentFamily::Spreadsheet, false),
-        constants::ODF_SPREADSHEET_TEMPLATE => (OpenDocumentFamily::Spreadsheet, true),
-        constants::ODF_PRESENTATION => (OpenDocumentFamily::Presentation, false),
-        constants::ODF_PRESENTATION_TEMPLATE => (OpenDocumentFamily::Presentation, true),
-        constants::ODF_DRAWING => (OpenDocumentFamily::Drawing, false),
-        constants::ODF_DRAWING_TEMPLATE => (OpenDocumentFamily::Drawing, true),
-        constants::ODF_CHART => (OpenDocumentFamily::Chart, false),
-        constants::ODF_CHART_TEMPLATE => (OpenDocumentFamily::Chart, true),
-        constants::ODF_FORMULA => (OpenDocumentFamily::Formula, false),
-        constants::ODF_FORMULA_TEMPLATE => (OpenDocumentFamily::Formula, true),
-        constants::ODF_IMAGE => (OpenDocumentFamily::Image, false),
-        constants::ODF_IMAGE_TEMPLATE => (OpenDocumentFamily::Image, true),
-        constants::ODF_MASTER => (OpenDocumentFamily::Master, false),
-        constants::ODF_MASTER_TEMPLATE => (OpenDocumentFamily::Master, true),
-        constants::ODF_WEB => (OpenDocumentFamily::Web, true),
-        constants::ODF_DATABASE => (OpenDocumentFamily::Database, false),
+        constants::ODF_TEXT => (Family::Text, false),
+        constants::ODF_TEXT_TEMPLATE => (Family::Text, true),
+        constants::ODF_SPREADSHEET => (Family::Spreadsheet, false),
+        constants::ODF_SPREADSHEET_TEMPLATE => (Family::Spreadsheet, true),
+        constants::ODF_PRESENTATION => (Family::Presentation, false),
+        constants::ODF_PRESENTATION_TEMPLATE => (Family::Presentation, true),
+        constants::ODF_DRAWING => (Family::Drawing, false),
+        constants::ODF_DRAWING_TEMPLATE => (Family::Drawing, true),
+        constants::ODF_CHART => (Family::Chart, false),
+        constants::ODF_CHART_TEMPLATE => (Family::Chart, true),
+        constants::ODF_FORMULA => (Family::Formula, false),
+        constants::ODF_FORMULA_TEMPLATE => (Family::Formula, true),
+        constants::ODF_IMAGE => (Family::Image, false),
+        constants::ODF_IMAGE_TEMPLATE => (Family::Image, true),
+        constants::ODF_MASTER => (Family::Master, false),
+        constants::ODF_MASTER_TEMPLATE => (Family::Master, true),
+        constants::ODF_WEB => (Family::Web, true),
+        constants::ODF_DATABASE => (Family::Database, false),
         _ => return None,
     })
 }
@@ -803,63 +798,35 @@ mod tests {
     #[test]
     fn opens_every_document_family_and_template_losslessly() {
         for (mimetype, family, template) in [
-            (constants::ODF_TEXT, OpenDocumentFamily::Text, false),
-            (constants::ODF_TEXT_TEMPLATE, OpenDocumentFamily::Text, true),
-            (
-                constants::ODF_SPREADSHEET,
-                OpenDocumentFamily::Spreadsheet,
-                false,
-            ),
+            (constants::ODF_TEXT, Family::Text, false),
+            (constants::ODF_TEXT_TEMPLATE, Family::Text, true),
+            (constants::ODF_SPREADSHEET, Family::Spreadsheet, false),
             (
                 constants::ODF_SPREADSHEET_TEMPLATE,
-                OpenDocumentFamily::Spreadsheet,
+                Family::Spreadsheet,
                 true,
             ),
-            (
-                constants::ODF_PRESENTATION,
-                OpenDocumentFamily::Presentation,
-                false,
-            ),
+            (constants::ODF_PRESENTATION, Family::Presentation, false),
             (
                 constants::ODF_PRESENTATION_TEMPLATE,
-                OpenDocumentFamily::Presentation,
+                Family::Presentation,
                 true,
             ),
-            (constants::ODF_DRAWING, OpenDocumentFamily::Drawing, false),
-            (
-                constants::ODF_DRAWING_TEMPLATE,
-                OpenDocumentFamily::Drawing,
-                true,
-            ),
-            (constants::ODF_CHART, OpenDocumentFamily::Chart, false),
-            (
-                constants::ODF_CHART_TEMPLATE,
-                OpenDocumentFamily::Chart,
-                true,
-            ),
-            (constants::ODF_FORMULA, OpenDocumentFamily::Formula, false),
-            (
-                constants::ODF_FORMULA_TEMPLATE,
-                OpenDocumentFamily::Formula,
-                true,
-            ),
-            (constants::ODF_IMAGE, OpenDocumentFamily::Image, false),
-            (
-                constants::ODF_IMAGE_TEMPLATE,
-                OpenDocumentFamily::Image,
-                true,
-            ),
-            (constants::ODF_MASTER, OpenDocumentFamily::Master, false),
-            (
-                constants::ODF_MASTER_TEMPLATE,
-                OpenDocumentFamily::Master,
-                true,
-            ),
-            (constants::ODF_WEB, OpenDocumentFamily::Web, true),
-            (constants::ODF_DATABASE, OpenDocumentFamily::Database, false),
+            (constants::ODF_DRAWING, Family::Drawing, false),
+            (constants::ODF_DRAWING_TEMPLATE, Family::Drawing, true),
+            (constants::ODF_CHART, Family::Chart, false),
+            (constants::ODF_CHART_TEMPLATE, Family::Chart, true),
+            (constants::ODF_FORMULA, Family::Formula, false),
+            (constants::ODF_FORMULA_TEMPLATE, Family::Formula, true),
+            (constants::ODF_IMAGE, Family::Image, false),
+            (constants::ODF_IMAGE_TEMPLATE, Family::Image, true),
+            (constants::ODF_MASTER, Family::Master, false),
+            (constants::ODF_MASTER_TEMPLATE, Family::Master, true),
+            (constants::ODF_WEB, Family::Web, true),
+            (constants::ODF_DATABASE, Family::Database, false),
         ] {
             let bytes = package(mimetype);
-            let document = OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
+            let document = Package::from_bytes(bytes.clone()).unwrap();
             assert_eq!(document.family(), family);
             assert_eq!(document.is_template(), template);
             assert_eq!(document.mimetype(), mimetype);
@@ -876,68 +843,43 @@ mod tests {
         let mut writer = PackageWriter::new();
         writer.set_mimetype("application/zip").unwrap();
         writer.add_file(constants::ODF_CONTENT, b"<x/>").unwrap();
-        assert!(OpenDocumentPackage::from_bytes(writer.finish_to_bytes().unwrap()).is_err());
+        assert!(Package::from_bytes(writer.finish_to_bytes().unwrap()).is_err());
 
         let mut writer = PackageWriter::new();
         writer.set_mimetype(constants::ODF_DRAWING).unwrap();
-        assert!(OpenDocumentPackage::from_bytes(writer.finish_to_bytes().unwrap()).is_err());
+        assert!(Package::from_bytes(writer.finish_to_bytes().unwrap()).is_err());
 
         let mut writer = PackageWriter::new();
         writer.set_mimetype(constants::ODF_CHART).unwrap();
         writer.add_file(constants::ODF_CONTENT, &[0xff]).unwrap();
-        assert!(OpenDocumentPackage::from_bytes(writer.finish_to_bytes().unwrap()).is_err());
+        assert!(Package::from_bytes(writer.finish_to_bytes().unwrap()).is_err());
     }
 
     #[test]
     fn opens_standard_and_odfdo_compatible_flat_documents_losslessly() {
         for (mimetype, body, family, extension) in [
-            (
-                constants::ODF_TEXT,
-                "text",
-                OpenDocumentFamily::Text,
-                "fodt",
-            ),
+            (constants::ODF_TEXT, "text", Family::Text, "fodt"),
             (
                 constants::ODF_SPREADSHEET,
                 "spreadsheet",
-                OpenDocumentFamily::Spreadsheet,
+                Family::Spreadsheet,
                 "fods",
             ),
             (
                 constants::ODF_PRESENTATION,
                 "presentation",
-                OpenDocumentFamily::Presentation,
+                Family::Presentation,
                 "fodp",
             ),
-            (
-                constants::ODF_DRAWING,
-                "drawing",
-                OpenDocumentFamily::Drawing,
-                "fodg",
-            ),
-            (
-                constants::ODF_CHART,
-                "chart",
-                OpenDocumentFamily::Chart,
-                "fodc",
-            ),
-            (
-                constants::ODF_FORMULA,
-                "formula",
-                OpenDocumentFamily::Formula,
-                "fodf",
-            ),
-            (
-                constants::ODF_IMAGE,
-                "image",
-                OpenDocumentFamily::Image,
-                "fodi",
-            ),
+            (constants::ODF_DRAWING, "drawing", Family::Drawing, "fodg"),
+            (constants::ODF_CHART, "chart", Family::Chart, "fodc"),
+            (constants::ODF_FORMULA, "formula", Family::Formula, "fodf"),
+            (constants::ODF_IMAGE, "image", Family::Image, "fodi"),
         ] {
             let xml = format!(
                 r#"<?xml version="1.0"?><!-- keep --><o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" o:mimetype="{mimetype}" o:version="1.3"><o:body><o:{body}/></o:body></o:document>"#
             );
-            let document = FlatOpenDocument::from_bytes(xml.clone().into_bytes()).unwrap();
+            let document = FlatDocument::from_bytes(xml.clone().into_bytes()).unwrap();
             assert_eq!(document.family(), family);
             assert_eq!(document.mimetype(), mimetype);
             assert_eq!(document.extension(), extension);
@@ -956,7 +898,7 @@ mod tests {
             r#"<o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" o:mimetype="application/vnd.oasis.opendocument.text"><o:body><o:text/></o:body></o:document><o:document/>"#,
         ] {
             assert!(
-                FlatOpenDocument::from_bytes(xml.as_bytes().to_vec()).is_err(),
+                FlatDocument::from_bytes(xml.as_bytes().to_vec()).is_err(),
                 "accepted invalid flat document {xml}"
             );
         }
@@ -970,7 +912,7 @@ mod tests {
             <o:meta><d:title>A &amp; B</d:title></o:meta>
             <o:body><o:text/></o:body>
         </o:document>"#;
-        let document = FlatOpenDocument::from_bytes(xml.to_vec()).unwrap();
+        let document = FlatDocument::from_bytes(xml.to_vec()).unwrap();
         assert_eq!(
             document.odf_metadata().unwrap().title.as_deref(),
             Some("A & B")
@@ -984,7 +926,7 @@ mod tests {
             r#"<o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" o:mimetype="{}"><o:body><o:text/></o:body></o:document>"#,
             constants::ODF_TEXT,
         );
-        let mut document = FlatOpenDocument::from_bytes(xml.into_bytes()).unwrap();
+        let mut document = FlatDocument::from_bytes(xml.into_bytes()).unwrap();
         let scope =
             crate::variable_declaration::Scope::Body(crate::variable_declaration::Body::Text);
         let first = crate::variable_declaration::Group {

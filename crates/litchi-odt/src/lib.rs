@@ -179,7 +179,7 @@ pub(crate) use embedded::Object;
     unused_imports,
     reason = "ODT facade exposes the canonical document package types"
 )]
-pub(crate) use generic::{FlatOpenDocument, OpenDocumentFamily, OpenDocumentPackage};
+pub(crate) use generic::{Family, FlatDocument, Package};
 #[allow(unused_imports, reason = "ODT facade exposes graphic style semantics")]
 pub(crate) use graphic_properties::{
     Child, ChildKind, Kind, Namespace, Properties, Property, Value, parse_graphic_style_properties,

@@ -290,7 +290,7 @@ impl Collection {
     }
 }
 
-impl crate::OpenDocumentPackage {
+impl crate::Package {
     pub fn drawing_fill_images(&self) -> Result<Collection> {
         let styles = self.styles_xml()?;
         parse_drawing_fill_images(styles.as_deref().unwrap_or_default())
@@ -314,7 +314,7 @@ impl crate::OpenDocumentPackage {
     }
 }
 
-impl crate::FlatOpenDocument {
+impl crate::FlatDocument {
     pub fn drawing_fill_images(&self) -> Result<Collection> {
         parse_drawing_fill_images(self.xml())
     }
@@ -964,7 +964,7 @@ mod tests {
     fn parses_local_linked_and_inline_resources() {
         let linked_xml =
             include_str!("../../../../../test-data/odf/drawing/fill-image-linked.fodp");
-        let linked = crate::FlatOpenDocument::from_bytes(linked_xml.as_bytes().to_vec()).unwrap();
+        let linked = crate::FlatDocument::from_bytes(linked_xml.as_bytes().to_vec()).unwrap();
         let images = linked.drawing_fill_images().unwrap();
         assert_eq!(
             images
@@ -979,7 +979,7 @@ mod tests {
 
         let inline_xml =
             include_str!("../../../../../test-data/odf/drawing/fill-image-inline.fodg");
-        let inline = crate::FlatOpenDocument::from_bytes(inline_xml.as_bytes().to_vec()).unwrap();
+        let inline = crate::FlatDocument::from_bytes(inline_xml.as_bytes().to_vec()).unwrap();
         let images = inline.drawing_fill_images().unwrap();
         let bytes = images
             .get("libreoffice_5f_0")

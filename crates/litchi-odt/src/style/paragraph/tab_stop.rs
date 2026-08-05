@@ -350,13 +350,13 @@ impl Styles {
     }
 }
 
-impl crate::OpenDocumentPackage {
+impl crate::Package {
     pub fn paragraph_style_tab_stops(&self) -> Result<Styles> {
         parse(self.styles_xml()?.as_deref().unwrap_or_default())
     }
 }
 
-impl crate::FlatOpenDocument {
+impl crate::FlatDocument {
     pub fn paragraph_style_tab_stops(&self) -> Result<Styles> {
         parse(self.xml())
     }

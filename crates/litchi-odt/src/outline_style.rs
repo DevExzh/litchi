@@ -11,7 +11,7 @@ use quick_xml::{
 };
 
 use crate::list_label_alignment::{Alignment, FollowedBy, Length};
-use crate::{FlatOpenDocument, OpenDocumentPackage};
+use crate::{FlatDocument, Package};
 
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
@@ -1421,7 +1421,7 @@ fn invalid_error(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
 }
 
-impl OpenDocumentPackage {
+impl Package {
     /// Return outline numbering styles from `styles.xml`.
     pub fn outline_styles(&self) -> Result<Styles> {
         self.styles_xml()?.map_or_else(
@@ -1431,7 +1431,7 @@ impl OpenDocumentPackage {
     }
 }
 
-impl FlatOpenDocument {
+impl FlatDocument {
     /// Return outline numbering styles without interpreting heading content.
     pub fn outline_styles(&self) -> Result<Styles> {
         parse_outline_styles(self.xml())

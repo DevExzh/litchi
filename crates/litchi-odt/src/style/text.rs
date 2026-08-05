@@ -1,6 +1,6 @@
 //! Complete typed ODF `style:text-properties` support.
 
-use crate::{FlatOpenDocument, OpenDocumentPackage};
+use crate::{FlatDocument, Package};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
@@ -904,7 +904,7 @@ pub fn set_text_style_properties_xml(xml: &str, requested: &TextStyleRecord) -> 
     out.insert_str(spans.style.end_start, &replacement);
     Ok(out)
 }
-impl OpenDocumentPackage {
+impl Package {
     pub fn text_style_properties(&self) -> Result<TextStylePropertiesSet> {
         self.styles_xml()?.map_or_else(
             || Ok(Default::default()),
@@ -912,7 +912,7 @@ impl OpenDocumentPackage {
         )
     }
 }
-impl FlatOpenDocument {
+impl FlatDocument {
     pub fn text_style_properties(&self) -> Result<TextStylePropertiesSet> {
         parse_text_style_properties(self.xml())
     }

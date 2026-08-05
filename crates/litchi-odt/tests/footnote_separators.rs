@@ -31,8 +31,7 @@ fn parses_bundled_libreoffice_flat_fixture() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sw/qa/core/text/data/footnote-connect.fodt"
     ));
-    let document =
-        litchi_odt::generic::FlatOpenDocument::from_reader(Cursor::new(fixture)).unwrap();
+    let document = litchi_odt::generic::FlatDocument::from_reader(Cursor::new(fixture)).unwrap();
     let separators = document.style_footnote_separators().unwrap();
     assert!(!separators.is_empty());
     assert!(separators.iter().any(|separator| separator == &sample()));
@@ -45,8 +44,7 @@ fn builder_and_package_accessors_round_trip_typed_state() {
         .add_page_layout_footnote_separator("pm1", sample())
         .unwrap();
     let bytes = builder.build().unwrap();
-    let package =
-        litchi_odt::generic::OpenDocumentPackage::from_reader(Cursor::new(bytes)).unwrap();
+    let package = litchi_odt::generic::Package::from_reader(Cursor::new(bytes)).unwrap();
     assert_eq!(package.style_footnote_separators().unwrap(), [sample()]);
 }
 

@@ -1,5 +1,5 @@
 //! Typed ODF paragraph flow and pagination properties.
-use crate::{FlatOpenDocument, OpenDocumentPackage};
+use crate::{FlatDocument, Package};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
@@ -454,13 +454,13 @@ pub fn parse(xml: &str) -> Result<Styles> {
     }
     Ok(Styles { styles: out })
 }
-impl OpenDocumentPackage {
+impl Package {
     pub fn paragraph_style_flows(&self) -> Result<Styles> {
         self.styles_xml()?
             .map_or_else(|| Ok(Default::default()), |x| parse(&x))
     }
 }
-impl FlatOpenDocument {
+impl FlatDocument {
     pub fn paragraph_style_flows(&self) -> Result<Styles> {
         parse(self.xml())
     }

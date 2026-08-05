@@ -1,6 +1,6 @@
 use litchi_odt::{
-    Document, FlatOpenDocument, OdfEmbeddedObjectKind, OdfEmbeddedObjectSource,
-    OdfInlineObjectRoot, OpenDocumentFamily, OpenDocumentPackage, Presentation, Spreadsheet,
+    Document, FlatDocument, OdfEmbeddedObjectKind, OdfEmbeddedObjectSource,
+    OdfInlineObjectRoot, Family, Package, Presentation, Spreadsheet,
 };
 use std::io::{Cursor, Write};
 use zip::CompressionMethod;
@@ -24,11 +24,11 @@ const ODT_CHART: &str =
 #[test]
 fn libreoffice_remote_objects_remain_typed_and_inert_across_families() {
     for (xml, family) in [
-        (ODT_REMOTE, OpenDocumentFamily::Text),
-        (ODS_REMOTE, OpenDocumentFamily::Spreadsheet),
-        (ODP_REMOTE, OpenDocumentFamily::Presentation),
+        (ODT_REMOTE, Family::Text),
+        (ODS_REMOTE, Family::Spreadsheet),
+        (ODP_REMOTE, Family::Presentation),
     ] {
-        let document = FlatOpenDocument::from_bytes(xml.as_bytes().to_vec()).unwrap();
+        let document = FlatDocument::from_bytes(xml.as_bytes().to_vec()).unwrap();
         assert_eq!(document.family(), family);
         let objects = document.embedded_objects().unwrap();
         assert_eq!(objects.len(), 1);
@@ -44,7 +44,7 @@ fn libreoffice_remote_objects_remain_typed_and_inert_across_families() {
 #[test]
 fn libreoffice_inline_math_and_chart_payloads_are_retained_without_recursion() {
     for xml in [ODT_MATH, ODP_MATH] {
-        let document = FlatOpenDocument::from_bytes(xml.as_bytes().to_vec()).unwrap();
+        let document = FlatDocument::from_bytes(xml.as_bytes().to_vec()).unwrap();
         let objects = document.embedded_objects().unwrap();
         assert_eq!(objects.len(), 1);
         assert!(matches!(
@@ -57,7 +57,7 @@ fn libreoffice_inline_math_and_chart_payloads_are_retained_without_recursion() {
         ));
     }
 
-    let document = FlatOpenDocument::from_bytes(ODT_CHART.as_bytes().to_vec()).unwrap();
+    let document = FlatDocument::from_bytes(ODT_CHART.as_bytes().to_vec()).unwrap();
     let objects = document.embedded_objects().unwrap();
     let chart = objects
         .iter()
@@ -78,15 +78,15 @@ fn package_subdocuments_are_exactly_classified_for_specialized_families() {
     for (mimetype, family) in [
         (
             "application/vnd.oasis.opendocument.text",
-            OpenDocumentFamily::Text,
+            Family::Text,
         ),
         (
             "application/vnd.oasis.opendocument.spreadsheet",
-            OpenDocumentFamily::Spreadsheet,
+            Family::Spreadsheet,
         ),
         (
             "application/vnd.oasis.opendocument.presentation",
-            OpenDocumentFamily::Presentation,
+            Family::Presentation,
         ),
     ] {
         let bytes = package(
@@ -99,16 +99,16 @@ fn package_subdocuments_are_exactly_classified_for_specialized_families() {
             )],
             Some(("Object_1/", "application/vnd.oasis.opendocument.chart")),
         );
-        let generic = OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
+        let generic = Package::from_bytes(bytes.clone()).unwrap();
         assert_eq!(generic.family(), family);
         assert_subdocument(&generic.embedded_objects().unwrap()[0]);
 
-        let specialized = if family == OpenDocumentFamily::Text {
+        let specialized = if family == Family::Text {
             Document::from_bytes(bytes)
                 .unwrap()
                 .embedded_objects()
                 .unwrap()
-        } else if family == OpenDocumentFamily::Spreadsheet {
+        } else if family == Family::Spreadsheet {
             Spreadsheet::from_bytes(bytes)
                 .unwrap()
                 .embedded_objects()
@@ -135,7 +135,7 @@ fn package_file_and_inline_ole_sources_are_inert_and_exact() {
         )],
         None,
     );
-    let objects = OpenDocumentPackage::from_bytes(bytes)
+    let objects = Package::from_bytes(bytes)
         .unwrap()
         .embedded_objects()
         .unwrap();
@@ -151,7 +151,7 @@ fn package_file_and_inline_ole_sources_are_inert_and_exact() {
     ));
 
     let body = "<office:text><text:p><draw:frame draw:name=\"OLE\"><draw:object-ole xlink:href=\"https://example.invalid/ignored\"><office:binary-data>Q0RG</office:binary-data></draw:object-ole><s:title>OLE title</s:title><s:desc>OLE description</s:desc></draw:frame></text:p></office:text>";
-    let document = FlatOpenDocument::from_bytes(
+    let document = FlatDocument::from_bytes(
         flat_document("application/vnd.oasis.opendocument.text", body).into_bytes(),
     )
     .unwrap();
@@ -178,7 +178,7 @@ fn malformed_active_content_and_unsafe_package_paths_are_rejected() {
         "<draw:object><draw:object/></draw:object>",
     ] {
         let body = format!("<office:text><text:p>{object}</text:p></office:text>");
-        let document = FlatOpenDocument::from_bytes(
+        let document = FlatDocument::from_bytes(
             flat_document("application/vnd.oasis.opendocument.text", &body).into_bytes(),
         )
         .unwrap();
@@ -190,7 +190,7 @@ fn malformed_active_content_and_unsafe_package_paths_are_rejected() {
         "<office:text><text:p><draw:object/></text:p></office:text>",
     )
     .replacen("<office:body>", "<!DOCTYPE x><office:body>", 1);
-    let parsed = FlatOpenDocument::from_bytes(xml.into_bytes());
+    let parsed = FlatDocument::from_bytes(xml.into_bytes());
     assert!(
         parsed
             .and_then(|document| document.embedded_objects())
@@ -204,7 +204,7 @@ fn malformed_active_content_and_unsafe_package_paths_are_rejected() {
         None,
     );
     assert!(
-        OpenDocumentPackage::from_bytes(bytes)
+        Package::from_bytes(bytes)
             .unwrap()
             .embedded_objects()
             .is_err()
@@ -217,7 +217,7 @@ fn depth_count_and_inline_xml_byte_limits_are_enforced() {
     let body = format!(
         "<office:text><text:p><draw:object><math:math>{oversized}</math:math></draw:object></text:p></office:text>"
     );
-    let document = FlatOpenDocument::from_bytes(
+    let document = FlatDocument::from_bytes(
         flat_document("application/vnd.oasis.opendocument.text", &body).into_bytes(),
     )
     .unwrap();
@@ -229,7 +229,7 @@ fn depth_count_and_inline_xml_byte_limits_are_enforced() {
         "</text:span>".repeat(4_097)
     );
     let body = format!("<office:text><text:p>{nested}</text:p></office:text>");
-    let document = FlatOpenDocument::from_bytes(
+    let document = FlatDocument::from_bytes(
         flat_document("application/vnd.oasis.opendocument.text", &body).into_bytes(),
     )
     .unwrap();
@@ -237,7 +237,7 @@ fn depth_count_and_inline_xml_byte_limits_are_enforced() {
 
     let objects = "<draw:object/>".repeat(100_001);
     let body = format!("<office:text><text:p>{objects}</text:p></office:text>");
-    let document = FlatOpenDocument::from_bytes(
+    let document = FlatDocument::from_bytes(
         flat_document("application/vnd.oasis.opendocument.text", &body).into_bytes(),
     )
     .unwrap();

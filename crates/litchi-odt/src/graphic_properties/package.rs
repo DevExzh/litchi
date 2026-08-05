@@ -2,10 +2,10 @@
 
 use super::codec::parse_graphic_style_properties;
 use super::model::Styles;
-use crate::{FlatOpenDocument, OpenDocumentPackage};
+use crate::{FlatDocument, Package};
 use litchi_core::Result;
 
-impl OpenDocumentPackage {
+impl Package {
     pub fn graphic_style_properties(&self) -> Result<Styles> {
         self.styles_xml()?.map_or_else(
             || Ok(Default::default()),
@@ -13,7 +13,7 @@ impl OpenDocumentPackage {
         )
     }
 }
-impl FlatOpenDocument {
+impl FlatDocument {
     pub fn graphic_style_properties(&self) -> Result<Styles> {
         parse_graphic_style_properties(self.xml())
     }

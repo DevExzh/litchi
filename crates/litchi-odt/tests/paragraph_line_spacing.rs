@@ -133,7 +133,7 @@ fn parses_flat_fixtures() {
     let bytes = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/uibase/shells/data/protectedLinkCopy.fodt"
     );
-    let flat = litchi_odt::generic::FlatOpenDocument::from_reader(Cursor::new(bytes)).unwrap();
+    let flat = litchi_odt::generic::FlatDocument::from_reader(Cursor::new(bytes)).unwrap();
     let set = flat.paragraph_style_line_spacings().unwrap();
     assert!(
         set.styles

@@ -133,7 +133,7 @@ fn builder_package_and_mutable_document_preserve_typed_styles() {
     builder.add_paragraph_tab_style(style.clone()).unwrap();
     builder.add_paragraph("tabbed").unwrap();
     let bytes = builder.build().unwrap();
-    let package = litchi_odt::generic::OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
+    let package = litchi_odt::generic::Package::from_bytes(bytes.clone()).unwrap();
     assert_eq!(
         package
             .paragraph_style_tab_stops()
@@ -145,7 +145,7 @@ fn builder_package_and_mutable_document_preserve_typed_styles() {
     let document = Document::from_bytes(bytes).unwrap();
     let mutable = litchi_odt::mutable::MutableDocument::from_document(document).unwrap();
     let round_trip = mutable.to_bytes().unwrap();
-    let package = litchi_odt::generic::OpenDocumentPackage::from_bytes(round_trip).unwrap();
+    let package = litchi_odt::generic::Package::from_bytes(round_trip).unwrap();
     assert_eq!(
         package
             .paragraph_style_tab_stops()

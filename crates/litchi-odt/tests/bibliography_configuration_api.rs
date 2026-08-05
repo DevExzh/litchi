@@ -84,8 +84,7 @@ fn document_reads_styles_bibliography_configuration() {
             .bibliography_configuration,
         Some(expected.clone())
     );
-    let generic =
-        litchi_odt::generic::OpenDocumentPackage::from_bytes(source.to_bytes().unwrap()).unwrap();
+    let generic = litchi_odt::generic::Package::from_bytes(source.to_bytes().unwrap()).unwrap();
     assert_eq!(
         generic.bibliography_configuration().unwrap(),
         Some(expected)

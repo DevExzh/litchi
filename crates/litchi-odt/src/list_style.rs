@@ -1,7 +1,7 @@
 //! Typed ODF `text:list-style` declarations (numbered, bullet, and image levels).
 
 use crate::outline_style::{NumberFormat, PositiveInteger};
-use crate::{FlatOpenDocument, OpenDocumentPackage};
+use crate::{FlatDocument, Package};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
@@ -865,14 +865,14 @@ pub fn parse(xml: &str) -> Result<Styles> {
     Ok(Styles { styles })
 }
 
-impl OpenDocumentPackage {
+impl Package {
     /// Parse the `text:list-style` declarations of the package `styles.xml`.
     pub fn styles(&self) -> Result<Styles> {
         self.styles_xml()?
             .map_or_else(|| Ok(Styles::default()), |xml| parse(&xml))
     }
 }
-impl FlatOpenDocument {
+impl FlatDocument {
     /// Parse the `text:list-style` declarations of a flat XML document.
     pub fn styles(&self) -> Result<Styles> {
         parse(self.xml())

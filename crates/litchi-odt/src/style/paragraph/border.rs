@@ -8,7 +8,7 @@
 //! duplicates and malformed owned values are rejected.
 
 use crate::{
-    FlatOpenDocument, OpenDocumentPackage,
+    FlatDocument, Package,
     line_numbering::NonNegativeLength,
     style::paragraph::margin::rewrite_start_tag,
     style::table::row::{
@@ -1217,13 +1217,13 @@ fn base64_decode(value: &str) -> Result<Vec<u8>> {
     Ok(out)
 }
 
-impl OpenDocumentPackage {
+impl Package {
     pub fn paragraph_style_borders(&self) -> Result<Styles> {
         self.styles_xml()?
             .map_or_else(|| Ok(Styles::default()), |xml| parse(&xml))
     }
 }
-impl FlatOpenDocument {
+impl FlatDocument {
     pub fn paragraph_style_borders(&self) -> Result<Styles> {
         parse(self.xml())
     }

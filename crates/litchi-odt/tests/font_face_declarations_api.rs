@@ -43,8 +43,7 @@ fn document_and_generic_package_keep_content_and_styles_declarations_separate() 
         Some(styles.clone())
     );
 
-    let package =
-        litchi_odt::generic::OpenDocumentPackage::from_bytes(source.to_bytes().unwrap()).unwrap();
+    let package = litchi_odt::generic::Package::from_bytes(source.to_bytes().unwrap()).unwrap();
     assert_eq!(
         package.content_font_face_declarations().unwrap(),
         Some(content)
@@ -151,8 +150,7 @@ fn mutable_document_replaces_and_clears_each_font_face_part_without_rewriting_ne
 
 #[test]
 fn flat_document_exposes_its_single_font_face_declarations_part() {
-    let document =
-        litchi_odt::generic::FlatOpenDocument::from_bytes(FLAT.as_bytes().to_vec()).unwrap();
+    let document = litchi_odt::generic::FlatDocument::from_bytes(FLAT.as_bytes().to_vec()).unwrap();
 
     assert_eq!(
         document.font_face_declarations().unwrap(),

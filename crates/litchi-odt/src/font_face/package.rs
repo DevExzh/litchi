@@ -7,7 +7,7 @@ use super::{
     model::Declarations,
     xml_error,
 };
-use crate::{FlatOpenDocument, OpenDocumentPackage};
+use crate::{FlatDocument, Package};
 use litchi_core::{Error, Result};
 use quick_xml::{events::Event, reader::NsReader};
 
@@ -269,7 +269,7 @@ fn insert_at(xml: &str, insertion: usize, fragment: &str) -> String {
     output
 }
 
-impl OpenDocumentPackage {
+impl Package {
     /// Return content-part font-face declarations.
     ///
     /// Font resource links are retained as inert metadata only. This method
@@ -289,7 +289,7 @@ impl OpenDocumentPackage {
     }
 }
 
-impl FlatOpenDocument {
+impl FlatDocument {
     /// Return the flat document's font-face declarations.
     ///
     /// Font resource links are retained as inert metadata only. This method

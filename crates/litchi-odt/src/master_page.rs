@@ -530,7 +530,7 @@ pub fn remove_master_page_xml(xml: &str, name: &str) -> Result<String> {
     ))
 }
 
-impl crate::OpenDocumentPackage {
+impl crate::Package {
     /// Parse inert master-page metadata from packaged `styles.xml`.
     pub fn master_pages(&self) -> Result<Vec<MasterPage>> {
         self.styles_xml()?.map_or_else(
@@ -540,7 +540,7 @@ impl crate::OpenDocumentPackage {
     }
 }
 
-impl crate::FlatOpenDocument {
+impl crate::FlatDocument {
     /// Parse inert master-page metadata from a flat OpenDocument.
     pub fn master_pages(&self) -> Result<Vec<MasterPage>> {
         crate::header_footer::parse_master_pages(self.xml())

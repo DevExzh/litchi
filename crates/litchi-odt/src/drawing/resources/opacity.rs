@@ -279,14 +279,14 @@ impl Collection {
     }
 }
 
-impl crate::OpenDocumentPackage {
+impl crate::Package {
     pub fn drawing_opacities(&self) -> Result<Collection> {
         let styles = self.styles_xml()?;
         parse_drawing_opacities(styles.as_deref().unwrap_or_default())
     }
 }
 
-impl crate::FlatOpenDocument {
+impl crate::FlatDocument {
     pub fn drawing_opacities(&self) -> Result<Collection> {
         parse_drawing_opacities(self.xml())
     }
@@ -819,7 +819,7 @@ mod tests {
     #[test]
     fn parses_local_angles_and_extension_stops() {
         let angles_xml = include_str!("../../../../../test-data/odf/drawing/opacity-angles.fodg");
-        let angles = crate::FlatOpenDocument::from_bytes(angles_xml.as_bytes().to_vec()).unwrap();
+        let angles = crate::FlatDocument::from_bytes(angles_xml.as_bytes().to_vec()).unwrap();
         let values = angles.drawing_opacities().unwrap();
         assert_eq!(values.opacities.len(), 6);
         assert_eq!(
@@ -837,7 +837,7 @@ mod tests {
 
         let stops_xml =
             include_str!("../../../../../test-data/odf/drawing/opacity-extension-stops.fodt");
-        let stops = crate::FlatOpenDocument::from_bytes(stops_xml.as_bytes().to_vec()).unwrap();
+        let stops = crate::FlatDocument::from_bytes(stops_xml.as_bytes().to_vec()).unwrap();
         let values = stops.drawing_opacities().unwrap();
         let value = values.get("Transparency_20_1").unwrap();
         assert_eq!(value.style, Style::Ellipsoid);

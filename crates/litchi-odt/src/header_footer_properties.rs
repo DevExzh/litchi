@@ -863,7 +863,7 @@ fn replace_in_wrapper(wrapper: &str, property: &str) -> Result<String> {
     }
 }
 
-impl crate::OpenDocumentPackage {
+impl crate::Package {
     pub fn page_layout_header_footer_properties(&self) -> Result<Vec<Properties>> {
         self.styles_xml()?.map_or_else(
             || Ok(Vec::new()),
@@ -871,7 +871,7 @@ impl crate::OpenDocumentPackage {
         )
     }
 }
-impl crate::FlatOpenDocument {
+impl crate::FlatDocument {
     pub fn page_layout_header_footer_properties(&self) -> Result<Vec<Properties>> {
         parse_page_layout_header_footer_properties(self.xml())
     }

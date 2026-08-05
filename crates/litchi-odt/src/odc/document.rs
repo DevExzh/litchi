@@ -1,6 +1,6 @@
 //! Namespace-aware access to a standalone OpenDocument chart package.
 
-use crate::{OpenDocumentFamily, OpenDocumentPackage, constants, core::PackageWriter};
+use crate::{Family, Package, constants, core::PackageWriter};
 use litchi_core::{Error, Metadata, Result};
 use litchi_odc::{Definition, serialize_content};
 use litchi_odf_common::calculation::{Settings, parse};
@@ -10,7 +10,7 @@ use std::path::Path;
 
 /// A validated standalone OpenDocument chart or chart template.
 pub struct Document {
-    pub(crate) package: OpenDocumentPackage,
+    pub(crate) package: Package,
     pub(crate) chart: Element,
 }
 
@@ -45,8 +45,8 @@ impl Document {
     }
 
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        let package = OpenDocumentPackage::from_bytes(bytes)?;
-        if package.family() != OpenDocumentFamily::Chart {
+        let package = Package::from_bytes(bytes)?;
+        if package.family() != Family::Chart {
             return Err(Error::InvalidFormat(format!(
                 "not an OpenDocument chart: MIME type is '{}'",
                 package.mimetype()

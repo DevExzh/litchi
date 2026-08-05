@@ -1,7 +1,7 @@
 //! Bounded OpenDocument bibliography configuration metadata.
 
 use crate::variable_declaration::Part;
-use crate::{FlatOpenDocument, OpenDocumentPackage};
+use crate::{FlatDocument, Package};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -707,7 +707,7 @@ pub(crate) fn remove_bibliography_configuration_xml(xml: &str) -> Result<String>
     Ok(format!("{}{}", &xml[..span.start], &xml[span.end..]))
 }
 
-impl OpenDocumentPackage {
+impl Package {
     /// Return the stored document-wide bibliography formatting policy.
     ///
     /// The policy is metadata in `styles.xml`. This method does not generate
@@ -718,7 +718,7 @@ impl OpenDocumentPackage {
     }
 }
 
-impl FlatOpenDocument {
+impl FlatDocument {
     /// Return the stored document-wide bibliography formatting policy.
     ///
     /// The policy is metadata in the flat document's `office:styles` element.
@@ -999,7 +999,7 @@ mod tests {
             <o:styles><t:bibliography-configuration t:prefix="["/></o:styles>
             <o:body><o:text/></o:body>
         </o:document>"#;
-        let document = FlatOpenDocument::from_bytes(xml.as_bytes().to_vec()).unwrap();
+        let document = FlatDocument::from_bytes(xml.as_bytes().to_vec()).unwrap();
         assert_eq!(
             document.bibliography_configuration().unwrap(),
             Some(BibliographyConfiguration {

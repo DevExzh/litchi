@@ -109,7 +109,7 @@ fn builder_package_and_mutable_paths_preserve_siblings() {
         .add_page_layout_header_footer_properties("pm1", Region::Footer, footer.clone())
         .unwrap();
     let bytes = builder.build().unwrap();
-    let package = litchi_odt::generic::OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
+    let package = litchi_odt::generic::Package::from_bytes(bytes.clone()).unwrap();
     let entries = package.page_layout_header_footer_properties().unwrap();
     assert_eq!(entries.len(), 2);
     let styles = package.styles_xml().unwrap().unwrap();
@@ -130,8 +130,7 @@ fn builder_package_and_mutable_paths_preserve_siblings() {
     mutable
         .set_page_layout_header_footer_properties("pm1", Region::Header, &replacement)
         .unwrap();
-    let output =
-        litchi_odt::generic::OpenDocumentPackage::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let output = litchi_odt::generic::Package::from_bytes(mutable.to_bytes().unwrap()).unwrap();
     let entries = output.page_layout_header_footer_properties().unwrap();
     assert_eq!(
         entries

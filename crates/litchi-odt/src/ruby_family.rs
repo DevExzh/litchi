@@ -1,6 +1,6 @@
 //! Complete typed ODF ruby styles and structure-preserving inline annotations.
 
-use crate::{FlatOpenDocument, OpenDocumentPackage};
+use crate::{FlatDocument, Package};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
@@ -1249,7 +1249,7 @@ pub fn remove_ruby_style_xml(xml: &str, name: &str) -> Result<String> {
     Ok(format!("{}{}", &xml[..span.start], &xml[span.end..]))
 }
 
-impl OpenDocumentPackage {
+impl Package {
     pub fn ruby_styles(&self) -> Result<RubyStyles> {
         self.styles_xml()?
             .map_or_else(|| Ok(Default::default()), |xml| parse_ruby_styles(&xml))
@@ -1258,7 +1258,7 @@ impl OpenDocumentPackage {
         parse_ruby_annotations(&self.content_xml()?)
     }
 }
-impl FlatOpenDocument {
+impl FlatDocument {
     pub fn ruby_styles(&self) -> Result<RubyStyles> {
         parse_ruby_styles(self.xml())
     }

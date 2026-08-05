@@ -35,7 +35,7 @@ fn parses_odfdo_and_libreoffice_fixtures() {
     let lo = include_bytes!(
         "../../../test-data/libreoffice-core/xmloff/qa/unit/data/differentListStylesInOneList.fodt"
     );
-    let flat = litchi_odt::generic::FlatOpenDocument::from_reader(Cursor::new(lo)).unwrap();
+    let flat = litchi_odt::generic::FlatDocument::from_reader(Cursor::new(lo)).unwrap();
     assert!(!flat.alignments().unwrap().levels.is_empty());
 }
 #[test]
@@ -48,7 +48,7 @@ fn builder_package_and_mutable_round_trip() {
         .unwrap();
     b.add_paragraph("x").unwrap();
     let bytes = b.build().unwrap();
-    let p = litchi_odt::generic::OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
+    let p = litchi_odt::generic::Package::from_bytes(bytes.clone()).unwrap();
     assert_eq!(&p.alignments().unwrap().get("L1", 1).unwrap().alignment, &a);
     let mut m =
         litchi_odt::mutable::MutableDocument::from_document(Document::from_bytes(bytes).unwrap())
@@ -56,7 +56,7 @@ fn builder_package_and_mutable_round_trip() {
     let replacement = Alignment::new(FollowedBy::Nothing);
     m.set_list_level_label_alignment(&Style::new("L1", 1, replacement.clone()).unwrap())
         .unwrap();
-    let p = litchi_odt::generic::OpenDocumentPackage::from_bytes(m.to_bytes().unwrap()).unwrap();
+    let p = litchi_odt::generic::Package::from_bytes(m.to_bytes().unwrap()).unwrap();
     assert_eq!(
         &p.alignments().unwrap().get("L1", 1).unwrap().alignment,
         &replacement

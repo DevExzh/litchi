@@ -6,7 +6,7 @@
 //! `style:justify-single-word`, `style:auto-text-indent`,
 //! `style:snap-to-layout-grid`, `style:tab-stop-distance`, `fo:text-align-last`).
 
-use crate::{FlatOpenDocument, OpenDocumentPackage, line_numbering::NonNegativeLength};
+use crate::{FlatDocument, Package, line_numbering::NonNegativeLength};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
@@ -618,14 +618,14 @@ pub fn parse(xml: &str) -> Result<Styles> {
     Ok(Styles { styles })
 }
 
-impl OpenDocumentPackage {
+impl Package {
     /// Parse the paragraph line-spacing properties of the package `styles.xml`.
     pub fn paragraph_style_line_spacings(&self) -> Result<Styles> {
         self.styles_xml()?
             .map_or_else(|| Ok(Styles::default()), |xml| parse(&xml))
     }
 }
-impl FlatOpenDocument {
+impl FlatDocument {
     /// Parse the paragraph line-spacing properties of a flat XML document.
     pub fn paragraph_style_line_spacings(&self) -> Result<Styles> {
         parse(self.xml())

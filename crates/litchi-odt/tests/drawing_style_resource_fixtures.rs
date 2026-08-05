@@ -71,7 +71,7 @@ fn local_dash_fixture_preserves_segments() {
 #[test]
 fn local_fill_image_fixtures_preserve_link_and_inline_bytes() {
     let linked =
-        litchi_odt::generic::FlatOpenDocument::from_bytes(FILL_IMAGE_LINKED.as_bytes().to_vec())
+        litchi_odt::generic::FlatDocument::from_bytes(FILL_IMAGE_LINKED.as_bytes().to_vec())
             .unwrap();
     let images = linked.drawing_fill_images().unwrap();
     assert_eq!(
@@ -86,7 +86,7 @@ fn local_fill_image_fixtures_preserve_link_and_inline_bytes() {
     );
 
     let inline =
-        litchi_odt::generic::FlatOpenDocument::from_bytes(FILL_IMAGE_INLINE.as_bytes().to_vec())
+        litchi_odt::generic::FlatDocument::from_bytes(FILL_IMAGE_INLINE.as_bytes().to_vec())
             .unwrap();
     let images = inline.drawing_fill_images().unwrap();
     let bytes = images
@@ -101,7 +101,7 @@ fn local_fill_image_fixtures_preserve_link_and_inline_bytes() {
 #[test]
 fn local_marker_fixture_preserves_view_box_and_path() {
     let document =
-        litchi_odt::generic::FlatOpenDocument::from_bytes(MARKER_FLAT.as_bytes().to_vec()).unwrap();
+        litchi_odt::generic::FlatDocument::from_bytes(MARKER_FLAT.as_bytes().to_vec()).unwrap();
     let markers = document.drawing_markers().unwrap();
     let marker = markers.get("Arrowheads_20_1").unwrap();
     assert_eq!(marker.view_box, marker::ViewBox::new(0, 0, 20, 30));
@@ -111,8 +111,7 @@ fn local_marker_fixture_preserves_view_box_and_path() {
 #[test]
 fn local_opacity_fixtures_preserve_angles_and_extension_stops() {
     let angles =
-        litchi_odt::generic::FlatOpenDocument::from_bytes(OPACITY_ANGLES.as_bytes().to_vec())
-            .unwrap();
+        litchi_odt::generic::FlatDocument::from_bytes(OPACITY_ANGLES.as_bytes().to_vec()).unwrap();
     let values = angles.drawing_opacities().unwrap();
     assert_eq!(values.opacities.len(), 6);
     assert_eq!(
@@ -128,10 +127,9 @@ fn local_opacity_fixtures_preserve_angles_and_extension_stops() {
         "1000grad"
     );
 
-    let stops = litchi_odt::generic::FlatOpenDocument::from_bytes(
-        OPACITY_EXTENSION_STOPS.as_bytes().to_vec(),
-    )
-    .unwrap();
+    let stops =
+        litchi_odt::generic::FlatDocument::from_bytes(OPACITY_EXTENSION_STOPS.as_bytes().to_vec())
+            .unwrap();
     let values = stops.drawing_opacities().unwrap();
     let value = values.get("Transparency_20_1").unwrap();
     assert_eq!(value.style, opacity::Style::Ellipsoid);

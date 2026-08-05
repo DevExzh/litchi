@@ -34,7 +34,7 @@ fn parses_real_libreoffice_fixture() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sw/qa/extras/layout/data/drop_asian_word.fodt"
     ));
-    let flat = litchi_odt::generic::FlatOpenDocument::from_reader(Cursor::new(bytes)).unwrap();
+    let flat = litchi_odt::generic::FlatDocument::from_reader(Cursor::new(bytes)).unwrap();
     let parsed = flat.paragraph_style_drop_caps().unwrap();
     assert!(parsed.styles.iter().any(|style| {
         style
@@ -104,7 +104,7 @@ fn builder_package_composition_and_mutation_round_trip() {
         .unwrap();
     builder.add_paragraph("Opening text").unwrap();
     let bytes = builder.build().unwrap();
-    let package = litchi_odt::generic::OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
+    let package = litchi_odt::generic::Package::from_bytes(bytes.clone()).unwrap();
     assert_eq!(
         package.paragraph_style_drop_caps().unwrap().get("Opening"),
         Some(&drop_style)
@@ -127,8 +127,7 @@ fn builder_package_composition_and_mutation_round_trip() {
     };
     drop_style.drop_cap = Some(replacement.clone());
     mutable.set_paragraph_style_drop_cap(&drop_style).unwrap();
-    let package =
-        litchi_odt::generic::OpenDocumentPackage::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let package = litchi_odt::generic::Package::from_bytes(mutable.to_bytes().unwrap()).unwrap();
     assert_eq!(
         package
             .paragraph_style_drop_caps()

@@ -1,5 +1,5 @@
 use litchi_odt::{
-    Document, FlatOpenDocument, ImagePart, ImageSource, OpenDocumentFamily, OpenDocumentPackage,
+    Document, FlatDocument, ImagePart, ImageSource, Family, Package,
     Presentation, Spreadsheet,
 };
 use std::io::{Cursor, Write};
@@ -26,21 +26,21 @@ const ODP_ALTERNATIVE_TEXT: &str = include_str!(
 #[test]
 fn libreoffice_flat_links_are_typed_and_remain_inert_across_families() {
     for (xml, family, page, sheet) in [
-        (ODT_LINK, OpenDocumentFamily::Text, None, None),
+        (ODT_LINK, Family::Text, None, None),
         (
             ODS_LINK,
-            OpenDocumentFamily::Spreadsheet,
+            Family::Spreadsheet,
             None,
             Some("Sheet1"),
         ),
         (
             ODP_LINK,
-            OpenDocumentFamily::Presentation,
+            Family::Presentation,
             Some("page1"),
             None,
         ),
     ] {
-        let document = FlatOpenDocument::from_bytes(xml.as_bytes().to_vec()).unwrap();
+        let document = FlatDocument::from_bytes(xml.as_bytes().to_vec()).unwrap();
         assert_eq!(document.family(), family);
         let images = document.images().unwrap();
         assert_eq!(images.len(), 1);
@@ -59,7 +59,7 @@ fn libreoffice_flat_links_are_typed_and_remain_inert_across_families() {
 
 #[test]
 fn libreoffice_inline_image_is_strictly_decoded_without_following_links() {
-    let document = FlatOpenDocument::from_bytes(ODT_INLINE.as_bytes().to_vec()).unwrap();
+    let document = FlatDocument::from_bytes(ODT_INLINE.as_bytes().to_vec()).unwrap();
     let images = document.images().unwrap();
     assert_eq!(images.len(), 1);
     let bytes = images[0].inline_bytes().unwrap();
@@ -91,7 +91,7 @@ fn packaged_images_join_references_manifest_and_bytes_for_all_specialized_famili
         ),
     ] {
         let bytes = package(mimetype, &content, "Pictures/no-extension");
-        let generic = OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
+        let generic = Package::from_bytes(bytes.clone()).unwrap();
         let images = generic.images().unwrap();
         assert_packaged_image(&images[0]);
         assert_eq!(
@@ -127,7 +127,7 @@ fn inline_data_wins_and_unsafe_package_traversal_is_rejected() {
         "<draw:image>",
         "<draw:image xlink:href=\"http://192.0.2.1/ignored.png\">",
     );
-    let document = FlatOpenDocument::from_bytes(inline.into_bytes()).unwrap();
+    let document = FlatDocument::from_bytes(inline.into_bytes()).unwrap();
     assert!(matches!(
         &document.images().unwrap()[0].source,
         ImageSource::Inline { ignored_href: Some(href), .. }
@@ -136,7 +136,7 @@ fn inline_data_wins_and_unsafe_package_traversal_is_rejected() {
 
     let content = content_xml("<office:text><text:p>{image}</text:p></office:text>")
         .replace("Pictures/no-extension", "%2e%2e/secret.png");
-    let document = OpenDocumentPackage::from_bytes(package(
+    let document = Package::from_bytes(package(
         "application/vnd.oasis.opendocument.text",
         &content,
         "Pictures/no-extension",
@@ -151,7 +151,7 @@ fn malformed_inline_base64_is_rejected() {
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8",
         "not!base64",
     );
-    let document = FlatOpenDocument::from_bytes(xml.into_bytes()).unwrap();
+    let document = FlatDocument::from_bytes(xml.into_bytes()).unwrap();
     assert!(document.images().is_err());
 }
 
@@ -165,7 +165,7 @@ fn libreoffice_image_accessibility_metadata_is_typed_after_image_content() {
             "This is the description",
         ),
     ] {
-        let document = FlatOpenDocument::from_bytes(xml.as_bytes().to_vec()).unwrap();
+        let document = FlatDocument::from_bytes(xml.as_bytes().to_vec()).unwrap();
         let images = document.images().unwrap();
         let image = images
             .iter()
@@ -188,22 +188,22 @@ fn accessibility_metadata_is_shared_across_flat_document_families() {
         (
             "application/vnd.oasis.opendocument.text",
             "<office:text><text:p>{frame}</text:p></office:text>",
-            OpenDocumentFamily::Text,
+            Family::Text,
         ),
         (
             "application/vnd.oasis.opendocument.spreadsheet",
             "<office:spreadsheet><table:table table:name=\"Sheet1\"><table:shapes>{frame}</table:shapes></table:table></office:spreadsheet>",
-            OpenDocumentFamily::Spreadsheet,
+            Family::Spreadsheet,
         ),
         (
             "application/vnd.oasis.opendocument.presentation",
             "<office:presentation><draw:page draw:name=\"Slide1\">{frame}</draw:page></office:presentation>",
-            OpenDocumentFamily::Presentation,
+            Family::Presentation,
         ),
     ] {
         let frame = "<draw:frame><s:title>Before &amp; &#x41;<![CDATA[ <raw>]]></s:title><s:desc/><draw:image xlink:href=\"https://example.invalid/image.png\"/></draw:frame>";
         let xml = flat_document(mimetype, &body.replace("{frame}", frame));
-        let document = FlatOpenDocument::from_bytes(xml.into_bytes()).unwrap();
+        let document = FlatDocument::from_bytes(xml.into_bytes()).unwrap();
         assert_eq!(document.family(), family);
         let images = document.images().unwrap();
         let frame = images[0].frame.as_ref().unwrap();
@@ -215,7 +215,7 @@ fn accessibility_metadata_is_shared_across_flat_document_families() {
 #[test]
 fn metadata_after_multiple_image_alternatives_is_deferred_to_frame_close() {
     let body = "<office:text><text:p><draw:frame><draw:image xlink:href=\"first.png\"/><draw:image xlink:href=\"second.png\"/><s:title>shared title</s:title><s:desc>shared description</s:desc></draw:frame></text:p></office:text>";
-    let document = FlatOpenDocument::from_bytes(
+    let document = FlatDocument::from_bytes(
         flat_document("application/vnd.oasis.opendocument.text", body).into_bytes(),
     )
     .unwrap();
@@ -232,7 +232,7 @@ fn metadata_after_multiple_image_alternatives_is_deferred_to_frame_close() {
 #[test]
 fn accessibility_metadata_is_direct_text_only_and_unique() {
     let scoped = "<office:text><text:p><draw:frame><draw:custom-shape><s:desc>shape only</s:desc></draw:custom-shape><draw:image xlink:href=\"image.png\"/><s:title>image title</s:title></draw:frame></text:p></office:text>";
-    let document = FlatOpenDocument::from_bytes(
+    let document = FlatDocument::from_bytes(
         flat_document("application/vnd.oasis.opendocument.text", scoped).into_bytes(),
     )
     .unwrap();
@@ -248,7 +248,7 @@ fn accessibility_metadata_is_direct_text_only_and_unique() {
         let body = format!(
             "<office:text><text:p><draw:frame><draw:image xlink:href=\"image.png\"/>{accessibility}</draw:frame></text:p></office:text>"
         );
-        let document = FlatOpenDocument::from_bytes(
+        let document = FlatDocument::from_bytes(
             flat_document("application/vnd.oasis.opendocument.text", &body).into_bytes(),
         )
         .unwrap();
@@ -262,7 +262,7 @@ fn accessibility_text_limits_are_enforced_per_field_and_in_aggregate() {
     let body = format!(
         "<office:text><text:p><draw:frame><draw:image xlink:href=\"image.png\"/><s:title>{oversized}</s:title></draw:frame></text:p></office:text>"
     );
-    let document = FlatOpenDocument::from_bytes(
+    let document = FlatDocument::from_bytes(
         flat_document("application/vnd.oasis.opendocument.text", &body).into_bytes(),
     )
     .unwrap();
@@ -279,7 +279,7 @@ fn accessibility_text_limits_are_enforced_per_field_and_in_aggregate() {
         "<draw:frame><draw:image xlink:href=\"image.png\"/><s:title>x</s:title></draw:frame>",
     );
     let body = format!("<office:text><text:p>{frames}</text:p></office:text>");
-    let document = FlatOpenDocument::from_bytes(
+    let document = FlatDocument::from_bytes(
         flat_document("application/vnd.oasis.opendocument.text", &body).into_bytes(),
     )
     .unwrap();

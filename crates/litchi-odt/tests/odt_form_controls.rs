@@ -120,7 +120,7 @@ fn visual_form() -> VisualForm {
 
 #[test]
 fn reads_fixture_form_controls_as_typed_inert_data() {
-    let document = litchi_odt::generic::FlatOpenDocument::open(FIXTURE).unwrap();
+    let document = litchi_odt::generic::FlatDocument::open(FIXTURE).unwrap();
     let forms = document.forms().unwrap();
     assert_eq!(forms.groups.len(), 1);
     assert!(forms.groups[0].apply_design_mode == Some(true));

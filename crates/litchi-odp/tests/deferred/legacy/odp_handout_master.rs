@@ -1,6 +1,6 @@
 //! Tests for `style:handout-master` against real presentation packages.
 
-use litchi_odp::OpenDocumentPackage;
+use litchi_odp::Package;
 use std::path::PathBuf;
 
 fn fixture(name: &str) -> PathBuf {
@@ -18,7 +18,7 @@ fn reads_handout_master_from_real_presentations() {
         "tdf169979.odp",
         "text-in-image.odp",
     ] {
-        let package = OpenDocumentPackage::open(fixture(name)).unwrap();
+        let package = Package::open(fixture(name)).unwrap();
         let master = package
             .handout_master()
             .unwrap_or_else(|error| panic!("{name}: {error}"))
@@ -35,7 +35,7 @@ fn reads_handout_master_from_real_presentations() {
 #[test]
 fn handout_master_is_absent_in_text_documents() {
     // An ODT without a handout master reports None rather than erroring.
-    let package = OpenDocumentPackage::open(
+    let package = Package::open(
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/odf/odt/note-tracked-changes.odt"),
     );
@@ -49,7 +49,7 @@ fn bom_prefixed_styles_xml_keeps_fragments_exact() {
     // tdf169979.odp stores styles.xml with a UTF-8 BOM; quick-xml reports
     // positions relative to the stripped text, and fragments must slice
     // against the same view.
-    let package = OpenDocumentPackage::open(fixture("tdf169979.odp")).unwrap();
+    let package = Package::open(fixture("tdf169979.odp")).unwrap();
     for page in package.master_pages().unwrap() {
         assert!(
             page.xml.starts_with("<style:master-page"),

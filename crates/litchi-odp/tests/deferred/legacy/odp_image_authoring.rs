@@ -3,7 +3,7 @@
 //! through the packaged read APIs after save and reopen.
 
 use litchi_odp::{
-    ImageSource, MutablePresentation, OdfLength, OpenDocumentPackage, OwnedPackage, Presentation,
+    ImageSource, MutablePresentation, OdfLength, Package, OwnedPackage, Presentation,
 };
 
 const PNG_PAYLOAD: &[u8] = b"\x89PNG\r\n\x1a\nfake-png-payload";
@@ -55,7 +55,7 @@ fn insert_image_round_trips_discoverable_package_pictures() {
     );
 
     // The media-level scan attributes frames to their pages with geometry.
-    let generic = OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
+    let generic = Package::from_bytes(bytes.clone()).unwrap();
     let scanned = generic.images().unwrap();
     assert_eq!(scanned.len(), 2);
     let first_frame = scanned[0].frame.as_ref().unwrap();

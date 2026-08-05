@@ -186,7 +186,7 @@ impl Collection {
     }
 }
 
-impl crate::OpenDocumentPackage {
+impl crate::Package {
     /// Parse named marker resources from the package `styles.xml` part.
     pub fn drawing_markers(&self) -> Result<Collection> {
         let styles = self.styles_xml()?;
@@ -194,7 +194,7 @@ impl crate::OpenDocumentPackage {
     }
 }
 
-impl crate::FlatOpenDocument {
+impl crate::FlatDocument {
     /// Parse named marker resources from this flat OpenDocument.
     pub fn drawing_markers(&self) -> Result<Collection> {
         parse_drawing_markers(self.xml())
@@ -570,7 +570,7 @@ mod tests {
     #[test]
     fn parses_local_flat_document_through_public_api() {
         let xml = include_str!("../../../../../test-data/odf/drawing/marker-flat.fods");
-        let document = crate::FlatOpenDocument::from_bytes(xml.as_bytes().to_vec()).unwrap();
+        let document = crate::FlatDocument::from_bytes(xml.as_bytes().to_vec()).unwrap();
         let markers = document.drawing_markers().unwrap();
         let marker = markers.get("Arrowheads_20_1").unwrap();
         assert_eq!(marker.view_box, ViewBox::new(0, 0, 20, 30));

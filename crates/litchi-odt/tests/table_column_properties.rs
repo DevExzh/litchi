@@ -80,7 +80,7 @@ fn parses_real_odfdo_and_libreoffice_fixtures() {
     let lo = include_bytes!(
         "../../../test-data/libreoffice-core/sc/qa/unit/data/functions/mathematical/fods/aggregate.fods"
     );
-    let flat = litchi_odt::generic::FlatOpenDocument::from_reader(Cursor::new(lo)).unwrap();
+    let flat = litchi_odt::generic::FlatDocument::from_reader(Cursor::new(lo)).unwrap();
     assert!(!flat.column_style_properties().unwrap().styles.is_empty());
 }
 
@@ -99,8 +99,7 @@ fn builder_package_round_trip() {
         .add_table_column_property_style(style.clone())
         .unwrap();
     builder.add_paragraph("x").unwrap();
-    let package =
-        litchi_odt::generic::OpenDocumentPackage::from_bytes(builder.build().unwrap()).unwrap();
+    let package = litchi_odt::generic::Package::from_bytes(builder.build().unwrap()).unwrap();
     assert_eq!(
         package.column_style_properties().unwrap().get("Col"),
         Some(&style)

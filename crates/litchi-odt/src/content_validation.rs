@@ -306,13 +306,13 @@ impl ContentValidations {
     }
 }
 
-impl crate::OpenDocumentPackage {
+impl crate::Package {
     pub fn content_validations(&self) -> Result<ContentValidations> {
         parse_part(&self.content_xml()?, ContentValidationPart::Content)
     }
 }
 
-impl crate::FlatOpenDocument {
+impl crate::FlatDocument {
     pub fn content_validations(&self) -> Result<ContentValidations> {
         parse_content_validations(self.xml())
     }

@@ -78,8 +78,7 @@ fn document_generic_package_and_mutable_document_expose_named_style_resources() 
         &dashes,
     );
 
-    let package =
-        litchi_odt::generic::OpenDocumentPackage::from_bytes(source.to_bytes().unwrap()).unwrap();
+    let package = litchi_odt::generic::Package::from_bytes(source.to_bytes().unwrap()).unwrap();
     assert_eq!(package.drawing_fill_images().unwrap(), fill_images);
     assert_eq!(package.drawing_gradients().unwrap(), gradients);
     assert_eq!(package.drawing_hatches().unwrap(), hatches);
@@ -98,8 +97,7 @@ fn document_generic_package_and_mutable_document_expose_named_style_resources() 
 
 #[test]
 fn flat_document_exposes_named_style_resources() {
-    let document =
-        litchi_odt::generic::FlatOpenDocument::from_bytes(FLAT.as_bytes().to_vec()).unwrap();
+    let document = litchi_odt::generic::FlatDocument::from_bytes(FLAT.as_bytes().to_vec()).unwrap();
     let fill_images = document.drawing_fill_images().unwrap();
     let gradients = document.drawing_gradients().unwrap();
     let hatches = document.drawing_hatches().unwrap();

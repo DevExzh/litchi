@@ -10,7 +10,7 @@ use quick_xml::{
     reader::NsReader,
 };
 
-use crate::{FlatOpenDocument, OpenDocumentPackage};
+use crate::{FlatDocument, Package};
 
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
@@ -462,7 +462,7 @@ pub(crate) fn remove_xml(xml: &str) -> Result<String> {
     Ok(format!("{}{}", &xml[..span.start], &xml[span.end..]))
 }
 
-impl OpenDocumentPackage {
+impl Package {
     /// Return stored document line-numbering configuration from styles XML.
     ///
     /// The declaration is presentation metadata only. It is never used to
@@ -473,7 +473,7 @@ impl OpenDocumentPackage {
     }
 }
 
-impl FlatOpenDocument {
+impl FlatDocument {
     /// Return stored document line-numbering configuration from flat ODF XML.
     ///
     /// The declaration is presentation metadata only. It is never used to
@@ -921,7 +921,7 @@ mod tests {
             r#"<o:document xmlns:o="{OFFICE}" xmlns:t="{TEXT}" xmlns:s="{STYLE}" o:mimetype="application/vnd.oasis.opendocument.text" o:version="1.3"><o:styles>{}</o:styles><o:body><o:text/></o:body></o:document>"#,
             configuration.to_xml().unwrap()
         );
-        let flat = FlatOpenDocument::from_bytes(flat_xml.into_bytes()).unwrap();
+        let flat = FlatDocument::from_bytes(flat_xml.into_bytes()).unwrap();
         assert_eq!(
             flat.line_numbering_configuration().unwrap(),
             Some(configuration)

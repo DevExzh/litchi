@@ -1,6 +1,6 @@
 //! ODF 1.2/1.3 list-level label alignment.
 
-use crate::{FlatOpenDocument, OpenDocumentPackage};
+use crate::{FlatDocument, Package};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
@@ -579,13 +579,13 @@ pub(crate) fn set_xml(xml: &str, item: &Style) -> Result<String> {
     ))
 }
 
-impl OpenDocumentPackage {
+impl Package {
     pub fn alignments(&self) -> Result<Styles> {
         self.styles_xml()?
             .map_or_else(|| Ok(Default::default()), |x| parse(&x))
     }
 }
-impl FlatOpenDocument {
+impl FlatDocument {
     pub fn alignments(&self) -> Result<Styles> {
         parse(self.xml())
     }

@@ -277,7 +277,7 @@ impl Columns {
     }
 }
 
-impl crate::OpenDocumentPackage {
+impl crate::Package {
     pub fn style_columns(&self) -> Result<Vec<Columns>> {
         let mut result = parse(self.styles_xml()?.as_deref().unwrap_or_default())?;
         result.extend(parse(&self.content_xml()?)?);
@@ -288,7 +288,7 @@ impl crate::OpenDocumentPackage {
     }
 }
 
-impl crate::FlatOpenDocument {
+impl crate::FlatDocument {
     pub fn style_columns(&self) -> Result<Vec<Columns>> {
         parse(self.xml())
     }

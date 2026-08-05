@@ -6,7 +6,7 @@
 //! elements. Unknown attributes, children, or text are rejected.
 
 use super::row::Break;
-use crate::{FlatOpenDocument, OpenDocumentPackage};
+use crate::{FlatDocument, Package};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
@@ -705,13 +705,13 @@ pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
     Ok(out)
 }
 
-impl OpenDocumentPackage {
+impl Package {
     pub fn column_style_properties(&self) -> Result<Styles> {
         self.styles_xml()?
             .map_or_else(|| Ok(Default::default()), |xml| parse(&xml))
     }
 }
-impl FlatOpenDocument {
+impl FlatDocument {
     pub fn column_style_properties(&self) -> Result<Styles> {
         parse(self.xml())
     }

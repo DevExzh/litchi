@@ -45,7 +45,7 @@ fn parses_libreoffice_section_separator_and_other_property_contexts() {
         )),
     ] {
         let flat =
-            litchi_odt::generic::FlatOpenDocument::from_bytes(fixture.as_bytes().to_vec()).unwrap();
+            litchi_odt::generic::FlatDocument::from_bytes(fixture.as_bytes().to_vec()).unwrap();
         let parsed = flat.style_columns().unwrap();
         assert!(
             parsed
@@ -134,7 +134,7 @@ fn builder_package_page_layout_and_mutable_update_round_trip() {
         .unwrap();
     builder.add_paragraph("body").unwrap();
     let bytes = builder.build().unwrap();
-    let package = litchi_odt::generic::OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
+    let package = litchi_odt::generic::Package::from_bytes(bytes.clone()).unwrap();
     assert!(package.style_columns().unwrap().contains(&columns));
     let document = Document::from_bytes(bytes).unwrap();
     let layout = document

@@ -8,7 +8,7 @@
 
 use litchi_odt::Document;
 use litchi_odt::elements::text::TextElements;
-use litchi_odt::generic::OpenDocumentFamily;
+use litchi_odt::generic::Family;
 
 /// Namespace preamble shared by the hand-written content fragments.
 const CONTENT_PREFIX: &str = concat!(
@@ -160,11 +160,11 @@ fn producer_written_frame_captions_round_trip_through_the_flat_reader() {
     // LibreOffice writes an anchored caption frame as a `text:p` that contains a
     // `draw:text-box` with its own `text:p`. Before frames were reachable this
     // shape made `text()` fail outright for the whole document.
-    let flat = litchi_odt::generic::FlatOpenDocument::open(
+    let flat = litchi_odt::generic::FlatDocument::open(
         "../../test-data/odf/odt/nested-frame-paragraphs.fodt",
     )
     .unwrap();
-    assert_eq!(flat.family(), OpenDocumentFamily::Text);
+    assert_eq!(flat.family(), Family::Text);
     assert!(flat.xml().contains("bar"));
     assert!(flat.xml().contains("Illustration"));
     assert!(flat.xml().contains(": foo"));

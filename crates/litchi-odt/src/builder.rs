@@ -2738,7 +2738,7 @@ mod tests {
             document.line_numbering_configuration().unwrap(),
             Some(configuration.clone())
         );
-        let package = crate::OpenDocumentPackage::from_bytes(bytes).unwrap();
+        let package = crate::Package::from_bytes(bytes).unwrap();
         assert_eq!(
             package.line_numbering_configuration().unwrap(),
             Some(configuration)

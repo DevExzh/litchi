@@ -1,6 +1,6 @@
 //! Complete typed ODF `style:chart-properties` support.
 
-use crate::{FlatOpenDocument, OpenDocumentPackage};
+use crate::{FlatDocument, Package};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
@@ -1499,7 +1499,7 @@ pub fn set_chart_style_properties_xml(xml: &str, requested: &StyleRecord) -> Res
     Ok(out)
 }
 
-impl OpenDocumentPackage {
+impl Package {
     pub fn chart_style_properties(&self) -> Result<StylePropertiesSet> {
         self.styles_xml()?.map_or_else(
             || Ok(Default::default()),
@@ -1507,7 +1507,7 @@ impl OpenDocumentPackage {
         )
     }
 }
-impl FlatOpenDocument {
+impl FlatDocument {
     pub fn chart_style_properties(&self) -> Result<StylePropertiesSet> {
         parse_chart_style_properties(self.xml())
     }
