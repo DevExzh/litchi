@@ -4544,6 +4544,47 @@ embedded-package integration targets, and the ODF common-package suite. No
 new ODF specification or native Office claim is made by these structural
 refactors.
 
+## Shared BIFF framing and legacy binary owner migration
+
+The legacy binary migration now has a neutral physical-record owner:
+`litchi-biff` implements the four-byte BIFF frame from `[MS-XLS]` §2.1.4 and
+`[MS-OGRAPH]` §2.1.4 (`u16` kind, `u16` payload length, and bounded payload
+bytes). Its `RecordRef`, `Records`, `Record`, `Encoder`, and `Limits` APIs are
+borrowed-first, lossless, allocation-bounded, and intentionally do not
+interpret continuation records, chart grammar, workbook topology, or host
+metadata. BIFF12 remains separately owned by `litchi-xlsb`.
+
+`litchi-ograph` and `litchi-xls` now depend on this substrate directly. The
+former local OGraph frame module and the XLS chart/workbook frame duplicates
+are removed; chart, package, record, worksheet, and writer layers retain their
+format-specific semantics and map shared framing failures into their own typed
+errors. Unknown record kinds and exact encoded bytes remain available at the
+neutral boundary for lossless higher-level handling.
+
+The same binary migration batch also layers the remaining touched semantic
+owners: DOC page borders are under
+`litchi-doc::doc::section::borders::{model,codec}`, PPT ExOle objects and
+references are under `litchi-ppt::embedded::{object,reference}`, and XLS
+worksheet views remain under `view::{model,codec}`. Canonical names are
+contextual and prefix-free; the removed `SectionPageBorder*`,
+`PowerPointOle*`, `PowerPointExternalObject*`, and `XlsView*` spellings are not
+retained as compatibility aliases.
+
+Focused verification covers 15 `litchi-biff`, 40 `litchi-ograph`, 837
+`litchi-doc`, 879 `litchi-ppt`, and 837 `litchi-xls` library tests, plus the
+all-target suites for the new BIFF and legacy owners. `cargo check` covers all
+five crates with all features and targets; formatting, metadata, and the
+boundary policy pass for 46 workspace packages and 150 internal dependency
+declarations with no explicit migration debts. DOC fixture targets that read
+the checked-in corrupted POI OLE sample remain an external fixture failure,
+not a regression in this slice.
+
+The next binary boundary is the target-driven OLE object API: neutral CFB and
+OLEDS capture should retain host metadata opaquely while DOC and XLS interpret
+their own `ObjectPool`/`MBD`/`LNK` references. Additional legacy semantic
+owners, including XLS layout rows and columns, remain format-specific follow-up
+work and must not be folded into `litchi-biff`.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:
