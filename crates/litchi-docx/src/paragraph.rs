@@ -1,6 +1,6 @@
 use crate::UnderlineStyle;
 use crate::color::Theme;
-use crate::drawing::{DrawingObject, parse_drawing_objects};
+use crate::drawing::{Object, parse};
 use crate::error::{Error, Result};
 use crate::hyperlink::Hyperlink;
 use crate::image::{InlineImage, parse_inline_images};
@@ -842,7 +842,7 @@ impl Paragraph {
 
     /// Extract all drawing objects (shapes, text boxes) from this paragraph.
     ///
-    /// Returns a vector of `DrawingObject` objects found in `<w:drawing>` elements
+    /// Returns a vector of [`Object`] values found in `<w:drawing>` elements
     /// within this paragraph. This includes shapes, text boxes, and other DrawingML objects.
     ///
     /// # Example
@@ -861,8 +861,8 @@ impl Paragraph {
     /// }
     /// ```
     #[inline]
-    pub fn drawing_objects(&self) -> Result<SmallVec<[DrawingObject; 4]>> {
-        parse_drawing_objects(self.xml_bytes())
+    pub fn drawing_objects(&self) -> Result<SmallVec<[Object; 4]>> {
+        parse(self.xml_bytes())
     }
 
     /// Extract all tracked changes (revisions) from this paragraph.
