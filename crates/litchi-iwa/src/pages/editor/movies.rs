@@ -6,7 +6,6 @@ use std::time::Duration;
 use litchi_iwa_common::media::Type as MediaType;
 
 use super::*;
-use crate::MediaPlaybackSettings;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
@@ -16,6 +15,7 @@ use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
     flip_drawable_geometry, offset_drawable_geometry, restore_drawable_original_size,
 };
+use litchi_iwa_common::media::playback::MediaPlaybackSettings;
 
 mod caption;
 mod graph;
@@ -639,7 +639,7 @@ impl PagesEditor {
 mod tests {
     use super::*;
     use crate::pages::PagesImageOptions;
-    use crate::{MediaLoopMode, MediaVolume};
+    use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
 
     const MOVIE: &[u8] = b"\0\0\0\x18ftypqt  source-built-pages-movie";
     const REPLACEMENT_MOVIE: &[u8] = b"\0\0\0\x18ftypqt  replacement-pages-movie";

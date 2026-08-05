@@ -412,7 +412,7 @@ mod tests {
         NumbersSheetMovieOptions,
     };
     use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize, RgbaColor, ShapeFill};
-    use crate::{MediaLoopMode, MediaVolume};
+    use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
     use litchi_iwa_common::shape::path::Preset;
 
     const AUDIO: &[u8] = b"FORM\0\0\0\x10AIFCsheet-duplicate-audio";

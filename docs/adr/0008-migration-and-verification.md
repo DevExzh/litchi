@@ -5909,6 +5909,16 @@ embedded image object in its native canvas/inspector. The CLI reported
 three ZIPs passed integrity checks, and the applications were quit after
 verification. The semantic classifier itself is exercised by the
 dependency-free suite, including complete and truncated ISO-BMFF headers.
+The media playback ownership slice now follows the same archive boundary at
+`litchi-iwa-common::media::playback`. Common tests cover compact volume
+validation, builder-preserved optional fields, strict trim-range validation,
+canonical known loop modes, and lossless genuinely unknown native values. The
+IWA adapter retains protobuf decoding, legacy/modern loop reconciliation,
+unknown-field-preserving wire patches, and transactional replacement; its
+wire-focused tests continue to cover those behaviors while Pages, Numbers,
+Keynote, and all six source-building media examples import the common types
+directly. The old IWA semantic owners and root compatibility exports are
+removed rather than duplicated.
 The shape-path ownership slice now follows the same boundary at
 `litchi-iwa-common::shape::path`. `Preset` owns the source-buildable geometry
 vocabulary while `CornerRadius`, `PolygonSides`, `StarPoints`, and

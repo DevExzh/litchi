@@ -10,13 +10,13 @@ use super::slide_movies::graph::{
     MovieObjectIds, audio_creation_values, audio_objects, movie_creation_context,
 };
 use super::*;
-use crate::MediaPlaybackSettings;
 use crate::data_reference_registry::add_component_data_reference;
 use crate::media_playback::media_playback_settings;
 use crate::media_playback::replace_movie_playback_settings;
 use crate::shapes::{
     DrawablePoint, DrawableProperties, drawable_properties, geometry_from_drawable,
 };
+use litchi_iwa_common::media::playback::MediaPlaybackSettings;
 
 const AUDIO_ARCHIVE_MESSAGE_TYPE: u32 = 3_007;
 
@@ -414,7 +414,7 @@ fn audio_info(
 mod tests {
     use super::*;
     use crate::keynote::KeynoteDocumentBuilder;
-    use crate::{MediaLoopMode, MediaVolume};
+    use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
 
     const AUDIO: &[u8] = b"FORM\0\0\0\x10AIFCsource-built-audio";
     const REPLACEMENT_AUDIO: &[u8] = b"FORM\0\0\0\x10AIFFreplacement-audio";

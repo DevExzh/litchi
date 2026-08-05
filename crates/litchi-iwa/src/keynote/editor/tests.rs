@@ -4,7 +4,7 @@ use crate::package_metadata::{PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_T
 use crate::protobuf::tsp::{ComponentInfo, ObjectUuidMapEntry, PackageMetadata, Reference, Uuid};
 use crate::protobuf::tswp::StorageArchive;
 use crate::shapes::{DrawablePoint, DrawableSize};
-use crate::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
+use litchi_iwa_common::media::playback::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
 use litchi_iwa_common::shape::fill::{Opacity, StopMidpoint, StopPosition};
 use litchi_keynote::transition::{
     Acceleration, AnimationParameters, CustomParameters, Direction, Effect, MosaicType, Settings,

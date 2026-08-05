@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteSlideMovieOptions};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
-use litchi_iwa::{MediaLoopMode, MediaVolume};
+use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
 
 const SLIDE_WIDTH_POINTS: f32 = 1_920.0;
 const SLIDE_HEIGHT_POINTS: f32 = 1_080.0;

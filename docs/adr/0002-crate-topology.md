@@ -195,6 +195,14 @@ video rule, and makes `Unknown` explicit. `litchi-iwa` retains `MediaAsset`,
 catalog traversal, package/protobuf metadata, filesystem I/O, resource limits,
 and transactional replacement; all consumers import the common type directly
 and the old facade-owned enum is removed.
+Media playback values now follow the same boundary at
+`litchi-iwa-common::media::playback::{MediaVolume, MediaLoopMode,
+MediaPlaybackSettings}`. The common module owns the compact duration, volume,
+loop-mode, and builder/validation vocabulary, including lossless unknown loop
+values. `litchi-iwa` retains movie protobuf decoding, legacy/modern loop-field
+reconciliation, wire-preserving replacement, package transactions, and IWA
+error mapping; Pages, Numbers, Keynote, and their creation examples import the
+canonical common types directly, with no facade compatibility aliases.
 The shape-path value slice follows the same ownership boundary at
 `litchi-iwa-common::shape::path::{Preset, CornerRadius, PolygonSides,
 StarPoints, InnerRadiusRatio}`. These compact, copyable controls and the

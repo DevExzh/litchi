@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use litchi_iwa::pages::{PagesAudioOptions, PagesEditor};
 use litchi_iwa::shapes::DrawablePoint;
-use litchi_iwa::{MediaLoopMode, MediaVolume};
+use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);

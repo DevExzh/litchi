@@ -4,7 +4,6 @@ use litchi_iwa_common::media::Type as MediaType;
 use litchi_keynote::slide::media::MovieKind;
 
 use super::*;
-use crate::MediaPlaybackSettings;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
@@ -14,6 +13,7 @@ use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
     flip_drawable_geometry, geometry_from_drawable, restore_drawable_original_size,
 };
+use litchi_iwa_common::media::playback::MediaPlaybackSettings;
 use std::time::Duration;
 
 mod builds;
@@ -987,7 +987,7 @@ fn take_movie_identifier(next: &mut u64) -> Result<u64> {
 mod tests {
     use super::*;
     use crate::keynote::KeynoteDocumentBuilder;
-    use crate::{MediaLoopMode, MediaVolume};
+    use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
 
     const MOVIE: &[u8] = b"\0\0\0\x18ftypqt  source-built-movie";
     const REPLACEMENT_MOVIE: &[u8] = b"\0\0\0\x18ftypqt  replacement-movie";

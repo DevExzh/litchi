@@ -6,13 +6,13 @@ use std::time::Duration;
 use litchi_iwa_common::media::Type as MediaType;
 
 use super::*;
-use crate::MediaPlaybackSettings;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
 use crate::media_playback::replace_movie_playback_settings;
 use crate::package_metadata::{add_component_external_reference, component_identifier_for_entry};
 use crate::shapes::{DrawablePoint, DrawableProperties, offset_drawable_geometry};
+use litchi_iwa_common::media::playback::MediaPlaybackSettings;
 
 mod graph;
 
@@ -526,7 +526,7 @@ impl PagesEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{MediaLoopMode, MediaVolume};
+    use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
 
     const AUDIO: &[u8] = b"FORM\0\0\0\x10AIFCsource-built-pages-audio";
     const REPLACEMENT_AUDIO: &[u8] = b"FORM\0\0\0\x10AIFFreplacement-pages-audio";

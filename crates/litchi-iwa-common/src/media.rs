@@ -3,6 +3,8 @@
 //! This module only classifies filenames and bounded byte prefixes. It does
 //! not open archives, inspect protobuf records, or own package transactions.
 
+pub mod playback;
+
 /// The media families recognized by iWork package assets.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

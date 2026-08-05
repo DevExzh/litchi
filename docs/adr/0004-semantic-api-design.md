@@ -137,6 +137,17 @@ while an unrecognized ISO-BMFF brand remains conservatively classified as
 `Video` to match iWork replacement semantics. Archive discovery, asset
 metadata, limits, and replacement validation remain in the IWA adapter.
 
+Media movie/audio playback uses the focused archive-free
+`litchi_iwa_common::media::playback` module. `MediaVolume` is a compact,
+validated linear multiplier; `MediaLoopMode` maps named native values while
+retaining genuinely unknown discriminants; and `MediaPlaybackSettings` uses
+consuming builders plus checked trim canonicalization. The semantic module has
+no archive, protobuf, graph, package, or IWA-error dependency. Native duration
+decoding, legacy/modern loop reconciliation, unknown-field-preserving wire
+patches, and transactional publication remain in `litchi-iwa`, while all three
+iWork consumers use the common owners directly and the old facade owners are
+deleted rather than aliased.
+
 Keynote slide movie classification uses the focused
 `litchi_keynote::slide::media::MovieKind` value. Its compact, non-exhaustive
 variants (`File`, `Audio`, `Placeholder`, and `LiveVideo`) contain no

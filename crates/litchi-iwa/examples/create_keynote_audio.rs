@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteSlideAudioOptions};
 use litchi_iwa::shapes::DrawablePoint;
-use litchi_iwa::{MediaLoopMode, MediaVolume};
+use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
 
 const SLIDE_CENTER: DrawablePoint = DrawablePoint { x: 960.0, y: 540.0 };
 

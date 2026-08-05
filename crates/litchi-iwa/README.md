@@ -918,13 +918,16 @@ field you need, then write it back—for example,
 Numbers, and Keynote movie/audio APIs preserve unknown movie-archive fields and
 carry the properties through native-style duplication.
 
-The same media APIs expose `MediaPlaybackSettings` for typed trim boundaries,
-poster position, repeat mode, and `MediaVolume`. Update the returned settings
-and write them through the matching `*_playback_settings` method (for example,
+The same media APIs expose the archive-free
+`litchi_iwa_common::media::playback::{MediaPlaybackSettings, MediaVolume,
+MediaLoopMode}` vocabulary for typed trim boundaries, poster position, repeat
+mode, and volume. Update the returned settings and write them through the
+matching `*_playback_settings` method (for example,
 `set_body_movie_playback_settings` or
 `set_slide_audio_playback_settings`). The update preserves unrelated and
-unknown movie-archive fields; `MediaVolume::new` rejects invalid levels, and
-`MediaLoopMode::Unknown` allows a newer native repeat value to round-trip.
+unknown movie-archive fields; the common builders reject invalid levels and
+trim ranges, and `MediaLoopMode::Unknown` allows a newer native repeat value to
+round-trip.
 
 ### Edit existing documents
 
