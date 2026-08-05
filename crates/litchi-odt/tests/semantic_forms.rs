@@ -1,6 +1,4 @@
-use litchi_odt::form::{
-    FormControl, FormControlKind, FormNode, FormPropertyValue, FormScalarValue,
-};
+use litchi_odt::form::{Control, ControlKind, Node, PropertyValue, ScalarValue};
 use std::path::{Path, PathBuf};
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -24,11 +22,11 @@ fn fixture(relative: &str) -> PathBuf {
         .join(relative)
 }
 
-fn collect<'a>(nodes: &'a [FormNode], out: &mut Vec<&'a FormControl>) {
+fn collect<'a>(nodes: &'a [Node], out: &mut Vec<&'a Control>) {
     for node in nodes {
         match node {
-            FormNode::Form(form) => collect(&form.children, out),
-            FormNode::Control(control) => {
+            Node::Form(form) => collect(&form.children, out),
+            Node::Control(control) => {
                 out.push(control);
                 collect(&control.children, out);
             },
@@ -79,15 +77,15 @@ fn parses_all_controls_nesting_typed_properties_and_links() {
     let mut parsed = Vec::new();
     collect(&forms.groups[0].forms[0].children, &mut parsed);
     assert_eq!(parsed.len(), names.len());
-    assert!(matches!(parsed[0].kind, FormControlKind::Text));
-    assert!(matches!(parsed[23].kind, FormControlKind::GenericControl));
+    assert!(matches!(parsed[0].kind, ControlKind::Text));
+    assert!(matches!(parsed[23].kind, ControlKind::GenericControl));
     assert!(matches!(
         forms.groups[0].forms[0].properties[0].value,
-        FormPropertyValue::Scalar(FormScalarValue::Boolean(true))
+        PropertyValue::Scalar(ScalarValue::Boolean(true))
     ));
     assert!(matches!(
         forms.groups[0].forms[0].properties[1].value,
-        FormPropertyValue::List { ref values, .. } if values.len() == 2
+        PropertyValue::List { ref values, .. } if values.len() == 2
     ));
     assert!(forms.control_shapes[0].resolved_control.is_some());
 }
@@ -108,7 +106,7 @@ fn flags_behavior_but_preserves_external_values_inertly() {
             .iter()
             .any(|attribute| attribute.value == "DROP TABLE x")
     );
-    let FormNode::Control(control) = &forms.groups[0].forms[0].children[0] else {
+    let Node::Control(control) = &forms.groups[0].forms[0].children[0] else {
         panic!()
     };
     assert_eq!(

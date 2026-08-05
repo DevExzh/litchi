@@ -153,7 +153,7 @@ impl FlatOpenDocument {
     }
 
     /// Inspect classic forms without executing bindings, events, or external resources.
-    pub fn forms(&self) -> Result<crate::Forms> {
+    pub fn forms(&self) -> Result<crate::form::Forms> {
         crate::form::parse_form_parts(&[(self.xml(), crate::form::Part::Flat)])
     }
 
@@ -565,7 +565,7 @@ impl OpenDocumentPackage {
     }
 
     /// Inspect classic forms in content and styles without executing behavior.
-    pub fn forms(&self) -> Result<crate::Forms> {
+    pub fn forms(&self) -> Result<crate::form::Forms> {
         let content = self.content_xml()?;
         let styles = self.styles_xml()?;
         let mut parts = vec![(content.as_str(), crate::form::Part::Content)];

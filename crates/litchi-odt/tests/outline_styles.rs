@@ -1,5 +1,5 @@
 use litchi_odt::list_label_alignment::FollowedBy;
-use litchi_odt::outline_style::{ListLevelPositionMode, OutlineTextAlign, parse_outline_styles};
+use litchi_odt::outline_style::{PositionMode, TextAlign, parse_outline_styles};
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
@@ -26,11 +26,8 @@ fn parses_complete_typed_outline_style_and_extensions() {
     assert_eq!(level.start_value.as_ref().unwrap().as_str(), "3");
     assert_eq!(level.extensions[0].namespace_uri(), "urn:producer");
     let properties = level.list_level_properties.as_ref().unwrap();
-    assert_eq!(properties.text_align, Some(OutlineTextAlign::Start));
-    assert_eq!(
-        properties.position_mode,
-        Some(ListLevelPositionMode::LabelAlignment)
-    );
+    assert_eq!(properties.text_align, Some(TextAlign::Start));
+    assert_eq!(properties.position_mode, Some(PositionMode::LabelAlignment));
     assert_eq!(
         properties
             .label_alignment

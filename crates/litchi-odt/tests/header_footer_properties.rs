@@ -1,6 +1,5 @@
 use litchi_odt::header_footer_properties::{
-    HeaderFooterBorder, HeaderFooterBorderStyle, HeaderFooterColor, HeaderFooterLength,
-    HeaderFooterShadow, HeaderFooterStyleProperties, PageHeaderFooterRegion,
+    Border, BorderStyle, Color, Length, Region, Shadow, StyleProperties,
     parse_page_layout_header_footer_properties,
 };
 use litchi_odt::section_properties::BackgroundRepeat;
@@ -18,32 +17,27 @@ fn parses_all_standard_attributes_and_round_trips() {
     );
     let parsed = parse_page_layout_header_footer_properties(&xml).unwrap();
     let p = &parsed[0].properties;
-    assert_eq!(
-        p.background_color,
-        Some(HeaderFooterColor::Rgb(192, 192, 192))
-    );
+    assert_eq!(p.background_color, Some(Color::Rgb(192, 192, 192)));
     assert!(matches!(
         p.borders.all,
-        Some(HeaderFooterBorder::Line {
-            style: HeaderFooterBorderStyle::Solid,
+        Some(Border::Line {
+            style: BorderStyle::Solid,
             ..
         })
     ));
-    assert!(matches!(p.shadow, Some(HeaderFooterShadow::Drop { .. })));
+    assert!(matches!(p.shadow, Some(Shadow::Drop { .. })));
     assert_eq!(
         p.background_image.as_ref().unwrap().repeat,
         Some(BackgroundRepeat::NoRepeat)
     );
-    let fragment = p
-        .to_region_fragment(PageHeaderFooterRegion::Header)
-        .unwrap();
+    let fragment = p.to_region_fragment(Region::Header).unwrap();
     let reparsed = parse_page_layout_header_footer_properties(&doc(&fragment)).unwrap();
     assert_eq!(parsed[0].properties, reparsed[0].properties);
     assert_eq!(
         fragment,
         reparsed[0]
             .properties
-            .to_region_fragment(PageHeaderFooterRegion::Header)
+            .to_region_fragment(Region::Header)
             .unwrap()
     );
 }
@@ -82,9 +76,9 @@ fn malformed_namespaces_order_cardinality_and_caps() {
 
 #[test]
 fn public_construction_is_bounded() {
-    assert!(HeaderFooterLength::new("1e9cm").is_err());
-    let p = HeaderFooterStyleProperties {
-        min_height: Some(HeaderFooterLength::new("1cm").unwrap()),
+    assert!(Length::new("1e9cm").is_err());
+    let p = StyleProperties {
+        min_height: Some(Length::new("1cm").unwrap()),
         ..Default::default()
     };
     assert!(
@@ -96,27 +90,23 @@ fn public_construction_is_bounded() {
 
 #[test]
 fn builder_package_and_mutable_paths_preserve_siblings() {
-    let header = HeaderFooterStyleProperties {
-        min_height: Some(HeaderFooterLength::new("1cm").unwrap()),
+    let header = StyleProperties {
+        min_height: Some(Length::new("1cm").unwrap()),
         dynamic_spacing: Some(true),
         ..Default::default()
     };
-    let footer = HeaderFooterStyleProperties {
-        min_height: Some(HeaderFooterLength::new("2cm").unwrap()),
-        background_color: Some(HeaderFooterColor::Transparent),
+    let footer = StyleProperties {
+        min_height: Some(Length::new("2cm").unwrap()),
+        background_color: Some(Color::Transparent),
         ..Default::default()
     };
     let mut builder = Builder::new();
     builder.add_paragraph("Body").unwrap();
     builder
-        .add_page_layout_header_footer_properties("pm1", PageHeaderFooterRegion::Header, header)
+        .add_page_layout_header_footer_properties("pm1", Region::Header, header)
         .unwrap();
     builder
-        .add_page_layout_header_footer_properties(
-            "pm1",
-            PageHeaderFooterRegion::Footer,
-            footer.clone(),
-        )
+        .add_page_layout_header_footer_properties("pm1", Region::Footer, footer.clone())
         .unwrap();
     let bytes = builder.build().unwrap();
     let package = litchi_odt::generic::OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
@@ -132,17 +122,13 @@ fn builder_package_and_mutable_paths_preserve_siblings() {
     assert!(styles.contains("Numbered list style"));
     let document = Document::from_bytes(bytes).unwrap();
     let mut mutable = litchi_odt::mutable::MutableDocument::from_document(document).unwrap();
-    let replacement = HeaderFooterStyleProperties {
-        min_height: Some(HeaderFooterLength::new("3cm").unwrap()),
-        shadow: Some(HeaderFooterShadow::None),
+    let replacement = StyleProperties {
+        min_height: Some(Length::new("3cm").unwrap()),
+        shadow: Some(Shadow::None),
         ..Default::default()
     };
     mutable
-        .set_page_layout_header_footer_properties(
-            "pm1",
-            PageHeaderFooterRegion::Header,
-            &replacement,
-        )
+        .set_page_layout_header_footer_properties("pm1", Region::Header, &replacement)
         .unwrap();
     let output =
         litchi_odt::generic::OpenDocumentPackage::from_bytes(mutable.to_bytes().unwrap()).unwrap();
@@ -150,7 +136,7 @@ fn builder_package_and_mutable_paths_preserve_siblings() {
     assert_eq!(
         entries
             .iter()
-            .find(|entry| entry.region == PageHeaderFooterRegion::Header)
+            .find(|entry| entry.region == Region::Header)
             .unwrap()
             .properties
             .min_height
@@ -162,7 +148,7 @@ fn builder_package_and_mutable_paths_preserve_siblings() {
     assert_eq!(
         entries
             .iter()
-            .find(|entry| entry.region == PageHeaderFooterRegion::Footer)
+            .find(|entry| entry.region == Region::Footer)
             .unwrap()
             .properties,
         footer

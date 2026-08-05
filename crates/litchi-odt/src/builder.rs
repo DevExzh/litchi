@@ -58,18 +58,18 @@ pub struct Builder {
     ruby_annotations: Vec<RubyAnnotationInsertion>,
     notes: Vec<(usize, crate::Note)>,
     ruby_styles: Vec<crate::RubyStyle>,
-    property_forms: Vec<crate::PropertyForm>,
-    control_forms: Vec<crate::ControlForm>,
-    interactive_forms: Vec<crate::InteractiveForm>,
-    selection_forms: Vec<crate::SelectionForm>,
-    visual_forms: Vec<crate::VisualForm>,
-    generic_forms: Vec<crate::GenericForm>,
-    password_file_forms: Vec<crate::PasswordFileForm>,
-    image_frame_forms: Vec<crate::ImageFrameForm>,
-    value_range_forms: Vec<crate::ValueRangeForm>,
-    typed_value_forms: Vec<crate::TypedValueForm>,
-    grid_forms: Vec<crate::GridForm>,
-    connection_resource_forms: Vec<crate::ConnectionResourceForm>,
+    property_forms: Vec<crate::form::PropertyForm>,
+    control_forms: Vec<crate::form::ControlForm>,
+    interactive_forms: Vec<crate::form::InteractiveForm>,
+    selection_forms: Vec<crate::form::SelectionForm>,
+    visual_forms: Vec<crate::form::VisualForm>,
+    generic_forms: Vec<crate::form::GenericForm>,
+    password_file_forms: Vec<crate::form::PasswordFileForm>,
+    image_frame_forms: Vec<crate::form::ImageFrameForm>,
+    value_range_forms: Vec<crate::form::ValueRangeForm>,
+    typed_value_forms: Vec<crate::form::TypedValueForm>,
+    grid_forms: Vec<crate::form::GridForm>,
+    connection_resource_forms: Vec<crate::form::ConnectionResourceForm>,
     metadata: Metadata,
     paragraph_tab_styles: Vec<crate::style::paragraph::tab_stop::Style>,
     paragraph_drop_cap_styles: Vec<crate::style::paragraph::drop_cap::Style>,
@@ -1228,7 +1228,7 @@ impl Builder {
     }
 
     /// Add a minimal inert form containing typed custom properties.
-    pub fn add_property_form(&mut self, form: &crate::PropertyForm) -> Result<&mut Self> {
+    pub fn add_property_form(&mut self, form: &crate::form::PropertyForm) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
             .property_forms
@@ -1245,7 +1245,7 @@ impl Builder {
     }
 
     /// Add a canonical form containing typed text and textarea controls.
-    pub fn add_control_form(&mut self, form: &crate::ControlForm) -> Result<&mut Self> {
+    pub fn add_control_form(&mut self, form: &crate::form::ControlForm) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
             .control_forms
@@ -1266,7 +1266,10 @@ impl Builder {
     }
 
     /// Add a canonical form containing typed button and checkbox controls.
-    pub fn add_interactive_form(&mut self, form: &crate::InteractiveForm) -> Result<&mut Self> {
+    pub fn add_interactive_form(
+        &mut self,
+        form: &crate::form::InteractiveForm,
+    ) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
             .interactive_forms
@@ -1291,7 +1294,7 @@ impl Builder {
     }
 
     /// Add a canonical form containing typed listbox and combobox controls.
-    pub fn add_selection_form(&mut self, form: &crate::SelectionForm) -> Result<&mut Self> {
+    pub fn add_selection_form(&mut self, form: &crate::form::SelectionForm) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
             .selection_forms
@@ -1320,7 +1323,7 @@ impl Builder {
     }
 
     /// Add a canonical form containing radio, frame, and image-button controls.
-    pub fn add_visual_form(&mut self, form: &crate::VisualForm) -> Result<&mut Self> {
+    pub fn add_visual_form(&mut self, form: &crate::form::VisualForm) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
             .visual_forms
@@ -1353,7 +1356,7 @@ impl Builder {
     }
 
     /// Add a canonical form containing fixed-text, hidden, and generic controls.
-    pub fn add_generic_form(&mut self, form: &crate::GenericForm) -> Result<&mut Self> {
+    pub fn add_generic_form(&mut self, form: &crate::form::GenericForm) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
             .generic_forms
@@ -1390,7 +1393,10 @@ impl Builder {
     }
 
     /// Add a canonical form containing password and file controls.
-    pub fn add_password_file_form(&mut self, form: &crate::PasswordFileForm) -> Result<&mut Self> {
+    pub fn add_password_file_form(
+        &mut self,
+        form: &crate::form::PasswordFileForm,
+    ) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
             .password_file_forms
@@ -1431,7 +1437,10 @@ impl Builder {
     }
 
     /// Add a canonical form containing image-frame controls.
-    pub fn add_image_frame_form(&mut self, form: &crate::ImageFrameForm) -> Result<&mut Self> {
+    pub fn add_image_frame_form(
+        &mut self,
+        form: &crate::form::ImageFrameForm,
+    ) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
             .image_frame_forms
@@ -2135,7 +2144,10 @@ impl Builder {
 
 impl Builder {
     /// Add a validated value-range form to the document.
-    pub fn add_value_range_form(&mut self, form: &crate::ValueRangeForm) -> Result<&mut Self> {
+    pub fn add_value_range_form(
+        &mut self,
+        form: &crate::form::ValueRangeForm,
+    ) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
             .value_range_forms
@@ -2186,7 +2198,10 @@ impl Builder {
 
 impl Builder {
     /// Add a validated form containing formatted-text, number, date, or time controls.
-    pub fn add_typed_value_form(&mut self, form: &crate::TypedValueForm) -> Result<&mut Self> {
+    pub fn add_typed_value_form(
+        &mut self,
+        form: &crate::form::TypedValueForm,
+    ) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
             .typed_value_forms
@@ -2243,7 +2258,7 @@ impl Builder {
     /// Adds a form whose final child is an inert `form:connection-resource`.
     pub fn add_connection_resource_form(
         &mut self,
-        form: &crate::ConnectionResourceForm,
+        form: &crate::form::ConnectionResourceForm,
     ) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
@@ -2304,7 +2319,7 @@ impl Builder {
         Ok(self)
     }
 
-    pub fn add_grid_form(&mut self, form: &crate::GridForm) -> Result<&mut Self> {
+    pub fn add_grid_form(&mut self, form: &crate::form::GridForm) -> Result<&mut Self> {
         form.to_xml_fragment()?;
         if self
             .grid_forms

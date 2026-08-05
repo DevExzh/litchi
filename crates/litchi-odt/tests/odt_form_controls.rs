@@ -9,8 +9,8 @@
 
 use litchi_odt::form::{
     ButtonControl, CheckboxControl, CheckboxState, ComboItem, ComboboxControl, ControlForm,
-    FixedTextControl, FormControlKind, FormNode, GenericForm, HiddenControl, InteractiveForm,
-    ListOption, ListboxControl, RadioControl, SelectionForm, TextControl, TypedValueControl,
+    ControlKind, FixedTextControl, GenericForm, HiddenControl, InteractiveForm, ListOption,
+    ListboxControl, Node, RadioControl, SelectionForm, TextControl, TypedValueControl,
     TypedValueControlKind, TypedValueForm, VisualForm,
 };
 use litchi_odt::{Builder, Document};
@@ -128,30 +128,30 @@ fn reads_fixture_form_controls_as_typed_inert_data() {
     let form = &forms.groups[0].forms[0];
     assert_eq!(form.name.as_deref(), Some("registration"));
 
-    let controls: Vec<&litchi_odt::form::FormControl> = form
+    let controls: Vec<&litchi_odt::form::Control> = form
         .children
         .iter()
         .map(|node| match node {
-            FormNode::Control(control) => control,
-            FormNode::Form(_) => panic!("no nested forms in fixture"),
+            Node::Control(control) => control,
+            Node::Form(_) => panic!("no nested forms in fixture"),
         })
         .collect();
-    let kinds: Vec<&FormControlKind> = controls.iter().map(|control| &control.kind).collect();
+    let kinds: Vec<&ControlKind> = controls.iter().map(|control| &control.kind).collect();
     assert_eq!(
         kinds,
         [
-            &FormControlKind::Text,
-            &FormControlKind::TextArea,
-            &FormControlKind::CheckBox,
-            &FormControlKind::Button,
-            &FormControlKind::ComboBox,
-            &FormControlKind::ListBox,
-            &FormControlKind::Radio,
-            &FormControlKind::FixedText,
-            &FormControlKind::Hidden,
-            &FormControlKind::Number,
-            &FormControlKind::Date,
-            &FormControlKind::Time,
+            &ControlKind::Text,
+            &ControlKind::TextArea,
+            &ControlKind::CheckBox,
+            &ControlKind::Button,
+            &ControlKind::ComboBox,
+            &ControlKind::ListBox,
+            &ControlKind::Radio,
+            &ControlKind::FixedText,
+            &ControlKind::Hidden,
+            &ControlKind::Number,
+            &ControlKind::Date,
+            &ControlKind::Time,
         ]
     );
 
@@ -170,15 +170,15 @@ fn reads_fixture_form_controls_as_typed_inert_data() {
     assert_eq!(controls[9].current_value.as_deref(), Some("36"));
 
     // Combobox items and listbox options are nested typed controls.
-    let FormNode::Control(item) = &controls[4].children[0] else {
+    let Node::Control(item) = &controls[4].children[0] else {
         panic!("combobox items are nested controls")
     };
-    assert_eq!(item.kind, FormControlKind::Item);
+    assert_eq!(item.kind, ControlKind::Item);
     assert_eq!(item.label.as_deref(), Some("Paris"));
-    let FormNode::Control(option) = &controls[5].children[0] else {
+    let Node::Control(option) = &controls[5].children[0] else {
         panic!("listbox options are nested controls")
     };
-    assert_eq!(option.kind, FormControlKind::Option);
+    assert_eq!(option.kind, ControlKind::Option);
     assert_eq!(option.current_selected, Some(true));
     assert_eq!(option.value.as_deref(), Some("r"));
 

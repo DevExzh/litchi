@@ -853,17 +853,17 @@ fn validate_column_control(value: &GridColumnControl) -> Result<()> {
     );
     let count = match value.kind {
         GridColumnControlKind::Text | GridColumnControlKind::Textarea => {
-            crate::text_controls(&wrapped)?.len()
+            crate::form::text_controls(&wrapped)?.len()
         },
-        GridColumnControlKind::Password => crate::password_file_controls(&wrapped)?.len(),
-        GridColumnControlKind::Checkbox => crate::interactive_controls(&wrapped)?.len(),
+        GridColumnControlKind::Password => crate::form::password_file_controls(&wrapped)?.len(),
+        GridColumnControlKind::Checkbox => crate::form::interactive_controls(&wrapped)?.len(),
         GridColumnControlKind::Listbox | GridColumnControlKind::Combobox => {
-            crate::selection_controls(&wrapped)?.len()
+            crate::form::selection_controls(&wrapped)?.len()
         },
         GridColumnControlKind::FormattedText
         | GridColumnControlKind::Number
         | GridColumnControlKind::Date
-        | GridColumnControlKind::Time => crate::typed_value_controls(&wrapped)?.len(),
+        | GridColumnControlKind::Time => crate::form::typed_value_controls(&wrapped)?.len(),
     };
     if count != 1 {
         return invalid("column control fragment does not match its declared kind");
