@@ -9,43 +9,19 @@ use crate::wire::{
     transform_length_delimited_field,
 };
 use crate::{Error, IWorkPackage, Result};
+pub use litchi_iwa_common::shape::geometry::{
+    FlipAxis as DrawableFlipAxis, Point as DrawablePoint, Size as DrawableSize,
+};
 
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
 const NATIVE_REFLECTION_FLAG: u32 = 1 << 2;
 const HALF_TURN_DEGREES: f32 = 180.0;
 const FULL_TURN_DEGREES: f32 = 360.0;
 
-/// A drawable position in document points.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct DrawablePoint {
-    pub x: f32,
-    pub y: f32,
-}
-
-/// A drawable size in document points.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct DrawableSize {
-    pub width: f32,
-    pub height: f32,
-}
-
-/// One native Arrange flip command for a drawable.
-///
-/// The command mirrors the horizontal and vertical Flip buttons in iWork's
-/// Arrange inspector. It is an operation, rather than an independently stored
-/// state, because the native representation composes reflection with rotation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum DrawableFlipAxis {
-    /// Mirror the drawable around its vertical center line.
-    Horizontal,
-    /// Mirror the drawable around its horizontal center line.
-    Vertical,
-}
-
 /// Geometry stored on an iWork drawable.
 ///
-/// Optional fields retain the distinction between an absent protobuf field and
-/// an explicit zero, allowing an update followed by restoration to be byte-exact.
+/// Native reflection flags remain in this adapter-owned value because they
+/// are protobuf details rather than archive-free semantic vocabulary.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct DrawableGeometry {
     pub position: Option<DrawablePoint>,

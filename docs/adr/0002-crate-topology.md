@@ -137,6 +137,10 @@ object lookup, and protobuf adaptation stay in `litchi-iwa`; the semantic crate
 never imports an `Archive` or generated schema. `litchi-keynote` owns `Slide`,
 `Show`, build, and transition values; both depend downward on
 `litchi-iwa-text` only.
+The Pages `header_footer::{Template, Kind}` role vocabulary is likewise
+owned by `litchi-pages`: it is fixed-size and archive-free, while IWA retains
+header/footer object discovery, native identifiers, text-storage resolution,
+and package mutation.
 The shared text leaf now also owns the strict `font::{Font, Name}` vocabulary
 and its typed `NameError`; the IWA facade keeps only a thin error conversion and
 native archive adapters. `Name` stores one boxed UTF-8 identifier, validates
@@ -188,6 +192,11 @@ unknown fields, and family-field position while replacing the owned family
 payload. The three concrete format owners consume the common `Preset` directly;
 the former redundant `Shape*` value names are removed rather than retained as
 compatibility aliases.
+The dependency-free shape-geometry leaf likewise owns only the compact
+`shape::geometry::{Point, Size, FlipAxis}` values. `litchi-iwa` retains the
+aggregate `DrawableGeometry` adapter because optional native field presence,
+reflection flags, rotation conventions, and wire-preserving patching are
+format-specific; the common crate never imports those archive details.
 Chart-axis selectors and tick-mark values now follow the same boundary at
 `litchi-iwa-common::chart::axis::{Axis, TickMarkLocation}`. `Axis` is a
 one-byte category/value selector, while `TickMarkLocation` is a compact

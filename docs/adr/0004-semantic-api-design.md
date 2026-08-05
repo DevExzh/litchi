@@ -36,6 +36,11 @@ other sum types. `Unknown` retains bounded lossless content. Common read methods
 live on the enum or narrow static-dispatch traits; the facade does not use boxed
 trait objects.
 
+Pages header/footer roles follow the focused-module rule at
+`litchi_pages::header_footer::{Template, Kind}`. These one-byte enums contain
+only semantic page-template and region roles; IWA keeps native object lookup,
+storage metadata, protobuf decoding, and package mutation at the boundary.
+
 The dependency-free Numbers formula vocabulary is an intentional naming
 exception. `litchi-numbers::formula` is consumed by Numbers, Pages, and Keynote,
 so `FormulaExpression`, `FormulaCellReference`, and the other `Formula*` names
@@ -110,6 +115,12 @@ inner-to-outer radius ratio in `[0, 1)`; it is not an archive-owned absolute
 radius. Structural `ShapePathKind`, native path-family decoding, natural-size
 constraints, and protobuf/wire mutation remain in `litchi-iwa`, so the common
 leaf stays dependency-free and allocation-free.
+
+Drawable geometry uses the adjacent focused
+`litchi_iwa_common::shape::geometry::{Point, Size, FlipAxis}` module for its
+fixed-size neutral values. The IWA-only `DrawableGeometry` aggregate retains
+optional native field presence, reflection flags, rotation conventions, and
+wire conversion; those protobuf details do not leak into the common leaf.
 
 Chart axis controls use the focused `litchi_iwa_common::chart::axis` module.
 `Axis::{Category, Value}` is the compact semantic selector shared by all three
