@@ -15,7 +15,7 @@ pub(super) fn write_textbox_story_text(
     texts: &[&str],
     text_stream: &mut Vec<u8>,
     current_cp: &mut u32,
-) -> Result<(Vec<u32>, u32), DocWriteError> {
+) -> Result<(Vec<u32>, u32), WriteError> {
     let story_start_cp = *current_cp;
     let mut start_cps = Vec::with_capacity(texts.len());
     for text in texts {
@@ -146,18 +146,18 @@ pub(super) fn build_revision_chpx_grpprl(
     fmt: &CharacterFormatting,
     font_builder: &mut FontTableBuilder,
     revisions: Option<&RevisionWriterData>,
-) -> Result<Vec<u8>, DocWriteError> {
+) -> Result<Vec<u8>, WriteError> {
     if fmt
         .preserved_properties_for_revision
         .as_ref()
         .is_some_and(|previous| previous.preserved_properties_for_revision.is_some())
     {
-        return Err(DocWriteError::InvalidData(
+        return Err(WriteError::InvalidData(
             "DOC character property revisions cannot contain nested preserved states".to_string(),
         ));
     }
     if fmt.insertion_revision.is_some() && fmt.deletion_revision.is_some() {
-        return Err(DocWriteError::InvalidData(
+        return Err(WriteError::InvalidData(
             "a DOC character run cannot be both an insertion and a deletion".to_string(),
         ));
     }
@@ -179,9 +179,9 @@ pub(super) fn build_revision_chpx_grpprl(
                       time_opcode: u16,
                       reason_opcode: u16,
                       rsid_opcode: u16|
-     -> Result<(), DocWriteError> {
+     -> Result<(), WriteError> {
         let author_index = revisions.indexes.get(&revision.author).ok_or_else(|| {
-            DocWriteError::InvalidData("DOC revision author was not indexed".to_string())
+            WriteError::InvalidData("DOC revision author was not indexed".to_string())
         })?;
         grp.extend_from_slice(&flag_opcode.to_le_bytes());
         grp.push(1);
@@ -195,13 +195,13 @@ pub(super) fn build_revision_chpx_grpprl(
         if let (Some(raw), Some(structured)) = (revision.revision_id, structured_reason)
             && raw != structured
         {
-            return Err(DocWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "DOC revision contains conflicting raw and structured reason codes".to_string(),
             ));
         }
         if let Some(reason) = structured_reason.or(revision.revision_id) {
             if reason > crate::RevisionReason::MAX_VALUE {
-                return Err(DocWriteError::InvalidData(
+                return Err(WriteError::InvalidData(
                     "DOC revision reason code is undefined".to_string(),
                 ));
             }
@@ -236,7 +236,7 @@ pub(super) fn build_revision_chpx_grpprl(
     }
     if let Some(revision) = &fmt.formatting_revision {
         let author_index = revisions.indexes.get(&revision.author).ok_or_else(|| {
-            DocWriteError::InvalidData("DOC revision author was not indexed".to_string())
+            WriteError::InvalidData("DOC revision author was not indexed".to_string())
         })?;
         grp.extend_from_slice(&SPRM_C_PROP_RMARK_CURRENT.to_le_bytes());
         grp.push(7);
@@ -251,7 +251,7 @@ pub(super) fn build_revision_chpx_grpprl(
                     .or(insertion.revision_id)
             });
             if insertion_reason.is_some_and(|value| value != reason.raw()) {
-                return Err(DocWriteError::InvalidData(
+                return Err(WriteError::InvalidData(
                     "DOC insertion and formatting revisions have conflicting reason codes"
                         .to_string(),
                 ));
@@ -266,13 +266,11 @@ pub(super) fn build_revision_chpx_grpprl(
     }
     if let Some(revision) = &fmt.display_field_revision {
         let author_index = revisions.indexes.get(&revision.author).ok_or_else(|| {
-            DocWriteError::InvalidData(
-                "DOC display-field revision author was not indexed".to_string(),
-            )
+            WriteError::InvalidData("DOC display-field revision author was not indexed".to_string())
         })?;
         let units = revision.previous_result.encode_utf16().collect::<Vec<_>>();
         if units.len() > 15 {
-            return Err(DocWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "DOC LISTNUM previous result exceeds its 15-code-unit XST".to_string(),
             ));
         }
@@ -747,27 +745,27 @@ pub(super) fn append_paragraph_border(output: &mut Vec<u8>, opcode: u16, border:
 pub(super) fn build_revision_papx_grpprl(
     fmt: &ParagraphFormatting,
     revisions: Option<&RevisionWriterData>,
-) -> Result<Vec<u8>, DocWriteError> {
+) -> Result<Vec<u8>, WriteError> {
     if fmt
         .preserved_properties_for_revision
         .as_ref()
         .is_some_and(|previous| previous.preserved_properties_for_revision.is_some())
     {
-        return Err(DocWriteError::InvalidData(
+        return Err(WriteError::InvalidData(
             "DOC paragraph property revisions cannot contain nested preserved states".to_string(),
         ));
     }
     if let Some(alignment) = fmt.alignment
         && alignment > 9
     {
-        return Err(DocWriteError::InvalidData(format!(
+        return Err(WriteError::InvalidData(format!(
             "DOC paragraph alignment {alignment} is outside 0..=9"
         )));
     }
     if let Some(outline_level) = fmt.outline_level
         && outline_level > 9
     {
-        return Err(DocWriteError::InvalidData(format!(
+        return Err(WriteError::InvalidData(format!(
             "DOC paragraph outline level {outline_level} is outside 0..=9"
         )));
     }
@@ -775,14 +773,14 @@ pub(super) fn build_revision_papx_grpprl(
         && level > 8
         && level != 0x0C
     {
-        return Err(DocWriteError::InvalidData(format!(
+        return Err(WriteError::InvalidData(format!(
             "DOC paragraph list level {level} is neither 0..=8 nor the skip value 12"
         )));
     }
     if let Some(ilfo) = fmt.ilfo
         && (0x07FF..=0xF800).contains(&ilfo)
     {
-        return Err(DocWriteError::InvalidData(format!(
+        return Err(WriteError::InvalidData(format!(
             "DOC paragraph list override {ilfo:#06x} is reserved"
         )));
     }
@@ -790,31 +788,31 @@ pub(super) fn build_revision_papx_grpprl(
         let prefix_units = value.prefix.encode_utf16().count();
         let suffix_units = value.suffix.encode_utf16().count();
         if prefix_units + suffix_units > 32 {
-            return Err(DocWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "DOC legacy autonumber label uses {} UTF-16 units; maximum is 32",
                 prefix_units + suffix_units
             )));
         }
         if value.underline > 7 {
-            return Err(DocWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "DOC legacy autonumber underline {} exceeds 7",
                 value.underline
             )));
         }
         if value.color_index > 16 {
-            return Err(DocWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "DOC legacy autonumber color index {} exceeds 16",
                 value.color_index
             )));
         }
         if !(-31_680..=31_680).contains(&value.indent_twips) {
-            return Err(DocWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "DOC legacy autonumber indent {} is outside -31680..=31680",
                 value.indent_twips
             )));
         }
         if value.space_twips > 31_680 {
-            return Err(DocWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "DOC legacy autonumber spacing {} exceeds 31680",
                 value.space_twips
             )));
@@ -828,7 +826,7 @@ pub(super) fn build_revision_papx_grpprl(
         if let Some(value) = value
             && !(-31_680..=31_680).contains(&value)
         {
-            return Err(DocWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "DOC paragraph {name} value {value} is outside -31680..=31680"
             )));
         }
@@ -840,7 +838,7 @@ pub(super) fn build_revision_papx_grpprl(
         if let Some(value) = value
             && value > 31_680
         {
-            return Err(DocWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "DOC paragraph {name} value {value} exceeds 31680"
             )));
         }
@@ -848,7 +846,7 @@ pub(super) fn build_revision_papx_grpprl(
     if let Some(spacing) = fmt.line_spacing
         && !(-31_680..=31_680).contains(&spacing.dya_line)
     {
-        return Err(DocWriteError::InvalidData(format!(
+        return Err(WriteError::InvalidData(format!(
             "DOC paragraph line spacing {} is outside the LSPD range",
             spacing.dya_line
         )));
@@ -868,12 +866,12 @@ pub(super) fn build_revision_papx_grpprl(
             .iter()
             .any(|position| !(-31_680..=31_680).contains(position))
         {
-            return Err(DocWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "DOC {kind} tab position is outside -31680..=31680"
             )));
         }
         if sorted.windows(2).any(|pair| pair[0] == pair[1]) {
-            return Err(DocWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "DOC {kind} tab positions contain a duplicate"
             )));
         }
@@ -882,21 +880,21 @@ pub(super) fn build_revision_papx_grpprl(
         && flow.backwards
         && !flow.vertical
     {
-        return Err(DocWriteError::InvalidData(
+        return Err(WriteError::InvalidData(
             "DOC backwards frame text flow requires vertical flow".to_string(),
         ));
     }
     if let Some(height) = fmt.frame_height
         && (height.height_twips > 0x7FFF || (height.minimum && height.height_twips == 0))
     {
-        return Err(DocWriteError::InvalidData(
+        return Err(WriteError::InvalidData(
             "DOC paragraph frame height is outside the WHeightAbs range".to_string(),
         ));
     }
     if let Some(drop_cap) = fmt.drop_cap
         && !(1..=10).contains(&drop_cap.lines)
     {
-        return Err(DocWriteError::InvalidData(format!(
+        return Err(WriteError::InvalidData(format!(
             "DOC drop-cap line count {} is outside 1..=10",
             drop_cap.lines
         )));
@@ -908,7 +906,7 @@ pub(super) fn build_revision_papx_grpprl(
         if let Some(distance) = distance
             && !(0..=31_680).contains(&distance)
         {
-            return Err(DocWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "DOC {name} frame text distance {distance} is outside 0..=31680"
             )));
         }
@@ -932,7 +930,7 @@ pub(super) fn build_revision_papx_grpprl(
         if let Some(offset) = offset
             && !(-31_679..=31_681).contains(&offset)
         {
-            return Err(DocWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "DOC {name} frame offset {offset} is outside the plus-one range"
             )));
         }
@@ -941,7 +939,7 @@ pub(super) fn build_revision_papx_grpprl(
             let is_special =
                 matches!(stored, 0 | -4 | -8 | -12 | -16) || (name == "vertical" && stored == -20);
             if is_special {
-                return Err(DocWriteError::InvalidData(format!(
+                return Err(WriteError::InvalidData(format!(
                     "DOC {name} frame offset {offset} encodes a reserved alignment value"
                 )));
             }
@@ -950,12 +948,12 @@ pub(super) fn build_revision_papx_grpprl(
     if let Some(width) = fmt.frame_width
         && width > 31_680
     {
-        return Err(DocWriteError::InvalidData(format!(
+        return Err(WriteError::InvalidData(format!(
             "DOC paragraph frame width {width} exceeds 31680"
         )));
     }
     if fmt.table_terminating_paragraph == Some(true) && fmt.in_table != Some(true) {
-        return Err(DocWriteError::InvalidData(
+        return Err(WriteError::InvalidData(
             "DOC table-terminating paragraph requires in_table=true".to_string(),
         ));
     }
@@ -967,7 +965,7 @@ pub(super) fn build_revision_papx_grpprl(
         && fmt.frame_width.is_none()
         && fmt.frame_anchor.is_none()
     {
-        return Err(DocWriteError::InvalidData(
+        return Err(WriteError::InvalidData(
             "DOC frame text flow requires a non-default frame property".to_string(),
         ));
     }
@@ -978,7 +976,7 @@ pub(super) fn build_revision_papx_grpprl(
         if let Some(value) = value
             && !(-20..=31_680).contains(&value)
         {
-            return Err(DocWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "DOC paragraph {name} value {value} is outside -20..=31680"
             )));
         }
@@ -995,7 +993,7 @@ pub(super) fn build_revision_papx_grpprl(
     .flatten()
     {
         if border.spacing > 31 {
-            return Err(DocWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "DOC paragraph border spacing {} exceeds 31 points",
                 border.spacing
             )));
@@ -1013,10 +1011,10 @@ pub(super) fn build_revision_papx_grpprl(
     };
     if let Some(revision) = &fmt.formatting_revision {
         let revisions = revisions.ok_or_else(|| {
-            DocWriteError::InvalidData("DOC paragraph revision author was not indexed".to_string())
+            WriteError::InvalidData("DOC paragraph revision author was not indexed".to_string())
         })?;
         let author_index = revisions.indexes.get(&revision.author).ok_or_else(|| {
-            DocWriteError::InvalidData("DOC paragraph revision author was not indexed".to_string())
+            WriteError::InvalidData("DOC paragraph revision author was not indexed".to_string())
         })?;
         grp.extend_from_slice(&SPRM_P_PROP_RMARK_CURRENT.to_le_bytes());
         grp.push(7);
@@ -1026,10 +1024,10 @@ pub(super) fn build_revision_papx_grpprl(
     }
     if let Some(revision) = &fmt.numbering_revision {
         let revisions = revisions.ok_or_else(|| {
-            DocWriteError::InvalidData("DOC numbering revision author was not indexed".to_string())
+            WriteError::InvalidData("DOC numbering revision author was not indexed".to_string())
         })?;
         let author_index = revisions.indexes.get(&revision.author).ok_or_else(|| {
-            DocWriteError::InvalidData("DOC numbering revision author was not indexed".to_string())
+            WriteError::InvalidData("DOC numbering revision author was not indexed".to_string())
         })?;
         let units = revision.format_string.encode_utf16().collect::<Vec<_>>();
         if units.len() > 31
@@ -1038,7 +1036,7 @@ pub(super) fn build_revision_papx_grpprl(
                 .iter()
                 .any(|position| usize::from(*position) > units.len())
         {
-            return Err(DocWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "DOC numbering revision format or placeholder exceeds NumRM limits".to_string(),
             ));
         }
@@ -1073,14 +1071,14 @@ pub(super) fn append_table_depth_sprms(grp: &mut Vec<u8>) {
 
 pub(super) fn build_table_row_papx_grpprl(
     formatting: &crate::writer::tap::TableRow,
-) -> Result<Vec<u8>, DocWriteError> {
+) -> Result<Vec<u8>, WriteError> {
     let mut grp = Vec::new();
     append_table_depth_sprms(&mut grp);
     grp.extend_from_slice(&SPRM_P_F_TTP.to_le_bytes());
     grp.push(1);
     grp.extend_from_slice(
         &crate::writer::tap::generate_row_sprms(formatting)
-            .map_err(|error| DocWriteError::InvalidData(error.to_string()))?,
+            .map_err(|error| WriteError::InvalidData(error.to_string()))?,
     );
     Ok(grp)
 }

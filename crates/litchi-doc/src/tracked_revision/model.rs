@@ -5,7 +5,7 @@ use crate::parts::fkp::ParagraphHeight;
 
 /// A revision representation supported by binary DOC.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum DocTrackedRevisionKind {
+pub enum RevisionKind {
     Insertion,
     Deletion,
     /// The deletion half of a move, paired by revision_save_id.
@@ -19,14 +19,14 @@ pub enum DocTrackedRevisionKind {
 
 /// Metadata used to author or replace a revision mark.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DocTrackedRevisionMetadata {
+pub struct RevisionMetadata {
     pub author: String,
     pub timestamp: Option<CommentDateTime>,
     pub reason: Option<u16>,
     pub revision_save_id: Option<u32>,
 }
 
-impl DocTrackedRevisionMetadata {
+impl RevisionMetadata {
     pub fn new(author: impl Into<String>) -> Self {
         Self {
             author: author.into(),
@@ -54,8 +54,8 @@ impl DocTrackedRevisionMetadata {
 
 /// A tracked range in main-story CP coordinates.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DocTrackedRevision {
-    pub kind: DocTrackedRevisionKind,
+pub struct Revision {
+    pub kind: RevisionKind,
     pub start_cp: u32,
     pub end_cp: u32,
     pub author_index: u16,

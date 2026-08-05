@@ -1,22 +1,21 @@
 //! Associated-document and save-history string-table authoring.
 
-use super::core::DocWriteError;
+use super::core::WriteError;
 use super::fib::FibBuilder;
 use crate::{DocumentAssociatedStrings, SavedByTable};
 
-fn invalid(error: impl std::fmt::Display) -> DocWriteError {
-    DocWriteError::InvalidData(error.to_string())
+fn invalid(error: impl std::fmt::Display) -> WriteError {
+    WriteError::InvalidData(error.to_string())
 }
 
-fn checked_length(data: &[u8], table: &str) -> Result<u32, DocWriteError> {
-    u32::try_from(data.len())
-        .map_err(|_| DocWriteError::InvalidData(format!("{table} exceeds 4 GiB")))
+fn checked_length(data: &[u8], table: &str) -> Result<u32, WriteError> {
+    u32::try_from(data.len()).map_err(|_| WriteError::InvalidData(format!("{table} exceeds 4 GiB")))
 }
 
-fn checked_end(offset: u32, length: u32) -> Result<u32, DocWriteError> {
+fn checked_end(offset: u32, length: u32) -> Result<u32, WriteError> {
     offset
         .checked_add(length)
-        .ok_or_else(|| DocWriteError::InvalidData("DOC table offset overflows".into()))
+        .ok_or_else(|| WriteError::InvalidData("DOC table offset overflows".into()))
 }
 
 /// Validate and append the mandatory `SttbfAssoc` and optional `SttbSavedBy`.
@@ -29,11 +28,11 @@ pub(super) fn append_auxiliary_string_tables(
     associated: &DocumentAssociatedStrings,
     saved_by: Option<&SavedByTable>,
     table_offset: u32,
-) -> Result<u32, DocWriteError> {
+) -> Result<u32, WriteError> {
     let actual_offset = u32::try_from(table_stream.len())
-        .map_err(|_| DocWriteError::InvalidData("DOC table stream exceeds 4 GiB".into()))?;
+        .map_err(|_| WriteError::InvalidData("DOC table stream exceeds 4 GiB".into()))?;
     if actual_offset != table_offset {
-        return Err(DocWriteError::InvalidData(
+        return Err(WriteError::InvalidData(
             "DOC table-stream offset plan is inconsistent".into(),
         ));
     }

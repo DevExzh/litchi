@@ -5,9 +5,9 @@
 
 use std::{error::Error, fs, path::PathBuf};
 
-use litchi_doc::writer::{DocWriter, FloatingPosition, Kind, Shape};
+use litchi_doc::writer::{FloatingPosition, Kind, Shape, Writer};
 use litchi_ppt::writer::{
-    FillStyle, LineStyleConfig, ShapeColor, ShapeStyle, ShapeType, Table, Writer,
+    FillStyle, LineStyleConfig, ShapeColor, ShapeStyle, ShapeType, Table, Writer as PptWriter,
 };
 use litchi_xls::writer as xls_writer;
 use litchi_xls::writer::shape::{Anchor, Behavior, Rect};
@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn write_doc(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
-    let mut doc = DocWriter::new();
+    let mut doc = Writer::new();
     doc.add_paragraph("Litchi OfficeArt native smoke test")?;
 
     if mode == "basic" {
@@ -69,7 +69,7 @@ fn write_doc(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
 }
 
 fn write_ppt(path: &std::path::Path) -> Result<(), Box<dyn Error>> {
-    let mut ppt = Writer::new_widescreen();
+    let mut ppt = PptWriter::new_widescreen();
     let slide = ppt.add_slide()?;
     ppt.add_textbox(slide, 50, 25, 650, 40, "Litchi OfficeArt native smoke test")?;
     let rectangle = ShapeStyle::default()

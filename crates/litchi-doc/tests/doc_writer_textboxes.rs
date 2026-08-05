@@ -5,7 +5,7 @@
 //! (ccpTxbx + PlcftxbxTxt) and the OfficeArtClientTextbox links must resolve
 //! to the right shapes and text.
 use litchi_doc::shape::{extract_drawing_shapes, extract_shape_text};
-use litchi_doc::writer::{DocPicture, DocWriter, FloatingPosition};
+use litchi_doc::writer::{FloatingPosition, Picture, Writer};
 use litchi_doc::writer::{Kind as DrawingKind, Shape as DrawingShape};
 use litchi_doc::{Package, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin};
 use litchi_odraw::{Record, shape::Kind};
@@ -66,14 +66,14 @@ const FIRST_BOX_SPID: u32 = 1028;
 const SECOND_BOX_SPID: u32 = 1029;
 
 fn write_doc_with_text_boxes(jpeg_bytes: &[u8]) -> Vec<u8> {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("before boxes").unwrap();
     writer
-        .insert_picture(DocPicture::new(make_png(32, 16)).unwrap())
+        .insert_picture(Picture::new(make_png(32, 16)).unwrap())
         .unwrap();
     writer
         .insert_floating_picture(
-            DocPicture::new(jpeg_bytes.to_vec()).unwrap(),
+            Picture::new(jpeg_bytes.to_vec()).unwrap(),
             FloatingPosition::new(1440, 720),
         )
         .unwrap();
@@ -262,7 +262,7 @@ fn genuine_word_text_boxes_parse_via_crate_reader() {
 
 #[test]
 fn document_without_text_boxes_has_empty_story() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("no boxes").unwrap();
     writer
         .insert_floating_shape(

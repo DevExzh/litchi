@@ -1,22 +1,21 @@
 //! Glossary-only DOC table authoring.
 
-use super::core::DocWriteError;
+use super::core::WriteError;
 use super::fib::FibBuilder;
 use crate::GlossaryMetadata;
 
-fn invalid(error: impl std::fmt::Display) -> DocWriteError {
-    DocWriteError::InvalidData(error.to_string())
+fn invalid(error: impl std::fmt::Display) -> WriteError {
+    WriteError::InvalidData(error.to_string())
 }
 
-fn checked_length(data: &[u8], table: &str) -> Result<u32, DocWriteError> {
-    u32::try_from(data.len())
-        .map_err(|_| DocWriteError::InvalidData(format!("{table} exceeds 4 GiB")))
+fn checked_length(data: &[u8], table: &str) -> Result<u32, WriteError> {
+    u32::try_from(data.len()).map_err(|_| WriteError::InvalidData(format!("{table} exceeds 4 GiB")))
 }
 
-fn checked_end(offset: u32, length: u32) -> Result<u32, DocWriteError> {
+fn checked_end(offset: u32, length: u32) -> Result<u32, WriteError> {
     offset
         .checked_add(length)
-        .ok_or_else(|| DocWriteError::InvalidData("DOC table offset overflows".into()))
+        .ok_or_else(|| WriteError::InvalidData("DOC table offset overflows".into()))
 }
 
 /// Validate, plan, and append all three parallel glossary tables atomically.
@@ -27,12 +26,12 @@ pub(super) fn append_glossary_tables(
     table_offset: u32,
     main_text_length: u32,
     text_stream: &[u8],
-) -> Result<u32, DocWriteError> {
+) -> Result<u32, WriteError> {
     let Some(metadata) = metadata else {
         return Ok(table_offset);
     };
     if metadata.main_text_length() != main_text_length {
-        return Err(DocWriteError::InvalidData(format!(
+        return Err(WriteError::InvalidData(format!(
             "glossary ccpText is {}; generated main story has {main_text_length} CPs",
             metadata.main_text_length()
         )));
@@ -41,9 +40,9 @@ pub(super) fn append_glossary_tables(
         .validate_utf16_bytes(text_stream)
         .map_err(invalid)?;
     let actual_offset = u32::try_from(table_stream.len())
-        .map_err(|_| DocWriteError::InvalidData("DOC table stream exceeds 4 GiB".into()))?;
+        .map_err(|_| WriteError::InvalidData("DOC table stream exceeds 4 GiB".into()))?;
     if actual_offset != table_offset {
-        return Err(DocWriteError::InvalidData(
+        return Err(WriteError::InvalidData(
             "DOC table-stream offset plan is inconsistent".into(),
         ));
     }

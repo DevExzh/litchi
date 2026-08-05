@@ -7,13 +7,13 @@
 //!
 //! Run with: cargo run --example doc_writer_footnotes
 
-use litchi_doc::writer::{DocWriter, FootnoteEntry};
+use litchi_doc::writer::{FootnoteEntry, Writer};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("Creating DOC file with footnotes and endnotes...");
 
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
 
     // Add main body content
     writer.add_paragraph("Understanding Footnotes and Endnotes")?;

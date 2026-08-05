@@ -20,35 +20,35 @@ use crate::writer::numbering::{ListFormatOverride, ListStructure};
 use crate::writer::revisions::{
     DisplayFieldRevision, FormattingRevision, NumberingRevision, TextRevision,
 };
-use crate::writer::smart_tags::DocSmartTagEntry;
+use crate::writer::smart_tags::SmartTagEntry;
 
 use crate::parts::numbering::NumberFormat;
 use std::io::Cursor;
 
 #[test]
 fn test_create_writer() {
-    let writer = DocWriter::new();
+    let writer = Writer::new();
     assert_eq!(writer.paragraphs.len(), 0);
     assert_eq!(writer.tables.len(), 0);
 }
 
 #[test]
 fn writes_custom_styles_into_document_stylesheet() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     let paragraph_style = writer
-        .add_style(super::super::stylesheet::DocStyleDefinition::new(
+        .add_style(super::super::stylesheet::StyleDefinition::new(
             crate::StyleKind::Paragraph,
             "Custom Body",
         ))
         .unwrap();
     let character_style = writer
-        .add_style(super::super::stylesheet::DocStyleDefinition::new(
+        .add_style(super::super::stylesheet::StyleDefinition::new(
             crate::StyleKind::Character,
             "Custom Emphasis",
         ))
         .unwrap();
     let table_style = writer
-        .add_style(super::super::stylesheet::DocStyleDefinition::new(
+        .add_style(super::super::stylesheet::StyleDefinition::new(
             crate::StyleKind::Table,
             "Custom Grid",
         ))
@@ -129,15 +129,15 @@ fn writes_revision_marked_style_and_author_table() {
     };
     let previous_papx = [SPRM_P_F_KEEP.to_le_bytes().as_slice(), &[0]].concat();
     let previous_chpx = [SPRM_C_F_BOLD.to_le_bytes().as_slice(), &[0]].concat();
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     let style_index = writer
         .add_style(
-            super::super::stylesheet::DocStyleDefinition::new(
+            super::super::stylesheet::StyleDefinition::new(
                 crate::StyleKind::Paragraph,
                 "Tracked Body",
             )
             .with_revision(
-                super::super::stylesheet::DocStyleRevision::paragraph(
+                super::super::stylesheet::StyleRevision::paragraph(
                     "Style Editor",
                     previous_papx.clone(),
                     previous_chpx.clone(),
@@ -185,7 +185,7 @@ fn writes_revision_marked_style_and_author_table() {
 #[test]
 fn rejects_undefined_or_wrong_kind_style_references() {
     let error_for_paragraph_style = |style_index| {
-        let mut writer = DocWriter::new();
+        let mut writer = Writer::new();
         writer
             .add_formatted_paragraph(
                 "text",
@@ -202,9 +202,9 @@ fn rejects_undefined_or_wrong_kind_style_references() {
     };
     assert!(error_for_paragraph_style(14).contains("undefined DOC style index 14"));
 
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     let character_style = writer
-        .add_style(super::super::stylesheet::DocStyleDefinition::new(
+        .add_style(super::super::stylesheet::StyleDefinition::new(
             crate::StyleKind::Character,
             "Wrong Kind",
         ))
@@ -227,7 +227,7 @@ fn rejects_undefined_or_wrong_kind_style_references() {
 
 #[test]
 fn test_add_paragraph() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("Test").unwrap();
     assert_eq!(writer.paragraphs.len(), 1);
     assert_eq!(writer.paragraphs[0].runs[0].text, "Test");
@@ -235,7 +235,7 @@ fn test_add_paragraph() {
 
 #[test]
 fn test_add_multiple_paragraphs() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("First paragraph").unwrap();
     writer.add_paragraph("Second paragraph").unwrap();
     writer.add_paragraph("Third paragraph").unwrap();
@@ -247,7 +247,7 @@ fn test_add_multiple_paragraphs() {
 
 #[test]
 fn test_add_formatted_paragraph() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     let para_fmt = ParagraphFormatting {
         alignment: Some(1), // Center
         space_before: Some(240),
@@ -264,7 +264,7 @@ fn test_add_formatted_paragraph() {
 
 #[test]
 fn test_add_paragraph_with_character_formatting() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     let char_fmt = CharacterFormatting {
         bold: Some(true),
         italic: Some(true),
@@ -284,7 +284,7 @@ fn test_add_paragraph_with_character_formatting() {
 
 #[test]
 fn test_add_paragraph_runs() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     let runs = vec![
         (
             "Bold ".to_string(),
@@ -312,7 +312,7 @@ fn test_add_paragraph_runs() {
 
 #[test]
 fn test_add_table() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     let idx = writer.add_table(2, 3).unwrap();
     assert_eq!(idx, 0);
     assert_eq!(writer.tables[0].rows.len(), 2);
@@ -321,7 +321,7 @@ fn test_add_table() {
 
 #[test]
 fn test_set_table_cell() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     let idx = writer.add_table(2, 2).unwrap();
     writer.set_table_cell_text(idx, 0, 0, "Cell").unwrap();
     assert_eq!(
@@ -332,7 +332,7 @@ fn test_set_table_cell() {
 
 #[test]
 fn test_set_table_cell_multiple() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     let idx = writer.add_table(2, 2).unwrap();
     writer.set_table_cell_text(idx, 0, 0, "A").unwrap();
     writer.set_table_cell_text(idx, 0, 1, "B").unwrap();
@@ -358,7 +358,7 @@ fn test_set_table_cell_multiple() {
 
 #[test]
 fn tables_round_trip_through_both_output_paths() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("Before table").unwrap();
     let table = writer.add_table(2, 2).unwrap();
     writer
@@ -642,7 +642,7 @@ fn tables_round_trip_through_both_output_paths() {
 
 #[test]
 fn file_and_seekable_outputs_are_byte_identical() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.set_property("Title", "Canonical output");
     writer.add_paragraph("One output assembly path").unwrap();
 
@@ -666,7 +666,7 @@ fn file_and_seekable_outputs_are_byte_identical() {
 
 #[test]
 fn test_set_property() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.set_property("Title", "Test Document");
     writer.set_property("Author", "Test Author");
     assert_eq!(
@@ -681,7 +681,7 @@ fn test_set_property() {
 
 #[test]
 fn test_headers_and_footers() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.set_odd_header("Odd Header");
     writer.set_even_header("Even Header");
     writer.set_first_header("First Header");
@@ -716,7 +716,7 @@ fn test_headers_and_footers() {
 
 #[test]
 fn test_footnotes() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     let entry = FootnoteEntry::new(0u32, "This is a footnote", 1u16);
     writer.add_footnote(entry);
     assert_eq!(writer.footnotes.len(), 1);
@@ -725,7 +725,7 @@ fn test_footnotes() {
 
 #[test]
 fn test_endnotes() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     let entry = FootnoteEntry::new(0u32, "This is an endnote", 1u16);
     writer.add_endnote(entry);
     assert_eq!(writer.endnotes.len(), 1);
@@ -734,7 +734,7 @@ fn test_endnotes() {
 
 #[test]
 fn test_write_to_memory() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("Test paragraph").unwrap();
     let mut cursor = Cursor::new(Vec::new());
     let result = writer.write_to(&mut cursor);
@@ -744,7 +744,7 @@ fn test_write_to_memory() {
 
 #[test]
 fn test_empty_document_write() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     let mut cursor = Cursor::new(Vec::new());
     let result = writer.write_to(&mut cursor);
     assert!(result.is_ok());
@@ -842,7 +842,7 @@ fn preserves_ordered_paragraph_property_revision_state() {
     assert_eq!(previous.indent_left, Some(100));
     assert_eq!(previous.indent_right, None);
 
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer
         .add_formatted_paragraph("Tracked formatting", formatting)
         .unwrap();
@@ -932,7 +932,7 @@ fn test_paragraph_formatting_writer_reader_round_trip() {
         prefix: "§(".to_string(),
         suffix: ")".to_string(),
     };
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer
         .add_formatted_paragraph(
             "Exactly spaced",
@@ -1411,7 +1411,7 @@ fn rejects_invalid_current_paragraph_layout_values() {
 fn supplementary_unicode_uses_utf16_code_unit_character_positions() {
     assert_eq!(utf16_code_unit_len("A😀𝄞").unwrap(), 5);
 
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer
         .add_paragraph_runs(
             vec![
@@ -1491,7 +1491,7 @@ fn supplementary_unicode_uses_utf16_code_unit_character_positions() {
 
 #[test]
 fn comments_round_trip_with_other_subdocuments() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("Main 😀").unwrap();
     writer.add_footnote(FootnoteEntry::new(0, "Footnote", 1));
     writer.add_comment(
@@ -1589,7 +1589,7 @@ fn comments_round_trip_with_other_subdocuments() {
 
 #[test]
 fn rejects_comment_metadata_outside_binary_limits() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("Main").unwrap();
     writer.add_comment(CommentEntry::new(0, "Body", "Author", "0123456789"));
 
@@ -1600,7 +1600,7 @@ fn rejects_comment_metadata_outside_binary_limits() {
 #[test]
 fn rejects_invalid_comment_ranges_timestamps_and_reply_trees() {
     let write_error = |entry: CommentEntry| {
-        let mut writer = DocWriter::new();
+        let mut writer = Writer::new();
         writer.add_paragraph("Main").unwrap();
         writer.add_comment(entry);
         writer
@@ -1646,7 +1646,7 @@ fn rejects_invalid_comment_ranges_timestamps_and_reply_trees() {
 
 #[test]
 fn standard_bookmarks_round_trip_through_both_output_paths() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("Main text").unwrap();
     writer.add_bookmark(BookmarkEntry::new("Outer", 2, 5));
     writer.add_bookmark(
@@ -1683,20 +1683,20 @@ fn standard_bookmarks_round_trip_through_both_output_paths() {
 
 #[test]
 fn smart_tags_round_trip_through_both_output_paths() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("abcdefghijklmnopqrst").unwrap();
     writer.add_smart_tag(
-        DocSmartTagEntry::new(0, 10, "urn:example:geo", "place")
+        SmartTagEntry::new(0, 10, "urn:example:geo", "place")
             .with_origin(crate::SmartTagOrigin::ExternalRecognizer)
             .with_native_export(true)
             .with_property("city", "東京"),
     );
     writer.add_smart_tag(
-        DocSmartTagEntry::new(5, 15, "urn:example:geo", "place")
+        SmartTagEntry::new(5, 15, "urn:example:geo", "place")
             .with_sub_entity(true)
             .with_property("city", "Paris"),
     );
-    writer.add_smart_tag(DocSmartTagEntry::new(5, 5, "urn:example:point", "cursor"));
+    writer.add_smart_tag(SmartTagEntry::new(5, 5, "urn:example:point", "cursor"));
     writer.add_smart_tag_recognizer_range(SmartTagRecognizerRange {
         start: 0,
         end: 5,
@@ -1754,7 +1754,7 @@ fn smart_tags_round_trip_through_both_output_paths() {
 #[test]
 fn rejects_invalid_standard_bookmarks() {
     let write_error = |entries: Vec<BookmarkEntry>| {
-        let mut writer = DocWriter::new();
+        let mut writer = Writer::new();
         writer.add_paragraph("Main").unwrap();
         for entry in entries {
             writer.add_bookmark(entry);
@@ -1791,7 +1791,7 @@ fn tracked_text_revisions_round_trip_through_both_output_paths() {
         minute: 30,
         weekday: 3,
     };
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.set_section_formatting_revision(
         FormattingRevision::new("Section Editor").with_timestamp(timestamp),
     );
@@ -2039,7 +2039,7 @@ fn preserves_ordered_character_property_revision_state() {
     assert_eq!(previous.is_bold, Some(true));
     assert_eq!(previous.is_italic, None);
 
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer
         .add_paragraph_runs(
             vec![("Tracked".to_string(), formatting)],
@@ -2066,7 +2066,7 @@ fn preserves_ordered_character_property_revision_state() {
 #[test]
 fn rejects_invalid_writer_revision_metadata() {
     let error_for = |formatting: CharacterFormatting| {
-        let mut writer = DocWriter::new();
+        let mut writer = Writer::new();
         writer
             .add_paragraph_runs(
                 vec![("text".to_string(), formatting)],
@@ -2134,7 +2134,7 @@ fn rejects_invalid_writer_revision_metadata() {
     };
     assert!(error_for(invalid_time).contains("timestamp"));
 
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.set_section_formatting_revision(FormattingRevision::new("Editor").with_timestamp(
         CommentDateTime {
             year: 2026,
@@ -2154,7 +2154,7 @@ fn rejects_invalid_writer_revision_metadata() {
             .contains("timestamp")
     );
 
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer
         .add_paragraph_runs(
             vec![("text".to_string(), CharacterFormatting::default())],
@@ -2181,7 +2181,7 @@ fn rejects_invalid_writer_revision_metadata() {
 
 #[test]
 fn list_tables_round_trip_through_fib_indices() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     let mut list = ListStructure::new(42);
     let mut level = crate::writer::numbering::ListLevel::new(3, NumberFormat::Decimal);
     level.number_text = "%1.😀".to_string();
@@ -2227,7 +2227,7 @@ fn list_tables_round_trip_through_fib_indices() {
 
 #[test]
 fn test_add_table_invalid_dimensions() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     assert!(writer.add_table(0, 3).is_err());
     assert!(writer.add_table(2, 0).is_err());
     assert!(writer.add_table(0, 0).is_err());
@@ -2236,7 +2236,7 @@ fn test_add_table_invalid_dimensions() {
 
 #[test]
 fn test_set_table_cell_invalid_indices() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     let idx = writer.add_table(2, 2).unwrap();
     assert!(writer.set_table_cell_text(idx, 2, 0, "Invalid").is_err());
     assert!(writer.set_table_cell_text(idx, 0, 2, "Invalid").is_err());
@@ -2245,7 +2245,7 @@ fn test_set_table_cell_invalid_indices() {
 
 #[test]
 fn rejects_invalid_table_row_formatting() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     let table = writer.add_table(2, 2).unwrap();
     let one_cell = crate::writer::TableRow {
         cells: vec![crate::writer::TableCell {
@@ -2299,7 +2299,7 @@ fn rejects_invalid_table_row_formatting() {
         .unwrap();
     assert!(writer.write_to(&mut Cursor::new(Vec::new())).is_err());
 
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     let table = writer.add_table(1, 1).unwrap();
     writer
         .set_table_row_formatting(
@@ -2323,9 +2323,9 @@ mod header_kind_tests {
 
     #[test]
     fn header_kinds_map_to_plcfhdd_slots() {
-        assert_eq!(DocHeaderKind::Odd.slot(), HEADER_SLOT_ODD);
-        assert_eq!(DocHeaderKind::Even.slot(), HEADER_SLOT_EVEN);
-        assert_eq!(DocHeaderKind::FirstPage.slot(), HEADER_SLOT_FIRST);
+        assert_eq!(HeaderKind::Odd.slot(), HEADER_SLOT_ODD);
+        assert_eq!(HeaderKind::Even.slot(), HEADER_SLOT_EVEN);
+        assert_eq!(HeaderKind::FirstPage.slot(), HEADER_SLOT_FIRST);
         // The writer's slot assignment matches the MS-DOC PlcfHdd layout:
         // even header 6, odd header 7, first-page header 10.
         assert_eq!(
@@ -2336,11 +2336,11 @@ mod header_kind_tests {
 
     #[test]
     fn header_shape_ids_use_the_header_cluster() {
-        let mut writer = DocWriter::new();
+        let mut writer = Writer::new();
         writer
             .insert_header_picture(
-                DocHeaderKind::Odd,
-                crate::writer::images::DocPicture::from_parts(
+                HeaderKind::Odd,
+                crate::writer::images::Picture::from_parts(
                     vec![0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A],
                     480,
                     240,
@@ -2351,7 +2351,7 @@ mod header_kind_tests {
             .unwrap();
         writer
             .insert_header_text_box(
-                DocHeaderKind::Even,
+                HeaderKind::Even,
                 crate::writer::shapes::Shape::new(
                     crate::writer::shapes::Kind::Rectangle,
                     1440,
@@ -2405,7 +2405,7 @@ mod chpx_position_hresi_effect_writer_tests {
         assert_eq!(properties.hyphenation, hyphenation);
         assert_eq!(properties.text_effect, TextEffect::Shimmer);
 
-        let mut writer = DocWriter::new();
+        let mut writer = Writer::new();
         writer
             .add_paragraph_runs(
                 vec![("effects".to_string(), formatting)],

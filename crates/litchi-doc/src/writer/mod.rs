@@ -102,25 +102,25 @@ pub use crate::parts::tap::{
 };
 pub use bookmarks::BookmarkEntry;
 pub use comments::CommentEntry;
-pub use core::DocHeaderKind;
+pub use core::HeaderKind;
 pub use core::{
-    CharacterFormatting, DocWriteError, DocWriter, HeaderFooterParagraph, LineSpacing,
-    ParagraphFormatting,
+    CharacterFormatting, HeaderFooterParagraph, LineSpacing, ParagraphFormatting, WriteError,
+    Writer,
 };
 pub use fib::FibBuilder;
 pub use fkp::{ChpxFkpBuilder, PapxFkpBuilder};
 pub use footnotes::{EndnotesWriter, FootnoteEntry, FootnotesWriter};
 pub use headers::{HeaderFooterEntry, HeaderFooterType, HeadersWriter};
 pub use hyperlinks::{HyperlinkEntry, HyperlinkType, HyperlinksWriter};
-pub use images::{DocPicture, FloatingPosition};
+pub use images::{FloatingPosition, Picture};
 pub use litchi_odraw::image::Kind as PictureKind;
 pub use numbering::{ListFormatOverride, ListLevel, ListStructure, NumberFormat, NumberingWriter};
 pub use piece_table::{Piece, PieceTableBuilder};
 pub use revisions::{DisplayFieldRevision, FormattingRevision, NumberingRevision, TextRevision};
 pub use shapes::{Kind, Shape};
-pub use smart_tags::DocSmartTagEntry;
+pub use smart_tags::SmartTagEntry;
 pub use sprm::SprmBuilder;
-pub use stylesheet::{DocStyleDefinition, DocStyleRevision, StyleWriteError};
+pub use stylesheet::{StyleDefinition, StyleRevision, StyleWriteError};
 pub use tap::{
     TableBorders, TableCell, TableRevisionMark, TableRow, TapBuildError, TapBuilder,
     generate_table_style_sprms, generate_table_style_sprms_with_conditionals,

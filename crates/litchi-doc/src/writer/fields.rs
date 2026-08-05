@@ -4,7 +4,7 @@
 //! begin marker. MS-DOC §2.8.25 requires five field kinds (`TC`, `TA`, `XE`,
 //! `RD`, and `PRIVATE`) to remain text-only and be omitted from the table.
 
-use super::core::DocWriteError;
+use super::core::WriteError;
 use crate::parts::fields::FieldType;
 
 const MAX_WRITER_FIELD_DEPTH: usize = 128;
@@ -26,7 +26,7 @@ fn stored_field_keyword(
     story_text: &[u8],
     start_cp: u32,
     end_cp: u32,
-) -> Result<Option<String>, DocWriteError> {
+) -> Result<Option<String>, WriteError> {
     if start_cp > end_cp {
         return Err(invalid("DOC field instruction range is reversed"));
     }
@@ -83,7 +83,7 @@ pub(super) fn build_plcffld(
     field_char_cps: &[(u32, u16)],
     text_length: u32,
     story_text: &[u8],
-) -> Result<Vec<u8>, DocWriteError> {
+) -> Result<Vec<u8>, WriteError> {
     let expected_bytes = usize::try_from(text_length)
         .ok()
         .and_then(|value| value.checked_mul(2))
@@ -214,15 +214,15 @@ pub(super) fn build_plcffld(
     Ok(plcffld)
 }
 
-fn invalid(message: impl Into<String>) -> DocWriteError {
-    DocWriteError::InvalidData(message.into())
+fn invalid(message: impl Into<String>) -> WriteError {
+    WriteError::InvalidData(message.into())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn build(text: &str) -> Result<Vec<u8>, DocWriteError> {
+    fn build(text: &str) -> Result<Vec<u8>, WriteError> {
         let units: Vec<u16> = text.encode_utf16().collect();
         let markers: Vec<(u32, u16)> = units
             .iter()

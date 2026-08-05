@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 use super::super::{codec, model::*};
 
-impl DocWriter {
+impl Writer {
     /// Build footnote or endnote subdocument text and PLCFs.
     ///
     /// Per MS-DOC spec:
@@ -34,12 +34,12 @@ impl DocWriter {
         pieces: &mut Vec<Piece>,
         current_cp_total: &mut u32,
         font_builder: &mut FontTableBuilder,
-    ) -> Result<Option<NoteStoryData>, DocWriteError> {
+    ) -> Result<Option<NoteStoryData>, WriteError> {
         if entries.is_empty() {
             return Ok(None);
         }
         if entries.len() != actual_ref_cps.len() {
-            return Err(DocWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "every DOC note must have a reference in the main document".to_string(),
             ));
         }
@@ -50,12 +50,12 @@ impl DocWriter {
             .collect::<Vec<_>>();
         ordered.sort_by_key(|(_, cp)| *cp);
         if ordered.windows(2).any(|pair| pair[0].1 == pair[1].1) {
-            return Err(DocWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "DOC note references must have unique character positions".to_string(),
             ));
         }
         if ordered.iter().any(|(_, cp)| *cp >= ccp_text) {
-            return Err(DocWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "DOC note reference lies outside the main document".to_string(),
             ));
         }
@@ -182,12 +182,12 @@ impl DocWriter {
         pieces: &mut Vec<Piece>,
         current_cp_total: &mut u32,
         font_builder: &mut FontTableBuilder,
-    ) -> Result<Option<CommentStoryData>, DocWriteError> {
+    ) -> Result<Option<CommentStoryData>, WriteError> {
         if entries.is_empty() {
             return Ok(None);
         }
         if entries.len() != actual_ref_cps.len() {
-            return Err(DocWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "every DOC comment must have a reference in the main document".to_string(),
             ));
         }
@@ -198,12 +198,12 @@ impl DocWriter {
             .collect::<Vec<_>>();
         ordered.sort_by_key(|(_, cp)| *cp);
         if ordered.windows(2).any(|pair| pair[0].1 == pair[1].1) {
-            return Err(DocWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "DOC comment references must have unique character positions".to_string(),
             ));
         }
         if ordered.iter().any(|(_, cp)| *cp >= ccp_text) {
-            return Err(DocWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "DOC comment reference lies outside the main document".to_string(),
             ));
         }
@@ -213,14 +213,14 @@ impl DocWriter {
         for (entry, _) in &ordered {
             let author_len = entry.author.encode_utf16().count();
             if author_len >= 56 {
-                return Err(DocWriteError::InvalidData(
+                return Err(WriteError::InvalidData(
                     "DOC comment author names must contain fewer than 56 UTF-16 code units"
                         .to_string(),
                 ));
             }
             let initials_len = entry.initials.encode_utf16().count();
             if initials_len > 9 {
-                return Err(DocWriteError::InvalidData(
+                return Err(WriteError::InvalidData(
                     "DOC comment initials must contain at most nine UTF-16 code units".to_string(),
                 ));
             }
@@ -229,7 +229,7 @@ impl DocWriter {
                 index
             } else {
                 if owners.len() >= 0x7FFF {
-                    return Err(DocWriteError::InvalidData(
+                    return Err(WriteError::InvalidData(
                         "DOC comment owner array exceeds 0x7FFF entries".to_string(),
                     ));
                 }
@@ -251,12 +251,12 @@ impl DocWriter {
             .filter(|(entry, _)| entry.range.is_some())
             .count();
         if ranged_count > 0x3FFC {
-            return Err(DocWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "DOC annotation bookmark table exceeds 0x3FFC entries".to_string(),
             ));
         }
         let bookmark_sentinel = ccp_text.checked_add(1).ok_or_else(|| {
-            DocWriteError::InvalidData("DOC annotation bookmark sentinel overflows".to_string())
+            WriteError::InvalidData("DOC annotation bookmark sentinel overflows".to_string())
         })?;
         let mut bookmark_tags = vec![None; ordered.len()];
         let mut ranges = Vec::<(u32, u32, u32)>::with_capacity(ranged_count);
@@ -265,12 +265,12 @@ impl DocWriter {
                 continue;
             };
             if start > end || end > ccp_text {
-                return Err(DocWriteError::InvalidData(
+                return Err(WriteError::InvalidData(
                     "DOC comment range must be ordered and inside the main document".to_string(),
                 ));
             }
             let tag = i32::try_from(index).map_err(|_| {
-                DocWriteError::InvalidData("DOC comment bookmark tag overflows".to_string())
+                WriteError::InvalidData("DOC comment bookmark tag overflows".to_string())
             })? as u32;
             bookmark_tags[index] = Some(tag);
             ranges.push((tag, start, end));
@@ -327,10 +327,10 @@ impl DocWriter {
                     is_ink: false,
                 });
             let depth = usize::try_from(metadata.depth).map_err(|_| {
-                DocWriteError::InvalidData("DOC comment reply depth is too large".to_string())
+                WriteError::InvalidData("DOC comment reply depth is too large".to_string())
             })?;
             if depth > active_ancestors.len() {
-                return Err(DocWriteError::InvalidData(
+                return Err(WriteError::InvalidData(
                     "DOC comment reply tree must be in pre-order".to_string(),
                 ));
             }
@@ -338,23 +338,21 @@ impl DocWriter {
             let parent_delta = match (depth, metadata.parent_index) {
                 (0, None) => 0,
                 (0, Some(_)) | (_, None) => {
-                    return Err(DocWriteError::InvalidData(
+                    return Err(WriteError::InvalidData(
                         "DOC comment parent and reply depth are inconsistent".to_string(),
                     ));
                 },
                 (_, Some(parent)) => {
                     let expected = active_ancestors.get(depth - 1).copied().ok_or_else(|| {
-                        DocWriteError::InvalidData(
-                            "DOC comment reply tree is malformed".to_string(),
-                        )
+                        WriteError::InvalidData("DOC comment reply tree is malformed".to_string())
                     })?;
                     if parent != expected {
-                        return Err(DocWriteError::InvalidData(
+                        return Err(WriteError::InvalidData(
                             "DOC comment parent does not match pre-order reply depth".to_string(),
                         ));
                     }
                     i32::try_from(parent as i64 - index as i64).map_err(|_| {
-                        DocWriteError::InvalidData(
+                        WriteError::InvalidData(
                             "DOC comment parent offset exceeds the binary format".to_string(),
                         )
                     })?
@@ -400,10 +398,10 @@ impl DocWriter {
             ));
 
             let story_chars = body_chars.checked_add(2).ok_or_else(|| {
-                DocWriteError::InvalidData("DOC comment story CP overflows".to_string())
+                WriteError::InvalidData("DOC comment story CP overflows".to_string())
             })?;
             let story_end = current_cp_total.checked_add(story_chars).ok_or_else(|| {
-                DocWriteError::InvalidData("DOC comment subdocument CP overflows".to_string())
+                WriteError::InvalidData("DOC comment subdocument CP overflows".to_string())
             })?;
             pieces.push(Piece::new(
                 *current_cp_total,
@@ -413,7 +411,7 @@ impl DocWriter {
             ));
             *current_cp_total = story_end;
             comment_cp = comment_cp.checked_add(story_chars).ok_or_else(|| {
-                DocWriteError::InvalidData("DOC comment subdocument CP overflows".to_string())
+                WriteError::InvalidData("DOC comment subdocument CP overflows".to_string())
             })?;
             text_cps.push(comment_cp);
         }
@@ -428,12 +426,12 @@ impl DocWriter {
             codec::build_papx_grpprl(&ParagraphFormatting::default()),
         ));
         let guard_end = current_cp_total.checked_add(1).ok_or_else(|| {
-            DocWriteError::InvalidData("DOC comment subdocument CP overflows".to_string())
+            WriteError::InvalidData("DOC comment subdocument CP overflows".to_string())
         })?;
         pieces.push(Piece::new(*current_cp_total, guard_end, fc_guard, true));
         *current_cp_total = guard_end;
         comment_cp = comment_cp.checked_add(1).ok_or_else(|| {
-            DocWriteError::InvalidData("DOC comment subdocument CP overflows".to_string())
+            WriteError::InvalidData("DOC comment subdocument CP overflows".to_string())
         })?;
         text_cps.push(comment_cp);
 
@@ -512,12 +510,12 @@ impl DocWriter {
     pub(super) fn build_bookmark_tables(
         entries: &[BookmarkEntry],
         document_end: u32,
-    ) -> Result<Option<BookmarkTableData>, DocWriteError> {
+    ) -> Result<Option<BookmarkTableData>, WriteError> {
         if entries.is_empty() {
             return Ok(None);
         }
         if entries.len() > 0x3FFB {
-            return Err(DocWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "DOC standard bookmark table exceeds 0x3FFB entries".to_string(),
             ));
         }
@@ -526,20 +524,20 @@ impl DocWriter {
         for (index, entry) in entries.iter().enumerate() {
             let units = entry.name.encode_utf16().collect::<Vec<_>>();
             if units.is_empty() || units.len() >= 40 || !unique.insert(entry.name.clone()) {
-                return Err(DocWriteError::InvalidData(
+                return Err(WriteError::InvalidData(
                     "DOC bookmark names must be unique and contain 1 through 39 UTF-16 code units"
                         .to_string(),
                 ));
             }
             if entry.start > entry.end || entry.end > document_end {
-                return Err(DocWriteError::InvalidData(
+                return Err(WriteError::InvalidData(
                     "DOC bookmark range must be ordered and inside the document parts".to_string(),
                 ));
             }
             let mut bkc = u16::from(entry.is_native) << 14;
             if let Some((first, limit)) = entry.column_range {
                 if first >= limit || first > 0x7F || limit > 0x3F {
-                    return Err(DocWriteError::InvalidData(
+                    return Err(WriteError::InvalidData(
                         "DOC bookmark column range exceeds BKC limits".to_string(),
                     ));
                 }
@@ -549,7 +547,7 @@ impl DocWriter {
         }
 
         let sentinel = document_end.checked_add(1).ok_or_else(|| {
-            DocWriteError::InvalidData("DOC bookmark sentinel CP overflows".to_string())
+            WriteError::InvalidData("DOC bookmark sentinel CP overflows".to_string())
         })?;
         let mut start_order = records.iter().collect::<Vec<_>>();
         start_order.sort_by_key(|record| (record.1.start, record.0));
@@ -594,15 +592,15 @@ impl DocWriter {
 
     pub(super) fn build_revision_writer_data(
         &self,
-    ) -> Result<Option<RevisionWriterData>, DocWriteError> {
+    ) -> Result<Option<RevisionWriterData>, WriteError> {
         let mut authors = vec!["Unknown".to_string()];
         let mut indexes = HashMap::from([("Unknown".to_string(), 0u16)]);
         let mut has_revisions = false;
-        let mut index_author = |author: &str| -> Result<(), DocWriteError> {
+        let mut index_author = |author: &str| -> Result<(), WriteError> {
             has_revisions = true;
             if !indexes.contains_key(author) {
                 if authors.len() >= 0x8000 {
-                    return Err(DocWriteError::InvalidData(
+                    return Err(WriteError::InvalidData(
                         "DOC revision author table exceeds the signed author-index range"
                             .to_string(),
                     ));
@@ -669,7 +667,7 @@ impl DocWriter {
         for author in authors {
             let units = author.encode_utf16().collect::<Vec<_>>();
             let length = u16::try_from(units.len()).map_err(|_| {
-                DocWriteError::InvalidData(
+                WriteError::InvalidData(
                     "DOC revision author exceeds the STTB string-length limit".to_string(),
                 )
             })?;
@@ -684,7 +682,7 @@ impl DocWriter {
         index: u16,
         expected_kind: crate::StyleKind,
         context: &str,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         let actual_kind = match index {
             0 => Some(crate::StyleKind::Paragraph),
             10 => Some(crate::StyleKind::Character),
@@ -695,12 +693,12 @@ impl DocWriter {
             _ => None,
         };
         let Some(actual_kind) = actual_kind else {
-            return Err(DocWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "{context} references undefined DOC style index {index}"
             )));
         };
         if actual_kind != expected_kind {
-            return Err(DocWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "{context} references {actual_kind:?} DOC style {index}, expected {expected_kind:?}"
             )));
         }
@@ -711,7 +709,7 @@ impl DocWriter {
         &self,
         formatting: &CharacterFormatting,
         context: &str,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         if let Some(index) = formatting.style_index {
             self.validate_style_reference(index, crate::StyleKind::Character, context)?;
         }
@@ -725,7 +723,7 @@ impl DocWriter {
         &self,
         formatting: &ParagraphFormatting,
         context: &str,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         if let Some(index) = formatting.style_index {
             self.validate_style_reference(index, crate::StyleKind::Paragraph, context)?;
         }
@@ -739,7 +737,7 @@ impl DocWriter {
         &self,
         formatting: &crate::writer::tap::TableRow,
         context: &str,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         if let Some(index) = formatting.table_style_index {
             self.validate_style_reference(index, crate::StyleKind::Table, context)?;
         }
@@ -749,7 +747,7 @@ impl DocWriter {
         Ok(())
     }
 
-    pub(super) fn validate_style_references(&self) -> Result<(), DocWriteError> {
+    pub(super) fn validate_style_references(&self) -> Result<(), WriteError> {
         let table_paragraphs = self.tables.iter().flat_map(|table| {
             table
                 .rows
@@ -799,7 +797,7 @@ impl DocWriter {
         field_char_cps: &mut Vec<(u32, u16)>,
         font_builder: &mut FontTableBuilder,
         revision_data: Option<&RevisionWriterData>,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         for table in &self.tables {
             let mut encountered_body_row = false;
             let mut vertical_merges = table
@@ -810,17 +808,17 @@ impl DocWriter {
             for row in &table.rows {
                 let column_count = row.cells.len();
                 if !(1..=63).contains(&column_count) {
-                    return Err(DocWriteError::InvalidData(
+                    return Err(WriteError::InvalidData(
                         "DOC table rows must contain between 1 and 63 cells".to_string(),
                     ));
                 }
                 if row.formatting.cells.len() != column_count {
-                    return Err(DocWriteError::InvalidData(
+                    return Err(WriteError::InvalidData(
                         "DOC table row formatting must define every cell".to_string(),
                     ));
                 }
                 if row.formatting.is_header && encountered_body_row {
-                    return Err(DocWriteError::InvalidData(
+                    return Err(WriteError::InvalidData(
                         "DOC header rows must form a contiguous prefix of the table".to_string(),
                     ));
                 }
@@ -835,7 +833,7 @@ impl DocWriter {
                         },
                         crate::parts::tap::VerticalMergeStatus::Merged => {
                             if !vertical_merges[index] {
-                                return Err(DocWriteError::InvalidData(format!(
+                                return Err(WriteError::InvalidData(format!(
                                     "DOC cell {index} continues a vertical merge that was not started"
                                 )));
                             }
@@ -844,7 +842,7 @@ impl DocWriter {
                 }
                 for cell in &row.cells {
                     if cell.paragraphs.is_empty() {
-                        return Err(DocWriteError::InvalidData(
+                        return Err(WriteError::InvalidData(
                             "DOC table cells must contain at least one paragraph".to_string(),
                         ));
                     }
@@ -873,16 +871,16 @@ impl DocWriter {
 
                 let fc_start = text_fc_start
                     .checked_add(u32::try_from(text_stream.len()).map_err(|_| {
-                        DocWriteError::InvalidData(
+                        WriteError::InvalidData(
                             "DOC text stream exceeds 32-bit FC space".to_string(),
                         )
                     })?)
                     .ok_or_else(|| {
-                        DocWriteError::InvalidData("DOC table row FC overflows".to_string())
+                        WriteError::InvalidData("DOC table row FC overflows".to_string())
                     })?;
                 text_stream.extend_from_slice(&0x0007u16.to_le_bytes());
                 let fc_end = fc_start.checked_add(2).ok_or_else(|| {
-                    DocWriteError::InvalidData("DOC table row FC overflows".to_string())
+                    WriteError::InvalidData("DOC table row FC overflows".to_string())
                 })?;
                 chpx_entries.push((fc_start, fc_end, Vec::new()));
                 papx_entries.push((
@@ -891,7 +889,7 @@ impl DocWriter {
                     codec::build_table_row_papx_grpprl(&row.formatting)?,
                 ));
                 let cp_end = current_cp.checked_add(1).ok_or_else(|| {
-                    DocWriteError::InvalidData("DOC table CP range overflows".to_string())
+                    WriteError::InvalidData("DOC table CP range overflows".to_string())
                 })?;
                 pieces.push(Piece::new(*current_cp, cp_end, fc_start, true));
                 *current_cp = cp_end;
@@ -924,26 +922,22 @@ impl DocWriter {
         field_char_cps: &mut Vec<(u32, u16)>,
         font_builder: &mut FontTableBuilder,
         revision_data: Option<&RevisionWriterData>,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         let fc_start = text_fc_start
             .checked_add(u32::try_from(text_stream.len()).map_err(|_| {
-                DocWriteError::InvalidData("DOC text stream exceeds 32-bit FC space".to_string())
+                WriteError::InvalidData("DOC text stream exceeds 32-bit FC space".to_string())
             })?)
             .ok_or_else(|| {
-                DocWriteError::InvalidData("DOC table paragraph FC overflows".to_string())
+                WriteError::InvalidData("DOC table paragraph FC overflows".to_string())
             })?;
         let mut paragraph_cps = 0u32;
         let mut last_chpx = None;
         for run in &paragraph.runs {
             let run_fc_start = text_fc_start
                 .checked_add(u32::try_from(text_stream.len()).map_err(|_| {
-                    DocWriteError::InvalidData(
-                        "DOC text stream exceeds 32-bit FC space".to_string(),
-                    )
+                    WriteError::InvalidData("DOC text stream exceeds 32-bit FC space".to_string())
                 })?)
-                .ok_or_else(|| {
-                    DocWriteError::InvalidData("DOC table run FC overflows".to_string())
-                })?;
+                .ok_or_else(|| WriteError::InvalidData("DOC table run FC overflows".to_string()))?;
             let run_cps = utf16_code_unit_len(&run.text)?;
             let mut offset = 0u32;
             for ch in run.text.chars() {
@@ -951,7 +945,7 @@ impl DocWriter {
                     .checked_add(paragraph_cps)
                     .and_then(|value| value.checked_add(offset))
                     .ok_or_else(|| {
-                        DocWriteError::InvalidData(
+                        WriteError::InvalidData(
                             "DOC table field character CP overflows".to_string(),
                         )
                     })?;
@@ -959,7 +953,7 @@ impl DocWriter {
                     field_char_cps.push((cp, ch as u16));
                 }
                 offset = offset.checked_add(ch.len_utf16() as u32).ok_or_else(|| {
-                    DocWriteError::InvalidData("DOC table run CP range overflows".to_string())
+                    WriteError::InvalidData("DOC table run CP range overflows".to_string())
                 })?;
             }
             for unit in run.text.encode_utf16() {
@@ -967,11 +961,9 @@ impl DocWriter {
             }
             let run_fc_end = run_fc_start
                 .checked_add(run_cps.checked_mul(2).ok_or_else(|| {
-                    DocWriteError::InvalidData("DOC table run FC overflows".to_string())
+                    WriteError::InvalidData("DOC table run FC overflows".to_string())
                 })?)
-                .ok_or_else(|| {
-                    DocWriteError::InvalidData("DOC table run FC overflows".to_string())
-                })?;
+                .ok_or_else(|| WriteError::InvalidData("DOC table run FC overflows".to_string()))?;
             chpx_entries.push((
                 run_fc_start,
                 run_fc_end,
@@ -979,16 +971,16 @@ impl DocWriter {
             ));
             last_chpx = Some(chpx_entries.len() - 1);
             paragraph_cps = paragraph_cps.checked_add(run_cps).ok_or_else(|| {
-                DocWriteError::InvalidData("DOC table paragraph CP range overflows".to_string())
+                WriteError::InvalidData("DOC table paragraph CP range overflows".to_string())
             })?;
         }
         text_stream.extend_from_slice(&terminator.to_le_bytes());
         let fc_end = text_fc_start
             .checked_add(u32::try_from(text_stream.len()).map_err(|_| {
-                DocWriteError::InvalidData("DOC text stream exceeds 32-bit FC space".to_string())
+                WriteError::InvalidData("DOC text stream exceeds 32-bit FC space".to_string())
             })?)
             .ok_or_else(|| {
-                DocWriteError::InvalidData("DOC table paragraph FC overflows".to_string())
+                WriteError::InvalidData("DOC table paragraph FC overflows".to_string())
             })?;
         if let Some(index) = last_chpx {
             chpx_entries[index].1 = fc_end;
@@ -1002,7 +994,7 @@ impl DocWriter {
             .checked_add(paragraph_cps)
             .and_then(|value| value.checked_add(1))
             .ok_or_else(|| {
-                DocWriteError::InvalidData("DOC table paragraph CP range overflows".to_string())
+                WriteError::InvalidData("DOC table paragraph CP range overflows".to_string())
             })?;
         pieces.push(Piece::new(*current_cp, cp_end, fc_start, true));
         *current_cp = cp_end;
@@ -1016,22 +1008,22 @@ impl DocWriter {
         pieces: &mut Vec<Piece>,
         chpx_entries: &mut Vec<(u32, u32, Vec<u8>)>,
         papx_entries: &mut Vec<(u32, u32, Vec<u8>)>,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         let fc_start = text_fc_start
             .checked_add(u32::try_from(text_stream.len()).map_err(|_| {
-                DocWriteError::InvalidData("DOC text stream exceeds 32-bit FC space".to_string())
+                WriteError::InvalidData("DOC text stream exceeds 32-bit FC space".to_string())
             })?)
             .ok_or_else(|| {
-                DocWriteError::InvalidData("DOC final paragraph FC overflows".to_string())
+                WriteError::InvalidData("DOC final paragraph FC overflows".to_string())
             })?;
         text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
         let fc_end = fc_start.checked_add(2).ok_or_else(|| {
-            DocWriteError::InvalidData("DOC final paragraph FC overflows".to_string())
+            WriteError::InvalidData("DOC final paragraph FC overflows".to_string())
         })?;
         chpx_entries.push((fc_start, fc_end, Vec::new()));
         papx_entries.push((fc_start, fc_end, Vec::new()));
         let cp_end = current_cp.checked_add(1).ok_or_else(|| {
-            DocWriteError::InvalidData("DOC final paragraph CP overflows".to_string())
+            WriteError::InvalidData("DOC final paragraph CP overflows".to_string())
         })?;
         pieces.push(Piece::new(*current_cp, cp_end, fc_start, true));
         *current_cp = cp_end;
@@ -1101,7 +1093,7 @@ impl DocWriter {
         current_cp_total: &mut u32,
         font_builder: &mut FontTableBuilder,
         header_pic_offsets: &[u32],
-    ) -> Result<Option<HeaderStoryData>, DocWriteError> {
+    ) -> Result<Option<HeaderStoryData>, WriteError> {
         // Short-circuit if nothing set
         if self.header_even.is_none()
             && self.header_odd.is_none()
@@ -1183,7 +1175,7 @@ impl DocWriter {
                             .checked_add(story_chars)
                             .and_then(|value| value.checked_add(paragraph_chars))
                             .ok_or_else(|| {
-                                DocWriteError::InvalidData(
+                                WriteError::InvalidData(
                                     "DOC header/footer field CP range overflows".to_string(),
                                 )
                             })?;
@@ -1194,7 +1186,7 @@ impl DocWriter {
                             marker_cp = marker_cp
                                 .checked_add(character.len_utf16() as u32)
                                 .ok_or_else(|| {
-                                    DocWriteError::InvalidData(
+                                    WriteError::InvalidData(
                                         "DOC header/footer field CP range overflows".to_string(),
                                     )
                                 })?;
@@ -1213,7 +1205,7 @@ impl DocWriter {
                         if let Some(FloatingAnchorKind::Picture(pic_index)) = anchor_kind {
                             let pic_offset =
                                 header_pic_offsets.get(pic_index as usize).ok_or_else(|| {
-                                    DocWriteError::InvalidData(format!(
+                                    WriteError::InvalidData(format!(
                                         "DOC header picture index {pic_index} is out of range"
                                     ))
                                 })?;
@@ -1224,7 +1216,7 @@ impl DocWriter {
                         last_chpx = Some(chpx_entries.len() - 1);
                         paragraph_chars =
                             paragraph_chars.checked_add(run_chars).ok_or_else(|| {
-                                DocWriteError::InvalidData(
+                                WriteError::InvalidData(
                                     "DOC header/footer paragraph CP range overflows".to_string(),
                                 )
                             })?;
@@ -1246,7 +1238,7 @@ impl DocWriter {
                         .checked_add(paragraph_chars)
                         .and_then(|value| value.checked_add(1))
                         .ok_or_else(|| {
-                            DocWriteError::InvalidData(
+                            WriteError::InvalidData(
                                 "DOC header/footer story CP range overflows".to_string(),
                             )
                         })?;
@@ -1263,13 +1255,13 @@ impl DocWriter {
                     codec::build_papx_grpprl(&ParagraphFormatting::default()),
                 ));
                 story_chars = story_chars.checked_add(1).ok_or_else(|| {
-                    DocWriteError::InvalidData(
+                    WriteError::InvalidData(
                         "DOC header/footer story CP range overflows".to_string(),
                     )
                 })?;
 
                 let cp_story_end = current_cp_total.checked_add(story_chars).ok_or_else(|| {
-                    DocWriteError::InvalidData(
+                    WriteError::InvalidData(
                         "DOC header/footer total CP range overflows".to_string(),
                     )
                 })?;
@@ -1281,7 +1273,7 @@ impl DocWriter {
                 ));
                 *current_cp_total = cp_story_end;
                 header_cp = header_cp.checked_add(story_chars).ok_or_else(|| {
-                    DocWriteError::InvalidData(
+                    WriteError::InvalidData(
                         "DOC header/footer subdocument CP range overflows".to_string(),
                     )
                 })?;

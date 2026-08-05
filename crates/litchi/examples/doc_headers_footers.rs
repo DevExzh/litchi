@@ -1,9 +1,9 @@
 //! Example: DOC headers/footers with odd/even/first behavior
 //! Run: cargo run --example doc_headers_footers
-use litchi_doc::DocWriter;
+use litchi_doc::Writer;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut w = DocWriter::new();
+    let mut w = Writer::new();
 
     // Body text
     w.add_paragraph("This document demonstrates odd/even/first headers and footers.")?;

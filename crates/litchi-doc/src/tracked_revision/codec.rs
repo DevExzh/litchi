@@ -36,13 +36,8 @@ pub(super) struct ParsedMetadata {
 }
 
 impl ParsedMetadata {
-    pub(super) fn to_revision(
-        &self,
-        kind: DocTrackedRevisionKind,
-        start_cp: u32,
-        end_cp: u32,
-    ) -> DocTrackedRevision {
-        DocTrackedRevision {
+    pub(super) fn to_revision(&self, kind: RevisionKind, start_cp: u32, end_cp: u32) -> Revision {
+        Revision {
             kind,
             start_cp,
             end_cp,
@@ -135,20 +130,15 @@ pub(super) fn property_metadata(
     })
 }
 
-pub(super) fn validate_metadata(
-    kind: DocTrackedRevisionKind,
-    metadata: &DocTrackedRevisionMetadata,
-) -> Result<()> {
+pub(super) fn validate_metadata(kind: RevisionKind, metadata: &RevisionMetadata) -> Result<()> {
     if metadata.author.is_empty() {
         return Err(corrupted("revision author must not be empty"));
     }
     if metadata.reason.is_some_and(|v| v > 0x2B) {
         return Err(corrupted("revision reason is undefined"));
     }
-    if matches!(
-        kind,
-        DocTrackedRevisionKind::MoveFrom | DocTrackedRevisionKind::MoveTo
-    ) && metadata.revision_save_id.is_none()
+    if matches!(kind, RevisionKind::MoveFrom | RevisionKind::MoveTo)
+        && metadata.revision_save_id.is_none()
     {
         return Err(corrupted(
             "move revisions require a shared revision_save_id",
@@ -161,13 +151,13 @@ pub(super) fn validate_metadata(
 }
 
 pub(super) fn encode_revision(
-    kind: DocTrackedRevisionKind,
+    kind: RevisionKind,
     author: u16,
-    metadata: &DocTrackedRevisionMetadata,
+    metadata: &RevisionMetadata,
 ) -> Result<Vec<u8>> {
     let mut output = Vec::new();
     match kind {
-        DocTrackedRevisionKind::Insertion | DocTrackedRevisionKind::MoveTo => {
+        RevisionKind::Insertion | RevisionKind::MoveTo => {
             push_byte(&mut output, SPRM_C_F_RMARK, 1);
             push_word(&mut output, SPRM_C_IBST_RMARK, author);
             if metadata.timestamp.is_some() {
@@ -184,7 +174,7 @@ pub(super) fn encode_revision(
                 push_dword(&mut output, SPRM_C_RSID_TEXT, v);
             }
         },
-        DocTrackedRevisionKind::Deletion | DocTrackedRevisionKind::MoveFrom => {
+        RevisionKind::Deletion | RevisionKind::MoveFrom => {
             push_byte(&mut output, SPRM_C_F_RMARK_DEL, 1);
             push_word(&mut output, SPRM_C_IBST_RMARK_DEL, author);
             if metadata.timestamp.is_some() {
@@ -201,7 +191,7 @@ pub(super) fn encode_revision(
                 push_dword(&mut output, SPRM_C_RSID_RM_DEL, v);
             }
         },
-        DocTrackedRevisionKind::CharacterFormatting => {
+        RevisionKind::CharacterFormatting => {
             output.extend_from_slice(&SPRM_C_PROP_RMARK_CURRENT.to_le_bytes());
             output.push(7);
             output.push(1);
@@ -214,14 +204,14 @@ pub(super) fn encode_revision(
                 push_dword(&mut output, SPRM_C_RSID_PROP, v);
             }
         },
-        DocTrackedRevisionKind::ParagraphFormatting => {
+        RevisionKind::ParagraphFormatting => {
             output.extend_from_slice(&SPRM_P_PROP_RMARK_CURRENT.to_le_bytes());
             output.push(7);
             output.push(1);
             output.extend_from_slice(&author.to_le_bytes());
             output.extend_from_slice(&pack_dttm(metadata.timestamp)?.to_le_bytes());
         },
-        DocTrackedRevisionKind::TableRowFormatting => {
+        RevisionKind::TableRowFormatting => {
             output.extend_from_slice(&SPRM_T_PROP_RMARK.to_le_bytes());
             output.push(7);
             output.push(1);
@@ -237,8 +227,8 @@ pub(super) fn encode_revision(
 
 pub(super) fn replace_revision_sprms(
     grp: &[u8],
-    kind: DocTrackedRevisionKind,
-    replacement: Option<(u16, &DocTrackedRevisionMetadata)>,
+    kind: RevisionKind,
+    replacement: Option<(u16, &RevisionMetadata)>,
 ) -> Result<Vec<u8>> {
     let remove = revision_opcodes(kind, replacement.is_none());
     let mut output = retain_sprms(grp, &remove)?;
@@ -253,8 +243,8 @@ pub(super) fn replace_revision_sprms(
 
 pub(super) fn replace_papx_revision_sprms(
     grp: &[u8],
-    kind: DocTrackedRevisionKind,
-    replacement: Option<(u16, &DocTrackedRevisionMetadata)>,
+    kind: RevisionKind,
+    replacement: Option<(u16, &RevisionMetadata)>,
 ) -> Result<Vec<u8>> {
     let style = grp
         .get(..2)
@@ -276,23 +266,23 @@ pub(super) fn replace_papx_revision_sprms(
     Ok(output)
 }
 
-pub(super) fn revision_opcodes(kind: DocTrackedRevisionKind, remove_wall: bool) -> Vec<u16> {
+pub(super) fn revision_opcodes(kind: RevisionKind, remove_wall: bool) -> Vec<u16> {
     match kind {
-        DocTrackedRevisionKind::Insertion | DocTrackedRevisionKind::MoveTo => vec![
+        RevisionKind::Insertion | RevisionKind::MoveTo => vec![
             SPRM_C_F_RMARK,
             SPRM_C_IBST_RMARK,
             SPRM_C_DTTM_RMARK,
             SPRM_C_IDSL_RMARK,
             SPRM_C_RSID_TEXT,
         ],
-        DocTrackedRevisionKind::Deletion | DocTrackedRevisionKind::MoveFrom => vec![
+        RevisionKind::Deletion | RevisionKind::MoveFrom => vec![
             SPRM_C_F_RMARK_DEL,
             SPRM_C_IBST_RMARK_DEL,
             SPRM_C_DTTM_RMARK_DEL,
             SPRM_C_IDSL_RMARK_DEL,
             SPRM_C_RSID_RM_DEL,
         ],
-        DocTrackedRevisionKind::CharacterFormatting => {
+        RevisionKind::CharacterFormatting => {
             let mut value = vec![
                 SPRM_C_PROP_RMARK90,
                 SPRM_C_PROP_RMARK_CURRENT,
@@ -303,7 +293,7 @@ pub(super) fn revision_opcodes(kind: DocTrackedRevisionKind, remove_wall: bool) 
             }
             value
         },
-        DocTrackedRevisionKind::ParagraphFormatting => {
+        RevisionKind::ParagraphFormatting => {
             let mut value = vec![
                 SPRM_P_PROP_RMARK,
                 SPRM_P_PROP_RMARK90,
@@ -314,7 +304,7 @@ pub(super) fn revision_opcodes(kind: DocTrackedRevisionKind, remove_wall: bool) 
             }
             value
         },
-        DocTrackedRevisionKind::TableRowFormatting => {
+        RevisionKind::TableRowFormatting => {
             let mut value = vec![SPRM_T_PROP_RMARK, SPRM_T_RSID];
             if remove_wall {
                 value.push(SPRM_T_WALL);
@@ -937,29 +927,29 @@ pub(super) fn read_units(
     Ok(out)
 }
 
-pub(super) fn infer_moves(revisions: &mut [DocTrackedRevision]) {
+pub(super) fn infer_moves(revisions: &mut [Revision]) {
     let mut groups: HashMap<u32, (Vec<usize>, Vec<usize>)> = HashMap::new();
     for (i, revision) in revisions.iter().enumerate() {
         if let Some(rsid) = revision.revision_save_id {
             let group = groups.entry(rsid).or_default();
             match revision.kind {
-                DocTrackedRevisionKind::Insertion => group.1.push(i),
-                DocTrackedRevisionKind::Deletion => group.0.push(i),
+                RevisionKind::Insertion => group.1.push(i),
+                RevisionKind::Deletion => group.0.push(i),
                 _ => {},
             }
         }
     }
     for (rsid, (from, to)) in groups {
         if from.len() == 1 && to.len() == 1 {
-            revisions[from[0]].kind = DocTrackedRevisionKind::MoveFrom;
-            revisions[to[0]].kind = DocTrackedRevisionKind::MoveTo;
+            revisions[from[0]].kind = RevisionKind::MoveFrom;
+            revisions[to[0]].kind = RevisionKind::MoveTo;
             revisions[from[0]].move_pair_id = Some(rsid);
             revisions[to[0]].move_pair_id = Some(rsid);
         }
     }
 }
 
-pub(super) fn merge_adjacent(output: &mut Vec<DocTrackedRevision>) {
+pub(super) fn merge_adjacent(output: &mut Vec<Revision>) {
     output.sort_by_key(|item| {
         (
             kind_order(item.kind),
@@ -970,7 +960,7 @@ pub(super) fn merge_adjacent(output: &mut Vec<DocTrackedRevision>) {
             item.end_cp,
         )
     });
-    let mut merged: Vec<DocTrackedRevision> = Vec::new();
+    let mut merged: Vec<Revision> = Vec::new();
     for item in output.drain(..) {
         if let Some(last) = merged.last_mut()
             && last.end_cp == item.start_cp
@@ -1003,13 +993,13 @@ pub(super) fn merge_fc_runs(runs: &mut Vec<FcRun>) {
     }
     *runs = out;
 }
-pub(super) fn kind_order(kind: DocTrackedRevisionKind) -> u8 {
+pub(super) fn kind_order(kind: RevisionKind) -> u8 {
     match kind {
-        DocTrackedRevisionKind::Insertion | DocTrackedRevisionKind::MoveTo => 0,
-        DocTrackedRevisionKind::Deletion | DocTrackedRevisionKind::MoveFrom => 1,
-        DocTrackedRevisionKind::CharacterFormatting => 2,
-        DocTrackedRevisionKind::ParagraphFormatting => 3,
-        DocTrackedRevisionKind::TableRowFormatting => 4,
+        RevisionKind::Insertion | RevisionKind::MoveTo => 0,
+        RevisionKind::Deletion | RevisionKind::MoveFrom => 1,
+        RevisionKind::CharacterFormatting => 2,
+        RevisionKind::ParagraphFormatting => 3,
+        RevisionKind::TableRowFormatting => 4,
     }
 }
 pub(super) fn validate_range(start: u32, end: u32, limit: u32) -> Result<()> {

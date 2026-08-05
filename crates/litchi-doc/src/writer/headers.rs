@@ -2,17 +2,17 @@
 //!
 //! Generates the PlcfHdd structure and header/footer subdocument content.
 
-use super::DocWriteError;
+use super::WriteError;
 
-fn add_cp(current: u32, text_units: usize, suffix: u32) -> Result<u32, DocWriteError> {
+fn add_cp(current: u32, text_units: usize, suffix: u32) -> Result<u32, WriteError> {
     let text_units = u32::try_from(text_units).map_err(|_| {
-        DocWriteError::InvalidData("DOC header story exceeds the 32-bit CP range".to_string())
+        WriteError::InvalidData("DOC header story exceeds the 32-bit CP range".to_string())
     })?;
     current
         .checked_add(text_units)
         .and_then(|next| next.checked_add(suffix))
         .ok_or_else(|| {
-            DocWriteError::InvalidData("DOC header story exceeds the 32-bit CP range".to_string())
+            WriteError::InvalidData("DOC header story exceeds the 32-bit CP range".to_string())
         })
 }
 
@@ -98,9 +98,9 @@ impl HeadersWriter {
     ///
     /// # Errors
     ///
-    /// Returns [`DocWriteError::InvalidData`] when the UTF-16 story length cannot
+    /// Returns [`WriteError::InvalidData`] when the UTF-16 story length cannot
     /// be represented by DOC's 32-bit character positions or allocated safely.
-    pub fn build_subdocument_text(&self) -> Result<(Vec<u8>, Vec<u32>), DocWriteError> {
+    pub fn build_subdocument_text(&self) -> Result<(Vec<u8>, Vec<u32>), WriteError> {
         if self.entries.is_empty() {
             return Ok((Vec::new(), vec![0]));
         }
@@ -110,14 +110,14 @@ impl HeadersWriter {
             .ok()
             .and_then(|count| count.checked_mul(2))
             .ok_or_else(|| {
-                DocWriteError::InvalidData(
+                WriteError::InvalidData(
                     "DOC header story byte length exceeds this platform".to_string(),
                 )
             })?;
 
         let mut text_bytes = Vec::new();
         text_bytes.try_reserve_exact(byte_count).map_err(|_| {
-            DocWriteError::InvalidData("DOC header story allocation is too large".to_string())
+            WriteError::InvalidData("DOC header story allocation is too large".to_string())
         })?;
         let mut char_positions = Vec::with_capacity(14);
         let mut current_pos = 0u32;
@@ -134,7 +134,7 @@ impl HeadersWriter {
                     .checked_sub(start)
                     .map(|bytes| bytes / size_of::<u16>())
                     .ok_or_else(|| {
-                        DocWriteError::InvalidData(
+                        WriteError::InvalidData(
                             "DOC header story byte length is invalid".to_string(),
                         )
                     })?;
@@ -163,9 +163,9 @@ impl HeadersWriter {
     ///
     /// # Errors
     ///
-    /// Returns [`DocWriteError::InvalidData`] when the header story exceeds DOC's
+    /// Returns [`WriteError::InvalidData`] when the header story exceeds DOC's
     /// 32-bit character-position range or cannot be allocated safely.
-    pub fn build_plcfhdd(&self) -> Result<Vec<u8>, DocWriteError> {
+    pub fn build_plcfhdd(&self) -> Result<Vec<u8>, WriteError> {
         let (_text, char_positions) = self.build_subdocument_text()?;
 
         let mut plcf = Vec::new();
@@ -181,9 +181,9 @@ impl HeadersWriter {
     ///
     /// # Errors
     ///
-    /// Returns [`DocWriteError::InvalidData`] when the UTF-16 story length exceeds
+    /// Returns [`WriteError::InvalidData`] when the UTF-16 story length exceeds
     /// DOC's 32-bit character-position range.
-    pub fn char_count(&self) -> Result<u32, DocWriteError> {
+    pub fn char_count(&self) -> Result<u32, WriteError> {
         if self.entries.is_empty() {
             return Ok(0);
         }

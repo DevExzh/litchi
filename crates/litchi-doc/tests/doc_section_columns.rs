@@ -1,10 +1,10 @@
 use litchi_doc::{
-    DocWriter, Package, TextFlow,
+    Package, TextFlow, Writer,
     section::columns::{Column, Error, Layout},
 };
 use std::io::Cursor;
 
-fn round_trip(writer: &mut DocWriter) -> litchi_doc::Section {
+fn round_trip(writer: &mut Writer) -> litchi_doc::Section {
     writer.add_paragraph("Columns").unwrap();
     let mut cursor = Cursor::new(Vec::new());
     writer.write_to(&mut cursor).unwrap();
@@ -14,7 +14,7 @@ fn round_trip(writer: &mut DocWriter) -> litchi_doc::Section {
 
 #[test]
 fn omitted_layout_reads_as_the_normative_single_column_default() {
-    let section = round_trip(&mut DocWriter::new());
+    let section = round_trip(&mut Writer::new());
     assert_eq!(section.columns, Layout::even(1, 720, false).unwrap());
     assert!(!section.behavior.right_to_left);
     assert_eq!(section.text_flow, TextFlow::HorizontalNonAsian);
@@ -22,7 +22,7 @@ fn omitted_layout_reads_as_the_normative_single_column_default() {
 
 #[test]
 fn equal_columns_rtl_and_vertical_flow_round_trip() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     let mut layout = Layout::even(3, 900, false).unwrap();
     layout.set_line_between(true);
     writer.set_section_columns(layout.clone()).unwrap();
@@ -49,7 +49,7 @@ fn unequal_width_and_spacing_arrays_round_trip_without_rtl_reversal() {
         true,
     )
     .unwrap();
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.set_section_columns(layout.clone()).unwrap();
     writer.set_section_right_to_left(true);
     let section = round_trip(&mut writer);
@@ -78,7 +78,7 @@ fn mutation_rejects_invalid_counts_widths_and_spacing_dependencies() {
     );
     assert!(Layout::unequal(vec![Column::new(1_000, Some(100)).unwrap()], false).is_err());
 
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer
         .set_section_columns(Layout::even(2, 720, false).unwrap())
         .unwrap();

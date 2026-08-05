@@ -5,12 +5,12 @@
 //!
 //! Run with: cargo run --example comprehensive_doc_test
 
-use litchi_doc::{CharacterFormatting, DocWriter, ParagraphFormatting};
+use litchi_doc::{CharacterFormatting, ParagraphFormatting, Writer};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Comprehensive DOC Writer Test ===\n");
 
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
 
     // ============================================================
     // 1. DOCUMENT PROPERTIES

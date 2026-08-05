@@ -5283,6 +5283,33 @@ migration evidence, not a claim of complete `[MS-DOC]`, `[MS-ODRAW]`,
 `[MS-OGRAPH]`, `[MS-OSHARED]`, `[MS-PPT]`, `[MS-XLS]`, OOXML, or ODF
 conformance.
 
+## Prefix-free DOC facade and RouteSlip continuation
+
+The next breaking DOC pass removes the remaining redundant `Doc` prefix from
+the writer facade and adjacent owners. `Writer`, `WriteError`, `HeaderKind`,
+`Picture`, `SmartTagEntry`, `StyleRevision`, `StyleDefinition` (under the
+writer facade), `MtefEquationWriteOptions`, `TextBox`, `Revision`,
+`RevisionKind`, `RevisionMetadata`, `RevisionEditor`, and the small writer
+`IoError` seams now use contextual names without compatibility aliases. The
+root facade keeps the reader-side `StyleDefinition` distinct from the writer
+facade's same contextual name, avoiding an ambiguous root export.
+
+The `[MS-DOC]` `RouteSlip`, `RouteSlipInfo`, and protection metadata now have
+a typed, lossless `parts::route_slip` facade. Its byte-oriented ANSI strings
+avoid an incorrect UTF-8 assumption; the codec validates Bool16 values,
+reserved fields, enum domains, signed lengths, recipient counts, stage
+relationships, truncation, overflow, and trailing bytes. It reads and writes
+the optional FIB `fcRouteSlip`/`lcbRouteSlip` range through the table-stream
+seam. The `Document` object does not yet own route-slip lifecycle editing and
+the protection enum remains metadata rather than an enforced editing policy.
+
+Strict DOC all-target and umbrella-library checks pass, as do lint-capped
+checks, 837 DOC library tests (two ignored), 162 umbrella library tests, the
+route-slip and renamed writer integration targets, formatting/diff checks, and
+the crate-boundary policy. This remains bounded `[MS-DOC]` implementation and
+API evidence, not a claim of complete Word routing workflow or Office
+conformance.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

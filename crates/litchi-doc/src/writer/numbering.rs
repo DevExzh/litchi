@@ -2,7 +2,7 @@
 //!
 //! Generates list structures (LST, LVL) and format overrides (LFO, LFOLVL).
 
-use super::core::DocWriteError;
+use super::core::WriteError;
 #[cfg(test)]
 use crate::parts::numbering::ListLevelOverrideMetadata;
 pub use crate::parts::numbering::NumberFormat;
@@ -49,14 +49,14 @@ impl ListLevel {
     ///
     /// The number text uses placeholder characters 0x0000–0x0008 for levels 0–8.
     /// For example, `"%1."` becomes `[0x0000, u'.']` (level 0 counter + period).
-    pub fn to_bytes(&self) -> Result<Vec<u8>, DocWriteError> {
+    pub fn to_bytes(&self) -> Result<Vec<u8>, WriteError> {
         self.to_bytes_with_metadata(None)
     }
 
     fn to_bytes_with_metadata(
         &self,
         metadata: Option<&ListLevelMetadata>,
-    ) -> Result<Vec<u8>, DocWriteError> {
+    ) -> Result<Vec<u8>, WriteError> {
         if matches!(
             self.number_format,
             NumberFormat::Hex
@@ -64,7 +64,7 @@ impl ListLevel {
                 | NumberFormat::DecimalHalfWidth
                 | NumberFormat::DecimalFullWidth2
         ) {
-            return Err(DocWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "MSONFC {:#04x} is forbidden in a DOC list level",
                 self.number_format as u8
             )));
@@ -73,7 +73,7 @@ impl ListLevel {
             && self.number_format != NumberFormat::None
             && self.start_at > 0x7FFF
         {
-            return Err(DocWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "DOC list start value {} exceeds 32767",
                 self.start_at
             )));
@@ -117,10 +117,10 @@ impl ListLevel {
         let number_properties =
             metadata.map_or(&[][..], |value| value.number_properties.as_slice());
         let cb_grpprl_papx = u8::try_from(paragraph_properties.len()).map_err(|_| {
-            DocWriteError::InvalidData("LVL paragraph properties exceed 255 bytes".to_string())
+            WriteError::InvalidData("LVL paragraph properties exceed 255 bytes".to_string())
         })?;
         let cb_grpprl_chpx = u8::try_from(number_properties.len()).map_err(|_| {
-            DocWriteError::InvalidData("LVL number properties exceed 255 bytes".to_string())
+            WriteError::InvalidData("LVL number properties exceed 255 bytes".to_string())
         })?;
 
         let mut buf = Vec::with_capacity(
@@ -266,14 +266,14 @@ impl ListStructure {
     ///
     /// Per MS-DOC spec, LVLs are appended after all LSTFs in the PlfLst
     /// and are NOT counted in `lcbPlfLst`.
-    pub fn levels_to_bytes(&self) -> Result<Vec<u8>, DocWriteError> {
+    pub fn levels_to_bytes(&self) -> Result<Vec<u8>, WriteError> {
         self.levels_to_bytes_with_metadata(None)
     }
 
     fn levels_to_bytes_with_metadata(
         &self,
         metadata: Option<&[ListLevelMetadata]>,
-    ) -> Result<Vec<u8>, DocWriteError> {
+    ) -> Result<Vec<u8>, WriteError> {
         let mut buf = Vec::new();
         let level_count = if self.levels.len() <= 1 { 1 } else { 9 };
         for level_index in 0..level_count {
@@ -349,9 +349,9 @@ impl ListFormatOverride {
     fn encode_with_data(
         &self,
         data: &ListFormatOverrideData,
-    ) -> Result<(Vec<u8>, Vec<u8>), DocWriteError> {
+    ) -> Result<(Vec<u8>, Vec<u8>), WriteError> {
         if data.levels.len() > 9 || data.metadata.levels.len() != data.levels.len() {
-            return Err(DocWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "LFOData must contain matching metadata for at most nine levels".to_string(),
             ));
         }
@@ -376,20 +376,20 @@ impl ListFormatOverride {
         for (level, metadata) in data.levels.iter().zip(&data.metadata.levels) {
             let index = usize::from(level.level);
             if index >= seen.len() || seen[index] {
-                return Err(DocWriteError::InvalidData(format!(
+                return Err(WriteError::InvalidData(format!(
                     "LFO level {} is out of range or duplicated",
                     level.level
                 )));
             }
             seen[index] = true;
             if level.start_at.is_some_and(|value| value > 0x7FFF) {
-                return Err(DocWriteError::InvalidData(format!(
+                return Err(WriteError::InvalidData(format!(
                     "LFO start value for level {} exceeds 32767",
                     level.level
                 )));
             }
             if level.format.is_some() != metadata.formatting.is_some() {
-                return Err(DocWriteError::InvalidData(format!(
+                return Err(WriteError::InvalidData(format!(
                     "LFO level {} formatting and metadata disagree",
                     level.level
                 )));
@@ -470,7 +470,7 @@ impl NumberingWriter {
         &mut self,
         lfo: ListFormatOverride,
         data: ListFormatOverrideData,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         let (header, body) = lfo.encode_with_data(&data)?;
         self.list_overrides.push(lfo);
         self.override_headers.push(Some(header));
@@ -488,20 +488,20 @@ impl NumberingWriter {
         self.list_templates = Some(table);
     }
 
-    pub fn build_sttb_list_names(&self) -> Result<Option<Vec<u8>>, DocWriteError> {
+    pub fn build_sttb_list_names(&self) -> Result<Option<Vec<u8>>, WriteError> {
         self.list_names
             .as_ref()
             .map(ListNamesTable::to_bytes)
             .transpose()
-            .map_err(|error| DocWriteError::InvalidData(error.to_string()))
+            .map_err(|error| WriteError::InvalidData(error.to_string()))
     }
 
-    pub fn build_sttb_rgtplc(&self) -> Result<Option<Vec<u8>>, DocWriteError> {
+    pub fn build_sttb_rgtplc(&self) -> Result<Option<Vec<u8>>, WriteError> {
         self.list_templates
             .as_ref()
             .map(ListTemplateTable::to_bytes)
             .transpose()
-            .map_err(|error| DocWriteError::InvalidData(error.to_string()))
+            .map_err(|error| WriteError::InvalidData(error.to_string()))
     }
 
     /// Get number of list structures
@@ -516,7 +516,7 @@ impl NumberingWriter {
     ///   `lcbPlfLst` should cover.
     /// - `lvl_data` = LVL array for all lists — appended immediately after but
     ///   NOT counted in `lcbPlfLst` per MS-DOC spec / Apache POI.
-    pub fn build_plflst(&self) -> Result<(Vec<u8>, Vec<u8>), DocWriteError> {
+    pub fn build_plflst(&self) -> Result<(Vec<u8>, Vec<u8>), WriteError> {
         let mut header_buf = Vec::new();
         let mut lvl_buf = Vec::new();
 

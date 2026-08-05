@@ -10,7 +10,7 @@
 //! machinery ([MS-DOC] PlcftxbxTxt/PlcffldTxbx and the OfficeArtClientTextbox
 //! record) which is out of scope for this writer.
 
-use super::core::DocWriteError;
+use super::core::WriteError;
 use super::images::{write_opt_record, write_record_header};
 
 // MSOSPT shape types ([MS-ODRAW] 2.4.24).
@@ -72,7 +72,7 @@ impl Kind {
 ///
 /// The shape uses its preset geometry ([MS-ODRAW] MSOSPT); position and
 /// wrapping come from the `FloatingPosition` passed to
-/// [`super::core::DocWriter::insert_floating_shape`]. By default a shape is
+/// [`super::core::Writer::insert_floating_shape`]. By default a shape is
 /// drawn as an outline: no fill, black line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Shape {
@@ -94,10 +94,10 @@ impl Shape {
     /// The shape starts as an outline (no fill, black line); use
     /// [`Self::with_fill`] / [`Self::with_line`] / [`Self::without_fill`] /
     /// [`Self::without_line`] to adjust.
-    pub fn new(kind: Kind, width_twips: u32, height_twips: u32) -> Result<Self, DocWriteError> {
+    pub fn new(kind: Kind, width_twips: u32, height_twips: u32) -> Result<Self, WriteError> {
         for dimension in [width_twips, height_twips] {
             if !(1..=MAX_SHAPE_DIMENSION_TWIPS).contains(&dimension) {
-                return Err(DocWriteError::InvalidData(format!(
+                return Err(WriteError::InvalidData(format!(
                     "DOC shape dimension {dimension} twips is outside 1..={MAX_SHAPE_DIMENSION_TWIPS}"
                 )));
             }

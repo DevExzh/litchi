@@ -49,9 +49,9 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use litchi_doc::DocWriter;
+//! use litchi_doc::Writer;
 //!
-//! let mut writer = DocWriter::new();
+//! let mut writer = Writer::new();
 //!
 //! // Add paragraphs
 //! writer.add_paragraph("Hello, World!")?;
@@ -79,8 +79,8 @@ mod package;
 mod tests;
 
 pub use model::{
-    CharacterFormatting, DocHeaderKind, DocWriteError, DocWriter, HeaderFooterParagraph,
-    LineSpacing, ParagraphFormatting,
+    CharacterFormatting, HeaderFooterParagraph, HeaderKind, LineSpacing, ParagraphFormatting,
+    WriteError, Writer,
 };
 
 pub(super) use model::pack_dttm;

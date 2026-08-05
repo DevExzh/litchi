@@ -1,6 +1,6 @@
 //! Typed encryption profiles used by legacy Word documents.
 
-/// Password-to-open encryption profile used by [`crate::DocWriter`].
+/// Password-to-open encryption profile used by [`crate::Writer`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EncryptionProfile {
     /// Legacy Word XOR obfuscation with an ANSI password of at most 15 characters.

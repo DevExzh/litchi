@@ -2125,7 +2125,7 @@ impl Document {
         entries: &[crate::parts::textbox::TextBoxEntry],
         story_range: Option<(u32, u32)>,
         in_header_story: bool,
-    ) -> Vec<crate::parts::textbox::DocTextBox> {
+    ) -> Vec<crate::parts::textbox::TextBox> {
         let Some((story_start, _)) = story_range else {
             return Vec::new();
         };
@@ -2145,7 +2145,7 @@ impl Document {
                 } else {
                     None
                 };
-                crate::parts::textbox::DocTextBox {
+                crate::parts::textbox::TextBox {
                     shape_id: entry.shape_id,
                     text: text.to_string(),
                     header_kind,
@@ -2161,7 +2161,7 @@ impl Document {
     /// OfficeArtFSP record in the drawing layer and the `lid` of its Spa.
     /// Paragraphs within a text box are separated by '\r'. Returns an empty
     /// vector when the document has no textbox story.
-    pub fn text_boxes(&self) -> Vec<crate::parts::textbox::DocTextBox> {
+    pub fn text_boxes(&self) -> Vec<crate::parts::textbox::TextBox> {
         self.resolve_text_boxes(&self.textbox_entries, self.fib.get_textbox_range(), false)
     }
 
@@ -2172,7 +2172,7 @@ impl Document {
     /// `header_kind` reports the header (odd, even, or first-page) the box is
     /// anchored in. Returns an empty vector when the document has no header
     /// textbox story.
-    pub fn header_text_boxes(&self) -> Vec<crate::parts::textbox::DocTextBox> {
+    pub fn header_text_boxes(&self) -> Vec<crate::parts::textbox::TextBox> {
         self.resolve_text_boxes(
             &self.header_textbox_entries,
             self.fib.get_header_textbox_range(),

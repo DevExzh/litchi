@@ -11,7 +11,7 @@ const USER_STYLE_ID: u16 = 0x0FFE;
 
 /// Previous formatting and attribution retained by a revision-marked style.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DocStyleRevision {
+pub struct StyleRevision {
     /// Revision author name, stored through the document's `SttbfRMark` table.
     pub author: String,
     /// Date and time at which the style was revision-marked.
@@ -22,7 +22,7 @@ pub struct DocStyleRevision {
     pub character_properties: Vec<u8>,
 }
 
-impl DocStyleRevision {
+impl StyleRevision {
     /// Create revision state for a paragraph style.
     pub fn paragraph(
         author: impl Into<String>,
@@ -56,7 +56,7 @@ impl DocStyleRevision {
 
 /// A custom style appended after the fifteen fixed DOC style slots.
 #[derive(Debug, Clone)]
-pub struct DocStyleDefinition {
+pub struct StyleDefinition {
     /// Invariant built-in identifier, or `0x0FFE` for a user-defined style.
     pub invariant_id: u16,
     /// Paragraph, character, table, or numbering style.
@@ -74,12 +74,12 @@ pub struct DocStyleDefinition {
     /// Optional Word 2000-and-later style metadata.
     pub post_2000: Option<StylePost2000>,
     /// Previous formatting and attribution for a revision-marked style.
-    pub revision: Option<DocStyleRevision>,
+    pub revision: Option<StyleRevision>,
     /// Style behavior flags.
     pub flags: StyleFlags,
 }
 
-impl DocStyleDefinition {
+impl StyleDefinition {
     /// Create an empty user-defined style with the required UPX count.
     pub fn new(kind: StyleKind, name: impl Into<String>) -> Self {
         let property_count = match kind {
@@ -132,7 +132,7 @@ impl DocStyleDefinition {
     }
 
     /// Mark this paragraph or character style as revised and retain its prior formatting.
-    pub fn with_revision(mut self, revision: DocStyleRevision) -> Self {
+    pub fn with_revision(mut self, revision: StyleRevision) -> Self {
         self.revision = Some(revision);
         self.post_2000
             .get_or_insert(StylePost2000 {
@@ -163,7 +163,7 @@ fn invalid(message: impl Into<String>) -> StyleWriteError {
     StyleWriteError(message.into())
 }
 
-fn required_property_count(style: &DocStyleDefinition) -> Result<usize, StyleWriteError> {
+fn required_property_count(style: &StyleDefinition) -> Result<usize, StyleWriteError> {
     let revision_marked = style
         .post_2000
         .as_ref()
@@ -194,7 +194,7 @@ fn current_property_count(kind: StyleKind) -> usize {
     }
 }
 
-fn validate_style(style: &DocStyleDefinition, index: u16) -> Result<(), StyleWriteError> {
+fn validate_style(style: &StyleDefinition, index: u16) -> Result<(), StyleWriteError> {
     if style.invariant_id > USER_STYLE_ID {
         return Err(invalid(
             "DOC style invariant identifiers cannot exceed 0x0FFE",
@@ -326,7 +326,7 @@ fn flags_word(flags: &StyleFlags) -> u16 {
 }
 
 fn serialize_style(
-    style: &DocStyleDefinition,
+    style: &StyleDefinition,
     index: u16,
     stdf_size: usize,
     revision_authors: Option<&HashMap<String, u16>>,
@@ -418,15 +418,15 @@ fn append_inner_upx(output: &mut Vec<u8>, property_set: &[u8]) -> Result<(), Sty
     Ok(())
 }
 
-fn normal_style() -> DocStyleDefinition {
-    let mut style = DocStyleDefinition::new(StyleKind::Paragraph, "Normal");
+fn normal_style() -> StyleDefinition {
+    let mut style = StyleDefinition::new(StyleKind::Paragraph, "Normal");
     style.invariant_id = 0;
     style.next_style = 0;
     style
 }
 
-fn default_font_style() -> DocStyleDefinition {
-    let mut style = DocStyleDefinition::new(StyleKind::Character, "Default Paragraph Font");
+fn default_font_style() -> StyleDefinition {
+    let mut style = StyleDefinition::new(StyleKind::Character, "Default Paragraph Font");
     style.invariant_id = 65;
     style.next_style = 10;
     style
@@ -434,7 +434,7 @@ fn default_font_style() -> DocStyleDefinition {
 
 /// Generate a complete stylesheet containing required built-ins and custom styles.
 pub fn generate_stylesheet(
-    custom_styles: &[DocStyleDefinition],
+    custom_styles: &[StyleDefinition],
     revision_authors: Option<&HashMap<String, u16>>,
 ) -> Result<Vec<u8>, StyleWriteError> {
     let style_count = MIN_STYLE_COUNT
@@ -532,7 +532,7 @@ mod tests {
         let papx = conditional(SPRM_P_CNF, 0x0001, &pap_nested);
         let chp_nested = [SPRM_C_F_BOLD.to_le_bytes().as_slice(), &[1]].concat();
         let chpx = conditional(SPRM_C_CNF, 0x0008, &chp_nested);
-        let style = DocStyleDefinition::new(StyleKind::Table, "Grid Accent")
+        let style = StyleDefinition::new(StyleKind::Table, "Grid Accent")
             .with_alias("Accent Grid")
             .with_property_sets(vec![tapx, papx, chpx])
             .with_post_2000(StylePost2000 {
@@ -577,10 +577,10 @@ mod tests {
             minute: 30,
             weekday: 4,
         };
-        let style = DocStyleDefinition::new(StyleKind::Paragraph, "Tracked Body")
+        let style = StyleDefinition::new(StyleKind::Paragraph, "Tracked Body")
             .with_property_sets(vec![current_papx, current_chpx])
             .with_revision(
-                DocStyleRevision::paragraph(
+                StyleRevision::paragraph(
                     "Style Editor",
                     previous_papx.clone(),
                     previous_chpx.clone(),
@@ -607,10 +607,8 @@ mod tests {
     #[test]
     fn revision_marked_character_style_round_trips_nested_upx() {
         let previous = [SPRM_C_F_BOLD.to_le_bytes().as_slice(), &[0]].concat();
-        let style =
-            DocStyleDefinition::new(StyleKind::Character, "Tracked Emphasis").with_revision(
-                DocStyleRevision::character("Style Editor", previous.clone()),
-            );
+        let style = StyleDefinition::new(StyleKind::Character, "Tracked Emphasis")
+            .with_revision(StyleRevision::character("Style Editor", previous.clone()));
         let authors = HashMap::from([("Style Editor".to_string(), 1u16)]);
 
         let bytes = generate_stylesheet(&[style], Some(&authors)).unwrap();
@@ -624,29 +622,29 @@ mod tests {
     #[test]
     fn rejects_invalid_custom_styles() {
         let wrong_count =
-            DocStyleDefinition::new(StyleKind::Table, "Wrong").with_property_sets(vec![Vec::new()]);
+            StyleDefinition::new(StyleKind::Table, "Wrong").with_property_sets(vec![Vec::new()]);
         assert!(generate_stylesheet(&[wrong_count], None).is_err());
 
-        let wrong_type = DocStyleDefinition::new(StyleKind::Table, "Wrong Type")
-            .with_property_sets(vec![
+        let wrong_type =
+            StyleDefinition::new(StyleKind::Table, "Wrong Type").with_property_sets(vec![
                 [SPRM_C_F_BOLD.to_le_bytes().as_slice(), &[1]].concat(),
                 Vec::new(),
                 Vec::new(),
             ]);
         assert!(generate_stylesheet(&[wrong_type], None).is_err());
 
-        let conditional_paragraph = DocStyleDefinition::new(StyleKind::Paragraph, "Not Table")
+        let conditional_paragraph = StyleDefinition::new(StyleKind::Paragraph, "Not Table")
             .with_property_sets(vec![conditional(SPRM_P_CNF, 1, &[]), Vec::new()]);
         assert!(generate_stylesheet(&[conditional_paragraph], None).is_err());
 
-        let self_based = DocStyleDefinition::new(StyleKind::Table, "Cycle").with_base_style(15);
+        let self_based = StyleDefinition::new(StyleKind::Table, "Cycle").with_base_style(15);
         assert!(generate_stylesheet(&[self_based], None).is_err());
 
-        let duplicate = DocStyleDefinition::new(StyleKind::Table, "Normal");
+        let duplicate = StyleDefinition::new(StyleKind::Table, "Normal");
         assert!(generate_stylesheet(&[duplicate], None).is_err());
 
-        let revision_marked = DocStyleDefinition::new(StyleKind::Character, "Revised")
-            .with_post_2000(StylePost2000 {
+        let revision_marked =
+            StyleDefinition::new(StyleKind::Character, "Revised").with_post_2000(StylePost2000 {
                 linked_style: None,
                 has_original_style: true,
                 revision_id: 1,

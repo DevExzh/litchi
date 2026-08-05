@@ -4,10 +4,10 @@
 //! section flags (DOP fFacingPages, SEP sprmSFTitlePage), and the header
 //! picture pipeline (PICF block + PlcfSpaHdr + header-drawing picture frame).
 use litchi_doc::shape::extract_drawing_shapes;
-use litchi_doc::writer::{DocPicture, DocWriter, FloatingPosition};
+use litchi_doc::writer::{FloatingPosition, Picture, Writer};
 use litchi_doc::writer::{Kind as DrawingKind, Shape as DrawingShape};
 use litchi_doc::{
-    DocHeaderKind, HeaderFooterParagraph, HeaderFooterType, Package, ShapeHorizontalOrigin,
+    HeaderFooterParagraph, HeaderFooterType, HeaderKind, Package, ShapeHorizontalOrigin,
     ShapeTextWrap, ShapeVerticalOrigin,
 };
 use litchi_odraw::shape::Kind;
@@ -62,14 +62,14 @@ fn jpeg_fixture() -> Vec<u8> {
 }
 
 fn write_doc_with_even_and_first_boxes() -> Vec<u8> {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("Body text").unwrap();
     writer
         .set_odd_header_paragraphs(vec![HeaderFooterParagraph::plain("OddH")])
         .unwrap();
     writer
         .insert_header_text_box(
-            DocHeaderKind::Even,
+            HeaderKind::Even,
             DrawingShape::new(DrawingKind::Rectangle, 2000, 1000).unwrap(),
             FloatingPosition::new(1000, 500),
             "Even box",
@@ -77,7 +77,7 @@ fn write_doc_with_even_and_first_boxes() -> Vec<u8> {
         .unwrap();
     writer
         .insert_header_text_box(
-            DocHeaderKind::FirstPage,
+            HeaderKind::FirstPage,
             DrawingShape::new(DrawingKind::Ellipse, 3000, 1500).unwrap(),
             FloatingPosition::new(2000, 800)
                 .with_origins(ShapeHorizontalOrigin::Page, ShapeVerticalOrigin::Paragraph)
@@ -192,19 +192,19 @@ fn even_and_first_headers_set_section_flags() {
 fn header_picture_round_trips_with_byte_identical_payload() {
     let png_bytes = make_png(32, 16);
 
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("Body").unwrap();
     writer
         .insert_header_picture(
-            DocHeaderKind::Odd,
-            DocPicture::new(png_bytes.clone()).unwrap(),
+            HeaderKind::Odd,
+            Picture::new(png_bytes.clone()).unwrap(),
             FloatingPosition::new(720, 360),
         )
         .unwrap();
     // A main-story floating picture as well, to prove coexistence.
     writer
         .insert_floating_picture(
-            DocPicture::new(jpeg_fixture()).unwrap(),
+            Picture::new(jpeg_fixture()).unwrap(),
             FloatingPosition::new(1440, 720),
         )
         .unwrap();

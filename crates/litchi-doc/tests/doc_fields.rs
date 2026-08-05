@@ -1,4 +1,4 @@
-use litchi_doc::writer::DocWriter;
+use litchi_doc::writer::Writer;
 use litchi_doc::{FieldStory, FieldType, IndexEntryOption, Package, TableOfAuthoritiesEntryOption};
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -123,7 +123,7 @@ fn poi_hyperlink_fixture_retains_inert_hyperlink_field() {
 
 #[test]
 fn generated_tc_document_discovers_table_of_contents_entries() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer
         .add_paragraph(concat!(
             "\u{0013} TC \"Illustration 1\" \\f i \\l 4 ",
@@ -148,7 +148,7 @@ fn generated_tc_document_discovers_table_of_contents_entries() {
 
 #[test]
 fn generated_ta_document_discovers_table_of_authorities_entries() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer
         .add_paragraph(concat!(
             "\u{0013} TA \\l \"Baldwin v. Alberti\" \\c 1 \\s Baldwin ",
@@ -183,7 +183,7 @@ fn generated_ta_document_discovers_table_of_authorities_entries() {
 
 #[test]
 fn generated_xe_document_discovers_index_entries() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer
         .add_paragraph(concat!(
             "\u{0013} XE \"Office Open XML:Syntax\" \\b \\f Intro \\i ",
@@ -216,7 +216,7 @@ fn generated_xe_document_discovers_index_entries() {
 
 #[test]
 fn generated_rd_document_discovers_referenced_documents() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer
         .add_paragraph(concat!(
             "\u{0013} RD \"chapters/Chapter 1.doc\" \\f \\* MERGEFORMAT ",
@@ -244,7 +244,7 @@ fn generated_rd_document_discovers_referenced_documents() {
 
 #[test]
 fn generated_private_document_discovers_private_fields() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer
         .add_paragraph(concat!(
             "\u{0013} PRIVATE \"converter payload\" \\* MERGEFORMAT ",

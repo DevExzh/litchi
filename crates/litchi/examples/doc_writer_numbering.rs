@@ -8,7 +8,7 @@
 //! Run with: cargo run --example doc_writer_numbering
 
 use litchi_doc::writer::{
-    DocWriter, ListFormatOverride, ListLevel, ListStructure, NumberFormat, ParagraphFormatting,
+    ListFormatOverride, ListLevel, ListStructure, NumberFormat, ParagraphFormatting, Writer,
 };
 use std::error::Error;
 
@@ -26,7 +26,7 @@ fn list_para(_text: &str, ilfo: u16, ilvl: u8) -> ParagraphFormatting {
 fn main() -> Result<(), Box<dyn Error>> {
     println!("Creating DOC file with numbered and bulleted lists...");
 
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
 
     // Title
     writer.add_paragraph("List Numbering Examples")?;

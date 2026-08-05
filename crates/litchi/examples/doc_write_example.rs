@@ -5,13 +5,13 @@
 //! for implementation status.
 //!
 //! Run with: cargo run --example doc_write_example
-use litchi_doc::{CharacterFormatting, DocWriter, ParagraphFormatting};
+use litchi_doc::{CharacterFormatting, ParagraphFormatting, Writer};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating a new DOC file...");
 
     // Create a new DOC writer
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
 
     // Set document properties
     writer.set_property("Title", "Sample Document");

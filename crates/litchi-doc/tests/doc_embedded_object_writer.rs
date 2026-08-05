@@ -1,13 +1,13 @@
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_doc::embedded_object::Limits;
-use litchi_doc::writer::DocWriter;
+use litchi_doc::writer::Writer;
 use litchi_doc::{Editor, Package, WriteOptions};
 use std::fs;
 use std::io::Cursor;
 use std::path::PathBuf;
 
 fn base_doc() -> Vec<u8> {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("before embedded objects").unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();

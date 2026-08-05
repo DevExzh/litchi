@@ -46,6 +46,7 @@ pub mod protection;
 pub mod repair_bookmarks;
 pub mod revisions;
 pub mod rmd_threading;
+pub mod route_slip;
 pub mod rsids;
 pub mod saved_by;
 pub mod sections;

@@ -9,7 +9,7 @@ use crate::writer::ChpxFkpBuilder;
 use litchi_ole_common::object::{Editor as ObjectEditor, Targets};
 
 #[derive(Clone)]
-pub struct DocTrackedRevisionEditor {
+pub struct RevisionEditor {
     package: ObjectEditor,
     word_path: Vec<String>,
     table_path: Vec<String>,
@@ -24,7 +24,7 @@ pub struct DocTrackedRevisionEditor {
     changed: bool,
 }
 
-impl DocTrackedRevisionEditor {
+impl RevisionEditor {
     pub fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         let package =
             ObjectEditor::open(bytes, Targets::default(), limits).map_err(PackageError::from)?;
@@ -104,13 +104,13 @@ impl DocTrackedRevisionEditor {
 
     /// Lists character and PAPX property revisions, merging adjacent runs with
     /// identical metadata even when the range crosses piece boundaries.
-    pub fn revisions(&self) -> Result<Vec<DocTrackedRevision>> {
+    pub fn revisions(&self) -> Result<Vec<Revision>> {
         let mut output = Vec::new();
         for run in &self.chpx {
             let sprms = strict_sprms(&run.grpprl)?;
             for (kind, flag, author_op, time_op, reason_op, rsid_op) in [
                 (
-                    DocTrackedRevisionKind::Insertion,
+                    RevisionKind::Insertion,
                     SPRM_C_F_RMARK,
                     SPRM_C_IBST_RMARK,
                     SPRM_C_DTTM_RMARK,
@@ -118,7 +118,7 @@ impl DocTrackedRevisionEditor {
                     SPRM_C_RSID_TEXT,
                 ),
                 (
-                    DocTrackedRevisionKind::Deletion,
+                    RevisionKind::Deletion,
                     SPRM_C_F_RMARK_DEL,
                     SPRM_C_IBST_RMARK_DEL,
                     SPRM_C_DTTM_RMARK_DEL,
@@ -154,7 +154,7 @@ impl DocTrackedRevisionEditor {
                             &mut output,
                             run.start,
                             run.end,
-                            DocTrackedRevisionKind::CharacterFormatting,
+                            RevisionKind::CharacterFormatting,
                             metadata,
                         )?;
                     }
@@ -170,7 +170,7 @@ impl DocTrackedRevisionEditor {
             let sprms = strict_sprms(body)?;
             for (kind, op, rsid) in [
                 (
-                    DocTrackedRevisionKind::ParagraphFormatting,
+                    RevisionKind::ParagraphFormatting,
                     [
                         SPRM_P_PROP_RMARK,
                         SPRM_P_PROP_RMARK90,
@@ -180,7 +180,7 @@ impl DocTrackedRevisionEditor {
                     None,
                 ),
                 (
-                    DocTrackedRevisionKind::TableRowFormatting,
+                    RevisionKind::TableRowFormatting,
                     [SPRM_T_PROP_RMARK].as_slice(),
                     Some(SPRM_T_RSID),
                 ),
@@ -211,13 +211,10 @@ impl DocTrackedRevisionEditor {
         &mut self,
         cp: u32,
         text: &str,
-        kind: DocTrackedRevisionKind,
-        metadata: DocTrackedRevisionMetadata,
-    ) -> Result<DocTrackedRevision> {
-        if !matches!(
-            kind,
-            DocTrackedRevisionKind::Insertion | DocTrackedRevisionKind::MoveTo
-        ) {
+        kind: RevisionKind,
+        metadata: RevisionMetadata,
+    ) -> Result<Revision> {
+        if !matches!(kind, RevisionKind::Insertion | RevisionKind::MoveTo) {
             return Err(corrupted(
                 "add_text requires an insertion or move-to revision",
             ));
@@ -278,9 +275,9 @@ impl DocTrackedRevisionEditor {
         &mut self,
         start_cp: u32,
         end_cp: u32,
-        kind: DocTrackedRevisionKind,
-        metadata: DocTrackedRevisionMetadata,
-    ) -> Result<DocTrackedRevision> {
+        kind: RevisionKind,
+        metadata: RevisionMetadata,
+    ) -> Result<Revision> {
         validate_range(start_cp, end_cp, self.main_ccp)?;
         validate_metadata(kind, &metadata)?;
         let mut candidate = self.clone();
@@ -293,11 +290,7 @@ impl DocTrackedRevisionEditor {
     }
 
     /// Replaces revision metadata without touching unrelated formatting SPRMs.
-    pub fn update(
-        &mut self,
-        index: usize,
-        metadata: DocTrackedRevisionMetadata,
-    ) -> Result<DocTrackedRevision> {
+    pub fn update(&mut self, index: usize, metadata: RevisionMetadata) -> Result<Revision> {
         let revision = self
             .revisions()?
             .get(index)
@@ -318,7 +311,7 @@ impl DocTrackedRevisionEditor {
     }
 
     /// Removes a mark while retaining its text/current formatting.
-    pub fn remove(&mut self, index: usize) -> Result<DocTrackedRevision> {
+    pub fn remove(&mut self, index: usize) -> Result<Revision> {
         let revision = self
             .revisions()?
             .get(index)
@@ -332,7 +325,7 @@ impl DocTrackedRevisionEditor {
     }
 
     /// Accepts a revision using Word redline semantics.
-    pub fn accept(&mut self, index: usize) -> Result<DocTrackedRevision> {
+    pub fn accept(&mut self, index: usize) -> Result<Revision> {
         let revision = self
             .revisions()?
             .get(index)
@@ -340,7 +333,7 @@ impl DocTrackedRevisionEditor {
             .ok_or_else(|| corrupted("revision index is out of range"))?;
         if matches!(
             revision.kind,
-            DocTrackedRevisionKind::Deletion | DocTrackedRevisionKind::MoveFrom
+            RevisionKind::Deletion | RevisionKind::MoveFrom
         ) {
             self.delete_revision_text(&revision)?;
         } else {
@@ -350,7 +343,7 @@ impl DocTrackedRevisionEditor {
     }
 
     /// Rejects a revision using Word redline semantics.
-    pub fn reject(&mut self, index: usize) -> Result<DocTrackedRevision> {
+    pub fn reject(&mut self, index: usize) -> Result<Revision> {
         let revision = self
             .revisions()?
             .get(index)
@@ -358,14 +351,14 @@ impl DocTrackedRevisionEditor {
             .ok_or_else(|| corrupted("revision index is out of range"))?;
         if matches!(
             revision.kind,
-            DocTrackedRevisionKind::Insertion | DocTrackedRevisionKind::MoveTo
+            RevisionKind::Insertion | RevisionKind::MoveTo
         ) {
             self.delete_revision_text(&revision)?;
         } else if matches!(
             revision.kind,
-            DocTrackedRevisionKind::CharacterFormatting
-                | DocTrackedRevisionKind::ParagraphFormatting
-                | DocTrackedRevisionKind::TableRowFormatting
+            RevisionKind::CharacterFormatting
+                | RevisionKind::ParagraphFormatting
+                | RevisionKind::TableRowFormatting
         ) {
             let mut candidate = self.clone();
             candidate.reject_formatting_revision(&revision)?;
@@ -381,7 +374,7 @@ impl DocTrackedRevisionEditor {
         self.package.finish().map_err(PackageError::from)
     }
 
-    fn delete_revision_text(&mut self, revision: &DocTrackedRevision) -> Result<()> {
+    fn delete_revision_text(&mut self, revision: &Revision) -> Result<()> {
         self.reject_destructive_interactions(revision.start_cp, revision.end_cp)?;
         let mut candidate = self.clone();
         delete_piece_range(&mut candidate.pieces, revision.start_cp, revision.end_cp)?;
@@ -419,23 +412,22 @@ impl DocTrackedRevisionEditor {
         &mut self,
         start: u32,
         end: u32,
-        kind: DocTrackedRevisionKind,
-        replacement: Option<(u16, &DocTrackedRevisionMetadata)>,
+        kind: RevisionKind,
+        replacement: Option<(u16, &RevisionMetadata)>,
     ) -> Result<()> {
         let intervals = self.fc_intervals(start, end)?;
         match kind {
-            DocTrackedRevisionKind::Insertion
-            | DocTrackedRevisionKind::Deletion
-            | DocTrackedRevisionKind::MoveFrom
-            | DocTrackedRevisionKind::MoveTo
-            | DocTrackedRevisionKind::CharacterFormatting => {
+            RevisionKind::Insertion
+            | RevisionKind::Deletion
+            | RevisionKind::MoveFrom
+            | RevisionKind::MoveTo
+            | RevisionKind::CharacterFormatting => {
                 split_transform_chpx(&mut self.chpx, &intervals, |grp| {
                     replace_revision_sprms(grp, kind, replacement)
                 })?;
                 self.rewrite_chpx()?;
             },
-            DocTrackedRevisionKind::ParagraphFormatting
-            | DocTrackedRevisionKind::TableRowFormatting => {
+            RevisionKind::ParagraphFormatting | RevisionKind::TableRowFormatting => {
                 split_transform_papx(&mut self.papx, &intervals, |grp| {
                     replace_papx_revision_sprms(grp, kind, replacement)
                 })?;
@@ -450,20 +442,20 @@ impl DocTrackedRevisionEditor {
         Ok(())
     }
 
-    fn reject_formatting_revision(&mut self, revision: &DocTrackedRevision) -> Result<()> {
+    fn reject_formatting_revision(&mut self, revision: &Revision) -> Result<()> {
         let intervals = self.fc_intervals(revision.start_cp, revision.end_cp)?;
         match revision.kind {
-            DocTrackedRevisionKind::CharacterFormatting => {
+            RevisionKind::CharacterFormatting => {
                 split_transform_chpx(&mut self.chpx, &intervals, |grp| {
                     restore_before_wall(
                         grp,
                         SPRM_C_WALL,
-                        &revision_opcodes(DocTrackedRevisionKind::CharacterFormatting, true),
+                        &revision_opcodes(RevisionKind::CharacterFormatting, true),
                     )
                 })?;
                 self.rewrite_chpx()
             },
-            DocTrackedRevisionKind::ParagraphFormatting => {
+            RevisionKind::ParagraphFormatting => {
                 split_transform_papx(&mut self.papx, &intervals, |grp| {
                     let style = grp
                         .get(..2)
@@ -472,13 +464,13 @@ impl DocTrackedRevisionEditor {
                     restored.extend_from_slice(&restore_before_wall(
                         &grp[2..],
                         SPRM_P_WALL,
-                        &revision_opcodes(DocTrackedRevisionKind::ParagraphFormatting, true),
+                        &revision_opcodes(RevisionKind::ParagraphFormatting, true),
                     )?);
                     Ok(restored)
                 })?;
                 self.rewrite_papx()
             },
-            DocTrackedRevisionKind::TableRowFormatting => {
+            RevisionKind::TableRowFormatting => {
                 split_transform_papx(&mut self.papx, &intervals, |grp| {
                     let style = grp
                         .get(..2)
@@ -487,7 +479,7 @@ impl DocTrackedRevisionEditor {
                     restored.extend_from_slice(&restore_before_wall(
                         &grp[2..],
                         SPRM_T_WALL,
-                        &revision_opcodes(DocTrackedRevisionKind::TableRowFormatting, true),
+                        &revision_opcodes(RevisionKind::TableRowFormatting, true),
                     )?);
                     Ok(restored)
                 })?;
@@ -524,10 +516,10 @@ impl DocTrackedRevisionEditor {
 
     fn push_fc_revision(
         &self,
-        output: &mut Vec<DocTrackedRevision>,
+        output: &mut Vec<Revision>,
         fc_start: u32,
         fc_end: u32,
-        kind: DocTrackedRevisionKind,
+        kind: RevisionKind,
         metadata: ParsedMetadata,
     ) -> Result<()> {
         for piece in &self.pieces {
@@ -553,12 +545,7 @@ impl DocTrackedRevisionEditor {
         Ok(())
     }
 
-    fn find_exact(
-        &self,
-        start: u32,
-        end: u32,
-        kind: DocTrackedRevisionKind,
-    ) -> Result<DocTrackedRevision> {
+    fn find_exact(&self, start: u32, end: u32, kind: RevisionKind) -> Result<Revision> {
         self.revisions()?
             .into_iter()
             .find(|r| {
@@ -567,13 +554,8 @@ impl DocTrackedRevisionEditor {
                     && (r.kind == kind
                         || matches!(
                             (r.kind, kind),
-                            (
-                                DocTrackedRevisionKind::Insertion,
-                                DocTrackedRevisionKind::MoveTo
-                            ) | (
-                                DocTrackedRevisionKind::Deletion,
-                                DocTrackedRevisionKind::MoveFrom
-                            )
+                            (RevisionKind::Insertion, RevisionKind::MoveTo)
+                                | (RevisionKind::Deletion, RevisionKind::MoveFrom)
                         ))
             })
             .ok_or_else(|| corrupted("authored revision was not discoverable"))

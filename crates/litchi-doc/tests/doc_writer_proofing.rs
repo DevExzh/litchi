@@ -1,6 +1,6 @@
 use litchi_doc::{
-    DocWriter, Package, ProofingEntry, ProofingFeature, ProofingState, ProofingStateTable,
-    ProofingStatus, ProofingTables,
+    Package, ProofingEntry, ProofingFeature, ProofingState, ProofingStateTable, ProofingStatus,
+    ProofingTables, Writer,
 };
 use std::io::Cursor;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -89,7 +89,7 @@ fn assert_authored_tables(package: &mut Package<Cursor<Vec<u8>>>, expected: &Pro
 #[test]
 fn spelling_and_grammar_tables_round_trip_through_write_to() {
     let expected = proofing_tables();
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("alpha beta").unwrap();
     writer.set_proofing_tables(expected.clone());
 
@@ -110,7 +110,7 @@ fn spelling_and_grammar_tables_round_trip_through_write_to() {
 #[test]
 fn proofing_tables_round_trip_through_file_save_and_can_be_cleared() {
     let expected = proofing_tables();
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("alpha beta").unwrap();
     writer.set_proofing_tables(expected.clone());
     let removed = writer
@@ -144,7 +144,7 @@ fn output_rejects_out_of_document_proofing_cps_before_writing() {
     )
     .unwrap();
 
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("x").unwrap();
     writer.set_proofing_table(table);
 

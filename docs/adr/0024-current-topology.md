@@ -106,6 +106,16 @@ surface remains prefix-free within each format context: DOC exports concise
 `Leniency`, `ToleranceReport`, `StylesheetDefect`, `EncryptionProfile`,
 `Element`, and `Section` names without compatibility aliases.
 
+The DOC writer facade now exports contextual `Writer`, `WriteError`,
+`HeaderKind`, `Picture`, `SmartTagEntry`, `StyleRevision`, and
+`StyleWriteError`; writer-only `StyleDefinition` remains under
+`litchi_doc::writer` because the root reader facade already owns that name.
+Tracked revisions, MTEF equation options, text boxes, and small writer I/O
+errors use the same prefix-free rule. DOC also has a nested
+`parts/route_slip` owner for typed, lossless MS-DOC routing-slip metadata; its
+FIB/table-stream parser and serializer are exposed without claiming Document
+lifecycle integration or protection-policy enforcement.
+
 ## ODF
 
 [`litchi-odf-common`](../../crates/litchi-odf-common/Cargo.toml) is the shared

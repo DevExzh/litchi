@@ -32,7 +32,7 @@ pub struct TextBoxEntry {
 
 /// A text box in a Word document: its shape and plain-text content.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DocTextBox {
+pub struct TextBox {
     /// Shape identifier; matches the `spid` of the shape's OfficeArtFSP and
     /// the `lid` of the shape's Spa.
     pub shape_id: u32,

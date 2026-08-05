@@ -1,10 +1,10 @@
 //! Round-trip tests for the DOC inline picture writer.
 //!
-//! Writes a new .doc with PNG and JPEG pictures via `DocWriter::insert_picture`
+//! Writes a new .doc with PNG and JPEG pictures via `Writer::insert_picture`
 //! and re-opens it with the crate's own DOC reader, asserting image count,
 //! format, dimensions, and byte-identity of the embedded payloads.
 use litchi_doc::image::PictureFields;
-use litchi_doc::writer::{DocPicture, DocWriter, FloatingPosition, PictureKind};
+use litchi_doc::writer::{FloatingPosition, Picture, PictureKind, Writer};
 use litchi_doc::{Package, Run, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin};
 use litchi_odraw::image::Kind as BlipKind;
 use std::io::{Cursor, Write};
@@ -96,13 +96,13 @@ fn picture_runs(document: &litchi_doc::Document) -> Vec<Run> {
 
 #[test]
 fn doc_picture_new_sniffs_format_and_dimensions() {
-    let png = DocPicture::new(make_png(32, 16)).unwrap();
+    let png = Picture::new(make_png(32, 16)).unwrap();
     assert_eq!(png.kind(), PictureKind::Png);
     // 96 DPI: 32 px * 1440 twips/inch / 96 dpi = 480 twips.
     assert_eq!(png.width_twips(), 480);
     assert_eq!(png.height_twips(), 240);
 
-    let jpeg = DocPicture::new(jpeg_fixture()).unwrap();
+    let jpeg = Picture::new(jpeg_fixture()).unwrap();
     assert_eq!(jpeg.kind(), PictureKind::Jpeg);
     assert!(jpeg.width_twips() > 0);
     assert!(jpeg.height_twips() > 0);
@@ -112,14 +112,14 @@ fn doc_picture_new_sniffs_format_and_dimensions() {
 fn png_and_jpeg_pictures_round_trip_through_doc_reader() {
     let png_bytes = make_png(32, 16);
     let jpeg_bytes = jpeg_fixture();
-    let png_picture = DocPicture::new(png_bytes.clone()).unwrap();
-    let jpeg_picture = DocPicture::new(jpeg_bytes.clone()).unwrap();
+    let png_picture = Picture::new(png_bytes.clone()).unwrap();
+    let jpeg_picture = Picture::new(jpeg_bytes.clone()).unwrap();
     let expected_dims = [
         (png_picture.width_twips(), png_picture.height_twips()),
         (jpeg_picture.width_twips(), jpeg_picture.height_twips()),
     ];
 
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("before pictures").unwrap();
     writer.insert_picture(png_picture).unwrap();
     writer.insert_picture(jpeg_picture).unwrap();
@@ -187,11 +187,11 @@ fn native_officeart_picture_family_round_trips_without_reencoding() {
             (1440, 720),
         ),
     ];
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     let mut expected = Vec::new();
     for (name, format, blip_type, dimensions) in fixtures {
         let bytes = hex_fixture(name);
-        let picture = DocPicture::new(bytes.clone())
+        let picture = Picture::new(bytes.clone())
             .unwrap_or_else(|error| panic!("{name} failed validation: {error}"));
         assert_eq!(picture.kind(), format);
         assert_eq!((picture.width_twips(), picture.height_twips()), dimensions);
@@ -222,20 +222,19 @@ fn bmp_is_normalized_to_dib_and_explicit_formats_are_validated() {
     bmp.extend_from_slice(&54u32.to_le_bytes());
     bmp.extend_from_slice(&dib);
 
-    let picture = DocPicture::new(bmp).unwrap();
+    let picture = Picture::new(bmp).unwrap();
     assert_eq!(picture.kind(), PictureKind::Dib);
     assert_eq!(picture.data(), dib);
     assert!(
-        DocPicture::from_parts_as(hex_fixture("tiff-2x3.hex"), PictureKind::Png, 100, 100,)
-            .is_err()
+        Picture::from_parts_as(hex_fixture("tiff-2x3.hex"), PictureKind::Png, 100, 100,).is_err()
     );
-    assert!(DocPicture::from_parts(b"BM\0\0".to_vec(), 100, 100).is_err());
-    assert!(DocPicture::from_parts(vec![0xD7, 0xCD, 0xC6, 0x9A], 100, 100).is_err());
+    assert!(Picture::from_parts(b"BM\0\0".to_vec(), 100, 100).is_err());
+    assert!(Picture::from_parts(vec![0xD7, 0xCD, 0xC6, 0x9A], 100, 100).is_err());
 }
 
 #[test]
 fn document_without_pictures_keeps_empty_data_stream() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("plain text").unwrap();
 
     let mut cursor = Cursor::new(Vec::new());
@@ -253,11 +252,11 @@ fn document_without_pictures_keeps_empty_data_stream() {
 const FLOATING_ANCHOR_CP: u32 = 18;
 
 fn write_doc_with_inline_and_floating(jpeg_bytes: &[u8]) -> (Vec<u8>, u32, u32) {
-    let png_picture = DocPicture::new(make_png(32, 16)).unwrap();
-    let jpeg_picture = DocPicture::new(jpeg_bytes.to_vec()).unwrap();
+    let png_picture = Picture::new(make_png(32, 16)).unwrap();
+    let jpeg_picture = Picture::new(jpeg_bytes.to_vec()).unwrap();
     let floating_dims = (jpeg_picture.width_twips(), jpeg_picture.height_twips());
 
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("before pictures").unwrap();
     writer.insert_picture(png_picture).unwrap();
     writer

@@ -1,12 +1,10 @@
-use litchi_doc::tracked_revision::Limits;
-use litchi_doc::writer::{CharacterFormatting, DocWriter, ParagraphFormatting, TextRevision};
-use litchi_doc::{
-    DocTrackedRevisionEditor, DocTrackedRevisionKind, DocTrackedRevisionMetadata, Package,
-};
+use litchi_doc::Package;
+use litchi_doc::tracked_revision::{Limits, RevisionEditor, RevisionKind, RevisionMetadata};
+use litchi_doc::writer::{CharacterFormatting, ParagraphFormatting, TextRevision, Writer};
 use std::io::Cursor;
 
 fn base_doc() -> Vec<u8> {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer
         .add_paragraph_runs(
             vec![
@@ -32,20 +30,20 @@ fn base_doc() -> Vec<u8> {
 
 #[test]
 fn lists_authors_and_mutates_insertions_and_deletions_transactionally() {
-    let mut editor = DocTrackedRevisionEditor::open(base_doc(), Limits::default()).unwrap();
+    let mut editor = RevisionEditor::open(base_doc(), Limits::default()).unwrap();
     assert!(editor.authors().contains(&"Existing".to_string()));
     let deletion = editor
         .revisions()
         .unwrap()
         .into_iter()
-        .find(|r| r.kind == DocTrackedRevisionKind::Deletion)
+        .find(|r| r.kind == RevisionKind::Deletion)
         .unwrap();
     let insertion = editor
         .add_text(
             0,
             "new ",
-            DocTrackedRevisionKind::Insertion,
-            DocTrackedRevisionMetadata::new("Alice").with_revision_save_id(9),
+            RevisionKind::Insertion,
+            RevisionMetadata::new("Alice").with_revision_save_id(9),
         )
         .unwrap();
     assert_eq!((insertion.start_cp, insertion.end_cp), (0, 4));
@@ -79,20 +77,20 @@ fn lists_authors_and_mutates_insertions_and_deletions_transactionally() {
 
 #[test]
 fn accepts_deletion_rejects_insertion_and_pairs_moves_by_rsid() {
-    let mut editor = DocTrackedRevisionEditor::open(base_doc(), Limits::default()).unwrap();
+    let mut editor = RevisionEditor::open(base_doc(), Limits::default()).unwrap();
     let deletion_index = editor
         .revisions()
         .unwrap()
         .iter()
-        .position(|r| r.kind == DocTrackedRevisionKind::Deletion)
+        .position(|r| r.kind == RevisionKind::Deletion)
         .unwrap();
     editor.accept(deletion_index).unwrap();
     editor
         .add_text(
             0,
             "temporary",
-            DocTrackedRevisionKind::Insertion,
-            DocTrackedRevisionMetadata::new("Alice"),
+            RevisionKind::Insertion,
+            RevisionMetadata::new("Alice"),
         )
         .unwrap();
     let insertion_index = editor
@@ -111,22 +109,22 @@ fn accepts_deletion_rejects_insertion_and_pairs_moves_by_rsid() {
 
 #[test]
 fn shared_rsid_exposes_binary_insertion_and_deletion_as_a_move_pair() {
-    let mut editor = DocTrackedRevisionEditor::open(base_doc(), Limits::default()).unwrap();
-    let metadata = DocTrackedRevisionMetadata::new("Mover").with_revision_save_id(0xAABBCCDD);
+    let mut editor = RevisionEditor::open(base_doc(), Limits::default()).unwrap();
+    let metadata = RevisionMetadata::new("Mover").with_revision_save_id(0xAABBCCDD);
     editor
-        .add(0, 4, DocTrackedRevisionKind::MoveFrom, metadata.clone())
+        .add(0, 4, RevisionKind::MoveFrom, metadata.clone())
         .unwrap();
     editor
-        .add_text(0, "kept", DocTrackedRevisionKind::MoveTo, metadata)
+        .add_text(0, "kept", RevisionKind::MoveTo, metadata)
         .unwrap();
     let revisions = editor.revisions().unwrap();
     let from = revisions
         .iter()
-        .find(|r| r.kind == DocTrackedRevisionKind::MoveFrom)
+        .find(|r| r.kind == RevisionKind::MoveFrom)
         .unwrap();
     let to = revisions
         .iter()
-        .find(|r| r.kind == DocTrackedRevisionKind::MoveTo)
+        .find(|r| r.kind == RevisionKind::MoveTo)
         .unwrap();
     assert_eq!(from.move_pair_id, Some(0xAABBCCDD));
     assert_eq!(to.move_pair_id, from.move_pair_id);
@@ -134,15 +132,15 @@ fn shared_rsid_exposes_binary_insertion_and_deletion_as_a_move_pair() {
 
 #[test]
 fn malformed_ranges_controls_and_failed_updates_roll_back() {
-    let mut editor = DocTrackedRevisionEditor::open(base_doc(), Limits::default()).unwrap();
+    let mut editor = RevisionEditor::open(base_doc(), Limits::default()).unwrap();
     let before = editor.revisions().unwrap();
     assert!(
         editor
             .add_text(
                 0,
                 "\u{13} MACROBUTTON",
-                DocTrackedRevisionKind::Insertion,
-                DocTrackedRevisionMetadata::new("Mallory")
+                RevisionKind::Insertion,
+                RevisionMetadata::new("Mallory")
             )
             .is_err()
     );
@@ -151,17 +149,14 @@ fn malformed_ranges_controls_and_failed_updates_roll_back() {
             .add(
                 20_000,
                 20_001,
-                DocTrackedRevisionKind::Deletion,
-                DocTrackedRevisionMetadata::new("Mallory")
+                RevisionKind::Deletion,
+                RevisionMetadata::new("Mallory")
             )
             .is_err()
     );
     assert!(
         editor
-            .update(
-                0,
-                DocTrackedRevisionMetadata::new("Mallory").with_reason(0x2c)
-            )
+            .update(0, RevisionMetadata::new("Mallory").with_reason(0x2c))
             .is_err()
     );
     assert_eq!(editor.revisions().unwrap(), before);
@@ -177,7 +172,7 @@ fn bundled_word_and_libreoffice_redline_fixtures_are_strictly_gated() {
     ];
     for path in fixtures {
         let original = std::fs::read(&path).unwrap();
-        match DocTrackedRevisionEditor::open(original.clone(), Limits::default()) {
+        match RevisionEditor::open(original.clone(), Limits::default()) {
             Ok(editor) => {
                 let _ = editor.revisions().unwrap();
                 assert_eq!(std::fs::read(&path).unwrap(), original);

@@ -1,10 +1,10 @@
 //! Minimal DOC file test - single paragraph only
 
-use litchi_doc::writer::DocWriter;
+use litchi_doc::writer::Writer;
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("Hello World")?;
     writer.save("output/doc_minimal.doc")?;
     println!("✅ Minimal DOC saved to output/doc_minimal.doc");

@@ -1,6 +1,6 @@
 //! Typed authoring for legacy Word smart tags and recognizer-state ranges.
 
-use super::core::DocWriteError;
+use super::core::WriteError;
 use crate::{SmartTagOrigin, SmartTagRecognizerRange, SmartTagRecognizerState};
 use litchi_codepage::Ansi;
 use litchi_ole_common::smart_tags::{
@@ -12,7 +12,7 @@ const MAX_SMART_TAGS: usize = 0x7ff0;
 
 /// One smart-tag bookmark to embed in a generated DOC file.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DocSmartTagEntry {
+pub struct SmartTagEntry {
     pub start: u32,
     pub end: u32,
     pub namespace_uri: String,
@@ -25,7 +25,7 @@ pub struct DocSmartTagEntry {
     pub properties: Vec<(String, String)>,
 }
 
-impl DocSmartTagEntry {
+impl SmartTagEntry {
     /// Create a smart tag with an empty property bag.
     pub fn new(
         start: u32,
@@ -105,10 +105,10 @@ struct DepthEvents {
 }
 
 pub(crate) fn build_tables(
-    entries: &[DocSmartTagEntry],
+    entries: &[SmartTagEntry],
     recognizer_ranges: &[SmartTagRecognizerRange],
     document_end: u32,
-) -> Result<SmartTagTableData, DocWriteError> {
+) -> Result<SmartTagTableData, WriteError> {
     if entries.len() > MAX_SMART_TAGS {
         return invalid("DOC smart-tag table exceeds 0x7FF0 entries");
     }
@@ -158,7 +158,7 @@ pub(crate) fn build_tables(
     })
 }
 
-fn validate_entry(entry: &DocSmartTagEntry, document_end: u32) -> Result<(), DocWriteError> {
+fn validate_entry(entry: &SmartTagEntry, document_end: u32) -> Result<(), WriteError> {
     if entry.start > entry.end || entry.end > document_end {
         return invalid("DOC smart-tag range must be ordered and inside the document parts");
     }
@@ -185,24 +185,24 @@ fn validate_entry(entry: &DocSmartTagEntry, document_end: u32) -> Result<(), Doc
 
 fn calculate_depths(
     events: BTreeMap<u32, DepthEvents>,
-) -> Result<BTreeMap<u32, (u16, u16)>, DocWriteError> {
+) -> Result<BTreeMap<u32, (u16, u16)>, WriteError> {
     let mut active = 0usize;
     let mut depths = BTreeMap::new();
     for (cp, event) in events {
         active = active
             .checked_sub(event.ends)
-            .ok_or_else(|| DocWriteError::InvalidData("smart-tag depth underflow".to_string()))?;
+            .ok_or_else(|| WriteError::InvalidData("smart-tag depth underflow".to_string()))?;
         active = active
             .checked_add(event.starts)
-            .ok_or_else(|| DocWriteError::InvalidData("smart-tag depth overflow".to_string()))?;
+            .ok_or_else(|| WriteError::InvalidData("smart-tag depth overflow".to_string()))?;
         let start = active
             .checked_add(event.empty)
             .and_then(|value| u16::try_from(value).ok())
             .ok_or_else(|| {
-                DocWriteError::InvalidData("smart-tag start depth exceeds 0xFFFF".to_string())
+                WriteError::InvalidData("smart-tag start depth exceeds 0xFFFF".to_string())
             })?;
         let end = u16::try_from(active).map_err(|_| {
-            DocWriteError::InvalidData("smart-tag end depth exceeds 0xFFFF".to_string())
+            WriteError::InvalidData("smart-tag end depth exceeds 0xFFFF".to_string())
         })?;
         depths.insert(cp, (start, end));
     }
@@ -212,12 +212,9 @@ fn calculate_depths(
     Ok(depths)
 }
 
-fn build_infos(
-    entries: &[DocSmartTagEntry],
-    start_order: &[usize],
-) -> Result<Vec<u8>, DocWriteError> {
+fn build_infos(entries: &[SmartTagEntry], start_order: &[usize]) -> Result<Vec<u8>, WriteError> {
     let count = u16::try_from(start_order.len())
-        .map_err(|_| DocWriteError::InvalidData("smart-tag count exceeds u16".to_string()))?;
+        .map_err(|_| WriteError::InvalidData("smart-tag count exceeds u16".to_string()))?;
     let mut output = Vec::with_capacity(6 + start_order.len() * 14);
     output.extend_from_slice(&0xffffu16.to_le_bytes());
     output.extend_from_slice(&count.to_le_bytes());
@@ -233,12 +230,12 @@ fn build_infos(
 }
 
 fn build_starts(
-    entries: &[DocSmartTagEntry],
+    entries: &[SmartTagEntry],
     start_order: &[usize],
     end_indexes: &HashMap<usize, u16>,
     depths: &BTreeMap<u32, (u16, u16)>,
     document_end: u32,
-) -> Result<Vec<u8>, DocWriteError> {
+) -> Result<Vec<u8>, WriteError> {
     let mut output = Vec::with_capacity(4 + start_order.len() * 10);
     for &index in start_order {
         output.extend_from_slice(&entries[index].start.to_le_bytes());
@@ -250,7 +247,7 @@ fn build_starts(
             &end_indexes
                 .get(&index)
                 .ok_or_else(|| {
-                    DocWriteError::InvalidData("smart-tag end index is missing".to_string())
+                    WriteError::InvalidData("smart-tag end index is missing".to_string())
                 })?
                 .to_le_bytes(),
         );
@@ -259,7 +256,7 @@ fn build_starts(
             &depths
                 .get(&entry.start)
                 .ok_or_else(|| {
-                    DocWriteError::InvalidData("smart-tag start depth is missing".to_string())
+                    WriteError::InvalidData("smart-tag start depth is missing".to_string())
                 })?
                 .0
                 .to_le_bytes(),
@@ -269,12 +266,12 @@ fn build_starts(
 }
 
 fn build_ends(
-    entries: &[DocSmartTagEntry],
+    entries: &[SmartTagEntry],
     end_order: &[usize],
     start_indexes: &HashMap<usize, u16>,
     depths: &BTreeMap<u32, (u16, u16)>,
     document_end: u32,
-) -> Result<Vec<u8>, DocWriteError> {
+) -> Result<Vec<u8>, WriteError> {
     let mut output = Vec::with_capacity(4 + end_order.len() * 8);
     for &index in end_order {
         output.extend_from_slice(&entries[index].end.to_le_bytes());
@@ -286,7 +283,7 @@ fn build_ends(
             &start_indexes
                 .get(&index)
                 .ok_or_else(|| {
-                    DocWriteError::InvalidData("smart-tag start index is missing".to_string())
+                    WriteError::InvalidData("smart-tag start index is missing".to_string())
                 })?
                 .to_le_bytes(),
         );
@@ -294,7 +291,7 @@ fn build_ends(
             &depths
                 .get(&entry.end)
                 .ok_or_else(|| {
-                    DocWriteError::InvalidData("smart-tag end depth is missing".to_string())
+                    WriteError::InvalidData("smart-tag end depth is missing".to_string())
                 })?
                 .1
                 .to_le_bytes(),
@@ -304,9 +301,9 @@ fn build_ends(
 }
 
 fn build_factoid_data(
-    entries: &[DocSmartTagEntry],
+    entries: &[SmartTagEntry],
     start_order: &[usize],
-) -> Result<Vec<u8>, DocWriteError> {
+) -> Result<Vec<u8>, WriteError> {
     let mut type_ids = HashMap::<(&str, &str, &str), u16>::new();
     let mut types = Vec::new();
     let mut string_indexes = HashMap::<&str, u32>::new();
@@ -324,7 +321,7 @@ fn build_factoid_data(
             *id
         } else {
             let id = u16::try_from(types.len() + 1).map_err(|_| {
-                DocWriteError::InvalidData("DOC smart-tag type count exceeds 65535".to_string())
+                WriteError::InvalidData("DOC smart-tag type count exceeds 65535".to_string())
             })?;
             type_ids.insert(type_key, id);
             types.push(Type {
@@ -356,19 +353,19 @@ fn build_factoid_data(
         strings,
     }
     .to_bytes_with_bags(&bags)
-    .map_err(|error| DocWriteError::InvalidData(error.to_string()))
+    .map_err(|error| WriteError::InvalidData(error.to_string()))
 }
 
 fn intern_string<'a>(
     value: &'a str,
     indexes: &mut HashMap<&'a str, u32>,
     strings: &mut Vec<PropertyBagString>,
-) -> Result<u32, DocWriteError> {
+) -> Result<u32, WriteError> {
     if let Some(index) = indexes.get(value) {
         return Ok(*index);
     }
     let index = u32::try_from(strings.len()).map_err(|_| {
-        DocWriteError::InvalidData("DOC smart-tag string table exceeds u32".to_string())
+        WriteError::InvalidData("DOC smart-tag string table exceeds u32".to_string())
     })?;
     indexes.insert(value, index);
     strings.push(unicode_string(value));
@@ -385,7 +382,7 @@ fn unicode_string(value: &str) -> PropertyBagString {
 fn build_recognizer_ranges(
     ranges: &[SmartTagRecognizerRange],
     document_end: u32,
-) -> Result<Option<Vec<u8>>, DocWriteError> {
+) -> Result<Option<Vec<u8>>, WriteError> {
     if ranges.is_empty() {
         return Ok(None);
     }
@@ -412,7 +409,7 @@ fn build_recognizer_ranges(
     Ok(Some(output))
 }
 
-fn bkc(entry: &DocSmartTagEntry) -> Result<u16, DocWriteError> {
+fn bkc(entry: &SmartTagEntry) -> Result<u16, WriteError> {
     let mut value = u16::from(entry.is_native) << 14;
     if let Some((first, limit)) = entry.column_range {
         if first >= limit || first > 0x7f || limit > 0x3f {
@@ -442,8 +439,8 @@ const fn recognizer_state_code(state: SmartTagRecognizerState) -> u16 {
     }
 }
 
-fn invalid<T>(message: impl Into<String>) -> Result<T, DocWriteError> {
-    Err(DocWriteError::InvalidData(message.into()))
+fn invalid<T>(message: impl Into<String>) -> Result<T, WriteError> {
+    Err(WriteError::InvalidData(message.into()))
 }
 
 #[cfg(test)]
@@ -453,9 +450,9 @@ mod tests {
     #[test]
     fn builds_overlapping_empty_and_recognizer_tables() {
         let entries = vec![
-            DocSmartTagEntry::new(0, 10, "urn:test", "outer").with_property("a", "1"),
-            DocSmartTagEntry::new(5, 15, "urn:test", "inner").with_property("b", "2"),
-            DocSmartTagEntry::new(5, 5, "urn:test", "point"),
+            SmartTagEntry::new(0, 10, "urn:test", "outer").with_property("a", "1"),
+            SmartTagEntry::new(5, 15, "urn:test", "inner").with_property("b", "2"),
+            SmartTagEntry::new(5, 5, "urn:test", "point"),
         ];
         let ranges = vec![
             SmartTagRecognizerRange {
@@ -479,10 +476,10 @@ mod tests {
 
     #[test]
     fn rejects_invalid_ranges_columns_and_recognizer_gaps() {
-        assert!(build_tables(&[DocSmartTagEntry::new(2, 1, "u", "t")], &[], 10).is_err());
+        assert!(build_tables(&[SmartTagEntry::new(2, 1, "u", "t")], &[], 10).is_err());
         assert!(
             build_tables(
-                &[DocSmartTagEntry::new(0, 1, "u", "t").with_column_range(3, 3)],
+                &[SmartTagEntry::new(0, 1, "u", "t").with_column_range(3, 3)],
                 &[],
                 10,
             )

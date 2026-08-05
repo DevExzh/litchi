@@ -6,10 +6,10 @@
 //! resolve correctly without disturbing the main stories.
 use litchi_doc::parts::headers::HeaderFooterType;
 use litchi_doc::shape::{extract_drawing_shapes, extract_shape_text};
-use litchi_doc::writer::{DocWriter, FloatingPosition};
+use litchi_doc::writer::{FloatingPosition, Writer};
 use litchi_doc::writer::{Kind as DrawingKind, Shape as DrawingShape};
 use litchi_doc::{
-    DocHeaderKind, HeaderFooterParagraph, Package, ShapeHorizontalOrigin, ShapeTextWrap,
+    HeaderFooterParagraph, HeaderKind, Package, ShapeHorizontalOrigin, ShapeTextWrap,
     ShapeVerticalOrigin,
 };
 use litchi_odraw::{Record, shape::Kind};
@@ -22,7 +22,7 @@ const HEADER_BOX_SPID: u32 = 2049;
 const MAIN_BOX_SPID: u32 = 1025;
 
 fn write_doc_with_header_text_box() -> Vec<u8> {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("Body text").unwrap();
     writer
         .set_odd_header_paragraphs(vec![HeaderFooterParagraph::plain("LETTERHEAD")])
@@ -38,7 +38,7 @@ fn write_doc_with_header_text_box() -> Vec<u8> {
     // Header text box (the watermark).
     writer
         .insert_header_text_box(
-            DocHeaderKind::Odd,
+            HeaderKind::Odd,
             DrawingShape::new(DrawingKind::Rectangle, 4000, 2000)
                 .unwrap()
                 .with_fill(0xEE, 0xEE, 0xFF)
@@ -174,7 +174,7 @@ fn header_text_box_writes_two_drawing_layers() {
 
 #[test]
 fn document_with_header_but_no_boxes_has_empty_header_story_tables() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("plain").unwrap();
     writer.set_odd_header("just a header");
 

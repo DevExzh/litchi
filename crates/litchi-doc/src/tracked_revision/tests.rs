@@ -1,10 +1,10 @@
 //! Focused regression tests for the tracked-revision semantic layer.
 
-use super::{DocTrackedRevisionKind, DocTrackedRevisionMetadata};
+use super::{RevisionKind, RevisionMetadata};
 
 #[test]
 fn metadata_builder_is_composable() {
-    let metadata = DocTrackedRevisionMetadata::new("Alice")
+    let metadata = RevisionMetadata::new("Alice")
         .with_reason(0x2b)
         .with_revision_save_id(42);
 
@@ -16,9 +16,9 @@ fn metadata_builder_is_composable() {
 
 #[test]
 fn revision_kinds_are_copyable_and_distinct() {
-    let insertion = DocTrackedRevisionKind::Insertion;
+    let insertion = RevisionKind::Insertion;
     let deletion = insertion;
 
     assert_eq!(insertion, deletion);
-    assert_ne!(insertion, DocTrackedRevisionKind::Deletion);
+    assert_ne!(insertion, RevisionKind::Deletion);
 }

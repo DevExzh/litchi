@@ -1,6 +1,6 @@
 //! Legacy Word spelling and grammar proofing PLCF authoring.
 
-use super::core::DocWriteError;
+use super::core::WriteError;
 use super::fib::FibBuilder;
 use crate::{ProofingStateTable, ProofingTables};
 
@@ -11,16 +11,16 @@ struct SerializedProofingTables {
 }
 
 impl SerializedProofingTables {
-    fn build(tables: &ProofingTables, maximum_cp: u32) -> Result<Self, DocWriteError> {
+    fn build(tables: &ProofingTables, maximum_cp: u32) -> Result<Self, WriteError> {
         fn serialize(
             table: Option<&ProofingStateTable>,
             maximum_cp: u32,
-        ) -> Result<Option<Vec<u8>>, DocWriteError> {
+        ) -> Result<Option<Vec<u8>>, WriteError> {
             table
                 .map(|table| {
                     table
                         .to_bytes_for_document(maximum_cp)
-                        .map_err(|error| DocWriteError::InvalidData(error.to_string()))
+                        .map_err(|error| WriteError::InvalidData(error.to_string()))
                 })
                 .transpose()
         }
@@ -32,22 +32,22 @@ impl SerializedProofingTables {
     }
 }
 
-fn checked_length(data: &[u8]) -> Result<u32, DocWriteError> {
+fn checked_length(data: &[u8]) -> Result<u32, WriteError> {
     u32::try_from(data.len())
-        .map_err(|_| DocWriteError::InvalidData("proofing PLCF exceeds 4 GiB".into()))
+        .map_err(|_| WriteError::InvalidData("proofing PLCF exceeds 4 GiB".into()))
 }
 
-fn checked_end(offset: u32, length: u32) -> Result<u32, DocWriteError> {
+fn checked_end(offset: u32, length: u32) -> Result<u32, WriteError> {
     offset
         .checked_add(length)
-        .ok_or_else(|| DocWriteError::InvalidData("DOC table offset overflows".into()))
+        .ok_or_else(|| WriteError::InvalidData("DOC table offset overflows".into()))
 }
 
-fn validate_start_offset(table_stream: &[u8], offset: u32) -> Result<(), DocWriteError> {
+fn validate_start_offset(table_stream: &[u8], offset: u32) -> Result<(), WriteError> {
     let actual_offset = u32::try_from(table_stream.len())
-        .map_err(|_| DocWriteError::InvalidData("DOC table stream exceeds 4 GiB".into()))?;
+        .map_err(|_| WriteError::InvalidData("DOC table stream exceeds 4 GiB".into()))?;
     if actual_offset != offset {
-        return Err(DocWriteError::InvalidData(
+        return Err(WriteError::InvalidData(
             "DOC table-stream offset plan is inconsistent".into(),
         ));
     }
@@ -64,7 +64,7 @@ pub(super) fn append_proofing_tables(
     tables: &ProofingTables,
     table_offset: u32,
     maximum_cp: u32,
-) -> Result<u32, DocWriteError> {
+) -> Result<u32, WriteError> {
     let serialized = SerializedProofingTables::build(tables, maximum_cp)?;
     validate_start_offset(table_stream, table_offset)?;
 

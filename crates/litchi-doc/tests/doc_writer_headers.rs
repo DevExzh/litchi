@@ -2,7 +2,7 @@ use litchi_doc::parts::fib::FileInformationBlock;
 use litchi_doc::parts::headers::HeaderFooterType;
 use litchi_doc::writer::FootnoteEntry;
 use litchi_doc::{
-    CharacterFormatting, DocWriter, HeaderFooterParagraph, Package, ParagraphFormatting,
+    CharacterFormatting, HeaderFooterParagraph, Package, ParagraphFormatting, Writer,
 };
 use std::io::Cursor;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -19,7 +19,7 @@ fn temporary_doc_path() -> std::path::PathBuf {
 
 #[test]
 fn formatted_multi_paragraph_header_round_trips_through_plcfhdd() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("Body").unwrap();
 
     let bold = CharacterFormatting {
@@ -56,7 +56,7 @@ fn formatted_multi_paragraph_header_round_trips_through_plcfhdd() {
 
 #[test]
 fn rich_header_api_rejects_ambiguous_or_unbounded_structure() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     assert!(writer.set_odd_header_paragraphs(Vec::new()).is_err());
     assert!(
         writer
@@ -98,7 +98,7 @@ fn rich_header_api_rejects_ambiguous_or_unbounded_structure() {
 
 #[test]
 fn inert_header_field_round_trips_with_structural_markers() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("Body").unwrap();
     let field = HeaderFooterParagraph::field("PAGE", "1", CharacterFormatting::default()).unwrap();
     writer.set_odd_footer_paragraphs(vec![field]).unwrap();
@@ -138,7 +138,7 @@ fn writes_header_and_note_plcfs_through_fib_pointers() {
             .collect()
     }
 
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("Main").unwrap();
     writer.add_paragraph("End").unwrap();
     writer.set_odd_header("Header");

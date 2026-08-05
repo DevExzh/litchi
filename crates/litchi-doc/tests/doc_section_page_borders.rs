@@ -1,9 +1,9 @@
 use litchi_doc::{
-    ApplyTo, Art, Border, BorderError, Borders, Color, Depth, DocWriter, Offset, Package, Style,
+    ApplyTo, Art, Border, BorderError, Borders, Color, Depth, Offset, Package, Style, Writer,
 };
 use std::io::Cursor;
 
-fn round_trip(writer: &mut DocWriter) -> litchi_doc::Section {
+fn round_trip(writer: &mut Writer) -> litchi_doc::Section {
     writer.add_paragraph("Borders").unwrap();
     let mut cursor = Cursor::new(Vec::new());
     writer.write_to(&mut cursor).unwrap();
@@ -25,10 +25,10 @@ fn border(style: Style, color: Color) -> Border {
 #[test]
 fn omitted_and_explicit_default_borders_emit_the_normative_default() {
     assert_eq!(
-        round_trip(&mut DocWriter::new()).page_borders,
+        round_trip(&mut Writer::new()).page_borders,
         Borders::default()
     );
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.set_section_page_borders(Borders::default()).unwrap();
     assert_eq!(round_trip(&mut writer).page_borders, Borders::default());
 }
@@ -51,7 +51,7 @@ fn four_edges_art_and_shared_placement_round_trip() {
         depth: Depth::Behind,
         offset_from: Offset::PageEdge,
     };
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.set_section_page_borders(expected).unwrap();
     assert_eq!(writer.section_page_borders(), Some(&expected));
     assert_eq!(round_trip(&mut writer).page_borders, expected);
@@ -63,7 +63,7 @@ fn setter_is_atomic_and_rejects_out_of_range_spacing() {
         top: Some(border(Style::Dotted, Color::Black)),
         ..Borders::default()
     };
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.set_section_page_borders(valid).unwrap();
     let invalid = Borders {
         top: Some(Border {
@@ -88,7 +88,7 @@ fn art_codes_report_typed_validation_errors() {
 
 #[test]
 fn later_set_replaces_and_clear_restores_omission() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer
         .set_section_page_borders(Borders {
             top: Some(border(Style::Single, Color::Blue)),

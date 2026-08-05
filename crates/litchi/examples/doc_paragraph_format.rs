@@ -5,7 +5,7 @@
 //! Run with:
 //!   cargo run --example doc_paragraph_format --features doc --no-default-features -- <output.doc>
 
-use litchi_doc::{CharacterFormatting, DocWriter, ParagraphFormatting};
+use litchi_doc::{CharacterFormatting, ParagraphFormatting, Writer};
 use std::env;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .unwrap_or_else(|| "doc_paragraph_format.doc".to_string());
 
-    let mut doc = DocWriter::new();
+    let mut doc = Writer::new();
 
     // Left aligned with indents
     let p1 = ParagraphFormatting {

@@ -16,40 +16,38 @@ pub(in crate::writer::core) struct DocOutputStreams {
     data: Vec<u8>,
 }
 
-impl DocWriter {
-    pub(in crate::writer::core) fn validate_as_attached_glossary(
-        &self,
-    ) -> Result<(), DocWriteError> {
+impl Writer {
+    pub(in crate::writer::core) fn validate_as_attached_glossary(&self) -> Result<(), WriteError> {
         if self.glossary_metadata.is_none() {
-            return Err(DocWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "attached DOC glossary requires glossary metadata".to_string(),
             ));
         }
         if self.attached_glossary.is_some() {
-            return Err(DocWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "attached DOC glossaries cannot contain another attached glossary".to_string(),
             ));
         }
         if self.encryption.is_some() {
-            return Err(DocWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "an attached DOC glossary cannot have independent encryption".to_string(),
             ));
         }
         if self.vba_project.is_some() {
-            return Err(DocWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "an attached DOC glossary cannot contain an independent VBA project".to_string(),
             ));
         }
         Ok(())
     }
 
-    fn encryption_table_header_len(&self) -> Result<usize, DocWriteError> {
+    fn encryption_table_header_len(&self) -> Result<usize, WriteError> {
         self.encryption
             .as_ref()
             .map(|value| value.profile.table_header_len())
             .transpose()
             .map(|value| value.unwrap_or(0))
-            .map_err(DocWriteError::InvalidData)
+            .map_err(WriteError::InvalidData)
     }
 
     fn encrypt_output_streams(
@@ -57,7 +55,7 @@ impl DocWriter {
         word_document: &mut [u8],
         table_stream: &mut [u8],
         data_stream: &mut [u8],
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         let Some(encryption) = &self.encryption else {
             return Ok(());
         };
@@ -68,7 +66,7 @@ impl DocWriter {
             table_stream,
             data_stream,
         )
-        .map_err(DocWriteError::InvalidData)
+        .map_err(WriteError::InvalidData)
     }
 
     fn populate_compound_document(
@@ -77,7 +75,7 @@ impl DocWriter {
         word_document_stream: &[u8],
         table_stream: &[u8],
         data_stream: &[u8],
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         ole_writer.set_root_clsid(WORD_DOCUMENT_CLSID);
 
         // Preserve the conventional stream order so WordDocument occupies the
@@ -98,14 +96,14 @@ impl DocWriter {
         Ok(())
     }
 }
-impl DocWriter {
-    pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), DocWriteError> {
+impl Writer {
+    pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), WriteError> {
         self.build_ole_writer()?.save(path)?;
         Ok(())
     }
 
     /// Build and validate the three core DOC streams.
-    fn build_output_streams(&mut self) -> Result<DocOutputStreams, DocWriteError> {
+    fn build_output_streams(&mut self) -> Result<DocOutputStreams, WriteError> {
         self.build_output_streams_with_data_prefix(Vec::new())
     }
 
@@ -113,9 +111,9 @@ impl DocWriter {
     fn build_output_streams_with_data_prefix(
         &mut self,
         data_prefix: Vec<u8>,
-    ) -> Result<DocOutputStreams, DocWriteError> {
+    ) -> Result<DocOutputStreams, WriteError> {
         if self.attached_glossary.is_some() && self.glossary_metadata.is_some() {
-            return Err(DocWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "a DOC template cannot be both glossary-only and contain an attached glossary"
                     .to_string(),
             ));
@@ -191,12 +189,12 @@ impl DocWriter {
                 // PlcfSpa.
                 let grpprl = if let Some(picture_index) = run.picture_index {
                     let entry = self.pictures.get(picture_index as usize).ok_or_else(|| {
-                        DocWriteError::InvalidData(format!(
+                        WriteError::InvalidData(format!(
                             "DOC picture index {picture_index} is out of range"
                         ))
                     })?;
                     let pic_offset = u32::try_from(data_stream.len()).map_err(|_| {
-                        DocWriteError::InvalidData(
+                        WriteError::InvalidData(
                             "DOC Data stream exceeds 32-bit FC space".to_string(),
                         )
                     })?;
@@ -353,7 +351,7 @@ impl DocWriter {
         let mut header_pic_offsets: Vec<u32> = Vec::with_capacity(self.header_pictures.len());
         for entry in &self.header_pictures {
             let pic_offset = u32::try_from(data_stream.len()).map_err(|_| {
-                DocWriteError::InvalidData("DOC Data stream exceeds 32-bit FC space".to_string())
+                WriteError::InvalidData("DOC Data stream exceeds 32-bit FC space".to_string())
             })?;
             crate::writer::images::write_picture_block(
                 &entry.picture,
@@ -539,7 +537,7 @@ impl DocWriter {
         let proofing_maximum_cp = current_cp
             .checked_add(if has_subdocs { 1 } else { 2 })
             .ok_or_else(|| {
-                DocWriteError::InvalidData("document-parts proofing CP ceiling overflows".into())
+                WriteError::InvalidData("document-parts proofing CP ceiling overflows".into())
             })?;
 
         let mut fib = FibBuilder::new();
@@ -569,7 +567,7 @@ impl DocWriter {
             &self.styles,
             revision_data.as_ref().map(|data| &data.indexes),
         )
-        .map_err(|error| DocWriteError::InvalidData(error.to_string()))?;
+        .map_err(|error| WriteError::InvalidData(error.to_string()))?;
         fib.set_stshf(table_offset, stylesheet_data.len() as u32);
         table_stream.extend_from_slice(&stylesheet_data);
         table_offset = table_stream.len() as u32;
@@ -693,7 +691,7 @@ impl DocWriter {
                 .and_then(|value| value.checked_mul(2))
                 .and_then(|length| text_stream.get(..length))
                 .ok_or_else(|| {
-                    DocWriteError::InvalidData(
+                    WriteError::InvalidData(
                         "DOC main field story exceeds the text stream".to_string(),
                     )
                 })?;
@@ -816,7 +814,7 @@ impl DocWriter {
             .section_formatting_revision
             .as_ref()
             .map(|revision| {
-                Ok::<_, DocWriteError>((
+                Ok::<_, WriteError>((
                     revision_data
                         .as_ref()
                         .expect("section revisions initialize revision writer data")
@@ -834,7 +832,7 @@ impl DocWriter {
             self.section_text_flow,
             self.section_page_borders.as_ref(),
         )
-        .map_err(|error| DocWriteError::InvalidData(error.to_string()))?;
+        .map_err(|error| WriteError::InvalidData(error.to_string()))?;
         word_document_stream.extend_from_slice(&sepx_data);
 
         // Write section table to table stream
@@ -1030,7 +1028,7 @@ impl DocWriter {
     }
 
     /// Build the complete compound document after validating every staged structure.
-    fn build_ole_writer(&mut self) -> Result<OleWriter, DocWriteError> {
+    fn build_ole_writer(&mut self) -> Result<OleWriter, WriteError> {
         let streams = self.build_output_streams()?;
         let mut ole_writer = OleWriter::new();
         self.populate_compound_document(
@@ -1046,7 +1044,7 @@ impl DocWriter {
     pub fn write_to<W: std::io::Write + std::io::Seek>(
         &mut self,
         writer: &mut W,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         self.build_ole_writer()?.write_to(writer)?;
         Ok(())
     }

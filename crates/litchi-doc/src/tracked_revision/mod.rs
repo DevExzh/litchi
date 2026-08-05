@@ -11,5 +11,5 @@ mod package;
 mod tests;
 
 pub use litchi_ole_common::object::Limits;
-pub use model::{DocTrackedRevision, DocTrackedRevisionKind, DocTrackedRevisionMetadata};
-pub use package::DocTrackedRevisionEditor;
+pub use model::{Revision, RevisionKind, RevisionMetadata};
+pub use package::RevisionEditor;

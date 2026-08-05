@@ -8,7 +8,7 @@
 //! sprmCPicLocation. Image bytes are stored without re-encoding; BMP file
 //! headers are removed because OfficeArt stores their DIB payload.
 
-use super::core::DocWriteError;
+use super::core::WriteError;
 use crate::parts::images::PictureType;
 use crate::parts::spa::{
     SPA_LEN, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin, ShapeWrapSide, Spa,
@@ -103,7 +103,7 @@ const MAX_PICF_DIMENSION_TWIPS: u32 = i16::MAX as u32;
 /// Encoded bytes are stored as-is except that a 14-byte BMP file header is
 /// removed to obtain the DIB payload required by OfficeArt.
 #[derive(Debug, Clone)]
-pub struct DocPicture {
+pub struct Picture {
     /// Raw BLIP file data.
     data: Vec<u8>,
     /// Detected native OfficeArt kind.
@@ -114,18 +114,18 @@ pub struct DocPicture {
     height_twips: u32,
 }
 
-impl DocPicture {
+impl Picture {
     /// Create a picture from raw image bytes.
     ///
     /// The format is sniffed from the byte signature and the display
     /// dimensions are derived from bitmap pixels or metafile bounds. Returns
     /// an error for unsupported formats or when the dimensions cannot be
     /// determined; use [`Self::from_parts`] to supply dimensions explicitly.
-    pub fn new(data: Vec<u8>) -> Result<Self, DocWriteError> {
+    pub fn new(data: Vec<u8>) -> Result<Self, WriteError> {
         let kind = sniff_kind(&data)?;
         let dimensions = intrinsic_dimensions_twips(kind, &data).ok_or_else(|| {
-            DocWriteError::InvalidData(
-                "DOC picture dimensions are unreadable; use DocPicture::from_parts".to_string(),
+            WriteError::InvalidData(
+                "DOC picture dimensions are unreadable; use Picture::from_parts".to_string(),
             )
         })?;
         Self::from_parts_as(data, kind, dimensions.0, dimensions.1)
@@ -137,7 +137,7 @@ impl DocPicture {
         data: Vec<u8>,
         width_twips: u32,
         height_twips: u32,
-    ) -> Result<Self, DocWriteError> {
+    ) -> Result<Self, WriteError> {
         let kind = sniff_kind(&data)?;
         Self::from_parts_as(data, kind, width_twips, height_twips)
     }
@@ -150,7 +150,7 @@ impl DocPicture {
         kind: BlipKind,
         width_twips: u32,
         height_twips: u32,
-    ) -> Result<Self, DocWriteError> {
+    ) -> Result<Self, WriteError> {
         validate_kind(kind, &data)?;
         if kind == BlipKind::Dib && data.starts_with(b"BM") {
             data.drain(..14);
@@ -172,10 +172,10 @@ impl DocPicture {
         mut self,
         width_twips: u32,
         height_twips: u32,
-    ) -> Result<Self, DocWriteError> {
+    ) -> Result<Self, WriteError> {
         for dimension in [width_twips, height_twips] {
             if !(1..=MAX_PICF_DIMENSION_TWIPS).contains(&dimension) {
-                return Err(DocWriteError::InvalidData(format!(
+                return Err(WriteError::InvalidData(format!(
                     "DOC picture dimension {dimension} twips is outside 1..={MAX_PICF_DIMENSION_TWIPS}"
                 )));
             }
@@ -207,7 +207,7 @@ impl DocPicture {
 }
 
 /// Sniff the picture format, rejecting unsupported or unrecognised data.
-fn sniff_kind(data: &[u8]) -> Result<BlipKind, DocWriteError> {
+fn sniff_kind(data: &[u8]) -> Result<BlipKind, WriteError> {
     let kind = match PictureType::from_data(data) {
         PictureType::Emf => Some(BlipKind::Emf),
         PictureType::Wmf => Some(BlipKind::Wmf),
@@ -220,14 +220,14 @@ fn sniff_kind(data: &[u8]) -> Result<BlipKind, DocWriteError> {
         _ => None,
     };
     kind.ok_or_else(|| {
-        DocWriteError::InvalidData(
+        WriteError::InvalidData(
             "DOC picture data is not a supported native OfficeArt format".to_string(),
         )
     })
 }
 
 /// Validate that explicit format metadata agrees with the encoded bytes.
-fn validate_kind(kind: BlipKind, data: &[u8]) -> Result<(), DocWriteError> {
+fn validate_kind(kind: BlipKind, data: &[u8]) -> Result<(), WriteError> {
     let valid = match kind {
         BlipKind::Emf => PictureType::from_data(data) == PictureType::Emf,
         BlipKind::Wmf => valid_wmf_data(data),
@@ -239,12 +239,12 @@ fn validate_kind(kind: BlipKind, data: &[u8]) -> Result<(), DocWriteError> {
         BlipKind::Error | BlipKind::Unknown | BlipKind::Other(_) => false,
     };
     if !valid {
-        return Err(DocWriteError::InvalidData(format!(
+        return Err(WriteError::InvalidData(format!(
             "DOC picture bytes do not match explicit {kind:?} kind"
         )));
     }
     if data.len() > i32::MAX as usize - 1024 {
-        return Err(DocWriteError::InvalidData(
+        return Err(WriteError::InvalidData(
             "DOC picture exceeds the signed 32-bit PICF block limit".to_string(),
         ));
     }
@@ -503,7 +503,7 @@ fn pict_frame(data: &[u8]) -> Option<(usize, i32, i32, i32, i32)> {
 }
 
 /// Clipping bounds stored in an OfficeArtMetafileHeader.
-fn metafile_bounds(picture: &DocPicture) -> Result<Rect, DocWriteError> {
+fn metafile_bounds(picture: &Picture) -> Result<Rect, WriteError> {
     let data = &picture.data;
     let bounds = match picture.kind {
         BlipKind::Emf if data.len() >= 24 => Rect {
@@ -520,7 +520,7 @@ fn metafile_bounds(picture: &DocPicture) -> Result<Rect, DocWriteError> {
         },
         BlipKind::Pict => {
             let (_, top, left, bottom, right) = pict_frame(data).ok_or_else(|| {
-                DocWriteError::InvalidData("validated PICT picture has no frame".to_string())
+                WriteError::InvalidData("validated PICT picture has no frame".to_string())
             })?;
             Rect {
                 left,
@@ -533,48 +533,47 @@ fn metafile_bounds(picture: &DocPicture) -> Result<Rect, DocWriteError> {
             left: 0,
             top: 0,
             right: i32::try_from(picture.width_twips)
-                .map_err(|_| DocWriteError::InvalidData("picture width exceeds i32".to_string()))?,
-            bottom: i32::try_from(picture.height_twips).map_err(|_| {
-                DocWriteError::InvalidData("picture height exceeds i32".to_string())
-            })?,
+                .map_err(|_| WriteError::InvalidData("picture width exceeds i32".to_string()))?,
+            bottom: i32::try_from(picture.height_twips)
+                .map_err(|_| WriteError::InvalidData("picture height exceeds i32".to_string()))?,
         },
     };
     Ok(bounds)
 }
 
-fn read_i32(data: &[u8], offset: usize) -> Result<i32, DocWriteError> {
-    let end = offset.checked_add(4).ok_or_else(|| {
-        DocWriteError::InvalidData("metafile bounds offset overflows".to_string())
-    })?;
+fn read_i32(data: &[u8], offset: usize) -> Result<i32, WriteError> {
+    let end = offset
+        .checked_add(4)
+        .ok_or_else(|| WriteError::InvalidData("metafile bounds offset overflows".to_string()))?;
     let bytes = data
         .get(offset..end)
-        .ok_or_else(|| DocWriteError::InvalidData("metafile bounds are truncated".to_string()))?;
+        .ok_or_else(|| WriteError::InvalidData("metafile bounds are truncated".to_string()))?;
     Ok(i32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
 }
 
-fn read_i16(data: &[u8], offset: usize) -> Result<i16, DocWriteError> {
-    let end = offset.checked_add(2).ok_or_else(|| {
-        DocWriteError::InvalidData("metafile bounds offset overflows".to_string())
-    })?;
+fn read_i16(data: &[u8], offset: usize) -> Result<i16, WriteError> {
+    let end = offset
+        .checked_add(2)
+        .ok_or_else(|| WriteError::InvalidData("metafile bounds offset overflows".to_string()))?;
     let bytes = data
         .get(offset..end)
-        .ok_or_else(|| DocWriteError::InvalidData("metafile bounds are truncated".to_string()))?;
+        .ok_or_else(|| WriteError::InvalidData("metafile bounds are truncated".to_string()))?;
     Ok(i16::from_le_bytes([bytes[0], bytes[1]]))
 }
 
-fn picture_blip(picture: &DocPicture) -> Result<BlipBuilder<'_>, DocWriteError> {
+fn picture_blip(picture: &Picture) -> Result<BlipBuilder<'_>, WriteError> {
     if picture.kind.is_meta() {
         let width = i32::try_from(picture.width_twips)
             .ok()
             .and_then(|value| value.checked_mul(635))
             .ok_or_else(|| {
-                DocWriteError::InvalidData("metafile width extent exceeds i32".to_string())
+                WriteError::InvalidData("metafile width extent exceeds i32".to_string())
             })?;
         let height = i32::try_from(picture.height_twips)
             .ok()
             .and_then(|value| value.checked_mul(635))
             .ok_or_else(|| {
-                DocWriteError::InvalidData("metafile height extent exceeds i32".to_string())
+                WriteError::InvalidData("metafile height extent exceeds i32".to_string())
             })?;
         Ok(BlipBuilder::meta(
             picture.kind,
@@ -624,7 +623,7 @@ pub(crate) fn write_opt_record(out: &mut Vec<u8>, properties: &[(u16, u32)]) {
 ///
 /// The 68-byte header is followed by the OfficeArt shape data; `lcb` covers
 /// both, matching the layout Word writes for inline pictures.
-fn write_picf(out: &mut Vec<u8>, picture: &DocPicture, lcb: u32) {
+fn write_picf(out: &mut Vec<u8>, picture: &Picture, lcb: u32) {
     out.extend_from_slice(&(lcb as i32).to_le_bytes());
     out.extend_from_slice(&PICF_CB_HEADER.to_le_bytes());
     out.extend_from_slice(&PICF_MM_SHAPE.to_le_bytes());
@@ -691,16 +690,13 @@ fn write_shape_container(out: &mut Vec<u8>, shape_id: u32) {
 /// Append an OfficeArtFBSE record with the embedded OfficeArtBlip record for
 /// a picture. Used both for the Data-stream picture blocks and for the
 /// BStoreContainer inside the drawing group of floating pictures.
-fn write_bse_with_embedded_blip(
-    out: &mut Vec<u8>,
-    picture: &DocPicture,
-) -> Result<(), DocWriteError> {
+fn write_bse_with_embedded_blip(out: &mut Vec<u8>, picture: &Picture) -> Result<(), WriteError> {
     let blip = picture_blip(picture)?;
     let blip_record_len = blip.wire_len()?;
     let bse_payload_len = u32::try_from(BSE_HEADER_LEN)
         .ok()
         .and_then(|header| header.checked_add(blip_record_len))
-        .ok_or_else(|| DocWriteError::InvalidData("DOC FBSE length exceeds u32".to_string()))?;
+        .ok_or_else(|| WriteError::InvalidData("DOC FBSE length exceeds u32".to_string()))?;
 
     write_record_header(
         out,
@@ -728,15 +724,15 @@ fn write_bse_with_embedded_blip(
 /// Append an OfficeArtWordDrawing block (PICF + shape container + BSE with an
 /// embedded BLIP) to the Data stream.
 pub(crate) fn write_picture_block(
-    picture: &DocPicture,
+    picture: &Picture,
     shape_id: u32,
     out: &mut Vec<u8>,
-) -> Result<(), DocWriteError> {
+) -> Result<(), WriteError> {
     let blip_record_len = picture_blip(picture)?.wire_len()?;
     let bse_payload_len = u32::try_from(BSE_HEADER_LEN)
         .ok()
         .and_then(|header| header.checked_add(blip_record_len))
-        .ok_or_else(|| DocWriteError::InvalidData("DOC FBSE length exceeds u32".to_string()))?;
+        .ok_or_else(|| WriteError::InvalidData("DOC FBSE length exceeds u32".to_string()))?;
 
     let block_start = out.len();
     // lcb covers the PICF header plus everything that follows it.
@@ -745,16 +741,17 @@ pub(crate) fn write_picture_block(
         .and_then(|value| value.checked_add(SHAPE_CONTAINER_LEN))
         .and_then(|value| value.checked_add(RECORD_HEADER_LEN as u32))
         .and_then(|value| value.checked_add(bse_payload_len))
-        .ok_or_else(|| DocWriteError::InvalidData("DOC picture block exceeds u32".to_string()))?;
+        .ok_or_else(|| WriteError::InvalidData("DOC picture block exceeds u32".to_string()))?;
     write_picf(out, picture, lcb);
     write_shape_container(out, shape_id);
     write_bse_with_embedded_blip(out, picture)?;
 
-    let actual = out.len().checked_sub(block_start).ok_or_else(|| {
-        DocWriteError::InvalidData("DOC picture block length underflow".to_string())
-    })?;
+    let actual = out
+        .len()
+        .checked_sub(block_start)
+        .ok_or_else(|| WriteError::InvalidData("DOC picture block length underflow".to_string()))?;
     if actual != usize::try_from(lcb).unwrap_or(usize::MAX) {
-        return Err(DocWriteError::InvalidData(
+        return Err(WriteError::InvalidData(
             "DOC picture block length mismatch".to_string(),
         ));
     }
@@ -769,7 +766,7 @@ pub(crate) fn write_picture_block(
 ///
 /// The position is the top-left corner of the picture in twips, relative to
 /// the origins selected by [`ShapeHorizontalOrigin`] and
-/// [`ShapeVerticalOrigin`]. The size comes from the [`DocPicture`] display
+/// [`ShapeVerticalOrigin`]. The size comes from the [`Picture`] display
 /// dimensions. Defaults match a typical Word floating picture: page-relative
 /// offsets, square wrapping on both sides, in front of the text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -847,7 +844,7 @@ impl FloatingPosition {
 /// The visual content of a floating shape in the drawing layer.
 pub(crate) enum FloatingShapeContent<'a> {
     /// A picture frame whose BLIP is stored in the blip store.
-    Picture(&'a DocPicture),
+    Picture(&'a Picture),
     /// A primitive preset-geometry shape (rectangle, ellipse, ...).
     Primitive(&'a super::shapes::Shape),
 }
@@ -1051,7 +1048,7 @@ pub(crate) fn build_dgg_info(
     main_shapes: &[FloatingShapeInfo<'_>],
     header_shapes: &[FloatingShapeInfo<'_>],
     allocated_main_shapes: u32,
-) -> Result<Vec<u8>, DocWriteError> {
+) -> Result<Vec<u8>, WriteError> {
     let mut out = Vec::new();
 
     // ── OfficeArtDggContainer ──
@@ -1102,11 +1099,10 @@ pub(crate) fn build_dgg_info(
             .iter()
             .filter(|shape| matches!(shape.content, FloatingShapeContent::Picture(_)))
             .count();
-    let picture_count = u16::try_from(picture_count).map_err(|_| {
-        DocWriteError::InvalidData("DOC BStore picture count exceeds u16".to_string())
-    })?;
+    let picture_count = u16::try_from(picture_count)
+        .map_err(|_| WriteError::InvalidData("DOC BStore picture count exceeds u16".to_string()))?;
     if picture_count > 0x0fff {
-        return Err(DocWriteError::InvalidData(
+        return Err(WriteError::InvalidData(
             "DOC BStore contains more than 4095 pictures".to_string(),
         ));
     }
@@ -1208,7 +1204,7 @@ mod tests {
 
     #[test]
     fn doc_picture_new_derives_dimensions_at_96_dpi() {
-        let picture = DocPicture::new(png_bytes()).unwrap();
+        let picture = Picture::new(png_bytes()).unwrap();
         assert_eq!(picture.kind(), BlipKind::Png);
         assert_eq!(picture.width_twips(), 32 * TWIPS_PER_INCH / ASSUMED_DPI);
         assert_eq!(picture.height_twips(), 16 * TWIPS_PER_INCH / ASSUMED_DPI);
@@ -1216,9 +1212,9 @@ mod tests {
 
     #[test]
     fn doc_picture_rejects_unknown_format_and_bad_dimensions() {
-        assert!(DocPicture::new(b"garbage".to_vec()).is_err());
-        assert!(DocPicture::from_parts(png_bytes(), 0, 100).is_err());
-        assert!(DocPicture::from_parts(png_bytes(), 100, MAX_PICF_DIMENSION_TWIPS + 1).is_err());
+        assert!(Picture::new(b"garbage".to_vec()).is_err());
+        assert!(Picture::from_parts(png_bytes(), 0, 100).is_err());
+        assert!(Picture::from_parts(png_bytes(), 100, MAX_PICF_DIMENSION_TWIPS + 1).is_err());
     }
 
     /// Parse an Escher record header, returning (version, instance, type, payload).
@@ -1231,7 +1227,7 @@ mod tests {
 
     #[test]
     fn picture_block_layout_matches_ms_doc() {
-        let picture = DocPicture::new(png_bytes()).unwrap();
+        let picture = Picture::new(png_bytes()).unwrap();
         let mut block = Vec::new();
         write_picture_block(&picture, FIRST_PICTURE_SHAPE_ID, &mut block).unwrap();
 
@@ -1285,7 +1281,7 @@ mod tests {
 
     #[test]
     fn picture_uid_is_the_md4_digest_of_blip_data() {
-        let picture = DocPicture::new(png_bytes()).unwrap();
+        let picture = Picture::new(png_bytes()).unwrap();
         assert_eq!(
             digest(picture.data()),
             picture_blip(&picture).unwrap().uid()
@@ -1315,7 +1311,7 @@ mod tests {
         use litchi_odraw::Record;
         use litchi_odraw::image::{Blip, Context, Entry, Storage};
 
-        let picture = DocPicture::new(jpeg_bytes()).unwrap();
+        let picture = Picture::new(jpeg_bytes()).unwrap();
         let mut block = Vec::new();
         write_picture_block(&picture, FIRST_PICTURE_SHAPE_ID, &mut block).unwrap();
 
@@ -1339,8 +1335,8 @@ mod tests {
     };
 
     fn floating_shapes<'a>(
-        png: &'a DocPicture,
-        jpeg: &'a DocPicture,
+        png: &'a Picture,
+        jpeg: &'a Picture,
         positions: &'a [FloatingPosition],
     ) -> Vec<FloatingShapeInfo<'a>> {
         vec![
@@ -1390,8 +1386,8 @@ mod tests {
 
     #[test]
     fn plcf_spa_layout_matches_ms_doc() {
-        let png = DocPicture::new(png_bytes()).unwrap();
-        let jpeg = DocPicture::new(jpeg_bytes()).unwrap();
+        let png = Picture::new(png_bytes()).unwrap();
+        let jpeg = Picture::new(jpeg_bytes()).unwrap();
         let positions = sample_positions();
         let shapes = floating_shapes(&png, &jpeg, &positions);
 
@@ -1468,8 +1464,8 @@ mod tests {
 
     #[test]
     fn dgg_info_layout_matches_ms_odraw() {
-        let png = DocPicture::new(png_bytes()).unwrap();
-        let jpeg = DocPicture::new(jpeg_bytes()).unwrap();
+        let png = Picture::new(png_bytes()).unwrap();
+        let jpeg = Picture::new(jpeg_bytes()).unwrap();
         let positions = sample_positions();
         let shapes = floating_shapes(&png, &jpeg, &positions);
 
@@ -1585,8 +1581,8 @@ mod tests {
         use litchi_odraw::Record;
         use litchi_odraw::image::{Context, Entry};
 
-        let png = DocPicture::new(png_bytes()).unwrap();
-        let jpeg = DocPicture::new(jpeg_bytes()).unwrap();
+        let png = Picture::new(png_bytes()).unwrap();
+        let jpeg = Picture::new(jpeg_bytes()).unwrap();
         let positions = sample_positions();
         let shapes = floating_shapes(&png, &jpeg, &positions);
 
@@ -1625,8 +1621,8 @@ mod tests {
     fn dgg_info_with_header_drawing_uses_own_cluster() {
         use crate::writer::shapes::Shape;
 
-        let png = DocPicture::new(png_bytes()).unwrap();
-        let jpeg = DocPicture::new(jpeg_bytes()).unwrap();
+        let png = Picture::new(png_bytes()).unwrap();
+        let jpeg = Picture::new(jpeg_bytes()).unwrap();
         let positions = sample_positions();
         let main_shapes = floating_shapes(&png, &jpeg, &positions);
 

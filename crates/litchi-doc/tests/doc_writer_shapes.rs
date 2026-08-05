@@ -4,7 +4,7 @@
 //! floating primitive shapes (rectangle, ellipse, rounded rectangle), then
 //! re-opens it with the crate's own reader and shape extraction APIs.
 use litchi_doc::shape::extract_drawing_shapes;
-use litchi_doc::writer::{DocPicture, DocWriter, FloatingPosition};
+use litchi_doc::writer::{FloatingPosition, Picture, Writer};
 use litchi_doc::writer::{Kind as DrawingKind, Shape as DrawingShape};
 use litchi_doc::{Package, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin};
 use litchi_odraw::shape::Kind;
@@ -67,14 +67,14 @@ const ELLIPSE_SPID: u32 = 1028;
 const ROUND_RECT_SPID: u32 = 1029;
 
 fn write_doc_with_shapes(jpeg_bytes: &[u8]) -> Vec<u8> {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("before shapes").unwrap();
     writer
-        .insert_picture(DocPicture::new(make_png(32, 16)).unwrap())
+        .insert_picture(Picture::new(make_png(32, 16)).unwrap())
         .unwrap();
     writer
         .insert_floating_picture(
-            DocPicture::new(jpeg_bytes.to_vec()).unwrap(),
+            Picture::new(jpeg_bytes.to_vec()).unwrap(),
             FloatingPosition::new(1440, 720),
         )
         .unwrap();
@@ -234,7 +234,7 @@ fn genuine_word_floating_pictures_extract_from_dgg_info() {
 
 #[test]
 fn document_with_only_shapes_has_no_picture_data() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("shapes only").unwrap();
     writer
         .insert_floating_shape(

@@ -5,7 +5,7 @@
 //! Compound-file and OfficeArt primitives live in `litchi-cfb`,
 //! `litchi-ole-common`, and `litchi-odraw`. The public API is re-exported at
 //! this crate's root so callers can use concise paths such as
-//! [`Package`] and [`writer::DocWriter`].
+//! [`Package`] and [`writer::Writer`].
 //!
 //! A Word binary document is an OLE2 structured storage containing a
 //! `WordDocument` stream, a `0Table` or `1Table` stream, and optional data,
@@ -80,7 +80,7 @@ pub use comment::{Comment, CommentDateTime, CommentExtendedMetadata};
 pub use document::Document;
 pub use embedded_object::{Editor, WriteOptions};
 pub use encryption::EncryptionProfile;
-pub use equation::{DocMtefEquationWriteOptions, EQUATION_3_CLSID, MtefEquation};
+pub use equation::{EQUATION_3_CLSID, MtefEquation, MtefEquationWriteOptions};
 pub use footnote::{Endnote, Footnote};
 pub use header_footer::HeaderFooter;
 pub use hyperlink::Hyperlink;
@@ -221,7 +221,7 @@ pub use parts::subdocuments::{Collection, Kind, Name, Reference};
 pub use parts::table_char_cache::{TableCharEntry, TableCharInfo, TableCharacterCache};
 pub use parts::tap::TableStyleCondition;
 pub use parts::text_services::{TextServicesTables, Uim, UimEntry, UimGuidTable, UimTable};
-pub use parts::textbox::DocTextBox;
+pub use parts::textbox::TextBox;
 pub use parts::textbox_breaks::{
     TextBoxBreak, TextBoxBreakEntry, TextBoxBreakKind, TextBoxBreakTable, TextBoxBreakTables,
 };
@@ -241,22 +241,18 @@ pub use section::{
 pub use shape::{Bounds, Kind as ShapeKind, Shape, UnknownRecord};
 pub use shape::{count_shapes, extract_drawing_shapes, extract_shape_text, extract_shapes};
 pub use table::{Cell, Row, Table};
-pub use tracked_revision::{
-    DocTrackedRevision, DocTrackedRevisionEditor, DocTrackedRevisionKind,
-    DocTrackedRevisionMetadata,
-};
+pub use tracked_revision::{Revision, RevisionEditor, RevisionMetadata};
 pub use vba::VbaProjectStorage;
 pub use writer::{
     AutoNumberAlignment, BookmarkEntry, CharacterFormatting, CommentEntry, DisplayFieldRevision,
-    DocHeaderKind, DocPicture, DocSmartTagEntry, DocStyleDefinition, DocStyleRevision,
-    DocWriteError, DocWriter, DropCap, DropCapType, FloatingPosition, FontAlignment,
-    FormattingRevision, FrameAnchor, FrameHeight, FrameHorizontalAnchor, FrameHorizontalPosition,
-    FrameTextFlow, FrameTextWrap, FrameVerticalAnchor, FrameVerticalPosition,
-    HeaderFooterParagraph, Kind as DrawingKind, LegacyAutoNumbering, LegacyBorderPosition,
-    LegacyBorderStyle, LineSpacing, NumberingRevision, ParagraphBorder, ParagraphBorderStyle,
-    ParagraphBorders, ParagraphFormatting, ParagraphShading, PhysicalJustification,
-    Shape as DrawingShape, StyleWriteError, TabAlignment, TabLeader, TabStop, TextBoxTightWrap,
-    TextRevision,
+    DropCap, DropCapType, FloatingPosition, FontAlignment, FormattingRevision, FrameAnchor,
+    FrameHeight, FrameHorizontalAnchor, FrameHorizontalPosition, FrameTextFlow, FrameTextWrap,
+    FrameVerticalAnchor, FrameVerticalPosition, HeaderFooterParagraph, HeaderKind,
+    Kind as DrawingKind, LegacyAutoNumbering, LegacyBorderPosition, LegacyBorderStyle, LineSpacing,
+    NumberingRevision, ParagraphBorder, ParagraphBorderStyle, ParagraphBorders,
+    ParagraphFormatting, ParagraphShading, PhysicalJustification, Picture, Shape as DrawingShape,
+    SmartTagEntry, StyleRevision, StyleWriteError, TabAlignment, TabLeader, TabStop,
+    TextBoxTightWrap, TextRevision, WriteError, Writer,
 };
 
 /// Crate-native ordered document element returned by [`Document::elements`].

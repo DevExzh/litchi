@@ -485,7 +485,7 @@ impl AttachedGlossary {
     }
 
     /// Text boxes stored in the attached main story.
-    pub fn text_boxes(&self) -> Vec<super::textbox::DocTextBox> {
+    pub fn text_boxes(&self) -> Vec<super::textbox::TextBox> {
         resolve_text_boxes(
             &self.text_extractor,
             &self.textbox_entries,
@@ -494,7 +494,7 @@ impl AttachedGlossary {
     }
 
     /// Text boxes stored in attached header/footer stories.
-    pub fn header_text_boxes(&self) -> Vec<super::textbox::DocTextBox> {
+    pub fn header_text_boxes(&self) -> Vec<super::textbox::TextBox> {
         resolve_text_boxes(
             &self.text_extractor,
             &self.header_textbox_entries,
@@ -624,7 +624,7 @@ fn resolve_text_boxes(
     text: &TextExtractor,
     entries: &[super::textbox::TextBoxEntry],
     range: Option<(u32, u32)>,
-) -> Vec<super::textbox::DocTextBox> {
+) -> Vec<super::textbox::TextBox> {
     let Some((story_start, story_end)) = range else {
         return Vec::new();
     };
@@ -637,7 +637,7 @@ fn resolve_text_boxes(
                 return None;
             }
             let raw = text.text_at_range(start, end);
-            Some(super::textbox::DocTextBox {
+            Some(super::textbox::TextBox {
                 shape_id: entry.shape_id,
                 text: raw.strip_suffix('\r').unwrap_or(raw).to_string(),
                 header_kind: None,

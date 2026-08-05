@@ -8,14 +8,14 @@
 //!
 //! Run with: cargo run --example doc_writer_images
 
-use litchi_doc::writer::{CharacterFormatting, DocWriter, ParagraphFormatting};
+use litchi_doc::writer::{CharacterFormatting, ParagraphFormatting, Writer};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("Creating DOC file with images...");
 
     // Create a new DOC writer
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
 
     // Add document title
     let title_char = CharacterFormatting {

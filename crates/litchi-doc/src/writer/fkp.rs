@@ -10,8 +10,8 @@
 //! Based on Microsoft's "[MS-DOC]" specification and Apache POI's
 //! `CHPFormattedDiskPage` / `PAPFormattedDiskPage`.
 
-/// Error type for DOC operations
-pub type DocError = std::io::Error;
+/// I/O error returned while generating FKP pages.
+pub type IoError = std::io::Error;
 
 /// Character property (CHPX) entry
 /// Represents a formatting run from fc_start to fc_end
@@ -79,7 +79,7 @@ impl ChpxFkpBuilder {
     ///
     /// If all entries fit in a single page, a single page is returned.
     /// Otherwise entries are split across multiple pages.
-    pub fn generate_pages(&self) -> Result<FkpPages, DocError> {
+    pub fn generate_pages(&self) -> Result<FkpPages, IoError> {
         if self.entries.is_empty() {
             // Return one empty page
             return Ok(FkpPages {
@@ -131,7 +131,7 @@ impl ChpxFkpBuilder {
     }
 
     /// Build a single 512-byte CHPX FKP page from a slice of entries.
-    fn build_page(entries: &[ChpxEntry]) -> Result<Vec<u8>, DocError> {
+    fn build_page(entries: &[ChpxEntry]) -> Result<Vec<u8>, IoError> {
         let mut fkp = vec![0u8; 512];
         let n = entries.len();
         if n == 0 {
@@ -174,7 +174,7 @@ impl ChpxFkpBuilder {
     }
 
     /// Legacy helper: generate a single 512-byte FKP (first page only).
-    pub fn generate(&self) -> Result<Vec<u8>, DocError> {
+    pub fn generate(&self) -> Result<Vec<u8>, IoError> {
         let pages = self.generate_pages()?;
         Ok(pages
             .pages
@@ -221,7 +221,7 @@ impl PapxFkpBuilder {
     }
 
     /// Generate one or more 512-byte PAPX FKP pages.
-    pub fn generate_pages(&self) -> Result<FkpPages, DocError> {
+    pub fn generate_pages(&self) -> Result<FkpPages, IoError> {
         if self.entries.is_empty() {
             return Ok(FkpPages {
                 pages: vec![vec![0u8; 512]],
@@ -267,7 +267,7 @@ impl PapxFkpBuilder {
     }
 
     /// Build a single 512-byte PAPX FKP page from a slice of entries.
-    fn build_page(entries: &[PapxEntry]) -> Result<Vec<u8>, DocError> {
+    fn build_page(entries: &[PapxEntry]) -> Result<Vec<u8>, IoError> {
         let mut fkp = vec![0u8; 512];
         let n = entries.len();
         if n == 0 {
@@ -321,7 +321,7 @@ impl PapxFkpBuilder {
     }
 
     /// Legacy helper: generate a single 512-byte FKP (first page only).
-    pub fn generate(&self) -> Result<Vec<u8>, DocError> {
+    pub fn generate(&self) -> Result<Vec<u8>, IoError> {
         let pages = self.generate_pages()?;
         Ok(pages
             .pages

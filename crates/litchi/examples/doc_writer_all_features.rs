@@ -12,15 +12,15 @@
 //! Run with: cargo run --example doc_writer_all_features
 
 use litchi_doc::writer::{
-    CharacterFormatting, DocWriter, FootnoteEntry, ListFormatOverride, ListLevel, ListStructure,
-    NumberFormat, ParagraphFormatting,
+    CharacterFormatting, FootnoteEntry, ListFormatOverride, ListLevel, ListStructure, NumberFormat,
+    ParagraphFormatting, Writer,
 };
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("Creating comprehensive DOC file with all features...");
 
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.set_property("Title", "Comprehensive DOC Features Demonstration");
     writer.set_property("Author", "Litchi Examples");
 

@@ -1,4 +1,4 @@
-use litchi_doc::{AssociatedStringSlot, DocWriter, Package, SavedByEntry, SavedByTable};
+use litchi_doc::{AssociatedStringSlot, Package, SavedByEntry, SavedByTable, Writer};
 use std::io::Cursor;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -15,8 +15,8 @@ fn temporary_doc_path() -> std::path::PathBuf {
     ))
 }
 
-fn configured_writer() -> (DocWriter, SavedByTable) {
-    let mut writer = DocWriter::new();
+fn configured_writer() -> (Writer, SavedByTable) {
+    let mut writer = Writer::new();
     writer.add_paragraph("Body").unwrap();
     writer
         .set_associated_string(AssociatedStringSlot::TemplatePath, "C:\\模板\\Normal.dot")
@@ -86,7 +86,7 @@ fn assert_configured_document(
 
 #[test]
 fn write_to_emits_the_mandatory_default_associated_string_table() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("Body").unwrap();
 
     let mut output = Cursor::new(Vec::new());
@@ -133,7 +133,7 @@ fn associated_strings_and_saved_by_round_trip_through_file_save() {
 
 #[test]
 fn writer_mutations_are_atomic_and_clearable() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer
         .set_associated_string(AssociatedStringSlot::Title, "kept")
         .unwrap();

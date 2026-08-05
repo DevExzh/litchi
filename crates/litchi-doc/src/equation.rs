@@ -7,7 +7,7 @@
 
 use super::embedded_object::{Editor, Reference, WriteOptions};
 use super::package::{Error as PackageError, Result};
-use super::writer::images::{DocPicture, write_picture_block};
+use super::writer::images::{Picture, write_picture_block};
 use litchi_cfb::OleWriter;
 use std::io::Cursor;
 
@@ -124,14 +124,14 @@ impl MtefEquation {
 
 /// Inputs for adding one native MathType/Equation Editor object to a DOC.
 #[derive(Clone, Debug)]
-pub struct DocMtefEquationWriteOptions {
+pub struct MtefEquationWriteOptions {
     pub storage_id: u32,
     pub equation: MtefEquation,
-    pub preview: DocPicture,
+    pub preview: Picture,
 }
 
-impl DocMtefEquationWriteOptions {
-    pub fn new(storage_id: u32, equation: MtefEquation, preview: DocPicture) -> Self {
+impl MtefEquationWriteOptions {
+    pub fn new(storage_id: u32, equation: MtefEquation, preview: Picture) -> Self {
         Self {
             storage_id,
             equation,
@@ -142,7 +142,7 @@ impl DocMtefEquationWriteOptions {
 
 impl Editor {
     /// Append a native Equation.3 EMBED field with a real PICF bitmap preview.
-    pub fn add_mtef_equation(&mut self, options: DocMtefEquationWriteOptions) -> Result<Reference> {
+    pub fn add_mtef_equation(&mut self, options: MtefEquationWriteOptions) -> Result<Reference> {
         let mut picture_data = Vec::new();
         write_picture_block(&options.preview, options.storage_id, &mut picture_data)
             .map_err(|error| PackageError::Corrupted(error.to_string()))?;

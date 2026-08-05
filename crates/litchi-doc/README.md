@@ -22,7 +22,7 @@ use litchi_doc::Package;
 let mut package = Package::open("example.doc")?;
 let document = package.document()?;
 println!("paragraphs: {}", document.paragraph_count()?);
-# Ok::<(), litchi_doc::DocError>(())
+# Ok::<(), litchi_doc::Error>(())
 ```
 
 ## Features

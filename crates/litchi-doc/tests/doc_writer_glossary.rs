@@ -1,11 +1,10 @@
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_doc::writer::{
-    CharacterFormatting, DocPicture, EncryptionProfile, FloatingPosition, Kind as DrawingKind,
-    ParagraphFormatting, Shape as DrawingShape,
+    CharacterFormatting, EncryptionProfile, FloatingPosition, Kind as DrawingKind,
+    ParagraphFormatting, Picture, Shape as DrawingShape,
 };
 use litchi_doc::{
-    DocWriter, GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle, OpenOptions,
-    Package,
+    GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle, OpenOptions, Package, Writer,
 };
 use std::io::Cursor;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -46,8 +45,8 @@ fn metadata() -> GlossaryMetadata {
     .unwrap()
 }
 
-fn writer() -> DocWriter {
-    let mut writer = DocWriter::new();
+fn writer() -> Writer {
+    let mut writer = Writer::new();
     writer.add_paragraph("Greeting").unwrap();
     writer.add_paragraph("World").unwrap();
     writer.add_paragraph("").unwrap();
@@ -65,11 +64,11 @@ fn image_fixture(relative: &str) -> Vec<u8> {
     .unwrap()
 }
 
-fn glossary_with_drawings() -> DocWriter {
-    let mut writer = DocWriter::new();
+fn glossary_with_drawings() -> Writer {
+    let mut writer = Writer::new();
     writer.add_paragraph("Greeting").unwrap();
     writer
-        .insert_picture(DocPicture::new(image_fixture("png/lena.png")).unwrap())
+        .insert_picture(Picture::new(image_fixture("png/lena.png")).unwrap())
         .unwrap();
     writer
         .insert_floating_text_box(
@@ -102,11 +101,11 @@ fn glossary_with_drawings() -> DocWriter {
     writer
 }
 
-fn glossary_with_hyperlink() -> DocWriter {
+fn glossary_with_hyperlink() -> Writer {
     const DISPLAY_TEXT: &str = "OpenAI";
     const TARGET: &str = "https://example.com";
 
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer
         .add_hyperlink(DISPLAY_TEXT, TARGET, ParagraphFormatting::default())
         .unwrap();
@@ -140,7 +139,7 @@ fn glossary_with_hyperlink() -> DocWriter {
     writer
 }
 
-fn glossary_with_non_plcf_fields() -> DocWriter {
+fn glossary_with_non_plcf_fields() -> Writer {
     const INSTRUCTIONS: [&str; 5] = [
         r#"TC "Illustration 1" \f i \l 4 \n"#,
         r#"TA \l "Baldwin v. Alberti" \c 1 \s Baldwin"#,
@@ -149,7 +148,7 @@ fn glossary_with_non_plcf_fields() -> DocWriter {
         r#"PRIVATE "converter payload""#,
     ];
 
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     let marker_format = CharacterFormatting {
         special: Some(true),
         ..CharacterFormatting::default()
@@ -301,7 +300,7 @@ fn glossary_only_document_round_trips_through_file_save_and_can_be_cleared() {
 
 #[test]
 fn mismatched_main_story_length_is_rejected_before_output_changes() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("short").unwrap();
     writer.set_glossary_metadata(metadata());
 
@@ -327,7 +326,7 @@ fn glossary_utf16_ranges_round_trip_non_bmp_text_and_reject_split_pairs() {
         )
         .unwrap()
     };
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("😀").unwrap();
     writer.add_paragraph("").unwrap();
     writer.add_paragraph("").unwrap();
@@ -367,7 +366,7 @@ fn template_secondary_fib_exposes_passive_attached_glossary() {
 
 #[test]
 fn distinct_attached_glossary_round_trips_through_public_writer() {
-    let mut template = DocWriter::new();
+    let mut template = Writer::new();
     template.add_paragraph("Template body only").unwrap();
     assert!(template.set_attached_glossary(writer()).unwrap().is_none());
     assert!(template.attached_glossary().is_some());
@@ -393,11 +392,11 @@ fn distinct_attached_glossary_round_trips_through_public_writer() {
 
 #[test]
 fn invalid_attached_glossary_configuration_is_atomic() {
-    let mut template = DocWriter::new();
+    let mut template = Writer::new();
     template.add_paragraph("Template").unwrap();
     let mut output = Cursor::new(vec![0xA5; 16]);
 
-    let error = match template.set_attached_glossary(DocWriter::new()) {
+    let error = match template.set_attached_glossary(Writer::new()) {
         Ok(_) => panic!("glossary metadata must be required"),
         Err(error) => error,
     };
@@ -413,7 +412,7 @@ fn invalid_attached_glossary_configuration_is_atomic() {
 
 #[test]
 fn attached_glossary_round_trips_inside_encrypted_template() {
-    let mut template = DocWriter::new();
+    let mut template = Writer::new();
     template.add_paragraph("Protected template").unwrap();
     template.set_attached_glossary(writer()).unwrap();
     template
@@ -444,10 +443,10 @@ fn attached_glossary_preserves_shared_data_and_drawing_graphs() {
 
     let parent_image = image_fixture("jpg/abstract1.jpg");
     let child_image = image_fixture("png/lena.png");
-    let mut template = DocWriter::new();
+    let mut template = Writer::new();
     template.add_paragraph("Template").unwrap();
     template
-        .insert_picture(DocPicture::new(parent_image.clone()).unwrap())
+        .insert_picture(Picture::new(parent_image.clone()).unwrap())
         .unwrap();
     template
         .set_attached_glossary(glossary_with_drawings())
@@ -530,7 +529,7 @@ fn attached_glossary_preserves_shared_data_and_drawing_graphs() {
 
 #[test]
 fn attached_glossary_exposes_typed_inert_fields() {
-    let mut template = DocWriter::new();
+    let mut template = Writer::new();
     template.add_paragraph("Template").unwrap();
     template
         .set_attached_glossary(glossary_with_hyperlink())
@@ -557,7 +556,7 @@ fn attached_glossary_exposes_typed_inert_fields() {
 
 #[test]
 fn attached_glossary_reconstructs_all_fields_excluded_from_plcfld() {
-    let mut template = DocWriter::new();
+    let mut template = Writer::new();
     template.add_paragraph("Template").unwrap();
     template
         .set_attached_glossary(glossary_with_non_plcf_fields())

@@ -1,11 +1,11 @@
-use litchi_doc::{DocWriter, EncryptionProfile, OpenOptions, Package};
+use litchi_doc::{EncryptionProfile, OpenOptions, Package, Writer};
 use litchi_vba::{
     Limits,
     build::{Module, Project},
 };
 use std::io::Cursor;
 
-fn write(writer: &mut DocWriter) -> Vec<u8> {
+fn write(writer: &mut Writer) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
     output.into_inner()
@@ -13,7 +13,7 @@ fn write(writer: &mut DocWriter) -> Vec<u8> {
 
 #[test]
 fn complete_project_round_trips_from_the_macros_storage() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("Body").unwrap();
     let project = Project::new("DocumentTools")
         .module(Module::standard(
@@ -57,7 +57,7 @@ fn complete_project_round_trips_from_the_macros_storage() {
 
 #[test]
 fn project_storage_remains_clear_when_document_streams_are_encrypted() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("Encrypted body").unwrap();
     let project = Project::new("EncryptedDocument").module(Module::standard(
         "Module1",
@@ -84,7 +84,7 @@ fn project_storage_remains_clear_when_document_streams_are_encrypted() {
 
 #[test]
 fn failed_build_is_atomic_and_project_can_be_cleared() {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("Body").unwrap();
     let existing = Project::new("ExistingProject")
         .finish(&Limits::default())

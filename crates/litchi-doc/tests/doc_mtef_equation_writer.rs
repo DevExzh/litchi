@@ -1,7 +1,7 @@
 use litchi_cfb::OleFile;
 use litchi_doc::embedded_object::{Info, Limits};
-use litchi_doc::writer::{DocPicture, DocWriter};
-use litchi_doc::{DocMtefEquationWriteOptions, EQUATION_3_CLSID, Editor, MtefEquation, Package};
+use litchi_doc::writer::{Picture, Writer};
+use litchi_doc::{EQUATION_3_CLSID, Editor, MtefEquation, MtefEquationWriteOptions, Package};
 use litchi_ole_common::object::{Editor as ObjectEditor, Limits as ObjectLimits, Target, Targets};
 use std::io::Cursor;
 
@@ -32,7 +32,7 @@ fn preview_png() -> Vec<u8> {
 }
 
 fn base_doc() -> Vec<u8> {
-    let mut writer = DocWriter::new();
+    let mut writer = Writer::new();
     writer.add_paragraph("native equation follows").unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
@@ -44,10 +44,10 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
     let payload = decode_hex_fixture();
     let equation = MtefEquation::from_mtef_payload(payload.clone()).unwrap();
     assert_eq!(equation.mtef_payload(), payload);
-    let preview = DocPicture::new(preview_png()).unwrap();
+    let preview = Picture::new(preview_png()).unwrap();
     let mut editor = Editor::open(base_doc(), Limits::default()).unwrap();
     let reference = editor
-        .add_mtef_equation(DocMtefEquationWriteOptions::new(314_159, equation, preview))
+        .add_mtef_equation(MtefEquationWriteOptions::new(314_159, equation, preview))
         .unwrap();
     assert_eq!(reference.storage_name, "_314159");
     assert_eq!(

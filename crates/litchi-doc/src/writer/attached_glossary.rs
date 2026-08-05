@@ -1,6 +1,6 @@
 //! Assembly of a secondary glossary FIB and its independent text graph.
 
-use super::core::DocWriteError;
+use super::core::WriteError;
 
 const FIB_SIZE: usize = 1248;
 const FIB_PN_NEXT_OFFSET: usize = 8;
@@ -28,11 +28,11 @@ struct BinEntry {
     page_number: u32,
 }
 
-fn invalid(message: impl Into<String>) -> DocWriteError {
-    DocWriteError::InvalidData(message.into())
+fn invalid(message: impl Into<String>) -> WriteError {
+    WriteError::InvalidData(message.into())
 }
 
-fn read_u16(data: &[u8], offset: usize, label: &str) -> Result<u16, DocWriteError> {
+fn read_u16(data: &[u8], offset: usize, label: &str) -> Result<u16, WriteError> {
     let bytes = data
         .get(offset..offset + 2)
         .ok_or_else(|| invalid(format!("{label} is truncated")))?;
@@ -41,7 +41,7 @@ fn read_u16(data: &[u8], offset: usize, label: &str) -> Result<u16, DocWriteErro
     ))
 }
 
-fn read_u32(data: &[u8], offset: usize, label: &str) -> Result<u32, DocWriteError> {
+fn read_u32(data: &[u8], offset: usize, label: &str) -> Result<u32, WriteError> {
     let bytes = data
         .get(offset..offset + 4)
         .ok_or_else(|| invalid(format!("{label} is truncated")))?;
@@ -50,7 +50,7 @@ fn read_u32(data: &[u8], offset: usize, label: &str) -> Result<u32, DocWriteErro
     ))
 }
 
-fn write_u16(data: &mut [u8], offset: usize, value: u16, label: &str) -> Result<(), DocWriteError> {
+fn write_u16(data: &mut [u8], offset: usize, value: u16, label: &str) -> Result<(), WriteError> {
     let target = data
         .get_mut(offset..offset + 2)
         .ok_or_else(|| invalid(format!("{label} is truncated")))?;
@@ -58,7 +58,7 @@ fn write_u16(data: &mut [u8], offset: usize, value: u16, label: &str) -> Result<
     Ok(())
 }
 
-fn write_u32(data: &mut [u8], offset: usize, value: u32, label: &str) -> Result<(), DocWriteError> {
+fn write_u32(data: &mut [u8], offset: usize, value: u32, label: &str) -> Result<(), WriteError> {
     let target = data
         .get_mut(offset..offset + 4)
         .ok_or_else(|| invalid(format!("{label} is truncated")))?;
@@ -66,13 +66,13 @@ fn write_u32(data: &mut [u8], offset: usize, value: u32, label: &str) -> Result<
     Ok(())
 }
 
-fn checked_add(value: u32, delta: u32, label: &str) -> Result<u32, DocWriteError> {
+fn checked_add(value: u32, delta: u32, label: &str) -> Result<u32, WriteError> {
     value
         .checked_add(delta)
         .ok_or_else(|| invalid(format!("{label} exceeds 32-bit DOC address space")))
 }
 
-fn pointer(fib: &[u8], index: usize) -> Result<(u32, u32), DocWriteError> {
+fn pointer(fib: &[u8], index: usize) -> Result<(u32, u32), WriteError> {
     let offset = FIB_POINTERS_OFFSET
         .checked_add(
             index
@@ -86,12 +86,7 @@ fn pointer(fib: &[u8], index: usize) -> Result<(u32, u32), DocWriteError> {
     ))
 }
 
-fn set_pointer(
-    fib: &mut [u8],
-    index: usize,
-    offset: u32,
-    length: u32,
-) -> Result<(), DocWriteError> {
+fn set_pointer(fib: &mut [u8], index: usize, offset: u32, length: u32) -> Result<(), WriteError> {
     let position = FIB_POINTERS_OFFSET + index * FIB_POINTER_SIZE;
     write_u32(fib, position, offset, "DOC FIB table pointer")?;
     write_u32(fib, position + 4, length, "DOC FIB table length")
@@ -102,7 +97,7 @@ fn table_range(
     offset: u32,
     length: u32,
     label: &str,
-) -> Result<std::ops::Range<usize>, DocWriteError> {
+) -> Result<std::ops::Range<usize>, WriteError> {
     let start =
         usize::try_from(offset).map_err(|_| invalid(format!("{label} offset is too large")))?;
     let length =
@@ -119,7 +114,7 @@ fn parse_bin_table(
     table: &[u8],
     index: usize,
     label: &str,
-) -> Result<Vec<BinEntry>, DocWriteError> {
+) -> Result<Vec<BinEntry>, WriteError> {
     let (offset, length) = pointer(fib, index)?;
     let range = table_range(table, offset, length, label)?;
     let bytes = &table[range];
@@ -150,7 +145,7 @@ fn relocate_fkp_pages(
     entries: &mut [BinEntry],
     word_delta: u32,
     label: &str,
-) -> Result<(), DocWriteError> {
+) -> Result<(), WriteError> {
     let page_delta = word_delta / WORD_PAGE_SIZE as u32;
     let mut previous_page = None;
     for entry in entries {
@@ -180,7 +175,7 @@ fn relocate_fkp_pages(
     Ok(())
 }
 
-fn relocate_clx(fib: &[u8], table: &mut [u8], word_delta: u32) -> Result<(), DocWriteError> {
+fn relocate_clx(fib: &[u8], table: &mut [u8], word_delta: u32) -> Result<(), WriteError> {
     let (offset, length) = pointer(fib, CLX_INDEX)?;
     let range = table_range(table, offset, length, "attached glossary CLX")?;
     let clx = &mut table[range];
@@ -218,11 +213,7 @@ fn relocate_clx(fib: &[u8], table: &mut [u8], word_delta: u32) -> Result<(), Doc
     Ok(())
 }
 
-fn relocate_section_table(
-    fib: &[u8],
-    table: &mut [u8],
-    word_delta: u32,
-) -> Result<(), DocWriteError> {
+fn relocate_section_table(fib: &[u8], table: &mut [u8], word_delta: u32) -> Result<(), WriteError> {
     let (offset, length) = pointer(fib, PLCF_SED_INDEX)?;
     let range = table_range(table, offset, length, "attached glossary PlcfSed")?;
     let plc = &mut table[range];
@@ -252,7 +243,7 @@ fn relocate_table_pointers(
     fib: &mut [u8],
     table: &[u8],
     table_delta: u32,
-) -> Result<(), DocWriteError> {
+) -> Result<(), WriteError> {
     for index in 0..FIB_POINTER_COUNT {
         let (offset, length) = pointer(fib, index)?;
         if length == 0 {
@@ -269,7 +260,7 @@ fn relocate_table_pointers(
     Ok(())
 }
 
-fn generate_bin_table(entries: &[BinEntry], label: &str) -> Result<Vec<u8>, DocWriteError> {
+fn generate_bin_table(entries: &[BinEntry], label: &str) -> Result<Vec<u8>, WriteError> {
     if entries.is_empty() {
         return Err(invalid(format!("{label} cannot be empty")));
     }
@@ -295,7 +286,7 @@ fn generate_bin_table(entries: &[BinEntry], label: &str) -> Result<Vec<u8>, DocW
     Ok(bytes)
 }
 
-fn set_flags(fib: &mut [u8], set: u16, clear: u16, label: &str) -> Result<(), DocWriteError> {
+fn set_flags(fib: &mut [u8], set: u16, clear: u16, label: &str) -> Result<(), WriteError> {
     let flags = read_u16(fib, FIB_FLAGS_OFFSET, label)?;
     write_u16(fib, FIB_FLAGS_OFFSET, (flags | set) & !clear, label)
 }
@@ -313,7 +304,7 @@ pub(super) fn merge_attached_glossary(
     main_table: &mut Vec<u8>,
     glossary_word: &mut [u8],
     glossary_table: &mut [u8],
-) -> Result<(), DocWriteError> {
+) -> Result<(), WriteError> {
     if main_word.len() < FIB_SIZE || glossary_word.len() < FIB_SIZE {
         return Err(invalid("DOC writer emitted a truncated FIB"));
     }

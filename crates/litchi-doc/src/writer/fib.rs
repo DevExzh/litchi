@@ -13,8 +13,8 @@
 //! - FibRgFcLcb (file character positions and byte counts)
 //! - FibRgCswNew (additional data)
 
-/// Error type for DOC operations
-pub type DocError = std::io::Error;
+/// I/O error returned while generating the FIB.
+pub type IoError = std::io::Error;
 
 /// FIB base version for backward compatibility
 /// Per MS-DOC spec: FibBase.nFib SHOULD be 0x00C1.
@@ -665,7 +665,7 @@ impl FibBuilder {
     ///
     /// Layout: Word 2002 format (nFibNew 0x0101) with 136 FibRgFcLcb pairs.
     /// FibBase.nFib is always 0x00C1 per spec; actual version in FibRgCswNew.nFibNew.
-    pub fn generate(&self) -> Result<Vec<u8>, DocError> {
+    pub fn generate(&self) -> Result<Vec<u8>, IoError> {
         // Word 2002 format (nFibNew 0x0101) FIB layout:
         //   32 (base) + 2 (csw) + 28 (RgW) + 2 (cslw) + 88 (RgLw)
         //   + 2 (cbRgFcLcb) + 1088 (RgFcLcb: 136 pairs * 8)
@@ -709,7 +709,7 @@ impl FibBuilder {
         Ok(fib)
     }
 
-    fn write_base(&self, fib: &mut [u8]) -> Result<(), DocError> {
+    fn write_base(&self, fib: &mut [u8]) -> Result<(), IoError> {
         // Word document magic number
         fib[0..2].copy_from_slice(&0xA5ECu16.to_le_bytes());
 
@@ -772,7 +772,7 @@ impl FibBuilder {
         Ok(())
     }
 
-    fn write_fibrgw(&self, buf: &mut [u8]) -> Result<(), DocError> {
+    fn write_fibrgw(&self, buf: &mut [u8]) -> Result<(), IoError> {
         // FibRgW contains various configuration values
 
         // wMagicCreated (offset 0 in FibRgW = offset 34 in FIB)
@@ -794,7 +794,7 @@ impl FibBuilder {
         Ok(())
     }
 
-    fn write_fibrglw(&self, buf: &mut [u8]) -> Result<(), DocError> {
+    fn write_fibrglw(&self, buf: &mut [u8]) -> Result<(), IoError> {
         // FibRgLw97 structure - character COUNTS for subdocuments
         // Based on POI's FibRgLw97AbstractType.serialize()
 
@@ -837,7 +837,7 @@ impl FibBuilder {
         Ok(())
     }
 
-    fn write_fibrgfclcb(&self, buf: &mut [u8]) -> Result<(), DocError> {
+    fn write_fibrgfclcb(&self, buf: &mut [u8]) -> Result<(), IoError> {
         // FibRgFcLcb contains file offsets and byte counts for various structures
         // Each entry is an (fc, lcb) pair - file offset and byte count
         // Based on Apache POI's FIBFieldHandler field indices

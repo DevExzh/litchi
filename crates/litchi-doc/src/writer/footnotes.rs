@@ -2,17 +2,17 @@
 //!
 //! Generates footnote/endnote reference PLCFs and subdocument content.
 
-use super::DocWriteError;
+use super::WriteError;
 
-fn add_cp(current: u32, text_units: usize, suffix: u32) -> Result<u32, DocWriteError> {
+fn add_cp(current: u32, text_units: usize, suffix: u32) -> Result<u32, WriteError> {
     let text_units = u32::try_from(text_units).map_err(|_| {
-        DocWriteError::InvalidData("DOC footnote story exceeds the 32-bit CP range".to_string())
+        WriteError::InvalidData("DOC footnote story exceeds the 32-bit CP range".to_string())
     })?;
     current
         .checked_add(text_units)
         .and_then(|next| next.checked_add(suffix))
         .ok_or_else(|| {
-            DocWriteError::InvalidData("DOC footnote story exceeds the 32-bit CP range".to_string())
+            WriteError::InvalidData("DOC footnote story exceeds the 32-bit CP range".to_string())
         })
 }
 
@@ -67,7 +67,7 @@ impl FootnotesWriter {
     ///
     /// Format: CP array followed by FRD (Footnote Reference Descriptor) array
     /// FRD is 2 bytes: footnote number
-    pub fn build_plcf_fnd_ref(&self) -> Result<Vec<u8>, DocWriteError> {
+    pub fn build_plcf_fnd_ref(&self) -> Result<Vec<u8>, WriteError> {
         let final_cp = match self
             .footnotes
             .iter()
@@ -75,7 +75,7 @@ impl FootnotesWriter {
             .max()
         {
             Some(cp) => cp.checked_add(1).ok_or_else(|| {
-                DocWriteError::InvalidData(
+                WriteError::InvalidData(
                     "DOC footnote reference exceeds the 32-bit CP range".to_string(),
                 )
             })?,
@@ -106,10 +106,10 @@ impl FootnotesWriter {
     ///
     /// # Errors
     ///
-    /// Returns [`DocWriteError::InvalidData`] when the UTF-16 footnote story length
+    /// Returns [`WriteError::InvalidData`] when the UTF-16 footnote story length
     /// exceeds DOC's 32-bit character-position range or the PLCF cannot be
     /// allocated safely.
-    pub fn build_plcf_fnd_txt(&self) -> Result<Vec<u8>, DocWriteError> {
+    pub fn build_plcf_fnd_txt(&self) -> Result<Vec<u8>, WriteError> {
         self.char_count()?;
         let final_mark = usize::from(!self.footnotes.is_empty());
         let cp_count = self
@@ -117,15 +117,13 @@ impl FootnotesWriter {
             .len()
             .checked_add(1)
             .and_then(|count| count.checked_add(final_mark))
-            .ok_or_else(|| {
-                DocWriteError::InvalidData("DOC footnote PLCF is too large".to_string())
-            })?;
-        let byte_count = cp_count.checked_mul(size_of::<u32>()).ok_or_else(|| {
-            DocWriteError::InvalidData("DOC footnote PLCF is too large".to_string())
-        })?;
+            .ok_or_else(|| WriteError::InvalidData("DOC footnote PLCF is too large".to_string()))?;
+        let byte_count = cp_count
+            .checked_mul(size_of::<u32>())
+            .ok_or_else(|| WriteError::InvalidData("DOC footnote PLCF is too large".to_string()))?;
         let mut plcf = Vec::new();
         plcf.try_reserve_exact(byte_count).map_err(|_| {
-            DocWriteError::InvalidData("DOC footnote PLCF allocation is too large".to_string())
+            WriteError::InvalidData("DOC footnote PLCF allocation is too large".to_string())
         })?;
         let mut current_cp = 0u32;
 
@@ -147,19 +145,19 @@ impl FootnotesWriter {
     }
 
     /// Get the subdocument text content
-    pub fn build_subdocument_text(&self) -> Result<Vec<u8>, DocWriteError> {
+    pub fn build_subdocument_text(&self) -> Result<Vec<u8>, WriteError> {
         let char_count = self.char_count()?;
         let byte_count = usize::try_from(char_count)
             .ok()
             .and_then(|count| count.checked_mul(2))
             .ok_or_else(|| {
-                DocWriteError::InvalidData(
+                WriteError::InvalidData(
                     "DOC footnote story byte length exceeds this platform".to_string(),
                 )
             })?;
         let mut text_bytes = Vec::new();
         text_bytes.try_reserve_exact(byte_count).map_err(|_| {
-            DocWriteError::InvalidData("DOC footnote story allocation is too large".to_string())
+            WriteError::InvalidData("DOC footnote story allocation is too large".to_string())
         })?;
         for footnote in self.ordered_footnotes() {
             text_bytes.extend_from_slice(&0x0002u16.to_le_bytes());
@@ -178,9 +176,9 @@ impl FootnotesWriter {
     ///
     /// # Errors
     ///
-    /// Returns [`DocWriteError::InvalidData`] when the UTF-16 story length exceeds
+    /// Returns [`WriteError::InvalidData`] when the UTF-16 story length exceeds
     /// DOC's 32-bit character-position range.
-    pub fn char_count(&self) -> Result<u32, DocWriteError> {
+    pub fn char_count(&self) -> Result<u32, WriteError> {
         let stories = self.footnotes.iter().try_fold(0u32, |total, footnote| {
             add_cp(total, footnote.text.encode_utf16().count(), 2)
         })?;

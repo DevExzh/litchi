@@ -6,8 +6,8 @@
 //!
 //! Based on Microsoft's "[MS-DOC]" specification and Apache POI's PieceDescriptor.
 
-/// Error type for DOC operations
-pub type DocError = std::io::Error;
+/// I/O error returned while generating the piece table.
+pub type IoError = std::io::Error;
 
 /// Piece descriptor - maps a range of characters to a file location
 #[derive(Debug, Clone)]
@@ -68,7 +68,7 @@ impl PieceTableBuilder {
     /// Clx structure containing piece descriptors
     ///
     /// Based on Apache POI's ComplexFileTable.writeTo() (line 96-106)
-    pub fn generate(&self) -> Result<Vec<u8>, DocError> {
+    pub fn generate(&self) -> Result<Vec<u8>, IoError> {
         let mut clx = Vec::new();
 
         // Prc (piece table header) - POI line 98

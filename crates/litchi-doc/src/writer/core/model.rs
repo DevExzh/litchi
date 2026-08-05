@@ -16,7 +16,7 @@ use crate::writer::numbering::{ListFormatOverride, ListStructure, NumberingWrite
 use crate::writer::revisions::{
     DisplayFieldRevision, FormattingRevision, NumberingRevision, TextRevision,
 };
-use crate::writer::smart_tags::DocSmartTagEntry;
+use crate::writer::smart_tags::SmartTagEntry;
 use crate::{
     AssociatedStringSlot, DocumentAssociatedStrings, GlossaryMetadata, ProofingFeature,
     ProofingStateTable, ProofingTables, SavedByTable, SmartTagRecognizerRange,
@@ -32,7 +32,7 @@ pub(super) const VBA_PROJECT_STORAGE_NAME: &str = "Macros";
 
 /// Error type for DOC writing
 #[derive(Debug)]
-pub enum DocWriteError {
+pub enum WriteError {
     /// I/O error
     Io(std::io::Error),
     /// Invalid data
@@ -43,36 +43,36 @@ pub enum DocWriteError {
     Vba(litchi_vba::Error),
 }
 
-impl From<std::io::Error> for DocWriteError {
+impl From<std::io::Error> for WriteError {
     fn from(err: std::io::Error) -> Self {
-        DocWriteError::Io(err)
+        WriteError::Io(err)
     }
 }
 
-impl From<OleError> for DocWriteError {
+impl From<OleError> for WriteError {
     fn from(err: OleError) -> Self {
-        DocWriteError::Ole(err)
+        WriteError::Ole(err)
     }
 }
 
-impl From<litchi_vba::Error> for DocWriteError {
+impl From<litchi_vba::Error> for WriteError {
     fn from(err: litchi_vba::Error) -> Self {
-        DocWriteError::Vba(err)
+        WriteError::Vba(err)
     }
 }
 
-impl std::fmt::Display for DocWriteError {
+impl std::fmt::Display for WriteError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DocWriteError::Io(e) => write!(f, "I/O error: {}", e),
-            DocWriteError::InvalidData(s) => write!(f, "Invalid data: {}", s),
-            DocWriteError::Ole(e) => write!(f, "OLE error: {}", e),
-            DocWriteError::Vba(e) => write!(f, "VBA project error: {}", e),
+            WriteError::Io(e) => write!(f, "I/O error: {}", e),
+            WriteError::InvalidData(s) => write!(f, "Invalid data: {}", s),
+            WriteError::Ole(e) => write!(f, "OLE error: {}", e),
+            WriteError::Vba(e) => write!(f, "VBA project error: {}", e),
         }
     }
 }
 
-impl std::error::Error for DocWriteError {
+impl std::error::Error for WriteError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Io(error) => Some(error),
@@ -83,12 +83,11 @@ impl std::error::Error for DocWriteError {
     }
 }
 
-pub(super) fn utf16_code_unit_len(text: &str) -> Result<u32, DocWriteError> {
-    let length = u32::try_from(text.encode_utf16().count()).map_err(|_| {
-        DocWriteError::InvalidData("DOC text exceeds the 32-bit CP range".to_string())
-    })?;
+pub(super) fn utf16_code_unit_len(text: &str) -> Result<u32, WriteError> {
+    let length = u32::try_from(text.encode_utf16().count())
+        .map_err(|_| WriteError::InvalidData("DOC text exceeds the 32-bit CP range".to_string()))?;
     if length >= 0x7FFF_FFFF {
-        return Err(DocWriteError::InvalidData(
+        return Err(WriteError::InvalidData(
             "DOC text exceeds the MS-DOC CP limit".to_string(),
         ));
     }
@@ -109,19 +108,19 @@ impl HeaderFieldState {
         &mut self,
         character: char,
         formatting: &CharacterFormatting,
-    ) -> Result<bool, DocWriteError> {
+    ) -> Result<bool, WriteError> {
         if !matches!(character as u32, 0x0013..=0x0015) {
             return Ok(false);
         }
         if formatting.special != Some(true) {
-            return Err(DocWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "DOC header/footer field marker requires fSpec formatting".to_string(),
             ));
         }
         match character as u32 {
             0x0013 => {
                 if self.separator_seen.len() >= MAX_HEADER_FIELD_DEPTH {
-                    return Err(DocWriteError::InvalidData(
+                    return Err(WriteError::InvalidData(
                         "DOC header/footer field nesting exceeds the limit".to_string(),
                     ));
                 }
@@ -129,12 +128,12 @@ impl HeaderFieldState {
             },
             0x0014 => {
                 let seen = self.separator_seen.last_mut().ok_or_else(|| {
-                    DocWriteError::InvalidData(
+                    WriteError::InvalidData(
                         "DOC header/footer field separator has no begin marker".to_string(),
                     )
                 })?;
                 if *seen {
-                    return Err(DocWriteError::InvalidData(
+                    return Err(WriteError::InvalidData(
                         "DOC header/footer field has duplicate separators".to_string(),
                     ));
                 }
@@ -142,7 +141,7 @@ impl HeaderFieldState {
             },
             0x0015 => {
                 self.separator_seen.pop().ok_or_else(|| {
-                    DocWriteError::InvalidData(
+                    WriteError::InvalidData(
                         "DOC header/footer field end has no begin marker".to_string(),
                     )
                 })?;
@@ -152,39 +151,36 @@ impl HeaderFieldState {
         Ok(true)
     }
 
-    pub(super) fn finish(self) -> Result<(), DocWriteError> {
+    pub(super) fn finish(self) -> Result<(), WriteError> {
         if self.separator_seen.is_empty() {
             Ok(())
         } else {
-            Err(DocWriteError::InvalidData(
+            Err(WriteError::InvalidData(
                 "DOC header/footer field is not terminated within its story".to_string(),
             ))
         }
     }
 }
 
-pub(super) fn checked_text_fc(
-    text_fc_start: u32,
-    stream_length: usize,
-) -> Result<u32, DocWriteError> {
+pub(super) fn checked_text_fc(text_fc_start: u32, stream_length: usize) -> Result<u32, WriteError> {
     let stream_length = u32::try_from(stream_length).map_err(|_| {
-        DocWriteError::InvalidData("DOC text stream exceeds 32-bit FC space".to_string())
+        WriteError::InvalidData("DOC text stream exceeds 32-bit FC space".to_string())
     })?;
     text_fc_start
         .checked_add(stream_length)
-        .ok_or_else(|| DocWriteError::InvalidData("DOC text stream FC range overflows".to_string()))
+        .ok_or_else(|| WriteError::InvalidData("DOC text stream FC range overflows".to_string()))
 }
 
 pub(super) fn validate_header_footer_paragraphs(
     paragraphs: &[HeaderFooterParagraph],
-) -> Result<(), DocWriteError> {
+) -> Result<(), WriteError> {
     if paragraphs.is_empty() {
-        return Err(DocWriteError::InvalidData(
+        return Err(WriteError::InvalidData(
             "DOC header/footer story requires at least one paragraph".to_string(),
         ));
     }
     if paragraphs.len() > MAX_HEADER_FOOTER_PARAGRAPHS {
-        return Err(DocWriteError::InvalidData(
+        return Err(WriteError::InvalidData(
             "DOC header/footer story exceeds the paragraph limit".to_string(),
         ));
     }
@@ -194,16 +190,16 @@ pub(super) fn validate_header_footer_paragraphs(
     let mut field_state = HeaderFieldState::default();
     for paragraph in paragraphs {
         run_count = run_count.checked_add(paragraph.runs.len()).ok_or_else(|| {
-            DocWriteError::InvalidData("DOC header/footer run count overflows".to_string())
+            WriteError::InvalidData("DOC header/footer run count overflows".to_string())
         })?;
         if run_count > MAX_HEADER_FOOTER_RUNS {
-            return Err(DocWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "DOC header/footer story exceeds the run limit".to_string(),
             ));
         }
         for (text, formatting) in &paragraph.runs {
             if text.contains('\r') {
-                return Err(DocWriteError::InvalidData(
+                return Err(WriteError::InvalidData(
                     "DOC header/footer run contains an embedded paragraph mark".to_string(),
                 ));
             }
@@ -213,24 +209,24 @@ pub(super) fn validate_header_footer_paragraphs(
             character_count = character_count
                 .checked_add(utf16_code_unit_len(text)?)
                 .ok_or_else(|| {
-                    DocWriteError::InvalidData(
+                    WriteError::InvalidData(
                         "DOC header/footer story CP range overflows".to_string(),
                     )
                 })?;
         }
         character_count = character_count.checked_add(1).ok_or_else(|| {
-            DocWriteError::InvalidData("DOC header/footer story CP range overflows".to_string())
+            WriteError::InvalidData("DOC header/footer story CP range overflows".to_string())
         })?;
     }
     if character_count >= 0x7FFF_FFFF {
-        return Err(DocWriteError::InvalidData(
+        return Err(WriteError::InvalidData(
             "DOC header/footer story exceeds the MS-DOC CP limit".to_string(),
         ));
     }
     field_state.finish()
 }
 
-pub(crate) fn pack_dttm(value: Option<CommentDateTime>) -> Result<u32, DocWriteError> {
+pub(crate) fn pack_dttm(value: Option<CommentDateTime>) -> Result<u32, WriteError> {
     let Some(value) = value else {
         return Ok(0);
     };
@@ -241,7 +237,7 @@ pub(crate) fn pack_dttm(value: Option<CommentDateTime>) -> Result<u32, DocWriteE
         || value.minute > 59
         || value.weekday > 6
     {
-        return Err(DocWriteError::InvalidData(
+        return Err(WriteError::InvalidData(
             "DOC timestamp is outside the DTTM field ranges".to_string(),
         ));
     }
@@ -278,7 +274,7 @@ pub(super) const HEADER_SLOT_FIRST: usize = 10;
 /// `fTitlePage`, because appending the anchor creates the corresponding
 /// header story.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DocHeaderKind {
+pub enum HeaderKind {
     /// Odd page header; Word's default header.
     Odd,
     /// Even page header (requires facing pages, enabled automatically).
@@ -288,7 +284,7 @@ pub enum DocHeaderKind {
     FirstPage,
 }
 
-impl DocHeaderKind {
+impl HeaderKind {
     /// The PlcfHdd slot holding this header kind's story.
     pub(super) fn slot(self) -> usize {
         match self {
@@ -427,9 +423,9 @@ impl LineSpacing {
     }
 
     /// Create proportional line spacing expressed in 240ths of one line.
-    pub fn multiple_240ths(value: u16) -> Result<Self, DocWriteError> {
+    pub fn multiple_240ths(value: u16) -> Result<Self, WriteError> {
         if !(1..=31_680).contains(&value) {
-            return Err(DocWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "line-spacing multiple {value} is outside the LSPD range 1..=31680"
             )));
         }
@@ -440,9 +436,9 @@ impl LineSpacing {
     }
 
     /// Create minimum line spacing in twips.
-    pub fn at_least_twips(value: u16) -> Result<Self, DocWriteError> {
+    pub fn at_least_twips(value: u16) -> Result<Self, WriteError> {
         if !(1..=31_680).contains(&value) {
-            return Err(DocWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "minimum line spacing {value} twips is outside the LSPD range 1..=31680"
             )));
         }
@@ -453,9 +449,9 @@ impl LineSpacing {
     }
 
     /// Create exact line spacing in twips.
-    pub fn exact_twips(value: u16) -> Result<Self, DocWriteError> {
+    pub fn exact_twips(value: u16) -> Result<Self, WriteError> {
         if !(1..=31_680).contains(&value) {
-            return Err(DocWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "exact line spacing {value} twips is outside the LSPD range 1..=31680"
             )));
         }
@@ -616,10 +612,10 @@ pub(super) struct TextRun {
     pub(super) text: String,
     /// Character formatting
     pub(super) formatting: CharacterFormatting,
-    /// Index into `DocWriter::pictures` when this run is a picture
+    /// Index into `Writer::pictures` when this run is a picture
     /// (a single 0x0001 inline or 0x0008 floating picture character).
     pub(super) picture_index: Option<u32>,
-    /// Index into `DocWriter::shapes` when this run is a floating
+    /// Index into `Writer::shapes` when this run is a floating
     /// drawing-shape anchor (a single 0x0008 character).
     pub(super) shape_index: Option<u32>,
 }
@@ -693,11 +689,11 @@ impl HeaderFooterParagraph {
         instruction: impl Into<String>,
         result: impl Into<String>,
         result_formatting: CharacterFormatting,
-    ) -> Result<Self, DocWriteError> {
+    ) -> Result<Self, WriteError> {
         let instruction = instruction.into();
         let result = result.into();
         if instruction.is_empty() {
-            return Err(DocWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "DOC header/footer field instruction is empty".to_string(),
             ));
         }
@@ -706,7 +702,7 @@ impl HeaderFooterParagraph {
             .chain(result.chars())
             .any(|character| character == '\r' || matches!(character as u32, 0x0013..=0x0015))
         {
-            return Err(DocWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "DOC header/footer field text contains a structural control character".to_string(),
             ));
         }
@@ -768,7 +764,7 @@ pub(super) struct WritableTable {
 #[derive(Debug, Clone)]
 pub(super) struct WriterPicture {
     /// The picture data and display dimensions.
-    pub(super) picture: crate::writer::images::DocPicture,
+    pub(super) picture: crate::writer::images::Picture,
     /// Shape id allocated at insert time (shared sequence with shapes).
     pub(super) shape_id: u32,
     /// Position and wrapping when the picture floats; `None` for inline.
@@ -791,16 +787,16 @@ pub(super) struct WriterShape {
 /// What kind of floating content a 0x0008 anchor character refers to.
 #[derive(Debug, Clone, Copy)]
 pub(super) enum FloatingAnchorKind {
-    /// Index into `DocWriter::pictures`.
+    /// Index into `Writer::pictures`.
     Picture(u32),
-    /// Index into `DocWriter::shapes`.
+    /// Index into `Writer::shapes`.
     Shape(u32),
 }
 
 /// DOC file writer
 ///
 /// Provides methods to create and modify DOC files.
-pub struct DocWriter {
+pub struct Writer {
     /// Paragraphs in the document
     pub(super) paragraphs: Vec<WritableParagraph>,
     /// Tables in the document
@@ -827,7 +823,7 @@ pub struct DocWriter {
     /// Standard bookmarks
     pub(super) bookmarks: Vec<BookmarkEntry>,
     /// Embedded smart-tag bookmarks and property bags.
-    pub(super) smart_tags: Vec<DocSmartTagEntry>,
+    pub(super) smart_tags: Vec<SmartTagEntry>,
     /// Smart-tag recognizer processing-state ranges.
     pub(super) smart_tag_recognizer_ranges: Vec<SmartTagRecognizerRange>,
     /// Optional spelling and grammar proofing-state PLCFs.
@@ -839,7 +835,7 @@ pub struct DocWriter {
     /// Optional glossary-only AutoText metadata over the main story.
     pub(super) glossary_metadata: Option<GlossaryMetadata>,
     /// Optional distinct AutoText-only document attached to this template.
-    pub(super) attached_glossary: Option<Box<DocWriter>>,
+    pub(super) attached_glossary: Option<Box<Writer>>,
     /// Property revision metadata for the writer's single document section
     pub(super) section_formatting_revision: Option<FormattingRevision>,
     /// Explicit column geometry for the writer's single document section.
@@ -853,10 +849,10 @@ pub struct DocWriter {
     /// Numbering writer for list tables
     pub(super) numbering: NumberingWriter,
     /// User-defined styles appended after the fifteen fixed style slots
-    pub(super) styles: Vec<crate::writer::stylesheet::DocStyleDefinition>,
-    /// Inline pictures embedded via [`DocWriter::insert_picture`]
+    pub(super) styles: Vec<crate::writer::stylesheet::StyleDefinition>,
+    /// Inline pictures embedded via [`Writer::insert_picture`]
     pub(super) pictures: Vec<WriterPicture>,
-    /// Primitive drawing shapes embedded via [`DocWriter::insert_floating_shape`]
+    /// Primitive drawing shapes embedded via [`Writer::insert_floating_shape`]
     pub(super) shapes: Vec<WriterShape>,
     /// Text boxes anchored in the header story, in insertion order.
     pub(super) header_shapes: Vec<WriterShape>,
@@ -868,12 +864,12 @@ pub struct DocWriter {
     /// Next shape id to allocate (shared by pictures and drawing shapes).
     pub(super) next_shape_id: u32,
     /// Password-to-open settings. The password is wiped when replaced, cleared, or dropped.
-    pub(super) encryption: Option<DocWriterEncryption>,
+    pub(super) encryption: Option<WriterEncryption>,
     /// Complete inert MS-OVBA project written under the MS-DOC `Macros` storage.
     pub(super) vba_project: Option<litchi_vba::Payload>,
 }
 
-pub(super) struct DocWriterEncryption {
+pub(super) struct WriterEncryption {
     pub(super) profile: EncryptionProfile,
     pub(super) password: Zeroizing<String>,
 }
@@ -885,7 +881,7 @@ pub(super) struct DocWriterEncryption {
 /// in the returned story character count. Returns the story-relative start
 /// CP of each text box and the total story length (a ccp value).
 
-impl DocWriter {
+impl Writer {
     /// Create a new DOC writer
     pub fn new() -> Self {
         Self {
@@ -935,10 +931,10 @@ impl DocWriter {
         &mut self,
         password: impl Into<String>,
         profile: EncryptionProfile,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         let password = Zeroizing::new(password.into());
-        validate_writer_password(profile, password.as_str()).map_err(DocWriteError::InvalidData)?;
-        self.encryption = Some(DocWriterEncryption { profile, password });
+        validate_writer_password(profile, password.as_str()).map_err(WriteError::InvalidData)?;
+        self.encryption = Some(WriterEncryption { profile, password });
         Ok(())
     }
 
@@ -953,7 +949,7 @@ impl DocWriter {
     }
 
     /// Configure a complete inert VBA project with safe default limits.
-    pub fn set_vba(&mut self, project: litchi_vba::build::Project) -> Result<(), DocWriteError> {
+    pub fn set_vba(&mut self, project: litchi_vba::build::Project) -> Result<(), WriteError> {
         self.set_vba_with(project, &litchi_vba::Limits::default())
     }
 
@@ -964,7 +960,7 @@ impl DocWriter {
         &mut self,
         project: litchi_vba::build::Project,
         limits: &litchi_vba::Limits,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         let payload = project.finish(limits)?;
         self.put_vba(payload);
         Ok(())
@@ -1025,10 +1021,10 @@ impl DocWriter {
         &mut self,
         slot: AssociatedStringSlot,
         value: impl Into<String>,
-    ) -> Result<String, DocWriteError> {
+    ) -> Result<String, WriteError> {
         self.associated_strings
             .set(slot, value)
-            .map_err(|error| DocWriteError::InvalidData(error.to_string()))
+            .map_err(|error| WriteError::InvalidData(error.to_string()))
     }
 
     /// Reset all associated-document string slots to empty strings.
@@ -1077,7 +1073,7 @@ impl DocWriter {
 
     /// Attach a distinct glossary-only document to this template.
     ///
-    /// The attached writer must have [`DocWriter::set_glossary_metadata`]
+    /// The attached writer must have [`Writer::set_glossary_metadata`]
     /// configured. Its main story becomes the template's AutoText story.
     ///
     /// # Errors
@@ -1087,8 +1083,8 @@ impl DocWriter {
     /// represented by the shared DOC stream topology.
     pub fn set_attached_glossary(
         &mut self,
-        glossary: DocWriter,
-    ) -> Result<Option<DocWriter>, DocWriteError> {
+        glossary: Writer,
+    ) -> Result<Option<Writer>, WriteError> {
         glossary.validate_as_attached_glossary()?;
         Ok(self
             .attached_glossary
@@ -1097,36 +1093,36 @@ impl DocWriter {
     }
 
     /// Access the attached glossary writer.
-    pub fn attached_glossary(&self) -> Option<&DocWriter> {
+    pub fn attached_glossary(&self) -> Option<&Writer> {
         self.attached_glossary.as_deref()
     }
 
     /// Mutably access the attached glossary writer.
-    pub fn attached_glossary_mut(&mut self) -> Option<&mut DocWriter> {
+    pub fn attached_glossary_mut(&mut self) -> Option<&mut Writer> {
         self.attached_glossary.as_deref_mut()
     }
 
     /// Remove and return the attached glossary writer.
-    pub fn clear_attached_glossary(&mut self) -> Option<DocWriter> {
+    pub fn clear_attached_glossary(&mut self) -> Option<Writer> {
         self.attached_glossary.take().map(|glossary| *glossary)
     }
 }
 
-impl DocWriter {
+impl Writer {
     /// Add a custom paragraph, character, table, or numbering style.
     ///
     /// Custom styles occupy consecutive indices beginning at 15. The returned
     /// index can be used by the corresponding formatting properties.
     pub fn add_style(
         &mut self,
-        style: crate::writer::stylesheet::DocStyleDefinition,
-    ) -> Result<u16, DocWriteError> {
+        style: crate::writer::stylesheet::StyleDefinition,
+    ) -> Result<u16, WriteError> {
         let index = 15usize
             .checked_add(self.styles.len())
             .and_then(|index| u16::try_from(index).ok())
             .filter(|index| *index <= 0x0FFC)
             .ok_or_else(|| {
-                DocWriteError::InvalidData("DOC stylesheet exceeds 4093 style slots".to_string())
+                WriteError::InvalidData("DOC stylesheet exceeds 4093 style slots".to_string())
             })?;
         self.styles.push(style);
         Ok(index)
@@ -1140,8 +1136,8 @@ impl DocWriter {
     ///
     /// # Returns
     ///
-    /// * `Result<(), DocWriteError>` - Success or error
-    pub fn add_paragraph(&mut self, text: &str) -> Result<(), DocWriteError> {
+    /// * `Result<(), WriteError>` - Success or error
+    pub fn add_paragraph(&mut self, text: &str) -> Result<(), WriteError> {
         self.paragraphs.push(WritableParagraph {
             runs: vec![TextRun {
                 text: text.to_string(),
@@ -1159,7 +1155,7 @@ impl DocWriter {
         &mut self,
         text: &str,
         para_fmt: ParagraphFormatting,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         self.add_paragraph_with_format(text, CharacterFormatting::default(), para_fmt)
     }
 
@@ -1175,7 +1171,7 @@ impl DocWriter {
         text: &str,
         char_fmt: CharacterFormatting,
         para_fmt: ParagraphFormatting,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         self.paragraphs.push(WritableParagraph {
             runs: vec![TextRun {
                 text: text.to_string(),
@@ -1196,7 +1192,7 @@ impl DocWriter {
         &mut self,
         runs: Vec<(String, CharacterFormatting)>,
         para_fmt: ParagraphFormatting,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         if runs.is_empty() {
             return self.add_paragraph_with_format("", CharacterFormatting::default(), para_fmt);
         }
@@ -1225,8 +1221,8 @@ impl DocWriter {
     /// bytes are stored verbatim — no re-encoding is performed.
     pub fn insert_picture(
         &mut self,
-        picture: crate::writer::images::DocPicture,
-    ) -> Result<(), DocWriteError> {
+        picture: crate::writer::images::Picture,
+    ) -> Result<(), WriteError> {
         self.insert_picture_run(picture, None, "\u{0001}")
     }
 
@@ -1240,9 +1236,9 @@ impl DocWriter {
     /// shape, so readers can resolve the anchor to position and image.
     pub fn insert_floating_picture(
         &mut self,
-        picture: crate::writer::images::DocPicture,
+        picture: crate::writer::images::Picture,
         position: crate::writer::images::FloatingPosition,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         self.insert_picture_run(picture, Some(position), "\u{0008}")
     }
 
@@ -1250,12 +1246,12 @@ impl DocWriter {
     /// picture and append a single-character anchor paragraph.
     fn insert_picture_run(
         &mut self,
-        picture: crate::writer::images::DocPicture,
+        picture: crate::writer::images::Picture,
         floating: Option<crate::writer::images::FloatingPosition>,
         anchor: &str,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         let picture_index = u32::try_from(self.pictures.len()).map_err(|_| {
-            DocWriteError::InvalidData("DOC picture count exceeds the 32-bit range".to_string())
+            WriteError::InvalidData("DOC picture count exceeds the 32-bit range".to_string())
         })?;
         let shape_id = self.allocate_shape_id()?;
         self.pictures.push(WriterPicture {
@@ -1284,9 +1280,9 @@ impl DocWriter {
         shape: crate::writer::shapes::Shape,
         position: crate::writer::images::FloatingPosition,
         text: Option<String>,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         let shape_index = u32::try_from(self.shapes.len()).map_err(|_| {
-            DocWriteError::InvalidData("DOC shape count exceeds the 32-bit range".to_string())
+            WriteError::InvalidData("DOC shape count exceeds the 32-bit range".to_string())
         })?;
         let shape_id = self.allocate_shape_id()?;
         self.shapes.push(WriterShape {
@@ -1323,7 +1319,7 @@ impl DocWriter {
         &mut self,
         shape: crate::writer::shapes::Shape,
         position: crate::writer::images::FloatingPosition,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         self.insert_shape_run(shape, position, None)
     }
 
@@ -1341,7 +1337,7 @@ impl DocWriter {
         shape: crate::writer::shapes::Shape,
         position: crate::writer::images::FloatingPosition,
         text: impl Into<String>,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         self.insert_shape_run(shape, position, Some(text.into()))
     }
 
@@ -1361,14 +1357,14 @@ impl DocWriter {
     /// header's paragraph list afterwards drops the anchor.
     pub fn insert_header_text_box(
         &mut self,
-        kind: DocHeaderKind,
+        kind: HeaderKind,
         shape: crate::writer::shapes::Shape,
         position: crate::writer::images::FloatingPosition,
         text: impl Into<String>,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         let shape_id = self.allocate_header_shape_id()?;
         let item_index = u32::try_from(self.header_shapes.len()).map_err(|_| {
-            DocWriteError::InvalidData(
+            WriteError::InvalidData(
                 "DOC header text box count exceeds the 32-bit range".to_string(),
             )
         })?;
@@ -1391,15 +1387,13 @@ impl DocWriter {
     /// picture-frame shape in the Header Document drawing.
     pub fn insert_header_picture(
         &mut self,
-        kind: DocHeaderKind,
-        picture: crate::writer::images::DocPicture,
+        kind: HeaderKind,
+        picture: crate::writer::images::Picture,
         position: crate::writer::images::FloatingPosition,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         let shape_id = self.allocate_header_shape_id()?;
         let item_index = u32::try_from(self.header_pictures.len()).map_err(|_| {
-            DocWriteError::InvalidData(
-                "DOC header picture count exceeds the 32-bit range".to_string(),
-            )
+            WriteError::InvalidData("DOC header picture count exceeds the 32-bit range".to_string())
         })?;
         self.header_pictures.push(WriterPicture {
             picture,
@@ -1410,10 +1404,10 @@ impl DocWriter {
     }
 
     /// Allocate the next header-drawing shape id from the header cluster.
-    fn allocate_header_shape_id(&mut self) -> Result<u32, DocWriteError> {
+    fn allocate_header_shape_id(&mut self) -> Result<u32, WriteError> {
         let count = self.header_shapes.len() + self.header_pictures.len();
         let index = u32::try_from(count).map_err(|_| {
-            DocWriteError::InvalidData(
+            WriteError::InvalidData(
                 "DOC header floating item count exceeds the 32-bit range".to_string(),
             )
         })?;
@@ -1423,13 +1417,13 @@ impl DocWriter {
     /// Append a 0x0008 anchor paragraph to the given header and record it.
     fn append_header_anchor(
         &mut self,
-        kind: DocHeaderKind,
+        kind: HeaderKind,
         anchor_kind: FloatingAnchorKind,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         let paragraphs = match kind {
-            DocHeaderKind::Odd => &mut self.header_odd,
-            DocHeaderKind::Even => &mut self.header_even,
-            DocHeaderKind::FirstPage => &mut self.header_first,
+            HeaderKind::Odd => &mut self.header_odd,
+            HeaderKind::Even => &mut self.header_even,
+            HeaderKind::FirstPage => &mut self.header_first,
         };
         let paragraphs = paragraphs.get_or_insert_with(Vec::new);
         let paragraph_index = paragraphs.len();
@@ -1453,12 +1447,12 @@ impl DocWriter {
 
     /// Allocate the next shape id from the sequence shared by pictures and
     /// drawing shapes (group shape ids start one below the first picture id).
-    fn allocate_shape_id(&mut self) -> Result<u32, DocWriteError> {
+    fn allocate_shape_id(&mut self) -> Result<u32, WriteError> {
         let shape_id = self.next_shape_id;
         self.next_shape_id = self
             .next_shape_id
             .checked_add(1)
-            .ok_or_else(|| DocWriteError::InvalidData("DOC shape ids exhausted".to_string()))?;
+            .ok_or_else(|| WriteError::InvalidData("DOC shape ids exhausted".to_string()))?;
         Ok(shape_id)
     }
 
@@ -1480,7 +1474,7 @@ impl DocWriter {
         display_text: &str,
         url: &str,
         mut para_fmt: ParagraphFormatting,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         // Stage: Implementing hyperlinks using field codes
 
         // Escape quotes inside URL by doubling them per Word field syntax
@@ -1554,7 +1548,7 @@ impl DocWriter {
     pub fn set_odd_header_paragraphs(
         &mut self,
         paragraphs: Vec<HeaderFooterParagraph>,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         validate_header_footer_paragraphs(&paragraphs)?;
         self.header_odd = Some(paragraphs);
         Ok(())
@@ -1564,7 +1558,7 @@ impl DocWriter {
     pub fn set_even_header_paragraphs(
         &mut self,
         paragraphs: Vec<HeaderFooterParagraph>,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         validate_header_footer_paragraphs(&paragraphs)?;
         self.header_even = Some(paragraphs);
         Ok(())
@@ -1574,7 +1568,7 @@ impl DocWriter {
     pub fn set_first_header_paragraphs(
         &mut self,
         paragraphs: Vec<HeaderFooterParagraph>,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         validate_header_footer_paragraphs(&paragraphs)?;
         self.header_first = Some(paragraphs);
         Ok(())
@@ -1584,7 +1578,7 @@ impl DocWriter {
     pub fn set_odd_footer_paragraphs(
         &mut self,
         paragraphs: Vec<HeaderFooterParagraph>,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         validate_header_footer_paragraphs(&paragraphs)?;
         self.footer_odd = Some(paragraphs);
         Ok(())
@@ -1594,7 +1588,7 @@ impl DocWriter {
     pub fn set_even_footer_paragraphs(
         &mut self,
         paragraphs: Vec<HeaderFooterParagraph>,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         validate_header_footer_paragraphs(&paragraphs)?;
         self.footer_even = Some(paragraphs);
         Ok(())
@@ -1604,7 +1598,7 @@ impl DocWriter {
     pub fn set_first_footer_paragraphs(
         &mut self,
         paragraphs: Vec<HeaderFooterParagraph>,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         validate_header_footer_paragraphs(&paragraphs)?;
         self.footer_first = Some(paragraphs);
         Ok(())
@@ -1634,7 +1628,7 @@ impl DocWriter {
     }
 
     /// Add an inert smart-tag bookmark and property bag.
-    pub fn add_smart_tag(&mut self, entry: DocSmartTagEntry) {
+    pub fn add_smart_tag(&mut self, entry: SmartTagEntry) {
         self.smart_tags.push(entry);
     }
 
@@ -1667,15 +1661,15 @@ impl DocWriter {
     }
 }
 
-impl DocWriter {
-    pub fn add_table(&mut self, rows: usize, cols: usize) -> Result<usize, DocWriteError> {
+impl Writer {
+    pub fn add_table(&mut self, rows: usize, cols: usize) -> Result<usize, WriteError> {
         if rows == 0 || cols == 0 {
-            return Err(DocWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "Table must have at least 1 row and 1 column".to_string(),
             ));
         }
         if cols > 63 {
-            return Err(DocWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "DOC table rows cannot exceed 63 cells".to_string(),
             ));
         }
@@ -1733,10 +1727,10 @@ impl DocWriter {
     pub fn set_section_columns(
         &mut self,
         columns: crate::section::columns::Layout,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         columns
             .validate()
-            .map_err(|error| DocWriteError::InvalidData(error.to_string()))?;
+            .map_err(|error| WriteError::InvalidData(error.to_string()))?;
         self.section_columns = Some(columns);
         Ok(())
     }
@@ -1773,10 +1767,10 @@ impl DocWriter {
     pub fn set_section_page_borders(
         &mut self,
         borders: crate::section::borders::Borders,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         borders
             .validate()
-            .map_err(|error| DocWriteError::InvalidData(error.to_string()))?;
+            .map_err(|error| WriteError::InvalidData(error.to_string()))?;
         self.section_page_borders = Some(borders);
         Ok(())
     }
@@ -1805,7 +1799,7 @@ impl DocWriter {
         row: usize,
         col: usize,
         text: &str,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         self.set_table_cell_paragraph_runs(
             table_idx,
             row,
@@ -1823,7 +1817,7 @@ impl DocWriter {
         col: usize,
         runs: Vec<(String, CharacterFormatting)>,
         formatting: ParagraphFormatting,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         let paragraph = writable_paragraph_from_runs(runs, formatting);
         self.table_cell_mut(table_idx, row, col)?.paragraphs = vec![paragraph];
         Ok(())
@@ -1837,7 +1831,7 @@ impl DocWriter {
         col: usize,
         runs: Vec<(String, CharacterFormatting)>,
         formatting: ParagraphFormatting,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         let paragraph = writable_paragraph_from_runs(runs, formatting);
         self.table_cell_mut(table_idx, row, col)?
             .paragraphs
@@ -1850,21 +1844,21 @@ impl DocWriter {
         table_idx: usize,
         row: usize,
         col: usize,
-    ) -> Result<&mut TableCell, DocWriteError> {
+    ) -> Result<&mut TableCell, WriteError> {
         let table = self
             .tables
             .get_mut(table_idx)
-            .ok_or_else(|| DocWriteError::InvalidData(format!("Table {} not found", table_idx)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Table {} not found", table_idx)))?;
 
         let row_data = table
             .rows
             .get_mut(row)
-            .ok_or_else(|| DocWriteError::InvalidData(format!("Row {} not found", row)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Row {} not found", row)))?;
 
         let cell = row_data
             .cells
             .get_mut(col)
-            .ok_or_else(|| DocWriteError::InvalidData(format!("Column {} not found", col)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Column {} not found", col)))?;
         Ok(cell)
     }
 
@@ -1874,24 +1868,24 @@ impl DocWriter {
         table_idx: usize,
         row: usize,
         formatting: crate::writer::tap::TableRow,
-    ) -> Result<(), DocWriteError> {
+    ) -> Result<(), WriteError> {
         let table = self
             .tables
             .get_mut(table_idx)
-            .ok_or_else(|| DocWriteError::InvalidData(format!("Table {table_idx} not found")))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Table {table_idx} not found")))?;
         let row_data = table
             .rows
             .get_mut(row)
-            .ok_or_else(|| DocWriteError::InvalidData(format!("Row {row} not found")))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Row {row} not found")))?;
         if formatting.cells.len() != row_data.cells.len() {
-            return Err(DocWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "Row {row} formatting has {} cells but the row contains {}",
                 formatting.cells.len(),
                 row_data.cells.len()
             )));
         }
         crate::writer::tap::generate_row_sprms(&formatting)
-            .map_err(|error| DocWriteError::InvalidData(error.to_string()))?;
+            .map_err(|error| WriteError::InvalidData(error.to_string()))?;
         row_data.formatting = formatting;
         Ok(())
     }
@@ -1907,7 +1901,7 @@ impl DocWriter {
     }
 }
 
-impl Default for DocWriter {
+impl Default for Writer {
     fn default() -> Self {
         Self::new()
     }
