@@ -18,14 +18,10 @@ pub use declaration::{
     DateTimeDeclaration, DateTimeSource, DeclarationBinding, DeclarationTarget, Declarations,
     TextDeclaration, parse as parse_declarations,
 };
-pub use legacy_animation::{LegacyAnimationKind, LegacyAnimationNode};
 pub use media::{Actuate, Parameter, Reference, Show};
 pub use settings::{CustomShow, FeatureState, Settings, parse as parse_settings};
 pub use slide::{
     DrawingAttribute, DrawingAttributeNamespace, DrawingShapeKind, EnhancedGeometry,
     EnhancedGeometryChild, EnhancedGeometryChildKind, Shape, Slide,
 };
-pub use transition::{
-    Transition, TransitionDirection, TransitionSound, TransitionSoundShow, TransitionSpeed,
-    TransitionStyle, TransitionType,
-};
+pub use transition::{Direction, Sound, SoundShow, Speed, Style, Transition, Type};

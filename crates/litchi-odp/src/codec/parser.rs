@@ -2,13 +2,13 @@
 
 use crate::model::animation::ANIMATION_NAMESPACE;
 use crate::model::legacy_animation::validate_legacy_animation_root;
+use crate::model::legacy_animation::{Kind as AnimationKind, Node as AnimationNode};
 use crate::model::{
-    Action, Actuate, Attribute, DrawingAttribute, DrawingAttributeNamespace, DrawingHyperlink,
-    DrawingShapeKind, Effect, EffectDirection, EnhancedGeometry, EnhancedGeometryChild,
-    EnhancedGeometryChildKind, EventListener, HyperlinkShow, Kind, LegacyAnimationKind,
-    LegacyAnimationNode, Namespace, Node, Parameter, Reference, ScriptEventListener, Shape,
-    ShapeEventListener, Show, Slide, Transition, TransitionDirection, TransitionSound,
-    TransitionSoundShow, TransitionSpeed, TransitionStyle, TransitionType,
+    Action, Actuate, Attribute, Direction, DrawingAttribute, DrawingAttributeNamespace,
+    DrawingHyperlink, DrawingShapeKind, Effect, EffectDirection, EnhancedGeometry,
+    EnhancedGeometryChild, EnhancedGeometryChildKind, EventListener, HyperlinkShow, Kind,
+    Namespace, Node, Parameter, Reference, ScriptEventListener, Shape, ShapeEventListener, Show,
+    Slide, Sound, SoundShow, Speed, Style, Transition, Type,
 };
 use litchi_core::{Error, Result, ShapeType};
 use quick_xml::XmlVersion;
@@ -104,7 +104,7 @@ enum Element {
     TextLineBreak,
     Animation(Kind),
     UnknownAnimation,
-    LegacyAnimation(LegacyAnimationKind),
+    LegacyAnimation(AnimationKind),
     Other,
 }
 
@@ -328,7 +328,7 @@ impl Parser {
             } else if local_name == b"sound" {
                 Element::Sound
             } else {
-                LegacyAnimationKind::from_local_name(local_name)
+                AnimationKind::from_local_name(local_name)
                     .map(Element::LegacyAnimation)
                     .unwrap_or(Element::Other)
             }
@@ -660,10 +660,10 @@ impl Parser {
     fn parse_legacy_animation_node(
         reader: &mut NsReader<&[u8]>,
         start: &BytesStart<'_>,
-        kind: LegacyAnimationKind,
+        kind: AnimationKind,
         depth: usize,
         node_count: &mut usize,
-    ) -> Result<LegacyAnimationNode> {
+    ) -> Result<AnimationNode> {
         if depth > 128 {
             return Err(Error::InvalidFormat(
                 "legacy ODP animation nesting exceeds 128 levels".to_string(),
@@ -692,14 +692,13 @@ impl Parser {
                             kind.local_name()
                         )));
                     }
-                    let child_kind =
-                        LegacyAnimationKind::from_local_name(child.local_name().as_ref())
-                            .ok_or_else(|| {
-                                Error::InvalidFormat(format!(
-                                    "unknown legacy presentation animation element '{}'",
-                                    String::from_utf8_lossy(child.local_name().as_ref())
-                                ))
-                            })?;
+                    let child_kind = AnimationKind::from_local_name(child.local_name().as_ref())
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(format!(
+                                "unknown legacy presentation animation element '{}'",
+                                String::from_utf8_lossy(child.local_name().as_ref())
+                            ))
+                        })?;
                     if !kind.allows_child(child_kind) {
                         return Err(Error::InvalidFormat(format!(
                             "presentation:{} cannot contain presentation:{}",
@@ -718,7 +717,7 @@ impl Parser {
                                 "legacy ODP animation tree exceeds 65536 nodes".to_string(),
                             ));
                         }
-                        LegacyAnimationNode::from_parsed(
+                        AnimationNode::from_parsed(
                             child_kind,
                             Self::animation_attributes(reader, child)?,
                             Vec::new(),
@@ -738,7 +737,7 @@ impl Parser {
                     if Self::is_namespace(&namespace, PRESENTATION_NAMESPACE)
                         && end.local_name().as_ref() == kind.local_name().as_bytes() =>
                 {
-                    return Ok(LegacyAnimationNode::from_parsed(kind, attributes, children));
+                    return Ok(AnimationNode::from_parsed(kind, attributes, children));
                 },
                 Event::Text(ref text) if !Self::decode_text(text)?.trim().is_empty() => {
                     return Err(Error::InvalidFormat(
@@ -1182,7 +1181,7 @@ impl Parser {
             .map(EffectDirection::new)
             .transpose()?;
         listener.speed = Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"speed")?
-            .map(|value| TransitionSpeed::parse(&value))
+            .map(|value| Speed::parse(&value))
             .transpose()?;
         listener.start_scale =
             Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"start-scale")?;
@@ -1522,20 +1521,20 @@ impl Parser {
     ) -> Result<()> {
         transition.transition_type =
             Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"transition-type")?
-                .map(|value| TransitionType::parse(&value))
+                .map(|value| Type::parse(&value))
                 .transpose()?;
         transition.style =
             Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"transition-style")?
-                .map(TransitionStyle::new)
+                .map(Style::new)
                 .transpose()?;
         transition.speed =
             Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"transition-speed")?
-                .map(|value| TransitionSpeed::parse(&value))
+                .map(|value| Speed::parse(&value))
                 .transpose()?;
         transition.smil_type = Self::get_attr(reader, element, SMIL_NAMESPACE, b"type")?;
         transition.smil_subtype = Self::get_attr(reader, element, SMIL_NAMESPACE, b"subtype")?;
         transition.direction = Self::get_attr(reader, element, SMIL_NAMESPACE, b"direction")?
-            .map(|value| TransitionDirection::parse(&value))
+            .map(|value| Direction::parse(&value))
             .transpose()?;
         transition.set_fade_color(Self::get_attr(
             reader,
@@ -1552,10 +1551,7 @@ impl Parser {
         Ok(())
     }
 
-    fn parse_transition_sound(
-        reader: &NsReader<&[u8]>,
-        element: &BytesStart<'_>,
-    ) -> Result<TransitionSound> {
+    fn parse_transition_sound(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Sound> {
         let href = Self::get_attr(reader, element, XLINK_NAMESPACE, b"href")?.ok_or_else(|| {
             Error::InvalidFormat("presentation:sound is missing xlink:href".to_string())
         })?;
@@ -1574,13 +1570,13 @@ impl Parser {
             )));
         }
         let show = Self::get_attr(reader, element, XLINK_NAMESPACE, b"show")?
-            .map(|value| TransitionSoundShow::parse(&value))
+            .map(|value| SoundShow::parse(&value))
             .transpose()?;
         let play_full = Self::parse_optional_bool(
             Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"play-full")?,
             "presentation:play-full",
         )?;
-        Ok(TransitionSound {
+        Ok(Sound {
             href,
             play_full,
             actuate_on_request: actuate.is_some(),
@@ -1935,7 +1931,7 @@ impl Parser {
                                 && shape_stack.is_empty()
                                 && current_paragraph.is_none() =>
                         {
-                            if kind != LegacyAnimationKind::Animations {
+                            if kind != AnimationKind::Animations {
                                 return Err(Error::InvalidFormat(
                                     "legacy presentation effects require a presentation:animations root"
                                         .to_string(),
@@ -2451,7 +2447,7 @@ impl Parser {
                         },
                         _ if in_notes => {},
                         Element::LegacyAnimation(kind) if in_slide => {
-                            if kind != LegacyAnimationKind::Animations {
+                            if kind != AnimationKind::Animations {
                                 return Err(Error::InvalidFormat(
                                     "legacy presentation effects require a presentation:animations root"
                                         .to_string(),
@@ -2469,7 +2465,7 @@ impl Parser {
                                         "legacy ODP animation node count overflow".to_string(),
                                     )
                                 })?;
-                            let root = LegacyAnimationNode::from_parsed(
+                            let root = AnimationNode::from_parsed(
                                 kind,
                                 Self::animation_attributes(&reader, element)?,
                                 Vec::new(),
@@ -3363,22 +3359,19 @@ mod tests {
 
         let slides = Parser::parse_slides_with_styles(content, Some(styles)).unwrap();
         let transition = slides[0].transition().unwrap();
-        assert_eq!(
-            transition.transition_type(),
-            Some(TransitionType::Automatic)
-        );
+        assert_eq!(transition.transition_type(), Some(Type::Automatic));
         assert_eq!(transition.style().unwrap().as_str(), "fade-from-left");
-        assert_eq!(transition.speed(), Some(TransitionSpeed::Fast));
+        assert_eq!(transition.speed(), Some(Speed::Fast));
         assert_eq!(transition.smil_type(), Some("fade"));
         assert_eq!(transition.smil_subtype(), Some("crossfade"));
-        assert_eq!(transition.direction(), Some(TransitionDirection::Reverse));
+        assert_eq!(transition.direction(), Some(Direction::Reverse));
         assert_eq!(transition.fade_color(), Some("#aB09fF"));
         assert_eq!(transition.duration(), Some("PT8S"));
         let sound = transition.sound().unwrap();
         assert_eq!(sound.href, "Sounds/a&b.ogg");
         assert_eq!(sound.play_full, Some(true));
         assert!(sound.actuate_on_request);
-        assert_eq!(sound.show, Some(TransitionSoundShow::Replace));
+        assert_eq!(sound.show, Some(SoundShow::Replace));
     }
 
     #[test]
@@ -3523,7 +3516,7 @@ mod tests {
         assert_eq!(action.action, Action::Show);
         assert_eq!(action.effect.as_ref().unwrap().as_str(), "fade");
         assert_eq!(action.direction.as_ref().unwrap().as_str(), "from-left");
-        assert_eq!(action.speed, Some(TransitionSpeed::Fast));
+        assert_eq!(action.speed, Some(Speed::Fast));
         assert_eq!(action.start_scale.as_deref(), Some("50%"));
         assert_eq!(action.verb, Some(2));
         assert_eq!(action.sound.as_ref().unwrap().href, "Sounds/click.ogg");
@@ -3555,18 +3548,18 @@ mod tests {
 
         let slides = Parser::parse_slides(xml).unwrap();
         let root = slides[0].legacy_animation().unwrap();
-        assert_eq!(root.kind(), LegacyAnimationKind::Animations);
+        assert_eq!(root.kind(), AnimationKind::Animations);
         assert_eq!(
             root.attribute(&Namespace::Other("urn:example:effects".to_string()), "mode"),
             Some("legacy")
         );
         let group = &root.children()[0];
-        assert_eq!(group.kind(), LegacyAnimationKind::Group);
+        assert_eq!(group.kind(), AnimationKind::Group);
         assert_eq!(group.children().len(), 4);
         let show = &group.children()[0];
-        assert_eq!(show.kind(), LegacyAnimationKind::ShowShape);
+        assert_eq!(show.kind(), AnimationKind::ShowShape);
         assert_eq!(show.attribute(&Namespace::Draw, "shape-id"), Some("shape1"));
-        assert_eq!(show.children()[0].kind(), LegacyAnimationKind::Sound);
+        assert_eq!(show.children()[0].kind(), AnimationKind::Sound);
         assert_eq!(
             show.children()[0].attribute(&Namespace::Xlink, "href"),
             Some("Sounds/a&b.ogg")

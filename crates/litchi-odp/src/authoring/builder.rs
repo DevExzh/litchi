@@ -1258,9 +1258,9 @@ mod tests {
     use super::*;
     use crate::core::OwnedPackage;
     use crate::{
-        Action, DrawingHyperlink, Effect, EventListener, HyperlinkShow, Parameter, Presentation,
-        ScriptEventListener, Shape, ShapeEventListener, TransitionDirection, TransitionSound,
-        TransitionSoundShow, TransitionSpeed, TransitionStyle, TransitionType,
+        Action, Direction, DrawingHyperlink, Effect, EventListener, HyperlinkShow, Parameter,
+        Presentation, ScriptEventListener, Shape, ShapeEventListener, Sound, SoundShow, Speed,
+        Style, Type,
     };
     use litchi_core::ShapeType;
 
@@ -1459,40 +1459,37 @@ mod tests {
         builder.add_slide("Transition slide").unwrap();
         let transition = builder.slides[0].transition_mut();
         transition
-            .set_transition_type(Some(TransitionType::Automatic))
-            .set_style(Some(TransitionStyle::new("fade-from-left").unwrap()))
-            .set_speed(Some(TransitionSpeed::Fast))
+            .set_transition_type(Some(Type::Automatic))
+            .set_style(Some(Style::new("fade-from-left").unwrap()))
+            .set_speed(Some(Speed::Fast))
             .set_smil_type(Some("fade & dissolve"))
             .set_smil_subtype(Some("crossfade"))
-            .set_direction(Some(TransitionDirection::Reverse));
+            .set_direction(Some(Direction::Reverse));
         transition.set_fade_color(Some("#102030")).unwrap();
         transition.set_duration(Some("PT6.5S")).unwrap();
-        let mut sound = TransitionSound::new("Sounds/a&b.ogg");
+        let mut sound = Sound::new("Sounds/a&b.ogg");
         sound.play_full = Some(true);
         sound.actuate_on_request = true;
-        sound.show = Some(TransitionSoundShow::Replace);
+        sound.show = Some(SoundShow::Replace);
         sound.xml_id = Some("transitionSound1".to_string());
         transition.set_sound(Some(sound));
 
         let presentation = Presentation::from_bytes(builder.build().unwrap()).unwrap();
         let slide = presentation.slides().unwrap().remove(0);
         let transition = slide.transition().unwrap();
-        assert_eq!(
-            transition.transition_type(),
-            Some(TransitionType::Automatic)
-        );
+        assert_eq!(transition.transition_type(), Some(Type::Automatic));
         assert_eq!(transition.style().unwrap().as_str(), "fade-from-left");
-        assert_eq!(transition.speed(), Some(TransitionSpeed::Fast));
+        assert_eq!(transition.speed(), Some(Speed::Fast));
         assert_eq!(transition.smil_type(), Some("fade & dissolve"));
         assert_eq!(transition.smil_subtype(), Some("crossfade"));
-        assert_eq!(transition.direction(), Some(TransitionDirection::Reverse));
+        assert_eq!(transition.direction(), Some(Direction::Reverse));
         assert_eq!(transition.fade_color(), Some("#102030"));
         assert_eq!(transition.duration(), Some("PT6.5S"));
         let sound = transition.sound().unwrap();
         assert_eq!(sound.href, "Sounds/a&b.ogg");
         assert_eq!(sound.play_full, Some(true));
         assert!(sound.actuate_on_request);
-        assert_eq!(sound.show, Some(TransitionSoundShow::Replace));
+        assert_eq!(sound.show, Some(SoundShow::Replace));
         assert_eq!(sound.xml_id.as_deref(), Some("transitionSound1"));
     }
 
@@ -1562,8 +1559,8 @@ mod tests {
 
         let mut action = EventListener::new("dom:click", Action::Sound).unwrap();
         action.effect = Some(Effect::new("fade").unwrap());
-        action.speed = Some(TransitionSpeed::Fast);
-        let mut sound = TransitionSound::new("Sounds/click.ogg");
+        action.speed = Some(Speed::Fast);
+        let mut sound = Sound::new("Sounds/click.ogg");
         sound.play_full = Some(true);
         sound.actuate_on_request = true;
         sound.xml_id = Some("clickSound".to_string());

@@ -1,7 +1,7 @@
 //! Inert hyperlinks and event bindings attached to presentation shapes.
 
 use super::media::{validate_bounded_xml_value, validate_href, validate_ncname};
-use super::{TransitionSound, TransitionSpeed};
+use super::{Sound, Speed};
 use litchi_core::{Error, Result, xml::escape_xml};
 
 const PRESENTATION_ACTIONS: &[&str] = &[
@@ -198,14 +198,14 @@ pub struct EventListener {
     pub action: Action,
     pub effect: Option<Effect>,
     pub direction: Option<EffectDirection>,
-    pub speed: Option<TransitionSpeed>,
+    pub speed: Option<Speed>,
     pub start_scale: Option<String>,
     /// Optional action target. Its serialized XLink type is always `simple`.
     pub href: Option<String>,
     pub show_embed: bool,
     pub actuate_on_request: bool,
     pub verb: Option<u64>,
-    pub sound: Option<TransitionSound>,
+    pub sound: Option<Sound>,
 }
 
 impl EventListener {
@@ -586,7 +586,7 @@ pub(crate) fn write_event_listeners(
     Ok(())
 }
 
-fn write_sound(output: &mut String, sound: &TransitionSound) -> Result<()> {
+fn write_sound(output: &mut String, sound: &Sound) -> Result<()> {
     validate_transition_sound(sound, "presentation action sound")?;
     output.push_str("<presentation:sound xlink:type=\"simple\"");
     push_attribute(output, "xlink:href", &sound.href);
@@ -610,7 +610,7 @@ fn write_sound(output: &mut String, sound: &TransitionSound) -> Result<()> {
     Ok(())
 }
 
-fn validate_transition_sound(sound: &TransitionSound, description: &str) -> Result<()> {
+fn validate_transition_sound(sound: &Sound, description: &str) -> Result<()> {
     validate_href(&sound.href)?;
     if let Some(xml_id) = &sound.xml_id {
         validate_ncname(xml_id, &format!("{description} XML ID"))?;

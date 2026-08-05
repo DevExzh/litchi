@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 /// A schema-defined legacy ODF presentation effect element.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LegacyAnimationKind {
+pub enum Kind {
     /// The page-level `presentation:animations` container.
     Animations,
     /// A group of effects.
@@ -27,7 +27,7 @@ pub enum LegacyAnimationKind {
     Sound,
 }
 
-impl LegacyAnimationKind {
+impl Kind {
     pub(crate) fn from_local_name(name: &[u8]) -> Option<Self> {
         match name {
             b"animations" => Some(Self::Animations),
@@ -71,15 +71,15 @@ impl LegacyAnimationKind {
 
 /// A bounded, inert node in the legacy ODF presentation effect tree.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LegacyAnimationNode {
-    kind: LegacyAnimationKind,
+pub struct Node {
+    kind: Kind,
     attributes: Vec<Attribute>,
-    children: Vec<LegacyAnimationNode>,
+    children: Vec<Node>,
 }
 
-impl LegacyAnimationNode {
+impl Node {
     /// Create an empty legacy effect node.
-    pub fn new(kind: LegacyAnimationKind) -> Self {
+    pub fn new(kind: Kind) -> Self {
         Self {
             kind,
             attributes: Vec::new(),
@@ -88,7 +88,7 @@ impl LegacyAnimationNode {
     }
 
     /// Return the element kind.
-    pub fn kind(&self) -> LegacyAnimationKind {
+    pub fn kind(&self) -> Kind {
         self.kind
     }
 
@@ -125,17 +125,17 @@ impl LegacyAnimationNode {
     }
 
     /// Return child effects.
-    pub fn children(&self) -> &[LegacyAnimationNode] {
+    pub fn children(&self) -> &[Node] {
         &self.children
     }
 
     /// Return mutable child effects.
-    pub fn children_mut(&mut self) -> &mut Vec<LegacyAnimationNode> {
+    pub fn children_mut(&mut self) -> &mut Vec<Node> {
         &mut self.children
     }
 
     /// Add a schema-valid child effect.
-    pub fn add_child(&mut self, child: LegacyAnimationNode) -> Result<()> {
+    pub fn add_child(&mut self, child: Node) -> Result<()> {
         if !self.kind.allows_child(child.kind) {
             return Err(invalid_child(self.kind, child.kind));
         }
@@ -143,11 +143,7 @@ impl LegacyAnimationNode {
         Ok(())
     }
 
-    pub(crate) fn from_parsed(
-        kind: LegacyAnimationKind,
-        attributes: Vec<Attribute>,
-        children: Vec<Self>,
-    ) -> Self {
+    pub(crate) fn from_parsed(kind: Kind, attributes: Vec<Attribute>, children: Vec<Self>) -> Self {
         Self {
             kind,
             attributes,
@@ -203,18 +199,14 @@ impl LegacyAnimationNode {
     fn validate_required_attributes(&self) -> Result<()> {
         let draw = &Namespace::Draw;
         match self.kind {
-            LegacyAnimationKind::Dim => {
+            Kind::Dim => {
                 self.require(draw, "shape-id")?;
                 self.require(draw, "color")?;
             },
-            LegacyAnimationKind::HideShape
-            | LegacyAnimationKind::HideText
-            | LegacyAnimationKind::Play
-            | LegacyAnimationKind::ShowShape
-            | LegacyAnimationKind::ShowText => {
+            Kind::HideShape | Kind::HideText | Kind::Play | Kind::ShowShape | Kind::ShowText => {
                 self.require(draw, "shape-id")?;
             },
-            LegacyAnimationKind::Sound => {
+            Kind::Sound => {
                 self.require(&Namespace::Xlink, "href")?;
                 let link_type = self.require(&Namespace::Xlink, "type")?;
                 if link_type != "simple" {
@@ -223,7 +215,7 @@ impl LegacyAnimationNode {
                     ));
                 }
             },
-            LegacyAnimationKind::Animations | LegacyAnimationKind::Group => {},
+            Kind::Animations | Kind::Group => {},
         }
         Ok(())
     }
@@ -270,8 +262,8 @@ impl LegacyAnimationNode {
     }
 }
 
-pub(crate) fn validate_legacy_animation_root(root: &LegacyAnimationNode) -> Result<()> {
-    if root.kind != LegacyAnimationKind::Animations {
+pub(crate) fn validate_legacy_animation_root(root: &Node) -> Result<()> {
+    if root.kind != Kind::Animations {
         return Err(Error::InvalidFormat(
             "legacy ODP animation root must be presentation:animations".to_string(),
         ));
@@ -280,7 +272,7 @@ pub(crate) fn validate_legacy_animation_root(root: &LegacyAnimationNode) -> Resu
     root.validate(1, &mut node_count)
 }
 
-fn invalid_child(parent: LegacyAnimationKind, child: LegacyAnimationKind) -> Error {
+fn invalid_child(parent: Kind, child: Kind) -> Error {
     Error::InvalidFormat(format!(
         "presentation:{} cannot contain presentation:{}",
         parent.local_name(),

@@ -1158,9 +1158,9 @@ impl Default for MutablePresentation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::legacy_animation::{Kind as AnimationKind, Node as AnimationNode};
     use crate::{
-        Attribute, Namespace, Kind, Node,
-        DrawingHyperlink, LegacyAnimationKind, LegacyAnimationNode, Action,
+        Attribute, Namespace, Kind, Node, DrawingHyperlink, Action,
         Builder, EventListener, ScriptEventListener, ShapeEventListener,
     };
 
@@ -1517,14 +1517,14 @@ mod tests {
     fn builder_and_mutable_round_trip_legacy_presentation_effects() {
         let attr =
             |namespace, name, value| Attribute::new(namespace, name, value).unwrap();
-        let mut sound = LegacyAnimationNode::new(LegacyAnimationKind::Sound);
+        let mut sound = AnimationNode::new(AnimationKind::Sound);
         sound.set_attribute(attr(
             Namespace::Xlink,
             "href",
             "Sounds/chime.ogg",
         ));
         sound.set_attribute(attr(Namespace::Xlink, "type", "simple"));
-        let mut show = LegacyAnimationNode::new(LegacyAnimationKind::ShowShape);
+        let mut show = AnimationNode::new(AnimationKind::ShowShape);
         show.set_attribute(attr(
             Namespace::Draw,
             "shape-id",
@@ -1536,7 +1536,7 @@ mod tests {
             "fade",
         ));
         show.add_child(sound).unwrap();
-        let mut root = LegacyAnimationNode::new(LegacyAnimationKind::Animations);
+        let mut root = AnimationNode::new(AnimationKind::Animations);
         root.set_attribute(attr(
             Namespace::Other("urn:example:legacy-effects".to_string()),
             "mode",

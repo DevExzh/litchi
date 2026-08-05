@@ -1,8 +1,7 @@
 //! Slide and shape structures for ODP presentations.
 
-use super::{
-    DrawingHyperlink, LegacyAnimationNode, Node, Reference, ShapeEventListener, Transition,
-};
+use super::legacy_animation::Node as AnimationNode;
+use super::{DrawingHyperlink, Node, Reference, ShapeEventListener, Transition};
 use crate::action::validate_event_listeners;
 use litchi_core::Result;
 
@@ -24,7 +23,7 @@ pub struct Slide {
     /// Inert ODF animation and timing trees attached to the slide.
     pub animations: Vec<Node>,
     /// Optional legacy `presentation:animations` effect tree.
-    pub legacy_animation: Option<LegacyAnimationNode>,
+    pub legacy_animation: Option<AnimationNode>,
     /// Shapes on the slide
     pub shapes: Vec<Shape>,
 }
@@ -130,12 +129,12 @@ impl Slide {
     }
 
     /// Return the optional legacy presentation effect tree.
-    pub fn legacy_animation(&self) -> Option<&LegacyAnimationNode> {
+    pub fn legacy_animation(&self) -> Option<&AnimationNode> {
         self.legacy_animation.as_ref()
     }
 
     /// Set or remove the legacy presentation effect tree.
-    pub fn set_legacy_animation(&mut self, animation: Option<LegacyAnimationNode>) {
+    pub fn set_legacy_animation(&mut self, animation: Option<AnimationNode>) {
         self.legacy_animation = animation;
     }
 }
