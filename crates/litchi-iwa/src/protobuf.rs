@@ -3,6 +3,12 @@
 //! This module provides support for decoding Protocol Buffers messages
 //! used in iWork IWA (iWork Archive) files using the prost crate.
 
+#![allow(
+    dead_code,
+    unused_imports,
+    reason = "This private decoder adapter retains in-crate migration entries."
+)]
+
 use crate::{Error, Result};
 use phf::phf_map;
 use prost::Message;

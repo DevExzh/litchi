@@ -128,7 +128,7 @@
 use std::sync::Arc;
 
 // Core parsing modules
-pub mod archive;
+mod archive;
 pub mod bundle;
 /// Typed native drawable stacking-order controls.
 pub mod drawable_order;
@@ -139,12 +139,12 @@ pub mod media;
 /// Native movie and audio playback wire adapter.
 pub(crate) mod media_playback;
 pub mod object_index;
-pub mod package;
+mod package;
 mod package_metadata;
-pub(crate) mod protobuf;
+mod protobuf;
 pub mod ref_graph;
 pub mod registry;
-pub mod snappy;
+mod snappy;
 mod structured;
 /// Typed copy-on-write appearance controls shared by Pages, Numbers, and Keynote.
 pub mod table_appearance;
@@ -158,7 +158,7 @@ mod table_hidden_axes;
 pub mod table_lock;
 pub mod theme;
 pub(crate) mod wire;
-pub mod zip_utils;
+mod zip_utils;
 
 /// Shared text extraction utilities
 pub mod text;
@@ -181,7 +181,6 @@ pub mod comments;
 pub mod shapes;
 
 /// Re-export commonly used types
-pub use archive::{ArchiveInfo, MessageInfo};
 pub use bundle::{Bundle, BundleMetadata, PropertyMap, PropertyValue};
 pub use comments::IWorkDrawableCommentEditor;
 pub use document::Document;
@@ -191,17 +190,12 @@ pub use media::{EmbeddedMediaAsset, IWorkMediaEditor, MediaAsset, MediaManager, 
 pub use package::IWorkPackage;
 pub use ref_graph::ReferenceGraph;
 pub use shapes::DrawableTitleCaption;
-pub use snappy::SnappyStream;
 pub use structured::StructuredData;
 pub use text::{
     ParagraphStyle, TextDecorations, TextExtractor, TextFragment, TextPointSize, TextStorage,
     TextStrikethrough, TextStyle, TextUnderline,
 };
 pub use theme::{IWorkThemeArchive, IWorkThemeExtensions};
-pub use zip_utils::{
-    FileStructureInfo, analyze_file_structure, extract_message_types_from_archive,
-    parse_iwa_files_from_archive,
-};
 
 /// Error types for iWork parsing
 #[derive(Debug, Clone)]

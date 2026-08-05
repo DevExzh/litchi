@@ -1615,7 +1615,8 @@ and `DataMetadataMap`; referenced deletion is rejected transactionally.
 ## Low-level CRUD
 
 ```rust
-use litchi_iwa::{IWorkPackage, archive::RawMessage};
+use litchi_iwa::IWorkPackage;
+use litchi_iwa_core::RawMessage;
 
 let mut package = IWorkPackage::open("document.pages")?;
 package.update_archive("Index/Document.iwa", |archive| {

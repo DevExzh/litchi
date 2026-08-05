@@ -5,6 +5,11 @@
 //!
 //! Uses soapberry-zip for high-performance ZIP reading.
 
+#![allow(
+    dead_code,
+    reason = "These archive inspection helpers remain private implementation support."
+)]
+
 use std::collections::HashMap;
 
 use soapberry_zip::office::ArchiveReader;
@@ -28,17 +33,6 @@ use crate::{Error, Result};
 ///
 /// * `Result<HashMap<String, Archive>>` - Map of archive names to parsed Archives
 ///
-/// # Examples
-///
-/// ```rust,no_run
-/// use soapberry_zip::office::ArchiveReader;
-/// use litchi_iwa::zip_utils::parse_iwa_files_from_archive;
-///
-/// let data = std::fs::read("document.pages")?;
-/// let archive = ArchiveReader::new(&data)?;
-/// let archives = parse_iwa_files_from_archive(&archive)?;
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
 pub fn parse_iwa_files_from_archive(
     archive: &ArchiveReader<'_>,
 ) -> Result<HashMap<String, Archive>> {
@@ -161,18 +155,6 @@ pub(crate) fn nested_index_zip_name(archive: &ArchiveReader<'_>) -> Result<Optio
 ///
 /// * `Result<Vec<u32>>` - List of all message types found in the archive
 ///
-/// # Examples
-///
-/// ```rust,no_run
-/// use soapberry_zip::office::ArchiveReader;
-/// use litchi_iwa::zip_utils::extract_message_types_from_archive;
-///
-/// let data = std::fs::read("document.pages")?;
-/// let archive = ArchiveReader::new(&data)?;
-/// let message_types = extract_message_types_from_archive(&archive)?;
-/// println!("Found {} message types", message_types.len());
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
 pub fn extract_message_types_from_archive(archive: &ArchiveReader<'_>) -> Result<Vec<u32>> {
     let mut all_message_types = Vec::new();
 

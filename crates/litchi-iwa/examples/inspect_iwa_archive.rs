@@ -58,7 +58,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) {
+fn print_archive(archive: litchi_iwa_core::Archive, object_id: Option<u64>) {
     for object in archive.objects {
         let identifier = object.archive_info.identifier.unwrap_or_default();
         if object_id.is_some_and(|expected| expected != identifier) {

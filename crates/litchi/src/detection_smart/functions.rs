@@ -380,45 +380,15 @@ mod tests {
 
     #[cfg(feature = "iwa")]
     fn iwork_package(mimetype: Option<&str>) -> Vec<u8> {
-        use litchi_iwa::archive::{Archive, ArchiveObject, RawMessage};
-        use std::io::{Cursor, Write};
-
-        let document = Archive {
-            objects: vec![
-                ArchiveObject::new(
-                    1,
-                    vec![RawMessage {
-                        type_: 6,
-                        // TN.DocumentArchive required references plus its shared root.
-                        data: vec![
-                            0x22, 0x02, 0x08, 0x01, 0x2a, 0x02, 0x08, 0x02, 0x32, 0x02, 0x08, 0x03,
-                            0x42, 0x02, 0x0a, 0x00,
-                        ],
-                    }],
-                )
-                .unwrap(),
-            ],
-        };
-        let document = litchi_iwa::SnappyStream::compress(&document.to_bytes().unwrap()).unwrap();
-
-        let mut bytes = Vec::new();
-        {
-            let mut writer = zip::ZipWriter::new(Cursor::new(&mut bytes));
-            let options = zip::write::SimpleFileOptions::default()
-                .compression_method(zip::CompressionMethod::Stored);
-            if let Some(mimetype) = mimetype {
-                writer.start_file("mimetype", options).unwrap();
-                writer.write_all(mimetype.as_bytes()).unwrap();
-            }
-            writer.start_file("Index/Document.iwa", options).unwrap();
-            writer.write_all(&document).unwrap();
-            writer
-                .start_file("Index/CalculationEngine-174.iwa", options)
+        let mut package = litchi_iwa::numbers::NumbersDocumentBuilder::new()
+            .build_package()
+            .unwrap();
+        if let Some(mimetype) = mimetype {
+            package
+                .insert_entry("mimetype", mimetype.as_bytes().to_vec())
                 .unwrap();
-            writer.write_all(b"iwa").unwrap();
-            writer.finish().unwrap();
         }
-        bytes
+        package.to_bytes().unwrap()
     }
 
     // Helper function to create a minimal DOCX-like ZIP for testing
