@@ -25,7 +25,7 @@ const MAX_VALUE: usize = 4_096;
 const MAX_TOTAL: usize = 16 * 1024 * 1024;
 const MAX_BINARY: usize = 8 * 1024 * 1024;
 /// Maximum `text:level` of a list level (ODF 1.2 allows deep lists).
-pub const MAX_LIST_STYLE_LEVEL: u16 = 1_024;
+pub const MAX_LEVEL: u16 = 1_024;
 
 fn bad(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
@@ -83,7 +83,7 @@ impl BulletRelativeSize {
 
 /// Level numbering decoration of a `text:list-level-style-number`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ListLevelNumberStyle {
+pub struct NumberStyle {
     pub format: Option<OutlineNumberFormat>,
     pub prefix: Option<String>,
     pub suffix: Option<String>,
@@ -91,7 +91,7 @@ pub struct ListLevelNumberStyle {
     pub display_levels: Option<OutlinePositiveInteger>,
     pub start_value: Option<OutlinePositiveInteger>,
 }
-impl ListLevelNumberStyle {
+impl NumberStyle {
     pub fn validate(&self) -> Result<()> {
         if self.letter_sync.is_some()
             && !self
@@ -115,13 +115,13 @@ impl ListLevelNumberStyle {
 
 /// Bullet decoration of a `text:list-level-style-bullet`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ListLevelBulletStyle {
+pub struct BulletStyle {
     pub bullet_char: char,
     pub relative_size: Option<BulletRelativeSize>,
     pub prefix: Option<String>,
     pub suffix: Option<String>,
 }
-impl ListLevelBulletStyle {
+impl BulletStyle {
     pub fn new(bullet_char: char) -> Result<Self> {
         let result = Self {
             bullet_char,
@@ -148,13 +148,13 @@ impl ListLevelBulletStyle {
 
 /// Image source of a `text:list-level-style-image`: linked or embedded binary data.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ListLevelImageSource {
+pub enum ImageSource {
     /// `xlink:href` reference to an image resource.
     Linked(String),
     /// Base64 content of an `office:binary-data` child.
     Embedded(String),
 }
-impl ListLevelImageSource {
+impl ImageSource {
     fn validate(&self) -> Result<()> {
         match self {
             Self::Linked(href) => name_ok(href, "xlink:href"),
@@ -174,46 +174,46 @@ impl ListLevelImageSource {
 
 /// The level-specific decoration of one list level.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ListLevelKind {
-    Number(ListLevelNumberStyle),
-    Bullet(ListLevelBulletStyle),
-    Image(ListLevelImageSource),
+pub enum Kind {
+    Number(NumberStyle),
+    Bullet(BulletStyle),
+    Image(ImageSource),
 }
 
 /// One `text:list-level-style-*` declaration of a list style.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ListLevelStyle {
+pub struct LevelStyle {
     pub level: u16,
     pub style_name: Option<String>,
-    pub kind: ListLevelKind,
+    pub kind: Kind,
 }
-impl ListLevelStyle {
+impl LevelStyle {
     pub fn validate(&self) -> Result<()> {
-        if !(1..=MAX_LIST_STYLE_LEVEL).contains(&self.level) {
+        if !(1..=MAX_LEVEL).contains(&self.level) {
             return Err(bad("text:level is outside the supported range"));
         }
         if let Some(value) = &self.style_name {
             name_ok(value, "text:style-name")?;
         }
         match &self.kind {
-            ListLevelKind::Number(number) => number.validate(),
-            ListLevelKind::Bullet(bullet) => bullet.validate(),
-            ListLevelKind::Image(source) => source.validate(),
+            Kind::Number(number) => number.validate(),
+            Kind::Bullet(bullet) => bullet.validate(),
+            Kind::Image(source) => source.validate(),
         }
     }
     fn to_xml_fragment(&self) -> Result<String> {
         self.validate()?;
         let tag = match &self.kind {
-            ListLevelKind::Number(_) => "list-level-style-number",
-            ListLevelKind::Bullet(_) => "list-level-style-bullet",
-            ListLevelKind::Image(_) => "list-level-style-image",
+            Kind::Number(_) => "list-level-style-number",
+            Kind::Bullet(_) => "list-level-style-bullet",
+            Kind::Image(_) => "list-level-style-image",
         };
         let mut xml = format!(r#"<text:{tag} text:level="{}""#, self.level);
         if let Some(value) = &self.style_name {
             xml.push_str(&format!(r#" text:style-name="{}""#, escape_xml(value)));
         }
         match &self.kind {
-            ListLevelKind::Number(number) => {
+            Kind::Number(number) => {
                 if let Some(value) = &number.format {
                     xml.push_str(&format!(
                         r#" style:num-format="{}""#,
@@ -243,7 +243,7 @@ impl ListLevelStyle {
                 }
                 xml.push_str("/>");
             },
-            ListLevelKind::Bullet(bullet) => {
+            Kind::Bullet(bullet) => {
                 xml.push_str(&format!(
                     r#" text:bullet-char="{}""#,
                     escape_xml(&bullet.bullet_char.to_string())
@@ -262,14 +262,14 @@ impl ListLevelStyle {
                 }
                 xml.push_str("/>");
             },
-            ListLevelKind::Image(ListLevelImageSource::Linked(href)) => {
+            Kind::Image(ImageSource::Linked(href)) => {
                 xml.push_str(&format!(
                     r#" xlink:type="simple" xlink:href="{}" xlink:show="embed" xlink:actuate="onLoad""#,
                     escape_xml(href)
                 ));
                 xml.push_str("/>");
             },
-            ListLevelKind::Image(ListLevelImageSource::Embedded(data)) => {
+            Kind::Image(ImageSource::Embedded(data)) => {
                 xml.push('>');
                 xml.push_str(&format!(
                     "<office:binary-data>{data}</office:binary-data></text:{tag}>"
@@ -282,13 +282,13 @@ impl ListLevelStyle {
 
 /// One `text:list-style` declaration.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ListStyle {
+pub struct Style {
     pub name: String,
     pub display_name: Option<String>,
     pub consecutive_numbering: Option<bool>,
-    pub levels: Vec<ListLevelStyle>,
+    pub levels: Vec<LevelStyle>,
 }
-impl ListStyle {
+impl Style {
     pub fn new(name: impl Into<String>) -> Result<Self> {
         let result = Self {
             name: name.into(),
@@ -299,7 +299,7 @@ impl ListStyle {
         result.validate()?;
         Ok(result)
     }
-    pub fn level(&self, level: u16) -> Option<&ListLevelStyle> {
+    pub fn level(&self, level: u16) -> Option<&LevelStyle> {
         self.levels.iter().find(|entry| entry.level == level)
     }
     pub fn validate(&self) -> Result<()> {
@@ -343,11 +343,11 @@ impl ListStyle {
 
 /// All `text:list-style` declarations of one styles part.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ListStyleSet {
-    pub styles: Vec<ListStyle>,
+pub struct Styles {
+    pub styles: Vec<Style>,
 }
-impl ListStyleSet {
-    pub fn get(&self, name: &str) -> Option<&ListStyle> {
+impl Styles {
+    pub fn get(&self, name: &str) -> Option<&Style> {
         self.styles.iter().find(|style| style.name == name)
     }
 }
@@ -432,7 +432,7 @@ fn parse_level_common(attrs: &mut Attrs) -> Result<(u16, Option<String>)> {
         .ok_or_else(|| bad("list level missing text:level"))?
         .parse::<u16>()
         .map_err(|_| bad("invalid text:level"))?;
-    if !(1..=MAX_LIST_STYLE_LEVEL).contains(&level) {
+    if !(1..=MAX_LEVEL).contains(&level) {
         return Err(bad("text:level is outside the supported range"));
     }
     let style_name = attrs.take(Ns::Text, b"style-name");
@@ -442,9 +442,9 @@ fn parse_level_common(attrs: &mut Attrs) -> Result<(u16, Option<String>)> {
     Ok((level, style_name))
 }
 
-fn parse_number_level(mut attrs: Attrs) -> Result<ListLevelStyle> {
+fn parse_number_level(mut attrs: Attrs) -> Result<LevelStyle> {
     let (level, style_name) = parse_level_common(&mut attrs)?;
-    let number = ListLevelNumberStyle {
+    let number = NumberStyle {
         format: attrs
             .take(Ns::Style, b"num-format")
             .map(OutlineNumberFormat::new)
@@ -465,16 +465,16 @@ fn parse_number_level(mut attrs: Attrs) -> Result<ListLevelStyle> {
             .transpose()?,
     };
     attrs.reject_unknown("text:list-level-style-number")?;
-    let result = ListLevelStyle {
+    let result = LevelStyle {
         level,
         style_name,
-        kind: ListLevelKind::Number(number),
+        kind: Kind::Number(number),
     };
     result.validate()?;
     Ok(result)
 }
 
-fn parse_bullet_level(mut attrs: Attrs) -> Result<ListLevelStyle> {
+fn parse_bullet_level(mut attrs: Attrs) -> Result<LevelStyle> {
     let (level, style_name) = parse_level_common(&mut attrs)?;
     let bullet_char = attrs
         .take(Ns::Text, b"bullet-char")
@@ -484,7 +484,7 @@ fn parse_bullet_level(mut attrs: Attrs) -> Result<ListLevelStyle> {
         .next()
         .filter(|_| chars.next().is_none())
         .ok_or_else(|| bad("text:bullet-char must be a single character"))?;
-    let bullet = ListLevelBulletStyle {
+    let bullet = BulletStyle {
         bullet_char,
         relative_size: attrs
             .take(Ns::Text, b"bullet-relative-size")
@@ -494,10 +494,10 @@ fn parse_bullet_level(mut attrs: Attrs) -> Result<ListLevelStyle> {
         suffix: attrs.take(Ns::Style, b"num-suffix"),
     };
     attrs.reject_unknown("text:list-level-style-bullet")?;
-    let result = ListLevelStyle {
+    let result = LevelStyle {
         level,
         style_name,
-        kind: ListLevelKind::Bullet(bullet),
+        kind: Kind::Bullet(bullet),
     };
     result.validate()?;
     Ok(result)
@@ -541,7 +541,7 @@ struct ImageState {
 
 struct Active {
     depth: usize,
-    style: ListStyle,
+    style: Style,
     levels: HashSet<u16>,
     /// Depth of an open non-image level element (number or bullet).
     open_level: Option<usize>,
@@ -550,8 +550,8 @@ struct Active {
     skip: Option<usize>,
 }
 impl Active {
-    fn push_level(&mut self, level: ListLevelStyle) -> Result<()> {
-        if self.style.levels.len() >= usize::from(MAX_LIST_STYLE_LEVEL) {
+    fn push_level(&mut self, level: LevelStyle) -> Result<()> {
+        if self.style.levels.len() >= usize::from(MAX_LEVEL) {
             return Err(bad("too many list levels"));
         }
         if !self.levels.insert(level.level) {
@@ -562,7 +562,7 @@ impl Active {
     }
 }
 
-fn push_style(styles: &mut Vec<ListStyle>, style: ListStyle, total: &mut usize) -> Result<()> {
+fn push_style(styles: &mut Vec<Style>, style: Style, total: &mut usize) -> Result<()> {
     if styles.len() >= MAX_STYLES {
         return Err(bad("too many list styles"));
     }
@@ -582,16 +582,16 @@ fn push_style(styles: &mut Vec<ListStyle>, style: ListStyle, total: &mut usize) 
     Ok(())
 }
 
-fn list_style_attrs(
+fn style_attrs(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<ListStyle> {
+) -> Result<Style> {
     let mut a = attrs(reader, version, start)?;
     let name = a
         .take(Ns::Style, b"name")
         .ok_or_else(|| bad("list style missing style:name"))?;
-    let style = ListStyle {
+    let style = Style {
         name,
         display_name: a.take(Ns::Style, b"display-name"),
         consecutive_numbering: a
@@ -605,7 +605,7 @@ fn list_style_attrs(
     Ok(style)
 }
 
-fn is_list_style(current: &(Ns, Vec<u8>), parent: Option<&(Ns, Vec<u8>)>) -> bool {
+fn is_style(current: &(Ns, Vec<u8>), parent: Option<&(Ns, Vec<u8>)>) -> bool {
     parent.is_some_and(|(n, l)| {
         *n == Ns::Office && matches!(l.as_slice(), b"styles" | b"automatic-styles")
     }) && current.0 == Ns::Text
@@ -613,12 +613,12 @@ fn is_list_style(current: &(Ns, Vec<u8>), parent: Option<&(Ns, Vec<u8>)>) -> boo
 }
 
 /// Parse every `text:list-style` declared in a styles or flat document part.
-pub fn parse_list_styles(xml: &str) -> Result<ListStyleSet> {
+pub fn parse(xml: &str) -> Result<Styles> {
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
     }
     if !xml.contains("list-style") {
-        return Ok(ListStyleSet::default());
+        return Ok(Styles::default());
     }
     let mut reader = NsReader::from_reader(xml.as_bytes());
     reader.config_mut().trim_text(false);
@@ -634,7 +634,7 @@ pub fn parse_list_styles(xml: &str) -> Result<ListStyleSet> {
                     return Err(bad("styles XML nesting is too deep"));
                 }
                 let current = element(&reader, start.name());
-                let direct = is_list_style(&current, stack.last());
+                let direct = is_style(&current, stack.last());
                 stack.push(current.clone());
                 let depth = stack.len();
                 if direct {
@@ -643,7 +643,7 @@ pub fn parse_list_styles(xml: &str) -> Result<ListStyleSet> {
                     }
                     active = Some(Active {
                         depth,
-                        style: list_style_attrs(&reader, version, &start)?,
+                        style: style_attrs(&reader, version, &start)?,
                         levels: HashSet::new(),
                         open_level: None,
                         image: None,
@@ -700,7 +700,7 @@ pub fn parse_list_styles(xml: &str) -> Result<ListStyleSet> {
                     (true, Ns::Text, b"list-level-style-image") => {
                         let (level, style_name, href) =
                             parse_image_attrs(attrs(&reader, version, &start)?)?;
-                        if state.style.levels.len() >= usize::from(MAX_LIST_STYLE_LEVEL) {
+                        if state.style.levels.len() >= usize::from(MAX_LEVEL) {
                             return Err(bad("too many list levels"));
                         }
                         if state.levels.contains(&level) {
@@ -722,13 +722,13 @@ pub fn parse_list_styles(xml: &str) -> Result<ListStyleSet> {
             },
             Ok(Event::Empty(start)) => {
                 let current = element(&reader, start.name());
-                if is_list_style(&current, stack.last()) {
+                if is_style(&current, stack.last()) {
                     if active.is_some() {
                         return Err(bad("nested text:list-style"));
                     }
                     push_style(
                         &mut styles,
-                        list_style_attrs(&reader, version, &start)?,
+                        style_attrs(&reader, version, &start)?,
                         &mut total,
                     )?;
                     continue;
@@ -781,10 +781,10 @@ pub fn parse_list_styles(xml: &str) -> Result<ListStyleSet> {
                         let href = href.ok_or_else(|| {
                             bad("text:list-level-style-image requires xlink:href or office:binary-data")
                         })?;
-                        state.push_level(ListLevelStyle {
+                        state.push_level(LevelStyle {
                             level,
                             style_name,
-                            kind: ListLevelKind::Image(ListLevelImageSource::Linked(href)),
+                            kind: Kind::Image(ImageSource::Linked(href)),
                         })?;
                     },
                     _ => {
@@ -823,18 +823,18 @@ pub fn parse_list_styles(xml: &str) -> Result<ListStyleSet> {
                     {
                         let image = state.image.take().unwrap();
                         let source = match (image.href, image.binary_seen) {
-                            (Some(href), false) => ListLevelImageSource::Linked(href),
-                            (None, true) => ListLevelImageSource::Embedded(image.binary),
+                            (Some(href), false) => ImageSource::Linked(href),
+                            (None, true) => ImageSource::Embedded(image.binary),
                             _ => {
                                 return Err(bad(
                                     "text:list-level-style-image requires exactly one of xlink:href or office:binary-data",
                                 ));
                             },
                         };
-                        let level = ListLevelStyle {
+                        let level = LevelStyle {
                             level: image.level,
                             style_name: image.style_name,
-                            kind: ListLevelKind::Image(source),
+                            kind: Kind::Image(source),
                         };
                         level.validate()?;
                         state.push_level(level)?;
@@ -861,21 +861,19 @@ pub fn parse_list_styles(xml: &str) -> Result<ListStyleSet> {
     if !stack.is_empty() || active.is_some() {
         return Err(bad("truncated styles XML"));
     }
-    Ok(ListStyleSet { styles })
+    Ok(Styles { styles })
 }
 
 impl OpenDocumentPackage {
     /// Parse the `text:list-style` declarations of the package `styles.xml`.
-    pub fn list_styles(&self) -> Result<ListStyleSet> {
-        self.styles_xml()?.map_or_else(
-            || Ok(ListStyleSet::default()),
-            |xml| parse_list_styles(&xml),
-        )
+    pub fn styles(&self) -> Result<Styles> {
+        self.styles_xml()?
+            .map_or_else(|| Ok(Styles::default()), |xml| parse(&xml))
     }
 }
 impl FlatOpenDocument {
     /// Parse the `text:list-style` declarations of a flat XML document.
-    pub fn list_styles(&self) -> Result<ListStyleSet> {
-        parse_list_styles(self.xml())
+    pub fn styles(&self) -> Result<Styles> {
+        parse(self.xml())
     }
 }
