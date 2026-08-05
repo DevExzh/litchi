@@ -29,7 +29,7 @@ enum NamespaceKind {
 
 /// Numbering format for line numbers.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum LineNumberFormat {
+pub enum Format {
     Empty,
     Arabic,
     LowerRoman,
@@ -39,7 +39,7 @@ pub enum LineNumberFormat {
     Custom(String),
 }
 
-impl LineNumberFormat {
+impl Format {
     pub fn parse(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         if value.len() > MAX_VALUE_BYTES {
@@ -77,14 +77,14 @@ impl LineNumberFormat {
 
 /// Placement of line numbers relative to the text area.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LineNumberPosition {
+pub enum Position {
     Left,
     Right,
     Inner,
     Outer,
 }
 
-impl LineNumberPosition {
+impl Position {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "left" => Ok(Self::Left),
@@ -123,34 +123,34 @@ impl NonNegativeLength {
 
 /// Optional separator emitted after every configured number of lines.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct LineNumberingSeparator {
+pub struct Separator {
     pub increment: Option<u64>,
     pub text: String,
 }
 
 /// One standard `text:linenumbering-configuration` declaration.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct LineNumberingConfiguration {
+pub struct Configuration {
     pub number_lines: Option<bool>,
-    pub number_format: Option<LineNumberFormat>,
+    pub number_format: Option<Format>,
     pub letter_sync: Option<bool>,
     pub style_name: Option<String>,
     pub increment: Option<u64>,
-    pub number_position: Option<LineNumberPosition>,
+    pub number_position: Option<Position>,
     pub offset: Option<NonNegativeLength>,
     pub count_empty_lines: Option<bool>,
     pub count_in_text_boxes: Option<bool>,
     pub restart_on_page: Option<bool>,
-    pub separator: Option<LineNumberingSeparator>,
+    pub separator: Option<Separator>,
 }
 
-impl LineNumberingConfiguration {
+impl Configuration {
     pub fn validate(&self) -> Result<()> {
         if self.letter_sync.is_some()
             && !self
                 .number_format
                 .as_ref()
-                .is_some_and(LineNumberFormat::permits_letter_sync)
+                .is_some_and(Format::permits_letter_sync)
         {
             return invalid("style:num-letter-sync requires style:num-format 'a' or 'A'");
         }
@@ -182,7 +182,7 @@ impl LineNumberingConfiguration {
         write_attr(
             &mut output,
             "style:num-format",
-            self.number_format.as_ref().map(LineNumberFormat::as_str),
+            self.number_format.as_ref().map(Format::as_str),
         );
         write_bool_attr(&mut output, "style:num-letter-sync", self.letter_sync);
         write_attr(&mut output, "text:style-name", self.style_name.as_deref());
@@ -190,7 +190,7 @@ impl LineNumberingConfiguration {
         write_attr(
             &mut output,
             "text:number-position",
-            self.number_position.map(LineNumberPosition::as_str),
+            self.number_position.map(Position::as_str),
         );
         write_attr(
             &mut output,
@@ -227,7 +227,7 @@ impl LineNumberingConfiguration {
 }
 
 /// Parse the optional line-numbering declaration from an ODF styles document.
-pub fn parse_line_numbering_configuration(xml: &str) -> Result<Option<LineNumberingConfiguration>> {
+pub fn parse(xml: &str) -> Result<Option<Configuration>> {
     if xml.len() > MAX_DOCUMENT_XML_BYTES {
         return invalid(format!(
             "ODF XML exceeds the {MAX_DOCUMENT_XML_BYTES} byte line-numbering limit"
@@ -330,7 +330,7 @@ fn event_start(xml: &str, end: usize) -> Result<usize> {
 }
 
 fn locate_configuration(xml: &str) -> Result<(Option<XmlSpan>, StylesSite)> {
-    parse_line_numbering_configuration(xml)?;
+    parse(xml)?;
 
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
@@ -416,10 +416,7 @@ fn locate_configuration(xml: &str) -> Result<(Option<XmlSpan>, StylesSite)> {
 
 /// Insert or replace the document line-numbering declaration without rewriting
 /// unrelated style XML.
-pub(crate) fn set_line_numbering_configuration_xml(
-    xml: &str,
-    configuration: &LineNumberingConfiguration,
-) -> Result<String> {
+pub(crate) fn set_xml(xml: &str, configuration: &Configuration) -> Result<String> {
     configuration.validate()?;
     let (target, site) = locate_configuration(xml)?;
     let fragment = configuration.to_xml()?;
@@ -457,7 +454,7 @@ pub(crate) fn set_line_numbering_configuration_xml(
 
 /// Remove the document line-numbering declaration without rewriting unrelated
 /// style XML.
-pub(crate) fn remove_line_numbering_configuration_xml(xml: &str) -> Result<String> {
+pub(crate) fn remove_xml(xml: &str) -> Result<String> {
     let (target, _) = locate_configuration(xml)?;
     let Some(span) = target else {
         return Ok(xml.to_string());
@@ -470,9 +467,9 @@ impl OpenDocumentPackage {
     ///
     /// The declaration is presentation metadata only. It is never used to
     /// paginate a document or generate line numbers.
-    pub fn line_numbering_configuration(&self) -> Result<Option<LineNumberingConfiguration>> {
+    pub fn line_numbering_configuration(&self) -> Result<Option<Configuration>> {
         self.styles_xml()?
-            .map_or_else(|| Ok(None), |xml| parse_line_numbering_configuration(&xml))
+            .map_or_else(|| Ok(None), |xml| parse(&xml))
     }
 }
 
@@ -481,16 +478,13 @@ impl FlatOpenDocument {
     ///
     /// The declaration is presentation metadata only. It is never used to
     /// paginate a document or generate line numbers.
-    pub fn line_numbering_configuration(&self) -> Result<Option<LineNumberingConfiguration>> {
-        parse_line_numbering_configuration(self.xml())
+    pub fn line_numbering_configuration(&self) -> Result<Option<Configuration>> {
+        parse(self.xml())
     }
 }
 
-fn parse_attributes(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
-) -> Result<LineNumberingConfiguration> {
-    let mut configuration = LineNumberingConfiguration::default();
+fn parse_attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Configuration> {
+    let mut configuration = Configuration::default();
     let mut seen = HashSet::new();
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(xml_error)?;
@@ -512,7 +506,7 @@ fn parse_attributes(
                 configuration.number_lines = Some(parse_bool(&value, "text:number-lines")?)
             },
             (NamespaceKind::Style, b"num-format") => {
-                configuration.number_format = Some(LineNumberFormat::parse(value)?)
+                configuration.number_format = Some(Format::parse(value)?)
             },
             (NamespaceKind::Style, b"num-letter-sync") => {
                 configuration.letter_sync = Some(parse_bool(&value, "style:num-letter-sync")?)
@@ -525,7 +519,7 @@ fn parse_attributes(
                 configuration.increment = Some(parse_nonnegative_integer(&value, "text:increment")?)
             },
             (NamespaceKind::Text, b"number-position") => {
-                configuration.number_position = Some(LineNumberPosition::parse(&value)?)
+                configuration.number_position = Some(Position::parse(&value)?)
             },
             (NamespaceKind::Text, b"offset") => {
                 configuration.offset = Some(NonNegativeLength::new(value)?)
@@ -547,9 +541,7 @@ fn parse_attributes(
     Ok(configuration)
 }
 
-fn parse_configuration_body(
-    reader: &mut NsReader<&[u8]>,
-) -> Result<Option<LineNumberingSeparator>> {
+fn parse_configuration_body(reader: &mut NsReader<&[u8]>) -> Result<Option<Separator>> {
     let mut separator = None;
     let mut buffer = Vec::new();
     loop {
@@ -574,7 +566,7 @@ fn parse_configuration_body(
                 if separator.is_some() {
                     return invalid("duplicate text:linenumbering-separator");
                 }
-                separator = Some(LineNumberingSeparator {
+                separator = Some(Separator {
                     increment: parse_separator_increment(reader, &element)?,
                     text: String::new(),
                 });
@@ -599,10 +591,7 @@ fn parse_configuration_body(
     Ok(separator)
 }
 
-fn parse_separator(
-    reader: &mut NsReader<&[u8]>,
-    element: &BytesStart<'_>,
-) -> Result<LineNumberingSeparator> {
+fn parse_separator(reader: &mut NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Separator> {
     let increment = parse_separator_increment(reader, element)?;
     let mut text = String::new();
     let mut buffer = Vec::new();
@@ -649,7 +638,7 @@ fn parse_separator(
         }
         buffer.clear();
     }
-    Ok(LineNumberingSeparator { increment, text })
+    Ok(Separator { increment, text })
 }
 
 fn parse_separator_increment(
@@ -840,40 +829,28 @@ mod tests {
         let xml = styles(
             r#"<t:linenumbering-configuration t:number-lines="1" s:num-format="A" s:num-letter-sync="false" t:style-name="Line &amp; Number" t:increment="5" t:number-position="outer" t:offset="0.25in" t:count-empty-lines="true" t:count-in-text-boxes="0" t:restart-on-page="false"><t:linenumbering-separator t:increment="10"> / &amp; </t:linenumbering-separator></t:linenumbering-configuration>"#,
         );
-        let configuration = parse_line_numbering_configuration(&xml).unwrap().unwrap();
+        let configuration = parse(&xml).unwrap().unwrap();
         assert_eq!(configuration.number_lines, Some(true));
-        assert_eq!(
-            configuration.number_format,
-            Some(LineNumberFormat::UpperAlpha)
-        );
-        assert_eq!(
-            configuration.number_position,
-            Some(LineNumberPosition::Outer)
-        );
+        assert_eq!(configuration.number_format, Some(Format::UpperAlpha));
+        assert_eq!(configuration.number_position, Some(Position::Outer));
         assert_eq!(configuration.offset.as_ref().unwrap().as_str(), "0.25in");
         assert_eq!(configuration.separator.as_ref().unwrap().text, " / & ");
 
         let serialized = configuration.to_xml().unwrap();
-        let reparsed = parse_line_numbering_configuration(&styles(&serialized))
-            .unwrap()
-            .unwrap();
+        let reparsed = parse(&styles(&serialized)).unwrap().unwrap();
         assert_eq!(reparsed, configuration);
     }
 
     #[test]
     fn preserves_empty_and_custom_number_formats() {
-        for format in [
-            LineNumberFormat::Empty,
-            LineNumberFormat::Custom("一, 二, 三".to_string()),
-        ] {
-            let configuration = LineNumberingConfiguration {
+        for format in [Format::Empty, Format::Custom("一, 二, 三".to_string())] {
+            let configuration = Configuration {
                 number_format: Some(format.clone()),
-                ..LineNumberingConfiguration::default()
+                ..Configuration::default()
             };
-            let parsed =
-                parse_line_numbering_configuration(&styles(&configuration.to_xml().unwrap()))
-                    .unwrap()
-                    .unwrap();
+            let parsed = parse(&styles(&configuration.to_xml().unwrap()))
+                .unwrap()
+                .unwrap();
             assert_eq!(parsed.number_format, Some(format));
         }
     }
@@ -889,17 +866,14 @@ mod tests {
             r#"<t:linenumbering-configuration><t:linenumbering-separator/><t:linenumbering-separator/></t:linenumbering-configuration>"#,
             r#"<t:linenumbering-configuration><t:linenumbering-separator><t:span/></t:linenumbering-separator></t:linenumbering-configuration>"#,
         ] {
-            assert!(
-                parse_line_numbering_configuration(&styles(body)).is_err(),
-                "{body}"
-            );
+            assert!(parse(&styles(body)).is_err(), "{body}");
         }
         let misplaced = format!(
             r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TEXT}"><o:body><t:linenumbering-configuration/></o:body></o:document-content>"#
         );
-        assert!(parse_line_numbering_configuration(&misplaced).is_err());
+        assert!(parse(&misplaced).is_err());
         assert!(
-            parse_line_numbering_configuration(&styles(
+            parse(&styles(
                 r#"<t:linenumbering-configuration/><t:linenumbering-configuration/>"#
             ))
             .is_err()
@@ -911,43 +885,37 @@ mod tests {
         let original = styles(
             r#"<s:style s:name="Preserved"/><t:linenumbering-configuration t:number-lines="false" s:num-format="1"/>"#,
         );
-        let configuration = LineNumberingConfiguration {
+        let configuration = Configuration {
             number_lines: Some(true),
-            number_format: Some(LineNumberFormat::LowerAlpha),
+            number_format: Some(Format::LowerAlpha),
             letter_sync: Some(true),
             style_name: Some("LineNumbers".to_string()),
             increment: Some(3),
-            number_position: Some(LineNumberPosition::Outer),
+            number_position: Some(Position::Outer),
             offset: Some(NonNegativeLength::new("0.25in").unwrap()),
             count_empty_lines: Some(true),
             count_in_text_boxes: Some(false),
             restart_on_page: Some(true),
-            separator: Some(LineNumberingSeparator {
+            separator: Some(Separator {
                 increment: Some(6),
                 text: " · ".to_string(),
             }),
         };
 
-        let replaced = set_line_numbering_configuration_xml(&original, &configuration).unwrap();
+        let replaced = set_xml(&original, &configuration).unwrap();
         assert!(replaced.contains(r#"<s:style s:name="Preserved"/>"#));
-        assert_eq!(
-            parse_line_numbering_configuration(&replaced).unwrap(),
-            Some(configuration.clone())
-        );
+        assert_eq!(parse(&replaced).unwrap(), Some(configuration.clone()));
 
-        let removed = remove_line_numbering_configuration_xml(&replaced).unwrap();
+        let removed = remove_xml(&replaced).unwrap();
         assert!(removed.contains(r#"<s:style s:name="Preserved"/>"#));
-        assert_eq!(parse_line_numbering_configuration(&removed).unwrap(), None);
+        assert_eq!(parse(&removed).unwrap(), None);
 
         let empty_styles = format!(
             r#"<o:document-styles xmlns:o="{OFFICE}" xmlns:t="{TEXT}" xmlns:s="{STYLE}"><o:styles/><o:automatic-styles/><o:master-styles/></o:document-styles>"#
         );
-        let inserted = set_line_numbering_configuration_xml(&empty_styles, &configuration).unwrap();
+        let inserted = set_xml(&empty_styles, &configuration).unwrap();
         assert!(inserted.contains("<o:styles>"));
-        assert_eq!(
-            parse_line_numbering_configuration(&inserted).unwrap(),
-            Some(configuration.clone())
-        );
+        assert_eq!(parse(&inserted).unwrap(), Some(configuration.clone()));
 
         let flat_xml = format!(
             r#"<o:document xmlns:o="{OFFICE}" xmlns:t="{TEXT}" xmlns:s="{STYLE}" o:mimetype="application/vnd.oasis.opendocument.text" o:version="1.3"><o:styles>{}</o:styles><o:body><o:text/></o:body></o:document>"#,
