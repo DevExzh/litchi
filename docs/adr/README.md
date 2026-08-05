@@ -36,6 +36,7 @@ Office round trips.
 | [0021](0021-docx-glossary-ownership.md) | Typed DOCX glossary and building-block ownership |
 | [0022](0022-pptx-embedded-font-ownership.md) | Typed PPTX embedded-font ownership |
 | [0023](0023-odf-family-crate-split.md) | Dedicated ODF family crates and umbrella facade |
+| [0024](0024-current-topology.md) | Current post-migration workspace topology |
 
 ## Decision hierarchy
 
@@ -46,3 +47,10 @@ When two records appear to conflict, apply this order:
 3. Performance decisions require representative measurements.
 4. Internal modularity serves the first three goals and never leaks type noise.
 5. Production readiness gates any support claim.
+
+## Current-state terminology
+
+[ADR 0024](0024-current-topology.md) is the authoritative inventory of the
+current workspace package topology. Older records may retain `litchi-ooxml` as
+historical migration-host terminology; those references are preserved as
+implementation evidence and do not denote a current workspace package.
