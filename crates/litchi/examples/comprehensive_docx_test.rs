@@ -14,9 +14,9 @@
 
 use litchi::ooxml::Props;
 use litchi::ooxml::docx::{
-    BorderColor, EndnotePos, Endnotes, FootnotePos, Footnotes, ListType, MutableDocument,
-    MutableTheme, Package, PageBorderStyle, PageNumberFormat, PageOrientation, ParagraphAlignment,
-    SectionPageBorder, SectionPageBorders, TableOfContents, UnderlineStyle, Watermark,
+    Border, Borders, Color, EndnotePos, Endnotes, FootnotePos, Footnotes, ListType,
+    MutableDocument, MutableTheme, Package, PageNumberFormat, PageOrientation, ParagraphAlignment,
+    Style, TableOfContents, UnderlineStyle, Watermark,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -513,11 +513,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Configure section
-    let page_border = SectionPageBorder {
-        style: PageBorderStyle::Double,
+    let page_border = Border {
+        style: Style::Double,
         size: Some(8),
         space: Some(24),
-        color: Some(BorderColor::rgb(31, 78, 120)),
+        color: Some(Color::rgb(31, 78, 120)),
         shadow: false,
         frame: false,
     };
@@ -537,12 +537,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         position: Some(EndnotePos::DocumentEnd),
         ..Endnotes::default()
     });
-    section.page_borders = Some(SectionPageBorders {
+    section.page_borders = Some(Borders {
         top: Some(page_border),
         left: Some(page_border),
         bottom: Some(page_border),
         right: Some(page_border),
-        ..SectionPageBorders::default()
+        ..Borders::default()
     });
 
     // ═══════════════════════════════════════════════════════════════════════════

@@ -4,6 +4,8 @@ use quick_xml::events::Event;
 use quick_xml::{Reader, XmlVersion};
 use std::fmt::Write;
 
+pub mod borders;
+
 /// Page number format used by page, footnote, and endnote numbering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PageNumberFormat {
@@ -416,11 +418,11 @@ macro_rules! define_page_border_art {
         /// corrupt document (`[MS-OI29500]` section 2.1.528(d)).
         #[repr(u8)]
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        pub enum PageBorderArt {
+        pub enum Art {
             $($variant),+
         }
 
-        impl PageBorderArt {
+        impl Art {
             /// Every page-border artwork value in schema order.
             pub const ALL: &'static [Self] = &[$(Self::$variant),+];
 
@@ -437,7 +439,7 @@ macro_rules! define_page_border_art {
             }
         }
 
-        impl std::str::FromStr for PageBorderArt {
+        impl std::str::FromStr for Art {
             type Err = Error;
 
             fn from_str(value: &str) -> Result<Self> {
@@ -450,13 +452,13 @@ macro_rules! define_page_border_art {
             }
         }
 
-        impl std::fmt::Display for PageBorderArt {
+        impl std::fmt::Display for Art {
             fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 formatter.write_str(self.token())
             }
         }
 
-        impl TryFrom<u8> for PageBorderArt {
+        impl TryFrom<u8> for Art {
             type Error = Error;
 
             fn try_from(value: u8) -> Result<Self> {
@@ -642,9 +644,9 @@ define_page_border_art! {
 /// Page-border style (`ST_Border`, ECMA-376 §17.18.2).
 ///
 /// Line styles map directly to fixed tokens; artwork is closed over
-/// [`PageBorderArt`] and cannot carry arbitrary strings.
+/// [`Art`] and cannot carry arbitrary strings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum PageBorderStyle {
+pub enum Style {
     Nil,
     None,
     Single,
@@ -672,10 +674,10 @@ pub enum PageBorderStyle {
     ThreeDEngrave,
     Outset,
     Inset,
-    Art(PageBorderArt),
+    Art(Art),
 }
 
-impl PageBorderStyle {
+impl Style {
     fn as_str(self) -> &'static str {
         match self {
             Self::Nil => "nil",
@@ -743,21 +745,21 @@ impl PageBorderStyle {
     }
 }
 
-impl From<PageBorderArt> for PageBorderStyle {
-    fn from(value: PageBorderArt) -> Self {
+impl From<Art> for Style {
+    fn from(value: Art) -> Self {
         Self::Art(value)
     }
 }
 
 /// Which pages display the section page border (`w:display`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PageBorderDisplay {
+pub enum Display {
     AllPages,
     FirstPage,
     NotFirstPage,
 }
 
-impl PageBorderDisplay {
+impl Display {
     fn as_str(self) -> &'static str {
         match self {
             Self::AllPages => "allPages",
@@ -780,12 +782,12 @@ impl PageBorderDisplay {
 
 /// Page-border measurement origin (`w:offsetFrom`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PageBorderOffsetFrom {
+pub enum OffsetFrom {
     Page,
     Text,
 }
 
-impl PageBorderOffsetFrom {
+impl OffsetFrom {
     fn as_str(self) -> &'static str {
         match self {
             Self::Page => "page",
@@ -806,12 +808,12 @@ impl PageBorderOffsetFrom {
 
 /// Whether the page border renders in front of or behind text (`w:zOrder`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PageBorderZOrder {
+pub enum ZOrder {
     Front,
     Back,
 }
 
-impl PageBorderZOrder {
+impl ZOrder {
     fn as_str(self) -> &'static str {
         match self {
             Self::Front => "front",
@@ -832,12 +834,12 @@ impl PageBorderZOrder {
 
 /// Page-border color (`ST_HexColor`), represented without heap allocation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BorderColor {
+pub enum Color {
     Auto,
     Rgb([u8; 3]),
 }
 
-impl BorderColor {
+impl Color {
     /// Creates an explicit red-green-blue color.
     pub const fn rgb(red: u8, green: u8, blue: u8) -> Self {
         Self::Rgb([red, green, blue])
@@ -869,45 +871,6 @@ impl BorderColor {
             component(2..4)?,
             component(4..6)?,
         ))
-    }
-}
-
-/// One page-border edge (`CT_Border`, ECMA-376 §17.6.16).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SectionPageBorder {
-    pub style: PageBorderStyle,
-    /// Border size in eighths of a point for line styles, points for art.
-    pub size: Option<u32>,
-    /// Border offset space in points (`0..=31`).
-    pub space: Option<u32>,
-    pub color: Option<BorderColor>,
-    pub shadow: bool,
-    pub frame: bool,
-}
-
-/// Section page-border settings (`CT_PageBorders`, ECMA-376 §17.6.16).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SectionPageBorders {
-    pub offset_from: PageBorderOffsetFrom,
-    pub z_order: PageBorderZOrder,
-    pub display: PageBorderDisplay,
-    pub top: Option<SectionPageBorder>,
-    pub left: Option<SectionPageBorder>,
-    pub bottom: Option<SectionPageBorder>,
-    pub right: Option<SectionPageBorder>,
-}
-
-impl Default for SectionPageBorders {
-    fn default() -> Self {
-        Self {
-            offset_from: PageBorderOffsetFrom::Page,
-            z_order: PageBorderZOrder::Back,
-            display: PageBorderDisplay::AllPages,
-            top: None,
-            left: None,
-            bottom: None,
-            right: None,
-        }
     }
 }
 
@@ -1018,7 +981,7 @@ pub struct SectionProperties {
     pub document_grid: Option<SectionDocumentGrid>,
     pub form_protection: bool,
     pub paper_source: Option<SectionPaperSource>,
-    pub page_borders: Option<SectionPageBorders>,
+    pub page_borders: Option<borders::Borders>,
     pub line_numbering: Option<SectionLineNumbering>,
     pub vertical_alignment: Option<SectionVerticalAlignment>,
     /// Different first-page header/footer (`w:titlePg`).
@@ -1311,7 +1274,7 @@ impl SectionProperties {
             {
                 if let Some(size) = border.size {
                     let max = match border.style {
-                        PageBorderStyle::Art(_) => MAX_PAGE_BORDER_ART_SIZE,
+                        Style::Art(_) => MAX_PAGE_BORDER_ART_SIZE,
                         _ => MAX_PAGE_BORDER_LINE_SIZE,
                     };
                     if size > max {
@@ -1827,22 +1790,22 @@ fn parse_grid(xml: &str) -> Result<SectionDocumentGrid> {
     })
 }
 
-fn parse_page_borders(xml: &str) -> Result<SectionPageBorders> {
+fn parse_page_borders(xml: &str) -> Result<borders::Borders> {
     let attrs = attributes(xml)?;
-    let mut borders = SectionPageBorders {
+    let mut borders = borders::Borders {
         offset_from: attr(&attrs, "offsetFrom")
-            .map(PageBorderOffsetFrom::parse)
+            .map(OffsetFrom::parse)
             .transpose()?
-            .unwrap_or(PageBorderOffsetFrom::Page),
+            .unwrap_or(OffsetFrom::Page),
         z_order: attr(&attrs, "zOrder")
-            .map(PageBorderZOrder::parse)
+            .map(ZOrder::parse)
             .transpose()?
-            .unwrap_or(PageBorderZOrder::Back),
+            .unwrap_or(ZOrder::Back),
         display: attr(&attrs, "display")
-            .map(PageBorderDisplay::parse)
+            .map(Display::parse)
             .transpose()?
-            .unwrap_or(PageBorderDisplay::AllPages),
-        ..SectionPageBorders::default()
+            .unwrap_or(Display::AllPages),
+        ..borders::Borders::default()
     };
     for (name, raw) in direct_nested_children(xml)? {
         let edge = match name.as_str() {
@@ -1866,12 +1829,12 @@ fn parse_page_borders(xml: &str) -> Result<SectionPageBorders> {
     Ok(borders)
 }
 
-fn parse_page_border(xml: &str) -> Result<SectionPageBorder> {
+fn parse_page_border(xml: &str) -> Result<borders::Border> {
     let attrs = attributes(xml)?;
     let on_off =
         |name: &str| attr(&attrs, name).is_some_and(|value| matches!(value, "1" | "true" | "on"));
-    Ok(SectionPageBorder {
-        style: PageBorderStyle::parse(
+    Ok(borders::Border {
+        style: Style::parse(
             attr(&attrs, "val")
                 .ok_or_else(|| Error::InvalidFormat("page border omits style".into()))?,
         )?,
@@ -1881,7 +1844,7 @@ fn parse_page_border(xml: &str) -> Result<SectionPageBorder> {
         space: attr(&attrs, "space")
             .map(|value| parse_u32(value, "page border space"))
             .transpose()?,
-        color: attr(&attrs, "color").map(BorderColor::parse).transpose()?,
+        color: attr(&attrs, "color").map(Color::parse).transpose()?,
         shadow: on_off("shadow"),
         frame: on_off("frame"),
     })
@@ -2079,7 +2042,7 @@ fn write_grid(xml: &mut String, grid: &SectionDocumentGrid) -> Result<()> {
     Ok(())
 }
 
-fn write_page_borders(xml: &mut String, borders: &SectionPageBorders) -> Result<()> {
+fn write_page_borders(xml: &mut String, borders: &borders::Borders) -> Result<()> {
     write!(
         xml,
         "<w:pgBorders w:offsetFrom=\"{}\" w:zOrder=\"{}\" w:display=\"{}\"",
@@ -2108,7 +2071,7 @@ fn write_page_borders(xml: &mut String, borders: &SectionPageBorders) -> Result<
     Ok(())
 }
 
-fn write_page_border(xml: &mut String, name: &str, border: &SectionPageBorder) -> Result<()> {
+fn write_page_border(xml: &mut String, name: &str, border: &borders::Border) -> Result<()> {
     write!(xml, "<w:{name} w:val=\"{}\"", escape(border.style.as_str()))
         .map_err(|error| Error::Xml(error.to_string()))?;
     if let Some(size) = border.size {
@@ -2119,8 +2082,8 @@ fn write_page_border(xml: &mut String, name: &str, border: &SectionPageBorder) -
     }
     if let Some(color) = border.color {
         match color {
-            BorderColor::Auto => xml.push_str(" w:color=\"auto\""),
-            BorderColor::Rgb([red, green, blue]) => {
+            Color::Auto => xml.push_str(" w:color=\"auto\""),
+            Color::Rgb([red, green, blue]) => {
                 write!(xml, " w:color=\"{red:02X}{green:02X}{blue:02X}\"")
                     .map_err(|error| Error::Xml(error.to_string()))?;
             },
@@ -2202,20 +2165,20 @@ mod tests {
             })
         );
         let borders = section.page_borders.as_ref().unwrap();
-        assert_eq!(borders.offset_from, PageBorderOffsetFrom::Text);
-        assert_eq!(borders.z_order, PageBorderZOrder::Front);
-        assert_eq!(borders.display, PageBorderDisplay::FirstPage);
+        assert_eq!(borders.offset_from, OffsetFrom::Text);
+        assert_eq!(borders.z_order, ZOrder::Front);
+        assert_eq!(borders.display, Display::FirstPage);
         let top = borders.top.as_ref().unwrap();
-        assert_eq!(top.style, PageBorderStyle::Double);
+        assert_eq!(top.style, Style::Double);
         assert_eq!(top.size, Some(8));
         assert_eq!(top.space, Some(24));
-        assert_eq!(top.color, Some(BorderColor::rgb(255, 0, 0)));
+        assert_eq!(top.color, Some(Color::rgb(255, 0, 0)));
         assert!(top.shadow);
         assert!(!top.frame);
         let bottom = borders.bottom.as_ref().unwrap();
-        assert_eq!(bottom.style, PageBorderStyle::Art(PageBorderArt::StarsTop));
+        assert_eq!(bottom.style, Style::Art(Art::StarsTop));
         assert_eq!(bottom.size, Some(120));
-        assert_eq!(bottom.color, Some(BorderColor::Auto));
+        assert_eq!(bottom.color, Some(Color::Auto));
         assert!(bottom.frame);
         assert!(borders.left.is_none() && borders.right.is_none());
         assert_eq!(
@@ -2259,9 +2222,9 @@ mod tests {
         let xml = r#"<w:sectPr><w:pgBorders/><w:lnNumType w:countBy="2"/></w:sectPr>"#;
         let section = SectionProperties::from_xml(xml).unwrap();
         let borders = section.page_borders.as_ref().unwrap();
-        assert_eq!(borders.offset_from, PageBorderOffsetFrom::Page);
-        assert_eq!(borders.z_order, PageBorderZOrder::Back);
-        assert_eq!(borders.display, PageBorderDisplay::AllPages);
+        assert_eq!(borders.offset_from, OffsetFrom::Page);
+        assert_eq!(borders.z_order, ZOrder::Back);
+        assert_eq!(borders.display, Display::AllPages);
         assert_eq!(
             section.line_numbering,
             Some(SectionLineNumbering {
@@ -2339,53 +2302,50 @@ mod tests {
     #[test]
     fn page_border_style_enum_round_trips() {
         let styles = [
-            PageBorderStyle::Nil,
-            PageBorderStyle::None,
-            PageBorderStyle::Single,
-            PageBorderStyle::Thick,
-            PageBorderStyle::Double,
-            PageBorderStyle::Dotted,
-            PageBorderStyle::Dashed,
-            PageBorderStyle::DotDash,
-            PageBorderStyle::DotDotDash,
-            PageBorderStyle::Triple,
-            PageBorderStyle::ThinThickSmallGap,
-            PageBorderStyle::ThinThickMediumGap,
-            PageBorderStyle::ThinThickLargeGap,
-            PageBorderStyle::ThickThinSmallGap,
-            PageBorderStyle::ThickThinMediumGap,
-            PageBorderStyle::ThickThinLargeGap,
-            PageBorderStyle::ThinThickThinSmallGap,
-            PageBorderStyle::ThinThickThinMediumGap,
-            PageBorderStyle::ThinThickThinLargeGap,
-            PageBorderStyle::Wave,
-            PageBorderStyle::DoubleWave,
-            PageBorderStyle::DashSmallGap,
-            PageBorderStyle::DashDotStroked,
-            PageBorderStyle::ThreeDEmboss,
-            PageBorderStyle::ThreeDEngrave,
-            PageBorderStyle::Outset,
-            PageBorderStyle::Inset,
+            Style::Nil,
+            Style::None,
+            Style::Single,
+            Style::Thick,
+            Style::Double,
+            Style::Dotted,
+            Style::Dashed,
+            Style::DotDash,
+            Style::DotDotDash,
+            Style::Triple,
+            Style::ThinThickSmallGap,
+            Style::ThinThickMediumGap,
+            Style::ThinThickLargeGap,
+            Style::ThickThinSmallGap,
+            Style::ThickThinMediumGap,
+            Style::ThickThinLargeGap,
+            Style::ThinThickThinSmallGap,
+            Style::ThinThickThinMediumGap,
+            Style::ThinThickThinLargeGap,
+            Style::Wave,
+            Style::DoubleWave,
+            Style::DashSmallGap,
+            Style::DashDotStroked,
+            Style::ThreeDEmboss,
+            Style::ThreeDEngrave,
+            Style::Outset,
+            Style::Inset,
         ];
         for style in &styles {
-            assert_eq!(&PageBorderStyle::parse(style.as_str()).unwrap(), style);
+            assert_eq!(&Style::parse(style.as_str()).unwrap(), style);
         }
-        assert_eq!(size_of::<PageBorderArt>(), 1);
-        assert_eq!(PageBorderArt::ALL.len(), 164);
-        for (index, art) in PageBorderArt::ALL.iter().enumerate() {
-            assert_eq!(art.token().parse::<PageBorderArt>().unwrap(), *art);
-            assert_eq!(PageBorderStyle::parse(art.token()).unwrap(), (*art).into());
+        assert_eq!(size_of::<Art>(), 1);
+        assert_eq!(Art::ALL.len(), 164);
+        for (index, art) in Art::ALL.iter().enumerate() {
+            assert_eq!(art.token().parse::<Art>().unwrap(), *art);
+            assert_eq!(Style::parse(art.token()).unwrap(), (*art).into());
             assert_eq!(art.to_string(), art.token());
             let code = 0x40 + u8::try_from(index).unwrap();
             assert_eq!(art.code(), code);
-            assert_eq!(PageBorderArt::try_from(code).unwrap(), *art);
+            assert_eq!(Art::try_from(code).unwrap(), *art);
         }
-        assert!(PageBorderArt::try_from(0x3F).is_err());
-        assert!(PageBorderArt::try_from(0xE4).is_err());
-        assert_eq!(
-            PageBorderStyle::parse("apples").unwrap(),
-            PageBorderStyle::Art(PageBorderArt::Apples)
-        );
+        assert!(Art::try_from(0x3F).is_err());
+        assert!(Art::try_from(0xE4).is_err());
+        assert_eq!(Style::parse("apples").unwrap(), Style::Art(Art::Apples));
         for invalid in [
             "custom",
             "earth3",
@@ -2397,13 +2357,10 @@ mod tests {
             "shapes2",
             "unknownArt",
         ] {
-            assert!(
-                PageBorderStyle::parse(invalid).is_err(),
-                "accepted {invalid}"
-            );
+            assert!(Style::parse(invalid).is_err(), "accepted {invalid}");
         }
-        assert!(PageBorderStyle::parse("not a style!").is_err());
-        assert!(PageBorderStyle::parse("").is_err());
+        assert!(Style::parse("not a style!").is_err());
+        assert!(Style::parse("").is_err());
     }
 
     #[test]

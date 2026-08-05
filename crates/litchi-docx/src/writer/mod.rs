@@ -33,13 +33,12 @@ pub use doc::{MutableDocument, Protection};
 pub use note::Note;
 
 // Re-export section types
+pub use section::borders::{Art, Border, Borders, Color, Display, OffsetFrom, Style, ZOrder};
 pub use section::{
-    BorderColor, ChapterSep, EndnotePos, Endnotes, FootnotePos, Footnotes, GridType,
-    LineNumberRestart, NoteNumberRestart, PageBorderArt, PageBorderDisplay, PageBorderOffsetFrom,
-    PageBorderStyle, PageBorderZOrder, PageNumberFormat, PageOrientation, SectionColumn,
-    SectionColumns, SectionDocumentGrid, SectionHeaderFooterPart, SectionHeaderFooterReference,
-    SectionLineNumbering, SectionPageBorder, SectionPageBorders, SectionPageNumbering,
-    SectionPaperSource, SectionProperties, SectionTextDirection, SectionVerticalAlignment,
+    ChapterSep, EndnotePos, Endnotes, FootnotePos, Footnotes, GridType, LineNumberRestart,
+    NoteNumberRestart, PageNumberFormat, PageOrientation, SectionColumn, SectionColumns,
+    SectionDocumentGrid, SectionHeaderFooterPart, SectionHeaderFooterReference, SectionPaperSource,
+    SectionProperties, SectionTextDirection, SectionVerticalAlignment,
 };
 
 // Re-export smart-tag types
