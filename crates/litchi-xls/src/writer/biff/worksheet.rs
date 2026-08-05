@@ -5,7 +5,7 @@ use crate::writer::core::{XlsPageSetupOptions, XlsWorksheetLayoutOptions};
 use crate::{XlsError, XlsResult};
 use std::io::Write;
 
-use super::write_record_header;
+use super::{write_record, write_record_header};
 
 fn write_unicode_string<W: Write>(writer: &mut W, value: &str) -> XlsResult<()> {
     let units = value.encode_utf16().collect::<Vec<_>>();
@@ -83,8 +83,7 @@ pub(super) fn write_consolidation<W: Write>(
                 crate::consolidation::DCON_BIN_RECORD_TYPE
             },
         };
-        write_record_header(writer, record_type, payload.len() as u16)?;
-        writer.write_all(&payload)?;
+        write_record(writer, record_type, &payload)?;
     }
     Ok(())
 }
@@ -103,18 +102,17 @@ fn write_header_footer<W: Write>(writer: &mut W, record_type: u16, text: &str) -
         ));
     }
     let compressed = units.iter().all(|unit| *unit <= 0x00ff);
-    let data_len = 3 + units.len() * if compressed { 1 } else { 2 };
-    write_record_header(writer, record_type, data_len as u16)?;
-    writer.write_all(&(units.len() as u16).to_le_bytes())?;
-    writer.write_all(&[u8::from(!compressed)])?;
+    let mut payload = Vec::with_capacity(3 + units.len() * if compressed { 1 } else { 2 });
+    payload.extend_from_slice(&(units.len() as u16).to_le_bytes());
+    payload.push(u8::from(!compressed));
     for unit in units {
         if compressed {
-            writer.write_all(&[unit as u8])?;
+            payload.push(unit as u8);
         } else {
-            writer.write_all(&unit.to_le_bytes())?;
+            payload.extend_from_slice(&unit.to_le_bytes());
         }
     }
-    Ok(())
+    write_record(writer, record_type, &payload)
 }
 
 fn write_page_breaks<W: Write>(
@@ -250,8 +248,7 @@ pub(super) fn write_page_settings<W: Write>(
     // substream grammar.
     if let Some(header_footer) = &options.header_footer {
         let payload = header_footer.to_payload()?;
-        write_record_header(writer, 0x089C, payload.len() as u16)?;
-        writer.write_all(&payload)?;
+        write_record(writer, 0x089C, &payload)?;
     }
     Ok(())
 }

@@ -15,8 +15,9 @@
 //! Based on Microsoft's "[MS-XLS]: Excel Binary File Format (.xls) Structure" specification
 //! and Apache POI's BIFF record generation.
 
-use super::super::XlsResult;
+use super::super::{XlsError, XlsResult};
 use crate::writer::XlsDefinedName;
+use litchi_biff::{Encoder, Kind};
 use std::io::Write;
 
 mod cells;
@@ -60,7 +61,47 @@ pub(crate) use pivot_xfext::write_pivot_xfext_block;
 pub(crate) use validation::{DvConfig, DvalConfig};
 pub use worksheet::AutoFilterConditionWrite;
 
-/// Write a BIFF record header
+fn map_frame_error(error: litchi_biff::Error) -> XlsError {
+    match error {
+        litchi_biff::Error::LimitExceeded {
+            resource: litchi_biff::Resource::RecordBytes,
+            observed,
+            maximum,
+        } => XlsError::InvalidLength {
+            expected: usize::try_from(maximum).unwrap_or(usize::MAX),
+            found: usize::try_from(observed).unwrap_or(usize::MAX),
+        },
+        litchi_biff::Error::Allocation { .. } => {
+            XlsError::Allocation("encoding a complete BIFF record")
+        },
+        error => XlsError::InvalidData(format!("BIFF frame encoding failed: {error}")),
+    }
+}
+
+fn record_kind(record_type: u16) -> XlsResult<Kind> {
+    Kind::try_from(u64::from(record_type)).map_err(map_frame_error)
+}
+
+/// Write one complete BIFF record through the neutral bounded frame encoder.
+///
+/// Callers should use this only after materializing the semantic payload. The
+/// streaming writers below intentionally keep [`write_record_header`] so that
+/// large or continuation-sensitive payloads do not acquire a per-record
+/// staging allocation.
+pub(crate) fn write_record<W: Write>(
+    writer: &mut W,
+    record_type: u16,
+    payload: &[u8],
+) -> XlsResult<()> {
+    let mut encoder = Encoder::new();
+    encoder
+        .push(record_kind(record_type)?, payload)
+        .map_err(map_frame_error)?;
+    writer.write_all(encoder.as_bytes())?;
+    Ok(())
+}
+
+/// Write a BIFF record header for a payload that will be streamed directly.
 ///
 /// # Arguments
 ///
@@ -73,7 +114,14 @@ pub(crate) fn write_record_header<W: Write>(
     record_type: u16,
     data_len: u16,
 ) -> XlsResult<()> {
-    writer.write_all(&record_type.to_le_bytes())?;
+    if usize::from(data_len) > litchi_biff::MAX_RECORD_BYTES {
+        return Err(XlsError::InvalidLength {
+            expected: litchi_biff::MAX_RECORD_BYTES,
+            found: usize::from(data_len),
+        });
+    }
+    let kind = record_kind(record_type)?;
+    writer.write_all(&kind.get().to_le_bytes())?;
     writer.write_all(&data_len.to_le_bytes())?;
     Ok(())
 }
@@ -1113,6 +1161,37 @@ mod tests {
 
         assert_eq!(u16::from_le_bytes([buf[0], buf[1]]), 0x0203);
         assert_eq!(u16::from_le_bytes([buf[2], buf[3]]), 14);
+    }
+
+    #[test]
+    fn complete_record_encoder_preserves_exact_frame_bytes_at_limit() {
+        let payload = vec![0xA5; litchi_biff::MAX_RECORD_BYTES];
+        let mut encoded = Vec::new();
+
+        write_record(&mut encoded, 0x7FFF, &payload).unwrap();
+
+        assert_eq!(encoded.len(), 4 + litchi_biff::MAX_RECORD_BYTES);
+        assert_eq!(&encoded[..4], &[0xFF, 0x7F, 0x20, 0x20]);
+        assert_eq!(&encoded[4..], payload.as_slice());
+    }
+
+    #[test]
+    fn complete_record_encoder_rejects_payload_above_biff_limit_without_output() {
+        let maximum = litchi_biff::MAX_RECORD_BYTES;
+        let payload = vec![0x5A; maximum + 1];
+        let mut encoded = Vec::new();
+
+        let error = write_record(&mut encoded, 0x0001, &payload).unwrap_err();
+
+        assert!(matches!(
+            error,
+            XlsError::InvalidLength {
+                expected,
+                found,
+            }
+            if expected == maximum && found == maximum + 1
+        ));
+        assert!(encoded.is_empty());
     }
 
     #[test]

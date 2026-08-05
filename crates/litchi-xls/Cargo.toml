@@ -12,6 +12,7 @@ rust-version.workspace = true
 bitflags           = { workspace = true }
 chrono             = { workspace = true }
 litchi-cfb         = { workspace = true }
+litchi-biff         = { workspace = true }
 litchi-codepage    = { workspace = true }
 litchi-core        = { workspace = true }
 litchi-crypto      = { workspace = true }

@@ -3,7 +3,7 @@
 use crate::{XlsError, XlsResult};
 use std::io::Write;
 
-use super::write_record_header;
+use super::{write_record, write_record_header};
 
 fn encode_rk(value: f64) -> Option<u32> {
     let int_value = value as i32;
@@ -236,9 +236,7 @@ pub(crate) fn write_formula<W: Write>(
 /// Record type: 0x0236
 pub(crate) fn write_table<W: Write>(writer: &mut W, table: &crate::XlsDataTable) -> XlsResult<()> {
     let payload = table.to_payload();
-    write_record_header(writer, 0x0236, payload.len() as u16)?;
-    writer.write_all(&payload)?;
-    Ok(())
+    write_record(writer, 0x0236, &payload)
 }
 
 #[cfg(test)]
