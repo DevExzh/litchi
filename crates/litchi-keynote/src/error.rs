@@ -45,6 +45,15 @@ pub enum Error {
     /// A native identifier required for lossless decoding was empty.
     #[error("Keynote animation identifier cannot be empty")]
     EmptyIdentifier,
+    /// A typed build value was non-finite or outside its semantic range.
+    #[error("Keynote build value is non-finite or outside its semantic range")]
+    InvalidBuildValue,
+    /// A build path or timing curve did not satisfy its semantic invariants.
+    #[error("Keynote build path is empty or malformed")]
+    InvalidBuildPath,
+    /// A build path exceeded the bounded semantic collection budget.
+    #[error("Keynote build path exceeds the semantic collection budget")]
+    BuildTooLarge,
     /// An opaque background payload cannot be empty.
     #[error("Keynote opaque background payload cannot be empty")]
     EmptyBackgroundPayload,

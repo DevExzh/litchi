@@ -2,6 +2,16 @@
 
 use crate::{Error, Result, Seconds};
 
+mod semantic;
+
+pub use semantic::{
+    Action, Blink, Bounce, Effect, Emphasis, Finite, Flip, FlipDirection, HorizontalDirection,
+    Jiggle, JiggleIntensity, Keyboard, KeyboardDirection, MAX_IDENTIFIER_BYTES, MAX_PATH_NODES,
+    MAX_PATH_SUBPATHS, Motion, Node, NodeKind, ObjectEffect, Opacity, Path, Point, Pop, Pulse,
+    Rotation, RotationDirection, Scale, Settings, Subpath, SwooshDirection, TimingCurve,
+    UnknownText,
+};
+
 const NONE_ACCELERATION: i32 = 0;
 const EASE_IN_ACCELERATION: i32 = 1;
 const EASE_OUT_ACCELERATION: i32 = 2;
