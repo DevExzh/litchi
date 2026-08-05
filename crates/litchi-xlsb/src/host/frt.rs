@@ -1,7 +1,7 @@
 //! Bounded codecs for Future Record Type headers used by XLSB extensions.
 
 use crate::package::error::{Error, Result};
-use crate::package::formula::{CellParsedFormula, MAX_CELL_FORMULA_BYTES};
+use crate::package::formula::{MAX_CELL_FORMULA_BYTES, ParsedFormula};
 
 /// Parse an FRTHeader whose only optional field is `rgFormulas`.
 ///
@@ -11,7 +11,7 @@ pub(crate) fn parse_formula_header(
     data: &[u8],
     record: &'static str,
     maximum_formulas: usize,
-) -> Result<(Vec<CellParsedFormula>, usize)> {
+) -> Result<(Vec<ParsedFormula>, usize)> {
     let mut cursor = FrtCursor::new(data, record);
     let flags = cursor.read_u32()?;
     if flags & !0x04 != 0 {
@@ -40,7 +40,7 @@ pub(crate) fn parse_formula_header(
 
 /// Serialize an FRTHeader whose only optional field is `rgFormulas`.
 pub(crate) fn serialize_formula_header(
-    formulas: &[CellParsedFormula],
+    formulas: &[ParsedFormula],
     maximum_formulas: usize,
 ) -> Result<Vec<u8>> {
     if formulas.len() > maximum_formulas {
@@ -81,7 +81,7 @@ pub(crate) fn serialize_formula_header(
     Ok(data)
 }
 
-fn validate_formula(formula: &CellParsedFormula) -> Result<()> {
+fn validate_formula(formula: &ParsedFormula) -> Result<()> {
     if formula.rgce.is_empty() || formula.rgce.len() > MAX_CELL_FORMULA_BYTES {
         return Err(Error::InvalidFormula(format!(
             "FRT formula token length {} is outside 1..={MAX_CELL_FORMULA_BYTES}",
@@ -129,7 +129,7 @@ impl<'a> FrtCursor<'a> {
         ))
     }
 
-    fn read_formula(&mut self) -> Result<CellParsedFormula> {
+    fn read_formula(&mut self) -> Result<ParsedFormula> {
         let flags = self.read_u32()?;
         if flags != 2 {
             return Err(invalid(
@@ -146,7 +146,7 @@ impl<'a> FrtCursor<'a> {
                 "FRT formula token length {cce} is outside 1..={MAX_CELL_FORMULA_BYTES}"
             )));
         }
-        Ok(CellParsedFormula {
+        Ok(ParsedFormula {
             rgce: self.take(cce)?.to_vec(),
             rgcb: self.take(cb)?.to_vec(),
         })
@@ -163,13 +163,13 @@ fn invalid(typ: impl Into<String>, val: impl Into<String>) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::package::formula::FormulaCompiler;
+    use crate::package::formula::text::Compiler as TextCompiler;
 
     #[test]
     fn formula_header_roundtrips_token_and_ancillary_streams() {
         let formulas = [
-            FormulaCompiler::compile("1+2").unwrap(),
-            FormulaCompiler::compile("{1,2}").unwrap(),
+            TextCompiler::compile("1+2").unwrap(),
+            TextCompiler::compile("{1,2}").unwrap(),
         ];
         assert!(!formulas[1].rgcb.is_empty());
         let data = serialize_formula_header(&formulas, 2).unwrap();

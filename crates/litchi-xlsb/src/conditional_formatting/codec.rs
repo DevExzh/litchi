@@ -5,8 +5,7 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::formula::{
-    ArrayValue, FormulaConverter, FormulaParser, FormulaResolution, MAX_CELL_FORMULA_BYTES,
-    ParsedFormula,
+    ArrayValue, Compiler, MAX_CELL_FORMULA_BYTES, ParsedFormula, Parser, Resolution,
 };
 use crate::raw::{Writer, kind};
 use std::collections::{HashMap, HashSet};
@@ -44,7 +43,7 @@ pub enum Error {
 #[derive(Debug, Clone, Copy, Default)]
 struct EmptyFormulaResolution;
 
-impl FormulaResolution for EmptyFormulaResolution {
+impl Resolution for EmptyFormulaResolution {
     fn sheet_prefix(&self, index: u16) -> crate::formula::Result<String> {
         Err(crate::formula::Error::InvalidFormula(format!(
             "formula references unresolved sheet index {index}"
@@ -85,9 +84,9 @@ impl FormulaResolution for EmptyFormulaResolution {
 /// The full workbook formula compiler remains a host concern. Conditional
 /// formatting only needs the bounded literal/reference/operator subset here;
 /// unsupported constructs are rejected rather than silently rewritten.
-struct FormulaCompiler;
+struct TextCompiler;
 
-impl FormulaCompiler {
+impl TextCompiler {
     fn compile(input: &str) -> Result<ParsedFormula> {
         let input = input.strip_prefix('=').unwrap_or(input).trim();
         if input.is_empty() {
@@ -882,7 +881,7 @@ impl Value {
     pub fn parse_with_context(
         data: &[u8],
         base: (u32, u32),
-        context: &impl FormulaResolution,
+        context: &impl Resolution,
     ) -> Result<Self> {
         let mut cursor = CfCursor::new(data, "BrtCFVO");
         let cfvo_type = u8::try_from(cursor.read_u32()?)
@@ -948,7 +947,7 @@ impl Value {
     pub fn parse_extension14_with_context(
         data: &[u8],
         base: (u32, u32),
-        context: &impl FormulaResolution,
+        context: &impl Resolution,
     ) -> Result<Self> {
         let (formulas, header_size) = parse_formula_header(data, "BrtCFVO14", 1)?;
         let mut cursor = CfCursor::new(&data[header_size..], "BrtCFVO14");
@@ -1356,7 +1355,7 @@ impl Rule {
     pub fn parse_with_context(
         data: &[u8],
         base: (u32, u32),
-        context: &impl FormulaResolution,
+        context: &impl Resolution,
     ) -> Result<Self> {
         let mut cursor = CfCursor::new(data, "BrtBeginCFRule");
         let rule_type_raw = cursor.read_u32()?;
@@ -1511,7 +1510,7 @@ impl Rule {
     pub fn parse_extension14_with_context(
         data: &[u8],
         base: (u32, u32),
-        context: &impl FormulaResolution,
+        context: &impl Resolution,
     ) -> Result<Self> {
         let (formulas, header_size) = parse_formula_header(data, "BrtBeginCFRule14", 2)?;
         let mut cursor = CfCursor::new(&data[header_size..], "BrtBeginCFRule14");
@@ -2010,12 +2009,11 @@ fn validate_parameter_and_flags(
 fn render_formula(
     formula: &ParsedFormula,
     base: (u32, u32),
-    context: &impl FormulaResolution,
+    context: &impl Resolution,
 ) -> Result<String> {
     let tokens =
-        FormulaParser::with_base_cell_and_extra(&formula.rgce, &formula.rgcb, base.0, base.1)
-            .parse()?;
-    Ok(FormulaConverter::try_tokens_to_string_with_resolution(
+        Parser::with_base_cell_and_extra(&formula.rgce, &formula.rgcb, base.0, base.1).parse()?;
+    Ok(Compiler::try_tokens_to_string_with_resolution(
         &tokens, context,
     )?)
 }
@@ -2075,7 +2073,7 @@ fn effective_rule_formulas(rule: &Rule) -> Result<Vec<ParsedFormula>> {
     }
     rule.formula_texts
         .iter()
-        .map(|formula| FormulaCompiler::compile(formula))
+        .map(|formula| TextCompiler::compile(formula))
         .collect()
 }
 
@@ -2285,7 +2283,7 @@ mod model_tests {
     }
 
     fn cell_rule_payload(dxf_id: u32, priority: u32, stop: bool, operator: u32) -> Vec<u8> {
-        let formula = FormulaCompiler::compile("1").unwrap();
+        let formula = TextCompiler::compile("1").unwrap();
         let mut data = Vec::new();
         data.extend_from_slice(&1u32.to_le_bytes());
         data.extend_from_slice(&0u32.to_le_bytes());
@@ -2555,7 +2553,7 @@ mod writer_tests {
     use super::*;
 
     fn fixture_cell_is_payload() -> Vec<u8> {
-        let formula = FormulaCompiler::compile("5").unwrap();
+        let formula = TextCompiler::compile("5").unwrap();
         let mut data = Vec::new();
         data.extend_from_slice(&1u32.to_le_bytes());
         data.extend_from_slice(&0u32.to_le_bytes());
@@ -2599,7 +2597,7 @@ mod writer_tests {
 
     #[test]
     fn parses_cfvo_with_ancillary_formula_losslessly() {
-        let formula = FormulaCompiler::compile("{1,2}").unwrap();
+        let formula = TextCompiler::compile("{1,2}").unwrap();
         assert!(!formula.rgcb.is_empty());
         let mut data = Vec::new();
         data.extend_from_slice(&7u32.to_le_bytes());
@@ -2614,7 +2612,7 @@ mod writer_tests {
 
     #[test]
     fn extension_cfvo_roundtrips_formula_and_automatic_bounds() {
-        let formula = FormulaCompiler::compile("$A$1").unwrap();
+        let formula = TextCompiler::compile("$A$1").unwrap();
         let formula_value = Value {
             cfvo_type: 7,
             value: Some("$A$1".to_string()),
@@ -2645,7 +2643,7 @@ mod writer_tests {
 
     #[test]
     fn extension_cfvo_rejects_inconsistent_formula_metadata() {
-        let formula = FormulaCompiler::compile("1").unwrap();
+        let formula = TextCompiler::compile("1").unwrap();
         let value = Value {
             cfvo_type: 7,
             value: Some("1".to_string()),
@@ -2794,8 +2792,8 @@ mod writer_tests {
 
     #[test]
     fn extension_rule_roundtrips_two_formulas_and_ancillary_data() {
-        let first = FormulaCompiler::compile("{1,2}").unwrap();
-        let second = FormulaCompiler::compile("10").unwrap();
+        let first = TextCompiler::compile("{1,2}").unwrap();
+        let second = TextCompiler::compile("10").unwrap();
         assert!(!first.rgcb.is_empty());
         let mut rule = Rule::new(RuleType::CellIs, 7);
         rule.operator = Some(1);
@@ -3256,7 +3254,7 @@ fn effective_formulas(rule: &Rule) -> Result<Vec<ParsedFormula>> {
     }
     rule.formula_texts
         .iter()
-        .map(|formula| FormulaCompiler::compile(formula))
+        .map(|formula| TextCompiler::compile(formula))
         .collect()
 }
 
@@ -3648,7 +3646,7 @@ fn effective_cfvo_formula(cfvo: &Value) -> Result<Option<ParsedFormula>> {
         return Ok(None);
     }
     if cfvo.cfvo_type == 7 || matches!(cfvo.cfvo_type, 1 | 4 | 5) {
-        return FormulaCompiler::compile(value).map(Some);
+        return TextCompiler::compile(value).map(Some);
     }
     Ok(None)
 }
@@ -3689,7 +3687,7 @@ mod tests {
     use crate::raw::Records;
 
     fn compiled(text: &str) -> ParsedFormula {
-        FormulaCompiler::compile(text).unwrap()
+        TextCompiler::compile(text).unwrap()
     }
 
     #[test]

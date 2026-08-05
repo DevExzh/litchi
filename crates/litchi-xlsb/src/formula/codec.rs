@@ -1442,11 +1442,6 @@ pub trait Resolution {
 
 pub struct Compiler;
 
-// Compatibility names are aliases to the canonical codec types.
-pub use Compiler as FormulaConverter;
-pub use Parser as FormulaParser;
-pub use Resolution as FormulaResolution;
-
 impl Compiler {
     /// Convert formula tokens to string representation
     ///
@@ -1464,14 +1459,14 @@ impl Compiler {
     /// Convert formula tokens using workbook extern-sheet and name metadata.
     pub fn try_tokens_to_string_with_resolution(
         tokens: &[Token],
-        context: &dyn FormulaResolution,
+        context: &dyn Resolution,
     ) -> Result<String> {
         Self::try_tokens_to_string_with_optional_context(tokens, Some(context))
     }
 
     fn try_tokens_to_string_with_optional_context(
         tokens: &[Token],
-        context: Option<&dyn FormulaResolution>,
+        context: Option<&dyn Resolution>,
     ) -> Result<String> {
         let mut stack: Vec<String> = Vec::new();
 
@@ -1908,7 +1903,7 @@ mod tests {
         let mut data = vec![ptg_types::PTG_BOOL, 1, ptg_types::PTG_NUM];
         data.extend_from_slice(&42.5_f64.to_le_bytes());
         data.extend_from_slice(&[0x7F, 0x7E]);
-        let mut parser = FormulaParser::new(&data);
+        let mut parser = Parser::new(&data);
         let tokens = parser.parse().unwrap();
         assert!(matches!(tokens[0], Token::Bool(true)));
         assert!(matches!(tokens[1], Token::Number(value) if value == 42.5));
@@ -1954,7 +1949,7 @@ mod tests {
             external: None,
         });
         let (rgce, rgcb) = token.to_extended_binary().unwrap();
-        let mut parser = FormulaParser::with_extra(&rgce, &rgcb);
+        let mut parser = Parser::with_extra(&rgce, &rgcb);
         assert_eq!(parser.parse().unwrap(), vec![token]);
     }
 }

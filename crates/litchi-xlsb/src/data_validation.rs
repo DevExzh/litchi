@@ -3,11 +3,9 @@
 //! The layouts and invariants in this module follow [MS-XLSB] sections
 //! 2.4.55–2.4.58, 2.5.36–2.5.37, 2.5.58–2.5.66, 2.5.98.8, and 2.5.156.
 //! Worksheet/package traversal stays in the OOXML host; formulas are rendered
-//! through the owner crate's [`crate::formula::FormulaResolution`] trait.
+//! through the owner crate's [`crate::formula::Resolution`] trait.
 
-use crate::formula::{
-    FormulaConverter, FormulaParser, FormulaResolution, MAX_CELL_FORMULA_BYTES, ParsedFormula,
-};
+use crate::formula::{Compiler, MAX_CELL_FORMULA_BYTES, ParsedFormula, Parser, Resolution};
 use std::io;
 use thiserror::Error;
 
@@ -175,7 +173,7 @@ impl<F: FormulaBinary> DataValidation<F> {
         }
     }
 
-    pub fn parse_classic<R: FormulaResolution>(
+    pub fn parse_classic<R: Resolution>(
         data: &[u8],
         list_formula: Option<String>,
         formula_context: &R,
@@ -254,10 +252,7 @@ impl<F: FormulaBinary> DataValidation<F> {
         })
     }
 
-    pub fn parse_extension14<R: FormulaResolution>(
-        data: &[u8],
-        formula_context: &R,
-    ) -> Result<Self> {
+    pub fn parse_extension14<R: Resolution>(data: &[u8], formula_context: &R) -> Result<Self> {
         let mut cursor = ValidationCursor::new(data, "BrtDVal14");
         let header_flags = cursor.read_u32()?;
         if header_flags & !0x06 != 0 || header_flags & 0x02 == 0 {
@@ -505,7 +500,7 @@ fn validate_formula_presence(
     Ok(())
 }
 
-fn render_formula<F: FormulaBinary, R: FormulaResolution>(
+fn render_formula<F: FormulaBinary, R: Resolution>(
     formula: Option<&F>,
     base: (u32, u32),
     context: &R,
@@ -514,11 +509,10 @@ fn render_formula<F: FormulaBinary, R: FormulaResolution>(
         return Ok(None);
     };
     let tokens =
-        FormulaParser::with_base_cell_and_extra(formula.rgce(), formula.rgcb(), base.0, base.1)
-            .parse()?;
-    Ok(Some(
-        FormulaConverter::try_tokens_to_string_with_resolution(&tokens, context)?,
-    ))
+        Parser::with_base_cell_and_extra(formula.rgce(), formula.rgcb(), base.0, base.1).parse()?;
+    Ok(Some(Compiler::try_tokens_to_string_with_resolution(
+        &tokens, context,
+    )?))
 }
 
 fn format_ranges(ranges: &[(u32, u32, u32, u32)]) -> String {

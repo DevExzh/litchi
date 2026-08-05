@@ -5,9 +5,7 @@
 use crate::calc::{self, Props};
 use crate::named_ranges::{Definition, validate_name};
 use crate::package::error::{Error, Result};
-use crate::package::formula::{
-    CellParsedFormula, FormulaCompilationContext, FormulaDefinedName, excel_name_eq,
-};
+use crate::package::formula::{CompilationContext, DefinedName, ParsedFormula, excel_name_eq};
 use crate::raw::{Writer, kind};
 use crate::writer::{
     MutableChartSheet, MutableSharedStringsWriter, MutableWorksheet, StylesWriter,
@@ -542,7 +540,7 @@ impl WorkbookWriter {
             let formula = named_range.formula.as_ref().ok_or_else(|| {
                 Error::InvalidFormula(format!("defined name {} has no formula", named_range.name))
             })?;
-            let parsed_formula = CellParsedFormula {
+            let parsed_formula = ParsedFormula {
                 rgce: formula.clone(),
                 rgcb: Vec::new(),
             };
@@ -1072,7 +1070,7 @@ impl WorkbookWriter {
         let defined_names = self
             .named_ranges
             .iter()
-            .map(|named_range| FormulaDefinedName {
+            .map(|named_range| DefinedName {
                 name: named_range.name.clone(),
                 sheet_id: named_range.sheet_id,
             })
@@ -1295,7 +1293,7 @@ impl WorkbookWriter {
             let mut sheet_data = Vec::new();
             let current_sheet = u32::try_from(worksheet_sheet_indexes[&i])
                 .map_err(|_| Error::InvalidFormula("worksheet index overflow".to_string()))?;
-            let formula_context = FormulaCompilationContext {
+            let formula_context = CompilationContext {
                 worksheet_names: &worksheet_names,
                 defined_names: &defined_names,
                 tables: &[],

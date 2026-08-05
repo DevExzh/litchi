@@ -33,7 +33,7 @@ use crate::package::data_validation::{
     DataValidationRecordKind, DataValidationSettings, Validation, validate_dval_list_formula,
 };
 use crate::package::error::{Error, Result};
-use crate::package::formula::{CellParsedFormula, FormulaCompiler};
+use crate::package::formula::ParsedFormula;
 use crate::raw::Writer;
 use crate::raw::kind;
 use crate::writer::bin_range::{parse_range_list, write_bin_range_list};
@@ -240,7 +240,7 @@ fn write_xl_nullable_wide_string(buf: &mut Vec<u8>, value: Option<&str>) {
 /// by the reader.
 fn write_biff12_formula(
     buf: &mut Vec<u8>,
-    binary: Option<&CellParsedFormula>,
+    binary: Option<&ParsedFormula>,
     formula: Option<&str>,
     string_list: bool,
 ) -> Result<()> {
@@ -251,7 +251,7 @@ fn write_biff12_formula(
         compiled = if string_list {
             compile_string_list(text)?
         } else {
-            FormulaCompiler::compile(text)?
+            crate::package::formula::text::Compiler::compile(text)?
         };
         Some(&compiled)
     } else {
@@ -311,10 +311,10 @@ fn serialize_extension14_validation(dv: &Validation) -> Result<Vec<u8>> {
 }
 
 fn compile_formula(
-    binary: Option<&CellParsedFormula>,
+    binary: Option<&ParsedFormula>,
     formula: Option<&str>,
     string_list: bool,
-) -> Result<Option<CellParsedFormula>> {
+) -> Result<Option<ParsedFormula>> {
     if let Some(binary) = binary {
         return Ok(Some(binary.clone()));
     }
@@ -324,7 +324,7 @@ fn compile_formula(
     if string_list {
         compile_string_list(text).map(Some)
     } else {
-        FormulaCompiler::compile(text).map(Some)
+        crate::package::formula::text::Compiler::compile(text).map(Some)
     }
 }
 
@@ -349,7 +349,7 @@ fn common_flags(dv: &Validation) -> u32 {
     flags | (u32::from(dv.operator) << 20)
 }
 
-fn compile_string_list(text: &str) -> Result<CellParsedFormula> {
+fn compile_string_list(text: &str) -> Result<ParsedFormula> {
     let value = text
         .strip_prefix('"')
         .and_then(|text| text.strip_suffix('"'))
@@ -362,7 +362,7 @@ fn compile_string_list(text: &str) -> Result<CellParsedFormula> {
     }
     let mut rgce = Vec::new();
     build_ptg_for_value(text, &mut rgce);
-    Ok(CellParsedFormula {
+    Ok(ParsedFormula {
         rgce,
         rgcb: Vec::new(),
     })
@@ -528,7 +528,7 @@ fn build_ptg_for_value(text: &str, ptg: &mut Vec<u8>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::package::formula::FormulaResolutionContext;
+    use crate::package::formula::Context;
     use crate::raw::Writer;
 
     #[test]
@@ -795,9 +795,7 @@ mod tests {
         rule.error_title = Some(String::new());
         validate_rule(&rule).unwrap();
         let payload = serialize_data_validation(&rule).unwrap();
-        let parsed =
-            Validation::parse_classic(&payload, None, &FormulaResolutionContext::default())
-                .unwrap();
+        let parsed = Validation::parse_classic(&payload, None, &Context::default()).unwrap();
 
         assert_eq!(parsed.cell_ranges, "A1:A4 C1");
         assert_eq!(parsed.formula1.as_deref(), Some("1"));
@@ -815,8 +813,7 @@ mod tests {
         rule.record_kind = DataValidationRecordKind::Extension14;
         validate_rule(&rule).unwrap();
         let payload = serialize_extension14_validation(&rule).unwrap();
-        let parsed =
-            Validation::parse_extension14(&payload, &FormulaResolutionContext::default()).unwrap();
+        let parsed = Validation::parse_extension14(&payload, &Context::default()).unwrap();
 
         assert_eq!(parsed.record_kind, DataValidationRecordKind::Extension14);
         assert_eq!(parsed.cell_ranges, "B2:B12 D2:D12");
@@ -826,10 +823,7 @@ mod tests {
 
         let mut malformed = payload;
         malformed[4..8].copy_from_slice(&2u32.to_le_bytes());
-        assert!(
-            Validation::parse_extension14(&malformed, &FormulaResolutionContext::default())
-                .is_err()
-        );
+        assert!(Validation::parse_extension14(&malformed, &Context::default()).is_err());
     }
 
     #[test]
@@ -855,12 +849,9 @@ mod tests {
         override_rule.list_formula = Some(long_list.clone());
         validate_rule(&override_rule).unwrap();
         let payload = serialize_data_validation(&override_rule).unwrap();
-        let parsed = Validation::parse_classic(
-            &payload,
-            Some(long_list.clone()),
-            &FormulaResolutionContext::default(),
-        )
-        .unwrap();
+        let parsed =
+            Validation::parse_classic(&payload, Some(long_list.clone()), &Context::default())
+                .unwrap();
         assert_eq!(parsed.formula1.as_deref(), Some(long_list.as_str()));
         assert_eq!(parsed.list_formula.as_deref(), Some(long_list.as_str()));
     }

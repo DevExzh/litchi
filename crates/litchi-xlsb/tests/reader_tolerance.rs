@@ -32,7 +32,7 @@ fn opens_xlsb_whose_pivot_cache_stream_starts_with_a_future_record_block() {
     );
 }
 
-/// Excel writes `CellParsedFormula` records whose token stream is empty
+/// Excel writes `ParsedFormula` records whose token stream is empty
 /// (`cce == 0`) even though MS-XLSB 2.5.98.4 requires a positive length.
 /// Treating that as fatal rejected the entire workbook over one cell.
 #[test]

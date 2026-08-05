@@ -43,7 +43,7 @@ pub mod error;
 pub mod external_link;
 #[path = "../host/external_link_write.rs"]
 pub(crate) mod external_link_write;
-#[path = "../host/formula.rs"]
+#[path = "../host/formula/mod.rs"]
 pub mod formula;
 #[path = "../host/frt.rs"]
 pub(crate) mod frt;

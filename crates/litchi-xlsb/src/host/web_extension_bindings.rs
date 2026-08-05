@@ -4,7 +4,7 @@ use litchi_ooxml_common::web;
 use std::collections::HashSet;
 
 use crate::package::error::{Error, Result};
-use crate::package::formula::{CellParsedFormula, FormulaParser, Token};
+use crate::package::formula::{ParsedFormula, Parser, Token};
 use crate::package::frt::{parse_formula_header, serialize_formula_header};
 use crate::raw::{Records, Writer, kind};
 
@@ -28,7 +28,7 @@ pub struct Binding {
     pub application_reference: String,
     pub range: Range,
     /// Exact `FRTFormula`, retained for lossless authoring.
-    pub formula: CellParsedFormula,
+    pub formula: ParsedFormula,
 }
 
 impl Binding {
@@ -38,7 +38,7 @@ impl Binding {
     /// one internal worksheet (`firstSheet >= 0` and `firstSheet == lastSheet`).
     pub fn new(
         application_reference: impl Into<String>,
-        formula: CellParsedFormula,
+        formula: ParsedFormula,
         valid_external_sheet: impl FnOnce(u16) -> bool,
     ) -> Result<Self> {
         let application_reference = application_reference.into();
@@ -249,7 +249,7 @@ impl<'a> PackageAppRefs<'a> {
     }
 }
 
-fn range_from_formula(formula: &CellParsedFormula) -> Result<Range> {
+fn range_from_formula(formula: &ParsedFormula) -> Result<Range> {
     if formula
         .rgce
         .first()
@@ -260,7 +260,7 @@ fn range_from_formula(formula: &CellParsedFormula) -> Result<Range> {
             "binding formula root must use the REFERENCE operand class",
         ));
     }
-    let tokens = FormulaParser::with_extra(&formula.rgce, &formula.rgcb).parse()?;
+    let tokens = Parser::with_extra(&formula.rgce, &formula.rgcb).parse()?;
     if tokens.len() != 1 {
         return Err(invalid(
             "BrtWebExtension",
@@ -395,7 +395,7 @@ fn invalid(typ: impl Into<String>, val: impl Into<String>) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::package::formula::FormulaCompiler;
+    use crate::package::formula::text::Compiler as TextCompiler;
 
     struct LyingHint<'a> {
         value: Option<&'a web::Binding>,
@@ -416,7 +416,7 @@ mod tests {
     fn binding() -> Binding {
         // Public context-free compilation intentionally rejects 3D formulas;
         // construct the canonical PtgArea3d token directly.
-        let binary = CellParsedFormula {
+        let binary = ParsedFormula {
             rgce: vec![0x3B, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 1, 0],
             rgcb: Vec::new(),
         };
@@ -443,7 +443,7 @@ mod tests {
         let binding = binding();
         let payload = binding.to_payload().unwrap();
         assert!(Binding::parse_payload(&payload, |_| false).is_err());
-        let local = FormulaCompiler::compile("$A$1:$B$4").unwrap();
+        let local = TextCompiler::compile("$A$1:$B$4").unwrap();
         assert!(Binding::new("local", local, |_| true).is_err());
         let mut trailing = payload;
         trailing.push(0);

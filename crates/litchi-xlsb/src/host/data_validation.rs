@@ -4,29 +4,14 @@
 //! formula-preserving semantic model. The OOXML host supplies its formula
 //! representation, error surface, and worksheet/package orchestration.
 
-use crate::package::error::{Error, Result};
-use crate::package::formula::CellParsedFormula;
-
 use crate::data_validation as owner;
+use crate::formula::ParsedFormula;
+use crate::package::error::{Error, Result};
 
 pub use owner::{DataValidationRecordKind, DataValidationSettings};
 
 /// Validation rule bound to the OOXML host formula representation.
-pub type Validation = owner::DataValidation<CellParsedFormula>;
-
-impl owner::FormulaBinary for CellParsedFormula {
-    fn from_parts(rgce: Vec<u8>, rgcb: Vec<u8>) -> Self {
-        Self { rgce, rgcb }
-    }
-
-    fn rgce(&self) -> &[u8] {
-        &self.rgce
-    }
-
-    fn rgcb(&self) -> &[u8] {
-        &self.rgcb
-    }
-}
+pub type Validation = owner::DataValidation<ParsedFormula>;
 
 impl From<owner::Error> for Error {
     fn from(error: owner::Error) -> Self {

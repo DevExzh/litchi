@@ -1,9 +1,6 @@
 //! Cell representation for XLSB files
 
-use crate::package::formula::{
-    CellParsedFormula, FormulaConverter, FormulaGroup, FormulaParser, FormulaResolutionContext,
-    GroupKind,
-};
+use crate::package::formula::{Compiler, Context, Group, GroupKind, ParsedFormula, Parser};
 use crate::package::records::CellRecord;
 use crate::package::shared_strings::SharedString;
 use litchi_core::sheet::{Cell as SheetCell, CellValue};
@@ -34,11 +31,11 @@ pub struct Cell {
     /// Track whether this cell came from a formula record
     is_formula: bool,
     /// Original binary formula, retained even if a token is not understood.
-    formula: Option<CellParsedFormula>,
+    formula: Option<ParsedFormula>,
     /// Inline rich-text value from a `BrtCellRString` record.
     rich_string: Option<SharedString>,
     /// Shared array/shared-formula definition.
-    formula_group: Option<Arc<FormulaGroup>>,
+    formula_group: Option<Arc<Group>>,
     /// Formula calculation flags from `GrbitFmla`.
     formula_flags: u16,
 }
@@ -82,14 +79,14 @@ impl Cell {
         row: u32,
         header: CellHeader,
         cached_value: CellValue,
-        formula: CellParsedFormula,
+        formula: ParsedFormula,
         formula_flags: u16,
-        formula_context: &FormulaResolutionContext,
+        formula_context: &Context,
     ) -> Self {
-        let value = FormulaParser::with_extra(&formula.rgce, &formula.rgcb)
+        let value = Parser::with_extra(&formula.rgce, &formula.rgcb)
             .parse()
             .and_then(|tokens| {
-                FormulaConverter::try_tokens_to_string_with_context(&tokens, formula_context)
+                Compiler::try_tokens_to_string_with_resolution(&tokens, formula_context)
             })
             .map(|formula_text| CellValue::Formula {
                 formula: formula_text,
@@ -117,16 +114,16 @@ impl Cell {
         row: u32,
         header: CellHeader,
         cached_value: CellValue,
-        placeholder: CellParsedFormula,
+        placeholder: ParsedFormula,
         formula_flags: u16,
-        group: Arc<FormulaGroup>,
-        formula_context: &FormulaResolutionContext,
+        group: Arc<Group>,
+        formula_context: &Context,
     ) -> Self {
         let tokens = match group.kind {
             GroupKind::Array => {
-                FormulaParser::with_extra(&group.formula.rgce, &group.formula.rgcb).parse()
+                Parser::with_extra(&group.formula.rgce, &group.formula.rgcb).parse()
             },
-            GroupKind::Shared => FormulaParser::with_base_cell_and_extra(
+            GroupKind::Shared => Parser::with_base_cell_and_extra(
                 &group.formula.rgce,
                 &group.formula.rgcb,
                 row,
@@ -137,7 +134,7 @@ impl Cell {
         let is_array = group.kind == GroupKind::Array;
         let value = tokens
             .and_then(|tokens| {
-                FormulaConverter::try_tokens_to_string_with_context(&tokens, formula_context)
+                Compiler::try_tokens_to_string_with_resolution(&tokens, formula_context)
             })
             .map(|formula_text| CellValue::Formula {
                 formula: formula_text,

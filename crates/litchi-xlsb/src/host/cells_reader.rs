@@ -9,9 +9,7 @@ use crate::package::data_validation::{
     DataValidationSettings, Validation, parse_collection_settings, parse_dval_list,
 };
 use crate::package::error::{Error, Result};
-use crate::package::formula::{
-    CellParsedFormula, FormulaGroup, FormulaResolutionContext, GroupKind,
-};
+use crate::package::formula::{Context, Group, GroupKind, ParsedFormula};
 use crate::package::hyperlinks::Hyperlink;
 use crate::package::merged_cells::MergedCell;
 use crate::package::records::Stream;
@@ -28,7 +26,7 @@ use std::sync::Arc;
 struct ParsedFormulaCell {
     header: CellHeader,
     cached_value: CellValue,
-    formula: CellParsedFormula,
+    formula: ParsedFormula,
     flags: u16,
 }
 
@@ -99,14 +97,14 @@ where
 {
     iter: Stream<RS>,
     shared_strings: &'a [SharedString],
-    formula_context: &'a FormulaResolutionContext,
+    formula_context: &'a Context,
     cell_xf_count: usize,
     dimensions: Dimensions,
     current_row: u32,
     last_row: Option<u32>,
     buf: Vec<u8>,
     pending_record: Option<(crate::raw::Kind, Vec<u8>)>,
-    formula_groups: Vec<Arc<FormulaGroup>>,
+    formula_groups: Vec<Arc<Group>>,
     /// Merged cells found in the worksheet
     pub merged_cells: Vec<MergedCell>,
     /// Hyperlinks found in the worksheet
@@ -143,7 +141,7 @@ where
     pub fn new(
         mut iter: Stream<RS>,
         shared_strings: &'a [SharedString],
-        formula_context: &'a FormulaResolutionContext,
+        formula_context: &'a Context,
         cell_xf_count: usize,
     ) -> Result<Self> {
         let mut buf = Vec::with_capacity(1024);
@@ -656,7 +654,7 @@ where
                 "invalid GrbitFmla flags 0x{flags:04X}"
             )));
         }
-        let (formula, consumed) = CellParsedFormula::parse(&self.buf[formula_offset..])?;
+        let (formula, consumed) = ParsedFormula::parse(&self.buf[formula_offset..])?;
         if formula_offset + consumed != self.buf.len() {
             return Err(Error::InvalidFormula(format!(
                 "formula record has {} trailing bytes",
@@ -679,8 +677,8 @@ where
         let mut next_data = Vec::new();
         let _ = self.iter.fill_buffer(&mut next_data)?;
         let new_group = match next_type {
-            kind::ARR_FMLA => Some(FormulaGroup::parse_array(&next_data)?),
-            kind::SHR_FMLA => Some(FormulaGroup::parse_shared(&next_data)?),
+            kind::ARR_FMLA => Some(Group::parse_array(&next_data)?),
+            kind::SHR_FMLA => Some(Group::parse_shared(&next_data)?),
             _ => {
                 self.pending_record = Some((next_type, next_data));
                 None
@@ -2173,7 +2171,7 @@ mod tests {
             .unwrap();
         writer.write_record(kind::SHEET_PROTECTION, &base).unwrap();
         writer.write_record(kind::END_SHEET, &[]).unwrap();
-        let formula_context = FormulaResolutionContext::default();
+        let formula_context = Context::default();
         let iter = Stream::new(std::io::Cursor::new(worksheet));
         let mut reader = CellsReader::new(iter, &[], &formula_context, 1).unwrap();
         assert!(reader.next_cell().unwrap().is_none());
@@ -2184,7 +2182,7 @@ mod tests {
     #[test]
     fn reads_inline_rich_string_cells() {
         let bytes = rich_string_worksheet();
-        let formula_context = FormulaResolutionContext::default();
+        let formula_context = Context::default();
         let iter = Stream::new(std::io::Cursor::new(bytes));
         let mut reader = CellsReader::new(iter, &[], &formula_context, 1).unwrap();
 
@@ -2238,7 +2236,7 @@ mod tests {
         writer.write_record(kind::END_D_VALS, &[]).unwrap();
         writer.write_record(kind::END_SHEET, &[]).unwrap();
 
-        let formula_context = FormulaResolutionContext::default();
+        let formula_context = Context::default();
         let iter = Stream::new(std::io::Cursor::new(worksheet));
         let mut reader = CellsReader::new(iter, &[], &formula_context, 1).unwrap();
         assert!(matches!(
@@ -2264,7 +2262,7 @@ mod tests {
         writer.write_record(kind::END_COND_FORMATTING, &[]).unwrap();
         writer.write_record(kind::END_SHEET, &[]).unwrap();
 
-        let formula_context = FormulaResolutionContext::default();
+        let formula_context = Context::default();
         let iter = Stream::new(std::io::Cursor::new(worksheet));
         let mut reader = CellsReader::new(iter, &[], &formula_context, 1).unwrap();
         assert!(matches!(
@@ -2392,7 +2390,7 @@ mod tests {
             .unwrap();
         writer.write_record(kind::END_SHEET, &[]).unwrap();
 
-        let formula_context = FormulaResolutionContext::default();
+        let formula_context = Context::default();
         let iter = Stream::new(std::io::Cursor::new(worksheet));
         let mut reader = CellsReader::new(iter, &[], &formula_context, 1).unwrap();
         assert!(reader.next_cell().unwrap().is_none());
@@ -2445,7 +2443,7 @@ mod tests {
         writer.write_record(kind::END_COND_FORMATTING, &[]).unwrap();
         writer.write_record(kind::END_SHEET, &[]).unwrap();
 
-        let formula_context = FormulaResolutionContext::default();
+        let formula_context = Context::default();
         let iter = Stream::new(std::io::Cursor::new(worksheet));
         let mut reader = CellsReader::new(iter, &[], &formula_context, 1).unwrap();
         assert!(reader.next_cell().is_err());

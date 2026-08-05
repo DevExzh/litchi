@@ -5,8 +5,7 @@ use crate::package::comments::Comment;
 use crate::package::data_validation::{DataValidationSettings, Validation};
 use crate::package::error::{Error, Result};
 use crate::package::formula::{
-    CellParsedFormula, FormulaCompilationContext, FormulaCompiler, FormulaConverter, FormulaGroup,
-    FormulaParser, FormulaRange, GroupKind,
+    CompilationContext, Compiler, Group, GroupKind, ParsedFormula, Parser, Range,
 };
 use crate::package::hyperlinks::Hyperlink;
 use crate::package::merged_cells::MergedCell;
@@ -27,7 +26,7 @@ pub struct CellData {
     pub value: CellValue,
     pub style: u32, // Style XF index
     /// Optional pre-encoded cell formula for lossless XLSB workflows.
-    pub formula_binary: Option<CellParsedFormula>,
+    pub formula_binary: Option<ParsedFormula>,
     /// `GrbitFmla` flags; only bit 1 (`fAlwaysCalc`) is defined.
     pub formula_flags: u16,
 }
@@ -139,7 +138,7 @@ pub struct MutableWorksheet {
     web_extension_bindings: Vec<Binding>,
     /// Array and shared formula definitions. Cell records contain only a
     /// `PtgExp` reference to one of these definitions.
-    formula_groups: Vec<FormulaGroup>,
+    formula_groups: Vec<Group>,
     /// Original text for formula groups created through the text API. Binary
     /// groups intentionally have no entry and are never recompiled.
     formula_group_sources: BTreeMap<(u32, u32), String>,
@@ -168,7 +167,7 @@ pub struct MutableWorksheet {
 
 pub(crate) struct ContextualFormulaRestore {
     cell_positions: Vec<(u32, u32)>,
-    group_formulas: Vec<(usize, CellParsedFormula)>,
+    group_formulas: Vec<(usize, ParsedFormula)>,
     validation_formulas: Vec<(usize, bool, bool)>,
     conditional_rule_formulas: Vec<(usize, usize)>,
     conditional_value_formulas: Vec<(usize, usize, ConditionalValueLocation)>,
@@ -289,7 +288,7 @@ impl MutableWorksheet {
 
     pub(crate) fn compile_contextual_formulas(
         &mut self,
-        context: &FormulaCompilationContext<'_>,
+        context: &CompilationContext<'_>,
     ) -> Result<ContextualFormulaRestore> {
         let mut compiled_groups = Vec::new();
         for (index, group) in self.formula_groups.iter().enumerate() {
@@ -297,13 +296,17 @@ impl MutableWorksheet {
                 continue;
             };
             let formula = match group.kind {
-                GroupKind::Array => FormulaCompiler::compile_with_context(source, context)?,
-                GroupKind::Shared => FormulaCompiler::compile_shared_with_context(
-                    source,
-                    group.range.row_first,
-                    group.range.col_first,
-                    context,
-                )?,
+                GroupKind::Array => {
+                    crate::package::formula::text::Compiler::compile_with_context(source, context)?
+                },
+                GroupKind::Shared => {
+                    crate::package::formula::text::Compiler::compile_shared_with_context(
+                        source,
+                        group.range.row_first,
+                        group.range.col_first,
+                        context,
+                    )?
+                },
             };
             compiled_groups.push((index, formula));
         }
@@ -326,12 +329,14 @@ impl MutableWorksheet {
             let is_array_anchor = *is_array
                 && array_range
                     .as_deref()
-                    .and_then(|range| FormulaRange::parse_a1(range).ok())
+                    .and_then(|range| Range::parse_a1(range).ok())
                     .is_some_and(|range| range.top_left() == position);
             if cell.formula_binary.is_none() && (!is_array || is_array_anchor) && !is_grouped {
                 compiled.push((
                     position,
-                    FormulaCompiler::compile_with_context(formula, context)?,
+                    crate::package::formula::text::Compiler::compile_with_context(
+                        formula, context,
+                    )?,
                 ));
             }
         }
@@ -342,7 +347,11 @@ impl MutableWorksheet {
                     .formula1
                     .as_deref()
                     .filter(|formula| !formula.is_empty())
-                    .map(|formula| FormulaCompiler::compile_with_context(formula, context))
+                    .map(|formula| {
+                        crate::package::formula::text::Compiler::compile_with_context(
+                            formula, context,
+                        )
+                    })
                     .transpose()?
             } else {
                 None
@@ -352,7 +361,11 @@ impl MutableWorksheet {
                     .formula2
                     .as_deref()
                     .filter(|formula| !formula.is_empty())
-                    .map(|formula| FormulaCompiler::compile_with_context(formula, context))
+                    .map(|formula| {
+                        crate::package::formula::text::Compiler::compile_with_context(
+                            formula, context,
+                        )
+                    })
                     .transpose()?
             } else {
                 None
@@ -369,7 +382,11 @@ impl MutableWorksheet {
                     let formulas = rule
                         .formula_texts
                         .iter()
-                        .map(|formula| FormulaCompiler::compile_with_context(formula, context))
+                        .map(|formula| {
+                            crate::package::formula::text::Compiler::compile_with_context(
+                                formula, context,
+                            )
+                        })
                         .collect::<Result<Vec<_>>>()?;
                     compiled_conditional_rules.push((formatting_index, rule_index, formulas));
                 }
@@ -422,7 +439,9 @@ impl MutableWorksheet {
                             formatting_index,
                             rule_index,
                             location,
-                            FormulaCompiler::compile_with_context(source, context)?,
+                            crate::package::formula::text::Compiler::compile_with_context(
+                                source, context,
+                            )?,
                         ));
                     }
                 }
@@ -478,7 +497,7 @@ impl MutableWorksheet {
                     location,
                 )
                 .expect("conditional value collected from worksheet")
-                .formula_binary = Some(formula.into_owner());
+                .formula_binary = Some(formula);
                 (formatting_index, rule_index, location)
             })
             .collect();
@@ -570,7 +589,7 @@ impl MutableWorksheet {
         self.max_col = self.max_col.max(col);
     }
 
-    /// Set a formula using an already encoded `CellParsedFormula`.
+    /// Set a formula using an already encoded `ParsedFormula`.
     ///
     /// This is the lossless path for formulas containing tokens that the text
     /// compiler does not yet understand. `cached_value` determines which
@@ -580,7 +599,7 @@ impl MutableWorksheet {
         row: u32,
         col: u32,
         cached_value: CellValue,
-        formula: CellParsedFormula,
+        formula: ParsedFormula,
         always_calculate: bool,
         style: u32,
     ) {
@@ -613,15 +632,15 @@ impl MutableWorksheet {
         col_last: u32,
         formula: &str,
     ) -> Result<()> {
-        let range = FormulaRange::new(row_first, row_last, col_first, col_last)?;
-        let definition = match FormulaCompiler::compile(formula) {
+        let range = Range::new(row_first, row_last, col_first, col_last)?;
+        let definition = match crate::package::formula::text::Compiler::compile(formula) {
             Ok(definition) => definition,
             Err(error) if formula_requires_workbook_context(&error) => {
-                FormulaCompiler::compile("0")?
+                crate::package::formula::text::Compiler::compile("0")?
             },
             Err(error) => return Err(error),
         };
-        let group = FormulaGroup {
+        let group = Group {
             kind: GroupKind::Array,
             range,
             formula: definition,
@@ -645,15 +664,17 @@ impl MutableWorksheet {
         col_last: u32,
         formula: &str,
     ) -> Result<()> {
-        let range = FormulaRange::new(row_first, row_last, col_first, col_last)?;
-        let definition = match FormulaCompiler::compile_shared(formula, row_first, col_first) {
+        let range = Range::new(row_first, row_last, col_first, col_last)?;
+        let definition = match crate::package::formula::text::Compiler::compile_shared(
+            formula, row_first, col_first,
+        ) {
             Ok(definition) => definition,
             Err(error) if formula_requires_workbook_context(&error) => {
-                FormulaCompiler::compile_shared("0", row_first, col_first)?
+                crate::package::formula::text::Compiler::compile_shared("0", row_first, col_first)?
             },
             Err(error) => return Err(error),
         };
-        let group = FormulaGroup {
+        let group = Group {
             kind: GroupKind::Shared,
             range,
             formula: definition,
@@ -670,7 +691,7 @@ impl MutableWorksheet {
     /// This is the lossless path for grouped formulas containing tokens that
     /// the text compiler or converter does not understand. Existing values in
     /// the group range are retained as cached results.
-    pub fn set_formula_group_binary(&mut self, group: FormulaGroup) -> Result<()> {
+    pub fn set_formula_group_binary(&mut self, group: Group) -> Result<()> {
         // Validate both the range and parsed-formula framing before mutating
         // the worksheet.
         let _ = group.to_record_data()?;
@@ -682,11 +703,7 @@ impl MutableWorksheet {
         self.install_formula_group(group, None)
     }
 
-    fn install_formula_group(
-        &mut self,
-        group: FormulaGroup,
-        anchor_formula: Option<&str>,
-    ) -> Result<()> {
+    fn install_formula_group(&mut self, group: Group, anchor_formula: Option<&str>) -> Result<()> {
         if let Some(index) = self
             .formula_groups
             .iter()
@@ -715,10 +732,9 @@ impl MutableWorksheet {
                 let decoded = || -> Result<String> {
                     let tokens = match group.kind {
                         GroupKind::Array => {
-                            FormulaParser::with_extra(&group.formula.rgce, &group.formula.rgcb)
-                                .parse()?
+                            Parser::with_extra(&group.formula.rgce, &group.formula.rgcb).parse()?
                         },
-                        GroupKind::Shared => FormulaParser::with_base_cell_and_extra(
+                        GroupKind::Shared => Parser::with_base_cell_and_extra(
                             &group.formula.rgce,
                             &group.formula.rgcb,
                             row,
@@ -726,7 +742,7 @@ impl MutableWorksheet {
                         )
                         .parse()?,
                     };
-                    FormulaConverter::try_tokens_to_string(&tokens)
+                    Ok(Compiler::try_tokens_to_string(&tokens)?)
                 };
                 let formula = match (group.kind, anchor_formula) {
                     (GroupKind::Array, Some(formula)) => formula.to_string(),
@@ -1863,7 +1879,7 @@ impl MutableWorksheet {
         writer: &mut Writer<W>,
         shared_strings: &mut crate::writer::MutableSharedStringsWriter,
         cells: &BTreeMap<(u32, u32), CellData>,
-        formula_groups: &[FormulaGroup],
+        formula_groups: &[Group],
     ) -> Result<()> {
         let mut current_row: Option<u32> = None;
 
@@ -1884,7 +1900,7 @@ impl MutableWorksheet {
         Ok(())
     }
 
-    fn formula_groups_for_write(&self) -> Result<Vec<FormulaGroup>> {
+    fn formula_groups_for_write(&self) -> Result<Vec<Group>> {
         let mut groups = self.formula_groups.clone();
         for (&position, cell) in &self.cells {
             let CellValue::Formula {
@@ -1902,7 +1918,7 @@ impl MutableWorksheet {
                     crate::package::utils::cell_reference(position.0, position.1)
                 ))
             })?;
-            let range = FormulaRange::parse_a1(range_text)?;
+            let range = Range::parse_a1(range_text)?;
             if range.top_left() != position {
                 continue;
             }
@@ -1912,13 +1928,13 @@ impl MutableWorksheet {
             {
                 continue;
             }
-            groups.push(FormulaGroup {
+            groups.push(Group {
                 kind: GroupKind::Array,
                 range,
                 formula: if let Some(formula) = &cell.formula_binary {
                     formula.clone()
                 } else {
-                    FormulaCompiler::compile(formula)?
+                    crate::package::formula::text::Compiler::compile(formula)?
                 },
                 always_calculate: cached_value.is_none(),
             });
@@ -1946,11 +1962,7 @@ impl MutableWorksheet {
         Ok(groups)
     }
 
-    fn formula_group_for_cell(
-        groups: &[FormulaGroup],
-        row: u32,
-        col: u32,
-    ) -> Option<&FormulaGroup> {
+    fn formula_group_for_cell(groups: &[Group], row: u32, col: u32) -> Option<&Group> {
         groups
             .iter()
             .find(|group| group.range.top_left() == (row, col))
@@ -1971,14 +1983,14 @@ impl MutableWorksheet {
         row: u32,
         col: u32,
         cell_data: &CellData,
-        group: &FormulaGroup,
+        group: &Group,
     ) -> Result<()> {
         let cached_value = match &cell_data.value {
             CellValue::Formula { cached_value, .. } => cached_value.as_deref(),
             CellValue::Empty => None,
             value => Some(value),
         };
-        let placeholder = CellParsedFormula::exp(group.range.row_first, group.range.col_first)?;
+        let placeholder = ParsedFormula::exp(group.range.row_first, group.range.col_first)?;
         self.write_formula_cell(
             writer,
             col,
@@ -2152,7 +2164,7 @@ impl MutableWorksheet {
         formula_text: &str,
         cached_value: Option<&CellValue>,
         is_array: bool,
-        encoded: Option<&CellParsedFormula>,
+        encoded: Option<&ParsedFormula>,
         flags: u16,
     ) -> Result<()> {
         if is_array {
@@ -2175,7 +2187,7 @@ impl MutableWorksheet {
         let parsed = if let Some(encoded) = encoded {
             encoded
         } else {
-            compiled = FormulaCompiler::compile(formula_text)?;
+            compiled = crate::package::formula::text::Compiler::compile(formula_text)?;
             &compiled
         };
         let formula_bytes = parsed.to_bytes()?;
@@ -2536,7 +2548,7 @@ mod tests {
 
     #[test]
     fn writes_worksheet_web_extension_collection() {
-        let formula = CellParsedFormula {
+        let formula = ParsedFormula {
             rgce: vec![0x3B, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 1, 0],
             rgcb: Vec::new(),
         };
@@ -3028,10 +3040,10 @@ mod tests {
             ]
         );
 
-        let group = FormulaGroup::parse_shared(&records[2].1).unwrap();
+        let group = Group::parse_shared(&records[2].1).unwrap();
         assert_eq!(group.range.to_a1(), "C3:C4");
         for formula_record in [&records[1].1, &records[4].1] {
-            let (placeholder, consumed) = CellParsedFormula::parse(&formula_record[18..]).unwrap();
+            let (placeholder, consumed) = ParsedFormula::parse(&formula_record[18..]).unwrap();
             assert_eq!(18 + consumed, formula_record.len());
             assert_eq!(placeholder.exp_cell().unwrap(), Some((2, 2)));
         }
@@ -3042,10 +3054,10 @@ mod tests {
         use crate::package::records::Stream;
         use std::io::Cursor;
 
-        let group = FormulaGroup {
+        let group = Group {
             kind: GroupKind::Array,
-            range: FormulaRange::new(8, 8, 2, 2).unwrap(),
-            formula: CellParsedFormula {
+            range: Range::new(8, 8, 2, 2).unwrap(),
+            formula: ParsedFormula {
                 rgce: vec![0x23, 0x02, 0x00, 0x00, 0x00, 0x42, 0x01, 0xFF, 0x00],
                 rgcb: Vec::new(),
             },

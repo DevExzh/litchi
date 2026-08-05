@@ -13,8 +13,8 @@ use crate::package::external_link::{
     OleItem, ValueMatrix,
 };
 use crate::package::formula::{
-    FormulaExternalBook, FormulaExternalSheet, FormulaPivotViewDefinition,
-    FormulaResolutionContext, FormulaSupportingLink, FormulaTableDefinition, excel_name_eq,
+    Context, ExternalBook, ExternalSheet, SupportingLink, View, excel_name_eq,
+    table::Definition as TableDefinition,
 };
 use crate::package::merged_cells::{MAX_MERGED_CELL_RANGES, MergedCell};
 use crate::package::shared_strings::SharedString;
@@ -54,7 +54,7 @@ pub struct Workbook {
     package: OpcPackage,
     worksheets: Vec<Worksheet>,
     worksheet_rel_ids: Vec<Option<String>>,
-    formula_context: FormulaResolutionContext,
+    formula_context: Context,
     shared_strings: Vec<SharedString>,
     styles: StylesTable,
     calc: Props,
@@ -77,8 +77,8 @@ struct ParsedWorkbookInfo {
     worksheet_names: Vec<String>,
     worksheet_rel_ids: Vec<Option<String>>,
     worksheet_states: Vec<u32>,
-    supporting_links: Vec<FormulaSupportingLink>,
-    external_sheets: Vec<FormulaExternalSheet>,
+    supporting_links: Vec<SupportingLink>,
+    external_sheets: Vec<ExternalSheet>,
     external_link_rel_ids: Vec<String>,
     defined_names: Vec<String>,
     is_1904: bool,
@@ -353,7 +353,7 @@ impl Workbook {
         self.formula_context
             .external_books
             .get(index)
-            .map(FormulaExternalBook::metadata_ref)
+            .map(ExternalBook::metadata_ref)
     }
 
     /// Iterate stored external links without cloning their cached values.
@@ -361,7 +361,7 @@ impl Workbook {
         self.formula_context
             .external_books
             .iter()
-            .map(FormulaExternalBook::metadata_ref)
+            .map(ExternalBook::metadata_ref)
     }
 
     /// Return stored external-workbook, DDE, and OLE link metadata.
@@ -375,17 +375,17 @@ impl Workbook {
         self.formula_context
             .external_books
             .iter()
-            .map(FormulaExternalBook::metadata)
+            .map(ExternalBook::metadata)
             .collect()
     }
 
     /// Structured-table definitions in workbook table-ID order of discovery.
-    pub fn tables(&self) -> &[FormulaTableDefinition] {
+    pub fn tables(&self) -> &[TableDefinition] {
         &self.formula_context.tables
     }
 
     /// PivotTable views available as hosts for calculated field/item formulas.
-    pub fn pivot_views(&self) -> &[FormulaPivotViewDefinition] {
+    pub fn pivot_views(&self) -> &[View] {
         &self.formula_context.pivot_views
     }
 
@@ -817,7 +817,7 @@ impl Workbook {
             package,
             worksheets: Vec::new(),
             worksheet_rel_ids: Vec::new(),
-            formula_context: FormulaResolutionContext::default(),
+            formula_context: Context::default(),
             shared_strings: Vec::new(),
             styles: StylesTable::default(),
             calc: Props::default(),
@@ -1303,7 +1303,7 @@ impl Workbook {
                 }
                 let part = self.package.get_part(&relationship.target_partname()?)?;
                 let table = Self::parse_table_definition(part.blob(), sheet_index)?;
-                if tables.iter().any(|existing: &FormulaTableDefinition| {
+                if tables.iter().any(|existing: &TableDefinition| {
                     existing.table_id() == table.table_id()
                 }) {
                     return Err(crate::package::error::Error::InvalidFormula(format!(
@@ -1311,7 +1311,7 @@ impl Workbook {
                         table.table_id()
                     )));
                 }
-                if tables.iter().any(|existing: &FormulaTableDefinition| {
+                if tables.iter().any(|existing: &TableDefinition| {
                     excel_name_eq(existing.display_name(), table.display_name())
                 }) {
                     return Err(crate::package::error::Error::InvalidFormula(format!(
@@ -1344,14 +1344,11 @@ impl Workbook {
                         view.cache_id()
                     )));
                 }
-                if pivot_views
-                    .iter()
-                    .any(|existing: &FormulaPivotViewDefinition| {
-                        existing.cache_id() == view.cache_id()
-                            && existing.sheet_index() == view.sheet_index()
-                            && excel_name_eq(existing.name(), view.name())
-                    })
-                {
+                if pivot_views.iter().any(|existing: &View| {
+                    existing.cache_id() == view.cache_id()
+                        && existing.sheet_index() == view.sheet_index()
+                        && excel_name_eq(existing.name(), view.name())
+                }) {
                     return Err(crate::package::error::Error::InvalidFormula(format!(
                         "duplicate PivotTable view {:?} for cache {} on sheet {sheet_index}",
                         view.name(),
@@ -1361,7 +1358,7 @@ impl Workbook {
                 pivot_views.push(view);
             }
         }
-        self.formula_context = FormulaResolutionContext {
+        self.formula_context = Context {
             worksheet_names: info.worksheet_names.into(),
             supporting_links: info.supporting_links.into(),
             external_sheets: info.external_sheets.into(),
@@ -1626,10 +1623,10 @@ impl Workbook {
                     worksheet_states.push(bundle_sh.state);
                 },
                 kind::SUP_SELF => {
-                    supporting_links.push(FormulaSupportingLink::SelfWorkbook);
+                    supporting_links.push(SupportingLink::SelfWorkbook);
                 },
                 kind::SUP_SAME => {
-                    supporting_links.push(FormulaSupportingLink::SameSheet);
+                    supporting_links.push(SupportingLink::SameSheet);
                 },
                 kind::SUP_BOOK_SRC => {
                     let (rel_id, consumed) =
@@ -1645,10 +1642,10 @@ impl Workbook {
                         )
                     })?;
                     external_link_rel_ids.push(rel_id);
-                    supporting_links.push(FormulaSupportingLink::ExternalWorkbook(book_index));
+                    supporting_links.push(SupportingLink::ExternalWorkbook(book_index));
                 },
                 kind::SUP_ADDIN => {
-                    supporting_links.push(FormulaSupportingLink::AddIn);
+                    supporting_links.push(SupportingLink::AddIn);
                 },
                 kind::EXTERN_SHEET => {
                     Self::parse_extern_sheet(record.payload(), external_sheets)?;
@@ -1679,7 +1676,7 @@ impl Workbook {
         cursor: Cursor<&[u8]>,
         name: String,
         shared_strings: &[SharedString],
-        formula_context: &FormulaResolutionContext,
+        formula_context: &Context,
         sheet_index: usize,
         cell_xf_count: usize,
     ) -> Result<Worksheet> {
@@ -1722,10 +1719,7 @@ impl Workbook {
         Ok(worksheet)
     }
 
-    fn parse_extern_sheet(
-        data: &[u8],
-        external_sheets: &mut Vec<FormulaExternalSheet>,
-    ) -> Result<()> {
+    fn parse_extern_sheet(data: &[u8], external_sheets: &mut Vec<ExternalSheet>) -> Result<()> {
         if data.len() < 4 {
             return Err(crate::package::error::Error::InvalidLength {
                 expected: 4,
@@ -1761,7 +1755,7 @@ impl Workbook {
         }
         external_sheets.reserve(count);
         for chunk in data[4..].chunks_exact(12) {
-            external_sheets.push(FormulaExternalSheet {
+            external_sheets.push(ExternalSheet {
                 external_link: binary::read_u32_le_at(chunk, 0)?,
                 first_sheet: binary::read_u32_le_at(chunk, 4)? as i32,
                 last_sheet: binary::read_u32_le_at(chunk, 8)? as i32,
@@ -1770,7 +1764,7 @@ impl Workbook {
         Ok(())
     }
 
-    fn load_external_book(&self, uri: &litchi_opc::PackURI) -> Result<FormulaExternalBook> {
+    fn load_external_book(&self, uri: &litchi_opc::PackURI) -> Result<ExternalBook> {
         let part = self.package.get_part(uri)?;
         if part.content_type() != "application/vnd.ms-excel.externalLink" {
             return Err(crate::package::error::Error::InvalidFormula(format!(
@@ -2183,7 +2177,7 @@ impl Workbook {
             entries,
         };
         metadata.validate()?;
-        Ok(FormulaExternalBook { metadata })
+        Ok(ExternalBook { metadata })
     }
 
     fn validate_external_name_bits(kind: u16, bits: &[u8; 7]) -> Result<()> {
@@ -2384,7 +2378,7 @@ impl Workbook {
         Ok(caches)
     }
 
-    fn parse_pivot_view(data: &[u8], sheet_index: usize) -> Result<FormulaPivotViewDefinition> {
+    fn parse_pivot_view(data: &[u8], sheet_index: usize) -> Result<View> {
         let mut view = None;
         for record in Records::new(data) {
             let record = record?;
@@ -2403,11 +2397,7 @@ impl Workbook {
                     "PivotTable view name overruns BrtBeginSXView".to_string(),
                 ));
             }
-            view = Some(FormulaPivotViewDefinition::try_new(
-                cache_id,
-                sheet_index,
-                name,
-            )?);
+            view = Some(View::try_new(cache_id, sheet_index, name)?);
         }
         view.ok_or_else(|| {
             crate::package::error::Error::InvalidFormula(
@@ -2416,7 +2406,7 @@ impl Workbook {
         })
     }
 
-    fn parse_table_definition(data: &[u8], sheet_index: usize) -> Result<FormulaTableDefinition> {
+    fn parse_table_definition(data: &[u8], sheet_index: usize) -> Result<TableDefinition> {
         let mut table_header: Option<(u32, String, usize)> = None;
         let mut expected_columns = None;
         let mut columns = Vec::new();
@@ -2520,7 +2510,7 @@ impl Workbook {
                 columns.len()
             )));
         }
-        FormulaTableDefinition::try_new(table_id, sheet_index, display_name, columns)
+        TableDefinition::try_new(table_id, sheet_index, display_name, columns)
     }
 
     fn parse_table_header(data: &[u8]) -> Result<(u32, String, usize)> {
@@ -2687,7 +2677,7 @@ impl<'a> SheetIterator<'a> for WorksheetIterator<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::package::formula::{FormulaConverter, FormulaParser};
+    use crate::package::formula::{Compiler, Parser};
     use crate::raw::{Kind as RawKind, Writer};
     use litchi_core::sheet::{Cell, WorkbookTrait, Worksheet};
     use litchi_ooxml_common::embedded::{Kind as EmbeddedKind, Target};
@@ -2718,7 +2708,7 @@ mod tests {
             package: OpcPackage::new(),
             worksheets: Vec::new(),
             worksheet_rel_ids: Vec::new(),
-            formula_context: FormulaResolutionContext::default(),
+            formula_context: Context::default(),
             shared_strings: Vec::new(),
             styles: StylesTable::default(),
             calc: Props::default(),
@@ -2812,7 +2802,7 @@ mod tests {
         assert!(workbook.task_panes().unwrap().is_none());
     }
 
-    fn parse_external_link(records: &[(RawKind, Vec<u8>)]) -> Result<FormulaExternalBook> {
+    fn parse_external_link(records: &[(RawKind, Vec<u8>)]) -> Result<ExternalBook> {
         parse_external_link_with_relationship_type(
             records,
             Some(relationship_type::EXTERNAL_LINK_PATH),
@@ -2822,7 +2812,7 @@ mod tests {
     fn parse_external_link_with_relationship_type(
         records: &[(RawKind, Vec<u8>)],
         target_relationship_type: Option<&str>,
-    ) -> Result<FormulaExternalBook> {
+    ) -> Result<ExternalBook> {
         let uri = PackURI::new("/xl/externalLinks/externalLink1.bin").unwrap();
         let mut part = BlobPart::new(
             uri.clone(),
@@ -2843,7 +2833,7 @@ mod tests {
             package,
             worksheets: Vec::new(),
             worksheet_rel_ids: Vec::new(),
-            formula_context: FormulaResolutionContext::default(),
+            formula_context: Context::default(),
             shared_strings: Vec::new(),
             styles: StylesTable::default(),
             calc: Props::default(),
@@ -3221,7 +3211,7 @@ mod tests {
             package,
             worksheets: Vec::new(),
             worksheet_rel_ids: Vec::new(),
-            formula_context: FormulaResolutionContext::default(),
+            formula_context: Context::default(),
             shared_strings: Vec::new(),
             styles: StylesTable::default(),
             calc: Props::default(),
@@ -3407,22 +3397,17 @@ mod tests {
         assert_eq!(link.sheet_names(), &["Data Sheet".to_string()]);
         assert_eq!(link.defined_names()[0].name(), "Rate");
 
-        let reference = FormulaParser::new(&[0x5A, 0, 0, 0, 0, 0, 0, 0, 0])
+        let reference = Parser::new(&[0x5A, 0, 0, 0, 0, 0, 0, 0, 0])
             .parse()
             .unwrap();
         assert_eq!(
-            FormulaConverter::try_tokens_to_string_with_context(
-                &reference,
-                &workbook.formula_context
-            )
-            .unwrap(),
+            Compiler::try_tokens_to_string_with_resolution(&reference, &workbook.formula_context)
+                .unwrap(),
             "'[Book.xlsx]Data Sheet'!$A$1"
         );
-        let name = FormulaParser::new(&[0x59, 0, 0, 1, 0, 0, 0])
-            .parse()
-            .unwrap();
+        let name = Parser::new(&[0x59, 0, 0, 1, 0, 0, 0]).parse().unwrap();
         assert_eq!(
-            FormulaConverter::try_tokens_to_string_with_context(&name, &workbook.formula_context)
+            Compiler::try_tokens_to_string_with_resolution(&name, &workbook.formula_context)
                 .unwrap(),
             "'[Book.xlsx]'!Rate"
         );
