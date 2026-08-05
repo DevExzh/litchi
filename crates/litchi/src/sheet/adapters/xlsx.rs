@@ -5,13 +5,11 @@
 //! that ownership boundary explicit and converts only at the high-level
 //! facade seam.
 
+use crate::ooxml::xlsx::{self, Address, Rect};
 use litchi_core::sheet::{
     Cell as CoreCell, CellIterator, CellValue, Result as SheetResult, RowIterator, WorkbookTrait,
     Worksheet as CoreWorksheet, WorksheetIterator,
 };
-use litchi_sheet::{Cell as Address, Rect};
-
-use crate::ooxml::xlsx;
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
@@ -29,6 +27,7 @@ fn convert_value(value: &xlsx::cell::Value) -> CellValue {
         xlsx::cell::Value::Text(value) => CellValue::String(value.as_str().to_owned()),
         xlsx::cell::Value::Date(value) => CellValue::String(value.as_str().to_owned()),
         xlsx::cell::Value::Error(value) => CellValue::Error(value.as_str().to_owned()),
+        _ => CellValue::Error("unknown XLSX value kind".to_owned()),
     }
 }
 
@@ -47,6 +46,7 @@ fn convert_cell(cell: &xlsx::cell::Cell) -> CellValue {
         xlsx::cell::Cell::Unknown(unknown) => {
             CellValue::Error(format!("unknown XLSX cell kind: {}", unknown.kind()))
         },
+        _ => CellValue::Error("unknown XLSX cell kind".to_owned()),
     }
 }
 
@@ -56,13 +56,13 @@ fn coordinate(row: u32, column: u32) -> Address {
 
 /// Internal dynamic-trait view over a standalone XLSX workbook snapshot.
 #[derive(Debug)]
-pub(super) struct Workbook {
+pub(crate) struct Workbook {
     workbook: xlsx::Workbook,
     names: Box<[String]>,
 }
 
 impl Workbook {
-    pub(super) fn new(workbook: xlsx::Workbook) -> Self {
+    pub(crate) fn new(workbook: xlsx::Workbook) -> Self {
         let names = workbook
             .sheets()
             .map(|sheet| sheet.name().to_owned())
@@ -154,6 +154,7 @@ impl Worksheet {
         match self.worksheet.cell((row, column)).map_err(boxed_error)? {
             xlsx::cell::View::Stored(cell) => Ok(convert_cell(cell)),
             xlsx::cell::View::Missing | xlsx::cell::View::Covered(_) => Ok(CellValue::Empty),
+            _ => Ok(CellValue::Empty),
         }
     }
 
@@ -184,7 +185,8 @@ impl Worksheet {
         let Some(extent) = self.extent()? else {
             return Ok(Vec::new());
         };
-        self.worksheet
+        Ok(self
+            .worksheet
             .cells(extent)
             .map_err(boxed_error)?
             .map(|(address, cell)| {
@@ -194,7 +196,7 @@ impl Worksheet {
                     convert_cell(cell),
                 )
             })
-            .collect()
+            .collect())
     }
 }
 

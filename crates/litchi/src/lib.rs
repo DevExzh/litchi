@@ -166,11 +166,6 @@
 
 #![forbid(unsafe_code)]
 
-#[cfg(feature = "ooxml")]
-pub(crate) fn map_ooxml_error<E: std::fmt::Display>(error: E) -> litchi_core::Error {
-    litchi_core::Error::Other(error.to_string())
-}
-
 /// Common types, traits, and utilities shared across formats.
 ///
 /// Re-export of the `litchi-core` crate under the historical `common` path.
@@ -335,6 +330,10 @@ pub mod drawing {
 /// **Note**: This requires the `ooxml` feature to be enabled.
 #[cfg(feature = "ooxml")]
 pub mod ooxml {
+    pub(crate) fn map_ooxml_error<E: std::fmt::Display>(error: E) -> litchi_core::Error {
+        litchi_core::Error::Other(error.to_string())
+    }
+
     pub use common::{custom, custom_xml, embedded, ribbon, web};
     /// WordprocessingML (`.docx`) package and semantic APIs.
     pub use litchi_docx as docx;

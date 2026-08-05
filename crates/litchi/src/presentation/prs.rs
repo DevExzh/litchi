@@ -176,17 +176,15 @@ impl Presentation {
             #[cfg(feature = "ooxml")]
             DetectedFormat::Pptx(opc_package) => {
                 // OPC package already parsed - reuse it!
+                let cached_metadata = crate::ooxml::common::properties::read(&opc_package)
+                    .map_err(crate::ooxml::map_ooxml_error)?
+                    .map(litchi_core::Metadata::from)
+                    .filter(|metadata| metadata.has_data());
                 let package = Box::new(
                     ooxml::pptx::Package::from_opc_package(opc_package)
                         .map_err(crate::ooxml::map_ooxml_error)?,
                 );
 
-                // Reuse the already validated semantic cache.
-                let cached_metadata = package
-                    .props()
-                    .cloned()
-                    .map(litchi_core::Metadata::from)
-                    .filter(|metadata| metadata.has_data());
                 Ok(Self {
                     inner: PresentationImpl::Pptx(package),
                     cached_metadata,

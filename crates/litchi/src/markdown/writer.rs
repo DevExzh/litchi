@@ -318,7 +318,9 @@ impl MarkdownWriter {
         {
             use crate::document::Paragraph;
             if let Paragraph::Docx(docx_para) = para {
-                let display_formulas = docx_para.paragraph_level_formulas()?;
+                let display_formulas = docx_para
+                    .paragraph_level_formulas()
+                    .map_err(crate::ooxml::map_ooxml_error)?;
                 if !display_formulas.is_empty() {
                     // This paragraph contains display formulas
                     // Process runs and formulas together in order
@@ -586,7 +588,9 @@ impl MarkdownWriter {
         #[cfg(feature = "ooxml")]
         let (text, bold, italic, strikethrough, vertical_pos) =
             if let crate::document::Run::Docx(docx_run) = run {
-                let (text, props) = docx_run.get_text_and_properties()?;
+                let (text, props) = docx_run
+                    .get_text_and_properties()
+                    .map_err(crate::ooxml::map_ooxml_error)?;
                 if text.is_empty() {
                     return Ok(());
                 }
@@ -1389,7 +1393,9 @@ impl MarkdownWriter {
         // Try OOXML OMML formulas first
         #[cfg(feature = "ooxml")]
         if let crate::document::Run::Docx(docx_run) = _run
-            && let Some(omml_xml) = docx_run.omml_formula()?
+            && let Some(omml_xml) = docx_run
+                .omml_formula()
+                .map_err(crate::ooxml::map_ooxml_error)?
         {
             // Parse OMML and convert to LaTeX
             #[cfg(feature = "formula")]

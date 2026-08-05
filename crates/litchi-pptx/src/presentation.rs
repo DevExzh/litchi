@@ -7,6 +7,15 @@ use crate::parts::{PresentationPart, SlideMasterPart, SlidePart, SlideReference}
 use crate::slide::{Key, Slide, SlideLayout, SlideMaster};
 use crate::{Error, Result};
 
+/// Layered semantic services that attach embedded resources to a
+/// PresentationML graph without interpreting executable payloads.
+#[path = "presentation/embedded/mod.rs"]
+pub mod embedded;
+
+/// Move-first authoring values for slide audio and video.
+#[path = "presentation/media.rs"]
+pub mod media;
+
 /// Borrowed semantic view of one PresentationML package graph.
 pub struct Presentation<'a> {
     package: &'a OpcPackage,
