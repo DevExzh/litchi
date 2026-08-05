@@ -117,7 +117,7 @@ pub use litchi_odraw::image::Kind as PictureKind;
 pub use numbering::{ListFormatOverride, ListLevel, ListStructure, NumberFormat, NumberingWriter};
 pub use piece_table::{Piece, PieceTableBuilder};
 pub use revisions::{DisplayFieldRevision, FormattingRevision, NumberingRevision, TextRevision};
-pub use shapes::{DocDrawingShape, DocShapeKind};
+pub use shapes::{Kind, Shape};
 pub use smart_tags::DocSmartTagEntry;
 pub use sprm::SprmBuilder;
 pub use stylesheet::{DocStyleDefinition, DocStyleRevision, StyleWriteError};

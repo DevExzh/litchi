@@ -3,8 +3,9 @@
 //! Covers the full header kind set (odd/even/first-page), the automatic
 //! section flags (DOP fFacingPages, SEP sprmSFTitlePage), and the header
 //! picture pipeline (PICF block + PlcfSpaHdr + header-drawing picture frame).
-use litchi_doc::shapes::extract_drawing_shapes;
-use litchi_doc::writer::{DocDrawingShape, DocPicture, DocShapeKind, DocWriter, FloatingPosition};
+use litchi_doc::shape::extract_drawing_shapes;
+use litchi_doc::writer::{DocPicture, DocWriter, FloatingPosition};
+use litchi_doc::writer::{Kind as DrawingKind, Shape as DrawingShape};
 use litchi_doc::{
     DocHeaderKind, HeaderFooterParagraph, HeaderFooterType, Package, ShapeHorizontalOrigin,
     ShapeTextWrap, ShapeVerticalOrigin,
@@ -69,7 +70,7 @@ fn write_doc_with_even_and_first_boxes() -> Vec<u8> {
     writer
         .insert_header_text_box(
             DocHeaderKind::Even,
-            DocDrawingShape::new(DocShapeKind::Rectangle, 2000, 1000).unwrap(),
+            DrawingShape::new(DrawingKind::Rectangle, 2000, 1000).unwrap(),
             FloatingPosition::new(1000, 500),
             "Even box",
         )
@@ -77,7 +78,7 @@ fn write_doc_with_even_and_first_boxes() -> Vec<u8> {
     writer
         .insert_header_text_box(
             DocHeaderKind::FirstPage,
-            DocDrawingShape::new(DocShapeKind::Ellipse, 3000, 1500).unwrap(),
+            DrawingShape::new(DrawingKind::Ellipse, 3000, 1500).unwrap(),
             FloatingPosition::new(2000, 800)
                 .with_origins(ShapeHorizontalOrigin::Page, ShapeVerticalOrigin::Paragraph)
                 .with_text_wrap(ShapeTextWrap::Square),

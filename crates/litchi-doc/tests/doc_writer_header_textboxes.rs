@@ -5,8 +5,9 @@
 //! text, header text box text/shape metadata, and both drawing layers must
 //! resolve correctly without disturbing the main stories.
 use litchi_doc::parts::headers::HeaderFooterType;
-use litchi_doc::shapes::{extract_drawing_shapes, extract_shape_text};
-use litchi_doc::writer::{DocDrawingShape, DocShapeKind, DocWriter, FloatingPosition};
+use litchi_doc::shape::{extract_drawing_shapes, extract_shape_text};
+use litchi_doc::writer::{DocWriter, FloatingPosition};
+use litchi_doc::writer::{Kind as DrawingKind, Shape as DrawingShape};
 use litchi_doc::{
     DocHeaderKind, HeaderFooterParagraph, Package, ShapeHorizontalOrigin, ShapeTextWrap,
     ShapeVerticalOrigin,
@@ -29,7 +30,7 @@ fn write_doc_with_header_text_box() -> Vec<u8> {
     // Main-story text box for coexistence.
     writer
         .insert_floating_text_box(
-            DocDrawingShape::new(DocShapeKind::Rectangle, 2000, 1000).unwrap(),
+            DrawingShape::new(DrawingKind::Rectangle, 2000, 1000).unwrap(),
             FloatingPosition::new(1440, 1440),
             "Main box",
         )
@@ -38,7 +39,7 @@ fn write_doc_with_header_text_box() -> Vec<u8> {
     writer
         .insert_header_text_box(
             DocHeaderKind::Odd,
-            DocDrawingShape::new(DocShapeKind::Rectangle, 4000, 2000)
+            DrawingShape::new(DrawingKind::Rectangle, 4000, 2000)
                 .unwrap()
                 .with_fill(0xEE, 0xEE, 0xFF)
                 .with_line(0x40, 0x40, 0x40),

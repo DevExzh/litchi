@@ -3,8 +3,9 @@
 //! Writes a .doc containing text, an inline picture, a floating picture, and
 //! floating primitive shapes (rectangle, ellipse, rounded rectangle), then
 //! re-opens it with the crate's own reader and shape extraction APIs.
-use litchi_doc::shapes::extract_drawing_shapes;
-use litchi_doc::writer::{DocDrawingShape, DocPicture, DocShapeKind, DocWriter, FloatingPosition};
+use litchi_doc::shape::extract_drawing_shapes;
+use litchi_doc::writer::{DocPicture, DocWriter, FloatingPosition};
+use litchi_doc::writer::{Kind as DrawingKind, Shape as DrawingShape};
 use litchi_doc::{Package, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin};
 use litchi_odraw::shape::Kind;
 use std::io::{Cursor, Write};
@@ -79,7 +80,7 @@ fn write_doc_with_shapes(jpeg_bytes: &[u8]) -> Vec<u8> {
         .unwrap();
     writer
         .insert_floating_shape(
-            DocDrawingShape::new(DocShapeKind::Rectangle, 2880, 1440)
+            DrawingShape::new(DrawingKind::Rectangle, 2880, 1440)
                 .unwrap()
                 .with_fill(0xFF, 0x00, 0x00)
                 .with_line(0x00, 0x00, 0xFF),
@@ -90,7 +91,7 @@ fn write_doc_with_shapes(jpeg_bytes: &[u8]) -> Vec<u8> {
         .unwrap();
     writer
         .insert_floating_shape(
-            DocDrawingShape::new(DocShapeKind::Ellipse, 1440, 1440)
+            DrawingShape::new(DrawingKind::Ellipse, 1440, 1440)
                 .unwrap()
                 .with_line(0x00, 0x80, 0x00),
             FloatingPosition::new(4000, 2000),
@@ -98,7 +99,7 @@ fn write_doc_with_shapes(jpeg_bytes: &[u8]) -> Vec<u8> {
         .unwrap();
     writer
         .insert_floating_shape(
-            DocDrawingShape::new(DocShapeKind::RoundRectangle, 2160, 1080).unwrap(),
+            DrawingShape::new(DrawingKind::RoundRectangle, 2160, 1080).unwrap(),
             FloatingPosition::new(6000, 3000).with_text_wrap(ShapeTextWrap::TopAndBottom),
         )
         .unwrap();
@@ -237,7 +238,7 @@ fn document_with_only_shapes_has_no_picture_data() {
     writer.add_paragraph("shapes only").unwrap();
     writer
         .insert_floating_shape(
-            DocDrawingShape::new(DocShapeKind::Rectangle, 1440, 720).unwrap(),
+            DrawingShape::new(DrawingKind::Rectangle, 1440, 720).unwrap(),
             FloatingPosition::new(720, 720),
         )
         .unwrap();

@@ -190,7 +190,7 @@ pub struct AttachedGlossary {
     stylesheet: Option<StyleSheet>,
     revision_authors: RevisionAuthorTable,
     images: Vec<super::super::image::Image>,
-    shapes: Vec<super::super::shapes::DocShape>,
+    shapes: Vec<crate::shape::Shape>,
     shape_anchors: Vec<super::spa::ShapeAnchor>,
     header_shape_anchors: Vec<super::spa::ShapeAnchor>,
     textbox_entries: Vec<super::textbox::TextBoxEntry>,
@@ -308,8 +308,8 @@ impl AttachedGlossary {
                 None
             };
         let images = collect_images(&text_extractor, chp_bin_table.as_ref(), data_stream);
-        let _ = table_slice(&fib, table_stream, super::super::shapes::FIB_INDEX_DGG_INFO)?;
-        let shapes = super::super::shapes::extract_dgg_shapes(&fib, table_stream)
+        let _ = table_slice(&fib, table_stream, crate::shape::FIB_INDEX_DGG_INFO)?;
+        let shapes = crate::shape::extract_dgg_shapes(&fib, table_stream)
             .map_err(|error| corrupted(format!("invalid attached glossary drawing: {error}")))?;
         let shape_anchors =
             parse_shape_anchors(&fib, table_stream, super::spa::FIB_INDEX_PLC_SPA_MOM)?;
@@ -470,7 +470,7 @@ impl AttachedGlossary {
     }
 
     /// Floating OfficeArt shapes stored by the secondary FIB.
-    pub fn shapes(&self) -> &[super::super::shapes::DocShape] {
+    pub fn shapes(&self) -> &[crate::shape::Shape] {
         &self.shapes
     }
 

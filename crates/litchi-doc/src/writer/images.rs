@@ -849,7 +849,7 @@ pub(crate) enum FloatingShapeContent<'a> {
     /// A picture frame whose BLIP is stored in the blip store.
     Picture(&'a DocPicture),
     /// A primitive preset-geometry shape (rectangle, ellipse, ...).
-    Primitive(&'a super::shapes::DocDrawingShape),
+    Primitive(&'a super::shapes::Shape),
 }
 
 /// Everything the table-stream builders need to know about one floating
@@ -1623,15 +1623,14 @@ mod tests {
 
     #[test]
     fn dgg_info_with_header_drawing_uses_own_cluster() {
-        use crate::writer::shapes::DocDrawingShape;
+        use crate::writer::shapes::Shape;
 
         let png = DocPicture::new(png_bytes()).unwrap();
         let jpeg = DocPicture::new(jpeg_bytes()).unwrap();
         let positions = sample_positions();
         let main_shapes = floating_shapes(&png, &jpeg, &positions);
 
-        let rect = DocDrawingShape::new(crate::writer::shapes::DocShapeKind::Rectangle, 1440, 720)
-            .unwrap();
+        let rect = Shape::new(crate::writer::shapes::Kind::Rectangle, 1440, 720).unwrap();
         let position = FloatingPosition::new(720, 360);
         let header_shapes = vec![FloatingShapeInfo {
             anchor_cp: 0,

@@ -1,7 +1,7 @@
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_doc::writer::{
-    CharacterFormatting, DocDrawingShape, DocEncryptionProfile, DocPicture, DocShapeKind,
-    FloatingPosition, ParagraphFormatting,
+    CharacterFormatting, DocEncryptionProfile, DocPicture, FloatingPosition, Kind as DrawingKind,
+    ParagraphFormatting, Shape as DrawingShape,
 };
 use litchi_doc::{
     DocOpenOptions, DocWriter, GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle,
@@ -73,7 +73,7 @@ fn glossary_with_drawings() -> DocWriter {
         .unwrap();
     writer
         .insert_floating_text_box(
-            DocDrawingShape::new(DocShapeKind::Rectangle, 1440, 720)
+            DrawingShape::new(DrawingKind::Rectangle, 1440, 720)
                 .unwrap()
                 .with_fill(0x80, 0x40, 0x20),
             FloatingPosition::new(720, 360),

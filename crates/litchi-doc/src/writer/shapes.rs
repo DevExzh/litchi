@@ -48,7 +48,7 @@ const MAX_SHAPE_DIMENSION_TWIPS: u32 = i16::MAX as u32;
 /// The values are the MSOSPT enumeration ([MS-ODRAW] 2.4.24) that the
 /// OfficeArtFSP record instance carries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DocShapeKind {
+pub enum Kind {
     /// msosptRectangle.
     Rectangle,
     /// msosptRoundRectangle.
@@ -57,7 +57,7 @@ pub enum DocShapeKind {
     Ellipse,
 }
 
-impl DocShapeKind {
+impl Kind {
     /// The MSOSPT value written as the OfficeArtFSP record instance.
     pub(crate) fn shape_type(self) -> u16 {
         match self {
@@ -75,9 +75,9 @@ impl DocShapeKind {
 /// [`super::core::DocWriter::insert_floating_shape`]. By default a shape is
 /// drawn as an outline: no fill, black line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct DocDrawingShape {
+pub struct Shape {
     /// Preset geometry kind.
-    kind: DocShapeKind,
+    kind: Kind,
     /// Width in twips (1/1440 inch).
     width_twips: u32,
     /// Height in twips.
@@ -88,17 +88,13 @@ pub struct DocDrawingShape {
     line_color: Option<(u8, u8, u8)>,
 }
 
-impl DocDrawingShape {
+impl Shape {
     /// Create a shape with the given size in twips (1/1440 inch).
     ///
     /// The shape starts as an outline (no fill, black line); use
     /// [`Self::with_fill`] / [`Self::with_line`] / [`Self::without_fill`] /
     /// [`Self::without_line`] to adjust.
-    pub fn new(
-        kind: DocShapeKind,
-        width_twips: u32,
-        height_twips: u32,
-    ) -> Result<Self, DocWriteError> {
+    pub fn new(kind: Kind, width_twips: u32, height_twips: u32) -> Result<Self, DocWriteError> {
         for dimension in [width_twips, height_twips] {
             if !(1..=MAX_SHAPE_DIMENSION_TWIPS).contains(&dimension) {
                 return Err(DocWriteError::InvalidData(format!(
@@ -140,7 +136,7 @@ impl DocDrawingShape {
     }
 
     /// The preset geometry kind.
-    pub fn kind(&self) -> DocShapeKind {
+    pub fn kind(&self) -> Kind {
         self.kind
     }
 
@@ -165,7 +161,7 @@ fn color_ref(red: u8, green: u8, blue: u8) -> u32 {
 /// colors, and the boolean properties that explicitly disable the fill or
 /// the line when unset. Properties are emitted in ascending opid order as
 /// Word writes them.
-pub(crate) fn write_shape_opt(out: &mut Vec<u8>, shape: &DocDrawingShape) {
+pub(crate) fn write_shape_opt(out: &mut Vec<u8>, shape: &Shape) {
     let mut properties: Vec<(u16, u32)> = Vec::with_capacity(4);
     if let Some((red, green, blue)) = shape.fill_color {
         properties.push((OPT_FILL_COLOR, color_ref(red, green, blue)));
@@ -261,21 +257,18 @@ mod tests {
 
     #[test]
     fn shape_kind_msospt_values_match_spec() {
-        assert_eq!(DocShapeKind::Rectangle.shape_type(), 0x0001);
-        assert_eq!(DocShapeKind::RoundRectangle.shape_type(), 0x0002);
-        assert_eq!(DocShapeKind::Ellipse.shape_type(), 0x0003);
+        assert_eq!(Kind::Rectangle.shape_type(), 0x0001);
+        assert_eq!(Kind::RoundRectangle.shape_type(), 0x0002);
+        assert_eq!(Kind::Ellipse.shape_type(), 0x0003);
     }
 
     #[test]
     fn new_shape_is_an_outline_by_default() {
-        let shape = DocDrawingShape::new(DocShapeKind::Rectangle, 1440, 720).unwrap();
+        let shape = Shape::new(Kind::Rectangle, 1440, 720).unwrap();
         assert_eq!(shape.fill_color, None);
         assert_eq!(shape.line_color, Some((0, 0, 0)));
-        assert!(DocDrawingShape::new(DocShapeKind::Rectangle, 0, 720).is_err());
-        assert!(
-            DocDrawingShape::new(DocShapeKind::Ellipse, 1440, MAX_SHAPE_DIMENSION_TWIPS + 1)
-                .is_err()
-        );
+        assert!(Shape::new(Kind::Rectangle, 0, 720).is_err());
+        assert!(Shape::new(Kind::Ellipse, 1440, MAX_SHAPE_DIMENSION_TWIPS + 1).is_err());
     }
 
     #[test]
@@ -289,7 +282,7 @@ mod tests {
     #[test]
     fn write_shape_opt_emits_colors_and_disable_flags() {
         // Filled + lined: two color properties in ascending opid order.
-        let shape = DocDrawingShape::new(DocShapeKind::Rectangle, 1440, 720)
+        let shape = Shape::new(Kind::Rectangle, 1440, 720)
             .unwrap()
             .with_fill(0xFF, 0x00, 0x00)
             .with_line(0x00, 0x00, 0xFF);

@@ -65,7 +65,7 @@ pub mod parts;
 mod plcf;
 pub mod revision;
 pub mod section;
-pub mod shapes;
+pub mod shape;
 pub mod table;
 pub mod tracked_revision;
 pub mod vba;
@@ -243,7 +243,8 @@ pub use section::{
     SectionPageNumbering, SectionPaperSettings, SectionProtection, SectionTextFlow,
     SectionVerticalJustification, VerticalMargin,
 };
-pub use shapes::DocShape;
+pub use shape::{Bounds, Kind as ShapeKind, Shape, UnknownRecord};
+pub use shape::{count_shapes, extract_drawing_shapes, extract_shape_text, extract_shapes};
 pub use table::{Cell, Row, Table};
 pub use tracked_revision::{
     DocTrackedRevision, DocTrackedRevisionEditor, DocTrackedRevisionKind,
@@ -252,14 +253,15 @@ pub use tracked_revision::{
 pub use vba::VbaProjectStorage;
 pub use writer::{
     AutoNumberAlignment, BookmarkEntry, CharacterFormatting, CommentEntry, DisplayFieldRevision,
-    DocDrawingShape, DocHeaderKind, DocPicture, DocShapeKind, DocSmartTagEntry, DocStyleDefinition,
-    DocStyleRevision, DocWriteError, DocWriter, DropCap, DropCapType, FloatingPosition,
-    FontAlignment, FormattingRevision, FrameAnchor, FrameHeight, FrameHorizontalAnchor,
-    FrameHorizontalPosition, FrameTextFlow, FrameTextWrap, FrameVerticalAnchor,
-    FrameVerticalPosition, HeaderFooterParagraph, LegacyAutoNumbering, LegacyBorderPosition,
+    DocHeaderKind, DocPicture, DocSmartTagEntry, DocStyleDefinition, DocStyleRevision,
+    DocWriteError, DocWriter, DropCap, DropCapType, FloatingPosition, FontAlignment,
+    FormattingRevision, FrameAnchor, FrameHeight, FrameHorizontalAnchor, FrameHorizontalPosition,
+    FrameTextFlow, FrameTextWrap, FrameVerticalAnchor, FrameVerticalPosition,
+    HeaderFooterParagraph, Kind as DrawingKind, LegacyAutoNumbering, LegacyBorderPosition,
     LegacyBorderStyle, LineSpacing, NumberingRevision, ParagraphBorder, ParagraphBorderStyle,
     ParagraphBorders, ParagraphFormatting, ParagraphShading, PhysicalJustification,
-    StyleWriteError, TabAlignment, TabLeader, TabStop, TextBoxTightWrap, TextRevision,
+    Shape as DrawingShape, StyleWriteError, TabAlignment, TabLeader, TabStop, TextBoxTightWrap,
+    TextRevision,
 };
 
 /// Crate-native ordered document element returned by [`Document::elements`].

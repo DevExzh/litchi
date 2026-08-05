@@ -854,7 +854,7 @@ struct WriterPicture {
 #[derive(Debug, Clone)]
 struct WriterShape {
     /// The shape geometry, size, and colors.
-    shape: super::shapes::DocDrawingShape,
+    shape: super::shapes::Shape,
     /// Shape id allocated at insert time (shared sequence with pictures).
     shape_id: u32,
     /// Position and wrapping.
@@ -1466,7 +1466,7 @@ impl DocWriter {
     /// Shared tail of `insert_floating_shape`/`insert_floating_text_box`.
     fn insert_shape_run(
         &mut self,
-        shape: super::shapes::DocDrawingShape,
+        shape: super::shapes::Shape,
         position: super::images::FloatingPosition,
         text: Option<String>,
     ) -> Result<(), DocWriteError> {
@@ -1503,10 +1503,10 @@ impl DocWriter {
     /// PlcfSpa — the same mechanism as floating pictures ([MS-DOC] 1.3).
     ///
     /// Shape text (text boxes) is not supported; see
-    /// [`super::shapes::DocDrawingShape`].
+    /// [`super::shapes::Shape`].
     pub fn insert_floating_shape(
         &mut self,
-        shape: super::shapes::DocDrawingShape,
+        shape: super::shapes::Shape,
         position: super::images::FloatingPosition,
     ) -> Result<(), DocWriteError> {
         self.insert_shape_run(shape, position, None)
@@ -1523,7 +1523,7 @@ impl DocWriter {
     /// paragraphs; no character or paragraph formatting is applied.
     pub fn insert_floating_text_box(
         &mut self,
-        shape: super::shapes::DocDrawingShape,
+        shape: super::shapes::Shape,
         position: super::images::FloatingPosition,
         text: impl Into<String>,
     ) -> Result<(), DocWriteError> {
@@ -1547,7 +1547,7 @@ impl DocWriter {
     pub fn insert_header_text_box(
         &mut self,
         kind: DocHeaderKind,
-        shape: super::shapes::DocDrawingShape,
+        shape: super::shapes::Shape,
         position: super::images::FloatingPosition,
         text: impl Into<String>,
     ) -> Result<(), DocWriteError> {
@@ -7783,8 +7783,8 @@ mod header_kind_tests {
         writer
             .insert_header_text_box(
                 DocHeaderKind::Even,
-                crate::writer::shapes::DocDrawingShape::new(
-                    crate::writer::shapes::DocShapeKind::Rectangle,
+                crate::writer::shapes::Shape::new(
+                    crate::writer::shapes::Kind::Rectangle,
                     1440,
                     720,
                 )

@@ -4,8 +4,9 @@
 //! boxes, then re-opens it with the crate's own reader: the textbox story
 //! (ccpTxbx + PlcftxbxTxt) and the OfficeArtClientTextbox links must resolve
 //! to the right shapes and text.
-use litchi_doc::shapes::{extract_drawing_shapes, extract_shape_text};
-use litchi_doc::writer::{DocDrawingShape, DocPicture, DocShapeKind, DocWriter, FloatingPosition};
+use litchi_doc::shape::{extract_drawing_shapes, extract_shape_text};
+use litchi_doc::writer::{DocPicture, DocWriter, FloatingPosition};
+use litchi_doc::writer::{Kind as DrawingKind, Shape as DrawingShape};
 use litchi_doc::{Package, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin};
 use litchi_odraw::{Record, shape::Kind};
 use std::io::{Cursor, Write};
@@ -78,7 +79,7 @@ fn write_doc_with_text_boxes(jpeg_bytes: &[u8]) -> Vec<u8> {
         .unwrap();
     writer
         .insert_floating_shape(
-            DocDrawingShape::new(DocShapeKind::Rectangle, 2880, 1440)
+            DrawingShape::new(DrawingKind::Rectangle, 2880, 1440)
                 .unwrap()
                 .with_fill(0xFF, 0x00, 0x00),
             FloatingPosition::new(2000, 1000),
@@ -86,7 +87,7 @@ fn write_doc_with_text_boxes(jpeg_bytes: &[u8]) -> Vec<u8> {
         .unwrap();
     writer
         .insert_floating_text_box(
-            DocDrawingShape::new(DocShapeKind::Rectangle, 3600, 1800)
+            DrawingShape::new(DrawingKind::Rectangle, 3600, 1800)
                 .unwrap()
                 .with_fill(0xFF, 0xFF, 0xCC)
                 .with_line(0x80, 0x00, 0x00),
@@ -98,7 +99,7 @@ fn write_doc_with_text_boxes(jpeg_bytes: &[u8]) -> Vec<u8> {
         .unwrap();
     writer
         .insert_floating_text_box(
-            DocDrawingShape::new(DocShapeKind::RoundRectangle, 3600, 1800).unwrap(),
+            DrawingShape::new(DrawingKind::RoundRectangle, 3600, 1800).unwrap(),
             FloatingPosition::new(5000, 3000),
             "Hello\nWorld",
         )
@@ -265,7 +266,7 @@ fn document_without_text_boxes_has_empty_story() {
     writer.add_paragraph("no boxes").unwrap();
     writer
         .insert_floating_shape(
-            DocDrawingShape::new(DocShapeKind::Ellipse, 1440, 720).unwrap(),
+            DrawingShape::new(DrawingKind::Ellipse, 1440, 720).unwrap(),
             FloatingPosition::new(720, 720),
         )
         .unwrap();
