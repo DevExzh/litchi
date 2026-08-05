@@ -10,17 +10,14 @@
 //! # Architecture
 //!
 //! The module is organized around these key types:
-//! - `Package`: The overall .pptx file package (entry point)
-//! - `Presentation`: The main presentation content and API
-//! - `Slide`: Individual slide content and API
-//! - `SlideMaster`: Slide master for themes and default formatting
-//! - `SlideLayout`: Layout templates for slides
-//! - `PresentationPart`, `SlidePart`, etc.: Lower-level part wrappers
+//! Package, presentation, slide, part, and writer ownership now lives in the
+//! standalone [`litchi_pptx`] crate. This host module retains only semantic
+//! capabilities that have not yet completed their standalone migration.
 //!
 //! # Example: Reading a Presentation
 //!
 //! ```rust,no_run
-//! use litchi_ooxml::pptx::Package;
+//! use litchi_pptx::Package;
 //!
 //! // Open a presentation
 //! let pkg = Package::open("presentation.pptx")?;
@@ -43,7 +40,7 @@
 //! # Example: Accessing Slide Masters
 //!
 //! ```rust,no_run
-//! use litchi_ooxml::pptx::Package;
+//! use litchi_pptx::Package;
 //!
 //! let pkg = Package::open("presentation.pptx")?;
 //! let mut pres = pkg.presentation()?;
@@ -75,12 +72,9 @@ pub mod laser;
 pub mod master_layout;
 pub mod media;
 pub mod media_parts;
-mod namespace;
 pub mod ole;
 pub mod ole_object;
-pub mod package;
 pub mod parts;
-pub mod presentation;
 pub mod presentation_properties;
 pub mod presentation_structure;
 pub mod protection;
@@ -89,7 +83,6 @@ pub mod sections;
 pub mod shape;
 mod shapes;
 pub mod show_events;
-pub mod slide;
 pub mod slide_sync;
 pub mod smartart;
 pub mod table;
@@ -98,7 +91,6 @@ pub mod theme;
 pub mod tracks;
 pub mod vba_project;
 pub mod view_properties;
-pub mod writer;
 
 pub use animations::{Direction, Effect, EffectInstance, Sequence};
 pub use backgrounds::{GradientStop, GradientType, PatternType, PictureStyle, SlideBackground};
@@ -151,48 +143,6 @@ pub use media_parts::{
 };
 pub use ole::{Mode, Object, PayloadKind};
 pub use ole_object::{AuthoredOleObject, OleObjectFrame, add_ole_object};
-pub use package::Package;
-pub use parts::{
-    CHART_COLOR_STYLE_CONTENT_TYPE, CHART_COLOR_STYLE_RELATIONSHIP_TYPE, CHART_STYLE_CONTENT_TYPE,
-    CHART_STYLE_RELATIONSHIP_TYPE, ChartColorStyleDocument, ChartColorStyleInfo,
-    ChartColorStyleMethod, ChartColorStylePart, ChartData, ChartExAxis, ChartExAxisScaling,
-    ChartExAxisTitle, ChartExAxisUnit, ChartExAxisUnits, ChartExAxisUnitsLabel, ChartExBinning,
-    ChartExBinningChoice, ChartExChart, ChartExChartSpaceFormatting, ChartExChartTitle,
-    ChartExClosedSide, ChartExColorKind, ChartExColorPosition, ChartExDataLabel,
-    ChartExDataLabelPosition, ChartExDataLabelVisibility, ChartExDataLabels, ChartExDataPoint,
-    ChartExDataSet, ChartExDimension, ChartExDocument, ChartExDoubleOrAutomatic,
-    ChartExDrawingPayload, ChartExElementVisibility, ChartExExternalData,
-    ChartExExternalDataTarget, ChartExFormatOverride, ChartExFormula, ChartExFormulaDirection,
-    ChartExGeoAddress, ChartExGeoCache, ChartExGeoCacheEntry, ChartExGeoChildEntitiesQuery,
-    ChartExGeoChildEntitiesQueryResult, ChartExGeoClear, ChartExGeoData, ChartExGeoDataEntityQuery,
-    ChartExGeoDataEntityQueryResult, ChartExGeoDataPointQuery, ChartExGeoDataPointToEntityQuery,
-    ChartExGeoDataPointToEntityQueryResult, ChartExGeoEntity, ChartExGeoEntityType,
-    ChartExGeoHierarchyEntity, ChartExGeoLocation, ChartExGeoLocationQuery,
-    ChartExGeoLocationQueryResult, ChartExGeoMappingLevel, ChartExGeoParentEntitiesQueryResult,
-    ChartExGeoPolygon, ChartExGeoProjection, ChartExGeography, ChartExGridlines,
-    ChartExHeaderFooter, ChartExInfo, ChartExLayoutProperties, ChartExLegend, ChartExNumberFormat,
-    ChartExNumericDimensionType, ChartExNumericLevel, ChartExNumericPoint, ChartExOffset,
-    ChartExPageMargins, ChartExPageOrientation, ChartExPageSetup, ChartExParentLabelLayout,
-    ChartExPart, ChartExPlotArea, ChartExPlotAreaRegion, ChartExPlotSurface,
-    ChartExPositionAlignment, ChartExPrintSettings, ChartExQuartileMethod,
-    ChartExRegionLabelLayout, ChartExSeriesDataReference, ChartExSeriesLayout, ChartExSidePosition,
-    ChartExSolidColor, ChartExStringDimensionType, ChartExStringLevel, ChartExStringPoint,
-    ChartExText, ChartExTickLabels, ChartExTickMarkType, ChartExTickMarks,
-    ChartExValueColorPositions, ChartExValueColors, ChartSeries, ChartStyleColor,
-    ChartStyleColorKind, ChartStyleColorTransform, ChartStyleColorTransformKind,
-    ChartStyleColorValue, ChartStyleDocument, ChartStyleEntry, ChartStyleEntryKind,
-    ChartStyleFontIndex, ChartStyleFontReference, ChartStyleInfo, ChartStyleMarkerLayout,
-    ChartStyleMarkerSymbol, ChartStylePart, ChartStylePayload, ChartStyleReference,
-    ChartStyleVariation, ChartType,
-};
-pub use parts::{
-    MasterVisibility, NotesSize, PhotoAlbumFrame, PhotoAlbumLayout, PresentationConformance,
-    PresentationCustomerDataList, PresentationDefaultTextStyle, PresentationKinsokuSettings,
-    PresentationMetadata, PresentationModificationVerifier, PresentationPhotoAlbum,
-    SlideHeaderFooterVisibility, SlideLayoutMetadata, SlideLayoutReference, SlideMasterTextStyle,
-    SlideMasterTextStyles, SlideSize,
-};
-pub use presentation::{Chart, Presentation};
 pub use presentation_properties::{
     BrowserSupport, Color, ColorKind, Extension, HtmlPublish, HtmlTarget, OpaqueExtension, Print,
     PrintColorMode, PrintOutput, Properties, Show, ShowExtension, ShowMode, SlideSelection, Web,
@@ -218,7 +168,6 @@ pub use sections::{Section, SectionList};
 pub use show_events::{
     Event, EventDraft, EventKind, SHOW_EVENT_EXTENSION_URI, store_slide_show_events,
 };
-pub use slide::{Slide, SlideLayout, SlideMaster};
 pub use slide_sync::{
     SLIDE_SYNC_CONTENT_TYPE, SLIDE_SYNC_RELATIONSHIP_TYPE, SlideSyncDateTime, SlideSyncOffset,
     SlideSyncProperties, SlideSyncPropertiesPart, load_slide_sync_properties,
@@ -237,4 +186,3 @@ pub use view_properties::{
     OutlineView, Point, Ratio, RestoredPane, SimpleView, SlideLikeView, SorterView, SplitterState,
     ViewKind, ViewProperties, load_from_package as load_view_properties,
 };
-pub use writer::{MutablePresentation, MutableShape, MutableSlide};

@@ -6,8 +6,6 @@ pub mod chart;
 pub mod chart_ex;
 pub mod chart_ex_style;
 pub mod comment;
-pub mod presentation;
-pub mod slide;
 pub mod theme;
 
 pub use chart::{
@@ -51,15 +49,5 @@ pub use chart_ex_style::{
 pub use comment::{
     Comment, CommentAuthor, CommentAuthorsPart, CommentsPart, generate_comment_authors_xml,
     generate_comments_xml,
-};
-pub use presentation::{
-    NotesSize, PhotoAlbumFrame, PhotoAlbumLayout, PresentationConformance,
-    PresentationCustomerDataList, PresentationDefaultTextStyle, PresentationKinsokuSettings,
-    PresentationMetadata, PresentationModificationVerifier, PresentationPart,
-    PresentationPhotoAlbum, SlideSize,
-};
-pub use slide::{
-    MasterVisibility, SlideHeaderFooterVisibility, SlideLayoutMetadata, SlideLayoutPart,
-    SlideLayoutReference, SlideMasterPart, SlideMasterTextStyle, SlideMasterTextStyles, SlidePart,
 };
 pub use theme::{Theme, ThemeColor, ThemeFont, ThemePart};
