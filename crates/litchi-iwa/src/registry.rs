@@ -3,74 +3,9 @@
 //! iWork applications use integer type IDs to identify different protobuf message types.
 //! This registry provides mappings from type IDs to message names for different applications.
 
+use crate::application::Application;
 use once_cell::sync::Lazy;
-use std::{collections::HashMap, fmt, str::FromStr};
-
-/// Application type for iWork documents
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Application {
-    /// Apple Pages
-    Pages,
-    /// Apple Keynote
-    Keynote,
-    /// Apple Numbers
-    Numbers,
-    /// Common/shared types
-    Common,
-}
-
-impl Application {
-    /// Return the stable lowercase name used by configuration and diagnostics.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Pages => "pages",
-            Self::Keynote => "keynote",
-            Self::Numbers => "numbers",
-            Self::Common => "common",
-        }
-    }
-
-    /// Return whether this is one of the three concrete iWork applications.
-    pub const fn is_concrete(self) -> bool {
-        !matches!(self, Self::Common)
-    }
-}
-
-impl fmt::Display for Application {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(self.as_str())
-    }
-}
-
-/// Error returned when a string does not name a supported iWork application.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ApplicationParseError;
-
-impl fmt::Display for ApplicationParseError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("unknown iWork application")
-    }
-}
-
-impl std::error::Error for ApplicationParseError {}
-
-impl FromStr for Application {
-    type Err = ApplicationParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.eq_ignore_ascii_case("pages") {
-            Ok(Self::Pages)
-        } else if s.eq_ignore_ascii_case("keynote") {
-            Ok(Self::Keynote)
-        } else if s.eq_ignore_ascii_case("numbers") {
-            Ok(Self::Numbers)
-        } else if s.eq_ignore_ascii_case("common") {
-            Ok(Self::Common)
-        } else {
-            Err(ApplicationParseError)
-        }
-    }
-}
+use std::{collections::HashMap, fmt};
 
 /// Error returned when a numeric message ID has more than one definition in
 /// the requested registry scope.
@@ -441,6 +376,8 @@ pub fn detect_application(message_type_ids: &[u32]) -> Option<Application> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::application::ParseError;
+    use std::str::FromStr;
 
     #[test]
     fn test_message_type_lookup() {
@@ -553,7 +490,7 @@ mod tests {
         assert_eq!(Application::from_str("Pages"), Ok(Application::Pages));
         assert_eq!(Application::from_str("keynote"), Ok(Application::Keynote));
         assert_eq!(Application::from_str("numbers"), Ok(Application::Numbers));
-        assert_eq!(Application::from_str("unknown"), Err(ApplicationParseError));
+        assert_eq!(Application::from_str("unknown"), Err(ParseError));
         assert_eq!(Application::Pages.as_str(), "pages");
         assert_eq!(Application::Pages.to_string(), "pages");
         assert!(Application::Pages.is_concrete());

@@ -10,6 +10,7 @@ use litchi_iwa_common::comment::{
 };
 use prost::Message;
 
+use crate::application::Application;
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::detect::detect_application_from_document;
 use crate::package_metadata::{
@@ -18,7 +19,6 @@ use crate::package_metadata::{
     remove_component_external_references_to_object, set_package_last_object_identifier,
 };
 use crate::protobuf::{kn, tn, tp, tsch, tsd, tsk, tsp, tst, tswp};
-use crate::registry::Application;
 #[cfg(test)]
 use crate::wire::parse_wire_fields;
 use crate::wire::{

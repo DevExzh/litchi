@@ -8,11 +8,11 @@ use std::sync::Arc;
 
 use prost::Message;
 
+use crate::application::Application;
 use crate::bundle::{Bundle, BundleLimits};
 use crate::object_index::ObjectIndex;
 use crate::protobuf::{tp, tswp};
 use crate::ref_graph::ObjectId;
-use crate::registry::Application;
 use crate::text::{TextExtractor, TextStorage};
 use crate::{Error, Result};
 

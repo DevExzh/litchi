@@ -129,6 +129,8 @@ use std::sync::Arc;
 
 // Core parsing modules
 mod archive;
+/// Semantic iWork application families.
+pub mod application;
 pub mod bundle;
 /// Typed native drawable stacking-order controls.
 pub mod drawable_order;
@@ -143,7 +145,8 @@ mod package;
 mod package_metadata;
 mod protobuf;
 pub mod ref_graph;
-pub mod registry;
+#[cfg(test)]
+mod registry;
 mod snappy;
 mod structured;
 /// Typed copy-on-write appearance controls shared by Pages, Numbers, and Keynote.

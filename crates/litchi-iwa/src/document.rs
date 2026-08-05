@@ -17,13 +17,13 @@ use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 
+use crate::application::Application;
 use crate::bundle::{Bundle, BundleLimits};
 use crate::detect::detect_application_from_document;
 use crate::media::{MediaLimits, MediaManager, MediaStats};
 use crate::object_index::{ObjectIndex, ResolvedObject, ResolvedObjectRef};
 use crate::package::PackageLimits;
 use crate::ref_graph::ObjectId;
-use crate::registry::Application;
 use crate::structured::{self, StructuredData};
 use crate::text::TextExtractor;
 use crate::{Error, Result};

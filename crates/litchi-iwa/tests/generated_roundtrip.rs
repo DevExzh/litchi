@@ -10,12 +10,12 @@ use std::io::Cursor;
 use std::path::Path;
 use std::sync::Arc;
 
+use litchi_iwa::application::Application;
 use litchi_iwa::Document;
 use litchi_iwa::detect::{self, Format};
 use litchi_iwa::keynote::{KeynoteDocument, KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::numbers::{NumbersDocument, NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::{PagesDocument, PagesEditor};
-use litchi_iwa::registry::Application;
 use tempfile::tempdir;
 
 fn assert_send_sync<T: Send + Sync>() {}

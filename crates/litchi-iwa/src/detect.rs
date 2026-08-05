@@ -4,8 +4,8 @@
 //! It inspects only the root archive envelope, not document content, and does
 //! not expose the ZIP implementation.
 
+use crate::application::Application;
 use crate::archive::Archive;
-use crate::registry::Application;
 use crate::snappy::SnappyStream;
 use crate::zip_utils::{is_encrypted_iwork_archive, nested_index_zip_name};
 use soapberry_zip::office::{ArchiveLimits, ArchiveReader};

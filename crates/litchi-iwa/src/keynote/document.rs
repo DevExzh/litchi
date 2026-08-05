@@ -5,10 +5,10 @@
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
+use crate::application::Application;
 use crate::bundle::{Bundle, BundleLimits};
 use crate::detect::detect_application_from_document;
 use crate::object_index::ObjectIndex;
-use crate::registry::Application;
 use crate::text::TextExtractor;
 use crate::{Error, Result};
 use litchi_keynote::{AnimationType, Build, Document, Effect, Seconds, Show, Slide, Transition};
