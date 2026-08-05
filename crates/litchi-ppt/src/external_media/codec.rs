@@ -1,28 +1,21 @@
-//! Strict, inert legacy PowerPoint external-media metadata.
+//! Record codecs for strict, inert legacy PowerPoint external-media metadata.
 
-use super::hyperlink::Hyperlinks;
-use super::package::{PptError, Result};
-use super::records::PptRecord;
-use super::sound_collection::PowerPointSoundCollection;
+use super::model::{
+    CdAudio, CdTime, Collection, EmbeddedWav, LinkedAudio, LinkedAudioKind, Media, Movie,
+    MovieKind, Object, UnknownRecord, Video,
+};
 use crate::consts::PptRecordType;
+use crate::hyperlink::Hyperlinks;
+use crate::package::{PptError, Result};
+use crate::records::PptRecord;
+use crate::sound_collection::PowerPointSoundCollection;
 use std::collections::HashSet;
 
-const MEDIA_FLAGS_MASK: u16 = 0x0007;
-const MAX_PATH_UNITS: usize = 32_768;
-const MAX_EXTERNAL_MEDIA_OBJECTS: usize = 4_096;
+pub(crate) const MEDIA_FLAGS_MASK: u16 = 0x0007;
+pub(crate) const MAX_PATH_UNITS: usize = 32_768;
+pub(crate) const MAX_EXTERNAL_MEDIA_OBJECTS: usize = 4_096;
 
-/// The common eight-byte payload in an `ExMediaAtom`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PowerPointExternalMedia {
-    pub id: u32,
-    pub loop_playback: bool,
-    pub rewind_after_playing: bool,
-    pub narration: bool,
-    /// Undefined source bytes preserved for record roundtrips.
-    pub unused: [u8; 2],
-}
-
-impl PowerPointExternalMedia {
+impl Media {
     pub fn parse(record: &PptRecord) -> Result<Self> {
         if record.version != 0
             || record.instance != 0
@@ -70,15 +63,7 @@ impl PowerPointExternalMedia {
     }
 }
 
-/// The shared `ExVideoContainer` nested by AVI and MCI movie records.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PowerPointExternalVideo {
-    pub media: PowerPointExternalMedia,
-    /// An inert UNC or local path. Parsing never accesses this path.
-    pub path: Option<String>,
-}
-
-impl PowerPointExternalVideo {
+impl Video {
     pub fn parse(record: &PptRecord) -> Result<Self> {
         if record.version != 0x0f
             || record.instance != 0
@@ -90,7 +75,7 @@ impl PowerPointExternalVideo {
         if !(1..=2).contains(&children.len()) {
             return corrupted("ExVideoContainer must contain media and optional path atoms");
         }
-        let media = PowerPointExternalMedia::parse(&children[0])?;
+        let media = Media::parse(&children[0])?;
         if media.narration {
             return corrupted("video ExMediaAtom cannot have the narration flag set");
         }
@@ -119,14 +104,7 @@ impl PowerPointExternalVideo {
     }
 }
 
-/// The external movie container family that selects an AVI or MCI player.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PowerPointExternalMovieKind {
-    Avi,
-    Mci,
-}
-
-impl PowerPointExternalMovieKind {
+impl MovieKind {
     fn record_type(self) -> PptRecordType {
         match self {
             Self::Avi => PptRecordType::ExternalAviMovie,
@@ -143,26 +121,19 @@ impl PowerPointExternalMovieKind {
     }
 }
 
-/// A validated `ExAviMovieContainer` or `ExMCIMovieContainer`.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PowerPointExternalMovie {
-    pub kind: PowerPointExternalMovieKind,
-    pub video: PowerPointExternalVideo,
-}
-
-impl PowerPointExternalMovie {
+impl Movie {
     pub fn parse(record: &PptRecord) -> Result<Self> {
         if record.version != 0x0f || record.instance != 0 {
             return corrupted("external movie container has an invalid header");
         }
-        let kind = PowerPointExternalMovieKind::from_record_type(record.record_type_raw)?;
+        let kind = MovieKind::from_record_type(record.record_type_raw)?;
         let children = PptRecord::parse_sequence_strict(&record.data, "external movie container")?;
         if children.len() != 1 {
             return corrupted("external movie container must contain exactly one ExVideoContainer");
         }
         Ok(Self {
             kind,
-            video: PowerPointExternalVideo::parse(&children[0])?,
+            video: Video::parse(&children[0])?,
         })
     }
 
@@ -180,14 +151,7 @@ impl PowerPointExternalMovie {
     }
 }
 
-/// The linked external-audio container family.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PowerPointLinkedAudioKind {
-    Midi,
-    Wav,
-}
-
-impl PowerPointLinkedAudioKind {
+impl LinkedAudioKind {
     fn record_type(self) -> PptRecordType {
         match self {
             Self::Midi => PptRecordType::ExternalMidiAudio,
@@ -204,28 +168,19 @@ impl PowerPointLinkedAudioKind {
     }
 }
 
-/// A validated `ExMIDIAudioContainer` or `ExWAVAudioLinkContainer`.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PowerPointLinkedAudio {
-    pub kind: PowerPointLinkedAudioKind,
-    pub media: PowerPointExternalMedia,
-    /// An inert UNC or local path. Parsing never accesses this path.
-    pub path: Option<String>,
-}
-
-impl PowerPointLinkedAudio {
+impl LinkedAudio {
     pub fn parse(record: &PptRecord) -> Result<Self> {
         if record.version != 0x0f || record.instance != 0 {
             return corrupted("linked audio container has an invalid header");
         }
-        let kind = PowerPointLinkedAudioKind::from_record_type(record.record_type_raw)?;
+        let kind = LinkedAudioKind::from_record_type(record.record_type_raw)?;
         let children = PptRecord::parse_sequence_strict(&record.data, "linked audio container")?;
         if !(1..=2).contains(&children.len()) {
             return corrupted("linked audio container must contain media and optional path atoms");
         }
         Ok(Self {
             kind,
-            media: PowerPointExternalMedia::parse(&children[0])?,
+            media: Media::parse(&children[0])?,
             path: children.get(1).map(parse_path).transpose()?,
         })
     }
@@ -248,16 +203,7 @@ impl PowerPointLinkedAudio {
     }
 }
 
-/// A validated `ExWAVAudioEmbeddedContainer`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PowerPointEmbeddedWav {
-    pub media: PowerPointExternalMedia,
-    /// A null reference is represented by `None`.
-    pub sound_id: Option<u32>,
-    pub duration_ms: u32,
-}
-
-impl PowerPointEmbeddedWav {
+impl EmbeddedWav {
     pub fn parse(record: &PptRecord) -> Result<Self> {
         if record.version != 0x0f
             || record.instance != 0
@@ -272,7 +218,7 @@ impl PowerPointEmbeddedWav {
                 "ExWAVAudioEmbeddedContainer must contain media and embedded-audio atoms",
             );
         }
-        let media = PowerPointExternalMedia::parse(&children[0])?;
+        let media = Media::parse(&children[0])?;
         let atom = &children[1];
         if atom.version != 1
             || atom.instance != 1
@@ -330,16 +276,7 @@ impl PowerPointEmbeddedWav {
     }
 }
 
-/// One audio or video definition from the document `ExObjListContainer`.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum PowerPointExternalMediaObject {
-    Movie(PowerPointExternalMovie),
-    LinkedAudio(PowerPointLinkedAudio),
-    CdAudio(PowerPointCdAudio),
-    EmbeddedWav(PowerPointEmbeddedWav),
-}
-
-impl PowerPointExternalMediaObject {
+impl Object {
     pub fn id(&self) -> u32 {
         match self {
             Self::Movie(value) => value.video.media.id,
@@ -350,14 +287,7 @@ impl PowerPointExternalMediaObject {
     }
 }
 
-/// Strict audio/video definitions discovered in a document external-object list.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PowerPointExternalMediaCollection {
-    pub id_seed: u32,
-    pub objects: Vec<PowerPointExternalMediaObject>,
-}
-
-impl PowerPointExternalMediaCollection {
+impl Collection {
     /// Discover the single `ExObjListContainer`, if present.
     pub fn parse(root: &PptRecord) -> Result<Option<Self>> {
         let mut lists = Vec::new();
@@ -406,25 +336,23 @@ impl PowerPointExternalMediaCollection {
         let id_seed = signed_seed as u32;
         let mut ids = HashSet::new();
         let mut objects = Vec::new();
+        let mut unknown_records = Vec::new();
         for child in &children[1..] {
             let object = match child.record_type {
-                PptRecordType::ExternalAviMovie | PptRecordType::ExternalMciMovie => Some(
-                    PowerPointExternalMediaObject::Movie(PowerPointExternalMovie::parse(child)?),
-                ),
+                PptRecordType::ExternalAviMovie | PptRecordType::ExternalMciMovie => {
+                    Some(Object::Movie(Movie::parse(child)?))
+                },
                 PptRecordType::ExternalMidiAudio | PptRecordType::ExternalWavAudioLink => {
-                    Some(PowerPointExternalMediaObject::LinkedAudio(
-                        PowerPointLinkedAudio::parse(child)?,
-                    ))
+                    Some(Object::LinkedAudio(LinkedAudio::parse(child)?))
                 },
-                PptRecordType::ExternalCdAudio => Some(PowerPointExternalMediaObject::CdAudio(
-                    PowerPointCdAudio::parse(child)?,
-                )),
+                PptRecordType::ExternalCdAudio => Some(Object::CdAudio(CdAudio::parse(child)?)),
                 PptRecordType::ExternalWavAudioEmbedded => {
-                    Some(PowerPointExternalMediaObject::EmbeddedWav(
-                        PowerPointEmbeddedWav::parse(child)?,
-                    ))
+                    Some(Object::EmbeddedWav(EmbeddedWav::parse(child)?))
                 },
-                _ => None,
+                _ => {
+                    unknown_records.push(UnknownRecord::from_record(child, objects.len()));
+                    None
+                },
             };
             let Some(object) = object else { continue };
             if objects.len() >= MAX_EXTERNAL_MEDIA_OBJECTS {
@@ -445,11 +373,20 @@ impl PowerPointExternalMediaCollection {
             }
             objects.push(object);
         }
-        Ok(Self { id_seed, objects })
+        Ok(Self {
+            id_seed,
+            objects,
+            unknown_records,
+        })
     }
 
-    pub fn get(&self, id: u32) -> Option<&PowerPointExternalMediaObject> {
+    pub fn get(&self, id: u32) -> Option<&Object> {
         self.objects.iter().find(|object| object.id() == id)
+    }
+
+    /// Unmodeled `ExObjList` children retained in source order.
+    pub fn unknown_records(&self) -> &[UnknownRecord] {
+        &self.unknown_records
     }
 
     /// Validate every non-null embedded WAV reference without decoding sound data.
@@ -458,7 +395,7 @@ impl PowerPointExternalMediaCollection {
         sounds: Option<&PowerPointSoundCollection<'_>>,
     ) -> Result<()> {
         for object in &self.objects {
-            let PowerPointExternalMediaObject::EmbeddedWav(value) = object else {
+            let Object::EmbeddedWav(value) = object else {
                 continue;
             };
             if value.sound_id.is_some() {
@@ -472,6 +409,45 @@ impl PowerPointExternalMediaCollection {
             }
         }
         Ok(())
+    }
+}
+
+impl UnknownRecord {
+    /// The original raw record type value.
+    pub fn record_type(&self) -> u16 {
+        self.record.record_type_raw
+    }
+
+    /// The original record version.
+    pub fn version(&self) -> u16 {
+        self.record.version
+    }
+
+    /// The original record instance.
+    pub fn instance(&self) -> u16 {
+        self.record.instance
+    }
+
+    /// The original record payload, borrowed from this collection snapshot.
+    pub fn data(&self) -> &[u8] {
+        &self.record.data
+    }
+
+    /// Reconstruct the exact header and payload retained by this record.
+    pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
+        record_bytes(
+            self.record.version,
+            self.record.instance,
+            self.record.record_type_raw,
+            &self.record.data,
+        )
+    }
+
+    pub(crate) fn from_record(record: &PptRecord, object_index: usize) -> Self {
+        Self {
+            record: record.clone(),
+            object_index,
+        }
     }
 }
 
@@ -518,16 +494,7 @@ fn encode_path(path: &str) -> Result<Vec<u8>> {
     Ok(units.into_iter().flat_map(u16::to_le_bytes).collect())
 }
 
-/// CD audio time in track/minute/second/frame form.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct PowerPointCdTime {
-    pub track: u8,
-    pub minute: u8,
-    pub second: u8,
-    pub frame: u8,
-}
-
-impl PowerPointCdTime {
+impl CdTime {
     pub fn new(track: u8, minute: u8, second: u8, frame: u8) -> Result<Self> {
         let value = Self {
             track,
@@ -559,15 +526,7 @@ impl PowerPointCdTime {
     }
 }
 
-/// A validated `ExCDAudioContainer`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PowerPointCdAudio {
-    pub media: PowerPointExternalMedia,
-    pub start: PowerPointCdTime,
-    pub end: PowerPointCdTime,
-}
-
-impl PowerPointCdAudio {
+impl CdAudio {
     pub fn parse(record: &PptRecord) -> Result<Self> {
         if record.version != 0x0f
             || record.instance != 0
@@ -579,7 +538,7 @@ impl PowerPointCdAudio {
         if children.len() != 2 {
             return corrupted("ExCDAudioContainer must contain media and CD-audio atoms");
         }
-        let media = PowerPointExternalMedia::parse(&children[0])?;
+        let media = Media::parse(&children[0])?;
         let atom = &children[1];
         if atom.version != 0
             || atom.instance != 0
@@ -589,8 +548,8 @@ impl PowerPointCdAudio {
         {
             return corrupted("ExCDAudioAtom has an invalid header or size");
         }
-        let start = PowerPointCdTime::parse(&atom.data[..4])?;
-        let end = PowerPointCdTime::parse(&atom.data[4..])?;
+        let start = CdTime::parse(&atom.data[..4])?;
+        let end = CdTime::parse(&atom.data[4..])?;
         if start > end {
             return corrupted("ExCDAudioAtom start must not be later than end");
         }
@@ -621,7 +580,12 @@ impl PowerPointCdAudio {
     }
 }
 
-fn record_bytes(version: u16, instance: u16, record_type: u16, data: &[u8]) -> Result<Vec<u8>> {
+pub(crate) fn record_bytes(
+    version: u16,
+    instance: u16,
+    record_type: u16,
+    data: &[u8],
+) -> Result<Vec<u8>> {
     let length = u32::try_from(data.len())
         .map_err(|_| PptError::Corrupted("PowerPoint record payload exceeds u32".to_string()))?;
     let mut bytes = Vec::with_capacity(8usize.saturating_add(data.len()));
@@ -634,363 +598,4 @@ fn record_bytes(version: u16, instance: u16, record_type: u16, data: &[u8]) -> R
 
 fn corrupted<T>(message: impl Into<String>) -> Result<T> {
     Err(PptError::Corrupted(message.into()))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn cd_audio() -> PowerPointCdAudio {
-        PowerPointCdAudio {
-            media: PowerPointExternalMedia {
-                id: 17,
-                loop_playback: true,
-                rewind_after_playing: true,
-                narration: true,
-                unused: [0xaa, 0x55],
-            },
-            start: PowerPointCdTime::new(1, 2, 3, 4).unwrap(),
-            end: PowerPointCdTime::new(2, 0, 0, 0).unwrap(),
-        }
-    }
-
-    #[test]
-    fn protocol_shaped_cd_audio_roundtrips_losslessly() {
-        let expected = cd_audio();
-        let parsed = PowerPointCdAudio::parse(&expected.to_record().unwrap()).unwrap();
-        assert_eq!(parsed, expected);
-        assert_eq!(
-            parsed.to_record_bytes().unwrap(),
-            expected.to_record_bytes().unwrap()
-        );
-    }
-
-    #[test]
-    fn rejects_hostile_media_flags_times_order_and_headers() {
-        for components in [
-            (0, 0, 0, 0),
-            (101, 0, 0, 0),
-            (1, 61, 0, 0),
-            (1, 0, 60, 0),
-            (1, 0, 0, 74),
-        ] {
-            assert!(
-                PowerPointCdTime::new(components.0, components.1, components.2, components.3)
-                    .is_err()
-            );
-        }
-        let mut value = cd_audio();
-        value.end = PowerPointCdTime::new(1, 0, 0, 0).unwrap();
-        assert!(value.to_record_bytes().is_err());
-        let mut bytes = cd_audio().to_record_bytes().unwrap();
-        bytes[20] = 0x08;
-        let record = PptRecord::parse(&bytes, 0).unwrap().0;
-        assert!(PowerPointCdAudio::parse(&record).is_err());
-        bytes = cd_audio().to_record_bytes().unwrap();
-        bytes[0] = 0;
-        let record = PptRecord::parse(&bytes, 0).unwrap().0;
-        assert!(PowerPointCdAudio::parse(&record).is_err());
-    }
-
-    #[test]
-    fn external_video_roundtrips_optional_inert_paths() {
-        for path in [None, Some(r"\\server\share\movie.avi".to_string())] {
-            let expected = PowerPointExternalVideo {
-                media: PowerPointExternalMedia {
-                    id: 23,
-                    loop_playback: false,
-                    rewind_after_playing: true,
-                    narration: false,
-                    unused: [3, 4],
-                },
-                path,
-            };
-            let parsed = PowerPointExternalVideo::parse(&expected.to_record().unwrap()).unwrap();
-            assert_eq!(parsed, expected);
-        }
-    }
-
-    #[test]
-    fn external_video_rejects_narration_and_hostile_paths() {
-        let mut video = PowerPointExternalVideo {
-            media: cd_audio().media,
-            path: Some("movie.avi".into()),
-        };
-        assert!(video.to_record_bytes().is_err());
-        video.media.narration = false;
-        video.path = Some("bad\0path".into());
-        assert!(video.to_record_bytes().is_err());
-        video.path = Some("x".repeat(MAX_PATH_UNITS + 1));
-        assert!(video.to_record_bytes().is_err());
-    }
-
-    #[test]
-    fn avi_and_mci_movie_containers_roundtrip_canonically() {
-        for kind in [
-            PowerPointExternalMovieKind::Avi,
-            PowerPointExternalMovieKind::Mci,
-        ] {
-            let expected = PowerPointExternalMovie {
-                kind,
-                video: PowerPointExternalVideo {
-                    media: PowerPointExternalMedia {
-                        id: 41,
-                        loop_playback: true,
-                        rewind_after_playing: false,
-                        narration: false,
-                        unused: [0x12, 0x34],
-                    },
-                    path: Some(r"\\server\share\movie.avi".into()),
-                },
-            };
-            let parsed = PowerPointExternalMovie::parse(&expected.to_record().unwrap()).unwrap();
-            assert_eq!(parsed, expected);
-            assert_eq!(
-                parsed.to_record_bytes().unwrap(),
-                expected.to_record_bytes().unwrap()
-            );
-        }
-    }
-
-    #[test]
-    fn movie_containers_reject_wrong_headers_and_extra_children() {
-        let movie = PowerPointExternalMovie {
-            kind: PowerPointExternalMovieKind::Avi,
-            video: PowerPointExternalVideo {
-                media: PowerPointExternalMedia {
-                    id: 42,
-                    loop_playback: false,
-                    rewind_after_playing: false,
-                    narration: false,
-                    unused: [0, 0],
-                },
-                path: None,
-            },
-        };
-        let mut bytes = movie.to_record_bytes().unwrap();
-        bytes[0] = 0;
-        assert!(PowerPointExternalMovie::parse(&PptRecord::parse(&bytes, 0).unwrap().0).is_err());
-
-        let child = movie.video.to_record_bytes().unwrap();
-        let doubled = [child.as_slice(), child.as_slice()].concat();
-        let bytes =
-            record_bytes(0x0f, 0, PptRecordType::ExternalAviMovie.as_u16(), &doubled).unwrap();
-        assert!(PowerPointExternalMovie::parse(&PptRecord::parse(&bytes, 0).unwrap().0).is_err());
-    }
-
-    #[test]
-    fn midi_and_linked_wav_roundtrip_optional_inert_paths() {
-        for kind in [
-            PowerPointLinkedAudioKind::Midi,
-            PowerPointLinkedAudioKind::Wav,
-        ] {
-            let expected = PowerPointLinkedAudio {
-                kind,
-                media: cd_audio().media,
-                path: Some(r"C:\media\theme.mid".into()),
-            };
-            assert_eq!(
-                PowerPointLinkedAudio::parse(&expected.to_record().unwrap()).unwrap(),
-                expected
-            );
-        }
-    }
-
-    #[test]
-    fn linked_audio_rejects_misplaced_children_and_hostile_paths() {
-        let mut audio = PowerPointLinkedAudio {
-            kind: PowerPointLinkedAudioKind::Wav,
-            media: cd_audio().media,
-            path: Some("bad\0path".into()),
-        };
-        assert!(audio.to_record_bytes().is_err());
-        audio.path = None;
-        let child = audio.media.to_record_bytes().unwrap();
-        let payload = [child.as_slice(), child.as_slice()].concat();
-        let bytes = record_bytes(
-            0x0f,
-            0,
-            PptRecordType::ExternalWavAudioLink.as_u16(),
-            &payload,
-        )
-        .unwrap();
-        assert!(PowerPointLinkedAudio::parse(&PptRecord::parse(&bytes, 0).unwrap().0).is_err());
-    }
-
-    #[test]
-    fn embedded_wav_roundtrips_nullable_sound_reference() {
-        for sound_id in [None, Some(7)] {
-            let expected = PowerPointEmbeddedWav {
-                media: cd_audio().media,
-                sound_id,
-                duration_ms: 90_000,
-            };
-            assert_eq!(
-                PowerPointEmbeddedWav::parse(&expected.to_record().unwrap()).unwrap(),
-                expected
-            );
-        }
-    }
-
-    #[test]
-    fn embedded_wav_rejects_negative_or_overflowing_duration() {
-        let value = PowerPointEmbeddedWav {
-            media: cd_audio().media,
-            sound_id: Some(1),
-            duration_ms: i32::MAX as u32 + 1,
-        };
-        assert!(value.to_record_bytes().is_err());
-
-        let mut bytes = PowerPointEmbeddedWav {
-            duration_ms: 1,
-            ..value
-        }
-        .to_record_bytes()
-        .unwrap();
-        let duration_offset = 8 + 16 + 8 + 4;
-        bytes[duration_offset..duration_offset + 4].copy_from_slice(&(-1i32).to_le_bytes());
-        assert!(PowerPointEmbeddedWav::parse(&PptRecord::parse(&bytes, 0).unwrap().0).is_err());
-    }
-
-    fn external_object_list(seed: i32, objects: &[Vec<u8>]) -> PptRecord {
-        let mut payload = record_bytes(
-            0,
-            0,
-            PptRecordType::ExObjListAtom.as_u16(),
-            &seed.to_le_bytes(),
-        )
-        .unwrap();
-        for object in objects {
-            payload.extend_from_slice(object);
-        }
-        let bytes = record_bytes(0x0f, 0, PptRecordType::ExObjList.as_u16(), &payload).unwrap();
-        PptRecord::parse(&bytes, 0).unwrap().0
-    }
-
-    fn hyperlink(id: u32) -> Vec<u8> {
-        let unicode = |value: &str| {
-            value
-                .encode_utf16()
-                .flat_map(u16::to_le_bytes)
-                .collect::<Vec<_>>()
-        };
-        let mut payload = record_bytes(
-            0,
-            0,
-            PptRecordType::ExternalHyperlinkAtom.as_u16(),
-            &id.to_le_bytes(),
-        )
-        .unwrap();
-        payload.extend(
-            record_bytes(
-                0,
-                0,
-                PptRecordType::CString.as_u16(),
-                &unicode("Media link"),
-            )
-            .unwrap(),
-        );
-        payload.extend(
-            record_bytes(
-                0,
-                1,
-                PptRecordType::CString.as_u16(),
-                &unicode("https://example.test"),
-            )
-            .unwrap(),
-        );
-        payload.extend(
-            record_bytes(0, 3, PptRecordType::CString.as_u16(), &unicode("slide")).unwrap(),
-        );
-        record_bytes(0x0f, 0, PptRecordType::ExternalHyperlink.as_u16(), &payload).unwrap()
-    }
-
-    #[test]
-    fn media_collection_discovers_typed_objects_and_resolves_ids() {
-        let movie = PowerPointExternalMovie {
-            kind: PowerPointExternalMovieKind::Mci,
-            video: PowerPointExternalVideo {
-                media: PowerPointExternalMedia {
-                    id: 3,
-                    loop_playback: false,
-                    rewind_after_playing: false,
-                    narration: false,
-                    unused: [0, 0],
-                },
-                path: None,
-            },
-        };
-        let audio = PowerPointLinkedAudio {
-            kind: PowerPointLinkedAudioKind::Midi,
-            media: PowerPointExternalMedia {
-                id: 7,
-                ..cd_audio().media
-            },
-            path: Some("theme.mid".into()),
-        };
-        let root = external_object_list(
-            7,
-            &[
-                movie.to_record_bytes().unwrap(),
-                audio.to_record_bytes().unwrap(),
-            ],
-        );
-        let parsed = PowerPointExternalMediaCollection::parse(&root)
-            .unwrap()
-            .unwrap();
-        assert_eq!(parsed.id_seed, 7);
-        assert_eq!(parsed.objects.len(), 2);
-        assert!(parsed.get(3).is_some());
-        assert!(parsed.get(7).is_some());
-    }
-
-    #[test]
-    fn media_collection_rejects_duplicate_ids_and_low_seed() {
-        let first = PowerPointLinkedAudio {
-            kind: PowerPointLinkedAudioKind::Midi,
-            media: PowerPointExternalMedia {
-                id: 9,
-                ..cd_audio().media
-            },
-            path: None,
-        }
-        .to_record_bytes()
-        .unwrap();
-        let second = PowerPointLinkedAudio {
-            kind: PowerPointLinkedAudioKind::Wav,
-            media: PowerPointExternalMedia {
-                id: 9,
-                ..cd_audio().media
-            },
-            path: None,
-        }
-        .to_record_bytes()
-        .unwrap();
-        assert!(
-            PowerPointExternalMediaCollection::parse(&external_object_list(
-                9,
-                &[first.clone(), second]
-            ))
-            .is_err()
-        );
-        assert!(
-            PowerPointExternalMediaCollection::parse(&external_object_list(8, &[first])).is_err()
-        );
-    }
-
-    #[test]
-    fn media_collection_rejects_cross_family_hyperlink_id_collisions() {
-        let media = PowerPointLinkedAudio {
-            kind: PowerPointLinkedAudioKind::Midi,
-            media: PowerPointExternalMedia {
-                id: 11,
-                ..cd_audio().media
-            },
-            path: None,
-        }
-        .to_record_bytes()
-        .unwrap();
-        let root = external_object_list(11, &[media, hyperlink(11)]);
-        assert!(PowerPointExternalMediaCollection::parse(&root).is_err());
-    }
 }

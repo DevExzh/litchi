@@ -1,8 +1,8 @@
 //! Strict PowerPoint shape references to inert external objects.
 
 use crate::consts::PptRecordType;
-use crate::embedded::object::{Collection, ExternalObject};
-use crate::external_media::{PowerPointExternalMediaCollection, PowerPointExternalMediaObject};
+use crate::embedded::object::{Collection as OleCollection, ExternalObject};
+use crate::external_media::{Collection as MediaCollection, Object};
 use crate::package::{PptError, Result};
 use crate::records::PptRecord;
 
@@ -13,7 +13,7 @@ pub struct Reference {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Target<'a> {
-    Media(&'a PowerPointExternalMediaObject),
+    Media(&'a Object),
     Ole(&'a ExternalObject),
 }
 
@@ -69,8 +69,8 @@ impl Reference {
 
     pub fn resolve<'a>(
         &self,
-        media: Option<&'a PowerPointExternalMediaCollection>,
-        ole: Option<&'a Collection>,
+        media: Option<&'a MediaCollection>,
+        ole: Option<&'a OleCollection>,
     ) -> Result<Target<'a>> {
         let media = media.and_then(|values| values.get(self.id));
         let ole = ole.and_then(|values| values.get(self.id));
@@ -96,7 +96,7 @@ fn corrupted<T>(message: impl Into<String>) -> Result<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{PowerPointExternalMedia, PowerPointLinkedAudio, PowerPointLinkedAudioKind};
+    use crate::{LinkedAudio, LinkedAudioKind, Media};
 
     #[test]
     fn external_object_reference_roundtrips_exactly() {
@@ -119,21 +119,20 @@ mod tests {
 
     #[test]
     fn resolver_returns_inert_media_and_rejects_missing_ids() {
-        let media = PowerPointExternalMediaCollection {
+        let media = MediaCollection {
             id_seed: 5,
-            objects: vec![PowerPointExternalMediaObject::LinkedAudio(
-                PowerPointLinkedAudio {
-                    kind: PowerPointLinkedAudioKind::Wav,
-                    media: PowerPointExternalMedia {
-                        id: 5,
-                        loop_playback: false,
-                        rewind_after_playing: false,
-                        narration: false,
-                        unused: [0, 0],
-                    },
-                    path: Some("sound.wav".into()),
+            objects: vec![Object::LinkedAudio(LinkedAudio {
+                kind: LinkedAudioKind::Wav,
+                media: Media {
+                    id: 5,
+                    loop_playback: false,
+                    rewind_after_playing: false,
+                    narration: false,
+                    unused: [0, 0],
                 },
-            )],
+                path: Some("sound.wav".into()),
+            })],
+            unknown_records: Vec::new(),
         };
         assert!(matches!(
             Reference::new(5)

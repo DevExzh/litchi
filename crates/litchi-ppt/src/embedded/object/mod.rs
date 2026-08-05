@@ -4,7 +4,7 @@
 //! server, follows a link, or executes object content.
 
 use crate::consts::PptRecordType;
-use crate::external_media::PowerPointExternalMediaCollection;
+use crate::external_media::Collection as MediaCollection;
 use crate::hyperlink::Hyperlinks;
 use crate::package::{PptError, Result};
 use crate::persist::PersistMapping;
@@ -682,7 +682,7 @@ impl Collection {
             objects.push(object);
         }
 
-        if let Some(media) = PowerPointExternalMediaCollection::parse(root)?
+        if let Some(media) = MediaCollection::parse(root)?
             && objects
                 .iter()
                 .any(|object| media.get(object.id()).is_some())

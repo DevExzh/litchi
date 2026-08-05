@@ -1,9 +1,9 @@
 use super::document_properties::PowerPoint12DocumentProperties;
-use super::embedded::object::Collection;
+use super::embedded::object::Collection as OleCollection;
 use super::embedded::storage::{Kind as StorageKind, Ref as StorageRef, Storage};
 use super::encryption::decrypt_pictures;
 use super::encryption::decrypt_powerpoint_document;
-use super::external_media::PowerPointExternalMediaCollection;
+use super::external_media::Collection as MediaCollection;
 use super::header_footer::{
     PowerPointHeaderFooterDisplayText, PowerPointHeaderFooterParent,
     PowerPointHeaderFooterParentOrdinal, PowerPointHeaderFooterScope, PowerPointHeaderFooters,
@@ -475,7 +475,7 @@ impl Presentation {
     /// Return strictly validated inert audio/video metadata from `ExObjListContainer`.
     ///
     /// Paths are never accessed and embedded sound bytes are never decoded or played.
-    pub fn external_media(&self) -> Result<Option<PowerPointExternalMediaCollection>> {
+    pub fn external_media(&self) -> Result<Option<MediaCollection>> {
         let records = self.parser.find_records_ref();
         let mut documents = records
             .into_iter()
@@ -488,10 +488,10 @@ impl Presentation {
                 "PowerPoint document has multiple Document containers".to_string(),
             ));
         }
-        let Some(media) = PowerPointExternalMediaCollection::parse(document)? else {
+        let Some(media) = MediaCollection::parse(document)? else {
             return Ok(None);
         };
-        let _ = Collection::parse(document)?;
+        let _ = OleCollection::parse(document)?;
         let sounds = self.embedded_sounds()?;
         media.validate_sound_collection(sounds.as_ref())?;
         Ok(Some(media))
@@ -506,7 +506,7 @@ impl Presentation {
     }
 
     /// Return inert embedded and linked OLE metadata without loading object storage.
-    pub fn ole_objects(&self) -> Result<Option<Collection>> {
+    pub fn ole_objects(&self) -> Result<Option<OleCollection>> {
         let records = self.parser.find_records_ref();
         let mut documents = records
             .into_iter()
@@ -519,7 +519,7 @@ impl Presentation {
                 "PowerPoint document has multiple Document containers".to_string(),
             ));
         }
-        let Some(objects) = Collection::parse(document)? else {
+        let Some(objects) = OleCollection::parse(document)? else {
             return Ok(None);
         };
         objects.validate_persist_mapping(&self.persist_mapping)?;

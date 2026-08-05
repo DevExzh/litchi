@@ -226,10 +226,8 @@ pub use envelope_data::{
 };
 pub use escher_textbox::EscherTextboxWrapper;
 pub use external_media::{
-    PowerPointCdAudio, PowerPointCdTime, PowerPointEmbeddedWav, PowerPointExternalMedia,
-    PowerPointExternalMediaCollection, PowerPointExternalMediaObject, PowerPointExternalMovie,
-    PowerPointExternalMovieKind, PowerPointExternalVideo, PowerPointLinkedAudio,
-    PowerPointLinkedAudioKind,
+    CdAudio, CdTime, EmbeddedWav, LinkedAudio, LinkedAudioKind, Media, Movie, MovieKind, Object,
+    Video,
 };
 pub use font::{
     EmbeddedPowerPointFont, PowerPointFont, PowerPointFontCollection, PowerPointFontCollections,
