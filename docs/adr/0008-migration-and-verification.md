@@ -5057,6 +5057,26 @@ batch is a typed, bounded, lossless structural increment, not a claim of full
 `[MS-DOC]`, `[MS-ODRAW]`, `[MS-OGRAPH]`, `[MS-OSHARED]`, `[MS-PPT]`, `[MS-XLS]`,
 or OOXML conformance.
 
+## Layered ODF and legacy owner continuation
+
+ODF text owners now use semantic folders for bibliography configuration, chart
+properties, content validation, document scripts, dynamic text, header/footer,
+notes configuration, tracked changes, and variable declarations. Shared ODF
+annotation, coordinate, and datatype owners are layered in `litchi-odf-common`.
+The same prefix-free facade rule now covers DOC encryption and SPRM operations,
+PPT view-set information, XLS data tables, and the existing PPT/XLSX owner
+migrations. Each owner separates `model`, `codec`, package integration, and
+tests; shared DrawingML wrappers remain in the common DrawingML/XML layers.
+
+The XLSX shape facade additionally retains bounded unknown anchor objects and
+DrawingML markup, parses nested groups and OLE graphic frames, validates OLE
+aspects, and keeps picture/chart frames out of the typed inventory. Combined
+all-target compilation passed. Focused all-target suites passed for ODF-common,
+ODT, OOXML-common, PPT, XLS, and XLSX; DOC passed 832 library tests with two
+ignored. The full DOC all-target run remains limited only by the previously
+recorded malformed Apache POI FAT fixture. This is a migration and typed-model
+increment, not a claim of complete Microsoft Office specification conformance.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

@@ -1,10 +1,12 @@
 //! Bounded XML parsing, serialization, and lossless mutation for chart styles.
 
-use super::model::{Angle, AxisLabelPosition, AxisPosition, DataLabelNumber, Direction, Double,
-EmptyCellTreatment, ErrorCategory, Integer, Interpolation, LabelArrangement, LabelPosition,
-LabelSeparator, NonNegativeInteger, NonNegativeLength, Percent, PositiveInteger,
-RegressionType, SeriesSource, SolidType, StyleProperties, StylePropertiesSet, StyleRecord,
-SymbolImage, SymbolName, SymbolType, TickMarkPosition, bad, safe};
+use super::model::{
+    Angle, AxisLabelPosition, AxisPosition, DataLabelNumber, Direction, Double, EmptyCellTreatment,
+    ErrorCategory, Integer, Interpolation, LabelArrangement, LabelPosition, LabelSeparator,
+    NonNegativeInteger, NonNegativeLength, Percent, PositiveInteger, RegressionType, SeriesSource,
+    SolidType, StyleProperties, StylePropertiesSet, StyleRecord, SymbolImage, SymbolName,
+    SymbolType, TickMarkPosition, bad, safe,
+};
 use super::{
     CHART, CHART_NS, MAX_ATTRIBUTES, MAX_DEPTH, MAX_EVENTS, MAX_STYLES, MAX_TOTAL, MAX_VALUE,
     MAX_XML, OFFICE, OFFICE_NS, STYLE, STYLE_NS, TEXT, TEXT_NS, XLINK, XLINK_NS,
@@ -113,7 +115,6 @@ pub(super) fn validate_paragraph(xml: &str) -> Result<()> {
     }
     Ok(())
 }
-
 
 impl StyleProperties {
     pub fn from_xml_fragment(fragment: &str) -> Result<Self> {

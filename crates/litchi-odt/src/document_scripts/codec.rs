@@ -8,13 +8,14 @@ use quick_xml::{
     reader::NsReader,
 };
 
+use super::model::{
+    EmbeddedScript, EventListener, NamespaceDeclaration, ScriptBinding, ScriptEventListener,
+    Scripts,
+};
 use super::{
     MAX_DOCUMENT_XML_BYTES, MAX_LISTENER_COUNT, MAX_SCRIPT_COUNT, MAX_TEXT_BYTES, MAX_VALUE_BYTES,
     MAX_XML_DEPTH, OFFICE_NAMESPACE, PRESENTATION_NAMESPACE, SCRIPT_NAMESPACE, XLINK_NAMESPACE,
     invalid,
-};
-use super::model::{
-    EmbeddedScript, EventListener, NamespaceDeclaration, ScriptBinding, ScriptEventListener, Scripts,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -682,7 +683,10 @@ fn merge_namespace_declarations(
     }
 }
 
-pub(super) fn validate_fragment(fragment: &str, declarations: &[NamespaceDeclaration]) -> Result<()> {
+pub(super) fn validate_fragment(
+    fragment: &str,
+    declarations: &[NamespaceDeclaration],
+) -> Result<()> {
     if fragment.len() > MAX_TEXT_BYTES {
         return invalid(format!(
             "preserved script XML exceeds the {MAX_TEXT_BYTES} byte limit"

@@ -1,5 +1,6 @@
 use super::codec::{CORE, PROTECTED_RANGES_EXTENSION_URI, STRICT, X14, XM};
 use super::*;
+use crate::error::Result;
 
 const START: &str =
     r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#;

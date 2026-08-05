@@ -530,7 +530,7 @@ impl Parser {
                     self.anchor_mut()?.client_data = client_data;
                     return Ok(Context::Other);
                 },
-                _ => return Ok(Context::Other),
+                _ => {},
             },
             Context::From | Context::To if xdr => {
                 let target = if parent == Context::From {
@@ -1248,6 +1248,9 @@ fn is_known_object_element(namespace: &ResolveResult<'_>, local: &[u8]) -> bool 
             | b"grpSpLocks"
             | b"stCxn"
             | b"endCxn"
+            | b"graphic"
+            | b"graphicData"
+            | b"xfrm"
             | b"off"
             | b"ext"
             | b"chOff"

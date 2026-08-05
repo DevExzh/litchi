@@ -4,7 +4,8 @@ use litchi_core::Result;
 
 use super::{
     MAX_LISTENER_COUNT, MAX_SCRIPT_COUNT,
-    codec::{checked_text_bytes, validate_fragment, validate_required_value}, invalid,
+    codec::{checked_text_bytes, validate_fragment, validate_required_value},
+    invalid,
 };
 
 /// One inert `office:script` declaration.

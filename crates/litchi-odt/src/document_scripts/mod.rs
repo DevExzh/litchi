@@ -1,7 +1,7 @@
 //! Inert ODF document script declarations.
- //!
- //! This module intentionally exposes script payloads as metadata only. It never
- //! loads linked resources and never executes embedded script content.
+//!
+//! This module intentionally exposes script payloads as metadata only. It never
+//! loads linked resources and never executes embedded script content.
 
 mod codec;
 mod model;
@@ -11,10 +11,8 @@ mod tests;
 
 use litchi_core::{Error, Result};
 
-pub(super) const OFFICE_NAMESPACE: &[u8] =
-    b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
-pub(super) const SCRIPT_NAMESPACE: &[u8] =
-    b"urn:oasis:names:tc:opendocument:xmlns:script:1.0";
+pub(super) const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+pub(super) const SCRIPT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:script:1.0";
 pub(super) const PRESENTATION_NAMESPACE: &[u8] =
     b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
 pub(super) const XLINK_NAMESPACE: &[u8] = b"http://www.w3.org/1999/xlink";

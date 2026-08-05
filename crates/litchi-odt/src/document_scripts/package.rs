@@ -2,7 +2,7 @@
 
 use litchi_core::Result;
 
-use super::{codec::parse_scripts, Scripts};
+use super::{Scripts, codec::parse_scripts};
 
 /// Read the optional document-level script inventory from package content XML.
 ///
