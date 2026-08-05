@@ -95,8 +95,8 @@ fn percent(value: &str) -> bool {
 /// A horizontal paragraph margin (`fo:margin-left`/`fo:margin-right`): a signed
 /// length or a percent.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParagraphHorizontalMargin(String);
-impl ParagraphHorizontalMargin {
+pub struct Horizontal(String);
+impl Horizontal {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         if value.len() > MAX_VALUE || !(length(&value, true) || percent(&value)) {
@@ -112,8 +112,8 @@ impl ParagraphHorizontalMargin {
 /// A vertical paragraph margin (`fo:margin`, `fo:margin-top`,
 /// `fo:margin-bottom`): a non-negative length or a percent.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParagraphVerticalMargin(String);
-impl ParagraphVerticalMargin {
+pub struct Vertical(String);
+impl Vertical {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         if value.len() > MAX_VALUE || !(length(&value, false) || percent(&value)) {
@@ -130,8 +130,8 @@ impl ParagraphVerticalMargin {
 
 /// The `fo:text-indent` value: a signed length.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParagraphTextIndent(String);
-impl ParagraphTextIndent {
+pub struct TextIndent(String);
+impl TextIndent {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         if value.len() > MAX_VALUE || !length(&value, true) {
@@ -147,16 +147,16 @@ impl ParagraphTextIndent {
 /// The margin and indentation attribute group of one `style:paragraph-properties`
 /// element.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ParagraphMargins {
-    pub margin: Option<ParagraphVerticalMargin>,
-    pub margin_left: Option<ParagraphHorizontalMargin>,
-    pub margin_right: Option<ParagraphHorizontalMargin>,
-    pub margin_top: Option<ParagraphVerticalMargin>,
-    pub margin_bottom: Option<ParagraphVerticalMargin>,
-    pub text_indent: Option<ParagraphTextIndent>,
+pub struct Properties {
+    pub margin: Option<Vertical>,
+    pub margin_left: Option<Horizontal>,
+    pub margin_right: Option<Horizontal>,
+    pub margin_top: Option<Vertical>,
+    pub margin_bottom: Option<Vertical>,
+    pub text_indent: Option<TextIndent>,
     pub contextual_spacing: Option<bool>,
 }
-impl ParagraphMargins {
+impl Properties {
     pub fn new() -> Self {
         Self::default()
     }
@@ -217,14 +217,14 @@ impl ParagraphMargins {
 
 /// A named or default paragraph style and its margin properties.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParagraphStyleMargins {
+pub struct Style {
     pub name: Option<String>,
     pub parent_style_name: Option<String>,
     pub is_default_style: bool,
-    pub properties: Option<ParagraphMargins>,
+    pub properties: Option<Properties>,
 }
-impl ParagraphStyleMargins {
-    pub fn named(name: impl Into<String>, properties: Option<ParagraphMargins>) -> Result<Self> {
+impl Style {
+    pub fn named(name: impl Into<String>, properties: Option<Properties>) -> Result<Self> {
         let result = Self {
             name: Some(name.into()),
             parent_style_name: None,
@@ -234,7 +234,7 @@ impl ParagraphStyleMargins {
         result.validate()?;
         Ok(result)
     }
-    pub fn default_style(properties: Option<ParagraphMargins>) -> Self {
+    pub fn default_style(properties: Option<Properties>) -> Self {
         Self {
             name: None,
             parent_style_name: None,
@@ -289,16 +289,16 @@ impl ParagraphStyleMargins {
 
 /// All paragraph styles of a styles part that carry margin properties.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ParagraphStyleMarginsSet {
-    pub styles: Vec<ParagraphStyleMargins>,
+pub struct Styles {
+    pub styles: Vec<Style>,
 }
-impl ParagraphStyleMarginsSet {
-    pub fn get(&self, name: &str) -> Option<&ParagraphStyleMargins> {
+impl Styles {
+    pub fn get(&self, name: &str) -> Option<&Style> {
         self.styles
             .iter()
             .find(|style| style.name.as_deref() == Some(name))
     }
-    pub fn default_style(&self) -> Option<&ParagraphStyleMargins> {
+    pub fn default_style(&self) -> Option<&Style> {
         self.styles.iter().find(|style| style.is_default_style)
     }
 }
@@ -337,7 +337,7 @@ fn style_attributes(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<Option<ParagraphStyleMargins>> {
+) -> Result<Option<Style>> {
     let mut name = None;
     let mut parent = None;
     let mut family = None;
@@ -369,7 +369,7 @@ fn style_attributes(
     if family.as_deref() != Some("paragraph") {
         return Ok(None);
     }
-    let result = ParagraphStyleMargins {
+    let result = Style {
         name,
         parent_style_name: parent,
         is_default_style: start.local_name().as_ref() == b"default-style",
@@ -383,8 +383,8 @@ fn margin_attributes(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<ParagraphMargins> {
-    let mut properties = ParagraphMargins::new();
+) -> Result<Properties> {
+    let mut properties = Properties::new();
     let mut seen = HashSet::new();
     let mut count = 0;
     for attribute in start.attributes().with_checks(true) {
@@ -408,21 +408,21 @@ fn margin_attributes(
             return Err(bad("paragraph-properties attribute is too large"));
         }
         match (namespace, local.as_ref()) {
-            (Ns::Fo, b"margin") => properties.margin = Some(ParagraphVerticalMargin::new(value)?),
+            (Ns::Fo, b"margin") => properties.margin = Some(Vertical::new(value)?),
             (Ns::Fo, b"margin-left") => {
-                properties.margin_left = Some(ParagraphHorizontalMargin::new(value)?);
+                properties.margin_left = Some(Horizontal::new(value)?);
             },
             (Ns::Fo, b"margin-right") => {
-                properties.margin_right = Some(ParagraphHorizontalMargin::new(value)?);
+                properties.margin_right = Some(Horizontal::new(value)?);
             },
             (Ns::Fo, b"margin-top") => {
-                properties.margin_top = Some(ParagraphVerticalMargin::new(value)?);
+                properties.margin_top = Some(Vertical::new(value)?);
             },
             (Ns::Fo, b"margin-bottom") => {
-                properties.margin_bottom = Some(ParagraphVerticalMargin::new(value)?);
+                properties.margin_bottom = Some(Vertical::new(value)?);
             },
             (Ns::Fo, b"text-indent") => {
-                properties.text_indent = Some(ParagraphTextIndent::new(value)?);
+                properties.text_indent = Some(TextIndent::new(value)?);
             },
             (Ns::Style, b"contextual-spacing") => {
                 properties.contextual_spacing =
@@ -436,11 +436,7 @@ fn margin_attributes(
     Ok(properties)
 }
 
-fn push_style(
-    styles: &mut Vec<ParagraphStyleMargins>,
-    style: ParagraphStyleMargins,
-    total: &mut usize,
-) -> Result<()> {
+fn push_style(styles: &mut Vec<Style>, style: Style, total: &mut usize) -> Result<()> {
     if styles.len() >= MAX_STYLES {
         return Err(bad("too many paragraph styles"));
     }
@@ -468,17 +464,17 @@ fn is_paragraph_style(current: &(Ns, Vec<u8>), parent: Option<&(Ns, Vec<u8>)>) -
 
 struct Active {
     depth: usize,
-    style: ParagraphStyleMargins,
+    style: Style,
     seen_properties: bool,
 }
 
 /// Parse paragraph styles and their margin properties from a styles part.
-pub fn parse_paragraph_style_margins(xml: &str) -> Result<ParagraphStyleMarginsSet> {
+pub fn parse(xml: &str) -> Result<Styles> {
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
     }
     if !xml.contains("paragraph-properties") {
-        return Ok(ParagraphStyleMarginsSet::default());
+        return Ok(Styles::default());
     }
     let mut reader = NsReader::from_reader(xml.as_bytes());
     reader.config_mut().trim_text(false);
@@ -564,7 +560,7 @@ pub fn parse_paragraph_style_margins(xml: &str) -> Result<ParagraphStyleMarginsS
     if !stack.is_empty() || active.is_some() {
         return Err(bad("truncated styles XML"));
     }
-    Ok(ParagraphStyleMarginsSet { styles })
+    Ok(Styles { styles })
 }
 
 #[derive(Default)]
@@ -723,10 +719,7 @@ fn qualify_insert(insert: &str, missing: (bool, bool)) -> String {
 /// Losslessly replace, insert, or remove this module's margin attributes on one
 /// existing paragraph style's `style:paragraph-properties` element. Attributes
 /// owned by sibling modules and child elements are preserved.
-pub fn set_paragraph_style_margins_xml(
-    xml: &str,
-    requested: &ParagraphStyleMargins,
-) -> Result<String> {
+pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
     requested.validate()?;
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
@@ -861,7 +854,7 @@ pub fn set_paragraph_style_margins_xml(
     let insert = requested
         .properties
         .as_ref()
-        .map(ParagraphMargins::attributes_xml)
+        .map(Properties::attributes_xml)
         .unwrap_or_default();
     if let Some(properties) = &spans.properties {
         let raw = &xml[properties.start..properties.end];
@@ -890,15 +883,13 @@ pub fn set_paragraph_style_margins_xml(
 }
 
 impl OpenDocumentPackage {
-    pub fn paragraph_style_margins(&self) -> Result<ParagraphStyleMarginsSet> {
-        self.styles_xml()?.map_or_else(
-            || Ok(ParagraphStyleMarginsSet::default()),
-            |xml| parse_paragraph_style_margins(&xml),
-        )
+    pub fn paragraph_style_margins(&self) -> Result<Styles> {
+        self.styles_xml()?
+            .map_or_else(|| Ok(Styles::default()), |xml| parse(&xml))
     }
 }
 impl FlatOpenDocument {
-    pub fn paragraph_style_margins(&self) -> Result<ParagraphStyleMarginsSet> {
-        parse_paragraph_style_margins(self.xml())
+    pub fn paragraph_style_margins(&self) -> Result<Styles> {
+        parse(self.xml())
     }
 }
