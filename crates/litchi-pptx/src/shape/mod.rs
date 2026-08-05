@@ -22,6 +22,7 @@
 //! ```
 
 pub mod diagram;
+pub mod text;
 pub mod theme;
 
 mod model;

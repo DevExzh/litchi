@@ -1,5 +1,10 @@
-use crate::error::{OoxmlError, Result};
-/// Text frame for accessing text content in shapes.
+//! Bounded DrawingML text extraction and borrowed element-range scanning.
+//!
+//! The functions in this focused module operate on one shape owner at a time;
+//! they preserve the source bytes and allocate only the requested text result
+//! or the caller's selected ranges.
+
+use crate::{Error, Result};
 use litchi_ooxml_common::xml::{
     DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE, decode_xml_reference,
 };
@@ -38,10 +43,8 @@ fn is_drawingml_name(
     }
 }
 
-pub(crate) fn extract_drawingml_text(
-    xml_bytes: &[u8],
-    paragraph_separator: Option<char>,
-) -> Result<String> {
+/// Extract visible DrawingML text from a shape or text-body fragment.
+pub fn extract(xml_bytes: &[u8], paragraph_separator: Option<char>) -> Result<String> {
     let mut reader = NsReader::from_reader(xml_bytes);
     let mut result = String::with_capacity(xml_bytes.len() / 8);
     let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
@@ -53,7 +56,7 @@ pub(crate) fn extract_drawingml_text(
     loop {
         let (namespace, event) = reader
             .read_resolved_event()
-            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            .map_err(|error| Error::Xml(error.to_string()))?;
         if fragment_prefix.is_none()
             && let Event::Start(element) = &event
             && !matches!(namespace, ResolveResult::Bound(_))
@@ -69,18 +72,18 @@ pub(crate) fn extract_drawingml_text(
         match event {
             Event::Start(element) => {
                 nodes = nodes.checked_add(1).ok_or_else(|| {
-                    OoxmlError::InvalidFormat("DrawingML element counter overflow".to_string())
+                    Error::Invalid("DrawingML element counter overflow".to_string())
                 })?;
                 if nodes > MAX_TEXT_SCAN_NODES {
-                    return Err(OoxmlError::InvalidFormat(format!(
+                    return Err(Error::Invalid(format!(
                         "DrawingML XML exceeds {MAX_TEXT_SCAN_NODES} elements"
                     )));
                 }
-                depth = depth.checked_add(1).ok_or_else(|| {
-                    OoxmlError::InvalidFormat("DrawingML nesting is too deep".to_string())
-                })?;
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| Error::Invalid("DrawingML nesting is too deep".to_string()))?;
                 if depth > MAX_TEXT_SCAN_DEPTH {
-                    return Err(OoxmlError::InvalidFormat(format!(
+                    return Err(Error::Invalid(format!(
                         "DrawingML nesting exceeds the {MAX_TEXT_SCAN_DEPTH} depth limit"
                     )));
                 }
@@ -105,10 +108,10 @@ pub(crate) fn extract_drawingml_text(
             },
             Event::Empty(element) => {
                 nodes = nodes.checked_add(1).ok_or_else(|| {
-                    OoxmlError::InvalidFormat("DrawingML element counter overflow".to_string())
+                    Error::Invalid("DrawingML element counter overflow".to_string())
                 })?;
                 if nodes > MAX_TEXT_SCAN_NODES {
-                    return Err(OoxmlError::InvalidFormat(format!(
+                    return Err(Error::Invalid(format!(
                         "DrawingML XML exceeds {MAX_TEXT_SCAN_NODES} elements"
                     )));
                 }
@@ -130,17 +133,17 @@ pub(crate) fn extract_drawingml_text(
             Event::Text(text) if text_depth.is_some() => {
                 let decoded = text
                     .xml_content(XmlVersion::Explicit1_0)
-                    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                    .map_err(|error| Error::Xml(error.to_string()))?;
                 result.push_str(
                     &quick_xml::escape::unescape(&decoded)
-                        .map_err(|error| OoxmlError::Xml(error.to_string()))?,
+                        .map_err(|error| Error::Xml(error.to_string()))?,
                 );
             },
             Event::CData(text) if text_depth.is_some() => {
                 result.push_str(
                     &text
                         .xml_content(XmlVersion::Explicit1_0)
-                        .map_err(|error| OoxmlError::Xml(error.to_string()))?,
+                        .map_err(|error| Error::Xml(error.to_string()))?,
                 );
             },
             Event::GeneralRef(reference) if text_depth.is_some() => {
@@ -152,14 +155,12 @@ pub(crate) fn extract_drawingml_text(
                 {
                     text_depth = None;
                 }
-                depth = depth.checked_sub(1).ok_or_else(|| {
-                    OoxmlError::InvalidFormat("invalid DrawingML nesting".to_string())
-                })?;
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| Error::Invalid("invalid DrawingML nesting".to_string()))?;
             },
             Event::Eof if depth != 0 || text_depth.is_some() => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated DrawingML XML".to_string(),
-                ));
+                return Err(Error::Invalid("unterminated DrawingML XML".to_string()));
             },
             Event::Eof => break,
             _ => {},
@@ -169,7 +170,8 @@ pub(crate) fn extract_drawingml_text(
     Ok(result)
 }
 
-pub(crate) fn scan_drawingml_element_ranges(
+/// Scan checked byte ranges for DrawingML elements with the requested local name.
+pub fn scan_ranges(
     xml_bytes: &[u8],
     target: &[u8],
     mut emit: impl FnMut(u32, u32) -> Result<()>,
@@ -187,13 +189,12 @@ pub(crate) fn scan_drawingml_element_ranges(
     let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
     let mut capture: Option<(usize, usize)> = None;
     loop {
-        let event_start = usize::try_from(reader.buffer_position()).map_err(|_| {
-            OoxmlError::InvalidFormat("DrawingML offset does not fit usize".to_string())
-        })?;
+        let event_start = usize::try_from(reader.buffer_position())
+            .map_err(|_| Error::Invalid("DrawingML offset does not fit usize".to_string()))?;
         let event = {
             let (namespace, event) = reader
                 .read_resolved_event()
-                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                .map_err(|error| Error::Xml(error.to_string()))?;
             if fragment_prefix.is_none()
                 && let Event::Start(element) = &event
                 && !matches!(namespace, ResolveResult::Bound(_))
@@ -228,35 +229,34 @@ pub(crate) fn scan_drawingml_element_ranges(
                 _ => ScanEvent::Other,
             }
         };
-        let event_end = usize::try_from(reader.buffer_position()).map_err(|_| {
-            OoxmlError::InvalidFormat("DrawingML offset does not fit usize".to_string())
-        })?;
+        let event_end = usize::try_from(reader.buffer_position())
+            .map_err(|_| Error::Invalid("DrawingML offset does not fit usize".to_string()))?;
 
         match event {
             ScanEvent::Start => capture = Some((event_start, 1)),
             ScanEvent::NestedStart => {
                 let Some((_, depth)) = capture.as_mut() else {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "missing captured DrawingML element".to_string(),
                     ));
                 };
-                *depth = depth.checked_add(1).ok_or_else(|| {
-                    OoxmlError::InvalidFormat("DrawingML nesting is too deep".to_string())
-                })?;
+                *depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| Error::Invalid("DrawingML nesting is too deep".to_string()))?;
             },
             ScanEvent::Empty => emit_drawingml_range(event_start, event_end, &mut emit)?,
             ScanEvent::End => {
                 let Some((_, depth)) = capture.as_mut() else {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "missing captured DrawingML element".to_string(),
                     ));
                 };
-                *depth = depth.checked_sub(1).ok_or_else(|| {
-                    OoxmlError::InvalidFormat("invalid DrawingML nesting".to_string())
-                })?;
+                *depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| Error::Invalid("invalid DrawingML nesting".to_string()))?;
                 if *depth == 0 {
                     let Some((start, _)) = capture.take() else {
-                        return Err(OoxmlError::InvalidFormat(
+                        return Err(Error::Invalid(
                             "missing DrawingML element range".to_string(),
                         ));
                     };
@@ -264,9 +264,7 @@ pub(crate) fn scan_drawingml_element_ranges(
                 }
             },
             ScanEvent::Eof if capture.is_some() => {
-                return Err(OoxmlError::InvalidFormat(
-                    "unterminated DrawingML element".to_string(),
-                ));
+                return Err(Error::Invalid("unterminated DrawingML element".to_string()));
             },
             ScanEvent::Eof => break,
             ScanEvent::Other => {},
@@ -282,13 +280,12 @@ fn emit_drawingml_range(
 ) -> Result<()> {
     let length = end
         .checked_sub(start)
-        .ok_or_else(|| OoxmlError::InvalidFormat("invalid DrawingML element range".to_string()))?;
+        .ok_or_else(|| Error::Invalid("invalid DrawingML element range".to_string()))?;
     emit(
         u32::try_from(start)
-            .map_err(|_| OoxmlError::InvalidFormat("DrawingML offset exceeds u32".to_string()))?,
-        u32::try_from(length).map_err(|_| {
-            OoxmlError::InvalidFormat("DrawingML element length exceeds u32".to_string())
-        })?,
+            .map_err(|_| Error::Invalid("DrawingML offset exceeds u32".to_string()))?,
+        u32::try_from(length)
+            .map_err(|_| Error::Invalid("DrawingML element length exceeds u32".to_string()))?,
     )
 }
 
@@ -305,15 +302,12 @@ mod tests {
                 <d:p><d:r><d:t>Second</d:t></d:r></d:p>
             </d:txBody>
         </p:sp>"#;
-        assert_eq!(
-            extract_drawingml_text(xml, Some('\n')).unwrap(),
-            " A & B < C\t\nSecond"
-        );
+        assert_eq!(extract(xml, Some('\n')).unwrap(), " A & B < C\t\nSecond");
         let mut paragraphs = Vec::new();
-        scan_drawingml_element_ranges(xml, b"p", |start, length| {
+        scan_ranges(xml, b"p", |start, length| {
             let start = start as usize;
             let end = start + length as usize;
-            paragraphs.push(extract_drawingml_text(&xml[start..end], None)?);
+            paragraphs.push(extract(&xml[start..end], None)?);
             Ok(())
         })
         .unwrap();
@@ -325,16 +319,16 @@ mod tests {
     #[test]
     fn drawingml_paragraph_text_accepts_inherited_conventional_prefix() {
         let paragraph = br#"<a:p><a:r><a:t>one</a:t></a:r><a:r><a:t>two</a:t></a:r></a:p>"#;
-        assert_eq!(extract_drawingml_text(paragraph, None).unwrap(), "onetwo");
+        assert_eq!(extract(paragraph, None).unwrap(), "onetwo");
     }
 
     #[test]
     fn drawingml_text_rejects_foreign_lookalikes_and_truncation() {
         let foreign = br#"<x:p xmlns:x="urn:not-drawingml"><x:r><x:t>ignored</x:t></x:r></x:p>"#;
-        assert_eq!(extract_drawingml_text(foreign, None).unwrap(), "");
+        assert_eq!(extract(foreign, None).unwrap(), "");
 
         let truncated = br#"<a:p xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:r><a:t>bad</a:t>"#;
-        assert!(extract_drawingml_text(truncated, None).is_err());
+        assert!(extract(truncated, None).is_err());
     }
 
     #[test]
