@@ -664,9 +664,14 @@ fn try_clone_property_set(section: &PropertySet) -> Result<PropertySet, OleError
 }
 
 impl PropertySetStream {
+    /// Version 0 property sets use only the original OLE Property Set types.
+    pub const VERSION_0: u16 = 0;
+    /// Version 1 property sets add the versioned numeric families.
+    pub const VERSION_1: u16 = 1;
+
     pub fn new(section: PropertySet) -> Self {
         Self {
-            version: 0,
+            version: Self::VERSION_0,
             system_identifier: 0,
             class_identifier: PropertySetGuid::from_bytes([0; 16]),
             sections: vec![section],
@@ -681,7 +686,7 @@ impl PropertySetStream {
             return Err(invalid("Property Set byte order must be 0xFFFE"));
         }
         let version = read_u16(data, 2, "version")?;
-        if version != 0 {
+        if !matches!(version, Self::VERSION_0 | Self::VERSION_1) {
             return Err(invalid(format!(
                 "Unsupported Property Set version {version}"
             )));
@@ -740,7 +745,11 @@ impl PropertySetStream {
 
         let mut sections = try_vec_with_capacity(section_count, "property-set sections")?;
         for (format_identifier, start, end) in descriptors {
-            sections.push(parse_section(&data[start..end], format_identifier)?);
+            sections.push(parse_section(
+                &data[start..end],
+                format_identifier,
+                version,
+            )?);
         }
         Ok(Self {
             version,
@@ -903,12 +912,13 @@ impl OlePropertySetEditor {
         if stream.section(kind.format_id()).is_none() {
             stream.add_section(PropertySet::new(kind.format_id()))?;
         }
+        let version = stream.version;
         let section = stream
             .section_mut(kind.format_id())
             .ok_or_else(|| invalid("Property Set section was not available after insertion"))?;
         let mut candidate = try_clone_property_set(section)?;
         edit(&mut candidate)?;
-        validate_section(&candidate)?;
+        validate_section(&candidate, version)?;
         *section = candidate;
         let bytes = stream.to_bytes()?;
         self.stage(kind, Some(bytes))?;
@@ -1025,7 +1035,27 @@ fn validate_property_name(name: &str) -> Result<(), OleError> {
     }
 }
 
-fn validate_section(section: &PropertySet) -> Result<(), OleError> {
+fn minimum_property_set_version(value: &PropertyValue) -> u16 {
+    match value {
+        PropertyValue::I1(_) | PropertyValue::Int(_) | PropertyValue::UInt(_) => 1,
+        PropertyValue::Vector(values) => values
+            .iter()
+            .map(minimum_property_set_version)
+            .max()
+            .unwrap_or(PropertySetStream::VERSION_0),
+        _ => PropertySetStream::VERSION_0,
+    }
+}
+
+fn validate_section(section: &PropertySet, version: u16) -> Result<(), OleError> {
+    if !matches!(
+        version,
+        PropertySetStream::VERSION_0 | PropertySetStream::VERSION_1
+    ) {
+        return Err(invalid(format!(
+            "Unsupported Property Set version {version}"
+        )));
+    }
     if section.properties.len() > MAX_PROPERTY_COUNT {
         return Err(invalid("Property count exceeds safety limit"));
     }
@@ -1034,6 +1064,24 @@ fn validate_section(section: &PropertySet) -> Result<(), OleError> {
             return Err(invalid(format!(
                 "Property identifier {identifier} is outside the Property Set range"
             )));
+        }
+    }
+    for (identifier, value) in &section.properties {
+        let required_version = minimum_property_set_version(value);
+        if required_version > version {
+            return Err(invalid(format!(
+                "Property {identifier} requires Property Set version {required_version}"
+            )));
+        }
+    }
+    if let Some(value) = section.properties.get(&PID_BEHAVIOR) {
+        if version == PropertySetStream::VERSION_0 {
+            return Err(invalid("Behavior property requires Property Set version 1"));
+        }
+        if !matches!(value, PropertyValue::UI4(0 | 1)) {
+            return Err(invalid(
+                "Behavior property must be VT_UI4 with value 0 or 1",
+            ));
         }
     }
     let mut names =
@@ -1061,9 +1109,13 @@ fn validate_section(section: &PropertySet) -> Result<(), OleError> {
 }
 
 fn serialize_property_set_stream(stream: &PropertySetStream) -> Result<Vec<u8>, OleError> {
-    if stream.version != 0 || !(1..=2).contains(&stream.sections.len()) {
+    if !matches!(
+        stream.version,
+        PropertySetStream::VERSION_0 | PropertySetStream::VERSION_1
+    ) || !(1..=2).contains(&stream.sections.len())
+    {
         return Err(invalid(
-            "Property Set must have version zero and one or two sections",
+            "Property Set must have version zero or one and one or two sections",
         ));
     }
     let mut ids = try_hash_set_with_capacity(stream.sections.len(), "property-set format IDs")?;
@@ -1071,7 +1123,7 @@ fn serialize_property_set_stream(stream: &PropertySetStream) -> Result<Vec<u8>, 
         if !ids.insert(section.format_identifier) {
             return Err(invalid("Duplicate section format identifier"));
         }
-        validate_section(section)?
+        validate_section(section, stream.version)?
     }
     let descriptor_end = checked_add(
         PROPERTY_SET_HEADER_SIZE,
@@ -1485,7 +1537,11 @@ impl<R: Read + Seek> OleFile<R> {
     }
 }
 
-fn parse_section(data: &[u8], format_identifier: PropertySetGuid) -> Result<PropertySet, OleError> {
+fn parse_section(
+    data: &[u8],
+    format_identifier: PropertySetGuid,
+    version: u16,
+) -> Result<PropertySet, OleError> {
     checked_range(data, 0, SECTION_HEADER_SIZE, "section header")?;
     let declared_size = usize::try_from(read_u32(data, 0, "section size")?)
         .map_err(|_| invalid("Property Set section size is too large"))?;
@@ -1610,7 +1666,7 @@ fn parse_section(data: &[u8], format_identifier: PropertySetGuid) -> Result<Prop
         property_order,
         dictionary_order,
     };
-    validate_section(&section)?;
+    validate_section(&section, version)?;
     Ok(section)
 }
 
@@ -2311,6 +2367,57 @@ mod tests {
             section.property(2),
             Some(&PropertyValue::Lpstr("Hello".into()))
         );
+    }
+
+    #[test]
+    fn version_one_round_trips_versioned_numeric_properties() {
+        let mut section = PropertySet::new(SUMMARY_INFORMATION_FMTID);
+        section.add(2, PropertyValue::I1(-7)).unwrap();
+        section.add(3, PropertyValue::Int(-42)).unwrap();
+        section.add(4, PropertyValue::UInt(42)).unwrap();
+
+        let version_zero = PropertySetStream::new(section.clone());
+        assert!(version_zero.to_bytes().is_err());
+
+        let mut version_one = PropertySetStream::new(section);
+        version_one.version = PropertySetStream::VERSION_1;
+        let bytes = version_one.to_bytes().unwrap();
+        let parsed = PropertySetStream::parse(&bytes).unwrap();
+        assert_eq!(parsed.version, PropertySetStream::VERSION_1);
+        assert_eq!(parsed.sections[0].property(2), Some(&PropertyValue::I1(-7)));
+        assert_eq!(
+            parsed.sections[0].property(3),
+            Some(&PropertyValue::Int(-42))
+        );
+        assert_eq!(
+            parsed.sections[0].property(4),
+            Some(&PropertyValue::UInt(42))
+        );
+
+        let mut downgraded = bytes;
+        downgraded[2..4].copy_from_slice(&PropertySetStream::VERSION_0.to_le_bytes());
+        assert!(PropertySetStream::parse(&downgraded).is_err());
+    }
+
+    #[test]
+    fn validates_the_version_one_behavior_property() {
+        let mut section = PropertySet::new(SUMMARY_INFORMATION_FMTID);
+        section.add(PID_BEHAVIOR, PropertyValue::UI4(1)).unwrap();
+        let mut stream = PropertySetStream::new(section);
+        stream.version = PropertySetStream::VERSION_1;
+        let parsed = PropertySetStream::parse(&stream.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            parsed.sections[0].property(PID_BEHAVIOR),
+            Some(&PropertyValue::UI4(1))
+        );
+
+        let mut invalid_behavior = PropertySet::new(SUMMARY_INFORMATION_FMTID);
+        invalid_behavior
+            .add(PID_BEHAVIOR, PropertyValue::I4(1))
+            .unwrap();
+        let mut invalid_stream = PropertySetStream::new(invalid_behavior);
+        invalid_stream.version = PropertySetStream::VERSION_1;
+        assert!(invalid_stream.to_bytes().is_err());
     }
 
     #[test]
