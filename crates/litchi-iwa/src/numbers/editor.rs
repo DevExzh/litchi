@@ -12,6 +12,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Range;
 use std::path::Path;
 
+use litchi_iwa_common::table::cell::BorderSide;
 pub use litchi_numbers::table::dimension::{Dimension, Points, Size};
 use litchi_iwa_common::table::cell::number_format::NumberFormat;
 use litchi_numbers::cell::data_format::{

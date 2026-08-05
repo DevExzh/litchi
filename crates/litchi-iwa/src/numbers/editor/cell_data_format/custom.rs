@@ -59,7 +59,7 @@ pub(super) fn acquire_reference(
         .map(uuid_key)
         .collect::<HashSet<_>>();
     let uuid = fresh_uuid(&mut existing);
-    let native = custom_format_to_native(format);
+    let native = custom_format_to_native(format)?;
     let mut uuid_payloads = wire::repeated_length_delimited_payloads(&location.data, UUID_FIELD)?
         .into_iter()
         .map(<[u8]>::to_vec)
@@ -190,8 +190,8 @@ pub(super) const fn scalar_kind(format: &Custom) -> bnc::CellDataFormatKind {
     }
 }
 
-fn custom_format_to_native(format: &Custom) -> tsk::CustomFormatArchive {
-    match format {
+fn custom_format_to_native(format: &Custom) -> Result<tsk::CustomFormatArchive> {
+    Ok(match format {
         Custom::Number(format) => tsk::CustomFormatArchive {
             name: format.name().as_str().to_owned(),
             format_type_pre_bnc: NATIVE_CUSTOM_NUMBER_FORMAT_TYPE,
@@ -202,7 +202,7 @@ fn custom_format_to_native(format: &Custom) -> tsk::CustomFormatArchive {
         Custom::Text(format) => tsk::CustomFormatArchive {
             name: format.name().as_str().to_owned(),
             format_type_pre_bnc: NATIVE_CUSTOM_TEXT_FORMAT_TYPE,
-            default_format: Box::new(text_pattern_to_native(format)),
+            default_format: Box::new(text_pattern_to_native(format)?),
             conditions: Vec::new(),
             format_type: Some(NATIVE_CUSTOM_TEXT_FORMAT_TYPE),
         },
@@ -213,7 +213,7 @@ fn custom_format_to_native(format: &Custom) -> tsk::CustomFormatArchive {
             conditions: Vec::new(),
             format_type: Some(NATIVE_CUSTOM_DATE_TIME_FORMAT_TYPE),
         },
-    }
+    })
 }
 
 fn custom_format_from_native(native: &tsk::CustomFormatArchive) -> Result<Custom> {
@@ -349,14 +349,21 @@ fn date_time_pattern_from_native(native: &tsk::FormatStructArchive) -> Result<Da
     .map_err(Into::into)
 }
 
-fn text_pattern_to_native(format: &CustomText) -> tsk::FormatStructArchive {
-    custom_pattern_archive(
+fn text_pattern_to_native(format: &CustomText) -> Result<tsk::FormatStructArchive> {
+    if format.prefix().contains(NATIVE_CUSTOM_TEXT_VALUE_TOKEN)
+        || format.suffix().contains(NATIVE_CUSTOM_TEXT_VALUE_TOKEN)
+    {
+        return Err(Error::InvalidFormat(
+            "custom Text affixes cannot contain the native cell-value token".to_owned(),
+        ));
+    }
+    Ok(custom_pattern_archive(
         NATIVE_CUSTOM_TEXT_FORMAT_TYPE,
         native_text_pattern(format),
         false,
         false,
         u32::try_from(format.suffix().encode_utf16().count()).unwrap_or(u32::MAX),
-    )
+    ))
 }
 
 fn native_text_pattern(format: &CustomText) -> String {

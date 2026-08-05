@@ -1,23 +1,29 @@
 use super::*;
 use crate::keynote::KeynoteDocumentBuilder;
 use crate::numbers::cell::CellValue;
-use crate::table_cell_data_format::{
-    TableCellCurrencyCode, TableCellCurrencyStyle, TableCellCustomFormatName,
-    TableCellCustomNumberFormat, TableCellCustomNumberPattern, TableCellFractionAccuracy,
-    TableCellNumeralSystemBase, TableCellNumeralSystemFixedPlaces,
-    TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces,
-};
 use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
 use litchi_iwa_common::table::cell::BorderSide;
-use litchi_iwa_common::table::cell::conditional_highlight::{Condition, Rule, Style, Text};
-use litchi_iwa_common::table::cell::number_format::{
-    DecimalPlaces as NumberDecimalPlaces, NegativeStyle as NumberNegativeStyle,
-    ThousandsSeparator as NumberThousandsSeparator,
+use litchi_iwa_common::table::cell::conditional_highlight::{
+    Condition, Rule, Style as ConditionalHighlightStyle, Text as ConditionalText,
 };
 use litchi_keynote::slide::table::{
     formula::{FormulaCachedValue, FormulaCellReference, FormulaExpression},
     sort::{ColumnIndex, Direction, Order, RowRange, Rule as SortRule},
 };
+use litchi_numbers::cell::data_format::control::{Range as ControlRange, Slider, Stepper};
+use litchi_numbers::cell::data_format::custom::{
+    Name as CustomFormatName, Number as CustomNumber, NumberPattern,
+};
+use litchi_numbers::cell::data_format::duration::{Duration, Style as DurationStyle, UnitRange};
+use litchi_numbers::cell::data_format::number::{
+    Currency, CurrencyCode, CurrencyStyle, DecimalPlaces, FixedDecimalPlaces, Fraction,
+    FractionAccuracy, NegativeStyle, Number, Percentage, Scientific, ThousandsSeparator,
+};
+use litchi_numbers::cell::data_format::numeral_system::{
+    Base, FixedPlaces, NegativeStyle as NumeralSystemNegativeStyle, Places,
+};
+use litchi_numbers::cell::data_format::pop_up_menu::PopUpMenu;
+use litchi_numbers::cell::data_format::{Checkbox, DataFormat, StarRating, Text as TextFormat};
 
 fn table_geometry() -> (DrawablePoint, DrawableSize) {
     (
@@ -72,8 +78,8 @@ fn source_built_table_creates_and_replaces_conditional_highlighting() {
         )
         .unwrap();
     let rule = Rule::new(
-        Condition::TextContains(Text::new("grain").unwrap()),
-        Style::with_text_color(
+        Condition::TextContains(ConditionalText::new("grain").unwrap()),
+        ConditionalHighlightStyle::with_text_color(
             crate::shapes::RgbaColor::new(0.1, 0.6, 0.2, 1.0, crate::shapes::RgbColorSpace::Srgb)
                 .unwrap(),
         ),
@@ -229,10 +235,10 @@ fn source_built_table_roundtrips_number_format_crud() {
     let table = editor
         .add_slide_table(0, "Formats", 3, 3, position, size)
         .unwrap();
-    let format = KeynoteTableCellNumberFormat::new(
-        NumberDecimalPlaces::fixed(2).unwrap(),
-        NumberNegativeStyle::Parentheses,
-        NumberThousandsSeparator::Shown,
+    let format = Number::new(
+        DecimalPlaces::fixed(2).unwrap(),
+        NegativeStyle::Parentheses,
+        ThousandsSeparator::Shown,
     );
     editor
         .set_slide_table_cell(
@@ -274,10 +280,10 @@ fn source_built_table_roundtrips_percentage_data_format() {
     let table = editor
         .add_slide_table(0, "Percentages", 3, 3, position, size)
         .unwrap();
-    let format = KeynoteTableCellPercentageFormat::new(
-        KeynoteTableCellDecimalPlaces::fixed(2).unwrap(),
-        KeynoteTableCellNegativeNumberStyle::Parentheses,
-        KeynoteTableCellThousandsSeparator::Shown,
+    let format = Percentage::new(
+        DecimalPlaces::fixed(2).unwrap(),
+        NegativeStyle::Parentheses,
+        ThousandsSeparator::Shown,
     );
     editor
         .set_slide_table_cell(
@@ -297,7 +303,7 @@ fn source_built_table_roundtrips_percentage_data_format() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Percentage(format)
+        DataFormat::Percentage(format)
     );
     assert_eq!(
         reopened
@@ -306,19 +312,13 @@ fn source_built_table_roundtrips_percentage_data_format() {
         Some(format)
     );
     reopened
-        .set_slide_table_cell_data_format(
-            0,
-            table.model_object_id,
-            1,
-            1,
-            KeynoteTableCellDataFormat::Automatic,
-        )
+        .set_slide_table_cell_data_format(0, table.model_object_id, 1, 1, DataFormat::Automatic)
         .unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -329,12 +329,12 @@ fn source_built_table_roundtrips_currency_format_crud() {
     let table = editor
         .add_slide_table(0, "Currencies", 3, 3, position, size)
         .unwrap();
-    let format = KeynoteTableCellCurrencyFormat::new(
-        TableCellCurrencyCode::GBP,
-        KeynoteTableCellDecimalPlaces::fixed(2).unwrap(),
-        KeynoteTableCellNegativeNumberStyle::Parentheses,
-        KeynoteTableCellThousandsSeparator::Shown,
-        TableCellCurrencyStyle::Accounting,
+    let format = Currency::new(
+        CurrencyCode::GBP,
+        DecimalPlaces::fixed(2).unwrap(),
+        NegativeStyle::Parentheses,
+        ThousandsSeparator::Shown,
+        CurrencyStyle::Accounting,
     );
     editor
         .set_slide_table_cell(
@@ -365,7 +365,7 @@ fn source_built_table_roundtrips_currency_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -376,8 +376,7 @@ fn source_built_table_roundtrips_scientific_format_crud() {
     let table = editor
         .add_slide_table(0, "Scientific", 3, 3, position, size)
         .unwrap();
-    let format =
-        KeynoteTableCellScientificFormat::new(KeynoteTableCellFixedDecimalPlaces::new(5).unwrap());
+    let format = Scientific::new(FixedDecimalPlaces::new(5).unwrap());
     editor
         .set_slide_table_cell(
             0,
@@ -407,7 +406,7 @@ fn source_built_table_roundtrips_scientific_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -418,7 +417,7 @@ fn source_built_table_roundtrips_fraction_format_crud() {
     let table = editor
         .add_slide_table(0, "Fractions", 3, 3, position, size)
         .unwrap();
-    let format = KeynoteTableCellFractionFormat::new(TableCellFractionAccuracy::Eighths);
+    let format = Fraction::new(FractionAccuracy::Eighths);
     editor
         .set_slide_table_cell(
             0,
@@ -448,7 +447,7 @@ fn source_built_table_roundtrips_fraction_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -459,10 +458,10 @@ fn source_built_table_roundtrips_numeral_system_format_crud() {
     let table = editor
         .add_slide_table(0, "Numeral Systems", 3, 3, position, size)
         .unwrap();
-    let format = KeynoteTableCellNumeralSystemFormat::new(
-        TableCellNumeralSystemBase::HEXADECIMAL,
-        TableCellNumeralSystemPlaces::Fixed(TableCellNumeralSystemFixedPlaces::EIGHT),
-        TableCellNumeralSystemNegativeStyle::TwosComplement,
+    let format = NumeralSystem::new(
+        Base::HEXADECIMAL,
+        Places::Fixed(FixedPlaces::EIGHT),
+        NumeralSystemNegativeStyle::TwosComplement,
     )
     .unwrap();
     editor
@@ -494,7 +493,7 @@ fn source_built_table_roundtrips_numeral_system_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -505,7 +504,7 @@ fn source_built_table_roundtrips_date_time_format_crud() {
     let table = editor
         .add_slide_table(0, "Dates", 3, 3, position, size)
         .unwrap();
-    let format = KeynoteTableCellDateTimeFormat::iso_date_time_24_hour_with_seconds();
+    let format = DateTime::iso_date_time_24_hour_with_seconds();
     editor
         .set_slide_table_cell(
             0,
@@ -535,7 +534,7 @@ fn source_built_table_roundtrips_date_time_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -546,9 +545,8 @@ fn source_built_table_roundtrips_duration_format_crud() {
     let table = editor
         .add_slide_table(0, "Durations", 3, 3, position, size)
         .unwrap();
-    let range = KeynoteTableCellDurationUnitRange::hours_to_milliseconds();
-    let format =
-        KeynoteTableCellDurationFormat::custom(KeynoteTableCellDurationStyle::Abbreviated, range);
+    let range = UnitRange::hours_to_milliseconds();
+    let format = Duration::custom(DurationStyle::Abbreviated, range);
     editor
         .set_slide_table_cell(
             0,
@@ -578,7 +576,7 @@ fn source_built_table_roundtrips_duration_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -590,13 +588,7 @@ fn source_built_table_roundtrips_checkbox_format_crud() {
         .add_slide_table(0, "Checkboxes", 3, 3, position, size)
         .unwrap();
     editor
-        .set_slide_table_cell_checkbox_format(
-            0,
-            table.model_object_id,
-            1,
-            1,
-            KeynoteTableCellCheckboxFormat,
-        )
+        .set_slide_table_cell_checkbox_format(0, table.model_object_id, 1, 1, Checkbox)
         .unwrap();
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -604,7 +596,7 @@ fn source_built_table_roundtrips_checkbox_format_crud() {
         reopened
             .slide_table_cell_checkbox_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        Some(KeynoteTableCellCheckboxFormat)
+        Some(Checkbox)
     );
     assert_eq!(
         reopened
@@ -622,7 +614,7 @@ fn source_built_table_roundtrips_checkbox_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -634,13 +626,7 @@ fn source_built_table_roundtrips_star_rating_format_crud() {
         .add_slide_table(0, "Ratings", 3, 3, position, size)
         .unwrap();
     editor
-        .set_slide_table_cell_star_rating_format(
-            0,
-            table.model_object_id,
-            1,
-            1,
-            KeynoteTableCellStarRatingFormat,
-        )
+        .set_slide_table_cell_star_rating_format(0, table.model_object_id, 1, 1, StarRating)
         .unwrap();
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -648,7 +634,7 @@ fn source_built_table_roundtrips_star_rating_format_crud() {
         reopened
             .slide_table_cell_star_rating_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        Some(KeynoteTableCellStarRatingFormat)
+        Some(StarRating)
     );
     assert_eq!(
         reopened
@@ -666,7 +652,7 @@ fn source_built_table_roundtrips_star_rating_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -677,11 +663,8 @@ fn source_built_table_roundtrips_slider_format_crud() {
     let table = editor
         .add_slide_table(0, "Sliders", 3, 3, position, size)
         .unwrap();
-    let range = KeynoteTableCellSliderRange::new(-10.0, 30.0, 0.5).unwrap();
-    let format = KeynoteTableCellSliderFormat::new(
-        range,
-        crate::table_cell_data_format::TableCellNumberFormat::default().into(),
-    );
+    let range = ControlRange::new(-10.0, 30.0, 0.5).unwrap();
+    let format = Slider::new(range, Number::default().into());
     editor
         .set_slide_table_cell_slider_format(0, table.model_object_id, 1, 1, format.clone())
         .unwrap();
@@ -709,7 +692,7 @@ fn source_built_table_roundtrips_slider_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -720,11 +703,8 @@ fn source_built_table_roundtrips_stepper_format_crud() {
     let table = editor
         .add_slide_table(0, "Steppers", 3, 3, position, size)
         .unwrap();
-    let range = KeynoteTableCellStepperRange::new(-10.0, 30.0, 0.5).unwrap();
-    let format = KeynoteTableCellStepperFormat::new(
-        range,
-        crate::table_cell_data_format::TableCellNumberFormat::default().into(),
-    );
+    let range = ControlRange::new(-10.0, 30.0, 0.5).unwrap();
+    let format = Stepper::new(range, Number::default().into());
     editor
         .set_slide_table_cell_stepper_format(0, table.model_object_id, 1, 1, format.clone())
         .unwrap();
@@ -752,7 +732,7 @@ fn source_built_table_roundtrips_stepper_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -781,7 +761,7 @@ fn source_built_table_roundtrips_text_format_crud() {
         reopened
             .slide_table_cell_text_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        Some(KeynoteTableCellTextFormat)
+        Some(TextFormat)
     );
     assert_eq!(
         reopened
@@ -799,7 +779,7 @@ fn source_built_table_roundtrips_text_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -810,9 +790,9 @@ fn source_built_table_roundtrips_custom_format_crud() {
     let table = editor
         .add_slide_table(0, "Custom Numbers", 3, 3, position, size)
         .unwrap();
-    let format = KeynoteTableCellCustomFormat::Number(TableCellCustomNumberFormat::new(
-        TableCellCustomFormatName::try_new("Grouped Integer").unwrap(),
-        TableCellCustomNumberPattern::try_new("#,###").unwrap(),
+    let format = Custom::Number(CustomNumber::new(
+        CustomFormatName::try_new("Grouped Integer").unwrap(),
+        NumberPattern::try_new("#,###").unwrap(),
     ));
     editor
         .set_slide_table_cell(
@@ -843,7 +823,7 @@ fn source_built_table_roundtrips_custom_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -854,7 +834,7 @@ fn source_built_table_roundtrips_pop_up_menu_format_crud() {
     let table = editor
         .add_slide_table(0, "Menus", 3, 3, position, size)
         .unwrap();
-    let format = KeynoteTableCellPopUpMenuFormat::try_new(["Draft", "Published"]).unwrap();
+    let format = PopUpMenu::new(["Draft", "Published"]).unwrap();
     editor
         .set_slide_table_cell_pop_up_menu_format(0, table.model_object_id, 1, 1, format.clone())
         .unwrap();
@@ -882,7 +862,7 @@ fn source_built_table_roundtrips_pop_up_menu_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 

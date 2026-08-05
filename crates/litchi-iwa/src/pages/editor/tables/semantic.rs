@@ -19,6 +19,10 @@ use super::*;
 use crate::numbers::editor::table::cell::Borders;
 use litchi_iwa_common::comment::Comment;
 use litchi_iwa_common::table::cell::BorderSide;
+use litchi_numbers::cell::data_format::{
+    Checkbox, Currency, Custom, DataFormat, DateTime, Duration, Fraction, Number, NumeralSystem,
+    Percentage, PopUpMenu, Scientific, Slider, StarRating, Stepper, Text,
+};
 
 /// Stable identity and dimensions of one native table attached to the Pages body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -222,7 +226,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<PagesTableCellDataFormat> {
+    ) -> Result<DataFormat> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_data_format_in_package(
             self.package(),
@@ -238,7 +242,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: PagesTableCellDataFormat,
+        format: DataFormat,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -268,7 +272,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<PagesTableCellNumberFormat>> {
+    ) -> Result<Option<Number>> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::common_table_cell_number_format_in_package(
             self.package(),
@@ -284,7 +288,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: PagesTableCellNumberFormat,
+        format: Number,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -343,7 +347,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<PagesTableCellTextFormat>> {
+    ) -> Result<Option<Text>> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_text_format_in_package(
             self.package(),
@@ -364,7 +368,7 @@ impl PagesEditor {
             model_object_id,
             row,
             column,
-            PagesTableCellTextFormat.into(),
+            Text.into(),
         )
     }
 
@@ -387,7 +391,7 @@ impl PagesEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             verified.require_body_table(model_object_id)?;
             if verified.table_cell_data_format(model_object_id, row, column)?
-                != PagesTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Pages Text-format reset failed package validation".to_owned(),
@@ -404,7 +408,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<PagesTableCellCustomFormat>> {
+    ) -> Result<Option<Custom>> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_custom_format_in_package(
             self.package(),
@@ -420,7 +424,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: PagesTableCellCustomFormat,
+        format: Custom,
     ) -> Result<()> {
         self.set_table_cell_data_format(model_object_id, row, column, format.into())
     }
@@ -444,7 +448,7 @@ impl PagesEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             verified.require_body_table(model_object_id)?;
             if verified.table_cell_data_format(model_object_id, row, column)?
-                != PagesTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Pages Custom-format reset failed package validation".to_owned(),
@@ -461,7 +465,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<PagesTableCellCurrencyFormat>> {
+    ) -> Result<Option<Currency>> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_currency_format_in_package(
             self.package(),
@@ -477,7 +481,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: PagesTableCellCurrencyFormat,
+        format: Currency,
     ) -> Result<()> {
         self.set_table_cell_data_format(model_object_id, row, column, format.into())
     }
@@ -501,7 +505,7 @@ impl PagesEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             verified.require_body_table(model_object_id)?;
             if verified.table_cell_data_format(model_object_id, row, column)?
-                != PagesTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Pages currency-format reset failed package validation".to_owned(),
@@ -518,7 +522,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<PagesTableCellPercentageFormat>> {
+    ) -> Result<Option<Percentage>> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_percentage_format_in_package(
             self.package(),
@@ -534,7 +538,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: PagesTableCellPercentageFormat,
+        format: Percentage,
     ) -> Result<()> {
         self.set_table_cell_data_format(model_object_id, row, column, format.into())
     }
@@ -558,7 +562,7 @@ impl PagesEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             verified.require_body_table(model_object_id)?;
             if verified.table_cell_data_format(model_object_id, row, column)?
-                != PagesTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Pages percentage-format reset failed package validation".to_owned(),
@@ -575,7 +579,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<PagesTableCellScientificFormat>> {
+    ) -> Result<Option<Scientific>> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_scientific_format_in_package(
             self.package(),
@@ -591,7 +595,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: PagesTableCellScientificFormat,
+        format: Scientific,
     ) -> Result<()> {
         self.set_table_cell_data_format(model_object_id, row, column, format.into())
     }
@@ -615,7 +619,7 @@ impl PagesEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             verified.require_body_table(model_object_id)?;
             if verified.table_cell_data_format(model_object_id, row, column)?
-                != PagesTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Pages scientific-format reset failed package validation".to_owned(),
@@ -632,7 +636,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<PagesTableCellFractionFormat>> {
+    ) -> Result<Option<Fraction>> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_fraction_format_in_package(
             self.package(),
@@ -648,7 +652,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: PagesTableCellFractionFormat,
+        format: Fraction,
     ) -> Result<()> {
         self.set_table_cell_data_format(model_object_id, row, column, format.into())
     }
@@ -672,7 +676,7 @@ impl PagesEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             verified.require_body_table(model_object_id)?;
             if verified.table_cell_data_format(model_object_id, row, column)?
-                != PagesTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Pages fraction-format reset failed package validation".to_owned(),
@@ -689,7 +693,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<PagesTableCellNumeralSystemFormat>> {
+    ) -> Result<Option<NumeralSystem>> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_numeral_system_format_in_package(
             self.package(),
@@ -705,7 +709,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: PagesTableCellNumeralSystemFormat,
+        format: NumeralSystem,
     ) -> Result<()> {
         self.set_table_cell_data_format(model_object_id, row, column, format.into())
     }
@@ -729,7 +733,7 @@ impl PagesEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             verified.require_body_table(model_object_id)?;
             if verified.table_cell_data_format(model_object_id, row, column)?
-                != PagesTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Pages numeral-system reset failed package validation".to_owned(),
@@ -746,7 +750,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<PagesTableCellDateTimeFormat>> {
+    ) -> Result<Option<DateTime>> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_date_time_format_in_package(
             self.package(),
@@ -762,7 +766,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: PagesTableCellDateTimeFormat,
+        format: DateTime,
     ) -> Result<()> {
         self.set_table_cell_data_format(model_object_id, row, column, format.into())
     }
@@ -786,7 +790,7 @@ impl PagesEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             verified.require_body_table(model_object_id)?;
             if verified.table_cell_data_format(model_object_id, row, column)?
-                != PagesTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Pages Date & Time reset failed package validation".to_owned(),
@@ -803,7 +807,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<PagesTableCellDurationFormat>> {
+    ) -> Result<Option<Duration>> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_duration_format_in_package(
             self.package(),
@@ -819,7 +823,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: PagesTableCellDurationFormat,
+        format: Duration,
     ) -> Result<()> {
         self.set_table_cell_data_format(model_object_id, row, column, format.into())
     }
@@ -843,7 +847,7 @@ impl PagesEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             verified.require_body_table(model_object_id)?;
             if verified.table_cell_data_format(model_object_id, row, column)?
-                != PagesTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Pages Duration reset failed package validation".to_owned(),
@@ -860,7 +864,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<PagesTableCellCheckboxFormat>> {
+    ) -> Result<Option<Checkbox>> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_checkbox_format_in_package(
             self.package(),
@@ -876,7 +880,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: PagesTableCellCheckboxFormat,
+        format: Checkbox,
     ) -> Result<()> {
         self.set_table_cell_data_format(model_object_id, row, column, format.into())
     }
@@ -900,7 +904,7 @@ impl PagesEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             verified.require_body_table(model_object_id)?;
             if verified.table_cell_data_format(model_object_id, row, column)?
-                != PagesTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Pages Checkbox reset failed package validation".to_owned(),
@@ -917,7 +921,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<PagesTableCellStarRatingFormat>> {
+    ) -> Result<Option<StarRating>> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_star_rating_format_in_package(
             self.package(),
@@ -933,7 +937,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: PagesTableCellStarRatingFormat,
+        format: StarRating,
     ) -> Result<()> {
         self.set_table_cell_data_format(model_object_id, row, column, format.into())
     }
@@ -957,7 +961,7 @@ impl PagesEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             verified.require_body_table(model_object_id)?;
             if verified.table_cell_data_format(model_object_id, row, column)?
-                != PagesTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Pages Star Rating reset failed package validation".to_owned(),
@@ -974,7 +978,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<PagesTableCellSliderFormat>> {
+    ) -> Result<Option<Slider>> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_slider_format_in_package(
             self.package(),
@@ -990,7 +994,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: PagesTableCellSliderFormat,
+        format: Slider,
     ) -> Result<()> {
         self.set_table_cell_data_format(model_object_id, row, column, format.into())
     }
@@ -1014,7 +1018,7 @@ impl PagesEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             verified.require_body_table(model_object_id)?;
             if verified.table_cell_data_format(model_object_id, row, column)?
-                != PagesTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Pages Slider reset failed package validation".to_owned(),
@@ -1031,7 +1035,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<PagesTableCellStepperFormat>> {
+    ) -> Result<Option<Stepper>> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_stepper_format_in_package(
             self.package(),
@@ -1047,7 +1051,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: PagesTableCellStepperFormat,
+        format: Stepper,
     ) -> Result<()> {
         self.set_table_cell_data_format(model_object_id, row, column, format.into())
     }
@@ -1071,7 +1075,7 @@ impl PagesEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             verified.require_body_table(model_object_id)?;
             if verified.table_cell_data_format(model_object_id, row, column)?
-                != PagesTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Pages Stepper reset failed package validation".to_owned(),
@@ -1088,7 +1092,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<PagesTableCellPopUpMenuFormat>> {
+    ) -> Result<Option<PopUpMenu>> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_pop_up_menu_format_in_package(
             self.package(),
@@ -1104,7 +1108,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: PagesTableCellPopUpMenuFormat,
+        format: PopUpMenu,
     ) -> Result<()> {
         self.set_table_cell_data_format(model_object_id, row, column, format.into())
     }
@@ -1128,7 +1132,7 @@ impl PagesEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             verified.require_body_table(model_object_id)?;
             if verified.table_cell_data_format(model_object_id, row, column)?
-                != PagesTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Pages Pop-Up Menu reset failed package validation".to_owned(),

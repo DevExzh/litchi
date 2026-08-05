@@ -39,8 +39,6 @@ pub enum Error {
     DuplicateCondition,
     /// A literal-only Text format has no literal content.
     EmptyLiteral,
-    /// An affix contains the native cell-value token.
-    PrivateTokenInAffix,
 }
 
 impl fmt::Display for Error {
@@ -70,9 +68,6 @@ impl fmt::Display for Error {
             },
             Self::DuplicateCondition => formatter.write_str("custom Number repeats a condition"),
             Self::EmptyLiteral => formatter.write_str("literal custom Text cannot be empty"),
-            Self::PrivateTokenInAffix => {
-                formatter.write_str("custom Text affixes cannot contain the private cell-value token")
-            },
         }
     }
 }
@@ -556,11 +551,7 @@ fn validate_visible(
 }
 
 fn validate_affix(value: &str) -> Result<()> {
-    validate_visible(value, "custom Text affix", MAX_PATTERN_BYTES, true)?;
-    if value.contains('\u{e421}') {
-        return Err(Error::PrivateTokenInAffix);
-    }
-    Ok(())
+    validate_visible(value, "custom Text affix", MAX_PATTERN_BYTES, true)
 }
 
 #[cfg(test)]

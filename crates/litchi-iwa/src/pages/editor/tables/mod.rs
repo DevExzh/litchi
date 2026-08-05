@@ -68,46 +68,11 @@ pub use crate::shapes::RgbaColor as PagesTableCellTextColor;
 pub use crate::table_cell_border::{
     TableCellBorderSide as PagesTableCellBorderSide, TableCellBorders as PagesTableCellBorders,
 };
-pub use crate::table_cell_data_format::{
-    TableCellCheckboxFormat as PagesTableCellCheckboxFormat,
-    TableCellCurrencyFormat as PagesTableCellCurrencyFormat,
-    TableCellCustomFormat as PagesTableCellCustomFormat,
-    TableCellDataFormat as PagesTableCellDataFormat,
-    TableCellDateTimeFormat as PagesTableCellDateTimeFormat,
-    TableCellDurationFormat as PagesTableCellDurationFormat,
-    TableCellDurationStyle as PagesTableCellDurationStyle,
-    TableCellDurationUnit as PagesTableCellDurationUnit,
-    TableCellDurationUnitRange as PagesTableCellDurationUnitRange,
-    TableCellDurationUnits as PagesTableCellDurationUnits,
-    TableCellFractionFormat as PagesTableCellFractionFormat,
-    TableCellNumeralSystemFormat as PagesTableCellNumeralSystemFormat,
-    TableCellPercentageFormat as PagesTableCellPercentageFormat,
-    TableCellPopUpMenuFormat as PagesTableCellPopUpMenuFormat,
-    TableCellPopUpMenuInitialSelection as PagesTableCellPopUpMenuInitialSelection,
-    TableCellPopUpMenuItem as PagesTableCellPopUpMenuItem,
-    TableCellScientificFormat as PagesTableCellScientificFormat,
-    TableCellSliderDisplayFormat as PagesTableCellSliderDisplayFormat,
-    TableCellSliderFormat as PagesTableCellSliderFormat,
-    TableCellSliderRange as PagesTableCellSliderRange,
-    TableCellStarRatingFormat as PagesTableCellStarRatingFormat,
-    TableCellStepperDisplayFormat as PagesTableCellStepperDisplayFormat,
-    TableCellStepperFormat as PagesTableCellStepperFormat,
-    TableCellStepperRange as PagesTableCellStepperRange,
-    TableCellTextFormat as PagesTableCellTextFormat,
-};
 pub use crate::table_cell_layout::{
     TableCellInset as PagesTableCellInset, TableCellInsets as PagesTableCellInsets,
     TableCellLayout as PagesTableCellLayout, TableCellTextWrap as PagesTableCellTextWrap,
     TableCellVerticalAlignment as PagesTableCellVerticalAlignment,
 };
-pub use crate::table_cell_data_format::{
-    TableCellDecimalPlaces as PagesTableCellDecimalPlaces,
-    TableCellFixedDecimalPlaces as PagesTableCellFixedDecimalPlaces,
-    TableCellNegativeNumberStyle as PagesTableCellNegativeNumberStyle,
-    TableCellThousandsSeparator as PagesTableCellThousandsSeparator,
-};
-pub use litchi_iwa_common::table::cell::number_format::NumberFormat
-    as PagesTableCellNumberFormat;
 pub use crate::text::ParagraphIndents as PagesTableCellParagraphIndents;
 pub use crate::text::ParagraphLineSpacing as PagesTableCellParagraphLineSpacing;
 pub use crate::text::ParagraphList as PagesTableCellParagraphList;

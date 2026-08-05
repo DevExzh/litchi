@@ -150,9 +150,6 @@ mod snappy;
 mod structured;
 /// Typed copy-on-write appearance controls shared by Pages, Numbers, and Keynote.
 pub mod table_appearance;
-/// Typed cell data formats shared by native iWork tables.
-pub mod table_cell_data_format;
-mod table_cell_number_format;
 mod table_hidden_axes;
 /// Typed native table lock controls shared by Pages, Numbers, and Keynote.
 pub mod table_lock;

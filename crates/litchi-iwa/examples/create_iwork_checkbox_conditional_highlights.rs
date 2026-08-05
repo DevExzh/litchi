@@ -2,9 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor, KeynoteTableCellCheckboxFormat};
+use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
-use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor, PagesTableCellCheckboxFormat};
+use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
 use litchi_iwa_common::table::cell::conditional_highlight::{Condition, Rule, Style};
 use litchi_numbers::cell::Value as CellValue;
@@ -79,7 +79,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
             table_id,
             CHECKBOX_ROW,
             column,
-            PagesTableCellCheckboxFormat,
+            Checkbox,
         )?;
     }
     let rules = checkbox_rules()?;
@@ -131,7 +131,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
             table.model_object_id,
             CHECKBOX_ROW,
             column,
-            KeynoteTableCellCheckboxFormat,
+            Checkbox,
         )?;
     }
     let rules = checkbox_rules()?;

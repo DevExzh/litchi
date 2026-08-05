@@ -4,6 +4,9 @@ use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 use std::path::Path;
 
+use litchi_iwa_common::comment::{
+    DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId,
+};
 use litchi_pages::document_options::Options as DocumentOptions;
 use litchi_pages::footnote::{
     Format as FootnoteFormat, Gap as FootnoteGap, Kind as FootnoteKind,
@@ -13,7 +16,6 @@ use litchi_pages::page_layout::{Layout as PageLayout, Orientation as PageOrienta
 use litchi_pages::section::{Background, Opaque, PageNumber, PageNumbering, Settings, Start};
 use litchi_iwa_text::columns::Columns;
 use prost::Message;
-use litchi_iwa_common::comment::{DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId};
 
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::comments::IWorkDrawableCommentEditor;
@@ -182,9 +184,7 @@ impl PagesEditor {
             let Some(storage_id) = drawable_owned_text_storage(self.package(), &drawable)? else {
                 continue;
             };
-            if let Some(previous_drawable) =
-                storage_owners.insert(storage_id, drawable.id.get())
-            {
+            if let Some(previous_drawable) = storage_owners.insert(storage_id, drawable.id.get()) {
                 return Err(Error::InvalidFormat(format!(
                     "Pages drawables {previous_drawable} and {} share owned text storage {storage_id}",
                     drawable.id
@@ -3908,10 +3908,7 @@ fn drawable_owned_text_storage(
     }
     owned_storage
         .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Pages drawable object {} is missing",
-                drawable.id
-            ))
+            Error::InvalidFormat(format!("Pages drawable object {} is missing", drawable.id))
         })
         .map(|storage| storage.map(|reference| reference.identifier))
 }
@@ -4675,14 +4672,8 @@ pub use charts::{PagesBodyChartInfo, RemovedPagesBodyChart};
 pub use images::{PagesImageInfo, PagesImageOptions, RemovedPagesImage};
 pub use movies::{PagesMovieInfo, PagesMovieOptions, RemovedPagesMovie};
 pub use tables::{
-    PagesCellValue, PagesTable, PagesTableCellCheckboxFormat,
-    PagesTableCellConditionalHighlightInfo, PagesTableCellCurrencyFormat, PagesTableCellDataFormat,
-    PagesTableCellDateTimeFormat, PagesTableCellDecimalPlaces, PagesTableCellDurationFormat,
-    PagesTableCellDurationStyle, PagesTableCellDurationUnit, PagesTableCellDurationUnitRange,
-    PagesTableCellDurationUnits, PagesTableCellFixedDecimalPlaces, PagesTableCellFractionFormat,
-    PagesTableCellInset, PagesTableCellInsets, PagesTableCellLayout,
-    PagesTableCellNegativeNumberStyle, PagesTableCellNumberFormat,
-    PagesTableCellNumeralSystemFormat, PagesTableCellParagraphIndents,
+    PagesCellValue, PagesTable, PagesTableCellConditionalHighlightInfo, PagesTableCellInset,
+    PagesTableCellInsets, PagesTableCellLayout, PagesTableCellParagraphIndents,
     PagesTableCellParagraphLineSpacing, PagesTableCellParagraphList,
     PagesTableCellParagraphListBullet, PagesTableCellParagraphListBulletGeometry,
     PagesTableCellParagraphListIndentation, PagesTableCellParagraphListLabelColor,
@@ -4690,22 +4681,17 @@ pub use tables::{
     PagesTableCellParagraphListNumberFormat, PagesTableCellParagraphListNumberScale,
     PagesTableCellParagraphListNumberTiering, PagesTableCellParagraphListNumbering,
     PagesTableCellParagraphListPlacement, PagesTableCellParagraphSpacing,
-    PagesTableCellParagraphTabStops, PagesTableCellPercentageFormat, PagesTableCellPopUpMenuFormat,
-    PagesTableCellPopUpMenuInitialSelection, PagesTableCellPopUpMenuItem, PagesTableCellRegion,
-    PagesTableCellScientificFormat, PagesTableCellSliderDisplayFormat, PagesTableCellSliderFormat,
-    PagesTableCellSliderRange, PagesTableCellStarRatingFormat, PagesTableCellStepperDisplayFormat,
-    PagesTableCellStepperFormat, PagesTableCellStepperRange, PagesTableCellTextAlignment,
+    PagesTableCellParagraphTabStops, PagesTableCellRegion, PagesTableCellTextAlignment,
     PagesTableCellTextBackground, PagesTableCellTextBaselineShift,
     PagesTableCellTextCapitalization, PagesTableCellTextCharacterSpacing, PagesTableCellTextColor,
-    PagesTableCellTextDecorations, PagesTableCellTextFont, PagesTableCellTextFormat,
-    PagesTableCellTextLigatures, PagesTableCellTextOutline, PagesTableCellTextScript,
-    PagesTableCellTextShadow, PagesTableCellTextStyle, PagesTableCellTextWrap,
-    PagesTableCellThousandsSeparator, PagesTableCellUpdate, PagesTableCellVerticalAlignment,
-    PagesTableColumnDeletion, PagesTableColumnInsertion, PagesTableDimension,
-    PagesTableDimensionSize, PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator,
-    PagesTableFormulaCachedValue, PagesTableFormulaCellReference, PagesTableFormulaExpression,
-    PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableInfo, PagesTablePoints,
-    PagesTableRowDeletion, PagesTableRowInsertion, PagesTableSortColumnIndex,
+    PagesTableCellTextDecorations, PagesTableCellTextFont, PagesTableCellTextLigatures,
+    PagesTableCellTextOutline, PagesTableCellTextScript, PagesTableCellTextShadow,
+    PagesTableCellTextStyle, PagesTableCellTextWrap, PagesTableCellUpdate,
+    PagesTableCellVerticalAlignment, PagesTableColumnDeletion, PagesTableColumnInsertion,
+    PagesTableDimension, PagesTableDimensionSize, PagesTableFormulaAxisReference,
+    PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue, PagesTableFormulaCellReference,
+    PagesTableFormulaExpression, PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableInfo,
+    PagesTablePoints, PagesTableRowDeletion, PagesTableRowInsertion, PagesTableSortColumnIndex,
     PagesTableSortDirection, PagesTableSortOrder, PagesTableSortRowRange, PagesTableSortRule,
     PagesTableSortScope, PagesTableTitleSettings,
 };
@@ -4731,12 +4717,8 @@ mod strict_selector_tests {
             PagesEditor::drawable_comment_replies;
         let _: fn(&mut PagesEditor, DrawableId, String) -> Result<StorageId> =
             PagesEditor::add_drawable_comment_reply;
-        let _: fn(
-            &mut PagesEditor,
-            DrawableId,
-            StorageId,
-            String,
-        ) -> Result<StorageId> = PagesEditor::set_drawable_comment_reply;
+        let _: fn(&mut PagesEditor, DrawableId, StorageId, String) -> Result<StorageId> =
+            PagesEditor::set_drawable_comment_reply;
         let _: fn(&mut PagesEditor, DrawableId, StorageId) -> Result<()> =
             PagesEditor::remove_drawable_comment_reply;
     }

@@ -6,25 +6,6 @@ use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
-use litchi_iwa::table_cell_data_format::{
-    TableCellCheckboxFormat, TableCellCurrencyCode, TableCellCurrencyFormat,
-    TableCellCurrencyStyle, TableCellCustomDateTimeFormat, TableCellCustomDateTimePattern,
-    TableCellCustomFormat, TableCellCustomFormatName, TableCellCustomNumberCondition,
-    TableCellCustomNumberConditionValue, TableCellCustomNumberFormat, TableCellCustomNumberPattern,
-    TableCellCustomNumberRule, TableCellCustomTextFormat, TableCellDateTimeFormat,
-    TableCellDecimalPlaces, TableCellDurationFormat, TableCellDurationStyle,
-    TableCellDurationUnitRange, TableCellFixedDecimalPlaces, TableCellFractionAccuracy,
-    TableCellFractionFormat, TableCellNegativeNumberStyle, TableCellNumberFormat,
-    TableCellNumeralSystemBase, TableCellNumeralSystemFixedPlaces, TableCellNumeralSystemFormat,
-    TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces, TableCellPercentageFormat,
-    TableCellPopUpMenuFormat, TableCellScientificFormat, TableCellSliderFormat,
-    TableCellSliderRange, TableCellStarRatingFormat, TableCellStepperFormat, TableCellStepperRange,
-    TableCellThousandsSeparator,
-};
-use litchi_iwa_common::table::cell::number_format::{
-    DecimalPlaces as SemanticDecimalPlaces, NegativeStyle as SemanticNegativeStyle,
-    NumberFormat as SemanticNumberFormat, ThousandsSeparator as SemanticThousandsSeparator,
-};
 use litchi_numbers::cell::Value as CellValue;
 use litchi_numbers::cell::data_format::duration::{Style as DurationStyle, UnitRange};
 use litchi_numbers::cell::data_format::numeral_system::{
@@ -79,12 +60,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn semantic_format() -> Result<SemanticNumberFormat, litchi_iwa::Error> {
-    Ok(SemanticNumberFormat::new(
-        SemanticDecimalPlaces::fixed(2)?,
-        SemanticNegativeStyle::Parentheses,
-        SemanticThousandsSeparator::Shown,
-    ))
+fn semantic_format() -> Result<Number, Box<dyn std::error::Error>> {
+    numbers_format()
 }
 
 fn numbers_format() -> Result<Number, Box<dyn std::error::Error>> {
@@ -181,112 +158,6 @@ fn numbers_custom_date_time_format() -> Result<numbers::Custom, Box<dyn std::err
 fn numbers_custom_text_format() -> Result<numbers::Custom, Box<dyn std::error::Error>> {
     Ok(numbers::custom::Text::try_new(
         numbers::custom::Name::try_new("Text With ID Suffix")?,
-        "",
-        "ID: ",
-    )?
-    .into())
-}
-
-fn percentage_format() -> Result<TableCellPercentageFormat, litchi_iwa::Error> {
-    Ok(TableCellPercentageFormat::new(
-        TableCellDecimalPlaces::fixed(2)?,
-        TableCellNegativeNumberStyle::Parentheses,
-        TableCellThousandsSeparator::Shown,
-    ))
-}
-
-fn currency_format() -> Result<TableCellCurrencyFormat, litchi_iwa::Error> {
-    Ok(TableCellCurrencyFormat::new(
-        TableCellCurrencyCode::USD,
-        TableCellDecimalPlaces::fixed(2)?,
-        TableCellNegativeNumberStyle::Parentheses,
-        TableCellThousandsSeparator::Shown,
-        TableCellCurrencyStyle::Accounting,
-    ))
-}
-
-fn scientific_format() -> Result<TableCellScientificFormat, litchi_iwa::Error> {
-    Ok(TableCellScientificFormat::new(
-        TableCellFixedDecimalPlaces::new(5)?,
-    ))
-}
-
-const fn fraction_format() -> TableCellFractionFormat {
-    TableCellFractionFormat::new(TableCellFractionAccuracy::Eighths)
-}
-
-fn numeral_system_format() -> Result<TableCellNumeralSystemFormat, litchi_iwa::Error> {
-    TableCellNumeralSystemFormat::new(
-        TableCellNumeralSystemBase::HEXADECIMAL,
-        TableCellNumeralSystemPlaces::Fixed(TableCellNumeralSystemFixedPlaces::EIGHT),
-        TableCellNumeralSystemNegativeStyle::TwosComplement,
-    )
-}
-
-fn date_time_format() -> TableCellDateTimeFormat {
-    TableCellDateTimeFormat::iso_date_time_24_hour_with_seconds()
-}
-
-const fn duration_format() -> TableCellDurationFormat {
-    TableCellDurationFormat::custom(
-        TableCellDurationStyle::Abbreviated,
-        TableCellDurationUnitRange::hours_to_milliseconds(),
-    )
-}
-
-fn slider_format() -> Result<TableCellSliderFormat, litchi_iwa::Error> {
-    Ok(TableCellSliderFormat::new(
-        TableCellSliderRange::new(-10.0, 30.0, 0.5)?,
-        TableCellNumberFormat::new(
-            TableCellDecimalPlaces::fixed(2)?,
-            TableCellNegativeNumberStyle::MinusSign,
-            TableCellThousandsSeparator::Hidden,
-        )
-        .into(),
-    ))
-}
-
-fn stepper_format() -> Result<TableCellStepperFormat, litchi_iwa::Error> {
-    Ok(TableCellStepperFormat::new(
-        TableCellStepperRange::new(-10.0, 30.0, 0.5)?,
-        TableCellNumberFormat::new(
-            TableCellDecimalPlaces::fixed(2)?,
-            TableCellNegativeNumberStyle::MinusSign,
-            TableCellThousandsSeparator::Hidden,
-        )
-        .into(),
-    ))
-}
-
-fn pop_up_menu_format() -> Result<TableCellPopUpMenuFormat, litchi_iwa::Error> {
-    TableCellPopUpMenuFormat::try_new(["Low", "Medium", "High"])
-}
-
-fn custom_number_format() -> Result<TableCellCustomFormat, litchi_iwa::Error> {
-    Ok(TableCellCustomNumberFormat::try_with_rules(
-        TableCellCustomFormatName::try_new("Grouped Integer")?,
-        TableCellCustomNumberPattern::try_new("#,###")?,
-        [TableCellCustomNumberRule::new(
-            TableCellCustomNumberCondition::LessThan(TableCellCustomNumberConditionValue::try_new(
-                0.0,
-            )?),
-            TableCellCustomNumberPattern::try_new("(#,###)")?,
-        )],
-    )?
-    .into())
-}
-
-fn custom_date_time_format() -> Result<TableCellCustomFormat, litchi_iwa::Error> {
-    Ok(TableCellCustomDateTimeFormat::new(
-        TableCellCustomFormatName::try_new("Month Day Year")?,
-        TableCellCustomDateTimePattern::try_new("MMM d, y")?,
-    )
-    .into())
-}
-
-fn custom_text_format() -> Result<TableCellCustomFormat, litchi_iwa::Error> {
-    Ok(TableCellCustomTextFormat::try_new(
-        TableCellCustomFormatName::try_new("Text With ID Suffix")?,
         "",
         "ID: ",
     )?
