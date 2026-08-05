@@ -1,6 +1,6 @@
 //! Shared formatting types for XLSX (used in both reading and writing).
 
-use super::styles::{Alignment, Scheme, Script, Underline, border::Border};
+use super::stylesheet::{Alignment, Scheme, Script, Underline, border::Border};
 
 /// Cell format information.
 #[derive(Debug, Clone, Default)]
@@ -249,7 +249,7 @@ mod tests {
 
     #[test]
     fn test_cell_border_side() {
-        use super::super::styles::border::{Color, Line, Side};
+        use super::super::stylesheet::border::{Color, Line, Side};
 
         let side = Side::new(Line::Thin).with_color(Color::rgb(0, 0, 0));
         assert_eq!(side.line.as_str(), "thin");
@@ -258,7 +258,7 @@ mod tests {
 
     #[test]
     fn test_cell_border_line_style_as_str() {
-        use super::super::styles::border::Line;
+        use super::super::stylesheet::border::Line;
 
         assert_eq!(Line::Thin.as_str(), "thin");
         assert_eq!(Line::Medium.as_str(), "medium");

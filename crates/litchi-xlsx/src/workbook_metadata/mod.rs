@@ -3,6 +3,8 @@
 /// Semantic values live in `model`, bounded XML/MCE conversion in `codec`,
 /// and the package contract vocabulary in `package`. OPC discovery remains
 /// in the OOXML compatibility host adapter.
+pub mod protection;
+
 mod codec;
 mod model;
 mod package;

@@ -6,6 +6,11 @@
 //! handle. Semantic reads and transactional edits live in [`crate::workbook`]
 //! and [`crate::edit`].
 
+/// Inert worksheet Printer Settings parts and references.
+pub mod printer_settings;
+/// Deterministic minimal package resources.
+pub mod template;
+
 use std::io::{Read, Write};
 use std::path::Path;
 

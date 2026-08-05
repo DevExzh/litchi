@@ -48,8 +48,8 @@ pub use number_format::NumberFormat;
 
 use std::collections::HashMap;
 
+use crate::conditional_formatting::Differential;
 use crate::error::Result;
-use crate::xlsx::conditional_formatting::Differential;
 
 /// Styles collection for an Excel workbook.
 ///

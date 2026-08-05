@@ -1,5 +1,8 @@
 //! Checked worksheet-name values and locale-independent identity semantics.
 
+/// Worksheet-level `sheetPr` metadata.
+pub mod properties;
+
 use std::borrow::Cow;
 use std::convert::Infallible;
 use std::fmt;

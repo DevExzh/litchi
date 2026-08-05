@@ -2,24 +2,35 @@
 
 use std::collections::HashMap;
 
-use litchi_core::sheet::Result as SheetResult;
+use crate::error::Result as SheetResult;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
-use super::RichTextRun;
-use super::namespace::is_spreadsheetml_name;
-use crate::error::{OoxmlError, Result};
+use crate::error::{Error, Result};
+use crate::raw::namespace::is_spreadsheetml_name;
 use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 
 const MAX_PREALLOCATED_STRINGS: usize = 4096;
 
 /// Shared strings table for efficient string storage.
 #[derive(Debug, Default)]
-pub struct SharedStrings {
+pub struct Table {
     strings: Vec<String>,
-    rich_text: HashMap<usize, Vec<RichTextRun>>,
+    rich_text: HashMap<usize, Vec<Run>>,
+}
+
+/// One rich-text run stored inside a shared-string item.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Run {
+    pub text: String,
+    pub font_name: Option<String>,
+    pub font_size: Option<f64>,
+    pub bold: bool,
+    pub italic: bool,
+    pub underline: bool,
+    pub color: Option<String>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -40,7 +51,7 @@ enum TextTarget {
 
 struct PendingString {
     text: String,
-    runs: Vec<RichTextRun>,
+    runs: Vec<Run>,
     saw_simple_text: bool,
     saw_rich_run: bool,
 }
@@ -57,7 +68,7 @@ impl PendingString {
 }
 
 struct PendingRun {
-    value: RichTextRun,
+    value: Run,
     saw_text: bool,
     saw_properties: bool,
     seen_properties: u8,
@@ -66,7 +77,7 @@ struct PendingRun {
 impl PendingRun {
     fn new() -> Self {
         Self {
-            value: RichTextRun {
+            value: Run {
                 text: String::new(),
                 font_name: None,
                 font_size: None,
@@ -84,7 +95,7 @@ impl PendingRun {
 
 struct SharedStringParser {
     strings: Vec<String>,
-    rich_text: HashMap<usize, Vec<RichTextRun>>,
+    rich_text: HashMap<usize, Vec<Run>>,
     pending_string: Option<PendingString>,
     pending_run: Option<PendingRun>,
     /// `sst/@uniqueCount`, used only to size the string table up front.
@@ -102,7 +113,7 @@ impl SharedStringParser {
         }
     }
 
-    fn parse(content: &str) -> Result<SharedStrings> {
+    fn parse(content: &str) -> Result<Table> {
         let mut reader = NsReader::from_reader(content.as_bytes());
         let mut parser = Self::new();
         let mut stack = Vec::new();
@@ -112,7 +123,7 @@ impl SharedStringParser {
             let decoder = reader.decoder();
             let event = reader
                 .read_event()
-                .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                .map_err(|error| Error::Invalid(error.to_string()))?
                 .into_owned();
             let resolver = reader.resolver().clone();
             let (namespace, event) = resolver.resolve_event(event);
@@ -149,7 +160,7 @@ impl SharedStringParser {
                     if let Some(target) = current_text_target(&stack) {
                         let value = text
                             .decode()
-                            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                            .map_err(|error| Error::Invalid(error.to_string()))?;
                         parser.push_text(target, &value)?;
                     }
                 },
@@ -157,7 +168,7 @@ impl SharedStringParser {
                     if let Some(target) = current_text_target(&stack) {
                         let value = text
                             .decode()
-                            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                            .map_err(|error| Error::Invalid(error.to_string()))?;
                         parser.push_text(target, &value)?;
                     }
                 },
@@ -190,7 +201,7 @@ impl SharedStringParser {
             }
         }
 
-        Ok(SharedStrings {
+        Ok(Table {
             strings: parser.strings,
             rich_text: parser.rich_text,
         })
@@ -482,7 +493,7 @@ impl SharedStringParser {
     }
 }
 
-impl SharedStrings {
+impl Table {
     /// Create a new empty shared strings table.
     pub fn new() -> Self {
         Self::default()
@@ -490,10 +501,8 @@ impl SharedStrings {
 
     /// Parse shared strings from `xl/sharedStrings.xml`.
     pub fn parse(content: &str) -> SheetResult<Self> {
-        let content = litchi_ooxml_common::mce::process_str(content)
-            .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)?;
+        let content = litchi_ooxml_common::mce::process_str(content)?;
         SharedStringParser::parse(content.as_ref())
-            .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)
     }
 
     /// Get a string by its index.
@@ -517,7 +526,7 @@ impl SharedStrings {
     }
 
     /// Get rich text runs for a specific shared string index, if present.
-    pub fn rich_text_runs(&self, index: usize) -> Option<&[RichTextRun]> {
+    pub fn rich_text_runs(&self, index: usize) -> Option<&[Run]> {
         self.rich_text.get(&index).map(Vec::as_slice)
     }
 }
@@ -646,8 +655,8 @@ fn mark_property(seen: &mut u8, bit: u8, description: &str) -> Result<()> {
     Ok(())
 }
 
-fn invalid(message: impl Into<String>) -> OoxmlError {
-    OoxmlError::InvalidFormat(message.into())
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
 }
 
 #[cfg(test)]
@@ -670,7 +679,7 @@ mod tests {
                 <x:si/>
             </x:sst>"#
         );
-        let strings = SharedStrings::parse(&xml).unwrap();
+        let strings = Table::parse(&xml).unwrap();
         assert_eq!(
             strings.strings(),
             &["A & B\n😀_x0041_", "", "Rich <text>", ""]
@@ -696,7 +705,7 @@ mod tests {
                 <si><f:t>Ignored</f:t><t>Strict</t></si><si><r><f:t>Ignored</f:t><t>Run</t></r></si>
             </sst>"#
         );
-        let strings = SharedStrings::parse(&xml).unwrap();
+        let strings = Table::parse(&xml).unwrap();
         assert_eq!(strings.strings(), &["Strict", "Run"]);
         assert_eq!(strings.rich_text_runs(1).unwrap()[0].text, "Run");
     }
@@ -710,7 +719,7 @@ mod tests {
             format!(r#"<sst xmlns="{S}"><si><t>bad_xD800_</t></si></sst>"#),
             format!(r#"<sst xmlns="{S}"><si><r><rPr/><t>x</t>"#),
         ] {
-            assert!(SharedStrings::parse(&xml).is_err(), "accepted {xml}");
+            assert!(Table::parse(&xml).is_err(), "accepted {xml}");
         }
     }
 
@@ -728,7 +737,7 @@ mod tests {
             format!(r#"<sst xmlns="{S}" uniqueCount="NaN"><si><t>one</t></si></sst>"#),
             format!(r#"<sst xmlns="{S}" count="-1"><si><t>one</t></si></sst>"#),
         ] {
-            let parsed = SharedStrings::parse(&xml).unwrap_or_else(|e| panic!("{xml}: {e}"));
+            let parsed = Table::parse(&xml).unwrap_or_else(|e| panic!("{xml}: {e}"));
             assert_eq!(parsed.strings(), ["one"], "{xml}");
         }
     }
@@ -737,7 +746,7 @@ mod tests {
     #[test]
     fn oversized_unique_count_hint_does_not_preallocate() {
         let xml = format!(r#"<sst xmlns="{S}" uniqueCount="4294967295"><si><t>one</t></si></sst>"#);
-        let parsed = SharedStrings::parse(&xml).unwrap();
+        let parsed = Table::parse(&xml).unwrap();
         assert_eq!(parsed.strings(), ["one"]);
     }
 }

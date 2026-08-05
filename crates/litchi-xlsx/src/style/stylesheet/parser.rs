@@ -13,7 +13,7 @@ use super::border::{Color, Dir, Line, Rgb, Side, Tint};
 use super::{
     Alignment, Border, CellStyle, Fill, Font, NumberFormat, Scheme, Script, Styles, Underline,
 };
-use crate::error::{OoxmlError, Result};
+use crate::error::{Error, Result};
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 
 const SPREADSHEETML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -28,10 +28,10 @@ fn is_spreadsheetml_name(spreadsheet_namespace: bool, name: QName<'_>, local_nam
 /// Parse styles from `xl/styles.xml` XML content.
 pub fn parse_styles(content: &str) -> Result<Styles> {
     let differential_formats =
-        crate::xlsx::conditional_formatting::parse_differential_formats(content.as_bytes())?;
+        crate::conditional_formatting::parse_differential_formats(content.as_bytes())?;
     let processed = litchi_ooxml_common::mce::process_ooxml(content.as_bytes())?;
     let content =
-        std::str::from_utf8(processed.as_ref()).map_err(|e| OoxmlError::Xml(e.to_string()))?;
+        std::str::from_utf8(processed.as_ref()).map_err(|e| Error::Invalid(e.to_string()))?;
     let mut reader = NsReader::from_reader(content.as_bytes());
     let mut styles = Styles::new();
     let mut seen_root = false;
@@ -811,7 +811,7 @@ fn parse_alignment(element: &BytesStart<'_>, decoder: Decoder) -> Result<Alignme
     let mut alignment = Alignment::new();
     let mut seen = 0u16;
     for attribute in element.attributes() {
-        let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        let attribute = attribute.map_err(|error| Error::Invalid(error.to_string()))?;
         let qualified = attribute.key.as_ref();
         if qualified == b"xmlns" || qualified.starts_with(b"xmlns:") {
             continue;
@@ -822,7 +822,7 @@ fn parse_alignment(element: &BytesStart<'_>, decoder: Decoder) -> Result<Alignme
         }
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
-            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            .map_err(|error| Error::Invalid(error.to_string()))?;
         match local.as_ref() {
             b"horizontal" => {
                 mark_property(&mut seen, 1, "horizontal alignment")?;
@@ -884,7 +884,7 @@ fn parse_alignment(element: &BytesStart<'_>, decoder: Decoder) -> Result<Alignme
     Ok(alignment)
 }
 
-fn unsupported_alignment_attribute(name: &[u8]) -> OoxmlError {
+fn unsupported_alignment_attribute(name: &[u8]) -> Error {
     invalid(format!(
         "unsupported cell alignment attribute '{}'",
         String::from_utf8_lossy(name)
@@ -1158,16 +1158,16 @@ fn set_once<T>(target: &mut Option<T>, value: T, description: &str) -> Result<()
     Ok(())
 }
 
-fn invalid(message: impl Into<String>) -> OoxmlError {
-    OoxmlError::InvalidFormat(message.into())
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
 }
 
-fn unterminated(element: &str) -> OoxmlError {
+fn unterminated(element: &str) -> Error {
     invalid(format!("unterminated SpreadsheetML {element} element"))
 }
 
-fn xml_error(context: &str, error: quick_xml::Error) -> OoxmlError {
-    OoxmlError::Xml(format!("XML error in {context}: {error}"))
+fn xml_error(context: &str, error: quick_xml::Error) -> Error {
+    Error::Invalid(format!("XML error in {context}: {error}"))
 }
 
 #[cfg(test)]

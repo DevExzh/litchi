@@ -1,5 +1,8 @@
 //! Formula values and stored calculation caches.
 
+/// Shared-formula expansion and reference translation.
+pub mod shared;
+
 use std::fmt;
 
 use crate::cell::{Text, Value};

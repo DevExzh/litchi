@@ -1,5 +1,12 @@
 //! Shared cell-format handles without native SpreadsheetML identifiers.
 
+/// Applied cell-format views used by worksheet-facing APIs.
+pub mod format;
+/// The parsed `styles.xml` resource graph.
+pub mod stylesheet;
+/// The DrawingML theme resource associated with a workbook.
+pub mod theme;
+
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::Range;

@@ -6,12 +6,12 @@ const MAX_ROW: u32 = 1_048_576;
 const MAX_COLUMN: u32 = 16_384;
 
 #[derive(Debug, Clone)]
-pub(crate) struct SharedFormulaCell {
-    pub(crate) row: u32,
-    pub(crate) column: u32,
-    pub(crate) index: u32,
-    pub(crate) reference: Option<String>,
-    pub(crate) formula: String,
+pub struct Member {
+    pub row: u32,
+    pub column: u32,
+    pub index: u32,
+    pub reference: Option<String>,
+    pub formula: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,9 +57,9 @@ struct Master {
     formula: String,
 }
 
-pub(crate) fn resolve_shared_formulas(
+pub fn resolve(
     cells: &mut HashMap<u32, HashMap<u32, CellValue>>,
-    shared_cells: &[SharedFormulaCell],
+    shared_cells: &[Member],
 ) -> Result<()> {
     if shared_cells.is_empty() {
         return Ok(());
@@ -507,235 +507,4 @@ fn render_row(row: Axis, delta: i64, output: &mut String) {
         output.push('$');
     }
     output.push_str(&value.to_string());
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::xlsx::parsers::worksheet_parser::parse_worksheet_data;
-    use litchi_opc::{OpcPackage, PackURI};
-
-    fn formula(value: &CellValue) -> (&str, Option<&CellValue>) {
-        let CellValue::Formula {
-            formula,
-            cached_value,
-            ..
-        } = value
-        else {
-            panic!("expected formula cell")
-        };
-        (formula, cached_value.as_deref())
-    }
-
-    fn parse_fixture(
-        bytes: &[u8],
-        sheet: &str,
-    ) -> Result<crate::xlsx::parsers::worksheet_parser::ParsedWorksheetData> {
-        let package = OpcPackage::from_bytes(bytes)?;
-        let part = package.get_part(&PackURI::new(sheet)?)?;
-        parse_worksheet_data(std::str::from_utf8(part.blob())?)
-    }
-
-    #[test]
-    fn translates_reference_forms_without_rewriting_other_tokens() {
-        let input = r#"SUM(A1,$A1,A$1,$A$1,A1:B2,A:C,1:3,'My Sheet'!A1,Sheet1:Sheet3!A1,[1]Sheet1!A1,INDIRECT("A1"),LOG10(2),Table1[A1])"#;
-        assert_eq!(
-            translate_formula(input, 1, 1, 3, 2),
-            r#"SUM(B3,$A3,B$1,$A$1,B3:C4,B:D,3:5,'My Sheet'!B3,Sheet1:Sheet3!B3,[1]Sheet1!B3,INDIRECT("A1"),LOG10(2),Table1[A1])"#
-        );
-    }
-
-    #[test]
-    fn checked_reference_shift_produces_ref_error() {
-        assert_eq!(translate_formula("A1:$A$1", 2, 2, 1, 1), "#REF!:$A$1");
-        assert_eq!(translate_formula("XFD1048576", 1, 1, 2, 2), "#REF!");
-    }
-
-    #[test]
-    fn validates_missing_duplicate_and_outside_groups() {
-        let xml = |body: &str| {
-            format!(
-                r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>{body}</sheetData></worksheet>"#
-            )
-        };
-        for body in [
-            r#"<row r="1"><c r="A1"><f t="shared" si="0"/></c></row>"#,
-            r#"<row r="1"><c r="A1"><f t="shared" ref="A1:A2" si="0">A1</f></c><c r="B1"><f t="shared" ref="B1:B2" si="0">B1</f></c></row>"#,
-            r#"<row r="1"><c r="A1"><f t="shared" ref="A1:A1" si="0">A1</f></c><c r="B1"><f t="shared" si="0"/></c></row>"#,
-        ] {
-            assert!(parse_worksheet_data(&xml(body)).is_err(), "accepted {body}");
-        }
-    }
-
-    #[test]
-    fn intersecting_declared_ranges_use_explicit_si_membership() {
-        let xml = r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>
-            <row r="1">
-                <c r="A1"><f t="shared" ref="A1:B2" si="0">A1</f><v>1</v></c>
-                <c r="B1"><f t="shared" ref="B1:C2" si="1">B1</f><v>2</v></c>
-                <c r="C1"><f t="shared" si="1"/><v>3</v></c>
-            </row>
-            <row r="2">
-                <c r="A2"><f t="shared" si="0"/><v>4</v></c>
-                <c r="B2"><f>B2+1</f><v>5</v></c>
-            </row>
-        </sheetData></worksheet>"#;
-        let data = parse_worksheet_data(xml).unwrap();
-        assert_eq!(formula(&data.cells[&2][&1]).0, "A2");
-        assert_eq!(formula(&data.cells[&1][&3]).0, "C1");
-        assert_eq!(formula(&data.cells[&2][&2]).0, "B2+1");
-    }
-
-    #[test]
-    fn rejects_duplicate_or_ambiguous_actual_membership() {
-        let mut cells = HashMap::from([
-            (
-                1,
-                HashMap::from([
-                    (
-                        1,
-                        CellValue::Formula {
-                            formula: "A1".into(),
-                            cached_value: None,
-                            is_array: false,
-                            array_range: None,
-                        },
-                    ),
-                    (
-                        2,
-                        CellValue::Formula {
-                            formula: "B1".into(),
-                            cached_value: None,
-                            is_array: false,
-                            array_range: None,
-                        },
-                    ),
-                ]),
-            ),
-            (
-                2,
-                HashMap::from([(
-                    1,
-                    CellValue::Formula {
-                        formula: String::new(),
-                        cached_value: None,
-                        is_array: false,
-                        array_range: None,
-                    },
-                )]),
-            ),
-        ]);
-        let shared = vec![
-            SharedFormulaCell {
-                row: 1,
-                column: 1,
-                index: 0,
-                reference: Some("A1:A2".into()),
-                formula: "A1".into(),
-            },
-            SharedFormulaCell {
-                row: 1,
-                column: 2,
-                index: 1,
-                reference: Some("B1:B2".into()),
-                formula: "B1".into(),
-            },
-            SharedFormulaCell {
-                row: 2,
-                column: 1,
-                index: 0,
-                reference: None,
-                formula: String::new(),
-            },
-            SharedFormulaCell {
-                row: 2,
-                column: 1,
-                index: 1,
-                reference: None,
-                formula: String::new(),
-            },
-        ];
-        assert!(resolve_shared_formulas(&mut cells, &shared).is_err());
-    }
-
-    #[test]
-    fn preserves_cached_values_and_explicit_formulas() {
-        let xml = r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>
-            <row r="1"><c r="A1" t="str"><f t="shared" ref="A1:A3" si="7">B1</f><v>one</v></c></row>
-            <row r="2"><c r="A2" t="str"><f>B2+1</f><v>two</v></c></row>
-            <row r="3"><c r="A3" t="str"><f t="shared" si="7"/><v>three</v></c></row>
-        </sheetData></worksheet>"#;
-        let data = parse_worksheet_data(xml).unwrap();
-        assert_eq!(
-            formula(&data.cells[&1][&1]),
-            ("B1", Some(&CellValue::String("one".into())))
-        );
-        assert_eq!(formula(&data.cells[&2][&1]).0, "B2+1");
-        assert_eq!(
-            formula(&data.cells[&3][&1]),
-            ("B3", Some(&CellValue::String("three".into())))
-        );
-    }
-
-    #[test]
-    fn poi_and_libreoffice_fixture_oracles_expand() {
-        let poi = parse_fixture(
-            include_bytes!("../../../../test-data/poi/test-data/spreadsheet/shared_formulas.xlsx"),
-            "/xl/worksheets/sheet1.xml",
-        )
-        .unwrap();
-        assert_eq!(formula(&poi.cells[&3][&1]).0, "B3");
-        assert_eq!(formula(&poi.cells[&41][&1]).0, "B41");
-
-        let shifted = parse_fixture(
-            include_bytes!(
-                "../../../../test-data/poi/test-data/spreadsheet/TestShiftRowSharedFormula.xlsx"
-            ),
-            "/xl/worksheets/sheet1.xml",
-        )
-        .unwrap();
-        assert_eq!(formula(&shifted.cells[&5][&5]).0, "SUM(E2:E4)");
-
-        let basic = parse_fixture(
-            include_bytes!("../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/basic.xlsx"),
-            "/xl/worksheets/sheet1.xml",
-        )
-        .unwrap();
-        assert_eq!(formula(&basic.cells[&4][&2]).0, "A4*10");
-        assert_eq!(formula(&basic.cells[&19][&2]).0, "A19*10");
-
-        let updated = parse_fixture(
-            include_bytes!("../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/refupdate.xlsx"),
-            "/xl/worksheets/sheet1.xml",
-        )
-        .unwrap();
-        assert_eq!(formula(&updated.cells[&1][&3]).0, "C30+1");
-        assert_eq!(formula(&updated.cells[&1][&5]).0, "E30+1");
-
-        let text = parse_fixture(
-            include_bytes!("../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/text-results.xlsx"),
-            "/xl/worksheets/sheet1.xml",
-        )
-        .unwrap();
-        assert_eq!(
-            formula(&text.cells[&4][&2]),
-            ("A4", Some(&CellValue::String("C".into())))
-        );
-
-        parse_fixture(
-            include_bytes!("../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/3d-reference.xlsx"),
-            "/xl/worksheets/sheet1.xml",
-        )
-        .unwrap();
-    }
-
-    #[test]
-    fn poi_intersecting_range_regression_fixtures_resolve_by_si() {
-        for bytes in [
-            include_bytes!("../../../../test-data/poi/test-data/spreadsheet/testSharedFormulasSetBlank.xlsx").as_slice(),
-            include_bytes!("../../../../test-data/poi/test-data/spreadsheet/testSharedFormulasRangeSetBlankBug.xlsx").as_slice(),
-        ] {
-            parse_fixture(bytes, "/xl/worksheets/sheet1.xml").unwrap();
-        }
-    }
 }

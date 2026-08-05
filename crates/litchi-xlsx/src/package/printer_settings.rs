@@ -1,7 +1,7 @@
 //! SpreadsheetML worksheet Printer Settings references and inert DEVMODE parts.
 
-use crate::error::{OoxmlError, Result};
-use crate::xlsx::page_setup::parse_worksheet_page_setup_relationship_id;
+use crate::error::{Error, Result};
+use crate::page_setup::parse_worksheet_page_setup_relationship_id;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use quick_xml::events::Event;
@@ -180,7 +180,7 @@ pub fn store_printer_settings(
 ) -> Result<()> {
     validate_id(&value.reference.relationship_id)?;
     validate_settings_bytes(&value.resource.data)?;
-    let resource_uri = PackURI::new(&value.resource.part_name).map_err(OoxmlError::InvalidUri)?;
+    let resource_uri = PackURI::new(&value.resource.part_name).map_err(invalid)?;
     validate_printer_settings_uri(&resource_uri)?;
     if load_printer_settings(package, worksheet_name)?.is_some() {
         return Err(invalid("worksheet already has Printer Settings"));
@@ -501,13 +501,13 @@ fn escape(output: &mut Vec<u8>, value: &str) {
         }
     }
 }
-fn xml_error(error: impl std::fmt::Display) -> OoxmlError {
-    OoxmlError::Xml(error.to_string())
+fn xml_error(error: impl std::fmt::Display) -> Error {
+    Error::Invalid(error.to_string())
 }
-fn invalid(message: impl Into<String>) -> OoxmlError {
-    OoxmlError::InvalidFormat(message.into())
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
 }
-fn limit(name: &str) -> OoxmlError {
+fn limit(name: &str) -> Error {
     invalid(format!("worksheet Printer Settings {name} limit exceeded"))
 }
 
@@ -650,7 +650,7 @@ mod tests {
         .unwrap_err();
         assert!(matches!(
             error,
-            OoxmlError::Opc(litchi_opc::error::OpcError::EquivalentPartNames { .. })
+            Error::Package(litchi_opc::error::OpcError::EquivalentPartNames { .. })
         ));
         assert_eq!(package.part_count(), original_part_count);
         assert_eq!(package.get_part(&uri).unwrap().blob(), original_xml);

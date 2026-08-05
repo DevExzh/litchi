@@ -11,13 +11,13 @@ use quick_xml::{
     reader::NsReader,
 };
 
-use crate::error::{OoxmlError, Result as SheetResult};
+use crate::error::{Error, Result as SheetResult};
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 
 const DRAWINGML: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
 
-fn invalid(message: impl Into<String>) -> OoxmlError {
-    OoxmlError::InvalidFormat(message.into())
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
 }
 
 /// One of the twelve theme color slots, in `a:clrScheme` order.

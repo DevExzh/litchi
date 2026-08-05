@@ -3,7 +3,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-pub use litchi_xlsx::color::{ParseRgbError, Rgb};
+pub use crate::color::{ParseRgbError, Rgb};
 
 /// SpreadsheetML namespace and edge-name convention.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

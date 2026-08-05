@@ -1,9 +1,9 @@
 //! Immutable XLSX worksheet sheet-properties read model.
 
-use crate::error::{OoxmlError, Result};
-use crate::xlsx::namespace::is_spreadsheetml_name;
+use crate::error::{Error, Result};
+use crate::outline_properties::{OutlineProperties, parse_outline_properties};
+use crate::raw::namespace::is_spreadsheetml_name;
 use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
-use litchi_xlsx::outline_properties::{OutlineProperties, parse_outline_properties};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -794,11 +794,11 @@ fn reject_unsafe_event(event: &Event<'_>) -> Result<()> {
     Ok(())
 }
 
-fn invalid(message: impl Into<String>) -> OoxmlError {
-    OoxmlError::InvalidFormat(message.into())
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
 }
 
-fn xml_error(error: impl std::fmt::Display) -> OoxmlError {
+fn xml_error(error: impl std::fmt::Display) -> Error {
     invalid(format!("invalid worksheet sheetPr XML: {error}"))
 }
 

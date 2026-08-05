@@ -232,6 +232,7 @@ impl Font {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::mem::size_of;
 
     #[test]
     fn test_font_default() {
@@ -383,8 +384,8 @@ mod tests {
         assert_eq!(error.value(), "Single");
         assert!("body".parse::<Scheme>().is_err());
         assert!("raised".parse::<Script>().is_err());
-        assert_eq!(std::mem::size_of::<Underline>(), 1);
-        assert_eq!(std::mem::size_of::<Scheme>(), 1);
-        assert_eq!(std::mem::size_of::<Script>(), 1);
+        assert_eq!(size_of::<Underline>(), 1);
+        assert_eq!(size_of::<Scheme>(), 1);
+        assert_eq!(size_of::<Script>(), 1);
     }
 }
