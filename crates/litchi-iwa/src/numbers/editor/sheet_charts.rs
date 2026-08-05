@@ -706,14 +706,14 @@ mod tests {
         ChartErrorBarDirection, ChartErrorBarFixedValue, ChartFont, ChartFontSize,
         ChartGapPercentage, ChartGapSpacing, ChartLegendFill, ChartLegendFont, ChartLegendFontSize,
         ChartLegendFrame, ChartLegendRect, ChartLegendShadow, ChartLegendStroke,
-        ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieLeaderLineVisibility,
-        ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners,
-        ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke,
-        ChartSeriesStrokePattern, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
-        ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAutoFit,
-        ChartSeriesValueLabelLocation, ChartSeriesValueLabelVisibility, ChartShadow, DecimalPlaces,
-        LabelAffixes, MajorStepCount, MinorStepCount, NegativeStyle, NumberFormat, Scale, Steps,
-        TickMarkLocation,
+        ChartPieLabelDistance, ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex,
+        ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex,
+        ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
+        ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
+        ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelLocation,
+        ChartSeriesValueLabelVisibility, ChartShadow, DecimalPlaces, LabelAffixes, LabelVisibility,
+        LeaderLineVisibility, MajorStepCount, MinorStepCount, NegativeStyle, NumberFormat, Scale,
+        Steps, TickMarkLocation,
     };
     use crate::numbers::NumbersDocumentBuilder;
     use crate::package_metadata::{component_identifier_for_entry, component_uuid_identifiers};
@@ -802,6 +802,81 @@ mod tests {
                     .contains(&entry.reference.identifier)
             );
         }
+    }
+
+    fn assert_series_non_styles_are_styled(
+        editor: &NumbersEditor,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        expected_count: usize,
+    ) {
+        let graph = chart_graph(editor, sheet_id, drawable_object_id).unwrap();
+        let archive = editor.package().archive(&graph.archive_name).unwrap();
+        let chart = archive.object(drawable_object_id).unwrap();
+        let chart = chart
+            .messages
+            .iter()
+            .find(|message| message.type_ == CHART_MESSAGE_TYPE)
+            .and_then(|message| IWorkChartArchive::decode(message.data.as_slice()).ok())
+            .and_then(|archive| archive.chart)
+            .unwrap();
+        let entries = chart.series_non_styles.unwrap().entries;
+        assert_eq!(entries.len(), expected_count);
+
+        let mut stylesheet_id = None;
+        let style_ids = entries
+            .iter()
+            .map(|entry| {
+                let non_style_archive_name = unique_chart_object_archive_name(
+                    editor.package(),
+                    entry.reference.identifier,
+                    "test series non-style",
+                )
+                .unwrap();
+                assert_eq!(non_style_archive_name, graph.archive_name);
+                assert!(
+                    !is_object_container_archive(editor.package(), &non_style_archive_name)
+                        .unwrap()
+                );
+                let non_style_archive = editor.package().archive(&non_style_archive_name).unwrap();
+                let non_style = non_style_archive
+                    .object(entry.reference.identifier)
+                    .unwrap();
+                let message = non_style
+                    .messages
+                    .iter()
+                    .find(|message| message.type_ == SERIES_NON_STYLE_MESSAGE_TYPE)
+                    .unwrap();
+                let parent = tsch::ChartSeriesNonStyleArchive::decode(message.data.as_slice())
+                    .unwrap()
+                    .super_
+                    .unwrap();
+                let parent_stylesheet_id = parent.stylesheet.unwrap().identifier;
+                match stylesheet_id {
+                    Some(expected) => assert_eq!(expected, parent_stylesheet_id),
+                    None => stylesheet_id = Some(parent_stylesheet_id),
+                }
+                let component_id =
+                    component_identifier_for_entry(editor.package(), &non_style_archive_name)
+                        .unwrap()
+                        .unwrap();
+                assert!(
+                    component_uuid_identifiers(editor.package(), component_id)
+                        .unwrap()
+                        .unwrap()
+                        .contains(&entry.reference.identifier)
+                );
+                entry.reference.identifier
+            })
+            .collect::<Vec<_>>();
+
+        validate_chart_styles_registered(
+            editor.package(),
+            stylesheet_id.unwrap(),
+            &graph.archive_name,
+            &style_ids,
+        )
+        .unwrap();
     }
 
     fn gap_spacing(between_items: f32, between_sets: f32) -> ChartGapSpacing {
@@ -3799,11 +3874,11 @@ mod tests {
         let source = editor
             .add_sheet_chart(sheet_id, ChartKind::Pie2d, pie_data(), POSITION, SIZE)
             .unwrap();
-        let defaults = vec![ChartPieLabelVisibility::DEFAULT; 3];
+        let defaults = vec![LabelVisibility::DEFAULT; 3];
         let customized = [
-            ChartPieLabelVisibility::DATA_POINT_NAMES_ONLY,
-            ChartPieLabelVisibility::ALL,
-            ChartPieLabelVisibility::HIDDEN,
+            LabelVisibility::DATA_POINT_NAMES_ONLY,
+            LabelVisibility::ALL,
+            LabelVisibility::HIDDEN,
         ];
         assert_eq!(
             editor
@@ -3824,6 +3899,12 @@ mod tests {
                 &customized,
             )
             .unwrap();
+        assert_series_non_styles_are_styled(
+            &editor,
+            sheet_id,
+            source.drawable_object_id,
+            customized.len(),
+        );
         assert_eq!(
             editor
                 .sheet_chart_pie_label_visibility(
@@ -3832,7 +3913,7 @@ mod tests {
                     ChartPieWedgeIndex::from_zero_based(1),
                 )
                 .unwrap(),
-            ChartPieLabelVisibility::ALL
+            LabelVisibility::ALL
         );
         let explosions = [
             ChartPieWedgeExplosion::from_percent(10.0).unwrap(),
@@ -3878,7 +3959,7 @@ mod tests {
                 sheet_id,
                 source.drawable_object_id,
                 ChartPieWedgeIndex::from_zero_based(0),
-                ChartPieLabelVisibility::VALUES_ONLY,
+                LabelVisibility::VALUES_ONLY,
             )
             .unwrap();
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -3932,11 +4013,11 @@ mod tests {
             .set_sheet_chart_pie_label_distances(sheet_id, source.drawable_object_id, &defaults)
             .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
-        let leader_line_defaults = [ChartPieLeaderLineVisibility::Visible; 3];
+        let leader_line_defaults = [LeaderLineVisibility::Visible; 3];
         let leader_line_customized = [
-            ChartPieLeaderLineVisibility::Hidden,
-            ChartPieLeaderLineVisibility::Visible,
-            ChartPieLeaderLineVisibility::Hidden,
+            LeaderLineVisibility::Hidden,
+            LeaderLineVisibility::Visible,
+            LeaderLineVisibility::Hidden,
         ];
         assert_eq!(
             editor
@@ -3965,7 +4046,7 @@ mod tests {
             source.drawable_object_id,
             leader_line_customized
                 .iter()
-                .filter(|visibility| **visibility == ChartPieLeaderLineVisibility::Hidden)
+                .filter(|visibility| **visibility == LeaderLineVisibility::Hidden)
                 .count(),
         );
         assert_eq!(
@@ -3976,7 +4057,7 @@ mod tests {
                     ChartPieWedgeIndex::from_zero_based(0),
                 )
                 .unwrap(),
-            ChartPieLeaderLineVisibility::Hidden
+            LeaderLineVisibility::Hidden
         );
         editor
             .set_sheet_chart_pie_leader_line_visibilities(
@@ -4007,9 +4088,9 @@ mod tests {
             customized[1]
         );
         let visibilities = [
-            ChartPieLabelVisibility::DATA_POINT_NAMES_ONLY,
-            ChartPieLabelVisibility::ALL,
-            ChartPieLabelVisibility::VALUES_ONLY,
+            LabelVisibility::DATA_POINT_NAMES_ONLY,
+            LabelVisibility::ALL,
+            LabelVisibility::VALUES_ONLY,
         ];
         editor
             .set_sheet_chart_pie_label_visibilities(
@@ -4031,7 +4112,7 @@ mod tests {
             .set_sheet_chart_pie_label_visibilities(
                 sheet_id,
                 source.drawable_object_id,
-                &[ChartPieLabelVisibility::DEFAULT; 3],
+                &[LabelVisibility::DEFAULT; 3],
             )
             .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -4065,7 +4146,7 @@ mod tests {
                 sheet_id,
                 source.drawable_object_id,
                 ChartPieWedgeIndex::from_zero_based(0),
-                ChartPieLeaderLineVisibility::Visible,
+                LeaderLineVisibility::Visible,
             )
             .unwrap();
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -4086,9 +4167,9 @@ mod tests {
                 .sheet_chart_pie_leader_line_visibilities(sheet_id, source.drawable_object_id,)
                 .unwrap(),
             [
-                ChartPieLeaderLineVisibility::Visible,
-                ChartPieLeaderLineVisibility::Visible,
-                ChartPieLeaderLineVisibility::Hidden,
+                LeaderLineVisibility::Visible,
+                LeaderLineVisibility::Visible,
+                LeaderLineVisibility::Hidden,
             ]
         );
         let before_rejected = reopened.to_bytes().unwrap();

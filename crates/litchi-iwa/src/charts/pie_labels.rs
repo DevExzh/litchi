@@ -10,57 +10,12 @@ use crate::charts::series_non_style::{
 use crate::protobuf::tsch;
 use crate::wire::{parse_wire_fields, patch_varint_field};
 use crate::{Error, IWorkPackage, Result};
+use litchi_iwa_common::chart::pie::LabelVisibility;
 
 /// `tschchartseriespieshowserieslabels` in the generated series non-style.
 const PIE_SHOW_DATA_POINT_NAMES_FIELD: u32 = 31;
 /// `tschchartseriespieshowvaluelabels` in the generated series non-style.
 const PIE_SHOW_VALUES_FIELD: u32 = 44;
-
-/// Visibility of the two native label components for one pie or donut wedge.
-///
-/// iWork defaults to showing values and hiding data-point names.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ChartPieLabelVisibility {
-    data_point_names_visible: bool,
-    values_visible: bool,
-}
-
-impl ChartPieLabelVisibility {
-    /// Native iWork defaults: values visible and data-point names hidden.
-    pub const DEFAULT: Self = Self::new(false, true);
-    /// Hide both label components.
-    pub const HIDDEN: Self = Self::new(false, false);
-    /// Show only data-point names.
-    pub const DATA_POINT_NAMES_ONLY: Self = Self::new(true, false);
-    /// Show only values.
-    pub const VALUES_ONLY: Self = Self::DEFAULT;
-    /// Show data-point names and values.
-    pub const ALL: Self = Self::new(true, true);
-
-    /// Construct an explicit label-visibility combination.
-    pub const fn new(data_point_names_visible: bool, values_visible: bool) -> Self {
-        Self {
-            data_point_names_visible,
-            values_visible,
-        }
-    }
-
-    /// Whether iWork renders the data-point name.
-    pub const fn data_point_names_visible(self) -> bool {
-        self.data_point_names_visible
-    }
-
-    /// Whether iWork renders the formatted value.
-    pub const fn values_visible(self) -> bool {
-        self.values_visible
-    }
-}
-
-impl Default for ChartPieLabelVisibility {
-    fn default() -> Self {
-        Self::DEFAULT
-    }
-}
 
 /// Read label visibility for every wedge in chart-series order.
 pub(crate) fn chart_pie_label_visibilities(
@@ -69,14 +24,14 @@ pub(crate) fn chart_pie_label_visibilities(
     drawable_object_id: u64,
     drawable_label: &str,
     series_count: usize,
-) -> Result<Vec<ChartPieLabelVisibility>> {
+) -> Result<Vec<LabelVisibility>> {
     chart_series_non_style_values(
         package,
         chart_archive_name,
         drawable_object_id,
         drawable_label,
         series_count,
-        ChartPieLabelVisibility::DEFAULT,
+        LabelVisibility::DEFAULT,
         read_series_non_style_labels,
     )
 }
@@ -87,7 +42,7 @@ pub(crate) fn set_chart_pie_label_visibilities(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    expected: &[ChartPieLabelVisibility],
+    expected: &[LabelVisibility],
 ) -> Result<()> {
     set_chart_series_non_style_values(
         package,
@@ -97,29 +52,26 @@ pub(crate) fn set_chart_pie_label_visibilities(
         "pie label visibility",
         NewChartSeriesNonStyleBase::Styled,
         expected,
-        ChartPieLabelVisibility::DEFAULT,
+        LabelVisibility::DEFAULT,
         read_series_non_style_labels,
         |data, visibility| patch_series_non_style_labels(data, *visibility),
     )
 }
 
-fn read_series_non_style_labels(data: &[u8]) -> Result<ChartPieLabelVisibility> {
+fn read_series_non_style_labels(data: &[u8]) -> Result<LabelVisibility> {
     let Some(extension) = generated_chart_series_non_style_extension(data)? else {
-        return Ok(ChartPieLabelVisibility::DEFAULT);
+        return Ok(LabelVisibility::DEFAULT);
     };
     tsch::generated::ChartSeriesNonStyleArchive::decode(extension)?;
-    Ok(ChartPieLabelVisibility::new(
+    Ok(LabelVisibility::new(
         strict_optional_bool(extension, PIE_SHOW_DATA_POINT_NAMES_FIELD)?.unwrap_or(false),
         strict_optional_bool(extension, PIE_SHOW_VALUES_FIELD)?.unwrap_or(true),
     ))
 }
 
-fn patch_series_non_style_labels(
-    data: &[u8],
-    visibility: ChartPieLabelVisibility,
-) -> Result<Vec<u8>> {
+fn patch_series_non_style_labels(data: &[u8], visibility: LabelVisibility) -> Result<Vec<u8>> {
     let Some(extension) = generated_chart_series_non_style_extension(data)? else {
-        if visibility == ChartPieLabelVisibility::DEFAULT {
+        if visibility == LabelVisibility::DEFAULT {
             return Ok(data.to_vec());
         }
         let generated = tsch::generated::ChartSeriesNonStyleArchive {
@@ -184,7 +136,7 @@ fn strict_optional_bool(data: &[u8], field_number: u32) -> Result<Option<bool>> 
                     "chart pie label field {field_number} is invalid: {error}"
                 ))
             })?;
-    if field.key_end() + consumed != field.end() || value > 1 {
+    if field.key_end() + consumed != field.end() || consumed != 1 || value > 1 {
         return Err(Error::InvalidFormat(format!(
             "chart pie label field {field_number} is not a canonical boolean"
         )));
@@ -192,7 +144,7 @@ fn strict_optional_bool(data: &[u8], field_number: u32) -> Result<Option<bool>> 
     Ok(Some(value == 1))
 }
 
-fn validate_patched_labels(data: &[u8], expected: ChartPieLabelVisibility) -> Result<()> {
+fn validate_patched_labels(data: &[u8], expected: LabelVisibility) -> Result<()> {
     if read_series_non_style_labels(data)? != expected {
         return Err(Error::InvalidFormat(
             "chart pie label-visibility wire patch failed validation".to_owned(),
@@ -219,13 +171,10 @@ mod tests {
 
     #[test]
     fn label_visibility_has_explicit_native_defaults() {
-        assert_eq!(
-            ChartPieLabelVisibility::default(),
-            ChartPieLabelVisibility::VALUES_ONLY
-        );
-        assert!(!ChartPieLabelVisibility::HIDDEN.values_visible());
-        assert!(ChartPieLabelVisibility::DATA_POINT_NAMES_ONLY.data_point_names_visible());
-        assert!(ChartPieLabelVisibility::ALL.values_visible());
+        assert_eq!(LabelVisibility::default(), LabelVisibility::VALUES_ONLY);
+        assert!(!LabelVisibility::HIDDEN.values_visible());
+        assert!(LabelVisibility::DATA_POINT_NAMES_ONLY.data_point_names_visible());
+        assert!(LabelVisibility::ALL.values_visible());
     }
 
     #[test]
@@ -241,14 +190,12 @@ mod tests {
         .unwrap();
         append_varint_field(&mut original, UNMAPPED_OUTER_FIELD, UNMAPPED_VALUE).unwrap();
 
-        let patched = patch_series_non_style_labels(
-            &original,
-            ChartPieLabelVisibility::DATA_POINT_NAMES_ONLY,
-        )
-        .unwrap();
+        let patched =
+            patch_series_non_style_labels(&original, LabelVisibility::DATA_POINT_NAMES_ONLY)
+                .unwrap();
         assert_eq!(
             read_series_non_style_labels(&patched).unwrap(),
-            ChartPieLabelVisibility::DATA_POINT_NAMES_ONLY
+            LabelVisibility::DATA_POINT_NAMES_ONLY
         );
         assert_eq!(
             raw_field(&patched, UNMAPPED_OUTER_FIELD),
@@ -269,7 +216,7 @@ mod tests {
             )
         );
         assert_eq!(
-            patch_series_non_style_labels(&patched, ChartPieLabelVisibility::DEFAULT).unwrap(),
+            patch_series_non_style_labels(&patched, LabelVisibility::DEFAULT).unwrap(),
             original
         );
     }
@@ -282,6 +229,17 @@ mod tests {
         ] {
             let mut generated = Vec::new();
             append_varint_field(&mut generated, field, value).unwrap();
+            let outer = patch_length_delimited_field(
+                &canonical_empty_chart_series_non_style_data().unwrap(),
+                GENERATED_CHART_SERIES_NON_STYLE_EXTENSION_FIELD,
+                false,
+                Some(&generated),
+            )
+            .unwrap();
+            assert!(read_series_non_style_labels(&outer).is_err());
+        }
+
+        for generated in [[0xf8, 0x01, 0x80, 0x00], [0xe0, 0x02, 0x80, 0x00]] {
             let outer = patch_length_delimited_field(
                 &canonical_empty_chart_series_non_style_data().unwrap(),
                 GENERATED_CHART_SERIES_NON_STYLE_EXTENSION_FIELD,

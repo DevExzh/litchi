@@ -140,6 +140,16 @@ variant. All four values are `Copy`, hashable, and four bytes wide, so the
 aggregate settings avoid enum payload overhead without weakening the archive
 boundary's validation or transactional guarantees.
 
+Pie and donut label settings use the focused
+`litchi_iwa_common::chart::pie` vocabulary. `LabelVisibility` packs the two
+independent label toggles into one byte with explicit native defaults;
+`LeaderLineVisibility` retains the signed native integer so unknown future
+states can be read, compared, and written without information loss. The IWA
+adapter owns field 31/44 and field 102 decoding, canonical varint checks,
+lossless unknown-field patching, and the styled versus geometry-only series
+allocation boundary. Concrete Numbers, Pages, and Keynote APIs consume these
+short semantic values directly.
+
 PresentationML implements this rule as `litchi-pptx::shape::{Scene, Shape}`.
 `Scene` is a bounded semantic index over one slide-like owner, not a vector of
 detached XML allocations. Shapes are visited in depth-first pre-order, while a

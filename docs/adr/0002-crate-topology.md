@@ -192,6 +192,14 @@ values and lossless `from_native`/`native_value` conversion for future values.
 IWA retains the aggregate transition settings, protobuf field mapping, and
 wire-preserving transactional mutation; no protobuf or archive dependency was
 introduced into `litchi-keynote`.
+Pie and donut label semantics follow the same focused boundary at
+`litchi-iwa-common::chart::pie::{LabelVisibility, LeaderLineVisibility}`.
+`LabelVisibility` is a one-byte bitset for data-point names and values, while
+`LeaderLineVisibility` is a four-byte transparent native integer that preserves
+future states losslessly. IWA retains the pie field identifiers, strict
+varint validation, series graph, stylesheet/object-container ownership, and
+transactional package mutation; the former `ChartPie*Visibility` names are
+removed rather than retained as aliases.
 The existing `litchi-iwa` package reader temporarily consumes these leaf values
 through private migration adapters. The direct edges are present in the
 canonical boundary graph because the adapters are already dependency-safe;

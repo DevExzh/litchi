@@ -9,14 +9,13 @@ use crate::charts::{
     ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont, ChartFontSize, ChartGapPercentage,
     ChartGapSpacing, ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendFrame,
     ChartLegendRect, ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance,
-    ChartPieLabelVisibility, ChartPieLeaderLineVisibility, ChartPieStartAngle,
-    ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit,
-    ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke, ChartSeriesStrokePattern,
-    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
+    ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners,
+    ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke,
+    ChartSeriesStrokePattern, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
     ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAutoFit,
     ChartSeriesValueLabelLocation, ChartSeriesValueLabelVisibility, ChartShadow, DecimalPlaces,
-    LabelAffixes, MajorStepCount, MinorStepCount, NegativeStyle, NumberFormat, Scale, Steps,
-    TickMarkLocation,
+    LabelAffixes, LabelVisibility, LeaderLineVisibility, MajorStepCount, MinorStepCount,
+    NegativeStyle, NumberFormat, Scale, Steps, TickMarkLocation,
 };
 use crate::package_metadata::{
     add_component_external_reference, add_component_object_uuids, component_identifier_for_entry,
@@ -2808,11 +2807,11 @@ fn scratch_document_supports_native_pie_label_visibility_crud() {
     let source = editor
         .add_body_chart(7, ChartKind::Pie2d, pie_data(), POSITION, SIZE)
         .unwrap();
-    let defaults = vec![ChartPieLabelVisibility::DEFAULT; 3];
+    let defaults = vec![LabelVisibility::DEFAULT; 3];
     let customized = [
-        ChartPieLabelVisibility::DATA_POINT_NAMES_ONLY,
-        ChartPieLabelVisibility::ALL,
-        ChartPieLabelVisibility::HIDDEN,
+        LabelVisibility::DATA_POINT_NAMES_ONLY,
+        LabelVisibility::ALL,
+        LabelVisibility::HIDDEN,
     ];
     assert_eq!(
         editor
@@ -2836,7 +2835,7 @@ fn scratch_document_supports_native_pie_label_visibility_crud() {
                 ChartPieWedgeIndex::from_zero_based(1),
             )
             .unwrap(),
-        ChartPieLabelVisibility::ALL
+        LabelVisibility::ALL
     );
     let explosions = [
         ChartPieWedgeExplosion::from_percent(10.0).unwrap(),
@@ -2876,7 +2875,7 @@ fn scratch_document_supports_native_pie_label_visibility_crud() {
         .set_body_chart_pie_label_visibility(
             source.drawable_object_id,
             ChartPieWedgeIndex::from_zero_based(0),
-            ChartPieLabelVisibility::VALUES_ONLY,
+            LabelVisibility::VALUES_ONLY,
         )
         .unwrap();
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -2925,11 +2924,11 @@ fn scratch_document_supports_native_pie_label_distance_crud() {
         .set_body_chart_pie_label_distances(source.drawable_object_id, &defaults)
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
-    let leader_line_defaults = [ChartPieLeaderLineVisibility::Visible; 3];
+    let leader_line_defaults = [LeaderLineVisibility::Visible; 3];
     let leader_line_customized = [
-        ChartPieLeaderLineVisibility::Hidden,
-        ChartPieLeaderLineVisibility::Visible,
-        ChartPieLeaderLineVisibility::Hidden,
+        LeaderLineVisibility::Hidden,
+        LeaderLineVisibility::Visible,
+        LeaderLineVisibility::Hidden,
     ];
     assert_eq!(
         editor
@@ -2957,7 +2956,7 @@ fn scratch_document_supports_native_pie_label_distance_crud() {
                 ChartPieWedgeIndex::from_zero_based(0),
             )
             .unwrap(),
-        ChartPieLeaderLineVisibility::Hidden
+        LeaderLineVisibility::Hidden
     );
     editor
         .set_body_chart_pie_leader_line_visibilities(
@@ -2980,9 +2979,9 @@ fn scratch_document_supports_native_pie_label_distance_crud() {
         customized[1]
     );
     let visibilities = [
-        ChartPieLabelVisibility::DATA_POINT_NAMES_ONLY,
-        ChartPieLabelVisibility::ALL,
-        ChartPieLabelVisibility::VALUES_ONLY,
+        LabelVisibility::DATA_POINT_NAMES_ONLY,
+        LabelVisibility::ALL,
+        LabelVisibility::VALUES_ONLY,
     ];
     editor
         .set_body_chart_pie_label_visibilities(source.drawable_object_id, &visibilities)
@@ -2999,7 +2998,7 @@ fn scratch_document_supports_native_pie_label_distance_crud() {
     editor
         .set_body_chart_pie_label_visibilities(
             source.drawable_object_id,
-            &[ChartPieLabelVisibility::DEFAULT; 3],
+            &[LabelVisibility::DEFAULT; 3],
         )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -3030,7 +3029,7 @@ fn scratch_document_supports_native_pie_label_distance_crud() {
         .set_body_chart_pie_leader_line_visibility(
             source.drawable_object_id,
             ChartPieWedgeIndex::from_zero_based(0),
-            ChartPieLeaderLineVisibility::Visible,
+            LeaderLineVisibility::Visible,
         )
         .unwrap();
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -3051,9 +3050,9 @@ fn scratch_document_supports_native_pie_label_distance_crud() {
             .body_chart_pie_leader_line_visibilities(source.drawable_object_id)
             .unwrap(),
         [
-            ChartPieLeaderLineVisibility::Visible,
-            ChartPieLeaderLineVisibility::Visible,
-            ChartPieLeaderLineVisibility::Hidden,
+            LeaderLineVisibility::Visible,
+            LeaderLineVisibility::Visible,
+            LeaderLineVisibility::Hidden,
         ]
     );
     let before_rejected = reopened.to_bytes().unwrap();

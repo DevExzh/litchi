@@ -5,7 +5,7 @@ use crate::charts::pie_labels::{
     chart_pie_label_visibilities as read_native_label_visibilities,
     set_chart_pie_label_visibilities as set_native_label_visibilities,
 };
-use crate::charts::{ChartPieLabelVisibility, ChartPieWedgeIndex};
+use crate::charts::{ChartPieWedgeIndex, LabelVisibility};
 
 impl NumbersEditor {
     /// Read label visibility for every pie or donut wedge in chart-series order.
@@ -13,7 +13,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<Vec<ChartPieLabelVisibility>> {
+    ) -> Result<Vec<LabelVisibility>> {
         sheet_chart_pie_label_visibilities(self, sheet_id, drawable_object_id)
     }
 
@@ -23,7 +23,7 @@ impl NumbersEditor {
         sheet_id: u64,
         drawable_object_id: u64,
         wedge: ChartPieWedgeIndex,
-    ) -> Result<ChartPieLabelVisibility> {
+    ) -> Result<LabelVisibility> {
         let values = sheet_chart_pie_label_visibilities(self, sheet_id, drawable_object_id)?;
         values
             .get(wedge.zero_based())
@@ -36,7 +36,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        visibilities: &[ChartPieLabelVisibility],
+        visibilities: &[LabelVisibility],
     ) -> Result<()> {
         set_sheet_chart_pie_label_visibilities(self, sheet_id, drawable_object_id, visibilities)
     }
@@ -47,7 +47,7 @@ impl NumbersEditor {
         sheet_id: u64,
         drawable_object_id: u64,
         wedge: ChartPieWedgeIndex,
-        visibility: ChartPieLabelVisibility,
+        visibility: LabelVisibility,
     ) -> Result<()> {
         let mut values = sheet_chart_pie_label_visibilities(self, sheet_id, drawable_object_id)?;
         let count = values.len();
@@ -66,7 +66,7 @@ fn sheet_chart_pie_label_visibilities(
     editor: &NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-) -> Result<Vec<ChartPieLabelVisibility>> {
+) -> Result<Vec<LabelVisibility>> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     require_pie_labels(graph.info.kind, drawable_object_id)?;
     let series_count = label_series_count(
@@ -88,7 +88,7 @@ fn set_sheet_chart_pie_label_visibilities(
     editor: &mut NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    visibilities: &[ChartPieLabelVisibility],
+    visibilities: &[LabelVisibility],
 ) -> Result<()> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     require_pie_labels(graph.info.kind, drawable_object_id)?;

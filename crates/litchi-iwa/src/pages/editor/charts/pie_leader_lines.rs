@@ -5,14 +5,14 @@ use crate::charts::pie_leader_lines::{
     chart_pie_leader_line_visibilities as read_native_leader_line_visibilities,
     set_chart_pie_leader_line_visibilities as set_native_leader_line_visibilities,
 };
-use crate::charts::{ChartPieLeaderLineVisibility, ChartPieWedgeIndex};
+use crate::charts::{ChartPieWedgeIndex, LeaderLineVisibility};
 
 impl PagesEditor {
     /// Read every pie or donut wedge's leader-line visibility.
     pub fn body_chart_pie_leader_line_visibilities(
         &self,
         drawable_object_id: u64,
-    ) -> Result<Vec<ChartPieLeaderLineVisibility>> {
+    ) -> Result<Vec<LeaderLineVisibility>> {
         body_chart_pie_leader_line_visibilities(self, drawable_object_id)
     }
 
@@ -21,7 +21,7 @@ impl PagesEditor {
         &self,
         drawable_object_id: u64,
         wedge: ChartPieWedgeIndex,
-    ) -> Result<ChartPieLeaderLineVisibility> {
+    ) -> Result<LeaderLineVisibility> {
         let visibilities = body_chart_pie_leader_line_visibilities(self, drawable_object_id)?;
         visibilities
             .get(wedge.zero_based())
@@ -35,7 +35,7 @@ impl PagesEditor {
     pub fn set_body_chart_pie_leader_line_visibilities(
         &mut self,
         drawable_object_id: u64,
-        visibilities: &[ChartPieLeaderLineVisibility],
+        visibilities: &[LeaderLineVisibility],
     ) -> Result<()> {
         set_body_chart_pie_leader_line_visibilities(self, drawable_object_id, visibilities)
     }
@@ -45,7 +45,7 @@ impl PagesEditor {
         &mut self,
         drawable_object_id: u64,
         wedge: ChartPieWedgeIndex,
-        visibility: ChartPieLeaderLineVisibility,
+        visibility: LeaderLineVisibility,
     ) -> Result<()> {
         let mut visibilities = body_chart_pie_leader_line_visibilities(self, drawable_object_id)?;
         let count = visibilities.len();
@@ -63,7 +63,7 @@ impl PagesEditor {
 fn body_chart_pie_leader_line_visibilities(
     editor: &PagesEditor,
     drawable_object_id: u64,
-) -> Result<Vec<ChartPieLeaderLineVisibility>> {
+) -> Result<Vec<LeaderLineVisibility>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     require_pie_leader_lines(graph.info.kind, drawable_object_id)?;
     let series_count = leader_line_series_count(
@@ -84,7 +84,7 @@ fn body_chart_pie_leader_line_visibilities(
 fn set_body_chart_pie_leader_line_visibilities(
     editor: &mut PagesEditor,
     drawable_object_id: u64,
-    visibilities: &[ChartPieLeaderLineVisibility],
+    visibilities: &[LeaderLineVisibility],
 ) -> Result<()> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     require_pie_leader_lines(graph.info.kind, drawable_object_id)?;

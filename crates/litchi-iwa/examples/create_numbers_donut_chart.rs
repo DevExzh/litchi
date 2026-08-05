@@ -3,7 +3,7 @@
 use std::env;
 
 use litchi_iwa::charts::{
-    ChartData, ChartDonutInnerRadius, ChartKind, ChartPieLabelDistance, ChartPieLabelVisibility,
+    ChartData, ChartDonutInnerRadius, ChartKind, ChartPieLabelDistance, LabelVisibility,
 };
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
@@ -33,9 +33,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         sheet_id,
         chart.drawable_object_id,
         &[
-            ChartPieLabelVisibility::DATA_POINT_NAMES_ONLY,
-            ChartPieLabelVisibility::ALL,
-            ChartPieLabelVisibility::VALUES_ONLY,
+            LabelVisibility::DATA_POINT_NAMES_ONLY,
+            LabelVisibility::ALL,
+            LabelVisibility::VALUES_ONLY,
         ],
     )?;
     editor.set_sheet_chart_pie_label_distances(

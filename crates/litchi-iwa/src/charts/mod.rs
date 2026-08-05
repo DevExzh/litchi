@@ -108,11 +108,12 @@ pub use litchi_iwa_common::chart::axis::{
 pub use litchi_iwa_common::chart::number_format::{
     DecimalPlaces, FixedDecimalPlaces, LabelAffixes, NegativeStyle, NumberFormat,
 };
+pub use litchi_iwa_common::chart::pie::{
+    LabelVisibility, LeaderLineVisibility, LeaderLineVisibilityKind,
+};
 pub use litchi_iwa_common::chart::{Direction, DirectionKind};
 pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};
 pub use pie_label_distance::ChartPieLabelDistance;
-pub use pie_labels::ChartPieLabelVisibility;
-pub use pie_leader_lines::ChartPieLeaderLineVisibility;
 pub use pie_start_angle::ChartPieStartAngle;
 pub use pie_wedge_explosion::{ChartPieWedgeExplosion, ChartPieWedgeIndex};
 pub use radar_grid_shape::ChartRadarGridShape;

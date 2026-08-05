@@ -5,7 +5,7 @@ use crate::charts::pie_leader_lines::{
     chart_pie_leader_line_visibilities as read_native_leader_line_visibilities,
     set_chart_pie_leader_line_visibilities as set_native_leader_line_visibilities,
 };
-use crate::charts::{ChartPieLeaderLineVisibility, ChartPieWedgeIndex};
+use crate::charts::{ChartPieWedgeIndex, LeaderLineVisibility};
 
 impl KeynoteEditor {
     /// Read every pie or donut wedge's leader-line visibility.
@@ -13,7 +13,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<Vec<ChartPieLeaderLineVisibility>> {
+    ) -> Result<Vec<LeaderLineVisibility>> {
         slide_chart_pie_leader_line_visibilities(self, slide_index, drawable_object_id)
     }
 
@@ -23,7 +23,7 @@ impl KeynoteEditor {
         slide_index: usize,
         drawable_object_id: u64,
         wedge: ChartPieWedgeIndex,
-    ) -> Result<ChartPieLeaderLineVisibility> {
+    ) -> Result<LeaderLineVisibility> {
         let visibilities =
             slide_chart_pie_leader_line_visibilities(self, slide_index, drawable_object_id)?;
         visibilities
@@ -39,7 +39,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        visibilities: &[ChartPieLeaderLineVisibility],
+        visibilities: &[LeaderLineVisibility],
     ) -> Result<()> {
         set_slide_chart_pie_leader_line_visibilities(
             self,
@@ -55,7 +55,7 @@ impl KeynoteEditor {
         slide_index: usize,
         drawable_object_id: u64,
         wedge: ChartPieWedgeIndex,
-        visibility: ChartPieLeaderLineVisibility,
+        visibility: LeaderLineVisibility,
     ) -> Result<()> {
         let mut visibilities =
             slide_chart_pie_leader_line_visibilities(self, slide_index, drawable_object_id)?;
@@ -80,7 +80,7 @@ fn slide_chart_pie_leader_line_visibilities(
     editor: &KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-) -> Result<Vec<ChartPieLeaderLineVisibility>> {
+) -> Result<Vec<LeaderLineVisibility>> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     require_pie_leader_lines(graph.info.kind, drawable_object_id)?;
     let series_count = leader_line_series_count(
@@ -102,7 +102,7 @@ fn set_slide_chart_pie_leader_line_visibilities(
     editor: &mut KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    visibilities: &[ChartPieLeaderLineVisibility],
+    visibilities: &[LeaderLineVisibility],
 ) -> Result<()> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     require_pie_leader_lines(graph.info.kind, drawable_object_id)?;

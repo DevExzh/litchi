@@ -3,17 +3,20 @@
 use std::env;
 use std::path::Path;
 
-use litchi_iwa::charts::{ChartData, ChartKind, ChartPieLeaderLineVisibility};
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::numbers::NumbersDocumentBuilder;
-use litchi_iwa::pages::PagesDocumentBuilder;
+use litchi_iwa::charts::{
+    ChartData, ChartKind, ChartPieLabelDistance, LabelVisibility, LeaderLineVisibility,
+};
+use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
+use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
+use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
-const LEADER_LINES: [ChartPieLeaderLineVisibility; 3] = [
-    ChartPieLeaderLineVisibility::Hidden,
-    ChartPieLeaderLineVisibility::Visible,
-    ChartPieLeaderLineVisibility::Hidden,
+const LEADER_LINES: [LeaderLineVisibility; 3] = [
+    LeaderLineVisibility::Hidden,
+    LeaderLineVisibility::Visible,
+    LeaderLineVisibility::Hidden,
 ];
+const LABEL_VISIBILITIES: [LabelVisibility; 3] = [LabelVisibility::ALL; 3];
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -25,6 +28,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let output = Path::new(&output);
     std::fs::create_dir_all(output)?;
+    let label_distances = [
+        ChartPieLabelDistance::from_percent(160.0)?,
+        ChartPieLabelDistance::from_percent(160.0)?,
+        ChartPieLabelDistance::from_percent(160.0)?,
+    ];
 
     let mut numbers = NumbersDocumentBuilder::new()
         .sheet_name("Pie Leader-Line CRUD")
@@ -50,7 +58,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         chart.drawable_object_id,
         &LEADER_LINES,
     )?;
-    numbers.save(output.join("chart-pie-leader-lines-crate.numbers"))?;
+    numbers.set_sheet_chart_pie_label_visibilities(
+        sheet_id,
+        chart.drawable_object_id,
+        &LABEL_VISIBILITIES,
+    )?;
+    numbers.set_sheet_chart_pie_label_distances(
+        sheet_id,
+        chart.drawable_object_id,
+        &label_distances,
+    )?;
+    let numbers_path = output.join("chart-pie-leader-lines-crate.numbers");
+    numbers.save(&numbers_path)?;
+    let reopened = NumbersEditor::from_bytes(&std::fs::read(&numbers_path)?)?;
+    assert_eq!(
+        reopened.sheet_chart_pie_leader_line_visibilities(sheet_id, chart.drawable_object_id)?,
+        LEADER_LINES
+    );
+    assert_eq!(
+        reopened.sheet_chart_pie_label_visibilities(sheet_id, chart.drawable_object_id)?,
+        LABEL_VISIBILITIES
+    );
+    assert_eq!(
+        reopened.sheet_chart_pie_label_distances(sheet_id, chart.drawable_object_id)?,
+        label_distances
+    );
 
     let body = "Pie Leader-Line CRUD";
     let mut pages = PagesDocumentBuilder::new().body_text(body).build()?;
@@ -66,7 +98,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     pages.set_body_chart_title(chart.drawable_object_id, "One visible leader line")?;
     pages.set_body_chart_pie_leader_line_visibilities(chart.drawable_object_id, &LEADER_LINES)?;
-    pages.save(output.join("chart-pie-leader-lines-crate.pages"))?;
+    pages.set_body_chart_pie_label_visibilities(chart.drawable_object_id, &LABEL_VISIBILITIES)?;
+    pages.set_body_chart_pie_label_distances(chart.drawable_object_id, &label_distances)?;
+    let pages_path = output.join("chart-pie-leader-lines-crate.pages");
+    pages.save(&pages_path)?;
+    let reopened = PagesEditor::from_bytes(&std::fs::read(&pages_path)?)?;
+    assert_eq!(
+        reopened.body_chart_pie_leader_line_visibilities(chart.drawable_object_id)?,
+        LEADER_LINES
+    );
+    assert_eq!(
+        reopened.body_chart_pie_label_visibilities(chart.drawable_object_id)?,
+        LABEL_VISIBILITIES
+    );
+    assert_eq!(
+        reopened.body_chart_pie_label_distances(chart.drawable_object_id)?,
+        label_distances
+    );
 
     let mut keynote = KeynoteDocumentBuilder::new()
         .title("Pie Leader-Line CRUD")
@@ -87,7 +135,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         chart.drawable_object_id,
         &LEADER_LINES,
     )?;
-    keynote.save(output.join("chart-pie-leader-lines-crate.key"))?;
+    keynote.set_slide_chart_pie_label_visibilities(
+        0,
+        chart.drawable_object_id,
+        &LABEL_VISIBILITIES,
+    )?;
+    keynote.set_slide_chart_pie_label_distances(0, chart.drawable_object_id, &label_distances)?;
+    let keynote_path = output.join("chart-pie-leader-lines-crate.key");
+    keynote.save(&keynote_path)?;
+    let reopened = KeynoteEditor::from_bytes(&std::fs::read(&keynote_path)?)?;
+    assert_eq!(
+        reopened.slide_chart_pie_leader_line_visibilities(0, chart.drawable_object_id)?,
+        LEADER_LINES
+    );
+    assert_eq!(
+        reopened.slide_chart_pie_label_visibilities(0, chart.drawable_object_id)?,
+        LABEL_VISIBILITIES
+    );
+    assert_eq!(
+        reopened.slide_chart_pie_label_distances(0, chart.drawable_object_id)?,
+        label_distances
+    );
 
     println!(
         "created typed pie leader-line fixtures in {}",

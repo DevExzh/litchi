@@ -6045,6 +6045,23 @@ opened it without a repair or recovery prompt; its Animate inspector exposed
 text-delivery, and acceleration values. No native-resave claim is made, and
 Keynote was quit after inspection.
 
+The pie-visibility ownership slice is complete. The archive-free
+`litchi-iwa-common::chart::pie` module now owns compact `LabelVisibility` and
+lossless `LeaderLineVisibility`; all three concrete chart owners consume the
+short values, and the old `ChartPie*Visibility` names are gone. The common
+suite passed 48 tests, the focused IWA pie suite passed 16 tests, and the
+Numbers CRUD test passed after adding stylesheet/component-registration
+invariants for styled label overrides. The focused fixture saved and typed-
+reopened valid Numbers, Pages, and Keynote ZIP packages. Native Pages and
+Keynote opened the authored chart without repair prompts and exposed North
+22%, South 33%, and West 44%; the screenshot showed the authored South-only
+leader line. Numbers opened a minimal unmodified pie and accepted a native
+resave, but rejected source-generated per-series pie mutation packages as
+damaged, including both styled and geometry-only probe variants. This remains
+a tracked Numbers series-non-style fixture limitation rather than claimed
+native resave support for that path; Numbers, Pages, and Keynote were quit
+after inspection.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512
