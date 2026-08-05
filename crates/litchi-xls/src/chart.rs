@@ -13,9 +13,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use litchi_ole_common::object::{
-    Editor as ObjectEditor, Format as ObjectFormat, Limits as ObjectLimits,
-};
+use litchi_ole_common::object::{Editor as ObjectEditor, Limits as ObjectLimits, Targets};
 
 use litchi_biff::MAX_RECORD_BYTES;
 use litchi_biff::{Encoder as GraphEncoder, Kind as RecordKind, Limits as BiffLimits, Records};
@@ -843,7 +841,7 @@ impl Editor {
     /// Takes ownership of an XLS compound file and validates its chart inventory.
     pub fn open(bytes: Vec<u8>, limits: Limits) -> XlsResult<Self> {
         validate_limits(limits)?;
-        let package = ObjectEditor::open(bytes, ObjectFormat::Xls, ObjectLimits::default())?;
+        let package = ObjectEditor::open(bytes, Targets::default(), ObjectLimits::default())?;
         let workbook_path = [vec!["Workbook".into()], vec!["Book".into()]]
             .into_iter()
             .find(|path| package.stream(path).is_some())
