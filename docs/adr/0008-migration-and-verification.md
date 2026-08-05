@@ -4913,6 +4913,40 @@ tests; affected all-target checks and formatting pass. This is incremental
 read/preserve/edit coverage, not a claim of complete legacy Office
 conformance.
 
+## Legacy shape, worksheet-layout, and external-media owner layering
+
+The next legacy slice continues the same contextual-owner rule. DOC now
+exposes `shape::{Shape,Kind,Bounds,UnknownRecord}` in a layered
+`shape/{mod,model,codec}` owner. The codec retains Word's FIB/table-stream
+story placement, while the model owns the owned OfficeArt shape tree, typed
+`FSPGR` bounds, and exact unknown record bytes. This follows the Word drawing
+and shape rules in `[MS-DOC]` and `[MS-ODRAW]`; the DOC facade does not expose
+the former `DocShape*` or `DocDrawingShape` names.
+
+XLS now exposes `layout::{Row,Column}` and
+`worksheet::layout::Layout`. `layout/{mod,row,column}` owns BIFF8 `ROW` and
+`COLINFO` semantics, while worksheet layout owns `GUTS`, `WSBOOL`,
+`DefRowHeight`, and `DefColWidth` state. Record ordering, reserved bits,
+coordinate sentinels, and format references are checked against `[MS-XLS]`;
+the former `XlsRowLayout`, `XlsColumnLayout`, and `XlsWorksheetLayout` names
+were removed without aliases.
+
+PPT external media is layered as
+`external_media::{model,codec,tests}` with contextual `Media`, `Video`,
+`Movie`, `LinkedAudio`, `EmbeddedWav`, `CdAudio`, `Collection`, and `Object`
+values. Strict `[MS-PPT]` codecs validate ExMedia, ExVideo, AVI/MCI, linked
+audio, embedded WAV, and CD-audio records; paths remain inert, reserved bytes
+round-trip, and unmodeled ExObjList children remain as `UnknownRecord` data.
+The former `PowerPointExternal*` and `PowerPointLinkedAudio*` names were
+removed without compatibility aliases.
+
+Verification passes DOC's 831 library tests (829 passed, 2 ignored), XLS's
+841-test all-target suite, PPT's 882 library tests (881 passed, 1 ignored)
+plus integration targets, and the affected ODF/CFB/OfficeArt suites. Combined
+all-target compilation, workspace formatting, metadata, diff, and boundary
+policy checks pass. These additions improve typed extraction and lossless
+preservation but do not claim complete legacy Office conformance.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:
