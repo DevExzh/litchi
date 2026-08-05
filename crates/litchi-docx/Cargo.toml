@@ -8,15 +8,40 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+default = []
+encryption = ["dep:litchi-crypto"]
+fonts = ["dep:allsorts", "dep:litchi-fonts"]
+
 [dependencies]
+allsorts = { workspace = true, optional = true }
 base64 = { workspace = true }
 bitflags = { workspace = true }
 caseless = { workspace = true }
+atoi_simd = { workspace = true }
+chrono = { workspace = true }
+litchi-core = { workspace = true }
+litchi-drawingml = { workspace = true }
+litchi-sign = { workspace = true }
 litchi-ooxml-common = { workspace = true }
 litchi-opc = { workspace = true }
+litchi-vba = { workspace = true }
 quick-xml = { workspace = true }
+smallvec = { workspace = true }
 thiserror = { workspace = true }
 unicode-normalization = { workspace = true }
+
+[dependencies.litchi-crypto]
+workspace = true
+features = ["ooxml"]
+optional = true
+
+[dependencies.litchi-fonts]
+workspace = true
+optional = true
+
+[dev-dependencies]
+tempfile = { workspace = true }
 
 [lints]
 workspace = true

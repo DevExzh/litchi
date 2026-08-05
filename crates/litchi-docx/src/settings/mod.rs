@@ -7,6 +7,7 @@
 mod codec;
 mod colors;
 mod compatibility;
+mod document;
 mod editing;
 mod model;
 mod notes;
@@ -31,7 +32,17 @@ pub const MAX_SETTINGS_XML_DEPTH: usize = 256;
 
 pub use colors::*;
 pub use compatibility::*;
+pub(crate) use document::{
+    ATTACHED_TEMPLATE_RELATIONSHIP, extract_document_variables, patch_attached_template,
+    patch_document_variables, patch_mail_merge, validate_attached_template_target,
+};
+pub use document::{AttachedTemplate, DocumentSettings};
 pub use editing::*;
 pub use model::*;
 pub use notes::*;
 pub use smart_tags::*;
+
+#[cfg(test)]
+pub(crate) use document::{
+    STRICT_ATTACHED_TEMPLATE_RELATIONSHIP, is_attached_template_relationship,
+};

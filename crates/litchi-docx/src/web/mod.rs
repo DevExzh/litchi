@@ -1,6 +1,6 @@
 //! Layered WordprocessingML web-settings models, codec, and OPC owner.
 //!
-//! The historical `litchi_docx::web` module remains the public facade.
+//! The historical `crate::web` module remains the public facade.
 
 mod codec;
 mod model;

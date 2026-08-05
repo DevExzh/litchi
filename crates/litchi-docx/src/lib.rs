@@ -9,20 +9,50 @@ mod error;
 
 pub mod alt;
 pub mod bibliography;
+pub mod bookmark;
+pub mod chart;
 pub mod color;
+pub mod comment;
+pub mod content_control;
+pub mod custom_xml;
+pub mod document;
+pub mod drawing;
 pub mod enums;
 pub mod field;
 pub mod font;
+pub mod footnote;
 pub mod format;
 pub mod glossary;
+pub mod header_footer;
 pub mod hyperlink;
+pub mod image;
+pub mod list;
 pub mod mail_merge;
+pub mod math;
 pub mod modern_comments;
+mod namespace;
 pub mod numbering;
+pub mod package;
+pub mod paragraph;
+pub mod parts;
+pub mod revision;
+pub mod section;
 pub mod settings;
+pub mod smart_tag;
+pub mod smartart;
 pub mod statistics;
+pub mod styles;
+pub mod table;
+pub mod template;
+pub mod textbox;
+pub mod theme;
 pub mod variables;
+pub mod vba_project;
 pub mod web;
+pub mod writer;
+
+#[cfg(feature = "encryption")]
+pub use litchi_crypto::ooxml as encryption;
 
 pub use bibliography::{
     BibliographySource, BibliographySourceStore, BibliographySourceValue,
@@ -59,8 +89,8 @@ pub use modern_comments::{
     write_comments_ids, write_people,
 };
 pub use numbering::{
-    Collection, Definition, Format, Instance, Level, MultiLevel, Override, Paragraph,
-    ParseFormatError, ParseMultiLevelError, PictureBullet, Restart, Suffix, parse_numbering,
+    Collection, Definition, Format, Instance, Level, MultiLevel, Override, ParseFormatError,
+    ParseMultiLevelError, PictureBullet, Restart, Suffix, parse_numbering,
 };
 pub use settings::{
     ColorSchemeIndex, ColorSchemeMapping, ColorSchemeSlot, CompatFlag, CompatibilityOption,
@@ -76,3 +106,17 @@ pub use statistics::{
     estimate_page_count,
 };
 pub use variables::{Variables, parse_variables};
+
+// Concrete document entry points are available through their contextual
+// modules. These root exports keep the standalone facade concise without
+// collapsing the owner modules back into host aliases.
+pub use document::{Block, Document, Element, ImageWatermarkPart};
+pub use math::{OfficeMath, OfficeMathParagraph};
+pub use package::Package;
+pub use paragraph::{
+    Paragraph, Run, RunBreak, RunBreakClear, RunBreakType, RunProperties, RunUnderline,
+    RunUnderlineColor,
+};
+pub use section::{Emu, Margins, PageSize, Section, Sections};
+pub use table::{Cell, Row, Table, VMergeState};
+pub use writer::*;

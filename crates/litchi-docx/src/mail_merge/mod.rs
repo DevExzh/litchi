@@ -1,5 +1,6 @@
 //! Layered, inert WordprocessingML mail-merge owner.
 
+mod adapter;
 mod codec;
 mod model;
 mod package;
@@ -7,6 +8,10 @@ mod package;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use adapter::{
+    extract_recipients, is_mail_merge_relationship_type, is_settings_relationship, map_docx_error,
+    validate_mail_merge_relationships,
+};
 pub use codec::parse_settings_mail_merge;
 pub use model::{
     Conformance, DataSourceObject, DataType, Destination, FieldMap, FieldMappingType,

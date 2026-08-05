@@ -1,6 +1,6 @@
 //! Layered WordprocessingML field models and bounded codecs.
 //!
-//! The public module remains the historical `litchi_docx::field` entry point.
+//! The public module remains the historical `crate::field` entry point.
 //! Field values and typed instruction metadata live in [`model`], while
 //! bounded Word instruction and document-XML parsing lives in [`codec`].
 

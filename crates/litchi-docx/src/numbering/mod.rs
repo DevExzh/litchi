@@ -2,6 +2,7 @@
 
 mod codec;
 mod model;
+mod package;
 
 #[cfg(test)]
 mod tests;
@@ -11,3 +12,4 @@ pub use model::{
     Collection, Definition, Format, Instance, Level, MultiLevel, Override, Paragraph,
     ParseFormatError, ParseMultiLevelError, PictureBullet, Restart, Suffix,
 };
+pub(crate) use package::parse_part;
