@@ -124,10 +124,7 @@ impl<'doc> Slide<'doc> {
         &self,
         limits: crate::InteractionLimits,
     ) -> Result<Vec<crate::ShapeInteractionEntry>> {
-        let Some(ppdrawing) = self
-            .record
-            .find_child(crate::consts::PptRecordType::PPDrawing)
-        else {
+        let Some(ppdrawing) = self.record.find_child(PptRecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
         let escher_shapes = crate::odraw::parse(&ppdrawing.data)?;
@@ -158,10 +155,7 @@ impl<'doc> Slide<'doc> {
         &self,
         limits: crate::PowerPointTextInteractionLimits,
     ) -> Result<Vec<crate::PowerPointShapeTextInteractionEntry>> {
-        let Some(ppdrawing) = self
-            .record
-            .find_child(crate::consts::PptRecordType::PPDrawing)
-        else {
+        let Some(ppdrawing) = self.record.find_child(PptRecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
         let escher_shapes = crate::odraw::parse(&ppdrawing.data)?;
@@ -205,10 +199,7 @@ impl<'doc> Slide<'doc> {
         &self,
         limits: crate::PowerPointShapeProgrammableTagLimits,
     ) -> Result<Vec<crate::PowerPointShapeProgrammableTagsEntry>> {
-        let Some(ppdrawing) = self
-            .record
-            .find_child(crate::consts::PptRecordType::PPDrawing)
-        else {
+        let Some(ppdrawing) = self.record.find_child(PptRecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
         let escher_shapes = crate::odraw::parse(&ppdrawing.data)?;
@@ -253,10 +244,7 @@ impl<'doc> Slide<'doc> {
         &self,
         limits: crate::PowerPointShapeFlagLimits,
     ) -> Result<Vec<crate::PowerPointShapeFlagEntry>> {
-        let Some(ppdrawing) = self
-            .record
-            .find_child(crate::consts::PptRecordType::PPDrawing)
-        else {
+        let Some(ppdrawing) = self.record.find_child(PptRecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
         let escher_shapes = crate::odraw::parse(&ppdrawing.data)?;
@@ -282,10 +270,7 @@ impl<'doc> Slide<'doc> {
         &self,
         limits: crate::PowerPointPlaceholderLimits,
     ) -> Result<Vec<crate::PowerPointPlaceholderEntry>> {
-        let Some(ppdrawing) = self
-            .record
-            .find_child(crate::consts::PptRecordType::PPDrawing)
-        else {
+        let Some(ppdrawing) = self.record.find_child(PptRecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
         let escher_shapes = crate::odraw::parse(&ppdrawing.data)?;
@@ -440,10 +425,7 @@ impl<'doc> Slide<'doc> {
     /// and need to outlive the parsing function scope.
     fn parse_shapes(&self) -> Result<Vec<ShapeEnum<'static>>> {
         // Find PPDrawing record
-        let ppdrawing = match self
-            .record
-            .find_child(crate::consts::PptRecordType::PPDrawing)
-        {
+        let ppdrawing = match self.record.find_child(PptRecordType::PPDrawing) {
             Some(record) => record,
             None => return Ok(Vec::new()),
         };
@@ -496,7 +478,7 @@ impl<'doc> Slide<'doc> {
         if let Some(placeholder_info) = escher_shape.placeholder()? {
             let mut properties = shape::ShapeProperties {
                 id: shape_id,
-                shape_type: shape::ShapeType::Placeholder,
+                shape_type: ShapeType::Placeholder,
                 powerpoint12_shape_metadata,
                 ..Default::default()
             };
@@ -527,7 +509,7 @@ impl<'doc> Slide<'doc> {
             };
             let mut properties = shape::ShapeProperties {
                 id: shape_id,
-                shape_type: shape::ShapeType::Placeholder,
+                shape_type: ShapeType::Placeholder,
                 powerpoint12_shape_metadata,
                 ..Default::default()
             };
@@ -551,7 +533,7 @@ impl<'doc> Slide<'doc> {
                 // Create TextBox with proper properties
                 let mut properties = shape::ShapeProperties {
                     id: shape_id,
-                    shape_type: shape::ShapeType::TextBox,
+                    shape_type: ShapeType::TextBox,
                     powerpoint12_shape_metadata,
                     ..Default::default()
                 };
@@ -572,7 +554,7 @@ impl<'doc> Slide<'doc> {
 
             Kind::Picture => {
                 // Create PictureShape
-                let mut picture = crate::shapes::PictureShape::new(shape_id);
+                let mut picture = PictureShape::new(shape_id);
 
                 picture.set_frame_kind(match escher_shape.frame_kind()? {
                     FrameKind::Object => PictureFrameKind::OleObject,
@@ -711,7 +693,7 @@ impl<'doc> Slide<'doc> {
                 // Create AutoShape
                 let mut properties = shape::ShapeProperties {
                     id: shape_id,
-                    shape_type: shape::ShapeType::AutoShape,
+                    shape_type: ShapeType::AutoShape,
                     powerpoint12_shape_metadata,
                     ..Default::default()
                 };
@@ -753,10 +735,7 @@ impl<'doc> Slide<'doc> {
 
         // 2. Extract text from Escher/PPDrawing (shapes, text boxes)
         // This is separate from regular record text extraction
-        if let Some(ppdrawing) = self
-            .record
-            .find_child(crate::consts::PptRecordType::PPDrawing)
-        {
+        if let Some(ppdrawing) = self.record.find_child(PptRecordType::PPDrawing) {
             let escher_text = crate::odraw::text_from_drawing(&ppdrawing.data)?;
             let trimmed = escher_text.trim();
             if !trimmed.is_empty() {
@@ -774,9 +753,7 @@ impl<'doc> Slide<'doc> {
     /// Check if this slide has a PPDrawing record (shapes).
     #[inline]
     pub fn has_drawing(&self) -> bool {
-        self.record
-            .find_child(crate::consts::PptRecordType::PPDrawing)
-            .is_some()
+        self.record.find_child(PptRecordType::PPDrawing).is_some()
     }
 
     /// Get raw slide record for advanced use cases.

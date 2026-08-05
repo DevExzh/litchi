@@ -296,7 +296,7 @@ impl<'a> TextBox<'a> {
     /// let props = litchi_odraw::prop::Props::parse(&opt_record)?;
     /// let (size, color, bold, italic, underline) = TextBox::format_from_props(&props);
     /// ```
-    pub fn format_from_props(props: &litchi_odraw::prop::Props) -> TextFormattingResult {
+    pub fn format_from_props(props: &litchi_odraw::prop::Props<'_>) -> TextFormattingResult {
         use litchi_odraw::prop::Id;
 
         // Extract font size from text properties
@@ -335,7 +335,9 @@ impl<'a> TextBox<'a> {
     ///
     /// - Single call to get_text_margins (already optimized)
     /// - No allocations
-    pub fn margins_from_props(props: &litchi_odraw::prop::Props) -> Option<(i32, i32, i32, i32)> {
+    pub fn margins_from_props(
+        props: &litchi_odraw::prop::Props<'_>,
+    ) -> Option<(i32, i32, i32, i32)> {
         props.get_text_margins()
     }
 

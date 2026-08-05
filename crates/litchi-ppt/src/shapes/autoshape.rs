@@ -332,7 +332,7 @@ impl<'a> AutoShape<'a> {
     /// - O(1) property lookups via HashMap
     /// - Missing positions use the protocol-defined default of zero
     /// - Trailing absent positions are omitted
-    pub fn extract_adjustments_from_properties(props: &litchi_odraw::prop::Props) -> Vec<i32> {
+    pub fn extract_adjustments_from_properties(props: &litchi_odraw::prop::Props<'_>) -> Vec<i32> {
         use litchi_odraw::prop::Id;
 
         let adjustment_ids = [

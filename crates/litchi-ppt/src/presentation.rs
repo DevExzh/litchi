@@ -1033,10 +1033,7 @@ impl Presentation {
             }
 
             // Extract text from Escher/PPDrawing using the optimized path
-            if let Some(ppdrawing) = slide_data
-                .record
-                .find_child(crate::consts::PptRecordType::PPDrawing)
-            {
+            if let Some(ppdrawing) = slide_data.record.find_child(PptRecordType::PPDrawing) {
                 let escher_text = super::odraw::text_from_drawing(&ppdrawing.data)?;
                 let trimmed = escher_text.trim();
                 if !trimmed.is_empty() {
@@ -1305,10 +1302,7 @@ impl Presentation {
     }
 
     /// Parse NamedShow containers from a NamedShows container.
-    fn parse_named_shows(
-        named_shows: &super::records::PptRecord,
-        shows: &mut Vec<ParsedCustomShow>,
-    ) {
+    fn parse_named_shows(named_shows: &PptRecord, shows: &mut Vec<ParsedCustomShow>) {
         for child in &named_shows.children {
             if child.record_type == PptRecordType::NamedShow {
                 let mut name = String::new();
@@ -1351,7 +1345,7 @@ impl Presentation {
 }
 
 fn placeholder_display_from_record(
-    record: &crate::records::PptRecord,
+    record: &PptRecord,
 ) -> Result<Option<PowerPointHeaderFooterDisplayText>> {
     let Some(drawing) = record.find_child(PptRecordType::PPDrawing) else {
         return Ok(None);

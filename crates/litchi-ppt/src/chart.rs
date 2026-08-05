@@ -543,7 +543,7 @@ fn chart_frames(presentation: &Presentation, wanted: &[u32]) -> Result<Vec<(u32,
 }
 
 fn collect_frames(
-    shapes: &[ShapeEnum],
+    shapes: &[ShapeEnum<'_>],
     slide: usize,
     wanted: &[u32],
     frames: &mut Vec<(u32, Frame)>,

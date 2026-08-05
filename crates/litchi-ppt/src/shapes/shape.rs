@@ -253,8 +253,8 @@ pub struct ShapeContainer<'a> {
     pub id_of_next_shape: Option<u32>,
 }
 
-impl<'a> std::fmt::Debug for ShapeContainer<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<'a> fmt::Debug for ShapeContainer<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut debug = f.debug_struct("ShapeContainer");
         debug
             .field("properties", &self.properties)

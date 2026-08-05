@@ -113,7 +113,7 @@ fn emitted_group_is_detected_as_table_with_grid_and_text() {
 
     // Group anchor: (50pt, 60pt) -> (400, 480) master units. ClientAnchor is
     // host-defined, so validate it through the typed PPT projection.
-    let (record, consumed) = litchi_odraw::Record::parse(&bytes, 0).unwrap();
+    let (record, consumed) = Record::parse(&bytes, 0).unwrap();
     assert_eq!(consumed, bytes.len());
     let typed = litchi_odraw::shape::Shape::try_from(record).unwrap();
     assert_eq!(typed.client_anchor().unwrap().len(), 8);

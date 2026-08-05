@@ -32,7 +32,7 @@ pub(crate) struct NotesIndex {
 }
 
 impl NotesIndex {
-    pub fn build(document_data: &[u8], slide_directory: &SlideDirectory) -> Self {
+    pub(crate) fn build(document_data: &[u8], slide_directory: &SlideDirectory) -> Self {
         match Self::try_build(document_data, slide_directory) {
             Ok(index) => index,
             Err(error) => Self {
@@ -108,7 +108,7 @@ impl NotesIndex {
         Ok(())
     }
 
-    pub fn descriptor(
+    pub(crate) fn descriptor(
         &self,
         slide: &PptRecord,
         slide_persist_id: u32,

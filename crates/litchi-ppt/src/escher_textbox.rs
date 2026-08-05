@@ -74,7 +74,7 @@ impl EscherTextboxWrapper {
         let metachars = super::text_metachar::metachars_from_records(child_records.iter())?;
         let outline_text_refs = child_records
             .iter()
-            .filter(|record| record.record_type == crate::consts::PptRecordType::OutlineTextRefAtom)
+            .filter(|record| record.record_type == PptRecordType::OutlineTextRefAtom)
             .map(super::text_si_exception::PowerPointOutlineTextRef::parse_record)
             .collect::<Result<Vec<_>>>()?;
 
