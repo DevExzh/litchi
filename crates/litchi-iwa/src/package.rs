@@ -521,13 +521,13 @@ impl IWorkPackage {
         Some(self.state.entries.get_at(position)?.data())
     }
 
-    /// Borrow a raw package member for low-level mutation.
+    /// Borrow a raw package member for package invariant tests.
     ///
-    /// The returned vector is intentionally an escape hatch for format-specific
-    /// editors. Package entry, aggregate, and ZIP safety budgets are rechecked
-    /// before serialization, so an oversized direct mutation cannot be
-    /// published accidentally.
-    pub fn entry_mut(&mut self, name: &str) -> Option<&mut Vec<u8>> {
+    /// This test-only helper ensures final validation still rejects a direct
+    /// byte mutation without exposing an unrestricted mutable buffer in the
+    /// production API.
+    #[cfg(test)]
+    fn entry_mut(&mut self, name: &str) -> Option<&mut Vec<u8>> {
         let name = normalize_entry_name(name);
         let position = self.entry_position(name)?;
         self.mark_mutated();
@@ -689,8 +689,8 @@ impl IWorkPackage {
 
     /// Validate the staged package state without encoding it.
     ///
-    /// This is the explicit validation boundary for callers that use the
-    /// low-level [`Self::entry_mut`] escape hatch. It performs the same
+    /// This is the explicit validation boundary used by package-invariant
+    /// tests. It performs the same
     /// package-member and aggregate budget checks used by serialization, but
     /// does not allocate a ZIP buffer or publish any output.
     pub fn validate(&self) -> Result<()> {
