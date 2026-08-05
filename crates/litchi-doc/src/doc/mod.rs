@@ -185,13 +185,12 @@ pub use revision::{
 };
 pub use section::{
     ChapterNumberSeparator, DocSection, LineNumberRestart, NoteNumberRestart, PageOrientation,
-    SectionBehavior, SectionBreakKind, SectionColumn, SectionColumnError, SectionColumnLayout,
-    SectionFootnotePosition, SectionLineNumbering, SectionMargins, SectionNoteSettings,
-    SectionPageBorder, SectionPageBorderApplyTo, SectionPageBorderArt, SectionPageBorderColor,
-    SectionPageBorderDepth, SectionPageBorderError, SectionPageBorderOffsetFrom,
-    SectionPageBorderStyle, SectionPageBorders, SectionPageGrid, SectionPageGridMode,
-    SectionPageLayout, SectionPageNumbering, SectionPaperSettings, SectionProtection,
-    SectionTextFlow, SectionVerticalJustification, VerticalMargin,
+    SectionBehavior, SectionBreakKind, SectionFootnotePosition, SectionLineNumbering,
+    SectionMargins, SectionNoteSettings, SectionPageBorder, SectionPageBorderApplyTo,
+    SectionPageBorderArt, SectionPageBorderColor, SectionPageBorderDepth, SectionPageBorderError,
+    SectionPageBorderOffsetFrom, SectionPageBorderStyle, SectionPageBorders, SectionPageGrid,
+    SectionPageGridMode, SectionPageLayout, SectionPageNumbering, SectionPaperSettings,
+    SectionProtection, SectionTextFlow, SectionVerticalJustification, VerticalMargin,
 };
 pub use shapes::DocShape;
 pub use table::{Cell, Row, Table};

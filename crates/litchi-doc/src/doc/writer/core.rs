@@ -925,7 +925,7 @@ pub struct DocWriter {
     /// Property revision metadata for the writer's single document section
     section_formatting_revision: Option<FormattingRevision>,
     /// Explicit column geometry for the writer's single document section.
-    section_columns: Option<crate::doc::SectionColumnLayout>,
+    section_columns: Option<crate::doc::section::columns::Layout>,
     /// Whether section columns are populated from right to left.
     section_right_to_left: bool,
     /// Section-wide glyph and line flow.
@@ -3246,7 +3246,7 @@ impl DocWriter {
     /// Set validated column geometry for the writer's single section.
     pub fn set_section_columns(
         &mut self,
-        columns: crate::doc::SectionColumnLayout,
+        columns: crate::doc::section::columns::Layout,
     ) -> Result<(), DocWriteError> {
         columns
             .validate()
@@ -3256,7 +3256,7 @@ impl DocWriter {
     }
 
     /// Return explicit section column geometry, or `None` for the file-format default.
-    pub fn section_columns(&self) -> Option<&crate::doc::SectionColumnLayout> {
+    pub fn section_columns(&self) -> Option<&crate::doc::section::columns::Layout> {
         self.section_columns.as_ref()
     }
 

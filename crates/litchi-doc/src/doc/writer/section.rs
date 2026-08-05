@@ -4,6 +4,8 @@
 //! Based on Microsoft's "[MS-DOC]" specification Section 2.9.245 and
 //! Apache POI's SectionTable implementation.
 
+use crate::doc::section::columns::{Layout, WireView};
+
 /// Generate SEPX (Section Properties) structure with optional first/odd-even header/footer flags
 ///
 /// - When `first_page_header` is true, emits `sprmSFTitlePage` to enable different first page.
@@ -37,7 +39,7 @@ pub(crate) fn generate_sepx_with_properties(
     first_page_header: bool,
     grpf_ihdt: u8,
     revision: Option<(u16, u32)>,
-    columns: Option<&crate::doc::SectionColumnLayout>,
+    columns: Option<&Layout>,
     right_to_left: bool,
     text_flow: crate::doc::SectionTextFlow,
     page_borders: Option<&crate::doc::SectionPageBorders>,
@@ -55,15 +57,20 @@ pub(crate) fn generate_sepx_with_properties(
     }
     if let Some(columns) = columns {
         columns.validate().map_err(|error| error.to_string())?;
-        let count_minus_one =
-            u16::try_from(columns.count() - 1).expect("validated section column count fits u16");
+        let count_minus_one = columns
+            .count()
+            .checked_sub(1)
+            .and_then(|count| u16::try_from(count).ok())
+            .ok_or_else(|| {
+                "validated section column count does not fit the SEPX field".to_string()
+            })?;
         push_word(
             &mut grpprl,
             crate::sprm_operations::SPRM_S_C_COLUMNS,
             count_minus_one,
         );
-        match columns {
-            crate::doc::SectionColumnLayout::Even {
+        match columns.wire_view() {
+            WireView::Even {
                 spacing_twips,
                 line_between,
                 ..
@@ -76,15 +83,15 @@ pub(crate) fn generate_sepx_with_properties(
                 push_word(
                     &mut grpprl,
                     crate::sprm_operations::SPRM_S_DXA_COLUMNS,
-                    *spacing_twips,
+                    spacing_twips,
                 );
                 push_bool(
                     &mut grpprl,
                     crate::sprm_operations::SPRM_S_L_BETWEEN,
-                    *line_between,
+                    line_between,
                 );
             },
-            crate::doc::SectionColumnLayout::Unequal {
+            WireView::Unequal {
                 columns,
                 line_between,
             } => {
@@ -98,21 +105,21 @@ pub(crate) fn generate_sepx_with_properties(
                         &mut grpprl,
                         crate::sprm_operations::SPRM_S_DXA_COL_WIDTH,
                         index,
-                        column.width_twips,
-                    );
-                    if let Some(spacing) = column.spacing_after_twips {
+                        column.width_twips(),
+                    )?;
+                    if let Some(spacing) = column.spacing_after_twips() {
                         push_indexed_twips(
                             &mut grpprl,
                             crate::sprm_operations::SPRM_S_DXA_COL_SPACING,
                             index,
                             spacing,
-                        );
+                        )?;
                     }
                 }
                 push_bool(
                     &mut grpprl,
                     crate::sprm_operations::SPRM_S_L_BETWEEN,
-                    *line_between,
+                    line_between,
                 );
             },
         }
@@ -196,10 +203,18 @@ fn push_word(output: &mut Vec<u8>, opcode: u16, value: u16) {
     output.extend_from_slice(&value.to_le_bytes());
 }
 
-fn push_indexed_twips(output: &mut Vec<u8>, opcode: u16, index: usize, value: u16) {
+fn push_indexed_twips(
+    output: &mut Vec<u8>,
+    opcode: u16,
+    index: usize,
+    value: u16,
+) -> Result<(), String> {
+    let index = u8::try_from(index)
+        .map_err(|_| "validated section column index does not fit the SEPX field".to_string())?;
     output.extend_from_slice(&opcode.to_le_bytes());
-    output.push(u8::try_from(index).expect("validated section column index fits u8"));
+    output.push(index);
     output.extend_from_slice(&value.to_le_bytes());
+    Ok(())
 }
 
 fn push_page_border(output: &mut Vec<u8>, opcode: u16, border: crate::doc::SectionPageBorder) {

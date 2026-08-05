@@ -3,6 +3,8 @@
 use crate::doc::NumberFormat;
 use std::fmt;
 
+pub mod columns;
+
 /// A section and the character-position range to which its properties apply.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DocSection {
@@ -15,7 +17,7 @@ pub struct DocSection {
     /// Page geometry for this section.
     pub page: SectionPageLayout,
     /// Column geometry for this section.
-    pub columns: SectionColumnLayout,
+    pub columns: columns::Layout,
     /// Page-number field behavior for this section.
     pub page_numbering: SectionPageNumbering,
     /// Printed line-number behavior for this section.
@@ -486,195 +488,4 @@ pub struct SectionPageLayout {
     pub header_distance_twips: u16,
     pub footer_distance_twips: u16,
     pub vertical_justification: SectionVerticalJustification,
-}
-
-/// Column geometry for a section.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SectionColumnLayout {
-    /// Equal-width columns separated by a common spacing value.
-    Even {
-        count: u8,
-        spacing_twips: u16,
-        line_between: bool,
-    },
-    /// Individually sized columns and their following spacing.
-    Unequal {
-        columns: Vec<SectionColumn>,
-        line_between: bool,
-    },
-}
-
-/// Validation failure for a section column layout.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SectionColumnError {
-    InvalidCount(usize),
-    InvalidWidth { index: usize, width_twips: u16 },
-    InvalidSpacing { index: usize, spacing_twips: u16 },
-    MissingSpacing { index: usize },
-    FinalColumnHasSpacing,
-}
-
-impl fmt::Display for SectionColumnError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::InvalidCount(count) => {
-                write!(formatter, "section column count {count} is outside 1..=44")
-            },
-            Self::InvalidWidth { index, width_twips } => write!(
-                formatter,
-                "section column {index} width {width_twips} is outside 718..=31680 twips"
-            ),
-            Self::InvalidSpacing {
-                index,
-                spacing_twips,
-            } => write!(
-                formatter,
-                "section column {index} spacing {spacing_twips} exceeds 31680 twips"
-            ),
-            Self::MissingSpacing { index } => {
-                write!(
-                    formatter,
-                    "section column {index} is missing following spacing"
-                )
-            },
-            Self::FinalColumnHasSpacing => {
-                formatter.write_str("the final section column cannot have following spacing")
-            },
-        }
-    }
-}
-
-impl std::error::Error for SectionColumnError {}
-
-impl SectionColumnLayout {
-    pub const MAX_COLUMNS: usize = 44;
-    pub const MAX_TWIPS: u16 = 31_680;
-    pub const MIN_UNEQUAL_WIDTH_TWIPS: u16 = 718;
-
-    /// Construct and validate an equal-width layout.
-    pub fn even(
-        count: u8,
-        spacing_twips: u16,
-        line_between: bool,
-    ) -> Result<Self, SectionColumnError> {
-        let layout = Self::Even {
-            count,
-            spacing_twips,
-            line_between,
-        };
-        layout.validate()?;
-        Ok(layout)
-    }
-
-    /// Construct and validate an unequal-width layout.
-    pub fn unequal(
-        columns: Vec<SectionColumn>,
-        line_between: bool,
-    ) -> Result<Self, SectionColumnError> {
-        let layout = Self::Unequal {
-            columns,
-            line_between,
-        };
-        layout.validate()?;
-        Ok(layout)
-    }
-
-    /// Validate all cross-field constraints without depending on SPRM order.
-    pub fn validate(&self) -> Result<(), SectionColumnError> {
-        let count = self.count();
-        if !(1..=Self::MAX_COLUMNS).contains(&count) {
-            return Err(SectionColumnError::InvalidCount(count));
-        }
-        match self {
-            Self::Even { spacing_twips, .. } => {
-                if *spacing_twips > Self::MAX_TWIPS {
-                    return Err(SectionColumnError::InvalidSpacing {
-                        index: 0,
-                        spacing_twips: *spacing_twips,
-                    });
-                }
-            },
-            Self::Unequal { columns, .. } => {
-                for (index, column) in columns.iter().enumerate() {
-                    if !(Self::MIN_UNEQUAL_WIDTH_TWIPS..=Self::MAX_TWIPS)
-                        .contains(&column.width_twips)
-                    {
-                        return Err(SectionColumnError::InvalidWidth {
-                            index,
-                            width_twips: column.width_twips,
-                        });
-                    }
-                    if index + 1 == columns.len() {
-                        if column.spacing_after_twips.is_some() {
-                            return Err(SectionColumnError::FinalColumnHasSpacing);
-                        }
-                    } else {
-                        let spacing_twips = column
-                            .spacing_after_twips
-                            .ok_or(SectionColumnError::MissingSpacing { index })?;
-                        if spacing_twips > Self::MAX_TWIPS {
-                            return Err(SectionColumnError::InvalidSpacing {
-                                index,
-                                spacing_twips,
-                            });
-                        }
-                    }
-                }
-            },
-        }
-        Ok(())
-    }
-
-    /// Replace this layout with a validated equal-width layout.
-    pub fn set_even(
-        &mut self,
-        count: u8,
-        spacing_twips: u16,
-        line_between: bool,
-    ) -> Result<(), SectionColumnError> {
-        *self = Self::even(count, spacing_twips, line_between)?;
-        Ok(())
-    }
-
-    /// Replace this layout with a validated unequal-width layout.
-    pub fn set_unequal(
-        &mut self,
-        columns: Vec<SectionColumn>,
-        line_between: bool,
-    ) -> Result<(), SectionColumnError> {
-        *self = Self::unequal(columns, line_between)?;
-        Ok(())
-    }
-
-    /// Change only the line-between flag without affecting column geometry.
-    pub fn set_line_between(&mut self, value: bool) {
-        match self {
-            Self::Even { line_between, .. } | Self::Unequal { line_between, .. } => {
-                *line_between = value;
-            },
-        }
-    }
-
-    /// Number of columns in this section.
-    pub fn count(&self) -> usize {
-        match self {
-            Self::Even { count, .. } => usize::from(*count),
-            Self::Unequal { columns, .. } => columns.len(),
-        }
-    }
-
-    /// Whether a vertical line is drawn between columns.
-    pub fn line_between(&self) -> bool {
-        match self {
-            Self::Even { line_between, .. } | Self::Unequal { line_between, .. } => *line_between,
-        }
-    }
-}
-
-/// Width and following spacing for one unequal-width column.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SectionColumn {
-    pub width_twips: u16,
-    /// Space after this column. The final column has no following spacing.
-    pub spacing_after_twips: Option<u16>,
 }

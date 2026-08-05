@@ -5,18 +5,18 @@ use super::numbering::NumberFormat;
 use super::revisions::RevisionAuthorTable;
 use crate::doc::package::{DocError, Result};
 use crate::doc::revision::{SectionRevisionMark, decode_dttm};
+use crate::doc::section::columns::{Column, Layout};
 use crate::doc::section::{
     ChapterNumberSeparator, DocSection, LineNumberRestart, NoteNumberRestart, PageOrientation,
-    SectionBehavior, SectionBreakKind, SectionColumn, SectionColumnLayout, SectionFootnotePosition,
-    SectionLineNumbering, SectionMargins, SectionNoteSettings, SectionPageBorder,
-    SectionPageBorderApplyTo, SectionPageBorderArt, SectionPageBorderColor, SectionPageBorderDepth,
+    SectionBehavior, SectionBreakKind, SectionFootnotePosition, SectionLineNumbering,
+    SectionMargins, SectionNoteSettings, SectionPageBorder, SectionPageBorderApplyTo,
+    SectionPageBorderArt, SectionPageBorderColor, SectionPageBorderDepth,
     SectionPageBorderOffsetFrom, SectionPageBorderStyle, SectionPageBorders, SectionPageGrid,
     SectionPageGridMode, SectionPageLayout, SectionPageNumbering, SectionPaperSettings,
     SectionProtection, SectionTextFlow, SectionVerticalJustification, VerticalMargin,
 };
 use crate::sprm::{Sprm, parse_sprms};
 
-const MAX_COLUMNS: usize = 44;
 const MAX_NON_NEGATIVE_TWIPS: u16 = 31_680;
 const MAX_VERTICAL_MARGIN_TWIPS: i16 = 31_665;
 
@@ -176,8 +176,8 @@ struct SectionProperties {
     evenly_spaced: bool,
     column_spacing_twips: u16,
     line_between: bool,
-    column_widths: [Option<u16>; MAX_COLUMNS],
-    column_spacings: [Option<u16>; MAX_COLUMNS],
+    column_widths: [Option<u16>; Layout::MAX_COLUMNS],
+    column_spacings: [Option<u16>; Layout::MAX_COLUMNS],
     page_numbering: SectionPageNumbering,
     line_numbering: SectionLineNumbering,
     notes: SectionNoteSettings,
@@ -211,8 +211,8 @@ impl Default for SectionProperties {
             evenly_spaced: true,
             column_spacing_twips: 720,
             line_between: false,
-            column_widths: [None; MAX_COLUMNS],
-            column_spacings: [None; MAX_COLUMNS],
+            column_widths: [None; Layout::MAX_COLUMNS],
+            column_spacings: [None; Layout::MAX_COLUMNS],
             page_numbering: SectionPageNumbering::default(),
             line_numbering: SectionLineNumbering::default(),
             notes: SectionNoteSettings::default(),
@@ -502,7 +502,7 @@ impl SectionProperties {
             return corrupted("an enabled section document grid requires sprmSDyaLinePitch");
         }
         let columns = if self.evenly_spaced {
-            SectionColumnLayout::even(
+            Layout::even(
                 self.column_count,
                 self.column_spacing_twips,
                 self.line_between,
@@ -535,12 +535,12 @@ impl SectionProperties {
                 } else {
                     None
                 };
-                columns.push(SectionColumn {
-                    width_twips,
-                    spacing_after_twips,
-                });
+                columns.push(
+                    Column::from_parts(index, width_twips, spacing_after_twips)
+                        .map_err(|error| DocError::Corrupted(error.to_string()))?,
+                );
             }
-            SectionColumnLayout::unequal(columns, self.line_between)
+            Layout::unequal(columns, self.line_between)
                 .map_err(|error| DocError::Corrupted(error.to_string()))?
         };
         Ok(DocSection {
@@ -793,7 +793,7 @@ fn column_operand(sprm: &Sprm, name: &str) -> Result<(usize, u16)> {
         return corrupted(&format!("{name} operand must contain exactly 3 bytes"));
     }
     let index = usize::from(operand[0]);
-    if index >= MAX_COLUMNS {
+    if index >= Layout::MAX_COLUMNS {
         return corrupted(&format!("{name} column index must be at most 43"));
     }
     Ok((index, u16::from_le_bytes([operand[1], operand[2]])))
@@ -945,30 +945,15 @@ mod tests {
         let parsed = parse_synthetic(&[Some(even), Some(unequal)]).unwrap();
         assert_eq!(
             parsed.sections()[0].columns,
-            SectionColumnLayout::Even {
-                count: 3,
-                spacing_twips: 900,
-                line_between: true,
-            }
+            Layout::even(3, 900, true).unwrap()
         );
-        let SectionColumnLayout::Unequal { columns, .. } = &parsed.sections()[1].columns else {
-            panic!("expected unequal columns");
-        };
+        let columns = parsed.sections()[1]
+            .columns
+            .unequal_columns()
+            .expect("parser produced unequal columns");
         assert_eq!(columns.len(), 3);
-        assert_eq!(
-            columns[0],
-            SectionColumn {
-                width_twips: 1_000,
-                spacing_after_twips: Some(100)
-            }
-        );
-        assert_eq!(
-            columns[2],
-            SectionColumn {
-                width_twips: 1_200,
-                spacing_after_twips: None
-            }
-        );
+        assert_eq!(columns[0], Column::new(1_000, Some(100)).unwrap());
+        assert_eq!(columns[2], Column::new(1_200, None).unwrap());
     }
 
     #[test]
@@ -991,12 +976,13 @@ mod tests {
         grpprl.extend(fixed_sprm(0x500B, &2u16.to_le_bytes()));
 
         let parsed = parse_synthetic(&[Some(grpprl)]).unwrap();
-        let SectionColumnLayout::Unequal { columns, .. } = &parsed.sections()[0].columns else {
-            panic!("expected unequal columns");
-        };
-        assert_eq!(columns[0].width_twips, 1_500);
-        assert_eq!(columns[0].spacing_after_twips, Some(100));
-        assert_eq!(columns[2].width_twips, 1_200);
+        let columns = parsed.sections()[0]
+            .columns
+            .unequal_columns()
+            .expect("parser produced unequal columns");
+        assert_eq!(columns[0].width_twips(), 1_500);
+        assert_eq!(columns[0].spacing_after_twips(), Some(100));
+        assert_eq!(columns[2].width_twips(), 1_200);
     }
 
     #[test]
