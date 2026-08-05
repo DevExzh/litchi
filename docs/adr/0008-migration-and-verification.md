@@ -4621,6 +4621,39 @@ The next high-value binary seam is the remaining host-specific CFB signature
 coverage and legacy layout ownership; new shared logic should be extracted only
 after its format-neutral vocabulary and specification boundary are identified.
 
+## DOCX section-border layering
+
+The DOCX writer now moves its section implementation into
+`writer::section::{mod,borders}.rs`. The page-border owner exposes contextual
+`section::borders::{Border, Borders, Art, Color, Display, OffsetFrom, Style,
+ZOrder}` values, while `section::SectionProperties` retains the ergonomic
+`page_borders` field. The former `SectionPageBorder*` names and the flat
+prefix-expanded facade were removed without aliases. The XML codec remains
+responsible for `[ECMA-376]` `CT_Border`/`CT_PageBorders` (§17.6.16) parsing,
+validation, deterministic writing, and lossless round-trip behavior.
+
+DOCX default all-target coverage passes 652 library tests plus its integration
+and example targets; the focused section suite passes 14 tests. Formatting
+passes. Enabling the optional fonts feature is currently environment-blocked by
+the missing system `pkg-config`/Fontconfig tool, unrelated to this module move;
+the standalone default feature set remains verified.
+
+## DOCX contextual enum ownership
+
+The compiled DOCX enum facade now follows the same contextual rule. Section
+layout owns `section::{Orientation, Start}`, header/footer semantics own
+`header_footer::Kind`, and style semantics own `styles::Type`. The former
+`WdOrientation`, `WdSectionStart`, `WdHeaderFooter`, and `WdStyleType` names,
+the flat `enums` module, and root compatibility reexports were removed. XML
+lexemes, numeric representations, defaults, and display behavior are unchanged;
+only the semantic owner and ergonomic path changed.
+
+DOCX library and integration coverage passes after this migration, and the
+umbrella DOCX example now consumes the canonical `ooxml::common::Props` and
+contextual enum paths. The next compiled prefix boundary is the nested
+`Chart*` vocabulary in `litchi-drawingml::chart`; its host consumers should
+continue to depend only on the neutral chart owner.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:
