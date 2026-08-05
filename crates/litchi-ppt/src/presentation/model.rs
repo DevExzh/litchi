@@ -1,29 +1,26 @@
-use super::document_properties::DocumentProperties12;
-use super::embedded::object::Collection as OleCollection;
-use super::embedded::storage::{Kind as StorageKind, Ref as StorageRef, Storage};
-use super::encryption::decrypt_pictures;
-use super::encryption::decrypt_powerpoint_document;
-use super::external_media::Collection as MediaCollection;
-use super::header_footer::{
-    HeaderFooterDisplayText, HeaderFooterParent, HeaderFooterParentOrdinal, HeaderFooterScope,
-    HeaderFooters,
-};
-use super::hyperlink::Hyperlinks;
-use super::main_master::MainMasterMetadata12;
-use super::non_zoom_view::OutlineSorterViewInformation;
-/// High-performance Presentation API with zero-copy slide parsing.
-use super::package::{Error, OpenOptions, Result};
-use super::parsers::RecordParser;
-use super::persist::PersistMapping;
-use super::records::Record;
-use super::routing_slip::Slip;
-use super::slide::{ParsedComment, Slide, SlideDirectory, SlideFactory};
-use super::sound_collection::Collection;
-use super::view_info::SlideViewInformation;
 use crate::consts::RecordType;
+use crate::document_properties::DocumentProperties12;
+use crate::embedded::object::Collection as OleCollection;
+use crate::embedded::storage::{Kind as StorageKind, Ref as StorageRef, Storage};
+use crate::external_media::Collection as MediaCollection;
+use crate::header_footer::{
+    HeaderFooterParent, HeaderFooterParentOrdinal, HeaderFooterScope, HeaderFooters,
+};
+use crate::hyperlink::Hyperlinks;
+use crate::main_master::MainMasterMetadata12;
+use crate::non_zoom_view::OutlineSorterViewInformation;
+/// High-performance Presentation API with zero-copy slide parsing.
+use crate::package::{Error, Result};
+use crate::parsers::RecordParser;
+use crate::persist::PersistMapping;
+use crate::records::Record;
+use crate::routing_slip::Slip;
+use crate::slide::{ParsedComment, Slide, SlideDirectory, SlideFactory};
+use crate::sound_collection::Collection;
+use crate::view_info::SlideViewInformation;
 use litchi_cfb::OleFile;
 use litchi_odraw::image::{File as ImageFile, Id as ImageId, Store as ImageStore};
-use std::io::{Cursor, Read, Seek};
+use std::io::Cursor;
 
 /// A PowerPoint presentation (.ppt) with high-performance zero-copy parsing.
 ///
@@ -50,122 +47,18 @@ use std::io::{Cursor, Read, Seek};
 /// ```
 pub struct Presentation {
     /// The main document stream data (owned for lifetime management)
-    powerpoint_document: Vec<u8>,
+    pub(super) powerpoint_document: Vec<u8>,
     /// Parsed record structure (reserved for future advanced parsing)
     #[allow(dead_code)]
     pub(crate) parser: RecordParser,
     /// Persist ID to offset mapping
     pub(crate) persist_mapping: PersistMapping,
-    slide_directory: SlideDirectory,
+    pub(super) slide_directory: SlideDirectory,
     /// Pictures stream data (for image extraction)
-    pictures_data: Option<Vec<u8>>,
-}
-
-fn drawing_textboxes(data: &[u8]) -> Result<Vec<litchi_odraw::Record<'_>>> {
-    fn collect<'data>(
-        shape: &litchi_odraw::shape::Shape<'data>,
-        records: &mut Vec<litchi_odraw::Record<'data>>,
-    ) -> Result<()> {
-        if let Some(textbox) = crate::odraw::textbox(shape)? {
-            records.push(textbox);
-        }
-        for child in shape.children() {
-            collect(child, records)?;
-        }
-        Ok(())
-    }
-
-    let shapes = crate::odraw::parse(data)?;
-    let mut records = Vec::new();
-    for shape in &shapes {
-        collect(shape, &mut records)?;
-    }
-    Ok(records)
+    pub(super) pictures_data: Option<Vec<u8>>,
 }
 
 impl Presentation {
-    /// Create a new Presentation from an OLE file.
-    pub(crate) fn from_ole<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Self> {
-        Self::from_ole_with_options(ole, OpenOptions::default())
-    }
-
-    /// Create a new Presentation from an OLE file with password-to-open options.
-    pub(crate) fn from_ole_with_options<R: Read + Seek>(
-        ole: &mut OleFile<R>,
-        options: OpenOptions<'_>,
-    ) -> Result<Self> {
-        // Read the PowerPoint Document stream
-        let mut powerpoint_document = Self::read_powerpoint_document(ole)?;
-        let current_user_data = ole
-            .open_stream(&["Current User"])
-            .or_else(|_| ole.open_stream(&["PP97_DUALSTORAGE", "Current User"]))
-            .ok();
-        let encrypted = decrypt_powerpoint_document(
-            &mut powerpoint_document,
-            current_user_data.as_deref(),
-            options.password,
-        )?;
-
-        // Parse document structure
-        let mut parser = RecordParser::new();
-        if let Some(encrypted) = &encrypted {
-            parser.parse_document_at_offsets(&powerpoint_document, &encrypted.live_offsets)?;
-        } else {
-            parser.parse_document(&powerpoint_document)?;
-        }
-
-        // Build persist mapping for slide lookup (collect all records recursively)
-        // Use zero-copy reference collection to avoid cloning all record data
-        let all_records_ref = parser.find_records_ref();
-        let mut persist_mapping = PersistMapping::build_from_records_ref(&all_records_ref);
-        if let Some(encrypted) = &encrypted {
-            persist_mapping = PersistMapping::new();
-            for &(persist_id, offset) in &encrypted.mappings {
-                persist_mapping.add_mapping(persist_id, offset);
-            }
-        }
-        let current_user_data = current_user_data
-            .as_deref()
-            .ok_or_else(|| Error::StreamNotFound("Current User".to_string()))?;
-        let slide_directory =
-            SlideDirectory::build(&powerpoint_document, current_user_data, &persist_mapping)?;
-
-        // Try to read Pictures stream for image extraction
-        let pictures_data = if let Ok(mut pictures) = ole.open_stream(&["Pictures"]) {
-            if let Some(encrypted) = &encrypted {
-                decrypt_pictures(&mut pictures, &encrypted.crypto)?;
-            }
-            Some(pictures)
-        } else {
-            None
-        };
-
-        Ok(Self {
-            powerpoint_document,
-            parser,
-            persist_mapping,
-            slide_directory,
-            pictures_data,
-        })
-    }
-
-    /// Read the PowerPoint Document stream from OLE file.
-    fn read_powerpoint_document<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Vec<u8>> {
-        // Try primary location
-        if let Ok(data) = ole.open_stream(&["PowerPoint Document"]) {
-            return Ok(data);
-        }
-
-        // Try alternate location
-        if let Ok(data) = ole.open_stream(&["PP97_DUALSTORAGE", "PowerPoint Document"]) {
-            return Ok(data);
-        }
-
-        Err(Error::InvalidFormat(
-            "PowerPoint Document stream not found".to_string(),
-        ))
-    }
-
     /// Get iterator over all slides with zero-copy borrowing.
     ///
     /// # Performance
@@ -252,7 +145,7 @@ impl Presentation {
 
         fn collect(record: &Record, out: &mut Vec<TextMetachar>) -> Result<()> {
             if record.record_type == RecordType::PPDrawing {
-                for textbox in drawing_textboxes(&record.data)? {
+                for textbox in super::codec::drawing_textboxes(&record.data)? {
                     let wrapper = crate::EscherTextboxWrapper::new(textbox.data().to_vec())?;
                     out.extend_from_slice(wrapper.metachars());
                 }
@@ -326,7 +219,7 @@ impl Presentation {
 
         fn collect(record: &Record, out: &mut Vec<OutlineTextRef>) -> Result<()> {
             if record.record_type == RecordType::PPDrawing {
-                for textbox in drawing_textboxes(&record.data)? {
+                for textbox in super::codec::drawing_textboxes(&record.data)? {
                     let wrapper = crate::EscherTextboxWrapper::new(textbox.data().to_vec())?;
                     out.extend_from_slice(wrapper.outline_text_refs());
                 }
@@ -891,7 +784,7 @@ impl Presentation {
             .filter(|record| record.record_type == RecordType::MainMaster)
             .enumerate()
         {
-            if let Some(display) = placeholder_display_from_record(master)? {
+            if let Some(display) = super::codec::placeholder_display_from_record(master)? {
                 let scope = HeaderFooterScope::Local {
                     parent: HeaderFooterParent::MainMaster,
                     parent_ordinal: HeaderFooterParentOrdinal::new(master_ordinal),
@@ -920,7 +813,7 @@ impl Presentation {
                 parent: HeaderFooterParent::Slide,
                 parent_ordinal: HeaderFooterParentOrdinal::new(ordinal),
             };
-            if let Some(display) = placeholder_display_from_record(slide)? {
+            if let Some(display) = super::codec::placeholder_display_from_record(slide)? {
                 if values.has_scope(scope) {
                     values.attach_placeholder_display(scope, display)?;
                 } else {
@@ -936,7 +829,8 @@ impl Presentation {
                 break;
             }
             if let Some(notes) = slide.speaker_notes()? {
-                first_notes_display = placeholder_display_from_shapes(notes.shapes()?)?;
+                first_notes_display =
+                    super::codec::placeholder_display_from_shapes(notes.shapes()?)?;
             }
         }
         if !has_master_display && let Some(display) = first_unoverridden_slide_display {
@@ -1009,7 +903,7 @@ impl Presentation {
 
             // Extract text from Escher/PPDrawing using the optimized path
             if let Some(ppdrawing) = slide_data.record.find_child(RecordType::PPDrawing) {
-                let escher_text = super::odraw::text_from_drawing(&ppdrawing.data)?;
+                let escher_text = crate::odraw::text_from_drawing(&ppdrawing.data)?;
                 let trimmed = escher_text.trim();
                 if !trimmed.is_empty() {
                     if !text.is_empty() {
@@ -1273,7 +1167,7 @@ impl Presentation {
     }
 
     /// Parse NamedShow containers from a NamedShows container.
-    fn parse_named_shows(named_shows: &Record, shows: &mut Vec<ParsedCustomShow>) {
+    pub(super) fn parse_named_shows(named_shows: &Record, shows: &mut Vec<ParsedCustomShow>) {
         for child in &named_shows.children {
             if child.record_type == RecordType::NamedShow {
                 let mut name = String::new();
@@ -1315,51 +1209,6 @@ impl Presentation {
     }
 }
 
-fn placeholder_display_from_record(record: &Record) -> Result<Option<HeaderFooterDisplayText>> {
-    let Some(drawing) = record.find_child(RecordType::PPDrawing) else {
-        return Ok(None);
-    };
-    let parsed = super::odraw::parse(&drawing.data)?;
-    let mut shapes = Vec::with_capacity(parsed.len());
-    for shape in &parsed {
-        if let Some(shape) = Slide::<'static>::convert_odraw_to_shape_enum(shape)? {
-            shapes.push(shape);
-        }
-    }
-    placeholder_display_from_shapes(&shapes)
-}
-
-fn placeholder_display_from_shapes(
-    shapes: &[crate::shapes::ShapeEnum<'static>],
-) -> Result<Option<HeaderFooterDisplayText>> {
-    use crate::shapes::PlaceholderType;
-
-    let mut display = HeaderFooterDisplayText::default();
-    for shape in shapes {
-        let Some(placeholder) = shape.as_placeholder() else {
-            continue;
-        };
-        let target = match placeholder.placeholder_type() {
-            PlaceholderType::DateAndTime => &mut display.user_date,
-            PlaceholderType::Header => &mut display.header,
-            PlaceholderType::Footer => &mut display.footer,
-            _ => continue,
-        };
-        if target.is_some() {
-            continue;
-        }
-        let text = shape.text()?;
-        if !text.is_empty() && text != "*" {
-            *target = Some(text);
-        }
-    }
-    if display == HeaderFooterDisplayText::default() {
-        Ok(None)
-    } else {
-        Ok(Some(display))
-    }
-}
-
 /// A parsed custom slide show from a PPT file.
 #[derive(Debug, Clone)]
 pub struct ParsedCustomShow {
@@ -1376,148 +1225,4 @@ pub struct ParsedSlideComments {
     pub slide_number: usize,
     /// Comments in record order.
     pub comments: Vec<ParsedComment>,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::records::Record;
-
-    fn record(record_type: RecordType, data: Vec<u8>, children: Vec<Record>) -> Record {
-        Record {
-            record_type,
-            record_type_raw: 0,
-            version: 0,
-            instance: 0,
-            data_length: data.len() as u32,
-            data,
-            children,
-        }
-    }
-
-    fn record_bytes(version: u16, instance: u16, record_type: RecordType, data: &[u8]) -> Vec<u8> {
-        let mut bytes = Vec::with_capacity(8 + data.len());
-        bytes.extend_from_slice(&((instance << 4) | version).to_le_bytes());
-        bytes.extend_from_slice(&record_type.as_u16().to_le_bytes());
-        bytes.extend_from_slice(&(data.len() as u32).to_le_bytes());
-        bytes.extend_from_slice(data);
-        bytes
-    }
-
-    fn presentation_with_vba_storage() -> Presentation {
-        let mut atom_data = Vec::new();
-        atom_data.extend_from_slice(&41u32.to_le_bytes());
-        atom_data.extend_from_slice(&1u32.to_le_bytes());
-        atom_data.extend_from_slice(&2u32.to_le_bytes());
-        let atom = record_bytes(2, 0, RecordType::VBAInfoAtom, &atom_data);
-        let vba_info = record_bytes(0x0f, 1, RecordType::VBAInfo, &atom);
-
-        let mut storage_data = Vec::new();
-        storage_data.extend_from_slice(&4096u32.to_le_bytes());
-        storage_data.extend_from_slice(&[0x78, 0x9c, 1, 2, 3]);
-        let storage = record_bytes(0, 1, RecordType::ExternalOleObjectStg, &storage_data);
-        let storage_offset = vba_info.len() as u32;
-
-        let mut powerpoint_document = vba_info;
-        powerpoint_document.extend_from_slice(&storage);
-        let mut parser = RecordParser::new();
-        parser.parse_document(&powerpoint_document).unwrap();
-        let mut persist_mapping = PersistMapping::new();
-        persist_mapping.add_mapping(41, storage_offset);
-
-        Presentation {
-            powerpoint_document,
-            parser,
-            persist_mapping,
-            slide_directory: SlideDirectory::new_for_test(0),
-            pictures_data: None,
-        }
-    }
-
-    fn named_shows(children: Vec<Record>) -> Record {
-        record(RecordType::NamedShows, Vec::new(), children)
-    }
-
-    fn named_show(name: &str, slide_ids: &[u32]) -> Record {
-        let name_bytes: Vec<u8> = name
-            .encode_utf16()
-            .flat_map(|unit| unit.to_le_bytes())
-            .collect();
-        let slide_bytes: Vec<u8> = slide_ids.iter().flat_map(|id| id.to_le_bytes()).collect();
-        record(
-            RecordType::NamedShow,
-            Vec::new(),
-            vec![
-                record(RecordType::CString, name_bytes, Vec::new()),
-                record(RecordType::NamedShowSlides, slide_bytes, Vec::new()),
-            ],
-        )
-    }
-
-    #[test]
-    fn parses_named_shows_container() {
-        let container = named_shows(vec![
-            named_show("Demo Show", &[0x101, 0x103]),
-            named_show("Short", &[0x100]),
-        ]);
-
-        let mut shows = Vec::new();
-        Presentation::parse_named_shows(&container, &mut shows);
-
-        assert_eq!(shows.len(), 2);
-        assert_eq!(shows[0].name, "Demo Show");
-        assert_eq!(shows[0].slide_indices, vec![1, 3]);
-        assert_eq!(shows[1].name, "Short");
-        assert_eq!(shows[1].slide_indices, vec![0]);
-    }
-
-    #[test]
-    fn ignores_trailing_partial_slide_id_bytes() {
-        let mut show = named_show("Odd", &[0x102]);
-        // Append 3 stray bytes to the NamedShowSlides atom.
-        show.children[1].data.extend_from_slice(&[0xAA, 0xBB, 0xCC]);
-        let container = named_shows(vec![show]);
-
-        let mut shows = Vec::new();
-        Presentation::parse_named_shows(&container, &mut shows);
-
-        assert_eq!(shows.len(), 1);
-        assert_eq!(shows[0].slide_indices, vec![2]);
-    }
-
-    #[test]
-    fn skips_named_show_without_name() {
-        let show = record(
-            RecordType::NamedShow,
-            Vec::new(),
-            vec![record(
-                RecordType::NamedShowSlides,
-                0x101u32.to_le_bytes().to_vec(),
-                Vec::new(),
-            )],
-        );
-        let container = named_shows(vec![show]);
-
-        let mut shows = Vec::new();
-        Presentation::parse_named_shows(&container, &mut shows);
-        assert!(shows.is_empty());
-    }
-
-    #[test]
-    fn vba_project_storage_returns_only_outer_metadata() {
-        let presentation = presentation_with_vba_storage();
-
-        let storage = presentation.vba_project_storage().unwrap().unwrap();
-        assert_eq!(storage.persist_id_ref(), 41);
-        assert!(storage.has_macros());
-        assert!(storage.has_persisted_storage());
-        assert_eq!(storage.stored_payload_len(), Some(5));
-        assert_eq!(storage.declared_uncompressed_len(), Some(4096));
-        assert_eq!(
-            storage.compression(),
-            Some(crate::embedded::storage::Compression::Zlib)
-        );
-        assert!(storage.may_contain_macro_code());
-        assert_eq!(presentation.vba_info().unwrap(), Some(storage.info()));
-    }
 }

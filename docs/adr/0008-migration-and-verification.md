@@ -5131,6 +5131,36 @@ This remains a typed/layered ownership increment, not a claim of complete
 `[MS-DOC]`, `[MS-ODRAW]`, `[MS-OGRAPH]`, `[MS-OSHARED]`, `[MS-PPT]`, or
 `[MS-XLS]` conformance.
 
+## Layered OLE2 and OOXML core-owner continuation
+
+The next breaking structural slice layers the remaining high-value core owners
+without adding redundant public prefixes. DOC, PPT, and XLS now expose
+`document`, `presentation`, and `workbook` facades backed by separate
+`model`, `codec`, `package`, and test modules. DOCX and PPTX package/layout
+owners follow the same semantic split. XLSX keeps its existing nested
+`worksheet`, `edit`, `data_model`, and `comments` owners while layering the
+workbook facade and calculation properties. The common OOXML external-workbook
+relationship vocabulary now lives under
+`litchi-ooxml-common::external_link::{model,codec}` with a small public facade.
+
+These moves preserve ergonomic crate paths while keeping typed object models,
+binary/XML codecs, package graph integration, and verification seams distinct.
+They do not add compatibility aliases, expose native identifiers, or claim
+complete `[MS-DOC]`, `[MS-ODRAW]`, `[MS-OGRAPH]`, `[MS-OSHARED]`, `[MS-PPT]`,
+`[MS-XLS]`, or OOXML conformance.
+
+The common owner, DOC, PPT, XLS, DOCX, and XLSX all-target checks passed,
+including 163 common tests, 832 DOC library tests with two ignored, 882 PPT
+tests with one ignored, 844 XLS tests, 643 DOCX library tests, and 642 XLSX
+library tests plus their integration targets. The umbrella `litchi` crate
+passed 162 tests and its integration targets. Focused PPTX tests passed for
+the migrated `master_layout` and `package` owners; the full PPTX suite still
+has the two previously observed `notes` tests failing on malformed synthetic
+XML (`attribute value not closed`), outside this slice. The full DOC all-target
+run remains limited by the previously recorded malformed Apache POI fixture
+(`FAT entry 52 beyond the physical file is not FREESECT`). Formatting, diff,
+and 46-package boundary checks pass.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:
