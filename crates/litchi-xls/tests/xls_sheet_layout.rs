@@ -39,7 +39,7 @@ fn worksheet_layout_round_trip() {
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
     let workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
-    let layout = workbook.xls_worksheet(0).unwrap().sheet_layout();
+    let layout = workbook.xls_worksheet(0).unwrap().layout();
     assert_eq!(layout.default_row_height_twips(), 360);
     assert!(layout.empty_rows_hidden());
     assert!(layout.default_row_height_unsynced());
@@ -66,7 +66,7 @@ fn reads_poi_column_width_fixture_defaults() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/poi/test-data/spreadsheet/colwidth.xls");
     let workbook = XlsWorkbook::new(File::open(fixture).unwrap()).unwrap();
-    let layout = workbook.xls_worksheet(0).unwrap().sheet_layout();
+    let layout = workbook.xls_worksheet(0).unwrap().layout();
     assert_eq!(layout.default_row_height_twips(), 255);
     assert_eq!(layout.default_column_width_chars(), 8);
     assert_eq!(layout.max_row_outline_level(), 0);

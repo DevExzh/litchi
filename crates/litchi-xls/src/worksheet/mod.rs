@@ -1,12 +1,14 @@
 //! Worksheet implementation for XLS files
 
+pub mod layout;
+
 use crate::autofilter::{AutoFilterColumn, AutoFilterInfo, SortInfo};
 use crate::cell::XlsCell;
 use crate::comments::XlsComment;
 use crate::conditional_format::XlsConditionalFormatting;
 use crate::error::XlsError;
 use crate::hyperlinks::XlsHyperlink;
-use crate::layout::{XlsColumnLayout, XlsRowLayout};
+use crate::layout::{Column, Row};
 use crate::merged_cells::MergedCellRange;
 use crate::number_format::{XlsExtendedFormat, XlsFormatting, XlsNumberFormat};
 use crate::page_setup::XlsPageSetup;
@@ -55,9 +57,9 @@ pub struct XlsWorksheet {
     formatting: Arc<XlsFormatting>,
     data_validation_settings: Option<XlsDataValidationSettings>,
     data_validations: Vec<XlsDataValidationRule>,
-    row_layouts: BTreeMap<u16, XlsRowLayout>,
-    column_layouts: Vec<XlsColumnLayout>,
-    sheet_layout: crate::sheet_layout::XlsWorksheetLayout,
+    row_layouts: BTreeMap<u16, Row>,
+    column_layouts: Vec<Column>,
+    layout: layout::Layout,
     worksheet_views: Vec<View>,
     page_setup: Option<XlsPageSetup>,
     calculation: crate::calculation::XlsWorksheetCalculation,
@@ -108,7 +110,7 @@ impl XlsWorksheet {
             data_validations: Vec::new(),
             row_layouts: BTreeMap::new(),
             column_layouts: Vec::new(),
-            sheet_layout: crate::sheet_layout::XlsWorksheetLayout::default(),
+            layout: layout::Layout::default(),
             worksheet_views: Vec::new(),
             page_setup: None,
             calculation: crate::calculation::XlsWorksheetCalculation::default(),
@@ -153,7 +155,7 @@ impl XlsWorksheet {
             data_validations: Vec::new(),
             row_layouts: BTreeMap::new(),
             column_layouts: Vec::new(),
-            sheet_layout: crate::sheet_layout::XlsWorksheetLayout::default(),
+            layout: layout::Layout::default(),
             worksheet_views: Vec::new(),
             page_setup: None,
             calculation: crate::calculation::XlsWorksheetCalculation::default(),
@@ -494,47 +496,40 @@ impl XlsWorksheet {
     }
 
     /// Layout metadata for a zero-based row index.
-    pub fn row_layout(&self, row: u16) -> Option<&XlsRowLayout> {
+    pub fn row_layout(&self, row: u16) -> Option<&Row> {
         self.row_layouts.get(&row)
     }
 
     /// Row layout metadata in ascending row order.
-    pub fn row_layouts(&self) -> impl ExactSizeIterator<Item = &XlsRowLayout> {
+    pub fn row_layouts(&self) -> impl ExactSizeIterator<Item = &Row> {
         self.row_layouts.values()
     }
 
     /// Column layout ranges in BIFF record order.
-    pub fn column_layouts(&self) -> &[XlsColumnLayout] {
+    pub fn column_layouts(&self) -> &[Column] {
         &self.column_layouts
     }
 
     /// The first layout range containing a zero-based column index.
-    pub fn column_layout(&self, column: u8) -> Option<&XlsColumnLayout> {
+    pub fn column_layout(&self, column: u8) -> Option<&Column> {
         let column = u16::from(column);
         self.column_layouts
             .iter()
             .find(|layout| (layout.first_column()..=layout.last_column()).contains(&column))
     }
 
-    pub(crate) fn set_layouts(
-        &mut self,
-        rows: BTreeMap<u16, XlsRowLayout>,
-        columns: Vec<XlsColumnLayout>,
-    ) {
+    pub(crate) fn set_layouts(&mut self, rows: BTreeMap<u16, Row>, columns: Vec<Column>) {
         self.row_layouts = rows;
         self.column_layouts = columns;
     }
 
     /// Default dimensions and outline workspace state for this worksheet.
-    pub fn sheet_layout(&self) -> &crate::sheet_layout::XlsWorksheetLayout {
-        &self.sheet_layout
+    pub fn layout(&self) -> &layout::Layout {
+        &self.layout
     }
 
-    pub(crate) fn set_sheet_layout(
-        &mut self,
-        sheet_layout: crate::sheet_layout::XlsWorksheetLayout,
-    ) {
-        self.sheet_layout = sheet_layout;
+    pub(crate) fn set_layout(&mut self, layout: layout::Layout) {
+        self.layout = layout;
     }
 
     /// The first display window associated with this worksheet.

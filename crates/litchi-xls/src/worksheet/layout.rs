@@ -1,6 +1,6 @@
 //! BIFF8 worksheet default dimensions and outline workspace metadata.
 
-use super::{XlsError, XlsResult};
+use crate::error::{XlsError, XlsResult};
 
 pub(crate) const GUTS_RECORD_TYPE: u16 = 0x0080;
 pub(crate) const WSBOOL_RECORD_TYPE: u16 = 0x0081;
@@ -10,7 +10,7 @@ const DIMENSIONS_RECORD_TYPE: u16 = 0x0200;
 
 /// Default row/column dimensions and outline workspace state for a worksheet.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsWorksheetLayout {
+pub struct Layout {
     default_row_height_twips: u16,
     empty_rows_hidden: bool,
     default_row_height_unsynced: bool,
@@ -32,7 +32,7 @@ pub struct XlsWorksheetLayout {
     alternate_formula_entry: bool,
 }
 
-impl Default for XlsWorksheetLayout {
+impl Default for Layout {
     fn default() -> Self {
         Self {
             default_row_height_twips: 255,
@@ -58,7 +58,7 @@ impl Default for XlsWorksheetLayout {
     }
 }
 
-impl XlsWorksheetLayout {
+impl Layout {
     pub fn default_row_height_twips(&self) -> u16 {
         self.default_row_height_twips
     }
@@ -118,17 +118,17 @@ impl XlsWorksheetLayout {
     }
 }
 
-pub(crate) struct SheetLayoutCollector {
-    layout: XlsWorksheetLayout,
+pub(crate) struct Collector {
+    layout: Layout,
     seen: [bool; 4],
     last_rank: Option<u8>,
     dimensions_seen: bool,
 }
 
-impl SheetLayoutCollector {
+impl Collector {
     pub(crate) fn new() -> Self {
         Self {
-            layout: XlsWorksheetLayout::default(),
+            layout: Layout::default(),
             seen: [false; 4],
             last_rank: None,
             dimensions_seen: false,
@@ -240,7 +240,7 @@ impl SheetLayoutCollector {
         Ok(())
     }
 
-    pub(crate) fn finish(self) -> XlsWorksheetLayout {
+    pub(crate) fn finish(self) -> Layout {
         self.layout
     }
 }
@@ -284,28 +284,28 @@ mod tests {
 
     #[test]
     fn rejects_malformed_layout_records() {
-        let mut collector = SheetLayoutCollector::new();
+        let mut collector = Collector::new();
         assert!(
             collector
                 .feed_record(DEFAULT_ROW_HEIGHT_RECORD_TYPE, &[0, 0, 1])
                 .is_err()
         );
 
-        let mut collector = SheetLayoutCollector::new();
+        let mut collector = Collector::new();
         assert!(
             collector
                 .feed_record(GUTS_RECORD_TYPE, &[0, 0, 0, 0, 1, 0, 0, 0])
                 .is_err()
         );
 
-        let mut collector = SheetLayoutCollector::new();
+        let mut collector = Collector::new();
         assert!(
             collector
                 .feed_record(WSBOOL_RECORD_TYPE, &0x0002u16.to_le_bytes())
                 .is_err()
         );
 
-        let mut collector = SheetLayoutCollector::new();
+        let mut collector = Collector::new();
         assert!(
             collector
                 .feed_record(DEF_COL_WIDTH_RECORD_TYPE, &256u16.to_le_bytes())
@@ -315,13 +315,13 @@ mod tests {
 
     #[test]
     fn rejects_duplicates_and_out_of_order_records() {
-        let mut collector = SheetLayoutCollector::new();
+        let mut collector = Collector::new();
         collector
             .feed_record(WSBOOL_RECORD_TYPE, &0x00c1u16.to_le_bytes())
             .unwrap();
         assert!(collector.feed_record(GUTS_RECORD_TYPE, &[0; 8]).is_err());
 
-        let mut collector = SheetLayoutCollector::new();
+        let mut collector = Collector::new();
         collector.feed_record(GUTS_RECORD_TYPE, &[0; 8]).unwrap();
         assert!(collector.feed_record(GUTS_RECORD_TYPE, &[0; 8]).is_err());
     }

@@ -18,8 +18,8 @@ pub mod records;
 /// Workbook parsing implementation
 mod workbook;
 
-/// Worksheet parsing implementation
-mod worksheet;
+/// Worksheet parsing implementation and worksheet-owned semantic views.
+pub mod worksheet;
 
 /// Cell value parsing and representation
 mod cell;
@@ -182,8 +182,8 @@ mod leniency;
 /// BIFF8 XF border and fill metadata.
 mod border_fill;
 
-/// BIFF8 worksheet row heights and column widths/formatting.
-mod layout;
+/// BIFF8 worksheet row and column formatting records.
+pub mod layout;
 
 /// BIFF8 `BookExt` record: workbook extension flags.
 mod book_ext;
@@ -205,9 +205,6 @@ mod phonetic_info;
 
 /// BIFF8 custom-view records (`UserBView`, `UserSViewBegin`, `UserSViewEnd`).
 mod custom_view;
-
-/// BIFF8 worksheet default dimensions and outline workspace metadata.
-mod sheet_layout;
 
 /// BIFF8 `SheetExt` record: sheet tab color and publish state.
 mod sheet_ext;
@@ -389,7 +386,7 @@ pub use formula_errors::{
 pub use function_group::{XlsBuiltInFunctionCategories, XlsFunctionGroups};
 pub use header_footer_picture::XlsHeaderFooterPicture;
 pub use interface_records::{XlsInterfaceEnd, XlsInterfaceHdr};
-pub use layout::{XlsColumnLayout, XlsRowLayout};
+pub use layout::{Column, Row};
 pub use leniency::{XlsFormattingDefect, XlsLeniency, XlsToleranceReport, XlsToleratedDefect};
 pub use list_object::{
     XlsCachedDiskHeader, XlsExternalTableField, XlsExternalTableMetadata, XlsExternalTableVersion,
@@ -457,7 +454,6 @@ pub use ser_aux_trend::{XlsSerAuxTrend, XlsTrendlineKind};
 pub use shapes::XlsShape;
 pub use shared_string_index::{XlsSharedStringBucket, XlsSharedStringIndex};
 pub use sheet_ext::{XlsSheetExt, XlsSheetExtOptional};
-pub use sheet_layout::XlsWorksheetLayout;
 pub use sheet_metadata::{XlsSheetKind, XlsSheetMetadata, XlsSheetVisibility};
 pub use style_ext::{XlsStyleCategory, XlsStyleExt};
 pub use sxview_link::XlsSXViewLink;
@@ -475,6 +471,7 @@ pub use web_pub::{XlsWebPageType, XlsWebPub, XlsWebPubRange, XlsWebSourceType};
 pub use workbook::{XlsOpenOptions, XlsWorkbook};
 pub use workbook_view::{XlsWorkbookView, XlsWorkbookWindow};
 pub use worksheet::XlsWorksheet;
+pub use worksheet::layout::Layout;
 pub use writer::{
     XlsShapeColor, XlsShapeFill, XlsShapeKind, XlsShapeLine, XlsShapeText, XlsShapeTextRun,
     XlsShapeWrite, XlsWriter,
