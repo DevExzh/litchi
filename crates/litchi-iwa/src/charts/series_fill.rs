@@ -6,6 +6,8 @@
 
 use prost::Message;
 
+use litchi_iwa_common::media::Type as MediaType;
+
 use crate::charts::ChartKind;
 use crate::charts::series_style::{
     ChartSeriesStyleSlot, GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD,
@@ -22,7 +24,7 @@ use crate::shapes::{
     remove_orphaned_image_asset, validate_image_asset,
 };
 use crate::wire::patch_length_delimited_field;
-use crate::{Error, IWorkMediaEditor, IWorkPackage, MediaType, Result};
+use crate::{Error, IWorkMediaEditor, IWorkPackage, Result};
 
 const AREA_3D_FILL_FIELD: u32 = 6;
 const BAR_3D_FILL_FIELD: u32 = 7;

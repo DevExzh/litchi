@@ -129,6 +129,13 @@ retains protobuf conversion, style inheritance, shared-style ownership, and
 transactional package mutation. The old `ShapeText*` value family is removed,
 so Pages, Numbers, Keynote, and their creation examples use the contextual
 `text::layout` module directly without a second facade model.
+Media classification is likewise owned by the compact, archive-free
+`litchi-iwa-common::media::Type`. It classifies extensions and bounded
+signatures without allocating, preserves the conservative unknown-`ftyp`-as-
+video rule, and makes `Unknown` explicit. `litchi-iwa` retains `MediaAsset`,
+catalog traversal, package/protobuf metadata, filesystem I/O, resource limits,
+and transactional replacement; all consumers import the common type directly
+and the old facade-owned enum is removed.
 The leaf's `transition::Effect` owns the lossless native transition-effect
 identifier vocabulary, including canonical known variants and lossless unknown
 identifiers; IWA retains transition archive decoding, wire patching, and

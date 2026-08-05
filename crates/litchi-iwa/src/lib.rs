@@ -196,9 +196,7 @@ pub use document::Document;
 pub use drawable_order::DrawableLayerMove;
 pub use identity::IWorkDocumentIdentity;
 pub use image_adjustments::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
-pub use media::{
-    EmbeddedMediaAsset, IWorkMediaEditor, MediaAsset, MediaManager, MediaStats, MediaType,
-};
+pub use media::{EmbeddedMediaAsset, IWorkMediaEditor, MediaAsset, MediaManager, MediaStats};
 pub use media_playback::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
 pub use package::IWorkPackage;
 pub use ref_graph::ReferenceGraph;

@@ -2,6 +2,8 @@
 
 use std::time::Duration;
 
+use litchi_iwa_common::media::Type as MediaType;
+
 use super::slide_movies::geometry::{set_movie_geometry, set_movie_properties};
 use super::slide_movies::graph::{
     MovieObjectIds, audio_creation_values, audio_objects, movie_creation_context,
@@ -83,7 +85,7 @@ impl KeynoteEditor {
 
         let mut media = IWorkMediaEditor::from_package(self.package().clone())?;
         let asset = media.insert_unreferenced(preferred_filename, data)?;
-        if asset.media_type != crate::MediaType::Audio {
+        if asset.media_type != MediaType::Audio {
             return Err(Error::ParseError(format!(
                 "Keynote slide audio requires audio data, not {}",
                 asset.media_type.name()

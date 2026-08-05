@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 
 pub mod color;
+pub mod media;
 pub mod table;
 pub mod text;
 pub mod varint;

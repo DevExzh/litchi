@@ -1,11 +1,12 @@
 //! Ordered media-item CRUD for a Keynote presentation soundtrack.
 
+use litchi_iwa_common::media::Type as MediaType;
+
 use super::soundtrack_wire::{
     encoded_media_reference, read_soundtrack, replace_soundtrack_message, rewrite_soundtrack_media,
     soundtrack_media_identifiers, soundtrack_media_payloads,
 };
 use super::*;
-use crate::MediaType;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };

@@ -99,17 +99,6 @@ fn nested_field_bytes(metadata: &[u8], field_number: u32) -> Vec<u8> {
 }
 
 #[test]
-fn detects_extensions_and_signatures() {
-    assert_eq!(MediaType::from_extension("PNG"), MediaType::Image);
-    assert_eq!(MediaType::from_extension("mov"), MediaType::Video);
-    assert_eq!(MediaType::from_extension("m4a"), MediaType::Audio);
-    assert_eq!(MediaType::from_extension("pdf"), MediaType::Pdf);
-    assert_eq!(MediaType::from_bytes(PNG), MediaType::Image);
-    assert_eq!(MediaType::from_bytes(b"%PDF-1.7\n"), MediaType::Pdf);
-    assert_eq!(MediaType::from_bytes(b"ID3\x04\0\0"), MediaType::Audio);
-}
-
-#[test]
 fn manager_reads_single_file_and_memory_packages() {
     let package = synthetic_package();
     let bytes = package.to_bytes().unwrap();

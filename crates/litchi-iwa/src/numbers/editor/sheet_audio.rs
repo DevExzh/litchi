@@ -3,6 +3,8 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use litchi_iwa_common::media::Type as MediaType;
+
 use super::sheet_movies::graph::{
     MovieObjectIds, movie_creation_context, set_movie_geometry, set_movie_properties,
 };
@@ -88,7 +90,7 @@ impl NumbersEditor {
 
         let mut media = IWorkMediaEditor::from_package(self.package.clone())?;
         let asset = media.insert_unreferenced(preferred_filename, data)?;
-        if asset.media_type != crate::MediaType::Audio {
+        if asset.media_type != MediaType::Audio {
             return Err(Error::ParseError(format!(
                 "Numbers sheet audio requires audio data, not {}",
                 asset.media_type.name()

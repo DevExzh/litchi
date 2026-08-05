@@ -2,6 +2,8 @@
 
 use std::collections::HashMap;
 
+use litchi_iwa_common::media::Type as MediaType;
+
 use super::*;
 use crate::ImageAdjustments;
 use crate::comments::DrawableObjectId;
@@ -109,7 +111,7 @@ impl PagesEditor {
 
         let mut media = IWorkMediaEditor::from_package(self.package().clone())?;
         let asset = media.insert_unreferenced(preferred_filename, data)?;
-        if asset.media_type != crate::MediaType::Image {
+        if asset.media_type != MediaType::Image {
             return Err(Error::ParseError(format!(
                 "Pages body images require image data, not {}",
                 asset.media_type.name()

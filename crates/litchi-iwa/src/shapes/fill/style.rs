@@ -4,6 +4,8 @@ use std::collections::HashSet;
 
 use prost::Message;
 
+use litchi_iwa_common::media::Type as MediaType;
+
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
@@ -12,7 +14,7 @@ use crate::package_metadata::{
     next_object_identifier, set_package_last_object_identifier,
 };
 use crate::protobuf::tswp;
-use crate::{Error, IWorkMediaEditor, IWorkPackage, MediaType, Result};
+use crate::{Error, IWorkMediaEditor, IWorkPackage, Result};
 
 use super::super::line_end::{
     ShapeStyleOverrides, ShapeStyleVariationLocation, collapse_style_variation,

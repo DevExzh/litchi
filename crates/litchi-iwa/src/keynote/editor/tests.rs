@@ -5,6 +5,7 @@ use crate::protobuf::tsp::{ComponentInfo, ObjectUuidMapEntry, PackageMetadata, R
 use crate::protobuf::tswp::StorageArchive;
 use crate::shapes::{DrawablePoint, DrawableSize};
 use crate::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
+use litchi_iwa_common::media::Type as MediaType;
 use std::time::Duration;
 
 const TEST_SLIDE_MESSAGE_TYPE: u32 = 5;
@@ -3376,7 +3377,7 @@ fn soundtrack_item_crud_is_ordered_transactional_and_wire_exact() {
 
     let first = editor.add_soundtrack_item("first.aiff", FIRST).unwrap();
     assert_eq!(first.index, 0);
-    assert_eq!(first.asset.media_type, crate::MediaType::Audio);
+    assert_eq!(first.asset.media_type, MediaType::Audio);
     let second = editor
         .insert_soundtrack_item(0, "second.aiff", SECOND)
         .unwrap();

@@ -78,6 +78,14 @@ error for non-finite or negative input. Native protobuf conversion, bounded
 style inheritance, and package transactions remain in `litchi-iwa`, and the
 facade exposes the common module through `litchi_iwa::text::layout`.
 
+Media classification uses the focused `litchi_iwa_common::media::Type`
+module. The five variants are a one-byte, copyable value with no archive or
+filesystem state; extension matching is ASCII-case-insensitive and signature
+sniffing borrows only the supplied byte prefix. Unknown bytes stay `Unknown`,
+while an unrecognized ISO-BMFF brand remains conservatively classified as
+`Video` to match iWork replacement semantics. Archive discovery, asset
+metadata, limits, and replacement validation remain in the IWA adapter.
+
 PresentationML implements this rule as `litchi-pptx::shape::{Scene, Shape}`.
 `Scene` is a bounded semantic index over one slide-like owner, not a vector of
 detached XML allocations. Shapes are visited in depth-first pre-order, while a

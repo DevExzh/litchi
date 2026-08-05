@@ -3,6 +3,8 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use litchi_iwa_common::media::Type as MediaType;
+
 use super::*;
 use crate::MediaPlaybackSettings;
 use crate::data_reference_registry::{
@@ -117,14 +119,14 @@ impl PagesEditor {
 
         let mut media = IWorkMediaEditor::from_package(self.package().clone())?;
         let movie_asset = media.insert_unreferenced(preferred_movie_filename, movie_data)?;
-        if movie_asset.media_type != crate::MediaType::Video {
+        if movie_asset.media_type != MediaType::Video {
             return Err(Error::ParseError(format!(
                 "Pages body movies require video data, not {}",
                 movie_asset.media_type.name()
             )));
         }
         let poster_asset = media.insert_unreferenced(preferred_poster_filename, poster_data)?;
-        if poster_asset.media_type != crate::MediaType::Image {
+        if poster_asset.media_type != MediaType::Image {
             return Err(Error::ParseError(format!(
                 "Pages movie posters require image data, not {}",
                 poster_asset.media_type.name()

@@ -5883,6 +5883,21 @@ the public layout APIs preserved those values and the edited text. All three
 ZIP archives passed integrity checks, and Numbers, Pages, and Keynote were
 quit after verification. The old `ShapeText*` model is deleted rather than
 retained as a compatibility alias.
+The media-kind ownership slice now follows the same boundary at
+`litchi-iwa-common::media::Type`. Its common tests pin one-byte storage,
+case-insensitive extension classification, representative signature families,
+the explicit `Unknown` case, and conservative unknown-`ftyp` handling. IWA
+retains media discovery, filesystem/package access, resource limits, metadata
+rewrites, and transactional replacement; its image, audio, movie, chart, and
+shape consumers import the common owner directly. Native media fixtures were
+verified through the existing real iWork image/media paths: fresh Numbers,
+Pages, and Keynote packages built from `test-data/images/png/lena.png` opened
+in the installed applications without repair prompts, and each exposed the
+embedded image object in its native canvas/inspector. The CLI reported
+`Type::Image` and the reachable data identifier for all three packages; all
+three ZIPs passed integrity checks, and the applications were quit after
+verification. The semantic classifier itself is exercised by the
+dependency-free suite, including complete and truncated ISO-BMFF headers.
 The BorderSide ownership slice
 is complete: the dependency-neutral table-cell edge selector now lives at
 `litchi-iwa-common::table::cell::BorderSide`; `Borders` and `ShapeStroke` remain

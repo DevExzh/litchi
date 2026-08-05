@@ -3,89 +3,11 @@
 use std::path::PathBuf;
 
 use crate::{Error, Result};
+pub use litchi_iwa_common::media::Type as MediaType;
 
 const DEFAULT_MAX_MEDIA_ASSETS: usize = 100_000;
 const DEFAULT_MAX_MEDIA_ASSET_BYTES: u64 = 512 * 1024 * 1024;
 const DEFAULT_MAX_MEDIA_TOTAL_BYTES: u64 = 2 * 1024 * 1024 * 1024;
-
-/// Types of media assets that can be found in iWork documents.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum MediaType {
-    /// Image file (PNG, JPEG, TIFF, HEIF, etc.).
-    Image,
-    /// Video file (MP4, MOV, etc.).
-    Video,
-    /// Audio file (MP3, AAC, WAV, etc.).
-    Audio,
-    /// PDF document.
-    Pdf,
-    /// Unknown or unsupported media type.
-    Unknown,
-}
-
-impl MediaType {
-    /// Detect a media type from a filename extension.
-    pub fn from_extension(ext: &str) -> Self {
-        match ext.to_ascii_lowercase().as_str() {
-            "png" | "jpg" | "jpeg" | "gif" | "tiff" | "tif" | "bmp" | "heic" | "heif" | "webp"
-            | "svg" => Self::Image,
-            "mp4" | "mov" | "m4v" | "avi" | "mkv" => Self::Video,
-            "mp3" | "aac" | "m4a" | "wav" | "aiff" | "aif" | "ogg" => Self::Audio,
-            "pdf" => Self::Pdf,
-            _ => Self::Unknown,
-        }
-    }
-
-    /// Sniff common media signatures without trusting the filename.
-    pub fn from_bytes(data: &[u8]) -> Self {
-        if data.starts_with(b"\x89PNG\r\n\x1a\n")
-            || data.starts_with(b"\xff\xd8\xff")
-            || data.starts_with(b"GIF87a")
-            || data.starts_with(b"GIF89a")
-            || data.starts_with(b"II*\0")
-            || data.starts_with(b"MM\0*")
-            || data.starts_with(b"BM")
-            || (data.len() >= 12 && &data[..4] == b"RIFF" && &data[8..12] == b"WEBP")
-        {
-            return Self::Image;
-        }
-        if data.starts_with(b"%PDF-") {
-            return Self::Pdf;
-        }
-        if data.starts_with(b"ID3")
-            || data
-                .get(..2)
-                .is_some_and(|prefix| prefix[0] == 0xff && prefix[1] & 0xe0 == 0xe0)
-            || (data.len() >= 12 && &data[..4] == b"RIFF" && &data[8..12] == b"WAVE")
-            || (data.len() >= 12
-                && &data[..4] == b"FORM"
-                && matches!(&data[8..12], b"AIFF" | b"AIFC"))
-            || data.starts_with(b"OggS")
-        {
-            return Self::Audio;
-        }
-        if data.len() >= 12 && &data[4..8] == b"ftyp" {
-            return match &data[8..12] {
-                b"heic" | b"heix" | b"hevc" | b"hevx" | b"heim" | b"heis" | b"mif1" | b"msf1"
-                | b"avif" | b"avis" => Self::Image,
-                b"M4A " | b"M4B " | b"M4P " => Self::Audio,
-                _ => Self::Video,
-            };
-        }
-        Self::Unknown
-    }
-
-    /// Get a human-readable name for this media type.
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Image => "Image",
-            Self::Video => "Video",
-            Self::Audio => "Audio",
-            Self::Pdf => "PDF Document",
-            Self::Unknown => "Unknown",
-        }
-    }
-}
 
 /// Information about a materialized `Data/*` package member.
 #[derive(Debug, Clone, PartialEq, Eq)]

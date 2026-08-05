@@ -1579,6 +1579,11 @@ metadata-backed editor retains stable data identifiers and reference counts,
 and patches only the digest and materialized length fields at the protobuf wire
 level so unknown Apple extensions remain byte-exact.
 
+`MediaAsset::media_type` uses the compact, archive-free
+`litchi_iwa_common::media::Type` value. It is a one-byte copyable classification
+for image, video, audio, PDF, and unknown assets; package discovery, metadata,
+limits, and replacement validation remain owned by this crate.
+
 ```rust
 use litchi_iwa::IWorkMediaEditor;
 

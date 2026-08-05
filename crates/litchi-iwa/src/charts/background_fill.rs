@@ -7,6 +7,8 @@
 
 use prost::Message;
 
+use litchi_iwa_common::media::Type as MediaType;
+
 use crate::charts::style::{
     ChartStyleSlot, GENERATED_CHART_STYLE_EXTENSION_FIELD, chart_style_slot,
     generated_chart_style_extension,
@@ -22,7 +24,7 @@ use crate::shapes::{
     fill_to_native, image_data_identifier, remove_orphaned_image_asset, validate_image_asset,
 };
 use crate::wire::patch_length_delimited_field;
-use crate::{Error, IWorkMediaEditor, IWorkPackage, MediaType, Result};
+use crate::{Error, IWorkMediaEditor, IWorkPackage, Result};
 
 /// `tschchartinfodefaultgridbackgroundfill` in `TSCH.Generated.ChartStyleArchive`.
 const CHART_BACKGROUND_FILL_FIELD: u32 = 14;
