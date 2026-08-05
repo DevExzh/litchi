@@ -9,7 +9,7 @@
 
 use litchi_cfb::OleFile;
 use litchi_doc::parts::fib::FileInformationBlock;
-use litchi_doc::parts::protection::DocumentProtectedRanges;
+use litchi_doc::parts::protection::Ranges;
 use std::fs::File;
 use std::path::PathBuf;
 
@@ -19,7 +19,7 @@ fn fixture(relative: &str) -> PathBuf {
         .join(relative)
 }
 
-fn parse_protection(relative: &str) -> Option<DocumentProtectedRanges> {
+fn parse_protection(relative: &str) -> Option<Ranges> {
     let mut ole = OleFile::open(File::open(fixture(relative)).unwrap()).unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();
@@ -29,7 +29,7 @@ fn parse_protection(relative: &str) -> Option<DocumentProtectedRanges> {
         "0Table"
     };
     let table_stream = ole.open_stream(&[table_name]).unwrap();
-    DocumentProtectedRanges::parse(&fib, &table_stream).unwrap()
+    Ranges::parse(&fib, &table_stream).unwrap()
 }
 
 #[test]

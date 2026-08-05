@@ -44,7 +44,7 @@ use super::parts::pap_bin_table::PapBinTable;
 use super::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
 use super::parts::piece_table::PieceTable;
 use super::parts::proofing::ProofingTables;
-use super::parts::protection::DocumentProtectedRanges;
+use super::parts::protection::Ranges;
 use super::parts::repair_bookmarks::DocumentRepairBookmarks;
 use super::parts::revisions::RevisionAuthorTable;
 use super::parts::rmd_threading::DocumentRmdThreading;
@@ -129,7 +129,7 @@ pub struct Document {
     /// AutoSummary priority ranges for the main document.
     auto_summary: Option<DocumentAutoSummary>,
     /// Word 2003 range-level protection ("editable ranges") metadata.
-    protected_ranges: Option<DocumentProtectedRanges>,
+    protected_ranges: Option<Ranges>,
     /// Format consistency-checker marks.
     format_consistency_marks: Option<DocumentFormatConsistencyMarks>,
     /// Word 2003 structured document tag bookmarks.
@@ -307,7 +307,7 @@ impl Document {
         let rmd_threading = DocumentRmdThreading::parse(&fib, &table_stream)?;
         let embedded_fonts = DocumentEmbeddedFonts::parse(&fib, &table_stream)?;
         let auto_summary = DocumentAutoSummary::parse(&fib, &table_stream)?;
-        let protected_ranges = DocumentProtectedRanges::parse(&fib, &table_stream)?;
+        let protected_ranges = Ranges::parse(&fib, &table_stream)?;
         let format_consistency_marks = DocumentFormatConsistencyMarks::parse(&fib, &table_stream)?;
         let structured_tags = DocumentStructuredTags::parse(&fib, &table_stream)?;
         let xml_schemas = super::parts::xml_schemas::Collection::parse(&fib, &table_stream)?;
@@ -2104,7 +2104,7 @@ impl Document {
     ///
     /// The metadata is inert: usernames are exposed verbatim, never
     /// authenticated, and no protection policy is enforced.
-    pub fn protected_ranges(&self) -> Option<&DocumentProtectedRanges> {
+    pub fn protected_ranges(&self) -> Option<&Ranges> {
         self.protected_ranges.as_ref()
     }
 
