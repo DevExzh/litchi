@@ -9,6 +9,8 @@
 
 /// Cell-level Numbers vocabulary.
 pub mod cell;
+/// Immutable, archive-free Numbers document snapshots.
+pub mod document;
 /// Dependency-free formula vocabulary shared by Numbers, Pages, and Keynote.
 pub mod formula;
 /// Semantic sheet containers.
@@ -16,6 +18,7 @@ pub mod sheet;
 /// Sparse semantic table vocabulary.
 pub mod table;
 
+pub use document::{Document, Error as DocumentError, MAX_SHEETS, Result as DocumentResult};
 pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,
     FormulaExpression, FormulaPivotCategoryReference, FormulaUuid,
