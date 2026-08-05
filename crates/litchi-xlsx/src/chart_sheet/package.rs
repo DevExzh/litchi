@@ -1,10 +1,16 @@
-//! Typed SpreadsheetML chartsheets and their inert workbook/drawing/chart package graph.
+//! Layered SpreadsheetML chartsheet package graph.
+//!
+//! This package boundary owns the inert OPC graph around one chartsheet:
+//! drawings, classic and extended charts, companion parts, media, VML,
+//! Printer Settings, and extension relationships. The semantic chartsheet
+//! grammar remains in [`super`].
 
-use crate::error::{OoxmlError, Result};
-use crate::xlsx::printer_settings::{
+use super::*;
+use crate::package::printer_settings::{
     MAX_SETTINGS_BYTES, PRINTER_CT, PrinterSettingsResource, is_printer_relationship,
     validate_printer_settings_uri, validate_settings_bytes,
 };
+use crate::{Error, Result};
 use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 use quick_xml::XmlVersion;
@@ -14,7 +20,7 @@ use quick_xml::reader::NsReader;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 #[cfg(test)]
-use crate::xlsx::printer_settings::PRINTER_REL;
+use crate::package::printer_settings::PRINTER_REL;
 #[cfg(test)]
 use litchi_opc::constants::relationship_type as rt;
 
@@ -98,11 +104,6 @@ const MAX_EXTENSION_URI_BYTES: usize = 1024;
 const MAX_EXTENSION_PAYLOAD_BYTES: usize = 1024 * 1024;
 const MAX_EXTENSION_RELATIONSHIPS: usize = 1024;
 const MAX_EXTENSION_RELATIONSHIP_STRING_BYTES: usize = 64 * 1024;
-pub use litchi_xlsx::chart_sheet::{
-    Chart, Color, Conformance, CustomView, Extension, ExtensionList, HeaderFooter, Margins,
-    PageOrientation, PageSetup, Properties, Protection, State, View, WebPublishItem,
-    WebPublishItems, WebSourceType,
-};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExtensionRelationshipTarget {
     Internal { part_name: String },
@@ -463,30 +464,6 @@ enum NodeContent {
     Child,
 }
 
-/// Parses the selected, bounded core of a complete Chartsheet part.
-/// Parse the bounded SpreadsheetML chartsheet part through the canonical XLSX owner.
-pub fn parse_chartsheet(xml: &[u8]) -> Result<(Conformance, Chart)> {
-    litchi_xlsx::chart_sheet::parse_chartsheet(xml).map_err(map_owner_error)
-}
-
-/// Serialize the bounded SpreadsheetML chartsheet part through the canonical XLSX owner.
-pub fn write_chartsheet(value: &Chart, conformance: Conformance) -> Result<Vec<u8>> {
-    litchi_xlsx::chart_sheet::write_chartsheet(value, conformance).map_err(map_owner_error)
-}
-
-fn map_owner_error(error: litchi_xlsx::Error) -> OoxmlError {
-    match error {
-        litchi_xlsx::Error::Package(error) => OoxmlError::Opc(error),
-        litchi_xlsx::Error::MarkupCompatibility(error) => OoxmlError::from(error),
-        litchi_xlsx::Error::Xml(error) => OoxmlError::Xml(error.to_string()),
-        litchi_xlsx::Error::Common(error) => OoxmlError::Common(error),
-        litchi_xlsx::Error::Invalid(message) => OoxmlError::InvalidFormat(message),
-        litchi_xlsx::Error::Allocation { resource, source } => {
-            OoxmlError::Allocation { resource, source }
-        },
-        other => OoxmlError::Xlsx(other),
-    }
-}
 /// Loads one workbook-referenced chartsheet and validates its bounded leaf graph.
 pub fn load_chartsheet(
     package: &OpcPackage,
@@ -1202,7 +1179,7 @@ fn store_chartsheet_inner(
         .printer_settings
         .as_ref()
         .map(|settings| -> Result<PackURI> {
-            let uri = PackURI::new(&settings.resource.part_name).map_err(OoxmlError::InvalidUri)?;
+            let uri = PackURI::new(&settings.resource.part_name).map_err(invalid)?;
             validate_printer_settings_uri(&uri)?;
             package.validate_new_part_name(&uri)?;
             Ok(uri)
@@ -1474,7 +1451,7 @@ fn store_chartsheet_inner(
         let (target, external) = match &relationship.target {
             ExtensionRelationshipTarget::Internal { part_name } => (
                 PackURI::new(part_name)
-                    .map_err(OoxmlError::InvalidUri)?
+                    .map_err(invalid)?
                     .relative_ref(chartsheet_uri.base_uri()),
                 false,
             ),
@@ -1615,7 +1592,7 @@ fn validate_package_value(value: &Package, conformance: Conformance) -> Result<(
     if value.drawing.content_type != DRAWING_CT || value.drawing.data.len() > MAX_DRAWING_BYTES {
         return Err(invalid("invalid or oversized chartsheet drawing resource"));
     }
-    let drawing_uri = PackURI::new(&value.drawing.part_name).map_err(OoxmlError::InvalidUri)?;
+    let drawing_uri = PackURI::new(&value.drawing.part_name).map_err(invalid)?;
     if !drawing_uri.as_str().starts_with("/xl/drawings/") {
         return Err(invalid("drawing resource is outside /xl/drawings"));
     }
@@ -1687,7 +1664,7 @@ fn validate_package_value(value: &Package, conformance: Conformance) -> Result<(
                     "chartsheet drawing and picture relationship IDs collide",
                 ));
             }
-            let uri = PackURI::new(&picture.part_name).map_err(OoxmlError::InvalidUri)?;
+            let uri = PackURI::new(&picture.part_name).map_err(invalid)?;
             if !uri.as_str().starts_with("/xl/media/") {
                 return Err(invalid("background image resource is outside /xl/media"));
             }
@@ -1726,7 +1703,7 @@ fn validate_package_value(value: &Package, conformance: Conformance) -> Result<(
                 ));
             }
             validate_settings_bytes(&settings.resource.data)?;
-            let uri = PackURI::new(&settings.resource.part_name).map_err(OoxmlError::InvalidUri)?;
+            let uri = PackURI::new(&settings.resource.part_name).map_err(invalid)?;
             validate_printer_settings_uri(&uri)?;
             add_resource(
                 &mut total,
@@ -1759,7 +1736,7 @@ fn validate_chart_resource_value<'a>(
     resources: &mut BTreeMap<String, &'a Vec<u8>>,
 ) -> Result<()> {
     validate_id(&chart.relationship_id)?;
-    let uri = PackURI::new(&chart.part_name).map_err(OoxmlError::InvalidUri)?;
+    let uri = PackURI::new(&chart.part_name).map_err(invalid)?;
     if !uri.as_str().starts_with("/xl/charts/") || !uri.as_str().ends_with(".xml") {
         return Err(invalid(
             "chart resource is outside /xl/charts or lacks .xml suffix",
@@ -1808,7 +1785,7 @@ fn validate_chart_resource_value<'a>(
                     if companion.content_type != content_type {
                         return Err(invalid("chart companion has invalid content type"));
                     }
-                    let uri = PackURI::new(&companion.part_name).map_err(OoxmlError::InvalidUri)?;
+                    let uri = PackURI::new(&companion.part_name).map_err(invalid)?;
                     if !uri.as_str().starts_with("/xl/charts/") || !uri.as_str().ends_with(".xml") {
                         return Err(invalid(
                             "chart companion is outside /xl/charts or lacks .xml suffix",
@@ -1837,7 +1814,7 @@ fn validate_chart_resource_value<'a>(
                 if user_shapes.content_type != CHART_USER_SHAPES_CT {
                     return Err(invalid("chartUserShapes has invalid content type"));
                 }
-                let uri = PackURI::new(&user_shapes.part_name).map_err(OoxmlError::InvalidUri)?;
+                let uri = PackURI::new(&user_shapes.part_name).map_err(invalid)?;
                 if !uri.as_str().starts_with("/xl/drawings/") || !uri.as_str().ends_with(".xml") {
                     return Err(invalid(
                         "chartUserShapes is outside /xl/drawings or lacks .xml suffix",
@@ -1873,8 +1850,7 @@ fn validate_chart_resource_value<'a>(
                             "chartUserShapes image metadata is duplicate or unreferenced",
                         ));
                     }
-                    let image_uri =
-                        PackURI::new(&image.part_name).map_err(OoxmlError::InvalidUri)?;
+                    let image_uri = PackURI::new(&image.part_name).map_err(invalid)?;
                     if !image_uri.as_str().starts_with("/xl/media/")
                         || !image.content_type.validates_part_name(image_uri.as_str())
                     {
@@ -1974,7 +1950,7 @@ fn validate_chart_outbound_resources<'a>(
                 if theme.content_type != THEME_OVERRIDE_CT {
                     return Err(invalid("themeOverride has invalid content type"));
                 }
-                let uri = PackURI::new(&theme.part_name).map_err(OoxmlError::InvalidUri)?;
+                let uri = PackURI::new(&theme.part_name).map_err(invalid)?;
                 if !uri.as_str().starts_with("/xl/theme/") || !uri.as_str().ends_with(".xml") {
                     return Err(invalid(
                         "themeOverride is outside /xl/theme or lacks .xml suffix",
@@ -2026,7 +2002,7 @@ fn validate_chart_outbound_resources<'a>(
                         "chartEx has multiple embedded package relationships",
                     ));
                 }
-                let uri = PackURI::new(&embedded.part_name).map_err(OoxmlError::InvalidUri)?;
+                let uri = PackURI::new(&embedded.part_name).map_err(invalid)?;
                 if !uri.as_str().starts_with("/xl/embeddings/")
                     || !embedded.content_type.validates_part_name(uri.as_str())
                 {
@@ -2065,7 +2041,7 @@ fn validate_chart_image_value<'a>(
     max_bytes: usize,
     label: &str,
 ) -> Result<()> {
-    let uri = PackURI::new(&image.part_name).map_err(OoxmlError::InvalidUri)?;
+    let uri = PackURI::new(&image.part_name).map_err(invalid)?;
     if !uri.as_str().starts_with("/xl/media/")
         || !image.content_type.validates_part_name(uri.as_str())
     {
@@ -2098,7 +2074,7 @@ fn validate_vml_pair<'a>(
                     "{label} relationship and resource metadata differ"
                 )));
             }
-            let uri = PackURI::new(&resource.part_name).map_err(OoxmlError::InvalidUri)?;
+            let uri = PackURI::new(&resource.part_name).map_err(invalid)?;
             if !uri.as_str().starts_with("/xl/drawings/")
                 || !uri.as_str().ends_with(".vml")
                 || resource.content_type != VML_DRAWING_CT
@@ -2127,9 +2103,6 @@ fn validate_vml_pair<'a>(
     }
 }
 
-fn validate_chartsheet(value: &Chart) -> Result<()> {
-    litchi_xlsx::chart_sheet::validate_chartsheet(value).map_err(map_owner_error)
-}
 fn workbook_entry(
     root: &Node,
     conformance: Conformance,
@@ -2201,7 +2174,7 @@ fn validate_entry(entry: &Entry) -> Result<()> {
         return Err(invalid("chartsheet sheetId must be positive"));
     }
     validate_id(&entry.workbook_relationship_id)?;
-    let uri = PackURI::new(&entry.part_name).map_err(OoxmlError::InvalidUri)?;
+    let uri = PackURI::new(&entry.part_name).map_err(invalid)?;
     if !uri.as_str().starts_with("/xl/chartsheets/") {
         return Err(invalid("chartsheet part is outside /xl/chartsheets"));
     }
@@ -2385,7 +2358,7 @@ fn validate_extension_relationships(value: &Package, conformance: Conformance) -
         match &relationship.target {
             ExtensionRelationshipTarget::Internal { part_name } => {
                 validate_extension_relationship_string(part_name, "target")?;
-                let uri = PackURI::new(part_name).map_err(OoxmlError::InvalidUri)?;
+                let uri = PackURI::new(part_name).map_err(invalid)?;
                 if !uri.as_str().starts_with('/') {
                     return Err(invalid(
                         "internal extension relationship target must be an absolute part name",
@@ -2960,7 +2933,7 @@ fn require_content_type(part: &dyn Part, expected: &str, label: &str) -> Result<
     }
 }
 fn new_uri(package: &OpcPackage, value: &str, prefix: &str) -> Result<PackURI> {
-    let uri = PackURI::new(value).map_err(OoxmlError::InvalidUri)?;
+    let uri = PackURI::new(value).map_err(invalid)?;
     if !uri.as_str().starts_with(prefix) {
         return Err(invalid(format!("part '{uri}' is outside {prefix}")));
     }
@@ -3028,13 +3001,13 @@ fn escape(out: &mut Vec<u8>, value: &str) {
         }
     }
 }
-fn xml_error(error: impl std::fmt::Display) -> OoxmlError {
-    OoxmlError::Xml(error.to_string())
+fn xml_error(error: impl std::fmt::Display) -> Error {
+    Error::Xml(litchi_ooxml_common::XmlError::Malformed(error.to_string()))
 }
-fn invalid(message: impl Into<String>) -> OoxmlError {
-    OoxmlError::InvalidFormat(message.into())
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
 }
-fn limit(name: &str) -> OoxmlError {
+fn limit(name: &str) -> Error {
     invalid(format!("chartsheet {name} limit exceeded"))
 }
 

@@ -1,8 +1,4 @@
-//! Typed SpreadsheetML chartsheet semantic model and bounded XML codec.
-//!
-//! The OOXML package graph, drawing/chart resources, and printer-settings
-//! projection remain in the OOXML host. This module owns only the bounded
-//! chartsheet part grammar described by [MS-XLSX] and [MS-OE376].
+//! Typed SpreadsheetML chartsheet semantic model, XML codec, and package graph.
 
 use crate::error::{Error, Result};
 use litchi_ooxml_common::custom_xml::valid_guid;
@@ -13,25 +9,8 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
-// Migration staging modules. The integrator will promote these declarations
-// to the crate facade once the legacy host wiring is removed. Keeping the
-// declarations here lets this slice compile and test without touching the
-// top-level facade.
-#[allow(dead_code)]
-#[path = "chart.rs"]
-pub mod chart;
-#[allow(dead_code)]
-#[path = "drawing.rs"]
-pub mod drawing;
-#[allow(dead_code)]
-#[path = "shape_geometry/mod.rs"]
-pub mod shape_geometry;
-#[allow(dead_code)]
-#[path = "shapes.rs"]
-pub mod shapes;
-#[allow(dead_code)]
-#[path = "pivot_chart.rs"]
-pub mod pivot_chart;
+/// Chartsheet package/resource graph and bounded load/store operations.
+pub mod package;
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_SML: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
