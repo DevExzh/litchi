@@ -6,6 +6,16 @@
 //! still need lossless preservation remain behind the existing adapter seam;
 //! ordinary build settings use the typed values below instead of raw fields.
 
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    clippy::float_cmp,
+    clippy::missing_errors_doc,
+    clippy::shadow_reuse,
+    clippy::unnecessary_lazy_evaluations,
+    clippy::wildcard_enum_match_arm,
+    reason = "This focused migration leaf keeps its validated constructors and lossless unknown branches together; the archive adapter audit will replace these local exceptions as each native family moves."
+)]
+
 use super::{Acceleration, Start};
 use crate::{Error, Result, Seconds};
 
@@ -1236,14 +1246,20 @@ impl Settings {
 
     /// Replace the start relationship while preserving valid delay rules.
     pub fn set_start(&mut self, start: Start) -> Result<()> {
+        if matches!(start, Start::OnClick | Start::WithPrevious) && self.delay != Seconds::ZERO {
+            return Err(Error::InvalidBuildValue);
+        }
         self.start = start;
-        self.validate()
+        Ok(())
     }
 
     /// Replace the delay while preserving valid delay rules.
     pub fn set_delay(&mut self, delay: Seconds) -> Result<()> {
+        if matches!(self.start, Start::OnClick | Start::WithPrevious) && delay != Seconds::ZERO {
+            return Err(Error::InvalidBuildValue);
+        }
         self.delay = delay;
-        self.validate()
+        Ok(())
     }
 
     /// Set the start relationship in a consuming builder step.
@@ -1394,6 +1410,18 @@ mod tests {
         settings.set_start(Start::AfterPrevious)?;
         settings.set_delay(Seconds::new(0.2)?)?;
         assert_eq!(settings.delay().as_f64(), 0.2);
+        assert_eq!(settings.start(), Start::AfterPrevious);
+        assert_eq!(
+            settings.set_start(Start::OnClick),
+            Err(Error::InvalidBuildValue)
+        );
+        assert_eq!(settings.start(), Start::AfterPrevious);
+        assert_eq!(settings.set_delay(Seconds::new(0.3)?), Ok(()));
+        assert_eq!(settings.delay().as_f64(), 0.3);
+        assert_eq!(
+            settings.set_start(Start::WithPrevious),
+            Err(Error::InvalidBuildValue)
+        );
         assert_eq!(settings.start(), Start::AfterPrevious);
         Ok(())
     }

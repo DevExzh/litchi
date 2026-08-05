@@ -1,8 +1,8 @@
 //! Keynote build-animation semantic values.
 
-use crate::{Error, Result, Seconds};
-
 mod semantic;
+
+use crate::{Error, Result, Seconds};
 
 pub use semantic::{
     Action, Blink, Bounce, Effect, Emphasis, Finite, Flip, FlipDirection, HorizontalDirection,

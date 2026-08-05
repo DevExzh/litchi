@@ -81,8 +81,7 @@ const BODY_DRAWABLE_DUPLICATE_OFFSET: f32 = 12.0;
 
 use litchi_pages::header_footer::{Kind, Template};
 pub use types::{
-    PagesDrawableTextInfo, PagesFootnote, PagesFootnoteId, PagesHeaderFooterInfo, PagesSectionInfo,
-    RemovedPagesTextBox,
+    PagesDrawableTextInfo, PagesHeaderFooterInfo, PagesSectionInfo, RemovedPagesTextBox,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]

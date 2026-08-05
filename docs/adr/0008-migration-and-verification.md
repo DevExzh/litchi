@@ -6225,6 +6225,16 @@ example now use the canonical Numbers leaf markers. No additional native
 iWork claim is needed for this ownership-only column change because serialized
 column semantics are unchanged.
 
+The Pages body-footnote selector slice is complete. The archive-free
+`litchi-pages::footnote::body` module now owns bounded `Footnote`, UTF-16
+`Position`, and source-order/position `Selector` values. `PagesEditor` no
+longer returns or accepts native footnote IDs: its body-footnote CRUD resolves
+selectors inside a staged transaction, while the private IWA adapter retains
+reference/storage/marker graph identifiers and cleanup. The focused Pages leaf
+tests and IWA body-footnote CRUD tests pass, and the migrated Pages examples
+compile against selectors. This is an ownership/API slice; native Pages
+verification remains part of the next fixture matrix run.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

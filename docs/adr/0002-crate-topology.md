@@ -892,6 +892,14 @@ removes a visit marker on every exit. No runtime lock wrapper enters the public
 API. Tokio remains test-only, and neither Tokio nor Reqwest is a normal
 dependency of the crate.
 
+Pages body-footnote semantics now follow the same downward boundary in
+`litchi-pages::footnote::body::{Footnote, Position, Selector}`. The leaf owns
+only bounded text, custom-marker, and UTF-16-position values; selector-based
+CRUD in `litchi-iwa` uses source order or body position and never publishes a
+package/runtime object identifier. Reference, footnote-storage, and marker
+objects remain private to the IWA graph adapter, including cleanup after
+ordinary body edits.
+
 The `litchi-ole` monolith is removed after DOC, PPT, and XLS migrate into their
 concrete crates. It does not remain as a compatibility crate, feature, or
 module. The current `litchi-ooxml` monolith is likewise removed after its

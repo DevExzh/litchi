@@ -37,18 +37,17 @@ pub use creation::PagesDocumentBuilder;
 pub use document::PagesDocument;
 pub use editor::{
     PagesAudioInfo, PagesAudioOptions, PagesBodyChartInfo, PagesBodyShapeInfo, PagesBodyShapeKind,
-    PagesCellValue, PagesDrawableTextInfo, PagesEditor, PagesFootnote, PagesFootnoteId,
-    PagesHeaderFooterInfo, PagesImageInfo, PagesImageOptions, PagesMovieInfo, PagesMovieOptions,
-    PagesSectionInfo, PagesTable, PagesTableCellParagraphIndents,
-    PagesTableCellParagraphLineSpacing, PagesTableCellParagraphList,
-    PagesTableCellParagraphListBullet, PagesTableCellParagraphListBulletGeometry,
-    PagesTableCellParagraphListIndentation, PagesTableCellParagraphListLabelColor,
-    PagesTableCellParagraphListLevel, PagesTableCellParagraphListLevelPlacement,
-    PagesTableCellParagraphListNumberFormat, PagesTableCellParagraphListNumberScale,
-    PagesTableCellParagraphListNumberTiering, PagesTableCellParagraphListNumbering,
-    PagesTableCellParagraphListPlacement, PagesTableCellParagraphSpacing,
-    PagesTableCellParagraphTabStops, PagesTableCellRegion, PagesTableCellTextAlignment,
-    PagesTableCellTextBackground, PagesTableCellTextBaselineShift,
+    PagesCellValue, PagesDrawableTextInfo, PagesEditor, PagesHeaderFooterInfo, PagesImageInfo,
+    PagesImageOptions, PagesMovieInfo, PagesMovieOptions, PagesSectionInfo, PagesTable,
+    PagesTableCellParagraphIndents, PagesTableCellParagraphLineSpacing,
+    PagesTableCellParagraphList, PagesTableCellParagraphListBullet,
+    PagesTableCellParagraphListBulletGeometry, PagesTableCellParagraphListIndentation,
+    PagesTableCellParagraphListLabelColor, PagesTableCellParagraphListLevel,
+    PagesTableCellParagraphListLevelPlacement, PagesTableCellParagraphListNumberFormat,
+    PagesTableCellParagraphListNumberScale, PagesTableCellParagraphListNumberTiering,
+    PagesTableCellParagraphListNumbering, PagesTableCellParagraphListPlacement,
+    PagesTableCellParagraphSpacing, PagesTableCellParagraphTabStops, PagesTableCellRegion,
+    PagesTableCellTextAlignment, PagesTableCellTextBackground, PagesTableCellTextBaselineShift,
     PagesTableCellTextCapitalization, PagesTableCellTextCharacterSpacing, PagesTableCellTextColor,
     PagesTableCellTextDecorations, PagesTableCellTextFont, PagesTableCellTextLigatures,
     PagesTableCellTextOutline, PagesTableCellTextScript, PagesTableCellTextShadow,
@@ -62,4 +61,5 @@ pub use editor::{
     PagesTableTitleSettings, RemovedPagesAudio, RemovedPagesBodyChart, RemovedPagesBodyShape,
     RemovedPagesImage, RemovedPagesMovie, RemovedPagesTextBox,
 };
+pub use litchi_pages::footnote::body::{Footnote, Position, Selector};
 pub use litchi_pages::{Section, SectionType};

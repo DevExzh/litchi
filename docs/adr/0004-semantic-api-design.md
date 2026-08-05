@@ -53,6 +53,14 @@ IWA side retains only native field mapping, protobuf validation, opaque fill
 payloads, discovery/package identifiers, and transactional publication; the
 former flat `Pages*` formatter aliases are removed.
 
+Pages body-footnote values use the focused
+`litchi_pages::footnote::body::{Footnote, Position, Selector}` module. A
+`Footnote` contains its checked UTF-16 body position, bounded text, and
+optional bounded custom marker; its native reference, contained storage, and
+marker identifiers are deliberately absent. Body-footnote reads and edits use
+`Selector::At` or `Selector::Index`, resolve ambiguity or absence as adapter
+errors, and publish only after staged wire and graph validation.
+
 The dependency-free Numbers formula vocabulary is an intentional naming
 exception. `litchi-numbers::formula` is consumed by Numbers, Pages, and Keynote,
 so `FormulaExpression`, `FormulaCellReference`, and the other `Formula*` names

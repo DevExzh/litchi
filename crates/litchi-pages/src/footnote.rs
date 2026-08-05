@@ -1,5 +1,7 @@
 //! Archive-free Pages footnote and endnote formatter values.
 
+pub mod body;
+
 use thiserror::Error;
 
 const RAW_KIND_FOOTNOTES: i32 = 0;

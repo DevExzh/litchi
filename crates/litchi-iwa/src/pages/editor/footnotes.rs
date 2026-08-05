@@ -16,13 +16,14 @@ use crate::package_metadata::{
     remove_component_object_uuids, set_package_last_object_identifier,
 };
 use crate::protobuf::{tsp, tswp};
+use crate::text::IWorkTextEditor;
 use crate::text::editor::storage_object_references;
-use crate::text::{IWorkTextEditor, TextPosition};
 use crate::wire::{
     patch_length_delimited_field, repeated_length_delimited_payloads,
     rewrite_repeated_length_delimited_fields,
 };
 use crate::{Error, IWorkPackage, Result};
+use litchi_pages::footnote::body::{Footnote, Position, Selector};
 
 const FOOTNOTE_REFERENCE_MESSAGE_TYPE: u32 = 2_008;
 const TEXTUAL_ATTACHMENT_MESSAGE_TYPE: u32 = 2_004;
@@ -38,7 +39,8 @@ const FOOTNOTE_CONTENT_PREFIX: &str = "\u{fffc} ";
 /// Native Pages footnote data plus the private objects it owns.
 #[derive(Debug, Clone)]
 pub(super) struct BodyFootnoteGraph {
-    pub(super) footnote: super::PagesFootnote,
+    pub(super) footnote: Footnote,
+    reference_id: u64,
     storage_id: u64,
     marker_id: u64,
 }
@@ -78,7 +80,7 @@ impl FootnoteObjectIds {
 
 impl PagesEditor {
     /// Read every native footnote attached to the main Pages body.
-    pub fn body_footnotes(&self) -> Result<Vec<super::PagesFootnote>> {
+    pub fn body_footnotes(&self) -> Result<Vec<Footnote>> {
         Ok(body_footnote_graphs(self.package(), self.body_storage_id)?
             .into_iter()
             .map(|graph| graph.footnote)
@@ -91,13 +93,13 @@ impl PagesEditor {
     /// use [`Self::body_footnotes`] instead of treating that character as text.
     pub fn insert_body_footnote(
         &mut self,
-        position: TextPosition,
+        position: Position,
         text: impl AsRef<str>,
-    ) -> Result<super::PagesFootnote> {
+    ) -> Result<Footnote> {
         let text = text.as_ref();
         validate_footnote_text(text)?;
         let position_u32 = position.utf16_index();
-        let position = usize::try_from(position_u32).map_err(|_| {
+        let position_index = usize::try_from(position_u32).map_err(|_| {
             Error::ParseError("Pages footnote position exceeds the platform index range".to_owned())
         })?;
         body_footnote_graphs(self.package(), self.body_storage_id)?;
@@ -105,7 +107,7 @@ impl PagesEditor {
         let mut text_editor = IWorkTextEditor::from_package(self.package().clone());
         text_editor.replace_text(
             self.body_storage_id,
-            position..position,
+            position_index..position_index,
             FOOTNOTE_ANCHOR_TEXT,
         )?;
         let mut staged = text_editor.into_package();
@@ -131,11 +133,7 @@ impl PagesEditor {
         set_package_last_object_identifier(&mut staged, ids.last())?;
 
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
-        let created = body_footnote_by_id(
-            &verified,
-            super::PagesFootnoteId::from_native(ids.reference),
-        )?
-        .footnote;
+        let created = body_footnote_by_selector(&verified, Selector::At(position))?.footnote;
         if created.position.utf16_index() != position_u32
             || created.text.as_ref() != text
             || created.custom_mark.is_some()
@@ -151,12 +149,12 @@ impl PagesEditor {
     /// Replace the user-visible text of one native body footnote.
     pub fn set_body_footnote_text(
         &mut self,
-        id: super::PagesFootnoteId,
+        selector: Selector,
         text: impl AsRef<str>,
-    ) -> Result<super::PagesFootnote> {
+    ) -> Result<Footnote> {
         let text = text.as_ref();
         validate_footnote_text(text)?;
-        let current = body_footnote_by_id(self, id)?;
+        let current = body_footnote_by_selector(self, selector)?;
         if current.footnote.text.as_ref() == text {
             return Ok(current.footnote);
         }
@@ -174,7 +172,7 @@ impl PagesEditor {
         let mut text_editor = IWorkTextEditor::from_package(self.package().clone());
         text_editor.replace_text(current.storage_id, prefix_units..content_units, text)?;
         let verified = Self::from_bytes(&text_editor.into_package().to_bytes()?)?;
-        let updated = body_footnote_by_id(&verified, id)?.footnote;
+        let updated = body_footnote_by_selector(&verified, selector)?.footnote;
         if updated.position != current.footnote.position
             || updated.text.as_ref() != text
             || updated.custom_mark != current.footnote.custom_mark
@@ -188,11 +186,8 @@ impl PagesEditor {
     }
 
     /// Delete one native body footnote, its body anchor, and its owned objects.
-    pub fn remove_body_footnote(
-        &mut self,
-        id: super::PagesFootnoteId,
-    ) -> Result<super::PagesFootnote> {
-        let removed = body_footnote_by_id(self, id)?.footnote;
+    pub fn remove_body_footnote(&mut self, selector: Selector) -> Result<Footnote> {
+        let removed = body_footnote_by_selector(self, selector)?.footnote;
         let start = usize::try_from(removed.position.utf16_index()).map_err(|_| {
             Error::ParseError("Pages footnote position exceeds the platform index range".to_owned())
         })?;
@@ -203,7 +198,7 @@ impl PagesEditor {
         if self
             .body_footnotes()?
             .iter()
-            .any(|footnote| footnote.id == id)
+            .any(|footnote| footnote.position == removed.position)
         {
             return Err(Error::InvalidFormat(
                 "Pages footnote deletion failed validation".to_owned(),
@@ -248,11 +243,11 @@ pub(super) fn cleanup_removed_body_footnotes(
     }
     let remaining = body_footnote_graphs(package, body_storage_id)?
         .into_iter()
-        .map(|graph| graph.footnote.id)
+        .map(|graph| graph.reference_id)
         .collect::<HashSet<_>>();
     let removed = before
         .iter()
-        .filter(|graph| !remaining.contains(&graph.footnote.id))
+        .filter(|graph| !remaining.contains(&graph.reference_id))
         .collect::<Vec<_>>();
     if removed.is_empty() {
         return Ok(());
@@ -269,26 +264,36 @@ pub(super) fn cleanup_removed_body_footnotes(
     Ok(())
 }
 
-fn body_footnote_by_id(
+fn body_footnote_by_selector(
     editor: &PagesEditor,
-    id: super::PagesFootnoteId,
+    selector: Selector,
 ) -> Result<BodyFootnoteGraph> {
-    let mut matches = body_footnote_graphs(editor.package(), editor.body_storage_id)?
-        .into_iter()
-        .filter(|graph| graph.footnote.id == id);
-    let Some(graph) = matches.next() else {
-        return Err(Error::InvalidFormat(format!(
-            "Pages body does not own footnote object {}",
-            id.object_id()
-        )));
-    };
-    if matches.next().is_some() {
-        return Err(Error::InvalidFormat(format!(
-            "Pages body references footnote object {} more than once",
-            id.object_id()
-        )));
+    let footnotes = body_footnote_graphs(editor.package(), editor.body_storage_id)?;
+    match selector {
+        Selector::Index(index) => footnotes.into_iter().nth(index).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Pages body has no footnote at source index {index}"
+            ))
+        }),
+        Selector::At(position) => {
+            let mut matches = footnotes
+                .into_iter()
+                .filter(|graph| graph.footnote.position == position);
+            let Some(graph) = matches.next() else {
+                return Err(Error::InvalidFormat(format!(
+                    "Pages body has no footnote at UTF-16 position {}",
+                    position.utf16_index()
+                )));
+            };
+            if matches.next().is_some() {
+                return Err(Error::InvalidFormat(format!(
+                    "Pages body has more than one footnote at UTF-16 position {}",
+                    position.utf16_index()
+                )));
+            }
+            Ok(graph)
+        },
     }
-    Ok(graph)
 }
 
 fn decode_footnote_graph(
@@ -345,13 +350,17 @@ fn decode_footnote_graph(
     let marker_id = footnote_marker_id(storage_id, &storage)?;
     validate_footnote_marker(package, marker_id)?;
 
+    let position = Position::from_utf16_index(usize::try_from(position).map_err(|_| {
+        Error::ParseError("Pages footnote position exceeds the platform index range".to_owned())
+    })?)
+    .map_err(|error| Error::ParseError(format!("invalid Pages footnote position: {error}")))?;
+    let footnote =
+        Footnote::with_custom_mark(position, text, reference.custom_mark_string.map(Into::into))
+            .map_err(|error| Error::ParseError(format!("invalid Pages footnote value: {error}")))?;
+
     Ok(BodyFootnoteGraph {
-        footnote: super::PagesFootnote::new(
-            super::PagesFootnoteId::from_native(reference_id),
-            TextPosition::from_native(position),
-            text,
-            reference.custom_mark_string,
-        ),
+        footnote,
+        reference_id,
         storage_id,
         marker_id,
     })
@@ -637,7 +646,7 @@ fn remove_unreferenced_footnote_graph(
     package: &mut IWorkPackage,
     graph: &BodyFootnoteGraph,
 ) -> Result<Vec<u64>> {
-    let reference_id = graph.footnote.id.object_id();
+    let reference_id = graph.reference_id;
     remove_unreferenced_footnote_object(
         package,
         reference_id,
@@ -835,17 +844,17 @@ fn utf16_unit_at(text: &[String], requested: u32) -> Option<u16> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pages::PagesFootnote;
+    use litchi_pages::footnote::body::Footnote;
 
     #[test]
     fn body_footnote_crud_round_trips_and_restores_a_source_document() {
         let mut editor = PagesEditor::create_with_text("A😀B").unwrap();
         let baseline = editor.to_bytes().unwrap();
         let note = editor
-            .insert_body_footnote(TextPosition::from_utf16_index(3).unwrap(), "Initial note")
+            .insert_body_footnote(Position::from_utf16_index(3).unwrap(), "Initial note")
             .unwrap();
         assert_eq!(editor.body_text().unwrap(), "A😀\u{e}B");
-        assert_eq!(note.position, TextPosition::from_utf16_index(3).unwrap());
+        assert_eq!(note.position, Position::from_utf16_index(3).unwrap());
         assert_eq!(note.text.as_ref(), "Initial note");
         assert_eq!(note.custom_mark, None);
         assert_eq!(editor.body_footnotes().unwrap(), vec![note.clone()]);
@@ -854,12 +863,14 @@ mod tests {
         assert_eq!(reopened.body_footnotes().unwrap(), vec![note.clone()]);
 
         let updated = editor
-            .set_body_footnote_text(note.id, "Updated note")
+            .set_body_footnote_text(Selector::Index(0), "Updated note")
             .unwrap();
         assert_eq!(updated.text.as_ref(), "Updated note");
         assert_eq!(updated.position, note.position);
 
-        let removed = editor.remove_body_footnote(note.id).unwrap();
+        let removed = editor
+            .remove_body_footnote(Selector::At(note.position))
+            .unwrap();
         assert_eq!(removed, updated);
         assert_eq!(editor.body_text().unwrap(), "A😀B");
         assert!(editor.body_footnotes().unwrap().is_empty());
@@ -869,11 +880,13 @@ mod tests {
     #[test]
     fn ordinary_body_replacement_reclaims_deleted_footnote_graphs() {
         let mut editor = PagesEditor::create_with_text("AB").unwrap();
-        let first = editor
-            .insert_body_footnote(TextPosition::from_utf16_index(1).unwrap(), "First")
+        editor
+            .insert_body_footnote(Position::from_utf16_index(1).unwrap(), "First")
             .unwrap();
+        let first_reference_id =
+            body_footnote_graphs(editor.package(), editor.body_storage_id).unwrap()[0].reference_id;
         let second = editor
-            .insert_body_footnote(TextPosition::from_utf16_index(3).unwrap(), "Second")
+            .insert_body_footnote(Position::from_utf16_index(3).unwrap(), "Second")
             .unwrap();
         assert_eq!(editor.body_text().unwrap(), "A\u{e}B\u{e}");
 
@@ -881,14 +894,14 @@ mod tests {
         assert_eq!(editor.body_text().unwrap(), "AB\u{e}");
         assert_eq!(
             editor.body_footnotes().unwrap(),
-            vec![PagesFootnote {
-                id: second.id,
-                position: TextPosition::from_utf16_index(2).unwrap(),
+            vec![Footnote {
+                position: Position::from_utf16_index(2).unwrap(),
                 text: "Second".into(),
                 custom_mark: None,
             }]
         );
-        assert!(find_object_archive(editor.package(), first.id.object_id()).is_err());
+        assert!(find_object_archive(editor.package(), first_reference_id).is_err());
+        assert_eq!(second.position, Position::from_utf16_index(3).unwrap());
     }
 
     #[test]
@@ -897,12 +910,12 @@ mod tests {
         let baseline = editor.to_bytes().unwrap();
         assert!(
             editor
-                .insert_body_footnote(TextPosition::ZERO, "Invalid\u{e}")
+                .insert_body_footnote(Position::ZERO, "Invalid\u{e}")
                 .is_err()
         );
         assert!(
             editor
-                .insert_body_footnote(TextPosition::ZERO, "Invalid\u{fffc}")
+                .insert_body_footnote(Position::ZERO, "Invalid\u{fffc}")
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -912,13 +925,15 @@ mod tests {
     fn native_footnote_reference_without_a_super_payload_is_supported() {
         let mut editor = PagesEditor::create_with_text("Body").unwrap();
         let footnote = editor
-            .insert_body_footnote(TextPosition::from_utf16_index(4).unwrap(), "Native")
+            .insert_body_footnote(Position::from_utf16_index(4).unwrap(), "Native")
             .unwrap();
+        let reference_id =
+            body_footnote_graphs(editor.package(), editor.body_storage_id).unwrap()[0].reference_id;
         let mut package = editor.package().clone();
-        let archive_name = find_object_archive(&package, footnote.id.object_id()).unwrap();
+        let archive_name = find_object_archive(&package, reference_id).unwrap();
         package
             .update_archive(&archive_name, |archive| {
-                let object = archive.object_mut(footnote.id.object_id()).unwrap();
+                let object = archive.object_mut(reference_id).unwrap();
                 let message = &object.messages[0];
                 let mut attachment =
                     tswp::FootnoteReferenceAttachmentArchive::decode(message.data.as_slice())?;
