@@ -4568,6 +4568,30 @@ ODT all-target suite (530 library tests plus integration targets) pass, along
 with affected-crate checks and formatting. This slice also removes the former
 ODT-local chart reader/semantic duplicate without compatibility aliases.
 
+## ODF chart authoring ownership
+
+Typed ODF chart authoring now belongs to the standalone `litchi-odc` owner.
+Its layered `authoring::{model,data,extensions,writer,builder}` modules expose
+the contextual `Definition`, axis/series/plot specifications, cached-table
+values, inert calculation settings, retained extension trees, and bounded
+deterministic `serialize_content`/fragment writers. `Builder` consumes a typed
+definition, while `Chart::from_definition` provides the concise package
+facade. The implementation reuses `litchi-odf-common::chart` vocabulary and
+reader validation without introducing a dependency on any host family.
+
+ODT now imports that authoring owner for standalone and embedded charts. ODT
+retains only its chart-document mutation and package mechanics: `Object_N/`
+paths, manifest entries, inline-root conversion, content replacement, and
+text/sheet/page host placement remain local. No compatibility aliases or
+duplicate authoring model are retained, and mutation extraction remains a
+separate follow-up so this slice does not overclaim chart completeness.
+
+Post-migration checks pass for ODC all targets (6 library tests plus its
+integration targets), ODT library coverage (527 tests), focused ODT chart
+mutation tests, formatting, and affected-crate compilation. A concurrent
+attempt to link every ODT integration target exhausted the generated build
+volume; this is an environment resource limit, not a source or test failure.
+
 ## Shared BIFF framing and legacy binary owner migration
 
 The legacy binary migration now has a neutral physical-record owner:
