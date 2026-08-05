@@ -7,15 +7,15 @@ pub use crate::authoring::Builder;
 
 /// Immutable document snapshot.
 pub struct Template {
-    package: crate::package::Package,
+    package: crate::package::Snapshot,
 }
 
 impl Template {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        crate::package::Package::open(path).map(|package| Self { package })
+        crate::package::Snapshot::open(path).map(|package| Self { package })
     }
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        crate::package::Package::from_bytes(bytes).map(|package| Self { package })
+        crate::package::Snapshot::from_bytes(bytes).map(|package| Self { package })
     }
     pub fn content_xml(&self) -> &str {
         self.package.content_xml()
@@ -25,6 +25,9 @@ impl Template {
     }
     pub fn metadata(&self) -> Option<&Metadata> {
         self.package.metadata()
+    }
+    pub fn as_bytes(&self) -> &[u8] {
+        self.package.as_bytes()
     }
     pub fn files(&self) -> Result<Vec<String>> {
         self.package.files()
@@ -43,5 +46,6 @@ mod tests {
         let bytes = Builder::new().build().unwrap();
         let document = Template::from_bytes(bytes).unwrap();
         assert!(document.content_xml().contains("<office:text"));
+        assert!(!document.as_bytes().is_empty());
     }
 }
