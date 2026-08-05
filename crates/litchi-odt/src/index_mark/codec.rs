@@ -1,77 +1,17 @@
-//! Semantic parsing for OpenDocument index source marks.
+//! Namespace-aware parsing for OpenDocument index source marks.
 
-mod writing;
-
-pub use writing::{
-    TextAlphabeticalMarkMetadata, TextIndexMarkFragments, insert_text_index_mark_xml,
-    remove_text_index_mark_xml, replace_text_index_mark_xml,
-};
-
-use super::index::{TextIndexAttribute, expanded_attributes};
+use super::model::{TextIndexMark, TextIndexMarkKind};
+use super::{MAX_MARK_DEPTH, MAX_MARKS};
 use crate::elements::xml::{
     TEXT_NAMESPACE, append_checked, append_text_control, decode_reference, is_bound,
     namespaced_attribute,
 };
+use crate::index::expanded_attributes;
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::NsReader;
 use std::collections::HashMap;
-
-const MAX_MARK_DEPTH: usize = 4_096;
-const MAX_MARKS: usize = 1_000_000;
-
-/// An index source-mark family.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum TextIndexMarkKind {
-    TableOfContents,
-    User,
-    Alphabetical,
-    Bibliography,
-}
-
-/// A point or resolved range mark that contributes an entry to a generated index.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TextIndexMark {
-    kind: TextIndexMarkKind,
-    id: Option<String>,
-    value: String,
-    range: bool,
-    attributes: Vec<TextIndexAttribute>,
-}
-
-impl TextIndexMark {
-    pub fn kind(&self) -> TextIndexMarkKind {
-        self.kind
-    }
-
-    pub fn id(&self) -> Option<&str> {
-        self.id.as_deref()
-    }
-
-    /// Point marks return their stored string; range marks return their referenced visible text.
-    pub fn value(&self) -> &str {
-        &self.value
-    }
-
-    pub fn is_range(&self) -> bool {
-        self.range
-    }
-
-    pub fn attributes(&self) -> &[TextIndexAttribute] {
-        &self.attributes
-    }
-
-    pub fn attribute(&self, namespace_uri: Option<&str>, local_name: &str) -> Option<&str> {
-        self.attributes
-            .iter()
-            .find(|attribute| {
-                attribute.namespace_uri() == namespace_uri && attribute.local_name() == local_name
-            })
-            .map(TextIndexAttribute::value)
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct MarkKey {
@@ -445,7 +385,7 @@ fn required_attribute(
     Ok(value)
 }
 
-fn is_bibliography_type(value: &str) -> bool {
+pub(super) fn is_bibliography_type(value: &str) -> bool {
     matches!(
         value,
         "article"
@@ -497,7 +437,7 @@ fn start_mark_paragraph(pending: &mut HashMap<MarkKey, PendingMark>) -> Result<(
     Ok(())
 }
 
-fn start_kind(local_name: &[u8]) -> Option<TextIndexMarkKind> {
+pub(super) fn start_kind(local_name: &[u8]) -> Option<TextIndexMarkKind> {
     match local_name {
         b"toc-mark-start" => Some(TextIndexMarkKind::TableOfContents),
         b"user-index-mark-start" => Some(TextIndexMarkKind::User),
@@ -506,7 +446,7 @@ fn start_kind(local_name: &[u8]) -> Option<TextIndexMarkKind> {
     }
 }
 
-fn end_kind(local_name: &[u8]) -> Option<TextIndexMarkKind> {
+pub(super) fn end_kind(local_name: &[u8]) -> Option<TextIndexMarkKind> {
     match local_name {
         b"toc-mark-end" => Some(TextIndexMarkKind::TableOfContents),
         b"user-index-mark-end" => Some(TextIndexMarkKind::User),
@@ -515,7 +455,7 @@ fn end_kind(local_name: &[u8]) -> Option<TextIndexMarkKind> {
     }
 }
 
-fn point_kind(local_name: &[u8]) -> Option<TextIndexMarkKind> {
+pub(super) fn point_kind(local_name: &[u8]) -> Option<TextIndexMarkKind> {
     match local_name {
         b"toc-mark" => Some(TextIndexMarkKind::TableOfContents),
         b"user-index-mark" => Some(TextIndexMarkKind::User),
@@ -544,102 +484,4 @@ fn checked_depth(depth: usize) -> Result<usize> {
         )));
     }
     Ok(depth)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
-
-    #[test]
-    fn parses_point_range_and_bibliography_marks_in_document_order() {
-        let xml = format!(
-            r#"<x:text xmlns:x="{TEXT}" xmlns:u="urn:vendor"><x:p><x:toc-mark-start x:id="same" x:outline-level="2" u:flag="yes"/>Alpha<x:span>&amp;</x:span><x:toc-mark x:string-value="Manual &amp; Entry"/><x:alphabetical-index-mark-start x:id="same" x:key1="K" x:main-entry="1"/>Beta<![CDATA[!]]><x:alphabetical-index-mark-end x:id="same"/></x:p><x:p>Next<x:toc-mark-end x:id="same"/><x:bibliography-mark x:bibliography-type="book" x:author="A &amp; B" x:title="T">[1] &amp; more</x:bibliography-mark><x:user-index-mark x:index-name="Custom" x:string-value="User" x:outline-level="3"/></x:p></x:text>"#
-        );
-        let marks = parse_text_index_marks(&xml).unwrap();
-        assert_eq!(marks.len(), 5);
-        assert_eq!(marks[0].kind(), TextIndexMarkKind::TableOfContents);
-        assert!(marks[0].is_range());
-        assert_eq!(marks[0].id(), Some("same"));
-        assert_eq!(marks[0].value(), "Alpha&Beta!\nNext");
-        assert_eq!(marks[0].attribute(Some(TEXT), "outline-level"), Some("2"));
-        assert_eq!(marks[0].attribute(Some("urn:vendor"), "flag"), Some("yes"));
-
-        assert_eq!(marks[1].kind(), TextIndexMarkKind::TableOfContents);
-        assert!(!marks[1].is_range());
-        assert_eq!(marks[1].value(), "Manual & Entry");
-
-        assert_eq!(marks[2].kind(), TextIndexMarkKind::Alphabetical);
-        assert_eq!(marks[2].id(), Some("same"));
-        assert_eq!(marks[2].value(), "Beta!");
-        assert_eq!(marks[2].attribute(Some(TEXT), "key1"), Some("K"));
-
-        assert_eq!(marks[3].kind(), TextIndexMarkKind::Bibliography);
-        assert_eq!(marks[3].value(), "[1] & more");
-        assert_eq!(marks[3].attribute(Some(TEXT), "author"), Some("A & B"));
-        assert_eq!(
-            marks[3].attribute(Some(TEXT), "bibliography-type"),
-            Some("book")
-        );
-
-        assert_eq!(marks[4].kind(), TextIndexMarkKind::User);
-        assert_eq!(marks[4].value(), "User");
-        assert_eq!(marks[4].attribute(Some(TEXT), "index-name"), Some("Custom"));
-    }
-
-    #[test]
-    fn index_marks_reject_missing_ambiguous_and_unmatched_metadata() {
-        let missing = format!(r#"<x:toc-mark xmlns:x="{TEXT}"/>"#);
-        assert!(parse_text_index_marks(&missing).is_err());
-        let unmatched = format!(r#"<x:toc-mark-end xmlns:x="{TEXT}" x:id="a"/>"#);
-        assert!(parse_text_index_marks(&unmatched).is_err());
-        let unclosed = format!(r#"<x:toc-mark-start xmlns:x="{TEXT}" x:id="a"/>"#);
-        assert!(parse_text_index_marks(&unclosed).is_err());
-        let duplicate = format!(
-            r#"<x:p xmlns:x="{TEXT}"><x:toc-mark-start x:id="a"/><x:toc-mark-start x:id="a"/></x:p>"#
-        );
-        assert!(parse_text_index_marks(&duplicate).is_err());
-        let aliases = format!(
-            r#"<x:toc-mark xmlns:x="{TEXT}" xmlns:y="{TEXT}" x:string-value="A" y:string-value="B"/>"#
-        );
-        assert!(parse_text_index_marks(&aliases).is_err());
-        let invalid_level = format!(
-            r#"<x:user-index-mark xmlns:x="{TEXT}" x:index-name="I" x:string-value="V" x:outline-level="0"/>"#
-        );
-        assert!(parse_text_index_marks(&invalid_level).is_err());
-        let invalid_boolean = format!(
-            r#"<x:alphabetical-index-mark xmlns:x="{TEXT}" x:string-value="A" x:main-entry="yes"/>"#
-        );
-        assert!(parse_text_index_marks(&invalid_boolean).is_err());
-        let invalid_bibliography_type = format!(
-            r#"<x:bibliography-mark xmlns:x="{TEXT}" x:bibliography-type="novel">bad</x:bibliography-mark>"#
-        );
-        assert!(parse_text_index_marks(&invalid_bibliography_type).is_err());
-        let bibliography_child = format!(
-            r#"<x:bibliography-mark xmlns:x="{TEXT}" x:bibliography-type="book"><x:span>bad</x:span></x:bibliography-mark>"#
-        );
-        assert!(parse_text_index_marks(&bibliography_child).is_err());
-        assert!(parse_text_index_marks("<x:toc-mark>").is_err());
-
-        let empty_strings =
-            format!(r#"<x:user-index-mark xmlns:x="{TEXT}" x:index-name="" x:string-value=""/>"#);
-        assert_eq!(
-            parse_text_index_marks(&empty_strings).unwrap()[0].value(),
-            ""
-        );
-    }
-
-    #[test]
-    fn index_marks_enforce_nesting_bound() {
-        let mut xml = format!(r#"<x:p xmlns:x="{TEXT}">"#);
-        for _ in 0..MAX_MARK_DEPTH {
-            xml.push_str("<x:span>");
-        }
-        for _ in 0..MAX_MARK_DEPTH {
-            xml.push_str("</x:span>");
-        }
-        xml.push_str("</x:p>");
-        assert!(parse_text_index_marks(&xml).is_err());
-    }
 }

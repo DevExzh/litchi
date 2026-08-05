@@ -242,7 +242,9 @@ fn ns(value: &ResolveResult<'_>) -> Ns {
         _ => Ns::Other,
     }
 }
-include!("ruby_inline_specs.rs");
+#[path = "ruby_inline_specs/mod.rs"]
+mod ruby_inline_specs;
+use ruby_inline_specs::{is_hyperlink_child, is_ruby_base_child};
 mod ruby_range {
     include!("ruby_range.rs");
 }

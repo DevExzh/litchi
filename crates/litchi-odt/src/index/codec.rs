@@ -1,15 +1,7 @@
-//! Inert semantic access to generated OpenDocument text indexes.
+//! XML codec for generated OpenDocument text indexes.
 
-mod writing;
-
-pub use writing::{
-    AlphabeticalIndexSource, BibliographyIndexSource, IllustrationIndexSource, ObjectIndexSource,
-    TableOfContentsSource, TextAlphabeticalIndexEntryTemplate, TextAlphabeticalIndexLevel,
-    TextBibliographyEntryTemplate, TextBibliographyEntryToken, TextBibliographyType, TextIndexBody,
-    TextIndexBodyParagraph, TextIndexBodyTitle, TextIndexCaptionSequenceFormat,
-    TextIndexChapterDisplay, TextIndexEntryTemplate, TextIndexEntryToken, TextIndexScope,
-    TextIndexSimpleEntryTemplate, TextIndexSourceStyles, TextIndexTabStop, TextIndexTitleTemplate,
-    UserIndexSource, insert_text_index_xml, remove_text_index_xml, replace_text_index_xml,
+use super::model::{
+    TextIndex, TextIndexAttribute, TextIndexContent, TextIndexElement, TextIndexKind,
 };
 
 use crate::elements::xml::{
@@ -21,152 +13,8 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
-const MAX_INDEX_DEPTH: usize = 4_096;
+pub(super) const MAX_INDEX_DEPTH: usize = 4_096;
 const MAX_INDEX_ITEMS: usize = 1_000_000;
-
-/// The seven generated-index families defined by OpenDocument Text.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum TextIndexKind {
-    TableOfContents,
-    Illustration,
-    Table,
-    Object,
-    User,
-    Alphabetical,
-    Bibliography,
-}
-
-/// A decoded attribute identified by its expanded XML name.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TextIndexAttribute {
-    pub(crate) namespace_uri: Option<String>,
-    pub(crate) local_name: String,
-    pub(crate) value: String,
-}
-
-impl TextIndexAttribute {
-    pub fn namespace_uri(&self) -> Option<&str> {
-        self.namespace_uri.as_deref()
-    }
-
-    pub fn local_name(&self) -> &str {
-        &self.local_name
-    }
-
-    pub fn value(&self) -> &str {
-        &self.value
-    }
-}
-
-/// Ordered mixed content within an index element.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TextIndexContent {
-    Text(String),
-    Element(TextIndexElement),
-}
-
-/// One namespace-aware element in an index source, template, or cached body.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TextIndexElement {
-    namespace_uri: Option<String>,
-    local_name: String,
-    attributes: Vec<TextIndexAttribute>,
-    content: Vec<TextIndexContent>,
-}
-
-impl TextIndexElement {
-    pub fn namespace_uri(&self) -> Option<&str> {
-        self.namespace_uri.as_deref()
-    }
-
-    pub fn local_name(&self) -> &str {
-        &self.local_name
-    }
-
-    pub fn attributes(&self) -> &[TextIndexAttribute] {
-        &self.attributes
-    }
-
-    pub fn attribute(&self, namespace_uri: Option<&str>, local_name: &str) -> Option<&str> {
-        self.attributes
-            .iter()
-            .find(|attribute| {
-                attribute.namespace_uri() == namespace_uri && attribute.local_name() == local_name
-            })
-            .map(TextIndexAttribute::value)
-    }
-
-    pub fn content(&self) -> &[TextIndexContent] {
-        &self.content
-    }
-
-    pub fn child_elements(&self) -> impl Iterator<Item = &TextIndexElement> {
-        self.content.iter().filter_map(|content| match content {
-            TextIndexContent::Element(element) => Some(element),
-            TextIndexContent::Text(_) => None,
-        })
-    }
-
-    /// Compose character content in exact document order.
-    pub fn all_text(&self) -> String {
-        let mut output = String::new();
-        append_all_text(self, &mut output);
-        output
-    }
-}
-
-/// A generated index declaration and its stored, inert cached body.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TextIndex {
-    kind: TextIndexKind,
-    root: TextIndexElement,
-}
-
-impl TextIndex {
-    pub fn kind(&self) -> TextIndexKind {
-        self.kind
-    }
-
-    pub fn root(&self) -> &TextIndexElement {
-        &self.root
-    }
-
-    pub fn name(&self) -> &str {
-        self.root
-            .attribute(
-                Some(std::str::from_utf8(TEXT_NAMESPACE).expect("ASCII namespace")),
-                "name",
-            )
-            .expect("validated index name")
-    }
-
-    pub fn protected(&self) -> bool {
-        matches!(
-            self.root.attribute(
-                Some(std::str::from_utf8(TEXT_NAMESPACE).expect("ASCII namespace")),
-                "protected"
-            ),
-            Some("true" | "1")
-        )
-    }
-
-    pub fn source(&self) -> Option<&TextIndexElement> {
-        self.root.child_elements().find(|element| {
-            element.namespace_uri()
-                == Some(std::str::from_utf8(TEXT_NAMESPACE).expect("ASCII namespace"))
-                && element.local_name().ends_with("-source")
-        })
-    }
-
-    pub fn body(&self) -> Option<&TextIndexElement> {
-        self.root.child_elements().find(|element| {
-            element.namespace_uri()
-                == Some(std::str::from_utf8(TEXT_NAMESPACE).expect("ASCII namespace"))
-                && element.local_name() == "index-body"
-        })
-    }
-}
 
 struct ActiveIndex {
     kind: TextIndexKind,
@@ -411,15 +259,6 @@ fn append_index_text(active: &mut [ActiveIndex], value: &str) -> Result<()> {
     Ok(())
 }
 
-fn append_all_text(element: &TextIndexElement, output: &mut String) {
-    for content in &element.content {
-        match content {
-            TextIndexContent::Text(text) => output.push_str(text),
-            TextIndexContent::Element(child) => append_all_text(child, output),
-        }
-    }
-}
-
 fn add_index_item(index: &mut ActiveIndex) -> Result<()> {
     index.item_count = index
         .item_count
@@ -443,97 +282,4 @@ fn checked_depth(depth: usize) -> Result<usize> {
         )));
     }
     Ok(depth)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
-    const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
-
-    #[test]
-    fn parses_every_text_index_kind_and_complete_ordered_subtrees() {
-        let xml = format!(
-            r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TEXT}" xmlns:u="urn:vendor"><o:body><o:text><t:table-of-content t:name="Contents &amp; More" t:protected="1" u:future="yes"><t:table-of-content-source t:outline-level="3"><t:index-title-template t:style-name="Title">Contents</t:index-title-template><t:table-of-content-entry-template t:outline-level="1" t:style-name="Entry"><t:index-entry-text/><u:extension u:value="A&amp;B"/></t:table-of-content-entry-template></t:table-of-content-source><t:index-body><t:index-title t:name="Cached"><t:p>Title</t:p></t:index-title><t:p>Pre&amp;<t:span>Mid</t:span><![CDATA[!]]>Post</t:p><t:user-index t:name="Nested"><t:user-index-source t:index-name="N"/><t:index-body><t:p>Nested</t:p></t:index-body></t:user-index></t:index-body></t:table-of-content><t:illustration-index t:name="I"/><t:table-index t:name="T"/><t:object-index t:name="O"/><t:alphabetical-index t:name="A"/><t:bibliography t:name="B"/></o:text></o:body></o:document-content>"#
-        );
-        let indexes = parse_text_indexes(&xml).unwrap();
-        assert_eq!(indexes.len(), 7);
-        assert_eq!(indexes[0].kind(), TextIndexKind::TableOfContents);
-        assert_eq!(indexes[0].name(), "Contents & More");
-        assert!(indexes[0].protected());
-        assert_eq!(
-            indexes[0].root().attribute(Some("urn:vendor"), "future"),
-            Some("yes")
-        );
-        let source = indexes[0].source().unwrap();
-        assert_eq!(source.local_name(), "table-of-content-source");
-        assert_eq!(source.attribute(Some(TEXT), "outline-level"), Some("3"));
-        let template = source
-            .child_elements()
-            .find(|element| element.local_name() == "table-of-content-entry-template")
-            .unwrap();
-        let extension = template
-            .child_elements()
-            .find(|element| element.namespace_uri() == Some("urn:vendor"))
-            .unwrap();
-        assert_eq!(
-            extension.attribute(Some("urn:vendor"), "value"),
-            Some("A&B")
-        );
-
-        let body = indexes[0].body().unwrap();
-        let paragraph = body
-            .child_elements()
-            .find(|element| element.local_name() == "p" && element.all_text().starts_with("Pre"))
-            .unwrap();
-        assert_eq!(paragraph.all_text(), "Pre&Mid!Post");
-        assert!(matches!(paragraph.content()[0], TextIndexContent::Text(_)));
-        assert!(matches!(
-            paragraph.content()[1],
-            TextIndexContent::Element(_)
-        ));
-        assert!(matches!(paragraph.content()[2], TextIndexContent::Text(_)));
-
-        assert_eq!(indexes[1].kind(), TextIndexKind::User);
-        assert_eq!(indexes[1].name(), "Nested");
-        assert_eq!(indexes[1].body().unwrap().all_text(), "Nested");
-        assert_eq!(indexes[2].kind(), TextIndexKind::Illustration);
-        assert_eq!(indexes[3].kind(), TextIndexKind::Table);
-        assert_eq!(indexes[4].kind(), TextIndexKind::Object);
-        assert_eq!(indexes[5].kind(), TextIndexKind::Alphabetical);
-        assert_eq!(indexes[6].kind(), TextIndexKind::Bibliography);
-    }
-
-    #[test]
-    fn text_indexes_reject_malformed_ambiguous_or_invalid_roots() {
-        let missing_name = format!(r#"<t:table-of-content xmlns:t="{TEXT}"/>"#);
-        assert!(parse_text_indexes(&missing_name).is_err());
-
-        let invalid_boolean =
-            format!(r#"<t:table-index xmlns:t="{TEXT}" t:name="T" t:protected="yes"/>"#);
-        assert!(parse_text_indexes(&invalid_boolean).is_err());
-
-        let duplicate =
-            format!(r#"<t:object-index xmlns:t="{TEXT}" xmlns:u="{TEXT}" t:name="A" u:name="B"/>"#);
-        assert!(parse_text_indexes(&duplicate).is_err());
-
-        let unknown_prefix =
-            format!(r#"<t:bibliography xmlns:t="{TEXT}" t:name="B" x:value="bad"/>"#);
-        assert!(parse_text_indexes(&unknown_prefix).is_err());
-        assert!(parse_text_indexes("<t:table-index>").is_err());
-    }
-
-    #[test]
-    fn text_indexes_enforce_nesting_bound() {
-        let mut xml = format!(r#"<t:table-of-content xmlns:t="{TEXT}" t:name="T">"#);
-        for _ in 0..MAX_INDEX_DEPTH {
-            xml.push_str("<t:span>");
-        }
-        for _ in 0..MAX_INDEX_DEPTH {
-            xml.push_str("</t:span>");
-        }
-        xml.push_str("</t:table-of-content>");
-        assert!(parse_text_indexes(&xml).is_err());
-    }
 }

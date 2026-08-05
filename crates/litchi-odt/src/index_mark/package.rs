@@ -1,6 +1,7 @@
 //! Canonical index-mark fragments and byte-preserving inline mutation.
 
-use super::{TextIndexMark, TextIndexMarkKind, parse_text_index_marks};
+use super::MAX_MARKS;
+use super::{TextIndexMark, TextIndexMarkFragments, TextIndexMarkKind, parse_text_index_marks};
 use crate::elements::xml::{TEXT_NAMESPACE, is_bound, namespaced_attribute};
 use crate::index::TextIndexAttribute;
 use crate::{BibliographyField, TextBibliographyType};
@@ -9,27 +10,10 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::NsReader;
 use std::collections::{HashMap, HashSet};
 
-const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+pub(super) const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const MAX_XML_BYTES: usize = 64 * 1024 * 1024;
 const MAX_FRAGMENT_BYTES: usize = 4 * 1024 * 1024;
 const MAX_DEPTH: usize = 4_096;
-const MAX_MARKS: usize = 1_000_000;
-
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct TextAlphabeticalMarkMetadata {
-    pub key1: Option<String>,
-    pub key2: Option<String>,
-    pub string_value_phonetic: Option<String>,
-    pub key1_phonetic: Option<String>,
-    pub key2_phonetic: Option<String>,
-    pub main_entry: Option<bool>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TextIndexMarkFragments {
-    Point(String),
-    Range { start: String, end: String },
-}
 
 impl TextIndexMark {
     pub fn toc_point(value: impl Into<String>, outline_level: Option<u16>) -> Result<Self> {
@@ -461,7 +445,7 @@ fn validate_mark(mark: &TextIndexMark) -> Result<()> {
     Ok(())
 }
 
-fn validated_marks(xml: &str) -> Result<Vec<TextIndexMark>> {
+pub(super) fn validated_marks(xml: &str) -> Result<Vec<TextIndexMark>> {
     if xml.len() > MAX_XML_BYTES {
         return invalid("index-mark XML exceeds 64 MiB");
     }
@@ -894,107 +878,4 @@ fn expand_empty(xml: &str, start: usize, end: usize, qname: &str, content: &str)
 }
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(Error::InvalidFormat(message.into()))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
-    fn document(body: &str) -> String {
-        format!(
-            "<office:document-content xmlns:office=\"{OFFICE}\" xmlns:text=\"{TEXT}\"><office:body><office:text>{body}</office:text></office:body></office:document-content>"
-        )
-    }
-
-    #[test]
-    fn canonical_point_and_range_fragments_round_trip() {
-        let toc = TextIndexMark::toc_point("Manual & entry", Some(2)).unwrap();
-        assert_eq!(
-            toc.to_xml_fragments().unwrap(),
-            TextIndexMarkFragments::Point(format!(
-                "<text:toc-mark xmlns:text=\"{TEXT}\" text:outline-level=\"2\" text:string-value=\"Manual &amp; entry\"/>"
-            ))
-        );
-        let user = TextIndexMark::user_range("r1", "Custom", Some(1)).unwrap();
-        let TextIndexMarkFragments::Range { start, end } = user.to_xml_fragments().unwrap() else {
-            panic!()
-        };
-        let xml = document(&format!("<text:p>{start}Visible{end}</text:p>"));
-        let parsed = validated_marks(&xml).unwrap();
-        assert_eq!(parsed[0].value(), "Visible");
-        assert_eq!(
-            parsed[0].attribute(Some(TEXT), "index-name"),
-            Some("Custom")
-        );
-    }
-
-    #[test]
-    fn insertion_replacement_and_removal_preserve_unrelated_bytes() {
-        let xml = document("<text:p><!--keep-->alpha<text:span>beta</text:span></text:p><text:p/>");
-        let range = TextIndexMark::alphabetical_range(
-            "a1",
-            TextAlphabeticalMarkMetadata {
-                key1: Some("A".to_string()),
-                ..Default::default()
-            },
-        )
-        .unwrap();
-        let xml = insert_text_index_mark_xml(&xml, 0, &range).unwrap();
-        assert!(xml.contains("<!--keep-->alpha<text:span>beta</text:span>"));
-        let replacement = TextIndexMark::toc_range("t1", Some(1)).unwrap();
-        let xml = replace_text_index_mark_xml(&xml, 0, &replacement).unwrap();
-        let xml = remove_text_index_mark_xml(&xml, 0).unwrap();
-        assert!(xml.contains("<text:p><!--keep-->alpha<text:span>beta</text:span></text:p>"));
-        let bibliography = TextIndexMark::bibliography_point(
-            TextBibliographyType::Www,
-            "[Test]",
-            vec![(BibliographyField::Identifier, "Test".to_string())],
-        )
-        .unwrap();
-        let xml = insert_text_index_mark_xml(&xml, 1, &bibliography).unwrap();
-        let xml = remove_text_index_mark_xml(&xml, 0).unwrap();
-        assert!(xml.contains("<text:p>[Test]</text:p>"));
-    }
-
-    #[test]
-    fn hostile_metadata_and_identity_are_rejected() {
-        assert!(TextIndexMark::toc_range("", None).is_err());
-        assert!(TextIndexMark::toc_point("x", Some(0)).is_err());
-        assert!(
-            TextIndexMark::bibliography_point(
-                TextBibliographyType::Book,
-                "x",
-                vec![
-                    (BibliographyField::Title, "a".to_string()),
-                    (BibliographyField::Title, "b".to_string())
-                ]
-            )
-            .is_err()
-        );
-        let spoofed = document(
-            "<text:p xmlns:u=\"urn:bad\"><text:toc-mark text:string-value=\"x\" u:outline-level=\"1\"/></text:p>",
-        );
-        assert!(validated_marks(&spoofed).is_err());
-        let crossed = document(
-            "<text:p><text:toc-mark-start text:id=\"a\"/><text:toc-mark-end text:id=\"b\"/></text:p>",
-        );
-        assert!(validated_marks(&crossed).is_err());
-    }
-
-    #[test]
-    fn libreoffice_point_range_and_bibliography_marks_round_trip() {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        for relative in [
-            "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/toxmarkhyperlink.fodt",
-            "test-data/libreoffice-core/sw/qa/extras/layout/data/tdf112256-diacritic-index-mark.fodt",
-            "test-data/libreoffice-core/sw/qa/uibase/shells/data/protectedLinkCopy.fodt",
-        ] {
-            let xml = std::fs::read_to_string(root.join(relative)).unwrap();
-            let marks = validated_marks(&xml).unwrap();
-            assert!(!marks.is_empty());
-            for mark in marks {
-                mark.to_xml_fragments().unwrap();
-            }
-        }
-    }
 }

@@ -1,5 +1,8 @@
 // Generated from the ODF 1.2 OS paragraph inline grammar.
-fn is_ruby_base_child(namespace: Ns, local: &[u8]) -> bool {
+
+use super::super::Ns;
+
+pub(super) fn is_ruby_base_child(namespace: Ns, local: &[u8]) -> bool {
     matches!((namespace, local),
         (Ns::Dr3d, b"scene") |
         (Ns::Draw, b"a") |
@@ -132,7 +135,7 @@ fn is_ruby_base_child(namespace: Ns, local: &[u8]) -> bool {
     )
 }
 
-fn is_hyperlink_child(namespace: Ns, local: &[u8]) -> bool {
+pub(super) fn is_hyperlink_child(namespace: Ns, local: &[u8]) -> bool {
     matches!((namespace, local),
         (Ns::Dr3d, b"scene") |
         (Ns::Draw, b"a") |
