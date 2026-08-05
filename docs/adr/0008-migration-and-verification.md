@@ -4579,11 +4579,47 @@ declarations with no explicit migration debts. DOC fixture targets that read
 the checked-in corrupted POI OLE sample remain an external fixture failure,
 not a regression in this slice.
 
-The next binary boundary is the target-driven OLE object API: neutral CFB and
-OLEDS capture should retain host metadata opaquely while DOC and XLS interpret
-their own `ObjectPool`/`MBD`/`LNK` references. Additional legacy semantic
-owners, including XLS layout rows and columns, remain format-specific follow-up
-work and must not be folded into `litchi-biff`.
+The target-driven OLE object boundary is recorded below: neutral CFB and OLEDS
+capture retains host metadata opaquely while DOC and XLS interpret their own
+`ObjectPool`/`MBD`/`LNK` references. Additional legacy semantic owners,
+including XLS layout rows and columns, remain format-specific follow-up work and
+must not be folded into `litchi-biff`.
+
+## Target-driven OLE object ownership
+
+The OLE boundary is now layered as
+`litchi-ole-common::object::{target,model,codec,discovery,editor}`. The common
+crate accepts explicit `Target`/`Targets` values and owns only bounded CFB
+capture, opaque `Storage`/`Stream` views, shared stream allocations, and
+transactional rendering. It no longer infers DOC/XLS storage names or models
+`Format`, `ObjInfo`, `CompObj`, native payloads, previews, or host object kinds.
+This follows `[MS-CFB]` directory/storage rules and keeps the inert
+`[MS-OLEDS]` object streams unactivated and unresolved.
+
+DOC derives `ObjectPool/_<decimal-id>` targets from its own field/storage
+semantics in `[MS-DOC]` sections 2.1.4 and 2.6.1, and interprets the opaque
+`\u{003}ObjInfo` stream as the typed `doc::embedded_object::Info` described by
+`[MS-DOC]` section 2.9.165. It also handles creating the first `ObjectPool`
+storage without leaking that topology into the common owner. XLS reads its
+`Workbook`/`Book` stream before common capture, derives deduplicated `MBD` and
+`LNK` targets from `Obj`/`FtPictFmla` records, and retains `MBD`/`LNK` semantics
+in the XLS owner as required by `[MS-XLS]` sections 2.1.7.5, 2.1.7.7, and
+2.5.150–2.5.151. Chart-only XLS editing passes an intentionally empty target
+catalog.
+
+The common object suite passes 18 tests, DOC all-feature library coverage
+passes 840 tests with two ignored, and XLS all-target coverage passes. The
+focused DOC and XLS OLE suites cover absent `ObjectPool`, `ObjInfo`, MBD/LNK,
+deduplication, shared-storage removal, and bounded workbook reads. Formatting,
+metadata, and the boundary policy continue to pass for 46 workspace packages,
+150 internal dependency declarations, and zero explicit migration debts. The
+full DOC target suite still reports the pre-existing corrupted Apache POI OLE
+fixture (`FAT entry 52`), which is external fixture data rather than a failure
+in the target migration.
+
+The next high-value binary seam is the remaining host-specific CFB signature
+coverage and legacy layout ownership; new shared logic should be extracted only
+after its format-neutral vocabulary and specification boundary are identified.
 
 ## Evidence levels
 
