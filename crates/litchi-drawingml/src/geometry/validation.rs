@@ -23,13 +23,13 @@ enum Mode {
 /// The schema requires the `a:pathLst` element but allows it to be empty;
 /// authored geometry additionally requires at least one path so the shape
 /// actually draws something.
-pub(crate) fn validate_custom_geometry(geometry: &CustomGeometry) -> Result<(), String> {
+pub fn validate_custom_geometry(geometry: &CustomGeometry) -> Result<(), String> {
     validate_geometry(geometry, Mode::Author)
 }
 
-/// Validate geometry loaded from a package without imposing the authoring-only
-/// requirement that a path list contain a visible path.
-pub(crate) fn validate_parsed_custom_geometry(geometry: &CustomGeometry) -> Result<(), String> {
+/// Validate decoded geometry without imposing the authoring-only requirement
+/// that a path list contain a visible path.
+pub fn validate_parsed_custom_geometry(geometry: &CustomGeometry) -> Result<(), String> {
     validate_geometry(geometry, Mode::Parsed)
 }
 

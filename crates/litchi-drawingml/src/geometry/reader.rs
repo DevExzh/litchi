@@ -1,19 +1,19 @@
-//! Streaming builder that assembles an [`CustomGeometry`] from the
-//! `a:custGeom` subtree of a worksheet drawing part.
+//! Streaming builder that assembles an [`CustomGeometry`] from an
+//! `a:custGeom` subtree in a DrawingML shape part.
 //!
-//! The shape inventory parser in [`super::shapes`] drives the builder:
-//! it routes every DrawingML start/empty event under `a:custGeom` through
+//! A format-owned shape inventory parser drives the builder: it routes every
+//! DrawingML start/empty event under `a:custGeom` through
 //! [`CustomGeometryBuilder::open`], every matching close through
 //! [`CustomGeometryBuilder::close`], and finalizes the geometry with
 //! [`CustomGeometryBuilder::finish`] when the `a:custGeom` element ends.
 //! Unknown elements are skipped inertly; structurally invalid geometry
 //! (missing required attributes, wrong point counts, a missing `a:pathLst`)
-//! is an error, mirroring the anchor parser's strictness.
+//! is an error; the owning host parser remains responsible for its anchors.
 
 use quick_xml::encoding::Decoder;
 use quick_xml::events::BytesStart;
 
-use crate::error::{Error, Result};
+use crate::{Error, Result};
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 
 use super::{
@@ -26,7 +26,7 @@ use super::{
 /// One element of the `a:custGeom` subtree, used as parser context so close
 /// events can be routed back to the builder.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum GeometryElement {
+pub enum GeometryElement {
     /// `a:custGeom`.
     CustomGeometry,
     /// `a:avLst`.
@@ -114,7 +114,7 @@ enum PendingSite {
 
 /// Streaming assembler for one `a:custGeom` subtree.
 #[derive(Debug, Default)]
-pub(crate) struct CustomGeometryBuilder {
+pub struct CustomGeometryBuilder {
     geometry: CustomGeometry,
     saw_path_list: bool,
     pending_site: Option<(PendingSite, bool)>,
@@ -123,13 +123,13 @@ pub(crate) struct CustomGeometryBuilder {
 }
 
 impl CustomGeometryBuilder {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self::default()
     }
 
     /// Handle a start or empty event whose parent is `parent`; returns the
     /// element context for known children and `None` for elements to skip.
-    pub(crate) fn open(
+    pub fn open(
         &mut self,
         parent: GeometryElement,
         local: &[u8],
@@ -196,7 +196,7 @@ impl CustomGeometryBuilder {
     }
 
     /// Handle the close event of a known geometry element.
-    pub(crate) fn close(&mut self, element: GeometryElement) -> Result<()> {
+    pub fn close(&mut self, element: GeometryElement) -> Result<()> {
         match element {
             GeometryElement::XyAdjustHandle
             | GeometryElement::PolarAdjustHandle
@@ -211,7 +211,7 @@ impl CustomGeometryBuilder {
     }
 
     /// Finalize the geometry when `a:custGeom` closes.
-    pub(crate) fn finish(self) -> Result<CustomGeometry> {
+    pub fn finish(self) -> Result<CustomGeometry> {
         if !self.saw_path_list {
             return Err(invalid("custom geometry is missing its path list"));
         }

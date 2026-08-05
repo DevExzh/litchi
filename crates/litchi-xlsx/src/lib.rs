@@ -45,7 +45,6 @@ pub mod raw;
 pub mod revisions;
 pub mod row;
 pub mod scenarios;
-pub mod shape_geometry;
 pub mod shapes;
 pub mod sheet;
 pub mod sheet_calculation_properties;

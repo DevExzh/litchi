@@ -1,5 +1,4 @@
-//! Typed DrawingML custom geometry (`a:custGeom`) for XLSX worksheet
-//! drawings.
+//! Typed DrawingML custom geometry (`a:custGeom`).
 //!
 //! ECMA-376 part 1 §20.1.9.8 (CT_CustomGeometry2D) describes a shape outline
 //! as an adjust-value list (`a:avLst`), a guide list (`a:gdLst`), adjust
@@ -12,28 +11,15 @@
 //! that carry either a literal or a guide reference, mirroring the
 //! ST_AdjCoordinate/ST_AdjAngle unions.
 //!
-//! The model is shared by the shape inventory reader
-//! ([`super::shapes`], which fills `Shape::custom_geometry`) and
-//! the shape authoring pipeline ([`crate::chart_sheet::writer::shape`], through
-//! [`crate::chart_sheet::writer::Geometry::Custom`]), so authored geometry round-trips
-//! through the inventory with identical semantics. Everything here is inert:
-//! no rendering and no formula evaluation.
-
-mod formula;
-pub(crate) mod parse;
-mod validate;
-pub(crate) mod write;
-
-#[cfg(test)]
-mod tests;
+//! Format crates own the surrounding shape inventory and authoring pipeline;
+//! this model is inert and performs no rendering or formula evaluation.
 
 use std::fmt;
 use std::str::FromStr;
 
-use crate::error::{Error, Result};
+use crate::{Error, Result};
 
-pub use formula::Formula;
-pub(crate) use validate::{validate_custom_geometry, validate_parsed_custom_geometry};
+use super::Formula;
 
 /// Smallest ST_Coordinate literal (ECMA-376 §20.1.10.16).
 pub(crate) const MIN_COORDINATE: i64 = -27_273_042_329_600;

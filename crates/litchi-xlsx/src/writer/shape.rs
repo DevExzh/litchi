@@ -25,12 +25,12 @@ use std::fmt::Write as _;
 use litchi_core::xml::escape::escape_xml;
 use litchi_drawingml::geom::Preset;
 
-use crate::shape_geometry::write::write_custom_geometry;
-use crate::shape_geometry::{CustomGeometry, validate_custom_geometry};
 use crate::shapes::{
     Anchor, Autofit, BodyProperties, CellMarker, Columns, Direction, EditAs, EmuExtent, EmuOffset,
     Geometry, GroupTransform, Paragraph, Run, VerticalAnchor, Wrap,
 };
+use litchi_drawingml::geometry::writer::write_custom_geometry;
+use litchi_drawingml::geometry::{CustomGeometry, validate_custom_geometry};
 
 /// Maximum number of authored top-level drawing objects per worksheet.
 const MAX_SHAPES_PER_WORKSHEET: usize = 4096;
@@ -1230,10 +1230,10 @@ mod tests {
 
 #[cfg(any())]
 mod group_connection_tests {
-    use super::shape_geometry::Path;
     use super::shapes::{CellMarker, Emu, Object, parse_drawing_shapes};
     use super::*;
     use crate::writer::sheet::MutableWorksheet;
+    use litchi_drawingml::geometry::Path;
 
     fn marker(column: u32, row: u32) -> CellMarker {
         CellMarker {

@@ -25,13 +25,13 @@ use std::fmt::Write as _;
 use litchi_core::xml::escape::escape_xml;
 use litchi_drawingml::geom::Preset;
 
-use crate::package::xlsx::shape_geometry::write::write_custom_geometry;
-use crate::package::xlsx::shape_geometry::{CustomGeometry, validate_custom_geometry};
 use crate::package::xlsx::shapes::{
     BodyProperties, CellMarker, Columns, EditAs, EmuExtent, EmuOffset, Geometry, GroupTransform,
     Paragraph, Run, ShapeAnchor, XlsxTextAutofit, XlsxTextDirection, XlsxTextVerticalAnchor,
     XlsxTextWrap,
 };
+use litchi_drawingml::geometry::writer::write_custom_geometry;
+use litchi_drawingml::geometry::{CustomGeometry, validate_custom_geometry};
 
 /// Maximum number of authored top-level drawing objects per worksheet.
 const MAX_SHAPES_PER_WORKSHEET: usize = 4096;

@@ -15,6 +15,11 @@
 //! through the package relationship graph. Everything here is read-only and
 //! inert: unknown elements are skipped, OLE payloads and external targets are
 //! never followed, and all inputs are bounded by named limits.
+//!
+//! Specification anchors: [MS-XLSB] Drawings host part (structure 2.1.7.23)
+//! and `BrtDrawing` (record 2.4.354), whose XML payload uses [MS-XLSX]
+//! SpreadsheetDrawing and [MS-ODRAWXML] shape content. OPC relationships stay
+//! in this XLSB host layer under [MS-OI29500].
 
 use std::fmt;
 use std::str::FromStr;
@@ -26,8 +31,8 @@ use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use crate::package::error::{Error, Result};
-use crate::package::xlsx::shape_geometry::CustomGeometry;
-use crate::package::xlsx::shape_geometry::parse::{CustomGeometryBuilder, GeometryElement};
+use litchi_drawingml::geometry::CustomGeometry;
+use litchi_drawingml::geometry::reader::{CustomGeometryBuilder, GeometryElement};
 use litchi_ooxml_common::relationships::attribute_value as common_relationship_attribute_value;
 
 /// The OLE rendering aspect retained by a worksheet drawing record.

@@ -10,7 +10,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use crate::error::{Error, Result};
+use crate::{Error, Result};
 
 use super::AdjustValue;
 

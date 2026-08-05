@@ -6,7 +6,6 @@
 
 pub mod chart;
 pub mod pivot_chart;
-pub mod shape_geometry;
 pub mod shapes;
 pub mod views;
 pub mod writer;

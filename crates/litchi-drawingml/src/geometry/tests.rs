@@ -193,7 +193,7 @@ fn validation_rejects_out_of_range_values() {
 #[test]
 fn serialization_omits_defaults_and_empty_lists() {
     let mut xml = String::new();
-    write::write_custom_geometry(&mut xml, &triangle_geometry());
+    writer::write_custom_geometry(&mut xml, &triangle_geometry());
     assert!(xml.starts_with("<a:custGeom><a:pathLst><a:path w=\"21600\" h=\"21600\">"));
     assert!(!xml.contains("avLst"));
     assert!(!xml.contains("gdLst"));
@@ -205,7 +205,7 @@ fn serialization_omits_defaults_and_empty_lists() {
     assert!(!xml.contains("extrusionOk="));
 
     let mut plain = String::new();
-    write::write_custom_geometry(
+    writer::write_custom_geometry(
         &mut plain,
         &CustomGeometry::new().with_path(Path::default()),
     );
@@ -226,7 +226,7 @@ fn serialization_writes_non_default_path_attributes() {
         commands: vec![PathCommand::Close],
     };
     let mut xml = String::new();
-    write::write_custom_geometry(&mut xml, &CustomGeometry::new().with_path(path));
+    writer::write_custom_geometry(&mut xml, &CustomGeometry::new().with_path(path));
     assert!(xml.contains(
         r#"<a:path w="100" h="200" fill="lighten" stroke="0" extrusionOk="0"><a:close/></a:path>"#
     ));

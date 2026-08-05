@@ -1,9 +1,9 @@
 //! Serializer for [`CustomGeometry`] into `a:custGeom` markup.
 //!
-//! Output is canonical: optional child lists are omitted when empty,
-//! attributes at their ECMA-376 defaults are omitted, and everything written
-//! here parses back through [`crate::package::xlsx::shapes::parse_drawing_shapes`]
-//! into an identical [`CustomGeometry`].
+//! Output is canonical: optional child lists are omitted when empty and
+//! attributes at their ECMA-376 defaults are omitted. The resulting subtree
+//! can be consumed by any format-owned shape parser into an identical
+//! [`CustomGeometry`].
 
 use std::fmt::Write as _;
 
@@ -14,7 +14,7 @@ use super::{
 };
 
 /// Serialize one custom geometry as its `a:custGeom` element.
-pub(crate) fn write_custom_geometry(xml: &mut String, geometry: &CustomGeometry) {
+pub fn write_custom_geometry(xml: &mut String, geometry: &CustomGeometry) {
     xml.push_str("<a:custGeom>");
     write_guide_list(xml, "avLst", &geometry.adjust_values);
     write_guide_list(xml, "gdLst", &geometry.guides);

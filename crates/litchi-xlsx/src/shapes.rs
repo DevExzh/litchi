@@ -15,6 +15,11 @@
 //! through the package relationship graph. Everything here is read-only and
 //! inert: unknown elements are skipped, OLE payloads and external targets are
 //! never followed, and all inputs are bounded by named limits.
+//!
+//! Specification anchors: [MS-XLSX] SpreadsheetDrawing complex types and
+//! schema (structure 2.6, schema appendix 5.8), with shared shape content from
+//! [MS-ODRAWXML]. The package and relationship traversal follows
+//! [MS-OI29500] OPC boundaries and remains format-owned here.
 
 use std::fmt;
 use std::str::FromStr;
@@ -25,13 +30,13 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use super::shape_geometry::CustomGeometry;
-use super::shape_geometry::parse::{CustomGeometryBuilder, GeometryElement};
 use crate::error::{Error, Result};
 use crate::raw::Sheet;
 use crate::raw::namespace::relationship_attribute_value;
 use crate::raw::parse_catalog;
 use litchi_drawingml::geom::Preset;
+use litchi_drawingml::geometry::CustomGeometry;
+use litchi_drawingml::geometry::reader::{CustomGeometryBuilder, GeometryElement};
 use litchi_drawingml::text::parse_bool;
 pub use litchi_drawingml::text::{
     Anchor as VerticalAnchor, Autofit, Columns, Coordinate32, Direction, TextSize, Underline, Wrap,
