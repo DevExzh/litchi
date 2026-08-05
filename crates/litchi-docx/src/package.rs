@@ -1135,9 +1135,9 @@ impl Package {
     }
 
     /// Load the bounded, inert classic-chart graph owned by the main document.
-    pub fn chart_graph(&self) -> Result<crate::chart::ChartGraph> {
+    pub fn chart_graph(&self) -> Result<crate::chart::Graph> {
         let document = self.opc.main_document_part()?.partname().clone();
-        crate::chart::load_chart_graph(&self.opc, &document)
+        crate::chart::load(&self.opc, &document)
     }
 
     /// Load the typed, inert SmartArt (DrawingML diagram) inventory anchored
@@ -1165,9 +1165,9 @@ impl Package {
     }
 
     /// Deterministically store an already coherent classic-chart graph.
-    pub fn store_chart_graph(&mut self, graph: &crate::chart::ChartGraph) -> Result<()> {
+    pub fn store_chart_graph(&mut self, graph: &crate::chart::Graph) -> Result<()> {
         let document = self.opc.main_document_part()?.partname().clone();
-        crate::chart::store_chart_graph(&mut self.opc, &document, graph)
+        crate::chart::store(&mut self.opc, &document, graph)
     }
 
     /// Transactionally edit the current plaintext OPC graph.

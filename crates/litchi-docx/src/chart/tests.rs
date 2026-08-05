@@ -1,19 +1,19 @@
 use super::model::{
     A, C, CHART_CT, COLOR_STYLE_CT, COLOR_STYLE_REL, Conformance, DOCUMENT_CT, MAX_WORKBOOK_BYTES,
-    STYLE_CT, STYLE_REL, W, WORKBOOK_CT,
+    STYLE_CT, STYLE_REL, WORKBOOK_CT,
 };
 use super::{load, store};
 use litchi_opc::constants::relationship_type as rt;
-use litchi_opc::part::BlobPart;
+use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::{OpcPackage, PackURI};
 
 const STYLE_NS: &str = "http://schemas.microsoft.com/office/drawing/2012/chartStyle";
-const POI: &[u8] = include_bytes!("../../../test-data/poi/test-data/document/61745.docx");
+const POI: &[u8] = include_bytes!("../../../../test-data/poi/test-data/document/61745.docx");
 const LO_INTERNAL: &[u8] = include_bytes!(
-    "../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx"
+    "../../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx"
 );
 const LO_EXTERNAL: &[u8] = include_bytes!(
-    "../../../test-data/libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx"
+    "../../../../test-data/libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx"
 );
 
 fn document() -> PackURI {

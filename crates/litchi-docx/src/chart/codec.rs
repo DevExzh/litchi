@@ -1,7 +1,7 @@
 //! XML discovery, validation, and shared DrawingML schema delegation.
 
 use super::model::{
-    C, COLOR_STYLE_CT, CS, Conformance, Graph, MAX_ATTRIBUTE_BYTES, MAX_ATTRIBUTES, MAX_CHART_XML,
+    COLOR_STYLE_CT, Conformance, Graph, MAX_ATTRIBUTE_BYTES, MAX_ATTRIBUTES, MAX_CHART_XML,
     MAX_CHARTS, MAX_COMPANION_XML, MAX_DEPTH, MAX_DOCUMENT_XML, MAX_NODES, MAX_TOTAL_BYTES,
     MAX_WORKBOOK_BYTES, R, RS, STYLE_CT,
 };
