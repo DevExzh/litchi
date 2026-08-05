@@ -8,6 +8,11 @@
 //! - XML readers and writers
 //! - Full support for all major chart types
 //!
+//! Core chart XML follows `[MS-ODRAWXML]` chart structures. Package parts and
+//! relationship graphs remain in the owning DOCX/PPTX/XLSX/XLSB facades under
+//! `[MS-OI29500]`; host-specific placement is documented by `[MS-PPTX]`,
+//! `[MS-XLSX]`, and `[MS-XLSB]`.
+//!
 //! # Chart Types Supported
 //!
 //! - Area charts (2D and 3D)

@@ -3,7 +3,7 @@
 //! The reusable comments stream and BIFF12 rich-string codec live in
 //! [`crate::comments`]. This boundary retains the historical host
 //! `Comment` model, including its `SharedStringRun` type, while keeping
-//! package and host error mapping in `litchi-ooxml`.
+//! package and host error mapping in the owning `litchi_xlsb` layers.
 
 use crate::package::error::{Error, Result};
 use crate::package::shared_strings::SharedStringRun;

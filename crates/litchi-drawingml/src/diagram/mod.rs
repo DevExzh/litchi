@@ -18,6 +18,10 @@
 //! Both the transitional and the ISO Strict `drawingml/diagram` namespaces are
 //! supported. Format-specific anchoring remains in the concrete `litchi-docx`
 //! and `litchi-pptx` crates.
+//!
+//! The shared part vocabulary follows `[MS-ODRAWXML]` diagram structures;
+//! `[MS-OI29500]` package relationships and the host anchors described by
+//! `[MS-PPTX]` remain outside this module.
 
 pub mod data;
 pub mod definition;
