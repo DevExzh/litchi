@@ -372,19 +372,19 @@ fn is_drawing_color_map_choice(local_name: &[u8]) -> bool {
 
 /// Parse a chart XML document.
 pub fn read<R: BufRead>(reader: R) -> Result<Chart> {
-    let limits = litchi_ooxml_common::mce::MceLimits::default();
+    let limits = litchi_ooxml_common::mce::Limits::default();
     let mut input = Vec::new();
     reader
         .take((limits.max_input_bytes as u64).saturating_add(1))
         .read_to_end(&mut input)?;
     if input.len() > limits.max_input_bytes {
         return Err(Error::Mce(
-            litchi_ooxml_common::mce::MceError::LimitExceeded("input bytes".into()),
+            litchi_ooxml_common::mce::Error::LimitExceeded("input bytes".into()),
         ));
     }
     let xml = litchi_ooxml_common::mce::process_markup_compatibility(
         &input,
-        &litchi_ooxml_common::mce::MceCapabilities::default(),
+        &litchi_ooxml_common::mce::Capabilities::default(),
         &limits,
     )?
     .xml

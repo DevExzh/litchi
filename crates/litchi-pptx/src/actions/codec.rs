@@ -5,7 +5,7 @@ use super::{Limits, invalid, limit};
 use crate::{Error, Result};
 use litchi_ooxml_common::relationships::attribute_value;
 use litchi_ooxml_common::xml::{is_drawingml_name, unqualified_attribute_value};
-use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Capabilities, process_markup_compatibility};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};
@@ -62,8 +62,8 @@ pub(super) fn scan(xml_bytes: &[u8], limits: &mut Limits) -> Result<Vec<Parsed>>
         return Err(limit("slide XML bytes", MAX_SLIDE_XML_BYTES));
     }
 
-    let capabilities = MceCapabilities::ooxml_baseline();
-    let mce_limits = MceLimits {
+    let capabilities = Capabilities::ooxml_baseline();
+    let mce_limits = litchi_ooxml_common::mce::Limits {
         max_input_bytes: MAX_SLIDE_XML_BYTES,
         max_output_bytes: MAX_SLIDE_XML_BYTES,
         max_depth: MAX_XML_DEPTH,

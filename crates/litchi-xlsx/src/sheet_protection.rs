@@ -13,7 +13,7 @@ use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use crate::error::{Error, Result};
-use litchi_ooxml_common::{ExpandedName, MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Name, Capabilities, Limits, process_markup_compatibility};
 
 const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -483,15 +483,15 @@ pub fn parse_protection(xml: &[u8]) -> Result<Metadata> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("worksheet XML is too large"));
     }
-    let mut capabilities = MceCapabilities::default();
+    let mut capabilities = Capabilities::default();
     capabilities
         .understand_namespace(String::from_utf8_lossy(X14).into_owned())
         .understand_namespace(String::from_utf8_lossy(XM).into_owned());
-    capabilities.preserve_extension_element(ExpandedName {
+    capabilities.preserve_extension_element(Name {
         namespace: String::from_utf8_lossy(X14).into_owned(),
         local_name: "protectedRanges".into(),
     });
-    let validated = process_markup_compatibility(xml, &capabilities, &MceLimits::default())?;
+    let validated = process_markup_compatibility(xml, &capabilities, &Limits::default())?;
     parse_selected(validated.xml.as_ref())
 }
 

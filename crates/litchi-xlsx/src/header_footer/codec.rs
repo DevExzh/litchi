@@ -8,7 +8,7 @@ use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
 use crate::error::{Error, Result};
-use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 
 use super::model::{Settings, Text};
 
@@ -59,7 +59,7 @@ pub fn parse_worksheet_header_footer(xml: &[u8]) -> Result<Option<Settings>> {
         return Err(invalid("worksheet XML is too large"));
     }
     let validated =
-        process_markup_compatibility(xml, &MceCapabilities::default(), &MceLimits::default())?;
+        process_markup_compatibility(xml, &Capabilities::default(), &Limits::default())?;
     let selected = if validated.report.alternate_content_count == 0 {
         xml
     } else {

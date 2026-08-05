@@ -11,7 +11,7 @@ pub fn read(xml: &[u8]) -> Result<(Catalog, Conformance)> {
     let original = parse_dom(xml)?;
     let original_conformance = Conformance::from_word(original.ns.as_ref())?;
     let producer_entries = extract_producer_entries(original, original_conformance)?;
-    let limits = litchi_ooxml_common::MceLimits {
+    let limits = litchi_ooxml_common::mce::Limits {
         max_input_bytes: MAX,
         max_output_bytes: MAX,
         max_depth: MAX_DEPTH,
@@ -19,9 +19,9 @@ pub fn read(xml: &[u8]) -> Result<(Catalog, Conformance)> {
         max_directive_tokens: MAX_VALUES,
         max_choices_per_alternate: MAX_VALUES,
     };
-    let xml = litchi_ooxml_common::process_markup_compatibility(
+    let xml = litchi_ooxml_common::mce::process_markup_compatibility(
         xml,
-        &litchi_ooxml_common::MceCapabilities::default(),
+        &litchi_ooxml_common::mce::Capabilities::default(),
         &limits,
     )?
     .xml;

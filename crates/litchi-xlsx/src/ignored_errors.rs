@@ -2,7 +2,7 @@
 
 use crate::error::{Error, Result};
 use crate::raw::namespace::is_spreadsheetml_name;
-use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 use quick_xml::Writer;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -132,7 +132,7 @@ pub fn parse_worksheet_ignored_errors(xml: &[u8]) -> Result<Option<IgnoredErrors
         return Err(invalid("ignoredErrors worksheet XML exceeds size limit"));
     }
     let processed =
-        process_markup_compatibility(xml, &MceCapabilities::default(), &MceLimits::default())?;
+        process_markup_compatibility(xml, &Capabilities::default(), &Limits::default())?;
     if processed.xml.len() > MAX_XML_BYTES {
         return Err(invalid(
             "processed ignoredErrors worksheet XML exceeds size limit",

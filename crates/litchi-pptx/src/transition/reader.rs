@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use litchi_ooxml_common::xml::unqualified_attribute_value;
-use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Capabilities, process_markup_compatibility};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -106,13 +106,13 @@ pub fn read_with(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
         });
     }
 
-    let mut capabilities = MceCapabilities::ooxml_baseline();
+    let mut capabilities = Capabilities::ooxml_baseline();
     capabilities.understand_namespace(P14);
-    let mce_limits = MceLimits {
+    let mce_limits = litchi_ooxml_common::mce::Limits {
         max_input_bytes: limits.input_bytes,
         max_output_bytes: limits.input_bytes,
         max_depth: limits.depth,
-        ..MceLimits::default()
+        ..litchi_ooxml_common::mce::Limits::default()
     };
     let processed = process_markup_compatibility(xml, &capabilities, &mce_limits)?.xml;
     if processed.len() > limits.input_bytes {

@@ -2,7 +2,7 @@
 
 use crate::error::{Error, Result, invalid};
 use litchi_ooxml_common::XmlError;
-use litchi_ooxml_common::mce::{MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::{NsReader, XmlVersion};
@@ -498,11 +498,11 @@ fn validate_extensions(values: &[OpaqueMetadataExtension]) -> Result<()> {
 }
 
 fn parse_mce_dom(xml: &[u8]) -> Result<Node> {
-    let mut capabilities = MceCapabilities::ooxml_baseline();
+    let mut capabilities = Capabilities::ooxml_baseline();
     capabilities
         .understand_namespace(XDA)
         .understand_namespace(XLRD);
-    let limits = MceLimits {
+    let limits = Limits {
         max_input_bytes: MAX_XML,
         max_output_bytes: MAX_OUTPUT,
         max_depth: MAX_DEPTH,

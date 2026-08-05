@@ -9,7 +9,7 @@ use crate::time::{Offset, ParseError as TimeParseError};
 use crate::{Error, Result};
 use litchi_drawingml::coordinate::{Coordinate, ParseError as CoordinateParseError};
 use litchi_ooxml_common::xml::unqualified_attribute_value;
-use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Capabilities, process_markup_compatibility};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, QName, ResolveResult};
@@ -110,9 +110,9 @@ fn scan_slide_laser_traces(
         return Err(limit("slide XML bytes", MAX_SLIDE_XML_BYTES));
     }
 
-    let mut capabilities = MceCapabilities::ooxml_baseline();
+    let mut capabilities = Capabilities::ooxml_baseline();
     capabilities.understand_namespace(P14_NAMESPACE);
-    let mce_limits = MceLimits {
+    let mce_limits = litchi_ooxml_common::mce::Limits {
         max_input_bytes: MAX_SLIDE_XML_BYTES,
         max_output_bytes: MAX_SLIDE_XML_BYTES,
         max_depth: MAX_XML_DEPTH,

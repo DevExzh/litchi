@@ -59,7 +59,7 @@ pub enum Error {
 
     /// Markup-compatibility preprocessing failed.
     #[error("OOXML markup compatibility error: {0}")]
-    Mce(#[from] crate::MceError),
+    Mce(#[from] crate::mce::Error),
 
     /// Shared entity, namespace, or attribute decoding failed.
     #[error("OOXML decoding error: {0}")]

@@ -17,10 +17,5 @@ pub mod web;
 pub mod xml;
 
 pub use error::{Error, Result};
-pub use mce::{
-    ActiveOffsetLimits, ExpandedName, MceCapabilities, MceError, MceLimits, MceOutput, MceReport,
-    active_offsets, process_markup_compatibility, process_ooxml, process_part, process_part_arc,
-    process_str,
-};
 pub use properties::{Keywords, Props};
 pub use xml::XmlError;

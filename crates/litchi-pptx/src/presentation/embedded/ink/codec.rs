@@ -3,7 +3,7 @@ use crate::presentation::embedded::{
     MAX_XML_DEPTH, increment_nodes, invalid, is_presentationml_name, limit, relationship_value,
     validate_root,
 };
-use litchi_ooxml_common::process_ooxml;
+use litchi_ooxml_common::mce::process_ooxml;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;

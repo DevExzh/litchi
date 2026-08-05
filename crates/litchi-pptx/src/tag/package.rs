@@ -2,7 +2,7 @@ use super::codec::{parse_profiled, pml, xml_error};
 use super::model::*;
 use super::*;
 use litchi_ooxml_common::mce::{
-    ActiveOffsetLimits, MceCapabilities, MceLimits, active_offsets, process_markup_compatibility,
+    OffsetLimits, Capabilities, Limits, active_offsets, process_markup_compatibility,
 };
 use litchi_opc::{OpcPackage, PackURI, Part as OpcPart, XmlPart};
 use quick_xml::events::{BytesStart, Event};
@@ -851,28 +851,28 @@ struct OwnerMapElement {
     preserve_when_empty: bool,
 }
 
-fn owner_mce_capabilities() -> MceCapabilities {
-    let mut capabilities = MceCapabilities::ooxml_baseline();
+fn owner_mce_capabilities() -> Capabilities {
+    let mut capabilities = Capabilities::ooxml_baseline();
     capabilities.understand_namespace(P14);
     capabilities.understand_namespace(P15);
     capabilities
 }
 
-fn owner_mce_limits(max_bytes: usize) -> MceLimits {
-    MceLimits {
+fn owner_mce_limits(max_bytes: usize) -> Limits {
+    Limits {
         max_input_bytes: max_bytes,
         max_output_bytes: max_bytes,
         max_depth: MAX_OWNER_DEPTH,
-        ..MceLimits::default()
+        ..Limits::default()
     }
 }
 
-fn owner_active_offset_limits() -> ActiveOffsetLimits {
-    ActiveOffsetLimits {
+fn owner_active_offset_limits() -> OffsetLimits {
+    OffsetLimits {
         max_source_bytes: MAX_OWNER_BYTES,
         max_offsets: MAX_OWNER_NODES,
         max_marked_bytes: MAX_OWNER_MARKED_BYTES,
-        mce: owner_mce_limits(MAX_OWNER_MARKED_BYTES),
+        processing: owner_mce_limits(MAX_OWNER_MARKED_BYTES),
     }
 }
 

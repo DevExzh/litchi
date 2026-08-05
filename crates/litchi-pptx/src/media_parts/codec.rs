@@ -1,4 +1,7 @@
 use super::*;
+use litchi_ooxml_common::mce::{
+    Capabilities, Limits, Name, NAMESPACE, process_markup_compatibility,
+};
 
 #[derive(Clone)]
 struct Attribute {
@@ -421,15 +424,15 @@ fn parse_document(xml: &[u8]) -> Result<Node> {
     if xml.len() > MAX_XML_BYTES {
         return Err(limit("input XML bytes"));
     }
-    let mut caps = MceCapabilities::ooxml_baseline();
+    let mut caps = Capabilities::ooxml_baseline();
     caps.understand_namespace(P14);
     for namespace in [PML, STRICT_PML] {
-        caps.preserve_extension_element(ExpandedName {
+        caps.preserve_extension_element(Name {
             namespace: namespace.to_owned(),
             local_name: "ext".to_owned(),
         });
     }
-    let limits = MceLimits {
+    let limits = Limits {
         max_input_bytes: MAX_XML_BYTES,
         max_output_bytes: MAX_XML_BYTES,
         max_depth: MAX_DEPTH,
@@ -793,7 +796,7 @@ fn collect_used_prefixes(node: &Node, prefixes: &mut BTreeSet<String>) {
                 prefixes.insert(prefix.to_owned());
             }
         }
-        if attribute.namespace == MCE_NAMESPACE
+        if attribute.namespace == NAMESPACE
             && matches!(attribute.name.as_str(), "Ignorable" | "Requires")
         {
             prefixes.extend(

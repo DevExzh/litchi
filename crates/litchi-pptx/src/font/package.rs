@@ -7,7 +7,7 @@ use super::{
     MAX_XML_BYTES, MCE_NS, PML, STRICT_PML, invalid, limit,
 };
 use crate::error::{Error, Result};
-use litchi_ooxml_common::mce::{ActiveOffsetLimits, MceCapabilities, MceLimits, active_offsets};
+use litchi_ooxml_common::mce::{OffsetLimits, Capabilities, Limits, active_offsets};
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use quick_xml::XmlVersion;
@@ -895,19 +895,19 @@ pub(super) fn active_direct_elements(xml: &[u8], conformance: Conformance) -> Re
     if !root_seen || !frames.is_empty() {
         return Err(invalid("invalid presentation XML"));
     }
-    let defaults = ActiveOffsetLimits::default();
-    let limits = ActiveOffsetLimits {
+    let defaults = OffsetLimits::default();
+    let limits = OffsetLimits {
         max_source_bytes: MAX_XML_BYTES,
         max_offsets: MAX_NODES,
         max_marked_bytes: MAX_MCE_MARKED_BYTES,
-        mce: MceLimits {
+        processing: Limits {
             max_input_bytes: MAX_MCE_MARKED_BYTES,
             max_output_bytes: MAX_MCE_MARKED_BYTES,
             max_depth: MAX_DEPTH,
-            ..defaults.mce
+            ..defaults.processing
         },
     };
-    let active = active_offsets(xml, &offsets, &MceCapabilities::default(), &limits)?;
+    let active = active_offsets(xml, &offsets, &Capabilities::default(), &limits)?;
     let mut active = active.into_iter().peekable();
     elements.retain(|element| {
         let Ok(start) = u32::try_from(element.start) else {

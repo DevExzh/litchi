@@ -60,11 +60,11 @@ struct PendingChunk {
 /// `mc:Fallback` branch.
 pub fn active(xml: &[u8], offsets: &[u32]) -> Result<Vec<u32>> {
     validate_xml(xml)?;
-    let limits = litchi_ooxml_common::mce::ActiveOffsetLimits {
+    let limits = litchi_ooxml_common::mce::OffsetLimits {
         max_source_bytes: MAX_XML_BYTES,
         max_offsets: MAX_VISIBILITY_OFFSETS,
         max_marked_bytes: MAX_MARKED_XML_BYTES,
-        mce: litchi_ooxml_common::mce::MceLimits {
+        processing: litchi_ooxml_common::mce::Limits {
             max_input_bytes: MAX_MARKED_XML_BYTES,
             max_output_bytes: MAX_MARKED_XML_BYTES,
             max_depth: MAX_XML_DEPTH,
@@ -76,7 +76,7 @@ pub fn active(xml: &[u8], offsets: &[u32]) -> Result<Vec<u32>> {
     litchi_ooxml_common::mce::active_offsets(
         xml,
         offsets,
-        &litchi_ooxml_common::mce::MceCapabilities::default(),
+        &litchi_ooxml_common::mce::Capabilities::default(),
         &limits,
     )
     .map_err(Error::from)

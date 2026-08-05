@@ -8,7 +8,7 @@ use crate::presentation_properties::metadata::is_presentationml_name;
 use crate::time::{Offset, ParseError as TimeParseError};
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::unqualified_attribute_value;
-use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 use litchi_opc::Part;
 use litchi_opc::constants::content_type as ct;
 use quick_xml::encoding::Decoder;
@@ -191,9 +191,9 @@ fn scan_slide_show_events(
         return Err(limit("slide XML bytes"));
     }
 
-    let mut capabilities = MceCapabilities::ooxml_baseline();
+    let mut capabilities = Capabilities::ooxml_baseline();
     capabilities.understand_namespace(P14_NAMESPACE);
-    let mce_limits = MceLimits {
+    let mce_limits = Limits {
         max_input_bytes: MAX_SLIDE_XML_BYTES,
         max_output_bytes: MAX_SLIDE_XML_BYTES,
         max_depth: MAX_XML_DEPTH,

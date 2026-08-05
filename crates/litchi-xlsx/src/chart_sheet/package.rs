@@ -11,7 +11,7 @@ use crate::package::printer_settings::{
     validate_printer_settings_uri, validate_settings_bytes,
 };
 use crate::{Error, Result};
-use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -2385,8 +2385,8 @@ struct DrawingChartReference {
     kind: DrawingChartKind,
 }
 
-fn chart_ex_mce_capabilities() -> MceCapabilities {
-    let mut capabilities = MceCapabilities::ooxml_baseline();
+fn chart_ex_mce_capabilities() -> Capabilities {
+    let mut capabilities = Capabilities::ooxml_baseline();
     capabilities
         .understand_namespace(CHART_EX)
         .understand_namespace(CHART_EX_CHOICE);
@@ -2613,18 +2613,18 @@ fn validate_theme_override_xml(xml: &[u8], conformance: Conformance) -> Result<B
 }
 
 fn parse_document(xml: &[u8], max_bytes: usize) -> Result<Node> {
-    parse_document_with_capabilities(xml, max_bytes, &MceCapabilities::ooxml_baseline())
+    parse_document_with_capabilities(xml, max_bytes, &Capabilities::ooxml_baseline())
 }
 
 fn parse_document_with_capabilities(
     xml: &[u8],
     max_bytes: usize,
-    capabilities: &MceCapabilities,
+    capabilities: &Capabilities,
 ) -> Result<Node> {
     if xml.len() > max_bytes {
         return Err(limit("input XML bytes"));
     }
-    let limits = MceLimits {
+    let limits = Limits {
         max_input_bytes: max_bytes,
         max_output_bytes: max_bytes,
         max_depth: MAX_DEPTH,

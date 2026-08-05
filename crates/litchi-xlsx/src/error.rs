@@ -27,7 +27,7 @@ pub enum Error {
     Package(#[from] litchi_opc::OpcError),
     /// Markup-compatibility preprocessing failed.
     #[error("markup compatibility error: {0}")]
-    MarkupCompatibility(#[from] litchi_ooxml_common::MceError),
+    MarkupCompatibility(#[from] litchi_ooxml_common::mce::Error),
     /// Shared OOXML decoding failed.
     #[error("OOXML decoding error: {0}")]
     Xml(#[from] litchi_ooxml_common::XmlError),

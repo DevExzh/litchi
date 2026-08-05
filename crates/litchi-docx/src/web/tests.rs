@@ -289,7 +289,7 @@ fn mce_preprocessing_respects_web_settings_xml_bound() {
 
     assert!(matches!(
         parse(&xml),
-        Err(Error::Mce(litchi_ooxml_common::MceError::LimitExceeded(_)))
+        Err(Error::Mce(litchi_ooxml_common::mce::Error::LimitExceeded(_)))
     ));
 }
 

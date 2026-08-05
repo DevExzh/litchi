@@ -20,7 +20,7 @@ use super::{
     replace_xml, staged_xml, validate_relative_target, validate_selected_relationship,
 };
 use crate::{Error, Result};
-use litchi_ooxml_common::mce::{ActiveOffsetLimits, MceCapabilities, active_offsets};
+use litchi_ooxml_common::mce::{OffsetLimits, Capabilities, active_offsets};
 use litchi_opc::{OpcPackage, PackURI, Part as OpcPart, XmlPart};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -453,7 +453,7 @@ fn raw_shape_span(
         xml,
         &offsets,
         &shape_mce_capabilities(),
-        &ActiveOffsetLimits::default(),
+        &OffsetLimits::default(),
     )?;
     let mut active = active.into_iter().peekable();
     let mut reader = NsReader::from_reader(xml);
@@ -1294,7 +1294,7 @@ fn active_pml_offsets(xml: &[u8], span: &Range<usize>) -> Result<Vec<u32>> {
         xml,
         &offsets,
         &shape_mce_capabilities(),
-        &ActiveOffsetLimits::default(),
+        &OffsetLimits::default(),
     )
     .map_err(Into::into)
 }
@@ -1343,8 +1343,8 @@ fn preserved_anchor_uses(xml: &[u8], relationship_id: &str) -> Result<usize> {
     Ok(uses)
 }
 
-fn shape_mce_capabilities() -> MceCapabilities {
-    let mut capabilities = MceCapabilities::ooxml_baseline();
+fn shape_mce_capabilities() -> Capabilities {
+    let mut capabilities = Capabilities::ooxml_baseline();
     capabilities.understand_namespace(P14);
     capabilities.understand_namespace(P15);
     capabilities

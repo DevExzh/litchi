@@ -194,7 +194,7 @@ pub enum Error {
 
     /// Markup-compatibility processing failed.
     #[error("PresentationML markup compatibility error: {0}")]
-    MarkupCompatibility(#[from] litchi_ooxml_common::MceError),
+    MarkupCompatibility(#[from] litchi_ooxml_common::mce::Error),
 
     /// Shared OOXML attribute decoding failed.
     #[error("PresentationML attribute decoding error: {0}")]

@@ -2,7 +2,7 @@
 
 use crate::error::{Error, Result, invalid};
 use crate::raw::namespace::is_spreadsheetml_name;
-use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -149,7 +149,7 @@ impl Builder {
 /// Parse the workbook's direct `calcPr` child without executing calculations.
 pub fn parse(xml: &[u8]) -> Result<Option<Properties>> {
     let processed =
-        process_markup_compatibility(xml, &MceCapabilities::default(), &MceLimits::default())?;
+        process_markup_compatibility(xml, &Capabilities::default(), &Limits::default())?;
     let mut reader = NsReader::from_reader(processed.xml.as_ref());
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;

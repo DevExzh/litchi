@@ -7,7 +7,7 @@ use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
 use crate::error::{Error, Result};
-use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 
 const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -64,13 +64,13 @@ pub fn parse_print_options(xml: &[u8]) -> Result<Option<PrintOptions>> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("worksheet XML is too large"));
     }
-    let limits = MceLimits {
+    let limits = Limits {
         max_input_bytes: MAX_XML_BYTES,
         max_output_bytes: MAX_XML_BYTES,
         max_depth: MAX_DEPTH,
-        ..MceLimits::default()
+        ..Limits::default()
     };
-    let validated = process_markup_compatibility(xml, &MceCapabilities::default(), &limits)?;
+    let validated = process_markup_compatibility(xml, &Capabilities::default(), &limits)?;
     if validated.xml.len() > MAX_XML_BYTES {
         return Err(invalid("processed worksheet XML is too large"));
     }

@@ -2,7 +2,7 @@
 
 use crate::error::{Error, Result};
 use crate::raw::namespace::is_spreadsheetml_name;
-use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -79,13 +79,13 @@ pub fn parse_outline_properties(xml: &[u8]) -> Result<Option<OutlineProperties>>
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("worksheet XML is too large"));
     }
-    let limits = MceLimits {
+    let limits = Limits {
         max_input_bytes: MAX_XML_BYTES,
         max_output_bytes: MAX_XML_BYTES,
         max_depth: MAX_DEPTH,
-        ..MceLimits::default()
+        ..Limits::default()
     };
-    let processed = process_markup_compatibility(xml, &MceCapabilities::default(), &limits)?;
+    let processed = process_markup_compatibility(xml, &Capabilities::default(), &limits)?;
     if processed.xml.len() > MAX_XML_BYTES {
         return Err(invalid("processed worksheet XML is too large"));
     }

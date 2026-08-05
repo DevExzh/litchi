@@ -234,14 +234,14 @@ pub fn parse(xml: &[u8]) -> Result<(Settings, Conformance)> {
 }
 
 fn process_web_xml(xml: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>> {
-    let limits = litchi_ooxml_common::MceLimits {
+    let limits = litchi_ooxml_common::mce::Limits {
         max_input_bytes: MAX_XML_BYTES,
         max_output_bytes: MAX_XML_BYTES,
-        ..litchi_ooxml_common::MceLimits::default()
+        ..litchi_ooxml_common::mce::Limits::default()
     };
-    litchi_ooxml_common::process_markup_compatibility(
+    litchi_ooxml_common::mce::process_markup_compatibility(
         xml,
-        &litchi_ooxml_common::MceCapabilities::default(),
+        &litchi_ooxml_common::mce::Capabilities::default(),
         &limits,
     )
     .map(|output| output.xml)

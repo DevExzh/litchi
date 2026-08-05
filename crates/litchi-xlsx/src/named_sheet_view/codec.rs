@@ -8,7 +8,7 @@ use crate::auto_filter::{
 };
 use crate::error::Result;
 use crate::sort::{SortBy, SortMethod};
-use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 use litchi_sheet::Cell as Address;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesEnd, BytesStart, Event};
@@ -29,14 +29,14 @@ pub fn parse_named_sheet_views(xml: &[u8]) -> Result<Views> {
     if xml.len() > MAX_PART_BYTES {
         return Err(invalid("Named Sheet Views part exceeds size limit"));
     }
-    let mut caps = MceCapabilities::default();
+    let mut caps = Capabilities::default();
     for ns in [NSV, X14, RICH] {
         caps.understand_namespace(String::from_utf8_lossy(ns).into_owned());
     }
-    let limits = MceLimits {
+    let limits = Limits {
         max_input_bytes: MAX_PART_BYTES,
         max_output_bytes: MAX_PART_BYTES * 2,
-        ..MceLimits::default()
+        ..Limits::default()
     };
     let processed = process_markup_compatibility(xml, &caps, &limits)?;
     let mut reader = NsReader::from_reader(processed.xml.as_ref());

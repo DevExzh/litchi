@@ -4,7 +4,7 @@ use crate::presentation::embedded::{
     MAX_XML_ATTRIBUTES, MAX_XML_BYTES, MAX_XML_DEPTH, PML, REL, STRICT_PML, STRICT_REL, bounded,
     increment_nodes, invalid, limit,
 };
-use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, ResolveResult};
@@ -33,7 +33,7 @@ pub(crate) fn parse_tree(xml_bytes: &[u8]) -> Result<Node> {
     if xml_bytes.len() > MAX_XML_BYTES {
         return Err(limit("OLE slide XML bytes", MAX_XML_BYTES));
     }
-    let mce = MceLimits {
+    let mce = Limits {
         max_input_bytes: MAX_XML_BYTES,
         max_output_bytes: MAX_XML_BYTES,
         max_depth: MAX_XML_DEPTH,
@@ -42,7 +42,7 @@ pub(crate) fn parse_tree(xml_bytes: &[u8]) -> Result<Node> {
         max_choices_per_alternate: 1024,
     };
     let xml =
-        process_markup_compatibility(xml_bytes, &MceCapabilities::ooxml_baseline(), &mce)?.xml;
+        process_markup_compatibility(xml_bytes, &Capabilities::ooxml_baseline(), &mce)?.xml;
     let mut reader = NsReader::from_reader(xml.as_ref());
     let mut stack: Vec<Node> = Vec::new();
     let mut root = None;

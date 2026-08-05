@@ -13,7 +13,7 @@ use crate::error::{Error, Result};
 use litchi_core::xml::escape::escape_xml;
 use litchi_ooxml_common::custom_xml::valid_guid;
 use litchi_ooxml_common::xml::decode_xml_reference;
-use litchi_ooxml_common::{ExpandedName, MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Name, Capabilities, Limits, process_markup_compatibility};
 use quick_xml::Writer;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -165,21 +165,21 @@ pub fn parse_data_validation_collections(xml: &[u8]) -> Result<Vec<Collection>> 
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("data-validation worksheet XML is too large"));
     }
-    let mut capabilities = MceCapabilities::default();
+    let mut capabilities = Capabilities::default();
     capabilities
         .understand_namespace(String::from_utf8_lossy(X14).into_owned())
         .understand_namespace(String::from_utf8_lossy(XM).into_owned())
         .understand_namespace(String::from_utf8_lossy(X12AC).into_owned())
         .understand_namespace(String::from_utf8_lossy(XR).into_owned());
-    capabilities.preserve_extension_element(ExpandedName {
+    capabilities.preserve_extension_element(Name {
         namespace: String::from_utf8_lossy(X14).into_owned(),
         local_name: "dataValidations".into(),
     });
-    let limits = MceLimits {
+    let limits = Limits {
         max_input_bytes: MAX_XML_BYTES,
         max_output_bytes: MAX_XML_BYTES,
         max_depth: MAX_DEPTH,
-        ..MceLimits::default()
+        ..Limits::default()
     };
     let validated = process_markup_compatibility(xml, &capabilities, &limits)?;
     if validated.xml.len() > MAX_XML_BYTES {

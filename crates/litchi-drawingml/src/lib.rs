@@ -41,7 +41,7 @@ pub enum Error {
 
     /// Markup-compatibility preprocessing failed.
     #[error("DrawingML markup compatibility error: {0}")]
-    Mce(#[from] litchi_ooxml_common::MceError),
+    Mce(#[from] litchi_ooxml_common::mce::Error),
 
     /// Shared OOXML entity or namespace decoding failed.
     #[error("DrawingML shared XML error: {0}")]

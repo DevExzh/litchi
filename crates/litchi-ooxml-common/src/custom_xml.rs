@@ -4,10 +4,9 @@
 //! retrieves schemas, validates against a schema, runs transforms, resolves
 //! external entities, or interprets application-specific payloads.
 
+use crate::mce::{Capabilities, Limits, Name, process_markup_compatibility};
 use crate::xml::decode_xml_reference;
-use crate::{
-    Error, ExpandedName, MceCapabilities, MceLimits, Result, process_markup_compatibility,
-};
+use crate::{Error, Result};
 use litchi_opc::part::XmlPart;
 use litchi_opc::{ContentType, OpcPackage, PackURI, Part, TargetMode};
 use quick_xml::XmlVersion;
@@ -112,7 +111,7 @@ pub struct Item {
     /// Declared XML-based content type.
     content_type: String,
     /// Expanded name of the payload document element.
-    root: ExpandedName,
+    root: Name,
     /// Exact, uninterpreted payload bytes.
     xml: Arc<Vec<u8>>,
     /// Canonical package name of the optional properties part.
@@ -148,7 +147,7 @@ impl Item {
 
     /// Expanded name of the payload document element.
     #[must_use]
-    pub fn root(&self) -> &ExpandedName {
+    pub fn root(&self) -> &Name {
         &self.root
     }
 
@@ -208,11 +207,11 @@ pub struct NewItem {
 /// Parse a Custom XML Data Storage Properties part with bounded MCE handling.
 pub fn read_props(xml: &[u8]) -> Result<Props> {
     require_at_most("custom XML properties bytes", xml.len(), MAX_PROPS_BYTES)?;
-    let mut capabilities = MceCapabilities::ooxml_baseline();
+    let mut capabilities = Capabilities::ooxml_baseline();
     capabilities
         .understand_namespace(TRANSITIONAL_NAMESPACE)
         .understand_namespace(STRICT_NAMESPACE);
-    let limits = MceLimits {
+    let limits = Limits {
         max_input_bytes: MAX_PROPS_BYTES,
         max_output_bytes: MAX_PROPS_BYTES.saturating_mul(2),
         max_depth: MAX_DEPTH,
@@ -452,7 +451,7 @@ pub fn valid_guid(value: &str) -> bool {
 }
 
 /// Validate a bounded XML payload and return its expanded document-element name.
-pub fn validate_payload(xml: &[u8]) -> Result<ExpandedName> {
+pub fn validate_payload(xml: &[u8]) -> Result<Name> {
     require_at_most("custom XML payload bytes", xml.len(), MAX_PART_BYTES)?;
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
@@ -589,7 +588,7 @@ fn scan(
         &str,
         PackURI,
         &dyn Part,
-        ExpandedName,
+        Name,
         Option<PackURI>,
         Option<Props>,
     ) -> Result<()>,
@@ -606,7 +605,7 @@ fn scan(
     let mut property_ids: HashMap<String, PackURI> = HashMap::new();
     let mut cached_props: HashMap<PackURI, Props> = HashMap::new();
     let mut props_owners: HashMap<PackURI, PackURI> = HashMap::new();
-    let mut cached_roots: HashMap<PackURI, ExpandedName> = HashMap::new();
+    let mut cached_roots: HashMap<PackURI, Name> = HashMap::new();
 
     for source in package.iter_parts() {
         for relationship in source
@@ -780,7 +779,7 @@ fn inspect_element(
     element: &BytesStart<'_>,
     version: XmlVersion,
     capture: bool,
-) -> Result<Option<ExpandedName>> {
+) -> Result<Option<Name>> {
     validate_qname(element.name().as_ref(), "element")?;
     let (resolved, local) = reader.resolver().resolve_element(element.name());
     let namespace = resolved_namespace(resolved, "element")?;
@@ -788,7 +787,7 @@ fn inspect_element(
         std::str::from_utf8(namespace).map_err(|error| Error::Xml(error.to_string()))?;
     let local =
         std::str::from_utf8(local.as_ref()).map_err(|error| Error::Xml(error.to_string()))?;
-    let captured = capture.then(|| ExpandedName {
+    let captured = capture.then(|| Name {
         namespace: namespace.into(),
         local_name: local.into(),
     });

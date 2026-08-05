@@ -2,7 +2,7 @@
 
 use crate::error::{Error, Result};
 use crate::raw::namespace::{is_spreadsheetml_name, relationship_attribute_value};
-use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 use quick_xml::Writer;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -516,7 +516,7 @@ struct PivotBuilder {
 /// Parse the worksheet's single `sheetViews` collection without resolving UI state or relationships.
 pub fn parse_worksheet_views(xml: &[u8]) -> Result<Option<Views>> {
     let processed =
-        process_markup_compatibility(xml, &MceCapabilities::default(), &MceLimits::default())?;
+        process_markup_compatibility(xml, &Capabilities::default(), &Limits::default())?;
     let mut reader = NsReader::from_reader(processed.xml.as_ref());
     reader.config_mut().trim_text(false);
     let mut parser = Parser {

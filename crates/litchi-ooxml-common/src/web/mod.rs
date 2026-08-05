@@ -4,7 +4,7 @@ mod codec;
 mod model;
 mod package;
 
-use crate::{Error, MceCapabilities, MceLimits, Result, process_markup_compatibility};
+use crate::{Error, Result};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 use quick_xml::Reader;
 use quick_xml::XmlVersion;

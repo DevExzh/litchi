@@ -8,7 +8,7 @@ use super::model::{
     ReactionUser, WORD_2012_NAMESPACE, WORD_2018_NAMESPACE,
 };
 use crate::{Error, Result};
-use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, Writer, XmlVersion};
 use std::collections::{HashMap, HashSet};
@@ -794,7 +794,7 @@ fn parse_document(xml: &[u8]) -> Result<XmlDocument> {
             "modern comment part exceeds {MAX_MODERN_COMMENT_PART_BYTES} bytes"
         ));
     }
-    let mut capabilities = MceCapabilities::ooxml_baseline();
+    let mut capabilities = Capabilities::ooxml_baseline();
     for namespace in [
         WORD_2012_NAMESPACE,
         COMMENTS_IDS_NAMESPACE,
@@ -805,7 +805,7 @@ fn parse_document(xml: &[u8]) -> Result<XmlDocument> {
     ] {
         capabilities.understand_namespace(namespace);
     }
-    let limits = MceLimits {
+    let limits = Limits {
         max_input_bytes: MAX_MODERN_COMMENT_PART_BYTES,
         max_output_bytes: MAX_MODERN_COMMENT_PART_BYTES * 2,
         max_depth: MAX_MODERN_COMMENT_DEPTH,

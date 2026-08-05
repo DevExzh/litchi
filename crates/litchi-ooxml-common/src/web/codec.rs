@@ -2,6 +2,7 @@
 
 use super::model::*;
 use super::*;
+use crate::mce::process_markup_compatibility;
 
 /// Parse one MS-OWEXML web extension part after bounded MCE preprocessing.
 #[cfg(test)]
@@ -1459,11 +1460,11 @@ pub(super) fn parse_mce_xml(
     if xml.len() > limits.xml_bytes {
         return limit("web extension XML bytes", limits.xml_bytes, xml.len());
     }
-    let mut capabilities = MceCapabilities::ooxml_baseline();
+    let mut capabilities = crate::mce::Capabilities::ooxml_baseline();
     for namespace in namespaces {
         capabilities.understand_namespace(*namespace);
     }
-    let mce_limits = MceLimits {
+    let mce_limits = crate::mce::Limits {
         max_input_bytes: limits.xml_bytes,
         max_output_bytes: limits.xml_bytes,
         max_depth: limits.depth,

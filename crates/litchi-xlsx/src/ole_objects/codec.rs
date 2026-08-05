@@ -1,7 +1,7 @@
 //! Bounded SpreadsheetML OLE markup codec.
 
 use crate::error::Result;
-use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -303,9 +303,9 @@ pub(super) fn parse_document(xml: &[u8]) -> Result<Node> {
     if xml.len() > MAX_XML_BYTES {
         return Err(limit("input XML bytes"));
     }
-    let mut caps = MceCapabilities::ooxml_baseline();
+    let mut caps = Capabilities::ooxml_baseline();
     caps.understand_namespace(X14);
-    let limits = MceLimits {
+    let limits = Limits {
         max_input_bytes: MAX_XML_BYTES,
         max_output_bytes: MAX_XML_BYTES,
         max_depth: MAX_DEPTH,

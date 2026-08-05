@@ -9,7 +9,7 @@ use super::model::{
     NumberFormat, Operator, Payload, Period, Range, Rule, Source, Value, ValueKind,
 };
 
-use litchi_ooxml_common::{ExpandedName, MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Name, Capabilities, Limits, process_markup_compatibility};
 
 use quick_xml::encoding::Decoder;
 
@@ -51,12 +51,12 @@ pub fn parse_conditional_formattings(
     xml: &[u8],
     differential_format_count: usize,
 ) -> Result<Vec<Formatting>> {
-    let mut capabilities = MceCapabilities::default();
-    capabilities.preserve_extension_element(ExpandedName {
+    let mut capabilities = Capabilities::default();
+    capabilities.preserve_extension_element(Name {
         namespace: String::from_utf8_lossy(X14).into_owned(),
         local_name: "conditionalFormattings".to_owned(),
     });
-    let _validated = process_markup_compatibility(xml, &capabilities, &MceLimits::default())?;
+    let _validated = process_markup_compatibility(xml, &capabilities, &Limits::default())?;
     // Parse the selected vocabulary from the source bytes so formula character data remains
     // byte-for-byte semantically opaque; the generic MCE writer may normalize XML entities.
     let captured = capture_conditional_formatting(xml)?;

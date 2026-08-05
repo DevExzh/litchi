@@ -1,4 +1,5 @@
-//! Bounded ISO/IEC 29500-3:2015 semantic preprocessing.
+//! Bounded ISO/IEC 29500-3 MCE preprocessing and active-offset selection.
+
 use quick_xml::{
     Reader, XmlVersion,
     encoding::Decoder,
@@ -6,160 +7,15 @@ use quick_xml::{
 };
 use std::{
     borrow::Cow,
-    collections::{BTreeMap, HashSet, TryReserveError},
+    collections::{BTreeMap, HashSet},
     str,
 };
-use thiserror::Error;
-pub const MCE_NAMESPACE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
-const XML_NS: &str = "http://www.w3.org/XML/1998/namespace";
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ExpandedName {
-    pub namespace: String,
-    pub local_name: String,
-}
-#[derive(Debug, Clone)]
-pub struct MceCapabilities {
-    understood: HashSet<String>,
-    extensions: HashSet<ExpandedName>,
-}
-impl MceCapabilities {
-    pub fn new() -> Self {
-        Self {
-            understood: HashSet::new(),
-            extensions: HashSet::new(),
-        }
-    }
-    pub fn ooxml_baseline() -> Self {
-        let mut s = Self::new();
-        for n in [
-            "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
-            "http://purl.oclc.org/ooxml/wordprocessingml/main",
-            "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
-            "http://purl.oclc.org/ooxml/spreadsheetml/main",
-            "http://schemas.openxmlformats.org/presentationml/2006/main",
-            "http://purl.oclc.org/ooxml/presentationml/main",
-            "http://schemas.openxmlformats.org/drawingml/2006/main",
-            "http://purl.oclc.org/ooxml/drawingml/main",
-            "http://schemas.openxmlformats.org/drawingml/2006/chart",
-            "http://purl.oclc.org/ooxml/drawingml/chart",
-            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
-            "http://purl.oclc.org/ooxml/officeDocument/relationships",
-            "http://schemas.openxmlformats.org/officeDocument/2006/math",
-            "http://purl.oclc.org/ooxml/officeDocument/math",
-            "urn:schemas-microsoft-com:vml",
-            "urn:schemas-microsoft-com:office:office",
-            XML_NS,
-        ] {
-            s.understood.insert(n.into());
-        }
-        s
-    }
-    pub fn understand_namespace(&mut self, n: impl Into<String>) -> &mut Self {
-        self.understood.insert(n.into());
-        self
-    }
-    pub fn preserve_extension_element(&mut self, n: ExpandedName) -> &mut Self {
-        self.extensions.insert(n);
-        self
-    }
-    pub fn understands(&self, n: &str) -> bool {
-        self.understood.contains(n)
-    }
-}
-impl Default for MceCapabilities {
-    fn default() -> Self {
-        Self::ooxml_baseline()
-    }
-}
-#[derive(Debug, Clone)]
-pub struct MceLimits {
-    pub max_input_bytes: usize,
-    pub max_output_bytes: usize,
-    pub max_depth: usize,
-    pub max_namespace_bindings: usize,
-    pub max_directive_tokens: usize,
-    pub max_choices_per_alternate: usize,
-}
 
-/// Resource policy for retaining source offsets through MCE preprocessing.
-///
-/// The source and returned coordinates are byte offsets into the caller's
-/// original XML. `mce` bounds the marked intermediate document as it passes
-/// through [`process_markup_compatibility`].
-#[derive(Debug, Clone)]
-pub struct ActiveOffsetLimits {
-    /// Maximum raw source XML accepted by [`active_offsets`].
-    pub max_source_bytes: usize,
-    /// Maximum number of source offsets accepted in one call.
-    pub max_offsets: usize,
-    /// Maximum marked intermediate XML retained during branch selection.
-    pub max_marked_bytes: usize,
-    /// Bounds applied by the semantic MCE processor.
-    pub mce: MceLimits,
-}
+use super::model::{
+    Capabilities, Error, Limits, NAMESPACE, Name, OffsetLimits, Output, Report, XML_NS,
+};
 
-impl Default for ActiveOffsetLimits {
-    fn default() -> Self {
-        let mce = MceLimits::default();
-        Self {
-            max_source_bytes: mce.max_input_bytes,
-            max_offsets: 1_000_000,
-            max_marked_bytes: mce.max_input_bytes,
-            mce,
-        }
-    }
-}
-impl Default for MceLimits {
-    fn default() -> Self {
-        Self {
-            max_input_bytes: 256 * 1024 * 1024,
-            max_output_bytes: 512 * 1024 * 1024,
-            max_depth: 256,
-            max_namespace_bindings: 4096,
-            max_directive_tokens: 4096,
-            max_choices_per_alternate: 1024,
-        }
-    }
-}
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct MceReport {
-    pub alternate_content_count: usize,
-    pub selected_choices: usize,
-    pub selected_fallbacks: usize,
-    pub ignored_elements: usize,
-    pub ignored_attributes: usize,
-    pub preserved_elements: usize,
-    pub preserved_attributes: usize,
-    pub unwrapped_elements: usize,
-}
-#[derive(Debug)]
-pub struct MceOutput<'a> {
-    pub xml: Cow<'a, [u8]>,
-    pub report: MceReport,
-}
-#[derive(Debug, Error, Clone, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum MceError {
-    #[error("non-conformant markup compatibility XML: {0}")]
-    NonConformant(String),
-    #[error("unsupported namespace required by MustUnderstand: {0}")]
-    MustUnderstand(String),
-    #[error("markup compatibility resource limit exceeded: {0}")]
-    LimitExceeded(String),
-    #[error("markup compatibility XML error: {0}")]
-    Xml(String),
-
-    /// A bounded intermediate buffer could not be allocated.
-    #[error("markup compatibility allocation failed for {resource}")]
-    Allocation {
-        /// Intermediate representation that could not reserve storage.
-        resource: &'static str,
-        /// Original allocator failure.
-        #[source]
-        source: TryReserveError,
-    },
-}
-type R<T> = Result<T, MceError>;
+type R<T> = Result<T, Error>;
 
 const ACTIVE_MARKER_TEMPLATE: &[u8; 38] = b"litchi-mce-active-0000000000000000-00:";
 const ACTIVE_MARKER_HASH_START: usize = 18;
@@ -178,8 +34,8 @@ const DECIMAL_BUFFER_BYTES: usize = usize::BITS as usize;
 pub fn active_offsets(
     xml: &[u8],
     offsets: &[u32],
-    capabilities: &MceCapabilities,
-    limits: &ActiveOffsetLimits,
+    capabilities: &Capabilities,
+    limits: &OffsetLimits,
 ) -> R<Vec<u32>> {
     if xml.len() > limits.max_source_bytes {
         return Err(limit("active-offset source bytes"));
@@ -196,7 +52,7 @@ pub fn active_offsets(
     if offsets.is_empty() {
         return Ok(Vec::new());
     }
-    if find_bytes(xml, MCE_NAMESPACE.as_bytes()).is_none() {
+    if find_bytes(xml, NAMESPACE.as_bytes()).is_none() {
         return copy_offsets(offsets);
     }
 
@@ -253,7 +109,7 @@ pub fn active_offsets(
             .ok_or_else(|| bad("active-offset source cursor is invalid"))?,
     );
 
-    let processed = process_markup_compatibility(&marked, capabilities, &limits.mce)?;
+    let processed = process_markup_compatibility(&marked, capabilities, &limits.processing)?;
     let processed = processed.xml.as_ref();
     let mut selected = Vec::new();
     reserve_exact(&mut selected, offsets.len(), "active-offset selection map")?;
@@ -318,10 +174,14 @@ fn copy_offsets(offsets: &[u32]) -> R<Vec<u32>> {
     Ok(copied)
 }
 
-fn reserve_exact<T>(values: &mut Vec<T>, additional: usize, resource: &'static str) -> R<()> {
+pub(crate) fn reserve_exact<T>(
+    values: &mut Vec<T>,
+    additional: usize,
+    resource: &'static str,
+) -> R<()> {
     values
         .try_reserve_exact(additional)
-        .map_err(|source| MceError::Allocation { resource, source })
+        .map_err(|source| Error::Allocation { resource, source })
 }
 
 fn active_marker(xml: &[u8]) -> R<[u8; ACTIVE_MARKER_TEMPLATE.len()]> {
@@ -331,7 +191,10 @@ fn active_marker(xml: &[u8]) -> R<[u8; ACTIVE_MARKER_TEMPLATE.len()]> {
     active_marker_with_hash(xml, hash)
 }
 
-fn active_marker_with_hash(xml: &[u8], hash: u64) -> R<[u8; ACTIVE_MARKER_TEMPLATE.len()]> {
+pub(crate) fn active_marker_with_hash(
+    xml: &[u8],
+    hash: u64,
+) -> R<[u8; ACTIVE_MARKER_TEMPLATE.len()]> {
     let mut base = *ACTIVE_MARKER_TEMPLATE;
     write_hex(
         hash,
@@ -416,7 +279,7 @@ fn parse_decimal(digits: &[u8]) -> R<usize> {
     })
 }
 
-fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+pub(crate) fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     if needle.is_empty() {
         return Some(0);
     }
@@ -426,14 +289,14 @@ fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 }
 #[derive(Clone, PartialEq, Eq, Hash)]
 enum NamePattern {
-    Exact(ExpandedName),
+    Exact(Name),
     Namespace(String),
 }
 #[derive(Clone)]
 struct Ctx {
     ns: BTreeMap<String, String>,
     ign: HashSet<String>,
-    process: HashSet<ExpandedName>,
+    process: HashSet<Name>,
     preserve_elements: HashSet<NamePattern>,
     preserve_attributes: HashSet<NamePattern>,
     opaque: bool,
@@ -456,16 +319,16 @@ struct Frame {
 }
 pub fn process_markup_compatibility<'a>(
     xml: &'a [u8],
-    caps: &MceCapabilities,
-    lim: &MceLimits,
-) -> R<MceOutput<'a>> {
+    caps: &Capabilities,
+    lim: &Limits,
+) -> R<Output<'a>> {
     if !xml
-        .windows(MCE_NAMESPACE.len())
-        .any(|w| w == MCE_NAMESPACE.as_bytes())
+        .windows(NAMESPACE.len())
+        .any(|w| w == NAMESPACE.as_bytes())
     {
-        return Ok(MceOutput {
+        return Ok(Output {
             xml: Cow::Borrowed(xml),
-            report: MceReport::default(),
+            report: Report::default(),
         });
     }
     if xml.len() > lim.max_input_bytes {
@@ -476,7 +339,7 @@ pub fn process_markup_compatibility<'a>(
     let (mut stack, mut out, mut rep, mut root, mut buf) = (
         Vec::new(),
         Vec::with_capacity(xml.len()),
-        MceReport::default(),
+        Report::default(),
         false,
         Vec::new(),
     );
@@ -548,7 +411,7 @@ pub fn process_markup_compatibility<'a>(
                 return Err(bad("DTD and processing instructions are rejected"));
             },
             Ok(Event::Eof) => break,
-            Err(e) => return Err(MceError::Xml(e.to_string())),
+            Err(e) => return Err(Error::Xml(e.to_string())),
         }
         if out.len() > lim.max_output_bytes {
             return Err(limit("output bytes"));
@@ -558,7 +421,7 @@ pub fn process_markup_compatibility<'a>(
     if !stack.is_empty() {
         return Err(bad("unterminated XML"));
     }
-    Ok(MceOutput {
+    Ok(Output {
         xml: Cow::Owned(out),
         report: rep,
     })
@@ -568,11 +431,11 @@ fn start(
     e: &BytesStart<'_>,
     d: Decoder,
     empty: bool,
-    caps: &MceCapabilities,
-    lim: &MceLimits,
+    caps: &Capabilities,
+    lim: &Limits,
     st: &mut Vec<Frame>,
     out: &mut Vec<u8>,
-    rep: &mut MceReport,
+    rep: &mut Report,
     root: &mut bool,
 ) -> R<()> {
     if st.len() >= lim.max_depth {
@@ -645,7 +508,7 @@ fn start(
             continue;
         }
         let n = expand(a, &c.ns, false)?;
-        if n.namespace != MCE_NAMESPACE {
+        if n.namespace != NAMESPACE {
             continue;
         }
         if !matches!(
@@ -677,7 +540,7 @@ fn start(
             let uri =
                 c.ns.get(prefix)
                     .ok_or_else(|| bad(format!("unbound Ignorable {prefix}")))?;
-            if uri == MCE_NAMESPACE {
+            if uri == NAMESPACE {
                 return Err(bad("MCE cannot be ignorable"));
             }
             local_ign.insert(uri.clone());
@@ -744,7 +607,7 @@ fn start(
                         c.ns.get(prefix)
                             .ok_or_else(|| bad(format!("unbound MustUnderstand {prefix}")))?;
                     if !caps.understands(uri) {
-                        return Err(MceError::MustUnderstand(uri.clone()));
+                        return Err(Error::MustUnderstand(uri.clone()));
                     }
                 }
             },
@@ -763,7 +626,7 @@ fn start(
             fallback,
         } = &mut parent.mode
     {
-        if name.namespace != MCE_NAMESPACE {
+        if name.namespace != NAMESPACE {
             return Err(bad("non-MCE AlternateContent child"));
         }
         let (active, mode) = match name.local_name.as_str() {
@@ -824,7 +687,7 @@ fn start(
         );
     }
     let mut active = parent_active;
-    let mode = if name.namespace == MCE_NAMESPACE {
+    let mode = if name.namespace == NAMESPACE {
         match name.local_name.as_str() {
             "AlternateContent" => {
                 rep.alternate_content_count += 1;
@@ -890,129 +753,6 @@ fn start(
     )
 }
 
-#[cfg(test)]
-mod preservation_tests {
-    use super::*;
-
-    const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
-
-    fn run_with(
-        xml: &str,
-        capabilities: &MceCapabilities,
-        limits: &MceLimits,
-    ) -> Result<(String, MceReport), MceError> {
-        let output = process_markup_compatibility(xml.as_bytes(), capabilities, limits)?;
-        Ok((
-            String::from_utf8(output.xml.into_owned()).expect("MCE output must remain UTF-8"),
-            output.report,
-        ))
-    }
-
-    fn run(xml: &str) -> Result<(String, MceReport), MceError> {
-        run_with(xml, &MceCapabilities::new(), &MceLimits::default())
-    }
-
-    #[test]
-    fn preserves_exact_and_wildcard_attributes_by_expanded_name() {
-        let exact = format!(
-            r#"<r xmlns:mc="{MC}" xmlns:x="urn:ext" xmlns:y="urn:ext" mc:Ignorable="x" mc:PreserveAttributes="x:keep"><a y:keep="yes" y:drop="no"/></r>"#
-        );
-        let (xml, report) = run(&exact).unwrap();
-        assert!(xml.contains(r#"y:keep="yes""#));
-        assert!(!xml.contains("y:drop"));
-        assert_eq!(report.preserved_attributes, 1);
-
-        let wildcard = format!(
-            r#"<r xmlns:mc="{MC}" xmlns:x="urn:ext" mc:Ignorable="x" mc:PreserveAttributes="x:*"><a x:one="1" x:two="2"/></r>"#
-        );
-        let (xml, report) = run(&wildcard).unwrap();
-        assert!(xml.contains(r#"x:one="1""#));
-        assert!(xml.contains(r#"x:two="2""#));
-        assert_eq!(report.preserved_attributes, 2);
-    }
-
-    #[test]
-    fn preserves_elements_but_still_processes_their_content_and_attributes() {
-        let source = format!(
-            r#"<r xmlns:mc="{MC}" xmlns:x="urn:ext" mc:Ignorable="x" mc:PreserveElements="x:keep" mc:PreserveAttributes="x:flag"><x:keep plain="yes" x:flag="yes" x:drop="no"><x:drop/><known/></x:keep><x:discard/></r>"#
-        );
-        let (xml, report) = run(&source).unwrap();
-        assert!(xml.contains("<x:keep"));
-        assert!(xml.contains(r#"plain="yes""#));
-        assert!(xml.contains(r#"x:flag="yes""#));
-        assert!(xml.contains("<known"));
-        assert!(!xml.contains("x:drop"));
-        assert!(!xml.contains("x:discard"));
-        assert_eq!(report.preserved_elements, 1);
-        assert_eq!(report.preserved_attributes, 1);
-    }
-
-    #[test]
-    fn local_ignorable_redeclaration_resets_inherited_preservation() {
-        let source = format!(
-            r#"<r xmlns:mc="{MC}" xmlns:x="urn:ext" mc:Ignorable="x" mc:PreserveAttributes="x:*"><a mc:Ignorable="x" x:value="discarded"/></r>"#
-        );
-        let (xml, report) = run(&source).unwrap();
-        assert!(!xml.contains("x:value"));
-        assert_eq!(report.preserved_attributes, 0);
-    }
-
-    #[test]
-    fn understood_attributes_are_not_discarded_and_spoofed_directives_do_not_apply() {
-        let understood = format!(
-            r#"<r xmlns:mc="{MC}" xmlns:x="urn:ext" mc:Ignorable="x"><a x:value="kept"/></r>"#
-        );
-        let mut capabilities = MceCapabilities::new();
-        capabilities.understand_namespace("urn:ext");
-        let (xml, _) = run_with(&understood, &capabilities, &MceLimits::default()).unwrap();
-        assert!(xml.contains(r#"x:value="kept""#));
-
-        let spoofed = format!(
-            r#"<r xmlns:mc="{MC}" xmlns:x="urn:ext" xmlns:f="urn:fake" mc:Ignorable="x f" f:PreserveAttributes="x:*"><a x:value="discarded"/></r>"#
-        );
-        let (xml, _) = run(&spoofed).unwrap();
-        assert!(!xml.contains("PreserveAttributes"));
-        assert!(!xml.contains("x:value"));
-    }
-
-    #[test]
-    fn rejects_invalid_preservation_tokens_and_duplicates() {
-        for directive in ["keep", "missing:keep", "x:keep:extra", "x:keep x:keep"] {
-            let source = format!(
-                r#"<r xmlns:mc="{MC}" xmlns:x="urn:ext" mc:Ignorable="x" mc:PreserveAttributes="{directive}"/>"#
-            );
-            assert!(
-                run(&source).is_err(),
-                "accepted invalid token list: {directive}"
-            );
-        }
-
-        let wildcard_process = format!(
-            r#"<r xmlns:mc="{MC}" xmlns:x="urn:ext" mc:Ignorable="x" mc:ProcessContent="x:*"/>"#
-        );
-        assert!(run(&wildcard_process).is_err());
-
-        let wrong_namespace = format!(
-            r#"<r xmlns:mc="{MC}" xmlns:x="urn:ext" xmlns:y="urn:other" mc:Ignorable="x" mc:PreserveElements="y:keep"/>"#
-        );
-        assert!(run(&wrong_namespace).is_err());
-    }
-
-    #[test]
-    fn preservation_tokens_respect_the_shared_directive_bound() {
-        let source = format!(
-            r#"<r xmlns:mc="{MC}" xmlns:x="urn:ext" mc:Ignorable="x" mc:PreserveAttributes="x:one x:two"/>"#
-        );
-        let limits = MceLimits {
-            max_directive_tokens: 2,
-            ..MceLimits::default()
-        };
-        assert!(matches!(
-            run_with(&source, &MceCapabilities::new(), &limits),
-            Err(MceError::LimitExceeded(_))
-        ));
-    }
-}
 fn close(st: &mut Vec<Frame>, f: Frame, empty: bool, out: &mut Vec<u8>) -> R<()> {
     if empty {
         match f.mode {
@@ -1032,14 +772,14 @@ fn close(st: &mut Vec<Frame>, f: Frame, empty: bool, out: &mut Vec<u8>) -> R<()>
 fn visible(s: &[Frame]) -> bool {
     s.last().is_some_and(|f| f.active)
 }
-fn bad(s: impl Into<String>) -> MceError {
-    MceError::NonConformant(s.into())
+fn bad(s: impl Into<String>) -> Error {
+    Error::NonConformant(s.into())
 }
-fn limit(s: &str) -> MceError {
-    MceError::LimitExceeded(s.into())
+fn limit(s: &str) -> Error {
+    Error::LimitExceeded(s.into())
 }
-fn xerr(e: impl std::fmt::Display) -> MceError {
-    MceError::Xml(e.to_string())
+fn xerr(e: impl std::fmt::Display) -> Error {
+    Error::Xml(e.to_string())
 }
 fn attr<'a>(r: &'a [(String, String)], n: &str) -> R<Option<&'a str>> {
     let mut v = None;
@@ -1053,7 +793,7 @@ fn attr<'a>(r: &'a [(String, String)], n: &str) -> R<Option<&'a str>> {
     }
     Ok(v)
 }
-fn expand(q: &str, ns: &BTreeMap<String, String>, element: bool) -> R<ExpandedName> {
+fn expand(q: &str, ns: &BTreeMap<String, String>, element: bool) -> R<Name> {
     let (p, l) = q.split_once(':').unwrap_or(("", q));
     if l.is_empty() || q.matches(':').count() > 1 {
         return Err(bad("invalid QName"));
@@ -1069,7 +809,7 @@ fn expand(q: &str, ns: &BTreeMap<String, String>, element: bool) -> R<ExpandedNa
             .cloned()
             .ok_or_else(|| bad(format!("unbound prefix {p}")))?
     };
-    Ok(ExpandedName {
+    Ok(Name {
         namespace: n,
         local_name: l.into(),
     })
@@ -1080,7 +820,7 @@ fn pattern_namespace(pattern: &NamePattern) -> &str {
         NamePattern::Namespace(namespace) => namespace,
     }
 }
-fn matches_pattern(patterns: &HashSet<NamePattern>, name: &ExpandedName) -> bool {
+fn matches_pattern(patterns: &HashSet<NamePattern>, name: &Name) -> bool {
     patterns.contains(&NamePattern::Exact(name.clone()))
         || patterns.contains(&NamePattern::Namespace(name.namespace.clone()))
 }
@@ -1099,7 +839,7 @@ fn parse_qname_target(
         .get(prefix)
         .cloned()
         .ok_or_else(|| bad(format!("unbound compatibility target prefix {prefix}")))?;
-    if namespace == MCE_NAMESPACE {
+    if namespace == NAMESPACE {
         return Err(bad("compatibility target cannot use the MCE namespace"));
     }
     if local == "*" {
@@ -1111,7 +851,7 @@ fn parse_qname_target(
     if !valid_ncname(local) {
         return Err(bad("invalid compatibility target QName"));
     }
-    Ok(NamePattern::Exact(ExpandedName {
+    Ok(NamePattern::Exact(Name {
         namespace,
         local_name: local.into(),
     }))
@@ -1132,9 +872,9 @@ fn write_start(
     raw: &[(String, String)],
     ign: &HashSet<String>,
     preserve: &HashSet<NamePattern>,
-    caps: &MceCapabilities,
+    caps: &Capabilities,
     filter: bool,
-    rep: &mut MceReport,
+    rep: &mut Report,
 ) -> R<()> {
     o.push(b'<');
     o.extend_from_slice(q.as_bytes());
@@ -1155,7 +895,7 @@ fn write_start(
             continue;
         }
         let n = expand(a, ns, false)?;
-        if filter && n.namespace == MCE_NAMESPACE {
+        if filter && n.namespace == NAMESPACE {
             rep.ignored_attributes += 1;
             continue;
         }
@@ -1198,8 +938,7 @@ fn esc(o: &mut Vec<u8>, s: &str) {
 }
 /// Applies the baseline OOXML markup-compatibility profile.
 pub fn process_ooxml(x: &[u8]) -> R<Cow<'_, [u8]>> {
-    process_markup_compatibility(x, &MceCapabilities::default(), &MceLimits::default())
-        .map(|x| x.xml)
+    process_markup_compatibility(x, &Capabilities::default(), &Limits::default()).map(|x| x.xml)
 }
 
 /// Applies baseline preprocessing to one OPC part.
@@ -1220,221 +959,6 @@ pub fn process_str(x: &str) -> R<Cow<'_, str>> {
         Cow::Borrowed(_) => Ok(Cow::Borrowed(x)),
         Cow::Owned(v) => String::from_utf8(v)
             .map(Cow::Owned)
-            .map_err(|error| MceError::Xml(format!("MCE output is not UTF-8: {error}"))),
-    }
-}
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn source_offset(xml: &[u8], needle: &[u8]) -> u32 {
-        let offset = find_bytes(xml, needle).expect("test element must occur in source XML");
-        u32::try_from(offset).expect("test source offset must fit u32")
-    }
-
-    #[test]
-    fn active_offsets_select_choice_and_fallback_in_caller_order() {
-        let xml = br#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:s="urn:supported" xmlns:x="urn:unsupported"><mc:AlternateContent><mc:Choice Requires="x"><inactive-choice/></mc:Choice><mc:Fallback><active-fallback/></mc:Fallback></mc:AlternateContent><mc:AlternateContent><mc:Choice Requires="s"><active-choice/></mc:Choice><mc:Fallback><inactive-fallback/></mc:Fallback></mc:AlternateContent></r>"#;
-        let inactive_choice = source_offset(xml, b"<inactive-choice/>");
-        let active_fallback = source_offset(xml, b"<active-fallback/>");
-        let active_choice = source_offset(xml, b"<active-choice/>");
-        let inactive_fallback = source_offset(xml, b"<inactive-fallback/>");
-        let input = [
-            active_choice,
-            inactive_choice,
-            inactive_choice,
-            active_fallback,
-            active_fallback,
-            inactive_fallback,
-        ];
-        let mut capabilities = MceCapabilities::new();
-        capabilities.understand_namespace("urn:supported");
-
-        let selected =
-            active_offsets(xml, &input, &capabilities, &ActiveOffsetLimits::default()).unwrap();
-
-        assert_eq!(
-            selected,
-            vec![active_choice, active_fallback, active_fallback]
-        );
-        assert!(selected.iter().all(|offset| {
-            usize::try_from(*offset)
-                .ok()
-                .and_then(|offset| xml.get(offset))
-                == Some(&b'<')
-        }));
-    }
-
-    #[test]
-    fn active_offsets_fast_path_preserves_order_and_duplicates() {
-        let xml = b"<r><first/><second/></r>";
-        let first = source_offset(xml, b"<first/>");
-        let second = source_offset(xml, b"<second/>");
-        let input = [second, first, second];
-
-        assert_eq!(
-            active_offsets(
-                xml,
-                &input,
-                &MceCapabilities::new(),
-                &ActiveOffsetLimits::default(),
-            )
-            .unwrap(),
-            input
-        );
-    }
-
-    #[test]
-    fn active_offsets_reject_invalid_offsets_and_resource_limits() {
-        let xml = br#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><a/></r>"#;
-        let outside = u32::try_from(xml.len()).unwrap();
-        assert!(matches!(
-            active_offsets(
-                xml,
-                &[outside],
-                &MceCapabilities::new(),
-                &ActiveOffsetLimits::default(),
-            ),
-            Err(MceError::NonConformant(_))
-        ));
-
-        let offset = source_offset(xml, b"<a/>");
-        let count_limited = ActiveOffsetLimits {
-            max_offsets: 0,
-            ..ActiveOffsetLimits::default()
-        };
-        assert!(matches!(
-            active_offsets(xml, &[offset], &MceCapabilities::new(), &count_limited),
-            Err(MceError::LimitExceeded(_))
-        ));
-
-        let marked_limited = ActiveOffsetLimits {
-            max_marked_bytes: xml.len(),
-            ..ActiveOffsetLimits::default()
-        };
-        assert!(matches!(
-            active_offsets(xml, &[offset], &MceCapabilities::new(), &marked_limited),
-            Err(MceError::LimitExceeded(_))
-        ));
-    }
-
-    #[test]
-    fn active_offset_markers_skip_source_collisions() {
-        let hash = 0x0123_4567_89ab_cdef;
-        let first = active_marker_with_hash(b"", hash).unwrap();
-        let selected = active_marker_with_hash(&first, hash).unwrap();
-
-        assert_ne!(selected, first);
-        assert!(find_bytes(&first, &selected).is_none());
-    }
-
-    #[test]
-    fn active_offset_allocation_error_retains_allocator_source() {
-        let mut values = Vec::<u8>::new();
-        let error = reserve_exact(&mut values, usize::MAX, "test active offsets").unwrap_err();
-
-        assert!(matches!(
-            &error,
-            MceError::Allocation {
-                resource: "test active offsets",
-                ..
-            }
-        ));
-        assert!(std::error::Error::source(&error).is_some());
-    }
-
-    fn run(x: &str, c: &MceCapabilities) -> R<String> {
-        Ok(String::from_utf8(
-            process_markup_compatibility(x.as_bytes(), c, &MceLimits::default())?
-                .xml
-                .into_owned(),
-        )
-        .unwrap())
-    }
-    #[test]
-    fn fast_borrowed() {
-        assert!(matches!(
-            process_markup_compatibility(b"<r/>", &MceCapabilities::new(), &MceLimits::default())
-                .unwrap()
-                .xml,
-            Cow::Borrowed(_)
-        ))
-    }
-    #[test]
-    fn choice_fallback() {
-        let x = r#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:a="urn:a"><mc:AlternateContent><mc:Choice Requires="a"><yes/></mc:Choice><mc:Fallback><no/></mc:Fallback></mc:AlternateContent></r>"#;
-        let mut c = MceCapabilities::new();
-        assert!(run(x, &c).unwrap().contains("<no"));
-        c.understand_namespace("urn:a");
-        assert!(run(x, &c).unwrap().contains("<yes"))
-    }
-    #[test]
-    fn ignore_and_unwrap() {
-        let x = r#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:x" mc:Ignorable="x" mc:ProcessContent="x:w"><x:no/><x:w><yes/></x:w></r>"#;
-        let y = run(x, &MceCapabilities::new()).unwrap();
-        assert!(!y.contains("<x:"));
-        assert!(y.contains("<yes"))
-    }
-    #[test]
-    fn security_and_limits() {
-        let x = r#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:x" mc:MustUnderstand="x"/>"#;
-        assert!(matches!(
-            run(x, &MceCapabilities::new()),
-            Err(MceError::MustUnderstand(_))
-        ));
-        let l = MceLimits {
-            max_depth: 1,
-            ..MceLimits::default()
-        };
-        assert!(process_markup_compatibility(b"<r xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\"><x/></r>",&MceCapabilities::new(),&l).is_err())
-    }
-}
-
-#[cfg(test)]
-mod fixture_tests {
-    use super::*;
-    use litchi_opc::{OpcPackage, PackURI};
-
-    #[test]
-    fn poi_styles_select_unsupported_vendor_fallbacks() {
-        let package = OpcPackage::from_bytes(include_bytes!(
-            "../../../test-data/poi/test-data/spreadsheet/style-alternate-content.xlsx"
-        ))
-        .unwrap();
-        let part = package
-            .get_part(&PackURI::new("/xl/styles.xml").unwrap())
-            .unwrap();
-        let output = process_markup_compatibility(
-            part.blob(),
-            &MceCapabilities::default(),
-            &MceLimits::default(),
-        )
-        .unwrap();
-        let xml = str::from_utf8(output.xml.as_ref()).unwrap();
-        assert!(!xml.contains("mc:AlternateContent"));
-        assert!(!xml.contains("hs:extension"));
-        assert!(output.report.selected_fallbacks > 10);
-    }
-
-    #[test]
-    fn libreoffice_pptx_emits_only_fallback_shape() {
-        let package = OpcPackage::from_bytes(include_bytes!(
-            "../../../test-data/libreoffice-core/oox/qa/unit/data/import-mce.pptx"
-        ))
-        .unwrap();
-        let part = package
-            .get_part(&PackURI::new("/ppt/slides/slide1.xml").unwrap())
-            .unwrap();
-        let output = process_markup_compatibility(
-            part.blob(),
-            &MceCapabilities::default(),
-            &MceLimits::default(),
-        )
-        .unwrap();
-        let xml = str::from_utf8(output.xml.as_ref()).unwrap();
-        assert!(!xml.contains("mc:AlternateContent"));
-        assert!(!xml.contains("a14:m"));
-        assert!(xml.contains("a:blipFill"));
-        assert_eq!(output.report.selected_fallbacks, 1);
+            .map_err(|error| Error::Xml(format!("MCE output is not UTF-8: {error}"))),
     }
 }

@@ -12,7 +12,7 @@ use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use crate::error::{Error, Result};
-use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 
 const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -926,7 +926,7 @@ fn parse_worksheet_page_setup_parts(
         return Err(invalid("worksheet XML is too large"));
     }
     let validated =
-        process_markup_compatibility(xml, &MceCapabilities::default(), &MceLimits::default())?;
+        process_markup_compatibility(xml, &Capabilities::default(), &Limits::default())?;
     let selected = if validated.report.alternate_content_count == 0 {
         xml
     } else {

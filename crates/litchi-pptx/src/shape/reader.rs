@@ -2,12 +2,10 @@
 
 use std::{borrow::Cow, str};
 
-use litchi_ooxml_common::{
-    MceCapabilities, MceLimits, process_markup_compatibility,
-    xml::{
-        DRAWINGML_CHART_NAMESPACE, DRAWINGML_NAMESPACE, STRICT_DRAWINGML_CHART_NAMESPACE,
-        STRICT_DRAWINGML_NAMESPACE, decode_xml_reference, unqualified_attribute_value,
-    },
+use litchi_ooxml_common::mce::{Capabilities, process_markup_compatibility};
+use litchi_ooxml_common::xml::{
+    DRAWINGML_CHART_NAMESPACE, DRAWINGML_NAMESPACE, STRICT_DRAWINGML_CHART_NAMESPACE,
+    STRICT_DRAWINGML_NAMESPACE, decode_xml_reference, unqualified_attribute_value,
 };
 use quick_xml::{
     XmlVersion,
@@ -189,14 +187,14 @@ impl<'a> Scene<'a> {
             ));
         }
 
-        let mut capabilities = MceCapabilities::ooxml_baseline();
+        let mut capabilities = Capabilities::ooxml_baseline();
         capabilities.understand_namespace(P14);
         capabilities.understand_namespace(P15);
-        let mce_limits = MceLimits {
+        let mce_limits = litchi_ooxml_common::mce::Limits {
             max_input_bytes: limits.input_bytes,
             max_output_bytes: limits.output_bytes,
             max_depth: limits.depth,
-            ..MceLimits::default()
+            ..litchi_ooxml_common::mce::Limits::default()
         };
         let output = process_markup_compatibility(xml, &capabilities, &mce_limits)?.xml;
         if output.len() > limits.output_bytes || output.len() > u32::MAX as usize {

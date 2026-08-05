@@ -6,7 +6,7 @@ use super::{
     MAX_SHAPE_ID, MAX_STRING, MAX_XML, REL, REL_STRICT, Result, SML, SML_STRICT, X14, XDR,
     XDR_STRICT, invalid, limit, relerr, xml_error,
 };
-use litchi_ooxml_common::mce::{MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::{NsReader, XmlVersion};
@@ -411,12 +411,12 @@ struct Node {
 }
 
 fn mce_dom(xml: &[u8], worksheet: bool) -> Result<Node> {
-    let mut caps = MceCapabilities::ooxml_baseline();
+    let mut caps = Capabilities::ooxml_baseline();
     caps.understand_namespace(X14)
         .understand_namespace(XDR)
         .understand_namespace(XDR_STRICT)
         .understand_namespace(AX);
-    let limits = MceLimits {
+    let limits = Limits {
         max_input_bytes: MAX_XML,
         max_output_bytes: MAX_OUTPUT_XML,
         max_depth: MAX_DEPTH,

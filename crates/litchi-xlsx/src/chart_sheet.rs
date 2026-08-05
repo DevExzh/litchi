@@ -2,7 +2,7 @@
 
 use crate::error::{Error, Result};
 use litchi_ooxml_common::custom_xml::valid_guid;
-use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -1362,18 +1362,18 @@ fn write_canonical_node<T: XmlOutput>(
 }
 
 fn parse_document(xml: &[u8], max_bytes: usize) -> Result<Node> {
-    parse_document_with_capabilities(xml, max_bytes, &MceCapabilities::ooxml_baseline())
+    parse_document_with_capabilities(xml, max_bytes, &Capabilities::ooxml_baseline())
 }
 
 fn parse_document_with_capabilities(
     xml: &[u8],
     max_bytes: usize,
-    capabilities: &MceCapabilities,
+    capabilities: &Capabilities,
 ) -> Result<Node> {
     if xml.len() > max_bytes {
         return Err(limit("input XML bytes"));
     }
-    let limits = MceLimits {
+    let limits = Limits {
         max_input_bytes: max_bytes,
         max_output_bytes: max_bytes,
         max_depth: MAX_DEPTH,

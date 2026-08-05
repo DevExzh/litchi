@@ -6,7 +6,7 @@ use crate::presentation::embedded::{
     limit, relationship_value, validate_root,
 };
 use litchi_ooxml_common::xml::unqualified_attribute_value;
-use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
@@ -26,7 +26,7 @@ pub(crate) fn scan(xml_bytes: &[u8], count: &mut usize) -> Result<Vec<Parsed>> {
     if xml_bytes.len() > MAX_SLIDE_XML_BYTES {
         return Err(limit("control slide XML bytes", MAX_SLIDE_XML_BYTES));
     }
-    let mce = MceLimits {
+    let mce = Limits {
         max_input_bytes: MAX_SLIDE_XML_BYTES,
         max_output_bytes: MAX_SLIDE_XML_BYTES,
         max_depth: MAX_XML_DEPTH,
@@ -35,7 +35,7 @@ pub(crate) fn scan(xml_bytes: &[u8], count: &mut usize) -> Result<Vec<Parsed>> {
         max_choices_per_alternate: 1024,
     };
     let xml =
-        process_markup_compatibility(xml_bytes, &MceCapabilities::ooxml_baseline(), &mce)?.xml;
+        process_markup_compatibility(xml_bytes, &Capabilities::ooxml_baseline(), &mce)?.xml;
     let mut reader = NsReader::from_reader(xml.as_ref());
     let mut values = Vec::new();
     let mut nodes = 0usize;

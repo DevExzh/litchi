@@ -201,8 +201,8 @@ impl From<litchi_ooxml_common::XmlError> for Error {
     }
 }
 
-impl From<litchi_ooxml_common::MceError> for Error {
-    fn from(error: litchi_ooxml_common::MceError) -> Self {
+impl From<litchi_ooxml_common::mce::Error> for Error {
+    fn from(error: litchi_ooxml_common::mce::Error) -> Self {
         Self::Encoding(error.to_string())
     }
 }
