@@ -3,6 +3,7 @@
 use std::env;
 
 use litchi_iwa::pages::PagesEditor;
+use litchi_pages::section::Settings;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -25,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .parse::<bool>()?;
 
     let mut editor = PagesEditor::open(input)?;
-    let mut settings = editor.section_settings(section_id)?;
+    let mut settings: Settings = editor.section_settings(section_id)?;
     settings.inherit_previous_header_footer = Some(match_previous);
     settings.first_page_hides_header_footer = Some(hide_first_page);
     editor.set_section_settings(section_id, settings)?;

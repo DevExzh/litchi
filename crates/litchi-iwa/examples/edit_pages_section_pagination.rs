@@ -3,7 +3,7 @@
 use std::env;
 
 use litchi_iwa::pages::PagesEditor;
-use litchi_pages::section::{PageNumber, PageNumbering, Start};
+use litchi_pages::section::{PageNumber, PageNumbering, Settings, Start};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let mut editor = PagesEditor::open(input)?;
-    let mut settings = editor.section_settings(section_id)?;
+    let mut settings: Settings = editor.section_settings(section_id)?;
     settings.start = Some(start);
     settings.page_numbering = Some(numbering);
     settings.starting_page_number = Some(starting_page_number);

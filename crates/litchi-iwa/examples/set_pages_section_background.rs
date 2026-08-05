@@ -2,8 +2,9 @@
 
 use std::env;
 
-use litchi_iwa::pages::{PagesEditor, PagesSectionBackground};
+use litchi_iwa::pages::PagesEditor;
 use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+use litchi_pages::section::Background;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -32,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = PagesEditor::open(input)?;
     editor.set_section_background(
         section_id,
-        PagesSectionBackground::Solid(Rgba::new(red, green, blue, alpha, color_space)?),
+        Background::Solid(Rgba::new(red, green, blue, alpha, color_space)?),
     )?;
     editor.save(output)?;
     Ok(())
