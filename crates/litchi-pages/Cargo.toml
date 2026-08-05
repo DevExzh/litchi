@@ -9,6 +9,7 @@ repository.workspace   = true
 rust-version.workspace = true
 
 [dependencies]
+litchi-iwa-common = { workspace = true }
 litchi-iwa-text = { workspace = true }
 thiserror       = { workspace = true }
 
