@@ -154,7 +154,7 @@ impl FlatOpenDocument {
 
     /// Inspect classic forms without executing bindings, events, or external resources.
     pub fn forms(&self) -> Result<crate::Forms> {
-        crate::form::parse_form_parts(&[(self.xml(), crate::FormPart::Flat)])
+        crate::form::parse_form_parts(&[(self.xml(), crate::form::Part::Flat)])
     }
 
     /// Inspect ordered ODF variable declarations without evaluating fields or formulas.
@@ -568,9 +568,9 @@ impl OpenDocumentPackage {
     pub fn forms(&self) -> Result<crate::Forms> {
         let content = self.content_xml()?;
         let styles = self.styles_xml()?;
-        let mut parts = vec![(content.as_str(), crate::FormPart::Content)];
+        let mut parts = vec![(content.as_str(), crate::form::Part::Content)];
         if let Some(styles) = styles.as_deref() {
-            parts.push((styles, crate::FormPart::Styles));
+            parts.push((styles, crate::form::Part::Styles));
         }
         crate::form::parse_form_parts(&parts)
     }
