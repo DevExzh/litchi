@@ -1,6 +1,8 @@
-//! Temporary host exports for canonical PresentationML authoring templates.
+//! Deterministic PresentationML authoring templates.
 
-pub use litchi_pptx::presentation_properties::metadata::template::{
+mod codec;
+
+pub use codec::{
     all_slide_layouts, default_app_props_xml, default_core_props_xml, default_pres_props_xml,
     default_presentation_xml, default_slide_master_xml, default_theme_xml, default_view_props_xml,
     pres_props_xml_with_handout, slide_layout_1_xml, slide_layout_2_xml, slide_layout_3_xml,

@@ -4,6 +4,11 @@ mod codec;
 mod model;
 mod package;
 
+/// Presentation/document metadata capabilities that share the presentation
+/// properties facade until the crate-level API integrator publishes their
+/// final top-level paths.
+pub mod metadata;
+
 pub use model::*;
 pub use package::load_from_package;
 
