@@ -125,15 +125,12 @@ impl NumbersTable {
 
     /// Set a cell value at the specified position.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics when the coordinate cannot be represented or the process cannot
-    /// reserve the requested sparse entry. Archive readers use
-    /// [`Self::try_set_cell`] instead.
-    pub fn set_cell(&mut self, row: usize, col: usize, value: CellValue) {
-        if let Err(error) = self.try_set_cell(row, col, value) {
-            panic!("Numbers table cell insertion failed: {error}");
-        }
+    /// Returns an error when the coordinate is not representable, lies
+    /// outside fixed archive dimensions, or a sparse-entry allocation fails.
+    pub fn set_cell(&mut self, row: usize, col: usize, value: CellValue) -> crate::Result<()> {
+        self.try_set_cell(row, col, value)
     }
 
     /// Fallible archive-safe cell insertion.
@@ -195,10 +192,18 @@ impl NumbersTable {
     }
 
     /// Attach or replace an in-memory comment.
-    pub fn set_comment(&mut self, row: usize, col: usize, comment: NumbersCellComment) {
-        if let Err(error) = self.try_set_comment(row, col, comment) {
-            panic!("Numbers table comment insertion failed: {error}");
-        }
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the coordinate cannot be represented, lies
+    /// outside fixed archive dimensions, or comment storage cannot grow.
+    pub fn set_comment(
+        &mut self,
+        row: usize,
+        col: usize,
+        comment: NumbersCellComment,
+    ) -> crate::Result<()> {
+        self.try_set_comment(row, col, comment)
     }
 
     /// Fallible archive-safe comment insertion.
@@ -360,9 +365,17 @@ mod tests {
         assert_eq!(table.column_count(), 0);
         assert!(table.is_empty());
 
-        table.set_cell(0, 0, CellValue::Text("A1".to_string()));
-        table.set_cell(0, 1, CellValue::Text("B1".to_string()));
-        table.set_cell(1, 0, CellValue::Number(42.0));
+        assert!(
+            table
+                .set_cell(0, 0, CellValue::Text("A1".to_string()))
+                .is_ok()
+        );
+        assert!(
+            table
+                .set_cell(0, 1, CellValue::Text("B1".to_string()))
+                .is_ok()
+        );
+        assert!(table.set_cell(1, 0, CellValue::Number(42.0)).is_ok());
 
         assert_eq!(table.row_count(), 2);
         assert_eq!(table.column_count(), 2);
@@ -372,10 +385,10 @@ mod tests {
     #[test]
     fn test_table_get_row_column() {
         let mut table = NumbersTable::new("Test".to_string());
-        table.set_cell(0, 0, CellValue::Number(1.0));
-        table.set_cell(0, 1, CellValue::Number(2.0));
-        table.set_cell(1, 0, CellValue::Number(3.0));
-        table.set_cell(1, 1, CellValue::Number(4.0));
+        assert!(table.set_cell(0, 0, CellValue::Number(1.0)).is_ok());
+        assert!(table.set_cell(0, 1, CellValue::Number(2.0)).is_ok());
+        assert!(table.set_cell(1, 0, CellValue::Number(3.0)).is_ok());
+        assert!(table.set_cell(1, 1, CellValue::Number(4.0)).is_ok());
 
         let row0 = table.get_row(0);
         assert_eq!(row0.len(), 2);
@@ -392,10 +405,18 @@ mod tests {
     fn test_table_to_csv() {
         let mut table = NumbersTable::new("Test".to_string());
         assert!(table.set_column_headers(["Name", "Age"]).is_ok());
-        table.set_cell(0, 0, CellValue::Text("Alice".to_string()));
-        table.set_cell(0, 1, CellValue::Number(30.0));
-        table.set_cell(1, 0, CellValue::Text("Bob".to_string()));
-        table.set_cell(1, 1, CellValue::Number(25.0));
+        assert!(
+            table
+                .set_cell(0, 0, CellValue::Text("Alice".to_string()))
+                .is_ok()
+        );
+        assert!(table.set_cell(0, 1, CellValue::Number(30.0)).is_ok());
+        assert!(
+            table
+                .set_cell(1, 0, CellValue::Text("Bob".to_string()))
+                .is_ok()
+        );
+        assert!(table.set_cell(1, 1, CellValue::Number(25.0)).is_ok());
 
         let csv = table.to_csv();
         assert!(csv.contains("Name,Age"));
@@ -406,7 +427,7 @@ mod tests {
     #[test]
     fn test_table_dimensions() {
         let mut table = NumbersTable::new("Test".to_string());
-        table.set_cell(5, 10, CellValue::Number(1.0));
+        assert!(table.set_cell(5, 10, CellValue::Number(1.0)).is_ok());
 
         let (rows, cols) = table.dimensions();
         assert_eq!(rows, 6); // 0-5 inclusive
@@ -416,7 +437,7 @@ mod tests {
     #[test]
     fn materialized_views_borrow_without_exposing_storage() {
         let mut table = NumbersTable::new("Test");
-        table.set_cell(2, 3, CellValue::Number(42.0));
+        assert!(table.set_cell(2, 3, CellValue::Number(42.0)).is_ok());
         assert!(table.set_column_headers(["A", "B"]).is_ok());
         assert!(table.set_row_headers(["Row 1"]).is_ok());
 

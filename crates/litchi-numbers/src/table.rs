@@ -6,6 +6,9 @@
 //! tables retain one immutable boxed slice. No dense grid is allocated by the
 //! semantic model.
 
+/// Checked, bounded plans for applying multiple cell mutations.
+pub mod edit;
+
 use crate::cell::Value;
 use std::fmt;
 

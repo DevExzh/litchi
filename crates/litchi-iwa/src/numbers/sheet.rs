@@ -100,7 +100,7 @@ mod tests {
         let mut sheet = NumbersSheet::new("Sheet1".to_string(), 0);
 
         let mut table = NumbersTable::new("Table1".to_string());
-        table.set_cell(0, 0, CellValue::Number(1.0));
+        assert!(table.set_cell(0, 0, CellValue::Number(1.0)).is_ok());
 
         sheet.add_table(table);
 
@@ -142,7 +142,7 @@ mod tests {
     fn semantic_sheet_consumes_tables_without_rebuilding_cell_maps() {
         let mut sheet = NumbersSheet::new("Sheet1".to_owned(), 0);
         let mut table = NumbersTable::new("Table1");
-        table.set_cell(1, 2, CellValue::Number(42.0));
+        assert!(table.set_cell(1, 2, CellValue::Number(42.0)).is_ok());
         assert!(table.set_column_headers(["A", "B", "C"]).is_ok());
         sheet.add_table(table);
 
