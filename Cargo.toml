@@ -100,6 +100,7 @@ too_many_arguments = "deny"
 [workspace.dependencies]
 # Path deps to internal crates.
 litchi              = { version = "0.0.1", path = "crates/litchi" }
+litchi-biff         = { version = "0.0.1", path = "crates/litchi-biff" }
 litchi-cfb          = { version = "0.0.1", path = "crates/litchi-cfb" }
 litchi-codepage     = { version = "0.0.1", path = "crates/litchi-codepage" }
 litchi-core         = { version = "0.0.1", path = "crates/litchi-core" }
