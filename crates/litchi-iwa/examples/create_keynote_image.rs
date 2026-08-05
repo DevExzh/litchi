@@ -6,7 +6,7 @@ use std::path::Path;
 
 use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteSlideImageOptions};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
-use litchi_iwa::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
+use litchi_iwa_common::shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
