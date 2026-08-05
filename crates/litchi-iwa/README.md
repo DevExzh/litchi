@@ -932,7 +932,7 @@ unknown movie-archive fields; `MediaVolume::new` rejects invalid levels, and
 use litchi_iwa::numbers::{
     CellValue, FormulaAxisReference, FormulaCellReference, FormulaExpression, NumbersEditor,
     NumbersTableHeaderCount,
-    NumbersTableTitleSettings,
+    Settings as TableTitleSettings,
 };
 use litchi_iwa::pages::{Kind, PagesEditor};
 use litchi_iwa_common::color::{RgbColorSpace, Rgba};
@@ -954,10 +954,7 @@ headers.header_rows_frozen = Some(true);
 numbers.set_table_header_settings(table.object_id, headers)?;
 numbers.set_table_title_settings(
     table.object_id,
-    NumbersTableTitleSettings {
-        visible: Some(true),
-        outlined: Some(false),
-    },
+    TableTitleSettings::new(Some(true), Some(false)),
 )?;
 numbers.set_cell(table.object_id, 1, 2, CellValue::Number(42.0))?;
 // Existing rich-text cells use the same call. Their TSWP formatting storage is
