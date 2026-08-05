@@ -1,4 +1,4 @@
-use litchi_ppt::{Package, PowerPointHeaderFooterParent, PowerPointHeaderFooterScope};
+use litchi_ppt::{HeaderFooterParent, HeaderFooterScope, Package};
 use std::path::PathBuf;
 
 fn fixture(name: &str) -> PathBuf {
@@ -7,7 +7,7 @@ fn fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
-fn read(name: &str) -> litchi_ppt::PowerPointHeaderFooters {
+fn read(name: &str) -> litchi_ppt::HeaderFooters {
     let mut package = Package::open(fixture(name)).expect("open POI fixture");
     package
         .presentation()
@@ -33,8 +33,8 @@ fn poi_headers_footers_ppt_covers_all_scopes() {
     assert!(values.entries().iter().any(|entry| {
         matches!(
             entry.scope,
-            PowerPointHeaderFooterScope::Local {
-                parent: PowerPointHeaderFooterParent::Slide,
+            HeaderFooterScope::Local {
+                parent: HeaderFooterParent::Slide,
                 ..
             }
         ) && entry.display_footer() == Some("per-slide footer")
@@ -57,7 +57,7 @@ fn poi_headers_footers_2007_ppt_preserves_dates_and_overrides() {
     assert_eq!(notes.display_footer(), Some("THE NOTES FOOTER TEXT"));
 
     assert!(values.placeholder_displays().iter().any(|display| {
-        matches!(display.scope, PowerPointHeaderFooterScope::Local { .. })
+        matches!(display.scope, HeaderFooterScope::Local { .. })
             && display.text.footer.as_deref() == Some("THE FOOTER TEXT FOR SLIDE 2")
             && display.text.user_date.as_deref() == Some("August 06, 2008")
     }));

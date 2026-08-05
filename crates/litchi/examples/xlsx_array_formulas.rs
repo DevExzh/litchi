@@ -11,7 +11,7 @@
 //! - Selecting C2 shows an array/dynamic array formula in the formula bar
 //!   (e.g., `{=A2:A4*B2:B4}` in older Excel, or a spilled formula in newer Excel).
 
-use litchi::ooxml::xlsx::Workbook;
+use litchi::ooxml::xlsx::{Formula, Workbook};
 use std::env;
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -25,35 +25,40 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!("Creating XLSX with array formulas: {}", output);
 
     // Create a new workbook and use the default first worksheet.
-    let mut wb = Workbook::create()?;
+    let wb = Workbook::create()?;
+    let mut edit = wb.edit()?;
     {
-        let ws = wb.worksheet_mut(0)?;
-        ws.set_name("ArrayFormulas".to_string());
+        edit.tab(0)?
+            .ok_or("default worksheet is missing")?
+            .rename("ArrayFormulas")?;
+        let mut ws = edit
+            .sheet("ArrayFormulas")?
+            .ok_or("renamed worksheet is missing")?;
 
         // Headers
-        ws.set_cell_value(1, 1, "A");
-        ws.set_cell_value(1, 2, "B");
-        ws.set_cell_value(1, 3, "A*B (array)");
+        ws.set("A1", "A")?;
+        ws.set("B1", "B")?;
+        ws.set("C1", "A*B (array)")?;
 
         // Input data in A2:A4 and B2:B4
-        ws.set_cell_value(2, 1, 1);
-        ws.set_cell_value(3, 1, 2);
-        ws.set_cell_value(4, 1, 3);
+        ws.set("A2", 1_i32)?;
+        ws.set("A3", 2_i32)?;
+        ws.set("A4", 3_i32)?;
 
-        ws.set_cell_value(2, 2, 10);
-        ws.set_cell_value(3, 2, 20);
-        ws.set_cell_value(4, 2, 30);
+        ws.set("B2", 10_i32)?;
+        ws.set("B3", 20_i32)?;
+        ws.set("B4", 30_i32)?;
 
-        // Set an array formula over C2:C4 that multiplies A and B element-wise.
-        // Excel should treat C2:C4 as a single array formula range.
-        ws.set_array_formula(2, 3, 4, 3, "A2:A4*B2:B4");
+        // The canonical Formula representation stores the dynamic-array
+        // anchor only; Excel spills its result from C2 through C4.
+        ws.set("C2", Formula::new("A2:A4*B2:B4")?)?;
 
         // A normal formula summing the array results, for comparison.
-        ws.set_cell_value(6, 1, "Sum of A*B:");
-        ws.set_cell_formula(6, 2, "SUM(C2:C4)");
+        ws.set("A6", "Sum of A*B:")?;
+        ws.set("B6", Formula::new("SUM(C2:C4)")?)?;
     }
 
-    wb.save(output)?;
+    edit.commit()?.into_workbook().save(output)?;
 
     println!("Saved array formula example to: {}", output);
     println!("Open it in Excel and:");

@@ -1,11 +1,11 @@
 //! Test FlyIn animation with sound
 
-use litchi_ppt::PptWriter;
+use litchi_ppt::Writer;
 use litchi_ppt::animation::*;
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
 
     let slide = writer.add_slide()?;
 

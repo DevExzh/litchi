@@ -9,8 +9,8 @@
 //! cargo run --example sheet_eval_criteria_aggregates --features ooxml -- sheet_eval_criteria_aggregates.xlsx
 //! ```
 
-use litchi::ooxml::xlsx::Workbook as XlsxWorkbook;
-use litchi::sheet::FormulaEvaluator;
+use litchi::ooxml::xlsx::{Formula, Workbook};
+use litchi::sheet::{FormulaEvaluator, functions::open_workbook};
 use std::env;
 use std::error::Error;
 
@@ -27,8 +27,8 @@ async fn main() -> ExampleResult<()> {
 
     build_sample_xlsx(path)?;
 
-    let xlsx_wb = XlsxWorkbook::open(path)?;
-    let evaluator = FormulaEvaluator::new(&xlsx_wb);
+    let xlsx_wb = open_workbook(path)?;
+    let evaluator = FormulaEvaluator::new(xlsx_wb.as_ref());
 
     println!("Evaluating criteria-based aggregates on Crit in {}", path);
 
@@ -55,54 +55,59 @@ async fn main() -> ExampleResult<()> {
 }
 
 fn build_sample_xlsx(path: &str) -> ExampleResult<()> {
-    let mut wb = XlsxWorkbook::create()?;
+    let wb = Workbook::create()?;
+    let mut edit = wb.edit()?;
+    edit.tab(0)?
+        .ok_or("missing worksheet tab")?
+        .rename("Crit")?;
 
-    wb.add_worksheet("Crit");
     {
-        let ws = wb.worksheet_mut(0)?;
-        ws.set_name("Crit".to_string());
+        let mut ws = edit.sheet(0)?.ok_or("missing worksheet")?;
 
         // Data table in A1:C6
         // A: values; B: categories; C: flags
-        ws.set_cell_value(1, 1, 10); // A1
-        ws.set_cell_value(2, 1, 20); // A2
-        ws.set_cell_value(3, 1, 5); // A3
-        ws.set_cell_value(4, 1, 15); // A4
-        ws.set_cell_value(5, 1, 25); // A5
-        ws.set_cell_value(6, 1, 30); // A6
+        ws.set("A1", 10_i32)?; // A1
+        ws.set("A2", 20_i32)?; // A2
+        ws.set("A3", 5_i32)?; // A3
+        ws.set("A4", 15_i32)?; // A4
+        ws.set("A5", 25_i32)?; // A5
+        ws.set("A6", 30_i32)?; // A6
 
-        ws.set_cell_value(1, 2, "A"); // B1
-        ws.set_cell_value(2, 2, "B"); // B2
-        ws.set_cell_value(3, 2, "A"); // B3
-        ws.set_cell_value(4, 2, "B"); // B4
-        ws.set_cell_value(5, 2, "A"); // B5
-        ws.set_cell_value(6, 2, "C"); // B6
+        ws.set("B1", "A")?; // B1
+        ws.set("B2", "B")?; // B2
+        ws.set("B3", "A")?; // B3
+        ws.set("B4", "B")?; // B4
+        ws.set("B5", "A")?; // B5
+        ws.set("B6", "C")?; // B6
 
-        ws.set_cell_value(1, 3, true); // C1
-        ws.set_cell_value(2, 3, false); // C2
-        ws.set_cell_value(3, 3, true); // C3
-        ws.set_cell_value(4, 3, true); // C4
-        ws.set_cell_value(5, 3, false); // C5
-        ws.set_cell_value(6, 3, true); // C6
+        ws.set("C1", true)?; // C1
+        ws.set("C2", false)?; // C2
+        ws.set("C3", true)?; // C3
+        ws.set("C4", true)?; // C4
+        ws.set("C5", false)?; // C5
+        ws.set("C6", true)?; // C6
 
         // E1..E6: SUMIF / COUNTIF / AVERAGEIF with various criteria
-        ws.set_cell_formula(1, 5, "SUMIF(A1:A6,\">10\")"); // E1: 20+15+25+30 = 90
-        ws.set_cell_formula(2, 5, "SUMIF(B1:B6,\"A\",A1:A6)"); // E2: A-rows in A: 10+5+25 = 40
-        ws.set_cell_formula(3, 5, "COUNTIF(B1:B6,\"A\")"); // E3: count of "A" = 3
-        ws.set_cell_formula(4, 5, "COUNTIF(A1:A6,\">=20\")"); // E4: values >= 20: 20,25,30 = 3
-        ws.set_cell_formula(5, 5, "AVERAGEIF(B1:B6,\"A\",A1:A6)"); // E5: avg of A rows: 40/3
-        ws.set_cell_formula(6, 5, "AVERAGEIF(A1:A6,\">20\")"); // E6: avg of >20: (25+30)/2 = 27.5
+        ws.set("E1", Formula::new("SUMIF(A1:A6,\">10\")")?)?; // E1: 20+15+25+30 = 90
+        ws.set("E2", Formula::new("SUMIF(B1:B6,\"A\",A1:A6)")?)?; // E2: A-rows in A: 10+5+25 = 40
+        ws.set("E3", Formula::new("COUNTIF(B1:B6,\"A\")")?)?; // E3: count of "A" = 3
+        ws.set("E4", Formula::new("COUNTIF(A1:A6,\">=20\")")?)?; // E4: values >= 20: 20,25,30 = 3
+        ws.set("E5", Formula::new("AVERAGEIF(B1:B6,\"A\",A1:A6)")?)?; // E5: avg of A rows: 40/3
+        ws.set("E6", Formula::new("AVERAGEIF(A1:A6,\">20\")")?)?; // E6: avg of >20: (25+30)/2 = 27.5
 
         // F1..F3: SUMIFS / COUNTIFS / AVERAGEIFS
         // SUMIFS over A where B="A" and C=TRUE
-        ws.set_cell_formula(1, 6, "SUMIFS(A1:A6,B1:B6,\"A\",C1:C6,TRUE)");
+        ws.set("F1", Formula::new("SUMIFS(A1:A6,B1:B6,\"A\",C1:C6,TRUE)")?)?;
         // COUNTIFS over B and C
-        ws.set_cell_formula(2, 6, "COUNTIFS(B1:B6,\"A\",C1:C6,TRUE)");
+        ws.set("F2", Formula::new("COUNTIFS(B1:B6,\"A\",C1:C6,TRUE)")?)?;
         // AVERAGEIFS over A with same criteria
-        ws.set_cell_formula(3, 6, "AVERAGEIFS(A1:A6,B1:B6,\"A\",C1:C6,TRUE)");
+        ws.set(
+            "F3",
+            Formula::new("AVERAGEIFS(A1:A6,B1:B6,\"A\",C1:C6,TRUE)")?,
+        )?;
     }
 
-    wb.save(path)?;
+    edit.commit()?.into_workbook().save(path)?;
     println!("Created criteria aggregates test workbook at {}", path);
 
     Ok(())

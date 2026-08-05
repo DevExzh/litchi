@@ -4,7 +4,7 @@
 //! that may span `ContinueFrt12` records (MS-XLS 2.4.74); the contents are
 //! stored verbatim and never interpreted.
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `Theme` record.
 pub(crate) const THEME_RECORD_TYPE: u16 = 0x0896;
@@ -20,8 +20,8 @@ const THEME_VERSION_CUSTOM: u32 = 0;
 /// `dwThemeVersion` value selecting the application default theme.
 const THEME_VERSION_DEFAULT: u32 = 124_226;
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: THEME_RECORD_TYPE,
         message: message.into(),
     }
@@ -29,16 +29,16 @@ fn invalid(message: impl Into<String>) -> XlsError {
 
 /// The theme in use in the document (MS-XLS 2.4.326).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsTheme {
+pub struct Theme {
     /// Raw `dwThemeVersion` theme type.
     version: u32,
     /// Opaque ECMA-376 theme part, present for custom themes.
     contents: Option<Vec<u8>>,
 }
 
-impl XlsTheme {
+impl Theme {
     /// A custom theme with inline ECMA-376 theme contents.
-    pub fn custom(contents: Vec<u8>) -> XlsResult<Self> {
+    pub fn custom(contents: Vec<u8>) -> Result<Self> {
         if contents.is_empty() {
             return Err(invalid("custom theme must carry theme contents"));
         }
@@ -73,9 +73,9 @@ impl XlsTheme {
 
     /// Parse a `Theme` record payload plus the payloads of the
     /// `ContinueFrt12` records that follow it.
-    pub(crate) fn parse(data: &[u8], continues: &[Vec<u8>]) -> XlsResult<Self> {
+    pub(crate) fn parse(data: &[u8], continues: &[Vec<u8>]) -> Result<Self> {
         if data.len() < FRT_HEADER_LEN + 4 {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: FRT_HEADER_LEN + 4,
                 found: data.len(),
             });
@@ -87,7 +87,7 @@ impl XlsTheme {
         let mut contents = data[FRT_HEADER_LEN + 4..].to_vec();
         for (index, continuation) in continues.iter().enumerate() {
             if continuation.len() < FRT_HEADER_LEN {
-                return Err(XlsError::InvalidLength {
+                return Err(Error::InvalidLength {
                     expected: FRT_HEADER_LEN,
                     found: continuation.len(),
                 });
@@ -162,7 +162,7 @@ mod tests {
 
     #[test]
     fn parses_custom_theme_with_continuations() {
-        let parsed = XlsTheme::parse(
+        let parsed = Theme::parse(
             &theme_record(0, b"<a:theme>"),
             &[continuation(b"part2"), continuation(b"part3")],
         )
@@ -174,20 +174,20 @@ mod tests {
     #[test]
     fn round_trips_across_record_boundaries() {
         let contents = vec![0x5Au8; 30_000];
-        let theme = XlsTheme::custom(contents.clone()).unwrap();
+        let theme = Theme::custom(contents.clone()).unwrap();
         let payloads = theme.to_record_payloads();
         assert!(payloads.len() > 1);
         for payload in &payloads {
             assert!(payload.len() <= MAX_RECORD_PAYLOAD);
         }
-        let parsed = XlsTheme::parse(&payloads[0], &payloads[1..]).unwrap();
+        let parsed = Theme::parse(&payloads[0], &payloads[1..]).unwrap();
         assert_eq!(parsed, theme);
         assert_eq!(parsed.contents(), Some(contents.as_slice()));
     }
 
     #[test]
     fn parses_default_theme_without_contents() {
-        let parsed = XlsTheme::parse(&theme_record(THEME_VERSION_DEFAULT, &[]), &[]).unwrap();
+        let parsed = Theme::parse(&theme_record(THEME_VERSION_DEFAULT, &[]), &[]).unwrap();
         assert!(!parsed.is_custom());
         assert_eq!(parsed.version(), THEME_VERSION_DEFAULT);
         assert_eq!(parsed.contents(), None);
@@ -199,18 +199,18 @@ mod tests {
     #[test]
     fn rejects_malformed_records() {
         // Truncated.
-        assert!(XlsTheme::parse(&[0; 10], &[]).is_err());
+        assert!(Theme::parse(&[0; 10], &[]).is_err());
         // Wrong FrtHeader.rt.
         let mut wrong_rt = theme_record(THEME_VERSION_DEFAULT, &[]);
         wrong_rt[0..2].copy_from_slice(&0x087Fu16.to_le_bytes());
-        assert!(XlsTheme::parse(&wrong_rt, &[]).is_err());
+        assert!(Theme::parse(&wrong_rt, &[]).is_err());
         // Custom theme without contents.
-        assert!(XlsTheme::parse(&theme_record(0, &[]), &[]).is_err());
+        assert!(Theme::parse(&theme_record(0, &[]), &[]).is_err());
         // Continuation with a wrong record type.
         let mut bad = continuation(b"x");
         bad[0..2].copy_from_slice(&0x003Cu16.to_le_bytes());
-        assert!(XlsTheme::parse(&theme_record(0, b"a"), &[bad]).is_err());
+        assert!(Theme::parse(&theme_record(0, b"a"), &[bad]).is_err());
         // Empty builder contents.
-        assert!(XlsTheme::custom(Vec::new()).is_err());
+        assert!(Theme::custom(Vec::new()).is_err());
     }
 }

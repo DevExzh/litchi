@@ -2,22 +2,17 @@
 
 use super::model::{Pane, PaneType, Range, Selection, View, invalid};
 use super::{PANE_RECORD_TYPE, SCL_RECORD_TYPE, SELECTION_RECORD_TYPE, WINDOW2_RECORD_TYPE};
-use crate::error::XlsResult;
+use crate::error::Result;
 
 const PLV_RECORD_TYPE: u16 = 0x088b;
 
-pub(super) fn read_u8(data: &[u8], offset: usize, record_type: u16, field: &str) -> XlsResult<u8> {
+pub(super) fn read_u8(data: &[u8], offset: usize, record_type: u16, field: &str) -> Result<u8> {
     data.get(offset)
         .copied()
         .ok_or_else(|| invalid(record_type, format!("truncated {field}")))
 }
 
-pub(super) fn read_u16(
-    data: &[u8],
-    offset: usize,
-    record_type: u16,
-    field: &str,
-) -> XlsResult<u16> {
+pub(super) fn read_u16(data: &[u8], offset: usize, record_type: u16, field: &str) -> Result<u16> {
     let end = offset
         .checked_add(2)
         .ok_or_else(|| invalid(record_type, format!("{field} offset overflows")))?;
@@ -30,11 +25,7 @@ pub(super) fn read_u16(
     Ok(u16::from_le_bytes(bytes))
 }
 
-pub(super) fn parse_zoom_percent(
-    value: u16,
-    record_type: u16,
-    name: &str,
-) -> XlsResult<Option<u16>> {
+pub(super) fn parse_zoom_percent(value: u16, record_type: u16, name: &str) -> Result<Option<u16>> {
     if value == 0 {
         Ok(None)
     } else if (10..=400).contains(&value) {
@@ -47,7 +38,7 @@ pub(super) fn parse_zoom_percent(
     }
 }
 
-pub(super) fn parse_window2(data: &[u8]) -> XlsResult<View> {
+pub(super) fn parse_window2(data: &[u8]) -> Result<View> {
     if data.len() != 18 {
         return Err(invalid(
             WINDOW2_RECORD_TYPE,
@@ -121,7 +112,7 @@ pub(super) fn parse_window2(data: &[u8]) -> XlsResult<View> {
     })
 }
 
-pub(super) fn parse_scl(data: &[u8]) -> XlsResult<(u16, u16)> {
+pub(super) fn parse_scl(data: &[u8]) -> Result<(u16, u16)> {
     if data.len() != 4 {
         return Err(invalid(
             SCL_RECORD_TYPE,
@@ -151,7 +142,7 @@ pub(super) fn parse_scl(data: &[u8]) -> XlsResult<(u16, u16)> {
     Ok((numerator as u16, denominator as u16))
 }
 
-pub(super) fn parse_pane(data: &[u8], frozen: bool) -> XlsResult<Pane> {
+pub(super) fn parse_pane(data: &[u8], frozen: bool) -> Result<Pane> {
     if data.len() != 10 {
         return Err(invalid(
             PANE_RECORD_TYPE,
@@ -191,7 +182,7 @@ pub(super) fn parse_pane(data: &[u8], frozen: bool) -> XlsResult<Pane> {
     })
 }
 
-pub(super) fn parse_selection(data: &[u8]) -> XlsResult<Selection> {
+pub(super) fn parse_selection(data: &[u8]) -> Result<Selection> {
     if data.len() < 9 {
         return Err(invalid(
             SELECTION_RECORD_TYPE,
@@ -286,7 +277,7 @@ impl ViewCollector {
         }
     }
 
-    fn finish_current(&mut self) -> XlsResult<()> {
+    fn finish_current(&mut self) -> Result<()> {
         if let Some(view) = self.current.take() {
             view.validate_selection_groups()?;
             if let Some(pane) = view.pane.as_ref() {
@@ -320,7 +311,7 @@ impl ViewCollector {
         Ok(())
     }
 
-    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
+    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> Result<()> {
         if record_type == WINDOW2_RECORD_TYPE {
             self.finish_current()?;
             self.current = Some(parse_window2(data)?);
@@ -368,7 +359,7 @@ impl ViewCollector {
         Ok(())
     }
 
-    pub(crate) fn finish(mut self) -> XlsResult<Vec<View>> {
+    pub(crate) fn finish(mut self) -> Result<Vec<View>> {
         self.finish_current()?;
         Ok(self.views)
     }

@@ -18,8 +18,8 @@
 //! cargo run --example sheet_eval_mvp --features ooxml -- sheet_eval_mvp.xlsx
 //! ```
 
-use litchi::ooxml::xlsx::Workbook as XlsxWorkbook;
-use litchi::sheet::FormulaEvaluator;
+use litchi::ooxml::xlsx::{Formula, Workbook};
+use litchi::sheet::{FormulaEvaluator, functions::open_workbook};
 use std::env;
 use std::error::Error;
 
@@ -38,8 +38,8 @@ async fn main() -> ExampleResult<()> {
     build_sample_xlsx(path)?;
 
     // 2) Open via the XLSX workbook type that implements WorkbookTrait.
-    let xlsx_wb = XlsxWorkbook::open(path)?;
-    let evaluator = FormulaEvaluator::new(&xlsx_wb);
+    let xlsx_wb = open_workbook(path)?;
+    let evaluator = FormulaEvaluator::new(xlsx_wb.as_ref());
 
     // 3) Evaluate a few cells on Sheet1.
     println!("Evaluating formulas on Sheet1 in {}", path);
@@ -63,40 +63,42 @@ async fn main() -> ExampleResult<()> {
 }
 
 fn build_sample_xlsx(path: &str) -> ExampleResult<()> {
-    let mut wb = XlsxWorkbook::create()?;
+    let wb = Workbook::create()?;
+    let mut edit = wb.edit()?;
+    edit.tab(0)?
+        .ok_or("missing worksheet tab")?
+        .rename("Sheet1")?;
 
     // Sheet1: source values + formulas.
     {
-        let ws = wb.worksheet_mut(0)?;
-        ws.set_name("Sheet1".to_string());
+        let mut ws = edit.sheet(0)?.ok_or("missing worksheet")?;
 
         // A1: plain number
-        ws.set_cell_value(1, 1, 10);
+        ws.set("A1", 10_i32)?;
 
         // B1: reference to A1 (no cached value)
-        ws.set_cell_formula(1, 2, "A1");
+        ws.set("B1", Formula::new("A1")?)?;
 
         // C1: string literal formula => "Hello"
-        ws.set_cell_formula(1, 3, "\"Hello\"");
+        ws.set("C1", Formula::new("\"Hello\"")?)?;
 
         // D1: boolean literal TRUE
-        ws.set_cell_formula(1, 4, "TRUE");
+        ws.set("D1", Formula::new("TRUE")?)?;
 
         // E1: numeric literal 42
-        ws.set_cell_formula(1, 5, "42");
+        ws.set("E1", Formula::new("42")?)?;
 
         // F1: reference to Sheet2!A1 (created below)
-        ws.set_cell_formula(1, 6, "Sheet2!A1");
+        ws.set("F1", Formula::new("Sheet2!A1")?)?;
     }
 
     // Sheet2: a single value that Sheet1!F1 refers to.
-    wb.add_worksheet("Sheet2");
+    let mut ws2 = edit.add("Sheet2")?;
     {
-        let ws2 = wb.worksheet_mut(1)?;
-        ws2.set_cell_value(1, 1, 123);
+        ws2.set("A1", 123_i32)?;
     }
 
-    wb.save(path)?;
+    edit.commit()?.into_workbook().save(path)?;
     println!("Created test workbook at {}", path);
 
     Ok(())

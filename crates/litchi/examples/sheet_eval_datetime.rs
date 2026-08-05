@@ -9,8 +9,8 @@
 //! cargo run --example sheet_eval_datetime --features ooxml -- sheet_eval_datetime.xlsx
 //! ```
 
-use litchi::ooxml::xlsx::Workbook as XlsxWorkbook;
-use litchi::sheet::FormulaEvaluator;
+use litchi::ooxml::xlsx::{Formula, Workbook};
+use litchi::sheet::{FormulaEvaluator, functions::open_workbook};
 use std::env;
 use std::error::Error;
 
@@ -27,8 +27,8 @@ async fn main() -> ExampleResult<()> {
 
     build_sample_xlsx(path)?;
 
-    let xlsx_wb = XlsxWorkbook::open(path)?;
-    let evaluator = FormulaEvaluator::new(&xlsx_wb);
+    let xlsx_wb = open_workbook(path)?;
+    let evaluator = FormulaEvaluator::new(xlsx_wb.as_ref());
 
     println!("Evaluating date/time functions on DateTime in {}", path);
 
@@ -54,51 +54,56 @@ async fn main() -> ExampleResult<()> {
 }
 
 fn build_sample_xlsx(path: &str) -> ExampleResult<()> {
-    let mut wb = XlsxWorkbook::create()?;
+    let wb = Workbook::create()?;
+    let mut edit = wb.edit()?;
+    edit.tab(0)?
+        .ok_or("missing worksheet tab")?
+        .rename("DateTime")?;
 
-    wb.add_worksheet("DateTime");
     {
-        let ws = wb.worksheet_mut(0)?;
-        ws.set_name("DateTime".to_string());
+        let mut ws = edit.sheet(0)?.ok_or("missing worksheet")?;
 
         // Column A: labels
-        ws.set_cell_value(1, 1, "TODAY()");
-        ws.set_cell_value(2, 1, "NOW()");
-        ws.set_cell_value(3, 1, "DATE(2024,1,1)");
-        ws.set_cell_value(4, 1, "TIME(12,0,0)");
-        ws.set_cell_value(5, 1, "DATEVALUE(\"2024-01-15\")");
-        ws.set_cell_value(6, 1, "TIMEVALUE(\"13:45\")");
-        ws.set_cell_value(7, 1, "EDATE(DATE(2024,1,1),1)");
-        ws.set_cell_value(8, 1, "EOMONTH(DATE(2024,1,1),1)");
-        ws.set_cell_value(9, 1, "WORKDAY(DATE(2024,1,1),5)");
-        ws.set_cell_value(10, 1, "WORKDAY.INTL(DATE(2024,1,1),5)");
-        ws.set_cell_value(11, 1, "NETWORKDAYS(DATE(2024,1,1),EDATE(DATE(2024,1,1),1))");
-        ws.set_cell_value(
-            12,
-            1,
+        ws.set("A1", "TODAY()")?;
+        ws.set("A2", "NOW()")?;
+        ws.set("A3", "DATE(2024,1,1)")?;
+        ws.set("A4", "TIME(12,0,0)")?;
+        ws.set("A5", "DATEVALUE(\"2024-01-15\")")?;
+        ws.set("A6", "TIMEVALUE(\"13:45\")")?;
+        ws.set("A7", "EDATE(DATE(2024,1,1),1)")?;
+        ws.set("A8", "EOMONTH(DATE(2024,1,1),1)")?;
+        ws.set("A9", "WORKDAY(DATE(2024,1,1),5)")?;
+        ws.set("A10", "WORKDAY.INTL(DATE(2024,1,1),5)")?;
+        ws.set("A11", "NETWORKDAYS(DATE(2024,1,1),EDATE(DATE(2024,1,1),1))")?;
+        ws.set(
+            "A12",
             "NETWORKDAYS(DATE(2024,1,1),EDATE(DATE(2024,1,1),1),WORKDAY(DATE(2024,1,1),5))",
-        );
+        )?;
 
         // Column B: formulas
-        ws.set_cell_formula(1, 2, "TODAY()");
-        ws.set_cell_formula(2, 2, "NOW()");
-        ws.set_cell_formula(3, 2, "DATE(2024,1,1)");
-        ws.set_cell_formula(4, 2, "TIME(12,0,0)");
-        ws.set_cell_formula(5, 2, "DATEVALUE(\"2024-01-15\")");
-        ws.set_cell_formula(6, 2, "TIMEVALUE(\"13:45\")");
-        ws.set_cell_formula(7, 2, "EDATE(DATE(2024,1,1),1)");
-        ws.set_cell_formula(8, 2, "EOMONTH(DATE(2024,1,1),1)");
-        ws.set_cell_formula(9, 2, "WORKDAY(DATE(2024,1,1),5)");
-        ws.set_cell_formula(10, 2, "WORKDAY.INTL(DATE(2024,1,1),5)");
-        ws.set_cell_formula(11, 2, "NETWORKDAYS(DATE(2024,1,1),EDATE(DATE(2024,1,1),1))");
-        ws.set_cell_formula(
-            12,
-            2,
-            "NETWORKDAYS(DATE(2024,1,1),EDATE(DATE(2024,1,1),1),WORKDAY(DATE(2024,1,1),5))",
-        );
+        ws.set("B1", Formula::new("TODAY()")?)?;
+        ws.set("B2", Formula::new("NOW()")?)?;
+        ws.set("B3", Formula::new("DATE(2024,1,1)")?)?;
+        ws.set("B4", Formula::new("TIME(12,0,0)")?)?;
+        ws.set("B5", Formula::new("DATEVALUE(\"2024-01-15\")")?)?;
+        ws.set("B6", Formula::new("TIMEVALUE(\"13:45\")")?)?;
+        ws.set("B7", Formula::new("EDATE(DATE(2024,1,1),1)")?)?;
+        ws.set("B8", Formula::new("EOMONTH(DATE(2024,1,1),1)")?)?;
+        ws.set("B9", Formula::new("WORKDAY(DATE(2024,1,1),5)")?)?;
+        ws.set("B10", Formula::new("WORKDAY.INTL(DATE(2024,1,1),5)")?)?;
+        ws.set(
+            "B11",
+            Formula::new("NETWORKDAYS(DATE(2024,1,1),EDATE(DATE(2024,1,1),1))")?,
+        )?;
+        ws.set(
+            "B12",
+            Formula::new(
+                "NETWORKDAYS(DATE(2024,1,1),EDATE(DATE(2024,1,1),1),WORKDAY(DATE(2024,1,1),5))",
+            )?,
+        )?;
     }
 
-    wb.save(path)?;
+    edit.commit()?.into_workbook().save(path)?;
     println!("Created date/time test workbook at {}", path);
 
     Ok(())

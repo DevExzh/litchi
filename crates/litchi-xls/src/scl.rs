@@ -10,7 +10,7 @@
 //!
 //! - MS-XLS 2.4.247 (Scl)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `Scl` record (MS-XLS 2.4.247).
 pub(crate) const SCL_RECORD_TYPE: u16 = 0x00A0;
@@ -18,8 +18,8 @@ pub(crate) const SCL_RECORD_TYPE: u16 = 0x00A0;
 /// Byte length of an `Scl` record payload: `nscl` + `dscl`.
 const PAYLOAD_LEN: usize = 4;
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: SCL_RECORD_TYPE,
         message: message.into(),
     }
@@ -29,18 +29,18 @@ fn invalid(message: impl Into<String>) -> XlsError {
 /// current view as the fraction `nscl`/`dscl`, which MUST be in
 /// 1/10..=4 (validated exactly with integer arithmetic).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsScl {
+pub struct Scl {
     /// Numerator of the zoom fraction (`nscl`), greater than or equal to 1.
     numerator: i16,
     /// Denominator of the zoom fraction (`dscl`), greater than or equal to 1.
     denominator: i16,
 }
 
-impl XlsScl {
+impl Scl {
     /// Parse an `Scl` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: PAYLOAD_LEN,
                 found: data.len(),
             });
@@ -102,31 +102,31 @@ mod tests {
         for (n, d) in [(1i16, 1i16), (1, 10), (4, 1), (3, 10), (1, 2)] {
             let mut payload = n.to_le_bytes().to_vec();
             payload.extend_from_slice(&d.to_le_bytes());
-            let parsed = XlsScl::parse(&payload).unwrap();
+            let parsed = Scl::parse(&payload).unwrap();
             assert_eq!(parsed.numerator(), n);
             assert_eq!(parsed.denominator(), d);
             assert_eq!(parsed.to_payload(), payload);
         }
-        assert_eq!(XlsScl::parse(&[1, 0, 10, 0]).unwrap().zoom(), 0.1);
-        assert_eq!(XlsScl::parse(&[4, 0, 1, 0]).unwrap().zoom(), 4.0);
+        assert_eq!(Scl::parse(&[1, 0, 10, 0]).unwrap().zoom(), 0.1);
+        assert_eq!(Scl::parse(&[4, 0, 1, 0]).unwrap().zoom(), 4.0);
     }
 
     #[test]
     fn rejects_malformed_records() {
         // Bad length.
-        assert!(XlsScl::parse(&[1, 0, 1]).is_err());
-        assert!(XlsScl::parse(&[1, 0, 1, 0, 0]).is_err());
+        assert!(Scl::parse(&[1, 0, 1]).is_err());
+        assert!(Scl::parse(&[1, 0, 1, 0, 0]).is_err());
         // nscl / dscl less than 1.
-        assert!(XlsScl::parse(&[0, 0, 1, 0]).is_err());
-        assert!(XlsScl::parse(&[1, 0, 0, 0]).is_err());
+        assert!(Scl::parse(&[0, 0, 1, 0]).is_err());
+        assert!(Scl::parse(&[1, 0, 0, 0]).is_err());
         let mut negative = (-1i16).to_le_bytes().to_vec();
         negative.extend_from_slice(&1i16.to_le_bytes());
-        assert!(XlsScl::parse(&negative).is_err());
+        assert!(Scl::parse(&negative).is_err());
         // Fraction outside 1/10..=4.
-        assert!(XlsScl::parse(&[1, 0, 11, 0]).is_err()); // 1/11 < 1/10
-        assert!(XlsScl::parse(&[5, 0, 1, 0]).is_err()); // 5/1 > 4
+        assert!(Scl::parse(&[1, 0, 11, 0]).is_err()); // 1/11 < 1/10
+        assert!(Scl::parse(&[5, 0, 1, 0]).is_err()); // 5/1 > 4
         // Exact boundaries are legal.
-        assert!(XlsScl::parse(&[1, 0, 10, 0]).is_ok());
-        assert!(XlsScl::parse(&[4, 0, 1, 0]).is_ok());
+        assert!(Scl::parse(&[1, 0, 10, 0]).is_ok());
+        assert!(Scl::parse(&[4, 0, 1, 0]).is_ok());
     }
 }

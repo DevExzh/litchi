@@ -3,8 +3,8 @@
 //! Idiomatic Rust implementation using iterator chaining and functional patterns.
 
 use super::ptr_holder::PersistPtrHolder;
-use crate::consts::PptRecordType;
-use crate::records::PptRecord;
+use crate::consts::RecordType;
+use crate::records::Record;
 use std::collections::HashMap;
 
 /// Consolidated mapping from persist IDs to byte offsets.
@@ -30,11 +30,11 @@ impl PersistMapping {
     /// - Filters records using iterator chaining
     /// - Pre-allocates HashMap based on record count
     /// - Later records override earlier ones (most recent wins)
-    pub fn build_from_records(records: &[PptRecord]) -> Self {
+    pub fn build_from_records(records: &[Record]) -> Self {
         // Count PersistPtrHolder records for capacity estimation
         let ptr_holder_count = records
             .iter()
-            .filter(|r| r.record_type == PptRecordType::PersistPtrHolder)
+            .filter(|r| r.record_type == RecordType::PersistPtrHolder)
             .count();
 
         // Pre-allocate with estimated capacity (assume ~10 slides per holder on average)
@@ -43,7 +43,7 @@ impl PersistMapping {
         // Process all PersistPtrHolder records in order
         records
             .iter()
-            .filter(|r| r.record_type == PptRecordType::PersistPtrHolder)
+            .filter(|r| r.record_type == RecordType::PersistPtrHolder)
             .filter_map(|r| PersistPtrHolder::parse(r).ok())
             .for_each(|holder| {
                 // Extend mappings (later entries override earlier ones)
@@ -60,11 +60,11 @@ impl PersistMapping {
     /// - Zero-copy: works with references instead of owned records
     /// - Avoids cloning large record data (`Vec<u8>`)
     /// - Same logic as `build_from_records` but more efficient
-    pub fn build_from_records_ref(records: &[&PptRecord]) -> Self {
+    pub fn build_from_records_ref(records: &[&Record]) -> Self {
         // Count PersistPtrHolder records for capacity estimation
         let ptr_holder_count = records
             .iter()
-            .filter(|r| r.record_type == PptRecordType::PersistPtrHolder)
+            .filter(|r| r.record_type == RecordType::PersistPtrHolder)
             .count();
 
         // Pre-allocate with estimated capacity (assume ~10 slides per holder on average)
@@ -73,7 +73,7 @@ impl PersistMapping {
         // Process all PersistPtrHolder records in order
         records
             .iter()
-            .filter(|r| r.record_type == PptRecordType::PersistPtrHolder)
+            .filter(|r| r.record_type == RecordType::PersistPtrHolder)
             .filter_map(|r| PersistPtrHolder::parse(r).ok())
             .for_each(|holder| {
                 // Extend mappings (later entries override earlier ones)
@@ -138,8 +138,8 @@ mod tests {
         data1.extend_from_slice(&1000u32.to_le_bytes());
         data1.extend_from_slice(&2000u32.to_le_bytes());
 
-        let record1 = PptRecord {
-            record_type: PptRecordType::PersistPtrHolder,
+        let record1 = Record {
+            record_type: RecordType::PersistPtrHolder,
             record_type_raw: 6001,
             version: 0,
             instance: 0,
@@ -153,8 +153,8 @@ mod tests {
         data2.extend_from_slice(&0x00100000u32.to_le_bytes()); // base=0, count=1
         data2.extend_from_slice(&1500u32.to_le_bytes()); // updated offset
 
-        let record2 = PptRecord {
-            record_type: PptRecordType::PersistPtrHolder,
+        let record2 = Record {
+            record_type: RecordType::PersistPtrHolder,
             record_type_raw: 6001,
             version: 0,
             instance: 0,

@@ -1,75 +1,163 @@
-//! Custom slide shows example - demonstrates named slide subsets.
+//! Typed custom slide shows with a transactional PresentationML round-trip.
 
-use litchi::ooxml::pptx::{CustomShow, CustomShowList};
+use litchi_pptx::Package;
+use litchi_pptx::presentation_properties::metadata::custom_show::{List, Show};
+use litchi_pptx::presentation_properties::metadata::structure;
+use std::error::Error as StdError;
 
-fn main() {
+const TITLES: [&str; 15] = [
+    "Company Overview",
+    "Financial Performance",
+    "Revenue Breakdown",
+    "Cost Analysis",
+    "Market Position",
+    "Competitive Landscape",
+    "Product Roadmap",
+    "Technology Stack",
+    "Infrastructure",
+    "Team Structure",
+    "Hiring Plans",
+    "Risk Assessment",
+    "Mitigation Strategies",
+    "Future Projections",
+    "Q&A",
+];
+
+fn main() -> Result<(), Box<dyn StdError>> {
     println!("=== Custom Slide Shows Example ===\n");
 
-    // Create a custom show list
-    let mut shows = CustomShowList::new();
+    let mut package = Package::new()?;
+    for title in TITLES {
+        package.presentation_mut()?.add_slide()?.set_title(title);
+    }
 
-    // Create shows for different audiences
-    shows.create("Executive Summary", vec![1, 5, 10, 15]);
-    shows.create("Technical Deep Dive", vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-    shows.create("Sales Pitch", vec![1, 5, 10, 11, 12, 15]);
-    shows.create("Quick Demo", vec![1, 3, 15]);
+    // Publish authored slides before the package-aware structure owner reads
+    // their stable PresentationML IDs.
+    let bytes = package.to_bytes()?;
+    let mut package = Package::from_bytes(&bytes)?;
+    let slide_ids = package
+        .with_opc(structure::load)?
+        .slides
+        .into_iter()
+        .map(|slide| slide.slide_id)
+        .collect::<Vec<_>>();
+    assert_eq!(slide_ids.len(), TITLES.len());
+
+    // Build the contextual custom-show model from real package slide IDs.
+    let mut shows = List::new();
+    shows.create(
+        "Executive Summary",
+        [0, 4, 9, 14]
+            .into_iter()
+            .map(|index| slide_ids[index])
+            .collect(),
+    );
+    shows.create(
+        "Technical Deep Dive",
+        (0..10).map(|index| slide_ids[index]).collect(),
+    );
+    shows.create(
+        "Sales Pitch",
+        [0, 4, 9, 10, 11, 14]
+            .into_iter()
+            .map(|index| slide_ids[index])
+            .collect(),
+    );
+    shows.create(
+        "Quick Demo",
+        [0, 2, 14]
+            .into_iter()
+            .map(|index| slide_ids[index])
+            .collect(),
+    );
 
     println!("Custom Shows Created: {}", shows.len());
-    println!();
-
-    // List all shows
     for show in &shows.shows {
         println!("Show: '{}' (ID: {})", show.name, show.id);
         println!("  Slides: {:?}", show.slide_ids);
         println!("  Slide count: {}", show.slide_count());
     }
 
-    // Lookup by name
-    println!("\n--- Lookup by Name ---");
-    if let Some(exec) = shows.get_by_name("Executive Summary") {
-        println!("Found 'Executive Summary': {} slides", exec.slide_count());
-    }
-
-    if let Some(tech) = shows.get_by_name("Technical Deep Dive") {
-        println!("Found 'Technical Deep Dive': {} slides", tech.slide_count());
-    }
-
+    println!("\n--- Model Lookups ---");
+    assert_eq!(
+        shows
+            .get_by_name("Executive Summary")
+            .expect("executive show")
+            .slide_count(),
+        4
+    );
+    assert_eq!(
+        shows
+            .get_by_name("Technical Deep Dive")
+            .expect("technical show")
+            .slide_count(),
+        10
+    );
     assert!(shows.get_by_name("Nonexistent").is_none());
-    println!("'Nonexistent' not found (as expected)");
+    assert_eq!(
+        shows.get_by_id(0).expect("first show").name,
+        "Executive Summary"
+    );
 
-    // Lookup by ID
-    println!("\n--- Lookup by ID ---");
-    if let Some(show) = shows.get_by_id(0) {
-        println!("ID 0: '{}'", show.name);
-    }
-    if let Some(show) = shows.get_by_id(2) {
-        println!("ID 2: '{}'", show.name);
-    }
-
-    // Generate XML
     let xml = shows.to_xml();
-    println!("\n--- Generated XML ---");
+    println!("\n--- Generated Typed XML ---");
     println!("XML length: {} bytes", xml.len());
     assert!(xml.contains("<p:custShowLst>"));
     assert!(xml.contains("Executive Summary"));
     assert!(xml.contains("Technical Deep Dive"));
 
-    // Create a show manually
-    println!("\n--- Manual Show Creation ---");
-    let mut manual_show = CustomShow::new(100, "Manual Show");
-    manual_show.add_slide(1);
-    manual_show.add_slide(2);
-    manual_show.add_slides(vec![3, 4, 5]);
+    // The standalone value remains useful for detached composition too.
+    let manual = Show::new(100, "Manual Show").with_slides(
+        [
+            slide_ids[0],
+            slide_ids[1],
+            slide_ids[2],
+            slide_ids[3],
+            slide_ids[4],
+        ]
+        .to_vec(),
+    );
+    assert_eq!(manual.slide_count(), 5);
 
-    println!("Manual show: {} slides", manual_show.slide_count());
-    assert_eq!(manual_show.slide_ids, vec![1, 2, 3, 4, 5]);
+    // Publish the typed values atomically into ppt/presentation.xml.
+    package.edit_opc(|opc| {
+        for show in shows.shows.iter().cloned() {
+            structure::add_custom_show(opc, show)?;
+        }
+        Ok(())
+    })?;
 
-    // Remove a show
-    println!("\n--- Remove Show ---");
-    let removed = shows.remove_by_name("Quick Demo");
-    println!("Removed: {:?}", removed.map(|s| s.name));
-    println!("Remaining shows: {}", shows.len());
-    assert_eq!(shows.len(), 3);
+    let graph = package.with_opc(structure::load)?;
+    assert_eq!(graph.custom_shows.shows, shows.shows);
+    println!(
+        "\nPublished {} custom shows transactionally.",
+        graph.custom_shows.len()
+    );
 
-    println!("\n✅ Custom slide shows example completed successfully!");
+    // Exercise a second transactional edit and verify it after reopening.
+    let quick_demo_id = shows.get_by_name("Quick Demo").expect("quick demo").id;
+    package.edit_opc(|opc| {
+        assert!(structure::remove_custom_show(opc, quick_demo_id)?);
+        Ok(())
+    })?;
+
+    let round_trip = Package::from_bytes(&package.to_bytes()?)?;
+    let graph = round_trip.with_opc(structure::load)?;
+    assert_eq!(graph.custom_shows.len(), 3);
+    assert!(graph.custom_shows.get_by_name("Quick Demo").is_none());
+    assert_eq!(
+        graph
+            .custom_shows
+            .get_by_name("Executive Summary")
+            .expect("round-tripped executive show")
+            .slide_count(),
+        4
+    );
+
+    println!(
+        "Removed 'Quick Demo'; {} shows remain after reopen.",
+        graph.custom_shows.len()
+    );
+    println!("\n✅ Custom slide show round-trip completed successfully!");
+    Ok(())
 }

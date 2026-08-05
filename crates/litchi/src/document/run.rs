@@ -5,7 +5,7 @@ use litchi_core::Error;
 use litchi_core::Result;
 
 #[cfg(feature = "doc")]
-use crate::doc;
+use litchi_doc as doc;
 
 #[cfg(feature = "ooxml")]
 use crate::ooxml;

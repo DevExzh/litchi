@@ -1,8 +1,8 @@
 use super::{BuiltinId, Collection};
-use crate::consts::PptRecordType;
-use crate::records::PptRecord;
+use crate::consts::RecordType;
+use crate::records::Record;
 
-fn record(version: u16, instance: u16, kind: PptRecordType, data: &[u8]) -> Vec<u8> {
+fn record(version: u16, instance: u16, kind: RecordType, data: &[u8]) -> Vec<u8> {
     let mut output = Vec::with_capacity(8 + data.len());
     output.extend_from_slice(&(version | (instance << 4)).to_le_bytes());
     output.extend_from_slice(&(kind as u16).to_le_bytes());
@@ -16,20 +16,15 @@ fn cstring(instance: u16, value: &str) -> Vec<u8> {
         .encode_utf16()
         .flat_map(u16::to_le_bytes)
         .collect::<Vec<_>>();
-    record(0, instance, PptRecordType::CString, &data)
+    record(0, instance, RecordType::CString, &data)
 }
 
 fn sound(id: &str) -> Vec<u8> {
     let mut data = cstring(0, "tone.wav");
     data.extend(cstring(1, ".WAV"));
     data.extend(cstring(2, id));
-    data.extend(record(
-        0,
-        0,
-        PptRecordType::SoundData,
-        b"RIFF\x04\0\0\0WAVE",
-    ));
-    record(0x0f, 0, PptRecordType::Sound, &data)
+    data.extend(record(0, 0, RecordType::SoundData, b"RIFF\x04\0\0\0WAVE"));
+    record(0x0f, 0, RecordType::Sound, &data)
 }
 
 fn sound_with_builtin(id: &str, builtin: &str) -> Vec<u8> {
@@ -37,27 +32,17 @@ fn sound_with_builtin(id: &str, builtin: &str) -> Vec<u8> {
     data.extend(cstring(1, ".WAV"));
     data.extend(cstring(2, id));
     data.extend(cstring(3, builtin));
-    data.extend(record(
-        0,
-        0,
-        PptRecordType::SoundData,
-        b"RIFF\x04\0\0\0WAVE",
-    ));
-    record(0x0f, 0, PptRecordType::Sound, &data)
+    data.extend(record(0, 0, RecordType::SoundData, b"RIFF\x04\0\0\0WAVE"));
+    record(0x0f, 0, RecordType::Sound, &data)
 }
 
-fn collection(seed: u32, sounds: &[Vec<u8>]) -> PptRecord {
-    let mut data = record(
-        0,
-        0,
-        PptRecordType::SoundCollectionAtom,
-        &seed.to_le_bytes(),
-    );
+fn collection(seed: u32, sounds: &[Vec<u8>]) -> Record {
+    let mut data = record(0, 0, RecordType::SoundCollectionAtom, &seed.to_le_bytes());
     for sound in sounds {
         data.extend(sound);
     }
-    let bytes = record(0x0f, 5, PptRecordType::SoundCollection, &data);
-    PptRecord::parse(&bytes, 0).unwrap().0
+    let bytes = record(0x0f, 5, RecordType::SoundCollection, &data);
+    Record::parse(&bytes, 0).unwrap().0
 }
 
 #[test]

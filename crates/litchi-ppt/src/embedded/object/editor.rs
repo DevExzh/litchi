@@ -2,13 +2,13 @@
 
 use super::{Collection, ExternalObject};
 use crate::embedded::storage::Storage;
-use crate::package::PptError;
+use crate::package::Error;
 use crate::writer::{PersistPtrBuilder, UserEditAtom};
 use litchi_cfb::{OleFile, OleWriter};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::Cursor;
 
-type Result<T> = std::result::Result<T, PptError>;
+type Result<T> = std::result::Result<T, Error>;
 
 const EX_OBJ_LIST: u16 = 1033;
 const USER_EDIT: u16 = 4085;
@@ -49,7 +49,7 @@ impl Editor {
                     | "\u{5}digitalsignature"
             )
         }) {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "signed or encrypted PPT is not eligible for OLE editing".into(),
             ));
         }
@@ -60,16 +60,16 @@ impl Editor {
                     .is_some_and(|name| name == "PowerPoint Document")
             })
             .cloned()
-            .ok_or_else(|| PptError::StreamNotFound("PowerPoint Document".into()))?;
+            .ok_or_else(|| Error::StreamNotFound("PowerPoint Document".into()))?;
         let current_user_path = paths
             .iter()
             .find(|path| path.last().is_some_and(|name| name == "Current User"))
             .cloned()
-            .ok_or_else(|| PptError::StreamNotFound("Current User".into()))?;
+            .ok_or_else(|| Error::StreamNotFound("Current User".into()))?;
         let document = ole.open_stream(&refs(&document_path))?;
         let current_user = ole.open_stream(&refs(&current_user_path))?;
         if current_user.len() < 28 || u32_at(&current_user, 12)? != 0xE391_C05F {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "unsupported or encrypted CurrentUserAtom".into(),
             ));
         }
@@ -78,7 +78,7 @@ impl Editor {
         collection.validate()?;
         for object in &collection.objects {
             if !mappings.contains_key(&object.persist_id()) {
-                return Err(PptError::Corrupted(format!(
+                return Err(Error::Corrupted(format!(
                     "OLE object references missing persist ID {}",
                     object.persist_id()
                 )));
@@ -133,7 +133,7 @@ impl Editor {
         let offset = *self
             .mappings
             .get(&persist_id)
-            .ok_or_else(|| PptError::Corrupted(format!("unknown persist ID {persist_id}")))?
+            .ok_or_else(|| Error::Corrupted(format!("unknown persist ID {persist_id}")))?
             as usize;
         Ok(record_slice(&self.document, offset)?.to_vec())
     }
@@ -143,15 +143,13 @@ impl Editor {
         if !self.mappings.contains_key(&persist_id)
             || self.removed_persist_ids.contains(&persist_id)
         {
-            return Err(PptError::Corrupted(format!(
-                "unknown persist ID {persist_id}"
-            )));
+            return Err(Error::Corrupted(format!("unknown persist ID {persist_id}")));
         }
         if record.len() < 8
             || record.len() > 128 * 1024 * 1024
             || record_slice(&record, 0).map(|value| value.len())? != record.len()
         {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "replacement persisted record has an invalid length".into(),
             ));
         }
@@ -187,7 +185,7 @@ impl Editor {
             .iter()
             .any(|object| object.persist_id() == persist_id)
         {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "persist ID has no OLE object reference".into(),
             ));
         }
@@ -237,7 +235,7 @@ impl Editor {
             self.mappings.insert(
                 *id,
                 u32::try_from(appended.len())
-                    .map_err(|_| PptError::Corrupted("PPT stream exceeds u32".into()))?,
+                    .map_err(|_| Error::Corrupted("PPT stream exceeds u32".into()))?,
             );
             appended.extend_from_slice(record);
         }
@@ -245,7 +243,7 @@ impl Editor {
             let document_offset = *self
                 .mappings
                 .get(&self.document_persist_id)
-                .ok_or_else(|| PptError::Corrupted("Document persist mapping is missing".into()))?
+                .ok_or_else(|| Error::Corrupted("Document persist mapping is missing".into()))?
                 as usize;
             let old_document = record_slice(&self.document, document_offset)?;
             let new_document = replace_nested_record(
@@ -256,12 +254,12 @@ impl Editor {
             self.mappings.insert(
                 self.document_persist_id,
                 u32::try_from(appended.len())
-                    .map_err(|_| PptError::Corrupted("PPT stream exceeds u32".into()))?,
+                    .map_err(|_| Error::Corrupted("PPT stream exceeds u32".into()))?,
             );
             appended.extend_from_slice(&new_document);
         }
         let persist_dir_offset = u32::try_from(appended.len())
-            .map_err(|_| PptError::Corrupted("PPT stream exceeds u32".into()))?;
+            .map_err(|_| Error::Corrupted("PPT stream exceeds u32".into()))?;
         let mut builder = PersistPtrBuilder::new();
         for (id, offset) in &self.mappings {
             builder.set_offset(*id, *offset);
@@ -277,7 +275,7 @@ impl Editor {
             UserEditAtom::new_minimal(persist_dir_offset, self.document_persist_id, max_id, 0);
         edit.offset_last_edit = self.current_edit_offset;
         let new_edit_offset = u32::try_from(appended.len())
-            .map_err(|_| PptError::Corrupted("PPT stream exceeds u32".into()))?;
+            .map_err(|_| Error::Corrupted("PPT stream exceeds u32".into()))?;
         appended.extend_from_slice(&edit.generate_record());
         self.current_user[16..20].copy_from_slice(&new_edit_offset.to_le_bytes());
 
@@ -301,7 +299,7 @@ impl Editor {
         let (mapping, _) = mapping_chain(&doc, u32_at(&cur, 16)?)?;
         for object in &self.collection.objects {
             if !mapping.contains_key(&object.persist_id()) {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "rewritten persist mapping failed validation".into(),
                 ));
             }
@@ -318,7 +316,7 @@ impl Editor {
             .unwrap_or(0)
             .checked_add(1)
             .filter(|id| *id <= 0x000F_FFFF)
-            .ok_or_else(|| PptError::Corrupted("persist ID space exhausted".into()))
+            .ok_or_else(|| Error::Corrupted("persist ID space exhausted".into()))
     }
 }
 
@@ -335,13 +333,13 @@ fn mapping_chain(document: &[u8], mut edit_offset: u32) -> Result<(BTreeMap<u32,
     let mut document_id = 0;
     while edit_offset != 0 {
         if !seen.insert(edit_offset) || seen.len() > 4_096 {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "cyclic or excessive UserEdit chain".into(),
             ));
         }
         let record = record_slice(document, edit_offset as usize)?;
         if type_of(record)? != USER_EDIT || record.len() < 36 {
-            return Err(PptError::Corrupted("invalid UserEditAtom".into()));
+            return Err(Error::Corrupted("invalid UserEditAtom".into()));
         }
         let data = &record[8..];
         if document_id == 0 {
@@ -349,7 +347,7 @@ fn mapping_chain(document: &[u8], mut edit_offset: u32) -> Result<(BTreeMap<u32,
         }
         let directory = record_slice(document, u32_at(data, 12)? as usize)?;
         if !matches!(type_of(directory)?, PERSIST_FULL | PERSIST_INCREMENTAL) {
-            return Err(PptError::Corrupted("invalid PersistDirectoryAtom".into()));
+            return Err(Error::Corrupted("invalid PersistDirectoryAtom".into()));
         }
         let mut offset = 8usize;
         while offset < directory.len() {
@@ -358,7 +356,7 @@ fn mapping_chain(document: &[u8], mut edit_offset: u32) -> Result<(BTreeMap<u32,
             let base = info & 0x000F_FFFF;
             let count = info >> 20;
             if count == 0 {
-                return Err(PptError::Corrupted("zero persist run".into()));
+                return Err(Error::Corrupted("zero persist run".into()));
             }
             for index in 0..count {
                 let value = u32_at(directory, offset)?;
@@ -369,14 +367,14 @@ fn mapping_chain(document: &[u8], mut edit_offset: u32) -> Result<(BTreeMap<u32,
         edit_offset = u32_at(data, 8)?;
     }
     if document_id == 0 {
-        return Err(PptError::Corrupted("missing Document persist ID".into()));
+        return Err(Error::Corrupted("missing Document persist ID".into()));
     }
     Ok((mapping, document_id))
 }
 
 fn replace_nested_record(record: &[u8], target: u16, replacement: &[u8]) -> Result<Vec<u8>> {
     replace_nested_record_at_depth(record, target, replacement, 0)?
-        .ok_or_else(|| PptError::Corrupted("ExObjList not found in Document container".into()))
+        .ok_or_else(|| Error::Corrupted("ExObjList not found in Document container".into()))
 }
 
 fn replace_nested_record_at_depth(
@@ -386,7 +384,7 @@ fn replace_nested_record_at_depth(
     depth: usize,
 ) -> Result<Option<Vec<u8>>> {
     if depth >= MAX_NESTED_RECORD_DEPTH {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "PPT record nesting exceeds the safety limit".into(),
         ));
     }
@@ -430,20 +428,20 @@ fn record_slice(data: &[u8], offset: usize) -> Result<&[u8]> {
     let end = offset
         .checked_add(8)
         .and_then(|v| v.checked_add(len))
-        .ok_or_else(|| PptError::Corrupted("record length overflow".into()))?;
+        .ok_or_else(|| Error::Corrupted("record length overflow".into()))?;
     data.get(offset..end)
-        .ok_or_else(|| PptError::Corrupted("truncated record".into()))
+        .ok_or_else(|| Error::Corrupted("truncated record".into()))
 }
 fn type_of(record: &[u8]) -> Result<u16> {
     record
         .get(2..4)
         .map(|v| u16::from_le_bytes([v[0], v[1]]))
-        .ok_or_else(|| PptError::Corrupted("truncated header".into()))
+        .ok_or_else(|| Error::Corrupted("truncated header".into()))
 }
 fn u32_at(data: &[u8], offset: usize) -> Result<u32> {
     data.get(offset..offset + 4)
         .map(|v| u32::from_le_bytes(v.try_into().unwrap()))
-        .ok_or_else(|| PptError::Corrupted("truncated u32".into()))
+        .ok_or_else(|| Error::Corrupted("truncated u32".into()))
 }
 fn refs(path: &[String]) -> Vec<&str> {
     path.iter().map(String::as_str).collect()
@@ -499,7 +497,7 @@ mod tests {
 
         assert!(matches!(
             error,
-            PptError::Corrupted(message)
+            Error::Corrupted(message)
                 if message == "PPT record nesting exceeds the safety limit"
         ));
     }

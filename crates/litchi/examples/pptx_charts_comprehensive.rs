@@ -1,457 +1,212 @@
-//! Comprehensive Charts Example
+//! Comprehensive typed PresentationML chart demonstration.
 //!
-//! Demonstrates creating various chart types and configurations.
-//! This example shows how to work with chart data structures and XML generation.
+//! Charts are encoded by the standalone `litchi-pptx` facade and attached to
+//! authored slides through its transactional OPC package editor.
 
-use litchi::ooxml::pptx::Package;
-use litchi::ooxml::pptx::parts::chart::{ChartData, ChartSeries, ChartType, generate_chart_xml};
+use litchi_pptx::chart::{self, encode as encode_chart};
+use litchi_pptx::{Chart, ChartSeries, ChartType, Package};
+
+const X: i64 = 914_400;
+const Y: i64 = 1_600_000;
+const WIDTH: i64 = 7_315_200;
+const HEIGHT: i64 = 4_000_000;
+
+fn chart(
+    chart_type: ChartType,
+    title: &str,
+    categories: &[&str],
+    series: &[(&str, &[f64])],
+    legend: bool,
+) -> Chart {
+    let categories: Vec<String> = categories.iter().map(|value| (*value).to_owned()).collect();
+    let mut value = Chart::new(chart_type, X, Y, WIDTH, HEIGHT)
+        .with_title(title)
+        .with_legend(legend);
+
+    for (name, values) in series {
+        value = value.add_series(
+            ChartSeries::new(*name)
+                .with_categories(categories.clone())
+                .with_values(values.to_vec()),
+        );
+    }
+
+    value
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("=== Comprehensive Charts Example ===\n");
-
-    // Create presentation with chart documentation
-    println!("Creating presentation with chart examples...\n");
-
-    let mut pkg = Package::new()?;
-    {
-        let pres = pkg.presentation_mut()?;
-
-        // Test different chart types and add slides for each
-        test_column_charts(pres)?;
-        test_bar_charts(pres)?;
-        test_line_charts(pres)?;
-        test_pie_charts(pres)?;
-        test_area_charts(pres)?;
-        test_scatter_charts(pres)?;
-        test_multi_series_charts(pres)?;
-    }
-    pkg.save("charts_comprehensive.pptx")?;
-    println!("\n✓ Saved: charts_comprehensive.pptx");
-
-    println!("\n=== All chart examples complete! ===");
-    println!(
-        "\nPresentation created with {} slides documenting chart types.",
-        7
-    );
-    println!("\nChart XML has been generated for:");
-    println!("  ✓ Column Charts (Quarterly Sales, Monthly Revenue)");
-    println!("  ✓ Bar Charts (Market Share, Department Budgets)");
-    println!("  ✓ Line Charts (Stock Prices, Website Traffic)");
-    println!("  ✓ Pie Charts (Regional Revenue, Customer Segments)");
-    println!("  ✓ Area Charts (Cumulative Sales)");
-    println!("  ✓ Scatter Charts (Correlation Analysis)");
-    println!("  ✓ Multi-Series Charts (Team Performance)");
-    println!("\nNote: Chart XML generation is demonstrated.");
-    println!("Full chart integration requires additional chart part infrastructure.");
-
-    Ok(())
-}
-
-/// Test 1: Column Charts
-/// Vertical bar charts for comparing values across categories
-fn test_column_charts(
-    pres: &mut litchi::ooxml::pptx::writer::pres::MutablePresentation,
-) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Test 1: Column Charts");
-    println!("----------------------");
-
-    // Create slide for column charts
-    let slide = pres.add_slide()?;
-    slide.set_title("Column Charts - Comparing Values");
-
-    // Quarterly sales data
-    let categories = vec![
-        "Q1".to_string(),
-        "Q2".to_string(),
-        "Q3".to_string(),
-        "Q4".to_string(),
+    let charts = vec![
+        chart(
+            ChartType::Column,
+            "Quarterly Sales Comparison",
+            &["Q1", "Q2", "Q3", "Q4"],
+            &[
+                ("2023 Sales", &[120.5, 145.2, 168.9, 195.3]),
+                ("2024 Sales", &[135.7, 162.4, 189.1, 218.6]),
+            ],
+            true,
+        ),
+        chart(
+            ChartType::Bar,
+            "Market Share by Product",
+            &[
+                "Product A",
+                "Product B",
+                "Product C",
+                "Product D",
+                "Product E",
+            ],
+            &[("Market Share %", &[28.5, 22.3, 18.7, 15.2, 15.3])],
+            false,
+        ),
+        chart(
+            ChartType::Line,
+            "Website Traffic 2024",
+            &["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+            &[
+                (
+                    "Unique Visitors",
+                    &[15_200.0, 16_800.0, 18_500.0, 19_200.0, 21_500.0, 23_800.0],
+                ),
+                (
+                    "Page Views",
+                    &[45_600.0, 50_400.0, 55_500.0, 57_600.0, 64_500.0, 71_400.0],
+                ),
+            ],
+            true,
+        ),
+        chart(
+            ChartType::Pie,
+            "Revenue by Region",
+            &[
+                "North America",
+                "Europe",
+                "Asia Pacific",
+                "Latin America",
+                "Middle East",
+            ],
+            &[("Revenue %", &[42.5, 28.3, 19.7, 6.2, 3.3])],
+            true,
+        ),
+        chart(
+            ChartType::Area,
+            "Cumulative Sales by Product Line",
+            &["Q1", "Q2", "Q3", "Q4"],
+            &[
+                ("Product Line A", &[125.0, 142.0, 168.0, 195.0]),
+                ("Product Line B", &[85.0, 98.0, 112.0, 128.0]),
+                ("Product Line C", &[45.0, 52.0, 61.0, 72.0]),
+            ],
+            true,
+        ),
+        chart(
+            ChartType::Scatter,
+            "Ad Spend vs Revenue Correlation",
+            &["10", "15", "20", "25", "30", "35", "40", "45", "50"],
+            &[(
+                "Revenue ($K)",
+                &[
+                    125.0, 165.0, 198.0, 235.0, 268.0, 295.0, 325.0, 352.0, 385.0,
+                ],
+            )],
+            false,
+        ),
+        chart(
+            ChartType::Line,
+            "Team Performance Scores",
+            &["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+            &[
+                ("Team Alpha", &[92.0, 94.0, 96.0, 95.0, 97.0, 98.0]),
+                ("Team Beta", &[88.0, 90.0, 91.0, 93.0, 94.0, 95.0]),
+                ("Team Gamma", &[85.0, 87.0, 89.0, 90.0, 92.0, 93.0]),
+                ("Team Delta", &[90.0, 91.0, 92.0, 94.0, 95.0, 97.0]),
+            ],
+            true,
+        ),
     ];
 
-    let series1 = ChartSeries::new("2023 Sales")
-        .with_categories(categories.clone())
-        .with_values(vec![120.5, 145.2, 168.9, 195.3]);
-
-    let series2 = ChartSeries::new("2024 Sales")
-        .with_categories(categories.clone())
-        .with_values(vec![135.7, 162.4, 189.1, 218.6]);
-
-    // Simple column chart
-    let chart = ChartData::new(ChartType::Column, 914400, 1828800, 7315200, 4000000)
-        .with_title("Quarterly Sales Comparison")
-        .add_series(series1)
-        .add_series(series2)
-        .with_legend(true);
-
-    let xml = generate_chart_xml(&chart)?;
-    println!("  ✓ Quarterly Sales chart: {} bytes XML", xml.len());
-    slide.add_text_box(
-        &format!("Quarterly Sales Comparison\n\nData:\n- Q1-Q4 2023/2024\n- Chart Type: Column\n- Generated XML: {} bytes", xml.len()),
-        914400, 1828800, 7315200, 3500000,
-    );
-
-    // Monthly revenue chart (single series)
-    let months = [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-    ]
-    .iter()
-    .map(|s| s.to_string())
-    .collect();
-
-    let revenue_series = ChartSeries::new("Monthly Revenue")
-        .with_categories(months)
-        .with_values(vec![
-            85.2, 89.1, 92.5, 95.8, 98.3, 102.7, 106.4, 110.2, 114.5, 118.9, 123.4, 128.1,
-        ]);
-
-    let revenue_chart = ChartData::new(ChartType::Column, 914400, 1828800, 7315200, 4000000)
-        .with_title("2024 Monthly Revenue ($K)")
-        .add_series(revenue_series)
-        .with_legend(false);
-
-    let xml = generate_chart_xml(&revenue_chart)?;
-    println!("  ✓ Monthly Revenue chart: {} bytes XML", xml.len());
-    println!();
-
-    Ok(())
-}
-
-/// Test 2: Bar Charts
-/// Horizontal bars for ranking or comparing many items
-fn test_bar_charts(
-    pres: &mut litchi::ooxml::pptx::writer::pres::MutablePresentation,
-) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Test 2: Bar Charts");
-    println!("------------------");
-
-    let slide = pres.add_slide()?;
-    slide.set_title("Bar Charts - Horizontal Comparison");
-
-    // Product comparison
-    let products = [
-        "Product A",
-        "Product B",
-        "Product C",
-        "Product D",
-        "Product E",
-        "Product F",
-    ]
-    .iter()
-    .map(|s| s.to_string())
-    .collect();
-
-    let market_share = ChartSeries::new("Market Share %")
-        .with_categories(products)
-        .with_values(vec![28.5, 22.3, 18.7, 15.2, 10.1, 5.2]);
-
-    let chart = ChartData::new(ChartType::Bar, 914400, 1828800, 7315200, 4000000)
-        .with_title("Market Share by Product")
-        .add_series(market_share)
-        .with_legend(false);
-
-    let xml = generate_chart_xml(&chart)?;
-    println!("  ✓ Market Share chart: {} bytes XML", xml.len());
-
-    // Department budget comparison
-    let departments: Vec<String> = [
-        "Engineering",
-        "Sales",
-        "Marketing",
-        "Operations",
-        "HR",
-        "Finance",
-    ]
-    .iter()
-    .map(|s| s.to_string())
-    .collect();
-
-    let budget_2023 = ChartSeries::new("2023 Budget")
-        .with_categories(departments.clone())
-        .with_values(vec![2500.0, 1800.0, 1200.0, 950.0, 650.0, 550.0]);
-
-    let budget_2024 = ChartSeries::new("2024 Budget")
-        .with_categories(departments)
-        .with_values(vec![2850.0, 2100.0, 1450.0, 1100.0, 750.0, 600.0]);
-
-    let budget_chart = ChartData::new(ChartType::Bar, 914400, 1828800, 7315200, 4000000)
-        .with_title("Department Budget Allocation ($K)")
-        .add_series(budget_2023)
-        .add_series(budget_2024)
-        .with_legend(true);
-
-    let xml = generate_chart_xml(&budget_chart)?;
-    println!("  ✓ Budget Allocation chart: {} bytes XML", xml.len());
-    slide.add_text_box(
-        &format!("Department Budget Allocation\n\nComparing:\n- 2023 vs 2024 budgets\n- 6 departments\n- Generated XML: {} bytes", xml.len()),
-        914400, 1828800, 7315200, 3500000,
-    );
-    println!();
-
-    Ok(())
-}
-
-/// Test 3: Line Charts
-/// Trends over time
-fn test_line_charts(
-    pres: &mut litchi::ooxml::pptx::writer::pres::MutablePresentation,
-) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Test 3: Line Charts");
-    println!("-------------------");
-
-    let slide = pres.add_slide()?;
-    slide.set_title("Line Charts - Trends Over Time");
-
-    // Stock price trend
-    let dates: Vec<String> = [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-    ]
-    .iter()
-    .map(|s| s.to_string())
-    .collect();
-
-    let stock_price = ChartSeries::new("Stock Price")
-        .with_categories(dates.clone())
-        .with_values(vec![
-            125.5, 128.2, 132.1, 129.8, 135.4, 140.2, 143.7, 147.5, 145.9, 152.3, 158.6, 165.2,
-        ]);
-
-    let chart = ChartData::new(ChartType::Line, 914400, 1828800, 7315200, 4000000)
-        .with_title("Stock Price Trend 2024")
-        .add_series(stock_price)
-        .with_legend(false);
-
-    let xml = generate_chart_xml(&chart)?;
-    println!("  ✓ Stock Price chart: {} bytes XML", xml.len());
-
-    // Website traffic (multiple metrics)
-    let visitors = ChartSeries::new("Unique Visitors")
-        .with_categories(dates.clone())
-        .with_values(vec![
-            15200.0, 16800.0, 18500.0, 19200.0, 21500.0, 23800.0, 25400.0, 27100.0, 28900.0,
-            31200.0, 33800.0, 36500.0,
-        ]);
-
-    let pageviews = ChartSeries::new("Page Views")
-        .with_categories(dates)
-        .with_values(vec![
-            45600.0, 50400.0, 55500.0, 57600.0, 64500.0, 71400.0, 76200.0, 81300.0, 86700.0,
-            93600.0, 101400.0, 109500.0,
-        ]);
-
-    let traffic_chart = ChartData::new(ChartType::Line, 914400, 1828800, 7315200, 4000000)
-        .with_title("Website Traffic 2024")
-        .add_series(visitors)
-        .add_series(pageviews)
-        .with_legend(true);
-
-    let xml = generate_chart_xml(&traffic_chart)?;
-    println!("  ✓ Website Traffic chart: {} bytes XML", xml.len());
-    slide.add_text_box(
-        &format!("Website Traffic 2024\n\nMetrics:\n- Unique Visitors\n- Page Views\n- 12 months of data\n- Generated XML: {} bytes", xml.len()),
-        914400, 1828800, 7315200, 3500000,
-    );
-    println!();
-
-    Ok(())
-}
-
-/// Test 4: Pie Charts
-/// Part-to-whole relationships
-fn test_pie_charts(
-    pres: &mut litchi::ooxml::pptx::writer::pres::MutablePresentation,
-) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Test 4: Pie Charts");
-    println!("------------------");
-
-    let slide = pres.add_slide()?;
-    slide.set_title("Pie Charts - Part-to-Whole");
-
-    // Revenue by region
-    let regions = [
-        "North America",
-        "Europe",
-        "Asia Pacific",
-        "Latin America",
-        "Middle East & Africa",
-    ]
-    .iter()
-    .map(|s| s.to_string())
-    .collect();
-
-    let regional_revenue = ChartSeries::new("Revenue Distribution")
-        .with_categories(regions)
-        .with_values(vec![42.5, 28.3, 19.7, 6.2, 3.3]);
-
-    let chart = ChartData::new(ChartType::Pie, 914400, 1828800, 7315200, 4000000)
-        .with_title("Revenue by Region (%)")
-        .add_series(regional_revenue)
-        .with_legend(true);
-
-    let xml = generate_chart_xml(&chart)?;
-    println!("  ✓ Regional Revenue chart: {} bytes XML", xml.len());
-
-    // Customer segments
-    let segments = ["Enterprise", "Mid-Market", "Small Business", "Startup"]
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
-
-    let customer_distribution = ChartSeries::new("Customer Base")
-        .with_categories(segments)
-        .with_values(vec![15.0, 35.0, 38.0, 12.0]);
-
-    let segment_chart = ChartData::new(ChartType::Pie, 914400, 1828800, 7315200, 4000000)
-        .with_title("Customer Segmentation")
-        .add_series(customer_distribution)
-        .with_legend(true);
-
-    let xml = generate_chart_xml(&segment_chart)?;
-    println!("  ✓ Customer Segmentation chart: {} bytes XML", xml.len());
-    slide.add_text_box(
-        &format!("Revenue by Region & Customer Segments\n\nShowing:\n- Regional distribution\n- Customer segments\n- Generated XML: {} + {} bytes", xml.len(), xml.len()),
-        914400, 1828800, 7315200, 3500000,
-    );
-    println!();
-
-    Ok(())
-}
-
-/// Test 5: Area Charts
-/// Cumulative values over time
-fn test_area_charts(
-    pres: &mut litchi::ooxml::pptx::writer::pres::MutablePresentation,
-) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Test 5: Area Charts");
-    println!("-------------------");
-
-    let slide = pres.add_slide()?;
-    slide.set_title("Area Charts - Cumulative Values");
-
-    // Cumulative sales by product line
-    let quarters: Vec<String> = ["Q1", "Q2", "Q3", "Q4"]
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
-
-    let product_a = ChartSeries::new("Product Line A")
-        .with_categories(quarters.clone())
-        .with_values(vec![125.0, 142.0, 168.0, 195.0]);
-
-    let product_b = ChartSeries::new("Product Line B")
-        .with_categories(quarters.clone())
-        .with_values(vec![85.0, 98.0, 112.0, 128.0]);
-
-    let product_c = ChartSeries::new("Product Line C")
-        .with_categories(quarters)
-        .with_values(vec![45.0, 52.0, 61.0, 72.0]);
-
-    let chart = ChartData::new(ChartType::Area, 914400, 1828800, 7315200, 4000000)
-        .with_title("Cumulative Sales by Product Line")
-        .add_series(product_a)
-        .add_series(product_b)
-        .add_series(product_c)
-        .with_legend(true);
-
-    let xml = generate_chart_xml(&chart)?;
-    println!("  ✓ Cumulative Sales chart: {} bytes XML", xml.len());
-    slide.add_text_box(
-        &format!("Cumulative Sales by Product Line\n\nData:\n- 3 product lines\n- Q1-Q4 quarterly data\n- Stacked area chart\n- Generated XML: {} bytes", xml.len()),
-        914400, 1828800, 7315200, 3500000,
-    );
-    println!();
-
-    Ok(())
-}
-
-/// Test 6: Scatter Charts
-/// Correlation between two variables
-fn test_scatter_charts(
-    pres: &mut litchi::ooxml::pptx::writer::pres::MutablePresentation,
-) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Test 6: Scatter Charts");
-    println!("----------------------");
-
-    let slide = pres.add_slide()?;
-    slide.set_title("Scatter Charts - Correlation Analysis");
-
-    // Ad spend vs. Revenue correlation
-    let ad_spend = ["10", "15", "20", "25", "30", "35", "40", "45", "50"]
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
-
-    let revenue_impact = ChartSeries::new("Revenue ($K)")
-        .with_categories(ad_spend)
-        .with_values(vec![
-            125.0, 165.0, 198.0, 235.0, 268.0, 295.0, 325.0, 352.0, 385.0,
-        ]);
-
-    let chart = ChartData::new(ChartType::Scatter, 914400, 1828800, 7315200, 4000000)
-        .with_title("Ad Spend vs Revenue Correlation")
-        .add_series(revenue_impact)
-        .with_legend(false);
-
-    let xml = generate_chart_xml(&chart)?;
-    println!("  ✓ Scatter chart: {} bytes XML", xml.len());
-    slide.add_text_box(
-        &format!("Ad Spend vs Revenue Correlation\n\nAnalysis:\n- Ad spend: $10K-$50K\n- Revenue impact measured\n- Correlation visualization\n- Generated XML: {} bytes", xml.len()),
-        914400, 1828800, 7315200, 3500000,
-    );
-    println!();
-
-    Ok(())
-}
-
-/// Test 7: Multi-Series Charts
-/// Complex datasets with multiple data series
-fn test_multi_series_charts(
-    pres: &mut litchi::ooxml::pptx::writer::pres::MutablePresentation,
-) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Test 7: Multi-Series Charts");
-    println!("---------------------------");
-
-    let slide = pres.add_slide()?;
-    slide.set_title("Multi-Series Charts - Complex Data");
-
-    // Performance metrics across teams
-    let months: Vec<String> = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
-
-    let team_alpha = ChartSeries::new("Team Alpha")
-        .with_categories(months.clone())
-        .with_values(vec![92.0, 94.0, 96.0, 95.0, 97.0, 98.0]);
-
-    let team_beta = ChartSeries::new("Team Beta")
-        .with_categories(months.clone())
-        .with_values(vec![88.0, 90.0, 91.0, 93.0, 94.0, 95.0]);
-
-    let team_gamma = ChartSeries::new("Team Gamma")
-        .with_categories(months.clone())
-        .with_values(vec![85.0, 87.0, 89.0, 90.0, 92.0, 93.0]);
-
-    let team_delta = ChartSeries::new("Team Delta")
-        .with_categories(months)
-        .with_values(vec![90.0, 91.0, 92.0, 94.0, 95.0, 97.0]);
-
-    let chart = ChartData::new(ChartType::Line, 914400, 1828800, 7315200, 4000000)
-        .with_title("Team Performance Scores")
-        .add_series(team_alpha)
-        .add_series(team_beta)
-        .add_series(team_gamma)
-        .add_series(team_delta)
-        .with_legend(true);
-
-    let xml = generate_chart_xml(&chart)?;
-    println!(
-        "  ✓ Multi-series Performance chart: {} bytes XML",
-        xml.len()
-    );
-    slide.add_text_box(
-        &format!("Team Performance Scores\n\nTracking:\n- 4 teams (Alpha, Beta, Gamma, Delta)\n- 6 months of scores\n- Multi-series line chart\n- Generated XML: {} bytes", xml.len()),
-        914400, 1828800, 7315200, 3500000,
-    );
-    println!();
+    println!("=== Comprehensive PPTX Charts ===");
+    println!("Building typed chart models and a summary presentation...");
+
+    let mut package = Package::new()?;
+    {
+        let presentation = package.presentation_mut()?;
+        let title = presentation.add_slide()?;
+        title.set_title("Comprehensive Chart Demonstration");
+        title.add_text_box(
+            "Typed DrawingML chart models\nEncoded and attached transactionally with litchi-pptx",
+            X,
+            2_500_000,
+            WIDTH,
+            1_200_000,
+        );
+
+        for (index, value) in charts.iter().enumerate() {
+            let slide = presentation.add_slide()?;
+            slide.set_title(value.title.as_deref().unwrap_or("Chart"));
+            let xml_len = encode_chart(value)?.len();
+            slide.add_text_box(
+                &format!(
+                    "Chart type: {:?}\nSeries: {}\nLegend: {}\nCanonical chart XML: {} bytes\n\nThe chart part is attached after slide authoring.",
+                    value.chart_type,
+                    value.series.len(),
+                    value.show_legend,
+                    xml_len,
+                ),
+                X,
+                Y,
+                WIDTH,
+                HEIGHT,
+            );
+            println!(
+                "  ✓ Chart {}: {} ({} bytes XML)",
+                index + 1,
+                value.title.as_deref().unwrap_or("Chart"),
+                xml_len
+            );
+        }
+    }
+
+    // Publish the managed slide model, then edit the canonical OPC graph.
+    let authored = package.to_bytes()?;
+    let mut package = Package::from_bytes(&authored)?;
+    let relationship_ids = package.edit_opc(|opc| {
+        let mut ids = Vec::with_capacity(charts.len());
+        for (index, value) in charts.iter().enumerate() {
+            let slide_name = format!("/ppt/slides/slide{}.xml", index + 2);
+            ids.push(chart::add(opc, &slide_name, value)?);
+        }
+        Ok(ids)
+    })?;
+
+    let bytes = package.to_bytes()?;
+    let reopened = Package::from_bytes(&bytes)?;
+    let presentation = reopened.presentation()?;
+    let slides = presentation.slides()?;
+
+    for (index, (value, relationship_id)) in charts.iter().zip(&relationship_ids).enumerate() {
+        let chart_part = slides[index + 1]
+            .charts()?
+            .into_iter()
+            .next()
+            .ok_or("chart relationship did not resolve to a chart part")?;
+        let info = chart_part.chart_info()?;
+        assert_eq!(info.chart_type, value.chart_type);
+        assert_eq!(info.title.as_deref(), value.title.as_deref());
+        assert_eq!(info.has_legend, value.show_legend);
+        println!(
+            "  ✓ Reopened chart {} through {} ({:?})",
+            index + 1,
+            relationship_id,
+            info.chart_type
+        );
+    }
+
+    let output_path = "charts_comprehensive.pptx";
+    std::fs::write(output_path, &bytes)?;
+    println!("✓ Saved: {output_path}");
+    println!("Total slides: {}", presentation.slide_count()?);
+    println!("Total chart parts: {}", charts.len());
 
     Ok(())
 }

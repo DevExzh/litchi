@@ -15,7 +15,7 @@
 //!   (FrtFlags), 2.5.135 (FrtHeader), 2.5.295 (XLUnicodeStringMin2), 2.5.296
 //!   (XLUnicodeStringNoCch)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `DataLabExt` record (MS-XLS 2.4.75); also the required
 /// `frtHeader.rt` value.
@@ -45,7 +45,7 @@ impl<'a> DataLabReader<'a> {
         Self { data, offset: 0 }
     }
 
-    fn read_bytes<const N: usize>(&mut self) -> XlsResult<[u8; N]> {
+    fn read_bytes<const N: usize>(&mut self) -> Result<[u8; N]> {
         let end = self.offset.checked_add(N).ok_or_else(|| {
             invalid(
                 DATA_LAB_EXT_CONTENTS_RECORD_TYPE,
@@ -55,11 +55,11 @@ impl<'a> DataLabReader<'a> {
         let bytes = self
             .data
             .get(self.offset..end)
-            .ok_or(XlsError::InvalidLength {
+            .ok_or(Error::InvalidLength {
                 expected: end,
                 found: self.data.len(),
             })?;
-        let value: [u8; N] = bytes.try_into().map_err(|_| XlsError::InvalidLength {
+        let value: [u8; N] = bytes.try_into().map_err(|_| Error::InvalidLength {
             expected: N,
             found: bytes.len(),
         })?;
@@ -67,15 +67,15 @@ impl<'a> DataLabReader<'a> {
         Ok(value)
     }
 
-    fn read_u8(&mut self) -> XlsResult<u8> {
+    fn read_u8(&mut self) -> Result<u8> {
         Ok(u8::from_le_bytes(self.read_bytes()?))
     }
 
-    fn read_u16(&mut self) -> XlsResult<u16> {
+    fn read_u16(&mut self) -> Result<u16> {
         Ok(u16::from_le_bytes(self.read_bytes()?))
     }
 
-    fn read_vec(&mut self, len: usize) -> XlsResult<Vec<u8>> {
+    fn read_vec(&mut self, len: usize) -> Result<Vec<u8>> {
         let end = self.offset.checked_add(len).ok_or_else(|| {
             invalid(
                 DATA_LAB_EXT_CONTENTS_RECORD_TYPE,
@@ -85,7 +85,7 @@ impl<'a> DataLabReader<'a> {
         let bytes = self
             .data
             .get(self.offset..end)
-            .ok_or(XlsError::InvalidLength {
+            .ok_or(Error::InvalidLength {
                 expected: end,
                 found: self.data.len(),
             })?;
@@ -98,8 +98,8 @@ impl<'a> DataLabReader<'a> {
     }
 }
 
-fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(record_type: u16, message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type,
         message: message.into(),
     }
@@ -112,7 +112,7 @@ fn validate_frt_header(
     reader: &mut DataLabReader<'_>,
     record_type: u16,
     name: &str,
-) -> XlsResult<(u16, [u8; 8])> {
+) -> Result<(u16, [u8; 8])> {
     let found_type = reader.read_u16()?;
     if found_type != record_type {
         return Err(invalid(
@@ -136,19 +136,19 @@ fn validate_frt_header(
 /// The `frtHeader` reserved bytes (MUST be ignored) are preserved verbatim so
 /// the record round-trips unchanged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsDataLabExt {
+pub struct DataLabExt {
     /// Raw `frtHeader.grbitFrt` bitfield (`fFrtRef`/`fFrtAlert` are zero).
     frt_flags: u16,
     /// `frtHeader.reserved` bytes, preserved verbatim.
     frt_reserved: [u8; 8],
 }
 
-impl XlsDataLabExt {
+impl DataLabExt {
     /// Parse a `DataLabExt` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         // MS-XLS 2.4.75: the record contains only the FrtHeader.
         if data.len() != FRT_HEADER_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: FRT_HEADER_LEN,
                 found: data.len(),
             });
@@ -185,7 +185,7 @@ impl XlsDataLabExt {
 /// The chart-group constraints on `fPercent` and `fBubSizes` (MS-XLS 2.4.76)
 /// are cross-record constraints the caller validates.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsDataLabExtContents {
+pub struct DataLabExtContents {
     /// Raw `frtHeader.grbitFrt` bitfield (`fFrtRef`/`fFrtAlert` are zero).
     frt_flags: u16,
     /// `frtHeader.reserved` bytes, preserved verbatim.
@@ -201,7 +201,7 @@ pub struct XlsDataLabExtContents {
     separator_bytes: Vec<u8>,
 }
 
-impl XlsDataLabExtContents {
+impl DataLabExtContents {
     /// Flags bit: `fSerName` (series name displayed).
     const FLAG_SERIES_NAME: u16 = 0x0001;
     /// Flags bit: `fCatName` (category name displayed).
@@ -214,12 +214,12 @@ impl XlsDataLabExtContents {
     const FLAG_BUBBLE_SIZES: u16 = 0x0010;
 
     /// Parse a `DataLabExtContents` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         // FrtHeader (12) + flags (2) + cch (2); the string option flags and
         // characters follow when cch is greater than zero.
         const MIN_LEN: usize = FRT_HEADER_LEN + 4;
         if data.len() < MIN_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: MIN_LEN,
                 found: data.len(),
             });
@@ -236,7 +236,7 @@ impl XlsDataLabExtContents {
         // zero; MS-XLS 2.5.296: rgb holds cch or 2*cch bytes.
         if separator_len == 0 {
             if reader.remaining() != 0 {
-                return Err(XlsError::InvalidLength {
+                return Err(Error::InvalidLength {
                     expected: MIN_LEN,
                     found: data.len(),
                 });
@@ -251,7 +251,7 @@ impl XlsDataLabExtContents {
             });
         }
         if reader.remaining() < 1 {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: MIN_LEN + 1,
                 found: data.len(),
             });
@@ -375,29 +375,26 @@ mod tests {
     #[test]
     fn data_lab_ext_round_trip() {
         let bytes = frt_header(DATA_LAB_EXT_RECORD_TYPE);
-        let parsed = XlsDataLabExt::parse(&bytes).unwrap();
+        let parsed = DataLabExt::parse(&bytes).unwrap();
         assert_eq!(parsed.frt_flags(), 0);
         assert_eq!(parsed.to_payload(), bytes);
         // Reserved header bytes round-trip verbatim.
         let mut reserved = bytes.clone();
         reserved[4..FRT_HEADER_LEN].copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
-        assert_eq!(
-            XlsDataLabExt::parse(&reserved).unwrap().to_payload(),
-            reserved
-        );
+        assert_eq!(DataLabExt::parse(&reserved).unwrap().to_payload(), reserved);
     }
 
     #[test]
     fn data_lab_ext_rejects_malformed_records() {
         let bytes = frt_header(DATA_LAB_EXT_RECORD_TYPE);
-        assert!(XlsDataLabExt::parse(&bytes[..11]).is_err());
-        assert!(XlsDataLabExt::parse(&[bytes.as_slice(), &[0]].concat()).is_err());
+        assert!(DataLabExt::parse(&bytes[..11]).is_err());
+        assert!(DataLabExt::parse(&[bytes.as_slice(), &[0]].concat()).is_err());
         let mut wrong_rt = bytes.clone();
         wrong_rt[0..2].copy_from_slice(&DATA_LAB_EXT_CONTENTS_RECORD_TYPE.to_le_bytes());
-        assert!(XlsDataLabExt::parse(&wrong_rt).is_err());
+        assert!(DataLabExt::parse(&wrong_rt).is_err());
         let mut bad_flags = bytes.clone();
         bad_flags[2..4].copy_from_slice(&0x0001u16.to_le_bytes());
-        assert!(XlsDataLabExt::parse(&bad_flags).is_err());
+        assert!(DataLabExt::parse(&bad_flags).is_err());
     }
 
     fn contents_record(flags: u16, separator: &[u8], high_byte: bool) -> Vec<u8> {
@@ -419,7 +416,7 @@ mod tests {
     #[test]
     fn contents_round_trip_compressed_and_double_byte() {
         let bytes = contents_record(0x001F, b" | ", false);
-        let parsed = XlsDataLabExtContents::parse(&bytes).unwrap();
+        let parsed = DataLabExtContents::parse(&bytes).unwrap();
         assert!(parsed.show_series_name());
         assert!(parsed.show_category_name());
         assert!(parsed.show_value());
@@ -430,14 +427,14 @@ mod tests {
 
         let wide: Vec<u8> = "; ".encode_utf16().flat_map(u16::to_le_bytes).collect();
         let bytes = contents_record(0x0005, &wide, true);
-        let parsed = XlsDataLabExtContents::parse(&bytes).unwrap();
+        let parsed = DataLabExtContents::parse(&bytes).unwrap();
         assert_eq!(parsed.separator(), "; ");
         assert_eq!(parsed.separator_flags(), 0x01);
         assert_eq!(parsed.to_payload(), bytes);
 
         // Empty separator: cch 0 and no string bytes.
         let bytes = contents_record(0x0000, b"", false);
-        let parsed = XlsDataLabExtContents::parse(&bytes).unwrap();
+        let parsed = DataLabExtContents::parse(&bytes).unwrap();
         assert_eq!(parsed.separator(), "");
         assert_eq!(parsed.to_payload(), bytes);
     }
@@ -446,23 +443,23 @@ mod tests {
     fn contents_rejects_malformed_records() {
         let bytes = contents_record(0x0001, b"ab", false);
         // Truncated header.
-        assert!(XlsDataLabExtContents::parse(&bytes[..15]).is_err());
+        assert!(DataLabExtContents::parse(&bytes[..15]).is_err());
         // Wrong FrtHeader.rt.
         let mut wrong_rt = bytes.clone();
         wrong_rt[0..2].copy_from_slice(&DATA_LAB_EXT_RECORD_TYPE.to_le_bytes());
-        assert!(XlsDataLabExtContents::parse(&wrong_rt).is_err());
+        assert!(DataLabExtContents::parse(&wrong_rt).is_err());
         // cch does not match the string byte count.
         let mut mismatch = contents_record(0, b"ab", false);
         mismatch[14..16].copy_from_slice(&3u16.to_le_bytes());
-        assert!(XlsDataLabExtContents::parse(&mismatch).is_err());
+        assert!(DataLabExtContents::parse(&mismatch).is_err());
         // String bytes present with cch 0.
         let mut extra = contents_record(0, b"", false);
         extra.push(0);
-        assert!(XlsDataLabExtContents::parse(&extra).is_err());
+        assert!(DataLabExtContents::parse(&extra).is_err());
         // Double-byte length mismatch.
         let mut wide_mismatch = contents_record(0, &[0x41, 0x00], true);
         wide_mismatch[14..16].copy_from_slice(&2u16.to_le_bytes());
-        assert!(XlsDataLabExtContents::parse(&wide_mismatch).is_err());
+        assert!(DataLabExtContents::parse(&wide_mismatch).is_err());
     }
 
     #[test]
@@ -470,7 +467,7 @@ mod tests {
         let header = frt_header(DATA_LAB_EXT_RECORD_TYPE);
         for length in 0..FRT_HEADER_LEN {
             assert!(
-                XlsDataLabExt::parse(&header[..length]).is_err(),
+                DataLabExt::parse(&header[..length]).is_err(),
                 "DataLabExt length {length}"
             );
         }
@@ -478,7 +475,7 @@ mod tests {
         let contents = contents_record(0x0001, b"ab", false);
         for length in 0..contents.len() {
             assert!(
-                XlsDataLabExtContents::parse(&contents[..length]).is_err(),
+                DataLabExtContents::parse(&contents[..length]).is_err(),
                 "DataLabExtContents length {length}"
             );
         }

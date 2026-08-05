@@ -1,61 +1,76 @@
-//! Simple PPTX demo without media for testing basic features.
+//! Concise typed PresentationML slide demo.
 //!
-//! Run with: cargo run --example pptx_simple_demo
+//! Run with: cargo run --example pptx_simple_demo --features ooxml
 
-use litchi::ooxml::pptx::Package;
+use litchi_pptx::{MutablePresentation, Package};
+
+const EMU_PER_INCH: i64 = 914_400;
+const TEXT_WIDTH: i64 = 7_315_200;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Creating simple PPTX demonstration...\n");
+    println!("Creating typed PPTX demonstration...\n");
 
-    let mut pkg = Package::new()?;
-    let pres = pkg.presentation_mut()?;
+    let mut package = Package::new()?;
+    {
+        let presentation = package.presentation_mut()?;
+        presentation.set_widescreen_slide_size();
+        add_title_slide(presentation)?;
+        add_shapes_slide(presentation)?;
+    }
 
-    // Slide 1: Title
-    println!("Creating Slide 1: Title");
-    let slide1 = pres.add_slide()?;
-    slide1.set_title("Simple Demo");
-    slide1.add_text_box(
-        "This is a test presentation",
-        914400,
-        3429000,
-        7315200,
-        914400,
-    );
-
-    // Slide 2: Table
-    println!("Creating Slide 2: Table");
-    let slide2 = pres.add_slide()?;
-    slide2.set_title("Table Test");
-    let table_data = vec![
-        vec!["A".to_string(), "B".to_string()],
-        vec!["1".to_string(), "2".to_string()],
-    ];
-    slide2.add_table(table_data, 914400, 1828800, 5486400, 1828800);
-
-    // Slide 3: Shapes
-    println!("Creating Slide 3: Shapes");
-    let slide3 = pres.add_slide()?;
-    slide3.set_title("Shape Test");
-    slide3.add_rectangle(
-        914400,
-        1828800,
-        1828800,
-        1371600,
-        Some("FF6B6B".to_string()),
-    );
-    slide3.add_ellipse(
-        3200400,
-        1828800,
-        1828800,
-        1371600,
-        Some("4ECDC4".to_string()),
-    );
-
-    // Save
     let output_path = "pptx_simple_demo.pptx";
     println!("\nSaving to {}...", output_path);
-    pkg.save(output_path)?;
+    package.save(output_path)?;
     println!("✓ Done!");
 
+    Ok(())
+}
+
+fn add_title_slide(
+    presentation: &mut MutablePresentation,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Creating Slide 1: Title");
+    let slide = presentation.add_slide()?;
+    slide.set_title("Simple Typed Demo");
+    slide
+        .add_text_box(
+            "A small PresentationML deck authored with typed slide and shape models.",
+            EMU_PER_INCH,
+            3 * EMU_PER_INCH,
+            TEXT_WIDTH,
+            EMU_PER_INCH,
+        )
+        .font("Aptos")
+        .font_size(24.0);
+    Ok(())
+}
+
+fn add_shapes_slide(
+    presentation: &mut MutablePresentation,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Creating Slide 2: Shapes");
+    let slide = presentation.add_slide()?;
+    slide.set_title("Typed Shapes");
+    slide.add_text_box(
+        "Rectangle and ellipse shapes use the current typed writer API.",
+        EMU_PER_INCH,
+        EMU_PER_INCH,
+        TEXT_WIDTH,
+        EMU_PER_INCH,
+    );
+    slide.add_rectangle(
+        EMU_PER_INCH,
+        2 * EMU_PER_INCH,
+        2 * EMU_PER_INCH,
+        1_500_000,
+        Some("FF6B6B".to_owned()),
+    );
+    slide.add_ellipse(
+        4 * EMU_PER_INCH,
+        2 * EMU_PER_INCH,
+        2 * EMU_PER_INCH,
+        1_500_000,
+        Some("4ECDC4".to_owned()),
+    );
     Ok(())
 }

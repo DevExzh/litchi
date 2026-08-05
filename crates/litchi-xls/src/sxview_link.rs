@@ -9,7 +9,7 @@
 //!
 //! - MS-XLS 2.4.316 (SXViewLink), 2.5.296 (XLUnicodeStringNoCch)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `SXViewLink` record (MS-XLS 2.4.316). The `rt` field
 /// of the payload MUST repeat this value.
@@ -22,8 +22,8 @@ const HEADER_LEN: usize = 7;
 /// `fHighByte` option bit of an `XLUnicodeStringNoCch` (MS-XLS 2.5.296).
 const STRING_HIGH_BYTE: u8 = 0x01;
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: SX_VIEW_LINK_RECORD_TYPE,
         message: message.into(),
     }
@@ -40,7 +40,7 @@ fn read_u16(data: &[u8], offset: usize) -> u16 {
 /// The `unused` and `reserved` fields MUST be ignored; they are preserved
 /// verbatim so the record round-trips unchanged.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsSXViewLink {
+pub struct SXViewLink {
     /// Undefined two-byte field (`unused`), preserved verbatim.
     unused: u16,
     /// Reserved two-byte field (`reserved`), preserved verbatim; MUST be
@@ -50,11 +50,11 @@ pub struct XlsSXViewLink {
     pivot_table_name: String,
 }
 
-impl XlsSXViewLink {
+impl SXViewLink {
     /// Parse an `SXViewLink` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < HEADER_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: HEADER_LEN,
                 found: data.len(),
             });
@@ -70,7 +70,7 @@ impl XlsSXViewLink {
         let cch = usize::from(data[6]);
 
         // stPivotTable: XLUnicodeStringNoCch (MS-XLS 2.5.296).
-        let flags = *data.get(HEADER_LEN).ok_or(XlsError::InvalidLength {
+        let flags = *data.get(HEADER_LEN).ok_or(Error::InvalidLength {
             expected: HEADER_LEN + 1,
             found: data.len(),
         })?;
@@ -85,7 +85,7 @@ impl XlsSXViewLink {
             .ok_or_else(|| invalid("SXViewLink stPivotTable length overflow"))?;
         let expected_len = HEADER_LEN + 1 + char_bytes;
         if data.len() != expected_len {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: expected_len,
                 found: data.len(),
             });
@@ -97,7 +97,7 @@ impl XlsSXViewLink {
                 .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
                 .collect();
             String::from_utf16(&units)
-                .map_err(|error| XlsError::Encoding(format!("SXViewLink stPivotTable: {error}")))?
+                .map_err(|error| Error::Encoding(format!("SXViewLink stPivotTable: {error}")))?
         } else {
             // Compressed Unicode supplies an implicit zero high byte.
             raw.iter().map(|&byte| char::from(byte)).collect()
@@ -164,7 +164,7 @@ mod tests {
     #[test]
     fn round_trip_compressed() {
         let payload = build_payload(10, 0, b"PivotTable");
-        let record = XlsSXViewLink::parse(&payload).unwrap();
+        let record = SXViewLink::parse(&payload).unwrap();
         assert_eq!(record.unused(), 0);
         assert_eq!(record.reserved(), 0);
         assert_eq!(record.pivot_table_name(), "PivotTable");
@@ -179,7 +179,7 @@ mod tests {
             .flat_map(u16::to_le_bytes)
             .collect();
         let payload = build_payload(7, STRING_HIGH_BYTE, &name);
-        let record = XlsSXViewLink::parse(&payload).unwrap();
+        let record = SXViewLink::parse(&payload).unwrap();
         assert_eq!(record.pivot_table_name(), "Сводная");
         assert_eq!(record.to_payload(), payload);
     }
@@ -187,7 +187,7 @@ mod tests {
     #[test]
     fn round_trip_empty_name() {
         let payload = build_payload(0, 0, &[]);
-        let record = XlsSXViewLink::parse(&payload).unwrap();
+        let record = SXViewLink::parse(&payload).unwrap();
         assert_eq!(record.pivot_table_name(), "");
         assert_eq!(record.to_payload(), payload);
     }
@@ -196,40 +196,40 @@ mod tests {
     fn rejects_wrong_rt() {
         let mut payload = build_payload(1, 0, b"A");
         payload[0..2].copy_from_slice(&0x0857u16.to_le_bytes());
-        assert!(XlsSXViewLink::parse(&payload).is_err());
+        assert!(SXViewLink::parse(&payload).is_err());
     }
 
     #[test]
     fn rejects_truncation_and_trailing_garbage() {
         let payload = build_payload(10, 0, b"PivotTable");
-        assert!(XlsSXViewLink::parse(&payload[..HEADER_LEN]).is_err());
-        assert!(XlsSXViewLink::parse(&payload[..payload.len() - 1]).is_err());
+        assert!(SXViewLink::parse(&payload[..HEADER_LEN]).is_err());
+        assert!(SXViewLink::parse(&payload[..payload.len() - 1]).is_err());
         let mut longer = payload.clone();
         longer.push(0);
-        assert!(XlsSXViewLink::parse(&longer).is_err());
+        assert!(SXViewLink::parse(&longer).is_err());
     }
 
     #[test]
     fn rejects_unsupported_string_flags() {
         // Bits other than fHighByte are reserved (MS-XLS 2.5.296).
         let payload = build_payload(10, 0x02, b"PivotTable");
-        assert!(XlsSXViewLink::parse(&payload).is_err());
+        assert!(SXViewLink::parse(&payload).is_err());
     }
 
     #[test]
     fn rejects_count_length_mismatch() {
         // cch says 11 characters but only 10 compressed bytes follow.
         let payload = build_payload(11, 0, b"PivotTable");
-        assert!(XlsSXViewLink::parse(&payload).is_err());
+        assert!(SXViewLink::parse(&payload).is_err());
         // cch says 5 characters but 10 follow.
         let payload = build_payload(5, 0, b"PivotTable");
-        assert!(XlsSXViewLink::parse(&payload).is_err());
+        assert!(SXViewLink::parse(&payload).is_err());
     }
 
     #[test]
     fn rejects_invalid_utf16() {
         // Lone surrogate in an otherwise well-formed wide string.
         let payload = build_payload(1, STRING_HIGH_BYTE, &[0x00, 0xD8]);
-        assert!(XlsSXViewLink::parse(&payload).is_err());
+        assert!(SXViewLink::parse(&payload).is_err());
     }
 }

@@ -1,16 +1,16 @@
-use litchi_ppt::writer::PptWriter;
+use litchi_ppt::writer::Writer;
 use litchi_ppt::{
-    Package, PowerPointHeaderFooter, PowerPointHeaderFooterOptions, PowerPointHeaderFooterParent,
-    PowerPointHeaderFooterParentOrdinal, PowerPointHeaderFooterScope,
+    HeaderFooter, HeaderFooterOptions, HeaderFooterParent, HeaderFooterParentOrdinal,
+    HeaderFooterScope, Package,
 };
 use std::io::Cursor;
 
-fn header_footer(footer: &str) -> PowerPointHeaderFooter {
-    PowerPointHeaderFooter {
-        scope: PowerPointHeaderFooterScope::PresentationSlides,
-        options: PowerPointHeaderFooterOptions {
+fn header_footer(footer: &str) -> HeaderFooter {
+    HeaderFooter {
+        scope: HeaderFooterScope::PresentationSlides,
+        options: HeaderFooterOptions {
             show_footer: true,
-            ..PowerPointHeaderFooterOptions::default()
+            ..HeaderFooterOptions::default()
         },
         user_date: None,
         header: None,
@@ -19,7 +19,7 @@ fn header_footer(footer: &str) -> PowerPointHeaderFooter {
     }
 }
 
-fn write(writer: &mut PptWriter) -> Vec<u8> {
+fn write(writer: &mut Writer) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
     output.into_inner()
@@ -27,7 +27,7 @@ fn write(writer: &mut PptWriter) -> Vec<u8> {
 
 #[test]
 fn writer_attaches_header_footers_to_every_supported_parent() {
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
     writer.add_slide().unwrap();
     writer.add_slide().unwrap();
 
@@ -52,27 +52,27 @@ fn writer_attaches_header_footers_to_every_supported_parent() {
     assert_eq!(values.entries().len(), 4);
     assert_eq!(
         values.entries()[0].scope,
-        PowerPointHeaderFooterScope::PresentationSlides
+        HeaderFooterScope::PresentationSlides
     );
     assert_eq!(values.entries()[0].footer.as_deref(), Some("全局页脚"));
     assert_eq!(
         values.entries()[1].scope,
-        PowerPointHeaderFooterScope::NotesAndHandouts
+        HeaderFooterScope::NotesAndHandouts
     );
     assert_eq!(values.entries()[1].header.as_deref(), Some("Notes 标题"));
     assert!(values.entries().iter().any(|entry| {
         entry.scope
-            == PowerPointHeaderFooterScope::Local {
-                parent: PowerPointHeaderFooterParent::MainMaster,
-                parent_ordinal: PowerPointHeaderFooterParentOrdinal::new(0),
+            == HeaderFooterScope::Local {
+                parent: HeaderFooterParent::MainMaster,
+                parent_ordinal: HeaderFooterParentOrdinal::new(0),
             }
             && entry.footer.as_deref() == Some("Master footer")
     }));
     assert!(values.entries().iter().any(|entry| {
         entry.scope
-            == PowerPointHeaderFooterScope::Local {
-                parent: PowerPointHeaderFooterParent::Slide,
-                parent_ordinal: PowerPointHeaderFooterParentOrdinal::new(0),
+            == HeaderFooterScope::Local {
+                parent: HeaderFooterParent::Slide,
+                parent_ordinal: HeaderFooterParentOrdinal::new(0),
             }
             && entry.footer.as_deref() == Some("Moved slide 页脚")
     }));
@@ -80,7 +80,7 @@ fn writer_attaches_header_footers_to_every_supported_parent() {
 
 #[test]
 fn rejected_local_header_does_not_replace_existing_slide_value() {
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
     writer.add_slide().unwrap();
     writer
         .set_slide_header_footer(0, header_footer("kept"))

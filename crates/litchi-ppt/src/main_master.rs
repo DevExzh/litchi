@@ -1,13 +1,12 @@
 //! PowerPoint 12 round-trip metadata attached to main master slides.
 
-use super::package::{PptError, Result};
-use super::records::PptRecord;
+use super::package::{Error, Result};
+use super::records::Record;
 use super::slide_round_trip::{
-    PowerPointAnimationPackage, PowerPointColorMapping, PowerPointEmbeddedXmlPackage,
-    PowerPointThemePackage, parse_animation_package, parse_color_mapping,
-    parse_embedded_xml_package, parse_theme_package, validate_variable_atom,
+    AnimationPackage, ColorMapping, EmbeddedXmlPackage, ThemePackage, parse_animation_package,
+    parse_color_mapping, parse_embedded_xml_package, parse_theme_package, validate_variable_atom,
 };
-use crate::consts::PptRecordType;
+use crate::consts::RecordType;
 use litchi_opc::constants::content_type;
 
 const PRESENTATIONML_NAMESPACE: &[u8] =
@@ -15,7 +14,7 @@ const PRESENTATIONML_NAMESPACE: &[u8] =
 
 /// Position of a PowerPoint 12 main-master text-style package in the container schema.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PowerPointMainMasterTextStylesSource {
+pub enum MainMasterTextStylesSource {
     /// Optional direct field before the main master's drawing.
     Direct,
     /// Member of the PowerPoint 12 round-trip array after the drawing.
@@ -24,48 +23,48 @@ pub enum PowerPointMainMasterTextStylesSource {
 
 /// Embedded slide layout associated with a PowerPoint 12 main master.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointContentMasterInfo {
+pub struct ContentMasterInfo {
     /// Record-instance bits retained because MS-PPT does not constrain them.
     pub record_instance: u16,
     /// Validated package containing the PresentationML `sldLayout` part.
-    pub package: PowerPointEmbeddedXmlPackage,
+    pub package: EmbeddedXmlPackage,
 }
 
 /// Embedded text styles associated with a PowerPoint 12 main master.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointMainMasterTextStyles {
+pub struct MainMasterTextStyles {
     /// Schema position from which this package was read.
-    pub source: PowerPointMainMasterTextStylesSource,
+    pub source: MainMasterTextStylesSource,
     /// Validated package containing the PresentationML `txStyles` part.
-    pub package: PowerPointEmbeddedXmlPackage,
+    pub package: EmbeddedXmlPackage,
 }
 
 /// PowerPoint 12 round-trip metadata stored on one main master slide.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct PowerPoint12MainMasterMetadata {
+pub struct MainMasterMetadata12 {
     /// Original PresentationML slide-master identifier.
     pub original_main_master_id: Option<u32>,
     /// Validated embedded theme or theme-override package.
-    pub theme_package: Option<PowerPointThemePackage>,
+    pub theme_package: Option<ThemePackage>,
     /// Validated color-mapping XML.
-    pub color_mapping: Option<PowerPointColorMapping>,
+    pub color_mapping: Option<ColorMapping>,
     /// Repeatable embedded slide-layout packages.
-    pub content_masters: Vec<PowerPointContentMasterInfo>,
+    pub content_masters: Vec<ContentMasterInfo>,
     /// Direct and/or round-trip-array text-style packages.
-    pub text_styles: Vec<PowerPointMainMasterTextStyles>,
+    pub text_styles: Vec<MainMasterTextStyles>,
     /// Validated embedded animation package.
-    pub animation_package: Option<PowerPointAnimationPackage>,
+    pub animation_package: Option<AnimationPackage>,
     /// Checksum stored for the animation data.
     pub animation_checksum: Option<u32>,
     /// Identifier of the main master merged into a custom layout.
     pub composite_master_id: Option<u32>,
 }
 
-impl PowerPoint12MainMasterMetadata {
+impl MainMasterMetadata12 {
     /// Parse PowerPoint 12 round-trip records from one `MainMaster` container.
-    pub fn parse(root: &PptRecord) -> Result<Self> {
-        if root.record_type != PptRecordType::MainMaster {
-            return Err(PptError::Corrupted(
+    pub fn parse(root: &Record) -> Result<Self> {
+        if root.record_type != RecordType::MainMaster {
+            return Err(Error::Corrupted(
                 "PowerPoint 12 main-master metadata requires a MainMaster container".to_string(),
             ));
         }
@@ -74,31 +73,28 @@ impl PowerPoint12MainMasterMetadata {
         let mut direct_text_styles = false;
         let mut array_text_styles = false;
         for record in &root.children {
-            if record.record_type == PptRecordType::PPDrawing {
+            if record.record_type == RecordType::PPDrawing {
                 seen_drawing = true;
                 continue;
             }
             match record.record_type {
-                PptRecordType::RoundTripOArtTextStyles12Atom => {
+                RecordType::RoundTripOArtTextStyles12Atom => {
                     let (source, seen) = if seen_drawing {
                         (
-                            PowerPointMainMasterTextStylesSource::RoundTripArray,
+                            MainMasterTextStylesSource::RoundTripArray,
                             &mut array_text_styles,
                         )
                     } else {
-                        (
-                            PowerPointMainMasterTextStylesSource::Direct,
-                            &mut direct_text_styles,
-                        )
+                        (MainMasterTextStylesSource::Direct, &mut direct_text_styles)
                     };
                     if *seen {
-                        return Err(PptError::Corrupted(format!(
+                        return Err(Error::Corrupted(format!(
                             "MainMaster contains duplicate {source:?} text-style records"
                         )));
                     }
                     *seen = true;
                     validate_variable_atom(record, "RoundTripOArtTextStyles12Atom")?;
-                    metadata.text_styles.push(PowerPointMainMasterTextStyles {
+                    metadata.text_styles.push(MainMasterTextStyles {
                         source,
                         package: parse_embedded_xml_package(
                             &record.data,
@@ -109,7 +105,7 @@ impl PowerPoint12MainMasterMetadata {
                         )?,
                     });
                 },
-                PptRecordType::RoundTripOriginalMainMasterId12Atom => {
+                RecordType::RoundTripOriginalMainMasterId12Atom => {
                     require_array_position(seen_drawing, "RoundTripOriginalMainMasterId12Atom")?;
                     if metadata.original_main_master_id.is_some() {
                         return Err(duplicate("RoundTripOriginalMainMasterId12Atom"));
@@ -117,7 +113,7 @@ impl PowerPoint12MainMasterMetadata {
                     validate_fixed_atom(record, "RoundTripOriginalMainMasterId12Atom", 4, true)?;
                     metadata.original_main_master_id = Some(read_u32(record));
                 },
-                PptRecordType::RoundTripTheme12Atom => {
+                RecordType::RoundTripTheme12Atom => {
                     require_array_position(seen_drawing, "RoundTripThemeAtom")?;
                     if metadata.theme_package.is_some() {
                         return Err(duplicate("RoundTripThemeAtom"));
@@ -125,7 +121,7 @@ impl PowerPoint12MainMasterMetadata {
                     validate_variable_atom(record, "RoundTripThemeAtom")?;
                     metadata.theme_package = Some(parse_theme_package(&record.data)?);
                 },
-                PptRecordType::RoundTripColorMapping12Atom => {
+                RecordType::RoundTripColorMapping12Atom => {
                     require_array_position(seen_drawing, "RoundTripColorMappingAtom")?;
                     if metadata.color_mapping.is_some() {
                         return Err(duplicate("RoundTripColorMappingAtom"));
@@ -133,13 +129,13 @@ impl PowerPoint12MainMasterMetadata {
                     validate_variable_atom(record, "RoundTripColorMappingAtom")?;
                     metadata.color_mapping = Some(parse_color_mapping(&record.data)?);
                 },
-                PptRecordType::RoundTripContentMasterInfo12Atom => {
+                RecordType::RoundTripContentMasterInfo12Atom => {
                     require_array_position(seen_drawing, "RoundTripContentMasterInfo12Atom")?;
                     validate_variable_atom_allow_instance(
                         record,
                         "RoundTripContentMasterInfo12Atom",
                     )?;
-                    metadata.content_masters.push(PowerPointContentMasterInfo {
+                    metadata.content_masters.push(ContentMasterInfo {
                         record_instance: record.instance,
                         package: parse_embedded_xml_package(
                             &record.data,
@@ -150,7 +146,7 @@ impl PowerPoint12MainMasterMetadata {
                         )?,
                     });
                 },
-                PptRecordType::RoundTripAnimation12Atom => {
+                RecordType::RoundTripAnimation12Atom => {
                     require_array_position(seen_drawing, "RoundTripAnimationAtom")?;
                     if metadata.animation_package.is_some() {
                         return Err(duplicate("RoundTripAnimationAtom"));
@@ -158,7 +154,7 @@ impl PowerPoint12MainMasterMetadata {
                     validate_variable_atom(record, "RoundTripAnimationAtom")?;
                     metadata.animation_package = Some(parse_animation_package(&record.data)?);
                 },
-                PptRecordType::RoundTripAnimationHash12Atom => {
+                RecordType::RoundTripAnimationHash12Atom => {
                     require_array_position(seen_drawing, "RoundTripAnimationHashAtom")?;
                     if metadata.animation_checksum.is_some() {
                         return Err(duplicate("RoundTripAnimationHashAtom"));
@@ -166,7 +162,7 @@ impl PowerPoint12MainMasterMetadata {
                     validate_fixed_atom(record, "RoundTripAnimationHashAtom", 4, true)?;
                     metadata.animation_checksum = Some(read_u32(record));
                 },
-                PptRecordType::RoundTripCompositeMasterId12Atom => {
+                RecordType::RoundTripCompositeMasterId12Atom => {
                     require_array_position(seen_drawing, "RoundTripCompositeMasterId12Atom")?;
                     if metadata.composite_master_id.is_some() {
                         return Err(duplicate("RoundTripCompositeMasterId12Atom"));
@@ -183,20 +179,20 @@ impl PowerPoint12MainMasterMetadata {
 
 fn require_array_position(seen_drawing: bool, name: &str) -> Result<()> {
     if !seen_drawing {
-        return Err(PptError::Corrupted(format!(
+        return Err(Error::Corrupted(format!(
             "{name} occurs before the MainMaster drawing"
         )));
     }
     Ok(())
 }
 
-fn duplicate(name: &str) -> PptError {
-    PptError::Corrupted(format!("MainMaster contains duplicate {name} records"))
+fn duplicate(name: &str) -> Error {
+    Error::Corrupted(format!("MainMaster contains duplicate {name} records"))
 }
 
-fn validate_variable_atom_allow_instance(record: &PptRecord, name: &str) -> Result<()> {
+fn validate_variable_atom_allow_instance(record: &Record, name: &str) -> Result<()> {
     if record.version != 0 || record.data_length as usize != record.data.len() {
-        return Err(PptError::Corrupted(format!(
+        return Err(Error::Corrupted(format!(
             "{name} has an invalid record header or size"
         )));
     }
@@ -204,7 +200,7 @@ fn validate_variable_atom_allow_instance(record: &PptRecord, name: &str) -> Resu
 }
 
 fn validate_fixed_atom(
-    record: &PptRecord,
+    record: &Record,
     name: &str,
     expected_length: usize,
     require_zero_instance: bool,
@@ -214,14 +210,14 @@ fn validate_fixed_atom(
         || record.data_length as usize != expected_length
         || record.data.len() != expected_length
     {
-        return Err(PptError::Corrupted(format!(
+        return Err(Error::Corrupted(format!(
             "{name} has an invalid record header or size"
         )));
     }
     Ok(())
 }
 
-fn read_u32(record: &PptRecord) -> u32 {
+fn read_u32(record: &Record) -> u32 {
     u32::from_le_bytes([
         record.data[0],
         record.data[1],
@@ -237,8 +233,8 @@ mod tests {
     use litchi_opc::{OpcPackage, PackURI, XmlPart};
     use std::io::Cursor;
 
-    fn record(record_type: PptRecordType, version: u16, instance: u16, data: &[u8]) -> PptRecord {
-        PptRecord {
+    fn record(record_type: RecordType, version: u16, instance: u16, data: &[u8]) -> Record {
+        Record {
             version,
             instance,
             record_type,
@@ -249,14 +245,14 @@ mod tests {
         }
     }
 
-    fn root(children: Vec<PptRecord>) -> PptRecord {
-        let mut root = record(PptRecordType::MainMaster, 0x0f, 0, &[]);
+    fn root(children: Vec<Record>) -> Record {
+        let mut root = record(RecordType::MainMaster, 0x0f, 0, &[]);
         root.children = children;
         root
     }
 
-    fn drawing() -> PptRecord {
-        record(PptRecordType::PPDrawing, 0x0f, 0, &[])
+    fn drawing() -> Record {
+        record(RecordType::PPDrawing, 0x0f, 0, &[])
     }
 
     fn xml_package(part_name: &str, content_type: &str, xml: &[u8]) -> Vec<u8> {
@@ -297,40 +293,40 @@ mod tests {
     fn parses_master_only_metadata_with_schema_position_and_boundaries() {
         let text_styles = text_styles_package();
         let content_master = content_master_package();
-        let parsed = PowerPoint12MainMasterMetadata::parse(&root(vec![
+        let parsed = MainMasterMetadata12::parse(&root(vec![
             record(
-                PptRecordType::RoundTripOArtTextStyles12Atom,
+                RecordType::RoundTripOArtTextStyles12Atom,
                 0,
                 0,
                 &text_styles,
             ),
             drawing(),
             record(
-                PptRecordType::RoundTripOriginalMainMasterId12Atom,
+                RecordType::RoundTripOriginalMainMasterId12Atom,
                 0,
                 0,
                 &0u32.to_le_bytes(),
             ),
             record(
-                PptRecordType::RoundTripContentMasterInfo12Atom,
+                RecordType::RoundTripContentMasterInfo12Atom,
                 0,
                 0,
                 &content_master,
             ),
             record(
-                PptRecordType::RoundTripContentMasterInfo12Atom,
+                RecordType::RoundTripContentMasterInfo12Atom,
                 0,
                 0x0fff,
                 &content_master,
             ),
             record(
-                PptRecordType::RoundTripOArtTextStyles12Atom,
+                RecordType::RoundTripOArtTextStyles12Atom,
                 0,
                 0,
                 &text_styles,
             ),
             record(
-                PptRecordType::RoundTripCompositeMasterId12Atom,
+                RecordType::RoundTripCompositeMasterId12Atom,
                 0,
                 0,
                 &u32::MAX.to_le_bytes(),
@@ -350,17 +346,17 @@ mod tests {
         assert_eq!(parsed.text_styles.len(), 2);
         assert_eq!(
             parsed.text_styles[0].source,
-            PowerPointMainMasterTextStylesSource::Direct
+            MainMasterTextStylesSource::Direct
         );
         assert_eq!(
             parsed.text_styles[1].source,
-            PowerPointMainMasterTextStylesSource::RoundTripArray
+            MainMasterTextStylesSource::RoundTripArray
         );
         assert_eq!(parsed.text_styles[0].package.data, text_styles);
 
         assert_eq!(
-            PowerPoint12MainMasterMetadata::parse(&root(vec![drawing()])).unwrap(),
-            PowerPoint12MainMasterMetadata::default()
+            MainMasterMetadata12::parse(&root(vec![drawing()])).unwrap(),
+            MainMasterMetadata12::default()
         );
     }
 
@@ -370,16 +366,13 @@ mod tests {
         let content_master = content_master_package();
         let original = |version, instance, data: &[u8]| {
             record(
-                PptRecordType::RoundTripOriginalMainMasterId12Atom,
+                RecordType::RoundTripOriginalMainMasterId12Atom,
                 version,
                 instance,
                 data,
             )
         };
-        assert!(
-            PowerPoint12MainMasterMetadata::parse(&record(PptRecordType::Slide, 0x0f, 0, &[]))
-                .is_err()
-        );
+        assert!(MainMasterMetadata12::parse(&record(RecordType::Slide, 0x0f, 0, &[])).is_err());
         for malformed in [
             root(vec![original(0, 0, &u32::MAX.to_le_bytes()), drawing()]),
             root(vec![drawing(), original(1, 0, &u32::MAX.to_le_bytes())]),
@@ -392,13 +385,13 @@ mod tests {
             ]),
             root(vec![
                 record(
-                    PptRecordType::RoundTripOArtTextStyles12Atom,
+                    RecordType::RoundTripOArtTextStyles12Atom,
                     0,
                     0,
                     &text_styles,
                 ),
                 record(
-                    PptRecordType::RoundTripOArtTextStyles12Atom,
+                    RecordType::RoundTripOArtTextStyles12Atom,
                     0,
                     0,
                     &text_styles,
@@ -408,13 +401,13 @@ mod tests {
             root(vec![
                 drawing(),
                 record(
-                    PptRecordType::RoundTripOArtTextStyles12Atom,
+                    RecordType::RoundTripOArtTextStyles12Atom,
                     0,
                     0,
                     &text_styles,
                 ),
                 record(
-                    PptRecordType::RoundTripOArtTextStyles12Atom,
+                    RecordType::RoundTripOArtTextStyles12Atom,
                     0,
                     0,
                     &text_styles,
@@ -423,21 +416,19 @@ mod tests {
             root(vec![
                 drawing(),
                 record(
-                    PptRecordType::RoundTripContentMasterInfo12Atom,
+                    RecordType::RoundTripContentMasterInfo12Atom,
                     1,
                     0,
                     &content_master,
                 ),
             ]),
         ] {
-            assert!(PowerPoint12MainMasterMetadata::parse(&malformed).is_err());
+            assert!(MainMasterMetadata12::parse(&malformed).is_err());
         }
 
         let mut wrong_declared = original(0, 0, &u32::MAX.to_le_bytes());
         wrong_declared.data_length = 5;
-        assert!(
-            PowerPoint12MainMasterMetadata::parse(&root(vec![drawing(), wrong_declared])).is_err()
-        );
+        assert!(MainMasterMetadata12::parse(&root(vec![drawing(), wrong_declared])).is_err());
     }
 
     #[test]
@@ -455,30 +446,28 @@ mod tests {
         );
         for (record_type, instance, package) in [
             (
-                PptRecordType::RoundTripOArtTextStyles12Atom,
+                RecordType::RoundTripOArtTextStyles12Atom,
                 0,
                 b"not a package".as_slice(),
             ),
             (
-                PptRecordType::RoundTripOArtTextStyles12Atom,
+                RecordType::RoundTripOArtTextStyles12Atom,
                 1,
                 text_styles.as_slice(),
             ),
             (
-                PptRecordType::RoundTripOArtTextStyles12Atom,
+                RecordType::RoundTripOArtTextStyles12Atom,
                 0,
                 wrong_text_root.as_slice(),
             ),
             (
-                PptRecordType::RoundTripContentMasterInfo12Atom,
+                RecordType::RoundTripContentMasterInfo12Atom,
                 0,
                 wrong_layout_type.as_slice(),
             ),
         ] {
             let candidate = record(record_type, 0, instance, package);
-            assert!(
-                PowerPoint12MainMasterMetadata::parse(&root(vec![drawing(), candidate])).is_err()
-            );
+            assert!(MainMasterMetadata12::parse(&root(vec![drawing(), candidate])).is_err());
         }
 
         let mut package = OpcPackage::new();
@@ -500,12 +489,12 @@ mod tests {
         let mut output = Cursor::new(Vec::new());
         package.to_stream(&mut output).unwrap();
         let ambiguous = record(
-            PptRecordType::RoundTripContentMasterInfo12Atom,
+            RecordType::RoundTripContentMasterInfo12Atom,
             0,
             0,
             &output.into_inner(),
         );
-        assert!(PowerPoint12MainMasterMetadata::parse(&root(vec![drawing(), ambiguous])).is_err());
+        assert!(MainMasterMetadata12::parse(&root(vec![drawing(), ambiguous])).is_err());
     }
 
     #[test]

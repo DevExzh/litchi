@@ -4,7 +4,7 @@
 /// This module handles the complex structure of text styling in PPT files.
 use litchi_core::binary::{read_i16_le, read_i32_le, read_u16_le, read_u32_le};
 
-use super::package::{PptError, Result};
+use super::package::{Error, Result};
 
 /// Text property definition.
 ///
@@ -342,9 +342,9 @@ pub fn parse_style_text_prop_atom_strict(
     text_length: usize,
 ) -> Result<(Vec<TextPropCollection>, Vec<TextPropCollection>)> {
     let style_length = u32::try_from(text_length)
-        .map_err(|_| PptError::Corrupted("StyleTextPropAtom text length exceeds u32".to_string()))?
+        .map_err(|_| Error::Corrupted("StyleTextPropAtom text length exceeds u32".to_string()))?
         .checked_add(1)
-        .ok_or_else(|| PptError::Corrupted("StyleTextPropAtom text length overflow".to_string()))?;
+        .ok_or_else(|| Error::Corrupted("StyleTextPropAtom text length overflow".to_string()))?;
     let mut paragraph_styles = Vec::new();
     let mut character_styles = Vec::new();
     let mut offset = 0usize;
@@ -354,7 +354,7 @@ pub fn parse_style_text_prop_atom_strict(
         require_style_bytes(data, offset, 10, "TextPFRun header")?;
         let char_count = read_u32_le(data, offset).unwrap_or(0);
         if char_count == 0 || char_count > style_length - paragraph_coverage {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "TextPFRun has invalid character coverage".to_string(),
             ));
         }
@@ -367,7 +367,7 @@ pub fn parse_style_text_prop_atom_strict(
         let property_end = offset + property_size;
         let (properties, tab_stops) = parse_paragraph_properties(data, &mut offset, mask);
         if offset != property_end {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "TextPFException property size mismatch".to_string(),
             ));
         }
@@ -386,7 +386,7 @@ pub fn parse_style_text_prop_atom_strict(
         require_style_bytes(data, offset, 8, "TextCFRun header")?;
         let char_count = read_u32_le(data, offset).unwrap_or(0);
         if char_count == 0 || char_count > style_length - character_coverage {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "TextCFRun has invalid character coverage".to_string(),
             ));
         }
@@ -398,7 +398,7 @@ pub fn parse_style_text_prop_atom_strict(
         let property_end = offset + property_size;
         let properties = parse_character_properties(data, &mut offset, mask);
         if offset != property_end {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "TextCFException property size mismatch".to_string(),
             ));
         }
@@ -411,7 +411,7 @@ pub fn parse_style_text_prop_atom_strict(
     }
 
     if offset != data.len() {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "StyleTextPropAtom has trailing bytes".to_string(),
         ));
     }
@@ -446,7 +446,7 @@ pub(crate) fn paragraph_property_size(data: &[u8], offset: usize, mask: u32) -> 
         size = size
             .checked_add(2)
             .and_then(|size| count.checked_mul(4).and_then(|tabs| size.checked_add(tabs)))
-            .ok_or_else(|| PptError::Corrupted("TabStops size overflow".to_string()))?;
+            .ok_or_else(|| Error::Corrupted("TabStops size overflow".to_string()))?;
     }
     if mask & 0x0001_0000 != 0 {
         size += 2;
@@ -486,9 +486,9 @@ pub(crate) fn require_style_bytes(
 ) -> Result<()> {
     let end = offset
         .checked_add(size)
-        .ok_or_else(|| PptError::Corrupted(format!("{field} offset overflow")))?;
+        .ok_or_else(|| Error::Corrupted(format!("{field} offset overflow")))?;
     if end > data.len() {
-        return Err(PptError::Corrupted(format!("Truncated {field}")));
+        return Err(Error::Corrupted(format!("Truncated {field}")));
     }
     Ok(())
 }

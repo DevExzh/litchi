@@ -9,6 +9,6 @@ pub mod slide_info;
 
 // Re-export commonly used types
 pub use document_info::DocumentInfo;
-pub use record::PptRecord;
+pub use record::Record;
 pub use slide_atoms_set::SlideAtomsSet;
 pub use slide_info::SlideInfo;

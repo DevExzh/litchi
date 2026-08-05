@@ -1,12 +1,12 @@
 use crate::sort_data::{Config, Parent};
-use crate::{XlsListObject, XlsResult};
+use crate::{ListObject, Result};
 use std::io::Write;
 
 pub(crate) fn write_list_objects<W: Write>(
     writer: &mut W,
-    tables: &[XlsListObject],
+    tables: &[ListObject],
     sort_data: Option<&Config>,
-) -> XlsResult<()> {
+) -> Result<()> {
     if tables.is_empty() {
         return Ok(());
     }

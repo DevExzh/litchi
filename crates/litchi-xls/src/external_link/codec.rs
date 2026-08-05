@@ -5,10 +5,10 @@ use super::{
     CRN_RECORD_TYPE, EXTERN_NAME_RECORD_TYPE, EXTERN_SHEET_RECORD_TYPE, MAX_DDE_OLE_VALUES,
     MAX_EXTERNAL_SHEETS, SUP_BOOK_RECORD_TYPE,
 };
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
 impl ClipboardFormat {
-    pub(super) fn parse(value: i16) -> XlsResult<Self> {
+    pub(super) fn parse(value: i16) -> Result<Self> {
         match value {
             -1 => Ok(Self::None),
             0 => Ok(Self::Text),
@@ -33,7 +33,7 @@ impl ClipboardFormat {
 }
 
 impl ErrorValue {
-    pub(super) fn parse(code: u8) -> XlsResult<Self> {
+    pub(super) fn parse(code: u8) -> Result<Self> {
         match code {
             0x00 => Ok(Self::Null),
             0x07 => Ok(Self::DivisionByZero),
@@ -55,7 +55,7 @@ pub(super) fn parse_external_name(
     data: &[u8],
     book_index: usize,
     book: &SupportingBook,
-) -> XlsResult<Name> {
+) -> Result<Name> {
     if data.len() < 8 || data.len() > 8224 {
         return invalid(
             EXTERN_NAME_RECORD_TYPE,
@@ -106,11 +106,11 @@ pub(super) fn parse_external_name(
                 );
             }
             let formula_len =
-                usize::from(*data.get(offset).ok_or_else(|| XlsError::InvalidRecord {
+                usize::from(*data.get(offset).ok_or_else(|| Error::InvalidRecord {
                     record_type: EXTERN_NAME_RECORD_TYPE,
                     message: "ExtNameParsedFormula length is missing".to_string(),
                 })?) | (usize::from(*data.get(offset + 1).ok_or_else(|| {
-                    XlsError::InvalidRecord {
+                    Error::InvalidRecord {
                         record_type: EXTERN_NAME_RECORD_TYPE,
                         message: "ExtNameParsedFormula length is truncated".to_string(),
                     }
@@ -205,7 +205,7 @@ pub(super) fn parse_external_name(
                     let last_row = read_u16(remaining, 1);
                     let expected = (usize::from(last_column) + 1)
                         .checked_mul(usize::from(last_row) + 1)
-                        .ok_or_else(|| XlsError::InvalidRecord {
+                        .ok_or_else(|| Error::InvalidRecord {
                             record_type: EXTERN_NAME_RECORD_TYPE,
                             message: "DDE/OLE matrix size overflows".to_string(),
                         })?;
@@ -238,7 +238,7 @@ pub(super) fn parse_external_name(
         },
     };
     Ok(Name {
-        supporting_book_index: u16::try_from(book_index).map_err(|_| XlsError::InvalidRecord {
+        supporting_book_index: u16::try_from(book_index).map_err(|_| Error::InvalidRecord {
             record_type: EXTERN_NAME_RECORD_TYPE,
             message: "supporting-book index exceeds u16".to_string(),
         })?,
@@ -257,7 +257,7 @@ pub(super) fn parse_ser_ar_values(
     data: &[u8],
     maximum: usize,
     record_type: u16,
-) -> XlsResult<Vec<CachedValue>> {
+) -> Result<Vec<CachedValue>> {
     let mut offset = 0usize;
     let mut values = Vec::new();
     while offset < data.len() {
@@ -314,7 +314,7 @@ fn require_available_for(
     offset: usize,
     length: usize,
     record_type: u16,
-) -> XlsResult<()> {
+) -> Result<()> {
     if offset
         .checked_add(length)
         .is_some_and(|end| end <= data.len())
@@ -332,25 +332,25 @@ fn parse_short_unicode_string(
     data: &[u8],
     offset: usize,
     record_type: u16,
-) -> XlsResult<(String, usize)> {
-    let count = usize::from(*data.get(offset).ok_or_else(|| XlsError::InvalidRecord {
+) -> Result<(String, usize)> {
+    let count = usize::from(*data.get(offset).ok_or_else(|| Error::InvalidRecord {
         record_type,
         message: "short Unicode string length is missing".to_string(),
     })?);
     parse_unicode_no_cch(data, offset + 1, count, record_type)
 }
 
-fn read_u16_checked(data: &[u8], offset: usize, record_type: u16) -> XlsResult<u16> {
+fn read_u16_checked(data: &[u8], offset: usize, record_type: u16) -> Result<u16> {
     let bytes = data
         .get(offset..offset + 2)
-        .ok_or_else(|| XlsError::InvalidRecord {
+        .ok_or_else(|| Error::InvalidRecord {
             record_type,
             message: "two-byte field is truncated".to_string(),
         })?;
     Ok(u16::from_le_bytes([bytes[0], bytes[1]]))
 }
 
-pub(super) fn parse_sup_book(data: &[u8]) -> XlsResult<SupportingBook> {
+pub(super) fn parse_sup_book(data: &[u8]) -> Result<SupportingBook> {
     if data.len() < 4 || data.len() > 8224 {
         return invalid(
             SUP_BOOK_RECORD_TYPE,
@@ -438,29 +438,25 @@ pub(super) fn parse_sup_book(data: &[u8]) -> XlsResult<SupportingBook> {
     }))
 }
 
-pub(super) fn parse_extern_sheet(data: &[u8]) -> XlsResult<Vec<SheetReference>> {
+pub(super) fn parse_extern_sheet(data: &[u8]) -> Result<Vec<SheetReference>> {
     if data.len() < 2 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 2,
             found: data.len(),
         });
     }
     let count = usize::from(read_u16(data, 0));
     let expected = 2usize
-        .checked_add(
-            count
-                .checked_mul(6)
-                .ok_or_else(|| XlsError::InvalidRecord {
-                    record_type: EXTERN_SHEET_RECORD_TYPE,
-                    message: "ExternSheet count overflows".to_string(),
-                })?,
-        )
-        .ok_or_else(|| XlsError::InvalidRecord {
+        .checked_add(count.checked_mul(6).ok_or_else(|| Error::InvalidRecord {
+            record_type: EXTERN_SHEET_RECORD_TYPE,
+            message: "ExternSheet count overflows".to_string(),
+        })?)
+        .ok_or_else(|| Error::InvalidRecord {
             record_type: EXTERN_SHEET_RECORD_TYPE,
             message: "ExternSheet size overflows".to_string(),
         })?;
     if data.len() != expected {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected,
             found: data.len(),
         });
@@ -479,10 +475,10 @@ pub(super) fn validate_reference(
     reference: &SheetReference,
     books: &[SupportingBook],
     internal_sheet_count: usize,
-) -> XlsResult<()> {
+) -> Result<()> {
     let book = books
         .get(usize::from(reference.supporting_book_index))
-        .ok_or_else(|| XlsError::InvalidRecord {
+        .ok_or_else(|| Error::InvalidRecord {
             record_type: EXTERN_SHEET_RECORD_TYPE,
             message: "XTI supporting-book index is out of range".to_string(),
         })?;
@@ -507,7 +503,7 @@ pub(super) fn validate_reference(
     Ok(())
 }
 
-fn validate_sheet_scope(first: i16, last: i16, sheet_count: usize) -> XlsResult<()> {
+fn validate_sheet_scope(first: i16, last: i16, sheet_count: usize) -> Result<()> {
     if first == -2 {
         if last != -2 {
             return invalid(EXTERN_SHEET_RECORD_TYPE, "workbook XTI scope must be -2/-2");
@@ -529,9 +525,9 @@ fn validate_sheet_scope(first: i16, last: i16, sheet_count: usize) -> XlsResult<
     Ok(())
 }
 
-pub(super) fn parse_cache_row(data: &[u8]) -> XlsResult<CacheRow> {
+pub(super) fn parse_cache_row(data: &[u8]) -> Result<CacheRow> {
     if data.len() < 4 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 4,
             found: data.len(),
         });
@@ -545,7 +541,7 @@ pub(super) fn parse_cache_row(data: &[u8]) -> XlsResult<CacheRow> {
     let mut offset = 4;
     let mut values = Vec::with_capacity(value_count);
     for _ in 0..value_count {
-        let tag = *data.get(offset).ok_or_else(|| XlsError::InvalidRecord {
+        let tag = *data.get(offset).ok_or_else(|| Error::InvalidRecord {
             record_type: CRN_RECORD_TYPE,
             message: "CRN cached value is truncated".to_string(),
         })?;
@@ -608,7 +604,7 @@ fn parse_unicode_string(
     offset: usize,
     max_characters: usize,
     record_type: u16,
-) -> XlsResult<(String, usize)> {
+) -> Result<(String, usize)> {
     require_available(data, offset, 3)?;
     let count = usize::from(read_u16(data, offset));
     parse_unicode_no_cch(data, offset + 2, count, record_type).and_then(|(value, next)| {
@@ -628,8 +624,8 @@ fn parse_unicode_no_cch(
     offset: usize,
     count: usize,
     record_type: u16,
-) -> XlsResult<(String, usize)> {
-    let flags = *data.get(offset).ok_or_else(|| XlsError::InvalidRecord {
+) -> Result<(String, usize)> {
+    let flags = *data.get(offset).ok_or_else(|| Error::InvalidRecord {
         record_type,
         message: "Unicode string options are missing".to_string(),
     })?;
@@ -640,29 +636,27 @@ fn parse_unicode_no_cch(
     let bytes =
         count
             .checked_mul(if wide { 2 } else { 1 })
-            .ok_or_else(|| XlsError::InvalidRecord {
+            .ok_or_else(|| Error::InvalidRecord {
                 record_type,
                 message: "Unicode string length overflows".to_string(),
             })?;
     let start = offset + 1;
     let end = start
         .checked_add(bytes)
-        .ok_or_else(|| XlsError::InvalidRecord {
+        .ok_or_else(|| Error::InvalidRecord {
             record_type,
             message: "Unicode string end overflows".to_string(),
         })?;
-    let encoded = data
-        .get(start..end)
-        .ok_or_else(|| XlsError::InvalidRecord {
-            record_type,
-            message: "Unicode string is truncated".to_string(),
-        })?;
+    let encoded = data.get(start..end).ok_or_else(|| Error::InvalidRecord {
+        record_type,
+        message: "Unicode string is truncated".to_string(),
+    })?;
     let value = if wide {
         let units = encoded
             .chunks_exact(2)
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
-        String::from_utf16(&units).map_err(|error| XlsError::InvalidRecord {
+        String::from_utf16(&units).map_err(|error| Error::InvalidRecord {
             record_type,
             message: format!("invalid UTF-16 string: {error}"),
         })?
@@ -672,15 +666,15 @@ fn parse_unicode_no_cch(
     Ok((value, end))
 }
 
-fn require_available(data: &[u8], offset: usize, length: usize) -> XlsResult<()> {
+fn require_available(data: &[u8], offset: usize, length: usize) -> Result<()> {
     let end = offset
         .checked_add(length)
-        .ok_or_else(|| XlsError::InvalidRecord {
+        .ok_or_else(|| Error::InvalidRecord {
             record_type: CRN_RECORD_TYPE,
             message: "cached value length overflows".to_string(),
         })?;
     if end > data.len() {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: end,
             found: data.len(),
         });
@@ -692,8 +686,8 @@ pub(super) fn read_u16(data: &[u8], offset: usize) -> u16 {
     u16::from_le_bytes([data[offset], data[offset + 1]])
 }
 
-pub(super) fn invalid<T>(record_type: u16, message: impl Into<String>) -> XlsResult<T> {
-    Err(XlsError::InvalidRecord {
+pub(super) fn invalid<T>(record_type: u16, message: impl Into<String>) -> Result<T> {
+    Err(Error::InvalidRecord {
         record_type,
         message: message.into(),
     })

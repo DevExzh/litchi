@@ -8,7 +8,7 @@
 //!
 //! - MS-XLS 2.4.14 (Backup), 2.5.14 (Boolean)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `Backup` record (MS-XLS 2.4.14).
 pub(crate) const BACKUP_RECORD_TYPE: u16 = 0x0040;
@@ -19,16 +19,16 @@ const PAYLOAD_LEN: usize = 2;
 /// Typed `Backup` record content (MS-XLS 2.4.14): whether to save a backup
 /// copy of the workbook.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsBackup {
+pub struct Backup {
     /// Whether a backup copy is saved when the workbook is saved (`fBackup`).
     save_backup: bool,
 }
 
-impl XlsBackup {
+impl Backup {
     /// Parse a `Backup` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: PAYLOAD_LEN,
                 found: data.len(),
             });
@@ -38,7 +38,7 @@ impl XlsBackup {
         match value {
             0x0000 => Ok(Self { save_backup: false }),
             0x0001 => Ok(Self { save_backup: true }),
-            other => Err(XlsError::InvalidRecord {
+            other => Err(Error::InvalidRecord {
                 record_type: BACKUP_RECORD_TYPE,
                 message: format!("Backup fBackup {other:#06X} is not a Boolean"),
             }),
@@ -63,7 +63,7 @@ mod tests {
     #[test]
     fn backup_round_trip() {
         for (payload, expected) in [([0x00, 0x00], false), ([0x01, 0x00], true)] {
-            let record = XlsBackup::parse(&payload).unwrap();
+            let record = Backup::parse(&payload).unwrap();
             assert_eq!(record.save_backup(), expected);
             assert_eq!(record.to_payload(), payload);
         }
@@ -71,10 +71,10 @@ mod tests {
 
     #[test]
     fn backup_rejects_bad_length_and_non_boolean() {
-        assert!(XlsBackup::parse(&[0x01]).is_err());
-        assert!(XlsBackup::parse(&[0x00, 0x00, 0x00]).is_err());
+        assert!(Backup::parse(&[0x01]).is_err());
+        assert!(Backup::parse(&[0x00, 0x00, 0x00]).is_err());
         // Boolean (MS-XLS 2.5.14) allows only 0x0000 and 0x0001.
-        assert!(XlsBackup::parse(&[0x02, 0x00]).is_err());
-        assert!(XlsBackup::parse(&[0x00, 0x01]).is_err());
+        assert!(Backup::parse(&[0x02, 0x00]).is_err());
+        assert!(Backup::parse(&[0x00, 0x01]).is_err());
     }
 }

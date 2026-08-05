@@ -5,13 +5,13 @@
 //! Everything here is inert: placeholders are never substituted, formatted,
 //! or laid out.
 
-use super::header_footer::PowerPointDateTimeFormatId;
-use super::records::record::PptRecord;
-use crate::consts::PptRecordType;
-use crate::package::{PptError, Result};
+use super::header_footer::DateTimeFormatId;
+use super::records::record::Record;
+use crate::consts::RecordType;
+use crate::package::{Error, Result};
 
-fn corrupted(message: impl Into<String>) -> PptError {
-    PptError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> Error {
+    Error::Corrupted(message.into())
 }
 
 /// Largest valid `DateTimeMCAtom` format identifier (MS-PPT 2.9.50);
@@ -28,7 +28,7 @@ const RTF_FORMAT_LEN: usize = 128;
 
 /// The kind of placeholder a metacharacter marks (MS-PPT 2.9.47-2.9.52).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum PowerPointMetacharKind {
+pub enum MetacharKind {
     /// `SlideNumberMCAtom`: a slide-number placeholder.
     SlideNumber,
     /// `HeaderMCAtom`: a header placeholder.
@@ -45,29 +45,29 @@ pub enum PowerPointMetacharKind {
 
 /// One metacharacter placeholder in a text body.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointTextMetachar {
+pub struct TextMetachar {
     /// Position of the metacharacter in the corresponding text.
     position: u32,
-    kind: PowerPointMetacharKind,
+    kind: MetacharKind,
     /// `DateTimeMCAtom` format identifier, when present.
-    datetime_format: Option<PowerPointDateTimeFormatId>,
+    datetime_format: Option<DateTimeFormatId>,
     /// `RTFDateTimeMCAtom` format string, when present.
     rtf_format: Option<String>,
 }
 
-impl PowerPointTextMetachar {
+impl TextMetachar {
     /// Position of the metacharacter in the corresponding text.
     pub const fn position(&self) -> u32 {
         self.position
     }
 
     /// The placeholder kind.
-    pub const fn kind(&self) -> PowerPointMetacharKind {
+    pub const fn kind(&self) -> MetacharKind {
         self.kind
     }
 
     /// `DateTimeMCAtom` format identifier, when this is a date/time atom.
-    pub const fn datetime_format(&self) -> Option<PowerPointDateTimeFormatId> {
+    pub const fn datetime_format(&self) -> Option<DateTimeFormatId> {
         self.datetime_format
     }
 
@@ -77,7 +77,7 @@ impl PowerPointTextMetachar {
     }
 }
 
-fn read_position(data: &[u8], record_type: PptRecordType) -> Result<u32> {
+fn read_position(data: &[u8], record_type: RecordType) -> Result<u32> {
     if data.len() < POSITION_ATOM_LEN {
         return Err(corrupted(format!(
             "{record_type:?} is truncated below its position field"
@@ -90,19 +90,19 @@ fn read_position(data: &[u8], record_type: PptRecordType) -> Result<u32> {
 
 /// Parse the metacharacter atoms of one text body, in record order.
 pub(crate) fn metachars_from_records<'a>(
-    records: impl IntoIterator<Item = &'a PptRecord>,
-) -> Result<Vec<PowerPointTextMetachar>> {
+    records: impl IntoIterator<Item = &'a Record>,
+) -> Result<Vec<TextMetachar>> {
     let mut result = Vec::new();
     for record in records {
         if record.version != 0 {
             if matches!(
                 record.record_type,
-                PptRecordType::SlideNumberMCAtom
-                    | PptRecordType::GenericDateMCAtom
-                    | PptRecordType::HeaderMCAtom
-                    | PptRecordType::FooterMCAtom
-                    | PptRecordType::DateTimeMCAtom
-                    | PptRecordType::RtfDateTimeMCAtom
+                RecordType::SlideNumberMCAtom
+                    | RecordType::GenericDateMCAtom
+                    | RecordType::HeaderMCAtom
+                    | RecordType::FooterMCAtom
+                    | RecordType::DateTimeMCAtom
+                    | RecordType::RtfDateTimeMCAtom
             ) {
                 return Err(corrupted(format!(
                     "{:?} has a nonzero record version",
@@ -112,10 +112,10 @@ pub(crate) fn metachars_from_records<'a>(
             continue;
         }
         let metachar = match record.record_type {
-            PptRecordType::SlideNumberMCAtom
-            | PptRecordType::GenericDateMCAtom
-            | PptRecordType::HeaderMCAtom
-            | PptRecordType::FooterMCAtom => {
+            RecordType::SlideNumberMCAtom
+            | RecordType::GenericDateMCAtom
+            | RecordType::HeaderMCAtom
+            | RecordType::FooterMCAtom => {
                 if record.data.len() != POSITION_ATOM_LEN {
                     return Err(corrupted(format!(
                         "{:?} must contain exactly a position field",
@@ -123,19 +123,19 @@ pub(crate) fn metachars_from_records<'a>(
                     )));
                 }
                 let kind = match record.record_type {
-                    PptRecordType::SlideNumberMCAtom => PowerPointMetacharKind::SlideNumber,
-                    PptRecordType::GenericDateMCAtom => PowerPointMetacharKind::GenericDate,
-                    PptRecordType::HeaderMCAtom => PowerPointMetacharKind::Header,
-                    _ => PowerPointMetacharKind::Footer,
+                    RecordType::SlideNumberMCAtom => MetacharKind::SlideNumber,
+                    RecordType::GenericDateMCAtom => MetacharKind::GenericDate,
+                    RecordType::HeaderMCAtom => MetacharKind::Header,
+                    _ => MetacharKind::Footer,
                 };
-                PowerPointTextMetachar {
+                TextMetachar {
                     position: read_position(&record.data, record.record_type)?,
                     kind,
                     datetime_format: None,
                     rtf_format: None,
                 }
             },
-            PptRecordType::DateTimeMCAtom => {
+            RecordType::DateTimeMCAtom => {
                 if record.data.len() != DATE_TIME_ATOM_LEN {
                     return Err(corrupted("DateTimeMCAtom must contain 8 bytes"));
                 }
@@ -143,14 +143,14 @@ pub(crate) fn metachars_from_records<'a>(
                 if index > MAX_METACHAR_FORMAT_ID {
                     return Err(corrupted("DateTimeMCAtom format ID is outside 0..=12"));
                 }
-                PowerPointTextMetachar {
+                TextMetachar {
                     position: read_position(&record.data, record.record_type)?,
-                    kind: PowerPointMetacharKind::DateTime,
-                    datetime_format: Some(PowerPointDateTimeFormatId::new(index)?),
+                    kind: MetacharKind::DateTime,
+                    datetime_format: Some(DateTimeFormatId::new(index)?),
                     rtf_format: None,
                 }
             },
-            PptRecordType::RtfDateTimeMCAtom => {
+            RecordType::RtfDateTimeMCAtom => {
                 if record.data.len() != RTF_DATE_TIME_ATOM_LEN {
                     return Err(corrupted("RTFDateTimeMCAtom must contain 0x84 bytes"));
                 }
@@ -159,9 +159,9 @@ pub(crate) fn metachars_from_records<'a>(
                     .iter()
                     .position(|byte| *byte == 0)
                     .unwrap_or(RTF_FORMAT_LEN);
-                PowerPointTextMetachar {
+                TextMetachar {
                     position: read_position(&record.data, record.record_type)?,
-                    kind: PowerPointMetacharKind::RtfDateTime,
+                    kind: MetacharKind::RtfDateTime,
                     datetime_format: None,
                     rtf_format: Some(
                         format_bytes[..end]
@@ -181,10 +181,10 @@ pub(crate) fn metachars_from_records<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consts::PptRecordType;
+    use crate::consts::RecordType;
 
-    fn atom(record_type: PptRecordType, data: &[u8]) -> PptRecord {
-        PptRecord {
+    fn atom(record_type: RecordType, data: &[u8]) -> Record {
+        Record {
             version: 0,
             instance: 0,
             record_type,
@@ -198,14 +198,14 @@ mod tests {
     #[test]
     fn parses_position_only_metachars() {
         let records = [
-            atom(PptRecordType::SlideNumberMCAtom, &7u32.to_le_bytes()),
-            atom(PptRecordType::FooterMCAtom, &3u32.to_le_bytes()),
+            atom(RecordType::SlideNumberMCAtom, &7u32.to_le_bytes()),
+            atom(RecordType::FooterMCAtom, &3u32.to_le_bytes()),
         ];
         let metachars = metachars_from_records(records.iter()).unwrap();
         assert_eq!(metachars.len(), 2);
-        assert_eq!(metachars[0].kind(), PowerPointMetacharKind::SlideNumber);
+        assert_eq!(metachars[0].kind(), MetacharKind::SlideNumber);
         assert_eq!(metachars[0].position(), 7);
-        assert_eq!(metachars[1].kind(), PowerPointMetacharKind::Footer);
+        assert_eq!(metachars[1].kind(), MetacharKind::Footer);
         assert_eq!(metachars[1].position(), 3);
     }
 
@@ -221,33 +221,33 @@ mod tests {
         format[..8].copy_from_slice(b"MM/dd/yy");
         rtf.extend_from_slice(&format);
         let records = [
-            atom(PptRecordType::DateTimeMCAtom, &date_time),
-            atom(PptRecordType::RtfDateTimeMCAtom, &rtf),
+            atom(RecordType::DateTimeMCAtom, &date_time),
+            atom(RecordType::RtfDateTimeMCAtom, &rtf),
         ];
         let metachars = metachars_from_records(records.iter()).unwrap();
-        assert_eq!(metachars[0].kind(), PowerPointMetacharKind::DateTime);
+        assert_eq!(metachars[0].kind(), MetacharKind::DateTime);
         assert_eq!(metachars[0].datetime_format().unwrap().get(), 5);
-        assert_eq!(metachars[1].kind(), PowerPointMetacharKind::RtfDateTime);
+        assert_eq!(metachars[1].kind(), MetacharKind::RtfDateTime);
         assert_eq!(metachars[1].rtf_format(), Some("MM/dd/yy"));
     }
 
     #[test]
     fn rejects_malformed_metachars() {
         // Truncated position atom.
-        let short = [atom(PptRecordType::FooterMCAtom, &[1, 2])];
+        let short = [atom(RecordType::FooterMCAtom, &[1, 2])];
         assert!(metachars_from_records(short.iter()).is_err());
         // Oversized position atom.
-        let long = [atom(PptRecordType::HeaderMCAtom, &[0; 8])];
+        let long = [atom(RecordType::HeaderMCAtom, &[0; 8])];
         assert!(metachars_from_records(long.iter()).is_err());
         // Format ID above 12.
         let mut bad_format = Vec::new();
         bad_format.extend_from_slice(&0u32.to_le_bytes());
         bad_format.push(13);
         bad_format.extend_from_slice(&[0; 3]);
-        let bad = [atom(PptRecordType::DateTimeMCAtom, &bad_format)];
+        let bad = [atom(RecordType::DateTimeMCAtom, &bad_format)];
         assert!(metachars_from_records(bad.iter()).is_err());
         // Truncated RTF atom.
-        let short_rtf = [atom(PptRecordType::RtfDateTimeMCAtom, &[0; 20])];
+        let short_rtf = [atom(RecordType::RtfDateTimeMCAtom, &[0; 20])];
         assert!(metachars_from_records(short_rtf.iter()).is_err());
     }
 }

@@ -28,9 +28,9 @@ pub struct TextBox<'a> {
     /// Textbox-specific ruler overrides
     text_ruler: Option<TextRuler>,
     /// Header/footer metacharacter placeholders in the textbox
-    metachars: Vec<crate::text_metachar::PowerPointTextMetachar>,
+    metachars: Vec<crate::text_metachar::TextMetachar>,
     /// Outline text references tying the textbox to outline text bodies
-    outline_text_refs: Vec<crate::text_si_exception::PowerPointOutlineTextRef>,
+    outline_text_refs: Vec<crate::text_si_exception::OutlineTextRef>,
     /// PowerPoint 9 picture-bullet and automatic-numbering extensions
     text_style_extension9: Option<TextStyleExtension9>,
     /// PowerPoint 10 alternate-script font extensions
@@ -232,7 +232,7 @@ impl<'a> TextBox<'a> {
             property(id)
                 .map(|value| {
                     if !(0..=MAX_TEXT_MARGIN).contains(&value) {
-                        Err(super::super::package::PptError::Corrupted(format!(
+                        Err(super::super::package::Error::Corrupted(format!(
                             "OfficeArt {name} margin exceeds the MS-ODRAW limit"
                         )))
                     } else {
@@ -251,7 +251,7 @@ impl<'a> TextBox<'a> {
             property(id)
                 .map(|value| {
                     u16::try_from(value).map_err(|_| {
-                        super::super::package::PptError::Corrupted(format!(
+                        super::super::package::Error::Corrupted(format!(
                             "OfficeArt {name} value does not fit in 16 bits"
                         ))
                     })
@@ -364,13 +364,13 @@ impl<'a> TextBox<'a> {
     /// Header/footer metacharacter placeholders in this text box, in record
     /// order (MS-PPT 2.9.47-2.9.52). Placeholders are never substituted,
     /// formatted, or laid out.
-    pub fn metachars(&self) -> &[crate::text_metachar::PowerPointTextMetachar] {
+    pub fn metachars(&self) -> &[crate::text_metachar::TextMetachar] {
         &self.metachars
     }
 
     /// Outline text references (`OutlineTextRefAtom`, MS-PPT 2.9.78) tying
     /// this text box to outline text bodies.
-    pub fn outline_text_refs(&self) -> &[crate::text_si_exception::PowerPointOutlineTextRef] {
+    pub fn outline_text_refs(&self) -> &[crate::text_si_exception::OutlineTextRef] {
         &self.outline_text_refs
     }
 
@@ -739,7 +739,7 @@ mod tests {
     fn parse_formatted_textbox(data: &[u8]) -> crate::package::Result<TextBox<'static>> {
         let shapes = litchi_odraw::shape::parse(data)?;
         let shape = shapes.first().ok_or_else(|| {
-            crate::package::PptError::Corrupted("test drawing contains no shape".to_owned())
+            crate::package::Error::Corrupted("test drawing contains no shape".to_owned())
         })?;
         let properties = ShapeProperties {
             id: shape.id(),

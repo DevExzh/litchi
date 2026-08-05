@@ -2,7 +2,7 @@
 //!
 //! Based on POI's SlideListWithText.SlideAtomsSet inner class.
 
-use super::record::PptRecord;
+use super::record::Record;
 use crate::package::Result;
 
 /// A set of records associated with a single slide's text.
@@ -12,9 +12,9 @@ use crate::package::Result;
 #[derive(Debug, Clone)]
 pub struct SlideAtomsSet<'a> {
     /// The SlidePersistAtom that identifies which slide this text belongs to
-    pub slide_persist_atom: &'a PptRecord,
+    pub slide_persist_atom: &'a Record,
     /// All text-related records for this slide (TextHeaderAtom, TextCharsAtom, etc.)
-    pub slide_records: Vec<&'a PptRecord>,
+    pub slide_records: Vec<&'a Record>,
 }
 
 impl<'a> SlideAtomsSet<'a> {
@@ -41,24 +41,24 @@ impl<'a> SlideAtomsSet<'a> {
 
     /// Validated outline text references (`OutlineTextRefAtom`, MS-PPT
     /// 2.9.78) tying this slide's shapes to outline text bodies.
-    pub fn outline_text_refs(&self) -> Result<Vec<crate::PowerPointOutlineTextRef>> {
+    pub fn outline_text_refs(&self) -> Result<Vec<crate::OutlineTextRef>> {
         self.slide_records
             .iter()
-            .filter(|record| record.record_type == crate::consts::PptRecordType::OutlineTextRefAtom)
-            .map(|record| crate::PowerPointOutlineTextRef::parse_record(record))
+            .filter(|record| record.record_type == crate::consts::RecordType::OutlineTextRefAtom)
+            .map(|record| crate::OutlineTextRef::parse_record(record))
             .collect()
     }
 
     /// Parse range-anchored actions from every text body in this slide set.
-    pub fn text_interactions(&self) -> Result<Vec<crate::PowerPointTextBodyInteractions>> {
-        self.text_interactions_with_limits(crate::PowerPointTextInteractionLimits::default())
+    pub fn text_interactions(&self) -> Result<Vec<crate::TextBodyInteractions>> {
+        self.text_interactions_with_limits(crate::TextInteractionLimits::default())
     }
 
     /// Parse text actions with caller-supplied resource limits.
     pub fn text_interactions_with_limits(
         &self,
-        limits: crate::PowerPointTextInteractionLimits,
-    ) -> Result<Vec<crate::PowerPointTextBodyInteractions>> {
+        limits: crate::TextInteractionLimits,
+    ) -> Result<Vec<crate::TextBodyInteractions>> {
         crate::text_interaction::parse_text_bodies(&self.slide_records, limits)
     }
 }

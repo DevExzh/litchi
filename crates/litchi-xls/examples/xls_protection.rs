@@ -1,7 +1,7 @@
-use litchi_xls::XlsWriter;
+use litchi_xls::Writer;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Protected")?;
 
     // Some sample content

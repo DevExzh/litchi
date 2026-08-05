@@ -2,21 +2,21 @@ use std::io::Cursor;
 use std::path::PathBuf;
 
 use litchi_xls::writer::{
-    PivotCacheValue, XlsPivotDataItemConfig, XlsPivotFieldConfig, XlsPivotItemConfig,
-    XlsPivotTableConfig, XlsWriter,
+    PivotCacheValue, PivotDataItemConfig, PivotFieldConfig, PivotItemConfig, PivotTableConfig,
+    Writer,
 };
 use litchi_xls::{
     PivotAxis, PivotAxisField, PivotCacheGrouping, PivotCacheItem, PivotCacheNumericGrouping,
-    XlsPivotViewEditor, XlsWorkbook,
+    PivotViewEditor, Workbook,
 };
 
 fn generated_workbook() -> Vec<u8> {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Source").unwrap();
     writer
         .add_pivot_table(
             sheet,
-            XlsPivotTableConfig {
+            PivotTableConfig {
                 name: "SalesPivot".to_string(),
                 source_type: 1,
                 source_sheet_name: "Source".to_string(),
@@ -35,18 +35,18 @@ fn generated_workbook() -> Vec<u8> {
                 data_axis: 0,
                 data_position: 0,
                 fields: vec![
-                    XlsPivotFieldConfig {
+                    PivotFieldConfig {
                         axis: 1,
                         subtotal_count: 0,
                         subtotal_flags: 0,
                         items: vec![
-                            XlsPivotItemConfig {
+                            PivotItemConfig {
                                 item_type: 0,
                                 flags: 0,
                                 cache_index: 0,
                                 name: None,
                             },
-                            XlsPivotItemConfig {
+                            PivotItemConfig {
                                 item_type: 0,
                                 flags: 0,
                                 cache_index: 1,
@@ -62,7 +62,7 @@ fn generated_workbook() -> Vec<u8> {
                         is_numeric: false,
                         grouping: None,
                     },
-                    XlsPivotFieldConfig {
+                    PivotFieldConfig {
                         axis: 8,
                         subtotal_count: 0,
                         subtotal_flags: 0,
@@ -74,7 +74,7 @@ fn generated_workbook() -> Vec<u8> {
                         grouping: None,
                     },
                 ],
-                data_items: vec![XlsPivotDataItemConfig {
+                data_items: vec![PivotDataItemConfig {
                     source_field_index: 1,
                     function: 0,
                     display_format: 0,
@@ -104,7 +104,7 @@ fn generated_workbook() -> Vec<u8> {
 
 #[test]
 fn writer_view_records_reopen_with_identical_layout_and_cache_link() {
-    let workbook = XlsWorkbook::new(Cursor::new(generated_workbook())).unwrap();
+    let workbook = Workbook::new(Cursor::new(generated_workbook())).unwrap();
     let table = workbook
         .xls_worksheet(0)
         .unwrap()
@@ -153,7 +153,7 @@ fn libreoffice_pivot_views_parse_with_cache_links() {
         "pivottable_number_grouping.xls",
         "pivottable_dates_grouping.xls",
     ] {
-        let workbook = XlsWorkbook::new(std::fs::File::open(root.join(name)).unwrap()).unwrap();
+        let workbook = Workbook::new(std::fs::File::open(root.join(name)).unwrap()).unwrap();
         let tables = (0..workbook.sheets().len())
             .filter_map(|index| workbook.worksheet_pivot_tables(index).ok())
             .flatten()
@@ -169,14 +169,14 @@ fn libreoffice_pivot_views_parse_with_cache_links() {
 fn pivot_view_editor_is_byte_exact_for_noop_and_reopens_mutations() {
     let original = generated_workbook();
     assert_eq!(
-        XlsPivotViewEditor::new(original.clone())
+        PivotViewEditor::new(original.clone())
             .unwrap()
             .finish()
             .unwrap(),
         original
     );
 
-    let mut editor = XlsPivotViewEditor::new(original).unwrap();
+    let mut editor = PivotViewEditor::new(original).unwrap();
     editor
         .update_by_name(0, "SalesPivot", |table| {
             table.view.name = "RenamedPivot".to_string();
@@ -187,7 +187,7 @@ fn pivot_view_editor_is_byte_exact_for_noop_and_reopens_mutations() {
         })
         .unwrap();
     let rewritten = editor.finish().unwrap();
-    let workbook = XlsWorkbook::new(Cursor::new(rewritten)).unwrap();
+    let workbook = Workbook::new(Cursor::new(rewritten)).unwrap();
     let table = workbook
         .xls_worksheet(0)
         .unwrap()
@@ -204,14 +204,14 @@ fn pivot_view_editor_is_byte_exact_for_noop_and_reopens_mutations() {
 #[test]
 fn pivot_view_editor_rolls_back_invalid_cache_and_supports_remove_add() {
     let original = generated_workbook();
-    let mut editor = XlsPivotViewEditor::new(original.clone()).unwrap();
+    let mut editor = PivotViewEditor::new(original.clone()).unwrap();
     assert!(editor.reassign_cache_by_name(0, "SalesPivot", 99).is_err());
     assert_eq!(editor.finish().unwrap(), original);
 
-    let mut editor = XlsPivotViewEditor::new(original).unwrap();
+    let mut editor = PivotViewEditor::new(original).unwrap();
     let table = editor.remove_by_name(0, "SalesPivot").unwrap();
     editor.add(0, table).unwrap();
-    let reopened = XlsWorkbook::new(Cursor::new(editor.finish().unwrap())).unwrap();
+    let reopened = Workbook::new(Cursor::new(editor.finish().unwrap())).unwrap();
     assert!(
         reopened
             .xls_worksheet(0)
@@ -223,7 +223,7 @@ fn pivot_view_editor_rolls_back_invalid_cache_and_supports_remove_add() {
 
 #[test]
 fn pivot_view_editor_regenerates_grouping_cache_and_preserves_fixture_noops() {
-    let mut editor = XlsPivotViewEditor::new(generated_workbook()).unwrap();
+    let mut editor = PivotViewEditor::new(generated_workbook()).unwrap();
     editor
         .update_cache_grouping(
             0,
@@ -238,7 +238,7 @@ fn pivot_view_editor_regenerates_grouping_cache_and_preserves_fixture_noops() {
             })),
         )
         .unwrap();
-    let workbook = XlsWorkbook::new(Cursor::new(editor.finish().unwrap())).unwrap();
+    let workbook = Workbook::new(Cursor::new(editor.finish().unwrap())).unwrap();
     assert!(matches!(
         workbook.pivot_caches()[0].fields()[1].grouping(),
         Some(PivotCacheGrouping::Numeric(_))
@@ -249,7 +249,7 @@ fn pivot_view_editor_regenerates_grouping_cache_and_preserves_fixture_noops() {
     );
     let bytes = std::fs::read(fixture).unwrap();
     assert_eq!(
-        XlsPivotViewEditor::new(bytes.clone())
+        PivotViewEditor::new(bytes.clone())
             .unwrap()
             .finish()
             .unwrap(),

@@ -1,6 +1,6 @@
 use super::{Authors, parse_slide_comments};
-use crate::consts::PptRecordType;
-use crate::records::PptRecord;
+use crate::consts::RecordType;
+use crate::records::Record;
 
 fn record_bytes(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u8> {
     let mut data = Vec::new();
@@ -15,14 +15,14 @@ fn utf16(value: &str) -> Vec<u8> {
     value.encode_utf16().flat_map(u16::to_le_bytes).collect()
 }
 
-fn prog_tags_record(version: u8, blob_payload: &[u8]) -> PptRecord {
+fn prog_tags_record(version: u8, blob_payload: &[u8]) -> Record {
     let name = record_bytes(0, 0, 4026, &utf16(&format!("___PPT{version}")));
     let blob = record_bytes(0, 0, 0x138b, blob_payload);
     let mut tag_payload = name;
     tag_payload.extend_from_slice(&blob);
     let tag = record_bytes(0x0f, 0, 0x138a, &tag_payload);
-    PptRecord {
-        record_type: PptRecordType::ProgTags,
+    Record {
+        record_type: RecordType::ProgTags,
         record_type_raw: 0x1388,
         version: 0x0f,
         instance: 0,
@@ -32,9 +32,9 @@ fn prog_tags_record(version: u8, blob_payload: &[u8]) -> PptRecord {
     }
 }
 
-fn root(children: Vec<PptRecord>) -> PptRecord {
-    PptRecord {
-        record_type: PptRecordType::Document,
+fn root(children: Vec<Record>) -> Record {
+    Record {
+        record_type: RecordType::Document,
         record_type_raw: 1000,
         version: 0x0f,
         instance: 0,

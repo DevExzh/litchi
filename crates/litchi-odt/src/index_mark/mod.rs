@@ -14,7 +14,7 @@ pub(super) const MAX_MARK_DEPTH: usize = 4_096;
 pub(super) const MAX_MARKS: usize = 1_000_000;
 
 pub(crate) use codec::parse_text_index_marks;
-pub(super) use codec::{end_kind, is_bibliography_type, point_kind, start_kind};
+pub(crate) use codec::{end_kind, is_bibliography_type, point_kind, start_kind};
 pub use model::{
     TextAlphabeticalMarkMetadata, TextIndexMark, TextIndexMarkFragments, TextIndexMarkKind,
 };

@@ -5,13 +5,13 @@
 //!
 //! Run with: cargo run --example comprehensive_ppt_test
 
-use litchi_ppt::PptWriter;
+use litchi_ppt::Writer;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Comprehensive PPT Writer Test ===\n");
 
     // Create a widescreen presentation (16:9)
-    let mut writer = PptWriter::new_widescreen();
+    let mut writer = Writer::new_widescreen();
 
     // ============================================================
     // PRESENTATION PROPERTIES

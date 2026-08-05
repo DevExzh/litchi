@@ -1,4 +1,4 @@
-use litchi_xls::XlsWorkbook;
+use litchi_xls::Workbook;
 use std::fs::File;
 use std::path::PathBuf;
 
@@ -16,7 +16,7 @@ fn libreoffice_fixture(name: &str) -> PathBuf {
 
 #[test]
 fn reads_formatting_fixture_font_table_and_reserved_index_gap() {
-    let workbook = XlsWorkbook::new(File::open(poi_fixture("Formatting.xls")).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(poi_fixture("Formatting.xls")).unwrap()).unwrap();
 
     assert!(workbook.fonts().len() >= 5);
     for index in 0..=3 {
@@ -48,7 +48,7 @@ fn reads_formatting_fixture_font_table_and_reserved_index_gap() {
 
 #[test]
 fn resolves_duprich_format_run_font_indices() {
-    let workbook = XlsWorkbook::new(File::open(poi_fixture("duprich2.xls")).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(poi_fixture("duprich2.xls")).unwrap()).unwrap();
     let worksheet = workbook.xls_worksheet(0).unwrap();
     let shared_strings = worksheet.shared_strings().unwrap();
     let mut run_count = 0;
@@ -69,8 +69,7 @@ fn resolves_duprich_format_run_font_indices() {
 
 #[test]
 fn resolves_libreoffice_xf_font_references() {
-    let workbook =
-        XlsWorkbook::new(File::open(libreoffice_fixture("formats.xls")).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(libreoffice_fixture("formats.xls")).unwrap()).unwrap();
     assert!(!workbook.extended_formats().is_empty());
     assert!(
         workbook
@@ -83,6 +82,6 @@ fn resolves_libreoffice_xf_font_references() {
 #[test]
 fn reads_poi_compressed_font_name_fixture() {
     let workbook =
-        XlsWorkbook::new(File::open(poi_fixture("SimpleWithColours.xls")).unwrap()).unwrap();
+        Workbook::new(File::open(poi_fixture("SimpleWithColours.xls")).unwrap()).unwrap();
     assert!(workbook.fonts().iter().all(|font| !font.name().is_empty()));
 }

@@ -1,18 +1,15 @@
 use std::io::Cursor;
 
 use litchi_xls::writer::{
-    XlsDataValidation, XlsDataValidationErrorStyle as WriterErrorStyle,
-    XlsDataValidationFormulaKind, XlsDataValidationImeMode as WriterImeMode,
-    XlsDataValidationOperator, XlsDataValidationOptions, XlsDataValidationRange,
-    XlsDataValidationTableOptions, XlsDataValidationType, XlsWriter,
+    DataValidation, DataValidationErrorStyle as WriterErrorStyle, DataValidationFormulaKind,
+    DataValidationImeMode as WriterImeMode, DataValidationOperator, DataValidationOptions,
+    DataValidationRange, DataValidationTableOptions, DataValidationType, Writer,
 };
-use litchi_xls::{
-    XlsDataValidationErrorStyle, XlsDataValidationImeMode, XlsDataValidationKind, XlsWorkbook,
-};
+use litchi_xls::{DataValidationErrorStyle, DataValidationImeMode, DataValidationKind, Workbook};
 
-fn validation(row: u32, validation_type: XlsDataValidationType) -> XlsDataValidation {
-    XlsDataValidation {
-        range: XlsDataValidationRange::new(row, row, 0, 0).unwrap(),
+fn validation(row: u32, validation_type: DataValidationType) -> DataValidation {
+    DataValidation {
+        range: DataValidationRange::new(row, row, 0, 0).unwrap(),
         validation_type,
         show_input_message: true,
         input_title: Some("输入".to_string()),
@@ -25,12 +22,12 @@ fn validation(row: u32, validation_type: XlsDataValidationType) -> XlsDataValida
 
 #[test]
 fn complete_validation_family_round_trips_as_inert_metadata() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Validation").unwrap();
     writer
         .set_data_validation_table_options(
             sheet,
-            XlsDataValidationTableOptions {
+            DataValidationTableOptions {
                 window_closed: true,
                 x_left: 120,
                 y_top: 240,
@@ -41,7 +38,7 @@ fn complete_validation_family_round_trips_as_inert_metadata() {
 
     let custom = validation(
         4,
-        XlsDataValidationType::Custom {
+        DataValidationType::Custom {
             formula_tokens: vec![0x1d, 1],
         },
     );
@@ -50,11 +47,11 @@ fn complete_validation_family_round_trips_as_inert_metadata() {
             sheet,
             custom,
             &[
-                XlsDataValidationRange::new(8, 9, 4, 5).unwrap(),
-                XlsDataValidationRange::new(1, 2, 2, 3).unwrap(),
-                XlsDataValidationRange::new(4, 4, 0, 0).unwrap(),
+                DataValidationRange::new(8, 9, 4, 5).unwrap(),
+                DataValidationRange::new(1, 2, 2, 3).unwrap(),
+                DataValidationRange::new(4, 4, 0, 0).unwrap(),
             ],
-            XlsDataValidationOptions {
+            DataValidationOptions {
                 error_style: WriterErrorStyle::Warning,
                 allow_blank: false,
                 suppress_dropdown: true,
@@ -63,15 +60,15 @@ fn complete_validation_family_round_trips_as_inert_metadata() {
         )
         .unwrap();
     writer
-        .add_data_validation(sheet, validation(5, XlsDataValidationType::Any))
+        .add_data_validation(sheet, validation(5, DataValidationType::Any))
         .unwrap();
     writer
         .add_data_validation(
             sheet,
             validation(
                 6,
-                XlsDataValidationType::Decimal {
-                    operator: XlsDataValidationOperator::Between,
+                DataValidationType::Decimal {
+                    operator: DataValidationOperator::Between,
                     value1: 1.5,
                     value2: Some(9.5),
                 },
@@ -83,8 +80,8 @@ fn complete_validation_family_round_trips_as_inert_metadata() {
             sheet,
             validation(
                 7,
-                XlsDataValidationType::Date {
-                    operator: XlsDataValidationOperator::GreaterThan,
+                DataValidationType::Date {
+                    operator: DataValidationOperator::GreaterThan,
                     value1: 45_000.0,
                     value2: None,
                 },
@@ -96,8 +93,8 @@ fn complete_validation_family_round_trips_as_inert_metadata() {
             sheet,
             validation(
                 8,
-                XlsDataValidationType::Time {
-                    operator: XlsDataValidationOperator::LessThan,
+                DataValidationType::Time {
+                    operator: DataValidationOperator::LessThan,
                     value1: 0.5,
                     value2: None,
                 },
@@ -109,8 +106,8 @@ fn complete_validation_family_round_trips_as_inert_metadata() {
             sheet,
             validation(
                 9,
-                XlsDataValidationType::TextLength {
-                    operator: XlsDataValidationOperator::LessThanOrEqual,
+                DataValidationType::TextLength {
+                    operator: DataValidationOperator::LessThanOrEqual,
                     value1: 20,
                     value2: None,
                 },
@@ -122,7 +119,7 @@ fn complete_validation_family_round_trips_as_inert_metadata() {
             sheet,
             validation(
                 10,
-                XlsDataValidationType::List {
+                DataValidationType::List {
                     values: vec!["是".to_string(), "否".to_string()],
                 },
             ),
@@ -133,9 +130,9 @@ fn complete_validation_family_round_trips_as_inert_metadata() {
             sheet,
             validation(
                 11,
-                XlsDataValidationType::RawFormula {
-                    kind: XlsDataValidationFormulaKind::Whole,
-                    operator: XlsDataValidationOperator::Equal,
+                DataValidationType::RawFormula {
+                    kind: DataValidationFormulaKind::Whole,
+                    operator: DataValidationOperator::Equal,
                     formula1_tokens: vec![0x1e, 42, 0],
                     formula2_tokens: None,
                 },
@@ -145,7 +142,7 @@ fn complete_validation_family_round_trips_as_inert_metadata() {
 
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
     let sheet = workbook.xls_worksheet(0).unwrap();
     let settings = sheet.data_validation_settings().unwrap();
     assert!(settings.window_closed());
@@ -156,9 +153,9 @@ fn complete_validation_family_round_trips_as_inert_metadata() {
 
     let rules = sheet.data_validations();
     assert_eq!(rules.len(), 8);
-    assert_eq!(rules[0].kind(), XlsDataValidationKind::Custom);
-    assert_eq!(rules[0].error_style(), XlsDataValidationErrorStyle::Warning);
-    assert_eq!(rules[0].ime_mode(), XlsDataValidationImeMode::Hiragana);
+    assert_eq!(rules[0].kind(), DataValidationKind::Custom);
+    assert_eq!(rules[0].error_style(), DataValidationErrorStyle::Warning);
+    assert_eq!(rules[0].ime_mode(), DataValidationImeMode::Hiragana);
     assert!(!rules[0].allow_blank());
     assert!(rules[0].suppress_dropdown());
     assert_eq!(rules[0].formula1().unwrap().tokens(), &[0x1d, 1]);
@@ -167,28 +164,28 @@ fn complete_validation_family_round_trips_as_inert_metadata() {
     assert_eq!(rules[0].ranges()[1].first_row(), 8);
     assert_eq!(rules[0].ranges()[2].first_row(), 1);
     assert_eq!(rules[0].ranges()[3].first_row(), 4);
-    assert_eq!(rules[1].kind(), XlsDataValidationKind::Any);
-    assert_eq!(rules[2].kind(), XlsDataValidationKind::Decimal);
-    assert_eq!(rules[3].kind(), XlsDataValidationKind::Date);
-    assert_eq!(rules[4].kind(), XlsDataValidationKind::Time);
-    assert_eq!(rules[5].kind(), XlsDataValidationKind::TextLength);
-    assert_eq!(rules[6].kind(), XlsDataValidationKind::List);
+    assert_eq!(rules[1].kind(), DataValidationKind::Any);
+    assert_eq!(rules[2].kind(), DataValidationKind::Decimal);
+    assert_eq!(rules[3].kind(), DataValidationKind::Date);
+    assert_eq!(rules[4].kind(), DataValidationKind::Time);
+    assert_eq!(rules[5].kind(), DataValidationKind::TextLength);
+    assert_eq!(rules[6].kind(), DataValidationKind::List);
     assert!(rules[6].explicit_list());
-    assert_eq!(rules[7].kind(), XlsDataValidationKind::Whole);
+    assert_eq!(rules[7].kind(), DataValidationKind::Whole);
     assert_eq!(rules[7].formula1().unwrap().tokens(), &[0x1e, 42, 0]);
 }
 
 #[test]
 fn malformed_writer_metadata_is_rejected() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Validation").unwrap();
     assert!(
         writer
             .set_data_validation_table_options(
                 sheet,
-                XlsDataValidationTableOptions {
+                DataValidationTableOptions {
                     x_left: 65_536,
-                    ..XlsDataValidationTableOptions::default()
+                    ..DataValidationTableOptions::default()
                 },
             )
             .is_err()
@@ -199,7 +196,7 @@ fn malformed_writer_metadata_is_rejected() {
                 sheet,
                 validation(
                     0,
-                    XlsDataValidationType::Custom {
+                    DataValidationType::Custom {
                         formula_tokens: Vec::new(),
                     },
                 ),
@@ -208,7 +205,7 @@ fn malformed_writer_metadata_is_rejected() {
     );
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
     assert!(
         workbook
             .xls_worksheet(0)
@@ -220,12 +217,12 @@ fn malformed_writer_metadata_is_rejected() {
 
 #[test]
 fn explicit_zero_rule_dval_and_oversized_dv_are_handled_deterministically() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("EmptyValidation").unwrap();
     writer
         .set_data_validation_table_options(
             sheet,
-            XlsDataValidationTableOptions {
+            DataValidationTableOptions {
                 window_closed: true,
                 x_left: 7,
                 y_top: 9,
@@ -235,7 +232,7 @@ fn explicit_zero_rule_dval_and_oversized_dv_are_handled_deterministically() {
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
     let settings = workbook
         .xls_worksheet(0)
         .unwrap()
@@ -244,14 +241,14 @@ fn explicit_zero_rule_dval_and_oversized_dv_are_handled_deterministically() {
     assert_eq!(settings.declared_rule_count(), 0);
     assert_eq!((settings.x_left(), settings.y_top()), (7, 9));
 
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Oversized").unwrap();
     writer
         .add_data_validation(
             sheet,
             validation(
                 0,
-                XlsDataValidationType::Custom {
+                DataValidationType::Custom {
                     formula_tokens: vec![0x1d; 8_200],
                 },
             ),

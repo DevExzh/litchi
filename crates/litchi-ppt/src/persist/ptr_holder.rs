@@ -2,9 +2,9 @@
 //!
 //! Idiomatic Rust implementation with zero-copy parsing and high performance.
 
-use crate::consts::PptRecordType;
-use crate::package::{PptError, Result};
-use crate::records::PptRecord;
+use crate::consts::RecordType;
+use crate::package::{Error, Result};
+use crate::records::Record;
 use std::collections::HashMap;
 
 /// Holder for persist pointer mappings from persist IDs to byte offsets.
@@ -30,9 +30,9 @@ impl PersistPtrHolder {
     /// - Uses `chunks_exact(4)` for efficient 4-byte iteration
     /// - Pre-allocates HashMap with estimated capacity
     /// - Zero-copy: reads directly from slice without intermediate allocations
-    pub fn parse(record: &PptRecord) -> Result<Self> {
-        if record.record_type != PptRecordType::PersistPtrHolder {
-            return Err(PptError::InvalidFormat(format!(
+    pub fn parse(record: &Record) -> Result<Self> {
+        if record.record_type != RecordType::PersistPtrHolder {
+            return Err(Error::InvalidFormat(format!(
                 "Expected PersistPtrHolder, got {:?}",
                 record.record_type
             )));
@@ -58,20 +58,20 @@ impl PersistPtrHolder {
 
             // Read offset entries for this group
             if entry_count == 0 {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "PersistDirectoryEntry has a zero entry count".to_string(),
                 ));
             }
             for i in 0..entry_count {
                 let offset_bytes = chunks.next().ok_or_else(|| {
-                    PptError::Corrupted("truncated PersistDirectoryEntry".to_string())
+                    Error::Corrupted("truncated PersistDirectoryEntry".to_string())
                 })?;
                 let offset = u32::from_le_bytes(offset_bytes.try_into().unwrap());
                 if slide_locations
                     .insert(base_persist_id + i, offset)
                     .is_some()
                 {
-                    return Err(PptError::Corrupted(format!(
+                    return Err(Error::Corrupted(format!(
                         "duplicate persist identifier {}",
                         base_persist_id + i
                     )));
@@ -80,7 +80,7 @@ impl PersistPtrHolder {
         }
 
         if !chunks.remainder().is_empty() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "persist directory is not aligned to 4 bytes".to_string(),
             ));
         }
@@ -134,8 +134,8 @@ mod tests {
         data.extend_from_slice(&1000u32.to_le_bytes()); // offset for persist_id=0
         data.extend_from_slice(&2000u32.to_le_bytes()); // offset for persist_id=1
 
-        let record = PptRecord {
-            record_type: PptRecordType::PersistPtrHolder,
+        let record = Record {
+            record_type: RecordType::PersistPtrHolder,
             record_type_raw: 6001,
             version: 0,
             instance: 0,
@@ -167,8 +167,8 @@ mod tests {
         data.extend_from_slice(&0x0010000Au32.to_le_bytes()); // base=10, count=1
         data.extend_from_slice(&3000u32.to_le_bytes());
 
-        let record = PptRecord {
-            record_type: PptRecordType::PersistPtrHolder,
+        let record = Record {
+            record_type: RecordType::PersistPtrHolder,
             record_type_raw: 6001,
             version: 0,
             instance: 0,

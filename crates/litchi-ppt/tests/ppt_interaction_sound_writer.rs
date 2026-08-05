@@ -1,12 +1,12 @@
 use litchi_ppt::animation::{AnimationInfo, AnimationSound, BuiltinSound};
-use litchi_ppt::writer::PptWriter;
+use litchi_ppt::writer::Writer;
 use litchi_ppt::{
     BuiltinId, Interaction, InteractionAction, InteractionLinkTarget, InteractionTrigger, Package,
-    PowerPointTextInteraction, PowerPointTextRange,
+    TextInteraction, TextRange,
 };
 use std::{io::Cursor, num::NonZeroU32};
 
-fn write(writer: &mut PptWriter) -> Result<Vec<u8>, litchi_ppt::writer::PptWriteError> {
+fn write(writer: &mut Writer) -> Result<Vec<u8>, litchi_ppt::writer::WriteError> {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output)?;
     Ok(output.into_inner())
@@ -18,7 +18,7 @@ fn minimal_wave() -> Vec<u8> {
 
 #[test]
 fn action_only_builtin_sounds_are_collected_remapped_and_repeatable() {
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
     let slide = writer.add_slide().unwrap();
     writer.add_textbox(slide, 10, 10, 240, 40, "A😀BC").unwrap();
 
@@ -29,8 +29,8 @@ fn action_only_builtin_sounds_are_collected_remapped_and_repeatable() {
     )
     .with_builtin_sound(BuiltinSound::Click);
     writer.set_last_shape_interaction(slide, click).unwrap();
-    let hover = PowerPointTextInteraction::new(
-        PowerPointTextRange::new(1, 3).unwrap(),
+    let hover = TextInteraction::new(
+        TextRange::new(1, 3).unwrap(),
         Interaction::new(
             InteractionTrigger::MouseOver,
             InteractionAction::NoAction,
@@ -72,7 +72,7 @@ fn action_only_builtin_sounds_are_collected_remapped_and_repeatable() {
 
 #[test]
 fn embedded_animation_sound_can_be_shared_by_shape_action() {
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
     let sound_id = writer
         .add_embedded_sound("Custom tone", minimal_wave())
         .unwrap();
@@ -121,7 +121,7 @@ fn embedded_animation_sound_can_be_shared_by_shape_action() {
 
 #[test]
 fn action_only_embedded_sound_uses_the_explicit_registry() {
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
     let sound_id = writer
         .add_embedded_sound("Action tone", minimal_wave())
         .unwrap();
@@ -161,7 +161,7 @@ fn action_only_embedded_sound_uses_the_explicit_registry() {
 
 #[test]
 fn missing_invalid_and_linked_sound_resources_fail_before_output() {
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
     assert!(writer.add_embedded_sound("Not audio", vec![0; 12]).is_err());
     assert_eq!(
         writer.embedded_sound_count(),

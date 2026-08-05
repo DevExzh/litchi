@@ -1,5 +1,5 @@
 use litchi_cfb::OleWriter;
-use litchi_xls::XlsError;
+use litchi_xls::Error;
 use litchi_xls::chart::{Chart, Editor, Limits, Location, Selector, build_workbook};
 use std::io::Cursor;
 
@@ -39,9 +39,9 @@ fn workbook() -> Vec<u8> {
     workbook_with(&[])
 }
 
-fn assert_unsupported<T>(result: Result<T, XlsError>) {
+fn assert_unsupported<T>(result: Result<T, Error>) {
     match result {
-        Err(XlsError::Graph(litchi_ograph::Error::UnsupportedAuthoring { reason })) => {
+        Err(Error::Graph(litchi_ograph::Error::UnsupportedAuthoring { reason })) => {
             assert!(!reason.is_empty());
         },
         Err(error) => panic!("expected typed unsupported-authoring error, found {error}"),
@@ -49,9 +49,9 @@ fn assert_unsupported<T>(result: Result<T, XlsError>) {
     }
 }
 
-fn assert_unsupported_mutation<T>(result: Result<T, XlsError>) {
+fn assert_unsupported_mutation<T>(result: Result<T, Error>) {
     match result {
-        Err(XlsError::Graph(litchi_ograph::Error::UnsupportedMutation { operation, reason })) => {
+        Err(Error::Graph(litchi_ograph::Error::UnsupportedMutation { operation, reason })) => {
             assert!(!operation.is_empty());
             assert!(!reason.is_empty());
         },

@@ -2,10 +2,10 @@
 
 use litchi_core::binary::{read_i16_le, read_u16_le, read_u32_le};
 
-use super::package::{PptError, Result};
-use super::records::PptRecord;
+use super::package::{Error, Result};
+use super::records::Record;
 use super::text_prop::TextTabStop;
-use crate::consts::PptRecordType;
+use crate::consts::RecordType;
 
 /// Margin and first-line indent overrides for one paragraph level.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -39,7 +39,7 @@ impl TextRuler {
         require_bytes(data, 0, 4, "TextRuler mask")?;
         let mask = read_u32_le(data, 0).unwrap_or(0);
         if mask & !0x0000_1fff != 0 {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "TextRuler has nonzero reserved mask bits".to_string(),
             ));
         }
@@ -47,7 +47,7 @@ impl TextRuler {
 
         let level_count = read_optional_i16(data, &mut offset, mask & 0x0002 != 0, "cLevels")?;
         if level_count.is_some_and(|count| !(0..=5).contains(&count)) {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "TextRuler cLevels must be between 0 and 5".to_string(),
             ));
         }
@@ -62,14 +62,14 @@ impl TextRuler {
             offset += 2;
             let byte_count = count
                 .checked_mul(4)
-                .ok_or_else(|| PptError::Corrupted("TextRuler tab size overflow".to_string()))?;
+                .ok_or_else(|| Error::Corrupted("TextRuler tab size overflow".to_string()))?;
             require_bytes(data, offset, byte_count, "TextRuler tab stops")?;
             tab_stops.reserve(count);
             for _ in 0..count {
                 let position = read_i16_le(data, offset).unwrap_or(0);
                 let alignment = read_u16_le(data, offset + 2).unwrap_or(0);
                 if alignment > 3 {
-                    return Err(PptError::Corrupted(
+                    return Err(Error::Corrupted(
                         "TextRuler has an invalid TextTabTypeEnum value".to_string(),
                     ));
                 }
@@ -98,7 +98,7 @@ impl TextRuler {
         }
 
         if offset != data.len() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "TextRulerAtom has trailing bytes".to_string(),
             ));
         }
@@ -116,7 +116,7 @@ impl TextRuler {
     pub fn parse_default(data: &[u8]) -> Result<Self> {
         let ruler = Self::parse(data)?;
         if ruler.mask & 0x0000_1fff != 0x0000_1fff {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "DefaultRulerAtom omits required ruler fields".to_string(),
             ));
         }
@@ -125,11 +125,11 @@ impl TextRuler {
 }
 
 /// Discover and parse the document-wide `DefaultRulerAtom` below `root`.
-pub fn parse_default_text_ruler(root: &PptRecord) -> Result<Option<TextRuler>> {
+pub fn parse_default_text_ruler(root: &Record) -> Result<Option<TextRuler>> {
     let mut records = Vec::new();
     collect_default_rulers(root, &mut records);
     if records.len() > 1 {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "Record tree contains multiple DefaultRulerAtom records".to_string(),
         ));
     }
@@ -137,7 +137,7 @@ pub fn parse_default_text_ruler(root: &PptRecord) -> Result<Option<TextRuler>> {
         .first()
         .map(|record| {
             if record.version != 0 || record.instance != 0 {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "DefaultRulerAtom has an invalid record header".to_string(),
                 ));
             }
@@ -146,8 +146,8 @@ pub fn parse_default_text_ruler(root: &PptRecord) -> Result<Option<TextRuler>> {
         .transpose()
 }
 
-fn collect_default_rulers<'a>(record: &'a PptRecord, output: &mut Vec<&'a PptRecord>) {
-    if record.record_type == PptRecordType::DefaultRulerAtom {
+fn collect_default_rulers<'a>(record: &'a Record, output: &mut Vec<&'a Record>) {
+    if record.record_type == RecordType::DefaultRulerAtom {
         output.push(record);
         return;
     }
@@ -174,9 +174,9 @@ fn read_optional_i16(
 fn require_bytes(data: &[u8], offset: usize, size: usize, field: &str) -> Result<()> {
     let end = offset
         .checked_add(size)
-        .ok_or_else(|| PptError::Corrupted(format!("{field} offset overflow")))?;
+        .ok_or_else(|| Error::Corrupted(format!("{field} offset overflow")))?;
     if end > data.len() {
-        return Err(PptError::Corrupted(format!("Truncated {field}")));
+        return Err(Error::Corrupted(format!("Truncated {field}")));
     }
     Ok(())
 }
@@ -258,8 +258,8 @@ mod tests {
         assert_eq!(ruler.levels[4].left_margin, Some(400));
         assert_eq!(ruler.levels[4].indent, Some(375));
 
-        let atom = PptRecord {
-            record_type: PptRecordType::DefaultRulerAtom,
+        let atom = Record {
+            record_type: RecordType::DefaultRulerAtom,
             record_type_raw: 4011,
             version: 0,
             instance: 0,
@@ -267,8 +267,8 @@ mod tests {
             data,
             children: Vec::new(),
         };
-        let root = PptRecord {
-            record_type: PptRecordType::Environment,
+        let root = Record {
+            record_type: RecordType::Environment,
             record_type_raw: 1010,
             version: 0x0f,
             instance: 0,

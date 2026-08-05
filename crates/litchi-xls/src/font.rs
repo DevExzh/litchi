@@ -1,7 +1,7 @@
 //! BIFF8 workbook font table support.
 
-use super::leniency::{XlsFormattingDefect, XlsToleranceLog};
-use super::{XlsColor, XlsError, XlsPalette, XlsResult};
+use super::leniency::{FormattingDefect, ToleranceLog};
+use super::{Color, Error, Palette, Result};
 
 /// MS-XLS 2.4.122 `Font` record type.
 pub(crate) const FONT_RECORD_TYPE: u16 = 0x0031;
@@ -14,7 +14,7 @@ const MAX_FONT_FAMILY: u8 = 5;
 
 /// Vertical positioning applied to a font.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XlsFontEscapement {
+pub enum FontEscapement {
     Normal,
     Superscript,
     Subscript,
@@ -22,7 +22,7 @@ pub enum XlsFontEscapement {
 
 /// Underline style applied to a font.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XlsFontUnderline {
+pub enum FontUnderline {
     None,
     Single,
     Double,
@@ -32,7 +32,7 @@ pub enum XlsFontUnderline {
 
 /// Windows logical font family.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XlsFontFamily {
+pub enum FontFamily {
     NotApplicable,
     Roman,
     Swiss,
@@ -43,7 +43,7 @@ pub enum XlsFontFamily {
 
 /// Windows character set associated with a BIFF8 font.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XlsFontCharset {
+pub enum FontCharset {
     Ansi,
     Default,
     Symbol,
@@ -67,7 +67,7 @@ pub enum XlsFontCharset {
 
 /// Font and font-formatting information from a global `Font` record.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsFont {
+pub struct Font {
     index: u16,
     name: String,
     height_twips: u16,
@@ -79,13 +79,13 @@ pub struct XlsFont {
     shadow: bool,
     condensed: bool,
     extended: bool,
-    escapement: XlsFontEscapement,
-    underline: XlsFontUnderline,
-    family: XlsFontFamily,
-    charset: XlsFontCharset,
+    escapement: FontEscapement,
+    underline: FontUnderline,
+    family: FontFamily,
+    charset: FontCharset,
 }
 
-impl XlsFont {
+impl Font {
     pub fn index(&self) -> u16 {
         self.index
     }
@@ -102,7 +102,7 @@ impl XlsFont {
         self.color_index
     }
 
-    pub fn color(&self, palette: &XlsPalette) -> Option<XlsColor> {
+    pub fn color(&self, palette: &Palette) -> Option<Color> {
         palette.color(self.color_index)
     }
 
@@ -138,34 +138,34 @@ impl XlsFont {
         self.extended
     }
 
-    pub fn escapement(&self) -> XlsFontEscapement {
+    pub fn escapement(&self) -> FontEscapement {
         self.escapement
     }
 
-    pub fn underline(&self) -> XlsFontUnderline {
+    pub fn underline(&self) -> FontUnderline {
         self.underline
     }
 
-    pub fn family(&self) -> XlsFontFamily {
+    pub fn family(&self) -> FontFamily {
         self.family
     }
 
-    pub fn charset(&self) -> XlsFontCharset {
+    pub fn charset(&self) -> FontCharset {
         self.charset
     }
 
     /// Parse a `Font` record under an explicit leniency policy.
     ///
-    /// Under [`super::XlsLeniency::TolerateFormattingDefects`] an out-of-range
-    /// `bFamily` degrades to [`XlsFontFamily::NotApplicable`] and a zero `cch`
+    /// Under [`super::Leniency::TolerateFormattingDefects`] an out-of-range
+    /// `bFamily` degrades to [`FontFamily::NotApplicable`] and a zero `cch`
     /// yields an empty name; both are recorded in `tolerance`. Every other
     /// deviation — including a payload whose length disagrees with `cch` — stays
     /// a hard error, because that is a framing defect rather than a cosmetic one.
     pub(crate) fn parse_record(
         index: u16,
         data: &[u8],
-        tolerance: &mut XlsToleranceLog,
-    ) -> XlsResult<Self> {
+        tolerance: &mut ToleranceLog,
+    ) -> Result<Self> {
         validate_font_index(index)?;
         if data.len() < FONT_FIXED_LENGTH + 2 {
             return Err(invalid(format!(
@@ -196,29 +196,29 @@ impl XlsFont {
             )));
         }
         let escapement = match u16::from_le_bytes([data[8], data[9]]) {
-            0 => XlsFontEscapement::Normal,
-            1 => XlsFontEscapement::Superscript,
-            2 => XlsFontEscapement::Subscript,
+            0 => FontEscapement::Normal,
+            1 => FontEscapement::Superscript,
+            2 => FontEscapement::Subscript,
             value => return Err(invalid(format!("Font escapement {value} is invalid"))),
         };
         let underline = match data[10] {
-            0x00 => XlsFontUnderline::None,
-            0x01 => XlsFontUnderline::Single,
-            0x02 => XlsFontUnderline::Double,
-            0x21 => XlsFontUnderline::SingleAccounting,
-            0x22 => XlsFontUnderline::DoubleAccounting,
+            0x00 => FontUnderline::None,
+            0x01 => FontUnderline::Single,
+            0x02 => FontUnderline::Double,
+            0x21 => FontUnderline::SingleAccounting,
+            0x22 => FontUnderline::DoubleAccounting,
             value => return Err(invalid(format!("Font underline {value:#04x} is invalid"))),
         };
         let family = match data[11] {
-            0 => XlsFontFamily::NotApplicable,
-            1 => XlsFontFamily::Roman,
-            2 => XlsFontFamily::Swiss,
-            3 => XlsFontFamily::Modern,
-            4 => XlsFontFamily::Script,
-            5 => XlsFontFamily::Decorative,
+            0 => FontFamily::NotApplicable,
+            1 => FontFamily::Roman,
+            2 => FontFamily::Swiss,
+            3 => FontFamily::Modern,
+            4 => FontFamily::Script,
+            5 => FontFamily::Decorative,
             value => {
                 tolerance.tolerate(
-                    XlsFormattingDefect::FontFamily,
+                    FormattingDefect::FontFamily,
                     u32::from(index),
                     u32::from(value),
                     || {
@@ -227,29 +227,29 @@ impl XlsFont {
                         ))
                     },
                 )?;
-                XlsFontFamily::NotApplicable
+                FontFamily::NotApplicable
             },
         };
         let charset = match data[12] {
-            0x00 => XlsFontCharset::Ansi,
-            0x01 => XlsFontCharset::Default,
-            0x02 => XlsFontCharset::Symbol,
-            0x4d => XlsFontCharset::Mac,
-            0x80 => XlsFontCharset::ShiftJis,
-            0x81 => XlsFontCharset::Korean,
-            0x82 => XlsFontCharset::Johab,
-            0x86 => XlsFontCharset::Gb2312,
-            0x88 => XlsFontCharset::ChineseBig5,
-            0xa1 => XlsFontCharset::Greek,
-            0xa2 => XlsFontCharset::Turkish,
-            0xa3 => XlsFontCharset::Vietnamese,
-            0xb1 => XlsFontCharset::Hebrew,
-            0xb2 => XlsFontCharset::Arabic,
-            0xba => XlsFontCharset::Baltic,
-            0xcc => XlsFontCharset::Russian,
-            0xdd => XlsFontCharset::Thai,
-            0xee => XlsFontCharset::EastEurope,
-            0xff => XlsFontCharset::Oem,
+            0x00 => FontCharset::Ansi,
+            0x01 => FontCharset::Default,
+            0x02 => FontCharset::Symbol,
+            0x4d => FontCharset::Mac,
+            0x80 => FontCharset::ShiftJis,
+            0x81 => FontCharset::Korean,
+            0x82 => FontCharset::Johab,
+            0x86 => FontCharset::Gb2312,
+            0x88 => FontCharset::ChineseBig5,
+            0xa1 => FontCharset::Greek,
+            0xa2 => FontCharset::Turkish,
+            0xa3 => FontCharset::Vietnamese,
+            0xb1 => FontCharset::Hebrew,
+            0xb2 => FontCharset::Arabic,
+            0xba => FontCharset::Baltic,
+            0xcc => FontCharset::Russian,
+            0xdd => FontCharset::Thai,
+            0xee => FontCharset::EastEurope,
+            0xff => FontCharset::Oem,
             value => {
                 return Err(invalid(format!(
                     "Font character set {value:#04x} is invalid"
@@ -262,7 +262,7 @@ impl XlsFont {
             // A nameless font is cosmetic: the record still carries every
             // metric, and a renderer substitutes its own default face exactly
             // as it would for a name it does not have installed.
-            tolerance.tolerate(XlsFormattingDefect::FontNameEmpty, u32::from(index), 0, || {
+            tolerance.tolerate(FormattingDefect::FontNameEmpty, u32::from(index), 0, || {
                 invalid(format!(
                     "Font name has 0 characters; expected {MIN_FONT_NAME_LENGTH}..={MAX_FONT_NAME_LENGTH}"
                 ))
@@ -324,7 +324,7 @@ impl XlsFont {
     }
 }
 
-pub(crate) fn logical_font_index(physical_index: usize) -> XlsResult<u16> {
+pub(crate) fn logical_font_index(physical_index: usize) -> Result<u16> {
     let logical_index = if physical_index < 4 {
         physical_index
     } else {
@@ -338,14 +338,14 @@ pub(crate) fn logical_font_index(physical_index: usize) -> XlsResult<u16> {
     Ok(logical_index)
 }
 
-pub(crate) fn validate_font_index(index: u16) -> XlsResult<()> {
+pub(crate) fn validate_font_index(index: u16) -> Result<()> {
     if index == 4 || index > 1022 {
         return Err(invalid(format!("Font logical index {index} is invalid")));
     }
     Ok(())
 }
 
-pub(crate) fn validate_font_table(fonts: &[XlsFont]) -> XlsResult<()> {
+pub(crate) fn validate_font_table(fonts: &[Font]) -> Result<()> {
     if fonts.len() < 4 {
         return Err(invalid(format!(
             "workbook has {} Font records; expected at least four",
@@ -368,19 +368,19 @@ fn valid_color_index(index: u16) -> bool {
     matches!(index, 0x0000..=0x0041 | 0x004d..=0x004f | 0x0051 | 0x7fff)
 }
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidData(message.into())
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidData(message.into())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::leniency::XlsLeniency;
+    use crate::leniency::Leniency;
 
     /// Strict-mode shim: these tests exercise the default reject-everything
     /// policy, which the production reader threads through a tolerance log.
-    fn parse_record(index: u16, data: &[u8]) -> XlsResult<XlsFont> {
-        XlsFont::parse_record(index, data, &mut XlsToleranceLog::new(XlsLeniency::Strict))
+    fn parse_record(index: u16, data: &[u8]) -> Result<Font> {
+        Font::parse_record(index, data, &mut ToleranceLog::new(Leniency::Strict))
     }
 
     fn font_record(weight: u16, italic: bool, color_index: u16, name: &str) -> Vec<u8> {
@@ -402,7 +402,7 @@ mod tests {
         data
     }
 
-    fn required_prefix() -> Vec<XlsFont> {
+    fn required_prefix() -> Vec<Font> {
         [(400, false), (700, false), (400, true), (700, true)]
             .into_iter()
             .enumerate()
@@ -449,11 +449,11 @@ mod tests {
         assert!(font.has_shadow());
         assert!(font.is_condensed());
         assert!(font.is_extended());
-        assert_eq!(font.escapement(), XlsFontEscapement::Superscript);
-        assert_eq!(font.underline(), XlsFontUnderline::DoubleAccounting);
-        assert_eq!(font.family(), XlsFontFamily::Modern);
-        assert_eq!(font.charset(), XlsFontCharset::Thai);
-        assert!(font.color(&XlsPalette::default()).is_some());
+        assert_eq!(font.escapement(), FontEscapement::Superscript);
+        assert_eq!(font.underline(), FontUnderline::DoubleAccounting);
+        assert_eq!(font.family(), FontFamily::Modern);
+        assert_eq!(font.charset(), FontCharset::Thai);
+        assert!(font.color(&Palette::default()).is_some());
     }
 
     #[test]

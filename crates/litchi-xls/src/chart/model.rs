@@ -6,7 +6,7 @@ use litchi_ograph::record::{line, pie};
 
 use super::codec::validate_link;
 use super::wire::*;
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
 /// Hard resource bounds for chart discovery and safe mutation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -578,7 +578,7 @@ impl Chart {
     }
 
     /// Checks resource bounds, invariants, flags, and inert cell references.
-    pub fn validate(&self, limits: Limits) -> XlsResult<()> {
+    pub fn validate(&self, limits: Limits) -> Result<()> {
         validate_limits(limits)?;
         validate_sheet_properties(self.sheet_properties)?;
         if self.series.len() > limits.max_series
@@ -698,7 +698,7 @@ impl Chart {
             .unknown_records
             .iter()
             .try_fold(0usize, |sum, value| sum.checked_add(value.data.len()))
-            .ok_or_else(|| XlsError::InvalidData("chart unknown-record size overflow".into()))?;
+            .ok_or_else(|| Error::InvalidData("chart unknown-record size overflow".into()))?;
         if unknown > limits.max_unknown_bytes {
             return invalid(CHART, "opaque chart data exceeds limit");
         }

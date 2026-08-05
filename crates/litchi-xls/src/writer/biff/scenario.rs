@@ -1,15 +1,15 @@
 use std::io::Write;
 
-use crate::scenario::XlsScenarioManager;
+use crate::scenario::ScenarioManager;
 use crate::writer::biff::write_record_header;
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
 const MAX_RECORD_DATA: usize = 8224;
 
 pub(crate) fn write_scenario_manager<W: Write>(
     writer: &mut W,
-    manager: &XlsScenarioManager,
-) -> XlsResult<()> {
+    manager: &ScenarioManager,
+) -> Result<()> {
     manager.validate_for_write()?;
     let manager_len = 8usize + manager.result_ranges.len() * 8;
     write_record_header(writer, 0x00AE, manager_len as u16)?;
@@ -29,16 +29,13 @@ pub(crate) fn write_scenario_manager<W: Write>(
     Ok(())
 }
 
-fn write_index<W: Write>(writer: &mut W, index: Option<usize>) -> XlsResult<()> {
+fn write_index<W: Write>(writer: &mut W, index: Option<usize>) -> Result<()> {
     let value = index.map(|value| value as i16).unwrap_or(-1);
     writer.write_all(&value.to_le_bytes())?;
     Ok(())
 }
 
-fn write_scenario<W: Write>(
-    writer: &mut W,
-    scenario: &crate::scenario::XlsScenario,
-) -> XlsResult<()> {
+fn write_scenario<W: Write>(writer: &mut W, scenario: &crate::scenario::Scenario) -> Result<()> {
     let mut prefix = Vec::new();
     prefix.extend_from_slice(&(scenario.cells.len() as u16).to_le_bytes());
     prefix.push(u8::from(scenario.locked));
@@ -69,7 +66,7 @@ fn write_scenario<W: Write>(
         prefix.extend_from_slice(&flags.to_le_bytes());
     }
     if prefix.len() > MAX_RECORD_DATA {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "Scenario fixed fields exceed BIFF8 record limit".to_string(),
         ));
     }
@@ -92,9 +89,9 @@ fn write_scenario<W: Write>(
     Ok(())
 }
 
-fn push_component(chunks: &mut Vec<Vec<u8>>, component: Vec<u8>) -> XlsResult<()> {
+fn push_component(chunks: &mut Vec<Vec<u8>>, component: Vec<u8>) -> Result<()> {
     if component.len() > MAX_RECORD_DATA {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "individual Scenario value exceeds BIFF8 continuation-safe limit".to_string(),
         ));
     }
@@ -106,10 +103,10 @@ fn push_component(chunks: &mut Vec<Vec<u8>>, component: Vec<u8>) -> XlsResult<()
     Ok(())
 }
 
-fn encode_unicode(output: &mut Vec<u8>, value: &str) -> XlsResult<()> {
+fn encode_unicode(output: &mut Vec<u8>, value: &str) -> Result<()> {
     let count = value.encode_utf16().count();
     if count > u16::MAX as usize {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "Scenario string exceeds 65535 UTF-16 code units".to_string(),
         ));
     }

@@ -1,8 +1,8 @@
 //! Strict, inert PowerPoint named/custom slide-show metadata.
 
-use super::package::{PptError, Result};
-use super::records::PptRecord;
-use crate::consts::PptRecordType;
+use super::package::{Error, Result};
+use super::records::Record;
+use crate::consts::RecordType;
 use std::collections::HashSet;
 
 const MAX_NAMED_SHOWS: usize = 4_096;
@@ -11,13 +11,13 @@ const MAX_SLIDES_PER_SHOW: usize = 1_048_576;
 
 /// One named show in source order.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PowerPointNamedShow {
+pub struct NamedShow {
     pub name: String,
     /// Ordered slide references. `None` preserves an absent slides atom.
     pub slide_ids: Option<Vec<u32>>,
 }
 
-impl PowerPointNamedShow {
+impl NamedShow {
     /// Return ordered references that exist in the presentation.
     ///
     /// Source references are retained for lossless rewriting even though
@@ -36,16 +36,16 @@ impl PowerPointNamedShow {
 
 /// The optional `NamedShowsContainer` directly below a presentation document.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct PowerPointNamedShows {
-    pub shows: Vec<PowerPointNamedShow>,
+pub struct NamedShows {
+    pub shows: Vec<NamedShow>,
 }
 
-impl PowerPointNamedShows {
-    pub fn parse(document: &PptRecord) -> Result<Option<Self>> {
+impl NamedShows {
+    pub fn parse(document: &Record) -> Result<Option<Self>> {
         let containers = document
             .children
             .iter()
-            .filter(|record| record.record_type_raw == PptRecordType::NamedShows.as_u16())
+            .filter(|record| record.record_type_raw == RecordType::NamedShows.as_u16())
             .collect::<Vec<_>>();
         if containers.len() > 1 {
             return corrupted("DocumentContainer contains duplicate NamedShowsContainer records");
@@ -57,13 +57,13 @@ impl PowerPointNamedShows {
             container,
             0x0f,
             0,
-            PptRecordType::NamedShows,
+            RecordType::NamedShows,
             "NamedShowsContainer",
         )?;
         if usize::try_from(container.data_length).ok() != Some(container.data.len()) {
             return corrupted("NamedShowsContainer has a truncated payload");
         }
-        let children = PptRecord::parse_sequence_strict(&container.data, "NamedShowsContainer")?;
+        let children = Record::parse_sequence_strict(&container.data, "NamedShowsContainer")?;
         if children.len() > MAX_NAMED_SHOWS {
             return corrupted(format!(
                 "NamedShowsContainer exceeds {MAX_NAMED_SHOWS} named shows"
@@ -76,9 +76,9 @@ impl PowerPointNamedShows {
         Ok(Some(Self { shows }))
     }
 
-    pub fn to_record(&self) -> Result<PptRecord> {
+    pub fn to_record(&self) -> Result<Record> {
         let bytes = self.to_record_bytes()?;
-        let (record, end) = PptRecord::parse(&bytes, 0)?;
+        let (record, end) = Record::parse(&bytes, 0)?;
         if end != bytes.len() {
             return corrupted("canonical NamedShowsContainer did not consume its record bytes");
         }
@@ -96,7 +96,7 @@ impl PowerPointNamedShows {
             let name = record_bytes(
                 0,
                 0,
-                PptRecordType::CString.as_u16(),
+                RecordType::CString.as_u16(),
                 &encode_name(&show.name)?,
             )?;
             let mut show_children = name;
@@ -114,33 +114,27 @@ impl PowerPointNamedShows {
                 show_children.extend_from_slice(&record_bytes(
                     0,
                     0,
-                    PptRecordType::NamedShowSlides.as_u16(),
+                    RecordType::NamedShowSlides.as_u16(),
                     &payload,
                 )?);
             }
             children.extend_from_slice(&record_bytes(
                 0x0f,
                 0,
-                PptRecordType::NamedShow.as_u16(),
+                RecordType::NamedShow.as_u16(),
                 &show_children,
             )?);
         }
-        record_bytes(0x0f, 0, PptRecordType::NamedShows.as_u16(), &children)
+        record_bytes(0x0f, 0, RecordType::NamedShows.as_u16(), &children)
     }
 }
 
-fn parse_named_show(record: &PptRecord) -> Result<PowerPointNamedShow> {
-    require_header(
-        record,
-        0x0f,
-        0,
-        PptRecordType::NamedShow,
-        "NamedShowContainer",
-    )?;
+fn parse_named_show(record: &Record) -> Result<NamedShow> {
+    require_header(record, 0x0f, 0, RecordType::NamedShow, "NamedShowContainer")?;
     if usize::try_from(record.data_length).ok() != Some(record.data.len()) {
         return corrupted("NamedShowContainer has a truncated payload");
     }
-    let children = PptRecord::parse_sequence_strict(&record.data, "NamedShowContainer")?;
+    let children = Record::parse_sequence_strict(&record.data, "NamedShowContainer")?;
     if !(1..=2).contains(&children.len()) {
         return corrupted("NamedShowContainer must contain a name and at most one slide-list atom");
     }
@@ -150,7 +144,7 @@ fn parse_named_show(record: &PptRecord) -> Result<PowerPointNamedShow> {
             slides,
             0,
             0,
-            PptRecordType::NamedShowSlides,
+            RecordType::NamedShowSlides,
             "NamedShowSlidesAtom",
         )?;
         if slides.data.len() % 4 != 0 {
@@ -172,11 +166,11 @@ fn parse_named_show(record: &PptRecord) -> Result<PowerPointNamedShow> {
     } else {
         None
     };
-    Ok(PowerPointNamedShow { name, slide_ids })
+    Ok(NamedShow { name, slide_ids })
 }
 
-fn parse_name(record: &PptRecord) -> Result<String> {
-    require_header(record, 0, 0, PptRecordType::CString, "NamedShowNameAtom")?;
+fn parse_name(record: &Record) -> Result<String> {
+    require_header(record, 0, 0, RecordType::CString, "NamedShowNameAtom")?;
     if !record.data.len().is_multiple_of(2) {
         return corrupted("NamedShowNameAtom has odd UTF-16 byte length");
     }
@@ -197,7 +191,7 @@ fn parse_name(record: &PptRecord) -> Result<String> {
         units.push(unit);
     }
     String::from_utf16(&units)
-        .map_err(|_| PptError::Corrupted("NamedShowNameAtom contains invalid UTF-16".to_string()))
+        .map_err(|_| Error::Corrupted("NamedShowNameAtom contains invalid UTF-16".to_string()))
 }
 
 fn encode_name(name: &str) -> Result<Vec<u8>> {
@@ -224,10 +218,10 @@ fn validate_slide_id_ref(id: u32) -> Result<()> {
 }
 
 fn require_header(
-    record: &PptRecord,
+    record: &Record,
     version: u16,
     instance: u16,
-    record_type: PptRecordType,
+    record_type: RecordType,
     context: &str,
 ) -> Result<()> {
     if record.version != version
@@ -241,7 +235,7 @@ fn require_header(
 
 fn record_bytes(version: u16, instance: u16, record_type: u16, data: &[u8]) -> Result<Vec<u8>> {
     let length = u32::try_from(data.len())
-        .map_err(|_| PptError::Corrupted("PowerPoint record payload exceeds u32".to_string()))?;
+        .map_err(|_| Error::Corrupted("PowerPoint record payload exceeds u32".to_string()))?;
     let mut bytes = Vec::with_capacity(8usize.saturating_add(data.len()));
     bytes.extend_from_slice(&((instance << 4) | version).to_le_bytes());
     bytes.extend_from_slice(&record_type.to_le_bytes());
@@ -251,48 +245,48 @@ fn record_bytes(version: u16, instance: u16, record_type: u16, data: &[u8]) -> R
 }
 
 fn corrupted<T>(message: impl Into<String>) -> Result<T> {
-    Err(PptError::Corrupted(message.into()))
+    Err(Error::Corrupted(message.into()))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn root(children: Vec<PptRecord>) -> PptRecord {
-        PptRecord {
+    fn root(children: Vec<Record>) -> Record {
+        Record {
             version: 0x0f,
             instance: 0,
-            record_type: PptRecordType::Document,
-            record_type_raw: PptRecordType::Document.as_u16(),
+            record_type: RecordType::Document,
+            record_type_raw: RecordType::Document.as_u16(),
             data_length: 0,
             data: Vec::new(),
             children,
         }
     }
 
-    fn parsed_record(bytes: &[u8]) -> PptRecord {
-        PptRecord::parse(bytes, 0).unwrap().0
+    fn parsed_record(bytes: &[u8]) -> Record {
+        Record::parse(bytes, 0).unwrap().0
     }
 
     #[test]
     fn protocol_shaped_named_shows_roundtrip_and_resolve() {
-        let shows = PowerPointNamedShows {
+        let shows = NamedShows {
             shows: vec![
-                PowerPointNamedShow {
+                NamedShow {
                     name: "Executive overview".into(),
                     slide_ids: Some(vec![0x100, 0x222, 0, 0x101]),
                 },
-                PowerPointNamedShow {
+                NamedShow {
                     name: "Empty".into(),
                     slide_ids: Some(Vec::new()),
                 },
-                PowerPointNamedShow {
+                NamedShow {
                     name: String::new(),
                     slide_ids: None,
                 },
             ],
         };
-        let parsed = PowerPointNamedShows::parse(&root(vec![shows.to_record().unwrap()]))
+        let parsed = NamedShows::parse(&root(vec![shows.to_record().unwrap()]))
             .unwrap()
             .unwrap();
         assert_eq!(parsed, shows);
@@ -311,36 +305,36 @@ mod tests {
 
     #[test]
     fn rejects_duplicate_and_malformed_container_grammar() {
-        let valid = PowerPointNamedShows {
-            shows: vec![PowerPointNamedShow {
+        let valid = NamedShows {
+            shows: vec![NamedShow {
                 name: "Show".into(),
                 slide_ids: Some(vec![0x100]),
             }],
         }
         .to_record()
         .unwrap();
-        assert!(PowerPointNamedShows::parse(&root(vec![valid.clone(), valid])).is_err());
+        assert!(NamedShows::parse(&root(vec![valid.clone(), valid])).is_err());
 
         let name_data = ('S' as u16).to_le_bytes();
-        let name = record_bytes(0, 0, PptRecordType::CString.as_u16(), &name_data).unwrap();
-        let slides = record_bytes(0, 0, PptRecordType::NamedShowSlides.as_u16(), &[0; 4]).unwrap();
+        let name = record_bytes(0, 0, RecordType::CString.as_u16(), &name_data).unwrap();
+        let slides = record_bytes(0, 0, RecordType::NamedShowSlides.as_u16(), &[0; 4]).unwrap();
         for children in [
             Vec::new(),
             slides.clone(),
             [slides.clone(), name.clone()].concat(),
             [name.clone(), slides.clone(), slides].concat(),
         ] {
-            let show = record_bytes(0x0f, 0, PptRecordType::NamedShow.as_u16(), &children).unwrap();
-            let outer = record_bytes(0x0f, 0, PptRecordType::NamedShows.as_u16(), &show).unwrap();
-            assert!(PowerPointNamedShows::parse(&root(vec![parsed_record(&outer)])).is_err());
+            let show = record_bytes(0x0f, 0, RecordType::NamedShow.as_u16(), &children).unwrap();
+            let outer = record_bytes(0x0f, 0, RecordType::NamedShows.as_u16(), &show).unwrap();
+            assert!(NamedShows::parse(&root(vec![parsed_record(&outer)])).is_err());
         }
     }
 
     #[test]
     fn rejects_hostile_names_lengths_and_slide_ids() {
         for name in ["line\nbreak", "nul\0suffix"] {
-            let shows = PowerPointNamedShows {
-                shows: vec![PowerPointNamedShow {
+            let shows = NamedShows {
+                shows: vec![NamedShow {
                     name: name.into(),
                     slide_ids: None,
                 }],
@@ -348,8 +342,8 @@ mod tests {
             assert!(shows.to_record_bytes().is_err());
         }
         for slide_id in [1, 0xff, 0x8000_0000, u32::MAX] {
-            let shows = PowerPointNamedShows {
-                shows: vec![PowerPointNamedShow {
+            let shows = NamedShows {
+                shows: vec![NamedShow {
                     name: "Show".into(),
                     slide_ids: Some(vec![slide_id]),
                 }],
@@ -357,20 +351,14 @@ mod tests {
             assert!(shows.to_record_bytes().is_err());
         }
         for child in [
-            record_bytes(0, 0, PptRecordType::CString.as_u16(), b"x").unwrap(),
-            record_bytes(
-                0,
-                0,
-                PptRecordType::CString.as_u16(),
-                &0xd800u16.to_le_bytes(),
-            )
-            .unwrap(),
-            record_bytes(0, 0, PptRecordType::CString.as_u16(), &1u16.to_le_bytes()).unwrap(),
-            record_bytes(0, 0, PptRecordType::NamedShowSlides.as_u16(), &[0, 1, 2]).unwrap(),
+            record_bytes(0, 0, RecordType::CString.as_u16(), b"x").unwrap(),
+            record_bytes(0, 0, RecordType::CString.as_u16(), &0xd800u16.to_le_bytes()).unwrap(),
+            record_bytes(0, 0, RecordType::CString.as_u16(), &1u16.to_le_bytes()).unwrap(),
+            record_bytes(0, 0, RecordType::NamedShowSlides.as_u16(), &[0, 1, 2]).unwrap(),
         ] {
-            let show = record_bytes(0x0f, 0, PptRecordType::NamedShow.as_u16(), &child).unwrap();
-            let outer = record_bytes(0x0f, 0, PptRecordType::NamedShows.as_u16(), &show).unwrap();
-            assert!(PowerPointNamedShows::parse(&root(vec![parsed_record(&outer)])).is_err());
+            let show = record_bytes(0x0f, 0, RecordType::NamedShow.as_u16(), &child).unwrap();
+            let outer = record_bytes(0x0f, 0, RecordType::NamedShows.as_u16(), &show).unwrap();
+            assert!(NamedShows::parse(&root(vec![parsed_record(&outer)])).is_err());
         }
     }
 }

@@ -1,11 +1,11 @@
-use litchi_ppt::PptWriter;
+use litchi_ppt::Writer;
 use litchi_ppt::animation::*;
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("Creating simple PPT animation demo...");
 
-    let mut writer = PptWriter::new_widescreen();
+    let mut writer = Writer::new_widescreen();
     writer.set_property("Title", "Simple Animation Demo");
 
     // Slide with 4 animated shapes

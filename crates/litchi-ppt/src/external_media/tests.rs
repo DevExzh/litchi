@@ -1,7 +1,7 @@
 use super::codec::*;
 use super::model::*;
-use crate::consts::PptRecordType;
-use crate::records::PptRecord;
+use crate::consts::RecordType;
+use crate::records::Record;
 
 fn cd_audio() -> CdAudio {
     CdAudio {
@@ -44,11 +44,11 @@ fn rejects_hostile_media_flags_times_order_and_headers() {
     assert!(value.to_record_bytes().is_err());
     let mut bytes = cd_audio().to_record_bytes().unwrap();
     bytes[20] = 0x08;
-    let record = PptRecord::parse(&bytes, 0).unwrap().0;
+    let record = Record::parse(&bytes, 0).unwrap().0;
     assert!(CdAudio::parse(&record).is_err());
     bytes = cd_audio().to_record_bytes().unwrap();
     bytes[0] = 0;
-    let record = PptRecord::parse(&bytes, 0).unwrap().0;
+    let record = Record::parse(&bytes, 0).unwrap().0;
     assert!(CdAudio::parse(&record).is_err());
 }
 
@@ -126,12 +126,12 @@ fn movie_containers_reject_wrong_headers_and_extra_children() {
     };
     let mut bytes = movie.to_record_bytes().unwrap();
     bytes[0] = 0;
-    assert!(Movie::parse(&PptRecord::parse(&bytes, 0).unwrap().0).is_err());
+    assert!(Movie::parse(&Record::parse(&bytes, 0).unwrap().0).is_err());
 
     let child = movie.video.to_record_bytes().unwrap();
     let doubled = [child.as_slice(), child.as_slice()].concat();
-    let bytes = record_bytes(0x0f, 0, PptRecordType::ExternalAviMovie.as_u16(), &doubled).unwrap();
-    assert!(Movie::parse(&PptRecord::parse(&bytes, 0).unwrap().0).is_err());
+    let bytes = record_bytes(0x0f, 0, RecordType::ExternalAviMovie.as_u16(), &doubled).unwrap();
+    assert!(Movie::parse(&Record::parse(&bytes, 0).unwrap().0).is_err());
 }
 
 #[test]
@@ -160,14 +160,8 @@ fn linked_audio_rejects_misplaced_children_and_hostile_paths() {
     audio.path = None;
     let child = audio.media.to_record_bytes().unwrap();
     let payload = [child.as_slice(), child.as_slice()].concat();
-    let bytes = record_bytes(
-        0x0f,
-        0,
-        PptRecordType::ExternalWavAudioLink.as_u16(),
-        &payload,
-    )
-    .unwrap();
-    assert!(LinkedAudio::parse(&PptRecord::parse(&bytes, 0).unwrap().0).is_err());
+    let bytes = record_bytes(0x0f, 0, RecordType::ExternalWavAudioLink.as_u16(), &payload).unwrap();
+    assert!(LinkedAudio::parse(&Record::parse(&bytes, 0).unwrap().0).is_err());
 }
 
 #[test]
@@ -202,22 +196,22 @@ fn embedded_wav_rejects_negative_or_overflowing_duration() {
     .unwrap();
     let duration_offset = 8 + 16 + 8 + 4;
     bytes[duration_offset..duration_offset + 4].copy_from_slice(&(-1i32).to_le_bytes());
-    assert!(EmbeddedWav::parse(&PptRecord::parse(&bytes, 0).unwrap().0).is_err());
+    assert!(EmbeddedWav::parse(&Record::parse(&bytes, 0).unwrap().0).is_err());
 }
 
-fn external_object_list(seed: i32, objects: &[Vec<u8>]) -> PptRecord {
+fn external_object_list(seed: i32, objects: &[Vec<u8>]) -> Record {
     let mut payload = record_bytes(
         0,
         0,
-        PptRecordType::ExObjListAtom.as_u16(),
+        RecordType::ExObjListAtom.as_u16(),
         &seed.to_le_bytes(),
     )
     .unwrap();
     for object in objects {
         payload.extend_from_slice(object);
     }
-    let bytes = record_bytes(0x0f, 0, PptRecordType::ExObjList.as_u16(), &payload).unwrap();
-    PptRecord::parse(&bytes, 0).unwrap().0
+    let bytes = record_bytes(0x0f, 0, RecordType::ExObjList.as_u16(), &payload).unwrap();
+    Record::parse(&bytes, 0).unwrap().0
 }
 
 fn hyperlink(id: u32) -> Vec<u8> {
@@ -230,30 +224,23 @@ fn hyperlink(id: u32) -> Vec<u8> {
     let mut payload = record_bytes(
         0,
         0,
-        PptRecordType::ExternalHyperlinkAtom.as_u16(),
+        RecordType::ExternalHyperlinkAtom.as_u16(),
         &id.to_le_bytes(),
     )
     .unwrap();
-    payload.extend(
-        record_bytes(
-            0,
-            0,
-            PptRecordType::CString.as_u16(),
-            &unicode("Media link"),
-        )
-        .unwrap(),
-    );
+    payload
+        .extend(record_bytes(0, 0, RecordType::CString.as_u16(), &unicode("Media link")).unwrap());
     payload.extend(
         record_bytes(
             0,
             1,
-            PptRecordType::CString.as_u16(),
+            RecordType::CString.as_u16(),
             &unicode("https://example.test"),
         )
         .unwrap(),
     );
-    payload.extend(record_bytes(0, 3, PptRecordType::CString.as_u16(), &unicode("slide")).unwrap());
-    record_bytes(0x0f, 0, PptRecordType::ExternalHyperlink.as_u16(), &payload).unwrap()
+    payload.extend(record_bytes(0, 3, RecordType::CString.as_u16(), &unicode("slide")).unwrap());
+    record_bytes(0x0f, 0, RecordType::ExternalHyperlink.as_u16(), &payload).unwrap()
 }
 
 #[test]

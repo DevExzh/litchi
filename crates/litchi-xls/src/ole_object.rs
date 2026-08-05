@@ -1,6 +1,6 @@
 //! Strict BIFF8 Obj/FtPictFmla parsing and transactional OLE-object editing.
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 use litchi_cfb::OleFile;
 use litchi_ole_common::object::{Editor as ObjectEditor, Target, Targets};
 use std::collections::{HashMap, HashSet};
@@ -86,7 +86,7 @@ impl FtPioGrbit {
     pub fn auto_load(self) -> bool {
         self.raw & 0x200 != 0
     }
-    fn validate(self) -> XlsResult<()> {
+    fn validate(self) -> Result<()> {
         if self.is_dde() && self.is_control() {
             return Err(invalid(
                 OBJ,
@@ -359,7 +359,7 @@ impl FtSbs {
     /// Validate the range and non-negative increments required by MS-XLS
     /// 2.5.154. Parsed records that fail this check remain lossless unknown
     /// subrecords; authored typed values fail before serialization.
-    pub fn validate(&self) -> XlsResult<()> {
+    pub fn validate(&self) -> Result<()> {
         if self.minimum > self.maximum {
             return Err(invalid(FT_SBS, "FtSbs minimum exceeds maximum"));
         }
@@ -468,7 +468,7 @@ pub struct LbsDropData {
 
 impl LbsDropData {
     /// Validate the bounded dropdown dimensions required by MS-XLS 2.5.171.
-    pub fn validate(&self) -> XlsResult<()> {
+    pub fn validate(&self) -> Result<()> {
         if self.line_count > 0x7FFF || self.min_width > 0x7FFF {
             return Err(invalid(
                 FT_LBS_DATA,
@@ -529,7 +529,7 @@ impl FtLbsData {
     /// Validate the list header and any dropdown dimensions required by
     /// MS-XLS 2.5.147 and 2.5.171. Item and selection arrays may be partial
     /// because the owning Obj can continue into later Continue records.
-    pub fn validate(&self) -> XlsResult<()> {
+    pub fn validate(&self) -> Result<()> {
         if self.entry_count > 0x7FFF {
             return Err(invalid(FT_LBS_DATA, "FtLbsData entry count exceeds 0x7FFF"));
         }
@@ -629,7 +629,7 @@ pub struct OleObjectRecord {
 }
 
 impl OleObjectRecord {
-    pub fn parse(data: &[u8], text_object: Option<Vec<u8>>) -> XlsResult<Self> {
+    pub fn parse(data: &[u8], text_object: Option<Vec<u8>>) -> Result<Self> {
         let value = Self {
             subrecords: parse_subrecords(data)?,
             text_object,
@@ -672,7 +672,7 @@ impl OleObjectRecord {
         ))
     }
 
-    pub fn validate(&self) -> XlsResult<()> {
+    pub fn validate(&self) -> Result<()> {
         if self.subrecords.len() > 1_024 {
             return Err(invalid(OBJ, "too many Obj subrecords"));
         }
@@ -727,7 +727,7 @@ impl OleObjectRecord {
         Ok(())
     }
 
-    pub fn to_record_bytes(&self) -> XlsResult<Vec<u8>> {
+    pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         self.validate()?;
         record(OBJ, &serialize_subrecords(&self.subrecords)?)
     }
@@ -826,7 +826,7 @@ impl FormControl {
     }
 
     /// Serialize the control back to a complete OBJ record.
-    pub fn to_record_bytes(&self) -> XlsResult<Vec<u8>> {
+    pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         record(OBJ, &serialize_subrecords(&self.subrecords)?)
     }
 
@@ -852,7 +852,7 @@ pub struct Editor {
 }
 
 impl Editor {
-    pub fn new(bytes: Vec<u8>, limits: Limits) -> XlsResult<Self> {
+    pub fn new(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         // Workbook metadata is XLS-owned. Read and parse it before handing
         // the original CFB bytes to the neutral object editor so the target
         // catalog can be derived solely from Obj/FtPictFmla records.
@@ -869,20 +869,20 @@ impl Editor {
         })
     }
 
-    pub fn objects(&self, worksheet: usize) -> XlsResult<&[OleObjectRecord]> {
+    pub fn objects(&self, worksheet: usize) -> Result<&[OleObjectRecord]> {
         self.sheets
             .get(worksheet)
             .map(Vec::as_slice)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet index {worksheet}")))
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))
     }
 
     /// Form controls (checkboxes, list boxes, scroll bars, ...) anchored in a
     /// worksheet, in Obj record order.
-    pub fn form_controls(&self, worksheet: usize) -> XlsResult<&[FormControl]> {
+    pub fn form_controls(&self, worksheet: usize) -> Result<&[FormControl]> {
         self.form_controls
             .get(worksheet)
             .map(Vec::as_slice)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet index {worksheet}")))
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))
     }
 
     pub fn add(
@@ -890,7 +890,7 @@ impl Editor {
         worksheet: usize,
         object: OleObjectRecord,
         compound_file: Vec<u8>,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         object.validate()?;
         let storage = object
             .storage_name()
@@ -907,7 +907,7 @@ impl Editor {
         candidate
             .sheets
             .get_mut(worksheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet index {worksheet}")))?
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))?
             .push(object);
         let target = target_for_storage(storage)?;
         candidate.package.add_storage(target, compound_file)?;
@@ -916,12 +916,12 @@ impl Editor {
         Ok(())
     }
 
-    pub fn remove(&mut self, worksheet: usize, object_id: u16) -> XlsResult<OleObjectRecord> {
+    pub fn remove(&mut self, worksheet: usize, object_id: u16) -> Result<OleObjectRecord> {
         let mut candidate = self.clone();
         let sheet = candidate
             .sheets
             .get_mut(worksheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet index {worksheet}")))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))?;
         let index = sheet
             .iter()
             .position(|value| value.object_id() == object_id)
@@ -942,12 +942,12 @@ impl Editor {
         Ok(removed)
     }
 
-    pub fn reorder(&mut self, worksheet: usize, ids: &[u16]) -> XlsResult<()> {
+    pub fn reorder(&mut self, worksheet: usize, ids: &[u16]) -> Result<()> {
         let mut candidate = self.clone();
         let sheet = candidate
             .sheets
             .get_mut(worksheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet index {worksheet}")))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))?;
         if ids.len() != sheet.len() {
             return Err(invalid(
                 OBJ,
@@ -969,7 +969,7 @@ impl Editor {
         Ok(())
     }
 
-    pub fn replace_storage(&mut self, storage_name: &str, compound_file: Vec<u8>) -> XlsResult<()> {
+    pub fn replace_storage(&mut self, storage_name: &str, compound_file: Vec<u8>) -> Result<()> {
         let storage = self
             .sheets
             .iter()
@@ -986,11 +986,11 @@ impl Editor {
             .map_err(Into::into)
     }
 
-    pub fn finish(self) -> XlsResult<Vec<u8>> {
+    pub fn finish(self) -> Result<Vec<u8>> {
         self.package.finish().map_err(Into::into)
     }
 
-    fn commit(&mut self) -> XlsResult<()> {
+    fn commit(&mut self) -> Result<()> {
         validate_objects(&self.sheets)?;
         let workbook = rewrite_workbook(&self.workbook, &self.sheets)?;
         self.package
@@ -1000,10 +1000,10 @@ impl Editor {
     }
 }
 
-fn read_workbook(bytes: &[u8], limits: Limits) -> XlsResult<(Vec<String>, Vec<u8>)> {
+fn read_workbook(bytes: &[u8], limits: Limits) -> Result<(Vec<String>, Vec<u8>)> {
     let max_size = limits.max_stream_size.min(limits.max_total_size);
     if max_size == 0 {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "Workbook stream limits must be non-zero".into(),
         ));
     }
@@ -1018,26 +1018,26 @@ fn read_workbook(bytes: &[u8], limits: Limits) -> XlsResult<(Vec<String>, Vec<u8
             continue;
         };
         if declared_size > max_size {
-            return Err(XlsError::InvalidData(format!(
+            return Err(Error::InvalidData(format!(
                 "{actual_name} stream exceeds configured read limit"
             )));
         }
         let workbook = ole.open_stream(&[actual_name.as_str()])?;
         if workbook.len() as u64 > max_size {
-            return Err(XlsError::InvalidData(format!(
+            return Err(Error::InvalidData(format!(
                 "{actual_name} stream exceeds configured read limit"
             )));
         }
         return Ok((vec![actual_name], workbook));
     }
-    Err(XlsError::InvalidData("Workbook stream not found".into()))
+    Err(Error::InvalidData("Workbook stream not found".into()))
 }
 
-fn target_for_storage(storage: String) -> XlsResult<Target> {
+fn target_for_storage(storage: String) -> Result<Target> {
     Ok(Target::new(storage.clone(), [storage])?)
 }
 
-fn targets_for_sheets(sheets: &[Vec<OleObjectRecord>]) -> XlsResult<Targets> {
+fn targets_for_sheets(sheets: &[Vec<OleObjectRecord>]) -> Result<Targets> {
     let mut seen = HashSet::new();
     let mut targets = Vec::new();
     for object in sheets.iter().flatten() {
@@ -1051,7 +1051,7 @@ fn targets_for_sheets(sheets: &[Vec<OleObjectRecord>]) -> XlsResult<Targets> {
     Ok(Targets::new(targets)?)
 }
 
-fn parse_formula(body: &[u8]) -> XlsResult<FtPictFmla> {
+fn parse_formula(body: &[u8]) -> Result<FtPictFmla> {
     if body.len() < 2 {
         return Err(invalid(OBJ, "FtPictFmla is truncated"));
     }
@@ -1079,7 +1079,7 @@ fn parse_formula(body: &[u8]) -> XlsResult<FtPictFmla> {
     })
 }
 
-fn parse_subrecords(data: &[u8]) -> XlsResult<Vec<ObjSubrecord>> {
+fn parse_subrecords(data: &[u8]) -> Result<Vec<ObjSubrecord>> {
     let mut offset = 0usize;
     let mut control_type = None;
     let mut subrecords = Vec::new();
@@ -1378,7 +1378,7 @@ fn decode_xl_unicode_string(encoded: &[u8]) -> Option<String> {
     }
 }
 
-fn serialize_subrecords(subrecords: &[ObjSubrecord]) -> XlsResult<Vec<u8>> {
+fn serialize_subrecords(subrecords: &[ObjSubrecord]) -> Result<Vec<u8>> {
     let mut output = Vec::new();
     for value in subrecords {
         let (kind, body) = serialize_subrecord(value)?;
@@ -1391,7 +1391,7 @@ fn serialize_subrecords(subrecords: &[ObjSubrecord]) -> XlsResult<Vec<u8>> {
     Ok(output)
 }
 
-fn serialize_subrecord(value: &ObjSubrecord) -> XlsResult<(u16, Vec<u8>)> {
+fn serialize_subrecord(value: &ObjSubrecord) -> Result<(u16, Vec<u8>)> {
     Ok(match value {
         ObjSubrecord::Common(value) => {
             let mut body = Vec::with_capacity(18);
@@ -1507,7 +1507,7 @@ fn serialize_subrecord(value: &ObjSubrecord) -> XlsResult<(u16, Vec<u8>)> {
 }
 
 #[allow(clippy::type_complexity)]
-fn parse_workbook(input: &[u8]) -> XlsResult<(Vec<Vec<OleObjectRecord>>, Vec<Vec<FormControl>>)> {
+fn parse_workbook(input: &[u8]) -> Result<(Vec<Vec<OleObjectRecord>>, Vec<Vec<FormControl>>)> {
     let (_, starts) = bindings(input)?;
     let mut sheets = Vec::new();
     let mut form_controls = Vec::new();
@@ -1524,7 +1524,7 @@ fn parse_workbook(input: &[u8]) -> XlsResult<(Vec<Vec<OleObjectRecord>>, Vec<Vec
     Ok((sheets, form_controls))
 }
 
-fn parse_sheet(input: &[u8]) -> XlsResult<(Vec<OleObjectRecord>, Vec<FormControl>)> {
+fn parse_sheet(input: &[u8]) -> Result<(Vec<OleObjectRecord>, Vec<FormControl>)> {
     let records = ranges(input)?;
     let mut objects = Vec::new();
     let mut controls = Vec::new();
@@ -1557,7 +1557,7 @@ fn parse_sheet(input: &[u8]) -> XlsResult<(Vec<OleObjectRecord>, Vec<FormControl
     Ok((objects, controls))
 }
 
-fn validate_objects(sheets: &[Vec<OleObjectRecord>]) -> XlsResult<()> {
+fn validate_objects(sheets: &[Vec<OleObjectRecord>]) -> Result<()> {
     let mut ids = HashSet::new();
     for (index, object) in sheets.iter().flatten().enumerate() {
         if index >= 4_096 {
@@ -1571,7 +1571,7 @@ fn validate_objects(sheets: &[Vec<OleObjectRecord>]) -> XlsResult<()> {
     Ok(())
 }
 
-fn rewrite_workbook(input: &[u8], sheets: &[Vec<OleObjectRecord>]) -> XlsResult<Vec<u8>> {
+fn rewrite_workbook(input: &[u8], sheets: &[Vec<OleObjectRecord>]) -> Result<Vec<u8>> {
     let (refs, starts) = bindings(input)?;
     let first = starts.first().map_or(input.len(), |value| value.0);
     let mut output = input[..first].to_vec();
@@ -1608,7 +1608,7 @@ fn rewrite_workbook(input: &[u8], sheets: &[Vec<OleObjectRecord>]) -> XlsResult<
     Ok(output)
 }
 
-fn rewrite_sheet(input: &[u8], objects: &[OleObjectRecord]) -> XlsResult<Vec<u8>> {
+fn rewrite_sheet(input: &[u8], objects: &[OleObjectRecord]) -> Result<Vec<u8>> {
     let records = ranges(input)?;
     let mut output = Vec::new();
     let mut next = 0usize;
@@ -1649,7 +1649,7 @@ fn rewrite_sheet(input: &[u8], objects: &[OleObjectRecord]) -> XlsResult<Vec<u8>
 }
 
 #[allow(clippy::type_complexity)]
-fn bindings(input: &[u8]) -> XlsResult<(Vec<(usize, usize)>, Vec<(usize, bool)>)> {
+fn bindings(input: &[u8]) -> Result<(Vec<(usize, usize)>, Vec<(usize, bool)>)> {
     let mut refs = Vec::new();
     for (start, _, kind, body_start, body_end) in ranges(input)? {
         if kind != BOUNDSHEET {
@@ -1687,23 +1687,21 @@ fn bindings(input: &[u8]) -> XlsResult<(Vec<(usize, usize)>, Vec<(usize, bool)>)
 }
 
 #[allow(clippy::type_complexity)]
-fn ranges(input: &[u8]) -> XlsResult<Vec<(usize, usize, u16, usize, usize)>> {
+fn ranges(input: &[u8]) -> Result<Vec<(usize, usize, u16, usize, usize)>> {
     let mut output = Vec::new();
     let mut offset = 0usize;
     while offset < input.len() {
-        let header = input
-            .get(offset..offset + 4)
-            .ok_or(XlsError::InvalidLength {
-                expected: offset + 4,
-                found: input.len(),
-            })?;
+        let header = input.get(offset..offset + 4).ok_or(Error::InvalidLength {
+            expected: offset + 4,
+            found: input.len(),
+        })?;
         let kind = u16::from_le_bytes([header[0], header[1]]);
         let len = usize::from(u16::from_le_bytes([header[2], header[3]]));
         let end = offset
             .checked_add(4 + len)
             .ok_or_else(|| invalid(kind, "record size overflow"))?;
         if end > input.len() {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: end,
                 found: input.len(),
             });
@@ -1714,7 +1712,7 @@ fn ranges(input: &[u8]) -> XlsResult<Vec<(usize, usize, u16, usize, usize)>> {
     Ok(output)
 }
 
-fn record(kind: u16, body: &[u8]) -> XlsResult<Vec<u8>> {
+fn record(kind: u16, body: &[u8]) -> Result<Vec<u8>> {
     if body.len() > 8_224 {
         return Err(invalid(kind, "record exceeds BIFF8 limit"));
     }
@@ -1725,8 +1723,8 @@ fn record(kind: u16, body: &[u8]) -> XlsResult<Vec<u8>> {
     Ok(output)
 }
 
-fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(record_type: u16, message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type,
         message: message.into(),
     }
@@ -1791,6 +1789,6 @@ mod tests {
         limits.max_stream_size = 64;
         let error = read_workbook(&output.into_inner(), limits)
             .expect_err("oversized Workbook must be rejected before reading");
-        assert!(matches!(error, XlsError::InvalidData(message) if message.contains("read limit")));
+        assert!(matches!(error, Error::InvalidData(message) if message.contains("read limit")));
     }
 }

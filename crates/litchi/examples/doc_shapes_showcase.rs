@@ -24,8 +24,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("However, the DOC reader CAN extract shapes using the shared Escher module:");
     println!();
     println!("Example of reading DOC shapes:");
-    println!("  use litchi::doc::Package;");
-    println!("  use litchi::doc::shapes::extract_shapes;");
+    println!("  use litchi_doc::Package;");
+    println!("  use litchi_doc::shape::extract_shapes;");
     println!();
     println!("  let mut pkg = Package::open(\"document.doc\")?;");
     println!("  let mut ole = pkg.ole_file_mut();");

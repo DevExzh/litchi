@@ -23,4 +23,4 @@ mod model;
 #[cfg(test)]
 mod tests;
 
-pub use model::{XlsCrtLayout12, XlsCrtLayout12A, XlsCrtLayout12Mode};
+pub use model::{CrtLayout12, CrtLayout12A, CrtLayout12Mode};

@@ -1,10 +1,10 @@
 //! Strict PowerPoint shape references to inert external objects.
 
-use crate::consts::PptRecordType;
+use crate::consts::RecordType;
 use crate::embedded::object::{Collection as OleCollection, ExternalObject};
 use crate::external_media::{Collection as MediaCollection, Object};
-use crate::package::{PptError, Result};
-use crate::records::PptRecord;
+use crate::package::{Error, Result};
+use crate::records::Record;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Reference {
@@ -25,10 +25,10 @@ impl Reference {
         Ok(Self { id })
     }
 
-    pub fn parse(record: &PptRecord) -> Result<Self> {
+    pub fn parse(record: &Record) -> Result<Self> {
         if record.version != 0
             || record.instance != 0
-            || record.record_type_raw != PptRecordType::ExternalObjectRefAtom.as_u16()
+            || record.record_type_raw != RecordType::ExternalObjectRefAtom.as_u16()
             || record.data_length != 4
         {
             return corrupted("ExObjRefAtom has an invalid header or size");
@@ -46,14 +46,14 @@ impl Reference {
         ))
     }
 
-    pub fn to_record(&self) -> Result<PptRecord> {
-        Ok(PptRecord::parse(&self.to_record_bytes()?, 0)?.0)
+    pub fn to_record(&self) -> Result<Record> {
+        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
     pub fn to_record_bytes(&self) -> Result<[u8; 12]> {
         let payload = self.to_payload_bytes()?;
         let mut bytes = [0; 12];
-        bytes[2..4].copy_from_slice(&PptRecordType::ExternalObjectRefAtom.as_u16().to_le_bytes());
+        bytes[2..4].copy_from_slice(&RecordType::ExternalObjectRefAtom.as_u16().to_le_bytes());
         bytes[4..8].copy_from_slice(&4u32.to_le_bytes());
         bytes[8..12].copy_from_slice(&payload);
         Ok(bytes)
@@ -90,7 +90,7 @@ impl Reference {
 }
 
 fn corrupted<T>(message: impl Into<String>) -> Result<T> {
-    Err(PptError::Corrupted(message.into()))
+    Err(Error::Corrupted(message.into()))
 }
 
 #[cfg(test)]
@@ -114,7 +114,7 @@ mod tests {
         assert!(Reference::new(0).is_err());
         let mut bytes = Reference::new(1).unwrap().to_record_bytes().unwrap();
         bytes[0] = 1;
-        assert!(Reference::parse(&PptRecord::parse(&bytes, 0).unwrap().0).is_err());
+        assert!(Reference::parse(&Record::parse(&bytes, 0).unwrap().0).is_err());
     }
 
     #[test]

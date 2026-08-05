@@ -5,7 +5,7 @@
 //!
 //! Run with: cargo run --example ppt_transitions_example
 
-use litchi_ppt::PptWriter;
+use litchi_ppt::Writer;
 use litchi_ppt::transition::{
     AdvanceMode, TransitionDirection, TransitionInfo, TransitionSpeed, TransitionType,
 };
@@ -14,7 +14,7 @@ use litchi_ppt::writer::SlideTiming;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating PPT file with transitions...");
 
-    let mut writer = PptWriter::new_widescreen();
+    let mut writer = Writer::new_widescreen();
     writer.set_property("Title", "Transition Effects Showcase");
     writer.set_property("Author", "Litchi Transition Demo");
 

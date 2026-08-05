@@ -3,7 +3,7 @@
 //! The public model is kept separate from the record codec. The codec accepts
 //! only the ordered, bounded records defined by [MS-PPT], while the model
 //! exposes contextual author metadata to callers. Unknown records remain in
-//! the surrounding `PptRecord` tree and are not executed or resolved.
+//! the surrounding `Record` tree and are not executed or resolved.
 
 mod codec;
 mod model;

@@ -2,10 +2,10 @@
 
 use std::fmt;
 
-use crate::consts::PptRecordType;
+use crate::consts::RecordType;
 
-use super::package::{PptError, Result};
-use super::records::PptRecord;
+use super::package::{Error, Result};
+use super::records::Record;
 
 const MAX_PASSWORD_BYTES: usize = 510;
 
@@ -15,11 +15,11 @@ const MAX_PASSWORD_BYTES: usize = 510;
 /// the explicitly named [`Self::expose_secret`] method. This type does not
 /// verify passwords, decrypt files, or grant modification access.
 #[derive(Clone, PartialEq, Eq)]
-pub struct PowerPointModifyPassword {
+pub struct ModifyPassword {
     value: String,
 }
 
-impl PowerPointModifyPassword {
+impl ModifyPassword {
     /// Construct a canonical printable Unicode modify password.
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
@@ -28,14 +28,14 @@ impl PowerPointModifyPassword {
     }
 
     /// Parse a `ModifyPasswordAtom` represented by a `CString` record.
-    pub fn parse(record: &PptRecord) -> Result<Self> {
-        if record.record_type != PptRecordType::CString
+    pub fn parse(record: &Record) -> Result<Self> {
+        if record.record_type != RecordType::CString
             || record.version != 0
             || record.instance != 3
             || record.data.len() > MAX_PASSWORD_BYTES
             || !record.data.len().is_multiple_of(2)
         {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "ModifyPasswordAtom has an invalid record header or size".to_string(),
             ));
         }
@@ -46,29 +46,29 @@ impl PowerPointModifyPassword {
                 break;
             }
             if is_forbidden_printable_unit(unit) {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "ModifyPasswordAtom contains a forbidden control character".to_string(),
                 ));
             }
             units.push(unit);
         }
         let value = String::from_utf16(&units).map_err(|_| {
-            PptError::Corrupted("ModifyPasswordAtom contains invalid UTF-16".to_string())
+            Error::Corrupted("ModifyPasswordAtom contains invalid UTF-16".to_string())
         })?;
         Ok(Self { value })
     }
 
     /// Discover the single modify-password atom in the PPT10 document tag.
-    pub(crate) fn parse_document(document: &PptRecord) -> Result<Option<Self>> {
+    pub(crate) fn parse_document(document: &Record) -> Result<Option<Self>> {
         let records = document.versioned_binary_tag_records(10)?;
         let mut matches = records
             .iter()
-            .filter(|record| record.record_type == PptRecordType::CString && record.instance == 3);
+            .filter(|record| record.record_type == RecordType::CString && record.instance == 3);
         let Some(record) = matches.next() else {
             return Ok(None);
         };
         if matches.next().is_some() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "PPT10 document tag contains multiple ModifyPasswordAtom records".to_string(),
             ));
         }
@@ -91,14 +91,14 @@ impl PowerPointModifyPassword {
     }
 
     /// Encode a canonical `ModifyPasswordAtom` record without a terminator.
-    pub fn to_record(&self) -> PptRecord {
+    pub fn to_record(&self) -> Record {
         let data: Vec<u8> = self
             .value
             .encode_utf16()
             .flat_map(u16::to_le_bytes)
             .collect();
-        PptRecord {
-            record_type: PptRecordType::CString,
+        Record {
+            record_type: RecordType::CString,
             record_type_raw: 4026,
             version: 0,
             instance: 3,
@@ -113,10 +113,10 @@ pub(crate) fn validate_value(value: &str) -> Result<()> {
     validate_printable_unicode(value)
 }
 
-impl fmt::Debug for PowerPointModifyPassword {
+impl fmt::Debug for ModifyPassword {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("PowerPointModifyPassword")
+            .debug_struct("ModifyPassword")
             .field("utf16_units", &self.len_utf16())
             .field("value", &"[REDACTED]")
             .finish()
@@ -127,15 +127,15 @@ fn validate_printable_unicode(value: &str) -> Result<()> {
     let mut bytes = 0usize;
     for unit in value.encode_utf16() {
         if is_forbidden_printable_unit(unit) {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "Modify password contains a forbidden control character".to_string(),
             ));
         }
         bytes = bytes
             .checked_add(2)
-            .ok_or_else(|| PptError::Corrupted("Modify password length overflow".to_string()))?;
+            .ok_or_else(|| Error::Corrupted("Modify password length overflow".to_string()))?;
         if bytes > MAX_PASSWORD_BYTES {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "Modify password exceeds the MS-PPT 510-byte limit".to_string(),
             ));
         }
@@ -153,8 +153,8 @@ mod tests {
 
     #[test]
     fn round_trips_and_redacts_modify_password() {
-        let password = PowerPointModifyPassword::new("s3cret\u{1f34b}").unwrap();
-        let parsed = PowerPointModifyPassword::parse(&password.to_record()).unwrap();
+        let password = ModifyPassword::new("s3cret\u{1f34b}").unwrap();
+        let parsed = ModifyPassword::parse(&password.to_record()).unwrap();
         assert_eq!(parsed.expose_secret(), "s3cret\u{1f34b}");
         let debug = format!("{parsed:?}");
         assert!(debug.contains("[REDACTED]"));
@@ -163,24 +163,22 @@ mod tests {
 
     #[test]
     fn null_terminates_input_but_writer_is_canonical() {
-        let mut record = PowerPointModifyPassword::new("visible")
-            .unwrap()
-            .to_record();
+        let mut record = ModifyPassword::new("visible").unwrap().to_record();
         record.data.extend_from_slice(&0u16.to_le_bytes());
         record.data.extend_from_slice(&('x' as u16).to_le_bytes());
         record.data_length = record.data.len() as u32;
-        let parsed = PowerPointModifyPassword::parse(&record).unwrap();
+        let parsed = ModifyPassword::parse(&record).unwrap();
         assert_eq!(parsed.expose_secret(), "visible");
         assert_eq!(parsed.to_record().data.len(), 14);
     }
 
     #[test]
     fn rejects_controls_invalid_utf16_and_oversize_values() {
-        assert!(PowerPointModifyPassword::new("bad\nvalue").is_err());
-        assert!(PowerPointModifyPassword::new("x".repeat(256)).is_err());
+        assert!(ModifyPassword::new("bad\nvalue").is_err());
+        assert!(ModifyPassword::new("x".repeat(256)).is_err());
 
-        let record = PptRecord {
-            record_type: PptRecordType::CString,
+        let record = Record {
+            record_type: RecordType::CString,
             record_type_raw: 4026,
             version: 0,
             instance: 3,
@@ -188,6 +186,6 @@ mod tests {
             data: 0xd800u16.to_le_bytes().to_vec(),
             children: Vec::new(),
         };
-        assert!(PowerPointModifyPassword::parse(&record).is_err());
+        assert!(ModifyPassword::parse(&record).is_err());
     }
 }

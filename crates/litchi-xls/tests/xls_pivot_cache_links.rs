@@ -1,8 +1,8 @@
 use std::io::Cursor;
 
-use litchi_xls::XlsWorkbook;
+use litchi_xls::Workbook;
 use litchi_xls::writer::{
-    PivotCacheValue, XlsPivotDataItemConfig, XlsPivotFieldConfig, XlsPivotTableConfig, XlsWriter,
+    PivotCacheValue, PivotDataItemConfig, PivotFieldConfig, PivotTableConfig, Writer,
 };
 
 const SXVIEW: u16 = 0x00B0;
@@ -14,8 +14,8 @@ fn pivot_config(
     source_sheet_name: &str,
     first_row: u16,
     value: f64,
-) -> XlsPivotTableConfig {
-    XlsPivotTableConfig {
+) -> PivotTableConfig {
+    PivotTableConfig {
         name: name.to_string(),
         source_type: 1,
         source_sheet_name: source_sheet_name.to_string(),
@@ -33,7 +33,7 @@ fn pivot_config(
         data_field_name: "Values".to_string(),
         data_axis: 2,
         data_position: 0,
-        fields: vec![XlsPivotFieldConfig {
+        fields: vec![PivotFieldConfig {
             axis: 8,
             subtotal_count: 0,
             subtotal_flags: 0,
@@ -44,7 +44,7 @@ fn pivot_config(
             is_numeric: true,
             grouping: None,
         }],
-        data_items: vec![XlsPivotDataItemConfig {
+        data_items: vec![PivotDataItemConfig {
             source_field_index: 0,
             function: 0,
             display_format: 0,
@@ -59,7 +59,7 @@ fn pivot_config(
 }
 
 fn generated_bytes(pivots_per_sheet: &[usize]) -> Vec<u8> {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     for (sheet_index, &pivot_count) in pivots_per_sheet.iter().enumerate() {
         let sheet_name = format!("Source{}", sheet_index + 1);
         let sheet = writer.add_worksheet(&sheet_name).unwrap();
@@ -146,7 +146,7 @@ fn pivot_cache_links_progress_across_two_worksheets() {
     assert!(contains_f64(&caches[1], 22.0));
     assert!(!contains_f64(&caches[1], 11.0));
 
-    let workbook = XlsWorkbook::new(Cursor::new(bytes)).unwrap();
+    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
     assert_eq!(workbook.sheets().len(), 2);
     assert!(workbook.xls_worksheet(0).is_ok());
     assert!(workbook.xls_worksheet(1).is_ok());
@@ -164,7 +164,7 @@ fn pivot_cache_links_progress_from_same_sheet_to_later_sheet() {
         assert!(contains_f64(&caches[cache_index], expected_value));
     }
 
-    let workbook = XlsWorkbook::new(Cursor::new(bytes)).unwrap();
+    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
     assert_eq!(workbook.sheets().len(), 2);
     assert!(workbook.xls_worksheet(0).is_ok());
     assert!(workbook.xls_worksheet(1).is_ok());

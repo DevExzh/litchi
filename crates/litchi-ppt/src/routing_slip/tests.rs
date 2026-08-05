@@ -1,5 +1,5 @@
 use super::{Address, CurrentRecipient, Slip, Text};
-use crate::records::PptRecord;
+use crate::records::Record;
 
 fn text(value: &str) -> Text {
     Text::from_ansi_bytes(value.as_bytes().to_vec()).unwrap()
@@ -33,7 +33,7 @@ fn routing_slip_round_trips_typed_state_and_undefined_bytes() {
     let record = slip.to_record().unwrap();
     assert_eq!(Slip::parse(&record).unwrap(), slip);
     assert_eq!(record.record_type_raw, 0x0406);
-    assert_eq!(record.children, Vec::<PptRecord>::new());
+    assert_eq!(record.children, Vec::<Record>::new());
 }
 
 #[test]

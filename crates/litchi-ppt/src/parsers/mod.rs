@@ -3,4 +3,4 @@
 pub mod parser;
 
 // Re-export the main parser
-pub use parser::PptRecordParser;
+pub use parser::RecordParser;

@@ -1,35 +1,34 @@
 use super::shape::{
-    Anchor, Rect, XlsShapeColor, XlsShapeFill, XlsShapeKind, XlsShapeLine, XlsShapeText,
-    validate_shape_style,
+    Anchor, Rect, ShapeColor, ShapeFill, ShapeKind, ShapeLine, ShapeText, validate_shape_style,
 };
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
 /// Writable primitive that lives inside a shape group and is anchored in the
 /// group's child coordinate space.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsShapeGroupChild {
-    pub kind: XlsShapeKind,
+pub struct ShapeGroupChild {
+    pub kind: ShapeKind,
     /// Child anchor in the group coordinate space declared by the group.
     pub anchor: Rect,
     /// Optional requested OBJ identifier. `None` assigns the first free canonical ID.
     pub object_id: Option<u16>,
-    pub text: Option<XlsShapeText>,
-    pub fill: XlsShapeFill,
-    pub line: XlsShapeLine,
+    pub text: Option<ShapeText>,
+    pub fill: ShapeFill,
+    pub line: ShapeLine,
     pub visible: bool,
     pub locked: bool,
 }
 
-impl XlsShapeGroupChild {
-    pub fn new(kind: XlsShapeKind, anchor: Rect) -> Self {
+impl ShapeGroupChild {
+    pub fn new(kind: ShapeKind, anchor: Rect) -> Self {
         Self {
             kind,
             anchor,
             object_id: None,
             text: None,
-            fill: XlsShapeFill::Solid(XlsShapeColor::rgb(255, 255, 255)),
-            line: XlsShapeLine::Solid {
-                color: XlsShapeColor::rgb(0, 0, 0),
+            fill: ShapeFill::Solid(ShapeColor::rgb(255, 255, 255)),
+            line: ShapeLine::Solid {
+                color: ShapeColor::rgb(0, 0, 0),
                 width_emu: 12_700,
             },
             visible: true,
@@ -37,7 +36,7 @@ impl XlsShapeGroupChild {
         }
     }
 
-    pub(crate) fn validate(&self) -> XlsResult<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         validate_shape_style(
             self.kind,
             self.object_id,
@@ -51,9 +50,9 @@ impl XlsShapeGroupChild {
 /// Writable, macro-inert BIFF8 shape group (OfficeArt SpgrContainer).
 ///
 /// The group itself is anchored to worksheet cells while every child is anchored
-/// inside [`XlsShapeGroupWrite::coordinates`], the group coordinate space.
+/// inside [`ShapeGroupWrite::coordinates`], the group coordinate space.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsShapeGroupWrite {
+pub struct ShapeGroupWrite {
     /// Cell-relative anchor of the whole group.
     pub anchor: Anchor,
     /// Coordinate space that child anchors are expressed in (OfficeArtFSPGR).
@@ -61,12 +60,12 @@ pub struct XlsShapeGroupWrite {
     /// Optional requested OBJ identifier for the group. `None` assigns the first
     /// free canonical ID.
     pub object_id: Option<u16>,
-    pub children: Vec<XlsShapeGroupChild>,
+    pub children: Vec<ShapeGroupChild>,
     pub visible: bool,
     pub locked: bool,
 }
 
-impl XlsShapeGroupWrite {
+impl ShapeGroupWrite {
     pub fn new(anchor: Anchor) -> Self {
         Self {
             anchor,
@@ -78,14 +77,14 @@ impl XlsShapeGroupWrite {
         }
     }
 
-    pub(crate) fn validate(&self) -> XlsResult<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         if matches!(self.object_id, Some(0 | u16::MAX)) {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "shape object ID 0 and 65535 are reserved".to_string(),
             ));
         }
         if self.children.is_empty() {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "a shape group must contain at least one child shape".to_string(),
             ));
         }
@@ -93,15 +92,13 @@ impl XlsShapeGroupWrite {
             .children
             .len()
             .checked_add(usize::from(self.object_id.is_some()))
-            .ok_or(XlsError::Allocation(
+            .ok_or(Error::Allocation(
                 "computing the shape-group object-ID count",
             ))?;
         let mut requested = Vec::new();
         requested
             .try_reserve_exact(requested_capacity)
-            .map_err(|_| {
-                XlsError::Allocation("reserving shape group object-ID validation storage")
-            })?;
+            .map_err(|_| Error::Allocation("reserving shape group object-ID validation storage"))?;
         if let Some(object_id) = self.object_id {
             requested.push(object_id);
         }
@@ -113,7 +110,7 @@ impl XlsShapeGroupWrite {
         }
         requested.sort_unstable();
         if requested.windows(2).any(|pair| pair[0] == pair[1]) {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "shape group requests the same object ID more than once".to_string(),
             ));
         }
@@ -121,13 +118,11 @@ impl XlsShapeGroupWrite {
     }
 
     /// Object IDs consumed by this group: one for the group plus one per child.
-    pub(crate) fn object_count(&self) -> XlsResult<usize> {
+    pub(crate) fn object_count(&self) -> Result<usize> {
         self.children
             .len()
             .checked_add(1)
-            .ok_or(XlsError::Allocation(
-                "computing the shape-group object count",
-            ))
+            .ok_or(Error::Allocation("computing the shape-group object count"))
     }
 }
 
@@ -142,7 +137,7 @@ mod tests {
 
     #[test]
     fn empty_group_is_rejected() {
-        let group = XlsShapeGroupWrite::new(anchor());
+        let group = ShapeGroupWrite::new(anchor());
         assert!(group.validate().is_err());
     }
 
@@ -155,10 +150,10 @@ mod tests {
 
     #[test]
     fn duplicate_requested_ids_inside_one_group_are_rejected() {
-        let mut group = XlsShapeGroupWrite::new(anchor());
+        let mut group = ShapeGroupWrite::new(anchor());
         group.object_id = Some(4);
         let mut child =
-            XlsShapeGroupChild::new(XlsShapeKind::Ellipse, Rect::new(0, 0, 100, 100).unwrap());
+            ShapeGroupChild::new(ShapeKind::Ellipse, Rect::new(0, 0, 100, 100).unwrap());
         child.object_id = Some(4);
         group.children.push(child);
         assert!(group.validate().is_err());
@@ -169,24 +164,23 @@ mod tests {
 
     #[test]
     fn grouped_line_children_reject_fill_and_text() {
-        let mut group = XlsShapeGroupWrite::new(anchor());
-        let mut line =
-            XlsShapeGroupChild::new(XlsShapeKind::Line, Rect::new(0, 0, 200, 100).unwrap());
-        line.text = Some(XlsShapeText::new("no text on lines"));
+        let mut group = ShapeGroupWrite::new(anchor());
+        let mut line = ShapeGroupChild::new(ShapeKind::Line, Rect::new(0, 0, 200, 100).unwrap());
+        line.text = Some(ShapeText::new("no text on lines"));
         group.children.push(line);
         assert!(group.validate().is_err());
 
         group.children[0].text = None;
-        group.children[0].fill = XlsShapeFill::None;
+        group.children[0].fill = ShapeFill::None;
         assert!(group.validate().is_ok());
     }
 
     #[test]
     fn group_object_count_includes_group_marker() {
-        let mut group = XlsShapeGroupWrite::new(anchor());
+        let mut group = ShapeGroupWrite::new(anchor());
         for _ in 0..3 {
-            group.children.push(XlsShapeGroupChild::new(
-                XlsShapeKind::Rectangle,
+            group.children.push(ShapeGroupChild::new(
+                ShapeKind::Rectangle,
                 Rect::new(0, 0, 10, 10).unwrap(),
             ));
         }
@@ -195,10 +189,10 @@ mod tests {
 
     #[test]
     fn requested_id_validation_does_not_unwind_for_large_groups() {
-        let mut group = XlsShapeGroupWrite::new(anchor());
+        let mut group = ShapeGroupWrite::new(anchor());
         for object_id in 1..=1_024 {
             let mut child =
-                XlsShapeGroupChild::new(XlsShapeKind::Rectangle, Rect::new(0, 0, 10, 10).unwrap());
+                ShapeGroupChild::new(ShapeKind::Rectangle, Rect::new(0, 0, 10, 10).unwrap());
             child.object_id = Some(object_id);
             group.children.push(child);
         }

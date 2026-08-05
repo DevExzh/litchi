@@ -37,10 +37,10 @@ pub fn open_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn WorkbookTrait>> 
 #[cfg(feature = "xls")]
 pub fn open_xls_workbook<P: AsRef<std::path::Path>>(
     path: P,
-) -> Result<crate::xls::XlsWorkbook<std::fs::File>> {
+) -> Result<crate::xls::Workbook<std::fs::File>> {
     use std::fs::File;
     let file = File::open(path)?;
-    let workbook = crate::xls::XlsWorkbook::new(file)?;
+    let workbook = crate::xls::Workbook::new(file)?;
     Ok(workbook)
 }
 
@@ -50,10 +50,10 @@ pub fn open_xls_workbook<P: AsRef<std::path::Path>>(
 #[cfg(feature = "xls")]
 pub fn open_xls_workbook_from_bytes(
     bytes: &[u8],
-) -> Result<crate::xls::XlsWorkbook<std::io::Cursor<&[u8]>>> {
+) -> Result<crate::xls::Workbook<std::io::Cursor<&[u8]>>> {
     use std::io::Cursor;
     let cursor = Cursor::new(bytes);
-    let workbook = crate::xls::XlsWorkbook::new(cursor)?;
+    let workbook = crate::xls::Workbook::new(cursor)?;
     Ok(workbook)
 }
 
@@ -73,7 +73,7 @@ pub fn open_xls_workbook_dyn<P: AsRef<std::path::Path>>(path: P) -> Result<Box<d
 pub fn open_xls_workbook_from_bytes_dyn(bytes: &[u8]) -> Result<Box<dyn WorkbookTrait>> {
     use std::io::Cursor;
     let cursor = Cursor::new(bytes.to_vec());
-    let workbook = crate::xls::XlsWorkbook::new(cursor)?;
+    let workbook = crate::xls::Workbook::new(cursor)?;
     Ok(Box::new(workbook))
 }
 

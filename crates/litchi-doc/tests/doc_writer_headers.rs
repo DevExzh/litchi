@@ -1,7 +1,10 @@
+use litchi_doc::parts::fib::FileInformationBlock;
 use litchi_doc::parts::headers::HeaderFooterType;
+use litchi_doc::writer::FootnoteEntry;
 use litchi_doc::{
     CharacterFormatting, DocWriter, HeaderFooterParagraph, Package, ParagraphFormatting,
 };
+use std::io::Cursor;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 static NEXT_FILE: AtomicUsize = AtomicUsize::new(0);
@@ -112,4 +115,99 @@ fn inert_header_field_round_trips_with_structural_markers() {
         .unwrap();
     assert_eq!(footer.text(), "\u{0013}PAGE\u{0014}1\u{0015}\r\r");
     std::fs::remove_file(path).unwrap();
+}
+
+#[test]
+fn writes_header_and_note_plcfs_through_fib_pointers() {
+    fn table_field<'a>(
+        fib: &FileInformationBlock,
+        table_stream: &'a [u8],
+        index: usize,
+    ) -> &'a [u8] {
+        let (offset, length) = fib
+            .get_table_pointer(index)
+            .unwrap_or_else(|| panic!("missing FIB table pointer {index}"));
+        let start = usize::try_from(offset).unwrap();
+        let end = start + usize::try_from(length).unwrap();
+        &table_stream[start..end]
+    }
+
+    fn cps(plcf: &[u8]) -> Vec<u32> {
+        plcf.chunks_exact(4)
+            .map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap()))
+            .collect()
+    }
+
+    let mut writer = DocWriter::new();
+    writer.add_paragraph("Main").unwrap();
+    writer.add_paragraph("End").unwrap();
+    writer.set_odd_header("Header");
+    writer.set_odd_footer("Footer");
+    // These positions are the ends of the two main-story paragraphs, where
+    // the writer injects the automatic reference characters.
+    writer.add_footnote(FootnoteEntry::new(4, "Ftn", 2));
+    writer.add_endnote(FootnoteEntry::new(9, "Edn", 3));
+
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    let document_bytes = output.into_inner();
+    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&document_bytes)).unwrap();
+    let word_document = ole.open_stream(&["WordDocument"]).unwrap();
+    let table_name = if FileInformationBlock::parse(&word_document)
+        .unwrap()
+        .which_table_stream()
+    {
+        "1Table"
+    } else {
+        "0Table"
+    };
+    let table_stream = ole.open_stream(&[table_name]).unwrap();
+    let fib = FileInformationBlock::parse(&word_document).unwrap();
+
+    let main_length = fib.get_main_doc_range().1;
+    assert_eq!(main_length, 11);
+    assert_eq!(fib.get_footnote_range(), Some((11, 17)));
+    assert_eq!(fib.get_header_range(), Some((17, 34)));
+    assert_eq!(fib.get_endnote_range(), Some((34, 40)));
+
+    let header_plcf = table_field(&fib, &table_stream, 11);
+    assert_eq!(header_plcf.len(), 14 * 4);
+    let header_cps = cps(header_plcf);
+    let (header_start, header_end) = fib.get_header_range().unwrap();
+    assert_eq!(header_cps[7], 0);
+    assert_eq!(header_cps[8], 8);
+    assert_eq!(header_cps[9], 8);
+    assert_eq!(header_cps[10], 16);
+    assert_eq!(header_cps[12], 16);
+    assert_eq!(header_cps[13], 17);
+    assert_eq!(header_cps[12], header_end - header_start - 1);
+
+    let footnote_ref = table_field(&fib, &table_stream, 2);
+    assert_eq!(footnote_ref.len(), 10);
+    assert_eq!(cps(&footnote_ref[..8]), vec![4, main_length]);
+    assert_eq!(
+        u16::from_le_bytes(footnote_ref[8..10].try_into().unwrap()),
+        2
+    );
+
+    let footnote_txt = table_field(&fib, &table_stream, 3);
+    assert_eq!(cps(footnote_txt), vec![0, 5, 6]);
+
+    let endnote_ref = table_field(&fib, &table_stream, 46);
+    assert_eq!(endnote_ref.len(), 10);
+    assert_eq!(cps(&endnote_ref[..8]), vec![9, main_length]);
+    assert_eq!(
+        u16::from_le_bytes(endnote_ref[8..10].try_into().unwrap()),
+        3
+    );
+
+    let endnote_txt = table_field(&fib, &table_stream, 47);
+    assert_eq!(cps(endnote_txt), vec![0, 5, 6]);
+
+    let mut package = Package::from_reader(Cursor::new(document_bytes)).unwrap();
+    let document = package.document().unwrap();
+    assert_eq!(document.footnotes().unwrap()[0].reference_position, 4);
+    assert_eq!(document.endnotes().unwrap()[0].reference_position, 9);
+    assert_eq!(document.headers().unwrap().len(), 1);
+    assert_eq!(document.footers().unwrap().len(), 1);
 }

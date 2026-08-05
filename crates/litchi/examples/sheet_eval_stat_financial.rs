@@ -10,8 +10,8 @@
 //! cargo run --example sheet_eval_stat_financial --features ooxml -- sheet_eval_stat_financial.xlsx
 //! ```
 
-use litchi::ooxml::xlsx::Workbook as XlsxWorkbook;
-use litchi::sheet::FormulaEvaluator;
+use litchi::ooxml::xlsx::{Formula, Number, Workbook};
+use litchi::sheet::{FormulaEvaluator, functions::open_workbook};
 use std::env;
 use std::error::Error;
 
@@ -28,15 +28,15 @@ async fn main() -> ExampleResult<()> {
 
     build_sample_xlsx(path)?;
 
-    let xlsx_wb = XlsxWorkbook::open(path)?;
-    let evaluator = FormulaEvaluator::new(&xlsx_wb);
+    let xlsx_wb = open_workbook(path)?;
+    let evaluator = FormulaEvaluator::new(xlsx_wb.as_ref());
 
     println!("Evaluating statistical and financial functions in {}", path);
 
     for (sheet, coord, row, col) in [
-        ("Stats", "B1", 1, 2),
-        ("Stats", "B2", 2, 2),
-        ("Stats", "B3", 3, 2),
+        ("Stat", "B1", 1, 2),
+        ("Stat", "B2", 2, 2),
+        ("Stat", "B3", 3, 2),
         ("Stat", "B4", 4, 2),
         ("Stat", "B5", 5, 2),
         ("Stat", "B6", 6, 2),
@@ -60,92 +60,93 @@ async fn main() -> ExampleResult<()> {
 }
 
 fn build_sample_xlsx(path: &str) -> ExampleResult<()> {
-    let mut wb = XlsxWorkbook::create()?;
+    let wb = Workbook::create()?;
+    let mut edit = wb.edit()?;
 
     // Statistical functions sheet
-    wb.add_worksheet("Stat");
     {
-        let ws = wb.worksheet_mut(0)?;
-        ws.set_name("Stat".to_string());
+        edit.tab(0)?
+            .ok_or("missing worksheet tab")?
+            .rename("Stat")?;
+        let mut ws = edit.sheet(0)?.ok_or("missing worksheet")?;
 
         // Column A: labels
-        ws.set_cell_value(1, 1, "NORM.DIST(0,0,1,TRUE)");
-        ws.set_cell_value(2, 1, "NORM.S.INV(0.5)");
-        ws.set_cell_value(3, 1, "CHISQ.DIST(2,4,TRUE)");
-        ws.set_cell_value(4, 1, "CHISQ.INV(0.95,4)");
-        ws.set_cell_value(5, 1, "T.DIST.2T(1,10)");
-        ws.set_cell_value(6, 1, "F.DIST.RT(1.5,4,6)");
-        ws.set_cell_value(7, 1, "PROB(C1:C3,D1:D3,2,3)");
+        ws.set("A1", "NORM.DIST(0,0,1,TRUE)")?;
+        ws.set("A2", "NORM.S.INV(0.5)")?;
+        ws.set("A3", "CHISQ.DIST(2,4,TRUE)")?;
+        ws.set("A4", "CHISQ.INV(0.95,4)")?;
+        ws.set("A5", "T.DIST.2T(1,10)")?;
+        ws.set("A6", "F.DIST.RT(1.5,4,6)")?;
+        ws.set("A7", "PROB(C1:C3,D1:D3,2,3)")?;
 
         // Column B: formulas
-        ws.set_cell_formula(1, 2, "NORM.DIST(0,0,1,TRUE)");
-        ws.set_cell_formula(2, 2, "NORM.S.INV(0.5)");
-        ws.set_cell_formula(3, 2, "CHISQ.DIST(2,4,TRUE)");
-        ws.set_cell_formula(4, 2, "CHISQ.INV(0.95,4)");
-        ws.set_cell_formula(5, 2, "T.DIST.2T(1,10)");
-        ws.set_cell_formula(6, 2, "F.DIST.RT(1.5,4,6)");
-        ws.set_cell_formula(7, 2, "PROB(C1:C3,D1:D3,2,3)");
+        ws.set("B1", Formula::new("NORM.DIST(0,0,1,TRUE)")?)?;
+        ws.set("B2", Formula::new("NORM.S.INV(0.5)")?)?;
+        ws.set("B3", Formula::new("CHISQ.DIST(2,4,TRUE)")?)?;
+        ws.set("B4", Formula::new("CHISQ.INV(0.95,4)")?)?;
+        ws.set("B5", Formula::new("T.DIST.2T(1,10)")?)?;
+        ws.set("B6", Formula::new("F.DIST.RT(1.5,4,6)")?)?;
+        ws.set("B7", Formula::new("PROB(C1:C3,D1:D3,2,3)")?)?;
 
         // Supporting data for PROB: x values in C1:C3, probabilities in D1:D3
-        ws.set_cell_value(1, 3, 1.0_f64); // C1
-        ws.set_cell_value(2, 3, 2.0_f64); // C2
-        ws.set_cell_value(3, 3, 3.0_f64); // C3
+        ws.set("C1", Number::new("1.0")?)?; // C1
+        ws.set("C2", Number::new("2.0")?)?; // C2
+        ws.set("C3", Number::new("3.0")?)?; // C3
 
-        ws.set_cell_value(1, 4, 0.2_f64); // D1
-        ws.set_cell_value(2, 4, 0.5_f64); // D2
-        ws.set_cell_value(3, 4, 0.3_f64); // D3
+        ws.set("D1", Number::new("0.2")?)?; // D1
+        ws.set("D2", Number::new("0.5")?)?; // D2
+        ws.set("D3", Number::new("0.3")?)?; // D3
     }
 
     // Financial functions sheet
-    wb.add_worksheet("Fin");
+    let fin = edit.add("Fin")?;
     {
-        let ws = wb.worksheet_mut(1)?;
-        ws.set_name("Fin".to_string());
+        let mut ws = fin;
 
         // Column A: labels
-        ws.set_cell_value(1, 1, "PV(0,3,100,0,0)");
-        ws.set_cell_value(2, 1, "FV(0,3,100,0,0)");
-        ws.set_cell_value(3, 1, "RATE(3,-100,250,0,0,0.1)");
-        ws.set_cell_value(4, 1, "NPV(0,10,20,30)");
-        ws.set_cell_value(5, 1, "IRR(C1:C2,0.1)");
-        ws.set_cell_value(6, 1, "XNPV(0.1,D1:D2,E1:E2)");
-        ws.set_cell_value(7, 1, "XIRR(D1:D2,E1:E2,0.1)");
-        ws.set_cell_value(8, 1, "PRODUCT(F1:F3)");
-        ws.set_cell_value(9, 1, "YIELD(0,365,0.05,95,100,2,0)");
-        ws.set_cell_value(10, 1, "DURATION(0,365,0.05,0.10,2,0)");
+        ws.set("A1", "PV(0,3,100,0,0)")?;
+        ws.set("A2", "FV(0,3,100,0,0)")?;
+        ws.set("A3", "RATE(3,-100,250,0,0,0.1)")?;
+        ws.set("A4", "NPV(0,10,20,30)")?;
+        ws.set("A5", "IRR(C1:C2,0.1)")?;
+        ws.set("A6", "XNPV(0.1,D1:D2,E1:E2)")?;
+        ws.set("A7", "XIRR(D1:D2,E1:E2,0.1)")?;
+        ws.set("A8", "PRODUCT(F1:F3)")?;
+        ws.set("A9", "YIELD(0,365,0.05,95,100,2,0)")?;
+        ws.set("A10", "DURATION(0,365,0.05,0.10,2,0)")?;
 
         // Supporting cash flows and dates
         // IRR cash flows
-        ws.set_cell_value(1, 3, -100.0_f64); // C1
-        ws.set_cell_value(2, 3, 110.0_f64); // C2
+        ws.set("C1", Number::new("-100.0")?)?; // C1
+        ws.set("C2", Number::new("110.0")?)?; // C2
 
         // XNPV/XIRR cash flows and dates (same pattern)
-        ws.set_cell_value(1, 4, -100.0_f64); // D1
-        ws.set_cell_value(2, 4, 110.0_f64); // D2
+        ws.set("D1", Number::new("-100.0")?)?; // D1
+        ws.set("D2", Number::new("110.0")?)?; // D2
 
         // Dates as numeric serials (relative year apart)
-        ws.set_cell_value(1, 5, 0.0_f64); // E1: base date
-        ws.set_cell_value(2, 5, 365.0_f64); // E2: one year later
+        ws.set("E1", Number::new("0.0")?)?; // E1: base date
+        ws.set("E2", Number::new("365.0")?)?; // E2: one year later
 
         // Values for PRODUCT in F1:F3
-        ws.set_cell_value(1, 6, 2.0_f64); // F1
-        ws.set_cell_value(2, 6, 3.0_f64); // F2
-        ws.set_cell_value(3, 6, 4.0_f64); // F3
+        ws.set("F1", Number::new("2.0")?)?; // F1
+        ws.set("F2", Number::new("3.0")?)?; // F2
+        ws.set("F3", Number::new("4.0")?)?; // F3
 
         // Column B: formulas
-        ws.set_cell_formula(1, 2, "PV(0,3,100,0,0)");
-        ws.set_cell_formula(2, 2, "FV(0,3,100,0,0)");
-        ws.set_cell_formula(3, 2, "RATE(3,-100,250,0,0,0.1)");
-        ws.set_cell_formula(4, 2, "NPV(0,10,20,30)");
-        ws.set_cell_formula(5, 2, "IRR(C1:C2,0.1)");
-        ws.set_cell_formula(6, 2, "XNPV(0.1,D1:D2,E1:E2)");
-        ws.set_cell_formula(7, 2, "XIRR(D1:D2,E1:E2,0.1)");
-        ws.set_cell_formula(8, 2, "PRODUCT(F1:F3)");
-        ws.set_cell_formula(9, 2, "YIELD(0,365,0.05,95,100,2,0)");
-        ws.set_cell_formula(10, 2, "DURATION(0,365,0.05,0.10,2,0)");
+        ws.set("B1", Formula::new("PV(0,3,100,0,0)")?)?;
+        ws.set("B2", Formula::new("FV(0,3,100,0,0)")?)?;
+        ws.set("B3", Formula::new("RATE(3,-100,250,0,0,0.1)")?)?;
+        ws.set("B4", Formula::new("NPV(0,10,20,30)")?)?;
+        ws.set("B5", Formula::new("IRR(C1:C2,0.1)")?)?;
+        ws.set("B6", Formula::new("XNPV(0.1,D1:D2,E1:E2)")?)?;
+        ws.set("B7", Formula::new("XIRR(D1:D2,E1:E2,0.1)")?)?;
+        ws.set("B8", Formula::new("PRODUCT(F1:F3)")?)?;
+        ws.set("B9", Formula::new("YIELD(0,365,0.05,95,100,2,0)")?)?;
+        ws.set("B10", Formula::new("DURATION(0,365,0.05,0.10,2,0)")?)?;
     }
 
-    wb.save(path)?;
+    edit.commit()?.into_workbook().save(path)?;
     println!("Created statistical/financial test workbook at {}", path);
 
     Ok(())

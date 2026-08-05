@@ -1,15 +1,15 @@
 use litchi_cfb::OleFile;
-use litchi_ppt::PptRecordType;
-use litchi_ppt::records::record::PptRecord;
+use litchi_ppt::RecordType;
+use litchi_ppt::records::record::Record;
 use std::env;
 use std::fs::File;
 
 fn dump_records(data: &[u8], indent: usize) {
     let mut off = 0;
     while off + 8 <= data.len() {
-        match PptRecord::parse(data, off) {
+        match Record::parse(data, off) {
             Ok((rec, consumed)) => {
-                if rec.record_type == PptRecordType::SlideListWithText {
+                if rec.record_type == RecordType::SlideListWithText {
                     println!(
                         "{indent:>width$}- type=0x{:04X} ver=0x{:X} inst={} len={} children={}",
                         rec.record_type_raw,

@@ -1,13 +1,13 @@
 use std::io::Cursor;
 
-use litchi_xls::XlsWorkbook;
+use litchi_xls::Workbook;
 use litchi_xls::view::{PaneType, Range};
-use litchi_xls::writer::XlsWriter;
+use litchi_xls::writer::Writer;
 use litchi_xls::writer::view::{Pane, Scale, Selection, View};
 
 #[test]
 fn writes_and_reads_typed_view_state() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("View").unwrap();
     let pane = Pane::split(1_200, 800, 7, 4, PaneType::LowerRight).unwrap();
     let selection = Selection::new(
@@ -29,7 +29,7 @@ fn writes_and_reads_typed_view_state() {
 
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
     let view = workbook.xls_worksheet(0).unwrap().worksheet_view().unwrap();
     assert!(view.shows_formulas());
     assert!(!view.shows_gridlines());
@@ -47,7 +47,7 @@ fn writes_and_reads_typed_view_state() {
 
 #[test]
 fn freeze_and_scale_round_trip() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Compat").unwrap();
     writer.freeze_panes(sheet, 7, 5).unwrap();
     writer
@@ -55,7 +55,7 @@ fn freeze_and_scale_round_trip() {
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
     let view = workbook.xls_worksheet(0).unwrap().worksheet_view().unwrap();
     assert!(view.has_frozen_panes());
     assert!(view.is_frozen_without_split());

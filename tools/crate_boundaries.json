@@ -19,6 +19,7 @@
       "litchi-odraw",
       "litchi-ods",
       "litchi-odt",
+      "litchi-ole-common",
       "litchi-ooxml-common",
       "litchi-opc",
       "litchi-ppt",
@@ -150,7 +151,8 @@
     ],
     "litchi-ole-common": [
       "litchi-cfb",
-      "litchi-codepage"
+      "litchi-codepage",
+      "litchi-core"
     ],
     "litchi-ooxml-common": [
       "litchi-core",

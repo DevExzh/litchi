@@ -1,33 +1,32 @@
 use litchi_xls::writer::{
-    FillPattern, XlsConditionalFormatGroup, XlsConditionalFormatOperator,
-    XlsConditionalFormatRange, XlsConditionalFormatRule, XlsConditionalFormatType,
-    XlsConditionalPattern, XlsWriter,
+    ConditionalFormatGroup, ConditionalFormatOperator, ConditionalFormatRange,
+    ConditionalFormatRule, ConditionalFormatType, ConditionalPattern, FillPattern, Writer,
 };
-use litchi_xls::{XlsConditionalComparison, XlsConditionalRuleKind, XlsWorkbook};
+use litchi_xls::{ConditionalComparison, ConditionalRuleKind, Workbook};
 use std::io::Cursor;
 
 #[test]
 fn grouped_ordered_legacy_rules_round_trip() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("CF").unwrap();
     writer
         .add_conditional_format_group(
             sheet,
-            XlsConditionalFormatGroup {
+            ConditionalFormatGroup {
                 ranges: vec![
-                    XlsConditionalFormatRange {
+                    ConditionalFormatRange {
                         first_row: 8,
                         last_row: 9,
                         first_col: 2,
                         last_col: 3,
                     },
-                    XlsConditionalFormatRange {
+                    ConditionalFormatRange {
                         first_row: 1,
                         last_row: 2,
                         first_col: 0,
                         last_col: 1,
                     },
-                    XlsConditionalFormatRange {
+                    ConditionalFormatRange {
                         first_row: 8,
                         last_row: 9,
                         first_col: 2,
@@ -35,20 +34,20 @@ fn grouped_ordered_legacy_rules_round_trip() {
                     },
                 ],
                 rules: vec![
-                    XlsConditionalFormatRule {
-                        format_type: XlsConditionalFormatType::CellValue {
-                            operator: XlsConditionalFormatOperator::Between,
+                    ConditionalFormatRule {
+                        format_type: ConditionalFormatType::CellValue {
+                            operator: ConditionalFormatOperator::Between,
                             formula1: "1".into(),
                             formula2: Some("10".into()),
                         },
-                        pattern: Some(XlsConditionalPattern {
+                        pattern: Some(ConditionalPattern {
                             pattern: FillPattern::Solid,
                             foreground_color: 2,
                             background_color: 3,
                         }),
                     },
-                    XlsConditionalFormatRule {
-                        format_type: XlsConditionalFormatType::Formula {
+                    ConditionalFormatRule {
+                        format_type: ConditionalFormatType::Formula {
                             formula: "A1>0".into(),
                         },
                         pattern: None,
@@ -59,7 +58,7 @@ fn grouped_ordered_legacy_rules_round_trip() {
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
     let groups = workbook.xls_worksheet(0).unwrap().conditional_formattings();
     assert_eq!(groups.len(), 1);
     assert_eq!(groups[0].ranges().len(), 3);
@@ -69,26 +68,26 @@ fn grouped_ordered_legacy_rules_round_trip() {
     assert_eq!(groups[0].rules().len(), 2);
     assert_eq!(
         groups[0].rules()[0].kind(),
-        XlsConditionalRuleKind::CellValue(XlsConditionalComparison::Between)
+        ConditionalRuleKind::CellValue(ConditionalComparison::Between)
     );
     assert_eq!(groups[0].rules()[0].formula1_rendered(), Some("=1"));
     assert_eq!(groups[0].rules()[0].formula2_rendered(), Some("=10"));
-    assert_eq!(groups[0].rules()[1].kind(), XlsConditionalRuleKind::Formula);
+    assert_eq!(groups[0].rules()[1].kind(), ConditionalRuleKind::Formula);
 }
 
 #[test]
 fn grouped_api_rejects_cardinality_and_formula_shape() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("CF").unwrap();
-    let range = XlsConditionalFormatRange {
+    let range = ConditionalFormatRange {
         first_row: 0,
         last_row: 0,
         first_col: 0,
         last_col: 0,
     };
-    let bad = XlsConditionalFormatRule {
-        format_type: XlsConditionalFormatType::CellValue {
-            operator: XlsConditionalFormatOperator::Between,
+    let bad = ConditionalFormatRule {
+        format_type: ConditionalFormatType::CellValue {
+            operator: ConditionalFormatOperator::Between,
             formula1: "1".into(),
             formula2: None,
         },
@@ -98,7 +97,7 @@ fn grouped_api_rejects_cardinality_and_formula_shape() {
         writer
             .add_conditional_format_group(
                 sheet,
-                XlsConditionalFormatGroup {
+                ConditionalFormatGroup {
                     ranges: vec![range],
                     rules: vec![bad]
                 }
@@ -109,7 +108,7 @@ fn grouped_api_rejects_cardinality_and_formula_shape() {
         writer
             .add_conditional_format_group(
                 sheet,
-                XlsConditionalFormatGroup {
+                ConditionalFormatGroup {
                     ranges: Vec::new(),
                     rules: Vec::new()
                 }

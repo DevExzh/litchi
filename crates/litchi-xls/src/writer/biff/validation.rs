@@ -1,4 +1,4 @@
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 use std::io::Write;
 
 use super::{unicode_string_size, write_record_header, write_unicode_string_biff8};
@@ -32,14 +32,14 @@ pub(crate) struct DvalConfig {
     pub dv_count: u32,
 }
 
-pub(crate) fn write_dval<W: Write>(writer: &mut W, cfg: DvalConfig) -> XlsResult<()> {
+pub(crate) fn write_dval<W: Write>(writer: &mut W, cfg: DvalConfig) -> Result<()> {
     if cfg.x_left > 65_535
         || cfg.y_top > 65_535
         || cfg.dv_count > 65_534
         || matches!(cfg.dropdown_object_id, Some(0))
         || cfg.dropdown_object_id.is_some_and(|id| id > 32_767)
     {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "DVAL metadata is out of range".to_string(),
         ));
     }
@@ -64,17 +64,15 @@ pub(crate) fn write_dv<W: Write>(
     writer: &mut W,
     cfg: &DvConfig<'_>,
     ranges: &[(u16, u16, u8, u8)],
-) -> XlsResult<()> {
+) -> Result<()> {
     if ranges.is_empty() {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "DV record must have at least one target range".to_string(),
         ));
     }
 
     if ranges.len() > 432 {
-        return Err(XlsError::InvalidData(
-            "DV range count exceeds 432".to_string(),
-        ));
+        return Err(Error::InvalidData("DV range count exceeds 432".to_string()));
     }
     if ranges
         .iter()
@@ -82,7 +80,7 @@ pub(crate) fn write_dv<W: Write>(
             first_row > last_row || first_col > last_col
         })
     {
-        return Err(XlsError::InvalidCellReference(
+        return Err(Error::InvalidCellReference(
             "DV contains a reversed target range".to_string(),
         ));
     }
@@ -110,9 +108,7 @@ pub(crate) fn write_dv<W: Write>(
         .formula1
         .map(|f| {
             u16::try_from(f.len()).map_err(|_| {
-                XlsError::InvalidData(
-                    "Data validation formula1 exceeds BIFF8 size limit".to_string(),
-                )
+                Error::InvalidData("Data validation formula1 exceeds BIFF8 size limit".to_string())
             })
         })
         .transpose()?
@@ -122,9 +118,7 @@ pub(crate) fn write_dv<W: Write>(
         .formula2
         .map(|f| {
             u16::try_from(f.len()).map_err(|_| {
-                XlsError::InvalidData(
-                    "Data validation formula2 exceeds BIFF8 size limit".to_string(),
-                )
+                Error::InvalidData("Data validation formula2 exceeds BIFF8 size limit".to_string())
             })
         })
         .transpose()?
@@ -141,7 +135,7 @@ pub(crate) fn write_dv<W: Write>(
     data_len = data_len.saturating_add(2 + dv_count_u16.saturating_mul(8)); // CellRangeAddressList
 
     if data_len > 8224 {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "DV record exceeds maximum BIFF8 record size".to_string(),
         ));
     }

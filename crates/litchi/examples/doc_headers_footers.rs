@@ -1,6 +1,6 @@
 //! Example: DOC headers/footers with odd/even/first behavior
 //! Run: cargo run --example doc_headers_footers
-use litchi::doc::DocWriter;
+use litchi_doc::DocWriter;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut w = DocWriter::new();

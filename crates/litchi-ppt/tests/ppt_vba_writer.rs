@@ -1,16 +1,13 @@
 use litchi_ppt::embedded::storage::{Compression, Kind};
-use litchi_ppt::writer::{PptEncryptionProfile, PptWriter};
-use litchi_ppt::{
-    Package, PowerPointVbaProjectCompression, PowerPointVbaProjectError,
-    PowerPointVbaProjectLimits, PptOpenOptions,
-};
+use litchi_ppt::writer::{EncryptionProfile, Writer};
+use litchi_ppt::{OpenOptions, Package, VbaProjectCompression, VbaProjectError, VbaProjectLimits};
 use litchi_vba::{
     Limits,
     build::{Module, Project},
 };
 use std::io::Cursor;
 
-fn write(writer: &mut PptWriter) -> Vec<u8> {
+fn write(writer: &mut Writer) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
     output.into_inner()
@@ -18,7 +15,7 @@ fn write(writer: &mut PptWriter) -> Vec<u8> {
 
 #[test]
 fn compressed_complete_project_round_trips_as_inert_source() {
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
     let slide = writer.add_slide().unwrap();
     writer
         .add_textbox(slide, 10, 20, 300, 40, "Macro-enabled presentation")
@@ -73,13 +70,13 @@ fn compressed_complete_project_round_trips_as_inert_source() {
 
 #[test]
 fn uncompressed_empty_project_round_trips_and_can_be_cleared() {
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
     writer.add_slide().unwrap();
     let project = Project::new("EmptyPresentation")
         .finish(&Limits::default())
         .unwrap();
     writer
-        .put_vba_with(project, PowerPointVbaProjectCompression::Uncompressed)
+        .put_vba_with(project, VbaProjectCompression::Uncompressed)
         .unwrap();
 
     let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
@@ -104,7 +101,7 @@ fn uncompressed_empty_project_round_trips_and_can_be_cleared() {
 
 #[test]
 fn failed_replacement_is_atomic_and_outer_limits_are_enforced() {
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
     writer.add_slide().unwrap();
     writer.set_vba(Project::new("ExistingProject")).unwrap();
     let replacement =
@@ -115,11 +112,7 @@ fn failed_replacement_is_atomic_and_outer_limits_are_enforced() {
     };
     assert!(
         writer
-            .set_vba_with(
-                replacement,
-                &build_limits,
-                PowerPointVbaProjectCompression::Zlib,
-            )
+            .set_vba_with(replacement, &build_limits, VbaProjectCompression::Zlib,)
             .is_err()
     );
 
@@ -128,28 +121,28 @@ fn failed_replacement_is_atomic_and_outer_limits_are_enforced() {
     let project = presentation.vba().unwrap().unwrap();
     assert_eq!(project.name(), "ExistingProject");
 
-    let limits = PowerPointVbaProjectLimits {
+    let limits = VbaProjectLimits {
         max_cfb_bytes: 1,
-        ..PowerPointVbaProjectLimits::default()
+        ..VbaProjectLimits::default()
     };
     assert!(matches!(
         presentation.vba_with(&limits),
-        Err(PowerPointVbaProjectError::PowerPoint(_))
+        Err(VbaProjectError::PowerPoint(_))
     ));
 
-    let limits = PowerPointVbaProjectLimits {
+    let limits = VbaProjectLimits {
         max_stored_bytes: 0,
-        ..PowerPointVbaProjectLimits::default()
+        ..VbaProjectLimits::default()
     };
     assert!(matches!(
         presentation.vba_with(&limits),
-        Err(PowerPointVbaProjectError::PowerPoint(_))
+        Err(VbaProjectError::PowerPoint(_))
     ));
 }
 
 #[test]
 fn project_remains_available_after_presentation_decryption() {
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
     writer.add_slide().unwrap();
     let project = Project::new("EncryptedPresentation").module(Module::standard(
         "Module1",
@@ -157,15 +150,12 @@ fn project_remains_available_after_presentation_decryption() {
     ));
     writer.set_vba(project).unwrap();
     writer
-        .set_password(
-            "secret",
-            PptEncryptionProfile::CryptoApiRc4 { key_bits: 128 },
-        )
+        .set_password("secret", EncryptionProfile::CryptoApiRc4 { key_bits: 128 })
         .unwrap();
 
     let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let presentation = package
-        .presentation_with_options(PptOpenOptions {
+        .presentation_with_options(OpenOptions {
             password: Some("secret"),
         })
         .unwrap();

@@ -1,6 +1,6 @@
 //! Typed semantic values for BIFF8 RealTimeData records.
 
-use crate::error::{XlsError, XlsResult};
+use crate::error::{Error, Result};
 
 /// The last value an RTD server returned for a topic (`RTDOper.rtdVt`).
 #[derive(Debug, Clone, PartialEq)]
@@ -30,16 +30,16 @@ pub struct Cell {
 
 impl Cell {
     /// Create a checked RTD subscriber cell from raw zero-based indices.
-    pub fn new(row: u32, column: u16, sheet_index: usize) -> XlsResult<Self> {
+    pub fn new(row: u32, column: u16, sheet_index: usize) -> Result<Self> {
         let invalid = || {
-            XlsError::InvalidCellReference(format!(
+            Error::InvalidCellReference(format!(
                 "RTD subscriber row {row}, column {column} is outside the BIFF8 grid"
             ))
         };
         let row = u16::try_from(row).map_err(|_| invalid())?;
         let column = u8::try_from(column).map_err(|_| invalid())?;
         let sheet_index = u16::try_from(sheet_index)
-            .map_err(|_| XlsError::WorksheetNotFound(format!("Sheet {sheet_index}")))?;
+            .map_err(|_| Error::WorksheetNotFound(format!("Sheet {sheet_index}")))?;
         Ok(Self {
             row,
             column,

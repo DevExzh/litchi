@@ -1,335 +1,398 @@
-//! Comprehensive Custom Slide Show Example
+//! Comprehensive typed custom-show and section example.
 //!
-//! Demonstrates creating presentations with custom slide shows for different audiences.
-//! Custom shows allow you to present subsets of slides without creating multiple files.
+//! The slide writer owns slide content, while the presentation-structure
+//! owner transactionally publishes custom shows and sections into the OPC
+//! presentation graph.
 
-use litchi::ooxml::pptx::Package;
+use litchi_pptx::presentation_properties::metadata::custom_show::Show;
+use litchi_pptx::presentation_properties::metadata::sections::Section;
+use litchi_pptx::presentation_properties::metadata::structure;
+use litchi_pptx::{MutablePresentation, Package};
+use std::error::Error as StdError;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+const X: i64 = 914_400;
+const Y: i64 = 1_828_800;
+const WIDTH: i64 = 7_315_200;
+
+struct ShowPlan {
+    name: &'static str,
+    positions: Vec<usize>,
+}
+
+struct SectionPlan {
+    name: &'static str,
+    id: &'static str,
+    positions: Vec<usize>,
+}
+
+fn main() -> Result<(), Box<dyn StdError>> {
     println!("=== Comprehensive Custom Slide Show Tests ===\n");
 
-    // Test 1: Executive presentation with multiple custom shows
     test_executive_presentation()?;
-
-    // Test 2: Training presentation with role-specific shows
     test_training_presentation()?;
-
-    // Test 3: Product demo with feature-specific shows
     test_product_demo()?;
-
-    // Test 4: Conference presentation with time-based shows
     test_conference_presentation()?;
 
     println!("\n=== All custom show tests complete! ===");
-    println!("\nTo verify custom shows:");
-    println!("  1. Open each file in PowerPoint");
-    println!("  2. Go to Slide Show > Custom Slide Show");
-    println!("  3. Verify that custom shows appear in the list");
-    println!("  4. Run each custom show to verify slide selection");
-
+    println!("\nEach output contains typed custom shows in ppt/presentation.xml.");
     Ok(())
 }
 
-/// Test 1: Executive Presentation
-/// Different custom shows for different management levels
-fn test_executive_presentation() -> Result<(), Box<dyn std::error::Error>> {
+fn add_slides(
+    presentation: &mut MutablePresentation,
+    titles: &[&str],
+    content_prefix: &str,
+    height: i64,
+) -> Result<(), Box<dyn StdError>> {
+    for title in titles {
+        let slide = presentation.add_slide()?;
+        slide.set_title(title);
+        slide.add_text_box(&format!("{content_prefix}{title}"), X, Y, WIDTH, height);
+    }
+    Ok(())
+}
+
+fn publish_structure(
+    mut package: Package,
+    output: &str,
+    slide_count: usize,
+    shows: Vec<ShowPlan>,
+    sections: Vec<SectionPlan>,
+) -> Result<(), Box<dyn StdError>> {
+    // Publish the mutable slide snapshot first. The structure owner operates
+    // on the canonical OPC graph and therefore cannot observe stale writer
+    // state.
+    let bytes = package.to_bytes()?;
+    let mut package = Package::from_bytes(&bytes)?;
+    let slide_ids = package
+        .with_opc(structure::load)?
+        .slides
+        .into_iter()
+        .map(|slide| slide.slide_id)
+        .collect::<Vec<_>>();
+    assert_eq!(slide_ids.len(), slide_count);
+
+    package.edit_opc(|opc| {
+        for (id, plan) in shows.iter().enumerate() {
+            let selected = plan
+                .positions
+                .iter()
+                .map(|&position| slide_ids[position])
+                .collect::<Vec<_>>();
+            structure::add_custom_show(
+                opc,
+                Show::new((id + 1) as u32, plan.name).with_slides(selected),
+            )?;
+        }
+
+        for plan in &sections {
+            let selected = plan
+                .positions
+                .iter()
+                .map(|&position| slide_ids[position])
+                .collect::<Vec<_>>();
+            structure::add_section(opc, Section::new(plan.name, plan.id).with_slides(selected))?;
+        }
+        Ok(())
+    })?;
+
+    let graph = package.with_opc(structure::load)?;
+    assert_eq!(graph.slides.len(), slide_count);
+    assert_eq!(graph.custom_shows.shows.len(), shows.len());
+    assert_eq!(graph.sections.len(), sections.len());
+    for (actual, expected) in graph.custom_shows.shows.iter().zip(&shows) {
+        assert_eq!(actual.name, expected.name);
+        assert_eq!(actual.slide_ids.len(), expected.positions.len());
+    }
+
+    package.save(output)?;
+    let reopened = Package::open(output)?;
+    let graph = reopened.with_opc(structure::load)?;
+    assert_eq!(graph.custom_shows.shows.len(), shows.len());
+    assert_eq!(graph.sections.len(), sections.len());
+    println!(
+        "  ✓ Saved and reopened {output} ({} slides, {} custom shows, {} sections)",
+        graph.slides.len(),
+        graph.custom_shows.shows.len(),
+        graph.sections.len()
+    );
+    Ok(())
+}
+
+fn test_executive_presentation() -> Result<(), Box<dyn StdError>> {
     println!("Test 1: Creating executive presentation with custom shows...");
-
-    let mut pkg = Package::new()?;
-    {
-        let pres = pkg.presentation_mut()?;
-
-        // Create 15 slides with content
-        let slide_titles = vec![
-            "Company Overview",      // 1
-            "Financial Performance", // 2
-            "Revenue Breakdown",     // 3
-            "Cost Analysis",         // 4
-            "Market Position",       // 5
-            "Competitive Landscape", // 6
-            "Product Roadmap",       // 7
-            "Technology Stack",      // 8
-            "Infrastructure",        // 9
-            "Team Structure",        // 10
-            "Hiring Plans",          // 11
-            "Risk Assessment",       // 12
-            "Mitigation Strategies", // 13
-            "Future Projections",    // 14
-            "Q&A",                   // 15
-        ];
-
-        for (i, title) in slide_titles.iter().enumerate() {
-            let slide = pres.add_slide()?;
-            slide.set_title(title);
-            slide.add_text_box(
-                &format!("Slide {} content area", i + 1),
-                914400,
-                1828800,
-                7315200,
-                2500000,
-            );
-        }
-
-        // Add sections for organization
-        pres.add_section("Overview", vec![256, 257]);
-        pres.add_section("Financials", vec![258, 259]);
-        pres.add_section("Market", vec![260, 261]);
-        pres.add_section("Product & Tech", vec![262, 263, 264, 265]);
-        pres.add_section("Organization", vec![266, 267]);
-        pres.add_section("Strategy", vec![268, 269]);
-        pres.add_section("Closing", vec![270]);
-
-        // Create custom shows for different audiences
-        pres.create_custom_show("Board Meeting", vec![256, 257, 260, 269, 270]);
-        println!("  ✓ Board Meeting show: 5 slides");
-
-        pres.create_custom_show(
-            "Executive Summary",
-            vec![256, 257, 258, 259, 260, 261, 262, 269, 270],
-        );
-        println!("  ✓ Executive Summary show: 9 slides");
-
-        pres.create_custom_show(
-            "Financial Review",
-            vec![256, 257, 258, 259, 267, 268, 269, 270],
-        );
-        println!("  ✓ Financial Review show: 8 slides");
-
-        pres.create_custom_show("Technical Review", vec![256, 262, 263, 264, 265, 270]);
-        println!("  ✓ Technical Review show: 6 slides");
-
-        pres.create_custom_show("All Hands Meeting", (256..=270).collect::<Vec<_>>());
-        println!("  ✓ All Hands Meeting show: 15 slides");
-
-        println!("  ✓ Generated {} custom shows", pres.custom_shows().len());
-    }
-    pkg.save("customshow_executive.pptx")?;
-    println!("  ✓ Saved: customshow_executive.pptx\n");
-
-    Ok(())
+    let titles = [
+        "Company Overview",
+        "Financial Performance",
+        "Revenue Breakdown",
+        "Cost Analysis",
+        "Market Position",
+        "Competitive Landscape",
+        "Product Roadmap",
+        "Technology Stack",
+        "Infrastructure",
+        "Team Structure",
+        "Hiring Plans",
+        "Risk Assessment",
+        "Mitigation Strategies",
+        "Future Projections",
+        "Q&A",
+    ];
+    let mut package = Package::new()?;
+    add_slides(
+        package.presentation_mut()?,
+        &titles,
+        "Executive content: ",
+        2_500_000,
+    )?;
+    publish_structure(
+        package,
+        "customshow_executive.pptx",
+        titles.len(),
+        vec![
+            ShowPlan {
+                name: "Board Meeting",
+                positions: vec![0, 1, 4, 13, 14],
+            },
+            ShowPlan {
+                name: "Executive Summary",
+                positions: vec![0, 1, 2, 3, 4, 5, 6, 13, 14],
+            },
+            ShowPlan {
+                name: "Financial Review",
+                positions: vec![0, 1, 2, 3, 11, 12, 13, 14],
+            },
+            ShowPlan {
+                name: "Technical Review",
+                positions: vec![0, 6, 7, 8, 9, 14],
+            },
+            ShowPlan {
+                name: "All Hands Meeting",
+                positions: (0..titles.len()).collect(),
+            },
+        ],
+        vec![
+            SectionPlan {
+                name: "Overview",
+                id: "{11111111-1111-1111-1111-111111111111}",
+                positions: vec![0, 1],
+            },
+            SectionPlan {
+                name: "Financials",
+                id: "{22222222-2222-2222-2222-222222222222}",
+                positions: vec![2, 3],
+            },
+            SectionPlan {
+                name: "Market",
+                id: "{33333333-3333-3333-3333-333333333333}",
+                positions: vec![4, 5],
+            },
+            SectionPlan {
+                name: "Product & Tech",
+                id: "{44444444-4444-4444-4444-444444444444}",
+                positions: vec![6, 7, 8, 9],
+            },
+            SectionPlan {
+                name: "Organization",
+                id: "{55555555-5555-5555-5555-555555555555}",
+                positions: vec![10, 11],
+            },
+            SectionPlan {
+                name: "Strategy",
+                id: "{66666666-6666-6666-6666-666666666666}",
+                positions: vec![12, 13],
+            },
+            SectionPlan {
+                name: "Closing",
+                id: "{77777777-7777-7777-7777-777777777777}",
+                positions: vec![14],
+            },
+        ],
+    )
 }
 
-/// Test 2: Training Presentation
-/// Custom shows for different roles and skill levels
-fn test_training_presentation() -> Result<(), Box<dyn std::error::Error>> {
+fn test_training_presentation() -> Result<(), Box<dyn StdError>> {
     println!("Test 2: Creating training presentation with role-specific shows...");
-
-    let mut pkg = Package::new()?;
-    {
-        let pres = pkg.presentation_mut()?;
-
-        // Create 20 training slides
-        let training_topics = vec![
-            "Welcome & Agenda",
-            "Company Policies",
-            "Safety Guidelines",
-            "Admin: Manager Tools",
-            "Admin: Reporting",
-            "Admin: Approvals",
-            "HR: Employee Records",
-            "HR: Benefits Admin",
-            "HR: Performance Reviews",
-            "IT: System Access",
-            "IT: Security Protocols",
-            "IT: Troubleshooting",
-            "Sales: CRM Training",
-            "Sales: Pricing Tools",
-            "Sales: Proposal Process",
-            "Support: Ticket System",
-            "Support: Escalation",
-            "Support: Knowledge Base",
-            "Q&A Session",
-            "Feedback & Next Steps",
-        ];
-
-        for title in training_topics.iter() {
-            let slide = pres.add_slide()?;
-            slide.set_title(title);
-            slide.add_text_box(
-                &format!("Training content for {}", title),
-                914400,
-                1828800,
-                7315200,
-                3000000,
-            );
-        }
-
-        // Create role-specific custom shows
-        pres.create_custom_show("New Employee Orientation", vec![256, 257, 258, 275]);
-        println!("  ✓ New Employee Orientation: 4 slides");
-
-        pres.create_custom_show("Manager Training", vec![256, 257, 258, 259, 260, 261, 275]);
-        println!("  ✓ Manager Training: 7 slides");
-
-        pres.create_custom_show("HR Department", vec![256, 257, 258, 262, 263, 264, 275]);
-        println!("  ✓ HR Department: 7 slides");
-
-        pres.create_custom_show("IT Department", vec![256, 257, 258, 265, 266, 267, 275]);
-        println!("  ✓ IT Department: 7 slides");
-
-        pres.create_custom_show("Sales Team", vec![256, 257, 268, 269, 270, 275]);
-        println!("  ✓ Sales Team: 6 slides");
-
-        pres.create_custom_show("Support Team", vec![256, 257, 271, 272, 273, 275]);
-        println!("  ✓ Support Team: 6 slides");
-
-        println!("  ✓ Generated {} custom shows", pres.custom_shows().len());
-    }
-    pkg.save("customshow_training.pptx")?;
-    println!("  ✓ Saved: customshow_training.pptx\n");
-
-    Ok(())
+    let titles = [
+        "Welcome & Agenda",
+        "Company Policies",
+        "Safety Guidelines",
+        "Admin: Manager Tools",
+        "Admin: Reporting",
+        "Admin: Approvals",
+        "HR: Employee Records",
+        "HR: Benefits Admin",
+        "HR: Performance Reviews",
+        "IT: System Access",
+        "IT: Security Protocols",
+        "IT: Troubleshooting",
+        "Sales: CRM Training",
+        "Sales: Pricing Tools",
+        "Sales: Proposal Process",
+        "Support: Ticket System",
+        "Support: Escalation",
+        "Support: Knowledge Base",
+        "Q&A Session",
+        "Feedback & Next Steps",
+    ];
+    let mut package = Package::new()?;
+    add_slides(
+        package.presentation_mut()?,
+        &titles,
+        "Training content for ",
+        3_000_000,
+    )?;
+    publish_structure(
+        package,
+        "customshow_training.pptx",
+        titles.len(),
+        vec![
+            ShowPlan {
+                name: "New Employee Orientation",
+                positions: vec![0, 1, 2, 19],
+            },
+            ShowPlan {
+                name: "Manager Training",
+                positions: vec![0, 1, 2, 3, 4, 5, 19],
+            },
+            ShowPlan {
+                name: "HR Department",
+                positions: vec![0, 1, 2, 6, 7, 8, 19],
+            },
+            ShowPlan {
+                name: "IT Department",
+                positions: vec![0, 1, 2, 9, 10, 11, 19],
+            },
+            ShowPlan {
+                name: "Sales Team",
+                positions: vec![0, 1, 12, 13, 14, 19],
+            },
+            ShowPlan {
+                name: "Support Team",
+                positions: vec![0, 1, 15, 16, 17, 19],
+            },
+        ],
+        Vec::new(),
+    )
 }
 
-/// Test 3: Product Demo
-/// Feature-specific shows for different customer interests
-fn test_product_demo() -> Result<(), Box<dyn std::error::Error>> {
+fn test_product_demo() -> Result<(), Box<dyn StdError>> {
     println!("Test 3: Creating product demo with feature-specific shows...");
-
-    let mut pkg = Package::new()?;
-    {
-        let pres = pkg.presentation_mut()?;
-
-        // Create product demo slides
-        let demo_slides = vec![
-            "Product Introduction",
-            "Core Features Overview",
-            "Feature: Analytics Dashboard",
-            "Feature: Real-time Reporting",
-            "Feature: Data Integration",
-            "Feature: Custom Workflows",
-            "Feature: API Access",
-            "Feature: Mobile App",
-            "Feature: Collaboration Tools",
-            "Feature: Security & Compliance",
-            "Feature: Scalability",
-            "Pricing Tiers",
-            "Implementation Timeline",
-            "Customer Success Stories",
-            "ROI Calculator",
-            "Next Steps",
-        ];
-
-        for title in demo_slides.iter() {
-            let slide = pres.add_slide()?;
-            slide.set_title(title);
-            slide.add_text_box(
-                &format!("Demo content: {}", title),
-                914400,
-                1828800,
-                7315200,
-                3500000,
-            );
-        }
-
-        // Create interest-based custom shows
-        pres.create_custom_show("Quick Overview", vec![256, 257, 267, 271]);
-        println!("  ✓ Quick Overview: 4 slides (5 minutes)");
-
-        pres.create_custom_show(
-            "Analytics Focus",
-            vec![256, 257, 258, 259, 260, 267, 269, 270, 271],
-        );
-        println!("  ✓ Analytics Focus: 9 slides");
-
-        pres.create_custom_show(
-            "Technical Deep Dive",
-            vec![256, 261, 262, 263, 266, 267, 271],
-        );
-        println!("  ✓ Technical Deep Dive: 7 slides");
-
-        pres.create_custom_show("Business Value", vec![256, 257, 267, 269, 270, 271]);
-        println!("  ✓ Business Value: 6 slides");
-
-        pres.create_custom_show("Mobile-First", vec![256, 263, 264, 267, 271]);
-        println!("  ✓ Mobile-First: 5 slides");
-
-        pres.create_custom_show("Full Demo", (256..=271).collect::<Vec<_>>());
-        println!("  ✓ Full Demo: 16 slides (complete)");
-
-        println!("  ✓ Generated {} custom shows", pres.custom_shows().len());
-    }
-    pkg.save("customshow_product_demo.pptx")?;
-    println!("  ✓ Saved: customshow_product_demo.pptx\n");
-
-    Ok(())
+    let titles = [
+        "Product Introduction",
+        "Core Features Overview",
+        "Feature: Analytics Dashboard",
+        "Feature: Real-time Reporting",
+        "Feature: Data Integration",
+        "Feature: Custom Workflows",
+        "Feature: API Access",
+        "Feature: Mobile App",
+        "Feature: Collaboration Tools",
+        "Feature: Security & Compliance",
+        "Feature: Scalability",
+        "Pricing Tiers",
+        "Implementation Timeline",
+        "Customer Success Stories",
+        "ROI Calculator",
+        "Next Steps",
+    ];
+    let mut package = Package::new()?;
+    add_slides(
+        package.presentation_mut()?,
+        &titles,
+        "Demo content: ",
+        3_500_000,
+    )?;
+    publish_structure(
+        package,
+        "customshow_product_demo.pptx",
+        titles.len(),
+        vec![
+            ShowPlan {
+                name: "Quick Overview",
+                positions: vec![0, 1, 11, 15],
+            },
+            ShowPlan {
+                name: "Analytics Focus",
+                positions: vec![0, 1, 2, 3, 4, 11, 13, 14, 15],
+            },
+            ShowPlan {
+                name: "Technical Deep Dive",
+                positions: vec![0, 5, 6, 7, 10, 11, 15],
+            },
+            ShowPlan {
+                name: "Business Value",
+                positions: vec![0, 1, 11, 13, 14, 15],
+            },
+            ShowPlan {
+                name: "Mobile-First",
+                positions: vec![0, 7, 8, 11, 15],
+            },
+            ShowPlan {
+                name: "Full Demo",
+                positions: (0..titles.len()).collect(),
+            },
+        ],
+        Vec::new(),
+    )
 }
 
-/// Test 4: Conference Presentation
-/// Time-based shows for different session lengths
-fn test_conference_presentation() -> Result<(), Box<dyn std::error::Error>> {
+fn test_conference_presentation() -> Result<(), Box<dyn StdError>> {
     println!("Test 4: Creating conference presentation with time-based shows...");
-
-    let mut pkg = Package::new()?;
-    {
-        let pres = pkg.presentation_mut()?;
-
-        // Create conference presentation slides
-        let conference_content = vec![
-            "Title & Speaker Intro",
-            "Problem Statement",
-            "Current Solutions & Limitations",
-            "Our Approach",
-            "Technical Architecture",
-            "Implementation Details",
-            "Code Example 1",
-            "Code Example 2",
-            "Performance Benchmarks",
-            "Comparison with Alternatives",
-            "Real-World Use Cases",
-            "Case Study: Company A",
-            "Case Study: Company B",
-            "Lessons Learned",
-            "Future Work",
-            "Open Source Release",
-            "Community Feedback",
-            "Q&A",
-            "Thank You & Contact Info",
-        ];
-
-        for title in conference_content.iter() {
-            let slide = pres.add_slide()?;
-            slide.set_title(title);
-            slide.add_text_box(
-                &format!("Conference content: {}", title),
-                914400,
-                1828800,
-                7315200,
-                3200000,
-            );
-        }
-
-        // Create time-based custom shows
-        pres.create_custom_show("Lightning Talk (5 min)", vec![256, 257, 259, 274]);
-        println!("  ✓ Lightning Talk: 4 slides (5 minutes)");
-
-        pres.create_custom_show(
-            "Short Session (15 min)",
-            vec![256, 257, 258, 259, 260, 264, 267, 274],
-        );
-        println!("  ✓ Short Session: 8 slides (15 minutes)");
-
-        pres.create_custom_show(
-            "Standard Talk (30 min)",
-            vec![
-                256, 257, 258, 259, 260, 261, 264, 265, 266, 267, 269, 271, 274,
-            ],
-        );
-        println!("  ✓ Standard Talk: 13 slides (30 minutes)");
-
-        pres.create_custom_show("Extended Session (45 min)", (256..=272).collect::<Vec<_>>());
-        println!("  ✓ Extended Session: 17 slides (45 minutes)");
-
-        pres.create_custom_show("Workshop (90 min)", (256..=274).collect::<Vec<_>>());
-        println!("  ✓ Workshop: 19 slides (90 minutes)");
-
-        println!(
-            "  ✓ Generated {} time-based shows",
-            pres.custom_shows().len()
-        );
-    }
-    pkg.save("customshow_conference.pptx")?;
-    println!("  ✓ Saved: customshow_conference.pptx\n");
-
-    Ok(())
+    let titles = [
+        "Title & Speaker Intro",
+        "Problem Statement",
+        "Current Solutions & Limitations",
+        "Our Approach",
+        "Technical Architecture",
+        "Implementation Details",
+        "Code Example 1",
+        "Code Example 2",
+        "Performance Benchmarks",
+        "Comparison with Alternatives",
+        "Real-World Use Cases",
+        "Case Study: Company A",
+        "Case Study: Company B",
+        "Lessons Learned",
+        "Future Work",
+        "Open Source Release",
+        "Community Feedback",
+        "Q&A",
+        "Thank You & Contact Info",
+    ];
+    let mut package = Package::new()?;
+    add_slides(
+        package.presentation_mut()?,
+        &titles,
+        "Conference content: ",
+        3_200_000,
+    )?;
+    publish_structure(
+        package,
+        "customshow_conference.pptx",
+        titles.len(),
+        vec![
+            ShowPlan {
+                name: "Lightning Talk (5 min)",
+                positions: vec![0, 1, 3, 18],
+            },
+            ShowPlan {
+                name: "Short Session (15 min)",
+                positions: vec![0, 1, 2, 3, 4, 8, 11, 18],
+            },
+            ShowPlan {
+                name: "Standard Talk (30 min)",
+                positions: vec![0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 13, 15, 18],
+            },
+            ShowPlan {
+                name: "Extended Session (45 min)",
+                positions: (0..=16).collect(),
+            },
+            ShowPlan {
+                name: "Workshop (90 min)",
+                positions: (0..titles.len()).collect(),
+            },
+        ],
+        Vec::new(),
+    )
 }

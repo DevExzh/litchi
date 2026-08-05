@@ -4,22 +4,22 @@
 //! and only when its checked Ref8U range matches. Targets remain inert.
 
 use super::codec::{invalid, parse_hlink_record, parse_tooltip};
-use super::model::{RECORD_TYPE, TOOLTIP_RECORD_TYPE, XlsHyperlink};
-use crate::error::{XlsError, XlsResult};
+use super::model::{Hyperlink, RECORD_TYPE, TOOLTIP_RECORD_TYPE};
+use crate::error::{Error, Result};
 
 #[derive(Debug, Default)]
 pub(crate) struct HyperlinkCollector {
-    hyperlinks: Vec<XlsHyperlink>,
+    hyperlinks: Vec<Hyperlink>,
     pending_tooltip_index: Option<usize>,
 }
 impl HyperlinkCollector {
     pub(crate) fn new() -> Self {
         Self::default()
     }
-    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
+    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> Result<()> {
         if record_type == TOOLTIP_RECORD_TYPE {
             let index = self.pending_tooltip_index.take().ok_or_else(|| {
-                XlsError::InvalidData("HLinkTooltip must immediately follow an HLink".to_string())
+                Error::InvalidData("HLinkTooltip must immediately follow an HLink".to_string())
             })?;
             let (range, tooltip) = parse_tooltip(data)?;
             if self.hyperlinks[index].range != range {
@@ -37,7 +37,7 @@ impl HyperlinkCollector {
         }
         Ok(())
     }
-    pub(crate) fn finish(self) -> Vec<XlsHyperlink> {
+    pub(crate) fn finish(self) -> Vec<Hyperlink> {
         self.hyperlinks
     }
 }

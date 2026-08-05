@@ -10,15 +10,15 @@
 //! workbook is opened, and the embedded payload is never activated. Public
 //! chart creation currently returns
 //! [`litchi_ograph::Error::UnsupportedAuthoring`] through
-//! [`PptWriteError::Graph`] before mutating the presentation; the complete
+//! [`WriteError::Graph`] before mutating the presentation; the complete
 //! Office-compatible BIFF chart grammar must land before emission is enabled.
 //!
 //! # Example
 //!
 //! ```rust,no_run
-//! use litchi_ppt::writer::{Chart, ChartKind, PptWriter};
+//! use litchi_ppt::writer::{Chart, ChartKind, Writer};
 //!
-//! let mut writer = PptWriter::new();
+//! let mut writer = Writer::new();
 //! let slide = writer.add_slide()?;
 //!
 //! let mut chart = Chart::new(ChartKind::Bar);
@@ -30,7 +30,7 @@
 //!     .expect_err("binary chart authoring is not enabled yet");
 //! assert!(matches!(
 //!     error,
-//!     litchi_ppt::writer::PptWriteError::Graph(
+//!     litchi_ppt::writer::WriteError::Graph(
 //!         litchi_ograph::Error::UnsupportedAuthoring { .. }
 //!     )
 //! ));
@@ -40,10 +40,8 @@
 use litchi_core::unit::emu_i32_to_ppt_master_i16_round;
 use zerocopy::IntoBytes;
 
-use super::core::PptWriteError;
-use super::escher::{
-    EscherBuilder, EscherSpData, PptError, ShapeFlags, header_version, record_type,
-};
+use super::core::WriteError;
+use super::escher::{Error, EscherBuilder, EscherSpData, ShapeFlags, header_version, record_type};
 use super::hyperlink::{HyperlinkCollection, record_type as hyperlink_record_type};
 use super::records::RecordBuilder;
 use crate::embedded::object::{
@@ -70,8 +68,8 @@ const MAX_STRING_UNITS: usize = 255;
 /// Matches the read-side inventory bound in [`crate::chart`].
 pub(crate) const MAX_CHART_OBJECTS: usize = 512;
 
-fn invalid(message: impl Into<String>) -> PptWriteError {
-    PptWriteError::InvalidData(message.into())
+fn invalid(message: impl Into<String>) -> WriteError {
+    WriteError::InvalidData(message.into())
 }
 
 /// Requested native-chart family.
@@ -139,7 +137,7 @@ impl Chart {
         &mut self,
         name: Option<impl Into<String>>,
         values: Vec<f64>,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         if values.is_empty() {
             return Err(invalid("chart series must contain at least one value"));
         }
@@ -159,7 +157,7 @@ impl Chart {
         Ok(())
     }
 
-    pub(super) fn validate(&self) -> Result<(), PptWriteError> {
+    pub(super) fn validate(&self) -> Result<(), WriteError> {
         if self.series.is_empty() {
             return Err(invalid("chart must contain at least one series"));
         }
@@ -181,7 +179,7 @@ impl Chart {
     }
 }
 
-fn check_string_units(value: &str, context: &str) -> Result<(), PptWriteError> {
+fn check_string_units(value: &str, context: &str) -> Result<(), WriteError> {
     if value.encode_utf16().count() > MAX_STRING_UNITS {
         return Err(invalid(format!(
             "{context} exceeds {MAX_STRING_UNITS} UTF-16 code units"
@@ -220,7 +218,7 @@ pub(crate) struct ChartPlan {
 
 impl ChartPlan {
     /// The `ExOleEmbedContainer` record declaring this chart object.
-    fn embed_container_bytes(&self) -> Result<Vec<u8>, PptWriteError> {
+    fn embed_container_bytes(&self) -> Result<Vec<u8>, WriteError> {
         Definition {
             kind: ContainerKind::Embedded(EmbedPreferences {
                 color_follow: ColorFollow::EntireScheme,
@@ -254,7 +252,7 @@ impl ChartPlan {
 pub(crate) fn build_ex_obj_list(
     hyperlinks: &HyperlinkCollection,
     plans: &[ChartPlan],
-) -> Result<Vec<u8>, PptWriteError> {
+) -> Result<Vec<u8>, WriteError> {
     if hyperlinks.is_empty() && plans.is_empty() {
         return Ok(Vec::new());
     }
@@ -275,7 +273,7 @@ pub(crate) fn build_ex_obj_list(
 }
 
 /// Build the uncompressed `ExOleObjStg` record persisting a chart workbook.
-pub(crate) fn chart_storage_record(workbook: &[u8]) -> Result<Vec<u8>, PptWriteError> {
+pub(crate) fn chart_storage_record(workbook: &[u8]) -> Result<Vec<u8>, WriteError> {
     Storage::uncompressed(StorageKind::OleObject, workbook.to_vec())
         .map_err(|error| invalid(format!("chart storage is invalid: {error}")))?
         .to_record_bytes()
@@ -305,7 +303,7 @@ impl ChartFrame {
         width: i32,
         height: i32,
         ex_obj_id: u32,
-    ) -> Result<Self, PptError> {
+    ) -> Result<Self, Error> {
         if ex_obj_id == 0 {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
@@ -342,7 +340,7 @@ impl ChartFrame {
 pub(crate) fn build_chart_sp_container(
     frame: &ChartFrame,
     shape_id: u32,
-) -> Result<Vec<u8>, PptError> {
+) -> Result<Vec<u8>, Error> {
     let mut container = EscherBuilder::new(header_version::CONTAINER, 0, record_type::SP_CONTAINER);
 
     let mut sp = EscherBuilder::new(header_version::SP, MSOSPT_PICTURE_FRAME, record_type::SP);
@@ -412,7 +410,7 @@ mod tests {
             persist_id: 7,
         }];
         let bytes = build_ex_obj_list(&hyperlinks, &plans).unwrap();
-        let (record, _) = crate::records::PptRecord::parse(&bytes, 0).unwrap();
+        let (record, _) = crate::records::Record::parse(&bytes, 0).unwrap();
         let collection = crate::embedded::object::Collection::parse(&record)
             .unwrap()
             .expect("chart object list");

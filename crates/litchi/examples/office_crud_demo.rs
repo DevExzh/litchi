@@ -8,11 +8,10 @@
 //! cargo run --example office_crud_demo
 //! ```
 
-use litchi::ooxml::Props;
+use litchi::ooxml::common::Props;
 use litchi::ooxml::docx::Package as DocxPackage;
 use litchi::ooxml::pptx::Package as PptxPackage;
-use litchi::ooxml::xlsx::Workbook;
-use litchi::sheet::WorkbookTrait;
+use litchi::ooxml::xlsx::{Formula, Workbook};
 
 type ExampleResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
@@ -133,53 +132,44 @@ fn demo_xlsx_operations() -> ExampleResult<()> {
 
     // CREATE: Create a new workbook
     println!("Creating new Excel workbook...");
-    let mut wb = Workbook::create()?;
+    let wb = Workbook::create()?;
+    let mut edit = wb.edit()?;
 
-    // Add data to first worksheet
+    // XLSX authoring is an atomic semantic transaction over an immutable
+    // workbook snapshot.
     {
-        let ws = wb.worksheet_mut(0)?;
-        ws.set_cell_value(1, 1, "Employee");
-        ws.set_cell_value(1, 2, "Department");
-        ws.set_cell_value(1, 3, "Salary");
-
-        ws.set_cell_value(2, 1, "Alice Johnson");
-        ws.set_cell_value(2, 2, "Engineering");
-        ws.set_cell_value(2, 3, 85000);
-
-        ws.set_cell_value(3, 1, "Bob Smith");
-        ws.set_cell_value(3, 2, "Marketing");
-        ws.set_cell_value(3, 3, 72000);
-
-        ws.set_cell_value(4, 1, "Carol Williams");
-        ws.set_cell_value(4, 2, "Sales");
-        ws.set_cell_value(4, 3, 68000);
-
-        ws.set_cell_value(5, 1, "David Brown");
-        ws.set_cell_value(5, 2, "Engineering");
-        ws.set_cell_value(5, 3, 92000);
-
-        // Set freeze panes
-        ws.freeze_panes(2, 1);
+        let mut sheet = edit
+            .sheet("Sheet1")?
+            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "Sheet1"))?;
+        sheet
+            .set("A1", "Employee")?
+            .set("B1", "Department")?
+            .set("C1", "Salary")?
+            .set("A2", "Alice Johnson")?
+            .set("B2", "Engineering")?
+            .set("C2", 85000_i32)?
+            .set("A3", "Bob Smith")?
+            .set("B3", "Marketing")?
+            .set("C3", 72000_i32)?
+            .set("A4", "Carol Williams")?
+            .set("B4", "Sales")?
+            .set("C4", 68000_i32)?
+            .set("A5", "David Brown")?
+            .set("B5", "Engineering")?
+            .set("C5", 92000_i32)?;
     }
 
-    // Add a second worksheet for summary
+    // Add a second worksheet for summary.
     {
-        let summary = wb.add_worksheet("Summary");
-        summary.set_cell_value(1, 1, "Department");
-        summary.set_cell_value(1, 2, "Average Salary");
-        summary.set_cell_value(2, 1, "Engineering");
-        summary.set_cell_formula(2, 2, "=AVERAGE(Sheet1!C2:C5)");
+        let mut summary = edit.add("Summary")?;
+        summary
+            .set("A1", "Department")?
+            .set("B1", "Average Salary")?
+            .set("A2", "Engineering")?
+            .set("B2", Formula::new("AVERAGE(Sheet1!C2:C5)")?)?;
     }
 
-    // Define named range
-    wb.define_name("EmployeeData", "Sheet1!$A$1:$C$5");
-
-    // Set metadata
-    let _ = wb.put_props(
-        Props::new()
-            .title("Employee Database")
-            .creator("Litchi Demo"),
-    );
+    let wb = edit.commit()?.into_workbook();
 
     // Save
     wb.save("demo_employees.xlsx")?;
@@ -189,14 +179,20 @@ fn demo_xlsx_operations() -> ExampleResult<()> {
     println!("Reading Excel workbook...");
     let wb = Workbook::open("demo_employees.xlsx")?;
 
-    println!("  Worksheets: {}", wb.worksheet_count());
-    for name in wb.worksheet_names() {
-        println!("    - {}", name);
+    println!("  Worksheets: {}", wb.len());
+    for sheet in wb.sheets() {
+        println!("    - {}", sheet.name());
     }
 
     // Read data from first worksheet
-    let ws = wb.worksheet_by_index(0)?;
-    println!("  Sheet '{}' dimensions: {:?}", ws.name(), ws.dimensions());
+    let ws = wb
+        .sheet(0)?
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "first worksheet"))?;
+    println!(
+        "  Sheet '{}' stored extent: {:?}",
+        ws.name(),
+        ws.stored_extent()?
+    );
 
     // Note: Search functionality requires the concrete Worksheet type
     // For now, we can iterate cells to search
@@ -204,19 +200,16 @@ fn demo_xlsx_operations() -> ExampleResult<()> {
 
     // UPDATE: Modify existing workbook
     println!("Updating Excel workbook...");
-    let mut wb = Workbook::open("demo_employees.xlsx")?;
-
-    // Add new employee
-    {
-        let ws = wb.worksheet_mut(0)?;
-        ws.set_cell_value(6, 1, "Eve Davis");
-        ws.set_cell_value(6, 2, "HR");
-        ws.set_cell_value(6, 3, 65000);
-    }
-
-    if let Some(props) = wb.props_mut() {
-        props.last_modified_by = Some("Litchi Update".to_string());
-    }
+    let wb = Workbook::open("demo_employees.xlsx")?;
+    let mut edit = wb.edit()?;
+    let mut sheet = edit
+        .sheet("Sheet1")?
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "Sheet1"))?;
+    sheet
+        .set("A6", "Eve Davis")?
+        .set("B6", "HR")?
+        .set("C6", 65000_i32)?;
+    let wb = edit.commit()?.into_workbook();
     wb.save("demo_employees_updated.xlsx")?;
     println!("✓ Updated: demo_employees_updated.xlsx");
 
@@ -272,13 +265,6 @@ fn demo_pptx_operations() -> ExampleResult<()> {
         914400,
     );
 
-    // Set metadata
-    let _ = pkg.put_props(
-        Props::new()
-            .title("Company Overview Q4 2024")
-            .creator("Litchi Demo"),
-    );
-
     // Save
     pkg.save("demo_presentation.pptx")?;
     println!("✓ Created: demo_presentation.pptx");
@@ -315,9 +301,6 @@ fn demo_pptx_operations() -> ExampleResult<()> {
     );
     slide4.add_text_box("Questions?", 914400, 3657600, 7315200, 914400);
 
-    if let Some(props) = pkg.props_mut() {
-        props.last_modified_by = Some("Litchi Update".to_string());
-    }
     pkg.save("demo_presentation_updated.pptx")?;
     println!("✓ Updated: demo_presentation_updated.pptx");
 

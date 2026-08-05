@@ -1667,8 +1667,6 @@ impl DocWriter {
         mut para_fmt: ParagraphFormatting,
     ) -> Result<(), DocWriteError> {
         // Stage: Implementing hyperlinks using field codes
-        // TODO(stage:headers_footers): Implement header/footer subdocuments via ccpHdd and PLCFs
-        // TODO(stage:notes): Implement footnotes/endnotes PLCFs (plcffndRef, plcfendRef, etc.)
 
         // Escape quotes inside URL by doubling them per Word field syntax
         let escaped = url.replace('"', "\"\"");

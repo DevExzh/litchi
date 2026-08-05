@@ -5,7 +5,7 @@
 use super::types::{
     AdvanceMode, TransitionDirection, TransitionInfo, TransitionSpeed, TransitionType,
 };
-use crate::consts::PptRecordType;
+use crate::consts::RecordType;
 
 /// Write SSSlideInfoAtom record with transition information.
 pub fn write_transition(transition: &TransitionInfo) -> Vec<u8> {
@@ -48,7 +48,7 @@ pub fn write_transition(transition: &TransitionInfo) -> Vec<u8> {
     // unused (3 bytes)
     data.extend(&[0u8, 0u8, 0u8]);
 
-    let header = create_record_header(PptRecordType::SSSlideInfoAtom, 0x00, 0, data.len() as u32);
+    let header = create_record_header(RecordType::SSSlideInfoAtom, 0x00, 0, data.len() as u32);
 
     let mut result = Vec::new();
     result.extend(header);
@@ -209,7 +209,7 @@ fn encode_transition_flags(transition: &TransitionInfo) -> u16 {
 
 /// Create a PPT record header.
 fn create_record_header(
-    record_type: PptRecordType,
+    record_type: RecordType,
     version: u16,
     instance: u16,
     data_length: u32,

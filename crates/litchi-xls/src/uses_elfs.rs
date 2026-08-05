@@ -8,7 +8,7 @@
 //!
 //! - MS-XLS 2.4.337 (UsesELFs), 2.5.14 (Boolean)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `UsesELFs` record (MS-XLS 2.4.337).
 pub(crate) const USES_ELFS_RECORD_TYPE: u16 = 0x0160;
@@ -19,16 +19,16 @@ const PAYLOAD_LEN: usize = 2;
 /// Typed `UsesELFs` record content (MS-XLS 2.4.337): whether the file
 /// supports natural language formulas.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsUsesElfs {
+pub struct UsesElfs {
     /// Whether the file supports natural language formulas (`useselfs`).
     uses_elfs: bool,
 }
 
-impl XlsUsesElfs {
+impl UsesElfs {
     /// Parse a `UsesELFs` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: PAYLOAD_LEN,
                 found: data.len(),
             });
@@ -38,7 +38,7 @@ impl XlsUsesElfs {
         match value {
             0x0000 => Ok(Self { uses_elfs: false }),
             0x0001 => Ok(Self { uses_elfs: true }),
-            other => Err(XlsError::InvalidRecord {
+            other => Err(Error::InvalidRecord {
                 record_type: USES_ELFS_RECORD_TYPE,
                 message: format!("UsesELFs useselfs {other:#06X} is not a Boolean"),
             }),
@@ -63,7 +63,7 @@ mod tests {
     #[test]
     fn uses_elfs_round_trip() {
         for (payload, expected) in [([0x00, 0x00], false), ([0x01, 0x00], true)] {
-            let record = XlsUsesElfs::parse(&payload).unwrap();
+            let record = UsesElfs::parse(&payload).unwrap();
             assert_eq!(record.uses_elfs(), expected);
             assert_eq!(record.to_payload(), payload);
         }
@@ -71,10 +71,10 @@ mod tests {
 
     #[test]
     fn uses_elfs_rejects_bad_length_and_non_boolean() {
-        assert!(XlsUsesElfs::parse(&[0x01]).is_err());
-        assert!(XlsUsesElfs::parse(&[0x00, 0x00, 0x00]).is_err());
+        assert!(UsesElfs::parse(&[0x01]).is_err());
+        assert!(UsesElfs::parse(&[0x00, 0x00, 0x00]).is_err());
         // Boolean (MS-XLS 2.5.14) allows only 0x0000 and 0x0001.
-        assert!(XlsUsesElfs::parse(&[0x02, 0x00]).is_err());
-        assert!(XlsUsesElfs::parse(&[0x00, 0x01]).is_err());
+        assert!(UsesElfs::parse(&[0x02, 0x00]).is_err());
+        assert!(UsesElfs::parse(&[0x00, 0x01]).is_err());
     }
 }

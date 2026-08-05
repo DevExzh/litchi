@@ -1,8 +1,8 @@
 //! Bounded BIFF8 codecs for chart layout future records.
 
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
-use super::model::{LayoutModes, XlsCrtLayout12, XlsCrtLayout12A, XlsCrtLayout12Mode};
+use super::model::{CrtLayout12, CrtLayout12A, CrtLayout12Mode, LayoutModes};
 
 /// Record type of the `CrtLayout12` record (MS-XLS 2.4.66); also the required
 /// `frtHeader.rt` value.
@@ -23,8 +23,8 @@ const FRT_FLAGS_FORBIDDEN: u16 = 0x0003;
 const CRT_LAYOUT_12_LEN: usize = 60;
 /// Byte length of a `CrtLayout12A` record payload.
 const CRT_LAYOUT_12_A_LEN: usize = 68;
-fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(record_type: u16, message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type,
         message: message.into(),
     }
@@ -52,7 +52,7 @@ impl<'a> LayoutReader<'a> {
         }
     }
 
-    fn read_bytes<const N: usize>(&mut self) -> XlsResult<[u8; N]> {
+    fn read_bytes<const N: usize>(&mut self) -> Result<[u8; N]> {
         let end = self.offset.checked_add(N).ok_or_else(|| {
             invalid(
                 self.record_type,
@@ -62,11 +62,11 @@ impl<'a> LayoutReader<'a> {
         let bytes = self
             .data
             .get(self.offset..end)
-            .ok_or(XlsError::InvalidLength {
+            .ok_or(Error::InvalidLength {
                 expected: end,
                 found: self.data.len(),
             })?;
-        let value: [u8; N] = bytes.try_into().map_err(|_| XlsError::InvalidLength {
+        let value: [u8; N] = bytes.try_into().map_err(|_| Error::InvalidLength {
             expected: N,
             found: bytes.len(),
         })?;
@@ -74,25 +74,25 @@ impl<'a> LayoutReader<'a> {
         Ok(value)
     }
 
-    fn read_u16(&mut self) -> XlsResult<u16> {
+    fn read_u16(&mut self) -> Result<u16> {
         Ok(u16::from_le_bytes(self.read_bytes()?))
     }
 
-    fn read_i16(&mut self) -> XlsResult<i16> {
+    fn read_i16(&mut self) -> Result<i16> {
         Ok(i16::from_le_bytes(self.read_bytes()?))
     }
 
-    fn read_u32(&mut self) -> XlsResult<u32> {
+    fn read_u32(&mut self) -> Result<u32> {
         Ok(u32::from_le_bytes(self.read_bytes()?))
     }
 
-    fn read_f64(&mut self) -> XlsResult<f64> {
+    fn read_f64(&mut self) -> Result<f64> {
         Ok(f64::from_le_bytes(self.read_bytes()?))
     }
 }
 
-impl XlsCrtLayout12Mode {
-    fn parse(value: u16, record_type: u16) -> XlsResult<Self> {
+impl CrtLayout12Mode {
+    fn parse(value: u16, record_type: u16) -> Result<Self> {
         match value {
             0x0000 => Ok(Self::Auto),
             0x0001 => Ok(Self::Factor),
@@ -106,9 +106,9 @@ impl XlsCrtLayout12Mode {
 }
 
 impl LayoutModes {
-    pub(super) fn parse(reader: &mut LayoutReader<'_>) -> XlsResult<Self> {
+    pub(super) fn parse(reader: &mut LayoutReader<'_>) -> Result<Self> {
         let mode = |reader: &mut LayoutReader<'_>| {
-            XlsCrtLayout12Mode::parse(reader.read_u16()?, reader.record_type)
+            CrtLayout12Mode::parse(reader.read_u16()?, reader.record_type)
         };
         Ok(Self {
             x_mode: mode(reader)?,
@@ -134,11 +134,7 @@ impl LayoutModes {
 
 /// Validate an `FrtHeader` (MS-XLS 2.5.135): the `rt` field and the
 /// `fFrtRef`/`fFrtAlert` bits that MUST be zero.
-fn validate_frt_header(
-    reader: &mut LayoutReader<'_>,
-    record_type: u16,
-    name: &str,
-) -> XlsResult<u16> {
+fn validate_frt_header(reader: &mut LayoutReader<'_>, record_type: u16, name: &str) -> Result<u16> {
     if reader.read_u16()? != record_type {
         return Err(invalid(
             record_type,
@@ -155,11 +151,11 @@ fn validate_frt_header(
     Ok(flags)
 }
 
-impl XlsCrtLayout12 {
+impl CrtLayout12 {
     /// Parse a `CrtLayout12` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != CRT_LAYOUT_12_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: CRT_LAYOUT_12_LEN,
                 found: data.len(),
             });
@@ -190,11 +186,11 @@ impl XlsCrtLayout12 {
     }
 }
 
-impl XlsCrtLayout12A {
+impl CrtLayout12A {
     /// Parse a `CrtLayout12A` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != CRT_LAYOUT_12_A_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: CRT_LAYOUT_12_A_LEN,
                 found: data.len(),
             });

@@ -8,7 +8,7 @@ use super::codec::{
     parse_segmented_topic, read_u16, read_u32, write_chars, write_segmented_topic,
 };
 use super::model::{Cell, Record, Value};
-use crate::error::{XlsError, XlsResult};
+use crate::error::{Error, Result};
 
 impl Record {
     /// Parse one logical `RealTimeData` payload: the record body with any
@@ -17,14 +17,14 @@ impl Record {
     /// `previous_topic` is the reconstructed [`Record::topic`] of
     /// the preceding `RealTimeData` record in the globals substream, needed
     /// to re-apply prefix compression; pass `None` for the first record.
-    pub fn parse(data: &[u8], previous_topic: Option<&str>) -> XlsResult<Self> {
+    pub fn parse(data: &[u8], previous_topic: Option<&str>) -> Result<Self> {
         if data.len() > MAX_LOGICAL_PAYLOAD_BYTES {
             return Err(invalid(format!(
                 "RealTimeData payload exceeds {MAX_LOGICAL_PAYLOAD_BYTES} bytes"
             )));
         }
         if data.len() < FRT_HEADER_LEN + 4 {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: FRT_HEADER_LEN + 4,
                 found: data.len(),
             });
@@ -38,7 +38,7 @@ impl Record {
 
         // stTopic: XLUnicodeStringSegmentedRTD (MS-XLS 2.5.298).
         let (topic_segments, used) = parse_segmented_topic(
-            data.get(offset..).ok_or(XlsError::InvalidLength {
+            data.get(offset..).ok_or(Error::InvalidLength {
                 expected: offset,
                 found: data.len(),
             })?,
@@ -49,7 +49,7 @@ impl Record {
             .ok_or_else(|| invalid("RealTimeData topic offset overflows usize"))?;
 
         // rtdOper: RTDOper (MS-XLS 2.5.224).
-        let (value, used) = parse_rtd_oper(data.get(offset..).ok_or(XlsError::InvalidLength {
+        let (value, used) = parse_rtd_oper(data.get(offset..).ok_or(Error::InvalidLength {
             expected: offset,
             found: data.len(),
         })?)?;
@@ -58,7 +58,7 @@ impl Record {
             .ok_or_else(|| invalid("RealTimeData value offset overflows usize"))?;
 
         // rgRTDE: the rest of the payload in 6-byte RTDEItem entries.
-        let remaining = data.get(offset..).ok_or(XlsError::InvalidLength {
+        let remaining = data.get(offset..).ok_or(Error::InvalidLength {
             expected: offset,
             found: data.len(),
         })?;
@@ -68,7 +68,7 @@ impl Record {
         let mut cells = Vec::new();
         cells
             .try_reserve_exact(remaining.len() / RTD_E_ITEM_LEN)
-            .map_err(|_| XlsError::Allocation("retaining RTD subscriber cells"))?;
+            .map_err(|_| Error::Allocation("retaining RTD subscriber cells"))?;
         for chunk in remaining.chunks_exact(RTD_E_ITEM_LEN) {
             let column = u8::try_from(read_u16(chunk, 2)?)
                 .map_err(|_| invalid("RTD subscriber column exceeds the BIFF8 grid"))?;
@@ -99,7 +99,7 @@ impl Record {
             let mut topic = String::new();
             topic
                 .try_reserve(capacity)
-                .map_err(|_| XlsError::Allocation("reconstructing RealTimeData topic"))?;
+                .map_err(|_| Error::Allocation("reconstructing RealTimeData topic"))?;
             topic.extend(previous.chars().take(prefix_len));
             topic.push_str(&stored);
             topic
@@ -121,7 +121,7 @@ impl Record {
     /// The stored topic sub-strings are written as-is, so a value parsed
     /// from a workbook round-trips exactly; `topic` is re-derived from
     /// `common_prefix_len` and the previous record on the next parse.
-    pub(crate) fn to_payload(&self) -> XlsResult<Vec<u8>> {
+    pub(crate) fn to_payload(&self) -> Result<Vec<u8>> {
         let common_prefix_len = usize::try_from(self.common_prefix_len)
             .map_err(|_| invalid("RTD common prefix does not fit in usize"))?;
         if common_prefix_len > MAX_STRING_CHARACTERS {

@@ -1,9 +1,9 @@
 //! MS-PPT sound-collection record codec and validation.
 
 use super::model::{BuiltinId, Collection, Sound};
-use crate::consts::PptRecordType;
-use crate::package::{PptError, Result};
-use crate::records::PptRecord;
+use crate::consts::RecordType;
+use crate::package::{Error, Result};
+use crate::records::Record;
 use std::collections::HashSet;
 
 const MAX_SOUNDS: usize = 4_096;
@@ -14,14 +14,14 @@ const MAX_ID_DIGITS: usize = 10;
 
 impl<'a> Collection<'a> {
     /// Parse one strict `SoundCollectionContainer` without copying sound data.
-    pub fn parse(record: &'a PptRecord) -> Result<Self> {
+    pub fn parse(record: &'a Record) -> Result<Self> {
         require_header(
             record.version,
             record.instance,
             record.record_type_raw,
             0x0f,
             5,
-            PptRecordType::SoundCollection,
+            RecordType::SoundCollection,
             "SoundCollectionContainer",
         )?;
         if usize::try_from(record.data_length).ok() != Some(record.data.len()) {
@@ -35,7 +35,7 @@ impl<'a> Collection<'a> {
             atom.record_type,
             0,
             0,
-            PptRecordType::SoundCollectionAtom,
+            RecordType::SoundCollectionAtom,
             "SoundCollectionAtom",
         )?;
         if atom.data.len() != 4 {
@@ -44,7 +44,7 @@ impl<'a> Collection<'a> {
         let sound_id_seed = u32::from_le_bytes(
             atom.data
                 .try_into()
-                .map_err(|_| PptError::Corrupted("SoundCollectionAtom is truncated".into()))?,
+                .map_err(|_| Error::Corrupted("SoundCollectionAtom is truncated".into()))?,
         );
         if sound_id_seed == 0 {
             return corrupted("SoundCollectionAtom soundIdSeed must be positive");
@@ -64,7 +64,7 @@ impl<'a> Collection<'a> {
                 sound.record_type,
                 0x0f,
                 0,
-                PptRecordType::Sound,
+                RecordType::Sound,
                 "SoundContainer",
             )?;
             let parsed = parse_sound(sound.data)?;
@@ -78,7 +78,7 @@ impl<'a> Collection<'a> {
                 return corrupted(format!("duplicate embedded sound ID {}", parsed.id));
             }
             aggregate = aggregate.checked_add(parsed.data.len()).ok_or_else(|| {
-                PptError::Corrupted("embedded sound aggregate size overflow".to_string())
+                Error::Corrupted("embedded sound aggregate size overflow".to_string())
             })?;
             if aggregate > MAX_AGGREGATE_SOUND_BYTES {
                 return corrupted("embedded sounds exceed 256 MiB aggregate");
@@ -103,7 +103,7 @@ struct RecordRef<'a> {
 fn next_record<'a>(data: &'a [u8], offset: &mut usize, context: &str) -> Result<RecordRef<'a>> {
     let header_end = offset
         .checked_add(8)
-        .ok_or_else(|| PptError::Corrupted(format!("{context} header offset overflow")))?;
+        .ok_or_else(|| Error::Corrupted(format!("{context} header offset overflow")))?;
     if header_end > data.len() {
         return corrupted(format!("truncated record header in {context}"));
     }
@@ -116,10 +116,10 @@ fn next_record<'a>(data: &'a [u8], offset: &mut usize, context: &str) -> Result<
         data[*offset + 7],
     ]);
     let length = usize::try_from(length)
-        .map_err(|_| PptError::Corrupted(format!("{context} record size overflow")))?;
+        .map_err(|_| Error::Corrupted(format!("{context} record size overflow")))?;
     let end = header_end
         .checked_add(length)
-        .ok_or_else(|| PptError::Corrupted(format!("{context} record size overflow")))?;
+        .ok_or_else(|| Error::Corrupted(format!("{context} record size overflow")))?;
     if end > data.len() {
         return corrupted(format!("record extends beyond {context}"));
     }
@@ -143,7 +143,7 @@ fn parse_sound(data: &[u8]) -> Result<Sound<'_>> {
         false,
     )?;
     let mut child = next_record(data, &mut offset, "SoundContainer")?;
-    let extension = if child.record_type == PptRecordType::CString as u16 && child.instance == 1 {
+    let extension = if child.record_type == RecordType::CString as u16 && child.instance == 1 {
         let value = parse_cstring(child, 1, "SoundExtensionAtom", 4, false)?;
         if value.encode_utf16().count() != 4 {
             return corrupted("SoundExtensionAtom must contain exactly four UTF-16 code units");
@@ -161,19 +161,19 @@ fn parse_sound(data: &[u8]) -> Result<Sound<'_>> {
     }
     let id = id_text
         .parse::<u32>()
-        .map_err(|_| PptError::Corrupted("SoundIdAtom is outside the u32 range".to_string()))?;
+        .map_err(|_| Error::Corrupted("SoundIdAtom is outside the u32 range".to_string()))?;
     if id == 0 {
         return corrupted("SoundIdAtom must be positive");
     }
 
     child = next_record(data, &mut offset, "SoundContainer")?;
-    let builtin_id = if child.record_type == PptRecordType::CString as u16 && child.instance == 3 {
+    let builtin_id = if child.record_type == RecordType::CString as u16 && child.instance == 3 {
         let value = parse_cstring(child, 3, "SoundBuiltinIdAtom", 3, false)?;
         if value.len() != 3 || !value.bytes().all(|byte| byte.is_ascii_digit()) {
             return corrupted("SoundBuiltinIdAtom must be a canonical three-digit integer");
         }
         let value = value.parse::<u16>().map_err(|_| {
-            PptError::Corrupted("SoundBuiltinIdAtom is outside the u16 range".to_string())
+            Error::Corrupted("SoundBuiltinIdAtom is outside the u16 range".to_string())
         })?;
         let value = parse_builtin_id(value)?;
         child = next_record(data, &mut offset, "SoundContainer")?;
@@ -187,7 +187,7 @@ fn parse_sound(data: &[u8]) -> Result<Sound<'_>> {
         child.record_type,
         0,
         0,
-        PptRecordType::SoundData,
+        RecordType::SoundData,
         "SoundDataBlob",
     )?;
     if child.data.len() > MAX_SOUND_BYTES {
@@ -251,7 +251,7 @@ fn parse_cstring(
         record.record_type,
         0,
         instance,
-        PptRecordType::CString,
+        RecordType::CString,
         context,
     )?;
     if !record.data.len().is_multiple_of(2) {
@@ -267,7 +267,7 @@ fn parse_cstring(
         .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
         .collect::<Vec<_>>();
     let value = String::from_utf16(&values)
-        .map_err(|_| PptError::Corrupted(format!("{context} contains invalid UTF-16")))?;
+        .map_err(|_| Error::Corrupted(format!("{context} contains invalid UTF-16")))?;
     if !allow_empty && value.is_empty() {
         return corrupted(format!("{context} cannot be empty"));
     }
@@ -293,7 +293,7 @@ fn require_header(
     record_type: u16,
     expected_version: u16,
     expected_instance: u16,
-    expected_type: PptRecordType,
+    expected_type: RecordType,
     context: &str,
 ) -> Result<()> {
     if version != expected_version
@@ -306,5 +306,5 @@ fn require_header(
 }
 
 fn corrupted<T>(message: impl Into<String>) -> Result<T> {
-    Err(PptError::Corrupted(message.into()))
+    Err(Error::Corrupted(message.into()))
 }

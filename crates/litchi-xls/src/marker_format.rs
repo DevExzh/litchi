@@ -12,7 +12,7 @@
 //!
 //! - MS-XLS 2.4.160 (MarkerFormat), 2.5.162 (IcvChart), 2.5.177 (LongRGB)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `MarkerFormat` record (MS-XLS 2.4.160).
 pub(crate) const MARKER_FORMAT_RECORD_TYPE: u16 = 0x1009;
@@ -36,15 +36,15 @@ const MIN_ICV_EXTENDED: u16 = 0x004D;
 /// Maximum `icv` value in the extended chart color range (MS-XLS 2.5.162).
 const MAX_ICV_EXTENDED: u16 = 0x004F;
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: MARKER_FORMAT_RECORD_TYPE,
         message: message.into(),
     }
 }
 
 /// Validate an `IcvChart` chart color index (MS-XLS 2.5.162).
-fn parse_icv(value: u16, field: &str) -> XlsResult<u16> {
+fn parse_icv(value: u16, field: &str) -> Result<u16> {
     if value <= MAX_ICV_PRIMARY || (MIN_ICV_EXTENDED..=MAX_ICV_EXTENDED).contains(&value) {
         Ok(value)
     } else {
@@ -58,7 +58,7 @@ fn parse_icv(value: u16, field: &str) -> XlsResult<u16> {
 /// and MUST be ignored) is preserved verbatim so the record round-trips
 /// unchanged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsChartRgb {
+pub struct ChartRgb {
     /// Relative intensity of red.
     pub red: u8,
     /// Relative intensity of green.
@@ -69,7 +69,7 @@ pub struct XlsChartRgb {
     pub reserved: u8,
 }
 
-impl XlsChartRgb {
+impl ChartRgb {
     fn parse(data: &[u8]) -> Self {
         Self {
             red: data[0],
@@ -87,7 +87,7 @@ impl XlsChartRgb {
 /// The `imk` data marker type (MS-XLS 2.4.160).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
-pub enum XlsDataMarkerKind {
+pub enum DataMarkerKind {
     /// 0x0000: no marker.
     None = 0x0000,
     /// 0x0001: square markers.
@@ -110,8 +110,8 @@ pub enum XlsDataMarkerKind {
     SquarePlus = 0x0009,
 }
 
-impl XlsDataMarkerKind {
-    fn parse(value: u16) -> XlsResult<Self> {
+impl DataMarkerKind {
+    fn parse(value: u16) -> Result<Self> {
         match value {
             0x0000 => Ok(Self::None),
             0x0001 => Ok(Self::Square),
@@ -136,13 +136,13 @@ impl XlsDataMarkerKind {
 /// The 13 reserved flags bits (`reserved1`/`reserved2`, MUST be ignored) are
 /// preserved verbatim so the record round-trips unchanged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsMarkerFormat {
+pub struct MarkerFormat {
     /// Border color of the data marker (`rgbFore`).
-    foreground: XlsChartRgb,
+    foreground: ChartRgb,
     /// Interior color of the data marker (`rgbBack`).
-    background: XlsChartRgb,
+    background: ChartRgb,
     /// The data marker type (`imk`).
-    kind: XlsDataMarkerKind,
+    kind: DataMarkerKind,
     /// Raw flags word: `fAuto`, `fNotShowInt`, `fNotShowBrd`, and the 13
     /// reserved bits, preserved verbatim.
     flags: u16,
@@ -154,11 +154,11 @@ pub struct XlsMarkerFormat {
     size_twips: u32,
 }
 
-impl XlsMarkerFormat {
+impl MarkerFormat {
     /// Parse a `MarkerFormat` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: PAYLOAD_LEN,
                 found: data.len(),
             });
@@ -170,9 +170,9 @@ impl XlsMarkerFormat {
             )));
         }
         Ok(Self {
-            foreground: XlsChartRgb::parse(&data[0..4]),
-            background: XlsChartRgb::parse(&data[4..8]),
-            kind: XlsDataMarkerKind::parse(u16::from_le_bytes([data[8], data[9]]))?,
+            foreground: ChartRgb::parse(&data[0..4]),
+            background: ChartRgb::parse(&data[4..8]),
+            kind: DataMarkerKind::parse(u16::from_le_bytes([data[8], data[9]]))?,
             flags: u16::from_le_bytes([data[10], data[11]]),
             icv_foreground: parse_icv(u16::from_le_bytes([data[12], data[13]]), "icvFore")?,
             icv_background: parse_icv(u16::from_le_bytes([data[14], data[15]]), "icvBack")?,
@@ -194,17 +194,17 @@ impl XlsMarkerFormat {
     }
 
     /// Border color of the data marker (`rgbFore`).
-    pub fn foreground(&self) -> XlsChartRgb {
+    pub fn foreground(&self) -> ChartRgb {
         self.foreground
     }
 
     /// Interior color of the data marker (`rgbBack`).
-    pub fn background(&self) -> XlsChartRgb {
+    pub fn background(&self) -> ChartRgb {
         self.background
     }
 
     /// The data marker type (`imk`).
-    pub fn kind(&self) -> XlsDataMarkerKind {
+    pub fn kind(&self) -> DataMarkerKind {
         self.kind
     }
 
@@ -263,19 +263,19 @@ mod tests {
     #[test]
     fn round_trip_all_marker_kinds() {
         for (value, expected) in [
-            (0x0000, XlsDataMarkerKind::None),
-            (0x0001, XlsDataMarkerKind::Square),
-            (0x0002, XlsDataMarkerKind::Diamond),
-            (0x0003, XlsDataMarkerKind::Triangle),
-            (0x0004, XlsDataMarkerKind::SquareX),
-            (0x0005, XlsDataMarkerKind::SquareAsterisk),
-            (0x0006, XlsDataMarkerKind::ShortBar),
-            (0x0007, XlsDataMarkerKind::LongBar),
-            (0x0008, XlsDataMarkerKind::Circle),
-            (0x0009, XlsDataMarkerKind::SquarePlus),
+            (0x0000, DataMarkerKind::None),
+            (0x0001, DataMarkerKind::Square),
+            (0x0002, DataMarkerKind::Diamond),
+            (0x0003, DataMarkerKind::Triangle),
+            (0x0004, DataMarkerKind::SquareX),
+            (0x0005, DataMarkerKind::SquareAsterisk),
+            (0x0006, DataMarkerKind::ShortBar),
+            (0x0007, DataMarkerKind::LongBar),
+            (0x0008, DataMarkerKind::Circle),
+            (0x0009, DataMarkerKind::SquarePlus),
         ] {
             let bytes = record(value, 0x0031, 0x004D, 0x0041, 100);
-            let parsed = XlsMarkerFormat::parse(&bytes).unwrap();
+            let parsed = MarkerFormat::parse(&bytes).unwrap();
             assert_eq!(parsed.kind(), expected);
             assert!(parsed.is_auto());
             assert!(parsed.hides_interior());
@@ -296,7 +296,7 @@ mod tests {
         let mut bytes = record(0x0008, 0xFFCE, 0x0000, 0x004F, 40);
         bytes[3] = 0xAA;
         bytes[7] = 0xBB;
-        let parsed = XlsMarkerFormat::parse(&bytes).unwrap();
+        let parsed = MarkerFormat::parse(&bytes).unwrap();
         assert_eq!(parsed.flags(), 0xFFCE);
         assert!(!parsed.is_auto());
         assert_eq!(parsed.size_twips(), 40);
@@ -307,16 +307,16 @@ mod tests {
     fn rejects_malformed_records() {
         let bytes = record(0x0001, 0x0001, 0x0000, 0x0000, 100);
         // Truncated and overlong payloads.
-        assert!(XlsMarkerFormat::parse(&bytes[..19]).is_err());
-        assert!(XlsMarkerFormat::parse(&[bytes.as_slice(), &[0]].concat()).is_err());
+        assert!(MarkerFormat::parse(&bytes[..19]).is_err());
+        assert!(MarkerFormat::parse(&[bytes.as_slice(), &[0]].concat()).is_err());
         // Undefined imk value.
-        assert!(XlsMarkerFormat::parse(&record(0x000A, 0, 0, 0, 100)).is_err());
+        assert!(MarkerFormat::parse(&record(0x000A, 0, 0, 0, 100)).is_err());
         // icv values outside the IcvChart ranges.
-        assert!(XlsMarkerFormat::parse(&record(0x0001, 0, 0x0042, 0, 100)).is_err());
-        assert!(XlsMarkerFormat::parse(&record(0x0001, 0, 0, 0x0050, 100)).is_err());
+        assert!(MarkerFormat::parse(&record(0x0001, 0, 0x0042, 0, 100)).is_err());
+        assert!(MarkerFormat::parse(&record(0x0001, 0, 0, 0x0050, 100)).is_err());
         // miSize outside 40..=1440 twips.
-        assert!(XlsMarkerFormat::parse(&record(0x0001, 0, 0, 0, 39)).is_err());
-        assert!(XlsMarkerFormat::parse(&record(0x0001, 0, 0, 0, 1441)).is_err());
-        assert!(XlsMarkerFormat::parse(&record(0x0001, 0, 0, 0, 1440)).is_ok());
+        assert!(MarkerFormat::parse(&record(0x0001, 0, 0, 0, 39)).is_err());
+        assert!(MarkerFormat::parse(&record(0x0001, 0, 0, 0, 1441)).is_err());
+        assert!(MarkerFormat::parse(&record(0x0001, 0, 0, 0, 1440)).is_ok());
     }
 }

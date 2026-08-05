@@ -1,9 +1,9 @@
 //! Strict `[MS-PPT]` routing-slip record codec.
 
 use super::model::{Address, CurrentRecipient, Slip, Text};
-use crate::consts::PptRecordType;
-use crate::package::{PptError, Result};
-use crate::records::PptRecord;
+use crate::consts::RecordType;
+use crate::package::{Error, Result};
+use crate::records::Record;
 
 const RECORD_HEADER_LEN: usize = 8;
 const FIXED_PAYLOAD_LEN: usize = 24;
@@ -21,8 +21,8 @@ const ROUTING_FLAGS_MASK: u32 = FLAG_ONE_AFTER_ANOTHER
 
 impl Slip {
     /// Parse one bounded `DocRoutingSlipAtom` record.
-    pub fn parse(record: &PptRecord) -> Result<Self> {
-        if record.record_type != PptRecordType::DocRoutingSlipAtom
+    pub fn parse(record: &Record) -> Result<Self> {
+        if record.record_type != RecordType::DocRoutingSlipAtom
             || record.version != 0
             || record.instance != 0
         {
@@ -106,7 +106,7 @@ impl Slip {
     }
 
     /// Encode this routing slip as a `DocRoutingSlipAtom` record.
-    pub fn to_record(&self) -> Result<PptRecord> {
+    pub fn to_record(&self) -> Result<Record> {
         let recipient_count = u32::try_from(self.recipients.len())
             .map_err(|_| corrupted("routing slip has too many recipients"))?;
         let current = match self.current_recipient {
@@ -161,8 +161,8 @@ impl Slip {
         data.extend_from_slice(&self.trailing_undefined);
         let data_length =
             u32::try_from(data.len()).map_err(|_| corrupted("routing-slip record is too large"))?;
-        Ok(PptRecord {
-            record_type: PptRecordType::DocRoutingSlipAtom,
+        Ok(Record {
+            record_type: RecordType::DocRoutingSlipAtom,
             record_type_raw: 0x0406,
             version: 0,
             instance: 0,
@@ -276,6 +276,6 @@ fn u32_at(data: &[u8], offset: usize) -> Result<u32> {
     ]))
 }
 
-fn corrupted(message: &str) -> PptError {
-    PptError::Corrupted(message.to_string())
+fn corrupted(message: &str) -> Error {
+    Error::Corrupted(message.to_string())
 }

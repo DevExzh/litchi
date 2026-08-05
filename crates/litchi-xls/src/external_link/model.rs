@@ -1,6 +1,6 @@
 //! Semantic BIFF8 external-link values.
 
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
 /// Clipboard format cached by a DDE or OLE external-name item.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -38,12 +38,12 @@ pub struct ValueMatrix {
 }
 
 impl ValueMatrix {
-    pub fn validate(&self) -> XlsResult<()> {
+    pub fn validate(&self) -> Result<()> {
         let count = (usize::from(self.last_column) + 1)
             .checked_mul(usize::from(self.last_row) + 1)
-            .ok_or_else(|| XlsError::InvalidData("DDE/OLE matrix size overflows".to_string()))?;
+            .ok_or_else(|| Error::InvalidData("DDE/OLE matrix size overflows".to_string()))?;
         if count > super::MAX_DDE_OLE_VALUES || self.values.len() != count {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "DDE/OLE matrix dimensions do not match its bounded value array".to_string(),
             ));
         }
@@ -51,7 +51,7 @@ impl ValueMatrix {
             if let CachedValue::Text(text) = value
                 && text.encode_utf16().count() > 255
             {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "DDE/OLE matrix text exceeds 255 UTF-16 code units".to_string(),
                 ));
             }

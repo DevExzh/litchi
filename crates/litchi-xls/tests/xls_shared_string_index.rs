@@ -1,6 +1,6 @@
 use std::fs::File;
 
-use litchi_xls::XlsWorkbook;
+use litchi_xls::Workbook;
 
 #[test]
 fn parses_poi_simple_shared_string_index() {
@@ -8,7 +8,7 @@ fn parses_poi_simple_shared_string_index() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/poi/test-data/spreadsheet/Simple.xls"
     );
-    let workbook = XlsWorkbook::new(File::open(path).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(path).unwrap()).unwrap();
     let index = workbook.shared_string_index().unwrap().unwrap();
     assert_eq!(index.unique_string_count(), 1);
     assert_eq!(index.strings_per_bucket(), 8);

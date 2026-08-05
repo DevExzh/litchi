@@ -20,7 +20,7 @@
 //! - MS-XLS 2.4.218 (RichTextStream), 2.4.258 (ShapePropsStream), 2.4.325
 //!   (TextPropsStream), 2.5.134 (FrtFlags), 2.5.135 (FrtHeader)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `ShapePropsStream` record (MS-XLS 2.4.258); also the
 /// required `frtHeader.rt` value.
@@ -42,8 +42,8 @@ const FRT_FLAGS_FORBIDDEN: u16 = 0x0003;
 /// Byte length of the `cb` field.
 const CB_LEN: usize = 4;
 
-fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(record_type: u16, message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type,
         message: message.into(),
     }
@@ -51,7 +51,7 @@ fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
 
 /// Validate an `FrtHeader` (MS-XLS 2.5.135): the `rt` field and the
 /// `fFrtRef`/`fFrtAlert` bits that MUST be zero.
-fn validate_frt_header(data: &[u8], record_type: u16, name: &str) -> XlsResult<u16> {
+fn validate_frt_header(data: &[u8], record_type: u16, name: &str) -> Result<u16> {
     if u16::from_le_bytes([data[0], data[1]]) != record_type {
         return Err(invalid(
             record_type,
@@ -70,7 +70,7 @@ fn validate_frt_header(data: &[u8], record_type: u16, name: &str) -> XlsResult<u
 
 /// Read the trailing `cb` + `rgb` pair shared by the three property-stream
 /// records, validating that `cb` is the exact `rgb` length.
-fn read_stream(data: &[u8], offset: usize, record_type: u16, name: &str) -> XlsResult<Vec<u8>> {
+fn read_stream(data: &[u8], offset: usize, record_type: u16, name: &str) -> Result<Vec<u8>> {
     let declared = u32::from_le_bytes(
         data[offset..offset + CB_LEN]
             .try_into()
@@ -101,7 +101,7 @@ fn write_stream(checksum: u32, stream: &[u8], output: &mut Vec<u8>) {
 /// The `frtHeader` reserved bytes and the `unused` field (MUST be ignored)
 /// are preserved verbatim so the record round-trips unchanged.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsShapePropsStream {
+pub struct ShapePropsStream {
     /// Raw `frtHeader.grbitFrt` bitfield (`fFrtRef`/`fFrtAlert` are zero).
     frt_flags: u16,
     /// `frtHeader.reserved` bytes, preserved verbatim.
@@ -119,15 +119,15 @@ pub struct XlsShapePropsStream {
     stream: Vec<u8>,
 }
 
-impl XlsShapePropsStream {
+impl ShapePropsStream {
     /// Byte length of the fixed prefix: `FrtHeader` (12) + `wObjContext` (2) +
     /// `unused` (2) + `dwChecksum` (4) + `cb` (4).
     const HEADER_LEN: usize = FRT_HEADER_LEN + 2 + 2 + 4 + CB_LEN;
 
     /// Parse a `ShapePropsStream` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < Self::HEADER_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: Self::HEADER_LEN,
                 found: data.len(),
             });
@@ -212,9 +212,9 @@ macro_rules! text_property_stream {
             const HEADER_LEN: usize = FRT_HEADER_LEN + 4 + CB_LEN;
 
             /// Parse the record payload.
-            pub fn parse(data: &[u8]) -> XlsResult<Self> {
+            pub fn parse(data: &[u8]) -> Result<Self> {
                 if data.len() < Self::HEADER_LEN {
-                    return Err(XlsError::InvalidLength {
+                    return Err(Error::InvalidLength {
                         expected: Self::HEADER_LEN,
                         found: data.len(),
                     });
@@ -264,13 +264,13 @@ macro_rules! text_property_stream {
 text_property_stream! {
     /// Typed `TextPropsStream` record content (MS-XLS 2.4.325): additional
     /// text properties for chart text, as an opaque XML stream.
-    XlsTextPropsStream, TEXT_PROPS_STREAM_RECORD_TYPE, "TextPropsStream"
+    TextPropsStream, TEXT_PROPS_STREAM_RECORD_TYPE, "TextPropsStream"
 }
 
 text_property_stream! {
     /// Typed `RichTextStream` record content (MS-XLS 2.4.218): additional
     /// rich text properties for chart text, as an opaque XML stream.
-    XlsRichTextStream, RICH_TEXT_STREAM_RECORD_TYPE, "RichTextStream"
+    RichTextStream, RICH_TEXT_STREAM_RECORD_TYPE, "RichTextStream"
 }
 
 #[cfg(test)]
@@ -296,7 +296,7 @@ mod tests {
             0x1234_5678,
             b"<c:spPr/>",
         );
-        let parsed = XlsShapePropsStream::parse(&bytes).unwrap();
+        let parsed = ShapePropsStream::parse(&bytes).unwrap();
         assert_eq!(parsed.object_context(), 0x0002);
         assert_eq!(parsed.unused(), 0xBBAA);
         assert_eq!(parsed.checksum(), 0x1234_5678);
@@ -307,47 +307,44 @@ mod tests {
     #[test]
     fn text_and_rich_text_streams_round_trip() {
         let text = record(TEXT_PROPS_STREAM_RECORD_TYPE, &[], 7, b"<c:txPr/>");
-        let parsed = XlsTextPropsStream::parse(&text).unwrap();
+        let parsed = TextPropsStream::parse(&text).unwrap();
         assert_eq!(parsed.checksum(), 7);
         assert_eq!(parsed.stream(), b"<c:txPr/>");
         assert_eq!(parsed.to_payload(), text);
 
         let rich = record(RICH_TEXT_STREAM_RECORD_TYPE, &[], 0, b"<c:rich/>");
-        let parsed = XlsRichTextStream::parse(&rich).unwrap();
+        let parsed = RichTextStream::parse(&rich).unwrap();
         assert_eq!(parsed.stream(), b"<c:rich/>");
         assert_eq!(parsed.to_payload(), rich);
 
         // Empty streams are legal.
         let empty = record(TEXT_PROPS_STREAM_RECORD_TYPE, &[], 0, b"");
-        assert_eq!(
-            XlsTextPropsStream::parse(&empty).unwrap().to_payload(),
-            empty
-        );
+        assert_eq!(TextPropsStream::parse(&empty).unwrap().to_payload(), empty);
     }
 
     #[test]
     fn rejects_malformed_streams() {
         let bytes = record(SHAPE_PROPS_STREAM_RECORD_TYPE, &[0; 4], 0, b"xml");
         // Truncated headers.
-        assert!(XlsShapePropsStream::parse(&bytes[..23]).is_err());
-        assert!(XlsTextPropsStream::parse(&bytes[..19]).is_err());
+        assert!(ShapePropsStream::parse(&bytes[..23]).is_err());
+        assert!(TextPropsStream::parse(&bytes[..19]).is_err());
         // Wrong FrtHeader.rt.
         let mut wrong_rt = bytes.clone();
         wrong_rt[0..2].copy_from_slice(&0x08A5u16.to_le_bytes());
-        assert!(XlsShapePropsStream::parse(&wrong_rt).is_err());
+        assert!(ShapePropsStream::parse(&wrong_rt).is_err());
         // fFrtRef / fFrtAlert set.
         let mut bad_flags = bytes.clone();
         bad_flags[2..4].copy_from_slice(&0x0003u16.to_le_bytes());
-        assert!(XlsShapePropsStream::parse(&bad_flags).is_err());
+        assert!(ShapePropsStream::parse(&bad_flags).is_err());
         // cb does not match the rgb size.
         let mut mismatch = bytes.clone();
         let cb_offset = bytes.len() - 4 - 3;
         mismatch[cb_offset..cb_offset + 4].copy_from_slice(&99u32.to_le_bytes());
-        assert!(XlsShapePropsStream::parse(&mismatch).is_err());
+        assert!(ShapePropsStream::parse(&mismatch).is_err());
         let text = record(TEXT_PROPS_STREAM_RECORD_TYPE, &[], 0, b"xml");
         let mut text_mismatch = text.clone();
         let text_cb_offset = text.len() - 4 - 3;
         text_mismatch[text_cb_offset..text_cb_offset + 4].copy_from_slice(&1u32.to_le_bytes());
-        assert!(XlsTextPropsStream::parse(&text_mismatch).is_err());
+        assert!(TextPropsStream::parse(&text_mismatch).is_err());
     }
 }

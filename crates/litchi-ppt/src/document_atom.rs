@@ -5,10 +5,10 @@
 //! already present in caller-supplied PPT records; no persist object is
 //! resolved and nothing is rendered.
 
-use super::package::{PptError, Result};
-use super::records::PptRecord;
-use super::view_info::PowerPointRatio;
-use crate::consts::PptRecordType;
+use super::package::{Error, Result};
+use super::records::Record;
+use super::view_info::Ratio;
+use crate::consts::RecordType;
 
 /// Byte length of a `DocumentAtom` payload.
 const DOCUMENT_ATOM_PAYLOAD_LEN: usize = 40;
@@ -23,7 +23,7 @@ const MAX_MASTER_DIMENSION: i32 = 0x7E00;
 const MAX_FIRST_SLIDE_NUMBER: u16 = 9999;
 
 fn corrupted<T>(message: impl Into<String>) -> Result<T> {
-    Err(PptError::Corrupted(message.into()))
+    Err(Error::Corrupted(message.into()))
 }
 
 fn strict_bool(value: u8, field: &str) -> Result<bool> {
@@ -36,7 +36,7 @@ fn strict_bool(value: u8, field: &str) -> Result<bool> {
 
 /// Presentation slide size types (MS-PPT 2.13.26).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum PowerPointSlideSizeType {
+pub enum SlideSizeType {
     /// Slide size ratio is consistent with a computer screen.
     #[default]
     Screen,
@@ -54,7 +54,7 @@ pub enum PowerPointSlideSizeType {
     Custom,
 }
 
-impl PowerPointSlideSizeType {
+impl SlideSizeType {
     fn from_u16(value: u16) -> Result<Self> {
         match value {
             0x0000 => Ok(Self::Screen),
@@ -84,12 +84,12 @@ impl PowerPointSlideSizeType {
 
 /// Width and height in master units, used for `slideSize` and `notesSize`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct PowerPointDocumentDimensions {
+pub struct DocumentDimensions {
     pub width: i32,
     pub height: i32,
 }
 
-impl PowerPointDocumentDimensions {
+impl DocumentDimensions {
     pub fn new(width: i32, height: i32) -> Result<Self> {
         let dimensions = Self { width, height };
         dimensions.validate()?;
@@ -108,13 +108,13 @@ impl PowerPointDocumentDimensions {
 
 /// A validated `DocumentAtom` (MS-PPT 2.4.2).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PowerPointDocumentAtom {
+pub struct DocumentAtom {
     /// Dimensions of the presentation slides in master units.
-    pub slide_size: PowerPointDocumentDimensions,
+    pub slide_size: DocumentDimensions,
     /// Dimensions of the notes and handout slides in master units.
-    pub notes_size: PowerPointDocumentDimensions,
+    pub notes_size: DocumentDimensions,
     /// Zoom level for OLE server representations of the document.
-    pub server_zoom: PowerPointRatio,
+    pub server_zoom: Ratio,
     /// Persist identifier reference of the notes master slide.
     pub notes_master_persist_id_ref: u32,
     /// Persist identifier reference of the handout master slide.
@@ -122,7 +122,7 @@ pub struct PowerPointDocumentAtom {
     /// Starting number for slide numbering.
     pub first_slide_number: u16,
     /// Type of the presentation slide size.
-    pub slide_size_type: PowerPointSlideSizeType,
+    pub slide_size_type: SlideSizeType,
     /// Whether fonts are embedded in the document.
     pub save_with_fonts: bool,
     /// Whether placeholder shapes on the title slide are not displayed.
@@ -133,17 +133,17 @@ pub struct PowerPointDocumentAtom {
     pub show_comments: bool,
 }
 
-impl PowerPointDocumentAtom {
+impl DocumentAtom {
     /// Construct and validate a `DocumentAtom` value.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        slide_size: PowerPointDocumentDimensions,
-        notes_size: PowerPointDocumentDimensions,
-        server_zoom: PowerPointRatio,
+        slide_size: DocumentDimensions,
+        notes_size: DocumentDimensions,
+        server_zoom: Ratio,
         notes_master_persist_id_ref: u32,
         handout_master_persist_id_ref: u32,
         first_slide_number: u16,
-        slide_size_type: PowerPointSlideSizeType,
+        slide_size_type: SlideSizeType,
         save_with_fonts: bool,
         omit_title_place: bool,
         right_to_left: bool,
@@ -167,10 +167,10 @@ impl PowerPointDocumentAtom {
     }
 
     /// Strictly parse one already-materialized `RT_DocumentAtom` record.
-    pub fn parse(record: &PptRecord) -> Result<Self> {
+    pub fn parse(record: &Record) -> Result<Self> {
         if record.version != DOCUMENT_ATOM_VERSION
             || record.instance != 0
-            || record.record_type_raw != PptRecordType::DocumentAtom.as_u16()
+            || record.record_type_raw != RecordType::DocumentAtom.as_u16()
             || record.data.len() != DOCUMENT_ATOM_PAYLOAD_LEN
             || record.data_length != DOCUMENT_ATOM_PAYLOAD_LEN as u32
         {
@@ -187,19 +187,19 @@ impl PowerPointDocumentAtom {
             u16::from_le_bytes(data[offset..offset + 2].try_into().expect("fixed slice"))
         };
         let atom = Self {
-            slide_size: PowerPointDocumentDimensions {
+            slide_size: DocumentDimensions {
                 width: read_i32(0),
                 height: read_i32(4),
             },
-            notes_size: PowerPointDocumentDimensions {
+            notes_size: DocumentDimensions {
                 width: read_i32(8),
                 height: read_i32(12),
             },
-            server_zoom: PowerPointRatio::new(read_i32(16), read_i32(20))?,
+            server_zoom: Ratio::new(read_i32(16), read_i32(20))?,
             notes_master_persist_id_ref: read_u32(24),
             handout_master_persist_id_ref: read_u32(28),
             first_slide_number: read_u16(32),
-            slide_size_type: PowerPointSlideSizeType::from_u16(read_u16(34))?,
+            slide_size_type: SlideSizeType::from_u16(read_u16(34))?,
             save_with_fonts: strict_bool(data[36], "fSaveWithFonts")?,
             omit_title_place: strict_bool(data[37], "fOmitTitlePlace")?,
             right_to_left: strict_bool(data[38], "fRightToLeft")?,
@@ -210,9 +210,9 @@ impl PowerPointDocumentAtom {
     }
 
     /// Serialize this value as one canonical `RT_DocumentAtom` record.
-    pub fn to_record(&self) -> Result<PptRecord> {
+    pub fn to_record(&self) -> Result<Record> {
         let bytes = self.to_record_bytes()?;
-        let (record, end) = PptRecord::parse(&bytes, 0)?;
+        let (record, end) = Record::parse(&bytes, 0)?;
         if end != bytes.len() {
             return corrupted("canonical DocumentAtom did not consume its bytes");
         }
@@ -224,7 +224,7 @@ impl PowerPointDocumentAtom {
         self.validate()?;
         let mut bytes = [0u8; 8 + DOCUMENT_ATOM_PAYLOAD_LEN];
         bytes[0..2].copy_from_slice(&DOCUMENT_ATOM_VERSION.to_le_bytes());
-        bytes[2..4].copy_from_slice(&PptRecordType::DocumentAtom.as_u16().to_le_bytes());
+        bytes[2..4].copy_from_slice(&RecordType::DocumentAtom.as_u16().to_le_bytes());
         bytes[4..8].copy_from_slice(&(DOCUMENT_ATOM_PAYLOAD_LEN as u32).to_le_bytes());
         bytes[8..12].copy_from_slice(&self.slide_size.width.to_le_bytes());
         bytes[12..16].copy_from_slice(&self.slide_size.height.to_le_bytes());
@@ -262,15 +262,15 @@ impl PowerPointDocumentAtom {
 mod tests {
     use super::*;
 
-    fn sample_atom() -> PowerPointDocumentAtom {
-        PowerPointDocumentAtom::new(
-            PowerPointDocumentDimensions::new(5760, 4320).unwrap(),
-            PowerPointDocumentDimensions::new(4320, 5760).unwrap(),
-            PowerPointRatio::new(1, 2).unwrap(),
+    fn sample_atom() -> DocumentAtom {
+        DocumentAtom::new(
+            DocumentDimensions::new(5760, 4320).unwrap(),
+            DocumentDimensions::new(4320, 5760).unwrap(),
+            Ratio::new(1, 2).unwrap(),
             2,
             0,
             1,
-            PowerPointSlideSizeType::Screen,
+            SlideSizeType::Screen,
             false,
             false,
             false,
@@ -283,29 +283,29 @@ mod tests {
     fn document_atom_roundtrips() {
         let atom = sample_atom();
         let record = atom.to_record().unwrap();
-        assert_eq!(record.record_type, PptRecordType::DocumentAtom);
+        assert_eq!(record.record_type, RecordType::DocumentAtom);
         assert_eq!(record.version, 1);
         assert_eq!(record.instance, 0);
-        let parsed = PowerPointDocumentAtom::parse(&record).unwrap();
+        let parsed = DocumentAtom::parse(&record).unwrap();
         assert_eq!(parsed, atom);
         assert_eq!(parsed.slide_size_type.as_u16(), 0);
     }
 
     #[test]
     fn rejects_out_of_range_dimensions_slide_numbers_and_zoom() {
-        assert!(PowerPointDocumentDimensions::new(0x23f, 4320).is_err());
-        assert!(PowerPointDocumentDimensions::new(5760, 0x7e01).is_err());
+        assert!(DocumentDimensions::new(0x23f, 4320).is_err());
+        assert!(DocumentDimensions::new(5760, 0x7e01).is_err());
 
         let mut atom = sample_atom();
         atom.first_slide_number = 10000;
         assert!(atom.to_record().is_err());
 
         let mut zero_zoom = sample_atom();
-        zero_zoom.server_zoom = PowerPointRatio::new(0, 2).unwrap();
+        zero_zoom.server_zoom = Ratio::new(0, 2).unwrap();
         assert!(zero_zoom.to_record().is_err());
 
         let mut negative_zoom = sample_atom();
-        negative_zoom.server_zoom = PowerPointRatio::new(1, -2).unwrap();
+        negative_zoom.server_zoom = Ratio::new(1, -2).unwrap();
         assert!(negative_zoom.to_record().is_err());
     }
 
@@ -313,18 +313,18 @@ mod tests {
     fn rejects_malformed_records() {
         let mut bad_flag = sample_atom().to_record_bytes().unwrap();
         bad_flag[8 + 36] = 2; // fSaveWithFonts is not a bool1
-        let record = PptRecord::parse(&bad_flag, 0).unwrap().0;
-        assert!(PowerPointDocumentAtom::parse(&record).is_err());
+        let record = Record::parse(&bad_flag, 0).unwrap().0;
+        assert!(DocumentAtom::parse(&record).is_err());
 
         let mut bad_size_type = sample_atom().to_record_bytes().unwrap();
         bad_size_type[8 + 34] = 7; // not a SlideSizeEnum value
-        let record = PptRecord::parse(&bad_size_type, 0).unwrap().0;
-        assert!(PowerPointDocumentAtom::parse(&record).is_err());
+        let record = Record::parse(&bad_size_type, 0).unwrap().0;
+        assert!(DocumentAtom::parse(&record).is_err());
 
         let mut bad_version = sample_atom().to_record_bytes().unwrap();
         bad_version[0] = 0;
-        let record = PptRecord::parse(&bad_version, 0).unwrap().0;
-        assert!(PowerPointDocumentAtom::parse(&record).is_err());
+        let record = Record::parse(&bad_version, 0).unwrap().0;
+        assert!(DocumentAtom::parse(&record).is_err());
     }
 
     #[test]
@@ -344,7 +344,7 @@ mod tests {
         assert_eq!(atom.notes_master_persist_id_ref, 2);
         assert_eq!(atom.handout_master_persist_id_ref, 0);
         assert_eq!(atom.first_slide_number, 1);
-        assert_eq!(atom.slide_size_type, PowerPointSlideSizeType::Screen);
+        assert_eq!(atom.slide_size_type, SlideSizeType::Screen);
         assert!(!atom.save_with_fonts);
         assert!(!atom.omit_title_place);
         assert!(!atom.right_to_left);

@@ -6,4 +6,4 @@
 
 mod model;
 
-pub(super) use model::{is_hyperlink_child, is_ruby_base_child};
+pub(crate) use model::{is_hyperlink_child, is_ruby_base_child};

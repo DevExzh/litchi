@@ -85,12 +85,12 @@ where
                 let mut visited = 0u32;
                 while let Some(shape) = shapes.pop() {
                     visited = visited.checked_add(1).ok_or_else(|| {
-                        crate::package::PptError::Corrupted(
+                        crate::package::Error::Corrupted(
                             "PowerPoint shape count overflowed".to_string(),
                         )
                     })?;
                     if visited > 1_000_000 {
-                        return Err(crate::package::PptError::Corrupted(
+                        return Err(crate::package::Error::Corrupted(
                             "PowerPoint group contains more than 1000000 shapes".to_string(),
                         ));
                     }

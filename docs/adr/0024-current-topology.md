@@ -62,8 +62,9 @@ This is reflected by the [`litchi-ole-common` manifest](../../crates/litchi-ole-
 and the manifests for [`litchi-doc`](../../crates/litchi-doc/Cargo.toml),
 [`litchi-ppt`](../../crates/litchi-ppt/Cargo.toml), and
 [`litchi-xls`](../../crates/litchi-xls/Cargo.toml). The common crate owns
-format-neutral validated OLE2 structures; host metadata and semantic records
-remain in the concrete legacy format crates.
+format-neutral validated OLE2 structures, including the typed `property_set`
+model/codec/editor shared by DOC, PPT, and XLS; host metadata and
+format-specific semantic records remain in the concrete legacy format crates.
 
 ## ODF
 

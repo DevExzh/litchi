@@ -1,8 +1,8 @@
 //! MS-PPT §2.8.3 PowerPoint 2002 animation hash atom.
 
-use crate::consts::PptRecordType;
-use crate::package::{PptError, Result};
-use crate::records::PptRecord;
+use crate::consts::RecordType;
+use crate::package::{Error, Result};
+use crate::records::Record;
 
 const HEADER_LEN: usize = 8;
 const PAYLOAD_LEN: usize = 4;
@@ -41,9 +41,9 @@ impl Hash10 {
     }
 
     /// Parse from the generic PowerPoint record model.
-    pub fn parse_record(record: &PptRecord) -> Result<Self> {
-        if record.record_type != PptRecordType::HashCode10Atom
-            || record.record_type_raw != PptRecordType::HashCode10Atom.as_u16()
+    pub fn parse_record(record: &Record) -> Result<Self> {
+        if record.record_type != RecordType::HashCode10Atom
+            || record.record_type_raw != RecordType::HashCode10Atom.as_u16()
         {
             return corrupted("HashCode10Atom has an invalid record type");
         }
@@ -80,7 +80,7 @@ impl Hash10 {
                 bytes.len()
             ));
         }
-        let (record, consumed) = PptRecord::parse_strict(bytes, 0)?;
+        let (record, consumed) = Record::parse_strict(bytes, 0)?;
         if consumed != bytes.len() {
             return corrupted("HashCode10Atom has trailing bytes");
         }
@@ -96,17 +96,17 @@ impl Hash10 {
     pub fn to_bytes(self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(RECORD_LEN);
         bytes.extend_from_slice(&0u16.to_le_bytes());
-        bytes.extend_from_slice(&PptRecordType::HashCode10Atom.as_u16().to_le_bytes());
+        bytes.extend_from_slice(&RecordType::HashCode10Atom.as_u16().to_le_bytes());
         bytes.extend_from_slice(&(PAYLOAD_LEN as u32).to_le_bytes());
         bytes.extend_from_slice(&self.to_payload());
         bytes
     }
 
     /// Convert to the generic PowerPoint record representation.
-    pub fn to_record(self) -> PptRecord {
-        PptRecord {
-            record_type: PptRecordType::HashCode10Atom,
-            record_type_raw: PptRecordType::HashCode10Atom.as_u16(),
+    pub fn to_record(self) -> Record {
+        Record {
+            record_type: RecordType::HashCode10Atom,
+            record_type_raw: RecordType::HashCode10Atom.as_u16(),
             version: 0,
             instance: 0,
             data_length: PAYLOAD_LEN as u32,
@@ -117,7 +117,7 @@ impl Hash10 {
 }
 
 fn corrupted<T>(message: impl Into<String>) -> Result<T> {
-    Err(PptError::Corrupted(message.into()))
+    Err(Error::Corrupted(message.into()))
 }
 
 #[cfg(test)]

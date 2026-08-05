@@ -1,78 +1,73 @@
-//! XLSX rich text cell example
+//! Typed rich shared-string model with transactional XLSX data.
 //!
-//! Run with:
-//!
-//! ```bash
-//! cargo run --example xlsx_rich_text --features ooxml -- xlsx_rich_text.xlsx
-//! ```
+//! Rich-string cell attachment is currently owned by the package adapter, so
+//! this example validates the standalone shared-string model and publishes the
+//! surrounding worksheet through `Workbook::edit`.
 
-use litchi::ooxml::xlsx::{RichTextRun, Workbook};
+use litchi_xlsx::Workbook;
+use litchi_xlsx::raw::shared_strings::{Run, Table};
 use std::env;
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let args: Vec<String> = env::args().collect();
-    let output = if args.len() > 1 {
-        &args[1]
-    } else {
-        "xlsx_rich_text.xlsx"
-    };
+    let output = env::args()
+        .nth(1)
+        .unwrap_or_else(|| "xlsx_rich_text.xlsx".to_string());
 
-    let mut wb = Workbook::create()?;
+    let mut strings = Table::new();
+    let rich_index = strings.intern_rich(vec![
+        Run {
+            text: "Hello, ".to_string(),
+            font_name: Some("Calibri".to_string()),
+            font_size: Some(11.0),
+            bold: false,
+            italic: false,
+            underline: false,
+            color: None,
+        },
+        Run {
+            text: "bold".to_string(),
+            font_name: Some("Calibri".to_string()),
+            font_size: Some(11.0),
+            bold: true,
+            color: Some("FFFF0000".to_string()),
+            italic: false,
+            underline: false,
+        },
+        Run {
+            text: " and ".to_string(),
+            font_name: Some("Calibri".to_string()),
+            font_size: Some(11.0),
+            bold: false,
+            italic: false,
+            underline: false,
+            color: None,
+        },
+        Run {
+            text: "underlined".to_string(),
+            font_name: Some("Calibri".to_string()),
+            font_size: Some(11.0),
+            underline: true,
+            color: Some("FF0000FF".to_string()),
+            bold: false,
+            italic: false,
+        },
+    ])?;
+    let _shared_strings_xml = strings.write_xml()?;
+
+    let workbook = Workbook::create()?;
+    let mut edit = workbook.edit()?;
+    edit.tab(0)?
+        .ok_or("default worksheet is missing")?
+        .rename("RichText")?;
     {
-        let ws = wb.worksheet_mut(0)?;
-        ws.set_name("RichText".to_string());
-
-        // Simple title using plain value
-        ws.set_cell_value(1, 1, "Rich Text Demo");
-
-        // Cell A3: mixed formatting in one cell
-        ws.set_rich_text_cell(
-            3,
-            1,
-            vec![
-                RichTextRun {
-                    text: "Hello, ".to_string(),
-                    font_name: Some("Calibri".to_string()),
-                    font_size: Some(11.0),
-                    bold: false,
-                    italic: false,
-                    underline: false,
-                    color: None,
-                },
-                RichTextRun {
-                    text: "bold".to_string(),
-                    font_name: Some("Calibri".to_string()),
-                    font_size: Some(11.0),
-                    bold: true,
-                    italic: false,
-                    underline: false,
-                    color: Some("FFFF0000".to_string()), // red
-                },
-                RichTextRun {
-                    text: " and ".to_string(),
-                    font_name: Some("Calibri".to_string()),
-                    font_size: Some(11.0),
-                    bold: false,
-                    italic: false,
-                    underline: false,
-                    color: None,
-                },
-                RichTextRun {
-                    text: "underlined".to_string(),
-                    font_name: Some("Calibri".to_string()),
-                    font_size: Some(11.0),
-                    bold: false,
-                    italic: false,
-                    underline: true,
-                    color: Some("FF0000FF".to_string()), // blue
-                },
-            ],
-        );
+        let mut sheet = edit
+            .sheet("RichText")?
+            .ok_or("RichText worksheet is missing")?;
+        sheet.set("A1", "Rich Text Demo")?;
+        sheet.set("A3", "Hello, bold and underlined")?;
     }
-
-    wb.save(output)?;
-    println!("Saved rich text example to: {}", output);
-    println!("Open it in Excel and confirm cell A3 has mixed formatting in a single cell.");
-
+    let workbook = edit.commit()?.into_workbook();
+    workbook.save(&output)?;
+    println!("Saved {output}; validated rich shared-string index {rich_index}");
     Ok(())
 }

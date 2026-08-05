@@ -4,9 +4,9 @@
 //! Parsing them never compares presentations, opens external data, or executes
 //! embedded content.
 
-use super::package::{PptError, Result};
-use super::records::PptRecord;
-use crate::consts::PptRecordType;
+use super::package::{Error, Result};
+use super::records::Record;
+use crate::consts::RecordType;
 
 const RECORD_HEADER_SIZE: usize = 8;
 const SIZE_ATOM_PAYLOAD_SIZE: usize = 4;
@@ -17,7 +17,7 @@ const MAX_SLIDE_LIST_ENTRIES: usize = 1_000_000;
 
 /// Reviewing toolbar and gallery display state from `DocToolbarStates10Atom`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointReviewingToolbarStates {
+pub struct ReviewingToolbarStates {
     show_reviewing_toolbar: bool,
     show_reviewing_gallery: bool,
     ignored_reserved_bits: u8,
@@ -36,7 +36,7 @@ const MAX_REVIEWER_NAME_BYTES: usize = 104;
 /// A value of `DiffTypeEnum` from MS-PPT section 2.13.8.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
-pub enum PowerPointDiffType {
+pub enum DiffType {
     Document = 0x00,
     Slide = 0x02,
     MainMaster = 0x03,
@@ -57,14 +57,14 @@ pub enum PowerPointDiffType {
     InteractiveInfo = 0x17,
 }
 
-impl PowerPointDiffType {
+impl DiffType {
     pub const fn as_u32(self) -> u32 {
         self as u32
     }
 }
 
-impl TryFrom<u32> for PowerPointDiffType {
-    type Error = PptError;
+impl TryFrom<u32> for DiffType {
+    type Error = Error;
 
     fn try_from(value: u32) -> Result<Self> {
         Ok(match value {
@@ -87,7 +87,7 @@ impl TryFrom<u32> for PowerPointDiffType {
             0x16 => Self::Table,
             0x17 => Self::InteractiveInfo,
             _ => {
-                return Err(PptError::Corrupted(format!(
+                return Err(Error::Corrupted(format!(
                     "invalid DiffTypeEnum value {value:#010X}"
                 )));
             },
@@ -98,25 +98,25 @@ impl TryFrom<u32> for PowerPointDiffType {
 /// A value of `ElementTypeEnum` from MS-PPT section 2.13.9.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
-pub enum PowerPointElementType {
+pub enum ElementType {
     Shape = 0x01,
     Sound = 0x02,
 }
 
-impl PowerPointElementType {
+impl ElementType {
     pub const fn as_u32(self) -> u32 {
         self as u32
     }
 }
 
-impl TryFrom<u32> for PowerPointElementType {
-    type Error = PptError;
+impl TryFrom<u32> for ElementType {
+    type Error = Error;
 
     fn try_from(value: u32) -> Result<Self> {
         match value {
             0x01 => Ok(Self::Shape),
             0x02 => Ok(Self::Sound),
-            _ => Err(PptError::Corrupted(format!(
+            _ => Err(Error::Corrupted(format!(
                 "invalid ElementTypeEnum value {value:#010X}"
             ))),
         }
@@ -146,7 +146,7 @@ macro_rules! define_diff_flags {
     };
 }
 
-define_diff_flags!(PowerPointDocDiffFlags {
+define_diff_flags!(DocDiffFlags {
     slide_size: 2,
     omit_title_placeholder: 3,
     named_show_list: 4,
@@ -154,7 +154,7 @@ define_diff_flags!(PowerPointDocDiffFlags {
     notes_header_footer: 6,
 });
 
-define_diff_flags!(PowerPointSlideDiffFlags {
+define_diff_flags!(SlideDiffFlags {
     scheme: 0,
     background: 1,
     add_slide: 4,
@@ -167,7 +167,7 @@ define_diff_flags!(PowerPointSlideDiffFlags {
     time_node: 12,
 });
 
-define_diff_flags!(PowerPointMainMasterDiffFlags {
+define_diff_flags!(MainMasterDiffFlags {
     scheme: 0,
     background: 1,
     time_node: 12,
@@ -176,7 +176,7 @@ define_diff_flags!(PowerPointMainMasterDiffFlags {
     locked: 15,
 });
 
-define_diff_flags!(PowerPointShapeDiffFlags {
+define_diff_flags!(ShapeDiffFlags {
     add_shape: 0,
     delete_shape: 1,
     child: 2,
@@ -199,77 +199,77 @@ define_diff_flags!(PowerPointShapeDiffFlags {
     ruler: 22,
 });
 
-define_diff_flags!(PowerPointTableDiffFlags {
+define_diff_flags!(TableDiffFlags {
     add_table: 0,
     delete_table: 1,
     modified_table: 2,
     position: 3,
 });
 
-define_diff_flags!(PowerPointTextDiffFlags { word_list: 2 });
+define_diff_flags!(TextDiffFlags { word_list: 2 });
 
 /// Typed interpretation of the 32-bit payload following `DiffRecordHeaders`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PowerPointDiffFlags {
-    Document(PowerPointDocDiffFlags),
-    Slide(PowerPointSlideDiffFlags),
-    MainMaster(PowerPointMainMasterDiffFlags),
-    Shape(PowerPointShapeDiffFlags),
-    Table(PowerPointTableDiffFlags),
-    Text(PowerPointTextDiffFlags),
-    Notes(PowerPointTextDiffFlags),
+pub enum DiffFlags {
+    Document(DocDiffFlags),
+    Slide(SlideDiffFlags),
+    MainMaster(MainMasterDiffFlags),
+    Shape(ShapeDiffFlags),
+    Table(TableDiffFlags),
+    Text(TextDiffFlags),
+    Notes(TextDiffFlags),
     None,
 }
 
-impl PowerPointDiffFlags {
-    pub fn for_type(diff_type: PowerPointDiffType) -> Self {
+impl DiffFlags {
+    pub fn for_type(diff_type: DiffType) -> Self {
         Self::from_raw(diff_type, 0).0
     }
 
-    fn from_raw(diff_type: PowerPointDiffType, raw: u32) -> (Self, u32) {
+    fn from_raw(diff_type: DiffType, raw: u32) -> (Self, u32) {
         let (flags, mask) = match diff_type {
-            PowerPointDiffType::Document => (
-                Self::Document(PowerPointDocDiffFlags::from_raw(raw)),
-                PowerPointDocDiffFlags::mask(),
+            DiffType::Document => (
+                Self::Document(DocDiffFlags::from_raw(raw)),
+                DocDiffFlags::mask(),
             ),
-            PowerPointDiffType::Slide => (
-                Self::Slide(PowerPointSlideDiffFlags::from_raw(raw)),
-                PowerPointSlideDiffFlags::mask(),
+            DiffType::Slide => (
+                Self::Slide(SlideDiffFlags::from_raw(raw)),
+                SlideDiffFlags::mask(),
             ),
-            PowerPointDiffType::MainMaster => (
-                Self::MainMaster(PowerPointMainMasterDiffFlags::from_raw(raw)),
-                PowerPointMainMasterDiffFlags::mask(),
+            DiffType::MainMaster => (
+                Self::MainMaster(MainMasterDiffFlags::from_raw(raw)),
+                MainMasterDiffFlags::mask(),
             ),
-            PowerPointDiffType::Shape => (
-                Self::Shape(PowerPointShapeDiffFlags::from_raw(raw)),
-                PowerPointShapeDiffFlags::mask(),
+            DiffType::Shape => (
+                Self::Shape(ShapeDiffFlags::from_raw(raw)),
+                ShapeDiffFlags::mask(),
             ),
-            PowerPointDiffType::Table => (
-                Self::Table(PowerPointTableDiffFlags::from_raw(raw)),
-                PowerPointTableDiffFlags::mask(),
+            DiffType::Table => (
+                Self::Table(TableDiffFlags::from_raw(raw)),
+                TableDiffFlags::mask(),
             ),
-            PowerPointDiffType::Text => (
-                Self::Text(PowerPointTextDiffFlags::from_raw(raw)),
-                PowerPointTextDiffFlags::mask(),
+            DiffType::Text => (
+                Self::Text(TextDiffFlags::from_raw(raw)),
+                TextDiffFlags::mask(),
             ),
-            PowerPointDiffType::Notes => (
-                Self::Notes(PowerPointTextDiffFlags::from_raw(raw)),
-                PowerPointTextDiffFlags::mask(),
+            DiffType::Notes => (
+                Self::Notes(TextDiffFlags::from_raw(raw)),
+                TextDiffFlags::mask(),
             ),
             _ => (Self::None, 0),
         };
         (flags, raw & !mask)
     }
 
-    fn diff_type(self) -> Option<PowerPointDiffType> {
+    fn diff_type(self) -> Option<DiffType> {
         match self {
-            Self::Document(_) => Some(PowerPointDiffType::Document),
-            Self::Slide(_) => Some(PowerPointDiffType::Slide),
-            Self::MainMaster(_) => Some(PowerPointDiffType::MainMaster),
-            Self::Shape(_) => Some(PowerPointDiffType::Shape),
-            Self::Table(_) => Some(PowerPointDiffType::Table),
-            Self::Text(_) => Some(PowerPointDiffType::Text),
-            Self::Notes(_) => Some(PowerPointDiffType::Notes),
+            Self::Document(_) => Some(DiffType::Document),
+            Self::Slide(_) => Some(DiffType::Slide),
+            Self::MainMaster(_) => Some(DiffType::MainMaster),
+            Self::Shape(_) => Some(DiffType::Shape),
+            Self::Table(_) => Some(DiffType::Table),
+            Self::Text(_) => Some(DiffType::Text),
+            Self::Notes(_) => Some(DiffType::Notes),
             Self::None => None,
         }
     }
@@ -289,15 +289,15 @@ impl PowerPointDiffFlags {
 
 /// The atom portion of a `DiffRecordHeaders` structure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointDiffRecordHeaders {
+pub struct DiffRecordHeaders {
     index: bool,
-    diff_type: PowerPointDiffType,
+    diff_type: DiffType,
     ignored_prefix: [u8; 3],
     ignored_tail: u32,
 }
 
-impl PowerPointDiffRecordHeaders {
-    pub const fn new(index: bool, diff_type: PowerPointDiffType) -> Self {
+impl DiffRecordHeaders {
+    pub const fn new(index: bool, diff_type: DiffType) -> Self {
         Self {
             index,
             diff_type,
@@ -310,7 +310,7 @@ impl PowerPointDiffRecordHeaders {
         self.index
     }
 
-    pub const fn diff_type(&self) -> PowerPointDiffType {
+    pub const fn diff_type(&self) -> DiffType {
         self.diff_type
     }
 
@@ -325,22 +325,22 @@ impl PowerPointDiffRecordHeaders {
 
 /// One recursively parsed `RT_Diff10` container.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointDiffNode {
-    headers: PowerPointDiffRecordHeaders,
-    flags: PowerPointDiffFlags,
+pub struct DiffNode {
+    headers: DiffRecordHeaders,
+    flags: DiffFlags,
     ignored_flag_bits: u32,
     children: Vec<Self>,
 }
 
-impl PowerPointDiffNode {
+impl DiffNode {
     pub fn new(
-        diff_type: PowerPointDiffType,
+        diff_type: DiffType,
         index: bool,
-        flags: PowerPointDiffFlags,
+        flags: DiffFlags,
         children: Vec<Self>,
     ) -> Result<Self> {
         let node = Self {
-            headers: PowerPointDiffRecordHeaders::new(index, diff_type),
+            headers: DiffRecordHeaders::new(index, diff_type),
             flags,
             ignored_flag_bits: 0,
             children,
@@ -349,15 +349,15 @@ impl PowerPointDiffNode {
         Ok(node)
     }
 
-    pub const fn headers(&self) -> &PowerPointDiffRecordHeaders {
+    pub const fn headers(&self) -> &DiffRecordHeaders {
         &self.headers
     }
 
-    pub const fn diff_type(&self) -> PowerPointDiffType {
+    pub const fn diff_type(&self) -> DiffType {
         self.headers.diff_type
     }
 
-    pub const fn flags(&self) -> PowerPointDiffFlags {
+    pub const fn flags(&self) -> DiffFlags {
         self.flags
     }
 
@@ -369,7 +369,7 @@ impl PowerPointDiffNode {
         &self.children
     }
 
-    pub fn children_of_type(&self, diff_type: PowerPointDiffType) -> impl Iterator<Item = &Self> {
+    pub fn children_of_type(&self, diff_type: DiffType) -> impl Iterator<Item = &Self> {
         self.children
             .iter()
             .filter(move |child| child.diff_type() == diff_type)
@@ -390,7 +390,7 @@ impl PowerPointDiffNode {
             return corrupted("document-comparison tree exceeds the nesting limit");
         }
         *count = count.checked_add(1).ok_or_else(|| {
-            PptError::Corrupted("document-comparison record count overflow".to_string())
+            Error::Corrupted("document-comparison record count overflow".to_string())
         })?;
         if *count > limits.max_records {
             return corrupted("document-comparison tree exceeds the record-count limit");
@@ -399,21 +399,21 @@ impl PowerPointDiffNode {
             return corrupted("truncated Diff10 container");
         }
         let (version, instance) = unpack_version_instance(read_u16(data, 0)?);
-        if version != 0xF || instance != 0 || read_u16(data, 2)? != PptRecordType::Diff10.as_u16() {
+        if version != 0xF || instance != 0 || read_u16(data, 2)? != RecordType::Diff10.as_u16() {
             return corrupted("invalid Diff10 record header");
         }
         let payload_len = usize::try_from(read_u32(data, 4)?)
-            .map_err(|_| PptError::Corrupted("Diff10 length does not fit usize".to_string()))?;
+            .map_err(|_| Error::Corrupted("Diff10 length does not fit usize".to_string()))?;
         let total_len = RECORD_HEADER_SIZE
             .checked_add(payload_len)
-            .ok_or_else(|| PptError::Corrupted("Diff10 length overflow".to_string()))?;
+            .ok_or_else(|| Error::Corrupted("Diff10 length overflow".to_string()))?;
         if total_len > data.len() || payload_len < DIFF_FIXED_SIZE - RECORD_HEADER_SIZE {
             return corrupted("Diff10 record extends beyond its parent");
         }
         let (atom_version, atom_instance) = unpack_version_instance(read_u16(data, 8)?);
         if atom_version != 0
             || atom_instance != 0
-            || read_u16(data, 10)? != PptRecordType::Diff10Atom.as_u16()
+            || read_u16(data, 10)? != RecordType::Diff10Atom.as_u16()
             || read_u32(data, 12)? != 12
         {
             return corrupted("invalid Diff10Atom header");
@@ -423,23 +423,23 @@ impl PowerPointDiffNode {
             1 => true,
             _ => return corrupted("Diff10Atom fIndex is not a bool1"),
         };
-        let diff_type = PowerPointDiffType::try_from(read_u32(data, 20)?)?;
+        let diff_type = DiffType::try_from(read_u32(data, 20)?)?;
         if index
             && !matches!(
                 diff_type,
-                PowerPointDiffType::HeaderFooter | PowerPointDiffType::InteractiveInfo
+                DiffType::HeaderFooter | DiffType::InteractiveInfo
             )
         {
             return corrupted("Diff10 fIndex is invalid for its diff type");
         }
-        let headers = PowerPointDiffRecordHeaders {
+        let headers = DiffRecordHeaders {
             index,
             diff_type,
             ignored_prefix: [data[17], data[18], data[19]],
             ignored_tail: read_u32(data, 24)?,
         };
         let raw_flags = read_u32(data, DIFF_HEADER_SIZE)?;
-        let (flags, ignored_flag_bits) = PowerPointDiffFlags::from_raw(diff_type, raw_flags);
+        let (flags, ignored_flag_bits) = DiffFlags::from_raw(diff_type, raw_flags);
         let mut children = Vec::new();
         let mut offset = DIFF_FIXED_SIZE;
         while offset < total_len {
@@ -466,7 +466,7 @@ impl PowerPointDiffNode {
             return corrupted("document-comparison tree exceeds the nesting limit");
         }
         *count = count.checked_add(1).ok_or_else(|| {
-            PptError::Corrupted("document-comparison record count overflow".to_string())
+            Error::Corrupted("document-comparison record count overflow".to_string())
         })?;
         if *count > POWERPOINT_DIFF_MAX_RECORDS {
             return corrupted("document-comparison tree exceeds the record-count limit");
@@ -477,19 +477,19 @@ impl PowerPointDiffNode {
         atom.extend_from_slice(&[0; 3]);
         atom.extend_from_slice(&self.headers.diff_type.as_u32().to_le_bytes());
         atom.extend_from_slice(&0u32.to_le_bytes());
-        let mut payload = encode_record(0, 0, PptRecordType::Diff10Atom, &atom);
+        let mut payload = encode_record(0, 0, RecordType::Diff10Atom, &atom);
         payload.extend_from_slice(&self.flags.to_raw().to_le_bytes());
         for child in &self.children {
             payload.extend_from_slice(&child.encode(depth + 1, count)?);
         }
-        Ok(encode_record(0xF, 0, PptRecordType::Diff10, &payload))
+        Ok(encode_record(0xF, 0, RecordType::Diff10, &payload))
     }
 
     fn validate_node(&self) -> Result<()> {
         if self.headers.index
             && !matches!(
                 self.headers.diff_type,
-                PowerPointDiffType::HeaderFooter | PowerPointDiffType::InteractiveInfo
+                DiffType::HeaderFooter | DiffType::InteractiveInfo
             )
         {
             return corrupted("Diff10 fIndex is invalid for its diff type");
@@ -500,13 +500,13 @@ impl PowerPointDiffNode {
             }
         } else if matches!(
             self.headers.diff_type,
-            PowerPointDiffType::Document
-                | PowerPointDiffType::Slide
-                | PowerPointDiffType::MainMaster
-                | PowerPointDiffType::Shape
-                | PowerPointDiffType::Table
-                | PowerPointDiffType::Text
-                | PowerPointDiffType::Notes
+            DiffType::Document
+                | DiffType::Slide
+                | DiffType::MainMaster
+                | DiffType::Shape
+                | DiffType::Table
+                | DiffType::Text
+                | DiffType::Notes
         ) {
             return corrupted("Diff10 record is missing its typed flags");
         }
@@ -522,15 +522,15 @@ struct DiffLimits {
 
 /// A complete `DiffTree10Container`, without dereferencing its reviewer document.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointDiffTree10 {
+pub struct DiffTree10 {
     reviewer_name: String,
-    document_diff: PowerPointDiffNode,
+    document_diff: DiffNode,
 }
 
-impl PowerPointDiffTree10 {
-    pub fn new(reviewer_name: String, document_diff: PowerPointDiffNode) -> Result<Self> {
+impl DiffTree10 {
+    pub fn new(reviewer_name: String, document_diff: DiffNode) -> Result<Self> {
         validate_reviewer_name(&reviewer_name)?;
-        if document_diff.diff_type() != PowerPointDiffType::Document {
+        if document_diff.diff_type() != DiffType::Document {
             return corrupted("DiffTree10 root is not a DocDiff10 container");
         }
         Ok(Self {
@@ -539,7 +539,7 @@ impl PowerPointDiffTree10 {
         })
     }
 
-    pub fn parse(record: &PptRecord) -> Result<Self> {
+    pub fn parse(record: &Record) -> Result<Self> {
         Self::parse_with_limits(
             record,
             POWERPOINT_DIFF_MAX_DEPTH,
@@ -548,14 +548,14 @@ impl PowerPointDiffTree10 {
     }
 
     pub fn parse_with_limits(
-        record: &PptRecord,
+        record: &Record,
         max_depth: usize,
         max_records: usize,
     ) -> Result<Self> {
         if max_records == 0 {
             return corrupted("document-comparison record limit must be nonzero");
         }
-        if record.record_type_raw != PptRecordType::DiffTree10.as_u16()
+        if record.record_type_raw != RecordType::DiffTree10.as_u16()
             || record.version != 0xF
             || record.instance != 0
             || usize::try_from(record.data_length).ok() != Some(record.data.len())
@@ -569,8 +569,8 @@ impl PowerPointDiffTree10 {
         let (reviewer_name, reviewer_len) = parse_reviewer_name(&record.data)?;
         let mut count = 0;
         let (document_diff, diff_len) =
-            PowerPointDiffNode::parse(&record.data[reviewer_len..], 0, limits, &mut count)?;
-        if document_diff.diff_type() != PowerPointDiffType::Document {
+            DiffNode::parse(&record.data[reviewer_len..], 0, limits, &mut count)?;
+        if document_diff.diff_type() != DiffType::Document {
             return corrupted("DiffTree10 root is not a DocDiff10 container");
         }
         if reviewer_len + diff_len != record.data.len() {
@@ -586,13 +586,13 @@ impl PowerPointDiffTree10 {
         &self.reviewer_name
     }
 
-    pub const fn document_diff(&self) -> &PowerPointDiffNode {
+    pub const fn document_diff(&self) -> &DiffNode {
         &self.document_diff
     }
 
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         validate_reviewer_name(&self.reviewer_name)?;
-        if self.document_diff.diff_type() != PowerPointDiffType::Document {
+        if self.document_diff.diff_type() != DiffType::Document {
             return corrupted("DiffTree10 root is not a DocDiff10 container");
         }
         let mut reviewer_payload = Vec::new();
@@ -601,15 +601,12 @@ impl PowerPointDiffTree10 {
         }
         let mut payload = encode_record_raw(0, 0, REVIEWER_NAME_RECORD_TYPE, &reviewer_payload);
         payload.extend_from_slice(&self.document_diff.to_record_bytes()?);
-        Ok(encode_record(0xF, 0, PptRecordType::DiffTree10, &payload))
+        Ok(encode_record(0xF, 0, RecordType::DiffTree10, &payload))
     }
 }
 
-fn validate_diff_children(
-    parent: PowerPointDiffType,
-    children: &[PowerPointDiffNode],
-) -> Result<()> {
-    use PowerPointDiffType as T;
+fn validate_diff_children(parent: DiffType, children: &[DiffNode]) -> Result<()> {
+    use DiffType as T;
     match parent {
         T::NamedShowList => require_repeated(children, &[T::NamedShow]),
         T::MasterList => require_repeated(children, &[T::MainMaster, T::Slide]),
@@ -655,7 +652,7 @@ fn validate_diff_children(
     }
 }
 
-fn require_repeated(children: &[PowerPointDiffNode], allowed: &[PowerPointDiffType]) -> Result<()> {
+fn require_repeated(children: &[DiffNode], allowed: &[DiffType]) -> Result<()> {
     if children
         .iter()
         .all(|child| allowed.contains(&child.diff_type()))
@@ -666,10 +663,7 @@ fn require_repeated(children: &[PowerPointDiffNode], allowed: &[PowerPointDiffTy
     }
 }
 
-fn require_ordered(
-    children: &[PowerPointDiffNode],
-    grammar: &[(PowerPointDiffType, Option<bool>)],
-) -> Result<()> {
+fn require_ordered(children: &[DiffNode], grammar: &[(DiffType, Option<bool>)]) -> Result<()> {
     let mut previous = None;
     for child in children {
         let rank = grammar
@@ -679,9 +673,7 @@ fn require_ordered(
                     && index.is_none_or(|value| child.headers.index == value)
             })
             .ok_or_else(|| {
-                PptError::Corrupted(
-                    "Diff10 container contains a child of the wrong type".to_string(),
-                )
+                Error::Corrupted("Diff10 container contains a child of the wrong type".to_string())
             })?;
         if previous.is_some_and(|value| rank <= value) {
             return corrupted("Diff10 children are duplicated or out of order");
@@ -697,10 +689,10 @@ fn parse_reviewer_name(data: &[u8]) -> Result<(String, usize)> {
     }
     let (version, instance) = unpack_version_instance(read_u16(data, 0)?);
     let byte_len = usize::try_from(read_u32(data, 4)?)
-        .map_err(|_| PptError::Corrupted("reviewer-name length does not fit usize".to_string()))?;
+        .map_err(|_| Error::Corrupted("reviewer-name length does not fit usize".to_string()))?;
     let total_len = RECORD_HEADER_SIZE
         .checked_add(byte_len)
-        .ok_or_else(|| PptError::Corrupted("reviewer-name length overflow".to_string()))?;
+        .ok_or_else(|| Error::Corrupted("reviewer-name length overflow".to_string()))?;
     if version != 0
         || instance != 0
         || read_u16(data, 2)? != REVIEWER_NAME_RECORD_TYPE
@@ -719,7 +711,7 @@ fn parse_reviewer_name(data: &[u8]) -> Result<(String, usize)> {
         units.push(unit);
     }
     let name = String::from_utf16(&units)
-        .map_err(|_| PptError::Corrupted("ReviewerNameAtom contains invalid UTF-16".to_string()))?;
+        .map_err(|_| Error::Corrupted("ReviewerNameAtom contains invalid UTF-16".to_string()))?;
     validate_reviewer_name(&name)?;
     Ok((name, total_len))
 }
@@ -744,14 +736,14 @@ fn unpack_version_instance(value: u16) -> (u16, u16) {
 fn read_u16(data: &[u8], offset: usize) -> Result<u16> {
     let bytes = data
         .get(offset..offset + 2)
-        .ok_or_else(|| PptError::Corrupted("truncated document-comparison field".to_string()))?;
+        .ok_or_else(|| Error::Corrupted("truncated document-comparison field".to_string()))?;
     Ok(u16::from_le_bytes([bytes[0], bytes[1]]))
 }
 
 fn read_u32(data: &[u8], offset: usize) -> Result<u32> {
     let bytes = data
         .get(offset..offset + 4)
-        .ok_or_else(|| PptError::Corrupted("truncated document-comparison field".to_string()))?;
+        .ok_or_else(|| Error::Corrupted("truncated document-comparison field".to_string()))?;
     Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
 }
 
@@ -768,23 +760,13 @@ fn encode_record_raw(version: u16, instance: u16, record_type: u16, payload: &[u
 mod diff_tree_tests {
     use super::*;
 
-    fn node(
-        diff_type: PowerPointDiffType,
-        index: bool,
-        children: Vec<PowerPointDiffNode>,
-    ) -> PowerPointDiffNode {
-        PowerPointDiffNode::new(
-            diff_type,
-            index,
-            PowerPointDiffFlags::for_type(diff_type),
-            children,
-        )
-        .unwrap()
+    fn node(diff_type: DiffType, index: bool, children: Vec<DiffNode>) -> DiffNode {
+        DiffNode::new(diff_type, index, DiffFlags::for_type(diff_type), children).unwrap()
     }
 
-    fn record_from_tree(tree: &PowerPointDiffTree10) -> PptRecord {
+    fn record_from_tree(tree: &DiffTree10) -> Record {
         let bytes = tree.to_record_bytes().unwrap();
-        PptRecord::parse(&bytes, 0).unwrap().0
+        Record::parse(&bytes, 0).unwrap().0
     }
 
     #[test]
@@ -795,37 +777,34 @@ mod diff_tree_tests {
         assert!(
             values
                 .into_iter()
-                .all(|value| PowerPointDiffType::try_from(value).is_ok())
+                .all(|value| DiffType::try_from(value).is_ok())
         );
-        assert!(PowerPointDiffType::try_from(1).is_err());
-        assert_eq!(
-            PowerPointElementType::try_from(1).unwrap(),
-            PowerPointElementType::Shape
-        );
-        assert!(PowerPointElementType::try_from(0).is_err());
+        assert!(DiffType::try_from(1).is_err());
+        assert_eq!(ElementType::try_from(1).unwrap(), ElementType::Shape);
+        assert!(ElementType::try_from(0).is_err());
     }
 
     #[test]
     fn diff_tree_round_trips_and_canonicalizes_ignored_bits() {
-        let named_show = node(PowerPointDiffType::NamedShow, false, vec![]);
-        let named_show_list = node(PowerPointDiffType::NamedShowList, false, vec![named_show]);
-        let document = PowerPointDiffNode::new(
-            PowerPointDiffType::Document,
+        let named_show = node(DiffType::NamedShow, false, vec![]);
+        let named_show_list = node(DiffType::NamedShowList, false, vec![named_show]);
+        let document = DiffNode::new(
+            DiffType::Document,
             false,
-            PowerPointDiffFlags::Document(PowerPointDocDiffFlags {
+            DiffFlags::Document(DocDiffFlags {
                 slide_size: true,
                 ..Default::default()
             }),
             vec![named_show_list],
         )
         .unwrap();
-        let tree = PowerPointDiffTree10::new("Reviewer".to_string(), document).unwrap();
+        let tree = DiffTree10::new("Reviewer".to_string(), document).unwrap();
         let mut bytes = tree.to_record_bytes().unwrap();
         let reviewer_len = 8 + "Reviewer".encode_utf16().count() * 2;
         let doc_flags_offset = 8 + reviewer_len + DIFF_HEADER_SIZE;
         bytes[doc_flags_offset + 3] = 0x80;
-        let record = PptRecord::parse(&bytes, 0).unwrap().0;
-        let parsed = PowerPointDiffTree10::parse(&record).unwrap();
+        let record = Record::parse(&bytes, 0).unwrap().0;
+        let parsed = DiffTree10::parse(&record).unwrap();
         assert_eq!(parsed.reviewer_name(), "Reviewer");
         assert_eq!(parsed.document_diff().ignored_flag_bits(), 0x8000_0000);
         let canonical = parsed.to_record_bytes().unwrap();
@@ -834,20 +813,20 @@ mod diff_tree_tests {
 
     #[test]
     fn malformed_tag_and_child_order_are_rejected() {
-        let document = node(PowerPointDiffType::Document, false, vec![]);
-        let tree = PowerPointDiffTree10::new("R".to_string(), document).unwrap();
+        let document = node(DiffType::Document, false, vec![]);
+        let tree = DiffTree10::new("R".to_string(), document).unwrap();
         let mut bytes = tree.to_record_bytes().unwrap();
         let tag_offset = 8 + 8 + 2 + 20;
         bytes[tag_offset..tag_offset + 4].copy_from_slice(&1u32.to_le_bytes());
-        let record = PptRecord::parse(&bytes, 0).unwrap().0;
-        assert!(PowerPointDiffTree10::parse(&record).is_err());
+        let record = Record::parse(&bytes, 0).unwrap().0;
+        assert!(DiffTree10::parse(&record).is_err());
 
-        let wrong_child = node(PowerPointDiffType::Text, false, vec![]);
+        let wrong_child = node(DiffType::Text, false, vec![]);
         assert!(
-            PowerPointDiffNode::new(
-                PowerPointDiffType::Document,
+            DiffNode::new(
+                DiffType::Document,
                 false,
-                PowerPointDiffFlags::for_type(PowerPointDiffType::Document),
+                DiffFlags::for_type(DiffType::Document),
                 vec![wrong_child],
             )
             .is_err()
@@ -856,20 +835,20 @@ mod diff_tree_tests {
 
     #[test]
     fn depth_and_record_count_limits_are_enforced() {
-        let text = node(PowerPointDiffType::Text, false, vec![]);
-        let shape = node(PowerPointDiffType::Shape, false, vec![text]);
-        let shape_list = node(PowerPointDiffType::ShapeList, false, vec![shape]);
-        let slide = node(PowerPointDiffType::Slide, false, vec![shape_list]);
-        let slide_list = node(PowerPointDiffType::SlideList, false, vec![slide]);
-        let document = node(PowerPointDiffType::Document, false, vec![slide_list]);
-        let tree = PowerPointDiffTree10::new("R".to_string(), document).unwrap();
+        let text = node(DiffType::Text, false, vec![]);
+        let shape = node(DiffType::Shape, false, vec![text]);
+        let shape_list = node(DiffType::ShapeList, false, vec![shape]);
+        let slide = node(DiffType::Slide, false, vec![shape_list]);
+        let slide_list = node(DiffType::SlideList, false, vec![slide]);
+        let document = node(DiffType::Document, false, vec![slide_list]);
+        let tree = DiffTree10::new("R".to_string(), document).unwrap();
         let record = record_from_tree(&tree);
-        assert!(PowerPointDiffTree10::parse_with_limits(&record, 2, 100).is_err());
-        assert!(PowerPointDiffTree10::parse_with_limits(&record, 32, 3).is_err());
+        assert!(DiffTree10::parse_with_limits(&record, 2, 100).is_err());
+        assert!(DiffTree10::parse_with_limits(&record, 32, 3).is_err());
     }
 }
 
-impl PowerPointReviewingToolbarStates {
+impl ReviewingToolbarStates {
     /// Construct reviewing UI state. Reserved bits are emitted as zero.
     pub const fn new(show_reviewing_toolbar: bool, show_reviewing_gallery: bool) -> Self {
         Self {
@@ -880,8 +859,8 @@ impl PowerPointReviewingToolbarStates {
     }
 
     /// Parse a strict `DocToolbarStates10Atom` record.
-    pub fn parse(record: &PptRecord) -> Result<Self> {
-        validate_atom(record, PptRecordType::DocToolbarStates10Atom, 1)?;
+    pub fn parse(record: &Record) -> Result<Self> {
+        validate_atom(record, RecordType::DocToolbarStates10Atom, 1)?;
         let value = record.data[0];
         Ok(Self {
             show_reviewing_toolbar: value & 0x01 != 0,
@@ -918,18 +897,18 @@ impl PowerPointReviewingToolbarStates {
         let value = self.ignored_reserved_bits
             | u8::from(self.show_reviewing_toolbar)
             | (u8::from(self.show_reviewing_gallery) << 1);
-        encode_record(0, 0, PptRecordType::DocToolbarStates10Atom, &[value])
+        encode_record(0, 0, RecordType::DocToolbarStates10Atom, &[value])
     }
 }
 
 /// One slide creation-time entry from a document-comparison slide list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointSlideCreationEntry {
+pub struct SlideCreationEntry {
     slide_id_ref: u32,
     file_time: u64,
 }
 
-impl PowerPointSlideCreationEntry {
+impl SlideCreationEntry {
     pub const fn new(slide_id_ref: u32, file_time: u64) -> Self {
         Self {
             slide_id_ref,
@@ -966,35 +945,35 @@ impl PowerPointSlideCreationEntry {
 
     /// Serialize a strict `SlideListEntry10Atom` record.
     pub fn to_record_bytes(self) -> Vec<u8> {
-        encode_record(0, 0, PptRecordType::SlideListEntry10Atom, &self.payload())
+        encode_record(0, 0, RecordType::SlideListEntry10Atom, &self.payload())
     }
 }
 
 /// Strict `SlideListTable10Container` metadata.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct PowerPointSlideListTable10 {
-    entries: Vec<PowerPointSlideCreationEntry>,
+pub struct SlideListTable10 {
+    entries: Vec<SlideCreationEntry>,
 }
 
-impl PowerPointSlideListTable10 {
-    pub fn new(entries: Vec<PowerPointSlideCreationEntry>) -> Result<Self> {
+impl SlideListTable10 {
+    pub fn new(entries: Vec<SlideCreationEntry>) -> Result<Self> {
         validate_count(entries.len())?;
         Ok(Self { entries })
     }
 
-    pub fn entries(&self) -> &[PowerPointSlideCreationEntry] {
+    pub fn entries(&self) -> &[SlideCreationEntry] {
         &self.entries
     }
 
-    pub fn push(&mut self, entry: PowerPointSlideCreationEntry) -> Result<()> {
+    pub fn push(&mut self, entry: SlideCreationEntry) -> Result<()> {
         validate_count(self.entries.len().saturating_add(1))?;
         self.entries.push(entry);
         Ok(())
     }
 
     /// Parse a strict container without allocating intermediate child records.
-    pub fn parse(record: &PptRecord) -> Result<Self> {
-        if record.record_type != PptRecordType::SlideListTable10
+    pub fn parse(record: &Record) -> Result<Self> {
+        if record.record_type != RecordType::SlideListTable10
             || record.version != 0x0f
             || record.instance != 0
             || usize::try_from(record.data_length).ok() != Some(record.data.len())
@@ -1008,17 +987,17 @@ impl PowerPointSlideListTable10 {
         let size_payload = child_payload(
             data,
             0,
-            PptRecordType::SlideListTableSize10Atom,
+            RecordType::SlideListTableSize10Atom,
             SIZE_ATOM_PAYLOAD_SIZE,
         )?;
         let signed_count = i32::from_le_bytes(size_payload.try_into().expect("fixed payload"));
         let count = usize::try_from(signed_count)
-            .map_err(|_| PptError::Corrupted("negative slide-list table count".to_string()))?;
+            .map_err(|_| Error::Corrupted("negative slide-list table count".to_string()))?;
         validate_count(count)?;
         let expected = count
             .checked_mul(ENTRY_RECORD_SIZE)
             .and_then(|size| size.checked_add(SIZE_ATOM_RECORD_SIZE))
-            .ok_or_else(|| PptError::Corrupted("slide-list table size overflow".to_string()))?;
+            .ok_or_else(|| Error::Corrupted("slide-list table size overflow".to_string()))?;
         if data.len() != expected {
             return corrupted("SlideListTable10Container count does not match its payload");
         }
@@ -1029,10 +1008,10 @@ impl PowerPointSlideListTable10 {
             let payload = child_payload(
                 data,
                 offset,
-                PptRecordType::SlideListEntry10Atom,
+                RecordType::SlideListEntry10Atom,
                 ENTRY_PAYLOAD_SIZE,
             )?;
-            entries.push(PowerPointSlideCreationEntry::parse_payload(payload));
+            entries.push(SlideCreationEntry::parse_payload(payload));
             offset += ENTRY_RECORD_SIZE;
         }
         Ok(Self { entries })
@@ -1042,15 +1021,15 @@ impl PowerPointSlideListTable10 {
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         validate_count(self.entries.len())?;
         let count = i32::try_from(self.entries.len())
-            .map_err(|_| PptError::Corrupted("slide-list table count overflow".to_string()))?;
+            .map_err(|_| Error::Corrupted("slide-list table count overflow".to_string()))?;
         let capacity = SIZE_ATOM_RECORD_SIZE
             .checked_add(self.entries.len().saturating_mul(ENTRY_RECORD_SIZE))
-            .ok_or_else(|| PptError::Corrupted("slide-list table size overflow".to_string()))?;
+            .ok_or_else(|| Error::Corrupted("slide-list table size overflow".to_string()))?;
         let mut payload = Vec::with_capacity(capacity);
         payload.extend_from_slice(&encode_record(
             0,
             0,
-            PptRecordType::SlideListTableSize10Atom,
+            RecordType::SlideListTableSize10Atom,
             &count.to_le_bytes(),
         ));
         for entry in &self.entries {
@@ -1059,13 +1038,13 @@ impl PowerPointSlideListTable10 {
         Ok(encode_record(
             0x0f,
             0,
-            PptRecordType::SlideListTable10,
+            RecordType::SlideListTable10,
             &payload,
         ))
     }
 }
 
-fn validate_atom(record: &PptRecord, kind: PptRecordType, payload_size: usize) -> Result<()> {
+fn validate_atom(record: &Record, kind: RecordType, payload_size: usize) -> Result<()> {
     if record.record_type != kind
         || record.version != 0
         || record.instance != 0
@@ -1088,15 +1067,15 @@ fn validate_count(count: usize) -> Result<()> {
 fn child_payload(
     data: &[u8],
     offset: usize,
-    kind: PptRecordType,
+    kind: RecordType,
     payload_size: usize,
 ) -> Result<&[u8]> {
     let header_end = offset
         .checked_add(RECORD_HEADER_SIZE)
-        .ok_or_else(|| PptError::Corrupted("record offset overflow".to_string()))?;
+        .ok_or_else(|| Error::Corrupted("record offset overflow".to_string()))?;
     let header = data
         .get(offset..header_end)
-        .ok_or_else(|| PptError::Corrupted("truncated document-comparison child".to_string()))?;
+        .ok_or_else(|| Error::Corrupted("truncated document-comparison child".to_string()))?;
     let version_instance = u16::from_le_bytes([header[0], header[1]]);
     let raw_type = u16::from_le_bytes([header[2], header[3]]);
     let length = u32::from_le_bytes(header[4..8].try_into().expect("fixed header"));
@@ -1105,12 +1084,12 @@ fn child_payload(
     }
     let end = header_end
         .checked_add(payload_size)
-        .ok_or_else(|| PptError::Corrupted("record length overflow".to_string()))?;
+        .ok_or_else(|| Error::Corrupted("record length overflow".to_string()))?;
     data.get(header_end..end)
-        .ok_or_else(|| PptError::Corrupted("truncated document-comparison payload".to_string()))
+        .ok_or_else(|| Error::Corrupted("truncated document-comparison payload".to_string()))
 }
 
-fn encode_record(version: u16, instance: u16, kind: PptRecordType, payload: &[u8]) -> Vec<u8> {
+fn encode_record(version: u16, instance: u16, kind: RecordType, payload: &[u8]) -> Vec<u8> {
     let mut output = Vec::with_capacity(RECORD_HEADER_SIZE + payload.len());
     output.extend_from_slice(&((instance << 4) | version).to_le_bytes());
     output.extend_from_slice(&kind.as_u16().to_le_bytes());
@@ -1120,15 +1099,15 @@ fn encode_record(version: u16, instance: u16, kind: PptRecordType, payload: &[u8
 }
 
 fn corrupted<T>(message: &str) -> Result<T> {
-    Err(PptError::Corrupted(message.to_string()))
+    Err(Error::Corrupted(message.to_string()))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn record(version: u16, kind: PptRecordType, data: Vec<u8>) -> PptRecord {
-        PptRecord {
+    fn record(version: u16, kind: RecordType, data: Vec<u8>) -> Record {
+        Record {
             version,
             instance: 0,
             record_type: kind,
@@ -1141,9 +1120,9 @@ mod tests {
 
     #[test]
     fn reviewing_toolbar_round_trips_ignored_bits_and_mutation() {
-        let parsed = PowerPointReviewingToolbarStates::parse(&record(
+        let parsed = ReviewingToolbarStates::parse(&record(
             0,
-            PptRecordType::DocToolbarStates10Atom,
+            RecordType::DocToolbarStates10Atom,
             vec![0xfd],
         ))
         .unwrap();
@@ -1152,21 +1131,21 @@ mod tests {
         assert_eq!(parsed.ignored_reserved_bits(), 0xfc);
         assert_eq!(parsed.to_record_bytes()[8], 0xfd);
 
-        let mut created = PowerPointReviewingToolbarStates::new(false, false);
+        let mut created = ReviewingToolbarStates::new(false, false);
         created.set_show_reviewing_gallery(true);
         assert_eq!(created.to_record_bytes()[8], 0x02);
     }
 
     #[test]
     fn slide_list_table_round_trips_filetime_order_and_entries() {
-        let table = PowerPointSlideListTable10::new(vec![
-            PowerPointSlideCreationEntry::new(7, 0x1122_3344_5566_7788),
-            PowerPointSlideCreationEntry::new(u32::MAX, u64::MAX),
+        let table = SlideListTable10::new(vec![
+            SlideCreationEntry::new(7, 0x1122_3344_5566_7788),
+            SlideCreationEntry::new(u32::MAX, u64::MAX),
         ])
         .unwrap();
         let bytes = table.to_record_bytes().unwrap();
-        let parsed_record = record(0x0f, PptRecordType::SlideListTable10, bytes[8..].to_vec());
-        let parsed = PowerPointSlideListTable10::parse(&parsed_record).unwrap();
+        let parsed_record = record(0x0f, RecordType::SlideListTable10, bytes[8..].to_vec());
+        let parsed = SlideListTable10::parse(&parsed_record).unwrap();
         assert_eq!(parsed, table);
         assert_eq!(bytes[32..36], 0x1122_3344u32.to_le_bytes());
         assert_eq!(bytes[36..40], 0x5566_7788u32.to_le_bytes());
@@ -1174,8 +1153,8 @@ mod tests {
 
     #[test]
     fn rejects_bad_headers_counts_order_truncation_and_trailing_data() {
-        let entry = PowerPointSlideCreationEntry::new(1, 2);
-        let table = PowerPointSlideListTable10::new(vec![entry]).unwrap();
+        let entry = SlideCreationEntry::new(1, 2);
+        let table = SlideListTable10::new(vec![entry]).unwrap();
         let bytes = table.to_record_bytes().unwrap();
         let payload = bytes[8..].to_vec();
 
@@ -1187,11 +1166,8 @@ mod tests {
         mismatch[8..12].copy_from_slice(&2i32.to_le_bytes());
         cases.push(mismatch);
         let mut wrong_child = payload.clone();
-        wrong_child[14..16].copy_from_slice(
-            &PptRecordType::SlideListTableSize10Atom
-                .as_u16()
-                .to_le_bytes(),
-        );
+        wrong_child[14..16]
+            .copy_from_slice(&RecordType::SlideListTableSize10Atom.as_u16().to_le_bytes());
         cases.push(wrong_child);
         cases.push(payload[..payload.len() - 1].to_vec());
         let mut trailing = payload.clone();
@@ -1200,30 +1176,23 @@ mod tests {
 
         for data in cases {
             assert!(
-                PowerPointSlideListTable10::parse(&record(
-                    0x0f,
-                    PptRecordType::SlideListTable10,
-                    data,
-                ))
-                .is_err()
+                SlideListTable10::parse(&record(0x0f, RecordType::SlideListTable10, data,))
+                    .is_err()
             );
         }
         assert!(
-            PowerPointSlideListTable10::parse(
-                &record(0, PptRecordType::SlideListTable10, payload,)
-            )
-            .is_err()
+            SlideListTable10::parse(&record(0, RecordType::SlideListTable10, payload,)).is_err()
         );
     }
 
     #[test]
     fn rejects_atom_children_and_oversized_builder() {
-        let mut atom = record(0, PptRecordType::DocToolbarStates10Atom, vec![0]);
+        let mut atom = record(0, RecordType::DocToolbarStates10Atom, vec![0]);
         atom.children
-            .push(record(0, PptRecordType::Unknown, Vec::new()));
-        assert!(PowerPointReviewingToolbarStates::parse(&atom).is_err());
+            .push(record(0, RecordType::Unknown, Vec::new()));
+        assert!(ReviewingToolbarStates::parse(&atom).is_err());
 
-        let oversized = vec![PowerPointSlideCreationEntry::new(0, 0); MAX_SLIDE_LIST_ENTRIES + 1];
-        assert!(PowerPointSlideListTable10::new(oversized).is_err());
+        let oversized = vec![SlideCreationEntry::new(0, 0); MAX_SLIDE_LIST_ENTRIES + 1];
+        assert!(SlideListTable10::new(oversized).is_err());
     }
 }

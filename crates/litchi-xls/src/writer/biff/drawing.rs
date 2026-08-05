@@ -1,8 +1,8 @@
 use std::io::Write;
 
 use crate::writer::shape::Anchor;
-use crate::writer::{XlsShapeFill, XlsShapeLine, XlsShapeText, XlsShapeTextRun, XlsShapeWrite};
-use crate::{XlsError, XlsResult};
+use crate::writer::{ShapeFill, ShapeLine, ShapeText, ShapeTextRun, ShapeWrite};
+use crate::{Error, Result};
 use litchi_odraw::{
     prop::Id,
     shape::{Flags, Native},
@@ -24,7 +24,7 @@ const TXO: u16 = 0x01B6;
 const CONTINUE: u16 = 0x003C;
 
 pub(crate) struct PrimitiveShapeConfig<'a> {
-    pub shape: &'a XlsShapeWrite,
+    pub shape: &'a ShapeWrite,
     pub object_id: u16,
 }
 
@@ -77,11 +77,11 @@ impl DrawingObject<'_> {
     }
 }
 
-fn write_mso<W: Write>(writer: &mut W, data: &[u8]) -> XlsResult<()> {
+fn write_mso<W: Write>(writer: &mut W, data: &[u8]) -> Result<()> {
     let length = u16::try_from(data.len())
-        .map_err(|_| XlsError::InvalidData("MsoDrawing record is too large".to_string()))?;
+        .map_err(|_| Error::InvalidData("MsoDrawing record is too large".to_string()))?;
     if length > 8224 {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "MsoDrawing record exceeds 8224 bytes".to_string(),
         ));
     }
@@ -90,23 +90,23 @@ fn write_mso<W: Write>(writer: &mut W, data: &[u8]) -> XlsResult<()> {
     Ok(())
 }
 
-fn group_prefix(drawing_id: u32, object_count: usize, shapes_size: usize) -> XlsResult<Vec<u8>> {
+fn group_prefix(drawing_id: u32, object_count: usize, shapes_size: usize) -> Result<Vec<u8>> {
     if drawing_id == 0 || drawing_id > 0x0FFF || object_count == 0 || object_count > 1022 {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "worksheet drawing ID or object count is outside OfficeArt limits".to_string(),
         ));
     }
     let shape_count = u32::try_from(object_count + 1)
-        .map_err(|_| XlsError::InvalidData("drawing shape count overflows".to_string()))?;
+        .map_err(|_| Error::InvalidData("drawing shape count overflows".to_string()))?;
     let spgr_length =
         48u32
             .checked_add(u32::try_from(shapes_size).map_err(|_| {
-                XlsError::InvalidData("worksheet drawing size exceeds u32".to_string())
+                Error::InvalidData("worksheet drawing size exceeds u32".to_string())
             })?)
-            .ok_or_else(|| XlsError::InvalidData("worksheet drawing size overflows".to_string()))?;
+            .ok_or_else(|| Error::InvalidData("worksheet drawing size overflows".to_string()))?;
     let dg_length = 24u32
         .checked_add(spgr_length)
-        .ok_or_else(|| XlsError::InvalidData("worksheet drawing size overflows".to_string()))?;
+        .ok_or_else(|| Error::InvalidData("worksheet drawing size overflows".to_string()))?;
     let patriarch = drawing_id << 10;
     let mut out = Vec::with_capacity(80);
     write_container_header(&mut out, 0, WriteContainer::Dg, dg_length)?;
@@ -124,7 +124,7 @@ fn group_prefix(drawing_id: u32, object_count: usize, shapes_size: usize) -> Xls
     Ok(out)
 }
 
-pub(super) fn write_xls_anchor<W: Write>(writer: &mut W, anchor: &Anchor) -> XlsResult<()> {
+pub(super) fn write_xls_anchor<W: Write>(writer: &mut W, anchor: &Anchor) -> Result<()> {
     write_atom_header(writer, 0, WriteAtom::ClientAnchor, 18)?;
     for value in anchor.fields() {
         writer.write_all(&value.to_le_bytes())?;
@@ -135,8 +135,8 @@ pub(super) fn write_xls_anchor<W: Write>(writer: &mut W, anchor: &Anchor) -> Xls
 /// Build the shared primitive style OPT properties (protection, fill, line, visibility).
 pub(super) fn style_properties(
     locked: bool,
-    fill: XlsShapeFill,
-    line: XlsShapeLine,
+    fill: ShapeFill,
+    line: ShapeLine,
     visible: bool,
 ) -> PropertyBuilder<'static> {
     let mut properties = PropertyBuilder::new();
@@ -145,22 +145,22 @@ pub(super) fn style_properties(
         if locked { 0x0104_0104 } else { 0x0104_0000 },
     );
     match fill {
-        XlsShapeFill::None => {
+        ShapeFill::None => {
             properties.add_simple(Id::FillColor, 0);
             properties.add_simple(Id::NoFillHitTest, 0x0010_0000);
         },
-        XlsShapeFill::Solid(color) => {
+        ShapeFill::Solid(color) => {
             properties.add_simple(Id::FillColor, color.officeart_color() as i32);
             properties.add_simple(Id::NoFillHitTest, 0x0015_0011);
         },
     }
     match line {
-        XlsShapeLine::None => {
+        ShapeLine::None => {
             properties.add_simple(Id::LineColor, 0);
             properties.add_simple(Id::LineWidth, 0);
             properties.add_simple(Id::NoLineDrawDash, 0x0008_0000);
         },
-        XlsShapeLine::Solid { color, width_emu } => {
+        ShapeLine::Solid { color, width_emu } => {
             properties.add_simple(Id::LineColor, color.officeart_color() as i32);
             properties.add_simple(Id::LineWidth, width_emu as i32);
             properties.add_simple(Id::NoLineDrawDash, 0x0008_0008);
@@ -176,24 +176,24 @@ pub(super) fn style_properties(
 pub(super) fn split_client_textbox(
     mut escher: Vec<u8>,
     has_textbox: bool,
-) -> XlsResult<(Vec<u8>, bool)> {
+) -> Result<(Vec<u8>, bool)> {
     if has_textbox {
         let split = escher.len().checked_sub(8).ok_or_else(|| {
-            XlsError::InvalidData("OfficeArt textbox shape is truncated".to_string())
+            Error::InvalidData("OfficeArt textbox shape is truncated".to_string())
         })?;
         escher.truncate(split);
     }
     Ok((escher, has_textbox))
 }
 
-fn primitive_shape(shape: &XlsShapeWrite, shape_id: u32) -> XlsResult<(Vec<u8>, bool)> {
+fn primitive_shape(shape: &ShapeWrite, shape_id: u32) -> Result<(Vec<u8>, bool)> {
     let mut children = Vec::with_capacity(112);
     ShapeBuilder::new(Native::from_raw(shape.kind.officeart_type()), shape_id)
         .with_flags(Flags::HAVE_ANCHOR | Flags::HAVE_SPT)
         .write(&mut children)?;
     style_properties(shape.locked, shape.fill, shape.line, shape.visible).write(&mut children)?;
     write_xls_anchor(&mut children, &shape.anchor)?;
-    let has_textbox = shape.kind == crate::writer::XlsShapeKind::TextBox || shape.text.is_some();
+    let has_textbox = shape.kind == crate::writer::ShapeKind::TextBox || shape.text.is_some();
     write_escher_atom(&mut children, 0, WriteAtom::ClientData, &[])?;
     if has_textbox {
         write_escher_atom(&mut children, 0, WriteAtom::ClientTextbox, &[])?;
@@ -203,7 +203,7 @@ fn primitive_shape(shape: &XlsShapeWrite, shape_id: u32) -> XlsResult<(Vec<u8>, 
     split_client_textbox(out, has_textbox)
 }
 
-fn pivot_shape(shape_id: u32) -> XlsResult<Vec<u8>> {
+fn pivot_shape(shape_id: u32) -> Result<Vec<u8>> {
     let mut children = Vec::with_capacity(82);
     ShapeBuilder::new(Native::from_raw(201), shape_id)
         .with_flags(Flags::HAVE_ANCHOR | Flags::HAVE_SPT)
@@ -239,7 +239,7 @@ fn write_ft_cmo<W: Write>(
     object_id: u16,
     locked: bool,
     visible: bool,
-) -> XlsResult<()> {
+) -> Result<()> {
     writer.write_all(&FT_CMO.to_le_bytes())?;
     writer.write_all(&FT_CMO_SIZE.to_le_bytes())?;
     writer.write_all(&object_type.to_le_bytes())?;
@@ -250,7 +250,7 @@ fn write_ft_cmo<W: Write>(
     Ok(())
 }
 
-fn write_ft_end<W: Write>(writer: &mut W) -> XlsResult<()> {
+fn write_ft_end<W: Write>(writer: &mut W) -> Result<()> {
     writer.write_all(&0u16.to_le_bytes())?;
     writer.write_all(&0u16.to_le_bytes())?;
     Ok(())
@@ -262,7 +262,7 @@ fn write_shape_obj<W: Write>(
     object_id: u16,
     locked: bool,
     visible: bool,
-) -> XlsResult<()> {
+) -> Result<()> {
     write_record_header(writer, OBJ, 26)?;
     write_ft_cmo(writer, object_type, object_id, locked, visible)?;
     write_ft_end(writer)
@@ -274,7 +274,7 @@ fn write_group_obj<W: Write>(
     object_id: u16,
     locked: bool,
     visible: bool,
-) -> XlsResult<()> {
+) -> Result<()> {
     write_record_header(writer, OBJ, 32)?;
     write_ft_cmo(writer, OBJECT_TYPE_GROUP, object_id, locked, visible)?;
     writer.write_all(&FT_GMO.to_le_bytes())?;
@@ -283,11 +283,11 @@ fn write_group_obj<W: Write>(
     write_ft_end(writer)
 }
 
-fn write_continue<W: Write>(writer: &mut W, data: &[u8]) -> XlsResult<()> {
+fn write_continue<W: Write>(writer: &mut W, data: &[u8]) -> Result<()> {
     let length = u16::try_from(data.len())
-        .map_err(|_| XlsError::InvalidData("shape CONTINUE record is too large".to_string()))?;
+        .map_err(|_| Error::InvalidData("shape CONTINUE record is too large".to_string()))?;
     if length > 8224 {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "shape CONTINUE record exceeds 8224 bytes".to_string(),
         ));
     }
@@ -296,13 +296,13 @@ fn write_continue<W: Write>(writer: &mut W, data: &[u8]) -> XlsResult<()> {
     Ok(())
 }
 
-fn write_shape_txo<W: Write>(writer: &mut W, text: Option<&XlsShapeText>) -> XlsResult<()> {
+fn write_shape_txo<W: Write>(writer: &mut W, text: Option<&ShapeText>) -> Result<()> {
     let value = text.map_or("", |text| text.value.as_str());
     let units = value.encode_utf16().collect::<Vec<_>>();
     let runs = match text {
         _ if units.is_empty() => Vec::new(),
         Some(text) if !text.runs.is_empty() => text.runs.clone(),
-        _ => vec![XlsShapeTextRun {
+        _ => vec![ShapeTextRun {
             character_index: 0,
             font_index: 0,
         }],
@@ -351,7 +351,7 @@ fn write_shape_txo<W: Write>(writer: &mut W, text: Option<&XlsShapeText>) -> Xls
     Ok(())
 }
 
-fn write_client_textbox<W: Write>(writer: &mut W) -> XlsResult<()> {
+fn write_client_textbox<W: Write>(writer: &mut W) -> Result<()> {
     let mut textbox = Vec::with_capacity(8);
     write_escher_atom(&mut textbox, 0, WriteAtom::ClientTextbox, &[])?;
     write_mso(writer, &textbox)
@@ -364,7 +364,7 @@ pub(crate) fn write_worksheet_drawing<W: Write>(
     primitives: &[PrimitiveShapeConfig<'_>],
     groups: &[GroupShapeConfig<'_>],
     comments: &[CommentConfig<'_>],
-) -> XlsResult<()> {
+) -> Result<()> {
     let group_object_count = groups
         .iter()
         .map(|config| 1 + config.group.children.len())

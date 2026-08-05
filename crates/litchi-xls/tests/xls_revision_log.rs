@@ -1,11 +1,11 @@
 //! Integration tests for the shared-workbook `Revision Log` stream: a real
 //! CFB container carrying both the `Workbook` stream and a `Revision Log`
-//! stream is opened through `XlsWorkbook`.
+//! stream is opened through `Workbook`.
 
 use std::io::Cursor;
 
 use litchi_cfb::{OleFile, OleWriter};
-use litchi_xls::{REVISION_LOG_STREAM_NAME, XlsRevision, XlsRevisionType, XlsWorkbook, XlsWriter};
+use litchi_xls::{REVISION_LOG_STREAM_NAME, Revision, RevisionType, Workbook, Writer};
 
 // BIFF8 record types (MS-XLS 2.3 record enumeration values).
 const EOF_RECORD_TYPE: u16 = 0x000A;
@@ -105,10 +105,10 @@ fn revision_log_stream() -> Vec<u8> {
     stream
 }
 
-/// Write a minimal workbook with `XlsWriter`, then move its `Workbook`
+/// Write a minimal workbook with `Writer`, then move its `Workbook`
 /// stream into a fresh container that also holds the supplied extra streams.
 fn workbook_container(extra_streams: &[(&str, Vec<u8>)]) -> Vec<u8> {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.write_string(sheet, 0, 0, "shared").unwrap();
     let mut workbook_bytes = Cursor::new(Vec::new());
@@ -132,7 +132,7 @@ fn workbook_container(extra_streams: &[(&str, Vec<u8>)]) -> Vec<u8> {
 #[test]
 fn workbook_without_revision_log_reports_none() {
     let bytes = workbook_container(&[]);
-    let mut workbook = XlsWorkbook::new(Cursor::new(bytes)).unwrap();
+    let mut workbook = Workbook::new(Cursor::new(bytes)).unwrap();
     assert!(!workbook.has_revision_log());
     assert!(workbook.revision_log().unwrap().is_none());
 }
@@ -140,7 +140,7 @@ fn workbook_without_revision_log_reports_none() {
 #[test]
 fn workbook_exposes_revision_log_stream() {
     let bytes = workbook_container(&[(REVISION_LOG_STREAM_NAME, revision_log_stream())]);
-    let mut workbook = XlsWorkbook::new(Cursor::new(bytes)).unwrap();
+    let mut workbook = Workbook::new(Cursor::new(bytes)).unwrap();
     assert!(workbook.has_revision_log());
 
     let log = workbook
@@ -165,8 +165,8 @@ fn workbook_exposes_revision_log_stream() {
 
     assert_eq!(header.revisions().len(), 1);
     match &header.revisions()[0] {
-        XlsRevision::RenSheet(sheet) => {
-            assert_eq!(sheet.header().revision_type(), XlsRevisionType::RenameSheet);
+        Revision::RenSheet(sheet) => {
+            assert_eq!(sheet.header().revision_type(), RevisionType::RenameSheet);
             assert_eq!(sheet.header().revision_id(), 41);
             assert_eq!(sheet.old_name(), "Sheet1");
             assert_eq!(sheet.new_name(), "Summary");
@@ -180,7 +180,7 @@ fn malformed_revision_log_surfaces_an_error() {
     // A `Revision Log` stream that does not start with RRDInfo.
     let malformed = record(EOF_RECORD_TYPE, &[]);
     let bytes = workbook_container(&[(REVISION_LOG_STREAM_NAME, malformed)]);
-    let mut workbook = XlsWorkbook::new(Cursor::new(bytes)).unwrap();
+    let mut workbook = Workbook::new(Cursor::new(bytes)).unwrap();
     assert!(workbook.has_revision_log());
     assert!(workbook.revision_log().is_err());
 }

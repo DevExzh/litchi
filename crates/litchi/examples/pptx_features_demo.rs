@@ -1,371 +1,463 @@
-//! Demonstration of PPTX features including Tables, Group Shapes, Comments, Sections, and Media.
+//! PresentationML feature showcase using the current semantic writer and
+//! typed package owners.
 //!
-//! Run this example with:
+//! Run with:
 //! ```bash
 //! cargo run --example pptx_features_demo
 //! ```
-//!
-//! This will generate `pptx_features_demo.pptx` in the project root directory.
-//! Open it in Microsoft PowerPoint to verify all features work correctly.
 
-use litchi::ooxml::pptx::{Package, Section, SectionList};
+use litchi_opc::{OpcPackage, PackURI};
+use litchi_pptx::comments::{
+    Author as CommentAuthor, Comment, Comments, Conformance as CommentConformance,
+    List as CommentList, store_presentation_comments,
+};
+use litchi_pptx::media_parts::{
+    Conformance as MediaConformance, Kind as MediaKind, List as MediaList, Picture, Resource,
+    Transform, store as store_slide_media,
+};
+use litchi_pptx::presentation::media::{Format as MediaFormat, Kind as AuthoringMediaKind};
+use litchi_pptx::presentation_properties::metadata::sections::{List as SectionList, Section};
+use litchi_pptx::{Error, MutablePresentation, MutableSlide, Package, Result};
+use std::collections::BTreeMap;
+use std::error::Error as StdError;
 use std::fs;
 use std::path::Path;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+const INCH: i64 = 914_400;
+const SLIDE_WIDTH: i64 = 10 * INCH;
+const SLIDE_HEIGHT: i64 = 7 * INCH + INCH / 2;
+
+struct MediaAttachment {
+    slide: usize,
+    data: Vec<u8>,
+    format: MediaFormat,
+    name: String,
+    x: i64,
+    y: i64,
+    width: i64,
+    height: i64,
+}
+
+fn main() -> std::result::Result<(), Box<dyn StdError>> {
     println!("Creating PPTX features demonstration...\n");
 
-    // Create a new presentation package
-    let mut pkg = Package::new()?;
+    let mut package = Package::new()?;
+    let media = {
+        let presentation = package.presentation_mut()?;
+        presentation.set_slide_size(SLIDE_WIDTH, SLIDE_HEIGHT);
+        build_slides(presentation)?
+    };
 
-    // Get mutable presentation for editing
-    let pres = pkg.presentation_mut()?;
-
-    // Set presentation metadata
-    pres.set_slide_size(9144000, 6858000); // Standard 4:3 (10" x 7.5" in EMUs)
-
-    // ========================================================================
-    // Slide 1: Title Slide
-    // ========================================================================
-    println!("Creating Slide 1: Title Slide");
-    let slide1 = pres.add_slide()?;
-    slide1.set_title("PPTX Features Demo");
-    slide1.add_text_box(
-        "Demonstrating Tables, Groups, Comments, Sections, and Media",
-        914400,  // x: 1 inch from left
-        3429000, // y: 3.75 inches from top
-        7315200, // width: 8 inches
-        914400,  // height: 1 inch
-    );
-
-    // Add a comment to the title slide
-    slide1.add_comment(
-        0,
-        "This is a demo presentation showcasing new PPTX features!",
-        914400,
-        914400,
-    );
-
-    // ========================================================================
-    // Slide 2: Table Demonstration
-    // ========================================================================
-    println!("Creating Slide 2: Table Demonstration");
-    let slide2 = pres.add_slide()?;
-    slide2.set_title("Table Feature");
-
-    // Create a simple data table
-    let table_data = vec![
-        vec![
-            "Feature".to_string(),
-            "Status".to_string(),
-            "Notes".to_string(),
-        ],
-        vec![
-            "Tables".to_string(),
-            "✓ Implemented".to_string(),
-            "Full read/write".to_string(),
-        ],
-        vec![
-            "Group Shapes".to_string(),
-            "✓ Implemented".to_string(),
-            "Nested groups".to_string(),
-        ],
-        vec![
-            "Comments".to_string(),
-            "✓ Implemented".to_string(),
-            "Author support".to_string(),
-        ],
-        vec![
-            "Sections".to_string(),
-            "✓ Implemented".to_string(),
-            "Slide organization".to_string(),
-        ],
-        vec![
-            "Audio/Video".to_string(),
-            "✓ Implemented".to_string(),
-            "Multiple formats".to_string(),
-        ],
-    ];
-
-    slide2.add_table(
-        table_data, 914400,  // x: 1 inch
-        1828800, // y: 2 inches
-        7315200, // width: 8 inches
-        2743200, // height: 3 inches
-    );
-
-    // Add a comment explaining the table
-    slide2.add_comment(
-        0,
-        "This table shows the implementation status of new features.",
-        914400,
-        1828800,
-    );
-
-    // ========================================================================
-    // Slide 3: Group Shapes Demonstration
-    // ========================================================================
-    println!("Creating Slide 3: Group Shapes Demonstration");
-    let slide3 = pres.add_slide()?;
-    slide3.set_title("Group Shapes Feature");
-
-    // Create a group with multiple shapes
-    let group_idx = slide3.add_group(
-        1828800, // x: 2 inches
-        1828800, // y: 2 inches
-        5486400, // width: 6 inches
-        3657600, // height: 4 inches
-    );
-
-    // Add shapes to the group
-    // Red rectangle (top-left)
-    slide3.add_rectangle_to_group(
-        group_idx,
-        1828800,                    // x position within group
-        1828800,                    // y position within group
-        1828800,                    // width: 2 inches
-        1371600,                    // height: 1.5 inches
-        Some("FF6B6B".to_string()), // Coral red
-    );
-
-    // Green rectangle (top-right)
-    slide3.add_rectangle_to_group(
-        group_idx,
-        4114800,                    // x position
-        1828800,                    // y position
-        1828800,                    // width
-        1371600,                    // height
-        Some("4ECDC4".to_string()), // Teal green
-    );
-
-    // Blue ellipse (bottom-center)
-    slide3.add_ellipse_to_group(
-        group_idx,
-        2971800,                    // x position (centered)
-        3657600,                    // y position
-        2286000,                    // width: 2.5 inches
-        1371600,                    // height: 1.5 inches
-        Some("45B7D1".to_string()), // Sky blue
-    );
-
-    // Add a text box label to the group
-    slide3.add_text_box_to_group(
-        group_idx,
-        "Grouped Shapes",
-        2514600, // x
-        5486400, // y
-        3200400, // width
-        457200,  // height
-    );
-
-    // Add explanatory text below
-    slide3.add_text_box(
-        "The shapes above are grouped together and can be manipulated as a single unit.",
-        914400,
-        5943600,
-        7315200,
-        457200,
-    );
-
-    // ========================================================================
-    // Slide 4: Audio Demonstration
-    // ========================================================================
-    println!("Creating Slide 4: Audio Demonstration");
-    let slide4 = pres.add_slide()?;
-    slide4.set_title("Audio Feature");
-
-    slide4.add_text_box(
-        "This slide contains embedded audio files.\nClick the audio icons to play.",
-        914400,
-        1828800,
-        7315200,
-        914400,
-    );
-
-    // Load and add MP3 audio
-    let mp3_path = Path::new("file_example_MP3_700KB.mp3");
-    if mp3_path.exists() {
-        let mp3_data = fs::read(mp3_path)?;
-        slide4.add_audio(
-            mp3_data, 1371600, // x: 1.5 inches
-            3200400, // y: 3.5 inches
-            914400,  // width: 1 inch
-            914400,  // height: 1 inch
-        );
-        slide4.add_text_box("MP3 Audio", 1143000, 4200400, 1371600, 457200);
-        println!("  - Added MP3 audio");
-    } else {
-        println!("  - Warning: MP3 file not found, skipping");
-    }
-
-    // Load and add WAV audio
-    let wav_path = Path::new("file_example_WAV_1MG.wav");
-    if wav_path.exists() {
-        let wav_data = fs::read(wav_path)?;
-        slide4.add_audio(
-            wav_data, 3886200, // x: 4.25 inches
-            3200400, // y: 3.5 inches
-            914400,  // width
-            914400,  // height
-        );
-        slide4.add_text_box("WAV Audio", 3657600, 4200400, 1371600, 457200);
-        println!("  - Added WAV audio");
-    } else {
-        println!("  - Warning: WAV file not found, skipping");
-    }
-
-    // ========================================================================
-    // Slide 5: Video Demonstration
-    // ========================================================================
-    println!("Creating Slide 5: Video Demonstration");
-    let slide5 = pres.add_slide()?;
-    slide5.set_title("Video Feature");
-
-    slide5.add_text_box(
-        "This slide contains an embedded video.\nClick to play the video.",
-        914400,
-        1600200,
-        7315200,
-        457200,
-    );
-
-    // Load and add MP4 video
-    let video_path = Path::new("ForBiggerMeltdowns.mp4");
-    if video_path.exists() {
-        let video_data = fs::read(video_path)?;
-        slide5.add_video(
-            video_data, 1828800, // x: 2 inches
-            2286000, // y: 2.5 inches
-            5486400, // width: 6 inches
-            3086100, // height: ~3.4 inches (16:9 aspect)
-        );
-        println!("  - Added MP4 video");
-    } else {
-        println!("  - Warning: Video file not found, skipping");
-    }
-
-    // ========================================================================
-    // Slide 6: Comments Demonstration
-    // ========================================================================
-    println!("Creating Slide 6: Comments Demonstration");
-    let slide6 = pres.add_slide()?;
-    slide6.set_title("Comments Feature");
-
-    slide6.add_text_box(
-        "This slide has multiple comments attached.\nOpen the Comments pane in PowerPoint to view them.",
-        914400,
-        1828800,
-        7315200,
-        914400,
-    );
-
-    // Add multiple comments at different positions
-    slide6.add_comment(
-        0,
-        "Comment 1: This is the first comment on this slide.",
-        914400,
-        3200400,
-    );
-    slide6.add_comment(
-        0,
-        "Comment 2: Comments can be placed at specific positions.",
-        4572000,
-        3200400,
-    );
-    slide6.add_comment(
-        0,
-        "Comment 3: Each comment is associated with an author.",
-        914400,
-        4572000,
-    );
-
-    // Add a visual marker where comments are
-    slide6.add_rectangle(914400, 3200400, 228600, 228600, Some("FFD93D".to_string())); // Yellow marker
-    slide6.add_rectangle(4572000, 3200400, 228600, 228600, Some("FFD93D".to_string()));
-    slide6.add_rectangle(914400, 4572000, 228600, 228600, Some("FFD93D".to_string()));
-
-    slide6.add_text_box(
-        "Yellow markers indicate comment positions",
-        914400,
-        5486400,
-        7315200,
-        457200,
-    );
-
-    // ========================================================================
-    // Slide 7: Summary with Table
-    // ========================================================================
-    println!("Creating Slide 7: Summary");
-    let slide7 = pres.add_slide()?;
-    slide7.set_title("Summary");
-
-    let summary_data = vec![
-        vec!["Slide".to_string(), "Feature Demonstrated".to_string()],
-        vec!["1".to_string(), "Title + Comments".to_string()],
-        vec!["2".to_string(), "Tables".to_string()],
-        vec!["3".to_string(), "Group Shapes".to_string()],
-        vec!["4".to_string(), "Audio (MP3, WAV)".to_string()],
-        vec!["5".to_string(), "Video (MP4)".to_string()],
-        vec!["6".to_string(), "Multiple Comments".to_string()],
-        vec!["7".to_string(), "Summary Table".to_string()],
-    ];
-
-    slide7.add_table_with_options(
-        summary_data,
-        1828800, // x: 2 inches
-        1828800, // y: 2 inches
-        5486400, // width: 6 inches
-        3200400, // height: 3.5 inches
-        None,    // auto column widths
-        None,    // auto row heights
-        true,    // first row as header
-        true,    // banded rows
-    );
-
-    // ========================================================================
-    // Create Sections (Note: Sections are metadata, created separately)
-    // ========================================================================
-    println!("\nCreating sections...");
-    let mut sections = SectionList::new();
-
-    // Introduction section (slides 1)
-    sections.add_section(
-        Section::new("Introduction", "1").with_slides(vec![256]), // First slide ID
-    );
-
-    // Features section (slides 2-6)
-    sections.add_section(
-        Section::new("Feature Demonstrations", "2").with_slides(vec![257, 258, 259, 260, 261]),
-    );
-
-    // Summary section (slide 7)
-    sections.add_section(Section::new("Summary", "3").with_slides(vec![262]));
-
-    // Generate section XML (for reference - would be included in presentation.xml)
-    let _section_xml = sections.to_xml()?;
-    println!("  - Created {} sections", sections.len());
-
-    // ========================================================================
-    // Save the presentation
-    // ========================================================================
-    let output_path = "pptx_features_demo.pptx";
-    println!("\nSaving presentation to {}...", output_path);
-
-    // Save the package (mutable reference goes out of scope)
-    pkg.save(output_path)?;
-
-    println!("\n✓ Presentation created successfully!");
+    let sections = build_sections();
     println!(
-        "\nOpen '{}' in Microsoft PowerPoint to verify:",
-        output_path
+        "Creating {} typed sections ({} XML bytes)...",
+        sections.len(),
+        sections.to_xml()?.len()
     );
-    println!("  - Slide 1: Title slide with a comment");
-    println!("  - Slide 2: Table with feature status");
-    println!("  - Slide 3: Group shapes (colored rectangles and ellipse)");
-    println!("  - Slide 4: Audio files (MP3 and WAV)");
-    println!("  - Slide 5: Video file (MP4)");
-    println!("  - Slide 6: Multiple comments with position markers");
-    println!("  - Slide 7: Summary table");
 
+    package.edit_opc(move |opc| {
+        store_comments(opc)?;
+        store_sections(opc, &sections.to_xml()?)?;
+        store_media(opc, media)
+    })?;
+
+    let output_path = "pptx_features_demo.pptx";
+    package.save(output_path)?;
+
+    println!("\nPresentation created successfully: {output_path}");
+    println!("  - semantic text and primitive-shape authoring");
+    println!("  - table rows rendered as typed-writer row snapshots");
+    println!("  - grouped-shape composition rendered as one visual scene");
+    println!("  - typed legacy comments and optional audio/video parts");
+    println!("  - typed PresentationML sections");
+    Ok(())
+}
+
+fn build_slides(presentation: &mut MutablePresentation) -> Result<Vec<MediaAttachment>> {
+    println!("Creating Slide 1: Title Slide");
+    let slide = presentation.add_slide()?;
+    slide.set_title("PPTX Features Demo");
+    slide
+        .add_text_box(
+            "Demonstrating tables, grouped scenes, comments, sections, and media",
+            INCH,
+            3 * INCH + INCH / 4,
+            8 * INCH,
+            INCH,
+        )
+        .font_size(18.0)
+        .bold(true);
+
+    println!("Creating Slide 2: Table Demonstration");
+    let slide = presentation.add_slide()?;
+    slide.set_title("Table Feature");
+    add_text_table(
+        slide,
+        &[
+            &["Feature", "Status", "Notes"][..],
+            &["Tables", "Implemented", "Row snapshots"][..],
+            &["Group Shapes", "Implemented", "Visual composition"][..],
+            &["Comments", "Implemented", "Typed package graph"][..],
+            &["Sections", "Implemented", "Slide organization"][..],
+            &["Audio/Video", "Implemented", "Media resources"][..],
+        ],
+        INCH,
+        2 * INCH,
+        8 * INCH,
+        3 * INCH,
+    );
+
+    println!("Creating Slide 3: Group Shapes Demonstration");
+    let slide = presentation.add_slide()?;
+    slide.set_title("Grouped Scene Feature");
+    // The current writer exposes semantic primitive shapes; compose the same
+    // scene without the retired group-mutator facade.
+    slide.add_rectangle(
+        2 * INCH,
+        2 * INCH,
+        2 * INCH,
+        3 * INCH / 2,
+        Some("FF6B6B".into()),
+    );
+    slide.add_rectangle(
+        5 * INCH,
+        2 * INCH,
+        2 * INCH,
+        3 * INCH / 2,
+        Some("4ECDC4".into()),
+    );
+    slide.add_ellipse(
+        3 * INCH + INCH / 4,
+        4 * INCH,
+        2 * INCH + INCH / 2,
+        3 * INCH / 2,
+        Some("45B7D1".into()),
+    );
+    slide
+        .add_text_box(
+            "Grouped Shapes",
+            2 * INCH + INCH / 2,
+            5 * INCH + INCH / 2,
+            5 * INCH,
+            INCH / 2,
+        )
+        .bold(true)
+        .font_size(16.0);
+    slide.add_text_box(
+        "The primitives form one grouped visual scene.",
+        INCH,
+        6 * INCH,
+        8 * INCH,
+        INCH / 2,
+    );
+
+    println!("Creating Slide 4: Audio Demonstration");
+    let slide = presentation.add_slide()?;
+    slide.set_title("Audio Feature");
+    slide.add_text_box(
+        "Optional audio resources are attached through the typed media package owner.",
+        INCH,
+        2 * INCH,
+        8 * INCH,
+        INCH,
+    );
+    let mut media = Vec::new();
+    for (path, x, label) in [
+        (
+            Path::new("file_example_MP3_700KB.mp3"),
+            3 * INCH / 2,
+            "MP3 Audio",
+        ),
+        (
+            Path::new("file_example_WAV_1MG.wav"),
+            17 * INCH / 4,
+            "WAV Audio",
+        ),
+    ] {
+        if let Some(attachment) = read_media(path, 4, x, 7 * INCH / 2, label)? {
+            slide.add_text_box(
+                &format!("{} (typed media)", attachment.name),
+                x - INCH / 4,
+                5 * INCH,
+                2 * INCH,
+                INCH / 2,
+            );
+            println!("  - queued {}", attachment.name);
+            media.push(attachment);
+        } else {
+            println!("  - {} not found, skipping", path.display());
+        }
+    }
+
+    println!("Creating Slide 5: Video Demonstration");
+    let slide = presentation.add_slide()?;
+    slide.set_title("Video Feature");
+    slide.add_text_box(
+        "Optional video is attached through the typed media package owner.",
+        INCH,
+        2 * INCH,
+        8 * INCH,
+        INCH / 2,
+    );
+    let path = Path::new("ForBiggerMeltdowns.mp4");
+    if let Some(attachment) = read_media(path, 5, 2 * INCH, 5 * INCH / 2, "MP4 Video")? {
+        println!("  - queued {}", attachment.name);
+        media.push(attachment);
+    } else {
+        println!("  - {} not found, skipping", path.display());
+    }
+
+    println!("Creating Slide 6: Comments Demonstration");
+    let slide = presentation.add_slide()?;
+    slide.set_title("Comments Feature");
+    slide.add_text_box(
+        "Typed comments are attached after the writer publishes the slide graph.",
+        INCH,
+        2 * INCH,
+        8 * INCH,
+        INCH,
+    );
+    for (x, y) in [
+        (INCH, 7 * INCH / 2),
+        (5 * INCH, 7 * INCH / 2),
+        (INCH, 5 * INCH),
+    ] {
+        slide.add_rectangle(x, y, INCH / 4, INCH / 4, Some("FFD93D".into()));
+    }
+    slide.add_text_box(
+        "Yellow markers indicate comment positions",
+        INCH,
+        6 * INCH,
+        8 * INCH,
+        INCH / 2,
+    );
+
+    println!("Creating Slide 7: Summary");
+    let slide = presentation.add_slide()?;
+    slide.set_title("Summary");
+    add_text_table(
+        slide,
+        &[
+            &["Slide", "Feature Demonstrated"][..],
+            &["1", "Title + comments"][..],
+            &["2", "Table row snapshots"][..],
+            &["3", "Grouped visual scene"][..],
+            &["4", "Audio resources"][..],
+            &["5", "Video resource"][..],
+            &["6", "Multiple comments"][..],
+            &["7", "Summary table"][..],
+        ],
+        2 * INCH,
+        2 * INCH,
+        6 * INCH,
+        7 * INCH / 2,
+    );
+
+    Ok(media)
+}
+
+fn add_text_table(
+    slide: &mut MutableSlide,
+    rows: &[&[&str]],
+    x: i64,
+    y: i64,
+    width: i64,
+    height: i64,
+) {
+    if rows.is_empty() {
+        return;
+    }
+    let row_height = height / rows.len() as i64;
+    for (index, row) in rows.iter().enumerate() {
+        let row_y = y + index as i64 * row_height;
+        slide.add_rectangle(
+            x,
+            row_y,
+            width,
+            row_height,
+            Some(if index == 0 { "D9EAF7" } else { "F4F7FA" }.into()),
+        );
+        slide
+            .add_text_box(
+                &row.join("  |  "),
+                x + INCH / 8,
+                row_y + INCH / 8,
+                width - INCH / 4,
+                row_height - INCH / 8,
+            )
+            .font_size(if index == 0 { 13.0 } else { 11.0 })
+            .bold(index == 0);
+    }
+}
+
+fn read_media(
+    path: &Path,
+    slide: usize,
+    x: i64,
+    y: i64,
+    _label: &str,
+) -> Result<Option<MediaAttachment>> {
+    if !path.exists() {
+        return Ok(None);
+    }
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
+    let format = MediaFormat::from_extension(extension);
+    if format == MediaFormat::Unknown {
+        return Err(Error::Invalid(format!(
+            "unsupported media extension for {}",
+            path.display()
+        )));
+    }
+    let name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("media")
+        .to_owned();
+    Ok(Some(MediaAttachment {
+        slide,
+        data: fs::read(path).map_err(|error| {
+            Error::Invalid(format!("could not read {}: {error}", path.display()))
+        })?,
+        format,
+        name,
+        x,
+        y,
+        width: INCH,
+        height: INCH,
+    }))
+}
+
+fn build_sections() -> SectionList {
+    let mut sections = SectionList::new();
+    sections.add_section(Section::new("Introduction", "section-1").with_slides([256]));
+    sections.add_section(
+        Section::new("Feature Demonstrations", "section-2").with_slides([257, 258, 259, 260, 261]),
+    );
+    sections.add_section(Section::new("Summary", "section-3").with_slides([262]));
+    sections
+}
+
+fn store_comments(opc: &mut OpcPackage) -> Result<()> {
+    let mut author = CommentAuthor::new(1, "Litchi Demo", "LD");
+    author.last_index = 5;
+    let comments = Comments {
+        author_relationship_id: "rIdCommentAuthors".into(),
+        author_part_name: "/ppt/commentAuthors.xml".into(),
+        authors: vec![author],
+        slides: vec![
+            CommentList {
+                slide_part_name: "/ppt/slides/slide1.xml".into(),
+                relationship_id: "rIdComments1".into(),
+                part_name: "/ppt/comments/comment1.xml".into(),
+                comments: vec![Comment::new(
+                    1,
+                    "This title slide introduces the typed PPTX feature graph.",
+                    INCH,
+                    INCH,
+                )],
+            },
+            CommentList {
+                slide_part_name: "/ppt/slides/slide2.xml".into(),
+                relationship_id: "rIdComments2".into(),
+                part_name: "/ppt/comments/comment2.xml".into(),
+                comments: vec![
+                    Comment::new(
+                        1,
+                        "The table is rendered as semantic writer row snapshots.",
+                        INCH,
+                        2 * INCH,
+                    )
+                    .with_index(2),
+                ],
+            },
+            CommentList {
+                slide_part_name: "/ppt/slides/slide6.xml".into(),
+                relationship_id: "rIdComments6".into(),
+                part_name: "/ppt/comments/comment3.xml".into(),
+                comments: vec![
+                    Comment::new(1, "First typed comment marker.", INCH, 7 * INCH / 2)
+                        .with_index(3),
+                    Comment::new(1, "Second typed comment marker.", 5 * INCH, 7 * INCH / 2)
+                        .with_index(4),
+                    Comment::new(1, "Third typed comment marker.", INCH, 5 * INCH).with_index(5),
+                ],
+            },
+        ],
+    };
+    store_presentation_comments(opc, &comments, CommentConformance::Transitional)
+}
+
+fn store_media(opc: &mut OpcPackage, media: Vec<MediaAttachment>) -> Result<()> {
+    let mut by_slide = BTreeMap::<usize, Vec<MediaAttachment>>::new();
+    for attachment in media {
+        by_slide
+            .entry(attachment.slide)
+            .or_default()
+            .push(attachment);
+    }
+
+    let mut resource_index = 1usize;
+    for (slide, attachments) in by_slide {
+        let mut pictures = Vec::with_capacity(attachments.len());
+        for (offset, attachment) in attachments.into_iter().enumerate() {
+            let kind = match attachment.format.kind() {
+                AuthoringMediaKind::Audio => MediaKind::Audio,
+                AuthoringMediaKind::Video => MediaKind::Video,
+            };
+            let relationship_id = format!("rIdMedia{resource_index}");
+            let resource = Resource::new(
+                format!(
+                    "/ppt/media/media{resource_index}.{}",
+                    attachment.format.extension()
+                ),
+                attachment.format.mime_type(),
+                attachment.data,
+            );
+            pictures.push(Picture {
+                shape_id: 10_000 + slide as u32 * 100 + offset as u32,
+                name: attachment.name,
+                kind,
+                relationship_id,
+                resource: Some(resource),
+                poster: None,
+                transform: Some(Transform::emu(
+                    attachment.x,
+                    attachment.y,
+                    attachment.width,
+                    attachment.height,
+                )?),
+                office_extension: None,
+            });
+            resource_index += 1;
+        }
+        let slide_name =
+            PackURI::new(format!("/ppt/slides/slide{slide}.xml")).map_err(Error::Uri)?;
+        store_slide_media(
+            opc,
+            &slide_name,
+            &MediaList { pictures },
+            MediaConformance::Transitional,
+        )?;
+    }
+    Ok(())
+}
+
+fn store_sections(opc: &mut OpcPackage, fragment: &str) -> Result<()> {
+    let presentation_name = PackURI::new("/ppt/presentation.xml").map_err(Error::Uri)?;
+    let current = std::str::from_utf8(opc.get_part(&presentation_name)?.blob())
+        .map_err(|error| Error::Xml(error.to_string()))?;
+    let closing = "</p:presentation>";
+    let offset = current
+        .rfind(closing)
+        .ok_or_else(|| Error::Invalid("presentation root has no closing element".into()))?;
+    let mut updated = String::with_capacity(current.len() + fragment.len());
+    updated.push_str(&current[..offset]);
+    updated.push_str(fragment);
+    updated.push_str(&current[offset..]);
+    opc.get_part_mut(&presentation_name)?
+        .set_blob(updated.into_bytes());
     Ok(())
 }

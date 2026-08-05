@@ -4,7 +4,7 @@
 // embedded images directly from shapes, similar to python-pptx.
 
 use super::shape::{Shape, ShapeProperties, ShapeType};
-use crate::package::PptError;
+use crate::package::Error;
 use litchi_core::error::Result;
 use litchi_odraw::Container;
 use litchi_odraw::image::File as ImageFile;
@@ -228,7 +228,7 @@ impl Shape for PictureShape {
         &mut self.properties
     }
 
-    fn text(&self) -> std::result::Result<String, PptError> {
+    fn text(&self) -> std::result::Result<String, Error> {
         Ok(String::new()) // Pictures don't have text
     }
 

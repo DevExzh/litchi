@@ -3,7 +3,7 @@
 //! This module reports markers, object code names, and OLE storage presence.
 //! It never opens, decompresses, parses, or executes VBA streams.
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// MS-XLS 2.4.185 `ObProj` record type (record enumeration value 211).
 pub(crate) const OB_PROJ_RECORD_TYPE: u16 = 0x00D3;
@@ -14,14 +14,14 @@ pub(crate) const OB_NO_MACROS_RECORD_TYPE: u16 = 0x01BD;
 const DIMENSIONS_RECORD_TYPE: u16 = 0x0200;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct XlsVbaMetadata {
+pub struct VbaMetadata {
     project_marker: bool,
     no_macros_marker: bool,
     project_storage_present: bool,
     workbook_code_name: Option<String>,
 }
 
-impl XlsVbaMetadata {
+impl VbaMetadata {
     pub fn has_project_marker(&self) -> bool {
         self.project_marker
     }
@@ -52,7 +52,7 @@ impl XlsVbaMetadata {
 /// never opens, decompresses, parses, or executes the `PROJECT`, `dir`,
 /// `_VBA_PROJECT`, SRP, or candidate module streams.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsVbaProjectStorage {
+pub struct VbaProjectStorage {
     root_storage_path: Vec<String>,
     vba_storage_path: Option<Vec<String>>,
     has_project_stream: bool,
@@ -64,7 +64,7 @@ pub struct XlsVbaProjectStorage {
     srp_stream_names: Vec<String>,
 }
 
-impl XlsVbaProjectStorage {
+impl VbaProjectStorage {
     /// Return the CFB path of the `_VBA_PROJECT_CUR` root storage.
     pub fn root_storage_path(&self) -> &[String] {
         &self.root_storage_path
@@ -155,7 +155,7 @@ impl XlsVbaProjectStorage {
 /// case-insensitive. No stream content is opened by this function.
 pub(crate) fn discover_vba_project_storage(
     stream_paths: &[Vec<String>],
-) -> Option<XlsVbaProjectStorage> {
+) -> Option<VbaProjectStorage> {
     let root_name = stream_paths
         .iter()
         .filter_map(|path| path.first())
@@ -204,7 +204,7 @@ pub(crate) fn discover_vba_project_storage(
         })
         .collect();
 
-    Some(XlsVbaProjectStorage {
+    Some(VbaProjectStorage {
         root_storage_path,
         vba_storage_path,
         has_project_stream,
@@ -259,18 +259,18 @@ fn compare_case_insensitively(left: &str, right: &str) -> std::cmp::Ordering {
 }
 
 pub(crate) struct WorkbookVbaCollector {
-    metadata: XlsVbaMetadata,
+    metadata: VbaMetadata,
     last_rank: Option<u8>,
 }
 
 impl WorkbookVbaCollector {
     pub(crate) fn new() -> Self {
         Self {
-            metadata: XlsVbaMetadata::default(),
+            metadata: VbaMetadata::default(),
             last_rank: None,
         }
     }
-    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
+    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> Result<()> {
         let rank = match record_type {
             OB_PROJ_RECORD_TYPE => 0,
             OB_NO_MACROS_RECORD_TYPE => 1,
@@ -317,7 +317,7 @@ impl WorkbookVbaCollector {
         }
         Ok(())
     }
-    pub(crate) fn finish(self) -> XlsVbaMetadata {
+    pub(crate) fn finish(self) -> VbaMetadata {
         self.metadata
     }
 }
@@ -334,7 +334,7 @@ impl WorksheetVbaCollector {
             dimensions_seen: false,
         }
     }
-    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
+    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> Result<()> {
         match record_type {
             DIMENSIONS_RECORD_TYPE => self.dimensions_seen = true,
             OB_PROJ_RECORD_TYPE | OB_NO_MACROS_RECORD_TYPE => {
@@ -364,7 +364,7 @@ impl WorksheetVbaCollector {
     }
 }
 
-pub(crate) fn validate_code_name(value: &str) -> XlsResult<()> {
+pub(crate) fn validate_code_name(value: &str) -> Result<()> {
     if value.encode_utf16().count() > 31 {
         return invalid_data("VBA object code name exceeds 31 UTF-16 code units");
     }
@@ -389,7 +389,7 @@ pub(crate) fn validate_code_name(value: &str) -> XlsResult<()> {
     Ok(())
 }
 
-pub(crate) fn parse_code_name(data: &[u8]) -> XlsResult<String> {
+pub(crate) fn parse_code_name(data: &[u8]) -> Result<String> {
     if data.len() < 3 {
         return invalid(CODE_NAME_RECORD_TYPE, "truncated CodeName record");
     }
@@ -409,9 +409,9 @@ pub(crate) fn parse_code_name(data: &[u8]) -> XlsResult<String> {
         .checked_add(
             count
                 .checked_mul(width)
-                .ok_or_else(|| XlsError::InvalidData("CodeName size overflow".to_string()))?,
+                .ok_or_else(|| Error::InvalidData("CodeName size overflow".to_string()))?,
         )
-        .ok_or_else(|| XlsError::InvalidData("CodeName size overflow".to_string()))?;
+        .ok_or_else(|| Error::InvalidData("CodeName size overflow".to_string()))?;
     if data.len() != expected {
         return invalid(
             CODE_NAME_RECORD_TYPE,
@@ -425,13 +425,13 @@ pub(crate) fn parse_code_name(data: &[u8]) -> XlsResult<String> {
             .chunks_exact(2)
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect();
-        String::from_utf16(&units).map_err(|_| XlsError::InvalidRecord {
+        String::from_utf16(&units).map_err(|_| Error::InvalidRecord {
             record_type: CODE_NAME_RECORD_TYPE,
             message: "CodeName contains invalid UTF-16".to_string(),
         })?
     };
     validate_code_name(&value).map_err(|error| match error {
-        XlsError::InvalidData(message) => XlsError::InvalidRecord {
+        Error::InvalidData(message) => Error::InvalidRecord {
             record_type: CODE_NAME_RECORD_TYPE,
             message,
         },
@@ -440,26 +440,26 @@ pub(crate) fn parse_code_name(data: &[u8]) -> XlsResult<String> {
     Ok(value)
 }
 
-fn require_empty(record_type: u16, data: &[u8]) -> XlsResult<()> {
+fn require_empty(record_type: u16, data: &[u8]) -> Result<()> {
     if !data.is_empty() {
         return invalid(record_type, "marker record payload must be empty");
     }
     Ok(())
 }
-fn invalid<T>(record_type: u16, message: impl Into<String>) -> XlsResult<T> {
-    Err(XlsError::InvalidRecord {
+fn invalid<T>(record_type: u16, message: impl Into<String>) -> Result<T> {
+    Err(Error::InvalidRecord {
         record_type,
         message: message.into(),
     })
 }
-fn invalid_data<T>(message: impl Into<String>) -> XlsResult<T> {
-    Err(XlsError::InvalidData(message.into()))
+fn invalid_data<T>(message: impl Into<String>) -> Result<T> {
+    Err(Error::InvalidData(message.into()))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{XlsWorkbook, XlsWriter};
+    use crate::{Workbook, Writer};
     use litchi_cfb::{OleFile, OleWriter};
     use std::io::Cursor;
 
@@ -575,7 +575,7 @@ mod tests {
 
     #[test]
     fn parsed_xls_workbook_discovers_invalid_vba_payloads_as_inert_metadata() {
-        let mut source_writer = XlsWriter::new();
+        let mut source_writer = Writer::new();
         source_writer.add_worksheet("Sheet1").unwrap();
         let mut source_bytes = Cursor::new(Vec::new());
         source_writer.write_to(&mut source_bytes).unwrap();
@@ -621,7 +621,7 @@ mod tests {
         let mut bytes = Cursor::new(Vec::new());
         writer.write_to(&mut bytes).unwrap();
 
-        let workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
+        let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
         let storage = workbook.vba_project_storage().unwrap();
         assert!(storage.is_structurally_complete());
         assert!(storage.may_contain_macro_code());
@@ -635,7 +635,7 @@ mod tests {
     fn parses_real_xls_vba_project_and_inert_module_source() {
         let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/poi/test-data/spreadsheet/SimpleMacro.xls");
-        let mut workbook = XlsWorkbook::new(std::fs::File::open(fixture).unwrap()).unwrap();
+        let mut workbook = Workbook::new(std::fs::File::open(fixture).unwrap()).unwrap();
         let project = workbook.vba().unwrap().unwrap();
 
         assert!(!project.name().is_empty());

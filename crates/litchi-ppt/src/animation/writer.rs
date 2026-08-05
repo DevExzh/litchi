@@ -26,8 +26,8 @@ use super::types::{
     is_valid_time_points_types, is_valid_time_set_value, time_animation_attribute_value_type,
     time_set_attribute_value_type,
 };
-use crate::consts::PptRecordType;
-use crate::package::{PptError, Result};
+use crate::consts::RecordType;
+use crate::package::{Error, Result};
 
 /// Write InteractiveInfo container with InteractiveInfoAtom for animations.
 /// Per POI MovieShape, this is required alongside AnimationInfo in ClientData.
@@ -49,7 +49,7 @@ pub fn write_interactive_info_with_sound(sound_ref: u32) -> Vec<u8> {
     atom_data.extend(&0u8.to_le_bytes()); // unknown3
 
     let atom_header = create_record_header(
-        PptRecordType::InteractiveInfoAtom,
+        RecordType::InteractiveInfoAtom,
         0x00,
         0,
         atom_data.len() as u32,
@@ -60,12 +60,7 @@ pub fn write_interactive_info_with_sound(sound_ref: u32) -> Vec<u8> {
     children.extend(atom_data);
 
     // InteractiveInfo container wrapping the atom
-    let header = create_record_header(
-        PptRecordType::InteractiveInfo,
-        0x0F,
-        0,
-        children.len() as u32,
-    );
+    let header = create_record_header(RecordType::InteractiveInfo, 0x0F, 0, children.len() as u32);
     data.extend(header);
     data.extend(children);
 
@@ -76,7 +71,7 @@ pub fn write_interactive_info_with_sound(sound_ref: u32) -> Vec<u8> {
 /// Returns (AnimationInfo bytes, sound_ref for InteractiveInfo)
 pub fn write_animation_info(info: &AnimationInfo) -> Result<(Vec<u8>, u32)> {
     if !info.time_nodes.is_empty() {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "extended time nodes belong to the slide animation extension, not AnimationInfo"
                 .to_string(),
         ));
@@ -131,15 +126,15 @@ pub fn write_animation_info(info: &AnimationInfo) -> Result<(Vec<u8>, u32)> {
     // }
 
     for raw_record in &info.raw_records {
-        if raw_record.record_type == PptRecordType::AnimationInfoAtom {
-            return Err(PptError::InvalidFormat(
+        if raw_record.record_type == RecordType::AnimationInfoAtom {
+            return Err(Error::InvalidFormat(
                 "raw AnimationInfo children cannot contain another AnimationInfoAtom".to_string(),
             ));
         }
         children.extend(serialize_raw_record(raw_record));
     }
 
-    let header = create_record_header(PptRecordType::AnimationInfo, 0x0F, 0, children.len() as u32);
+    let header = create_record_header(RecordType::AnimationInfo, 0x0F, 0, children.len() as u32);
     data.extend(header);
     data.extend(children);
 
@@ -149,18 +144,18 @@ pub fn write_animation_info(info: &AnimationInfo) -> Result<(Vec<u8>, u32)> {
 /// Serialize an exact PowerPoint 97 `AnimationInfoAtom`.
 pub fn write_animation_info_atom(atom: &LegacyAnimationAtom) -> Result<Vec<u8>> {
     if atom.automatic && atom.delay_time_ms < 0 {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "automatic AnimationInfoAtom cannot have a negative delay".to_string(),
         ));
     }
     if atom.order_id < -2 {
-        return Err(PptError::InvalidFormat(format!(
+        return Err(Error::InvalidFormat(format!(
             "AnimationInfoAtom orderID {} is less than -2",
             atom.order_id
         )));
     }
     if !atom.effect.accepts_direction(atom.effect_direction) {
-        return Err(PptError::InvalidFormat(format!(
+        return Err(Error::InvalidFormat(format!(
             "AnimationInfoAtom direction {:#04X} is invalid for {:?}",
             atom.effect_direction, atom.effect
         )));
@@ -202,7 +197,7 @@ pub fn write_animation_info_atom(atom: &LegacyAnimationAtom) -> Result<Vec<u8>> 
     data.push(atom.ole_verb);
     data.extend([0, 0]);
 
-    let mut result = create_record_header(PptRecordType::AnimationInfoAtom, 0x01, 0, 28);
+    let mut result = create_record_header(RecordType::AnimationInfoAtom, 0x01, 0, 28);
     result.extend(data);
     Ok(result)
 }
@@ -256,23 +251,23 @@ pub fn write_extended_time_node(node: &ExtendedTimeNode) -> Result<Vec<u8>> {
     for child in &node.children {
         children.extend(write_extended_time_node(child)?);
     }
-    wrap_record(PptRecordType::ExtTimeNode, 0x0F, 1, children)
+    wrap_record(RecordType::ExtTimeNode, 0x0F, 1, children)
 }
 
 fn validate_extended_time_node(node: &ExtendedTimeNode) -> Result<()> {
     let kind = node.atom.node_type.unwrap_or(TimeNodeKind::Parallel);
     if node.behavior.is_some() && kind != TimeNodeKind::Behavior {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "animation behaviors require a behavior time node".to_string(),
         ));
     }
     if node.visual_target.is_some() && kind != TimeNodeKind::Media {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "standalone visual targets require a media time node".to_string(),
         ));
     }
     if node.sequence_data.is_some() && kind != TimeNodeKind::Sequential {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "sequence data requires a sequential time node".to_string(),
         ));
     }
@@ -281,7 +276,7 @@ fn validate_extended_time_node(node: &ExtendedTimeNode) -> Result<()> {
             || (kind == TimeNodeKind::Sequential
                 && condition.condition_type == TimeConditionType::Next);
         if !valid {
-            return Err(PptError::InvalidFormat(
+            return Err(Error::InvalidFormat(
                 "begin-condition arrays may contain only begin conditions, or next conditions on sequential nodes"
                     .to_string(),
             ));
@@ -292,7 +287,7 @@ fn validate_extended_time_node(node: &ExtendedTimeNode) -> Result<()> {
             || (kind == TimeNodeKind::Sequential
                 && condition.condition_type == TimeConditionType::Previous);
         if !valid {
-            return Err(PptError::InvalidFormat(
+            return Err(Error::InvalidFormat(
                 "end-condition arrays may contain only end conditions, or previous conditions on sequential nodes"
                     .to_string(),
             ));
@@ -303,7 +298,7 @@ fn validate_extended_time_node(node: &ExtendedTimeNode) -> Result<()> {
         .as_ref()
         .is_some_and(|condition| condition.condition_type != TimeConditionType::EndSync)
     {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "end-sync condition must use the EndSync condition type".to_string(),
         ));
     }
@@ -316,18 +311,18 @@ pub fn write_time_sub_effect(sub_effect: &TimeSubEffect) -> Result<Vec<u8>> {
         Some(TimeNodeKind::Behavior) => TimeNodeKind::Behavior,
         Some(TimeNodeKind::Media) => TimeNodeKind::Media,
         _ => {
-            return Err(PptError::InvalidFormat(
+            return Err(Error::InvalidFormat(
                 "subeffect time-node type must explicitly be Behavior or Media".to_string(),
             ));
         },
     };
     if sub_effect.behavior.is_some() && kind != TimeNodeKind::Behavior {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "subeffect behavior requires a behavior time node".to_string(),
         ));
     }
     if sub_effect.visual_target.is_some() && kind != TimeNodeKind::Media {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "subeffect visual target requires a media time node".to_string(),
         ));
     }
@@ -340,7 +335,7 @@ pub fn write_time_sub_effect(sub_effect: &TimeSubEffect) -> Result<Vec<u8>> {
             .iter()
             .any(|condition| condition.condition_type != TimeConditionType::End)
     {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "subeffect condition arrays must contain only their matching Begin or End type"
                 .to_string(),
         ));
@@ -372,7 +367,7 @@ pub fn write_time_sub_effect(sub_effect: &TimeSubEffect) -> Result<Vec<u8>> {
     for modifier in &sub_effect.modifiers {
         children.extend(write_time_modifier(modifier));
     }
-    wrap_record(PptRecordType::TimeSubEffectContainer, 0x0F, 1, children)
+    wrap_record(RecordType::TimeSubEffectContainer, 0x0F, 1, children)
 }
 
 /// Serialize an exact 32-byte `TimeNodeAtom` payload.
@@ -394,7 +389,7 @@ pub fn write_time_node_atom(atom: &TimeNodeAtom) -> Vec<u8> {
         | (u32::from(atom.node_type.is_some()) << 3)
         | (u32::from(atom.duration_ms.is_some()) << 4);
     data.extend(flags.to_le_bytes());
-    let mut result = create_record_header(PptRecordType::TimeNode, 0, 0, 32);
+    let mut result = create_record_header(RecordType::TimeNode, 0, 0, 32);
     result.extend(data);
     result
 }
@@ -405,7 +400,7 @@ pub fn write_time_node_property_list(
     context: TimePropertyListContext,
 ) -> Result<Vec<u8>> {
     if !has_valid_time_effect_properties(&list.properties) {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "invalid effect ID, type, or direction combination".to_string(),
         ));
     }
@@ -420,28 +415,23 @@ pub fn write_time_node_property_list(
     for property in &list.properties {
         let (id, data) = encode_time_node_property(property)?;
         if !seen.insert(id) {
-            return Err(PptError::InvalidFormat(format!(
+            return Err(Error::InvalidFormat(format!(
                 "duplicate time property {id:#X}"
             )));
         }
         validate_time_property_context(id, context)?;
         if matches!(property, TimeNodeProperty::EventFilter(_)) && !has_interactive_sequence {
-            return Err(PptError::InvalidFormat(
+            return Err(Error::InvalidFormat(
                 "event filter requires an interactive sequence".to_string(),
             ));
         }
         let length = u32::try_from(data.len()).map_err(|_| {
-            PptError::InvalidFormat("time property exceeds 4 GiB record limit".to_string())
+            Error::InvalidFormat("time property exceeds 4 GiB record limit".to_string())
         })?;
-        children.extend(create_record_header(
-            PptRecordType::TimeVariant,
-            0,
-            id,
-            length,
-        ));
+        children.extend(create_record_header(RecordType::TimeVariant, 0, id, length));
         children.extend(data);
     }
-    wrap_record(PptRecordType::TimePropertyList, 0x0F, 0, children)
+    wrap_record(RecordType::TimePropertyList, 0x0F, 0, children)
 }
 
 fn encode_time_node_property(property: &TimeNodeProperty) -> Result<(u16, Vec<u8>)> {
@@ -484,13 +474,13 @@ fn encode_time_node_property(property: &TimeNodeProperty) -> Result<(u16, Vec<u8
         TimeNodeProperty::SlideCount(value) => (0x0F, integer(*value)),
         TimeNodeProperty::TimeFilter(value) => {
             if !is_valid_time_filter(value) {
-                return Err(PptError::InvalidFormat("invalid time filter".to_string()));
+                return Err(Error::InvalidFormat("invalid time filter".to_string()));
             }
             (0x10, string(value))
         },
         TimeNodeProperty::EventFilter(value) => {
             if value != "cancelBubble" {
-                return Err(PptError::InvalidFormat(
+                return Err(Error::InvalidFormat(
                     "event filter must be cancelBubble".to_string(),
                 ));
             }
@@ -515,7 +505,7 @@ fn encode_time_node_property(property: &TimeNodeProperty) -> Result<(u16, Vec<u8
         TimeNodeProperty::PlaceholderNode(value) => (0x15, boolean(*value)),
         TimeNodeProperty::MediaVolume(value) => {
             if !value.is_finite() || !(0.0..=100_000.0).contains(value) {
-                return Err(PptError::InvalidFormat(
+                return Err(Error::InvalidFormat(
                     "media volume out of range".to_string(),
                 ));
             }
@@ -536,7 +526,7 @@ fn validate_time_property_context(id: u16, context: TimePropertyListContext) -> 
         },
     };
     if invalid {
-        return Err(PptError::InvalidFormat(format!(
+        return Err(Error::InvalidFormat(format!(
             "time property {id:#X} is invalid in {context:?} context"
         )));
     }
@@ -553,7 +543,7 @@ pub fn write_time_behavior(behavior: &TimeBehavior) -> Result<Vec<u8>> {
         children.extend(write_time_behavior_property_list(properties)?);
     }
     children.extend(write_time_visual_element(&behavior.target)?);
-    wrap_record(PptRecordType::TimeBehaviorContainer, 0x0F, 0, children)
+    wrap_record(RecordType::TimeBehaviorContainer, 0x0F, 0, children)
 }
 
 /// Serialize an exact 16-byte `TimeBehaviorAtom` payload.
@@ -571,7 +561,7 @@ pub fn write_time_behavior_atom(atom: &TimeBehaviorAtom) -> Vec<u8> {
     );
     data.extend(0u32.to_le_bytes());
     data.extend(0u32.to_le_bytes());
-    let mut result = create_record_header(PptRecordType::TimeBehavior, 0, 0, 16);
+    let mut result = create_record_header(RecordType::TimeBehavior, 0, 0, 16);
     result.extend(data);
     result
 }
@@ -589,12 +579,7 @@ pub fn write_time_animate_behavior(animate: &TimeAnimateBehavior) -> Result<Vec<
         }
     }
     children.extend(write_time_behavior(&animate.behavior)?);
-    wrap_record(
-        PptRecordType::TimeAnimateBehaviorContainer,
-        0x0F,
-        0,
-        children,
-    )
+    wrap_record(RecordType::TimeAnimateBehaviorContainer, 0x0F, 0, children)
 }
 
 /// Serialize an exact `TimeAnimateBehaviorAtom`.
@@ -615,7 +600,7 @@ pub fn write_time_animate_behavior_atom(atom: &TimeAnimateBehaviorAtom) -> Vec<u
         TimeAnimateValueType::Number => 1,
         TimeAnimateValueType::Color => 2,
     });
-    let mut result = create_record_header(PptRecordType::TimeAnimateBehavior, 0, 0, 12);
+    let mut result = create_record_header(RecordType::TimeAnimateBehavior, 0, 0, 12);
     result.extend(mode.to_le_bytes());
     result.extend(flags.to_le_bytes());
     result.extend(value_type.to_le_bytes());
@@ -632,24 +617,24 @@ pub fn write_time_animation_value_list(list: &TimeAnimationValueList) -> Result<
         }
         if let Some(formula) = &entry.formula {
             if !is_valid_time_formula(formula) {
-                return Err(PptError::InvalidFormat(
+                return Err(Error::InvalidFormat(
                     "invalid animation keyframe formula".to_string(),
                 ));
             }
             append_time_variant(&mut children, 1, encode_time_variant_string(formula))?;
         }
     }
-    wrap_record(PptRecordType::TimeAnimationValueList, 0x0F, 0, children)
+    wrap_record(RecordType::TimeAnimationValueList, 0x0F, 0, children)
 }
 
 /// Serialize an exact `TimeAnimationValueAtom`.
 pub fn write_time_animation_value_atom(time: i32) -> Result<Vec<u8>> {
     if time != -1000 && !(0..=1000).contains(&time) {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "animation keyframe time is out of range".to_string(),
         ));
     }
-    let mut result = create_record_header(PptRecordType::TimeAnimationValue, 0, 0, 4);
+    let mut result = create_record_header(RecordType::TimeAnimationValue, 0, 0, 4);
     result.extend(time.to_le_bytes());
     Ok(result)
 }
@@ -678,36 +663,36 @@ fn validate_animate_behavior(animate: &TimeAnimateBehavior) -> Result<()> {
         (animate.atom.to_used, animate.to.as_ref(), "to"),
     ] {
         if used && value.is_none() {
-            return Err(PptError::InvalidFormat(format!(
+            return Err(Error::InvalidFormat(format!(
                 "animate {field}-use flag requires a value"
             )));
         }
     }
     if animate.atom.animation_values_used && animate.values.is_none() {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "animate-values-use flag requires a keyframe list".to_string(),
         ));
     }
     if animate.from.is_some() && animate.by.is_none() && animate.to.is_none() {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "animate from value requires a by or to value".to_string(),
         ));
     }
     if !animate.behavior.atom.attribute_names_used {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "animate behavior requires an explicit attribute name".to_string(),
         ));
     }
     let attribute = match animate.behavior.attribute_names.as_deref() {
         Some([attribute]) => attribute.as_str(),
         _ => {
-            return Err(PptError::InvalidFormat(
+            return Err(Error::InvalidFormat(
                 "animate behavior requires exactly one attribute name".to_string(),
             ));
         },
     };
     let expected_type = time_animation_attribute_value_type(attribute).ok_or_else(|| {
-        PptError::InvalidFormat(format!(
+        Error::InvalidFormat(format!(
             "unsupported animate behavior attribute {attribute}"
         ))
     })?;
@@ -716,7 +701,7 @@ fn validate_animate_behavior(animate: &TimeAnimateBehavior) -> Result<()> {
         .value_type
         .unwrap_or(TimeAnimateValueType::Number);
     if actual_type != expected_type {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "animate value type does not match its attribute".to_string(),
         ));
     }
@@ -725,7 +710,7 @@ fn validate_animate_behavior(animate: &TimeAnimateBehavior) -> Result<()> {
         .flatten()
         .any(|value| !is_valid_time_animate_value(attribute, actual_type, value))
     {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "animate value is invalid for its attribute".to_string(),
         ));
     }
@@ -735,7 +720,7 @@ fn validate_animate_behavior(animate: &TimeAnimateBehavior) -> Result<()> {
             .as_ref()
             .is_some_and(|list| list.entries.iter().any(|entry| entry.formula.is_some()))
     {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "formula calculation mode requires a keyframe formula".to_string(),
         ));
     }
@@ -747,13 +732,13 @@ pub fn write_time_color_behavior(behavior: &TimeColorBehavior) -> Result<Vec<u8>
     validate_color_behavior(&behavior.atom, &behavior.behavior)?;
     let mut children = write_time_color_behavior_atom(&behavior.atom)?;
     children.extend(write_time_behavior(&behavior.behavior)?);
-    wrap_record(PptRecordType::TimeColorBehaviorContainer, 0x0F, 0, children)
+    wrap_record(RecordType::TimeColorBehaviorContainer, 0x0F, 0, children)
 }
 
 /// Serialize an exact `TimeColorBehaviorAtom`.
 pub fn write_time_color_behavior_atom(atom: &TimeColorBehaviorAtom) -> Result<Vec<u8>> {
     if atom.from.is_some() && atom.by.is_none() && atom.to.is_none() {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "color from value requires a by or to value".to_string(),
         ));
     }
@@ -776,7 +761,7 @@ pub fn write_time_color_behavior_atom(atom: &TimeColorBehaviorAtom) -> Result<Ve
         Some(color) => encode_animate_color(color)?,
         None => [0; 16],
     });
-    let mut result = create_record_header(PptRecordType::TimeColorBehavior, 0, 0, 52);
+    let mut result = create_record_header(RecordType::TimeColorBehavior, 0, 0, 52);
     result.extend(data);
     Ok(result)
 }
@@ -792,7 +777,7 @@ fn encode_animate_color_by(color: &TimeAnimateColorBy) -> Result<[u8; 16]> {
         TimeAnimateColorBy::Scheme(index) => return encode_scheme_color(*index),
     };
     if values.iter().any(|value| !(-255..=255).contains(value)) {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "color offset component is out of range".to_string(),
         ));
     }
@@ -809,7 +794,7 @@ fn encode_animate_color(color: &TimeAnimateColor) -> Result<[u8; 16]> {
         TimeAnimateColor::Scheme(index) => encode_scheme_color(*index),
         TimeAnimateColor::Rgb { red, green, blue } => {
             if *red > 255 || *green > 255 || *blue > 255 {
-                return Err(PptError::InvalidFormat(
+                return Err(Error::InvalidFormat(
                     "RGB color component is out of range".to_string(),
                 ));
             }
@@ -824,7 +809,7 @@ fn encode_animate_color(color: &TimeAnimateColor) -> Result<[u8; 16]> {
 
 fn encode_scheme_color(index: u32) -> Result<[u8; 16]> {
     if index > 7 {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "scheme color index is out of range".to_string(),
         ));
     }
@@ -851,7 +836,7 @@ fn validate_color_behavior(atom: &TimeColorBehaviorAtom, behavior: &TimeBehavior
     if !behavior.atom.attribute_names_used
         || !matches!(behavior.attribute_names.as_deref(), Some([name]) if NAMES.contains(&name.as_str()))
     {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "color behavior requires exactly one supported color attribute".to_string(),
         ));
     }
@@ -869,7 +854,7 @@ fn validate_color_behavior(atom: &TimeColorBehaviorAtom, behavior: &TimeBehavior
                 | TimeBehaviorProperty::PointsTypes(_)
         )
     }) {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "color behavior contains a motion-only property".to_string(),
         ));
     }
@@ -878,7 +863,7 @@ fn validate_color_behavior(atom: &TimeColorBehaviorAtom, behavior: &TimeBehavior
             .iter()
             .any(|property| matches!(property, TimeBehaviorProperty::ColorModel(_)))
     {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "color-space-used flag requires a color model property".to_string(),
         ));
     }
@@ -887,7 +872,7 @@ fn validate_color_behavior(atom: &TimeColorBehaviorAtom, behavior: &TimeBehavior
             .iter()
             .any(|property| matches!(property, TimeBehaviorProperty::ColorDirection(_)))
     {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "direction-used flag requires a color direction property".to_string(),
         ));
     }
@@ -918,12 +903,7 @@ pub fn write_time_effect_behavior(effect: &TimeEffectBehavior) -> Result<Vec<u8>
         )?;
     }
     children.extend(write_time_behavior(&effect.behavior)?);
-    wrap_record(
-        PptRecordType::TimeEffectBehaviorContainer,
-        0x0F,
-        0,
-        children,
-    )
+    wrap_record(RecordType::TimeEffectBehaviorContainer, 0x0F, 0, children)
 }
 
 /// Serialize an exact `TimeEffectBehaviorAtom`.
@@ -936,7 +916,7 @@ pub fn write_time_effect_behavior_atom(atom: &TimeEffectBehaviorAtom) -> Vec<u8>
         TimeEffectTransition::In => 0,
         TimeEffectTransition::Out => 1,
     });
-    let mut result = create_record_header(PptRecordType::TimeEffectBehavior, 0, 0, 8);
+    let mut result = create_record_header(RecordType::TimeEffectBehavior, 0, 0, 8);
     result.extend(flags.to_le_bytes());
     result.extend(transition.to_le_bytes());
     result
@@ -944,17 +924,17 @@ pub fn write_time_effect_behavior_atom(atom: &TimeEffectBehaviorAtom) -> Vec<u8>
 
 fn validate_effect_behavior(effect: &TimeEffectBehavior) -> Result<()> {
     if effect.atom.filter_used && effect.filter.is_none() {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "image-effect filter-use flag requires a filter".to_string(),
         ));
     }
     if effect.atom.progress_used && effect.progress.is_none() {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "image-effect progress-use flag requires progress".to_string(),
         ));
     }
     if effect.atom.runtime_context_used && effect.runtime_context.is_none() {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "image-effect runtime-context-use flag requires a runtime context".to_string(),
         ));
     }
@@ -962,7 +942,7 @@ fn validate_effect_behavior(effect: &TimeEffectBehavior) -> Result<()> {
         .progress
         .is_some_and(|value| !(0.0..=1.0).contains(&value))
     {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "image-effect progress must be between zero and one".to_string(),
         ));
     }
@@ -971,7 +951,7 @@ fn validate_effect_behavior(effect: &TimeEffectBehavior) -> Result<()> {
         .as_deref()
         .is_some_and(|value| !is_valid_runtime_context(value))
     {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "invalid image-effect runtime context".to_string(),
         ));
     }
@@ -991,18 +971,13 @@ pub fn write_time_motion_behavior(motion: &TimeMotionBehavior) -> Result<Vec<u8>
         append_time_variant(&mut children, 2, data)?;
     }
     children.extend(write_time_behavior(&motion.behavior)?);
-    wrap_record(
-        PptRecordType::TimeMotionBehaviorContainer,
-        0x0F,
-        0,
-        children,
-    )
+    wrap_record(RecordType::TimeMotionBehaviorContainer, 0x0F, 0, children)
 }
 
 /// Serialize an exact `TimeMotionBehaviorAtom`.
 pub fn write_time_motion_behavior_atom(atom: &TimeMotionBehaviorAtom) -> Result<Vec<u8>> {
     if atom.from.is_some() && atom.by.is_none() && atom.to.is_none() {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "motion from values require by or to values".to_string(),
         ));
     }
@@ -1032,14 +1007,14 @@ pub fn write_time_motion_behavior_atom(atom: &TimeMotionBehaviorAtom) -> Result<
             })
             .to_le_bytes(),
     );
-    let mut result = create_record_header(PptRecordType::TimeMotionBehavior, 0, 0, 32);
+    let mut result = create_record_header(RecordType::TimeMotionBehavior, 0, 0, 32);
     result.extend(data);
     Ok(result)
 }
 
 fn validate_motion_behavior(motion: &TimeMotionBehavior) -> Result<()> {
     if motion.atom.path_used && motion.path.is_none() {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "motion path-use flag requires a path".to_string(),
         ));
     }
@@ -1048,7 +1023,7 @@ fn validate_motion_behavior(motion: &TimeMotionBehavior) -> Result<()> {
         .as_deref()
         .is_some_and(|path| !is_valid_motion_path(path))
     {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "invalid motion path syntax".to_string(),
         ));
     }
@@ -1063,7 +1038,7 @@ fn validate_motion_behavior(motion: &TimeMotionBehavior) -> Result<()> {
             TimeBehaviorProperty::ColorModel(_) | TimeBehaviorProperty::ColorDirection(_)
         )
     }) {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "motion behavior contains a color-only property".to_string(),
         ));
     }
@@ -1077,7 +1052,7 @@ fn validate_motion_behavior(motion: &TimeMotionBehavior) -> Result<()> {
         .iter()
         .any(|property| matches!(property, TimeBehaviorProperty::PathEditRotationY(_)));
     if motion.atom.edit_rotation_used && !(has_angle && has_x && has_y) {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "motion edit-rotation flag requires angle, X, and Y properties".to_string(),
         ));
     }
@@ -1086,7 +1061,7 @@ fn validate_motion_behavior(motion: &TimeMotionBehavior) -> Result<()> {
             .iter()
             .any(|property| matches!(property, TimeBehaviorProperty::PointsTypes(_)))
     {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "motion points-types flag requires a points-types property".to_string(),
         ));
     }
@@ -1102,7 +1077,7 @@ fn validate_motion_behavior(motion: &TimeMotionBehavior) -> Result<()> {
                         .any(|name| !is_valid_animation_attribute_name(name))
             })
     {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "motion behavior requires at most two supported attribute names".to_string(),
         ));
     }
@@ -1111,9 +1086,9 @@ fn validate_motion_behavior(motion: &TimeMotionBehavior) -> Result<()> {
 
 fn append_time_variant(children: &mut Vec<u8>, instance: u16, data: Vec<u8>) -> Result<()> {
     let length = u32::try_from(data.len())
-        .map_err(|_| PptError::InvalidFormat("time variant exceeds 4 GiB".to_string()))?;
+        .map_err(|_| Error::InvalidFormat("time variant exceeds 4 GiB".to_string()))?;
     children.extend(create_record_header(
-        PptRecordType::TimeVariant,
+        RecordType::TimeVariant,
         0,
         instance,
         length,
@@ -1129,22 +1104,17 @@ pub fn write_time_behavior_property_list(list: &TimeBehaviorPropertyList) -> Res
     for property in &list.properties {
         let (id, data) = encode_time_behavior_property(property)?;
         if !seen.insert(id) {
-            return Err(PptError::InvalidFormat(format!(
+            return Err(Error::InvalidFormat(format!(
                 "duplicate time behavior property {id:#X}"
             )));
         }
         let length = u32::try_from(data.len()).map_err(|_| {
-            PptError::InvalidFormat("time behavior property exceeds 4 GiB".to_string())
+            Error::InvalidFormat("time behavior property exceeds 4 GiB".to_string())
         })?;
-        children.extend(create_record_header(
-            PptRecordType::TimeVariant,
-            0,
-            id,
-            length,
-        ));
+        children.extend(create_record_header(RecordType::TimeVariant, 0, id, length));
         children.extend(data);
     }
-    wrap_record(PptRecordType::TimePropertyList, 0x0F, 0, children)
+    wrap_record(RecordType::TimePropertyList, 0x0F, 0, children)
 }
 
 fn encode_time_behavior_property(property: &TimeBehaviorProperty) -> Result<(u16, Vec<u8>)> {
@@ -1163,7 +1133,7 @@ fn encode_time_behavior_property(property: &TimeBehaviorProperty) -> Result<(u16
         TimeBehaviorProperty::UnknownPropertyList(value) => (0x01, string(value)),
         TimeBehaviorProperty::RuntimeContext(value) => {
             if !is_valid_runtime_context(value) {
-                return Err(PptError::InvalidFormat(
+                return Err(Error::InvalidFormat(
                     "invalid time runtime context".to_string(),
                 ));
             }
@@ -1191,7 +1161,7 @@ fn encode_time_behavior_property(property: &TimeBehaviorProperty) -> Result<(u16
         TimeBehaviorProperty::PathEditRotationY(value) => (0x09, float(*value)),
         TimeBehaviorProperty::PointsTypes(value) => {
             if !is_valid_time_points_types(value) {
-                return Err(PptError::InvalidFormat(
+                return Err(Error::InvalidFormat(
                     "invalid time path point types".to_string(),
                 ));
             }
@@ -1204,18 +1174,12 @@ fn write_time_string_list(names: &[String]) -> Result<Vec<u8>> {
     let mut children = Vec::new();
     for name in names {
         let data = encode_time_variant_string(name);
-        let length = u32::try_from(data.len()).map_err(|_| {
-            PptError::InvalidFormat("time attribute name exceeds 4 GiB".to_string())
-        })?;
-        children.extend(create_record_header(
-            PptRecordType::TimeVariant,
-            0,
-            0,
-            length,
-        ));
+        let length = u32::try_from(data.len())
+            .map_err(|_| Error::InvalidFormat("time attribute name exceeds 4 GiB".to_string()))?;
+        children.extend(create_record_header(RecordType::TimeVariant, 0, 0, length));
         children.extend(data);
     }
-    wrap_record(PptRecordType::TimeVariantList, 0x0F, 1, children)
+    wrap_record(RecordType::TimeVariantList, 0x0F, 1, children)
 }
 
 fn encode_time_variant_string(value: &str) -> Vec<u8> {
@@ -1229,13 +1193,13 @@ fn encode_time_variant_string(value: &str) -> Vec<u8> {
 pub fn write_time_visual_element(target: &TimeVisualElement) -> Result<Vec<u8>> {
     let atom = match target {
         TimeVisualElement::Page => {
-            let mut atom = create_record_header(PptRecordType::VisualPageAtom, 0, 0, 4);
+            let mut atom = create_record_header(RecordType::VisualPageAtom, 0, 0, 4);
             atom.extend(TimeVisualElementKind::Page.as_u32().to_le_bytes());
             atom
         },
         TimeVisualElement::Sound { kind, sound_id_ref } => {
             if *kind == TimeVisualElementKind::Page {
-                return Err(PptError::InvalidFormat(
+                return Err(Error::InvalidFormat(
                     "sound target cannot use the page element type".to_string(),
                 ));
             }
@@ -1251,7 +1215,7 @@ pub fn write_time_visual_element(target: &TimeVisualElement) -> Result<Vec<u8>> 
                 kind,
                 TimeVisualElementKind::Page | TimeVisualElementKind::ChartElement
             ) {
-                return Err(PptError::InvalidFormat(
+                return Err(Error::InvalidFormat(
                     "general shape target has an invalid element type".to_string(),
                 ));
             }
@@ -1269,7 +1233,7 @@ pub fn write_time_visual_element(target: &TimeVisualElement) -> Result<Vec<u8>> 
             element_index,
         } => {
             if *element_index < -1 {
-                return Err(PptError::InvalidFormat(
+                return Err(Error::InvalidFormat(
                     "chart target element index must be at least -1".to_string(),
                 ));
             }
@@ -1282,7 +1246,7 @@ pub fn write_time_visual_element(target: &TimeVisualElement) -> Result<Vec<u8>> 
             )
         },
     };
-    wrap_record(PptRecordType::TimeClientVisualElement, 0x0F, 0, atom)
+    wrap_record(RecordType::TimeClientVisualElement, 0x0F, 0, atom)
 }
 
 fn write_visual_shape_atom(
@@ -1292,7 +1256,7 @@ fn write_visual_shape_atom(
     data1: u32,
     data2: u32,
 ) -> Vec<u8> {
-    let mut atom = create_record_header(PptRecordType::VisualShapeAtom, 0, 0, 20);
+    let mut atom = create_record_header(RecordType::VisualShapeAtom, 0, 0, 20);
     atom.extend(kind.as_u32().to_le_bytes());
     atom.extend(reference_type.to_le_bytes());
     atom.extend(reference_id.to_le_bytes());
@@ -1306,18 +1270,13 @@ pub fn write_time_rotation_behavior(behavior: &TimeRotationBehavior) -> Result<V
     validate_rotation_behavior(&behavior.behavior)?;
     let mut children = write_time_rotation_behavior_atom(&behavior.atom)?;
     children.extend(write_time_behavior(&behavior.behavior)?);
-    wrap_record(
-        PptRecordType::TimeRotationBehaviorContainer,
-        0x0F,
-        0,
-        children,
-    )
+    wrap_record(RecordType::TimeRotationBehaviorContainer, 0x0F, 0, children)
 }
 
 /// Serialize an exact `TimeRotationBehaviorAtom`.
 pub fn write_time_rotation_behavior_atom(atom: &TimeRotationBehaviorAtom) -> Result<Vec<u8>> {
     if atom.from_degrees.is_some() && atom.by_degrees.is_none() && atom.to_degrees.is_none() {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "rotation from value requires a by or to value".to_string(),
         ));
     }
@@ -1338,7 +1297,7 @@ pub fn write_time_rotation_behavior_atom(atom: &TimeRotationBehaviorAtom) -> Res
             })
             .to_le_bytes(),
     );
-    let mut result = create_record_header(PptRecordType::TimeRotationBehavior, 0, 0, 20);
+    let mut result = create_record_header(RecordType::TimeRotationBehavior, 0, 0, 20);
     result.extend(data);
     Ok(result)
 }
@@ -1348,13 +1307,13 @@ pub fn write_time_scale_behavior(behavior: &TimeScaleBehavior) -> Result<Vec<u8>
     validate_basic_behavior_properties(&behavior.behavior)?;
     let mut children = write_time_scale_behavior_atom(&behavior.atom)?;
     children.extend(write_time_behavior(&behavior.behavior)?);
-    wrap_record(PptRecordType::TimeScaleBehaviorContainer, 0x0F, 0, children)
+    wrap_record(RecordType::TimeScaleBehaviorContainer, 0x0F, 0, children)
 }
 
 /// Serialize an exact `TimeScaleBehaviorAtom`.
 pub fn write_time_scale_behavior_atom(atom: &TimeScaleBehaviorAtom) -> Result<Vec<u8>> {
     if atom.from_percent.is_some() && atom.by_percent.is_none() && atom.to_percent.is_none() {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "scale from values require by or to values".to_string(),
         ));
     }
@@ -1374,7 +1333,7 @@ pub fn write_time_scale_behavior_atom(atom: &TimeScaleBehaviorAtom) -> Result<Ve
     }
     data.push(atom.zoom_contents.map_or(1, u8::from));
     data.extend([0, 0, 0]);
-    let mut result = create_record_header(PptRecordType::TimeScaleBehavior, 0, 0, 32);
+    let mut result = create_record_header(RecordType::TimeScaleBehavior, 0, 0, 32);
     result.extend(data);
     Ok(result)
 }
@@ -1387,7 +1346,7 @@ pub fn write_time_set_behavior(set: &TimeSetBehavior) -> Result<Vec<u8>> {
         append_time_variant(&mut children, 1, encode_time_variant_string(value))?;
     }
     children.extend(write_time_behavior(&set.behavior)?);
-    wrap_record(PptRecordType::TimeSetBehaviorContainer, 0x0F, 0, children)
+    wrap_record(RecordType::TimeSetBehaviorContainer, 0x0F, 0, children)
 }
 
 /// Serialize an exact `TimeSetBehaviorAtom`.
@@ -1398,7 +1357,7 @@ pub fn write_time_set_behavior_atom(atom: &TimeSetBehaviorAtom) -> Vec<u8> {
         TimeAnimateValueType::Number => 1,
         TimeAnimateValueType::Color => 2,
     });
-    let mut result = create_record_header(PptRecordType::TimeSetBehavior, 0, 0, 8);
+    let mut result = create_record_header(RecordType::TimeSetBehavior, 0, 0, 8);
     result.extend(flags.to_le_bytes());
     result.extend(value_type.to_le_bytes());
     result
@@ -1406,29 +1365,29 @@ pub fn write_time_set_behavior_atom(atom: &TimeSetBehaviorAtom) -> Vec<u8> {
 
 fn validate_set_behavior(set: &TimeSetBehavior) -> Result<()> {
     if set.atom.to_used && set.to.is_none() {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "set to-use flag requires a value".to_string(),
         ));
     }
     if !set.behavior.atom.attribute_names_used {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "set behavior requires an explicit attribute name".to_string(),
         ));
     }
     let attribute = match set.behavior.attribute_names.as_deref() {
         Some([attribute]) => attribute.as_str(),
         _ => {
-            return Err(PptError::InvalidFormat(
+            return Err(Error::InvalidFormat(
                 "set behavior requires exactly one attribute name".to_string(),
             ));
         },
     };
     let expected_type = time_set_attribute_value_type(attribute).ok_or_else(|| {
-        PptError::InvalidFormat(format!("unsupported set behavior attribute {attribute}"))
+        Error::InvalidFormat(format!("unsupported set behavior attribute {attribute}"))
     })?;
     let actual_type = set.atom.value_type.unwrap_or(TimeAnimateValueType::Number);
     if actual_type != expected_type {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "set behavior value type does not match its attribute".to_string(),
         ));
     }
@@ -1437,7 +1396,7 @@ fn validate_set_behavior(set: &TimeSetBehavior) -> Result<()> {
         .as_deref()
         .is_some_and(|value| !is_valid_time_set_value(attribute, value))
     {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "set behavior value is invalid for its attribute".to_string(),
         ));
     }
@@ -1451,7 +1410,7 @@ fn validate_rotation_behavior(behavior: &TimeBehavior) -> Result<()> {
             Some([name]) if matches!(name.as_str(), "r" | "ppt_r")
         )
     {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "rotation behavior requires exactly one r or ppt_r attribute".to_string(),
         ));
     }
@@ -1473,7 +1432,7 @@ fn validate_basic_behavior_properties(behavior: &TimeBehavior) -> Result<()> {
             )
         })
     }) {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "behavior contains properties reserved for color or motion behaviors".to_string(),
         ));
     }
@@ -1490,22 +1449,12 @@ pub fn write_time_command_behavior(behavior: &TimeCommandBehavior) -> Result<Vec
     if let Some(command) = &behavior.command {
         let data = encode_time_variant_string(command);
         let length = u32::try_from(data.len())
-            .map_err(|_| PptError::InvalidFormat("time command exceeds 4 GiB".to_string()))?;
-        children.extend(create_record_header(
-            PptRecordType::TimeVariant,
-            0,
-            1,
-            length,
-        ));
+            .map_err(|_| Error::InvalidFormat("time command exceeds 4 GiB".to_string()))?;
+        children.extend(create_record_header(RecordType::TimeVariant, 0, 1, length));
         children.extend(data);
     }
     children.extend(write_time_behavior(&behavior.behavior)?);
-    wrap_record(
-        PptRecordType::TimeCommandBehaviorContainer,
-        0x0F,
-        0,
-        children,
-    )
+    wrap_record(RecordType::TimeCommandBehaviorContainer, 0x0F, 0, children)
 }
 
 /// Serialize an exact `TimeCommandBehaviorAtom`.
@@ -1516,7 +1465,7 @@ pub fn write_time_command_behavior_atom(atom: &TimeCommandBehaviorAtom) -> Vec<u
         TimeCommandBehaviorType::Call => 1,
         TimeCommandBehaviorType::OleVerb => 2,
     });
-    let mut result = create_record_header(PptRecordType::TimeCommandBehavior, 0, 0, 8);
+    let mut result = create_record_header(RecordType::TimeCommandBehavior, 0, 0, 8);
     result.extend(flags.to_le_bytes());
     result.extend(command_type.to_le_bytes());
     result
@@ -1541,7 +1490,7 @@ fn validate_time_command(
         },
     };
     if !valid {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "invalid command for command behavior type".to_string(),
         ));
     }
@@ -1582,7 +1531,7 @@ pub fn write_time_iterate_data(data: &TimeIterateData) -> Vec<u8> {
             .to_le_bytes(),
     );
     payload.extend(flags.to_le_bytes());
-    let mut result = create_record_header(PptRecordType::TimeIterateData, 0, 0, 20);
+    let mut result = create_record_header(RecordType::TimeIterateData, 0, 0, 20);
     result.extend(payload);
     result
 }
@@ -1612,7 +1561,7 @@ pub fn write_time_sequence_data(data: &TimeSequenceData) -> Vec<u8> {
     );
     payload.extend(0u32.to_le_bytes());
     payload.extend(flags.to_le_bytes());
-    let mut result = create_record_header(PptRecordType::TimeSequenceData, 0, 0, 20);
+    let mut result = create_record_header(RecordType::TimeSequenceData, 0, 0, 20);
     result.extend(payload);
     result
 }
@@ -1621,7 +1570,7 @@ pub fn write_time_sequence_data(data: &TimeSequenceData) -> Vec<u8> {
 pub fn write_time_condition(condition: &TimeCondition) -> Result<Vec<u8>> {
     let expects_visual = condition.atom.trigger_object == TimeTriggerObject::VisualElement;
     if expects_visual != condition.visual_target.is_some() {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "visual target must exist exactly for visual-element conditions".to_string(),
         ));
     }
@@ -1637,18 +1586,13 @@ pub fn write_time_condition(condition: &TimeCondition) -> Result<Vec<u8>> {
         TimeConditionType::Previous => 5,
         TimeConditionType::EndSync => 6,
     };
-    wrap_record(
-        PptRecordType::TimeConditionContainer,
-        0x0F,
-        instance,
-        children,
-    )
+    wrap_record(RecordType::TimeConditionContainer, 0x0F, instance, children)
 }
 
 /// Serialize an exact `TimeConditionAtom`.
 pub fn write_time_condition_atom(atom: &TimeConditionAtom) -> Result<Vec<u8>> {
     if atom.trigger_object == TimeTriggerObject::RuntimeNodeReference && atom.target_id != 2 {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "runtime-node condition target must be 2".to_string(),
         ));
     }
@@ -1669,7 +1613,7 @@ pub fn write_time_condition_atom(atom: &TimeConditionAtom) -> Result<Vec<u8>> {
         TimeTriggerEvent::OnPrevious => 10,
         TimeTriggerEvent::StopAudio => 11,
     };
-    let mut result = create_record_header(PptRecordType::TimeCondition, 0, 0, 16);
+    let mut result = create_record_header(RecordType::TimeCondition, 0, 0, 16);
     result.extend(trigger_object.to_le_bytes());
     result.extend(trigger_event.to_le_bytes());
     result.extend(atom.target_id.to_le_bytes());
@@ -1687,7 +1631,7 @@ pub fn write_time_modifier(modifier: &TimeModifier) -> Vec<u8> {
         TimeModifier::Decelerate(value) => (4, *value),
         TimeModifier::AutomaticReverse(value) => (5, *value),
     };
-    let mut result = create_record_header(PptRecordType::TimeModifier, 0, 0, 8);
+    let mut result = create_record_header(RecordType::TimeModifier, 0, 0, 8);
     result.extend(kind.to_le_bytes());
     result.extend(value.to_le_bytes());
     result
@@ -1836,7 +1780,7 @@ pub fn write_build_list(build_info: &BuildList) -> Result<Vec<u8>> {
             BuildListEntry::Diagram(build) => &build.atom,
         };
         if !identities.insert((atom.build_id, atom.shape_id_ref)) {
-            return Err(PptError::InvalidFormat(format!(
+            return Err(Error::InvalidFormat(format!(
                 "duplicate build identity ({}, {})",
                 atom.build_id, atom.shape_id_ref
             )));
@@ -1847,7 +1791,7 @@ pub fn write_build_list(build_info: &BuildList) -> Result<Vec<u8>> {
             BuildListEntry::Diagram(build) => write_diagram_build(build)?,
         });
     }
-    wrap_record(PptRecordType::BuildList, 0x0F, 0, children)
+    wrap_record(RecordType::BuildList, 0x0F, 0, children)
 }
 
 fn write_build_atom(atom: &BuildAtom, kind: BuildKind) -> Vec<u8> {
@@ -1858,7 +1802,7 @@ fn write_build_atom(atom: &BuildAtom, kind: BuildKind) -> Vec<u8> {
     data.push(u8::from(atom.expanded));
     data.push(u8::from(atom.ui_expanded));
     data.extend([0, 0]);
-    let mut result = create_record_header(PptRecordType::BuildAtom, 0, 0, 16);
+    let mut result = create_record_header(RecordType::BuildAtom, 0, 0, 16);
     result.extend(data);
     result
 }
@@ -1874,14 +1818,14 @@ fn write_paragraph_build(build: &ParagraphBuild) -> Result<Vec<u8>> {
     atom.push(u8::from(build.paragraph.user_set_animate_background));
     atom.push(u8::from(build.paragraph.automatic));
     atom.extend(build.paragraph.delay_time_ms.to_le_bytes());
-    children.extend(create_record_header(PptRecordType::ParaBuildAtom, 1, 0, 16));
+    children.extend(create_record_header(RecordType::ParaBuildAtom, 1, 0, 16));
     children.extend(atom);
     for level in &build.levels {
-        children.extend(create_record_header(PptRecordType::LevelInfoAtom, 0, 0, 4));
+        children.extend(create_record_header(RecordType::LevelInfoAtom, 0, 0, 4));
         children.extend(level.level.to_le_bytes());
         children.extend(write_extended_time_node(&level.time_node)?);
     }
-    wrap_record(PptRecordType::ParaBuild, 0x0F, 0, children)
+    wrap_record(RecordType::ParaBuild, 0x0F, 0, children)
 }
 
 fn write_chart_build(build: &ChartBuild) -> Result<Vec<u8>> {
@@ -1890,21 +1834,16 @@ fn write_chart_build(build: &ChartBuild) -> Result<Vec<u8>> {
     atom.extend(build.chart.build_type.as_u32().to_le_bytes());
     atom.push(u8::from(build.chart.animate_background));
     atom.extend([0, 0, 0]);
-    children.extend(create_record_header(PptRecordType::ChartBuildAtom, 0, 0, 8));
+    children.extend(create_record_header(RecordType::ChartBuildAtom, 0, 0, 8));
     children.extend(atom);
-    wrap_record(PptRecordType::ChartBuild, 0x0F, 0, children)
+    wrap_record(RecordType::ChartBuild, 0x0F, 0, children)
 }
 
 fn write_diagram_build(build: &DiagramBuild) -> Result<Vec<u8>> {
     let mut children = write_build_atom(&build.atom, BuildKind::Diagram);
-    children.extend(create_record_header(
-        PptRecordType::DiagramBuildAtom,
-        0,
-        0,
-        4,
-    ));
+    children.extend(create_record_header(RecordType::DiagramBuildAtom, 0, 0, 4));
     children.extend(build.diagram.build_type.as_u32().to_le_bytes());
-    wrap_record(PptRecordType::DiagramBuild, 0x0F, 0, children)
+    wrap_record(RecordType::DiagramBuild, 0x0F, 0, children)
 }
 
 fn validate_paragraph_levels(
@@ -1912,24 +1851,24 @@ fn validate_paragraph_levels(
     levels: &[ParagraphBuildLevel],
 ) -> Result<()> {
     if levels.is_empty() {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "ParaBuild requires at least one level".to_string(),
         ));
     }
     if *build_type == super::types::ParagraphBuildType::AsAWhole && levels.len() != 1 {
-        return Err(PptError::InvalidFormat(
+        return Err(Error::InvalidFormat(
             "AsAWhole ParaBuild requires exactly one level".to_string(),
         ));
     }
     for (index, level) in levels.iter().enumerate() {
         if level.level > 9 {
-            return Err(PptError::InvalidFormat(format!(
+            return Err(Error::InvalidFormat(format!(
                 "paragraph build level {} exceeds 9",
                 level.level
             )));
         }
         if index > 0 && levels[index - 1].level >= level.level {
-            return Err(PptError::InvalidFormat(
+            return Err(Error::InvalidFormat(
                 "ParaBuild levels must be strictly increasing".to_string(),
             ));
         }
@@ -1938,13 +1877,13 @@ fn validate_paragraph_levels(
 }
 
 fn wrap_record(
-    record_type: PptRecordType,
+    record_type: RecordType,
     version: u16,
     instance: u16,
     data: Vec<u8>,
 ) -> Result<Vec<u8>> {
     let length = u32::try_from(data.len()).map_err(|_| {
-        PptError::InvalidFormat(format!("{record_type:?} data exceeds 4 GiB record limit"))
+        Error::InvalidFormat(format!("{record_type:?} data exceeds 4 GiB record limit"))
     })?;
     let mut result = create_record_header(record_type, version, instance, length);
     result.extend(data);
@@ -1953,7 +1892,7 @@ fn wrap_record(
 
 /// Create a PPT record header.
 fn create_record_header(
-    record_type: PptRecordType,
+    record_type: RecordType,
     version: u16,
     instance: u16,
     data_length: u32,
@@ -1980,7 +1919,7 @@ fn create_record_header_raw(
 }
 
 /// Serialize raw record (for preserving unknown/complex records).
-fn serialize_raw_record(record: &crate::records::PptRecord) -> Vec<u8> {
+fn serialize_raw_record(record: &crate::records::Record) -> Vec<u8> {
     let mut data = Vec::new();
 
     let header = create_record_header_raw(

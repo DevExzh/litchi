@@ -9,7 +9,7 @@ use litchi_ograph::{Limits, Package as GraphPackage};
 
 use super::model::Kind;
 use crate::embedded::storage::{Compression, Kind as StorageKind, Storage};
-use crate::package::{PptError, Result};
+use crate::package::{Error, Result};
 use crate::presentation::Presentation;
 
 const MAX_EXCEL_ROOT_ENTRIES: usize = 64;
@@ -41,14 +41,14 @@ pub(super) fn decode(storage: Storage, limits: Limits) -> Result<Vec<u8>> {
         },
         Compression::Zlib => {
             let uncompressed_len = storage.declared_uncompressed_len().ok_or_else(|| {
-                PptError::Corrupted("compressed chart storage is missing its size".into())
+                Error::Corrupted("compressed chart storage is missing its size".into())
             })?;
             let declared = usize::try_from(uncompressed_len)
-                .map_err(|_| PptError::Corrupted("chart storage size exceeds usize".into()))?;
+                .map_err(|_| Error::Corrupted("chart storage size exceeds usize".into()))?;
             check_limit("chart package bytes", declared, limits.max_package_bytes)?;
             let capacity = declared
                 .checked_add(1)
-                .ok_or_else(|| PptError::Corrupted("chart storage size overflows usize".into()))?;
+                .ok_or_else(|| Error::Corrupted("chart storage size overflows usize".into()))?;
             let mut bytes = Vec::new();
             bytes
                 .try_reserve_exact(capacity)
@@ -73,7 +73,7 @@ pub(super) fn parse(
     limits: Limits,
 ) -> Result<Parsed> {
     let storage = presentation.ole_storage(persist_id)?.ok_or_else(|| {
-        PptError::Corrupted(format!(
+        Error::Corrupted(format!(
             "chart object persist ID {persist_id} has no storage"
         ))
     })?;
@@ -144,7 +144,7 @@ fn extract_excel_workbook(package: Vec<u8>, limits: Limits) -> Result<Vec<u8>> {
                 ));
             }
         }
-        stream.ok_or_else(|| PptError::Corrupted("chart package has no Workbook stream".into()))?
+        stream.ok_or_else(|| Error::Corrupted("chart package has no Workbook stream".into()))?
     };
     let workbook = cfb.open_stream(&[stream.as_str()])?;
     check_limit("Workbook bytes", workbook.len(), limits.max_workbook_bytes)?;
@@ -158,7 +158,7 @@ fn check_limit(resource: &'static str, observed: usize, maximum: usize) -> Resul
     Ok(())
 }
 
-fn limit_error(resource: &'static str, observed: u64, maximum: u64) -> PptError {
+fn limit_error(resource: &'static str, observed: u64, maximum: u64) -> Error {
     litchi_ograph::Error::LimitExceeded {
         resource,
         observed,
@@ -172,5 +172,5 @@ fn as_u64(value: usize) -> u64 {
 }
 
 pub(super) fn corrupted<T>(message: impl Into<String>) -> Result<T> {
-    Err(PptError::Corrupted(message.into()))
+    Err(Error::Corrupted(message.into()))
 }

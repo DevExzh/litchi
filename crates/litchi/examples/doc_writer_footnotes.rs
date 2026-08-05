@@ -7,7 +7,7 @@
 //!
 //! Run with: cargo run --example doc_writer_footnotes
 
-use litchi::doc::writer::{DocWriter, FootnoteEntry};
+use litchi_doc::writer::{DocWriter, FootnoteEntry};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {

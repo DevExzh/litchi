@@ -1,12 +1,9 @@
 //! Bounded binary codecs for PowerPoint header/footer records.
 
-use super::model::{
-    PowerPointDateTimeFormatId, PowerPointHeaderFooter, PowerPointHeaderFooterOptions,
-    PowerPointHeaderFooterScope,
-};
-use crate::consts::PptRecordType;
-use crate::package::{PptError, Result};
-use crate::records::PptRecord;
+use super::model::{DateTimeFormatId, HeaderFooter, HeaderFooterOptions, HeaderFooterScope};
+use crate::consts::RecordType;
+use crate::package::{Error, Result};
+use crate::records::Record;
 
 pub(crate) const HEADERS_FOOTERS_RECORD_TYPE: u16 = 0x0FD9;
 pub(crate) const HEADERS_FOOTERS_ATOM_RECORD_TYPE: u16 = 0x0FDA;
@@ -27,7 +24,7 @@ pub(crate) const MAX_HEADER_FOOTER_ENTRIES: usize = 65_536;
 pub(crate) const MAX_SCANNED_RECORDS: usize = 1_000_000;
 const KNOWN_FLAG_MASK: u16 = 0x003F;
 
-impl PowerPointHeaderFooterScope {
+impl HeaderFooterScope {
     pub(crate) fn record_instance(self) -> u16 {
         match self {
             Self::PresentationSlides => PRESENTATION_SLIDES_INSTANCE,
@@ -41,11 +38,11 @@ impl PowerPointHeaderFooterScope {
     }
 }
 
-impl PowerPointHeaderFooterOptions {
-    fn from_atom(record: &PptRecord) -> Result<Self> {
+impl HeaderFooterOptions {
+    fn from_atom(record: &Record) -> Result<Self> {
         validate_record_header(
             record,
-            PptRecordType::HeadersFootersAtom,
+            RecordType::HeadersFootersAtom,
             HEADERS_FOOTERS_ATOM_RECORD_TYPE,
             ATOM_VERSION,
             0,
@@ -59,7 +56,7 @@ impl PowerPointHeaderFooterOptions {
             ));
         }
         let format_id = i16::from_le_bytes([record.data[0], record.data[1]]);
-        if !(0..=i16::from(PowerPointDateTimeFormatId::MAX)).contains(&format_id) {
+        if !(0..=i16::from(DateTimeFormatId::MAX)).contains(&format_id) {
             return Err(corrupted(
                 "header/footer datetime format ID is outside 0..=13",
             ));
@@ -71,7 +68,7 @@ impl PowerPointHeaderFooterOptions {
             ));
         }
         Ok(Self {
-            datetime_format: PowerPointDateTimeFormatId::new(format_id as u8)?,
+            datetime_format: DateTimeFormatId::new(format_id as u8)?,
             show_date: mask & 0x0001 != 0,
             use_current_datetime: mask & 0x0002 != 0,
             use_user_date: mask & 0x0004 != 0,
@@ -91,25 +88,25 @@ impl PowerPointHeaderFooterOptions {
     }
 }
 
-impl PowerPointHeaderFooter {
+impl HeaderFooter {
     /// Strictly parse one already-materialized `RT_HeadersFooters` record.
     ///
     /// The supplied scope is checked against the record instance. Direct-parent
-    /// placement is validated by [`PowerPointHeaderFooters`] when parsing a
+    /// placement is validated by [`HeaderFooters`] when parsing a
     /// complete presentation.
-    pub fn parse_record(record: &PptRecord, scope: PowerPointHeaderFooterScope) -> Result<Self> {
+    pub fn parse_record(record: &Record, scope: HeaderFooterScope) -> Result<Self> {
         let mut aggregate = 0usize;
         Self::parse_record_bounded(record, scope, &mut aggregate)
     }
 
     pub(crate) fn parse_record_bounded(
-        record: &PptRecord,
-        scope: PowerPointHeaderFooterScope,
+        record: &Record,
+        scope: HeaderFooterScope,
         aggregate: &mut usize,
     ) -> Result<Self> {
         validate_record_header(
             record,
-            PptRecordType::HeadersFooters,
+            RecordType::HeadersFooters,
             HEADERS_FOOTERS_RECORD_TYPE,
             CONTAINER_VERSION,
             scope.record_instance(),
@@ -117,20 +114,20 @@ impl PowerPointHeaderFooter {
         if record.data_length as usize != record.data.len() {
             return Err(corrupted("HeadersFooters container payload is truncated"));
         }
-        let children = PptRecord::parse_sequence_strict(&record.data, "HeadersFooters")?;
+        let children = Record::parse_sequence_strict(&record.data, "HeadersFooters")?;
         let Some(atom) = children.first() else {
             return Err(corrupted(
                 "HeadersFooters container is missing HeadersFootersAtom",
             ));
         };
-        let options = PowerPointHeaderFooterOptions::from_atom(atom)?;
+        let options = HeaderFooterOptions::from_atom(atom)?;
 
         let mut user_date = None;
         let mut header = None;
         let mut footer = None;
         let mut previous_instance = None;
         for child in &children[1..] {
-            if child.record_type != PptRecordType::CString
+            if child.record_type != RecordType::CString
                 || child.record_type_raw != CSTRING_RECORD_TYPE
                 || child.version != ATOM_VERSION
             {
@@ -264,8 +261,8 @@ impl PowerPointHeaderFooter {
 }
 
 pub(crate) fn validate_record_header(
-    record: &PptRecord,
-    expected_type: PptRecordType,
+    record: &Record,
+    expected_type: RecordType,
     expected_raw_type: u16,
     expected_version: u16,
     expected_instance: u16,
@@ -369,6 +366,6 @@ fn append_record(
     Ok(())
 }
 
-pub(crate) fn corrupted(message: impl Into<String>) -> PptError {
-    PptError::Corrupted(message.into())
+pub(crate) fn corrupted(message: impl Into<String>) -> Error {
+    Error::Corrupted(message.into())
 }

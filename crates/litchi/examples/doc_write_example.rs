@@ -5,7 +5,7 @@
 //! for implementation status.
 //!
 //! Run with: cargo run --example doc_write_example
-use litchi::doc::{CharacterFormatting, DocWriter, ParagraphFormatting};
+use litchi_doc::{CharacterFormatting, DocWriter, ParagraphFormatting};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating a new DOC file...");

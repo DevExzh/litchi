@@ -1,13 +1,13 @@
 //! Worksheet-level BIFF8 record writers.
 
-use crate::page_setup::{XlsPrintComments, XlsPrintErrors, XlsPrintOrder, XlsPrintOrientation};
-use crate::writer::core::{XlsPageSetupOptions, XlsWorksheetLayoutOptions};
-use crate::{XlsError, XlsResult};
+use crate::page_setup::{PrintComments, PrintErrors, PrintOrder, PrintOrientation};
+use crate::writer::core::{PageSetupOptions, WorksheetLayoutOptions};
+use crate::{Error, Result};
 use std::io::Write;
 
 use super::{write_record, write_record_header};
 
-fn write_unicode_string<W: Write>(writer: &mut W, value: &str) -> XlsResult<()> {
+fn write_unicode_string<W: Write>(writer: &mut W, value: &str) -> Result<()> {
     let units = value.encode_utf16().collect::<Vec<_>>();
     let compressed = units.iter().all(|unit| *unit <= 0xff);
     writer.write_all(&(units.len() as u16).to_le_bytes())?;
@@ -22,7 +22,7 @@ fn write_unicode_string<W: Write>(writer: &mut W, value: &str) -> XlsResult<()> 
     Ok(())
 }
 
-fn write_dcon_file<W: Write>(writer: &mut W, file: &crate::XlsConsolidationFile) -> XlsResult<()> {
+fn write_dcon_file<W: Write>(writer: &mut W, file: &crate::ConsolidationFile) -> Result<()> {
     let units = file.encoded_path().encode_utf16().collect::<Vec<_>>();
     let compressed = units.iter().all(|unit| *unit <= 0xff);
     writer.write_all(&(units.len() as u16).to_le_bytes())?;
@@ -43,8 +43,8 @@ fn write_dcon_file<W: Write>(writer: &mut W, file: &crate::XlsConsolidationFile)
 /// Write one complete contiguous `DCON` worksheet directory.
 pub(super) fn write_consolidation<W: Write>(
     writer: &mut W,
-    consolidation: &crate::XlsConsolidation,
-) -> XlsResult<()> {
+    consolidation: &crate::Consolidation,
+) -> Result<()> {
     consolidation.validate_for_write()?;
     write_record_header(writer, crate::consolidation::DCON_RECORD_TYPE, 8)?;
     writer.write_all(&consolidation.function().code().to_le_bytes())?;
@@ -54,7 +54,7 @@ pub(super) fn write_consolidation<W: Write>(
     for source in consolidation.sources() {
         let mut payload = Vec::new();
         let record_type = match source {
-            crate::XlsConsolidationSource::CellRange { range, file } => {
+            crate::ConsolidationSource::CellRange { range, file } => {
                 payload.extend_from_slice(&range.first_row().to_le_bytes());
                 payload.extend_from_slice(&range.last_row().to_le_bytes());
                 payload.push(range.first_column());
@@ -62,7 +62,7 @@ pub(super) fn write_consolidation<W: Write>(
                 write_dcon_file(&mut payload, file)?;
                 crate::consolidation::DCON_REF_RECORD_TYPE
             },
-            crate::XlsConsolidationSource::DefinedName { name, file } => {
+            crate::ConsolidationSource::DefinedName { name, file } => {
                 write_unicode_string(&mut payload, name)?;
                 if let Some(file) = file {
                     write_dcon_file(&mut payload, file)?;
@@ -71,7 +71,7 @@ pub(super) fn write_consolidation<W: Write>(
                 }
                 crate::consolidation::DCON_NAME_RECORD_TYPE
             },
-            crate::XlsConsolidationSource::BuiltInName { name, file } => {
+            crate::ConsolidationSource::BuiltInName { name, file } => {
                 payload.push(name.code());
                 payload.extend_from_slice(&0u16.to_le_bytes());
                 payload.push(0);
@@ -88,16 +88,16 @@ pub(super) fn write_consolidation<W: Write>(
     Ok(())
 }
 
-fn write_bool_record<W: Write>(writer: &mut W, record_type: u16, value: bool) -> XlsResult<()> {
+fn write_bool_record<W: Write>(writer: &mut W, record_type: u16, value: bool) -> Result<()> {
     write_record_header(writer, record_type, 2)?;
     writer.write_all(&u16::from(value).to_le_bytes())?;
     Ok(())
 }
 
-fn write_header_footer<W: Write>(writer: &mut W, record_type: u16, text: &str) -> XlsResult<()> {
+fn write_header_footer<W: Write>(writer: &mut W, record_type: u16, text: &str) -> Result<()> {
     let units = text.encode_utf16().collect::<Vec<_>>();
     if units.len() > 255 {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "header/footer exceeds 255 UTF-16 code units".to_string(),
         ));
     }
@@ -119,13 +119,13 @@ fn write_page_breaks<W: Write>(
     writer: &mut W,
     record_type: u16,
     page_breaks: &[(u16, u16, u16)],
-) -> XlsResult<()> {
+) -> Result<()> {
     if page_breaks.is_empty() {
         return Ok(());
     }
     let maximum = if record_type == 0x001b { 1026 } else { 255 };
     if page_breaks.len() > maximum {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "page-break count exceeds BIFF8 limit".to_string(),
         ));
     }
@@ -136,16 +136,14 @@ fn write_page_breaks<W: Write>(
             || (record_type == 0x001b && range_end > 16383)
             || (record_type == 0x001a && position > 255)
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "page-break range is invalid".to_string(),
             ));
         }
         if index > 0 {
             let previous = ordered[index - 1];
             if position == previous.0 && range_start <= previous.2 {
-                return Err(XlsError::InvalidData(
-                    "page-break ranges overlap".to_string(),
-                ));
+                return Err(Error::InvalidData("page-break ranges overlap".to_string()));
             }
         }
     }
@@ -159,7 +157,7 @@ fn write_page_breaks<W: Write>(
     Ok(())
 }
 
-fn write_pls<W: Write>(writer: &mut W, driver_data: &[u8]) -> XlsResult<()> {
+fn write_pls<W: Write>(writer: &mut W, driver_data: &[u8]) -> Result<()> {
     const MAX_PAYLOAD: usize = 8224;
     let first_len = driver_data.len().min(MAX_PAYLOAD - 2);
     write_record_header(writer, 0x004d, (first_len + 2) as u16)?;
@@ -175,10 +173,10 @@ fn write_pls<W: Write>(writer: &mut W, driver_data: &[u8]) -> XlsResult<()> {
 /// Write the primary BIFF8 worksheet page-settings records in canonical order.
 pub(super) fn write_page_settings<W: Write>(
     writer: &mut W,
-    options: &XlsPageSetupOptions,
+    options: &PageSetupOptions,
     horizontal_breaks: &[(u16, u16, u16)],
     vertical_breaks: &[(u16, u16, u16)],
-) -> XlsResult<()> {
+) -> Result<()> {
     write_bool_record(writer, 0x002a, options.print_headers)?;
     write_bool_record(writer, 0x002b, options.print_gridlines)?;
     write_page_breaks(writer, 0x001b, horizontal_breaks)?;
@@ -201,15 +199,15 @@ pub(super) fn write_page_settings<W: Write>(
     }
 
     let mut flags = 0u16;
-    if options.print_order == XlsPrintOrder::OverThenDown {
+    if options.print_order == PrintOrder::OverThenDown {
         flags |= 0x0001;
     }
     if options.printer_driver_data.is_none() {
         flags |= 0x0004;
     }
     match options.orientation {
-        Some(XlsPrintOrientation::Portrait) => flags |= 0x0002,
-        Some(XlsPrintOrientation::Landscape) => {},
+        Some(PrintOrientation::Portrait) => flags |= 0x0002,
+        Some(PrintOrientation::Landscape) => {},
         None => flags |= 0x0040,
     }
     if options.black_and_white {
@@ -219,18 +217,18 @@ pub(super) fn write_page_settings<W: Write>(
         flags |= 0x0010;
     }
     match options.comments {
-        XlsPrintComments::None => {},
-        XlsPrintComments::AsDisplayed => flags |= 0x0020,
-        XlsPrintComments::AtEnd => flags |= 0x0220,
+        PrintComments::None => {},
+        PrintComments::AsDisplayed => flags |= 0x0020,
+        PrintComments::AtEnd => flags |= 0x0220,
     }
     if options.starting_page_number.is_some() {
         flags |= 0x0080;
     }
     flags |= match options.errors {
-        XlsPrintErrors::Displayed => 0,
-        XlsPrintErrors::Blank => 1 << 10,
-        XlsPrintErrors::Dashes => 2 << 10,
-        XlsPrintErrors::NotAvailable => 3 << 10,
+        PrintErrors::Displayed => 0,
+        PrintErrors::Blank => 1 << 10,
+        PrintErrors::Dashes => 2 << 10,
+        PrintErrors::NotAvailable => 3 << 10,
     };
     write_record_header(writer, 0x00a1, 34)?;
     writer.write_all(&options.paper_size.to_le_bytes())?;
@@ -256,9 +254,9 @@ pub(super) fn write_page_settings<W: Write>(
 /// Write DEFCOLWIDTH record.
 ///
 /// Record type: 0x0055, Length: 2
-pub(super) fn write_def_col_width<W: Write>(writer: &mut W, width_chars: u16) -> XlsResult<()> {
+pub(super) fn write_def_col_width<W: Write>(writer: &mut W, width_chars: u16) -> Result<()> {
     if width_chars > 255 {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "default column width exceeds 255 characters".to_string(),
         ));
     }
@@ -277,10 +275,10 @@ pub(super) fn write_index<W: Write>(
     last_row_plus1: u32,
     def_col_width_pos: u32,
     dbcell_positions: &[u32],
-) -> XlsResult<()> {
+) -> Result<()> {
     let data_len = 16u16
         + u16::try_from(dbcell_positions.len() * 4).map_err(|_| {
-            XlsError::InvalidData(
+            Error::InvalidData(
                 "INDEX record DBCell pointer list exceeds BIFF8 size limit".to_string(),
             )
         })?;
@@ -303,10 +301,10 @@ pub(super) fn write_dbcell<W: Write>(
     writer: &mut W,
     row_offset: u32,
     cell_offsets: &[u16],
-) -> XlsResult<()> {
+) -> Result<()> {
     let data_len = 4u16
         + u16::try_from(cell_offsets.len() * 2).map_err(|_| {
-            XlsError::InvalidData("DBCELL row offset list exceeds BIFF8 size limit".to_string())
+            Error::InvalidData("DBCELL row offset list exceeds BIFF8 size limit".to_string())
         })?;
     write_record_header(writer, 0x00D7, data_len)?;
     writer.write_all(&row_offset.to_le_bytes())?;
@@ -319,8 +317,8 @@ pub(super) fn write_dbcell<W: Write>(
 /// Write GUTS, DEFAULTROWHEIGHT, and WSBOOL from typed worksheet settings.
 pub(super) fn write_worksheet_layout<W: Write>(
     writer: &mut W,
-    options: &XlsWorksheetLayoutOptions,
-) -> XlsResult<()> {
+    options: &WorksheetLayoutOptions,
+) -> Result<()> {
     options.validate()?;
     write_record_header(writer, 0x0080, 8)?;
     writer.write_all(&options.row_gutter_width.to_le_bytes())?;
@@ -360,7 +358,7 @@ pub(super) fn write_worksheet_layout<W: Write>(
     Ok(())
 }
 
-pub(super) fn write_uncalced<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(super) fn write_uncalced<W: Write>(writer: &mut W) -> Result<()> {
     write_record_header(writer, 0x005E, 2)?;
     writer.write_all(&0u16.to_le_bytes())?;
     Ok(())
@@ -368,24 +366,24 @@ pub(super) fn write_uncalced<W: Write>(writer: &mut W) -> XlsResult<()> {
 
 pub(super) fn write_calculation_settings<W: Write>(
     writer: &mut W,
-    settings: &crate::writer::core::XlsCalculationSettings,
-) -> XlsResult<()> {
+    settings: &crate::writer::core::CalculationSettings,
+) -> Result<()> {
     if !(1..=32_767).contains(&settings.maximum_iterations)
         || !settings.iteration_delta.is_finite()
         || settings.iteration_delta < 0.0
     {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "invalid BIFF8 calculation settings".to_string(),
         ));
     }
     let mode = match settings.mode {
-        crate::XlsCalculationMode::Manual => 0u16,
-        crate::XlsCalculationMode::Automatic => 1u16,
-        crate::XlsCalculationMode::AutomaticExceptTables => 2u16,
+        crate::CalculationMode::Manual => 0u16,
+        crate::CalculationMode::Automatic => 1u16,
+        crate::CalculationMode::AutomaticExceptTables => 2u16,
     };
     let reference_mode = match settings.reference_mode {
-        crate::XlsReferenceMode::R1C1 => 0u16,
-        crate::XlsReferenceMode::A1 => 1u16,
+        crate::ReferenceMode::R1C1 => 0u16,
+        crate::ReferenceMode::A1 => 1u16,
     };
     write_record_header(writer, 0x000D, 2)?;
     writer.write_all(&mode.to_le_bytes())?;
@@ -404,8 +402,8 @@ pub(super) fn write_calculation_settings<W: Write>(
 
 pub(super) fn write_pivot_sheet_preamble<W: Write>(
     writer: &mut W,
-    options: &XlsWorksheetLayoutOptions,
-) -> XlsResult<()> {
+    options: &WorksheetLayoutOptions,
+) -> Result<()> {
     const MARGIN_BYTES: [u8; 8] = [0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0xE6, 0x3F];
     const TOP_BOTTOM_MARGIN_BYTES: [u8; 8] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xE8, 0x3F];
     const PRINT_SETUP_BYTES: [u8; 34] = [
@@ -452,7 +450,7 @@ pub(super) fn write_pivot_colinfo<W: Write>(
     first_col: u16,
     last_col: u16,
     col_width: u16,
-) -> XlsResult<()> {
+) -> Result<()> {
     write_record_header(writer, 0x007D, 12)?;
     writer.write_all(&first_col.to_le_bytes())?;
     writer.write_all(&last_col.to_le_bytes())?;
@@ -476,7 +474,7 @@ pub(super) fn write_colinfo<W: Write>(
     last_col: u16,
     col_width: u16,
     hidden: bool,
-) -> XlsResult<()> {
+) -> Result<()> {
     write_record_header(writer, 0x007D, 12)?;
 
     // Column range (inclusive)
@@ -518,18 +516,18 @@ pub(super) fn write_pane<W: Write>(
     writer: &mut W,
     freeze_rows: u32,
     freeze_cols: u16,
-) -> XlsResult<()> {
+) -> Result<()> {
     if freeze_rows == 0 && freeze_cols == 0 {
         return Ok(());
     }
 
     let y = u16::try_from(freeze_rows).map_err(|_| {
-        XlsError::InvalidData(
+        Error::InvalidData(
             "freeze_panes: freeze_rows exceeds BIFF8 limit 65535 for PANE record".to_string(),
         )
     })?;
     if freeze_cols > 255 {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "freeze_panes: freeze_cols exceeds BIFF8 frozen PANE limit 255".to_string(),
         ));
     }
@@ -557,7 +555,7 @@ pub(super) fn write_pane<W: Write>(
     Ok(())
 }
 
-pub(super) fn write_autofilterinfo<W: Write>(writer: &mut W, c_entries: u16) -> XlsResult<()> {
+pub(super) fn write_autofilterinfo<W: Write>(writer: &mut W, c_entries: u16) -> Result<()> {
     if c_entries == 0 {
         return Ok(());
     }
@@ -590,7 +588,7 @@ pub(super) fn write_autofilter<W: Write>(
     hide_arrow: bool,
     cond1: &AutoFilterConditionWrite,
     cond2: &AutoFilterConditionWrite,
-) -> XlsResult<()> {
+) -> Result<()> {
     let mut grbit: u16 = 0;
     if join_or {
         grbit |= 0x0001;
@@ -720,7 +718,7 @@ pub(super) fn write_sort<W: Write>(
     case_sensitive: bool,
     sort_by_columns: bool,
     keys: &[(u16, bool)], // (column_index, descending)
-) -> XlsResult<()> {
+) -> Result<()> {
     if keys.is_empty() {
         return Ok(());
     }
@@ -766,7 +764,7 @@ pub(super) fn write_sheet_protection<W: Write>(
     protect_objects: bool,
     protect_scenarios: bool,
     password_hash: Option<u16>,
-) -> XlsResult<()> {
+) -> Result<()> {
     write_record_header(writer, 0x0012, 2)?;
     writer.write_all(&0x0001u16.to_le_bytes())?;
 
@@ -811,7 +809,7 @@ fn write_hyperlink_web<W: Write>(
     col1: u16,
     col2: u16,
     url: &str,
-) -> XlsResult<()> {
+) -> Result<()> {
     if url.is_empty() {
         return Ok(());
     }
@@ -827,9 +825,8 @@ fn write_hyperlink_web<W: Write>(
     ];
 
     let url_bytes = encode_web_url_bytes(url);
-    let url_len = u32::try_from(url_bytes.len()).map_err(|_| {
-        XlsError::InvalidData("Hyperlink URL exceeds BIFF8 length limit".to_string())
-    })?;
+    let url_len = u32::try_from(url_bytes.len())
+        .map_err(|_| Error::InvalidData("Hyperlink URL exceeds BIFF8 length limit".to_string()))?;
 
     // Base size (0x34) matches POI's HyperlinkRecord.getDataSize():
     //  - 8 bytes Ref8U (rwFirst, rwLast, colFirst, colLast)
@@ -840,7 +837,7 @@ fn write_hyperlink_web<W: Write>(
     //  - 4 bytes address length (byte count)
     let data_len = 0x34u32.saturating_add(url_len);
     if data_len > u16::MAX as u32 {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "Hyperlink record exceeds BIFF8 length limit".to_string(),
         ));
     }
@@ -871,7 +868,7 @@ fn write_hyperlink_internal<W: Write>(
     col1: u16,
     col2: u16,
     url: &str,
-) -> XlsResult<()> {
+) -> Result<()> {
     if url.is_empty() {
         return Ok(());
     }
@@ -896,11 +893,11 @@ fn write_hyperlink_internal<W: Write>(
     }
 
     let url_len = u32::try_from(char_count)
-        .map_err(|_| XlsError::InvalidData("Internal hyperlink target is too long".to_string()))?;
+        .map_err(|_| Error::InvalidData("Internal hyperlink target is too long".to_string()))?;
 
     let data_len = 0x24u32.saturating_add(u32::from(wide.len() as u16));
     if data_len > u16::MAX as u32 {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "Internal hyperlink record exceeds BIFF8 length limit".to_string(),
         ));
     }
@@ -935,9 +932,9 @@ pub(super) fn write_hyperlink<W: Write>(
     col1: u16,
     col2: u16,
     url: &str,
-) -> XlsResult<()> {
+) -> Result<()> {
     if row1 > u16::MAX as u32 || row2 > u16::MAX as u32 {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "Hyperlink row index must be <= 65535 for BIFF8".to_string(),
         ));
     }
@@ -947,17 +944,17 @@ pub(super) fn write_hyperlink<W: Write>(
     // Validate the complete range before choosing a hyperlink encoding so a
     // malformed record can never be emitted for an out-of-grid target.
     if row1 > row2 {
-        return Err(XlsError::InvalidCellReference(
+        return Err(Error::InvalidCellReference(
             "Hyperlink row range must be ordered".to_string(),
         ));
     }
     if col1 > col2 {
-        return Err(XlsError::InvalidCellReference(
+        return Err(Error::InvalidCellReference(
             "Hyperlink column range must be ordered".to_string(),
         ));
     }
     if col2 > u8::MAX as u16 {
-        return Err(XlsError::InvalidCellReference(
+        return Err(Error::InvalidCellReference(
             "Hyperlink column index must be <= 255 for BIFF8".to_string(),
         ));
     }
@@ -993,7 +990,7 @@ pub(super) fn write_hyperlink<W: Write>(
 /// FREEZE_PANES_NO_SPLIT (0x0100) bits are set in the options field,
 /// mirroring Apache POI's behaviour after `createFreezePane`.
 #[allow(dead_code)]
-pub(super) fn write_window2<W: Write>(writer: &mut W, has_freeze_panes: bool) -> XlsResult<()> {
+pub(super) fn write_window2<W: Write>(writer: &mut W, has_freeze_panes: bool) -> Result<()> {
     write_record_header(writer, 0x023E, 18)?;
 
     // Base options value from POI's InternalSheet.createWindowTwo(): 0x06B6
@@ -1033,11 +1030,7 @@ pub(super) fn write_window2<W: Write>(writer: &mut W, has_freeze_panes: bool) ->
 }
 
 /// Write an SCL record for a non-default worksheet zoom fraction.
-pub(super) fn write_scl<W: Write>(
-    writer: &mut W,
-    numerator: u16,
-    denominator: u16,
-) -> XlsResult<()> {
+pub(super) fn write_scl<W: Write>(writer: &mut W, numerator: u16, denominator: u16) -> Result<()> {
     if numerator == 0
         || denominator == 0
         || numerator > i16::MAX as u16
@@ -1045,7 +1038,7 @@ pub(super) fn write_scl<W: Write>(
         || u32::from(numerator) * 10 < u32::from(denominator)
         || u32::from(numerator) > u32::from(denominator) * 4
     {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "SCL zoom fraction must be between 1/10 and 4 with positive terms".to_string(),
         ));
     }
@@ -1058,7 +1051,7 @@ pub(super) fn write_scl<W: Write>(
 pub(super) fn write_window2_options<W: Write>(
     writer: &mut W,
     options: &crate::writer::view::View,
-) -> XlsResult<()> {
+) -> Result<()> {
     options.validate()?;
     let mut flags = 0u16;
     flags |= u16::from(options.shows_formulas());
@@ -1093,7 +1086,7 @@ pub(super) fn write_window2_options<W: Write>(
 pub(super) fn write_pane_options<W: Write>(
     writer: &mut W,
     pane: &crate::writer::view::Pane,
-) -> XlsResult<()> {
+) -> Result<()> {
     pane.validate()?;
     write_record_header(writer, 0x0041, 10)?;
     writer.write_all(&pane.horizontal().to_le_bytes())?;
@@ -1107,19 +1100,19 @@ pub(super) fn write_pane_options<W: Write>(
 pub(super) fn write_selection_options<W: Write>(
     writer: &mut W,
     selection: &crate::writer::view::Selection,
-) -> XlsResult<()> {
+) -> Result<()> {
     crate::writer::view::validate_selection(selection)?;
-    let payload_len = 9usize
-        .checked_add(selection.ranges().len().checked_mul(6).ok_or_else(|| {
-            XlsError::InvalidData("SELECTION payload length overflow".to_string())
-        })?)
-        .ok_or_else(|| XlsError::InvalidData("SELECTION payload length overflow".to_string()))?;
+    let payload_len =
+        9usize
+            .checked_add(selection.ranges().len().checked_mul(6).ok_or_else(|| {
+                Error::InvalidData("SELECTION payload length overflow".to_string())
+            })?)
+            .ok_or_else(|| Error::InvalidData("SELECTION payload length overflow".to_string()))?;
     write_record_header(
         writer,
         0x001d,
-        u16::try_from(payload_len).map_err(|_| {
-            XlsError::InvalidData("SELECTION payload exceeds BIFF8 limit".to_string())
-        })?,
+        u16::try_from(payload_len)
+            .map_err(|_| Error::InvalidData("SELECTION payload exceeds BIFF8 limit".to_string()))?,
     )?;
     writer.write_all(&[selection.pane().code()])?;
     writer.write_all(&selection.row().to_le_bytes())?;
@@ -1140,9 +1133,9 @@ pub(super) fn write_default_selection<W: Write>(
     writer: &mut W,
     freeze_rows: u16,
     freeze_cols: u16,
-) -> XlsResult<()> {
+) -> Result<()> {
     if freeze_cols > 255 {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "SELECTION active column exceeds BIFF8 limit 255".to_string(),
         ));
     }
@@ -1164,7 +1157,7 @@ pub(super) fn write_default_selection<W: Write>(
     Ok(())
 }
 
-pub(super) fn write_pivot_window2<W: Write>(writer: &mut W, selected: bool) -> XlsResult<()> {
+pub(super) fn write_pivot_window2<W: Write>(writer: &mut W, selected: bool) -> Result<()> {
     const FLAGS: u16 = 0x00B6;
     static DATA: &[u8] = &[
         0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11, 0x00, 0x00,
@@ -1177,7 +1170,7 @@ pub(super) fn write_pivot_window2<W: Write>(writer: &mut W, selected: bool) -> X
     Ok(())
 }
 
-pub(super) fn write_plv<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(super) fn write_plv<W: Write>(writer: &mut W) -> Result<()> {
     static DATA: &[u8] = &[
         0x8B, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x12,
         0x00,
@@ -1187,7 +1180,7 @@ pub(super) fn write_plv<W: Write>(writer: &mut W) -> XlsResult<()> {
     Ok(())
 }
 
-pub(super) fn write_selection<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(super) fn write_selection<W: Write>(writer: &mut W) -> Result<()> {
     static DATA: &[u8] = &[
         0x03, 0x0F, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x0F, 0x00, 0x0F, 0x00, 0x03, 0x03,
     ];
@@ -1196,14 +1189,14 @@ pub(super) fn write_selection<W: Write>(writer: &mut W) -> XlsResult<()> {
     Ok(())
 }
 
-pub(super) fn write_phonetic_pr<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(super) fn write_phonetic_pr<W: Write>(writer: &mut W) -> Result<()> {
     static DATA: &[u8] = &[0x17, 0x00, 0x37, 0x00, 0x00, 0x00];
     write_record_header(writer, 0x00EF, DATA.len() as u16)?;
     writer.write_all(DATA)?;
     Ok(())
 }
 
-pub(super) fn write_sheet_ext<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(super) fn write_sheet_ext<W: Write>(writer: &mut W) -> Result<()> {
     static DATA: &[u8] = &[
         0x67, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01,
         0xFF, 0xFF, 0xFF, 0xFF, 0x03, 0x44, 0x00, 0x00,
@@ -1219,8 +1212,8 @@ pub(super) fn write_sheet_ext<W: Write>(writer: &mut W) -> XlsResult<()> {
 /// Record type: 0x00EF
 pub(super) fn write_phonetic_info<W: Write>(
     writer: &mut W,
-    value: &crate::XlsPhoneticInfo,
-) -> XlsResult<()> {
+    value: &crate::PhoneticInfo,
+) -> Result<()> {
     const MAX_RECORD_PAYLOAD: usize = 8_224;
     const CONTINUE_RECORD_TYPE: u16 = 0x003C;
     let payload = value.to_payload();
@@ -1241,8 +1234,8 @@ pub(super) fn write_phonetic_info<W: Write>(
 /// Write a SHEETEXT record (MS-XLS 2.4.259) carrying a sheet tab color.
 ///
 /// Record type: 0x0862
-pub(super) fn write_sheet_ext_tab_color<W: Write>(writer: &mut W, tab_color: u8) -> XlsResult<()> {
-    let payload = crate::sheet_ext::XlsSheetExt::from_tab_color(Some(tab_color)).to_payload();
+pub(super) fn write_sheet_ext_tab_color<W: Write>(writer: &mut W, tab_color: u8) -> Result<()> {
+    let payload = crate::sheet_ext::SheetExt::from_tab_color(Some(tab_color)).to_payload();
     write_record_header(
         writer,
         crate::sheet_ext::SHEET_EXT_RECORD_TYPE,
@@ -1269,7 +1262,7 @@ pub(super) fn write_dimensions<W: Write>(
     last_row: u32,
     first_col: u16,
     last_col: u16,
-) -> XlsResult<()> {
+) -> Result<()> {
     write_record_header(writer, 0x0200, 14)?;
 
     writer.write_all(&first_row.to_le_bytes())?;
@@ -1296,9 +1289,9 @@ pub(super) fn write_row<W: Write>(
     last_col_plus1: u16,
     height: u16,
     hidden: bool,
-) -> XlsResult<()> {
+) -> Result<()> {
     let row_u16 = u16::try_from(row_index).map_err(|_| {
-        XlsError::InvalidData(format!(
+        Error::InvalidData(format!(
             "Row index {} exceeds BIFF8 limit 65535 for ROW record",
             row_index
         ))
@@ -1343,7 +1336,7 @@ pub(super) fn write_row<W: Write>(
     Ok(())
 }
 
-pub(super) fn write_mergedcells<W, I>(writer: &mut W, ranges: I) -> XlsResult<()>
+pub(super) fn write_mergedcells<W, I>(writer: &mut W, ranges: I) -> Result<()>
 where
     W: Write,
     I: IntoIterator<Item = (u16, u16, u8, u8)>,
@@ -1354,7 +1347,7 @@ where
 
     for (first_row, last_row, first_col, last_col) in ranges {
         if first_row > last_row || first_col > last_col {
-            return Err(XlsError::InvalidCellReference(
+            return Err(Error::InvalidCellReference(
                 "MERGEDCELLS contains a reversed range".to_string(),
             ));
         }
@@ -1373,15 +1366,12 @@ where
     Ok(())
 }
 
-fn write_mergedcells_chunk<W: Write>(
-    writer: &mut W,
-    ranges: &[(u16, u16, u8, u8)],
-) -> XlsResult<()> {
+fn write_mergedcells_chunk<W: Write>(writer: &mut W, ranges: &[(u16, u16, u8, u8)]) -> Result<()> {
     debug_assert!(!ranges.is_empty());
     debug_assert!(ranges.len() <= 1027);
 
     let count = u16::try_from(ranges.len())
-        .map_err(|_| XlsError::InvalidData("MERGEDCELLS range count exceeds u16".to_string()))?;
+        .map_err(|_| Error::InvalidData("MERGEDCELLS range count exceeds u16".to_string()))?;
     let data_len: u16 = 2u16 + count.saturating_mul(8);
 
     write_record_header(writer, 0x00E5, data_len)?;

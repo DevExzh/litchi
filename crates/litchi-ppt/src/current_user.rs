@@ -3,7 +3,7 @@
 /// The CurrentUser stream contains information about the current editing session,
 /// including the offset to the current user edit record. This follows Apache POI's
 /// CurrentUserAtom implementation.
-use super::package::{PptError, Result};
+use super::package::{Error, Result};
 
 /// Minimum size of CurrentUser stream in bytes
 const CURRENT_USER_MIN_SIZE: usize = 28;
@@ -47,22 +47,20 @@ impl CurrentUser {
     /// - Bytes 28+: ANSI username, release version, and optional UTF-16LE username
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < CURRENT_USER_MIN_SIZE {
-            return Err(PptError::Corrupted(
-                "CurrentUser stream too short".to_string(),
-            ));
+            return Err(Error::Corrupted("CurrentUser stream too short".to_string()));
         }
 
         let ver_instance = u16::from_le_bytes([data[0], data[1]]);
         let record_type = u16::from_le_bytes([data[2], data[3]]);
         if ver_instance != 0 || record_type != CURRENT_USER_RECORD_TYPE {
-            return Err(PptError::InvalidFormat(format!(
+            return Err(Error::InvalidFormat(format!(
                 "Invalid CurrentUser record header: ver/instance=0x{ver_instance:04X}, type=0x{record_type:04X}"
             )));
         }
 
         let fixed_size = u32::from_le_bytes([data[8], data[9], data[10], data[11]]);
         if fixed_size != 20 {
-            return Err(PptError::InvalidFormat(format!(
+            return Err(Error::InvalidFormat(format!(
                 "Invalid CurrentUser fixed size: {fixed_size}"
             )));
         }
@@ -72,7 +70,7 @@ impl CurrentUser {
             UNENCRYPTED_HEADER_TOKEN => false,
             ENCRYPTED_HEADER_TOKEN => true,
             _ => {
-                return Err(PptError::InvalidFormat(format!(
+                return Err(Error::InvalidFormat(format!(
                     "Invalid CurrentUser header token: 0x{header_token:08X}"
                 )));
             },
@@ -80,7 +78,7 @@ impl CurrentUser {
         let current_edit_offset = u32::from_le_bytes([data[16], data[17], data[18], data[19]]);
         let username_len = u16::from_le_bytes([data[20], data[21]]) as usize;
         if username_len > 255 {
-            return Err(PptError::InvalidFormat(format!(
+            return Err(Error::InvalidFormat(format!(
                 "Invalid CurrentUser username length: {username_len}"
             )));
         }
@@ -88,17 +86,17 @@ impl CurrentUser {
 
         let ansi_start = CURRENT_USER_MIN_SIZE;
         let Some(release_start) = ansi_start.checked_add(username_len) else {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "CurrentUser username length overflow".to_string(),
             ));
         };
         let Some(unicode_start) = release_start.checked_add(4) else {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "CurrentUser release offset overflow".to_string(),
             ));
         };
         if unicode_start > data.len() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "CurrentUser stream truncates the ANSI username or release version".to_string(),
             ));
         }

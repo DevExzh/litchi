@@ -1,7 +1,7 @@
 //! Tests for NormalViewSetInfo9 and NotesTextViewInfo9 view preferences
 //! against real PowerPoint fixtures.
 
-use litchi_ppt::{Package, PowerPointNormalViewSetPayload};
+use litchi_ppt::{NormalViewSetPayload, Package};
 use std::path::PathBuf;
 
 fn fixture(name: &str) -> PathBuf {
@@ -32,7 +32,7 @@ fn reads_normal_view_set_info_from_real_presentations() {
             continue;
         };
         match view.payload() {
-            PowerPointNormalViewSetPayload::Layout(layout) => {
+            NormalViewSetPayload::Layout(layout) => {
                 found_layout += 1;
                 let left = layout.left_portion();
                 assert!(
@@ -42,7 +42,7 @@ fn reads_normal_view_set_info_from_real_presentations() {
                     "{name}: leftPortion out of range"
                 );
             },
-            PowerPointNormalViewSetPayload::Other(raw) => {
+            NormalViewSetPayload::Other(raw) => {
                 found_other += 1;
                 assert_eq!(raw.len(), 20, "{name}");
             },

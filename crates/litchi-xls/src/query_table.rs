@@ -18,7 +18,7 @@
 //! collector before [`super::sort_data::SortDataCollector`]; while a
 //! `QUERYTABLE` sequence is open, the `SortData` record and its declared
 //! `ContinueFrt12` records are consumed here (payloads preserved verbatim in
-//! [`XlsQueryTable::sort_data_bytes`]) so they are never mis-attributed as
+//! [`QueryTable::sort_data_bytes`]) so they are never mis-attributed as
 //! the worksheet sort. `SXADDLQSI` (`SXAddl` records of the `SxcQsi` class)
 //! and `QSIR` (`Qsir`/`Qsif` formatting records) are consumed but not
 //! interpreted. Malformed records never abort worksheet parsing: a broken
@@ -28,7 +28,7 @@
 use litchi_core::binary;
 
 use super::pivot_table::parse_qsi_sx_tag;
-use super::records::XlsEncoding;
+use super::records::Encoding;
 use super::utils::parse_string_record;
 
 /// `Qsi` record type (MS-XLS 2.4.208).
@@ -137,7 +137,7 @@ const PARAMQRY_NON_DEFAULT_NAME: u16 = 0x0004;
 /// Data source type of an external connection (MS-XLS 2.5.64
 /// `DataSourceType`, also the 3-bit `dbt` field of DbQuery, MS-XLS 2.4.80).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsQuerySource {
+pub enum QuerySource {
     /// ODBC-based source (`DBT_ODBC`).
     Odbc,
     /// DAO record set (`DBT_DAO`).
@@ -154,7 +154,7 @@ pub enum XlsQuerySource {
     Unknown(u16),
 }
 
-impl XlsQuerySource {
+impl QuerySource {
     fn from_dbt(dbt: u16) -> Self {
         match dbt {
             0x0001 => Self::Odbc,
@@ -171,7 +171,7 @@ impl XlsQuerySource {
 /// Parameter kind of a parameterized query (MS-XLS 2.5.197
 /// `PARAMQRY_Fixed.pbt`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsQueryParameterType {
+pub enum QueryParameterType {
     /// The user is prompted for the value of the parameter.
     Prompt,
     /// The parameter value is specified in the query.
@@ -185,11 +185,11 @@ pub enum XlsQueryParameterType {
 /// A parameter of a parameterized query (SXString name followed by a
 /// ParamQry record, MS-XLS 2.4.190).
 #[derive(Debug, Clone, PartialEq)]
-pub struct XlsQueryParameter {
+pub struct QueryParameter {
     /// Parameter name from the preceding SXString record.
     pub name: String,
     /// Parameter kind (`PARAMQRY_Fixed.pbt`).
-    pub parameter_type: XlsQueryParameterType,
+    pub parameter_type: QueryParameterType,
     /// ODBC SQL data type of the parameter (`PARAMQRY_Fixed.wTypeSql`).
     pub sql_type: u16,
     /// Whether a non-default prompt is stored (`fNonDefaultName`).
@@ -203,7 +203,7 @@ pub struct XlsQueryParameter {
 
 /// Code page of a text-query source file (`TxtQry.iCpid`, MS-XLS 2.4.330).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsTextCodePage {
+pub enum TextCodePage {
     /// Macintosh code page.
     Macintosh,
     /// Windows (ANSI) code page.
@@ -216,7 +216,7 @@ pub enum XlsTextCodePage {
 
 /// Text qualifier of a delimited text query (`TxtQry.iTextDelm`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsTextDelimiter {
+pub enum TextDelimiter {
     /// Quotation mark.
     QuotationMark,
     /// Apostrophe.
@@ -230,7 +230,7 @@ pub enum XlsTextDelimiter {
 /// Column import format of a text-query field (`TxtWf.fieldType`, MS-XLS
 /// 2.5.273).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsTextFieldFormat {
+pub enum TextFieldFormat {
     /// General.
     General,
     /// Text.
@@ -255,9 +255,9 @@ pub enum XlsTextFieldFormat {
 
 /// One field of a text query (`TxtWf`, MS-XLS 2.5.273).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsTextField {
+pub struct TextField {
     /// Column import format.
-    pub format: XlsTextFieldFormat,
+    pub format: TextFieldFormat,
     /// Zero-based character position of the field.
     pub start: i32,
 }
@@ -265,11 +265,11 @@ pub struct XlsTextField {
 /// Text query settings (`TxtQry`, MS-XLS 2.4.330). The source file path is
 /// stored verbatim and is never opened.
 #[derive(Debug, Clone, PartialEq)]
-pub struct XlsTextQuery {
+pub struct TextQuery {
     /// Whether the source data is delimited (false = fixed-width fields).
     pub delimited: bool,
     /// Code page of the source file.
-    pub codepage: XlsTextCodePage,
+    pub codepage: TextCodePage,
     /// Raw application-specific code page hint (`iCpidNew`).
     pub new_codepage: u16,
     /// Whether `new_codepage` supersedes `codepage` (`fUseNewiCpid`).
@@ -291,13 +291,13 @@ pub struct XlsTextQuery {
     /// Consecutive delimiters are treated as one.
     pub consecutive: bool,
     /// Text qualifier for delimited fields.
-    pub text_delimiter: XlsTextDelimiter,
+    pub text_delimiter: TextDelimiter,
     /// Decimal separator of the source file.
     pub decimal_separator: char,
     /// Thousands separator of the source file.
     pub thousands_separator: char,
     /// Per-field widths/formats (`rgtxtwf`).
-    pub fields: Vec<XlsTextField>,
+    pub fields: Vec<TextField>,
     /// Path of the source text file (`rgchFile`), stored verbatim and never
     /// opened.
     pub file: String,
@@ -309,7 +309,7 @@ pub struct XlsTextQuery {
 /// ExtString records, MS-XLS 2.4.186). The connection string is stored
 /// verbatim and is never used.
 #[derive(Debug, Clone, PartialEq)]
-pub struct XlsOleDbConnection {
+pub struct OleDbConnection {
     /// Whether the password was stripped from the connection string
     /// (`fPasswd`).
     pub password_stripped: bool,
@@ -322,7 +322,7 @@ pub struct XlsOleDbConnection {
 
 /// HTML formatting applied to imported Web query data (`DBQueryExt.wHtmlFmt`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsHtmlFormatting {
+pub enum HtmlFormatting {
     /// No formatting is applied.
     None,
     /// Rich text formatting only.
@@ -340,7 +340,7 @@ pub enum XlsHtmlFormatting {
 /// verbatim and are never opened, resolved, contacted, refreshed, or
 /// executed.
 #[derive(Debug, Clone, PartialEq)]
-pub struct XlsQueryTable {
+pub struct QueryTable {
     /// Query table name (`Qsi.rgchName`).
     pub name: String,
     /// First row of the query table contains column titles.
@@ -389,7 +389,7 @@ pub struct XlsQueryTable {
     /// preserved verbatim; zero when no tag was bound.
     pub qsi_future: u32,
     /// Data source type of the external connection.
-    pub source: XlsQuerySource,
+    pub source: QuerySource,
     /// The database connection remains open once established.
     pub maintain_connection: bool,
     /// The connection was never refreshed (`fNewQuery`).
@@ -419,7 +419,7 @@ pub struct XlsQueryTable {
     /// SQL statement for server-based fields (`cstSQLSav` chunks).
     pub sql_server_fields: Option<String>,
     /// Query parameters with their prompts, in record order.
-    pub parameters: Vec<XlsQueryParameter>,
+    pub parameters: Vec<QueryParameter>,
     /// Comma-delimited list of table names to import (ExtString after
     /// DBQueryExt when `fTableNames` is set).
     pub table_names: Option<String>,
@@ -434,13 +434,13 @@ pub struct XlsQueryTable {
     /// Minutes between automatic refreshes; 0 disables timed refresh.
     pub refresh_interval: u16,
     /// HTML formatting applied to imported Web query data.
-    pub html_formatting: XlsHtmlFormatting,
+    pub html_formatting: HtmlFormatting,
     /// Raw `PBT` items describing the query parameters (`rgPbt`).
     pub parameter_flags: Vec<u16>,
     /// Text query settings, when this is a text query.
-    pub text_query: Option<Box<XlsTextQuery>>,
+    pub text_query: Option<Box<TextQuery>>,
     /// OLE DB connections, in record order.
-    pub ole_db_connections: Vec<XlsOleDbConnection>,
+    pub ole_db_connections: Vec<OleDbConnection>,
     /// `rgbFutureBytes` of the DBQueryExt record, preserved verbatim.
     pub future_bytes: Vec<u8>,
     /// Concatenated payloads of the trailing `SORTDATA12` member (`SortData`
@@ -449,7 +449,7 @@ pub struct XlsQueryTable {
     pub sort_data_bytes: Vec<u8>,
 }
 
-impl Default for XlsQueryTable {
+impl Default for QueryTable {
     fn default() -> Self {
         Self {
             name: String::new(),
@@ -474,7 +474,7 @@ impl Default for XlsQueryTable {
             auto_format_pattern: false,
             auto_format_protection: false,
             qsi_future: 0,
-            source: XlsQuerySource::Unknown(0),
+            source: QuerySource::Unknown(0),
             maintain_connection: false,
             new_query: false,
             import_xml_source: false,
@@ -494,7 +494,7 @@ impl Default for XlsQueryTable {
             refreshed_version: 0,
             refreshable_min_version: 0,
             refresh_interval: 0,
-            html_formatting: XlsHtmlFormatting::None,
+            html_formatting: HtmlFormatting::None,
             parameter_flags: Vec::new(),
             text_query: None,
             ole_db_connections: Vec::new(),
@@ -517,7 +517,7 @@ enum ExtContext {
 /// In-progress assembly of one `QUERYTABLE` sequence.
 #[derive(Debug)]
 struct QueryTableBuild {
-    table: XlsQueryTable,
+    table: QueryTable,
     dbquery_seen: bool,
     /// Previous record was an SXString or a ParamQry: a following 0x00DC is
     /// a ParamQry rather than a DbQuery (MS-XLS 2.4.79).
@@ -538,7 +538,7 @@ struct QueryTableBuild {
 }
 
 impl QueryTableBuild {
-    fn new(table: XlsQueryTable) -> Self {
+    fn new(table: QueryTable) -> Self {
         Self {
             table,
             dbquery_seen: false,
@@ -559,7 +559,7 @@ impl QueryTableBuild {
         }
     }
 
-    fn finish(mut self) -> XlsQueryTable {
+    fn finish(mut self) -> QueryTable {
         if !self.query_chunks.is_empty() {
             self.table.command_text = Some(self.query_chunks.concat());
         }
@@ -576,14 +576,14 @@ impl QueryTableBuild {
     }
 }
 
-fn parse_qsi(data: &[u8]) -> Option<XlsQueryTable> {
+fn parse_qsi(data: &[u8]) -> Option<QueryTable> {
     if data.len() < 13 {
         return None;
     }
     let flags = binary::read_u16_le_at(data, 0).ok()?;
     let attributes = binary::read_u16_le_at(data, 2).ok()?;
-    let name = parse_string_record(&data[10..], &XlsEncoding::Utf16Le).ok()?;
-    Some(XlsQueryTable {
+    let name = parse_string_record(&data[10..], &Encoding::Utf16Le).ok()?;
+    Some(QueryTable {
         name,
         titles: flags & QSI_TITLES != 0,
         row_numbers: flags & QSI_ROW_NUMS != 0,
@@ -604,7 +604,7 @@ fn parse_qsi(data: &[u8]) -> Option<XlsQueryTable> {
         auto_format_border: attributes & QSI_ATR_BDR != 0,
         auto_format_pattern: attributes & QSI_ATR_PAT != 0,
         auto_format_protection: attributes & QSI_ATR_PROT != 0,
-        ..XlsQueryTable::default()
+        ..QueryTable::default()
     })
 }
 
@@ -613,7 +613,7 @@ fn parse_db_query(build: &mut QueryTableBuild, data: &[u8]) -> Option<()> {
         return None;
     }
     let flags = binary::read_u16_le_at(data, 0).ok()?;
-    build.table.source = XlsQuerySource::from_dbt(flags & DBQUERY_DBT_MASK);
+    build.table.source = QuerySource::from_dbt(flags & DBQUERY_DBT_MASK);
     build.table.save_password = flags & DBQUERY_SAVE_PWD != 0;
     build.table.tables_only_html = flags & DBQUERY_TABLES_ONLY_HTML != 0;
     build.remaining_query = string_count(data, 4, flags & (DBQUERY_SQL | DBQUERY_WEB) != 0)?;
@@ -639,19 +639,19 @@ fn parse_param_qry(build: &mut QueryTableBuild, data: &[u8]) -> Option<()> {
     let value_type = binary::read_u16_le_at(data, 4).ok()?;
     let pbt = flags & PARAMQRY_PBT_MASK;
     let parameter_type = match pbt {
-        0 => XlsQueryParameterType::Prompt,
-        1 => XlsQueryParameterType::Value,
-        2 => XlsQueryParameterType::CellReference,
-        other => XlsQueryParameterType::Unknown(other),
+        0 => QueryParameterType::Prompt,
+        1 => QueryParameterType::Value,
+        2 => QueryParameterType::CellReference,
+        other => QueryParameterType::Unknown(other),
     };
     // For prompt parameters the trailing field is an SXString prompt
     // followed by an unused byte; other value encodings stay uninterpreted.
     let prompt = if pbt == 0 && data.len() > 8 {
-        parse_string_record(&data[8..], &XlsEncoding::Utf16Le).ok()
+        parse_string_record(&data[8..], &Encoding::Utf16Le).ok()
     } else {
         None
     };
-    build.table.parameters.push(XlsQueryParameter {
+    build.table.parameters.push(QueryParameter {
         name: build.pending_param_name.take().unwrap_or_default(),
         parameter_type,
         sql_type,
@@ -676,7 +676,7 @@ fn parse_db_query_ext(build: &mut QueryTableBuild, data: &[u8]) -> Option<()> {
     let future_count = usize::from(binary::read_u16_le_at(data, 20).ok()?);
     let future_end = parameter_end.checked_add(future_count)?;
     // The DBQueryExt DataSourceType supersedes the 3-bit DbQuery dbt.
-    build.table.source = XlsQuerySource::from_dbt(binary::read_u16_le_at(data, 4).ok()?);
+    build.table.source = QuerySource::from_dbt(binary::read_u16_le_at(data, 4).ok()?);
     build.table.maintain_connection = flags & DBEXT_MAINTAIN != 0;
     build.table.new_query = flags & DBEXT_NEW_QUERY != 0;
     build.table.import_xml_source = flags & DBEXT_IMPORT_XML_SOURCE != 0;
@@ -689,10 +689,10 @@ fn parse_db_query_ext(build: &mut QueryTableBuild, data: &[u8]) -> Option<()> {
     build.table.refreshable_min_version = data[14];
     build.table.refresh_interval = binary::read_u16_le_at(data, 22).ok()?;
     build.table.html_formatting = match binary::read_u16_le_at(data, 24).ok()? {
-        0x0001 => XlsHtmlFormatting::None,
-        0x0002 => XlsHtmlFormatting::RichText,
-        0x0003 => XlsHtmlFormatting::Full,
-        other => XlsHtmlFormatting::Unknown(other),
+        0x0001 => HtmlFormatting::None,
+        0x0002 => HtmlFormatting::RichText,
+        0x0003 => HtmlFormatting::Full,
+        other => HtmlFormatting::Unknown(other),
     };
     build.table.parameter_flags = data[28..parameter_end]
         .chunks_exact(2)
@@ -707,7 +707,7 @@ fn parse_db_query_ext(build: &mut QueryTableBuild, data: &[u8]) -> Option<()> {
     Some(())
 }
 
-fn parse_txt_qry(data: &[u8]) -> Option<XlsTextQuery> {
+fn parse_txt_qry(data: &[u8]) -> Option<TextQuery> {
     if data.len() < 22 || binary::read_u16_le_at(data, 0).ok()? != TXT_QRY_RECORD_TYPE {
         return None;
     }
@@ -726,30 +726,30 @@ fn parse_txt_qry(data: &[u8]) -> Option<XlsTextQuery> {
     }
     let fields = data[22..fields_end]
         .chunks_exact(8)
-        .map(|chunk| XlsTextField {
+        .map(|chunk| TextField {
             format: match u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]) {
-                0 => XlsTextFieldFormat::General,
-                1 => XlsTextFieldFormat::Text,
-                2 => XlsTextFieldFormat::DateMdy,
-                3 => XlsTextFieldFormat::DateDmy,
-                4 => XlsTextFieldFormat::DateYmd,
-                5 => XlsTextFieldFormat::DateMyd,
-                6 => XlsTextFieldFormat::DateDym,
-                7 => XlsTextFieldFormat::DateYdm,
-                8 => XlsTextFieldFormat::Skip,
-                other => XlsTextFieldFormat::Unknown(other),
+                0 => TextFieldFormat::General,
+                1 => TextFieldFormat::Text,
+                2 => TextFieldFormat::DateMdy,
+                3 => TextFieldFormat::DateDmy,
+                4 => TextFieldFormat::DateYmd,
+                5 => TextFieldFormat::DateMyd,
+                6 => TextFieldFormat::DateDym,
+                7 => TextFieldFormat::DateYdm,
+                8 => TextFieldFormat::Skip,
+                other => TextFieldFormat::Unknown(other),
             },
             start: i32::from_le_bytes([chunk[4], chunk[5], chunk[6], chunk[7]]),
         })
         .collect();
-    let file = parse_string_record(&data[fields_end..], &XlsEncoding::Utf16Le).ok()?;
-    Some(XlsTextQuery {
+    let file = parse_string_record(&data[fields_end..], &Encoding::Utf16Le).ok()?;
+    Some(TextQuery {
         delimited: flags & TXT_DELIMITED != 0,
         codepage: match (flags >> TXT_CPID_SHIFT) & TXT_CPID_MASK {
-            0 => XlsTextCodePage::Macintosh,
-            1 => XlsTextCodePage::WindowsAnsi,
-            2 => XlsTextCodePage::MsDos,
-            other => XlsTextCodePage::Unknown(other),
+            0 => TextCodePage::Macintosh,
+            1 => TextCodePage::WindowsAnsi,
+            2 => TextCodePage::MsDos,
+            other => TextCodePage::Unknown(other),
         },
         new_codepage: (flags >> 5) & 0x03FF,
         use_new_codepage: flags & TXT_USE_NEW_CPID != 0,
@@ -766,10 +766,10 @@ fn parse_txt_qry(data: &[u8]) -> Option<XlsTextQuery> {
         },
         consecutive: delimiters & TXT_DELIM_CONSECUTIVE != 0,
         text_delimiter: match (delimiters >> TXT_TEXT_DELIM_SHIFT) & TXT_TEXT_DELIM_MASK {
-            0 => XlsTextDelimiter::QuotationMark,
-            1 => XlsTextDelimiter::Apostrophe,
-            2 => XlsTextDelimiter::None,
-            other => XlsTextDelimiter::Unknown(other),
+            0 => TextDelimiter::QuotationMark,
+            1 => TextDelimiter::Apostrophe,
+            2 => TextDelimiter::None,
+            other => TextDelimiter::Unknown(other),
         },
         decimal_separator: char::from(data[20]),
         thousands_separator: char::from(data[21]),
@@ -784,7 +784,7 @@ fn parse_txt_qry(data: &[u8]) -> Option<XlsTextQuery> {
 /// contract and the `SORTDATA12` interaction.
 #[derive(Debug, Default)]
 pub(crate) struct QueryTableCollector {
-    completed: Vec<XlsQueryTable>,
+    completed: Vec<QueryTable>,
     current: Option<QueryTableBuild>,
 }
 
@@ -854,7 +854,7 @@ impl QueryTableCollector {
                 true
             },
             SX_STRING_RECORD_TYPE => {
-                let Ok(text) = parse_string_record(data, &XlsEncoding::Utf16Le) else {
+                let Ok(text) = parse_string_record(data, &Encoding::Utf16Le) else {
                     // Malformed chunk: drop the in-progress sequence.
                     self.current = None;
                     return true;
@@ -907,7 +907,7 @@ impl QueryTableCollector {
             },
             EXT_STRING_RECORD_TYPE => {
                 let text = if data.len() >= 7 {
-                    parse_string_record(&data[4..], &XlsEncoding::Utf16Le).ok()
+                    parse_string_record(&data[4..], &Encoding::Utf16Le).ok()
                 } else {
                     None
                 };
@@ -948,7 +948,7 @@ impl QueryTableCollector {
                     && binary::read_u16_le_at(data, 0).ok() == Some(OLE_DB_CONN_RECORD_TYPE)
                 {
                     let flags = binary::read_u16_le_at(data, 4).unwrap_or(0);
-                    build.table.ole_db_connections.push(XlsOleDbConnection {
+                    build.table.ole_db_connections.push(OleDbConnection {
                         password_stripped: flags & OLECONN_PASSWD_STRIPPED != 0,
                         local: flags & OLECONN_LOCAL != 0,
                         connection_string: String::new(),
@@ -988,7 +988,7 @@ impl QueryTableCollector {
         }
     }
 
-    pub(crate) fn finish(mut self) -> Vec<XlsQueryTable> {
+    pub(crate) fn finish(mut self) -> Vec<QueryTable> {
         self.finalize_current();
         self.completed
     }
@@ -1195,29 +1195,29 @@ mod tests {
         assert!(table.auto_format_pattern);
         assert_eq!(table.enable_refresh, Some(true));
         assert_eq!(table.qsi_future, 3);
-        assert_eq!(table.source, XlsQuerySource::Text);
+        assert_eq!(table.source, QuerySource::Text);
         assert_eq!(table.refresh_interval, 15);
         assert_eq!(table.edited_version, 3);
         assert_eq!(table.future_bytes, vec![1, 2, 3]);
         let text_query = table.text_query.as_ref().expect("text query present");
         assert!(text_query.delimited);
-        assert_eq!(text_query.codepage, XlsTextCodePage::WindowsAnsi);
+        assert_eq!(text_query.codepage, TextCodePage::WindowsAnsi);
         assert_eq!(text_query.row_start_at, 2);
         assert!(text_query.comma);
         assert!(!text_query.tab);
         assert_eq!(text_query.custom_delimiter, Some('|'));
-        assert_eq!(text_query.text_delimiter, XlsTextDelimiter::QuotationMark);
+        assert_eq!(text_query.text_delimiter, TextDelimiter::QuotationMark);
         assert_eq!(text_query.decimal_separator, '.');
         assert_eq!(text_query.thousands_separator, ',');
         assert_eq!(
             text_query.fields,
             vec![
-                XlsTextField {
-                    format: XlsTextFieldFormat::General,
+                TextField {
+                    format: TextFieldFormat::General,
                     start: 0
                 },
-                XlsTextField {
-                    format: XlsTextFieldFormat::Text,
+                TextField {
+                    format: TextFieldFormat::Text,
                     start: 5
                 },
             ]
@@ -1252,7 +1252,7 @@ mod tests {
         let tables = collector.finish();
         assert_eq!(tables.len(), 1);
         let table = &tables[0];
-        assert_eq!(table.source, XlsQuerySource::Odbc);
+        assert_eq!(table.source, QuerySource::Odbc);
         assert!(table.maintain_connection);
         assert!(table.save_password);
         assert_eq!(
@@ -1267,7 +1267,7 @@ mod tests {
         assert_eq!(table.parameters.len(), 1);
         let parameter = &table.parameters[0];
         assert_eq!(parameter.name, "id");
-        assert_eq!(parameter.parameter_type, XlsQueryParameterType::Prompt);
+        assert_eq!(parameter.parameter_type, QueryParameterType::Prompt);
         assert_eq!(parameter.sql_type, 4);
         assert_eq!(parameter.prompt.as_deref(), Some("Enter id"));
     }
@@ -1295,7 +1295,7 @@ mod tests {
         let tables = collector.finish();
         assert_eq!(tables.len(), 1);
         let table = &tables[0];
-        assert_eq!(table.source, XlsQuerySource::Web);
+        assert_eq!(table.source, QuerySource::Web);
         assert!(table.tables_only_html);
         assert_eq!(
             table.command_text.as_deref(),
@@ -1303,7 +1303,7 @@ mod tests {
         );
         assert_eq!(table.web_post.as_deref(), Some("q=1&r=2"));
         assert_eq!(table.connection_flags, 0x0023);
-        assert_eq!(table.html_formatting, XlsHtmlFormatting::RichText);
+        assert_eq!(table.html_formatting, HtmlFormatting::RichText);
         assert_eq!(table.table_names.as_deref(), Some("Table1,Table2"));
     }
 
@@ -1329,7 +1329,7 @@ mod tests {
         let tables = collector.finish();
         assert_eq!(tables.len(), 1);
         let table = &tables[0];
-        assert_eq!(table.source, XlsQuerySource::OleDb);
+        assert_eq!(table.source, QuerySource::OleDb);
         assert_eq!(table.ole_db_connections.len(), 1);
         let connection = &table.ole_db_connections[0];
         assert!(connection.password_stripped);
@@ -1410,7 +1410,7 @@ mod tests {
         let tables = collector.finish();
         assert_eq!(tables.len(), 1);
         assert_eq!(tables[0].enable_refresh, None);
-        assert_eq!(tables[0].source, XlsQuerySource::Text);
+        assert_eq!(tables[0].source, QuerySource::Text);
     }
 
     #[test]
@@ -1571,7 +1571,7 @@ mod tests {
 
     /// Feed every record of a fixture's Workbook stream through the
     /// collector, mirroring the worksheet walker.
-    fn collect_from_fixture(path: &str) -> Vec<XlsQueryTable> {
+    fn collect_from_fixture(path: &str) -> Vec<QueryTable> {
         let bytes = std::fs::read(path).expect("fixture readable");
         let mut ole = litchi_cfb::OleFile::open(std::io::Cursor::new(bytes))
             .expect("fixture is a CFB container");
@@ -1601,14 +1601,14 @@ mod tests {
         assert_eq!(tables.len(), 1);
         let table = &tables[0];
         assert_eq!(table.name, "ExternalData_1");
-        assert_eq!(table.source, XlsQuerySource::Web);
+        assert_eq!(table.source, QuerySource::Web);
         assert!(table.titles);
         assert!(table.async_refresh);
         assert!(table.auto_refresh);
         assert!(table.shrink);
         assert_eq!(table.enable_refresh, Some(false));
         assert_eq!(table.qsi_future, 3);
-        assert_eq!(table.html_formatting, XlsHtmlFormatting::None);
+        assert_eq!(table.html_formatting, HtmlFormatting::None);
         assert_eq!(table.connection_flags, 0x0023);
         assert!(table.text_query.is_none());
         let url = table.command_text.as_deref().expect("web query URL");
@@ -1629,7 +1629,7 @@ mod tests {
         assert_eq!(tables.len(), 1);
         let table = &tables[0];
         assert_eq!(table.name, "Jac-Jackson-MSC_1");
-        assert_eq!(table.source, XlsQuerySource::Text);
+        assert_eq!(table.source, QuerySource::Text);
         let text_query = table.text_query.as_ref().expect("text query present");
         assert_eq!(text_query.file, "D:\\Jac-Jackson-MSC_1.csv");
         assert_eq!(text_query.row_start_at, 1);

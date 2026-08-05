@@ -1,341 +1,131 @@
-//! Comprehensive demonstration of XLSX features
+//! Snapshot/edit XLSX example with typed feature models.
 //!
-//! This example demonstrates all the major features of the XLSX writer,
-//! including the newly completed features for hyperlinks, comments,
-//! conditional formatting, images, page setup, and more.
+//! The workbook mutation surface intentionally covers the currently supported
+//! lossless cell, formula, merge, row, and column edits. Styles, conditional
+//! formatting, page setup, and worksheet drawings are constructed below as
+//! typed models so this example remains a compile-checked guide to those
+//! domains; their worksheet package authoring operations are not exposed by
+//! the current facade yet.
 
-use litchi::ooxml::Props;
-use litchi::ooxml::xlsx::{
-    Border, CellFill, CellFillPatternType, CellFont, CellFormat, ConditionalFormatType,
-    HeaderFooter, Workbook,
-    page_setup::{Orientation, Paper, Scale, Setup},
-    styles::{
-        Alignment,
-        alignment::{Horizontal, Vertical},
-        border::{Color, Line, Side},
-    },
-    writer::Operator,
-};
+use litchi::drawing::geom::Preset;
+use litchi::ooxml::xlsx::conditional_formatting::{IconSet, Kind, Operator};
+use litchi::ooxml::xlsx::shapes::{Anchor, CellMarker, EditAs, Emu};
+use litchi::ooxml::xlsx::style::format::{CellFont, CellFormat};
+use litchi::ooxml::xlsx::style::stylesheet::{Scheme, Underline};
+use litchi::ooxml::xlsx::writer::shape::ShapeSpec;
+use litchi::ooxml::xlsx::{Fit, Formula, Orientation, Paper, Setup};
+use litchi::ooxml::xlsx::{Number, Value, Workbook};
+use std::path::PathBuf;
+
+fn marker(column: u32, row: u32) -> CellMarker {
+    CellMarker {
+        column,
+        column_offset: Emu(0),
+        row,
+        row_offset: Emu(0),
+    }
+}
+
+fn anchor(from: (u32, u32), to: (u32, u32)) -> Anchor {
+    Anchor::TwoCell {
+        from: marker(from.0, from.1),
+        to: marker(to.0, to.1),
+        edit_as: EditAs::TwoCell,
+    }
+}
+
+fn typed_feature_models() {
+    let _header_format = CellFormat {
+        font: Some(CellFont {
+            bold: true,
+            underline: Some(Underline::Single),
+            scheme: Some(Scheme::Minor),
+            ..CellFont::default()
+        }),
+        ..CellFormat::default()
+    };
+    let _conditional_kinds = [Kind::ColorScale, Kind::IconSet, Kind::CellIs];
+    let _conditional_operator = Operator::GreaterThan;
+    let _icon_set = IconSet::ThreeTrafficLights1;
+    let _page_setup = Setup {
+        orientation: Some(Orientation::Landscape),
+        paper: Some(Paper::A4),
+        fit_to_width: Some(Fit::ONE),
+        fit_to_height: Some(Fit::NONE),
+        ..Setup::default()
+    };
+    let _shapes = [
+        ShapeSpec::text_box(
+            "Summary",
+            anchor((0, 8), (4, 14)),
+            Preset::RoundRect,
+            "Typed worksheet drawing",
+        ),
+        ShapeSpec::shape(
+            "Status",
+            anchor((5, 8), (9, 14)),
+            Preset::Ellipse,
+            "Authoring boundary",
+        ),
+    ];
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    println!("Creating comprehensive XLSX workbook...");
+    let output = std::env::args_os()
+        .nth(1)
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("xlsx_comprehensive_features.xlsx"));
 
-    // Create a new workbook
-    let mut workbook = Workbook::create()?;
+    // Immutable snapshots make the source state cheap to share; one edit
+    // publishes all worksheet changes atomically at commit time.
+    let workbook = Workbook::create()?;
+    let mut edit = workbook.edit()?;
+    edit.tab(0)?
+        .ok_or("missing initial worksheet tab")?
+        .rename("Sales")?;
 
-    // Set workbook properties
-    let _ = workbook.put_props(
-        Props::new()
-            .title("Comprehensive Features Demo")
-            .creator("Litchi Library")
-            .subject("Feature Demonstration"),
-    );
-
-    // ===== WORKSHEET 1: Basic Features =====
     {
-        let ws = workbook.worksheet_mut(0)?;
-        ws.set_name("Basic Features".to_string());
+        let mut sheet = edit.sheet("Sales")?.ok_or("missing Sales worksheet")?;
+        sheet.set("A1", "Product")?;
+        sheet.set("B1", "Quantity")?;
+        sheet.set("C1", "Price")?;
+        sheet.set("D1", "Total")?;
 
-        // Set some cell values
-        ws.set_cell_value(1, 1, "Product");
-        ws.set_cell_value(1, 2, "Quantity");
-        ws.set_cell_value(1, 3, "Price");
-        ws.set_cell_value(1, 4, "Total");
+        sheet.set("A2", Value::text("Widget A"))?;
+        sheet.set("B2", Value::Number(Number::new("10")?))?;
+        sheet.set("C2", Value::Number(Number::new("25.50")?))?;
+        sheet.set("D2", Formula::new("B2*C2")?)?;
+        sheet.set("A3", Value::text("Widget B"))?;
+        sheet.set("B3", Value::Number(Number::new("5")?))?;
+        sheet.set("C3", Value::Number(Number::new("42.00")?))?;
+        sheet.set("D3", Formula::new("B3*C3")?)?;
 
-        ws.set_cell_value(2, 1, "Widget A");
-        ws.set_cell_value(2, 2, 10);
-        ws.set_cell_value(2, 3, 25.50);
-        ws.set_cell_formula(2, 4, "B2*C2");
-
-        ws.set_cell_value(3, 1, "Widget B");
-        ws.set_cell_value(3, 2, 5);
-        ws.set_cell_value(3, 3, 42.00);
-        ws.set_cell_formula(3, 4, "B3*C3");
-
-        // Apply cell formatting
-        let header_format = CellFormat {
-            font: Some(CellFont {
-                name: Some("Arial".to_string()),
-                size: Some(12.0),
-                bold: true,
-                color: Some("FFFFFF".to_string()),
-                ..CellFont::default()
-            }),
-            fill: Some(CellFill {
-                pattern_type: CellFillPatternType::Solid,
-                fg_color: Some("4472C4".to_string()),
-                bg_color: None,
-            }),
-            border: Some(Border {
-                bottom: Some(Side::new(Line::Thick).with_color(Color::rgb(0, 0, 0))),
-                ..Border::default()
-            }),
-            alignment: Some(Alignment {
-                horizontal: Some(Horizontal::Center),
-                vertical: Some(Vertical::Center),
-                wrap_text: true,
-                ..Alignment::new()
-            }),
-            ..CellFormat::default()
-        };
-
-        for col in 1..=4 {
-            ws.set_cell_format(1, col, header_format.clone());
-        }
-
-        // Merge cells
-        ws.merge_cells(5, 1, 5, 4);
-        ws.set_cell_value(5, 1, "Summary Section");
-
-        // Set column widths
-        ws.set_column_width(1, 15.0);
-        ws.set_column_width(2, 10.0);
-        ws.set_column_width(3, 10.0);
-        ws.set_column_width(4, 12.0);
-
-        // Freeze panes
-        ws.freeze_panes(1, 0);
+        sheet.merge("A5:D5")?.set("A5", "Sales summary")?;
+        sheet.column("A")?.width(18.0)?;
+        sheet.column("B")?.width(12.0)?;
+        sheet.column("C")?.width(12.0)?;
+        sheet.column("D")?.width(14.0)?;
+        sheet.row(1)?.height(22.0)?.thick_bottom();
     }
 
-    // ===== WORKSHEET 2: Hyperlinks and Comments =====
-    {
-        workbook.add_worksheet("Links & Comments");
-        let ws = workbook.worksheet_mut(1)?;
+    let mut links = edit.add("Links")?;
+    links.set("A1", "External link data")?;
+    links.set("B1", "https://example.com")?;
+    links.set("A2", "Snapshot/edit example")?;
 
-        // Add hyperlinks
-        ws.set_cell_value(1, 1, "Visit our website");
-        ws.set_hyperlink(1, 1, "https://example.com", Some("Click here"));
-
-        ws.set_cell_value(2, 1, "Email us");
-        ws.set_hyperlink(2, 1, "mailto:info@example.com", None);
-
-        ws.set_cell_value(3, 1, "Internal link");
-        ws.set_hyperlink(3, 1, "Sheet1!A1", Some("Go to Sheet1"));
-
-        // Add comments
-        ws.set_cell_value(5, 1, "Important data");
-        ws.set_cell_comment(5, 1, "This is a critical value!", "John Doe");
-
-        ws.set_cell_value(6, 1, "Review required");
-        ws.set_cell_comment(6, 1, "Please review this before the meeting.", "Jane Smith");
-
-        ws.set_column_width(1, 20.0);
+    let mut analysis = edit.add("Analysis")?;
+    analysis.set("A1", "Value")?;
+    for (row, value) in (2..=6).zip([10, 25, 50, 75, 100]) {
+        analysis.set((row, 1), Value::Number(Number::new(value.to_string())?))?;
     }
+    analysis.set("B1", "Total")?;
+    analysis.set("B2", Formula::new("SUM(A2:A6)")?)?;
+    analysis.activate();
 
-    // ===== WORKSHEET 3: Conditional Formatting =====
-    {
-        workbook.add_worksheet("Conditional Format");
-        let ws = workbook.worksheet_mut(2)?;
+    typed_feature_models();
 
-        // Create data
-        ws.set_cell_value(1, 1, "Value");
-        for i in 2..=11 {
-            ws.set_cell_value(i, 1, (i as i64 - 2) * 10);
-        }
-
-        ws.set_cell_value(1, 3, "Score");
-        for i in 2..=11 {
-            ws.set_cell_value(i, 3, (i as i64 - 2) * 5);
-        }
-
-        // Add conditional formatting - CellIs
-        ws.add_conditional_formatting(
-            "A2:A11",
-            ConditionalFormatType::CellIs {
-                operator: Operator::GreaterThan,
-                formula: "50".to_string(),
-            },
-            1,
-            None,
-        );
-
-        // Add conditional formatting - Color Scale
-        ws.add_conditional_formatting(
-            "C2:C11",
-            ConditionalFormatType::ColorScale {
-                min_color: "FF0000".to_string(),
-                max_color: "00FF00".to_string(),
-                mid_color: Some("FFFF00".to_string()),
-            },
-            2,
-            None,
-        );
-
-        // Add conditional formatting - Data Bar
-        ws.add_conditional_formatting(
-            "A2:A11",
-            ConditionalFormatType::DataBar {
-                color: "638EC6".to_string(),
-                show_value: true,
-            },
-            3,
-            None,
-        );
-
-        ws.set_column_width(1, 15.0);
-        ws.set_column_width(3, 15.0);
-    }
-
-    // ===== WORKSHEET 4: Data Validation & Auto-filter =====
-    {
-        workbook.add_worksheet("Validation & Filter");
-        let ws = workbook.worksheet_mut(3)?;
-
-        // Headers
-        ws.set_cell_value(1, 1, "Category");
-        ws.set_cell_value(1, 2, "Status");
-        ws.set_cell_value(1, 3, "Priority");
-
-        // Sample data
-        ws.set_cell_value(2, 1, "Development");
-        ws.set_cell_value(2, 2, "In Progress");
-        ws.set_cell_value(2, 3, "High");
-
-        // Add data validation
-        use litchi::ooxml::xlsx::DataValidationType;
-
-        ws.add_data_validation(
-            "B2:B10",
-            DataValidationType::List {
-                values: vec![
-                    "Not Started".to_string(),
-                    "In Progress".to_string(),
-                    "Completed".to_string(),
-                ],
-            },
-            true,
-            Some("Select Status"),
-            Some("Choose a status from the list"),
-            true,
-            Some("Invalid Selection"),
-            Some("Please select a valid status"),
-        );
-
-        ws.add_data_validation(
-            "C2:C10",
-            DataValidationType::List {
-                values: vec!["Low".to_string(), "Medium".to_string(), "High".to_string()],
-            },
-            true,
-            None,
-            None,
-            false,
-            None,
-            None,
-        );
-
-        // Add auto-filter
-        ws.set_auto_filter("A1:C10");
-
-        ws.set_column_width(1, 15.0);
-        ws.set_column_width(2, 15.0);
-        ws.set_column_width(3, 12.0);
-    }
-
-    // ===== WORKSHEET 5: Page Setup & Headers/Footers =====
-    {
-        workbook.add_worksheet("Page Setup");
-        let ws = workbook.worksheet_mut(4)?;
-
-        // Add content
-        ws.set_cell_value(1, 1, "This sheet demonstrates page setup");
-        ws.set_cell_value(2, 1, "Check Print Preview to see headers/footers");
-
-        // Configure page setup
-        ws.set_page(Setup {
-            orientation: Some(Orientation::Landscape),
-            paper: Some(Paper::A4),
-            scale: Some(Scale::new(100)?),
-            ..Setup::default()
-        });
-
-        // Set headers and footers
-        let hf = HeaderFooter {
-            header_left: Some("Company Name".to_string()),
-            header_center: Some("Confidential Document".to_string()),
-            header_right: Some("&D".to_string()), // Current date
-            footer_left: Some("Department".to_string()),
-            footer_center: Some("Page &P of &N".to_string()), // Page numbers
-            footer_right: Some("&T".to_string()),             // Current time
-        };
-
-        ws.set_header_footer(hf);
-
-        // Set print area and repeating rows
-        ws.set_print_area("A1:E20");
-        ws.set_repeating_rows("1:1");
-
-        ws.set_column_width(1, 40.0);
-    }
-
-    // ===== WORKSHEET 6: Protection & Grouping =====
-    {
-        workbook.add_worksheet("Protection");
-        let ws = workbook.worksheet_mut(5)?;
-
-        // Add content
-        ws.set_cell_value(1, 1, "Protected Sheet");
-        ws.set_cell_value(2, 1, "This sheet is protected with password: 'secret'");
-
-        // Group rows
-        ws.set_cell_value(4, 1, "Group 1");
-        ws.set_cell_value(5, 1, "Item 1");
-        ws.set_cell_value(6, 1, "Item 2");
-        ws.group_rows(5, 6, 1);
-
-        ws.set_cell_value(8, 1, "Group 2");
-        ws.set_cell_value(9, 1, "Item A");
-        ws.set_cell_value(10, 1, "Item B");
-        ws.set_cell_value(11, 1, "Item C");
-        ws.group_rows(9, 11, 1);
-
-        // Protect sheet
-        ws.protect_sheet(Some("secret"));
-
-        ws.set_column_width(1, 30.0);
-    }
-
-    // ===== Workbook-level Features =====
-
-    // Set active sheet
-    workbook.set_active_sheet(0)?;
-
-    // Set tab colors
-    workbook.set_tab_color(0, "FF0000")?; // Red for first sheet
-    workbook.set_tab_color(2, "00FF00")?; // Green for conditional formatting
-
-    // Define named ranges (sheet names with spaces must be quoted)
-    workbook.define_name("SalesData", "'Basic Features'!$A$2:$D$3");
-    workbook.define_name("TotalColumn", "'Basic Features'!$D:$D");
-
-    // Set calculation mode
-    workbook.set_calculation_mode("auto")?;
-
-    // Protect workbook structure
-    workbook.protect_workbook(Some("workbook123"), true, false);
-
-    // Save the workbook
-    println!("Saving workbook...");
-    workbook.save("xlsx_comprehensive_features.xlsx")?;
-
-    println!("✅ Successfully created xlsx_comprehensive_features.xlsx");
-    println!("The file demonstrates:");
-    println!("  - Cell values and formulas");
-    println!("  - Cell formatting (fonts, fills, borders, typed alignment)");
-    println!("  - Merged cells");
-    println!("  - Column widths and freeze panes");
-    println!("  - Hyperlinks (external and internal)");
-    println!("  - Cell comments");
-    println!("  - Conditional formatting (CellIs, ColorScale, DataBar)");
-    println!("  - Data validation");
-    println!("  - Auto-filters");
-    println!("  - Page setup and print settings");
-    println!("  - Headers and footers");
-    println!("  - Sheet protection");
-    println!("  - Row/column grouping");
-    println!("  - Named ranges");
-    println!("  - Tab colors");
-    println!("  - Workbook protection");
-
+    let workbook = edit.commit()?.into_workbook();
+    workbook.save(&output)?;
+    println!("saved {}", output.display());
     Ok(())
 }

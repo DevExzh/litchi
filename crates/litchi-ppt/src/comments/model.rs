@@ -1,6 +1,6 @@
 //! Contextual presentation-comment author models.
 
-use crate::package::{PptError, Result};
+use crate::package::{Error, Result};
 use crate::slide::ParsedComment;
 
 /// Document-level metadata for one presentation-comment author.
@@ -38,7 +38,7 @@ impl Authors {
                 .iter()
                 .any(|comment| comment.author == *name && comment.index > seed)
             {
-                return Err(PptError::Corrupted(format!(
+                return Err(Error::Corrupted(format!(
                     "Comment index exceeds the seed for author {name:?}"
                 )));
             }

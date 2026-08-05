@@ -1,14 +1,14 @@
 //! PowerPoint 11 smart-tag store parsing.
 
-use super::package::{PptError, Result};
-use super::records::PptRecord;
-use crate::consts::PptRecordType;
+use super::package::{Error, Result};
+use super::records::Record;
+use crate::consts::RecordType;
 use litchi_codepage::Ansi;
 use litchi_ole_common::smart_tags::{Limits, PropertyBagStore};
 
 /// One smart-tag type declared by the shared property-bag store.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointSmartTagType {
+pub struct SmartTagType {
     pub id: u16,
     pub namespace_uri: String,
     pub tag_name: String,
@@ -17,7 +17,7 @@ pub struct PowerPointSmartTagType {
 
 /// One resolved key/value pair attached to a smart tag.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointSmartTagProperty {
+pub struct SmartTagProperty {
     pub key_index: u32,
     pub value_index: u32,
     pub key: String,
@@ -26,36 +26,36 @@ pub struct PowerPointSmartTagProperty {
 
 /// One smart tag referenced by zero-based `SmartTagIndex` values in text runs.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointSmartTag {
+pub struct SmartTag {
     pub type_id: u16,
-    pub properties: Vec<PowerPointSmartTagProperty>,
+    pub properties: Vec<SmartTagProperty>,
 }
 
 /// PowerPoint 11 smart-tag types, shared strings, and property bags.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointSmartTagStore {
+pub struct SmartTagStore {
     /// ANSI code page used to decode ANSI `PBString` values.
     pub ansi: Ansi,
-    pub types: Vec<PowerPointSmartTagType>,
+    pub types: Vec<SmartTagType>,
     pub string_table: Vec<String>,
-    pub tags: Vec<PowerPointSmartTag>,
+    pub tags: Vec<SmartTag>,
 }
 
-impl PowerPointSmartTagStore {
+impl SmartTagStore {
     /// Parse the optional `___PPT11` smart-tag store using Windows-1252 for ANSI strings.
-    pub fn parse(root: &PptRecord) -> Result<Option<Self>> {
+    pub fn parse(root: &Record) -> Result<Option<Self>> {
         Self::parse_with(root, Ansi::WINDOWS_1252)
     }
 
     /// Parse with an explicitly validated ANSI page.
-    pub fn parse_with(root: &PptRecord, ansi: Ansi) -> Result<Option<Self>> {
+    pub fn parse_with(root: &Record, ansi: Ansi) -> Result<Option<Self>> {
         let mut store = None;
         for record in root.versioned_binary_tag_records(11)? {
-            if record.record_type != PptRecordType::SmartTagStore11 {
+            if record.record_type != RecordType::SmartTagStore11 {
                 continue;
             }
             if store.is_some() {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "Record tree contains multiple PowerPoint 11 smart-tag stores".to_string(),
                 ));
             }
@@ -65,34 +65,34 @@ impl PowerPointSmartTagStore {
     }
 
     /// Validate a raw ANSI page identifier and parse the optional store.
-    pub fn parse_page(root: &PptRecord, page: u32) -> Result<Option<Self>> {
-        let ansi = Ansi::require(page).map_err(|error| PptError::Corrupted(error.to_string()))?;
+    pub fn parse_page(root: &Record, page: u32) -> Result<Option<Self>> {
+        let ansi = Ansi::require(page).map_err(|error| Error::Corrupted(error.to_string()))?;
         Self::parse_with(root, ansi)
     }
 
     /// Resolve a zero-based smart-tag index from a text run.
-    pub fn get(&self, index: u32) -> Option<&PowerPointSmartTag> {
+    pub fn get(&self, index: u32) -> Option<&SmartTag> {
         self.tags.get(usize::try_from(index).ok()?)
     }
 
     /// Resolve a smart tag's declared type.
-    pub fn tag_type(&self, tag: &PowerPointSmartTag) -> Option<&PowerPointSmartTagType> {
+    pub fn tag_type(&self, tag: &SmartTag) -> Option<&SmartTagType> {
         self.types.iter().find(|kind| kind.id == tag.type_id)
     }
 }
 
-fn parse_store(record: &PptRecord, ansi: Ansi) -> Result<PowerPointSmartTagStore> {
-    if record.record_type != PptRecordType::SmartTagStore11
+fn parse_store(record: &Record, ansi: Ansi) -> Result<SmartTagStore> {
+    if record.record_type != RecordType::SmartTagStore11
         || record.version != 0x0f
         || record.instance != 0
     {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "SmartTagStore11Container has an invalid record header".to_string(),
         ));
     }
     let data = &record.data;
     let bag_count_bytes = data.get(..4).ok_or_else(|| {
-        PptError::Corrupted("SmartTagStore11Container is missing its bag count".to_string())
+        Error::Corrupted("SmartTagStore11Container is missing its bag count".to_string())
     })?;
     let bag_count = usize::try_from(u32::from_le_bytes([
         bag_count_bytes[0],
@@ -100,21 +100,21 @@ fn parse_store(record: &PptRecord, ansi: Ansi) -> Result<PowerPointSmartTagStore
         bag_count_bytes[2],
         bag_count_bytes[3],
     ]))
-    .map_err(|_| PptError::Corrupted("smart-tag bag count overflows usize".to_string()))?;
+    .map_err(|_| Error::Corrupted("smart-tag bag count overflows usize".to_string()))?;
     let limits = Limits::default();
     let (shared, consumed) = PropertyBagStore::parse_prefix(&data[4..], ansi, limits)
-        .map_err(|error| PptError::Corrupted(error.to_string()))?;
+        .map_err(|error| Error::Corrupted(error.to_string()))?;
     let bags_start = 4usize
         .checked_add(consumed)
-        .ok_or_else(|| PptError::Corrupted("smart-tag store offset overflows".to_string()))?;
+        .ok_or_else(|| Error::Corrupted("smart-tag store offset overflows".to_string()))?;
     let bags = shared
         .parse_bags(&data[bags_start..], bag_count, limits)
-        .map_err(|error| PptError::Corrupted(error.to_string()))?;
+        .map_err(|error| Error::Corrupted(error.to_string()))?;
 
     let types = shared
         .types
         .iter()
-        .map(|kind| PowerPointSmartTagType {
+        .map(|kind| SmartTagType {
             id: kind.id,
             namespace_uri: kind.namespace_uri.value.clone(),
             tag_name: kind.tag_name.value.clone(),
@@ -131,23 +131,23 @@ fn parse_store(record: &PptRecord, ansi: Ansi) -> Result<PowerPointSmartTagStore
         let mut properties = Vec::with_capacity(bag.properties.len());
         for property in bag.properties {
             let (key, value) = shared.resolve_property(property).ok_or_else(|| {
-                PptError::Corrupted(
+                Error::Corrupted(
                     "shared smart-tag property index validation was inconsistent".to_string(),
                 )
             })?;
-            properties.push(PowerPointSmartTagProperty {
+            properties.push(SmartTagProperty {
                 key_index: property.key_index,
                 value_index: property.value_index,
                 key: key.to_string(),
                 value: value.to_string(),
             });
         }
-        tags.push(PowerPointSmartTag {
+        tags.push(SmartTag {
             type_id: bag.type_id,
             properties,
         });
     }
-    Ok(PowerPointSmartTagStore {
+    Ok(SmartTagStore {
         ansi,
         types,
         string_table,
@@ -211,7 +211,7 @@ mod tests {
         data
     }
 
-    fn prog_tags_record(version: u8, blob_payload: &[u8]) -> PptRecord {
+    fn prog_tags_record(version: u8, blob_payload: &[u8]) -> Record {
         let tag_name: Vec<u8> = format!("___PPT{version}")
             .encode_utf16()
             .flat_map(u16::to_le_bytes)
@@ -221,8 +221,8 @@ mod tests {
         let mut tag_payload = name;
         tag_payload.extend_from_slice(&blob);
         let tag = record_bytes(0x0f, 0, 0x138a, &tag_payload);
-        PptRecord {
-            record_type: PptRecordType::ProgTags,
+        Record {
+            record_type: RecordType::ProgTags,
             record_type_raw: 0x1388,
             version: 0x0f,
             instance: 0,
@@ -232,9 +232,9 @@ mod tests {
         }
     }
 
-    fn root(version: u8, payload: &[u8]) -> PptRecord {
-        PptRecord {
-            record_type: PptRecordType::Document,
+    fn root(version: u8, payload: &[u8]) -> Record {
+        Record {
+            record_type: RecordType::Document,
             record_type_raw: 1000,
             version: 0x0f,
             instance: 0,
@@ -251,9 +251,7 @@ mod tests {
     #[test]
     fn parses_and_resolves_powerpoint11_smart_tags() {
         let record = smart_tag_record(&store_payload(2, 0, 0));
-        let store = PowerPointSmartTagStore::parse(&root(11, &record))
-            .unwrap()
-            .unwrap();
+        let store = SmartTagStore::parse(&root(11, &record)).unwrap().unwrap();
 
         assert_eq!(store.ansi, Ansi::WINDOWS_1252);
         let tag = store.get(0).unwrap();
@@ -275,25 +273,21 @@ mod tests {
             smart_tag_record(&oversized_count),
         ];
         for record in malformed {
-            assert!(PowerPointSmartTagStore::parse(&root(11, &record)).is_err());
+            assert!(SmartTagStore::parse(&root(11, &record)).is_err());
         }
 
         let record = smart_tag_record(&store_payload(2, 0, 0));
         let mut duplicate = record.clone();
         duplicate.extend_from_slice(&record);
-        assert!(PowerPointSmartTagStore::parse(&root(11, &duplicate)).is_err());
+        assert!(SmartTagStore::parse(&root(11, &duplicate)).is_err());
     }
 
     #[test]
     fn isolates_smart_tags_by_version_and_validates_codepages() {
         let record = smart_tag_record(&store_payload(2, 0, 0));
 
-        assert!(
-            PowerPointSmartTagStore::parse(&root(10, &record))
-                .unwrap()
-                .is_none()
-        );
-        assert!(PowerPointSmartTagStore::parse_page(&root(11, &record), 99_999).is_err());
-        assert!(PowerPointSmartTagStore::parse_page(&root(11, &record), 65001).is_err());
+        assert!(SmartTagStore::parse(&root(10, &record)).unwrap().is_none());
+        assert!(SmartTagStore::parse_page(&root(11, &record), 99_999).is_err());
+        assert!(SmartTagStore::parse_page(&root(11, &record), 65001).is_err());
     }
 }

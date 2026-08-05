@@ -6,10 +6,10 @@
 //! `TextCFRun` structures (MS-PPT 2.9.46). It is inert: font references are
 //! never resolved and formatting is never applied.
 
-use super::records::record::PptRecord;
-use super::text_format_exception::{PowerPointTextCFException, PowerPointTextPFException};
-use crate::consts::PptRecordType;
-use crate::package::{PptError, Result};
+use super::records::record::Record;
+use super::text_format_exception::{TextCFException, TextPFException};
+use crate::consts::RecordType;
+use crate::package::{Error, Result};
 
 /// `RT_StyleTextPropAtom` record type (MS-PPT 2.9.44).
 const STYLE_TEXT_PROP_TYPE: u16 = 0x0FA1;
@@ -21,8 +21,8 @@ const MAX_INDENT_LEVEL: u16 = 4;
 /// `leftMargin`, `indent`, `defaultTabSize`, and `tabStops`.
 const PF_RUN_FORBIDDEN_MASKS: u32 = 0x0000_0100 | 0x0000_0400 | 0x0000_8000 | 0x0010_0000;
 
-fn corrupted(message: impl Into<String>) -> PptError {
-    PptError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> Error {
+    Error::Corrupted(message.into())
 }
 
 fn read_u16(data: &[u8], offset: usize) -> u16 {
@@ -42,13 +42,13 @@ fn require_bytes(data: &[u8], offset: usize, needed: usize, field: &str) -> Resu
 
 /// A `TextPFRun` paragraph-formatting run (MS-PPT 2.9.45).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointTextPFRun {
+pub struct TextPFRun {
     count: u32,
     indent_level: u16,
-    paragraph: PowerPointTextPFException,
+    paragraph: TextPFException,
 }
 
-impl PowerPointTextPFRun {
+impl TextPFRun {
     /// Number of characters of the corresponding text this run covers.
     pub const fn count(&self) -> u32 {
         self.count
@@ -58,7 +58,7 @@ impl PowerPointTextPFRun {
         self.indent_level
     }
     /// The `TextPFException` paragraph formatting of the run.
-    pub const fn paragraph(&self) -> &PowerPointTextPFException {
+    pub const fn paragraph(&self) -> &TextPFException {
         &self.paragraph
     }
 
@@ -75,7 +75,7 @@ impl PowerPointTextPFRun {
         if indent_level > MAX_INDENT_LEVEL {
             return Err(corrupted("TextPFRun indent level is out of range"));
         }
-        let (paragraph, paragraph_len) = PowerPointTextPFException::parse_prefix(&data[6..])?;
+        let (paragraph, paragraph_len) = TextPFException::parse_prefix(&data[6..])?;
         if paragraph.masks() & PF_RUN_FORBIDDEN_MASKS != 0 {
             return Err(corrupted("TextPFRun has forbidden paragraph masks set"));
         }
@@ -101,18 +101,18 @@ impl PowerPointTextPFRun {
 
 /// A `TextCFRun` character-formatting run (MS-PPT 2.9.46).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointTextCFRun {
+pub struct TextCFRun {
     count: u32,
-    character: PowerPointTextCFException,
+    character: TextCFException,
 }
 
-impl PowerPointTextCFRun {
+impl TextCFRun {
     /// Number of characters of the corresponding text this run covers.
     pub const fn count(&self) -> u32 {
         self.count
     }
     /// The `TextCFException` character formatting of the run.
-    pub const fn character(&self) -> &PowerPointTextCFException {
+    pub const fn character(&self) -> &TextCFException {
         &self.character
     }
 
@@ -125,7 +125,7 @@ impl PowerPointTextCFRun {
         if count == 0 {
             return Err(corrupted("TextCFRun covers zero characters"));
         }
-        let (character, character_len) = PowerPointTextCFException::parse_prefix(&data[4..])?;
+        let (character, character_len) = TextCFException::parse_prefix(&data[4..])?;
         Ok((Self { count, character }, 4 + character_len))
     }
 
@@ -142,26 +142,26 @@ impl PowerPointTextCFRun {
 /// paragraph-level and character-level formatting runs of the corresponding
 /// text.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct PowerPointStyleTextPropAtom {
-    paragraph_runs: Vec<PowerPointTextPFRun>,
-    character_runs: Vec<PowerPointTextCFRun>,
+pub struct StyleTextPropAtom {
+    paragraph_runs: Vec<TextPFRun>,
+    character_runs: Vec<TextCFRun>,
 }
 
-impl PowerPointStyleTextPropAtom {
+impl StyleTextPropAtom {
     /// The `TextPFRun` paragraph-formatting runs.
-    pub fn paragraph_runs(&self) -> &[PowerPointTextPFRun] {
+    pub fn paragraph_runs(&self) -> &[TextPFRun] {
         &self.paragraph_runs
     }
     /// The `TextCFRun` character-formatting runs.
-    pub fn character_runs(&self) -> &[PowerPointTextCFRun] {
+    pub fn character_runs(&self) -> &[TextCFRun] {
         &self.character_runs
     }
 
     /// Parse a complete `StyleTextPropAtom` record (MS-PPT 2.9.44).
     ///
     /// See [`Self::parse`] for the meaning of `text_length`.
-    pub fn parse_record(record: &PptRecord, text_length: usize) -> Result<Self> {
-        if record.record_type != PptRecordType::StyleTextPropAtom
+    pub fn parse_record(record: &Record, text_length: usize) -> Result<Self> {
+        if record.record_type != RecordType::StyleTextPropAtom
             || record.record_type_raw != STYLE_TEXT_PROP_TYPE
             || record.version != 0
             || record.instance != 0
@@ -190,7 +190,7 @@ impl PowerPointStyleTextPropAtom {
         let mut paragraph_runs = Vec::new();
         let mut paragraph_coverage = 0u32;
         while paragraph_coverage < style_length {
-            let (run, consumed) = PowerPointTextPFRun::parse_prefix(&data[offset..])?;
+            let (run, consumed) = TextPFRun::parse_prefix(&data[offset..])?;
             if run.count > style_length - paragraph_coverage {
                 return Err(corrupted("TextPFRun has invalid character coverage"));
             }
@@ -202,7 +202,7 @@ impl PowerPointStyleTextPropAtom {
         let mut character_runs = Vec::new();
         let mut character_coverage = 0u32;
         while character_coverage < style_length {
-            let (run, consumed) = PowerPointTextCFRun::parse_prefix(&data[offset..])?;
+            let (run, consumed) = TextCFRun::parse_prefix(&data[offset..])?;
             if run.count > style_length - character_coverage {
                 return Err(corrupted("TextCFRun has invalid character coverage"));
             }
@@ -241,12 +241,12 @@ impl PowerPointStyleTextPropAtom {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::slide_show_settings::PowerPointColorIndexKind;
+    use crate::slide_show_settings::ColorIndexKind;
     use crate::text_run::ParagraphAlignment;
 
-    fn record(data: &[u8]) -> PptRecord {
-        PptRecord {
-            record_type: PptRecordType::StyleTextPropAtom,
+    fn record(data: &[u8]) -> Record {
+        Record {
+            record_type: RecordType::StyleTextPropAtom,
             record_type_raw: STYLE_TEXT_PROP_TYPE,
             version: 0,
             instance: 0,
@@ -296,7 +296,7 @@ mod tests {
     #[test]
     fn parses_runs_and_round_trips() {
         let payload = sample_payload();
-        let parsed = PowerPointStyleTextPropAtom::parse_record(&record(&payload), 9).unwrap();
+        let parsed = StyleTextPropAtom::parse_record(&record(&payload), 9).unwrap();
 
         let paragraphs = parsed.paragraph_runs();
         assert_eq!(paragraphs.len(), 2);
@@ -318,13 +318,13 @@ mod tests {
         assert_eq!(characters[1].count(), 4);
         assert_eq!(characters[1].character().font_size(), Some(2400));
         let color = characters[1].character().color().unwrap();
-        assert_eq!(color.kind, PowerPointColorIndexKind::Srgb);
+        assert_eq!(color.kind, ColorIndexKind::Srgb);
         assert_eq!(color.red, 0x12);
 
         let serialized = parsed.to_bytes();
         assert_eq!(serialized[8..], payload[..]);
         assert_eq!(
-            PowerPointStyleTextPropAtom::parse(&serialized[8..], 9).unwrap(),
+            StyleTextPropAtom::parse(&serialized[8..], 9).unwrap(),
             parsed
         );
     }
@@ -337,7 +337,7 @@ mod tests {
         payload.extend_from_slice(&0u32.to_le_bytes());
         payload.extend_from_slice(&2u32.to_le_bytes());
         payload.extend_from_slice(&0u32.to_le_bytes());
-        let parsed = PowerPointStyleTextPropAtom::parse(&payload, 1).unwrap();
+        let parsed = StyleTextPropAtom::parse(&payload, 1).unwrap();
         assert_eq!(parsed.paragraph_runs().len(), 1);
         assert_eq!(parsed.character_runs().len(), 1);
         assert_eq!(parsed.to_bytes()[8..], payload[..]);
@@ -348,29 +348,29 @@ mod tests {
         let payload = sample_payload();
         // Wrong record type.
         let mut wrong = record(&payload);
-        wrong.record_type = PptRecordType::TxCFStyleAtom;
-        assert!(PowerPointStyleTextPropAtom::parse_record(&wrong, 9).is_err());
+        wrong.record_type = RecordType::TxCFStyleAtom;
+        assert!(StyleTextPropAtom::parse_record(&wrong, 9).is_err());
         // Nonzero version.
         let mut wrong = record(&payload);
         wrong.version = 0xF;
-        assert!(PowerPointStyleTextPropAtom::parse_record(&wrong, 9).is_err());
+        assert!(StyleTextPropAtom::parse_record(&wrong, 9).is_err());
         // Nonzero instance.
         let mut wrong = record(&payload);
         wrong.instance = 1;
-        assert!(PowerPointStyleTextPropAtom::parse_record(&wrong, 9).is_err());
+        assert!(StyleTextPropAtom::parse_record(&wrong, 9).is_err());
         // Every truncation is rejected.
         for length in 0..payload.len() {
-            assert!(PowerPointStyleTextPropAtom::parse(&payload[..length], 9).is_err());
+            assert!(StyleTextPropAtom::parse(&payload[..length], 9).is_err());
         }
         // Trailing bytes.
         let mut trailing = payload.clone();
         trailing.push(0);
-        assert!(PowerPointStyleTextPropAtom::parse(&trailing, 9).is_err());
+        assert!(StyleTextPropAtom::parse(&trailing, 9).is_err());
         // Text length that does not fit a u32.
-        assert!(PowerPointStyleTextPropAtom::parse(&payload, usize::MAX).is_err());
+        assert!(StyleTextPropAtom::parse(&payload, usize::MAX).is_err());
         // Wrong text length: run coverage no longer matches.
-        assert!(PowerPointStyleTextPropAtom::parse(&payload, 8).is_err());
-        assert!(PowerPointStyleTextPropAtom::parse(&payload, 10).is_err());
+        assert!(StyleTextPropAtom::parse(&payload, 8).is_err());
+        assert!(StyleTextPropAtom::parse(&payload, 10).is_err());
     }
 
     #[test]
@@ -380,7 +380,7 @@ mod tests {
         data.extend_from_slice(&0u32.to_le_bytes());
         data.extend_from_slice(&0u16.to_le_bytes());
         data.extend_from_slice(&0u32.to_le_bytes());
-        assert!(PowerPointStyleTextPropAtom::parse(&data, 1).is_err());
+        assert!(StyleTextPropAtom::parse(&data, 1).is_err());
 
         // Indent level above the maximum.
         let mut data = Vec::new();
@@ -389,7 +389,7 @@ mod tests {
         data.extend_from_slice(&0u32.to_le_bytes());
         data.extend_from_slice(&2u32.to_le_bytes());
         data.extend_from_slice(&0u32.to_le_bytes());
-        assert!(PowerPointStyleTextPropAtom::parse(&data, 1).is_err());
+        assert!(StyleTextPropAtom::parse(&data, 1).is_err());
 
         // Forbidden leftMargin mask inside a TextPFRun.
         let mut data = Vec::new();
@@ -399,7 +399,7 @@ mod tests {
         data.extend_from_slice(&288i16.to_le_bytes());
         data.extend_from_slice(&2u32.to_le_bytes());
         data.extend_from_slice(&0u32.to_le_bytes());
-        assert!(PowerPointStyleTextPropAtom::parse(&data, 1).is_err());
+        assert!(StyleTextPropAtom::parse(&data, 1).is_err());
 
         // Forbidden tabStops mask inside a TextPFRun.
         let mut data = Vec::new();
@@ -411,7 +411,7 @@ mod tests {
         data.extend_from_slice(&0u16.to_le_bytes());
         data.extend_from_slice(&2u32.to_le_bytes());
         data.extend_from_slice(&0u32.to_le_bytes());
-        assert!(PowerPointStyleTextPropAtom::parse(&data, 1).is_err());
+        assert!(StyleTextPropAtom::parse(&data, 1).is_err());
 
         // Forbidden pp10ext mask inside a TextCFRun.
         let mut data = Vec::new();
@@ -420,6 +420,6 @@ mod tests {
         data.extend_from_slice(&0u32.to_le_bytes());
         data.extend_from_slice(&2u32.to_le_bytes());
         data.extend_from_slice(&0x0010_0000u32.to_le_bytes());
-        assert!(PowerPointStyleTextPropAtom::parse(&data, 1).is_err());
+        assert!(StyleTextPropAtom::parse(&data, 1).is_err());
     }
 }

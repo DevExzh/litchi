@@ -5,7 +5,37 @@ use super::workbook_types::WorkbookImpl;
 #[allow(unused_imports)] // Used by sheet implementations
 use crate::sheet::WorkbookTrait;
 use litchi_core::{Error, Metadata};
+#[cfg(feature = "xls")]
+use litchi_ole_common::property_set::PropertySetReader;
 use std::path::Path;
+
+fn append_cell_text(out: &mut String, cell: &litchi_core::sheet::CellValue) {
+    use litchi_core::sheet::CellValue;
+
+    match cell {
+        CellValue::Empty => {},
+        CellValue::Bool(value) => out.push_str(if *value { "TRUE" } else { "FALSE" }),
+        CellValue::Int(value) => out.push_str(&value.to_string()),
+        CellValue::Float(value) => out.push_str(&value.to_string()),
+        CellValue::String(value) => out.push_str(value),
+        CellValue::DateTime(value) => out.push_str(&value.to_string()),
+        CellValue::Error(value) => out.push_str(value),
+        CellValue::Formula {
+            formula,
+            cached_value,
+            ..
+        } => match cached_value.as_deref() {
+            Some(CellValue::String(value)) => out.push_str(value),
+            Some(CellValue::Int(value)) => out.push_str(&value.to_string()),
+            Some(CellValue::Float(value)) => out.push_str(&value.to_string()),
+            Some(CellValue::Bool(value)) => out.push_str(if *value { "TRUE" } else { "FALSE" }),
+            _ => {
+                out.push('=');
+                out.push_str(formula);
+            },
+        },
+    }
+}
 
 /// A unified workbook interface for Apple Numbers spreadsheets.
 ///
@@ -123,7 +153,7 @@ impl Workbook {
                     .unwrap_or_default();
 
                 // Create XLS workbook directly from the parsed OLE file
-                let xls = crate::xls::XlsWorkbook::from_ole_file(ole_file_for_metadata)
+                let xls = crate::xls::Workbook::from_ole_file(ole_file_for_metadata)
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
                 (WorkbookImpl::XlsMem(xls), metadata)
             },
@@ -328,43 +358,7 @@ impl Workbook {
                             if idx > 0 {
                                 out.push('\t');
                             }
-                            match cell {
-                                crate::sheet::CellValue::Empty => {},
-                                crate::sheet::CellValue::Bool(b) => {
-                                    out.push_str(if *b { "TRUE" } else { "FALSE" })
-                                },
-                                crate::sheet::CellValue::Int(n) => out.push_str(&n.to_string()),
-                                crate::sheet::CellValue::Float(f) => out.push_str(&f.to_string()),
-                                crate::sheet::CellValue::String(s) => out.push_str(s),
-                                crate::sheet::CellValue::DateTime(dt) => {
-                                    out.push_str(&dt.to_string())
-                                },
-                                crate::sheet::CellValue::Error(e) => out.push_str(e),
-                                crate::sheet::CellValue::Formula {
-                                    formula,
-                                    cached_value,
-                                    ..
-                                } => {
-                                    // For CSV export, use cached value if available, otherwise show formula
-                                    if let Some(cached) = cached_value {
-                                        match &**cached {
-                                            crate::sheet::CellValue::String(s) => out.push_str(s),
-                                            crate::sheet::CellValue::Int(n) => {
-                                                out.push_str(&n.to_string())
-                                            },
-                                            crate::sheet::CellValue::Float(f) => {
-                                                out.push_str(&f.to_string())
-                                            },
-                                            crate::sheet::CellValue::Bool(b) => {
-                                                out.push_str(if *b { "TRUE" } else { "FALSE" })
-                                            },
-                                            _ => out.push_str(&format!("={}", formula)),
-                                        }
-                                    } else {
-                                        out.push_str(&format!("={}", formula));
-                                    }
-                                },
-                            }
+                            append_cell_text(&mut out, cell);
                         }
                         out.push('\n');
                     }
@@ -384,43 +378,7 @@ impl Workbook {
                             if idx > 0 {
                                 out.push('\t');
                             }
-                            match cell {
-                                crate::sheet::CellValue::Empty => {},
-                                crate::sheet::CellValue::Bool(b) => {
-                                    out.push_str(if *b { "TRUE" } else { "FALSE" })
-                                },
-                                crate::sheet::CellValue::Int(n) => out.push_str(&n.to_string()),
-                                crate::sheet::CellValue::Float(f) => out.push_str(&f.to_string()),
-                                crate::sheet::CellValue::String(s) => out.push_str(s),
-                                crate::sheet::CellValue::DateTime(dt) => {
-                                    out.push_str(&dt.to_string())
-                                },
-                                crate::sheet::CellValue::Error(e) => out.push_str(e),
-                                crate::sheet::CellValue::Formula {
-                                    formula,
-                                    cached_value,
-                                    ..
-                                } => {
-                                    // For CSV export, use cached value if available, otherwise show formula
-                                    if let Some(cached) = cached_value {
-                                        match &**cached {
-                                            crate::sheet::CellValue::String(s) => out.push_str(s),
-                                            crate::sheet::CellValue::Int(n) => {
-                                                out.push_str(&n.to_string())
-                                            },
-                                            crate::sheet::CellValue::Float(f) => {
-                                                out.push_str(&f.to_string())
-                                            },
-                                            crate::sheet::CellValue::Bool(b) => {
-                                                out.push_str(if *b { "TRUE" } else { "FALSE" })
-                                            },
-                                            _ => out.push_str(&format!("={}", formula)),
-                                        }
-                                    } else {
-                                        out.push_str(&format!("={}", formula));
-                                    }
-                                },
-                            }
+                            append_cell_text(&mut out, cell);
                         }
                         out.push('\n');
                     }
@@ -440,43 +398,7 @@ impl Workbook {
                             if idx > 0 {
                                 out.push('\t');
                             }
-                            match cell {
-                                crate::sheet::CellValue::Empty => {},
-                                crate::sheet::CellValue::Bool(b) => {
-                                    out.push_str(if *b { "TRUE" } else { "FALSE" })
-                                },
-                                crate::sheet::CellValue::Int(n) => out.push_str(&n.to_string()),
-                                crate::sheet::CellValue::Float(f) => out.push_str(&f.to_string()),
-                                crate::sheet::CellValue::String(s) => out.push_str(s),
-                                crate::sheet::CellValue::DateTime(dt) => {
-                                    out.push_str(&dt.to_string())
-                                },
-                                crate::sheet::CellValue::Error(e) => out.push_str(e),
-                                crate::sheet::CellValue::Formula {
-                                    formula,
-                                    cached_value,
-                                    ..
-                                } => {
-                                    // For CSV export, use cached value if available, otherwise show formula
-                                    if let Some(cached) = cached_value {
-                                        match &**cached {
-                                            crate::sheet::CellValue::String(s) => out.push_str(s),
-                                            crate::sheet::CellValue::Int(n) => {
-                                                out.push_str(&n.to_string())
-                                            },
-                                            crate::sheet::CellValue::Float(f) => {
-                                                out.push_str(&f.to_string())
-                                            },
-                                            crate::sheet::CellValue::Bool(b) => {
-                                                out.push_str(if *b { "TRUE" } else { "FALSE" })
-                                            },
-                                            _ => out.push_str(&format!("={}", formula)),
-                                        }
-                                    } else {
-                                        out.push_str(&format!("={}", formula));
-                                    }
-                                },
-                            }
+                            append_cell_text(&mut out, &cell);
                         }
                         out.push('\n');
                     }
@@ -495,43 +417,7 @@ impl Workbook {
                             if idx > 0 {
                                 out.push('\t');
                             }
-                            match cell {
-                                crate::sheet::CellValue::Empty => {},
-                                crate::sheet::CellValue::Bool(b) => {
-                                    out.push_str(if *b { "TRUE" } else { "FALSE" })
-                                },
-                                crate::sheet::CellValue::Int(n) => out.push_str(&n.to_string()),
-                                crate::sheet::CellValue::Float(f) => out.push_str(&f.to_string()),
-                                crate::sheet::CellValue::String(s) => out.push_str(s),
-                                crate::sheet::CellValue::DateTime(dt) => {
-                                    out.push_str(&dt.to_string())
-                                },
-                                crate::sheet::CellValue::Error(e) => out.push_str(e),
-                                crate::sheet::CellValue::Formula {
-                                    formula,
-                                    cached_value,
-                                    ..
-                                } => {
-                                    // For CSV export, use cached value if available, otherwise show formula
-                                    if let Some(cached) = cached_value {
-                                        match &**cached {
-                                            crate::sheet::CellValue::String(s) => out.push_str(s),
-                                            crate::sheet::CellValue::Int(n) => {
-                                                out.push_str(&n.to_string())
-                                            },
-                                            crate::sheet::CellValue::Float(f) => {
-                                                out.push_str(&f.to_string())
-                                            },
-                                            crate::sheet::CellValue::Bool(b) => {
-                                                out.push_str(if *b { "TRUE" } else { "FALSE" })
-                                            },
-                                            _ => out.push_str(&format!("={}", formula)),
-                                        }
-                                    } else {
-                                        out.push_str(&format!("={}", formula));
-                                    }
-                                },
-                            }
+                            append_cell_text(&mut out, &cell);
                         }
                         out.push('\n');
                     }

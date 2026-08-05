@@ -1,5 +1,5 @@
-use litchi::ooxml::xlsx::Workbook as XlsxWorkbook;
-use litchi::sheet::{CellValue, FormulaEvaluator};
+use litchi::ooxml::xlsx::{Formula, Workbook};
+use litchi::sheet::{CellValue, FormulaEvaluator, functions::open_workbook};
 use tempfile::tempdir;
 
 #[tokio::test]
@@ -10,8 +10,8 @@ async fn eval_lookup_and_text_functions() {
 
     build_workbook(path_str);
 
-    let wb = XlsxWorkbook::open(path_str).expect("open workbook");
-    let evaluator = FormulaEvaluator::new(&wb);
+    let wb = open_workbook(path_str).expect("open workbook");
+    let evaluator = FormulaEvaluator::new(wb.as_ref());
 
     assert_int(
         evaluator
@@ -53,33 +53,68 @@ async fn eval_lookup_and_text_functions() {
 }
 
 fn build_workbook(path: &str) {
-    let mut wb = XlsxWorkbook::create().expect("create workbook");
+    let wb = Workbook::create().expect("create workbook");
+    let mut edit = wb.edit().expect("start workbook edit");
+    edit.tab(0)
+        .expect("worksheet tab lookup")
+        .expect("worksheet tab")
+        .rename("Sheet1")
+        .expect("rename worksheet");
 
     {
-        let ws = wb.worksheet_mut(0).expect("worksheet 0");
-        ws.set_name("Sheet1".to_string());
-
+        let mut ws = edit
+            .sheet(0)
+            .expect("worksheet lookup")
+            .expect("worksheet 0");
         // Lookup table
-        ws.set_cell_value(1, 1, "Apples");
-        ws.set_cell_value(2, 1, "Pears");
-        ws.set_cell_value(3, 1, "Bananas");
+        ws.set("A1", "Apples").expect("A1");
+        ws.set("A2", "Pears").expect("A2");
+        ws.set("A3", "Bananas").expect("A3");
 
-        ws.set_cell_value(1, 2, 10);
-        ws.set_cell_value(2, 2, 20);
-        ws.set_cell_value(3, 2, 30);
+        ws.set("B1", 10).expect("B1");
+        ws.set("B2", 20).expect("B2");
+        ws.set("B3", 30).expect("B3");
 
         // Lookup formulas
-        ws.set_cell_formula(1, 4, "VLOOKUP(\"Apples\", A1:B3, 2, FALSE)");
-        ws.set_cell_formula(2, 4, "INDEX(B1:B3, MATCH(\"Pears\", A1:A3, 0))");
-        ws.set_cell_formula(3, 4, "XLOOKUP(\"Bananas\", A1:A3, B1:B3)");
+        ws.set(
+            "D1",
+            Formula::new("VLOOKUP(\"Apples\", A1:B3, 2, FALSE)").expect("VLOOKUP formula"),
+        )
+        .expect("D1");
+        ws.set(
+            "D2",
+            Formula::new("INDEX(B1:B3, MATCH(\"Pears\", A1:A3, 0))").expect("INDEX/MATCH formula"),
+        )
+        .expect("D2");
+        ws.set(
+            "D3",
+            Formula::new("XLOOKUP(\"Bananas\", A1:A3, B1:B3)").expect("XLOOKUP formula"),
+        )
+        .expect("D3");
 
         // Text formulas
-        ws.set_cell_formula(1, 6, "CONCAT(\"Hello\", \" \", \"World\")");
-        ws.set_cell_formula(2, 6, "LEFT(\"Sample\", 3)");
-        ws.set_cell_formula(3, 6, "FIND(\"am\", \"Sample\")");
+        ws.set(
+            "F1",
+            Formula::new("CONCAT(\"Hello\", \" \", \"World\")").expect("CONCAT formula"),
+        )
+        .expect("F1");
+        ws.set(
+            "F2",
+            Formula::new("LEFT(\"Sample\", 3)").expect("LEFT formula"),
+        )
+        .expect("F2");
+        ws.set(
+            "F3",
+            Formula::new("FIND(\"am\", \"Sample\")").expect("FIND formula"),
+        )
+        .expect("F3");
     }
 
-    wb.save(path).expect("save workbook");
+    edit.commit()
+        .expect("commit workbook edit")
+        .workbook()
+        .save(path)
+        .expect("save workbook");
 }
 
 fn assert_int(value: CellValue, expected: i64) {

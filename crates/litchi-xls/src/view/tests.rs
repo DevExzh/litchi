@@ -4,7 +4,7 @@ use super::codec::{
 use super::{
     PANE_RECORD_TYPE, PaneType, SCL_RECORD_TYPE, SELECTION_RECORD_TYPE, WINDOW2_RECORD_TYPE,
 };
-use crate::error::XlsError;
+use crate::error::Error;
 
 fn window2(flags: u16) -> [u8; 18] {
     let mut data = [0u8; 18];
@@ -28,7 +28,7 @@ fn binary_field_reads_return_typed_errors_for_truncation_and_overflow() {
     let truncated = read_u16(&[0], 0, WINDOW2_RECORD_TYPE, "WINDOW2.flags").unwrap_err();
     assert!(matches!(
         truncated,
-        XlsError::InvalidRecord {
+        Error::InvalidRecord {
             record_type: WINDOW2_RECORD_TYPE,
             message,
         } if message == "truncated WINDOW2.flags"
@@ -37,7 +37,7 @@ fn binary_field_reads_return_typed_errors_for_truncation_and_overflow() {
     let overflowing = read_u16(&[], usize::MAX, WINDOW2_RECORD_TYPE, "WINDOW2.flags").unwrap_err();
     assert!(matches!(
         overflowing,
-        XlsError::InvalidRecord {
+        Error::InvalidRecord {
             record_type: WINDOW2_RECORD_TYPE,
             message,
         } if message == "WINDOW2.flags offset overflows"
@@ -151,7 +151,7 @@ fn rejects_cross_record_view_inconsistencies() {
 
 #[test]
 fn reads_poi_pane_and_zoom_fixtures() {
-    use crate::XlsWorkbook;
+    use crate::Workbook;
     use std::fs::File;
     use std::path::Path;
 
@@ -161,7 +161,7 @@ fn reads_poi_pane_and_zoom_fixtures() {
             .join(name)
     };
 
-    let zoomed = XlsWorkbook::new(File::open(fixture("41139.xls")).unwrap()).unwrap();
+    let zoomed = Workbook::new(File::open(fixture("41139.xls")).unwrap()).unwrap();
     let view = zoomed.xls_worksheet(0).unwrap().worksheet_view().unwrap();
     assert_eq!(view.zoom_fraction(), Some((3, 4)));
     assert_eq!(view.normal_zoom_percent(), Some(75));
@@ -174,7 +174,7 @@ fn reads_poi_pane_and_zoom_fixtures() {
     );
     assert_eq!(pane.active_pane(), PaneType::LowerRight);
 
-    let split = XlsWorkbook::new(File::open(fixture("50939.xls")).unwrap()).unwrap();
+    let split = Workbook::new(File::open(fixture("50939.xls")).unwrap()).unwrap();
     let view = split.xls_worksheet(0).unwrap().worksheet_view().unwrap();
     assert!(view.has_frozen_panes());
     assert!(!view.is_frozen_without_split());

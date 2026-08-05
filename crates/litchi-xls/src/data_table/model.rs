@@ -1,20 +1,20 @@
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
 use super::invalid;
 
 /// The cell range covered by a data table (BIFF8 `Ref`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsDataTableRange {
+pub struct DataTableRange {
     pub(super) first_row: u16,
     pub(super) last_row: u16,
     pub(super) first_col: u8,
     pub(super) last_col: u8,
 }
 
-impl XlsDataTableRange {
+impl DataTableRange {
     /// A range; both the first row and the first column are 1-based per the
     /// `Table` record constraints.
-    pub fn new(first_row: u16, last_row: u16, first_col: u8, last_col: u8) -> XlsResult<Self> {
+    pub fn new(first_row: u16, last_row: u16, first_col: u8, last_col: u8) -> Result<Self> {
         if first_row == 0 || first_col == 0 {
             return Err(invalid("data-table range origin is 1-based"));
         }
@@ -45,7 +45,7 @@ impl XlsDataTableRange {
 
 /// An input cell of a data table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsDataTableInputCell {
+pub enum DataTableInputCell {
     /// The input cell reference.
     Present {
         /// Row of the input cell.
@@ -57,11 +57,11 @@ pub enum XlsDataTableInputCell {
     Deleted,
 }
 
-impl XlsDataTableInputCell {
+impl DataTableInputCell {
     /// Create a present input-cell reference from zero-based raw indices.
-    pub fn present(row: u32, col: u16) -> XlsResult<Self> {
+    pub fn present(row: u32, col: u16) -> Result<Self> {
         let invalid = || {
-            XlsError::InvalidCellReference(format!(
+            Error::InvalidCellReference(format!(
                 "data-table input row {row}, column {col} is outside the BIFF8 grid"
             ))
         };
@@ -73,13 +73,13 @@ impl XlsDataTableInputCell {
 
 /// The shape of a data table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsDataTableKind {
+pub enum DataTableKind {
     /// One-variable table (`fTbl2` = 0): a single input cell, interpreted as
     /// a row input cell when `row_orientation` is set and as a column input
     /// cell otherwise.
     OneVariable {
         /// The single input cell.
-        input: XlsDataTableInputCell,
+        input: DataTableInputCell,
         /// Raw `(rwInpCol, colInpCol)` pair; undefined for one-variable
         /// tables and preserved verbatim for round-trips.
         ignored_coordinates: (u16, u16),
@@ -90,35 +90,35 @@ pub enum XlsDataTableKind {
     /// Two-variable table (`fTbl2` = 1): row and column input cells.
     TwoVariable {
         /// Row input cell.
-        row_input: XlsDataTableInputCell,
+        row_input: DataTableInputCell,
         /// Column input cell.
-        column_input: XlsDataTableInputCell,
+        column_input: DataTableInputCell,
     },
 }
 
 /// Typed `Table` record content (MS-XLS 2.4.319).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsDataTable {
-    pub(super) range: XlsDataTableRange,
+pub struct DataTable {
+    pub(super) range: DataTableRange,
     pub(super) always_calc: bool,
     /// `fRw`; the one-variable orientation, preserved verbatim for
     /// two-variable tables.
     pub(super) row_orientation: bool,
-    pub(super) kind: XlsDataTableKind,
+    pub(super) kind: DataTableKind,
 }
 
-impl XlsDataTable {
+impl DataTable {
     /// A one-variable data table.
     pub fn one_variable(
-        range: XlsDataTableRange,
+        range: DataTableRange,
         row_orientation: bool,
-        input: XlsDataTableInputCell,
+        input: DataTableInputCell,
     ) -> Self {
         Self {
             range,
             always_calc: false,
             row_orientation,
-            kind: XlsDataTableKind::OneVariable {
+            kind: DataTableKind::OneVariable {
                 input,
                 ignored_coordinates: (0, 0),
                 ignored_deleted2: false,
@@ -128,22 +128,22 @@ impl XlsDataTable {
 
     /// A two-variable data table.
     pub fn two_variable(
-        range: XlsDataTableRange,
-        row_input: XlsDataTableInputCell,
-        column_input: XlsDataTableInputCell,
+        range: DataTableRange,
+        row_input: DataTableInputCell,
+        column_input: DataTableInputCell,
     ) -> Self {
         Self {
             range,
             always_calc: false,
             row_orientation: false,
-            kind: XlsDataTableKind::TwoVariable {
+            kind: DataTableKind::TwoVariable {
                 row_input,
                 column_input,
             },
         }
     }
 
-    pub const fn range(&self) -> XlsDataTableRange {
+    pub const fn range(&self) -> DataTableRange {
         self.range
     }
     pub const fn always_calc(&self) -> bool {
@@ -158,9 +158,9 @@ impl XlsDataTable {
         self.row_orientation
     }
     pub const fn is_two_variable(&self) -> bool {
-        matches!(self.kind, XlsDataTableKind::TwoVariable { .. })
+        matches!(self.kind, DataTableKind::TwoVariable { .. })
     }
-    pub const fn kind(&self) -> &XlsDataTableKind {
+    pub const fn kind(&self) -> &DataTableKind {
         &self.kind
     }
 }

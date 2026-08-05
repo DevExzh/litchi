@@ -5,15 +5,12 @@
 
 use std::{error::Error, fs, path::PathBuf};
 
-use litchi::doc::writer::{DocDrawingShape, DocShapeKind, DocWriter, FloatingPosition};
-use litchi::ppt::writer::{
-    FillStyle, LineStyleConfig, PptWriter, ShapeColor, ShapeStyle, ShapeType, Table,
+use litchi_doc::writer::{DocWriter, FloatingPosition, Kind, Shape};
+use litchi_ppt::writer::{
+    FillStyle, LineStyleConfig, ShapeColor, ShapeStyle, ShapeType, Table, Writer,
 };
-use litchi::xls::writer::shape::{Anchor, Behavior, Rect};
-use litchi::xls::writer::{
-    XlsShapeColor, XlsShapeFill, XlsShapeGroupChild, XlsShapeGroupWrite, XlsShapeKind,
-    XlsShapeLine, XlsShapeText, XlsShapeWrite, XlsWriter,
-};
+use litchi_xls::writer as xls_writer;
+use litchi_xls::writer::shape::{Anchor, Behavior, Rect};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let output = std::env::var_os("LITCHI_OFFICE_SMOKE_DIR")
@@ -48,7 +45,7 @@ fn write_doc(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
     }
 
     doc.insert_floating_shape(
-        DocDrawingShape::new(DocShapeKind::Rectangle, 2880, 1440)?
+        Shape::new(Kind::Rectangle, 2880, 1440)?
             .with_fill(0x1F, 0x4E, 0x78)
             .with_line(0xFF, 0xFF, 0xFF),
         FloatingPosition::new(900, 1200),
@@ -60,7 +57,7 @@ fn write_doc(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
     }
 
     doc.insert_floating_text_box(
-        DocDrawingShape::new(DocShapeKind::RoundRectangle, 3600, 1440)?
+        Shape::new(Kind::RoundRectangle, 3600, 1440)?
             .with_fill(0xE2, 0xF0, 0xD9)
             .with_line(0x54, 0x8B, 0x2F),
         FloatingPosition::new(4200, 2400),
@@ -72,7 +69,7 @@ fn write_doc(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
 }
 
 fn write_ppt(path: &std::path::Path) -> Result<(), Box<dyn Error>> {
-    let mut ppt = PptWriter::new_widescreen();
+    let mut ppt = Writer::new_widescreen();
     let slide = ppt.add_slide()?;
     ppt.add_textbox(slide, 50, 25, 650, 40, "Litchi OfficeArt native smoke test")?;
     let rectangle = ShapeStyle::default()
@@ -108,7 +105,7 @@ fn write_ppt(path: &std::path::Path) -> Result<(), Box<dyn Error>> {
 }
 
 fn write_xls(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
-    let mut xls = XlsWriter::new();
+    let mut xls = xls_writer::Writer::new();
     let sheet = xls.add_worksheet("OfficeArt")?;
     xls.write_string(sheet, 0, 0, "Litchi OfficeArt native smoke test")?;
     xls.write_number(sheet, 1, 0, 42.0)?;
@@ -118,9 +115,10 @@ fn write_xls(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    let mut rectangle = XlsShapeWrite::new(XlsShapeKind::Rectangle, xls_anchor(1, 2, 5, 8)?);
-    rectangle.fill = XlsShapeFill::Solid(XlsShapeColor::rgb(0x1F, 0x4E, 0x78));
-    rectangle.line = XlsShapeLine::None;
+    let mut rectangle =
+        xls_writer::ShapeWrite::new(xls_writer::ShapeKind::Rectangle, xls_anchor(1, 2, 5, 8)?);
+    rectangle.fill = xls_writer::ShapeFill::Solid(xls_writer::ShapeColor::rgb(0x1F, 0x4E, 0x78));
+    rectangle.line = xls_writer::ShapeLine::None;
     xls.add_shape(sheet, rectangle)?;
 
     if mode == "primitive" {
@@ -128,9 +126,10 @@ fn write_xls(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    let mut textbox = XlsShapeWrite::new(XlsShapeKind::TextBox, xls_anchor(6, 2, 11, 8)?);
-    textbox.text = Some(XlsShapeText::new("Typed XLS textbox 世界"));
-    textbox.fill = XlsShapeFill::Solid(XlsShapeColor::rgb(0xE2, 0xF0, 0xD9));
+    let mut textbox =
+        xls_writer::ShapeWrite::new(xls_writer::ShapeKind::TextBox, xls_anchor(6, 2, 11, 8)?);
+    textbox.text = Some(xls_writer::ShapeText::new("Typed XLS textbox 世界"));
+    textbox.fill = xls_writer::ShapeFill::Solid(xls_writer::ShapeColor::rgb(0xE2, 0xF0, 0xD9));
     xls.add_shape(sheet, textbox)?;
 
     if mode == "textbox" {
@@ -138,13 +137,19 @@ fn write_xls(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    let mut group = XlsShapeGroupWrite::new(xls_anchor(1, 10, 11, 20)?);
+    let mut group = xls_writer::ShapeGroupWrite::new(xls_anchor(1, 10, 11, 20)?);
     group.coordinates = Rect::new(0, 0, 2000, 1000)?;
-    let mut child = XlsShapeGroupChild::new(XlsShapeKind::Ellipse, Rect::new(0, 0, 900, 900)?);
-    child.fill = XlsShapeFill::Solid(XlsShapeColor::rgb(0xFF, 0xC0, 0x00));
+    let mut child = xls_writer::ShapeGroupChild::new(
+        xls_writer::ShapeKind::Ellipse,
+        Rect::new(0, 0, 900, 900)?,
+    );
+    child.fill = xls_writer::ShapeFill::Solid(xls_writer::ShapeColor::rgb(0xFF, 0xC0, 0x00));
     group.children.push(child);
-    let mut label = XlsShapeGroupChild::new(XlsShapeKind::TextBox, Rect::new(950, 100, 2000, 900)?);
-    label.text = Some(XlsShapeText::new("Grouped"));
+    let mut label = xls_writer::ShapeGroupChild::new(
+        xls_writer::ShapeKind::TextBox,
+        Rect::new(950, 100, 2000, 900)?,
+    );
+    label.text = Some(xls_writer::ShapeText::new("Grouped"));
     group.children.push(label);
     xls.add_shape_group(sheet, group)?;
 
@@ -157,7 +162,7 @@ fn xls_anchor(
     first_row: u32,
     last_col: u16,
     last_row: u32,
-) -> litchi::xls::XlsResult<Anchor> {
+) -> litchi_xls::Result<Anchor> {
     Anchor::cells(
         first_row,
         first_col,

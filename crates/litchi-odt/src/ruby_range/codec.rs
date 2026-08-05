@@ -234,9 +234,9 @@ pub(super) fn collect_ruby_text_node(
     text_offset: &mut usize,
     range: &Range<usize>,
     stack: &[(Ns, Vec<u8>)],
-    value: &RubyAnnotation,
     fragment: &str,
     target_depth: Option<usize>,
+    value: &Annotation,
     pending: &mut Option<PendingRubyRange>,
 ) -> Result<Option<String>> {
     let Some(target_depth) = target_depth else {

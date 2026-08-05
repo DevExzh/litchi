@@ -14,7 +14,7 @@
 //! - MS-XLS sections 2.4.271–2.4.283
 //! - Apache POI `org.apache.poi.hssf.record.pivottable.*`
 
-use crate::error::{XlsError, XlsResult};
+use crate::error::{Error, Result};
 use litchi_core::binary;
 
 /// A BIFF8 cell error stored in an `SXERROR` PivotCache item.
@@ -37,7 +37,7 @@ impl PivotCacheError {
 }
 
 impl TryFrom<u16> for PivotCacheError {
-    type Error = XlsError;
+    type Error = Error;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
@@ -80,7 +80,7 @@ pub enum PivotCacheDateGroupUnit {
 }
 
 impl TryFrom<u16> for PivotCacheDateGroupUnit {
-    type Error = XlsError;
+    type Error = Error;
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
             1 => Ok(Self::Seconds),
@@ -152,7 +152,7 @@ impl PivotCacheDateTime {
         hour: u8,
         minute: u8,
         second: u8,
-    ) -> XlsResult<Self> {
+    ) -> Result<Self> {
         let value = Self {
             year,
             month,
@@ -165,7 +165,7 @@ impl PivotCacheDateTime {
         Ok(value)
     }
 
-    fn validate(self) -> XlsResult<()> {
+    fn validate(self) -> Result<()> {
         let leap = self.year.is_multiple_of(4)
             && (!self.year.is_multiple_of(100) || self.year.is_multiple_of(400));
         let max_day = match self.month {
@@ -243,7 +243,7 @@ impl From<&str> for PivotCacheItem {
 }
 
 impl PivotCacheItem {
-    pub(crate) fn validate(&self) -> XlsResult<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         match self {
             Self::String(value) if value.is_empty() => Err(cache_invalid(
                 0x00CD,
@@ -372,30 +372,28 @@ impl PivotCache {
     }
 }
 
-fn cache_invalid(record_type: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn cache_invalid(record_type: u16, message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type,
         message: message.into(),
     }
 }
 
-fn cache_records(data: &[u8]) -> XlsResult<Vec<(u16, &[u8])>> {
+fn cache_records(data: &[u8]) -> Result<Vec<(u16, &[u8])>> {
     let mut records = Vec::new();
     let mut offset = 0usize;
     while offset < data.len() {
-        let header = data
-            .get(offset..offset + 4)
-            .ok_or(XlsError::InvalidLength {
-                expected: offset + 4,
-                found: data.len(),
-            })?;
+        let header = data.get(offset..offset + 4).ok_or(Error::InvalidLength {
+            expected: offset + 4,
+            found: data.len(),
+        })?;
         let kind = u16::from_le_bytes([header[0], header[1]]);
         let len = usize::from(u16::from_le_bytes([header[2], header[3]]));
         let end = offset
             .checked_add(4)
             .and_then(|value| value.checked_add(len))
             .ok_or_else(|| cache_invalid(kind, "PivotCache record length overflow"))?;
-        let body = data.get(offset + 4..end).ok_or(XlsError::InvalidLength {
+        let body = data.get(offset + 4..end).ok_or(Error::InvalidLength {
             expected: end,
             found: data.len(),
         })?;
@@ -405,9 +403,9 @@ fn cache_records(data: &[u8]) -> XlsResult<Vec<(u16, &[u8])>> {
     Ok(records)
 }
 
-fn parse_cache_string(data: &[u8], record_type: u16) -> XlsResult<(String, usize)> {
+fn parse_cache_string(data: &[u8], record_type: u16) -> Result<(String, usize)> {
     if data.len() < 3 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 3,
             found: data.len(),
         });
@@ -420,7 +418,7 @@ fn parse_cache_string(data: &[u8], record_type: u16) -> XlsResult<(String, usize
     let end = 3usize
         .checked_add(byte_count)
         .ok_or_else(|| cache_invalid(record_type, "PivotCache string length overflow"))?;
-    let chars = data.get(3..end).ok_or(XlsError::InvalidLength {
+    let chars = data.get(3..end).ok_or(Error::InvalidLength {
         expected: end,
         found: data.len(),
     })?;
@@ -437,11 +435,11 @@ fn parse_cache_string(data: &[u8], record_type: u16) -> XlsResult<(String, usize
     Ok((value, end))
 }
 
-fn parse_cache_item(record_type: u16, data: &[u8]) -> XlsResult<PivotCacheItem> {
+fn parse_cache_item(record_type: u16, data: &[u8]) -> Result<PivotCacheItem> {
     let item = match record_type {
         0x00C9 => {
             if data.len() != 8 {
-                return Err(XlsError::InvalidLength {
+                return Err(Error::InvalidLength {
                     expected: 8,
                     found: data.len(),
                 });
@@ -450,7 +448,7 @@ fn parse_cache_item(record_type: u16, data: &[u8]) -> XlsResult<PivotCacheItem> 
         },
         0x00CA => {
             if data.len() != 2 {
-                return Err(XlsError::InvalidLength {
+                return Err(Error::InvalidLength {
                     expected: 2,
                     found: data.len(),
                 });
@@ -468,7 +466,7 @@ fn parse_cache_item(record_type: u16, data: &[u8]) -> XlsResult<PivotCacheItem> 
         },
         0x00CB => {
             if data.len() != 2 {
-                return Err(XlsError::InvalidLength {
+                return Err(Error::InvalidLength {
                     expected: 2,
                     found: data.len(),
                 });
@@ -479,7 +477,7 @@ fn parse_cache_item(record_type: u16, data: &[u8]) -> XlsResult<PivotCacheItem> 
         },
         0x00CC => {
             if data.len() != 2 {
-                return Err(XlsError::InvalidLength {
+                return Err(Error::InvalidLength {
                     expected: 2,
                     found: data.len(),
                 });
@@ -495,7 +493,7 @@ fn parse_cache_item(record_type: u16, data: &[u8]) -> XlsResult<PivotCacheItem> 
         },
         0x00CE => {
             if data.len() != 8 {
-                return Err(XlsError::InvalidLength {
+                return Err(Error::InvalidLength {
                     expected: 8,
                     found: data.len(),
                 });
@@ -511,7 +509,7 @@ fn parse_cache_item(record_type: u16, data: &[u8]) -> XlsResult<PivotCacheItem> 
         },
         0x00CF => {
             if !data.is_empty() {
-                return Err(XlsError::InvalidLength {
+                return Err(Error::InvalidLength {
                     expected: 0,
                     found: data.len(),
                 });
@@ -530,7 +528,7 @@ fn parse_cache_item(record_type: u16, data: &[u8]) -> XlsResult<PivotCacheItem> 
 }
 
 /// Parse one `_SX_DB_CUR/nnnn` PivotCache stream.
-pub fn parse_pivot_cache_stream(data: &[u8]) -> XlsResult<PivotCache> {
+pub fn parse_pivot_cache_stream(data: &[u8]) -> Result<PivotCache> {
     let records = cache_records(data)?;
     let (sxdb_type, sxdb) = records
         .first()
@@ -624,7 +622,7 @@ pub fn parse_pivot_cache_stream(data: &[u8]) -> XlsResult<PivotCache> {
             }))
         } else if let Some((0x00D8, body)) = records.get(position) {
             if body.len() != 2 {
-                return Err(XlsError::InvalidLength {
+                return Err(Error::InvalidLength {
                     expected: 2,
                     found: body.len(),
                 });
@@ -650,7 +648,7 @@ pub fn parse_pivot_cache_stream(data: &[u8]) -> XlsResult<PivotCache> {
                             "numeric grouping limits must be numeric",
                         )),
                     })
-                    .collect::<XlsResult<Vec<_>>>()?;
+                    .collect::<Result<Vec<_>>>()?;
                 Some(PivotCacheGrouping::Numeric(PivotCacheNumericGrouping {
                     start: numbers[0],
                     end: numbers[1],
@@ -748,7 +746,7 @@ pub fn parse_pivot_cache_stream(data: &[u8]) -> XlsResult<PivotCache> {
                 let width = if field.flags & 0x0200 != 0 { 2 } else { 1 };
                 let encoded =
                     body.get(body_offset..body_offset + width)
-                        .ok_or(XlsError::InvalidLength {
+                        .ok_or(Error::InvalidLength {
                             expected: body_offset + width,
                             found: body.len(),
                         })?;
@@ -863,7 +861,7 @@ pub enum PivotAxis {
 }
 
 impl PivotAxis {
-    fn from_u16(val: u16) -> XlsResult<Self> {
+    fn from_u16(val: u16) -> Result<Self> {
         match val {
             0x0000 => Ok(Self::None),
             0x0001 => Ok(Self::Row),
@@ -1016,9 +1014,9 @@ pub struct PivotViewDef {
 /// 38  var  name (XLUnicodeStringNoCch)
 ///     var  dataField (XLUnicodeStringNoCch)
 /// ```
-pub fn parse_sxview(data: &[u8]) -> XlsResult<PivotViewDef> {
+pub fn parse_sxview(data: &[u8]) -> Result<PivotViewDef> {
     if data.len() < 44 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 44,
             found: data.len(),
         });
@@ -1137,9 +1135,9 @@ pub struct PivotViewField {
 ///  8  u16  cchName  (0xFFFF = not present)
 /// 10  var  name (XLUnicodeStringNoCch)  — only if cchName != 0xFFFF
 /// ```
-pub fn parse_sxvd(data: &[u8]) -> XlsResult<PivotViewField> {
+pub fn parse_sxvd(data: &[u8]) -> Result<PivotViewField> {
     if data.len() < 10 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 10,
             found: data.len(),
         });
@@ -1265,9 +1263,9 @@ pub struct PivotViewItem {
 ///  6  u16  cchName  (0xFFFF = not present)
 ///  8  var  name
 /// ```
-pub fn parse_sxvi(data: &[u8]) -> XlsResult<PivotViewItem> {
+pub fn parse_sxvi(data: &[u8]) -> Result<PivotViewItem> {
     if data.len() < 8 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 8,
             found: data.len(),
         });
@@ -1332,9 +1330,9 @@ pub struct PivotDataItem {
 /// 12  u16  cchName
 /// 14  var  name
 /// ```
-pub fn parse_sxdi(data: &[u8]) -> XlsResult<PivotDataItem> {
+pub fn parse_sxdi(data: &[u8]) -> Result<PivotDataItem> {
     if data.len() < 14 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 14,
             found: data.len(),
         });
@@ -1397,9 +1395,9 @@ impl PivotSourceType {
 }
 
 /// Parse an SXVS record (2 bytes: source type).
-pub fn parse_sxvs(data: &[u8]) -> XlsResult<PivotSourceType> {
+pub fn parse_sxvs(data: &[u8]) -> Result<PivotSourceType> {
     if data.len() != 2 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 2,
             found: data.len(),
         });
@@ -1443,7 +1441,7 @@ impl PageFieldEntry {
 ///
 /// Each entry is 6 bytes: `(isxvi: u16, isxvd: u16, idObj: u16)`.
 /// The number of entries is `data.len() / 6`.
-pub fn parse_sxpi(data: &[u8]) -> XlsResult<Vec<PageFieldEntry>> {
+pub fn parse_sxpi(data: &[u8]) -> Result<Vec<PageFieldEntry>> {
     if !data.len().is_multiple_of(6) {
         return Err(cache_invalid(
             SXPI_TYPE,
@@ -1472,7 +1470,7 @@ pub enum PivotAxisField {
     DataLayout,
 }
 
-pub fn parse_sxivd(data: &[u8]) -> XlsResult<Vec<PivotAxisField>> {
+pub fn parse_sxivd(data: &[u8]) -> Result<Vec<PivotAxisField>> {
     if !data.len().is_multiple_of(2) {
         return Err(cache_invalid(SXIVD_TYPE, "SXIVD length must be even"));
     }
@@ -1497,9 +1495,9 @@ pub struct PivotViewFieldExtension {
     pub reserved: [u8; 8],
 }
 
-pub fn parse_sxvdex(data: &[u8]) -> XlsResult<PivotViewFieldExtension> {
+pub fn parse_sxvdex(data: &[u8]) -> Result<PivotViewFieldExtension> {
     if data.len() < 20 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 20,
             found: data.len(),
         });
@@ -1543,7 +1541,7 @@ fn parse_sxli(
     data: &[u8],
     expected_lines: usize,
     max_indices: usize,
-) -> XlsResult<Vec<PivotLayoutLine>> {
+) -> Result<Vec<PivotLayoutLine>> {
     if expected_lines == 0 || !data.len().is_multiple_of(expected_lines) {
         return Err(cache_invalid(
             SXLI_TYPE,
@@ -1603,11 +1601,7 @@ pub struct PivotViewExtension {
     pub vacate_style: Option<String>,
 }
 
-fn parse_optional_sx_string(
-    data: &[u8],
-    offset: &mut usize,
-    cch: u16,
-) -> XlsResult<Option<String>> {
+fn parse_optional_sx_string(data: &[u8], offset: &mut usize, cch: u16) -> Result<Option<String>> {
     if cch == u16::MAX {
         Ok(None)
     } else {
@@ -1615,9 +1609,9 @@ fn parse_optional_sx_string(
     }
 }
 
-pub fn parse_sxex(data: &[u8]) -> XlsResult<PivotViewExtension> {
+pub fn parse_sxex(data: &[u8]) -> Result<PivotViewExtension> {
     if data.len() < 24 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 24,
             found: data.len(),
         });
@@ -1663,11 +1657,11 @@ pub struct PivotQueryTag {
     pub trailing_payload: Vec<u8>,
 }
 
-fn read_xl_unicode_string(data: &[u8], offset: &mut usize) -> XlsResult<String> {
+fn read_xl_unicode_string(data: &[u8], offset: &mut usize) -> Result<String> {
     let cch_end = offset
         .checked_add(2)
         .ok_or_else(|| cache_invalid(QSI_SX_TAG_TYPE, "string offset overflow"))?;
-    let cch_bytes = data.get(*offset..cch_end).ok_or(XlsError::InvalidLength {
+    let cch_bytes = data.get(*offset..cch_end).ok_or(Error::InvalidLength {
         expected: cch_end,
         found: data.len(),
     })?;
@@ -1679,9 +1673,9 @@ fn read_xl_unicode_string(data: &[u8], offset: &mut usize) -> XlsResult<String> 
     )
 }
 
-pub fn parse_qsi_sx_tag(data: &[u8]) -> XlsResult<PivotQueryTag> {
+pub fn parse_qsi_sx_tag(data: &[u8]) -> Result<PivotQueryTag> {
     if data.len() < 19 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 19,
             found: data.len(),
         });
@@ -1716,9 +1710,9 @@ pub struct PivotViewEx9 {
     pub grand_total_name: String,
 }
 
-pub fn parse_sxviewex9(data: &[u8]) -> XlsResult<PivotViewEx9> {
+pub fn parse_sxviewex9(data: &[u8]) -> Result<PivotViewEx9> {
     if data.len() < 17 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 17,
             found: data.len(),
         });
@@ -1752,9 +1746,9 @@ pub struct PivotAdditionalExtension {
     pub payload: Vec<u8>,
 }
 
-pub fn parse_sxaddl(data: &[u8]) -> XlsResult<PivotAdditionalExtension> {
+pub fn parse_sxaddl(data: &[u8]) -> Result<PivotAdditionalExtension> {
     if data.len() < 6 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 6,
             found: data.len(),
         });
@@ -1892,7 +1886,7 @@ impl PivotTableBuild {
             && (self.table.view.data_col_count == 0 || self.column_lines_seen)
     }
 
-    fn require_fields(&self, record_type: u16) -> XlsResult<()> {
+    fn require_fields(&self, record_type: u16) -> Result<()> {
         if self.fields_complete() {
             Ok(())
         } else {
@@ -1903,7 +1897,7 @@ impl PivotTableBuild {
         }
     }
 
-    fn add_extension_bytes(&mut self, record_type: u16, count: usize) -> XlsResult<()> {
+    fn add_extension_bytes(&mut self, record_type: u16, count: usize) -> Result<()> {
         self.extension_bytes = self
             .extension_bytes
             .checked_add(count)
@@ -1917,7 +1911,7 @@ impl PivotTableBuild {
         Ok(())
     }
 
-    fn feed(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
+    fn feed(&mut self, record_type: u16, data: &[u8]) -> Result<()> {
         match record_type {
             SXVD_TYPE => {
                 if let Some(previous) = self.table.fields.last()
@@ -2157,7 +2151,7 @@ impl PivotTableBuild {
         Ok(())
     }
 
-    fn finish(self) -> XlsResult<PivotTable> {
+    fn finish(self) -> Result<PivotTable> {
         if !self.fields_complete()
             || !self.axes_complete()
             || !self.page_complete()
@@ -2189,7 +2183,7 @@ impl PivotTableCollector {
         }
     }
 
-    fn push_current(&mut self) -> XlsResult<()> {
+    fn push_current(&mut self) -> Result<()> {
         let Some(build) = self.current.take() else {
             return Ok(());
         };
@@ -2215,7 +2209,7 @@ impl PivotTableCollector {
     }
 
     /// Returns true when the record belongs to the PivotTable aggregate.
-    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<bool> {
+    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> Result<bool> {
         let pivot_record = is_worksheet_view_record(record_type);
         if record_type == SXVIEW_TYPE {
             self.push_current()?;
@@ -2245,7 +2239,7 @@ impl PivotTableCollector {
         Ok(false)
     }
 
-    pub(crate) fn finish(mut self) -> XlsResult<Vec<PivotTable>> {
+    pub(crate) fn finish(mut self) -> Result<Vec<PivotTable>> {
         self.push_current()?;
         Ok(self.completed)
     }
@@ -2259,10 +2253,10 @@ fn ranges_overlap(left: &PivotViewDef, right: &PivotViewDef) -> bool {
 }
 
 pub(crate) fn validate_pivot_cache_links(
-    worksheets: &[crate::worksheet::XlsWorksheet],
+    worksheets: &[crate::worksheet::Worksheet],
     caches: &[PivotCache],
     cache_stream_ids: &[u16],
-) -> XlsResult<()> {
+) -> Result<()> {
     for worksheet in worksheets {
         for table in worksheet.pivot_tables() {
             let stream_id = *cache_stream_ids
@@ -2368,7 +2362,7 @@ fn validate_axis_fields(
     table: &PivotTable,
     fields: &[PivotAxisField],
     axis: PivotAxis,
-) -> XlsResult<()> {
+) -> Result<()> {
     let mut data_layout_seen = false;
     for entry in fields {
         match *entry {
@@ -2405,12 +2399,12 @@ fn validate_axis_fields(
 // ---------------------------------------------------------------------------
 
 /// Read an XLUnicodeStringNoCch: 1-byte flags then `cch` chars.
-fn read_xl_string_no_cch(data: &[u8], offset: &mut usize, cch: usize) -> XlsResult<String> {
+fn read_xl_string_no_cch(data: &[u8], offset: &mut usize, cch: usize) -> Result<String> {
     if cch == 0 {
         let end = offset
             .checked_add(1)
             .ok_or_else(|| cache_invalid(SXVIEW_TYPE, "pivot string offset overflow"))?;
-        data.get(*offset..end).ok_or(XlsError::InvalidLength {
+        data.get(*offset..end).ok_or(Error::InvalidLength {
             expected: end,
             found: data.len(),
         })?;
@@ -2419,7 +2413,7 @@ fn read_xl_string_no_cch(data: &[u8], offset: &mut usize, cch: usize) -> XlsResu
     }
 
     if *offset >= data.len() {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: *offset + 1,
             found: data.len(),
         });
@@ -2437,7 +2431,7 @@ fn read_xl_string_no_cch(data: &[u8], offset: &mut usize, cch: usize) -> XlsResu
             .checked_add(byte_len)
             .ok_or_else(|| cache_invalid(SXVIEW_TYPE, "pivot string offset overflow"))?;
         if end > data.len() {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: end,
                 found: data.len(),
             });
@@ -2448,13 +2442,13 @@ fn read_xl_string_no_cch(data: &[u8], offset: &mut usize, cch: usize) -> XlsResu
             .collect();
         *offset = end;
         String::from_utf16(&words)
-            .map_err(|e| XlsError::InvalidData(format!("Invalid UTF-16 in pivot string: {}", e)))
+            .map_err(|e| Error::InvalidData(format!("Invalid UTF-16 in pivot string: {}", e)))
     } else {
         let end = offset
             .checked_add(cch)
             .ok_or_else(|| cache_invalid(SXVIEW_TYPE, "pivot string offset overflow"))?;
         if end > data.len() {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: end,
                 found: data.len(),
             });

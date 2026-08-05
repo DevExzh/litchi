@@ -3,14 +3,14 @@ use std::collections::{HashMap, HashSet};
 use crate::writer::biff;
 use crate::writer::formatting::FormattingManager;
 use crate::writer::formula::{FormulaTokenizer, encode_ptg_tokens};
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
-use super::named_range::XlsDefinedName as InternalDefinedName;
+use super::named_range::DefinedName as InternalDefinedName;
 use super::worksheet::WritableWorksheet;
 use super::{
-    XlsCalculationSettings, XlsCellValue, XlsCustomTableStyles, XlsExternalWorkbookOptions,
-    XlsFileSharing, XlsFunctionGroupOptions, XlsVbaWriteMetadata, XlsWorkbookEnvironmentOptions,
-    XlsWorkbookProtection, XlsWorkbookWindowOptions,
+    CalculationSettings, CellValue, CustomTableStyles, ExternalWorkbookOptions, FileSharing,
+    FunctionGroupOptions, VbaWriteMetadata, WorkbookEnvironmentOptions, WorkbookProtection,
+    WorkbookWindowOptions,
 };
 
 const DEFAULT_WRITE_ACCESS_USER: &str = "litchi";
@@ -37,23 +37,23 @@ fn lookup_shared_string_index(
     shared_strings: &[String],
     string_map: &HashMap<String, u32>,
     value: &str,
-) -> XlsResult<u32> {
+) -> Result<u32> {
     let index = string_map.get(value).copied().ok_or_else(|| {
-        XlsError::InvalidData(format!(
+        Error::InvalidData(format!(
             "string cell value {value:?} is missing from the shared string table"
         ))
     })?;
     let table_index = usize::try_from(index).map_err(|_| {
-        XlsError::InvalidData(format!(
+        Error::InvalidData(format!(
             "shared string index {index} for value {value:?} cannot be represented"
         ))
     })?;
     match shared_strings.get(table_index) {
         Some(entry) if entry == value => Ok(index),
-        Some(_) => Err(XlsError::InvalidData(format!(
+        Some(_) => Err(Error::InvalidData(format!(
             "shared string index {index} for value {value:?} does not match the shared string table"
         ))),
-        None => Err(XlsError::InvalidData(format!(
+        None => Err(Error::InvalidData(format!(
             "shared string index {index} for value {value:?} is outside the shared string table"
         ))),
     }
@@ -61,14 +61,14 @@ fn lookup_shared_string_index(
 
 fn stage_pivot_cache_identities(
     worksheets: &[WritableWorksheet],
-) -> XlsResult<Vec<Vec<PivotCacheIdentity>>> {
+) -> Result<Vec<Vec<PivotCacheIdentity>>> {
     let pivot_count = worksheets.iter().try_fold(0usize, |count, worksheet| {
         count
             .checked_add(worksheet.pivot_tables.len())
-            .ok_or_else(|| XlsError::InvalidData("PivotTable cache count overflow".to_string()))
+            .ok_or_else(|| Error::InvalidData("PivotTable cache count overflow".to_string()))
     })?;
     if pivot_count > usize::from(u16::MAX) {
-        return Err(XlsError::InvalidData(format!(
+        return Err(Error::InvalidData(format!(
             "PivotTable cache count {pivot_count} exceeds the BIFF8 limit of {}",
             u16::MAX
         )));
@@ -81,13 +81,13 @@ fn stage_pivot_cache_identities(
             (0..worksheet.pivot_tables.len())
                 .map(|_| {
                     let cache_index = u16::try_from(next_index).map_err(|_| {
-                        XlsError::InvalidData("PivotTable cache index overflow".to_string())
+                        Error::InvalidData("PivotTable cache index overflow".to_string())
                     })?;
                     let stream_id = cache_index.checked_add(1).ok_or_else(|| {
-                        XlsError::InvalidData("PivotTable cache stream ID overflow".to_string())
+                        Error::InvalidData("PivotTable cache stream ID overflow".to_string())
                     })?;
                     next_index = next_index.checked_add(1).ok_or_else(|| {
-                        XlsError::InvalidData("PivotTable cache index overflow".to_string())
+                        Error::InvalidData("PivotTable cache index overflow".to_string())
                     })?;
                     Ok(PivotCacheIdentity {
                         cache_index,
@@ -104,36 +104,36 @@ fn stage_pivot_cache_identities(
 #[allow(clippy::cognitive_complexity, clippy::too_many_arguments)]
 pub(crate) fn generate_workbook_stream(
     use_1904_dates: bool,
-    calculation_settings: XlsCalculationSettings,
-    vba_metadata: Option<&XlsVbaWriteMetadata>,
-    environment: XlsWorkbookEnvironmentOptions,
-    workbook_window: XlsWorkbookWindowOptions,
-    function_groups: &XlsFunctionGroupOptions,
-    external_workbooks: &[XlsExternalWorkbookOptions],
-    external_names: &[Vec<super::XlsExternalDefinedNameOptions>],
-    add_in_functions: &[super::XlsAddInFunctionOptions],
-    dde_or_ole_links: &[super::XlsDdeOrOleLinkOptions],
+    calculation_settings: CalculationSettings,
+    vba_metadata: Option<&VbaWriteMetadata>,
+    environment: WorkbookEnvironmentOptions,
+    workbook_window: WorkbookWindowOptions,
+    function_groups: &FunctionGroupOptions,
+    external_workbooks: &[ExternalWorkbookOptions],
+    external_names: &[Vec<super::ExternalDefinedNameOptions>],
+    add_in_functions: &[super::AddInFunctionOptions],
+    dde_or_ole_links: &[super::DdeOrOleLinkOptions],
     fmt: &FormattingManager,
-    custom_table_styles: Option<&XlsCustomTableStyles>,
+    custom_table_styles: Option<&CustomTableStyles>,
     defined_names: &[InternalDefinedName],
     defined_name_records: &[(
-        super::XlsDefinedNameRecordOptions,
-        crate::XlsDefinedNameFutureRecords,
+        super::DefinedNameRecordOptions,
+        crate::DefinedNameFutureRecords,
     )],
     shared_strings: &[String],
     sst_total: u32,
-    workbook_protection: Option<XlsWorkbookProtection>,
-    file_sharing: Option<&XlsFileSharing>,
-    book_ext: Option<&crate::XlsBookExt>,
-    theme: Option<&crate::XlsTheme>,
-    mdx_metadata: Option<&crate::XlsMdxMetadata>,
-    real_time_data: &[crate::XlsRealTimeData],
-    web_publications: &[crate::XlsWebPub],
-    xf_extensions: &[crate::XlsXfExt],
-    style_extensions: &[crate::XlsStyleExt],
+    workbook_protection: Option<WorkbookProtection>,
+    file_sharing: Option<&FileSharing>,
+    book_ext: Option<&crate::BookExt>,
+    theme: Option<&crate::Theme>,
+    mdx_metadata: Option<&crate::MdxMetadata>,
+    real_time_data: &[crate::RealTimeData],
+    web_publications: &[crate::WebPub],
+    xf_extensions: &[crate::XfExt],
+    style_extensions: &[crate::StyleExt],
     worksheets: &[WritableWorksheet],
     string_map: &HashMap<String, u32>,
-) -> XlsResult<WorkbookStreams> {
+) -> Result<WorkbookStreams> {
     if let Some(styles) = custom_table_styles {
         styles.validate(fmt)?;
     }
@@ -146,12 +146,12 @@ pub(crate) fn generate_workbook_stream(
     workbook_window.validate_for_sheet_count(worksheets.len())?;
     let active_sheet = usize::from(workbook_window.active_sheet_index);
     let active_worksheet = worksheets.get(active_sheet).ok_or_else(|| {
-        XlsError::InvalidData(format!(
+        Error::InvalidData(format!(
             "active worksheet index {active_sheet} is outside the sheet collection"
         ))
     })?;
     if !active_worksheet.view.is_selected() {
-        return Err(XlsError::InvalidData(format!(
+        return Err(Error::InvalidData(format!(
             "active worksheet {active_sheet} must be selected in Window2"
         )));
     }
@@ -160,7 +160,7 @@ pub(crate) fn generate_workbook_stream(
         .filter(|sheet| sheet.view.is_selected())
         .count();
     if selected_sheet_count != usize::from(workbook_window.selected_sheet_count) {
-        return Err(XlsError::InvalidData(format!(
+        return Err(Error::InvalidData(format!(
             "Window1 selected sheet count {} disagrees with Window2 selected state ({selected_sheet_count})",
             workbook_window.selected_sheet_count
         )));
@@ -171,9 +171,8 @@ pub(crate) fn generate_workbook_stream(
     let pivot_cache_identities = stage_pivot_cache_identities(worksheets)?;
     let mut stream = Vec::new();
     let has_pivot_tables = worksheets.iter().any(|ws| !ws.pivot_tables.is_empty());
-    let sheet_count = u16::try_from(worksheets.len()).map_err(|_| {
-        XlsError::InvalidData("worksheet count exceeds the BIFF8 limit".to_string())
-    })?;
+    let sheet_count = u16::try_from(worksheets.len())
+        .map_err(|_| Error::InvalidData("worksheet count exceeds the BIFF8 limit".to_string()))?;
     let (protect_structure, protect_windows, password_hash, protect_revisions, revision_hash) =
         workbook_protection
             .map(|protection| {
@@ -239,9 +238,9 @@ pub(crate) fn generate_workbook_stream(
     biff::write_hide_obj(
         &mut stream,
         match environment.object_display_mode {
-            crate::XlsObjectDisplayMode::ShowAll => 0,
-            crate::XlsObjectDisplayMode::ShowPlaceholders => 1,
-            crate::XlsObjectDisplayMode::HideAll => 2,
+            crate::ObjectDisplayMode::ShowAll => 0,
+            crate::ObjectDisplayMode::ShowPlaceholders => 1,
+            crate::ObjectDisplayMode::HideAll => 2,
         },
     )?;
     biff::write_date1904(&mut stream, use_1904_dates)?;
@@ -261,7 +260,7 @@ pub(crate) fn generate_workbook_stream(
         let xf_count = fmt.xf_record_count();
         for extension in xf_extensions {
             if extension.xf_index() >= xf_count {
-                return Err(XlsError::InvalidData(format!(
+                return Err(Error::InvalidData(format!(
                     "XFExt references XF index {} but only {xf_count} XF records are written",
                     extension.xf_index()
                 )));
@@ -351,7 +350,7 @@ pub(crate) fn generate_workbook_stream(
             .as_ref()
             .is_some_and(|value| value.category_index() >= extended_count)
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "NameFnGrp12 category does not reference an emitted FnGrp12 record".to_string(),
             ));
         }
@@ -467,7 +466,7 @@ pub(crate) fn generate_workbook_stream(
                         continue;
                     }
                     let val = values.next().ok_or_else(|| {
-                        XlsError::InvalidData(format!(
+                        Error::InvalidData(format!(
                             "PivotCache source row {row_index} is missing a value for field {field_index}"
                         ))
                     })?;
@@ -500,7 +499,7 @@ pub(crate) fn generate_workbook_stream(
                     }
                 }
                 if values.next().is_some() {
-                    return Err(XlsError::InvalidData(format!(
+                    return Err(Error::InvalidData(format!(
                         "PivotCache source row {row_index} has more values than source fields"
                     )));
                 }
@@ -547,7 +546,7 @@ pub(crate) fn generate_workbook_stream(
             + group_object_count
             + worksheet.comments.len();
         if object_count > 1022 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "a worksheet cannot contain more than 1022 drawing objects".to_string(),
             ));
         }
@@ -556,7 +555,7 @@ pub(crate) fn generate_workbook_stream(
         } else {
             let drawing_id = next_drawing_id;
             next_drawing_id = next_drawing_id.checked_add(1).ok_or_else(|| {
-                XlsError::InvalidData("workbook drawing IDs are exhausted".to_string())
+                Error::InvalidData("workbook drawing IDs are exhausted".to_string())
             })?;
             drawing_clusters.push((drawing_id, object_count as u32 + 1));
             worksheet_drawing_ids.push(Some(drawing_id));
@@ -641,7 +640,7 @@ pub(crate) fn generate_workbook_stream(
     for (worksheet_index, worksheet) in worksheets.iter().enumerate() {
         // Record the position of this worksheet's BOF
         let worksheet_pos = u32::try_from(stream.len()).map_err(|_| {
-            XlsError::InvalidData("workbook stream position exceeds the BIFF8 limit".to_string())
+            Error::InvalidData("workbook stream position exceeds the BIFF8 limit".to_string())
         })?;
         actual_positions.push(worksheet_pos);
 
@@ -783,7 +782,7 @@ pub(crate) fn generate_workbook_stream(
                 .saturating_sub(u32::from(af.first_col))
                 .saturating_add(1);
             let c_entries = u16::try_from(width).map_err(|_| {
-                XlsError::InvalidData(
+                Error::InvalidData(
                     "set_auto_filter: auto-filter column span exceeds BIFF8 limit".to_string(),
                 )
             })?;
@@ -899,7 +898,7 @@ pub(crate) fn generate_workbook_stream(
         let mut cell_index = 0usize;
         while cell_index < sorted_cells.len() {
             let ((row, col), cell) = sorted_cells.get(cell_index).copied().ok_or_else(|| {
-                XlsError::InvalidData(format!(
+                Error::InvalidData(format!(
                     "worksheet cell index {cell_index} is outside the sorted cell list"
                 ))
             })?;
@@ -920,7 +919,7 @@ pub(crate) fn generate_workbook_stream(
                     cell.pivot_xf_role,
                     Some(super::worksheet::PivotCellXfRole::Value)
                 )
-                && matches!(cell.value, XlsCellValue::Number(_))
+                && matches!(cell.value, CellValue::Number(_))
             {
                 let mut mulrk_values = Vec::new();
                 let mut next_index = cell_index;
@@ -929,7 +928,7 @@ pub(crate) fn generate_workbook_stream(
                 while next_index < sorted_cells.len() {
                     let ((next_row, next_col), next_cell) =
                         sorted_cells.get(next_index).copied().ok_or_else(|| {
-                            XlsError::InvalidData(format!(
+                            Error::InvalidData(format!(
                                 "worksheet cell index {next_index} is outside the sorted cell list"
                             ))
                         })?;
@@ -943,7 +942,7 @@ pub(crate) fn generate_workbook_stream(
                         break;
                     }
                     let next_xf_index = pivot_xf_indices.value;
-                    let XlsCellValue::Number(next_value) = &next_cell.value else {
+                    let CellValue::Number(next_value) = &next_cell.value else {
                         break;
                     };
                     mulrk_values.push((next_xf_index, *next_value));
@@ -973,23 +972,23 @@ pub(crate) fn generate_workbook_stream(
             }
 
             match &cell.value {
-                XlsCellValue::Number(value) => {
+                CellValue::Number(value) => {
                     biff::write_number(&mut stream, *row, *col, xf_index, *value)?;
                 },
-                XlsCellValue::String(s) => {
+                CellValue::String(s) => {
                     let sst_index = lookup_shared_string_index(shared_strings, string_map, s)?;
                     biff::write_labelsst(&mut stream, *row, *col, xf_index, sst_index)?;
                 },
-                XlsCellValue::Boolean(value) => {
+                CellValue::Boolean(value) => {
                     biff::write_boolerr(&mut stream, *row, *col, xf_index, *value)?;
                 },
-                XlsCellValue::Formula(formula) => {
+                CellValue::Formula(formula) => {
                     let expression = formula.strip_prefix('=').unwrap_or(formula);
                     let tokens = FormulaTokenizer::new().tokenize(expression)?;
                     let encoded = encode_ptg_tokens(&tokens);
                     biff::write_formula(&mut stream, *row, *col, xf_index, &encoded)?;
                 },
-                XlsCellValue::Blank => {
+                CellValue::Blank => {
                     // Skip blank cells
                 },
             }
@@ -998,31 +997,31 @@ pub(crate) fn generate_workbook_stream(
 
         let staged_row_table = stream.split_off(row_table_start);
         let def_col_width_pos = def_col_width_pos.ok_or_else(|| {
-            XlsError::InvalidData("worksheet is missing DEFCOLWIDTH for INDEX".to_string())
+            Error::InvalidData("worksheet is missing DEFCOLWIDTH for INDEX".to_string())
         })?;
-        let plan =
-            crate::writer::row_blocks::XlsRowBlockLayoutPlan::generate_from_staged(
-                u64::try_from(index_record_pos).map_err(|_| {
-                    XlsError::InvalidData("worksheet INDEX position overflow".to_string())
-                })?,
-                u64::try_from(
-                    row_table_start
-                        .checked_sub(index_record_pos)
-                        .ok_or_else(|| {
-                            XlsError::InvalidData("worksheet row table precedes INDEX".to_string())
-                        })?,
-                )
-                .map_err(|_| {
-                    XlsError::InvalidData("worksheet row-table position overflow".to_string())
-                })?,
-                u64::try_from(def_col_width_pos.checked_sub(index_record_pos).ok_or_else(
-                    || XlsError::InvalidData("worksheet DEFCOLWIDTH precedes INDEX".to_string()),
-                )?)
-                .map_err(|_| {
-                    XlsError::InvalidData("worksheet DEFCOLWIDTH position overflow".to_string())
-                })?,
-                &staged_row_table,
-            )?;
+        let plan = crate::writer::row_blocks::RowBlockLayoutPlan::generate_from_staged(
+            u64::try_from(index_record_pos)
+                .map_err(|_| Error::InvalidData("worksheet INDEX position overflow".to_string()))?,
+            u64::try_from(
+                row_table_start
+                    .checked_sub(index_record_pos)
+                    .ok_or_else(|| {
+                        Error::InvalidData("worksheet row table precedes INDEX".to_string())
+                    })?,
+            )
+            .map_err(|_| Error::InvalidData("worksheet row-table position overflow".to_string()))?,
+            u64::try_from(
+                def_col_width_pos
+                    .checked_sub(index_record_pos)
+                    .ok_or_else(|| {
+                        Error::InvalidData("worksheet DEFCOLWIDTH precedes INDEX".to_string())
+                    })?,
+            )
+            .map_err(|_| {
+                Error::InvalidData("worksheet DEFCOLWIDTH position overflow".to_string())
+            })?,
+            &staged_row_table,
+        )?;
         let (index_record, row_table) = plan.into_records();
         stream.splice(index_record_pos..index_record_pos, index_record);
         stream.extend_from_slice(&row_table);
@@ -1031,7 +1030,7 @@ pub(crate) fn generate_workbook_stream(
             .get(worksheet_index)
             .copied()
             .ok_or_else(|| {
-                XlsError::InvalidData(format!(
+                Error::InvalidData(format!(
                     "worksheet drawing ID plan is missing worksheet {worksheet_index}"
                 ))
             })?;
@@ -1045,7 +1044,7 @@ pub(crate) fn generate_workbook_stream(
             let mut reserved = HashSet::new();
             for &object_id in &pivot_object_ids {
                 if !reserved.insert(object_id) {
-                    return Err(XlsError::InvalidData(
+                    return Err(Error::InvalidData(
                         "pivot page object ID is duplicated on the worksheet".to_string(),
                     ));
                 }
@@ -1053,10 +1052,10 @@ pub(crate) fn generate_workbook_stream(
             let mut primitive_configs = Vec::with_capacity(worksheet.shapes.len());
             for shape in &worksheet.shapes {
                 let object_id = shape.object_id.ok_or_else(|| {
-                    XlsError::InvalidData("writable shape has no assigned object ID".to_string())
+                    Error::InvalidData("writable shape has no assigned object ID".to_string())
                 })?;
                 if object_id == 0 || object_id == u16::MAX || !reserved.insert(object_id) {
-                    return Err(XlsError::InvalidData(
+                    return Err(Error::InvalidData(
                         "shape object ID is reserved or duplicated on the worksheet".to_string(),
                     ));
                 }
@@ -1065,22 +1064,20 @@ pub(crate) fn generate_workbook_stream(
             let mut group_configs = Vec::with_capacity(worksheet.shape_groups.len());
             for group in &worksheet.shape_groups {
                 let object_id = group.object_id.ok_or_else(|| {
-                    XlsError::InvalidData(
-                        "writable shape group has no assigned object ID".to_string(),
-                    )
+                    Error::InvalidData("writable shape group has no assigned object ID".to_string())
                 })?;
                 if object_id == 0 || object_id == u16::MAX || !reserved.insert(object_id) {
-                    return Err(XlsError::InvalidData(
+                    return Err(Error::InvalidData(
                         "shape object ID is reserved or duplicated on the worksheet".to_string(),
                     ));
                 }
                 let mut child_object_ids = Vec::with_capacity(group.children.len());
                 for child in &group.children {
                     let child_id = child.object_id.ok_or_else(|| {
-                        XlsError::InvalidData("grouped shape has no assigned object ID".to_string())
+                        Error::InvalidData("grouped shape has no assigned object ID".to_string())
                     })?;
                     if child_id == 0 || child_id == u16::MAX || !reserved.insert(child_id) {
-                        return Err(XlsError::InvalidData(
+                        return Err(Error::InvalidData(
                             "shape object ID is reserved or duplicated on the worksheet"
                                 .to_string(),
                         ));
@@ -1099,9 +1096,7 @@ pub(crate) fn generate_workbook_stream(
             for comment in &worksheet.comments {
                 while reserved.contains(&next_object_id) {
                     next_object_id = next_object_id.checked_add(1).ok_or_else(|| {
-                        XlsError::InvalidData(
-                            "worksheet comment object IDs are exhausted".to_string(),
-                        )
+                        Error::InvalidData("worksheet comment object IDs are exhausted".to_string())
                     })?;
                 }
                 let object_id = next_object_id;
@@ -1116,7 +1111,7 @@ pub(crate) fn generate_workbook_stream(
                     )
                 });
                 if !guids.insert(guid) {
-                    return Err(XlsError::InvalidData(
+                    return Err(Error::InvalidData(
                         "comment GUID is duplicated after planning".to_string(),
                     ));
                 }
@@ -1320,7 +1315,7 @@ pub(crate) fn generate_workbook_stream(
         //   SxEx
         let worksheet_pivot_cache_identities =
             pivot_cache_identities.get(worksheet_index).ok_or_else(|| {
-                XlsError::InvalidData(format!(
+                Error::InvalidData(format!(
                     "pivot cache identity plan is missing worksheet {worksheet_index}"
                 ))
             })?;
@@ -1539,17 +1534,17 @@ pub(crate) fn generate_workbook_stream(
     // Go back and update BoundSheet positions
     for (i, &pos) in actual_positions.iter().enumerate() {
         let boundsheet_pos = boundsheet_positions.get(i).copied().ok_or_else(|| {
-            XlsError::InvalidData(format!("BoundSheet position is missing for worksheet {i}"))
+            Error::InvalidData(format!("BoundSheet position is missing for worksheet {i}"))
         })?;
         // Position field starts at offset 4 in the record (after header)
         let pos_offset = boundsheet_pos.checked_add(4).ok_or_else(|| {
-            XlsError::InvalidData("BoundSheet position overflows the workbook stream".to_string())
+            Error::InvalidData("BoundSheet position overflows the workbook stream".to_string())
         })?;
         let pos_end = pos_offset.checked_add(4).ok_or_else(|| {
-            XlsError::InvalidData("BoundSheet position overflows the workbook stream".to_string())
+            Error::InvalidData("BoundSheet position overflows the workbook stream".to_string())
         })?;
         let position_field = stream.get_mut(pos_offset..pos_end).ok_or_else(|| {
-            XlsError::InvalidData(
+            Error::InvalidData(
                 "BoundSheet position does not point to a complete record".to_string(),
             )
         })?;
@@ -1575,7 +1570,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(XlsError::InvalidData(message)) if message.contains("missing from the shared string table")
+            Err(Error::InvalidData(message)) if message.contains("missing from the shared string table")
         ));
     }
 
@@ -1589,7 +1584,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(XlsError::InvalidData(message)) if message.contains("does not match the shared string table")
+            Err(Error::InvalidData(message)) if message.contains("does not match the shared string table")
         ));
     }
 }

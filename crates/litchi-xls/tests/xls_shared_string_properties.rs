@@ -1,4 +1,4 @@
-use litchi_xls::XlsWorkbook;
+use litchi_xls::Workbook;
 use std::fs::File;
 use std::path::PathBuf;
 
@@ -10,7 +10,7 @@ fn poi_fixture(name: &str) -> PathBuf {
 
 #[test]
 fn worksheet_exposes_rich_shared_string_properties_by_index() {
-    let workbook = XlsWorkbook::new(File::open(poi_fixture("duprich2.xls")).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(poi_fixture("duprich2.xls")).unwrap()).unwrap();
     let worksheet = workbook.xls_worksheet(0).unwrap();
     let shared_strings = worksheet.shared_strings().unwrap();
 
@@ -23,7 +23,7 @@ fn worksheet_exposes_rich_shared_string_properties_by_index() {
 
 #[test]
 fn worksheet_resolves_properties_for_duplicate_rich_text_cell() {
-    let workbook = XlsWorkbook::new(File::open(poi_fixture("duprich1.xls")).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(poi_fixture("duprich1.xls")).unwrap()).unwrap();
     let worksheet = workbook.xls_worksheet(1).unwrap();
     let cells = [
         worksheet.get_cell(0, 8).unwrap(),

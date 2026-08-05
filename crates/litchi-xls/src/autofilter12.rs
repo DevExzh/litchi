@@ -5,34 +5,34 @@
 //! remain opaque in the ListObject collector. Criteria are metadata only; they
 //! are never evaluated by the reader or writer.
 
-use super::list_object::{XlsListObjectId, XlsListObjectRange};
-use super::{XlsError, XlsResult};
+use super::list_object::{ListObjectId, ListObjectRange};
+use super::{Error, Result};
 
 pub const AUTO_FILTER12_RECORD_TYPE: u16 = 0x087E;
 pub(crate) const CONTINUE_FRT12_RECORD_TYPE: u16 = 0x087F;
 const MAX_RECORD_PAYLOAD: usize = 8_224;
 const MAX_AGGREGATE_BYTES: usize = 1_048_576;
 
-fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(record_type: u16, message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type,
         message: message.into(),
     }
 }
 
-fn u16_at(data: &[u8], offset: usize, record_type: u16, field: &str) -> XlsResult<u16> {
+fn u16_at(data: &[u8], offset: usize, record_type: u16, field: &str) -> Result<u16> {
     data.get(offset..offset + 2)
         .map(|value| u16::from_le_bytes([value[0], value[1]]))
         .ok_or_else(|| invalid(record_type, format!("truncated {field}")))
 }
 
-fn u32_at(data: &[u8], offset: usize, record_type: u16, field: &str) -> XlsResult<u32> {
+fn u32_at(data: &[u8], offset: usize, record_type: u16, field: &str) -> Result<u32> {
     data.get(offset..offset + 4)
         .map(|value| u32::from_le_bytes(value.try_into().unwrap()))
         .ok_or_else(|| invalid(record_type, format!("truncated {field}")))
 }
 
-fn append_frt(out: &mut Vec<u8>, record_type: u16, range: XlsListObjectRange) {
+fn append_frt(out: &mut Vec<u8>, record_type: u16, range: ListObjectRange) {
     out.extend_from_slice(&record_type.to_le_bytes());
     out.extend_from_slice(&1u16.to_le_bytes());
     out.extend_from_slice(&range.first_row().to_le_bytes());
@@ -41,7 +41,7 @@ fn append_frt(out: &mut Vec<u8>, record_type: u16, range: XlsListObjectRange) {
     out.extend_from_slice(&range.last_column().to_le_bytes());
 }
 
-fn validate_frt(data: &[u8], record_type: u16, range: XlsListObjectRange) -> XlsResult<()> {
+fn validate_frt(data: &[u8], record_type: u16, range: ListObjectRange) -> Result<()> {
     if u16_at(data, 0, record_type, "frt.rt")? != record_type
         || u16_at(data, 2, record_type, "frt.flags")? != 1
         || u16_at(data, 4, record_type, "frt.rwFirst")? != range.first_row()
@@ -57,7 +57,7 @@ fn validate_frt(data: &[u8], record_type: u16, range: XlsListObjectRange) -> Xls
     Ok(())
 }
 
-fn record(record_type: u16, payload: Vec<u8>) -> XlsResult<Vec<u8>> {
+fn record(record_type: u16, payload: Vec<u8>) -> Result<Vec<u8>> {
     if payload.len() > MAX_RECORD_PAYLOAD {
         return Err(invalid(
             record_type,
@@ -73,7 +73,7 @@ fn record(record_type: u16, payload: Vec<u8>) -> XlsResult<Vec<u8>> {
 
 /// Comparison operator stored in an `AFDOper` structure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsAutoFilter12Operator {
+pub enum AutoFilter12Operator {
     LessThan,
     Equal,
     LessThanOrEqual,
@@ -82,7 +82,7 @@ pub enum XlsAutoFilter12Operator {
     GreaterThanOrEqual,
 }
 
-impl XlsAutoFilter12Operator {
+impl AutoFilter12Operator {
     const fn code(self) -> u8 {
         match self {
             Self::LessThan => 1,
@@ -109,7 +109,7 @@ impl XlsAutoFilter12Operator {
 
 /// Scalar comparison value stored in an `AF12Criteria` structure.
 #[derive(Debug, Clone)]
-pub enum XlsAutoFilter12Value {
+pub enum AutoFilter12Value {
     Number(f64),
     String(String),
     Boolean(bool),
@@ -120,7 +120,7 @@ pub enum XlsAutoFilter12Value {
 
 /// Icon-set discriminant stored in an `AF12CellIcon` filter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsAutoFilter12IconSet {
+pub enum AutoFilter12IconSet {
     NoIcon,
     ThreeArrows,
     ThreeArrowsGray,
@@ -141,7 +141,7 @@ pub enum XlsAutoFilter12IconSet {
     FiveQuarters,
 }
 
-impl XlsAutoFilter12IconSet {
+impl AutoFilter12IconSet {
     const fn code(self) -> u32 {
         match self {
             Self::NoIcon => u32::MAX,
@@ -214,14 +214,14 @@ impl XlsAutoFilter12IconSet {
 
 /// A validated `AF12CellIcon` selection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsAutoFilter12Icon {
-    set: XlsAutoFilter12IconSet,
+pub struct AutoFilter12Icon {
+    set: AutoFilter12IconSet,
     index: u32,
 }
 
 /// Dynamic filter discriminator stored in `AutoFilter12.cft`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsAutoFilter12DynamicType {
+pub enum AutoFilter12DynamicType {
     AboveAverage,
     BelowAverage,
     Tomorrow,
@@ -258,9 +258,9 @@ pub enum XlsAutoFilter12DynamicType {
     Month12,
 }
 
-impl XlsAutoFilter12DynamicType {
+impl AutoFilter12DynamicType {
     const fn code(self) -> u32 {
-        use XlsAutoFilter12DynamicType::*;
+        use AutoFilter12DynamicType::*;
         match self {
             AboveAverage => 1,
             BelowAverage => 2,
@@ -300,7 +300,7 @@ impl XlsAutoFilter12DynamicType {
     }
 
     fn from_code(value: u32) -> Option<Self> {
-        use XlsAutoFilter12DynamicType::*;
+        use AutoFilter12DynamicType::*;
         Some(match value {
             1 => AboveAverage,
             2 => BelowAverage,
@@ -343,7 +343,7 @@ impl XlsAutoFilter12DynamicType {
 
 /// Granularity selected by an `AF12DateInfo` grouping.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsAutoFilter12DateLevel {
+pub enum AutoFilter12DateLevel {
     Year,
     Month,
     Day,
@@ -352,7 +352,7 @@ pub enum XlsAutoFilter12DateLevel {
     Second,
 }
 
-impl XlsAutoFilter12DateLevel {
+impl AutoFilter12DateLevel {
     const fn code(self) -> u32 {
         match self {
             Self::Year => 0,
@@ -378,17 +378,17 @@ impl XlsAutoFilter12DateLevel {
 
 /// One validated `AF12DateInfo` continuation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsAutoFilter12DateGroup {
+pub struct AutoFilter12DateGroup {
     year: u16,
     month: u16,
     day: u32,
     hour: u16,
     minute: u16,
     second: u16,
-    level: XlsAutoFilter12DateLevel,
+    level: AutoFilter12DateLevel,
 }
 
-impl XlsAutoFilter12DateGroup {
+impl AutoFilter12DateGroup {
     pub fn try_new(
         year: u16,
         month: u16,
@@ -396,8 +396,8 @@ impl XlsAutoFilter12DateGroup {
         hour: u16,
         minute: u16,
         second: u16,
-        level: XlsAutoFilter12DateLevel,
-    ) -> XlsResult<Self> {
+        level: AutoFilter12DateLevel,
+    ) -> Result<Self> {
         if !(1..=12).contains(&month) || hour > 23 || minute > 59 || second > 59 {
             return Err(invalid(
                 CONTINUE_FRT12_RECORD_TYPE,
@@ -446,24 +446,24 @@ impl XlsAutoFilter12DateGroup {
     pub const fn second(self) -> u16 {
         self.second
     }
-    pub const fn level(self) -> XlsAutoFilter12DateLevel {
+    pub const fn level(self) -> AutoFilter12DateLevel {
         self.level
     }
 }
 
 /// Formatting property selected by a `DXFN12NoCB` filter payload.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsAutoFilter12FormatKind {
+pub enum AutoFilter12FormatKind {
     CellColor,
     FontColor,
 }
 
 /// Bounded serialized `DXFN12NoCB` metadata. It is passive formatting data.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsAutoFilter12DifferentialFormat(Vec<u8>);
+pub struct AutoFilter12DifferentialFormat(Vec<u8>);
 
-impl XlsAutoFilter12DifferentialFormat {
-    pub fn try_new(bytes: Vec<u8>) -> XlsResult<Self> {
+impl AutoFilter12DifferentialFormat {
+    pub fn try_new(bytes: Vec<u8>) -> Result<Self> {
         if bytes.is_empty() || bytes.len() > MAX_RECORD_PAYLOAD - 60 {
             return Err(invalid(
                 AUTO_FILTER12_RECORD_TYPE,
@@ -477,8 +477,8 @@ impl XlsAutoFilter12DifferentialFormat {
     }
 }
 
-impl XlsAutoFilter12Icon {
-    pub fn try_new(set: XlsAutoFilter12IconSet, index: u32) -> XlsResult<Self> {
+impl AutoFilter12Icon {
+    pub fn try_new(set: AutoFilter12IconSet, index: u32) -> Result<Self> {
         let valid = match set.expected_icon_bound() {
             None => index == u32::MAX,
             Some(bound) => index < bound,
@@ -492,7 +492,7 @@ impl XlsAutoFilter12Icon {
         Ok(Self { set, index })
     }
 
-    pub const fn set(self) -> XlsAutoFilter12IconSet {
+    pub const fn set(self) -> AutoFilter12IconSet {
         self.set
     }
     pub const fn index(self) -> u32 {
@@ -500,7 +500,7 @@ impl XlsAutoFilter12Icon {
     }
 }
 
-impl PartialEq for XlsAutoFilter12Value {
+impl PartialEq for AutoFilter12Value {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Number(left), Self::Number(right)) => left.to_bits() == right.to_bits(),
@@ -513,35 +513,32 @@ impl PartialEq for XlsAutoFilter12Value {
     }
 }
 
-impl Eq for XlsAutoFilter12Value {}
+impl Eq for AutoFilter12Value {}
 
 /// One inert comparison criterion for a table column.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsAutoFilter12Criterion {
-    operator: XlsAutoFilter12Operator,
-    value: XlsAutoFilter12Value,
+pub struct AutoFilter12Criterion {
+    operator: AutoFilter12Operator,
+    value: AutoFilter12Value,
 }
 
-impl XlsAutoFilter12Criterion {
-    pub fn try_new(
-        operator: XlsAutoFilter12Operator,
-        value: XlsAutoFilter12Value,
-    ) -> XlsResult<Self> {
+impl AutoFilter12Criterion {
+    pub fn try_new(operator: AutoFilter12Operator, value: AutoFilter12Value) -> Result<Self> {
         let criterion = Self { operator, value };
         criterion.validate()?;
         Ok(criterion)
     }
 
-    pub const fn operator(&self) -> XlsAutoFilter12Operator {
+    pub const fn operator(&self) -> AutoFilter12Operator {
         self.operator
     }
-    pub const fn value(&self) -> &XlsAutoFilter12Value {
+    pub const fn value(&self) -> &AutoFilter12Value {
         &self.value
     }
 
-    fn validate(&self) -> XlsResult<()> {
+    fn validate(&self) -> Result<()> {
         match &self.value {
-            XlsAutoFilter12Value::String(value) => {
+            AutoFilter12Value::String(value) => {
                 let count = value.encode_utf16().count();
                 if !(1..=255).contains(&count) {
                     return Err(invalid(
@@ -550,7 +547,7 @@ impl XlsAutoFilter12Criterion {
                     ));
                 }
             },
-            XlsAutoFilter12Value::Error(value)
+            AutoFilter12Value::Error(value)
                 if !matches!(
                     *value,
                     0x00 | 0x07 | 0x0F | 0x17 | 0x1D | 0x24 | 0x2A | 0x2B
@@ -569,19 +566,19 @@ impl XlsAutoFilter12Criterion {
 
 /// Typed, table-owned `AutoFilter12` metadata for one relative table column.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsTableAutoFilter12 {
+pub struct TableAutoFilter12 {
     column_index: u16,
     hide_arrow: bool,
-    criteria: Vec<XlsAutoFilter12Criterion>,
-    date_groupings: Vec<XlsAutoFilter12DateGroup>,
-    dynamic_filter: Option<XlsAutoFilter12DynamicType>,
-    icon: Option<XlsAutoFilter12Icon>,
-    format_kind: Option<XlsAutoFilter12FormatKind>,
-    differential_format: Option<XlsAutoFilter12DifferentialFormat>,
+    criteria: Vec<AutoFilter12Criterion>,
+    date_groupings: Vec<AutoFilter12DateGroup>,
+    dynamic_filter: Option<AutoFilter12DynamicType>,
+    icon: Option<AutoFilter12Icon>,
+    format_kind: Option<AutoFilter12FormatKind>,
+    differential_format: Option<AutoFilter12DifferentialFormat>,
 }
 
-impl XlsTableAutoFilter12 {
-    pub fn try_new(column_index: u16, criteria: Vec<XlsAutoFilter12Criterion>) -> XlsResult<Self> {
+impl TableAutoFilter12 {
+    pub fn try_new(column_index: u16, criteria: Vec<AutoFilter12Criterion>) -> Result<Self> {
         if criteria.is_empty() {
             return Err(invalid(
                 AUTO_FILTER12_RECORD_TYPE,
@@ -602,7 +599,7 @@ impl XlsTableAutoFilter12 {
         Ok(value)
     }
 
-    pub fn try_new_icon(column_index: u16, icon: XlsAutoFilter12Icon) -> XlsResult<Self> {
+    pub fn try_new_icon(column_index: u16, icon: AutoFilter12Icon) -> Result<Self> {
         let value = Self {
             column_index,
             hide_arrow: false,
@@ -619,8 +616,8 @@ impl XlsTableAutoFilter12 {
 
     pub fn try_new_date_groups(
         column_index: u16,
-        date_groupings: Vec<XlsAutoFilter12DateGroup>,
-    ) -> XlsResult<Self> {
+        date_groupings: Vec<AutoFilter12DateGroup>,
+    ) -> Result<Self> {
         let value = Self {
             column_index,
             hide_arrow: false,
@@ -637,9 +634,9 @@ impl XlsTableAutoFilter12 {
 
     pub fn try_new_dynamic(
         column_index: u16,
-        dynamic_filter: XlsAutoFilter12DynamicType,
-        criteria: Vec<XlsAutoFilter12Criterion>,
-    ) -> XlsResult<Self> {
+        dynamic_filter: AutoFilter12DynamicType,
+        criteria: Vec<AutoFilter12Criterion>,
+    ) -> Result<Self> {
         let value = Self {
             column_index,
             hide_arrow: false,
@@ -656,9 +653,9 @@ impl XlsTableAutoFilter12 {
 
     pub fn try_new_format(
         column_index: u16,
-        kind: XlsAutoFilter12FormatKind,
-        format: XlsAutoFilter12DifferentialFormat,
-    ) -> XlsResult<Self> {
+        kind: AutoFilter12FormatKind,
+        format: AutoFilter12DifferentialFormat,
+    ) -> Result<Self> {
         let value = Self {
             column_index,
             hide_arrow: false,
@@ -684,26 +681,26 @@ impl XlsTableAutoFilter12 {
     pub const fn hides_arrow(&self) -> bool {
         self.hide_arrow
     }
-    pub fn criteria(&self) -> &[XlsAutoFilter12Criterion] {
+    pub fn criteria(&self) -> &[AutoFilter12Criterion] {
         &self.criteria
     }
-    pub fn date_groupings(&self) -> &[XlsAutoFilter12DateGroup] {
+    pub fn date_groupings(&self) -> &[AutoFilter12DateGroup] {
         &self.date_groupings
     }
-    pub const fn dynamic_filter(&self) -> Option<XlsAutoFilter12DynamicType> {
+    pub const fn dynamic_filter(&self) -> Option<AutoFilter12DynamicType> {
         self.dynamic_filter
     }
-    pub const fn icon_filter(&self) -> Option<XlsAutoFilter12Icon> {
+    pub const fn icon_filter(&self) -> Option<AutoFilter12Icon> {
         self.icon
     }
-    pub const fn format_kind(&self) -> Option<XlsAutoFilter12FormatKind> {
+    pub const fn format_kind(&self) -> Option<AutoFilter12FormatKind> {
         self.format_kind
     }
-    pub fn differential_format(&self) -> Option<&XlsAutoFilter12DifferentialFormat> {
+    pub fn differential_format(&self) -> Option<&AutoFilter12DifferentialFormat> {
         self.differential_format.as_ref()
     }
 
-    pub(crate) fn validate(&self) -> XlsResult<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         if self.column_index > 255 {
             return Err(invalid(
                 AUTO_FILTER12_RECORD_TYPE,
@@ -734,7 +731,7 @@ impl XlsTableAutoFilter12 {
             .iter()
             .try_fold(60usize, |size, criterion| {
                 let extra = match &criterion.value {
-                    XlsAutoFilter12Value::String(value) => 23 + value.encode_utf16().count() * 2,
+                    AutoFilter12Value::String(value) => 23 + value.encode_utf16().count() * 2,
                     _ => 22,
                 };
                 size.checked_add(extra)
@@ -754,11 +751,8 @@ impl XlsTableAutoFilter12 {
     }
 }
 
-fn encode_date_group(
-    value: XlsAutoFilter12DateGroup,
-    range: XlsListObjectRange,
-) -> XlsResult<Vec<u8>> {
-    XlsAutoFilter12DateGroup::try_new(
+fn encode_date_group(value: AutoFilter12DateGroup, range: ListObjectRange) -> Result<Vec<u8>> {
+    AutoFilter12DateGroup::try_new(
         value.year,
         value.month,
         value.day,
@@ -781,7 +775,7 @@ fn encode_date_group(
     Ok(payload)
 }
 
-fn parse_date_group(data: &[u8], range: XlsListObjectRange) -> XlsResult<XlsAutoFilter12DateGroup> {
+fn parse_date_group(data: &[u8], range: ListObjectRange) -> Result<AutoFilter12DateGroup> {
     validate_frt(data, CONTINUE_FRT12_RECORD_TYPE, range)?;
     if data.len() != 36 || data[28..32].iter().any(|byte| *byte != 0) {
         return Err(invalid(
@@ -789,61 +783,53 @@ fn parse_date_group(data: &[u8], range: XlsListObjectRange) -> XlsResult<XlsAuto
             "invalid AF12DateInfo length or reserved bytes",
         ));
     }
-    XlsAutoFilter12DateGroup::try_new(
+    AutoFilter12DateGroup::try_new(
         u16_at(data, 12, CONTINUE_FRT12_RECORD_TYPE, "year")?,
         u16_at(data, 14, CONTINUE_FRT12_RECORD_TYPE, "month")?,
         u32_at(data, 16, CONTINUE_FRT12_RECORD_TYPE, "day")?,
         u16_at(data, 20, CONTINUE_FRT12_RECORD_TYPE, "hour")?,
         u16_at(data, 22, CONTINUE_FRT12_RECORD_TYPE, "minute")?,
         u16_at(data, 24, CONTINUE_FRT12_RECORD_TYPE, "second")?,
-        XlsAutoFilter12DateLevel::from_code(u32_at(
-            data,
-            32,
-            CONTINUE_FRT12_RECORD_TYPE,
-            "nodeType",
-        )?)
-        .ok_or_else(|| invalid(CONTINUE_FRT12_RECORD_TYPE, "reserved AF12DateInfo nodeType"))?,
+        AutoFilter12DateLevel::from_code(u32_at(data, 32, CONTINUE_FRT12_RECORD_TYPE, "nodeType")?)
+            .ok_or_else(|| invalid(CONTINUE_FRT12_RECORD_TYPE, "reserved AF12DateInfo nodeType"))?,
     )
 }
 
-fn encode_criterion(
-    criterion: &XlsAutoFilter12Criterion,
-    range: XlsListObjectRange,
-) -> XlsResult<Vec<u8>> {
+fn encode_criterion(criterion: &AutoFilter12Criterion, range: ListObjectRange) -> Result<Vec<u8>> {
     criterion.validate()?;
     let mut payload = Vec::new();
     append_frt(&mut payload, CONTINUE_FRT12_RECORD_TYPE, range);
     let mut doper = [0u8; 10];
     doper[1] = criterion.operator.code();
     let trailing = match &criterion.value {
-        XlsAutoFilter12Value::Number(value) => {
+        AutoFilter12Value::Number(value) => {
             doper[0] = 0x04;
             doper[2..10].copy_from_slice(&value.to_le_bytes());
             None
         },
-        XlsAutoFilter12Value::String(value) => {
+        AutoFilter12Value::String(value) => {
             let units = value.encode_utf16().collect::<Vec<_>>();
             doper[0] = 0x06;
             doper[2] = units.len() as u8;
             doper[3] = u8::from(!value.contains(['?', '*']));
             Some(units)
         },
-        XlsAutoFilter12Value::Boolean(value) => {
+        AutoFilter12Value::Boolean(value) => {
             doper[0] = 0x08;
             doper[2] = u8::from(*value);
             None
         },
-        XlsAutoFilter12Value::Error(value) => {
+        AutoFilter12Value::Error(value) => {
             doper[0] = 0x08;
             doper[2] = *value;
             doper[3] = 1;
             None
         },
-        XlsAutoFilter12Value::Blanks => {
+        AutoFilter12Value::Blanks => {
             doper[0] = 0x0C;
             None
         },
-        XlsAutoFilter12Value::NonBlanks => {
+        AutoFilter12Value::NonBlanks => {
             doper[0] = 0x0E;
             None
         },
@@ -857,10 +843,10 @@ fn encode_criterion(
 }
 
 pub(crate) fn write_table_autofilter12(
-    filter: &XlsTableAutoFilter12,
-    range: XlsListObjectRange,
-    table_id: XlsListObjectId,
-) -> XlsResult<Vec<Vec<u8>>> {
+    filter: &TableAutoFilter12,
+    range: ListObjectRange,
+    table_id: ListObjectId,
+) -> Result<Vec<Vec<u8>>> {
     filter.validate()?;
     if usize::from(filter.column_index) >= range.column_count() {
         return Err(invalid(
@@ -884,8 +870,8 @@ pub(crate) fn write_table_autofilter12(
         3
     } else {
         match filter.format_kind {
-            Some(XlsAutoFilter12FormatKind::CellColor) => 1,
-            Some(XlsAutoFilter12FormatKind::FontColor) => 2,
+            Some(AutoFilter12FormatKind::CellColor) => 1,
+            Some(AutoFilter12FormatKind::FontColor) => 2,
             None => 0,
         }
     };
@@ -893,7 +879,7 @@ pub(crate) fn write_table_autofilter12(
     base.extend_from_slice(
         &filter
             .dynamic_filter
-            .map_or(0, XlsAutoFilter12DynamicType::code)
+            .map_or(0, AutoFilter12DynamicType::code)
             .to_le_bytes(),
     );
     base.extend_from_slice(&(filter.criteria.len() as u32).to_le_bytes());
@@ -924,7 +910,7 @@ pub(crate) fn write_table_autofilter12(
     Ok(records)
 }
 
-fn parse_criterion(data: &[u8], range: XlsListObjectRange) -> XlsResult<XlsAutoFilter12Criterion> {
+fn parse_criterion(data: &[u8], range: ListObjectRange) -> Result<AutoFilter12Criterion> {
     validate_frt(data, CONTINUE_FRT12_RECORD_TYPE, range)?;
     if data.len() < 22 {
         return Err(invalid(
@@ -932,7 +918,7 @@ fn parse_criterion(data: &[u8], range: XlsListObjectRange) -> XlsResult<XlsAutoF
             "truncated AF12Criteria",
         ));
     }
-    let operator = XlsAutoFilter12Operator::from_code(data[13]).ok_or_else(|| {
+    let operator = AutoFilter12Operator::from_code(data[13]).ok_or_else(|| {
         invalid(
             CONTINUE_FRT12_RECORD_TYPE,
             "invalid AFDOper comparison operator",
@@ -946,7 +932,7 @@ fn parse_criterion(data: &[u8], range: XlsListObjectRange) -> XlsResult<XlsAutoF
                     "numeric criterion has trailing data",
                 ));
             }
-            XlsAutoFilter12Value::Number(f64::from_le_bytes(data[14..22].try_into().unwrap()))
+            AutoFilter12Value::Number(f64::from_le_bytes(data[14..22].try_into().unwrap()))
         },
         0x06 => {
             if data[16] != 0 || data[15] > 1 {
@@ -1007,7 +993,7 @@ fn parse_criterion(data: &[u8], range: XlsListObjectRange) -> XlsResult<XlsAutoF
                     )
                 })?
             };
-            XlsAutoFilter12Value::String(value)
+            AutoFilter12Value::String(value)
         },
         0x08 => {
             if data.len() != 22 {
@@ -1017,8 +1003,8 @@ fn parse_criterion(data: &[u8], range: XlsListObjectRange) -> XlsResult<XlsAutoF
                 ));
             }
             match data[15] {
-                0 if data[14] <= 1 => XlsAutoFilter12Value::Boolean(data[14] != 0),
-                1 => XlsAutoFilter12Value::Error(data[14]),
+                0 if data[14] <= 1 => AutoFilter12Value::Boolean(data[14] != 0),
+                1 => AutoFilter12Value::Error(data[14]),
                 _ => {
                     return Err(invalid(
                         CONTINUE_FRT12_RECORD_TYPE,
@@ -1035,9 +1021,9 @@ fn parse_criterion(data: &[u8], range: XlsListObjectRange) -> XlsResult<XlsAutoF
                 ));
             }
             if data[12] == 0x0C {
-                XlsAutoFilter12Value::Blanks
+                AutoFilter12Value::Blanks
             } else {
-                XlsAutoFilter12Value::NonBlanks
+                AutoFilter12Value::NonBlanks
             }
         },
         0x02 => {
@@ -1053,16 +1039,16 @@ fn parse_criterion(data: &[u8], range: XlsListObjectRange) -> XlsResult<XlsAutoF
             ));
         },
     };
-    XlsAutoFilter12Criterion::try_new(operator, value)
+    AutoFilter12Criterion::try_new(operator, value)
 }
 
 /// Returns `None` for a structurally owned but unsupported extension form.
 pub(crate) fn parse_table_autofilter12(
     base: &[u8],
     continuations: &[Vec<u8>],
-    range: XlsListObjectRange,
-    table_id: XlsListObjectId,
-) -> XlsResult<Option<XlsTableAutoFilter12>> {
+    range: ListObjectRange,
+    table_id: ListObjectId,
+) -> Result<Option<TableAutoFilter12>> {
     if !(60..=MAX_RECORD_PAYLOAD).contains(&base.len()) {
         return Err(invalid(
             AUTO_FILTER12_RECORD_TYPE,
@@ -1098,14 +1084,12 @@ pub(crate) fn parse_table_autofilter12(
     let dynamic_filter = if cft_code == 0 {
         None
     } else {
-        Some(
-            XlsAutoFilter12DynamicType::from_code(cft_code).ok_or_else(|| {
-                invalid(
-                    AUTO_FILTER12_RECORD_TYPE,
-                    "reserved AutoFilter12 custom filter type",
-                )
-            })?,
-        )
+        Some(AutoFilter12DynamicType::from_code(cft_code).ok_or_else(|| {
+            invalid(
+                AUTO_FILTER12_RECORD_TYPE,
+                "reserved AutoFilter12 custom filter type",
+            )
+        })?)
     };
     let criterion_count = u32_at(base, 26, AUTO_FILTER12_RECORD_TYPE, "cCriteria")? as usize;
     let date_count = u32_at(base, 30, AUTO_FILTER12_RECORD_TYPE, "cDateGroupings")? as usize;
@@ -1159,7 +1143,7 @@ pub(crate) fn parse_table_autofilter12(
                 "icon AutoFilter12 must contain exactly one eight-byte AF12CellIcon payload",
             ));
         }
-        let set = XlsAutoFilter12IconSet::from_code(u32_at(
+        let set = AutoFilter12IconSet::from_code(u32_at(
             base,
             60,
             AUTO_FILTER12_RECORD_TYPE,
@@ -1171,11 +1155,9 @@ pub(crate) fn parse_table_autofilter12(
                 "reserved AF12CellIcon icon-set value",
             )
         })?;
-        let icon = XlsAutoFilter12Icon::try_new(
-            set,
-            u32_at(base, 64, AUTO_FILTER12_RECORD_TYPE, "iIcon")?,
-        )?;
-        return Ok(Some(XlsTableAutoFilter12 {
+        let icon =
+            AutoFilter12Icon::try_new(set, u32_at(base, 64, AUTO_FILTER12_RECORD_TYPE, "iIcon")?)?;
+        return Ok(Some(TableAutoFilter12 {
             column_index,
             hide_arrow,
             criteria: Vec::new(),
@@ -1193,13 +1175,13 @@ pub(crate) fn parse_table_autofilter12(
                 "format AutoFilter12 has incompatible metadata",
             ));
         }
-        let format = XlsAutoFilter12DifferentialFormat::try_new(base[60..].to_vec())?;
+        let format = AutoFilter12DifferentialFormat::try_new(base[60..].to_vec())?;
         let format_kind = Some(if ft == 1 {
-            XlsAutoFilter12FormatKind::CellColor
+            AutoFilter12FormatKind::CellColor
         } else {
-            XlsAutoFilter12FormatKind::FontColor
+            AutoFilter12FormatKind::FontColor
         });
-        return Ok(Some(XlsTableAutoFilter12 {
+        return Ok(Some(TableAutoFilter12 {
             column_index,
             hide_arrow,
             criteria: Vec::new(),
@@ -1219,12 +1201,12 @@ pub(crate) fn parse_table_autofilter12(
     let criteria = continuations[..criterion_count]
         .iter()
         .map(|item| parse_criterion(item, range))
-        .collect::<XlsResult<Vec<_>>>()?;
+        .collect::<Result<Vec<_>>>()?;
     let date_groupings = continuations[criterion_count..]
         .iter()
         .map(|item| parse_date_group(item, range))
-        .collect::<XlsResult<Vec<_>>>()?;
-    let value = XlsTableAutoFilter12 {
+        .collect::<Result<Vec<_>>>()?;
+    let value = TableAutoFilter12 {
         column_index,
         hide_arrow,
         criteria,
@@ -1242,39 +1224,39 @@ pub(crate) fn parse_table_autofilter12(
 mod tests {
     use super::*;
 
-    fn range() -> XlsListObjectRange {
-        XlsListObjectRange::try_new(1, 9, 2, 4).unwrap()
+    fn range() -> ListObjectRange {
+        ListObjectRange::try_new(1, 9, 2, 4).unwrap()
     }
 
     #[test]
     fn scalar_criteria_round_trip_and_reject_hostile_lengths() {
         let criteria = vec![
-            XlsAutoFilter12Criterion::try_new(
-                XlsAutoFilter12Operator::GreaterThan,
-                XlsAutoFilter12Value::Number(7.5),
+            AutoFilter12Criterion::try_new(
+                AutoFilter12Operator::GreaterThan,
+                AutoFilter12Value::Number(7.5),
             )
             .unwrap(),
-            XlsAutoFilter12Criterion::try_new(
-                XlsAutoFilter12Operator::Equal,
-                XlsAutoFilter12Value::String("A*".into()),
+            AutoFilter12Criterion::try_new(
+                AutoFilter12Operator::Equal,
+                AutoFilter12Value::String("A*".into()),
             )
             .unwrap(),
-            XlsAutoFilter12Criterion::try_new(
-                XlsAutoFilter12Operator::NotEqual,
-                XlsAutoFilter12Value::Error(0x2A),
+            AutoFilter12Criterion::try_new(
+                AutoFilter12Operator::NotEqual,
+                AutoFilter12Value::Error(0x2A),
             )
             .unwrap(),
-            XlsAutoFilter12Criterion::try_new(
-                XlsAutoFilter12Operator::Equal,
-                XlsAutoFilter12Value::Boolean(true),
+            AutoFilter12Criterion::try_new(
+                AutoFilter12Operator::Equal,
+                AutoFilter12Value::Boolean(true),
             )
             .unwrap(),
         ];
-        let expected = XlsTableAutoFilter12::try_new(1, criteria)
+        let expected = TableAutoFilter12::try_new(1, criteria)
             .unwrap()
             .with_hidden_arrow(true);
         let records =
-            write_table_autofilter12(&expected, range(), XlsListObjectId::try_new(9).unwrap())
+            write_table_autofilter12(&expected, range(), ListObjectId::try_new(9).unwrap())
                 .unwrap();
         let payload = |record: &[u8]| record[4..].to_vec();
         let base = payload(&records[0]);
@@ -1287,7 +1269,7 @@ mod tests {
                 &base,
                 &continuations,
                 range(),
-                XlsListObjectId::try_new(9).unwrap()
+                ListObjectId::try_new(9).unwrap()
             )
             .unwrap(),
             Some(expected.clone())
@@ -1300,7 +1282,7 @@ mod tests {
                 &wrong_owner,
                 &continuations,
                 range(),
-                XlsListObjectId::try_new(9).unwrap()
+                ListObjectId::try_new(9).unwrap()
             )
             .is_err()
         );
@@ -1309,7 +1291,7 @@ mod tests {
                 &base,
                 &continuations[..2],
                 range(),
-                XlsListObjectId::try_new(9).unwrap()
+                ListObjectId::try_new(9).unwrap()
             )
             .is_err()
         );
@@ -1320,7 +1302,7 @@ mod tests {
                 &base,
                 &wrong_range,
                 range(),
-                XlsListObjectId::try_new(9).unwrap()
+                ListObjectId::try_new(9).unwrap()
             )
             .is_err()
         );
@@ -1332,7 +1314,7 @@ mod tests {
                 &base,
                 &producer_padding,
                 range(),
-                XlsListObjectId::try_new(9).unwrap()
+                ListObjectId::try_new(9).unwrap()
             )
             .unwrap(),
             Some(expected),
@@ -1341,34 +1323,32 @@ mod tests {
 
     #[test]
     fn icon_filter_round_trips_and_rejects_reserved_sets_indices_and_continuations() {
-        assert!(
-            XlsAutoFilter12Icon::try_new(XlsAutoFilter12IconSet::ThreeTrafficLights1, 3).is_err()
-        );
-        assert!(XlsAutoFilter12Icon::try_new(XlsAutoFilter12IconSet::NoIcon, 0).is_err());
-        let expected = XlsTableAutoFilter12::try_new_icon(
+        assert!(AutoFilter12Icon::try_new(AutoFilter12IconSet::ThreeTrafficLights1, 3).is_err());
+        assert!(AutoFilter12Icon::try_new(AutoFilter12IconSet::NoIcon, 0).is_err());
+        let expected = TableAutoFilter12::try_new_icon(
             2,
-            XlsAutoFilter12Icon::try_new(XlsAutoFilter12IconSet::FiveQuarters, 4).unwrap(),
+            AutoFilter12Icon::try_new(AutoFilter12IconSet::FiveQuarters, 4).unwrap(),
         )
         .unwrap();
         let records =
-            write_table_autofilter12(&expected, range(), XlsListObjectId::try_new(9).unwrap())
+            write_table_autofilter12(&expected, range(), ListObjectId::try_new(9).unwrap())
                 .unwrap();
         assert_eq!(records.len(), 1);
         let mut base = records[0][4..].to_vec();
         assert_eq!(
-            parse_table_autofilter12(&base, &[], range(), XlsListObjectId::try_new(9).unwrap())
+            parse_table_autofilter12(&base, &[], range(), ListObjectId::try_new(9).unwrap())
                 .unwrap(),
             Some(expected)
         );
         base[60..64].copy_from_slice(&17u32.to_le_bytes());
         assert!(
-            parse_table_autofilter12(&base, &[], range(), XlsListObjectId::try_new(9).unwrap())
+            parse_table_autofilter12(&base, &[], range(), ListObjectId::try_new(9).unwrap())
                 .is_err()
         );
-        base[60..64].copy_from_slice(&XlsAutoFilter12IconSet::FiveQuarters.code().to_le_bytes());
+        base[60..64].copy_from_slice(&AutoFilter12IconSet::FiveQuarters.code().to_le_bytes());
         base[64..68].copy_from_slice(&5u32.to_le_bytes());
         assert!(
-            parse_table_autofilter12(&base, &[], range(), XlsListObjectId::try_new(9).unwrap())
+            parse_table_autofilter12(&base, &[], range(), ListObjectId::try_new(9).unwrap())
                 .is_err()
         );
         assert!(
@@ -1376,7 +1356,7 @@ mod tests {
                 &records[0][4..],
                 &[vec![0; 12]],
                 range(),
-                XlsListObjectId::try_new(9).unwrap()
+                ListObjectId::try_new(9).unwrap()
             )
             .is_err()
         );
@@ -1384,19 +1364,12 @@ mod tests {
 
     #[test]
     fn dynamic_date_and_format_filters_round_trip_typed() {
-        let date = XlsAutoFilter12DateGroup::try_new(
-            2024,
-            2,
-            29,
-            23,
-            59,
-            58,
-            XlsAutoFilter12DateLevel::Second,
-        )
-        .unwrap();
-        let expected = XlsTableAutoFilter12::try_new_date_groups(0, vec![date]).unwrap();
+        let date =
+            AutoFilter12DateGroup::try_new(2024, 2, 29, 23, 59, 58, AutoFilter12DateLevel::Second)
+                .unwrap();
+        let expected = TableAutoFilter12::try_new_date_groups(0, vec![date]).unwrap();
         let records =
-            write_table_autofilter12(&expected, range(), XlsListObjectId::try_new(9).unwrap())
+            write_table_autofilter12(&expected, range(), ListObjectId::try_new(9).unwrap())
                 .unwrap();
         let base = records[0][4..].to_vec();
         let continuations = records[1..]
@@ -1408,7 +1381,7 @@ mod tests {
                 &base,
                 &continuations,
                 range(),
-                XlsListObjectId::try_new(9).unwrap()
+                ListObjectId::try_new(9).unwrap()
             )
             .unwrap(),
             Some(expected)
@@ -1416,43 +1389,33 @@ mod tests {
         let mut unused = continuations.clone();
         unused[0][26] = 0xa5;
         assert!(
-            parse_table_autofilter12(
-                &base,
-                &unused,
-                range(),
-                XlsListObjectId::try_new(9).unwrap()
-            )
-            .is_ok()
+            parse_table_autofilter12(&base, &unused, range(), ListObjectId::try_new(9).unwrap())
+                .is_ok()
         );
         let mut reserved = continuations;
         reserved[0][28] = 1;
         assert!(
-            parse_table_autofilter12(
-                &base,
-                &reserved,
-                range(),
-                XlsListObjectId::try_new(9).unwrap()
-            )
-            .is_err()
+            parse_table_autofilter12(&base, &reserved, range(), ListObjectId::try_new(9).unwrap())
+                .is_err()
         );
         assert!(
-            XlsAutoFilter12DateGroup::try_new(2023, 2, 29, 0, 0, 0, XlsAutoFilter12DateLevel::Day)
+            AutoFilter12DateGroup::try_new(2023, 2, 29, 0, 0, 0, AutoFilter12DateLevel::Day)
                 .is_err()
         );
 
-        let criterion = XlsAutoFilter12Criterion::try_new(
-            XlsAutoFilter12Operator::GreaterThan,
-            XlsAutoFilter12Value::Number(1.0),
+        let criterion = AutoFilter12Criterion::try_new(
+            AutoFilter12Operator::GreaterThan,
+            AutoFilter12Value::Number(1.0),
         )
         .unwrap();
-        let expected = XlsTableAutoFilter12::try_new_dynamic(
+        let expected = TableAutoFilter12::try_new_dynamic(
             1,
-            XlsAutoFilter12DynamicType::AboveAverage,
+            AutoFilter12DynamicType::AboveAverage,
             vec![criterion],
         )
         .unwrap();
         let records =
-            write_table_autofilter12(&expected, range(), XlsListObjectId::try_new(9).unwrap())
+            write_table_autofilter12(&expected, range(), ListObjectId::try_new(9).unwrap())
                 .unwrap();
         let base = records[0][4..].to_vec();
         let continuations = records[1..]
@@ -1464,31 +1427,31 @@ mod tests {
                 &base,
                 &continuations,
                 range(),
-                XlsListObjectId::try_new(9).unwrap()
+                ListObjectId::try_new(9).unwrap()
             )
             .unwrap(),
             Some(expected)
         );
 
         for kind in [
-            XlsAutoFilter12FormatKind::CellColor,
-            XlsAutoFilter12FormatKind::FontColor,
+            AutoFilter12FormatKind::CellColor,
+            AutoFilter12FormatKind::FontColor,
         ] {
-            let expected = XlsTableAutoFilter12::try_new_format(
+            let expected = TableAutoFilter12::try_new_format(
                 2,
                 kind,
-                XlsAutoFilter12DifferentialFormat::try_new(vec![1, 2, 3, 4]).unwrap(),
+                AutoFilter12DifferentialFormat::try_new(vec![1, 2, 3, 4]).unwrap(),
             )
             .unwrap();
             let records =
-                write_table_autofilter12(&expected, range(), XlsListObjectId::try_new(9).unwrap())
+                write_table_autofilter12(&expected, range(), ListObjectId::try_new(9).unwrap())
                     .unwrap();
             assert_eq!(
                 parse_table_autofilter12(
                     &records[0][4..],
                     &[],
                     range(),
-                    XlsListObjectId::try_new(9).unwrap()
+                    ListObjectId::try_new(9).unwrap()
                 )
                 .unwrap(),
                 Some(expected)

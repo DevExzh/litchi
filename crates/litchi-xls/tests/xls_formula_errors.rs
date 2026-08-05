@@ -1,6 +1,6 @@
 use std::fs::File;
 
-use litchi_xls::XlsWorkbook;
+use litchi_xls::Workbook;
 
 #[test]
 fn parses_poi_formula_error_shared_feature_fixture() {
@@ -8,7 +8,7 @@ fn parses_poi_formula_error_shared_feature_fixture() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/poi/test-data/spreadsheet/46136-NoWarnings.xls"
     );
-    let workbook = XlsWorkbook::new(File::open(path).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(path).unwrap()).unwrap();
     let worksheet = workbook.xls_worksheet(0).unwrap();
     let features = worksheet.formula_error_features();
     assert_eq!(features.len(), 1);

@@ -3,9 +3,9 @@
 //! Parsing is limited to bytes already present in a caller-supplied PPT record.
 //! This module never opens or renders the referenced metafile.
 
-use super::package::{PptError, Result};
-use super::records::PptRecord;
-use crate::consts::PptRecordType;
+use super::package::{Error, Result};
+use super::records::Record;
+use crate::consts::RecordType;
 
 const PREFIX_BYTES: usize = 12;
 const ENTRY_BYTES: usize = 44;
@@ -13,13 +13,13 @@ const VARIANT_BYTES: usize = 34;
 const USED_HEADER_FLAGS: u16 = 0x0017;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointRecolorLimits {
+pub struct RecolorLimits {
     pub max_record_bytes: usize,
     pub max_entries: usize,
     pub max_trailing_bytes: usize,
 }
 
-impl Default for PowerPointRecolorLimits {
+impl Default for RecolorLimits {
     fn default() -> Self {
         Self {
             max_record_bytes: 16 * 1024 * 1024,
@@ -31,13 +31,13 @@ impl Default for PowerPointRecolorLimits {
 
 /// Six-byte `WideColorStruct` from MS-PPT section 2.12.3.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct PowerPointWideColor {
+pub struct WideColor {
     pub red: u16,
     pub green: u16,
     pub blue: u16,
 }
 
-impl PowerPointWideColor {
+impl WideColor {
     pub const fn new(red: u16, green: u16, blue: u16) -> Self {
         Self { red, green, blue }
     }
@@ -46,7 +46,7 @@ impl PowerPointWideColor {
 /// MS-WMF section 2.1.1.4 `BrushStyle`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
-pub enum PowerPointWmfBrushStyle {
+pub enum WmfBrushStyle {
     Solid = 0,
     Null = 1,
     Hatched = 2,
@@ -59,8 +59,8 @@ pub enum PowerPointWmfBrushStyle {
     MonoPattern = 9,
 }
 
-impl TryFrom<u16> for PowerPointWmfBrushStyle {
-    type Error = PptError;
+impl TryFrom<u16> for WmfBrushStyle {
+    type Error = Error;
 
     fn try_from(value: u16) -> Result<Self> {
         match value {
@@ -82,7 +82,7 @@ impl TryFrom<u16> for PowerPointWmfBrushStyle {
 /// MS-WMF section 2.1.1.12 `HatchStyle`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
-pub enum PowerPointWmfHatchStyle {
+pub enum WmfHatchStyle {
     Horizontal = 0,
     Vertical = 1,
     ForwardDiagonal = 2,
@@ -91,8 +91,8 @@ pub enum PowerPointWmfHatchStyle {
     DiagonalCross = 5,
 }
 
-impl TryFrom<u16> for PowerPointWmfHatchStyle {
-    type Error = PptError;
+impl TryFrom<u16> for WmfHatchStyle {
+    type Error = Error;
 
     fn try_from(value: u16) -> Result<Self> {
         match value {
@@ -109,14 +109,14 @@ impl TryFrom<u16> for PowerPointWmfHatchStyle {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
-pub enum PowerPointRecolorBitmapType {
+pub enum RecolorBitmapType {
     MonochromePattern = 0,
     DibPattern = 1,
     NonMonochromeOrIndirect = 3,
 }
 
-impl TryFrom<u16> for PowerPointRecolorBitmapType {
-    type Error = PptError;
+impl TryFrom<u16> for RecolorBitmapType {
+    type Error = Error;
 
     fn try_from(value: u16) -> Result<Self> {
         match value {
@@ -130,16 +130,16 @@ impl TryFrom<u16> for PowerPointRecolorBitmapType {
 
 /// Conditional `lbHatch` representation. Non-hatched brushes retain its ignored value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PowerPointRecolorHatch {
-    Hatched(PowerPointWmfHatchStyle),
+pub enum RecolorHatch {
+    Hatched(WmfHatchStyle),
     Ignored(u16),
 }
 
 /// Conditional pattern representation. Non-pattern brushes retain ignored bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PowerPointRecolorPattern {
+pub enum RecolorPattern {
     Pattern {
-        bitmap_type: PowerPointRecolorBitmapType,
+        bitmap_type: RecolorBitmapType,
         bytes: [u8; 8],
     },
     Ignored {
@@ -149,54 +149,54 @@ pub enum PowerPointRecolorPattern {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointRecolorBrush {
-    pub style: PowerPointWmfBrushStyle,
-    pub color: PowerPointWideColor,
-    pub hatch: PowerPointRecolorHatch,
-    pub foreground_color: PowerPointWideColor,
-    pub background_color: PowerPointWideColor,
-    pub pattern: PowerPointRecolorPattern,
+pub struct RecolorBrush {
+    pub style: WmfBrushStyle,
+    pub color: WideColor,
+    pub hatch: RecolorHatch,
+    pub foreground_color: WideColor,
+    pub background_color: WideColor,
+    pub pattern: RecolorPattern,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PowerPointRecolorSource {
+pub enum RecolorSource {
     Color {
-        color: PowerPointWideColor,
+        color: WideColor,
         /// Undefined bytes retained without interpretation.
         unused: [u8; 26],
     },
-    Brush(PowerPointRecolorBrush),
+    Brush(RecolorBrush),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointRecolorEntry {
+pub struct RecolorEntry {
     pub do_recolor: bool,
     /// Destination color; ignored by consumers when `destination_index < 8`.
-    pub destination_color: PowerPointWideColor,
+    pub destination_color: WideColor,
     /// Scheme index for values below eight, otherwise `destination_color` is used.
     pub destination_index: u8,
     /// Undefined byte retained without interpretation.
     pub unused: u8,
-    pub source: PowerPointRecolorSource,
+    pub source: RecolorSource,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointRecolorInfo {
+pub struct RecolorInfo {
     pub should_recolor: bool,
     pub missing_colors: bool,
     pub missing_fills: bool,
     pub mono_recolor: bool,
     /// Undefined flag bits retained without interpretation.
     pub ignored_flags: u16,
-    pub mono_color: PowerPointWideColor,
-    pub entries: Vec<PowerPointRecolorEntry>,
+    pub mono_color: WideColor,
+    pub entries: Vec<RecolorEntry>,
     /// Undefined bytes following the fixed-size entry array.
     pub trailing_unused: Vec<u8>,
 }
 
-impl PowerPointRecolorInfo {
-    pub fn parse(record: &PptRecord, limits: PowerPointRecolorLimits) -> Result<Self> {
-        if record.record_type != PptRecordType::RecolorInfoAtom
+impl RecolorInfo {
+    pub fn parse(record: &Record, limits: RecolorLimits) -> Result<Self> {
+        if record.record_type != RecordType::RecolorInfoAtom
             || record.record_type_raw != 0x0fe7
             || record.version != 0
             || record.instance != 0
@@ -209,7 +209,7 @@ impl PowerPointRecolorInfo {
         Self::parse_payload(&record.data, limits)
     }
 
-    pub fn parse_payload(payload: &[u8], limits: PowerPointRecolorLimits) -> Result<Self> {
+    pub fn parse_payload(payload: &[u8], limits: RecolorLimits) -> Result<Self> {
         if payload.len() > limits.max_record_bytes {
             return corrupted("RecolorInfoAtom exceeds the record byte limit");
         }
@@ -244,8 +244,8 @@ impl PowerPointRecolorInfo {
         for bytes in payload[PREFIX_BYTES..required].chunks_exact(ENTRY_BYTES) {
             let entry = parse_entry(bytes)?;
             match entry.source {
-                PowerPointRecolorSource::Color { .. } => parsed_colors += 1,
-                PowerPointRecolorSource::Brush(_) => parsed_fills += 1,
+                RecolorSource::Color { .. } => parsed_colors += 1,
+                RecolorSource::Brush(_) => parsed_fills += 1,
             }
             entries.push(entry);
         }
@@ -264,12 +264,12 @@ impl PowerPointRecolorInfo {
         })
     }
 
-    pub fn to_payload(&self, limits: PowerPointRecolorLimits) -> Result<Vec<u8>> {
+    pub fn to_payload(&self, limits: RecolorLimits) -> Result<Vec<u8>> {
         validate(self, limits)?;
         let color_count = self
             .entries
             .iter()
-            .filter(|entry| matches!(entry.source, PowerPointRecolorSource::Color { .. }))
+            .filter(|entry| matches!(entry.source, RecolorSource::Color { .. }))
             .count();
         let fill_count = self.entries.len() - color_count;
         let size = PREFIX_BYTES
@@ -306,12 +306,12 @@ impl PowerPointRecolorInfo {
         Ok(output)
     }
 
-    pub fn to_record(&self, limits: PowerPointRecolorLimits) -> Result<PptRecord> {
+    pub fn to_record(&self, limits: RecolorLimits) -> Result<Record> {
         let data = self.to_payload(limits)?;
         let data_length = u32::try_from(data.len())
             .map_err(|_| corrupt("RecolorInfoAtom payload exceeds u32"))?;
-        Ok(PptRecord {
-            record_type: PptRecordType::RecolorInfoAtom,
+        Ok(Record {
+            record_type: RecordType::RecolorInfoAtom,
             record_type_raw: 0x0fe7,
             version: 0,
             instance: 0,
@@ -322,7 +322,7 @@ impl PowerPointRecolorInfo {
     }
 }
 
-fn parse_entry(bytes: &[u8]) -> Result<PowerPointRecolorEntry> {
+fn parse_entry(bytes: &[u8]) -> Result<RecolorEntry> {
     if bytes.len() != ENTRY_BYTES {
         return corrupted("RecolorEntry has an invalid size");
     }
@@ -331,7 +331,7 @@ fn parse_entry(bytes: &[u8]) -> Result<PowerPointRecolorEntry> {
         return corrupted("RecolorEntry reserved bits are nonzero");
     }
     let source = parse_source(&bytes[10..])?;
-    Ok(PowerPointRecolorEntry {
+    Ok(RecolorEntry {
         do_recolor: flags & 1 != 0,
         destination_color: parse_color(&bytes[2..8])?,
         destination_index: bytes[8],
@@ -340,7 +340,7 @@ fn parse_entry(bytes: &[u8]) -> Result<PowerPointRecolorEntry> {
     })
 }
 
-fn parse_source(bytes: &[u8]) -> Result<PowerPointRecolorSource> {
+fn parse_source(bytes: &[u8]) -> Result<RecolorSource> {
     if bytes.len() != VARIANT_BYTES {
         return corrupted("RecolorEntryVariant has an invalid size");
     }
@@ -348,34 +348,34 @@ fn parse_source(bytes: &[u8]) -> Result<PowerPointRecolorSource> {
         0 => {
             let mut unused = [0u8; 26];
             unused.copy_from_slice(&bytes[8..34]);
-            Ok(PowerPointRecolorSource::Color {
+            Ok(RecolorSource::Color {
                 color: parse_color(&bytes[2..8])?,
                 unused,
             })
         },
         1 => {
-            let style = PowerPointWmfBrushStyle::try_from(u16_at(bytes, 2)?)?;
+            let style = WmfBrushStyle::try_from(u16_at(bytes, 2)?)?;
             let raw_hatch = u16_at(bytes, 10)?;
-            let hatch = if style == PowerPointWmfBrushStyle::Hatched {
-                PowerPointRecolorHatch::Hatched(PowerPointWmfHatchStyle::try_from(raw_hatch)?)
+            let hatch = if style == WmfBrushStyle::Hatched {
+                RecolorHatch::Hatched(WmfHatchStyle::try_from(raw_hatch)?)
             } else {
-                PowerPointRecolorHatch::Ignored(raw_hatch)
+                RecolorHatch::Ignored(raw_hatch)
             };
             let raw_bitmap_type = u16_at(bytes, 24)?;
             let mut pattern_bytes = [0u8; 8];
             pattern_bytes.copy_from_slice(&bytes[26..34]);
-            let pattern = if style == PowerPointWmfBrushStyle::Pattern {
-                PowerPointRecolorPattern::Pattern {
-                    bitmap_type: PowerPointRecolorBitmapType::try_from(raw_bitmap_type)?,
+            let pattern = if style == WmfBrushStyle::Pattern {
+                RecolorPattern::Pattern {
+                    bitmap_type: RecolorBitmapType::try_from(raw_bitmap_type)?,
                     bytes: pattern_bytes,
                 }
             } else {
-                PowerPointRecolorPattern::Ignored {
+                RecolorPattern::Ignored {
                     bitmap_type: raw_bitmap_type,
                     bytes: pattern_bytes,
                 }
             };
-            Ok(PowerPointRecolorSource::Brush(PowerPointRecolorBrush {
+            Ok(RecolorSource::Brush(RecolorBrush {
                 style,
                 color: parse_color(&bytes[4..10])?,
                 hatch,
@@ -388,35 +388,35 @@ fn parse_source(bytes: &[u8]) -> Result<PowerPointRecolorSource> {
     }
 }
 
-fn write_entry(output: &mut Vec<u8>, entry: &PowerPointRecolorEntry) -> Result<()> {
+fn write_entry(output: &mut Vec<u8>, entry: &RecolorEntry) -> Result<()> {
     output.extend_from_slice(&u16::from(entry.do_recolor).to_le_bytes());
     write_color(output, entry.destination_color);
     output.push(entry.destination_index);
     output.push(entry.unused);
     match &entry.source {
-        PowerPointRecolorSource::Color { color, unused } => {
+        RecolorSource::Color { color, unused } => {
             output.extend_from_slice(&0u16.to_le_bytes());
             write_color(output, *color);
             output.extend_from_slice(unused);
         },
-        PowerPointRecolorSource::Brush(brush) => {
+        RecolorSource::Brush(brush) => {
             validate_brush(brush)?;
             output.extend_from_slice(&1u16.to_le_bytes());
             output.extend_from_slice(&(brush.style as u16).to_le_bytes());
             write_color(output, brush.color);
             let hatch = match brush.hatch {
-                PowerPointRecolorHatch::Hatched(value) => value as u16,
-                PowerPointRecolorHatch::Ignored(value) => value,
+                RecolorHatch::Hatched(value) => value as u16,
+                RecolorHatch::Ignored(value) => value,
             };
             output.extend_from_slice(&hatch.to_le_bytes());
             write_color(output, brush.foreground_color);
             write_color(output, brush.background_color);
             match brush.pattern {
-                PowerPointRecolorPattern::Pattern { bitmap_type, bytes } => {
+                RecolorPattern::Pattern { bitmap_type, bytes } => {
                     output.extend_from_slice(&(bitmap_type as u16).to_le_bytes());
                     output.extend_from_slice(&bytes);
                 },
-                PowerPointRecolorPattern::Ignored { bitmap_type, bytes } => {
+                RecolorPattern::Ignored { bitmap_type, bytes } => {
                     output.extend_from_slice(&bitmap_type.to_le_bytes());
                     output.extend_from_slice(&bytes);
                 },
@@ -426,7 +426,7 @@ fn write_entry(output: &mut Vec<u8>, entry: &PowerPointRecolorEntry) -> Result<(
     Ok(())
 }
 
-fn validate(value: &PowerPointRecolorInfo, limits: PowerPointRecolorLimits) -> Result<()> {
+fn validate(value: &RecolorInfo, limits: RecolorLimits) -> Result<()> {
     if value.ignored_flags & USED_HEADER_FLAGS != 0 {
         return corrupted("RecolorInfoAtom ignored flags overlap defined flags");
     }
@@ -439,7 +439,7 @@ fn validate(value: &PowerPointRecolorInfo, limits: PowerPointRecolorLimits) -> R
     let colors = value
         .entries
         .iter()
-        .filter(|entry| matches!(entry.source, PowerPointRecolorSource::Color { .. }))
+        .filter(|entry| matches!(entry.source, RecolorSource::Color { .. }))
         .count();
     let fills = value.entries.len() - colors;
     if colors > usize::from(u16::MAX) || fills > usize::from(u16::MAX) {
@@ -459,49 +459,49 @@ fn validate(value: &PowerPointRecolorInfo, limits: PowerPointRecolorLimits) -> R
         return corrupted("RecolorInfoAtom exceeds the record byte limit");
     }
     for entry in &value.entries {
-        if let PowerPointRecolorSource::Brush(brush) = &entry.source {
+        if let RecolorSource::Brush(brush) = &entry.source {
             validate_brush(brush)?;
         }
     }
     Ok(())
 }
 
-fn validate_brush(brush: &PowerPointRecolorBrush) -> Result<()> {
+fn validate_brush(brush: &RecolorBrush) -> Result<()> {
     match (brush.style, brush.hatch) {
-        (PowerPointWmfBrushStyle::Hatched, PowerPointRecolorHatch::Hatched(_)) => {},
-        (PowerPointWmfBrushStyle::Hatched, PowerPointRecolorHatch::Ignored(_)) => {
+        (WmfBrushStyle::Hatched, RecolorHatch::Hatched(_)) => {},
+        (WmfBrushStyle::Hatched, RecolorHatch::Ignored(_)) => {
             return corrupted("hatched RecolorEntryBrush lacks a typed HatchStyle");
         },
-        (_, PowerPointRecolorHatch::Hatched(_)) => {
+        (_, RecolorHatch::Hatched(_)) => {
             return corrupted("non-hatched RecolorEntryBrush contains a typed HatchStyle");
         },
-        (_, PowerPointRecolorHatch::Ignored(_)) => {},
+        (_, RecolorHatch::Ignored(_)) => {},
     }
     match (brush.style, brush.pattern) {
-        (PowerPointWmfBrushStyle::Pattern, PowerPointRecolorPattern::Pattern { .. }) => {},
-        (PowerPointWmfBrushStyle::Pattern, PowerPointRecolorPattern::Ignored { .. }) => {
+        (WmfBrushStyle::Pattern, RecolorPattern::Pattern { .. }) => {},
+        (WmfBrushStyle::Pattern, RecolorPattern::Ignored { .. }) => {
             return corrupted("pattern RecolorEntryBrush lacks a typed bitmapType");
         },
-        (_, PowerPointRecolorPattern::Pattern { .. }) => {
+        (_, RecolorPattern::Pattern { .. }) => {
             return corrupted("non-pattern RecolorEntryBrush contains a typed bitmapType");
         },
-        (_, PowerPointRecolorPattern::Ignored { .. }) => {},
+        (_, RecolorPattern::Ignored { .. }) => {},
     }
     Ok(())
 }
 
-fn parse_color(bytes: &[u8]) -> Result<PowerPointWideColor> {
+fn parse_color(bytes: &[u8]) -> Result<WideColor> {
     if bytes.len() != 6 {
         return corrupted("WideColorStruct has an invalid size");
     }
-    Ok(PowerPointWideColor {
+    Ok(WideColor {
         red: u16_at(bytes, 0)?,
         green: u16_at(bytes, 2)?,
         blue: u16_at(bytes, 4)?,
     })
 }
 
-fn write_color(output: &mut Vec<u8>, color: PowerPointWideColor) {
+fn write_color(output: &mut Vec<u8>, color: WideColor) {
     output.extend_from_slice(&color.red.to_le_bytes());
     output.extend_from_slice(&color.green.to_le_bytes());
     output.extend_from_slice(&color.blue.to_le_bytes());
@@ -514,8 +514,8 @@ fn u16_at(bytes: &[u8], offset: usize) -> Result<u16> {
     Ok(u16::from_le_bytes([value[0], value[1]]))
 }
 
-fn corrupt(message: &str) -> PptError {
-    PptError::Corrupted(message.to_string())
+fn corrupt(message: &str) -> Error {
+    Error::Corrupted(message.to_string())
 }
 
 fn corrupted<T>(message: &str) -> Result<T> {
@@ -526,20 +526,20 @@ fn corrupted<T>(message: &str) -> Result<T> {
 mod tests {
     use super::*;
 
-    fn limits() -> PowerPointRecolorLimits {
-        PowerPointRecolorLimits {
+    fn limits() -> RecolorLimits {
+        RecolorLimits {
             max_record_bytes: 4096,
             max_entries: 8,
             max_trailing_bytes: 16,
         }
     }
 
-    fn color(red: u16, green: u16, blue: u16) -> PowerPointWideColor {
-        PowerPointWideColor::new(red, green, blue)
+    fn color(red: u16, green: u16, blue: u16) -> WideColor {
+        WideColor::new(red, green, blue)
     }
 
-    fn sample() -> PowerPointRecolorInfo {
-        PowerPointRecolorInfo {
+    fn sample() -> RecolorInfo {
+        RecolorInfo {
             should_recolor: true,
             missing_colors: false,
             missing_fills: true,
@@ -547,29 +547,29 @@ mod tests {
             ignored_flags: 0xa008,
             mono_color: color(1, 2, 3),
             entries: vec![
-                PowerPointRecolorEntry {
+                RecolorEntry {
                     do_recolor: true,
                     destination_color: color(4, 5, 6),
                     destination_index: 8,
                     unused: 0x7f,
-                    source: PowerPointRecolorSource::Color {
+                    source: RecolorSource::Color {
                         color: color(7, 8, 9),
                         unused: [0x55; 26],
                     },
                 },
-                PowerPointRecolorEntry {
+                RecolorEntry {
                     do_recolor: false,
                     destination_color: color(10, 11, 12),
                     destination_index: 2,
                     unused: 0x80,
-                    source: PowerPointRecolorSource::Brush(PowerPointRecolorBrush {
-                        style: PowerPointWmfBrushStyle::Pattern,
+                    source: RecolorSource::Brush(RecolorBrush {
+                        style: WmfBrushStyle::Pattern,
                         color: color(13, 14, 15),
-                        hatch: PowerPointRecolorHatch::Ignored(0xbeef),
+                        hatch: RecolorHatch::Ignored(0xbeef),
                         foreground_color: color(16, 17, 18),
                         background_color: color(19, 20, 21),
-                        pattern: PowerPointRecolorPattern::Pattern {
-                            bitmap_type: PowerPointRecolorBitmapType::DibPattern,
+                        pattern: RecolorPattern::Pattern {
+                            bitmap_type: RecolorBitmapType::DibPattern,
                             bytes: [0xaa, 0x55, 0xaa, 0x55, 0xaa, 0x55, 0xaa, 0x55],
                         },
                     }),
@@ -583,7 +583,7 @@ mod tests {
     fn parses_and_writes_complete_recolor_family_byte_exactly() {
         let expected = sample();
         let record = expected.to_record(limits()).unwrap();
-        assert_eq!(record.record_type, PptRecordType::RecolorInfoAtom);
+        assert_eq!(record.record_type, RecordType::RecolorInfoAtom);
         assert_eq!(record.data.len(), 102);
         assert_eq!(&record.data[0..6], &[0x1d, 0xa0, 1, 0, 1, 0]);
         assert_eq!(&record.data[12..14], &[1, 0]);
@@ -592,7 +592,7 @@ mod tests {
         assert_eq!(&record.data[66..68], &[1, 0]);
         assert_eq!(&record.data[68..70], &[3, 0]);
         assert_eq!(&record.data[100..], &[0xde, 0xad]);
-        let parsed = PowerPointRecolorInfo::parse(&record, limits()).unwrap();
+        let parsed = RecolorInfo::parse(&record, limits()).unwrap();
         assert_eq!(parsed, expected);
         assert_eq!(parsed.to_payload(limits()).unwrap(), record.data);
     }
@@ -601,32 +601,32 @@ mod tests {
     fn validates_hatched_and_pattern_conditional_payloads() {
         let mut value = sample();
         {
-            let PowerPointRecolorSource::Brush(brush) = &mut value.entries[1].source else {
+            let RecolorSource::Brush(brush) = &mut value.entries[1].source else {
                 unreachable!()
             };
-            brush.style = PowerPointWmfBrushStyle::Hatched;
-            brush.hatch = PowerPointRecolorHatch::Hatched(PowerPointWmfHatchStyle::DiagonalCross);
-            brush.pattern = PowerPointRecolorPattern::Ignored {
+            brush.style = WmfBrushStyle::Hatched;
+            brush.hatch = RecolorHatch::Hatched(WmfHatchStyle::DiagonalCross);
+            brush.pattern = RecolorPattern::Ignored {
                 bitmap_type: 0xffff,
                 bytes: [0xcc; 8],
             };
         }
         let payload = value.to_payload(limits()).unwrap();
         assert_eq!(
-            PowerPointRecolorInfo::parse_payload(&payload, limits()).unwrap(),
+            RecolorInfo::parse_payload(&payload, limits()).unwrap(),
             value
         );
 
-        let PowerPointRecolorSource::Brush(brush) = &mut value.entries[1].source else {
+        let RecolorSource::Brush(brush) = &mut value.entries[1].source else {
             unreachable!()
         };
-        brush.hatch = PowerPointRecolorHatch::Ignored(5);
+        brush.hatch = RecolorHatch::Ignored(5);
         assert!(value.to_payload(limits()).is_err());
-        let PowerPointRecolorSource::Brush(brush) = &mut value.entries[1].source else {
+        let RecolorSource::Brush(brush) = &mut value.entries[1].source else {
             unreachable!()
         };
-        brush.style = PowerPointWmfBrushStyle::Solid;
-        brush.hatch = PowerPointRecolorHatch::Hatched(PowerPointWmfHatchStyle::Horizontal);
+        brush.style = WmfBrushStyle::Solid;
+        brush.hatch = RecolorHatch::Hatched(WmfHatchStyle::Horizontal);
         assert!(value.to_payload(limits()).is_err());
     }
 
@@ -638,14 +638,14 @@ mod tests {
             value[offset..offset + bytes.len()].copy_from_slice(bytes);
             value
         };
-        assert!(PowerPointRecolorInfo::parse_payload(&mutate(12, &[2, 0]), limits()).is_err());
-        assert!(PowerPointRecolorInfo::parse_payload(&mutate(22, &[2, 0]), limits()).is_err());
-        assert!(PowerPointRecolorInfo::parse_payload(&mutate(2, &[2, 0]), limits()).is_err());
-        assert!(PowerPointRecolorInfo::parse_payload(&payload[..99], limits()).is_err());
+        assert!(RecolorInfo::parse_payload(&mutate(12, &[2, 0]), limits()).is_err());
+        assert!(RecolorInfo::parse_payload(&mutate(22, &[2, 0]), limits()).is_err());
+        assert!(RecolorInfo::parse_payload(&mutate(2, &[2, 0]), limits()).is_err());
+        assert!(RecolorInfo::parse_payload(&payload[..99], limits()).is_err());
         assert!(
-            PowerPointRecolorInfo::parse_payload(
+            RecolorInfo::parse_payload(
                 &payload,
-                PowerPointRecolorLimits {
+                RecolorLimits {
                     max_record_bytes: 99,
                     ..limits()
                 }
@@ -653,9 +653,9 @@ mod tests {
             .is_err()
         );
         assert!(
-            PowerPointRecolorInfo::parse_payload(
+            RecolorInfo::parse_payload(
                 &payload,
-                PowerPointRecolorLimits {
+                RecolorLimits {
                     max_entries: 1,
                     ..limits()
                 }
@@ -663,9 +663,9 @@ mod tests {
             .is_err()
         );
         assert!(
-            PowerPointRecolorInfo::parse_payload(
+            RecolorInfo::parse_payload(
                 &payload,
-                PowerPointRecolorLimits {
+                RecolorLimits {
                     max_trailing_bytes: 1,
                     ..limits()
                 }
@@ -675,9 +675,9 @@ mod tests {
 
         let mut invalid_style = payload.clone();
         invalid_style[68..70].copy_from_slice(&10u16.to_le_bytes());
-        assert!(PowerPointRecolorInfo::parse_payload(&invalid_style, limits()).is_err());
+        assert!(RecolorInfo::parse_payload(&invalid_style, limits()).is_err());
         let mut invalid_bitmap = payload.clone();
         invalid_bitmap[90..92].copy_from_slice(&2u16.to_le_bytes());
-        assert!(PowerPointRecolorInfo::parse_payload(&invalid_bitmap, limits()).is_err());
+        assert!(RecolorInfo::parse_payload(&invalid_bitmap, limits()).is_err());
     }
 }

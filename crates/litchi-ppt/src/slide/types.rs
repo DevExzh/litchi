@@ -1,15 +1,15 @@
 /// High-performance Slide implementation with lazy shape loading and zero-copy design.
-use super::super::package::{PptError, Result};
-use super::super::records::PptRecord;
+use super::super::package::{Error, Result};
+use super::super::records::Record;
 use super::super::shapes::ShapeEnum;
 use super::factory::SlideData;
 use super::notes::{NoteDescriptor, SpeakerNotes};
 use crate::animation::{ShapeAnimation, SlideAnimationExtension};
-use crate::consts::PptRecordType;
+use crate::consts::RecordType;
 use crate::odraw::{FrameKind, ShapeExt as _};
 use crate::slide_extension::SlideExtension;
-use crate::slide_round_trip::PowerPoint12SlideRoundTripMetadata;
-use crate::slide_sync::PowerPointSlideSyncInfo;
+use crate::slide_round_trip::SlideRoundTripMetadata12;
+use crate::slide_sync::SlideSyncInfo;
 use crate::transition::{TransitionInfo, parse_transition};
 use once_cell::unsync::OnceCell;
 
@@ -26,12 +26,12 @@ pub struct Slide<'doc> {
     /// Stable SlideId from the live SlidePersistAtom.
     slide_id: u32,
     slide_list_text: String,
-    outline_text_interactions: Vec<crate::PowerPointTextBodyInteractions>,
-    outline_text_refs: Vec<crate::PowerPointOutlineTextRef>,
+    outline_text_interactions: Vec<crate::TextBodyInteractions>,
+    outline_text_refs: Vec<crate::OutlineTextRef>,
     /// Slide number (1-based for display)
     slide_number: usize,
     /// Slide record
-    record: PptRecord,
+    record: Record,
     /// Reference to document data for lazy shape parsing (reserved for future use)
     #[allow(dead_code)]
     doc_data: &'doc [u8],
@@ -46,9 +46,9 @@ pub struct Slide<'doc> {
     /// Lazily parsed PowerPoint 12 slide/master round-trip metadata.
     powerpoint12_extension: OnceCell<SlideExtension>,
     /// Lazily parsed, inert slide-library synchronization metadata.
-    sync_info: OnceCell<Option<PowerPointSlideSyncInfo>>,
+    sync_info: OnceCell<Option<SlideSyncInfo>>,
     /// Lazily parsed direct PowerPoint 12 slide round-trip metadata.
-    round_trip_metadata: OnceCell<PowerPoint12SlideRoundTripMetadata>,
+    round_trip_metadata: OnceCell<SlideRoundTripMetadata12>,
     notes_descriptor: std::result::Result<Option<NoteDescriptor>, String>,
     speaker_notes: OnceCell<Option<SpeakerNotes>>,
 }
@@ -124,7 +124,7 @@ impl<'doc> Slide<'doc> {
         &self,
         limits: crate::InteractionLimits,
     ) -> Result<Vec<crate::ShapeInteractionEntry>> {
-        let Some(ppdrawing) = self.record.find_child(PptRecordType::PPDrawing) else {
+        let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
         let escher_shapes = crate::odraw::parse(&ppdrawing.data)?;
@@ -144,18 +144,16 @@ impl<'doc> Slide<'doc> {
     }
 
     /// Return every shape that has a range-anchored text action.
-    pub fn shape_text_interactions(
-        &self,
-    ) -> Result<Vec<crate::PowerPointShapeTextInteractionEntry>> {
-        self.shape_text_interactions_with_limits(crate::PowerPointTextInteractionLimits::default())
+    pub fn shape_text_interactions(&self) -> Result<Vec<crate::ShapeTextInteractionEntry>> {
+        self.shape_text_interactions_with_limits(crate::TextInteractionLimits::default())
     }
 
     /// Return shape text actions with caller-supplied resource limits.
     pub fn shape_text_interactions_with_limits(
         &self,
-        limits: crate::PowerPointTextInteractionLimits,
-    ) -> Result<Vec<crate::PowerPointShapeTextInteractionEntry>> {
-        let Some(ppdrawing) = self.record.find_child(PptRecordType::PPDrawing) else {
+        limits: crate::TextInteractionLimits,
+    ) -> Result<Vec<crate::ShapeTextInteractionEntry>> {
+        let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
         let escher_shapes = crate::odraw::parse(&ppdrawing.data)?;
@@ -164,7 +162,7 @@ impl<'doc> Slide<'doc> {
         while let Some(shape) = pending.pop() {
             let interactions = shape.text_interactions_with_limits(limits)?;
             if !interactions.is_empty() {
-                result.push(crate::PowerPointShapeTextInteractionEntry {
+                result.push(crate::ShapeTextInteractionEntry {
                     shape_id: shape.id(),
                     interactions,
                 });
@@ -175,38 +173,34 @@ impl<'doc> Slide<'doc> {
     }
 
     /// Range-anchored actions stored with outline/placeholder text.
-    pub fn outline_text_interactions(&self) -> &[crate::PowerPointTextBodyInteractions] {
+    pub fn outline_text_interactions(&self) -> &[crate::TextBodyInteractions] {
         &self.outline_text_interactions
     }
 
     /// Validated outline text references (`OutlineTextRefAtom`, MS-PPT 2.9.78)
     /// tying this slide's shapes to outline text bodies.
-    pub fn outline_text_refs(&self) -> &[crate::PowerPointOutlineTextRef] {
+    pub fn outline_text_refs(&self) -> &[crate::OutlineTextRef] {
         &self.outline_text_refs
     }
 
     /// Return every shape-scoped programmable-tag container on this slide.
-    pub fn shape_programmable_tags(
-        &self,
-    ) -> Result<Vec<crate::PowerPointShapeProgrammableTagsEntry>> {
-        self.shape_programmable_tags_with_limits(
-            crate::PowerPointShapeProgrammableTagLimits::default(),
-        )
+    pub fn shape_programmable_tags(&self) -> Result<Vec<crate::ShapeProgrammableTagsEntry>> {
+        self.shape_programmable_tags_with_limits(crate::ShapeProgrammableTagLimits::default())
     }
 
     /// Return shape programmable tags with caller-supplied resource limits.
     pub fn shape_programmable_tags_with_limits(
         &self,
-        limits: crate::PowerPointShapeProgrammableTagLimits,
-    ) -> Result<Vec<crate::PowerPointShapeProgrammableTagsEntry>> {
-        let Some(ppdrawing) = self.record.find_child(PptRecordType::PPDrawing) else {
+        limits: crate::ShapeProgrammableTagLimits,
+    ) -> Result<Vec<crate::ShapeProgrammableTagsEntry>> {
+        let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
         let escher_shapes = crate::odraw::parse(&ppdrawing.data)?;
         let mut result = Vec::new();
         for shape in &escher_shapes {
             if let Some(programmable_tags) = shape.programmable_tags_with_limits(limits)? {
-                result.push(crate::PowerPointShapeProgrammableTagsEntry {
+                result.push(crate::ShapeProgrammableTagsEntry {
                     shape_id: shape.id(),
                     programmable_tags,
                 });
@@ -220,38 +214,38 @@ impl<'doc> Slide<'doc> {
     ///
     /// Tag payloads are inert: they are parsed and preserved, never executed,
     /// loaded, or resolved. Use
-    /// [`crate::PowerPointProgTags::slide_extensions`] to decode the
+    /// [`crate::ProgTags::slide_extensions`] to decode the
     /// versioned binary-tag payloads into typed extension structs.
-    pub fn programmable_tags(&self) -> Result<Option<crate::PowerPointProgTags>> {
-        self.programmable_tags_with_limits(crate::PowerPointProgTagLimits::default())
+    pub fn programmable_tags(&self) -> Result<Option<crate::ProgTags>> {
+        self.programmable_tags_with_limits(crate::ProgTagLimits::default())
     }
 
     /// Return slide-level programmable tags with caller-supplied resource limits.
     pub fn programmable_tags_with_limits(
         &self,
-        limits: crate::PowerPointProgTagLimits,
-    ) -> Result<Option<crate::PowerPointProgTags>> {
-        crate::PowerPointProgTags::parse_slide(&self.record, limits)
+        limits: crate::ProgTagLimits,
+    ) -> Result<Option<crate::ProgTags>> {
+        crate::ProgTags::parse_slide(&self.record, limits)
     }
 
     /// Return every typed shape-flag projection on this slide.
-    pub fn shape_flags(&self) -> Result<Vec<crate::PowerPointShapeFlagEntry>> {
-        self.shape_flags_with_limits(crate::PowerPointShapeFlagLimits::default())
+    pub fn shape_flags(&self) -> Result<Vec<crate::ShapeFlagEntry>> {
+        self.shape_flags_with_limits(crate::ShapeFlagLimits::default())
     }
 
     /// Return shape flags with caller-supplied client-data resource limits.
     pub fn shape_flags_with_limits(
         &self,
-        limits: crate::PowerPointShapeFlagLimits,
-    ) -> Result<Vec<crate::PowerPointShapeFlagEntry>> {
-        let Some(ppdrawing) = self.record.find_child(PptRecordType::PPDrawing) else {
+        limits: crate::ShapeFlagLimits,
+    ) -> Result<Vec<crate::ShapeFlagEntry>> {
+        let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
         let escher_shapes = crate::odraw::parse(&ppdrawing.data)?;
         let mut result = Vec::new();
         for shape in &escher_shapes {
             if let Some(projection) = shape.ppt_flags_with(limits)? {
-                result.push(crate::PowerPointShapeFlagEntry {
+                result.push(crate::ShapeFlagEntry {
                     shape_id: shape.id(),
                     projection,
                 });
@@ -261,16 +255,16 @@ impl<'doc> Slide<'doc> {
     }
 
     /// Return context-validated placeholders on this presentation slide.
-    pub fn placeholder_atoms(&self) -> Result<Vec<crate::PowerPointPlaceholderEntry>> {
-        self.placeholder_atoms_with_limits(crate::PowerPointPlaceholderLimits::default())
+    pub fn placeholder_atoms(&self) -> Result<Vec<crate::PlaceholderEntry>> {
+        self.placeholder_atoms_with_limits(crate::PlaceholderLimits::default())
     }
 
     /// Return placeholders with caller-supplied client-data limits.
     pub fn placeholder_atoms_with_limits(
         &self,
-        limits: crate::PowerPointPlaceholderLimits,
-    ) -> Result<Vec<crate::PowerPointPlaceholderEntry>> {
-        let Some(ppdrawing) = self.record.find_child(PptRecordType::PPDrawing) else {
+        limits: crate::PlaceholderLimits,
+    ) -> Result<Vec<crate::PlaceholderEntry>> {
+        let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
         let escher_shapes = crate::odraw::parse(&ppdrawing.data)?;
@@ -278,15 +272,15 @@ impl<'doc> Slide<'doc> {
         let mut result = Vec::new();
         for shape in &escher_shapes {
             if let Some(placeholder) = shape.placeholder_atom_with_limits(
-                crate::PowerPointPlaceholderContext::PresentationSlide,
+                crate::PlaceholderContext::PresentationSlide,
                 limits,
             )? {
                 if placeholder.position != -1 && !positions.insert(placeholder.position) {
-                    return Err(PptError::Corrupted(
+                    return Err(Error::Corrupted(
                         "Presentation slide contains duplicate placeholder positions".to_string(),
                     ));
                 }
-                result.push(crate::PowerPointPlaceholderEntry {
+                result.push(crate::PlaceholderEntry {
                     shape_id: shape.id(),
                     placeholder,
                 });
@@ -301,7 +295,7 @@ impl<'doc> Slide<'doc> {
             .get_or_try_init(|| match &self.notes_descriptor {
                 Ok(None) => Ok(None),
                 Ok(Some(descriptor)) => SpeakerNotes::parse(*descriptor, self.doc_data).map(Some),
-                Err(error) => Err(PptError::Corrupted(error.clone())),
+                Err(error) => Err(Error::Corrupted(error.clone())),
             })
             .map(Option::as_ref)
     }
@@ -314,7 +308,7 @@ impl<'doc> Slide<'doc> {
     }
 
     fn parse_animations(&self) -> Result<Vec<ShapeAnimation>> {
-        let Some(ppdrawing) = self.record.find_child(PptRecordType::PPDrawing) else {
+        let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
         let shapes = crate::odraw::parse(&ppdrawing.data)?;
@@ -340,18 +334,18 @@ impl<'doc> Slide<'doc> {
     }
 
     fn parse_animation_extension(&self) -> Result<Option<SlideAnimationExtension>> {
-        for prog_tags in self.record.find_children(PptRecordType::ProgTags) {
-            for prog_binary_tag in prog_tags.find_children(PptRecordType::ProgBinaryTag) {
-                let Some(tag_name) = prog_binary_tag.find_child(PptRecordType::CString) else {
+        for prog_tags in self.record.find_children(RecordType::ProgTags) {
+            for prog_binary_tag in prog_tags.find_children(RecordType::ProgBinaryTag) {
+                let Some(tag_name) = prog_binary_tag.find_child(RecordType::CString) else {
                     continue;
                 };
                 if !Self::is_ppt10_tag_name(tag_name) {
                     continue;
                 }
                 let data = prog_binary_tag
-                    .find_child(PptRecordType::BinaryTagData)
+                    .find_child(RecordType::BinaryTagData)
                     .ok_or_else(|| {
-                        PptError::Corrupted(
+                        Error::Corrupted(
                             "___PPT10 programmable tag is missing BinaryTagData".to_string(),
                         )
                     })?;
@@ -361,7 +355,7 @@ impl<'doc> Slide<'doc> {
         Ok(None)
     }
 
-    fn is_ppt10_tag_name(record: &PptRecord) -> bool {
+    fn is_ppt10_tag_name(record: &Record) -> bool {
         const PPT10: [u16; 8] = [0x5F, 0x5F, 0x5F, 0x50, 0x50, 0x54, 0x31, 0x30];
         record.version == 0
             && record.instance == 0
@@ -380,16 +374,16 @@ impl<'doc> Slide<'doc> {
     }
 
     /// Return inert PowerPoint 12 slide-library synchronization metadata.
-    pub fn sync_info(&self) -> Result<Option<&PowerPointSlideSyncInfo>> {
+    pub fn sync_info(&self) -> Result<Option<&SlideSyncInfo>> {
         self.sync_info
-            .get_or_try_init(|| PowerPointSlideSyncInfo::parse(&self.record))
+            .get_or_try_init(|| SlideSyncInfo::parse(&self.record))
             .map(Option::as_ref)
     }
 
     /// Return inert PowerPoint 12 metadata stored directly on this slide.
-    pub fn powerpoint12_round_trip_metadata(&self) -> Result<&PowerPoint12SlideRoundTripMetadata> {
+    pub fn powerpoint12_round_trip_metadata(&self) -> Result<&SlideRoundTripMetadata12> {
         self.round_trip_metadata
-            .get_or_try_init(|| PowerPoint12SlideRoundTripMetadata::parse(&self.record))
+            .get_or_try_init(|| SlideRoundTripMetadata12::parse(&self.record))
     }
 
     /// Extract all text from this slide (lazy-loaded).
@@ -425,7 +419,7 @@ impl<'doc> Slide<'doc> {
     /// and need to outlive the parsing function scope.
     fn parse_shapes(&self) -> Result<Vec<ShapeEnum<'static>>> {
         // Find PPDrawing record
-        let ppdrawing = match self.record.find_child(PptRecordType::PPDrawing) {
+        let ppdrawing = match self.record.find_child(RecordType::PPDrawing) {
             Some(record) => record,
             None => return Ok(Vec::new()),
         };
@@ -462,7 +456,7 @@ impl<'doc> Slide<'doc> {
     ) -> Result<Option<ShapeEnum<'static>>> {
         const MAX_SHAPE_DEPTH: usize = 256;
         if depth >= MAX_SHAPE_DEPTH {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "OfficeArt shape tree exceeds the PPT nesting limit".to_string(),
             ));
         }
@@ -735,7 +729,7 @@ impl<'doc> Slide<'doc> {
 
         // 2. Extract text from Escher/PPDrawing (shapes, text boxes)
         // This is separate from regular record text extraction
-        if let Some(ppdrawing) = self.record.find_child(PptRecordType::PPDrawing) {
+        if let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) {
             let escher_text = crate::odraw::text_from_drawing(&ppdrawing.data)?;
             let trimmed = escher_text.trim();
             if !trimmed.is_empty() {
@@ -753,12 +747,12 @@ impl<'doc> Slide<'doc> {
     /// Check if this slide has a PPDrawing record (shapes).
     #[inline]
     pub fn has_drawing(&self) -> bool {
-        self.record.find_child(PptRecordType::PPDrawing).is_some()
+        self.record.find_child(RecordType::PPDrawing).is_some()
     }
 
     /// Get raw slide record for advanced use cases.
     #[inline]
-    pub fn record(&self) -> &PptRecord {
+    pub fn record(&self) -> &Record {
         &self.record
     }
 
@@ -793,7 +787,7 @@ impl<'doc> Slide<'doc> {
     ///
     /// Returns an error when the `SSSlideInfoAtom` record is truncated.
     pub fn transition(&self) -> Result<Option<TransitionInfo>> {
-        match self.record.find_child(PptRecordType::SSSlideInfoAtom) {
+        match self.record.find_child(RecordType::SSSlideInfoAtom) {
             Some(info) => Ok(Some(parse_transition(info)?)),
             None => Ok(None),
         }
@@ -804,7 +798,7 @@ impl<'doc> Slide<'doc> {
     /// Returns `None` if the slide has no timing record.
     pub fn timing(&self) -> Option<ParsedSlideTiming> {
         // SSSlideInfoAtom (type=1017) is a direct child of the Slide container
-        let info = self.record.find_child(PptRecordType::SSSlideInfoAtom)?;
+        let info = self.record.find_child(RecordType::SSSlideInfoAtom)?;
 
         if info.data.len() < 16 {
             return None;
@@ -876,8 +870,8 @@ pub struct ParsedSlideTiming {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consts::PptRecordType;
-    use crate::records::PptRecord;
+    use crate::consts::RecordType;
+    use crate::records::Record;
     use crate::slide::SlideData;
 
     const ROOT_SHAPE_FLAGS: u32 = 0x0A00;
@@ -1248,12 +1242,8 @@ mod tests {
     }
 
     // Helper function to create a test record
-    fn create_test_record(
-        record_type: PptRecordType,
-        data: Vec<u8>,
-        children: Vec<PptRecord>,
-    ) -> PptRecord {
-        PptRecord {
+    fn create_test_record(record_type: RecordType, data: Vec<u8>, children: Vec<Record>) -> Record {
+        Record {
             record_type,
             record_type_raw: record_type as u16,
             version: 0,
@@ -1280,14 +1270,14 @@ mod tests {
         right: i32,
         bottom: i32,
     ) -> std::io::Result<()> {
-        crate::PowerPointClientAnchor::rect(left, top, right, bottom)
+        crate::ClientAnchor::rect(left, top, right, bottom)
             .map_err(|error| {
                 std::io::Error::new(std::io::ErrorKind::InvalidData, error.to_string())
             })?
             .write_to(data)
     }
 
-    fn prog_tags_record(version: u8, blob_payload: &[u8]) -> PptRecord {
+    fn prog_tags_record(version: u8, blob_payload: &[u8]) -> Record {
         let tag_name: Vec<u8> = format!("___PPT{version}")
             .encode_utf16()
             .flat_map(u16::to_le_bytes)
@@ -1297,27 +1287,27 @@ mod tests {
         let mut tag_payload = name;
         tag_payload.extend_from_slice(&blob);
         let tag = record_bytes(0x0f, 0, 0x138a, &tag_payload);
-        create_test_record(PptRecordType::ProgTags, tag, Vec::new())
+        create_test_record(RecordType::ProgTags, tag, Vec::new())
     }
 
     // Helper function to create a basic slide record without children
-    fn create_basic_slide_record() -> PptRecord {
-        create_test_record(PptRecordType::Slide, vec![0u8; 8], Vec::new())
+    fn create_basic_slide_record() -> Record {
+        create_test_record(RecordType::Slide, vec![0u8; 8], Vec::new())
     }
 
     // Helper function to create a slide with PPDrawing
-    fn create_slide_with_drawing() -> PptRecord {
+    fn create_slide_with_drawing() -> Record {
         let dg = record_bytes(0, 0, 0xf008, &[0; 8]);
         let ppdrawing = create_test_record(
-            PptRecordType::PPDrawing,
+            RecordType::PPDrawing,
             record_bytes(0x0f, 0, 0xf002, &dg),
             Vec::new(),
         );
-        create_test_record(PptRecordType::Slide, vec![0u8; 8], vec![ppdrawing])
+        create_test_record(RecordType::Slide, vec![0u8; 8], vec![ppdrawing])
     }
 
     // Helper function to create a slide with text
-    fn create_slide_with_text() -> PptRecord {
+    fn create_slide_with_text() -> Record {
         // Create a TextCharsAtom with "Test" in UTF-16 LE
         let text_data = vec![
             0x54, 0x00, // 'T'
@@ -1325,13 +1315,13 @@ mod tests {
             0x73, 0x00, // 's'
             0x74, 0x00, // 't'
         ];
-        let text_atom = create_test_record(PptRecordType::TextCharsAtom, text_data, Vec::new());
-        create_test_record(PptRecordType::Slide, vec![0u8; 8], vec![text_atom])
+        let text_atom = create_test_record(RecordType::TextCharsAtom, text_data, Vec::new());
+        create_test_record(RecordType::Slide, vec![0u8; 8], vec![text_atom])
     }
 
     // Helper function to create SlideData
     fn create_slide_data<'doc>(
-        record: PptRecord,
+        record: Record,
         persist_id: u32,
         doc_data: &'doc [u8],
     ) -> SlideData<'doc> {
@@ -1382,8 +1372,8 @@ mod tests {
         }
         let atom = record_bytes(0, 0, 0x3715, &times);
         let container = record_bytes(0x0f, 0, 0x3714, &[server, url, atom].concat());
-        let sync = PptRecord::parse(&container, 0).unwrap().0;
-        let slide_record = create_test_record(PptRecordType::Slide, Vec::new(), vec![sync]);
+        let sync = Record::parse(&container, 0).unwrap().0;
+        let slide_record = create_test_record(RecordType::Slide, Vec::new(), vec![sync]);
         let doc_data = vec![0u8; 32];
         let slide = Slide::from_slide_data(create_slide_data(slide_record, 256, &doc_data), 1);
 
@@ -1397,10 +1387,10 @@ mod tests {
 
     #[test]
     fn exposes_direct_powerpoint12_slide_master_references() {
-        let composite = PptRecord {
+        let composite = Record {
             version: 0,
             instance: 0,
-            record_type: PptRecordType::RoundTripCompositeMasterId12Atom,
+            record_type: RecordType::RoundTripCompositeMasterId12Atom,
             record_type_raw: 0x041d,
             data_length: 4,
             data: 17u32.to_le_bytes().to_vec(),
@@ -1410,17 +1400,17 @@ mod tests {
         content_data.extend_from_slice(&23u32.to_le_bytes());
         content_data.extend_from_slice(&5u16.to_le_bytes());
         content_data.extend_from_slice(&9u16.to_le_bytes());
-        let content = PptRecord {
+        let content = Record {
             version: 0,
             instance: 7,
-            record_type: PptRecordType::RoundTripContentMasterId12Atom,
+            record_type: RecordType::RoundTripContentMasterId12Atom,
             record_type_raw: 0x0422,
             data_length: 8,
             data: content_data,
             children: Vec::new(),
         };
         let slide_record =
-            create_test_record(PptRecordType::Slide, Vec::new(), vec![composite, content]);
+            create_test_record(RecordType::Slide, Vec::new(), vec![composite, content]);
         let doc_data = vec![0u8; 32];
         let slide = Slide::from_slide_data(create_slide_data(slide_record, 256, &doc_data), 1);
 
@@ -1475,7 +1465,7 @@ mod tests {
         let slide = Slide::from_slide_data(slide_data, 1);
 
         let rec = slide.record();
-        assert_eq!(rec.record_type, PptRecordType::Slide);
+        assert_eq!(rec.record_type, RecordType::Slide);
     }
 
     #[test]
@@ -1568,11 +1558,11 @@ mod tests {
             0x41, 0x00, // 'A'
             0x42, 0x00, // 'B'
         ];
-        let text_atom = create_test_record(PptRecordType::TextCharsAtom, text_data, Vec::new());
+        let text_atom = create_test_record(RecordType::TextCharsAtom, text_data, Vec::new());
 
-        let container = create_test_record(PptRecordType::SlideAtom, vec![0u8; 8], vec![text_atom]);
+        let container = create_test_record(RecordType::SlideAtom, vec![0u8; 8], vec![text_atom]);
 
-        let slide_record = create_test_record(PptRecordType::Slide, vec![0u8; 8], vec![container]);
+        let slide_record = create_test_record(RecordType::Slide, vec![0u8; 8], vec![container]);
 
         let slide_data = create_slide_data(slide_record, 256, &doc_data);
         let slide = Slide::from_slide_data(slide_data, 1);
@@ -1590,17 +1580,16 @@ mod tests {
             0x48, 0x00, // 'H'
             0x69, 0x00, // 'i'
         ];
-        let text1 = create_test_record(PptRecordType::TextCharsAtom, text1_data, Vec::new());
+        let text1 = create_test_record(RecordType::TextCharsAtom, text1_data, Vec::new());
 
         let text2_data = vec![
             0x42, 0x00, // 'B'
             0x79, 0x00, // 'y'
             0x65, 0x00, // 'e'
         ];
-        let text2 = create_test_record(PptRecordType::TextCharsAtom, text2_data, Vec::new());
+        let text2 = create_test_record(RecordType::TextCharsAtom, text2_data, Vec::new());
 
-        let slide_record =
-            create_test_record(PptRecordType::Slide, vec![0u8; 8], vec![text1, text2]);
+        let slide_record = create_test_record(RecordType::Slide, vec![0u8; 8], vec![text1, text2]);
 
         let slide_data = create_slide_data(slide_record, 256, &doc_data);
         let slide = Slide::from_slide_data(slide_data, 1);
@@ -1617,11 +1606,10 @@ mod tests {
 
         // Create TextBytesAtom (ASCII/ANSI encoding)
         let text_bytes = vec![0x54, 0x65, 0x78, 0x74]; // "Text" in ASCII
-        let text_bytes_atom =
-            create_test_record(PptRecordType::TextBytesAtom, text_bytes, Vec::new());
+        let text_bytes_atom = create_test_record(RecordType::TextBytesAtom, text_bytes, Vec::new());
 
         let slide_record =
-            create_test_record(PptRecordType::Slide, vec![0u8; 8], vec![text_bytes_atom]);
+            create_test_record(RecordType::Slide, vec![0u8; 8], vec![text_bytes_atom]);
 
         let slide_data = create_slide_data(slide_record, 256, &doc_data);
         let slide = Slide::from_slide_data(slide_data, 1);
@@ -1674,11 +1662,11 @@ mod tests {
     fn referenced_picture_frame_is_exposed_as_picture_shape() {
         let doc_data = vec![0u8; 32];
         let ppdrawing = create_test_record(
-            PptRecordType::PPDrawing,
+            RecordType::PPDrawing,
             create_picture_escher_drawing(7),
             Vec::new(),
         );
-        let record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let record = create_test_record(RecordType::Slide, Vec::new(), vec![ppdrawing]);
         let slide = Slide::from_slide_data(create_slide_data(record, 256, &doc_data), 1);
 
         let shapes = slide.shapes().unwrap();
@@ -1698,11 +1686,11 @@ mod tests {
 
         let doc_data = vec![0u8; 32];
         let ppdrawing = create_test_record(
-            PptRecordType::PPDrawing,
+            RecordType::PPDrawing,
             create_autoshape_escher_drawing(),
             Vec::new(),
         );
-        let record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let record = create_test_record(RecordType::Slide, Vec::new(), vec![ppdrawing]);
         let slide = Slide::from_slide_data(create_slide_data(record, 256, &doc_data), 1);
 
         let shapes = slide.shapes().unwrap();
@@ -1727,11 +1715,11 @@ mod tests {
 
         let doc_data = vec![0u8; 32];
         let ppdrawing = create_test_record(
-            PptRecordType::PPDrawing,
+            RecordType::PPDrawing,
             create_freeform_escher_drawing(),
             Vec::new(),
         );
-        let record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let record = create_test_record(RecordType::Slide, Vec::new(), vec![ppdrawing]);
         let slide = Slide::from_slide_data(create_slide_data(record, 256, &doc_data), 1);
 
         let shapes = slide.shapes().unwrap();
@@ -1756,11 +1744,11 @@ mod tests {
 
         let doc_data = vec![0u8; 32];
         let ppdrawing = create_test_record(
-            PptRecordType::PPDrawing,
+            RecordType::PPDrawing,
             create_frame_escher_drawing(8, Some(5), Some(77)),
             Vec::new(),
         );
-        let record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let record = create_test_record(RecordType::Slide, Vec::new(), vec![ppdrawing]);
         let slide = Slide::from_slide_data(create_slide_data(record, 256, &doc_data), 1);
 
         let shapes = slide.shapes().unwrap();
@@ -1779,11 +1767,11 @@ mod tests {
 
         let doc_data = vec![0u8; 32];
         let ppdrawing = create_test_record(
-            PptRecordType::PPDrawing,
+            RecordType::PPDrawing,
             create_frame_escher_drawing(9, Some(6), Some(88)),
             Vec::new(),
         );
-        let record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let record = create_test_record(RecordType::Slide, Vec::new(), vec![ppdrawing]);
         let slide = Slide::from_slide_data(create_slide_data(record, 256, &doc_data), 1);
 
         let shapes = slide.shapes().unwrap();
@@ -1802,11 +1790,11 @@ mod tests {
 
         let doc_data = vec![0u8; 32];
         let ppdrawing = create_test_record(
-            PptRecordType::PPDrawing,
+            RecordType::PPDrawing,
             create_frame_escher_drawing(10, None, Some(99)),
             Vec::new(),
         );
-        let record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let record = create_test_record(RecordType::Slide, Vec::new(), vec![ppdrawing]);
         let slide = Slide::from_slide_data(create_slide_data(record, 256, &doc_data), 1);
 
         let shapes = slide.shapes().unwrap();
@@ -1822,11 +1810,11 @@ mod tests {
 
         let doc_data = vec![0u8; 32];
         let ppdrawing = create_test_record(
-            PptRecordType::PPDrawing,
+            RecordType::PPDrawing,
             create_placeholder_escher_drawing(&[]),
             Vec::new(),
         );
-        let record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let record = create_test_record(RecordType::Slide, Vec::new(), vec![ppdrawing]);
         let slide = Slide::from_slide_data(create_slide_data(record, 256, &doc_data), 1);
 
         let shapes = slide.shapes().unwrap();
@@ -1853,11 +1841,11 @@ mod tests {
         .concat();
         let doc_data = vec![0u8; 32];
         let ppdrawing = create_test_record(
-            PptRecordType::PPDrawing,
+            RecordType::PPDrawing,
             create_round_trip_placeholder_escher_drawing(202, &records),
             Vec::new(),
         );
-        let slide_record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let slide_record = create_test_record(RecordType::Slide, Vec::new(), vec![ppdrawing]);
         let slide = Slide::from_slide_data(create_slide_data(slide_record, 256, &doc_data), 1);
 
         let shapes = slide.shapes().unwrap();
@@ -1883,11 +1871,11 @@ mod tests {
         let footer = record_bytes(0, 0, 0x0420, &[9]);
         let doc_data = vec![0u8; 32];
         let ppdrawing = create_test_record(
-            PptRecordType::PPDrawing,
+            RecordType::PPDrawing,
             create_placeholder_escher_drawing(&footer),
             Vec::new(),
         );
-        let slide_record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let slide_record = create_test_record(RecordType::Slide, Vec::new(), vec![ppdrawing]);
         let slide = Slide::from_slide_data(create_slide_data(slide_record, 256, &doc_data), 1);
 
         let shapes = slide.shapes().unwrap();
@@ -1908,11 +1896,11 @@ mod tests {
         let picture = record_bytes(0, 0, 0x0bdd, &[26]);
         let doc_data = vec![0u8; 32];
         let ppdrawing = create_test_record(
-            PptRecordType::PPDrawing,
+            RecordType::PPDrawing,
             create_round_trip_placeholder_escher_drawing(1, &picture),
             Vec::new(),
         );
-        let slide_record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let slide_record = create_test_record(RecordType::Slide, Vec::new(), vec![ppdrawing]);
         let slide = Slide::from_slide_data(create_slide_data(slide_record, 256, &doc_data), 1);
 
         let shapes = slide.shapes().unwrap();
@@ -1954,12 +1942,11 @@ mod tests {
         ] {
             let doc_data = vec![0u8; 32];
             let ppdrawing = create_test_record(
-                PptRecordType::PPDrawing,
+                RecordType::PPDrawing,
                 create_round_trip_placeholder_escher_drawing(202, &malformed),
                 Vec::new(),
             );
-            let slide_record =
-                create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+            let slide_record = create_test_record(RecordType::Slide, Vec::new(), vec![ppdrawing]);
             let slide = Slide::from_slide_data(create_slide_data(slide_record, 256, &doc_data), 1);
             assert!(slide.shapes().is_err());
         }
@@ -2018,11 +2005,11 @@ mod tests {
         .concat();
         let doc_data = vec![0u8; 32];
         let ppdrawing = create_test_record(
-            PptRecordType::PPDrawing,
+            RecordType::PPDrawing,
             create_round_trip_placeholder_escher_drawing(1, &records),
             Vec::new(),
         );
-        let slide_record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let slide_record = create_test_record(RecordType::Slide, Vec::new(), vec![ppdrawing]);
         let slide = Slide::from_slide_data(create_slide_data(slide_record, 256, &doc_data), 1);
         let metadata = slide.shapes().unwrap()[0]
             .powerpoint12_shape_metadata()
@@ -2080,11 +2067,11 @@ mod tests {
     fn table_group_is_exposed_with_grid_and_text() {
         let doc_data = vec![0u8; 32];
         let ppdrawing = create_test_record(
-            PptRecordType::PPDrawing,
+            RecordType::PPDrawing,
             create_table_escher_drawing(),
             Vec::new(),
         );
-        let record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let record = create_test_record(RecordType::Slide, Vec::new(), vec![ppdrawing]);
         let slide = Slide::from_slide_data(create_slide_data(record, 256, &doc_data), 1);
 
         let shapes = slide.shapes().unwrap();
@@ -2107,13 +2094,13 @@ mod tests {
 
         // Create deeply nested structure
         let text_data = vec![0x58, 0x00]; // 'X'
-        let text_atom = create_test_record(PptRecordType::TextCharsAtom, text_data, Vec::new());
+        let text_atom = create_test_record(RecordType::TextCharsAtom, text_data, Vec::new());
 
-        let level3 = create_test_record(PptRecordType::SlideAtom, vec![], vec![text_atom]);
+        let level3 = create_test_record(RecordType::SlideAtom, vec![], vec![text_atom]);
 
-        let level2 = create_test_record(PptRecordType::SlideAtom, vec![], vec![level3]);
+        let level2 = create_test_record(RecordType::SlideAtom, vec![], vec![level3]);
 
-        let level1 = create_test_record(PptRecordType::Slide, vec![], vec![level2]);
+        let level1 = create_test_record(RecordType::Slide, vec![], vec![level2]);
 
         let slide_data = create_slide_data(level1, 256, &doc_data);
         let slide = Slide::from_slide_data(slide_data, 1);
@@ -2132,9 +2119,9 @@ mod tests {
             0x20, 0x00, // space
             0x09, 0x00, // tab
         ];
-        let text_atom = create_test_record(PptRecordType::TextCharsAtom, text_data, Vec::new());
+        let text_atom = create_test_record(RecordType::TextCharsAtom, text_data, Vec::new());
 
-        let slide_record = create_test_record(PptRecordType::Slide, vec![], vec![text_atom]);
+        let slide_record = create_test_record(RecordType::Slide, vec![], vec![text_atom]);
 
         let slide_data = create_slide_data(slide_record, 256, &doc_data);
         let slide = Slide::from_slide_data(slide_data, 1);
@@ -2176,17 +2163,17 @@ mod tests {
 
         // Create slide with both text and PPDrawing
         let text_data = vec![0x41, 0x00]; // 'A'
-        let text_atom = create_test_record(PptRecordType::TextCharsAtom, text_data, Vec::new());
+        let text_atom = create_test_record(RecordType::TextCharsAtom, text_data, Vec::new());
 
         let dg = record_bytes(0, 0, 0xf008, &[0; 8]);
         let ppdrawing = create_test_record(
-            PptRecordType::PPDrawing,
+            RecordType::PPDrawing,
             record_bytes(0x0f, 0, 0xf002, &dg),
             Vec::new(),
         );
 
         let slide_record =
-            create_test_record(PptRecordType::Slide, vec![], vec![text_atom, ppdrawing]);
+            create_test_record(RecordType::Slide, vec![], vec![text_atom, ppdrawing]);
 
         let slide_data = create_slide_data(slide_record, 256, &doc_data);
         let slide = Slide::from_slide_data(slide_data, 1);
@@ -2213,9 +2200,9 @@ mod tests {
 
         // CString records contain UTF-16LE text.
         let cstring_data = "Hi😀".encode_utf16().flat_map(u16::to_le_bytes).collect();
-        let cstring = create_test_record(PptRecordType::CString, cstring_data, Vec::new());
+        let cstring = create_test_record(RecordType::CString, cstring_data, Vec::new());
 
-        let slide_record = create_test_record(PptRecordType::Slide, vec![], vec![cstring]);
+        let slide_record = create_test_record(RecordType::Slide, vec![], vec![cstring]);
 
         let slide_data = create_slide_data(slide_record, 256, &doc_data);
         let slide = Slide::from_slide_data(slide_data, 1);
@@ -2255,11 +2242,11 @@ mod tests {
     fn exposes_inert_shape_animations_from_the_slide() {
         let doc_data = vec![0u8; 1024];
         let ppdrawing = create_test_record(
-            PptRecordType::PPDrawing,
+            RecordType::PPDrawing,
             create_animated_escher_drawing(),
             Vec::new(),
         );
-        let slide_record = create_test_record(PptRecordType::Slide, Vec::new(), vec![ppdrawing]);
+        let slide_record = create_test_record(RecordType::Slide, Vec::new(), vec![ppdrawing]);
         let slide = Slide::from_slide_data(create_slide_data(slide_record, 256, &doc_data), 1);
 
         let animations = slide.animations().unwrap();
@@ -2302,7 +2289,7 @@ mod tests {
             &mut prog_binary_children,
             0,
             0,
-            PptRecordType::BinaryTagData.as_u16(),
+            RecordType::BinaryTagData.as_u16(),
             &extension_data,
         )
         .unwrap();
@@ -2310,7 +2297,7 @@ mod tests {
         write_container(
             &mut prog_tags_children,
             0,
-            PptRecordType::ProgBinaryTag.as_u16(),
+            RecordType::ProgBinaryTag.as_u16(),
             &prog_binary_children,
         )
         .unwrap();
@@ -2318,20 +2305,14 @@ mod tests {
         write_container(
             &mut slide_children,
             0,
-            PptRecordType::ProgTags.as_u16(),
+            RecordType::ProgTags.as_u16(),
             &prog_tags_children,
         )
         .unwrap();
         let mut bytes = Vec::new();
-        write_container(
-            &mut bytes,
-            0,
-            PptRecordType::Slide.as_u16(),
-            &slide_children,
-        )
-        .unwrap();
+        write_container(&mut bytes, 0, RecordType::Slide.as_u16(), &slide_children).unwrap();
 
-        let (record, consumed) = PptRecord::parse(&bytes, 0).unwrap();
+        let (record, consumed) = Record::parse(&bytes, 0).unwrap();
         assert_eq!(consumed, bytes.len());
         let doc_data = Vec::new();
         let slide = Slide::from_slide_data(create_slide_data(record, 256, &doc_data), 1);
@@ -2347,14 +2328,9 @@ mod tests {
 
     #[test]
     fn ignores_powerpoint10_slide_settings_in_other_tag_versions() {
-        let flags = record_bytes(
-            0,
-            0,
-            PptRecordType::SlideFlags10Atom.as_u16(),
-            &[3, 0, 0, 0],
-        );
+        let flags = record_bytes(0, 0, RecordType::SlideFlags10Atom.as_u16(), &[3, 0, 0, 0]);
         let slide_record = create_test_record(
-            PptRecordType::Slide,
+            RecordType::Slide,
             Vec::new(),
             vec![prog_tags_record(9, &flags)],
         );
@@ -2368,18 +2344,18 @@ mod tests {
     fn truncated_comment_atoms_are_rejected_without_panicking() {
         let mut child = Vec::new();
         child.extend(0u16.to_le_bytes());
-        child.extend(PptRecordType::Comment2000Atom.as_u16().to_le_bytes());
+        child.extend(RecordType::Comment2000Atom.as_u16().to_le_bytes());
         child.extend(28u32.to_le_bytes());
         child.push(0);
 
         let mut data = Vec::new();
         data.extend(0x000Fu16.to_le_bytes());
-        data.extend(PptRecordType::Comment2000.as_u16().to_le_bytes());
+        data.extend(RecordType::Comment2000.as_u16().to_le_bytes());
         data.extend(u32::try_from(child.len()).unwrap().to_le_bytes());
         data.extend(child);
 
         let extension = prog_tags_record(10, &data);
-        let slide = create_test_record(PptRecordType::Slide, Vec::new(), vec![extension]);
+        let slide = create_test_record(RecordType::Slide, Vec::new(), vec![extension]);
         assert!(crate::comments::parse_slide_comments(&slide).is_err());
     }
 
@@ -2389,25 +2365,24 @@ mod tests {
 
         // Create multiple text atoms in specific order
         let text1 = create_test_record(
-            PptRecordType::TextCharsAtom,
+            RecordType::TextCharsAtom,
             vec![0x31, 0x00], // '1'
             Vec::new(),
         );
 
         let text2 = create_test_record(
-            PptRecordType::TextCharsAtom,
+            RecordType::TextCharsAtom,
             vec![0x32, 0x00], // '2'
             Vec::new(),
         );
 
         let text3 = create_test_record(
-            PptRecordType::TextCharsAtom,
+            RecordType::TextCharsAtom,
             vec![0x33, 0x00], // '3'
             Vec::new(),
         );
 
-        let slide_record =
-            create_test_record(PptRecordType::Slide, vec![], vec![text1, text2, text3]);
+        let slide_record = create_test_record(RecordType::Slide, vec![], vec![text1, text2, text3]);
 
         let slide_data = create_slide_data(slide_record, 256, &doc_data);
         let slide = Slide::from_slide_data(slide_data, 1);

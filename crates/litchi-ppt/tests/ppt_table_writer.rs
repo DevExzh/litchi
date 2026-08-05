@@ -1,11 +1,11 @@
-//! Integration tests for PPT table authoring: tables written by `PptWriter`
+//! Integration tests for PPT table authoring: tables written by `Writer`
 //! must round-trip through the table extraction APIs after save/reopen.
 
 use litchi_ppt::Package;
-use litchi_ppt::writer::{PptWriter, Table};
+use litchi_ppt::writer::{Table, Writer};
 use std::io::Cursor;
 
-fn write(writer: &mut PptWriter) -> Vec<u8> {
+fn write(writer: &mut Writer) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
     output.into_inner()
@@ -17,7 +17,7 @@ fn reopen(bytes: Vec<u8>) -> Package<Cursor<Vec<u8>>> {
 
 #[test]
 fn authored_2x3_table_round_trips_with_cell_text() {
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
     let slide = writer.add_slide().unwrap();
 
     let mut table = Table::new(2, 3).unwrap();
@@ -48,7 +48,7 @@ fn authored_2x3_table_round_trips_with_cell_text() {
 
 #[test]
 fn table_coexists_with_other_shapes() {
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
     let slide = writer.add_slide().unwrap();
 
     writer.add_rectangle(slide, 10, 10, 100, 50).unwrap();
@@ -82,7 +82,7 @@ fn table_coexists_with_other_shapes() {
 
 #[test]
 fn multiple_tables_on_one_slide_round_trip() {
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
     let slide = writer.add_slide().unwrap();
 
     let mut first = Table::new(1, 2).unwrap();
@@ -109,7 +109,7 @@ fn multiple_tables_on_one_slide_round_trip() {
 
 #[test]
 fn unicode_cell_text_round_trips() {
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
     let slide = writer.add_slide().unwrap();
 
     let mut table = Table::new(1, 1).unwrap();
@@ -126,7 +126,7 @@ fn unicode_cell_text_round_trips() {
 
 #[test]
 fn custom_cell_dimensions_round_trip_to_bounds() {
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
     let slide = writer.add_slide().unwrap();
 
     let mut table = Table::new(2, 2).unwrap();

@@ -10,7 +10,7 @@
 //! - **FORMAT**: Number format definition
 //! - **PALETTE**: Color palette
 
-use super::super::XlsResult;
+use super::super::Result;
 use std::collections::HashMap;
 use std::io::Write;
 
@@ -294,7 +294,7 @@ impl Default for CellStyle {
 ///
 /// * `writer` - Output writer
 /// * `font` - Font definition
-pub fn write_font<W: Write>(writer: &mut W, font: &Font) -> XlsResult<()> {
+pub fn write_font<W: Write>(writer: &mut W, font: &Font) -> Result<()> {
     let mut name_end = 0;
     let mut name_len = 0;
     for (offset, character) in font.name.char_indices() {
@@ -373,7 +373,7 @@ pub fn write_font<W: Write>(writer: &mut W, font: &Font) -> XlsResult<()> {
 /// * `writer` - Output writer
 /// * `xf` - Extended format definition
 /// * `is_style_xf` - True for style XF, false for cell XF
-pub fn write_xf<W: Write>(writer: &mut W, xf: &ExtendedFormat, is_style_xf: bool) -> XlsResult<()> {
+pub fn write_xf<W: Write>(writer: &mut W, xf: &ExtendedFormat, is_style_xf: bool) -> Result<()> {
     super::biff::write_record_header(writer, 0x00E0, 20)?;
 
     // Font index
@@ -606,7 +606,7 @@ impl FormattingManager {
     }
 
     /// Write all FONT records
-    pub fn write_fonts<W: Write>(&self, writer: &mut W) -> XlsResult<()> {
+    pub fn write_fonts<W: Write>(&self, writer: &mut W) -> Result<()> {
         for font in &self.fonts {
             write_font(writer, font)?;
         }
@@ -615,7 +615,7 @@ impl FormattingManager {
 
     /// Write all FORMAT records (0x041E): the eight BIFF8 default records and any
     /// registered user-defined formats.
-    pub fn write_number_formats<W: Write>(&self, writer: &mut W) -> XlsResult<()> {
+    pub fn write_number_formats<W: Write>(&self, writer: &mut W) -> Result<()> {
         // [MS-XLS] 2.4.126 permits the default locale-sensitive groups 5..=8
         // and 41..=44. Built-ins 0..=4 are referenced directly by XF records
         // and MUST NOT be serialized as Format records.
@@ -635,7 +635,7 @@ impl FormattingManager {
     }
 
     /// Write all XF records
-    pub fn write_formats<W: Write>(&self, writer: &mut W) -> XlsResult<()> {
+    pub fn write_formats<W: Write>(&self, writer: &mut W) -> Result<()> {
         // Base style XF (matches Excel/POI defaults: General format, font 0)
         let base = ExtendedFormat::default();
 
@@ -808,10 +808,10 @@ mod tests {
         let mut record = Vec::new();
         write_font(&mut record, &font).unwrap();
 
-        let parsed = crate::font::XlsFont::parse_record(
+        let parsed = crate::font::Font::parse_record(
             0,
             &record[4..],
-            &mut crate::leniency::XlsToleranceLog::new(crate::leniency::XlsLeniency::Strict),
+            &mut crate::leniency::ToleranceLog::new(crate::leniency::Leniency::Strict),
         )
         .unwrap();
         assert_eq!(parsed.name(), font.name);

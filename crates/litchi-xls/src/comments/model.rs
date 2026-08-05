@@ -1,6 +1,6 @@
 //! Typed, lossless values for a worksheet's BIFF8 comments.
 
-use crate::error::{XlsError, XlsResult};
+use crate::error::{Error, Result};
 
 /// BIFF8 maximum payload for a single record.
 pub(crate) const MAX_RECORD_BYTES: usize = 8_224;
@@ -106,16 +106,16 @@ impl CommentRecord {
         &self.payload
     }
 
-    pub(crate) fn new(kind: RecordKind, data: &[u8]) -> XlsResult<Self> {
+    pub(crate) fn new(kind: RecordKind, data: &[u8]) -> Result<Self> {
         if data.len() > MAX_RECORD_BYTES {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "comment record payload exceeds the BIFF8 record bound".to_string(),
             ));
         }
         let mut payload = Vec::new();
         payload
             .try_reserve_exact(data.len())
-            .map_err(|_| XlsError::Allocation("retaining comment record payload"))?;
+            .map_err(|_| Error::Allocation("retaining comment record payload"))?;
         payload.extend_from_slice(data);
         Ok(Self {
             kind,
@@ -187,16 +187,16 @@ impl ObjectSubrecord {
         self.known
     }
 
-    pub(crate) fn new(record_type: u16, payload: &[u8], known: bool) -> XlsResult<Self> {
+    pub(crate) fn new(record_type: u16, payload: &[u8], known: bool) -> Result<Self> {
         if payload.len() > MAX_RECORD_BYTES {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "OBJ subrecord payload exceeds the BIFF8 record bound".to_string(),
             ));
         }
         let mut owned = Vec::new();
         owned
             .try_reserve_exact(payload.len())
-            .map_err(|_| XlsError::Allocation("retaining OBJ subrecord payload"))?;
+            .map_err(|_| Error::Allocation("retaining OBJ subrecord payload"))?;
         owned.extend_from_slice(payload);
         Ok(Self {
             record_type,
@@ -215,16 +215,16 @@ impl ObjectPadding {
         &self.0
     }
 
-    pub(crate) fn new(data: &[u8]) -> XlsResult<Self> {
+    pub(crate) fn new(data: &[u8]) -> Result<Self> {
         if data.len() > MAX_RECORD_BYTES {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "OBJ padding exceeds the BIFF8 record bound".to_string(),
             ));
         }
         let mut owned = Vec::new();
         owned
             .try_reserve_exact(data.len())
-            .map_err(|_| XlsError::Allocation("retaining OBJ padding"))?;
+            .map_err(|_| Error::Allocation("retaining OBJ padding"))?;
         owned.extend_from_slice(data);
         Ok(Self(owned.into_boxed_slice()))
     }
@@ -447,16 +447,16 @@ impl Comment {
     }
 }
 
-pub(crate) fn boxed_bytes(data: &[u8], context: &'static str) -> XlsResult<Box<[u8]>> {
+pub(crate) fn boxed_bytes(data: &[u8], context: &'static str) -> Result<Box<[u8]>> {
     if data.len() > MAX_RECORD_BYTES {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "retained comment bytes exceed the BIFF8 record bound".to_string(),
         ));
     }
     let mut owned = Vec::new();
     owned
         .try_reserve_exact(data.len())
-        .map_err(|_| XlsError::Allocation(context))?;
+        .map_err(|_| Error::Allocation(context))?;
     owned.extend_from_slice(data);
     Ok(owned.into_boxed_slice())
 }

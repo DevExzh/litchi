@@ -1,0 +1,882 @@
+//! Bounded SpreadsheetML Custom XML Maps XML codec.
+
+use std::collections::HashSet;
+
+use super::invalid;
+use super::model::*;
+use litchi_core::sheet::Result;
+use quick_xml::encoding::Decoder;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
+use quick_xml::{Reader, Writer, XmlVersion};
+
+impl XmlMapInfo {
+    pub fn parse(xml: &[u8]) -> Result<Self> {
+        if xml.len() > MAX_PART_BYTES {
+            return Err(invalid("custom XML maps part exceeds 32 MiB"));
+        }
+        let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
+        if processed.len() > MAX_PART_BYTES {
+            return Err(invalid("processed custom XML maps part exceeds 32 MiB"));
+        }
+        std::str::from_utf8(processed.as_ref()).map_err(xml_error)?;
+        parse_processed(processed.as_ref())
+    }
+
+    pub fn to_xml(&self, strict: bool) -> Result<Vec<u8>> {
+        validate(self)?;
+        let namespace = if strict { STRICT_NS_TEXT } else { NS_TEXT };
+        let mut xml = BoundedXml::new();
+        xml.push_str(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><MapInfo xmlns=\"",
+        )?;
+        escape_attr(&mut xml, namespace)?;
+        xml.push_str("\" SelectionNamespaces=\"")?;
+        escape_attr(&mut xml, &self.selection_namespaces)?;
+        xml.push_str("\">")?;
+        for schema in &self.schemas {
+            xml.push_str("<Schema ID=\"")?;
+            escape_attr(&mut xml, &schema.id)?;
+            xml.push_char('"')?;
+            optional_string_attr(&mut xml, "SchemaRef", schema.schema_reference.as_deref())?;
+            optional_string_attr(&mut xml, "Namespace", schema.namespace.as_deref())?;
+            if let Some(payload) = &schema.payload_xml {
+                xml.push_char('>')?;
+                xml.push_str(std::str::from_utf8(payload).map_err(xml_error)?)?;
+                xml.push_str("</Schema>")?;
+            } else {
+                xml.push_str("/>")?;
+            }
+        }
+        for map in &self.maps {
+            xml.push_str("<Map ID=\"")?;
+            xml.push_str(&map.id.to_string())?;
+            xml.push_str("\" Name=\"")?;
+            escape_attr(&mut xml, &map.name)?;
+            xml.push_str("\" RootElement=\"")?;
+            escape_attr(&mut xml, &map.root_element)?;
+            xml.push_str("\" SchemaID=\"")?;
+            escape_attr(&mut xml, &map.schema_id)?;
+            xml.push_char('"')?;
+            bool_attr(
+                &mut xml,
+                "ShowImportExportValidationErrors",
+                map.show_import_export_validation_errors,
+            )?;
+            bool_attr(&mut xml, "AutoFit", map.auto_fit)?;
+            bool_attr(&mut xml, "Append", map.append)?;
+            bool_attr(
+                &mut xml,
+                "PreserveSortAFLayout",
+                map.preserve_sort_auto_filter_layout,
+            )?;
+            bool_attr(&mut xml, "PreserveFormat", map.preserve_format)?;
+            if let Some(binding) = &map.data_binding {
+                xml.push_str("><DataBinding")?;
+                optional_string_attr(
+                    &mut xml,
+                    "DataBindingName",
+                    binding.data_binding_name.as_deref(),
+                )?;
+                optional_bool_attr(&mut xml, "FileBinding", binding.file_binding)?;
+                optional_u32_attr(&mut xml, "ConnectionID", binding.connection_id)?;
+                optional_string_attr(
+                    &mut xml,
+                    "FileBindingName",
+                    binding.file_binding_name.as_deref(),
+                )?;
+                optional_u32_attr(&mut xml, "DataBindingLoadMode", Some(binding.load_mode))?;
+                if let Some(payload) = &binding.payload_xml {
+                    xml.push_char('>')?;
+                    xml.push_str(std::str::from_utf8(payload).map_err(xml_error)?)?;
+                    xml.push_str("</DataBinding></Map>")?;
+                } else {
+                    xml.push_str("/></Map>")?;
+                }
+            } else {
+                xml.push_str("/>")?;
+            }
+        }
+        xml.push_str("</MapInfo>")?;
+        Ok(xml.finish())
+    }
+}
+
+#[derive(Clone, Copy)]
+enum Context {
+    Root,
+    Schema(usize),
+    Map(usize),
+    Binding(usize),
+}
+#[derive(Clone, Copy)]
+enum Owner {
+    Schema(usize),
+    Binding(usize),
+}
+struct Capture {
+    depth: usize,
+    events: usize,
+    owner: Owner,
+    writer: Writer<Vec<u8>>,
+}
+struct SchemaBuilder {
+    value: XmlMapSchema,
+    bindings: Vec<(String, String)>,
+}
+struct BindingBuilder {
+    value: XmlMapDataBinding,
+    bindings: Vec<(String, String)>,
+}
+struct MapBuilder {
+    value: XmlMap,
+    binding: Option<BindingBuilder>,
+}
+
+fn parse_processed(xml: &[u8]) -> Result<XmlMapInfo> {
+    let mut reader = NsReader::from_reader(xml);
+    let mut stack = Vec::new();
+    let mut root_closed = false;
+    let mut root_bindings = Vec::new();
+    let mut selection = None;
+    let mut schemas: Vec<SchemaBuilder> = Vec::new();
+    let mut maps: Vec<MapBuilder> = Vec::new();
+    let mut capture: Option<Capture> = None;
+    loop {
+        let decoder = reader.decoder();
+        let event = reader.read_event()?.into_owned();
+        if let Some(active) = capture.as_mut() {
+            active.events += 1;
+            if active.events > MAX_EVENTS {
+                return Err(invalid("opaque XML event limit exceeded"));
+            }
+            match &event {
+                Event::Start(_) => {
+                    active.depth += 1;
+                    if active.depth > MAX_DEPTH {
+                        return Err(invalid("opaque XML depth limit exceeded"));
+                    }
+                },
+                Event::End(_) => {
+                    active.depth = active
+                        .depth
+                        .checked_sub(1)
+                        .ok_or_else(|| invalid("invalid opaque XML nesting"))?;
+                },
+                Event::DocType(_) | Event::PI(_) => {
+                    return Err(invalid("DTD and processing instructions are rejected"));
+                },
+                Event::Eof => return Err(invalid("unterminated opaque XML payload")),
+                _ => {},
+            }
+            active
+                .writer
+                .write_event(event.clone())
+                .map_err(xml_error)?;
+            if active.writer.get_ref().len() > MAX_OPAQUE_BYTES {
+                return Err(invalid("opaque XML payload exceeds 16 MiB"));
+            }
+            if active.depth == 0 {
+                let completed = capture
+                    .take()
+                    .ok_or_else(|| invalid("opaque XML capture state was lost"))?;
+                assign_payload(
+                    &mut schemas,
+                    &mut maps,
+                    completed.owner,
+                    completed.writer.into_inner(),
+                )?;
+            }
+            continue;
+        }
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+        match event {
+            Event::Start(e) if stack.is_empty() => {
+                if root_closed || !root_name(&namespace, &e, b"MapInfo") {
+                    return Err(invalid("expected one SpreadsheetML MapInfo root"));
+                }
+                root_bindings = namespace_attributes(&e, decoder)?;
+                selection = Some(required_attr(&e, decoder, b"SelectionNamespaces")?);
+                only_attrs(&e, &[b"SelectionNamespaces"])?;
+                stack.push(Context::Root);
+            },
+            Event::Start(e) => handle_start(
+                &mut stack,
+                &mut schemas,
+                &mut maps,
+                &root_bindings,
+                &namespace,
+                e,
+                decoder,
+                &mut capture,
+            )?,
+            Event::Empty(e) => handle_empty(
+                &mut stack,
+                &mut schemas,
+                &mut maps,
+                &root_bindings,
+                &namespace,
+                e,
+                decoder,
+            )?,
+            Event::Text(t) => {
+                if !t.decode().map_err(xml_error)?.trim().is_empty() {
+                    return Err(invalid("text outside opaque XML payload"));
+                }
+            },
+            Event::CData(t) => {
+                if !t.decode().map_err(xml_error)?.trim().is_empty() {
+                    return Err(invalid("CDATA outside opaque XML payload"));
+                }
+            },
+            Event::GeneralRef(_) => {
+                return Err(invalid("entity reference outside opaque XML payload"));
+            },
+            Event::End(_) => {
+                let ended = stack
+                    .pop()
+                    .ok_or_else(|| invalid("closing element outside MapInfo"))?;
+                if let Context::Binding(index) = ended {
+                    let value = maps
+                        .get(index)
+                        .and_then(|map| map.binding.as_ref())
+                        .map(|binding| binding.value.clone())
+                        .ok_or_else(|| invalid("DataBinding context has no binding"))?;
+                    maps.get_mut(index)
+                        .ok_or_else(|| invalid("DataBinding context has no map"))?
+                        .value
+                        .data_binding = Some(value);
+                }
+                if matches!(ended, Context::Root) {
+                    root_closed = true;
+                }
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid("DTD and processing instructions are rejected"));
+            },
+            Event::Decl(_) | Event::Comment(_) => {},
+            Event::Eof => break,
+        }
+    }
+    if !root_closed || !stack.is_empty() {
+        return Err(invalid("unterminated custom XML maps XML"));
+    }
+    let result = XmlMapInfo {
+        selection_namespaces: selection.ok_or_else(|| invalid("missing MapInfo root"))?,
+        schemas: schemas.into_iter().map(|v| v.value).collect(),
+        maps: maps.into_iter().map(|v| v.value).collect(),
+    };
+    validate(&result)?;
+    Ok(result)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn handle_start(
+    stack: &mut Vec<Context>,
+    schemas: &mut Vec<SchemaBuilder>,
+    maps: &mut Vec<MapBuilder>,
+    root_bindings: &[(String, String)],
+    ns: &ResolveResult<'_>,
+    e: BytesStart<'static>,
+    decoder: Decoder,
+    capture: &mut Option<Capture>,
+) -> Result<()> {
+    match stack
+        .last()
+        .copied()
+        .ok_or_else(|| invalid("element outside MapInfo"))?
+    {
+        Context::Root if core_name(ns, &e, b"Schema") => {
+            if !maps.is_empty() || schemas.len() >= MAX_SCHEMAS {
+                return Err(invalid("invalid Schema order or limit"));
+            }
+            let value = parse_schema(&e, decoder)?;
+            let bindings = merged_bindings(root_bindings, &namespace_attributes(&e, decoder)?);
+            schemas.push(SchemaBuilder { value, bindings });
+            stack.push(Context::Schema(schemas.len() - 1));
+        },
+        Context::Root if core_name(ns, &e, b"Map") => {
+            if schemas.is_empty() || maps.len() >= MAX_MAPS {
+                return Err(invalid("invalid Map order or limit"));
+            }
+            maps.push(MapBuilder {
+                value: parse_map(&e, decoder)?,
+                binding: None,
+            });
+            stack.push(Context::Map(maps.len() - 1));
+        },
+        Context::Map(index) if core_name(ns, &e, b"DataBinding") => {
+            if maps[index].binding.is_some() {
+                return Err(invalid("duplicate DataBinding"));
+            }
+            let value = parse_binding(&e, decoder)?;
+            let bindings = merged_bindings(root_bindings, &namespace_attributes(&e, decoder)?);
+            maps[index].binding = Some(BindingBuilder { value, bindings });
+            stack.push(Context::Binding(index));
+        },
+        Context::Schema(index) => {
+            if schemas[index].value.payload_xml.is_some() {
+                return Err(invalid("Schema permits at most one opaque child"));
+            }
+            *capture = Some(begin_capture(
+                Owner::Schema(index),
+                e,
+                &schemas[index].bindings,
+            )?);
+        },
+        Context::Binding(index) => {
+            let binding = maps
+                .get(index)
+                .and_then(|map| map.binding.as_ref())
+                .ok_or_else(|| invalid("DataBinding context has no binding"))?;
+            if binding.value.payload_xml.is_some() {
+                return Err(invalid("DataBinding permits at most one opaque child"));
+            }
+            *capture = Some(begin_capture(Owner::Binding(index), e, &binding.bindings)?);
+        },
+        _ => return Err(invalid("unexpected custom XML maps element")),
+    }
+    Ok(())
+}
+
+fn handle_empty(
+    stack: &mut [Context],
+    schemas: &mut Vec<SchemaBuilder>,
+    maps: &mut Vec<MapBuilder>,
+    root_bindings: &[(String, String)],
+    ns: &ResolveResult<'_>,
+    e: BytesStart<'static>,
+    decoder: Decoder,
+) -> Result<()> {
+    match stack.last().copied() {
+        Some(Context::Root) if core_name(ns, &e, b"Schema") => {
+            if !maps.is_empty() || schemas.len() >= MAX_SCHEMAS {
+                return Err(invalid("invalid Schema order or limit"));
+            }
+            schemas.push(SchemaBuilder {
+                value: parse_schema(&e, decoder)?,
+                bindings: merged_bindings(root_bindings, &namespace_attributes(&e, decoder)?),
+            });
+        },
+        Some(Context::Root) if core_name(ns, &e, b"Map") => {
+            if schemas.is_empty() || maps.len() >= MAX_MAPS {
+                return Err(invalid("invalid Map order or limit"));
+            }
+            maps.push(MapBuilder {
+                value: parse_map(&e, decoder)?,
+                binding: None,
+            });
+        },
+        Some(Context::Map(index)) if core_name(ns, &e, b"DataBinding") => {
+            if maps[index].binding.is_some() {
+                return Err(invalid("duplicate DataBinding"));
+            }
+            let value = parse_binding(&e, decoder)?;
+            maps[index].value.data_binding = Some(value);
+        },
+        Some(Context::Schema(index)) => {
+            if schemas[index].value.payload_xml.is_some() {
+                return Err(invalid("Schema permits at most one opaque child"));
+            }
+            schemas[index].value.payload_xml = Some(capture_empty(e, &schemas[index].bindings)?);
+        },
+        Some(Context::Binding(index)) => {
+            let binding = maps
+                .get_mut(index)
+                .and_then(|map| map.binding.as_mut())
+                .ok_or_else(|| invalid("DataBinding context has no binding"))?;
+            if binding.value.payload_xml.is_some() {
+                return Err(invalid("DataBinding permits at most one opaque child"));
+            }
+            binding.value.payload_xml = Some(capture_empty(e, &binding.bindings)?);
+        },
+        _ => return Err(invalid("unexpected empty custom XML maps element")),
+    }
+    Ok(())
+}
+
+fn parse_schema(e: &BytesStart<'_>, d: Decoder) -> Result<XmlMapSchema> {
+    let id = required_attr(e, d, b"ID")?;
+    let schema_reference = optional_attr(e, d, b"SchemaRef")?;
+    let namespace = optional_attr(e, d, b"Namespace")?;
+    only_attrs(e, &[b"ID", b"SchemaRef", b"Namespace"])?;
+    Ok(XmlMapSchema {
+        id,
+        schema_reference,
+        namespace,
+        payload_xml: None,
+    })
+}
+fn parse_map(e: &BytesStart<'_>, d: Decoder) -> Result<XmlMap> {
+    let id = required_u32_attr(e, d, b"ID")?;
+    let name = required_attr(e, d, b"Name")?;
+    let root_element = required_attr(e, d, b"RootElement")?;
+    let schema_id = required_attr(e, d, b"SchemaID")?;
+    let show_import_export_validation_errors =
+        required_bool_attr(e, d, b"ShowImportExportValidationErrors")?;
+    let auto_fit = required_bool_attr(e, d, b"AutoFit")?;
+    let append = required_bool_attr(e, d, b"Append")?;
+    let preserve_sort_auto_filter_layout = required_bool_attr(e, d, b"PreserveSortAFLayout")?;
+    let preserve_format = required_bool_attr(e, d, b"PreserveFormat")?;
+    only_attrs(
+        e,
+        &[
+            b"ID",
+            b"Name",
+            b"RootElement",
+            b"SchemaID",
+            b"ShowImportExportValidationErrors",
+            b"AutoFit",
+            b"Append",
+            b"PreserveSortAFLayout",
+            b"PreserveFormat",
+        ],
+    )?;
+    Ok(XmlMap {
+        id,
+        name,
+        root_element,
+        schema_id,
+        show_import_export_validation_errors,
+        auto_fit,
+        append,
+        preserve_sort_auto_filter_layout,
+        preserve_format,
+        data_binding: None,
+    })
+}
+fn parse_binding(e: &BytesStart<'_>, d: Decoder) -> Result<XmlMapDataBinding> {
+    let data_binding_name = optional_attr(e, d, b"DataBindingName")?;
+    let file_binding = parse_bool_attr(e, d, b"FileBinding", false)?;
+    let connection_id = parse_u32_attr(e, d, b"ConnectionID", false)?;
+    let file_binding_name = optional_attr(e, d, b"FileBindingName")?;
+    let load_mode = required_u32_attr(e, d, b"DataBindingLoadMode")?;
+    only_attrs(
+        e,
+        &[
+            b"DataBindingName",
+            b"FileBinding",
+            b"ConnectionID",
+            b"FileBindingName",
+            b"DataBindingLoadMode",
+        ],
+    )?;
+    Ok(XmlMapDataBinding {
+        data_binding_name,
+        file_binding,
+        connection_id,
+        file_binding_name,
+        load_mode,
+        payload_xml: None,
+    })
+}
+
+fn begin_capture(
+    owner: Owner,
+    e: BytesStart<'static>,
+    bindings: &[(String, String)],
+) -> Result<Capture> {
+    let e = add_inherited_bindings(e, bindings)?;
+    let mut writer = Writer::new(Vec::new());
+    writer.write_event(Event::Start(e)).map_err(xml_error)?;
+    Ok(Capture {
+        depth: 1,
+        events: 1,
+        owner,
+        writer,
+    })
+}
+fn capture_empty(e: BytesStart<'static>, bindings: &[(String, String)]) -> Result<Vec<u8>> {
+    let e = add_inherited_bindings(e, bindings)?;
+    let mut writer = Writer::new(Vec::new());
+    writer.write_event(Event::Empty(e)).map_err(xml_error)?;
+    let bytes = writer.into_inner();
+    if bytes.len() > MAX_OPAQUE_BYTES {
+        return Err(invalid("opaque XML payload exceeds 16 MiB"));
+    }
+    Ok(bytes)
+}
+fn assign_payload(
+    schemas: &mut [SchemaBuilder],
+    maps: &mut [MapBuilder],
+    owner: Owner,
+    payload: Vec<u8>,
+) -> Result<()> {
+    match owner {
+        Owner::Schema(i) => schemas[i].value.payload_xml = Some(payload),
+        Owner::Binding(i) => {
+            let map = maps
+                .get_mut(i)
+                .ok_or_else(|| invalid("DataBinding payload has no map"))?;
+            let binding = map
+                .binding
+                .as_mut()
+                .ok_or_else(|| invalid("DataBinding payload has no binding"))?;
+            binding.value.payload_xml = Some(payload);
+            map.value.data_binding = Some(binding.value.clone());
+        },
+    }
+    Ok(())
+}
+
+fn validate(info: &XmlMapInfo) -> Result<()> {
+    bounded(&info.selection_namespaces)?;
+    if info.schemas.is_empty() || info.schemas.len() > MAX_SCHEMAS {
+        return Err(invalid("MapInfo requires 1..4096 Schema children"));
+    }
+    if info.maps.is_empty() || info.maps.len() > MAX_MAPS {
+        return Err(invalid("MapInfo requires 1..65536 Map children"));
+    }
+    let mut schema_ids = HashSet::new();
+    for schema in &info.schemas {
+        bounded(&schema.id)?;
+        if !schema_ids.insert(schema.id.as_str()) {
+            return Err(invalid("duplicate Schema ID"));
+        }
+        optional_bounded(schema.schema_reference.as_deref())?;
+        optional_bounded(schema.namespace.as_deref())?;
+        if let Some(payload) = &schema.payload_xml {
+            validate_opaque(payload)?;
+        }
+    }
+    let mut map_ids = HashSet::new();
+    for map in &info.maps {
+        if !map_ids.insert(map.id) {
+            return Err(invalid("duplicate Map ID"));
+        }
+        for value in [&map.name, &map.root_element, &map.schema_id] {
+            bounded(value)?;
+        }
+        if !schema_ids.contains(map.schema_id.as_str()) {
+            return Err(invalid("Map references an unknown SchemaID"));
+        }
+        if let Some(binding) = &map.data_binding {
+            optional_bounded(binding.data_binding_name.as_deref())?;
+            optional_bounded(binding.file_binding_name.as_deref())?;
+            if let Some(payload) = &binding.payload_xml {
+                validate_opaque(payload)?;
+            }
+        }
+    }
+    Ok(())
+}
+fn validate_opaque(xml: &[u8]) -> Result<()> {
+    if xml.len() > MAX_OPAQUE_BYTES {
+        return Err(invalid("opaque XML payload exceeds 16 MiB"));
+    }
+    std::str::from_utf8(xml).map_err(xml_error)?;
+    let mut reader = Reader::from_reader(xml);
+    let mut depth = 0usize;
+    let mut roots = 0usize;
+    let mut events = 0usize;
+    loop {
+        events += 1;
+        if events > MAX_EVENTS {
+            return Err(invalid("opaque XML event limit exceeded"));
+        }
+        match reader.read_event() {
+            Ok(Event::Start(_)) => {
+                if depth == 0 {
+                    roots += 1;
+                }
+                depth += 1;
+                if depth > MAX_DEPTH {
+                    return Err(invalid("opaque XML depth limit exceeded"));
+                }
+            },
+            Ok(Event::Empty(_)) if depth == 0 => {
+                roots += 1;
+            },
+            Ok(Event::End(_)) => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("invalid opaque XML nesting"))?;
+            },
+            Ok(Event::DocType(_) | Event::PI(_) | Event::Decl(_)) => {
+                return Err(invalid(
+                    "DTD, declarations, and processing instructions are rejected in opaque XML",
+                ));
+            },
+            Ok(Event::Text(t))
+                if depth == 0 && !t.decode().map_err(xml_error)?.trim().is_empty() =>
+            {
+                return Err(invalid("text outside opaque XML root"));
+            },
+            Ok(Event::CData(_) | Event::GeneralRef(_)) if depth == 0 => {
+                return Err(invalid("data outside opaque XML root"));
+            },
+            Ok(Event::Eof) => break,
+            Err(e) => return Err(xml_error(e)),
+            _ => {},
+        }
+    }
+    if roots != 1 || depth != 0 {
+        return Err(invalid(
+            "opaque XML must contain exactly one complete element",
+        ));
+    }
+    Ok(())
+}
+
+fn root_name(ns: &ResolveResult<'_>, e: &BytesStart<'_>, local: &[u8]) -> bool {
+    namespace_matches(ns) && e.local_name().as_ref() == local
+}
+fn core_name(ns: &ResolveResult<'_>, e: &BytesStart<'_>, local: &[u8]) -> bool {
+    (namespace_matches(ns) || matches!(ns, ResolveResult::Unbound))
+        && e.local_name().as_ref() == local
+}
+fn namespace_matches(ns: &ResolveResult<'_>) -> bool {
+    match ns {
+        ResolveResult::Bound(Namespace(v)) => {
+            let bytes: &[u8] = v;
+            bytes == NS || bytes == STRICT_NS
+        },
+        _ => false,
+    }
+}
+fn required_attr(e: &BytesStart<'_>, d: Decoder, n: &[u8]) -> Result<String> {
+    optional_attr(e, d, n)?.ok_or_else(|| {
+        invalid(format!(
+            "missing required attribute '{}'",
+            String::from_utf8_lossy(n)
+        ))
+    })
+}
+fn optional_attr(e: &BytesStart<'_>, d: Decoder, n: &[u8]) -> Result<Option<String>> {
+    let mut value = None;
+    for a in e.attributes().with_checks(true) {
+        let a = a.map_err(xml_error)?;
+        if a.key.as_ref() == n {
+            if value.is_some() {
+                return Err(invalid("duplicate attribute"));
+            }
+            value = Some(
+                a.decoded_and_normalized_value(XmlVersion::Implicit1_0, d)
+                    .map_err(xml_error)?
+                    .into_owned(),
+            );
+        }
+    }
+    Ok(value)
+}
+fn parse_bool_attr(
+    e: &BytesStart<'_>,
+    d: Decoder,
+    n: &[u8],
+    required: bool,
+) -> Result<Option<bool>> {
+    let value = optional_attr(e, d, n)?;
+    match value.as_deref() {
+        Some("1" | "true") => Ok(Some(true)),
+        Some("0" | "false") => Ok(Some(false)),
+        Some(_) => Err(invalid(format!(
+            "invalid boolean attribute '{}'",
+            String::from_utf8_lossy(n)
+        ))),
+        None if required => Err(invalid(format!(
+            "missing required attribute '{}'",
+            String::from_utf8_lossy(n)
+        ))),
+        None => Ok(None),
+    }
+}
+fn parse_u32_attr(e: &BytesStart<'_>, d: Decoder, n: &[u8], required: bool) -> Result<Option<u32>> {
+    match optional_attr(e, d, n)? {
+        Some(v) => Ok(Some(v.parse().map_err(|_| {
+            invalid(format!(
+                "invalid unsigned integer attribute '{}'",
+                String::from_utf8_lossy(n)
+            ))
+        })?)),
+        None if required => Err(invalid(format!(
+            "missing required attribute '{}'",
+            String::from_utf8_lossy(n)
+        ))),
+        None => Ok(None),
+    }
+}
+fn required_bool_attr(e: &BytesStart<'_>, d: Decoder, n: &[u8]) -> Result<bool> {
+    parse_bool_attr(e, d, n, true)?.ok_or_else(|| {
+        invalid(format!(
+            "missing required attribute '{}'",
+            String::from_utf8_lossy(n)
+        ))
+    })
+}
+fn required_u32_attr(e: &BytesStart<'_>, d: Decoder, n: &[u8]) -> Result<u32> {
+    parse_u32_attr(e, d, n, true)?.ok_or_else(|| {
+        invalid(format!(
+            "missing required attribute '{}'",
+            String::from_utf8_lossy(n)
+        ))
+    })
+}
+fn only_attrs(e: &BytesStart<'_>, allowed: &[&[u8]]) -> Result<()> {
+    for a in e.attributes().with_checks(true) {
+        let a = a.map_err(xml_error)?;
+        let k = a.key.as_ref();
+        if k == b"xmlns" || k.starts_with(b"xmlns:") {
+            continue;
+        }
+        if k.contains(&b':') || !allowed.contains(&k) {
+            return Err(invalid(format!(
+                "unexpected attribute '{}'",
+                String::from_utf8_lossy(k)
+            )));
+        }
+    }
+    Ok(())
+}
+fn namespace_attributes(e: &BytesStart<'_>, d: Decoder) -> Result<Vec<(String, String)>> {
+    let mut values = Vec::new();
+    for a in e.attributes().with_checks(true) {
+        let a = a.map_err(xml_error)?;
+        let key = std::str::from_utf8(a.key.as_ref()).map_err(xml_error)?;
+        if key == "xmlns" || key.starts_with("xmlns:") {
+            values.push((
+                key.to_string(),
+                a.decoded_and_normalized_value(XmlVersion::Implicit1_0, d)
+                    .map_err(xml_error)?
+                    .into_owned(),
+            ));
+        }
+    }
+    Ok(values)
+}
+fn merged_bindings(
+    parent: &[(String, String)],
+    local: &[(String, String)],
+) -> Vec<(String, String)> {
+    let mut result = parent.to_vec();
+    for (key, value) in local {
+        if let Some(existing) = result.iter_mut().find(|v| v.0 == *key) {
+            existing.1 = value.clone();
+        } else {
+            result.push((key.clone(), value.clone()));
+        }
+    }
+    result
+}
+fn add_inherited_bindings(
+    mut e: BytesStart<'static>,
+    bindings: &[(String, String)],
+) -> Result<BytesStart<'static>> {
+    let declared: HashSet<Vec<u8>> = e
+        .attributes()
+        .with_checks(true)
+        .filter_map(|a| a.ok())
+        .filter(|a| a.key.as_ref() == b"xmlns" || a.key.as_ref().starts_with(b"xmlns:"))
+        .map(|a| a.key.as_ref().to_vec())
+        .collect();
+    for (key, value) in bindings {
+        if !declared.contains(key.as_bytes()) {
+            e.push_attribute((key.as_str(), value.as_str()));
+        }
+    }
+    Ok(e)
+}
+fn bounded(value: &str) -> Result<()> {
+    if value.len() > MAX_STRING_BYTES {
+        Err(invalid("custom XML maps string exceeds 1 MiB"))
+    } else {
+        Ok(())
+    }
+}
+fn optional_bounded(value: Option<&str>) -> Result<()> {
+    if let Some(v) = value {
+        bounded(v)
+    } else {
+        Ok(())
+    }
+}
+struct BoundedXml {
+    bytes: Vec<u8>,
+}
+
+impl BoundedXml {
+    fn new() -> Self {
+        Self { bytes: Vec::new() }
+    }
+
+    fn push_str(&mut self, value: &str) -> Result<()> {
+        self.push_bytes(value.as_bytes())
+    }
+
+    fn push_char(&mut self, value: char) -> Result<()> {
+        let mut encoded = [0; 4];
+        let length = value.encode_utf8(&mut encoded).len();
+        self.push_bytes(&encoded[..length])
+    }
+
+    fn push_bytes(&mut self, value: &[u8]) -> Result<()> {
+        let length = self
+            .bytes
+            .len()
+            .checked_add(value.len())
+            .ok_or_else(|| invalid("serialized custom XML maps length overflows"))?;
+        if length > MAX_PART_BYTES {
+            return Err(invalid("serialized custom XML maps part exceeds 32 MiB"));
+        }
+        self.bytes
+            .try_reserve_exact(value.len())
+            .map_err(|_| invalid("serialized custom XML maps output allocation failed"))?;
+        self.bytes.extend_from_slice(value);
+        Ok(())
+    }
+
+    fn finish(self) -> Vec<u8> {
+        self.bytes
+    }
+}
+
+fn optional_string_attr(xml: &mut BoundedXml, name: &str, value: Option<&str>) -> Result<()> {
+    if let Some(value) = value {
+        xml.push_char(' ')?;
+        xml.push_str(name)?;
+        xml.push_str("=\"")?;
+        escape_attr(xml, value)?;
+        xml.push_char('"')?;
+    }
+    Ok(())
+}
+fn optional_bool_attr(xml: &mut BoundedXml, name: &str, value: Option<bool>) -> Result<()> {
+    if let Some(value) = value {
+        bool_attr(xml, name, value)?;
+    }
+    Ok(())
+}
+fn optional_u32_attr(xml: &mut BoundedXml, name: &str, value: Option<u32>) -> Result<()> {
+    if let Some(value) = value {
+        xml.push_char(' ')?;
+        xml.push_str(name)?;
+        xml.push_str("=\"")?;
+        xml.push_str(&value.to_string())?;
+        xml.push_char('"')?;
+    }
+    Ok(())
+}
+fn bool_attr(xml: &mut BoundedXml, name: &str, value: bool) -> Result<()> {
+    xml.push_char(' ')?;
+    xml.push_str(name)?;
+    xml.push_str(if value { "=\"1\"" } else { "=\"0\"" })?;
+    Ok(())
+}
+fn escape_attr(out: &mut BoundedXml, value: &str) -> Result<()> {
+    for c in value.chars() {
+        match c {
+            '&' => out.push_str("&amp;")?,
+            '<' => out.push_str("&lt;")?,
+            '"' => out.push_str("&quot;")?,
+            '\r' => out.push_str("&#xD;")?,
+            '\n' => out.push_str("&#xA;")?,
+            '\t' => out.push_str("&#x9;")?,
+            _ => out.push_char(c)?,
+        }
+    }
+    Ok(())
+}
+fn xml_error(e: impl std::fmt::Display) -> Box<dyn std::error::Error + Send + Sync> {
+    invalid(e.to_string())
+}

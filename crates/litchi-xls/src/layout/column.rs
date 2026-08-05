@@ -1,7 +1,7 @@
 //! BIFF8 `COLINFO` records and their worksheet-facing semantic view.
 
 use super::{COLINFO_RECORD_TYPE, invalid, read_u16};
-use crate::error::XlsResult;
+use crate::error::Result;
 
 /// Formatting and display metadata for an inclusive worksheet column range.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -68,7 +68,7 @@ impl Column {
     }
 }
 
-pub(super) fn parse(data: &[u8]) -> XlsResult<Column> {
+pub(super) fn parse(data: &[u8]) -> Result<Column> {
     if data.len() != 12 {
         return Err(invalid(
             COLINFO_RECORD_TYPE,

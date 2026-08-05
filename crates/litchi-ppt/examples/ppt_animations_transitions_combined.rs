@@ -5,7 +5,7 @@
 //!
 //! Run with: cargo run --example ppt_animations_transitions_combined
 
-use litchi_ppt::PptWriter;
+use litchi_ppt::Writer;
 use litchi_ppt::animation::writer::write_animation_info;
 use litchi_ppt::animation::{
     AfterEffect, AnimationEffect, AnimationInfo, AnimationTrigger, BuildInfo, BuildLevel,
@@ -21,7 +21,7 @@ use std::io::Write;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating comprehensive PPT with animations and transitions...");
 
-    let mut writer = PptWriter::new_widescreen();
+    let mut writer = Writer::new_widescreen();
     writer.set_property("Title", "Complete Animation & Transition Demo");
     writer.set_property("Author", "Litchi Comprehensive Demo");
     writer.set_property(

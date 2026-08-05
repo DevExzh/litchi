@@ -2,17 +2,17 @@ use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
 
-use litchi_xls::XlsWorkbook;
-use litchi_xls::writer::{XlsWorkbookWindowOptions, XlsWriter};
+use litchi_xls::Workbook;
+use litchi_xls::writer::{WorkbookWindowOptions, Writer};
 
 #[test]
 fn workbook_window_and_sheet_ids_round_trip() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     writer.add_worksheet("One").unwrap();
     writer.add_worksheet("Two").unwrap();
     writer.add_worksheet("Three").unwrap();
     writer
-        .set_workbook_window(XlsWorkbookWindowOptions {
+        .set_workbook_window(WorkbookWindowOptions {
             horizontal_position_twips: -120,
             vertical_position_twips: 240,
             width_twips: 12000,
@@ -33,7 +33,7 @@ fn workbook_window_and_sheet_ids_round_trip() {
 
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
     let view = workbook.workbook_view();
     assert_eq!(view.sheet_ids(), &[1, 2, 3]);
     let window = view.primary_window().unwrap();
@@ -82,7 +82,7 @@ fn workbook_window_and_sheet_ids_round_trip() {
 fn reads_poi_simple_workbook_window_and_sheet_ids() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/poi/test-data/spreadsheet/Simple.xls");
-    let workbook = XlsWorkbook::new(File::open(fixture).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(fixture).unwrap()).unwrap();
     let view = workbook.workbook_view();
     assert_eq!(view.sheet_ids(), &[1, 2, 3]);
     let window = view.primary_window().unwrap();
@@ -127,7 +127,7 @@ fn reads_poi_simple_workbook_window_and_sheet_ids() {
 fn writer_rejects_window1_window2_selection_disagreement() {
     use litchi_xls::writer::view::View;
 
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     writer.add_worksheet("One").unwrap();
     let second = writer.add_worksheet("Two").unwrap();
     let mut view = View::default();
@@ -140,34 +140,34 @@ fn writer_rejects_window1_window2_selection_disagreement() {
 fn reads_poi_zero_based_sheet_identifiers() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/poi/test-data/spreadsheet/duprich1.xls");
-    let workbook = XlsWorkbook::new(File::open(fixture).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(fixture).unwrap()).unwrap();
     assert_eq!(workbook.workbook_view().sheet_ids(), &[0, 1, 2]);
 }
 
 #[test]
 fn writer_rejects_invalid_window_and_tab_references() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     writer.add_worksheet("One").unwrap();
     assert!(
         writer
-            .set_workbook_window(XlsWorkbookWindowOptions {
+            .set_workbook_window(WorkbookWindowOptions {
                 width_twips: 0,
-                ..XlsWorkbookWindowOptions::default()
+                ..WorkbookWindowOptions::default()
             })
             .is_err()
     );
     assert!(
         writer
-            .set_workbook_window(XlsWorkbookWindowOptions {
+            .set_workbook_window(WorkbookWindowOptions {
                 sheet_tab_ratio_per_mille: 1001,
-                ..XlsWorkbookWindowOptions::default()
+                ..WorkbookWindowOptions::default()
             })
             .is_err()
     );
     writer
-        .set_workbook_window(XlsWorkbookWindowOptions {
+        .set_workbook_window(WorkbookWindowOptions {
             active_sheet_index: 1,
-            ..XlsWorkbookWindowOptions::default()
+            ..WorkbookWindowOptions::default()
         })
         .unwrap();
     assert!(writer.write_to(&mut Cursor::new(Vec::new())).is_err());

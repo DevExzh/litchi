@@ -1,4 +1,4 @@
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 use std::io::Write;
 
 use super::write_record_header;
@@ -23,7 +23,7 @@ fn write_frt<W: Write>(
     record_type: u16,
     referenced: bool,
     range: (u16, u16, u16, u16),
-) -> XlsResult<()> {
+) -> Result<()> {
     writer.write_all(&record_type.to_le_bytes())?;
     writer.write_all(&u16::from(referenced).to_le_bytes())?;
     for value in [range.0, range.1, range.2, range.3] {
@@ -37,7 +37,7 @@ pub(crate) fn write_condfmt12<W: Write>(
     ranges: &[(u32, u32, u16, u16)],
     rules: u16,
     identifier: u16,
-) -> XlsResult<()> {
+) -> Result<()> {
     let mut legacy = Vec::new();
     write_cfheader_with_identifier(&mut legacy, ranges, rules, identifier)?;
     let payload = &legacy[4..];
@@ -48,21 +48,21 @@ pub(crate) fn write_condfmt12<W: Write>(
         u16::from_le_bytes([payload[10], payload[11]]),
     );
     let length = u16::try_from(12 + payload.len())
-        .map_err(|_| XlsError::InvalidData("CondFmt12 record is too large".to_string()))?;
+        .map_err(|_| Error::InvalidData("CondFmt12 record is too large".to_string()))?;
     write_record_header(writer, 0x0879, length)?;
     write_frt(writer, 0x0879, true, enclosing)?;
     writer.write_all(payload)?;
     Ok(())
 }
 
-pub(crate) fn write_cf12<W: Write>(writer: &mut W, cfg: &Cf12Config<'_>) -> XlsResult<()> {
+pub(crate) fn write_cf12<W: Write>(writer: &mut W, cfg: &Cf12Config<'_>) -> Result<()> {
     if !(1..=6).contains(&cfg.condition_type)
         || cfg.formula1.len() > 16409
         || cfg.formula2.len() > 16409
         || cfg.active_formula.len() > 16409
         || cfg.differential_format.len() < 6
     {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "CF12 configuration is invalid".to_string(),
         ));
     }
@@ -72,12 +72,12 @@ pub(crate) fn write_cf12<W: Write>(writer: &mut W, cfg: &Cf12Config<'_>) -> XlsR
     } else {
         4usize
             .checked_add(cb)
-            .ok_or_else(|| XlsError::InvalidData("CF12 DXFN12 length overflows".to_string()))?
+            .ok_or_else(|| Error::InvalidData("CF12 DXFN12 length overflows".to_string()))?
     };
     if cfg.differential_format.len() != expected
         || (cb == 0 && cfg.differential_format[4..6] != [0, 0])
     {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "CF12 DXFN12 length is invalid".to_string(),
         ));
     }
@@ -95,7 +95,7 @@ pub(crate) fn write_cf12<W: Write>(writer: &mut W, cfg: &Cf12Config<'_>) -> XlsR
         + 16
         + cfg.rule_payload.len();
     if total > 8224 {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "CF12 record exceeds maximum BIFF8 record size".to_string(),
         ));
     }
@@ -122,7 +122,7 @@ pub(crate) fn write_cfex12_marker<W: Write>(
     writer: &mut W,
     identifier: u16,
     enclosing: (u16, u16, u16, u16),
-) -> XlsResult<()> {
+) -> Result<()> {
     write_record_header(writer, 0x087b, 18)?;
     write_frt(writer, 0x087b, true, enclosing)?;
     writer.write_all(&1u32.to_le_bytes())?;
@@ -134,7 +134,7 @@ pub(crate) fn write_cfheader<W: Write>(
     writer: &mut W,
     ranges: &[(u32, u32, u16, u16)],
     num_rules: u16,
-) -> XlsResult<()> {
+) -> Result<()> {
     write_cfheader_with_identifier(writer, ranges, num_rules, 0)
 }
 
@@ -143,27 +143,27 @@ pub(crate) fn write_cfheader_with_identifier<W: Write>(
     ranges: &[(u32, u32, u16, u16)],
     num_rules: u16,
     identifier: u16,
-) -> XlsResult<()> {
+) -> Result<()> {
     if ranges.is_empty() {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "CFHEADER must have at least one target range".to_string(),
         ));
     }
 
     let numcf = num_rules;
     if numcf == 0 {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "CFHEADER must describe at least one rule".to_string(),
         ));
     }
 
     if ranges.len() > 1026 || identifier > 0x7fff {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "CFHEADER range count or identifier exceeds BIFF8 limits".to_string(),
         ));
     }
     let range_count_u16 = u16::try_from(ranges.len())
-        .map_err(|_| XlsError::InvalidData("Too many conditional formatting ranges".to_string()))?;
+        .map_err(|_| Error::InvalidData("Too many conditional formatting ranges".to_string()))?;
 
     // Compute enclosing cell range over all regions
     let mut enc_first_row = u32::MAX;
@@ -173,7 +173,7 @@ pub(crate) fn write_cfheader_with_identifier<W: Write>(
 
     for (first_row, last_row, first_col, last_col) in ranges {
         if *first_row > *last_row || *first_col > *last_col || *last_col > 255 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "Conditional format range must have first <= last for rows and columns".to_string(),
             ));
         }
@@ -184,13 +184,13 @@ pub(crate) fn write_cfheader_with_identifier<W: Write>(
     }
 
     let enc_first_row_u16 = u16::try_from(enc_first_row).map_err(|_| {
-        XlsError::InvalidData(format!(
+        Error::InvalidData(format!(
             "Row index {} exceeds BIFF8 limit 65535 for CFHEADER record",
             enc_first_row
         ))
     })?;
     let enc_last_row_u16 = u16::try_from(enc_last_row).map_err(|_| {
-        XlsError::InvalidData(format!(
+        Error::InvalidData(format!(
             "Row index {} exceeds BIFF8 limit 65535 for CFHEADER record",
             enc_last_row
         ))
@@ -206,7 +206,7 @@ pub(crate) fn write_cfheader_with_identifier<W: Write>(
     let data_len: u16 = 14u16.saturating_add(range_count_u16.saturating_mul(8));
 
     if data_len > 8224 {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "CFHEADER record exceeds maximum BIFF8 record size".to_string(),
         ));
     }
@@ -230,13 +230,13 @@ pub(crate) fn write_cfheader_with_identifier<W: Write>(
 
     for (first_row_u32, last_row_u32, first_col, last_col) in ranges {
         let first_row_u16 = u16::try_from(*first_row_u32).map_err(|_| {
-            XlsError::InvalidData(format!(
+            Error::InvalidData(format!(
                 "Row index {} exceeds BIFF8 limit 65535 for CFHEADER range",
                 first_row_u32
             ))
         })?;
         let last_row_u16 = u16::try_from(*last_row_u32).map_err(|_| {
-            XlsError::InvalidData(format!(
+            Error::InvalidData(format!(
                 "Row index {} exceeds BIFF8 limit 65535 for CFHEADER range",
                 last_row_u32
             ))
@@ -258,12 +258,12 @@ pub(crate) fn write_cfrule<W: Write>(
     formula1: &[u8],
     formula2: &[u8],
     pattern: Option<(u16, u16, u16)>,
-) -> XlsResult<()> {
+) -> Result<()> {
     let f1_len = u16::try_from(formula1.len()).map_err(|_| {
-        XlsError::InvalidData("Conditional format formula1 exceeds BIFF8 size limit".to_string())
+        Error::InvalidData("Conditional format formula1 exceeds BIFF8 size limit".to_string())
     })?;
     let f2_len = u16::try_from(formula2.len()).map_err(|_| {
-        XlsError::InvalidData("Conditional format formula2 exceeds BIFF8 size limit".to_string())
+        Error::InvalidData("Conditional format formula2 exceeds BIFF8 size limit".to_string())
     })?;
 
     // Base size: 1 (condition_type) + 1 (comparison_op)
@@ -278,7 +278,7 @@ pub(crate) fn write_cfrule<W: Write>(
         .saturating_add(f2_len);
 
     if data_len > 8224 {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "CFRULE record exceeds maximum BIFF8 record size".to_string(),
         ));
     }

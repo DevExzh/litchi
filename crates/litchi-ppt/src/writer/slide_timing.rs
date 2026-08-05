@@ -26,7 +26,7 @@
 //! └── unused (3 bytes)
 //! ```
 
-use super::records::{PptError, RecordBuilder, record_type};
+use super::records::{Error, RecordBuilder, record_type};
 
 /// Per-slide timing configuration.
 ///
@@ -99,7 +99,7 @@ impl SlideTiming {
 /// This is used when the slide has timing but no transition effect.
 /// If the slide also has a transition, the transition writer handles
 /// the SSSlideInfoAtom instead (since it shares the same record).
-pub fn build_slide_timing(timing: &SlideTiming) -> Result<Vec<u8>, PptError> {
+pub fn build_slide_timing(timing: &SlideTiming) -> Result<Vec<u8>, Error> {
     let mut data = Vec::with_capacity(16);
 
     // slideTime (u32): auto-advance time in ms

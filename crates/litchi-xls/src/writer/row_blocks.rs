@@ -10,13 +10,13 @@ const BIFF8_MAX_RECORD_PAYLOAD: usize = 8_224;
 
 /// An encoded BIFF8 `ROW` record and the encoded cell records belonging to it.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XlsRowBlockLayoutRow {
+pub struct RowBlockLayoutRow {
     row: u16,
     row_record: Vec<u8>,
     cell_records: Vec<u8>,
 }
 
-impl XlsRowBlockLayoutRow {
+impl RowBlockLayoutRow {
     pub fn new(row: u16, row_record: Vec<u8>, cell_records: Vec<u8>) -> Self {
         Self {
             row,
@@ -38,7 +38,7 @@ impl XlsRowBlockLayoutRow {
 
 /// A fully checked INDEX/DBCELL layout for one serialized worksheet stream.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct XlsRowBlockLayoutPlan {
+pub struct RowBlockLayoutPlan {
     index_record_position: u32,
     row_table_position: u32,
     default_column_width_position: u32,
@@ -47,7 +47,7 @@ pub struct XlsRowBlockLayoutPlan {
     row_table: Vec<u8>,
 }
 
-impl XlsRowBlockLayoutPlan {
+impl RowBlockLayoutPlan {
     /// Rebuilds a staged `ROW* CELL*` table into BIFF8 row blocks.
     ///
     /// The staged bytes must contain all ROW records first, followed by cell
@@ -75,7 +75,7 @@ impl XlsRowBlockLayoutPlan {
         index_record_position: u64,
         records_between_index_and_rows: u64,
         default_column_width_offset: u64,
-        rows: Vec<XlsRowBlockLayoutRow>,
+        rows: Vec<RowBlockLayoutRow>,
     ) -> io::Result<Self> {
         if default_column_width_offset >= records_between_index_and_rows {
             return Err(invalid(
@@ -164,7 +164,7 @@ impl XlsRowBlockLayoutPlan {
     }
 }
 
-fn decode_staged_rows(bytes: &[u8]) -> io::Result<Vec<XlsRowBlockLayoutRow>> {
+fn decode_staged_rows(bytes: &[u8]) -> io::Result<Vec<RowBlockLayoutRow>> {
     let mut rows = Vec::new();
     let mut offset = 0usize;
     let mut reached_cells = false;
@@ -195,7 +195,7 @@ fn decode_staged_rows(bytes: &[u8]) -> io::Result<Vec<XlsRowBlockLayoutRow>> {
                 return Err(invalid("staged ROW record does not have a 16-byte payload"));
             }
             let row = u16::from_le_bytes([bytes[header_end], bytes[header_end + 1]]);
-            rows.push(XlsRowBlockLayoutRow::new(
+            rows.push(RowBlockLayoutRow::new(
                 row,
                 bytes[offset..record_end].to_vec(),
                 Vec::new(),
@@ -217,7 +217,7 @@ fn decode_staged_rows(bytes: &[u8]) -> io::Result<Vec<XlsRowBlockLayoutRow>> {
             }
             let row = u16::from_le_bytes([bytes[header_end], bytes[header_end + 1]]);
             let row_index = rows
-                .binary_search_by_key(&row, XlsRowBlockLayoutRow::row)
+                .binary_search_by_key(&row, RowBlockLayoutRow::row)
                 .map_err(|_| invalid("staged cell record has no corresponding ROW record"))?;
             rows[row_index]
                 .cell_records
@@ -229,7 +229,7 @@ fn decode_staged_rows(bytes: &[u8]) -> io::Result<Vec<XlsRowBlockLayoutRow>> {
     Ok(rows)
 }
 
-fn validate_rows(rows: &[XlsRowBlockLayoutRow]) -> io::Result<()> {
+fn validate_rows(rows: &[RowBlockLayoutRow]) -> io::Result<()> {
     let mut previous = None;
     for row in rows {
         if previous.is_some_and(|value| row.row <= value) {
@@ -242,7 +242,7 @@ fn validate_rows(rows: &[XlsRowBlockLayoutRow]) -> io::Result<()> {
     Ok(())
 }
 
-fn logical_blocks(rows: &[XlsRowBlockLayoutRow]) -> io::Result<Vec<std::ops::Range<usize>>> {
+fn logical_blocks(rows: &[RowBlockLayoutRow]) -> io::Result<Vec<std::ops::Range<usize>>> {
     let Some(first) = rows.first() else {
         return Ok(Vec::new());
     };
@@ -280,7 +280,7 @@ fn logical_blocks(rows: &[XlsRowBlockLayoutRow]) -> io::Result<Vec<std::ops::Ran
     Ok(blocks)
 }
 
-fn validate_row_record(row: &XlsRowBlockLayoutRow) -> io::Result<()> {
+fn validate_row_record(row: &RowBlockLayoutRow) -> io::Result<()> {
     if row.row_record.len() != 20 {
         return Err(invalid("ROW record must have a 16-byte BIFF8 payload"));
     }
@@ -298,7 +298,7 @@ fn validate_row_record(row: &XlsRowBlockLayoutRow) -> io::Result<()> {
     Ok(())
 }
 
-fn validate_cell_records(row: &XlsRowBlockLayoutRow) -> io::Result<()> {
+fn validate_cell_records(row: &RowBlockLayoutRow) -> io::Result<()> {
     let mut offset = 0usize;
     while offset < row.cell_records.len() {
         let header_end = offset.checked_add(4).ok_or_else(overflow)?;
@@ -349,7 +349,7 @@ fn append_block(
     row_table: &mut Vec<u8>,
     dbcell_positions: &mut Vec<u32>,
     row_table_position: u64,
-    rows: &[XlsRowBlockLayoutRow],
+    rows: &[RowBlockLayoutRow],
 ) -> io::Result<()> {
     let block_start = row_table.len();
     for row in rows {
@@ -451,7 +451,7 @@ fn overflow() -> io::Error {
 
 #[cfg(test)]
 mod tests {
-    use super::{XlsRowBlockLayoutPlan, XlsRowBlockLayoutRow};
+    use super::{RowBlockLayoutPlan, RowBlockLayoutRow};
 
     fn row_record(row: u16) -> Vec<u8> {
         let mut bytes = vec![0x08, 0x02, 0x10, 0x00];
@@ -472,10 +472,10 @@ mod tests {
     #[test]
     fn generates_exact_single_block_bytes() {
         let rows = vec![
-            XlsRowBlockLayoutRow::new(0, row_record(0), number_record(0, 0)),
-            XlsRowBlockLayoutRow::new(1, row_record(1), number_record(1, 0)),
+            RowBlockLayoutRow::new(0, row_record(0), number_record(0, 0)),
+            RowBlockLayoutRow::new(1, row_record(1), number_record(1, 0)),
         ];
-        let plan = XlsRowBlockLayoutPlan::generate(100, 40, 8, rows).unwrap();
+        let plan = RowBlockLayoutPlan::generate(100, 40, 8, rows).unwrap();
         assert_eq!(plan.index_record_position(), 100);
         assert_eq!(plan.row_table_position(), 164);
         assert_eq!(plan.default_column_width_position(), 132);
@@ -496,9 +496,9 @@ mod tests {
     #[test]
     fn splits_at_the_32_row_boundary() {
         let rows = (0..33)
-            .map(|row| XlsRowBlockLayoutRow::new(row, row_record(row), number_record(row, 0)))
+            .map(|row| RowBlockLayoutRow::new(row, row_record(row), number_record(row, 0)))
             .collect();
-        let plan = XlsRowBlockLayoutPlan::generate(0, 8, 0, rows).unwrap();
+        let plan = RowBlockLayoutPlan::generate(0, 8, 0, rows).unwrap();
         assert_eq!(plan.dbcell_positions().len(), 2);
         assert_eq!(plan.index_record().len(), 28);
     }
@@ -506,10 +506,10 @@ mod tests {
     #[test]
     fn emits_an_empty_dbcell_for_a_sparse_logical_block() {
         let rows = vec![
-            XlsRowBlockLayoutRow::new(1, row_record(1), number_record(1, 0)),
-            XlsRowBlockLayoutRow::new(76, row_record(76), number_record(76, 0)),
+            RowBlockLayoutRow::new(1, row_record(1), number_record(1, 0)),
+            RowBlockLayoutRow::new(76, row_record(76), number_record(76, 0)),
         ];
-        let plan = XlsRowBlockLayoutPlan::generate(0, 8, 0, rows).unwrap();
+        let plan = RowBlockLayoutPlan::generate(0, 8, 0, rows).unwrap();
         assert_eq!(plan.dbcell_positions().len(), 3);
         let first_dbcell_end = 48;
         assert_eq!(
@@ -520,50 +520,49 @@ mod tests {
 
     #[test]
     fn rejects_malformed_layouts_before_serializing() {
-        let wrong_row = XlsRowBlockLayoutRow::new(2, row_record(1), number_record(2, 0));
-        assert!(XlsRowBlockLayoutPlan::generate(0, 8, 0, vec![wrong_row]).is_err());
-        let truncated_cell = XlsRowBlockLayoutRow::new(0, row_record(0), vec![3, 2, 14]);
-        assert!(XlsRowBlockLayoutPlan::generate(0, 8, 0, vec![truncated_cell]).is_err());
+        let wrong_row = RowBlockLayoutRow::new(2, row_record(1), number_record(2, 0));
+        assert!(RowBlockLayoutPlan::generate(0, 8, 0, vec![wrong_row]).is_err());
+        let truncated_cell = RowBlockLayoutRow::new(0, row_record(0), vec![3, 2, 14]);
+        assert!(RowBlockLayoutPlan::generate(0, 8, 0, vec![truncated_cell]).is_err());
         let unordered = vec![
-            XlsRowBlockLayoutRow::new(1, row_record(1), Vec::new()),
-            XlsRowBlockLayoutRow::new(0, row_record(0), Vec::new()),
+            RowBlockLayoutRow::new(1, row_record(1), Vec::new()),
+            RowBlockLayoutRow::new(0, row_record(0), Vec::new()),
         ];
-        assert!(XlsRowBlockLayoutPlan::generate(0, 8, 0, unordered).is_err());
+        assert!(RowBlockLayoutPlan::generate(0, 8, 0, unordered).is_err());
     }
 
     #[test]
     fn rejects_stream_pointer_overflow() {
-        let rows = vec![XlsRowBlockLayoutRow::new(
+        let rows = vec![RowBlockLayoutRow::new(
             0,
             row_record(0),
             number_record(0, 0),
         )];
-        assert!(XlsRowBlockLayoutPlan::generate(u64::from(u32::MAX), 8, 0, rows).is_err());
+        assert!(RowBlockLayoutPlan::generate(u64::from(u32::MAX), 8, 0, rows).is_err());
     }
 
     #[test]
     fn regenerates_a_staged_table_into_the_same_checked_layout() {
-        let first = XlsRowBlockLayoutRow::new(0, row_record(0), number_record(0, 0));
-        let second = XlsRowBlockLayoutRow::new(1, row_record(1), number_record(1, 0));
+        let first = RowBlockLayoutRow::new(0, row_record(0), number_record(0, 0));
+        let second = RowBlockLayoutRow::new(1, row_record(1), number_record(1, 0));
         let expected =
-            XlsRowBlockLayoutPlan::generate(100, 40, 8, vec![first.clone(), second.clone()])
-                .unwrap();
+            RowBlockLayoutPlan::generate(100, 40, 8, vec![first.clone(), second.clone()]).unwrap();
         let mut staged = Vec::new();
         staged.extend_from_slice(first.row_record());
         staged.extend_from_slice(second.row_record());
         staged.extend_from_slice(first.cell_records());
         staged.extend_from_slice(second.cell_records());
-        let regenerated = XlsRowBlockLayoutPlan::generate_from_staged(100, 40, 8, &staged).unwrap();
+        let regenerated = RowBlockLayoutPlan::generate_from_staged(100, 40, 8, &staged).unwrap();
         assert_eq!(regenerated, expected);
     }
 
     #[test]
     fn omits_rgdb_entries_for_rows_without_cells() {
         let rows = vec![
-            XlsRowBlockLayoutRow::new(0, row_record(0), Vec::new()),
-            XlsRowBlockLayoutRow::new(1, row_record(1), number_record(1, 0)),
+            RowBlockLayoutRow::new(0, row_record(0), Vec::new()),
+            RowBlockLayoutRow::new(1, row_record(1), number_record(1, 0)),
         ];
-        let plan = XlsRowBlockLayoutPlan::generate(0, 8, 0, rows).unwrap();
+        let plan = RowBlockLayoutPlan::generate(0, 8, 0, rows).unwrap();
         assert_eq!(
             &plan.row_table()[58..],
             &[0xd7, 0x00, 0x06, 0x00, 58, 0, 0, 0, 20, 0]

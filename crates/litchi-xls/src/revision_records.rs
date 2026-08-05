@@ -7,7 +7,7 @@
 //! `CellParsedFormula` token arrays, and `Ducr` undo data) are preserved raw;
 //! parsing them never executes or applies the recorded revision.
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// MS-XLS 2.4.226 `RRDHead` record type (record enumeration value 312).
 pub(crate) const RRD_HEAD_RECORD_TYPE: u16 = 0x0138;
@@ -111,8 +111,8 @@ const MIN_FORMULA_VALUE_LEN: u32 = 0x18;
 /// `XLUnicodeStringNoCch` option bit selecting UTF-16 characters.
 const STRING_HIGH_BYTE: u8 = 0x01;
 
-fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(record_type: u16, message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type,
         message: message.into(),
     }
@@ -146,7 +146,7 @@ fn read_i32(data: &[u8], offset: usize) -> i32 {
 
 /// Revision kind stored in `RRD.revt` (MS-XLS 2.5.212 RevisionType).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XlsRevisionType {
+pub enum RevisionType {
     InsertRow,
     InsertColumn,
     DeleteRow,
@@ -167,9 +167,9 @@ pub enum XlsRevisionType {
     TrashQueryTableField,
 }
 
-impl XlsRevisionType {
+impl RevisionType {
     /// Decode the MS-XLS 2.5.212 enumeration value.
-    pub fn from_u16(record_type: u16, value: u16) -> XlsResult<Self> {
+    pub fn from_u16(record_type: u16, value: u16) -> Result<Self> {
         match value {
             0x0000 => Ok(Self::InsertRow),
             0x0001 => Ok(Self::InsertColumn),
@@ -223,7 +223,7 @@ impl XlsRevisionType {
 
 /// Date and time of a revision action (MS-XLS 2.5.239 ShortDTR).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct XlsShortDtr {
+pub struct ShortDtr {
     year: u16,
     month: u8,
     day: u8,
@@ -233,9 +233,9 @@ pub struct XlsShortDtr {
     weekday: u8,
 }
 
-impl XlsShortDtr {
+impl ShortDtr {
     /// Parse the fixed 8-byte structure with Gregorian calendar validation.
-    pub fn parse(record_type: u16, data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(record_type: u16, data: &[u8]) -> Result<Self> {
         if data.len() != SHORT_DTR_LEN {
             return Err(invalid(
                 record_type,
@@ -304,16 +304,16 @@ impl XlsShortDtr {
 
 /// Cell range used by insert/delete and move revisions (MS-XLS 2.5.209 Ref8U).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct XlsRevisionCellRange {
+pub struct RevisionCellRange {
     first_row: u16,
     last_row: u16,
     first_column: u16,
     last_column: u16,
 }
 
-impl XlsRevisionCellRange {
+impl RevisionCellRange {
     /// Parse the fixed 8-byte structure, enforcing the ordering constraints.
-    pub fn parse(record_type: u16, data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(record_type: u16, data: &[u8]) -> Result<Self> {
         if data.len() != REF8U_LEN {
             return Err(invalid(
                 record_type,
@@ -357,12 +357,12 @@ impl XlsRevisionCellRange {
 
 /// Location of a changed cell (MS-XLS 2.5.198.109 RgceLoc).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct XlsRevisionCellLocation {
+pub struct RevisionCellLocation {
     row: u16,
     column_flags: u16,
 }
 
-impl XlsRevisionCellLocation {
+impl RevisionCellLocation {
     fn parse(data: &[u8]) -> Self {
         Self {
             row: read_u16(data, 0),
@@ -393,20 +393,20 @@ impl XlsRevisionCellLocation {
 
 /// The fixed RRD structure shared by all revision records (MS-XLS 2.5.220).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct XlsRevisionRecordHeader {
+pub struct RevisionRecordHeader {
     memory_size: u32,
     revision_id: i32,
-    revision_type: XlsRevisionType,
+    revision_type: RevisionType,
     accepted: bool,
     undo_action: bool,
     deleted_at_edge_of_sort: bool,
     tab_id: u16,
 }
 
-impl XlsRevisionRecordHeader {
+impl RevisionRecordHeader {
     /// Parse the 14-byte structure. `is_head` selects the RRDHead-specific
     /// `cbMemory` rule (fixed sentinel instead of the >= 26 minimum).
-    pub fn parse(record_type: u16, data: &[u8], is_head: bool) -> XlsResult<Self> {
+    pub fn parse(record_type: u16, data: &[u8], is_head: bool) -> Result<Self> {
         if data.len() < RRD_LEN {
             return Err(invalid(
                 record_type,
@@ -415,7 +415,7 @@ impl XlsRevisionRecordHeader {
         }
         let memory_size = read_u32(data, 0);
         let revision_id = read_i32(data, 4);
-        let revision_type = XlsRevisionType::from_u16(record_type, read_u16(data, 8))?;
+        let revision_type = RevisionType::from_u16(record_type, read_u16(data, 8))?;
         let flags = read_u16(data, 10);
         if flags & 0xFFF4 != 0 {
             return Err(invalid(record_type, "RRD contains reserved flag bits"));
@@ -453,7 +453,7 @@ impl XlsRevisionRecordHeader {
     pub fn revision_id(&self) -> i32 {
         self.revision_id
     }
-    pub fn revision_type(&self) -> XlsRevisionType {
+    pub fn revision_type(&self) -> RevisionType {
         self.revision_type
     }
     pub fn is_accepted(&self) -> bool {
@@ -474,7 +474,7 @@ impl XlsRevisionRecordHeader {
         }
     }
 
-    fn require_reviewable(&self, record_type: u16) -> XlsResult<()> {
+    fn require_reviewable(&self, record_type: u16) -> Result<()> {
         if self.revision_id <= 0 {
             return Err(invalid(
                 record_type,
@@ -484,7 +484,7 @@ impl XlsRevisionRecordHeader {
         Ok(())
     }
 
-    fn require_sheet(&self, record_type: u16) -> XlsResult<()> {
+    fn require_sheet(&self, record_type: u16) -> Result<()> {
         if self.tab_id == NO_SHEET_TAB_ID {
             return Err(invalid(record_type, "revision does not specify a sheet"));
         }
@@ -500,7 +500,7 @@ fn decode_fixed_string(
     field: &[u8],
     cch: usize,
     context: &str,
-) -> XlsResult<String> {
+) -> Result<String> {
     let Some((&flags, characters)) = field.split_first() else {
         return Err(invalid(record_type, format!("{context} field is empty")));
     };
@@ -538,7 +538,7 @@ fn validate_sheet_name_chars(
     field: &[u8],
     cch: u16,
     context: &str,
-) -> XlsResult<()> {
+) -> Result<()> {
     let wide = field
         .first()
         .map(|flags| flags & STRING_HIGH_BYTE != 0)
@@ -559,7 +559,7 @@ fn validate_sheet_name_chars(
 
 /// MS-XLS 2.4.227 `RRDInfo`: shared-workbook revision-tracking state.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsRrdInfo {
+pub struct RrdInfo {
     biff_version: u16,
     shared: bool,
     disk_has_revisions: bool,
@@ -575,9 +575,9 @@ pub struct XlsRrdInfo {
     history_interval_days: u16,
 }
 
-impl XlsRrdInfo {
+impl RrdInfo {
     /// Parse the fixed 50-byte record payload.
-    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if data.len() != RRD_INFO_PAYLOAD_LEN {
             return Err(invalid(
                 RRD_INFO_RECORD_TYPE,
@@ -630,7 +630,7 @@ impl XlsRrdInfo {
         Ok(value)
     }
 
-    fn validate(&self) -> XlsResult<()> {
+    fn validate(&self) -> Result<()> {
         let invalid_info = |message: &str| invalid(RRD_INFO_RECORD_TYPE, message);
         if self.shared && self.exclusive {
             return Err(invalid_info("RRDInfo is both shared and exclusive"));
@@ -722,7 +722,7 @@ impl XlsRrdInfo {
 
 /// MS-XLS 2.4.116 `FileLock`: a lock held on the shared workbook.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XlsFileLockPurpose {
+pub enum FileLockPurpose {
     NotLocked,
     WritingUserInfo,
     MergingRevisions,
@@ -730,8 +730,8 @@ pub enum XlsFileLockPurpose {
     DeleteOrRename,
 }
 
-impl XlsFileLockPurpose {
-    fn from_u32(value: u32) -> XlsResult<Self> {
+impl FileLockPurpose {
+    fn from_u32(value: u32) -> Result<Self> {
         match value {
             0x0000_0000 => Ok(Self::NotLocked),
             0x0001_0001 => Ok(Self::WritingUserInfo),
@@ -749,15 +749,15 @@ impl XlsFileLockPurpose {
 /// MS-XLS 2.4.116 `FileLock` record. Inert: reading it never acquires or
 /// releases any lock.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsFileLock {
-    purpose: XlsFileLockPurpose,
+pub struct FileLock {
+    purpose: FileLockPurpose,
     user_name: String,
     unused: Vec<u8>,
 }
 
-impl XlsFileLock {
+impl FileLock {
     /// Parse the fixed 162-byte record payload.
-    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if data.len() != FILE_LOCK_PAYLOAD_LEN {
             return Err(invalid(
                 FILE_LOCK_RECORD_TYPE,
@@ -767,7 +767,7 @@ impl XlsFileLock {
                 ),
             ));
         }
-        let purpose = XlsFileLockPurpose::from_u32(read_u32(data, 0))?;
+        let purpose = FileLockPurpose::from_u32(read_u32(data, 0))?;
         let cch = usize::from(read_u16(data, 4));
         if cch > FILE_LOCK_MAX_USER_CHARS {
             return Err(invalid(
@@ -792,7 +792,7 @@ impl XlsFileLock {
         })
     }
 
-    pub fn purpose(&self) -> XlsFileLockPurpose {
+    pub fn purpose(&self) -> FileLockPurpose {
         self.purpose
     }
     pub fn user_name(&self) -> &str {
@@ -805,16 +805,16 @@ impl XlsFileLock {
 
 /// MS-XLS 2.4.339 `UsrExcl`: an exclusive lock on the shared workbook.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsUsrExcl {
+pub struct UsrExcl {
     exclusive: bool,
-    date_time: XlsShortDtr,
+    date_time: ShortDtr,
     user_name: String,
 }
 
-impl XlsUsrExcl {
+impl UsrExcl {
     /// Parse the record payload: `fExclusive`, `sdtr`, `cchUser`, and the
     /// fixed 147-character `stUser` field.
-    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if data.len() < USR_EXCL_PREFIX_LEN + 1 + USR_EXCL_USER_FIELD_CHARS {
             return Err(invalid(
                 USR_EXCL_RECORD_TYPE,
@@ -835,7 +835,7 @@ impl XlsUsrExcl {
                 ));
             },
         };
-        let date_time = XlsShortDtr::parse(USR_EXCL_RECORD_TYPE, &data[4..12])?;
+        let date_time = ShortDtr::parse(USR_EXCL_RECORD_TYPE, &data[4..12])?;
         let cch = read_u16(data, 12);
         if usize::from(cch) > USR_EXCL_MAX_USER_CHARS {
             return Err(invalid(
@@ -871,7 +871,7 @@ impl XlsUsrExcl {
     pub fn is_exclusive(&self) -> bool {
         self.exclusive
     }
-    pub fn date_time(&self) -> XlsShortDtr {
+    pub fn date_time(&self) -> ShortDtr {
         self.date_time
     }
     pub fn user_name(&self) -> &str {
@@ -881,17 +881,17 @@ impl XlsUsrExcl {
 
 /// MS-XLS 2.4.226 `RRDHead`: metadata for one user's set of revisions.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsRrdHead {
+pub struct RrdHead {
     guid: [u8; GUID_LEN],
     code_page: u16,
     user_name: String,
-    saved_at: XlsShortDtr,
+    saved_at: ShortDtr,
     next_tab_id: i16,
 }
 
-impl XlsRrdHead {
+impl RrdHead {
     /// Parse the fixed 158-byte record payload.
-    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse_payload(data: &[u8]) -> Result<Self> {
         const PAYLOAD_LEN: usize =
             RRD_LEN + GUID_LEN + 2 + 2 + RRD_HEAD_USER_FIELD_LEN + SHORT_DTR_LEN + 2;
         if data.len() != PAYLOAD_LEN {
@@ -903,8 +903,8 @@ impl XlsRrdHead {
                 ),
             ));
         }
-        let header = XlsRevisionRecordHeader::parse(RRD_HEAD_RECORD_TYPE, data, true)?;
-        if header.revision_type != XlsRevisionType::Header {
+        let header = RevisionRecordHeader::parse(RRD_HEAD_RECORD_TYPE, data, true)?;
+        if header.revision_type != RevisionType::Header {
             return Err(invalid(
                 RRD_HEAD_RECORD_TYPE,
                 "RRDHead revision type is not REVTHEADER",
@@ -931,7 +931,7 @@ impl XlsRrdHead {
             "RRDHead stUser",
         )?;
         let dtr_offset = field_offset + RRD_HEAD_USER_FIELD_LEN;
-        let saved_at = XlsShortDtr::parse(
+        let saved_at = ShortDtr::parse(
             RRD_HEAD_RECORD_TYPE,
             &data[dtr_offset..dtr_offset + SHORT_DTR_LEN],
         )?;
@@ -962,7 +962,7 @@ impl XlsRrdHead {
     pub fn user_name(&self) -> &str {
         &self.user_name
     }
-    pub fn saved_at(&self) -> XlsShortDtr {
+    pub fn saved_at(&self) -> ShortDtr {
         self.saved_at
     }
     /// Next available sheet identifier (`tabidMac`).
@@ -973,13 +973,13 @@ impl XlsRrdHead {
 
 /// MS-XLS 2.4.241 `RRTabId`: sheet identifiers in BoundSheet8 order.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsRrTabId {
+pub struct RrTabId {
     sheet_ids: Vec<u16>,
 }
 
-impl XlsRrTabId {
+impl RrTabId {
     /// Parse the record payload, an array of 2-byte sheet identifiers.
-    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if !data.len().is_multiple_of(2) {
             return Err(invalid(
                 RR_TAB_ID_RECORD_TYPE,
@@ -1009,15 +1009,15 @@ impl XlsRrTabId {
 
 /// MS-XLS 2.4.234 `RRDRenSheet`: old and new names of a renamed sheet.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsRrdRenSheet {
-    header: XlsRevisionRecordHeader,
+pub struct RrdRenSheet {
+    header: RevisionRecordHeader,
     old_name: String,
     new_name: String,
 }
 
-impl XlsRrdRenSheet {
+impl RrdRenSheet {
     /// Parse the fixed 528-byte record payload.
-    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse_payload(data: &[u8]) -> Result<Self> {
         const PAYLOAD_LEN: usize =
             RRD_LEN + 2 + REN_SHEET_NAME_FIELD_LEN + 2 + REN_SHEET_NAME_FIELD_LEN;
         if data.len() != PAYLOAD_LEN {
@@ -1029,9 +1029,9 @@ impl XlsRrdRenSheet {
                 ),
             ));
         }
-        let header = XlsRevisionRecordHeader::parse(RRD_REN_SHEET_RECORD_TYPE, data, false)?;
+        let header = RevisionRecordHeader::parse(RRD_REN_SHEET_RECORD_TYPE, data, false)?;
         header.require_reviewable(RRD_REN_SHEET_RECORD_TYPE)?;
-        if header.revision_type != XlsRevisionType::RenameSheet {
+        if header.revision_type != RevisionType::RenameSheet {
             return Err(invalid(
                 RRD_REN_SHEET_RECORD_TYPE,
                 "RRDRenSheet revision type is not REVTRENSHEET",
@@ -1074,7 +1074,7 @@ impl XlsRrdRenSheet {
         })
     }
 
-    pub fn header(&self) -> &XlsRevisionRecordHeader {
+    pub fn header(&self) -> &RevisionRecordHeader {
         &self.header
     }
     pub fn old_name(&self) -> &str {
@@ -1090,17 +1090,17 @@ impl XlsRrdRenSheet {
 /// The `Ducr` undo array is preserved raw; applying it would replay formula
 /// edits, which an inert reader must not do.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsRrdInsDel {
-    header: XlsRevisionRecordHeader,
+pub struct RrdInsDel {
+    header: RevisionRecordHeader,
     end_of_list: bool,
-    range: XlsRevisionCellRange,
+    range: RevisionCellRange,
     undo_count: u32,
     undo_data: Vec<u8>,
 }
 
-impl XlsRrdInsDel {
+impl RrdInsDel {
     /// Parse the record payload.
-    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse_payload(data: &[u8]) -> Result<Self> {
         const FIXED_LEN: usize = RRD_LEN + 2 + REF8U_LEN + 4;
         if data.len() < FIXED_LEN {
             return Err(invalid(
@@ -1111,13 +1111,13 @@ impl XlsRrdInsDel {
                 ),
             ));
         }
-        let header = XlsRevisionRecordHeader::parse(RRD_INS_DEL_RECORD_TYPE, data, false)?;
+        let header = RevisionRecordHeader::parse(RRD_INS_DEL_RECORD_TYPE, data, false)?;
         header.require_reviewable(RRD_INS_DEL_RECORD_TYPE)?;
         match header.revision_type {
-            XlsRevisionType::InsertRow
-            | XlsRevisionType::InsertColumn
-            | XlsRevisionType::DeleteRow
-            | XlsRevisionType::DeleteColumn => {},
+            RevisionType::InsertRow
+            | RevisionType::InsertColumn
+            | RevisionType::DeleteRow
+            | RevisionType::DeleteColumn => {},
             _ => {
                 return Err(invalid(
                     RRD_INS_DEL_RECORD_TYPE,
@@ -1134,13 +1134,13 @@ impl XlsRrdInsDel {
             ));
         }
         let end_of_list = flags & 0x0001 != 0;
-        if end_of_list && header.revision_type != XlsRevisionType::InsertRow {
+        if end_of_list && header.revision_type != RevisionType::InsertRow {
             return Err(invalid(
                 RRD_INS_DEL_RECORD_TYPE,
                 "RRDInsDel fEndOfList is set for a non row-insert",
             ));
         }
-        let range = XlsRevisionCellRange::parse(
+        let range = RevisionCellRange::parse(
             RRD_INS_DEL_RECORD_TYPE,
             &data[RRD_LEN + 2..RRD_LEN + 2 + REF8U_LEN],
         )?;
@@ -1167,13 +1167,13 @@ impl XlsRrdInsDel {
         })
     }
 
-    pub fn header(&self) -> &XlsRevisionRecordHeader {
+    pub fn header(&self) -> &RevisionRecordHeader {
         &self.header
     }
     pub fn is_end_of_list(&self) -> bool {
         self.end_of_list
     }
-    pub fn range(&self) -> XlsRevisionCellRange {
+    pub fn range(&self) -> RevisionCellRange {
         self.range
     }
     pub fn undo_count(&self) -> u32 {
@@ -1187,18 +1187,18 @@ impl XlsRrdInsDel {
 
 /// MS-XLS 2.4.231 `RRDMove`: a moved cell range.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsRrdMove {
-    header: XlsRevisionRecordHeader,
-    source: XlsRevisionCellRange,
-    destination: XlsRevisionCellRange,
+pub struct RrdMove {
+    header: RevisionRecordHeader,
+    source: RevisionCellRange,
+    destination: RevisionCellRange,
     source_tab_id: u16,
     undo_count: u32,
     undo_data: Vec<u8>,
 }
 
-impl XlsRrdMove {
+impl RrdMove {
     /// Parse the record payload.
-    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse_payload(data: &[u8]) -> Result<Self> {
         const FIXED_LEN: usize = RRD_LEN + 2 * REF8U_LEN + 2 + 4;
         if data.len() < FIXED_LEN {
             return Err(invalid(
@@ -1209,9 +1209,9 @@ impl XlsRrdMove {
                 ),
             ));
         }
-        let header = XlsRevisionRecordHeader::parse(RRD_MOVE_RECORD_TYPE, data, false)?;
+        let header = RevisionRecordHeader::parse(RRD_MOVE_RECORD_TYPE, data, false)?;
         header.require_reviewable(RRD_MOVE_RECORD_TYPE)?;
-        if header.revision_type != XlsRevisionType::CellMove {
+        if header.revision_type != RevisionType::CellMove {
             return Err(invalid(
                 RRD_MOVE_RECORD_TYPE,
                 "RRDMove revision type is not REVTMOVE",
@@ -1219,8 +1219,8 @@ impl XlsRrdMove {
         }
         header.require_sheet(RRD_MOVE_RECORD_TYPE)?;
         let source =
-            XlsRevisionCellRange::parse(RRD_MOVE_RECORD_TYPE, &data[RRD_LEN..RRD_LEN + REF8U_LEN])?;
-        let destination = XlsRevisionCellRange::parse(
+            RevisionCellRange::parse(RRD_MOVE_RECORD_TYPE, &data[RRD_LEN..RRD_LEN + REF8U_LEN])?;
+        let destination = RevisionCellRange::parse(
             RRD_MOVE_RECORD_TYPE,
             &data[RRD_LEN + REF8U_LEN..RRD_LEN + 2 * REF8U_LEN],
         )?;
@@ -1249,13 +1249,13 @@ impl XlsRrdMove {
         })
     }
 
-    pub fn header(&self) -> &XlsRevisionRecordHeader {
+    pub fn header(&self) -> &RevisionRecordHeader {
         &self.header
     }
-    pub fn source(&self) -> XlsRevisionCellRange {
+    pub fn source(&self) -> RevisionCellRange {
         self.source
     }
-    pub fn destination(&self) -> XlsRevisionCellRange {
+    pub fn destination(&self) -> RevisionCellRange {
         self.destination
     }
     /// Sheet on which the source range resides.
@@ -1273,15 +1273,15 @@ impl XlsRrdMove {
 
 /// MS-XLS 2.4.239 `RRInsertSh`: an inserted sheet.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsRrInsertSh {
-    header: XlsRevisionRecordHeader,
+pub struct RrInsertSh {
+    header: RevisionRecordHeader,
     position: u16,
     name: String,
 }
 
-impl XlsRrInsertSh {
+impl RrInsertSh {
     /// Parse the fixed 276-byte record payload.
-    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse_payload(data: &[u8]) -> Result<Self> {
         const PAYLOAD_LEN: usize = RRD_LEN + 2 + 2 + 2 + INSERT_SH_NAME_FIELD_LEN;
         if data.len() != PAYLOAD_LEN {
             return Err(invalid(
@@ -1292,9 +1292,9 @@ impl XlsRrInsertSh {
                 ),
             ));
         }
-        let header = XlsRevisionRecordHeader::parse(RR_INSERT_SH_RECORD_TYPE, data, false)?;
+        let header = RevisionRecordHeader::parse(RR_INSERT_SH_RECORD_TYPE, data, false)?;
         header.require_reviewable(RR_INSERT_SH_RECORD_TYPE)?;
-        if header.revision_type != XlsRevisionType::InsertSheet {
+        if header.revision_type != RevisionType::InsertSheet {
             return Err(invalid(
                 RR_INSERT_SH_RECORD_TYPE,
                 "RRInsertSh revision type is not REVTINSERTSH",
@@ -1328,7 +1328,7 @@ impl XlsRrInsertSh {
         })
     }
 
-    pub fn header(&self) -> &XlsRevisionRecordHeader {
+    pub fn header(&self) -> &RevisionRecordHeader {
         &self.header
     }
     /// Position of the new sheet in the workbook (`itabPos`).
@@ -1342,7 +1342,7 @@ impl XlsRrInsertSh {
 
 /// Kind of cell contents recorded by an `RRDChgCell` revision.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XlsRevisionCellContent {
+pub enum RevisionCellContent {
     Blank,
     RkNumber,
     Xnum,
@@ -1351,8 +1351,8 @@ pub enum XlsRevisionCellContent {
     Formula,
 }
 
-impl XlsRevisionCellContent {
-    fn from_bits(record_type: u16, bits: u32, context: &str) -> XlsResult<Self> {
+impl RevisionCellContent {
+    fn from_bits(record_type: u16, bits: u32, context: &str) -> Result<Self> {
         match bits {
             0x0 => Ok(Self::Blank),
             0x1 => Ok(Self::RkNumber),
@@ -1377,10 +1377,10 @@ impl XlsRevisionCellContent {
 /// not decoded: rich strings and `CellParsedFormula` token arrays are
 /// variable-length structures specified outside the revision record.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsRrdChgCell {
-    header: XlsRevisionRecordHeader,
-    new_content: XlsRevisionCellContent,
-    old_content: XlsRevisionCellContent,
+pub struct RrdChgCell {
+    header: RevisionRecordHeader,
+    new_content: RevisionCellContent,
+    old_content: RevisionCellContent,
     lotus_prefix: bool,
     has_old_format: bool,
     old_format_empty: bool,
@@ -1392,15 +1392,15 @@ pub struct XlsRrdChgCell {
     phonetic_shown: bool,
     old_phonetic_shown: bool,
     formula_adjusted: bool,
-    location: XlsRevisionCellLocation,
+    location: RevisionCellLocation,
     old_value_size: u32,
     formatting_run_count: u16,
     tail: Vec<u8>,
 }
 
-impl XlsRrdChgCell {
+impl RrdChgCell {
     /// Parse the record payload.
-    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if data.len() < RRD_CHG_CELL_FIXED_LEN {
             return Err(invalid(
                 RRD_CHG_CELL_RECORD_TYPE,
@@ -1410,8 +1410,8 @@ impl XlsRrdChgCell {
                 ),
             ));
         }
-        let header = XlsRevisionRecordHeader::parse(RRD_CHG_CELL_RECORD_TYPE, data, false)?;
-        if header.revision_type != XlsRevisionType::ChangeCell {
+        let header = RevisionRecordHeader::parse(RRD_CHG_CELL_RECORD_TYPE, data, false)?;
+        if header.revision_type != RevisionType::ChangeCell {
             return Err(invalid(
                 RRD_CHG_CELL_RECORD_TYPE,
                 "RRDChgCell revision type is not REVTCHANGECELL",
@@ -1432,20 +1432,17 @@ impl XlsRrdChgCell {
             ));
         }
         let new_content =
-            XlsRevisionCellContent::from_bits(RRD_CHG_CELL_RECORD_TYPE, flags & 0x7, "vt")?;
-        let old_content = XlsRevisionCellContent::from_bits(
-            RRD_CHG_CELL_RECORD_TYPE,
-            (flags >> 3) & 0x7,
-            "vtOld",
-        )?;
-        let location = XlsRevisionCellLocation::parse(&data[RRD_LEN + 4..RRD_LEN + 8]);
+            RevisionCellContent::from_bits(RRD_CHG_CELL_RECORD_TYPE, flags & 0x7, "vt")?;
+        let old_content =
+            RevisionCellContent::from_bits(RRD_CHG_CELL_RECORD_TYPE, (flags >> 3) & 0x7, "vtOld")?;
+        let location = RevisionCellLocation::parse(&data[RRD_LEN + 4..RRD_LEN + 8]);
         let old_value_size = read_u32(data, RRD_LEN + 8);
         let expected_old_size = match old_content {
-            XlsRevisionCellContent::Blank => Some(0),
-            XlsRevisionCellContent::RkNumber => Some(4),
-            XlsRevisionCellContent::Xnum => Some(8),
-            XlsRevisionCellContent::BoolError => Some(2),
-            XlsRevisionCellContent::RichExtendedString | XlsRevisionCellContent::Formula => None,
+            RevisionCellContent::Blank => Some(0),
+            RevisionCellContent::RkNumber => Some(4),
+            RevisionCellContent::Xnum => Some(8),
+            RevisionCellContent::BoolError => Some(2),
+            RevisionCellContent::RichExtendedString | RevisionCellContent::Formula => None,
         };
         if let Some(expected) = expected_old_size
             && old_value_size != expected
@@ -1457,8 +1454,7 @@ impl XlsRrdChgCell {
                 ),
             ));
         }
-        if old_content == XlsRevisionCellContent::Formula && old_value_size < MIN_FORMULA_VALUE_LEN
-        {
+        if old_content == RevisionCellContent::Formula && old_value_size < MIN_FORMULA_VALUE_LEN {
             return Err(invalid(
                 RRD_CHG_CELL_RECORD_TYPE,
                 "RRDChgCell old formula is smaller than 24 bytes",
@@ -1500,13 +1496,13 @@ impl XlsRrdChgCell {
         })
     }
 
-    pub fn header(&self) -> &XlsRevisionRecordHeader {
+    pub fn header(&self) -> &RevisionRecordHeader {
         &self.header
     }
-    pub fn new_content(&self) -> XlsRevisionCellContent {
+    pub fn new_content(&self) -> RevisionCellContent {
         self.new_content
     }
-    pub fn old_content(&self) -> XlsRevisionCellContent {
+    pub fn old_content(&self) -> RevisionCellContent {
         self.old_content
     }
     /// Whether Lotus 1-2-3 prefix characters are present (`f123Prefix`).
@@ -1547,7 +1543,7 @@ impl XlsRrdChgCell {
     pub fn formula_adjusted(&self) -> bool {
         self.formula_adjusted
     }
-    pub fn location(&self) -> XlsRevisionCellLocation {
+    pub fn location(&self) -> RevisionCellLocation {
         self.location
     }
     /// Byte size of the old cell contents (`cbOldVal`).
@@ -1566,13 +1562,13 @@ impl XlsRrdChgCell {
 
 /// MS-XLS 2.4.224 `RRDConflict`: resolution of a conflict between revisions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsRrdConflict {
-    header: XlsRevisionRecordHeader,
+pub struct RrdConflict {
+    header: RevisionRecordHeader,
 }
 
-impl XlsRrdConflict {
+impl RrdConflict {
     /// Parse the record payload, which is the RRD structure alone.
-    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if data.len() != RRD_LEN {
             return Err(invalid(
                 RRD_CONFLICT_RECORD_TYPE,
@@ -1582,9 +1578,9 @@ impl XlsRrdConflict {
                 ),
             ));
         }
-        let header = XlsRevisionRecordHeader::parse(RRD_CONFLICT_RECORD_TYPE, data, false)?;
+        let header = RevisionRecordHeader::parse(RRD_CONFLICT_RECORD_TYPE, data, false)?;
         header.require_reviewable(RRD_CONFLICT_RECORD_TYPE)?;
-        if header.revision_type != XlsRevisionType::Conflict {
+        if header.revision_type != RevisionType::Conflict {
             return Err(invalid(
                 RRD_CONFLICT_RECORD_TYPE,
                 "RRDConflict revision type is not REVTCONFLICT",
@@ -1593,21 +1589,21 @@ impl XlsRrdConflict {
         Ok(Self { header })
     }
 
-    pub fn header(&self) -> &XlsRevisionRecordHeader {
+    pub fn header(&self) -> &RevisionRecordHeader {
         &self.header
     }
 }
 
 /// MS-XLS 2.4.237 `RRDUserView`: a custom-view revision.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsRrdUserView {
-    header: XlsRevisionRecordHeader,
+pub struct RrdUserView {
+    header: RevisionRecordHeader,
     guid: [u8; GUID_LEN],
 }
 
-impl XlsRrdUserView {
+impl RrdUserView {
     /// Parse the fixed 30-byte record payload.
-    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if data.len() != RRD_USER_VIEW_PAYLOAD_LEN {
             return Err(invalid(
                 RRD_USER_VIEW_RECORD_TYPE,
@@ -1617,7 +1613,7 @@ impl XlsRrdUserView {
                 ),
             ));
         }
-        let header = XlsRevisionRecordHeader::parse(RRD_USER_VIEW_RECORD_TYPE, data, false)?;
+        let header = RevisionRecordHeader::parse(RRD_USER_VIEW_RECORD_TYPE, data, false)?;
         if header.revision_id != 0 {
             return Err(invalid(
                 RRD_USER_VIEW_RECORD_TYPE,
@@ -1626,7 +1622,7 @@ impl XlsRrdUserView {
         }
         if !matches!(
             header.revision_type,
-            XlsRevisionType::AddView | XlsRevisionType::DeleteView
+            RevisionType::AddView | RevisionType::DeleteView
         ) {
             return Err(invalid(
                 RRD_USER_VIEW_RECORD_TYPE,
@@ -1644,7 +1640,7 @@ impl XlsRrdUserView {
         Ok(Self { header, guid })
     }
 
-    pub fn header(&self) -> &XlsRevisionRecordHeader {
+    pub fn header(&self) -> &RevisionRecordHeader {
         &self.header
     }
     /// Identifier of the custom view whose revision this record describes.
@@ -1654,7 +1650,7 @@ impl XlsRrdUserView {
 }
 
 /// Validate that an empty begin/end marker record has no payload.
-pub(crate) fn validate_empty_marker(record_type: u16, data: &[u8], name: &str) -> XlsResult<()> {
+pub(crate) fn validate_empty_marker(record_type: u16, data: &[u8], name: &str) -> Result<()> {
     if !data.is_empty() {
         return Err(invalid(
             record_type,
@@ -1703,16 +1699,16 @@ mod tests {
             0x0000u16, 0x0001, 0x0002, 0x0003, 0x0004, 0x0005, 0x0007, 0x0008, 0x0009, 0x000A,
             0x000B, 0x000C, 0x000D, 0x0020, 0x0025, 0x002B, 0x002C, 0x002E,
         ] {
-            let kind = XlsRevisionType::from_u16(RRD_HEAD_RECORD_TYPE, value).unwrap();
+            let kind = RevisionType::from_u16(RRD_HEAD_RECORD_TYPE, value).unwrap();
             assert_eq!(kind.to_u16(), value);
         }
-        assert!(XlsRevisionType::from_u16(RRD_HEAD_RECORD_TYPE, 0x0006).is_err());
-        assert!(XlsRevisionType::from_u16(RRD_HEAD_RECORD_TYPE, 0xFFFF).is_err());
+        assert!(RevisionType::from_u16(RRD_HEAD_RECORD_TYPE, 0x0006).is_err());
+        assert!(RevisionType::from_u16(RRD_HEAD_RECORD_TYPE, 0xFFFF).is_err());
     }
 
     #[test]
     fn short_dtr_validates_calendar_ranges() {
-        let dtr = XlsShortDtr::parse(RRD_HEAD_RECORD_TYPE, &short_dtr_bytes()).unwrap();
+        let dtr = ShortDtr::parse(RRD_HEAD_RECORD_TYPE, &short_dtr_bytes()).unwrap();
         assert_eq!(dtr.year(), 2024);
         assert_eq!(dtr.month(), 1);
         assert_eq!(dtr.day(), 15);
@@ -1721,7 +1717,7 @@ mod tests {
         assert_eq!(dtr.second(), 5);
         assert_eq!(dtr.weekday(), 1);
 
-        assert!(XlsShortDtr::parse(RRD_HEAD_RECORD_TYPE, &[0; 7]).is_err());
+        assert!(ShortDtr::parse(RRD_HEAD_RECORD_TYPE, &[0; 7]).is_err());
         for (index, value) in [
             (0usize, 0u8), // year low byte -> year 0
             (2, 0),        // month 0
@@ -1739,7 +1735,7 @@ mod tests {
                 data[1] = 0;
             }
             assert!(
-                XlsShortDtr::parse(RRD_HEAD_RECORD_TYPE, &data).is_err(),
+                ShortDtr::parse(RRD_HEAD_RECORD_TYPE, &data).is_err(),
                 "index {index} value {value} must be rejected"
             );
         }
@@ -1752,7 +1748,7 @@ mod tests {
         data[2..4].copy_from_slice(&9u16.to_le_bytes());
         data[4..6].copy_from_slice(&2u16.to_le_bytes());
         data[6..8].copy_from_slice(&0x00FFu16.to_le_bytes());
-        let range = XlsRevisionCellRange::parse(RRD_INS_DEL_RECORD_TYPE, &data).unwrap();
+        let range = RevisionCellRange::parse(RRD_INS_DEL_RECORD_TYPE, &data).unwrap();
         assert_eq!(range.first_row(), 5);
         assert_eq!(range.last_row(), 9);
         assert_eq!(range.first_column(), 2);
@@ -1760,54 +1756,48 @@ mod tests {
 
         let mut swapped_rows = data;
         swapped_rows[0..2].copy_from_slice(&10u16.to_le_bytes());
-        assert!(XlsRevisionCellRange::parse(RRD_INS_DEL_RECORD_TYPE, &swapped_rows).is_err());
+        assert!(RevisionCellRange::parse(RRD_INS_DEL_RECORD_TYPE, &swapped_rows).is_err());
         let mut over_column = data;
         over_column[6..8].copy_from_slice(&0x0100u16.to_le_bytes());
-        assert!(XlsRevisionCellRange::parse(RRD_INS_DEL_RECORD_TYPE, &over_column).is_err());
-        assert!(XlsRevisionCellRange::parse(RRD_INS_DEL_RECORD_TYPE, &data[..7]).is_err());
+        assert!(RevisionCellRange::parse(RRD_INS_DEL_RECORD_TYPE, &over_column).is_err());
+        assert!(RevisionCellRange::parse(RRD_INS_DEL_RECORD_TYPE, &data[..7]).is_err());
     }
 
     #[test]
     fn rrd_header_validates_memory_flags_and_revid() {
         let header =
-            XlsRevisionRecordHeader::parse(RRD_CHG_CELL_RECORD_TYPE, &rrd(0x0008, 3, 1), false)
+            RevisionRecordHeader::parse(RRD_CHG_CELL_RECORD_TYPE, &rrd(0x0008, 3, 1), false)
                 .unwrap();
         assert_eq!(header.memory_size(), 26);
         assert_eq!(header.revision_id(), 3);
-        assert_eq!(header.revision_type(), XlsRevisionType::ChangeCell);
+        assert_eq!(header.revision_type(), RevisionType::ChangeCell);
         assert_eq!(header.tab_id(), Some(1));
         assert!(!header.is_accepted());
 
         let mut small_memory = rrd(0x0008, 3, 1);
         small_memory[0..4].copy_from_slice(&25u32.to_le_bytes());
         assert!(
-            XlsRevisionRecordHeader::parse(RRD_CHG_CELL_RECORD_TYPE, &small_memory, false).is_err()
+            RevisionRecordHeader::parse(RRD_CHG_CELL_RECORD_TYPE, &small_memory, false).is_err()
         );
         // RRDHead requires the sentinel instead of the minimum.
         assert!(
-            XlsRevisionRecordHeader::parse(RRD_HEAD_RECORD_TYPE, &rrd(0x0020, 0, 0xFFFF), true)
+            RevisionRecordHeader::parse(RRD_HEAD_RECORD_TYPE, &rrd(0x0020, 0, 0xFFFF), true)
                 .is_err()
         );
         let mut head = rrd(0x0020, 0, 0xFFFF);
         head[0..4].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
-        let header = XlsRevisionRecordHeader::parse(RRD_HEAD_RECORD_TYPE, &head, true).unwrap();
+        let header = RevisionRecordHeader::parse(RRD_HEAD_RECORD_TYPE, &head, true).unwrap();
         assert_eq!(header.tab_id(), None);
 
         let mut flags = rrd(0x0008, 3, 1);
         flags[10] = 0x10; // reserved bit
-        assert!(XlsRevisionRecordHeader::parse(RRD_CHG_CELL_RECORD_TYPE, &flags, false).is_err());
+        assert!(RevisionRecordHeader::parse(RRD_CHG_CELL_RECORD_TYPE, &flags, false).is_err());
         let mut negative = rrd(0x0008, 3, 1);
         negative[4..8].copy_from_slice(&(-1i32).to_le_bytes());
+        assert!(RevisionRecordHeader::parse(RRD_CHG_CELL_RECORD_TYPE, &negative, false).is_err());
         assert!(
-            XlsRevisionRecordHeader::parse(RRD_CHG_CELL_RECORD_TYPE, &negative, false).is_err()
-        );
-        assert!(
-            XlsRevisionRecordHeader::parse(
-                RRD_CHG_CELL_RECORD_TYPE,
-                &rrd(0x0008, 3, 1)[..13],
-                false
-            )
-            .is_err()
+            RevisionRecordHeader::parse(RRD_CHG_CELL_RECORD_TYPE, &rrd(0x0008, 3, 1)[..13], false)
+                .is_err()
         );
     }
 
@@ -1826,7 +1816,7 @@ mod tests {
 
     #[test]
     fn rrd_info_parses_flags_and_guids() {
-        let info = XlsRrdInfo::parse_payload(&rrd_info_payload()).unwrap();
+        let info = RrdInfo::parse_payload(&rrd_info_payload()).unwrap();
         assert_eq!(info.biff_version(), 8);
         assert!(info.is_shared());
         assert!(info.disk_has_revisions());
@@ -1850,11 +1840,11 @@ mod tests {
             data[44..46].copy_from_slice(&flags2.to_le_bytes());
             data[46..48].copy_from_slice(&interval.to_le_bytes());
             assert!(
-                XlsRrdInfo::parse_payload(&data).is_err(),
+                RrdInfo::parse_payload(&data).is_err(),
                 "flags {flags:#06X} flags2 {flags2:#06X} interval {interval} must fail"
             );
         };
-        assert!(XlsRrdInfo::parse_payload(&rrd_info_payload()[..49]).is_err());
+        assert!(RrdInfo::parse_payload(&rrd_info_payload()[..49]).is_err());
         assert_flag_error(0x0011, 0, 30); // shared + exclusive
         assert_flag_error(0x0008, 0, 30); // revTrack without shared
         assert_flag_error(0x0003, 0, 30); // diskHasRev without revTrack
@@ -1868,20 +1858,16 @@ mod tests {
         assert_flag_error(0x000B, 0x0004, 30); // reserved flag bit in flags2
         let mut reserved1 = rrd_info_payload();
         reserved1[2] = 1;
-        assert!(XlsRrdInfo::parse_payload(&reserved1).is_err());
+        assert!(RrdInfo::parse_payload(&reserved1).is_err());
         let mut negative_revid = rrd_info_payload();
         negative_revid[38..42].copy_from_slice(&(-1i32).to_le_bytes());
-        assert!(XlsRrdInfo::parse_payload(&negative_revid).is_err());
+        assert!(RrdInfo::parse_payload(&negative_revid).is_err());
 
         // Exclusive workbooks ignore the history interval entirely.
         let mut exclusive = rrd_info_payload();
         exclusive[4..6].copy_from_slice(&0x0010u16.to_le_bytes());
         exclusive[46..48].copy_from_slice(&0u16.to_le_bytes());
-        assert!(
-            XlsRrdInfo::parse_payload(&exclusive)
-                .unwrap()
-                .is_exclusive()
-        );
+        assert!(RrdInfo::parse_payload(&exclusive).unwrap().is_exclusive());
     }
 
     #[test]
@@ -1890,21 +1876,21 @@ mod tests {
         data[0..4].copy_from_slice(&0x0001_0002u32.to_le_bytes());
         data[4..6].copy_from_slice(&4u16.to_le_bytes());
         data[7..11].copy_from_slice(b"Yves");
-        let lock = XlsFileLock::parse_payload(&data).unwrap();
-        assert_eq!(lock.purpose(), XlsFileLockPurpose::MergingRevisions);
+        let lock = FileLock::parse_payload(&data).unwrap();
+        assert_eq!(lock.purpose(), FileLockPurpose::MergingRevisions);
         assert_eq!(lock.user_name(), "Yves");
         assert_eq!(lock.unused_bytes().len(), FILE_LOCK_PAYLOAD_LEN - 6 - 1 - 4);
 
-        assert!(XlsFileLock::parse_payload(&data[..161]).is_err());
+        assert!(FileLock::parse_payload(&data[..161]).is_err());
         let mut bad_purpose = data.clone();
         bad_purpose[0..4].copy_from_slice(&0x0001_0003u32.to_le_bytes());
-        assert!(XlsFileLock::parse_payload(&bad_purpose).is_err());
+        assert!(FileLock::parse_payload(&bad_purpose).is_err());
         let mut long_name = data.clone();
         long_name[4..6].copy_from_slice(&53u16.to_le_bytes());
-        assert!(XlsFileLock::parse_payload(&long_name).is_err());
+        assert!(FileLock::parse_payload(&long_name).is_err());
         let mut reserved_flags = data;
         reserved_flags[6] = 0x02;
-        assert!(XlsFileLock::parse_payload(&reserved_flags).is_err());
+        assert!(FileLock::parse_payload(&reserved_flags).is_err());
     }
 
     fn usr_excl_payload(wide: bool) -> Vec<u8> {
@@ -1928,23 +1914,23 @@ mod tests {
 
     #[test]
     fn usr_excl_parses_both_string_widths() {
-        let lock = XlsUsrExcl::parse_payload(&usr_excl_payload(false)).unwrap();
+        let lock = UsrExcl::parse_payload(&usr_excl_payload(false)).unwrap();
         assert!(lock.is_exclusive());
         assert_eq!(lock.user_name(), "Lock");
         assert_eq!(lock.date_time().year(), 2024);
 
-        let wide = XlsUsrExcl::parse_payload(&usr_excl_payload(true)).unwrap();
+        let wide = UsrExcl::parse_payload(&usr_excl_payload(true)).unwrap();
         assert_eq!(wide.user_name(), "Lock");
 
         let mut bad_bool = usr_excl_payload(false);
         bad_bool[0..4].copy_from_slice(&2u32.to_le_bytes());
-        assert!(XlsUsrExcl::parse_payload(&bad_bool).is_err());
+        assert!(UsrExcl::parse_payload(&bad_bool).is_err());
         let mut bad_size = usr_excl_payload(false);
         bad_size.pop();
-        assert!(XlsUsrExcl::parse_payload(&bad_size).is_err());
+        assert!(UsrExcl::parse_payload(&bad_size).is_err());
         let mut long_name = usr_excl_payload(false);
         long_name[12..14].copy_from_slice(&55u16.to_le_bytes());
-        assert!(XlsUsrExcl::parse_payload(&long_name).is_err());
+        assert!(UsrExcl::parse_payload(&long_name).is_err());
     }
 
     /// Build a valid 158-byte RRDHead payload.
@@ -1964,32 +1950,32 @@ mod tests {
 
     #[test]
     fn rrd_head_parses_metadata() {
-        let head = XlsRrdHead::parse_payload(&rrd_head_payload()).unwrap();
+        let head = RrdHead::parse_payload(&rrd_head_payload()).unwrap();
         assert_eq!(head.guid(), &[0xCC; GUID_LEN]);
         assert_eq!(head.code_page(), 1200);
         assert_eq!(head.user_name(), "Alice");
         assert_eq!(head.saved_at().day(), 15);
         assert_eq!(head.next_tab_id(), 3);
 
-        assert!(XlsRrdHead::parse_payload(&rrd_head_payload()[..157]).is_err());
+        assert!(RrdHead::parse_payload(&rrd_head_payload()[..157]).is_err());
         let mut bad_revt = rrd_head_payload();
         bad_revt[8..10].copy_from_slice(&0x0008u16.to_le_bytes());
-        assert!(XlsRrdHead::parse_payload(&bad_revt).is_err());
+        assert!(RrdHead::parse_payload(&bad_revt).is_err());
         let mut bad_revid = rrd_head_payload();
         bad_revid[4..8].copy_from_slice(&1i32.to_le_bytes());
-        assert!(XlsRrdHead::parse_payload(&bad_revid).is_err());
+        assert!(RrdHead::parse_payload(&bad_revid).is_err());
         let mut long_name = rrd_head_payload();
         long_name[32..34].copy_from_slice(&55u16.to_le_bytes());
-        assert!(XlsRrdHead::parse_payload(&long_name).is_err());
+        assert!(RrdHead::parse_payload(&long_name).is_err());
         let mut bad_tabid_mac = rrd_head_payload();
         bad_tabid_mac[156..158].copy_from_slice(&(-2i16).to_le_bytes());
-        assert!(XlsRrdHead::parse_payload(&bad_tabid_mac).is_err());
+        assert!(RrdHead::parse_payload(&bad_tabid_mac).is_err());
 
         // tabidMac = -1 is legal.
         let mut minus_one = rrd_head_payload();
         minus_one[156..158].copy_from_slice(&(-1i16).to_le_bytes());
         assert_eq!(
-            XlsRrdHead::parse_payload(&minus_one).unwrap().next_tab_id(),
+            RrdHead::parse_payload(&minus_one).unwrap().next_tab_id(),
             -1
         );
     }
@@ -2001,15 +1987,15 @@ mod tests {
             data.extend_from_slice(&id.to_le_bytes());
         }
         assert_eq!(
-            XlsRrTabId::parse_payload(&data).unwrap().sheet_ids(),
+            RrTabId::parse_payload(&data).unwrap().sheet_ids(),
             &[1, 7, 42]
         );
-        assert!(XlsRrTabId::parse_payload(&data[..5]).is_err());
+        assert!(RrTabId::parse_payload(&data[..5]).is_err());
         let mut too_many = Vec::new();
         for id in 0..4113u16 {
             too_many.extend_from_slice(&id.to_le_bytes());
         }
-        assert!(XlsRrTabId::parse_payload(&too_many).is_err());
+        assert!(RrTabId::parse_payload(&too_many).is_err());
     }
 
     /// Build a valid 528-byte RRDRenSheet payload.
@@ -2025,29 +2011,29 @@ mod tests {
 
     #[test]
     fn ren_sheet_parses_old_and_new_names() {
-        let sheet = XlsRrdRenSheet::parse_payload(&ren_sheet_payload()).unwrap();
+        let sheet = RrdRenSheet::parse_payload(&ren_sheet_payload()).unwrap();
         assert_eq!(sheet.old_name(), "Old1");
         assert_eq!(sheet.new_name(), "New1");
         assert_eq!(sheet.header().tab_id(), Some(2));
 
-        assert!(XlsRrdRenSheet::parse_payload(&ren_sheet_payload()[..527]).is_err());
+        assert!(RrdRenSheet::parse_payload(&ren_sheet_payload()[..527]).is_err());
         let mut bad_revt = ren_sheet_payload();
         bad_revt[8..10].copy_from_slice(&0x0008u16.to_le_bytes());
-        assert!(XlsRrdRenSheet::parse_payload(&bad_revt).is_err());
+        assert!(RrdRenSheet::parse_payload(&bad_revt).is_err());
         let mut no_sheet = ren_sheet_payload();
         no_sheet[12..14].copy_from_slice(&0xFFFFu16.to_le_bytes());
-        assert!(XlsRrdRenSheet::parse_payload(&no_sheet).is_err());
+        assert!(RrdRenSheet::parse_payload(&no_sheet).is_err());
         let mut zero_revid = ren_sheet_payload();
         zero_revid[4..8].copy_from_slice(&0i32.to_le_bytes());
-        assert!(XlsRrdRenSheet::parse_payload(&zero_revid).is_err());
+        assert!(RrdRenSheet::parse_payload(&zero_revid).is_err());
         let mut long_name = ren_sheet_payload();
         long_name[14..16].copy_from_slice(&228u16.to_le_bytes());
-        assert!(XlsRrdRenSheet::parse_payload(&long_name).is_err());
+        assert!(RrdRenSheet::parse_payload(&long_name).is_err());
         // UTF-16 names are limited to 127 characters.
         let mut wide = ren_sheet_payload();
         wide[14..16].copy_from_slice(&128u16.to_le_bytes());
         wide[16] = 1;
-        assert!(XlsRrdRenSheet::parse_payload(&wide).is_err());
+        assert!(RrdRenSheet::parse_payload(&wide).is_err());
     }
 
     fn ins_del_payload(revt: u16, flags: u16) -> Vec<u8> {
@@ -2064,8 +2050,8 @@ mod tests {
 
     #[test]
     fn ins_del_validates_revision_kind_and_undo() {
-        let insert = XlsRrdInsDel::parse_payload(&ins_del_payload(0x0000, 0x0001)).unwrap();
-        assert_eq!(insert.header().revision_type(), XlsRevisionType::InsertRow);
+        let insert = RrdInsDel::parse_payload(&ins_del_payload(0x0000, 0x0001)).unwrap();
+        assert_eq!(insert.header().revision_type(), RevisionType::InsertRow);
         assert!(insert.is_end_of_list());
         assert_eq!(insert.range().first_row(), 5);
         assert_eq!(insert.range().last_column(), 3);
@@ -2073,27 +2059,27 @@ mod tests {
         assert!(insert.undo_data().is_empty());
 
         // fEndOfList is only meaningful for row inserts.
-        assert!(XlsRrdInsDel::parse_payload(&ins_del_payload(0x0002, 0x0001)).is_err());
+        assert!(RrdInsDel::parse_payload(&ins_del_payload(0x0002, 0x0001)).is_err());
         // Sort revisions are not insert/delete revisions.
-        assert!(XlsRrdInsDel::parse_payload(&ins_del_payload(0x0007, 0)).is_err());
+        assert!(RrdInsDel::parse_payload(&ins_del_payload(0x0007, 0)).is_err());
         // Reserved flags.
-        assert!(XlsRrdInsDel::parse_payload(&ins_del_payload(0x0000, 0x0002)).is_err());
+        assert!(RrdInsDel::parse_payload(&ins_del_payload(0x0000, 0x0002)).is_err());
 
         // Undo bytes require a matching count.
         let mut stray_undo = ins_del_payload(0x0000, 0);
         stray_undo.extend_from_slice(&[1, 2, 3]);
-        assert!(XlsRrdInsDel::parse_payload(&stray_undo).is_err());
+        assert!(RrdInsDel::parse_payload(&stray_undo).is_err());
         let mut missing_undo = ins_del_payload(0x0000, 0);
         let len = missing_undo.len();
         missing_undo[len - 4..].copy_from_slice(&2u32.to_le_bytes());
-        assert!(XlsRrdInsDel::parse_payload(&missing_undo).is_err());
+        assert!(RrdInsDel::parse_payload(&missing_undo).is_err());
 
         // Raw Ducr bytes are preserved when the count is nonzero.
         let mut with_undo = ins_del_payload(0x0000, 0);
         let len = with_undo.len();
         with_undo[len - 4..].copy_from_slice(&1u32.to_le_bytes());
         with_undo.extend_from_slice(&[0xDE, 0xAD, 0xBE, 0xEF]);
-        let parsed = XlsRrdInsDel::parse_payload(&with_undo).unwrap();
+        let parsed = RrdInsDel::parse_payload(&with_undo).unwrap();
         assert_eq!(parsed.undo_count(), 1);
         assert_eq!(parsed.undo_data(), &[0xDE, 0xAD, 0xBE, 0xEF]);
     }
@@ -2114,18 +2100,18 @@ mod tests {
 
     #[test]
     fn move_parses_source_and_destination() {
-        let moved = XlsRrdMove::parse_payload(&move_payload()).unwrap();
+        let moved = RrdMove::parse_payload(&move_payload()).unwrap();
         assert_eq!(moved.source().first_row(), 1);
         assert_eq!(moved.destination().first_row(), 10);
         assert_eq!(moved.source_tab_id(), 1);
 
         let mut bad_revt = move_payload();
         bad_revt[8..10].copy_from_slice(&0x0000u16.to_le_bytes());
-        assert!(XlsRrdMove::parse_payload(&bad_revt).is_err());
+        assert!(RrdMove::parse_payload(&bad_revt).is_err());
         let mut no_sheet = move_payload();
         no_sheet[12..14].copy_from_slice(&0xFFFFu16.to_le_bytes());
-        assert!(XlsRrdMove::parse_payload(&no_sheet).is_err());
-        assert!(XlsRrdMove::parse_payload(&move_payload()[..20]).is_err());
+        assert!(RrdMove::parse_payload(&no_sheet).is_err());
+        assert!(RrdMove::parse_payload(&move_payload()[..20]).is_err());
     }
 
     fn insert_sh_payload() -> Vec<u8> {
@@ -2140,18 +2126,18 @@ mod tests {
 
     #[test]
     fn insert_sh_parses_position_and_name() {
-        let sheet = XlsRrInsertSh::parse_payload(&insert_sh_payload()).unwrap();
+        let sheet = RrInsertSh::parse_payload(&insert_sh_payload()).unwrap();
         assert_eq!(sheet.position(), 1);
         assert_eq!(sheet.name(), "Added");
         assert_eq!(sheet.header().tab_id(), Some(4));
 
         let mut reserved = insert_sh_payload();
         reserved[16..18].copy_from_slice(&1u16.to_le_bytes());
-        assert!(XlsRrInsertSh::parse_payload(&reserved).is_err());
+        assert!(RrInsertSh::parse_payload(&reserved).is_err());
         let mut bad_revt = insert_sh_payload();
         bad_revt[8..10].copy_from_slice(&0x0009u16.to_le_bytes());
-        assert!(XlsRrInsertSh::parse_payload(&bad_revt).is_err());
-        assert!(XlsRrInsertSh::parse_payload(&insert_sh_payload()[..275]).is_err());
+        assert!(RrInsertSh::parse_payload(&bad_revt).is_err());
+        assert!(RrInsertSh::parse_payload(&insert_sh_payload()[..275]).is_err());
     }
 
     /// Build an RRDChgCell payload: blank old value, Xnum new value.
@@ -2171,9 +2157,9 @@ mod tests {
 
     #[test]
     fn chg_cell_parses_flags_and_location() {
-        let cell = XlsRrdChgCell::parse_payload(&chg_cell_payload()).unwrap();
-        assert_eq!(cell.new_content(), XlsRevisionCellContent::Xnum);
-        assert_eq!(cell.old_content(), XlsRevisionCellContent::Blank);
+        let cell = RrdChgCell::parse_payload(&chg_cell_payload()).unwrap();
+        assert_eq!(cell.new_content(), RevisionCellContent::Xnum);
+        assert_eq!(cell.old_content(), RevisionCellContent::Blank);
         assert!(cell.phonetic_shown());
         assert!(!cell.old_phonetic_shown());
         assert!(!cell.has_old_format());
@@ -2186,17 +2172,17 @@ mod tests {
 
         let mut bad_revt = chg_cell_payload();
         bad_revt[8..10].copy_from_slice(&0x0004u16.to_le_bytes());
-        assert!(XlsRrdChgCell::parse_payload(&bad_revt).is_err());
+        assert!(RrdChgCell::parse_payload(&bad_revt).is_err());
         let mut edge_of_sort = chg_cell_payload();
         edge_of_sort[10] = 0x08;
-        assert!(XlsRrdChgCell::parse_payload(&edge_of_sort).is_err());
+        assert!(RrdChgCell::parse_payload(&edge_of_sort).is_err());
         let mut no_sheet = chg_cell_payload();
         no_sheet[12..14].copy_from_slice(&0xFFFFu16.to_le_bytes());
-        assert!(XlsRrdChgCell::parse_payload(&no_sheet).is_err());
+        assert!(RrdChgCell::parse_payload(&no_sheet).is_err());
         let mut reserved = chg_cell_payload();
         reserved[17] |= 0x80; // reserved2 bit
-        assert!(XlsRrdChgCell::parse_payload(&reserved).is_err());
-        assert!(XlsRrdChgCell::parse_payload(&chg_cell_payload()[..25]).is_err());
+        assert!(RrdChgCell::parse_payload(&reserved).is_err());
+        assert!(RrdChgCell::parse_payload(&chg_cell_payload()[..25]).is_err());
     }
 
     #[test]
@@ -2210,49 +2196,49 @@ mod tests {
         data.extend_from_slice(&4u32.to_le_bytes());
         data.extend_from_slice(&0u16.to_le_bytes());
         data.extend_from_slice(&42u32.to_le_bytes()); // rkOld
-        let cell = XlsRrdChgCell::parse_payload(&data).unwrap();
-        assert_eq!(cell.old_content(), XlsRevisionCellContent::RkNumber);
+        let cell = RrdChgCell::parse_payload(&data).unwrap();
+        assert_eq!(cell.old_content(), RevisionCellContent::RkNumber);
         assert_eq!(cell.old_value_size(), 4);
 
         let mut wrong_size = data.clone();
         wrong_size[22..26].copy_from_slice(&5u32.to_le_bytes());
-        assert!(XlsRrdChgCell::parse_payload(&wrong_size).is_err());
+        assert!(RrdChgCell::parse_payload(&wrong_size).is_err());
 
         // An old formula must be at least 24 bytes.
         let mut formula = data.clone();
         formula[14..18].copy_from_slice(&(5u32 << 3).to_le_bytes());
         formula[22..26].copy_from_slice(&8u32.to_le_bytes());
-        assert!(XlsRrdChgCell::parse_payload(&formula).is_err());
+        assert!(RrdChgCell::parse_payload(&formula).is_err());
 
         // Unknown content type bits (6/7) are rejected.
         let mut unknown = data;
         unknown[14..18].copy_from_slice(&7u32.to_le_bytes());
-        assert!(XlsRrdChgCell::parse_payload(&unknown).is_err());
+        assert!(RrdChgCell::parse_payload(&unknown).is_err());
     }
 
     #[test]
     fn conflict_and_user_view_validate_rrd_invariants() {
-        let conflict = XlsRrdConflict::parse_payload(&rrd(0x0025, 16, 0xFFFF)).unwrap();
-        assert_eq!(conflict.header().revision_type(), XlsRevisionType::Conflict);
-        assert!(XlsRrdConflict::parse_payload(&rrd(0x0025, 0, 0xFFFF)).is_err());
-        assert!(XlsRrdConflict::parse_payload(&rrd(0x0008, 16, 0xFFFF)).is_err());
-        assert!(XlsRrdConflict::parse_payload(&rrd(0x0025, 16, 0xFFFF)[..13]).is_err());
+        let conflict = RrdConflict::parse_payload(&rrd(0x0025, 16, 0xFFFF)).unwrap();
+        assert_eq!(conflict.header().revision_type(), RevisionType::Conflict);
+        assert!(RrdConflict::parse_payload(&rrd(0x0025, 0, 0xFFFF)).is_err());
+        assert!(RrdConflict::parse_payload(&rrd(0x0008, 16, 0xFFFF)).is_err());
+        assert!(RrdConflict::parse_payload(&rrd(0x0025, 16, 0xFFFF)[..13]).is_err());
 
         let mut view = Vec::new();
         view.extend_from_slice(&rrd(0x002B, 0, 0xFFFF));
         view.extend_from_slice(&[0x42; GUID_LEN]);
-        let view = XlsRrdUserView::parse_payload(&view).unwrap();
-        assert_eq!(view.header().revision_type(), XlsRevisionType::AddView);
+        let view = RrdUserView::parse_payload(&view).unwrap();
+        assert_eq!(view.header().revision_type(), RevisionType::AddView);
         assert_eq!(view.guid(), &[0x42; GUID_LEN]);
 
         let mut sheet_scoped = Vec::new();
         sheet_scoped.extend_from_slice(&rrd(0x002B, 0, 1));
         sheet_scoped.extend_from_slice(&[0x42; GUID_LEN]);
-        assert!(XlsRrdUserView::parse_payload(&sheet_scoped).is_err());
+        assert!(RrdUserView::parse_payload(&sheet_scoped).is_err());
         let mut bad_revid = Vec::new();
         bad_revid.extend_from_slice(&rrd(0x002B, 5, 0xFFFF));
         bad_revid.extend_from_slice(&[0x42; GUID_LEN]);
-        assert!(XlsRrdUserView::parse_payload(&bad_revid).is_err());
+        assert!(RrdUserView::parse_payload(&bad_revid).is_err());
     }
 
     #[test]

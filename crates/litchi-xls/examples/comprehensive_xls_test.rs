@@ -5,12 +5,12 @@
 //!
 //! Run with: cargo run --example comprehensive_xls_test
 
-use litchi_xls::XlsWriter;
+use litchi_xls::Writer;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Comprehensive XLS Writer Test ===\n");
 
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
 
     // ============================================================
     // 1. SALES DATA SHEET - Numbers, Strings, and Formulas

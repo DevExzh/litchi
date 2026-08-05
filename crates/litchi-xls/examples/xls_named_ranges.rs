@@ -10,13 +10,13 @@
 //! cargo run --example xls_named_ranges --features ole --no-default-features
 //! ```
 
-use litchi_xls::XlsWriter;
+use litchi_xls::Writer;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating xls_named_ranges.xls with named ranges...");
 
     // Create a new XLS writer and a single worksheet.
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("NamedRanges")?;
 
     // Populate a small table so the named ranges have visible content.

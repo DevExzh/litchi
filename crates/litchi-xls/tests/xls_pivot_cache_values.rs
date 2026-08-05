@@ -2,9 +2,9 @@ use std::io::Cursor;
 use std::path::PathBuf;
 
 use litchi_xls::writer::{
-    PivotCacheValue, XlsPivotFieldConfig, XlsPivotItemConfig, XlsPivotTableConfig, XlsWriter,
+    PivotCacheValue, PivotFieldConfig, PivotItemConfig, PivotTableConfig, Writer,
 };
-use litchi_xls::{PivotCacheDateTime, PivotCacheError, PivotCacheItem, XlsWorkbook};
+use litchi_xls::{PivotCacheDateTime, PivotCacheError, PivotCacheItem, Workbook};
 
 fn typed_items() -> Vec<PivotCacheItem> {
     vec![
@@ -16,8 +16,8 @@ fn typed_items() -> Vec<PivotCacheItem> {
     ]
 }
 
-fn typed_config(name: &str, sheet_name: &str) -> XlsPivotTableConfig {
-    XlsPivotTableConfig {
+fn typed_config(name: &str, sheet_name: &str) -> PivotTableConfig {
+    PivotTableConfig {
         name: name.to_string(),
         source_type: 1,
         source_sheet_name: sheet_name.to_string(),
@@ -35,12 +35,12 @@ fn typed_config(name: &str, sheet_name: &str) -> XlsPivotTableConfig {
         data_field_name: "Values".to_string(),
         data_axis: 0,
         data_position: 0,
-        fields: vec![XlsPivotFieldConfig {
+        fields: vec![PivotFieldConfig {
             axis: 1,
             subtotal_count: 0,
             subtotal_flags: 0,
             items: (0..5)
-                .map(|index| XlsPivotItemConfig {
+                .map(|index| PivotItemConfig {
                     item_type: 0,
                     flags: 0,
                     cache_index: index,
@@ -68,7 +68,7 @@ fn typed_config(name: &str, sheet_name: &str) -> XlsPivotTableConfig {
 }
 
 fn write_typed_workbook(sheet_count: usize) -> Vec<u8> {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     for index in 0..sheet_count {
         let sheet_name = format!("Typed{}", index + 1);
         let sheet = writer.add_worksheet(&sheet_name).unwrap();
@@ -139,7 +139,7 @@ fn typed_cache_items_emit_exact_flags_payloads_and_rows() {
         vec![vec![0], vec![1], vec![2], vec![3], vec![4]]
     );
 
-    let workbook = XlsWorkbook::new(Cursor::new(bytes)).unwrap();
+    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
     assert_eq!(workbook.pivot_caches().len(), 1);
     assert_eq!(
         workbook.pivot_caches()[0].fields()[0].items(),
@@ -160,7 +160,7 @@ fn typed_caches_coexist_with_workbook_global_stream_ids() {
     let bytes = write_typed_workbook(2);
     assert!(!cache_stream(&bytes, 1).is_empty());
     assert!(!cache_stream(&bytes, 2).is_empty());
-    let workbook = XlsWorkbook::new(Cursor::new(bytes)).unwrap();
+    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
     assert_eq!(
         workbook
             .pivot_caches()
@@ -188,7 +188,7 @@ fn reads_libreoffice_boolean_and_empty_pivot_caches() {
         let path = root
             .join("../../test-data/libreoffice-core/sc/qa/unit/data/xls")
             .join(name);
-        let workbook = XlsWorkbook::new(std::fs::File::open(path).unwrap()).unwrap();
+        let workbook = Workbook::new(std::fs::File::open(path).unwrap()).unwrap();
         assert!(
             workbook
                 .pivot_caches()
@@ -214,7 +214,7 @@ fn malformed_typed_records_are_rejected_and_invalid_add_is_atomic() {
     cache[boolean + 4..boolean + 6].copy_from_slice(&2u16.to_le_bytes());
     assert!(litchi_xls::pivot_table::parse_pivot_cache_stream(&cache).is_err());
 
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Atomic").unwrap();
     let mut invalid = typed_config("Invalid", "Atomic");
     invalid.fields[0]
@@ -223,6 +223,6 @@ fn malformed_typed_records_are_rejected_and_invalid_add_is_atomic() {
     assert!(writer.add_pivot_table(sheet, invalid).is_err());
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let workbook = XlsWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
     assert!(workbook.pivot_caches().is_empty());
 }

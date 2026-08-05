@@ -4,10 +4,10 @@ use super::model::{
     CdAudio, CdTime, Collection, EmbeddedWav, LinkedAudio, LinkedAudioKind, Media, Movie,
     MovieKind, Object, UnknownRecord, Video,
 };
-use crate::consts::PptRecordType;
+use crate::consts::RecordType;
 use crate::hyperlink::Hyperlinks;
-use crate::package::{PptError, Result};
-use crate::records::PptRecord;
+use crate::package::{Error, Result};
+use crate::records::Record;
 use crate::sound_collection::Collection as SoundCollection;
 use std::collections::HashSet;
 
@@ -16,10 +16,10 @@ pub(crate) const MAX_PATH_UNITS: usize = 32_768;
 pub(crate) const MAX_EXTERNAL_MEDIA_OBJECTS: usize = 4_096;
 
 impl Media {
-    pub fn parse(record: &PptRecord) -> Result<Self> {
+    pub fn parse(record: &Record) -> Result<Self> {
         if record.version != 0
             || record.instance != 0
-            || record.record_type_raw != PptRecordType::ExternalMediaAtom.as_u16()
+            || record.record_type_raw != RecordType::ExternalMediaAtom.as_u16()
             || record.data.len() != 8
             || record.data_length != 8
         {
@@ -42,8 +42,8 @@ impl Media {
         })
     }
 
-    pub fn to_record(&self) -> Result<PptRecord> {
-        Ok(PptRecord::parse(&self.to_record_bytes()?, 0)?.0)
+    pub fn to_record(&self) -> Result<Record> {
+        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
     pub fn to_record_bytes(&self) -> Result<[u8; 16]> {
@@ -54,7 +54,7 @@ impl Media {
             | (self.rewind_after_playing as u16) << 1
             | (self.narration as u16) << 2;
         let mut bytes = [0; 16];
-        bytes[2..4].copy_from_slice(&PptRecordType::ExternalMediaAtom.as_u16().to_le_bytes());
+        bytes[2..4].copy_from_slice(&RecordType::ExternalMediaAtom.as_u16().to_le_bytes());
         bytes[4..8].copy_from_slice(&8u32.to_le_bytes());
         bytes[8..12].copy_from_slice(&self.id.to_le_bytes());
         bytes[12..14].copy_from_slice(&flags.to_le_bytes());
@@ -64,14 +64,14 @@ impl Media {
 }
 
 impl Video {
-    pub fn parse(record: &PptRecord) -> Result<Self> {
+    pub fn parse(record: &Record) -> Result<Self> {
         if record.version != 0x0f
             || record.instance != 0
-            || record.record_type_raw != PptRecordType::ExternalVideo.as_u16()
+            || record.record_type_raw != RecordType::ExternalVideo.as_u16()
         {
             return corrupted("ExVideoContainer has an invalid header");
         }
-        let children = PptRecord::parse_sequence_strict(&record.data, "ExVideoContainer")?;
+        let children = Record::parse_sequence_strict(&record.data, "ExVideoContainer")?;
         if !(1..=2).contains(&children.len()) {
             return corrupted("ExVideoContainer must contain media and optional path atoms");
         }
@@ -83,8 +83,8 @@ impl Video {
         Ok(Self { media, path })
     }
 
-    pub fn to_record(&self) -> Result<PptRecord> {
-        Ok(PptRecord::parse(&self.to_record_bytes()?, 0)?.0)
+    pub fn to_record(&self) -> Result<Record> {
+        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
@@ -96,38 +96,38 @@ impl Video {
             children.extend_from_slice(&record_bytes(
                 0,
                 0,
-                PptRecordType::CString.as_u16(),
+                RecordType::CString.as_u16(),
                 &encode_path(path)?,
             )?);
         }
-        record_bytes(0x0f, 0, PptRecordType::ExternalVideo.as_u16(), &children)
+        record_bytes(0x0f, 0, RecordType::ExternalVideo.as_u16(), &children)
     }
 }
 
 impl MovieKind {
-    fn record_type(self) -> PptRecordType {
+    fn record_type(self) -> RecordType {
         match self {
-            Self::Avi => PptRecordType::ExternalAviMovie,
-            Self::Mci => PptRecordType::ExternalMciMovie,
+            Self::Avi => RecordType::ExternalAviMovie,
+            Self::Mci => RecordType::ExternalMciMovie,
         }
     }
 
     fn from_record_type(record_type: u16) -> Result<Self> {
         match record_type {
-            value if value == PptRecordType::ExternalAviMovie.as_u16() => Ok(Self::Avi),
-            value if value == PptRecordType::ExternalMciMovie.as_u16() => Ok(Self::Mci),
+            value if value == RecordType::ExternalAviMovie.as_u16() => Ok(Self::Avi),
+            value if value == RecordType::ExternalMciMovie.as_u16() => Ok(Self::Mci),
             _ => corrupted("external movie container has an invalid record type"),
         }
     }
 }
 
 impl Movie {
-    pub fn parse(record: &PptRecord) -> Result<Self> {
+    pub fn parse(record: &Record) -> Result<Self> {
         if record.version != 0x0f || record.instance != 0 {
             return corrupted("external movie container has an invalid header");
         }
         let kind = MovieKind::from_record_type(record.record_type_raw)?;
-        let children = PptRecord::parse_sequence_strict(&record.data, "external movie container")?;
+        let children = Record::parse_sequence_strict(&record.data, "external movie container")?;
         if children.len() != 1 {
             return corrupted("external movie container must contain exactly one ExVideoContainer");
         }
@@ -137,8 +137,8 @@ impl Movie {
         })
     }
 
-    pub fn to_record(&self) -> Result<PptRecord> {
-        Ok(PptRecord::parse(&self.to_record_bytes()?, 0)?.0)
+    pub fn to_record(&self) -> Result<Record> {
+        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
@@ -152,29 +152,29 @@ impl Movie {
 }
 
 impl LinkedAudioKind {
-    fn record_type(self) -> PptRecordType {
+    fn record_type(self) -> RecordType {
         match self {
-            Self::Midi => PptRecordType::ExternalMidiAudio,
-            Self::Wav => PptRecordType::ExternalWavAudioLink,
+            Self::Midi => RecordType::ExternalMidiAudio,
+            Self::Wav => RecordType::ExternalWavAudioLink,
         }
     }
 
     fn from_record_type(record_type: u16) -> Result<Self> {
         match record_type {
-            value if value == PptRecordType::ExternalMidiAudio.as_u16() => Ok(Self::Midi),
-            value if value == PptRecordType::ExternalWavAudioLink.as_u16() => Ok(Self::Wav),
+            value if value == RecordType::ExternalMidiAudio.as_u16() => Ok(Self::Midi),
+            value if value == RecordType::ExternalWavAudioLink.as_u16() => Ok(Self::Wav),
             _ => corrupted("linked audio container has an invalid record type"),
         }
     }
 }
 
 impl LinkedAudio {
-    pub fn parse(record: &PptRecord) -> Result<Self> {
+    pub fn parse(record: &Record) -> Result<Self> {
         if record.version != 0x0f || record.instance != 0 {
             return corrupted("linked audio container has an invalid header");
         }
         let kind = LinkedAudioKind::from_record_type(record.record_type_raw)?;
-        let children = PptRecord::parse_sequence_strict(&record.data, "linked audio container")?;
+        let children = Record::parse_sequence_strict(&record.data, "linked audio container")?;
         if !(1..=2).contains(&children.len()) {
             return corrupted("linked audio container must contain media and optional path atoms");
         }
@@ -185,8 +185,8 @@ impl LinkedAudio {
         })
     }
 
-    pub fn to_record(&self) -> Result<PptRecord> {
-        Ok(PptRecord::parse(&self.to_record_bytes()?, 0)?.0)
+    pub fn to_record(&self) -> Result<Record> {
+        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
@@ -195,7 +195,7 @@ impl LinkedAudio {
             children.extend_from_slice(&record_bytes(
                 0,
                 0,
-                PptRecordType::CString.as_u16(),
+                RecordType::CString.as_u16(),
                 &encode_path(path)?,
             )?);
         }
@@ -204,15 +204,14 @@ impl LinkedAudio {
 }
 
 impl EmbeddedWav {
-    pub fn parse(record: &PptRecord) -> Result<Self> {
+    pub fn parse(record: &Record) -> Result<Self> {
         if record.version != 0x0f
             || record.instance != 0
-            || record.record_type_raw != PptRecordType::ExternalWavAudioEmbedded.as_u16()
+            || record.record_type_raw != RecordType::ExternalWavAudioEmbedded.as_u16()
         {
             return corrupted("ExWAVAudioEmbeddedContainer has an invalid header");
         }
-        let children =
-            PptRecord::parse_sequence_strict(&record.data, "ExWAVAudioEmbeddedContainer")?;
+        let children = Record::parse_sequence_strict(&record.data, "ExWAVAudioEmbeddedContainer")?;
         if children.len() != 2 {
             return corrupted(
                 "ExWAVAudioEmbeddedContainer must contain media and embedded-audio atoms",
@@ -222,7 +221,7 @@ impl EmbeddedWav {
         let atom = &children[1];
         if atom.version != 1
             || atom.instance != 1
-            || atom.record_type_raw != PptRecordType::ExternalWavAudioEmbeddedAtom.as_u16()
+            || atom.record_type_raw != RecordType::ExternalWavAudioEmbeddedAtom.as_u16()
             || atom.data.len() != 8
             || atom.data_length != 8
         {
@@ -249,8 +248,8 @@ impl EmbeddedWav {
         Ok(())
     }
 
-    pub fn to_record(&self) -> Result<PptRecord> {
-        Ok(PptRecord::parse(&self.to_record_bytes()?, 0)?.0)
+    pub fn to_record(&self) -> Result<Record> {
+        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
@@ -264,13 +263,13 @@ impl EmbeddedWav {
         children.extend_from_slice(&record_bytes(
             1,
             1,
-            PptRecordType::ExternalWavAudioEmbeddedAtom.as_u16(),
+            RecordType::ExternalWavAudioEmbeddedAtom.as_u16(),
             &atom,
         )?);
         record_bytes(
             0x0f,
             0,
-            PptRecordType::ExternalWavAudioEmbedded.as_u16(),
+            RecordType::ExternalWavAudioEmbedded.as_u16(),
             &children,
         )
     }
@@ -289,7 +288,7 @@ impl Object {
 
 impl Collection {
     /// Discover the single `ExObjListContainer`, if present.
-    pub fn parse(root: &PptRecord) -> Result<Option<Self>> {
+    pub fn parse(root: &Record) -> Result<Option<Self>> {
         let mut lists = Vec::new();
         collect_external_object_lists(root, &mut lists);
         if lists.len() > 1 {
@@ -310,20 +309,20 @@ impl Collection {
         Ok(Some(result))
     }
 
-    fn parse_list(record: &PptRecord) -> Result<Self> {
+    fn parse_list(record: &Record) -> Result<Self> {
         if record.version != 0x0f
             || record.instance != 0
-            || record.record_type_raw != PptRecordType::ExObjList.as_u16()
+            || record.record_type_raw != RecordType::ExObjList.as_u16()
         {
             return corrupted("ExObjListContainer has an invalid header");
         }
-        let children = PptRecord::parse_sequence_strict(&record.data, "ExObjListContainer")?;
+        let children = Record::parse_sequence_strict(&record.data, "ExObjListContainer")?;
         let Some(atom) = children.first() else {
             return corrupted("ExObjListContainer is missing ExObjListAtom");
         };
         if atom.version != 0
             || atom.instance != 0
-            || atom.record_type_raw != PptRecordType::ExObjListAtom.as_u16()
+            || atom.record_type_raw != RecordType::ExObjListAtom.as_u16()
             || atom.data.len() != 4
             || atom.data_length != 4
         {
@@ -339,14 +338,14 @@ impl Collection {
         let mut unknown_records = Vec::new();
         for child in &children[1..] {
             let object = match child.record_type {
-                PptRecordType::ExternalAviMovie | PptRecordType::ExternalMciMovie => {
+                RecordType::ExternalAviMovie | RecordType::ExternalMciMovie => {
                     Some(Object::Movie(Movie::parse(child)?))
                 },
-                PptRecordType::ExternalMidiAudio | PptRecordType::ExternalWavAudioLink => {
+                RecordType::ExternalMidiAudio | RecordType::ExternalWavAudioLink => {
                     Some(Object::LinkedAudio(LinkedAudio::parse(child)?))
                 },
-                PptRecordType::ExternalCdAudio => Some(Object::CdAudio(CdAudio::parse(child)?)),
-                PptRecordType::ExternalWavAudioEmbedded => {
+                RecordType::ExternalCdAudio => Some(Object::CdAudio(CdAudio::parse(child)?)),
+                RecordType::ExternalWavAudioEmbedded => {
                     Some(Object::EmbeddedWav(EmbeddedWav::parse(child)?))
                 },
                 _ => {
@@ -397,7 +396,7 @@ impl Collection {
             };
             if value.sound_id.is_some() {
                 let sounds = sounds.ok_or_else(|| {
-                    PptError::Corrupted(
+                    Error::Corrupted(
                         "embedded WAV references a sound but the document has no SoundCollection"
                             .to_string(),
                     )
@@ -440,7 +439,7 @@ impl UnknownRecord {
         )
     }
 
-    pub(crate) fn from_record(record: &PptRecord, object_index: usize) -> Self {
+    pub(crate) fn from_record(record: &Record, object_index: usize) -> Self {
         Self {
             record: record.clone(),
             object_index,
@@ -448,8 +447,8 @@ impl UnknownRecord {
     }
 }
 
-fn collect_external_object_lists<'a>(record: &'a PptRecord, lists: &mut Vec<&'a PptRecord>) {
-    if record.record_type == PptRecordType::ExObjList {
+fn collect_external_object_lists<'a>(record: &'a Record, lists: &mut Vec<&'a Record>) {
+    if record.record_type == RecordType::ExObjList {
         lists.push(record);
     }
     for child in &record.children {
@@ -457,10 +456,10 @@ fn collect_external_object_lists<'a>(record: &'a PptRecord, lists: &mut Vec<&'a 
     }
 }
 
-fn parse_path(record: &PptRecord) -> Result<String> {
+fn parse_path(record: &Record) -> Result<String> {
     if record.version != 0
         || record.instance != 0
-        || record.record_type_raw != PptRecordType::CString.as_u16()
+        || record.record_type_raw != RecordType::CString.as_u16()
         || !record.data.len().is_multiple_of(2)
         || record.data.len() / 2 > MAX_PATH_UNITS
     {
@@ -475,7 +474,7 @@ fn parse_path(record: &PptRecord) -> Result<String> {
         return corrupted("UncOrLocalPathAtom contains an embedded null");
     }
     String::from_utf16(&units)
-        .map_err(|_| PptError::Corrupted("UncOrLocalPathAtom contains invalid UTF-16".to_string()))
+        .map_err(|_| Error::Corrupted("UncOrLocalPathAtom contains invalid UTF-16".to_string()))
 }
 
 fn encode_path(path: &str) -> Result<Vec<u8>> {
@@ -524,14 +523,14 @@ impl CdTime {
 }
 
 impl CdAudio {
-    pub fn parse(record: &PptRecord) -> Result<Self> {
+    pub fn parse(record: &Record) -> Result<Self> {
         if record.version != 0x0f
             || record.instance != 0
-            || record.record_type_raw != PptRecordType::ExternalCdAudio.as_u16()
+            || record.record_type_raw != RecordType::ExternalCdAudio.as_u16()
         {
             return corrupted("ExCDAudioContainer has an invalid header");
         }
-        let children = PptRecord::parse_sequence_strict(&record.data, "ExCDAudioContainer")?;
+        let children = Record::parse_sequence_strict(&record.data, "ExCDAudioContainer")?;
         if children.len() != 2 {
             return corrupted("ExCDAudioContainer must contain media and CD-audio atoms");
         }
@@ -539,7 +538,7 @@ impl CdAudio {
         let atom = &children[1];
         if atom.version != 0
             || atom.instance != 0
-            || atom.record_type_raw != PptRecordType::ExternalCdAudioAtom.as_u16()
+            || atom.record_type_raw != RecordType::ExternalCdAudioAtom.as_u16()
             || atom.data.len() != 8
             || atom.data_length != 8
         {
@@ -553,8 +552,8 @@ impl CdAudio {
         Ok(Self { media, start, end })
     }
 
-    pub fn to_record(&self) -> Result<PptRecord> {
-        Ok(PptRecord::parse(&self.to_record_bytes()?, 0)?.0)
+    pub fn to_record(&self) -> Result<Record> {
+        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
@@ -570,10 +569,10 @@ impl CdAudio {
         children.extend_from_slice(&record_bytes(
             0,
             0,
-            PptRecordType::ExternalCdAudioAtom.as_u16(),
+            RecordType::ExternalCdAudioAtom.as_u16(),
             &times,
         )?);
-        record_bytes(0x0f, 0, PptRecordType::ExternalCdAudio.as_u16(), &children)
+        record_bytes(0x0f, 0, RecordType::ExternalCdAudio.as_u16(), &children)
     }
 }
 
@@ -584,7 +583,7 @@ pub(crate) fn record_bytes(
     data: &[u8],
 ) -> Result<Vec<u8>> {
     let length = u32::try_from(data.len())
-        .map_err(|_| PptError::Corrupted("PowerPoint record payload exceeds u32".to_string()))?;
+        .map_err(|_| Error::Corrupted("PowerPoint record payload exceeds u32".to_string()))?;
     let mut bytes = Vec::with_capacity(8usize.saturating_add(data.len()));
     bytes.extend_from_slice(&((instance << 4) | version).to_le_bytes());
     bytes.extend_from_slice(&record_type.to_le_bytes());
@@ -594,5 +593,5 @@ pub(crate) fn record_bytes(
 }
 
 fn corrupted<T>(message: impl Into<String>) -> Result<T> {
-    Err(PptError::Corrupted(message.into()))
+    Err(Error::Corrupted(message.into()))
 }

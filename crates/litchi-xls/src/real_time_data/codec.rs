@@ -1,7 +1,7 @@
 //! Bounded BIFF8 wire codecs for RealTimeData records.
 
 use super::model::Value;
-use crate::error::{XlsError, XlsResult};
+use crate::error::{Error, Result};
 
 /// Record type of the `RealTimeData` record (MS-XLS 2.4.214).
 pub(crate) const REAL_TIME_DATA_RECORD_TYPE: u16 = 0x0813;
@@ -35,36 +35,36 @@ pub(super) const MIN_TOPIC_SEGMENTS: usize = 3;
 pub(super) const MIN_PREFIXED_TOPIC_SEGMENTS: usize = 2;
 pub(super) const MAX_TOPIC_SEGMENTS: usize = 39;
 
-pub(super) fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+pub(super) fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: REAL_TIME_DATA_RECORD_TYPE,
         message: message.into(),
     }
 }
 
-fn read_bytes<const N: usize>(data: &[u8], offset: usize) -> XlsResult<&[u8]> {
+fn read_bytes<const N: usize>(data: &[u8], offset: usize) -> Result<&[u8]> {
     let end = offset
         .checked_add(N)
         .ok_or_else(|| invalid("RealTimeData field offset overflows usize"))?;
-    data.get(offset..end).ok_or(XlsError::InvalidLength {
+    data.get(offset..end).ok_or(Error::InvalidLength {
         expected: end,
         found: data.len(),
     })
 }
 
-pub(super) fn read_u16(data: &[u8], offset: usize) -> XlsResult<u16> {
+pub(super) fn read_u16(data: &[u8], offset: usize) -> Result<u16> {
     let bytes = read_bytes::<2>(data, offset)?;
     Ok(u16::from_le_bytes([bytes[0], bytes[1]]))
 }
 
-pub(super) fn read_u32(data: &[u8], offset: usize) -> XlsResult<u32> {
+pub(super) fn read_u32(data: &[u8], offset: usize) -> Result<u32> {
     let bytes = read_bytes::<4>(data, offset)?;
     Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
 }
 
 /// Decode `char_count` characters from `bytes` in compressed (1 byte/char)
 /// or uncompressed UTF-16LE (2 bytes/char) form.
-fn decode_chars(bytes: &[u8], wide: bool) -> XlsResult<String> {
+fn decode_chars(bytes: &[u8], wide: bool) -> Result<String> {
     if wide {
         if !bytes.len().is_multiple_of(2) {
             return Err(invalid("RTD wide string has an odd byte length"));
@@ -72,7 +72,7 @@ fn decode_chars(bytes: &[u8], wide: bool) -> XlsResult<String> {
         let mut value = String::new();
         value
             .try_reserve(bytes.len())
-            .map_err(|_| XlsError::Allocation("decoding RTD UTF-16 text"))?;
+            .map_err(|_| Error::Allocation("decoding RTD UTF-16 text"))?;
         for result in char::decode_utf16(
             bytes
                 .chunks_exact(2)
@@ -85,13 +85,13 @@ fn decode_chars(bytes: &[u8], wide: bool) -> XlsResult<String> {
         let mut value = String::new();
         value
             .try_reserve(bytes.len())
-            .map_err(|_| XlsError::Allocation("decoding RTD compressed text"))?;
+            .map_err(|_| Error::Allocation("decoding RTD compressed text"))?;
         value.extend(bytes.iter().map(|&byte| char::from(byte)));
         Ok(value)
     }
 }
 
-pub(super) fn join_segments(segments: &[String]) -> XlsResult<String> {
+pub(super) fn join_segments(segments: &[String]) -> Result<String> {
     let byte_len = segments.iter().try_fold(0usize, |total, segment| {
         total
             .checked_add(segment.len())
@@ -100,7 +100,7 @@ pub(super) fn join_segments(segments: &[String]) -> XlsResult<String> {
     let mut value = String::new();
     value
         .try_reserve(byte_len)
-        .map_err(|_| XlsError::Allocation("reassembling RTD topic text"))?;
+        .map_err(|_| Error::Allocation("reassembling RTD topic text"))?;
     for segment in segments {
         value.push_str(segment);
     }
@@ -117,7 +117,7 @@ impl Payload {
         Self { bytes: Vec::new() }
     }
 
-    pub(super) fn push(&mut self, byte: u8) -> XlsResult<()> {
+    pub(super) fn push(&mut self, byte: u8) -> Result<()> {
         if self.bytes.len() >= MAX_LOGICAL_PAYLOAD_BYTES {
             return Err(invalid(format!(
                 "serialized RealTimeData payload exceeds {MAX_LOGICAL_PAYLOAD_BYTES} bytes"
@@ -126,13 +126,13 @@ impl Payload {
         if self.bytes.len() == self.bytes.capacity() {
             self.bytes
                 .try_reserve(1)
-                .map_err(|_| XlsError::Allocation("serializing RealTimeData payload"))?;
+                .map_err(|_| Error::Allocation("serializing RealTimeData payload"))?;
         }
         self.bytes.push(byte);
         Ok(())
     }
 
-    pub(super) fn extend_from_slice(&mut self, bytes: &[u8]) -> XlsResult<()> {
+    pub(super) fn extend_from_slice(&mut self, bytes: &[u8]) -> Result<()> {
         let new_len = self
             .bytes
             .len()
@@ -145,7 +145,7 @@ impl Payload {
         }
         self.bytes
             .try_reserve(bytes.len())
-            .map_err(|_| XlsError::Allocation("serializing RealTimeData payload"))?;
+            .map_err(|_| Error::Allocation("serializing RealTimeData payload"))?;
         self.bytes.extend_from_slice(bytes);
         Ok(())
     }
@@ -170,7 +170,7 @@ pub(super) fn biff_char_count(text: &str) -> usize {
 }
 
 /// Append the option byte and characters of an `XLUnicodeStringNoCch`.
-pub(super) fn write_chars(out: &mut Payload, text: &str) -> XlsResult<()> {
+pub(super) fn write_chars(out: &mut Payload, text: &str) -> Result<()> {
     if is_compressible(text) {
         out.push(0u8)?; // fHighByte = 0
         for ch in text.chars() {
@@ -190,7 +190,7 @@ pub(super) fn write_segmented_topic(
     out: &mut Payload,
     segments: &[String],
     minimum_segments: usize,
-) -> XlsResult<()> {
+) -> Result<()> {
     if !(minimum_segments..=MAX_TOPIC_SEGMENTS).contains(&segments.len()) {
         return Err(invalid(format!(
             "RTD topic must have {minimum_segments}..={MAX_TOPIC_SEGMENTS} segments"
@@ -211,7 +211,7 @@ pub(super) fn write_segmented_topic(
     for (index, segment) in segments.iter().enumerate() {
         let count = biff_char_count(segment);
         if count > usize::from(u16::MAX) {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "RTD topic sub-string exceeds 65535 characters".to_string(),
             ));
         }
@@ -261,12 +261,9 @@ pub(super) fn write_segmented_topic(
 
 /// Parse an `XLUnicodeStringSegmentedRTD`; returns the sub-strings and the
 /// number of bytes consumed.
-pub(super) fn parse_segmented_topic(
-    data: &[u8],
-    prefixed: bool,
-) -> XlsResult<(Vec<String>, usize)> {
+pub(super) fn parse_segmented_topic(data: &[u8], prefixed: bool) -> Result<(Vec<String>, usize)> {
     if data.len() < 5 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 5,
             found: data.len(),
         });
@@ -291,7 +288,7 @@ pub(super) fn parse_segmented_topic(
     let rgb_end = 5usize
         .checked_add(rgb_len)
         .ok_or_else(|| invalid("RealTimeData stTopic byte offset overflows usize"))?;
-    data.get(5..rgb_end).ok_or(XlsError::InvalidLength {
+    data.get(5..rgb_end).ok_or(Error::InvalidLength {
         expected: rgb_end,
         found: data.len(),
     })?;
@@ -304,7 +301,7 @@ pub(super) fn parse_segmented_topic(
     };
     segments
         .try_reserve(minimum_segments)
-        .map_err(|_| XlsError::Allocation("retaining RTD topic segments"))?;
+        .map_err(|_| Error::Allocation("retaining RTD topic segments"))?;
     let mut units_read = 0usize;
     while units_read < cch {
         if segments.len() >= MAX_TOPIC_SEGMENTS {
@@ -318,7 +315,7 @@ pub(super) fn parse_segmented_topic(
         let count_end = offset
             .checked_add(count_len)
             .ok_or_else(|| invalid("RealTimeData stTopic offset overflows usize"))?;
-        let count_bytes = data.get(offset..count_end).ok_or(XlsError::InvalidLength {
+        let count_bytes = data.get(offset..count_end).ok_or(Error::InvalidLength {
             expected: count_end,
             found: data.len(),
         })?;
@@ -346,13 +343,13 @@ pub(super) fn parse_segmented_topic(
         if byte_end > rgb_end {
             return Err(invalid("RealTimeData stTopic sub-string overruns cch"));
         }
-        let bytes = data.get(offset..byte_end).ok_or(XlsError::InvalidLength {
+        let bytes = data.get(offset..byte_end).ok_or(Error::InvalidLength {
             expected: byte_end,
             found: data.len(),
         })?;
         segments
             .try_reserve(1)
-            .map_err(|_| XlsError::Allocation("retaining RTD topic segments"))?;
+            .map_err(|_| Error::Allocation("retaining RTD topic segments"))?;
         segments.push(decode_chars(bytes, wide)?);
         offset = byte_end;
         units_read = next_units;
@@ -370,25 +367,25 @@ pub(super) fn parse_segmented_topic(
 
 /// Parse an `RTDOper` variant; returns the value and the number of bytes
 /// consumed.
-pub(super) fn parse_rtd_oper(data: &[u8]) -> XlsResult<(Value, usize)> {
+pub(super) fn parse_rtd_oper(data: &[u8]) -> Result<(Value, usize)> {
     if data.len() < 4 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 4,
             found: data.len(),
         });
     }
     let kind = read_u32(data, 0)?;
-    let body = data.get(4..).ok_or(XlsError::InvalidLength {
+    let body = data.get(4..).ok_or(Error::InvalidLength {
         expected: 4,
         found: data.len(),
     })?;
     match kind {
         RTD_OPER_NUMBER => {
-            let bytes = body.get(..8).ok_or(XlsError::InvalidLength {
+            let bytes = body.get(..8).ok_or(Error::InvalidLength {
                 expected: 12,
                 found: data.len(),
             })?;
-            let bytes = <[u8; 8]>::try_from(bytes).map_err(|_| XlsError::InvalidLength {
+            let bytes = <[u8; 8]>::try_from(bytes).map_err(|_| Error::InvalidLength {
                 expected: 12,
                 found: data.len(),
             })?;
@@ -408,7 +405,7 @@ pub(super) fn parse_rtd_oper(data: &[u8]) -> XlsResult<(Value, usize)> {
             Ok((Value::Text(text), total))
         },
         RTD_OPER_BOOLEAN => {
-            let raw = body.get(..4).ok_or(XlsError::InvalidLength {
+            let raw = body.get(..4).ok_or(Error::InvalidLength {
                 expected: 8,
                 found: data.len(),
             })?;
@@ -422,11 +419,11 @@ pub(super) fn parse_rtd_oper(data: &[u8]) -> XlsResult<(Value, usize)> {
             Ok((Value::Boolean(value), 8))
         },
         RTD_OPER_ERROR | RTD_OPER_INTEGER => {
-            let raw = body.get(..4).ok_or(XlsError::InvalidLength {
+            let raw = body.get(..4).ok_or(Error::InvalidLength {
                 expected: 8,
                 found: data.len(),
             })?;
-            let raw = <[u8; 4]>::try_from(raw).map_err(|_| XlsError::InvalidLength {
+            let raw = <[u8; 4]>::try_from(raw).map_err(|_| Error::InvalidLength {
                 expected: 8,
                 found: data.len(),
             })?;
@@ -446,9 +443,9 @@ pub(super) fn parse_rtd_oper(data: &[u8]) -> XlsResult<(Value, usize)> {
 
 /// Parse an `RTDOperStr` (MS-XLS 2.5.225): a 4-byte character count followed
 /// by an `XLUnicodeStringNoCch`.
-fn parse_rtd_oper_str(data: &[u8]) -> XlsResult<(String, usize, usize)> {
+fn parse_rtd_oper_str(data: &[u8]) -> Result<(String, usize, usize)> {
     if data.len() < 5 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 5,
             found: data.len(),
         });
@@ -469,7 +466,7 @@ fn parse_rtd_oper_str(data: &[u8]) -> XlsResult<(String, usize, usize)> {
     let end = 5usize
         .checked_add(byte_len)
         .ok_or_else(|| invalid("RTDOperStr byte offset overflows usize"))?;
-    let bytes = data.get(5..end).ok_or(XlsError::InvalidLength {
+    let bytes = data.get(5..end).ok_or(Error::InvalidLength {
         expected: end,
         found: data.len(),
     })?;

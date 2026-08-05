@@ -1,55 +1,45 @@
 use std::io::Cursor;
 
 use litchi_ppt::writer::{
-    PowerPointGuide, PowerPointGuideOrientation, PowerPointRatio, PowerPointSlideViewInfo,
-    PowerPointSlideViewPreferences, PowerPointViewKind, PowerPointViewOrigin,
-    PowerPointZoomViewInfo, PptWriter,
+    Guide, GuideOrientation, Ratio, SlideViewInfo, SlideViewPreferences, ViewKind, ViewOrigin,
+    Writer, ZoomViewInfo,
 };
-use litchi_ppt::{Package, PptRecord};
+use litchi_ppt::{Package, Record};
 
-fn slide_view() -> PowerPointSlideViewInfo {
-    let scale = PowerPointRatio::new(3, 4).unwrap();
-    PowerPointSlideViewInfo::new(
-        PowerPointViewKind::Slide,
-        PowerPointSlideViewPreferences::new(true, false),
-        Some(
-            PowerPointZoomViewInfo::new(
-                scale,
-                scale,
-                PowerPointViewOrigin::new(-100, 200),
-                true,
-                false,
-            )
-            .unwrap(),
-        ),
+fn slide_view() -> SlideViewInfo {
+    let scale = Ratio::new(3, 4).unwrap();
+    SlideViewInfo::new(
+        ViewKind::Slide,
+        SlideViewPreferences::new(true, false),
+        Some(ZoomViewInfo::new(scale, scale, ViewOrigin::new(-100, 200), true, false).unwrap()),
         vec![
-            PowerPointGuide::new(PowerPointGuideOrientation::Horizontal, 2160).unwrap(),
-            PowerPointGuide::new(PowerPointGuideOrientation::Vertical, 2880).unwrap(),
+            Guide::new(GuideOrientation::Horizontal, 2160).unwrap(),
+            Guide::new(GuideOrientation::Vertical, 2880).unwrap(),
         ],
     )
     .unwrap()
 }
 
-fn notes_view() -> PowerPointSlideViewInfo {
-    PowerPointSlideViewInfo::new(
-        PowerPointViewKind::Notes,
-        PowerPointSlideViewPreferences::new(false, true),
+fn notes_view() -> SlideViewInfo {
+    SlideViewInfo::new(
+        ViewKind::Notes,
+        SlideViewPreferences::new(false, true),
         None,
-        vec![PowerPointGuide::new(PowerPointGuideOrientation::Horizontal, 720).unwrap()],
+        vec![Guide::new(GuideOrientation::Horizontal, 720).unwrap()],
     )
     .unwrap()
 }
 
-fn write(writer: &mut PptWriter) -> Vec<u8> {
+fn write(writer: &mut Writer) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
     output.into_inner()
 }
 
-fn view_records(bytes: &[u8]) -> Vec<PptRecord> {
+fn view_records(bytes: &[u8]) -> Vec<Record> {
     let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
     let stream = ole.open_stream(&["PowerPoint Document"]).unwrap();
-    let (document, _) = PptRecord::parse(&stream, 0).unwrap();
+    let (document, _) = Record::parse(&stream, 0).unwrap();
     let doc_info = document
         .children
         .iter()
@@ -65,7 +55,7 @@ fn view_records(bytes: &[u8]) -> Vec<PptRecord> {
 
 #[test]
 fn emits_exact_slide_and_notes_view_record_structure() {
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
     writer.add_slide().unwrap();
     writer.set_slide_view_info(slide_view()).unwrap();
     writer.set_notes_view_info(notes_view()).unwrap();
@@ -95,7 +85,7 @@ fn emits_exact_slide_and_notes_view_record_structure() {
 
 #[test]
 fn simultaneous_slide_and_notes_views_round_trip_through_writer_and_reader() {
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
     writer.add_slide().unwrap();
     writer.set_slide_view_info(slide_view()).unwrap();
     writer.set_notes_view_info(notes_view()).unwrap();
@@ -117,34 +107,30 @@ fn simultaneous_slide_and_notes_views_round_trip_through_writer_and_reader() {
 
 #[test]
 fn setters_reject_wrong_kinds_atomically_and_models_enforce_limits() {
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
     writer.add_slide().unwrap();
     writer.set_slide_view_info(slide_view()).unwrap();
     assert!(writer.set_slide_view_info(notes_view()).is_err());
-    assert_eq!(
-        writer.slide_view_info().unwrap().kind(),
-        PowerPointViewKind::Slide
-    );
+    assert_eq!(writer.slide_view_info().unwrap().kind(), ViewKind::Slide);
     assert!(writer.set_notes_view_info(slide_view()).is_err());
     assert!(writer.notes_view_info().is_none());
 
-    assert!(PowerPointGuide::new(PowerPointGuideOrientation::Vertical, 32_256).is_err());
-    let too_many =
-        vec![PowerPointGuide::new(PowerPointGuideOrientation::Horizontal, 0).unwrap(); 9];
+    assert!(Guide::new(GuideOrientation::Vertical, 32_256).is_err());
+    let too_many = vec![Guide::new(GuideOrientation::Horizontal, 0).unwrap(); 9];
     assert!(
-        PowerPointSlideViewInfo::new(
-            PowerPointViewKind::Slide,
-            PowerPointSlideViewPreferences::new(false, false),
+        SlideViewInfo::new(
+            ViewKind::Slide,
+            SlideViewPreferences::new(false, false),
             None,
             too_many,
         )
         .is_err()
     );
     assert!(
-        PowerPointZoomViewInfo::new(
-            PowerPointRatio::new(1, 2).unwrap(),
-            PowerPointRatio::new(3, 4).unwrap(),
-            PowerPointViewOrigin::new(0, 0),
+        ZoomViewInfo::new(
+            Ratio::new(1, 2).unwrap(),
+            Ratio::new(3, 4).unwrap(),
+            ViewOrigin::new(0, 0),
             false,
             false,
         )

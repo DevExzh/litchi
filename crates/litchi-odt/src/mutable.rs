@@ -240,7 +240,7 @@ impl MutableDocument {
     }
 
     /// Return structure-preserving ruby annotations from the current content XML.
-    pub fn ruby_annotations(&self) -> Result<crate::RubyAnnotations> {
+    pub fn ruby_annotations(&self) -> Result<crate::ruby_family::Annotations> {
         self.with_content_xml(crate::parse_ruby_annotations)
     }
 
@@ -252,7 +252,7 @@ impl MutableDocument {
     pub fn insert_ruby_annotation(
         &mut self,
         paragraph_index: usize,
-        annotation: &crate::RubyAnnotation,
+        annotation: &crate::ruby_family::Annotation,
     ) -> Result<()> {
         let updated = self.with_content_xml(|xml| {
             crate::insert_ruby_annotation_xml(xml, paragraph_index, annotation)
@@ -273,7 +273,7 @@ impl MutableDocument {
         &mut self,
         paragraph_index: usize,
         range: Range<usize>,
-        annotation: &crate::RubyAnnotation,
+        annotation: &crate::ruby_family::Annotation,
     ) -> Result<()> {
         let updated = self.with_content_xml(|xml| {
             crate::wrap_ruby_annotation_xml(xml, paragraph_index, range, annotation)
@@ -286,8 +286,8 @@ impl MutableDocument {
     pub fn replace_ruby_annotation(
         &mut self,
         annotation_index: usize,
-        replacement: &crate::RubyAnnotation,
-    ) -> Result<crate::RubyAnnotation> {
+        replacement: &crate::ruby_family::Annotation,
+    ) -> Result<crate::ruby_family::Annotation> {
         let old = self
             .ruby_annotations()?
             .annotations
@@ -309,7 +309,7 @@ impl MutableDocument {
     pub fn remove_ruby_annotation(
         &mut self,
         annotation_index: usize,
-    ) -> Result<crate::RubyAnnotation> {
+    ) -> Result<crate::ruby_family::Annotation> {
         let old = self
             .ruby_annotations()?
             .annotations
@@ -327,14 +327,17 @@ impl MutableDocument {
     }
 
     /// Return typed named ruby styles from the current `styles.xml`.
-    pub fn ruby_styles(&self) -> Result<crate::RubyStyles> {
+    pub fn ruby_styles(&self) -> Result<crate::ruby_family::Styles> {
         self.styles_xml
             .as_deref()
             .map_or_else(|| Ok(Default::default()), crate::parse_ruby_styles)
     }
 
     /// Insert or replace one named ruby style definition and return the old value.
-    pub fn set_ruby_style(&mut self, style: &crate::RubyStyle) -> Result<Option<crate::RubyStyle>> {
+    pub fn set_ruby_style(
+        &mut self,
+        style: &crate::ruby_family::Style,
+    ) -> Result<Option<crate::ruby_family::Style>> {
         style.validate()?;
         let old = self.ruby_styles()?.get(&style.name).cloned();
         let styles = self
@@ -349,7 +352,7 @@ impl MutableDocument {
     ///
     /// Existing `text:ruby` style references are preserved verbatim, so callers
     /// can intentionally manage their lifecycle separately.
-    pub fn remove_ruby_style(&mut self, name: &str) -> Result<Option<crate::RubyStyle>> {
+    pub fn remove_ruby_style(&mut self, name: &str) -> Result<Option<crate::ruby_family::Style>> {
         let old = self.ruby_styles()?.get(name).cloned();
         let Some(styles) = self.styles_xml.as_deref() else {
             return Ok(None);
@@ -632,7 +635,9 @@ impl MutableDocument {
     ///
     /// The policy is styles metadata only. It is never used to generate
     /// bibliography entries, resolve citations, or access external sources.
-    pub fn bibliography_configuration(&self) -> Result<Option<crate::BibliographyConfiguration>> {
+    pub fn bibliography_configuration(
+        &self,
+    ) -> Result<Option<crate::bibliography_configuration::Configuration>> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(None),
             crate::bibliography_configuration::parse_bibliography_configuration,
@@ -645,8 +650,8 @@ impl MutableDocument {
     /// regenerate bibliography entries or modify bibliography marks.
     pub fn set_bibliography_configuration(
         &mut self,
-        configuration: &crate::BibliographyConfiguration,
-    ) -> Result<Option<crate::BibliographyConfiguration>> {
+        configuration: &crate::bibliography_configuration::Configuration,
+    ) -> Result<Option<crate::bibliography_configuration::Configuration>> {
         configuration.validate()?;
         let old = self.bibliography_configuration()?;
         let styles = self
@@ -668,7 +673,7 @@ impl MutableDocument {
     /// source marks are preserved verbatim.
     pub fn clear_bibliography_configuration(
         &mut self,
-    ) -> Result<Option<crate::BibliographyConfiguration>> {
+    ) -> Result<Option<crate::bibliography_configuration::Configuration>> {
         let old = self.bibliography_configuration()?;
         let Some(styles) = self.styles_xml.as_deref() else {
             return Ok(None);
@@ -3093,32 +3098,32 @@ mod tests {
 
     #[test]
     fn mutable_ruby_annotation_and_style_crud_round_trip_through_an_odt_package() {
-        let first_style = crate::RubyStyle::new(
+        let first_style = crate::ruby_family::Style::new(
             "RubyAbove",
-            Some(crate::RubyProperties {
-                position: Some(crate::RubyPosition::Above),
-                alignment: Some(crate::RubyAlignment::Center),
+            Some(crate::ruby_family::Properties {
+                position: Some(crate::ruby_family::Position::Above),
+                alignment: Some(crate::ruby_family::Alignment::Center),
             }),
         )
         .unwrap();
-        let second_style = crate::RubyStyle::new(
+        let second_style = crate::ruby_family::Style::new(
             "RubyAbove",
-            Some(crate::RubyProperties {
-                position: Some(crate::RubyPosition::Below),
-                alignment: Some(crate::RubyAlignment::DistributeLetter),
+            Some(crate::ruby_family::Properties {
+                position: Some(crate::ruby_family::Position::Below),
+                alignment: Some(crate::ruby_family::Alignment::DistributeLetter),
             }),
         )
         .unwrap();
-        let first = crate::RubyAnnotation::new(
+        let first = crate::ruby_family::Annotation::new(
             Some(first_style.name.clone()),
-            crate::RubyBase::from_text("語").unwrap(),
+            crate::ruby_family::Base::from_text("語").unwrap(),
             "ご",
             None,
         )
         .unwrap();
-        let replacement = crate::RubyAnnotation::new(
+        let replacement = crate::ruby_family::Annotation::new(
             Some(first_style.name.clone()),
-            crate::RubyBase::from_text("文").unwrap(),
+            crate::ruby_family::Base::from_text("文").unwrap(),
             "ぶん",
             None,
         )
@@ -3152,9 +3157,13 @@ mod tests {
 
     #[test]
     fn mutable_ruby_range_wrapping_round_trips_through_an_odt_package() {
-        let annotation =
-            crate::RubyAnnotation::new(None, crate::RubyBase::from_text("字").unwrap(), "じ", None)
-                .unwrap();
+        let annotation = crate::ruby_family::Annotation::new(
+            None,
+            crate::ruby_family::Base::from_text("字").unwrap(),
+            "じ",
+            None,
+        )
+        .unwrap();
         let mut mutable = MutableDocument::new();
         mutable.add_paragraph("Read 漢字").unwrap();
         let start = "Read 漢".len();

@@ -32,7 +32,7 @@
 //!   (LPWideString), 2.5.180–2.5.182 (MDir, MDTInfoIndex, MDXStrIndex),
 //!   2.5.169 (KPIProp), 2.5.233 (SD_SetSortOrder), 2.5.267 (Tag_Fn_MDX)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `MDTInfo` record (MS-XLS 2.4.162).
 pub(crate) const MDT_INFO_RECORD_TYPE: u16 = 0x0884;
@@ -60,8 +60,8 @@ const MDIR_LEN: usize = 8;
 /// length prefix is an unsigned 16-bit character count.
 const MAX_LP_WIDE_STRING_CHARS: usize = u16::MAX as usize;
 
-fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(record_type: u16, message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type,
         message: message.into(),
     }
@@ -86,14 +86,14 @@ fn read_i32(data: &[u8], offset: usize) -> i32 {
 }
 
 /// Validate the `FrtHeader` and return the record body that follows it.
-fn record_body(data: &[u8], record_type: u16) -> XlsResult<&[u8]> {
+fn record_body(data: &[u8], record_type: u16) -> Result<&[u8]> {
     super::differential_format::validate_frt_header(data, record_type)?;
     Ok(&data[FRT_HEADER_LEN..])
 }
 
 /// Parse an `LPWideString` (MS-XLS 2.5.179) that must span `data` exactly:
 /// a 16-bit character count followed by that many UTF-16LE code units.
-fn parse_lp_wide_string(data: &[u8], record_type: u16) -> XlsResult<String> {
+fn parse_lp_wide_string(data: &[u8], record_type: u16) -> Result<String> {
     if data.len() < 2 {
         return Err(invalid(record_type, "truncated LPWideString"));
     }
@@ -110,10 +110,10 @@ fn parse_lp_wide_string(data: &[u8], record_type: u16) -> XlsResult<String> {
 }
 
 /// Serialize an `LPWideString` (MS-XLS 2.5.179) into `output`.
-fn append_lp_wide_string(record_type: u16, value: &str, output: &mut Vec<u8>) -> XlsResult<()> {
+fn append_lp_wide_string(record_type: u16, value: &str, output: &mut Vec<u8>) -> Result<()> {
     let units: Vec<u16> = value.encode_utf16().collect();
     if units.len() > MAX_LP_WIDE_STRING_CHARS {
-        return Err(XlsError::InvalidData(format!(
+        return Err(Error::InvalidData(format!(
             "record 0x{record_type:04X} LPWideString exceeds {} UTF-16 code units",
             MAX_LP_WIDE_STRING_CHARS
         )));
@@ -138,7 +138,7 @@ fn frt_header_payload(record_type: u16) -> Vec<u8> {
 /// MS-XLS 2.5.267).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
-pub enum XlsCubeFunction {
+pub enum CubeFunction {
     /// `CUBEMEMBER` (TFNCUBEMEMBER).
     CubeMember = 0x01,
     /// `CUBEVALUE` (TFNCUBEVALUE).
@@ -155,8 +155,8 @@ pub enum XlsCubeFunction {
     CubeKpiProperty = 0x07,
 }
 
-impl XlsCubeFunction {
-    fn from_code(record_type: u16, code: u8) -> XlsResult<Self> {
+impl CubeFunction {
+    fn from_code(record_type: u16, code: u8) -> Result<Self> {
         Ok(match code {
             0x01 => Self::CubeMember,
             0x02 => Self::CubeValue,
@@ -184,7 +184,7 @@ impl XlsCubeFunction {
 /// MS-XLS 2.5.169).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
-pub enum XlsKpiProperty {
+pub enum KpiProperty {
     /// Value (KPIPROPVALUE).
     Value = 0x01,
     /// Goal (KPIPROPGOAL).
@@ -199,8 +199,8 @@ pub enum XlsKpiProperty {
     CurrentTimeMember = 0x06,
 }
 
-impl XlsKpiProperty {
-    fn from_code(code: u8) -> XlsResult<Self> {
+impl KpiProperty {
+    fn from_code(code: u8) -> Result<Self> {
         Ok(match code {
             0x01 => Self::Value,
             0x02 => Self::Goal,
@@ -226,7 +226,7 @@ impl XlsKpiProperty {
 /// The sort order of an MDX set (`SD_SetSortOrder`, MS-XLS 2.5.233).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
-pub enum XlsMdxSetSortOrder {
+pub enum MdxSetSortOrder {
     /// No sorting order (SSONONE).
     None = 0x00,
     /// Ascending order (SSOASC).
@@ -243,8 +243,8 @@ pub enum XlsMdxSetSortOrder {
     NaturalDescending = 0x06,
 }
 
-impl XlsMdxSetSortOrder {
-    fn from_code(code: u8) -> XlsResult<Self> {
+impl MdxSetSortOrder {
+    fn from_code(code: u8) -> Result<Self> {
         Ok(match code {
             0x00 => Self::None,
             0x01 => Self::Ascending,
@@ -302,9 +302,9 @@ const F_CELL_META: u32 = 0x4000_0000;
 /// applied when the cell carrying it is edited, deleted, copied, pasted,
 /// merged, split, shifted, cleared, or coerced.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct XlsMdtInfoFlags(u32);
+pub struct MdtInfoFlags(u32);
 
-impl XlsMdtInfoFlags {
+impl MdtInfoFlags {
     /// Create a flag set from raw bits; undefined bits are preserved so the
     /// value round-trips losslessly.
     pub const fn from_bits(bits: u32) -> Self {
@@ -430,27 +430,27 @@ impl XlsMdtInfoFlags {
 /// An `MDTInfo` record (MS-XLS 2.4.162): behavior flags and the name of a
 /// single metadata type.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsMdtInfo {
+pub struct MdtInfo {
     /// Behavior flags (`grbit`).
-    pub flags: XlsMdtInfoFlags,
+    pub flags: MdtInfoFlags,
     /// Name of the metadata type (`stName`).
     pub name: String,
 }
 
-impl XlsMdtInfo {
+impl MdtInfo {
     /// Parse an `MDTInfo` record payload (FrtHeader included).
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         let body = record_body(data, MDT_INFO_RECORD_TYPE)?;
         if body.len() < 4 {
             return Err(invalid(MDT_INFO_RECORD_TYPE, "truncated MDTInfo flags"));
         }
-        let flags = XlsMdtInfoFlags::from_bits(read_u32(body, 0));
+        let flags = MdtInfoFlags::from_bits(read_u32(body, 0));
         let name = parse_lp_wide_string(&body[4..], MDT_INFO_RECORD_TYPE)?;
         Ok(Self { flags, name })
     }
 
     /// Serialize the record payload (FrtHeader included).
-    pub fn to_payload(&self) -> XlsResult<Vec<u8>> {
+    pub fn to_payload(&self) -> Result<Vec<u8>> {
         let mut payload = frt_header_payload(MDT_INFO_RECORD_TYPE);
         payload.extend_from_slice(&self.flags.bits().to_le_bytes());
         append_lp_wide_string(MDT_INFO_RECORD_TYPE, &self.name, &mut payload)?;
@@ -461,31 +461,29 @@ impl XlsMdtInfo {
 /// An `MDXTuple` record (MS-XLS 2.4.167): tuple metadata generated by a
 /// `CUBEMEMBER`, `CUBEVALUE`, or `CUBERANKEDMEMBER` cube function.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsMdxTuple {
+pub struct MdxTuple {
     /// Index of the connection name in the shared MDX string table
     /// (`istrConnName`).
     pub connection_name_index: i32,
     /// The cube function that generated the metadata (`tfnSrc`).
-    pub function: XlsCubeFunction,
+    pub function: CubeFunction,
     /// Indexes of the MDX unique name strings in the shared MDX string
     /// table (`rgistr`).
     pub string_indexes: Vec<i32>,
 }
 
-impl XlsMdxTuple {
+impl MdxTuple {
     /// Parse an `MDXTuple` record payload (FrtHeader included).
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         let body = record_body(data, MDX_TUPLE_RECORD_TYPE)?;
         if body.len() < 9 {
             return Err(invalid(MDX_TUPLE_RECORD_TYPE, "truncated MDXTuple"));
         }
         let connection_name_index = read_i32(body, 0);
-        let function = XlsCubeFunction::from_code(MDX_TUPLE_RECORD_TYPE, body[4])?;
+        let function = CubeFunction::from_code(MDX_TUPLE_RECORD_TYPE, body[4])?;
         if !matches!(
             function,
-            XlsCubeFunction::CubeMember
-                | XlsCubeFunction::CubeValue
-                | XlsCubeFunction::CubeRankedMember
+            CubeFunction::CubeMember | CubeFunction::CubeValue | CubeFunction::CubeRankedMember
         ) {
             return Err(invalid(
                 MDX_TUPLE_RECORD_TYPE,
@@ -501,7 +499,7 @@ impl XlsMdxTuple {
     }
 
     /// Serialize the record payload (FrtHeader included).
-    pub fn to_payload(&self) -> XlsResult<Vec<u8>> {
+    pub fn to_payload(&self) -> Result<Vec<u8>> {
         let mut payload = frt_header_payload(MDX_TUPLE_RECORD_TYPE);
         payload.extend_from_slice(&self.connection_name_index.to_le_bytes());
         payload.push(self.function.code());
@@ -513,14 +511,14 @@ impl XlsMdxTuple {
 /// An `MDXSet` record (MS-XLS 2.4.165): set metadata generated by a
 /// `CUBESET` or `CUBESETCOUNT` cube function.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsMdxSet {
+pub struct MdxSet {
     /// Index of the connection name in the shared MDX string table
     /// (`istrConnName`).
     pub connection_name_index: i32,
     /// The cube function that generated the metadata (`tfnSrc`).
-    pub function: XlsCubeFunction,
+    pub function: CubeFunction,
     /// The set sort order (`sso`).
-    pub sort_order: XlsMdxSetSortOrder,
+    pub sort_order: MdxSetSortOrder,
     /// Index of the set definition string in the shared MDX string table
     /// (`istrSetDef`).
     pub set_definition_index: i32,
@@ -529,25 +527,22 @@ pub struct XlsMdxSet {
     pub string_indexes: Vec<i32>,
 }
 
-impl XlsMdxSet {
+impl MdxSet {
     /// Parse an `MDXSet` record payload (FrtHeader included).
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         let body = record_body(data, MDX_SET_RECORD_TYPE)?;
         if body.len() < 14 {
             return Err(invalid(MDX_SET_RECORD_TYPE, "truncated MDXSet"));
         }
         let connection_name_index = read_i32(body, 0);
-        let function = XlsCubeFunction::from_code(MDX_SET_RECORD_TYPE, body[4])?;
-        if !matches!(
-            function,
-            XlsCubeFunction::CubeSet | XlsCubeFunction::CubeSetCount
-        ) {
+        let function = CubeFunction::from_code(MDX_SET_RECORD_TYPE, body[4])?;
+        if !matches!(function, CubeFunction::CubeSet | CubeFunction::CubeSetCount) {
             return Err(invalid(
                 MDX_SET_RECORD_TYPE,
                 "MDXSet tfnSrc must be CUBESET or CUBESETCOUNT",
             ));
         }
-        let sort_order = XlsMdxSetSortOrder::from_code(body[5])?;
+        let sort_order = MdxSetSortOrder::from_code(body[5])?;
         let set_definition_index = read_i32(body, 6);
         let string_indexes = parse_index_array(body, 10, MDX_SET_RECORD_TYPE)?;
         Ok(Self {
@@ -560,7 +555,7 @@ impl XlsMdxSet {
     }
 
     /// Serialize the record payload (FrtHeader included).
-    pub fn to_payload(&self) -> XlsResult<Vec<u8>> {
+    pub fn to_payload(&self) -> Result<Vec<u8>> {
         let mut payload = frt_header_payload(MDX_SET_RECORD_TYPE);
         payload.extend_from_slice(&self.connection_name_index.to_le_bytes());
         payload.push(self.function.code());
@@ -574,31 +569,31 @@ impl XlsMdxSet {
 /// An `MDXProp` record (MS-XLS 2.4.164): member property metadata generated
 /// by a `CUBEMEMBERPROPERTY` cube function.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsMdxProp {
+pub struct MdxProp {
     /// Index of the connection name in the shared MDX string table
     /// (`istrConnName`).
     pub connection_name_index: i32,
     /// The cube function that generated the metadata (`tfnSrc`); always
-    /// [`XlsCubeFunction::CubeMemberProperty`].
-    pub function: XlsCubeFunction,
+    /// [`CubeFunction::CubeMemberProperty`].
+    pub function: CubeFunction,
     /// Index of the MDX unique name string (`istrMbr`).
     pub member_index: i32,
     /// Index of the property name string (`istrProp`).
     pub property_index: i32,
 }
 
-impl XlsMdxProp {
+impl MdxProp {
     /// Fixed body size: `istrConnName` + `tfnSrc` + `istrMbr` + `istrProp`.
     const BODY_LEN: usize = 4 + 1 + 4 + 4;
 
     /// Parse an `MDXProp` record payload (FrtHeader included).
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         let body = record_body(data, MDX_PROP_RECORD_TYPE)?;
         if body.len() != Self::BODY_LEN {
             return Err(invalid(MDX_PROP_RECORD_TYPE, "malformed MDXProp body"));
         }
-        let function = XlsCubeFunction::from_code(MDX_PROP_RECORD_TYPE, body[4])?;
-        if function != XlsCubeFunction::CubeMemberProperty {
+        let function = CubeFunction::from_code(MDX_PROP_RECORD_TYPE, body[4])?;
+        if function != CubeFunction::CubeMemberProperty {
             return Err(invalid(
                 MDX_PROP_RECORD_TYPE,
                 "MDXProp tfnSrc must be CUBEMEMBERPROPERTY",
@@ -613,7 +608,7 @@ impl XlsMdxProp {
     }
 
     /// Serialize the record payload (FrtHeader included).
-    pub fn to_payload(&self) -> XlsResult<Vec<u8>> {
+    pub fn to_payload(&self) -> Result<Vec<u8>> {
         let mut payload = frt_header_payload(MDX_PROP_RECORD_TYPE);
         payload.extend_from_slice(&self.connection_name_index.to_le_bytes());
         payload.push(self.function.code());
@@ -626,34 +621,34 @@ impl XlsMdxProp {
 /// An `MDXKPI` record (MS-XLS 2.4.163): key performance indicator metadata
 /// generated by a `CUBEKPIPROPERTY` cube function.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsMdxKpi {
+pub struct MdxKpi {
     /// Index of the connection name in the shared MDX string table
     /// (`istrConnName`).
     pub connection_name_index: i32,
     /// The cube function that generated the metadata (`tfnSrc`); always
-    /// [`XlsCubeFunction::CubeKpiProperty`].
-    pub function: XlsCubeFunction,
+    /// [`CubeFunction::CubeKpiProperty`].
+    pub function: CubeFunction,
     /// The KPI property kind (`kpiprop`).
-    pub kpi_property: XlsKpiProperty,
+    pub kpi_property: KpiProperty,
     /// Index of the MDX unique name string (`istrKPIName`).
     pub kpi_name_index: i32,
     /// Index of the key performance indicator name string (`istrMbrKPI`).
     pub member_kpi_index: i32,
 }
 
-impl XlsMdxKpi {
+impl MdxKpi {
     /// Fixed body size: `istrConnName` + `tfnSrc` + `kpiprop` + `istrKPIName`
     /// + `istrMbrKPI`.
     const BODY_LEN: usize = 4 + 1 + 1 + 4 + 4;
 
     /// Parse an `MDXKPI` record payload (FrtHeader included).
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         let body = record_body(data, MDX_KPI_RECORD_TYPE)?;
         if body.len() != Self::BODY_LEN {
             return Err(invalid(MDX_KPI_RECORD_TYPE, "malformed MDXKPI body"));
         }
-        let function = XlsCubeFunction::from_code(MDX_KPI_RECORD_TYPE, body[4])?;
-        if function != XlsCubeFunction::CubeKpiProperty {
+        let function = CubeFunction::from_code(MDX_KPI_RECORD_TYPE, body[4])?;
+        if function != CubeFunction::CubeKpiProperty {
             return Err(invalid(
                 MDX_KPI_RECORD_TYPE,
                 "MDXKPI tfnSrc must be CUBEKPIPROPERTY",
@@ -662,14 +657,14 @@ impl XlsMdxKpi {
         Ok(Self {
             connection_name_index: read_i32(body, 0),
             function,
-            kpi_property: XlsKpiProperty::from_code(body[5])?,
+            kpi_property: KpiProperty::from_code(body[5])?,
             kpi_name_index: read_i32(body, 6),
             member_kpi_index: read_i32(body, 10),
         })
     }
 
     /// Serialize the record payload (FrtHeader included).
-    pub fn to_payload(&self) -> XlsResult<Vec<u8>> {
+    pub fn to_payload(&self) -> Result<Vec<u8>> {
         let mut payload = frt_header_payload(MDX_KPI_RECORD_TYPE);
         payload.extend_from_slice(&self.connection_name_index.to_le_bytes());
         payload.push(self.function.code());
@@ -682,7 +677,7 @@ impl XlsMdxKpi {
 
 /// Parse `cistr`/`rgistr`: a signed count at `offset` followed by that many
 /// signed `MDXStrIndex` entries (MS-XLS 2.5.182), spanning the body exactly.
-fn parse_index_array(body: &[u8], offset: usize, record_type: u16) -> XlsResult<Vec<i32>> {
+fn parse_index_array(body: &[u8], offset: usize, record_type: u16) -> Result<Vec<i32>> {
     let count = read_i32(body, offset);
     if count < 0 {
         return Err(invalid(record_type, "negative MDX string index count"));
@@ -700,9 +695,9 @@ fn parse_index_array(body: &[u8], offset: usize, record_type: u16) -> XlsResult<
 }
 
 /// Serialize `cistr`/`rgistr`.
-fn append_index_array(indexes: &[i32], output: &mut Vec<u8>) -> XlsResult<()> {
+fn append_index_array(indexes: &[i32], output: &mut Vec<u8>) -> Result<()> {
     let count = i32::try_from(indexes.len())
-        .map_err(|_| XlsError::InvalidData("too many MDX string indexes".to_string()))?;
+        .map_err(|_| Error::InvalidData("too many MDX string indexes".to_string()))?;
     output.extend_from_slice(&count.to_le_bytes());
     for index in indexes {
         output.extend_from_slice(&index.to_le_bytes());
@@ -712,7 +707,7 @@ fn append_index_array(indexes: &[i32], output: &mut Vec<u8>) -> XlsResult<()> {
 
 /// One metadata type/value pair of an `MDB` block (`MDir`, MS-XLS 2.5.180).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct XlsMdxMetadataDir {
+pub struct MdxMetadataDir {
     /// One-based index of the `MDTInfo` record identifying the metadata
     /// type (`imdt`).
     pub info_index: i32,
@@ -724,14 +719,14 @@ pub struct XlsMdxMetadataDir {
 /// An `MDB` record (MS-XLS 2.4.161): a unique set of metadata type/value
 /// pairs shared by all cells that reference MDX value metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsMdb {
+pub struct Mdb {
     /// The metadata type/value pairs of this block (`rgmdir`).
-    pub entries: Vec<XlsMdxMetadataDir>,
+    pub entries: Vec<MdxMetadataDir>,
 }
 
-impl XlsMdb {
+impl Mdb {
     /// Parse an `MDB` record payload (FrtHeader included).
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         let body = record_body(data, MDB_RECORD_TYPE)?;
         if body.len() % MDIR_LEN != 0 {
             return Err(invalid(
@@ -741,7 +736,7 @@ impl XlsMdb {
         }
         let entries = body
             .chunks_exact(MDIR_LEN)
-            .map(|chunk| XlsMdxMetadataDir {
+            .map(|chunk| MdxMetadataDir {
                 info_index: read_i32(chunk, 0),
                 metadata_index: read_u32(chunk, 4),
             })
@@ -750,7 +745,7 @@ impl XlsMdb {
     }
 
     /// Serialize the record payload (FrtHeader included).
-    pub fn to_payload(&self) -> XlsResult<Vec<u8>> {
+    pub fn to_payload(&self) -> Result<Vec<u8>> {
         let mut payload = frt_header_payload(MDB_RECORD_TYPE);
         for entry in &self.entries {
             payload.extend_from_slice(&entry.info_index.to_le_bytes());
@@ -763,18 +758,18 @@ impl XlsMdb {
 /// One MDX metadata record of the `*(MDXTUPLESET / MDXProp / MDXKPI)` run
 /// (MS-XLS 2.1), in workbook record order.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum XlsMdxMetadataRecord {
+pub enum MdxMetadataRecord {
     /// An `MDXTuple` record.
-    Tuple(XlsMdxTuple),
+    Tuple(MdxTuple),
     /// An `MDXSet` record.
-    Set(XlsMdxSet),
+    Set(MdxSet),
     /// An `MDXProp` record.
-    Prop(XlsMdxProp),
+    Prop(MdxProp),
     /// An `MDXKPI` record.
-    Kpi(XlsMdxKpi),
+    Kpi(MdxKpi),
 }
 
-impl XlsMdxMetadataRecord {
+impl MdxMetadataRecord {
     /// Every `MDXStrIndex` this record references.
     fn referenced_string_indexes(&self) -> Vec<i32> {
         match self {
@@ -806,7 +801,7 @@ impl XlsMdxMetadataRecord {
     }
 
     /// Serialize the record payload (FrtHeader included).
-    fn to_payload(&self) -> XlsResult<Vec<u8>> {
+    fn to_payload(&self) -> Result<Vec<u8>> {
         match self {
             Self::Tuple(tuple) => tuple.to_payload(),
             Self::Set(set) => set.to_payload(),
@@ -825,17 +820,17 @@ impl XlsMdxMetadataRecord {
 /// every cross-record index is validated against the entries collected so
 /// far, as MS-XLS requires.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsMdxMetadata {
-    infos: Vec<XlsMdtInfo>,
+pub struct MdxMetadata {
+    infos: Vec<MdtInfo>,
     strings: Vec<String>,
-    records: Vec<XlsMdxMetadataRecord>,
-    blocks: Vec<XlsMdb>,
+    records: Vec<MdxMetadataRecord>,
+    blocks: Vec<Mdb>,
 }
 
-impl XlsMdxMetadata {
+impl MdxMetadata {
     /// Metadata types (`MDTInfo` records), in record order. `MDTInfoIndex`
     /// values are one-based indexes into this collection.
-    pub fn infos(&self) -> &[XlsMdtInfo] {
+    pub fn infos(&self) -> &[MdtInfo] {
         &self.infos
     }
 
@@ -848,12 +843,12 @@ impl XlsMdxMetadata {
     /// The MDX metadata records (`MDXTuple`, `MDXSet`, `MDXProp`, `MDXKPI`),
     /// in record order. `MDir.mdd` values are zero-based indexes into this
     /// collection.
-    pub fn records(&self) -> &[XlsMdxMetadataRecord] {
+    pub fn records(&self) -> &[MdxMetadataRecord] {
         &self.records
     }
 
     /// The metadata blocks (`MDB` records), in record order.
-    pub fn blocks(&self) -> &[XlsMdb] {
+    pub fn blocks(&self) -> &[Mdb] {
         &self.blocks
     }
 
@@ -866,14 +861,14 @@ impl XlsMdxMetadata {
     }
 
     /// Append a metadata type declaration (`MDTInfo`).
-    pub fn add_info(&mut self, info: XlsMdtInfo) {
+    pub fn add_info(&mut self, info: MdtInfo) {
         self.infos.push(info);
     }
 
     /// Append a shared MDX string (`MDXStr`).
-    pub fn add_string(&mut self, value: String) -> XlsResult<()> {
+    pub fn add_string(&mut self, value: String) -> Result<()> {
         if value.encode_utf16().count() > MAX_LP_WIDE_STRING_CHARS {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "MDXStr string exceeds the LPWideString length limit".to_string(),
             ));
         }
@@ -883,7 +878,7 @@ impl XlsMdxMetadata {
 
     /// Append an MDX metadata record, validating its `MDXStrIndex`
     /// references against the shared strings collected so far.
-    pub fn add_record(&mut self, record: XlsMdxMetadataRecord) -> XlsResult<()> {
+    pub fn add_record(&mut self, record: MdxMetadataRecord) -> Result<()> {
         for index in record.referenced_string_indexes() {
             self.validate_string_index(index)?;
         }
@@ -893,7 +888,7 @@ impl XlsMdxMetadata {
 
     /// Append a metadata block (`MDB`), validating its `MDir` references
     /// against the types and records collected so far.
-    pub fn add_block(&mut self, block: XlsMdb) -> XlsResult<()> {
+    pub fn add_block(&mut self, block: Mdb) -> Result<()> {
         for entry in &block.entries {
             if entry.info_index < 1 || entry.info_index as usize > self.infos.len() {
                 return Err(invalid(
@@ -918,7 +913,7 @@ impl XlsMdxMetadata {
         Ok(())
     }
 
-    fn validate_string_index(&self, index: i32) -> XlsResult<()> {
+    fn validate_string_index(&self, index: i32) -> Result<()> {
         if index < 0 || index as usize >= self.strings.len() {
             return Err(invalid(
                 MDX_STR_RECORD_TYPE,
@@ -933,9 +928,9 @@ impl XlsMdxMetadata {
 
     /// Parse one `METADATA` record (payload including any trailing
     /// `ContinueFrt12` bodies concatenated) into the collection.
-    pub(crate) fn push_record(&mut self, record_type: u16, payload: &[u8]) -> XlsResult<()> {
+    pub(crate) fn push_record(&mut self, record_type: u16, payload: &[u8]) -> Result<()> {
         match record_type {
-            MDT_INFO_RECORD_TYPE => self.add_info(XlsMdtInfo::parse(payload)?),
+            MDT_INFO_RECORD_TYPE => self.add_info(MdtInfo::parse(payload)?),
             MDX_STR_RECORD_TYPE => {
                 self.strings.push(parse_lp_wide_string(
                     record_body(payload, record_type)?,
@@ -943,20 +938,20 @@ impl XlsMdxMetadata {
                 )?);
             },
             MDX_TUPLE_RECORD_TYPE => {
-                self.add_record(XlsMdxMetadataRecord::Tuple(XlsMdxTuple::parse(payload)?))?;
+                self.add_record(MdxMetadataRecord::Tuple(MdxTuple::parse(payload)?))?;
             },
             MDX_SET_RECORD_TYPE => {
-                self.add_record(XlsMdxMetadataRecord::Set(XlsMdxSet::parse(payload)?))?;
+                self.add_record(MdxMetadataRecord::Set(MdxSet::parse(payload)?))?;
             },
             MDX_PROP_RECORD_TYPE => {
-                self.add_record(XlsMdxMetadataRecord::Prop(XlsMdxProp::parse(payload)?))?;
+                self.add_record(MdxMetadataRecord::Prop(MdxProp::parse(payload)?))?;
             },
             MDX_KPI_RECORD_TYPE => {
-                self.add_record(XlsMdxMetadataRecord::Kpi(XlsMdxKpi::parse(payload)?))?;
+                self.add_record(MdxMetadataRecord::Kpi(MdxKpi::parse(payload)?))?;
             },
-            MDB_RECORD_TYPE => self.add_block(XlsMdb::parse(payload)?)?,
+            MDB_RECORD_TYPE => self.add_block(Mdb::parse(payload)?)?,
             other => {
-                return Err(XlsError::UnexpectedRecordType {
+                return Err(Error::UnexpectedRecordType {
                     expected: MDT_INFO_RECORD_TYPE,
                     found: other,
                 });
@@ -967,7 +962,7 @@ impl XlsMdxMetadata {
 
     /// Serialize the whole collection in ABNF order as record payloads
     /// (FrtHeader included, not yet chunked into BIFF records).
-    pub(crate) fn to_record_payloads(&self) -> XlsResult<Vec<(u16, Vec<u8>)>> {
+    pub(crate) fn to_record_payloads(&self) -> Result<Vec<(u16, Vec<u8>)>> {
         let mut payloads = Vec::new();
         for info in &self.infos {
             payloads.push((MDT_INFO_RECORD_TYPE, info.to_payload()?));
@@ -979,10 +974,10 @@ impl XlsMdxMetadata {
         }
         for record in &self.records {
             let record_type = match record {
-                XlsMdxMetadataRecord::Tuple(_) => MDX_TUPLE_RECORD_TYPE,
-                XlsMdxMetadataRecord::Set(_) => MDX_SET_RECORD_TYPE,
-                XlsMdxMetadataRecord::Prop(_) => MDX_PROP_RECORD_TYPE,
-                XlsMdxMetadataRecord::Kpi(_) => MDX_KPI_RECORD_TYPE,
+                MdxMetadataRecord::Tuple(_) => MDX_TUPLE_RECORD_TYPE,
+                MdxMetadataRecord::Set(_) => MDX_SET_RECORD_TYPE,
+                MdxMetadataRecord::Prop(_) => MDX_PROP_RECORD_TYPE,
+                MdxMetadataRecord::Kpi(_) => MDX_KPI_RECORD_TYPE,
             };
             payloads.push((record_type, record.to_payload()?));
         }
@@ -1019,7 +1014,7 @@ mod tests {
             .to_le_bytes()
             .to_vec();
         body.extend_from_slice(&wide_string("MDXValueMetadata"));
-        let info = XlsMdtInfo::parse(&payload(MDT_INFO_RECORD_TYPE, &body)).unwrap();
+        let info = MdtInfo::parse(&payload(MDT_INFO_RECORD_TYPE, &body)).unwrap();
         assert_eq!(info.name, "MDXValueMetadata");
         assert!(info.flags.copied_with_cell());
         assert!(info.flags.paste_values());
@@ -1051,26 +1046,26 @@ mod tests {
 
     #[test]
     fn mdt_info_rejects_truncated_and_mismatched_strings() {
-        assert!(XlsMdtInfo::parse(&payload(MDT_INFO_RECORD_TYPE, &[0; 3])).is_err());
+        assert!(MdtInfo::parse(&payload(MDT_INFO_RECORD_TYPE, &[0; 3])).is_err());
         // Declared character count exceeds the body.
         let mut body = 0u32.to_le_bytes().to_vec();
         body.extend_from_slice(&5u16.to_le_bytes());
         body.extend_from_slice(&[0; 4]);
-        assert!(XlsMdtInfo::parse(&payload(MDT_INFO_RECORD_TYPE, &body)).is_err());
+        assert!(MdtInfo::parse(&payload(MDT_INFO_RECORD_TYPE, &body)).is_err());
         // Wrong FrtHeader record type echo.
         let mut body = 0u32.to_le_bytes().to_vec();
         body.extend_from_slice(&wide_string("x"));
         let mut data = payload(MDX_STR_RECORD_TYPE, &body);
-        assert!(XlsMdtInfo::parse(&data).is_err());
+        assert!(MdtInfo::parse(&data).is_err());
         data[0] = 0x84;
         data[1] = 0x08;
-        assert!(XlsMdtInfo::parse(&data).is_ok());
+        assert!(MdtInfo::parse(&data).is_ok());
     }
 
     #[test]
     fn mdx_str_parses_shared_string() {
         let body = wide_string("Adventure Works");
-        let mut metadata = XlsMdxMetadata::default();
+        let mut metadata = MdxMetadata::default();
         metadata
             .push_record(MDX_STR_RECORD_TYPE, &payload(MDX_STR_RECORD_TYPE, &body))
             .unwrap();
@@ -1080,82 +1075,82 @@ mod tests {
     #[test]
     fn mdx_tuple_parses_and_validates_function() {
         let mut body = 0i32.to_le_bytes().to_vec();
-        body.push(XlsCubeFunction::CubeMember.code());
+        body.push(CubeFunction::CubeMember.code());
         body.extend_from_slice(&2i32.to_le_bytes());
         body.extend_from_slice(&1i32.to_le_bytes());
         body.extend_from_slice(&2i32.to_le_bytes());
-        let tuple = XlsMdxTuple::parse(&payload(MDX_TUPLE_RECORD_TYPE, &body)).unwrap();
+        let tuple = MdxTuple::parse(&payload(MDX_TUPLE_RECORD_TYPE, &body)).unwrap();
         assert_eq!(tuple.connection_name_index, 0);
-        assert_eq!(tuple.function, XlsCubeFunction::CubeMember);
+        assert_eq!(tuple.function, CubeFunction::CubeMember);
         assert_eq!(tuple.string_indexes, vec![1, 2]);
 
         // CubeSet is not a valid tuple source function.
-        body[4] = XlsCubeFunction::CubeSet.code();
-        assert!(XlsMdxTuple::parse(&payload(MDX_TUPLE_RECORD_TYPE, &body)).is_err());
+        body[4] = CubeFunction::CubeSet.code();
+        assert!(MdxTuple::parse(&payload(MDX_TUPLE_RECORD_TYPE, &body)).is_err());
         // Negative count and mismatched rgistr length.
-        body[4] = XlsCubeFunction::CubeValue.code();
+        body[4] = CubeFunction::CubeValue.code();
         body[5..9].copy_from_slice(&(-1i32).to_le_bytes());
-        assert!(XlsMdxTuple::parse(&payload(MDX_TUPLE_RECORD_TYPE, &body)).is_err());
+        assert!(MdxTuple::parse(&payload(MDX_TUPLE_RECORD_TYPE, &body)).is_err());
         body[5..9].copy_from_slice(&3i32.to_le_bytes());
-        assert!(XlsMdxTuple::parse(&payload(MDX_TUPLE_RECORD_TYPE, &body)).is_err());
+        assert!(MdxTuple::parse(&payload(MDX_TUPLE_RECORD_TYPE, &body)).is_err());
         // Truncated fixed part.
-        assert!(XlsMdxTuple::parse(&payload(MDX_TUPLE_RECORD_TYPE, &[0; 8])).is_err());
+        assert!(MdxTuple::parse(&payload(MDX_TUPLE_RECORD_TYPE, &[0; 8])).is_err());
     }
 
     #[test]
     fn mdx_set_parses_sort_order() {
         let mut body = 0i32.to_le_bytes().to_vec();
-        body.push(XlsCubeFunction::CubeSetCount.code());
-        body.push(XlsMdxSetSortOrder::NaturalDescending.code());
+        body.push(CubeFunction::CubeSetCount.code());
+        body.push(MdxSetSortOrder::NaturalDescending.code());
         body.extend_from_slice(&3i32.to_le_bytes());
         body.extend_from_slice(&0i32.to_le_bytes());
-        let set = XlsMdxSet::parse(&payload(MDX_SET_RECORD_TYPE, &body)).unwrap();
-        assert_eq!(set.function, XlsCubeFunction::CubeSetCount);
-        assert_eq!(set.sort_order, XlsMdxSetSortOrder::NaturalDescending);
+        let set = MdxSet::parse(&payload(MDX_SET_RECORD_TYPE, &body)).unwrap();
+        assert_eq!(set.function, CubeFunction::CubeSetCount);
+        assert_eq!(set.sort_order, MdxSetSortOrder::NaturalDescending);
         assert_eq!(set.set_definition_index, 3);
         assert!(set.string_indexes.is_empty());
 
         body[5] = 0x07; // invalid SD_SetSortOrder
-        assert!(XlsMdxSet::parse(&payload(MDX_SET_RECORD_TYPE, &body)).is_err());
-        body[5] = XlsMdxSetSortOrder::Ascending.code();
-        body[4] = XlsCubeFunction::CubeMember.code(); // not a set function
-        assert!(XlsMdxSet::parse(&payload(MDX_SET_RECORD_TYPE, &body)).is_err());
+        assert!(MdxSet::parse(&payload(MDX_SET_RECORD_TYPE, &body)).is_err());
+        body[5] = MdxSetSortOrder::Ascending.code();
+        body[4] = CubeFunction::CubeMember.code(); // not a set function
+        assert!(MdxSet::parse(&payload(MDX_SET_RECORD_TYPE, &body)).is_err());
     }
 
     #[test]
     fn mdx_prop_parses_fixed_body() {
         let mut body = 0i32.to_le_bytes().to_vec();
-        body.push(XlsCubeFunction::CubeMemberProperty.code());
+        body.push(CubeFunction::CubeMemberProperty.code());
         body.extend_from_slice(&1i32.to_le_bytes());
         body.extend_from_slice(&2i32.to_le_bytes());
-        let prop = XlsMdxProp::parse(&payload(MDX_PROP_RECORD_TYPE, &body)).unwrap();
+        let prop = MdxProp::parse(&payload(MDX_PROP_RECORD_TYPE, &body)).unwrap();
         assert_eq!(prop.member_index, 1);
         assert_eq!(prop.property_index, 2);
 
         body.push(0); // trailing byte
-        assert!(XlsMdxProp::parse(&payload(MDX_PROP_RECORD_TYPE, &body)).is_err());
+        assert!(MdxProp::parse(&payload(MDX_PROP_RECORD_TYPE, &body)).is_err());
         body.pop();
-        body[4] = XlsCubeFunction::CubeValue.code();
-        assert!(XlsMdxProp::parse(&payload(MDX_PROP_RECORD_TYPE, &body)).is_err());
+        body[4] = CubeFunction::CubeValue.code();
+        assert!(MdxProp::parse(&payload(MDX_PROP_RECORD_TYPE, &body)).is_err());
     }
 
     #[test]
     fn mdx_kpi_parses_fixed_body() {
         let mut body = 0i32.to_le_bytes().to_vec();
-        body.push(XlsCubeFunction::CubeKpiProperty.code());
-        body.push(XlsKpiProperty::Status.code());
+        body.push(CubeFunction::CubeKpiProperty.code());
+        body.push(KpiProperty::Status.code());
         body.extend_from_slice(&1i32.to_le_bytes());
         body.extend_from_slice(&2i32.to_le_bytes());
-        let kpi = XlsMdxKpi::parse(&payload(MDX_KPI_RECORD_TYPE, &body)).unwrap();
-        assert_eq!(kpi.kpi_property, XlsKpiProperty::Status);
+        let kpi = MdxKpi::parse(&payload(MDX_KPI_RECORD_TYPE, &body)).unwrap();
+        assert_eq!(kpi.kpi_property, KpiProperty::Status);
         assert_eq!(kpi.kpi_name_index, 1);
         assert_eq!(kpi.member_kpi_index, 2);
 
         body[5] = 0x00; // invalid KPIProp
-        assert!(XlsMdxKpi::parse(&payload(MDX_KPI_RECORD_TYPE, &body)).is_err());
-        body[5] = XlsKpiProperty::CurrentTimeMember.code();
-        body[4] = XlsCubeFunction::CubeMemberProperty.code();
-        assert!(XlsMdxKpi::parse(&payload(MDX_KPI_RECORD_TYPE, &body)).is_err());
+        assert!(MdxKpi::parse(&payload(MDX_KPI_RECORD_TYPE, &body)).is_err());
+        body[5] = KpiProperty::CurrentTimeMember.code();
+        body[4] = CubeFunction::CubeMemberProperty.code();
+        assert!(MdxKpi::parse(&payload(MDX_KPI_RECORD_TYPE, &body)).is_err());
     }
 
     #[test]
@@ -1164,15 +1159,15 @@ mod tests {
         body.extend_from_slice(&0u32.to_le_bytes());
         body.extend_from_slice(&2i32.to_le_bytes());
         body.extend_from_slice(&3u32.to_le_bytes());
-        let block = XlsMdb::parse(&payload(MDB_RECORD_TYPE, &body)).unwrap();
+        let block = Mdb::parse(&payload(MDB_RECORD_TYPE, &body)).unwrap();
         assert_eq!(
             block.entries,
             vec![
-                XlsMdxMetadataDir {
+                MdxMetadataDir {
                     info_index: 1,
                     metadata_index: 0
                 },
-                XlsMdxMetadataDir {
+                MdxMetadataDir {
                     info_index: 2,
                     metadata_index: 3
                 },
@@ -1180,16 +1175,16 @@ mod tests {
         );
 
         body.push(0); // not a whole MDir array
-        assert!(XlsMdb::parse(&payload(MDB_RECORD_TYPE, &body)).is_err());
+        assert!(Mdb::parse(&payload(MDB_RECORD_TYPE, &body)).is_err());
     }
 
     #[test]
     fn metadata_collection_validates_cross_record_indexes() {
-        let mut metadata = XlsMdxMetadata::default();
+        let mut metadata = MdxMetadata::default();
         assert!(metadata.is_empty());
 
-        metadata.add_info(XlsMdtInfo {
-            flags: XlsMdtInfoFlags::from_bits(F_COPY),
+        metadata.add_info(MdtInfo {
+            flags: MdtInfoFlags::from_bits(F_COPY),
             name: "ValueMetadata".to_string(),
         });
         metadata.add_string("connection".to_string()).unwrap();
@@ -1198,9 +1193,9 @@ mod tests {
             .unwrap();
 
         // A tuple referencing a string that does not exist yet is rejected.
-        let tuple = XlsMdxMetadataRecord::Tuple(XlsMdxTuple {
+        let tuple = MdxMetadataRecord::Tuple(MdxTuple {
             connection_name_index: 0,
-            function: XlsCubeFunction::CubeValue,
+            function: CubeFunction::CubeValue,
             string_indexes: vec![1, 2],
         });
         assert!(metadata.add_record(tuple.clone()).is_err());
@@ -1212,22 +1207,22 @@ mod tests {
 
         // MDir indexes must reference collected types and records; MDTInfo
         // indexes are one-based.
-        let bad_info = XlsMdb {
-            entries: vec![XlsMdxMetadataDir {
+        let bad_info = Mdb {
+            entries: vec![MdxMetadataDir {
                 info_index: 0,
                 metadata_index: 0,
             }],
         };
         assert!(metadata.add_block(bad_info).is_err());
-        let bad_record = XlsMdb {
-            entries: vec![XlsMdxMetadataDir {
+        let bad_record = Mdb {
+            entries: vec![MdxMetadataDir {
                 info_index: 1,
                 metadata_index: 1,
             }],
         };
         assert!(metadata.add_block(bad_record).is_err());
-        let good = XlsMdb {
-            entries: vec![XlsMdxMetadataDir {
+        let good = Mdb {
+            entries: vec![MdxMetadataDir {
                 info_index: 1,
                 metadata_index: 0,
             }],
@@ -1240,46 +1235,46 @@ mod tests {
 
     #[test]
     fn push_record_rejects_unknown_record_type() {
-        let mut metadata = XlsMdxMetadata::default();
+        let mut metadata = MdxMetadata::default();
         assert!(metadata.push_record(0x0801, &[]).is_err());
     }
 
     #[test]
     fn payloads_round_trip_through_parse() {
-        let mut metadata = XlsMdxMetadata::default();
-        metadata.add_info(XlsMdtInfo {
-            flags: XlsMdtInfoFlags::from_bits(F_COPY | F_PASTE_ALL),
+        let mut metadata = MdxMetadata::default();
+        metadata.add_info(MdtInfo {
+            flags: MdtInfoFlags::from_bits(F_COPY | F_PASTE_ALL),
             name: "ValueMetadata".to_string(),
         });
         for value in ["conn", "set-definition", "member", "property"] {
             metadata.add_string(value.to_string()).unwrap();
         }
         metadata
-            .add_record(XlsMdxMetadataRecord::Set(XlsMdxSet {
+            .add_record(MdxMetadataRecord::Set(MdxSet {
                 connection_name_index: 0,
-                function: XlsCubeFunction::CubeSet,
-                sort_order: XlsMdxSetSortOrder::AlphaAscending,
+                function: CubeFunction::CubeSet,
+                sort_order: MdxSetSortOrder::AlphaAscending,
                 set_definition_index: 1,
                 string_indexes: vec![2],
             }))
             .unwrap();
         metadata
-            .add_record(XlsMdxMetadataRecord::Kpi(XlsMdxKpi {
+            .add_record(MdxMetadataRecord::Kpi(MdxKpi {
                 connection_name_index: 0,
-                function: XlsCubeFunction::CubeKpiProperty,
-                kpi_property: XlsKpiProperty::Trend,
+                function: CubeFunction::CubeKpiProperty,
+                kpi_property: KpiProperty::Trend,
                 kpi_name_index: 2,
                 member_kpi_index: 3,
             }))
             .unwrap();
         metadata
-            .add_block(XlsMdb {
+            .add_block(Mdb {
                 entries: vec![
-                    XlsMdxMetadataDir {
+                    MdxMetadataDir {
                         info_index: 1,
                         metadata_index: 0,
                     },
-                    XlsMdxMetadataDir {
+                    MdxMetadataDir {
                         info_index: 1,
                         metadata_index: 1,
                     },
@@ -1306,7 +1301,7 @@ mod tests {
             ]
         );
 
-        let mut parsed = XlsMdxMetadata::default();
+        let mut parsed = MdxMetadata::default();
         for (record_type, data) in &payloads {
             parsed.push_record(*record_type, data).unwrap();
         }

@@ -4,13 +4,13 @@ pub const RECORD_TYPE: u16 = 0x01B8;
 pub const TOOLTIP_RECORD_TYPE: u16 = 0x0800;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct XlsHyperlinkRange {
+pub struct HyperlinkRange {
     pub(crate) first_row: u16,
     pub(crate) last_row: u16,
     pub(crate) first_column: u8,
     pub(crate) last_column: u8,
 }
-impl XlsHyperlinkRange {
+impl HyperlinkRange {
     pub fn first_row(&self) -> u16 {
         self.first_row
     }
@@ -26,11 +26,11 @@ impl XlsHyperlinkRange {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsUrlMoniker {
+pub struct UrlMoniker {
     pub(crate) url: String,
     pub(crate) serialization_uri_flags: Option<u32>,
 }
-impl XlsUrlMoniker {
+impl UrlMoniker {
     pub fn url(&self) -> &str {
         &self.url
     }
@@ -40,13 +40,13 @@ impl XlsUrlMoniker {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsFileMoniker {
+pub struct FileMoniker {
     pub(crate) parent_directory_count: u16,
     pub(crate) ansi_path: String,
     pub(crate) unicode_path: Option<String>,
     pub(crate) unc_server_character_count: Option<u16>,
 }
-impl XlsFileMoniker {
+impl FileMoniker {
     pub fn parent_directory_count(&self) -> u16 {
         self.parent_directory_count
     }
@@ -68,13 +68,13 @@ impl XlsFileMoniker {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsItemMoniker {
+pub struct ItemMoniker {
     pub(crate) delimiter_ansi: String,
     pub(crate) delimiter_unicode: Option<String>,
     pub(crate) item_ansi: String,
     pub(crate) item_unicode: Option<String>,
 }
-impl XlsItemMoniker {
+impl ItemMoniker {
     pub fn delimiter(&self) -> &str {
         self.delimiter_unicode
             .as_deref()
@@ -93,17 +93,17 @@ impl XlsItemMoniker {
 
 /// Serialized moniker data retained without activation or resolution.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum XlsHyperlinkMoniker {
+pub enum HyperlinkMoniker {
     String(String),
-    Url(XlsUrlMoniker),
-    File(XlsFileMoniker),
-    Composite(Vec<XlsHyperlinkMoniker>),
+    Url(UrlMoniker),
+    File(FileMoniker),
+    Composite(Vec<HyperlinkMoniker>),
     Anti { count: u32 },
-    Item(XlsItemMoniker),
+    Item(ItemMoniker),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsHyperlinkTargetKind {
+pub enum HyperlinkTargetKind {
     Document,
     Url,
     Email,
@@ -116,22 +116,22 @@ pub enum XlsHyperlinkTargetKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsHyperlink {
-    pub(crate) range: XlsHyperlinkRange,
+pub struct Hyperlink {
+    pub(crate) range: HyperlinkRange,
     pub(crate) class_id: [u8; 16],
     pub(crate) absolute: bool,
     pub(crate) site_gave_display_name: bool,
     pub(crate) absolute_from_relative: bool,
     pub(crate) display_name: Option<String>,
     pub(crate) target_frame: Option<String>,
-    pub(crate) moniker: Option<XlsHyperlinkMoniker>,
+    pub(crate) moniker: Option<HyperlinkMoniker>,
     pub(crate) location: Option<String>,
     pub(crate) hyperlink_guid: Option<[u8; 16]>,
     pub(crate) creation_time: Option<u64>,
     pub(crate) tooltip: Option<String>,
 }
-impl XlsHyperlink {
-    pub fn range(&self) -> XlsHyperlinkRange {
+impl Hyperlink {
+    pub fn range(&self) -> HyperlinkRange {
         self.range
     }
     pub fn class_id(&self) -> &[u8; 16] {
@@ -152,7 +152,7 @@ impl XlsHyperlink {
     pub fn target_frame(&self) -> Option<&str> {
         self.target_frame.as_deref()
     }
-    pub fn moniker(&self) -> Option<&XlsHyperlinkMoniker> {
+    pub fn moniker(&self) -> Option<&HyperlinkMoniker> {
         self.moniker.as_ref()
     }
     pub fn location(&self) -> Option<&str> {
@@ -167,39 +167,39 @@ impl XlsHyperlink {
     pub fn tooltip(&self) -> Option<&str> {
         self.tooltip.as_deref()
     }
-    pub fn target_kind(&self) -> XlsHyperlinkTargetKind {
+    pub fn target_kind(&self) -> HyperlinkTargetKind {
         match self.moniker.as_ref() {
-            None => XlsHyperlinkTargetKind::Document,
-            Some(XlsHyperlinkMoniker::Url(url))
+            None => HyperlinkTargetKind::Document,
+            Some(HyperlinkMoniker::Url(url))
                 if starts_ascii_case_insensitive(url.url(), "mailto:") =>
             {
-                XlsHyperlinkTargetKind::Email
+                HyperlinkTargetKind::Email
             },
-            Some(XlsHyperlinkMoniker::Url(_)) => XlsHyperlinkTargetKind::Url,
-            Some(XlsHyperlinkMoniker::File(file)) if file.is_unc() => XlsHyperlinkTargetKind::Unc,
-            Some(XlsHyperlinkMoniker::File(_)) => XlsHyperlinkTargetKind::File,
-            Some(XlsHyperlinkMoniker::String(value)) if value.starts_with("\\\\") => {
-                XlsHyperlinkTargetKind::Unc
+            Some(HyperlinkMoniker::Url(_)) => HyperlinkTargetKind::Url,
+            Some(HyperlinkMoniker::File(file)) if file.is_unc() => HyperlinkTargetKind::Unc,
+            Some(HyperlinkMoniker::File(_)) => HyperlinkTargetKind::File,
+            Some(HyperlinkMoniker::String(value)) if value.starts_with("\\\\") => {
+                HyperlinkTargetKind::Unc
             },
-            Some(XlsHyperlinkMoniker::String(value))
+            Some(HyperlinkMoniker::String(value))
                 if starts_ascii_case_insensitive(value, "mailto:") =>
             {
-                XlsHyperlinkTargetKind::Email
+                HyperlinkTargetKind::Email
             },
-            Some(XlsHyperlinkMoniker::String(_)) => XlsHyperlinkTargetKind::StringMoniker,
-            Some(XlsHyperlinkMoniker::Composite(_)) => XlsHyperlinkTargetKind::Composite,
-            Some(XlsHyperlinkMoniker::Anti { .. }) => XlsHyperlinkTargetKind::Anti,
-            Some(XlsHyperlinkMoniker::Item(_)) => XlsHyperlinkTargetKind::Item,
+            Some(HyperlinkMoniker::String(_)) => HyperlinkTargetKind::StringMoniker,
+            Some(HyperlinkMoniker::Composite(_)) => HyperlinkTargetKind::Composite,
+            Some(HyperlinkMoniker::Anti { .. }) => HyperlinkTargetKind::Anti,
+            Some(HyperlinkMoniker::Item(_)) => HyperlinkTargetKind::Item,
         }
     }
     /// Serialized base address, without filesystem or network resolution.
     pub fn address(&self) -> Option<&str> {
         match self.moniker.as_ref() {
-            Some(XlsHyperlinkMoniker::String(value)) => Some(value),
-            Some(XlsHyperlinkMoniker::Url(url)) => Some(url.url()),
-            Some(XlsHyperlinkMoniker::File(file)) => Some(file.path()),
-            Some(XlsHyperlinkMoniker::Item(item)) => Some(item.item()),
-            Some(XlsHyperlinkMoniker::Composite(_) | XlsHyperlinkMoniker::Anti { .. }) => None,
+            Some(HyperlinkMoniker::String(value)) => Some(value),
+            Some(HyperlinkMoniker::Url(url)) => Some(url.url()),
+            Some(HyperlinkMoniker::File(file)) => Some(file.path()),
+            Some(HyperlinkMoniker::Item(item)) => Some(item.item()),
+            Some(HyperlinkMoniker::Composite(_) | HyperlinkMoniker::Anti { .. }) => None,
             None => self.location(),
         }
     }

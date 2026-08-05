@@ -1,6 +1,6 @@
 //! Typed BIFF8 workbook-global environment and behavioral options.
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 pub(crate) const BACKUP_RECORD_TYPE: u16 = 0x0040;
 pub(crate) const TEMPLATE_RECORD_TYPE: u16 = 0x0060;
@@ -13,52 +13,52 @@ pub(crate) const REFRESH_ALL_RECORD_TYPE: u16 = 0x01B7;
 pub(crate) const EXCEL9_FILE_RECORD_TYPE: u16 = 0x01C0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsObjectDisplayMode {
+pub enum ObjectDisplayMode {
     ShowAll,
     ShowPlaceholders,
     HideAll,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsLinkUpdateMode {
+pub enum LinkUpdateMode {
     Prompt,
     Never,
     Silent,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsWorkbookEnvironment {
+pub struct WorkbookEnvironment {
     template: bool,
     has_biff5_stream: bool,
     excel9_file_marker: bool,
     create_backup_copy: bool,
-    object_display_mode: XlsObjectDisplayMode,
+    object_display_mode: ObjectDisplayMode,
     refresh_external_data_on_load: bool,
     save_external_link_values: bool,
     has_envelope: bool,
     envelope_visible: bool,
     envelope_initialized: bool,
-    link_update_mode: XlsLinkUpdateMode,
+    link_update_mode: LinkUpdateMode,
     hide_unselected_table_borders: bool,
     supports_natural_language_formulas: bool,
     default_country_code: u16,
     current_country_code: u16,
 }
 
-impl Default for XlsWorkbookEnvironment {
+impl Default for WorkbookEnvironment {
     fn default() -> Self {
         Self {
             template: false,
             has_biff5_stream: false,
             excel9_file_marker: false,
             create_backup_copy: false,
-            object_display_mode: XlsObjectDisplayMode::ShowAll,
+            object_display_mode: ObjectDisplayMode::ShowAll,
             refresh_external_data_on_load: false,
             save_external_link_values: true,
             has_envelope: false,
             envelope_visible: false,
             envelope_initialized: false,
-            link_update_mode: XlsLinkUpdateMode::Prompt,
+            link_update_mode: LinkUpdateMode::Prompt,
             hide_unselected_table_borders: false,
             supports_natural_language_formulas: false,
             default_country_code: 1,
@@ -67,7 +67,7 @@ impl Default for XlsWorkbookEnvironment {
     }
 }
 
-impl XlsWorkbookEnvironment {
+impl WorkbookEnvironment {
     pub fn is_template(&self) -> bool {
         self.template
     }
@@ -80,7 +80,7 @@ impl XlsWorkbookEnvironment {
     pub fn create_backup_copy(&self) -> bool {
         self.create_backup_copy
     }
-    pub fn object_display_mode(&self) -> XlsObjectDisplayMode {
+    pub fn object_display_mode(&self) -> ObjectDisplayMode {
         self.object_display_mode
     }
     /// Metadata only: the reader never refreshes or opens external data.
@@ -99,7 +99,7 @@ impl XlsWorkbookEnvironment {
     pub fn envelope_initialized(&self) -> bool {
         self.envelope_initialized
     }
-    pub fn link_update_mode(&self) -> XlsLinkUpdateMode {
+    pub fn link_update_mode(&self) -> LinkUpdateMode {
         self.link_update_mode
     }
     pub fn hide_unselected_table_borders(&self) -> bool {
@@ -117,7 +117,7 @@ impl XlsWorkbookEnvironment {
 }
 
 pub(crate) struct EnvironmentCollector {
-    value: XlsWorkbookEnvironment,
+    value: WorkbookEnvironment,
     seen: u16,
     last_rank: Option<u8>,
 }
@@ -125,12 +125,12 @@ pub(crate) struct EnvironmentCollector {
 impl EnvironmentCollector {
     pub(crate) fn new() -> Self {
         Self {
-            value: XlsWorkbookEnvironment::default(),
+            value: WorkbookEnvironment::default(),
             seen: 0,
             last_rank: None,
         }
     }
-    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
+    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> Result<()> {
         let (rank, bit) = match record_type {
             TEMPLATE_RECORD_TYPE => (0, 1 << 0),
             DSF_RECORD_TYPE => (1, 1 << 1),
@@ -170,9 +170,9 @@ impl EnvironmentCollector {
             HIDE_OBJ_RECORD_TYPE => {
                 require_length(record_type, data, 2)?;
                 self.value.object_display_mode = match read_u16(data, 0) {
-                    0 => XlsObjectDisplayMode::ShowAll,
-                    1 => XlsObjectDisplayMode::ShowPlaceholders,
-                    2 => XlsObjectDisplayMode::HideAll,
+                    0 => ObjectDisplayMode::ShowAll,
+                    1 => ObjectDisplayMode::ShowPlaceholders,
+                    2 => ObjectDisplayMode::HideAll,
                     value => return invalid(record_type, format!("invalid HideObj value {value}")),
                 };
             },
@@ -197,7 +197,7 @@ impl EnvironmentCollector {
         }
         Ok(())
     }
-    fn parse_book_bool(&mut self, data: &[u8]) -> XlsResult<()> {
+    fn parse_book_bool(&mut self, data: &[u8]) -> Result<()> {
         require_length(BOOK_BOOL_RECORD_TYPE, data, 2)?;
         let bits = read_u16(data, 0);
         if bits & 0xFE02 != 0 {
@@ -217,15 +217,15 @@ impl EnvironmentCollector {
         self.value.envelope_visible = visible;
         self.value.envelope_initialized = initialized;
         self.value.link_update_mode = match (bits >> 5) & 3 {
-            0 => XlsLinkUpdateMode::Prompt,
-            1 => XlsLinkUpdateMode::Never,
-            2 => XlsLinkUpdateMode::Silent,
+            0 => LinkUpdateMode::Prompt,
+            1 => LinkUpdateMode::Never,
+            2 => LinkUpdateMode::Silent,
             _ => return invalid(BOOK_BOOL_RECORD_TYPE, "invalid BookBool link update mode"),
         };
         self.value.hide_unselected_table_borders = bits & 0x0100 != 0;
         Ok(())
     }
-    pub(crate) fn finish(self) -> XlsResult<XlsWorkbookEnvironment> {
+    pub(crate) fn finish(self) -> Result<WorkbookEnvironment> {
         if self.value.refresh_external_data_on_load && !self.value.template {
             return invalid(
                 REFRESH_ALL_RECORD_TYPE,
@@ -236,7 +236,7 @@ impl EnvironmentCollector {
     }
 }
 
-fn parse_bool(record_type: u16, data: &[u8]) -> XlsResult<bool> {
+fn parse_bool(record_type: u16, data: &[u8]) -> Result<bool> {
     require_length(record_type, data, 2)?;
     match read_u16(data, 0) {
         0 => Ok(false),
@@ -244,7 +244,7 @@ fn parse_bool(record_type: u16, data: &[u8]) -> XlsResult<bool> {
         value => invalid(record_type, format!("Boolean must be 0 or 1, got {value}")),
     }
 }
-fn require_length(record_type: u16, data: &[u8], expected: usize) -> XlsResult<()> {
+fn require_length(record_type: u16, data: &[u8], expected: usize) -> Result<()> {
     if data.len() != expected {
         return invalid(
             record_type,
@@ -259,8 +259,8 @@ fn require_length(record_type: u16, data: &[u8], expected: usize) -> XlsResult<(
 fn read_u16(data: &[u8], offset: usize) -> u16 {
     u16::from_le_bytes(data[offset..offset + 2].try_into().unwrap())
 }
-fn invalid<T>(record_type: u16, message: impl Into<String>) -> XlsResult<T> {
-    Err(XlsError::InvalidRecord {
+fn invalid<T>(record_type: u16, message: impl Into<String>) -> Result<T> {
+    Err(Error::InvalidRecord {
         record_type,
         message: message.into(),
     })

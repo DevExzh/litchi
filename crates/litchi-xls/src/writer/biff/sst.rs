@@ -1,6 +1,6 @@
 //! Shared String Table (SST) BIFF8 writer.
 
-use crate::XlsResult;
+use crate::Result;
 use std::io::Write;
 
 use super::write_record_header;
@@ -13,7 +13,7 @@ use super::write_record_header;
 ///
 /// * `writer` - Output writer
 /// * `data` - Continuation data
-fn write_continue<W: Write>(writer: &mut W, data: &[u8]) -> XlsResult<()> {
+fn write_continue<W: Write>(writer: &mut W, data: &[u8]) -> Result<()> {
     let len = data.len().min(8224) as u16; // Max record size
     write_record_header(writer, 0x003C, len)?;
     writer.write_all(&data[..len as usize])?;
@@ -40,7 +40,7 @@ pub(crate) fn write_sst<W: Write>(
     writer: &mut W,
     strings: &[String],
     cst_total: u32,
-) -> XlsResult<()> {
+) -> Result<()> {
     const MAX_RECORD_DATA: usize = 8224; // max data payload per record
 
     // We'll build each record's payload into a local buffer, then flush with the header
@@ -48,7 +48,7 @@ pub(crate) fn write_sst<W: Write>(
     let mut buffer: Vec<u8> = Vec::with_capacity(MAX_RECORD_DATA);
 
     // Helper to flush current buffer as either SST or CONTINUE
-    let flush = |writer: &mut W, buf: &mut Vec<u8>, first: bool| -> XlsResult<()> {
+    let flush = |writer: &mut W, buf: &mut Vec<u8>, first: bool| -> Result<()> {
         if buf.is_empty() {
             return Ok(());
         }

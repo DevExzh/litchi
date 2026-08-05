@@ -1,8 +1,8 @@
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
 /// Safe, inert OfficeArt primitive supported by the BIFF8 writer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsShapeKind {
+pub enum ShapeKind {
     Rectangle,
     RoundedRectangle,
     Ellipse,
@@ -10,7 +10,7 @@ pub enum XlsShapeKind {
     TextBox,
 }
 
-impl XlsShapeKind {
+impl ShapeKind {
     pub(crate) const fn officeart_type(self) -> u16 {
         match self {
             Self::Rectangle => 1,
@@ -33,13 +33,13 @@ impl XlsShapeKind {
 
 /// RGB color used by a primitive shape fill or outline.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsShapeColor {
+pub struct ShapeColor {
     pub red: u8,
     pub green: u8,
     pub blue: u8,
 }
 
-impl XlsShapeColor {
+impl ShapeColor {
     pub const fn rgb(red: u8, green: u8, blue: u8) -> Self {
         Self { red, green, blue }
     }
@@ -51,17 +51,17 @@ impl XlsShapeColor {
 
 /// Fill style for a writable primitive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsShapeFill {
+pub enum ShapeFill {
     None,
-    Solid(XlsShapeColor),
+    Solid(ShapeColor),
 }
 
 /// Outline style for a writable primitive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsShapeLine {
+pub enum ShapeLine {
     None,
     Solid {
-        color: XlsShapeColor,
+        color: ShapeColor,
         /// Line width in English Metric Units.
         width_emu: u32,
     },
@@ -100,11 +100,11 @@ pub struct Point {
 
 impl Point {
     /// Create a point at a cell boundary, rejecting locations outside the BIFF8 grid.
-    pub fn new(row: u32, column: u16) -> XlsResult<Self> {
+    pub fn new(row: u32, column: u16) -> Result<Self> {
         let row = u16::try_from(row)
-            .map_err(|_| XlsError::InvalidData("shape anchor row must be <= 65535".to_string()))?;
+            .map_err(|_| Error::InvalidData("shape anchor row must be <= 65535".to_string()))?;
         let column = u8::try_from(column)
-            .map_err(|_| XlsError::InvalidData("shape anchor column must be <= 255".to_string()))?;
+            .map_err(|_| Error::InvalidData("shape anchor column must be <= 255".to_string()))?;
         Ok(Self::cell(row, column))
     }
 
@@ -119,12 +119,12 @@ impl Point {
     }
 
     /// Set the row and column fractions, moving the checked point on success.
-    pub fn offset(mut self, row: u16, column: u16) -> XlsResult<Self> {
+    pub fn offset(mut self, row: u16, column: u16) -> Result<Self> {
         let row = u8::try_from(row).map_err(|_| {
-            XlsError::InvalidData("shape anchor row offset must be <= 255".to_string())
+            Error::InvalidData("shape anchor row offset must be <= 255".to_string())
         })?;
         if column > 1023 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "shape anchor column offset must be <= 1023".to_string(),
             ));
         }
@@ -164,12 +164,12 @@ pub struct Anchor {
 
 impl Anchor {
     /// Create an anchor whose horizontal and vertical endpoints are strictly ordered.
-    pub fn new(first: Point, last: Point, behavior: Behavior) -> XlsResult<Self> {
+    pub fn new(first: Point, last: Point, behavior: Behavior) -> Result<Self> {
         let horizontal_order =
             (first.column, first.column_offset) < (last.column, last.column_offset);
         let vertical_order = (first.row, first.row_offset) < (last.row, last.row_offset);
         if !horizontal_order || !vertical_order {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "shape anchor endpoints must be strictly ordered on both axes".to_string(),
             ));
         }
@@ -187,7 +187,7 @@ impl Anchor {
         last_row: u32,
         last_column: u16,
         behavior: Behavior,
-    ) -> XlsResult<Self> {
+    ) -> Result<Self> {
         Self::new(
             Point::new(first_row, first_column)?,
             Point::new(last_row, last_column)?,
@@ -253,9 +253,9 @@ impl Rect {
     };
 
     /// Create a rectangle with strictly increasing axes.
-    pub fn new(left: i32, top: i32, right: i32, bottom: i32) -> XlsResult<Self> {
+    pub fn new(left: i32, top: i32, right: i32, bottom: i32) -> Result<Self> {
         if left >= right || top >= bottom {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "group rectangle must have left < right and top < bottom".to_string(),
             ));
         }
@@ -294,7 +294,7 @@ impl Rect {
 
 /// One rich-text run in a writable shape's TXO text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsShapeTextRun {
+pub struct ShapeTextRun {
     /// UTF-16 code-unit position where this run starts.
     pub character_index: u16,
     pub font_index: u16,
@@ -302,13 +302,13 @@ pub struct XlsShapeTextRun {
 
 /// Optional TXO text attached to a primitive shape.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsShapeText {
+pub struct ShapeText {
     pub value: String,
-    pub runs: Vec<XlsShapeTextRun>,
+    pub runs: Vec<ShapeTextRun>,
     pub font_when_empty: u16,
 }
 
-impl XlsShapeText {
+impl ShapeText {
     pub fn new(value: impl Into<String>) -> Self {
         Self {
             value: value.into(),
@@ -317,25 +317,25 @@ impl XlsShapeText {
         }
     }
 
-    fn validate(&self) -> XlsResult<()> {
+    fn validate(&self) -> Result<()> {
         let mut units = Vec::new();
         units
             .try_reserve_exact(self.value.len())
-            .map_err(|_| XlsError::Allocation("reserving shape text validation storage"))?;
+            .map_err(|_| Error::Allocation("reserving shape text validation storage"))?;
         units.extend(self.value.encode_utf16());
         if units.len() > usize::from(u16::MAX) {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "shape text exceeds 65535 UTF-16 code units".to_string(),
             ));
         }
         if units.is_empty() && !self.runs.is_empty() {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "empty shape text cannot contain formatting runs".to_string(),
             ));
         }
         if !self.runs.is_empty() {
             if self.runs[0].character_index != 0 {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "the first shape formatting run must start at character zero".to_string(),
                 ));
             }
@@ -346,7 +346,7 @@ impl XlsShapeText {
                     || previous.is_some_and(|value| value >= run.character_index)
                     || (index > 0 && (0xDC00..=0xDFFF).contains(&units[index]))
                 {
-                    return Err(XlsError::InvalidData(
+                    return Err(Error::InvalidData(
                         "shape formatting runs must be ordered UTF-16 character boundaries"
                             .to_string(),
                     ));
@@ -362,9 +362,9 @@ impl XlsShapeText {
         let run_bytes = run_count
             .checked_add(1)
             .and_then(|count| count.checked_mul(8))
-            .ok_or_else(|| XlsError::InvalidData("shape formatting run size overflows".into()))?;
+            .ok_or_else(|| Error::InvalidData("shape formatting run size overflows".into()))?;
         if run_bytes > 65_528 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "shape formatting runs exceed the BIFF8 cbRuns limit".to_string(),
             ));
         }
@@ -374,28 +374,28 @@ impl XlsShapeText {
 
 /// Writable, macro-inert BIFF8 worksheet primitive.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsShapeWrite {
-    pub kind: XlsShapeKind,
+pub struct ShapeWrite {
+    pub kind: ShapeKind,
     pub anchor: Anchor,
     /// Optional requested OBJ identifier. `None` assigns the first free canonical ID.
     pub object_id: Option<u16>,
-    pub text: Option<XlsShapeText>,
-    pub fill: XlsShapeFill,
-    pub line: XlsShapeLine,
+    pub text: Option<ShapeText>,
+    pub fill: ShapeFill,
+    pub line: ShapeLine,
     pub visible: bool,
     pub locked: bool,
 }
 
-impl XlsShapeWrite {
-    pub fn new(kind: XlsShapeKind, anchor: Anchor) -> Self {
+impl ShapeWrite {
+    pub fn new(kind: ShapeKind, anchor: Anchor) -> Self {
         Self {
             kind,
             anchor,
             object_id: None,
             text: None,
-            fill: XlsShapeFill::Solid(XlsShapeColor::rgb(255, 255, 255)),
-            line: XlsShapeLine::Solid {
-                color: XlsShapeColor::rgb(0, 0, 0),
+            fill: ShapeFill::Solid(ShapeColor::rgb(255, 255, 255)),
+            line: ShapeLine::Solid {
+                color: ShapeColor::rgb(0, 0, 0),
                 width_emu: 12_700,
             },
             visible: true,
@@ -403,7 +403,7 @@ impl XlsShapeWrite {
         }
     }
 
-    pub(crate) fn validate(&self) -> XlsResult<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         validate_shape_style(
             self.kind,
             self.object_id,
@@ -416,26 +416,26 @@ impl XlsShapeWrite {
 
 /// Validate the primitive style fields shared by top-level and grouped shapes.
 pub(crate) fn validate_shape_style(
-    kind: XlsShapeKind,
+    kind: ShapeKind,
     object_id: Option<u16>,
-    fill: XlsShapeFill,
-    line: XlsShapeLine,
-    text: Option<&XlsShapeText>,
-) -> XlsResult<()> {
+    fill: ShapeFill,
+    line: ShapeLine,
+    text: Option<&ShapeText>,
+) -> Result<()> {
     if matches!(object_id, Some(0 | u16::MAX)) {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "shape object ID 0 and 65535 are reserved".to_string(),
         ));
     }
-    if let XlsShapeLine::Solid { width_emu, .. } = line
+    if let ShapeLine::Solid { width_emu, .. } = line
         && !(1..=20_116_800).contains(&width_emu)
     {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "shape line width must be 1..=20116800 EMU".to_string(),
         ));
     }
-    if kind == XlsShapeKind::Line && (fill != XlsShapeFill::None || text.is_some()) {
-        return Err(XlsError::InvalidData(
+    if kind == ShapeKind::Line && (fill != ShapeFill::None || text.is_some()) {
+        return Err(Error::InvalidData(
             "line primitives do not support fill or text".to_string(),
         ));
     }
@@ -495,12 +495,12 @@ mod tests {
     #[test]
     fn text_validation_checks_utf16_boundaries_without_unwinding() {
         let outcome = catch_unwind(|| {
-            let oversized = XlsShapeText::new("a".repeat(usize::from(u16::MAX) + 1));
+            let oversized = ShapeText::new("a".repeat(usize::from(u16::MAX) + 1));
             assert!(oversized.validate().is_err());
 
-            let split_surrogate = XlsShapeText {
+            let split_surrogate = ShapeText {
                 value: "😀".to_string(),
-                runs: vec![XlsShapeTextRun {
+                runs: vec![ShapeTextRun {
                     character_index: 1,
                     font_index: 0,
                 }],

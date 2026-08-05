@@ -3,11 +3,11 @@
 use std::fmt;
 
 /// Result type alias for XLS operations
-pub type XlsResult<T> = Result<T, XlsError>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Password-to-open encryption families identified in a BIFF `FILEPASS` record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsEncryptionKind {
+pub enum EncryptionKind {
     /// Legacy BIFF8 binary RC4.
     BinaryRc4,
     /// CryptoAPI encryption.
@@ -18,7 +18,7 @@ pub enum XlsEncryptionKind {
 
 /// Errors that can occur during XLS file parsing
 #[derive(Debug)]
-pub enum XlsError {
+pub enum Error {
     /// I/O error
     Io(std::io::Error),
     /// CFB (Compound File Binary) error
@@ -43,7 +43,7 @@ pub enum XlsError {
     /// The supplied password did not match the `FILEPASS` verifier.
     InvalidPassword,
     /// The encryption family is recognized but not implemented.
-    UnsupportedEncryption(XlsEncryptionKind),
+    UnsupportedEncryption(EncryptionKind),
     /// The `FILEPASS` record is structurally invalid.
     MalformedFilePass(String),
     /// Invalid data length
@@ -84,124 +84,124 @@ pub enum XlsError {
     Eof(&'static str),
 }
 
-impl fmt::Display for XlsError {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            XlsError::Io(e) => write!(f, "I/O error: {}", e),
-            XlsError::Cfb(e) => write!(f, "CFB error: {}", e),
-            XlsError::Vba(e) => write!(f, "VBA project error: {}", e),
-            XlsError::Graph(e) => write!(f, "Office Graph error: {e}"),
-            XlsError::InvalidRecord {
+            Error::Io(e) => write!(f, "I/O error: {}", e),
+            Error::Cfb(e) => write!(f, "CFB error: {}", e),
+            Error::Vba(e) => write!(f, "VBA project error: {}", e),
+            Error::Graph(e) => write!(f, "Office Graph error: {e}"),
+            Error::InvalidRecord {
                 record_type,
                 message,
             } => {
                 write!(f, "Invalid record 0x{:04X}: {}", record_type, message)
             },
-            XlsError::UnsupportedBiffVersion(version) => {
+            Error::UnsupportedBiffVersion(version) => {
                 write!(f, "Unsupported BIFF version: {}", version)
             },
-            XlsError::PasswordProtected => {
+            Error::PasswordProtected => {
                 write!(f, "Workbook is password protected")
             },
-            XlsError::PasswordRequired => write!(f, "Workbook password is required"),
-            XlsError::InvalidPassword => write!(f, "Invalid workbook password"),
-            XlsError::UnsupportedEncryption(kind) => {
+            Error::PasswordRequired => write!(f, "Workbook password is required"),
+            Error::InvalidPassword => write!(f, "Invalid workbook password"),
+            Error::UnsupportedEncryption(kind) => {
                 write!(f, "Unsupported workbook encryption: {kind:?}")
             },
-            XlsError::MalformedFilePass(message) => {
+            Error::MalformedFilePass(message) => {
                 write!(f, "Malformed FILEPASS record: {message}")
             },
-            XlsError::InvalidLength { expected, found } => {
+            Error::InvalidLength { expected, found } => {
                 write!(f, "Invalid length: expected {}, found {}", expected, found)
             },
-            XlsError::Allocation(context) => {
+            Error::Allocation(context) => {
                 write!(f, "Allocation failed while {context}")
             },
-            XlsError::UnexpectedEndOfStream(context) => {
+            Error::UnexpectedEndOfStream(context) => {
                 write!(f, "Unexpected end of stream: {}", context)
             },
-            XlsError::InvalidFormula(msg) => {
+            Error::InvalidFormula(msg) => {
                 write!(f, "Invalid formula: {}", msg)
             },
-            XlsError::InvalidCellReference(ref_str) => {
+            Error::InvalidCellReference(ref_str) => {
                 write!(f, "Invalid cell reference: {}", ref_str)
             },
-            XlsError::WorksheetNotFound(name) => {
+            Error::WorksheetNotFound(name) => {
                 write!(f, "Worksheet '{}' not found", name)
             },
-            XlsError::InvalidFormat(code) => {
+            Error::InvalidFormat(code) => {
                 write!(f, "Invalid format code: {}", code)
             },
-            XlsError::Encoding(msg) => {
+            Error::Encoding(msg) => {
                 write!(f, "Encoding error: {}", msg)
             },
-            XlsError::UnsupportedFeature(feature) => {
+            Error::UnsupportedFeature(feature) => {
                 write!(f, "Unsupported feature: {}", feature)
             },
-            XlsError::InvalidData(msg) => {
+            Error::InvalidData(msg) => {
                 write!(f, "Invalid data: {}", msg)
             },
-            XlsError::UnsafeEdit(msg) => write!(f, "Unsafe edit refused: {msg}"),
-            XlsError::UnexpectedRecordType { expected, found } => {
+            Error::UnsafeEdit(msg) => write!(f, "Unsafe edit refused: {msg}"),
+            Error::UnexpectedRecordType { expected, found } => {
                 write!(
                     f,
                     "Unexpected record type: expected 0x{:04X}, found 0x{:04X}",
                     expected, found
                 )
             },
-            XlsError::Eof(context) => {
+            Error::Eof(context) => {
                 write!(f, "End of file: {}", context)
             },
         }
     }
 }
 
-impl std::error::Error for XlsError {
+impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            XlsError::Io(e) => Some(e),
-            XlsError::Cfb(e) => Some(e),
-            XlsError::Vba(e) => Some(e),
-            XlsError::Graph(e) => Some(e),
+            Error::Io(e) => Some(e),
+            Error::Cfb(e) => Some(e),
+            Error::Vba(e) => Some(e),
+            Error::Graph(e) => Some(e),
             _ => None,
         }
     }
 }
 
-impl From<std::io::Error> for XlsError {
+impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
-        XlsError::Io(err)
+        Error::Io(err)
     }
 }
 
-impl From<litchi_cfb::OleError> for XlsError {
+impl From<litchi_cfb::OleError> for Error {
     fn from(err: litchi_cfb::OleError) -> Self {
-        XlsError::Cfb(err)
+        Error::Cfb(err)
     }
 }
 
-impl From<litchi_vba::Error> for XlsError {
+impl From<litchi_vba::Error> for Error {
     fn from(err: litchi_vba::Error) -> Self {
-        XlsError::Vba(err)
+        Error::Vba(err)
     }
 }
 
-impl From<litchi_ograph::Error> for XlsError {
+impl From<litchi_ograph::Error> for Error {
     fn from(err: litchi_ograph::Error) -> Self {
         Self::Graph(err)
     }
 }
 
-impl From<litchi_core::binary::BinaryError> for XlsError {
+impl From<litchi_core::binary::BinaryError> for Error {
     fn from(err: litchi_core::binary::BinaryError) -> Self {
-        XlsError::InvalidData(err.to_string())
+        Error::InvalidData(err.to_string())
     }
 }
 
-impl From<litchi_biff::Error> for XlsError {
+impl From<litchi_biff::Error> for Error {
     fn from(err: litchi_biff::Error) -> Self {
         match err {
-            litchi_biff::Error::TruncatedHeader { available, .. } => XlsError::InvalidLength {
+            litchi_biff::Error::TruncatedHeader { available, .. } => Error::InvalidLength {
                 expected: 4,
                 found: available,
             },
@@ -210,13 +210,13 @@ impl From<litchi_biff::Error> for XlsError {
                 declared,
                 available,
                 ..
-            } => XlsError::InvalidRecord {
+            } => Error::InvalidRecord {
                 record_type: kind.get(),
                 message: format!(
                     "truncated BIFF payload: declared {declared} bytes, only {available} available"
                 ),
             },
-            other => XlsError::InvalidData(other.to_string()),
+            other => Error::InvalidData(other.to_string()),
         }
     }
 }
@@ -224,12 +224,12 @@ impl From<litchi_biff::Error> for XlsError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::error::Error;
+    use std::error::Error as StdError;
 
     #[test]
     fn test_xls_error_io() {
         let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
-        let err = XlsError::Io(io_err);
+        let err = Error::Io(io_err);
         let display = format!("{}", err);
         assert!(display.contains("I/O error"));
         assert!(display.contains("file not found"));
@@ -237,7 +237,7 @@ mod tests {
 
     #[test]
     fn test_xls_error_invalid_record() {
-        let err = XlsError::InvalidRecord {
+        let err = Error::InvalidRecord {
             record_type: 0x0201,
             message: "Invalid data".to_string(),
         };
@@ -248,21 +248,21 @@ mod tests {
 
     #[test]
     fn test_xls_error_unsupported_biff_version() {
-        let err = XlsError::UnsupportedBiffVersion(0x0100);
+        let err = Error::UnsupportedBiffVersion(0x0100);
         let display = format!("{}", err);
         assert!(display.contains("Unsupported BIFF version: 256"));
     }
 
     #[test]
     fn test_xls_error_password_protected() {
-        let err = XlsError::PasswordProtected;
+        let err = Error::PasswordProtected;
         let display = format!("{}", err);
         assert_eq!(display, "Workbook is password protected");
     }
 
     #[test]
     fn test_xls_error_invalid_length() {
-        let err = XlsError::InvalidLength {
+        let err = Error::InvalidLength {
             expected: 10,
             found: 5,
         };
@@ -272,7 +272,7 @@ mod tests {
 
     #[test]
     fn test_xls_error_unexpected_end_of_stream() {
-        let err = XlsError::UnexpectedEndOfStream("while reading header".to_string());
+        let err = Error::UnexpectedEndOfStream("while reading header".to_string());
         let display = format!("{}", err);
         assert!(display.contains("Unexpected end of stream"));
         assert!(display.contains("while reading header"));
@@ -280,7 +280,7 @@ mod tests {
 
     #[test]
     fn test_xls_error_invalid_formula() {
-        let err = XlsError::InvalidFormula("Missing closing paren".to_string());
+        let err = Error::InvalidFormula("Missing closing paren".to_string());
         let display = format!("{}", err);
         assert!(display.contains("Invalid formula"));
         assert!(display.contains("Missing closing paren"));
@@ -288,28 +288,28 @@ mod tests {
 
     #[test]
     fn test_xls_error_invalid_cell_reference() {
-        let err = XlsError::InvalidCellReference("XYZ123".to_string());
+        let err = Error::InvalidCellReference("XYZ123".to_string());
         let display = format!("{}", err);
         assert!(display.contains("Invalid cell reference: XYZ123"));
     }
 
     #[test]
     fn test_xls_error_worksheet_not_found() {
-        let err = XlsError::WorksheetNotFound("Sheet99".to_string());
+        let err = Error::WorksheetNotFound("Sheet99".to_string());
         let display = format!("{}", err);
         assert!(display.contains("Worksheet 'Sheet99' not found"));
     }
 
     #[test]
     fn test_xls_error_invalid_format() {
-        let err = XlsError::InvalidFormat(0xFF);
+        let err = Error::InvalidFormat(0xFF);
         let display = format!("{}", err);
         assert!(display.contains("Invalid format code: 255"));
     }
 
     #[test]
     fn test_xls_error_encoding() {
-        let err = XlsError::Encoding("UTF-8 error".to_string());
+        let err = Error::Encoding("UTF-8 error".to_string());
         let display = format!("{}", err);
         assert!(display.contains("Encoding error"));
         assert!(display.contains("UTF-8 error"));
@@ -317,7 +317,7 @@ mod tests {
 
     #[test]
     fn test_xls_error_unsupported_feature() {
-        let err = XlsError::UnsupportedFeature("Pivot tables".to_string());
+        let err = Error::UnsupportedFeature("Pivot tables".to_string());
         let display = format!("{}", err);
         assert!(display.contains("Unsupported feature"));
         assert!(display.contains("Pivot tables"));
@@ -325,7 +325,7 @@ mod tests {
 
     #[test]
     fn test_xls_error_invalid_data() {
-        let err = XlsError::InvalidData("Corrupted header".to_string());
+        let err = Error::InvalidData("Corrupted header".to_string());
         let display = format!("{}", err);
         assert!(display.contains("Invalid data"));
         assert!(display.contains("Corrupted header"));
@@ -333,7 +333,7 @@ mod tests {
 
     #[test]
     fn test_xls_error_unexpected_record_type() {
-        let err = XlsError::UnexpectedRecordType {
+        let err = Error::UnexpectedRecordType {
             expected: 0x0009,
             found: 0x0006,
         };
@@ -345,14 +345,14 @@ mod tests {
 
     #[test]
     fn test_xls_error_eof() {
-        let err = XlsError::Eof("stream");
+        let err = Error::Eof("stream");
         let display = format!("{}", err);
         assert!(display.contains("End of file: stream"));
     }
 
     #[test]
     fn test_xls_error_debug() {
-        let err = XlsError::PasswordProtected;
+        let err = Error::PasswordProtected;
         let debug_str = format!("{:?}", err);
         assert!(debug_str.contains("PasswordProtected"));
     }
@@ -360,33 +360,33 @@ mod tests {
     #[test]
     fn test_xls_error_source_io() {
         let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "test");
-        let err = XlsError::Io(io_err);
+        let err = Error::Io(io_err);
         assert!(err.source().is_some());
     }
 
     #[test]
     fn test_xls_error_source_other() {
-        let err = XlsError::PasswordProtected;
+        let err = Error::PasswordProtected;
         assert!(err.source().is_none());
     }
 
     #[test]
     fn test_xls_error_from_io() {
         let io_err = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "access denied");
-        let xls_err: XlsError = io_err.into();
+        let xls_err: Error = io_err.into();
         match xls_err {
-            XlsError::Io(_) => {},
+            Error::Io(_) => {},
             _ => panic!("Expected Io error variant"),
         }
     }
 
     #[test]
     fn test_xls_result_type() {
-        fn returns_ok() -> XlsResult<u32> {
+        fn returns_ok() -> Result<u32> {
             Ok(42)
         }
-        fn returns_err() -> XlsResult<u32> {
-            Err(XlsError::PasswordProtected)
+        fn returns_err() -> Result<u32> {
+            Err(Error::PasswordProtected)
         }
 
         assert_eq!(returns_ok().unwrap(), 42);
@@ -397,7 +397,7 @@ mod tests {
     fn test_xls_error_cfb_source() {
         // Test that CFB errors properly return source
         let cfb_err = litchi_cfb::OleError::StreamNotFound;
-        let err = XlsError::Cfb(cfb_err);
+        let err = Error::Cfb(cfb_err);
         // The CFB error doesn't have a source (unit variant), but test the variant
         let display = format!("{}", err);
         assert!(display.contains("Stream not found"));

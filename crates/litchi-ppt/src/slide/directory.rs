@@ -1,10 +1,10 @@
 //! Normative logical slide directory for binary PowerPoint files.
 
-use crate::consts::PptRecordType;
+use crate::consts::RecordType;
 use crate::current_user::CurrentUser;
-use crate::package::{PptError, Result};
+use crate::package::{Error, Result};
 use crate::persist::PersistMapping;
-use crate::records::PptRecord;
+use crate::records::Record;
 use std::collections::HashMap;
 
 const USER_EDIT_ATOM: u16 = 0x0ff5;
@@ -20,8 +20,8 @@ pub struct SlideDirectoryEntry {
     flags: u32,
     text_placeholder_count: u32,
     list_text: String,
-    outline_text_interactions: Vec<crate::PowerPointTextBodyInteractions>,
-    outline_text_refs: Vec<crate::PowerPointOutlineTextRef>,
+    outline_text_interactions: Vec<crate::TextBodyInteractions>,
+    outline_text_refs: Vec<crate::OutlineTextRef>,
 }
 
 impl SlideDirectoryEntry {
@@ -45,12 +45,12 @@ impl SlideDirectoryEntry {
         &self.list_text
     }
 
-    pub fn outline_text_interactions(&self) -> &[crate::PowerPointTextBodyInteractions] {
+    pub fn outline_text_interactions(&self) -> &[crate::TextBodyInteractions] {
         &self.outline_text_interactions
     }
 
     /// Validated outline text references of this slide's shapes.
-    pub fn outline_text_refs(&self) -> &[crate::PowerPointOutlineTextRef] {
+    pub fn outline_text_refs(&self) -> &[crate::OutlineTextRef] {
         &self.outline_text_refs
     }
 }
@@ -72,28 +72,26 @@ impl SlideDirectory {
         persist_mapping: &PersistMapping,
     ) -> Result<Self> {
         let current_user = CurrentUser::parse(current_user_data)?;
-        let user_edit_offset =
-            usize::try_from(current_user.current_edit_offset()).map_err(|_| {
-                PptError::Corrupted("current edit offset does not fit usize".to_string())
-            })?;
+        let user_edit_offset = usize::try_from(current_user.current_edit_offset())
+            .map_err(|_| Error::Corrupted("current edit offset does not fit usize".to_string()))?;
         let user_edit = read_header(document_data, user_edit_offset, "UserEditAtom")?;
         if user_edit.version != 0
             || user_edit.instance != 0
             || user_edit.record_type != USER_EDIT_ATOM
         {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "CurrentUser does not reference a valid UserEditAtom".to_string(),
             ));
         }
         if !matches!(user_edit.data_len, 28 | 32) {
-            return Err(PptError::Corrupted(format!(
+            return Err(Error::Corrupted(format!(
                 "UserEditAtom has invalid length {}",
                 user_edit.data_len
             )));
         }
         let payload_offset = user_edit_offset
             .checked_add(8)
-            .ok_or_else(|| PptError::Corrupted("UserEditAtom offset overflow".to_string()))?;
+            .ok_or_else(|| Error::Corrupted("UserEditAtom offset overflow".to_string()))?;
         let user_edit_data = checked_slice(
             document_data,
             payload_offset,
@@ -102,26 +100,26 @@ impl SlideDirectory {
         )?;
         let document_persist_id = read_u32(user_edit_data, 16, "docPersistIdRef")?;
         if document_persist_id == 0 {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "UserEditAtom has a null docPersistIdRef".to_string(),
             ));
         }
         let document_offset = persist_mapping
             .get_offset(document_persist_id)
             .ok_or_else(|| {
-                PptError::Corrupted(format!(
+                Error::Corrupted(format!(
                     "document persist ID {document_persist_id} has no directory entry"
                 ))
             })?;
         let document_offset = usize::try_from(document_offset).map_err(|_| {
-            PptError::Corrupted("document persist offset does not fit usize".to_string())
+            Error::Corrupted("document persist offset does not fit usize".to_string())
         })?;
-        let (document, _) = PptRecord::parse(document_data, document_offset)?;
-        if document.record_type != PptRecordType::Document
+        let (document, _) = Record::parse(document_data, document_offset)?;
+        if document.record_type != RecordType::Document
             || document.version != 0x0f
             || document.instance != 0
         {
-            return Err(PptError::Corrupted(format!(
+            return Err(Error::Corrupted(format!(
                 "persist ID {document_persist_id} does not resolve to a DocumentContainer"
             )));
         }
@@ -132,12 +130,12 @@ impl SlideDirectory {
                 continue;
             }
             if child.version != 0x0f {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "presentation SlideListWithTextContainer has invalid version".to_string(),
                 ));
             }
             if slide_list.replace(child).is_some() {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "duplicate presentation SlideListWithTextContainer".to_string(),
                 ));
             }
@@ -149,7 +147,7 @@ impl SlideDirectory {
         if let Some(slide_list) = slide_list {
             entries.reserve(slide_list.data.len() / 28);
             for child in &slide_list.children {
-                if child.record_type != PptRecordType::SlidePersistAtom {
+                if child.record_type != RecordType::SlidePersistAtom {
                     if let Some(entry) = entries.last_mut()
                         && let Ok(value) = child.extract_text()
                         && !value.is_empty()
@@ -165,7 +163,7 @@ impl SlideDirectory {
                     || child.instance != 0
                     || child.data.len() != SLIDE_PERSIST_ATOM_SIZE
                 {
-                    return Err(PptError::Corrupted(format!(
+                    return Err(Error::Corrupted(format!(
                         "invalid SlidePersistAtom header or length: version={}, instance={}, length={}",
                         child.version,
                         child.instance,
@@ -177,39 +175,39 @@ impl SlideDirectory {
                 let text_placeholder_count = read_u32(&child.data, 8, "SlidePersistAtom.cTexts")?;
                 let slide_id = read_u32(&child.data, 12, "SlidePersistAtom.slideId")?;
                 if persist_id == 0 || slide_id == 0 {
-                    return Err(PptError::Corrupted(
+                    return Err(Error::Corrupted(
                         "SlidePersistAtom has a null persistIdRef or slideId".to_string(),
                     ));
                 }
                 if text_placeholder_count > 8 {
-                    return Err(PptError::Corrupted(format!(
+                    return Err(Error::Corrupted(format!(
                         "SlidePersistAtom cTexts exceeds 8: {text_placeholder_count}"
                     )));
                 }
                 if by_slide_id.contains_key(&slide_id) {
-                    return Err(PptError::Corrupted(format!(
+                    return Err(Error::Corrupted(format!(
                         "duplicate presentation slideId {slide_id}"
                     )));
                 }
                 if by_persist_id.contains_key(&persist_id) {
-                    return Err(PptError::Corrupted(format!(
+                    return Err(Error::Corrupted(format!(
                         "duplicate presentation persistIdRef {persist_id}"
                     )));
                 }
                 let slide_offset = persist_mapping.get_offset(persist_id).ok_or_else(|| {
-                    PptError::Corrupted(format!(
+                    Error::Corrupted(format!(
                         "slide persist ID {persist_id} has no directory entry"
                     ))
                 })?;
                 let slide_offset = usize::try_from(slide_offset).map_err(|_| {
-                    PptError::Corrupted("slide persist offset does not fit usize".to_string())
+                    Error::Corrupted("slide persist offset does not fit usize".to_string())
                 })?;
                 let slide_header = read_header(document_data, slide_offset, "SlideContainer")?;
                 if slide_header.record_type != SLIDE_CONTAINER
                     || slide_header.version != 0x0f
                     || slide_header.instance != 0
                 {
-                    return Err(PptError::Corrupted(format!(
+                    return Err(Error::Corrupted(format!(
                         "persist ID {persist_id} does not resolve to a SlideContainer"
                     )));
                 }
@@ -230,7 +228,7 @@ impl SlideDirectory {
                 let slide_id =
                     read_u32(&set.slide_persist_atom.data, 12, "SlidePersistAtom.slideId")?;
                 let Some(&index) = by_slide_id.get(&slide_id) else {
-                    return Err(PptError::Corrupted(format!(
+                    return Err(Error::Corrupted(format!(
                         "text records reference unknown slideId {slide_id}"
                     )));
                 };
@@ -304,10 +302,10 @@ fn read_header(data: &[u8], offset: usize, name: &str) -> Result<RawHeader> {
     let bytes = checked_slice(data, offset, 8, &format!("{name} header"))?;
     let version_instance = u16::from_le_bytes(bytes[0..2].try_into().unwrap());
     let data_len = usize::try_from(u32::from_le_bytes(bytes[4..8].try_into().unwrap()))
-        .map_err(|_| PptError::Corrupted(format!("{name} length does not fit usize")))?;
+        .map_err(|_| Error::Corrupted(format!("{name} length does not fit usize")))?;
     let total = 8usize
         .checked_add(data_len)
-        .ok_or_else(|| PptError::Corrupted(format!("{name} length overflow")))?;
+        .ok_or_else(|| Error::Corrupted(format!("{name} length overflow")))?;
     checked_slice(data, offset, total, name)?;
     Ok(RawHeader {
         version: version_instance & 0x000f,
@@ -320,9 +318,9 @@ fn read_header(data: &[u8], offset: usize, name: &str) -> Result<RawHeader> {
 fn checked_slice<'a>(data: &'a [u8], offset: usize, len: usize, name: &str) -> Result<&'a [u8]> {
     let end = offset
         .checked_add(len)
-        .ok_or_else(|| PptError::Corrupted(format!("{name} range overflow")))?;
+        .ok_or_else(|| Error::Corrupted(format!("{name} range overflow")))?;
     data.get(offset..end)
-        .ok_or_else(|| PptError::Corrupted(format!("{name} is truncated")))
+        .ok_or_else(|| Error::Corrupted(format!("{name} is truncated")))
 }
 
 fn read_u32(data: &[u8], offset: usize, name: &str) -> Result<u32> {

@@ -7,9 +7,9 @@
 //! cargo run --example xlsb_writer --features ooxml --no-default-features
 //! ```
 
-use litchi::ooxml::xlsb::comments::Comment;
 use litchi::ooxml::xlsb::hyperlinks::Hyperlink;
 use litchi::ooxml::xlsb::merged_cells::MergedCell;
+use litchi::ooxml::xlsb::package::comments::Comment;
 use litchi::ooxml::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use litchi::sheet::CellValue;
 use std::fs::File;

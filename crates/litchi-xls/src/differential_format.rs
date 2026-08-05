@@ -1,9 +1,8 @@
 //! BIFF8 global differential formats (`DXF`) and formatting properties (`XFProps`).
 
 use super::{
-    XlsBorderStyle, XlsError, XlsFillPattern, XlsFontCharset, XlsFontEscapement, XlsFontFamily,
-    XlsFontUnderline, XlsHorizontalAlignment, XlsReadingOrder, XlsResult, XlsTextRotation,
-    XlsVerticalAlignment,
+    BorderStyle, Error, FillPattern, FontCharset, FontEscapement, FontFamily, FontUnderline,
+    HorizontalAlignment, ReadingOrder, Result, TextRotation, VerticalAlignment,
 };
 
 pub(crate) const DXF_RECORD_TYPE: u16 = 0x088D;
@@ -12,14 +11,14 @@ const FIXED_PAYLOAD_LEN: usize = FRT_HEADER_LEN + 2 + 4;
 const MAX_BIFF8_PAYLOAD_LEN: usize = 8_224;
 const MAX_XF_PROPERTIES: usize = 2_048;
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: DXF_RECORD_TYPE,
         message: message.into(),
     }
 }
 
-fn read_bytes<const N: usize>(data: &[u8], offset: usize, field: &str) -> XlsResult<[u8; N]> {
+fn read_bytes<const N: usize>(data: &[u8], offset: usize, field: &str) -> Result<[u8; N]> {
     let end = offset
         .checked_add(N)
         .ok_or_else(|| invalid(format!("truncated {field}")))?;
@@ -31,31 +30,31 @@ fn read_bytes<const N: usize>(data: &[u8], offset: usize, field: &str) -> XlsRes
         .map_err(|_| invalid(format!("truncated {field}")))
 }
 
-fn read_u8(data: &[u8], offset: usize, field: &str) -> XlsResult<u8> {
+fn read_u8(data: &[u8], offset: usize, field: &str) -> Result<u8> {
     data.get(offset)
         .copied()
         .ok_or_else(|| invalid(format!("truncated {field}")))
 }
 
-fn read_u16(data: &[u8], offset: usize, field: &str) -> XlsResult<u16> {
+fn read_u16(data: &[u8], offset: usize, field: &str) -> Result<u16> {
     Ok(u16::from_le_bytes(read_bytes::<2>(data, offset, field)?))
 }
 
-fn read_u32(data: &[u8], offset: usize, field: &str) -> XlsResult<u32> {
+fn read_u32(data: &[u8], offset: usize, field: &str) -> Result<u32> {
     Ok(u32::from_le_bytes(read_bytes::<4>(data, offset, field)?))
 }
 
-fn read_i16(data: &[u8], offset: usize, field: &str) -> XlsResult<i16> {
+fn read_i16(data: &[u8], offset: usize, field: &str) -> Result<i16> {
     Ok(read_u16(data, offset, field)? as i16)
 }
 
-fn read_f64(data: &[u8], offset: usize, field: &str) -> XlsResult<f64> {
+fn read_f64(data: &[u8], offset: usize, field: &str) -> Result<f64> {
     Ok(f64::from_le_bytes(read_bytes::<8>(data, offset, field)?))
 }
 
 /// A theme color slot used by an extended formatting property.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XlsThemeColor {
+pub enum ThemeColor {
     Dark1,
     Light1,
     Dark2,
@@ -70,8 +69,8 @@ pub enum XlsThemeColor {
     FollowedHyperlink,
 }
 
-impl XlsThemeColor {
-    fn from_byte(value: u8) -> XlsResult<Self> {
+impl ThemeColor {
+    fn from_byte(value: u8) -> Result<Self> {
         match value {
             0 => Ok(Self::Dark1),
             1 => Ok(Self::Light1),
@@ -109,36 +108,36 @@ impl XlsThemeColor {
 
 /// The source used to resolve an extended formatting color.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XlsXfColorSource {
+pub enum XfColorSource {
     Automatic,
     Indexed(u8),
     Rgb,
-    Theme(XlsThemeColor),
+    Theme(ThemeColor),
     NotSet,
 }
 
 /// An `XFPropColor`, including its resolved RGBA cache and tint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct XlsXfColor {
-    source: XlsXfColorSource,
+pub struct XfColor {
+    source: XfColorSource,
     tint: i16,
     rgba: [u8; 4],
     ignored_index: u8,
 }
 
-impl XlsXfColor {
-    pub fn try_new(source: XlsXfColorSource, tint: i16, rgba: [u8; 4]) -> XlsResult<Self> {
+impl XfColor {
+    pub fn try_new(source: XfColorSource, tint: i16, rgba: [u8; 4]) -> Result<Self> {
         if tint == i16::MIN {
             return Err(invalid("XFPropColor tint cannot equal -32768"));
         }
-        if let XlsXfColorSource::Indexed(index) = source
+        if let XfColorSource::Indexed(index) = source
             && !matches!(index, 0..=65 | 72)
         {
             return Err(invalid(format!("invalid indexed XF color {index}")));
         }
         let ignored_index = match source {
-            XlsXfColorSource::Indexed(index) => index,
-            XlsXfColorSource::Theme(theme) => theme.to_byte(),
+            XfColorSource::Indexed(index) => index,
+            XfColorSource::Theme(theme) => theme.to_byte(),
             _ => 0,
         };
         Ok(Self {
@@ -149,7 +148,7 @@ impl XlsXfColor {
         })
     }
 
-    pub const fn source(&self) -> XlsXfColorSource {
+    pub const fn source(&self) -> XfColorSource {
         self.source
     }
     pub const fn tint(&self) -> i16 {
@@ -159,7 +158,7 @@ impl XlsXfColor {
         self.rgba
     }
 
-    pub(crate) fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub(crate) fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != 8 {
             return Err(invalid(format!(
                 "XFPropColor has {} bytes; expected 8",
@@ -172,16 +171,16 @@ impl XlsXfColor {
             return Err(invalid("XFPropColor fValidRGBA must be set"));
         }
         let source = match flags >> 1 {
-            0 => XlsXfColorSource::Automatic,
+            0 => XfColorSource::Automatic,
             1 => {
                 if !matches!(index, 0..=65 | 72) {
                     return Err(invalid(format!("invalid indexed XF color {index}")));
                 }
-                XlsXfColorSource::Indexed(index)
+                XfColorSource::Indexed(index)
             },
-            2 => XlsXfColorSource::Rgb,
-            3 => XlsXfColorSource::Theme(XlsThemeColor::from_byte(index)?),
-            4 => XlsXfColorSource::NotSet,
+            2 => XfColorSource::Rgb,
+            3 => XfColorSource::Theme(ThemeColor::from_byte(index)?),
+            4 => XfColorSource::NotSet,
             value => return Err(invalid(format!("reserved XF color source {value}"))),
         };
         let tint = i16::from_le_bytes([tint_low, tint_high]);
@@ -198,11 +197,11 @@ impl XlsXfColor {
 
     pub(crate) fn write_to(&self, output: &mut Vec<u8>) {
         let (kind, index) = match self.source {
-            XlsXfColorSource::Automatic => (0, self.ignored_index),
-            XlsXfColorSource::Indexed(index) => (1, index),
-            XlsXfColorSource::Rgb => (2, self.ignored_index),
-            XlsXfColorSource::Theme(theme) => (3, theme.to_byte()),
-            XlsXfColorSource::NotSet => (4, self.ignored_index),
+            XfColorSource::Automatic => (0, self.ignored_index),
+            XfColorSource::Indexed(index) => (1, index),
+            XfColorSource::Rgb => (2, self.ignored_index),
+            XfColorSource::Theme(theme) => (3, theme.to_byte()),
+            XfColorSource::NotSet => (4, self.ignored_index),
         };
         output.push(0x01 | (kind << 1));
         output.push(index);
@@ -213,26 +212,26 @@ impl XlsXfColor {
 
 /// Border formatting stored by an `XFProp`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct XlsXfBorder {
-    color: XlsXfColor,
-    style: XlsBorderStyle,
+pub struct XfBorder {
+    color: XfColor,
+    style: BorderStyle,
 }
 
-impl XlsXfBorder {
-    pub const fn new(color: XlsXfColor, style: XlsBorderStyle) -> Self {
+impl XfBorder {
+    pub const fn new(color: XfColor, style: BorderStyle) -> Self {
         Self { color, style }
     }
-    pub const fn color(&self) -> XlsXfColor {
+    pub const fn color(&self) -> XfColor {
         self.color
     }
-    pub const fn style(&self) -> XlsBorderStyle {
+    pub const fn style(&self) -> BorderStyle {
         self.style
     }
 }
 
 /// Gradient fill parameters stored by an `XFProp`.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct XlsXfGradient {
+pub struct XfGradient {
     rectangular: bool,
     degree: f64,
     fill_to_left: f64,
@@ -241,8 +240,8 @@ pub struct XlsXfGradient {
     fill_to_bottom: f64,
 }
 
-impl XlsXfGradient {
-    pub fn linear(degree: f64) -> XlsResult<Self> {
+impl XfGradient {
+    pub fn linear(degree: f64) -> Result<Self> {
         if !degree.is_finite() {
             return Err(invalid("linear gradient degree must be finite"));
         }
@@ -256,7 +255,7 @@ impl XlsXfGradient {
         })
     }
 
-    pub fn rectangular(left: f64, right: f64, top: f64, bottom: f64) -> XlsResult<Self> {
+    pub fn rectangular(left: f64, right: f64, top: f64, bottom: f64) -> Result<Self> {
         validate_unit_interval(left, "left")?;
         validate_unit_interval(right, "right")?;
         validate_unit_interval(top, "top")?;
@@ -290,7 +289,7 @@ impl XlsXfGradient {
         self.fill_to_bottom
     }
 
-    pub(crate) fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub(crate) fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != 44 {
             return Err(invalid(format!(
                 "XFPropGradient has {} bytes; expected 44",
@@ -334,7 +333,7 @@ impl XlsXfGradient {
     }
 }
 
-fn validate_unit_interval(value: f64, field: &str) -> XlsResult<()> {
+fn validate_unit_interval(value: f64, field: &str) -> Result<()> {
     if !value.is_finite() || !(0.0..=1.0).contains(&value) {
         return Err(invalid(format!(
             "gradient {field} coordinate must be between 0.0 and 1.0"
@@ -345,14 +344,14 @@ fn validate_unit_interval(value: f64, field: &str) -> XlsResult<()> {
 
 /// One color stop in an extended gradient fill.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct XlsXfGradientStop {
+pub struct XfGradientStop {
     position: f64,
-    color: XlsXfColor,
+    color: XfColor,
     unused: u16,
 }
 
-impl XlsXfGradientStop {
-    pub fn try_new(position: f64, color: XlsXfColor) -> XlsResult<Self> {
+impl XfGradientStop {
+    pub fn try_new(position: f64, color: XfColor) -> Result<Self> {
         validate_unit_interval(position, "stop")?;
         Ok(Self {
             position,
@@ -363,11 +362,11 @@ impl XlsXfGradientStop {
     pub const fn position(&self) -> f64 {
         self.position
     }
-    pub const fn color(&self) -> XlsXfColor {
+    pub const fn color(&self) -> XfColor {
         self.color
     }
 
-    pub(crate) fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub(crate) fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != 18 {
             return Err(invalid(format!(
                 "XFPropGradientStop has {} bytes; expected 18",
@@ -376,7 +375,7 @@ impl XlsXfGradientStop {
         }
         let stop = Self {
             position: read_f64(data, 2, "XFPropGradientStop.numPosition")?,
-            color: XlsXfColor::parse(&read_bytes::<8>(data, 10, "XFPropGradientStop.color")?)?,
+            color: XfColor::parse(&read_bytes::<8>(data, 10, "XFPropGradientStop.color")?)?,
             unused: read_u16(data, 0, "XFPropGradientStop.unused")?,
         };
         validate_unit_interval(stop.position, "stop")?;
@@ -392,14 +391,14 @@ impl XlsXfGradientStop {
 
 /// Font weight stored by an extended formatting property.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XlsXfFontWeight {
+pub enum XfFontWeight {
     Normal,
     Bold,
 }
 
 /// Theme-font scheme stored by an extended formatting property.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XlsXfFontScheme {
+pub enum XfFontScheme {
     None,
     Major,
     Minor,
@@ -408,46 +407,46 @@ pub enum XlsXfFontScheme {
 
 /// One typed entry in an `XFProps` array.
 #[derive(Debug, Clone, PartialEq)]
-pub enum XlsXfProperty {
-    FillPattern(XlsFillPattern),
-    ForegroundColor(XlsXfColor),
-    BackgroundColor(XlsXfColor),
-    Gradient(XlsXfGradient),
-    GradientStop(XlsXfGradientStop),
-    TextColor(XlsXfColor),
-    TopBorder(XlsXfBorder),
-    BottomBorder(XlsXfBorder),
-    LeftBorder(XlsXfBorder),
-    RightBorder(XlsXfBorder),
-    DiagonalBorder(XlsXfBorder),
-    VerticalBorder(XlsXfBorder),
-    HorizontalBorder(XlsXfBorder),
+pub enum XfProperty {
+    FillPattern(FillPattern),
+    ForegroundColor(XfColor),
+    BackgroundColor(XfColor),
+    Gradient(XfGradient),
+    GradientStop(XfGradientStop),
+    TextColor(XfColor),
+    TopBorder(XfBorder),
+    BottomBorder(XfBorder),
+    LeftBorder(XfBorder),
+    RightBorder(XfBorder),
+    DiagonalBorder(XfBorder),
+    VerticalBorder(XfBorder),
+    HorizontalBorder(XfBorder),
     DiagonalUp(bool),
     DiagonalDown(bool),
     /// `None` represents the specification's explicit "alignment not specified" value.
-    HorizontalAlignment(Option<XlsHorizontalAlignment>),
-    VerticalAlignment(XlsVerticalAlignment),
-    TextRotation(XlsTextRotation),
+    HorizontalAlignment(Option<HorizontalAlignment>),
+    VerticalAlignment(VerticalAlignment),
+    TextRotation(TextRotation),
     AbsoluteIndent(u16),
-    ReadingOrder(XlsReadingOrder),
+    ReadingOrder(ReadingOrder),
     WrapText(bool),
     JustifyDistributed(bool),
     ShrinkToFit(bool),
     Merged(bool),
     FontName(String),
-    FontWeight(XlsXfFontWeight),
-    FontUnderline(XlsFontUnderline),
-    FontEscapement(XlsFontEscapement),
+    FontWeight(XfFontWeight),
+    FontUnderline(FontUnderline),
+    FontEscapement(FontEscapement),
     FontItalic(bool),
     FontStrikethrough(bool),
     FontOutline(bool),
     FontShadow(bool),
     FontCondensed(bool),
     FontExtended(bool),
-    FontCharset(XlsFontCharset),
-    FontFamily(XlsFontFamily),
+    FontCharset(FontCharset),
+    FontFamily(FontFamily),
     FontSizeTwips(u32),
-    FontScheme(XlsXfFontScheme),
+    FontScheme(XfFontScheme),
     NumberFormatCode(String),
     NumberFormatId(u16),
     RelativeIndent(Option<i16>),
@@ -455,7 +454,7 @@ pub enum XlsXfProperty {
     Hidden(bool),
 }
 
-impl XlsXfProperty {
+impl XfProperty {
     fn property_type(&self) -> u16 {
         match self {
             Self::FillPattern(_) => 0x0000,
@@ -504,7 +503,7 @@ impl XlsXfProperty {
         }
     }
 
-    fn parse(property_type: u16, data: &[u8]) -> XlsResult<Self> {
+    fn parse(property_type: u16, data: &[u8]) -> Result<Self> {
         let exact = |expected: usize| {
             if data.len() == expected {
                 Ok(())
@@ -524,15 +523,15 @@ impl XlsXfProperty {
                     "XFPropFillPattern.pattern",
                 )?)?))
             },
-            0x0001 => Ok(Self::ForegroundColor(XlsXfColor::parse(data)?)),
-            0x0002 => Ok(Self::BackgroundColor(XlsXfColor::parse(data)?)),
-            0x0003 => Ok(Self::Gradient(XlsXfGradient::parse(data)?)),
-            0x0004 => Ok(Self::GradientStop(XlsXfGradientStop::parse(data)?)),
-            0x0005 => Ok(Self::TextColor(XlsXfColor::parse(data)?)),
+            0x0001 => Ok(Self::ForegroundColor(XfColor::parse(data)?)),
+            0x0002 => Ok(Self::BackgroundColor(XfColor::parse(data)?)),
+            0x0003 => Ok(Self::Gradient(XfGradient::parse(data)?)),
+            0x0004 => Ok(Self::GradientStop(XfGradientStop::parse(data)?)),
+            0x0005 => Ok(Self::TextColor(XfColor::parse(data)?)),
             0x0006..=0x000C => {
                 exact(10)?;
-                let border = XlsXfBorder {
-                    color: XlsXfColor::parse(&read_bytes::<8>(data, 0, "XFPropBorder.color")?)?,
+                let border = XfBorder {
+                    color: XfColor::parse(&read_bytes::<8>(data, 0, "XFPropBorder.color")?)?,
                     style: parse_border_style(read_u16(data, 8, "XFPropBorder.dgBorder")?)?,
                 };
                 Ok(match property_type {
@@ -607,8 +606,8 @@ impl XlsXfProperty {
             0x0019 => {
                 exact(2)?;
                 Ok(Self::FontWeight(match read_u16(data, 0, "font weight")? {
-                    400 => XlsXfFontWeight::Normal,
-                    700 => XlsXfFontWeight::Bold,
+                    400 => XfFontWeight::Normal,
+                    700 => XfFontWeight::Bold,
                     value => return Err(invalid(format!("reserved font weight {value}"))),
                 }))
             },
@@ -656,10 +655,10 @@ impl XlsXfProperty {
                 exact(1)?;
                 Ok(Self::FontScheme(
                     match read_u8(data, 0, "XFProp.font scheme")? {
-                        0 => XlsXfFontScheme::None,
-                        1 => XlsXfFontScheme::Major,
-                        2 => XlsXfFontScheme::Minor,
-                        0xFF => XlsXfFontScheme::NotSpecified,
+                        0 => XfFontScheme::None,
+                        1 => XfFontScheme::Major,
+                        2 => XfFontScheme::Minor,
+                        0xFF => XfFontScheme::NotSpecified,
                         value => return Err(invalid(format!("reserved font scheme {value}"))),
                     },
                 ))
@@ -686,7 +685,7 @@ impl XlsXfProperty {
         }
     }
 
-    fn data_bytes(&self) -> XlsResult<Vec<u8>> {
+    fn data_bytes(&self) -> Result<Vec<u8>> {
         let mut data = Vec::new();
         match self {
             Self::FillPattern(value) => data.push(fill_pattern_byte(*value)),
@@ -732,8 +731,8 @@ impl XlsXfProperty {
             Self::FontName(value) => write_lp_wide_string(value, &mut data)?,
             Self::FontWeight(value) => data.extend_from_slice(
                 &match value {
-                    XlsXfFontWeight::Normal => 400u16,
-                    XlsXfFontWeight::Bold => 700u16,
+                    XfFontWeight::Normal => 400u16,
+                    XfFontWeight::Bold => 700u16,
                 }
                 .to_le_bytes(),
             ),
@@ -754,10 +753,10 @@ impl XlsXfProperty {
                 data.extend_from_slice(&value.to_le_bytes());
             },
             Self::FontScheme(value) => data.push(match value {
-                XlsXfFontScheme::None => 0,
-                XlsXfFontScheme::Major => 1,
-                XlsXfFontScheme::Minor => 2,
-                XlsXfFontScheme::NotSpecified => 0xFF,
+                XfFontScheme::None => 0,
+                XfFontScheme::Major => 1,
+                XfFontScheme::Minor => 2,
+                XfFontScheme::NotSpecified => 0xFF,
             }),
             Self::NumberFormatCode(value) => write_number_format_code(value, &mut data)?,
             Self::NumberFormatId(value) => data.extend_from_slice(&value.to_le_bytes()),
@@ -778,18 +777,18 @@ impl XlsXfProperty {
 
 /// The complete ordered formatting-property array embedded in a DXF.
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct XlsXfProperties {
-    properties: Vec<XlsXfProperty>,
+pub struct XfProperties {
+    properties: Vec<XfProperty>,
 }
 
-impl XlsXfProperties {
-    pub fn try_new(properties: Vec<XlsXfProperty>) -> XlsResult<Self> {
+impl XfProperties {
+    pub fn try_new(properties: Vec<XfProperty>) -> Result<Self> {
         let value = Self { properties };
         value.validate()?;
         Ok(value)
     }
 
-    pub fn properties(&self) -> &[XlsXfProperty] {
+    pub fn properties(&self) -> &[XfProperty] {
         &self.properties
     }
 
@@ -797,7 +796,7 @@ impl XlsXfProperties {
         self.properties.is_empty()
     }
 
-    pub(crate) fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub(crate) fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < 4 {
             return Err(invalid("truncated XFProps header"));
         }
@@ -832,7 +831,7 @@ impl XlsXfProperties {
             let blob = data
                 .get(data_offset..end)
                 .ok_or_else(|| invalid("truncated XFProp data"))?;
-            properties.push(XlsXfProperty::parse(property_type, blob)?);
+            properties.push(XfProperty::parse(property_type, blob)?);
             offset = end;
         }
         if offset != data.len() {
@@ -843,7 +842,7 @@ impl XlsXfProperties {
         Self::try_new(properties)
     }
 
-    fn validate(&self) -> XlsResult<()> {
+    fn validate(&self) -> Result<()> {
         if self.properties.len() > MAX_XF_PROPERTIES || self.properties.len() > u16::MAX as usize {
             return Err(invalid(format!(
                 "XFProps count exceeds resource cap {MAX_XF_PROPERTIES}"
@@ -852,11 +851,11 @@ impl XlsXfProperties {
         let has_pattern = self
             .properties
             .iter()
-            .any(|property| matches!(property, XlsXfProperty::FillPattern(_)));
+            .any(|property| matches!(property, XfProperty::FillPattern(_)));
         let has_gradient = self.properties.iter().any(|property| {
             matches!(
                 property,
-                XlsXfProperty::Gradient(_) | XlsXfProperty::GradientStop(_)
+                XfProperty::Gradient(_) | XfProperty::GradientStop(_)
             )
         });
         if has_pattern && has_gradient {
@@ -869,12 +868,12 @@ impl XlsXfProperties {
         let mut horizontal_distributed = false;
         for property in &self.properties {
             match property {
-                XlsXfProperty::Gradient(_) => preceding_gradient = true,
-                XlsXfProperty::GradientStop(_) if !preceding_gradient => {
+                XfProperty::Gradient(_) => preceding_gradient = true,
+                XfProperty::GradientStop(_) if !preceding_gradient => {
                     return Err(invalid("gradient stop has no preceding gradient property"));
                 },
-                XlsXfProperty::JustifyDistributed(true) => distributed = true,
-                XlsXfProperty::HorizontalAlignment(Some(XlsHorizontalAlignment::Distributed)) => {
+                XfProperty::JustifyDistributed(true) => distributed = true,
+                XfProperty::HorizontalAlignment(Some(HorizontalAlignment::Distributed)) => {
                     horizontal_distributed = true;
                 },
                 _ => {},
@@ -889,7 +888,7 @@ impl XlsXfProperties {
         Ok(())
     }
 
-    pub(crate) fn to_bytes(&self) -> XlsResult<Vec<u8>> {
+    pub(crate) fn to_bytes(&self) -> Result<Vec<u8>> {
         self.validate()?;
         let mut data = Vec::new();
         data.extend_from_slice(&0u16.to_le_bytes());
@@ -913,17 +912,17 @@ impl XlsXfProperties {
 
 /// A global BIFF8 differential format referenced by table-style elements.
 #[derive(Debug, Clone, PartialEq)]
-pub struct XlsDifferentialFormat {
+pub struct DifferentialFormat {
     new_border: bool,
-    properties: XlsXfProperties,
+    properties: XfProperties,
     unused_flags: u16,
 }
 
-impl XlsDifferentialFormat {
-    pub fn try_new(new_border: bool, properties: Vec<XlsXfProperty>) -> XlsResult<Self> {
+impl DifferentialFormat {
+    pub fn try_new(new_border: bool, properties: Vec<XfProperty>) -> Result<Self> {
         let value = Self {
             new_border,
-            properties: XlsXfProperties::try_new(properties)?,
+            properties: XfProperties::try_new(properties)?,
             unused_flags: 0,
         };
         value.validate()?;
@@ -933,11 +932,11 @@ impl XlsDifferentialFormat {
     pub const fn has_new_border(&self) -> bool {
         self.new_border
     }
-    pub fn properties(&self) -> &XlsXfProperties {
+    pub fn properties(&self) -> &XfProperties {
         &self.properties
     }
 
-    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if !(FIXED_PAYLOAD_LEN..=MAX_BIFF8_PAYLOAD_LEN).contains(&data.len()) {
             return Err(invalid(format!(
                 "DXF payload has {} bytes; expected {FIXED_PAYLOAD_LEN}..={MAX_BIFF8_PAYLOAD_LEN}",
@@ -952,7 +951,7 @@ impl XlsDifferentialFormat {
         let value = Self {
             new_border: flags & 0x0002 != 0,
             unused_flags: flags & 0x0005,
-            properties: XlsXfProperties::parse(
+            properties: XfProperties::parse(
                 data.get(FRT_HEADER_LEN + 2..)
                     .ok_or_else(|| invalid("truncated DXF properties"))?,
             )?,
@@ -961,7 +960,7 @@ impl XlsDifferentialFormat {
         Ok(value)
     }
 
-    pub fn to_payload(&self) -> XlsResult<Vec<u8>> {
+    pub fn to_payload(&self) -> Result<Vec<u8>> {
         self.validate()?;
         let properties = self.properties.to_bytes()?;
         let size = FRT_HEADER_LEN
@@ -980,7 +979,7 @@ impl XlsDifferentialFormat {
         Ok(data)
     }
 
-    pub fn to_record_bytes(&self) -> XlsResult<Vec<u8>> {
+    pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         let payload = self.to_payload()?;
         let record_len = 4usize
             .checked_add(payload.len())
@@ -994,13 +993,13 @@ impl XlsDifferentialFormat {
         Ok(data)
     }
 
-    fn validate(&self) -> XlsResult<()> {
+    fn validate(&self) -> Result<()> {
         self.properties.validate()?;
         if !self.new_border
             && self.properties.properties.iter().any(|property| {
                 matches!(
                     property,
-                    XlsXfProperty::VerticalBorder(_) | XlsXfProperty::HorizontalBorder(_)
+                    XfProperty::VerticalBorder(_) | XfProperty::HorizontalBorder(_)
                 )
             })
         {
@@ -1010,8 +1009,8 @@ impl XlsDifferentialFormat {
     }
 }
 
-pub(crate) fn validate_frt_header(data: &[u8], record_type: u16) -> XlsResult<()> {
-    let header = data.get(..FRT_HEADER_LEN).ok_or(XlsError::InvalidRecord {
+pub(crate) fn validate_frt_header(data: &[u8], record_type: u16) -> Result<()> {
+    let header = data.get(..FRT_HEADER_LEN).ok_or(Error::InvalidRecord {
         record_type,
         message: "truncated FrtHeader".to_string(),
     })?;
@@ -1019,12 +1018,12 @@ pub(crate) fn validate_frt_header(data: &[u8], record_type: u16) -> XlsResult<()
         .get(..2)
         .and_then(|bytes| <[u8; 2]>::try_from(bytes).ok())
         .map(u16::from_le_bytes)
-        .ok_or(XlsError::InvalidRecord {
+        .ok_or(Error::InvalidRecord {
             record_type,
             message: "truncated FrtHeader".to_string(),
         })?;
     if actual_record_type != record_type {
-        return Err(XlsError::InvalidRecord {
+        return Err(Error::InvalidRecord {
             record_type,
             message: "future-record type does not match record header".to_string(),
         });
@@ -1033,7 +1032,7 @@ pub(crate) fn validate_frt_header(data: &[u8], record_type: u16) -> XlsResult<()
         .get(2..FRT_HEADER_LEN)
         .is_none_or(|reserved| reserved.iter().any(|byte| *byte != 0))
     {
-        return Err(XlsError::InvalidRecord {
+        return Err(Error::InvalidRecord {
             record_type,
             message: "future-record reserved fields must be zero".to_string(),
         });
@@ -1046,7 +1045,7 @@ pub(crate) fn write_frt_header(output: &mut Vec<u8>, record_type: u16) {
     output.extend_from_slice(&[0; 10]);
 }
 
-fn parse_bool(value: u8, property_type: u16) -> XlsResult<bool> {
+fn parse_bool(value: u8, property_type: u16) -> Result<bool> {
     match value {
         0 => Ok(false),
         1 => Ok(true),
@@ -1056,294 +1055,294 @@ fn parse_bool(value: u8, property_type: u16) -> XlsResult<bool> {
     }
 }
 
-fn parse_fill_pattern(value: u8) -> XlsResult<XlsFillPattern> {
+fn parse_fill_pattern(value: u8) -> Result<FillPattern> {
     Ok(match value {
-        0 => XlsFillPattern::None,
-        1 => XlsFillPattern::Solid,
-        2 => XlsFillPattern::MediumGray,
-        3 => XlsFillPattern::DarkGray,
-        4 => XlsFillPattern::LightGray,
-        5 => XlsFillPattern::DarkHorizontal,
-        6 => XlsFillPattern::DarkVertical,
-        7 => XlsFillPattern::DarkDown,
-        8 => XlsFillPattern::DarkUp,
-        9 => XlsFillPattern::DarkGrid,
-        10 => XlsFillPattern::DarkTrellis,
-        11 => XlsFillPattern::LightHorizontal,
-        12 => XlsFillPattern::LightVertical,
-        13 => XlsFillPattern::LightDown,
-        14 => XlsFillPattern::LightUp,
-        15 => XlsFillPattern::LightGrid,
-        16 => XlsFillPattern::LightTrellis,
-        17 => XlsFillPattern::Gray125,
-        18 => XlsFillPattern::Gray0625,
+        0 => FillPattern::None,
+        1 => FillPattern::Solid,
+        2 => FillPattern::MediumGray,
+        3 => FillPattern::DarkGray,
+        4 => FillPattern::LightGray,
+        5 => FillPattern::DarkHorizontal,
+        6 => FillPattern::DarkVertical,
+        7 => FillPattern::DarkDown,
+        8 => FillPattern::DarkUp,
+        9 => FillPattern::DarkGrid,
+        10 => FillPattern::DarkTrellis,
+        11 => FillPattern::LightHorizontal,
+        12 => FillPattern::LightVertical,
+        13 => FillPattern::LightDown,
+        14 => FillPattern::LightUp,
+        15 => FillPattern::LightGrid,
+        16 => FillPattern::LightTrellis,
+        17 => FillPattern::Gray125,
+        18 => FillPattern::Gray0625,
         _ => return Err(invalid(format!("reserved fill pattern {value}"))),
     })
 }
 
-fn fill_pattern_byte(value: XlsFillPattern) -> u8 {
+fn fill_pattern_byte(value: FillPattern) -> u8 {
     match value {
-        XlsFillPattern::None => 0,
-        XlsFillPattern::Solid => 1,
-        XlsFillPattern::MediumGray => 2,
-        XlsFillPattern::DarkGray => 3,
-        XlsFillPattern::LightGray => 4,
-        XlsFillPattern::DarkHorizontal => 5,
-        XlsFillPattern::DarkVertical => 6,
-        XlsFillPattern::DarkDown => 7,
-        XlsFillPattern::DarkUp => 8,
-        XlsFillPattern::DarkGrid => 9,
-        XlsFillPattern::DarkTrellis => 10,
-        XlsFillPattern::LightHorizontal => 11,
-        XlsFillPattern::LightVertical => 12,
-        XlsFillPattern::LightDown => 13,
-        XlsFillPattern::LightUp => 14,
-        XlsFillPattern::LightGrid => 15,
-        XlsFillPattern::LightTrellis => 16,
-        XlsFillPattern::Gray125 => 17,
-        XlsFillPattern::Gray0625 => 18,
+        FillPattern::None => 0,
+        FillPattern::Solid => 1,
+        FillPattern::MediumGray => 2,
+        FillPattern::DarkGray => 3,
+        FillPattern::LightGray => 4,
+        FillPattern::DarkHorizontal => 5,
+        FillPattern::DarkVertical => 6,
+        FillPattern::DarkDown => 7,
+        FillPattern::DarkUp => 8,
+        FillPattern::DarkGrid => 9,
+        FillPattern::DarkTrellis => 10,
+        FillPattern::LightHorizontal => 11,
+        FillPattern::LightVertical => 12,
+        FillPattern::LightDown => 13,
+        FillPattern::LightUp => 14,
+        FillPattern::LightGrid => 15,
+        FillPattern::LightTrellis => 16,
+        FillPattern::Gray125 => 17,
+        FillPattern::Gray0625 => 18,
     }
 }
 
-fn parse_border_style(value: u16) -> XlsResult<XlsBorderStyle> {
+fn parse_border_style(value: u16) -> Result<BorderStyle> {
     Ok(match value {
-        0 => XlsBorderStyle::None,
-        1 => XlsBorderStyle::Thin,
-        2 => XlsBorderStyle::Medium,
-        3 => XlsBorderStyle::Dashed,
-        4 => XlsBorderStyle::Dotted,
-        5 => XlsBorderStyle::Thick,
-        6 => XlsBorderStyle::Double,
-        7 => XlsBorderStyle::Hair,
-        8 => XlsBorderStyle::MediumDashed,
-        9 => XlsBorderStyle::DashDot,
-        10 => XlsBorderStyle::MediumDashDot,
-        11 => XlsBorderStyle::DashDotDot,
-        12 => XlsBorderStyle::MediumDashDotDot,
-        13 => XlsBorderStyle::SlantedDashDot,
+        0 => BorderStyle::None,
+        1 => BorderStyle::Thin,
+        2 => BorderStyle::Medium,
+        3 => BorderStyle::Dashed,
+        4 => BorderStyle::Dotted,
+        5 => BorderStyle::Thick,
+        6 => BorderStyle::Double,
+        7 => BorderStyle::Hair,
+        8 => BorderStyle::MediumDashed,
+        9 => BorderStyle::DashDot,
+        10 => BorderStyle::MediumDashDot,
+        11 => BorderStyle::DashDotDot,
+        12 => BorderStyle::MediumDashDotDot,
+        13 => BorderStyle::SlantedDashDot,
         _ => return Err(invalid(format!("reserved border style {value}"))),
     })
 }
 
-fn border_style_u16(value: XlsBorderStyle) -> u16 {
+fn border_style_u16(value: BorderStyle) -> u16 {
     match value {
-        XlsBorderStyle::None => 0,
-        XlsBorderStyle::Thin => 1,
-        XlsBorderStyle::Medium => 2,
-        XlsBorderStyle::Dashed => 3,
-        XlsBorderStyle::Dotted => 4,
-        XlsBorderStyle::Thick => 5,
-        XlsBorderStyle::Double => 6,
-        XlsBorderStyle::Hair => 7,
-        XlsBorderStyle::MediumDashed => 8,
-        XlsBorderStyle::DashDot => 9,
-        XlsBorderStyle::MediumDashDot => 10,
-        XlsBorderStyle::DashDotDot => 11,
-        XlsBorderStyle::MediumDashDotDot => 12,
-        XlsBorderStyle::SlantedDashDot => 13,
+        BorderStyle::None => 0,
+        BorderStyle::Thin => 1,
+        BorderStyle::Medium => 2,
+        BorderStyle::Dashed => 3,
+        BorderStyle::Dotted => 4,
+        BorderStyle::Thick => 5,
+        BorderStyle::Double => 6,
+        BorderStyle::Hair => 7,
+        BorderStyle::MediumDashed => 8,
+        BorderStyle::DashDot => 9,
+        BorderStyle::MediumDashDot => 10,
+        BorderStyle::DashDotDot => 11,
+        BorderStyle::MediumDashDotDot => 12,
+        BorderStyle::SlantedDashDot => 13,
     }
 }
 
-fn parse_horizontal_alignment(value: u8) -> XlsResult<Option<XlsHorizontalAlignment>> {
+fn parse_horizontal_alignment(value: u8) -> Result<Option<HorizontalAlignment>> {
     Ok(match value {
-        0 => Some(XlsHorizontalAlignment::General),
-        1 => Some(XlsHorizontalAlignment::Left),
-        2 => Some(XlsHorizontalAlignment::Center),
-        3 => Some(XlsHorizontalAlignment::Right),
-        4 => Some(XlsHorizontalAlignment::Fill),
-        5 => Some(XlsHorizontalAlignment::Justify),
-        6 => Some(XlsHorizontalAlignment::CenterAcrossSelection),
-        7 => Some(XlsHorizontalAlignment::Distributed),
+        0 => Some(HorizontalAlignment::General),
+        1 => Some(HorizontalAlignment::Left),
+        2 => Some(HorizontalAlignment::Center),
+        3 => Some(HorizontalAlignment::Right),
+        4 => Some(HorizontalAlignment::Fill),
+        5 => Some(HorizontalAlignment::Justify),
+        6 => Some(HorizontalAlignment::CenterAcrossSelection),
+        7 => Some(HorizontalAlignment::Distributed),
         0xFF => None,
         _ => return Err(invalid(format!("reserved horizontal alignment {value}"))),
     })
 }
 
-fn horizontal_alignment_byte(value: Option<XlsHorizontalAlignment>) -> u8 {
+fn horizontal_alignment_byte(value: Option<HorizontalAlignment>) -> u8 {
     match value {
-        Some(XlsHorizontalAlignment::General) => 0,
-        Some(XlsHorizontalAlignment::Left) => 1,
-        Some(XlsHorizontalAlignment::Center) => 2,
-        Some(XlsHorizontalAlignment::Right) => 3,
-        Some(XlsHorizontalAlignment::Fill) => 4,
-        Some(XlsHorizontalAlignment::Justify) => 5,
-        Some(XlsHorizontalAlignment::CenterAcrossSelection) => 6,
-        Some(XlsHorizontalAlignment::Distributed) => 7,
+        Some(HorizontalAlignment::General) => 0,
+        Some(HorizontalAlignment::Left) => 1,
+        Some(HorizontalAlignment::Center) => 2,
+        Some(HorizontalAlignment::Right) => 3,
+        Some(HorizontalAlignment::Fill) => 4,
+        Some(HorizontalAlignment::Justify) => 5,
+        Some(HorizontalAlignment::CenterAcrossSelection) => 6,
+        Some(HorizontalAlignment::Distributed) => 7,
         None => 0xFF,
     }
 }
 
-fn parse_vertical_alignment(value: u8) -> XlsResult<XlsVerticalAlignment> {
+fn parse_vertical_alignment(value: u8) -> Result<VerticalAlignment> {
     Ok(match value {
-        0 => XlsVerticalAlignment::Top,
-        1 => XlsVerticalAlignment::Center,
-        2 => XlsVerticalAlignment::Bottom,
-        3 => XlsVerticalAlignment::Justify,
-        4 => XlsVerticalAlignment::Distributed,
+        0 => VerticalAlignment::Top,
+        1 => VerticalAlignment::Center,
+        2 => VerticalAlignment::Bottom,
+        3 => VerticalAlignment::Justify,
+        4 => VerticalAlignment::Distributed,
         _ => return Err(invalid(format!("reserved vertical alignment {value}"))),
     })
 }
 
-fn vertical_alignment_byte(value: XlsVerticalAlignment) -> u8 {
+fn vertical_alignment_byte(value: VerticalAlignment) -> u8 {
     match value {
-        XlsVerticalAlignment::Top => 0,
-        XlsVerticalAlignment::Center => 1,
-        XlsVerticalAlignment::Bottom => 2,
-        XlsVerticalAlignment::Justify => 3,
-        XlsVerticalAlignment::Distributed => 4,
+        VerticalAlignment::Top => 0,
+        VerticalAlignment::Center => 1,
+        VerticalAlignment::Bottom => 2,
+        VerticalAlignment::Justify => 3,
+        VerticalAlignment::Distributed => 4,
     }
 }
 
-fn parse_rotation(value: u8) -> XlsResult<XlsTextRotation> {
+fn parse_rotation(value: u8) -> Result<TextRotation> {
     match value {
-        0 => Ok(XlsTextRotation::None),
-        1..=90 => Ok(XlsTextRotation::CounterClockwise(value)),
-        91..=180 => Ok(XlsTextRotation::Clockwise(value - 90)),
-        255 => Ok(XlsTextRotation::Vertical),
+        0 => Ok(TextRotation::None),
+        1..=90 => Ok(TextRotation::CounterClockwise(value)),
+        91..=180 => Ok(TextRotation::Clockwise(value - 90)),
+        255 => Ok(TextRotation::Vertical),
         _ => Err(invalid(format!("reserved text rotation {value}"))),
     }
 }
 
-fn rotation_byte(value: XlsTextRotation) -> XlsResult<u8> {
+fn rotation_byte(value: TextRotation) -> Result<u8> {
     match value {
-        XlsTextRotation::None => Ok(0),
-        XlsTextRotation::CounterClockwise(value @ 1..=90) => Ok(value),
-        XlsTextRotation::Clockwise(value @ 1..=90) => Ok(value + 90),
-        XlsTextRotation::Vertical => Ok(255),
+        TextRotation::None => Ok(0),
+        TextRotation::CounterClockwise(value @ 1..=90) => Ok(value),
+        TextRotation::Clockwise(value @ 1..=90) => Ok(value + 90),
+        TextRotation::Vertical => Ok(255),
         _ => Err(invalid("text rotation degrees must be between 1 and 90")),
     }
 }
 
-fn parse_reading_order(value: u8) -> XlsResult<XlsReadingOrder> {
+fn parse_reading_order(value: u8) -> Result<ReadingOrder> {
     match value {
-        0 => Ok(XlsReadingOrder::Context),
-        1 => Ok(XlsReadingOrder::LeftToRight),
-        2 => Ok(XlsReadingOrder::RightToLeft),
+        0 => Ok(ReadingOrder::Context),
+        1 => Ok(ReadingOrder::LeftToRight),
+        2 => Ok(ReadingOrder::RightToLeft),
         _ => Err(invalid(format!("reserved reading order {value}"))),
     }
 }
 
-fn reading_order_byte(value: XlsReadingOrder) -> u8 {
+fn reading_order_byte(value: ReadingOrder) -> u8 {
     match value {
-        XlsReadingOrder::Context => 0,
-        XlsReadingOrder::LeftToRight => 1,
-        XlsReadingOrder::RightToLeft => 2,
+        ReadingOrder::Context => 0,
+        ReadingOrder::LeftToRight => 1,
+        ReadingOrder::RightToLeft => 2,
     }
 }
 
-fn parse_underline(value: u16) -> XlsResult<XlsFontUnderline> {
+fn parse_underline(value: u16) -> Result<FontUnderline> {
     match value {
-        0 => Ok(XlsFontUnderline::None),
-        1 => Ok(XlsFontUnderline::Single),
-        2 => Ok(XlsFontUnderline::Double),
-        0x21 => Ok(XlsFontUnderline::SingleAccounting),
-        0x22 => Ok(XlsFontUnderline::DoubleAccounting),
+        0 => Ok(FontUnderline::None),
+        1 => Ok(FontUnderline::Single),
+        2 => Ok(FontUnderline::Double),
+        0x21 => Ok(FontUnderline::SingleAccounting),
+        0x22 => Ok(FontUnderline::DoubleAccounting),
         _ => Err(invalid(format!("reserved underline style {value}"))),
     }
 }
 
-fn underline_u16(value: XlsFontUnderline) -> u16 {
+fn underline_u16(value: FontUnderline) -> u16 {
     match value {
-        XlsFontUnderline::None => 0,
-        XlsFontUnderline::Single => 1,
-        XlsFontUnderline::Double => 2,
-        XlsFontUnderline::SingleAccounting => 0x21,
-        XlsFontUnderline::DoubleAccounting => 0x22,
+        FontUnderline::None => 0,
+        FontUnderline::Single => 1,
+        FontUnderline::Double => 2,
+        FontUnderline::SingleAccounting => 0x21,
+        FontUnderline::DoubleAccounting => 0x22,
     }
 }
 
-fn parse_escapement(value: u16) -> XlsResult<XlsFontEscapement> {
+fn parse_escapement(value: u16) -> Result<FontEscapement> {
     match value {
-        0 => Ok(XlsFontEscapement::Normal),
-        1 => Ok(XlsFontEscapement::Superscript),
-        2 => Ok(XlsFontEscapement::Subscript),
+        0 => Ok(FontEscapement::Normal),
+        1 => Ok(FontEscapement::Superscript),
+        2 => Ok(FontEscapement::Subscript),
         _ => Err(invalid(format!("reserved font escapement {value}"))),
     }
 }
 
-fn escapement_u16(value: XlsFontEscapement) -> u16 {
+fn escapement_u16(value: FontEscapement) -> u16 {
     match value {
-        XlsFontEscapement::Normal => 0,
-        XlsFontEscapement::Superscript => 1,
-        XlsFontEscapement::Subscript => 2,
+        FontEscapement::Normal => 0,
+        FontEscapement::Superscript => 1,
+        FontEscapement::Subscript => 2,
     }
 }
 
-fn parse_charset(value: u8) -> XlsResult<XlsFontCharset> {
+fn parse_charset(value: u8) -> Result<FontCharset> {
     match value {
-        0 => Ok(XlsFontCharset::Ansi),
-        1 => Ok(XlsFontCharset::Default),
-        2 => Ok(XlsFontCharset::Symbol),
-        77 => Ok(XlsFontCharset::Mac),
-        128 => Ok(XlsFontCharset::ShiftJis),
-        129 => Ok(XlsFontCharset::Korean),
-        130 => Ok(XlsFontCharset::Johab),
-        134 => Ok(XlsFontCharset::Gb2312),
-        136 => Ok(XlsFontCharset::ChineseBig5),
-        161 => Ok(XlsFontCharset::Greek),
-        162 => Ok(XlsFontCharset::Turkish),
-        163 => Ok(XlsFontCharset::Vietnamese),
-        177 => Ok(XlsFontCharset::Hebrew),
-        178 => Ok(XlsFontCharset::Arabic),
-        186 => Ok(XlsFontCharset::Baltic),
-        204 => Ok(XlsFontCharset::Russian),
-        222 => Ok(XlsFontCharset::Thai),
-        238 => Ok(XlsFontCharset::EastEurope),
-        255 => Ok(XlsFontCharset::Oem),
+        0 => Ok(FontCharset::Ansi),
+        1 => Ok(FontCharset::Default),
+        2 => Ok(FontCharset::Symbol),
+        77 => Ok(FontCharset::Mac),
+        128 => Ok(FontCharset::ShiftJis),
+        129 => Ok(FontCharset::Korean),
+        130 => Ok(FontCharset::Johab),
+        134 => Ok(FontCharset::Gb2312),
+        136 => Ok(FontCharset::ChineseBig5),
+        161 => Ok(FontCharset::Greek),
+        162 => Ok(FontCharset::Turkish),
+        163 => Ok(FontCharset::Vietnamese),
+        177 => Ok(FontCharset::Hebrew),
+        178 => Ok(FontCharset::Arabic),
+        186 => Ok(FontCharset::Baltic),
+        204 => Ok(FontCharset::Russian),
+        222 => Ok(FontCharset::Thai),
+        238 => Ok(FontCharset::EastEurope),
+        255 => Ok(FontCharset::Oem),
         _ => Err(invalid(format!(
             "unsupported LOGFONT character set {value}"
         ))),
     }
 }
 
-fn charset_byte(value: XlsFontCharset) -> u8 {
+fn charset_byte(value: FontCharset) -> u8 {
     match value {
-        XlsFontCharset::Ansi => 0,
-        XlsFontCharset::Default => 1,
-        XlsFontCharset::Symbol => 2,
-        XlsFontCharset::Mac => 77,
-        XlsFontCharset::ShiftJis => 128,
-        XlsFontCharset::Korean => 129,
-        XlsFontCharset::Johab => 130,
-        XlsFontCharset::Gb2312 => 134,
-        XlsFontCharset::ChineseBig5 => 136,
-        XlsFontCharset::Greek => 161,
-        XlsFontCharset::Turkish => 162,
-        XlsFontCharset::Vietnamese => 163,
-        XlsFontCharset::Hebrew => 177,
-        XlsFontCharset::Arabic => 178,
-        XlsFontCharset::Baltic => 186,
-        XlsFontCharset::Russian => 204,
-        XlsFontCharset::Thai => 222,
-        XlsFontCharset::EastEurope => 238,
-        XlsFontCharset::Oem => 255,
+        FontCharset::Ansi => 0,
+        FontCharset::Default => 1,
+        FontCharset::Symbol => 2,
+        FontCharset::Mac => 77,
+        FontCharset::ShiftJis => 128,
+        FontCharset::Korean => 129,
+        FontCharset::Johab => 130,
+        FontCharset::Gb2312 => 134,
+        FontCharset::ChineseBig5 => 136,
+        FontCharset::Greek => 161,
+        FontCharset::Turkish => 162,
+        FontCharset::Vietnamese => 163,
+        FontCharset::Hebrew => 177,
+        FontCharset::Arabic => 178,
+        FontCharset::Baltic => 186,
+        FontCharset::Russian => 204,
+        FontCharset::Thai => 222,
+        FontCharset::EastEurope => 238,
+        FontCharset::Oem => 255,
     }
 }
 
-fn parse_font_family(value: u8) -> XlsResult<XlsFontFamily> {
+fn parse_font_family(value: u8) -> Result<FontFamily> {
     match value {
-        0 => Ok(XlsFontFamily::NotApplicable),
-        1 => Ok(XlsFontFamily::Roman),
-        2 => Ok(XlsFontFamily::Swiss),
-        3 => Ok(XlsFontFamily::Modern),
-        4 => Ok(XlsFontFamily::Script),
-        5 => Ok(XlsFontFamily::Decorative),
+        0 => Ok(FontFamily::NotApplicable),
+        1 => Ok(FontFamily::Roman),
+        2 => Ok(FontFamily::Swiss),
+        3 => Ok(FontFamily::Modern),
+        4 => Ok(FontFamily::Script),
+        5 => Ok(FontFamily::Decorative),
         _ => Err(invalid(format!("reserved font family {value}"))),
     }
 }
 
-fn font_family_byte(value: XlsFontFamily) -> u8 {
+fn font_family_byte(value: FontFamily) -> u8 {
     match value {
-        XlsFontFamily::NotApplicable => 0,
-        XlsFontFamily::Roman => 1,
-        XlsFontFamily::Swiss => 2,
-        XlsFontFamily::Modern => 3,
-        XlsFontFamily::Script => 4,
-        XlsFontFamily::Decorative => 5,
+        FontFamily::NotApplicable => 0,
+        FontFamily::Roman => 1,
+        FontFamily::Swiss => 2,
+        FontFamily::Modern => 3,
+        FontFamily::Script => 4,
+        FontFamily::Decorative => 5,
     }
 }
 
-fn parse_lp_wide_string(data: &[u8]) -> XlsResult<String> {
+fn parse_lp_wide_string(data: &[u8]) -> Result<String> {
     let count = usize::from(read_u16(data, 0, "LPWideString.cchCharacters")?);
     if count > 32 {
         return Err(invalid(
@@ -1368,7 +1367,7 @@ fn parse_lp_wide_string(data: &[u8]) -> XlsResult<String> {
     )
 }
 
-fn write_lp_wide_string(value: &str, data: &mut Vec<u8>) -> XlsResult<()> {
+fn write_lp_wide_string(value: &str, data: &mut Vec<u8>) -> Result<()> {
     let units = value.encode_utf16().collect::<Vec<_>>();
     if units.len() > 32 {
         return Err(invalid("font name exceeds 32 UTF-16 code units"));
@@ -1380,7 +1379,7 @@ fn write_lp_wide_string(value: &str, data: &mut Vec<u8>) -> XlsResult<()> {
     Ok(())
 }
 
-fn parse_number_format_code(data: &[u8]) -> XlsResult<String> {
+fn parse_number_format_code(data: &[u8]) -> Result<String> {
     if data.len() < 2 {
         return Err(invalid("truncated number-format string"));
     }
@@ -1406,7 +1405,7 @@ fn parse_number_format_code(data: &[u8]) -> XlsResult<String> {
     )
 }
 
-fn write_number_format_code(value: &str, data: &mut Vec<u8>) -> XlsResult<()> {
+fn write_number_format_code(value: &str, data: &mut Vec<u8>) -> Result<()> {
     let units = value.encode_utf16().collect::<Vec<_>>();
     if !(1..=255).contains(&units.len()) {
         return Err(invalid("number-format string length must be 1..=255"));
@@ -1418,7 +1417,7 @@ fn write_number_format_code(value: &str, data: &mut Vec<u8>) -> XlsResult<()> {
     Ok(())
 }
 
-fn decode_utf16(data: &[u8], field: &str) -> XlsResult<String> {
+fn decode_utf16(data: &[u8], field: &str) -> Result<String> {
     if !data.len().is_multiple_of(2) {
         return Err(invalid(format!("{field} has an odd byte length")));
     }
@@ -1437,9 +1436,9 @@ fn decode_utf16(data: &[u8], field: &str) -> XlsResult<String> {
 mod tests {
     use super::*;
 
-    fn color() -> XlsXfColor {
-        XlsXfColor::try_new(
-            XlsXfColorSource::Theme(XlsThemeColor::Accent2),
+    fn color() -> XfColor {
+        XfColor::try_new(
+            XfColorSource::Theme(ThemeColor::Accent2),
             100,
             [1, 2, 3, 255],
         )
@@ -1448,28 +1447,28 @@ mod tests {
 
     #[test]
     fn typed_dxf_round_trips_representative_property_families() {
-        let dxf = XlsDifferentialFormat::try_new(
+        let dxf = DifferentialFormat::try_new(
             true,
             vec![
-                XlsXfProperty::Gradient(XlsXfGradient::linear(45.0).unwrap()),
-                XlsXfProperty::GradientStop(XlsXfGradientStop::try_new(0.5, color()).unwrap()),
-                XlsXfProperty::TopBorder(XlsXfBorder::new(color(), XlsBorderStyle::Thin)),
-                XlsXfProperty::VerticalBorder(XlsXfBorder::new(color(), XlsBorderStyle::Dashed)),
-                XlsXfProperty::HorizontalAlignment(Some(XlsHorizontalAlignment::Distributed)),
-                XlsXfProperty::JustifyDistributed(true),
-                XlsXfProperty::TextRotation(XlsTextRotation::Clockwise(30)),
-                XlsXfProperty::FontName("Aptos".to_string()),
-                XlsXfProperty::FontWeight(XlsXfFontWeight::Bold),
-                XlsXfProperty::FontUnderline(XlsFontUnderline::Double),
-                XlsXfProperty::FontSizeTwips(220),
-                XlsXfProperty::NumberFormatCode("0.00".to_string()),
-                XlsXfProperty::RelativeIndent(Some(-2)),
-                XlsXfProperty::Locked(true),
+                XfProperty::Gradient(XfGradient::linear(45.0).unwrap()),
+                XfProperty::GradientStop(XfGradientStop::try_new(0.5, color()).unwrap()),
+                XfProperty::TopBorder(XfBorder::new(color(), BorderStyle::Thin)),
+                XfProperty::VerticalBorder(XfBorder::new(color(), BorderStyle::Dashed)),
+                XfProperty::HorizontalAlignment(Some(HorizontalAlignment::Distributed)),
+                XfProperty::JustifyDistributed(true),
+                XfProperty::TextRotation(TextRotation::Clockwise(30)),
+                XfProperty::FontName("Aptos".to_string()),
+                XfProperty::FontWeight(XfFontWeight::Bold),
+                XfProperty::FontUnderline(FontUnderline::Double),
+                XfProperty::FontSizeTwips(220),
+                XfProperty::NumberFormatCode("0.00".to_string()),
+                XfProperty::RelativeIndent(Some(-2)),
+                XfProperty::Locked(true),
             ],
         )
         .unwrap();
         let payload = dxf.to_payload().unwrap();
-        assert_eq!(XlsDifferentialFormat::parse_payload(&payload).unwrap(), dxf);
+        assert_eq!(DifferentialFormat::parse_payload(&payload).unwrap(), dxf);
         let record = dxf.to_record_bytes().unwrap();
         assert_eq!(&record[..2], &[0x8D, 0x08]);
     }
@@ -1478,87 +1477,84 @@ mod tests {
     fn xfprop_color_uses_low_flag_bit_and_high_seven_type_bits() {
         // Apache POI producer forms: bit 7 is clear, while fValidRGBA in bit 0 is set.
         let rgb = [0x05, 0xFF, 0x00, 0x00, 0xFF, 0xC7, 0xCE, 0xFF];
-        let parsed = XlsXfColor::parse(&rgb).unwrap();
-        assert_eq!(parsed.source(), XlsXfColorSource::Rgb);
+        let parsed = XfColor::parse(&rgb).unwrap();
+        assert_eq!(parsed.source(), XfColorSource::Rgb);
         let mut encoded = Vec::new();
         parsed.write_to(&mut encoded);
         assert_eq!(encoded, rgb);
 
         let theme = [0x07, 0x04, 0x65, 0x66, 0xDC, 0xE6, 0xF1, 0xFF];
-        let parsed = XlsXfColor::parse(&theme).unwrap();
-        assert_eq!(
-            parsed.source(),
-            XlsXfColorSource::Theme(XlsThemeColor::Accent1)
-        );
+        let parsed = XfColor::parse(&theme).unwrap();
+        assert_eq!(parsed.source(), XfColorSource::Theme(ThemeColor::Accent1));
         let mut encoded = Vec::new();
         parsed.write_to(&mut encoded);
         assert_eq!(encoded, theme);
 
         let indexed = [0x03, 0x40, 0, 0, 1, 2, 3, 4];
         assert_eq!(
-            XlsXfColor::parse(&indexed).unwrap().source(),
-            XlsXfColorSource::Indexed(0x40)
+            XfColor::parse(&indexed).unwrap().source(),
+            XfColorSource::Indexed(0x40)
         );
         let automatic = [0x01, 0xAA, 0, 0, 1, 2, 3, 4];
         assert_eq!(
-            XlsXfColor::parse(&automatic).unwrap().source(),
-            XlsXfColorSource::Automatic
+            XfColor::parse(&automatic).unwrap().source(),
+            XfColorSource::Automatic
         );
         let not_set = [0x09, 0xAA, 0, 0, 1, 2, 3, 4];
         assert_eq!(
-            XlsXfColor::parse(&not_set).unwrap().source(),
-            XlsXfColorSource::NotSet
+            XfColor::parse(&not_set).unwrap().source(),
+            XfColorSource::NotSet
         );
     }
 
     #[test]
     fn xfprop_color_rejects_clear_valid_flag_and_invalid_type_data() {
-        assert!(XlsXfColor::parse(&[0x04, 0, 0, 0, 0, 0, 0, 0]).is_err());
-        assert!(XlsXfColor::parse(&[0x0B, 0, 0, 0, 0, 0, 0, 0]).is_err());
-        assert!(XlsXfColor::parse(&[0x03, 66, 0, 0, 0, 0, 0, 0]).is_err());
-        assert!(XlsXfColor::parse(&[0x07, 12, 0, 0, 0, 0, 0, 0]).is_err());
-        assert!(XlsXfColor::parse(&[0x05, 0, 0x00, 0x80, 0, 0, 0, 0]).is_err());
+        assert!(XfColor::parse(&[0x04, 0, 0, 0, 0, 0, 0, 0]).is_err());
+        assert!(XfColor::parse(&[0x0B, 0, 0, 0, 0, 0, 0, 0]).is_err());
+        assert!(XfColor::parse(&[0x03, 66, 0, 0, 0, 0, 0, 0]).is_err());
+        assert!(XfColor::parse(&[0x07, 12, 0, 0, 0, 0, 0, 0]).is_err());
+        assert!(XfColor::parse(&[0x05, 0, 0x00, 0x80, 0, 0, 0, 0]).is_err());
     }
 
     #[test]
     fn rejects_hostile_headers_sizes_flags_and_property_relationships() {
-        let empty = XlsDifferentialFormat::try_new(false, vec![])
+        let empty = DifferentialFormat::try_new(false, vec![])
             .unwrap()
             .to_payload()
             .unwrap();
-        assert!(XlsDifferentialFormat::parse_payload(&empty[..17]).is_err());
+        assert!(DifferentialFormat::parse_payload(&empty[..17]).is_err());
         let mut bad = empty.clone();
         bad[0] = 0;
-        assert!(XlsDifferentialFormat::parse_payload(&bad).is_err());
+        assert!(DifferentialFormat::parse_payload(&bad).is_err());
         let mut bad = empty.clone();
         bad[14] = 1;
-        assert!(XlsDifferentialFormat::parse_payload(&bad).is_err());
+        assert!(DifferentialFormat::parse_payload(&bad).is_err());
         let mut bad = empty;
         bad[16..18].copy_from_slice(&1u16.to_le_bytes());
-        assert!(XlsDifferentialFormat::parse_payload(&bad).is_err());
+        assert!(DifferentialFormat::parse_payload(&bad).is_err());
 
         assert!(
-            XlsDifferentialFormat::try_new(
+            DifferentialFormat::try_new(
                 false,
-                vec![XlsXfProperty::VerticalBorder(XlsXfBorder::new(
+                vec![XfProperty::VerticalBorder(XfBorder::new(
                     color(),
-                    XlsBorderStyle::Thin,
+                    BorderStyle::Thin,
                 ))],
             )
             .is_err()
         );
         assert!(
-            XlsDifferentialFormat::try_new(
+            DifferentialFormat::try_new(
                 false,
                 vec![
-                    XlsXfProperty::FillPattern(XlsFillPattern::Solid),
-                    XlsXfProperty::Gradient(XlsXfGradient::linear(0.0).unwrap()),
+                    XfProperty::FillPattern(FillPattern::Solid),
+                    XfProperty::Gradient(XfGradient::linear(0.0).unwrap()),
                 ],
             )
             .is_err()
         );
         assert!(
-            XlsDifferentialFormat::try_new(false, vec![XlsXfProperty::JustifyDistributed(true)],)
+            DifferentialFormat::try_new(false, vec![XfProperty::JustifyDistributed(true)],)
                 .is_err()
         );
     }
@@ -1581,7 +1577,7 @@ mod tests {
 
     #[test]
     fn malformed_fixed_width_properties_return_errors_without_panicking() {
-        let empty = XlsDifferentialFormat::try_new(false, vec![])
+        let empty = DifferentialFormat::try_new(false, vec![])
             .unwrap()
             .to_payload()
             .unwrap();
@@ -1593,8 +1589,7 @@ mod tests {
             payload[16..18].copy_from_slice(&1u16.to_le_bytes());
             payload.extend_from_slice(&property_type.to_le_bytes());
             payload.extend_from_slice(&4u16.to_le_bytes());
-            let parsed =
-                std::panic::catch_unwind(|| XlsDifferentialFormat::parse_payload(&payload));
+            let parsed = std::panic::catch_unwind(|| DifferentialFormat::parse_payload(&payload));
             assert!(
                 matches!(parsed, Ok(Err(_))),
                 "property type 0x{property_type:04X} did not reject empty data"
@@ -1604,9 +1599,9 @@ mod tests {
 
     #[test]
     fn oversized_dxf_writes_are_rejected_without_truncating_record_length() {
-        let dxf = XlsDifferentialFormat::try_new(
+        let dxf = DifferentialFormat::try_new(
             false,
-            vec![XlsXfProperty::WrapText(false); MAX_XF_PROPERTIES],
+            vec![XfProperty::WrapText(false); MAX_XF_PROPERTIES],
         )
         .unwrap();
         assert!(dxf.to_payload().is_err());
@@ -1616,13 +1611,12 @@ mod tests {
     #[test]
     fn enforces_resource_caps() {
         assert!(
-            XlsXfProperties::try_new(vec![XlsXfProperty::WrapText(false); MAX_XF_PROPERTIES + 1])
+            XfProperties::try_new(vec![XfProperty::WrapText(false); MAX_XF_PROPERTIES + 1])
                 .is_err()
         );
         let huge = "x".repeat(256);
         assert!(
-            XlsDifferentialFormat::try_new(false, vec![XlsXfProperty::NumberFormatCode(huge)])
-                .is_err()
+            DifferentialFormat::try_new(false, vec![XfProperty::NumberFormatCode(huge)]).is_err()
         );
     }
 

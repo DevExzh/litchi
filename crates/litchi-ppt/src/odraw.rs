@@ -9,7 +9,7 @@ use litchi_odraw::shape::Shape;
 use litchi_odraw::{Container, Record, RecordKind};
 
 use super::embedded::reference::Reference;
-use super::package::{PptError, Result};
+use super::package::{Error, Result};
 
 const CLIENT_DATA_RAW_KIND: u16 = 0xf011;
 const CLIENT_TEXTBOX_RAW_KIND: u16 = 0xf00d;
@@ -21,9 +21,9 @@ pub struct Placeholder {
     /// Placeholder position from the PowerPoint `PlaceholderAtom`.
     pub position: Option<u16>,
     /// Exact PowerPoint placeholder kind.
-    pub kind: super::PowerPointPlaceholderKind,
+    pub kind: super::PlaceholderKind,
     /// Checked PowerPoint placeholder size.
-    pub size: super::PowerPointPlaceholderSize,
+    pub size: super::AtomPlaceholderSize,
 }
 
 /// Host-specific meaning of an OfficeArt picture-frame shape.
@@ -134,47 +134,47 @@ pub trait ShapeExt {
     ) -> Result<Vec<super::Interaction>>;
 
     /// Parses range-anchored text actions with default limits.
-    fn text_interactions(&self) -> Result<Vec<super::PowerPointTextInteraction>>;
+    fn text_interactions(&self) -> Result<Vec<super::TextInteraction>>;
 
     /// Parses range-anchored text actions with explicit limits.
     fn text_interactions_with_limits(
         &self,
-        limits: super::PowerPointTextInteractionLimits,
-    ) -> Result<Vec<super::PowerPointTextInteraction>>;
+        limits: super::TextInteractionLimits,
+    ) -> Result<Vec<super::TextInteraction>>;
 
     /// Parses a context-validated placeholder atom with default limits.
     fn placeholder_atom(
         &self,
-        context: super::PowerPointPlaceholderContext,
-    ) -> Result<Option<super::PowerPointPlaceholderAtom>>;
+        context: super::PlaceholderContext,
+    ) -> Result<Option<super::PlaceholderAtom>>;
 
     /// Parses a context-validated placeholder atom with explicit limits.
     fn placeholder_atom_with_limits(
         &self,
-        context: super::PowerPointPlaceholderContext,
-        limits: super::PowerPointPlaceholderLimits,
-    ) -> Result<Option<super::PowerPointPlaceholderAtom>>;
+        context: super::PlaceholderContext,
+        limits: super::PlaceholderLimits,
+    ) -> Result<Option<super::PlaceholderAtom>>;
 
     /// Parses PowerPoint 12 shape round-trip metadata.
     fn powerpoint12_shape_metadata(&self) -> Result<Option<super::ShapeMetadata>>;
 
     /// Parses inert shape programmable tags with default limits.
-    fn programmable_tags(&self) -> Result<Option<super::PowerPointShapeProgrammableTags>>;
+    fn programmable_tags(&self) -> Result<Option<super::ShapeProgrammableTags>>;
 
     /// Parses inert shape programmable tags with explicit limits.
     fn programmable_tags_with_limits(
         &self,
-        limits: super::PowerPointShapeProgrammableTagLimits,
-    ) -> Result<Option<super::PowerPointShapeProgrammableTags>>;
+        limits: super::ShapeProgrammableTagLimits,
+    ) -> Result<Option<super::ShapeProgrammableTags>>;
 
     /// Parses the PPT shape-flag projection with default limits.
-    fn ppt_flags(&self) -> Result<Option<super::PowerPointShapeFlagProjection>>;
+    fn ppt_flags(&self) -> Result<Option<super::ShapeFlagProjection>>;
 
     /// Parses the PPT shape-flag projection with explicit limits.
     fn ppt_flags_with(
         &self,
-        limits: super::PowerPointShapeFlagLimits,
-    ) -> Result<Option<super::PowerPointShapeFlagProjection>>;
+        limits: super::ShapeFlagLimits,
+    ) -> Result<Option<super::ShapeFlagProjection>>;
 
     /// Parses inert legacy PowerPoint animation metadata.
     fn animation(&self) -> Result<Option<super::animation::AnimationInfo>>;
@@ -216,14 +216,14 @@ impl ShapeExt for Shape<'_> {
         super::Interaction::parse_client_data_payload(client_data.data(), limits)
     }
 
-    fn text_interactions(&self) -> Result<Vec<super::PowerPointTextInteraction>> {
-        self.text_interactions_with_limits(super::PowerPointTextInteractionLimits::default())
+    fn text_interactions(&self) -> Result<Vec<super::TextInteraction>> {
+        self.text_interactions_with_limits(super::TextInteractionLimits::default())
     }
 
     fn text_interactions_with_limits(
         &self,
-        limits: super::PowerPointTextInteractionLimits,
-    ) -> Result<Vec<super::PowerPointTextInteraction>> {
+        limits: super::TextInteractionLimits,
+    ) -> Result<Vec<super::TextInteraction>> {
         let Some(textbox) = host_record(self, RecordKind::ClientTextbox)? else {
             return Ok(Vec::new());
         };
@@ -233,33 +233,31 @@ impl ShapeExt for Shape<'_> {
 
     fn placeholder_atom(
         &self,
-        context: super::PowerPointPlaceholderContext,
-    ) -> Result<Option<super::PowerPointPlaceholderAtom>> {
-        self.placeholder_atom_with_limits(context, super::PowerPointPlaceholderLimits::default())
+        context: super::PlaceholderContext,
+    ) -> Result<Option<super::PlaceholderAtom>> {
+        self.placeholder_atom_with_limits(context, super::PlaceholderLimits::default())
     }
 
     fn placeholder_atom_with_limits(
         &self,
-        context: super::PowerPointPlaceholderContext,
-        limits: super::PowerPointPlaceholderLimits,
-    ) -> Result<Option<super::PowerPointPlaceholderAtom>> {
+        context: super::PlaceholderContext,
+        limits: super::PlaceholderLimits,
+    ) -> Result<Option<super::PlaceholderAtom>> {
         let Some(client_data) = host_record(self, RecordKind::ClientData)? else {
             return Ok(None);
         };
         validate_host_record(&client_data, CLIENT_DATA_RAW_KIND, "ClientData")?;
-        Ok(
-            super::PowerPointPlaceholderProjection::parse_client_data_payload(
-                client_data.data(),
-                context,
-                limits,
-            )?
-            .placeholder,
-        )
+        Ok(super::PlaceholderProjection::parse_client_data_payload(
+            client_data.data(),
+            context,
+            limits,
+        )?
+        .placeholder)
     }
 
     fn powerpoint12_shape_metadata(&self) -> Result<Option<super::ShapeMetadata>> {
         use super::{HeaderFooterPlaceholder, NewPlaceholder, ShapeChecksums, ShapeMetadata};
-        use crate::consts::PptRecordType;
+        use crate::consts::RecordType;
 
         let Some(client_data) = host_record(self, RecordKind::ClientData)? else {
             return Ok(None);
@@ -273,9 +271,9 @@ impl ShapeExt for Shape<'_> {
         while offset < client_data.data().len() {
             visit_host_record(&mut records)?;
             let (record, consumed) =
-                super::records::PptRecord::parse_strict(client_data.data(), offset)?;
+                super::records::Record::parse_strict(client_data.data(), offset)?;
             match record.record_type {
-                PptRecordType::RoundTripHFPlaceholder12Atom => {
+                RecordType::RoundTripHFPlaceholder12Atom => {
                     if metadata.header_footer.is_some() {
                         return Err(corrupted(
                             "Shape contains duplicate RoundTripHFPlaceholder12Atom records",
@@ -295,7 +293,7 @@ impl ShapeExt for Shape<'_> {
                     });
                     found = true;
                 },
-                PptRecordType::RoundTripNewPlaceholderId12Atom => {
+                RecordType::RoundTripNewPlaceholderId12Atom => {
                     if metadata.new_placeholder.is_some() {
                         return Err(corrupted(
                             "Shape contains duplicate RoundTripNewPlaceholderId12Atom records",
@@ -313,7 +311,7 @@ impl ShapeExt for Shape<'_> {
                     });
                     found = true;
                 },
-                PptRecordType::RoundTripShapeId12Atom => {
+                RecordType::RoundTripShapeId12Atom => {
                     if metadata.shape_id.is_some() {
                         return Err(corrupted(
                             "Shape contains duplicate RoundTripShapeId12Atom records",
@@ -328,7 +326,7 @@ impl ShapeExt for Shape<'_> {
                     ]));
                     found = true;
                 },
-                PptRecordType::RoundTripShapeCheckSumForCustomLayouts12Atom => {
+                RecordType::RoundTripShapeCheckSumForCustomLayouts12Atom => {
                     if metadata.custom_layout_checksums.is_some() {
                         return Err(corrupted(
                             "Shape contains duplicate RoundTripShapeCheckSumForCustomLayouts12Atom records",
@@ -365,8 +363,8 @@ impl ShapeExt for Shape<'_> {
 
     fn programmable_tags_with_limits(
         &self,
-        limits: super::PowerPointShapeProgrammableTagLimits,
-    ) -> Result<Option<super::PowerPointShapeProgrammableTags>> {
+        limits: super::ShapeProgrammableTagLimits,
+    ) -> Result<Option<super::ShapeProgrammableTags>> {
         let Some(client_data) = host_record(self, RecordKind::ClientData)? else {
             return Ok(None);
         };
@@ -378,9 +376,9 @@ impl ShapeExt for Shape<'_> {
         while offset < client_data.data().len() {
             visit_host_record(&mut records)?;
             let (record, consumed) =
-                super::records::PptRecord::parse_strict(client_data.data(), offset)?;
-            if record.record_type == crate::consts::PptRecordType::ProgTags {
-                let parsed = super::PowerPointShapeProgrammableTags::parse(&record, limits)?;
+                super::records::Record::parse_strict(client_data.data(), offset)?;
+            if record.record_type == crate::consts::RecordType::ProgTags {
+                let parsed = super::ShapeProgrammableTags::parse(&record, limits)?;
                 if result.replace(parsed).is_some() {
                     return Err(corrupted(
                         "Shape ClientData contains multiple ShapeProgTagsContainer records",
@@ -392,26 +390,24 @@ impl ShapeExt for Shape<'_> {
         Ok(result)
     }
 
-    fn programmable_tags(&self) -> Result<Option<super::PowerPointShapeProgrammableTags>> {
-        self.programmable_tags_with_limits(super::PowerPointShapeProgrammableTagLimits::default())
+    fn programmable_tags(&self) -> Result<Option<super::ShapeProgrammableTags>> {
+        self.programmable_tags_with_limits(super::ShapeProgrammableTagLimits::default())
     }
 
-    fn ppt_flags(&self) -> Result<Option<super::PowerPointShapeFlagProjection>> {
-        self.ppt_flags_with(super::PowerPointShapeFlagLimits::default())
+    fn ppt_flags(&self) -> Result<Option<super::ShapeFlagProjection>> {
+        self.ppt_flags_with(super::ShapeFlagLimits::default())
     }
 
     fn ppt_flags_with(
         &self,
-        limits: super::PowerPointShapeFlagLimits,
-    ) -> Result<Option<super::PowerPointShapeFlagProjection>> {
+        limits: super::ShapeFlagLimits,
+    ) -> Result<Option<super::ShapeFlagProjection>> {
         let Some(client_data) = host_record(self, RecordKind::ClientData)? else {
             return Ok(None);
         };
         validate_host_record(&client_data, CLIENT_DATA_RAW_KIND, "ClientData")?;
-        let projection = super::PowerPointShapeFlagProjection::parse_client_data_payload(
-            client_data.data(),
-            limits,
-        )?;
+        let projection =
+            super::ShapeFlagProjection::parse_client_data_payload(client_data.data(), limits)?;
         Ok(projection.has_flags().then_some(projection))
     }
 
@@ -425,8 +421,8 @@ impl ShapeExt for Shape<'_> {
         while offset < client_data.data().len() {
             visit_host_record(&mut records)?;
             let (record, consumed) =
-                super::records::PptRecord::parse_strict(client_data.data(), offset)?;
-            if record.record_type == crate::consts::PptRecordType::AnimationInfo {
+                super::records::Record::parse_strict(client_data.data(), offset)?;
+            if record.record_type == crate::consts::RecordType::AnimationInfo {
                 return super::animation::parse_animation_info(&record).map(Some);
             }
             offset = advance(offset, consumed, "OfficeArt client-data")?;
@@ -470,7 +466,7 @@ pub fn anchor(shape: &Shape<'_>) -> Result<Option<Anchor>> {
     {
         return Err(corrupted("Invalid PowerPoint OfficeArtClientAnchor header"));
     }
-    let anchor = super::PowerPointClientAnchorData::parse(anchor.data())?;
+    let anchor = super::ClientAnchorData::parse(anchor.data())?;
     Anchor::new(anchor.left(), anchor.top(), anchor.right(), anchor.bottom()).map(Some)
 }
 
@@ -562,8 +558,8 @@ fn placeholder(shape: &Shape<'_>) -> Result<Option<Placeholder>> {
                     corrupted("PlaceholderAtom position is outside the supported range")
                 })?),
             };
-            let kind = super::PowerPointPlaceholderKind::try_from(record.data[4])?;
-            let size = super::PowerPointPlaceholderSize::try_from(record.data[5])?;
+            let kind = super::PlaceholderKind::try_from(record.data[4])?;
+            let size = super::AtomPlaceholderSize::try_from(record.data[5])?;
             found = Some(Placeholder {
                 position,
                 kind,
@@ -746,7 +742,7 @@ fn is_text_container(kind: u16) -> bool {
 }
 
 fn validate_round_trip_atom(
-    record: &super::records::PptRecord,
+    record: &super::records::Record,
     name: &str,
     expected_len: usize,
 ) -> Result<()> {
@@ -781,8 +777,8 @@ fn visit_host_record(records: &mut u32) -> Result<()> {
     Ok(())
 }
 
-fn corrupted(message: &str) -> PptError {
-    PptError::Corrupted(message.to_owned())
+fn corrupted(message: &str) -> Error {
+    Error::Corrupted(message.to_owned())
 }
 
 #[derive(Debug, Clone, Copy)]

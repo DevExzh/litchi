@@ -6,8 +6,8 @@
 //! Each OBJ-bearing SpContainer becomes its own MsoDrawing fragment so the BIFF
 //! stream can interleave the matching OBJ records.
 
-use crate::XlsResult;
-use crate::writer::{XlsShapeGroupChild, XlsShapeGroupWrite, XlsShapeKind};
+use crate::Result;
+use crate::writer::{ShapeGroupChild, ShapeGroupWrite, ShapeKind};
 use litchi_odraw::{
     prop::Id,
     shape::{Flags, Native},
@@ -36,7 +36,7 @@ const GROUP_SHAPE_HIDDEN: i32 = 0x0002_0002;
 
 /// Serialization plan for one shape group with fully assigned OBJ identifiers.
 pub(crate) struct GroupShapeConfig<'a> {
-    pub group: &'a XlsShapeGroupWrite,
+    pub group: &'a ShapeGroupWrite,
     pub object_id: u16,
     pub child_object_ids: Vec<u16>,
 }
@@ -56,14 +56,14 @@ pub(crate) enum GroupFragmentObj<'a> {
         visible: bool,
     },
     Child {
-        child: &'a XlsShapeGroupChild,
+        child: &'a ShapeGroupChild,
         object_id: u16,
     },
 }
 
 /// Whether a grouped child carries an OfficeArt ClientTextbox and a TXO record.
-pub(crate) fn child_has_textbox(child: &XlsShapeGroupChild) -> bool {
-    child.kind == XlsShapeKind::TextBox || child.text.is_some()
+pub(crate) fn child_has_textbox(child: &ShapeGroupChild) -> bool {
+    child.kind == ShapeKind::TextBox || child.text.is_some()
 }
 
 /// Split one group into ordered MsoDrawing fragments with sequential shape IDs.
@@ -74,7 +74,7 @@ pub(crate) fn child_has_textbox(child: &XlsShapeGroupChild) -> bool {
 pub(crate) fn group_fragments<'a>(
     config: &'a GroupShapeConfig<'a>,
     first_shape_id: u32,
-) -> XlsResult<Vec<GroupFragment<'a>>> {
+) -> Result<Vec<GroupFragment<'a>>> {
     let group = config.group;
     let header = group_header_shape(group, first_shape_id)?;
     let mut child_shapes = Vec::with_capacity(group.children.len());
@@ -119,7 +119,7 @@ pub(crate) fn group_fragments<'a>(
 }
 
 /// Build the group-header SpContainer (Spgr + Sp + OPT + ClientAnchor + ClientData).
-fn group_header_shape(group: &XlsShapeGroupWrite, shape_id: u32) -> XlsResult<Vec<u8>> {
+fn group_header_shape(group: &ShapeGroupWrite, shape_id: u32) -> Result<Vec<u8>> {
     let mut children = Vec::with_capacity(104);
     let [left, top, right, bottom] = group.coordinates.fields();
     write_spgr(&mut children, left, top, right, bottom)?;
@@ -152,7 +152,7 @@ fn group_header_shape(group: &XlsShapeGroupWrite, shape_id: u32) -> XlsResult<Ve
 }
 
 /// Build one child SpContainer anchored with an OfficeArtChildAnchor.
-fn grouped_child_shape(child: &XlsShapeGroupChild, shape_id: u32) -> XlsResult<(Vec<u8>, bool)> {
+fn grouped_child_shape(child: &ShapeGroupChild, shape_id: u32) -> Result<(Vec<u8>, bool)> {
     let mut children = Vec::with_capacity(112);
     ShapeBuilder::new(Native::from_raw(child.kind.officeart_type()), shape_id)
         .with_flags(Flags::CHILD | Flags::HAVE_ANCHOR | Flags::HAVE_SPT)
@@ -180,7 +180,7 @@ mod tests {
         Anchor::cells(0, 0, 10, 6, Behavior::MoveAndSize).unwrap()
     }
 
-    fn config(group: &XlsShapeGroupWrite) -> GroupShapeConfig<'_> {
+    fn config(group: &ShapeGroupWrite) -> GroupShapeConfig<'_> {
         GroupShapeConfig {
             group,
             object_id: 1,
@@ -197,14 +197,14 @@ mod tests {
 
     #[test]
     fn spgr_container_length_spans_every_fragment() {
-        let mut group = XlsShapeGroupWrite::new(anchor());
+        let mut group = ShapeGroupWrite::new(anchor());
         group.coordinates = Rect::new(0, 0, 2000, 1000).unwrap();
-        group.children.push(XlsShapeGroupChild::new(
-            XlsShapeKind::Rectangle,
+        group.children.push(ShapeGroupChild::new(
+            ShapeKind::Rectangle,
             Rect::new(0, 0, 900, 500).unwrap(),
         ));
-        group.children.push(XlsShapeGroupChild::new(
-            XlsShapeKind::Ellipse,
+        group.children.push(ShapeGroupChild::new(
+            ShapeKind::Ellipse,
             Rect::new(900, 400, 2000, 1000).unwrap(),
         ));
         let config = config(&group);
@@ -225,10 +225,10 @@ mod tests {
 
     #[test]
     fn group_header_holds_spgr_rect_group_flags_and_client_anchor() {
-        let mut group = XlsShapeGroupWrite::new(anchor());
+        let mut group = ShapeGroupWrite::new(anchor());
         group.coordinates = Rect::new(10, 20, 1210, 820).unwrap();
-        group.children.push(XlsShapeGroupChild::new(
-            XlsShapeKind::Rectangle,
+        group.children.push(ShapeGroupChild::new(
+            ShapeKind::Rectangle,
             Rect::new(10, 20, 400, 300).unwrap(),
         ));
         let config = config(&group);
@@ -273,11 +273,11 @@ mod tests {
 
     #[test]
     fn children_use_child_anchors_child_flags_and_sequential_shape_ids() {
-        let mut group = XlsShapeGroupWrite::new(anchor());
+        let mut group = ShapeGroupWrite::new(anchor());
         group.coordinates = Rect::new(0, 0, 1000, 1000).unwrap();
         let mut textbox =
-            XlsShapeGroupChild::new(XlsShapeKind::TextBox, Rect::new(-20, 0, 480, 480).unwrap());
-        textbox.text = Some(crate::writer::XlsShapeText::new("grouped"));
+            ShapeGroupChild::new(ShapeKind::TextBox, Rect::new(-20, 0, 480, 480).unwrap());
+        textbox.text = Some(crate::writer::ShapeText::new("grouped"));
         group.children.push(textbox);
         let config = config(&group);
         let fragments = group_fragments(&config, 3073).unwrap();
@@ -285,7 +285,7 @@ mod tests {
 
         let (_, sp_instance, sp, _) = read_escher_header(&child[8..16]);
         assert_eq!(sp, RecordKind::Sp.raw());
-        assert_eq!(sp_instance, XlsShapeKind::TextBox.officeart_type());
+        assert_eq!(sp_instance, ShapeKind::TextBox.officeart_type());
         assert_eq!(u32::from_le_bytes(child[16..20].try_into().unwrap()), 3074);
         assert_eq!(
             u32::from_le_bytes(child[20..24].try_into().unwrap()),

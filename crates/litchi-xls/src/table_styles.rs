@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use super::differential_format::{DXF_RECORD_TYPE, validate_frt_header, write_frt_header};
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 pub(crate) const TABLE_STYLES_RECORD_TYPE: u16 = 0x088E;
 pub(crate) const TABLE_STYLE_RECORD_TYPE: u16 = 0x088F;
@@ -18,28 +18,28 @@ const MAX_TABLE_STYLE_ELEMENTS: usize = 28;
 const MAX_CUSTOM_TABLE_STYLES: usize = 65_536;
 const MAX_DIFFERENTIAL_FORMATS: usize = 65_536;
 
-fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(record_type: u16, message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type,
         message: message.into(),
     }
 }
 
-fn read_u16(data: &[u8], offset: usize, record_type: u16, field: &str) -> XlsResult<u16> {
+fn read_u16(data: &[u8], offset: usize, record_type: u16, field: &str) -> Result<u16> {
     let bytes = data
         .get(offset..offset + 2)
         .ok_or_else(|| invalid(record_type, format!("truncated {field}")))?;
     Ok(u16::from_le_bytes([bytes[0], bytes[1]]))
 }
 
-fn read_u32(data: &[u8], offset: usize, record_type: u16, field: &str) -> XlsResult<u32> {
+fn read_u32(data: &[u8], offset: usize, record_type: u16, field: &str) -> Result<u32> {
     let bytes = data
         .get(offset..offset + 4)
         .ok_or_else(|| invalid(record_type, format!("truncated {field}")))?;
     Ok(u32::from_le_bytes(bytes.try_into().unwrap()))
 }
 
-fn record_bytes(record_type: u16, payload: Vec<u8>) -> XlsResult<Vec<u8>> {
+fn record_bytes(record_type: u16, payload: Vec<u8>) -> Result<Vec<u8>> {
     let length = u16::try_from(payload.len())
         .map_err(|_| invalid(record_type, "payload length exceeds BIFF u16"))?;
     let mut data = Vec::with_capacity(4 + payload.len());
@@ -51,9 +51,9 @@ fn record_bytes(record_type: u16, payload: Vec<u8>) -> XlsResult<Vec<u8>> {
 
 /// A typed, zero-based reference into the workbook's global DXF table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct XlsDifferentialFormatId(u32);
+pub struct DifferentialFormatId(u32);
 
-impl XlsDifferentialFormatId {
+impl DifferentialFormatId {
     pub const fn new(index: u32) -> Self {
         Self(index)
     }
@@ -65,7 +65,7 @@ impl XlsDifferentialFormatId {
 
 /// One of the 28 regions that can be formatted by a BIFF8 table style.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XlsTableStyleRegion {
+pub enum TableStyleRegion {
     WholeTable,
     HeaderRow,
     TotalRow,
@@ -96,8 +96,8 @@ pub enum XlsTableStyleRegion {
     PageFieldValues,
 }
 
-impl XlsTableStyleRegion {
-    fn from_u32(value: u32) -> XlsResult<Self> {
+impl TableStyleRegion {
+    fn from_u32(value: u32) -> Result<Self> {
         Ok(match value {
             0 => Self::WholeTable,
             1 => Self::HeaderRow,
@@ -182,25 +182,25 @@ impl XlsTableStyleRegion {
 
 /// One `TableStyleElement` and its reference to a global differential format.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsTableStyleElement {
-    region: XlsTableStyleRegion,
+pub struct TableStyleElement {
+    region: TableStyleRegion,
     size: u32,
-    differential_format: XlsDifferentialFormatId,
+    differential_format: DifferentialFormatId,
 }
 
-impl XlsTableStyleElement {
+impl TableStyleElement {
     pub fn try_new(
-        region: XlsTableStyleRegion,
-        differential_format: XlsDifferentialFormatId,
-    ) -> XlsResult<Self> {
+        region: TableStyleRegion,
+        differential_format: DifferentialFormatId,
+    ) -> Result<Self> {
         Self::try_with_size(region, 1, differential_format)
     }
 
     pub fn try_with_stripe_size(
-        region: XlsTableStyleRegion,
+        region: TableStyleRegion,
         stripe_size: u8,
-        differential_format: XlsDifferentialFormatId,
-    ) -> XlsResult<Self> {
+        differential_format: DifferentialFormatId,
+    ) -> Result<Self> {
         if !region.is_stripe() {
             return Err(invalid(
                 TABLE_STYLE_ELEMENT_RECORD_TYPE,
@@ -211,10 +211,10 @@ impl XlsTableStyleElement {
     }
 
     fn try_with_size(
-        region: XlsTableStyleRegion,
+        region: TableStyleRegion,
         size: u32,
-        differential_format: XlsDifferentialFormatId,
-    ) -> XlsResult<Self> {
+        differential_format: DifferentialFormatId,
+    ) -> Result<Self> {
         if !(1..=9).contains(&size) {
             return Err(invalid(
                 TABLE_STYLE_ELEMENT_RECORD_TYPE,
@@ -228,7 +228,7 @@ impl XlsTableStyleElement {
         })
     }
 
-    pub const fn region(&self) -> XlsTableStyleRegion {
+    pub const fn region(&self) -> TableStyleRegion {
         self.region
     }
 
@@ -236,11 +236,11 @@ impl XlsTableStyleElement {
         self.region.is_stripe().then_some(self.size as u8)
     }
 
-    pub const fn differential_format(&self) -> XlsDifferentialFormatId {
+    pub const fn differential_format(&self) -> DifferentialFormatId {
         self.differential_format
     }
 
-    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if data.len() != TABLE_STYLE_ELEMENT_LEN {
             return Err(invalid(
                 TABLE_STYLE_ELEMENT_RECORD_TYPE,
@@ -252,7 +252,7 @@ impl XlsTableStyleElement {
         }
         validate_frt_header(data, TABLE_STYLE_ELEMENT_RECORD_TYPE)?;
         Self::try_with_size(
-            XlsTableStyleRegion::from_u32(read_u32(
+            TableStyleRegion::from_u32(read_u32(
                 data,
                 12,
                 TABLE_STYLE_ELEMENT_RECORD_TYPE,
@@ -264,7 +264,7 @@ impl XlsTableStyleElement {
                 TABLE_STYLE_ELEMENT_RECORD_TYPE,
                 "TableStyleElement.size",
             )?,
-            XlsDifferentialFormatId::new(read_u32(
+            DifferentialFormatId::new(read_u32(
                 data,
                 20,
                 TABLE_STYLE_ELEMENT_RECORD_TYPE,
@@ -273,7 +273,7 @@ impl XlsTableStyleElement {
         )
     }
 
-    pub fn to_payload(&self) -> XlsResult<Vec<u8>> {
+    pub fn to_payload(&self) -> Result<Vec<u8>> {
         Self::try_with_size(self.region, self.size, self.differential_format)?;
         let mut data = Vec::with_capacity(TABLE_STYLE_ELEMENT_LEN);
         write_frt_header(&mut data, TABLE_STYLE_ELEMENT_RECORD_TYPE);
@@ -283,28 +283,28 @@ impl XlsTableStyleElement {
         Ok(data)
     }
 
-    pub fn to_record_bytes(&self) -> XlsResult<Vec<u8>> {
+    pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         record_bytes(TABLE_STYLE_ELEMENT_RECORD_TYPE, self.to_payload()?)
     }
 }
 
 /// A user-defined table style and its ordered style elements.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsTableStyle {
+pub struct TableStyle {
     name: String,
     available_for_tables: bool,
     available_for_pivot_tables: bool,
-    elements: Vec<XlsTableStyleElement>,
+    elements: Vec<TableStyleElement>,
     declared_element_count: u32,
 }
 
-impl XlsTableStyle {
+impl TableStyle {
     pub fn try_new(
         name: impl Into<String>,
         available_for_tables: bool,
         available_for_pivot_tables: bool,
-        elements: Vec<XlsTableStyleElement>,
-    ) -> XlsResult<Self> {
+        elements: Vec<TableStyleElement>,
+    ) -> Result<Self> {
         let declared_element_count = u32::try_from(elements.len()).map_err(|_| {
             invalid(
                 TABLE_STYLE_RECORD_TYPE,
@@ -331,14 +331,14 @@ impl XlsTableStyle {
     pub const fn is_available_for_pivot_tables(&self) -> bool {
         self.available_for_pivot_tables
     }
-    pub fn elements(&self) -> &[XlsTableStyleElement] {
+    pub fn elements(&self) -> &[TableStyleElement] {
         &self.elements
     }
     pub const fn declared_element_count(&self) -> u32 {
         self.declared_element_count
     }
 
-    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if data.len() < TABLE_STYLE_FIXED_LEN
             || data.len() > TABLE_STYLE_FIXED_LEN + MAX_STYLE_NAME_UNITS * 2
         {
@@ -390,7 +390,7 @@ impl XlsTableStyle {
         })
     }
 
-    pub fn to_payload(&self) -> XlsResult<Vec<u8>> {
+    pub fn to_payload(&self) -> Result<Vec<u8>> {
         self.validate_complete()?;
         let units = self.name.encode_utf16().collect::<Vec<_>>();
         let mut data = Vec::with_capacity(TABLE_STYLE_FIXED_LEN + units.len() * 2);
@@ -404,11 +404,11 @@ impl XlsTableStyle {
         Ok(data)
     }
 
-    pub fn to_record_bytes(&self) -> XlsResult<Vec<u8>> {
+    pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         record_bytes(TABLE_STYLE_RECORD_TYPE, self.to_payload()?)
     }
 
-    fn validate_header(&self) -> XlsResult<()> {
+    fn validate_header(&self) -> Result<()> {
         let units = self.name.encode_utf16().count();
         if !(1..=MAX_STYLE_NAME_UNITS).contains(&units) {
             return Err(invalid(
@@ -425,7 +425,7 @@ impl XlsTableStyle {
         Ok(())
     }
 
-    fn validate_complete(&self) -> XlsResult<()> {
+    fn validate_complete(&self) -> Result<()> {
         self.validate_header()?;
         if self.elements.len() != self.declared_element_count as usize {
             return Err(invalid(
@@ -453,20 +453,20 @@ impl XlsTableStyle {
 
 /// The `TableStyles` catalog header and all following custom style records.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsTableStyles {
+pub struct TableStyles {
     total_style_count: u32,
     default_table_style: String,
     default_pivot_style: String,
-    custom_styles: Vec<XlsTableStyle>,
+    custom_styles: Vec<TableStyle>,
 }
 
-impl XlsTableStyles {
+impl TableStyles {
     /// Constructs a catalog header. Use `try_with_custom_styles` for a complete custom catalog.
     pub fn try_new(
         total_style_count: u32,
         default_table_style: impl Into<String>,
         default_pivot_style: impl Into<String>,
-    ) -> XlsResult<Self> {
+    ) -> Result<Self> {
         let value = Self {
             total_style_count,
             default_table_style: default_table_style.into(),
@@ -480,8 +480,8 @@ impl XlsTableStyles {
     pub fn try_with_custom_styles(
         default_table_style: impl Into<String>,
         default_pivot_style: impl Into<String>,
-        custom_styles: Vec<XlsTableStyle>,
-    ) -> XlsResult<Self> {
+        custom_styles: Vec<TableStyle>,
+    ) -> Result<Self> {
         if custom_styles.len() > MAX_CUSTOM_TABLE_STYLES {
             return Err(invalid(
                 TABLE_STYLES_RECORD_TYPE,
@@ -501,7 +501,7 @@ impl XlsTableStyles {
         Ok(value)
     }
 
-    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse_payload(data: &[u8]) -> Result<Self> {
         let maximum = TABLE_STYLES_FIXED_LEN + MAX_STYLE_NAME_UNITS * 4;
         if !(TABLE_STYLES_FIXED_LEN..=maximum).contains(&data.len()) {
             return Err(invalid(
@@ -570,11 +570,11 @@ impl XlsTableStyles {
     pub fn default_pivot_style(&self) -> &str {
         &self.default_pivot_style
     }
-    pub fn custom_styles(&self) -> &[XlsTableStyle] {
+    pub fn custom_styles(&self) -> &[TableStyle] {
         &self.custom_styles
     }
 
-    pub fn to_payload(&self) -> XlsResult<Vec<u8>> {
+    pub fn to_payload(&self) -> Result<Vec<u8>> {
         self.validate_header()?;
         let table_units = self.default_table_style.encode_utf16().collect::<Vec<_>>();
         let pivot_units = self.default_pivot_style.encode_utf16().collect::<Vec<_>>();
@@ -590,12 +590,12 @@ impl XlsTableStyles {
         Ok(data)
     }
 
-    pub fn to_record_bytes(&self) -> XlsResult<Vec<u8>> {
+    pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         record_bytes(TABLE_STYLES_RECORD_TYPE, self.to_payload()?)
     }
 
     /// Serializes the complete `TABLESTYLES` ABNF family in record order.
-    pub fn to_family_record_bytes(&self, differential_format_count: usize) -> XlsResult<Vec<u8>> {
+    pub fn to_family_record_bytes(&self, differential_format_count: usize) -> Result<Vec<u8>> {
         self.validate_complete(differential_format_count)?;
         let mut data = self.to_record_bytes()?;
         for style in &self.custom_styles {
@@ -607,7 +607,7 @@ impl XlsTableStyles {
         Ok(data)
     }
 
-    fn validate_header(&self) -> XlsResult<()> {
+    fn validate_header(&self) -> Result<()> {
         if self.total_style_count < BUILT_IN_STYLE_COUNT {
             return Err(invalid(
                 TABLE_STYLES_RECORD_TYPE,
@@ -634,7 +634,7 @@ impl XlsTableStyles {
         Ok(())
     }
 
-    fn validate_complete(&self, differential_format_count: usize) -> XlsResult<()> {
+    fn validate_complete(&self, differential_format_count: usize) -> Result<()> {
         self.validate_header()?;
         if self.custom_styles.len() != self.custom_style_count() as usize {
             return Err(invalid(
@@ -671,7 +671,7 @@ impl XlsTableStyles {
     }
 }
 
-fn decode_utf16(data: &[u8], record_type: u16, field: &str) -> XlsResult<String> {
+fn decode_utf16(data: &[u8], record_type: u16, field: &str) -> Result<String> {
     let units = data
         .chunks_exact(2)
         .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]));
@@ -681,9 +681,9 @@ fn decode_utf16(data: &[u8], record_type: u16, field: &str) -> XlsResult<String>
 }
 
 pub(crate) struct TableStylesCollector {
-    header: Option<XlsTableStyles>,
-    styles: Vec<XlsTableStyle>,
-    current_style: Option<XlsTableStyle>,
+    header: Option<TableStyles>,
+    styles: Vec<TableStyle>,
+    current_style: Option<TableStyle>,
     family_closed: bool,
     saw_style_record: bool,
     differential_format_count: usize,
@@ -701,7 +701,7 @@ impl TableStylesCollector {
         }
     }
 
-    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
+    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> Result<()> {
         if self
             .current_style
             .as_ref()
@@ -746,7 +746,7 @@ impl TableStylesCollector {
                         "duplicate or noncontiguous TableStyles",
                     ));
                 }
-                self.header = Some(XlsTableStyles::parse_payload(data)?);
+                self.header = Some(TableStyles::parse_payload(data)?);
             },
             TABLE_STYLE_RECORD_TYPE => {
                 if self.header.is_none() || self.family_closed {
@@ -769,7 +769,7 @@ impl TableStylesCollector {
                         ),
                     ));
                 }
-                let style = XlsTableStyle::parse_payload(data)?;
+                let style = TableStyle::parse_payload(data)?;
                 if style.declared_element_count == 0 {
                     self.styles.push(style);
                 } else {
@@ -795,9 +795,7 @@ impl TableStylesCollector {
                         "TableStyleElement exceeds the preceding ctse count",
                     ));
                 }
-                style
-                    .elements
-                    .push(XlsTableStyleElement::parse_payload(data)?);
+                style.elements.push(TableStyleElement::parse_payload(data)?);
             },
             _ if self.header.is_some() => self.close_family()?,
             _ => {},
@@ -805,7 +803,7 @@ impl TableStylesCollector {
         Ok(())
     }
 
-    fn finish_current_style(&mut self) -> XlsResult<()> {
+    fn finish_current_style(&mut self) -> Result<()> {
         if let Some(style) = self.current_style.take() {
             style.validate_complete()?;
             self.styles.push(style);
@@ -813,7 +811,7 @@ impl TableStylesCollector {
         Ok(())
     }
 
-    fn close_family(&mut self) -> XlsResult<()> {
+    fn close_family(&mut self) -> Result<()> {
         if let Some(style) = &self.current_style
             && style.elements.len() != style.declared_element_count as usize
         {
@@ -830,7 +828,7 @@ impl TableStylesCollector {
     pub(crate) fn finish(
         mut self,
         differential_format_count: usize,
-    ) -> XlsResult<Option<XlsTableStyles>> {
+    ) -> Result<Option<TableStyles>> {
         if self.header.is_none() {
             return Ok(None);
         }
@@ -874,7 +872,7 @@ mod tests {
     }
 
     fn empty_style_record(name: &str, count: u32) -> Vec<u8> {
-        let mut style = XlsTableStyle::try_new(name, true, false, vec![]).unwrap();
+        let mut style = TableStyle::try_new(name, true, false, vec![]).unwrap();
         style.declared_element_count = count;
         let units = name.encode_utf16().collect::<Vec<_>>();
         let mut data = Vec::new();
@@ -889,7 +887,7 @@ mod tests {
     #[test]
     fn parses_and_round_trips_poi_reference_header() {
         let bytes = decode_hex(POI_REFERENCE_HEX);
-        let styles = XlsTableStyles::parse_payload(&bytes).unwrap();
+        let styles = TableStyles::parse_payload(&bytes).unwrap();
         assert_eq!(styles.total_style_count(), 144);
         assert_eq!(styles.custom_style_count(), 0);
         assert_eq!(styles.default_table_style(), "TableStyleMedium9");
@@ -899,15 +897,14 @@ mod tests {
 
     #[test]
     fn complete_custom_family_round_trips_all_record_types() {
-        let element = XlsTableStyleElement::try_with_stripe_size(
-            XlsTableStyleRegion::FirstRowStripe,
+        let element = TableStyleElement::try_with_stripe_size(
+            TableStyleRegion::FirstRowStripe,
             2,
-            XlsDifferentialFormatId::new(0),
+            DifferentialFormatId::new(0),
         )
         .unwrap();
-        let style =
-            XlsTableStyle::try_new("Custom One", true, true, vec![element.clone()]).unwrap();
-        let catalog = XlsTableStyles::try_with_custom_styles(
+        let style = TableStyle::try_new("Custom One", true, true, vec![element.clone()]).unwrap();
+        let catalog = TableStyles::try_with_custom_styles(
             "TableStyleMedium2",
             "PivotStyleLight16",
             vec![style.clone()],
@@ -917,35 +914,33 @@ mod tests {
         assert!(bytes.windows(2).any(|value| value == [0x8F, 0x08]));
         assert!(bytes.windows(2).any(|value| value == [0x90, 0x08]));
         assert_eq!(
-            XlsTableStyle::parse_payload(&style.to_payload().unwrap())
+            TableStyle::parse_payload(&style.to_payload().unwrap())
                 .unwrap()
                 .name(),
             "Custom One"
         );
         assert_eq!(
-            XlsTableStyleElement::parse_payload(&element.to_payload().unwrap()).unwrap(),
+            TableStyleElement::parse_payload(&element.to_payload().unwrap()).unwrap(),
             element
         );
     }
 
     #[test]
     fn collector_enforces_abnf_counts_and_references() {
-        let header = XlsTableStyles::try_new(145, "TableStyleMedium2", "PivotStyleLight16")
+        let header = TableStyles::try_new(145, "TableStyleMedium2", "PivotStyleLight16")
             .unwrap()
             .to_payload()
             .unwrap();
-        let dxf = crate::differential_format::XlsDifferentialFormat::try_new(false, vec![])
+        let dxf = crate::differential_format::DifferentialFormat::try_new(false, vec![])
             .unwrap()
             .to_payload()
             .unwrap();
         let style = empty_style_record("Custom", 1);
-        let element = XlsTableStyleElement::try_new(
-            XlsTableStyleRegion::WholeTable,
-            XlsDifferentialFormatId::new(0),
-        )
-        .unwrap()
-        .to_payload()
-        .unwrap();
+        let element =
+            TableStyleElement::try_new(TableStyleRegion::WholeTable, DifferentialFormatId::new(0))
+                .unwrap()
+                .to_payload()
+                .unwrap();
 
         let mut collector = TableStylesCollector::new();
         collector.feed_record(DXF_RECORD_TYPE, &dxf).unwrap();
@@ -973,13 +968,11 @@ mod tests {
             .unwrap();
         assert!(missing.feed_record(0x000A, &[]).is_err());
 
-        let bad_reference = XlsTableStyleElement::try_new(
-            XlsTableStyleRegion::WholeTable,
-            XlsDifferentialFormatId::new(1),
-        )
-        .unwrap()
-        .to_payload()
-        .unwrap();
+        let bad_reference =
+            TableStyleElement::try_new(TableStyleRegion::WholeTable, DifferentialFormatId::new(1))
+                .unwrap()
+                .to_payload()
+                .unwrap();
         let mut hostile = TableStylesCollector::new();
         hostile.feed_record(DXF_RECORD_TYPE, &dxf).unwrap();
         hostile.feed_record(STYLE_RECORD_TYPE, &[]).unwrap();
@@ -998,39 +991,33 @@ mod tests {
     #[test]
     fn rejects_hostile_headers_lengths_regions_duplicates_and_caps() {
         let reference = decode_hex(POI_REFERENCE_HEX);
-        assert!(XlsTableStyles::parse_payload(&reference[..19]).is_err());
+        assert!(TableStyles::parse_payload(&reference[..19]).is_err());
         let mut bad = reference.clone();
         bad[0] = 0;
-        assert!(XlsTableStyles::parse_payload(&bad).is_err());
+        assert!(TableStyles::parse_payload(&bad).is_err());
         let mut bad = reference;
         bad[12..16].copy_from_slice(&143u32.to_le_bytes());
-        assert!(XlsTableStyles::parse_payload(&bad).is_err());
-        assert!(XlsTableStyles::try_new(144, "x".repeat(256), "").is_err());
+        assert!(TableStyles::parse_payload(&bad).is_err());
+        assert!(TableStyles::try_new(144, "x".repeat(256), "").is_err());
 
-        let element = XlsTableStyleElement::try_new(
-            XlsTableStyleRegion::WholeTable,
-            XlsDifferentialFormatId::new(0),
-        )
-        .unwrap();
+        let element =
+            TableStyleElement::try_new(TableStyleRegion::WholeTable, DifferentialFormatId::new(0))
+                .unwrap();
+        assert!(TableStyle::try_new("dup", true, false, vec![element.clone(), element]).is_err());
         assert!(
-            XlsTableStyle::try_new("dup", true, false, vec![element.clone(), element]).is_err()
-        );
-        assert!(
-            XlsTableStyleElement::try_with_stripe_size(
-                XlsTableStyleRegion::HeaderRow,
+            TableStyleElement::try_with_stripe_size(
+                TableStyleRegion::HeaderRow,
                 2,
-                XlsDifferentialFormatId::new(0),
+                DifferentialFormatId::new(0),
             )
             .is_err()
         );
-        let mut bad_element = XlsTableStyleElement::try_new(
-            XlsTableStyleRegion::WholeTable,
-            XlsDifferentialFormatId::new(0),
-        )
-        .unwrap()
-        .to_payload()
-        .unwrap();
+        let mut bad_element =
+            TableStyleElement::try_new(TableStyleRegion::WholeTable, DifferentialFormatId::new(0))
+                .unwrap()
+                .to_payload()
+                .unwrap();
         bad_element[12..16].copy_from_slice(&28u32.to_le_bytes());
-        assert!(XlsTableStyleElement::parse_payload(&bad_element).is_err());
+        assert!(TableStyleElement::parse_payload(&bad_element).is_err());
     }
 }

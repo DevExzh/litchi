@@ -4,7 +4,7 @@ use crate::records::{BoundSheetRecord, SheetType, SheetVisible};
 
 /// Visibility state of a workbook sheet.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsSheetVisibility {
+pub enum SheetVisibility {
     Visible,
     Hidden,
     VeryHidden,
@@ -12,7 +12,7 @@ pub enum XlsSheetVisibility {
 
 /// BIFF substream kind referenced by a workbook sheet entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsSheetKind {
+pub enum SheetKind {
     /// A worksheet or dialog sheet. `BoundSheet8` does not distinguish them.
     WorksheetOrDialog,
     MacroSheet,
@@ -22,46 +22,46 @@ pub enum XlsSheetKind {
 
 /// One entry in the workbook's sheet directory, in tab order.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsSheetMetadata {
+pub struct SheetMetadata {
     workbook_index: usize,
     name: String,
-    visibility: XlsSheetVisibility,
-    kind: XlsSheetKind,
+    visibility: SheetVisibility,
+    kind: SheetKind,
     parsed_worksheet_index: Option<usize>,
 }
 
-impl XlsSheetMetadata {
+impl SheetMetadata {
     pub fn workbook_index(&self) -> usize {
         self.workbook_index
     }
     pub fn name(&self) -> &str {
         &self.name
     }
-    pub fn visibility(&self) -> XlsSheetVisibility {
+    pub fn visibility(&self) -> SheetVisibility {
         self.visibility
     }
-    pub fn kind(&self) -> XlsSheetKind {
+    pub fn kind(&self) -> SheetKind {
         self.kind
     }
-    /// Index accepted by `XlsWorkbook::xls_worksheet`, when this entry was parsed as a worksheet.
+    /// Index accepted by `Workbook::xls_worksheet`, when this entry was parsed as a worksheet.
     pub fn parsed_worksheet_index(&self) -> Option<usize> {
         self.parsed_worksheet_index
     }
     pub fn is_visible(&self) -> bool {
-        self.visibility == XlsSheetVisibility::Visible
+        self.visibility == SheetVisibility::Visible
     }
 
     pub(crate) fn from_bound_sheet(workbook_index: usize, sheet: &BoundSheetRecord) -> Self {
         let visibility = match sheet.visible {
-            SheetVisible::Visible => XlsSheetVisibility::Visible,
-            SheetVisible::Hidden => XlsSheetVisibility::Hidden,
-            SheetVisible::VeryHidden => XlsSheetVisibility::VeryHidden,
+            SheetVisible::Visible => SheetVisibility::Visible,
+            SheetVisible::Hidden => SheetVisibility::Hidden,
+            SheetVisible::VeryHidden => SheetVisibility::VeryHidden,
         };
         let kind = match sheet.sheet_type {
-            SheetType::WorkSheet => XlsSheetKind::WorksheetOrDialog,
-            SheetType::MacroSheet => XlsSheetKind::MacroSheet,
-            SheetType::ChartSheet => XlsSheetKind::ChartSheet,
-            SheetType::VBModule => XlsSheetKind::VbaModule,
+            SheetType::WorkSheet => SheetKind::WorksheetOrDialog,
+            SheetType::MacroSheet => SheetKind::MacroSheet,
+            SheetType::ChartSheet => SheetKind::ChartSheet,
+            SheetType::VBModule => SheetKind::VbaModule,
         };
         Self {
             workbook_index,
@@ -80,7 +80,7 @@ impl XlsSheetMetadata {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::XlsWorkbook;
+    use crate::Workbook;
     use std::fs::File;
     use std::path::{Path, PathBuf};
 
@@ -92,39 +92,37 @@ mod tests {
 
     #[test]
     fn reads_hidden_and_very_hidden_poi_sheets() {
-        let workbook = XlsWorkbook::new(File::open(fixture("45761.xls")).unwrap()).unwrap();
+        let workbook = Workbook::new(File::open(fixture("45761.xls")).unwrap()).unwrap();
         let sheets = workbook.sheets();
         assert_eq!(sheets.len(), 3);
         assert_eq!(sheets[0].name(), "VisibleSheet");
-        assert_eq!(sheets[0].visibility(), XlsSheetVisibility::Visible);
+        assert_eq!(sheets[0].visibility(), SheetVisibility::Visible);
         assert_eq!(sheets[1].name(), "HiddenSheet");
-        assert_eq!(sheets[1].visibility(), XlsSheetVisibility::Hidden);
+        assert_eq!(sheets[1].visibility(), SheetVisibility::Hidden);
         assert_eq!(sheets[2].name(), "VeryHiddenSheet");
-        assert_eq!(sheets[2].visibility(), XlsSheetVisibility::VeryHidden);
+        assert_eq!(sheets[2].visibility(), SheetVisibility::VeryHidden);
         assert!(
             sheets
                 .iter()
-                .all(|sheet| sheet.kind() == XlsSheetKind::WorksheetOrDialog)
+                .all(|sheet| sheet.kind() == SheetKind::WorksheetOrDialog)
         );
 
-        let hidden =
-            XlsWorkbook::new(File::open(fixture("TwoSheetsOneHidden.xls")).unwrap()).unwrap();
-        assert_eq!(hidden.sheets()[0].visibility(), XlsSheetVisibility::Hidden);
-        assert_eq!(hidden.sheets()[1].visibility(), XlsSheetVisibility::Visible);
+        let hidden = Workbook::new(File::open(fixture("TwoSheetsOneHidden.xls")).unwrap()).unwrap();
+        assert_eq!(hidden.sheets()[0].visibility(), SheetVisibility::Hidden);
+        assert_eq!(hidden.sheets()[1].visibility(), SheetVisibility::Visible);
     }
 
     #[test]
     fn catalogs_chart_sheets_without_parsing_them_as_worksheets() {
-        let workbook =
-            XlsWorkbook::new(File::open(fixture("44010-TwoCharts.xls")).unwrap()).unwrap();
+        let workbook = Workbook::new(File::open(fixture("44010-TwoCharts.xls")).unwrap()).unwrap();
         let sheets = workbook.sheets();
         assert_eq!(sheets.len(), 3);
-        assert_eq!(sheets[0].kind(), XlsSheetKind::WorksheetOrDialog);
+        assert_eq!(sheets[0].kind(), SheetKind::WorksheetOrDialog);
         assert_eq!(sheets[1].name(), "Graph1");
-        assert_eq!(sheets[1].kind(), XlsSheetKind::ChartSheet);
+        assert_eq!(sheets[1].kind(), SheetKind::ChartSheet);
         assert_eq!(sheets[1].parsed_worksheet_index(), None);
         assert_eq!(sheets[2].name(), "Graph2");
-        assert_eq!(sheets[2].kind(), XlsSheetKind::ChartSheet);
+        assert_eq!(sheets[2].kind(), SheetKind::ChartSheet);
         assert_eq!(sheets[2].parsed_worksheet_index(), None);
     }
 }

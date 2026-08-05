@@ -1,11 +1,11 @@
 //! Semantic worksheet-window values for legacy BIFF8.
 
-use crate::error::{XlsError, XlsResult};
+use crate::error::{Error, Result};
 
 use super::SELECTION_RECORD_TYPE;
 
-pub(super) fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+pub(super) fn invalid(record_type: u16, message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type,
         message: message.into(),
     }
@@ -32,7 +32,7 @@ pub enum PaneType {
 }
 
 impl PaneType {
-    pub(super) fn parse(value: u8, record_type: u16) -> XlsResult<Self> {
+    pub(super) fn parse(value: u8, record_type: u16) -> Result<Self> {
         match value {
             0 => Ok(Self::LowerRight),
             1 => Ok(Self::UpperRight),
@@ -63,14 +63,9 @@ pub struct Range {
 
 impl Range {
     /// Create an inclusive range, rejecting inverted endpoints.
-    pub fn new(
-        first_row: u16,
-        last_row: u16,
-        first_column: u8,
-        last_column: u8,
-    ) -> XlsResult<Self> {
+    pub fn new(first_row: u16, last_row: u16, first_column: u8, last_column: u8) -> Result<Self> {
         if first_row > last_row || first_column > last_column {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "selection range endpoints must be ordered".to_string(),
             ));
         }
@@ -240,7 +235,7 @@ impl View {
         &self.selections
     }
 
-    pub(super) fn validate_selection_groups(&self) -> XlsResult<()> {
+    pub(super) fn validate_selection_groups(&self) -> Result<()> {
         let mut start = 0;
         while start < self.selections.len() {
             let first = &self.selections[start];

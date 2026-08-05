@@ -2,11 +2,11 @@ use std::io::Cursor;
 
 use litchi_cfb::OleFile;
 use litchi_core::sheet::{Cell, CellValue, WorkbookTrait};
-use litchi_xls::writer::{XlsEncryptionProfile, XlsWriter};
-use litchi_xls::{XlsError, XlsOpenOptions, XlsWorkbook};
+use litchi_xls::writer::{EncryptionProfile, Writer};
+use litchi_xls::{Error, OpenOptions, Workbook};
 
-fn encrypted_workbook(profile: XlsEncryptionProfile, password: &str) -> Vec<u8> {
-    let mut writer = XlsWriter::new();
+fn encrypted_workbook(profile: EncryptionProfile, password: &str) -> Vec<u8> {
+    let mut writer = Writer::new();
     let first = writer.add_worksheet("Data").unwrap();
     let second = writer.add_worksheet("Second").unwrap();
     writer.write_string(first, 0, 0, "shared text").unwrap();
@@ -22,15 +22,12 @@ fn encrypted_workbook(profile: XlsEncryptionProfile, password: &str) -> Vec<u8> 
     output.into_inner()
 }
 
-fn open<'a>(
-    bytes: &'a [u8],
-    password: Option<&str>,
-) -> Result<XlsWorkbook<Cursor<&'a [u8]>>, XlsError> {
-    XlsWorkbook::new_with_options(
+fn open<'a>(bytes: &'a [u8], password: Option<&str>) -> Result<Workbook<Cursor<&'a [u8]>>, Error> {
+    Workbook::new_with_options(
         Cursor::new(bytes),
-        XlsOpenOptions {
+        OpenOptions {
             password,
-            ..XlsOpenOptions::default()
+            ..OpenOptions::default()
         },
     )
 }
@@ -57,15 +54,12 @@ fn filepass(stream: &[u8]) -> (usize, &[u8]) {
     found.unwrap()
 }
 
-fn assert_round_trip(profile: XlsEncryptionProfile, password: &str) -> Vec<u8> {
+fn assert_round_trip(profile: EncryptionProfile, password: &str) -> Vec<u8> {
     let bytes = encrypted_workbook(profile, password);
-    assert!(matches!(
-        open(&bytes, None),
-        Err(XlsError::PasswordRequired)
-    ));
+    assert!(matches!(open(&bytes, None), Err(Error::PasswordRequired)));
     assert!(matches!(
         open(&bytes, Some("wrong")),
-        Err(XlsError::InvalidPassword)
+        Err(Error::InvalidPassword)
     ));
     let workbook = open(&bytes, Some(password)).unwrap();
     assert_eq!(workbook.worksheet_count(), 2);
@@ -85,20 +79,20 @@ fn assert_round_trip(profile: XlsEncryptionProfile, password: &str) -> Vec<u8> {
 
 #[test]
 fn all_profiles_round_trip_and_emit_exact_filepass_families() {
-    let xor = assert_round_trip(XlsEncryptionProfile::XorObfuscation, "cafe");
+    let xor = assert_round_trip(EncryptionProfile::XorObfuscation, "cafe");
     let xor_stream = workbook_stream(&xor);
     let (_, xor_pass) = filepass(&xor_stream);
     assert_eq!(xor_pass.len(), 6);
     assert_eq!(&xor_pass[..2], &[0, 0]);
 
-    let binary = assert_round_trip(XlsEncryptionProfile::OfficeBinaryRc4, "密码🔐");
+    let binary = assert_round_trip(EncryptionProfile::OfficeBinaryRc4, "密码🔐");
     let binary_stream = workbook_stream(&binary);
     let (_, binary_pass) = filepass(&binary_stream);
     assert_eq!(binary_pass.len(), 54);
     assert_eq!(&binary_pass[..6], &[1, 0, 1, 0, 1, 0]);
 
     for key_bits in [40, 56, 120, 128] {
-        let bytes = assert_round_trip(XlsEncryptionProfile::CryptoApiRc4 { key_bits }, "密码🔐");
+        let bytes = assert_round_trip(EncryptionProfile::CryptoApiRc4 { key_bits }, "密码🔐");
         let stream = workbook_stream(&bytes);
         let (offset, pass) = filepass(&stream);
         assert_eq!(&pass[..6], &[1, 0, 2, 0, 2, 0]);
@@ -116,8 +110,8 @@ fn all_profiles_round_trip_and_emit_exact_filepass_families() {
 
 #[test]
 fn salts_are_nondeterministic_and_configuration_changes_are_atomic() {
-    let first = encrypted_workbook(XlsEncryptionProfile::OfficeBinaryRc4, "secret");
-    let second = encrypted_workbook(XlsEncryptionProfile::OfficeBinaryRc4, "secret");
+    let first = encrypted_workbook(EncryptionProfile::OfficeBinaryRc4, "secret");
+    let second = encrypted_workbook(EncryptionProfile::OfficeBinaryRc4, "secret");
     let first_stream = workbook_stream(&first);
     let second_stream = workbook_stream(&second);
     assert_ne!(
@@ -125,29 +119,29 @@ fn salts_are_nondeterministic_and_configuration_changes_are_atomic() {
         &filepass(&second_stream).1[6..22]
     );
 
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     writer.add_worksheet("Sheet").unwrap();
     writer
-        .set_password("kept", XlsEncryptionProfile::OfficeBinaryRc4)
+        .set_password("kept", EncryptionProfile::OfficeBinaryRc4)
         .unwrap();
     assert!(
         writer
-            .set_password("", XlsEncryptionProfile::XorObfuscation)
+            .set_password("", EncryptionProfile::XorObfuscation)
             .is_err()
     );
     assert!(
         writer
-            .set_password("not ANSI 🔐", XlsEncryptionProfile::XorObfuscation)
+            .set_password("not ANSI 🔐", EncryptionProfile::XorObfuscation)
             .is_err()
     );
     assert!(
         writer
-            .set_password("bad", XlsEncryptionProfile::CryptoApiRc4 { key_bits: 41 })
+            .set_password("bad", EncryptionProfile::CryptoApiRc4 { key_bits: 41 })
             .is_err()
     );
     assert_eq!(
         writer.encryption_profile(),
-        Some(XlsEncryptionProfile::OfficeBinaryRc4)
+        Some(EncryptionProfile::OfficeBinaryRc4)
     );
     writer.clear_password();
     assert_eq!(writer.encryption_profile(), None);

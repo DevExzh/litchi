@@ -1,9 +1,9 @@
 //! Strict, inert PowerPoint document-level slide-show settings.
 
-use super::named_shows::{PowerPointNamedShow, PowerPointNamedShows};
-use super::package::{PptError, Result};
-use super::records::PptRecord;
-use crate::consts::PptRecordType;
+use super::named_shows::{NamedShow, NamedShows};
+use super::package::{Error, Result};
+use super::records::Record;
+use crate::consts::RecordType;
 use std::ops::RangeInclusive;
 
 const PAYLOAD_LEN: usize = 80;
@@ -13,7 +13,7 @@ const KNOWN_FLAGS: u16 = 0x01ff;
 /// The meaning of the index byte in an MS-PPT `ColorIndexStruct`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
-pub enum PowerPointColorIndexKind {
+pub enum ColorIndexKind {
     Background = 0x00,
     Text = 0x01,
     Shadow = 0x02,
@@ -26,7 +26,7 @@ pub enum PowerPointColorIndexKind {
     Undefined = 0xff,
 }
 
-impl PowerPointColorIndexKind {
+impl ColorIndexKind {
     fn parse(value: u8) -> Result<Self> {
         match value {
             0x00 => Ok(Self::Background),
@@ -46,24 +46,24 @@ impl PowerPointColorIndexKind {
 
 /// A four-byte MS-PPT `ColorIndexStruct`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PowerPointColorIndex {
+pub struct ColorIndex {
     pub red: u8,
     pub green: u8,
     pub blue: u8,
-    pub kind: PowerPointColorIndexKind,
+    pub kind: ColorIndexKind,
 }
 
-impl PowerPointColorIndex {
+impl ColorIndex {
     /// Parse one four-byte `ColorIndexStruct` (MS-PPT 2.12.2).
     pub(crate) fn parse_bytes(data: &[u8]) -> Result<Self> {
         let [red, green, blue, index]: [u8; 4] = data
             .try_into()
-            .map_err(|_| PptError::Corrupted("ColorIndexStruct is truncated".to_string()))?;
+            .map_err(|_| Error::Corrupted("ColorIndexStruct is truncated".to_string()))?;
         Ok(Self {
             red,
             green,
             blue,
-            kind: PowerPointColorIndexKind::parse(index)?,
+            kind: ColorIndexKind::parse(index)?,
         })
     }
 
@@ -75,7 +75,7 @@ impl PowerPointColorIndex {
 
 /// The nine defined `SlideShowDocInfoAtom` flags.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct PowerPointSlideShowFlags {
+pub struct SlideShowFlags {
     pub auto_advance: bool,
     pub will_skip_builds: bool,
     pub use_slide_range: bool,
@@ -87,7 +87,7 @@ pub struct PowerPointSlideShowFlags {
     pub hide_scroll_bar: bool,
 }
 
-impl PowerPointSlideShowFlags {
+impl SlideShowFlags {
     fn parse(bits: u16) -> Result<Self> {
         if bits & !KNOWN_FLAGS != 0 {
             return corrupted("SlideShowDocInfoAtom has nonzero reserved flag bits");
@@ -130,24 +130,24 @@ impl PowerPointSlideShowFlags {
 
 /// A validated document-level `SlideShowDocInfoAtom`.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PowerPointSlideShowSettings {
-    pub pen_color: PowerPointColorIndex,
+pub struct SlideShowSettings {
+    pub pen_color: ColorIndex,
     pub restart_time_millis: i32,
     pub start_slide: u16,
     pub end_slide: u16,
     pub named_show: String,
-    pub flags: PowerPointSlideShowFlags,
+    pub flags: SlideShowFlags,
     /// Undefined bytes preserved for a lossless record roundtrip.
     pub unused: [u8; 2],
 }
 
-impl PowerPointSlideShowSettings {
+impl SlideShowSettings {
     /// Parse the unique direct settings atom below `document`.
-    pub fn parse(document: &PptRecord) -> Result<Option<Self>> {
+    pub fn parse(document: &Record) -> Result<Option<Self>> {
         let records = document
             .children
             .iter()
-            .filter(|record| record.record_type_raw == PptRecordType::SlideShowDocInfoAtom.as_u16())
+            .filter(|record| record.record_type_raw == RecordType::SlideShowDocInfoAtom.as_u16())
             .collect::<Vec<_>>();
         if records.len() > 1 {
             return corrupted("DocumentContainer contains duplicate SlideShowDocInfoAtom records");
@@ -163,17 +163,17 @@ impl PowerPointSlideShowSettings {
             return corrupted("SlideShowDocInfoAtom has an invalid header or size");
         }
         let data = record.data.as_slice();
-        let pen_color = PowerPointColorIndex {
+        let pen_color = ColorIndex {
             red: data[0],
             green: data[1],
             blue: data[2],
-            kind: PowerPointColorIndexKind::parse(data[3])?,
+            kind: ColorIndexKind::parse(data[3])?,
         };
         let restart_time_millis = i32::from_le_bytes(data[4..8].try_into().expect("fixed slice"));
         let start_slide = parse_nonnegative_i16(&data[8..10], "startSlide")?;
         let end_slide = parse_nonnegative_i16(&data[10..12], "endSlide")?;
         let named_show = parse_char2(&data[12..12 + NAMED_SHOW_BYTES])?;
-        let flags = PowerPointSlideShowFlags::parse(u16::from_le_bytes([data[76], data[77]]))?;
+        let flags = SlideShowFlags::parse(u16::from_le_bytes([data[76], data[77]]))?;
         let settings = Self {
             pen_color,
             restart_time_millis,
@@ -187,9 +187,9 @@ impl PowerPointSlideShowSettings {
         Ok(Some(settings))
     }
 
-    pub fn to_record(&self) -> Result<PptRecord> {
+    pub fn to_record(&self) -> Result<Record> {
         let bytes = self.to_record_bytes()?;
-        let (record, end) = PptRecord::parse(&bytes, 0)?;
+        let (record, end) = Record::parse(&bytes, 0)?;
         if end != bytes.len() {
             return corrupted("canonical SlideShowDocInfoAtom did not consume its bytes");
         }
@@ -215,7 +215,7 @@ impl PowerPointSlideShowSettings {
 
         let mut bytes = Vec::with_capacity(PAYLOAD_LEN + 8);
         bytes.extend_from_slice(&1u16.to_le_bytes());
-        bytes.extend_from_slice(&PptRecordType::SlideShowDocInfoAtom.as_u16().to_le_bytes());
+        bytes.extend_from_slice(&RecordType::SlideShowDocInfoAtom.as_u16().to_le_bytes());
         bytes.extend_from_slice(&(PAYLOAD_LEN as u32).to_le_bytes());
         bytes.extend_from_slice(&payload);
         Ok(bytes)
@@ -229,10 +229,7 @@ impl PowerPointSlideShowSettings {
     }
 
     /// Resolve the active named show, ignoring it when range mode takes precedence.
-    pub fn selected_named_show<'a>(
-        &self,
-        named_shows: &'a PowerPointNamedShows,
-    ) -> Option<&'a PowerPointNamedShow> {
+    pub fn selected_named_show<'a>(&self, named_shows: &'a NamedShows) -> Option<&'a NamedShow> {
         (!self.flags.use_slide_range && self.flags.use_named_show)
             .then(|| {
                 named_shows
@@ -244,7 +241,7 @@ impl PowerPointSlideShowSettings {
     }
 
     /// Validate the named-show reference in the document-wide context.
-    pub fn validate_named_show(&self, named_shows: &PowerPointNamedShows) -> Result<()> {
+    pub fn validate_named_show(&self, named_shows: &NamedShows) -> Result<()> {
         if !self.flags.use_slide_range
             && self.flags.use_named_show
             && self.selected_named_show(named_shows).is_none()
@@ -270,7 +267,7 @@ impl PowerPointSlideShowSettings {
 fn parse_nonnegative_i16(data: &[u8], field: &str) -> Result<u16> {
     let value = i16::from_le_bytes(data.try_into().expect("two-byte slice"));
     u16::try_from(value)
-        .map_err(|_| PptError::Corrupted(format!("SlideShowDocInfoAtom {field} is negative")))
+        .map_err(|_| Error::Corrupted(format!("SlideShowDocInfoAtom {field} is negative")))
 }
 
 fn parse_char2(data: &[u8]) -> Result<String> {
@@ -283,7 +280,7 @@ fn parse_char2(data: &[u8]) -> Result<String> {
         units.push(unit);
     }
     String::from_utf16(&units)
-        .map_err(|_| PptError::Corrupted("namedShow contains invalid UTF-16".to_string()))
+        .map_err(|_| Error::Corrupted("namedShow contains invalid UTF-16".to_string()))
 }
 
 fn encode_char2(value: &str) -> Result<[u8; NAMED_SHOW_BYTES]> {
@@ -302,43 +299,43 @@ fn encode_char2(value: &str) -> Result<[u8; NAMED_SHOW_BYTES]> {
 }
 
 fn corrupted<T>(message: impl Into<String>) -> Result<T> {
-    Err(PptError::Corrupted(message.into()))
+    Err(Error::Corrupted(message.into()))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn root(children: Vec<PptRecord>) -> PptRecord {
-        PptRecord {
+    fn root(children: Vec<Record>) -> Record {
+        Record {
             version: 0x0f,
             instance: 0,
-            record_type: PptRecordType::Document,
-            record_type_raw: PptRecordType::Document.as_u16(),
+            record_type: RecordType::Document,
+            record_type_raw: RecordType::Document.as_u16(),
             data_length: 0,
             data: Vec::new(),
             children,
         }
     }
 
-    fn settings() -> PowerPointSlideShowSettings {
-        PowerPointSlideShowSettings {
-            pen_color: PowerPointColorIndex {
+    fn settings() -> SlideShowSettings {
+        SlideShowSettings {
+            pen_color: ColorIndex {
                 red: 12,
                 green: 34,
                 blue: 56,
-                kind: PowerPointColorIndexKind::Srgb,
+                kind: ColorIndexKind::Srgb,
             },
             restart_time_millis: 30_000,
             start_slide: 2,
             end_slide: 7,
             named_show: "Executive".into(),
-            flags: PowerPointSlideShowFlags {
+            flags: SlideShowFlags {
                 auto_advance: true,
                 use_slide_range: true,
                 kiosk_mode: true,
                 loop_continuously: true,
-                ..PowerPointSlideShowFlags::default()
+                ..SlideShowFlags::default()
             },
             unused: [0xaa, 0x55],
         }
@@ -347,7 +344,7 @@ mod tests {
     #[test]
     fn protocol_shaped_settings_roundtrip_and_preserve_unused_bytes() {
         let expected = settings();
-        let parsed = PowerPointSlideShowSettings::parse(&root(vec![expected.to_record().unwrap()]))
+        let parsed = SlideShowSettings::parse(&root(vec![expected.to_record().unwrap()]))
             .unwrap()
             .unwrap();
         assert_eq!(parsed, expected);
@@ -360,8 +357,8 @@ mod tests {
 
     #[test]
     fn resolves_named_show_only_when_range_mode_is_inactive() {
-        let shows = PowerPointNamedShows {
-            shows: vec![PowerPointNamedShow {
+        let shows = NamedShows {
+            shows: vec![NamedShow {
                 name: "Executive".into(),
                 slide_ids: Some(vec![0x100]),
             }],
@@ -381,17 +378,17 @@ mod tests {
     #[test]
     fn rejects_invalid_headers_color_flags_ranges_and_names() {
         let valid = settings().to_record().unwrap();
-        assert!(PowerPointSlideShowSettings::parse(&root(vec![valid.clone(), valid])).is_err());
+        assert!(SlideShowSettings::parse(&root(vec![valid.clone(), valid])).is_err());
         let mut bytes = settings().to_record_bytes().unwrap();
         for (offset, replacement) in [(0, 0u8), (8 + 3, 0x08), (8 + 77, 0x02)] {
             let mut hostile = bytes.clone();
             hostile[offset] = replacement;
-            let record = PptRecord::parse(&hostile, 0).unwrap().0;
-            assert!(PowerPointSlideShowSettings::parse(&root(vec![record])).is_err());
+            let record = Record::parse(&hostile, 0).unwrap().0;
+            assert!(SlideShowSettings::parse(&root(vec![record])).is_err());
         }
         bytes[8 + 8..8 + 10].copy_from_slice(&(-1i16).to_le_bytes());
-        let record = PptRecord::parse(&bytes, 0).unwrap().0;
-        assert!(PowerPointSlideShowSettings::parse(&root(vec![record])).is_err());
+        let record = Record::parse(&bytes, 0).unwrap().0;
+        assert!(SlideShowSettings::parse(&root(vec![record])).is_err());
 
         let mut value = settings();
         value.flags.browse_mode = true;

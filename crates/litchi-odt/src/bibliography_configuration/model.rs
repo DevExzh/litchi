@@ -226,6 +226,3 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
 
 // These aliases are consumed by the unchanged crate-root facade. New code
 // within this owner uses the shorter contextual vocabulary above.
-pub type BibliographyField = Field;
-pub type BibliographySortKey = SortKey;
-pub type BibliographyConfiguration = Configuration;

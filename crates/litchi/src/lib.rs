@@ -156,7 +156,7 @@
 //!
 //! ## Low-Level Modules (Advanced Use)
 //!
-//! - `doc` - Direct access to the legacy Word parser and writer
+//! - `litchi_doc` - Direct access to the independently owned legacy Word parser and writer
 //! - `ppt` - Direct access to the legacy PowerPoint parser and writer
 //! - `xls` - Direct access to legacy Excel BIFF parsers and writers
 //! - `ooxml` - Direct access to OOXML format parsers
@@ -274,20 +274,6 @@ pub mod sheet;
 /// Use the [`markdown::ToMarkdown`] trait on Document or Presentation types.
 pub mod markdown;
 
-// Low-level format-specific modules (advanced use)
-/// Legacy Word binary parser (`.doc`).
-///
-/// This is the canonical low-level facade for the independently owned
-/// `litchi-doc` package. Compound-file primitives live in `litchi-cfb`, while
-/// legacy PowerPoint support is exposed independently through `litchi::ppt`.
-/// Most users should use the high-level [`Document`] API instead.
-///
-/// **Note**: This requires the `doc` feature to be enabled.
-#[cfg(feature = "doc")]
-pub mod doc {
-    pub use litchi_doc::*;
-}
-
 /// Legacy PowerPoint binary parser and writer (`.ppt`).
 ///
 /// This is the canonical low-level facade for the independently owned
@@ -331,7 +317,10 @@ pub mod drawing {
 #[cfg(feature = "ooxml")]
 pub mod ooxml {
     pub(crate) fn map_ooxml_error<E: std::fmt::Display>(error: E) -> litchi_core::Error {
-        litchi_core::Error::Other(error.to_string())
+        // The unified facade has no concrete OOXML error variant, but these
+        // failures are format/graph validation failures rather than generic
+        // application errors. Preserve that distinction for callers.
+        litchi_core::Error::InvalidFormat(error.to_string())
     }
 
     pub use common::{custom, custom_xml, embedded, ribbon, web};

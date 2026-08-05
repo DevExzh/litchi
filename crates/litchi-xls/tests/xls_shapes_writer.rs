@@ -4,8 +4,8 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use litchi_xls::shapes::extract_shapes_from_workbook;
 use litchi_xls::writer::shape::{Anchor, Behavior, Point};
 use litchi_xls::writer::{
-    XlsPivotTableConfig, XlsShapeColor, XlsShapeFill, XlsShapeKind, XlsShapeLine, XlsShapeText,
-    XlsShapeTextRun, XlsShapeWrite, XlsWriter,
+    PivotTableConfig, ShapeColor, ShapeFill, ShapeKind, ShapeLine, ShapeText, ShapeTextRun,
+    ShapeWrite, Writer,
 };
 
 fn anchor() -> Anchor {
@@ -37,7 +37,7 @@ fn records(stream: &[u8]) -> Vec<(u16, Vec<u8>)> {
     records
 }
 
-fn write(writer: &mut XlsWriter) -> Vec<u8> {
+fn write(writer: &mut Writer) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
     workbook_stream(output.into_inner())
@@ -45,19 +45,19 @@ fn write(writer: &mut XlsWriter) -> Vec<u8> {
 
 #[test]
 fn primitives_emit_exact_client_record_order_and_parse_after_write() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Shapes").unwrap();
 
-    let mut rectangle = XlsShapeWrite::new(XlsShapeKind::Rectangle, anchor());
+    let mut rectangle = ShapeWrite::new(ShapeKind::Rectangle, anchor());
     rectangle.object_id = Some(7);
-    rectangle.fill = XlsShapeFill::Solid(XlsShapeColor::rgb(0x12, 0x34, 0x56));
-    rectangle.line = XlsShapeLine::None;
+    rectangle.fill = ShapeFill::Solid(ShapeColor::rgb(0x12, 0x34, 0x56));
+    rectangle.line = ShapeLine::None;
     assert_eq!(writer.add_shape(sheet, rectangle).unwrap(), 7);
 
-    let mut textbox = XlsShapeWrite::new(XlsShapeKind::TextBox, anchor());
-    textbox.text = Some(XlsShapeText {
+    let mut textbox = ShapeWrite::new(ShapeKind::TextBox, anchor());
+    textbox.text = Some(ShapeText {
         value: "Hello 世界".to_string(),
-        runs: vec![XlsShapeTextRun {
+        runs: vec![ShapeTextRun {
             character_index: 0,
             font_index: 0,
         }],
@@ -110,18 +110,18 @@ fn primitives_emit_exact_client_record_order_and_parse_after_write() {
 
 #[test]
 fn all_safe_primitive_types_use_unique_shape_and_object_ids() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Kinds").unwrap();
     for kind in [
-        XlsShapeKind::Rectangle,
-        XlsShapeKind::RoundedRectangle,
-        XlsShapeKind::Ellipse,
-        XlsShapeKind::Line,
-        XlsShapeKind::TextBox,
+        ShapeKind::Rectangle,
+        ShapeKind::RoundedRectangle,
+        ShapeKind::Ellipse,
+        ShapeKind::Line,
+        ShapeKind::TextBox,
     ] {
-        let mut shape = XlsShapeWrite::new(kind, anchor());
-        if kind == XlsShapeKind::Line {
-            shape.fill = XlsShapeFill::None;
+        let mut shape = ShapeWrite::new(kind, anchor());
+        if kind == ShapeKind::Line {
+            shape.fill = ShapeFill::None;
         }
         writer.add_shape(sheet, shape).unwrap();
     }
@@ -145,12 +145,12 @@ fn all_safe_primitive_types_use_unique_shape_and_object_ids() {
 
 #[test]
 fn mixed_pivot_shape_and_comment_ids_are_collision_free_in_one_cluster() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Mixed").unwrap();
     writer
         .add_pivot_table(
             sheet,
-            XlsPivotTableConfig {
+            PivotTableConfig {
                 name: "Pivot".into(),
                 source_type: 1,
                 source_sheet_name: "Mixed".into(),
@@ -175,7 +175,7 @@ fn mixed_pivot_shape_and_comment_ids_are_collision_free_in_one_cluster() {
             },
         )
         .unwrap();
-    let mut shape = XlsShapeWrite::new(XlsShapeKind::Ellipse, anchor());
+    let mut shape = ShapeWrite::new(ShapeKind::Ellipse, anchor());
     shape.object_id = Some(2);
     writer.add_shape(sheet, shape).unwrap();
     writer.add_comment(sheet, 1, 1, "A", "note").unwrap();
@@ -197,14 +197,14 @@ fn mixed_pivot_shape_and_comment_ids_are_collision_free_in_one_cluster() {
 
 #[test]
 fn shape_mutations_reject_malformed_input_and_are_atomic() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Atomic").unwrap();
 
-    let mut first = XlsShapeWrite::new(XlsShapeKind::Rectangle, anchor());
+    let mut first = ShapeWrite::new(ShapeKind::Rectangle, anchor());
     first.object_id = Some(9);
     writer.add_shape(sheet, first).unwrap();
     let before = write(&mut writer);
-    let mut collision = XlsShapeWrite::new(XlsShapeKind::Ellipse, anchor());
+    let mut collision = ShapeWrite::new(ShapeKind::Ellipse, anchor());
     collision.object_id = Some(9);
     let outcome = catch_unwind(AssertUnwindSafe(|| writer.add_shape(sheet, collision)));
     assert!(outcome.is_ok());
@@ -214,8 +214,8 @@ fn shape_mutations_reject_malformed_input_and_are_atomic() {
     assert_eq!(writer.clear_shapes(sheet).unwrap(), 1);
     assert_eq!(writer.clear_shapes(sheet).unwrap(), 0);
 
-    let mut line = XlsShapeWrite::new(XlsShapeKind::Line, anchor());
-    line.text = Some(XlsShapeText::new("unsupported"));
+    let mut line = ShapeWrite::new(ShapeKind::Line, anchor());
+    line.text = Some(ShapeText::new("unsupported"));
     assert!(writer.add_shape(sheet, line).is_err());
     assert!(
         records(&write(&mut writer))
@@ -226,10 +226,10 @@ fn shape_mutations_reject_malformed_input_and_are_atomic() {
 
 #[test]
 fn long_unicode_shape_text_respects_continue_record_limits() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Long").unwrap();
-    let mut shape = XlsShapeWrite::new(XlsShapeKind::TextBox, anchor());
-    shape.text = Some(XlsShapeText::new("😀".repeat(5000)));
+    let mut shape = ShapeWrite::new(ShapeKind::TextBox, anchor());
+    shape.text = Some(ShapeText::new("😀".repeat(5000)));
     writer.add_shape(sheet, shape).unwrap();
     let records = records(&write(&mut writer));
     assert!(records.iter().all(|(_, data)| data.len() <= 8224));

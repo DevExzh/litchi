@@ -5,8 +5,8 @@ use litchi_odraw::shape::Kind;
 use litchi_xls::shapes::extract_shapes_from_workbook;
 use litchi_xls::writer::shape::{Anchor, Behavior, Point, Rect};
 use litchi_xls::writer::{
-    XlsShapeColor, XlsShapeFill, XlsShapeGroupChild, XlsShapeGroupWrite, XlsShapeKind,
-    XlsShapeLine, XlsShapeText, XlsShapeWrite, XlsWriter,
+    ShapeColor, ShapeFill, ShapeGroupChild, ShapeGroupWrite, ShapeKind, ShapeLine, ShapeText,
+    ShapeWrite, Writer,
 };
 
 fn anchor() -> Anchor {
@@ -18,19 +18,17 @@ fn anchor() -> Anchor {
     .unwrap()
 }
 
-fn group_with_children() -> XlsShapeGroupWrite {
-    let mut group = XlsShapeGroupWrite::new(anchor());
+fn group_with_children() -> ShapeGroupWrite {
+    let mut group = ShapeGroupWrite::new(anchor());
     group.coordinates = Rect::new(0, 0, 2000, 1000).unwrap();
     let mut rectangle =
-        XlsShapeGroupChild::new(XlsShapeKind::Rectangle, Rect::new(0, 0, 900, 500).unwrap());
-    rectangle.fill = XlsShapeFill::Solid(XlsShapeColor::rgb(0x20, 0x40, 0x60));
+        ShapeGroupChild::new(ShapeKind::Rectangle, Rect::new(0, 0, 900, 500).unwrap());
+    rectangle.fill = ShapeFill::Solid(ShapeColor::rgb(0x20, 0x40, 0x60));
     group.children.push(rectangle);
-    let mut textbox = XlsShapeGroupChild::new(
-        XlsShapeKind::TextBox,
-        Rect::new(900, 400, 2000, 1000).unwrap(),
-    );
-    textbox.line = XlsShapeLine::None;
-    textbox.text = Some(XlsShapeText::new("Grouped 世界"));
+    let mut textbox =
+        ShapeGroupChild::new(ShapeKind::TextBox, Rect::new(900, 400, 2000, 1000).unwrap());
+    textbox.line = ShapeLine::None;
+    textbox.text = Some(ShapeText::new("Grouped 世界"));
     group.children.push(textbox);
     group
 }
@@ -55,7 +53,7 @@ fn records(stream: &[u8]) -> Vec<(u16, Vec<u8>)> {
     records
 }
 
-fn write(writer: &mut XlsWriter) -> Vec<u8> {
+fn write(writer: &mut Writer) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
     workbook_stream(output.into_inner())
@@ -63,10 +61,10 @@ fn write(writer: &mut XlsWriter) -> Vec<u8> {
 
 #[test]
 fn grouped_shapes_emit_exact_record_order_and_round_trip() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Groups").unwrap();
 
-    let standalone = XlsShapeWrite::new(XlsShapeKind::Rectangle, anchor());
+    let standalone = ShapeWrite::new(ShapeKind::Rectangle, anchor());
     assert_eq!(writer.add_shape(sheet, standalone).unwrap(), 1);
     assert_eq!(
         writer
@@ -191,7 +189,7 @@ fn grouped_shapes_emit_exact_record_order_and_round_trip() {
 
 #[test]
 fn group_object_ids_are_collision_free_across_primitives_and_groups() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Ids").unwrap();
 
     let mut group = group_with_children();
@@ -207,10 +205,10 @@ fn group_object_ids_are_collision_free_across_primitives_and_groups() {
         3
     );
 
-    let mut colliding = XlsShapeWrite::new(XlsShapeKind::Ellipse, anchor());
+    let mut colliding = ShapeWrite::new(ShapeKind::Ellipse, anchor());
     colliding.object_id = Some(5);
     assert!(writer.add_shape(sheet, colliding).is_err());
-    let free = XlsShapeWrite::new(XlsShapeKind::Ellipse, anchor());
+    let free = ShapeWrite::new(ShapeKind::Ellipse, anchor());
     assert_eq!(writer.add_shape(sheet, free).unwrap(), 7);
 
     let stream = write(&mut writer);
@@ -230,7 +228,7 @@ fn group_object_ids_are_collision_free_across_primitives_and_groups() {
 
 #[test]
 fn automatic_group_ids_skip_ids_requested_by_later_children() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Requested").unwrap();
     let mut group = group_with_children();
     group.children[0].object_id = Some(1);
@@ -247,13 +245,13 @@ fn automatic_group_ids_skip_ids_requested_by_later_children() {
 
 #[test]
 fn group_mutations_reject_malformed_input_and_are_atomic() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Atomic").unwrap();
 
     // Structurally invalid groups never partially register.
     assert!(
         writer
-            .add_shape_group(sheet, XlsShapeGroupWrite::new(anchor()))
+            .add_shape_group(sheet, ShapeGroupWrite::new(anchor()))
             .is_err()
     );
     assert!(Rect::new(0, 0, 0, 1000).is_err());
@@ -262,7 +260,7 @@ fn group_mutations_reject_malformed_input_and_are_atomic() {
     duplicated.children[1].object_id = Some(9);
     assert!(writer.add_shape_group(sheet, duplicated).is_err());
 
-    let mut primitive = XlsShapeWrite::new(XlsShapeKind::Rectangle, anchor());
+    let mut primitive = ShapeWrite::new(ShapeKind::Rectangle, anchor());
     primitive.object_id = Some(3);
     writer.add_shape(sheet, primitive).unwrap();
     let before = write(&mut writer);

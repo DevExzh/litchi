@@ -1,6 +1,6 @@
 use crate::writer::formatting::FillPattern;
 use crate::writer::formula::{FormulaTokenizer, encode_ptg_tokens};
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
 /// Conditional formatting rule types supported by the XLS writer.
 ///
@@ -9,7 +9,7 @@ use crate::{XlsError, XlsResult};
 /// model small while still being expressive: most conditional formatting
 /// scenarios can be expressed as a boolean formula.
 #[derive(Debug, Clone)]
-pub enum XlsConditionalFormatType {
+pub enum ConditionalFormatType {
     /// Formula that evaluates to TRUE for cells that should be formatted.
     ///
     /// The formula is written without a leading `=` and is tokenized using
@@ -19,14 +19,14 @@ pub enum XlsConditionalFormatType {
         formula: String,
     },
     CellValue {
-        operator: XlsConditionalFormatOperator,
+        operator: ConditionalFormatOperator,
         formula1: String,
         formula2: Option<String>,
     },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsConditionalFormatOperator {
+pub enum ConditionalFormatOperator {
     Between,
     NotBetween,
     Equal,
@@ -36,7 +36,7 @@ pub enum XlsConditionalFormatOperator {
     GreaterThanOrEqual,
     LessThanOrEqual,
 }
-impl XlsConditionalFormatOperator {
+impl ConditionalFormatOperator {
     fn code(self) -> u8 {
         match self {
             Self::Between => 1,
@@ -51,23 +51,23 @@ impl XlsConditionalFormatOperator {
     }
 }
 
-impl XlsConditionalFormatType {
+impl ConditionalFormatType {
     /// Convert this conditional format description into BIFF8 CFRule payload
     /// components.
     ///
     /// Returns `(condition_type, comparison_operator, formula1_bytes, formula2_bytes)`.
     /// The returned byte vectors contain encoded Ptg tokens in RPN order.
-    pub(crate) fn to_biff_payload(&self) -> XlsResult<(u8, u8, Vec<u8>, Vec<u8>)> {
+    pub(crate) fn to_biff_payload(&self) -> Result<(u8, u8, Vec<u8>, Vec<u8>)> {
         let tokenizer = FormulaTokenizer::new();
 
         match self {
-            XlsConditionalFormatType::Formula { formula } => {
+            ConditionalFormatType::Formula { formula } => {
                 // CONDITION_TYPE_FORMULA (2) with NO_COMPARISON (0)
                 let condition_type = 0x02u8;
                 let comparison_op = 0x00u8;
 
                 let tokens = tokenizer.tokenize(formula).map_err(|e| {
-                    XlsError::InvalidData(format!(
+                    Error::InvalidData(format!(
                         "Invalid conditional formatting formula '{}': {}",
                         formula, e
                     ))
@@ -77,22 +77,21 @@ impl XlsConditionalFormatType {
                 // Second formula is unused for simple expression-based rules.
                 Ok((condition_type, comparison_op, formula1, Vec::new()))
             },
-            XlsConditionalFormatType::CellValue {
+            ConditionalFormatType::CellValue {
                 operator,
                 formula1,
                 formula2,
             } => {
                 let needs_two = matches!(
                     operator,
-                    XlsConditionalFormatOperator::Between
-                        | XlsConditionalFormatOperator::NotBetween
+                    ConditionalFormatOperator::Between | ConditionalFormatOperator::NotBetween
                 );
                 if needs_two != formula2.is_some() {
-                    return Err(XlsError::InvalidData("between/not-between conditional format requires two formulas; other comparisons require one".to_string()));
+                    return Err(Error::InvalidData("between/not-between conditional format requires two formulas; other comparisons require one".to_string()));
                 }
-                let encode = |formula: &str| -> XlsResult<Vec<u8>> {
+                let encode = |formula: &str| -> Result<Vec<u8>> {
                     let tokens = tokenizer.tokenize(formula).map_err(|error| {
-                        XlsError::InvalidData(format!(
+                        Error::InvalidData(format!(
                             "Invalid conditional formatting formula '{formula}': {error}"
                         ))
                     })?;
@@ -115,7 +114,7 @@ impl XlsConditionalFormatType {
 
 /// Pattern fill definition for a conditional formatting rule.
 #[derive(Debug, Clone)]
-pub struct XlsConditionalPattern {
+pub struct ConditionalPattern {
     pub pattern: FillPattern,
     pub foreground_color: u16,
     pub background_color: u16,
@@ -125,31 +124,31 @@ pub struct XlsConditionalPattern {
 ///
 /// Row and column indices are 0-based and inclusive at both ends.
 #[derive(Debug, Clone)]
-pub struct XlsConditionalFormat {
+pub struct ConditionalFormat {
     pub first_row: u32,
     pub last_row: u32,
     pub first_col: u16,
     pub last_col: u16,
-    pub format_type: XlsConditionalFormatType,
-    pub pattern: Option<XlsConditionalPattern>,
+    pub format_type: ConditionalFormatType,
+    pub pattern: Option<ConditionalPattern>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsConditionalFormatRange {
+pub struct ConditionalFormatRange {
     pub first_row: u32,
     pub last_row: u32,
     pub first_col: u16,
     pub last_col: u16,
 }
 #[derive(Debug, Clone)]
-pub struct XlsConditionalFormatRule {
-    pub format_type: XlsConditionalFormatType,
-    pub pattern: Option<XlsConditionalPattern>,
+pub struct ConditionalFormatRule {
+    pub format_type: ConditionalFormatType,
+    pub pattern: Option<ConditionalPattern>,
 }
 #[derive(Debug, Clone)]
-pub struct XlsConditionalFormatGroup {
-    pub ranges: Vec<XlsConditionalFormatRange>,
-    pub rules: Vec<XlsConditionalFormatRule>,
+pub struct ConditionalFormatGroup {
+    pub ranges: Vec<ConditionalFormatRange>,
+    pub rules: Vec<ConditionalFormatRule>,
 }
 
 /// A future-record (`CF12`) conditional-format rule type.
@@ -157,9 +156,9 @@ pub struct XlsConditionalFormatGroup {
 /// Formula fields contain encoded BIFF Ptg tokens. Visual rule payloads are
 /// preserved and written verbatim; the writer never evaluates them.
 #[derive(Debug, Clone)]
-pub enum XlsConditionalFormat12Type {
+pub enum ConditionalFormat12Type {
     CellValue {
-        operator: XlsConditionalFormatOperator,
+        operator: ConditionalFormatOperator,
         formula1: Vec<u8>,
         formula2: Option<Vec<u8>>,
     },
@@ -183,7 +182,7 @@ pub enum XlsConditionalFormat12Type {
     },
 }
 
-impl XlsConditionalFormat12Type {
+impl ConditionalFormat12Type {
     #[allow(clippy::type_complexity)]
     pub(crate) fn biff_parts(&self) -> (u8, u8, &[u8], &[u8], &[u8], &[u8]) {
         match self {
@@ -219,8 +218,8 @@ impl XlsConditionalFormat12Type {
 
 /// One ordered rule in a `CondFmt12` collection.
 #[derive(Debug, Clone)]
-pub struct XlsConditionalFormat12Rule {
-    pub format_type: XlsConditionalFormat12Type,
+pub struct ConditionalFormat12Rule {
+    pub format_type: ConditionalFormat12Type,
     /// Complete serialized DXFN12 structure, including its length prefix.
     pub differential_format: Vec<u8>,
     pub stop_if_true: bool,
@@ -231,12 +230,12 @@ pub struct XlsConditionalFormat12Rule {
 
 /// One future conditional-format collection with ordered ranges and rules.
 #[derive(Debug, Clone)]
-pub struct XlsConditionalFormat12Group {
-    pub ranges: Vec<XlsConditionalFormatRange>,
-    pub rules: Vec<XlsConditionalFormat12Rule>,
+pub struct ConditionalFormat12Group {
+    pub ranges: Vec<ConditionalFormatRange>,
+    pub rules: Vec<ConditionalFormat12Rule>,
 }
 
-impl XlsConditionalFormat {
+impl ConditionalFormat {
     /// Convert the optional pattern into BIFF8 PatternFormatting triple
     /// `(pattern_code, fg_index, bg_index)`.
     pub fn to_biff_pattern(&self) -> Option<(u16, u16, u16)> {
@@ -255,7 +254,7 @@ mod tests {
 
     #[test]
     fn test_formula_to_biff_payload() {
-        let cf_type = XlsConditionalFormatType::Formula {
+        let cf_type = ConditionalFormatType::Formula {
             formula: "A1>0".to_string(),
         };
         let result = cf_type.to_biff_payload();
@@ -271,7 +270,7 @@ mod tests {
     #[test]
     fn test_formula_to_biff_payload_invalid() {
         // This should still work as the tokenizer may handle it differently
-        let cf_type = XlsConditionalFormatType::Formula {
+        let cf_type = ConditionalFormatType::Formula {
             formula: "".to_string(),
         };
         // Empty formula should still tokenize (may produce empty tokens)
@@ -282,7 +281,7 @@ mod tests {
 
     #[test]
     fn test_conditional_pattern() {
-        let pattern = XlsConditionalPattern {
+        let pattern = ConditionalPattern {
             pattern: FillPattern::Solid,
             foreground_color: 0x0040, // Palette index
             background_color: 0x0041,
@@ -295,15 +294,15 @@ mod tests {
 
     #[test]
     fn test_xls_conditional_format_to_biff_pattern() {
-        let cf = XlsConditionalFormat {
+        let cf = ConditionalFormat {
             first_row: 0,
             last_row: 9,
             first_col: 0,
             last_col: 1,
-            format_type: XlsConditionalFormatType::Formula {
+            format_type: ConditionalFormatType::Formula {
                 formula: "A1>0".to_string(),
             },
-            pattern: Some(XlsConditionalPattern {
+            pattern: Some(ConditionalPattern {
                 pattern: FillPattern::Solid,
                 foreground_color: 0x0040,
                 background_color: 0x0041,
@@ -320,12 +319,12 @@ mod tests {
 
     #[test]
     fn test_xls_conditional_format_no_pattern() {
-        let cf = XlsConditionalFormat {
+        let cf = ConditionalFormat {
             first_row: 0,
             last_row: 9,
             first_col: 0,
             last_col: 1,
-            format_type: XlsConditionalFormatType::Formula {
+            format_type: ConditionalFormatType::Formula {
                 formula: "A1>0".to_string(),
             },
             pattern: None,
@@ -338,15 +337,15 @@ mod tests {
     #[test]
     fn test_xls_conditional_format_color_masking() {
         // Test that colors are properly masked to 7 bits
-        let cf = XlsConditionalFormat {
+        let cf = ConditionalFormat {
             first_row: 0,
             last_row: 9,
             first_col: 0,
             last_col: 1,
-            format_type: XlsConditionalFormatType::Formula {
+            format_type: ConditionalFormatType::Formula {
                 formula: "A1>0".to_string(),
             },
-            pattern: Some(XlsConditionalPattern {
+            pattern: Some(ConditionalPattern {
                 pattern: FillPattern::Solid,
                 foreground_color: 0xFFFF, // Should be masked to 0x007F
                 background_color: 0xFF80, // Should be masked to 0x0000
@@ -360,15 +359,15 @@ mod tests {
 
     #[test]
     fn test_xls_conditional_format_clone() {
-        let cf = XlsConditionalFormat {
+        let cf = ConditionalFormat {
             first_row: 0,
             last_row: 9,
             first_col: 0,
             last_col: 1,
-            format_type: XlsConditionalFormatType::Formula {
+            format_type: ConditionalFormatType::Formula {
                 formula: "A1>0".to_string(),
             },
-            pattern: Some(XlsConditionalPattern {
+            pattern: Some(ConditionalPattern {
                 pattern: FillPattern::Solid,
                 foreground_color: 0x0040,
                 background_color: 0x0041,
@@ -384,22 +383,22 @@ mod tests {
 
     #[test]
     fn test_xls_conditional_format_type_clone() {
-        let cf_type = XlsConditionalFormatType::Formula {
+        let cf_type = ConditionalFormatType::Formula {
             formula: "A1>0".to_string(),
         };
         let cloned = cf_type.clone();
 
         match cloned {
-            XlsConditionalFormatType::Formula { formula } => {
+            ConditionalFormatType::Formula { formula } => {
                 assert_eq!(formula, "A1>0");
             },
-            XlsConditionalFormatType::CellValue { .. } => unreachable!(),
+            ConditionalFormatType::CellValue { .. } => unreachable!(),
         }
     }
 
     #[test]
     fn test_xls_conditional_pattern_clone() {
-        let pattern = XlsConditionalPattern {
+        let pattern = ConditionalPattern {
             pattern: FillPattern::Solid,
             foreground_color: 0x0040,
             background_color: 0x0041,

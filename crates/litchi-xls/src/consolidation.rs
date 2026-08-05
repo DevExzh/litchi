@@ -1,4 +1,4 @@
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
 pub(crate) const DCON_RECORD_TYPE: u16 = 0x0050;
 pub(crate) const DCON_REF_RECORD_TYPE: u16 = 0x0051;
@@ -8,7 +8,7 @@ const MAX_SOURCES: usize = 16_384;
 const MAX_PATH_UNITS: usize = 4_096;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsConsolidationFunction {
+pub enum ConsolidationFunction {
     Average,
     CountNumbers,
     Count,
@@ -22,8 +22,8 @@ pub enum XlsConsolidationFunction {
     VariancePopulation,
 }
 
-impl XlsConsolidationFunction {
-    fn from_code(code: u16) -> XlsResult<Self> {
+impl ConsolidationFunction {
+    fn from_code(code: u16) -> Result<Self> {
         Ok(match code {
             0 => Self::Average,
             1 => Self::CountNumbers,
@@ -57,19 +57,14 @@ impl XlsConsolidationFunction {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsConsolidationRange {
+pub struct ConsolidationRange {
     first_row: u16,
     last_row: u16,
     first_column: u8,
     last_column: u8,
 }
-impl XlsConsolidationRange {
-    pub fn new(
-        first_row: u16,
-        last_row: u16,
-        first_column: u8,
-        last_column: u8,
-    ) -> XlsResult<Self> {
+impl ConsolidationRange {
+    pub fn new(first_row: u16, last_row: u16, first_column: u8, last_column: u8) -> Result<Self> {
         if first_row > last_row || first_column > last_column {
             return invalid(
                 DCON_REF_RECORD_TYPE,
@@ -99,18 +94,18 @@ impl XlsConsolidationRange {
 
 /// Encoded `DConFile` metadata. It is retained but never opened or resolved.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsConsolidationFile {
+pub struct ConsolidationFile {
     encoded_path: String,
 }
-impl XlsConsolidationFile {
-    pub fn new(encoded_path: impl Into<String>) -> XlsResult<Self> {
+impl ConsolidationFile {
+    pub fn new(encoded_path: impl Into<String>) -> Result<Self> {
         let value = Self {
             encoded_path: encoded_path.into(),
         };
         value.validate(DCON_REF_RECORD_TYPE)?;
         Ok(value)
     }
-    pub fn self_reference(sheet_name: &str) -> XlsResult<Self> {
+    pub fn self_reference(sheet_name: &str) -> Result<Self> {
         Self::new(format!("\u{2}{sheet_name}"))
     }
     pub fn encoded_path(&self) -> &str {
@@ -122,7 +117,7 @@ impl XlsConsolidationFile {
     pub fn is_external(&self) -> bool {
         self.encoded_path.starts_with('\u{1}')
     }
-    fn validate(&self, record_type: u16) -> XlsResult<()> {
+    fn validate(&self, record_type: u16) -> Result<()> {
         let units = self.encoded_path.encode_utf16().collect::<Vec<_>>();
         if !(2..=MAX_PATH_UNITS).contains(&units.len()) {
             return invalid(
@@ -141,7 +136,7 @@ impl XlsConsolidationFile {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsConsolidationBuiltInName {
+pub enum ConsolidationBuiltInName {
     ConsolidateArea,
     AutoOpen,
     AutoClose,
@@ -157,8 +152,8 @@ pub enum XlsConsolidationBuiltInName {
     SheetTitle,
     FilterDatabase,
 }
-impl XlsConsolidationBuiltInName {
-    fn from_code(code: u8) -> XlsResult<Self> {
+impl ConsolidationBuiltInName {
+    fn from_code(code: u8) -> Result<Self> {
         Ok(match code {
             0 => Self::ConsolidateArea,
             1 => Self::AutoOpen,
@@ -198,31 +193,31 @@ impl XlsConsolidationBuiltInName {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum XlsConsolidationSource {
+pub enum ConsolidationSource {
     CellRange {
-        range: XlsConsolidationRange,
-        file: XlsConsolidationFile,
+        range: ConsolidationRange,
+        file: ConsolidationFile,
     },
     DefinedName {
         name: String,
-        file: Option<XlsConsolidationFile>,
+        file: Option<ConsolidationFile>,
     },
     BuiltInName {
-        name: XlsConsolidationBuiltInName,
-        file: Option<XlsConsolidationFile>,
+        name: ConsolidationBuiltInName,
+        file: Option<ConsolidationFile>,
     },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsConsolidation {
-    function: XlsConsolidationFunction,
+pub struct Consolidation {
+    function: ConsolidationFunction,
     use_left_labels: bool,
     use_top_labels: bool,
     create_links: bool,
-    sources: Vec<XlsConsolidationSource>,
+    sources: Vec<ConsolidationSource>,
 }
-impl XlsConsolidation {
-    pub fn new(function: XlsConsolidationFunction) -> Self {
+impl Consolidation {
+    pub fn new(function: ConsolidationFunction) -> Self {
         Self {
             function,
             use_left_labels: false,
@@ -231,7 +226,7 @@ impl XlsConsolidation {
             sources: Vec::new(),
         }
     }
-    pub fn function(&self) -> XlsConsolidationFunction {
+    pub fn function(&self) -> ConsolidationFunction {
         self.function
     }
     pub fn uses_left_labels(&self) -> bool {
@@ -243,7 +238,7 @@ impl XlsConsolidation {
     pub fn creates_links(&self) -> bool {
         self.create_links
     }
-    pub fn sources(&self) -> &[XlsConsolidationSource] {
+    pub fn sources(&self) -> &[ConsolidationSource] {
         &self.sources
     }
     pub fn set_use_left_labels(&mut self, value: bool) {
@@ -255,7 +250,7 @@ impl XlsConsolidation {
     pub fn set_create_links(&mut self, value: bool) {
         self.create_links = value;
     }
-    pub fn add_source(&mut self, source: XlsConsolidationSource) -> XlsResult<()> {
+    pub fn add_source(&mut self, source: ConsolidationSource) -> Result<()> {
         if self.sources.len() >= MAX_SOURCES {
             return invalid(
                 DCON_RECORD_TYPE,
@@ -266,7 +261,7 @@ impl XlsConsolidation {
         self.sources.push(source);
         Ok(())
     }
-    pub(crate) fn validate_for_write(&self) -> XlsResult<()> {
+    pub(crate) fn validate_for_write(&self) -> Result<()> {
         if self.sources.len() > MAX_SOURCES {
             return invalid(
                 DCON_RECORD_TYPE,
@@ -280,10 +275,10 @@ impl XlsConsolidation {
     }
 }
 
-fn validate_source(source: &XlsConsolidationSource) -> XlsResult<()> {
+fn validate_source(source: &ConsolidationSource) -> Result<()> {
     let (base, file, record_type) = match source {
-        XlsConsolidationSource::CellRange { range, file } => {
-            XlsConsolidationRange::new(
+        ConsolidationSource::CellRange { range, file } => {
+            ConsolidationRange::new(
                 range.first_row,
                 range.last_row,
                 range.first_column,
@@ -292,7 +287,7 @@ fn validate_source(source: &XlsConsolidationSource) -> XlsResult<()> {
             file.validate(DCON_REF_RECORD_TYPE)?;
             (8, Some(file), DCON_REF_RECORD_TYPE)
         },
-        XlsConsolidationSource::DefinedName { name, file } => {
+        ConsolidationSource::DefinedName { name, file } => {
             validate_defined_name(name)?;
             if let Some(file) = file {
                 file.validate(DCON_NAME_RECORD_TYPE)?;
@@ -303,7 +298,7 @@ fn validate_source(source: &XlsConsolidationSource) -> XlsResult<()> {
                 DCON_NAME_RECORD_TYPE,
             )
         },
-        XlsConsolidationSource::BuiltInName { file, .. } => {
+        ConsolidationSource::BuiltInName { file, .. } => {
             if let Some(file) = file {
                 file.validate(DCON_BIN_RECORD_TYPE)?;
             }
@@ -329,7 +324,7 @@ fn validate_source(source: &XlsConsolidationSource) -> XlsResult<()> {
     Ok(())
 }
 
-fn validate_defined_name(name: &str) -> XlsResult<()> {
+fn validate_defined_name(name: &str) -> Result<()> {
     if !(1..=255).contains(&name.encode_utf16().count()) {
         return invalid(
             DCON_NAME_RECORD_TYPE,
@@ -388,7 +383,7 @@ fn is_r1c1(value: &str) -> bool {
 
 #[derive(Debug, Default)]
 pub(crate) struct ConsolidationCollector {
-    value: Option<XlsConsolidation>,
+    value: Option<Consolidation>,
     open: bool,
     closed: bool,
 }
@@ -396,7 +391,7 @@ impl ConsolidationCollector {
     pub(crate) fn new() -> Self {
         Self::default()
     }
-    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
+    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> Result<()> {
         let source = matches!(
             record_type,
             DCON_REF_RECORD_TYPE | DCON_NAME_RECORD_TYPE | DCON_BIN_RECORD_TYPE
@@ -435,36 +430,35 @@ impl ConsolidationCollector {
         }
         Ok(())
     }
-    pub(crate) fn finish(self) -> Option<XlsConsolidation> {
+    pub(crate) fn finish(self) -> Option<Consolidation> {
         self.value
     }
 }
 
-fn parse_dcon(data: &[u8]) -> XlsResult<XlsConsolidation> {
+fn parse_dcon(data: &[u8]) -> Result<Consolidation> {
     if data.len() != 8 {
         return invalid(DCON_RECORD_TYPE, "DCon payload must be exactly 8 bytes");
     }
-    let mut value =
-        XlsConsolidation::new(XlsConsolidationFunction::from_code(u16::from_le_bytes([
-            data[0], data[1],
-        ]))?);
+    let mut value = Consolidation::new(ConsolidationFunction::from_code(u16::from_le_bytes([
+        data[0], data[1],
+    ]))?);
     value.use_left_labels = boolean(&data[2..4], DCON_RECORD_TYPE)?;
     value.use_top_labels = boolean(&data[4..6], DCON_RECORD_TYPE)?;
     value.create_links = boolean(&data[6..8], DCON_RECORD_TYPE)?;
     Ok(value)
 }
-fn parse_ref(data: &[u8]) -> XlsResult<XlsConsolidationSource> {
+fn parse_ref(data: &[u8]) -> Result<ConsolidationSource> {
     let mut c = Cursor::new(data, DCON_REF_RECORD_TYPE);
-    let range = XlsConsolidationRange::new(c.u16()?, c.u16()?, c.u8()?, c.u8()?)?;
+    let range = ConsolidationRange::new(c.u16()?, c.u16()?, c.u8()?, c.u8()?)?;
     let count = usize::from(c.u16()?);
     if count < 2 {
         return invalid(DCON_REF_RECORD_TYPE, "DConRef cchFile must be at least 2");
     }
     let file = parse_file(&mut c, count)?;
     c.finish()?;
-    Ok(XlsConsolidationSource::CellRange { range, file })
+    Ok(ConsolidationSource::CellRange { range, file })
 }
-fn parse_name(data: &[u8]) -> XlsResult<XlsConsolidationSource> {
+fn parse_name(data: &[u8]) -> Result<ConsolidationSource> {
     let mut c = Cursor::new(data, DCON_NAME_RECORD_TYPE);
     let name = c.string()?;
     validate_defined_name(&name)?;
@@ -481,11 +475,11 @@ fn parse_name(data: &[u8]) -> XlsResult<XlsConsolidationSource> {
         Some(parse_file(&mut c, count)?)
     };
     c.finish()?;
-    Ok(XlsConsolidationSource::DefinedName { name, file })
+    Ok(ConsolidationSource::DefinedName { name, file })
 }
-fn parse_bin(data: &[u8]) -> XlsResult<XlsConsolidationSource> {
+fn parse_bin(data: &[u8]) -> Result<ConsolidationSource> {
     let mut c = Cursor::new(data, DCON_BIN_RECORD_TYPE);
-    let name = XlsConsolidationBuiltInName::from_code(c.u8()?)?;
+    let name = ConsolidationBuiltInName::from_code(c.u8()?)?;
     if c.u16()? != 0 || c.u8()? != 0 {
         return invalid(DCON_BIN_RECORD_TYPE, "DConBin reserved fields must be zero");
     }
@@ -502,9 +496,9 @@ fn parse_bin(data: &[u8]) -> XlsResult<XlsConsolidationSource> {
         Some(parse_file(&mut c, count)?)
     };
     c.finish()?;
-    Ok(XlsConsolidationSource::BuiltInName { name, file })
+    Ok(ConsolidationSource::BuiltInName { name, file })
 }
-fn parse_file(c: &mut Cursor<'_>, count: usize) -> XlsResult<XlsConsolidationFile> {
+fn parse_file(c: &mut Cursor<'_>, count: usize) -> Result<ConsolidationFile> {
     if count > MAX_PATH_UNITS {
         return invalid(c.record_type, "DConFile exceeds the path resource limit");
     }
@@ -516,7 +510,7 @@ fn parse_file(c: &mut Cursor<'_>, count: usize) -> XlsResult<XlsConsolidationFil
     let raw = c.take(
         count
             .checked_mul(if wide { 2 } else { 1 })
-            .ok_or_else(|| XlsError::InvalidData("DConFile size overflow".into()))?,
+            .ok_or_else(|| Error::InvalidData("DConFile size overflow".into()))?,
     )?;
     let encoded_path = if wide {
         let units = raw
@@ -524,11 +518,11 @@ fn parse_file(c: &mut Cursor<'_>, count: usize) -> XlsResult<XlsConsolidationFil
             .map(|p| u16::from_le_bytes([p[0], p[1]]))
             .collect::<Vec<_>>();
         String::from_utf16(&units)
-            .map_err(|_| XlsError::InvalidData("DConFile contains invalid UTF-16".into()))?
+            .map_err(|_| Error::InvalidData("DConFile contains invalid UTF-16".into()))?
     } else {
         raw.iter().map(|byte| char::from(*byte)).collect()
     };
-    let file = XlsConsolidationFile { encoded_path };
+    let file = ConsolidationFile { encoded_path };
     file.validate(c.record_type)?;
     if file.is_self_reference()
         && c.take(if wide { 2 } else { 1 })?
@@ -542,15 +536,15 @@ fn parse_file(c: &mut Cursor<'_>, count: usize) -> XlsResult<XlsConsolidationFil
     }
     Ok(file)
 }
-fn boolean(data: &[u8], record_type: u16) -> XlsResult<bool> {
+fn boolean(data: &[u8], record_type: u16) -> Result<bool> {
     match u16::from_le_bytes([data[0], data[1]]) {
         0 => Ok(false),
         1 => Ok(true),
         _ => invalid(record_type, "DCon Boolean must be 0 or 1"),
     }
 }
-fn invalid<T>(record_type: u16, message: impl Into<String>) -> XlsResult<T> {
-    Err(XlsError::InvalidRecord {
+fn invalid<T>(record_type: u16, message: impl Into<String>) -> Result<T> {
+    Err(Error::InvalidRecord {
         record_type,
         message: message.into(),
     })
@@ -569,29 +563,29 @@ impl<'a> Cursor<'a> {
             record_type,
         }
     }
-    fn take(&mut self, count: usize) -> XlsResult<&'a [u8]> {
+    fn take(&mut self, count: usize) -> Result<&'a [u8]> {
         let end = self
             .offset
             .checked_add(count)
-            .ok_or_else(|| XlsError::InvalidData("data-consolidation size overflow".into()))?;
+            .ok_or_else(|| Error::InvalidData("data-consolidation size overflow".into()))?;
         let value = self
             .data
             .get(self.offset..end)
-            .ok_or_else(|| XlsError::InvalidRecord {
+            .ok_or_else(|| Error::InvalidRecord {
                 record_type: self.record_type,
                 message: "truncated data-consolidation record".into(),
             })?;
         self.offset = end;
         Ok(value)
     }
-    fn u8(&mut self) -> XlsResult<u8> {
+    fn u8(&mut self) -> Result<u8> {
         Ok(self.take(1)?[0])
     }
-    fn u16(&mut self) -> XlsResult<u16> {
+    fn u16(&mut self) -> Result<u16> {
         let b = self.take(2)?;
         Ok(u16::from_le_bytes([b[0], b[1]]))
     }
-    fn string(&mut self) -> XlsResult<String> {
+    fn string(&mut self) -> Result<String> {
         let count = usize::from(self.u16()?);
         if !(1..=255).contains(&count) {
             return invalid(self.record_type, "DConName string count must be 1..=255");
@@ -611,12 +605,12 @@ impl<'a> Cursor<'a> {
                 .map(|p| u16::from_le_bytes([p[0], p[1]]))
                 .collect::<Vec<_>>();
             String::from_utf16(&units)
-                .map_err(|_| XlsError::InvalidData("DConName contains invalid UTF-16".into()))
+                .map_err(|_| Error::InvalidData("DConName contains invalid UTF-16".into()))
         } else {
             Ok(raw.iter().map(|byte| char::from(*byte)).collect())
         }
     }
-    fn finish(&self) -> XlsResult<()> {
+    fn finish(&self) -> Result<()> {
         if self.offset != self.data.len() {
             return invalid(
                 self.record_type,

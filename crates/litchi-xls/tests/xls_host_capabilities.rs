@@ -1,13 +1,13 @@
 use std::fs::File;
 use std::path::PathBuf;
 
-use litchi_xls::XlsWorkbook;
+use litchi_xls::Workbook;
 
 #[test]
 fn facade_exposes_signatures_and_standard_property_sets() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
 
-    let mut signed = XlsWorkbook::new(
+    let mut signed = Workbook::new(
         File::open(root.join("test-data/poi/test-data/spreadsheet/Simple.xls"))
             .expect("XLS signature fixture"),
     )
@@ -19,7 +19,7 @@ fn facade_exposes_signatures_and_standard_property_sets() {
             .is_empty()
     );
 
-    let mut metadata = XlsWorkbook::new(
+    let mut metadata = Workbook::new(
         File::open(root.join("test-data/ole/xls/Simple.xls")).expect("XLS metadata fixture"),
     )
     .expect("valid XLS fixture");

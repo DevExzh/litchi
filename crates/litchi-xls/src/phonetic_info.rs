@@ -4,7 +4,7 @@
 //! The record may span `Continue` records when the `SqRef` range list is
 //! long; continuations are concatenated before parsing.
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `PhoneticInfo` record.
 pub(crate) const PHONETIC_INFO_RECORD_TYPE: u16 = 0x00EF;
@@ -21,8 +21,8 @@ const PHONETIC_TYPE_MASK: u16 = 0x0003;
 const ALIGNMENT_SHIFT: u16 = 2;
 const ALIGNMENT_MASK: u16 = 0x0003;
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: PHONETIC_INFO_RECORD_TYPE,
         message: message.into(),
     }
@@ -30,7 +30,7 @@ fn invalid(message: impl Into<String>) -> XlsError {
 
 /// The phonetic character type of a `Phs` structure (`phType`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsPhoneticType {
+pub enum PhoneticType {
     /// Narrow (half-width) Katakana characters.
     NarrowKatakana,
     /// Wide (full-width) Katakana characters.
@@ -41,7 +41,7 @@ pub enum XlsPhoneticType {
     Any,
 }
 
-impl XlsPhoneticType {
+impl PhoneticType {
     fn from_code(value: u16) -> Self {
         match value & PHONETIC_TYPE_MASK {
             0 => Self::NarrowKatakana,
@@ -63,7 +63,7 @@ impl XlsPhoneticType {
 
 /// The phonetic-string alignment of a `Phs` structure (`alcH`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsPhoneticAlignment {
+pub enum PhoneticAlignment {
     /// General alignment.
     General,
     /// Left aligned.
@@ -74,7 +74,7 @@ pub enum XlsPhoneticAlignment {
     Distributed,
 }
 
-impl XlsPhoneticAlignment {
+impl PhoneticAlignment {
     fn from_code(value: u16) -> Self {
         match (value >> ALIGNMENT_SHIFT) & ALIGNMENT_MASK {
             0 => Self::General,
@@ -96,21 +96,17 @@ impl XlsPhoneticAlignment {
 
 /// The default phonetic-string format of a sheet (`Phs`, MS-XLS 2.5.201).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsPhoneticFormat {
+pub struct PhoneticFormat {
     font_index: u16,
-    phonetic_type: XlsPhoneticType,
-    alignment: XlsPhoneticAlignment,
+    phonetic_type: PhoneticType,
+    alignment: PhoneticAlignment,
     /// Raw unused bits of the `Phs` bitfield, preserved verbatim.
     unused_flags: u16,
 }
 
-impl XlsPhoneticFormat {
+impl PhoneticFormat {
     /// A phonetic format with no unused flag bits.
-    pub fn new(
-        font_index: u16,
-        phonetic_type: XlsPhoneticType,
-        alignment: XlsPhoneticAlignment,
-    ) -> Self {
+    pub fn new(font_index: u16, phonetic_type: PhoneticType, alignment: PhoneticAlignment) -> Self {
         Self {
             font_index,
             phonetic_type,
@@ -122,26 +118,26 @@ impl XlsPhoneticFormat {
     pub const fn font_index(&self) -> u16 {
         self.font_index
     }
-    pub const fn phonetic_type(&self) -> XlsPhoneticType {
+    pub const fn phonetic_type(&self) -> PhoneticType {
         self.phonetic_type
     }
-    pub const fn alignment(&self) -> XlsPhoneticAlignment {
+    pub const fn alignment(&self) -> PhoneticAlignment {
         self.alignment
     }
 }
 
 /// One cell range with visible phonetic strings (`Ref8`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsPhoneticRange {
+pub struct PhoneticRange {
     first_row: u16,
     last_row: u16,
     first_col: u8,
     last_col: u8,
 }
 
-impl XlsPhoneticRange {
+impl PhoneticRange {
     /// A range; the last row and column must not precede the first.
-    pub fn new(first_row: u16, last_row: u16, first_col: u8, last_col: u8) -> XlsResult<Self> {
+    pub fn new(first_row: u16, last_row: u16, first_col: u8, last_col: u8) -> Result<Self> {
         if last_row < first_row || last_col < first_col {
             return Err(invalid("phonetic range is reversed"));
         }
@@ -169,32 +165,32 @@ impl XlsPhoneticRange {
 
 /// Typed `PhoneticInfo` record content (MS-XLS 2.4.192).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsPhoneticInfo {
-    format: XlsPhoneticFormat,
-    ranges: Vec<XlsPhoneticRange>,
+pub struct PhoneticInfo {
+    format: PhoneticFormat,
+    ranges: Vec<PhoneticRange>,
 }
 
-impl XlsPhoneticInfo {
+impl PhoneticInfo {
     /// A record with the default format and the visible phonetic ranges.
-    pub fn try_new(format: XlsPhoneticFormat, ranges: Vec<XlsPhoneticRange>) -> XlsResult<Self> {
+    pub fn try_new(format: PhoneticFormat, ranges: Vec<PhoneticRange>) -> Result<Self> {
         if ranges.len() > MAX_RANGES {
             return Err(invalid("phonetic range count exceeds 0x2000"));
         }
         Ok(Self { format, ranges })
     }
 
-    pub const fn format(&self) -> XlsPhoneticFormat {
+    pub const fn format(&self) -> PhoneticFormat {
         self.format
     }
-    pub fn ranges(&self) -> &[XlsPhoneticRange] {
+    pub fn ranges(&self) -> &[PhoneticRange] {
         &self.ranges
     }
 
     /// Parse the concatenated payloads of a `PhoneticInfo` record and its
     /// `Continue` records.
-    pub(crate) fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub(crate) fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < HEADER_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: HEADER_LEN,
                 found: data.len(),
             });
@@ -212,14 +208,14 @@ impl XlsPhoneticInfo {
             )
             .ok_or_else(|| invalid("range overflow"))?;
         if data.len() != expected {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected,
                 found: data.len(),
             });
         }
         let mut ranges = Vec::with_capacity(range_count);
         for chunk in data[HEADER_LEN..].chunks_exact(REF8_LEN) {
-            ranges.push(XlsPhoneticRange::new(
+            ranges.push(PhoneticRange::new(
                 u16::from_le_bytes([chunk[0], chunk[1]]),
                 u16::from_le_bytes([chunk[2], chunk[3]]),
                 chunk[4],
@@ -227,10 +223,10 @@ impl XlsPhoneticInfo {
             )?);
         }
         Ok(Self {
-            format: XlsPhoneticFormat {
+            format: PhoneticFormat {
                 font_index: u16::from_le_bytes([data[0], data[1]]),
-                phonetic_type: XlsPhoneticType::from_code(flags),
-                alignment: XlsPhoneticAlignment::from_code(flags),
+                phonetic_type: PhoneticType::from_code(flags),
+                alignment: PhoneticAlignment::from_code(flags),
                 unused_flags: flags & !0x000F,
             },
             ranges,
@@ -260,12 +256,12 @@ impl XlsPhoneticInfo {
 mod tests {
     use super::*;
 
-    fn sample() -> XlsPhoneticInfo {
-        XlsPhoneticInfo::try_new(
-            XlsPhoneticFormat::new(4, XlsPhoneticType::Hiragana, XlsPhoneticAlignment::Center),
+    fn sample() -> PhoneticInfo {
+        PhoneticInfo::try_new(
+            PhoneticFormat::new(4, PhoneticType::Hiragana, PhoneticAlignment::Center),
             vec![
-                XlsPhoneticRange::new(1, 3, 0, 5).unwrap(),
-                XlsPhoneticRange::new(7, 7, 2, 2).unwrap(),
+                PhoneticRange::new(1, 3, 0, 5).unwrap(),
+                PhoneticRange::new(7, 7, 2, 2).unwrap(),
             ],
         )
         .unwrap()
@@ -274,11 +270,11 @@ mod tests {
     #[test]
     fn round_trips() {
         let payload = sample().to_payload();
-        let parsed = XlsPhoneticInfo::parse(&payload).unwrap();
+        let parsed = PhoneticInfo::parse(&payload).unwrap();
         assert_eq!(parsed, sample());
         assert_eq!(parsed.format().font_index(), 4);
-        assert_eq!(parsed.format().phonetic_type(), XlsPhoneticType::Hiragana);
-        assert_eq!(parsed.format().alignment(), XlsPhoneticAlignment::Center);
+        assert_eq!(parsed.format().phonetic_type(), PhoneticType::Hiragana);
+        assert_eq!(parsed.format().alignment(), PhoneticAlignment::Center);
         assert_eq!(parsed.ranges().len(), 2);
         assert_eq!(parsed.ranges()[1].last_col(), 2);
     }
@@ -287,7 +283,7 @@ mod tests {
     fn preserves_unused_flag_bits() {
         let mut payload = sample().to_payload();
         payload[2] |= 0xF0;
-        let parsed = XlsPhoneticInfo::parse(&payload).unwrap();
+        let parsed = PhoneticInfo::parse(&payload).unwrap();
         assert_eq!(parsed.format().unused_flags & 0xF0, 0xF0);
         assert_eq!(parsed.to_payload(), payload);
     }
@@ -295,18 +291,18 @@ mod tests {
     #[test]
     fn rejects_malformed_records() {
         // Truncated header.
-        assert!(XlsPhoneticInfo::parse(&[0; 5]).is_err());
+        assert!(PhoneticInfo::parse(&[0; 5]).is_err());
         // Count/payload mismatch.
         let mut payload = sample().to_payload();
         payload.truncate(HEADER_LEN + REF8_LEN);
-        assert!(XlsPhoneticInfo::parse(&payload).is_err());
+        assert!(PhoneticInfo::parse(&payload).is_err());
         // Reversed range.
-        assert!(XlsPhoneticRange::new(5, 2, 0, 1).is_err());
+        assert!(PhoneticRange::new(5, 2, 0, 1).is_err());
         // Count cap.
         assert!(
-            XlsPhoneticInfo::try_new(
-                XlsPhoneticFormat::new(0, XlsPhoneticType::Any, XlsPhoneticAlignment::General),
-                vec![XlsPhoneticRange::new(0, 0, 0, 0).unwrap(); MAX_RANGES + 1],
+            PhoneticInfo::try_new(
+                PhoneticFormat::new(0, PhoneticType::Any, PhoneticAlignment::General),
+                vec![PhoneticRange::new(0, 0, 0, 0).unwrap(); MAX_RANGES + 1],
             )
             .is_err()
         );

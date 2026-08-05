@@ -37,15 +37,15 @@ enum DocumentElement {
 }
 
 #[derive(Debug, Clone)]
-enum RubyAnnotationInsertion {
+enum AnnotationInsertion {
     Append {
         paragraph_index: usize,
-        annotation: crate::RubyAnnotation,
+        annotation: crate::ruby_family::Annotation,
     },
     Wrap {
         paragraph_index: usize,
         range: Range<usize>,
-        annotation: crate::RubyAnnotation,
+        annotation: crate::ruby_family::Annotation,
     },
 }
 
@@ -55,11 +55,11 @@ pub struct Builder {
     text_index_marks: Vec<(usize, crate::TextIndexMark)>,
     reference_marks: Vec<(usize, crate::ReferenceMark)>,
     bookmark_targets: Vec<(usize, crate::BookmarkTarget)>,
-    ruby_annotations: Vec<RubyAnnotationInsertion>,
     notes: Vec<(usize, crate::Note)>,
-    ruby_styles: Vec<crate::RubyStyle>,
     property_forms: Vec<crate::form::PropertyForm>,
     control_forms: Vec<crate::form::ControlForm>,
+    ruby_annotations: Vec<AnnotationInsertion>,
+    ruby_styles: Vec<crate::ruby_family::Style>,
     interactive_forms: Vec<crate::form::InteractiveForm>,
     selection_forms: Vec<crate::form::SelectionForm>,
     visual_forms: Vec<crate::form::VisualForm>,
@@ -1138,7 +1138,7 @@ impl Builder {
     pub fn add_ruby_annotation(
         &mut self,
         paragraph_index: usize,
-        annotation: &crate::RubyAnnotation,
+        annotation: &crate::ruby_family::Annotation,
     ) -> Result<&mut Self> {
         annotation.validate()?;
         let body = self.generate_content_body();
@@ -1146,7 +1146,7 @@ impl Builder {
             r#"<office:text xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">{body}</office:text>"#
         );
         crate::insert_ruby_annotation_xml(&xml, paragraph_index, annotation)?;
-        self.ruby_annotations.push(RubyAnnotationInsertion::Append {
+        self.ruby_annotations.push(AnnotationInsertion::Append {
             paragraph_index,
             annotation: annotation.clone(),
         });
@@ -1163,7 +1163,7 @@ impl Builder {
         &mut self,
         paragraph_index: usize,
         range: Range<usize>,
-        annotation: &crate::RubyAnnotation,
+        annotation: &crate::ruby_family::Annotation,
     ) -> Result<&mut Self> {
         annotation.validate()?;
         let body = self.generate_content_body();
@@ -1171,7 +1171,7 @@ impl Builder {
             r#"<office:text xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">{body}</office:text>"#
         );
         crate::wrap_ruby_annotation_xml(&xml, paragraph_index, range.clone(), annotation)?;
-        self.ruby_annotations.push(RubyAnnotationInsertion::Wrap {
+        self.ruby_annotations.push(AnnotationInsertion::Wrap {
             paragraph_index,
             range,
             annotation: annotation.clone(),
@@ -1198,7 +1198,7 @@ impl Builder {
     }
 
     /// Add a named ODF ruby style definition to `styles.xml`.
-    pub fn add_ruby_style(&mut self, style: crate::RubyStyle) -> Result<&mut Self> {
+    pub fn add_ruby_style(&mut self, style: crate::ruby_family::Style) -> Result<&mut Self> {
         style.validate()?;
         if self
             .ruby_styles
@@ -1673,12 +1673,12 @@ impl Builder {
             let mut wrapped = format!("{prefix}{body}{suffix}");
             for insertion in &self.ruby_annotations {
                 wrapped = match insertion {
-                    RubyAnnotationInsertion::Append {
+                    AnnotationInsertion::Append {
                         paragraph_index,
                         annotation,
                     } => crate::insert_ruby_annotation_xml(&wrapped, *paragraph_index, annotation)
                         .expect("validated builder ruby annotation"),
-                    RubyAnnotationInsertion::Wrap {
+                    AnnotationInsertion::Wrap {
                         paragraph_index,
                         range,
                         annotation,
@@ -2438,17 +2438,17 @@ mod tests {
 
     #[test]
     fn ruby_annotation_authoring_round_trips_through_an_odt_package() {
-        let style = crate::RubyStyle::new(
+        let style = crate::ruby_family::Style::new(
             "RubyAbove",
-            Some(crate::RubyProperties {
-                position: Some(crate::RubyPosition::Above),
-                alignment: Some(crate::RubyAlignment::Center),
+            Some(crate::ruby_family::Properties {
+                position: Some(crate::ruby_family::Position::Above),
+                alignment: Some(crate::ruby_family::Alignment::Center),
             }),
         )
         .unwrap();
-        let annotation = crate::RubyAnnotation::new(
+        let annotation = crate::ruby_family::Annotation::new(
             Some(style.name.clone()),
-            crate::RubyBase::from_text("漢").unwrap(),
+            crate::ruby_family::Base::from_text("漢").unwrap(),
             "かん",
             None,
         )
@@ -2478,9 +2478,13 @@ mod tests {
 
     #[test]
     fn ruby_range_annotation_authoring_round_trips_through_an_odt_package() {
-        let annotation =
-            crate::RubyAnnotation::new(None, crate::RubyBase::from_text("字").unwrap(), "じ", None)
-                .unwrap();
+        let annotation = crate::ruby_family::Annotation::new(
+            None,
+            crate::ruby_family::Base::from_text("字").unwrap(),
+            "じ",
+            None,
+        )
+        .unwrap();
         let mut builder = Builder::new();
         builder.add_paragraph("Read 漢字").unwrap();
         let start = "Read 漢".len();
@@ -2494,11 +2498,10 @@ mod tests {
             vec![annotation]
         );
 
-        let structured_base = crate::RubyBase::from_xml_fragment(
+        let structured_base = crate::ruby_family::Base::from_xml_fragment(
             r#"<text:span text:style-name="Em">漢</text:span><text:span text:style-name="Strong">字</text:span>"#,
         )
         .unwrap();
-        let structured = crate::RubyAnnotation::new(None, structured_base, "かんじ", None).unwrap();
         let mut builder = Builder::new();
         builder
             .add_rich_paragraph(vec![
@@ -2508,6 +2511,8 @@ mod tests {
                 ("Z", None),
             ])
             .unwrap();
+        let structured =
+            crate::ruby_family::Annotation::new(None, structured_base, "かんじ", None).unwrap();
         builder
             .wrap_ruby_annotation(0, 1..1 + "漢字".len(), &structured)
             .unwrap();

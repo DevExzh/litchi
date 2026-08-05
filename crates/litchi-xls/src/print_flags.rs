@@ -13,7 +13,7 @@
 //!
 //! - MS-XLS 2.4.132 (GridSet), 2.4.203 (PrintRowCol), 2.5.14 (Boolean)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `PrintRowCol` record (MS-XLS 2.4.203).
 pub(crate) const PRINT_ROW_COL_RECORD_TYPE: u16 = 0x002A;
@@ -25,8 +25,8 @@ const PAYLOAD_LEN: usize = 2;
 /// `GridSet` bitfield: `fPrintGrid` (MS-XLS 2.4.132).
 const GRID_SET_PRINT_GRID: u16 = 0x0001;
 
-fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(record_type: u16, message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type,
         message: message.into(),
     }
@@ -40,16 +40,16 @@ fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
 /// the `Boolean` semantics of MS-XLS 2.5.14, where 0x0001 means the headers
 /// ARE printed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsPrintRowCol {
+pub struct PrintRowCol {
     /// Whether the row and column headers are printed (`printRwCol`).
     print_headers: bool,
 }
 
-impl XlsPrintRowCol {
+impl PrintRowCol {
     /// Parse a `PrintRowCol` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: PAYLOAD_LEN,
                 found: data.len(),
             });
@@ -87,16 +87,16 @@ impl XlsPrintRowCol {
 /// The 15 `unused` bits are undefined and MUST be ignored; they are
 /// preserved verbatim so the record round-trips unchanged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsGridSet {
+pub struct GridSet {
     /// Raw two-byte bitfield, including the undefined `unused` bits.
     flags: u16,
 }
 
-impl XlsGridSet {
+impl GridSet {
     /// Parse a `GridSet` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: PAYLOAD_LEN,
                 found: data.len(),
             });
@@ -128,7 +128,7 @@ mod tests {
     #[test]
     fn print_row_col_round_trip() {
         for (payload, expected) in [([0x00, 0x00], false), ([0x01, 0x00], true)] {
-            let record = XlsPrintRowCol::parse(&payload).unwrap();
+            let record = PrintRowCol::parse(&payload).unwrap();
             assert_eq!(record.print_headers(), expected);
             assert_eq!(record.to_payload(), payload);
         }
@@ -136,23 +136,23 @@ mod tests {
 
     #[test]
     fn print_row_col_rejects_bad_length_and_non_boolean() {
-        assert!(XlsPrintRowCol::parse(&[0x01]).is_err());
-        assert!(XlsPrintRowCol::parse(&[0x00, 0x00, 0x00]).is_err());
+        assert!(PrintRowCol::parse(&[0x01]).is_err());
+        assert!(PrintRowCol::parse(&[0x00, 0x00, 0x00]).is_err());
         // Boolean (MS-XLS 2.5.14) allows only 0x0000 and 0x0001.
-        assert!(XlsPrintRowCol::parse(&[0x02, 0x00]).is_err());
-        assert!(XlsPrintRowCol::parse(&[0x00, 0x01]).is_err());
+        assert!(PrintRowCol::parse(&[0x02, 0x00]).is_err());
+        assert!(PrintRowCol::parse(&[0x00, 0x01]).is_err());
     }
 
     #[test]
     fn grid_set_round_trip() {
         let payload = [0x01, 0x00];
-        let record = XlsGridSet::parse(&payload).unwrap();
+        let record = GridSet::parse(&payload).unwrap();
         assert!(record.print_grid());
         assert_eq!(record.flags(), 0x0001);
         assert_eq!(record.to_payload(), payload);
 
         let payload = [0x00, 0x00];
-        let record = XlsGridSet::parse(&payload).unwrap();
+        let record = GridSet::parse(&payload).unwrap();
         assert!(!record.print_grid());
         assert_eq!(record.to_payload(), payload);
     }
@@ -162,14 +162,14 @@ mod tests {
         // The 15 unused bits are undefined and MUST be ignored, but the
         // record must round-trip unchanged.
         let payload = [0xFE, 0x7F];
-        let record = XlsGridSet::parse(&payload).unwrap();
+        let record = GridSet::parse(&payload).unwrap();
         assert!(!record.print_grid());
         assert_eq!(record.to_payload(), payload);
     }
 
     #[test]
     fn grid_set_rejects_bad_length() {
-        assert!(XlsGridSet::parse(&[0x01]).is_err());
-        assert!(XlsGridSet::parse(&[0x01, 0x00, 0x00]).is_err());
+        assert!(GridSet::parse(&[0x01]).is_err());
+        assert!(GridSet::parse(&[0x01, 0x00, 0x00]).is_err());
     }
 }

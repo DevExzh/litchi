@@ -9,7 +9,7 @@
 //!
 //! - MS-XLS 2.4.109 (Fbi), 2.5.14 (Boolean)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `Fbi` record (MS-XLS 2.4.109).
 pub(crate) const FBI_RECORD_TYPE: u16 = 0x1060;
@@ -23,8 +23,8 @@ const MIN_HEIGHT_BASIS: u16 = 20;
 /// Maximum `twpHeightBasis` value, in twips (MS-XLS 2.4.109).
 const MAX_HEIGHT_BASIS: u16 = 8180;
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: FBI_RECORD_TYPE,
         message: message.into(),
     }
@@ -33,15 +33,15 @@ fn invalid(message: impl Into<String>) -> XlsError {
 /// The `scab` scale basis of an `Fbi` record (MS-XLS 2.4.109).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
-pub enum XlsFontScaleBasis {
+pub enum FontScaleBasis {
     /// 0x0000: scale by chart area.
     ChartArea = 0x0000,
     /// 0x0001: scale by plot area.
     PlotArea = 0x0001,
 }
 
-impl XlsFontScaleBasis {
-    fn parse(value: u16) -> XlsResult<Self> {
+impl FontScaleBasis {
+    fn parse(value: u16) -> Result<Self> {
         // Boolean (MS-XLS 2.5.14): only 0x0000 and 0x0001 are legal.
         match value {
             0x0000 => Ok(Self::ChartArea),
@@ -54,7 +54,7 @@ impl XlsFontScaleBasis {
 /// Typed `Fbi` record content (MS-XLS 2.4.109): font information for a
 /// scalable chart font.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsFbi {
+pub struct Fbi {
     /// Font width in twips when the font was first applied (`dmixBasis`).
     width_basis: u16,
     /// Font height in twips when the font was first applied (`dmiyBasis`).
@@ -62,16 +62,16 @@ pub struct XlsFbi {
     /// Default font height in twips (`twpHeightBasis`), in 20..=8180.
     font_height_basis: u16,
     /// The scale basis (`scab`).
-    scale: XlsFontScaleBasis,
+    scale: FontScaleBasis,
     /// The font index (`ifnt`), a `FontIndex` structure.
     font_index: u16,
 }
 
-impl XlsFbi {
+impl Fbi {
     /// Parse an `Fbi` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: PAYLOAD_LEN,
                 found: data.len(),
             });
@@ -95,7 +95,7 @@ impl XlsFbi {
             width_basis,
             height_basis,
             font_height_basis,
-            scale: XlsFontScaleBasis::parse(u16::from_le_bytes([data[6], data[7]]))?,
+            scale: FontScaleBasis::parse(u16::from_le_bytes([data[6], data[7]]))?,
             font_index: u16::from_le_bytes([data[8], data[9]]),
         })
     }
@@ -127,7 +127,7 @@ impl XlsFbi {
     }
 
     /// The scale basis (`scab`).
-    pub fn scale(&self) -> XlsFontScaleBasis {
+    pub fn scale(&self) -> FontScaleBasis {
         self.scale
     }
 
@@ -154,11 +154,11 @@ mod tests {
     #[test]
     fn round_trip_both_scales() {
         for (scale, expected) in [
-            (0x0000, XlsFontScaleBasis::ChartArea),
-            (0x0001, XlsFontScaleBasis::PlotArea),
+            (0x0000, FontScaleBasis::ChartArea),
+            (0x0001, FontScaleBasis::PlotArea),
         ] {
             let bytes = record(96, 1440, 240, scale, 5);
-            let parsed = XlsFbi::parse(&bytes).unwrap();
+            let parsed = Fbi::parse(&bytes).unwrap();
             assert_eq!(parsed.width_basis(), 96);
             assert_eq!(parsed.height_basis(), 1440);
             assert_eq!(parsed.font_height_basis(), 240);
@@ -170,23 +170,23 @@ mod tests {
 
     #[test]
     fn accepts_basis_bounds() {
-        assert!(XlsFbi::parse(&record(0x7FFF, 0x7FFF, 20, 0, 0)).is_ok());
-        assert!(XlsFbi::parse(&record(0, 0, 8180, 0, 0)).is_ok());
+        assert!(Fbi::parse(&record(0x7FFF, 0x7FFF, 20, 0, 0)).is_ok());
+        assert!(Fbi::parse(&record(0, 0, 8180, 0, 0)).is_ok());
     }
 
     #[test]
     fn rejects_malformed_records() {
         let bytes = record(96, 1440, 240, 0, 5);
         // Truncated and overlong payloads.
-        assert!(XlsFbi::parse(&bytes[..9]).is_err());
-        assert!(XlsFbi::parse(&[bytes.as_slice(), &[0]].concat()).is_err());
+        assert!(Fbi::parse(&bytes[..9]).is_err());
+        assert!(Fbi::parse(&[bytes.as_slice(), &[0]].concat()).is_err());
         // dmixBasis / dmiyBasis above 0x7FFF.
-        assert!(XlsFbi::parse(&record(0x8000, 0, 240, 0, 0)).is_err());
-        assert!(XlsFbi::parse(&record(0, 0x8000, 240, 0, 0)).is_err());
+        assert!(Fbi::parse(&record(0x8000, 0, 240, 0, 0)).is_err());
+        assert!(Fbi::parse(&record(0, 0x8000, 240, 0, 0)).is_err());
         // twpHeightBasis outside 20..=8180.
-        assert!(XlsFbi::parse(&record(0, 0, 19, 0, 0)).is_err());
-        assert!(XlsFbi::parse(&record(0, 0, 8181, 0, 0)).is_err());
+        assert!(Fbi::parse(&record(0, 0, 19, 0, 0)).is_err());
+        assert!(Fbi::parse(&record(0, 0, 8181, 0, 0)).is_err());
         // scab is a Boolean.
-        assert!(XlsFbi::parse(&record(0, 0, 240, 0x0002, 0)).is_err());
+        assert!(Fbi::parse(&record(0, 0, 240, 0x0002, 0)).is_err());
     }
 }

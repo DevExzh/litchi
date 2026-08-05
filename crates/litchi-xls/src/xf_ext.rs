@@ -6,8 +6,8 @@
 //! and the text indentation level. Extensions of a type or size the
 //! specification does not define are preserved verbatim.
 
-use super::differential_format::{XlsXfFontScheme, XlsXfGradient, XlsXfGradientStop};
-use super::{XlsError, XlsResult};
+use super::differential_format::{XfFontScheme, XfGradient, XfGradientStop};
+use super::{Error, Result};
 
 /// Record type of the `XFExt` record.
 pub(crate) const XF_EXT_RECORD_TYPE: u16 = 0x087D;
@@ -45,8 +45,8 @@ const EXT_TEXT_COLOR: u16 = 0x000D;
 const EXT_FONT_SCHEME: u16 = 0x000E;
 const EXT_INDENT: u16 = 0x000F;
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: XF_EXT_RECORD_TYPE,
         message: message.into(),
     }
@@ -54,7 +54,7 @@ fn invalid(message: impl Into<String>) -> XlsError {
 
 /// How the color data of a `FullColorExt` is stored (`XColorType`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsFullColorType {
+pub enum FullColorType {
     /// Automatic color; `value` is zero.
     Automatic,
     /// Color-table index (`IcvXF`) in the low bytes of `value`.
@@ -67,8 +67,8 @@ pub enum XlsFullColorType {
     NotSet,
 }
 
-impl XlsFullColorType {
-    fn from_code(value: u16) -> XlsResult<Self> {
+impl FullColorType {
+    fn from_code(value: u16) -> Result<Self> {
         Ok(match value {
             0x0000 => Self::Automatic,
             0x0001 => Self::Indexed,
@@ -92,8 +92,8 @@ impl XlsFullColorType {
 
 /// A `FullColorExt` (MS-XLS 2.5.155): a theme-aware extended color.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsFullColorExt {
-    color_type: XlsFullColorType,
+pub struct FullColorExt {
+    color_type: FullColorType,
     /// Tint; positive lightens, negative darkens.
     tint: i16,
     /// Raw `xclrValue` color data (index, RGBA, or theme selector).
@@ -102,14 +102,10 @@ pub struct XlsFullColorExt {
     unused: [u8; 8],
 }
 
-impl XlsFullColorExt {
+impl FullColorExt {
     /// A color; `Automatic` and `NotSet` colors must carry a zero value.
-    pub fn try_new(color_type: XlsFullColorType, tint: i16, value: u32) -> XlsResult<Self> {
-        if matches!(
-            color_type,
-            XlsFullColorType::Automatic | XlsFullColorType::NotSet
-        ) && value != 0
-        {
+    pub fn try_new(color_type: FullColorType, tint: i16, value: u32) -> Result<Self> {
+        if matches!(color_type, FullColorType::Automatic | FullColorType::NotSet) && value != 0 {
             return Err(invalid(
                 "automatic and not-set colors must carry a zero value",
             ));
@@ -122,7 +118,7 @@ impl XlsFullColorExt {
         })
     }
 
-    pub const fn color_type(&self) -> XlsFullColorType {
+    pub const fn color_type(&self) -> FullColorType {
         self.color_type
     }
     pub const fn tint(&self) -> i16 {
@@ -132,7 +128,7 @@ impl XlsFullColorExt {
         self.value
     }
 
-    fn parse(data: &[u8]) -> XlsResult<Self> {
+    fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != FULL_COLOR_EXT_LEN {
             return Err(invalid(format!(
                 "FullColorExt has {} bytes; expected {FULL_COLOR_EXT_LEN}",
@@ -140,14 +136,14 @@ impl XlsFullColorExt {
             )));
         }
         let value = Self {
-            color_type: XlsFullColorType::from_code(u16::from_le_bytes([data[0], data[1]]))?,
+            color_type: FullColorType::from_code(u16::from_le_bytes([data[0], data[1]]))?,
             tint: i16::from_le_bytes([data[2], data[3]]),
             value: u32::from_le_bytes(data[4..8].try_into().expect("length checked")),
             unused: data[8..16].try_into().expect("length checked"),
         };
         if matches!(
             value.color_type,
-            XlsFullColorType::Automatic | XlsFullColorType::NotSet
+            FullColorType::Automatic | FullColorType::NotSet
         ) && value.value != 0
         {
             return Err(invalid(
@@ -167,32 +163,32 @@ impl XlsFullColorExt {
 
 /// One typed entry in an `XFExt` `rgExt` array (MS-XLS 2.5.108).
 #[derive(Debug, Clone, PartialEq)]
-pub enum XlsExtProp {
+pub enum ExtProp {
     /// Cell interior foreground color (0x0004).
-    FillForegroundColor(XlsFullColorExt),
+    FillForegroundColor(FullColorExt),
     /// Cell interior background color (0x0005).
-    FillBackgroundColor(XlsFullColorExt),
+    FillBackgroundColor(FullColorExt),
     /// Cell interior gradient fill (0x0006).
     FillGradient {
         /// Gradient parameters.
-        gradient: XlsXfGradient,
+        gradient: XfGradient,
         /// Gradient color stops.
-        stops: Vec<XlsXfGradientStop>,
+        stops: Vec<XfGradientStop>,
     },
     /// Top cell border color (0x0007).
-    BorderTopColor(XlsFullColorExt),
+    BorderTopColor(FullColorExt),
     /// Bottom cell border color (0x0008).
-    BorderBottomColor(XlsFullColorExt),
+    BorderBottomColor(FullColorExt),
     /// Left cell border color (0x0009).
-    BorderLeftColor(XlsFullColorExt),
+    BorderLeftColor(FullColorExt),
     /// Right cell border color (0x000A).
-    BorderRightColor(XlsFullColorExt),
+    BorderRightColor(FullColorExt),
     /// Diagonal cell border color (0x000B).
-    BorderDiagonalColor(XlsFullColorExt),
+    BorderDiagonalColor(FullColorExt),
     /// Cell text color (0x000D).
-    TextColor(XlsFullColorExt),
+    TextColor(FullColorExt),
     /// Theme-font scheme (0x000E).
-    FontScheme(XlsXfFontScheme),
+    FontScheme(XfFontScheme),
     /// Text indentation level (0x000F), at most 250.
     Indent(u16),
     /// An extension the specification does not define, or a known extension
@@ -205,7 +201,7 @@ pub enum XlsExtProp {
     },
 }
 
-impl XlsExtProp {
+impl ExtProp {
     fn ext_type(&self) -> u16 {
         match self {
             Self::FillForegroundColor(_) => EXT_FILL_FOREGROUND,
@@ -228,8 +224,8 @@ impl XlsExtProp {
             ext_type,
             data: data.to_vec(),
         };
-        let color = |build: fn(XlsFullColorExt) -> Self| {
-            XlsFullColorExt::parse(data).map_or_else(|_| unknown(), build)
+        let color = |build: fn(FullColorExt) -> Self| {
+            FullColorExt::parse(data).map_or_else(|_| unknown(), build)
         };
         match ext_type {
             EXT_FILL_FOREGROUND => color(Self::FillForegroundColor),
@@ -244,9 +240,9 @@ impl XlsExtProp {
             EXT_FONT_SCHEME => {
                 if data.len() == 2 {
                     match u16::from_le_bytes([data[0], data[1]]) {
-                        0 => Self::FontScheme(XlsXfFontScheme::None),
-                        1 => Self::FontScheme(XlsXfFontScheme::Major),
-                        2 => Self::FontScheme(XlsXfFontScheme::Minor),
+                        0 => Self::FontScheme(XfFontScheme::None),
+                        1 => Self::FontScheme(XfFontScheme::Major),
+                        2 => Self::FontScheme(XfFontScheme::Minor),
                         _ => unknown(),
                     }
                 } else {
@@ -269,11 +265,11 @@ impl XlsExtProp {
         }
     }
 
-    fn parse_gradient(data: &[u8]) -> XlsResult<Self> {
+    fn parse_gradient(data: &[u8]) -> Result<Self> {
         if data.len() < GRADIENT_LEN + 4 {
             return Err(invalid("XFExtGradient is truncated"));
         }
-        let gradient = XlsXfGradient::parse(&data[..GRADIENT_LEN])?;
+        let gradient = XfGradient::parse(&data[..GRADIENT_LEN])?;
         let stop_count = u32::from_le_bytes(
             data[GRADIENT_LEN..GRADIENT_LEN + 4]
                 .try_into()
@@ -290,12 +286,12 @@ impl XlsExtProp {
         }
         let mut stops = Vec::with_capacity(stop_count);
         for chunk in data[GRADIENT_LEN + 4..].chunks_exact(GRAD_STOP_LEN) {
-            stops.push(XlsXfGradientStop::parse(chunk)?);
+            stops.push(XfGradientStop::parse(chunk)?);
         }
         Ok(Self::FillGradient { gradient, stops })
     }
 
-    fn data_bytes(&self) -> XlsResult<Vec<u8>> {
+    fn data_bytes(&self) -> Result<Vec<u8>> {
         let mut data = Vec::new();
         match self {
             Self::FillForegroundColor(value)
@@ -318,10 +314,10 @@ impl XlsExtProp {
             },
             Self::FontScheme(value) => {
                 let code = match value {
-                    XlsXfFontScheme::None => 0u16,
-                    XlsXfFontScheme::Major => 1,
-                    XlsXfFontScheme::Minor => 2,
-                    XlsXfFontScheme::NotSpecified => {
+                    XfFontScheme::None => 0u16,
+                    XfFontScheme::Major => 1,
+                    XfFontScheme::Minor => 2,
+                    XfFontScheme::NotSpecified => {
                         return Err(invalid("ExtProp FontScheme has no not-specified value"));
                     },
                 };
@@ -341,14 +337,14 @@ impl XlsExtProp {
 
 /// Typed `XFExt` record content (MS-XLS 2.4.355).
 #[derive(Debug, Clone, PartialEq)]
-pub struct XlsXfExt {
+pub struct XfExt {
     xf_index: u16,
-    properties: Vec<XlsExtProp>,
+    properties: Vec<ExtProp>,
 }
 
-impl XlsXfExt {
+impl XfExt {
     /// Extensions for the `XF` record at `xf_index` (at most 4050).
-    pub fn try_new(xf_index: u16, properties: Vec<XlsExtProp>) -> XlsResult<Self> {
+    pub fn try_new(xf_index: u16, properties: Vec<ExtProp>) -> Result<Self> {
         if xf_index > MAX_XF_INDEX {
             return Err(invalid(format!("XFExt index {xf_index} exceeds 4050")));
         }
@@ -367,14 +363,14 @@ impl XlsXfExt {
     }
 
     /// The formatting property extensions, in record order.
-    pub fn properties(&self) -> &[XlsExtProp] {
+    pub fn properties(&self) -> &[ExtProp] {
         &self.properties
     }
 
     /// Parse an `XFExt` record payload.
-    pub(crate) fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub(crate) fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < FRT_HEADER_LEN + FIXED_TAIL_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: FRT_HEADER_LEN + FIXED_TAIL_LEN,
                 found: data.len(),
             });
@@ -407,7 +403,7 @@ impl XlsXfExt {
             let blob = data
                 .get(offset + 4..end)
                 .ok_or_else(|| invalid("truncated ExtProp data"))?;
-            properties.push(XlsExtProp::parse(ext_type, blob));
+            properties.push(ExtProp::parse(ext_type, blob));
             offset = end;
         }
         if offset != data.len() {
@@ -422,7 +418,7 @@ impl XlsXfExt {
     }
 
     /// Serialize back to a complete `XFExt` record payload.
-    pub(crate) fn to_payload(&self) -> XlsResult<Vec<u8>> {
+    pub(crate) fn to_payload(&self) -> Result<Vec<u8>> {
         if self.properties.len() > u16::MAX as usize {
             return Err(invalid("XFExt property count exceeds u16"));
         }
@@ -480,14 +476,11 @@ mod tests {
         indent.extend_from_slice(&6u16.to_le_bytes());
         indent.extend_from_slice(&12u16.to_le_bytes());
         let data = record(21, &[color_property(EXT_FILL_FOREGROUND), indent]);
-        let parsed = XlsXfExt::parse(&data).unwrap();
+        let parsed = XfExt::parse(&data).unwrap();
         assert_eq!(parsed.xf_index(), 21);
         match parsed.properties() {
-            [
-                XlsExtProp::FillForegroundColor(color),
-                XlsExtProp::Indent(12),
-            ] => {
-                assert_eq!(color.color_type(), XlsFullColorType::Theme);
+            [ExtProp::FillForegroundColor(color), ExtProp::Indent(12)] => {
+                assert_eq!(color.color_type(), FullColorType::Theme);
                 assert_eq!(color.tint(), -2);
                 assert_eq!(color.value(), 1);
             },
@@ -498,15 +491,15 @@ mod tests {
 
     #[test]
     fn parses_gradient_fill() {
-        let gradient = XlsXfGradient::linear(90.0).unwrap();
-        let color = super::super::differential_format::XlsXfColor::try_new(
-            super::super::differential_format::XlsXfColorSource::Rgb,
+        let gradient = XfGradient::linear(90.0).unwrap();
+        let color = super::super::differential_format::XfColor::try_new(
+            super::super::differential_format::XfColorSource::Rgb,
             0,
             [0xFF, 0, 0, 0xFF],
         )
         .unwrap();
-        let stop = XlsXfGradientStop::try_new(0.5, color).unwrap();
-        let property = XlsExtProp::FillGradient {
+        let stop = XfGradientStop::try_new(0.5, color).unwrap();
+        let property = ExtProp::FillGradient {
             gradient,
             stops: vec![stop],
         };
@@ -516,7 +509,7 @@ mod tests {
         entry.extend_from_slice(&((4 + blob.len()) as u16).to_le_bytes());
         entry.append(&mut blob);
         let data = record(0, &[entry]);
-        let parsed = XlsXfExt::parse(&data).unwrap();
+        let parsed = XfExt::parse(&data).unwrap();
         assert_eq!(parsed.properties(), &[property]);
         assert_eq!(parsed.to_payload().unwrap(), data);
     }
@@ -534,15 +527,15 @@ mod tests {
         malformed.extend_from_slice(&5u16.to_le_bytes());
         malformed.push(0x02);
         let data = record(5, &[unknown, malformed]);
-        let parsed = XlsXfExt::parse(&data).unwrap();
+        let parsed = XfExt::parse(&data).unwrap();
         assert!(matches!(
             parsed.properties(),
             [
-                XlsExtProp::Unknown {
+                ExtProp::Unknown {
                     ext_type: 0x00F0,
                     ..
                 },
-                XlsExtProp::Unknown {
+                ExtProp::Unknown {
                     ext_type: EXT_FONT_SCHEME,
                     ..
                 }
@@ -554,19 +547,19 @@ mod tests {
     #[test]
     fn rejects_malformed_records() {
         // Truncated.
-        assert!(XlsXfExt::parse(&[0; 10]).is_err());
+        assert!(XfExt::parse(&[0; 10]).is_err());
         // Wrong FrtHeader.rt.
         let mut wrong_rt = record(0, &[]);
         wrong_rt[0..2].copy_from_slice(&0x087Cu16.to_le_bytes());
-        assert!(XlsXfExt::parse(&wrong_rt).is_err());
+        assert!(XfExt::parse(&wrong_rt).is_err());
         // Index above 4050.
-        assert!(XlsXfExt::parse(&record(4051, &[])).is_err());
+        assert!(XfExt::parse(&record(4051, &[])).is_err());
         // Declared count not consuming the payload.
         let mut trailing = record(0, &[]);
         trailing[18] = 1;
-        assert!(XlsXfExt::parse(&trailing).is_err());
+        assert!(XfExt::parse(&trailing).is_err());
         // Constructor validation.
-        assert!(XlsXfExt::try_new(4051, Vec::new()).is_err());
-        assert!(XlsFullColorExt::try_new(XlsFullColorType::Automatic, 0, 7).is_err());
+        assert!(XfExt::try_new(4051, Vec::new()).is_err());
+        assert!(FullColorExt::try_new(FullColorType::Automatic, 0, 7).is_err());
     }
 }

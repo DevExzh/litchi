@@ -6,7 +6,7 @@
 //! Run with:
 //!   cargo run --example minimal_doc_mre --features doc --no-default-features
 
-use litchi::doc::DocWriter;
+use litchi_doc::DocWriter;
 use std::env;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

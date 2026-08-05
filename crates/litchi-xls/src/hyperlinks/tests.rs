@@ -1,7 +1,7 @@
 //! Regression coverage for the BIFF8/MS-XLS hyperlink owner.
 
 use super::codec::{FILE_MONIKER_CLSID, URL_MONIKER_CLSID, URL_SERIAL_GUID, parse_hlink_record};
-use super::model::{RECORD_TYPE, TOOLTIP_RECORD_TYPE, XlsHyperlinkMoniker, XlsHyperlinkTargetKind};
+use super::model::{HyperlinkMoniker, HyperlinkTargetKind, RECORD_TYPE, TOOLTIP_RECORD_TYPE};
 use super::package::HyperlinkCollector;
 
 const TEST_HLINK_CLSID: [u8; 16] = [
@@ -49,13 +49,13 @@ fn url_link() -> Vec<u8> {
 #[test]
 fn parses_url_email_document_file_and_string_monikers() {
     let url = parse_hlink_record(&url_link()).unwrap();
-    assert_eq!(url.target_kind(), XlsHyperlinkTargetKind::Url);
+    assert_eq!(url.target_kind(), HyperlinkTargetKind::Url);
     assert_eq!(url.address(), Some("https://example.com"));
     let mut document = base(0x1C);
     string(&mut document, "place");
     string(&mut document, "Sheet1!A1");
     let document = parse_hlink_record(&document).unwrap();
-    assert_eq!(document.target_kind(), XlsHyperlinkTargetKind::Document);
+    assert_eq!(document.target_kind(), HyperlinkTargetKind::Document);
     assert_eq!(document.location(), Some("Sheet1!A1"));
     let mut file = base(1);
     file.extend_from_slice(&FILE_MONIKER_CLSID);
@@ -68,12 +68,12 @@ fn parses_url_email_document_file_and_string_monikers() {
     file.extend_from_slice(&0u32.to_le_bytes());
     file.extend_from_slice(&0u32.to_le_bytes());
     let file = parse_hlink_record(&file).unwrap();
-    assert_eq!(file.target_kind(), XlsHyperlinkTargetKind::File);
+    assert_eq!(file.target_kind(), HyperlinkTargetKind::File);
     assert_eq!(file.address(), Some("file.xls"));
     let mut unc = base(0x101);
     string(&mut unc, "\\\\server\\share");
     let unc = parse_hlink_record(&unc).unwrap();
-    assert_eq!(unc.target_kind(), XlsHyperlinkTargetKind::Unc);
+    assert_eq!(unc.target_kind(), HyperlinkTargetKind::Unc);
 }
 
 #[test]
@@ -127,7 +127,7 @@ fn accepts_and_retains_nonstandard_hlink_producer_clsid() {
 
 #[test]
 fn reads_poi_hyperlink_fixtures() {
-    use crate::XlsWorkbook;
+    use crate::Workbook;
     use std::fs::File;
     use std::path::Path;
     let fixture = |name: &str| {
@@ -135,7 +135,7 @@ fn reads_poi_hyperlink_fixtures() {
             .join("../../test-data/poi/test-data/spreadsheet")
             .join(name)
     };
-    let workbook = XlsWorkbook::new(File::open(fixture("WithTwoHyperLinks.xls")).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(fixture("WithTwoHyperLinks.xls")).unwrap()).unwrap();
     let links = workbook.xls_worksheet(0).unwrap().hyperlinks();
     assert_eq!(links.len(), 2);
     assert_eq!(links[0].range().first_row(), 4);
@@ -143,13 +143,13 @@ fn reads_poi_hyperlink_fixtures() {
     assert_eq!(links[0].address(), Some("http://poi.apache.org/"));
     assert_eq!(links[1].range().first_column(), 1);
     let workbook =
-        XlsWorkbook::new(File::open(fixture("HyperlinksOnManySheets.xls")).unwrap()).unwrap();
+        Workbook::new(File::open(fixture("HyperlinksOnManySheets.xls")).unwrap()).unwrap();
     assert_eq!(workbook.xls_worksheet(0).unwrap().hyperlinks().len(), 2);
     let email = &workbook.xls_worksheet(1).unwrap().hyperlinks()[0];
-    assert_eq!(email.target_kind(), XlsHyperlinkTargetKind::Email);
+    assert_eq!(email.target_kind(), HyperlinkTargetKind::Email);
     assert_eq!(email.address(), Some("mailto:dev@poi.apache.org"));
     let document = &workbook.xls_worksheet(2).unwrap().hyperlinks()[0];
-    assert_eq!(document.target_kind(), XlsHyperlinkTargetKind::Document);
+    assert_eq!(document.target_kind(), HyperlinkTargetKind::Document);
     assert_eq!(document.location(), Some("WebLinks!A1"));
 }
 
@@ -169,7 +169,7 @@ fn test_parse_hlink_record_invalid_version() {
 #[test]
 fn test_hyperlink_target_url() {
     let link = parse_hlink_record(&url_link()).unwrap();
-    assert_eq!(link.target_kind(), XlsHyperlinkTargetKind::Url);
+    assert_eq!(link.target_kind(), HyperlinkTargetKind::Url);
     assert_eq!(link.address(), Some("https://example.com"));
     assert!(link.absolute());
 }
@@ -179,7 +179,7 @@ fn test_hyperlink_target_document() {
     let mut data = base(0x08);
     string(&mut data, "Sheet1!A1");
     let link = parse_hlink_record(&data).unwrap();
-    assert_eq!(link.target_kind(), XlsHyperlinkTargetKind::Document);
+    assert_eq!(link.target_kind(), HyperlinkTargetKind::Document);
     assert_eq!(link.address(), Some("Sheet1!A1"));
 }
 
@@ -188,7 +188,7 @@ fn test_hyperlink_target_unc() {
     let mut data = base(0x101);
     string(&mut data, "\\\\server\\share\\file.txt");
     let link = parse_hlink_record(&data).unwrap();
-    assert_eq!(link.target_kind(), XlsHyperlinkTargetKind::Unc);
+    assert_eq!(link.target_kind(), HyperlinkTargetKind::Unc);
     assert_eq!(link.address(), Some("\\\\server\\share\\file.txt"));
 }
 
@@ -213,7 +213,7 @@ fn test_hyperlink_target_file_with_long_name() {
     data.extend_from_slice(&unicode);
     let link = parse_hlink_record(&data).unwrap();
     assert_eq!(link.address(), Some("long_filename.txt"));
-    let XlsHyperlinkMoniker::File(file) = link.moniker().unwrap() else {
+    let HyperlinkMoniker::File(file) = link.moniker().unwrap() else {
         panic!()
     };
     assert_eq!(file.ansi_path(), "LONGFI~1.TXT");
@@ -250,7 +250,7 @@ fn test_xls_hyperlink_clone() {
 fn test_xls_hyperlink_debug() {
     let link = parse_hlink_record(&url_link()).unwrap();
     let debug = format!("{link:?}");
-    assert!(debug.contains("XlsHyperlink"));
+    assert!(debug.contains("Hyperlink"));
     assert!(debug.contains("https://example.com"));
 }
 

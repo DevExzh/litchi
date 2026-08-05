@@ -1,10 +1,10 @@
 //! Strict BIFF8/MS-XLS HLink and HLinkTooltip codecs.
 
 use super::model::{
-    TOOLTIP_RECORD_TYPE, XlsFileMoniker, XlsHyperlink, XlsHyperlinkMoniker, XlsHyperlinkRange,
-    XlsItemMoniker, XlsUrlMoniker,
+    FileMoniker, Hyperlink, HyperlinkMoniker, HyperlinkRange, ItemMoniker, TOOLTIP_RECORD_TYPE,
+    UrlMoniker,
 };
-use crate::error::{XlsError, XlsResult};
+use crate::error::{Error, Result};
 
 pub(super) const URL_MONIKER_CLSID: [u8; 16] = [
     0xE0, 0xC9, 0xEA, 0x79, 0xF9, 0xBA, 0xCE, 0x11, 0x8C, 0x82, 0x00, 0xAA, 0x00, 0x4B, 0xA9, 0x0B,
@@ -19,7 +19,7 @@ pub(super) const URL_SERIAL_GUID: [u8; 16] = [
     0x79, 0x58, 0x81, 0xF4, 0x3B, 0x1D, 0x7F, 0x48, 0xAF, 0x2C, 0x82, 0x5D, 0xC4, 0x85, 0x27, 0x63,
 ];
 
-pub fn parse_hlink_record(data: &[u8]) -> XlsResult<XlsHyperlink> {
+pub fn parse_hlink_record(data: &[u8]) -> Result<Hyperlink> {
     let mut cursor = Cursor::new(data);
     let range = cursor.range()?;
     let class_id = cursor.guid()?;
@@ -54,7 +54,7 @@ pub fn parse_hlink_record(data: &[u8]) -> XlsResult<XlsHyperlink> {
     let display_name = has_display.then(|| cursor.hyperlink_string()).transpose()?;
     let target_frame = has_frame.then(|| cursor.hyperlink_string()).transpose()?;
     let moniker = if string_moniker {
-        Some(XlsHyperlinkMoniker::String(cursor.hyperlink_string()?))
+        Some(HyperlinkMoniker::String(cursor.hyperlink_string()?))
     } else if has_moniker {
         Some(parse_moniker(&mut cursor, 0)?)
     } else {
@@ -71,7 +71,7 @@ pub fn parse_hlink_record(data: &[u8]) -> XlsResult<XlsHyperlink> {
             cursor.remaining()
         ));
     }
-    Ok(XlsHyperlink {
+    Ok(Hyperlink {
         range,
         class_id,
         absolute: flags & 2 != 0,
@@ -87,7 +87,7 @@ pub fn parse_hlink_record(data: &[u8]) -> XlsResult<XlsHyperlink> {
     })
 }
 
-pub(super) fn parse_tooltip(data: &[u8]) -> XlsResult<(XlsHyperlinkRange, String)> {
+pub(super) fn parse_tooltip(data: &[u8]) -> Result<(HyperlinkRange, String)> {
     if data.len() < 14 {
         return invalid(format!("HLinkTooltip payload is too short: {}", data.len()));
     }
@@ -109,16 +109,16 @@ pub(super) fn parse_tooltip(data: &[u8]) -> XlsResult<(XlsHyperlinkRange, String
     Ok((range, decode_terminated_utf16(cursor.take(remaining)?)?))
 }
 
-fn parse_moniker(cursor: &mut Cursor<'_>, depth: usize) -> XlsResult<XlsHyperlinkMoniker> {
+fn parse_moniker(cursor: &mut Cursor<'_>, depth: usize) -> Result<HyperlinkMoniker> {
     if depth >= 16 {
         return invalid("HLink composite-moniker nesting exceeds 16".to_string());
     }
     let clsid = cursor.guid()?;
     if clsid == URL_MONIKER_CLSID {
-        return Ok(XlsHyperlinkMoniker::Url(parse_url_moniker(cursor)?));
+        return Ok(HyperlinkMoniker::Url(parse_url_moniker(cursor)?));
     }
     if clsid == FILE_MONIKER_CLSID {
-        return Ok(XlsHyperlinkMoniker::File(parse_file_moniker(cursor)?));
+        return Ok(HyperlinkMoniker::File(parse_file_moniker(cursor)?));
     }
     if clsid == COMPOSITE_MONIKER_CLSID {
         let count = cursor.u32()? as usize;
@@ -129,22 +129,22 @@ fn parse_moniker(cursor: &mut Cursor<'_>, depth: usize) -> XlsResult<XlsHyperlin
         for _ in 0..count {
             monikers.push(parse_moniker(cursor, depth + 1)?);
         }
-        return Ok(XlsHyperlinkMoniker::Composite(monikers));
+        return Ok(HyperlinkMoniker::Composite(monikers));
     }
     if clsid == ANTI_MONIKER_CLSID {
         let count = cursor.u32()?;
         if count > 1_048_576 {
             return invalid(format!("anti-moniker count exceeds 1048576: {count}"));
         }
-        return Ok(XlsHyperlinkMoniker::Anti { count });
+        return Ok(HyperlinkMoniker::Anti { count });
     }
     if clsid == ITEM_MONIKER_CLSID {
-        return Ok(XlsHyperlinkMoniker::Item(parse_item_moniker(cursor)?));
+        return Ok(HyperlinkMoniker::Item(parse_item_moniker(cursor)?));
     }
     invalid("HLink contains an unknown moniker CLSID".to_string())
 }
 
-fn parse_url_moniker(cursor: &mut Cursor<'_>) -> XlsResult<XlsUrlMoniker> {
+fn parse_url_moniker(cursor: &mut Cursor<'_>) -> Result<UrlMoniker> {
     let length = cursor.u32()? as usize;
     if length < 2 || !length.is_multiple_of(2) {
         return invalid(format!("invalid URLMoniker length: {length}"));
@@ -171,13 +171,13 @@ fn parse_url_moniker(cursor: &mut Cursor<'_>) -> XlsResult<XlsUrlMoniker> {
     if url_data.len() < 2 || url_data.len() % 2 != 0 {
         return invalid("URLMoniker URL has an invalid byte length".to_string());
     }
-    Ok(XlsUrlMoniker {
+    Ok(UrlMoniker {
         url: decode_terminated_utf16(url_data)?,
         serialization_uri_flags,
     })
 }
 
-fn parse_file_moniker(cursor: &mut Cursor<'_>) -> XlsResult<XlsFileMoniker> {
+fn parse_file_moniker(cursor: &mut Cursor<'_>) -> Result<FileMoniker> {
     let parent_directory_count = cursor.u16()?;
     let ansi_length = cursor.u32()? as usize;
     if ansi_length == 0 || ansi_length > 32_767 {
@@ -226,7 +226,7 @@ fn parse_file_moniker(cursor: &mut Cursor<'_>) -> XlsResult<XlsFileMoniker> {
         }
         Some(decode_unterminated_utf16(cursor.take(unicode_bytes)?)?)
     };
-    Ok(XlsFileMoniker {
+    Ok(FileMoniker {
         parent_directory_count,
         ansi_path,
         unicode_path,
@@ -234,21 +234,21 @@ fn parse_file_moniker(cursor: &mut Cursor<'_>) -> XlsResult<XlsFileMoniker> {
     })
 }
 
-fn parse_item_moniker(cursor: &mut Cursor<'_>) -> XlsResult<XlsItemMoniker> {
+fn parse_item_moniker(cursor: &mut Cursor<'_>) -> Result<ItemMoniker> {
     let delimiter_length = cursor.u32()? as usize;
     let (delimiter_ansi, delimiter_unicode) = parse_item_string(cursor.take(delimiter_length)?)?;
     let item_length = cursor.u32()? as usize;
     let (item_ansi, item_unicode) = parse_item_string(cursor.take(item_length)?)?;
-    Ok(XlsItemMoniker {
+    Ok(ItemMoniker {
         delimiter_ansi,
         delimiter_unicode,
         item_ansi,
         item_unicode,
     })
 }
-fn parse_item_string(data: &[u8]) -> XlsResult<(String, Option<String>)> {
+fn parse_item_string(data: &[u8]) -> Result<(String, Option<String>)> {
     let terminator = data.iter().position(|&byte| byte == 0).ok_or_else(|| {
-        XlsError::InvalidData("ItemMoniker ANSI string is not NUL-terminated".to_string())
+        Error::InvalidData("ItemMoniker ANSI string is not NUL-terminated".to_string())
     })?;
     let ansi = data[..terminator]
         .iter()
@@ -264,7 +264,7 @@ fn parse_item_string(data: &[u8]) -> XlsResult<(String, Option<String>)> {
     Ok((ansi, unicode))
 }
 
-fn decode_terminated_utf16(data: &[u8]) -> XlsResult<String> {
+fn decode_terminated_utf16(data: &[u8]) -> Result<String> {
     if data.len() < 2 || !data.len().is_multiple_of(2) {
         return invalid("invalid terminated UTF-16 byte length".to_string());
     }
@@ -276,9 +276,9 @@ fn decode_terminated_utf16(data: &[u8]) -> XlsResult<String> {
         return invalid("hyperlink string must contain exactly one trailing NUL".to_string());
     }
     String::from_utf16(&units[..units.len() - 1])
-        .map_err(|_| XlsError::InvalidData("hyperlink string contains invalid UTF-16".to_string()))
+        .map_err(|_| Error::InvalidData("hyperlink string contains invalid UTF-16".to_string()))
 }
-fn decode_unterminated_utf16(data: &[u8]) -> XlsResult<String> {
+fn decode_unterminated_utf16(data: &[u8]) -> Result<String> {
     if !data.len().is_multiple_of(2) {
         return invalid("invalid UTF-16 byte length".to_string());
     }
@@ -290,9 +290,9 @@ fn decode_unterminated_utf16(data: &[u8]) -> XlsResult<String> {
         return invalid("unterminated hyperlink string contains NUL".to_string());
     }
     String::from_utf16(&units)
-        .map_err(|_| XlsError::InvalidData("hyperlink string contains invalid UTF-16".to_string()))
+        .map_err(|_| Error::InvalidData("hyperlink string contains invalid UTF-16".to_string()))
 }
-fn decode_terminated_ansi(data: &[u8]) -> XlsResult<String> {
+fn decode_terminated_ansi(data: &[u8]) -> Result<String> {
     if data.last() != Some(&0) || data[..data.len() - 1].contains(&0) {
         return invalid("FileMoniker ANSI path must contain exactly one trailing NUL".to_string());
     }
@@ -313,31 +313,31 @@ impl<'a> Cursor<'a> {
     fn remaining(&self) -> usize {
         self.data.len().saturating_sub(self.position)
     }
-    fn take(&mut self, count: usize) -> XlsResult<&'a [u8]> {
+    fn take(&mut self, count: usize) -> Result<&'a [u8]> {
         let end = self
             .position
             .checked_add(count)
-            .ok_or_else(|| XlsError::InvalidData("hyperlink field size overflow".to_string()))?;
+            .ok_or_else(|| Error::InvalidData("hyperlink field size overflow".to_string()))?;
         let data = self
             .data
             .get(self.position..end)
-            .ok_or_else(|| XlsError::InvalidData("truncated hyperlink record".to_string()))?;
+            .ok_or_else(|| Error::InvalidData("truncated hyperlink record".to_string()))?;
         self.position = end;
         Ok(data)
     }
-    fn u16(&mut self) -> XlsResult<u16> {
+    fn u16(&mut self) -> Result<u16> {
         Ok(u16::from_le_bytes(self.take(2)?.try_into().unwrap()))
     }
-    fn u32(&mut self) -> XlsResult<u32> {
+    fn u32(&mut self) -> Result<u32> {
         Ok(u32::from_le_bytes(self.take(4)?.try_into().unwrap()))
     }
-    fn u64(&mut self) -> XlsResult<u64> {
+    fn u64(&mut self) -> Result<u64> {
         Ok(u64::from_le_bytes(self.take(8)?.try_into().unwrap()))
     }
-    fn guid(&mut self) -> XlsResult<[u8; 16]> {
+    fn guid(&mut self) -> Result<[u8; 16]> {
         Ok(self.take(16)?.try_into().unwrap())
     }
-    fn range(&mut self) -> XlsResult<XlsHyperlinkRange> {
+    fn range(&mut self) -> Result<HyperlinkRange> {
         let first_row = self.u16()?;
         let last_row = self.u16()?;
         let first_column = self.u16()?;
@@ -345,25 +345,25 @@ impl<'a> Cursor<'a> {
         if first_row > last_row || first_column > last_column || last_column > 255 {
             return invalid("hyperlink contains an invalid or out-of-range Ref8U".to_string());
         }
-        Ok(XlsHyperlinkRange {
+        Ok(HyperlinkRange {
             first_row,
             last_row,
             first_column: first_column as u8,
             last_column: last_column as u8,
         })
     }
-    fn hyperlink_string(&mut self) -> XlsResult<String> {
+    fn hyperlink_string(&mut self) -> Result<String> {
         let units = self.u32()? as usize;
         if units == 0 {
             return invalid("HyperlinkString length must include a NUL terminator".to_string());
         }
         let bytes = units
             .checked_mul(2)
-            .ok_or_else(|| XlsError::InvalidData("HyperlinkString size overflow".to_string()))?;
+            .ok_or_else(|| Error::InvalidData("HyperlinkString size overflow".to_string()))?;
         decode_terminated_utf16(self.take(bytes)?)
     }
 }
 
-pub(super) fn invalid<T>(message: String) -> XlsResult<T> {
-    Err(XlsError::InvalidData(message))
+pub(super) fn invalid<T>(message: String) -> Result<T> {
+    Err(Error::InvalidData(message))
 }

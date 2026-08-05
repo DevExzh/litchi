@@ -14,7 +14,7 @@
 //! Multiple MERGECELLS records may appear per worksheet; all are aggregated.
 //! Each record holds at most 1027 ranges (enforced by the 8224-byte BIFF limit).
 
-use crate::error::{XlsError, XlsResult};
+use crate::error::{Error, Result};
 use litchi_core::binary;
 
 /// MERGECELLS record type identifier.
@@ -58,9 +58,9 @@ impl MergedCellRange {
 ///
 /// - `u16` cmcs: count of CellRangeAddress structs
 /// - `cmcs * 8` bytes: array of `(rwFirst: u16, rwLast: u16, colFirst: u16, colLast: u16)`
-pub fn parse_mergecells_record(data: &[u8], out: &mut Vec<MergedCellRange>) -> XlsResult<()> {
+pub fn parse_mergecells_record(data: &[u8], out: &mut Vec<MergedCellRange>) -> Result<()> {
     if data.len() < 2 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 2,
             found: data.len(),
         });
@@ -70,7 +70,7 @@ pub fn parse_mergecells_record(data: &[u8], out: &mut Vec<MergedCellRange>) -> X
     let expected_len = 2 + count * 8;
 
     if data.len() < expected_len {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: expected_len,
             found: data.len(),
         });
@@ -175,7 +175,7 @@ mod tests {
 
     #[test]
     fn reads_poi_merged_cell_fixtures() {
-        use crate::XlsWorkbook;
+        use crate::Workbook;
         use std::fs::File;
         use std::path::Path;
 
@@ -186,7 +186,7 @@ mod tests {
         };
 
         // Single merged region: rows 8-15, columns C-F (0-based 7-14 / 2-5).
-        let workbook = XlsWorkbook::new(File::open(fixture("53109.xls")).unwrap()).unwrap();
+        let workbook = Workbook::new(File::open(fixture("53109.xls")).unwrap()).unwrap();
         let merged = workbook.xls_worksheet(0).unwrap().merged_cells();
         assert_eq!(merged.len(), 1);
         assert_eq!(
@@ -204,7 +204,7 @@ mod tests {
         assert!(!merged[0].contains(6, 3));
 
         // A workbook holding many merged regions across several sheets.
-        let workbook = XlsWorkbook::new(File::open(fixture("59858.xls")).unwrap()).unwrap();
+        let workbook = Workbook::new(File::open(fixture("59858.xls")).unwrap()).unwrap();
         let per_sheet: Vec<usize> = (0..workbook.sheets().len())
             .map(|index| workbook.xls_worksheet(index).unwrap().merged_cells().len())
             .collect();

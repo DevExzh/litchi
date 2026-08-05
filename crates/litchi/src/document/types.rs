@@ -6,7 +6,7 @@ use litchi_core::{Error, Result};
 use std::io::{Read, Seek};
 
 #[cfg(feature = "doc")]
-use crate::doc;
+use litchi_doc as doc;
 
 #[cfg(feature = "ooxml")]
 use crate::ooxml;

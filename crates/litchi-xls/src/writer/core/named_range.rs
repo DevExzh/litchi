@@ -5,17 +5,17 @@
 //! the `biff` module; this module only models the logical structure and
 //! provides helpers to convert range references into BIFF formula bytes.
 
-use crate::XlsDefinedNameFutureRecords;
-use crate::XlsResult;
+use crate::DefinedNameFutureRecords;
+use crate::Result;
 use crate::writer::formula::{Area, Ptg, Ref, encode_ptg_tokens};
-use crate::{XlsBuiltInName, XlsDefinedNameKind, XlsError, XlsNameScope};
+use crate::{BuiltInName, DefinedNameKind, Error, NameScope};
 
 /// Complete inert BIFF8 `Lbl` metadata for names beyond simple ranges.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsDefinedNameRecordOptions {
+pub struct DefinedNameRecordOptions {
     pub name: String,
-    pub kind: XlsDefinedNameKind,
-    pub scope: XlsNameScope,
+    pub kind: DefinedNameKind,
+    pub scope: NameScope,
     pub hidden: bool,
     pub function: bool,
     pub vba_procedure: bool,
@@ -34,32 +34,30 @@ pub struct XlsDefinedNameRecordOptions {
     pub comment: Option<String>,
 }
 
-impl XlsDefinedNameRecordOptions {
-    pub(super) fn validate(&self, sheet_count: usize) -> XlsResult<()> {
+impl DefinedNameRecordOptions {
+    pub(super) fn validate(&self, sheet_count: usize) -> Result<()> {
         let name_len = self.name.encode_utf16().count();
         match self.kind {
-            XlsDefinedNameKind::User
-                if !(1..=255).contains(&name_len) || self.name.contains('\0') =>
-            {
-                return Err(XlsError::InvalidData(
+            DefinedNameKind::User if !(1..=255).contains(&name_len) || self.name.contains('\0') => {
+                return Err(Error::InvalidData(
                     "defined name must contain 1..=255 non-NUL UTF-16 units".to_string(),
                 ));
             },
-            XlsDefinedNameKind::BuiltIn(_) => {},
+            DefinedNameKind::BuiltIn(_) => {},
             _ => {},
         }
-        if matches!(self.scope, XlsNameScope::Worksheet(index) if index >= sheet_count) {
-            return Err(XlsError::InvalidData(
+        if matches!(self.scope, NameScope::Worksheet(index) if index >= sheet_count) {
+            return Err(Error::InvalidData(
                 "defined name scope is outside worksheet collection".to_string(),
             ));
         }
         if (self.function || self.vba_procedure) && !self.procedure {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "function/VBA name flags require procedure".to_string(),
             ));
         }
         if self.function_group > 31 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "defined name function group must be at most 31".to_string(),
             ));
         }
@@ -67,7 +65,7 @@ impl XlsDefinedNameRecordOptions {
             .shortcut_key
             .is_some_and(|key| self.function || !self.procedure || !key.is_ascii_alphabetic())
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "invalid defined-name macro shortcut".to_string(),
             ));
         }
@@ -78,7 +76,7 @@ impl XlsDefinedNameRecordOptions {
                 .checked_add(self.formula_extra.len())
                 .is_none_or(|len| len > 1_048_576)
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "defined-name formula bytes exceed resource bound".to_string(),
             ));
         }
@@ -91,7 +89,7 @@ impl XlsDefinedNameRecordOptions {
             if value.chars().count() > 255
                 || value.chars().any(|character| u32::from(character) > 0xff)
             {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "legacy defined-name UI strings must be <=255 compressed characters"
                         .to_string(),
                 ));
@@ -102,7 +100,7 @@ impl XlsDefinedNameRecordOptions {
             .as_ref()
             .is_some_and(|comment| comment.encode_utf16().count() > 255)
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "defined-name comment exceeds 255 UTF-16 units".to_string(),
             ));
         }
@@ -111,37 +109,37 @@ impl XlsDefinedNameRecordOptions {
 
     pub(crate) fn serialized_name(&self) -> &str {
         match self.kind {
-            XlsDefinedNameKind::User => &self.name,
-            XlsDefinedNameKind::BuiltIn(name) => name.canonical_name(),
+            DefinedNameKind::User => &self.name,
+            DefinedNameKind::BuiltIn(name) => name.canonical_name(),
         }
     }
 
-    pub(crate) fn built_in(&self) -> Option<XlsBuiltInName> {
+    pub(crate) fn built_in(&self) -> Option<BuiltInName> {
         match self.kind {
-            XlsDefinedNameKind::BuiltIn(name) => Some(name),
+            DefinedNameKind::BuiltIn(name) => Some(name),
             _ => None,
         }
     }
 }
 
 pub(super) fn validate_future_records(
-    future: &XlsDefinedNameFutureRecords,
+    future: &DefinedNameFutureRecords,
     serialized_name: &str,
-) -> XlsResult<()> {
+) -> Result<()> {
     if let Some(value) = &future.function_group {
         let count = value.function_name.encode_utf16().count();
         if !(1..=255).contains(&count) || value.function_name.contains('\0') {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "NameFnGrp12 function name must contain 1..=255 non-NUL UTF-16 units".to_string(),
             ));
         }
         if !(32..=255).contains(&value.category) {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "NameFnGrp12 category must be in 32..=255".to_string(),
             ));
         }
         if !crate::defined_names::unicode_name_eq(&value.function_name, serialized_name) {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "NameFnGrp12 function name must match its defined name".to_string(),
             ));
         }
@@ -149,12 +147,12 @@ pub(super) fn validate_future_records(
     if let Some(value) = &future.publication {
         let count = value.name.encode_utf16().count();
         if !(1..=255).contains(&count) || value.name.contains('\0') {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "NamePublish name must contain 1..=255 non-NUL UTF-16 units".to_string(),
             ));
         }
         if !crate::defined_names::unicode_name_eq(&value.name, serialized_name) {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "NamePublish name must match its defined name".to_string(),
             ));
         }
@@ -167,7 +165,7 @@ pub(super) fn validate_future_records(
 /// This mirrors the high-level structure of OOXML named ranges but is
 /// tailored for BIFF8 `NAME` (Lbl) records.
 #[derive(Debug, Clone)]
-pub struct XlsDefinedName {
+pub struct DefinedName {
     /// Name of the defined range (e.g. "TaxRate", "SalesData").
     pub name: String,
     /// Reference text for the name.
@@ -205,12 +203,12 @@ pub struct XlsDefinedName {
     pub built_in_code: Option<u8>,
 }
 
-impl XlsDefinedName {
+impl DefinedName {
     /// Convert this defined name's reference to a BIFF8 `rgce` payload.
     ///
     /// This currently supports only simple A1-style references as
-    /// documented on [`XlsDefinedName::reference`].
-    pub fn to_biff_formula(&self) -> XlsResult<Vec<u8>> {
+    /// documented on [`DefinedName::reference`].
+    pub fn to_biff_formula(&self) -> Result<Vec<u8>> {
         let trimmed = self.reference.trim();
 
         if let Some(colon_pos) = trimmed.find(':') {

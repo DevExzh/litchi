@@ -1,8 +1,8 @@
 //! PowerPoint 9 picture-bullet collection parsing.
 
-use super::package::{PptError, Result};
-use super::records::PptRecord;
-use crate::consts::PptRecordType;
+use super::package::{Error, Result};
+use super::records::Record;
+use crate::consts::RecordType;
 
 /// Preferred native picture format for a PowerPoint 9 bullet.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -19,7 +19,7 @@ pub enum PictureBulletType {
 }
 
 impl TryFrom<u8> for PictureBulletType {
-    type Error = PptError;
+    type Error = Error;
 
     fn try_from(value: u8) -> Result<Self> {
         match value {
@@ -27,7 +27,7 @@ impl TryFrom<u8> for PictureBulletType {
             0x03 => Ok(Self::Wmf),
             0x05 => Ok(Self::Jpeg),
             0x06 => Ok(Self::Png),
-            _ => Err(PptError::Corrupted(
+            _ => Err(Error::Corrupted(
                 "BlipEntityAtom has an invalid winBlipType".to_string(),
             )),
         }
@@ -71,12 +71,10 @@ impl PictureBullet {
     ) -> Result<litchi_odraw::image::Blip<'data>> {
         use litchi_odraw::image::{Blip, Context, Delay, Entry};
 
-        let (record, consumed) =
-            litchi_odraw::Record::parse(&self.officeart_record, 0).map_err(|error| {
-                PptError::Corrupted(format!("Invalid picture-bullet BLIP: {error}"))
-            })?;
+        let (record, consumed) = litchi_odraw::Record::parse(&self.officeart_record, 0)
+            .map_err(|error| Error::Corrupted(format!("Invalid picture-bullet BLIP: {error}")))?;
         if consumed != self.officeart_record.len() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "Picture-bullet BLIP was only partially parsed".to_string(),
             ));
         }
@@ -86,13 +84,13 @@ impl PictureBullet {
                 Context::new().with_delay(Delay::new(data))
             });
             entry.resolve(context)?.ok_or_else(|| {
-                PptError::Corrupted("Picture-bullet FBSE is an empty slot".to_string())
+                Error::Corrupted("Picture-bullet FBSE is an empty slot".to_string())
             })?
         } else {
             Blip::from_record(record)?
         };
         if !picture_type_matches(self.picture_type, blip.kind()) {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "Picture-bullet preferred and stored BLIP types disagree".to_string(),
             ));
         }
@@ -109,23 +107,23 @@ pub struct PictureBulletCollection {
 
 impl PictureBulletCollection {
     /// Parse a `BlipCollection9Container` record.
-    pub fn parse(record: &PptRecord) -> Result<Self> {
-        if record.record_type != PptRecordType::BlipCollection9
+    pub fn parse(record: &Record) -> Result<Self> {
+        if record.record_type != RecordType::BlipCollection9
             || record.version != 0x0f
             || record.instance != 0
         {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "BlipCollection9Container has an invalid record header".to_string(),
             ));
         }
-        let children = PptRecord::parse_sequence_strict(&record.data, "picture-bullet collection")?;
+        let children = Record::parse_sequence_strict(&record.data, "picture-bullet collection")?;
         let mut bullets = Vec::with_capacity(children.len());
         for child in children {
-            if child.record_type != PptRecordType::BlipEntity9Atom
+            if child.record_type != RecordType::BlipEntity9Atom
                 || child.version != 0
                 || child.instance > 0x80
             {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "Picture-bullet collection has an invalid child record".to_string(),
                 ));
             }
@@ -133,7 +131,7 @@ impl PictureBulletCollection {
                 .iter()
                 .any(|bullet: &PictureBullet| bullet.index == child.instance)
             {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "Picture-bullet collection has a duplicate index".to_string(),
                 ));
             }
@@ -143,14 +141,14 @@ impl PictureBulletCollection {
     }
 
     /// Discover the single PowerPoint 9 picture-bullet collection below `root`.
-    pub fn parse_from(root: &PptRecord) -> Result<Option<Self>> {
+    pub fn parse_from(root: &Record) -> Result<Option<Self>> {
         let mut result = None;
         for record in root.versioned_binary_tag_records(9)? {
-            if record.record_type != PptRecordType::BlipCollection9 {
+            if record.record_type != RecordType::BlipCollection9 {
                 continue;
             }
             if result.replace(Self::parse(&record)?).is_some() {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "Record tree contains multiple picture-bullet collections".to_string(),
                 ));
             }
@@ -165,18 +163,16 @@ impl PictureBulletCollection {
     }
 }
 
-fn parse_picture_bullet(record: &PptRecord) -> Result<PictureBullet> {
+fn parse_picture_bullet(record: &Record) -> Result<PictureBullet> {
     if record.data.len() < 10 {
-        return Err(PptError::Corrupted(
-            "BlipEntityAtom is truncated".to_string(),
-        ));
+        return Err(Error::Corrupted("BlipEntityAtom is truncated".to_string()));
     }
     let picture_type = PictureBulletType::try_from(record.data[0])?;
     let unused = record.data[1];
     let officeart_record = &record.data[2..];
     let (image_record, consumed) = litchi_odraw::Record::parse(officeart_record, 0)?;
     if consumed != officeart_record.len() {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "Picture-bullet OfficeArt record has an invalid size".to_string(),
         ));
     }
@@ -186,7 +182,7 @@ fn parse_picture_bullet(record: &PptRecord) -> Result<PictureBullet> {
         litchi_odraw::image::Blip::from_record(image_record)?.kind()
     };
     if !picture_type_matches(picture_type, kind) {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "Picture-bullet preferred and stored BLIP types disagree".to_string(),
         ));
     }
@@ -248,9 +244,9 @@ mod tests {
         record_bytes(0, index, 2041, &payload)
     }
 
-    fn collection(payload: Vec<u8>) -> PptRecord {
-        PptRecord {
-            record_type: PptRecordType::BlipCollection9,
+    fn collection(payload: Vec<u8>) -> Record {
+        Record {
+            record_type: RecordType::BlipCollection9,
             record_type_raw: 2040,
             version: 0x0f,
             instance: 0,
@@ -260,7 +256,7 @@ mod tests {
         }
     }
 
-    fn prog_tags_record(blob_payload: &[u8]) -> PptRecord {
+    fn prog_tags_record(blob_payload: &[u8]) -> Record {
         let tag_name: Vec<u8> = "___PPT9"
             .encode_utf16()
             .flat_map(u16::to_le_bytes)
@@ -270,8 +266,8 @@ mod tests {
         let mut tag_payload = name;
         tag_payload.extend_from_slice(&blob);
         let tag = record_bytes(0x0f, 0, 0x138a, &tag_payload);
-        PptRecord {
-            record_type: PptRecordType::ProgTags,
+        Record {
+            record_type: RecordType::ProgTags,
             record_type_raw: 0x1388,
             version: 0x0f,
             instance: 0,
@@ -298,8 +294,8 @@ mod tests {
     #[test]
     fn discovers_picture_bullets_in_powerpoint_9_tags() {
         let collection = record_bytes(0x0f, 0, 2040, &png_bullet(7));
-        let root = PptRecord {
-            record_type: PptRecordType::Document,
+        let root = Record {
+            record_type: RecordType::Document,
             record_type_raw: 1000,
             version: 0x0f,
             instance: 0,

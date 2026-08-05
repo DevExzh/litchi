@@ -1,4 +1,4 @@
-use litchi_xls::XlsWorkbook;
+use litchi_xls::Workbook;
 use litchi_xls::view::{PaneType, Range};
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -17,7 +17,7 @@ fn libreoffice_fixture(name: &str) -> PathBuf {
 
 #[test]
 fn reads_poi_zoom_panes_and_selections() {
-    let workbook = XlsWorkbook::new(File::open(poi_fixture("41139.xls")).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(poi_fixture("41139.xls")).unwrap()).unwrap();
     let view = workbook.xls_worksheet(0).unwrap().worksheet_view().unwrap();
     assert_eq!(view.zoom_fraction(), Some((3, 4)));
     assert_eq!(view.pane().unwrap().active_pane(), PaneType::LowerRight);
@@ -26,8 +26,7 @@ fn reads_poi_zoom_panes_and_selections() {
 
 #[test]
 fn reads_libreoffice_worksheet_view() {
-    let workbook =
-        XlsWorkbook::new(File::open(libreoffice_fixture("formats.xls")).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(libreoffice_fixture("formats.xls")).unwrap()).unwrap();
     let view = workbook.xls_worksheet(0).unwrap().worksheet_view().unwrap();
     assert!(view.shows_gridlines());
     assert!(view.shows_row_column_headers());

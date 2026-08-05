@@ -1,8 +1,8 @@
 use std::io::Write;
 
-use crate::writer::XlsCommentTextRunWrite;
+use crate::writer::CommentTextRunWrite;
 use crate::writer::shape::Anchor;
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
 use super::write_record_header;
 
@@ -19,7 +19,7 @@ pub(crate) struct CommentConfig<'a> {
     pub visible: bool,
     pub shared: bool,
     pub anchor: Anchor,
-    pub text_runs: &'a [XlsCommentTextRunWrite],
+    pub text_runs: &'a [CommentTextRunWrite],
     pub font_when_empty: u16,
     pub guid: [u8; 16],
     pub object_id: u16,
@@ -68,7 +68,7 @@ pub(super) fn comment_shape(config: &CommentConfig<'_>, shape_id: u32) -> Vec<u8
     out
 }
 
-pub(super) fn write_obj<W: Write>(writer: &mut W, config: &CommentConfig<'_>) -> XlsResult<()> {
+pub(super) fn write_obj<W: Write>(writer: &mut W, config: &CommentConfig<'_>) -> Result<()> {
     write_record_header(writer, OBJ, 52)?;
     writer.write_all(&0x0015u16.to_le_bytes())?;
     writer.write_all(&0x0012u16.to_le_bytes())?;
@@ -85,11 +85,11 @@ pub(super) fn write_obj<W: Write>(writer: &mut W, config: &CommentConfig<'_>) ->
     Ok(())
 }
 
-fn write_continue<W: Write>(writer: &mut W, data: &[u8]) -> XlsResult<()> {
+fn write_continue<W: Write>(writer: &mut W, data: &[u8]) -> Result<()> {
     let length = u16::try_from(data.len())
-        .map_err(|_| XlsError::InvalidData("comment CONTINUE record is too large".to_string()))?;
+        .map_err(|_| Error::InvalidData("comment CONTINUE record is too large".to_string()))?;
     if length > 8224 {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "comment CONTINUE exceeds 8224 bytes".to_string(),
         ));
     }
@@ -98,12 +98,12 @@ fn write_continue<W: Write>(writer: &mut W, data: &[u8]) -> XlsResult<()> {
     Ok(())
 }
 
-pub(super) fn write_txo<W: Write>(writer: &mut W, config: &CommentConfig<'_>) -> XlsResult<()> {
+pub(super) fn write_txo<W: Write>(writer: &mut W, config: &CommentConfig<'_>) -> Result<()> {
     let units: Vec<u16> = config.text.encode_utf16().collect();
-    let runs: Vec<XlsCommentTextRunWrite> = if units.is_empty() {
+    let runs: Vec<CommentTextRunWrite> = if units.is_empty() {
         Vec::new()
     } else if config.text_runs.is_empty() {
-        vec![XlsCommentTextRunWrite {
+        vec![CommentTextRunWrite {
             character_index: 0,
             font_index: 0,
         }]
@@ -155,7 +155,7 @@ pub(super) fn write_txo<W: Write>(writer: &mut W, config: &CommentConfig<'_>) ->
     Ok(())
 }
 
-pub(super) fn write_note<W: Write>(writer: &mut W, config: &CommentConfig<'_>) -> XlsResult<()> {
+pub(super) fn write_note<W: Write>(writer: &mut W, config: &CommentConfig<'_>) -> Result<()> {
     let author: Vec<u16> = config.author.encode_utf16().collect();
     let compressed = author.iter().all(|unit| *unit <= 0x00FF);
     let byte_count = author.len() * if compressed { 1 } else { 2 };

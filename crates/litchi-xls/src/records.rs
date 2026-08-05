@@ -4,7 +4,7 @@
 //! records used in Excel XLS files. BIFF records contain various types of
 //! data including cell values, formatting, formulas, and metadata.
 
-use crate::error::{XlsError, XlsResult};
+use crate::error::{Error, Result};
 use crate::utils;
 use litchi_biff::RecordRef;
 use litchi_codepage::{Mbcs, Page};
@@ -46,9 +46,9 @@ pub struct BofRecord {
 }
 
 impl BofRecord {
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < 4 {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 4,
                 found: data.len(),
             });
@@ -62,7 +62,7 @@ impl BofRecord {
         };
 
         let version = BiffVersion::from_bof_version(biff_version)
-            .ok_or(XlsError::UnsupportedBiffVersion(biff_version))?;
+            .ok_or(Error::UnsupportedBiffVersion(biff_version))?;
 
         let is_1904_date_system = dt == 1;
 
@@ -83,7 +83,7 @@ pub struct DimensionsRecord {
 }
 
 impl DimensionsRecord {
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         match data.len() {
             10 => {
                 // BIFF5-BIFF8
@@ -103,7 +103,7 @@ impl DimensionsRecord {
                     last_col: binary::read_u16_le_at(data, 10)? as u32,
                 })
             },
-            _ => Err(XlsError::InvalidLength {
+            _ => Err(Error::InvalidLength {
                 expected: 10,
                 found: data.len(),
             }),
@@ -120,12 +120,12 @@ pub enum SheetVisible {
 }
 
 impl SheetVisible {
-    pub fn from_u8(value: u8) -> XlsResult<Self> {
+    pub fn from_u8(value: u8) -> Result<Self> {
         match value & 0x3 {
             0x00 => Ok(SheetVisible::Visible),
             0x01 => Ok(SheetVisible::Hidden),
             0x02 => Ok(SheetVisible::VeryHidden),
-            v => Err(XlsError::InvalidRecord {
+            v => Err(Error::InvalidRecord {
                 record_type: 0x0085, // BoundSheet8
                 message: format!("Invalid visibility value: {}", v),
             }),
@@ -143,13 +143,13 @@ pub enum SheetType {
 }
 
 impl SheetType {
-    pub fn from_u8(value: u8) -> XlsResult<Self> {
+    pub fn from_u8(value: u8) -> Result<Self> {
         match value {
             0x00 => Ok(SheetType::WorkSheet),
             0x01 => Ok(SheetType::MacroSheet),
             0x02 => Ok(SheetType::ChartSheet),
             0x06 => Ok(SheetType::VBModule),
-            v => Err(XlsError::InvalidRecord {
+            v => Err(Error::InvalidRecord {
                 record_type: 0x0085, // BoundSheet8
                 message: format!("Invalid sheet type: {}", v),
             }),
@@ -168,9 +168,9 @@ pub struct BoundSheetRecord {
 }
 
 impl BoundSheetRecord {
-    pub fn parse(data: &[u8], encoding: &XlsEncoding) -> XlsResult<Self> {
+    pub fn parse(data: &[u8], encoding: &Encoding) -> Result<Self> {
         if data.len() < 8 {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 8,
                 found: data.len(),
             });
@@ -179,14 +179,14 @@ impl BoundSheetRecord {
         let character_count = usize::from(data[6]);
         let string_flags = data[7];
         if string_flags & 0xfe != 0 {
-            return Err(XlsError::InvalidRecord {
+            return Err(Error::InvalidRecord {
                 record_type: 0x0085,
                 message: "BoundSheet8 name has reserved string option bits".to_string(),
             });
         }
         let character_width = if string_flags & 1 != 0 { 2 } else { 1 };
         if data.len() != 8 + character_count * character_width {
-            return Err(XlsError::InvalidRecord {
+            return Err(Error::InvalidRecord {
                 record_type: 0x0085,
                 message: "BoundSheet8 name length does not match its payload".to_string(),
             });
@@ -211,7 +211,7 @@ impl BoundSheetRecord {
             || name.starts_with('\'')
             || name.ends_with('\'')
         {
-            return Err(XlsError::InvalidRecord {
+            return Err(Error::InvalidRecord {
                 record_type: 0x0085,
                 message: format!("Invalid BoundSheet8 sheet name: {name:?}"),
             });
@@ -228,25 +228,25 @@ impl BoundSheetRecord {
 
 /// Codepage/encoding information
 #[derive(Debug, Clone)]
-pub enum XlsEncoding {
+pub enum Encoding {
     /// NUL-terminated byte-stream encoding with a checked code page.
     Codepage(Mbcs),
     /// UTF-16 little endian (BIFF8+)
     Utf16Le,
 }
 
-impl XlsEncoding {
+impl Encoding {
     /// Create encoding from codepage identifier
     ///
     /// # Arguments
     ///
     /// * `codepage` - Windows codepage identifier (e.g., 1252 for Western European, 1200 for UTF-16LE)
-    pub fn from_codepage(codepage: u16) -> XlsResult<Self> {
+    pub fn from_codepage(codepage: u16) -> Result<Self> {
         match codepage {
-            1200 => Ok(XlsEncoding::Utf16Le),
+            1200 => Ok(Encoding::Utf16Le),
             cp => Mbcs::require(u32::from(cp))
-                .map(XlsEncoding::Codepage)
-                .map_err(|error| XlsError::Encoding(error.to_string())),
+                .map(Encoding::Codepage)
+                .map_err(|error| Error::Encoding(error.to_string())),
         }
     }
 
@@ -254,11 +254,11 @@ impl XlsEncoding {
     ///
     /// Record terminators are handled here while the shared codec performs
     /// strict conversion without guessing format-specific boundaries.
-    pub fn decode(&self, data: &[u8]) -> XlsResult<String> {
+    pub fn decode(&self, data: &[u8]) -> Result<String> {
         match self {
-            XlsEncoding::Utf16Le => {
+            Encoding::Utf16Le => {
                 if !data.len().is_multiple_of(2) {
-                    return Err(XlsError::Encoding(
+                    return Err(Error::Encoding(
                         "UTF-16LE text has an odd byte length".to_string(),
                     ));
                 }
@@ -269,16 +269,16 @@ impl XlsEncoding {
                 Page::UTF_16LE
                     .decode(&data[..end])
                     .map(|text| text.into_owned())
-                    .map_err(|error| XlsError::Encoding(error.to_string()))
+                    .map_err(|error| Error::Encoding(error.to_string()))
             },
-            XlsEncoding::Codepage(page) => {
+            Encoding::Codepage(page) => {
                 let end = data
                     .iter()
                     .position(|byte| *byte == 0)
                     .unwrap_or(data.len());
                 page.decode(&data[..end])
                     .map(|text| text.into_owned())
-                    .map_err(|error| XlsError::Encoding(error.to_string()))
+                    .map_err(|error| Error::Encoding(error.to_string()))
             },
         }
     }
@@ -353,10 +353,7 @@ pub struct PhoneticRun {
 
 impl SharedStringTable {
     /// Parse SST from potentially multiple records (SST + CONTINUE)
-    pub fn parse_from_records(
-        records: &[RecordRef<'_>],
-        encoding: &XlsEncoding,
-    ) -> XlsResult<Self> {
+    pub fn parse_from_records(records: &[RecordRef<'_>], encoding: &Encoding) -> Result<Self> {
         if records.is_empty() {
             return Ok(SharedStringTable {
                 strings: Vec::new(),
@@ -366,7 +363,7 @@ impl SharedStringTable {
         }
 
         if records[0].kind().get() != 0x00FC {
-            return Err(XlsError::UnexpectedRecordType {
+            return Err(Error::UnexpectedRecordType {
                 expected: 0x00FC,
                 found: records[0].kind().get(),
             });
@@ -376,7 +373,7 @@ impl SharedStringTable {
             .skip(1)
             .find(|record| record.kind().get() != 0x003C)
         {
-            return Err(XlsError::UnexpectedRecordType {
+            return Err(Error::UnexpectedRecordType {
                 expected: 0x003C,
                 found: record.kind().get(),
             });
@@ -386,22 +383,22 @@ impl SharedStringTable {
         Self::parse_segments(&segments, encoding)
     }
 
-    pub fn parse(data: &[u8], encoding: &XlsEncoding) -> XlsResult<Self> {
+    pub fn parse(data: &[u8], encoding: &Encoding) -> Result<Self> {
         Self::parse_segments(&[data], encoding)
     }
 
-    fn parse_segments(segments: &[&[u8]], _encoding: &XlsEncoding) -> XlsResult<Self> {
+    fn parse_segments(segments: &[&[u8]], _encoding: &Encoding) -> Result<Self> {
         let mut cursor = SstCursor::new(segments);
         cursor.ensure_current(8, "SST header")?;
         let total_count = cursor.read_u32_continued("SST total count")?;
         let unique_count = cursor.read_u32_continued("SST unique count")?;
         if total_count > i32::MAX as u32 || unique_count > i32::MAX as u32 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "SST counts must be non-negative signed integers".to_string(),
             ));
         }
         if total_count < unique_count {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "SST total count is smaller than its unique count".to_string(),
             ));
         }
@@ -409,7 +406,7 @@ impl SharedStringTable {
         let unique_count = unique_count as usize;
         let available = segments.iter().map(|segment| segment.len()).sum::<usize>();
         if unique_count > available.saturating_sub(8) / 3 {
-            return Err(XlsError::InvalidData(format!(
+            return Err(Error::InvalidData(format!(
                 "SST declares {unique_count} strings but its records are too short"
             )));
         }
@@ -417,12 +414,12 @@ impl SharedStringTable {
         let mut strings = Vec::new();
         let mut properties = Vec::new();
         strings.try_reserve_exact(unique_count).map_err(|error| {
-            XlsError::InvalidData(format!("cannot allocate SST string index: {error}"))
+            Error::InvalidData(format!("cannot allocate SST string index: {error}"))
         })?;
         properties
             .try_reserve_exact(unique_count)
             .map_err(|error| {
-                XlsError::InvalidData(format!("cannot allocate SST property index: {error}"))
+                Error::InvalidData(format!("cannot allocate SST property index: {error}"))
             })?;
 
         for string_index in 0..unique_count {
@@ -440,7 +437,7 @@ impl SharedStringTable {
                 cursor.ensure_current(4, "shared string extension length")?;
                 let length = cursor.read_u32_continued("shared string extension length")?;
                 if length > i32::MAX as u32 {
-                    return Err(XlsError::InvalidData(format!(
+                    return Err(Error::InvalidData(format!(
                         "shared string {string_index} has a negative extension length"
                     )));
                 }
@@ -508,12 +505,12 @@ impl<'a> SstCursor<'a> {
         self.current().len().saturating_sub(self.offset)
     }
 
-    fn ensure_current(&mut self, required: usize, context: &str) -> XlsResult<()> {
+    fn ensure_current(&mut self, required: usize, context: &str) -> Result<()> {
         while self.remaining() == 0 && self.segment_index + 1 < self.segments.len() {
             self.advance_segment(context)?;
         }
         if self.remaining() < required {
-            return Err(XlsError::UnexpectedEndOfStream(format!(
+            return Err(Error::UnexpectedEndOfStream(format!(
                 "{context} must fit in one BIFF record"
             )));
         }
@@ -530,16 +527,16 @@ impl<'a> SstCursor<'a> {
                 .sum::<usize>()
     }
 
-    fn advance_segment(&mut self, context: &str) -> XlsResult<()> {
+    fn advance_segment(&mut self, context: &str) -> Result<()> {
         self.segment_index += 1;
         self.offset = 0;
         if self.segment_index >= self.segments.len() {
-            return Err(XlsError::UnexpectedEndOfStream(context.to_string()));
+            return Err(Error::UnexpectedEndOfStream(context.to_string()));
         }
         Ok(())
     }
 
-    fn read_u8_continued(&mut self, context: &str) -> XlsResult<u8> {
+    fn read_u8_continued(&mut self, context: &str) -> Result<u8> {
         while self.remaining() == 0 {
             self.advance_segment(context)?;
         }
@@ -548,19 +545,19 @@ impl<'a> SstCursor<'a> {
         Ok(value)
     }
 
-    fn read_u16_continued(&mut self, context: &str) -> XlsResult<u16> {
+    fn read_u16_continued(&mut self, context: &str) -> Result<u16> {
         let mut bytes = [0; 2];
         self.read_exact(&mut bytes, context)?;
         Ok(u16::from_le_bytes(bytes))
     }
 
-    fn read_u32_continued(&mut self, context: &str) -> XlsResult<u32> {
+    fn read_u32_continued(&mut self, context: &str) -> Result<u32> {
         let mut bytes = [0; 4];
         self.read_exact(&mut bytes, context)?;
         Ok(u32::from_le_bytes(bytes))
     }
 
-    fn read_exact(&mut self, output: &mut [u8], context: &str) -> XlsResult<()> {
+    fn read_exact(&mut self, output: &mut [u8], context: &str) -> Result<()> {
         let mut written = 0;
         while written < output.len() {
             if self.remaining() == 0 {
@@ -575,20 +572,20 @@ impl<'a> SstCursor<'a> {
         Ok(())
     }
 
-    fn read_bytes(&mut self, length: usize, context: &str) -> XlsResult<Vec<u8>> {
+    fn read_bytes(&mut self, length: usize, context: &str) -> Result<Vec<u8>> {
         if length > self.remaining_total() {
-            return Err(XlsError::UnexpectedEndOfStream(context.to_string()));
+            return Err(Error::UnexpectedEndOfStream(context.to_string()));
         }
         let mut bytes = Vec::new();
-        bytes.try_reserve_exact(length).map_err(|error| {
-            XlsError::InvalidData(format!("cannot allocate {context}: {error}"))
-        })?;
+        bytes
+            .try_reserve_exact(length)
+            .map_err(|error| Error::InvalidData(format!("cannot allocate {context}: {error}")))?;
         bytes.resize(length, 0);
         self.read_exact(&mut bytes, context)?;
         Ok(bytes)
     }
 
-    fn read_characters(&mut self, count: u16, mut high_byte: bool) -> XlsResult<String> {
+    fn read_characters(&mut self, count: u16, mut high_byte: bool) -> Result<String> {
         let mut characters = Vec::with_capacity(count as usize);
         while characters.len() < count as usize {
             let bytes_per_character = if high_byte { 2 } else { 1 };
@@ -597,7 +594,7 @@ impl<'a> SstCursor<'a> {
             let chunk_characters = available_characters.min(wanted);
 
             if high_byte && !self.remaining().is_multiple_of(2) && chunk_characters < wanted {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "a UTF-16 shared string is split inside a code unit".to_string(),
                 ));
             }
@@ -619,14 +616,14 @@ impl<'a> SstCursor<'a> {
                 break;
             }
             if self.remaining() != 0 {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "shared string character data does not end at a record boundary".to_string(),
                 ));
             }
             self.advance_segment("continued shared string character data")?;
             let continuation_flags = self.read_u8_continued("shared string continuation flags")?;
             if continuation_flags > 1 {
-                return Err(XlsError::InvalidData(format!(
+                return Err(Error::InvalidData(format!(
                     "invalid shared string continuation flags 0x{continuation_flags:02X}"
                 )));
             }
@@ -634,7 +631,7 @@ impl<'a> SstCursor<'a> {
         }
 
         String::from_utf16(&characters)
-            .map_err(|error| XlsError::Encoding(format!("UTF-16 decoding error: {error}")))
+            .map_err(|error| Error::Encoding(format!("UTF-16 decoding error: {error}")))
     }
 
     fn read_formatting_runs(
@@ -642,19 +639,19 @@ impl<'a> SstCursor<'a> {
         count: u16,
         character_count: u16,
         string_index: usize,
-    ) -> XlsResult<Vec<SharedStringFormatRun>> {
+    ) -> Result<Vec<SharedStringFormatRun>> {
         let mut runs = Vec::with_capacity(count as usize);
         let mut previous = None;
         for _ in 0..count {
             let character_index = self.read_u16_continued("shared string formatting run")?;
             let font_index = self.read_u16_continued("shared string formatting run")?;
             if character_index > character_count {
-                return Err(XlsError::InvalidData(format!(
+                return Err(Error::InvalidData(format!(
                     "shared string {string_index} has a formatting run past its text"
                 )));
             }
             if previous.is_some_and(|value| character_index <= value) {
-                return Err(XlsError::InvalidData(format!(
+                return Err(Error::InvalidData(format!(
                     "shared string {string_index} formatting runs are not strictly increasing"
                 )));
             }
@@ -674,9 +671,9 @@ fn parse_phonetic_string(
     data: &[u8],
     base_character_count: u16,
     string_index: usize,
-) -> XlsResult<PhoneticString> {
+) -> Result<PhoneticString> {
     if data.len() < 14 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 14,
             found: data.len(),
         });
@@ -706,22 +703,22 @@ fn parse_phonetic_string(
     let character_count = binary::read_u16_le(data, 10)?;
     let repeated_character_count = binary::read_u16_le(data, 12)?;
     if run_count > 32767 || character_count > 32767 || character_count != repeated_character_count {
-        return Err(XlsError::InvalidData(format!(
+        return Err(Error::InvalidData(format!(
             "shared string {string_index} has invalid ExtRst string counts"
         )));
     }
     let text_byte_length = usize::from(character_count)
         .checked_mul(2)
-        .ok_or_else(|| XlsError::InvalidData("ExtRst text length overflow".to_string()))?;
+        .ok_or_else(|| Error::InvalidData("ExtRst text length overflow".to_string()))?;
     let run_byte_length = usize::from(run_count)
         .checked_mul(6)
-        .ok_or_else(|| XlsError::InvalidData("ExtRst run length overflow".to_string()))?;
+        .ok_or_else(|| Error::InvalidData("ExtRst run length overflow".to_string()))?;
     let required = 14usize
         .checked_add(text_byte_length)
         .and_then(|length| length.checked_add(run_byte_length))
-        .ok_or_else(|| XlsError::InvalidData("ExtRst length overflow".to_string()))?;
+        .ok_or_else(|| Error::InvalidData("ExtRst length overflow".to_string()))?;
     if required > data.len() {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: required,
             found: data.len(),
         });
@@ -733,7 +730,7 @@ fn parse_phonetic_string(
         .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
         .collect();
     let text = String::from_utf16(&text_words)
-        .map_err(|error| XlsError::Encoding(format!("ExtRst UTF-16 decoding error: {error}")))?;
+        .map_err(|error| Error::Encoding(format!("ExtRst UTF-16 decoding error: {error}")))?;
 
     let mut runs = Vec::with_capacity(run_count as usize);
     let mut offset = 14 + text_byte_length;
@@ -752,7 +749,7 @@ fn parse_phonetic_string(
             || previous_phonetic.is_some_and(|value| phonetic_text_index <= value)
             || previous_base.is_some_and(|value| base_text_index <= value)
         {
-            return Err(XlsError::InvalidData(format!(
+            return Err(Error::InvalidData(format!(
                 "shared string {string_index} has an invalid ExtRst phonetic run"
             )));
         }
@@ -767,7 +764,7 @@ fn parse_phonetic_string(
         offset += 6;
     }
     if total_base_length > base_character_count as usize {
-        return Err(XlsError::InvalidData(format!(
+        return Err(Error::InvalidData(format!(
             "shared string {string_index} ExtRst runs exceed the base string"
         )));
     }
@@ -812,7 +809,7 @@ mod shared_string_tests {
         data.extend_from_slice(&[2, 0, 0, b'A', 0xC0]);
         data.extend_from_slice(&[1, 0, 1, 0x22, 0x6F]);
 
-        let encoding = XlsEncoding::from_codepage(1251).unwrap();
+        let encoding = Encoding::from_codepage(1251).unwrap();
         let table = SharedStringTable::parse(&data, &encoding).unwrap();
 
         assert_eq!(table.total_count, 3);
@@ -824,9 +821,9 @@ mod shared_string_tests {
 
     #[test]
     fn codepage_construction_and_utf16_decoding_are_strict() {
-        assert!(XlsEncoding::from_codepage(437).is_err());
-        assert!(XlsEncoding::from_codepage(1201).is_err());
-        assert!(XlsEncoding::Utf16Le.decode(b"A").is_err());
+        assert!(Encoding::from_codepage(437).is_err());
+        assert!(Encoding::from_codepage(1201).is_err());
+        assert!(Encoding::Utf16Le.decode(b"A").is_err());
     }
 
     #[test]
@@ -834,7 +831,7 @@ mod shared_string_tests {
         let mut data = sst_header(1, 1);
         data.extend_from_slice(&[1, 0, 0xF2, b'A']);
 
-        let table = SharedStringTable::parse(&data, &XlsEncoding::Utf16Le).unwrap();
+        let table = SharedStringTable::parse(&data, &Encoding::Utf16Le).unwrap();
 
         assert_eq!(table.strings, ["A"]);
     }
@@ -851,7 +848,7 @@ mod shared_string_tests {
         data.extend_from_slice(&2u16.to_le_bytes());
         data.extend_from_slice(&3u16.to_le_bytes());
 
-        let table = SharedStringTable::parse(&data, &XlsEncoding::Utf16Le).unwrap();
+        let table = SharedStringTable::parse(&data, &Encoding::Utf16Le).unwrap();
         let properties = table.properties[0].as_deref().unwrap();
 
         assert_eq!(table.strings[0], "Hello");
@@ -897,7 +894,7 @@ mod shared_string_tests {
         }
         data.extend_from_slice(&extension);
 
-        let table = SharedStringTable::parse(&data, &XlsEncoding::Utf16Le).unwrap();
+        let table = SharedStringTable::parse(&data, &Encoding::Utf16Le).unwrap();
         let phonetic = table.properties[0]
             .as_deref()
             .unwrap()
@@ -932,7 +929,7 @@ mod shared_string_tests {
 
         let records = [record(0x00FC, first), record(0x003C, second)];
         let refs = record_refs(&records);
-        let table = SharedStringTable::parse_from_records(&refs, &XlsEncoding::Utf16Le).unwrap();
+        let table = SharedStringTable::parse_from_records(&refs, &Encoding::Utf16Le).unwrap();
 
         assert_eq!(table.strings, ["AB漢字"]);
     }
@@ -951,8 +948,8 @@ mod shared_string_tests {
         let refs = record_refs(&records);
 
         assert!(matches!(
-            SharedStringTable::parse_from_records(&refs, &XlsEncoding::Utf16Le),
-            Err(XlsError::UnexpectedEndOfStream(_))
+            SharedStringTable::parse_from_records(&refs, &Encoding::Utf16Le),
+            Err(Error::UnexpectedEndOfStream(_))
         ));
     }
 
@@ -968,7 +965,7 @@ mod shared_string_tests {
 
         let records = [record(0x00FC, first), record(0x003C, second)];
         let refs = record_refs(&records);
-        let table = SharedStringTable::parse_from_records(&refs, &XlsEncoding::Utf16Le).unwrap();
+        let table = SharedStringTable::parse_from_records(&refs, &Encoding::Utf16Le).unwrap();
 
         assert_eq!(
             table.properties[0].as_deref().unwrap().formatting_runs,
@@ -987,14 +984,14 @@ mod shared_string_tests {
         first.push(b'A');
         let bad_flags = [record(0x00FC, first), record(0x003C, vec![2, b'B'])];
         let bad_refs = record_refs(&bad_flags);
-        assert!(SharedStringTable::parse_from_records(&bad_refs, &XlsEncoding::Utf16Le).is_err());
+        assert!(SharedStringTable::parse_from_records(&bad_refs, &Encoding::Utf16Le).is_err());
 
         let mut truncated = sst_header(1, 1);
         truncated.extend_from_slice(&1u16.to_le_bytes());
         truncated.push(0x04);
         truncated.extend_from_slice(&100u32.to_le_bytes());
         truncated.push(b'A');
-        assert!(SharedStringTable::parse(&truncated, &XlsEncoding::Utf16Le).is_err());
+        assert!(SharedStringTable::parse(&truncated, &Encoding::Utf16Le).is_err());
     }
 
     #[test]
@@ -1004,7 +1001,7 @@ mod shared_string_tests {
         crate::writer::biff::write_sst(&mut bytes, &expected, 2).unwrap();
         let records: Vec<RecordRef<'_>> = Records::new(&bytes).collect::<Result<_, _>>().unwrap();
 
-        let table = SharedStringTable::parse_from_records(&records, &XlsEncoding::Utf16Le).unwrap();
+        let table = SharedStringTable::parse_from_records(&records, &Encoding::Utf16Le).unwrap();
 
         assert_eq!(table.strings, expected);
     }
@@ -1016,11 +1013,11 @@ mod shared_string_tests {
             .next()
             .expect("the malformed input yields one framing error")
             .expect_err("the payload is shorter than its declared length");
-        let error = XlsError::from(error);
+        let error = Error::from(error);
 
         assert!(matches!(
             error,
-            XlsError::InvalidRecord {
+            Error::InvalidRecord {
                 record_type: 0x00FC,
                 ..
             }
@@ -1038,9 +1035,9 @@ pub struct ExtendedFormat {
 
 #[allow(dead_code)]
 impl ExtendedFormat {
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < 4 {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 4,
                 found: data.len(),
             });
@@ -1145,7 +1142,7 @@ impl CellRecord {
         }
     }
 
-    pub fn parse(record_type: u16, data: &[u8], encoding: &XlsEncoding) -> XlsResult<Self> {
+    pub fn parse(record_type: u16, data: &[u8], encoding: &Encoding) -> Result<Self> {
         match record_type {
             0x0201 => Self::parse_blank(data),           // Blank
             0x0203 => Self::parse_number(data),          // Number
@@ -1154,14 +1151,14 @@ impl CellRecord {
             0x027E => Self::parse_rk(data),              // RK
             0x00FD => Self::parse_label_sst(data),       // LabelSst
             0x0006 => Self::parse_formula(data),         // Formula
-            _ => Err(XlsError::InvalidRecord {
+            _ => Err(Error::InvalidRecord {
                 record_type,
                 message: "Unknown cell record type".to_string(),
             }),
         }
     }
 
-    pub(crate) fn parse_mul_rk(data: &[u8]) -> XlsResult<Vec<Self>> {
+    pub(crate) fn parse_mul_rk(data: &[u8]) -> Result<Vec<Self>> {
         let (row, first_col, count) = Self::packed_cell_range(data, 6, "MulRk")?;
         let mut cells = Vec::with_capacity(count);
         for index in 0..count {
@@ -1176,7 +1173,7 @@ impl CellRecord {
         Ok(cells)
     }
 
-    pub(crate) fn parse_mul_blank(data: &[u8]) -> XlsResult<Vec<Self>> {
+    pub(crate) fn parse_mul_blank(data: &[u8]) -> Result<Vec<Self>> {
         let (row, first_col, count) = Self::packed_cell_range(data, 2, "MulBlank")?;
         let mut cells = Vec::with_capacity(count);
         for index in 0..count {
@@ -1193,21 +1190,21 @@ impl CellRecord {
         data: &[u8],
         item_size: usize,
         record_name: &str,
-    ) -> XlsResult<(u16, u16, usize)> {
+    ) -> Result<(u16, u16, usize)> {
         let Some(items_size) = data.len().checked_sub(6) else {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 6 + item_size * 2,
                 found: data.len(),
             });
         };
         if items_size % item_size != 0 {
-            return Err(XlsError::InvalidData(format!(
+            return Err(Error::InvalidData(format!(
                 "{record_name} payload does not contain whole packed cells"
             )));
         }
         let count = items_size / item_size;
         if !(2..=256).contains(&count) {
-            return Err(XlsError::InvalidData(format!(
+            return Err(Error::InvalidData(format!(
                 "{record_name} contains {count} cells; expected 2 through 256"
             )));
         }
@@ -1217,18 +1214,18 @@ impl CellRecord {
         let last_col = binary::read_u16_le_at(data, data.len() - 2)?;
         let expected_last = first_col
             .checked_add((count - 1) as u16)
-            .ok_or_else(|| XlsError::InvalidData(format!("{record_name} column overflow")))?;
+            .ok_or_else(|| Error::InvalidData(format!("{record_name} column overflow")))?;
         if first_col > 254 || last_col != expected_last || last_col > 255 {
-            return Err(XlsError::InvalidData(format!(
+            return Err(Error::InvalidData(format!(
                 "{record_name} column range {first_col}..={last_col} does not match {count} cells"
             )));
         }
         Ok((row, first_col, count))
     }
 
-    fn parse_blank(data: &[u8]) -> XlsResult<Self> {
+    fn parse_blank(data: &[u8]) -> Result<Self> {
         if data.len() < 6 {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 6,
                 found: data.len(),
             });
@@ -1241,9 +1238,9 @@ impl CellRecord {
         })
     }
 
-    fn parse_number(data: &[u8]) -> XlsResult<Self> {
+    fn parse_number(data: &[u8]) -> Result<Self> {
         if data.len() < 14 {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 14,
                 found: data.len(),
             });
@@ -1257,9 +1254,9 @@ impl CellRecord {
         })
     }
 
-    fn parse_label(data: &[u8], encoding: &XlsEncoding) -> XlsResult<Self> {
+    fn parse_label(data: &[u8], encoding: &Encoding) -> Result<Self> {
         if data.len() < 8 {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 8,
                 found: data.len(),
             });
@@ -1278,9 +1275,9 @@ impl CellRecord {
         })
     }
 
-    fn parse_bool_err(data: &[u8]) -> XlsResult<Self> {
+    fn parse_bool_err(data: &[u8]) -> Result<Self> {
         if data.len() < 8 {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 8,
                 found: data.len(),
             });
@@ -1303,9 +1300,9 @@ impl CellRecord {
         })
     }
 
-    fn parse_rk(data: &[u8]) -> XlsResult<Self> {
+    fn parse_rk(data: &[u8]) -> Result<Self> {
         if data.len() < 10 {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 10,
                 found: data.len(),
             });
@@ -1325,9 +1322,9 @@ impl CellRecord {
         })
     }
 
-    fn parse_label_sst(data: &[u8]) -> XlsResult<Self> {
+    fn parse_label_sst(data: &[u8]) -> Result<Self> {
         if data.len() < 10 {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 10,
                 found: data.len(),
             });
@@ -1341,9 +1338,9 @@ impl CellRecord {
         })
     }
 
-    fn parse_formula(data: &[u8]) -> XlsResult<Self> {
+    fn parse_formula(data: &[u8]) -> Result<Self> {
         if data.len() < 22 {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 22,
                 found: data.len(),
             });
@@ -1356,9 +1353,9 @@ impl CellRecord {
         let formula_len = binary::read_u16_le_at(data, 20)? as usize;
         let formula_end = 22usize
             .checked_add(formula_len)
-            .ok_or_else(|| XlsError::InvalidData("Formula token length overflow".to_string()))?;
+            .ok_or_else(|| Error::InvalidData("Formula token length overflow".to_string()))?;
         if formula_end > data.len() {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: formula_end,
                 found: data.len(),
             });
@@ -1455,7 +1452,7 @@ mod packed_cell_tests {
         data.extend_from_slice(&3u16.to_le_bytes());
         data.extend_from_slice(&[0x1E, 0x2A, 0x00, 0xFF]);
 
-        let formula = CellRecord::parse(0x0006, &data, &XlsEncoding::Utf16Le).unwrap();
+        let formula = CellRecord::parse(0x0006, &data, &Encoding::Utf16Le).unwrap();
 
         assert!(matches!(
             formula,

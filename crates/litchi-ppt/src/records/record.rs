@@ -4,8 +4,8 @@
 //! Apache POI's HSLF Record.java implementation.
 
 use super::{DocumentInfo, SlideAtomsSet, SlideInfo};
-use crate::consts::PptRecordType;
-use crate::package::{PptError, Result};
+use crate::consts::RecordType;
+use crate::package::{Error, Result};
 use crate::text::extractor::{parse_cstring, parse_text_bytes_atom, parse_text_chars_atom};
 use zerocopy::{
     FromBytes,
@@ -14,9 +14,9 @@ use zerocopy::{
 
 /// A PPT record containing binary data and metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PptRecord {
+pub struct Record {
     /// Record type
-    pub record_type: PptRecordType,
+    pub record_type: RecordType,
     /// Original record type value (for unknown types)
     pub record_type_raw: u16,
     /// Record version
@@ -28,10 +28,10 @@ pub struct PptRecord {
     /// Record data
     pub data: Vec<u8>,
     /// Child records (for container records)
-    pub children: Vec<PptRecord>,
+    pub children: Vec<Record>,
 }
 
-impl PptRecord {
+impl Record {
     /// Parse a PPT record from binary data.
     ///
     /// # Arguments
@@ -56,13 +56,11 @@ impl PptRecord {
 
         let header_end = offset
             .checked_add(HEADER_LEN)
-            .ok_or_else(|| PptError::Corrupted("PPT record header offset overflow".to_string()))?;
+            .ok_or_else(|| Error::Corrupted("PPT record header offset overflow".to_string()))?;
         let header: &[u8; HEADER_LEN] = data
             .get(offset..header_end)
             .and_then(|bytes| bytes.try_into().ok())
-            .ok_or_else(|| {
-                PptError::Corrupted("Not enough data for PPT record header".to_string())
-            })?;
+            .ok_or_else(|| Error::Corrupted("Not enough data for PPT record header".to_string()))?;
 
         // Read record header (8 bytes) - little-endian format
         // PPT Record Header format (based on POI's Record.java):
@@ -90,7 +88,7 @@ impl PptRecord {
         // Read data length (bytes 4-7)
         let data_length = u32::from_le_bytes([len_0, len_1, len_2, len_3]);
         let declared_data_size = usize::try_from(data_length).map_err(|_| {
-            PptError::Corrupted(format!(
+            Error::Corrupted(format!(
                 "PPT record at offset {offset} has a data length that exceeds this platform"
             ))
         })?;
@@ -100,13 +98,13 @@ impl PptRecord {
         let version = version_instance & 0x000F; // Low 4 bits for version
         let instance = (version_instance >> 4) & 0x0FFF; // High 12 bits for instance
 
-        let record_type_enum = PptRecordType::from(record_type);
+        let record_type_enum = RecordType::from(record_type);
 
         // Check if record data extends beyond available data
         let available_data_size = data.len() - header_end;
         if declared_data_size > available_data_size {
             if strict {
-                return Err(PptError::Corrupted(format!(
+                return Err(Error::Corrupted(format!(
                     "PPT record at offset {offset} extends beyond its containing data"
                 )));
             }
@@ -114,7 +112,7 @@ impl PptRecord {
             if Self::is_container_record(record_type_enum) && available_data_size > 0 {
                 // For container records, we can still parse what we have
             } else if available_data_size == 0 {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "Record extends beyond data bounds and no data available".to_string(),
                 ));
             }
@@ -123,18 +121,18 @@ impl PptRecord {
         // Use available data size, but don't exceed what the record claims to need
         let actual_data_size = available_data_size.min(declared_data_size);
         let record_end = header_end.checked_add(actual_data_size).ok_or_else(|| {
-            PptError::Corrupted(format!("PPT record at offset {offset} size overflow"))
+            Error::Corrupted(format!("PPT record at offset {offset} size overflow"))
         })?;
         let record_data = data
             .get(header_end..record_end)
             .ok_or_else(|| {
-                PptError::Corrupted(format!(
+                Error::Corrupted(format!(
                     "PPT record at offset {offset} extends beyond its containing data"
                 ))
             })?
             .to_vec();
 
-        let mut record = PptRecord {
+        let mut record = Record {
             record_type: record_type_enum,
             record_type_raw: record_type,
             version,
@@ -147,7 +145,7 @@ impl PptRecord {
         // Parse children if this is a container record
         if Self::is_container_record(record_type_enum) && actual_data_size > 0 {
             let children_data = data.get(header_end..record_end).ok_or_else(|| {
-                PptError::Corrupted(format!(
+                Error::Corrupted(format!(
                     "PPT record at offset {offset} extends beyond its containing data"
                 ))
             })?;
@@ -159,71 +157,71 @@ impl PptRecord {
         }
 
         let consumed = record_end.checked_sub(offset).ok_or_else(|| {
-            PptError::Corrupted(format!("PPT record at offset {offset} size underflow"))
+            Error::Corrupted(format!("PPT record at offset {offset} size underflow"))
         })?;
         Ok((record, consumed))
     }
 
     /// Check if a record type is a container that can hold child records.
-    fn is_container_record(record_type: PptRecordType) -> bool {
+    fn is_container_record(record_type: RecordType) -> bool {
         matches!(
             record_type,
-            PptRecordType::Document
-                | PptRecordType::Slide
-                | PptRecordType::Notes
-                | PptRecordType::Handout
-                | PptRecordType::MainMaster
-                | PptRecordType::HeadersFooters
-                | PptRecordType::DocInfoList
-                | PptRecordType::SlideViewInfo
-                | PptRecordType::ExObjList
-                | PptRecordType::VBAInfo
-                | PptRecordType::SlideListWithText
-                | PptRecordType::NormalViewSetInfo9
-                | PptRecordType::NotesTextViewInfo9
-                | PptRecordType::Environment
-                | PptRecordType::FontCollection
-                | PptRecordType::FontCollection10
-                | PptRecordType::BlipCollection9
-                | PptRecordType::Kinsoku
-                | PptRecordType::ExternalHyperlink
-                | PptRecordType::ExternalHyperlink9
-                | PptRecordType::InteractiveInfo
-                | PptRecordType::AnimationInfo
-                | PptRecordType::ProgTags
-                | PptRecordType::ProgStringTag
-                | PptRecordType::ProgBinaryTag
-                | PptRecordType::RoundTripSlideSyncInfo12
-                | PptRecordType::OutlineTextProps9
-                | PptRecordType::OutlineTextProps10
-                | PptRecordType::OutlineTextProps11
-                | PptRecordType::Comment2000
-                | PptRecordType::CommentIndex10
-                | PptRecordType::BuildList
-                | PptRecordType::ChartBuild
-                | PptRecordType::DiagramBuild
-                | PptRecordType::ParaBuild
-                | PptRecordType::ExtTimeNode
-                | PptRecordType::TimeSubEffectContainer
-                | PptRecordType::TimeConditionContainer
-                | PptRecordType::TimeBehaviorContainer
-                | PptRecordType::TimeAnimateBehaviorContainer
-                | PptRecordType::TimeColorBehaviorContainer
-                | PptRecordType::TimeEffectBehaviorContainer
-                | PptRecordType::TimeMotionBehaviorContainer
-                | PptRecordType::TimeRotationBehaviorContainer
-                | PptRecordType::TimeScaleBehaviorContainer
-                | PptRecordType::TimeSetBehaviorContainer
-                | PptRecordType::TimeCommandBehaviorContainer
-                | PptRecordType::TimeClientVisualElement
-                | PptRecordType::TimePropertyList
-                | PptRecordType::TimeVariantList
-                | PptRecordType::TimeAnimationValueList
+            RecordType::Document
+                | RecordType::Slide
+                | RecordType::Notes
+                | RecordType::Handout
+                | RecordType::MainMaster
+                | RecordType::HeadersFooters
+                | RecordType::DocInfoList
+                | RecordType::SlideViewInfo
+                | RecordType::ExObjList
+                | RecordType::VBAInfo
+                | RecordType::SlideListWithText
+                | RecordType::NormalViewSetInfo9
+                | RecordType::NotesTextViewInfo9
+                | RecordType::Environment
+                | RecordType::FontCollection
+                | RecordType::FontCollection10
+                | RecordType::BlipCollection9
+                | RecordType::Kinsoku
+                | RecordType::ExternalHyperlink
+                | RecordType::ExternalHyperlink9
+                | RecordType::InteractiveInfo
+                | RecordType::AnimationInfo
+                | RecordType::ProgTags
+                | RecordType::ProgStringTag
+                | RecordType::ProgBinaryTag
+                | RecordType::RoundTripSlideSyncInfo12
+                | RecordType::OutlineTextProps9
+                | RecordType::OutlineTextProps10
+                | RecordType::OutlineTextProps11
+                | RecordType::Comment2000
+                | RecordType::CommentIndex10
+                | RecordType::BuildList
+                | RecordType::ChartBuild
+                | RecordType::DiagramBuild
+                | RecordType::ParaBuild
+                | RecordType::ExtTimeNode
+                | RecordType::TimeSubEffectContainer
+                | RecordType::TimeConditionContainer
+                | RecordType::TimeBehaviorContainer
+                | RecordType::TimeAnimateBehaviorContainer
+                | RecordType::TimeColorBehaviorContainer
+                | RecordType::TimeEffectBehaviorContainer
+                | RecordType::TimeMotionBehaviorContainer
+                | RecordType::TimeRotationBehaviorContainer
+                | RecordType::TimeScaleBehaviorContainer
+                | RecordType::TimeSetBehaviorContainer
+                | RecordType::TimeCommandBehaviorContainer
+                | RecordType::TimeClientVisualElement
+                | RecordType::TimePropertyList
+                | RecordType::TimeVariantList
+                | RecordType::TimeAnimationValueList
         )
     }
 
     /// Parse child records from a container record.
-    fn parse_container_children(data: &[u8]) -> Result<Vec<PptRecord>> {
+    fn parse_container_children(data: &[u8]) -> Result<Vec<Record>> {
         let mut children = Vec::new();
         let mut offset = 0;
 
@@ -249,18 +247,18 @@ impl PptRecord {
         Ok(children)
     }
 
-    fn parse_container_children_strict(data: &[u8]) -> Result<Vec<PptRecord>> {
+    fn parse_container_children_strict(data: &[u8]) -> Result<Vec<Record>> {
         let mut children = Vec::new();
         let mut offset = 0usize;
         while offset < data.len() {
             if data.len() - offset < 8 {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "container ends with a truncated record header".to_string(),
                 ));
             }
             let (child, consumed) = Self::parse_impl(data, offset, true)?;
             if consumed == 0 {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "zero-length progress while parsing a PPT container".to_string(),
                 ));
             }
@@ -271,14 +269,14 @@ impl PptRecord {
     }
 
     /// Find a child record of a specific type.
-    pub fn find_child(&self, record_type: PptRecordType) -> Option<&PptRecord> {
+    pub fn find_child(&self, record_type: RecordType) -> Option<&Record> {
         self.children
             .iter()
             .find(|child| child.record_type == record_type)
     }
 
     /// Find all child records of a specific type.
-    pub fn find_children(&self, record_type: PptRecordType) -> Vec<&PptRecord> {
+    pub fn find_children(&self, record_type: RecordType) -> Vec<&Record> {
         self.children
             .iter()
             .filter(|child| child.record_type == record_type)
@@ -289,9 +287,9 @@ impl PptRecord {
     ///
     /// `BinaryTagData` is an atom whose payload is itself a strict sequence of
     /// PPT records, so these records do not appear in the ordinary child tree.
-    pub fn versioned_binary_tag_records(&self, version: u8) -> Result<Vec<PptRecord>> {
+    pub fn versioned_binary_tag_records(&self, version: u8) -> Result<Vec<Record>> {
         if !matches!(version, 9..=12) {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "Unsupported PowerPoint programmable-tag version".to_string(),
             ));
         }
@@ -305,14 +303,14 @@ impl PptRecord {
             for tag in
                 Self::parse_sequence_strict(&container.data, &format!("PPT{version} ProgTags"))?
             {
-                if tag.record_type != PptRecordType::ProgBinaryTag {
+                if tag.record_type != RecordType::ProgBinaryTag {
                     continue;
                 }
                 let children =
                     Self::parse_sequence_strict(&tag.data, &format!("PPT{version} ProgBinaryTag"))?;
                 let Some(name) = children
                     .iter()
-                    .find(|child| child.record_type == PptRecordType::CString)
+                    .find(|child| child.record_type == RecordType::CString)
                 else {
                     continue;
                 };
@@ -329,9 +327,9 @@ impl PptRecord {
                 }
                 let blob = children
                     .iter()
-                    .find(|child| child.record_type == PptRecordType::BinaryTagData)
+                    .find(|child| child.record_type == RecordType::BinaryTagData)
                     .ok_or_else(|| {
-                        PptError::Corrupted(format!(
+                        Error::Corrupted(format!(
                             "___PPT{version} programmable tag is missing BinaryTagData"
                         ))
                     })?;
@@ -344,15 +342,15 @@ impl PptRecord {
         Ok(records)
     }
 
-    pub(crate) fn parse_sequence_strict(data: &[u8], context: &str) -> Result<Vec<PptRecord>> {
+    pub(crate) fn parse_sequence_strict(data: &[u8], context: &str) -> Result<Vec<Record>> {
         let mut records = Vec::new();
         let mut offset = 0usize;
         while offset < data.len() {
             let header_end = offset.checked_add(8).ok_or_else(|| {
-                PptError::Corrupted(format!("{context} record header offset overflow"))
+                Error::Corrupted(format!("{context} record header offset overflow"))
             })?;
             if header_end > data.len() {
-                return Err(PptError::Corrupted(format!(
+                return Err(Error::Corrupted(format!(
                     "Truncated record header in {context}"
                 )));
             }
@@ -363,18 +361,16 @@ impl PptRecord {
                 data[offset + 7],
             ]);
             let length = usize::try_from(length)
-                .map_err(|_| PptError::Corrupted(format!("{context} record size overflow")))?;
+                .map_err(|_| Error::Corrupted(format!("{context} record size overflow")))?;
             let record_end = header_end
                 .checked_add(length)
-                .ok_or_else(|| PptError::Corrupted(format!("{context} record size overflow")))?;
+                .ok_or_else(|| Error::Corrupted(format!("{context} record size overflow")))?;
             if record_end > data.len() {
-                return Err(PptError::Corrupted(format!(
-                    "Record extends beyond {context}"
-                )));
+                return Err(Error::Corrupted(format!("Record extends beyond {context}")));
             }
             let (record, consumed) = Self::parse(&data[offset..record_end], 0)?;
             if consumed != record_end - offset {
-                return Err(PptError::Corrupted(format!(
+                return Err(Error::Corrupted(format!(
                     "Record in {context} was only partially parsed"
                 )));
             }
@@ -386,12 +382,11 @@ impl PptRecord {
 
     /// Extract slide data from this record.
     pub fn extract_slide_data(&self) -> Option<Vec<u8>> {
-        if let Some(ppdrawing) = self.find_child(PptRecordType::PPDrawing) {
+        if let Some(ppdrawing) = self.find_child(RecordType::PPDrawing) {
             return Some(ppdrawing.data.clone());
         }
 
-        if self.record_type == PptRecordType::Slide && !self.data.is_empty() && self.data.len() > 8
-        {
+        if self.record_type == RecordType::Slide && !self.data.is_empty() && self.data.len() > 8 {
             let first_record_type = U16::<LittleEndian>::read_from_bytes(&self.data[0..2])
                 .map(|v| v.get())
                 .unwrap_or(0);
@@ -405,21 +400,21 @@ impl PptRecord {
 
     /// Extract document information from this record.
     pub fn extract_document_info(&self) -> Option<DocumentInfo> {
-        if self.record_type != PptRecordType::Document {
+        if self.record_type != RecordType::Document {
             return None;
         }
 
         let mut info = DocumentInfo::default();
 
-        if let Some(document_atom) = self.find_child(PptRecordType::DocumentAtom) {
+        if let Some(document_atom) = self.find_child(RecordType::DocumentAtom) {
             info = Self::parse_document_atom(document_atom);
         }
 
-        if self.find_child(PptRecordType::Environment).is_some() {
+        if self.find_child(RecordType::Environment).is_some() {
             info.has_environment = true;
         }
 
-        if self.find_child(PptRecordType::PPDrawingGroup).is_some() {
+        if self.find_child(RecordType::PPDrawingGroup).is_some() {
             info.has_drawing_group = true;
         }
 
@@ -427,7 +422,7 @@ impl PptRecord {
     }
 
     /// Parse DocumentAtom record data.
-    fn parse_document_atom(record: &PptRecord) -> DocumentInfo {
+    fn parse_document_atom(record: &Record) -> DocumentInfo {
         let mut info = DocumentInfo::default();
 
         if record.data.len() >= 20 {
@@ -465,17 +460,17 @@ impl PptRecord {
 
     /// Extract slide information from this record.
     pub fn extract_slide_info(&self) -> Option<SlideInfo> {
-        if self.record_type != PptRecordType::Slide {
+        if self.record_type != RecordType::Slide {
             return None;
         }
 
         let mut info = SlideInfo::default();
 
-        if let Some(slide_atom) = self.find_child(PptRecordType::SlideAtom) {
+        if let Some(slide_atom) = self.find_child(RecordType::SlideAtom) {
             info = Self::parse_slide_atom(slide_atom);
         }
 
-        if self.find_child(PptRecordType::PPDrawing).is_some() {
+        if self.find_child(RecordType::PPDrawing).is_some() {
             info.has_drawing = true;
         }
 
@@ -485,7 +480,7 @@ impl PptRecord {
     }
 
     /// Parse SlideAtom record data.
-    fn parse_slide_atom(record: &PptRecord) -> SlideInfo {
+    fn parse_slide_atom(record: &Record) -> SlideInfo {
         let mut info = SlideInfo::default();
 
         if record.data.len() >= 20 {
@@ -507,10 +502,10 @@ impl PptRecord {
     pub fn extract_text(&self) -> Result<String> {
         if matches!(
             self.record_type,
-            PptRecordType::ProgTags
-                | PptRecordType::ProgStringTag
-                | PptRecordType::ProgBinaryTag
-                | PptRecordType::Comment2000
+            RecordType::ProgTags
+                | RecordType::ProgStringTag
+                | RecordType::ProgBinaryTag
+                | RecordType::Comment2000
         ) {
             return Ok(String::new());
         }
@@ -518,17 +513,17 @@ impl PptRecord {
 
         // Extract text from text-related records
         match self.record_type {
-            PptRecordType::TextCharsAtom => {
+            RecordType::TextCharsAtom => {
                 if let Ok(text) = parse_text_chars_atom(&self.data) {
                     text_parts.push(text);
                 }
             },
-            PptRecordType::TextBytesAtom => {
+            RecordType::TextBytesAtom => {
                 if let Ok(text) = parse_text_bytes_atom(&self.data) {
                     text_parts.push(text);
                 }
             },
-            PptRecordType::CString => {
+            RecordType::CString => {
                 if let Ok(text) = parse_cstring(&self.data) {
                     text_parts.push(text);
                 }
@@ -549,14 +544,14 @@ impl PptRecord {
     }
 
     /// Extract SlideListWithText records from Document record.
-    pub fn extract_slide_list_with_texts(&self) -> Vec<&PptRecord> {
-        if self.record_type != PptRecordType::Document {
+    pub fn extract_slide_list_with_texts(&self) -> Vec<&Record> {
+        if self.record_type != RecordType::Document {
             return Vec::new();
         }
 
         self.children
             .iter()
-            .filter(|child| child.record_type == PptRecordType::SlideListWithText)
+            .filter(|child| child.record_type == RecordType::SlideListWithText)
             .collect()
     }
 
@@ -567,7 +562,7 @@ impl PptRecord {
 
     /// Group children into SlideAtomsSets.
     pub fn group_into_slide_atoms_sets<'a>(&'a self) -> Vec<SlideAtomsSet<'a>> {
-        if self.record_type != PptRecordType::SlideListWithText {
+        if self.record_type != RecordType::SlideListWithText {
             return Vec::new();
         }
 
@@ -575,17 +570,17 @@ impl PptRecord {
         let mut i = 0;
 
         while i < self.children.len() {
-            if self.children[i].record_type == PptRecordType::SlidePersistAtom {
+            if self.children[i].record_type == RecordType::SlidePersistAtom {
                 let slide_persist_atom = &self.children[i];
 
                 let mut end_pos = i + 1;
                 while end_pos < self.children.len()
-                    && self.children[end_pos].record_type != PptRecordType::SlidePersistAtom
+                    && self.children[end_pos].record_type != RecordType::SlidePersistAtom
                 {
                     end_pos += 1;
                 }
 
-                let associated_records: Vec<&PptRecord> =
+                let associated_records: Vec<&Record> =
                     self.children[i + 1..end_pos].iter().collect();
 
                 sets.push(SlideAtomsSet {
@@ -604,7 +599,7 @@ impl PptRecord {
 
     /// Get the slide ID from a SlidePersistAtom record.
     pub fn get_slide_id(&self) -> Option<u32> {
-        if self.record_type == PptRecordType::SlidePersistAtom && self.data.len() >= 4 {
+        if self.record_type == RecordType::SlidePersistAtom && self.data.len() >= 4 {
             Some(
                 U32::<LittleEndian>::read_from_bytes(&self.data[0..4])
                     .map(|v| v.get())
@@ -616,8 +611,8 @@ impl PptRecord {
     }
 }
 
-fn collect_prog_tags<'a>(record: &'a PptRecord, output: &mut Vec<&'a PptRecord>) {
-    if record.record_type == PptRecordType::ProgTags {
+fn collect_prog_tags<'a>(record: &'a Record, output: &mut Vec<&'a Record>) {
+    if record.record_type == RecordType::ProgTags {
         output.push(record);
         return;
     }
@@ -641,8 +636,8 @@ mod tests {
 
     #[test]
     fn test_record_creation() {
-        let record = PptRecord {
-            record_type: PptRecordType::Document,
+        let record = Record {
+            record_type: RecordType::Document,
             record_type_raw: 1000,
             version: 1,
             instance: 0,
@@ -651,7 +646,7 @@ mod tests {
             children: Vec::new(),
         };
 
-        assert_eq!(record.record_type, PptRecordType::Document);
+        assert_eq!(record.record_type, RecordType::Document);
         assert_eq!(record.version, 1);
         assert_eq!(record.data_length, 16);
         assert_eq!(record.data.len(), 16);
@@ -659,29 +654,29 @@ mod tests {
 
     #[test]
     fn parse_rejects_header_offset_overflow() {
-        let error = PptRecord::parse(&[0; 8], usize::MAX).unwrap_err();
+        let error = Record::parse(&[0; 8], usize::MAX).unwrap_err();
 
         assert!(matches!(
             error,
-            PptError::Corrupted(message) if message.contains("header offset overflow")
+            Error::Corrupted(message) if message.contains("header offset overflow")
         ));
     }
 
     #[test]
     fn parse_rejects_header_offset_just_below_overflow() {
-        let error = PptRecord::parse(&[0; 8], usize::MAX - 3).unwrap_err();
+        let error = Record::parse(&[0; 8], usize::MAX - 3).unwrap_err();
 
         assert!(matches!(
             error,
-            PptError::Corrupted(message) if message.contains("header offset overflow")
+            Error::Corrupted(message) if message.contains("header offset overflow")
         ));
     }
 
     #[test]
     fn parse_rejects_offset_past_input() {
-        let error = PptRecord::parse(&[0; 8], 9).unwrap_err();
+        let error = Record::parse(&[0; 8], 9).unwrap_err();
 
-        assert!(matches!(error, PptError::Corrupted(_)));
+        assert!(matches!(error, Error::Corrupted(_)));
     }
 
     #[test]
@@ -690,7 +685,7 @@ mod tests {
         let mut bytes = vec![0xFF; 5];
         bytes.extend_from_slice(&atom(0x2222, &payload));
 
-        let (record, consumed) = PptRecord::parse(&bytes, 5).unwrap();
+        let (record, consumed) = Record::parse(&bytes, 5).unwrap();
 
         assert_eq!(consumed, 8 + payload.len());
         assert_eq!(record.record_type_raw, 0x2222);
@@ -704,11 +699,11 @@ mod tests {
         let mut bytes = atom(0x2222, &[]);
         bytes[4..8].copy_from_slice(&u32::MAX.to_le_bytes());
 
-        let error = PptRecord::parse_strict(&bytes, 0).unwrap_err();
+        let error = Record::parse_strict(&bytes, 0).unwrap_err();
 
         assert!(matches!(
             error,
-            PptError::Corrupted(message)
+            Error::Corrupted(message)
                 if message.contains("extends beyond its containing data")
         ));
     }

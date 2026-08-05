@@ -8,7 +8,7 @@
 //!
 //! - MS-XLS 2.4.182 (ObjectLink)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `ObjectLink` record (MS-XLS 2.4.182).
 pub(crate) const OBJECT_LINK_RECORD_TYPE: u16 = 0x1027;
@@ -25,8 +25,8 @@ const MAX_SERIES_INDEX: u16 = 254;
 /// (MS-XLS 2.4.182).
 const MAX_DATA_POINT_INDEX: u16 = 31999;
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: OBJECT_LINK_RECORD_TYPE,
         message: message.into(),
     }
@@ -35,7 +35,7 @@ fn invalid(message: impl Into<String>) -> XlsError {
 /// The `wLinkObj` chart object a `Text` record is linked to (MS-XLS 2.4.182).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
-pub enum XlsObjectLinkTarget {
+pub enum ObjectLinkTarget {
     /// 0x0001: the entire chart.
     EntireChart = 0x0001,
     /// 0x0002: the value axis (vertical value axis on bubble/scatter groups).
@@ -51,8 +51,8 @@ pub enum XlsObjectLinkTarget {
     DisplayUnitsLabels = 0x000C,
 }
 
-impl XlsObjectLinkTarget {
-    fn parse(value: u16) -> XlsResult<Self> {
+impl ObjectLinkTarget {
+    fn parse(value: u16) -> Result<Self> {
         match value {
             0x0001 => Ok(Self::EntireChart),
             0x0002 => Ok(Self::ValueAxis),
@@ -74,9 +74,9 @@ impl XlsObjectLinkTarget {
 /// be zero and MUST be ignored; they are preserved verbatim so the record
 /// round-trips unchanged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsObjectLink {
+pub struct ObjectLink {
     /// The chart object the text is linked to (`wLinkObj`).
-    target: XlsObjectLinkTarget,
+    target: ObjectLinkTarget,
     /// Zero-based index into the Series records (`wLinkVar1`); meaningful
     /// only for `SeriesOrDataPoints`, when it is at most 254.
     series_index: u16,
@@ -86,19 +86,19 @@ pub struct XlsObjectLink {
     category_index: u16,
 }
 
-impl XlsObjectLink {
+impl ObjectLink {
     /// Parse an `ObjectLink` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: PAYLOAD_LEN,
                 found: data.len(),
             });
         }
-        let target = XlsObjectLinkTarget::parse(u16::from_le_bytes([data[0], data[1]]))?;
+        let target = ObjectLinkTarget::parse(u16::from_le_bytes([data[0], data[1]]))?;
         let series_index = u16::from_le_bytes([data[2], data[3]]);
         let category_index = u16::from_le_bytes([data[4], data[5]]);
-        if target == XlsObjectLinkTarget::SeriesOrDataPoints {
+        if target == ObjectLinkTarget::SeriesOrDataPoints {
             if series_index > MAX_SERIES_INDEX {
                 return Err(invalid(format!(
                     "ObjectLink wLinkVar1 {series_index:#06X} exceeds {MAX_SERIES_INDEX:#06X}"
@@ -127,7 +127,7 @@ impl XlsObjectLink {
     }
 
     /// The chart object the text is linked to (`wLinkObj`).
-    pub fn target(&self) -> XlsObjectLinkTarget {
+    pub fn target(&self) -> ObjectLinkTarget {
         self.target
     }
 
@@ -160,15 +160,15 @@ mod tests {
     #[test]
     fn round_trip_all_targets() {
         for (value, expected) in [
-            (0x0001, XlsObjectLinkTarget::EntireChart),
-            (0x0002, XlsObjectLinkTarget::ValueAxis),
-            (0x0003, XlsObjectLinkTarget::CategoryAxis),
-            (0x0004, XlsObjectLinkTarget::SeriesOrDataPoints),
-            (0x0007, XlsObjectLinkTarget::SeriesAxis),
-            (0x000C, XlsObjectLinkTarget::DisplayUnitsLabels),
+            (0x0001, ObjectLinkTarget::EntireChart),
+            (0x0002, ObjectLinkTarget::ValueAxis),
+            (0x0003, ObjectLinkTarget::CategoryAxis),
+            (0x0004, ObjectLinkTarget::SeriesOrDataPoints),
+            (0x0007, ObjectLinkTarget::SeriesAxis),
+            (0x000C, ObjectLinkTarget::DisplayUnitsLabels),
         ] {
             let bytes = record(value, 0, 0);
-            let parsed = XlsObjectLink::parse(&bytes).unwrap();
+            let parsed = ObjectLink::parse(&bytes).unwrap();
             assert_eq!(parsed.target(), expected);
             assert_eq!(parsed.to_payload(), bytes);
         }
@@ -178,13 +178,13 @@ mod tests {
     fn series_link_indexes() {
         // Whole-series link.
         let bytes = record(0x0004, 254, 0xFFFF);
-        let parsed = XlsObjectLink::parse(&bytes).unwrap();
+        let parsed = ObjectLink::parse(&bytes).unwrap();
         assert_eq!(parsed.series_index(), 254);
         assert_eq!(parsed.category_index(), 0xFFFF);
         assert_eq!(parsed.to_payload(), bytes);
         // Single data point link.
         let bytes = record(0x0004, 0, 31999);
-        assert_eq!(XlsObjectLink::parse(&bytes).unwrap().to_payload(), bytes);
+        assert_eq!(ObjectLink::parse(&bytes).unwrap().to_payload(), bytes);
     }
 
     #[test]
@@ -192,7 +192,7 @@ mod tests {
         // wLinkVar1/wLinkVar2 MUST be zero and MUST be ignored for non-series
         // targets; they round-trip verbatim.
         let bytes = record(0x0001, 0xAAAA, 0xBBBB);
-        let parsed = XlsObjectLink::parse(&bytes).unwrap();
+        let parsed = ObjectLink::parse(&bytes).unwrap();
         assert_eq!(parsed.series_index(), 0xAAAA);
         assert_eq!(parsed.to_payload(), bytes);
     }
@@ -201,13 +201,13 @@ mod tests {
     fn rejects_malformed_records() {
         let bytes = record(0x0001, 0, 0);
         // Truncated and overlong payloads.
-        assert!(XlsObjectLink::parse(&bytes[..5]).is_err());
-        assert!(XlsObjectLink::parse(&[bytes.as_slice(), &[0]].concat()).is_err());
+        assert!(ObjectLink::parse(&bytes[..5]).is_err());
+        assert!(ObjectLink::parse(&[bytes.as_slice(), &[0]].concat()).is_err());
         // Undefined wLinkObj.
-        assert!(XlsObjectLink::parse(&record(0x0005, 0, 0)).is_err());
+        assert!(ObjectLink::parse(&record(0x0005, 0, 0)).is_err());
         // Series/data-point index bounds.
-        assert!(XlsObjectLink::parse(&record(0x0004, 255, 0)).is_err());
-        assert!(XlsObjectLink::parse(&record(0x0004, 0, 32000)).is_err());
-        assert!(XlsObjectLink::parse(&record(0x0004, 0, 0xFFFE)).is_err());
+        assert!(ObjectLink::parse(&record(0x0004, 255, 0)).is_err());
+        assert!(ObjectLink::parse(&record(0x0004, 0, 32000)).is_err());
+        assert!(ObjectLink::parse(&record(0x0004, 0, 0xFFFE)).is_err());
     }
 }

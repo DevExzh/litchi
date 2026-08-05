@@ -5028,9 +5028,10 @@ remains the previously recorded external integration debt.
 ## Layered OLE2 and OOXML owner continuation
 
 This turn extends the same breaking, prefix-free owner pattern across the OLE2
-and OOXML migration hosts. CFB property-set metadata now lives under
-`metadata::{model,codec,tests}` with the contextual `Metadata`, `Stream`,
-`Section`, `Value`, `Standard`, and `Editor` facade. DOCX header/footer stories,
+and OOXML migration hosts. Shared OLE2 property-set grammar now lives in
+`litchi-ole-common::property_set::{model,codec,tests}` with the contextual
+`Metadata`, `Stream`, `Section`, `Value`, `Standard`, and `Editor` facade;
+CFB remains the container owner. DOCX header/footer stories,
 XLS BIFF8 comments, XLSX auto-filters, and XLSX external links now each have
 separate semantic model, bounded codec, package/orchestration, and regression
 layers. Their public values no longer repeat the owner name, and direct callers
@@ -5076,6 +5077,30 @@ ODT, OOXML-common, PPT, XLS, and XLSX; DOC passed 832 library tests with two
 ignored. The full DOC all-target run remains limited only by the previously
 recorded malformed Apache POI FAT fixture. This is a migration and typed-model
 increment, not a claim of complete Microsoft Office specification conformance.
+
+## Layered ODF/OLE2 facade continuation
+
+The ODF family slice continues the breaking split through `litchi-odt`,
+`litchi-ods`, and `litchi-odp`, while ODT’s smaller owners use semantic
+`model`/`codec`/`tests` folders instead of accumulating new flat modules. Ruby
+annotations, forms, settings, DDE connections, outline styles, list-label
+alignment, and related metadata are exposed through contextual owner facades;
+redundant public prefixes and compatibility aliases were removed.
+
+The shared OLE2 property-set reader/editor is now owned by
+`litchi-ole-common`, and DOC/PPT/XLS call it directly. The umbrella `litchi`
+crate no longer wraps the standalone `litchi-doc` package in an outer `doc`
+module; internal unified-document code refers to the package directly and
+format-specific users depend on `litchi-doc` itself. DOC header/footer and note
+PLC writers are wired through checked FIB pointers, and the CFB container keeps
+property sets outside its format-neutral core.
+
+Focused checks passed for ODT, OLE-common, CFB, DOC, PPT, XLS, and XLSX,
+including the ODT all-target suite, OLE property-set tests, CFB’s 96-test
+suite, DOC writer/property-set integration tests, and PPT/XLS/XLSX all-target
+compilation. These checks establish the current typed/layered migration
+boundary; they do not claim complete `[MS-DOC]`, `[MS-ODRAW]`, `[MS-OGRAPH]`,
+`[MS-OSHARED]`, `[MS-PPT]`, or `[MS-XLS]` conformance.
 
 ## Evidence levels
 

@@ -1,6 +1,6 @@
 //! Contextual routing-slip values and the semantic document model.
 
-use crate::package::{PptError, Result};
+use crate::package::{Error, Result};
 
 /// A bounded legacy printable-ANSI routing-slip string.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -12,12 +12,12 @@ impl Text {
     /// Build a routing-slip string from its printable-ANSI bytes.
     pub fn from_ansi_bytes(bytes: Vec<u8>) -> Result<Self> {
         if bytes.contains(&0) {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "routing-slip text contains an embedded NUL".to_string(),
             ));
         }
         if bytes.len() > usize::from(u16::MAX) - 1 {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "routing-slip text exceeds the 16-bit length limit".to_string(),
             ));
         }
@@ -98,7 +98,7 @@ impl Slip {
         message: Text,
     ) -> Result<Self> {
         if recipients.len() > u32::MAX as usize {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "routing slip has too many recipients".to_string(),
             ));
         }

@@ -1,23 +1,23 @@
 //! PowerPoint 10 document metadata and privacy settings.
 
-use super::package::{PptError, Result};
-use super::records::PptRecord;
-use super::slide_round_trip::{PowerPointEmbeddedXmlPackage, parse_embedded_xml_package};
-use crate::consts::PptRecordType;
+use super::package::{Error, Result};
+use super::records::Record;
+use super::slide_round_trip::{EmbeddedXmlPackage, parse_embedded_xml_package};
+use crate::consts::RecordType;
 use litchi_opc::constants::content_type;
 
 const DRAWINGML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
 
 /// Square-grid spacing stored by a PowerPoint 10 document extension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointGridSpacing {
+pub struct GridSpacing {
     /// Horizontal and vertical spacing in PowerPoint grid units.
     pub grid_units: i32,
 }
 
 /// Arrangement of pictures on photo-album slides.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PowerPointPhotoAlbumLayout {
+pub enum PhotoAlbumLayout {
     FitToSlide,
     OnePicture,
     TwoPictures,
@@ -29,7 +29,7 @@ pub enum PowerPointPhotoAlbumLayout {
 
 /// Shape drawn or cropped around pictures in a photo album.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PowerPointPhotoAlbumFrameShape {
+pub enum PhotoAlbumFrameShape {
     Rectangle,
     RoundedRectangle,
     Beveled,
@@ -41,22 +41,22 @@ pub enum PowerPointPhotoAlbumFrameShape {
 
 /// PowerPoint 10 photo-album display preferences.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointPhotoAlbumSettings {
+pub struct PhotoAlbumSettings {
     /// Whether pictures are displayed as grayscale graphics.
     pub use_grayscale: bool,
     /// Whether each picture has a caption beneath it.
     pub has_captions: bool,
     /// Preferred picture arrangement.
-    pub layout: PowerPointPhotoAlbumLayout,
+    pub layout: PhotoAlbumLayout,
     /// Undefined byte retained for lossless inspection.
     pub unused: u8,
     /// Preferred picture frame shape.
-    pub frame_shape: PowerPointPhotoAlbumFrameShape,
+    pub frame_shape: PhotoAlbumFrameShape,
 }
 
 /// Metadata and privacy settings stored in the `___PPT10` document extension.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct PowerPoint10DocumentProperties {
+pub struct DocumentProperties10 {
     /// Optional copyright notice.
     pub copyright: Option<String>,
     /// Optional document keywords.
@@ -71,40 +71,40 @@ pub struct PowerPoint10DocumentProperties {
     /// `None` means that the optional `FilterPrivacyFlags10Atom` is absent.
     pub remove_personally_identifiable_information: Option<bool>,
     /// Optional square-grid spacing used for alignment and positioning cues.
-    pub grid_spacing: Option<PowerPointGridSpacing>,
+    pub grid_spacing: Option<GridSpacing>,
     /// Optional photo-album display preferences.
-    pub photo_album: Option<PowerPointPhotoAlbumSettings>,
+    pub photo_album: Option<PhotoAlbumSettings>,
 }
 
 /// Document-level settings stored in the `___PPT12` extension.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct PowerPoint12DocumentProperties {
+pub struct DocumentProperties12 {
     /// Whether pictures are automatically compressed when the presentation is saved.
     ///
     /// `None` means that the optional `RoundTripDocFlags12Atom` is absent.
     pub compress_pictures_on_save: Option<bool>,
     /// Validated embedded custom table styles.
-    pub custom_table_styles: Option<PowerPointCustomTableStyles>,
+    pub custom_table_styles: Option<CustomTableStyles>,
 }
 
 /// PowerPoint 12 custom table styles stored directly in the Document container.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointCustomTableStyles {
+pub struct CustomTableStyles {
     /// Record version retained because MS-PPT recommends, but does not require, version zero.
     pub record_version: u16,
     /// Validated package containing the DrawingML `tblStyleLst` part.
-    pub package: PowerPointEmbeddedXmlPackage,
+    pub package: EmbeddedXmlPackage,
 }
 
-impl PowerPoint10DocumentProperties {
+impl DocumentProperties10 {
     /// Discover and parse document properties from every `___PPT10` programmable tag below `root`.
-    pub fn parse(root: &PptRecord) -> Result<Self> {
+    pub fn parse(root: &Record) -> Result<Self> {
         let mut properties = Self::default();
         for record in root.versioned_binary_tag_records(10)? {
             match (record.record_type, record.instance) {
-                (PptRecordType::CString, 1) => {
+                (RecordType::CString, 1) => {
                     if properties.copyright.is_some() {
-                        return Err(PptError::Corrupted(
+                        return Err(Error::Corrupted(
                             "PowerPoint 10 document extension contains duplicate copyright"
                                 .to_string(),
                         ));
@@ -112,18 +112,18 @@ impl PowerPoint10DocumentProperties {
                     properties.copyright =
                         Some(parse_document_string(&record, 1, "CopyrightAtom")?);
                 },
-                (PptRecordType::CString, 2) => {
+                (RecordType::CString, 2) => {
                     if properties.keywords.is_some() {
-                        return Err(PptError::Corrupted(
+                        return Err(Error::Corrupted(
                             "PowerPoint 10 document extension contains duplicate keywords"
                                 .to_string(),
                         ));
                     }
                     properties.keywords = Some(parse_document_string(&record, 2, "KeywordsAtom")?);
                 },
-                (PptRecordType::CString, 3) => {
+                (RecordType::CString, 3) => {
                     if properties.modify_password.is_some() {
-                        return Err(PptError::Corrupted(
+                        return Err(Error::Corrupted(
                             "PowerPoint 10 document extension contains duplicate modify password"
                                 .to_string(),
                         ));
@@ -131,12 +131,12 @@ impl PowerPoint10DocumentProperties {
                     properties.modify_password =
                         Some(parse_document_string(&record, 3, "ModifyPasswordAtom")?);
                 },
-                (PptRecordType::FilterPrivacyFlags10Atom, _) => {
+                (RecordType::FilterPrivacyFlags10Atom, _) => {
                     if properties
                         .remove_personally_identifiable_information
                         .is_some()
                     {
-                        return Err(PptError::Corrupted(
+                        return Err(Error::Corrupted(
                             "PowerPoint 10 document extension contains duplicate privacy flags"
                                 .to_string(),
                         ));
@@ -144,18 +144,18 @@ impl PowerPoint10DocumentProperties {
                     properties.remove_personally_identifiable_information =
                         Some(parse_privacy_flags(&record)?);
                 },
-                (PptRecordType::GridSpacing10Atom, _) => {
+                (RecordType::GridSpacing10Atom, _) => {
                     if properties.grid_spacing.is_some() {
-                        return Err(PptError::Corrupted(
+                        return Err(Error::Corrupted(
                             "PowerPoint 10 document extension contains duplicate grid spacing"
                                 .to_string(),
                         ));
                     }
                     properties.grid_spacing = Some(parse_grid_spacing(&record)?);
                 },
-                (PptRecordType::PhotoAlbumInfo10Atom, _) => {
+                (RecordType::PhotoAlbumInfo10Atom, _) => {
                     if properties.photo_album.is_some() {
-                        return Err(PptError::Corrupted(
+                        return Err(Error::Corrupted(
                             "PowerPoint 10 document extension contains duplicate photo album settings"
                                 .to_string(),
                         ));
@@ -169,27 +169,27 @@ impl PowerPoint10DocumentProperties {
     }
 }
 
-impl PowerPoint12DocumentProperties {
+impl DocumentProperties12 {
     /// Discover and parse document properties from every `___PPT12` programmable tag below `root`.
-    pub fn parse(root: &PptRecord) -> Result<Self> {
+    pub fn parse(root: &Record) -> Result<Self> {
         let mut properties = Self::default();
         for record in &root.children {
-            if record.record_type != PptRecordType::RoundTripCustomTableStyles12Atom {
+            if record.record_type != RecordType::RoundTripCustomTableStyles12Atom {
                 continue;
             }
             if properties.custom_table_styles.is_some() {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "Document contains duplicate RoundTripCustomTableStyles12Atom records"
                         .to_string(),
                 ));
             }
             if record.instance != 0 || record.data_length as usize != record.data.len() {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "RoundTripCustomTableStyles12Atom has an invalid record header or size"
                         .to_string(),
                 ));
             }
-            properties.custom_table_styles = Some(PowerPointCustomTableStyles {
+            properties.custom_table_styles = Some(CustomTableStyles {
                 record_version: record.version,
                 package: parse_embedded_xml_package(
                     &record.data,
@@ -201,22 +201,22 @@ impl PowerPoint12DocumentProperties {
             });
         }
         for record in root.versioned_binary_tag_records(12)? {
-            if record.record_type != PptRecordType::RoundTripDocFlags12Atom {
+            if record.record_type != RecordType::RoundTripDocFlags12Atom {
                 continue;
             }
             if properties.compress_pictures_on_save.is_some() {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "PowerPoint 12 document extension contains duplicate document flags"
                         .to_string(),
                 ));
             }
             if record.version != 0 || record.instance != 0 || record.data.len() != 1 {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "RoundTripDocFlags12Atom has an invalid record header or size".to_string(),
                 ));
             }
             if record.data[0] & 0xfe != 0 {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "RoundTripDocFlags12Atom has nonzero reserved bits".to_string(),
                 ));
             }
@@ -226,14 +226,14 @@ impl PowerPoint12DocumentProperties {
     }
 }
 
-fn parse_document_string(record: &PptRecord, instance: u16, name: &str) -> Result<String> {
-    if record.record_type != PptRecordType::CString
+fn parse_document_string(record: &Record, instance: u16, name: &str) -> Result<String> {
+    if record.record_type != RecordType::CString
         || record.version != 0
         || record.instance != instance
         || record.data.len() > 510
         || record.data.len() & 1 != 0
     {
-        return Err(PptError::Corrupted(format!(
+        return Err(Error::Corrupted(format!(
             "{name} has an invalid record header or size"
         )));
     }
@@ -245,23 +245,23 @@ fn parse_document_string(record: &PptRecord, instance: u16, name: &str) -> Resul
             break;
         }
         if matches!(unit, 0x0001..=0x001f | 0x007f..=0x009f) {
-            return Err(PptError::Corrupted(format!(
+            return Err(Error::Corrupted(format!(
                 "{name} contains a non-printable character"
             )));
         }
         units.push(unit);
     }
     String::from_utf16(&units)
-        .map_err(|_| PptError::Corrupted(format!("{name} contains invalid UTF-16")))
+        .map_err(|_| Error::Corrupted(format!("{name} contains invalid UTF-16")))
 }
 
-fn parse_privacy_flags(record: &PptRecord) -> Result<bool> {
-    if record.record_type != PptRecordType::FilterPrivacyFlags10Atom
+fn parse_privacy_flags(record: &Record) -> Result<bool> {
+    if record.record_type != RecordType::FilterPrivacyFlags10Atom
         || record.version != 0
         || record.instance != 0
         || record.data.len() != 4
     {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "FilterPrivacyFlags10Atom has an invalid record header or size".to_string(),
         ));
     }
@@ -272,76 +272,76 @@ fn parse_privacy_flags(record: &PptRecord) -> Result<bool> {
         record.data[3],
     ]);
     if flags & !1 != 0 {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "FilterPrivacyFlags10Atom has nonzero reserved bits".to_string(),
         ));
     }
     Ok(flags & 1 != 0)
 }
 
-fn parse_grid_spacing(record: &PptRecord) -> Result<PowerPointGridSpacing> {
-    if record.record_type != PptRecordType::GridSpacing10Atom
+fn parse_grid_spacing(record: &Record) -> Result<GridSpacing> {
+    if record.record_type != RecordType::GridSpacing10Atom
         || record.version != 0
         || record.instance != 0
         || record.data.len() != 8
     {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "GridSpacing10Atom has an invalid record header or size".to_string(),
         ));
     }
     let x = i32::from_le_bytes(record.data[0..4].try_into().map_err(|_| {
-        PptError::Corrupted("GridSpacing10Atom horizontal value is truncated".to_string())
+        Error::Corrupted("GridSpacing10Atom horizontal value is truncated".to_string())
     })?);
     let y = i32::from_le_bytes(record.data[4..8].try_into().map_err(|_| {
-        PptError::Corrupted("GridSpacing10Atom vertical value is truncated".to_string())
+        Error::Corrupted("GridSpacing10Atom vertical value is truncated".to_string())
     })?);
     if !(0x0000_5ab8..=0x0012_0000).contains(&x) || x != y {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "GridSpacing10Atom values are unequal or out of range".to_string(),
         ));
     }
-    Ok(PowerPointGridSpacing { grid_units: x })
+    Ok(GridSpacing { grid_units: x })
 }
 
-fn parse_photo_album(record: &PptRecord) -> Result<PowerPointPhotoAlbumSettings> {
-    if record.record_type != PptRecordType::PhotoAlbumInfo10Atom
+fn parse_photo_album(record: &Record) -> Result<PhotoAlbumSettings> {
+    if record.record_type != RecordType::PhotoAlbumInfo10Atom
         || record.version != 0
         || record.instance != 0
         || record.data.len() != 6
     {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "PhotoAlbumInfo10Atom has an invalid record header or size".to_string(),
         ));
     }
     let layout = match record.data[2] {
-        0 => PowerPointPhotoAlbumLayout::FitToSlide,
-        1 => PowerPointPhotoAlbumLayout::OnePicture,
-        2 => PowerPointPhotoAlbumLayout::TwoPictures,
-        3 => PowerPointPhotoAlbumLayout::FourPictures,
-        4 => PowerPointPhotoAlbumLayout::OnePictureAndTitle,
-        5 => PowerPointPhotoAlbumLayout::TwoPicturesAndTitle,
-        6 => PowerPointPhotoAlbumLayout::FourPicturesAndTitle,
+        0 => PhotoAlbumLayout::FitToSlide,
+        1 => PhotoAlbumLayout::OnePicture,
+        2 => PhotoAlbumLayout::TwoPictures,
+        3 => PhotoAlbumLayout::FourPictures,
+        4 => PhotoAlbumLayout::OnePictureAndTitle,
+        5 => PhotoAlbumLayout::TwoPicturesAndTitle,
+        6 => PhotoAlbumLayout::FourPicturesAndTitle,
         _ => {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "PhotoAlbumInfo10Atom has an invalid layout".to_string(),
             ));
         },
     };
     let frame_shape = match u16::from_le_bytes([record.data[4], record.data[5]]) {
-        0 => PowerPointPhotoAlbumFrameShape::Rectangle,
-        1 => PowerPointPhotoAlbumFrameShape::RoundedRectangle,
-        2 => PowerPointPhotoAlbumFrameShape::Beveled,
-        3 => PowerPointPhotoAlbumFrameShape::Oval,
-        4 => PowerPointPhotoAlbumFrameShape::Octagon,
-        5 => PowerPointPhotoAlbumFrameShape::Cross,
-        6 => PowerPointPhotoAlbumFrameShape::Plaque,
+        0 => PhotoAlbumFrameShape::Rectangle,
+        1 => PhotoAlbumFrameShape::RoundedRectangle,
+        2 => PhotoAlbumFrameShape::Beveled,
+        3 => PhotoAlbumFrameShape::Oval,
+        4 => PhotoAlbumFrameShape::Octagon,
+        5 => PhotoAlbumFrameShape::Cross,
+        6 => PhotoAlbumFrameShape::Plaque,
         _ => {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "PhotoAlbumInfo10Atom has an invalid frame shape".to_string(),
             ));
         },
     };
-    Ok(PowerPointPhotoAlbumSettings {
+    Ok(PhotoAlbumSettings {
         use_grayscale: record.data[0] != 0,
         has_captions: record.data[1] != 0,
         layout,
@@ -370,15 +370,15 @@ mod tests {
         value.encode_utf16().flat_map(u16::to_le_bytes).collect()
     }
 
-    fn prog_tags_record(version: u8, blob_payload: &[u8]) -> PptRecord {
+    fn prog_tags_record(version: u8, blob_payload: &[u8]) -> Record {
         let tag_name = utf16(&format!("___PPT{version}"));
         let name = record_bytes(0, 0, 4026, &tag_name);
         let blob = record_bytes(0, 0, 0x138b, blob_payload);
         let mut tag_payload = name;
         tag_payload.extend_from_slice(&blob);
         let tag = record_bytes(0x0f, 0, 0x138a, &tag_payload);
-        PptRecord {
-            record_type: PptRecordType::ProgTags,
+        Record {
+            record_type: RecordType::ProgTags,
             record_type_raw: 0x1388,
             version: 0x0f,
             instance: 0,
@@ -388,9 +388,9 @@ mod tests {
         }
     }
 
-    fn root(children: Vec<PptRecord>) -> PptRecord {
-        PptRecord {
-            record_type: PptRecordType::Document,
+    fn root(children: Vec<Record>) -> Record {
+        Record {
+            record_type: RecordType::Document,
             record_type_raw: 1000,
             version: 0x0f,
             instance: 0,
@@ -426,10 +426,10 @@ mod tests {
         )
     }
 
-    fn table_styles_record(version: u16, instance: u16, data: &[u8]) -> PptRecord {
-        PptRecord {
-            record_type: PptRecordType::RoundTripCustomTableStyles12Atom,
-            record_type_raw: PptRecordType::RoundTripCustomTableStyles12Atom.as_u16(),
+    fn table_styles_record(version: u16, instance: u16, data: &[u8]) -> Record {
+        Record {
+            record_type: RecordType::RoundTripCustomTableStyles12Atom,
+            record_type_raw: RecordType::RoundTripCustomTableStyles12Atom.as_u16(),
             version,
             instance,
             data_length: data.len() as u32,
@@ -450,8 +450,7 @@ mod tests {
         records.extend_from_slice(&record_bytes(0, 0, 0x36b2, &[2, 0, 6, 0xff, 6, 0]));
 
         let properties =
-            PowerPoint10DocumentProperties::parse(&root(vec![prog_tags_record(10, &records)]))
-                .unwrap();
+            DocumentProperties10::parse(&root(vec![prog_tags_record(10, &records)])).unwrap();
 
         assert_eq!(properties.copyright.as_deref(), Some("Copyright © 2026"));
         assert_eq!(properties.keywords.as_deref(), Some("rust; ooxml"));
@@ -464,12 +463,9 @@ mod tests {
         let album = properties.photo_album.unwrap();
         assert!(album.use_grayscale);
         assert!(!album.has_captions);
-        assert_eq!(
-            album.layout,
-            PowerPointPhotoAlbumLayout::FourPicturesAndTitle
-        );
+        assert_eq!(album.layout, PhotoAlbumLayout::FourPicturesAndTitle);
         assert_eq!(album.unused, 0xff);
-        assert_eq!(album.frame_shape, PowerPointPhotoAlbumFrameShape::Plaque);
+        assert_eq!(album.frame_shape, PhotoAlbumFrameShape::Plaque);
     }
 
     #[test]
@@ -477,7 +473,7 @@ mod tests {
         let copyright = record_bytes(0, 1, 4026, &utf16("old"));
         let keywords = record_bytes(0, 2, 4026, &utf16("current"));
         let password = record_bytes(0, 3, 4026, &utf16("old-password"));
-        let properties = PowerPoint10DocumentProperties::parse(&root(vec![
+        let properties = DocumentProperties10::parse(&root(vec![
             prog_tags_record(9, &[copyright, password].concat()),
             prog_tags_record(10, &keywords),
         ]))
@@ -507,7 +503,7 @@ mod tests {
         ];
         for record in malformed {
             let document = root(vec![prog_tags_record(10, &record)]);
-            assert!(PowerPoint10DocumentProperties::parse(&document).is_err());
+            assert!(DocumentProperties10::parse(&document).is_err());
         }
     }
 
@@ -524,7 +520,7 @@ mod tests {
             let mut duplicate = record.clone();
             duplicate.extend_from_slice(&record);
             let document = root(vec![prog_tags_record(10, &duplicate)]);
-            assert!(PowerPoint10DocumentProperties::parse(&document).is_err());
+            assert!(DocumentProperties10::parse(&document).is_err());
         }
     }
 
@@ -545,7 +541,7 @@ mod tests {
         ];
         for record in malformed {
             let document = root(vec![prog_tags_record(10, &record)]);
-            assert!(PowerPoint10DocumentProperties::parse(&document).is_err());
+            assert!(DocumentProperties10::parse(&document).is_err());
         }
     }
 
@@ -553,13 +549,11 @@ mod tests {
     fn parses_powerpoint12_document_flags_and_isolates_versions() {
         let flags = record_bytes(0, 0, 0x0425, &[1]);
         let properties =
-            PowerPoint12DocumentProperties::parse(&root(vec![prog_tags_record(12, &flags)]))
-                .unwrap();
+            DocumentProperties12::parse(&root(vec![prog_tags_record(12, &flags)])).unwrap();
         assert_eq!(properties.compress_pictures_on_save, Some(true));
 
         let properties =
-            PowerPoint12DocumentProperties::parse(&root(vec![prog_tags_record(11, &flags)]))
-                .unwrap();
+            DocumentProperties12::parse(&root(vec![prog_tags_record(11, &flags)])).unwrap();
         assert_eq!(properties.compress_pictures_on_save, None);
     }
 
@@ -572,24 +566,23 @@ mod tests {
             record_bytes(0, 0, 0x0425, &[2]),
         ] {
             let document = root(vec![prog_tags_record(12, &flags)]);
-            assert!(PowerPoint12DocumentProperties::parse(&document).is_err());
+            assert!(DocumentProperties12::parse(&document).is_err());
         }
 
         let flags = record_bytes(0, 0, 0x0425, &[0]);
         let mut duplicate = flags.clone();
         duplicate.extend_from_slice(&flags);
         let document = root(vec![prog_tags_record(12, &duplicate)]);
-        assert!(PowerPoint12DocumentProperties::parse(&document).is_err());
+        assert!(DocumentProperties12::parse(&document).is_err());
     }
 
     #[test]
     fn parses_custom_table_styles_and_retains_recommended_version_deviations() {
         let package = valid_table_styles_package();
         for version in [0, 0x0f] {
-            let parsed = PowerPoint12DocumentProperties::parse(&root(vec![table_styles_record(
-                version, 0, &package,
-            )]))
-            .unwrap();
+            let parsed =
+                DocumentProperties12::parse(&root(vec![table_styles_record(version, 0, &package)]))
+                    .unwrap();
             let styles = parsed.custom_table_styles.unwrap();
             assert_eq!(styles.record_version, version);
             assert_eq!(styles.package.data, package);
@@ -622,15 +615,15 @@ mod tests {
                 ),
             ),
         ] {
-            assert!(PowerPoint12DocumentProperties::parse(&root(vec![malformed])).is_err());
+            assert!(DocumentProperties12::parse(&root(vec![malformed])).is_err());
         }
         let mut wrong_declared = table_styles_record(0, 0, &package);
         wrong_declared.data_length -= 1;
-        assert!(PowerPoint12DocumentProperties::parse(&root(vec![wrong_declared])).is_err());
+        assert!(DocumentProperties12::parse(&root(vec![wrong_declared])).is_err());
 
-        let end_document = PptRecord {
-            record_type: PptRecordType::EndDocument,
-            record_type_raw: PptRecordType::EndDocument.as_u16(),
+        let end_document = Record {
+            record_type: RecordType::EndDocument,
+            record_type_raw: RecordType::EndDocument.as_u16(),
             version: 0,
             instance: 0,
             data_length: 0,
@@ -638,7 +631,7 @@ mod tests {
             children: Vec::new(),
         };
         assert!(
-            PowerPoint12DocumentProperties::parse(&root(vec![
+            DocumentProperties12::parse(&root(vec![
                 table_styles_record(0, 0, &package),
                 end_document,
                 table_styles_record(0x0f, 0, &package),

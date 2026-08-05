@@ -6,7 +6,7 @@ use litchi_ograph::chart::format;
 use litchi_ograph::record::{chart3d, frame, line, marker, pie, series};
 
 use super::model::{AreaFormat, Limits, LineFormat};
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
 pub(crate) const BOF: u16 = 0x0809;
 pub(crate) const EOF: u16 = 0x000a;
@@ -67,7 +67,7 @@ pub(crate) const DATA_LAB_EXT: u16 = 0x086a;
 pub(crate) const DATA_LAB_EXT_CONTENTS: u16 = 0x086b;
 pub(crate) const PLOT_GROWTH: u16 = 0x1064;
 pub(crate) const SI_INDEX: u16 = 0x1065;
-pub(crate) fn parse_line_format(data: &[u8]) -> XlsResult<LineFormat> {
+pub(crate) fn parse_line_format(data: &[u8]) -> Result<LineFormat> {
     exact(data, 12, LINE_FORMAT)?;
     Ok(LineFormat {
         color: array_at(data, 0)?,
@@ -105,7 +105,7 @@ pub(crate) fn shared_line_bytes(value: &format::Line) -> Vec<u8> {
         color_index: value.color_index,
     })
 }
-pub(crate) fn parse_area_format(data: &[u8]) -> XlsResult<AreaFormat> {
+pub(crate) fn parse_area_format(data: &[u8]) -> Result<AreaFormat> {
     exact(data, 16, AREA_FORMAT)?;
     Ok(AreaFormat {
         foreground: array_at(data, 0)?,
@@ -147,7 +147,7 @@ pub(crate) fn shared_area_bytes(value: &format::Area) -> Vec<u8> {
         background_index: value.background_index,
     })
 }
-pub(crate) fn parse_short_text(data: &[u8]) -> XlsResult<String> {
+pub(crate) fn parse_short_text(data: &[u8]) -> Result<String> {
     if data.len() < 4 || u16_at(data, 0)? != 0 {
         return invalid(
             SERIES_TEXT,
@@ -157,12 +157,12 @@ pub(crate) fn parse_short_text(data: &[u8]) -> XlsResult<String> {
     parse_biff8_string(&data[2..])
 }
 #[cfg(test)]
-pub(crate) fn short_text(value: &str) -> XlsResult<Vec<u8>> {
+pub(crate) fn short_text(value: &str) -> Result<Vec<u8>> {
     let mut d = 0u16.to_le_bytes().to_vec();
     d.extend(biff8_string(value)?);
     Ok(d)
 }
-pub(crate) fn parse_biff8_string(data: &[u8]) -> XlsResult<String> {
+pub(crate) fn parse_biff8_string(data: &[u8]) -> Result<String> {
     if data.len() < 2 {
         return invalid(SERIES_TEXT, "chart string is truncated");
     }
@@ -187,7 +187,7 @@ pub(crate) fn parse_biff8_string(data: &[u8]) -> XlsResult<String> {
     }
 }
 #[cfg(test)]
-pub(crate) fn biff8_string(value: &str) -> XlsResult<Vec<u8>> {
+pub(crate) fn biff8_string(value: &str) -> Result<Vec<u8>> {
     let units = value.encode_utf16().collect::<Vec<_>>();
     if units.len() > 255 {
         return invalid(SERIES_TEXT, "chart string exceeds 255 UTF-16 code units");
@@ -224,7 +224,7 @@ pub(crate) fn chart_scan_limits(limits: Limits) -> GraphLimits {
     }
 }
 #[cfg(test)]
-pub(crate) fn chart_encoder(limits: Limits) -> XlsResult<GraphEncoder> {
+pub(crate) fn chart_encoder(limits: Limits) -> Result<GraphEncoder> {
     GraphEncoder::with_limits(BiffLimits {
         max_records: limits.max_records_per_chart,
         max_output_bytes: limits.max_workbook_bytes,
@@ -232,15 +232,15 @@ pub(crate) fn chart_encoder(limits: Limits) -> XlsResult<GraphEncoder> {
     })
     .map_err(|error| frame_error(CHART, error))
 }
-pub(crate) fn push_record(out: &mut GraphEncoder, kind: u16, data: &[u8]) -> XlsResult<()> {
+pub(crate) fn push_record(out: &mut GraphEncoder, kind: u16, data: &[u8]) -> Result<()> {
     out.push(RecordKind::from_wire(kind), data)
         .map_err(|error| frame_error(kind, error))
 }
-pub(crate) fn record(kind: u16, data: &[u8]) -> XlsResult<Vec<u8>> {
+pub(crate) fn record(kind: u16, data: &[u8]) -> Result<Vec<u8>> {
     let output_bytes = data
         .len()
         .checked_add(4)
-        .ok_or_else(|| XlsError::InvalidData("BIFF record size overflow".into()))?;
+        .ok_or_else(|| Error::InvalidData("BIFF record size overflow".into()))?;
     let limits = BiffLimits {
         max_records: 1,
         max_output_bytes: output_bytes.max(1),
@@ -296,7 +296,7 @@ pub(crate) fn known_record(kind: u16) -> bool {
             | AXIS_PARENT
     )
 }
-pub(crate) fn validate_limits(v: Limits) -> XlsResult<()> {
+pub(crate) fn validate_limits(v: Limits) -> Result<()> {
     if v.max_workbook_bytes == 0
         || v.max_charts == 0
         || v.max_records_per_chart == 0
@@ -307,14 +307,14 @@ pub(crate) fn validate_limits(v: Limits) -> XlsResult<()> {
         || v.max_cached_values == 0
         || v.max_unknown_bytes == 0
     {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "all chart limits must be nonzero".into(),
         ));
     }
     Ok(())
 }
 
-pub(crate) fn validate_sheet_properties(flags: u32) -> XlsResult<()> {
+pub(crate) fn validate_sheet_properties(flags: u32) -> Result<()> {
     let blank = (flags >> 16) & 0xff;
     let always_auto = flags & (1 << 4) != 0;
     let manual_plot = flags & (1 << 3) != 0;
@@ -326,57 +326,57 @@ pub(crate) fn validate_sheet_properties(flags: u32) -> XlsResult<()> {
     }
     Ok(())
 }
-pub(crate) fn bounded_count(data: &[u8], offset: usize) -> XlsResult<u16> {
+pub(crate) fn bounded_count(data: &[u8], offset: usize) -> Result<u16> {
     let v = u16_at(data, offset)?;
     if v > 32767 {
         return invalid(SERIES, "series value count exceeds 32767");
     }
     Ok(v)
 }
-pub(crate) fn exact(data: &[u8], len: usize, kind: u16) -> XlsResult<()> {
+pub(crate) fn exact(data: &[u8], len: usize, kind: u16) -> Result<()> {
     if data.len() != len {
         return invalid(kind, format!("record must contain {len} bytes"));
     }
     Ok(())
 }
-pub(crate) fn u16_at(data: &[u8], o: usize) -> XlsResult<u16> {
+pub(crate) fn u16_at(data: &[u8], o: usize) -> Result<u16> {
     Ok(u16::from_le_bytes(array_at(data, o)?))
 }
-pub(crate) fn i16_at(data: &[u8], o: usize) -> XlsResult<i16> {
+pub(crate) fn i16_at(data: &[u8], o: usize) -> Result<i16> {
     Ok(u16_at(data, o)? as i16)
 }
-pub(crate) fn u32_at(data: &[u8], o: usize) -> XlsResult<u32> {
+pub(crate) fn u32_at(data: &[u8], o: usize) -> Result<u32> {
     Ok(u32::from_le_bytes(array_at(data, o)?))
 }
-pub(crate) fn i32_at(data: &[u8], o: usize) -> XlsResult<i32> {
+pub(crate) fn i32_at(data: &[u8], o: usize) -> Result<i32> {
     Ok(u32_at(data, o)? as i32)
 }
-pub(crate) fn f64_at(data: &[u8], o: usize) -> XlsResult<f64> {
+pub(crate) fn f64_at(data: &[u8], o: usize) -> Result<f64> {
     Ok(f64::from_le_bytes(array_at(data, o)?))
 }
-pub(crate) fn array_at<const N: usize>(data: &[u8], offset: usize) -> XlsResult<[u8; N]> {
+pub(crate) fn array_at<const N: usize>(data: &[u8], offset: usize) -> Result<[u8; N]> {
     let expected = offset
         .checked_add(N)
-        .ok_or_else(|| XlsError::InvalidData("record field offset overflow".into()))?;
+        .ok_or_else(|| Error::InvalidData("record field offset overflow".into()))?;
     data.get(offset..expected)
         .and_then(|bytes| bytes.try_into().ok())
-        .ok_or(XlsError::InvalidLength {
+        .ok_or(Error::InvalidLength {
             expected,
             found: data.len(),
         })
 }
-pub(crate) fn invalid_error(kind: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+pub(crate) fn invalid_error(kind: u16, message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: kind,
         message: message.into(),
     }
 }
-pub(crate) fn graph_error(kind: u16, error: litchi_ograph::Error) -> XlsError {
+pub(crate) fn graph_error(kind: u16, error: litchi_ograph::Error) -> Error {
     invalid_error(kind, error.to_string())
 }
-pub(crate) fn frame_error(kind: u16, error: litchi_biff::Error) -> XlsError {
+pub(crate) fn frame_error(kind: u16, error: litchi_biff::Error) -> Error {
     invalid_error(kind, error.to_string())
 }
-pub(crate) fn invalid<T>(kind: u16, message: impl Into<String>) -> XlsResult<T> {
+pub(crate) fn invalid<T>(kind: u16, message: impl Into<String>) -> Result<T> {
     Err(invalid_error(kind, message))
 }

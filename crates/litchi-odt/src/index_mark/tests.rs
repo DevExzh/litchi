@@ -102,7 +102,7 @@ mod parser {
 mod package {
     use super::super::package::{TEXT, validated_marks};
     use super::*;
-    use crate::{BibliographyField, TextBibliographyType};
+    use crate::{TextBibliographyType, bibliography_configuration::Field};
 
     const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
     fn document(body: &str) -> String {
@@ -153,7 +153,7 @@ mod package {
         let bibliography = TextIndexMark::bibliography_point(
             TextBibliographyType::Www,
             "[Test]",
-            vec![(BibliographyField::Identifier, "Test".to_string())],
+            vec![(Field::Identifier, "Test".to_string())],
         )
         .unwrap();
         let xml = insert_text_index_mark_xml(&xml, 1, &bibliography).unwrap();
@@ -170,8 +170,8 @@ mod package {
                 TextBibliographyType::Book,
                 "x",
                 vec![
-                    (BibliographyField::Title, "a".to_string()),
-                    (BibliographyField::Title, "b".to_string())
+                    (Field::Title, "a".to_string()),
+                    (Field::Title, "b".to_string())
                 ]
             )
             .is_err()

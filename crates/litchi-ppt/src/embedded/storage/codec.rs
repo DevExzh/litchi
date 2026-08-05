@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 use std::io::Read;
 
-use crate::consts::PptRecordType;
-use crate::package::{PptError, Result};
-use crate::records::PptRecord;
+use crate::consts::RecordType;
+use crate::package::{Error, Result};
+use crate::records::Record;
 
 use super::model::{Compression, Kind, MAX_DECLARED, MAX_STORED, Metadata, Ref, Storage};
 
@@ -12,11 +12,11 @@ impl<'a> Ref<'a> {
     pub(crate) fn parse_at(document: &'a [u8], offset: usize, kind: Kind) -> Result<Self> {
         let header_end = offset
             .checked_add(8)
-            .ok_or_else(|| PptError::Corrupted("ExOleObjStg header offset overflows".into()))?;
+            .ok_or_else(|| Error::Corrupted("ExOleObjStg header offset overflows".into()))?;
         let header: &[u8; 8] = document
             .get(offset..header_end)
             .and_then(|bytes| bytes.try_into().ok())
-            .ok_or_else(|| PptError::Corrupted("truncated ExOleObjStg header".into()))?;
+            .ok_or_else(|| Error::Corrupted("truncated ExOleObjStg header".into()))?;
         let version_instance = u16::from_le_bytes([header[0], header[1]]);
         let version = version_instance & 0x000f;
         let instance = (version_instance >> 4) & 0x0fff;
@@ -24,8 +24,8 @@ impl<'a> Ref<'a> {
         let stored_len = usize::try_from(u32::from_le_bytes([
             header[4], header[5], header[6], header[7],
         ]))
-        .map_err(|_| PptError::Corrupted("ExOleObjStg size exceeds usize".into()))?;
-        if version != 0 || record_type != PptRecordType::ExternalOleObjectStg.as_u16() {
+        .map_err(|_| Error::Corrupted("ExOleObjStg size exceeds usize".into()))?;
+        if version != 0 || record_type != RecordType::ExternalOleObjectStg.as_u16() {
             return corrupted("persisted storage is not a strict ExOleObjStg record");
         }
         if stored_len > MAX_STORED {
@@ -33,10 +33,10 @@ impl<'a> Ref<'a> {
         }
         let payload_end = header_end
             .checked_add(stored_len)
-            .ok_or_else(|| PptError::Corrupted("ExOleObjStg payload size overflows".into()))?;
+            .ok_or_else(|| Error::Corrupted("ExOleObjStg payload size overflows".into()))?;
         let payload = document
             .get(header_end..payload_end)
-            .ok_or_else(|| PptError::Corrupted("truncated ExOleObjStg payload".into()))?;
+            .ok_or_else(|| Error::Corrupted("truncated ExOleObjStg payload".into()))?;
         match instance {
             0 => Ok(Self {
                 kind,
@@ -49,9 +49,7 @@ impl<'a> Ref<'a> {
                     .get(..4)
                     .and_then(|bytes| bytes.try_into().ok())
                     .ok_or_else(|| {
-                        PptError::Corrupted(
-                            "compressed ExOleObjStg is missing its size prefix".into(),
-                        )
+                        Error::Corrupted("compressed ExOleObjStg is missing its size prefix".into())
                     })?;
                 let declared_uncompressed_len = u32::from_le_bytes(*prefix);
                 if declared_uncompressed_len > MAX_DECLARED {
@@ -62,7 +60,7 @@ impl<'a> Ref<'a> {
                     compression: Compression::Zlib,
                     declared_uncompressed_len: Some(declared_uncompressed_len),
                     data: payload.get(4..).ok_or_else(|| {
-                        PptError::Corrupted("compressed ExOleObjStg is missing its payload".into())
+                        Error::Corrupted("compressed ExOleObjStg is missing its payload".into())
                     })?,
                 })
             },
@@ -107,10 +105,10 @@ impl<'a> Ref<'a> {
             },
             Compression::Zlib => {
                 let declared = self.declared_uncompressed_len.ok_or_else(|| {
-                    PptError::Corrupted("compressed ExOleObjStg is missing its size".into())
+                    Error::Corrupted("compressed ExOleObjStg is missing its size".into())
                 })?;
                 let declared = usize::try_from(declared).map_err(|_| {
-                    PptError::Corrupted(
+                    Error::Corrupted(
                         "compressed ExOleObjStg size does not fit in memory".to_string(),
                     )
                 })?;
@@ -120,16 +118,15 @@ impl<'a> Ref<'a> {
                     ));
                 }
                 let read_limit = maximum.checked_add(1).ok_or_else(|| {
-                    PptError::Corrupted("ExOleObjStg output limit overflows".to_string())
+                    Error::Corrupted("ExOleObjStg output limit overflows".to_string())
                 })?;
-                let read_limit = u64::try_from(read_limit).map_err(|_| {
-                    PptError::Corrupted("ExOleObjStg output limit exceeds u64".into())
-                })?;
+                let read_limit = u64::try_from(read_limit)
+                    .map_err(|_| Error::Corrupted("ExOleObjStg output limit exceeds u64".into()))?;
                 let decoder = flate2::read::ZlibDecoder::new(self.data);
                 let mut limited = decoder.take(read_limit);
                 let mut output = Vec::with_capacity(declared.min(64 * 1024));
                 limited.read_to_end(&mut output).map_err(|error| {
-                    PptError::Corrupted(format!("invalid ExOleObjStg zlib payload: {error}"))
+                    Error::Corrupted(format!("invalid ExOleObjStg zlib payload: {error}"))
                 })?;
                 let decoder = limited.into_inner();
                 if output.len() > maximum {
@@ -143,9 +140,8 @@ impl<'a> Ref<'a> {
                         output.len()
                     ));
                 }
-                let stored_len = u64::try_from(self.data.len()).map_err(|_| {
-                    PptError::Corrupted("ExOleObjStg stored size exceeds u64".into())
-                })?;
+                let stored_len = u64::try_from(self.data.len())
+                    .map_err(|_| Error::Corrupted("ExOleObjStg stored size exceeds u64".into()))?;
                 if decoder.total_in() != stored_len {
                     return corrupted("ExOleObjStg zlib payload has trailing bytes");
                 }
@@ -157,14 +153,14 @@ impl<'a> Ref<'a> {
 
 impl Storage {
     /// Parse an embedded OLE-object storage.
-    pub fn parse(record: &PptRecord) -> Result<Self> {
+    pub fn parse(record: &Record) -> Result<Self> {
         Self::parse_as(record, Kind::OleObject)
     }
 
     /// Parse a persisted storage using its referencing record's kind.
-    pub fn parse_as(record: &PptRecord, kind: Kind) -> Result<Self> {
+    pub fn parse_as(record: &Record, kind: Kind) -> Result<Self> {
         if record.version != 0
-            || record.record_type_raw != PptRecordType::ExternalOleObjectStg.as_u16()
+            || record.record_type_raw != RecordType::ExternalOleObjectStg.as_u16()
             || usize::try_from(record.data_length).ok() != Some(record.data.len())
             || record.data.len() > MAX_STORED
         {
@@ -178,9 +174,7 @@ impl Storage {
                     .get(..4)
                     .and_then(|bytes| bytes.try_into().ok())
                     .ok_or_else(|| {
-                        PptError::Corrupted(
-                            "compressed ExOleObjStg is missing its size prefix".into(),
-                        )
+                        Error::Corrupted("compressed ExOleObjStg is missing its size prefix".into())
                     })?;
                 let declared = u32::from_le_bytes(*prefix);
                 Self::compressed(
@@ -190,9 +184,7 @@ impl Storage {
                         .data
                         .get(4..)
                         .ok_or_else(|| {
-                            PptError::Corrupted(
-                                "compressed ExOleObjStg is missing its payload".into(),
-                            )
+                            Error::Corrupted("compressed ExOleObjStg is missing its payload".into())
                         })?
                         .to_vec(),
                 )
@@ -214,8 +206,8 @@ impl Storage {
     }
 
     /// Encode the complete `ExOleObjStg` record.
-    pub fn to_record(&self) -> Result<PptRecord> {
-        Ok(PptRecord::parse(&self.to_record_bytes()?, 0)?.0)
+    pub fn to_record(&self) -> Result<Record> {
+        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
     /// Encode the complete record without an intermediate parsed view.
@@ -226,7 +218,7 @@ impl Storage {
                 1u16,
                 4usize,
                 Some(self.declared_uncompressed_len.ok_or_else(|| {
-                    PptError::Corrupted("compressed ExOleObjStg is missing its size".into())
+                    Error::Corrupted("compressed ExOleObjStg is missing its size".into())
                 })?),
             ),
         };
@@ -234,7 +226,7 @@ impl Storage {
             .data
             .len()
             .checked_add(prefix_len)
-            .ok_or_else(|| PptError::Corrupted("ExOleObjStg payload size overflows".into()))?;
+            .ok_or_else(|| Error::Corrupted("ExOleObjStg payload size overflows".into()))?;
         if data_len > MAX_STORED {
             return corrupted("ExOleObjStg exceeds 128 MiB stored data");
         }
@@ -244,10 +236,10 @@ impl Storage {
             }
         }
         let length = u32::try_from(data_len)
-            .map_err(|_| PptError::Corrupted("ExOleObjStg payload exceeds u32".into()))?;
+            .map_err(|_| Error::Corrupted("ExOleObjStg payload exceeds u32".into()))?;
         let mut bytes = Vec::with_capacity(data_len.saturating_add(8));
         bytes.extend_from_slice(&(instance << 4).to_le_bytes());
-        bytes.extend_from_slice(&PptRecordType::ExternalOleObjectStg.as_u16().to_le_bytes());
+        bytes.extend_from_slice(&RecordType::ExternalOleObjectStg.as_u16().to_le_bytes());
         bytes.extend_from_slice(&length.to_le_bytes());
         if let Some(declared) = declared {
             bytes.extend_from_slice(&declared.to_le_bytes());
@@ -258,5 +250,5 @@ impl Storage {
 }
 
 fn corrupted<T>(message: impl Into<String>) -> Result<T> {
-    Err(PptError::Corrupted(message.into()))
+    Err(Error::Corrupted(message.into()))
 }

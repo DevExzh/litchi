@@ -8,7 +8,7 @@ use super::wire::{
     AREA_FORMAT, BEGIN, BOF, CHART, CRT_LINE, DROP_BAR, END, EOF, LINE_FORMAT, record,
 };
 use super::*;
-use crate::XlsError;
+use crate::Error;
 
 #[cfg(test)]
 mod tests {
@@ -71,10 +71,10 @@ mod tests {
 
     #[test]
     fn public_authoring_refuses_atomically_with_typed_error() {
-        fn assert_unsupported(error: XlsError) {
+        fn assert_unsupported(error: Error) {
             assert!(matches!(
                 error,
-                XlsError::Graph(litchi_ograph::Error::UnsupportedAuthoring { .. })
+                Error::Graph(litchi_ograph::Error::UnsupportedAuthoring { .. })
             ));
         }
 
@@ -114,7 +114,7 @@ mod tests {
                     index: 0,
                 })
                 .expect_err("embedded removal must be refused"),
-            XlsError::Graph(litchi_ograph::Error::UnsupportedMutation { .. })
+            Error::Graph(litchi_ograph::Error::UnsupportedMutation { .. })
         ));
         assert_eq!(removed.finish().unwrap(), original);
     }
@@ -155,7 +155,7 @@ mod tests {
         });
         assert!(matches!(
             serialize_chart(&chart, Limits::default()),
-            Err(XlsError::UnsafeEdit(_))
+            Err(Error::UnsafeEdit(_))
         ));
     }
 

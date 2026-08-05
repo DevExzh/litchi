@@ -24,10 +24,10 @@ pub(super) enum WorkbookImpl {
 
     // Legacy OLE-based Excel
     #[cfg(feature = "xls")]
-    #[allow(dead_code)] // Kept for compatibility with old code
-    XlsFile(crate::xls::XlsWorkbook<std::io::BufReader<std::fs::File>>),
+    #[allow(dead_code)]
+    XlsFile(crate::xls::Workbook<std::io::BufReader<std::fs::File>>),
     #[cfg(feature = "xls")]
-    XlsMem(crate::xls::XlsWorkbook<std::io::Cursor<Vec<u8>>>),
+    XlsMem(crate::xls::Workbook<std::io::Cursor<Vec<u8>>>),
 
     /// Parsed ODS package retained for the dedicated facade to expose richer
     /// worksheet APIs as they become available.

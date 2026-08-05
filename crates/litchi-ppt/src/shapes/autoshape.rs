@@ -288,7 +288,7 @@ impl<'a> AutoShape<'a> {
             let mut offset = 0;
             while stream.len().saturating_sub(offset) >= 8 {
                 if scanned == MAX_SCANNED_RECORDS {
-                    return Err(super::super::package::PptError::Corrupted(
+                    return Err(super::super::package::Error::Corrupted(
                         "OfficeArt shape exceeds the PPT record limit".to_string(),
                     ));
                 }
@@ -304,7 +304,7 @@ impl<'a> AutoShape<'a> {
                     break;
                 }
                 offset = offset.checked_add(consumed).ok_or_else(|| {
-                    super::super::package::PptError::Corrupted(
+                    super::super::package::Error::Corrupted(
                         "OfficeArt shape traversal offset overflow".to_string(),
                     )
                 })?;

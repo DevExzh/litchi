@@ -1,10 +1,8 @@
 use std::io::Cursor;
 
 use litchi_xls::writer::shape::{Anchor, Behavior, Point};
-use litchi_xls::writer::{
-    XlsCommentTextRunWrite, XlsCommentWriteOptions, XlsPivotTableConfig, XlsWriter,
-};
-use litchi_xls::{Visibility, XlsWorkbook};
+use litchi_xls::writer::{CommentTextRunWrite, CommentWriteOptions, PivotTableConfig, Writer};
+use litchi_xls::{Visibility, Workbook};
 
 fn workbook_records(bytes: Vec<u8>) -> Vec<(u16, Vec<u8>)> {
     let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
@@ -25,7 +23,7 @@ fn workbook_records(bytes: Vec<u8>) -> Vec<(u16, Vec<u8>)> {
 
 #[test]
 fn comments_round_trip_unicode_runs_visibility_and_guid() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Comments").unwrap();
     let guid = [7u8; 16];
     writer
@@ -35,7 +33,7 @@ fn comments_round_trip_unicode_runs_visibility_and_guid() {
             2,
             "Author",
             "Hello 😀",
-            XlsCommentWriteOptions {
+            CommentWriteOptions {
                 visible: true,
                 shared: true,
                 anchor: Some(
@@ -46,7 +44,7 @@ fn comments_round_trip_unicode_runs_visibility_and_guid() {
                     )
                     .unwrap(),
                 ),
-                text_runs: vec![XlsCommentTextRunWrite {
+                text_runs: vec![CommentTextRunWrite {
                     character_index: 0,
                     font_index: 0,
                 }],
@@ -57,7 +55,7 @@ fn comments_round_trip_unicode_runs_visibility_and_guid() {
         .unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let workbook = XlsWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let comments = workbook.xls_worksheet(0).unwrap().comments();
     assert_eq!(comments.len(), 1);
     assert_eq!(comments[0].text(), "Hello 😀");
@@ -69,13 +67,13 @@ fn comments_round_trip_unicode_runs_visibility_and_guid() {
 
 #[test]
 fn long_comment_splits_without_breaking_surrogates() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Long").unwrap();
     let text = "😀".repeat(5000);
     writer.add_comment(sheet, 0, 0, "A", &text).unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let workbook = XlsWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
     assert_eq!(
         workbook.xls_worksheet(0).unwrap().comments()[0].text(),
         text
@@ -84,7 +82,7 @@ fn long_comment_splits_without_breaking_surrogates() {
 
 #[test]
 fn comment_api_rejects_bounds_duplicates_and_bad_runs() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Bad").unwrap();
     assert!(writer.add_comment(sheet, 65_536, 0, "A", "x").is_err());
     assert!(writer.add_comment(sheet, 0, 256, "A", "x").is_err());
@@ -99,8 +97,8 @@ fn comment_api_rejects_bounds_duplicates_and_bad_runs() {
                 0,
                 "A",
                 "x",
-                XlsCommentWriteOptions {
-                    text_runs: vec![XlsCommentTextRunWrite {
+                CommentWriteOptions {
+                    text_runs: vec![CommentTextRunWrite {
                         character_index: 1,
                         font_index: 0
                     }],
@@ -113,7 +111,7 @@ fn comment_api_rejects_bounds_duplicates_and_bad_runs() {
 
 #[test]
 fn comment_records_follow_client_boundaries_and_note_order() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Structure").unwrap();
     writer.add_comment(sheet, 0, 0, "A", "text").unwrap();
     let mut output = Cursor::new(Vec::new());
@@ -140,12 +138,12 @@ fn comment_records_follow_client_boundaries_and_note_order() {
 
 #[test]
 fn comments_and_pivot_objects_share_one_drawing_and_use_separate_object_ids() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Mixed").unwrap();
     writer
         .add_pivot_table(
             sheet,
-            XlsPivotTableConfig {
+            PivotTableConfig {
                 name: "Pivot".into(),
                 source_type: 1,
                 source_sheet_name: "Mixed".into(),

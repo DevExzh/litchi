@@ -1,16 +1,15 @@
 use std::collections::{HashMap, HashSet};
 
 use super::comment::WritableComment;
-use super::shape::XlsShapeWrite;
-use super::shape_group::XlsShapeGroupWrite;
+use super::shape::ShapeWrite;
+use super::shape_group::ShapeGroupWrite;
 use super::{
-    XlsCellValue, XlsConditionalFormat, XlsConditionalFormat12Group, XlsConditionalFormatGroup,
-    XlsConditionalFormatRange, XlsConditionalFormatRule, XlsDataValidation,
-    XlsDataValidationBiffPayload, XlsDataValidationOptions, XlsDataValidationRange,
-    XlsDataValidationTableOptions, XlsPageSetupOptions,
+    CellValue, ConditionalFormat, ConditionalFormat12Group, ConditionalFormatGroup,
+    ConditionalFormatRange, ConditionalFormatRule, DataValidation, DataValidationBiffPayload,
+    DataValidationOptions, DataValidationRange, DataValidationTableOptions, PageSetupOptions,
 };
 use crate::writer::biff::AutoFilterConditionWrite;
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum PivotCellXfRole {
@@ -27,9 +26,9 @@ pub(super) struct CellPos {
 }
 
 impl CellPos {
-    pub(super) fn try_new(row: u32, col: u16) -> XlsResult<Self> {
+    pub(super) fn try_new(row: u32, col: u16) -> Result<Self> {
         let invalid = || {
-            XlsError::InvalidCellReference(format!(
+            Error::InvalidCellReference(format!(
                 "row {row}, column {col} is outside the BIFF8 grid"
             ))
         };
@@ -51,7 +50,7 @@ impl CellPos {
 pub(super) struct WritableCell {
     pos: CellPos,
     /// Cell value
-    pub value: XlsCellValue,
+    pub value: CellValue,
     pub format_idx: u16,
     pub pivot_xf_role: Option<PivotCellXfRole>,
 }
@@ -59,7 +58,7 @@ pub(super) struct WritableCell {
 impl WritableCell {
     pub(super) const fn new(
         pos: CellPos,
-        value: XlsCellValue,
+        value: CellValue,
         format_idx: u16,
         pivot_xf_role: Option<PivotCellXfRole>,
     ) -> Self {
@@ -92,11 +91,11 @@ impl MergedRange {
         last_row: u32,
         first_col: u16,
         last_col: u16,
-    ) -> XlsResult<Self> {
+    ) -> Result<Self> {
         let first = CellPos::try_new(first_row, first_col)?;
         let last = CellPos::try_new(last_row, last_col)?;
         if first.row() > last.row() || first.col() > last.col() {
-            return Err(XlsError::InvalidCellReference(format!(
+            return Err(Error::InvalidCellReference(format!(
                 "range ({first_row}, {first_col})..=({last_row}, {last_col}) is reversed"
             )));
         }
@@ -128,14 +127,14 @@ pub(super) struct HorizontalPageBreak {
 }
 
 impl HorizontalPageBreak {
-    pub(super) fn try_new(row: u32, col_start: u16, col_end: u16) -> XlsResult<Self> {
+    pub(super) fn try_new(row: u32, col_start: u16, col_end: u16) -> Result<Self> {
         let row = u16::try_from(row).map_err(|_| {
-            XlsError::InvalidCellReference(format!(
+            Error::InvalidCellReference(format!(
                 "horizontal page-break row {row} is outside the BIFF8 grid"
             ))
         })?;
         if col_end <= col_start || col_end > 16_383 {
-            return Err(XlsError::InvalidCellReference(format!(
+            return Err(Error::InvalidCellReference(format!(
                 "horizontal page-break columns {col_start}..={col_end} are outside the BIFF8 page-break bounds"
             )));
         }
@@ -163,9 +162,9 @@ pub(super) struct VerticalPageBreak {
 }
 
 impl VerticalPageBreak {
-    pub(super) fn try_new(col: u16, row_start: u32, row_end: u32) -> XlsResult<Self> {
+    pub(super) fn try_new(col: u16, row_start: u32, row_end: u32) -> Result<Self> {
         let invalid = || {
-            XlsError::InvalidCellReference(format!(
+            Error::InvalidCellReference(format!(
                 "vertical page-break column {col}, rows {row_start}..={row_end} are outside the BIFF8 grid"
             ))
         };
@@ -200,7 +199,7 @@ pub(super) struct AutoFilterRange {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(super) struct XlsSheetProtection {
+pub(super) struct SheetProtection {
     pub protect_objects: bool,
     pub protect_scenarios: bool,
     pub password_hash: Option<u16>,
@@ -208,15 +207,15 @@ pub(super) struct XlsSheetProtection {
 
 #[derive(Debug, Clone)]
 pub(super) struct WritableDataValidation {
-    pub validation: XlsDataValidation,
-    pub payload: XlsDataValidationBiffPayload,
-    pub ranges: Vec<XlsDataValidationRange>,
-    pub options: XlsDataValidationOptions,
+    pub validation: DataValidation,
+    pub payload: DataValidationBiffPayload,
+    pub ranges: Vec<DataValidationRange>,
+    pub options: DataValidationOptions,
 }
 
 /// Hyperlink target within a worksheet.
 #[derive(Debug, Clone)]
-pub(super) struct XlsHyperlink {
+pub(super) struct Hyperlink {
     /// First row (0-based) of the hyperlink range.
     pub first_row: u32,
     /// Last row (0-based) of the hyperlink range.
@@ -254,21 +253,21 @@ pub(super) struct WritableWorksheet {
     pub hidden_rows: HashSet<u32>,
     pub merged_ranges: Vec<MergedRange>,
     pub data_validations: Vec<WritableDataValidation>,
-    pub data_validation_table_options: Option<XlsDataValidationTableOptions>,
-    pub conditional_formats: Vec<XlsConditionalFormatGroup>,
-    pub conditional_formats12: Vec<XlsConditionalFormat12Group>,
+    pub data_validation_table_options: Option<DataValidationTableOptions>,
+    pub conditional_formats: Vec<ConditionalFormatGroup>,
+    pub conditional_formats12: Vec<ConditionalFormat12Group>,
     pub view: crate::writer::view::View,
-    pub sheet_protection: Option<XlsSheetProtection>,
-    pub sheet_layout: super::XlsWorksheetLayoutOptions,
-    pub page_setup: Option<XlsPageSetupOptions>,
+    pub sheet_protection: Option<SheetProtection>,
+    pub sheet_layout: super::WorksheetLayoutOptions,
+    pub page_setup: Option<PageSetupOptions>,
     pub horizontal_page_breaks: Vec<HorizontalPageBreak>,
     pub vertical_page_breaks: Vec<VerticalPageBreak>,
     pub auto_filter: Option<AutoFilterRange>,
     /// Cell or range hyperlinks stored for this worksheet.
-    pub hyperlinks: Vec<XlsHyperlink>,
+    pub hyperlinks: Vec<Hyperlink>,
     pub comments: Vec<WritableComment>,
-    pub shapes: Vec<XlsShapeWrite>,
-    pub shape_groups: Vec<XlsShapeGroupWrite>,
+    pub shapes: Vec<ShapeWrite>,
+    pub shape_groups: Vec<ShapeGroupWrite>,
     /// Per-column AutoFilter conditions.
     pub auto_filter_columns: Vec<AutoFilterColumnDef>,
     /// Sort configuration.
@@ -278,18 +277,18 @@ pub(super) struct WritableWorksheet {
     /// Pivot tables to write.
     pub pivot_tables: Vec<WritablePivotTable>,
     pub formulas_pending_recalculation: bool,
-    pub scenario_manager: Option<crate::scenario::XlsScenarioManager>,
+    pub scenario_manager: Option<crate::scenario::ScenarioManager>,
     pub vba_code_name: Option<String>,
-    pub consolidation: Option<crate::consolidation::XlsConsolidation>,
-    pub list_objects: Vec<crate::XlsListObject>,
+    pub consolidation: Option<crate::consolidation::Consolidation>,
+    pub list_objects: Vec<crate::ListObject>,
     /// Sheet tab color as a palette index (SHEETEXT `icvPlain`).
     pub tab_color: Option<u8>,
     /// What-if data tables: anchor formula cell and typed TABLE record.
-    pub data_tables: Vec<(u32, u16, crate::XlsDataTable)>,
+    pub data_tables: Vec<(u32, u16, crate::DataTable)>,
     /// Default phonetic format and visible ranges (PHONETICINFO).
-    pub phonetic_info: Option<crate::XlsPhoneticInfo>,
+    pub phonetic_info: Option<crate::PhoneticInfo>,
     /// Web pages published from this sheet (`WebPub` records).
-    pub web_publications: Vec<crate::XlsWebPub>,
+    pub web_publications: Vec<crate::WebPub>,
 }
 
 /// A column-level AutoFilter condition for the writer.
@@ -335,7 +334,7 @@ impl WritableWorksheet {
             conditional_formats12: Vec::new(),
             view: crate::writer::view::View::default(),
             sheet_protection: None,
-            sheet_layout: super::XlsWorksheetLayoutOptions::default(),
+            sheet_layout: super::WorksheetLayoutOptions::default(),
             page_setup: None,
             horizontal_page_breaks: Vec::new(),
             vertical_page_breaks: Vec::new(),
@@ -380,7 +379,7 @@ impl WritableWorksheet {
         self.cells.insert((row, col), cell);
     }
 
-    pub(super) fn include_list_object_range(&mut self, range: crate::XlsListObjectRange) {
+    pub(super) fn include_list_object_range(&mut self, range: crate::ListObjectRange) {
         if self.cells.is_empty() && self.list_objects.is_empty() {
             self.first_row = u32::from(range.first_row());
             self.last_row = u32::from(range.last_row()) + 1;
@@ -400,10 +399,10 @@ impl WritableWorksheet {
 
     pub(super) fn add_data_validation(
         &mut self,
-        validation: XlsDataValidation,
-        payload: XlsDataValidationBiffPayload,
-        ranges: Vec<XlsDataValidationRange>,
-        options: XlsDataValidationOptions,
+        validation: DataValidation,
+        payload: DataValidationBiffPayload,
+        ranges: Vec<DataValidationRange>,
+        options: DataValidationOptions,
     ) {
         self.data_validations.push(WritableDataValidation {
             validation,
@@ -413,28 +412,28 @@ impl WritableWorksheet {
         });
     }
 
-    pub(super) fn add_conditional_format(&mut self, cf: XlsConditionalFormat) {
-        self.conditional_formats.push(XlsConditionalFormatGroup {
-            ranges: vec![XlsConditionalFormatRange {
+    pub(super) fn add_conditional_format(&mut self, cf: ConditionalFormat) {
+        self.conditional_formats.push(ConditionalFormatGroup {
+            ranges: vec![ConditionalFormatRange {
                 first_row: cf.first_row,
                 last_row: cf.last_row,
                 first_col: cf.first_col,
                 last_col: cf.last_col,
             }],
-            rules: vec![XlsConditionalFormatRule {
+            rules: vec![ConditionalFormatRule {
                 format_type: cf.format_type,
                 pattern: cf.pattern,
             }],
         });
     }
-    pub(super) fn add_conditional_format_group(&mut self, group: XlsConditionalFormatGroup) {
+    pub(super) fn add_conditional_format_group(&mut self, group: ConditionalFormatGroup) {
         self.conditional_formats.push(group)
     }
-    pub(super) fn add_conditional_format12_group(&mut self, group: XlsConditionalFormat12Group) {
+    pub(super) fn add_conditional_format12_group(&mut self, group: ConditionalFormat12Group) {
         self.conditional_formats12.push(group);
     }
 
-    pub(super) fn set_freeze_panes(&mut self, freeze_rows: u16, freeze_cols: u8) -> XlsResult<()> {
+    pub(super) fn set_freeze_panes(&mut self, freeze_rows: u16, freeze_cols: u8) -> Result<()> {
         self.view.set_frozen(freeze_rows, freeze_cols)
     }
 
@@ -457,14 +456,14 @@ impl WritableWorksheet {
         self.hidden_columns.insert(col);
     }
 
-    pub(super) fn add_hyperlink(&mut self, hyperlink: XlsHyperlink) {
+    pub(super) fn add_hyperlink(&mut self, hyperlink: Hyperlink) {
         self.hyperlinks.push(hyperlink);
     }
 
-    pub(super) fn add_comment(&mut self, comment: WritableComment) -> XlsResult<()> {
+    pub(super) fn add_comment(&mut self, comment: WritableComment) -> Result<()> {
         self.comments
             .try_reserve(1)
-            .map_err(|_| XlsError::Allocation("reserving worksheet comment storage"))?;
+            .map_err(|_| Error::Allocation("reserving worksheet comment storage"))?;
         self.comments.push(comment);
         Ok(())
     }

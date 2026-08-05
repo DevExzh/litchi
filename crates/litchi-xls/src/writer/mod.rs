@@ -28,39 +28,36 @@ pub use core::shape;
 pub mod row_blocks;
 
 // Re-export public types
-pub use crate::XlsEncryptionProfile;
+pub use crate::EncryptionProfile;
 pub use crate::{
-    XlsAutoFilter12Criterion, XlsAutoFilter12Icon, XlsAutoFilter12IconSet, XlsAutoFilter12Operator,
-    XlsAutoFilter12Value, XlsExternalTableField, XlsExternalTableMetadata, XlsExternalTableVersion,
-    XlsListColumnId, XlsListObject, XlsListObjectColumn, XlsListObjectFeatureVersion,
-    XlsListObjectId, XlsListObjectRange, XlsListObjectSourceMetadata, XlsListObjectStyleOptions,
-    XlsListTotalAggregation, XlsTableAutoFilter12, XlsWebColumnType, XlsWebDefaultValue,
-    XlsWebEditMode, XlsWebFieldInfo, XlsWebInvalidCell, XlsWebReadingOrder, XlsWebTableField,
-    XlsWebTableMetadata, XlsXmlColumnMapping, XlsXmlDataType, XlsXmlTableField,
-    XlsXmlTableMetadata,
+    AutoFilter12Criterion, AutoFilter12Icon, AutoFilter12IconSet, AutoFilter12Operator,
+    AutoFilter12Value, ExternalTableField, ExternalTableMetadata, ExternalTableVersion,
+    ListColumnId, ListObject, ListObjectColumn, ListObjectFeatureVersion, ListObjectId,
+    ListObjectRange, ListObjectSourceMetadata, ListObjectStyleOptions, ListTotalAggregation,
+    TableAutoFilter12, WebColumnType, WebDefaultValue, WebEditMode, WebFieldInfo, WebInvalidCell,
+    WebReadingOrder, WebTableField, WebTableMetadata, XmlColumnMapping, XmlDataType, XmlTableField,
+    XmlTableMetadata,
 };
 pub use crate::{
-    XlsConsolidation, XlsConsolidationBuiltInName, XlsConsolidationFile, XlsConsolidationFunction,
-    XlsConsolidationRange, XlsConsolidationSource,
+    Consolidation, ConsolidationBuiltInName, ConsolidationFile, ConsolidationFunction,
+    ConsolidationRange, ConsolidationSource,
 };
-pub use crate::{XlsDefinedNameFutureRecords, XlsNameFnGrp12, XlsNamePublish};
+pub use crate::{DefinedNameFutureRecords, NameFnGrp12, NamePublish};
 pub use biff::{AutoFilterConditionWrite, write_cfex12_marker, write_cfheader};
 pub use core::{
-    PivotCacheValue, XlsAddInFunctionOptions, XlsCalculationSettings, XlsCellValue,
-    XlsCommentTextRunWrite, XlsCommentWriteOptions, XlsConditionalFormat,
-    XlsConditionalFormat12Group, XlsConditionalFormat12Rule, XlsConditionalFormat12Type,
-    XlsConditionalFormatGroup, XlsConditionalFormatOperator, XlsConditionalFormatRange,
-    XlsConditionalFormatRule, XlsConditionalFormatType, XlsConditionalPattern,
-    XlsCustomTableStyles, XlsDataValidation, XlsDataValidationErrorStyle,
-    XlsDataValidationFormulaKind, XlsDataValidationImeMode, XlsDataValidationOperator,
-    XlsDataValidationOptions, XlsDataValidationRange, XlsDataValidationTableOptions,
-    XlsDataValidationType, XlsDdeOrOleItemOptions, XlsDdeOrOleLinkOptions, XlsDefinedName,
-    XlsDefinedNameRecordOptions, XlsExternalCacheRowOptions, XlsExternalDefinedNameOptions,
-    XlsExternalSheetOptions, XlsExternalWorkbookOptions, XlsFunctionGroupOptions,
-    XlsPageSetupOptions, XlsPivotDataItemConfig, XlsPivotFieldConfig, XlsPivotItemConfig,
-    XlsPivotTableConfig, XlsShapeColor, XlsShapeFill, XlsShapeGroupChild, XlsShapeGroupWrite,
-    XlsShapeKind, XlsShapeLine, XlsShapeText, XlsShapeTextRun, XlsShapeWrite,
-    XlsWorkbookEnvironmentOptions, XlsWorkbookWindowOptions, XlsWorksheetLayoutOptions, XlsWriter,
+    AddInFunctionOptions, CalculationSettings, CellValue, CommentTextRunWrite, CommentWriteOptions,
+    ConditionalFormat, ConditionalFormat12Group, ConditionalFormat12Rule, ConditionalFormat12Type,
+    ConditionalFormatGroup, ConditionalFormatOperator, ConditionalFormatRange,
+    ConditionalFormatRule, ConditionalFormatType, ConditionalPattern, CustomTableStyles,
+    DataValidation, DataValidationErrorStyle, DataValidationFormulaKind, DataValidationImeMode,
+    DataValidationOperator, DataValidationOptions, DataValidationRange, DataValidationTableOptions,
+    DataValidationType, DdeOrOleItemOptions, DdeOrOleLinkOptions, DefinedName,
+    DefinedNameRecordOptions, ExternalCacheRowOptions, ExternalDefinedNameOptions,
+    ExternalSheetOptions, ExternalWorkbookOptions, FunctionGroupOptions, PageSetupOptions,
+    PivotCacheValue, PivotDataItemConfig, PivotFieldConfig, PivotItemConfig, PivotTableConfig,
+    ShapeColor, ShapeFill, ShapeGroupChild, ShapeGroupWrite, ShapeKind, ShapeLine, ShapeText,
+    ShapeTextRun, ShapeWrite, WorkbookEnvironmentOptions, WorkbookWindowOptions,
+    WorksheetLayoutOptions, Writer,
 };
 pub use formatting::{
     BorderStyle, Borders, CellStyle, ExtendedFormat, Fill, FillPattern, Font, FormattingManager,

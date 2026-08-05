@@ -2,7 +2,7 @@
 
 use std::io::{self, Write};
 
-use super::package::{PptError, Result};
+use super::package::{Error, Result};
 
 /// OfficeArt record type for an OfficeArtClientAnchor record.
 pub const OFFICE_ART_CLIENT_ANCHOR_RECORD_TYPE: u16 = 0xF010;
@@ -13,12 +13,12 @@ const RECT_LEN: usize = 16;
 
 /// Resource limits for parsing an OfficeArtClientAnchor record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointClientAnchorLimits {
+pub struct ClientAnchorLimits {
     /// Maximum accepted payload size, excluding the eight-byte OfficeArt header.
     pub max_payload_bytes: usize,
 }
 
-impl Default for PowerPointClientAnchorLimits {
+impl Default for ClientAnchorLimits {
     fn default() -> Self {
         Self {
             max_payload_bytes: RECT_LEN,
@@ -28,7 +28,7 @@ impl Default for PowerPointClientAnchorLimits {
 
 /// The exact rectangle representation carried by an anchor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PowerPointClientAnchorEncoding {
+pub enum ClientAnchorEncoding {
     /// An eight-byte SmallRectStruct containing four signed 16-bit coordinates.
     SmallRect,
     /// A sixteen-byte RectStruct containing four signed 32-bit coordinates.
@@ -37,14 +37,14 @@ pub enum PowerPointClientAnchorEncoding {
 
 /// The MS-PPT SmallRectStruct payload.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointSmallRect {
+pub struct SmallRect {
     top: i16,
     left: i16,
     right: i16,
     bottom: i16,
 }
 
-impl PowerPointSmallRect {
+impl SmallRect {
     /// Construct a compact rectangle. Bounds are supplied in geometric order.
     pub fn new(left: i16, top: i16, right: i16, bottom: i16) -> Result<Self> {
         validate_bounds(left as i32, top as i32, right as i32, bottom as i32)?;
@@ -79,14 +79,14 @@ impl PowerPointSmallRect {
 
 /// The MS-PPT RectStruct payload.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointRect {
+pub struct Rect {
     top: i32,
     left: i32,
     right: i32,
     bottom: i32,
 }
 
-impl PowerPointRect {
+impl Rect {
     /// Construct a full-width rectangle. Bounds are supplied in geometric order.
     pub fn new(left: i32, top: i32, right: i32, bottom: i32) -> Result<Self> {
         validate_bounds(left, top, right, bottom)?;
@@ -121,21 +121,21 @@ impl PowerPointRect {
 
 /// The variable OfficeArtClientAnchorData payload.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PowerPointClientAnchorData {
+pub enum ClientAnchorData {
     /// The original record used the compact eight-byte form.
-    SmallRect(PowerPointSmallRect),
+    SmallRect(SmallRect),
     /// The original record used the full sixteen-byte form.
-    Rect(PowerPointRect),
+    Rect(Rect),
 }
 
-impl PowerPointClientAnchorData {
+impl ClientAnchorData {
     /// Parse an exact payload, selecting its representation from its length.
     pub fn parse(bytes: &[u8]) -> Result<Self> {
-        Self::parse_with_limits(bytes, PowerPointClientAnchorLimits::default())
+        Self::parse_with_limits(bytes, ClientAnchorLimits::default())
     }
 
     /// Parse an exact payload with a caller-supplied allocation/input bound.
-    pub fn parse_with_limits(bytes: &[u8], limits: PowerPointClientAnchorLimits) -> Result<Self> {
+    pub fn parse_with_limits(bytes: &[u8], limits: ClientAnchorLimits) -> Result<Self> {
         if bytes.len() > limits.max_payload_bytes {
             return Err(corrupted(
                 "OfficeArtClientAnchorData exceeds the configured limit",
@@ -143,29 +143,29 @@ impl PowerPointClientAnchorData {
         }
 
         match bytes.len() {
-            SMALL_RECT_LEN => Ok(Self::SmallRect(PowerPointSmallRect::new(
+            SMALL_RECT_LEN => Ok(Self::SmallRect(SmallRect::new(
                 i16_at(bytes, 2),
                 i16_at(bytes, 0),
                 i16_at(bytes, 4),
                 i16_at(bytes, 6),
             )?)),
-            RECT_LEN => Ok(Self::Rect(PowerPointRect::new(
+            RECT_LEN => Ok(Self::Rect(Rect::new(
                 i32_at(bytes, 4),
                 i32_at(bytes, 0),
                 i32_at(bytes, 8),
                 i32_at(bytes, 12),
             )?)),
-            length => Err(PptError::Corrupted(format!(
+            length => Err(Error::Corrupted(format!(
                 "OfficeArtClientAnchorData length must be 8 or 16 bytes, got {length}"
             ))),
         }
     }
 
     /// Return the representation used on the wire.
-    pub fn encoding(self) -> PowerPointClientAnchorEncoding {
+    pub fn encoding(self) -> ClientAnchorEncoding {
         match self {
-            Self::SmallRect(_) => PowerPointClientAnchorEncoding::SmallRect,
-            Self::Rect(_) => PowerPointClientAnchorEncoding::Rect,
+            Self::SmallRect(_) => ClientAnchorEncoding::SmallRect,
+            Self::Rect(_) => ClientAnchorEncoding::Rect,
         }
     }
 
@@ -242,37 +242,37 @@ impl PowerPointClientAnchorData {
 
 /// A complete OfficeArtClientAnchor record, including its strict header.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointClientAnchor {
-    data: PowerPointClientAnchorData,
+pub struct ClientAnchor {
+    data: ClientAnchorData,
 }
 
-impl PowerPointClientAnchor {
+impl ClientAnchor {
     /// Construct an anchor from an already validated payload.
-    pub fn new(data: PowerPointClientAnchorData) -> Self {
+    pub fn new(data: ClientAnchorData) -> Self {
         Self { data }
     }
 
     /// Construct an eight-byte SmallRectStruct anchor.
     pub fn small(left: i16, top: i16, right: i16, bottom: i16) -> Result<Self> {
-        Ok(Self::new(PowerPointClientAnchorData::SmallRect(
-            PowerPointSmallRect::new(left, top, right, bottom)?,
-        )))
+        Ok(Self::new(ClientAnchorData::SmallRect(SmallRect::new(
+            left, top, right, bottom,
+        )?)))
     }
 
     /// Construct a sixteen-byte RectStruct anchor.
     pub fn rect(left: i32, top: i32, right: i32, bottom: i32) -> Result<Self> {
-        Ok(Self::new(PowerPointClientAnchorData::Rect(
-            PowerPointRect::new(left, top, right, bottom)?,
-        )))
+        Ok(Self::new(ClientAnchorData::Rect(Rect::new(
+            left, top, right, bottom,
+        )?)))
     }
 
     /// Parse one complete record and reject truncation or trailing bytes.
     pub fn parse(bytes: &[u8]) -> Result<Self> {
-        Self::parse_with_limits(bytes, PowerPointClientAnchorLimits::default())
+        Self::parse_with_limits(bytes, ClientAnchorLimits::default())
     }
 
     /// Parse one complete record with a caller-supplied input bound.
-    pub fn parse_with_limits(bytes: &[u8], limits: PowerPointClientAnchorLimits) -> Result<Self> {
+    pub fn parse_with_limits(bytes: &[u8], limits: ClientAnchorLimits) -> Result<Self> {
         if bytes.len() < OFFICE_ART_HEADER_LEN {
             return Err(corrupted("OfficeArtClientAnchor header is truncated"));
         }
@@ -281,26 +281,26 @@ impl PowerPointClientAnchor {
         let version = version_instance & 0x000F;
         let instance = version_instance >> 4;
         if version != 0 {
-            return Err(PptError::Corrupted(format!(
+            return Err(Error::Corrupted(format!(
                 "OfficeArtClientAnchor recVer must be 0, got {version}"
             )));
         }
         if instance != 0 {
-            return Err(PptError::Corrupted(format!(
+            return Err(Error::Corrupted(format!(
                 "OfficeArtClientAnchor recInstance must be 0, got {instance}"
             )));
         }
 
         let record_type = u16::from_le_bytes([bytes[2], bytes[3]]);
         if record_type != OFFICE_ART_CLIENT_ANCHOR_RECORD_TYPE {
-            return Err(PptError::Corrupted(format!(
+            return Err(Error::Corrupted(format!(
                 "OfficeArtClientAnchor recType must be 0xF010, got 0x{record_type:04X}"
             )));
         }
 
         let payload_len = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]) as usize;
         if payload_len != SMALL_RECT_LEN && payload_len != RECT_LEN {
-            return Err(PptError::Corrupted(format!(
+            return Err(Error::Corrupted(format!(
                 "OfficeArtClientAnchor recLen must be 8 or 16, got {payload_len}"
             )));
         }
@@ -312,25 +312,25 @@ impl PowerPointClientAnchor {
 
         let expected_len = OFFICE_ART_HEADER_LEN + payload_len;
         if bytes.len() != expected_len {
-            return Err(PptError::Corrupted(format!(
+            return Err(Error::Corrupted(format!(
                 "OfficeArtClientAnchor record length is {0}, expected {expected_len}",
                 bytes.len()
             )));
         }
 
-        Ok(Self::new(PowerPointClientAnchorData::parse_with_limits(
+        Ok(Self::new(ClientAnchorData::parse_with_limits(
             &bytes[OFFICE_ART_HEADER_LEN..],
             limits,
         )?))
     }
 
     /// The exact variable payload.
-    pub fn data(self) -> PowerPointClientAnchorData {
+    pub fn data(self) -> ClientAnchorData {
         self.data
     }
 
     /// Return the original compact or full-width encoding.
-    pub fn encoding(self) -> PowerPointClientAnchorEncoding {
+    pub fn encoding(self) -> ClientAnchorEncoding {
         self.data.encoding()
     }
 
@@ -385,13 +385,13 @@ impl PowerPointClientAnchor {
         writer.write_all(&OFFICE_ART_CLIENT_ANCHOR_RECORD_TYPE.to_le_bytes())?;
         writer.write_all(&(self.data.encoded_len() as u32).to_le_bytes())?;
         match self.data {
-            PowerPointClientAnchorData::SmallRect(rect) => {
+            ClientAnchorData::SmallRect(rect) => {
                 writer.write_all(&rect.top.to_le_bytes())?;
                 writer.write_all(&rect.left.to_le_bytes())?;
                 writer.write_all(&rect.right.to_le_bytes())?;
                 writer.write_all(&rect.bottom.to_le_bytes())?;
             },
-            PowerPointClientAnchorData::Rect(rect) => {
+            ClientAnchorData::Rect(rect) => {
                 writer.write_all(&rect.top.to_le_bytes())?;
                 writer.write_all(&rect.left.to_le_bytes())?;
                 writer.write_all(&rect.right.to_le_bytes())?;
@@ -425,8 +425,8 @@ fn i32_at(bytes: &[u8], offset: usize) -> i32 {
     ])
 }
 
-fn corrupted(message: &str) -> PptError {
-    PptError::Corrupted(message.to_string())
+fn corrupted(message: &str) -> Error {
+    Error::Corrupted(message.to_string())
 }
 
 #[cfg(test)]
@@ -451,9 +451,9 @@ mod tests {
             0x90, 0x01, // bottom = 400
         ];
         let bytes = record(&payload);
-        let anchor = PowerPointClientAnchor::parse(&bytes).unwrap();
+        let anchor = ClientAnchor::parse(&bytes).unwrap();
 
-        assert_eq!(anchor.encoding(), PowerPointClientAnchorEncoding::SmallRect);
+        assert_eq!(anchor.encoding(), ClientAnchorEncoding::SmallRect);
         assert_eq!((anchor.left(), anchor.top()), (-200, -100));
         assert_eq!((anchor.right(), anchor.bottom()), (300, 400));
         assert_eq!((anchor.width(), anchor.height()), (500, 500));
@@ -462,11 +462,11 @@ mod tests {
 
     #[test]
     fn full_rect_round_trips_extreme_coordinates_without_geometry_overflow() {
-        let anchor = PowerPointClientAnchor::rect(i32::MIN, -7, i32::MAX, 9).unwrap();
+        let anchor = ClientAnchor::rect(i32::MIN, -7, i32::MAX, 9).unwrap();
         let bytes = anchor.to_bytes();
-        let parsed = PowerPointClientAnchor::parse(&bytes).unwrap();
+        let parsed = ClientAnchor::parse(&bytes).unwrap();
 
-        assert_eq!(parsed.encoding(), PowerPointClientAnchorEncoding::Rect);
+        assert_eq!(parsed.encoding(), ClientAnchorEncoding::Rect);
         assert_eq!(parsed.width(), u32::MAX as i64);
         assert_eq!(parsed.height(), 16);
         assert_eq!(parsed.to_bytes(), bytes);
@@ -475,8 +475,8 @@ mod tests {
     #[test]
     fn write_to_is_byte_exact_for_both_encodings() {
         for anchor in [
-            PowerPointClientAnchor::small(-2, -1, 4, 8).unwrap(),
-            PowerPointClientAnchor::rect(-200_000, -100_000, 400_000, 800_000).unwrap(),
+            ClientAnchor::small(-2, -1, 4, 8).unwrap(),
+            ClientAnchor::rect(-200_000, -100_000, 400_000, 800_000).unwrap(),
         ] {
             let expected = anchor.to_bytes();
             let mut actual = Vec::new();
@@ -487,40 +487,38 @@ mod tests {
 
     #[test]
     fn rejects_invalid_header_fields_lengths_and_bounds() {
-        let valid = PowerPointClientAnchor::small(1, 2, 3, 4)
-            .unwrap()
-            .to_bytes();
+        let valid = ClientAnchor::small(1, 2, 3, 4).unwrap().to_bytes();
 
         let mut bad_version = valid.clone();
         bad_version[0] = 1;
-        assert!(PowerPointClientAnchor::parse(&bad_version).is_err());
+        assert!(ClientAnchor::parse(&bad_version).is_err());
 
         let mut bad_instance = valid.clone();
         bad_instance[1] = 1;
-        assert!(PowerPointClientAnchor::parse(&bad_instance).is_err());
+        assert!(ClientAnchor::parse(&bad_instance).is_err());
 
         let mut bad_type = valid.clone();
         bad_type[2] ^= 1;
-        assert!(PowerPointClientAnchor::parse(&bad_type).is_err());
+        assert!(ClientAnchor::parse(&bad_type).is_err());
 
         let mut bad_length = valid.clone();
         bad_length[4..8].copy_from_slice(&12u32.to_le_bytes());
-        assert!(PowerPointClientAnchor::parse(&bad_length).is_err());
+        assert!(ClientAnchor::parse(&bad_length).is_err());
 
         let mut trailing = valid.clone();
         trailing.push(0);
-        assert!(PowerPointClientAnchor::parse(&trailing).is_err());
-        assert!(PowerPointClientAnchor::parse(&valid[..valid.len() - 1]).is_err());
-        assert!(PowerPointClientAnchor::small(4, 2, 3, 5).is_err());
-        assert!(PowerPointClientAnchor::rect(1, 8, 3, 4).is_err());
+        assert!(ClientAnchor::parse(&trailing).is_err());
+        assert!(ClientAnchor::parse(&valid[..valid.len() - 1]).is_err());
+        assert!(ClientAnchor::small(4, 2, 3, 5).is_err());
+        assert!(ClientAnchor::rect(1, 8, 3, 4).is_err());
     }
 
     #[test]
     fn enforces_payload_limit_before_parsing() {
-        let bytes = PowerPointClientAnchor::rect(1, 2, 3, 4).unwrap().to_bytes();
-        let limits = PowerPointClientAnchorLimits {
+        let bytes = ClientAnchor::rect(1, 2, 3, 4).unwrap().to_bytes();
+        let limits = ClientAnchorLimits {
             max_payload_bytes: 8,
         };
-        assert!(PowerPointClientAnchor::parse_with_limits(&bytes, limits).is_err());
+        assert!(ClientAnchor::parse_with_limits(&bytes, limits).is_err());
     }
 }

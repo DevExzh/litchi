@@ -5,7 +5,7 @@ use std::num::{NonZeroU32, NonZeroUsize};
 use litchi_ograph::chart::{Book, Refs};
 use litchi_ograph::{Package as GraphPackage, PackageRef};
 
-use crate::package::PptError;
+use crate::package::Error;
 
 /// The producer grammar and host topology behind a chart object.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -200,7 +200,7 @@ impl Chart {
 pub struct Failure {
     info: Info,
     kind: Kind,
-    error: PptError,
+    error: Error,
 }
 
 impl Failure {
@@ -215,11 +215,11 @@ impl Failure {
     }
 
     /// Decode or validation failure.
-    pub const fn error(&self) -> &PptError {
+    pub const fn error(&self) -> &Error {
         &self.error
     }
 
-    pub(super) fn new(info: Info, kind: Kind, error: PptError) -> Self {
+    pub(super) fn new(info: Info, kind: Kind, error: Error) -> Self {
         Self { info, kind, error }
     }
 }

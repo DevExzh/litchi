@@ -3,12 +3,12 @@
 //! This module never loads an embedded storage, invokes COM, starts an OLE
 //! server, follows a link, or executes object content.
 
-use crate::consts::PptRecordType;
+use crate::consts::RecordType;
 use crate::external_media::Collection as MediaCollection;
 use crate::hyperlink::Hyperlinks;
-use crate::package::{PptError, Result};
+use crate::package::{Error, Result};
 use crate::persist::PersistMapping;
-use crate::records::PptRecord;
+use crate::records::Record;
 use std::collections::HashSet;
 
 pub mod editor;
@@ -72,8 +72,8 @@ pub enum ObjectSubtype {
     WordArt = 7,
     Sound = 8,
     Image = 9,
-    PowerPointPresentation = 10,
-    PowerPointSlide = 11,
+    Presentation = 10,
+    Slide = 11,
     Project = 12,
     NoteIt = 13,
     ExcelChart = 14,
@@ -93,8 +93,8 @@ impl ObjectSubtype {
             7 => Ok(Self::WordArt),
             8 => Ok(Self::Sound),
             9 => Ok(Self::Image),
-            10 => Ok(Self::PowerPointPresentation),
-            11 => Ok(Self::PowerPointSlide),
+            10 => Ok(Self::Presentation),
+            11 => Ok(Self::Slide),
             12 => Ok(Self::Project),
             13 => Ok(Self::NoteIt),
             14 => Ok(Self::ExcelChart),
@@ -116,12 +116,12 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    pub fn parse(record: &PptRecord) -> Result<Self> {
+    pub fn parse(record: &Record) -> Result<Self> {
         require_atom(
             record,
             1,
             0,
-            PptRecordType::ExternalOleObjectAtom,
+            RecordType::ExternalOleObjectAtom,
             24,
             "ExOleObjAtom",
         )?;
@@ -147,8 +147,8 @@ impl Metadata {
         Ok(())
     }
 
-    pub fn to_record(&self) -> Result<PptRecord> {
-        Ok(PptRecord::parse(&self.to_record_bytes()?, 0)?.0)
+    pub fn to_record(&self) -> Result<Record> {
+        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
@@ -160,7 +160,7 @@ impl Metadata {
         data[12..16].copy_from_slice(&(self.subtype as u32).to_le_bytes());
         data[16..20].copy_from_slice(&self.persist_id.to_le_bytes());
         data[20..24].copy_from_slice(&self.unused);
-        record_bytes(1, 0, PptRecordType::ExternalOleObjectAtom, &data)
+        record_bytes(1, 0, RecordType::ExternalOleObjectAtom, &data)
     }
 }
 
@@ -220,12 +220,12 @@ pub struct EmbedPreferences {
 }
 
 impl EmbedPreferences {
-    pub fn parse(record: &PptRecord) -> Result<Self> {
+    pub fn parse(record: &Record) -> Result<Self> {
         require_atom(
             record,
             0,
             0,
-            PptRecordType::ExternalOleEmbedAtom,
+            RecordType::ExternalOleEmbedAtom,
             8,
             "ExOleEmbedAtom",
         )?;
@@ -238,8 +238,8 @@ impl EmbedPreferences {
         })
     }
 
-    pub fn to_record(&self) -> Result<PptRecord> {
-        Ok(PptRecord::parse(&self.to_record_bytes()?, 0)?.0)
+    pub fn to_record(&self) -> Result<Record> {
+        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
@@ -249,7 +249,7 @@ impl EmbedPreferences {
         data[5] = self.dimension_policy.value();
         data[6] = self.is_word_table as u8;
         data[7] = self.unused;
-        record_bytes(0, 0, PptRecordType::ExternalOleEmbedAtom, &data)
+        record_bytes(0, 0, RecordType::ExternalOleEmbedAtom, &data)
     }
 }
 
@@ -279,12 +279,12 @@ pub struct LinkInfo {
 }
 
 impl LinkInfo {
-    pub fn parse(record: &PptRecord) -> Result<Self> {
+    pub fn parse(record: &Record) -> Result<Self> {
         require_atom(
             record,
             0,
             0,
-            PptRecordType::ExternalOleLinkAtom,
+            RecordType::ExternalOleLinkAtom,
             12,
             "ExOleLinkAtom",
         )?;
@@ -296,8 +296,8 @@ impl LinkInfo {
         })
     }
 
-    pub fn to_record(&self) -> Result<PptRecord> {
-        Ok(PptRecord::parse(&self.to_record_bytes()?, 0)?.0)
+    pub fn to_record(&self) -> Result<Record> {
+        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
@@ -305,7 +305,7 @@ impl LinkInfo {
         data[0..4].copy_from_slice(&self.slide_id.unwrap_or(0).to_le_bytes());
         data[4..8].copy_from_slice(&(self.update_mode as u32).to_le_bytes());
         data[8..12].copy_from_slice(&self.unused);
-        record_bytes(0, 0, PptRecordType::ExternalOleLinkAtom, &data)
+        record_bytes(0, 0, RecordType::ExternalOleLinkAtom, &data)
     }
 }
 
@@ -341,14 +341,14 @@ pub struct Control {
 }
 
 impl Control {
-    pub fn parse(record: &PptRecord) -> Result<Self> {
+    pub fn parse(record: &Record) -> Result<Self> {
         if record.version != 0x0f
             || record.instance != 0
-            || record.record_type != PptRecordType::ExternalOleControl
+            || record.record_type != RecordType::ExternalOleControl
         {
             return corrupted("ExControlContainer has an invalid header");
         }
-        let children = PptRecord::parse_sequence_strict(&record.data, "ExControlContainer")?;
+        let children = Record::parse_sequence_strict(&record.data, "ExControlContainer")?;
         if !(2..=6).contains(&children.len()) {
             return corrupted("ExControlContainer has an invalid child count");
         }
@@ -356,7 +356,7 @@ impl Control {
             &children[0],
             0,
             0,
-            PptRecordType::ExternalOleControlAtom,
+            RecordType::ExternalOleControlAtom,
             4,
             "ExControlAtom",
         )?;
@@ -377,8 +377,8 @@ impl Control {
         })
     }
 
-    pub fn to_record(&self) -> Result<PptRecord> {
-        Ok(PptRecord::parse(&self.to_record_bytes()?, 0)?.0)
+    pub fn to_record(&self) -> Result<Record> {
+        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
@@ -388,7 +388,7 @@ impl Control {
         let mut children = record_bytes(
             0,
             0,
-            PptRecordType::ExternalOleControlAtom,
+            RecordType::ExternalOleControlAtom,
             &self.slide_id.unwrap_or(0).to_le_bytes(),
         )?;
         children.extend_from_slice(&self.object.to_record_bytes()?);
@@ -399,21 +399,21 @@ impl Control {
             self.clipboard_name.as_deref(),
             self.metafile.as_deref(),
         )?;
-        record_bytes(0x0f, 0, PptRecordType::ExternalOleControl, &children)
+        record_bytes(0x0f, 0, RecordType::ExternalOleControl, &children)
     }
 }
 
 impl Definition {
-    pub fn parse(record: &PptRecord) -> Result<Self> {
+    pub fn parse(record: &Record) -> Result<Self> {
         if record.version != 0x0f || record.instance != 0 {
             return corrupted("OLE object container has an invalid header");
         }
         let expected_type = match record.record_type {
-            PptRecordType::ExternalOleEmbed => ObjectType::Embedded,
-            PptRecordType::ExternalOleLink => ObjectType::Linked,
+            RecordType::ExternalOleEmbed => ObjectType::Embedded,
+            RecordType::ExternalOleLink => ObjectType::Linked,
             _ => return corrupted("OLE object container has an invalid record type"),
         };
-        let children = PptRecord::parse_sequence_strict(&record.data, "OLE object container")?;
+        let children = Record::parse_sequence_strict(&record.data, "OLE object container")?;
         if !(2..=6).contains(&children.len()) {
             return corrupted("OLE object container has an invalid child count");
         }
@@ -433,7 +433,7 @@ impl Definition {
         let mut metafile = None;
         let mut last_string_instance = 0u16;
         for child in &children[2..] {
-            if child.record_type == PptRecordType::CString {
+            if child.record_type == RecordType::CString {
                 if metafile.is_some()
                     || !(1..=3).contains(&child.instance)
                     || child.instance <= last_string_instance
@@ -448,7 +448,7 @@ impl Definition {
                     3 => clipboard_name = Some(value),
                     _ => unreachable!("instance was bounded"),
                 }
-            } else if child.record_type == PptRecordType::MetaFile {
+            } else if child.record_type == RecordType::MetaFile {
                 if metafile.is_some()
                     || child.version != 0
                     || child.instance != 0
@@ -472,19 +472,19 @@ impl Definition {
         })
     }
 
-    pub fn to_record(&self) -> Result<PptRecord> {
-        Ok(PptRecord::parse(&self.to_record_bytes()?, 0)?.0)
+    pub fn to_record(&self) -> Result<Record> {
+        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         let (container_type, expected_type, first) = match self.kind {
             ContainerKind::Embedded(value) => (
-                PptRecordType::ExternalOleEmbed,
+                RecordType::ExternalOleEmbed,
                 ObjectType::Embedded,
                 value.to_record_bytes()?,
             ),
             ContainerKind::Linked(value) => (
-                PptRecordType::ExternalOleLink,
+                RecordType::ExternalOleLink,
                 ObjectType::Linked,
                 value.to_record_bytes()?,
             ),
@@ -503,7 +503,7 @@ impl Definition {
                 children.extend_from_slice(&record_bytes(
                     0,
                     instance,
-                    PptRecordType::CString,
+                    RecordType::CString,
                     &encode_ole_string(value, printable)?,
                 )?);
             }
@@ -512,7 +512,7 @@ impl Definition {
             if metafile.len() > MAX_METAFILE_BYTES {
                 return corrupted("MetafileBlob exceeds 64 MiB");
             }
-            children.extend_from_slice(&record_bytes(0, 0, PptRecordType::MetaFile, metafile)?);
+            children.extend_from_slice(&record_bytes(0, 0, RecordType::MetaFile, metafile)?);
         }
         record_bytes(0x0f, 0, container_type, &children)
     }
@@ -563,7 +563,7 @@ impl ExternalObject {
 /// payload merely to inspect it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UnknownRecord {
-    record: PptRecord,
+    record: Record,
     object_index: usize,
 }
 
@@ -598,7 +598,7 @@ impl UnknownRecord {
         )
     }
 
-    fn from_record(record: &PptRecord, object_index: usize) -> Self {
+    fn from_record(record: &Record, object_index: usize) -> Self {
         Self {
             record: record.clone(),
             object_index,
@@ -610,7 +610,7 @@ impl UnknownRecord {
             return corrupted("unknown ExObjList record has an invalid source slot");
         }
         let expected_length = usize::try_from(self.record.data_length)
-            .map_err(|_| PptError::Corrupted("unknown ExObjList record size overflows".into()))?;
+            .map_err(|_| Error::Corrupted("unknown ExObjList record size overflows".into()))?;
         if expected_length != self.record.data.len() {
             return corrupted("unknown ExObjList record has inconsistent payload length");
         }
@@ -619,7 +619,7 @@ impl UnknownRecord {
 }
 
 impl Collection {
-    pub fn parse(root: &PptRecord) -> Result<Option<Self>> {
+    pub fn parse(root: &Record) -> Result<Option<Self>> {
         let mut lists = Vec::new();
         collect_external_object_lists(root, &mut lists);
         if lists.len() > 1 {
@@ -628,17 +628,14 @@ impl Collection {
         let Some(list) = lists.first() else {
             return Ok(None);
         };
-        if list.version != 0x0f
-            || list.instance != 0
-            || list.record_type != PptRecordType::ExObjList
-        {
+        if list.version != 0x0f || list.instance != 0 || list.record_type != RecordType::ExObjList {
             return corrupted("ExObjListContainer has an invalid header");
         }
-        let children = PptRecord::parse_sequence_strict(&list.data, "ExObjListContainer")?;
+        let children = Record::parse_sequence_strict(&list.data, "ExObjListContainer")?;
         let Some(atom) = children.first() else {
             return corrupted("ExObjListContainer is missing ExObjListAtom");
         };
-        require_atom(atom, 0, 0, PptRecordType::ExObjListAtom, 4, "ExObjListAtom")?;
+        require_atom(atom, 0, 0, RecordType::ExObjListAtom, 4, "ExObjListAtom")?;
         let signed_seed = i32::from_le_bytes(atom.data[..4].try_into().expect("fixed slice"));
         if signed_seed < 1 {
             return corrupted("ExObjListAtom identifier seed must be positive");
@@ -650,9 +647,9 @@ impl Collection {
         for child in &children[1..] {
             if !matches!(
                 child.record_type,
-                PptRecordType::ExternalOleEmbed
-                    | PptRecordType::ExternalOleLink
-                    | PptRecordType::ExternalOleControl
+                RecordType::ExternalOleEmbed
+                    | RecordType::ExternalOleLink
+                    | RecordType::ExternalOleControl
             ) {
                 unknown_records.push(UnknownRecord::from_record(child, objects.len()));
                 continue;
@@ -663,7 +660,7 @@ impl Collection {
                 ));
             }
             let object = match child.record_type {
-                PptRecordType::ExternalOleControl => {
+                RecordType::ExternalOleControl => {
                     ExternalObject::ActiveXControl(Control::parse(child)?)
                 },
                 _ => ExternalObject::Object(Definition::parse(child)?),
@@ -741,7 +738,7 @@ impl Collection {
             .objects
             .iter_mut()
             .find(|object| object.id() == id)
-            .ok_or_else(|| PptError::Corrupted(format!("OLE object ID {id} was not found")))?;
+            .ok_or_else(|| Error::Corrupted(format!("OLE object ID {id} was not found")))?;
         edit(object)?;
         validate_collection(candidate.id_seed, &candidate.objects)?;
         *self = candidate;
@@ -754,7 +751,7 @@ impl Collection {
             .objects
             .iter()
             .position(|object| object.id() == id)
-            .ok_or_else(|| PptError::Corrupted(format!("OLE object ID {id} was not found")))?;
+            .ok_or_else(|| Error::Corrupted(format!("OLE object ID {id} was not found")))?;
         let previous = std::mem::replace(&mut candidate.objects[index], replacement);
         validate_collection(candidate.id_seed, &candidate.objects)?;
         *self = candidate;
@@ -767,7 +764,7 @@ impl Collection {
             .objects
             .iter()
             .position(|object| object.id() == id)
-            .ok_or_else(|| PptError::Corrupted(format!("OLE object ID {id} was not found")))?;
+            .ok_or_else(|| Error::Corrupted(format!("OLE object ID {id} was not found")))?;
         let removed = candidate.objects.remove(index);
         for record in &mut candidate.unknown_records {
             if record.object_index > index {
@@ -789,7 +786,7 @@ impl Collection {
                 .iter()
                 .position(|object| object.id() == *id)
                 .ok_or_else(|| {
-                    PptError::Corrupted(format!("unknown or repeated OLE object ID {id}"))
+                    Error::Corrupted(format!("unknown or repeated OLE object ID {id}"))
                 })?;
             candidate.push(remaining.remove(index));
         }
@@ -806,8 +803,8 @@ impl Collection {
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         self.validate()?;
         let seed = i32::try_from(self.id_seed)
-            .map_err(|_| PptError::Corrupted("ExObjList identifier seed exceeds i32".into()))?;
-        let mut children = record_bytes(0, 0, PptRecordType::ExObjListAtom, &seed.to_le_bytes())?;
+            .map_err(|_| Error::Corrupted("ExObjList identifier seed exceeds i32".into()))?;
+        let mut children = record_bytes(0, 0, RecordType::ExObjListAtom, &seed.to_le_bytes())?;
         for object_index in 0..=self.objects.len() {
             for record in self
                 .unknown_records
@@ -820,7 +817,7 @@ impl Collection {
                 children.extend_from_slice(&object.to_record_bytes()?);
             }
         }
-        record_bytes(0x0f, 0, PptRecordType::ExObjList, &children)
+        record_bytes(0x0f, 0, RecordType::ExObjList, &children)
     }
 
     pub fn validate_persist_mapping(&self, mapping: &PersistMapping) -> Result<()> {
@@ -872,7 +869,7 @@ fn validate_collection(id_seed: u32, objects: &[ExternalObject]) -> Result<()> {
 
 #[allow(clippy::type_complexity)]
 fn parse_optional_ole_children(
-    children: &[PptRecord],
+    children: &[Record],
 ) -> Result<(
     Option<String>,
     Option<String>,
@@ -885,7 +882,7 @@ fn parse_optional_ole_children(
     let mut metafile = None;
     let mut last_string_instance = 0u16;
     for child in children {
-        if child.record_type == PptRecordType::CString {
+        if child.record_type == RecordType::CString {
             if metafile.is_some()
                 || !(1..=3).contains(&child.instance)
                 || child.instance <= last_string_instance
@@ -900,7 +897,7 @@ fn parse_optional_ole_children(
                 3 => clipboard_name = Some(value),
                 _ => unreachable!("instance was bounded"),
             }
-        } else if child.record_type == PptRecordType::MetaFile {
+        } else if child.record_type == RecordType::MetaFile {
             if metafile.is_some()
                 || child.version != 0
                 || child.instance != 0
@@ -933,7 +930,7 @@ fn append_optional_ole_children(
             children.extend_from_slice(&record_bytes(
                 0,
                 instance,
-                PptRecordType::CString,
+                RecordType::CString,
                 &encode_ole_string(value, printable)?,
             )?);
         }
@@ -942,13 +939,13 @@ fn append_optional_ole_children(
         if metafile.len() > MAX_METAFILE_BYTES {
             return corrupted("MetafileBlob exceeds 64 MiB");
         }
-        children.extend_from_slice(&record_bytes(0, 0, PptRecordType::MetaFile, metafile)?);
+        children.extend_from_slice(&record_bytes(0, 0, RecordType::MetaFile, metafile)?);
     }
     Ok(())
 }
 
-fn collect_external_object_lists<'a>(record: &'a PptRecord, lists: &mut Vec<&'a PptRecord>) {
-    if record.record_type == PptRecordType::ExObjList {
+fn collect_external_object_lists<'a>(record: &'a Record, lists: &mut Vec<&'a Record>) {
+    if record.record_type == RecordType::ExObjList {
         lists.push(record);
     }
     for child in &record.children {
@@ -956,9 +953,9 @@ fn collect_external_object_lists<'a>(record: &'a PptRecord, lists: &mut Vec<&'a 
     }
 }
 
-fn parse_ole_string(record: &PptRecord, printable: bool) -> Result<String> {
+fn parse_ole_string(record: &Record, printable: bool) -> Result<String> {
     if record.version != 0
-        || record.record_type != PptRecordType::CString
+        || record.record_type != RecordType::CString
         || !record.data.len().is_multiple_of(2)
         || record.data.len() / 2 > MAX_OLE_NAME_UNITS
         || usize::try_from(record.data_length).ok() != Some(record.data.len())
@@ -974,7 +971,7 @@ fn parse_ole_string(record: &PptRecord, printable: bool) -> Result<String> {
         return corrupted("OLE object string contains an embedded null");
     }
     let value = String::from_utf16(&units)
-        .map_err(|_| PptError::Corrupted("OLE object string contains invalid UTF-16".into()))?;
+        .map_err(|_| Error::Corrupted("OLE object string contains invalid UTF-16".into()))?;
     if printable && value.chars().any(char::is_control) {
         return corrupted("OLE object printable string contains a control character");
     }
@@ -1010,10 +1007,10 @@ fn u32_at(data: &[u8], offset: usize) -> u32 {
 }
 
 fn require_atom(
-    record: &PptRecord,
+    record: &Record,
     version: u16,
     instance: u16,
-    kind: PptRecordType,
+    kind: RecordType,
     length: usize,
     context: &str,
 ) -> Result<()> {
@@ -1028,7 +1025,7 @@ fn require_atom(
     Ok(())
 }
 
-fn record_bytes(version: u16, instance: u16, kind: PptRecordType, data: &[u8]) -> Result<Vec<u8>> {
+fn record_bytes(version: u16, instance: u16, kind: RecordType, data: &[u8]) -> Result<Vec<u8>> {
     record_bytes_raw(version, instance, kind.as_u16(), data)
 }
 
@@ -1037,7 +1034,7 @@ fn record_bytes_raw(version: u16, instance: u16, kind: u16, data: &[u8]) -> Resu
         return corrupted("PowerPoint record header exceeds its encoded domain");
     }
     let length = u32::try_from(data.len())
-        .map_err(|_| PptError::Corrupted("PowerPoint record payload exceeds u32".into()))?;
+        .map_err(|_| Error::Corrupted("PowerPoint record payload exceeds u32".into()))?;
     let mut bytes = Vec::with_capacity(8usize.saturating_add(data.len()));
     bytes.extend_from_slice(&((instance << 4) | version).to_le_bytes());
     bytes.extend_from_slice(&kind.to_le_bytes());
@@ -1047,7 +1044,7 @@ fn record_bytes_raw(version: u16, instance: u16, kind: u16, data: &[u8]) -> Resu
 }
 
 fn corrupted<T>(message: impl Into<String>) -> Result<T> {
-    Err(PptError::Corrupted(message.into()))
+    Err(Error::Corrupted(message.into()))
 }
 
 #[cfg(test)]
@@ -1080,7 +1077,7 @@ mod tests {
     fn ole_object_metadata_rejects_invalid_domains_and_ids() {
         let mut bytes = metadata().to_record_bytes().unwrap();
         bytes[8..12].copy_from_slice(&99u32.to_le_bytes());
-        assert!(Metadata::parse(&PptRecord::parse(&bytes, 0).unwrap().0).is_err());
+        assert!(Metadata::parse(&Record::parse(&bytes, 0).unwrap().0).is_err());
         let mut value = metadata();
         value.persist_id = 0;
         assert!(value.to_record_bytes().is_err());
@@ -1112,7 +1109,7 @@ mod tests {
         );
         let mut bytes = expected.to_record_bytes().unwrap();
         bytes[12..16].copy_from_slice(&2u32.to_le_bytes());
-        assert!(LinkInfo::parse(&PptRecord::parse(&bytes, 0).unwrap().0).is_err());
+        assert!(LinkInfo::parse(&Record::parse(&bytes, 0).unwrap().0).is_err());
     }
 
     fn definition(kind: ContainerKind) -> Definition {
@@ -1186,7 +1183,7 @@ mod tests {
             &record_bytes(
                 0,
                 2,
-                PptRecordType::CString,
+                RecordType::CString,
                 &encode_ole_string("Prog", true).unwrap(),
             )
             .unwrap(),
@@ -1195,13 +1192,13 @@ mod tests {
             &record_bytes(
                 0,
                 1,
-                PptRecordType::CString,
+                RecordType::CString,
                 &encode_ole_string("Menu", false).unwrap(),
             )
             .unwrap(),
         );
-        let bytes = record_bytes(0x0f, 0, PptRecordType::ExternalOleEmbed, &children).unwrap();
-        assert!(Definition::parse(&PptRecord::parse(&bytes, 0).unwrap().0).is_err());
+        let bytes = record_bytes(0x0f, 0, RecordType::ExternalOleEmbed, &children).unwrap();
+        assert!(Definition::parse(&Record::parse(&bytes, 0).unwrap().0).is_err());
     }
 
     impl Definition {
@@ -1213,18 +1210,18 @@ mod tests {
         }
     }
 
-    fn external_object_list(seed: i32, objects: &[Vec<u8>]) -> PptRecord {
+    fn external_object_list(seed: i32, objects: &[Vec<u8>]) -> Record {
         external_object_list_with_children(seed, objects).0
     }
 
-    fn external_object_list_with_children(seed: i32, children: &[Vec<u8>]) -> (PptRecord, Vec<u8>) {
+    fn external_object_list_with_children(seed: i32, children: &[Vec<u8>]) -> (Record, Vec<u8>) {
         let mut child_bytes =
-            record_bytes(0, 0, PptRecordType::ExObjListAtom, &seed.to_le_bytes()).unwrap();
+            record_bytes(0, 0, RecordType::ExObjListAtom, &seed.to_le_bytes()).unwrap();
         for child in children {
             child_bytes.extend_from_slice(child);
         }
-        let bytes = record_bytes(0x0f, 0, PptRecordType::ExObjList, &child_bytes).unwrap();
-        (PptRecord::parse(&bytes, 0).unwrap().0, bytes)
+        let bytes = record_bytes(0x0f, 0, RecordType::ExObjList, &child_bytes).unwrap();
+        (Record::parse(&bytes, 0).unwrap().0, bytes)
     }
 
     #[test]

@@ -2,7 +2,7 @@
 /// `y`, `dx`, and `dy` fields.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
-pub enum XlsCrtLayout12Mode {
+pub enum CrtLayout12Mode {
     /// 0x0000: position and dimension are determined by the application.
     Auto = 0x0000,
     /// 0x0001: `x`/`y` are offsets from the default position, `dx`/`dy` are
@@ -23,10 +23,10 @@ const LAYOUT_TARGET_INNER: u16 = 0x0001;
 /// `CrtLayout12A`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) struct LayoutModes {
-    pub(super) x_mode: XlsCrtLayout12Mode,
-    pub(super) y_mode: XlsCrtLayout12Mode,
-    pub(super) width_mode: XlsCrtLayout12Mode,
-    pub(super) height_mode: XlsCrtLayout12Mode,
+    pub(super) x_mode: CrtLayout12Mode,
+    pub(super) y_mode: CrtLayout12Mode,
+    pub(super) width_mode: CrtLayout12Mode,
+    pub(super) height_mode: CrtLayout12Mode,
     /// Raw `x`/`y`/`dx`/`dy` Xnum bit patterns (MS-XLS 2.5.342).
     pub(super) x: f64,
     pub(super) y: f64,
@@ -41,7 +41,7 @@ pub(super) struct LayoutModes {
 /// field (MUST be ignored) are preserved verbatim so the record round-trips
 /// unchanged.
 #[derive(Debug, Clone, PartialEq)]
-pub struct XlsCrtLayout12 {
+pub struct CrtLayout12 {
     /// Raw `frtHeader.grbitFrt` bitfield (`fFrtRef`/`fFrtAlert` are zero).
     pub(super) frt_flags: u16,
     /// `frtHeader.reserved` bytes, preserved verbatim.
@@ -55,7 +55,7 @@ pub struct XlsCrtLayout12 {
     pub(super) reserved2: u16,
 }
 
-impl XlsCrtLayout12 {
+impl CrtLayout12 {
     /// The automatic layout type of the legend (`autolayouttype`, 4 bits).
     /// MUST be ignored when the record is in an ATTACHEDLABEL rule sequence
     /// (MS-XLS 2.4.66); defined values are 0x0 through 0x4.
@@ -74,22 +74,22 @@ impl XlsCrtLayout12 {
     }
 
     /// Layout mode of `x` (`wXMode`).
-    pub fn x_mode(&self) -> XlsCrtLayout12Mode {
+    pub fn x_mode(&self) -> CrtLayout12Mode {
         self.modes.x_mode
     }
 
     /// Layout mode of `y` (`wYMode`).
-    pub fn y_mode(&self) -> XlsCrtLayout12Mode {
+    pub fn y_mode(&self) -> CrtLayout12Mode {
         self.modes.y_mode
     }
 
     /// Layout mode of `dx` (`wWidthMode`).
-    pub fn width_mode(&self) -> XlsCrtLayout12Mode {
+    pub fn width_mode(&self) -> CrtLayout12Mode {
         self.modes.width_mode
     }
 
     /// Layout mode of `dy` (`wHeightMode`).
-    pub fn height_mode(&self) -> XlsCrtLayout12Mode {
+    pub fn height_mode(&self) -> CrtLayout12Mode {
         self.modes.height_mode
     }
 
@@ -120,7 +120,7 @@ impl XlsCrtLayout12 {
 /// The 15 `reserved1` bits and the trailing `reserved2` field (MUST be
 /// ignored) are preserved verbatim so the record round-trips unchanged.
 #[derive(Debug, Clone, PartialEq)]
-pub struct XlsCrtLayout12A {
+pub struct CrtLayout12A {
     /// Raw `frtHeader.grbitFrt` bitfield (`fFrtRef`/`fFrtAlert` are zero).
     pub(super) frt_flags: u16,
     /// `frtHeader.reserved` bytes, preserved verbatim.
@@ -142,7 +142,7 @@ pub struct XlsCrtLayout12A {
     pub(super) reserved2: u16,
 }
 
-impl XlsCrtLayout12A {
+impl CrtLayout12A {
     /// The `dwCheckSum` value: 0x00000001 when the plot area layout is manual
     /// and not always automatically computed, 0x00000000 otherwise (derived
     /// from the `ShtProps` flags, MS-XLS 2.4.67).
@@ -181,22 +181,22 @@ impl XlsCrtLayout12A {
     }
 
     /// Layout mode of `x` (`wXMode`).
-    pub fn x_mode(&self) -> XlsCrtLayout12Mode {
+    pub fn x_mode(&self) -> CrtLayout12Mode {
         self.modes.x_mode
     }
 
     /// Layout mode of `y` (`wYMode`).
-    pub fn y_mode(&self) -> XlsCrtLayout12Mode {
+    pub fn y_mode(&self) -> CrtLayout12Mode {
         self.modes.y_mode
     }
 
     /// Layout mode of `dx` (`wWidthMode`).
-    pub fn width_mode(&self) -> XlsCrtLayout12Mode {
+    pub fn width_mode(&self) -> CrtLayout12Mode {
         self.modes.width_mode
     }
 
     /// Layout mode of `dy` (`wHeightMode`).
-    pub fn height_mode(&self) -> XlsCrtLayout12Mode {
+    pub fn height_mode(&self) -> CrtLayout12Mode {
         self.modes.height_mode
     }
 

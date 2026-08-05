@@ -15,9 +15,9 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use litchi_xls::XlsWriter;
+//! use litchi_xls::Writer;
 //!
-//! let mut writer = XlsWriter::new();
+//! let mut writer = Writer::new();
 //! let sheet = writer.add_worksheet("Sheet1")?;
 //!
 //! // Write some data
@@ -29,15 +29,13 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-use super::super::error::{XlsError, XlsResult};
+use super::super::error::{Error, Result};
 use super::biff::AutoFilterConditionWrite;
 use super::formatting::{CellStyle, ExtendedFormat, FormattingManager};
-use crate::XlsEncryptionProfile;
-use crate::encryption::{
-    XlsWriterEncryption, encrypt_workbook_for_write, validate_writer_encryption,
-};
-use crate::page_setup::{XlsPrintComments, XlsPrintErrors, XlsPrintOrder, XlsPrintOrientation};
-use crate::{XlsDifferentialFormat, XlsListObject, XlsTableStyle, XlsTableStyles, XlsXfProperty};
+use crate::EncryptionProfile;
+use crate::encryption::{WriterEncryption, encrypt_workbook_for_write, validate_writer_encryption};
+use crate::page_setup::{PrintComments, PrintErrors, PrintOrder, PrintOrientation};
+use crate::{DifferentialFormat, ListObject, TableStyle, TableStyles, XfProperty};
 use litchi_cfb::writer::OleWriter;
 use std::collections::{HashMap, HashSet};
 use zeroize::Zeroizing;
@@ -51,36 +49,34 @@ mod shape_group;
 mod stream;
 mod worksheet;
 
-pub use self::comment::{XlsCommentTextRunWrite, XlsCommentWriteOptions};
+pub use self::comment::{CommentTextRunWrite, CommentWriteOptions};
 pub use self::conditional_format::{
-    XlsConditionalFormat, XlsConditionalFormat12Group, XlsConditionalFormat12Rule,
-    XlsConditionalFormat12Type, XlsConditionalFormatGroup, XlsConditionalFormatOperator,
-    XlsConditionalFormatRange, XlsConditionalFormatRule, XlsConditionalFormatType,
-    XlsConditionalPattern,
+    ConditionalFormat, ConditionalFormat12Group, ConditionalFormat12Rule, ConditionalFormat12Type,
+    ConditionalFormatGroup, ConditionalFormatOperator, ConditionalFormatRange,
+    ConditionalFormatRule, ConditionalFormatType, ConditionalPattern,
 };
-use self::data_validation::XlsDataValidationBiffPayload;
+use self::data_validation::DataValidationBiffPayload;
 pub use self::data_validation::{
-    XlsDataValidation, XlsDataValidationErrorStyle, XlsDataValidationFormulaKind,
-    XlsDataValidationImeMode, XlsDataValidationOperator, XlsDataValidationOptions,
-    XlsDataValidationRange, XlsDataValidationTableOptions, XlsDataValidationType,
+    DataValidation, DataValidationErrorStyle, DataValidationFormulaKind, DataValidationImeMode,
+    DataValidationOperator, DataValidationOptions, DataValidationRange, DataValidationTableOptions,
+    DataValidationType,
 };
-use self::named_range::XlsDefinedName as InternalDefinedName;
-pub use self::named_range::{XlsDefinedName, XlsDefinedNameRecordOptions};
+use self::named_range::DefinedName as InternalDefinedName;
+pub use self::named_range::{DefinedName, DefinedNameRecordOptions};
 pub use self::shape::{
-    XlsShapeColor, XlsShapeFill, XlsShapeKind, XlsShapeLine, XlsShapeText, XlsShapeTextRun,
-    XlsShapeWrite,
+    ShapeColor, ShapeFill, ShapeKind, ShapeLine, ShapeText, ShapeTextRun, ShapeWrite,
 };
-pub use self::shape_group::{XlsShapeGroupChild, XlsShapeGroupWrite};
+pub use self::shape_group::{ShapeGroupChild, ShapeGroupWrite};
 use self::worksheet::{
-    AutoFilterColumnDef, AutoFilterRange, CellPos, HorizontalPageBreak, MergedRange,
-    PivotCellXfRole, SortConfig, VerticalPageBreak, WritableCell, WritablePivotDataItem,
-    WritablePivotField, WritablePivotItem, WritablePivotTable, WritableWorksheet, XlsHyperlink,
-    XlsSheetProtection,
+    AutoFilterColumnDef, AutoFilterRange, CellPos, HorizontalPageBreak, Hyperlink, MergedRange,
+    PivotCellXfRole, SheetProtection, SortConfig, VerticalPageBreak, WritableCell,
+    WritablePivotDataItem, WritablePivotField, WritablePivotItem, WritablePivotTable,
+    WritableWorksheet,
 };
 
-/// Public configuration for adding a pivot table via [`XlsWriter::add_pivot_table`].
+/// Public configuration for adding a pivot table via [`Writer::add_pivot_table`].
 #[derive(Debug, Clone)]
-pub struct XlsPivotTableConfig {
+pub struct PivotTableConfig {
     /// Pivot table name.
     pub name: String,
     /// Source type (0x0001 = Worksheet, 0x0002 = External).
@@ -117,9 +113,9 @@ pub struct XlsPivotTableConfig {
     /// Position of data label within the axis.
     pub data_position: u16,
     /// Field definitions.
-    pub fields: Vec<XlsPivotFieldConfig>,
+    pub fields: Vec<PivotFieldConfig>,
     /// Data item (value field) definitions.
-    pub data_items: Vec<XlsPivotDataItemConfig>,
+    pub data_items: Vec<PivotDataItemConfig>,
     /// Page field entries: `(item_index, field_index, object_id)`.
     pub page_entries: Vec<(u16, u16, u16)>,
     /// Source data rows for the pivot cache (fSaveData).
@@ -135,7 +131,7 @@ pub struct XlsPivotTableConfig {
 
 /// A single pivot field definition.
 #[derive(Debug, Clone)]
-pub struct XlsPivotFieldConfig {
+pub struct PivotFieldConfig {
     /// Axis: 0=none, 1=row, 2=col, 4=page, 8=data.
     pub axis: u16,
     /// Number of subtotals.
@@ -143,7 +139,7 @@ pub struct XlsPivotFieldConfig {
     /// Subtotal function bitmask.
     pub subtotal_flags: u16,
     /// Items belonging to this field.
-    pub items: Vec<XlsPivotItemConfig>,
+    pub items: Vec<PivotItemConfig>,
     /// Optional SXVD display name override (`None` → use cache name, i.e. cch=0xFFFF).
     pub name: Option<String>,
     /// Source column name used in the pivot cache SXFDB record.
@@ -189,13 +185,13 @@ impl PivotCacheValue {
     }
 }
 
-fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
+fn validate_pivot_table_config(config: &PivotTableConfig) -> Result<()> {
     if config.source_first_row > config.source_last_row
         || config.source_first_col > config.source_last_col
         || config.first_row > config.last_row
         || config.first_col > config.last_col
     {
-        return Err(XlsError::InvalidCellReference(
+        return Err(Error::InvalidCellReference(
             "PivotTable source or output range is reversed".to_string(),
         ));
     }
@@ -212,16 +208,16 @@ fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
         || !(config.first_row..=config.last_row).contains(&config.first_data_row)
         || !(config.first_col..=config.last_col).contains(&config.first_data_col)
     {
-        return Err(XlsError::InvalidCellReference(
+        return Err(Error::InvalidCellReference(
             "PivotTable location is outside its BIFF8 output grid".to_string(),
         ));
     }
     u16::try_from(config.fields.len()).map_err(|_| {
-        XlsError::InvalidData("PivotTable field count exceeds BIFF8 capacity".to_string())
+        Error::InvalidData("PivotTable field count exceeds BIFF8 capacity".to_string())
     })?;
     let expected_rows = usize::from(config.source_last_row - config.source_first_row);
     if !config.source_data.is_empty() && config.source_data.len() != expected_rows {
-        return Err(XlsError::InvalidData(format!(
+        return Err(Error::InvalidData(format!(
             "PivotCache source row count {} does not match source range row count {expected_rows}",
             config.source_data.len()
         )));
@@ -231,12 +227,12 @@ fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
         if let Some(crate::PivotCacheGrouping::Discrete(grouping)) = &field.grouping {
             let base = usize::from(grouping.base_field_index);
             if base >= config.fields.len() || base == field_index {
-                return Err(XlsError::InvalidData(format!(
+                return Err(Error::InvalidData(format!(
                     "PivotCache grouping field {field_index} has invalid base field {base}"
                 )));
             }
             if group_children[base].replace(field_index).is_some() {
-                return Err(XlsError::InvalidData(format!(
+                return Err(Error::InvalidData(format!(
                     "PivotCache base field {base} has multiple grouping children"
                 )));
             }
@@ -246,7 +242,7 @@ fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
                 &config.fields[cursor].grouping
             {
                 if seen[cursor] {
-                    return Err(XlsError::InvalidData(
+                    return Err(Error::InvalidData(
                         "PivotCache grouping chain contains a cycle".to_string(),
                     ));
                 }
@@ -260,12 +256,12 @@ fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
     }
     for (field_index, field) in config.fields.iter().enumerate() {
         u16::try_from(field.cache_items.len()).map_err(|_| {
-            XlsError::InvalidData(format!(
+            Error::InvalidData(format!(
                 "PivotCache field {field_index} has too many shared items"
             ))
         })?;
         if field.is_numeric && !field.cache_items.is_empty() && field.grouping.is_none() {
-            return Err(XlsError::InvalidData(format!(
+            return Err(Error::InvalidData(format!(
                 "numeric PivotCache field {field_index} must use inline Number rows"
             )));
         }
@@ -274,12 +270,12 @@ fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
             if matches!(item, crate::PivotCacheItem::Number(_))
                 && !matches!(field.grouping, Some(crate::PivotCacheGrouping::Numeric(_)))
             {
-                return Err(XlsError::InvalidData(format!(
+                return Err(Error::InvalidData(format!(
                     "non-numeric PivotCache field {field_index} cannot contain numeric shared item {item_index}"
                 )));
             }
             if field.cache_items[..item_index].contains(item) {
-                return Err(XlsError::InvalidData(format!(
+                return Err(Error::InvalidData(format!(
                     "PivotCache field {field_index} contains duplicate shared item {item_index}"
                 )));
             }
@@ -287,14 +283,14 @@ fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
         if let Some(grouping) = &field.grouping {
             let group_items = grouping.group_items();
             if group_items.is_empty() || group_items.len() > usize::from(u16::MAX) {
-                return Err(XlsError::InvalidData(format!(
+                return Err(Error::InvalidData(format!(
                     "PivotCache grouping field {field_index} has invalid group-item count"
                 )));
             }
             for (index, item) in group_items.iter().enumerate() {
                 item.validate()?;
                 if group_items[..index].contains(item) {
-                    return Err(XlsError::InvalidData(format!(
+                    return Err(Error::InvalidData(format!(
                         "PivotCache grouping field {field_index} has duplicate group item {index}"
                     )));
                 }
@@ -307,7 +303,7 @@ fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
                         || value.start >= value.end
                         || value.step <= 0.0
                     {
-                        return Err(XlsError::InvalidData(format!(
+                        return Err(Error::InvalidData(format!(
                             "PivotCache numeric grouping field {field_index} has invalid bounds or step"
                         )));
                     }
@@ -316,14 +312,14 @@ fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
                         .iter()
                         .any(|item| !matches!(item, crate::PivotCacheItem::Number(_)))
                     {
-                        return Err(XlsError::InvalidData(format!(
+                        return Err(Error::InvalidData(format!(
                             "PivotCache numeric grouping field {field_index} has nonnumeric original items"
                         )));
                     }
                 },
                 crate::PivotCacheGrouping::Date(value) => {
                     if value.start >= value.end || value.step == 0 || value.step > i16::MAX as u16 {
-                        return Err(XlsError::InvalidData(format!(
+                        return Err(Error::InvalidData(format!(
                             "PivotCache date grouping field {field_index} has invalid bounds or step"
                         )));
                     }
@@ -333,14 +329,14 @@ fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
                             crate::PivotCacheItem::DateTime(_) | crate::PivotCacheItem::Empty
                         )
                     }) {
-                        return Err(XlsError::InvalidData(format!(
+                        return Err(Error::InvalidData(format!(
                             "PivotCache date grouping field {field_index} has invalid original items"
                         )));
                     }
                 },
                 crate::PivotCacheGrouping::Discrete(value) => {
                     if !field.cache_items.is_empty() || field.is_numeric {
-                        return Err(XlsError::InvalidData(format!(
+                        return Err(Error::InvalidData(format!(
                             "discrete PivotCache grouping field {field_index} must be derived"
                         )));
                     }
@@ -348,7 +344,7 @@ fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
                         .cache_items
                         .len();
                     if value.item_to_group.len() != base_items {
-                        return Err(XlsError::InvalidData(format!(
+                        return Err(Error::InvalidData(format!(
                             "PivotCache grouping field {field_index} mapping is not exhaustive"
                         )));
                     }
@@ -356,14 +352,14 @@ fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
                     for mapped in &value.item_to_group {
                         let mapped = usize::from(*mapped);
                         if mapped >= used.len() {
-                            return Err(XlsError::InvalidData(format!(
+                            return Err(Error::InvalidData(format!(
                                 "PivotCache grouping field {field_index} mapping index is out of range"
                             )));
                         }
                         used[mapped] = true;
                     }
                     if used.iter().any(|used| !used) {
-                        return Err(XlsError::InvalidData(format!(
+                        return Err(Error::InvalidData(format!(
                             "PivotCache grouping field {field_index} contains an unused group item"
                         )));
                     }
@@ -378,7 +374,7 @@ fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
                     grouping.group_items().len()
                 });
             if item.item_type == 0 && usize::from(item.cache_index) >= visible_count {
-                return Err(XlsError::InvalidData(format!(
+                return Err(Error::InvalidData(format!(
                     "PivotTable field {field_index} SXVI cache index {} is out of range",
                     item.cache_index
                 )));
@@ -392,7 +388,7 @@ fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
             .filter(|field| !matches!(field.grouping, Some(crate::PivotCacheGrouping::Discrete(_))))
             .count();
         if row.len() != source_field_count {
-            return Err(XlsError::InvalidData(format!(
+            return Err(Error::InvalidData(format!(
                 "PivotCache row {row_index} has {} values for {} fields",
                 row.len(),
                 source_field_count
@@ -408,12 +404,12 @@ fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
                 match value {
                     PivotCacheValue::Number(number) if number.is_finite() => {},
                     PivotCacheValue::Number(_) => {
-                        return Err(XlsError::InvalidData(format!(
+                        return Err(Error::InvalidData(format!(
                             "PivotCache row {row_index} field {field_index} is non-finite"
                         )));
                     },
                     _ => {
-                        return Err(XlsError::InvalidData(format!(
+                        return Err(Error::InvalidData(format!(
                             "PivotCache row {row_index} field {field_index} does not match numeric field type"
                         )));
                     },
@@ -425,19 +421,19 @@ fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
                 PivotCacheValue::SharedItemIndex(index) => usize::from(*index),
                 PivotCacheValue::Number(number) if matches!(field.grouping, Some(crate::PivotCacheGrouping::Numeric(_))) => {
                     field.cache_items.iter().position(|candidate| candidate == &crate::PivotCacheItem::Number(*number)).ok_or_else(|| {
-                        XlsError::InvalidData(format!("PivotCache row {row_index} field {field_index} numeric value is absent from original items"))
+                        Error::InvalidData(format!("PivotCache row {row_index} field {field_index} numeric value is absent from original items"))
                     })?
                 },
-                PivotCacheValue::Number(_) => return Err(XlsError::InvalidData(format!("PivotCache row {row_index} field {field_index} does not match shared field type"))),
+                PivotCacheValue::Number(_) => return Err(Error::InvalidData(format!("PivotCache row {row_index} field {field_index} does not match shared field type"))),
                 typed => {
                     let item = typed.shared_item().expect("typed shared value");
                     field.cache_items.iter().position(|candidate| candidate == &item).ok_or_else(|| {
-                        XlsError::InvalidData(format!("PivotCache row {row_index} field {field_index} value is absent from shared items"))
+                        Error::InvalidData(format!("PivotCache row {row_index} field {field_index} value is absent from shared items"))
                     })?
                 },
             };
             if index >= field.cache_items.len() {
-                return Err(XlsError::InvalidData(format!(
+                return Err(Error::InvalidData(format!(
                     "PivotCache row {row_index} field {field_index} shared index {index} is out of range"
                 )));
             }
@@ -448,7 +444,7 @@ fn validate_pivot_table_config(config: &XlsPivotTableConfig) -> XlsResult<()> {
 
 /// A single pivot item.
 #[derive(Debug, Clone)]
-pub struct XlsPivotItemConfig {
+pub struct PivotItemConfig {
     /// Item type: 0x0000=Data, 0x0001=Default subtotal, 0x0002=Sum, etc.
     pub item_type: u16,
     /// Option flags.
@@ -461,7 +457,7 @@ pub struct XlsPivotItemConfig {
 
 /// A pivot data item (value field).
 #[derive(Debug, Clone)]
-pub struct XlsPivotDataItemConfig {
+pub struct PivotDataItemConfig {
     /// Index of the source field in the pivot cache.
     pub source_field_index: u16,
     /// Aggregation function: 0=Sum, 1=Count, 2=Average, 3=Max, 4=Min, ...
@@ -503,7 +499,7 @@ fn a1_cell(row: u32, col: u16) -> String {
 
 /// Cell value type for writing
 #[derive(Debug, Clone)]
-pub enum XlsCellValue {
+pub enum CellValue {
     /// String value
     String(String),
     /// Number value (f64)
@@ -516,9 +512,9 @@ pub enum XlsCellValue {
     Blank,
 }
 
-/// BIFF8 worksheet print/page setup written by `XlsWriter::set_page_setup`.
+/// BIFF8 worksheet print/page setup written by `Writer::set_page_setup`.
 #[derive(Debug, Clone, PartialEq)]
-pub struct XlsPageSetupOptions {
+pub struct PageSetupOptions {
     pub print_headers: bool,
     pub print_gridlines: bool,
     pub header: String,
@@ -534,12 +530,12 @@ pub struct XlsPageSetupOptions {
     pub starting_page_number: Option<i16>,
     pub fit_width_pages: u16,
     pub fit_height_pages: u16,
-    pub print_order: XlsPrintOrder,
-    pub orientation: Option<XlsPrintOrientation>,
+    pub print_order: PrintOrder,
+    pub orientation: Option<PrintOrientation>,
     pub black_and_white: bool,
     pub draft_quality: bool,
-    pub comments: XlsPrintComments,
-    pub errors: XlsPrintErrors,
+    pub comments: PrintComments,
+    pub errors: PrintErrors,
     pub horizontal_resolution_dpi: u16,
     pub vertical_resolution_dpi: u16,
     pub header_margin_inches: f64,
@@ -549,10 +545,10 @@ pub struct XlsPageSetupOptions {
     pub printer_driver_data: Option<Vec<u8>>,
     /// Even/first-page header/footer text and display flags; `None` emits no
     /// `HeaderFooter` record.
-    pub header_footer: Option<crate::XlsHeaderFooter>,
+    pub header_footer: Option<crate::HeaderFooter>,
 }
 
-impl Default for XlsPageSetupOptions {
+impl Default for PageSetupOptions {
     fn default() -> Self {
         Self {
             print_headers: false,
@@ -570,12 +566,12 @@ impl Default for XlsPageSetupOptions {
             starting_page_number: None,
             fit_width_pages: 1,
             fit_height_pages: 1,
-            print_order: XlsPrintOrder::DownThenOver,
-            orientation: Some(XlsPrintOrientation::Portrait),
+            print_order: PrintOrder::DownThenOver,
+            orientation: Some(PrintOrientation::Portrait),
             black_and_white: false,
             draft_quality: false,
-            comments: XlsPrintComments::None,
-            errors: XlsPrintErrors::Displayed,
+            comments: PrintComments::None,
+            errors: PrintErrors::Displayed,
             horizontal_resolution_dpi: 600,
             vertical_resolution_dpi: 600,
             header_margin_inches: 0.5,
@@ -589,7 +585,7 @@ impl Default for XlsPageSetupOptions {
 
 /// BIFF8 worksheet default dimensions and outline workspace settings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsWorksheetLayoutOptions {
+pub struct WorksheetLayoutOptions {
     pub default_row_height_twips: u16,
     pub empty_rows_hidden: bool,
     pub default_row_height_unsynced: bool,
@@ -611,7 +607,7 @@ pub struct XlsWorksheetLayoutOptions {
     pub alternate_formula_entry: bool,
 }
 
-impl Default for XlsWorksheetLayoutOptions {
+impl Default for WorksheetLayoutOptions {
     fn default() -> Self {
         Self {
             default_row_height_twips: 255,
@@ -637,23 +633,23 @@ impl Default for XlsWorksheetLayoutOptions {
     }
 }
 
-impl XlsWorksheetLayoutOptions {
-    pub(super) fn validate(self) -> XlsResult<()> {
+impl WorksheetLayoutOptions {
+    pub(super) fn validate(self) -> Result<()> {
         if self.default_row_height_twips > 8179
             || (!self.empty_rows_hidden && self.default_row_height_twips == 0)
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "default row height must be 1..=8179, or 0..=8179 for hidden empty rows"
                     .to_string(),
             ));
         }
         if self.default_column_width_chars > 255 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "default column width must be at most 255 characters".to_string(),
             ));
         }
         if self.max_row_outline_level > 7 || self.max_column_outline_level > 7 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "worksheet outline levels must be 0..=7".to_string(),
             ));
         }
@@ -661,7 +657,7 @@ impl XlsWorksheetLayoutOptions {
     }
 }
 #[derive(Debug, Clone, Copy, Default)]
-struct XlsWorkbookProtection {
+struct WorkbookProtection {
     protect_structure: bool,
     protect_windows: bool,
     password_hash: Option<u16>,
@@ -670,44 +666,44 @@ struct XlsWorkbookProtection {
 }
 
 #[derive(Debug, Clone)]
-struct XlsFileSharing {
+struct FileSharing {
     read_only_recommended: bool,
     password_hash: Option<u16>,
     user_name: String,
 }
 #[derive(Debug)]
-pub(super) struct XlsVbaWriteMetadata {
+pub(super) struct VbaWriteMetadata {
     pub workbook_code_name: String,
     pub project: litchi_vba::Payload,
 }
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct XlsCalculationSettings {
-    pub mode: crate::XlsCalculationMode,
+pub struct CalculationSettings {
+    pub mode: crate::CalculationMode,
     pub maximum_iterations: u16,
     pub iteration_enabled: bool,
     pub iteration_delta: f64,
     pub full_precision: bool,
-    pub reference_mode: crate::XlsReferenceMode,
+    pub reference_mode: crate::ReferenceMode,
     pub recalculate_before_save: bool,
     pub recalculation_engine_id: u32,
     /// Optional BIFF8 multithreaded-calculation metadata. This controls only
     /// serialized workbook settings; the writer never evaluates formulas.
-    pub multithreaded_calculation: Option<crate::XlsMultithreadedCalculation>,
+    pub multithreaded_calculation: Option<crate::MultithreadedCalculation>,
     pub force_full_calculation: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsWorkbookEnvironmentOptions {
+pub struct WorkbookEnvironmentOptions {
     pub template: bool,
     pub has_biff5_stream: bool,
     pub create_backup_copy: bool,
-    pub object_display_mode: crate::XlsObjectDisplayMode,
+    pub object_display_mode: crate::ObjectDisplayMode,
     pub refresh_external_data_on_load: bool,
     pub save_external_link_values: bool,
     pub has_envelope: bool,
     pub envelope_visible: bool,
     pub envelope_initialized: bool,
-    pub link_update_mode: crate::XlsLinkUpdateMode,
+    pub link_update_mode: crate::LinkUpdateMode,
     pub hide_unselected_table_borders: bool,
     pub supports_natural_language_formulas: bool,
     pub default_country_code: u16,
@@ -716,7 +712,7 @@ pub struct XlsWorkbookEnvironmentOptions {
 
 /// Primary BIFF8 workbook window and sheet-tab navigation settings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsWorkbookWindowOptions {
+pub struct WorkbookWindowOptions {
     pub horizontal_position_twips: i16,
     pub vertical_position_twips: i16,
     pub width_twips: i16,
@@ -736,33 +732,33 @@ pub struct XlsWorkbookWindowOptions {
 
 /// BIFF8 built-in and custom function-category settings.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsFunctionGroupOptions {
-    pub built_in: crate::XlsBuiltInFunctionCategories,
+pub struct FunctionGroupOptions {
+    pub built_in: crate::BuiltInFunctionCategories,
     pub custom_categories: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct XlsExternalCacheRowOptions {
+pub struct ExternalCacheRowOptions {
     pub row: u16,
     pub first_column: u8,
     pub values: Vec<crate::CachedValue>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct XlsExternalSheetOptions {
+pub struct ExternalSheetOptions {
     pub name: String,
-    pub cache_rows: Vec<XlsExternalCacheRowOptions>,
+    pub cache_rows: Vec<ExternalCacheRowOptions>,
 }
 
 /// An inert external-workbook directory/cache. The encoded path is serialized but never opened.
 #[derive(Debug, Clone, PartialEq)]
-pub struct XlsExternalWorkbookOptions {
+pub struct ExternalWorkbookOptions {
     pub encoded_virtual_path: String,
-    pub sheets: Vec<XlsExternalSheetOptions>,
+    pub sheets: Vec<ExternalSheetOptions>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsExternalDefinedNameOptions {
+pub struct ExternalDefinedNameOptions {
     pub name: String,
     pub sheet_index: Option<u16>,
     pub built_in: bool,
@@ -770,13 +766,13 @@ pub struct XlsExternalDefinedNameOptions {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsAddInFunctionOptions {
+pub struct AddInFunctionOptions {
     pub name: String,
     pub unused_data: Vec<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct XlsDdeOrOleItemOptions {
+pub struct DdeOrOleItemOptions {
     pub name: String,
     pub automatic: bool,
     pub picture: bool,
@@ -789,28 +785,28 @@ pub struct XlsDdeOrOleItemOptions {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct XlsDdeOrOleLinkOptions {
+pub struct DdeOrOleLinkOptions {
     pub encoded_virtual_path: String,
-    pub items: Vec<XlsDdeOrOleItemOptions>,
+    pub items: Vec<DdeOrOleItemOptions>,
 }
 
-fn validate_short_external_name(name: &str) -> XlsResult<()> {
+fn validate_short_external_name(name: &str) -> Result<()> {
     if name.encode_utf16().count() > u8::MAX as usize {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "external name exceeds 255 UTF-16 code units".to_string(),
         ));
     }
     Ok(())
 }
 
-impl XlsExternalDefinedNameOptions {
-    pub(super) fn validate(&self, sheet_count: usize) -> XlsResult<()> {
+impl ExternalDefinedNameOptions {
+    pub(super) fn validate(&self, sheet_count: usize) -> Result<()> {
         validate_short_external_name(&self.name)?;
         if self
             .sheet_index
             .is_some_and(|index| usize::from(index) >= sheet_count)
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "external name sheet scope is out of range".to_string(),
             ));
         }
@@ -820,7 +816,7 @@ impl XlsExternalDefinedNameOptions {
                 .first()
                 .is_some_and(|token| !matches!(token, 0x1c | 0x3a | 0x3b | 0x3c | 0x3d))
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "invalid opaque external-name formula bytes".to_string(),
             ));
         }
@@ -828,11 +824,11 @@ impl XlsExternalDefinedNameOptions {
     }
 }
 
-impl XlsAddInFunctionOptions {
-    pub(super) fn validate(&self) -> XlsResult<()> {
+impl AddInFunctionOptions {
+    pub(super) fn validate(&self) -> Result<()> {
         validate_short_external_name(&self.name)?;
         if self.unused_data.len() > u16::MAX as usize {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "add-in unused data exceeds u16".to_string(),
             ));
         }
@@ -840,20 +836,20 @@ impl XlsAddInFunctionOptions {
     }
 }
 
-impl XlsDdeOrOleLinkOptions {
-    pub(super) fn validate(&self) -> XlsResult<()> {
+impl DdeOrOleLinkOptions {
+    pub(super) fn validate(&self) -> Result<()> {
         let path_len = self.encoded_virtual_path.encode_utf16().count();
         let path_characters = self.encoded_virtual_path.chars().collect::<Vec<_>>();
         let has_ole_separator = path_characters
             .get(1..path_characters.len().saturating_sub(1))
             .is_some_and(|middle| middle.contains(&'\u{3}'));
         if !(3..=255).contains(&path_len) || !has_ole_separator {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "DDE/OLE virtual path must be a bounded encoded OLE-link".to_string(),
             ));
         }
         if self.items.is_empty() || self.items.len() > 4096 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "DDE/OLE source must contain 1..=4096 items".to_string(),
             ));
         }
@@ -866,18 +862,18 @@ impl XlsDdeOrOleLinkOptions {
                     || item.name != "StdDocumentName"
                     || item.matrix.is_some()
                 {
-                    return Err(XlsError::InvalidData(
+                    return Err(Error::InvalidData(
                         "invalid standard-document DDE item".to_string(),
                     ));
                 }
             } else {
                 if !item.ole_link && item.storage_id != 0 {
-                    return Err(XlsError::InvalidData(
+                    return Err(Error::InvalidData(
                         "DDE item cannot identify OLE link storage".to_string(),
                     ));
                 }
                 if item.displayed_as_icon && !item.ole_link {
-                    return Err(XlsError::InvalidData(
+                    return Err(Error::InvalidData(
                         "only an OLE item can be displayed as an icon".to_string(),
                     ));
                 }
@@ -890,16 +886,16 @@ impl XlsDdeOrOleLinkOptions {
     }
 }
 
-impl XlsExternalWorkbookOptions {
-    pub(super) fn validate(&self) -> XlsResult<()> {
+impl ExternalWorkbookOptions {
+    pub(super) fn validate(&self) -> Result<()> {
         let path_len = self.encoded_virtual_path.encode_utf16().count();
         if !(1..=255).contains(&path_len) {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "external virtual path must be 1..=255 UTF-16 code units".to_string(),
             ));
         }
         if self.sheets.is_empty() || self.sheets.len() > 256 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "external workbook must contain 1..=256 sheets".to_string(),
             ));
         }
@@ -912,19 +908,19 @@ impl XlsExternalWorkbookOptions {
                 || sheet.name.starts_with('\'')
                 || sheet.name.ends_with('\'')
             {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "invalid external sheet name".to_string(),
                 ));
             }
             if sheet.cache_rows.len() > i16::MAX as usize {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "external sheet cache has too many CRN rows".to_string(),
                 ));
             }
             let mut previous_end = None;
             for row in &sheet.cache_rows {
                 if row.values.is_empty() || usize::from(row.first_column) + row.values.len() > 256 {
-                    return Err(XlsError::InvalidData(
+                    return Err(Error::InvalidData(
                         "external CRN column range is invalid".to_string(),
                     ));
                 }
@@ -933,7 +929,7 @@ impl XlsExternalWorkbookOptions {
                         || (row.row == previous_row
                             && usize::from(row.first_column) <= previous_column)
                 }) {
-                    return Err(XlsError::InvalidData(
+                    return Err(Error::InvalidData(
                         "external CRN rows overlap or are out of order".to_string(),
                     ));
                 }
@@ -944,12 +940,12 @@ impl XlsExternalWorkbookOptions {
                 for value in &row.values {
                     match value {
                         crate::CachedValue::Number(number) if !number.is_finite() => {
-                            return Err(XlsError::InvalidData(
+                            return Err(Error::InvalidData(
                                 "external cached number must be finite".to_string(),
                             ));
                         },
                         crate::CachedValue::Text(text) if text.encode_utf16().count() > 255 => {
-                            return Err(XlsError::InvalidData(
+                            return Err(Error::InvalidData(
                                 "external cached string exceeds 255 UTF-16 code units".to_string(),
                             ));
                         },
@@ -962,31 +958,31 @@ impl XlsExternalWorkbookOptions {
     }
 }
 
-impl Default for XlsFunctionGroupOptions {
+impl Default for FunctionGroupOptions {
     fn default() -> Self {
         Self {
-            built_in: crate::XlsBuiltInFunctionCategories::Fourteen,
+            built_in: crate::BuiltInFunctionCategories::Fourteen,
             custom_categories: Vec::new(),
         }
     }
 }
 
-impl XlsFunctionGroupOptions {
-    pub(super) fn validate(&self) -> XlsResult<()> {
+impl FunctionGroupOptions {
+    pub(super) fn validate(&self) -> Result<()> {
         if usize::from(self.built_in.count()) + self.custom_categories.len() > 256 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "function category count exceeds 256".to_string(),
             ));
         }
         let mut unique = HashSet::with_capacity(self.custom_categories.len());
         for name in &self.custom_categories {
             if name.encode_utf16().count() > 32 {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "function category name exceeds 32 UTF-16 code units".to_string(),
                 ));
             }
             if !unique.insert(name) {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "function category names must be unique".to_string(),
                 ));
             }
@@ -995,7 +991,7 @@ impl XlsFunctionGroupOptions {
     }
 }
 
-impl Default for XlsWorkbookWindowOptions {
+impl Default for WorkbookWindowOptions {
     fn default() -> Self {
         Self {
             horizontal_position_twips: i16::MAX,
@@ -1017,30 +1013,30 @@ impl Default for XlsWorkbookWindowOptions {
     }
 }
 
-impl XlsWorkbookWindowOptions {
-    pub(super) fn validate_intrinsic(self) -> XlsResult<()> {
+impl WorkbookWindowOptions {
+    pub(super) fn validate_intrinsic(self) -> Result<()> {
         if self.width_twips < 1 || self.height_twips < 1 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "workbook window dimensions must be positive".to_string(),
             ));
         }
         if self.sheet_tab_ratio_per_mille > 1000 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "sheet tab ratio must be at most 1000".to_string(),
             ));
         }
         if self.very_hidden && !self.hidden {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "very hidden workbook windows must also be hidden".to_string(),
             ));
         }
         Ok(())
     }
 
-    pub(super) fn validate_for_sheet_count(self, sheet_count: usize) -> XlsResult<()> {
+    pub(super) fn validate_for_sheet_count(self, sheet_count: usize) -> Result<()> {
         self.validate_intrinsic()?;
         if sheet_count == 0 || sheet_count > 4112 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "RRTabId writer supports 1..=4112 sheets".to_string(),
             ));
         }
@@ -1048,7 +1044,7 @@ impl XlsWorkbookWindowOptions {
             || usize::from(self.first_visible_sheet_index) >= sheet_count
             || usize::from(self.selected_sheet_count) > sheet_count
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "workbook window tab reference is outside the sheet collection".to_string(),
             ));
         }
@@ -1056,19 +1052,19 @@ impl XlsWorkbookWindowOptions {
     }
 }
 
-impl Default for XlsWorkbookEnvironmentOptions {
+impl Default for WorkbookEnvironmentOptions {
     fn default() -> Self {
         Self {
             template: false,
             has_biff5_stream: false,
             create_backup_copy: false,
-            object_display_mode: crate::XlsObjectDisplayMode::ShowAll,
+            object_display_mode: crate::ObjectDisplayMode::ShowAll,
             refresh_external_data_on_load: false,
             save_external_link_values: true,
             has_envelope: false,
             envelope_visible: false,
             envelope_initialized: false,
-            link_update_mode: crate::XlsLinkUpdateMode::Prompt,
+            link_update_mode: crate::LinkUpdateMode::Prompt,
             hide_unselected_table_borders: false,
             supports_natural_language_formulas: false,
             default_country_code: 1,
@@ -1077,30 +1073,30 @@ impl Default for XlsWorkbookEnvironmentOptions {
     }
 }
 
-impl XlsWorkbookEnvironmentOptions {
+impl WorkbookEnvironmentOptions {
     pub(super) fn book_bool_bits(self) -> u16 {
         u16::from(!self.save_external_link_values)
             | (u16::from(self.has_envelope) << 2)
             | (u16::from(self.envelope_visible) << 3)
             | (u16::from(self.envelope_initialized) << 4)
             | ((match self.link_update_mode {
-                crate::XlsLinkUpdateMode::Prompt => 0,
-                crate::XlsLinkUpdateMode::Never => 1,
-                crate::XlsLinkUpdateMode::Silent => 2,
+                crate::LinkUpdateMode::Prompt => 0,
+                crate::LinkUpdateMode::Never => 1,
+                crate::LinkUpdateMode::Silent => 2,
             }) << 5)
             | (u16::from(self.hide_unselected_table_borders) << 8)
     }
 }
 
-impl Default for XlsCalculationSettings {
+impl Default for CalculationSettings {
     fn default() -> Self {
         Self {
-            mode: crate::XlsCalculationMode::Automatic,
+            mode: crate::CalculationMode::Automatic,
             maximum_iterations: 100,
             iteration_enabled: false,
             iteration_delta: 0.001,
             full_precision: true,
-            reference_mode: crate::XlsReferenceMode::A1,
+            reference_mode: crate::ReferenceMode::A1,
             recalculate_before_save: true,
             recalculation_engine_id: 0x000E_EA35,
             multithreaded_calculation: None,
@@ -1110,16 +1106,16 @@ impl Default for XlsCalculationSettings {
 }
 /// A complete caller-defined BIFF8 table-style family.
 #[derive(Debug, Clone, PartialEq)]
-pub struct XlsCustomTableStyles {
-    differential_formats: Vec<XlsDifferentialFormat>,
-    catalog: XlsTableStyles,
+pub struct CustomTableStyles {
+    differential_formats: Vec<DifferentialFormat>,
+    catalog: TableStyles,
 }
 
-impl XlsCustomTableStyles {
+impl CustomTableStyles {
     pub fn try_new(
-        differential_formats: Vec<XlsDifferentialFormat>,
-        catalog: XlsTableStyles,
-    ) -> XlsResult<Self> {
+        differential_formats: Vec<DifferentialFormat>,
+        catalog: TableStyles,
+    ) -> Result<Self> {
         let value = Self {
             differential_formats,
             catalog,
@@ -1129,14 +1125,14 @@ impl XlsCustomTableStyles {
     }
 
     pub fn try_from_styles(
-        differential_formats: Vec<XlsDifferentialFormat>,
+        differential_formats: Vec<DifferentialFormat>,
         default_table_style: impl Into<String>,
         default_pivot_style: impl Into<String>,
-        custom_styles: Vec<XlsTableStyle>,
-    ) -> XlsResult<Self> {
+        custom_styles: Vec<TableStyle>,
+    ) -> Result<Self> {
         Self::try_new(
             differential_formats,
-            XlsTableStyles::try_with_custom_styles(
+            TableStyles::try_with_custom_styles(
                 default_table_style,
                 default_pivot_style,
                 custom_styles,
@@ -1144,17 +1140,17 @@ impl XlsCustomTableStyles {
         )
     }
 
-    pub fn differential_formats(&self) -> &[XlsDifferentialFormat] {
+    pub fn differential_formats(&self) -> &[DifferentialFormat] {
         &self.differential_formats
     }
 
-    pub const fn catalog(&self) -> &XlsTableStyles {
+    pub const fn catalog(&self) -> &TableStyles {
         &self.catalog
     }
 
-    fn validate_structure(&self) -> XlsResult<()> {
+    fn validate_structure(&self) -> Result<()> {
         if self.differential_formats.len() > usize::from(u16::MAX) + 1 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "custom table styles contain more than 65,536 DXFs".to_string(),
             ));
         }
@@ -1166,14 +1162,14 @@ impl XlsCustomTableStyles {
         Ok(())
     }
 
-    pub(super) fn validate(&self, formatting: &FormattingManager) -> XlsResult<()> {
+    pub(super) fn validate(&self, formatting: &FormattingManager) -> Result<()> {
         self.validate_structure()?;
         for (dxf_index, differential_format) in self.differential_formats.iter().enumerate() {
             for property in differential_format.properties().properties() {
-                if let XlsXfProperty::NumberFormatId(number_format_id) = property
+                if let XfProperty::NumberFormatId(number_format_id) = property
                     && !formatting.contains_number_format_id(*number_format_id)
                 {
-                    return Err(XlsError::InvalidData(format!(
+                    return Err(Error::InvalidData(format!(
                         "custom table-style DXF {dxf_index} references undefined number format {number_format_id}"
                     )));
                 }
@@ -1199,8 +1195,8 @@ fn is_builtin_table_style(name: &str) -> bool {
 
 pub(super) fn validate_list_object_style(
     name: &str,
-    custom: Option<&XlsCustomTableStyles>,
-) -> XlsResult<()> {
+    custom: Option<&CustomTableStyles>,
+) -> Result<()> {
     if is_builtin_table_style(name)
         || custom.is_some_and(|styles| {
             styles.catalog().custom_styles().iter().any(|style| {
@@ -1210,20 +1206,17 @@ pub(super) fn validate_list_object_style(
     {
         return Ok(());
     }
-    Err(XlsError::InvalidData(format!(
+    Err(Error::InvalidData(format!(
         "table style {name:?} is not a table-capable built-in or configured custom style"
     )))
 }
 
 fn validate_list_object_relationships(
     worksheets: &[WritableWorksheet],
-    custom: Option<&XlsCustomTableStyles>,
+    custom: Option<&CustomTableStyles>,
     defined_names: &[InternalDefinedName],
-    defined_name_records: &[(
-        XlsDefinedNameRecordOptions,
-        crate::XlsDefinedNameFutureRecords,
-    )],
-) -> XlsResult<()> {
+    defined_name_records: &[(DefinedNameRecordOptions, crate::DefinedNameFutureRecords)],
+) -> Result<()> {
     let mut ids = HashSet::new();
     let mut names = HashSet::new();
     let defined_names = defined_names
@@ -1240,12 +1233,12 @@ fn validate_list_object_relationships(
             table.validate()?;
             validate_list_object_style(table.style().unwrap().name(), custom)?;
             if !ids.insert(table.id()) || !names.insert(table.name().to_lowercase()) {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "duplicate workbook table identifier or name".to_string(),
                 ));
             }
             if defined_names.contains(&table.name().to_lowercase()) {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "table name collides with a workbook defined name".to_string(),
                 ));
             }
@@ -1253,7 +1246,7 @@ fn validate_list_object_relationships(
                 .iter()
                 .any(|existing| existing.range().overlaps(table.range()))
             {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "table ranges overlap within the worksheet".to_string(),
                 ));
             }
@@ -1263,7 +1256,7 @@ fn validate_list_object_relationships(
                     && table.range().first_column() <= filter.last_col
                     && filter.first_col <= table.range().last_column()
             }) {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "table range overlaps the worksheet AutoFilter".to_string(),
                 ));
             }
@@ -1275,7 +1268,7 @@ fn validate_list_object_relationships(
                 .iter()
                 .any(|table| table.id().value() == id)
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "table SortData references an unknown ListObject identifier".to_string(),
             ));
         }
@@ -1283,34 +1276,32 @@ fn validate_list_object_relationships(
     Ok(())
 }
 
-fn prepare_data_validation(
-    validation: &XlsDataValidation,
-) -> XlsResult<XlsDataValidationBiffPayload> {
+fn prepare_data_validation(validation: &DataValidation) -> Result<DataValidationBiffPayload> {
     if let Some(title) = validation.input_title.as_ref()
         && title.encode_utf16().count() > 32
     {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "Input message title must be at most 32 characters".to_string(),
         ));
     }
     if let Some(text) = validation.input_message.as_ref()
         && text.encode_utf16().count() > 255
     {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "Input message text must be at most 255 characters".to_string(),
         ));
     }
     if let Some(title) = validation.error_title.as_ref()
         && title.encode_utf16().count() > 32
     {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "Error message title must be at most 32 characters".to_string(),
         ));
     }
     if let Some(text) = validation.error_message.as_ref()
         && text.encode_utf16().count() > 225
     {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "Error message text must be at most 225 characters".to_string(),
         ));
     }
@@ -1320,7 +1311,7 @@ fn prepare_data_validation(
 /// XLS file writer
 ///
 /// Provides methods to create and modify XLS (BIFF8) files.
-pub struct XlsWriter {
+pub struct Writer {
     /// Worksheets to write
     worksheets: Vec<WritableWorksheet>,
     /// Shared string table
@@ -1329,41 +1320,38 @@ pub struct XlsWriter {
     string_map: HashMap<String, u32>,
     /// Workbook-level defined names (named ranges).
     defined_names: Vec<InternalDefinedName>,
-    defined_name_records: Vec<(
-        XlsDefinedNameRecordOptions,
-        crate::XlsDefinedNameFutureRecords,
-    )>,
+    defined_name_records: Vec<(DefinedNameRecordOptions, crate::DefinedNameFutureRecords)>,
     fmt: FormattingManager,
     /// Total number of string occurrences (including duplicates) for SST.cstTotal
     sst_total: u32,
-    workbook_protection: Option<XlsWorkbookProtection>,
-    file_sharing: Option<XlsFileSharing>,
+    workbook_protection: Option<WorkbookProtection>,
+    file_sharing: Option<FileSharing>,
     /// Use 1904 date system (Mac) instead of 1900 (Windows)
     use_1904_dates: bool,
-    calculation_settings: XlsCalculationSettings,
-    vba_metadata: Option<XlsVbaWriteMetadata>,
-    environment_options: XlsWorkbookEnvironmentOptions,
-    workbook_window_options: XlsWorkbookWindowOptions,
-    function_group_options: XlsFunctionGroupOptions,
-    external_workbooks: Vec<XlsExternalWorkbookOptions>,
-    external_names: Vec<Vec<XlsExternalDefinedNameOptions>>,
-    add_in_functions: Vec<XlsAddInFunctionOptions>,
-    dde_or_ole_links: Vec<XlsDdeOrOleLinkOptions>,
-    custom_table_styles: Option<XlsCustomTableStyles>,
-    book_ext: Option<crate::XlsBookExt>,
-    theme: Option<crate::XlsTheme>,
+    calculation_settings: CalculationSettings,
+    vba_metadata: Option<VbaWriteMetadata>,
+    environment_options: WorkbookEnvironmentOptions,
+    workbook_window_options: WorkbookWindowOptions,
+    function_group_options: FunctionGroupOptions,
+    external_workbooks: Vec<ExternalWorkbookOptions>,
+    external_names: Vec<Vec<ExternalDefinedNameOptions>>,
+    add_in_functions: Vec<AddInFunctionOptions>,
+    dde_or_ole_links: Vec<DdeOrOleLinkOptions>,
+    custom_table_styles: Option<CustomTableStyles>,
+    book_ext: Option<crate::BookExt>,
+    theme: Option<crate::Theme>,
     /// MDX (OLAP cube) metadata emitted as the globals `METADATA` production.
-    mdx_metadata: Option<crate::XlsMdxMetadata>,
+    mdx_metadata: Option<crate::MdxMetadata>,
     /// Real-time data (RTD) topics emitted as `RealTimeData` records.
-    real_time_data: Vec<crate::XlsRealTimeData>,
+    real_time_data: Vec<crate::RealTimeData>,
     /// Web pages published from the workbook globals (`WebPub` records).
-    web_publications: Vec<crate::XlsWebPub>,
-    xf_extensions: Vec<crate::XlsXfExt>,
-    style_extensions: Vec<crate::XlsStyleExt>,
-    encryption: Option<XlsWriterEncryption>,
+    web_publications: Vec<crate::WebPub>,
+    xf_extensions: Vec<crate::XfExt>,
+    style_extensions: Vec<crate::StyleExt>,
+    encryption: Option<WriterEncryption>,
 }
 
-impl XlsWriter {
+impl Writer {
     /// Create a new XLS writer
     pub fn new() -> Self {
         Self {
@@ -1377,11 +1365,11 @@ impl XlsWriter {
             workbook_protection: None,
             file_sharing: None,
             use_1904_dates: false,
-            calculation_settings: XlsCalculationSettings::default(),
+            calculation_settings: CalculationSettings::default(),
             vba_metadata: None,
-            environment_options: XlsWorkbookEnvironmentOptions::default(),
-            workbook_window_options: XlsWorkbookWindowOptions::default(),
-            function_group_options: XlsFunctionGroupOptions::default(),
+            environment_options: WorkbookEnvironmentOptions::default(),
+            workbook_window_options: WorkbookWindowOptions::default(),
+            function_group_options: FunctionGroupOptions::default(),
             external_workbooks: Vec::new(),
             external_names: Vec::new(),
             add_in_functions: Vec::new(),
@@ -1405,11 +1393,11 @@ impl XlsWriter {
     pub fn set_password(
         &mut self,
         password: impl Into<String>,
-        profile: XlsEncryptionProfile,
-    ) -> XlsResult<()> {
+        profile: EncryptionProfile,
+    ) -> Result<()> {
         let password = password.into();
         validate_writer_encryption(&password, profile)?;
-        self.encryption = Some(XlsWriterEncryption {
+        self.encryption = Some(WriterEncryption {
             password: Zeroizing::new(password),
             profile,
         });
@@ -1422,7 +1410,7 @@ impl XlsWriter {
     }
 
     /// Return the configured password-to-open encryption profile.
-    pub fn encryption_profile(&self) -> Option<XlsEncryptionProfile> {
+    pub fn encryption_profile(&self) -> Option<EncryptionProfile> {
         self.encryption.as_ref().map(|value| value.profile)
     }
 
@@ -1434,18 +1422,18 @@ impl XlsWriter {
     ///
     /// # Returns
     ///
-    /// * `Result<usize, XlsError>` - Worksheet index or error
-    pub fn add_worksheet(&mut self, name: &str) -> XlsResult<usize> {
+    /// * `Result<usize, Error>` - Worksheet index or error
+    pub fn add_worksheet(&mut self, name: &str) -> Result<usize> {
         // Validate worksheet name
         if name.is_empty() || name.len() > 31 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "Worksheet name must be 1-31 characters".to_string(),
             ));
         }
 
         // Check for duplicate names
         if self.worksheets.iter().any(|ws| ws.name == name) {
-            return Err(XlsError::InvalidData(format!(
+            return Err(Error::InvalidData(format!(
                 "Worksheet '{}' already exists",
                 name
             )));
@@ -1466,7 +1454,7 @@ impl XlsWriter {
     /// * `row` - Row index (0-based)
     /// * `col` - Column index (0-based)
     /// * `value` - String value
-    pub fn write_string(&mut self, sheet: usize, row: u32, col: u16, value: &str) -> XlsResult<()> {
+    pub fn write_string(&mut self, sheet: usize, row: u32, col: u16, value: &str) -> Result<()> {
         self.write_string_with_format(sheet, row, col, value, 0)
     }
 
@@ -1477,14 +1465,9 @@ impl XlsWriter {
         col: u16,
         value: &str,
         format_id: u16,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         let pos = CellPos::try_new(row, col)?;
-        self.write_cell(
-            sheet,
-            pos,
-            XlsCellValue::String(value.to_string()),
-            format_id,
-        )
+        self.write_cell(sheet, pos, CellValue::String(value.to_string()), format_id)
     }
 
     /// Write a number value to a cell
@@ -1495,7 +1478,7 @@ impl XlsWriter {
     /// * `row` - Row index (0-based)
     /// * `col` - Column index (0-based)
     /// * `value` - Numeric value
-    pub fn write_number(&mut self, sheet: usize, row: u32, col: u16, value: f64) -> XlsResult<()> {
+    pub fn write_number(&mut self, sheet: usize, row: u32, col: u16, value: f64) -> Result<()> {
         self.write_number_with_format(sheet, row, col, value, 0)
     }
 
@@ -1506,14 +1489,14 @@ impl XlsWriter {
         col: u16,
         value: f64,
         format_id: u16,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         if !value.is_finite() {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "cell number must be finite for BIFF8 serialization".to_string(),
             ));
         }
         let pos = CellPos::try_new(row, col)?;
-        self.write_cell(sheet, pos, XlsCellValue::Number(value), format_id)
+        self.write_cell(sheet, pos, CellValue::Number(value), format_id)
     }
 
     /// Write a boolean value to a cell
@@ -1524,13 +1507,7 @@ impl XlsWriter {
     /// * `row` - Row index (0-based)
     /// * `col` - Column index (0-based)
     /// * `value` - Boolean value
-    pub fn write_boolean(
-        &mut self,
-        sheet: usize,
-        row: u32,
-        col: u16,
-        value: bool,
-    ) -> XlsResult<()> {
+    pub fn write_boolean(&mut self, sheet: usize, row: u32, col: u16, value: bool) -> Result<()> {
         self.write_boolean_with_format(sheet, row, col, value, 0)
     }
 
@@ -1541,9 +1518,9 @@ impl XlsWriter {
         col: u16,
         value: bool,
         format_id: u16,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         let pos = CellPos::try_new(row, col)?;
-        self.write_cell(sheet, pos, XlsCellValue::Boolean(value), format_id)
+        self.write_cell(sheet, pos, CellValue::Boolean(value), format_id)
     }
 
     /// Write a formula to a cell
@@ -1558,13 +1535,7 @@ impl XlsWriter {
     /// The supported BIFF8 formula subset includes constants, cell/range
     /// references, arithmetic/comparison operators, and built-in functions
     /// recognized by [`FormulaTokenizer`](crate::writer::FormulaTokenizer).
-    pub fn write_formula(
-        &mut self,
-        sheet: usize,
-        row: u32,
-        col: u16,
-        formula: &str,
-    ) -> XlsResult<()> {
+    pub fn write_formula(&mut self, sheet: usize, row: u32, col: u16, formula: &str) -> Result<()> {
         self.write_formula_with_format(sheet, row, col, formula, 0)
     }
 
@@ -1575,12 +1546,12 @@ impl XlsWriter {
         col: u16,
         formula: &str,
         format_id: u16,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         let pos = CellPos::try_new(row, col)?;
         self.write_cell(
             sheet,
             pos,
-            XlsCellValue::Formula(formula.to_string()),
+            CellValue::Formula(formula.to_string()),
             format_id,
         )
     }
@@ -1611,7 +1582,7 @@ impl XlsWriter {
     ///
     /// Validation happens before assignment, so an error leaves the current
     /// writer configuration unchanged.
-    pub fn set_custom_table_styles(&mut self, styles: XlsCustomTableStyles) -> XlsResult<()> {
+    pub fn set_custom_table_styles(&mut self, styles: CustomTableStyles) -> Result<()> {
         styles.validate(&self.fmt)?;
         self.custom_table_styles = Some(styles);
         Ok(())
@@ -1623,10 +1594,10 @@ impl XlsWriter {
     }
 
     /// Adds a legacy BIFF8 worksheet table and writes its header captions.
-    pub fn add_list_object(&mut self, sheet: usize, table: XlsListObject) -> XlsResult<()> {
+    pub fn add_list_object(&mut self, sheet: usize, table: ListObject) -> Result<()> {
         table.validate()?;
         let style = table.style().ok_or_else(|| {
-            XlsError::InvalidData("validated table is missing its style".to_string())
+            Error::InvalidData("validated table is missing its style".to_string())
         })?;
         validate_list_object_style(style.name(), self.custom_table_styles.as_ref())?;
         if self
@@ -1637,7 +1608,7 @@ impl XlsWriter {
                 existing.id() == table.id() || existing.name().eq_ignore_ascii_case(table.name())
             })
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "table identifier or name collides within the workbook".to_string(),
             ));
         }
@@ -1650,20 +1621,20 @@ impl XlsWriter {
                 .iter()
                 .any(|(name, _)| name.name.eq_ignore_ascii_case(table.name()))
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "table name collides with a workbook defined name".to_string(),
             ));
         }
         let worksheet = self
             .worksheets
             .get(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         if worksheet
             .list_objects
             .iter()
             .any(|existing| existing.range().overlaps(table.range()))
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "table ranges overlap within the worksheet".to_string(),
             ));
         }
@@ -1673,7 +1644,7 @@ impl XlsWriter {
                 && table.range().first_column() <= filter.last_col
                 && filter.first_col <= table.range().last_column()
         }) {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "table range overlaps the worksheet AutoFilter".to_string(),
             ));
         }
@@ -1689,15 +1660,15 @@ impl XlsWriter {
                 table.range().first_column() + offset as u16,
             );
             if let Some(cell) = worksheet.cells.get(&key)
-                && !matches!(&cell.value, XlsCellValue::String(value) if value == column.name())
+                && !matches!(&cell.value, CellValue::String(value) if value == column.name())
             {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "table header collides with a different cell value".to_string(),
                 ));
             } else if !worksheet.cells.contains_key(&key) {
                 header_cells.push(WritableCell::new(
                     CellPos::try_new(key.0, key.1)?,
-                    XlsCellValue::String(column.name().to_string()),
+                    CellValue::String(column.name().to_string()),
                     0,
                     None,
                 ));
@@ -1706,7 +1677,7 @@ impl XlsWriter {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.include_list_object_range(table.range());
         for cell in header_cells {
             worksheet.add_cell(cell);
@@ -1715,10 +1686,10 @@ impl XlsWriter {
         Ok(())
     }
 
-    pub fn clear_list_objects(&mut self, sheet: usize) -> XlsResult<()> {
+    pub fn clear_list_objects(&mut self, sheet: usize) -> Result<()> {
         self.worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?
             .list_objects
             .clear();
         Ok(())
@@ -1730,16 +1701,16 @@ impl XlsWriter {
     /// specification:
     /// - Name MUST NOT be empty.
     /// - Name length MUST be at most 255 characters (Lbl.cch is a byte).
-    fn validate_defined_name(name: &str) -> XlsResult<()> {
+    fn validate_defined_name(name: &str) -> Result<()> {
         if name.is_empty() {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "Defined name must not be empty".to_string(),
             ));
         }
 
         let char_count = name.chars().count();
         if char_count > u8::MAX as usize {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "Defined name must be at most 255 characters".to_string(),
             ));
         }
@@ -1773,15 +1744,15 @@ impl XlsWriter {
     /// writer APIs. The hyperlink target can be a standard URL (http, https,
     /// ftp, mailto) or an internal reference such as `Sheet1!A1` or
     /// `internal:Sheet1!A1`.
-    pub fn set_hyperlink(&mut self, sheet: usize, row: u32, col: u16, url: &str) -> XlsResult<()> {
+    pub fn set_hyperlink(&mut self, sheet: usize, row: u32, col: u16, url: &str) -> Result<()> {
         if row > u16::MAX as u32 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "set_hyperlink: row index must be <= 65535 for BIFF8".to_string(),
             ));
         }
 
         if col >= 256 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "set_hyperlink: column index must be < 256 for BIFF8".to_string(),
             ));
         }
@@ -1789,7 +1760,7 @@ impl XlsWriter {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
 
         // Replace any existing hyperlink on this exact cell to match
         // XLSX writer semantics.
@@ -1797,7 +1768,7 @@ impl XlsWriter {
             !(h.first_row == row && h.last_row == row && h.first_col == col && h.last_col == col)
         });
 
-        worksheet.add_hyperlink(XlsHyperlink {
+        worksheet.add_hyperlink(Hyperlink {
             first_row: row,
             last_row: row,
             first_col: col,
@@ -1816,14 +1787,14 @@ impl XlsWriter {
         col: u16,
         author: &str,
         text: &str,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         self.add_comment_with_options(
             sheet,
             row,
             col,
             author,
             text,
-            XlsCommentWriteOptions::default(),
+            CommentWriteOptions::default(),
         )
     }
 
@@ -1835,15 +1806,15 @@ impl XlsWriter {
         col: u16,
         author: &str,
         text: &str,
-        options: XlsCommentWriteOptions,
-    ) -> XlsResult<()> {
+        options: CommentWriteOptions,
+    ) -> Result<()> {
         let (row, column) = comment::validate_comment(row, col, author, text, &options)?;
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         if worksheet.comments.len() >= 1022 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "a worksheet cannot contain more than 1022 canonical comment shapes".to_string(),
             ));
         }
@@ -1852,7 +1823,7 @@ impl XlsWriter {
             .iter()
             .any(|comment| comment.row == row && comment.column == column)
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "a cell cannot contain more than one comment".to_string(),
             ));
         }
@@ -1862,7 +1833,7 @@ impl XlsWriter {
                 .iter()
                 .any(|comment| comment.options.guid == Some(guid))
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "comment GUID override is duplicated on the worksheet".to_string(),
             ));
         }
@@ -1871,28 +1842,28 @@ impl XlsWriter {
     }
 
     /// Add a validated, macro-inert primitive shape and return its worksheet OBJ identifier.
-    pub fn add_shape(&mut self, sheet: usize, mut shape: XlsShapeWrite) -> XlsResult<u16> {
+    pub fn add_shape(&mut self, sheet: usize, mut shape: ShapeWrite) -> Result<u16> {
         shape.validate()?;
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         let reserved = collect_reserved_object_ids(worksheet, 0)?;
         let object_count =
             reserved
                 .len()
                 .checked_add(worksheet.comments.len())
-                .ok_or(XlsError::Allocation(
+                .ok_or(Error::Allocation(
                     "computing the worksheet drawing-object count",
                 ))?;
         if object_count >= 1022 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "a worksheet cannot contain more than 1022 drawing objects".to_string(),
             ));
         }
         let object_id = if let Some(requested) = shape.object_id {
             if reserved.contains(&requested) {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "shape object ID collides with another worksheet object".to_string(),
                 ));
             }
@@ -1901,43 +1872,43 @@ impl XlsWriter {
             (1..u16::MAX)
                 .find(|candidate| !reserved.contains(candidate))
                 .ok_or_else(|| {
-                    XlsError::InvalidData("worksheet object IDs are exhausted".to_string())
+                    Error::InvalidData("worksheet object IDs are exhausted".to_string())
                 })?
         };
         worksheet
             .shapes
             .try_reserve(1)
-            .map_err(|_| XlsError::Allocation("reserving worksheet shape storage"))?;
+            .map_err(|_| Error::Allocation("reserving worksheet shape storage"))?;
         shape.object_id = Some(object_id);
         worksheet.shapes.push(shape);
         Ok(object_id)
     }
 
     /// Remove a primitive by its assigned OBJ identifier.
-    pub fn remove_shape(&mut self, sheet: usize, object_id: u16) -> XlsResult<XlsShapeWrite> {
+    pub fn remove_shape(&mut self, sheet: usize, object_id: u16) -> Result<ShapeWrite> {
         if object_id == 0 || object_id == u16::MAX {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "shape object ID 0 and 65535 are reserved".to_string(),
             ));
         }
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         let index = worksheet
             .shapes
             .iter()
             .position(|shape| shape.object_id == Some(object_id))
-            .ok_or_else(|| XlsError::InvalidData("shape object ID was not found".to_string()))?;
+            .ok_or_else(|| Error::InvalidData("shape object ID was not found".to_string()))?;
         Ok(worksheet.shapes.remove(index))
     }
 
     /// Remove all writable primitive shapes from a worksheet.
-    pub fn clear_shapes(&mut self, sheet: usize) -> XlsResult<usize> {
+    pub fn clear_shapes(&mut self, sheet: usize) -> Result<usize> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         let count = worksheet.shapes.len();
         worksheet.shapes.clear();
         Ok(count)
@@ -1947,33 +1918,29 @@ impl XlsWriter {
     ///
     /// The group consumes one object ID for itself plus one per child; assigned
     /// child identifiers are stored back into the group before it is retained.
-    pub fn add_shape_group(
-        &mut self,
-        sheet: usize,
-        mut group: XlsShapeGroupWrite,
-    ) -> XlsResult<u16> {
+    pub fn add_shape_group(&mut self, sheet: usize, mut group: ShapeGroupWrite) -> Result<u16> {
         group.validate()?;
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         let group_count = group.object_count()?;
         let mut reserved = collect_reserved_object_ids(worksheet, group_count)?;
         let object_count = reserved
             .len()
             .checked_add(worksheet.comments.len())
             .and_then(|count| count.checked_add(group_count))
-            .ok_or(XlsError::Allocation(
+            .ok_or(Error::Allocation(
                 "computing the worksheet drawing-object count",
             ))?;
         if object_count > 1022 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "a worksheet cannot contain more than 1022 drawing objects".to_string(),
             ));
         }
         for requested in group_object_ids(&group) {
             if reserved.contains(&requested) {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "shape object ID collides with another worksheet object".to_string(),
                 ));
             }
@@ -1984,7 +1951,7 @@ impl XlsWriter {
         worksheet
             .shape_groups
             .try_reserve(1)
-            .map_err(|_| XlsError::Allocation("reserving worksheet shape-group storage"))?;
+            .map_err(|_| Error::Allocation("reserving worksheet shape-group storage"))?;
         let group_id = assign_object_id(&mut reserved, group.object_id)?;
         group.object_id = Some(group_id);
         for child in &mut group.children {
@@ -1995,25 +1962,21 @@ impl XlsWriter {
     }
 
     /// Remove a shape group by the group's assigned OBJ identifier.
-    pub fn remove_shape_group(
-        &mut self,
-        sheet: usize,
-        object_id: u16,
-    ) -> XlsResult<XlsShapeGroupWrite> {
+    pub fn remove_shape_group(&mut self, sheet: usize, object_id: u16) -> Result<ShapeGroupWrite> {
         if object_id == 0 || object_id == u16::MAX {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "shape object ID 0 and 65535 are reserved".to_string(),
             ));
         }
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         let index = worksheet
             .shape_groups
             .iter()
             .position(|group| group.object_id == Some(object_id))
-            .ok_or_else(|| XlsError::InvalidData("shape object ID was not found".to_string()))?;
+            .ok_or_else(|| Error::InvalidData("shape object ID was not found".to_string()))?;
         Ok(worksheet.shape_groups.remove(index))
     }
 
@@ -2024,19 +1987,19 @@ impl XlsWriter {
         last_row: u32,
         first_col: u16,
         last_col: u16,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         MergedRange::try_new(first_row, last_row, first_col, last_col)?;
         let worksheet = self
             .worksheets
             .get(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         if worksheet.list_objects.iter().any(|table| {
             first_row <= u32::from(table.range().last_row())
                 && u32::from(table.range().first_row()) <= last_row
                 && first_col <= table.range().last_column()
                 && table.range().first_column() <= last_col
         }) {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "set_auto_filter: range overlaps a worksheet table".to_string(),
             ));
         }
@@ -2044,12 +2007,12 @@ impl XlsWriter {
             .checked_add(1)
             .and_then(|index| u16::try_from(index).ok())
             .ok_or_else(|| {
-                XlsError::InvalidData(
+                Error::InvalidData(
                     "set_auto_filter: sheet index exceeds BIFF8 itab limit".to_string(),
                 )
             })?;
         let target_sheet = u16::try_from(sheet).map_err(|_| {
-            XlsError::InvalidData("set_auto_filter: sheet index exceeds BIFF8 limit".to_string())
+            Error::InvalidData("set_auto_filter: sheet index exceeds BIFF8 limit".to_string())
         })?;
 
         let start_ref = a1_cell(first_row, first_col);
@@ -2070,7 +2033,7 @@ impl XlsWriter {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.auto_filter = Some(AutoFilterRange {
             first_row,
             last_row,
@@ -2117,20 +2080,20 @@ impl XlsWriter {
         join_or: bool,
         cond1: AutoFilterConditionWrite,
         cond2: AutoFilterConditionWrite,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
 
         let Some(filter) = worksheet.auto_filter else {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "add_filter_condition: call set_auto_filter first".to_string(),
             ));
         };
         let width = filter.last_col - filter.first_col + 1;
         if column_index >= width {
-            return Err(XlsError::InvalidCellReference(format!(
+            return Err(Error::InvalidCellReference(format!(
                 "AutoFilter relative column {column_index} exceeds its {width}-column range"
             )));
         }
@@ -2139,7 +2102,7 @@ impl XlsWriter {
             .iter()
             .any(|entry| entry.column_index == column_index)
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "AutoFilter column already has a condition".to_string(),
             ));
         }
@@ -2168,14 +2131,14 @@ impl XlsWriter {
         case_sensitive: bool,
         sort_by_columns: bool,
         keys: &[(u16, bool)],
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         if keys.is_empty() || keys.len() > 3 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "set_sort: must provide 1..3 sort keys".to_string(),
             ));
         }
         if keys.iter().any(|(col, _)| *col > u16::from(u8::MAX)) {
-            return Err(XlsError::InvalidCellReference(
+            return Err(Error::InvalidCellReference(
                 "sort key column is outside the BIFF8 grid".to_string(),
             ));
         }
@@ -2183,7 +2146,7 @@ impl XlsWriter {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
 
         worksheet.set_sort_config(SortConfig {
             case_sensitive,
@@ -2204,18 +2167,18 @@ impl XlsWriter {
         &mut self,
         sheet: usize,
         sort: crate::writer::sort::Config,
-    ) -> XlsResult<Option<crate::writer::sort::Config>> {
+    ) -> Result<Option<crate::writer::sort::Config>> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         if let crate::writer::sort::Parent::Table { id } = sort.parent()
             && !worksheet
                 .list_objects
                 .iter()
                 .any(|table| table.id().value() == id)
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "table SortData references an unknown ListObject identifier".to_string(),
             ));
         }
@@ -2225,11 +2188,11 @@ impl XlsWriter {
     /// Remove and return the extended BIFF8 sort metadata for a worksheet.
     ///
     /// Removing an absent configuration succeeds and returns `None`.
-    pub fn remove_sort(&mut self, sheet: usize) -> XlsResult<Option<crate::writer::sort::Config>> {
+    pub fn remove_sort(&mut self, sheet: usize) -> Result<Option<crate::writer::sort::Config>> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         Ok(worksheet.remove_sort())
     }
 
@@ -2242,13 +2205,13 @@ impl XlsWriter {
     /// # Arguments
     ///
     /// * `sheet` — worksheet index (0-based)
-    /// * `config` — pivot table configuration (see [`XlsPivotTableConfig`])
-    pub fn add_pivot_table(&mut self, sheet: usize, config: XlsPivotTableConfig) -> XlsResult<()> {
+    /// * `config` — pivot table configuration (see [`PivotTableConfig`])
+    pub fn add_pivot_table(&mut self, sheet: usize, config: PivotTableConfig) -> Result<()> {
         validate_pivot_table_config(&config)?;
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
 
         // Generate pivot output cells BEFORE consuming config.fields / config.data_items.
         // Excel validates that DIMENSIONS and cell content are consistent with the
@@ -2361,8 +2324,8 @@ impl XlsWriter {
     /// ```
     fn generate_pivot_output_cells(
         ws: &mut WritableWorksheet,
-        cfg: &XlsPivotTableConfig,
-    ) -> XlsResult<()> {
+        cfg: &PivotTableConfig,
+    ) -> Result<()> {
         // Identify fields per axis.
         let row_field = cfg.fields.iter().find(|f| f.axis == 0x0001);
         let col_field = cfg.fields.iter().find(|f| f.axis == 0x0002);
@@ -2389,24 +2352,20 @@ impl XlsWriter {
         let lc = cfg.last_col;
         let fc = cfg.first_col;
 
-        let offset = |base: u16, amount: usize| -> XlsResult<u16> {
+        let offset = |base: u16, amount: usize| -> Result<u16> {
             let amount = u16::try_from(amount).map_err(|_| {
-                XlsError::InvalidCellReference(
-                    "PivotTable output exceeds the BIFF8 grid".to_string(),
-                )
+                Error::InvalidCellReference("PivotTable output exceeds the BIFF8 grid".to_string())
             })?;
             base.checked_add(amount).ok_or_else(|| {
-                XlsError::InvalidCellReference(
-                    "PivotTable output exceeds the BIFF8 grid".to_string(),
-                )
+                Error::InvalidCellReference("PivotTable output exceeds the BIFF8 grid".to_string())
             })
         };
         let mut staged = Vec::new();
         let mut add = |row: u16,
                        col: u16,
-                       value: XlsCellValue,
+                       value: CellValue,
                        pivot_xf_role: Option<PivotCellXfRole>|
-         -> XlsResult<()> {
+         -> Result<()> {
             staged.push(WritableCell::new(
                 CellPos::try_new(u32::from(row), col)?,
                 value,
@@ -2422,13 +2381,13 @@ impl XlsWriter {
             add(
                 page_row,
                 0,
-                XlsCellValue::String(pf.cache_name.clone()),
+                CellValue::String(pf.cache_name.clone()),
                 Some(PivotCellXfRole::HeaderAccent),
             )?;
             add(
                 page_row,
                 1,
-                XlsCellValue::String("(All)".to_string()),
+                CellValue::String("(All)".to_string()),
                 Some(PivotCellXfRole::HeaderPlain),
             )?;
         }
@@ -2438,7 +2397,7 @@ impl XlsWriter {
             add(
                 fr,
                 fc,
-                XlsCellValue::String(di.name.clone()),
+                CellValue::String(di.name.clone()),
                 Some(PivotCellXfRole::HeaderAccent),
             )?;
         }
@@ -2446,7 +2405,7 @@ impl XlsWriter {
             add(
                 fr,
                 fdc,
-                XlsCellValue::String("Column Labels".to_string()),
+                CellValue::String("Column Labels".to_string()),
                 Some(PivotCellXfRole::HeaderAccent),
             )?;
         }
@@ -2455,21 +2414,21 @@ impl XlsWriter {
         add(
             fhr,
             fc,
-            XlsCellValue::String("Row Labels".to_string()),
+            CellValue::String("Row Labels".to_string()),
             Some(PivotCellXfRole::HeaderAccent),
         )?;
         for (j, ci) in col_items.iter().enumerate() {
             add(
                 fhr,
                 offset(fdc, j)?,
-                XlsCellValue::String(ci.clone()),
+                CellValue::String(ci.clone()),
                 Some(PivotCellXfRole::HeaderPlain),
             )?;
         }
         add(
             fhr,
             lc,
-            XlsCellValue::String("Grand Total".to_string()),
+            CellValue::String("Grand Total".to_string()),
             Some(PivotCellXfRole::HeaderPlain),
         )?;
 
@@ -2522,21 +2481,21 @@ impl XlsWriter {
             add(
                 r,
                 fc,
-                XlsCellValue::String(ri_name.clone()),
+                CellValue::String(ri_name.clone()),
                 Some(PivotCellXfRole::RowLabel),
             )?;
             for (j, cell_val) in grid[i].iter().enumerate() {
                 add(
                     r,
                     offset(fdc, j)?,
-                    XlsCellValue::Number(*cell_val),
+                    CellValue::Number(*cell_val),
                     Some(PivotCellXfRole::Value),
                 )?;
             }
             add(
                 r,
                 lc,
-                XlsCellValue::Number(*row_total),
+                CellValue::Number(*row_total),
                 Some(PivotCellXfRole::Value),
             )?;
         }
@@ -2545,21 +2504,21 @@ impl XlsWriter {
         add(
             lr,
             fc,
-            XlsCellValue::String("Grand Total".to_string()),
+            CellValue::String("Grand Total".to_string()),
             Some(PivotCellXfRole::RowLabel),
         )?;
         for (j, col_total) in col_totals.iter().enumerate() {
             add(
                 lr,
                 offset(fdc, j)?,
-                XlsCellValue::Number(*col_total),
+                CellValue::Number(*col_total),
                 Some(PivotCellXfRole::Value),
             )?;
         }
         add(
             lr,
             lc,
-            XlsCellValue::Number(grand_total),
+            CellValue::Number(grand_total),
             Some(PivotCellXfRole::Value),
         )?;
         for cell in staged {
@@ -2573,7 +2532,7 @@ impl XlsWriter {
     ///
     /// Returns `(sorted_labels, cache_to_sorted)` where `cache_to_sorted[i]`
     /// gives the position of original cache item `i` in the sorted output.
-    fn sorted_cache_items(field: Option<&XlsPivotFieldConfig>) -> (Vec<String>, Vec<usize>) {
+    fn sorted_cache_items(field: Option<&PivotFieldConfig>) -> (Vec<String>, Vec<usize>) {
         let Some(f) = field else {
             return (Vec::new(), Vec::new());
         };
@@ -2603,11 +2562,11 @@ impl XlsWriter {
     /// The reference must currently be a simple A1 or A1:B10 style range
     /// without sheet qualifiers. More complex formulas will be rejected
     /// at serialization time to avoid emitting invalid BIFF payloads.
-    pub fn define_name(&mut self, name: &str, reference: &str) -> XlsResult<()> {
+    pub fn define_name(&mut self, name: &str, reference: &str) -> Result<()> {
         Self::validate_defined_name(name)?;
 
         if self.worksheets.is_empty() {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "define_name: workbook must have at least one worksheet".to_string(),
             ));
         }
@@ -2635,21 +2594,16 @@ impl XlsWriter {
     /// Define a sheet-scoped named range.
     ///
     /// `sheet` is a 0-based worksheet index.
-    pub fn define_name_local(
-        &mut self,
-        name: &str,
-        reference: &str,
-        sheet: usize,
-    ) -> XlsResult<()> {
+    pub fn define_name_local(&mut self, name: &str, reference: &str, sheet: usize) -> Result<()> {
         Self::validate_defined_name(name)?;
 
         let _ = self
             .worksheets
             .get(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
 
         let itab = u16::try_from(sheet + 1).map_err(|_| {
-            XlsError::InvalidData(
+            Error::InvalidData(
                 "define_name_local: sheet index exceeds BIFF8 itab limit".to_string(),
             )
         })?;
@@ -2675,11 +2629,11 @@ impl XlsWriter {
         name: &str,
         reference: &str,
         comment: &str,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         Self::validate_defined_name(name)?;
 
         if self.worksheets.is_empty() {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "define_name_with_comment: workbook must have at least one worksheet".to_string(),
             ));
         }
@@ -2711,18 +2665,15 @@ impl XlsWriter {
     }
 
     /// Get all defined names in this workbook.
-    pub fn named_ranges(&self) -> &[XlsDefinedName] {
+    pub fn named_ranges(&self) -> &[DefinedName] {
         &self.defined_names
     }
 
     /// Add complete inert BIFF8 defined-name metadata.
-    pub fn add_defined_name_record(
-        &mut self,
-        options: XlsDefinedNameRecordOptions,
-    ) -> XlsResult<usize> {
+    pub fn add_defined_name_record(&mut self, options: DefinedNameRecordOptions) -> Result<usize> {
         options.validate(self.worksheets.len())?;
         if self.defined_names.len() + self.defined_name_records.len() >= usize::from(u16::MAX) {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "defined name count exceeds BIFF8 bound".to_string(),
             ));
         }
@@ -2735,13 +2686,13 @@ impl XlsWriter {
     /// Add complete inert `Lbl` metadata and its ordered BIFF8 future records.
     pub fn add_defined_name_record_with_future_records(
         &mut self,
-        options: XlsDefinedNameRecordOptions,
-        future: crate::XlsDefinedNameFutureRecords,
-    ) -> XlsResult<usize> {
+        options: DefinedNameRecordOptions,
+        future: crate::DefinedNameFutureRecords,
+    ) -> Result<usize> {
         options.validate(self.worksheets.len())?;
         named_range::validate_future_records(&future, options.serialized_name())?;
         if self.defined_names.len() + self.defined_name_records.len() >= usize::from(u16::MAX) {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "defined name count exceeds BIFF8 bound".to_string(),
             ));
         }
@@ -2757,15 +2708,15 @@ impl XlsWriter {
     /// UI, i.e. the number of characters of the "0" glyph in the default
     /// font. Internally this is converted to BIFF8 units of 1/256 characters
     /// for the COLINFO record.
-    pub fn set_column_width(&mut self, sheet: usize, col: u16, width_chars: f64) -> XlsResult<()> {
+    pub fn set_column_width(&mut self, sheet: usize, col: u16, width_chars: f64) -> Result<()> {
         if col >= 256 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "set_column_width: column index must be < 256 for BIFF8".to_string(),
             ));
         }
 
         if !(width_chars.is_finite()) || width_chars <= 0.0 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "set_column_width: width must be a positive finite value".to_string(),
             ));
         }
@@ -2773,7 +2724,7 @@ impl XlsWriter {
         let max_units = 255u32 * 256u32; // Excel maximum column width
         let width_units_f = (width_chars * 256.0).round();
         if width_units_f <= 0.0 || width_units_f > max_units as f64 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "set_column_width: width exceeds Excel's maximum (255 characters)".to_string(),
             ));
         }
@@ -2783,15 +2734,15 @@ impl XlsWriter {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.set_column_width(col, width_units);
         Ok(())
     }
 
     /// Hide a column.
-    pub fn hide_column(&mut self, sheet: usize, col: u16) -> XlsResult<()> {
+    pub fn hide_column(&mut self, sheet: usize, col: u16) -> Result<()> {
         if col >= 256 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "hide_column: column index must be < 256 for BIFF8".to_string(),
             ));
         }
@@ -2799,15 +2750,15 @@ impl XlsWriter {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.hide_column(col);
         Ok(())
     }
 
     /// Show a previously hidden column.
-    pub fn show_column(&mut self, sheet: usize, col: u16) -> XlsResult<()> {
+    pub fn show_column(&mut self, sheet: usize, col: u16) -> Result<()> {
         if col >= 256 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "show_column: column index must be < 256 for BIFF8".to_string(),
             ));
         }
@@ -2815,7 +2766,7 @@ impl XlsWriter {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.show_column(col);
         Ok(())
     }
@@ -2827,22 +2778,20 @@ impl XlsWriter {
         last_row: u32,
         first_col: u16,
         last_col: u16,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         let range = MergedRange::try_new(first_row, last_row, first_col, last_col)?;
 
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
 
         if worksheet
             .merged_ranges
             .iter()
             .any(|existing| range.overlaps(*existing))
         {
-            return Err(XlsError::InvalidData(
-                "merged-cell ranges overlap".to_string(),
-            ));
+            return Err(Error::InvalidData("merged-cell ranges overlap".to_string()));
         }
 
         worksheet.add_merged_range(range);
@@ -2854,41 +2803,34 @@ impl XlsWriter {
     ///
     /// Row and column indices are 0-based and represent the number of
     /// rows/columns at the top/left that remain frozen.
-    pub fn freeze_panes(
-        &mut self,
-        sheet: usize,
-        freeze_rows: u32,
-        freeze_cols: u16,
-    ) -> XlsResult<()> {
+    pub fn freeze_panes(&mut self, sheet: usize, freeze_rows: u32, freeze_cols: u16) -> Result<()> {
         if freeze_rows == 0 && freeze_cols == 0 {
             let worksheet = self
                 .worksheets
                 .get_mut(sheet)
-                .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+                .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
             worksheet.clear_freeze_panes();
             return Ok(());
         }
         let freeze_rows = u16::try_from(freeze_rows).map_err(|_| {
-            XlsError::InvalidCellReference("freeze-panes row is outside the BIFF8 grid".to_string())
+            Error::InvalidCellReference("freeze-panes row is outside the BIFF8 grid".to_string())
         })?;
         let freeze_cols = u8::try_from(freeze_cols).map_err(|_| {
-            XlsError::InvalidCellReference(
-                "freeze-panes column is outside the BIFF8 grid".to_string(),
-            )
+            Error::InvalidCellReference("freeze-panes column is outside the BIFF8 grid".to_string())
         })?;
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.set_freeze_panes(freeze_rows, freeze_cols)
     }
 
     /// Remove any freeze panes from the specified worksheet.
-    pub fn unfreeze_panes(&mut self, sheet: usize) -> XlsResult<()> {
+    pub fn unfreeze_panes(&mut self, sheet: usize) -> Result<()> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.clear_freeze_panes();
         Ok(())
     }
@@ -2898,11 +2840,11 @@ impl XlsWriter {
         &mut self,
         sheet: usize,
         scale: Option<crate::writer::view::Scale>,
-    ) -> XlsResult<Option<crate::writer::view::Scale>> {
+    ) -> Result<Option<crate::writer::view::Scale>> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         Ok(worksheet.put_scale(scale))
     }
 
@@ -2911,12 +2853,12 @@ impl XlsWriter {
         &mut self,
         sheet: usize,
         view: crate::writer::view::View,
-    ) -> XlsResult<crate::writer::view::View> {
+    ) -> Result<crate::writer::view::View> {
         view.validate()?;
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         Ok(std::mem::replace(&mut worksheet.view, view))
     }
 
@@ -2926,14 +2868,14 @@ impl XlsWriter {
         sheet: usize,
         pane: crate::writer::view::Pane,
         selections: Vec<crate::writer::view::Selection>,
-    ) -> XlsResult<(
+    ) -> Result<(
         Option<crate::writer::view::Pane>,
         Vec<crate::writer::view::Selection>,
     )> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.view.put_pane(pane, selections)
     }
 
@@ -2942,22 +2884,22 @@ impl XlsWriter {
     /// The row index is 0-based (0 = first row), and the height is specified
     /// in typographic points. Internally this is converted to twips
     /// (1/20th of a point) for the BIFF8 ROW record.
-    pub fn set_row_height(&mut self, sheet: usize, row: u32, height_points: f64) -> XlsResult<()> {
+    pub fn set_row_height(&mut self, sheet: usize, row: u32, height_points: f64) -> Result<()> {
         if !(height_points.is_finite()) || height_points <= 0.0 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "set_row_height: height must be a positive finite value".to_string(),
             ));
         }
 
         if row > u16::MAX as u32 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "set_row_height: row index must be <= 65535 for BIFF8".to_string(),
             ));
         }
 
         let height_units_f = (height_points * 20.0).round();
         if height_units_f <= 0.0 || height_units_f > u16::MAX as f64 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "set_row_height: height exceeds BIFF8 row height limit".to_string(),
             ));
         }
@@ -2967,15 +2909,15 @@ impl XlsWriter {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.set_row_height(row, height_units);
         Ok(())
     }
 
     /// Hide a row.
-    pub fn hide_row(&mut self, sheet: usize, row: u32) -> XlsResult<()> {
+    pub fn hide_row(&mut self, sheet: usize, row: u32) -> Result<()> {
         if row > u16::MAX as u32 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "hide_row: row index must be <= 65535 for BIFF8".to_string(),
             ));
         }
@@ -2983,15 +2925,15 @@ impl XlsWriter {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.hide_row(row);
         Ok(())
     }
 
     /// Show a previously hidden row.
-    pub fn show_row(&mut self, sheet: usize, row: u32) -> XlsResult<()> {
+    pub fn show_row(&mut self, sheet: usize, row: u32) -> Result<()> {
         if row > u16::MAX as u32 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "show_row: row index must be <= 65535 for BIFF8".to_string(),
             ));
         }
@@ -2999,30 +2941,26 @@ impl XlsWriter {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.show_row(row);
         Ok(())
     }
 
     /// Add a data validation rule to the specified worksheet.
-    pub fn add_data_validation(
-        &mut self,
-        sheet: usize,
-        validation: XlsDataValidation,
-    ) -> XlsResult<()> {
+    pub fn add_data_validation(&mut self, sheet: usize, validation: DataValidation) -> Result<()> {
         let payload = prepare_data_validation(&validation)?;
 
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
 
         let range = validation.range;
         worksheet.add_data_validation(
             validation,
             payload,
             vec![range],
-            XlsDataValidationOptions::default(),
+            DataValidationOptions::default(),
         );
 
         Ok(())
@@ -3032,18 +2970,16 @@ impl XlsWriter {
     pub fn add_data_validation_with_options(
         &mut self,
         sheet: usize,
-        validation: XlsDataValidation,
-        additional_ranges: &[XlsDataValidationRange],
-        options: XlsDataValidationOptions,
-    ) -> XlsResult<()> {
+        validation: DataValidation,
+        additional_ranges: &[DataValidationRange],
+        options: DataValidationOptions,
+    ) -> Result<()> {
         let payload = prepare_data_validation(&validation)?;
         let range_count = 1usize
             .checked_add(additional_ranges.len())
-            .ok_or_else(|| XlsError::InvalidData("DV range count overflows".to_string()))?;
+            .ok_or_else(|| Error::InvalidData("DV range count overflows".to_string()))?;
         if range_count > 432 {
-            return Err(XlsError::InvalidData(
-                "DV range count exceeds 432".to_string(),
-            ));
+            return Err(Error::InvalidData("DV range count exceeds 432".to_string()));
         }
         let mut ranges = Vec::with_capacity(range_count);
         ranges.push(validation.range);
@@ -3051,7 +2987,7 @@ impl XlsWriter {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.add_data_validation(validation, payload, ranges, options);
         Ok(())
     }
@@ -3060,36 +2996,32 @@ impl XlsWriter {
     pub fn set_data_validation_table_options(
         &mut self,
         sheet: usize,
-        options: XlsDataValidationTableOptions,
-    ) -> XlsResult<()> {
+        options: DataValidationTableOptions,
+    ) -> Result<()> {
         if options.x_left > 65_535
             || options.y_top > 65_535
             || matches!(options.dropdown_object_id, Some(0))
             || options.dropdown_object_id.is_some_and(|id| id > 32_767)
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "DVAL metadata is out of range".to_string(),
             ));
         }
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.data_validation_table_options = Some(options);
         Ok(())
     }
 
-    pub fn add_conditional_format(
-        &mut self,
-        sheet: usize,
-        cf: XlsConditionalFormat,
-    ) -> XlsResult<()> {
+    pub fn add_conditional_format(&mut self, sheet: usize, cf: ConditionalFormat) -> Result<()> {
         if cf.first_row > cf.last_row
             || cf.first_col > cf.last_col
             || cf.last_row > 65_535
             || cf.last_col > 255
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "add_conditional_format: first row/col must be <= last row/col".to_string(),
             ));
         }
@@ -3097,7 +3029,7 @@ impl XlsWriter {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
 
         worksheet.add_conditional_format(cf);
 
@@ -3108,15 +3040,15 @@ impl XlsWriter {
     pub fn add_conditional_format_group(
         &mut self,
         sheet: usize,
-        group: XlsConditionalFormatGroup,
-    ) -> XlsResult<()> {
+        group: ConditionalFormatGroup,
+    ) -> Result<()> {
         if group.ranges.is_empty() || group.ranges.len() > 1026 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "conditional-format range count must be 1..=1026".to_string(),
             ));
         }
         if group.rules.is_empty() || group.rules.len() > 3 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "legacy conditional-format rule count must be 1..=3".to_string(),
             ));
         }
@@ -3126,7 +3058,7 @@ impl XlsWriter {
                 || range.last_row > 65_535
                 || range.last_col > 255
             {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "conditional-format range is outside BIFF8 bounds".to_string(),
                 ));
             }
@@ -3136,7 +3068,7 @@ impl XlsWriter {
         }
         self.worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?
             .add_conditional_format_group(group);
         Ok(())
     }
@@ -3146,15 +3078,15 @@ impl XlsWriter {
     pub fn add_conditional_format12_group(
         &mut self,
         sheet: usize,
-        group: XlsConditionalFormat12Group,
-    ) -> XlsResult<()> {
+        group: ConditionalFormat12Group,
+    ) -> Result<()> {
         if group.ranges.is_empty() || group.ranges.len() > 1026 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "future conditional-format range count must be 1..=1026".to_string(),
             ));
         }
         if group.rules.is_empty() || group.rules.len() > usize::from(u16::MAX) {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "future conditional-format rule count must be 1..=65535".to_string(),
             ));
         }
@@ -3164,7 +3096,7 @@ impl XlsWriter {
                 || range.last_row > 65_535
                 || range.last_col > 255
             {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "future conditional-format range is outside BIFF8 bounds".to_string(),
                 ));
             }
@@ -3172,9 +3104,9 @@ impl XlsWriter {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         if worksheet.conditional_formats.len() + worksheet.conditional_formats12.len() >= 32_768 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "conditional-format group count exceeds the 15-bit BIFF identifier space"
                     .to_string(),
             ));
@@ -3186,39 +3118,39 @@ impl XlsWriter {
             .collect::<HashSet<_>>();
         for rule in &group.rules {
             if rule.priority == 0 || !priorities.insert(rule.priority) {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "future conditional-format priorities must be nonzero and unique per sheet"
                         .to_string(),
                 ));
             }
             if !matches!(rule.template, 0..=5 | 7..=12 | 15..=27 | 29 | 30) {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "future conditional-format template is invalid".to_string(),
                 ));
             }
             let between = matches!(
                 rule.format_type,
-                XlsConditionalFormat12Type::CellValue {
-                    operator: XlsConditionalFormatOperator::Between
-                        | XlsConditionalFormatOperator::NotBetween,
+                ConditionalFormat12Type::CellValue {
+                    operator: ConditionalFormatOperator::Between
+                        | ConditionalFormatOperator::NotBetween,
                     ..
                 }
             );
-            if let XlsConditionalFormat12Type::CellValue { formula2, .. } = &rule.format_type
+            if let ConditionalFormat12Type::CellValue { formula2, .. } = &rule.format_type
                 && between != formula2.is_some()
             {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                         "between/not-between CF12 rules require two formulas; other comparisons require one".to_string(),
                     ));
             }
             let visual = matches!(
                 rule.format_type,
-                XlsConditionalFormat12Type::ColorScale { .. }
-                    | XlsConditionalFormat12Type::DataBar { .. }
-                    | XlsConditionalFormat12Type::IconSet { .. }
+                ConditionalFormat12Type::ColorScale { .. }
+                    | ConditionalFormat12Type::DataBar { .. }
+                    | ConditionalFormat12Type::IconSet { .. }
             );
             if visual && (rule.stop_if_true || rule.differential_format != [0, 0, 0, 0, 0, 0]) {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "visual CF12 rules require an empty DXFN12 and cannot stop-if-true".to_string(),
                 ));
             }
@@ -3247,17 +3179,17 @@ impl XlsWriter {
         &mut self,
         sheet: usize,
         pos: CellPos,
-        value: XlsCellValue,
+        value: CellValue,
         format_id: u16,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         if self.fmt.get_format(format_id).is_none() {
-            return Err(XlsError::InvalidFormat(format_id));
+            return Err(Error::InvalidFormat(format_id));
         }
 
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
 
         worksheet.add_cell(WritableCell::new(pos, value, format_id, None));
 
@@ -3273,24 +3205,21 @@ impl XlsWriter {
         self.use_1904_dates = use_1904;
     }
 
-    pub fn set_workbook_environment(
-        &mut self,
-        options: XlsWorkbookEnvironmentOptions,
-    ) -> XlsResult<()> {
+    pub fn set_workbook_environment(&mut self, options: WorkbookEnvironmentOptions) -> Result<()> {
         if options.refresh_external_data_on_load && !options.template {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "RefreshAll requires a template workbook".to_string(),
             ));
         }
         if (options.envelope_visible || options.envelope_initialized) && !options.has_envelope {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "envelope state flags require has_envelope".to_string(),
             ));
         }
         if !(1..=981).contains(&options.default_country_code)
             || !(1..=981).contains(&options.current_country_code)
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "country codes must be 1..=981".to_string(),
             ));
         }
@@ -3300,7 +3229,7 @@ impl XlsWriter {
 
     /// Set the workbook extension flags emitted as a `BookExt` record
     /// (MS-XLS 2.4.23); `None` emits no record.
-    pub fn set_book_ext(&mut self, book_ext: Option<crate::XlsBookExt>) {
+    pub fn set_book_ext(&mut self, book_ext: Option<crate::BookExt>) {
         self.book_ext = book_ext;
     }
 
@@ -3308,16 +3237,16 @@ impl XlsWriter {
     /// record (MS-XLS 2.4.214) in the workbook globals.
     ///
     /// When the topic shares a prefix with the previously added topic, set
-    /// [`crate::XlsRealTimeData::common_prefix_len`] and store only the
+    /// [`crate::RealTimeData::common_prefix_len`] and store only the
     /// trailing sub-strings in `topic_segments`, matching the on-disk prefix
     /// compression.
-    pub fn add_real_time_data(&mut self, topic: crate::XlsRealTimeData) -> XlsResult<()> {
+    pub fn add_real_time_data(&mut self, topic: crate::RealTimeData) -> Result<()> {
         if let Some(cell) = topic
             .cells
             .iter()
             .find(|cell| usize::from(cell.sheet_index) >= self.worksheets.len())
         {
-            return Err(XlsError::WorksheetNotFound(format!(
+            return Err(Error::WorksheetNotFound(format!(
                 "Sheet {}",
                 cell.sheet_index
             )));
@@ -3328,7 +3257,7 @@ impl XlsWriter {
 
     /// Append a Web page published from the workbook globals, emitted as a
     /// `WebPub` record (MS-XLS 2.4.344).
-    pub fn add_web_publication(&mut self, publication: crate::XlsWebPub) -> XlsResult<()> {
+    pub fn add_web_publication(&mut self, publication: crate::WebPub) -> Result<()> {
         publication.validate_for_write()?;
         self.web_publications.push(publication);
         Ok(())
@@ -3339,13 +3268,13 @@ impl XlsWriter {
     pub fn add_sheet_web_publication(
         &mut self,
         sheet: usize,
-        publication: crate::XlsWebPub,
-    ) -> XlsResult<()> {
+        publication: crate::WebPub,
+    ) -> Result<()> {
         publication.validate_for_write()?;
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.web_publications.push(publication);
         Ok(())
     }
@@ -3355,12 +3284,12 @@ impl XlsWriter {
     pub fn set_phonetic_info(
         &mut self,
         sheet: usize,
-        phonetic_info: Option<crate::XlsPhoneticInfo>,
-    ) -> XlsResult<()> {
+        phonetic_info: Option<crate::PhoneticInfo>,
+    ) -> Result<()> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.phonetic_info = phonetic_info;
         Ok(())
     }
@@ -3368,31 +3297,31 @@ impl XlsWriter {
     /// Set the document theme emitted as a `Theme` record (MS-XLS 2.4.326);
     /// `None` emits no record. Large custom theme contents are chunked into
     /// ContinueFrt12 records automatically.
-    pub fn set_theme(&mut self, theme: Option<crate::XlsTheme>) {
+    pub fn set_theme(&mut self, theme: Option<crate::Theme>) {
         self.theme = theme;
     }
 
     /// Set the MDX (OLAP cube) metadata emitted as the workbook globals
     /// `METADATA` production (MS-XLS 2.1); `None` emits no records. Oversized
     /// record payloads are chunked into ContinueFrt12 records automatically.
-    pub fn set_mdx_metadata(&mut self, metadata: Option<crate::XlsMdxMetadata>) {
+    pub fn set_mdx_metadata(&mut self, metadata: Option<crate::MdxMetadata>) {
         self.mdx_metadata = metadata;
     }
 
     /// Set the `XFExt` formatting property extensions (MS-XLS 2.4.355)
     /// emitted after the XF table. Each extension's `xf_index` is validated
     /// against the written XF record count when the workbook is saved.
-    pub fn set_xf_extensions(&mut self, xf_extensions: Vec<crate::XlsXfExt>) {
+    pub fn set_xf_extensions(&mut self, xf_extensions: Vec<crate::XfExt>) {
         self.xf_extensions = xf_extensions;
     }
 
     /// Set the `StyleExt` cell-style extensions (MS-XLS 2.4.270) emitted
     /// after the built-in STYLE records.
-    pub fn set_style_extensions(&mut self, style_extensions: Vec<crate::XlsStyleExt>) {
+    pub fn set_style_extensions(&mut self, style_extensions: Vec<crate::StyleExt>) {
         self.style_extensions = style_extensions;
     }
 
-    pub fn set_workbook_window(&mut self, options: XlsWorkbookWindowOptions) -> XlsResult<()> {
+    pub fn set_workbook_window(&mut self, options: WorkbookWindowOptions) -> Result<()> {
         options.validate_intrinsic()?;
         self.workbook_window_options = options;
         self.synchronize_workbook_window_selection();
@@ -3413,7 +3342,7 @@ impl XlsWriter {
         }
     }
 
-    pub fn set_function_groups(&mut self, options: XlsFunctionGroupOptions) -> XlsResult<()> {
+    pub fn set_function_groups(&mut self, options: FunctionGroupOptions) -> Result<()> {
         options.validate()?;
         self.function_group_options = options;
         Ok(())
@@ -3421,15 +3350,15 @@ impl XlsWriter {
 
     pub fn add_external_workbook_link(
         &mut self,
-        options: XlsExternalWorkbookOptions,
-    ) -> XlsResult<usize> {
+        options: ExternalWorkbookOptions,
+    ) -> Result<usize> {
         options.validate()?;
         if self.external_workbooks.len()
             + self.dde_or_ole_links.len()
             + usize::from(!self.add_in_functions.is_empty())
             >= 1024
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "external supporting-book count exceeds resource bound".to_string(),
             ));
         }
@@ -3452,17 +3381,17 @@ impl XlsWriter {
     pub fn add_external_defined_name(
         &mut self,
         external_workbook: usize,
-        options: XlsExternalDefinedNameOptions,
-    ) -> XlsResult<usize> {
+        options: ExternalDefinedNameOptions,
+    ) -> Result<usize> {
         let book = self
             .external_workbooks
             .get(external_workbook)
             .ok_or_else(|| {
-                XlsError::InvalidData("external workbook index is out of range".to_string())
+                Error::InvalidData("external workbook index is out of range".to_string())
             })?;
         options.validate(book.sheets.len())?;
         if self.external_name_count() >= 4096 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "external name count exceeds resource bound".to_string(),
             ));
         }
@@ -3472,17 +3401,17 @@ impl XlsWriter {
         Ok(index)
     }
 
-    pub fn add_add_in_function(&mut self, options: XlsAddInFunctionOptions) -> XlsResult<usize> {
+    pub fn add_add_in_function(&mut self, options: AddInFunctionOptions) -> Result<usize> {
         options.validate()?;
         if self.add_in_functions.is_empty()
             && self.external_workbooks.len() + self.dde_or_ole_links.len() >= 1024
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "supporting-book count exceeds resource bound".to_string(),
             ));
         }
         if self.external_name_count() >= 4096 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "add-in function count exceeds resource bound".to_string(),
             ));
         }
@@ -3491,14 +3420,14 @@ impl XlsWriter {
         Ok(index)
     }
 
-    pub fn add_dde_or_ole_link(&mut self, options: XlsDdeOrOleLinkOptions) -> XlsResult<usize> {
+    pub fn add_dde_or_ole_link(&mut self, options: DdeOrOleLinkOptions) -> Result<usize> {
         options.validate()?;
         if self.external_workbooks.len()
             + self.dde_or_ole_links.len()
             + usize::from(!self.add_in_functions.is_empty())
             >= 1024
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "supporting-book count exceeds resource bound".to_string(),
             ));
         }
@@ -3507,7 +3436,7 @@ impl XlsWriter {
             .checked_add(options.items.len())
             .is_none_or(|count| count > 4096)
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "external name count exceeds resource bound".to_string(),
             ));
         }
@@ -3516,14 +3445,14 @@ impl XlsWriter {
         Ok(index)
     }
 
-    pub fn set_calculation_settings(&mut self, settings: XlsCalculationSettings) -> XlsResult<()> {
+    pub fn set_calculation_settings(&mut self, settings: CalculationSettings) -> Result<()> {
         if !(1..=32_767).contains(&settings.maximum_iterations) {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "maximum calculation iterations must be 1..=32767".to_string(),
             ));
         }
         if !settings.iteration_delta.is_finite() || settings.iteration_delta < 0.0 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "calculation iteration delta must be finite and non-negative".to_string(),
             ));
         }
@@ -3531,11 +3460,11 @@ impl XlsWriter {
         Ok(())
     }
 
-    pub fn set_recalculation_pending(&mut self, sheet: usize, pending: bool) -> XlsResult<()> {
+    pub fn set_recalculation_pending(&mut self, sheet: usize, pending: bool) -> Result<()> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.formulas_pending_recalculation = pending;
         Ok(())
     }
@@ -3543,22 +3472,22 @@ impl XlsWriter {
     pub fn set_scenario_manager(
         &mut self,
         sheet: usize,
-        manager: crate::XlsScenarioManager,
-    ) -> XlsResult<()> {
+        manager: crate::ScenarioManager,
+    ) -> Result<()> {
         manager.validate_for_write()?;
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.scenario_manager = Some(manager);
         Ok(())
     }
 
-    pub fn clear_scenario_manager(&mut self, sheet: usize) -> XlsResult<()> {
+    pub fn clear_scenario_manager(&mut self, sheet: usize) -> Result<()> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.scenario_manager = None;
         Ok(())
     }
@@ -3567,22 +3496,22 @@ impl XlsWriter {
     pub fn set_consolidation(
         &mut self,
         sheet: usize,
-        consolidation: crate::XlsConsolidation,
-    ) -> XlsResult<()> {
+        consolidation: crate::Consolidation,
+    ) -> Result<()> {
         consolidation.validate_for_write()?;
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.consolidation = Some(consolidation);
         Ok(())
     }
 
-    pub fn clear_consolidation(&mut self, sheet: usize) -> XlsResult<()> {
+    pub fn clear_consolidation(&mut self, sheet: usize) -> Result<()> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.consolidation = None;
         Ok(())
     }
@@ -3592,7 +3521,7 @@ impl XlsWriter {
         &mut self,
         workbook_code_name: &str,
         project: litchi_vba::build::Project,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         self.set_vba_with(workbook_code_name, project, &litchi_vba::Limits::default())
     }
 
@@ -3605,7 +3534,7 @@ impl XlsWriter {
         workbook_code_name: &str,
         project: litchi_vba::build::Project,
         limits: &litchi_vba::Limits,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         crate::vba::validate_code_name(workbook_code_name)?;
         let payload = project.finish(limits)?;
         self.put_vba(workbook_code_name, payload)
@@ -3618,9 +3547,9 @@ impl XlsWriter {
         &mut self,
         workbook_code_name: &str,
         payload: litchi_vba::Payload,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         crate::vba::validate_code_name(workbook_code_name)?;
-        self.vba_metadata = Some(XlsVbaWriteMetadata {
+        self.vba_metadata = Some(VbaWriteMetadata {
             workbook_code_name: workbook_code_name.to_string(),
             project: payload,
         });
@@ -3643,22 +3572,18 @@ impl XlsWriter {
     /// Set a worksheet's tab color as a BIFF8 palette index (SHEETEXT
     /// `icvPlain`, MS-XLS 2.4.259). Valid indices are 0x08 through 0x3F;
     /// `None` clears an explicitly set color.
-    pub fn set_worksheet_tab_color(
-        &mut self,
-        sheet: usize,
-        tab_color: Option<u8>,
-    ) -> XlsResult<()> {
+    pub fn set_worksheet_tab_color(&mut self, sheet: usize, tab_color: Option<u8>) -> Result<()> {
         if let Some(index) = tab_color
             && !(0x08..=0x3F).contains(&index)
         {
-            return Err(XlsError::InvalidData(format!(
+            return Err(Error::InvalidData(format!(
                 "sheet tab color index {index:#04X} is outside the Icv palette"
             )));
         }
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.tab_color = tab_color;
         Ok(())
     }
@@ -3672,39 +3597,39 @@ impl XlsWriter {
         sheet: usize,
         anchor_row: u32,
         anchor_col: u16,
-        table: crate::XlsDataTable,
-    ) -> XlsResult<()> {
+        table: crate::DataTable,
+    ) -> Result<()> {
         let anchor_pos = CellPos::try_new(anchor_row, anchor_col)?;
         let range = table.range();
         let inside = (u32::from(range.first_row())..=u32::from(range.last_row()))
             .contains(&anchor_row)
             && (range.first_col()..=range.last_col()).contains(&anchor_pos.col());
         if inside {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "data-table anchor formula cell must lie outside the table range".to_string(),
             ));
         }
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         if worksheet
             .data_tables
             .iter()
             .any(|(row, col, _)| (*row, *col) == (anchor_row, anchor_col))
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "duplicate data-table anchor cell".to_string(),
             ));
         }
         if let Some(cell) = worksheet.cells.get(&(anchor_row, anchor_col)) {
-            if !matches!(cell.value, XlsCellValue::Blank) {
-                return Err(XlsError::InvalidData(
+            if !matches!(cell.value, CellValue::Blank) {
+                return Err(Error::InvalidData(
                     "data-table anchor cell already carries a value".to_string(),
                 ));
             }
         } else {
-            worksheet.add_cell(WritableCell::new(anchor_pos, XlsCellValue::Blank, 0, None));
+            worksheet.add_cell(WritableCell::new(anchor_pos, CellValue::Blank, 0, None));
         }
         worksheet.data_tables.push((anchor_row, anchor_col, table));
         Ok(())
@@ -3714,9 +3639,9 @@ impl XlsWriter {
         &mut self,
         sheet: usize,
         code_name: Option<&str>,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         if self.vba_metadata.is_none() && code_name.is_some() {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "worksheet VBA code names require an enabled VBA project".to_string(),
             ));
         }
@@ -3726,7 +3651,7 @@ impl XlsWriter {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.vba_code_name = code_name.map(str::to_string);
         Ok(())
     }
@@ -3735,19 +3660,19 @@ impl XlsWriter {
     pub fn set_worksheet_layout(
         &mut self,
         sheet: usize,
-        options: XlsWorksheetLayoutOptions,
-    ) -> XlsResult<()> {
+        options: WorksheetLayoutOptions,
+    ) -> Result<()> {
         options.validate()?;
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.sheet_layout = options;
         Ok(())
     }
 
     /// Configure the complete primary worksheet print/page settings block.
-    pub fn set_page_setup(&mut self, sheet: usize, options: XlsPageSetupOptions) -> XlsResult<()> {
+    pub fn set_page_setup(&mut self, sheet: usize, options: PageSetupOptions) -> Result<()> {
         let valid_margin = |value: f64| value.is_finite() && (0.0..49.0).contains(&value);
         if !valid_margin(options.left_margin_inches)
             || !valid_margin(options.right_margin_inches)
@@ -3756,14 +3681,14 @@ impl XlsWriter {
             || !valid_margin(options.header_margin_inches)
             || !valid_margin(options.footer_margin_inches)
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "page margins must be finite and between 0 and 49 inches".to_string(),
             ));
         }
         if options.header.encode_utf16().count() > 255
             || options.footer.encode_utf16().count() > 255
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "header and footer must not exceed 255 UTF-16 code units".to_string(),
             ));
         }
@@ -3776,23 +3701,23 @@ impl XlsWriter {
             || options.copies == 0
             || options.copies > 32767
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "page setup contains an out-of-range dimension".to_string(),
             ));
         }
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.page_setup = Some(options);
         Ok(())
     }
 
-    pub fn clear_page_setup(&mut self, sheet: usize) -> XlsResult<()> {
+    pub fn clear_page_setup(&mut self, sheet: usize) -> Result<()> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.page_setup = None;
         worksheet.horizontal_page_breaks.clear();
         worksheet.vertical_page_breaks.clear();
@@ -3806,14 +3731,14 @@ impl XlsWriter {
         row: u32,
         col_start: u16,
         col_end: u16,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         let page_break = HorizontalPageBreak::try_new(row, col_start, col_end)?;
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         if worksheet.horizontal_page_breaks.len() >= 1026 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "horizontal page-break count exceeds 1026".to_string(),
             ));
         }
@@ -3822,7 +3747,7 @@ impl XlsWriter {
             .iter()
             .any(|existing| page_break.overlaps(*existing))
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "horizontal page-break ranges overlap".to_string(),
             ));
         }
@@ -3837,14 +3762,14 @@ impl XlsWriter {
         column: u16,
         row_start: u32,
         row_end: u32,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         let page_break = VerticalPageBreak::try_new(column, row_start, row_end)?;
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         if worksheet.vertical_page_breaks.len() >= 255 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "vertical page-break count exceeds 255".to_string(),
             ));
         }
@@ -3853,7 +3778,7 @@ impl XlsWriter {
             .iter()
             .any(|existing| page_break.overlaps(*existing))
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "vertical page-break ranges overlap".to_string(),
             ));
         }
@@ -3914,13 +3839,13 @@ impl XlsWriter {
         read_only_recommended: bool,
         password: Option<&str>,
         user_name: &str,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         if user_name.encode_utf16().count() > 54 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "FILESHARING username exceeds 54 UTF-16 code units".to_string(),
             ));
         }
-        self.file_sharing = Some(XlsFileSharing {
+        self.file_sharing = Some(FileSharing {
             read_only_recommended,
             password_hash: password.map(Self::hash_password),
             user_name: user_name.to_string(),
@@ -3938,14 +3863,14 @@ impl XlsWriter {
         password: Option<&str>,
         protect_objects: bool,
         protect_scenarios: bool,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
 
         let password_hash = password.map(Self::hash_password);
-        worksheet.sheet_protection = Some(XlsSheetProtection {
+        worksheet.sheet_protection = Some(SheetProtection {
             protect_objects,
             protect_scenarios,
             password_hash,
@@ -3954,11 +3879,11 @@ impl XlsWriter {
         Ok(())
     }
 
-    pub fn unprotect_sheet(&mut self, sheet: usize) -> XlsResult<()> {
+    pub fn unprotect_sheet(&mut self, sheet: usize) -> Result<()> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
         worksheet.sheet_protection = None;
         Ok(())
     }
@@ -3971,7 +3896,7 @@ impl XlsWriter {
     ///
     /// # Returns
     ///
-    /// * `Result<(), XlsError>` - Success or error
+    /// * `Result<(), Error>` - Success or error
     ///
     /// # Implementation Status
     ///
@@ -3983,7 +3908,7 @@ impl XlsWriter {
     /// ❌ Column widths / row heights
     /// ❌ Merged cells
     /// ❌ Named ranges
-    pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> XlsResult<()> {
+    pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<()> {
         // Build shared string table
         self.build_shared_strings();
 
@@ -4008,8 +3933,8 @@ impl XlsWriter {
     ///
     /// # Returns
     ///
-    /// * `Result<(), XlsError>` - Success or error
-    pub fn write_to<W: std::io::Write + std::io::Seek>(&mut self, writer: &mut W) -> XlsResult<()> {
+    /// * `Result<(), Error>` - Success or error
+    pub fn write_to<W: std::io::Write + std::io::Seek>(&mut self, writer: &mut W) -> Result<()> {
         // Build shared string table
         self.build_shared_strings();
 
@@ -4030,7 +3955,7 @@ impl XlsWriter {
         &self,
         ole_writer: &mut OleWriter,
         streams: &stream::WorkbookStreams,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         ole_writer.create_stream(&["Workbook"], &streams.workbook)?;
         if let Some(metadata) = &self.vba_metadata {
             ole_writer.create_storage(&["_VBA_PROJECT_CUR"])?;
@@ -4060,7 +3985,7 @@ impl XlsWriter {
         // Collect all unique strings from all worksheets
         for worksheet in &self.worksheets {
             for cell in worksheet.cells.values() {
-                if let XlsCellValue::String(ref s) = cell.value {
+                if let CellValue::String(ref s) = cell.value {
                     // Count total occurrences
                     self.sst_total = self.sst_total.saturating_add(1);
                     // Insert unique strings
@@ -4076,7 +4001,7 @@ impl XlsWriter {
 
     /// Generate the complete Workbook stream (plus pivot cache streams) with
     /// all BIFF records.
-    fn generate_workbook_streams(&self) -> XlsResult<stream::WorkbookStreams> {
+    fn generate_workbook_streams(&self) -> Result<stream::WorkbookStreams> {
         let mut streams = stream::generate_workbook_stream(
             self.use_1904_dates,
             self.calculation_settings,
@@ -4133,14 +4058,14 @@ impl XlsWriter {
     // ✅ Formula parsing and tokenization for the supported writer subset
 }
 
-impl Default for XlsWriter {
+impl Default for Writer {
     fn default() -> Self {
         Self::new()
     }
 }
 
 /// Iterate every OBJ identifier requested or assigned inside a shape group.
-fn group_object_ids(group: &XlsShapeGroupWrite) -> impl Iterator<Item = u16> + '_ {
+fn group_object_ids(group: &ShapeGroupWrite) -> impl Iterator<Item = u16> + '_ {
     group
         .object_id
         .into_iter()
@@ -4152,14 +4077,14 @@ fn group_object_ids(group: &XlsShapeGroupWrite) -> impl Iterator<Item = u16> + '
 fn collect_reserved_object_ids(
     worksheet: &WritableWorksheet,
     additional: usize,
-) -> XlsResult<HashSet<u16>> {
+) -> Result<HashSet<u16>> {
     let pivot_capacity = worksheet
         .pivot_tables
         .iter()
         .try_fold(0usize, |count, table| {
             count
                 .checked_add(table.page_entries.len())
-                .ok_or(XlsError::Allocation(
+                .ok_or(Error::Allocation(
                     "computing worksheet pivot-object ID capacity",
                 ))
         })?;
@@ -4169,7 +4094,7 @@ fn collect_reserved_object_ids(
         .try_fold(0usize, |count, group| {
             count
                 .checked_add(group.object_count()?)
-                .ok_or(XlsError::Allocation(
+                .ok_or(Error::Allocation(
                     "computing worksheet shape-group ID capacity",
                 ))
         })?;
@@ -4177,13 +4102,13 @@ fn collect_reserved_object_ids(
         .checked_add(worksheet.shapes.len())
         .and_then(|count| count.checked_add(group_capacity))
         .and_then(|count| count.checked_add(additional))
-        .ok_or(XlsError::Allocation(
+        .ok_or(Error::Allocation(
             "computing worksheet drawing-object ID capacity",
         ))?;
     let mut reserved = HashSet::new();
     reserved
         .try_reserve(capacity)
-        .map_err(|_| XlsError::Allocation("reserving worksheet drawing-object ID storage"))?;
+        .map_err(|_| Error::Allocation("reserving worksheet drawing-object ID storage"))?;
     reserved.extend(
         worksheet
             .pivot_tables
@@ -4197,14 +4122,12 @@ fn collect_reserved_object_ids(
 }
 
 /// Reserve the requested OBJ identifier or the first free canonical one.
-fn assign_object_id(reserved: &mut HashSet<u16>, requested: Option<u16>) -> XlsResult<u16> {
+fn assign_object_id(reserved: &mut HashSet<u16>, requested: Option<u16>) -> Result<u16> {
     let object_id = match requested {
         Some(object_id) => object_id,
         None => (1..u16::MAX)
             .find(|candidate| !reserved.contains(candidate))
-            .ok_or_else(|| {
-                XlsError::InvalidData("worksheet object IDs are exhausted".to_string())
-            })?,
+            .ok_or_else(|| Error::InvalidData("worksheet object IDs are exhausted".to_string()))?,
     };
     if requested.is_none() {
         reserved.insert(object_id);
@@ -4245,14 +4168,14 @@ mod tests {
 
     #[test]
     fn test_create_writer() {
-        let writer = XlsWriter::new();
+        let writer = Writer::new();
         assert_eq!(writer.worksheets.len(), 0);
         assert_eq!(writer.shared_strings.len(), 0);
     }
 
     #[test]
     fn test_add_worksheet() {
-        let mut writer = XlsWriter::new();
+        let mut writer = Writer::new();
         let idx = writer.add_worksheet("Sheet1").unwrap();
         assert_eq!(idx, 0);
         assert_eq!(writer.worksheets.len(), 1);
@@ -4261,7 +4184,7 @@ mod tests {
 
     #[test]
     fn test_add_multiple_worksheets() {
-        let mut writer = XlsWriter::new();
+        let mut writer = Writer::new();
         let idx1 = writer.add_worksheet("Sheet1").unwrap();
         let idx2 = writer.add_worksheet("Sheet2").unwrap();
         let idx3 = writer.add_worksheet("Sheet3").unwrap();
@@ -4274,14 +4197,14 @@ mod tests {
 
     #[test]
     fn test_add_worksheet_empty_name() {
-        let mut writer = XlsWriter::new();
+        let mut writer = Writer::new();
         let result = writer.add_worksheet("");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_add_worksheet_long_name() {
-        let mut writer = XlsWriter::new();
+        let mut writer = Writer::new();
         let long_name = "A".repeat(50);
         let result = writer.add_worksheet(&long_name);
         assert!(result.is_err()); // Name too long
@@ -4289,7 +4212,7 @@ mod tests {
 
     #[test]
     fn test_add_worksheet_duplicate_name() {
-        let mut writer = XlsWriter::new();
+        let mut writer = Writer::new();
         writer.add_worksheet("Sheet1").unwrap();
         let result = writer.add_worksheet("Sheet1");
         assert!(result.is_err());
@@ -4297,7 +4220,7 @@ mod tests {
 
     #[test]
     fn test_write_string() {
-        let mut writer = XlsWriter::new();
+        let mut writer = Writer::new();
         let sheet = writer.add_worksheet("Sheet1").unwrap();
         writer.write_string(sheet, 0, 0, "Hello").unwrap();
         assert_eq!(writer.worksheets[0].cells.len(), 1);
@@ -4305,23 +4228,23 @@ mod tests {
         let cell = writer.worksheets[0].cells.get(&(0, 0)).unwrap();
         assert_eq!(cell.row(), 0);
         assert_eq!(cell.col(), 0);
-        assert!(matches!(&cell.value, XlsCellValue::String(s) if s == "Hello"));
+        assert!(matches!(&cell.value, CellValue::String(s) if s == "Hello"));
     }
 
     #[test]
     fn test_write_number() {
-        let mut writer = XlsWriter::new();
+        let mut writer = Writer::new();
         let sheet = writer.add_worksheet("Sheet1").unwrap();
         writer.write_number(sheet, 0, 0, 42.5).unwrap();
         assert_eq!(writer.worksheets[0].cells.len(), 1);
 
         let cell = writer.worksheets[0].cells.get(&(0, 0)).unwrap();
-        assert!(matches!(&cell.value, XlsCellValue::Number(n) if *n == 42.5));
+        assert!(matches!(&cell.value, CellValue::Number(n) if *n == 42.5));
     }
 
     #[test]
     fn non_finite_cell_numbers_are_rejected_before_mutation() {
-        let mut writer = XlsWriter::new();
+        let mut writer = Writer::new();
         let sheet = writer.add_worksheet("Sheet1").unwrap();
 
         for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
@@ -4330,7 +4253,7 @@ mod tests {
             }));
             assert!(matches!(
                 result,
-                Ok(Err(XlsError::InvalidData(message)))
+                Ok(Err(Error::InvalidData(message)))
                     if message == "cell number must be finite for BIFF8 serialization"
             ));
             assert!(writer.worksheets[sheet].cells.is_empty());
@@ -4339,14 +4262,14 @@ mod tests {
 
     #[test]
     fn cell_grid_bounds_are_atomic_and_never_unwind() {
-        let mut writer = XlsWriter::new();
+        let mut writer = Writer::new();
         let sheet = writer.add_worksheet("Sheet1").unwrap();
 
         let max = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             writer.write_number(sheet, u32::from(u16::MAX), u16::from(u8::MAX), 42.5)
         }));
         assert!(matches!(max, Ok(Ok(()))));
-        let state = |writer: &XlsWriter| {
+        let state = |writer: &Writer| {
             let worksheet = &writer.worksheets[sheet];
             (
                 worksheet.cells.len(),
@@ -4364,7 +4287,7 @@ mod tests {
         }));
         assert!(matches!(
             oversized_row,
-            Ok(Err(XlsError::InvalidCellReference(_)))
+            Ok(Err(Error::InvalidCellReference(_)))
         ));
         assert_eq!(state(&writer), max_state);
 
@@ -4373,7 +4296,7 @@ mod tests {
         }));
         assert!(matches!(
             adversarial_row,
-            Ok(Err(XlsError::InvalidCellReference(_)))
+            Ok(Err(Error::InvalidCellReference(_)))
         ));
         assert_eq!(state(&writer), max_state);
 
@@ -4382,21 +4305,21 @@ mod tests {
         }));
         assert!(matches!(
             oversized_col,
-            Ok(Err(XlsError::InvalidCellReference(_)))
+            Ok(Err(Error::InvalidCellReference(_)))
         ));
         assert_eq!(state(&writer), max_state);
 
-        let table = crate::XlsDataTable::one_variable(
-            crate::XlsDataTableRange::new(2, 8, 3, 5).unwrap(),
+        let table = crate::DataTable::one_variable(
+            crate::DataTableRange::new(2, 8, 3, 5).unwrap(),
             false,
-            crate::XlsDataTableInputCell::Deleted,
+            crate::DataTableInputCell::Deleted,
         );
         let adversarial_col = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             writer.add_data_table(sheet, 0, u16::MAX, table)
         }));
         assert!(matches!(
             adversarial_col,
-            Ok(Err(XlsError::InvalidCellReference(_)))
+            Ok(Err(Error::InvalidCellReference(_)))
         ));
         assert_eq!(state(&writer), max_state);
         assert!(writer.worksheets[sheet].data_tables.is_empty());
@@ -4404,7 +4327,7 @@ mod tests {
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).unwrap();
         output.set_position(0);
-        let workbook = crate::XlsWorkbook::new(output).unwrap();
+        let workbook = crate::Workbook::new(output).unwrap();
         let cell = workbook
             .xls_worksheet(0)
             .unwrap()
@@ -4418,7 +4341,7 @@ mod tests {
 
     #[test]
     fn worksheet_location_bounds_are_atomic_and_never_unwind() {
-        let mut writer = XlsWriter::new();
+        let mut writer = Writer::new();
         let sheet = writer.add_worksheet("Grid").unwrap();
 
         writer.merge_cells(sheet, 65_534, 65_535, 254, 255).unwrap();
@@ -4428,15 +4351,15 @@ mod tests {
         writer
             .add_vertical_page_break(sheet, 255, 0, 65_535)
             .unwrap();
-        let max_range = XlsDataValidationRange::new(65_535, 65_535, 255, 255).unwrap();
+        let max_range = DataValidationRange::new(65_535, 65_535, 255, 255).unwrap();
         writer
             .add_data_validation(
                 sheet,
-                XlsDataValidation::new(max_range, XlsDataValidationType::Any),
+                DataValidation::new(max_range, DataValidationType::Any),
             )
             .unwrap();
 
-        let state = |writer: &XlsWriter| {
+        let state = |writer: &Writer| {
             let worksheet = &writer.worksheets[sheet];
             (
                 worksheet.merged_ranges.len(),
@@ -4461,16 +4384,13 @@ mod tests {
                 writer.merge_cells(sheet, 2, 1, 0, 0)
             })),
         ] {
-            assert!(matches!(
-                outcome,
-                Ok(Err(XlsError::InvalidCellReference(_)))
-            ));
+            assert!(matches!(outcome, Ok(Err(Error::InvalidCellReference(_)))));
             assert_eq!(state(&writer), max_state);
         }
         let merge_overlap = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             writer.merge_cells(sheet, 65_535, 65_535, 255, 255)
         }));
-        assert!(matches!(merge_overlap, Ok(Err(XlsError::InvalidData(_)))));
+        assert!(matches!(merge_overlap, Ok(Err(Error::InvalidData(_)))));
         assert_eq!(state(&writer), max_state);
 
         for outcome in [
@@ -4487,33 +4407,27 @@ mod tests {
                 writer.add_vertical_page_break(sheet, 0, 0, 65_536)
             })),
         ] {
-            assert!(matches!(
-                outcome,
-                Ok(Err(XlsError::InvalidCellReference(_)))
-            ));
+            assert!(matches!(outcome, Ok(Err(Error::InvalidCellReference(_)))));
             assert_eq!(state(&writer), max_state);
         }
 
         let overlap = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             writer.add_horizontal_page_break(sheet, 65_535, 1, 2)
         }));
-        assert!(matches!(overlap, Ok(Err(XlsError::InvalidData(_)))));
+        assert!(matches!(overlap, Ok(Err(Error::InvalidData(_)))));
         assert_eq!(state(&writer), max_state);
         let overlap = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             writer.add_vertical_page_break(sheet, 255, 1, 2)
         }));
-        assert!(matches!(overlap, Ok(Err(XlsError::InvalidData(_)))));
+        assert!(matches!(overlap, Ok(Err(Error::InvalidData(_)))));
         assert_eq!(state(&writer), max_state);
 
         for outcome in [
-            std::panic::catch_unwind(|| XlsDataValidationRange::new(65_536, 65_536, 0, 0)),
-            std::panic::catch_unwind(|| XlsDataValidationRange::new(0, 0, 256, 256)),
-            std::panic::catch_unwind(|| XlsDataValidationRange::new(1, 0, 0, 0)),
+            std::panic::catch_unwind(|| DataValidationRange::new(65_536, 65_536, 0, 0)),
+            std::panic::catch_unwind(|| DataValidationRange::new(0, 0, 256, 256)),
+            std::panic::catch_unwind(|| DataValidationRange::new(1, 0, 0, 0)),
         ] {
-            assert!(matches!(
-                outcome,
-                Ok(Err(XlsError::InvalidCellReference(_)))
-            ));
+            assert!(matches!(outcome, Ok(Err(Error::InvalidCellReference(_)))));
             assert_eq!(state(&writer), max_state);
         }
 
@@ -4521,18 +4435,18 @@ mod tests {
         let count_error = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             writer.add_data_validation_with_options(
                 sheet,
-                XlsDataValidation::new(max_range, XlsDataValidationType::Any),
+                DataValidation::new(max_range, DataValidationType::Any),
                 &too_many_ranges,
-                XlsDataValidationOptions::default(),
+                DataValidationOptions::default(),
             )
         }));
-        assert!(matches!(count_error, Ok(Err(XlsError::InvalidData(_)))));
+        assert!(matches!(count_error, Ok(Err(Error::InvalidData(_)))));
         assert_eq!(state(&writer), max_state);
 
-        let invalid_rule = XlsDataValidation::new(
+        let invalid_rule = DataValidation::new(
             max_range,
-            XlsDataValidationType::Whole {
-                operator: XlsDataValidationOperator::Between,
+            DataValidationType::Whole {
+                operator: DataValidationOperator::Between,
                 value1: 1,
                 value2: None,
             },
@@ -4540,32 +4454,29 @@ mod tests {
         let rule_error = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             writer.add_data_validation(sheet, invalid_rule)
         }));
-        assert!(matches!(rule_error, Ok(Err(XlsError::InvalidData(_)))));
+        assert!(matches!(rule_error, Ok(Err(Error::InvalidData(_)))));
         assert_eq!(state(&writer), max_state);
 
         assert!(matches!(
-            crate::XlsDataTableInputCell::present(65_535, 255),
-            Ok(crate::XlsDataTableInputCell::Present {
+            crate::DataTableInputCell::present(65_535, 255),
+            Ok(crate::DataTableInputCell::Present {
                 row: 65_535,
                 col: 255
             })
         ));
         for outcome in [
-            std::panic::catch_unwind(|| crate::XlsDataTableInputCell::present(65_536, 0)),
-            std::panic::catch_unwind(|| crate::XlsDataTableInputCell::present(u32::MAX, 0)),
-            std::panic::catch_unwind(|| crate::XlsDataTableInputCell::present(0, 256)),
-            std::panic::catch_unwind(|| crate::XlsDataTableInputCell::present(0, u16::MAX)),
+            std::panic::catch_unwind(|| crate::DataTableInputCell::present(65_536, 0)),
+            std::panic::catch_unwind(|| crate::DataTableInputCell::present(u32::MAX, 0)),
+            std::panic::catch_unwind(|| crate::DataTableInputCell::present(0, 256)),
+            std::panic::catch_unwind(|| crate::DataTableInputCell::present(0, u16::MAX)),
         ] {
-            assert!(matches!(
-                outcome,
-                Ok(Err(XlsError::InvalidCellReference(_)))
-            ));
+            assert!(matches!(outcome, Ok(Err(Error::InvalidCellReference(_)))));
             assert_eq!(state(&writer), max_state);
         }
-        let invalid_publication = crate::XlsWebPub {
-            source: crate::XlsWebSourceType::Workbook,
-            page_type: crate::XlsWebPageType::ViewOnly,
-            range: Some(crate::XlsWebPubRange::new(0, 0, 0, 0).unwrap()),
+        let invalid_publication = crate::WebPub {
+            source: crate::WebSourceType::Workbook,
+            page_type: crate::WebPageType::ViewOnly,
+            range: Some(crate::WebPubRange::new(0, 0, 0, 0).unwrap()),
             auto_republish: false,
             single_file: false,
             style_id: 1,
@@ -4581,55 +4492,49 @@ mod tests {
         }));
         assert!(matches!(
             invalid_publication,
-            Ok(Err(XlsError::InvalidData(_)))
+            Ok(Err(Error::InvalidData(_)))
         ));
         assert_eq!(state(&writer), max_state);
 
         for outcome in [
-            std::panic::catch_unwind(|| crate::XlsWebPubRange::new(65_536, 65_536, 0, 0)),
-            std::panic::catch_unwind(|| crate::XlsWebPubRange::new(0, 0, 256, 256)),
-            std::panic::catch_unwind(|| crate::XlsWebPubRange::new(1, 0, 0, 0)),
+            std::panic::catch_unwind(|| crate::WebPubRange::new(65_536, 65_536, 0, 0)),
+            std::panic::catch_unwind(|| crate::WebPubRange::new(0, 0, 256, 256)),
+            std::panic::catch_unwind(|| crate::WebPubRange::new(1, 0, 0, 0)),
         ] {
-            assert!(matches!(
-                outcome,
-                Ok(Err(XlsError::InvalidCellReference(_)))
-            ));
+            assert!(matches!(outcome, Ok(Err(Error::InvalidCellReference(_)))));
             assert_eq!(state(&writer), max_state);
         }
 
         for outcome in [
-            std::panic::catch_unwind(|| crate::XlsRtdCell::new(65_536, 0, 0)),
-            std::panic::catch_unwind(|| crate::XlsRtdCell::new(0, 256, 0)),
+            std::panic::catch_unwind(|| crate::RtdCell::new(65_536, 0, 0)),
+            std::panic::catch_unwind(|| crate::RtdCell::new(0, 256, 0)),
         ] {
-            assert!(matches!(
-                outcome,
-                Ok(Err(XlsError::InvalidCellReference(_)))
-            ));
+            assert!(matches!(outcome, Ok(Err(Error::InvalidCellReference(_)))));
             assert_eq!(state(&writer), max_state);
         }
-        let invalid_topic = crate::XlsRealTimeData {
+        let invalid_topic = crate::RealTimeData {
             common_prefix_len: 0,
             topic_segments: vec!["server".to_string(), String::new()],
             topic: "server".to_string(),
-            value: crate::XlsRtdValue::Integer(1),
-            cells: vec![crate::XlsRtdCell::new(0, 0, 1).unwrap()],
+            value: crate::RtdValue::Integer(1),
+            cells: vec![crate::RtdCell::new(0, 0, 1).unwrap()],
         };
         let missing_sheet = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             writer.add_real_time_data(invalid_topic)
         }));
         assert!(matches!(
             missing_sheet,
-            Ok(Err(XlsError::WorksheetNotFound(_)))
+            Ok(Err(Error::WorksheetNotFound(_)))
         ));
         assert_eq!(state(&writer), max_state);
 
         writer
-            .set_page_setup(sheet, XlsPageSetupOptions::default())
+            .set_page_setup(sheet, PageSetupOptions::default())
             .unwrap();
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).unwrap();
         output.set_position(0);
-        let workbook = crate::XlsWorkbook::new(output).unwrap();
+        let workbook = crate::Workbook::new(output).unwrap();
         let worksheet = workbook.xls_worksheet(sheet).unwrap();
         assert!(
             worksheet
@@ -4649,7 +4554,7 @@ mod tests {
 
     #[test]
     fn page_break_entry_limits_are_failure_atomic() {
-        let mut writer = XlsWriter::new();
+        let mut writer = Writer::new();
         let sheet = writer.add_worksheet("Break limits").unwrap();
 
         for row in 0..1_026 {
@@ -4664,22 +4569,22 @@ mod tests {
         let horizontal = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             writer.add_horizontal_page_break(sheet, 1_026, 0, 1)
         }));
-        assert!(matches!(horizontal, Ok(Err(XlsError::InvalidData(_)))));
+        assert!(matches!(horizontal, Ok(Err(Error::InvalidData(_)))));
         assert_eq!(writer.worksheets[sheet].horizontal_page_breaks.len(), 1_026);
 
         let vertical = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             writer.add_vertical_page_break(sheet, 255, 0, 1)
         }));
-        assert!(matches!(vertical, Ok(Err(XlsError::InvalidData(_)))));
+        assert!(matches!(vertical, Ok(Err(Error::InvalidData(_)))));
         assert_eq!(writer.worksheets[sheet].vertical_page_breaks.len(), 255);
     }
 
     #[test]
     fn filter_sort_and_pivot_locations_fail_before_mutation() {
-        let mut writer = XlsWriter::new();
+        let mut writer = Writer::new();
         let sheet = writer.add_worksheet("Locations").unwrap();
         writer.set_auto_filter(sheet, 0, 65_535, 0, 255).unwrap();
-        let filter_state = |writer: &XlsWriter| {
+        let filter_state = |writer: &Writer| {
             let worksheet = &writer.worksheets[sheet];
             (
                 worksheet.auto_filter.map(|range| {
@@ -4711,10 +4616,7 @@ mod tests {
                 writer.set_auto_filter(sheet, 1, 0, 0, 0)
             })),
         ] {
-            assert!(matches!(
-                outcome,
-                Ok(Err(XlsError::InvalidCellReference(_)))
-            ));
+            assert!(matches!(outcome, Ok(Err(Error::InvalidCellReference(_)))));
             assert_eq!(filter_state(&writer), initial);
         }
 
@@ -4729,7 +4631,7 @@ mod tests {
         }));
         assert!(matches!(
             invalid_filter,
-            Ok(Err(XlsError::InvalidCellReference(_)))
+            Ok(Err(Error::InvalidCellReference(_)))
         ));
         assert_eq!(filter_state(&writer), initial);
 
@@ -4738,11 +4640,11 @@ mod tests {
         }));
         assert!(matches!(
             invalid_sort,
-            Ok(Err(XlsError::InvalidCellReference(_)))
+            Ok(Err(Error::InvalidCellReference(_)))
         ));
         assert_eq!(filter_state(&writer), initial);
 
-        let invalid_pivot = XlsPivotTableConfig {
+        let invalid_pivot = PivotTableConfig {
             name: "InvalidPivot".to_string(),
             source_type: 1,
             source_sheet_name: "Locations".to_string(),
@@ -4770,14 +4672,14 @@ mod tests {
         }));
         assert!(matches!(
             invalid_pivot,
-            Ok(Err(XlsError::InvalidCellReference(_)))
+            Ok(Err(Error::InvalidCellReference(_)))
         ));
         assert_eq!(filter_state(&writer), initial);
     }
 
     #[test]
     fn test_write_boolean() {
-        let mut writer = XlsWriter::new();
+        let mut writer = Writer::new();
         let sheet = writer.add_worksheet("Sheet1").unwrap();
         writer.write_boolean(sheet, 0, 0, true).unwrap();
         writer.write_boolean(sheet, 1, 0, false).unwrap();
@@ -4785,28 +4687,28 @@ mod tests {
         assert_eq!(writer.worksheets[0].cells.len(), 2);
         assert!(matches!(
             writer.worksheets[0].cells.get(&(0, 0)).unwrap().value,
-            XlsCellValue::Boolean(true)
+            CellValue::Boolean(true)
         ));
         assert!(matches!(
             writer.worksheets[0].cells.get(&(1, 0)).unwrap().value,
-            XlsCellValue::Boolean(false)
+            CellValue::Boolean(false)
         ));
     }
 
     #[test]
     fn test_write_formula() {
-        let mut writer = XlsWriter::new();
+        let mut writer = Writer::new();
         let sheet = writer.add_worksheet("Sheet1").unwrap();
         writer.write_formula(sheet, 0, 0, "SUM(A1:B1)").unwrap();
 
         let cell = writer.worksheets[0].cells.get(&(0, 0)).unwrap();
-        assert!(matches!(&cell.value, XlsCellValue::Formula(f) if f == "SUM(A1:B1)"));
+        assert!(matches!(&cell.value, CellValue::Formula(f) if f == "SUM(A1:B1)"));
     }
 
     #[test]
     fn invalid_formula_reference_returns_error_without_unwinding() {
-        let outcome = std::panic::catch_unwind(|| -> XlsResult<()> {
-            let mut writer = XlsWriter::new();
+        let outcome = std::panic::catch_unwind(|| -> Result<()> {
+            let mut writer = Writer::new();
             let sheet = writer.add_worksheet("Sheet1")?;
             writer.write_formula(sheet, 0, 0, "ZZZZ1")?;
             writer.write_to(&mut Cursor::new(Vec::new()))
@@ -4814,13 +4716,13 @@ mod tests {
 
         assert!(matches!(
             outcome,
-            Ok(Err(XlsError::InvalidCellReference(reference))) if reference == "ZZZZ1"
+            Ok(Err(Error::InvalidCellReference(reference))) if reference == "ZZZZ1"
         ));
     }
 
     #[test]
     fn test_formula_round_trips_through_xls_reader() {
-        let mut writer = XlsWriter::new();
+        let mut writer = Writer::new();
         let sheet = writer.add_worksheet("Sheet1").unwrap();
         writer.write_number(sheet, 0, 0, 2.0).unwrap();
         writer.write_number(sheet, 0, 1, 3.0).unwrap();
@@ -4832,7 +4734,7 @@ mod tests {
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).unwrap();
         output.set_position(0);
-        let workbook = crate::XlsWorkbook::new(output).unwrap();
+        let workbook = crate::Workbook::new(output).unwrap();
         let formula_cell = workbook.xls_worksheet(0).unwrap().get_cell(0, 2).unwrap();
 
         assert!(formula_cell.is_formula());
@@ -4851,7 +4753,7 @@ mod tests {
 
     #[test]
     fn test_write_multiple_cells() {
-        let mut writer = XlsWriter::new();
+        let mut writer = Writer::new();
         let sheet = writer.add_worksheet("Sheet1").unwrap();
 
         writer.write_string(sheet, 0, 0, "A1").unwrap();
@@ -4864,7 +4766,7 @@ mod tests {
 
     #[test]
     fn test_shared_strings_build() {
-        let mut writer = XlsWriter::new();
+        let mut writer = Writer::new();
         let sheet = writer.add_worksheet("Sheet1").unwrap();
 
         writer.write_string(sheet, 0, 0, "Hello").unwrap();
@@ -4880,7 +4782,7 @@ mod tests {
 
     #[test]
     fn test_write_to_memory() {
-        let mut writer = XlsWriter::new();
+        let mut writer = Writer::new();
         let sheet = writer.add_worksheet("Sheet1").unwrap();
         writer.write_string(sheet, 0, 0, "Test").unwrap();
         writer.write_number(sheet, 0, 1, 123.45).unwrap();
@@ -4900,7 +4802,7 @@ mod tests {
 
     #[test]
     fn test_save_to_file() {
-        let mut writer = XlsWriter::new();
+        let mut writer = Writer::new();
         let sheet = writer.add_worksheet("Sheet1").unwrap();
         writer.write_string(sheet, 0, 0, "Hello").unwrap();
 
@@ -4917,45 +4819,45 @@ mod tests {
 
     #[test]
     fn test_xls_writer_default() {
-        let writer: XlsWriter = Default::default();
+        let writer: Writer = Default::default();
         assert_eq!(writer.worksheets.len(), 0);
         assert_eq!(writer.shared_strings.len(), 0);
     }
 
     #[test]
     fn test_xlscellvalue_variants() {
-        let string_val = XlsCellValue::String("test".to_string());
-        let number_val = XlsCellValue::Number(42.0);
-        let bool_val = XlsCellValue::Boolean(true);
-        let formula_val = XlsCellValue::Formula("A1+B1".to_string());
-        let blank_val = XlsCellValue::Blank;
+        let string_val = CellValue::String("test".to_string());
+        let number_val = CellValue::Number(42.0);
+        let bool_val = CellValue::Boolean(true);
+        let formula_val = CellValue::Formula("A1+B1".to_string());
+        let blank_val = CellValue::Blank;
 
-        assert!(matches!(string_val, XlsCellValue::String(_)));
-        assert!(matches!(number_val, XlsCellValue::Number(_)));
-        assert!(matches!(bool_val, XlsCellValue::Boolean(_)));
-        assert!(matches!(formula_val, XlsCellValue::Formula(_)));
-        assert!(matches!(blank_val, XlsCellValue::Blank));
+        assert!(matches!(string_val, CellValue::String(_)));
+        assert!(matches!(number_val, CellValue::Number(_)));
+        assert!(matches!(bool_val, CellValue::Boolean(_)));
+        assert!(matches!(formula_val, CellValue::Formula(_)));
+        assert!(matches!(blank_val, CellValue::Blank));
     }
 
     #[test]
     fn test_xlscellvalue_debug() {
-        let val = XlsCellValue::String("test".to_string());
+        let val = CellValue::String("test".to_string());
         let debug = format!("{:?}", val);
         assert!(debug.contains("String"));
     }
 
     #[test]
     fn test_xlscellvalue_clone() {
-        let val = XlsCellValue::Number(42.0);
+        let val = CellValue::Number(42.0);
         let cloned = val.clone();
-        assert!(matches!(cloned, XlsCellValue::Number(42.0)));
+        assert!(matches!(cloned, CellValue::Number(42.0)));
     }
 
     #[test]
     fn test_writablecell_creation() {
         let cell = WritableCell::new(
             CellPos::try_new(5, 3).unwrap(),
-            XlsCellValue::String("Test".to_string()),
+            CellValue::String("Test".to_string()),
             15,
             None,
         );
@@ -4965,11 +4867,11 @@ mod tests {
         assert_eq!(cell.format_idx, 15);
         assert!(matches!(
             CellPos::try_new(65_536, 0),
-            Err(XlsError::InvalidCellReference(_))
+            Err(Error::InvalidCellReference(_))
         ));
         assert!(matches!(
             CellPos::try_new(0, 256),
-            Err(XlsError::InvalidCellReference(_))
+            Err(Error::InvalidCellReference(_))
         ));
     }
 
@@ -4987,7 +4889,7 @@ mod tests {
         let mut ws = WritableWorksheet::new("Sheet1".to_string());
         let cell = WritableCell::new(
             CellPos::try_new(0, 0).unwrap(),
-            XlsCellValue::Number(100.0),
+            CellValue::Number(100.0),
             0,
             None,
         );
@@ -5023,12 +4925,12 @@ mod tests {
     #[test]
     fn test_writableworksheet_add_conditional_format() {
         let mut ws = WritableWorksheet::new("Sheet1".to_string());
-        let cf = XlsConditionalFormat {
+        let cf = ConditionalFormat {
             first_row: 0,
             last_row: 10,
             first_col: 0,
             last_col: 0,
-            format_type: XlsConditionalFormatType::Formula {
+            format_type: ConditionalFormatType::Formula {
                 formula: "A1>100".to_string(),
             },
             pattern: None,
@@ -5040,9 +4942,9 @@ mod tests {
     #[test]
     fn test_writableworksheet_add_data_validation() {
         let mut ws = WritableWorksheet::new("Sheet1".to_string());
-        let dv = XlsDataValidation {
-            range: XlsDataValidationRange::new(0, 10, 0, 0).unwrap(),
-            validation_type: XlsDataValidationType::List {
+        let dv = DataValidation {
+            range: DataValidationRange::new(0, 10, 0, 0).unwrap(),
+            validation_type: DataValidationType::List {
                 values: vec!["Option1".to_string(), "Option2".to_string()],
             },
             show_input_message: true,
@@ -5056,8 +4958,8 @@ mod tests {
         ws.add_data_validation(
             dv,
             payload,
-            vec![XlsDataValidationRange::new(0, 9, 0, 0).unwrap()],
-            XlsDataValidationOptions::default(),
+            vec![DataValidationRange::new(0, 9, 0, 0).unwrap()],
+            DataValidationOptions::default(),
         );
         assert_eq!(ws.data_validations.len(), 1);
     }
@@ -5065,7 +4967,7 @@ mod tests {
     #[test]
     fn test_writableworksheet_add_hyperlink() {
         let mut ws = WritableWorksheet::new("Sheet1".to_string());
-        let link = XlsHyperlink {
+        let link = Hyperlink {
             first_row: 0,
             last_row: 0,
             first_col: 0,
@@ -5079,7 +4981,7 @@ mod tests {
 
     #[test]
     fn test_xls_defined_name_basic() {
-        let name = XlsDefinedName {
+        let name = DefinedName {
             name: "TestRange".to_string(),
             reference: "A1:B10".to_string(),
             comment: None,
@@ -5097,7 +4999,7 @@ mod tests {
 
     #[test]
     fn test_xls_defined_name_to_biff_formula_area() {
-        let name = XlsDefinedName {
+        let name = DefinedName {
             name: "TestRange".to_string(),
             reference: "A1:B10".to_string(),
             comment: None,
@@ -5114,7 +5016,7 @@ mod tests {
 
     #[test]
     fn test_xls_defined_name_normalizes_reversed_area_corners() {
-        let forward = XlsDefinedName {
+        let forward = DefinedName {
             name: "Forward".to_string(),
             reference: "A1:B10".to_string(),
             comment: None,
@@ -5125,7 +5027,7 @@ mod tests {
             is_built_in: false,
             built_in_code: None,
         };
-        let reversed = XlsDefinedName {
+        let reversed = DefinedName {
             name: "Reversed".to_string(),
             reference: "B10:A1".to_string(),
             ..forward.clone()
@@ -5139,7 +5041,7 @@ mod tests {
 
     #[test]
     fn test_xls_defined_name_to_biff_formula_single() {
-        let name = XlsDefinedName {
+        let name = DefinedName {
             name: "SingleCell".to_string(),
             reference: "C5".to_string(),
             comment: None,

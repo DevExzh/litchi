@@ -12,8 +12,7 @@ mod package;
 mod tests;
 
 pub use model::{
-    PowerPointDateTimeFormatId, PowerPointHeaderFooter, PowerPointHeaderFooterDisplayText,
-    PowerPointHeaderFooterOptions, PowerPointHeaderFooterParent,
-    PowerPointHeaderFooterParentOrdinal, PowerPointHeaderFooterScope, PowerPointHeaderFooters,
-    PowerPointScopedHeaderFooterDisplayText,
+    DateTimeFormatId, HeaderFooter, HeaderFooterDisplayText, HeaderFooterOptions,
+    HeaderFooterParent, HeaderFooterParentOrdinal, HeaderFooterScope, HeaderFooters,
+    ScopedHeaderFooterDisplayText,
 };

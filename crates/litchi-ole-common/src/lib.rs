@@ -4,4 +4,5 @@
 
 pub mod custom_xml;
 pub mod object;
+pub mod property_set;
 pub mod smart_tags;

@@ -1,11 +1,11 @@
 //! BIFF8 XF border and fill metadata.
 
-use crate::{XlsColor, XlsError, XlsPalette, XlsResult};
+use crate::{Color, Error, Palette, Result};
 
 /// A BIFF8 cell border line style.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[non_exhaustive]
-pub enum XlsBorderStyle {
+pub enum BorderStyle {
     #[default]
     None,
     Thin,
@@ -23,8 +23,8 @@ pub enum XlsBorderStyle {
     SlantedDashDot,
 }
 
-impl XlsBorderStyle {
-    fn from_bits(value: u32) -> XlsResult<Self> {
+impl BorderStyle {
+    fn from_bits(value: u32) -> Result<Self> {
         match value {
             0 => Ok(Self::None),
             1 => Ok(Self::Thin),
@@ -40,7 +40,7 @@ impl XlsBorderStyle {
             11 => Ok(Self::DashDotDot),
             12 => Ok(Self::MediumDashDotDot),
             13 => Ok(Self::SlantedDashDot),
-            _ => Err(XlsError::InvalidData(format!(
+            _ => Err(Error::InvalidData(format!(
                 "reserved BIFF8 border style {value}"
             ))),
         }
@@ -49,13 +49,13 @@ impl XlsBorderStyle {
 
 /// The style and indexed color of one cell border edge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct XlsBorderSide {
-    style: XlsBorderStyle,
+pub struct BorderSide {
+    style: BorderStyle,
     color_index: u16,
 }
 
-impl XlsBorderSide {
-    pub fn style(&self) -> XlsBorderStyle {
+impl BorderSide {
+    pub fn style(&self) -> BorderStyle {
         self.style
     }
 
@@ -63,41 +63,41 @@ impl XlsBorderSide {
         self.color_index
     }
 
-    pub fn color(&self, palette: &XlsPalette) -> Option<XlsColor> {
+    pub fn color(&self, palette: &Palette) -> Option<Color> {
         palette.color(self.color_index)
     }
 }
 
 /// All border metadata stored by a BIFF8 XF record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct XlsCellBorders {
-    left: XlsBorderSide,
-    right: XlsBorderSide,
-    top: XlsBorderSide,
-    bottom: XlsBorderSide,
-    diagonal: XlsBorderSide,
+pub struct CellBorders {
+    left: BorderSide,
+    right: BorderSide,
+    top: BorderSide,
+    bottom: BorderSide,
+    diagonal: BorderSide,
     diagonal_down: bool,
     diagonal_up: bool,
 }
 
-impl XlsCellBorders {
-    pub fn left(&self) -> &XlsBorderSide {
+impl CellBorders {
+    pub fn left(&self) -> &BorderSide {
         &self.left
     }
 
-    pub fn right(&self) -> &XlsBorderSide {
+    pub fn right(&self) -> &BorderSide {
         &self.right
     }
 
-    pub fn top(&self) -> &XlsBorderSide {
+    pub fn top(&self) -> &BorderSide {
         &self.top
     }
 
-    pub fn bottom(&self) -> &XlsBorderSide {
+    pub fn bottom(&self) -> &BorderSide {
         &self.bottom
     }
 
-    pub fn diagonal(&self) -> &XlsBorderSide {
+    pub fn diagonal(&self) -> &BorderSide {
         &self.diagonal
     }
 
@@ -115,7 +115,7 @@ impl XlsCellBorders {
 /// A BIFF8 cell fill pattern.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[non_exhaustive]
-pub enum XlsFillPattern {
+pub enum FillPattern {
     #[default]
     None,
     Solid,
@@ -138,8 +138,8 @@ pub enum XlsFillPattern {
     Gray0625,
 }
 
-impl XlsFillPattern {
-    fn from_bits(value: u32) -> XlsResult<Self> {
+impl FillPattern {
+    fn from_bits(value: u32) -> Result<Self> {
         match value {
             0 => Ok(Self::None),
             1 => Ok(Self::Solid),
@@ -160,7 +160,7 @@ impl XlsFillPattern {
             16 => Ok(Self::LightTrellis),
             17 => Ok(Self::Gray125),
             18 => Ok(Self::Gray0625),
-            _ => Err(XlsError::InvalidData(format!(
+            _ => Err(Error::InvalidData(format!(
                 "reserved BIFF8 fill pattern {value}"
             ))),
         }
@@ -169,14 +169,14 @@ impl XlsFillPattern {
 
 /// Fill pattern and foreground/background indexed colors from a BIFF8 XF.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct XlsCellFill {
-    pattern: XlsFillPattern,
+pub struct CellFill {
+    pattern: FillPattern,
     foreground_color_index: u16,
     background_color_index: u16,
 }
 
-impl XlsCellFill {
-    pub fn pattern(&self) -> XlsFillPattern {
+impl CellFill {
+    pub fn pattern(&self) -> FillPattern {
         self.pattern
     }
 
@@ -188,19 +188,16 @@ impl XlsCellFill {
         self.background_color_index
     }
 
-    pub fn foreground_color(&self, palette: &XlsPalette) -> Option<XlsColor> {
+    pub fn foreground_color(&self, palette: &Palette) -> Option<Color> {
         palette.color(self.foreground_color_index)
     }
 
-    pub fn background_color(&self, palette: &XlsPalette) -> Option<XlsColor> {
+    pub fn background_color(&self, palette: &Palette) -> Option<Color> {
         palette.color(self.background_color_index)
     }
 }
 
-pub(crate) fn parse_xf_border_fill(
-    data: &[u8],
-    style_xf: bool,
-) -> XlsResult<(XlsCellBorders, XlsCellFill)> {
+pub(crate) fn parse_xf_border_fill(data: &[u8], style_xf: bool) -> Result<(CellBorders, CellFill)> {
     debug_assert!(data.len() >= 20);
     let border1 = u32::from_le_bytes([data[10], data[11], data[12], data[13]]);
     let border2 = u32::from_le_bytes([data[14], data[15], data[16], data[17]]);
@@ -210,9 +207,9 @@ pub(crate) fn parse_xf_border_fill(
 
     let diagonal_down = border1 & (1 << 30) != 0;
     let diagonal_up = border1 & (1 << 31) != 0;
-    let diagonal_style = XlsBorderStyle::from_bits((border2 >> 21) & 0x0f)?;
-    if (diagonal_down || diagonal_up) != (diagonal_style != XlsBorderStyle::None) {
-        return Err(XlsError::InvalidData(
+    let diagonal_style = BorderStyle::from_bits((border2 >> 21) & 0x0f)?;
+    if (diagonal_down || diagonal_up) != (diagonal_style != BorderStyle::None) {
+        return Err(Error::InvalidData(
             "BIFF8 diagonal border direction and style contradict each other".to_string(),
         ));
     }
@@ -234,38 +231,38 @@ pub(crate) fn parse_xf_border_fill(
         ("fill background", background_color),
     ] {
         if color > 0x41 && color != 0x7f {
-            return Err(XlsError::InvalidData(format!(
+            return Err(Error::InvalidData(format!(
                 "invalid BIFF8 {name} color index {color:#04x}"
             )));
         }
     }
 
-    let borders = XlsCellBorders {
-        left: XlsBorderSide {
-            style: XlsBorderStyle::from_bits(border1 & 0x0f)?,
+    let borders = CellBorders {
+        left: BorderSide {
+            style: BorderStyle::from_bits(border1 & 0x0f)?,
             color_index: left_color,
         },
-        right: XlsBorderSide {
-            style: XlsBorderStyle::from_bits((border1 >> 4) & 0x0f)?,
+        right: BorderSide {
+            style: BorderStyle::from_bits((border1 >> 4) & 0x0f)?,
             color_index: right_color,
         },
-        top: XlsBorderSide {
-            style: XlsBorderStyle::from_bits((border1 >> 8) & 0x0f)?,
+        top: BorderSide {
+            style: BorderStyle::from_bits((border1 >> 8) & 0x0f)?,
             color_index: top_color,
         },
-        bottom: XlsBorderSide {
-            style: XlsBorderStyle::from_bits((border1 >> 12) & 0x0f)?,
+        bottom: BorderSide {
+            style: BorderStyle::from_bits((border1 >> 12) & 0x0f)?,
             color_index: bottom_color,
         },
-        diagonal: XlsBorderSide {
+        diagonal: BorderSide {
             style: diagonal_style,
             color_index: diagonal_color,
         },
         diagonal_down,
         diagonal_up,
     };
-    let fill = XlsCellFill {
-        pattern: XlsFillPattern::from_bits(border2 >> 26)?,
+    let fill = CellFill {
+        pattern: FillPattern::from_bits(border2 >> 26)?,
         foreground_color_index: foreground_color,
         background_color_index: background_color,
     };
@@ -276,43 +273,43 @@ pub(crate) fn parse_xf_border_fill(
 mod tests {
     use super::*;
 
-    const BORDER_STYLES: [XlsBorderStyle; 14] = [
-        XlsBorderStyle::None,
-        XlsBorderStyle::Thin,
-        XlsBorderStyle::Medium,
-        XlsBorderStyle::Dashed,
-        XlsBorderStyle::Dotted,
-        XlsBorderStyle::Thick,
-        XlsBorderStyle::Double,
-        XlsBorderStyle::Hair,
-        XlsBorderStyle::MediumDashed,
-        XlsBorderStyle::DashDot,
-        XlsBorderStyle::MediumDashDot,
-        XlsBorderStyle::DashDotDot,
-        XlsBorderStyle::MediumDashDotDot,
-        XlsBorderStyle::SlantedDashDot,
+    const BORDER_STYLES: [BorderStyle; 14] = [
+        BorderStyle::None,
+        BorderStyle::Thin,
+        BorderStyle::Medium,
+        BorderStyle::Dashed,
+        BorderStyle::Dotted,
+        BorderStyle::Thick,
+        BorderStyle::Double,
+        BorderStyle::Hair,
+        BorderStyle::MediumDashed,
+        BorderStyle::DashDot,
+        BorderStyle::MediumDashDot,
+        BorderStyle::DashDotDot,
+        BorderStyle::MediumDashDotDot,
+        BorderStyle::SlantedDashDot,
     ];
 
-    const FILL_PATTERNS: [XlsFillPattern; 19] = [
-        XlsFillPattern::None,
-        XlsFillPattern::Solid,
-        XlsFillPattern::MediumGray,
-        XlsFillPattern::DarkGray,
-        XlsFillPattern::LightGray,
-        XlsFillPattern::DarkHorizontal,
-        XlsFillPattern::DarkVertical,
-        XlsFillPattern::DarkDown,
-        XlsFillPattern::DarkUp,
-        XlsFillPattern::DarkGrid,
-        XlsFillPattern::DarkTrellis,
-        XlsFillPattern::LightHorizontal,
-        XlsFillPattern::LightVertical,
-        XlsFillPattern::LightDown,
-        XlsFillPattern::LightUp,
-        XlsFillPattern::LightGrid,
-        XlsFillPattern::LightTrellis,
-        XlsFillPattern::Gray125,
-        XlsFillPattern::Gray0625,
+    const FILL_PATTERNS: [FillPattern; 19] = [
+        FillPattern::None,
+        FillPattern::Solid,
+        FillPattern::MediumGray,
+        FillPattern::DarkGray,
+        FillPattern::LightGray,
+        FillPattern::DarkHorizontal,
+        FillPattern::DarkVertical,
+        FillPattern::DarkDown,
+        FillPattern::DarkUp,
+        FillPattern::DarkGrid,
+        FillPattern::DarkTrellis,
+        FillPattern::LightHorizontal,
+        FillPattern::LightVertical,
+        FillPattern::LightDown,
+        FillPattern::LightUp,
+        FillPattern::LightGrid,
+        FillPattern::LightTrellis,
+        FillPattern::Gray125,
+        FillPattern::Gray0625,
     ];
 
     fn xf(border1: u32, border2: u32, area: u16) -> [u8; 20] {
@@ -323,7 +320,7 @@ mod tests {
         data
     }
 
-    fn parse_cell(data: &[u8]) -> XlsResult<(XlsCellBorders, XlsCellFill)> {
+    fn parse_cell(data: &[u8]) -> Result<(CellBorders, CellFill)> {
         parse_xf_border_fill(data, false)
     }
 
@@ -345,7 +342,7 @@ mod tests {
         let (borders, fill) = parse_cell(&xf(border1, border2, area)).unwrap();
         assert!(borders.diagonal_down());
         assert!(borders.diagonal_up());
-        assert_eq!(borders.diagonal().style(), XlsBorderStyle::Double);
+        assert_eq!(borders.diagonal().style(), BorderStyle::Double);
         assert_eq!(borders.diagonal().color_index(), 11);
         assert_eq!(borders.left().color_index(), 7);
         assert_eq!(borders.right().color_index(), 8);
@@ -393,7 +390,7 @@ mod tests {
     #[test]
     fn resolves_palette_colors() {
         let (borders, fill) = parse_cell(&xf(8 << 16, 0, 9 | (10 << 7))).unwrap();
-        let palette = XlsPalette::default();
+        let palette = Palette::default();
         assert!(borders.left().color(&palette).is_some());
         assert!(fill.foreground_color(&palette).is_some());
         assert!(fill.background_color(&palette).is_some());

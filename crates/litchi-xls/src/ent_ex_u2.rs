@@ -12,19 +12,19 @@
 //!
 //! - MS-XLS 2.4.102 (EntExU2)
 
-use super::XlsResult;
+use super::Result;
 
 /// Typed `EntExU2` record content (MS-XLS 2.4.102): an application-specific
 /// cache of information, preserved as opaque bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsEntExU2 {
+pub struct EntExU2 {
     /// The opaque `rgb` cache bytes.
     cache: Vec<u8>,
 }
 
-impl XlsEntExU2 {
+impl EntExU2 {
     /// Parse an `EntExU2` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         Ok(Self {
             cache: data.to_vec(),
         })
@@ -49,7 +49,7 @@ mod tests {
     fn round_trip() {
         // The rgb field has no spec-defined structure or size constraints.
         for payload in [&b""[..], &b"x"[..], &[0xDE, 0xAD, 0xBE, 0xEF], &[0; 64]] {
-            let parsed = XlsEntExU2::parse(payload).unwrap();
+            let parsed = EntExU2::parse(payload).unwrap();
             assert_eq!(parsed.cache(), payload);
             assert_eq!(parsed.to_payload(), payload);
         }

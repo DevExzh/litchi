@@ -25,7 +25,7 @@
 //!         var   string2 - String for condition 2 (if applicable)
 //! ```
 
-use crate::error::{XlsError, XlsResult};
+use crate::error::{Error, Result};
 use litchi_core::binary;
 
 /// AUTOFILTERINFO record type identifier.
@@ -166,9 +166,9 @@ pub struct SortInfo {
 }
 
 /// Parse an AUTOFILTERINFO record.
-pub fn parse_autofilterinfo(data: &[u8]) -> XlsResult<u16> {
+pub fn parse_autofilterinfo(data: &[u8]) -> Result<u16> {
     if data.len() < 2 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 2,
             found: data.len(),
         });
@@ -180,9 +180,9 @@ pub fn parse_autofilterinfo(data: &[u8]) -> XlsResult<u16> {
 ///
 /// The record body is empty ([MS-XLS] 2.4.119); its presence alone specifies
 /// that the containing sheet data was filtered.
-pub fn parse_filtermode(data: &[u8]) -> XlsResult<()> {
+pub fn parse_filtermode(data: &[u8]) -> Result<()> {
     if !data.is_empty() {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 0,
             found: data.len(),
         });
@@ -194,9 +194,9 @@ pub fn parse_filtermode(data: &[u8]) -> XlsResult<()> {
 ///
 /// Returns `(FilterCondition, string_byte_count)` where `string_byte_count`
 /// is the number of trailing string bytes to read (0 if not a string condition).
-fn parse_doper(data: &[u8], offset: usize) -> XlsResult<(FilterCondition, usize)> {
+fn parse_doper(data: &[u8], offset: usize) -> Result<(FilterCondition, usize)> {
     if offset + 10 > data.len() {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: offset + 10,
             found: data.len(),
         });
@@ -263,10 +263,10 @@ fn parse_doper(data: &[u8], offset: usize) -> XlsResult<(FilterCondition, usize)
 /// Parse an AUTOFILTER record.
 ///
 /// The record data starts after the standard BIFF header.
-pub fn parse_autofilter(data: &[u8]) -> XlsResult<AutoFilterColumn> {
+pub fn parse_autofilter(data: &[u8]) -> Result<AutoFilterColumn> {
     // Minimum: 2 (iEntry) + 2 (grbit) + 10 (doper1) + 10 (doper2) = 24
     if data.len() < 24 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 24,
             found: data.len(),
         });
@@ -354,10 +354,10 @@ pub fn parse_autofilter(data: &[u8]) -> XlsResult<AutoFilterColumn> {
 }
 
 /// Parse a SORT record (0x0090).
-pub fn parse_sort(data: &[u8]) -> XlsResult<SortInfo> {
+pub fn parse_sort(data: &[u8]) -> Result<SortInfo> {
     // Minimum 10 bytes (flags + 3 sort key column indices + 3 reserved)
     if data.len() < 10 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 10,
             found: data.len(),
         });

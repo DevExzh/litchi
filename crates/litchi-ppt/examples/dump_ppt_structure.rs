@@ -1,8 +1,8 @@
 use litchi_cfb::OleFile;
-use litchi_ppt::PptRecord;
-use litchi_ppt::PptRecordType;
+use litchi_ppt::Record;
+use litchi_ppt::RecordType;
 
-fn dump_children(rec: &PptRecord, indent: usize, depth: usize) {
+fn dump_children(rec: &Record, indent: usize, depth: usize) {
     if depth == 0 || rec.children.is_empty() {
         return;
     }
@@ -21,10 +21,10 @@ fn dump_children(rec: &PptRecord, indent: usize, depth: usize) {
             child.data_length,
         );
 
-        if child.record_type == PptRecordType::PPDrawingGroup {
+        if child.record_type == RecordType::PPDrawingGroup {
             dump_escher_dgg(&child.data);
         }
-        if child.record_type == PptRecordType::PPDrawing {
+        if child.record_type == RecordType::PPDrawing {
             dump_escher_dg(&child.data);
         }
 
@@ -361,7 +361,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut index = 0usize;
 
     while offset + 8 <= len {
-        match PptRecord::parse(&data, offset) {
+        match Record::parse(&data, offset) {
             Ok((rec, consumed)) => {
                 println!(
                     "[{}] @0x{:08X}: ver={}, inst={}, type_raw=0x{:04X}, type={:?}, len={}",
@@ -376,14 +376,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 if matches!(
                     rec.record_type,
-                    PptRecordType::Document | PptRecordType::MainMaster | PptRecordType::Slide
+                    RecordType::Document | RecordType::MainMaster | RecordType::Slide
                 ) {
                     dump_children(&rec, 2, 3);
                 }
-                if rec.record_type == PptRecordType::PPDrawingGroup {
+                if rec.record_type == RecordType::PPDrawingGroup {
                     dump_escher_dgg(&rec.data);
                 }
-                if rec.record_type == PptRecordType::PPDrawing {
+                if rec.record_type == RecordType::PPDrawing {
                     dump_escher_dg(&rec.data);
                 }
                 if rec.record_type_raw == 6001 || rec.record_type_raw == 6002 {

@@ -56,7 +56,7 @@
 mod consts;
 mod officeart_wire;
 
-pub use consts::PptRecordType;
+pub use consts::RecordType;
 // Core modules
 pub mod package;
 pub mod presentation;
@@ -89,7 +89,7 @@ pub mod odraw;
 // PowerPoint host metadata over format-neutral Office Graph views.
 pub mod chart;
 
-// Legacy compatibility modules
+// Format-specific semantic owners
 pub mod bookmark_summary;
 pub mod broadcast;
 pub mod client_anchor;
@@ -146,34 +146,30 @@ pub mod view_set_info;
 
 // Re-export main types for convenience
 pub use document_comparison::{
-    PowerPointDiffFlags, PowerPointDiffNode, PowerPointDiffRecordHeaders, PowerPointDiffTree10,
-    PowerPointDiffType, PowerPointDocDiffFlags, PowerPointElementType,
-    PowerPointMainMasterDiffFlags, PowerPointReviewingToolbarStates, PowerPointShapeDiffFlags,
-    PowerPointSlideCreationEntry, PowerPointSlideDiffFlags, PowerPointSlideListTable10,
-    PowerPointTableDiffFlags, PowerPointTextDiffFlags,
+    DiffFlags, DiffNode, DiffRecordHeaders, DiffTree10, DiffType, DocDiffFlags, ElementType,
+    MainMasterDiffFlags, ReviewingToolbarStates, ShapeDiffFlags, SlideCreationEntry,
+    SlideDiffFlags, SlideListTable10, TableDiffFlags, TextDiffFlags,
 };
-pub use encryption::PptEncryptionProfile;
+pub use encryption::EncryptionProfile;
 pub use non_zoom_view::{
-    PowerPointNoZoomViewInfo, PowerPointNonZoomViewKind, PowerPointOutlineSorterViewInfo,
-    PowerPointOutlineSorterViewInformation,
+    NoZoomViewInfo, NonZoomViewKind, OutlineSorterViewInfo, OutlineSorterViewInformation,
 };
-pub use package::{Package, PptEncryptionKind, PptError, PptOpenOptions};
+pub use package::{EncryptionKind, Error, OpenOptions, Package};
 pub use presentation::{ParsedCustomShow, ParsedSlideComments, Presentation};
-pub use presentation_advisor::{PowerPointAdvisorRule, PowerPointPresentationAdvisorSettings};
+pub use presentation_advisor::{AdvisorRule, PresentationAdvisorSettings};
 pub use slide::{
     ParsedComment, ParsedSlideTiming, Slide, SlideData, SlideDirectory, SlideDirectoryEntry,
     SlideFactory, SpeakerNotes,
 };
 pub use sound_collection::{BuiltinId, Sound};
 pub use view_info::{
-    PowerPointGuide, PowerPointGuideOrientation, PowerPointRatio, PowerPointSlideViewInfo,
-    PowerPointSlideViewInformation, PowerPointSlideViewPreferences, PowerPointViewKind,
-    PowerPointViewOrigin, PowerPointZoomViewInfo,
+    Guide, GuideOrientation, Ratio, SlideViewInfo, SlideViewInformation, SlideViewPreferences,
+    ViewKind, ViewOrigin, ZoomViewInfo,
 };
 
 // Re-export record types
-pub use parsers::PptRecordParser;
-pub use records::{DocumentInfo, PptRecord, SlideAtomsSet, SlideInfo};
+pub use parsers::RecordParser;
+pub use records::{DocumentInfo, Record, SlideAtomsSet, SlideInfo};
 
 // Re-export persist types
 pub use persist::{PersistMapping, PersistPtrHolder};
@@ -182,32 +178,25 @@ pub use persist::{PersistMapping, PersistPtrHolder};
 pub use shapes::{AutoShape, Placeholder, PlaceholderSize, PlaceholderType, Shape, TextBox};
 
 // Re-export legacy types
-pub use bookmark_summary::{PowerPointBookmark, PowerPointBookmarkSummary};
-pub use broadcast::{PowerPointBroadcast, PowerPointBroadcastProperties, PowerPointBroadcasts};
+pub use bookmark_summary::{Bookmark, BookmarkSummary};
+pub use broadcast::{Broadcast, BroadcastProperties, Broadcasts};
 pub use client_anchor::{
-    OFFICE_ART_CLIENT_ANCHOR_RECORD_TYPE, PowerPointClientAnchor, PowerPointClientAnchorData,
-    PowerPointClientAnchorEncoding, PowerPointClientAnchorLimits, PowerPointRect,
-    PowerPointSmallRect,
+    ClientAnchor, ClientAnchorData, ClientAnchorEncoding, ClientAnchorLimits,
+    OFFICE_ART_CLIENT_ANCHOR_RECORD_TYPE, Rect, SmallRect,
 };
 pub use client_data::{
-    OFFICE_ART_CLIENT_DATA_RECORD_TYPE, PowerPointClientData, PowerPointClientDataChild,
-    PowerPointClientDataChildKind, PowerPointClientDataLimits,
+    ClientData, ClientDataChild, ClientDataChildKind, ClientDataLimits,
+    OFFICE_ART_CLIENT_DATA_RECORD_TYPE,
 };
-pub use color_scheme::{
-    PowerPointColorScheme, PowerPointColorSchemeAtom, PowerPointColorSchemeAtomKind,
-    PowerPointSchemeColor,
-};
+pub use color_scheme::{ColorScheme, ColorSchemeAtom, ColorSchemeAtomKind, SchemeColor};
 pub use comments::{Author, Authors};
 pub use current_user::CurrentUser;
-pub use document_atom::{
-    PowerPointDocumentAtom, PowerPointDocumentDimensions, PowerPointSlideSizeType,
-};
+pub use document_atom::{DocumentAtom, DocumentDimensions, SlideSizeType};
 pub use document_properties::{
-    PowerPoint10DocumentProperties, PowerPoint12DocumentProperties, PowerPointCustomTableStyles,
-    PowerPointGridSpacing, PowerPointPhotoAlbumFrameShape, PowerPointPhotoAlbumLayout,
-    PowerPointPhotoAlbumSettings,
+    CustomTableStyles, DocumentProperties10, DocumentProperties12, GridSpacing,
+    PhotoAlbumFrameShape, PhotoAlbumLayout, PhotoAlbumSettings,
 };
-pub use document_structure::{PowerPointCustomTableStylesPlacement, PowerPointDocumentStructure};
+pub use document_structure::{CustomTableStylesPlacement, DocumentStructure};
 pub use embedded::object::Editor;
 pub use embedded::object::{
     Collection, ColorFollow, ContainerKind, Control, Definition, DimensionPolicy, DrawAspect,
@@ -215,106 +204,82 @@ pub use embedded::object::{
     UpdateMode,
 };
 pub use embedded::reference::{Reference, Target};
-pub use envelope::PowerPointEnvelopeSettings;
+pub use envelope::EnvelopeSettings;
 pub use envelope_data::{
-    MSO_ENVELOPE_CLSID, MsoAttachment, MsoEnvelope, MsoEnvelopeText, MsoEnvelopeVersion,
-    MsoFollowUpStatus, MsoImportance, MsoPropertyValue, MsoRecipientCollection,
+    EnvelopeData, EnvelopePayload, MSO_ENVELOPE_CLSID, MsoAttachment, MsoEnvelope, MsoEnvelopeText,
+    MsoEnvelopeVersion, MsoFollowUpStatus, MsoImportance, MsoPropertyValue, MsoRecipientCollection,
     MsoRecipientProperties, MsoRecipientProperty, MsoSecurityFlags, MsoSensitivity,
-    PowerPointEnvelopeData, PowerPointEnvelopePayload,
 };
 pub use escher_textbox::EscherTextboxWrapper;
 pub use external_media::{
     CdAudio, CdTime, EmbeddedWav, LinkedAudio, LinkedAudioKind, Media, Movie, MovieKind, Object,
     Video,
 };
-pub use font::{
-    EmbeddedPowerPointFont, PowerPointFont, PowerPointFontCollection, PowerPointFontCollections,
-    PowerPointFontEmbeddingFlags,
-};
+pub use font::{EmbeddedFont, Font, FontCollection, FontCollections, FontEmbeddingFlags};
 pub use header_footer::{
-    PowerPointDateTimeFormatId, PowerPointHeaderFooter, PowerPointHeaderFooterDisplayText,
-    PowerPointHeaderFooterOptions, PowerPointHeaderFooterParent,
-    PowerPointHeaderFooterParentOrdinal, PowerPointHeaderFooterScope, PowerPointHeaderFooters,
-    PowerPointScopedHeaderFooterDisplayText,
+    DateTimeFormatId, HeaderFooter, HeaderFooterDisplayText, HeaderFooterOptions,
+    HeaderFooterParent, HeaderFooterParentOrdinal, HeaderFooterScope, HeaderFooters,
+    ScopedHeaderFooterDisplayText,
 };
 pub use html_publish::{
-    PowerPointCodePage, PowerPointHtmlDocumentSettings, PowerPointHtmlPublishSettings,
-    PowerPointWebFrameColors, PowerPointWebOutput, PowerPointWebScreenSize,
+    CodePage, HtmlDocumentSettings, HtmlPublishSettings, WebFrameColors, WebOutput, WebScreenSize,
 };
 pub use hyperlink::{Hyperlink, HyperlinkExtension, Hyperlinks};
 pub use hyperlink::{
     Interaction, InteractionAction, InteractionJump, InteractionLimits, InteractionLinkTarget,
     InteractionTrigger, InteractiveInfoAtom, MacroNameAtom, ShapeInteractionEntry,
 };
-pub use kinsoku::{
-    BaseKinsokuSettings, KinsokuLanguage, KinsokuLevel, PowerPoint9KinsokuSettings,
-    PowerPointKinsoku,
-};
+pub use kinsoku::{BaseKinsokuSettings, Kinsoku, KinsokuLanguage, KinsokuLevel, KinsokuSettings9};
 pub use main_master::{
-    PowerPoint12MainMasterMetadata, PowerPointContentMasterInfo, PowerPointMainMasterTextStyles,
-    PowerPointMainMasterTextStylesSource,
+    ContentMasterInfo, MainMasterMetadata12, MainMasterTextStyles, MainMasterTextStylesSource,
 };
 pub use master_style::{TextMasterStyle, TextMasterStyleLevel};
-pub use modify_password::PowerPointModifyPassword;
-pub use named_shows::{PowerPointNamedShow, PowerPointNamedShows};
+pub use modify_password::ModifyPassword;
+pub use named_shows::{NamedShow, NamedShows};
 pub use picture_bullets::{PictureBullet, PictureBulletCollection, PictureBulletType};
 pub use placeholder_atom::{
-    PowerPointPlaceholderAtom, PowerPointPlaceholderContext, PowerPointPlaceholderEntry,
-    PowerPointPlaceholderKind, PowerPointPlaceholderLimits, PowerPointPlaceholderProjection,
-    PowerPointPlaceholderSize, PowerPointPresentationPlaceholderEntry,
+    AtomPlaceholderSize, PlaceholderAtom, PlaceholderContext, PlaceholderEntry, PlaceholderKind,
+    PlaceholderLimits, PlaceholderProjection, PresentationPlaceholderEntry,
 };
-pub use print_options::{PowerPointPrintColorMode, PowerPointPrintOptions, PowerPointPrintTarget};
-pub use privacy::PowerPointPrivacySettings;
+pub use print_options::{PrintColorMode, PrintOptions, PrintTarget};
+pub use privacy::PrivacySettings;
 pub use prog_tag_extensions::{
-    PowerPoint9DocBinaryTagExtension, PowerPoint9SlideBinaryTagExtension,
-    PowerPoint10DocBinaryTagExtension, PowerPoint10SlideBinaryTagExtension,
-    PowerPoint11DocBinaryTagExtension, PowerPoint12DocBinaryTagExtension,
-    PowerPoint12SlideBinaryTagExtension, PowerPointDocBinaryTagExtension,
-    PowerPointDocumentTagExtensions, PowerPointSlideBinaryTagExtension,
-    PowerPointSlideTagExtensions,
+    DocBinaryTagExtension, DocBinaryTagExtension9, DocBinaryTagExtension10,
+    DocBinaryTagExtension11, DocBinaryTagExtension12, DocumentTagExtensions,
+    SlideBinaryTagExtension, SlideBinaryTagExtension9, SlideBinaryTagExtension10,
+    SlideBinaryTagExtension12, SlideTagExtensions,
 };
 pub use prog_tags::{
-    PowerPointProgBinaryTag, PowerPointProgBinaryTagVersion, PowerPointProgStringTag,
-    PowerPointProgTag, PowerPointProgTagLimits, PowerPointProgTagScope, PowerPointProgTags,
+    ProgBinaryTag, ProgBinaryTagVersion, ProgStringTag, ProgTag, ProgTagLimits, ProgTagScope,
+    ProgTags,
 };
 pub use recolor::{
-    PowerPointRecolorBitmapType, PowerPointRecolorBrush, PowerPointRecolorEntry,
-    PowerPointRecolorHatch, PowerPointRecolorInfo, PowerPointRecolorLimits,
-    PowerPointRecolorPattern, PowerPointRecolorSource, PowerPointWideColor,
-    PowerPointWmfBrushStyle, PowerPointWmfHatchStyle,
+    RecolorBitmapType, RecolorBrush, RecolorEntry, RecolorHatch, RecolorInfo, RecolorLimits,
+    RecolorPattern, RecolorSource, WideColor, WmfBrushStyle, WmfHatchStyle,
 };
 pub use routing_slip::{Address, CurrentRecipient, Slip, Text};
 pub use shape_flags::{
-    PowerPointPresentationShapeFlagEntry, PowerPointShapeFlagEntry, PowerPointShapeFlagLimits,
-    PowerPointShapeFlagProjection, PowerPointShapeFlags, PowerPointShapeFlags10,
+    PresentationShapeFlagEntry, ShapeFlagEntry, ShapeFlagLimits, ShapeFlagProjection, ShapeFlags,
+    ShapeFlags10,
 };
 pub use shape_programmable_tags::{
-    PowerPointPresentationShapeProgrammableTagsEntry, PowerPointShapeBinaryTag,
-    PowerPointShapeBinaryTagPayload, PowerPointShapeBinaryTagVersion,
-    PowerPointShapeProgrammableTag, PowerPointShapeProgrammableTagLimits,
-    PowerPointShapeProgrammableTags, PowerPointShapeProgrammableTagsEntry,
-    PowerPointShapeStringTag, PowerPointShapeStyleAtom,
+    PresentationShapeProgrammableTagsEntry, ShapeBinaryTag, ShapeBinaryTagPayload,
+    ShapeBinaryTagVersion, ShapeProgrammableTag, ShapeProgrammableTagLimits, ShapeProgrammableTags,
+    ShapeProgrammableTagsEntry, ShapeStringTag, ShapeStyleAtom,
 };
 pub use slide_extension::{
     HeaderFooterDefaults, HeaderFooterPlaceholder, NewPlaceholder, ShapeChecksums, ShapeMetadata,
     SlideExtension,
 };
 pub use slide_round_trip::{
-    PowerPoint12SlideRoundTripMetadata, PowerPointAnimationPackage, PowerPointColorMapping,
-    PowerPointColorMappingKind, PowerPointColorMappingValues, PowerPointColorSchemeIndex,
-    PowerPointContentMasterReference, PowerPointEmbeddedXmlPackage, PowerPointThemeKind,
-    PowerPointThemePackage,
+    AnimationPackage, ColorMapping, ColorMappingKind, ColorMappingValues, ColorSchemeIndex,
+    ContentMasterReference, EmbeddedXmlPackage, SlideRoundTripMetadata12, ThemeKind, ThemePackage,
 };
-pub use slide_show_settings::{
-    PowerPointColorIndex, PowerPointColorIndexKind, PowerPointSlideShowFlags,
-    PowerPointSlideShowSettings,
-};
-pub use slide_sync::{PowerPointSlideSyncInfo, PowerPointSystemTime};
-pub use smart_tags::{
-    PowerPointSmartTag, PowerPointSmartTagProperty, PowerPointSmartTagStore, PowerPointSmartTagType,
-};
-pub use style_text_prop::{PowerPointStyleTextPropAtom, PowerPointTextCFRun, PowerPointTextPFRun};
-pub use text_bookmark::PowerPointTextBookmark;
+pub use slide_show_settings::{ColorIndex, ColorIndexKind, SlideShowFlags, SlideShowSettings};
+pub use slide_sync::{SlideSyncInfo, SystemTime};
+pub use smart_tags::{SmartTag, SmartTagProperty, SmartTagStore, SmartTagType};
+pub use style_text_prop::{StyleTextPropAtom, TextCFRun, TextPFRun};
+pub use text_bookmark::TextBookmark;
 pub use text_extensions::{
     TextCharacterExtension9, TextCharacterExtension10, TextDefaultsExtension9,
     TextDefaultsExtension10, TextMasterStyleExtension9, TextMasterStyleExtension9Level,
@@ -323,14 +288,13 @@ pub use text_extensions::{
     TextStyleExtension11, VersionedTextDefaults, VersionedTextMasterStyles,
 };
 pub use text_format_exception::{
-    PowerPointBulletFlags, PowerPointCFStyle, PowerPointTextCFException, PowerPointTextPFException,
-    PowerPointWrapFlags,
+    BulletFlags, CFStyle, TextCFException, TextPFException, WrapFlags,
 };
 pub use text_interaction::{
-    PowerPointShapeTextInteractionEntry, PowerPointTextBodyInteractions, PowerPointTextInteraction,
-    PowerPointTextInteractionLimits, PowerPointTextRange, PowerPointTextType,
+    ShapeTextInteractionEntry, TextBodyInteractions, TextInteraction, TextInteractionLimits,
+    TextRange, TextType,
 };
-pub use text_metachar::{PowerPointMetacharKind, PowerPointTextMetachar};
+pub use text_metachar::{MetacharKind, TextMetachar};
 pub use text_prop::{TextProp, TextPropCollection, TextPropType, TextTabStop};
 pub use text_ruler::{TextRuler, TextRulerLevel, parse_default_text_ruler};
 pub use text_run::{
@@ -338,27 +302,22 @@ pub use text_run::{
     ParagraphTabAlignment, ParagraphTabStop, ParagraphTextDirection, TextRun, TextRunExtractor,
     TextRunFormatting,
 };
-pub use text_si_exception::{
-    PowerPointOutlineTextRef, PowerPointSpellingFlags, PowerPointTextSpecialInfoDefaults,
-};
+pub use text_si_exception::{OutlineTextRef, SpellingFlags, TextSpecialInfoDefaults};
 pub use text_special_info::{
-    PowerPointMasterTextPropLevels, PowerPointMasterTextPropRun, PowerPointTextSIException,
-    PowerPointTextSIRun, PowerPointTextSpecialInfoRuns,
+    MasterTextPropLevels, MasterTextPropRun, TextSIException, TextSIRun, TextSpecialInfoRuns,
 };
 pub use vba_info::{
-    PowerPointVbaInfo, PowerPointVbaProjectCompression, PowerPointVbaProjectError,
-    PowerPointVbaProjectLimits, PowerPointVbaProjectStorage,
+    VbaInfo, VbaProjectCompression, VbaProjectError, VbaProjectLimits, VbaProjectStorage,
 };
 pub use view_set_info::{
-    PowerPointNormalViewSet, PowerPointNormalViewSetInfo, PowerPointNormalViewSetPayload,
-    PowerPointNotesTextViewInfo, PowerPointViewBarState,
+    NormalViewSet, NormalViewSetInfo, NormalViewSetPayload, NotesTextViewInfo, ViewBarState,
 };
 
 // Re-export writer types
 pub use writer::{
-    FreeformGeometry, GeometryRect, PowerPointSmartTagDefinition, PowerPointSmartTagIndex,
-    PptWriteError, PptWriter, ShapePathType, ShapeProperties, ShapeType, TabAlign, TabStop,
-    TextAlignment, TextDirection, TextFontAlign,
+    FreeformGeometry, GeometryRect, ShapePathType, ShapeProperties, ShapeType, SmartTagDefinition,
+    SmartTagIndex, TabAlign, TabStop, TextAlignment, TextDirection, TextFontAlign, WriteError,
+    Writer,
 };
 
 // Animation and transition support

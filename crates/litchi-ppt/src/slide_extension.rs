@@ -1,8 +1,8 @@
 //! PowerPoint 12 slide and master round-trip metadata.
 
-use super::package::{PptError, Result};
-use super::records::PptRecord;
-use crate::consts::PptRecordType;
+use super::package::{Error, Result};
+use super::records::Record;
+use crate::consts::RecordType;
 
 /// Default visibility of header and footer placeholders on newly created slides.
 ///
@@ -76,27 +76,27 @@ pub struct SlideExtension {
 
 impl SlideExtension {
     /// Discover and parse slide metadata from every `___PPT12` programmable tag below `root`.
-    pub fn parse(root: &PptRecord) -> Result<Self> {
+    pub fn parse(root: &Record) -> Result<Self> {
         let mut extension = Self::default();
         for record in root.versioned_binary_tag_records(12)? {
-            if record.record_type != PptRecordType::RoundTripHeaderFooterDefaults12Atom {
+            if record.record_type != RecordType::RoundTripHeaderFooterDefaults12Atom {
                 continue;
             }
             if extension.header_footer_defaults.is_some() {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "PowerPoint 12 slide extension contains duplicate header/footer defaults"
                         .to_string(),
                 ));
             }
             if record.version != 0 || record.instance != 0 || record.data.len() != 1 {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "RoundTripHeaderFooterDefaults12Atom has an invalid record header or size"
                         .to_string(),
                 ));
             }
             let flags = record.data[0];
             if flags & 0xf0 != 0 {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "RoundTripHeaderFooterDefaults12Atom has nonzero reserved bits".to_string(),
                 ));
             }
@@ -124,25 +124,25 @@ mod tests {
         bytes
     }
 
-    fn prog_tags_record(version: u8, records: &[u8]) -> PptRecord {
+    fn prog_tags_record(version: u8, records: &[u8]) -> Record {
         let name: Vec<u8> = format!("___PPT{version}")
             .encode_utf16()
             .flat_map(u16::to_le_bytes)
             .collect();
-        let name = record_bytes(0, 0, PptRecordType::CString.as_u16(), &name);
-        let blob = record_bytes(0, 0, PptRecordType::BinaryTagData.as_u16(), records);
+        let name = record_bytes(0, 0, RecordType::CString.as_u16(), &name);
+        let blob = record_bytes(0, 0, RecordType::BinaryTagData.as_u16(), records);
         let tag_data = [name, blob].concat();
-        let tag = record_bytes(0xf, 0, PptRecordType::ProgBinaryTag.as_u16(), &tag_data);
-        let tags = record_bytes(0xf, 0, PptRecordType::ProgTags.as_u16(), &tag);
-        PptRecord::parse(&tags, 0).unwrap().0
+        let tag = record_bytes(0xf, 0, RecordType::ProgBinaryTag.as_u16(), &tag_data);
+        let tags = record_bytes(0xf, 0, RecordType::ProgTags.as_u16(), &tag);
+        Record::parse(&tags, 0).unwrap().0
     }
 
-    fn root(children: Vec<PptRecord>) -> PptRecord {
-        PptRecord {
+    fn root(children: Vec<Record>) -> Record {
+        Record {
             version: 0xf,
             instance: 0,
-            record_type: PptRecordType::Document,
-            record_type_raw: PptRecordType::Document.as_u16(),
+            record_type: RecordType::Document,
+            record_type_raw: RecordType::Document.as_u16(),
             data_length: 0,
             data: Vec::new(),
             children,

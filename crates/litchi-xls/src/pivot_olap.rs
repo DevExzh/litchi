@@ -32,7 +32,7 @@
 //!   2.5.157 (HiddenMemberSet), 2.5.254 (SXAxis), 2.5.263 (SXVIFlags),
 //!   2.5.294 (XLUnicodeString)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `SXPIEx` record (MS-XLS 2.4.299).
 pub(crate) const SXPI_EX_RECORD_TYPE: u16 = 0x080C;
@@ -115,8 +115,8 @@ const VI_OLAP_FILTER_SELECTED: u16 = 0x0020;
 /// Reserved bits of an `SXVIFlags` word: MUST be zero (MS-XLS 2.5.263).
 const VI_RESERVED: u16 = 0xFFC2;
 
-fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(record_type: u16, message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type,
         message: message.into(),
     }
@@ -144,11 +144,11 @@ fn read_i32(data: &[u8], offset: usize) -> i32 {
 }
 
 /// Borrow `len` bytes at `offset`, or fail with a truncation error.
-fn slice_at(data: &[u8], offset: usize, len: usize, record_type: u16) -> XlsResult<&[u8]> {
+fn slice_at(data: &[u8], offset: usize, len: usize, record_type: u16) -> Result<&[u8]> {
     let end = offset
         .checked_add(len)
         .ok_or_else(|| invalid(record_type, "field offset overflow"))?;
-    data.get(offset..end).ok_or(XlsError::InvalidLength {
+    data.get(offset..end).ok_or(Error::InvalidLength {
         expected: end,
         found: data.len(),
     })
@@ -157,7 +157,7 @@ fn slice_at(data: &[u8], offset: usize, len: usize, record_type: u16) -> XlsResu
 /// Validate an `FrtHeaderOld` (MS-XLS 2.5.136) and return the record body
 /// that follows it. `grbitFrt.fFrtRef` and `grbitFrt.fFrtAlert` MUST be
 /// zero and the reserved bits MUST be zero, so the whole word must be 0.
-fn frt_body(data: &[u8], record_type: u16, expected_rt: u16) -> XlsResult<&[u8]> {
+fn frt_body(data: &[u8], record_type: u16, expected_rt: u16) -> Result<&[u8]> {
     let header = slice_at(data, 0, FRT_HEADER_OLD_LEN, record_type)?;
     if read_u16(header, 0) != expected_rt {
         return Err(invalid(record_type, "FrtHeaderOld.rt mismatch"));
@@ -170,7 +170,7 @@ fn frt_body(data: &[u8], record_type: u16, expected_rt: u16) -> XlsResult<&[u8]>
 
 /// Parse an `XLUnicodeString` (MS-XLS 2.5.294) at the start of `data`.
 /// Returns the string and the number of bytes consumed.
-fn parse_olap_string(data: &[u8], record_type: u16) -> XlsResult<(String, usize)> {
+fn parse_olap_string(data: &[u8], record_type: u16) -> Result<(String, usize)> {
     let header = slice_at(data, 0, 3, record_type)?;
     let char_count = usize::from(read_u16(header, 0));
     if char_count > MAX_OLAP_STRING_CHARS {
@@ -205,7 +205,7 @@ fn parse_olap_string(data: &[u8], record_type: u16) -> XlsResult<(String, usize)
 /// Serialize an `XLUnicodeString` (MS-XLS 2.5.294) into `output`,
 /// compressed when every character is in U+0000..=U+00FF and wide
 /// otherwise.
-fn append_olap_string(record_type: u16, value: &str, output: &mut Vec<u8>) -> XlsResult<()> {
+fn append_olap_string(record_type: u16, value: &str, output: &mut Vec<u8>) -> Result<()> {
     let compressible = value.chars().all(|ch| u32::from(ch) <= 0xFF);
     let char_count = if compressible {
         value.len()
@@ -213,7 +213,7 @@ fn append_olap_string(record_type: u16, value: &str, output: &mut Vec<u8>) -> Xl
         value.encode_utf16().count()
     };
     if char_count > MAX_OLAP_STRING_CHARS {
-        return Err(XlsError::InvalidData(format!(
+        return Err(Error::InvalidData(format!(
             "record 0x{record_type:04X} XLUnicodeString exceeds {MAX_OLAP_STRING_CHARS} characters"
         )));
     }
@@ -231,20 +231,15 @@ fn append_olap_string(record_type: u16, value: &str, output: &mut Vec<u8>) -> Xl
 }
 
 /// Validate an `XLUnicodeString` field length on the write path.
-fn check_string_len(
-    record_type: u16,
-    value: &str,
-    field: &str,
-    allow_empty: bool,
-) -> XlsResult<()> {
+fn check_string_len(record_type: u16, value: &str, field: &str, allow_empty: bool) -> Result<()> {
     let char_count = value.chars().count();
     if char_count > MAX_OLAP_STRING_CHARS {
-        return Err(XlsError::InvalidData(format!(
+        return Err(Error::InvalidData(format!(
             "record 0x{record_type:04X} {field} exceeds {MAX_OLAP_STRING_CHARS} characters"
         )));
     }
     if !allow_empty && char_count == 0 {
-        return Err(XlsError::InvalidData(format!(
+        return Err(Error::InvalidData(format!(
             "record 0x{record_type:04X} {field} must not be empty"
         )));
     }
@@ -258,7 +253,7 @@ fn check_string_len(
 /// Typed `SXViewEx` record content (MS-XLS 2.4.314): the header of the
 /// PivotTable view OLAP extension sequence.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsPivotViewOlapHeader {
+pub struct PivotViewOlapHeader {
     /// Number of `SXTH` records that follow (`csxth`). MUST be at least 1.
     pub hierarchy_count: u32,
     /// Number of `SXPIEx` records that follow the `SXTH` records (`csxpi`).
@@ -270,9 +265,9 @@ pub struct XlsPivotViewOlapHeader {
     pub future_bytes: Vec<u8>,
 }
 
-impl XlsPivotViewOlapHeader {
+impl PivotViewOlapHeader {
     /// Parse an `SXViewEx` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         let body = frt_body(data, SX_VIEW_EX_RECORD_TYPE, SX_VIEW_EX_FRT_RT)?;
         let fixed = slice_at(body, 0, 16, SX_VIEW_EX_RECORD_TYPE)?;
         let hierarchy_count = read_i32(fixed, 0);
@@ -304,7 +299,7 @@ impl XlsPivotViewOlapHeader {
                 "SXViewEx cbFuture does not match the record size",
             ));
         }
-        Ok(XlsPivotViewOlapHeader {
+        Ok(PivotViewOlapHeader {
             hierarchy_count: hierarchy_count as u32,
             page_extension_count: page_extension_count as u32,
             field_extension_count: field_extension_count as u32,
@@ -313,14 +308,14 @@ impl XlsPivotViewOlapHeader {
     }
 
     /// Serialize back to a complete `SXViewEx` record payload.
-    pub fn to_payload(&self) -> XlsResult<Vec<u8>> {
+    pub fn to_payload(&self) -> Result<Vec<u8>> {
         if self.hierarchy_count < 1 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "SXViewEx hierarchy_count must be at least 1".to_string(),
             ));
         }
         if self.future_bytes.len() > MAX_FUTURE_BYTES {
-            return Err(XlsError::InvalidData(format!(
+            return Err(Error::InvalidData(format!(
                 "SXViewEx future_bytes exceeds {MAX_FUTURE_BYTES} bytes"
             )));
         }
@@ -343,7 +338,7 @@ impl XlsPivotViewOlapHeader {
 /// The PivotTable axis or axes a pivot hierarchy is present on (`SXAxis`,
 /// MS-XLS 2.5.254).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct XlsPivotHierarchyAxis {
+pub struct PivotHierarchyAxis {
     /// Whether the hierarchy is on the row axis (`sxaxisRw`).
     pub row: bool,
     /// Whether the hierarchy is on the column axis (`sxaxisCol`).
@@ -354,12 +349,12 @@ pub struct XlsPivotHierarchyAxis {
     pub data: bool,
 }
 
-impl XlsPivotHierarchyAxis {
-    fn from_bits(record_type: u16, bits: u16) -> XlsResult<Self> {
+impl PivotHierarchyAxis {
+    fn from_bits(record_type: u16, bits: u16) -> Result<Self> {
         if bits & AXIS_RESERVED != 0 {
             return Err(invalid(record_type, "SXAxis reserved bits set"));
         }
-        Ok(XlsPivotHierarchyAxis {
+        Ok(PivotHierarchyAxis {
             row: bits & AXIS_ROW != 0,
             column: bits & AXIS_COLUMN != 0,
             page: bits & AXIS_PAGE != 0,
@@ -388,7 +383,7 @@ impl XlsPivotHierarchyAxis {
 /// A `HiddenMemberSet` structure (MS-XLS 2.5.157): the OLAP members hidden
 /// from the PivotTable view at one level of a pivot hierarchy.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsHiddenMemberSet {
+pub struct HiddenMemberSet {
     /// Names of the hidden OLAP members (`rgMemberName`), each at most 255
     /// characters.
     pub member_names: Vec<String>,
@@ -397,7 +392,7 @@ pub struct XlsHiddenMemberSet {
 /// Typed `SXTH` record content (MS-XLS 2.4.308): properties of one OLAP
 /// pivot hierarchy.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsPivotHierarchy {
+pub struct PivotHierarchy {
     /// Whether this hierarchy is an OLAP measure (`fMeasure`).
     pub is_measure: bool,
     /// Whether level fields are created with `SXVDEx.fOutline` set
@@ -428,12 +423,12 @@ pub struct XlsPivotHierarchy {
     /// Whether this hierarchy is a KPI hierarchy (`fKPI`).
     pub is_kpi: bool,
     /// The axis or axes this hierarchy is present on (`sxaxis`).
-    pub axis: XlsPivotHierarchyAxis,
+    pub axis: PivotHierarchyAxis,
     /// The associated pivot field index (`isxvd`).
     pub pivot_field_index: i32,
     /// Number of pivot fields on PivotTable axes for this hierarchy
     /// (`csxvdXl`). Related to `level_fields` by the `stAll` rule (see
-    /// [`XlsPivotHierarchy::parse`]).
+    /// [`PivotHierarchy::parse`]).
     pub axis_field_count: i32,
     /// Whether this hierarchy can be placed on the row axis (`fDragToRow`).
     pub drag_to_row: bool,
@@ -463,10 +458,10 @@ pub struct XlsPivotHierarchy {
     /// element is a pivot field index or -1 for none.
     pub level_fields: Vec<i32>,
     /// Hidden OLAP members per level (`rgHiddenMemberSets`).
-    pub hidden_member_sets: Vec<XlsHiddenMemberSet>,
+    pub hidden_member_sets: Vec<HiddenMemberSet>,
 }
 
-impl XlsPivotHierarchy {
+impl PivotHierarchy {
     /// Parse an `SXTH` record payload.
     ///
     /// Cross-field rules enforced (MS-XLS 2.4.308):
@@ -478,14 +473,14 @@ impl XlsPivotHierarchy {
     /// - `axis_field_count` (`csxvdXl`) MUST equal the `level_fields` count
     ///   when `all_member` (`stAll`) is empty, and one less otherwise;
     /// - `hidden_member_sets` MUST be empty when `filter_inclusive` is set.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         let body = frt_body(data, SXTH_RECORD_TYPE, SXTH_FRT_RT)?;
         let fixed = slice_at(body, 0, 18, SXTH_RECORD_TYPE)?;
         let flags = read_u32(fixed, 0);
         let is_measure = flags & TH_MEASURE != 0;
         let is_named_set = flags & TH_NAMED_SET != 0;
         let filter_inclusive = flags & TH_FILTER_INCLUSIVE != 0;
-        let axis = XlsPivotHierarchyAxis::from_bits(SXTH_RECORD_TYPE, read_u16(fixed, 4))?;
+        let axis = PivotHierarchyAxis::from_bits(SXTH_RECORD_TYPE, read_u16(fixed, 4))?;
         if read_u16(fixed, 6) != 0 {
             return Err(invalid(SXTH_RECORD_TYPE, "SXTH reserved word must be zero"));
         }
@@ -584,14 +579,14 @@ impl XlsPivotHierarchy {
                     offset += used;
                     member_names.push(name);
                 }
-                hidden_member_sets.push(XlsHiddenMemberSet { member_names });
+                hidden_member_sets.push(HiddenMemberSet { member_names });
             }
         }
         if offset != body.len() {
             return Err(invalid(SXTH_RECORD_TYPE, "trailing bytes after SXTH"));
         }
 
-        Ok(XlsPivotHierarchy {
+        Ok(PivotHierarchy {
             is_measure,
             outline_mode: flags & TH_OUTLINE_MODE != 0,
             multiple_page_items: flags & TH_MULTIPLE_PAGE_ITEMS != 0,
@@ -622,27 +617,27 @@ impl XlsPivotHierarchy {
     }
 
     /// Serialize back to a complete `SXTH` record payload. The same
-    /// cross-field rules as [`XlsPivotHierarchy::parse`] are enforced.
-    pub fn to_payload(&self) -> XlsResult<Vec<u8>> {
+    /// cross-field rules as [`PivotHierarchy::parse`] are enforced.
+    pub fn to_payload(&self) -> Result<Vec<u8>> {
         if self.is_measure
             && (self.is_named_set || self.drag_to_row || self.drag_to_column || self.drag_to_page)
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "SXTH measure cannot be a named set or drag to row/column/page".to_string(),
             ));
         }
         if self.is_measure && !self.dimension.is_empty() {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "SXTH measure must have an empty dimension".to_string(),
             ));
         }
         if !self.level_fields.is_empty() && !self.axis.row && !self.axis.column {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "SXTH level_fields must be empty off the row/column axes".to_string(),
             ));
         }
         if self.axis_field_count < 0 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "SXTH axis_field_count must be non-negative".to_string(),
             ));
         }
@@ -652,17 +647,17 @@ impl XlsPivotHierarchy {
             self.level_fields.len() as i64 - 1
         };
         if i64::from(self.axis_field_count) != expected_axis_fields {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "SXTH axis_field_count does not match level_fields and all_member".to_string(),
             ));
         }
         if self.filter_inclusive && !self.hidden_member_sets.is_empty() {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "SXTH hidden_member_sets must be empty for inclusive filters".to_string(),
             ));
         }
         if !self.hidden_member_sets.is_empty() && self.level_fields.is_empty() {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "SXTH hidden_member_sets require non-empty level_fields".to_string(),
             ));
         }
@@ -678,7 +673,7 @@ impl XlsPivotHierarchy {
         check_string_len(SXTH_RECORD_TYPE, &self.dimension, "dimension", true)?;
         for &field in &self.level_fields {
             if field < -1 {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "SXTH level_fields element must be -1 or a pivot field index".to_string(),
                 ));
             }
@@ -774,7 +769,7 @@ impl XlsPivotHierarchy {
 /// Typed `SXPIEx` record content (MS-XLS 2.4.299): the OLAP extension of
 /// one page-axis entry of a PivotTable view.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsPivotPageItemOlapExt {
+pub struct PivotPageItemOlapExt {
     /// Pivot hierarchy index of the hierarchy on the page axis (`isxth`).
     pub hierarchy_index: u32,
     /// Unique name of the OLAP member used for filtering (`stUnique`), at
@@ -784,9 +779,9 @@ pub struct XlsPivotPageItemOlapExt {
     pub display_name: String,
 }
 
-impl XlsPivotPageItemOlapExt {
+impl PivotPageItemOlapExt {
     /// Parse an `SXPIEx` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         let body = frt_body(data, SXPI_EX_RECORD_TYPE, SXPI_EX_FRT_RT)?;
         let hierarchy_index = read_u32(slice_at(body, 0, 4, SXPI_EX_RECORD_TYPE)?, 0);
         let (unique_name, used) = parse_olap_string(&body[4..], SXPI_EX_RECORD_TYPE)?;
@@ -795,7 +790,7 @@ impl XlsPivotPageItemOlapExt {
         if used != tail.len() {
             return Err(invalid(SXPI_EX_RECORD_TYPE, "trailing bytes after SXPIEx"));
         }
-        Ok(XlsPivotPageItemOlapExt {
+        Ok(PivotPageItemOlapExt {
             hierarchy_index,
             unique_name,
             display_name,
@@ -803,7 +798,7 @@ impl XlsPivotPageItemOlapExt {
     }
 
     /// Serialize back to a complete `SXPIEx` record payload.
-    pub fn to_payload(&self) -> XlsResult<Vec<u8>> {
+    pub fn to_payload(&self) -> Result<Vec<u8>> {
         check_string_len(SXPI_EX_RECORD_TYPE, &self.unique_name, "unique_name", true)?;
         check_string_len(
             SXPI_EX_RECORD_TYPE,
@@ -828,7 +823,7 @@ impl XlsPivotPageItemOlapExt {
 /// An `SXVIFlags` structure (MS-XLS 2.5.263): additional OLAP properties
 /// of one pivot item.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct XlsPivotItemOlapFlags {
+pub struct PivotItemOlapFlags {
     /// Whether child elements of this item are collapsed
     /// (`fDrilledMember`).
     pub drilled_member: bool,
@@ -844,12 +839,12 @@ pub struct XlsPivotItemOlapFlags {
     pub olap_filter_selected: bool,
 }
 
-impl XlsPivotItemOlapFlags {
-    fn from_bits(record_type: u16, bits: u16) -> XlsResult<Self> {
+impl PivotItemOlapFlags {
+    fn from_bits(record_type: u16, bits: u16) -> Result<Self> {
         if bits & VI_RESERVED != 0 {
             return Err(invalid(record_type, "SXVIFlags reserved bits set"));
         }
-        Ok(XlsPivotItemOlapFlags {
+        Ok(PivotItemOlapFlags {
             drilled_member: bits & VI_DRILLED_MEMBER != 0,
             has_children: bits & VI_HAS_CHILDREN != 0,
             collapsed_member: bits & VI_COLLAPSED_MEMBER != 0,
@@ -882,7 +877,7 @@ impl XlsPivotItemOlapFlags {
 /// Typed `SXVDTEx` record content (MS-XLS 2.4.311): the OLAP extension of
 /// one pivot field.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsPivotFieldOlapExt {
+pub struct PivotFieldOlapExt {
     /// Whether the sort order is determined by the OLAP source data
     /// (`fTensorSort`).
     pub tensor_sort: bool,
@@ -909,12 +904,12 @@ pub struct XlsPivotFieldOlapExt {
     pub olap_level_index: i32,
     /// Additional properties of the pivot items (`rgsxvi`); one element
     /// per pivot item of this field.
-    pub item_flags: Vec<XlsPivotItemOlapFlags>,
+    pub item_flags: Vec<PivotItemOlapFlags>,
 }
 
-impl XlsPivotFieldOlapExt {
+impl PivotFieldOlapExt {
     /// Parse an `SXVDTEx` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         let body = frt_body(data, SXVDT_EX_RECORD_TYPE, SXVDT_EX_FRT_RT)?;
         let fixed = slice_at(body, 0, 12, SXVDT_EX_RECORD_TYPE)?;
         let flags = read_u16(fixed, 0);
@@ -946,12 +941,12 @@ impl XlsPivotFieldOlapExt {
         }
         let mut item_flags = Vec::with_capacity(item_count);
         for chunk in items.chunks_exact(2) {
-            item_flags.push(XlsPivotItemOlapFlags::from_bits(
+            item_flags.push(PivotItemOlapFlags::from_bits(
                 SXVDT_EX_RECORD_TYPE,
                 u16::from_le_bytes([chunk[0], chunk[1]]),
             )?);
         }
-        Ok(XlsPivotFieldOlapExt {
+        Ok(PivotFieldOlapExt {
             tensor_sort: flags & VDT_TENSOR_SORT != 0,
             drilled_level: flags & VDT_DRILLED_LEVEL != 0,
             items_drilled_by_default: flags & VDT_ITEMS_DRILLED_BY_DEFAULT != 0,
@@ -965,9 +960,9 @@ impl XlsPivotFieldOlapExt {
     }
 
     /// Serialize back to a complete `SXVDTEx` record payload.
-    pub fn to_payload(&self) -> XlsResult<Vec<u8>> {
+    pub fn to_payload(&self) -> Result<Vec<u8>> {
         if self.hierarchy_index < -1 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "SXVDTEx hierarchy_index must be -1 or a pivot hierarchy index".to_string(),
             ));
         }
@@ -1039,7 +1034,7 @@ mod tests {
     #[test]
     fn view_ex_parses() {
         let header =
-            XlsPivotViewOlapHeader::parse(&view_ex_payload(2, 1, 3, &[0xDE, 0xAD])).expect("parse");
+            PivotViewOlapHeader::parse(&view_ex_payload(2, 1, 3, &[0xDE, 0xAD])).expect("parse");
         assert_eq!(header.hierarchy_count, 2);
         assert_eq!(header.page_extension_count, 1);
         assert_eq!(header.field_extension_count, 3);
@@ -1050,25 +1045,25 @@ mod tests {
     fn view_ex_rejects_bad_header_and_counts() {
         // Wrong FrtHeaderOld.rt (the record type itself is NOT the rt here).
         assert!(
-            XlsPivotViewOlapHeader::parse(&view_ex_payload(1, 0, 0, &[])[..])
+            PivotViewOlapHeader::parse(&view_ex_payload(1, 0, 0, &[])[..])
                 .map(|_| ())
                 .is_ok()
         );
         let mut payload = view_ex_payload(1, 0, 0, &[]);
         payload[0] = 0x0E; // rt = 0x080E (the record type) is wrong per spec
         payload[1] = 0x08;
-        assert!(XlsPivotViewOlapHeader::parse(&payload).is_err());
+        assert!(PivotViewOlapHeader::parse(&payload).is_err());
 
         // grbitFrt must be zero.
         let mut payload = view_ex_payload(1, 0, 0, &[]);
         payload[2] = 0x01;
-        assert!(XlsPivotViewOlapHeader::parse(&payload).is_err());
+        assert!(PivotViewOlapHeader::parse(&payload).is_err());
 
         // csxth must be at least 1.
-        assert!(XlsPivotViewOlapHeader::parse(&view_ex_payload(0, 0, 0, &[])).is_err());
+        assert!(PivotViewOlapHeader::parse(&view_ex_payload(0, 0, 0, &[])).is_err());
         // Negative counts are illegal.
-        assert!(XlsPivotViewOlapHeader::parse(&view_ex_payload(1, -1, 0, &[])).is_err());
-        assert!(XlsPivotViewOlapHeader::parse(&view_ex_payload(1, 0, -1, &[])).is_err());
+        assert!(PivotViewOlapHeader::parse(&view_ex_payload(1, -1, 0, &[])).is_err());
+        assert!(PivotViewOlapHeader::parse(&view_ex_payload(1, 0, -1, &[])).is_err());
     }
 
     #[test]
@@ -1076,23 +1071,23 @@ mod tests {
         // cbFuture larger than the record.
         let mut payload = view_ex_payload(1, 0, 0, &[1, 2]);
         payload.truncate(payload.len() - 1);
-        assert!(XlsPivotViewOlapHeader::parse(&payload).is_err());
+        assert!(PivotViewOlapHeader::parse(&payload).is_err());
 
         // cbFuture beyond the 1024-byte bound.
         let mut payload = view_ex_payload(1, 0, 0, &[]);
         payload[16] = 0x01; // cbFuture = 1025
         payload[17] = 0x04;
-        assert!(XlsPivotViewOlapHeader::parse(&payload).is_err());
+        assert!(PivotViewOlapHeader::parse(&payload).is_err());
 
         // Truncated fixed part.
-        assert!(XlsPivotViewOlapHeader::parse(&[]).is_err());
-        assert!(XlsPivotViewOlapHeader::parse(&frt_header(SX_VIEW_EX_FRT_RT)).is_err());
+        assert!(PivotViewOlapHeader::parse(&[]).is_err());
+        assert!(PivotViewOlapHeader::parse(&frt_header(SX_VIEW_EX_FRT_RT)).is_err());
     }
 
     #[test]
     fn view_ex_round_trips() {
         for future in [Vec::new(), vec![0xAA; 17]] {
-            let header = XlsPivotViewOlapHeader {
+            let header = PivotViewOlapHeader {
                 hierarchy_count: 1,
                 page_extension_count: 2,
                 field_extension_count: 4,
@@ -1100,12 +1095,12 @@ mod tests {
             };
             let payload = header.to_payload().expect("serialize");
             assert_eq!(
-                XlsPivotViewOlapHeader::parse(&payload).expect("re-parse"),
+                PivotViewOlapHeader::parse(&payload).expect("re-parse"),
                 header
             );
         }
         // Zero hierarchies cannot be written.
-        let bad = XlsPivotViewOlapHeader {
+        let bad = PivotViewOlapHeader {
             hierarchy_count: 0,
             page_extension_count: 0,
             field_extension_count: 0,
@@ -1113,7 +1108,7 @@ mod tests {
         };
         assert!(bad.to_payload().is_err());
         // An oversized future blob cannot be written.
-        let bad = XlsPivotViewOlapHeader {
+        let bad = PivotViewOlapHeader {
             hierarchy_count: 1,
             page_extension_count: 0,
             field_extension_count: 0,
@@ -1199,7 +1194,7 @@ mod tests {
         ];
         // Inclusive filter forbids hidden sets; flip to exclusive.
         builder.flags &= !TH_FILTER_INCLUSIVE;
-        let hierarchy = XlsPivotHierarchy::parse(&builder.build()).expect("parse");
+        let hierarchy = PivotHierarchy::parse(&builder.build()).expect("parse");
         assert!(!hierarchy.is_measure);
         assert!(hierarchy.is_attribute_hierarchy);
         assert!(!hierarchy.filter_inclusive);
@@ -1207,7 +1202,7 @@ mod tests {
         assert!(!hierarchy.is_kpi);
         assert_eq!(
             hierarchy.axis,
-            XlsPivotHierarchyAxis {
+            PivotHierarchyAxis {
                 row: true,
                 column: false,
                 page: false,
@@ -1243,11 +1238,11 @@ mod tests {
         let mut builder = HierarchyBuilder::new();
         builder.all_member = String::new();
         builder.csxvd_xl = 3;
-        assert!(XlsPivotHierarchy::parse(&builder.build()).is_ok());
+        assert!(PivotHierarchy::parse(&builder.build()).is_ok());
         // stAll non-empty => csxvdXl MUST equal cisxvd - 1 (3 - 1 = 2 ok, 3 bad).
         let mut builder = HierarchyBuilder::new();
         builder.csxvd_xl = 3;
-        assert!(XlsPivotHierarchy::parse(&builder.build()).is_err());
+        assert!(PivotHierarchy::parse(&builder.build()).is_err());
     }
 
     #[test]
@@ -1256,30 +1251,30 @@ mod tests {
         let mut payload = HierarchyBuilder::new().build();
         payload[0] = 0xDB; // record type is NOT the mandated rt
         payload[1] = 0x00;
-        assert!(XlsPivotHierarchy::parse(&payload).is_err());
+        assert!(PivotHierarchy::parse(&payload).is_err());
 
         // Reserved word after sxaxis must be zero.
         let mut builder = HierarchyBuilder::new();
         builder.reserved = 1;
-        assert!(XlsPivotHierarchy::parse(&builder.build()).is_err());
+        assert!(PivotHierarchy::parse(&builder.build()).is_err());
 
         // SXAxis reserved bits must be zero.
         let mut builder = HierarchyBuilder::new();
         builder.axis |= 0x0010;
-        assert!(XlsPivotHierarchy::parse(&builder.build()).is_err());
+        assert!(PivotHierarchy::parse(&builder.build()).is_err());
 
         // Negative csxvdXl.
         let mut builder = HierarchyBuilder::new();
         builder.csxvd_xl = -1;
-        assert!(XlsPivotHierarchy::parse(&builder.build()).is_err());
+        assert!(PivotHierarchy::parse(&builder.build()).is_err());
 
         // Truncation and trailing bytes.
-        assert!(XlsPivotHierarchy::parse(&[]).is_err());
+        assert!(PivotHierarchy::parse(&[]).is_err());
         let payload = HierarchyBuilder::new().build();
-        assert!(XlsPivotHierarchy::parse(&payload[..payload.len() - 1]).is_err());
+        assert!(PivotHierarchy::parse(&payload[..payload.len() - 1]).is_err());
         let mut payload = HierarchyBuilder::new().build();
         payload.push(0);
-        assert!(XlsPivotHierarchy::parse(&payload).is_err());
+        assert!(PivotHierarchy::parse(&payload).is_err());
     }
 
     #[test]
@@ -1287,13 +1282,13 @@ mod tests {
         // Measure + named set.
         let mut builder = HierarchyBuilder::new();
         builder.flags |= TH_MEASURE | TH_NAMED_SET;
-        assert!(XlsPivotHierarchy::parse(&builder.build()).is_err());
+        assert!(PivotHierarchy::parse(&builder.build()).is_err());
 
         // Measure + drag to page.
         let mut builder = HierarchyBuilder::new();
         builder.flags |= TH_MEASURE;
         builder.drag |= DRAG_TO_PAGE;
-        assert!(XlsPivotHierarchy::parse(&builder.build()).is_err());
+        assert!(PivotHierarchy::parse(&builder.build()).is_err());
 
         // Measure with a non-empty dimension.
         let mut builder = HierarchyBuilder::new();
@@ -1302,7 +1297,7 @@ mod tests {
         builder.axis = AXIS_DATA;
         builder.levels = Vec::new();
         builder.csxvd_xl = -1; // also invalid on its own
-        assert!(XlsPivotHierarchy::parse(&builder.build()).is_err());
+        assert!(PivotHierarchy::parse(&builder.build()).is_err());
         let mut builder = HierarchyBuilder::new();
         builder.flags |= TH_MEASURE;
         builder.drag &= !DRAG_TO_ROW;
@@ -1311,7 +1306,7 @@ mod tests {
         builder.all_member = String::new();
         builder.csxvd_xl = 0;
         builder.dimension = String::new();
-        assert!(XlsPivotHierarchy::parse(&builder.build()).is_ok());
+        assert!(PivotHierarchy::parse(&builder.build()).is_ok());
     }
 
     #[test]
@@ -1319,26 +1314,26 @@ mod tests {
         // cisxvd > 0 while on neither row nor column axis.
         let mut builder = HierarchyBuilder::new();
         builder.axis = AXIS_PAGE;
-        assert!(XlsPivotHierarchy::parse(&builder.build()).is_err());
+        assert!(PivotHierarchy::parse(&builder.build()).is_err());
 
         // Inclusive filter with hidden member sets.
         let mut builder = HierarchyBuilder::new();
         builder.hidden_set_count = 1;
         builder.hidden_sets = vec![vec!["&[4]".to_string()]];
-        assert!(XlsPivotHierarchy::parse(&builder.build()).is_err());
+        assert!(PivotHierarchy::parse(&builder.build()).is_err());
 
         // Empty stUnique / stDisplay.
         let mut builder = HierarchyBuilder::new();
         builder.unique = String::new();
-        assert!(XlsPivotHierarchy::parse(&builder.build()).is_err());
+        assert!(PivotHierarchy::parse(&builder.build()).is_err());
         let mut builder = HierarchyBuilder::new();
         builder.display = String::new();
-        assert!(XlsPivotHierarchy::parse(&builder.build()).is_err());
+        assert!(PivotHierarchy::parse(&builder.build()).is_err());
 
         // rgisxvd element below -1.
         let mut builder = HierarchyBuilder::new();
         builder.levels = vec![3, -2, 5];
-        assert!(XlsPivotHierarchy::parse(&builder.build()).is_err());
+        assert!(PivotHierarchy::parse(&builder.build()).is_err());
     }
 
     #[test]
@@ -1348,17 +1343,17 @@ mod tests {
         // stUnique option byte: frt(4) + fixed(18) + cch(2).
         let mut payload2 = payload.clone();
         payload2[4 + 18 + 2] = 0x02;
-        assert!(XlsPivotHierarchy::parse(&payload2).is_err());
+        assert!(PivotHierarchy::parse(&payload2).is_err());
 
         // String longer than 255 characters.
         let mut builder = HierarchyBuilder::new();
         builder.unique = "x".repeat(300);
-        assert!(XlsPivotHierarchy::parse(&builder.build()).is_err());
+        assert!(PivotHierarchy::parse(&builder.build()).is_err());
     }
 
     #[test]
     fn hierarchy_round_trips() {
-        let hierarchy = XlsPivotHierarchy {
+        let hierarchy = PivotHierarchy {
             is_measure: false,
             outline_mode: true,
             multiple_page_items: true,
@@ -1370,7 +1365,7 @@ mod tests {
             filter_inclusive: false,
             is_key_attribute_hierarchy: true,
             is_kpi: false,
-            axis: XlsPivotHierarchyAxis {
+            axis: PivotHierarchyAxis {
                 row: true,
                 column: true,
                 page: false,
@@ -1389,18 +1384,18 @@ mod tests {
             all_member: "[Date].[Calendar].[All]".to_string(),
             dimension: "[Date]".to_string(),
             level_fields: vec![0, 2],
-            hidden_member_sets: vec![XlsHiddenMemberSet {
+            hidden_member_sets: vec![HiddenMemberSet {
                 member_names: vec!["&[2001]".to_string()],
             }],
         };
         let payload = hierarchy.to_payload().expect("serialize");
         assert_eq!(
-            XlsPivotHierarchy::parse(&payload).expect("re-parse"),
+            PivotHierarchy::parse(&payload).expect("re-parse"),
             hierarchy
         );
 
         // A measure hierarchy with no level fields.
-        let measure = XlsPivotHierarchy {
+        let measure = PivotHierarchy {
             is_measure: true,
             outline_mode: false,
             multiple_page_items: false,
@@ -1412,7 +1407,7 @@ mod tests {
             filter_inclusive: false,
             is_key_attribute_hierarchy: false,
             is_kpi: false,
-            axis: XlsPivotHierarchyAxis {
+            axis: PivotHierarchyAxis {
                 row: false,
                 column: false,
                 page: false,
@@ -1434,15 +1429,12 @@ mod tests {
             hidden_member_sets: Vec::new(),
         };
         let payload = measure.to_payload().expect("serialize");
-        assert_eq!(
-            XlsPivotHierarchy::parse(&payload).expect("re-parse"),
-            measure
-        );
+        assert_eq!(PivotHierarchy::parse(&payload).expect("re-parse"), measure);
     }
 
     #[test]
     fn hierarchy_serialize_rejects_inconsistent_fields() {
-        let base = XlsPivotHierarchy::parse(&HierarchyBuilder::new().build()).expect("parse");
+        let base = PivotHierarchy::parse(&HierarchyBuilder::new().build()).expect("parse");
 
         let mut bad = base.clone();
         bad.unique_name = String::new();
@@ -1462,7 +1454,7 @@ mod tests {
 
         let mut bad = base.clone();
         bad.filter_inclusive = true;
-        bad.hidden_member_sets = vec![XlsHiddenMemberSet {
+        bad.hidden_member_sets = vec![HiddenMemberSet {
             member_names: vec!["x".to_string()],
         }];
         assert!(bad.to_payload().is_err());
@@ -1484,7 +1476,7 @@ mod tests {
 
     #[test]
     fn page_ext_parses() {
-        let ext = XlsPivotPageItemOlapExt::parse(&page_ext_payload(1, "[Product].&[3]", "Bikes"))
+        let ext = PivotPageItemOlapExt::parse(&page_ext_payload(1, "[Product].&[3]", "Bikes"))
             .expect("parse");
         assert_eq!(ext.hierarchy_index, 1);
         assert_eq!(ext.unique_name, "[Product].&[3]");
@@ -1497,34 +1489,32 @@ mod tests {
         let mut payload = page_ext_payload(0, "u", "d");
         payload[0] = 0x0C;
         payload[1] = 0x08;
-        assert!(XlsPivotPageItemOlapExt::parse(&payload).is_err());
+        assert!(PivotPageItemOlapExt::parse(&payload).is_err());
 
         // Oversized string, truncation, trailing bytes.
-        assert!(
-            XlsPivotPageItemOlapExt::parse(&page_ext_payload(0, &"x".repeat(300), "d")).is_err()
-        );
-        assert!(XlsPivotPageItemOlapExt::parse(&[]).is_err());
+        assert!(PivotPageItemOlapExt::parse(&page_ext_payload(0, &"x".repeat(300), "d")).is_err());
+        assert!(PivotPageItemOlapExt::parse(&[]).is_err());
         let payload = page_ext_payload(0, "u", "d");
-        assert!(XlsPivotPageItemOlapExt::parse(&payload[..payload.len() - 1]).is_err());
+        assert!(PivotPageItemOlapExt::parse(&payload[..payload.len() - 1]).is_err());
         let mut payload = page_ext_payload(0, "u", "d");
         payload.push(0);
-        assert!(XlsPivotPageItemOlapExt::parse(&payload).is_err());
+        assert!(PivotPageItemOlapExt::parse(&payload).is_err());
     }
 
     #[test]
     fn page_ext_round_trips() {
-        let ext = XlsPivotPageItemOlapExt {
+        let ext = PivotPageItemOlapExt {
             hierarchy_index: 0x7FFF,
             unique_name: "[Date].&[2024]".to_string(),
             display_name: "Year 2024 €".to_string(), // wide string path
         };
         let payload = ext.to_payload().expect("serialize");
         assert_eq!(
-            XlsPivotPageItemOlapExt::parse(&payload).expect("re-parse"),
+            PivotPageItemOlapExt::parse(&payload).expect("re-parse"),
             ext
         );
 
-        let bad = XlsPivotPageItemOlapExt {
+        let bad = PivotPageItemOlapExt {
             hierarchy_index: 0,
             unique_name: "x".repeat(256),
             display_name: String::new(),
@@ -1553,8 +1543,7 @@ mod tests {
             VI_HAS_CHILDREN | VI_OLAP_FILTER_SELECTED,
             VI_COLLAPSED_MEMBER,
         ];
-        let ext =
-            XlsPivotFieldOlapExt::parse(&field_ext_payload(flags, 2, 1, &items)).expect("parse");
+        let ext = PivotFieldOlapExt::parse(&field_ext_payload(flags, 2, 1, &items)).expect("parse");
         assert!(ext.tensor_sort);
         assert!(!ext.drilled_level);
         assert!(ext.member_property_in_report);
@@ -1571,33 +1560,33 @@ mod tests {
     #[test]
     fn field_ext_rejects_defects() {
         // Reserved flag bits.
-        assert!(XlsPivotFieldOlapExt::parse(&field_ext_payload(0x0040, 0, 0, &[])).is_err());
+        assert!(PivotFieldOlapExt::parse(&field_ext_payload(0x0040, 0, 0, &[])).is_err());
         // Reserved SXVIFlags bits.
-        assert!(XlsPivotFieldOlapExt::parse(&field_ext_payload(0, 0, 0, &[0x0002])).is_err());
+        assert!(PivotFieldOlapExt::parse(&field_ext_payload(0, 0, 0, &[0x0002])).is_err());
         // isxth below -1.
-        assert!(XlsPivotFieldOlapExt::parse(&field_ext_payload(0, -2, 0, &[])).is_err());
+        assert!(PivotFieldOlapExt::parse(&field_ext_payload(0, -2, 0, &[])).is_err());
         // Negative csxvi.
         let mut payload = field_ext_payload(0, 0, 0, &[]);
         payload[12] = 0xFF;
         payload[13] = 0xFF;
         payload[14] = 0xFF;
         payload[15] = 0xFF;
-        assert!(XlsPivotFieldOlapExt::parse(&payload).is_err());
+        assert!(PivotFieldOlapExt::parse(&payload).is_err());
         // csxvi not matching the record size.
         let mut payload = field_ext_payload(0, 0, 0, &[0]);
         payload.pop();
-        assert!(XlsPivotFieldOlapExt::parse(&payload).is_err());
+        assert!(PivotFieldOlapExt::parse(&payload).is_err());
         let mut payload = field_ext_payload(0, 0, 0, &[]);
         payload.extend_from_slice(&[0, 0]);
-        assert!(XlsPivotFieldOlapExt::parse(&payload).is_err());
+        assert!(PivotFieldOlapExt::parse(&payload).is_err());
         // Truncation.
-        assert!(XlsPivotFieldOlapExt::parse(&[]).is_err());
-        assert!(XlsPivotFieldOlapExt::parse(&frt_header(SXVDT_EX_FRT_RT)).is_err());
+        assert!(PivotFieldOlapExt::parse(&[]).is_err());
+        assert!(PivotFieldOlapExt::parse(&frt_header(SXVDT_EX_FRT_RT)).is_err());
     }
 
     #[test]
     fn field_ext_round_trips() {
-        let ext = XlsPivotFieldOlapExt {
+        let ext = PivotFieldOlapExt {
             tensor_sort: true,
             drilled_level: true,
             items_drilled_by_default: false,
@@ -1607,23 +1596,20 @@ mod tests {
             hierarchy_index: -1,
             olap_level_index: 0x0000_7FFF,
             item_flags: vec![
-                XlsPivotItemOlapFlags {
+                PivotItemOlapFlags {
                     drilled_member: true,
                     has_children: true,
                     collapsed_member: false,
                     has_children_estimated: true,
                     olap_filter_selected: false,
                 },
-                XlsPivotItemOlapFlags::default(),
+                PivotItemOlapFlags::default(),
             ],
         };
         let payload = ext.to_payload().expect("serialize");
-        assert_eq!(
-            XlsPivotFieldOlapExt::parse(&payload).expect("re-parse"),
-            ext
-        );
+        assert_eq!(PivotFieldOlapExt::parse(&payload).expect("re-parse"), ext);
 
-        let bad = XlsPivotFieldOlapExt {
+        let bad = PivotFieldOlapExt {
             hierarchy_index: -2,
             ..ext
         };

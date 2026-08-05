@@ -1,9 +1,7 @@
 //! BIFF8 worksheet tables (`FeatHdr11`, `Feature11`, and `List12`).
 
-use super::autofilter12::{
-    XlsTableAutoFilter12, parse_table_autofilter12, write_table_autofilter12,
-};
-use super::{XlsError, XlsResult};
+use super::autofilter12::{TableAutoFilter12, parse_table_autofilter12, write_table_autofilter12};
+use super::{Error, Result};
 use std::collections::HashSet;
 
 pub(crate) const FEAT_HDR11_RECORD_TYPE: u16 = 0x0871;
@@ -17,37 +15,37 @@ const MAX_PAYLOAD: usize = 8_224;
 const MAX_CONTINUE_RGB: usize = 8_212;
 const MAX_FEATURE_BYTES: usize = 1_048_576;
 
-fn invalid(rt: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(rt: u16, message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: rt,
         message: message.into(),
     }
 }
-fn u16_at(data: &[u8], offset: usize, rt: u16, field: &str) -> XlsResult<u16> {
+fn u16_at(data: &[u8], offset: usize, rt: u16, field: &str) -> Result<u16> {
     data.get(offset..offset + 2)
         .map(|v| u16::from_le_bytes([v[0], v[1]]))
         .ok_or_else(|| invalid(rt, format!("truncated {field}")))
 }
-fn u32_at(data: &[u8], offset: usize, rt: u16, field: &str) -> XlsResult<u32> {
+fn u32_at(data: &[u8], offset: usize, rt: u16, field: &str) -> Result<u32> {
     data.get(offset..offset + 4)
         .map(|v| u32::from_le_bytes(v.try_into().unwrap()))
         .ok_or_else(|| invalid(rt, format!("truncated {field}")))
 }
-fn append_range(out: &mut Vec<u8>, range: XlsListObjectRange) {
+fn append_range(out: &mut Vec<u8>, range: ListObjectRange) {
     out.extend_from_slice(&range.first_row.to_le_bytes());
     out.extend_from_slice(&range.last_row.to_le_bytes());
     out.extend_from_slice(&range.first_column.to_le_bytes());
     out.extend_from_slice(&range.last_column.to_le_bytes());
 }
-fn parse_range(data: &[u8], offset: usize, rt: u16) -> XlsResult<XlsListObjectRange> {
-    XlsListObjectRange::try_new(
+fn parse_range(data: &[u8], offset: usize, rt: u16) -> Result<ListObjectRange> {
+    ListObjectRange::try_new(
         u16_at(data, offset, rt, "rwFirst")?,
         u16_at(data, offset + 2, rt, "rwLast")?,
         u16_at(data, offset + 4, rt, "colFirst")?,
         u16_at(data, offset + 6, rt, "colLast")?,
     )
 }
-fn append_frt(out: &mut Vec<u8>, rt: u16, range: Option<XlsListObjectRange>) {
+fn append_frt(out: &mut Vec<u8>, rt: u16, range: Option<ListObjectRange>) {
     out.extend_from_slice(&rt.to_le_bytes());
     out.extend_from_slice(&u16::from(range.is_some()).to_le_bytes());
     if let Some(range) = range {
@@ -56,7 +54,7 @@ fn append_frt(out: &mut Vec<u8>, rt: u16, range: Option<XlsListObjectRange>) {
         out.extend_from_slice(&[0; 8]);
     }
 }
-fn validate_frt(data: &[u8], rt: u16, reference: bool) -> XlsResult<()> {
+fn validate_frt(data: &[u8], rt: u16, reference: bool) -> Result<()> {
     if u16_at(data, 0, rt, "frt.rt")? != rt
         || u16_at(data, 2, rt, "frt.flags")? != u16::from(reference)
     {
@@ -67,7 +65,7 @@ fn validate_frt(data: &[u8], rt: u16, reference: bool) -> XlsResult<()> {
     }
     Ok(())
 }
-fn validate_frt_any(data: &[u8], rt: u16) -> XlsResult<()> {
+fn validate_frt_any(data: &[u8], rt: u16) -> Result<()> {
     if u16_at(data, 0, rt, "frt.rt")? != rt {
         return Err(invalid(rt, "future-record type echo is invalid"));
     }
@@ -83,7 +81,7 @@ fn validate_frt_any(data: &[u8], rt: u16) -> XlsResult<()> {
     }
     Ok(())
 }
-fn record(rt: u16, payload: Vec<u8>) -> XlsResult<Vec<u8>> {
+fn record(rt: u16, payload: Vec<u8>) -> Result<Vec<u8>> {
     let len =
         u16::try_from(payload.len()).map_err(|_| invalid(rt, "payload exceeds BIFF8 length"))?;
     let mut out = Vec::with_capacity(4 + payload.len());
@@ -103,7 +101,7 @@ fn append_string(out: &mut Vec<u8>, value: &str) {
         out.extend(units.into_iter().flat_map(u16::to_le_bytes));
     }
 }
-fn parse_string(data: &[u8], offset: usize, rt: u16, field: &str) -> XlsResult<(String, usize)> {
+fn parse_string(data: &[u8], offset: usize, rt: u16, field: &str) -> Result<(String, usize)> {
     let count = usize::from(u16_at(data, offset, rt, field)?);
     let flags = *data
         .get(offset + 2)
@@ -132,7 +130,7 @@ fn parse_string(data: &[u8], offset: usize, rt: u16, field: &str) -> XlsResult<(
     };
     Ok((value, end))
 }
-fn validate_name(value: &str, field: &str) -> XlsResult<()> {
+fn validate_name(value: &str, field: &str) -> Result<()> {
     if !(1..=255).contains(&value.encode_utf16().count())
         || value
             .chars()
@@ -142,7 +140,7 @@ fn validate_name(value: &str, field: &str) -> XlsResult<()> {
     }
     Ok(())
 }
-fn validate_table_name(value: &str) -> XlsResult<()> {
+fn validate_table_name(value: &str) -> Result<()> {
     validate_name(value, "table name")?;
     let mut chars = value.chars();
     let first = chars.next().unwrap();
@@ -156,7 +154,7 @@ fn validate_table_name(value: &str) -> XlsResult<()> {
     }
     Ok(())
 }
-fn validate_column_name(value: &str) -> XlsResult<()> {
+fn validate_column_name(value: &str) -> Result<()> {
     if !(1..=255).contains(&value.encode_utf16().count())
         || value.chars().any(|c| {
             (c < '\u{20}' && !matches!(c, '\t' | '\n' | '\r'))
@@ -179,7 +177,7 @@ fn parse_list_formula_extra_end(
     tokens: &[u8],
     mut offset: usize,
     rt: u16,
-) -> XlsResult<usize> {
+) -> Result<usize> {
     let mut extras = Vec::new();
     let mut position = 0usize;
     while position < tokens.len() {
@@ -305,9 +303,9 @@ fn parse_list_formula_extra_end(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct XlsListObjectId(u32);
-impl XlsListObjectId {
-    pub fn try_new(value: u32) -> XlsResult<Self> {
+pub struct ListObjectId(u32);
+impl ListObjectId {
+    pub fn try_new(value: u32) -> Result<Self> {
         if value == 0 {
             Err(invalid(FEATURE11_RECORD_TYPE, "table id must be nonzero"))
         } else {
@@ -319,9 +317,9 @@ impl XlsListObjectId {
     }
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct XlsListColumnId(u32);
-impl XlsListColumnId {
-    pub fn try_new(value: u32) -> XlsResult<Self> {
+pub struct ListColumnId(u32);
+impl ListColumnId {
+    pub fn try_new(value: u32) -> Result<Self> {
         if value == 0 {
             Err(invalid(FEATURE11_RECORD_TYPE, "column id must be nonzero"))
         } else {
@@ -333,19 +331,19 @@ impl XlsListColumnId {
     }
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsListObjectRange {
+pub struct ListObjectRange {
     first_row: u16,
     last_row: u16,
     first_column: u16,
     last_column: u16,
 }
-impl XlsListObjectRange {
+impl ListObjectRange {
     pub fn try_new(
         first_row: u16,
         last_row: u16,
         first_column: u16,
         last_column: u16,
-    ) -> XlsResult<Self> {
+    ) -> Result<Self> {
         if first_row > last_row || first_column > last_column || last_column > 255 {
             Err(invalid(
                 FEATURE11_RECORD_TYPE,
@@ -383,7 +381,7 @@ impl XlsListObjectRange {
     }
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsListTotalAggregation {
+pub enum ListTotalAggregation {
     None,
     Average,
     Count,
@@ -395,11 +393,11 @@ pub enum XlsListTotalAggregation {
     Variance,
     Custom,
 }
-impl XlsListTotalAggregation {
+impl ListTotalAggregation {
     fn code(self) -> u32 {
         self as u32
     }
-    fn from_code(v: u32) -> XlsResult<Self> {
+    fn from_code(v: u32) -> Result<Self> {
         Ok(match v {
             0 => Self::None,
             1 => Self::Average,
@@ -416,43 +414,43 @@ impl XlsListTotalAggregation {
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsListObjectColumn {
-    id: XlsListColumnId,
+pub struct ListObjectColumn {
+    id: ListColumnId,
     name: String,
-    aggregation: XlsListTotalAggregation,
+    aggregation: ListTotalAggregation,
     total_formula: Option<Vec<u8>>,
     total_string: Option<String>,
 }
-impl XlsListObjectColumn {
-    pub fn try_new(id: XlsListColumnId, name: impl Into<String>) -> XlsResult<Self> {
+impl ListObjectColumn {
+    pub fn try_new(id: ListColumnId, name: impl Into<String>) -> Result<Self> {
         let value = Self {
             id,
             name: name.into(),
-            aggregation: XlsListTotalAggregation::None,
+            aggregation: ListTotalAggregation::None,
             total_formula: None,
             total_string: None,
         };
         validate_column_name(&value.name)?;
         Ok(value)
     }
-    pub fn with_total_aggregation(mut self, value: XlsListTotalAggregation) -> XlsResult<Self> {
+    pub fn with_total_aggregation(mut self, value: ListTotalAggregation) -> Result<Self> {
         self.aggregation = value;
         self.validate_totals()?;
         Ok(self)
     }
-    pub fn with_total_formula_tokens(mut self, tokens: Vec<u8>) -> XlsResult<Self> {
+    pub fn with_total_formula_tokens(mut self, tokens: Vec<u8>) -> Result<Self> {
         if tokens.is_empty() || tokens.len() > u16::MAX as usize {
             return Err(invalid(
                 FEATURE12_RECORD_TYPE,
                 "total formula token length must be 1..=65535",
             ));
         }
-        self.aggregation = XlsListTotalAggregation::Custom;
+        self.aggregation = ListTotalAggregation::Custom;
         self.total_formula = Some(tokens);
         self.validate_totals()?;
         Ok(self)
     }
-    pub fn with_total_string(mut self, value: impl Into<String>) -> XlsResult<Self> {
+    pub fn with_total_string(mut self, value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         if value.encode_utf16().count() > 32767 {
             return Err(invalid(
@@ -460,19 +458,19 @@ impl XlsListObjectColumn {
                 "total string exceeds 32767 UTF-16 units",
             ));
         }
-        self.aggregation = XlsListTotalAggregation::None;
+        self.aggregation = ListTotalAggregation::None;
         self.total_string = Some(value);
         self.validate_totals()?;
         Ok(self)
     }
-    fn validate_totals(&self) -> XlsResult<()> {
-        if self.total_formula.is_some() != (self.aggregation == XlsListTotalAggregation::Custom) {
+    fn validate_totals(&self) -> Result<()> {
+        if self.total_formula.is_some() != (self.aggregation == ListTotalAggregation::Custom) {
             return Err(invalid(
                 FEATURE12_RECORD_TYPE,
                 "custom aggregation and total formula must occur together",
             ));
         }
-        if self.total_string.is_some() && self.aggregation != XlsListTotalAggregation::None {
+        if self.total_string.is_some() && self.aggregation != ListTotalAggregation::None {
             return Err(invalid(
                 FEATURE12_RECORD_TYPE,
                 "total string requires no aggregation",
@@ -480,13 +478,13 @@ impl XlsListObjectColumn {
         }
         Ok(())
     }
-    pub const fn id(&self) -> XlsListColumnId {
+    pub const fn id(&self) -> ListColumnId {
         self.id
     }
     pub fn name(&self) -> &str {
         &self.name
     }
-    pub const fn total_aggregation(&self) -> XlsListTotalAggregation {
+    pub const fn total_aggregation(&self) -> ListTotalAggregation {
         self.aggregation
     }
     pub fn total_formula_tokens(&self) -> Option<&[u8]> {
@@ -497,7 +495,7 @@ impl XlsListObjectColumn {
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsListObjectStyleOptions {
+pub struct ListObjectStyleOptions {
     name: String,
     first: bool,
     last: bool,
@@ -505,8 +503,8 @@ pub struct XlsListObjectStyleOptions {
     column_stripes: bool,
     default_style: bool,
 }
-impl XlsListObjectStyleOptions {
-    pub fn try_new(name: impl Into<String>) -> XlsResult<Self> {
+impl ListObjectStyleOptions {
+    pub fn try_new(name: impl Into<String>) -> Result<Self> {
         let name = name.into();
         validate_name(&name, "table style name")?;
         Ok(Self {
@@ -559,25 +557,25 @@ impl XlsListObjectStyleOptions {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsListObjectFeatureVersion {
+pub enum ListObjectFeatureVersion {
     Feature11,
     Feature12,
 }
 
 /// Excel version recorded by an external-data table definition.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsExternalTableVersion {
+pub enum ExternalTableVersion {
     Excel2003,
     Excel2007,
 }
-impl XlsExternalTableVersion {
+impl ExternalTableVersion {
     const fn code(self) -> u32 {
         match self {
             Self::Excel2003 => 0xB,
             Self::Excel2007 => 0xC,
         }
     }
-    fn from_code(value: u32) -> XlsResult<Self> {
+    fn from_code(value: u32) -> Result<Self> {
         match value {
             0xB => Ok(Self::Excel2003),
             0xC => Ok(Self::Excel2007),
@@ -594,15 +592,15 @@ impl XlsExternalTableVersion {
 /// The DXFN12List payload is preserved without interpretation. Parsed values
 /// retain the original XLUnicodeString encoding of the optional style name.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsCachedDiskHeader {
+pub struct CachedDiskHeader {
     encoded: Vec<u8>,
     format_end: usize,
     style_name: Option<String>,
 }
 
-impl XlsCachedDiskHeader {
+impl CachedDiskHeader {
     /// Construct a cached header from an inert serialized DXFN12List payload.
-    pub fn try_new(formatting: Vec<u8>) -> XlsResult<Self> {
+    pub fn try_new(formatting: Vec<u8>) -> Result<Self> {
         if formatting.len() > MAX_FEATURE_BYTES.saturating_sub(4)
             || formatting.len() > u32::MAX as usize
         {
@@ -625,7 +623,7 @@ impl XlsCachedDiskHeader {
         Self::try_new(Vec::new()).expect("empty cached header is valid")
     }
 
-    fn parse(encoded: Vec<u8>, has_style_name: bool, rt: u16) -> XlsResult<Self> {
+    fn parse(encoded: Vec<u8>, has_style_name: bool, rt: u16) -> Result<Self> {
         if encoded.len() > MAX_FEATURE_BYTES {
             return Err(invalid(rt, "cached header exceeds resource bound"));
         }
@@ -660,7 +658,7 @@ impl XlsCachedDiskHeader {
         })
     }
 
-    pub fn with_style_name(mut self, name: impl Into<String>) -> XlsResult<Self> {
+    pub fn with_style_name(mut self, name: impl Into<String>) -> Result<Self> {
         let name = name.into();
         validate_name(&name, "cached header style name")?;
         self.encoded.truncate(self.format_end);
@@ -701,27 +699,27 @@ impl XlsCachedDiskHeader {
 /// Opaque byte slices are retained for BIFF substructures that litchi does not
 /// execute or render. `auto_filter` contains the complete Feat11FdaAutoFilter.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsExternalTableField {
-    column_id: XlsListColumnId,
+pub struct ExternalTableField {
+    column_id: ListColumnId,
     source_name: String,
     query_field_id: u32,
     aggregate_format: Vec<u8>,
     insert_row_format: Vec<u8>,
     auto_filter: Vec<u8>,
     formula_extra: Vec<u8>,
-    header_cache: XlsCachedDiskHeader,
+    header_cache: CachedDiskHeader,
     aggregate_style: u32,
     insert_row_style: u32,
     filter_hidden: bool,
     total_array_formula: bool,
     auto_create_calculated_column: bool,
 }
-impl XlsExternalTableField {
+impl ExternalTableField {
     pub fn try_new(
-        column_id: XlsListColumnId,
+        column_id: ListColumnId,
         source_name: impl Into<String>,
         query_field_id: u32,
-    ) -> XlsResult<Self> {
+    ) -> Result<Self> {
         let value = Self {
             column_id,
             source_name: source_name.into(),
@@ -730,7 +728,7 @@ impl XlsExternalTableField {
             insert_row_format: Vec::new(),
             auto_filter: vec![0; 6],
             formula_extra: Vec::new(),
-            header_cache: XlsCachedDiskHeader::empty(),
+            header_cache: CachedDiskHeader::empty(),
             aggregate_style: u32::MAX,
             insert_row_style: u32::MAX,
             filter_hidden: false,
@@ -740,7 +738,7 @@ impl XlsExternalTableField {
         value.validate()?;
         Ok(value)
     }
-    fn validate(&self) -> XlsResult<()> {
+    fn validate(&self) -> Result<()> {
         validate_name(&self.source_name, "external source field name")?;
         if self.query_field_id == 0 {
             return Err(invalid(
@@ -780,7 +778,7 @@ impl XlsExternalTableField {
         }
         Ok(())
     }
-    pub const fn column_id(&self) -> XlsListColumnId {
+    pub const fn column_id(&self) -> ListColumnId {
         self.column_id
     }
     pub fn source_name(&self) -> &str {
@@ -804,7 +802,7 @@ impl XlsExternalTableField {
     pub fn header_cache_bytes(&self) -> &[u8] {
         self.header_cache.as_bytes()
     }
-    pub const fn cached_disk_header(&self) -> &XlsCachedDiskHeader {
+    pub const fn cached_disk_header(&self) -> &CachedDiskHeader {
         &self.header_cache
     }
     pub const fn aggregate_style_index(&self) -> u32 {
@@ -822,40 +820,39 @@ impl XlsExternalTableField {
     pub const fn auto_creates_calculated_column(&self) -> bool {
         self.auto_create_calculated_column
     }
-    pub fn with_aggregate_format_bytes(mut self, bytes: Vec<u8>) -> XlsResult<Self> {
+    pub fn with_aggregate_format_bytes(mut self, bytes: Vec<u8>) -> Result<Self> {
         self.aggregate_format = bytes;
         self.validate()?;
         Ok(self)
     }
-    pub fn with_insert_row_format_bytes(mut self, bytes: Vec<u8>) -> XlsResult<Self> {
+    pub fn with_insert_row_format_bytes(mut self, bytes: Vec<u8>) -> Result<Self> {
         self.insert_row_format = bytes;
         self.validate()?;
         Ok(self)
     }
-    pub fn with_auto_filter_bytes(mut self, bytes: Vec<u8>) -> XlsResult<Self> {
+    pub fn with_auto_filter_bytes(mut self, bytes: Vec<u8>) -> Result<Self> {
         self.auto_filter = bytes;
         self.validate()?;
         Ok(self)
     }
-    pub fn with_formula_extra_bytes(mut self, bytes: Vec<u8>, array: bool) -> XlsResult<Self> {
+    pub fn with_formula_extra_bytes(mut self, bytes: Vec<u8>, array: bool) -> Result<Self> {
         self.formula_extra = bytes;
         self.total_array_formula = array;
         self.validate()?;
         Ok(self)
     }
-    pub fn with_header_cache_bytes(mut self, bytes: Vec<u8>) -> XlsResult<Self> {
+    pub fn with_header_cache_bytes(mut self, bytes: Vec<u8>) -> Result<Self> {
         let format_len = usize::try_from(u32_at(&bytes, 0, FEATURE12_RECORD_TYPE, "cbdxfHdrDisk")?)
             .map_err(|_| invalid(FEATURE12_RECORD_TYPE, "cached header length overflows"))?;
         let format_end = 4usize
             .checked_add(format_len)
             .ok_or_else(|| invalid(FEATURE12_RECORD_TYPE, "cached header length overflows"))?;
         let has_style_name = format_end < bytes.len();
-        self.header_cache =
-            XlsCachedDiskHeader::parse(bytes, has_style_name, FEATURE12_RECORD_TYPE)?;
+        self.header_cache = CachedDiskHeader::parse(bytes, has_style_name, FEATURE12_RECORD_TYPE)?;
         self.validate()?;
         Ok(self)
     }
-    pub fn with_cached_disk_header(mut self, header: XlsCachedDiskHeader) -> XlsResult<Self> {
+    pub fn with_cached_disk_header(mut self, header: CachedDiskHeader) -> Result<Self> {
         self.header_cache = header;
         self.validate()?;
         Ok(self)
@@ -864,14 +861,14 @@ impl XlsExternalTableField {
 
 /// Typed, non-executing metadata for a Feature12 LTEXTERNALDATA table.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsExternalTableMetadata {
-    version: XlsExternalTableVersion,
+pub struct ExternalTableMetadata {
+    version: ExternalTableVersion,
     build_number: u16,
-    fields: Vec<XlsExternalTableField>,
+    fields: Vec<ExternalTableField>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsWebColumnType {
+pub enum WebColumnType {
     Text,
     Number,
     Boolean,
@@ -884,7 +881,7 @@ pub enum XlsWebColumnType {
     Counter,
     MultipleChoices,
 }
-impl XlsWebColumnType {
+impl WebColumnType {
     pub const ALL: &'static [Self] = &[
         Self::Text,
         Self::Number,
@@ -904,7 +901,7 @@ impl XlsWebColumnType {
     fn code(self) -> u32 {
         self.value()
     }
-    fn from_code(value: u32) -> XlsResult<Self> {
+    fn from_code(value: u32) -> Result<Self> {
         Ok(match value {
             1 => Self::Text,
             2 => Self::Number,
@@ -922,16 +919,16 @@ impl XlsWebColumnType {
     }
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsWebReadingOrder {
+pub enum WebReadingOrder {
     Context,
     LeftToRight,
     RightToLeft,
 }
-impl XlsWebReadingOrder {
+impl WebReadingOrder {
     fn code(self) -> u32 {
         self as u32
     }
-    fn from_code(v: u32) -> XlsResult<Self> {
+    fn from_code(v: u32) -> Result<Self> {
         match v {
             0 => Ok(Self::Context),
             1 => Ok(Self::LeftToRight),
@@ -941,21 +938,21 @@ impl XlsWebReadingOrder {
     }
 }
 #[derive(Debug, Clone, PartialEq)]
-pub enum XlsWebDefaultValue {
+pub enum WebDefaultValue {
     String(String),
     Boolean(bool),
     Number(f64),
     DateTime(f64),
 }
-impl Eq for XlsWebDefaultValue {}
+impl Eq for WebDefaultValue {}
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsWebFieldInfo {
+pub struct WebFieldInfo {
     locale: u32,
     decimal_places: u32,
     percent: bool,
     fixed_decimal: bool,
     date_only: bool,
-    reading_order: XlsWebReadingOrder,
+    reading_order: WebReadingOrder,
     rich_text: bool,
     unknown_rich_text: bool,
     alert_unknown_rich_text: bool,
@@ -965,12 +962,12 @@ pub struct XlsWebFieldInfo {
     maximum_set: bool,
     default_today: bool,
     allow_fill_in: bool,
-    default_value: Option<XlsWebDefaultValue>,
+    default_value: Option<WebDefaultValue>,
     validation_formula: Option<String>,
     ignored_display_flags: u32,
     ignored_validation_flags: u32,
 }
-impl XlsWebFieldInfo {
+impl WebFieldInfo {
     pub fn new(locale: u32) -> Self {
         Self {
             locale,
@@ -978,7 +975,7 @@ impl XlsWebFieldInfo {
             percent: false,
             fixed_decimal: false,
             date_only: false,
-            reading_order: XlsWebReadingOrder::Context,
+            reading_order: WebReadingOrder::Context,
             rich_text: false,
             unknown_rich_text: false,
             alert_unknown_rich_text: false,
@@ -1000,11 +997,11 @@ impl XlsWebFieldInfo {
         self.percent = percent;
         self
     }
-    pub fn with_default_value(mut self, value: XlsWebDefaultValue) -> Self {
+    pub fn with_default_value(mut self, value: WebDefaultValue) -> Self {
         self.default_value = Some(value);
         self
     }
-    pub fn with_validation_formula(mut self, value: impl Into<String>) -> XlsResult<Self> {
+    pub fn with_validation_formula(mut self, value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         if value.encode_utf16().count() > 255 {
             return Err(invalid(
@@ -1029,7 +1026,7 @@ impl XlsWebFieldInfo {
     pub const fn decimal_places(&self) -> u32 {
         self.decimal_places
     }
-    pub fn default_value(&self) -> Option<&XlsWebDefaultValue> {
+    pub fn default_value(&self) -> Option<&WebDefaultValue> {
         self.default_value.as_ref()
     }
     pub fn validation_formula(&self) -> Option<&str> {
@@ -1043,7 +1040,7 @@ impl XlsWebFieldInfo {
     pub const fn ignored_validation_flags(&self) -> u32 {
         self.ignored_validation_flags
     }
-    fn validate(&self, kind: XlsWebColumnType) -> XlsResult<()> {
+    fn validate(&self, kind: WebColumnType) -> Result<()> {
         if self.reading_order.code() > 2 {
             return Err(invalid(FEATURE11_RECORD_TYPE, "invalid Web reading order"));
         }
@@ -1051,16 +1048,14 @@ impl XlsWebFieldInfo {
             let valid = matches!(
                 (kind, value),
                 (
-                    XlsWebColumnType::Text
-                        | XlsWebColumnType::Choice
-                        | XlsWebColumnType::MultipleChoices,
-                    XlsWebDefaultValue::String(_)
-                ) | (XlsWebColumnType::Boolean, XlsWebDefaultValue::Boolean(_))
+                    WebColumnType::Text | WebColumnType::Choice | WebColumnType::MultipleChoices,
+                    WebDefaultValue::String(_)
+                ) | (WebColumnType::Boolean, WebDefaultValue::Boolean(_))
                     | (
-                        XlsWebColumnType::Number | XlsWebColumnType::Currency,
-                        XlsWebDefaultValue::Number(_)
+                        WebColumnType::Number | WebColumnType::Currency,
+                        WebDefaultValue::Number(_)
                     )
-                    | (XlsWebColumnType::DateTime, XlsWebDefaultValue::DateTime(_))
+                    | (WebColumnType::DateTime, WebDefaultValue::DateTime(_))
             );
             if !valid {
                 return Err(invalid(
@@ -1068,7 +1063,7 @@ impl XlsWebFieldInfo {
                     "Web default value does not match column type",
                 ));
             }
-            if let XlsWebDefaultValue::String(value) = value
+            if let WebDefaultValue::String(value) = value
                 && value.encode_utf16().count() > 255
             {
                 return Err(invalid(
@@ -1081,11 +1076,11 @@ impl XlsWebFieldInfo {
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsWebTableField {
-    column_id: XlsListColumnId,
+pub struct WebTableField {
+    column_id: ListColumnId,
     source_name: String,
-    data_type: XlsWebColumnType,
-    info: XlsWebFieldInfo,
+    data_type: WebColumnType,
+    info: WebFieldInfo,
     calculated_formula: Option<Vec<u8>>,
     auto_filter: Vec<u8>,
     aggregate_format: Vec<u8>,
@@ -1094,13 +1089,13 @@ pub struct XlsWebTableField {
     header_cache: Vec<u8>,
     ignored_flags: u32,
 }
-impl XlsWebTableField {
+impl WebTableField {
     pub fn try_new(
-        column_id: XlsListColumnId,
+        column_id: ListColumnId,
         source_name: impl Into<String>,
-        data_type: XlsWebColumnType,
-        info: XlsWebFieldInfo,
-    ) -> XlsResult<Self> {
+        data_type: WebColumnType,
+        info: WebFieldInfo,
+    ) -> Result<Self> {
         let value = Self {
             column_id,
             source_name: source_name.into(),
@@ -1117,7 +1112,7 @@ impl XlsWebTableField {
         value.validate()?;
         Ok(value)
     }
-    pub fn with_calculated_formula_tokens(mut self, tokens: Vec<u8>) -> XlsResult<Self> {
+    pub fn with_calculated_formula_tokens(mut self, tokens: Vec<u8>) -> Result<Self> {
         if tokens.is_empty() || tokens.len() > u16::MAX as usize {
             return Err(invalid(
                 FEATURE11_RECORD_TYPE,
@@ -1127,16 +1122,16 @@ impl XlsWebTableField {
         self.calculated_formula = Some(tokens);
         Ok(self)
     }
-    pub const fn column_id(&self) -> XlsListColumnId {
+    pub const fn column_id(&self) -> ListColumnId {
         self.column_id
     }
     pub fn source_name(&self) -> &str {
         &self.source_name
     }
-    pub const fn data_type(&self) -> XlsWebColumnType {
+    pub const fn data_type(&self) -> WebColumnType {
         self.data_type
     }
-    pub const fn info(&self) -> &XlsWebFieldInfo {
+    pub const fn info(&self) -> &WebFieldInfo {
         &self.info
     }
     pub fn calculated_formula_tokens(&self) -> Option<&[u8]> {
@@ -1146,7 +1141,7 @@ impl XlsWebTableField {
     pub const fn ignored_flags(&self) -> u32 {
         self.ignored_flags
     }
-    fn validate(&self) -> XlsResult<()> {
+    fn validate(&self) -> Result<()> {
         validate_name(&self.source_name, "Web source field name")?;
         self.info.validate(self.data_type)?;
         if self.auto_filter.len() < 6
@@ -1169,7 +1164,7 @@ impl XlsWebTableField {
     }
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsWebEditMode {
+pub enum WebEditMode {
     Normal,
     RefreshCopy,
     RefreshCache,
@@ -1183,11 +1178,11 @@ pub enum XlsWebEditMode {
     RefreshLoadHashValidation,
     NoEditModeratedView,
 }
-impl XlsWebEditMode {
+impl WebEditMode {
     fn code(self) -> u32 {
         self as u32
     }
-    fn from_code(v: u32) -> XlsResult<Self> {
+    fn from_code(v: u32) -> Result<Self> {
         Ok(match v {
             0 => Self::Normal,
             1 => Self::RefreshCopy,
@@ -1211,27 +1206,27 @@ impl XlsWebEditMode {
     }
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsWebInvalidCell {
+pub struct WebInvalidCell {
     row_id: u32,
-    column_id: XlsListColumnId,
+    column_id: ListColumnId,
 }
-impl XlsWebInvalidCell {
-    pub fn new(row_id: u32, column_id: XlsListColumnId) -> Self {
+impl WebInvalidCell {
+    pub fn new(row_id: u32, column_id: ListColumnId) -> Self {
         Self { row_id, column_id }
     }
     pub const fn row_id(self) -> u32 {
         self.row_id
     }
-    pub const fn column_id(self) -> XlsListColumnId {
+    pub const fn column_id(self) -> ListColumnId {
         self.column_id
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsWebTableMetadata {
-    version: XlsExternalTableVersion,
+pub struct WebTableMetadata {
+    version: ExternalTableVersion,
     build_number: u16,
-    fields: Vec<XlsWebTableField>,
-    edit_mode: XlsWebEditMode,
+    fields: Vec<WebTableField>,
+    edit_mode: WebEditMode,
     cache_position: u32,
     cache_size: u32,
     cache_characters: u32,
@@ -1240,19 +1235,19 @@ pub struct XlsWebTableMetadata {
     entry_id: Option<String>,
     deleted_row_ids: Vec<u32>,
     changed_row_ids: Vec<u32>,
-    invalid_cells: Vec<XlsWebInvalidCell>,
+    invalid_cells: Vec<WebInvalidCell>,
     needs_commit: bool,
     compressed_cache: bool,
     ignored_fixed_word: u16,
     ignored_flags: u32,
 }
-impl XlsWebTableMetadata {
-    pub fn try_new(fields: Vec<XlsWebTableField>) -> XlsResult<Self> {
+impl WebTableMetadata {
+    pub fn try_new(fields: Vec<WebTableField>) -> Result<Self> {
         let value = Self {
-            version: XlsExternalTableVersion::Excel2003,
+            version: ExternalTableVersion::Excel2003,
             build_number: 0,
             fields,
-            edit_mode: XlsWebEditMode::Normal,
+            edit_mode: WebEditMode::Normal,
             cache_position: 0,
             cache_size: 0,
             cache_characters: 0,
@@ -1270,10 +1265,10 @@ impl XlsWebTableMetadata {
         value.validate()?;
         Ok(value)
     }
-    pub fn fields(&self) -> &[XlsWebTableField] {
+    pub fn fields(&self) -> &[WebTableField] {
         &self.fields
     }
-    pub const fn edit_mode(&self) -> XlsWebEditMode {
+    pub const fn edit_mode(&self) -> WebEditMode {
         self.edit_mode
     }
     pub fn deleted_row_ids(&self) -> &[u32] {
@@ -1282,7 +1277,7 @@ impl XlsWebTableMetadata {
     pub fn changed_row_ids(&self) -> &[u32] {
         &self.changed_row_ids
     }
-    pub fn invalid_cells(&self) -> &[XlsWebInvalidCell] {
+    pub fn invalid_cells(&self) -> &[WebInvalidCell] {
         &self.invalid_cells
     }
     pub const fn ignored_fixed_word(&self) -> u16 {
@@ -1291,34 +1286,34 @@ impl XlsWebTableMetadata {
     pub const fn ignored_flags(&self) -> u32 {
         self.ignored_flags
     }
-    pub fn with_deleted_row_ids(mut self, v: Vec<u32>) -> XlsResult<Self> {
+    pub fn with_deleted_row_ids(mut self, v: Vec<u32>) -> Result<Self> {
         self.deleted_row_ids = v;
         self.validate()?;
         Ok(self)
     }
-    pub fn with_changed_row_ids(mut self, v: Vec<u32>) -> XlsResult<Self> {
+    pub fn with_changed_row_ids(mut self, v: Vec<u32>) -> Result<Self> {
         self.changed_row_ids = v;
         self.validate()?;
         Ok(self)
     }
-    pub fn with_invalid_cells(mut self, v: Vec<XlsWebInvalidCell>) -> XlsResult<Self> {
+    pub fn with_invalid_cells(mut self, v: Vec<WebInvalidCell>) -> Result<Self> {
         self.invalid_cells = v;
         self.validate()?;
         Ok(self)
     }
-    pub fn with_provider_name(mut self, v: impl Into<String>) -> XlsResult<Self> {
+    pub fn with_provider_name(mut self, v: impl Into<String>) -> Result<Self> {
         let v = v.into();
         validate_name(&v, "Web cryptographic provider")?;
         self.provider_name = Some(v);
         Ok(self)
     }
-    pub fn with_entry_id(mut self, v: impl Into<String>) -> XlsResult<Self> {
+    pub fn with_entry_id(mut self, v: impl Into<String>) -> Result<Self> {
         let v = v.into();
         validate_name(&v, "Web entry id")?;
         self.entry_id = Some(v);
         Ok(self)
     }
-    fn validate(&self) -> XlsResult<()> {
+    fn validate(&self) -> Result<()> {
         if !(1..=256).contains(&self.fields.len())
             || self.deleted_row_ids.len() > u16::MAX as usize
             || self.changed_row_ids.len() > u16::MAX as usize
@@ -1353,7 +1348,7 @@ impl XlsWebTableMetadata {
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
-pub enum XlsXmlDataType {
+pub enum XmlDataType {
     Null = 0x0800,
     Schema = 0x1000,
     Attribute = 0x1001,
@@ -1427,7 +1422,7 @@ pub enum XlsXmlDataType {
     NullAnyAttribute = 0x4802,
     NullElement = 0x4803,
 }
-impl XlsXmlDataType {
+impl XmlDataType {
     pub const ALL: &'static [Self] = &[
         Self::Null,
         Self::Schema,
@@ -1502,7 +1497,7 @@ impl XlsXmlDataType {
         Self::NullAnyAttribute,
         Self::NullElement,
     ];
-    pub fn try_new(v: u32) -> XlsResult<Self> {
+    pub fn try_new(v: u32) -> Result<Self> {
         Self::ALL
             .iter()
             .copied()
@@ -1514,13 +1509,13 @@ impl XlsXmlDataType {
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsXmlColumnMapping {
+pub struct XmlColumnMapping {
     can_be_single: bool,
     map_id: u32,
     xpath: String,
 }
-impl XlsXmlColumnMapping {
-    pub fn try_new(map_id: u32, xpath: impl Into<String>, can_be_single: bool) -> XlsResult<Self> {
+impl XmlColumnMapping {
+    pub fn try_new(map_id: u32, xpath: impl Into<String>, can_be_single: bool) -> Result<Self> {
         let xpath = xpath.into();
         if map_id == 0 || xpath.encode_utf16().count() >= 32000 {
             return Err(invalid(
@@ -1545,11 +1540,11 @@ impl XlsXmlColumnMapping {
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsXmlTableField {
-    column_id: XlsListColumnId,
+pub struct XmlTableField {
+    column_id: ListColumnId,
     source_name: String,
-    data_type: XlsXmlDataType,
-    mapping: Option<XlsXmlColumnMapping>,
+    data_type: XmlDataType,
+    mapping: Option<XmlColumnMapping>,
     auto_filter: Vec<u8>,
     aggregate_format: Vec<u8>,
     insert_row_format: Vec<u8>,
@@ -1557,12 +1552,12 @@ pub struct XlsXmlTableField {
     header_cache: Vec<u8>,
     ignored_flags: u32,
 }
-impl XlsXmlTableField {
+impl XmlTableField {
     pub fn try_new(
-        column_id: XlsListColumnId,
+        column_id: ListColumnId,
         source_name: impl Into<String>,
-        data_type: XlsXmlDataType,
-    ) -> XlsResult<Self> {
+        data_type: XmlDataType,
+    ) -> Result<Self> {
         let value = Self {
             column_id,
             source_name: source_name.into(),
@@ -1578,20 +1573,20 @@ impl XlsXmlTableField {
         validate_name(&value.source_name, "XML source field name")?;
         Ok(value)
     }
-    pub fn with_mapping(mut self, v: XlsXmlColumnMapping) -> Self {
+    pub fn with_mapping(mut self, v: XmlColumnMapping) -> Self {
         self.mapping = Some(v);
         self
     }
-    pub const fn column_id(&self) -> XlsListColumnId {
+    pub const fn column_id(&self) -> ListColumnId {
         self.column_id
     }
     pub fn source_name(&self) -> &str {
         &self.source_name
     }
-    pub const fn data_type(&self) -> XlsXmlDataType {
+    pub const fn data_type(&self) -> XmlDataType {
         self.data_type
     }
-    pub fn mapping(&self) -> Option<&XlsXmlColumnMapping> {
+    pub fn mapping(&self) -> Option<&XmlColumnMapping> {
         self.mapping.as_ref()
     }
     /// Undefined Feat11FieldDataItem flag bits retained from parsed input.
@@ -1600,18 +1595,18 @@ impl XlsXmlTableField {
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsXmlTableMetadata {
-    version: XlsExternalTableVersion,
+pub struct XmlTableMetadata {
+    version: ExternalTableVersion,
     build_number: u16,
-    fields: Vec<XlsXmlTableField>,
+    fields: Vec<XmlTableField>,
     entry_id: Option<String>,
     single_cell: bool,
     ignored_fixed_word: u16,
     ignored_flags: u32,
     ignored_fixed_tail: [u8; 32],
 }
-impl XlsXmlTableMetadata {
-    pub fn try_new(fields: Vec<XlsXmlTableField>) -> XlsResult<Self> {
+impl XmlTableMetadata {
+    pub fn try_new(fields: Vec<XmlTableField>) -> Result<Self> {
         if !(1..=256).contains(&fields.len()) {
             return Err(invalid(
                 FEATURE11_RECORD_TYPE,
@@ -1619,7 +1614,7 @@ impl XlsXmlTableMetadata {
             ));
         }
         let value = Self {
-            version: XlsExternalTableVersion::Excel2003,
+            version: ExternalTableVersion::Excel2003,
             build_number: 0,
             fields,
             entry_id: None,
@@ -1631,7 +1626,7 @@ impl XlsXmlTableMetadata {
         value.validate()?;
         Ok(value)
     }
-    pub fn fields(&self) -> &[XlsXmlTableField] {
+    pub fn fields(&self) -> &[XmlTableField] {
         &self.fields
     }
     pub const fn is_single_cell(&self) -> bool {
@@ -1649,18 +1644,18 @@ impl XlsXmlTableMetadata {
     pub const fn ignored_fixed_tail(&self) -> &[u8; 32] {
         &self.ignored_fixed_tail
     }
-    pub fn with_entry_id(mut self, v: impl Into<String>) -> XlsResult<Self> {
+    pub fn with_entry_id(mut self, v: impl Into<String>) -> Result<Self> {
         let v = v.into();
         validate_name(&v, "XML entry id")?;
         self.entry_id = Some(v);
         Ok(self)
     }
-    pub fn with_single_cell(mut self, v: bool) -> XlsResult<Self> {
+    pub fn with_single_cell(mut self, v: bool) -> Result<Self> {
         self.single_cell = v;
         self.validate()?;
         Ok(self)
     }
-    fn validate(&self) -> XlsResult<()> {
+    fn validate(&self) -> Result<()> {
         if self.single_cell && self.fields.len() != 1 {
             return Err(invalid(
                 FEATURE11_RECORD_TYPE,
@@ -1681,19 +1676,19 @@ impl XlsXmlTableMetadata {
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum XlsListObjectSourceMetadata {
-    Web(XlsWebTableMetadata),
-    Xml(XlsXmlTableMetadata),
+pub enum ListObjectSourceMetadata {
+    Web(WebTableMetadata),
+    Xml(XmlTableMetadata),
 }
 
-fn append_formula(out: &mut Vec<u8>, tokens: &[u8]) -> XlsResult<()> {
+fn append_formula(out: &mut Vec<u8>, tokens: &[u8]) -> Result<()> {
     let len = u16::try_from(tokens.len())
         .map_err(|_| invalid(FEATURE11_RECORD_TYPE, "formula token length exceeds 65535"))?;
     out.extend_from_slice(&len.to_le_bytes());
     out.extend_from_slice(tokens);
     Ok(())
 }
-fn parse_formula(data: &[u8], offset: &mut usize, rt: u16, field: &str) -> XlsResult<Vec<u8>> {
+fn parse_formula(data: &[u8], offset: &mut usize, rt: u16, field: &str) -> Result<Vec<u8>> {
     let len = usize::from(u16_at(data, *offset, rt, field)?);
     if len == 0 {
         return Err(invalid(rt, format!("empty {field}")));
@@ -1708,7 +1703,7 @@ fn parse_formula(data: &[u8], offset: &mut usize, rt: u16, field: &str) -> XlsRe
     *offset = end;
     Ok(value)
 }
-fn append_web_info(out: &mut Vec<u8>, info: &XlsWebFieldInfo) -> XlsResult<()> {
+fn append_web_info(out: &mut Vec<u8>, info: &WebFieldInfo) -> Result<()> {
     out.extend_from_slice(&info.locale.to_le_bytes());
     out.extend_from_slice(&info.decimal_places.to_le_bytes());
     let flags1 = u32::from(info.percent)
@@ -1722,9 +1717,9 @@ fn append_web_info(out: &mut Vec<u8>, info: &XlsWebFieldInfo) -> XlsResult<()> {
     out.extend_from_slice(&flags1.to_le_bytes());
     let default_type = match info.default_value {
         None => 0,
-        Some(XlsWebDefaultValue::String(_)) => 1,
-        Some(XlsWebDefaultValue::Boolean(_)) => 2,
-        Some(XlsWebDefaultValue::Number(_) | XlsWebDefaultValue::DateTime(_)) => 3,
+        Some(WebDefaultValue::String(_)) => 1,
+        Some(WebDefaultValue::Boolean(_)) => 2,
+        Some(WebDefaultValue::Number(_) | WebDefaultValue::DateTime(_)) => 3,
     };
     let flags2 = u32::from(info.read_only)
         | (u32::from(info.required) << 1)
@@ -1739,9 +1734,9 @@ fn append_web_info(out: &mut Vec<u8>, info: &XlsWebFieldInfo) -> XlsResult<()> {
     out.extend_from_slice(&flags2.to_le_bytes());
     if let Some(value) = &info.default_value {
         match value {
-            XlsWebDefaultValue::String(v) => append_string(out, v),
-            XlsWebDefaultValue::Boolean(v) => out.extend_from_slice(&u32::from(*v).to_le_bytes()),
-            XlsWebDefaultValue::Number(v) | XlsWebDefaultValue::DateTime(v) => {
+            WebDefaultValue::String(v) => append_string(out, v),
+            WebDefaultValue::Boolean(v) => out.extend_from_slice(&u32::from(*v).to_le_bytes()),
+            WebDefaultValue::Number(v) | WebDefaultValue::DateTime(v) => {
                 out.extend_from_slice(&v.to_le_bytes())
             },
         }
@@ -1755,50 +1750,42 @@ fn append_web_info(out: &mut Vec<u8>, info: &XlsWebFieldInfo) -> XlsResult<()> {
 fn parse_web_info(
     data: &[u8],
     offset: &mut usize,
-    kind: XlsWebColumnType,
+    kind: WebColumnType,
     rt: u16,
-) -> XlsResult<XlsWebFieldInfo> {
+) -> Result<WebFieldInfo> {
     let locale = u32_at(data, *offset, rt, "Web LCID")?;
     let decimal_places = u32_at(data, *offset + 4, rt, "Web cDec")?;
     let a = u32_at(data, *offset + 8, rt, "Web display flags")?;
     let b = u32_at(data, *offset + 12, rt, "Web validation flags")?;
-    let reading_order = XlsWebReadingOrder::from_code((a >> 3) & 3)?;
+    let reading_order = WebReadingOrder::from_code((a >> 3) & 3)?;
     let default_set = b & 0x10 != 0;
     let default_type = ((b >> 8) & 0xff) as u8;
     *offset += 16;
     let default_value = if default_set {
         Some(match (default_type, kind) {
-            (
-                1,
-                XlsWebColumnType::Text
-                | XlsWebColumnType::Choice
-                | XlsWebColumnType::MultipleChoices,
-            ) => {
+            (1, WebColumnType::Text | WebColumnType::Choice | WebColumnType::MultipleChoices) => {
                 let (v, end) = parse_string(data, *offset, rt, "Web default string")?;
                 *offset = end;
-                XlsWebDefaultValue::String(v)
+                WebDefaultValue::String(v)
             },
-            (2, XlsWebColumnType::Boolean) => {
+            (2, WebColumnType::Boolean) => {
                 let v = u32_at(data, *offset, rt, "Web default boolean")?;
                 if v > 1 {
                     return Err(invalid(rt, "invalid Web default boolean"));
                 }
                 *offset += 4;
-                XlsWebDefaultValue::Boolean(v != 0)
+                WebDefaultValue::Boolean(v != 0)
             },
-            (
-                3,
-                XlsWebColumnType::Number | XlsWebColumnType::Currency | XlsWebColumnType::DateTime,
-            ) => {
+            (3, WebColumnType::Number | WebColumnType::Currency | WebColumnType::DateTime) => {
                 let bytes = data
                     .get(*offset..*offset + 8)
                     .ok_or_else(|| invalid(rt, "truncated Web default number"))?;
                 *offset += 8;
                 let v = f64::from_le_bytes(bytes.try_into().unwrap());
-                if kind == XlsWebColumnType::DateTime {
-                    XlsWebDefaultValue::DateTime(v)
+                if kind == WebColumnType::DateTime {
+                    WebDefaultValue::DateTime(v)
                 } else {
-                    XlsWebDefaultValue::Number(v)
+                    WebDefaultValue::Number(v)
                 }
             },
             _ => return Err(invalid(rt, "Web default type does not match column type")),
@@ -1820,7 +1807,7 @@ fn parse_web_info(
         return Err(invalid(rt, "Web field-info reserved value must be zero"));
     }
     *offset += 4;
-    let value = XlsWebFieldInfo {
+    let value = WebFieldInfo {
         locale,
         decimal_places,
         percent: a & 1 != 0,
@@ -1844,17 +1831,17 @@ fn parse_web_info(
     value.validate(kind)?;
     Ok(value)
 }
-impl XlsExternalTableMetadata {
-    pub fn try_new(fields: Vec<XlsExternalTableField>) -> XlsResult<Self> {
+impl ExternalTableMetadata {
+    pub fn try_new(fields: Vec<ExternalTableField>) -> Result<Self> {
         let value = Self {
-            version: XlsExternalTableVersion::Excel2007,
+            version: ExternalTableVersion::Excel2007,
             build_number: 0,
             fields,
         };
         value.validate()?;
         Ok(value)
     }
-    fn validate(&self) -> XlsResult<()> {
+    fn validate(&self) -> Result<()> {
         if !(1..=256).contains(&self.fields.len()) {
             return Err(invalid(
                 FEATURE12_RECORD_TYPE,
@@ -1878,16 +1865,16 @@ impl XlsExternalTableMetadata {
         }
         Ok(())
     }
-    pub const fn version(&self) -> XlsExternalTableVersion {
+    pub const fn version(&self) -> ExternalTableVersion {
         self.version
     }
     pub const fn build_number(&self) -> u16 {
         self.build_number
     }
-    pub fn fields(&self) -> &[XlsExternalTableField] {
+    pub fn fields(&self) -> &[ExternalTableField] {
         &self.fields
     }
-    pub fn with_version(mut self, version: XlsExternalTableVersion) -> Self {
+    pub fn with_version(mut self, version: ExternalTableVersion) -> Self {
         self.version = version;
         self
     }
@@ -1898,12 +1885,12 @@ impl XlsExternalTableMetadata {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsOpaqueListObjectFeature {
+pub struct OpaqueListObjectFeature {
     record_type: u16,
     base_payload: Vec<u8>,
     continuation_payloads: Vec<Vec<u8>>,
 }
-impl XlsOpaqueListObjectFeature {
+impl OpaqueListObjectFeature {
     pub const fn record_type(&self) -> u16 {
         self.record_type
     }
@@ -1924,13 +1911,13 @@ impl XlsOpaqueListObjectFeature {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsOpaqueListObjectFutureRecord {
+pub struct OpaqueListObjectFutureRecord {
     record_type: u16,
     payload: Vec<u8>,
     continuation_payloads: Vec<Vec<u8>>,
     after_list12_count: usize,
 }
-impl XlsOpaqueListObjectFutureRecord {
+impl OpaqueListObjectFutureRecord {
     pub const fn record_type(&self) -> u16 {
         self.record_type
     }
@@ -1946,38 +1933,38 @@ impl XlsOpaqueListObjectFutureRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsListObject {
-    id: XlsListObjectId,
+pub struct ListObject {
+    id: ListObjectId,
     name: String,
-    range: XlsListObjectRange,
-    columns: Vec<XlsListObjectColumn>,
-    style: Option<XlsListObjectStyleOptions>,
+    range: ListObjectRange,
+    columns: Vec<ListObjectColumn>,
+    style: Option<ListObjectStyleOptions>,
     has_header: bool,
     has_totals: bool,
     autofilter: bool,
     comment: String,
-    feature_version: XlsListObjectFeatureVersion,
-    opaque_feature: Option<XlsOpaqueListObjectFeature>,
-    opaque_future_records: Vec<XlsOpaqueListObjectFutureRecord>,
-    autofilter12_criteria: Option<XlsTableAutoFilter12>,
-    external_metadata: Option<XlsExternalTableMetadata>,
-    source_metadata: Option<XlsListObjectSourceMetadata>,
+    feature_version: ListObjectFeatureVersion,
+    opaque_feature: Option<OpaqueListObjectFeature>,
+    opaque_future_records: Vec<OpaqueListObjectFutureRecord>,
+    autofilter12_criteria: Option<TableAutoFilter12>,
+    external_metadata: Option<ExternalTableMetadata>,
+    source_metadata: Option<ListObjectSourceMetadata>,
 }
-impl XlsListObject {
+impl ListObject {
     pub fn try_new(
-        id: XlsListObjectId,
+        id: ListObjectId,
         name: impl Into<String>,
-        range: XlsListObjectRange,
-        columns: Vec<XlsListObjectColumn>,
-        style: XlsListObjectStyleOptions,
-    ) -> XlsResult<Self> {
+        range: ListObjectRange,
+        columns: Vec<ListObjectColumn>,
+        style: ListObjectStyleOptions,
+    ) -> Result<Self> {
         let feature_version = if columns
             .iter()
             .any(|c| c.total_formula.is_some() || c.total_string.is_some())
         {
-            XlsListObjectFeatureVersion::Feature12
+            ListObjectFeatureVersion::Feature12
         } else {
-            XlsListObjectFeatureVersion::Feature11
+            ListObjectFeatureVersion::Feature11
         };
         let value = Self {
             id,
@@ -1999,33 +1986,33 @@ impl XlsListObject {
         value.validate()?;
         Ok(value)
     }
-    pub fn with_header_row(mut self, v: bool) -> XlsResult<Self> {
+    pub fn with_header_row(mut self, v: bool) -> Result<Self> {
         self.has_header = v;
         if !v {
             self.autofilter = false;
-            self.feature_version = XlsListObjectFeatureVersion::Feature12;
+            self.feature_version = ListObjectFeatureVersion::Feature12;
         } else if self.opaque_feature.is_none() {
-            self.feature_version = XlsListObjectFeatureVersion::Feature11;
+            self.feature_version = ListObjectFeatureVersion::Feature11;
         }
         self.validate()?;
         Ok(self)
     }
-    pub fn with_totals_row(mut self, v: bool) -> XlsResult<Self> {
+    pub fn with_totals_row(mut self, v: bool) -> Result<Self> {
         self.has_totals = v;
         self.validate()?;
         Ok(self)
     }
-    pub fn with_autofilter(mut self, v: bool) -> XlsResult<Self> {
+    pub fn with_autofilter(mut self, v: bool) -> Result<Self> {
         self.autofilter = v;
         self.validate()?;
         Ok(self)
     }
-    pub fn with_autofilter12_criteria(mut self, value: XlsTableAutoFilter12) -> XlsResult<Self> {
+    pub fn with_autofilter12_criteria(mut self, value: TableAutoFilter12) -> Result<Self> {
         self.autofilter12_criteria = Some(value);
         self.validate()?;
         Ok(self)
     }
-    pub fn with_comment(mut self, v: impl Into<String>) -> XlsResult<Self> {
+    pub fn with_comment(mut self, v: impl Into<String>) -> Result<Self> {
         self.comment = v.into();
         if self.comment.encode_utf16().count() > 255 {
             return Err(invalid(
@@ -2035,49 +2022,49 @@ impl XlsListObject {
         }
         Ok(self)
     }
-    pub fn with_external_data(mut self, metadata: XlsExternalTableMetadata) -> XlsResult<Self> {
+    pub fn with_external_data(mut self, metadata: ExternalTableMetadata) -> Result<Self> {
         metadata.validate()?;
         self.external_metadata = Some(metadata);
-        self.feature_version = XlsListObjectFeatureVersion::Feature12;
+        self.feature_version = ListObjectFeatureVersion::Feature12;
         self.opaque_feature = None;
         self.validate()?;
         Ok(self)
     }
-    pub fn with_web_source(mut self, metadata: XlsWebTableMetadata) -> XlsResult<Self> {
+    pub fn with_web_source(mut self, metadata: WebTableMetadata) -> Result<Self> {
         metadata.validate()?;
-        self.source_metadata = Some(XlsListObjectSourceMetadata::Web(metadata));
+        self.source_metadata = Some(ListObjectSourceMetadata::Web(metadata));
         self.external_metadata = None;
         self.opaque_feature = None;
-        if self.feature_version != XlsListObjectFeatureVersion::Feature12 {
-            self.feature_version = XlsListObjectFeatureVersion::Feature11;
+        if self.feature_version != ListObjectFeatureVersion::Feature12 {
+            self.feature_version = ListObjectFeatureVersion::Feature11;
         }
         self.validate()?;
         Ok(self)
     }
-    pub fn with_xml_source(mut self, metadata: XlsXmlTableMetadata) -> XlsResult<Self> {
+    pub fn with_xml_source(mut self, metadata: XmlTableMetadata) -> Result<Self> {
         metadata.validate()?;
-        self.source_metadata = Some(XlsListObjectSourceMetadata::Xml(metadata));
+        self.source_metadata = Some(ListObjectSourceMetadata::Xml(metadata));
         self.external_metadata = None;
         self.opaque_feature = None;
-        if self.feature_version != XlsListObjectFeatureVersion::Feature12 {
-            self.feature_version = XlsListObjectFeatureVersion::Feature11;
+        if self.feature_version != ListObjectFeatureVersion::Feature12 {
+            self.feature_version = ListObjectFeatureVersion::Feature11;
         }
         self.validate()?;
         Ok(self)
     }
-    pub const fn id(&self) -> XlsListObjectId {
+    pub const fn id(&self) -> ListObjectId {
         self.id
     }
     pub fn name(&self) -> &str {
         &self.name
     }
-    pub const fn range(&self) -> XlsListObjectRange {
+    pub const fn range(&self) -> ListObjectRange {
         self.range
     }
-    pub fn columns(&self) -> &[XlsListObjectColumn] {
+    pub fn columns(&self) -> &[ListObjectColumn] {
         &self.columns
     }
-    pub fn style(&self) -> Option<&XlsListObjectStyleOptions> {
+    pub fn style(&self) -> Option<&ListObjectStyleOptions> {
         self.style.as_ref()
     }
     pub const fn has_header_row(&self) -> bool {
@@ -2092,25 +2079,25 @@ impl XlsListObject {
     pub fn comment(&self) -> &str {
         &self.comment
     }
-    pub const fn feature_version(&self) -> XlsListObjectFeatureVersion {
+    pub const fn feature_version(&self) -> ListObjectFeatureVersion {
         self.feature_version
     }
-    pub fn opaque_feature(&self) -> Option<&XlsOpaqueListObjectFeature> {
+    pub fn opaque_feature(&self) -> Option<&OpaqueListObjectFeature> {
         self.opaque_feature.as_ref()
     }
-    pub fn opaque_future_records(&self) -> &[XlsOpaqueListObjectFutureRecord] {
+    pub fn opaque_future_records(&self) -> &[OpaqueListObjectFutureRecord] {
         &self.opaque_future_records
     }
-    pub fn autofilter12_criteria(&self) -> Option<&XlsTableAutoFilter12> {
+    pub fn autofilter12_criteria(&self) -> Option<&TableAutoFilter12> {
         self.autofilter12_criteria.as_ref()
     }
-    pub fn external_metadata(&self) -> Option<&XlsExternalTableMetadata> {
+    pub fn external_metadata(&self) -> Option<&ExternalTableMetadata> {
         self.external_metadata.as_ref()
     }
-    pub fn source_metadata(&self) -> Option<&XlsListObjectSourceMetadata> {
+    pub fn source_metadata(&self) -> Option<&ListObjectSourceMetadata> {
         self.source_metadata.as_ref()
     }
-    pub(crate) fn validate(&self) -> XlsResult<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         validate_table_name(&self.name)?;
         if self.opaque_feature.is_none()
             && (self.columns.is_empty()
@@ -2123,7 +2110,7 @@ impl XlsListObject {
             ));
         }
         if self.opaque_feature.is_some()
-            && self.feature_version != XlsListObjectFeatureVersion::Feature12
+            && self.feature_version != ListObjectFeatureVersion::Feature12
         {
             return Err(invalid(
                 FEATURE12_RECORD_TYPE,
@@ -2132,7 +2119,7 @@ impl XlsListObject {
         }
         if let Some(metadata) = &self.external_metadata {
             metadata.validate()?;
-            if self.feature_version != XlsListObjectFeatureVersion::Feature12
+            if self.feature_version != ListObjectFeatureVersion::Feature12
                 || metadata.fields.len() != self.columns.len()
                 || metadata
                     .fields
@@ -2174,7 +2161,7 @@ impl XlsListObject {
         if let Some(source) = &self.source_metadata {
             if !matches!(
                 self.feature_version,
-                XlsListObjectFeatureVersion::Feature11 | XlsListObjectFeatureVersion::Feature12
+                ListObjectFeatureVersion::Feature11 | ListObjectFeatureVersion::Feature12
             ) || self.external_metadata.is_some()
                 || self.opaque_feature.is_some()
             {
@@ -2187,14 +2174,13 @@ impl XlsListObject {
                 .columns
                 .iter()
                 .any(|column| column.total_formula.is_some() || column.total_string.is_some());
-            if self.feature_version == XlsListObjectFeatureVersion::Feature11 && has_feature12_field
-            {
+            if self.feature_version == ListObjectFeatureVersion::Feature11 && has_feature12_field {
                 return Err(invalid(
                     FEATURE11_RECORD_TYPE,
                     "Feature11 source fields cannot load total formulas or strings",
                 ));
             }
-            if self.feature_version == XlsListObjectFeatureVersion::Feature12
+            if self.feature_version == ListObjectFeatureVersion::Feature12
                 && self.has_header
                 && !has_feature12_field
             {
@@ -2204,7 +2190,7 @@ impl XlsListObject {
                 ));
             }
             match source {
-                XlsListObjectSourceMetadata::Web(metadata) => {
+                ListObjectSourceMetadata::Web(metadata) => {
                     metadata.validate()?;
                     if !self.has_header
                         || metadata.fields.len() != self.columns.len()
@@ -2230,7 +2216,7 @@ impl XlsListObject {
                         }
                     }
                 },
-                XlsListObjectSourceMetadata::Xml(metadata) => {
+                ListObjectSourceMetadata::Xml(metadata) => {
                     metadata.validate()?;
                     if metadata
                         .entry_id
@@ -2325,7 +2311,7 @@ impl XlsListObject {
         }
         Ok(())
     }
-    pub(crate) fn to_feature_record_bytes(&self) -> XlsResult<Vec<Vec<u8>>> {
+    pub(crate) fn to_feature_record_bytes(&self) -> Result<Vec<Vec<u8>>> {
         self.validate()?;
         if let Some(opaque) = &self.opaque_feature {
             let mut records = vec![record(opaque.record_type, opaque.base_payload.clone())?];
@@ -2341,8 +2327,8 @@ impl XlsListObject {
             return self.to_source_feature_record_bytes(metadata);
         }
         let rt = match self.feature_version {
-            XlsListObjectFeatureVersion::Feature11 => FEATURE11_RECORD_TYPE,
-            XlsListObjectFeatureVersion::Feature12 => FEATURE12_RECORD_TYPE,
+            ListObjectFeatureVersion::Feature11 => FEATURE11_RECORD_TYPE,
+            ListObjectFeatureVersion::Feature12 => FEATURE12_RECORD_TYPE,
         };
         let mut feature = Vec::new();
         feature.extend_from_slice(&0u32.to_le_bytes());
@@ -2427,17 +2413,17 @@ impl XlsListObject {
     }
     fn to_source_feature_record_bytes(
         &self,
-        source: &XlsListObjectSourceMetadata,
-    ) -> XlsResult<Vec<Vec<u8>>> {
+        source: &ListObjectSourceMetadata,
+    ) -> Result<Vec<Vec<u8>>> {
         let rt = match self.feature_version {
-            XlsListObjectFeatureVersion::Feature11 => FEATURE11_RECORD_TYPE,
-            XlsListObjectFeatureVersion::Feature12 => FEATURE12_RECORD_TYPE,
+            ListObjectFeatureVersion::Feature11 => FEATURE11_RECORD_TYPE,
+            ListObjectFeatureVersion::Feature12 => FEATURE12_RECORD_TYPE,
         };
         let (lt, version, build, single, fields_len): (u32, _, _, _, _) = match source {
-            XlsListObjectSourceMetadata::Web(v) => {
+            ListObjectSourceMetadata::Web(v) => {
                 (1u32, v.version, v.build_number, false, v.fields.len())
             },
-            XlsListObjectSourceMetadata::Xml(v) => (
+            ListObjectSourceMetadata::Xml(v) => (
                 2u32,
                 v.version,
                 v.build_number,
@@ -2462,8 +2448,8 @@ impl XlsListObject {
         feature.extend_from_slice(&64u32.to_le_bytes());
         feature.extend_from_slice(&build.to_le_bytes());
         let ignored_fixed_word = match source {
-            XlsListObjectSourceMetadata::Web(v) => v.ignored_fixed_word,
-            XlsListObjectSourceMetadata::Xml(v) => v.ignored_fixed_word,
+            ListObjectSourceMetadata::Web(v) => v.ignored_fixed_word,
+            ListObjectSourceMetadata::Xml(v) => v.ignored_fixed_word,
         };
         feature.extend_from_slice(&ignored_fixed_word.to_le_bytes());
         let mut flags = (version.code() << 16)
@@ -2472,7 +2458,7 @@ impl XlsListObject {
             | (u32::from(single) << 9)
             | 0x0040_0000;
         match source {
-            XlsListObjectSourceMetadata::Web(v) => {
+            ListObjectSourceMetadata::Web(v) => {
                 flags |= u32::from(!v.deleted_row_ids.is_empty()) << 5
                     | u32::from(v.needs_commit) << 8
                     | u32::from(v.compressed_cache) << 13
@@ -2482,25 +2468,25 @@ impl XlsListObject {
                     | u32::from(!v.invalid_cells.is_empty()) << 21
                     | v.ignored_flags
             },
-            XlsListObjectSourceMetadata::Xml(v) => {
+            ListObjectSourceMetadata::Xml(v) => {
                 flags |= u32::from(v.entry_id.is_some()) << 20 | v.ignored_flags
             },
         };
         feature.extend_from_slice(&flags.to_le_bytes());
         match source {
-            XlsListObjectSourceMetadata::Web(v) => {
+            ListObjectSourceMetadata::Web(v) => {
                 feature.extend_from_slice(&v.cache_position.to_le_bytes());
                 feature.extend_from_slice(&v.cache_size.to_le_bytes());
                 feature.extend_from_slice(&v.cache_characters.to_le_bytes());
                 feature.extend_from_slice(&v.edit_mode.code().to_le_bytes());
                 feature.extend_from_slice(&v.hash_parameters)
             },
-            XlsListObjectSourceMetadata::Xml(v) => feature.extend_from_slice(&v.ignored_fixed_tail),
+            ListObjectSourceMetadata::Xml(v) => feature.extend_from_slice(&v.ignored_fixed_tail),
         };
         append_string(&mut feature, &self.name);
         feature.extend_from_slice(&(fields_len as u16).to_le_bytes());
         match source {
-            XlsListObjectSourceMetadata::Web(v) => {
+            ListObjectSourceMetadata::Web(v) => {
                 if let Some(name) = &v.provider_name {
                     append_string(&mut feature, name)
                 }
@@ -2508,7 +2494,7 @@ impl XlsListObject {
                     append_string(&mut feature, entry)
                 }
             },
-            XlsListObjectSourceMetadata::Xml(v) => {
+            ListObjectSourceMetadata::Xml(v) => {
                 if let Some(entry) = &v.entry_id {
                     append_string(&mut feature, entry)
                 }
@@ -2516,8 +2502,8 @@ impl XlsListObject {
         }
         for (index, column) in self.columns.iter().enumerate() {
             let (web, xml) = match source {
-                XlsListObjectSourceMetadata::Web(v) => (Some(&v.fields[index]), None),
-                XlsListObjectSourceMetadata::Xml(v) => (None, Some(&v.fields[index])),
+                ListObjectSourceMetadata::Web(v) => (Some(&v.fields[index]), None),
+                ListObjectSourceMetadata::Xml(v) => (None, Some(&v.fields[index])),
             };
             let (
                 source_name,
@@ -2603,7 +2589,7 @@ impl XlsListObject {
                 append_web_info(&mut feature, &v.info)?
             }
         }
-        if let XlsListObjectSourceMetadata::Web(v) = source {
+        if let ListObjectSourceMetadata::Web(v) = source {
             if !v.deleted_row_ids.is_empty() {
                 feature.extend_from_slice(&(v.deleted_row_ids.len() as u16).to_le_bytes());
                 for id in &v.deleted_row_ids {
@@ -2652,8 +2638,8 @@ impl XlsListObject {
     }
     fn to_external_feature_record_bytes(
         &self,
-        metadata: &XlsExternalTableMetadata,
-    ) -> XlsResult<Vec<Vec<u8>>> {
+        metadata: &ExternalTableMetadata,
+    ) -> Result<Vec<Vec<u8>>> {
         let mut feature = Vec::new();
         feature.extend_from_slice(&3u32.to_le_bytes());
         feature.extend_from_slice(&self.id.value().to_le_bytes());
@@ -2753,7 +2739,7 @@ impl XlsListObject {
         }
         Ok(records)
     }
-    pub(crate) fn to_list12_record_bytes(&self) -> XlsResult<Vec<Vec<u8>>> {
+    pub(crate) fn to_list12_record_bytes(&self) -> Result<Vec<Vec<u8>>> {
         let mut block = Vec::new();
         append_frt(&mut block, LIST12_RECORD_TYPE, None);
         block.extend_from_slice(&0u16.to_le_bytes());
@@ -2785,7 +2771,7 @@ impl XlsListObject {
             record(LIST12_RECORD_TYPE, display)?,
         ])
     }
-    pub(crate) fn to_following_record_bytes(&self) -> XlsResult<Vec<Vec<u8>>> {
+    pub(crate) fn to_following_record_bytes(&self) -> Result<Vec<Vec<u8>>> {
         let list12 = self.to_list12_record_bytes()?;
         let mut output = Vec::new();
         for (index, item) in list12.into_iter().enumerate() {
@@ -2821,7 +2807,7 @@ impl XlsListObject {
         }
         Ok(output)
     }
-    fn parse_opaque_feature12(pending: PendingFeature) -> XlsResult<Self> {
+    fn parse_opaque_feature12(pending: PendingFeature) -> Result<Self> {
         let data = &pending.combined;
         if data.len() < 108 {
             return Err(invalid(FEATURE12_RECORD_TYPE, "truncated opaque Feature12"));
@@ -2837,7 +2823,7 @@ impl XlsListObject {
             ));
         }
         let range = parse_range(data, 4, FEATURE12_RECORD_TYPE)?;
-        let id = XlsListObjectId::try_new(u32_at(data, 39, FEATURE12_RECORD_TYPE, "idList")?)?;
+        let id = ListObjectId::try_new(u32_at(data, 39, FEATURE12_RECORD_TYPE, "idList")?)?;
         let header = u32_at(data, 43, FEATURE12_RECORD_TYPE, "crwHeader")?;
         let totals = u32_at(data, 47, FEATURE12_RECORD_TYPE, "crwTotals")?;
         if header > 1 || totals > 1 {
@@ -2848,7 +2834,7 @@ impl XlsListObject {
         }
         let flags = u32_at(data, 63, FEATURE12_RECORD_TYPE, "flags")?;
         let (name, _) = parse_string(data, 99, FEATURE12_RECORD_TYPE, "rgbName")?;
-        let opaque_feature = XlsOpaqueListObjectFeature {
+        let opaque_feature = OpaqueListObjectFeature {
             record_type: pending.record_type,
             base_payload: pending.base,
             continuation_payloads: pending.continuations,
@@ -2863,7 +2849,7 @@ impl XlsListObject {
             has_totals: totals != 0,
             autofilter: flags & 2 != 0,
             comment: String::new(),
-            feature_version: XlsListObjectFeatureVersion::Feature12,
+            feature_version: ListObjectFeatureVersion::Feature12,
             opaque_feature: Some(opaque_feature),
             opaque_future_records: Vec::new(),
             autofilter12_criteria: None,
@@ -2871,7 +2857,7 @@ impl XlsListObject {
             source_metadata: None,
         })
     }
-    fn parse_external_feature12(pending: PendingFeature) -> XlsResult<Self> {
+    fn parse_external_feature12(pending: PendingFeature) -> Result<Self> {
         let data = &pending.combined;
         let rt = FEATURE12_RECORD_TYPE;
         if !(99..=MAX_FEATURE_BYTES).contains(&data.len()) {
@@ -2900,7 +2886,7 @@ impl XlsListObject {
         if u32_at(data, base, rt, "lt")? != 3 {
             return Err(invalid(rt, "external parser requires LTEXTERNALDATA"));
         }
-        let id = XlsListObjectId::try_new(u32_at(data, base + 4, rt, "idList")?)?;
+        let id = ListObjectId::try_new(u32_at(data, base + 4, rt, "idList")?)?;
         let header = u32_at(data, base + 8, rt, "crwHeader")?;
         let totals = u32_at(data, base + 12, rt, "crwTotals")?;
         if header > 1
@@ -2914,7 +2900,7 @@ impl XlsListObject {
             ));
         }
         let flags = u32_at(data, base + 28, rt, "flags")?;
-        let version = XlsExternalTableVersion::from_code((flags >> 16) & 0xF)?;
+        let version = ExternalTableVersion::from_code((flags >> 16) & 0xF)?;
         if flags & 0x0020_E7A0 != 0
             || flags & 0x4 != 0 && flags & 0x2 == 0
             || flags & 0x10 != 0 && flags & 0x8 == 0
@@ -2942,14 +2928,14 @@ impl XlsListObject {
         let mut fields = Vec::with_capacity(count);
         for _ in 0..count {
             let start = offset;
-            let cid = XlsListColumnId::try_new(u32_at(data, start, rt, "idField")?)?;
+            let cid = ListColumnId::try_new(u32_at(data, start, rt, "idField")?)?;
             if u32_at(data, start + 4, rt, "lfdt")? != 0
                 || u32_at(data, start + 8, rt, "lfxidt")? != 0
             {
                 return Err(invalid(rt, "external field data types must be zero"));
             }
             let aggregation =
-                XlsListTotalAggregation::from_code(u32_at(data, start + 12, rt, "ilta")?)?;
+                ListTotalAggregation::from_code(u32_at(data, start + 12, rt, "ilta")?)?;
             let aggregate_len = usize::try_from(u32_at(data, start + 16, rt, "cbFmtAgg")?)
                 .map_err(|_| invalid(rt, "aggregate format length overflows"))?;
             let aggregate_style = u32_at(data, start + 20, rt, "istnAgg")?;
@@ -2960,8 +2946,8 @@ impl XlsListObject {
             if field_flags & 0x4C != 0
                 || field_flags & 0x40 != 0
                 || field_flags & 0x100 != 0 && field_flags & 0x80 == 0
-                || field_flags & 0x80 != 0 && aggregation != XlsListTotalAggregation::Custom
-                || field_flags & 0x400 != 0 && aggregation != XlsListTotalAggregation::None
+                || field_flags & 0x80 != 0 && aggregation != ListTotalAggregation::Custom
+                || field_flags & 0x400 != 0 && aggregation != ListTotalAggregation::None
                 || field_flags & 2 != 0 && field_flags & 1 == 0
                 || (field_flags & 1 != 0) != (flags & 2 != 0)
             {
@@ -3056,7 +3042,7 @@ impl XlsListObject {
                 } else {
                     format_end
                 };
-                let value = XlsCachedDiskHeader::parse(
+                let value = CachedDiskHeader::parse(
                     data[offset..end].to_vec(),
                     field_flags & 0x200 != 0,
                     rt,
@@ -3067,9 +3053,9 @@ impl XlsListObject {
                 if field_flags & 0x200 != 0 {
                     return Err(invalid(rt, "header style name requires a CachedDiskHeader"));
                 }
-                XlsCachedDiskHeader::empty()
+                CachedDiskHeader::empty()
             };
-            let column = XlsListObjectColumn {
+            let column = ListObjectColumn {
                 id: cid,
                 name: caption,
                 aggregation,
@@ -3078,7 +3064,7 @@ impl XlsListObject {
             };
             column.validate_totals()?;
             columns.push(column);
-            fields.push(XlsExternalTableField {
+            fields.push(ExternalTableField {
                 column_id: cid,
                 source_name,
                 query_field_id,
@@ -3097,13 +3083,13 @@ impl XlsListObject {
         if offset != data.len() {
             return Err(invalid(rt, "trailing external Feature12 data"));
         }
-        let metadata = XlsExternalTableMetadata {
+        let metadata = ExternalTableMetadata {
             version,
             build_number: u16_at(data, base + 24, rt, "rupBuild")?,
             fields,
         };
         metadata.validate()?;
-        let opaque_feature = XlsOpaqueListObjectFeature {
+        let opaque_feature = OpaqueListObjectFeature {
             record_type: pending.record_type,
             base_payload: pending.base,
             continuation_payloads: pending.continuations,
@@ -3118,7 +3104,7 @@ impl XlsListObject {
             has_totals: totals != 0,
             autofilter: flags & 2 != 0,
             comment: String::new(),
-            feature_version: XlsListObjectFeatureVersion::Feature12,
+            feature_version: ListObjectFeatureVersion::Feature12,
             opaque_feature: Some(opaque_feature),
             opaque_future_records: Vec::new(),
             autofilter12_criteria: None,
@@ -3126,7 +3112,7 @@ impl XlsListObject {
             source_metadata: None,
         })
     }
-    fn parse_source_feature(data: &[u8], rt: u16, lt: u32) -> XlsResult<Self> {
+    fn parse_source_feature(data: &[u8], rt: u16, lt: u32) -> Result<Self> {
         if !matches!(rt, FEATURE11_RECORD_TYPE | FEATURE12_RECORD_TYPE) {
             return Err(invalid(
                 rt,
@@ -3135,7 +3121,7 @@ impl XlsListObject {
         }
         let range = parse_range(data, 4, rt)?;
         let base = 35;
-        let id = XlsListObjectId::try_new(u32_at(data, base + 4, rt, "idList")?)?;
+        let id = ListObjectId::try_new(u32_at(data, base + 4, rt, "idList")?)?;
         let header = u32_at(data, base + 8, rt, "crwHeader")?;
         let totals = u32_at(data, base + 12, rt, "crwTotals")?;
         if header > 1 || totals > 1 || u32_at(data, base + 20, rt, "cbFSData")? != 64 {
@@ -3144,7 +3130,7 @@ impl XlsListObject {
         let build = u16_at(data, base + 24, rt, "rupBuild")?;
         let ignored_fixed_word = u16_at(data, base + 26, rt, "unused1")?;
         let flags = u32_at(data, base + 28, rt, "flags")?;
-        let version = XlsExternalTableVersion::from_code((flags >> 16) & 0xf)?;
+        let version = ExternalTableVersion::from_code((flags >> 16) & 0xf)?;
         if flags & 0x0000_0480 != 0
             || flags & 4 != 0 && flags & 2 == 0
             || flags & 0x10 != 0 && flags & 8 == 0
@@ -3170,7 +3156,7 @@ impl XlsListObject {
                 u32_at(data, base + 32, rt, "cache position")?,
                 u32_at(data, base + 36, rt, "cache size")?,
                 u32_at(data, base + 40, rt, "cache characters")?,
-                XlsWebEditMode::from_code(u32_at(data, base + 44, rt, "edit mode")?)?,
+                WebEditMode::from_code(u32_at(data, base + 44, rt, "edit mode")?)?,
                 hash,
             )
         } else {
@@ -3181,7 +3167,7 @@ impl XlsListObject {
             if ignored_fixed_tail[12..16].iter().any(|byte| *byte != 0) {
                 return Err(invalid(rt, "XML edit mode must be zero"));
             }
-            (0, 0, 0, XlsWebEditMode::Normal, [0; 16])
+            (0, 0, 0, WebEditMode::Normal, [0; 16])
         };
         let (name, mut offset) = parse_string(data, base + 64, rt, "rgbName")?;
         validate_table_name(&name)?;
@@ -3212,14 +3198,14 @@ impl XlsListObject {
         let mut xml_fields = Vec::with_capacity(count);
         for _ in 0..count {
             let start = offset;
-            let cid = XlsListColumnId::try_new(u32_at(data, start, rt, "idField")?)?;
+            let cid = ListColumnId::try_new(u32_at(data, start, rt, "idField")?)?;
             let web_type = u32_at(data, start + 4, rt, "lfdt")?;
             let xml_type = u32_at(data, start + 8, rt, "lfxidt")?;
             if (lt == 1 && xml_type != 0) || (lt == 2 && web_type != 0) {
                 return Err(invalid(rt, "field data type does not match table source"));
             }
             let aggregation =
-                XlsListTotalAggregation::from_code(u32_at(data, start + 12, rt, "ilta")?)?;
+                ListTotalAggregation::from_code(u32_at(data, start + 12, rt, "ilta")?)?;
             let agg_len = usize::try_from(u32_at(data, start + 16, rt, "cbFmtAgg")?)
                 .map_err(|_| invalid(rt, "aggregate format length overflows"))?;
             let field_flags = u32_at(data, start + 24, rt, "field flags")?;
@@ -3228,8 +3214,8 @@ impl XlsListObject {
             if field_flags & 0x0000_0040 != 0
                 || field_flags & 2 != 0 && field_flags & 1 == 0
                 || field_flags & 0x100 != 0 && field_flags & 0x80 == 0
-                || field_flags & 0x80 != 0 && aggregation != XlsListTotalAggregation::Custom
-                || field_flags & 0x400 != 0 && aggregation != XlsListTotalAggregation::None
+                || field_flags & 0x80 != 0 && aggregation != ListTotalAggregation::Custom
+                || field_flags & 0x400 != 0 && aggregation != ListTotalAggregation::None
                 || (field_flags & 1 != 0) != (flags & 2 != 0)
                 || (lt == 1 && field_flags & 0x804 != 0)
                 || (lt == 2 && field_flags & 8 != 0)
@@ -3288,7 +3274,7 @@ impl XlsListObject {
                 let map_id = u32_at(data, offset + 6, rt, "XML map id")?;
                 let (xpath, end) = parse_string(data, offset + 10, rt, "XPath")?;
                 offset = end;
-                Some(XlsXmlColumnMapping::try_new(
+                Some(XmlColumnMapping::try_new(
                     map_id,
                     xpath,
                     map_flags & 4 != 0,
@@ -3325,7 +3311,7 @@ impl XlsListObject {
                 None
             };
             let web_kind = if lt == 1 {
-                Some(XlsWebColumnType::from_code(web_type)?)
+                Some(WebColumnType::from_code(web_type)?)
             } else {
                 None
             };
@@ -3350,7 +3336,7 @@ impl XlsListObject {
             } else if field_flags & 0x200 != 0 {
                 return Err(invalid(rt, "cached header style lacks cached header"));
             }
-            let column = XlsListObjectColumn {
+            let column = ListObjectColumn {
                 id: cid,
                 name: caption,
                 aggregation,
@@ -3360,7 +3346,7 @@ impl XlsListObject {
             column.validate_totals()?;
             columns.push(column);
             if let (Some(kind), Some(info)) = (web_kind, web_info) {
-                web_fields.push(XlsWebTableField {
+                web_fields.push(WebTableField {
                     column_id: cid,
                     source_name,
                     data_type: kind,
@@ -3374,10 +3360,10 @@ impl XlsListObject {
                     ignored_flags: field_flags & 0xffff_f030,
                 })
             } else {
-                xml_fields.push(XlsXmlTableField {
+                xml_fields.push(XmlTableField {
                     column_id: cid,
                     source_name,
-                    data_type: XlsXmlDataType::try_new(xml_type)?,
+                    data_type: XmlDataType::try_new(xml_type)?,
                     mapping,
                     auto_filter,
                     aggregate_format,
@@ -3389,7 +3375,7 @@ impl XlsListObject {
             }
         }
         let source_metadata = if lt == 1 {
-            let parse_ids = |data: &[u8], offset: &mut usize, label: &str| -> XlsResult<Vec<u32>> {
+            let parse_ids = |data: &[u8], offset: &mut usize, label: &str| -> Result<Vec<u32>> {
                 let count = usize::from(u16_at(data, *offset, rt, label)?);
                 *offset += 2;
                 let end = (*offset)
@@ -3425,20 +3411,16 @@ impl XlsListObject {
                 let mut out = Vec::with_capacity(n);
                 for _ in 0..n {
                     let row = u32_at(data, offset, rt, "invalid cell row")?;
-                    let column = XlsListColumnId::try_new(u32_at(
-                        data,
-                        offset + 4,
-                        rt,
-                        "invalid cell field",
-                    )?)?;
+                    let column =
+                        ListColumnId::try_new(u32_at(data, offset + 4, rt, "invalid cell field")?)?;
                     offset += 8;
-                    out.push(XlsWebInvalidCell::new(row, column))
+                    out.push(WebInvalidCell::new(row, column))
                 }
                 out
             } else {
                 Vec::new()
             };
-            XlsListObjectSourceMetadata::Web(XlsWebTableMetadata {
+            ListObjectSourceMetadata::Web(WebTableMetadata {
                 version,
                 build_number: build,
                 fields: web_fields,
@@ -3458,7 +3440,7 @@ impl XlsListObject {
                 ignored_flags: flags & 0xfe80_0001,
             })
         } else {
-            XlsListObjectSourceMetadata::Xml(XlsXmlTableMetadata {
+            ListObjectSourceMetadata::Xml(XmlTableMetadata {
                 version,
                 build_number: build,
                 fields: xml_fields,
@@ -3492,9 +3474,9 @@ impl XlsListObject {
             autofilter: flags & 2 != 0,
             comment: String::new(),
             feature_version: if rt == FEATURE12_RECORD_TYPE {
-                XlsListObjectFeatureVersion::Feature12
+                ListObjectFeatureVersion::Feature12
             } else {
-                XlsListObjectFeatureVersion::Feature11
+                ListObjectFeatureVersion::Feature11
             },
             opaque_feature: None,
             opaque_future_records: Vec::new(),
@@ -3503,7 +3485,7 @@ impl XlsListObject {
             source_metadata: Some(source_metadata),
         })
     }
-    fn parse_feature(data: &[u8], rt: u16) -> XlsResult<Self> {
+    fn parse_feature(data: &[u8], rt: u16) -> Result<Self> {
         if !(99..=MAX_FEATURE_BYTES).contains(&data.len()) {
             return Err(invalid(rt, "invalid table feature length"));
         }
@@ -3532,8 +3514,7 @@ impl XlsListObject {
                 "unsupported table source type",
             ));
         }
-        let id =
-            XlsListObjectId::try_new(u32_at(data, base + 4, FEATURE11_RECORD_TYPE, "idList")?)?;
+        let id = ListObjectId::try_new(u32_at(data, base + 4, FEATURE11_RECORD_TYPE, "idList")?)?;
         let header = u32_at(data, base + 8, FEATURE11_RECORD_TYPE, "crwHeader")?;
         let totals = u32_at(data, base + 12, FEATURE11_RECORD_TYPE, "crwTotals")?;
         if header > 1
@@ -3569,7 +3550,7 @@ impl XlsListObject {
         for _ in 0..count {
             let start = offset;
             let cid =
-                XlsListColumnId::try_new(u32_at(data, start, FEATURE11_RECORD_TYPE, "idField")?)?;
+                ListColumnId::try_new(u32_at(data, start, FEATURE11_RECORD_TYPE, "idField")?)?;
             if u32_at(data, start + 4, FEATURE11_RECORD_TYPE, "lfdt")? != 0
                 || u32_at(data, start + 8, FEATURE11_RECORD_TYPE, "lfxidt")? != 0
             {
@@ -3581,7 +3562,7 @@ impl XlsListObject {
             let agg = u32_at(data, start + 16, FEATURE11_RECORD_TYPE, "cbFmtAgg")? as usize;
             let cflags = u32_at(data, start + 24, FEATURE11_RECORD_TYPE, "column flags")?;
             let insert = u32_at(data, start + 28, FEATURE11_RECORD_TYPE, "cbFmtInsert")? as usize;
-            let aggregation = XlsListTotalAggregation::from_code(u32_at(
+            let aggregation = ListTotalAggregation::from_code(u32_at(
                 data,
                 start + 12,
                 FEATURE11_RECORD_TYPE,
@@ -3642,7 +3623,7 @@ impl XlsListObject {
             if offset > data.len() {
                 return Err(invalid(FEATURE11_RECORD_TYPE, "truncated column data"));
             }
-            let column = XlsListObjectColumn {
+            let column = ListObjectColumn {
                 id: cid,
                 name: caption,
                 aggregation,
@@ -3666,9 +3647,9 @@ impl XlsListObject {
             autofilter: flags & 2 != 0,
             comment: String::new(),
             feature_version: if rt == FEATURE12_RECORD_TYPE {
-                XlsListObjectFeatureVersion::Feature12
+                ListObjectFeatureVersion::Feature12
             } else {
-                XlsListObjectFeatureVersion::Feature11
+                ListObjectFeatureVersion::Feature11
             },
             opaque_feature: None,
             opaque_future_records: Vec::new(),
@@ -3677,7 +3658,7 @@ impl XlsListObject {
             source_metadata: None,
         })
     }
-    fn apply_list12(&mut self, data: &[u8]) -> XlsResult<u16> {
+    fn apply_list12(&mut self, data: &[u8]) -> Result<u16> {
         if data.len() < 18 {
             return Err(invalid(LIST12_RECORD_TYPE, "truncated List12"));
         }
@@ -3698,7 +3679,7 @@ impl XlsListObject {
                 if end != data.len() {
                     return Err(invalid(LIST12_RECORD_TYPE, "trailing style List12 data"));
                 }
-                self.style = Some(XlsListObjectStyleOptions {
+                self.style = Some(ListObjectStyleOptions {
                     name,
                     first: bits & 1 != 0,
                     last: bits & 2 != 0,
@@ -3735,12 +3716,12 @@ struct PendingFuture {
 pub(crate) struct ListObjectCollector {
     header: Option<u32>,
     pending: Option<PendingFeature>,
-    current: Option<XlsListObject>,
+    current: Option<ListObject>,
     pending_future: Option<PendingFuture>,
     kinds: HashSet<u16>,
     list12_count: usize,
     sort_continuations: usize,
-    tables: Vec<XlsListObject>,
+    tables: Vec<ListObject>,
     ended: bool,
 }
 impl ListObjectCollector {
@@ -3757,7 +3738,7 @@ impl ListObjectCollector {
             ended: false,
         }
     }
-    pub(crate) fn feed_record(&mut self, rt: u16, data: &[u8]) -> XlsResult<()> {
+    pub(crate) fn feed_record(&mut self, rt: u16, data: &[u8]) -> Result<()> {
         if self.header.is_none()
             && matches!(
                 rt,
@@ -3963,23 +3944,23 @@ impl ListObjectCollector {
         }
         Ok(())
     }
-    fn materialize(&mut self) -> XlsResult<()> {
+    fn materialize(&mut self) -> Result<()> {
         let Some(pending) = self.pending.take() else {
             return Ok(());
         };
         let source_type = u32_at(&pending.combined, 35, pending.record_type, "lt")?;
         self.current = Some(
             if pending.record_type == FEATURE12_RECORD_TYPE && source_type == 3 {
-                XlsListObject::parse_external_feature12(pending)?
+                ListObject::parse_external_feature12(pending)?
             } else if pending.record_type == FEATURE12_RECORD_TYPE && source_type > 3 {
-                XlsListObject::parse_opaque_feature12(pending)?
+                ListObject::parse_opaque_feature12(pending)?
             } else {
-                XlsListObject::parse_feature(&pending.combined, pending.record_type)?
+                ListObject::parse_feature(&pending.combined, pending.record_type)?
             },
         );
         Ok(())
     }
-    fn finish_future(&mut self) -> XlsResult<()> {
+    fn finish_future(&mut self) -> Result<()> {
         if let Some(future) = self.pending_future.take() {
             let table = self
                 .current
@@ -3995,7 +3976,7 @@ impl ListObjectCollector {
             } else {
                 table
                     .opaque_future_records
-                    .push(XlsOpaqueListObjectFutureRecord {
+                    .push(OpaqueListObjectFutureRecord {
                         record_type: AUTO_FILTER12_RECORD_TYPE,
                         payload: future.payload,
                         continuation_payloads: future.continuations,
@@ -4005,14 +3986,14 @@ impl ListObjectCollector {
         }
         Ok(())
     }
-    fn flush(&mut self) -> XlsResult<()> {
+    fn flush(&mut self) -> Result<()> {
         if let Some(table) = self.current.take() {
             table.validate()?;
             self.tables.push(table);
         }
         Ok(())
     }
-    pub(crate) fn finish(mut self) -> XlsResult<Vec<XlsListObject>> {
+    pub(crate) fn finish(mut self) -> Result<Vec<ListObject>> {
         if self.sort_continuations != 0 {
             return Err(invalid(
                 crate::sort_data::SORT_DATA_RECORD_TYPE,
@@ -4032,7 +4013,7 @@ impl ListObjectCollector {
         Ok(self.tables)
     }
 }
-pub(crate) fn feature_header_record(tables: &[XlsListObject]) -> XlsResult<Vec<u8>> {
+pub(crate) fn feature_header_record(tables: &[ListObject]) -> Result<Vec<u8>> {
     let next = tables
         .iter()
         .map(|t| t.id.value())
@@ -4055,22 +4036,22 @@ pub(crate) fn feature_header_record(tables: &[XlsListObject]) -> XlsResult<Vec<u
 mod tests {
     use super::*;
 
-    fn table(column_count: usize, name_len: usize) -> XlsListObject {
+    fn table(column_count: usize, name_len: usize) -> ListObject {
         let columns = (0..column_count)
             .map(|index| {
-                XlsListObjectColumn::try_new(
-                    XlsListColumnId::try_new(index as u32 + 1).unwrap(),
+                ListObjectColumn::try_new(
+                    ListColumnId::try_new(index as u32 + 1).unwrap(),
                     format!("C{index}_{}", "x".repeat(name_len)),
                 )
                 .unwrap()
             })
             .collect();
-        XlsListObject::try_new(
-            XlsListObjectId::try_new(1).unwrap(),
+        ListObject::try_new(
+            ListObjectId::try_new(1).unwrap(),
             "TableOne",
-            XlsListObjectRange::try_new(0, 2, 0, column_count as u16 - 1).unwrap(),
+            ListObjectRange::try_new(0, 2, 0, column_count as u16 - 1).unwrap(),
             columns,
-            XlsListObjectStyleOptions::try_new("TableStyleMedium2").unwrap(),
+            ListObjectStyleOptions::try_new("TableStyleMedium2").unwrap(),
         )
         .unwrap()
     }
@@ -4079,10 +4060,7 @@ mod tests {
         &record[4..]
     }
 
-    fn parse_feature_records(
-        table: &XlsListObject,
-        records: &[Vec<u8>],
-    ) -> XlsResult<XlsListObject> {
+    fn parse_feature_records(table: &ListObject, records: &[Vec<u8>]) -> Result<ListObject> {
         let mut collector = ListObjectCollector::new();
         let header = feature_header_record(std::slice::from_ref(table))?;
         collector.feed_record(FEAT_HDR11_RECORD_TYPE, payload(&header))?;
@@ -4199,16 +4177,16 @@ mod tests {
     fn external_feature12_is_lossless_and_hostile_versions_cardinality_and_feature11_are_rejected()
     {
         let base_table = table(2, 3);
-        let metadata = XlsExternalTableMetadata::try_new(vec![
-            XlsExternalTableField::try_new(base_table.columns[0].id, "SOURCE_A", 41).unwrap(),
-            XlsExternalTableField::try_new(base_table.columns[1].id, "SOURCE_B", 42).unwrap(),
+        let metadata = ExternalTableMetadata::try_new(vec![
+            ExternalTableField::try_new(base_table.columns[0].id, "SOURCE_A", 41).unwrap(),
+            ExternalTableField::try_new(base_table.columns[1].id, "SOURCE_B", 42).unwrap(),
         ])
         .unwrap();
         let value = base_table.with_external_data(metadata).unwrap();
         let header = feature_header_record(std::slice::from_ref(&value)).unwrap();
         let feature = value.to_feature_record_bytes().unwrap();
         let list12 = value.to_list12_record_bytes().unwrap();
-        let parse = |records: &[Vec<u8>]| -> XlsResult<Vec<XlsListObject>> {
+        let parse = |records: &[Vec<u8>]| -> Result<Vec<ListObject>> {
             let mut collector = ListObjectCollector::new();
             collector.feed_record(FEAT_HDR11_RECORD_TYPE, payload(&header))?;
             collector.feed_record(FEATURE12_RECORD_TYPE, payload(&records[0]))?;
@@ -4255,28 +4233,27 @@ mod tests {
 
     #[test]
     fn feature11_web_lfdt_values_and_defaults_round_trip_strictly() {
-        let base = table(XlsWebColumnType::ALL.len(), 1);
-        let fields = XlsWebColumnType::ALL
+        let base = table(WebColumnType::ALL.len(), 1);
+        let fields = WebColumnType::ALL
             .iter()
             .copied()
             .enumerate()
             .map(|(index, kind)| {
-                let info = match kind {
-                    XlsWebColumnType::Text
-                    | XlsWebColumnType::Choice
-                    | XlsWebColumnType::MultipleChoices => XlsWebFieldInfo::new(1033)
-                        .with_default_value(XlsWebDefaultValue::String(format!("v{index}"))),
-                    XlsWebColumnType::Boolean => XlsWebFieldInfo::new(1033)
-                        .with_default_value(XlsWebDefaultValue::Boolean(true)),
-                    XlsWebColumnType::Number | XlsWebColumnType::Currency => {
-                        XlsWebFieldInfo::new(1033)
-                            .with_default_value(XlsWebDefaultValue::Number(12.5))
-                    },
-                    XlsWebColumnType::DateTime => XlsWebFieldInfo::new(1033)
-                        .with_default_value(XlsWebDefaultValue::DateTime(45_000.25)),
-                    _ => XlsWebFieldInfo::new(1033),
-                };
-                XlsWebTableField::try_new(
+                let info =
+                    match kind {
+                        WebColumnType::Text
+                        | WebColumnType::Choice
+                        | WebColumnType::MultipleChoices => WebFieldInfo::new(1033)
+                            .with_default_value(WebDefaultValue::String(format!("v{index}"))),
+                        WebColumnType::Boolean => WebFieldInfo::new(1033)
+                            .with_default_value(WebDefaultValue::Boolean(true)),
+                        WebColumnType::Number | WebColumnType::Currency => WebFieldInfo::new(1033)
+                            .with_default_value(WebDefaultValue::Number(12.5)),
+                        WebColumnType::DateTime => WebFieldInfo::new(1033)
+                            .with_default_value(WebDefaultValue::DateTime(45_000.25)),
+                        _ => WebFieldInfo::new(1033),
+                    };
+                WebTableField::try_new(
                     base.columns[index].id,
                     format!("SOURCE_{index}"),
                     kind,
@@ -4286,34 +4263,30 @@ mod tests {
             })
             .collect();
         let value = base
-            .with_web_source(XlsWebTableMetadata::try_new(fields).unwrap())
+            .with_web_source(WebTableMetadata::try_new(fields).unwrap())
             .unwrap();
-        assert_eq!(
-            value.feature_version(),
-            XlsListObjectFeatureVersion::Feature11
-        );
+        assert_eq!(value.feature_version(), ListObjectFeatureVersion::Feature11);
         let records = value.to_feature_record_bytes().unwrap();
         let parsed = parse_feature_records(&value, &records).unwrap();
-        let XlsListObjectSourceMetadata::Web(metadata) = parsed.source_metadata().unwrap() else {
+        let ListObjectSourceMetadata::Web(metadata) = parsed.source_metadata().unwrap() else {
             panic!("expected Web metadata")
         };
         assert_eq!(
             metadata
                 .fields()
                 .iter()
-                .map(XlsWebTableField::data_type)
+                .map(WebTableField::data_type)
                 .collect::<Vec<_>>(),
-            XlsWebColumnType::ALL
+            WebColumnType::ALL
         );
         assert_eq!(parsed.to_feature_record_bytes().unwrap(), records);
 
         assert!(
-            XlsWebTableField::try_new(
+            WebTableField::try_new(
                 value.columns[0].id,
                 "INVALID_DEFAULT",
-                XlsWebColumnType::Note,
-                XlsWebFieldInfo::new(0)
-                    .with_default_value(XlsWebDefaultValue::String("x".to_string())),
+                WebColumnType::Note,
+                WebFieldInfo::new(0).with_default_value(WebDefaultValue::String("x".to_string())),
             )
             .is_err()
         );
@@ -4321,18 +4294,18 @@ mod tests {
 
     #[test]
     fn feature11_xml_lfxidt_is_exhaustive_and_preserves_ignored_storage() {
-        let base = table(XlsXmlDataType::ALL.len(), 1);
-        let fields = XlsXmlDataType::ALL
+        let base = table(XmlDataType::ALL.len(), 1);
+        let fields = XmlDataType::ALL
             .iter()
             .copied()
             .enumerate()
             .map(|(index, kind)| {
-                XlsXmlTableField::try_new(base.columns[index].id, format!("XML_{index}"), kind)
+                XmlTableField::try_new(base.columns[index].id, format!("XML_{index}"), kind)
                     .unwrap()
             })
             .collect();
         let value = base
-            .with_xml_source(XlsXmlTableMetadata::try_new(fields).unwrap())
+            .with_xml_source(XmlTableMetadata::try_new(fields).unwrap())
             .unwrap();
         let mut records = value.to_feature_record_bytes().unwrap();
         assert_eq!(records.len(), 1);
@@ -4353,7 +4326,7 @@ mod tests {
             .copy_from_slice(&(field_flags | 0x8000_0030).to_le_bytes());
 
         let parsed = parse_feature_records(&value, &records).unwrap();
-        let XlsListObjectSourceMetadata::Xml(metadata) = parsed.source_metadata().unwrap() else {
+        let ListObjectSourceMetadata::Xml(metadata) = parsed.source_metadata().unwrap() else {
             panic!("expected XML metadata")
         };
         assert_eq!(metadata.ignored_fixed_word(), 0xa55a);
@@ -4365,9 +4338,9 @@ mod tests {
             metadata
                 .fields()
                 .iter()
-                .map(XlsXmlTableField::data_type)
+                .map(XmlTableField::data_type)
                 .collect::<Vec<_>>(),
-            XlsXmlDataType::ALL
+            XmlDataType::ALL
         );
         assert_eq!(parsed.to_feature_record_bytes().unwrap(), records);
 
@@ -4384,16 +4357,16 @@ mod tests {
     #[test]
     fn feature11_web_ignored_flags_round_trip_but_reserved_and_source_bits_fail() {
         let base = table(1, 1);
-        let field = XlsWebTableField::try_new(
+        let field = WebTableField::try_new(
             base.columns[0].id,
             "SOURCE",
-            XlsWebColumnType::Text,
-            XlsWebFieldInfo::new(1033)
-                .with_default_value(XlsWebDefaultValue::String("default".to_string())),
+            WebColumnType::Text,
+            WebFieldInfo::new(1033)
+                .with_default_value(WebDefaultValue::String("default".to_string())),
         )
         .unwrap();
         let value = base
-            .with_web_source(XlsWebTableMetadata::try_new(vec![field]).unwrap())
+            .with_web_source(WebTableMetadata::try_new(vec![field]).unwrap())
             .unwrap();
         let canonical = value.to_feature_record_bytes().unwrap();
         let (_, count_offset) =
@@ -4448,7 +4421,7 @@ mod tests {
         assert!(parse_feature_records(&value, &bad_lfdt).is_err());
         let mut bad_xml_type = canonical.clone();
         bad_xml_type[0][4 + field_offset + 8..4 + field_offset + 12]
-            .copy_from_slice(&XlsXmlDataType::DataTypeString.value().to_le_bytes());
+            .copy_from_slice(&XmlDataType::DataTypeString.value().to_le_bytes());
         assert!(parse_feature_records(&value, &bad_xml_type).is_err());
         let mut reserved = canonical.clone();
         let field_flags = u32::from_le_bytes(
@@ -4469,12 +4442,12 @@ mod tests {
     #[test]
     fn feature12_single_cell_xml_source_round_trips() {
         let mut base = table(1, 1);
-        base.range = XlsListObjectRange::try_new(0, 0, 0, 0).unwrap();
+        base.range = ListObjectRange::try_new(0, 0, 0, 0).unwrap();
         let base = base.with_header_row(false).unwrap();
         let field =
-            XlsXmlTableField::try_new(base.columns[0].id, "single", XlsXmlDataType::DataTypeString)
+            XmlTableField::try_new(base.columns[0].id, "single", XmlDataType::DataTypeString)
                 .unwrap();
-        let metadata = XlsXmlTableMetadata::try_new(vec![field])
+        let metadata = XmlTableMetadata::try_new(vec![field])
             .unwrap()
             .with_single_cell(true)
             .unwrap();
@@ -4497,7 +4470,7 @@ mod tests {
         raw.push(1);
         raw.extend("Header".encode_utf16().flat_map(u16::to_le_bytes));
         let base = table(1, 1).with_header_row(false).unwrap();
-        let field = XlsExternalTableField::try_new(base.columns[0].id, "SOURCE", 7)
+        let field = ExternalTableField::try_new(base.columns[0].id, "SOURCE", 7)
             .unwrap()
             .with_header_cache_bytes(raw.clone())
             .unwrap();
@@ -4509,7 +4482,7 @@ mod tests {
         assert_eq!(field.header_cache_bytes(), raw);
         let value = base
             .clone()
-            .with_external_data(XlsExternalTableMetadata::try_new(vec![field]).unwrap())
+            .with_external_data(ExternalTableMetadata::try_new(vec![field]).unwrap())
             .unwrap();
         let records = value.to_feature_record_bytes().unwrap();
         let parsed = parse_feature_records(&value, &records).unwrap();
@@ -4518,7 +4491,7 @@ mod tests {
         assert_eq!(field.cached_disk_header().style_name(), Some("Header"));
         assert_eq!(parsed.to_feature_record_bytes().unwrap(), records);
 
-        let built = XlsCachedDiskHeader::try_new(vec![1, 2])
+        let built = CachedDiskHeader::try_new(vec![1, 2])
             .unwrap()
             .with_style_name("BuiltInHeader")
             .unwrap();
@@ -4529,34 +4502,34 @@ mod tests {
 
     #[test]
     fn cached_disk_header_presence_lengths_and_flags_are_strict() {
-        assert!(XlsCachedDiskHeader::try_new(vec![0; MAX_FEATURE_BYTES]).is_err());
+        assert!(CachedDiskHeader::try_new(vec![0; MAX_FEATURE_BYTES]).is_err());
         assert!(
-            XlsExternalTableField::try_new(XlsListColumnId::try_new(1).unwrap(), "SOURCE", 1,)
+            ExternalTableField::try_new(ListColumnId::try_new(1).unwrap(), "SOURCE", 1,)
                 .unwrap()
                 .with_header_cache_bytes(vec![2, 0, 0, 0, 1])
                 .is_err()
         );
 
-        let header = XlsCachedDiskHeader::try_new(vec![1])
+        let header = CachedDiskHeader::try_new(vec![1])
             .unwrap()
             .with_style_name("HeaderStyle")
             .unwrap();
         let headered = table(1, 1);
-        let field = XlsExternalTableField::try_new(headered.columns[0].id, "SOURCE", 1)
+        let field = ExternalTableField::try_new(headered.columns[0].id, "SOURCE", 1)
             .unwrap()
             .with_cached_disk_header(header)
             .unwrap();
         assert!(
             headered
-                .with_external_data(XlsExternalTableMetadata::try_new(vec![field]).unwrap())
+                .with_external_data(ExternalTableMetadata::try_new(vec![field]).unwrap())
                 .is_err()
         );
 
         let base = table(1, 1).with_header_row(false).unwrap();
-        let field = XlsExternalTableField::try_new(base.columns[0].id, "SOURCE", 1)
+        let field = ExternalTableField::try_new(base.columns[0].id, "SOURCE", 1)
             .unwrap()
             .with_cached_disk_header(
-                XlsCachedDiskHeader::try_new(vec![0x10])
+                CachedDiskHeader::try_new(vec![0x10])
                     .unwrap()
                     .with_style_name("HeaderStyle")
                     .unwrap(),
@@ -4564,7 +4537,7 @@ mod tests {
             .unwrap();
         let value = base
             .clone()
-            .with_external_data(XlsExternalTableMetadata::try_new(vec![field]).unwrap())
+            .with_external_data(ExternalTableMetadata::try_new(vec![field]).unwrap())
             .unwrap();
         let records = value.to_feature_record_bytes().unwrap();
         let (_, count_offset) =
@@ -4592,9 +4565,9 @@ mod tests {
             .copy_from_slice(&(flags & !0x200).to_le_bytes());
         assert!(parse_feature_records(&value, &missing_flag).is_err());
 
-        let empty_field = XlsExternalTableField::try_new(base.columns[0].id, "SOURCE", 1).unwrap();
+        let empty_field = ExternalTableField::try_new(base.columns[0].id, "SOURCE", 1).unwrap();
         let empty_value = base
-            .with_external_data(XlsExternalTableMetadata::try_new(vec![empty_field]).unwrap())
+            .with_external_data(ExternalTableMetadata::try_new(vec![empty_field]).unwrap())
             .unwrap();
         let mut spurious_flag = empty_value.to_feature_record_bytes().unwrap();
         let (_, count_offset) = parse_string(

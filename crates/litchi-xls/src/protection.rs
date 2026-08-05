@@ -2,7 +2,7 @@
 //!
 //! Verifiers exposed here are inert legacy metadata, not encryption keys.
 
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
 pub const PROTECT_TYPE: u16 = 0x0012;
 pub const PASSWORD_TYPE: u16 = 0x0013;
@@ -109,9 +109,9 @@ impl SheetProtection {
     }
 }
 
-fn parse_bool(record_type: u16, data: &[u8]) -> XlsResult<bool> {
+fn parse_bool(record_type: u16, data: &[u8]) -> Result<bool> {
     if data.len() != 2 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 2,
             found: data.len(),
         });
@@ -119,16 +119,16 @@ fn parse_bool(record_type: u16, data: &[u8]) -> XlsResult<bool> {
     match u16::from_le_bytes([data[0], data[1]]) {
         0 => Ok(false),
         1 => Ok(true),
-        value => Err(XlsError::InvalidRecord {
+        value => Err(Error::InvalidRecord {
             record_type,
             message: format!("Boolean must be 0 or 1, found 0x{value:04X}"),
         }),
     }
 }
 
-fn parse_verifier(data: &[u8]) -> XlsResult<PasswordVerifier> {
+fn parse_verifier(data: &[u8]) -> Result<PasswordVerifier> {
     if data.len() != 2 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 2,
             found: data.len(),
         });
@@ -138,16 +138,16 @@ fn parse_verifier(data: &[u8]) -> XlsResult<PasswordVerifier> {
     ])))
 }
 
-fn duplicate(record_type: u16) -> XlsError {
-    XlsError::InvalidRecord {
+fn duplicate(record_type: u16) -> Error {
+    Error::InvalidRecord {
         record_type,
         message: "duplicate protection record".into(),
     }
 }
 
-fn parse_file_sharing(data: &[u8]) -> XlsResult<FileSharing> {
+fn parse_file_sharing(data: &[u8]) -> Result<FileSharing> {
     if data.len() < 6 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 6,
             found: data.len(),
         });
@@ -157,13 +157,13 @@ fn parse_file_sharing(data: &[u8]) -> XlsResult<FileSharing> {
     let cch_or_marker = u16::from_le_bytes([data[4], data[5]]);
     if !write_password.is_set() {
         if cch_or_marker != 0 {
-            return Err(XlsError::InvalidRecord {
+            return Err(Error::InvalidRecord {
                 record_type: FILESHARING_TYPE,
                 message: "iNoResPass must be zero".into(),
             });
         }
         if data.len() != 6 {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 6,
                 found: data.len(),
             });
@@ -176,20 +176,20 @@ fn parse_file_sharing(data: &[u8]) -> XlsResult<FileSharing> {
     }
     let cch = usize::from(cch_or_marker);
     if cch > 54 {
-        return Err(XlsError::InvalidRecord {
+        return Err(Error::InvalidRecord {
             record_type: FILESHARING_TYPE,
             message: "username exceeds 54 characters".into(),
         });
     }
     if data.len() < 7 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 7,
             found: data.len(),
         });
     }
     let flags = data[6];
     if flags & !1 != 0 {
-        return Err(XlsError::InvalidRecord {
+        return Err(Error::InvalidRecord {
             record_type: FILESHARING_TYPE,
             message: format!("reserved string flags set: 0x{flags:02X}"),
         });
@@ -197,7 +197,7 @@ fn parse_file_sharing(data: &[u8]) -> XlsResult<FileSharing> {
     let wide = flags == 1;
     let expected = 7 + cch * if wide { 2 } else { 1 };
     if data.len() != expected {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected,
             found: data.len(),
         });
@@ -207,7 +207,7 @@ fn parse_file_sharing(data: &[u8]) -> XlsResult<FileSharing> {
             .chunks_exact(2)
             .map(|v| u16::from_le_bytes([v[0], v[1]]))
             .collect::<Vec<_>>();
-        String::from_utf16(&units).map_err(|error| XlsError::InvalidRecord {
+        String::from_utf16(&units).map_err(|error| Error::InvalidRecord {
             record_type: FILESHARING_TYPE,
             message: format!("invalid UTF-16 username: {error}"),
         })?
@@ -239,7 +239,7 @@ impl WorkbookProtectionCollector {
         Self::default()
     }
 
-    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
+    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> Result<()> {
         match record_type {
             PROTECT_TYPE => {
                 if self.protect {
@@ -274,7 +274,7 @@ impl WorkbookProtectionCollector {
                     return Err(duplicate(record_type));
                 }
                 if self.previous != Some(PROT4REV_TYPE) {
-                    return Err(XlsError::InvalidRecord {
+                    return Err(Error::InvalidRecord {
                         record_type,
                         message: "PROT4REVPASS must immediately follow PROT4REV".into(),
                     });
@@ -282,7 +282,7 @@ impl WorkbookProtectionCollector {
                 self.rev_pass = true;
                 self.value.revision_password = parse_verifier(data)?;
                 if !self.value.revisions_protected && self.value.revision_password.is_set() {
-                    return Err(XlsError::InvalidRecord {
+                    return Err(Error::InvalidRecord {
                         record_type,
                         message: "revision verifier must be zero when protection is disabled"
                             .into(),
@@ -294,7 +294,7 @@ impl WorkbookProtectionCollector {
                     return Err(duplicate(record_type));
                 }
                 if !data.is_empty() {
-                    return Err(XlsError::InvalidLength {
+                    return Err(Error::InvalidLength {
                         expected: 0,
                         found: data.len(),
                     });
@@ -315,9 +315,9 @@ impl WorkbookProtectionCollector {
         Ok(())
     }
 
-    pub(crate) fn finish(&self) -> XlsResult<WorkbookProtection> {
+    pub(crate) fn finish(&self) -> Result<WorkbookProtection> {
         if self.rev != self.rev_pass {
-            return Err(XlsError::InvalidRecord {
+            return Err(Error::InvalidRecord {
                 record_type: PROT4REVPASS_TYPE,
                 message: "PROT4REV and PROT4REVPASS must occur as a pair".into(),
             });
@@ -340,7 +340,7 @@ impl SheetProtectionCollector {
         Self::default()
     }
 
-    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
+    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> Result<()> {
         match record_type {
             PROTECT_TYPE => {
                 if self.protect {
@@ -348,7 +348,7 @@ impl SheetProtectionCollector {
                 }
                 self.protect = true;
                 if !parse_bool(record_type, data)? {
-                    return Err(XlsError::InvalidRecord {
+                    return Err(Error::InvalidRecord {
                         record_type,
                         message: "sheet PROTECT must be 1".into(),
                     });
@@ -361,7 +361,7 @@ impl SheetProtectionCollector {
                 }
                 self.object = true;
                 if !parse_bool(record_type, data)? {
-                    return Err(XlsError::InvalidRecord {
+                    return Err(Error::InvalidRecord {
                         record_type,
                         message: "OBJPROTECT must be 1".into(),
                     });
@@ -382,7 +382,7 @@ impl SheetProtectionCollector {
                 self.password = true;
                 let verifier = parse_verifier(data)?;
                 if !verifier.is_set() {
-                    return Err(XlsError::InvalidRecord {
+                    return Err(Error::InvalidRecord {
                         record_type,
                         message: "sheet verifier must not be zero".into(),
                     });
@@ -394,9 +394,9 @@ impl SheetProtectionCollector {
         Ok(())
     }
 
-    pub(crate) fn finish(&self) -> XlsResult<SheetProtection> {
+    pub(crate) fn finish(&self) -> Result<SheetProtection> {
         if !self.protect && (self.object || self.scenario || self.password) {
-            return Err(XlsError::InvalidRecord {
+            return Err(Error::InvalidRecord {
                 record_type: PROTECT_TYPE,
                 message: "sheet protection metadata exists without PROTECT".into(),
             });

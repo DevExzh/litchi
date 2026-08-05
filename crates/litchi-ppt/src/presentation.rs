@@ -1,26 +1,26 @@
-use super::document_properties::PowerPoint12DocumentProperties;
+use super::document_properties::DocumentProperties12;
 use super::embedded::object::Collection as OleCollection;
 use super::embedded::storage::{Kind as StorageKind, Ref as StorageRef, Storage};
 use super::encryption::decrypt_pictures;
 use super::encryption::decrypt_powerpoint_document;
 use super::external_media::Collection as MediaCollection;
 use super::header_footer::{
-    PowerPointHeaderFooterDisplayText, PowerPointHeaderFooterParent,
-    PowerPointHeaderFooterParentOrdinal, PowerPointHeaderFooterScope, PowerPointHeaderFooters,
+    HeaderFooterDisplayText, HeaderFooterParent, HeaderFooterParentOrdinal, HeaderFooterScope,
+    HeaderFooters,
 };
 use super::hyperlink::Hyperlinks;
-use super::main_master::PowerPoint12MainMasterMetadata;
-use super::non_zoom_view::PowerPointOutlineSorterViewInformation;
+use super::main_master::MainMasterMetadata12;
+use super::non_zoom_view::OutlineSorterViewInformation;
 /// High-performance Presentation API with zero-copy slide parsing.
-use super::package::{PptError, PptOpenOptions, Result};
-use super::parsers::PptRecordParser;
+use super::package::{Error, OpenOptions, Result};
+use super::parsers::RecordParser;
 use super::persist::PersistMapping;
-use super::records::PptRecord;
+use super::records::Record;
 use super::routing_slip::Slip;
 use super::slide::{ParsedComment, Slide, SlideDirectory, SlideFactory};
 use super::sound_collection::Collection;
-use super::view_info::PowerPointSlideViewInformation;
-use crate::consts::PptRecordType;
+use super::view_info::SlideViewInformation;
+use crate::consts::RecordType;
 use litchi_cfb::OleFile;
 use litchi_odraw::image::{File as ImageFile, Id as ImageId, Store as ImageStore};
 use std::io::{Cursor, Read, Seek};
@@ -53,7 +53,7 @@ pub struct Presentation {
     powerpoint_document: Vec<u8>,
     /// Parsed record structure (reserved for future advanced parsing)
     #[allow(dead_code)]
-    pub(crate) parser: PptRecordParser,
+    pub(crate) parser: RecordParser,
     /// Persist ID to offset mapping
     pub(crate) persist_mapping: PersistMapping,
     slide_directory: SlideDirectory,
@@ -86,13 +86,13 @@ fn drawing_textboxes(data: &[u8]) -> Result<Vec<litchi_odraw::Record<'_>>> {
 impl Presentation {
     /// Create a new Presentation from an OLE file.
     pub(crate) fn from_ole<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Self> {
-        Self::from_ole_with_options(ole, PptOpenOptions::default())
+        Self::from_ole_with_options(ole, OpenOptions::default())
     }
 
     /// Create a new Presentation from an OLE file with password-to-open options.
     pub(crate) fn from_ole_with_options<R: Read + Seek>(
         ole: &mut OleFile<R>,
-        options: PptOpenOptions<'_>,
+        options: OpenOptions<'_>,
     ) -> Result<Self> {
         // Read the PowerPoint Document stream
         let mut powerpoint_document = Self::read_powerpoint_document(ole)?;
@@ -107,7 +107,7 @@ impl Presentation {
         )?;
 
         // Parse document structure
-        let mut parser = PptRecordParser::new();
+        let mut parser = RecordParser::new();
         if let Some(encrypted) = &encrypted {
             parser.parse_document_at_offsets(&powerpoint_document, &encrypted.live_offsets)?;
         } else {
@@ -126,7 +126,7 @@ impl Presentation {
         }
         let current_user_data = current_user_data
             .as_deref()
-            .ok_or_else(|| PptError::StreamNotFound("Current User".to_string()))?;
+            .ok_or_else(|| Error::StreamNotFound("Current User".to_string()))?;
         let slide_directory =
             SlideDirectory::build(&powerpoint_document, current_user_data, &persist_mapping)?;
 
@@ -161,7 +161,7 @@ impl Presentation {
             return Ok(data);
         }
 
-        Err(PptError::InvalidFormat(
+        Err(Error::InvalidFormat(
             "PowerPoint Document stream not found".to_string(),
         ))
     }
@@ -205,12 +205,12 @@ impl Presentation {
     /// The returned values follow the main-master order in the PowerPoint document stream.
     /// Embedded ECMA-376 packages are validated but remain inert; no external resources or
     /// executable content are activated.
-    pub fn powerpoint12_main_master_metadata(&self) -> Result<Vec<PowerPoint12MainMasterMetadata>> {
+    pub fn powerpoint12_main_master_metadata(&self) -> Result<Vec<MainMasterMetadata12>> {
         self.parser
             .find_records_ref()
             .into_iter()
-            .filter(|record| record.record_type == PptRecordType::MainMaster)
-            .map(PowerPoint12MainMasterMetadata::parse)
+            .filter(|record| record.record_type == RecordType::MainMaster)
+            .map(MainMasterMetadata12::parse)
             .collect()
     }
 
@@ -220,22 +220,22 @@ impl Presentation {
     ///
     /// Tag payloads are inert: they are parsed and preserved, never executed,
     /// loaded, or resolved. Use
-    /// [`crate::PowerPointProgTags::slide_extensions`] to decode the
+    /// [`crate::ProgTags::slide_extensions`] to decode the
     /// versioned binary-tag payloads into typed extension structs.
-    pub fn main_master_programmable_tags(&self) -> Result<Vec<crate::PowerPointProgTags>> {
-        self.main_master_programmable_tags_with_limits(crate::PowerPointProgTagLimits::default())
+    pub fn main_master_programmable_tags(&self) -> Result<Vec<crate::ProgTags>> {
+        self.main_master_programmable_tags_with_limits(crate::ProgTagLimits::default())
     }
 
     /// Return main-master programmable tags with caller-supplied resource limits.
     pub fn main_master_programmable_tags_with_limits(
         &self,
-        limits: crate::PowerPointProgTagLimits,
-    ) -> Result<Vec<crate::PowerPointProgTags>> {
+        limits: crate::ProgTagLimits,
+    ) -> Result<Vec<crate::ProgTags>> {
         self.parser
             .find_records_ref()
             .into_iter()
-            .filter(|record| record.record_type == PptRecordType::MainMaster)
-            .filter_map(|record| crate::PowerPointProgTags::parse_slide(record, limits).transpose())
+            .filter(|record| record.record_type == RecordType::MainMaster)
+            .filter_map(|record| crate::ProgTags::parse_slide(record, limits).transpose())
             .collect()
     }
 
@@ -247,23 +247,23 @@ impl Presentation {
     /// both from outline text bodies and from the Escher text boxes of slide,
     /// notes, and master drawing groups. They are inert: placeholders are
     /// never substituted, formatted, or laid out.
-    pub fn text_metachars(&self) -> Result<Vec<crate::text_metachar::PowerPointTextMetachar>> {
-        use crate::text_metachar::PowerPointTextMetachar;
+    pub fn text_metachars(&self) -> Result<Vec<crate::text_metachar::TextMetachar>> {
+        use crate::text_metachar::TextMetachar;
 
-        fn collect(record: &PptRecord, out: &mut Vec<PowerPointTextMetachar>) -> Result<()> {
-            if record.record_type == PptRecordType::PPDrawing {
+        fn collect(record: &Record, out: &mut Vec<TextMetachar>) -> Result<()> {
+            if record.record_type == RecordType::PPDrawing {
                 for textbox in drawing_textboxes(&record.data)? {
                     let wrapper = crate::EscherTextboxWrapper::new(textbox.data().to_vec())?;
                     out.extend_from_slice(wrapper.metachars());
                 }
             } else if matches!(
                 record.record_type,
-                PptRecordType::SlideNumberMCAtom
-                    | PptRecordType::GenericDateMCAtom
-                    | PptRecordType::HeaderMCAtom
-                    | PptRecordType::FooterMCAtom
-                    | PptRecordType::DateTimeMCAtom
-                    | PptRecordType::RtfDateTimeMCAtom
+                RecordType::SlideNumberMCAtom
+                    | RecordType::GenericDateMCAtom
+                    | RecordType::HeaderMCAtom
+                    | RecordType::FooterMCAtom
+                    | RecordType::DateTimeMCAtom
+                    | RecordType::RtfDateTimeMCAtom
             ) {
                 out.extend(crate::text_metachar::metachars_from_records([record])?);
             }
@@ -280,13 +280,10 @@ impl Presentation {
     /// The normal three-pane view's splitter state (`NormalViewSetInfo9`,
     /// MS-PPT 2.4.21.2), when the document declares one. Files with multiple
     /// top-level Document containers yield the first occurrence.
-    pub fn normal_view_set_info(
-        &self,
-    ) -> Result<Option<crate::view_set_info::PowerPointNormalViewSet>> {
+    pub fn normal_view_set_info(&self) -> Result<Option<crate::view_set_info::NormalViewSet>> {
         for record in self.parser.find_records_ref() {
-            if record.record_type == PptRecordType::NormalViewSetInfo9 {
-                return crate::view_set_info::PowerPointNormalViewSet::parse_record(record)
-                    .map(Some);
+            if record.record_type == RecordType::NormalViewSetInfo9 {
+                return crate::view_set_info::NormalViewSet::parse_record(record).map(Some);
             }
         }
         Ok(None)
@@ -295,13 +292,10 @@ impl Presentation {
     /// The notes-text view's scaling state (`NotesTextViewInfo9`, MS-PPT
     /// 2.4.21.4), when the document declares one. Files with multiple
     /// top-level Document containers yield the first occurrence.
-    pub fn notes_text_view_info(
-        &self,
-    ) -> Result<Option<crate::view_set_info::PowerPointNotesTextViewInfo>> {
+    pub fn notes_text_view_info(&self) -> Result<Option<crate::view_set_info::NotesTextViewInfo>> {
         for record in self.parser.find_records_ref() {
-            if record.record_type == PptRecordType::NotesTextViewInfo9 {
-                return crate::view_set_info::PowerPointNotesTextViewInfo::parse_record(record)
-                    .map(Some);
+            if record.record_type == RecordType::NotesTextViewInfo9 {
+                return crate::view_set_info::NotesTextViewInfo::parse_record(record).map(Some);
             }
         }
         Ok(None)
@@ -311,13 +305,11 @@ impl Presentation {
     /// (`TextSIExceptionAtom`, MS-PPT 2.9.31), when declared.
     pub fn text_special_info_defaults(
         &self,
-    ) -> Result<Option<crate::text_si_exception::PowerPointTextSpecialInfoDefaults>> {
+    ) -> Result<Option<crate::text_si_exception::TextSpecialInfoDefaults>> {
         for record in self.parser.find_records_ref() {
-            if record.record_type == PptRecordType::TextSpecialInfoDefaultAtom {
-                return crate::text_si_exception::PowerPointTextSpecialInfoDefaults::parse_record(
-                    record,
-                )
-                .map(Some);
+            if record.record_type == RecordType::TextSpecialInfoDefaultAtom {
+                return crate::text_si_exception::TextSpecialInfoDefaults::parse_record(record)
+                    .map(Some);
             }
         }
         Ok(None)
@@ -329,17 +321,17 @@ impl Presentation {
     /// The atoms tie shape text boxes to outline text bodies and mostly live
     /// in the Escher text boxes of slide shapes, so they are collected both
     /// from the record tree and from every drawing-group text box.
-    pub fn outline_text_refs(&self) -> Result<Vec<crate::PowerPointOutlineTextRef>> {
-        use crate::PowerPointOutlineTextRef;
+    pub fn outline_text_refs(&self) -> Result<Vec<crate::OutlineTextRef>> {
+        use crate::OutlineTextRef;
 
-        fn collect(record: &PptRecord, out: &mut Vec<PowerPointOutlineTextRef>) -> Result<()> {
-            if record.record_type == PptRecordType::PPDrawing {
+        fn collect(record: &Record, out: &mut Vec<OutlineTextRef>) -> Result<()> {
+            if record.record_type == RecordType::PPDrawing {
                 for textbox in drawing_textboxes(&record.data)? {
                     let wrapper = crate::EscherTextboxWrapper::new(textbox.data().to_vec())?;
                     out.extend_from_slice(wrapper.outline_text_refs());
                 }
-            } else if record.record_type == PptRecordType::OutlineTextRefAtom {
-                out.push(PowerPointOutlineTextRef::parse_record(record)?);
+            } else if record.record_type == RecordType::OutlineTextRefAtom {
+                out.push(OutlineTextRef::parse_record(record)?);
             }
             Ok(())
         }
@@ -352,21 +344,21 @@ impl Presentation {
     }
 
     /// Parse document-level PowerPoint 12 settings and round-trip metadata.
-    pub fn powerpoint12_document_properties(&self) -> Result<PowerPoint12DocumentProperties> {
+    pub fn powerpoint12_document_properties(&self) -> Result<DocumentProperties12> {
         let mut documents = self
             .parser
             .find_records_ref()
             .into_iter()
-            .filter(|record| record.record_type == PptRecordType::Document);
+            .filter(|record| record.record_type == RecordType::Document);
         let document = documents.next().ok_or_else(|| {
-            PptError::Corrupted("PowerPoint document has no Document container".to_string())
+            Error::Corrupted("PowerPoint document has no Document container".to_string())
         })?;
         if documents.next().is_some() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "PowerPoint document has multiple Document containers".to_string(),
             ));
         }
-        PowerPoint12DocumentProperties::parse(document)
+        DocumentProperties12::parse(document)
     }
 
     /// Return the document routing-slip metadata, when present.
@@ -377,24 +369,24 @@ impl Presentation {
         let records = self.parser.find_records_ref();
         let mut documents = records
             .into_iter()
-            .filter(|record| record.record_type == PptRecordType::Document);
+            .filter(|record| record.record_type == RecordType::Document);
         let document = documents.next().ok_or_else(|| {
-            PptError::Corrupted("PowerPoint document has no Document container".to_string())
+            Error::Corrupted("PowerPoint document has no Document container".to_string())
         })?;
         if documents.next().is_some() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "PowerPoint document has multiple Document containers".to_string(),
             ));
         }
         let mut records = document
             .children
             .iter()
-            .filter(|record| record.record_type == PptRecordType::DocRoutingSlipAtom);
+            .filter(|record| record.record_type == RecordType::DocRoutingSlipAtom);
         let Some(record) = records.next() else {
             return Ok(None);
         };
         if records.next().is_some() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "PowerPoint document has multiple routing slips".to_string(),
             ));
         }
@@ -409,24 +401,24 @@ impl Presentation {
         let records = self.parser.find_records_ref();
         let mut documents = records
             .into_iter()
-            .filter(|record| record.record_type == PptRecordType::Document);
+            .filter(|record| record.record_type == RecordType::Document);
         let document = documents.next().ok_or_else(|| {
-            PptError::Corrupted("PowerPoint document has no Document container".to_string())
+            Error::Corrupted("PowerPoint document has no Document container".to_string())
         })?;
         if documents.next().is_some() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "PowerPoint document has multiple Document containers".to_string(),
             ));
         }
         let mut collections = document
             .children
             .iter()
-            .filter(|record| record.record_type == PptRecordType::SoundCollection);
+            .filter(|record| record.record_type == RecordType::SoundCollection);
         let Some(collection) = collections.next() else {
             return Ok(None);
         };
         if collections.next().is_some() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "PowerPoint document has multiple SoundCollection containers".to_string(),
             ));
         }
@@ -444,7 +436,7 @@ impl Presentation {
                 return Ok(());
             }
             let sounds = sounds.as_ref().ok_or_else(|| {
-                PptError::Corrupted(
+                Error::Corrupted(
                     "interaction references a sound but the document has no SoundCollection"
                         .to_string(),
                 )
@@ -479,12 +471,12 @@ impl Presentation {
         let records = self.parser.find_records_ref();
         let mut documents = records
             .into_iter()
-            .filter(|record| record.record_type == PptRecordType::Document);
+            .filter(|record| record.record_type == RecordType::Document);
         let document = documents.next().ok_or_else(|| {
-            PptError::Corrupted("PowerPoint document has no Document container".to_string())
+            Error::Corrupted("PowerPoint document has no Document container".to_string())
         })?;
         if documents.next().is_some() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "PowerPoint document has multiple Document containers".to_string(),
             ));
         }
@@ -510,12 +502,12 @@ impl Presentation {
         let records = self.parser.find_records_ref();
         let mut documents = records
             .into_iter()
-            .filter(|record| record.record_type == PptRecordType::Document);
+            .filter(|record| record.record_type == RecordType::Document);
         let document = documents.next().ok_or_else(|| {
-            PptError::Corrupted("PowerPoint document has no Document container".to_string())
+            Error::Corrupted("PowerPoint document has no Document container".to_string())
         })?;
         if documents.next().is_some() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "PowerPoint document has multiple Document containers".to_string(),
             ));
         }
@@ -537,10 +529,10 @@ impl Presentation {
             return Ok(None);
         };
         let offset = usize::try_from(offset)
-            .map_err(|_| PptError::Corrupted("OLE storage offset exceeds usize".to_string()))?;
-        let (record, _) = PptRecord::parse(&self.powerpoint_document, offset)?;
-        if record.record_type != PptRecordType::ExternalOleObjectStg {
-            return Err(PptError::Corrupted(format!(
+            .map_err(|_| Error::Corrupted("OLE storage offset exceeds usize".to_string()))?;
+        let (record, _) = Record::parse(&self.powerpoint_document, offset)?;
+        if record.record_type != RecordType::ExternalOleObjectStg {
+            return Err(Error::Corrupted(format!(
                 "persist ID {persist_id} does not reference ExOleObjStg"
             )));
         }
@@ -567,16 +559,16 @@ impl Presentation {
     ///
     /// Incrementally saved presentations can hold several `DocumentContainer`
     /// records; only the one referenced by the current `UserEditAtom` is live.
-    pub(crate) fn live_document_record(&self) -> Result<PptRecord> {
+    pub(crate) fn live_document_record(&self) -> Result<Record> {
         let persist_id = self.slide_directory.document_persist_id();
         let offset = self.persist_mapping.get_offset(persist_id).ok_or_else(|| {
-            PptError::Corrupted(format!("document persist ID {persist_id} has no mapping"))
+            Error::Corrupted(format!("document persist ID {persist_id} has no mapping"))
         })?;
         let offset = usize::try_from(offset)
-            .map_err(|_| PptError::Corrupted("document offset exceeds usize".to_string()))?;
-        let (record, _) = PptRecord::parse(&self.powerpoint_document, offset)?;
-        if record.record_type != PptRecordType::Document {
-            return Err(PptError::Corrupted(
+            .map_err(|_| Error::Corrupted("document offset exceeds usize".to_string()))?;
+        let (record, _) = Record::parse(&self.powerpoint_document, offset)?;
+        if record.record_type != RecordType::Document {
+            return Err(Error::Corrupted(
                 "document persist ID does not resolve to a DocumentContainer".to_string(),
             ));
         }
@@ -587,24 +579,21 @@ impl Presentation {
     ///
     /// Macro bytes are not returned, decompressed, interpreted, or executed.
     /// A non-null persist reference must resolve to a `VbaProjectStg` record.
-    pub fn vba_project_storage(&self) -> Result<Option<crate::PowerPointVbaProjectStorage>> {
+    pub fn vba_project_storage(&self) -> Result<Option<crate::VbaProjectStorage>> {
         let records = self.parser.find_records_ref();
-        let Some(info) = crate::PowerPointVbaInfo::parse_records(&records)? else {
+        let Some(info) = crate::VbaInfo::parse_records(&records)? else {
             return Ok(None);
         };
         let storage = self.resolve_vba_storage(info)?;
-        crate::PowerPointVbaProjectStorage::from_info_and_metadata(
-            info,
-            storage.map(StorageRef::metadata),
-        )
-        .map(Some)
+        crate::VbaProjectStorage::from_info_and_metadata(info, storage.map(StorageRef::metadata))
+            .map(Some)
     }
 
     /// Return validated inert `VBAInfoAtom` metadata for the document.
     ///
     /// For richer outer-storage metadata without exposing VBA payload bytes,
     /// use [`Self::vba_project_storage`].
-    pub fn vba_info(&self) -> Result<Option<crate::PowerPointVbaInfo>> {
+    pub fn vba_info(&self) -> Result<Option<crate::VbaInfo>> {
         Ok(self.vba_project_storage()?.map(|storage| storage.info()))
     }
 
@@ -615,9 +604,8 @@ impl Presentation {
     /// [`Self::vba_with`] to supply custom ceilings.
     pub fn vba(
         &self,
-    ) -> std::result::Result<Option<litchi_vba::project::Project>, crate::PowerPointVbaProjectError>
-    {
-        self.vba_with(&crate::PowerPointVbaProjectLimits::default())
+    ) -> std::result::Result<Option<litchi_vba::project::Project>, crate::VbaProjectError> {
+        self.vba_with(&crate::VbaProjectLimits::default())
     }
 
     /// Parse the embedded MS-OVBA project with explicit resource limits.
@@ -626,15 +614,14 @@ impl Presentation {
     /// before any VBA payload is copied or decompressed.
     pub fn vba_with(
         &self,
-        limits: &crate::PowerPointVbaProjectLimits,
-    ) -> std::result::Result<Option<litchi_vba::project::Project>, crate::PowerPointVbaProjectError>
-    {
+        limits: &crate::VbaProjectLimits,
+    ) -> std::result::Result<Option<litchi_vba::project::Project>, crate::VbaProjectError> {
         let records = self.parser.find_records_ref();
-        let Some(info) = crate::PowerPointVbaInfo::parse_records(&records)? else {
+        let Some(info) = crate::VbaInfo::parse_records(&records)? else {
             return Ok(None);
         };
         let storage = self.resolve_vba_storage(info)?;
-        let summary = crate::PowerPointVbaProjectStorage::from_info_and_metadata(
+        let summary = crate::VbaProjectStorage::from_info_and_metadata(
             info,
             storage.map(StorageRef::metadata),
         )?;
@@ -642,7 +629,7 @@ impl Presentation {
             return Ok(None);
         }
         let Some(storage) = storage else {
-            return Err(PptError::Corrupted(format!(
+            return Err(Error::Corrupted(format!(
                 "VBAInfoAtom persist ID {} has no storage record",
                 summary.persist_id_ref()
             ))
@@ -652,16 +639,13 @@ impl Presentation {
         let cfb = storage.decompressed_bytes(limits.max_cfb_bytes)?;
         let mut ole = OleFile::open(Cursor::new(cfb.as_ref()))
             .map_err(litchi_vba::Error::from)
-            .map_err(crate::PowerPointVbaProjectError::from)?;
+            .map_err(crate::VbaProjectError::from)?;
         litchi_vba::project::Project::open(&mut ole, &[], &limits.project)
             .map(Some)
             .map_err(Into::into)
     }
 
-    fn resolve_vba_storage(
-        &self,
-        info: crate::PowerPointVbaInfo,
-    ) -> Result<Option<StorageRef<'_>>> {
+    fn resolve_vba_storage(&self, info: crate::VbaInfo) -> Result<Option<StorageRef<'_>>> {
         if info.persist_id_ref == 0 {
             return Ok(None);
         }
@@ -669,13 +653,13 @@ impl Presentation {
             .persist_mapping
             .get_offset(info.persist_id_ref)
             .ok_or_else(|| {
-                PptError::Corrupted(format!(
+                Error::Corrupted(format!(
                     "VBAInfoAtom persist ID {} has no storage record",
                     info.persist_id_ref
                 ))
             })?;
         let offset = usize::try_from(offset)
-            .map_err(|_| PptError::Corrupted("VBA storage offset exceeds usize".to_string()))?;
+            .map_err(|_| Error::Corrupted("VBA storage offset exceeds usize".to_string()))?;
         StorageRef::parse_at(&self.powerpoint_document, offset, StorageKind::VbaProject).map(Some)
     }
 
@@ -684,77 +668,77 @@ impl Presentation {
     /// The returned value redacts its secret from `Debug`; callers must use an
     /// explicitly named accessor to inspect it. This method does not decrypt
     /// the presentation or grant modification access.
-    pub fn modify_password(&self) -> Result<Option<crate::PowerPointModifyPassword>> {
+    pub fn modify_password(&self) -> Result<Option<crate::ModifyPassword>> {
         let records = self.parser.find_records_ref();
         let mut documents = records
             .into_iter()
-            .filter(|record| record.record_type == PptRecordType::Document);
+            .filter(|record| record.record_type == RecordType::Document);
         let document = documents.next().ok_or_else(|| {
-            PptError::Corrupted("PowerPoint document has no Document container".to_string())
+            Error::Corrupted("PowerPoint document has no Document container".to_string())
         })?;
         if documents.next().is_some() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "PowerPoint document has multiple Document containers".to_string(),
             ));
         }
-        crate::PowerPointModifyPassword::parse_document(document)
+        crate::ModifyPassword::parse_document(document)
     }
 
     /// Return the inert PowerPoint 10 privacy preference, if present.
     ///
     /// This accessor never removes document metadata or rewrites the file.
-    pub fn privacy_settings(&self) -> Result<Option<crate::PowerPointPrivacySettings>> {
+    pub fn privacy_settings(&self) -> Result<Option<crate::PrivacySettings>> {
         let records = self.parser.find_records_ref();
         let mut documents = records
             .into_iter()
-            .filter(|record| record.record_type == PptRecordType::Document);
+            .filter(|record| record.record_type == RecordType::Document);
         let document = documents.next().ok_or_else(|| {
-            PptError::Corrupted("PowerPoint document has no Document container".to_string())
+            Error::Corrupted("PowerPoint document has no Document container".to_string())
         })?;
         if documents.next().is_some() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "PowerPoint document has multiple Document containers".to_string(),
             ));
         }
-        crate::PowerPointPrivacySettings::parse_document(document)
+        crate::PrivacySettings::parse_document(document)
     }
 
     /// Return typed PowerPoint 9 Presentation Advisor warning preferences.
     pub fn presentation_advisor_settings(
         &self,
-    ) -> Result<Option<crate::PowerPointPresentationAdvisorSettings>> {
+    ) -> Result<Option<crate::PresentationAdvisorSettings>> {
         let records = self.parser.find_records_ref();
         let mut documents = records
             .into_iter()
-            .filter(|record| record.record_type == PptRecordType::Document);
+            .filter(|record| record.record_type == RecordType::Document);
         let document = documents.next().ok_or_else(|| {
-            PptError::Corrupted("PowerPoint document has no Document container".to_string())
+            Error::Corrupted("PowerPoint document has no Document container".to_string())
         })?;
         if documents.next().is_some() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "PowerPoint document has multiple Document containers".to_string(),
             ));
         }
-        crate::PowerPointPresentationAdvisorSettings::parse_document(document)
+        crate::PresentationAdvisorSettings::parse_document(document)
     }
 
     /// Return typed PowerPoint 9 Web-document publishing preferences.
     ///
     /// This accessor never writes files, invokes a browser, or exports content.
-    pub fn html_document_settings(&self) -> Result<Option<crate::PowerPointHtmlDocumentSettings>> {
+    pub fn html_document_settings(&self) -> Result<Option<crate::HtmlDocumentSettings>> {
         let records = self.parser.find_records_ref();
         let mut documents = records
             .into_iter()
-            .filter(|record| record.record_type == PptRecordType::Document);
+            .filter(|record| record.record_type == RecordType::Document);
         let document = documents.next().ok_or_else(|| {
-            PptError::Corrupted("PowerPoint document has no Document container".to_string())
+            Error::Corrupted("PowerPoint document has no Document container".to_string())
         })?;
         if documents.next().is_some() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "PowerPoint document has multiple Document containers".to_string(),
             ));
         }
-        crate::PowerPointHtmlDocumentSettings::parse_document(document)
+        crate::HtmlDocumentSettings::parse_document(document)
     }
 
     /// Return inert PowerPoint 9 Web-publication metadata, if present.
@@ -762,77 +746,77 @@ impl Presentation {
     /// Named-show references are cross-validated against the presentation's
     /// named-show table. This accessor never writes files, resolves a URI,
     /// invokes a browser, or exports presentation content.
-    pub fn html_publish_settings(&self) -> Result<Option<crate::PowerPointHtmlPublishSettings>> {
+    pub fn html_publish_settings(&self) -> Result<Option<crate::HtmlPublishSettings>> {
         let records = self.parser.find_records_ref();
         let mut documents = records
             .into_iter()
-            .filter(|record| record.record_type == PptRecordType::Document);
+            .filter(|record| record.record_type == RecordType::Document);
         let document = documents.next().ok_or_else(|| {
-            PptError::Corrupted("PowerPoint document has no Document container".to_string())
+            Error::Corrupted("PowerPoint document has no Document container".to_string())
         })?;
         if documents.next().is_some() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "PowerPoint document has multiple Document containers".to_string(),
             ));
         }
-        crate::PowerPointHtmlPublishSettings::parse_document(document)
+        crate::HtmlPublishSettings::parse_document(document)
     }
 
     /// Return all inert PowerPoint 9 presentation-broadcast descriptions.
     ///
     /// This accessor never contacts a server, opens a URL or ASD file, sends
     /// mail, records media, or starts a broadcast.
-    pub fn broadcasts(&self) -> Result<crate::PowerPointBroadcasts> {
+    pub fn broadcasts(&self) -> Result<crate::Broadcasts> {
         let records = self.parser.find_records_ref();
         let mut documents = records
             .into_iter()
-            .filter(|record| record.record_type == PptRecordType::Document);
+            .filter(|record| record.record_type == RecordType::Document);
         let document = documents.next().ok_or_else(|| {
-            PptError::Corrupted("PowerPoint document has no Document container".to_string())
+            Error::Corrupted("PowerPoint document has no Document container".to_string())
         })?;
         if documents.next().is_some() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "PowerPoint document has multiple Document containers".to_string(),
             ));
         }
-        crate::PowerPointBroadcasts::parse_document(document)
+        crate::Broadcasts::parse_document(document)
     }
 
     /// Return the structurally decoded, inert PowerPoint 9 mail envelope.
     ///
     /// This accessor never sends mail, invokes a mail client, opens an
     /// attachment, or evaluates attachment bytes.
-    pub fn envelope_data(&self) -> Result<Option<crate::PowerPointEnvelopeData>> {
+    pub fn envelope_data(&self) -> Result<Option<crate::EnvelopeData>> {
         let records = self.parser.find_records_ref();
         let mut documents = records
             .into_iter()
-            .filter(|record| record.record_type == PptRecordType::Document);
+            .filter(|record| record.record_type == RecordType::Document);
         let document = documents.next().ok_or_else(|| {
-            PptError::Corrupted("PowerPoint document has no Document container".to_string())
+            Error::Corrupted("PowerPoint document has no Document container".to_string())
         })?;
         if documents.next().is_some() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "PowerPoint document has multiple Document containers".to_string(),
             ));
         }
-        crate::PowerPointEnvelopeData::parse_document(document)
+        crate::EnvelopeData::parse_document(document)
     }
 
     /// Validate and expose the specification-defined terminal document records.
-    pub fn document_structure(&self) -> Result<crate::PowerPointDocumentStructure> {
+    pub fn document_structure(&self) -> Result<crate::DocumentStructure> {
         let records = self.parser.find_records_ref();
         let mut documents = records
             .into_iter()
-            .filter(|record| record.record_type == PptRecordType::Document);
+            .filter(|record| record.record_type == RecordType::Document);
         let document = documents.next().ok_or_else(|| {
-            PptError::Corrupted("PowerPoint document has no Document container".to_string())
+            Error::Corrupted("PowerPoint document has no Document container".to_string())
         })?;
         if documents.next().is_some() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "PowerPoint document has multiple Document containers".to_string(),
             ));
         }
-        crate::PowerPointDocumentStructure::parse(document)
+        crate::DocumentStructure::parse(document)
     }
 
     /// Return the document-wide `DocumentAtom` (MS-PPT 2.4.2), if present.
@@ -841,12 +825,12 @@ impl Presentation {
     /// flags are inert metadata: no persist object is resolved and nothing is
     /// rendered. Files with multiple top-level Document containers yield the
     /// first occurrence.
-    pub fn document_atom(&self) -> Result<Option<crate::PowerPointDocumentAtom>> {
+    pub fn document_atom(&self) -> Result<Option<crate::DocumentAtom>> {
         for record in self.parser.find_records_ref() {
-            if record.record_type == PptRecordType::Document
-                && let Some(atom) = record.find_child(PptRecordType::DocumentAtom)
+            if record.record_type == RecordType::Document
+                && let Some(atom) = record.find_child(RecordType::DocumentAtom)
             {
-                return crate::PowerPointDocumentAtom::parse(atom).map(Some);
+                return crate::DocumentAtom::parse(atom).map(Some);
             }
         }
         Ok(None)
@@ -857,17 +841,17 @@ impl Presentation {
     ///
     /// The colors are inert display metadata: nothing is rendered, resolved
     /// against a theme, or applied to shapes.
-    pub fn color_schemes(&self) -> Result<Vec<crate::PowerPointColorSchemeAtom>> {
+    pub fn color_schemes(&self) -> Result<Vec<crate::ColorSchemeAtom>> {
         let mut schemes = Vec::new();
         for record in self.parser.find_records_ref() {
             if matches!(
                 record.record_type,
-                PptRecordType::Slide
-                    | PptRecordType::Notes
-                    | PptRecordType::MainMaster
-                    | PptRecordType::Handout
+                RecordType::Slide
+                    | RecordType::Notes
+                    | RecordType::MainMaster
+                    | RecordType::Handout
             ) {
-                schemes.extend(crate::PowerPointColorSchemeAtom::collect(record)?);
+                schemes.extend(crate::ColorSchemeAtom::collect(record)?);
             }
         }
         Ok(schemes)
@@ -877,40 +861,40 @@ impl Presentation {
     ///
     /// This accessor never sends mail, invokes a mail client, or interprets the
     /// associated envelope payload.
-    pub fn envelope_settings(&self) -> Result<Option<crate::PowerPointEnvelopeSettings>> {
+    pub fn envelope_settings(&self) -> Result<Option<crate::EnvelopeSettings>> {
         let records = self.parser.find_records_ref();
         let mut documents = records
             .into_iter()
-            .filter(|record| record.record_type == PptRecordType::Document);
+            .filter(|record| record.record_type == RecordType::Document);
         let document = documents.next().ok_or_else(|| {
-            PptError::Corrupted("PowerPoint document has no Document container".to_string())
+            Error::Corrupted("PowerPoint document has no Document container".to_string())
         })?;
         if documents.next().is_some() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "PowerPoint document has multiple Document containers".to_string(),
             ));
         }
-        crate::PowerPointEnvelopeSettings::parse_document(document)
+        crate::EnvelopeSettings::parse_document(document)
     }
 
     /// Return strictly validated header/footer metadata from all specification-defined scopes.
     ///
     /// Date identifiers and text remain inert metadata. This method does not format dates,
     /// execute content, resolve resources, or modify the underlying OLE file.
-    pub fn header_footers(&self) -> Result<PowerPointHeaderFooters> {
+    pub fn header_footers(&self) -> Result<HeaderFooters> {
         let records = self.parser.find_records_ref();
-        let mut values = PowerPointHeaderFooters::parse_record_tree(&records)?;
+        let mut values = HeaderFooters::parse_record_tree(&records)?;
 
         let mut first_master_display = None;
         for (master_ordinal, master) in records
             .iter()
-            .filter(|record| record.record_type == PptRecordType::MainMaster)
+            .filter(|record| record.record_type == RecordType::MainMaster)
             .enumerate()
         {
             if let Some(display) = placeholder_display_from_record(master)? {
-                let scope = PowerPointHeaderFooterScope::Local {
-                    parent: PowerPointHeaderFooterParent::MainMaster,
-                    parent_ordinal: PowerPointHeaderFooterParentOrdinal::new(master_ordinal),
+                let scope = HeaderFooterScope::Local {
+                    parent: HeaderFooterParent::MainMaster,
+                    parent_ordinal: HeaderFooterParentOrdinal::new(master_ordinal),
                 };
                 if values.has_scope(scope) {
                     values.attach_placeholder_display(scope, display.clone())?;
@@ -922,22 +906,19 @@ impl Presentation {
         }
         let has_master_display = first_master_display.is_some();
         if let Some(display) = first_master_display {
-            values.attach_placeholder_display(
-                PowerPointHeaderFooterScope::PresentationSlides,
-                display,
-            )?;
+            values.attach_placeholder_display(HeaderFooterScope::PresentationSlides, display)?;
         }
 
         let mut first_unoverridden_slide_display = None;
         let mut first_notes_display = None;
         for (ordinal, slide) in records
             .iter()
-            .filter(|record| record.record_type == PptRecordType::Slide)
+            .filter(|record| record.record_type == RecordType::Slide)
             .enumerate()
         {
-            let scope = PowerPointHeaderFooterScope::Local {
-                parent: PowerPointHeaderFooterParent::Slide,
-                parent_ordinal: PowerPointHeaderFooterParentOrdinal::new(ordinal),
+            let scope = HeaderFooterScope::Local {
+                parent: HeaderFooterParent::Slide,
+                parent_ordinal: HeaderFooterParentOrdinal::new(ordinal),
             };
             if let Some(display) = placeholder_display_from_record(slide)? {
                 if values.has_scope(scope) {
@@ -959,16 +940,10 @@ impl Presentation {
             }
         }
         if !has_master_display && let Some(display) = first_unoverridden_slide_display {
-            values.attach_placeholder_display(
-                PowerPointHeaderFooterScope::PresentationSlides,
-                display,
-            )?;
+            values.attach_placeholder_display(HeaderFooterScope::PresentationSlides, display)?;
         }
         if let Some(display) = first_notes_display {
-            values.attach_placeholder_display(
-                PowerPointHeaderFooterScope::NotesAndHandouts,
-                display,
-            )?;
+            values.attach_placeholder_display(HeaderFooterScope::NotesAndHandouts, display)?;
         }
         Ok(values)
     }
@@ -1033,7 +1008,7 @@ impl Presentation {
             }
 
             // Extract text from Escher/PPDrawing using the optimized path
-            if let Some(ppdrawing) = slide_data.record.find_child(PptRecordType::PPDrawing) {
+            if let Some(ppdrawing) = slide_data.record.find_child(RecordType::PPDrawing) {
                 let escher_text = super::odraw::text_from_drawing(&ppdrawing.data)?;
                 let trimmed = escher_text.trim();
                 if !trimmed.is_empty() {
@@ -1078,11 +1053,11 @@ impl Presentation {
     pub fn images(&self) -> Result<Vec<ImageFile<'_>>> {
         if let Some(store) = self.image_store()? {
             return litchi_odraw::image::all(&store, self.pictures_data.as_deref())
-                .map_err(PptError::from);
+                .map_err(Error::from);
         }
         self.pictures_data.as_deref().map_or_else(
             || Ok(Vec::new()),
-            |pictures| litchi_odraw::image::delay(pictures).map_err(PptError::from),
+            |pictures| litchi_odraw::image::delay(pictures).map_err(Error::from),
         )
     }
 
@@ -1100,7 +1075,7 @@ impl Presentation {
         let Some(store) = self.image_store()? else {
             return Ok(None);
         };
-        litchi_odraw::image::get(&store, id, self.pictures_data.as_deref()).map_err(PptError::from)
+        litchi_odraw::image::get(&store, id, self.pictures_data.as_deref()).map_err(Error::from)
     }
 
     /// Resolves a raw one-based host index after checking its OfficeArt range.
@@ -1118,13 +1093,13 @@ impl Presentation {
             .parser
             .find_records_ref()
             .into_iter()
-            .filter(|record| record.record_type == PptRecordType::PPDrawingGroup)
+            .filter(|record| record.record_type == RecordType::PPDrawingGroup)
         {
-            let candidate = litchi_odraw::image::store(&record.data).map_err(PptError::from)?;
+            let candidate = litchi_odraw::image::store(&record.data).map_err(Error::from)?;
             if let Some(candidate) = candidate
                 && store.replace(candidate).is_some()
             {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "Presentation contains multiple OfficeArt BStore containers".to_string(),
                 ));
             }
@@ -1138,17 +1113,15 @@ impl Presentation {
     }
 
     /// Strictly parse slide and notes editing-view information.
-    pub fn slide_view_information(&self) -> Result<PowerPointSlideViewInformation> {
+    pub fn slide_view_information(&self) -> Result<SlideViewInformation> {
         let records = self.parser.find_records_ref();
-        PowerPointSlideViewInformation::parse_records(&records)
+        SlideViewInformation::parse_records(&records)
     }
 
     /// Strictly parse outline and slide-sorter editing-view information.
-    pub fn outline_sorter_view_information(
-        &self,
-    ) -> Result<PowerPointOutlineSorterViewInformation> {
+    pub fn outline_sorter_view_information(&self) -> Result<OutlineSorterViewInformation> {
         let records = self.parser.find_records_ref();
-        PowerPointOutlineSorterViewInformation::parse_records(&records)
+        OutlineSorterViewInformation::parse_records(&records)
     }
 
     /// Parse all slide comments in the presentation.
@@ -1177,16 +1150,14 @@ impl Presentation {
     /// Return all shape-scoped programmable tags in slide and shape order.
     pub fn shape_programmable_tags(
         &self,
-    ) -> Result<Vec<crate::PowerPointPresentationShapeProgrammableTagsEntry>> {
-        self.shape_programmable_tags_with_limits(
-            crate::PowerPointShapeProgrammableTagLimits::default(),
-        )
+    ) -> Result<Vec<crate::PresentationShapeProgrammableTagsEntry>> {
+        self.shape_programmable_tags_with_limits(crate::ShapeProgrammableTagLimits::default())
     }
 
     /// Return the inert document-wide PowerPoint 11 smart-tag store.
-    pub fn smart_tags(&self) -> Result<Option<crate::PowerPointSmartTagStore>> {
+    pub fn smart_tags(&self) -> Result<Option<crate::SmartTagStore>> {
         let document = self.live_document_record()?;
-        crate::PowerPointSmartTagStore::parse(&document)
+        crate::SmartTagStore::parse(&document)
     }
 
     /// Return the typed document-level programmable tags (MS-PPT 2.4.23), when
@@ -1194,29 +1165,29 @@ impl Presentation {
     ///
     /// Tag payloads are inert: they are parsed and preserved, never executed,
     /// loaded, or resolved. Use
-    /// [`crate::PowerPointProgTags::document_extensions`] to decode the
+    /// [`crate::ProgTags::document_extensions`] to decode the
     /// versioned binary-tag payloads into typed extension structs.
-    pub fn programmable_tags(&self) -> Result<Option<crate::PowerPointProgTags>> {
-        self.programmable_tags_with_limits(crate::PowerPointProgTagLimits::default())
+    pub fn programmable_tags(&self) -> Result<Option<crate::ProgTags>> {
+        self.programmable_tags_with_limits(crate::ProgTagLimits::default())
     }
 
     /// Return document-level programmable tags with caller-supplied resource limits.
     pub fn programmable_tags_with_limits(
         &self,
-        limits: crate::PowerPointProgTagLimits,
-    ) -> Result<Option<crate::PowerPointProgTags>> {
-        crate::PowerPointProgTags::parse_document(&self.live_document_record()?, limits)
+        limits: crate::ProgTagLimits,
+    ) -> Result<Option<crate::ProgTags>> {
+        crate::ProgTags::parse_document(&self.live_document_record()?, limits)
     }
 
     /// Return all shape programmable tags with caller-supplied resource limits.
     pub fn shape_programmable_tags_with_limits(
         &self,
-        limits: crate::PowerPointShapeProgrammableTagLimits,
-    ) -> Result<Vec<crate::PowerPointPresentationShapeProgrammableTagsEntry>> {
+        limits: crate::ShapeProgrammableTagLimits,
+    ) -> Result<Vec<crate::PresentationShapeProgrammableTagsEntry>> {
         let mut result = Vec::new();
         for slide in self.slides()? {
             for entry in slide.shape_programmable_tags_with_limits(limits)? {
-                result.push(crate::PowerPointPresentationShapeProgrammableTagsEntry {
+                result.push(crate::PresentationShapeProgrammableTagsEntry {
                     slide_number: slide.slide_number(),
                     shape_id: entry.shape_id,
                     programmable_tags: entry.programmable_tags,
@@ -1227,19 +1198,19 @@ impl Presentation {
     }
 
     /// Return every typed shape-flag projection in slide and shape order.
-    pub fn shape_flags(&self) -> Result<Vec<crate::PowerPointPresentationShapeFlagEntry>> {
-        self.shape_flags_with_limits(crate::PowerPointShapeFlagLimits::default())
+    pub fn shape_flags(&self) -> Result<Vec<crate::PresentationShapeFlagEntry>> {
+        self.shape_flags_with_limits(crate::ShapeFlagLimits::default())
     }
 
     /// Return shape flags with caller-supplied client-data resource limits.
     pub fn shape_flags_with_limits(
         &self,
-        limits: crate::PowerPointShapeFlagLimits,
-    ) -> Result<Vec<crate::PowerPointPresentationShapeFlagEntry>> {
+        limits: crate::ShapeFlagLimits,
+    ) -> Result<Vec<crate::PresentationShapeFlagEntry>> {
         let mut result = Vec::new();
         for slide in self.slides()? {
             for entry in slide.shape_flags_with_limits(limits)? {
-                result.push(crate::PowerPointPresentationShapeFlagEntry {
+                result.push(crate::PresentationShapeFlagEntry {
                     slide_number: slide.slide_number(),
                     shape_id: entry.shape_id,
                     projection: entry.projection,
@@ -1250,19 +1221,19 @@ impl Presentation {
     }
 
     /// Return every context-validated presentation-slide placeholder.
-    pub fn placeholder_atoms(&self) -> Result<Vec<crate::PowerPointPresentationPlaceholderEntry>> {
-        self.placeholder_atoms_with_limits(crate::PowerPointPlaceholderLimits::default())
+    pub fn placeholder_atoms(&self) -> Result<Vec<crate::PresentationPlaceholderEntry>> {
+        self.placeholder_atoms_with_limits(crate::PlaceholderLimits::default())
     }
 
     /// Return placeholders with caller-supplied client-data limits.
     pub fn placeholder_atoms_with_limits(
         &self,
-        limits: crate::PowerPointPlaceholderLimits,
-    ) -> Result<Vec<crate::PowerPointPresentationPlaceholderEntry>> {
+        limits: crate::PlaceholderLimits,
+    ) -> Result<Vec<crate::PresentationPlaceholderEntry>> {
         let mut result = Vec::new();
         for slide in self.slides()? {
             for entry in slide.placeholder_atoms_with_limits(limits)? {
-                result.push(crate::PowerPointPresentationPlaceholderEntry {
+                result.push(crate::PresentationPlaceholderEntry {
                     slide_number: slide.slide_number(),
                     shape_id: entry.shape_id,
                     placeholder: entry.placeholder,
@@ -1288,10 +1259,10 @@ impl Presentation {
         // Parse Document record from the stream
         let records = self.parser.find_records_ref();
         for record in &records {
-            if record.record_type == PptRecordType::Document {
+            if record.record_type == RecordType::Document {
                 // Find NamedShows container in Document
                 for child in &record.children {
-                    if child.record_type == PptRecordType::NamedShows {
+                    if child.record_type == RecordType::NamedShows {
                         Self::parse_named_shows(child, &mut shows);
                     }
                 }
@@ -1302,15 +1273,15 @@ impl Presentation {
     }
 
     /// Parse NamedShow containers from a NamedShows container.
-    fn parse_named_shows(named_shows: &PptRecord, shows: &mut Vec<ParsedCustomShow>) {
+    fn parse_named_shows(named_shows: &Record, shows: &mut Vec<ParsedCustomShow>) {
         for child in &named_shows.children {
-            if child.record_type == PptRecordType::NamedShow {
+            if child.record_type == RecordType::NamedShow {
                 let mut name = String::new();
                 let mut slide_indices = Vec::new();
 
                 for sub in &child.children {
                     match sub.record_type {
-                        PptRecordType::CString => {
+                        RecordType::CString => {
                             // UTF-16LE name
                             let chars: Vec<u16> = sub
                                 .data
@@ -1319,7 +1290,7 @@ impl Presentation {
                                 .collect();
                             name = String::from_utf16_lossy(&chars);
                         },
-                        PptRecordType::NamedShowSlides => {
+                        RecordType::NamedShowSlides => {
                             // Array of u32 slide IDs (0x100 + slide_index)
                             for chunk in sub.data.chunks_exact(4) {
                                 let slide_id =
@@ -1344,10 +1315,8 @@ impl Presentation {
     }
 }
 
-fn placeholder_display_from_record(
-    record: &PptRecord,
-) -> Result<Option<PowerPointHeaderFooterDisplayText>> {
-    let Some(drawing) = record.find_child(PptRecordType::PPDrawing) else {
+fn placeholder_display_from_record(record: &Record) -> Result<Option<HeaderFooterDisplayText>> {
+    let Some(drawing) = record.find_child(RecordType::PPDrawing) else {
         return Ok(None);
     };
     let parsed = super::odraw::parse(&drawing.data)?;
@@ -1362,10 +1331,10 @@ fn placeholder_display_from_record(
 
 fn placeholder_display_from_shapes(
     shapes: &[crate::shapes::ShapeEnum<'static>],
-) -> Result<Option<PowerPointHeaderFooterDisplayText>> {
+) -> Result<Option<HeaderFooterDisplayText>> {
     use crate::shapes::PlaceholderType;
 
-    let mut display = PowerPointHeaderFooterDisplayText::default();
+    let mut display = HeaderFooterDisplayText::default();
     for shape in shapes {
         let Some(placeholder) = shape.as_placeholder() else {
             continue;
@@ -1384,7 +1353,7 @@ fn placeholder_display_from_shapes(
             *target = Some(text);
         }
     }
-    if display == PowerPointHeaderFooterDisplayText::default() {
+    if display == HeaderFooterDisplayText::default() {
         Ok(None)
     } else {
         Ok(Some(display))
@@ -1412,10 +1381,10 @@ pub struct ParsedSlideComments {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::records::PptRecord;
+    use crate::records::Record;
 
-    fn record(record_type: PptRecordType, data: Vec<u8>, children: Vec<PptRecord>) -> PptRecord {
-        PptRecord {
+    fn record(record_type: RecordType, data: Vec<u8>, children: Vec<Record>) -> Record {
+        Record {
             record_type,
             record_type_raw: 0,
             version: 0,
@@ -1426,12 +1395,7 @@ mod tests {
         }
     }
 
-    fn record_bytes(
-        version: u16,
-        instance: u16,
-        record_type: PptRecordType,
-        data: &[u8],
-    ) -> Vec<u8> {
+    fn record_bytes(version: u16, instance: u16, record_type: RecordType, data: &[u8]) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(8 + data.len());
         bytes.extend_from_slice(&((instance << 4) | version).to_le_bytes());
         bytes.extend_from_slice(&record_type.as_u16().to_le_bytes());
@@ -1445,18 +1409,18 @@ mod tests {
         atom_data.extend_from_slice(&41u32.to_le_bytes());
         atom_data.extend_from_slice(&1u32.to_le_bytes());
         atom_data.extend_from_slice(&2u32.to_le_bytes());
-        let atom = record_bytes(2, 0, PptRecordType::VBAInfoAtom, &atom_data);
-        let vba_info = record_bytes(0x0f, 1, PptRecordType::VBAInfo, &atom);
+        let atom = record_bytes(2, 0, RecordType::VBAInfoAtom, &atom_data);
+        let vba_info = record_bytes(0x0f, 1, RecordType::VBAInfo, &atom);
 
         let mut storage_data = Vec::new();
         storage_data.extend_from_slice(&4096u32.to_le_bytes());
         storage_data.extend_from_slice(&[0x78, 0x9c, 1, 2, 3]);
-        let storage = record_bytes(0, 1, PptRecordType::ExternalOleObjectStg, &storage_data);
+        let storage = record_bytes(0, 1, RecordType::ExternalOleObjectStg, &storage_data);
         let storage_offset = vba_info.len() as u32;
 
         let mut powerpoint_document = vba_info;
         powerpoint_document.extend_from_slice(&storage);
-        let mut parser = PptRecordParser::new();
+        let mut parser = RecordParser::new();
         parser.parse_document(&powerpoint_document).unwrap();
         let mut persist_mapping = PersistMapping::new();
         persist_mapping.add_mapping(41, storage_offset);
@@ -1470,22 +1434,22 @@ mod tests {
         }
     }
 
-    fn named_shows(children: Vec<PptRecord>) -> PptRecord {
-        record(PptRecordType::NamedShows, Vec::new(), children)
+    fn named_shows(children: Vec<Record>) -> Record {
+        record(RecordType::NamedShows, Vec::new(), children)
     }
 
-    fn named_show(name: &str, slide_ids: &[u32]) -> PptRecord {
+    fn named_show(name: &str, slide_ids: &[u32]) -> Record {
         let name_bytes: Vec<u8> = name
             .encode_utf16()
             .flat_map(|unit| unit.to_le_bytes())
             .collect();
         let slide_bytes: Vec<u8> = slide_ids.iter().flat_map(|id| id.to_le_bytes()).collect();
         record(
-            PptRecordType::NamedShow,
+            RecordType::NamedShow,
             Vec::new(),
             vec![
-                record(PptRecordType::CString, name_bytes, Vec::new()),
-                record(PptRecordType::NamedShowSlides, slide_bytes, Vec::new()),
+                record(RecordType::CString, name_bytes, Vec::new()),
+                record(RecordType::NamedShowSlides, slide_bytes, Vec::new()),
             ],
         )
     }
@@ -1524,10 +1488,10 @@ mod tests {
     #[test]
     fn skips_named_show_without_name() {
         let show = record(
-            PptRecordType::NamedShow,
+            RecordType::NamedShow,
             Vec::new(),
             vec![record(
-                PptRecordType::NamedShowSlides,
+                RecordType::NamedShowSlides,
                 0x101u32.to_le_bytes().to_vec(),
                 Vec::new(),
             )],

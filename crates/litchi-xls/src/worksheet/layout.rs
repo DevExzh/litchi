@@ -1,6 +1,6 @@
 //! BIFF8 worksheet default dimensions and outline workspace metadata.
 
-use crate::error::{XlsError, XlsResult};
+use crate::error::{Error, Result};
 
 pub(crate) const GUTS_RECORD_TYPE: u16 = 0x0080;
 pub(crate) const WSBOOL_RECORD_TYPE: u16 = 0x0081;
@@ -135,7 +135,7 @@ impl Collector {
         }
     }
 
-    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
+    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> Result<()> {
         if record_type == DIMENSIONS_RECORD_TYPE {
             self.dimensions_seen = true;
             return Ok(());
@@ -169,7 +169,7 @@ impl Collector {
         Ok(())
     }
 
-    fn parse_guts(&mut self, data: &[u8]) -> XlsResult<()> {
+    fn parse_guts(&mut self, data: &[u8]) -> Result<()> {
         require_length(GUTS_RECORD_TYPE, data, 8)?;
         self.layout.row_gutter_width = read_u16(data, 0);
         self.layout.column_gutter_height = read_u16(data, 2);
@@ -178,7 +178,7 @@ impl Collector {
         Ok(())
     }
 
-    fn parse_default_row_height(&mut self, data: &[u8]) -> XlsResult<()> {
+    fn parse_default_row_height(&mut self, data: &[u8]) -> Result<()> {
         require_length(DEFAULT_ROW_HEIGHT_RECORD_TYPE, data, 4)?;
         let flags = read_u16(data, 0);
         if flags & !0x000f != 0 {
@@ -203,7 +203,7 @@ impl Collector {
         Ok(())
     }
 
-    fn parse_wsbool(&mut self, data: &[u8]) -> XlsResult<()> {
+    fn parse_wsbool(&mut self, data: &[u8]) -> Result<()> {
         require_length(WSBOOL_RECORD_TYPE, data, 2)?;
         let flags = read_u16(data, 0);
         if flags & 0x020e != 0 {
@@ -227,7 +227,7 @@ impl Collector {
         Ok(())
     }
 
-    fn parse_def_col_width(&mut self, data: &[u8]) -> XlsResult<()> {
+    fn parse_def_col_width(&mut self, data: &[u8]) -> Result<()> {
         require_length(DEF_COL_WIDTH_RECORD_TYPE, data, 2)?;
         let width = read_u16(data, 0);
         if width > 255 {
@@ -245,7 +245,7 @@ impl Collector {
     }
 }
 
-fn decode_outline_level(encoded: u16) -> XlsResult<u8> {
+fn decode_outline_level(encoded: u16) -> Result<u8> {
     match encoded {
         0 => Ok(0),
         2..=8 => Ok((encoded - 1) as u8),
@@ -256,9 +256,9 @@ fn decode_outline_level(encoded: u16) -> XlsResult<u8> {
     }
 }
 
-fn require_length(record_type: u16, data: &[u8], expected: usize) -> XlsResult<()> {
+fn require_length(record_type: u16, data: &[u8], expected: usize) -> Result<()> {
     if data.len() != expected {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected,
             found: data.len(),
         });
@@ -271,8 +271,8 @@ fn read_u16(data: &[u8], offset: usize) -> u16 {
     u16::from_le_bytes([data[offset], data[offset + 1]])
 }
 
-fn invalid<T>(record_type: u16, message: impl Into<String>) -> XlsResult<T> {
-    Err(XlsError::InvalidRecord {
+fn invalid<T>(record_type: u16, message: impl Into<String>) -> Result<T> {
+    Err(Error::InvalidRecord {
         record_type,
         message: message.into(),
     })

@@ -5,8 +5,8 @@ use std::io::Cursor;
 
 use litchi_cfb::{OleFile, OleWriter};
 
-use super::XlsWorkbook;
-use super::error::{XlsError, XlsResult};
+use super::Workbook;
+use super::error::{Error, Result};
 use super::pivot_table::*;
 use super::writer::biff;
 
@@ -16,7 +16,7 @@ const EOF: u16 = 0x000A;
 const MAX_RECORD: usize = 8_224;
 
 /// An owned, transactional editor for PivotTable worksheet views in an XLS file.
-pub struct XlsPivotViewEditor {
+pub struct PivotViewEditor {
     original: Vec<u8>,
     original_tables: Vec<Vec<PivotTable>>,
     tables: Vec<Vec<PivotTable>>,
@@ -25,10 +25,10 @@ pub struct XlsPivotViewEditor {
     cache_stream_ids: Vec<u16>,
 }
 
-impl XlsPivotViewEditor {
+impl PivotViewEditor {
     /// Parses an owned XLS file. Calling [`finish`](Self::finish) without edits returns these bytes unchanged.
-    pub fn new(bytes: Vec<u8>) -> XlsResult<Self> {
-        let workbook = XlsWorkbook::new(Cursor::new(bytes.clone()))?;
+    pub fn new(bytes: Vec<u8>) -> Result<Self> {
+        let workbook = Workbook::new(Cursor::new(bytes.clone()))?;
         let worksheet_count = workbook
             .sheets()
             .iter()
@@ -56,18 +56,18 @@ impl XlsPivotViewEditor {
     pub fn worksheet_count(&self) -> usize {
         self.tables.len()
     }
-    pub fn pivot_tables(&self, worksheet: usize) -> XlsResult<&[PivotTable]> {
+    pub fn pivot_tables(&self, worksheet: usize) -> Result<&[PivotTable]> {
         self.tables
             .get(worksheet)
             .map(Vec::as_slice)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet index {worksheet}")))
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))
     }
 
-    pub fn add(&mut self, worksheet: usize, table: PivotTable) -> XlsResult<()> {
+    pub fn add(&mut self, worksheet: usize, table: PivotTable) -> Result<()> {
         self.transaction(|tables, _| {
             let target = tables
                 .get_mut(worksheet)
-                .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet index {worksheet}")))?;
+                .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))?;
             if target
                 .iter()
                 .any(|value| value.view.name == table.view.name)
@@ -87,7 +87,7 @@ impl XlsPivotViewEditor {
         worksheet: usize,
         index: usize,
         table: PivotTable,
-    ) -> XlsResult<PivotTable> {
+    ) -> Result<PivotTable> {
         let mut removed = None;
         self.transaction(|tables, _| {
             let target = table_at_mut(tables, worksheet, index)?;
@@ -102,12 +102,12 @@ impl XlsPivotViewEditor {
         worksheet: usize,
         name: &str,
         table: PivotTable,
-    ) -> XlsResult<PivotTable> {
+    ) -> Result<PivotTable> {
         let index = self.index_by_name(worksheet, name)?;
         self.replace_by_index(worksheet, index, table)
     }
 
-    pub fn update_by_index<F>(&mut self, worksheet: usize, index: usize, update: F) -> XlsResult<()>
+    pub fn update_by_index<F>(&mut self, worksheet: usize, index: usize, update: F) -> Result<()>
     where
         F: FnOnce(&mut PivotTable),
     {
@@ -117,7 +117,7 @@ impl XlsPivotViewEditor {
         })
     }
 
-    pub fn update_by_name<F>(&mut self, worksheet: usize, name: &str, update: F) -> XlsResult<()>
+    pub fn update_by_name<F>(&mut self, worksheet: usize, name: &str, update: F) -> Result<()>
     where
         F: FnOnce(&mut PivotTable),
     {
@@ -125,12 +125,12 @@ impl XlsPivotViewEditor {
         self.update_by_index(worksheet, index, update)
     }
 
-    pub fn remove_by_index(&mut self, worksheet: usize, index: usize) -> XlsResult<PivotTable> {
+    pub fn remove_by_index(&mut self, worksheet: usize, index: usize) -> Result<PivotTable> {
         let mut removed = None;
         self.transaction(|tables, _| {
             let target = tables
                 .get_mut(worksheet)
-                .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet index {worksheet}")))?;
+                .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))?;
             if index >= target.len() {
                 return Err(invalid(SXVIEW_TYPE, "PivotTable index is out of range"));
             }
@@ -140,7 +140,7 @@ impl XlsPivotViewEditor {
         Ok(removed.expect("transaction ran"))
     }
 
-    pub fn remove_by_name(&mut self, worksheet: usize, name: &str) -> XlsResult<PivotTable> {
+    pub fn remove_by_name(&mut self, worksheet: usize, name: &str) -> Result<PivotTable> {
         let index = self.index_by_name(worksheet, name)?;
         self.remove_by_index(worksheet, index)
     }
@@ -151,10 +151,10 @@ impl XlsPivotViewEditor {
         index: usize,
         to_sheet: usize,
         to_index: usize,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         self.transaction(|tables, _| {
             if from_sheet >= tables.len() || to_sheet >= tables.len() {
-                return Err(XlsError::WorksheetNotFound(
+                return Err(Error::WorksheetNotFound(
                     "PivotTable move worksheet".to_string(),
                 ));
             }
@@ -181,7 +181,7 @@ impl XlsPivotViewEditor {
         name: &str,
         to_sheet: usize,
         to_index: usize,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         let index = self.index_by_name(from_sheet, name)?;
         self.move_by_index(from_sheet, index, to_sheet, to_index)
     }
@@ -191,7 +191,7 @@ impl XlsPivotViewEditor {
         worksheet: usize,
         index: usize,
         cache_index: u16,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         self.update_by_index(worksheet, index, |table| {
             table.view.cache_index = cache_index
         })
@@ -202,7 +202,7 @@ impl XlsPivotViewEditor {
         worksheet: usize,
         name: &str,
         cache_index: u16,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         let index = self.index_by_name(worksheet, name)?;
         self.reassign_cache_by_index(worksheet, index, cache_index)
     }
@@ -213,7 +213,7 @@ impl XlsPivotViewEditor {
         cache_index: u16,
         field_index: u16,
         grouping: Option<PivotCacheGrouping>,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         let stream_id = *self
             .cache_stream_ids
             .get(usize::from(cache_index))
@@ -247,7 +247,7 @@ impl XlsPivotViewEditor {
     }
 
     /// Serializes all staged edits. Validation and serialization complete before any output is returned.
-    pub fn finish(self) -> XlsResult<Vec<u8>> {
+    pub fn finish(self) -> Result<Vec<u8>> {
         if self.tables == self.original_tables && self.caches == self.original_caches {
             return Ok(self.original);
         }
@@ -279,7 +279,7 @@ impl XlsPivotViewEditor {
                         || path[0].eq_ignore_ascii_case("Book"))
             })
             .cloned()
-            .ok_or_else(|| XlsError::InvalidData("Workbook stream not found".to_string()))?;
+            .ok_or_else(|| Error::InvalidData("Workbook stream not found".to_string()))?;
         let refs = workbook_path.iter().map(String::as_str).collect::<Vec<_>>();
         let workbook_stream = input.open_stream(&refs)?;
         let rewritten_workbook =
@@ -305,16 +305,16 @@ impl XlsPivotViewEditor {
         Ok(output.into_inner())
     }
 
-    fn index_by_name(&self, worksheet: usize, name: &str) -> XlsResult<usize> {
+    fn index_by_name(&self, worksheet: usize, name: &str) -> Result<usize> {
         self.pivot_tables(worksheet)?
             .iter()
             .position(|table| table.view.name == name)
             .ok_or_else(|| invalid(SXVIEW_TYPE, format!("PivotTable {name:?} not found")))
     }
 
-    fn transaction<F>(&mut self, edit: F) -> XlsResult<()>
+    fn transaction<F>(&mut self, edit: F) -> Result<()>
     where
-        F: FnOnce(&mut Vec<Vec<PivotTable>>, &mut Vec<PivotCache>) -> XlsResult<()>,
+        F: FnOnce(&mut Vec<Vec<PivotTable>>, &mut Vec<PivotCache>) -> Result<()>,
     {
         let mut tables = self.tables.clone();
         let mut caches = self.caches.clone();
@@ -331,14 +331,14 @@ fn table_at_mut(
     tables: &mut [Vec<PivotTable>],
     worksheet: usize,
     index: usize,
-) -> XlsResult<&mut PivotTable> {
+) -> Result<&mut PivotTable> {
     tables
         .get_mut(worksheet)
         .and_then(|tables| tables.get_mut(index))
         .ok_or_else(|| invalid(SXVIEW_TYPE, "PivotTable index is out of range"))
 }
 
-fn normalize_tables(sheets: &mut [Vec<PivotTable>]) -> XlsResult<()> {
+fn normalize_tables(sheets: &mut [Vec<PivotTable>]) -> Result<()> {
     for tables in sheets {
         for table in tables {
             table.view.field_count = u16::try_from(table.fields.len())
@@ -376,7 +376,7 @@ fn validate_tables(
     sheets: &[Vec<PivotTable>],
     caches: &[PivotCache],
     stream_ids: &[u16],
-) -> XlsResult<()> {
+) -> Result<()> {
     let mut total = 0usize;
     for tables in sheets {
         total = total
@@ -438,7 +438,7 @@ fn rewrite_workbook_stream(
     input: &[u8],
     tables: &[Vec<PivotTable>],
     dirty: &HashSet<usize>,
-) -> XlsResult<Vec<u8>> {
+) -> Result<Vec<u8>> {
     let records = record_ranges(input)?;
     let mut bindings = Vec::new();
     let mut worksheet_index = 0usize;
@@ -536,7 +536,7 @@ fn rewrite_workbook_stream(
     Ok(output)
 }
 
-fn rewrite_worksheet(input: &[u8], tables: &[PivotTable]) -> XlsResult<Vec<u8>> {
+fn rewrite_worksheet(input: &[u8], tables: &[PivotTable]) -> Result<Vec<u8>> {
     let mut output = Vec::with_capacity(input.len());
     let mut inserted = false;
     for (start, end, kind, body_start, body_end) in record_ranges(input)? {
@@ -560,7 +560,7 @@ fn rewrite_worksheet(input: &[u8], tables: &[PivotTable]) -> XlsResult<Vec<u8>> 
     Ok(output)
 }
 
-fn serialize_table(table: &PivotTable) -> XlsResult<Vec<u8>> {
+fn serialize_table(table: &PivotTable) -> Result<Vec<u8>> {
     let mut out = Vec::new();
     biff::write_sxview(
         &mut out,
@@ -676,7 +676,7 @@ fn serialize_table(table: &PivotTable) -> XlsResult<Vec<u8>> {
     Ok(out)
 }
 
-fn write_axis(out: &mut Vec<u8>, axis: &[PivotAxisField]) -> XlsResult<()> {
+fn write_axis(out: &mut Vec<u8>, axis: &[PivotAxisField]) -> Result<()> {
     if axis.is_empty() {
         return Ok(());
     }
@@ -689,7 +689,7 @@ fn write_axis(out: &mut Vec<u8>, axis: &[PivotAxisField]) -> XlsResult<()> {
         .collect::<Vec<_>>();
     biff::write_sxivd(out, &raw)
 }
-fn write_lines(out: &mut Vec<u8>, lines: &[PivotLayoutLine]) -> XlsResult<()> {
+fn write_lines(out: &mut Vec<u8>, lines: &[PivotLayoutLine]) -> Result<()> {
     if lines.is_empty() {
         return Ok(());
     }
@@ -705,7 +705,7 @@ fn write_lines(out: &mut Vec<u8>, lines: &[PivotLayoutLine]) -> XlsResult<()> {
     }
     record(out, SXLI_TYPE, &body)
 }
-fn write_field_extension(out: &mut Vec<u8>, value: &PivotViewFieldExtension) -> XlsResult<()> {
+fn write_field_extension(out: &mut Vec<u8>, value: &PivotViewFieldExtension) -> Result<()> {
     let mut body = Vec::new();
     body.extend_from_slice(&value.flags.to_le_bytes());
     body.extend_from_slice(&value.auto_sort_data_index.unwrap_or(u16::MAX).to_le_bytes());
@@ -724,7 +724,7 @@ fn write_field_extension(out: &mut Vec<u8>, value: &PivotViewFieldExtension) -> 
     }
     record(out, SXVDEX_TYPE, &body)
 }
-fn write_view_extension(out: &mut Vec<u8>, v: &PivotViewExtension) -> XlsResult<()> {
+fn write_view_extension(out: &mut Vec<u8>, v: &PivotViewExtension) -> Result<()> {
     let strings = [
         &v.error_string,
         &v.null_string,
@@ -758,7 +758,7 @@ fn write_view_extension(out: &mut Vec<u8>, v: &PivotViewExtension) -> XlsResult<
     }
     record(out, SXEX_TYPE, &body)
 }
-fn write_query_tag(out: &mut Vec<u8>, v: &PivotQueryTag) -> XlsResult<()> {
+fn write_query_tag(out: &mut Vec<u8>, v: &PivotQueryTag) -> Result<()> {
     let mut body = Vec::new();
     body.extend_from_slice(&QSI_SX_TAG_TYPE.to_le_bytes());
     body.extend_from_slice(&0u16.to_le_bytes());
@@ -773,7 +773,7 @@ fn write_query_tag(out: &mut Vec<u8>, v: &PivotQueryTag) -> XlsResult<()> {
     body.extend_from_slice(&v.trailing_payload);
     record(out, QSI_SX_TAG_TYPE, &body)
 }
-fn write_view_ex9(out: &mut Vec<u8>, v: &PivotViewEx9) -> XlsResult<()> {
+fn write_view_ex9(out: &mut Vec<u8>, v: &PivotViewEx9) -> Result<()> {
     let mut body = Vec::new();
     body.extend_from_slice(&SXVIEWEX9_TYPE.to_le_bytes());
     body.extend_from_slice(&v.frt_flags.to_le_bytes());
@@ -783,7 +783,7 @@ fn write_view_ex9(out: &mut Vec<u8>, v: &PivotViewEx9) -> XlsResult<()> {
     body.extend_from_slice(&full_string(&v.grand_total_name));
     record(out, SXVIEWEX9_TYPE, &body)
 }
-fn write_addl(out: &mut Vec<u8>, v: &PivotAdditionalExtension) -> XlsResult<()> {
+fn write_addl(out: &mut Vec<u8>, v: &PivotAdditionalExtension) -> Result<()> {
     let mut body = Vec::new();
     body.extend_from_slice(&SXADDL_TYPE.to_le_bytes());
     body.extend_from_slice(&v.reserved.to_le_bytes());
@@ -810,7 +810,7 @@ fn full_string(value: &str) -> Vec<u8> {
     out.extend_from_slice(&no_cch(value));
     out
 }
-fn record(out: &mut Vec<u8>, kind: u16, body: &[u8]) -> XlsResult<()> {
+fn record(out: &mut Vec<u8>, kind: u16, body: &[u8]) -> Result<()> {
     if body.len() > MAX_RECORD {
         return Err(invalid(kind, "record exceeds BIFF8 size"));
     }
@@ -820,10 +820,7 @@ fn record(out: &mut Vec<u8>, kind: u16, body: &[u8]) -> XlsResult<()> {
     Ok(())
 }
 
-fn regenerate_caches(
-    caches: &[PivotCache],
-    dirty: &HashSet<u16>,
-) -> XlsResult<HashMap<u16, Vec<u8>>> {
+fn regenerate_caches(caches: &[PivotCache], dirty: &HashSet<u16>) -> Result<HashMap<u16, Vec<u8>>> {
     let mut result = HashMap::new();
     for cache in caches.iter().filter(|c| dirty.contains(&c.stream_id())) {
         let source = cache
@@ -915,23 +912,21 @@ fn regenerate_caches(
 }
 
 #[allow(clippy::type_complexity)]
-fn record_ranges(data: &[u8]) -> XlsResult<Vec<(usize, usize, u16, usize, usize)>> {
+fn record_ranges(data: &[u8]) -> Result<Vec<(usize, usize, u16, usize, usize)>> {
     let mut out = Vec::new();
     let mut offset = 0usize;
     while offset < data.len() {
-        let header = data
-            .get(offset..offset + 4)
-            .ok_or(XlsError::InvalidLength {
-                expected: offset + 4,
-                found: data.len(),
-            })?;
+        let header = data.get(offset..offset + 4).ok_or(Error::InvalidLength {
+            expected: offset + 4,
+            found: data.len(),
+        })?;
         let kind = u16::from_le_bytes([header[0], header[1]]);
         let len = usize::from(u16::from_le_bytes([header[2], header[3]]));
         let end = offset
             .checked_add(4 + len)
             .ok_or_else(|| invalid(kind, "record size overflow"))?;
         if end > data.len() {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: end,
                 found: data.len(),
             });
@@ -941,8 +936,8 @@ fn record_ranges(data: &[u8]) -> XlsResult<Vec<(usize, usize, u16, usize, usize)
     }
     Ok(out)
 }
-fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(record_type: u16, message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type,
         message: message.into(),
     }

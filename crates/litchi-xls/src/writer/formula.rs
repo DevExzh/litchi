@@ -20,7 +20,7 @@
 //! Tokens: [Ref(A1), Ref(B1), Int(2), Mul, Add]
 //! ```
 
-use super::super::XlsError;
+use super::super::Error;
 use std::collections::HashMap;
 
 const MAX_BIFF8_COLUMN: u16 = 255;
@@ -49,9 +49,9 @@ impl Ref {
     }
 
     /// Convert a wider zero-based column after checking the BIFF8 limit.
-    pub fn checked(row: u16, col: u16) -> Result<Self, XlsError> {
+    pub fn checked(row: u16, col: u16) -> Result<Self, Error> {
         let col = u8::try_from(col).map_err(|_| {
-            XlsError::InvalidCellReference(format!(
+            Error::InvalidCellReference(format!(
                 "zero-based column {col} exceeds IV ({MAX_BIFF8_COLUMN})"
             ))
         })?;
@@ -59,7 +59,7 @@ impl Ref {
     }
 
     /// Parse an A1-style BIFF8 reference.
-    pub fn parse(value: &str) -> Result<Self, XlsError> {
+    pub fn parse(value: &str) -> Result<Self, Error> {
         parse_ref(value)
     }
 
@@ -110,7 +110,7 @@ impl Ref {
 }
 
 impl std::str::FromStr for Ref {
-    type Err = XlsError;
+    type Err = Error;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         Self::parse(value)
@@ -126,9 +126,9 @@ pub struct Area {
 
 impl Area {
     /// Construct an ordered area from its upper-left and lower-right cells.
-    pub fn new(first: Ref, last: Ref) -> Result<Self, XlsError> {
+    pub fn new(first: Ref, last: Ref) -> Result<Self, Error> {
         if first.row > last.row || first.col > last.col {
-            return Err(XlsError::InvalidCellReference(
+            return Err(Error::InvalidCellReference(
                 "BIFF8 area endpoints are reversed".to_string(),
             ));
         }
@@ -226,14 +226,14 @@ fn get_precedence(op: &str) -> u8 {
 /// This is exposed as `pub(crate)` so that other writer components
 /// (for example, named range handling) can reuse the same parsing
 /// logic and stay consistent with formula tokenization.
-pub(crate) fn parse_cell_ref(s: &str) -> Result<Ptg, XlsError> {
+pub(crate) fn parse_cell_ref(s: &str) -> Result<Ptg, Error> {
     Ref::parse(s).map(Ptg::Ref)
 }
 
-fn parse_ref(value: &str) -> Result<Ref, XlsError> {
+fn parse_ref(value: &str) -> Result<Ref, Error> {
     let value = value.trim();
     let bytes = value.as_bytes();
-    let invalid = || XlsError::InvalidCellReference(value.to_string());
+    let invalid = || Error::InvalidCellReference(value.to_string());
     let mut position = 0;
 
     let column_relative = if bytes.get(position) == Some(&b'$') {
@@ -334,7 +334,7 @@ impl FormulaTokenizer {
     /// # Returns
     ///
     /// Vector of Ptg tokens in RPN order
-    pub fn tokenize(&self, formula: &str) -> Result<Vec<Ptg>, XlsError> {
+    pub fn tokenize(&self, formula: &str) -> Result<Vec<Ptg>, Error> {
         let formula = formula.trim();
         if formula.is_empty() {
             return Ok(Vec::new());
@@ -364,14 +364,14 @@ impl FormulaTokenizer {
                 }
                 let num_str: String = chars[start..i].iter().collect();
                 if num_str.contains('.') {
-                    let num = num_str.parse::<f64>().map_err(|_| {
-                        XlsError::InvalidData(format!("Invalid number: {}", num_str))
-                    })?;
+                    let num = num_str
+                        .parse::<f64>()
+                        .map_err(|_| Error::InvalidData(format!("Invalid number: {}", num_str)))?;
                     output.push(Ptg::Num(num));
                 } else {
-                    let num = num_str.parse::<u16>().map_err(|_| {
-                        XlsError::InvalidData(format!("Invalid integer: {}", num_str))
-                    })?;
+                    let num = num_str
+                        .parse::<u16>()
+                        .map_err(|_| Error::InvalidData(format!("Invalid integer: {}", num_str)))?;
                     output.push(Ptg::Int(num));
                 }
                 expect_operand = false;
@@ -398,7 +398,7 @@ impl FormulaTokenizer {
                     i += 1;
                 }
                 if !closed {
-                    return Err(XlsError::InvalidFormula(
+                    return Err(Error::InvalidFormula(
                         "Unterminated string literal".to_string(),
                     ));
                 }
@@ -419,7 +419,7 @@ impl FormulaTokenizer {
                 if i < chars.len() && chars[i] == '(' {
                     let func_name = token.to_uppercase();
                     let func_idx = self.functions.get(&func_name).copied().ok_or_else(|| {
-                        XlsError::InvalidData(format!("Unknown function: {func_name}"))
+                        Error::InvalidData(format!("Unknown function: {func_name}"))
                     })?;
                     let mut next = i + 1;
                     while next < chars.len() && chars[next].is_whitespace() {
@@ -452,7 +452,7 @@ impl FormulaTokenizer {
                 let two_char: String = chars[i..i + 2].iter().collect();
                 if two_char == "<>" || two_char == "<=" || two_char == ">=" {
                     if expect_operand {
-                        return Err(XlsError::InvalidFormula(format!(
+                        return Err(Error::InvalidFormula(format!(
                             "Operator {two_char} is missing its left operand"
                         )));
                     }
@@ -490,7 +490,7 @@ impl FormulaTokenizer {
                     }
                     if operators.last().is_some_and(|(op, _, _)| *op == "FUNC") {
                         let (_, func_idx, argc) = operators.pop().ok_or_else(|| {
-                            XlsError::InvalidFormula(
+                            Error::InvalidFormula(
                                 "function operator stack became inconsistent".to_string(),
                             )
                         })?;
@@ -506,7 +506,7 @@ impl FormulaTokenizer {
                             if op_str == "+" { "u+" } else { "u-" },
                         )?;
                     } else if expect_operand {
-                        return Err(XlsError::InvalidFormula(format!(
+                        return Err(Error::InvalidFormula(format!(
                             "Operator {op_str} is missing its left operand"
                         )));
                     } else {
@@ -516,7 +516,7 @@ impl FormulaTokenizer {
                 },
                 "%" => {
                     if expect_operand {
-                        return Err(XlsError::InvalidFormula(
+                        return Err(Error::InvalidFormula(
                             "Percent operator is missing its operand".to_string(),
                         ));
                     }
@@ -532,7 +532,7 @@ impl FormulaTokenizer {
                             break;
                         }
                         let (op, func_idx, argc) = operators.pop().ok_or_else(|| {
-                            XlsError::InvalidFormula(
+                            Error::InvalidFormula(
                                 "argument operator stack became inconsistent".to_string(),
                             )
                         })?;
@@ -546,31 +546,28 @@ impl FormulaTokenizer {
                         .iter()
                         .rposition(|(op, _, _)| *op == "(")
                         .ok_or_else(|| {
-                            XlsError::InvalidData("Argument separator outside function".to_string())
+                            Error::InvalidData("Argument separator outside function".to_string())
                         })?;
                     let function = open_paren.checked_sub(1).ok_or_else(|| {
-                        XlsError::InvalidData("Argument separator outside function".to_string())
+                        Error::InvalidData("Argument separator outside function".to_string())
                     })?;
                     let (op, _, argc) = operators.get_mut(function).ok_or_else(|| {
-                        XlsError::InvalidFormula(
+                        Error::InvalidFormula(
                             "argument operator stack became inconsistent".to_string(),
                         )
                     })?;
                     if *op != "FUNC" {
-                        return Err(XlsError::InvalidData(
+                        return Err(Error::InvalidData(
                             "Argument separator outside function".to_string(),
                         ));
                     }
                     *argc = argc.checked_add(1).ok_or_else(|| {
-                        XlsError::InvalidData("Too many function arguments".to_string())
+                        Error::InvalidData("Too many function arguments".to_string())
                     })?;
                     expect_operand = true;
                 },
                 _ => {
-                    return Err(XlsError::InvalidData(format!(
-                        "Unknown operator: {}",
-                        op_str
-                    )));
+                    return Err(Error::InvalidData(format!("Unknown operator: {}", op_str)));
                 },
             }
 
@@ -579,7 +576,7 @@ impl FormulaTokenizer {
         }
 
         if expect_operand && !output.is_empty() {
-            return Err(XlsError::InvalidFormula(
+            return Err(Error::InvalidFormula(
                 "Formula ends with an operator".to_string(),
             ));
         }
@@ -587,7 +584,7 @@ impl FormulaTokenizer {
         // Pop remaining operators
         while let Some((op, func_idx, argc)) = operators.pop() {
             if op == "(" {
-                return Err(XlsError::InvalidData("Mismatched parentheses".to_string()));
+                return Err(Error::InvalidData("Mismatched parentheses".to_string()));
             }
             if op == "FUNC" {
                 output.push(Ptg::Func(func_idx, argc));
@@ -599,7 +596,7 @@ impl FormulaTokenizer {
         Ok(output)
     }
 
-    fn push_operator(&self, output: &mut Vec<Ptg>, op: &str) -> Result<(), XlsError> {
+    fn push_operator(&self, output: &mut Vec<Ptg>, op: &str) -> Result<(), Error> {
         let ptg = match op {
             "+" => Ptg::Add,
             "-" => Ptg::Sub,
@@ -616,7 +613,7 @@ impl FormulaTokenizer {
             ":" => Ptg::Range,
             "u+" => Ptg::UnaryPlus,
             "u-" => Ptg::UnaryMinus,
-            _ => return Err(XlsError::InvalidData(format!("Unknown operator: {}", op))),
+            _ => return Err(Error::InvalidData(format!("Unknown operator: {}", op))),
         };
         output.push(ptg);
         Ok(())
@@ -627,7 +624,7 @@ impl FormulaTokenizer {
         output: &mut Vec<Ptg>,
         operators: &mut Vec<(&'static str, u16, u8)>,
         op: &str,
-    ) -> Result<(), XlsError> {
+    ) -> Result<(), Error> {
         // Convert string to static str for storage
         let op_static: &'static str = match op {
             "+" => "+",
@@ -645,7 +642,7 @@ impl FormulaTokenizer {
             ":" => ":",
             "u+" => "u+",
             "u-" => "u-",
-            _ => return Err(XlsError::InvalidData(format!("Unknown operator: {}", op))),
+            _ => return Err(Error::InvalidData(format!("Unknown operator: {}", op))),
         };
 
         let prec = get_precedence(op);
@@ -657,7 +654,7 @@ impl FormulaTokenizer {
             if get_precedence(top_op) > prec || (left_associative && get_precedence(top_op) == prec)
             {
                 let (op, func_idx, argc) = operators.pop().ok_or_else(|| {
-                    XlsError::InvalidFormula("operator stack became inconsistent".to_string())
+                    Error::InvalidFormula("operator stack became inconsistent".to_string())
                 })?;
                 if op == "FUNC" {
                     output.push(Ptg::Func(func_idx, argc));
@@ -820,7 +817,7 @@ mod tests {
             assert!(
                 matches!(
                     parse_cell_ref(value),
-                    Err(XlsError::InvalidCellReference(reference)) if reference == value
+                    Err(Error::InvalidCellReference(reference)) if reference == value
                 ),
                 "unexpected result for {value:?}"
             );
@@ -829,7 +826,7 @@ mod tests {
         let oversized = format!("{}1", "Z".repeat(4_096));
         assert!(matches!(
             parse_cell_ref(&oversized),
-            Err(XlsError::InvalidCellReference(reference)) if reference == oversized
+            Err(Error::InvalidCellReference(reference)) if reference == oversized
         ));
     }
 
@@ -838,15 +835,15 @@ mod tests {
         assert_eq!(Ref::checked(0, 255).unwrap(), Ref::new(0, 255));
         assert!(matches!(
             Ref::checked(0, 256),
-            Err(XlsError::InvalidCellReference(_))
+            Err(Error::InvalidCellReference(_))
         ));
         assert!(matches!(
             Area::new(Ref::new(1, 0), Ref::new(0, 0)),
-            Err(XlsError::InvalidCellReference(_))
+            Err(Error::InvalidCellReference(_))
         ));
         assert!(matches!(
             Area::new(Ref::new(0, 1), Ref::new(0, 0)),
-            Err(XlsError::InvalidCellReference(_))
+            Err(Error::InvalidCellReference(_))
         ));
     }
 
@@ -855,11 +852,11 @@ mod tests {
         let outcome = std::panic::catch_unwind(|| FormulaTokenizer::new().tokenize("ZZZZ1"));
         assert!(matches!(
             outcome,
-            Ok(Err(XlsError::InvalidCellReference(reference))) if reference == "ZZZZ1"
+            Ok(Err(Error::InvalidCellReference(reference))) if reference == "ZZZZ1"
         ));
         assert!(matches!(
             FormulaTokenizer::new().tokenize("IW1"),
-            Err(XlsError::InvalidCellReference(reference)) if reference == "IW1"
+            Err(Error::InvalidCellReference(reference)) if reference == "IW1"
         ));
     }
 

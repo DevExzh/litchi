@@ -5,13 +5,13 @@
 //! target is resolved or activated here.
 
 use super::hyperlink::{Interaction, InteractionLimits, InteractionTrigger, encode_record};
-use super::package::{PptError, Result};
-use super::records::PptRecord;
-use crate::consts::PptRecordType;
+use super::package::{Error, Result};
+use super::records::Record;
+use crate::consts::RecordType;
 
 /// Resource limits for text-range interaction parsing and authoring.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointTextInteractionLimits {
+pub struct TextInteractionLimits {
     /// Limits for each paired `InteractiveInfo` record.
     pub interaction: InteractionLimits,
     /// Maximum number of action/range pairs in one text body.
@@ -20,7 +20,7 @@ pub struct PowerPointTextInteractionLimits {
     pub max_text_units: u32,
 }
 
-impl Default for PowerPointTextInteractionLimits {
+impl Default for TextInteractionLimits {
     fn default() -> Self {
         Self {
             interaction: InteractionLimits::default(),
@@ -32,7 +32,7 @@ impl Default for PowerPointTextInteractionLimits {
 
 /// MS-PPT `TextTypeEnum` stored by `TextHeaderAtom`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PowerPointTextType {
+pub enum TextType {
     Title,
     Body,
     Notes,
@@ -43,7 +43,7 @@ pub enum PowerPointTextType {
     QuarterBody,
 }
 
-impl PowerPointTextType {
+impl TextType {
     pub(crate) fn parse(value: u32) -> Result<Self> {
         match value {
             0 => Ok(Self::Title),
@@ -78,12 +78,12 @@ impl PowerPointTextType {
 /// Legacy PPT logical text includes one implicit final paragraph mark after
 /// the units serialized by `TextCharsAtom` or `TextBytesAtom`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct PowerPointTextRange {
+pub struct TextRange {
     begin: u32,
     end: u32,
 }
 
-impl PowerPointTextRange {
+impl TextRange {
     /// Construct a representable, non-empty range.
     pub fn new(begin: u32, end: u32) -> Result<Self> {
         let value = Self { begin, end };
@@ -135,24 +135,20 @@ impl PowerPointTextRange {
 
 /// One inert click or mouse-over action anchored to a text range.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointTextInteraction {
-    pub range: PowerPointTextRange,
+pub struct TextInteraction {
+    pub range: TextRange,
     pub interaction: Interaction,
 }
 
-impl PowerPointTextInteraction {
+impl TextInteraction {
     /// Construct and validate a range/action pair without a text-length bound.
-    pub fn new(range: PowerPointTextRange, interaction: Interaction) -> Result<Self> {
+    pub fn new(range: TextRange, interaction: Interaction) -> Result<Self> {
         range.validate_shape()?;
         Ok(Self { range, interaction })
     }
 
     /// Validate the complete pair against resource and corresponding-text bounds.
-    pub fn validate_for_text(
-        &self,
-        text_units: u32,
-        limits: PowerPointTextInteractionLimits,
-    ) -> Result<()> {
+    pub fn validate_for_text(&self, text_units: u32, limits: TextInteractionLimits) -> Result<()> {
         if text_units > limits.max_text_units {
             return corrupted("Corresponding text exceeds the configured interaction limit");
         }
@@ -165,7 +161,7 @@ impl PowerPointTextInteraction {
     pub fn to_bytes_for_text(
         &self,
         text_units: u32,
-        limits: PowerPointTextInteractionLimits,
+        limits: TextInteractionLimits,
     ) -> Result<Vec<u8>> {
         self.validate_for_text(text_units, limits)?;
         let mut bytes = self.interaction.to_bytes_with_limits(limits.interaction)?;
@@ -175,7 +171,7 @@ impl PowerPointTextInteraction {
         bytes.extend_from_slice(&encode_record(
             0,
             trigger_instance(self.interaction.trigger),
-            PptRecordType::TextInteractiveInfoAtom as u16,
+            RecordType::TextInteractiveInfoAtom as u16,
             &range,
         )?);
         Ok(bytes)
@@ -183,9 +179,9 @@ impl PowerPointTextInteraction {
 
     /// Parse every paired interaction in one corresponding text body.
     pub(crate) fn parse_records<'a>(
-        records: impl IntoIterator<Item = &'a PptRecord>,
+        records: impl IntoIterator<Item = &'a Record>,
         text_units: u32,
-        limits: PowerPointTextInteractionLimits,
+        limits: TextInteractionLimits,
     ) -> Result<Vec<Self>> {
         if text_units > limits.max_text_units {
             return corrupted("Corresponding text exceeds the configured interaction limit");
@@ -195,18 +191,18 @@ impl PowerPointTextInteraction {
         let mut interaction_section = false;
         let mut terminal_text_records = false;
         while let Some(record) = records.next() {
-            if record.record_type == PptRecordType::TextInteractiveInfoAtom {
+            if record.record_type == RecordType::TextInteractiveInfoAtom {
                 return corrupted("TextInteractiveInfoAtom has no preceding InteractiveInfo");
             }
-            if record.record_type != PptRecordType::InteractiveInfo {
+            if record.record_type != RecordType::InteractiveInfo {
                 if interaction_section {
                     if !matches!(
                         record.record_type,
-                        PptRecordType::TextRulerAtom
-                            | PptRecordType::MasterTextPropAtom
+                        RecordType::TextRulerAtom
+                            | RecordType::MasterTextPropAtom
                             // Seen after the interaction pair in established producer output,
                             // despite its earlier position in the normative ABNF.
-                            | PptRecordType::TextSpecInfoAtom
+                            | RecordType::TextSpecInfoAtom
                     ) {
                         return corrupted(format!(
                             "Text body has a nonterminal {:?} record after interactive information",
@@ -226,7 +222,7 @@ impl PowerPointTextInteraction {
             }
             let interaction = Interaction::parse_with_limits(record, limits.interaction)?;
             let anchor = records.next().ok_or_else(|| {
-                PptError::Corrupted(
+                Error::Corrupted(
                     "Text InteractiveInfo has no following TextInteractiveInfoAtom".to_string(),
                 )
             })?;
@@ -239,34 +235,34 @@ impl PowerPointTextInteraction {
 
 /// One text body and its range-anchored actions.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointTextBodyInteractions {
+pub struct TextBodyInteractions {
     /// `TextHeaderAtom.recInstance`, identifying the body within its slide set.
     pub text_header_instance: u16,
-    pub text_type: PowerPointTextType,
+    pub text_type: TextType,
     pub text: String,
-    pub interactions: Vec<PowerPointTextInteraction>,
+    pub interactions: Vec<TextInteraction>,
     /// Header/footer metacharacter placeholders in this body, in record order.
-    pub metachars: Vec<crate::text_metachar::PowerPointTextMetachar>,
+    pub metachars: Vec<crate::text_metachar::TextMetachar>,
 }
 
 /// Text interactions attached to one OfficeArt shape.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointShapeTextInteractionEntry {
+pub struct ShapeTextInteractionEntry {
     pub shape_id: u32,
-    pub interactions: Vec<PowerPointTextInteraction>,
+    pub interactions: Vec<TextInteraction>,
 }
 
 pub(crate) fn parse_text_bodies(
-    records: &[&PptRecord],
-    limits: PowerPointTextInteractionLimits,
-) -> Result<Vec<PowerPointTextBodyInteractions>> {
+    records: &[&Record],
+    limits: TextInteractionLimits,
+) -> Result<Vec<TextBodyInteractions>> {
     let mut result = Vec::new();
     let mut offset = 0;
     while offset < records.len() {
-        if records[offset].record_type != PptRecordType::TextHeaderAtom {
+        if records[offset].record_type != RecordType::TextHeaderAtom {
             if matches!(
                 records[offset].record_type,
-                PptRecordType::InteractiveInfo | PptRecordType::TextInteractiveInfoAtom
+                RecordType::InteractiveInfo | RecordType::TextInteractiveInfoAtom
             ) {
                 return corrupted("Text interaction appears before a TextHeaderAtom");
             }
@@ -277,30 +273,29 @@ pub(crate) fn parse_text_bodies(
         if header.version != 0
             || header.data_length != 4
             || header.data.len() != 4
-            || header.record_type_raw != PptRecordType::TextHeaderAtom as u16
+            || header.record_type_raw != RecordType::TextHeaderAtom as u16
         {
             return corrupted("TextHeaderAtom has an invalid header or length");
         }
-        let text_type =
-            PowerPointTextType::parse(u32::from_le_bytes(header.data[..4].try_into().unwrap()))?;
+        let text_type = TextType::parse(u32::from_le_bytes(header.data[..4].try_into().unwrap()))?;
         let end = records[offset + 1..]
             .iter()
-            .position(|record| record.record_type == PptRecordType::TextHeaderAtom)
+            .position(|record| record.record_type == RecordType::TextHeaderAtom)
             .map_or(records.len(), |relative| offset + 1 + relative);
         let body = &records[offset + 1..end];
         let has_interactions = body.iter().any(|record| {
             matches!(
                 record.record_type,
-                PptRecordType::InteractiveInfo | PptRecordType::TextInteractiveInfoAtom
+                RecordType::InteractiveInfo | RecordType::TextInteractiveInfoAtom
             )
         });
         if has_interactions {
             let text_units = text_units_from_records(body.iter().copied())?;
             let interactions =
-                PowerPointTextInteraction::parse_records(body.iter().copied(), text_units, limits)?;
+                TextInteraction::parse_records(body.iter().copied(), text_units, limits)?;
             let text = exact_text_from_records(body.iter().copied())?;
             let metachars = crate::text_metachar::metachars_from_records(body.iter().copied())?;
-            result.push(PowerPointTextBodyInteractions {
+            result.push(TextBodyInteractions {
                 text_header_instance: header.instance,
                 text_type,
                 text,
@@ -314,12 +309,12 @@ pub(crate) fn parse_text_bodies(
 }
 
 pub(crate) fn text_units_from_records<'a>(
-    records: impl IntoIterator<Item = &'a PptRecord>,
+    records: impl IntoIterator<Item = &'a Record>,
 ) -> Result<u32> {
     let mut text_units = None;
     for record in records {
         let units = match record.record_type {
-            PptRecordType::TextCharsAtom => {
+            RecordType::TextCharsAtom => {
                 if record.version != 0
                     || record.instance != 0
                     || record.data.len() % 2 != 0
@@ -328,9 +323,9 @@ pub(crate) fn text_units_from_records<'a>(
                     return corrupted("TextCharsAtom has an invalid header or UTF-16 length");
                 }
                 u32::try_from(record.data.len() / 2)
-                    .map_err(|_| PptError::Corrupted("TextCharsAtom is too large".to_string()))?
+                    .map_err(|_| Error::Corrupted("TextCharsAtom is too large".to_string()))?
             },
-            PptRecordType::TextBytesAtom => {
+            RecordType::TextBytesAtom => {
                 if record.version != 0
                     || record.instance != 0
                     || usize::try_from(record.data_length).ok() != Some(record.data.len())
@@ -338,7 +333,7 @@ pub(crate) fn text_units_from_records<'a>(
                     return corrupted("TextBytesAtom has an invalid header or length");
                 }
                 u32::try_from(record.data.len())
-                    .map_err(|_| PptError::Corrupted("TextBytesAtom is too large".to_string()))?
+                    .map_err(|_| Error::Corrupted("TextBytesAtom is too large".to_string()))?
             },
             _ => continue,
         };
@@ -349,11 +344,11 @@ pub(crate) fn text_units_from_records<'a>(
     Ok(text_units.unwrap_or(0))
 }
 
-fn exact_text_from_records<'a>(records: impl IntoIterator<Item = &'a PptRecord>) -> Result<String> {
+fn exact_text_from_records<'a>(records: impl IntoIterator<Item = &'a Record>) -> Result<String> {
     let mut text = None;
     for record in records {
         let value = match record.record_type {
-            PptRecordType::TextCharsAtom => {
+            RecordType::TextCharsAtom => {
                 if record.data.len() % 2 != 0 {
                     return corrupted("TextCharsAtom has an odd UTF-16 byte length");
                 }
@@ -363,12 +358,10 @@ fn exact_text_from_records<'a>(records: impl IntoIterator<Item = &'a PptRecord>)
                     .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
                     .collect::<Vec<_>>();
                 String::from_utf16(&units).map_err(|_| {
-                    PptError::Corrupted("TextCharsAtom contains invalid UTF-16".to_string())
+                    Error::Corrupted("TextCharsAtom contains invalid UTF-16".to_string())
                 })?
             },
-            PptRecordType::TextBytesAtom => {
-                record.data.iter().map(|byte| char::from(*byte)).collect()
-            },
+            RecordType::TextBytesAtom => record.data.iter().map(|byte| char::from(*byte)).collect(),
             _ => continue,
         };
         if text.replace(value).is_some() {
@@ -379,12 +372,12 @@ fn exact_text_from_records<'a>(records: impl IntoIterator<Item = &'a PptRecord>)
 }
 
 fn parse_anchor(
-    record: &PptRecord,
+    record: &Record,
     trigger: InteractionTrigger,
     text_units: u32,
-) -> Result<PowerPointTextRange> {
-    if record.record_type != PptRecordType::TextInteractiveInfoAtom
-        || record.record_type_raw != PptRecordType::TextInteractiveInfoAtom as u16
+) -> Result<TextRange> {
+    if record.record_type != RecordType::TextInteractiveInfoAtom
+        || record.record_type_raw != RecordType::TextInteractiveInfoAtom as u16
         || record.version != 0
         || record.instance != trigger_instance(trigger)
         || record.data_length != 8
@@ -397,10 +390,10 @@ fn parse_anchor(
     let begin = i32::from_le_bytes(record.data[0..4].try_into().unwrap());
     let end = i32::from_le_bytes(record.data[4..8].try_into().unwrap());
     let begin = u32::try_from(begin)
-        .map_err(|_| PptError::Corrupted("Text interaction begin position is negative".into()))?;
+        .map_err(|_| Error::Corrupted("Text interaction begin position is negative".into()))?;
     let end = u32::try_from(end)
-        .map_err(|_| PptError::Corrupted("Text interaction end position is negative".into()))?;
-    let range = PowerPointTextRange::new(begin, end)?;
+        .map_err(|_| Error::Corrupted("Text interaction end position is negative".into()))?;
+    let range = TextRange::new(begin, end)?;
     range.validate_for_text(text_units)?;
     Ok(range)
 }
@@ -413,7 +406,7 @@ const fn trigger_instance(trigger: InteractionTrigger) -> u16 {
 }
 
 fn corrupted<T>(message: impl Into<String>) -> Result<T> {
-    Err(PptError::Corrupted(message.into()))
+    Err(Error::Corrupted(message.into()))
 }
 
 #[cfg(test)]
@@ -421,15 +414,15 @@ mod tests {
     use super::*;
     use crate::{InteractionAction, InteractionLinkTarget};
 
-    fn record(version: u16, instance: u16, kind: PptRecordType, data: &[u8]) -> PptRecord {
+    fn record(version: u16, instance: u16, kind: RecordType, data: &[u8]) -> Record {
         let bytes = encode_record(version, instance, kind as u16, data).unwrap();
-        let (record, consumed) = PptRecord::parse_strict(&bytes, 0).unwrap();
+        let (record, consumed) = Record::parse_strict(&bytes, 0).unwrap();
         assert_eq!(consumed, bytes.len());
         record
     }
 
-    fn pair(trigger: InteractionTrigger, range: PowerPointTextRange) -> PowerPointTextInteraction {
-        PowerPointTextInteraction::new(
+    fn pair(trigger: InteractionTrigger, range: TextRange) -> TextInteraction {
+        TextInteraction::new(
             range,
             Interaction::new(
                 trigger,
@@ -443,68 +436,47 @@ mod tests {
     #[test]
     fn paired_click_and_hover_round_trip_exactly() {
         let values = [
-            pair(
-                InteractionTrigger::Click,
-                PowerPointTextRange::new(1, 3).unwrap(),
-            ),
-            pair(
-                InteractionTrigger::MouseOver,
-                PowerPointTextRange::new(3, 5).unwrap(),
-            ),
+            pair(InteractionTrigger::Click, TextRange::new(1, 3).unwrap()),
+            pair(InteractionTrigger::MouseOver, TextRange::new(3, 5).unwrap()),
         ];
         let bytes = values
             .iter()
             .flat_map(|value| {
                 value
-                    .to_bytes_for_text(5, PowerPointTextInteractionLimits::default())
+                    .to_bytes_for_text(5, TextInteractionLimits::default())
                     .unwrap()
             })
             .collect::<Vec<_>>();
-        let records = PptRecord::parse_sequence_strict(&bytes, "text interactions").unwrap();
+        let records = Record::parse_sequence_strict(&bytes, "text interactions").unwrap();
 
         assert_eq!(
-            PowerPointTextInteraction::parse_records(
-                &records,
-                5,
-                PowerPointTextInteractionLimits::default()
-            )
-            .unwrap(),
+            TextInteraction::parse_records(&records, 5, TextInteractionLimits::default()).unwrap(),
             values
         );
     }
 
     #[test]
     fn rejects_orphans_trigger_mismatch_ranges_and_limits() {
-        let click = pair(
-            InteractionTrigger::Click,
-            PowerPointTextRange::new(1, 3).unwrap(),
-        );
+        let click = pair(InteractionTrigger::Click, TextRange::new(1, 3).unwrap());
         let action = click.interaction.to_record().unwrap();
         let hover_anchor = record(
             0,
             1,
-            PptRecordType::TextInteractiveInfoAtom,
+            RecordType::TextInteractiveInfoAtom,
             &[1, 0, 0, 0, 3, 0, 0, 0],
         );
         assert!(
-            PowerPointTextInteraction::parse_records(
-                [&action, &hover_anchor],
-                3,
-                Default::default()
-            )
-            .is_err()
-        );
-        assert!(
-            PowerPointTextInteraction::parse_records([&hover_anchor], 3, Default::default())
+            TextInteraction::parse_records([&action, &hover_anchor], 3, Default::default())
                 .is_err()
         );
+        assert!(TextInteraction::parse_records([&hover_anchor], 3, Default::default()).is_err());
         assert!(click.validate_for_text(2, Default::default()).is_ok());
         assert!(click.validate_for_text(1, Default::default()).is_err());
         assert!(
             click
                 .validate_for_text(
                     3,
-                    PowerPointTextInteractionLimits {
+                    TextInteractionLimits {
                         max_text_units: 2,
                         ..Default::default()
                     }
@@ -512,18 +484,18 @@ mod tests {
                 .is_err()
         );
         assert!(
-            PowerPointTextInteraction::parse_records(
+            TextInteraction::parse_records(
                 [
                     &action,
                     &record(
                         0,
                         0,
-                        PptRecordType::TextInteractiveInfoAtom,
+                        RecordType::TextInteractiveInfoAtom,
                         &[1, 0, 0, 0, 3, 0, 0, 0],
                     )
                 ],
                 3,
-                PowerPointTextInteractionLimits {
+                TextInteractionLimits {
                     max_interactions: 0,
                     ..Default::default()
                 }
@@ -534,29 +506,21 @@ mod tests {
         let click_anchor = record(
             0,
             0,
-            PptRecordType::TextInteractiveInfoAtom,
+            RecordType::TextInteractiveInfoAtom,
             &[1, 0, 0, 0, 3, 0, 0, 0],
         );
-        let style = record(0, 0, PptRecordType::StyleTextPropAtom, &[]);
+        let style = record(0, 0, RecordType::StyleTextPropAtom, &[]);
         assert!(
-            PowerPointTextInteraction::parse_records(
-                [&action, &click_anchor, &style],
-                3,
-                Default::default()
-            )
-            .is_err()
+            TextInteraction::parse_records([&action, &click_anchor, &style], 3, Default::default())
+                .is_err()
         );
-        let ruler = record(0, 0, PptRecordType::TextRulerAtom, &[]);
+        let ruler = record(0, 0, RecordType::TextRulerAtom, &[]);
         assert!(
-            PowerPointTextInteraction::parse_records(
-                [&action, &click_anchor, &ruler],
-                3,
-                Default::default()
-            )
-            .is_ok()
+            TextInteraction::parse_records([&action, &click_anchor, &ruler], 3, Default::default())
+                .is_ok()
         );
         assert!(
-            PowerPointTextInteraction::parse_records(
+            TextInteraction::parse_records(
                 [&action, &click_anchor, &ruler, &action, &click_anchor],
                 3,
                 Default::default()
@@ -570,28 +534,24 @@ mod tests {
         let header = record(
             0,
             2,
-            PptRecordType::TextHeaderAtom,
-            &PowerPointTextType::Body.value().to_le_bytes(),
+            RecordType::TextHeaderAtom,
+            &TextType::Body.value().to_le_bytes(),
         );
         let text = record(
             0,
             0,
-            PptRecordType::TextCharsAtom,
+            RecordType::TextCharsAtom,
             &[b'A', 0, 0x3D, 0xD8, 0x00, 0xDE],
         );
-        let pair = pair(
-            InteractionTrigger::Click,
-            PowerPointTextRange::new(1, 3).unwrap(),
-        );
+        let pair = pair(InteractionTrigger::Click, TextRange::new(1, 3).unwrap());
         let pair_bytes = pair.to_bytes_for_text(3, Default::default()).unwrap();
-        let pair_records =
-            PptRecord::parse_sequence_strict(&pair_bytes, "text interaction").unwrap();
+        let pair_records = Record::parse_sequence_strict(&pair_bytes, "text interaction").unwrap();
         let records = [&header, &text, &pair_records[0], &pair_records[1]];
 
         let parsed = parse_text_bodies(&records, Default::default()).unwrap();
         assert_eq!(parsed.len(), 1);
         assert_eq!(parsed[0].text_header_instance, 2);
-        assert_eq!(parsed[0].text_type, PowerPointTextType::Body);
+        assert_eq!(parsed[0].text_type, TextType::Body);
         assert_eq!(parsed[0].text, "A😀");
         assert_eq!(parsed[0].interactions, [pair]);
     }

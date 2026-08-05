@@ -17,12 +17,12 @@ pub enum PlaceholderSize {
     Full,
 }
 
-impl From<crate::PowerPointPlaceholderSize> for PlaceholderSize {
-    fn from(size: crate::PowerPointPlaceholderSize) -> Self {
+impl From<crate::AtomPlaceholderSize> for PlaceholderSize {
+    fn from(size: crate::AtomPlaceholderSize) -> Self {
         match size {
-            crate::PowerPointPlaceholderSize::Full => Self::Full,
-            crate::PowerPointPlaceholderSize::Half => Self::Half,
-            crate::PowerPointPlaceholderSize::Quarter => Self::Quarter,
+            crate::AtomPlaceholderSize::Full => Self::Full,
+            crate::AtomPlaceholderSize::Half => Self::Half,
+            crate::AtomPlaceholderSize::Quarter => Self::Quarter,
         }
     }
 }
@@ -113,9 +113,9 @@ impl From<u16> for PlaceholderType {
     }
 }
 
-impl From<crate::PowerPointPlaceholderKind> for PlaceholderType {
-    fn from(kind: crate::PowerPointPlaceholderKind) -> Self {
-        use crate::PowerPointPlaceholderKind as Kind;
+impl From<crate::PlaceholderKind> for PlaceholderType {
+    fn from(kind: crate::PlaceholderKind) -> Self {
+        use crate::PlaceholderKind as Kind;
 
         match kind {
             Kind::MasterTitle | Kind::Title => Self::Title,
@@ -236,7 +236,7 @@ impl<'a> Placeholder<'a> {
         } else {
             let (record, consumed) = litchi_odraw::Record::parse(&container.raw_data, 0)?;
             if consumed != container.raw_data.len() {
-                return Err(super::super::package::PptError::Corrupted(
+                return Err(super::super::package::Error::Corrupted(
                     "placeholder container has trailing OfficeArt records".to_owned(),
                 ));
             }
@@ -245,9 +245,9 @@ impl<'a> Placeholder<'a> {
                 Some(info) => (
                     PlaceholderType::from(info.kind),
                     Some(match info.size {
-                        crate::PowerPointPlaceholderSize::Full => 0,
-                        crate::PowerPointPlaceholderSize::Half => 1,
-                        crate::PowerPointPlaceholderSize::Quarter => 2,
+                        crate::AtomPlaceholderSize::Full => 0,
+                        crate::AtomPlaceholderSize::Half => 1,
+                        crate::AtomPlaceholderSize::Quarter => 2,
                     }),
                     info.position,
                 ),

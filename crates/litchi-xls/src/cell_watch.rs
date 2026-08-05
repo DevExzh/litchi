@@ -9,7 +9,7 @@
 //! - MS-XLS 2.4.41 (CellWatch), 2.5.134 (FrtFlags), 2.5.139 (FrtRefHeaderU),
 //!   2.5.209 (Ref8U)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `CellWatch` record (MS-XLS 2.4.41); also the required
 /// `frtRefHeaderU.rt` value.
@@ -26,8 +26,8 @@ const FRT_FLAG_ALERT: u16 = 0x0002;
 /// Maximum column index of a `Ref8U` (MS-XLS 2.5.209).
 const MAX_COLUMN_INDEX: u16 = 0x00FF;
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: CELL_WATCH_RECORD_TYPE,
         message: message.into(),
     }
@@ -40,7 +40,7 @@ fn invalid(message: impl Into<String>) -> XlsError {
 /// zero, and MUST be ignored) are preserved verbatim so the record
 /// round-trips unchanged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsCellWatch {
+pub struct CellWatch {
     /// Raw `frtRefHeaderU.grbitFrt` bitfield. `fFrtRef` is guaranteed set and
     /// `fFrtAlert` guaranteed clear; the undefined reserved bits are preserved.
     flags: u16,
@@ -56,11 +56,11 @@ pub struct XlsCellWatch {
     reserved: [u8; 4],
 }
 
-impl XlsCellWatch {
+impl CellWatch {
     /// Parse a `CellWatch` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: PAYLOAD_LEN,
                 found: data.len(),
             });
@@ -162,7 +162,7 @@ mod tests {
     #[test]
     fn round_trip() {
         let bytes = record(0x0001, [3, 3, 2, 2], [0; 4]);
-        let parsed = XlsCellWatch::parse(&bytes).unwrap();
+        let parsed = CellWatch::parse(&bytes).unwrap();
         assert_eq!(parsed.row_first(), 3);
         assert_eq!(parsed.row_last(), 3);
         assert_eq!(parsed.column_first(), 2);
@@ -176,7 +176,7 @@ mod tests {
         // The 14 reserved grbitFrt bits and the 4 reserved bytes MUST be
         // ignored but round-trip verbatim.
         let bytes = record(0xFFFD, [0, 10, 0, 0xFF], [0xDE, 0xAD, 0xBE, 0xEF]);
-        let parsed = XlsCellWatch::parse(&bytes).unwrap();
+        let parsed = CellWatch::parse(&bytes).unwrap();
         assert_eq!(parsed.flags(), 0xFFFD);
         assert_eq!(parsed.reserved(), [0xDE, 0xAD, 0xBE, 0xEF]);
         assert_eq!(parsed.to_payload(), bytes);
@@ -186,18 +186,18 @@ mod tests {
     fn rejects_malformed_records() {
         let bytes = record(0x0001, [3, 3, 2, 2], [0; 4]);
         // Truncated and overlong payloads.
-        assert!(XlsCellWatch::parse(&bytes[..15]).is_err());
-        assert!(XlsCellWatch::parse(&[bytes.as_slice(), &[0]].concat()).is_err());
+        assert!(CellWatch::parse(&bytes[..15]).is_err());
+        assert!(CellWatch::parse(&[bytes.as_slice(), &[0]].concat()).is_err());
         // Wrong FrtRefHeaderU.rt.
         let mut wrong_rt = bytes.clone();
         wrong_rt[0..2].copy_from_slice(&0x0868u16.to_le_bytes());
-        assert!(XlsCellWatch::parse(&wrong_rt).is_err());
+        assert!(CellWatch::parse(&wrong_rt).is_err());
         // fFrtRef clear / fFrtAlert set.
-        assert!(XlsCellWatch::parse(&record(0x0000, [3, 3, 2, 2], [0; 4])).is_err());
-        assert!(XlsCellWatch::parse(&record(0x0003, [3, 3, 2, 2], [0; 4])).is_err());
+        assert!(CellWatch::parse(&record(0x0000, [3, 3, 2, 2], [0; 4])).is_err());
+        assert!(CellWatch::parse(&record(0x0003, [3, 3, 2, 2], [0; 4])).is_err());
         // Invalid Ref8U ranges.
-        assert!(XlsCellWatch::parse(&record(0x0001, [4, 3, 2, 2], [0; 4])).is_err());
-        assert!(XlsCellWatch::parse(&record(0x0001, [3, 3, 3, 2], [0; 4])).is_err());
-        assert!(XlsCellWatch::parse(&record(0x0001, [3, 3, 2, 0x0100], [0; 4])).is_err());
+        assert!(CellWatch::parse(&record(0x0001, [4, 3, 2, 2], [0; 4])).is_err());
+        assert!(CellWatch::parse(&record(0x0001, [3, 3, 3, 2], [0; 4])).is_err());
+        assert!(CellWatch::parse(&record(0x0001, [3, 3, 2, 0x0100], [0; 4])).is_err());
     }
 }

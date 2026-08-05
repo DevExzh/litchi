@@ -2,16 +2,16 @@ use std::io::Cursor;
 use std::path::PathBuf;
 
 use litchi_xls::writer::{
-    PivotCacheValue, XlsPivotFieldConfig, XlsPivotItemConfig, XlsPivotTableConfig, XlsWriter,
+    PivotCacheValue, PivotFieldConfig, PivotItemConfig, PivotTableConfig, Writer,
 };
 use litchi_xls::{
     PivotCacheDateGroupUnit, PivotCacheDateGrouping, PivotCacheDateTime,
     PivotCacheDiscreteGrouping, PivotCacheGrouping, PivotCacheItem, PivotCacheNumericGrouping,
-    XlsWorkbook,
+    Workbook,
 };
 
-fn item(index: u16) -> XlsPivotItemConfig {
-    XlsPivotItemConfig {
+fn item(index: u16) -> PivotItemConfig {
+    PivotItemConfig {
         item_type: 0,
         flags: 0,
         cache_index: index,
@@ -22,10 +22,10 @@ fn item(index: u16) -> XlsPivotItemConfig {
 fn config(
     name: &str,
     sheet: &str,
-    fields: Vec<XlsPivotFieldConfig>,
+    fields: Vec<PivotFieldConfig>,
     rows: Vec<Vec<PivotCacheValue>>,
-) -> XlsPivotTableConfig {
-    XlsPivotTableConfig {
+) -> PivotTableConfig {
+    PivotTableConfig {
         name: name.to_string(),
         source_type: 1,
         source_sheet_name: sheet.to_string(),
@@ -54,8 +54,8 @@ fn config(
     }
 }
 
-fn write_configs(configs: Vec<(&str, XlsPivotTableConfig)>) -> Vec<u8> {
-    let mut writer = XlsWriter::new();
+fn write_configs(configs: Vec<(&str, PivotTableConfig)>) -> Vec<u8> {
+    let mut writer = Writer::new();
     for (sheet_name, config) in configs {
         let sheet = writer.add_worksheet(sheet_name).unwrap();
         writer.add_pivot_table(sheet, config).unwrap();
@@ -65,11 +65,11 @@ fn write_configs(configs: Vec<(&str, XlsPivotTableConfig)>) -> Vec<u8> {
     output.into_inner()
 }
 
-fn numeric_config(sheet: &str) -> XlsPivotTableConfig {
+fn numeric_config(sheet: &str) -> PivotTableConfig {
     config(
         "Numeric",
         sheet,
-        vec![XlsPivotFieldConfig {
+        vec![PivotFieldConfig {
             axis: 1,
             subtotal_count: 0,
             subtotal_flags: 0,
@@ -97,14 +97,14 @@ fn numeric_config(sheet: &str) -> XlsPivotTableConfig {
     )
 }
 
-fn date_config(sheet: &str) -> XlsPivotTableConfig {
+fn date_config(sheet: &str) -> PivotTableConfig {
     let jan = PivotCacheDateTime::try_new(2026, 1, 1, 0, 0, 0).unwrap();
     let feb = PivotCacheDateTime::try_new(2026, 2, 1, 0, 0, 0).unwrap();
     let mar = PivotCacheDateTime::try_new(2026, 3, 1, 0, 0, 0).unwrap();
     config(
         "Dates",
         sheet,
-        vec![XlsPivotFieldConfig {
+        vec![PivotFieldConfig {
             axis: 1,
             subtotal_count: 0,
             subtotal_flags: 0,
@@ -130,12 +130,12 @@ fn date_config(sheet: &str) -> XlsPivotTableConfig {
     )
 }
 
-fn discrete_config(sheet: &str) -> XlsPivotTableConfig {
+fn discrete_config(sheet: &str) -> PivotTableConfig {
     config(
         "Discrete",
         sheet,
         vec![
-            XlsPivotFieldConfig {
+            PivotFieldConfig {
                 axis: 0,
                 subtotal_count: 0,
                 subtotal_flags: 0,
@@ -146,7 +146,7 @@ fn discrete_config(sheet: &str) -> XlsPivotTableConfig {
                 is_numeric: false,
                 grouping: None,
             },
-            XlsPivotFieldConfig {
+            PivotFieldConfig {
                 axis: 1,
                 subtotal_count: 0,
                 subtotal_flags: 0,
@@ -220,7 +220,7 @@ fn emits_and_reopens_exact_numeric_date_and_discrete_grouping_records() {
     assert_eq!(u16::from_le_bytes(sxdb.1[10..12].try_into().unwrap()), 1);
     assert_eq!(u16::from_le_bytes(sxdb.1[12..14].try_into().unwrap()), 2);
 
-    let workbook = XlsWorkbook::new(Cursor::new(bytes)).unwrap();
+    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
     assert_eq!(
         workbook
             .pivot_caches()
@@ -251,7 +251,7 @@ fn reads_libreoffice_number_and_date_grouping_fixtures() {
         "pivottable_number_grouping.xls",
         "pivottable_dates_grouping.xls",
     ] {
-        let workbook = XlsWorkbook::new(std::fs::File::open(root.join(file)).unwrap()).unwrap();
+        let workbook = Workbook::new(std::fs::File::open(root.join(file)).unwrap()).unwrap();
         assert!(
             workbook
                 .pivot_caches()
@@ -264,7 +264,7 @@ fn reads_libreoffice_number_and_date_grouping_fixtures() {
 
 #[test]
 fn invalid_grouping_is_rejected_without_mutating_writer() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Atomic").unwrap();
     let mut invalid = numeric_config("Atomic");
     if let Some(PivotCacheGrouping::Numeric(grouping)) = &mut invalid.fields[0].grouping {
@@ -274,7 +274,7 @@ fn invalid_grouping_is_rejected_without_mutating_writer() {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
     assert!(
-        XlsWorkbook::new(Cursor::new(output.into_inner()))
+        Workbook::new(Cursor::new(output.into_inner()))
             .unwrap()
             .pivot_caches()
             .is_empty()

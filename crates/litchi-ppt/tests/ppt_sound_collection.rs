@@ -1,5 +1,5 @@
 use litchi_ppt::writer::build_sound_collection;
-use litchi_ppt::{Package, PptRecord, sound_collection::Collection};
+use litchi_ppt::{Package, Record, sound_collection::Collection};
 use std::collections::HashSet;
 
 #[test]
@@ -27,7 +27,7 @@ fn existing_writer_round_trips_through_strict_reader() {
     let mut ids = HashSet::new();
     ids.insert(8);
     let (bytes, mapping) = build_sound_collection(&ids).unwrap();
-    let (record, consumed) = PptRecord::parse(&bytes, 0).unwrap();
+    let (record, consumed) = Record::parse(&bytes, 0).unwrap();
     assert_eq!(consumed, bytes.len());
     let collection = Collection::parse(&record).unwrap();
     assert_eq!(collection.sounds.len(), 1);

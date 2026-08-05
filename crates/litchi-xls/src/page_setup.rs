@@ -1,7 +1,7 @@
 //! BIFF8 worksheet print and page setup records.
 
 use super::number_format::{COMPRESSED_CHAR_BYTES, UTF16_CHAR_BYTES, XL_UNICODE_STRING_HIGH_BYTE};
-use crate::error::{XlsError, XlsResult};
+use crate::error::{Error, Result};
 
 const HEADER_RECORD_TYPE: u16 = 0x0014;
 const FOOTER_RECORD_TYPE: u16 = 0x0015;
@@ -24,8 +24,8 @@ use super::custom_view::{
     USER_S_VIEW_END_RECORD_TYPE as USER_SVIEW_END_RECORD_TYPE,
 };
 
-fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(record_type: u16, message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type,
         message: message.into(),
     }
@@ -41,21 +41,21 @@ fn read_f64(data: &[u8], offset: usize) -> f64 {
 
 /// Order in which a multi-page worksheet is printed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsPrintOrder {
+pub enum PrintOrder {
     DownThenOver,
     OverThenDown,
 }
 
 /// Explicit paper orientation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsPrintOrientation {
+pub enum PrintOrientation {
     Landscape,
     Portrait,
 }
 
 /// Representation used for cell errors when printing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsPrintErrors {
+pub enum PrintErrors {
     Displayed,
     Blank,
     Dashes,
@@ -64,7 +64,7 @@ pub enum XlsPrintErrors {
 
 /// How cell comments are printed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsPrintComments {
+pub enum PrintComments {
     None,
     AsDisplayed,
     AtEnd,
@@ -72,13 +72,13 @@ pub enum XlsPrintComments {
 
 /// One explicit page break and the inclusive perpendicular page span.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsPageBreak {
+pub struct PageBreak {
     position: u16,
     range_start: u16,
     range_end: u16,
 }
 
-impl XlsPageBreak {
+impl PageBreak {
     /// First row below a horizontal break, or first column right of a vertical break.
     pub const fn position(&self) -> u16 {
         self.position
@@ -93,19 +93,19 @@ impl XlsPageBreak {
 
 /// Fixed `SETUP` print configuration.
 #[derive(Debug, Clone, PartialEq)]
-pub struct XlsPrintSetup {
+pub struct PrintSetup {
     printer_settings_available: bool,
     paper_size: Option<u16>,
     scale_percent: Option<u16>,
     starting_page_number: Option<i16>,
     fit_width_pages: u16,
     fit_height_pages: u16,
-    print_order: XlsPrintOrder,
-    orientation: Option<XlsPrintOrientation>,
+    print_order: PrintOrder,
+    orientation: Option<PrintOrientation>,
     black_and_white: bool,
     draft_quality: bool,
-    comments: XlsPrintComments,
-    errors: XlsPrintErrors,
+    comments: PrintComments,
+    errors: PrintErrors,
     horizontal_resolution_dpi: Option<u16>,
     vertical_resolution_dpi: Option<u16>,
     header_margin_inches: f64,
@@ -113,7 +113,7 @@ pub struct XlsPrintSetup {
     copies: Option<u16>,
 }
 
-impl XlsPrintSetup {
+impl PrintSetup {
     pub fn printer_settings_available(&self) -> bool {
         self.printer_settings_available
     }
@@ -132,10 +132,10 @@ impl XlsPrintSetup {
     pub fn fit_height_pages(&self) -> u16 {
         self.fit_height_pages
     }
-    pub fn print_order(&self) -> XlsPrintOrder {
+    pub fn print_order(&self) -> PrintOrder {
         self.print_order
     }
-    pub fn orientation(&self) -> Option<XlsPrintOrientation> {
+    pub fn orientation(&self) -> Option<PrintOrientation> {
         self.orientation
     }
     pub fn is_black_and_white(&self) -> bool {
@@ -144,10 +144,10 @@ impl XlsPrintSetup {
     pub fn is_draft_quality(&self) -> bool {
         self.draft_quality
     }
-    pub fn comments(&self) -> XlsPrintComments {
+    pub fn comments(&self) -> PrintComments {
         self.comments
     }
-    pub fn errors(&self) -> XlsPrintErrors {
+    pub fn errors(&self) -> PrintErrors {
         self.errors
     }
     pub fn horizontal_resolution_dpi(&self) -> Option<u16> {
@@ -167,7 +167,7 @@ impl XlsPrintSetup {
     }
 }
 
-impl Default for XlsPrintSetup {
+impl Default for PrintSetup {
     fn default() -> Self {
         Self {
             printer_settings_available: false,
@@ -176,12 +176,12 @@ impl Default for XlsPrintSetup {
             starting_page_number: None,
             fit_width_pages: 0,
             fit_height_pages: 0,
-            print_order: XlsPrintOrder::DownThenOver,
+            print_order: PrintOrder::DownThenOver,
             orientation: None,
             black_and_white: false,
             draft_quality: false,
-            comments: XlsPrintComments::None,
-            errors: XlsPrintErrors::Displayed,
+            comments: PrintComments::None,
+            errors: PrintErrors::Displayed,
             horizontal_resolution_dpi: None,
             vertical_resolution_dpi: None,
             header_margin_inches: 0.5,
@@ -193,7 +193,7 @@ impl Default for XlsPrintSetup {
 
 /// Print configuration associated with a worksheet.
 #[derive(Debug, Clone, PartialEq)]
-pub struct XlsPageSetup {
+pub struct PageSetup {
     print_headers: bool,
     print_gridlines: bool,
     header: String,
@@ -204,14 +204,14 @@ pub struct XlsPageSetup {
     right_margin_inches: Option<f64>,
     top_margin_inches: Option<f64>,
     bottom_margin_inches: Option<f64>,
-    horizontal_page_breaks: Vec<XlsPageBreak>,
-    vertical_page_breaks: Vec<XlsPageBreak>,
+    horizontal_page_breaks: Vec<PageBreak>,
+    vertical_page_breaks: Vec<PageBreak>,
     printer_driver_data: Vec<Vec<u8>>,
-    print_setup: XlsPrintSetup,
-    header_footer: Option<XlsHeaderFooter>,
+    print_setup: PrintSetup,
+    header_footer: Option<HeaderFooter>,
 }
 
-impl XlsPageSetup {
+impl PageSetup {
     pub const fn print_headers(&self) -> bool {
         self.print_headers
     }
@@ -244,27 +244,27 @@ impl XlsPageSetup {
     pub fn bottom_margin_inches(&self) -> Option<f64> {
         self.bottom_margin_inches
     }
-    pub fn horizontal_page_breaks(&self) -> &[XlsPageBreak] {
+    pub fn horizontal_page_breaks(&self) -> &[PageBreak] {
         &self.horizontal_page_breaks
     }
-    pub fn vertical_page_breaks(&self) -> &[XlsPageBreak] {
+    pub fn vertical_page_breaks(&self) -> &[PageBreak] {
         &self.vertical_page_breaks
     }
     /// Opaque DEVMODE payloads from `PLS`; these bytes are never executed.
     pub fn printer_driver_data(&self) -> &[Vec<u8>] {
         &self.printer_driver_data
     }
-    pub fn print_setup(&self) -> &XlsPrintSetup {
+    pub fn print_setup(&self) -> &PrintSetup {
         &self.print_setup
     }
     /// Even-page and first-page header/footer text and display flags from the
     /// `HeaderFooter` record, when present.
-    pub fn header_footer(&self) -> Option<&XlsHeaderFooter> {
+    pub fn header_footer(&self) -> Option<&HeaderFooter> {
         self.header_footer.as_ref()
     }
 }
 
-fn parse_header_footer(data: &[u8], record_type: u16) -> XlsResult<String> {
+fn parse_header_footer(data: &[u8], record_type: u16) -> Result<String> {
     if data.is_empty() {
         return Ok(String::new());
     }
@@ -328,7 +328,7 @@ const MAX_HEADER_FOOTER_CHARS: usize = 255;
 /// Typed `HeaderFooter` record (MS-XLS 2.4.137): even-page and first-page
 /// header/footer text plus header/footer display flags.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsHeaderFooter {
+pub struct HeaderFooter {
     /// GUID of the sheet view the record applies to; `None` for the sheet
     /// itself (an all-zero `guidSView`).
     sheet_view_guid: Option<[u8; 16]>,
@@ -350,7 +350,7 @@ pub struct XlsHeaderFooter {
     first_footer: String,
 }
 
-impl XlsHeaderFooter {
+impl HeaderFooter {
     pub fn sheet_view_guid(&self) -> Option<&[u8; 16]> {
         self.sheet_view_guid.as_ref()
     }
@@ -381,7 +381,7 @@ impl XlsHeaderFooter {
 
     /// Even-page header/footer text; setting either marks the record as
     /// differentiating odd and even pages.
-    pub fn set_even(&mut self, header: String, footer: String) -> XlsResult<()> {
+    pub fn set_even(&mut self, header: String, footer: String) -> Result<()> {
         validate_header_footer_text(&header)?;
         validate_header_footer_text(&footer)?;
         self.diff_odd_even = true;
@@ -392,7 +392,7 @@ impl XlsHeaderFooter {
 
     /// First-page header/footer text; setting either marks the record as
     /// differentiating the first page.
-    pub fn set_first(&mut self, header: String, footer: String) -> XlsResult<()> {
+    pub fn set_first(&mut self, header: String, footer: String) -> Result<()> {
         validate_header_footer_text(&header)?;
         validate_header_footer_text(&footer)?;
         self.diff_first = true;
@@ -410,9 +410,9 @@ impl XlsHeaderFooter {
     }
 
     /// Parse a `HeaderFooter` record payload.
-    pub(crate) fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub(crate) fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < HEADER_FOOTER_FIXED_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: HEADER_FOOTER_FIXED_LEN,
                 found: data.len(),
             });
@@ -480,7 +480,7 @@ impl XlsHeaderFooter {
     }
 
     /// Serialize back to a complete `HeaderFooter` record payload.
-    pub(crate) fn to_payload(&self) -> XlsResult<Vec<u8>> {
+    pub(crate) fn to_payload(&self) -> Result<Vec<u8>> {
         for text in [
             &self.even_header,
             &self.even_footer,
@@ -536,7 +536,7 @@ impl XlsHeaderFooter {
     }
 }
 
-fn validate_header_footer_text(text: &str) -> XlsResult<()> {
+fn validate_header_footer_text(text: &str) -> Result<()> {
     if text.encode_utf16().count() > MAX_HEADER_FOOTER_CHARS {
         return Err(invalid(
             HEADER_FOOTER_RECORD_TYPE,
@@ -548,8 +548,8 @@ fn validate_header_footer_text(text: &str) -> XlsResult<()> {
 
 /// Parse an `XLUnicodeStringNoCch` (MS-XLS 2.5.296) of `count` characters,
 /// advancing `offset` past the consumed bytes.
-fn parse_no_cch_string(data: &[u8], offset: &mut usize, count: usize) -> XlsResult<String> {
-    let flags = *data.get(*offset).ok_or(XlsError::InvalidLength {
+fn parse_no_cch_string(data: &[u8], offset: &mut usize, count: usize) -> Result<String> {
+    let flags = *data.get(*offset).ok_or(Error::InvalidLength {
         expected: *offset + 1,
         found: data.len(),
     })?;
@@ -564,7 +564,7 @@ fn parse_no_cch_string(data: &[u8], offset: &mut usize, count: usize) -> XlsResu
         .ok_or_else(|| invalid(HEADER_FOOTER_RECORD_TYPE, "header/footer length overflow"))?;
     let text = data
         .get(*offset..*offset + byte_count)
-        .ok_or(XlsError::InvalidLength {
+        .ok_or(Error::InvalidLength {
             expected: *offset + byte_count,
             found: data.len(),
         })?;
@@ -599,7 +599,7 @@ fn write_no_cch_string(out: &mut Vec<u8>, text: &str) {
     }
 }
 
-fn parse_bool(data: &[u8], record_type: u16) -> XlsResult<bool> {
+fn parse_bool(data: &[u8], record_type: u16) -> Result<bool> {
     if data.len() != 2 {
         return Err(invalid(
             record_type,
@@ -613,7 +613,7 @@ fn parse_bool(data: &[u8], record_type: u16) -> XlsResult<bool> {
     }
 }
 
-fn parse_margin(data: &[u8], record_type: u16) -> XlsResult<f64> {
+fn parse_margin(data: &[u8], record_type: u16) -> Result<f64> {
     if data.len() != 8 {
         return Err(invalid(
             record_type,
@@ -630,7 +630,7 @@ fn parse_margin(data: &[u8], record_type: u16) -> XlsResult<f64> {
     Ok(margin)
 }
 
-fn parse_page_breaks(data: &[u8], record_type: u16) -> XlsResult<Vec<XlsPageBreak>> {
+fn parse_page_breaks(data: &[u8], record_type: u16) -> Result<Vec<PageBreak>> {
     if data.len() < 2 {
         return Err(invalid(
             record_type,
@@ -659,9 +659,9 @@ fn parse_page_breaks(data: &[u8], record_type: u16) -> XlsResult<Vec<XlsPageBrea
             ),
         ));
     }
-    let mut breaks: Vec<XlsPageBreak> = Vec::with_capacity(count);
+    let mut breaks: Vec<PageBreak> = Vec::with_capacity(count);
     for chunk in data[2..].chunks_exact(6) {
-        let page_break = XlsPageBreak {
+        let page_break = PageBreak {
             position: read_u16(chunk, 0),
             range_start: read_u16(chunk, 2),
             range_end: read_u16(chunk, 4),
@@ -701,7 +701,7 @@ fn parse_page_breaks(data: &[u8], record_type: u16) -> XlsResult<Vec<XlsPageBrea
     Ok(breaks)
 }
 
-fn parse_pls(data: &[u8]) -> XlsResult<Vec<u8>> {
+fn parse_pls(data: &[u8]) -> Result<Vec<u8>> {
     if data.len() < 2 {
         return Err(invalid(
             PLS_RECORD_TYPE,
@@ -714,7 +714,7 @@ fn parse_pls(data: &[u8]) -> XlsResult<Vec<u8>> {
     Ok(data[2..].to_vec())
 }
 
-fn parse_setup(data: &[u8]) -> XlsResult<XlsPrintSetup> {
+fn parse_setup(data: &[u8]) -> Result<PrintSetup> {
     if data.len() != 34 {
         return Err(invalid(
             SETUP_RECORD_TYPE,
@@ -760,25 +760,25 @@ fn parse_setup(data: &[u8]) -> XlsResult<XlsPrintSetup> {
     let orientation = if no_printer_settings || flags & 0x0040 != 0 {
         None
     } else if flags & 0x0002 != 0 {
-        Some(XlsPrintOrientation::Portrait)
+        Some(PrintOrientation::Portrait)
     } else {
-        Some(XlsPrintOrientation::Landscape)
+        Some(PrintOrientation::Landscape)
     };
     let comments = if flags & 0x0020 == 0 {
-        XlsPrintComments::None
+        PrintComments::None
     } else if flags & 0x0200 != 0 {
-        XlsPrintComments::AtEnd
+        PrintComments::AtEnd
     } else {
-        XlsPrintComments::AsDisplayed
+        PrintComments::AsDisplayed
     };
     let errors = match (flags >> 10) & 3 {
-        0 => XlsPrintErrors::Displayed,
-        1 => XlsPrintErrors::Blank,
-        2 => XlsPrintErrors::Dashes,
-        _ => XlsPrintErrors::NotAvailable,
+        0 => PrintErrors::Displayed,
+        1 => PrintErrors::Blank,
+        2 => PrintErrors::Dashes,
+        _ => PrintErrors::NotAvailable,
     };
 
-    Ok(XlsPrintSetup {
+    Ok(PrintSetup {
         printer_settings_available: !no_printer_settings,
         paper_size: printer_value(paper_size),
         scale_percent: printer_value(read_u16(data, 2)),
@@ -786,9 +786,9 @@ fn parse_setup(data: &[u8]) -> XlsResult<XlsPrintSetup> {
         fit_width_pages,
         fit_height_pages,
         print_order: if flags & 0x0001 != 0 {
-            XlsPrintOrder::OverThenDown
+            PrintOrder::OverThenDown
         } else {
-            XlsPrintOrder::DownThenOver
+            PrintOrder::DownThenOver
         },
         orientation,
         black_and_white: flags & 0x0008 != 0,
@@ -815,11 +815,11 @@ struct PartialPageSetup {
     right_margin_inches: Option<f64>,
     top_margin_inches: Option<f64>,
     bottom_margin_inches: Option<f64>,
-    horizontal_page_breaks: Option<Vec<XlsPageBreak>>,
-    vertical_page_breaks: Option<Vec<XlsPageBreak>>,
+    horizontal_page_breaks: Option<Vec<PageBreak>>,
+    vertical_page_breaks: Option<Vec<PageBreak>>,
     printer_driver_data: Vec<Vec<u8>>,
-    print_setup: Option<XlsPrintSetup>,
-    header_footer: Option<XlsHeaderFooter>,
+    print_setup: Option<PrintSetup>,
+    header_footer: Option<HeaderFooter>,
 }
 
 /// Collects primary worksheet page records while excluding custom views.
@@ -838,14 +838,14 @@ impl PageSetupCollector {
         }
     }
 
-    fn duplicate(record_type: u16) -> XlsError {
+    fn duplicate(record_type: u16) -> Error {
         invalid(
             record_type,
             "worksheet contains a duplicate primary page-setup record",
         )
     }
 
-    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
+    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> Result<()> {
         if self.collecting_pls {
             if record_type == CONTINUE_RECORD_TYPE {
                 self.page
@@ -951,7 +951,7 @@ impl PageSetupCollector {
                 if self.page.header_footer.is_some() {
                     return Err(Self::duplicate(record_type));
                 }
-                self.page.header_footer = Some(XlsHeaderFooter::parse(data)?);
+                self.page.header_footer = Some(HeaderFooter::parse(data)?);
             },
             PLS_RECORD_TYPE => {
                 self.page.printer_driver_data.push(parse_pls(data)?);
@@ -968,7 +968,7 @@ impl PageSetupCollector {
         Ok(())
     }
 
-    pub(crate) fn finish(self) -> XlsResult<Option<XlsPageSetup>> {
+    pub(crate) fn finish(self) -> Result<Option<PageSetup>> {
         let has_partial = self.page.print_headers.is_some()
             || self.page.print_gridlines.is_some()
             || self.page.horizontal_page_breaks.is_some()
@@ -986,7 +986,7 @@ impl PageSetupCollector {
         if !has_partial && self.page.print_setup.is_none() {
             return Ok(None);
         }
-        Ok(Some(XlsPageSetup {
+        Ok(Some(PageSetup {
             print_headers: self.page.print_headers.unwrap_or(false),
             print_gridlines: self.page.print_gridlines.unwrap_or(false),
             header: self.page.header.unwrap_or_default(),
@@ -1053,7 +1053,7 @@ mod tests {
         assert!(page.is_horizontally_centered());
         assert_eq!(
             page.print_setup().orientation(),
-            Some(XlsPrintOrientation::Portrait)
+            Some(PrintOrientation::Portrait)
         );
         assert_eq!(page.print_setup().horizontal_resolution_dpi(), Some(600));
         assert_eq!(
@@ -1128,7 +1128,7 @@ mod tests {
 
     #[test]
     fn reads_poi_page_setup_fixtures() {
-        use crate::XlsWorkbook;
+        use crate::Workbook;
         use std::fs::File;
         use std::path::Path;
 
@@ -1138,7 +1138,7 @@ mod tests {
                 .join(name)
         };
 
-        let dbcs = XlsWorkbook::new(File::open(fixture("DBCSHeader.xls")).unwrap()).unwrap();
+        let dbcs = Workbook::new(File::open(fixture("DBCSHeader.xls")).unwrap()).unwrap();
         let page = dbcs.xls_worksheet(0).unwrap().page_setup().unwrap();
         assert_eq!(
             page.header(),
@@ -1150,12 +1150,12 @@ mod tests {
         );
         assert_eq!(
             page.print_setup().orientation(),
-            Some(XlsPrintOrientation::Portrait)
+            Some(PrintOrientation::Portrait)
         );
         assert_eq!(page.print_setup().paper_size(), Some(1));
 
         let breaks =
-            XlsWorkbook::new(File::open(fixture("SimpleWithPageBreaks.xls")).unwrap()).unwrap();
+            Workbook::new(File::open(fixture("SimpleWithPageBreaks.xls")).unwrap()).unwrap();
         let page = breaks.xls_worksheet(0).unwrap().page_setup().unwrap();
         assert!(
             !page.horizontal_page_breaks().is_empty() || !page.vertical_page_breaks().is_empty()
@@ -1185,7 +1185,7 @@ mod tests {
         strings.extend_from_slice(&0x6587u16.to_le_bytes());
         let data = header_footer_record(0x000F, [2, 0, 1, 0], &strings);
 
-        let parsed = XlsHeaderFooter::parse(&data).unwrap();
+        let parsed = HeaderFooter::parse(&data).unwrap();
         assert!(parsed.diff_odd_even());
         assert!(parsed.diff_first());
         assert!(parsed.scale_with_doc());
@@ -1201,7 +1201,7 @@ mod tests {
     #[test]
     fn parses_header_footer_without_strings() {
         let data = header_footer_record(0x000C, [0, 0, 0, 0], &[]);
-        let parsed = XlsHeaderFooter::parse(&data).unwrap();
+        let parsed = HeaderFooter::parse(&data).unwrap();
         assert!(!parsed.diff_odd_even());
         assert!(!parsed.diff_first());
         assert!(parsed.scale_with_doc());
@@ -1212,41 +1212,38 @@ mod tests {
     #[test]
     fn rejects_malformed_header_footer_records() {
         // Truncated fixed portion.
-        assert!(XlsHeaderFooter::parse(&[0; 30]).is_err());
+        assert!(HeaderFooter::parse(&[0; 30]).is_err());
         // Wrong FrtHeader.rt.
         let mut wrong_rt = header_footer_record(0x000C, [0, 0, 0, 0], &[]);
         wrong_rt[0..2].copy_from_slice(&0x0862u16.to_le_bytes());
-        assert!(XlsHeaderFooter::parse(&wrong_rt).is_err());
+        assert!(HeaderFooter::parse(&wrong_rt).is_err());
         // Text without its difference flag.
         let mut strings = Vec::new();
         strings.push(0);
         strings.extend_from_slice(b"EH");
         assert!(
-            XlsHeaderFooter::parse(&header_footer_record(0x000C, [2, 0, 0, 0], &strings)).is_err()
+            HeaderFooter::parse(&header_footer_record(0x000C, [2, 0, 0, 0], &strings)).is_err()
         );
         // Character count above the 255-unit limit.
-        assert!(
-            XlsHeaderFooter::parse(&header_footer_record(0x000F, [256, 0, 0, 0], &[])).is_err()
-        );
+        assert!(HeaderFooter::parse(&header_footer_record(0x000F, [256, 0, 0, 0], &[])).is_err());
         // Trailing garbage after the declared strings.
-        assert!(XlsHeaderFooter::parse(&header_footer_record(0x000C, [0, 0, 0, 0], &[0])).is_err());
+        assert!(HeaderFooter::parse(&header_footer_record(0x000C, [0, 0, 0, 0], &[0])).is_err());
         // Truncated string payload.
         assert!(
-            XlsHeaderFooter::parse(&header_footer_record(0x0001, [3, 0, 0, 0], &[0, b'E']))
-                .is_err()
+            HeaderFooter::parse(&header_footer_record(0x0001, [3, 0, 0, 0], &[0, b'E'])).is_err()
         );
     }
 
     #[test]
     fn header_footer_builder_validates_and_serializes() {
-        let mut value = XlsHeaderFooter::default();
+        let mut value = HeaderFooter::default();
         value
             .set_even("&LEven".to_string(), "&CFooter".to_string())
             .unwrap();
         value.set_first("First".to_string(), String::new()).unwrap();
         value.set_scale_with_doc(true);
         value.set_align_margins(true);
-        let parsed = XlsHeaderFooter::parse(&value.to_payload().unwrap()).unwrap();
+        let parsed = HeaderFooter::parse(&value.to_payload().unwrap()).unwrap();
         assert_eq!(parsed, value);
 
         assert!(value.set_even("x".repeat(256), String::new()).is_err());

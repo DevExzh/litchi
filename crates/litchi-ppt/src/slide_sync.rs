@@ -1,13 +1,13 @@
 //! Inert PowerPoint 12 slide-library synchronization metadata.
 
-use super::package::{PptError, Result};
-use super::records::PptRecord;
-use crate::consts::PptRecordType;
+use super::package::{Error, Result};
+use super::records::Record;
+use crate::consts::RecordType;
 use chrono::NaiveDate;
 
 /// A validated Windows `SYSTEMTIME` used by PowerPoint synchronization records.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointSystemTime {
+pub struct SystemTime {
     /// Gregorian year.
     pub year: u16,
     /// Month (`1` through `12`).
@@ -30,23 +30,23 @@ pub struct PowerPointSystemTime {
 ///
 /// Parsing this structure never accesses the URL or performs synchronization.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointSlideSyncInfo {
+pub struct SlideSyncInfo {
     /// Unique server-side slide identifier.
     pub server_slide_id: String,
     /// HTTP URL of the source slide library.
     pub slide_library_url: String,
     /// Time the server-side slide was last modified.
-    pub server_modified: PowerPointSystemTime,
+    pub server_modified: SystemTime,
     /// Time the slide was inserted into this presentation.
-    pub client_inserted: PowerPointSystemTime,
+    pub client_inserted: SystemTime,
 }
 
-impl PowerPointSlideSyncInfo {
+impl SlideSyncInfo {
     /// Parse the optional synchronization container directly below `root`.
-    pub fn parse(root: &PptRecord) -> Result<Option<Self>> {
-        let containers = root.find_children(PptRecordType::RoundTripSlideSyncInfo12);
+    pub fn parse(root: &Record) -> Result<Option<Self>> {
+        let containers = root.find_children(RecordType::RoundTripSlideSyncInfo12);
         if containers.len() > 1 {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "Slide contains duplicate RoundTripSlideSyncInfo12 containers".to_string(),
             ));
         }
@@ -54,14 +54,13 @@ impl PowerPointSlideSyncInfo {
             return Ok(None);
         };
         if container.version != 0x0f || container.instance != 0 {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "RoundTripSlideSyncInfo12 has an invalid record header".to_string(),
             ));
         }
-        let children =
-            PptRecord::parse_sequence_strict(&container.data, "RoundTripSlideSyncInfo12")?;
+        let children = Record::parse_sequence_strict(&container.data, "RoundTripSlideSyncInfo12")?;
         if children.len() != 3 {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "RoundTripSlideSyncInfo12 must contain exactly three records".to_string(),
             ));
         }
@@ -69,21 +68,21 @@ impl PowerPointSlideSyncInfo {
         let server_slide_id = parse_unicode_string(&children[0], 0, "ServerIdAtom")?;
         let slide_library_url = parse_unicode_string(&children[1], 1, "SlideLibUrlAtom")?;
         let parsed_url = url::Url::parse(&slide_library_url).map_err(|_| {
-            PptError::Corrupted("SlideLibUrlAtom does not contain a valid HTTP URI".to_string())
+            Error::Corrupted("SlideLibUrlAtom does not contain a valid HTTP URI".to_string())
         })?;
         if parsed_url.scheme() != "http" {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "SlideLibUrlAtom does not use the HTTP scheme".to_string(),
             ));
         }
 
         let atom = &children[2];
-        if atom.record_type != PptRecordType::RoundTripSlideSyncInfoAtom12
+        if atom.record_type != RecordType::RoundTripSlideSyncInfoAtom12
             || atom.version != 0
             || atom.instance != 0
             || atom.data.len() != 32
         {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "SlideSyncInfoAtom12 has an invalid record header or size".to_string(),
             ));
         }
@@ -97,13 +96,13 @@ impl PowerPointSlideSyncInfo {
     }
 }
 
-fn parse_unicode_string(record: &PptRecord, instance: u16, name: &str) -> Result<String> {
-    if record.record_type != PptRecordType::CString
+fn parse_unicode_string(record: &Record, instance: u16, name: &str) -> Result<String> {
+    if record.record_type != RecordType::CString
         || record.version != 0
         || record.instance != instance
         || record.data.len() & 1 != 0
     {
-        return Err(PptError::Corrupted(format!(
+        return Err(Error::Corrupted(format!(
             "{name} has an invalid record header or size"
         )));
     }
@@ -114,19 +113,19 @@ fn parse_unicode_string(record: &PptRecord, instance: u16, name: &str) -> Result
             break;
         }
         if matches!(unit, 0x0001..=0x001f | 0x007f..=0x009f) {
-            return Err(PptError::Corrupted(format!(
+            return Err(Error::Corrupted(format!(
                 "{name} contains a non-printable character"
             )));
         }
         units.push(unit);
     }
     String::from_utf16(&units)
-        .map_err(|_| PptError::Corrupted(format!("{name} contains invalid UTF-16")))
+        .map_err(|_| Error::Corrupted(format!("{name} contains invalid UTF-16")))
 }
 
-fn parse_system_time(data: &[u8], name: &str) -> Result<PowerPointSystemTime> {
+fn parse_system_time(data: &[u8], name: &str) -> Result<SystemTime> {
     let field = |index: usize| u16::from_le_bytes([data[index], data[index + 1]]);
-    let time = PowerPointSystemTime {
+    let time = SystemTime {
         year: field(0),
         month: field(2),
         day_of_week: field(4),
@@ -144,7 +143,7 @@ fn parse_system_time(data: &[u8], name: &str) -> Result<PowerPointSystemTime> {
         || time.millisecond > 999
         || NaiveDate::from_ymd_opt(time.year.into(), time.month.into(), time.day.into()).is_none()
     {
-        return Err(PptError::Corrupted(format!(
+        return Err(Error::Corrupted(format!(
             "Slide synchronization {name} is not a valid SYSTEMTIME"
         )));
     }
@@ -181,17 +180,17 @@ mod tests {
         [server, url, atom].concat()
     }
 
-    fn container(version: u16, instance: u16, children: &[u8]) -> PptRecord {
+    fn container(version: u16, instance: u16, children: &[u8]) -> Record {
         let bytes = record_bytes(version, instance, 0x3714, children);
-        PptRecord::parse(&bytes, 0).unwrap().0
+        Record::parse(&bytes, 0).unwrap().0
     }
 
-    fn root(children: Vec<PptRecord>) -> PptRecord {
-        PptRecord {
+    fn root(children: Vec<Record>) -> Record {
+        Record {
             version: 0x0f,
             instance: 0,
-            record_type: PptRecordType::Slide,
-            record_type_raw: PptRecordType::Slide.as_u16(),
+            record_type: RecordType::Slide,
+            record_type_raw: RecordType::Slide.as_u16(),
             data_length: 0,
             data: Vec::new(),
             children,
@@ -200,14 +199,10 @@ mod tests {
 
     #[test]
     fn parses_slide_library_synchronization_metadata() {
-        assert_eq!(
-            PowerPointSlideSyncInfo::parse(&root(Vec::new())).unwrap(),
-            None
-        );
-        let parsed =
-            PowerPointSlideSyncInfo::parse(&root(vec![container(0x0f, 0, &valid_children())]))
-                .unwrap()
-                .unwrap();
+        assert_eq!(SlideSyncInfo::parse(&root(Vec::new())).unwrap(), None);
+        let parsed = SlideSyncInfo::parse(&root(vec![container(0x0f, 0, &valid_children())]))
+            .unwrap()
+            .unwrap();
 
         assert_eq!(parsed.server_slide_id, "server-slide-42");
         assert_eq!(parsed.slide_library_url, "http://example.com/slides?id=42");
@@ -233,7 +228,7 @@ mod tests {
             root(vec![container(0x0f, 0, &reordered)]),
             root(vec![container(0x0f, 0, &extra)]),
         ] {
-            assert!(PowerPointSlideSyncInfo::parse(&document).is_err());
+            assert!(SlideSyncInfo::parse(&document).is_err());
         }
 
         for (server, url) in [
@@ -247,9 +242,7 @@ mod tests {
         ] {
             let url = record_bytes(0, 1, 4026, &url);
             let children = [server, url, atom.clone()].concat();
-            assert!(
-                PowerPointSlideSyncInfo::parse(&root(vec![container(0x0f, 0, &children)])).is_err()
-            );
+            assert!(SlideSyncInfo::parse(&root(vec![container(0x0f, 0, &children)])).is_err());
         }
 
         for invalid_url in [
@@ -259,9 +252,7 @@ mod tests {
             record_bytes(0, 1, 4026, &[0x00, 0xd8]),
         ] {
             let children = [server.clone(), invalid_url, atom.clone()].concat();
-            assert!(
-                PowerPointSlideSyncInfo::parse(&root(vec![container(0x0f, 0, &children)])).is_err()
-            );
+            assert!(SlideSyncInfo::parse(&root(vec![container(0x0f, 0, &children)])).is_err());
         }
     }
 
@@ -278,9 +269,7 @@ mod tests {
         ] {
             let atom = record_bytes(version, instance, 0x3715, &payload);
             let children = [server.clone(), url.clone(), atom].concat();
-            assert!(
-                PowerPointSlideSyncInfo::parse(&root(vec![container(0x0f, 0, &children)])).is_err()
-            );
+            assert!(SlideSyncInfo::parse(&root(vec![container(0x0f, 0, &children)])).is_err());
         }
 
         for invalid in [
@@ -298,9 +287,7 @@ mod tests {
             times.extend_from_slice(&system_time([2024, 1, 1, 1, 0, 0, 0, 0]));
             let atom = record_bytes(0, 0, 0x3715, &times);
             let children = [server.clone(), url.clone(), atom].concat();
-            assert!(
-                PowerPointSlideSyncInfo::parse(&root(vec![container(0x0f, 0, &children)])).is_err()
-            );
+            assert!(SlideSyncInfo::parse(&root(vec![container(0x0f, 0, &children)])).is_err());
         }
     }
 }

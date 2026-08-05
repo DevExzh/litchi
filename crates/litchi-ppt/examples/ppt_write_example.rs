@@ -5,13 +5,13 @@
 //! for implementation status.
 //!
 //! Run with: cargo run --example ppt_write_example
-use litchi_ppt::PptWriter;
+use litchi_ppt::Writer;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating a new PPT file...");
 
     // Create a new widescreen presentation (16:9)
-    let mut writer = PptWriter::new_widescreen();
+    let mut writer = Writer::new_widescreen();
 
     // Set presentation properties
     writer.set_property("Title", "Sample Presentation");

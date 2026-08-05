@@ -10,7 +10,7 @@
 //! - MS-XLS 2.4.125 (ForceFullCalculation), 2.5.14 (Boolean), 2.5.134
 //!   (FrtFlags), 2.5.135 (FrtHeader)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `ForceFullCalculation` record (MS-XLS 2.4.125); also
 /// the required `frtHeader.rt` value.
@@ -25,8 +25,8 @@ const FRT_FLAGS_FORBIDDEN: u16 = 0x0003;
 /// `fNoDeps` (4).
 const PAYLOAD_LEN: usize = 16;
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: FORCE_FULL_CALCULATION_RECORD_TYPE,
         message: message.into(),
     }
@@ -38,7 +38,7 @@ fn invalid(message: impl Into<String>) -> XlsError {
 /// The `frtHeader` reserved bytes (MUST be ignored) are preserved verbatim so
 /// the record round-trips unchanged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsForceFullCalculation {
+pub struct ForceFullCalculation {
     /// Raw `frtHeader.grbitFrt` bitfield (`fFrtRef`/`fFrtAlert` are zero).
     frt_flags: u16,
     /// `frtHeader.reserved` bytes, preserved verbatim.
@@ -48,11 +48,11 @@ pub struct XlsForceFullCalculation {
     force_full: bool,
 }
 
-impl XlsForceFullCalculation {
+impl ForceFullCalculation {
     /// Parse a `ForceFullCalculation` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: PAYLOAD_LEN,
                 found: data.len(),
             });
@@ -123,7 +123,7 @@ mod tests {
     fn round_trip_both_modes() {
         for (value, expected) in [(0, false), (1, true)] {
             let bytes = record(0, value);
-            let parsed = XlsForceFullCalculation::parse(&bytes).unwrap();
+            let parsed = ForceFullCalculation::parse(&bytes).unwrap();
             assert_eq!(parsed.force_full(), expected);
             assert_eq!(parsed.frt_flags(), 0);
             assert_eq!(parsed.to_payload(), bytes);
@@ -136,7 +136,7 @@ mod tests {
         // MUST be ignored but round-trip verbatim.
         let mut bytes = record(0xFFFC, 1);
         bytes[4..FRT_HEADER_LEN].copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
-        let parsed = XlsForceFullCalculation::parse(&bytes).unwrap();
+        let parsed = ForceFullCalculation::parse(&bytes).unwrap();
         assert_eq!(parsed.frt_flags(), 0xFFFC);
         assert_eq!(parsed.to_payload(), bytes);
     }
@@ -145,17 +145,17 @@ mod tests {
     fn rejects_malformed_records() {
         let bytes = record(0, 1);
         // Truncated and overlong payloads.
-        assert!(XlsForceFullCalculation::parse(&bytes[..15]).is_err());
-        assert!(XlsForceFullCalculation::parse(&[bytes.as_slice(), &[0]].concat()).is_err());
+        assert!(ForceFullCalculation::parse(&bytes[..15]).is_err());
+        assert!(ForceFullCalculation::parse(&[bytes.as_slice(), &[0]].concat()).is_err());
         // Wrong FrtHeader.rt.
         let mut wrong_rt = bytes.clone();
         wrong_rt[0..2].copy_from_slice(&0x08A4u16.to_le_bytes());
-        assert!(XlsForceFullCalculation::parse(&wrong_rt).is_err());
+        assert!(ForceFullCalculation::parse(&wrong_rt).is_err());
         // fFrtRef / fFrtAlert set.
-        assert!(XlsForceFullCalculation::parse(&record(0x0001, 1)).is_err());
-        assert!(XlsForceFullCalculation::parse(&record(0x0002, 1)).is_err());
+        assert!(ForceFullCalculation::parse(&record(0x0001, 1)).is_err());
+        assert!(ForceFullCalculation::parse(&record(0x0002, 1)).is_err());
         // Non-Boolean fNoDeps.
-        assert!(XlsForceFullCalculation::parse(&record(0, 2)).is_err());
-        assert!(XlsForceFullCalculation::parse(&record(0, 0xFFFF_FFFF)).is_err());
+        assert!(ForceFullCalculation::parse(&record(0, 2)).is_err());
+        assert!(ForceFullCalculation::parse(&record(0, 0xFFFF_FFFF)).is_err());
     }
 }

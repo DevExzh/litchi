@@ -1,8 +1,8 @@
 //! East Asian line-breaking preferences in legacy PowerPoint files.
 
-use super::package::{PptError, Result};
-use super::records::PptRecord;
-use crate::consts::PptRecordType;
+use super::package::{Error, Result};
+use super::records::Record;
+use crate::consts::RecordType;
 
 /// Language whose East Asian line-breaking behavior is being queried.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,7 +34,7 @@ impl KinsokuLevel {
             0 => Ok(Self::Standard),
             1 => Ok(Self::Strict),
             2 => Ok(Self::Custom),
-            _ => Err(PptError::Corrupted(
+            _ => Err(Error::Corrupted(
                 "KinsokuAtom has an invalid line-breaking level".to_string(),
             )),
         }
@@ -45,7 +45,7 @@ impl KinsokuLevel {
             0 => Ok(Self::Standard),
             1 if japanese => Ok(Self::Strict),
             2 => Ok(Self::Custom),
-            _ => Err(PptError::Corrupted(
+            _ => Err(Error::Corrupted(
                 "Kinsoku9Atom has an invalid language level".to_string(),
             )),
         }
@@ -65,14 +65,14 @@ pub struct BaseKinsokuSettings {
 
 impl BaseKinsokuSettings {
     /// Parse a base `KinsokuContainer` record.
-    pub fn parse(record: &PptRecord) -> Result<Self> {
+    pub fn parse(record: &Record) -> Result<Self> {
         parse_base(record)
     }
 }
 
 /// Per-language settings introduced by PowerPoint 9.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPoint9KinsokuSettings {
+pub struct KinsokuSettings9 {
     /// Korean line-breaking level.
     pub korean: KinsokuLevel,
     /// Simplified Chinese line-breaking level.
@@ -87,9 +87,9 @@ pub struct PowerPoint9KinsokuSettings {
     pub following_characters: Option<String>,
 }
 
-impl PowerPoint9KinsokuSettings {
+impl KinsokuSettings9 {
     /// Parse a PowerPoint 9 `Kinsoku9Container` record.
-    pub fn parse(record: &PptRecord) -> Result<Self> {
+    pub fn parse(record: &Record) -> Result<Self> {
         parse_powerpoint9(record)
     }
 
@@ -118,20 +118,20 @@ impl PowerPoint9KinsokuSettings {
 
 /// Resolved base and PowerPoint 9 East Asian line-breaking preferences.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct PowerPointKinsoku {
+pub struct Kinsoku {
     /// Base document settings.
     pub base: Option<BaseKinsokuSettings>,
     /// PowerPoint 9 per-language settings, which take precedence over the base.
-    pub powerpoint9: Option<PowerPoint9KinsokuSettings>,
+    pub powerpoint9: Option<KinsokuSettings9>,
 }
 
-impl PowerPointKinsoku {
+impl Kinsoku {
     /// Discover, parse, and cross-validate line-breaking records below `root`.
-    pub fn parse(root: &PptRecord) -> Result<Self> {
+    pub fn parse(root: &Record) -> Result<Self> {
         let mut base_records = Vec::new();
-        collect_records(root, PptRecordType::Kinsoku, &mut base_records);
+        collect_records(root, RecordType::Kinsoku, &mut base_records);
         if base_records.len() > 1 {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "Record tree contains multiple base Kinsoku containers".to_string(),
             ));
         }
@@ -142,14 +142,14 @@ impl PowerPointKinsoku {
 
         let mut powerpoint9 = None;
         for record in root.versioned_binary_tag_records(9)? {
-            if record.record_type != PptRecordType::Kinsoku {
+            if record.record_type != RecordType::Kinsoku {
                 continue;
             }
             if powerpoint9
-                .replace(PowerPoint9KinsokuSettings::parse(&record)?)
+                .replace(KinsokuSettings9::parse(&record)?)
                 .is_some()
             {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "Record tree contains multiple PowerPoint 9 Kinsoku containers".to_string(),
                 ));
             }
@@ -194,14 +194,14 @@ impl PowerPointKinsoku {
     }
 }
 
-fn parse_base(record: &PptRecord) -> Result<BaseKinsokuSettings> {
+fn parse_base(record: &Record) -> Result<BaseKinsokuSettings> {
     validate_container_header(record)?;
-    let children = PptRecord::parse_sequence_strict(&record.data, "base Kinsoku container")?;
+    let children = Record::parse_sequence_strict(&record.data, "base Kinsoku container")?;
     let (level_word, leading_characters, following_characters) = parse_children(children, false)?;
     let level = KinsokuLevel::parse_base(level_word)?;
     let has_both_lists = leading_characters.is_some() && following_characters.is_some();
     if (level == KinsokuLevel::Custom) != has_both_lists {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "Base Kinsoku custom lists do not match its level".to_string(),
         ));
     }
@@ -212,17 +212,16 @@ fn parse_base(record: &PptRecord) -> Result<BaseKinsokuSettings> {
     })
 }
 
-fn parse_powerpoint9(record: &PptRecord) -> Result<PowerPoint9KinsokuSettings> {
+fn parse_powerpoint9(record: &Record) -> Result<KinsokuSettings9> {
     validate_container_header(record)?;
-    let children =
-        PptRecord::parse_sequence_strict(&record.data, "PowerPoint 9 Kinsoku container")?;
+    let children = Record::parse_sequence_strict(&record.data, "PowerPoint 9 Kinsoku container")?;
     let (levels, leading_characters, following_characters) = parse_children(children, true)?;
     if levels & 0xffff_ff00 != 0 {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "Kinsoku9Atom has nonzero reserved bits".to_string(),
         ));
     }
-    let settings = PowerPoint9KinsokuSettings {
+    let settings = KinsokuSettings9 {
         korean: KinsokuLevel::parse_language((levels & 0x03) as u8, false)?,
         simplified_chinese: KinsokuLevel::parse_language(((levels >> 2) & 0x03) as u8, false)?,
         traditional_chinese: KinsokuLevel::parse_language(((levels >> 4) & 0x03) as u8, false)?,
@@ -231,19 +230,16 @@ fn parse_powerpoint9(record: &PptRecord) -> Result<PowerPoint9KinsokuSettings> {
         following_characters,
     };
     if settings.custom_count() > 1 {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "Kinsoku9Atom customizes more than one language".to_string(),
         ));
     }
     Ok(settings)
 }
 
-fn validate_container_header(record: &PptRecord) -> Result<()> {
-    if record.record_type != PptRecordType::Kinsoku
-        || record.version != 0x0f
-        || record.instance != 2
-    {
-        return Err(PptError::Corrupted(
+fn validate_container_header(record: &Record) -> Result<()> {
+    if record.record_type != RecordType::Kinsoku || record.version != 0x0f || record.instance != 2 {
+        return Err(Error::Corrupted(
             "KinsokuContainer has an invalid record header".to_string(),
         ));
     }
@@ -251,20 +247,20 @@ fn validate_container_header(record: &PptRecord) -> Result<()> {
 }
 
 fn parse_children(
-    children: Vec<PptRecord>,
+    children: Vec<Record>,
     powerpoint9: bool,
 ) -> Result<(u32, Option<String>, Option<String>)> {
     let Some(atom) = children.first() else {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "KinsokuContainer is missing its settings atom".to_string(),
         ));
     };
-    if atom.record_type != PptRecordType::KinsokuAtom
+    if atom.record_type != RecordType::KinsokuAtom
         || atom.version != 0
         || atom.instance != 3
         || atom.data.len() != 4
     {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "Kinsoku settings atom has an invalid header or size".to_string(),
         ));
     }
@@ -272,8 +268,8 @@ fn parse_children(
     let mut leading = None;
     let mut following = None;
     for child in &children[1..] {
-        if child.record_type != PptRecordType::CString || child.version != 0 {
-            return Err(PptError::Corrupted(
+        if child.record_type != RecordType::CString || child.version != 0 {
+            return Err(Error::Corrupted(
                 "KinsokuContainer has an unexpected child record".to_string(),
             ));
         }
@@ -281,25 +277,25 @@ fn parse_children(
             0 => &mut leading,
             1 if leading.is_some() => &mut following,
             _ => {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "Kinsoku character lists are duplicated or out of order".to_string(),
                 ));
             },
         };
         if target.is_some() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "Kinsoku character list is duplicated".to_string(),
             ));
         }
         *target = Some(parse_utf16(&child.data)?);
     }
     if leading.is_some() != following.is_some() {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "KinsokuContainer contains only one custom character list".to_string(),
         ));
     }
     if !powerpoint9 && children.len() > 3 {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "Base KinsokuContainer has too many child records".to_string(),
         ));
     }
@@ -308,7 +304,7 @@ fn parse_children(
 
 fn parse_utf16(data: &[u8]) -> Result<String> {
     if data.len() & 1 != 0 {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "Kinsoku character list has an odd byte length".to_string(),
         ));
     }
@@ -317,12 +313,12 @@ fn parse_utf16(data: &[u8]) -> Result<String> {
         .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
         .collect();
     String::from_utf16(&units)
-        .map_err(|_| PptError::Corrupted("Kinsoku character list is invalid UTF-16".to_string()))
+        .map_err(|_| Error::Corrupted("Kinsoku character list is invalid UTF-16".to_string()))
 }
 
 fn validate_cross_version(
     base: &Option<BaseKinsokuSettings>,
-    powerpoint9: &Option<PowerPoint9KinsokuSettings>,
+    powerpoint9: &Option<KinsokuSettings9>,
 ) -> Result<()> {
     let Some(extension) = powerpoint9 else {
         return Ok(());
@@ -334,18 +330,14 @@ fn validate_cross_version(
         .is_some_and(|settings| settings.level == KinsokuLevel::Custom);
     let extension_needs_lists = extension.custom_count() == 1 && !base_supplies_lists;
     if extension_has_lists != extension_needs_lists {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "PowerPoint 9 Kinsoku custom lists conflict with the base settings".to_string(),
         ));
     }
     Ok(())
 }
 
-fn collect_records<'a>(
-    record: &'a PptRecord,
-    record_type: PptRecordType,
-    records: &mut Vec<&'a PptRecord>,
-) {
+fn collect_records<'a>(record: &'a Record, record_type: RecordType, records: &mut Vec<&'a Record>) {
     if record.record_type == record_type {
         records.push(record);
     }
@@ -367,7 +359,7 @@ mod tests {
         data
     }
 
-    fn container(levels: u32, lists: Option<(&str, &str)>) -> PptRecord {
+    fn container(levels: u32, lists: Option<(&str, &str)>) -> Record {
         let mut payload = record_bytes(0, 3, 4050, &levels.to_le_bytes());
         if let Some((leading, following)) = lists {
             let leading: Vec<u8> = leading.encode_utf16().flat_map(u16::to_le_bytes).collect();
@@ -378,8 +370,8 @@ mod tests {
             payload.extend_from_slice(&record_bytes(0, 0, 4026, &leading));
             payload.extend_from_slice(&record_bytes(0, 1, 4026, &following));
         }
-        PptRecord {
-            record_type: PptRecordType::Kinsoku,
+        Record {
+            record_type: RecordType::Kinsoku,
             record_type_raw: 4040,
             version: 0x0f,
             instance: 2,
@@ -389,7 +381,7 @@ mod tests {
         }
     }
 
-    fn prog_tags_record(blob_payload: &[u8]) -> PptRecord {
+    fn prog_tags_record(blob_payload: &[u8]) -> Record {
         let tag_name: Vec<u8> = "___PPT9"
             .encode_utf16()
             .flat_map(u16::to_le_bytes)
@@ -399,8 +391,8 @@ mod tests {
         let mut tag_payload = name;
         tag_payload.extend_from_slice(&blob);
         let tag = record_bytes(0x0f, 0, 0x138a, &tag_payload);
-        PptRecord {
-            record_type: PptRecordType::ProgTags,
+        Record {
+            record_type: RecordType::ProgTags,
             record_type_raw: 0x1388,
             version: 0x0f,
             instance: 0,
@@ -410,7 +402,7 @@ mod tests {
         }
     }
 
-    fn root(base: Option<PptRecord>, extension: Option<PptRecord>) -> PptRecord {
+    fn root(base: Option<Record>, extension: Option<Record>) -> Record {
         let mut children = Vec::new();
         if let Some(base) = base {
             children.push(base);
@@ -424,8 +416,8 @@ mod tests {
             );
             children.push(prog_tags_record(&bytes));
         }
-        PptRecord {
-            record_type: PptRecordType::Document,
+        Record {
+            record_type: RecordType::Document,
             record_type_raw: 1000,
             version: 0x0f,
             instance: 0,
@@ -437,7 +429,7 @@ mod tests {
 
     #[test]
     fn resolves_base_and_powerpoint9_precedence() {
-        let settings = PowerPointKinsoku::parse(&root(Some(container(1, None)), None)).unwrap();
+        let settings = Kinsoku::parse(&root(Some(container(1, None)), None)).unwrap();
         assert_eq!(
             settings.effective_level(KinsokuLanguage::Japanese),
             KinsokuLevel::Strict
@@ -447,7 +439,7 @@ mod tests {
             KinsokuLevel::Standard
         );
 
-        let settings = PowerPointKinsoku::parse(&root(
+        let settings = Kinsoku::parse(&root(
             Some(container(2, Some(("（", "）")))),
             Some(container(2, None)),
         ))
@@ -469,7 +461,7 @@ mod tests {
     #[test]
     fn resolves_powerpoint9_owned_custom_lists() {
         let japanese_custom = 2 << 6;
-        let settings = PowerPointKinsoku::parse(&root(
+        let settings = Kinsoku::parse(&root(
             None,
             Some(container(japanese_custom, Some(("「", "」")))),
         ))
@@ -482,18 +474,14 @@ mod tests {
 
     #[test]
     fn rejects_malformed_kinsoku_settings() {
-        assert!(PowerPointKinsoku::parse(&root(Some(container(3, None)), None)).is_err());
-        assert!(PowerPointKinsoku::parse(&root(Some(container(2, None)), None)).is_err());
-        assert!(PowerPointKinsoku::parse(&root(None, Some(container(1, None)))).is_err());
+        assert!(Kinsoku::parse(&root(Some(container(3, None)), None)).is_err());
+        assert!(Kinsoku::parse(&root(Some(container(2, None)), None)).is_err());
+        assert!(Kinsoku::parse(&root(None, Some(container(1, None)))).is_err());
+        assert!(Kinsoku::parse(&root(None, Some(container(2 | (2 << 2), None)))).is_err());
+        assert!(Kinsoku::parse(&root(None, Some(container(1 << 8, None)))).is_err());
+        assert!(Kinsoku::parse(&root(None, Some(container(0, Some(("A", "B")))))).is_err());
         assert!(
-            PowerPointKinsoku::parse(&root(None, Some(container(2 | (2 << 2), None)))).is_err()
-        );
-        assert!(PowerPointKinsoku::parse(&root(None, Some(container(1 << 8, None)))).is_err());
-        assert!(
-            PowerPointKinsoku::parse(&root(None, Some(container(0, Some(("A", "B")))))).is_err()
-        );
-        assert!(
-            PowerPointKinsoku::parse(&root(
+            Kinsoku::parse(&root(
                 Some(container(2, Some(("A", "B")))),
                 Some(container(2, Some(("C", "D")))),
             ))

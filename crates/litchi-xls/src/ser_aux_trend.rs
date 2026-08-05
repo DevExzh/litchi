@@ -13,7 +13,7 @@
 //! - MS-XLS 2.4.250 (SerAuxTrend), 2.5.14 (Boolean), 2.5.40
 //!   (ChartNumNillable), 2.5.184 (NilChartNum), 2.5.342 (Xnum)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `SerAuxTrend` record (MS-XLS 2.4.250).
 pub(crate) const SER_AUX_TREND_RECORD_TYPE: u16 = 0x104B;
@@ -28,15 +28,15 @@ const MIN_ORDER: u8 = 0x02;
 /// Maximum `ordUser` value for polynomial trendlines (MS-XLS 2.4.250).
 const MAX_ORDER: u8 = 0x06;
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: SER_AUX_TREND_RECORD_TYPE,
         message: message.into(),
     }
 }
 
 /// Parse a `Boolean` byte (MS-XLS 2.5.14).
-fn parse_bool1(value: u8, field: &str) -> XlsResult<bool> {
+fn parse_bool1(value: u8, field: &str) -> Result<bool> {
     match value {
         0x00 => Ok(false),
         0x01 => Ok(true),
@@ -49,7 +49,7 @@ fn parse_bool1(value: u8, field: &str) -> XlsResult<bool> {
 /// The `regt` trendline type (MS-XLS 2.4.250).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub enum XlsTrendlineKind {
+pub enum TrendlineKind {
     /// 0x00: polynomial.
     Polynomial = 0x00,
     /// 0x01: exponential.
@@ -62,8 +62,8 @@ pub enum XlsTrendlineKind {
     MovingAverage = 0x04,
 }
 
-impl XlsTrendlineKind {
-    fn parse(value: u8) -> XlsResult<Self> {
+impl TrendlineKind {
+    fn parse(value: u8) -> Result<Self> {
         match value {
             0x00 => Ok(Self::Polynomial),
             0x01 => Ok(Self::Exponential),
@@ -82,9 +82,9 @@ impl XlsTrendlineKind {
 /// The `numIntercept` bytes are preserved verbatim as a `ChartNumNillable`
 /// union (MS-XLS 2.5.40); [`Self::intercept`] decodes it.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct XlsSerAuxTrend {
+pub struct SerAuxTrend {
     /// The trendline type (`regt`).
-    kind: XlsTrendlineKind,
+    kind: TrendlineKind,
     /// Polynomial order or moving average period (`ordUser`); for polynomial
     /// trendlines in 0x02..=0x06.
     order: u8,
@@ -100,21 +100,21 @@ pub struct XlsSerAuxTrend {
     backcast: f64,
 }
 
-impl XlsSerAuxTrend {
+impl SerAuxTrend {
     /// Parse a `SerAuxTrend` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: PAYLOAD_LEN,
                 found: data.len(),
             });
         }
-        let kind = XlsTrendlineKind::parse(data[0])?;
+        let kind = TrendlineKind::parse(data[0])?;
         let order = data[1];
         // MS-XLS 2.4.250: ordUser MUST be in 0x02..=0x06 for polynomial
         // trendlines; it is ignored (and preserved) for moving average, and
         // ignored for all other types.
-        if kind == XlsTrendlineKind::Polynomial && !(MIN_ORDER..=MAX_ORDER).contains(&order) {
+        if kind == TrendlineKind::Polynomial && !(MIN_ORDER..=MAX_ORDER).contains(&order) {
             return Err(invalid(format!(
                 "SerAuxTrend ordUser {order:#04X} is outside {MIN_ORDER:#04X}..={MAX_ORDER:#04X}"
             )));
@@ -144,7 +144,7 @@ impl XlsSerAuxTrend {
     }
 
     /// The trendline type (`regt`).
-    pub fn kind(&self) -> XlsTrendlineKind {
+    pub fn kind(&self) -> TrendlineKind {
         self.kind
     }
 
@@ -224,14 +224,14 @@ mod tests {
     #[test]
     fn round_trip_all_trendline_kinds() {
         for (kind, expected) in [
-            (0x00, XlsTrendlineKind::Polynomial),
-            (0x01, XlsTrendlineKind::Exponential),
-            (0x02, XlsTrendlineKind::Logarithmic),
-            (0x03, XlsTrendlineKind::Power),
-            (0x04, XlsTrendlineKind::MovingAverage),
+            (0x00, TrendlineKind::Polynomial),
+            (0x01, TrendlineKind::Exponential),
+            (0x02, TrendlineKind::Logarithmic),
+            (0x03, TrendlineKind::Power),
+            (0x04, TrendlineKind::MovingAverage),
         ] {
             let bytes = record(kind, 0x03, nil_intercept(), 0x01, 0x00, 1.5, -0.5);
-            let parsed = XlsSerAuxTrend::parse(&bytes).unwrap();
+            let parsed = SerAuxTrend::parse(&bytes).unwrap();
             assert_eq!(parsed.kind(), expected);
             assert_eq!(parsed.order(), 0x03);
             assert_eq!(parsed.intercept(), None);
@@ -247,7 +247,7 @@ mod tests {
     #[test]
     fn numeric_intercept_decodes() {
         let bytes = record(0x01, 0x00, 2.75f64.to_le_bytes(), 0x00, 0x01, 0.0, 0.0);
-        let parsed = XlsSerAuxTrend::parse(&bytes).unwrap();
+        let parsed = SerAuxTrend::parse(&bytes).unwrap();
         assert_eq!(parsed.intercept(), Some(2.75));
         assert_eq!(parsed.to_payload(), bytes);
     }
@@ -256,25 +256,19 @@ mod tests {
     fn rejects_malformed_records() {
         let bytes = record(0x00, 0x02, nil_intercept(), 0x01, 0x01, 0.0, 0.0);
         // Truncated and overlong payloads.
-        assert!(XlsSerAuxTrend::parse(&bytes[..26]).is_err());
-        assert!(XlsSerAuxTrend::parse(&[bytes.as_slice(), &[0]].concat()).is_err());
+        assert!(SerAuxTrend::parse(&bytes[..26]).is_err());
+        assert!(SerAuxTrend::parse(&[bytes.as_slice(), &[0]].concat()).is_err());
         // Undefined regt.
-        assert!(
-            XlsSerAuxTrend::parse(&record(0x05, 0x02, nil_intercept(), 0, 0, 0.0, 0.0)).is_err()
-        );
+        assert!(SerAuxTrend::parse(&record(0x05, 0x02, nil_intercept(), 0, 0, 0.0, 0.0)).is_err());
         // Polynomial order outside 0x02..=0x06.
-        assert!(
-            XlsSerAuxTrend::parse(&record(0x00, 0x01, nil_intercept(), 0, 0, 0.0, 0.0)).is_err()
-        );
-        assert!(
-            XlsSerAuxTrend::parse(&record(0x00, 0x07, nil_intercept(), 0, 0, 0.0, 0.0)).is_err()
-        );
+        assert!(SerAuxTrend::parse(&record(0x00, 0x01, nil_intercept(), 0, 0, 0.0, 0.0)).is_err());
+        assert!(SerAuxTrend::parse(&record(0x00, 0x07, nil_intercept(), 0, 0, 0.0, 0.0)).is_err());
         // Non-Boolean fEquation / fRSquared.
         assert!(
-            XlsSerAuxTrend::parse(&record(0x01, 0x00, nil_intercept(), 0x02, 0, 0.0, 0.0)).is_err()
+            SerAuxTrend::parse(&record(0x01, 0x00, nil_intercept(), 0x02, 0, 0.0, 0.0)).is_err()
         );
         assert!(
-            XlsSerAuxTrend::parse(&record(0x01, 0x00, nil_intercept(), 0, 0xFF, 0.0, 0.0)).is_err()
+            SerAuxTrend::parse(&record(0x01, 0x00, nil_intercept(), 0, 0xFF, 0.0, 0.0)).is_err()
         );
     }
 }

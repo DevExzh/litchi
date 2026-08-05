@@ -1,30 +1,31 @@
 //! Presentation protection example - demonstrates security settings.
 
-use litchi::ooxml::pptx::{CryptoAlgorithm, Package, Protection, ProtectionType, SlideProtection};
+use litchi::crypto::ooxml::{self, Mode};
+use litchi_pptx::Package;
+use litchi_pptx::presentation_properties::metadata::protection::{
+    Algorithm, Settings, Slide, Type,
+};
 
 fn main() {
     println!("=== Presentation Protection Example ===\n");
 
-    // Create unprotected presentation
-    let unprotected = Protection::new();
+    // Create unprotected settings
+    let unprotected = Settings::new();
     println!("Unprotected Presentation:");
     println!("  Is protected: {}", unprotected.is_protected());
     println!("  Protection type: {:?}", unprotected.protection_type());
-    assert_eq!(unprotected.protection_type(), ProtectionType::None);
+    assert_eq!(unprotected.protection_type(), Type::None);
 
     // Create read-only recommended
-    let read_only = Protection::new().with_read_only_recommended(true);
+    let read_only = Settings::new().with_read_only_recommended(true);
 
     println!("\nRead-Only Recommended:");
     println!("  Is protected: {}", read_only.is_protected());
     println!("  Protection type: {:?}", read_only.protection_type());
-    assert_eq!(
-        read_only.protection_type(),
-        ProtectionType::ReadOnlyRecommended
-    );
+    assert_eq!(read_only.protection_type(), Type::ReadOnlyRecommended);
 
-    // Create with structure protection
-    let structure_protected = Protection::new()
+    // Create settings with structure protection
+    let structure_protected = Settings::new()
         .with_structure_protection(true)
         .with_window_protection(true);
 
@@ -36,7 +37,7 @@ fn main() {
     println!("  Protect windows: {}", structure_protected.protect_windows);
 
     // Test password protection
-    let mut password_protected = Protection::new();
+    let mut password_protected = Settings::new();
     if let Err(e) = password_protected.set_modify_password("secret123") {
         println!("\nError setting modify password: {e}");
         return;
@@ -54,10 +55,7 @@ fn main() {
         "  Protection type: {:?}",
         password_protected.protection_type()
     );
-    assert_eq!(
-        password_protected.protection_type(),
-        ProtectionType::ModifyPassword
-    );
+    assert_eq!(password_protected.protection_type(), Type::ModifyPassword);
 
     // Clear password
     password_protected.clear_modify_password();
@@ -70,15 +68,15 @@ fn main() {
     // Test crypto algorithms
     println!("\n--- Crypto Algorithms ---");
     let algorithms = [
-        CryptoAlgorithm::Sha1,
-        CryptoAlgorithm::Sha256,
-        CryptoAlgorithm::Sha384,
-        CryptoAlgorithm::Sha512,
+        Algorithm::Sha1,
+        Algorithm::Sha256,
+        Algorithm::Sha384,
+        Algorithm::Sha512,
     ];
 
     for algo in algorithms {
         let uri = algo.uri();
-        let Ok(parsed) = CryptoAlgorithm::from_uri(uri) else {
+        let Ok(parsed) = Algorithm::from_uri(uri) else {
             println!("  Unexpected unsupported algorithm URI: {uri}");
             return;
         };
@@ -88,7 +86,7 @@ fn main() {
 
     // Slide-level protection
     println!("\n--- Slide Protection ---");
-    let slide_prot = SlideProtection::new().protect_all();
+    let slide_prot = Slide::new().protect_all();
 
     println!("Full slide protection:");
     println!("  No select: {}", slide_prot.no_select);
@@ -101,7 +99,7 @@ fn main() {
     assert!(slide_prot.is_protected());
 
     // Partial slide protection
-    let partial = SlideProtection {
+    let partial = Slide {
         no_edit_text: true,
         no_resize: true,
         ..Default::default()
@@ -112,12 +110,12 @@ fn main() {
     println!("  No move: {}", partial.no_move);
 
     println!(
-        "\nOpen-password encryption is selected explicitly on Package::save_encrypted, \
+        "\nOpen-password encryption is applied by the standalone OOXML crypto service, \
          independently of presentation modification protection."
     );
 
     // Generate XML
-    let mut with_password = Protection::new();
+    let mut with_password = Settings::new();
     if let Err(error) = with_password.set_modify_password("secret123") {
         println!("\nError setting XML example password: {error}");
         return;
@@ -143,18 +141,27 @@ fn generate_protection_pptx() -> Result<(), Box<dyn std::error::Error>> {
     {
         let pres = pkg.presentation_mut()?;
         let slide = pres.add_slide()?;
-        slide.set_title("Protection Demo");
+        slide.set_title("Protection and Encryption Demo");
         slide.add_text_box(
-            "This presentation is modify-protected. Try modifying it in PowerPoint.",
+            concat!(
+                "This package demonstrates open-password encryption. ",
+                "Modify-password settings are modeled and serialized separately ",
+                "as PresentationML protection metadata."
+            ),
             914400,
             1828800,
             7315200,
             914400,
         );
-        let mut protection = Protection::new();
-        protection.set_modify_password("secret123")?;
-        pres.set_protection(protection);
     }
-    pkg.save("pptx_protection_modify_password.pptx")?;
+    let clear_package = pkg.to_bytes()?;
+    std::fs::write("pptx_protection_clear.pptx", &clear_package)?;
+
+    let encrypted_package = ooxml::encrypt(clear_package, "open-secret", Mode::Agile)?;
+    std::fs::write("pptx_protection_open_password.pptx", &encrypted_package)?;
+
+    let opened = ooxml::open(encrypted_package, "open-secret")?;
+    assert_eq!(opened.mode(), Some(Mode::Agile));
+    Package::from_vec(opened.into_bytes())?;
     Ok(())
 }

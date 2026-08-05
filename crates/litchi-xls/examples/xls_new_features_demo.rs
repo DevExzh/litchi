@@ -7,14 +7,14 @@
 //!
 //! The file is saved to `output/xls_new_features_demo.xls`.
 
-use litchi_xls::XlsWriter;
+use litchi_xls::Writer;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output_dir = std::path::Path::new("output");
     std::fs::create_dir_all(output_dir)?;
     let output_path = output_dir.join("xls_new_features_demo.xls");
 
-    let mut w = XlsWriter::new();
+    let mut w = Writer::new();
 
     // ================================================================
     // Sheet 1 — Merged Cells
@@ -245,16 +245,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Read the generated XLS file back using `XlsWorkbook` and print
+/// Read the generated XLS file back using `Workbook` and print
 /// the parsed merged cells, hyperlinks, comments, and auto-filter data.
 fn round_trip_verify(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
     use litchi_core::sheet::WorkbookTrait;
-    use litchi_xls::XlsWorkbook;
+    use litchi_xls::Workbook;
     use std::io::Cursor;
 
     let data = std::fs::read(path)?;
     let cursor = Cursor::new(data);
-    let wb = XlsWorkbook::new(cursor)?;
+    let wb = Workbook::new(cursor)?;
 
     println!("Worksheets: {:?}", wb.worksheet_names());
     println!("Sheet count: {}", wb.worksheet_count());
@@ -262,9 +262,9 @@ fn round_trip_verify(path: &std::path::Path) -> Result<(), Box<dyn std::error::E
     for (idx, name) in wb.worksheet_names().iter().enumerate() {
         println!("\n--- Sheet {}: \"{}\" ---", idx, name);
 
-        // Access the underlying XlsWorksheet to inspect new features.
+        // Access the underlying Worksheet to inspect new features.
         // The WorkbookTrait gives us a dyn Worksheet, but we stored
-        // typed worksheets inside XlsWorkbook. The easiest way to
+        // typed worksheets inside Workbook. The easiest way to
         // inspect features is through the typed accessor.
         //
         // For now, print basic cell info via the trait.

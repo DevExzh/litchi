@@ -1,37 +1,40 @@
-//! Animations example - demonstrates animation effects and sequences.
+//! Animations example - demonstrates typed effects, triggers, and timing XML.
 
-use litchi::ooxml::pptx::{Animation, AnimationEffect, AnimationSequence, AnimationTrigger};
+use litchi_pptx::animations::{Effect, EffectInstance, Sequence, Trigger};
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Animations Example ===\n");
 
-    // Create individual animations
-    let fade_in = Animation::new(1, AnimationEffect::Fade)
-        .with_duration(1000)
-        .with_trigger(AnimationTrigger::OnClick);
+    // Create individual typed animations.
+    let fade_in = EffectInstance::new(1, Effect::Fade)
+        .with_duration_ms(1_000)
+        .with_trigger(Trigger::OnClick);
 
-    let fly_in = Animation::new(2, AnimationEffect::FlyIn)
-        .with_duration(500)
+    let fly_in = EffectInstance::new(2, Effect::FlyIn)
+        .with_duration_ms(500)
         .with_delay(200)
-        .with_trigger(AnimationTrigger::AfterPrevious);
+        .with_trigger(Trigger::AfterPrevious);
 
-    let zoom = Animation::new(3, AnimationEffect::Zoom)
-        .with_duration(750)
-        .with_trigger(AnimationTrigger::WithPrevious);
+    let zoom = EffectInstance::new(3, Effect::Zoom)
+        .with_duration_ms(750)
+        .with_trigger(Trigger::WithPrevious);
 
     println!("Created animations:");
     println!(
         "  Shape 1: {:?}, duration={:?}",
-        fade_in.effect, fade_in.duration
+        &fade_in.effect, fade_in.duration
     );
     println!(
         "  Shape 2: {:?}, duration={:?}, delay={}ms",
-        fly_in.effect, fly_in.duration, fly_in.delay
+        &fly_in.effect, fly_in.duration, fly_in.delay
     );
-    println!("  Shape 3: {:?}, duration={:?}", zoom.effect, zoom.duration);
+    println!(
+        "  Shape 3: {:?}, duration={:?}",
+        &zoom.effect, zoom.duration
+    );
 
-    // Build an animation sequence
-    let mut sequence = AnimationSequence::new();
+    // Build and serialize an OOXML timing sequence.
+    let mut sequence = Sequence::new();
     sequence.add(fade_in);
     sequence.add(fly_in);
     sequence.add(zoom);
@@ -40,44 +43,46 @@ fn main() {
     println!("  Total animations: {}", sequence.len());
     println!("  Is empty: {}", sequence.is_empty());
 
-    // Generate timing XML
     let xml = sequence.to_xml();
+    let parsed = Sequence::parse_timing_xml(&xml)?;
     println!("\nGenerated timing XML length: {} bytes", xml.len());
     assert!(xml.contains("<p:timing>"));
     assert!(xml.contains("spid=\"1\""));
     assert!(xml.contains("spid=\"2\""));
     assert!(xml.contains("spid=\"3\""));
+    assert_eq!(parsed.animations.len(), 3);
 
-    // Test all animation effects
+    // Exercise the typed preset vocabulary and its XML-facing identifiers.
     println!("\n--- Animation Effects ---");
     let effects = [
-        AnimationEffect::Appear,
-        AnimationEffect::Fade,
-        AnimationEffect::FlyIn,
-        AnimationEffect::FloatIn,
-        AnimationEffect::Split,
-        AnimationEffect::Wipe,
-        AnimationEffect::Zoom,
-        AnimationEffect::Bounce,
-        AnimationEffect::Spin,
-        AnimationEffect::GrowShrink,
+        Effect::Appear,
+        Effect::Fade,
+        Effect::FlyIn,
+        Effect::FloatIn,
+        Effect::Split,
+        Effect::Wipe,
+        Effect::Zoom,
+        Effect::Bounce,
+        Effect::Spin,
+        Effect::GrowShrink,
     ];
 
     for effect in effects {
         let preset_class = effect.preset_class();
         let preset_id = effect.preset_id();
-        let parsed = AnimationEffect::from_preset_id(preset_id);
+        let parsed = Effect::from_preset_id(preset_id);
         println!(
             "  {:?} -> {} + {} -> {:?}",
             effect, preset_class, preset_id, parsed
         );
     }
 
-    // Test triggers
+    // Test the canonical trigger model.
     println!("\n--- Animation Triggers ---");
-    println!("  OnClick (default): {:?}", AnimationTrigger::default());
-    println!("  WithPrevious: {:?}", AnimationTrigger::WithPrevious);
-    println!("  AfterPrevious: {:?}", AnimationTrigger::AfterPrevious);
+    println!("  OnClick (default): {:?}", Trigger::default());
+    println!("  WithPrevious: {:?}", Trigger::WithPrevious);
+    println!("  AfterPrevious: {:?}", Trigger::AfterPrevious);
 
     println!("\n✅ Animations example completed successfully!");
+    Ok(())
 }

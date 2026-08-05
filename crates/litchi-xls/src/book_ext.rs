@@ -4,7 +4,7 @@
 //! depending on the declared record size, the `BookExt_Conditional11`
 //! (MS-XLS 2.5.12) and `BookExt_Conditional12` (MS-XLS 2.5.13) extensions.
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `BookExt` record.
 pub(crate) const BOOK_EXT_RECORD_TYPE: u16 = 0x0863;
@@ -37,7 +37,7 @@ const PUBLISHED_BOOK_ITEMS: u8 = 0x02;
 
 /// How smart tags are displayed in the workbook (`mdFactoidDisplay`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum XlsFactoidDisplay {
+pub enum FactoidDisplay {
     /// Show the smart-tag actions button and the smart-tag indicator.
     #[default]
     IndicatorAndButton,
@@ -47,14 +47,14 @@ pub enum XlsFactoidDisplay {
     Hidden,
 }
 
-impl XlsFactoidDisplay {
-    fn from_code(value: u32) -> XlsResult<Self> {
+impl FactoidDisplay {
+    fn from_code(value: u32) -> Result<Self> {
         Ok(match value {
             0 => Self::IndicatorAndButton,
             1 => Self::ButtonOnly,
             2 => Self::Hidden,
             _ => {
-                return Err(XlsError::InvalidRecord {
+                return Err(Error::InvalidRecord {
                     record_type: BOOK_EXT_RECORD_TYPE,
                     message: "mdFactoidDisplay value 3 is reserved".to_string(),
                 });
@@ -73,7 +73,7 @@ impl XlsFactoidDisplay {
 
 /// `BookExt_Conditional11` extension flags (MS-XLS 2.5.12).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct XlsBookExtConditional11 {
+pub struct BookExtConditional11 {
     /// Whether a warning is requested before loading a smart-document
     /// manifest (`fBuggedUserAboutSolution`).
     pub bugged_user_about_solution: bool,
@@ -83,7 +83,7 @@ pub struct XlsBookExtConditional11 {
 
 /// `BookExt_Conditional12` extension flags (MS-XLS 2.5.13).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct XlsBookExtConditional12 {
+pub struct BookExtConditional12 {
     /// Whether only selected items are shown when the workbook is published
     /// to a server (`fPublishedBookItems`).
     pub published_book_items: bool,
@@ -91,7 +91,7 @@ pub struct XlsBookExtConditional12 {
 
 /// Typed `BookExt` record content (MS-XLS 2.4.23).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsBookExt {
+pub struct BookExt {
     /// Whether AutoRecover is disabled for the workbook.
     pub dont_auto_recover: bool,
     /// Whether the PivotTable field list is hidden.
@@ -101,7 +101,7 @@ pub struct XlsBookExt {
     /// Whether smart tags are embedded on save.
     pub embed_factoids: bool,
     /// How smart tags are displayed.
-    pub factoid_display: XlsFactoidDisplay,
+    pub factoid_display: FactoidDisplay,
     /// Whether the workbook was saved during AutoRecover.
     pub saved_during_recovery: bool,
     /// Whether the workbook was created by a minimal save during recovery.
@@ -111,20 +111,20 @@ pub struct XlsBookExt {
     /// Whether the workbook was opened in safe-load mode.
     pub opened_via_safe_load: bool,
     /// Conditional11 extension, present iff the record size demands it.
-    pub conditional11: Option<XlsBookExtConditional11>,
+    pub conditional11: Option<BookExtConditional11>,
     /// Conditional12 extension, present iff the record size demands it.
-    pub conditional12: Option<XlsBookExtConditional12>,
+    pub conditional12: Option<BookExtConditional12>,
 }
 
-impl XlsBookExt {
+impl BookExt {
     /// Parse a `BookExt` record payload.
-    pub(crate) fn parse(data: &[u8]) -> XlsResult<Self> {
-        let invalid = |message: &str| XlsError::InvalidRecord {
+    pub(crate) fn parse(data: &[u8]) -> Result<Self> {
+        let invalid = |message: &str| Error::InvalidRecord {
             record_type: BOOK_EXT_RECORD_TYPE,
             message: message.to_string(),
         };
         if data.len() < BASE_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: BASE_LEN,
                 found: data.len(),
             });
@@ -137,7 +137,7 @@ impl XlsBookExt {
             return Err(invalid("BookExt declares an unsupported record size"));
         }
         if data.len() != cb {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: cb,
                 found: data.len(),
             });
@@ -145,7 +145,7 @@ impl XlsBookExt {
         let flags = u32::from_le_bytes(data[16..20].try_into().expect("length checked"));
         let conditional11 = if cb > BASE_LEN {
             let grbit = data[BASE_LEN];
-            Some(XlsBookExtConditional11 {
+            Some(BookExtConditional11 {
                 bugged_user_about_solution: grbit & BUGGED_USER_ABOUT_SOLUTION != 0,
                 show_ink_annotation: grbit & SHOW_INK_ANNOTATION != 0,
             })
@@ -154,7 +154,7 @@ impl XlsBookExt {
         };
         let conditional12 = if cb > BASE_LEN + 1 {
             let grbit = data[BASE_LEN + 1];
-            Some(XlsBookExtConditional12 {
+            Some(BookExtConditional12 {
                 published_book_items: grbit & PUBLISHED_BOOK_ITEMS != 0,
             })
         } else {
@@ -165,7 +165,7 @@ impl XlsBookExt {
             hide_pivot_list: flags & HIDE_PIVOT_LIST != 0,
             filter_privacy: flags & FILTER_PRIVACY != 0,
             embed_factoids: flags & EMBED_FACTOIDS != 0,
-            factoid_display: XlsFactoidDisplay::from_code(
+            factoid_display: FactoidDisplay::from_code(
                 (flags >> FACTOID_DISPLAY_SHIFT) & FACTOID_DISPLAY_MASK,
             )?,
             saved_during_recovery: flags & SAVED_DURING_RECOVERY != 0,
@@ -254,12 +254,12 @@ mod tests {
             | (2 << FACTOID_DISPLAY_SHIFT)
             | SAVED_DURING_RECOVERY
             | OPENED_VIA_SAFE_LOAD;
-        let parsed = XlsBookExt::parse(&record(flags, &[])).unwrap();
+        let parsed = BookExt::parse(&record(flags, &[])).unwrap();
         assert!(parsed.dont_auto_recover);
         assert!(!parsed.hide_pivot_list);
         assert!(parsed.filter_privacy);
         assert!(!parsed.embed_factoids);
-        assert_eq!(parsed.factoid_display, XlsFactoidDisplay::Hidden);
+        assert_eq!(parsed.factoid_display, FactoidDisplay::Hidden);
         assert!(parsed.saved_during_recovery);
         assert!(!parsed.created_via_minimal_save);
         assert!(!parsed.opened_via_data_recovery);
@@ -271,7 +271,7 @@ mod tests {
 
     #[test]
     fn parses_conditional_extensions() {
-        let parsed = XlsBookExt::parse(&record(0, &[0x03, 0x02])).unwrap();
+        let parsed = BookExt::parse(&record(0, &[0x03, 0x02])).unwrap();
         let conditional11 = parsed.conditional11.unwrap();
         assert!(conditional11.bugged_user_about_solution);
         assert!(conditional11.show_ink_annotation);
@@ -279,7 +279,7 @@ mod tests {
         assert_eq!(parsed.to_payload(), record(0, &[0x03, 0x02]));
 
         // Conditional11 without Conditional12.
-        let parsed = XlsBookExt::parse(&record(0, &[0x02])).unwrap();
+        let parsed = BookExt::parse(&record(0, &[0x02])).unwrap();
         assert!(parsed.conditional11.unwrap().show_ink_annotation);
         assert!(parsed.conditional12.is_none());
         assert_eq!(parsed.to_payload(), record(0, &[0x02]));
@@ -288,21 +288,21 @@ mod tests {
     #[test]
     fn rejects_malformed_records() {
         // Truncated.
-        assert!(XlsBookExt::parse(&record(0, &[])[..10]).is_err());
+        assert!(BookExt::parse(&record(0, &[])[..10]).is_err());
         // Wrong FrtHeader.rt.
         let mut wrong_rt = record(0, &[]);
         wrong_rt[0..2].copy_from_slice(&0x0862u16.to_le_bytes());
-        assert!(XlsBookExt::parse(&wrong_rt).is_err());
+        assert!(BookExt::parse(&wrong_rt).is_err());
         // Unsupported record size.
         let mut wrong_cb = record(0, &[0, 0]);
         wrong_cb[12..16].copy_from_slice(&23u32.to_le_bytes());
         wrong_cb.push(0);
-        assert!(XlsBookExt::parse(&wrong_cb).is_err());
+        assert!(BookExt::parse(&wrong_cb).is_err());
         // Reserved mdFactoidDisplay value.
-        assert!(XlsBookExt::parse(&record(3 << FACTOID_DISPLAY_SHIFT, &[])).is_err());
+        assert!(BookExt::parse(&record(3 << FACTOID_DISPLAY_SHIFT, &[])).is_err());
         // Declared size disagreeing with the payload length.
         let mut padded = record(0, &[]);
         padded.push(0);
-        assert!(XlsBookExt::parse(&padded).is_err());
+        assert!(BookExt::parse(&padded).is_err());
     }
 }

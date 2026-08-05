@@ -2,11 +2,11 @@
 
 use super::directory::SlideDirectory;
 use super::types::Slide;
-use crate::consts::PptRecordType;
+use crate::consts::RecordType;
 use crate::odraw::ShapeExt as _;
-use crate::package::{PptError, Result};
+use crate::package::{Error, Result};
 use crate::persist::PersistMapping;
-use crate::records::PptRecord;
+use crate::records::Record;
 use crate::shapes::ShapeEnum;
 use once_cell::unsync::OnceCell;
 use std::collections::HashMap;
@@ -43,9 +43,9 @@ impl NotesIndex {
     }
 
     fn try_build(document_data: &[u8], slide_directory: &SlideDirectory) -> Result<Self> {
-        let (document, _) = PptRecord::parse(document_data, slide_directory.document_offset())?;
-        if document.record_type != PptRecordType::Document {
-            return Err(PptError::Corrupted(
+        let (document, _) = Record::parse(document_data, slide_directory.document_offset())?;
+        if document.record_type != RecordType::Document {
+            return Err(Error::Corrupted(
                 "live document persist object is not a DocumentContainer".to_string(),
             ));
         }
@@ -61,14 +61,14 @@ impl NotesIndex {
                 continue;
             }
             if saw_notes_list {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "duplicate NotesListWithTextContainer".to_string(),
                 ));
             }
             saw_notes_list = true;
 
             for atom in &list.children {
-                if atom.record_type != PptRecordType::SlidePersistAtom {
+                if atom.record_type != RecordType::SlidePersistAtom {
                     continue;
                 }
                 Self::validate_persist_atom(atom)?;
@@ -76,17 +76,17 @@ impl NotesIndex {
                 let identifier = read_u32(&atom.data, 12, "slide/notes identifier")?;
 
                 if persist_id == 0 {
-                    return Err(PptError::Corrupted(
+                    return Err(Error::Corrupted(
                         "SlidePersistAtom has a null persistIdRef".to_string(),
                     ));
                 }
                 if !(0x100..=0x7fff_ffff).contains(&identifier) {
-                    return Err(PptError::Corrupted(format!(
+                    return Err(Error::Corrupted(format!(
                         "invalid NotesId {identifier:#010x}"
                     )));
                 }
                 if index.notes.insert(identifier, persist_id).is_some() {
-                    return Err(PptError::Corrupted(format!(
+                    return Err(Error::Corrupted(format!(
                         "duplicate NotesId {identifier:#010x}"
                     )));
                 }
@@ -96,9 +96,9 @@ impl NotesIndex {
         Ok(index)
     }
 
-    fn validate_persist_atom(atom: &PptRecord) -> Result<()> {
+    fn validate_persist_atom(atom: &Record) -> Result<()> {
         if atom.version != 0 || atom.instance != 0 || atom.data.len() != NOTES_PERSIST_ATOM_SIZE {
-            return Err(PptError::Corrupted(format!(
+            return Err(Error::Corrupted(format!(
                 "invalid SlidePersistAtom header or length: version={}, instance={}, length={}",
                 atom.version,
                 atom.instance,
@@ -110,11 +110,11 @@ impl NotesIndex {
 
     pub(crate) fn descriptor(
         &self,
-        slide: &PptRecord,
+        slide: &Record,
         slide_persist_id: u32,
         persist_mapping: &PersistMapping,
     ) -> std::result::Result<Option<NoteDescriptor>, String> {
-        let Some(slide_atom) = slide.find_child(PptRecordType::SlideAtom) else {
+        let Some(slide_atom) = slide.find_child(RecordType::SlideAtom) else {
             return Err("SlideContainer is missing SlideAtom".to_string());
         };
         if slide_atom.data.len() != SLIDE_ATOM_SIZE {
@@ -157,7 +157,7 @@ pub struct SpeakerNotes {
     notes_id: u32,
     persist_id: u32,
     slide_id_ref: u32,
-    record: PptRecord,
+    record: Record,
     shapes: OnceCell<Vec<ShapeEnum<'static>>>,
     text: OnceCell<String>,
 }
@@ -169,29 +169,27 @@ impl SpeakerNotes {
             .checked_add(8)
             .is_none_or(|end| end > document_data.len())
         {
-            return Err(PptError::Corrupted(format!(
+            return Err(Error::Corrupted(format!(
                 "notes persist offset {} is outside the PowerPoint Document stream",
                 descriptor.offset
             )));
         }
-        let (record, _) = PptRecord::parse(document_data, descriptor.offset)?;
-        if record.record_type != PptRecordType::Notes
-            || record.version != 0x0f
-            || record.instance != 0
+        let (record, _) = Record::parse(document_data, descriptor.offset)?;
+        if record.record_type != RecordType::Notes || record.version != 0x0f || record.instance != 0
         {
-            return Err(PptError::Corrupted(format!(
+            return Err(Error::Corrupted(format!(
                 "persist ID {} does not resolve to a valid NotesContainer",
                 descriptor.persist_id
             )));
         }
-        let notes_atom = record.find_child(PptRecordType::NotesAtom).ok_or_else(|| {
-            PptError::Corrupted("NotesContainer is missing NotesAtom".to_string())
-        })?;
+        let notes_atom = record
+            .find_child(RecordType::NotesAtom)
+            .ok_or_else(|| Error::Corrupted("NotesContainer is missing NotesAtom".to_string()))?;
         if notes_atom.version != 1
             || notes_atom.instance != 0
             || notes_atom.data.len() != NOTES_ATOM_SIZE
         {
-            return Err(PptError::Corrupted(format!(
+            return Err(Error::Corrupted(format!(
                 "invalid NotesAtom header or length: version={}, instance={}, length={}",
                 notes_atom.version,
                 notes_atom.instance,
@@ -200,7 +198,7 @@ impl SpeakerNotes {
         }
         let slide_id_ref = read_u32(&notes_atom.data, 0, "NotesAtom.slideIdRef")?;
         if slide_id_ref == 0 {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "notes slide has a null NotesAtom.slideIdRef".to_string(),
             ));
         }
@@ -208,7 +206,7 @@ impl SpeakerNotes {
             .expected_slide_id
             .is_some_and(|expected| expected != slide_id_ref)
         {
-            return Err(PptError::Corrupted(format!(
+            return Err(Error::Corrupted(format!(
                 "NotesAtom.slideIdRef {slide_id_ref:#010x} does not match its slide"
             )));
         }
@@ -240,18 +238,18 @@ impl SpeakerNotes {
     ///
     /// Tag payloads are inert: they are parsed and preserved, never executed,
     /// loaded, or resolved. Use
-    /// [`crate::PowerPointProgTags::slide_extensions`] to decode the
+    /// [`crate::ProgTags::slide_extensions`] to decode the
     /// versioned binary-tag payloads into typed extension structs.
-    pub fn programmable_tags(&self) -> Result<Option<crate::PowerPointProgTags>> {
-        self.programmable_tags_with_limits(crate::PowerPointProgTagLimits::default())
+    pub fn programmable_tags(&self) -> Result<Option<crate::ProgTags>> {
+        self.programmable_tags_with_limits(crate::ProgTagLimits::default())
     }
 
     /// Return notes programmable tags with caller-supplied resource limits.
     pub fn programmable_tags_with_limits(
         &self,
-        limits: crate::PowerPointProgTagLimits,
-    ) -> Result<Option<crate::PowerPointProgTags>> {
-        crate::PowerPointProgTags::parse_slide(&self.record, limits)
+        limits: crate::ProgTagLimits,
+    ) -> Result<Option<crate::ProgTags>> {
+        crate::ProgTags::parse_slide(&self.record, limits)
     }
 
     pub fn shapes(&self) -> Result<&[ShapeEnum<'static>]> {
@@ -267,7 +265,7 @@ impl SpeakerNotes {
     }
 
     fn parse_shapes(&self) -> Result<Vec<ShapeEnum<'static>>> {
-        let Some(drawing) = self.record.find_child(PptRecordType::PPDrawing) else {
+        let Some(drawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
         let parsed = crate::odraw::parse(&drawing.data)?;
@@ -281,7 +279,7 @@ impl SpeakerNotes {
     }
 
     fn extract_notes_body_text(&self) -> Result<String> {
-        let Some(drawing) = self.record.find_child(PptRecordType::PPDrawing) else {
+        let Some(drawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(String::new());
         };
         let shapes = crate::odraw::parse(&drawing.data)?;
@@ -304,15 +302,16 @@ fn collect_notes_body_text(
     while let Some(shape) = pending.pop() {
         visited = visited
             .checked_add(1)
-            .ok_or_else(|| PptError::Corrupted("Notes shape count overflow".to_string()))?;
+            .ok_or_else(|| Error::Corrupted("Notes shape count overflow".to_string()))?;
         if visited > MAX_SHAPES {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "Notes page exceeds the PPT shape limit".to_string(),
             ));
         }
-        if shape.placeholder()?.is_some_and(|placeholder| {
-            placeholder.kind == crate::PowerPointPlaceholderKind::NotesBody
-        }) && let Some(value) = shape.text()?.filter(|value| !value.is_empty())
+        if shape
+            .placeholder()?
+            .is_some_and(|placeholder| placeholder.kind == crate::PlaceholderKind::NotesBody)
+            && let Some(value) = shape.text()?.filter(|value| !value.is_empty())
         {
             text.push(value);
         }
@@ -324,10 +323,10 @@ fn collect_notes_body_text(
 fn read_u32(data: &[u8], offset: usize, field: &str) -> Result<u32> {
     let end = offset
         .checked_add(4)
-        .ok_or_else(|| PptError::Corrupted(format!("{field} offset overflow")))?;
+        .ok_or_else(|| Error::Corrupted(format!("{field} offset overflow")))?;
     let bytes = data
         .get(offset..end)
-        .ok_or_else(|| PptError::Corrupted(format!("truncated {field}")))?;
+        .ok_or_else(|| Error::Corrupted(format!("truncated {field}")))?;
     Ok(u32::from_le_bytes(
         bytes.try_into().expect("validated four-byte field"),
     ))
@@ -397,7 +396,7 @@ mod tests {
         slide_atom_data[16..20].copy_from_slice(&0x345u32.to_le_bytes());
         let slide_atom = record(2, 0, 0x03ef, &slide_atom_data);
         let slide_bytes = record(0x0f, 0, 0x03ee, &slide_atom);
-        let (slide, _) = PptRecord::parse(&slide_bytes, 0).expect("parse synthetic slide");
+        let (slide, _) = Record::parse(&slide_bytes, 0).expect("parse synthetic slide");
         let error = index
             .descriptor(&slide, 4, &PersistMapping::new())
             .expect_err("dangling persist reference must fail");
@@ -430,7 +429,7 @@ mod tests {
 
     #[test]
     fn writer_notes_round_trip_through_reader_api() {
-        let mut writer = crate::writer::PptWriter::new();
+        let mut writer = crate::writer::Writer::new();
         let slide = writer.add_slide().expect("add slide");
         let notes_page = crate::writer::NotesPage::simple(0, "reader writer notes round trip")
             .with_header("excluded notes header")

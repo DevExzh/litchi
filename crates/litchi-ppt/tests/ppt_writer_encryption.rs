@@ -1,11 +1,11 @@
 use litchi_cfb::OleFile;
-use litchi_ppt::writer::{PictureKind, PptEncryptionProfile, PptWriter};
-use litchi_ppt::{Package, PptError, PptOpenOptions};
+use litchi_ppt::writer::{EncryptionProfile, PictureKind, Writer};
+use litchi_ppt::{Error, OpenOptions, Package};
 use std::collections::BTreeMap;
 use std::io::Cursor;
 
-fn write(profile: PptEncryptionProfile, password: &str, picture: bool) -> Vec<u8> {
-    let mut writer = PptWriter::new();
+fn write(profile: EncryptionProfile, password: &str, picture: bool) -> Vec<u8> {
+    let mut writer = Writer::new();
     let slide = writer.add_slide().unwrap();
     writer
         .add_textbox(slide, 10, 10, 300, 40, "Encrypted 文本")
@@ -51,21 +51,21 @@ fn persist_mappings(document: &[u8], offset: usize) -> BTreeMap<u32, u32> {
     output
 }
 
-fn assert_round_trip(profile: PptEncryptionProfile, password: &str, picture: bool) -> Vec<u8> {
+fn assert_round_trip(profile: EncryptionProfile, password: &str, picture: bool) -> Vec<u8> {
     let bytes = write(profile, password, picture);
     let mut package = Package::from_reader(Cursor::new(bytes.clone())).unwrap();
     assert!(matches!(
         package.presentation(),
-        Err(PptError::PasswordRequired)
+        Err(Error::PasswordRequired)
     ));
     assert!(matches!(
-        package.presentation_with_options(PptOpenOptions {
+        package.presentation_with_options(OpenOptions {
             password: Some("wrong")
         }),
-        Err(PptError::InvalidPassword)
+        Err(Error::InvalidPassword)
     ));
     let presentation = package
-        .presentation_with_options(PptOpenOptions {
+        .presentation_with_options(OpenOptions {
             password: Some(password),
         })
         .unwrap();
@@ -81,7 +81,7 @@ fn assert_round_trip(profile: PptEncryptionProfile, password: &str, picture: boo
 fn cryptoapi_profiles_round_trip_and_emit_exact_bootstrap() {
     for key_bits in [40, 56, 120, 128] {
         let bytes = assert_round_trip(
-            PptEncryptionProfile::CryptoApiRc4 { key_bits },
+            EncryptionProfile::CryptoApiRc4 { key_bits },
             "密码🔐",
             false,
         );
@@ -147,12 +147,12 @@ fn cryptoapi_profiles_round_trip_and_emit_exact_bootstrap() {
 #[test]
 fn pictures_salts_and_atomic_profile_validation_are_covered() {
     let first = assert_round_trip(
-        PptEncryptionProfile::CryptoApiRc4 { key_bits: 128 },
+        EncryptionProfile::CryptoApiRc4 { key_bits: 128 },
         "secret",
         true,
     );
     let second = write(
-        PptEncryptionProfile::CryptoApiRc4 { key_bits: 128 },
+        EncryptionProfile::CryptoApiRc4 { key_bits: 128 },
         "secret",
         false,
     );
@@ -175,23 +175,23 @@ fn pictures_salts_and_atomic_profile_validation_are_covered() {
         salt(&second_document, &second_current)
     );
 
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
     writer
-        .set_password("kept", PptEncryptionProfile::CryptoApiRc4 { key_bits: 128 })
+        .set_password("kept", EncryptionProfile::CryptoApiRc4 { key_bits: 128 })
         .unwrap();
     assert!(
         writer
-            .set_password("", PptEncryptionProfile::CryptoApiRc4 { key_bits: 40 })
+            .set_password("", EncryptionProfile::CryptoApiRc4 { key_bits: 40 })
             .is_err()
     );
     assert!(
         writer
-            .set_password("bad", PptEncryptionProfile::CryptoApiRc4 { key_bits: 41 })
+            .set_password("bad", EncryptionProfile::CryptoApiRc4 { key_bits: 41 })
             .is_err()
     );
     assert_eq!(
         writer.encryption_profile(),
-        Some(PptEncryptionProfile::CryptoApiRc4 { key_bits: 128 })
+        Some(EncryptionProfile::CryptoApiRc4 { key_bits: 128 })
     );
     writer.clear_password();
     assert_eq!(writer.encryption_profile(), None);

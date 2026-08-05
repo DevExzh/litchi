@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 pub(crate) const WINDOW1_RECORD_TYPE: u16 = 0x003d;
 pub(crate) const RR_TAB_ID_RECORD_TYPE: u16 = 0x013d;
@@ -11,7 +11,7 @@ const MAX_RR_TAB_IDS: usize = 4112;
 
 /// Display and sheet-tab navigation state for one workbook window.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsWorkbookWindow {
+pub struct WorkbookWindow {
     horizontal_position_twips: i16,
     vertical_position_twips: i16,
     width_twips: i16,
@@ -29,7 +29,7 @@ pub struct XlsWorkbookWindow {
     sheet_tab_ratio_per_mille: u16,
 }
 
-impl XlsWorkbookWindow {
+impl WorkbookWindow {
     pub fn horizontal_position_twips(&self) -> i16 {
         self.horizontal_position_twips
     }
@@ -76,7 +76,7 @@ impl XlsWorkbookWindow {
         self.sheet_tab_ratio_per_mille
     }
 
-    fn validate_sheet_references(&self, sheet_count: usize) -> XlsResult<()> {
+    fn validate_sheet_references(&self, sheet_count: usize) -> Result<()> {
         if usize::from(self.active_sheet_index) >= sheet_count {
             return invalid(
                 WINDOW1_RECORD_TYPE,
@@ -101,21 +101,21 @@ impl XlsWorkbookWindow {
 
 /// Workbook window collection and stable sheet identifiers.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsWorkbookView {
+pub struct WorkbookView {
     sheet_ids: Vec<u16>,
-    windows: Vec<XlsWorkbookWindow>,
+    windows: Vec<WorkbookWindow>,
 }
 
-impl XlsWorkbookView {
+impl WorkbookView {
     /// Stable sheet identifiers in `BoundSheet8` order.
     pub fn sheet_ids(&self) -> &[u16] {
         &self.sheet_ids
     }
     /// Workbook windows in `Window1` record order.
-    pub fn windows(&self) -> &[XlsWorkbookWindow] {
+    pub fn windows(&self) -> &[WorkbookWindow] {
         &self.windows
     }
-    pub fn primary_window(&self) -> Option<&XlsWorkbookWindow> {
+    pub fn primary_window(&self) -> Option<&WorkbookWindow> {
         self.windows.first()
     }
 
@@ -123,7 +123,7 @@ impl XlsWorkbookView {
         &self,
         visible_tabs: &[bool],
         selected_worksheet_tabs: &[Option<bool>],
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         if visible_tabs.len() != selected_worksheet_tabs.len() {
             return invalid(
                 WINDOW1_RECORD_TYPE,
@@ -184,7 +184,7 @@ impl XlsWorkbookView {
 
 pub(crate) struct WorkbookViewCollector {
     sheet_ids: Option<Vec<u16>>,
-    windows: Vec<XlsWorkbookWindow>,
+    windows: Vec<WorkbookWindow>,
     boundsheets_started: bool,
 }
 
@@ -197,7 +197,7 @@ impl WorkbookViewCollector {
         }
     }
 
-    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
+    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> Result<()> {
         match record_type {
             RR_TAB_ID_RECORD_TYPE => {
                 if self.sheet_ids.is_some() {
@@ -223,12 +223,12 @@ impl WorkbookViewCollector {
         Ok(())
     }
 
-    pub(crate) fn finish(self, sheet_count: usize) -> XlsResult<XlsWorkbookView> {
+    pub(crate) fn finish(self, sheet_count: usize) -> Result<WorkbookView> {
         if sheet_count == 0 {
             return invalid(BOUND_SHEET8_RECORD_TYPE, "workbook contains no sheets");
         }
         let sheet_ids = if sheet_count <= MAX_RR_TAB_IDS {
-            self.sheet_ids.ok_or_else(|| XlsError::InvalidRecord {
+            self.sheet_ids.ok_or_else(|| Error::InvalidRecord {
                 record_type: RR_TAB_ID_RECORD_TYPE,
                 message: "RRTabId is required for workbooks with at most 4112 sheets".to_string(),
             })?
@@ -258,14 +258,14 @@ impl WorkbookViewCollector {
         for window in &self.windows {
             window.validate_sheet_references(sheet_count)?;
         }
-        Ok(XlsWorkbookView {
+        Ok(WorkbookView {
             sheet_ids,
             windows: self.windows,
         })
     }
 }
 
-fn parse_rr_tab_id(data: &[u8]) -> XlsResult<Vec<u16>> {
+fn parse_rr_tab_id(data: &[u8]) -> Result<Vec<u16>> {
     if data.is_empty() || !data.len().is_multiple_of(2) || data.len() > MAX_RR_TAB_IDS * 2 {
         return invalid(
             RR_TAB_ID_RECORD_TYPE,
@@ -295,9 +295,9 @@ fn parse_rr_tab_id(data: &[u8]) -> XlsResult<Vec<u16>> {
     Ok(ids)
 }
 
-fn parse_window1(data: &[u8]) -> XlsResult<XlsWorkbookWindow> {
+fn parse_window1(data: &[u8]) -> Result<WorkbookWindow> {
     if data.len() != 18 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 18,
             found: data.len(),
         });
@@ -324,7 +324,7 @@ fn parse_window1(data: &[u8]) -> XlsResult<XlsWorkbookWindow> {
     if ratio > 1000 {
         return invalid(WINDOW1_RECORD_TYPE, "sheet tab ratio must be at most 1000");
     }
-    Ok(XlsWorkbookWindow {
+    Ok(WorkbookWindow {
         horizontal_position_twips: read_i16(data, 0),
         vertical_position_twips: read_i16(data, 2),
         width_twips,
@@ -351,8 +351,8 @@ fn read_i16(data: &[u8], offset: usize) -> i16 {
     i16::from_le_bytes([data[offset], data[offset + 1]])
 }
 
-fn invalid<T>(record_type: u16, message: impl Into<String>) -> XlsResult<T> {
-    Err(XlsError::InvalidRecord {
+fn invalid<T>(record_type: u16, message: impl Into<String>) -> Result<T> {
+    Err(Error::InvalidRecord {
         record_type,
         message: message.into(),
     })
@@ -402,7 +402,7 @@ mod tests {
     fn validates_boundsheet_visibility_and_window2_selection() {
         let mut first_hidden = valid_window();
         first_hidden[12] = 1;
-        let view = XlsWorkbookView {
+        let view = WorkbookView {
             sheet_ids: vec![1, 2],
             windows: vec![parse_window1(&first_hidden).unwrap()],
         };
@@ -411,7 +411,7 @@ mod tests {
                 .is_err()
         );
 
-        let view = XlsWorkbookView {
+        let view = WorkbookView {
             sheet_ids: vec![1, 2],
             windows: vec![parse_window1(&valid_window()).unwrap()],
         };

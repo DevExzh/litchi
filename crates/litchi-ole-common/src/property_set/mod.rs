@@ -1,0 +1,24 @@
+//! Shared OLE Property Set metadata grammar and transactional CFB editing.
+//!
+//! The semantic model follows [MS-OLEPS] and the shared property-set rules in
+//! [MS-OSHARED]. Parsing and serialization are lossless within the supported
+//! typed grammar, while [`Editor`] stages complete CFB rewrites and publishes
+//! them only after every requested mutation has validated successfully.
+//!
+//! [`PropertySetReader`] is an extension trait because the CFB container owns
+//! [`litchi_cfb::OleFile`]. Import the trait to add property-set readers to an
+//! opened compound file.
+
+mod codec;
+mod model;
+
+#[cfg(test)]
+mod tests;
+
+pub use codec::{Editor, PropertySetReader};
+pub use model::{
+    CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Guid, Metadata, SUMMARY_INFORMATION_FMTID,
+    Section, Standard, Stream, USER_DEFINED_PROPERTIES_FMTID, Value,
+};
+#[cfg(test)]
+pub(crate) use model::{DEFAULT_CODEPAGE, PID_BEHAVIOR, PID_CODEPAGE};

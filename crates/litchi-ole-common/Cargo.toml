@@ -9,8 +9,10 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+chrono = { workspace = true }
 litchi-cfb = { workspace = true }
 litchi-codepage = { workspace = true }
+litchi-core = { workspace = true }
 quick-xml = { workspace = true }
 
 [lints]

@@ -1,9 +1,9 @@
 //! PowerPoint 10 slide flags and creation-time atoms (MS-PPT 2.5.30-2.5.31).
 
 use super::types::{Flags, SlideAnimationExtension};
-use crate::consts::PptRecordType;
+use crate::consts::RecordType;
 use crate::package::Result;
-use crate::{PptError, PptRecord};
+use crate::{Error, Record};
 
 const HEADER_LEN: usize = 8;
 const FLAGS_PAYLOAD_LEN: usize = 4;
@@ -59,25 +59,22 @@ impl Flags {
     }
 
     /// Parses a generic record using the default resource bounds.
-    pub fn parse_record(record: &PptRecord) -> Result<Self> {
+    pub fn parse_record(record: &Record) -> Result<Self> {
         Self::parse_record_with_limits(record, SlideMetadataLimits::default())
     }
 
     /// Parses a generic record using explicit resource bounds.
-    pub fn parse_record_with_limits(
-        record: &PptRecord,
-        limits: SlideMetadataLimits,
-    ) -> Result<Self> {
+    pub fn parse_record_with_limits(record: &Record, limits: SlideMetadataLimits) -> Result<Self> {
         let payload = validate_record(
             record,
-            PptRecordType::SlideFlags10Atom,
+            RecordType::SlideFlags10Atom,
             FLAGS_PAYLOAD_LEN,
             limits,
             "SlideFlags10Atom",
         )?;
         Ok(Self::from_raw(u32::from_le_bytes(
             payload.try_into().map_err(|_| {
-                PptError::Corrupted("SlideFlags10Atom payload is truncated".to_string())
+                Error::Corrupted("SlideFlags10Atom payload is truncated".to_string())
             })?,
         )))
     }
@@ -91,14 +88,14 @@ impl Flags {
     pub fn parse_bytes_with_limits(bytes: &[u8], limits: SlideMetadataLimits) -> Result<Self> {
         let payload = validate_bytes(
             bytes,
-            PptRecordType::SlideFlags10Atom,
+            RecordType::SlideFlags10Atom,
             FLAGS_PAYLOAD_LEN,
             limits,
             "SlideFlags10Atom",
         )?;
         Ok(Self::from_raw(u32::from_le_bytes(
             payload.try_into().map_err(|_| {
-                PptError::Corrupted("SlideFlags10Atom payload is truncated".to_string())
+                Error::Corrupted("SlideFlags10Atom payload is truncated".to_string())
             })?,
         )))
     }
@@ -110,15 +107,15 @@ impl Flags {
 
     /// Serializes the complete atom, including its record header.
     pub fn to_bytes(&self) -> Vec<u8> {
-        serialize_atom(PptRecordType::SlideFlags10Atom, &self.to_payload())
+        serialize_atom(RecordType::SlideFlags10Atom, &self.to_payload())
     }
 
     /// Converts the atom into the generic record representation.
-    pub fn to_record(&self) -> PptRecord {
+    pub fn to_record(&self) -> Record {
         let data = self.to_payload().to_vec();
-        PptRecord {
-            record_type: PptRecordType::SlideFlags10Atom,
-            record_type_raw: PptRecordType::SlideFlags10Atom.as_u16(),
+        Record {
+            record_type: RecordType::SlideFlags10Atom,
+            record_type_raw: RecordType::SlideFlags10Atom.as_u16(),
             version: 0,
             instance: 0,
             data_length: FLAGS_PAYLOAD_LEN as u32,
@@ -146,24 +143,21 @@ impl SlideTime {
     }
 
     /// Parses a generic record using the default resource bounds.
-    pub fn parse_record(record: &PptRecord) -> Result<Self> {
+    pub fn parse_record(record: &Record) -> Result<Self> {
         Self::parse_record_with_limits(record, SlideMetadataLimits::default())
     }
 
     /// Parses a generic record using explicit resource bounds.
-    pub fn parse_record_with_limits(
-        record: &PptRecord,
-        limits: SlideMetadataLimits,
-    ) -> Result<Self> {
+    pub fn parse_record_with_limits(record: &Record, limits: SlideMetadataLimits) -> Result<Self> {
         let payload = validate_record(
             record,
-            PptRecordType::SlideTime10Atom,
+            RecordType::SlideTime10Atom,
             TIME_PAYLOAD_LEN,
             limits,
             "SlideTime10Atom",
         )?;
         Ok(Self::new(u64::from_le_bytes(payload.try_into().map_err(
-            |_| PptError::Corrupted("SlideTime10Atom payload is truncated".to_string()),
+            |_| Error::Corrupted("SlideTime10Atom payload is truncated".to_string()),
         )?)))
     }
 
@@ -176,13 +170,13 @@ impl SlideTime {
     pub fn parse_bytes_with_limits(bytes: &[u8], limits: SlideMetadataLimits) -> Result<Self> {
         let payload = validate_bytes(
             bytes,
-            PptRecordType::SlideTime10Atom,
+            RecordType::SlideTime10Atom,
             TIME_PAYLOAD_LEN,
             limits,
             "SlideTime10Atom",
         )?;
         Ok(Self::new(u64::from_le_bytes(payload.try_into().map_err(
-            |_| PptError::Corrupted("SlideTime10Atom payload is truncated".to_string()),
+            |_| Error::Corrupted("SlideTime10Atom payload is truncated".to_string()),
         )?)))
     }
 
@@ -193,15 +187,15 @@ impl SlideTime {
 
     /// Serializes the complete atom, including its record header.
     pub fn to_bytes(self) -> Vec<u8> {
-        serialize_atom(PptRecordType::SlideTime10Atom, &self.to_payload())
+        serialize_atom(RecordType::SlideTime10Atom, &self.to_payload())
     }
 
     /// Converts the atom into the generic record representation.
-    pub fn to_record(self) -> PptRecord {
+    pub fn to_record(self) -> Record {
         let data = self.to_payload().to_vec();
-        PptRecord {
-            record_type: PptRecordType::SlideTime10Atom,
-            record_type_raw: PptRecordType::SlideTime10Atom.as_u16(),
+        Record {
+            record_type: RecordType::SlideTime10Atom,
+            record_type_raw: RecordType::SlideTime10Atom.as_u16(),
             version: 0,
             instance: 0,
             data_length: TIME_PAYLOAD_LEN as u32,
@@ -234,35 +228,33 @@ impl SlideAnimationExtension {
 }
 
 fn validate_record<'a>(
-    record: &'a PptRecord,
-    expected_type: PptRecordType,
+    record: &'a Record,
+    expected_type: RecordType,
     payload_len: usize,
     limits: SlideMetadataLimits,
     name: &str,
 ) -> Result<&'a [u8]> {
     let total_len = HEADER_LEN + payload_len;
     if total_len > limits.max_record_bytes {
-        return Err(PptError::InvalidFormat(format!(
+        return Err(Error::InvalidFormat(format!(
             "{name} exceeds the configured record-size limit"
         )));
     }
     if record.record_type != expected_type || record.record_type_raw != expected_type.as_u16() {
-        return Err(PptError::InvalidFormat(format!(
-            "expected {name} record type"
-        )));
+        return Err(Error::InvalidFormat(format!("expected {name} record type")));
     }
     if record.version != 0 || record.instance != 0 {
-        return Err(PptError::InvalidFormat(format!(
+        return Err(Error::InvalidFormat(format!(
             "{name} requires record version 0 and instance 0"
         )));
     }
     if record.data_length != payload_len as u32 || record.data.len() != payload_len {
-        return Err(PptError::InvalidFormat(format!(
+        return Err(Error::InvalidFormat(format!(
             "{name} requires a {payload_len}-byte payload"
         )));
     }
     if !record.children.is_empty() {
-        return Err(PptError::InvalidFormat(format!(
+        return Err(Error::InvalidFormat(format!(
             "{name} is an atom and cannot contain child records"
         )));
     }
@@ -271,18 +263,18 @@ fn validate_record<'a>(
 
 fn validate_bytes<'a>(
     bytes: &'a [u8],
-    expected_type: PptRecordType,
+    expected_type: RecordType,
     payload_len: usize,
     limits: SlideMetadataLimits,
     name: &str,
 ) -> Result<&'a [u8]> {
     if bytes.len() > limits.max_record_bytes {
-        return Err(PptError::InvalidFormat(format!(
+        return Err(Error::InvalidFormat(format!(
             "{name} exceeds the configured record-size limit"
         )));
     }
     if bytes.len() < HEADER_LEN {
-        return Err(PptError::Corrupted(format!(
+        return Err(Error::Corrupted(format!(
             "{name} record header is truncated"
         )));
     }
@@ -294,34 +286,32 @@ fn validate_bytes<'a>(
     let declared_len = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
 
     if version != 0 || instance != 0 {
-        return Err(PptError::InvalidFormat(format!(
+        return Err(Error::InvalidFormat(format!(
             "{name} requires record version 0 and instance 0"
         )));
     }
     if record_type != expected_type.as_u16() {
-        return Err(PptError::InvalidFormat(format!(
-            "expected {name} record type"
-        )));
+        return Err(Error::InvalidFormat(format!("expected {name} record type")));
     }
     if declared_len != payload_len as u32 {
-        return Err(PptError::InvalidFormat(format!(
+        return Err(Error::InvalidFormat(format!(
             "{name} requires a {payload_len}-byte payload"
         )));
     }
 
     let expected_len = HEADER_LEN + payload_len;
     if bytes.len() < expected_len {
-        return Err(PptError::Corrupted(format!("{name} payload is truncated")));
+        return Err(Error::Corrupted(format!("{name} payload is truncated")));
     }
     if bytes.len() > expected_len {
-        return Err(PptError::InvalidFormat(format!(
+        return Err(Error::InvalidFormat(format!(
             "{name} record has trailing data"
         )));
     }
     Ok(&bytes[HEADER_LEN..expected_len])
 }
 
-fn serialize_atom(record_type: PptRecordType, payload: &[u8]) -> Vec<u8> {
+fn serialize_atom(record_type: RecordType, payload: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(HEADER_LEN + payload.len());
     bytes.extend_from_slice(&0u16.to_le_bytes());
     bytes.extend_from_slice(&record_type.as_u16().to_le_bytes());
@@ -451,7 +441,7 @@ mod tests {
     #[test]
     fn generic_records_reject_inconsistent_type_length_and_children() {
         let mut flags = Flags::new(false, false).to_record();
-        flags.record_type_raw = PptRecordType::SlideTime10Atom.as_u16();
+        flags.record_type_raw = RecordType::SlideTime10Atom.as_u16();
         assert!(Flags::parse_record(&flags).is_err());
 
         let mut time = SlideTime::new(0).to_record();
@@ -463,7 +453,7 @@ mod tests {
         assert!(SlideTime::parse_record(&time).is_err());
 
         let mut flags = Flags::new(false, false).to_record();
-        flags.record_type = PptRecordType::SlideTime10Atom;
+        flags.record_type = RecordType::SlideTime10Atom;
         assert!(Flags::parse_record(&flags).is_err());
     }
 }

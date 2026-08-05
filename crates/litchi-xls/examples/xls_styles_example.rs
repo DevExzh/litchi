@@ -2,9 +2,9 @@ use litchi_xls::writer::formatting::{
     COLOR_AUTOMATIC, COLOR_BLACK, COLOR_RED, COLOR_WHITE, FONT_WEIGHT_BOLD, FONT_WEIGHT_NORMAL,
 };
 use litchi_xls::writer::{
-    BorderStyle, Borders, CellStyle, Fill, FillPattern, Font, HorizontalAlignment,
-    VerticalAlignment, XlsConditionalFormat, XlsConditionalFormatType, XlsConditionalPattern,
-    XlsDataValidation, XlsDataValidationType, XlsWriter,
+    BorderStyle, Borders, CellStyle, ConditionalFormat, ConditionalFormatType, ConditionalPattern,
+    DataValidation, DataValidationType, Fill, FillPattern, Font, HorizontalAlignment,
+    VerticalAlignment, Writer,
 };
 
 fn make_header_style() -> CellStyle {
@@ -232,7 +232,7 @@ fn make_alignment_demo_style() -> CellStyle {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Styles")?;
 
     let header_style_id = writer.add_cell_style(make_header_style());
@@ -269,9 +269,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     writer.write_string(sheet, 10, 0, "Status (with validation)")?;
     writer.write_string(sheet, 11, 0, "Value:")?;
 
-    let dv = XlsDataValidation {
-        range: litchi_xls::writer::XlsDataValidationRange::new(11, 11, 1, 1)?,
-        validation_type: XlsDataValidationType::List {
+    let dv = DataValidation {
+        range: litchi_xls::writer::DataValidationRange::new(11, 11, 1, 1)?,
+        validation_type: DataValidationType::List {
             values: vec![
                 "Not Started".to_string(),
                 "In Progress".to_string(),
@@ -288,16 +288,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     writer.add_data_validation(sheet, dv)?;
 
-    let status_cf = XlsConditionalFormat {
+    let status_cf = ConditionalFormat {
         first_row: 11,
         last_row: 11,
         first_col: 1,
         last_col: 1,
-        format_type: XlsConditionalFormatType::Formula {
+        format_type: ConditionalFormatType::Formula {
             // Highlight when the selected status is "Completed"
             formula: "B12=\"Completed\"".to_string(),
         },
-        pattern: Some(XlsConditionalPattern {
+        pattern: Some(ConditionalPattern {
             pattern: FillPattern::Solid,
             foreground_color: COLOR_RED,
             background_color: COLOR_RED,

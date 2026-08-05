@@ -1,4 +1,4 @@
-use crate::package::{PptError, Result};
+use crate::package::{Error, Result};
 
 const MAX_STORED_BYTES: usize = 128 * 1_048_576;
 const MAX_DECLARED_BYTES: u32 = 256 * 1_048_576;
@@ -85,7 +85,7 @@ impl Storage {
         let stored_len = data
             .len()
             .checked_add(prefix_len)
-            .ok_or_else(|| PptError::Corrupted("ExOleObjStg stored size overflows".into()))?;
+            .ok_or_else(|| Error::Corrupted("ExOleObjStg stored size overflows".into()))?;
         if stored_len > MAX_STORED_BYTES {
             return corrupted("ExOleObjStg exceeds 128 MiB stored data");
         }
@@ -153,7 +153,7 @@ impl Storage {
 }
 
 fn corrupted<T>(message: impl Into<String>) -> Result<T> {
-    Err(PptError::Corrupted(message.into()))
+    Err(Error::Corrupted(message.into()))
 }
 
 pub(super) const MAX_DECLARED: u32 = MAX_DECLARED_BYTES;

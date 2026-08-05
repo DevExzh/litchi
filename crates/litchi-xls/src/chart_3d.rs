@@ -11,7 +11,7 @@
 //!
 //! - MS-XLS 2.4.46 (Chart3d)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `Chart3d` record (MS-XLS 2.4.46).
 pub(crate) const CHART_3D_RECORD_TYPE: u16 = 0x103A;
@@ -45,8 +45,8 @@ const MAX_GAP: u16 = 500;
 /// Maximum `pcHeight` value (exclusive): 65535 (MS-XLS 2.4.46).
 const MAX_HEIGHT_EXCLUSIVE: u16 = 0xFFFF;
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: CHART_3D_RECORD_TYPE,
         message: message.into(),
     }
@@ -58,7 +58,7 @@ fn invalid(message: impl Into<String>) -> XlsError {
 /// The `reserved1`/`reserved2` bits (MUST be zero, and MUST be ignored) are
 /// preserved verbatim so the record round-trips unchanged.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct XlsChart3d {
+pub struct Chart3d {
     /// Clockwise rotation around the vertical center line, in degrees
     /// (`anRot`), in 0..=360.
     rotation: i16,
@@ -82,11 +82,11 @@ pub struct XlsChart3d {
     flags: u16,
 }
 
-impl XlsChart3d {
+impl Chart3d {
     /// Parse a `Chart3d` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: PAYLOAD_LEN,
                 found: data.len(),
             });
@@ -232,7 +232,7 @@ mod tests {
     #[test]
     fn round_trip() {
         let bytes = record([30, 15, 20], 100, 100, 150, 0x0037);
-        let parsed = XlsChart3d::parse(&bytes).unwrap();
+        let parsed = Chart3d::parse(&bytes).unwrap();
         assert_eq!(parsed.rotation(), 30);
         assert_eq!(parsed.elevation(), 15);
         assert_eq!(parsed.distance(), 20);
@@ -249,11 +249,11 @@ mod tests {
 
     #[test]
     fn accepts_bounds_and_preserves_reserved_bits() {
-        assert!(XlsChart3d::parse(&record([0, -90, 0], 0, 1, 0, 0)).is_ok());
-        assert!(XlsChart3d::parse(&record([360, 90, 199], 0xFFFE, 2000, 500, 0)).is_ok());
+        assert!(Chart3d::parse(&record([0, -90, 0], 0, 1, 0, 0)).is_ok());
+        assert!(Chart3d::parse(&record([360, 90, 199], 0xFFFE, 2000, 500, 0)).is_ok());
         // The 11 reserved bits MUST be ignored but round-trip verbatim.
         let bytes = record([0, 0, 0], 0, 1, 0, 0xFFC8);
-        let parsed = XlsChart3d::parse(&bytes).unwrap();
+        let parsed = Chart3d::parse(&bytes).unwrap();
         assert_eq!(parsed.flags(), 0xFFC8);
         assert!(!parsed.perspective());
         assert_eq!(parsed.to_payload(), bytes);
@@ -263,18 +263,18 @@ mod tests {
     fn rejects_malformed_records() {
         let bytes = record([0, 0, 0], 0, 1, 0, 0);
         // Truncated and overlong payloads.
-        assert!(XlsChart3d::parse(&bytes[..13]).is_err());
-        assert!(XlsChart3d::parse(&[bytes.as_slice(), &[0]].concat()).is_err());
+        assert!(Chart3d::parse(&bytes[..13]).is_err());
+        assert!(Chart3d::parse(&[bytes.as_slice(), &[0]].concat()).is_err());
         // Field bounds.
-        assert!(XlsChart3d::parse(&record([-1, 0, 0], 0, 1, 0, 0)).is_err());
-        assert!(XlsChart3d::parse(&record([361, 0, 0], 0, 1, 0, 0)).is_err());
-        assert!(XlsChart3d::parse(&record([0, -91, 0], 0, 1, 0, 0)).is_err());
-        assert!(XlsChart3d::parse(&record([0, 91, 0], 0, 1, 0, 0)).is_err());
-        assert!(XlsChart3d::parse(&record([0, 0, -1], 0, 1, 0, 0)).is_err());
-        assert!(XlsChart3d::parse(&record([0, 0, 200], 0, 1, 0, 0)).is_err());
-        assert!(XlsChart3d::parse(&record([0, 0, 0], 0xFFFF, 1, 0, 0)).is_err());
-        assert!(XlsChart3d::parse(&record([0, 0, 0], 0, 0, 0, 0)).is_err());
-        assert!(XlsChart3d::parse(&record([0, 0, 0], 0, 2001, 0, 0)).is_err());
-        assert!(XlsChart3d::parse(&record([0, 0, 0], 0, 1, 501, 0)).is_err());
+        assert!(Chart3d::parse(&record([-1, 0, 0], 0, 1, 0, 0)).is_err());
+        assert!(Chart3d::parse(&record([361, 0, 0], 0, 1, 0, 0)).is_err());
+        assert!(Chart3d::parse(&record([0, -91, 0], 0, 1, 0, 0)).is_err());
+        assert!(Chart3d::parse(&record([0, 91, 0], 0, 1, 0, 0)).is_err());
+        assert!(Chart3d::parse(&record([0, 0, -1], 0, 1, 0, 0)).is_err());
+        assert!(Chart3d::parse(&record([0, 0, 200], 0, 1, 0, 0)).is_err());
+        assert!(Chart3d::parse(&record([0, 0, 0], 0xFFFF, 1, 0, 0)).is_err());
+        assert!(Chart3d::parse(&record([0, 0, 0], 0, 0, 0, 0)).is_err());
+        assert!(Chart3d::parse(&record([0, 0, 0], 0, 2001, 0, 0)).is_err());
+        assert!(Chart3d::parse(&record([0, 0, 0], 0, 1, 501, 0)).is_err());
     }
 }

@@ -1,11 +1,11 @@
 //! Round-trip tests for the BIFF8 HeaderFooter record (even/first pages).
 
-use litchi_xls::writer::{XlsPageSetupOptions, XlsWriter};
-use litchi_xls::{XlsHeaderFooter, XlsWorkbook};
+use litchi_xls::writer::{PageSetupOptions, Writer};
+use litchi_xls::{HeaderFooter, Workbook};
 use std::io::Cursor;
 
-fn written_workbook(options: XlsPageSetupOptions) -> Vec<u8> {
-    let mut writer = XlsWriter::new();
+fn written_workbook(options: PageSetupOptions) -> Vec<u8> {
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("HF").unwrap();
     writer.write_string(sheet, 0, 0, "content").unwrap();
     writer.set_page_setup(sheet, options).unwrap();
@@ -16,7 +16,7 @@ fn written_workbook(options: XlsPageSetupOptions) -> Vec<u8> {
 
 #[test]
 fn even_and_first_pages_round_trip() {
-    let mut header_footer = XlsHeaderFooter::default();
+    let mut header_footer = HeaderFooter::default();
     header_footer
         .set_even("&LEven header".to_string(), "&REven footer".to_string())
         .unwrap();
@@ -26,13 +26,13 @@ fn even_and_first_pages_round_trip() {
     header_footer.set_scale_with_doc(true);
     header_footer.set_align_margins(true);
 
-    let options = XlsPageSetupOptions {
+    let options = PageSetupOptions {
         header: "&COdd header".to_string(),
         footer: "&COdd footer".to_string(),
         header_footer: Some(header_footer.clone()),
-        ..XlsPageSetupOptions::default()
+        ..PageSetupOptions::default()
     };
-    let workbook = XlsWorkbook::new(Cursor::new(written_workbook(options))).unwrap();
+    let workbook = Workbook::new(Cursor::new(written_workbook(options))).unwrap();
     let page = workbook.xls_worksheet(0).unwrap().page_setup().unwrap();
 
     assert_eq!(page.header(), "&COdd header");
@@ -43,10 +43,8 @@ fn even_and_first_pages_round_trip() {
 
 #[test]
 fn no_header_footer_record_by_default() {
-    let workbook = XlsWorkbook::new(Cursor::new(
-        written_workbook(XlsPageSetupOptions::default()),
-    ))
-    .unwrap();
+    let workbook =
+        Workbook::new(Cursor::new(written_workbook(PageSetupOptions::default()))).unwrap();
     let page = workbook.xls_worksheet(0).unwrap().page_setup().unwrap();
     assert!(page.header_footer().is_none());
 }

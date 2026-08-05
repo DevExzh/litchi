@@ -1,30 +1,36 @@
-//! Minimal PPTX demo with ONLY media for testing.
+//! Minimal PresentationML media model and XML smoke test.
 //!
-//! Run with: cargo run --example pptx_media_only
+//! The typed media item owns the payload and emits the slide-picture XML
+//! fragment after the package writer assigns relationship IDs.
+//!
+//! Run with: cargo run --example pptx_media_only --features ooxml
 
-use litchi::ooxml::pptx::Package;
+use litchi_pptx::presentation::media::{Format, Item, Kind};
 use std::fs;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Creating minimal PPTX with only media...\n");
-
-    let mut pkg = Package::new()?;
-    let pres = pkg.presentation_mut()?;
-
-    // Only one slide with one audio
-    let slide = pres.add_slide()?;
-    slide.set_title("Audio Test");
-
-    // Add just the MP3 audio
     let audio_data = fs::read("file_example_MP3_700KB.mp3")?;
-    slide.add_audio(audio_data, 914400, 1828800, 914400, 914400);
-    println!("Added MP3 audio");
+    let mut audio = Item::with_format(
+        audio_data,
+        Format::Mp3,
+        914_400,
+        1_828_800,
+        914_400,
+        914_400,
+    )
+    .with_auto_play();
+    audio.set_name("Audio Test");
+    audio.validate()?;
 
-    // Save
-    let output_path = "pptx_media_only.pptx";
-    println!("\nSaving to {}...", output_path);
-    pkg.save(output_path)?;
-    println!("✓ Done!");
+    // The package boundary supplies the relationship IDs; this is the
+    // canonical typed XML fragment for the media-only slide shape.
+    let shape_xml = audio.to_shape_xml(2, "rIdAudio", None)?;
+    assert_eq!(audio.kind(), Kind::Audio);
+    assert!(shape_xml.contains("audioFile"));
+    assert!(shape_xml.contains("rIdAudio"));
+
+    println!("Validated one MP3 media item ({} bytes)", audio.data.len());
+    println!("Generated media shape XML ({} bytes)", shape_xml.len());
 
     Ok(())
 }

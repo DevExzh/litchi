@@ -7,7 +7,9 @@ use super::types::DocumentImpl;
 use litchi_core::{Error, Result};
 
 #[cfg(feature = "doc")]
-use crate::doc;
+use litchi_doc as doc;
+#[cfg(feature = "doc")]
+use litchi_ole_common::property_set::PropertySetReader;
 
 #[cfg(feature = "ooxml")]
 use crate::ooxml;

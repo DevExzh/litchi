@@ -8,7 +8,7 @@ use litchi_ograph::record::{chart3d, frame, line, marker, pie, series};
 use super::model::*;
 use super::package::{is_chart_bof, ranges_with};
 use super::wire::*;
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
 #[cfg(test)]
 use super::package::chart_bof;
@@ -27,7 +27,7 @@ struct PendingDrop {
     area: Option<format::Area>,
 }
 
-pub(super) fn parse_chart(input: &[u8], limits: Limits) -> XlsResult<Chart> {
+pub(super) fn parse_chart(input: &[u8], limits: Limits) -> Result<Chart> {
     let records = ranges_with(input, limits.max_records_per_chart)?;
     if records
         .first()
@@ -80,7 +80,7 @@ pub(super) fn parse_chart(input: &[u8], limits: Limits) -> XlsResult<Chart> {
                 pending_begin = false;
                 depth = depth
                     .checked_add(1)
-                    .ok_or_else(|| XlsError::InvalidData("chart nesting overflow".into()))?;
+                    .ok_or_else(|| Error::InvalidData("chart nesting overflow".into()))?;
                 if depth > 128 {
                     return invalid(BEGIN, "chart nesting exceeds limit");
                 }
@@ -278,7 +278,7 @@ pub(super) fn parse_chart(input: &[u8], limits: Limits) -> XlsResult<Chart> {
                     owner,
                     depth: depth
                         .checked_add(1)
-                        .ok_or_else(|| XlsError::InvalidData("DropBar nesting overflow".into()))?,
+                        .ok_or_else(|| Error::InvalidData("DropBar nesting overflow".into()))?,
                     gap,
                     line: None,
                     area: None,
@@ -554,7 +554,7 @@ pub(super) fn parse_chart(input: &[u8], limits: Limits) -> XlsResult<Chart> {
     Ok(chart)
 }
 
-pub(super) fn validate_link(link: &DataLink, limits: Limits) -> XlsResult<()> {
+pub(super) fn validate_link(link: &DataLink, limits: Limits) -> Result<()> {
     if link.formula_tokens.len() > limits.max_formula_bytes {
         return invalid(0x1051, "BRAI formula length exceeds the configured limit");
     }
@@ -581,7 +581,7 @@ pub(super) fn validate_link(link: &DataLink, limits: Limits) -> XlsResult<()> {
     Ok(())
 }
 
-pub(crate) fn parse_link(data: &[u8], limits: Limits) -> XlsResult<DataLink> {
+pub(crate) fn parse_link(data: &[u8], limits: Limits) -> Result<DataLink> {
     if data.len() < 8 {
         return invalid(0x1051, "BRAI is truncated");
     }
@@ -618,7 +618,7 @@ pub(crate) fn parse_link(data: &[u8], limits: Limits) -> XlsResult<DataLink> {
     Ok(value)
 }
 
-pub(crate) fn parse_chart_references(tokens: &[u8]) -> XlsResult<Vec<CellRef>> {
+pub(crate) fn parse_chart_references(tokens: &[u8]) -> Result<Vec<CellRef>> {
     if tokens.is_empty() {
         return Ok(Vec::new());
     }
@@ -645,7 +645,7 @@ pub(crate) fn parse_chart_references(tokens: &[u8]) -> XlsResult<Vec<CellRef>> {
     }
 }
 
-pub(crate) fn parse_group(kind: u16, data: &[u8]) -> XlsResult<GroupKind> {
+pub(crate) fn parse_group(kind: u16, data: &[u8]) -> Result<GroupKind> {
     Ok(match kind {
         BAR => {
             exact(data, 6, BAR)?;
@@ -701,10 +701,10 @@ pub(crate) fn parse_group(kind: u16, data: &[u8]) -> XlsResult<GroupKind> {
 }
 
 #[cfg(test)]
-pub(super) fn serialize_chart(chart: &Chart, limits: Limits) -> XlsResult<Vec<u8>> {
+pub(super) fn serialize_chart(chart: &Chart, limits: Limits) -> Result<Vec<u8>> {
     chart.validate(limits)?;
     if !chart.unknown_records.is_empty() {
-        return Err(XlsError::UnsafeEdit(
+        return Err(Error::UnsafeEdit(
             "opaque chart records have no proven canonical placement".to_string(),
         ));
     }
@@ -740,7 +740,7 @@ pub(super) fn serialize_chart(chart: &Chart, limits: Limits) -> XlsResult<Vec<u8
             data.extend(link.number_format.to_le_bytes());
             data.extend(
                 u16::try_from(link.formula_tokens.len())
-                    .map_err(|_| XlsError::InvalidData("chart formula exceeds u16".into()))?
+                    .map_err(|_| Error::InvalidData("chart formula exceeds u16".into()))?
                     .to_le_bytes(),
             );
             data.extend(&link.formula_tokens);
@@ -902,7 +902,7 @@ pub(super) fn serialize_chart(chart: &Chart, limits: Limits) -> XlsResult<Vec<u8
 }
 
 #[cfg(test)]
-pub(super) fn write_group(out: &mut GraphEncoder, group: &Group) -> XlsResult<()> {
+pub(super) fn write_group(out: &mut GraphEncoder, group: &Group) -> Result<()> {
     match &group.kind {
         GroupKind::Line { flags } => push_record(out, LINE, &flags.to_le_bytes())?,
         GroupKind::Area { flags } => push_record(out, AREA, &flags.to_le_bytes())?,

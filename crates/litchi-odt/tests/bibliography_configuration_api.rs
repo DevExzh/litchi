@@ -1,7 +1,5 @@
 use litchi_odt::Document;
-use litchi_odt::bibliography_configuration::{
-    BibliographyConfiguration, BibliographyField, BibliographySortKey,
-};
+use litchi_odt::bibliography_configuration::{Configuration, Field, SortKey};
 mod support;
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -24,8 +22,8 @@ fn document(styles: &str) -> Document {
     .unwrap()
 }
 
-fn fixture_configuration() -> BibliographyConfiguration {
-    BibliographyConfiguration {
+fn fixture_configuration() -> Configuration {
+    Configuration {
         prefix: Some("[".to_string()),
         suffix: Some("]".to_string()),
         numbered_entries: Some(true),
@@ -36,32 +34,32 @@ fn fixture_configuration() -> BibliographyConfiguration {
         script: Some("Latn".to_string()),
         rfc_language_tag: Some("en-US".to_string()),
         sort_keys: vec![
-            BibliographySortKey {
-                field: BibliographyField::Author,
+            SortKey {
+                field: Field::Author,
                 ascending: Some(true),
             },
-            BibliographySortKey {
-                field: BibliographyField::Year,
+            SortKey {
+                field: Field::Year,
                 ascending: Some(false),
             },
-            BibliographySortKey {
-                field: BibliographyField::Isbn,
+            SortKey {
+                field: Field::Isbn,
                 ascending: None,
             },
         ],
     }
 }
 
-fn replacement_configuration() -> BibliographyConfiguration {
-    BibliographyConfiguration {
+fn replacement_configuration() -> Configuration {
+    Configuration {
         prefix: Some("(".to_string()),
         suffix: Some(")".to_string()),
         numbered_entries: Some(false),
         language: Some("de".to_string()),
         country: Some("DE".to_string()),
         rfc_language_tag: Some("de-DE".to_string()),
-        sort_keys: vec![BibliographySortKey {
-            field: BibliographyField::Title,
+        sort_keys: vec![SortKey {
+            field: Field::Title,
             ascending: Some(false),
         }],
         ..Default::default()

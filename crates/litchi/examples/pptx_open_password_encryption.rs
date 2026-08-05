@@ -1,4 +1,4 @@
-use litchi::crypto::ooxml::Mode;
+use litchi::crypto::ooxml::{self, Mode};
 use litchi::ooxml::pptx::Package;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -37,7 +37,7 @@ fn generate_standard_2007(password: &str) -> Result<(), Box<dyn std::error::Erro
         "Saving Standard 2007-encrypted presentation to {}...",
         output
     );
-    pkg.save_encrypted(output, password, Mode::Standard)?;
+    write_encrypted(pkg, output, password, Mode::Standard)?;
     Ok(())
 }
 
@@ -58,6 +58,25 @@ fn generate_agile(password: &str) -> Result<(), Box<dyn std::error::Error>> {
 
     let output = "pptx_open_password_agile.pptx";
     println!("Saving Agile-encrypted presentation to {}...", output);
-    pkg.save_encrypted(output, password, Mode::Agile)?;
+    write_encrypted(pkg, output, password, Mode::Agile)?;
+    Ok(())
+}
+
+fn write_encrypted(
+    mut package: Package,
+    output: &str,
+    password: &str,
+    mode: Mode,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let clear_package = package.to_bytes()?;
+    let encrypted_package = ooxml::encrypt(clear_package, password, mode)?;
+    std::fs::write(output, &encrypted_package)?;
+
+    // Exercise the canonical read path as well: decrypt the package through
+    // the bounded crypto service, then validate the clear OPC graph with the
+    // typed PPTX facade.
+    let opened = ooxml::open(encrypted_package, password)?;
+    assert_eq!(opened.mode(), Some(mode));
+    Package::from_vec(opened.into_bytes())?;
     Ok(())
 }

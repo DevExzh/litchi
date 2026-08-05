@@ -15,8 +15,8 @@ pub(crate) use codec::{parse_dv, parse_dval};
 pub(crate) use model::{DV_RECORD_TYPE, DVAL_RECORD_TYPE};
 
 pub use model::{
-    ErrorStyle as XlsDataValidationErrorStyle, Formula as XlsDataValidationFormula,
-    ImeMode as XlsDataValidationImeMode, Kind as XlsDataValidationKind,
-    Operator as XlsDataValidationOperator, Range as XlsDataValidationRange,
-    Rule as XlsDataValidationRule, Settings as XlsDataValidationSettings,
+    ErrorStyle as DataValidationErrorStyle, Formula as DataValidationFormula,
+    ImeMode as DataValidationImeMode, Kind as DataValidationKind,
+    Operator as DataValidationOperator, Range as DataValidationRange, Rule as DataValidationRule,
+    Settings as DataValidationSettings,
 };

@@ -3,18 +3,16 @@
 
 use litchi_core::sheet::WorkbookTrait;
 use litchi_xls::view::PaneType;
-use litchi_xls::{
-    XlsCustomViewHiddenRows, XlsCustomViewNoteDisplay, XlsObjectDisplayMode, XlsWorkbook,
-};
+use litchi_xls::{CustomViewHiddenRows, CustomViewNoteDisplay, ObjectDisplayMode, Workbook};
 
 const EXPECTED_GUID: [u8; 16] = [
     0x98, 0x93, 0x94, 0x42, 0xeb, 0x7b, 0x6b, 0x49, 0xac, 0x82, 0x6b, 0x9c, 0xd9, 0x34, 0x29, 0x8f,
 ];
 
-fn open_fixture() -> XlsWorkbook<std::io::BufReader<std::fs::File>> {
+fn open_fixture() -> Workbook<std::io::BufReader<std::fs::File>> {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/ole/xls/WithCustomViews.xls");
-    XlsWorkbook::new(std::io::BufReader::new(std::fs::File::open(path).unwrap())).unwrap()
+    Workbook::new(std::io::BufReader::new(std::fs::File::open(path).unwrap())).unwrap()
 }
 
 #[test]
@@ -31,8 +29,8 @@ fn reads_workbook_custom_view() {
     assert_eq!(view.tab_ratio(), 601);
     assert!(view.shows_formula_bar());
     assert!(view.shows_status_bar());
-    assert_eq!(view.note_display(), XlsCustomViewNoteDisplay::VisualCue);
-    assert_eq!(view.object_display(), XlsObjectDisplayMode::ShowAll);
+    assert_eq!(view.note_display(), CustomViewNoteDisplay::VisualCue);
+    assert_eq!(view.object_display(), ObjectDisplayMode::ShowAll);
     assert!(view.includes_print_settings());
     assert!(view.includes_hidden_rows_columns_and_filters());
     assert!(view.is_personal_view());
@@ -69,7 +67,7 @@ fn reads_sheet_custom_views() {
         assert!(!begin.is_frozen());
         assert!(!begin.is_split_vertically());
         assert!(!begin.is_split_horizontally());
-        assert_eq!(begin.hidden_rows(), XlsCustomViewHiddenRows::Present);
+        assert_eq!(begin.hidden_rows(), CustomViewHiddenRows::Present);
         assert!(!begin.has_hidden_columns());
         assert!(!begin.is_page_break_preview());
         assert!(!begin.is_page_layout_view());
@@ -90,7 +88,7 @@ fn workbook_without_custom_views_reads_empty() {
     let path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/xls/Simple.xls");
     let workbook =
-        XlsWorkbook::new(std::io::BufReader::new(std::fs::File::open(path).unwrap())).unwrap();
+        Workbook::new(std::io::BufReader::new(std::fs::File::open(path).unwrap())).unwrap();
     assert!(workbook.custom_views().is_empty());
     let worksheet = workbook.xls_worksheet(0).unwrap();
     assert!(worksheet.custom_views().is_empty());

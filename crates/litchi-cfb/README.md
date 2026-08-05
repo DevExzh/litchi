@@ -6,9 +6,10 @@ Parser and writer for the Microsoft Compound File Binary (CFB / OLE2) container 
 
 CFB is the storage substrate underneath the legacy Microsoft Office binary
 documents (`.doc`, `.xls`, `.ppt`) and is also used to wrap encrypted OOXML
-packages. This crate implements `[MS-CFB]` reading and writing, exposes the
-directory tree, stream I/O, and standard property-set metadata, and is consumed
-directly by `litchi-doc`, `litchi-ppt`, `litchi-xls`, umbrella format
+packages. This crate implements `[MS-CFB]` reading and writing and exposes the
+directory tree and stream I/O. Shared OLE Property Set grammar is owned by
+`litchi-ole-common`, which consumes this CFB substrate. The container is
+consumed directly by `litchi-doc`, `litchi-ppt`, `litchi-xls`, umbrella format
 detection, and OOXML encryption.
 
 ## Usage
@@ -32,7 +33,7 @@ let word_doc = ole.open_stream(&["WordDocument"])?;
 
 - Zero-copy parsing of CFB headers, FAT/MiniFAT, and directory entries
 - Stream extraction by path through the storage tree
-- Standard property-set metadata (`SummaryInformation`, `DocumentSummaryInformation`)
+- CFB storage primitives consumed by the shared OLE Property Set owner
 - Optional `write` feature for authoring new CFB containers via `OleWriter`
 
 ## License

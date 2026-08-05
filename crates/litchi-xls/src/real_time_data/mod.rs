@@ -30,4 +30,4 @@ pub(crate) use codec::{CONTINUE_FRT_RECORD_TYPE, REAL_TIME_DATA_RECORD_TYPE};
 
 // The crate-root facade is migrated separately; keep its existing exports
 // working while the contextual owner uses prefix-free canonical names.
-pub use model::{Cell as XlsRtdCell, Record as XlsRealTimeData, Value as XlsRtdValue};
+pub use model::{Cell as RtdCell, Record as RealTimeData, Value as RtdValue};

@@ -6,10 +6,10 @@
 
 use std::io::Write;
 
-use crate::writer::XlsDefinedName;
-use crate::writer::XlsDefinedNameRecordOptions;
-use crate::{XlsDefinedNameKind, XlsNameScope};
-use crate::{XlsError, XlsResult};
+use crate::writer::DefinedName;
+use crate::writer::DefinedNameRecordOptions;
+use crate::{DefinedNameKind, NameScope};
+use crate::{Error, Result};
 
 use super::{has_multibyte_char, write_record_header};
 
@@ -18,13 +18,9 @@ use super::{has_multibyte_char, write_record_header};
 /// The `rgce` argument contains the BIFF8 formula bytes for the defined
 /// name (for example, a `PtgRef` or `PtgArea` sequence produced by the
 /// formula module).
-pub(crate) fn write_name<W: Write>(
-    writer: &mut W,
-    name: &XlsDefinedName,
-    rgce: &[u8],
-) -> XlsResult<()> {
+pub(crate) fn write_name<W: Write>(writer: &mut W, name: &DefinedName, rgce: &[u8]) -> Result<()> {
     if rgce.len() > u16::MAX as usize {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "Named range formula exceeds BIFF8 length limit".to_string(),
         ));
     }
@@ -35,18 +31,18 @@ pub(crate) fn write_name<W: Write>(
     let (cch, is_16bit, built_in_code, name_str): (u8, bool, Option<u8>, Option<&str>) =
         if name.is_built_in {
             let code = name.built_in_code.ok_or_else(|| {
-                XlsError::InvalidData("Built-in defined name requires a built_in_code".to_string())
+                Error::InvalidData("Built-in defined name requires a built_in_code".to_string())
             })?;
             (1, false, Some(code), None)
         } else {
             let char_count = name.name.chars().count();
             if char_count == 0 {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "Defined name must not be empty".to_string(),
                 ));
             }
             if char_count > u8::MAX as usize {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "Defined name must be at most 255 characters".to_string(),
                 ));
             }
@@ -141,11 +137,7 @@ fn push_no_cch_string(data: &mut Vec<u8>, value: &str) {
     }
 }
 
-fn write_continued_record<W: Write>(
-    writer: &mut W,
-    record_type: u16,
-    data: &[u8],
-) -> XlsResult<()> {
+fn write_continued_record<W: Write>(writer: &mut W, record_type: u16, data: &[u8]) -> Result<()> {
     let mut offset = 0;
     let first = data.len().min(8224);
     write_record_header(writer, record_type, first as u16)?;
@@ -162,14 +154,14 @@ fn write_continued_record<W: Write>(
 
 pub(crate) fn write_defined_name_record<W: Write>(
     writer: &mut W,
-    name: &XlsDefinedNameRecordOptions,
-) -> XlsResult<()> {
+    name: &DefinedNameRecordOptions,
+) -> Result<()> {
     let mut flags = u16::from(name.hidden)
         | (u16::from(name.function) << 1)
         | (u16::from(name.vba_procedure) << 2)
         | (u16::from(name.procedure) << 3)
         | (u16::from(name.calculated_expression) << 4)
-        | (u16::from(matches!(name.kind, XlsDefinedNameKind::BuiltIn(_))) << 5)
+        | (u16::from(matches!(name.kind, DefinedNameKind::BuiltIn(_))) << 5)
         | (u16::from(name.function_group) << 6)
         | (u16::from(name.published) << 13)
         | (u16::from(name.workbook_parameter) << 14);
@@ -185,10 +177,9 @@ pub(crate) fn write_defined_name_record<W: Write>(
     data.extend_from_slice(&(name.formula_tokens.len() as u16).to_le_bytes());
     data.extend_from_slice(&0u16.to_le_bytes());
     let itab = match name.scope {
-        XlsNameScope::Workbook => 0,
-        XlsNameScope::Worksheet(index) => u16::try_from(index + 1).map_err(|_| {
-            XlsError::InvalidData("defined name sheet scope exceeds u16".to_string())
-        })?,
+        NameScope::Workbook => 0,
+        NameScope::Worksheet(index) => u16::try_from(index + 1)
+            .map_err(|_| Error::InvalidData("defined name sheet scope exceeds u16".to_string()))?,
     };
     data.extend_from_slice(&itab.to_le_bytes());
     for value in [
@@ -225,11 +216,11 @@ pub(crate) fn write_name_comment<W: Write>(
     writer: &mut W,
     name: &str,
     comment: &str,
-) -> XlsResult<()> {
+) -> Result<()> {
     let name_len = name.encode_utf16().count();
     let comment_len = comment.encode_utf16().count();
     if name_len > 255 || comment_len > 255 {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "NameCmt strings exceed 255 UTF-16 units".to_string(),
         ));
     }
@@ -267,8 +258,8 @@ fn push_xl_name_unicode(data: &mut Vec<u8>, value: &str) {
 
 pub(crate) fn write_name_function_group<W: Write>(
     writer: &mut W,
-    value: &crate::XlsNameFnGrp12,
-) -> XlsResult<()> {
+    value: &crate::NameFnGrp12,
+) -> Result<()> {
     let mut data = Vec::new();
     push_frt_header(&mut data, 0x0899);
     let count = value.function_name.encode_utf16().count();
@@ -282,8 +273,8 @@ pub(crate) fn write_name_function_group<W: Write>(
 
 pub(crate) fn write_name_publish<W: Write>(
     writer: &mut W,
-    value: &crate::XlsNamePublish,
-) -> XlsResult<()> {
+    value: &crate::NamePublish,
+) -> Result<()> {
     let mut data = Vec::new();
     push_frt_header(&mut data, 0x0893);
     let flags = u16::from(value.published) | (u16::from(value.workbook_parameter) << 1);

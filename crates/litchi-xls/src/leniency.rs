@@ -9,21 +9,21 @@
 //! is the only way to guarantee a caller never silently reads a value the file
 //! did not contain.
 //!
-//! [`XlsLeniency::TolerateFormattingDefects`] trades that guarantee for reach:
-//! the defects enumerated by [`XlsFormattingDefect`] are repaired with a
+//! [`Leniency::TolerateFormattingDefects`] trades that guarantee for reach:
+//! the defects enumerated by [`FormattingDefect`] are repaired with a
 //! documented substitute value and *recorded*, so the caller can enumerate
-//! exactly what was tolerated through [`XlsToleranceReport`]. Nothing is
+//! exactly what was tolerated through [`ToleranceReport`]. Nothing is
 //! swallowed silently, and nothing outside that enumeration is affected —
 //! record framing, stream grammar, and encryption remain hard errors in both
 //! modes.
 
-use super::error::{XlsError, XlsResult};
+use super::error::{Error, Result};
 
 /// Upper bound on individually recorded defects.
 ///
 /// A hostile or merely enormous workbook must not be able to make the report
 /// grow without limit. Defects beyond this bound are counted, not stored; see
-/// [`XlsToleranceReport::unrecorded`].
+/// [`ToleranceReport::unrecorded`].
 const MAX_RECORDED_DEFECTS: usize = 1024;
 
 /// How the reader treats non-structural formatting defects.
@@ -32,34 +32,34 @@ const MAX_RECORDED_DEFECTS: usize = 1024;
 /// grammar, or unsupported/absent decryption material — are hard errors under
 /// every variant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub enum XlsLeniency {
+pub enum Leniency {
     /// Every deviation from MS-XLS is a hard error.
     ///
     /// This is the default and the historical behaviour: a workbook either
     /// parses exactly as specified or it does not parse at all.
     #[default]
     Strict,
-    /// Repair and record the cosmetic defects listed by [`XlsFormattingDefect`].
+    /// Repair and record the cosmetic defects listed by [`FormattingDefect`].
     ///
     /// Each repair substitutes the value documented on the corresponding
-    /// [`XlsFormattingDefect`] variant and appends an [`XlsToleratedDefect`] to
-    /// the workbook's [`XlsToleranceReport`].
+    /// [`FormattingDefect`] variant and appends an [`ToleratedDefect`] to
+    /// the workbook's [`ToleranceReport`].
     TolerateFormattingDefects,
 }
 
-impl XlsLeniency {
+impl Leniency {
     /// Whether formatting defects are repaired rather than rejected.
     pub fn tolerates_formatting_defects(self) -> bool {
-        matches!(self, XlsLeniency::TolerateFormattingDefects)
+        matches!(self, Leniency::TolerateFormattingDefects)
     }
 }
 
 /// The class of cosmetic formatting defect a lenient read is allowed to repair.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of what
-/// [`XlsLeniency::TolerateFormattingDefects`] may change about a workbook.
+/// [`Leniency::TolerateFormattingDefects`] may change about a workbook.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XlsFormattingDefect {
+pub enum FormattingDefect {
     /// `Font.bFamily` (MS-XLS 2.4.122) held a value outside `0..=5`.
     ///
     /// Repaired to `NotApplicable`, the value MS-XLS assigns to a font whose
@@ -88,31 +88,31 @@ pub enum XlsFormattingDefect {
     FormatStringOverrun,
 }
 
-impl XlsFormattingDefect {
+impl FormattingDefect {
     /// The BIFF record type whose payload carried the defect.
     pub fn record_type(self) -> u16 {
         match self {
-            XlsFormattingDefect::FontFamily | XlsFormattingDefect::FontNameEmpty => {
+            FormattingDefect::FontFamily | FormattingDefect::FontNameEmpty => {
                 super::font::FONT_RECORD_TYPE
             },
-            XlsFormattingDefect::AlignmentJustifyLastLine => super::number_format::XF_RECORD,
-            XlsFormattingDefect::ExtendedFormatCountMismatch => super::number_format::XFCRC_RECORD,
-            XlsFormattingDefect::FormatStringOverrun => super::number_format::FORMAT_RECORD,
+            FormattingDefect::AlignmentJustifyLastLine => super::number_format::XF_RECORD,
+            FormattingDefect::ExtendedFormatCountMismatch => super::number_format::XFCRC_RECORD,
+            FormattingDefect::FormatStringOverrun => super::number_format::FORMAT_RECORD,
         }
     }
 
     /// A stable, allocation-free description of the defect class.
     pub fn description(self) -> &'static str {
         match self {
-            XlsFormattingDefect::FontFamily => "Font family byte is outside the enumeration",
-            XlsFormattingDefect::FontNameEmpty => "Font record declares an empty name",
-            XlsFormattingDefect::AlignmentJustifyLastLine => {
+            FormattingDefect::FontFamily => "Font family byte is outside the enumeration",
+            FormattingDefect::FontNameEmpty => "Font record declares an empty name",
+            FormattingDefect::AlignmentJustifyLastLine => {
                 "XF justify-last-line is set without distributed horizontal alignment"
             },
-            XlsFormattingDefect::ExtendedFormatCountMismatch => {
+            FormattingDefect::ExtendedFormatCountMismatch => {
                 "XFCRC disagrees with the number of XF records"
             },
-            XlsFormattingDefect::FormatStringOverrun => {
+            FormattingDefect::FormatStringOverrun => {
                 "Format record character count overstates its payload"
             },
         }
@@ -121,26 +121,26 @@ impl XlsFormattingDefect {
 
 /// One repaired formatting defect, located within the workbook that carried it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct XlsToleratedDefect {
-    defect: XlsFormattingDefect,
+pub struct ToleratedDefect {
+    defect: FormattingDefect,
     ordinal: u32,
     observed: u32,
 }
 
-impl XlsToleratedDefect {
+impl ToleratedDefect {
     /// The class of defect that was repaired.
-    pub fn defect(&self) -> XlsFormattingDefect {
+    pub fn defect(&self) -> FormattingDefect {
         self.defect
     }
 
     /// Where the defect was found.
     ///
-    /// For [`XlsFormattingDefect::FontFamily`] and
-    /// [`XlsFormattingDefect::FontNameEmpty`] this is the font's logical index.
-    /// For [`XlsFormattingDefect::AlignmentJustifyLastLine`] it is the `XF`
-    /// index. For [`XlsFormattingDefect::FormatStringOverrun`] it is the
+    /// For [`FormattingDefect::FontFamily`] and
+    /// [`FormattingDefect::FontNameEmpty`] this is the font's logical index.
+    /// For [`FormattingDefect::AlignmentJustifyLastLine`] it is the `XF`
+    /// index. For [`FormattingDefect::FormatStringOverrun`] it is the
     /// zero-based ordinal of the `Format` record among the `Format` records
-    /// parsed so far. For [`XlsFormattingDefect::ExtendedFormatCountMismatch`]
+    /// parsed so far. For [`FormattingDefect::ExtendedFormatCountMismatch`]
     /// it is the number of `XF` records that were actually parsed.
     pub fn ordinal(&self) -> u32 {
         self.ordinal
@@ -148,12 +148,12 @@ impl XlsToleratedDefect {
 
     /// The offending value read from the file.
     ///
-    /// For [`XlsFormattingDefect::FontFamily`] this is the out-of-range
-    /// `bFamily` byte. For [`XlsFormattingDefect::AlignmentJustifyLastLine`] it
+    /// For [`FormattingDefect::FontFamily`] this is the out-of-range
+    /// `bFamily` byte. For [`FormattingDefect::AlignmentJustifyLastLine`] it
     /// is the `alcH` value that accompanied the flag. For
-    /// [`XlsFormattingDefect::ExtendedFormatCountMismatch`] it is the declared
-    /// `cxfs`. For [`XlsFormattingDefect::FormatStringOverrun`] it is the
-    /// declared `cch`. For [`XlsFormattingDefect::FontNameEmpty`] it is always
+    /// [`FormattingDefect::ExtendedFormatCountMismatch`] it is the declared
+    /// `cxfs`. For [`FormattingDefect::FormatStringOverrun`] it is the
+    /// declared `cch`. For [`FormattingDefect::FontNameEmpty`] it is always
     /// zero, since the defect *is* the value.
     pub fn observed(&self) -> u32 {
         self.observed
@@ -170,12 +170,12 @@ impl XlsToleratedDefect {
 /// A strict read always produces an empty report. An empty report from a
 /// lenient read means the workbook needed no repairs at all.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct XlsToleranceReport {
-    defects: Vec<XlsToleratedDefect>,
+pub struct ToleranceReport {
+    defects: Vec<ToleratedDefect>,
     unrecorded: u32,
 }
 
-impl XlsToleranceReport {
+impl ToleranceReport {
     /// Whether the workbook parsed without any repair.
     pub fn is_clean(&self) -> bool {
         self.defects.is_empty() && self.unrecorded == 0
@@ -183,16 +183,16 @@ impl XlsToleranceReport {
 
     /// The individually recorded defects, in discovery order.
     ///
-    /// At most [`XlsToleranceReport::RECORD_LIMIT`] entries; any excess is
-    /// reported by [`XlsToleranceReport::unrecorded`].
-    pub fn defects(&self) -> &[XlsToleratedDefect] {
+    /// At most [`ToleranceReport::RECORD_LIMIT`] entries; any excess is
+    /// reported by [`ToleranceReport::unrecorded`].
+    pub fn defects(&self) -> &[ToleratedDefect] {
         &self.defects
     }
 
     /// Defects that were repaired but not individually stored.
     ///
     /// Non-zero only for workbooks with more than
-    /// [`XlsToleranceReport::RECORD_LIMIT`] defects, where storing every one
+    /// [`ToleranceReport::RECORD_LIMIT`] defects, where storing every one
     /// would let the file dictate unbounded memory use.
     pub fn unrecorded(&self) -> u32 {
         self.unrecorded
@@ -206,8 +206,8 @@ impl XlsToleranceReport {
     /// How many recorded defects belong to `defect`.
     ///
     /// Counts only individually recorded entries; compare
-    /// [`XlsToleranceReport::unrecorded`] before treating a zero as absence.
-    pub fn count(&self, defect: XlsFormattingDefect) -> usize {
+    /// [`ToleranceReport::unrecorded`] before treating a zero as absence.
+    pub fn count(&self, defect: FormattingDefect) -> usize {
         self.defects
             .iter()
             .filter(|entry| entry.defect == defect)
@@ -220,42 +220,42 @@ impl XlsToleranceReport {
 
 /// Reader-side policy holder that decides and records each repair.
 ///
-/// Parsers call [`XlsToleranceLog::tolerate`] at the exact point they would
+/// Parsers call [`ToleranceLog::tolerate`] at the exact point they would
 /// otherwise have returned an error, and continue with the documented
 /// substitute value only when it returns `Ok`.
 #[derive(Debug, Clone, Default)]
-pub(crate) struct XlsToleranceLog {
-    leniency: XlsLeniency,
-    report: XlsToleranceReport,
+pub(crate) struct ToleranceLog {
+    leniency: Leniency,
+    report: ToleranceReport,
 }
 
-impl XlsToleranceLog {
+impl ToleranceLog {
     /// Build a log that applies `leniency`.
-    pub(crate) fn new(leniency: XlsLeniency) -> Self {
+    pub(crate) fn new(leniency: Leniency) -> Self {
         Self {
             leniency,
-            report: XlsToleranceReport::default(),
+            report: ToleranceReport::default(),
         }
     }
 
     /// Decide whether `defect` may be repaired, recording it if so.
     ///
-    /// Returns `Err(on_strict())` under [`XlsLeniency::Strict`], so a caller
+    /// Returns `Err(on_strict())` under [`Leniency::Strict`], so a caller
     /// that propagates with `?` keeps byte-identical strict behaviour. Under
-    /// [`XlsLeniency::TolerateFormattingDefects`] it returns `Ok(())` and the
+    /// [`Leniency::TolerateFormattingDefects`] it returns `Ok(())` and the
     /// caller substitutes the value documented on the `defect` variant.
     pub(crate) fn tolerate(
         &mut self,
-        defect: XlsFormattingDefect,
+        defect: FormattingDefect,
         ordinal: u32,
         observed: u32,
-        on_strict: impl FnOnce() -> XlsError,
-    ) -> XlsResult<()> {
+        on_strict: impl FnOnce() -> Error,
+    ) -> Result<()> {
         if !self.leniency.tolerates_formatting_defects() {
             return Err(on_strict());
         }
         if self.report.defects.len() < MAX_RECORDED_DEFECTS {
-            self.report.defects.push(XlsToleratedDefect {
+            self.report.defects.push(ToleratedDefect {
                 defect,
                 ordinal,
                 observed,
@@ -267,7 +267,7 @@ impl XlsToleranceLog {
     }
 
     /// Consume the log and yield the report handed to the caller.
-    pub(crate) fn into_report(self) -> XlsToleranceReport {
+    pub(crate) fn into_report(self) -> ToleranceReport {
         self.report
     }
 }
@@ -276,15 +276,15 @@ impl XlsToleranceLog {
 mod tests {
     use super::*;
 
-    fn strict_error() -> XlsError {
-        XlsError::InvalidData("strict".to_string())
+    fn strict_error() -> Error {
+        Error::InvalidData("strict".to_string())
     }
 
     #[test]
     fn strict_mode_rejects_every_defect_and_records_nothing() {
-        let mut log = XlsToleranceLog::new(XlsLeniency::Strict);
+        let mut log = ToleranceLog::new(Leniency::Strict);
         let error = log
-            .tolerate(XlsFormattingDefect::FontFamily, 3, 32, strict_error)
+            .tolerate(FormattingDefect::FontFamily, 3, 32, strict_error)
             .expect_err("strict mode must reject");
         assert!(error.to_string().contains("strict"));
         assert!(log.into_report().is_clean());
@@ -292,35 +292,30 @@ mod tests {
 
     #[test]
     fn default_leniency_is_strict() {
-        assert_eq!(XlsLeniency::default(), XlsLeniency::Strict);
-        assert!(!XlsLeniency::default().tolerates_formatting_defects());
-        assert!(XlsToleranceLog::default().into_report().is_clean());
+        assert_eq!(Leniency::default(), Leniency::Strict);
+        assert!(!Leniency::default().tolerates_formatting_defects());
+        assert!(ToleranceLog::default().into_report().is_clean());
     }
 
     #[test]
     fn lenient_mode_records_defects_in_discovery_order() {
-        let mut log = XlsToleranceLog::new(XlsLeniency::TolerateFormattingDefects);
-        log.tolerate(XlsFormattingDefect::FontFamily, 3, 32, strict_error)
+        let mut log = ToleranceLog::new(Leniency::TolerateFormattingDefects);
+        log.tolerate(FormattingDefect::FontFamily, 3, 32, strict_error)
             .expect("lenient mode tolerates");
-        log.tolerate(
-            XlsFormattingDefect::FormatStringOverrun,
-            7,
-            40,
-            strict_error,
-        )
-        .expect("lenient mode tolerates");
-        log.tolerate(XlsFormattingDefect::FontFamily, 5, 108, strict_error)
+        log.tolerate(FormattingDefect::FormatStringOverrun, 7, 40, strict_error)
+            .expect("lenient mode tolerates");
+        log.tolerate(FormattingDefect::FontFamily, 5, 108, strict_error)
             .expect("lenient mode tolerates");
 
         let report = log.into_report();
         assert!(!report.is_clean());
         assert_eq!(report.total(), 3);
         assert_eq!(report.unrecorded(), 0);
-        assert_eq!(report.count(XlsFormattingDefect::FontFamily), 2);
-        assert_eq!(report.count(XlsFormattingDefect::FontNameEmpty), 0);
+        assert_eq!(report.count(FormattingDefect::FontFamily), 2);
+        assert_eq!(report.count(FormattingDefect::FontNameEmpty), 0);
 
         let first = report.defects()[0];
-        assert_eq!(first.defect(), XlsFormattingDefect::FontFamily);
+        assert_eq!(first.defect(), FormattingDefect::FontFamily);
         assert_eq!(first.ordinal(), 3);
         assert_eq!(first.observed(), 32);
         assert_eq!(first.record_type(), super::super::font::FONT_RECORD_TYPE);
@@ -330,11 +325,11 @@ mod tests {
 
     #[test]
     fn recorded_defects_are_bounded_and_the_excess_is_counted() {
-        let mut log = XlsToleranceLog::new(XlsLeniency::TolerateFormattingDefects);
-        let total = XlsToleranceReport::RECORD_LIMIT + 5;
+        let mut log = ToleranceLog::new(Leniency::TolerateFormattingDefects);
+        let total = ToleranceReport::RECORD_LIMIT + 5;
         for ordinal in 0..total {
             log.tolerate(
-                XlsFormattingDefect::FontNameEmpty,
+                FormattingDefect::FontNameEmpty,
                 ordinal as u32,
                 0,
                 strict_error,
@@ -343,7 +338,7 @@ mod tests {
         }
 
         let report = log.into_report();
-        assert_eq!(report.defects().len(), XlsToleranceReport::RECORD_LIMIT);
+        assert_eq!(report.defects().len(), ToleranceReport::RECORD_LIMIT);
         assert_eq!(report.unrecorded(), 5);
         assert_eq!(report.total(), total as u64);
     }
@@ -352,23 +347,23 @@ mod tests {
     fn every_defect_class_maps_to_its_record_type_and_description() {
         let expectations = [
             (
-                XlsFormattingDefect::FontFamily,
+                FormattingDefect::FontFamily,
                 super::super::font::FONT_RECORD_TYPE,
             ),
             (
-                XlsFormattingDefect::FontNameEmpty,
+                FormattingDefect::FontNameEmpty,
                 super::super::font::FONT_RECORD_TYPE,
             ),
             (
-                XlsFormattingDefect::AlignmentJustifyLastLine,
+                FormattingDefect::AlignmentJustifyLastLine,
                 super::super::number_format::XF_RECORD,
             ),
             (
-                XlsFormattingDefect::ExtendedFormatCountMismatch,
+                FormattingDefect::ExtendedFormatCountMismatch,
                 super::super::number_format::XFCRC_RECORD,
             ),
             (
-                XlsFormattingDefect::FormatStringOverrun,
+                FormattingDefect::FormatStringOverrun,
                 super::super::number_format::FORMAT_RECORD,
             ),
         ];

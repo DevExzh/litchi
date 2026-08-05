@@ -5,13 +5,13 @@
 //! for implementation status.
 //!
 //! Run with: cargo run --example xls_write_example
-use litchi_xls::XlsWriter;
+use litchi_xls::Writer;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating a new XLS file...");
 
     // Create a new XLS writer
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
 
     // Add first worksheet
     let sheet1 = writer.add_worksheet("Sales Data")?;

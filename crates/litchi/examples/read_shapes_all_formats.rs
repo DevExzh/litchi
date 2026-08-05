@@ -5,10 +5,10 @@
 //!
 //! Run with: cargo run --example read_shapes_all_formats <file.doc|file.ppt|file.xls>
 
-use litchi::doc::Package as DocPackage;
 use litchi::ppt::Package as PptPackage;
 use litchi::sheet::WorkbookTrait;
-use litchi::xls::XlsWorkbook;
+use litchi::xls::Workbook;
+use litchi_doc::Package as DocPackage;
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -57,7 +57,7 @@ fn read_doc_shapes(file_path: &str) -> Result<(), Box<dyn Error>> {
     let ole = pkg.ole_file();
 
     // Use the DOC shapes module
-    use litchi::doc::shapes;
+    use litchi_doc::shape as shapes;
 
     let shape_count = shapes::count_shapes(ole)?;
     println!("Total shapes: {}", shape_count);
@@ -126,13 +126,13 @@ fn read_xls_shapes(file_path: &str) -> Result<(), Box<dyn Error>> {
     println!();
 
     let file = File::open(file_path)?;
-    let workbook = XlsWorkbook::new(file)?;
+    let workbook = Workbook::new(file)?;
 
     println!("Worksheets: {}", workbook.worksheet_names().len());
     println!();
 
     // Note: XLS shape extraction requires access to the raw workbook stream
-    // which is not directly exposed by XlsWorkbook API
+    // which is not directly exposed by the XLS workbook API
     println!("XLS shape extraction requires raw workbook data access.");
     println!("Use litchi::xls::shapes::extract_shapes_from_workbook() with raw data.");
     println!();

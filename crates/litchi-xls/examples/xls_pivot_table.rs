@@ -1,6 +1,6 @@
 //! Pivot Table Writer — XLS Example
 //!
-//! Demonstrates the `add_pivot_table` API on `XlsWriter`. Generates an XLS
+//! Demonstrates the `add_pivot_table` API on `Writer`. Generates an XLS
 //! file with a source data sheet and a second sheet containing a pivot table
 //! definition (SXVS/SXVIEW/SXVD/SXVI/SXDI records).
 //!
@@ -8,10 +8,9 @@
 //!
 //! The file is saved to `output/xls_pivot_table.xls`.
 
-use litchi_xls::XlsWriter;
+use litchi_xls::Writer;
 use litchi_xls::writer::{
-    PivotCacheValue, XlsPivotDataItemConfig, XlsPivotFieldConfig, XlsPivotItemConfig,
-    XlsPivotTableConfig,
+    PivotCacheValue, PivotDataItemConfig, PivotFieldConfig, PivotItemConfig, PivotTableConfig,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::create_dir_all(output_dir)?;
     let output_path = output_dir.join("xls_pivot_table.xls");
 
-    let mut w = XlsWriter::new();
+    let mut w = Writer::new();
 
     // ================================================================
     // Sheet 1 — Source Data
@@ -80,7 +79,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //   Data field: Sum of Revenue (field 3)
     //
     // The output range starts at row 2 to leave room for the title.
-    let pivot_config = XlsPivotTableConfig {
+    let pivot_config = PivotTableConfig {
         name: "SalesPivot".to_string(),
         source_type: 0x0001, // Worksheet
 
@@ -104,37 +103,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         data_position: 0xFFFF, // EXC_SXVIEW_DATALAST (single data field)
         fields: vec![
             // Field 0: Region — row axis
-            XlsPivotFieldConfig {
+            PivotFieldConfig {
                 axis: 0x0001, // row
                 subtotal_count: 1,
                 subtotal_flags: 0x0001, // DEFAULT subtotal
                 items: vec![
-                    XlsPivotItemConfig {
+                    PivotItemConfig {
                         item_type: 0x0000, // EXC_SXVI_TYPE_DATA
                         flags: 0,
                         cache_index: 0,
                         name: None, // use cache name
                     },
-                    XlsPivotItemConfig {
+                    PivotItemConfig {
                         item_type: 0x0000,
                         flags: 0,
                         cache_index: 1,
                         name: None,
                     },
-                    XlsPivotItemConfig {
+                    PivotItemConfig {
                         item_type: 0x0000,
                         flags: 0,
                         cache_index: 2,
                         name: None,
                     },
-                    XlsPivotItemConfig {
+                    PivotItemConfig {
                         item_type: 0x0000,
                         flags: 0,
                         cache_index: 3,
                         name: None,
                     },
                     // DEFAULT subtotal item — required by Excel
-                    XlsPivotItemConfig {
+                    PivotItemConfig {
                         item_type: 0x0001, // EXC_SXVI_TYPE_DEFAULT
                         flags: 0,
                         cache_index: 0xFFFF,
@@ -148,24 +147,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 grouping: None,
             },
             // Field 1: Product — column axis
-            XlsPivotFieldConfig {
+            PivotFieldConfig {
                 axis: 0x0002, // column
                 subtotal_count: 1,
                 subtotal_flags: 0x0001,
                 items: vec![
-                    XlsPivotItemConfig {
+                    PivotItemConfig {
                         item_type: 0x0000,
                         flags: 0,
                         cache_index: 0,
                         name: None,
                     },
-                    XlsPivotItemConfig {
+                    PivotItemConfig {
                         item_type: 0x0000,
                         flags: 0,
                         cache_index: 1,
                         name: None,
                     },
-                    XlsPivotItemConfig {
+                    PivotItemConfig {
                         item_type: 0x0001, // DEFAULT subtotal
                         flags: 0,
                         cache_index: 0xFFFF,
@@ -179,24 +178,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 grouping: None,
             },
             // Field 2: Quarter — page axis
-            XlsPivotFieldConfig {
+            PivotFieldConfig {
                 axis: 0x0004, // page
                 subtotal_count: 1,
                 subtotal_flags: 0x0001,
                 items: vec![
-                    XlsPivotItemConfig {
+                    PivotItemConfig {
                         item_type: 0x0000,
                         flags: 0,
                         cache_index: 0,
                         name: None,
                     },
-                    XlsPivotItemConfig {
+                    PivotItemConfig {
                         item_type: 0x0000,
                         flags: 0,
                         cache_index: 1,
                         name: None,
                     },
-                    XlsPivotItemConfig {
+                    PivotItemConfig {
                         item_type: 0x0001, // DEFAULT subtotal
                         flags: 0,
                         cache_index: 0xFFFF,
@@ -210,7 +209,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 grouping: None,
             },
             // Field 3: Revenue — data axis (aggregated)
-            XlsPivotFieldConfig {
+            PivotFieldConfig {
                 axis: 0x0008, // data
                 subtotal_count: 1,
                 subtotal_flags: 0x0001,
@@ -224,7 +223,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ],
         data_items: vec![
             // Sum of Revenue
-            XlsPivotDataItemConfig {
+            PivotDataItemConfig {
                 source_field_index: 3, // Revenue is field index 3
                 function: 0,           // 0 = Sum
                 display_format: 0,

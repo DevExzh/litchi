@@ -15,8 +15,8 @@ use super::env_data::{
     TxCFStyleAtom, TxPFStyleAtom, TxSIStyleAtom, VBAInfoAtom,
 };
 use super::spec::{
-    BinaryTagData, MAIN_MASTER_PLACEHOLDERS, MAIN_MASTER_SLIDE_ATOM_RESERVED, Ppt10Tag,
-    SlideLayoutType, color_schemes,
+    BinaryTagData, MAIN_MASTER_PLACEHOLDERS, MAIN_MASTER_SLIDE_ATOM_RESERVED, SlideLayoutType,
+    Tag10, color_schemes,
 };
 use super::tx_style::{
     build_tx_master_style_body, build_tx_master_style_center_body,
@@ -25,11 +25,11 @@ use super::tx_style::{
     build_tx_master_style_title, tx_style_instance,
 };
 
-use crate::view_info::PowerPointSlideViewInfo;
+use crate::view_info::SlideViewInfo;
 use litchi_core::unit::emu_u32_to_ppt_master_u32;
 
 /// Error type for PPT operations
-pub type PptError = std::io::Error;
+pub type Error = std::io::Error;
 
 /// PPT record types
 pub mod record_type {
@@ -120,7 +120,7 @@ impl RecordHeader {
     }
 
     /// Write the header to a writer (8 bytes)
-    pub fn write<W: Write>(&self, writer: &mut W) -> Result<(), PptError> {
+    pub fn write<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         // Combine version and instance into first 2 bytes
         let ver_inst = (self.version as u16) | ((self.instance & 0x0FFF) << 4);
         writer.write_all(&ver_inst.to_le_bytes())?;
@@ -168,7 +168,7 @@ impl RecordBuilder {
     }
 
     /// Build the complete record (header + data)
-    pub fn build(&self) -> Result<Vec<u8>, PptError> {
+    pub fn build(&self) -> Result<Vec<u8>, Error> {
         let mut record = Vec::new();
         self.header.write(&mut record)?;
         record.extend_from_slice(&self.data);
@@ -187,7 +187,7 @@ impl RecordBuilder {
 }
 
 /// Create a document container record
-pub fn create_document_container(slides: &[Vec<u8>]) -> Result<Vec<u8>, PptError> {
+pub fn create_document_container(slides: &[Vec<u8>]) -> Result<Vec<u8>, Error> {
     let mut builder = RecordBuilder::new(0x0F, 0, record_type::DOCUMENT);
 
     // Add slide list
@@ -199,7 +199,7 @@ pub fn create_document_container(slides: &[Vec<u8>]) -> Result<Vec<u8>, PptError
 }
 
 /// Create a MainMaster container aligned with POI's empty.ppt structure.
-pub fn create_main_master_container(ppdrawing: &[u8]) -> Result<Vec<u8>, PptError> {
+pub fn create_main_master_container(ppdrawing: &[u8]) -> Result<Vec<u8>, Error> {
     let mut builder = RecordBuilder::new(0x0F, 0, record_type::MAIN_MASTER);
 
     // 1) SlideAtom (MS-PPT 2.4.7) - master slide atom
@@ -317,7 +317,7 @@ pub fn create_main_master_container(ppdrawing: &[u8]) -> Result<Vec<u8>, PptErro
         let mut prog_tags = RecordBuilder::new(0x0F, 0, record_type::PROG_TAGS);
         let mut prog_bin = RecordBuilder::new(0x0F, 0, record_type::PROG_BINARY_TAG);
         let mut cstr = RecordBuilder::new(0x00, 0, record_type::CSTRING);
-        cstr.write_data(&Ppt10Tag::to_bytes());
+        cstr.write_data(&Tag10::to_bytes());
         prog_bin.write_child(&cstr.build()?);
         let mut bin = RecordBuilder::new(0x00, 0, record_type::BINARY_TAG_DATA);
         bin.write_data(&BinaryTagData::MAIN_MASTER.to_bytes());
@@ -331,7 +331,7 @@ pub fn create_main_master_container(ppdrawing: &[u8]) -> Result<Vec<u8>, PptErro
 
 /// Create a SlideListWithText (instance=MASTER) containing SlidePersistAtom entries for masters.
 /// Each entry is (persist_id_ref, slide_identifier).
-pub fn create_slide_list_with_text_master(entries: &[(u32, u32)]) -> Result<Vec<u8>, PptError> {
+pub fn create_slide_list_with_text_master(entries: &[(u32, u32)]) -> Result<Vec<u8>, Error> {
     let mut builder = RecordBuilder::new(0x0F, 1, record_type::SLIDE_LIST_WITH_TEXT);
 
     for &(persist_id_ref, slide_identifier) in entries {
@@ -361,7 +361,7 @@ pub fn create_document_atom(
     _slide_count: u32,
     _notes_count: u32,
     _master_count: u32,
-) -> Result<Vec<u8>, PptError> {
+) -> Result<Vec<u8>, Error> {
     // Match PowerPoint/POI files: recVer = 1, recInstance = 0, 40-byte payload
     let mut builder = RecordBuilder::new(0x01, 0, record_type::DOCUMENT_ATOM);
     let mut data = Vec::with_capacity(40);
@@ -395,7 +395,7 @@ pub fn create_document_atom(
 }
 
 /// Create a slide container record
-pub fn create_slide_container(_slide_id: u32, text: &str) -> Result<Vec<u8>, PptError> {
+pub fn create_slide_container(_slide_id: u32, text: &str) -> Result<Vec<u8>, Error> {
     let mut builder = RecordBuilder::new(0x0F, 0, record_type::SLIDE);
 
     // Add slide atom
@@ -425,7 +425,7 @@ pub fn create_slide_container(_slide_id: u32, text: &str) -> Result<Vec<u8>, Ppt
 }
 
 /// Wrap an Escher DggContainer blob into a PPDrawingGroup PPT record.
-pub fn wrap_dgg_into_ppdrawing_group(dgg_blob: &[u8]) -> Result<Vec<u8>, PptError> {
+pub fn wrap_dgg_into_ppdrawing_group(dgg_blob: &[u8]) -> Result<Vec<u8>, Error> {
     // Align with POI: version 0x0F (container) but payload is raw Escher DGG data
     let mut builder = RecordBuilder::new(0x0F, 0, record_type::PP_DRAWING_GROUP);
     builder.write_data(dgg_blob);
@@ -433,14 +433,14 @@ pub fn wrap_dgg_into_ppdrawing_group(dgg_blob: &[u8]) -> Result<Vec<u8>, PptErro
 }
 
 /// Wrap an Escher DgContainer blob (plus any following Escher children) into a PPDrawing PPT record.
-pub fn wrap_dg_into_ppdrawing(dg_blob_and_children: &[u8]) -> Result<Vec<u8>, PptError> {
+pub fn wrap_dg_into_ppdrawing(dg_blob_and_children: &[u8]) -> Result<Vec<u8>, Error> {
     let mut builder = RecordBuilder::new(0x0F, 0, record_type::PP_DRAWING);
     builder.write_data(dg_blob_and_children);
     builder.build()
 }
 
 /// Create a minimal Environment container with an empty FontCollection child.
-pub fn create_environment_minimal() -> Result<Vec<u8>, PptError> {
+pub fn create_environment_minimal() -> Result<Vec<u8>, Error> {
     // Environment container (1010)
     let mut env = RecordBuilder::new(0x0F, 0, record_type::ENVIRONMENT);
 
@@ -498,7 +498,7 @@ pub fn create_environment_minimal() -> Result<Vec<u8>, PptError> {
 
 /// Create a SlideListWithText (instance=SLIDES) containing SlidePersistAtom entries.
 /// Each entry is (persist_id_ref, slide_identifier).
-pub fn create_slide_list_with_text_slides(entries: &[(u32, u32)]) -> Result<Vec<u8>, PptError> {
+pub fn create_slide_list_with_text_slides(entries: &[(u32, u32)]) -> Result<Vec<u8>, Error> {
     let mut builder = RecordBuilder::new(0x0F, 0, record_type::SLIDE_LIST_WITH_TEXT);
 
     for &(persist_id_ref, slide_identifier) in entries {
@@ -519,7 +519,7 @@ pub fn create_slide_list_with_text_slides(entries: &[(u32, u32)]) -> Result<Vec<
 
 /// Create a SlideListWithText (instance=NOTES) containing SlidePersistAtom entries for notes.
 /// Each entry is (persist_id_ref, notes_identifier).
-pub fn create_slide_list_with_text_notes(entries: &[(u32, u32)]) -> Result<Vec<u8>, PptError> {
+pub fn create_slide_list_with_text_notes(entries: &[(u32, u32)]) -> Result<Vec<u8>, Error> {
     let mut builder = RecordBuilder::new(0x0F, 2, record_type::SLIDE_LIST_WITH_TEXT); // instance=2 for NOTES
 
     for &(persist_id_ref, notes_identifier) in entries {
@@ -540,9 +540,9 @@ pub fn create_slide_list_with_text_notes(entries: &[(u32, u32)]) -> Result<Vec<u
 
 /// Create a DocInfo List container with optional typed slide and notes editing views.
 pub fn create_docinfo_list_container(
-    slide_view_info: Option<&PowerPointSlideViewInfo>,
-    notes_view_info: Option<&PowerPointSlideViewInfo>,
-) -> Result<Vec<u8>, PptError> {
+    slide_view_info: Option<&SlideViewInfo>,
+    notes_view_info: Option<&SlideViewInfo>,
+) -> Result<Vec<u8>, Error> {
     create_docinfo_list_container_with_binary_tags(
         slide_view_info,
         notes_view_info,
@@ -554,11 +554,11 @@ pub fn create_docinfo_list_container(
 /// Create a DocInfo List and append validated `ProgBinaryTag` records to its
 /// single `DocProgTagsContainer`.
 pub(crate) fn create_docinfo_list_container_with_binary_tags<'a>(
-    slide_view_info: Option<&PowerPointSlideViewInfo>,
-    notes_view_info: Option<&PowerPointSlideViewInfo>,
+    slide_view_info: Option<&SlideViewInfo>,
+    notes_view_info: Option<&SlideViewInfo>,
     vba_info: VBAInfoAtom,
     additional_binary_tags: impl IntoIterator<Item = &'a [u8]>,
-) -> Result<Vec<u8>, PptError> {
+) -> Result<Vec<u8>, Error> {
     let mut list = RecordBuilder::new(0x0F, 0, record_type::DOC_INFO_LIST);
 
     // SheetProperties (1044) container with timestamp atom
@@ -599,7 +599,7 @@ pub(crate) fn create_docinfo_list_container_with_binary_tags<'a>(
     let mut prog_tags = RecordBuilder::new(0x0F, 0, record_type::PROG_TAGS);
     let mut prog_bin = RecordBuilder::new(0x0F, 0, record_type::PROG_BINARY_TAG);
     let mut cstr = RecordBuilder::new(0x00, 0, record_type::CSTRING);
-    cstr.write_data(&Ppt10Tag::to_bytes());
+    cstr.write_data(&Tag10::to_bytes());
     prog_bin.write_child(&cstr.build()?);
     let mut bin = RecordBuilder::new(0x00, 0, record_type::BINARY_TAG_DATA);
     bin.write_data(&BinaryTagData::DOCINFO.to_bytes());
@@ -618,7 +618,7 @@ fn validate_complete_record(
     data: &[u8],
     expected_version: u8,
     expected_type: u16,
-) -> Result<(), PptError> {
+) -> Result<(), Error> {
     let header = data
         .get(..8)
         .ok_or_else(|| std::io::Error::other("programmable tag record is truncated"))?;
@@ -640,18 +640,18 @@ fn validate_complete_record(
 }
 
 /// Create the historical minimal DocInfo List with a default slide view.
-pub fn create_docinfo_list_container_minimal() -> Result<Vec<u8>, PptError> {
+pub fn create_docinfo_list_container_minimal() -> Result<Vec<u8>, Error> {
     create_docinfo_list_container(None, None)
 }
 
 /// Create an EndDocument record.
-pub fn create_end_document() -> Result<Vec<u8>, PptError> {
+pub fn create_end_document() -> Result<Vec<u8>, Error> {
     let builder = RecordBuilder::new(0x00, 0, record_type::END_DOCUMENT);
     builder.build()
 }
 
 /// Create a text chars atom (for Unicode text)
-pub fn create_text_atom(text: &str) -> Result<Vec<u8>, PptError> {
+pub fn create_text_atom(text: &str) -> Result<Vec<u8>, Error> {
     let mut builder = RecordBuilder::new(0x00, 0, record_type::TEXT_CHARS_ATOM);
 
     // Convert text to UTF-16LE
@@ -782,12 +782,12 @@ mod tests {
         // Should contain FontCollection and other required atoms
         assert!(env.len() > 100);
 
-        let (environment, consumed) = crate::records::PptRecord::parse(&env, 0).unwrap();
+        let (environment, consumed) = crate::records::Record::parse(&env, 0).unwrap();
         assert_eq!(consumed, env.len());
         let collection = environment
-            .find_child(crate::consts::PptRecordType::FontCollection)
+            .find_child(crate::consts::RecordType::FontCollection)
             .unwrap();
-        let fonts = crate::PowerPointFontCollection::parse(collection).unwrap();
+        let fonts = crate::FontCollection::parse(collection).unwrap();
         assert_eq!(fonts.fonts.len(), 1);
         assert_eq!(fonts.fonts[0].name, "Arial");
         assert!(fonts.fonts[0].truetype);

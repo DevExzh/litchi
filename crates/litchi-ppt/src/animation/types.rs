@@ -5,7 +5,7 @@
 use super::motion_path::MotionPath;
 use super::sound::AnimationSound;
 use super::triggers::{InteractiveTrigger, IterationType, RepeatBehavior};
-use crate::records::PptRecord;
+use crate::records::Record;
 
 /// Animation information for a slide or shape.
 #[derive(Debug, Clone)]
@@ -27,7 +27,7 @@ pub struct AnimationInfo {
     /// After-effect color (for dim effects)
     pub after_effect_color: Option<u32>,
     /// Raw animation records for advanced parsing
-    pub raw_records: Vec<PptRecord>,
+    pub raw_records: Vec<Record>,
 }
 
 impl Default for AnimationInfo {
@@ -2674,7 +2674,7 @@ pub struct TimeNodeContainer {
     /// Child nodes
     pub children: Vec<TimeNodeContainer>,
     /// Raw record for advanced parsing
-    pub raw_record: Option<PptRecord>,
+    pub raw_record: Option<Record>,
 }
 
 impl Default for TimeNodeContainer {

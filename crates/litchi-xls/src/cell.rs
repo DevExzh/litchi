@@ -1,14 +1,14 @@
 //! Cell representation for XLS files
 
 use crate::formula::{FormulaContext, render_formula};
-use crate::number_format::XlsFormatting;
+use crate::number_format::Formatting;
 use crate::records::{BoolErrValue, CellRecord, FormulaValue};
 use crate::utils;
-use litchi_core::sheet::{Cell, CellValue};
+use litchi_core::sheet::{Cell as CellTrait, CellValue};
 
 /// XLS cell implementation
 #[derive(Debug, Clone)]
-pub struct XlsCell {
+pub struct Cell {
     row: u32,
     col: u32,
     value: CellValue,
@@ -18,10 +18,10 @@ pub struct XlsCell {
     xf_index: u16,
 }
 
-impl XlsCell {
+impl Cell {
     /// Create a new XLS cell
     pub fn new(row: u32, col: u32, value: CellValue) -> Self {
-        XlsCell {
+        Cell {
             row,
             col,
             value,
@@ -34,7 +34,7 @@ impl XlsCell {
 
     /// Create a cell with formula
     pub fn with_formula(row: u32, col: u32, value: CellValue, formula: String) -> Self {
-        XlsCell {
+        Cell {
             row,
             col,
             value,
@@ -54,7 +54,7 @@ impl XlsCell {
         record: &CellRecord,
         sst: Option<&[String]>,
         formula_context: Option<&FormulaContext>,
-        formatting: Option<&XlsFormatting>,
+        formatting: Option<&Formatting>,
     ) -> Option<Self> {
         let xf_index = record_xf_index(record);
         let shared_string_index = match record {
@@ -163,7 +163,7 @@ impl XlsCell {
             value => value,
         };
 
-        Some(XlsCell {
+        Some(Cell {
             row,
             col,
             value,
@@ -214,13 +214,13 @@ fn record_xf_index(record: &CellRecord) -> u16 {
     }
 }
 
-fn table_is_date_time(formatting: Option<&XlsFormatting>, format_id: u16) -> bool {
+fn table_is_date_time(formatting: Option<&Formatting>, format_id: u16) -> bool {
     formatting
         .map(|table| table.is_date_time_format(format_id))
         .unwrap_or(false)
 }
 
-impl Cell for XlsCell {
+impl CellTrait for Cell {
     fn row(&self) -> u32 {
         self.row
     }
@@ -242,8 +242,8 @@ impl Cell for XlsCell {
     }
 }
 
-// Implement Cell for &XlsCell to allow zero-copy reference returns
-impl Cell for &XlsCell {
+// Implement Cell for &Cell to allow zero-copy reference returns
+impl CellTrait for &Cell {
     fn row(&self) -> u32 {
         (*self).row()
     }
@@ -273,7 +273,7 @@ mod tests {
 
     #[test]
     fn test_new_cell() {
-        let cell = XlsCell::new(0, 0, CellValue::String("Test".to_string()));
+        let cell = Cell::new(0, 0, CellValue::String("Test".to_string()));
         assert_eq!(cell.row(), 0);
         assert_eq!(cell.column(), 0);
         assert_eq!(cell.coordinate(), "A1");
@@ -282,7 +282,7 @@ mod tests {
 
     #[test]
     fn test_cell_with_formula() {
-        let cell = XlsCell::with_formula(1, 2, CellValue::Float(42.0), "=A1+B1".to_string());
+        let cell = Cell::with_formula(1, 2, CellValue::Float(42.0), "=A1+B1".to_string());
         assert_eq!(cell.row(), 1);
         assert_eq!(cell.column(), 2);
         assert_eq!(cell.coordinate(), "C2");
@@ -293,13 +293,13 @@ mod tests {
 
     #[test]
     fn test_cell_coordinate_various_positions() {
-        let cell1 = XlsCell::new(0, 0, CellValue::Empty);
+        let cell1 = Cell::new(0, 0, CellValue::Empty);
         assert_eq!(cell1.coordinate(), "A1");
 
-        let cell2 = XlsCell::new(9, 25, CellValue::Empty);
+        let cell2 = Cell::new(9, 25, CellValue::Empty);
         assert_eq!(cell2.coordinate(), "Z10");
 
-        let cell3 = XlsCell::new(99, 26, CellValue::Empty);
+        let cell3 = Cell::new(99, 26, CellValue::Empty);
         assert_eq!(cell3.coordinate(), "AA100");
     }
 
@@ -310,7 +310,7 @@ mod tests {
             col: 3,
             xf_index: 0,
         };
-        let cell = XlsCell::from_record(&record, None).unwrap();
+        let cell = Cell::from_record(&record, None).unwrap();
         assert_eq!(cell.row(), 5);
         assert_eq!(cell.column(), 3);
         assert_eq!(cell.coordinate(), "D6");
@@ -325,7 +325,7 @@ mod tests {
             xf_index: 0,
             value: 123.456,
         };
-        let cell = XlsCell::from_record(&record, None).unwrap();
+        let cell = Cell::from_record(&record, None).unwrap();
         assert_eq!(cell.row(), 0);
         assert_eq!(cell.column(), 0);
         if let CellValue::Float(v) = cell.value() {
@@ -343,7 +343,7 @@ mod tests {
             xf_index: 0,
             value: "Hello World".to_string(),
         };
-        let cell = XlsCell::from_record(&record, None).unwrap();
+        let cell = Cell::from_record(&record, None).unwrap();
         assert_eq!(cell.row(), 2);
         assert_eq!(cell.column(), 1);
         assert!(matches!(cell.value(), CellValue::String(s) if s == "Hello World"));
@@ -357,7 +357,7 @@ mod tests {
             xf_index: 0,
             value: BoolErrValue::Bool(true),
         };
-        let cell = XlsCell::from_record(&record, None).unwrap();
+        let cell = Cell::from_record(&record, None).unwrap();
         assert!(matches!(cell.value(), CellValue::Bool(true)));
     }
 
@@ -369,7 +369,7 @@ mod tests {
             xf_index: 0,
             value: BoolErrValue::Error(7),
         };
-        let cell = XlsCell::from_record(&record, None).unwrap();
+        let cell = Cell::from_record(&record, None).unwrap();
         assert!(matches!(cell.value(), CellValue::Error(_)));
     }
 
@@ -381,7 +381,7 @@ mod tests {
             xf_index: 0,
             value: 100.5,
         };
-        let cell = XlsCell::from_record(&record, None).unwrap();
+        let cell = Cell::from_record(&record, None).unwrap();
         assert_eq!(cell.row(), 10);
         assert_eq!(cell.column(), 5);
         if let CellValue::Float(v) = cell.value() {
@@ -404,7 +404,7 @@ mod tests {
             xf_index: 0,
             sst_index: 1,
         };
-        let cell = XlsCell::from_record(&record, Some(&sst)).unwrap();
+        let cell = Cell::from_record(&record, Some(&sst)).unwrap();
         assert!(matches!(cell.value(), CellValue::String(s) if s == "Second"));
         assert_eq!(cell.shared_string_index(), Some(1));
     }
@@ -418,7 +418,7 @@ mod tests {
             xf_index: 0,
             sst_index: 5,
         };
-        let cell = XlsCell::from_record(&record, Some(&sst)).unwrap();
+        let cell = Cell::from_record(&record, Some(&sst)).unwrap();
         assert!(matches!(cell.value(), CellValue::Error(_)));
     }
 
@@ -430,7 +430,7 @@ mod tests {
             xf_index: 0,
             sst_index: 0,
         };
-        let cell = XlsCell::from_record(&record, None).unwrap();
+        let cell = Cell::from_record(&record, None).unwrap();
         assert!(matches!(cell.value(), CellValue::Error(_)));
     }
 
@@ -444,7 +444,7 @@ mod tests {
             value: FormulaValue::Number(std::f64::consts::PI),
             formula: formula.clone(),
         };
-        let cell = XlsCell::from_record(&record, None).unwrap();
+        let cell = Cell::from_record(&record, None).unwrap();
         assert!(cell.is_formula());
         assert_eq!(cell.formula(), Some("=(2+3)"));
         assert_eq!(cell.formula_bytes(), Some(formula.as_slice()));
@@ -464,7 +464,7 @@ mod tests {
             value: FormulaValue::String("Result".to_string()),
             formula: vec![],
         };
-        let cell = XlsCell::from_record(&record, None).unwrap();
+        let cell = Cell::from_record(&record, None).unwrap();
         assert!(matches!(cell.value(), CellValue::String(s) if s == "Result"));
     }
 
@@ -477,7 +477,7 @@ mod tests {
             value: FormulaValue::Bool(false),
             formula: vec![],
         };
-        let cell = XlsCell::from_record(&record, None).unwrap();
+        let cell = Cell::from_record(&record, None).unwrap();
         assert!(matches!(cell.value(), CellValue::Bool(false)));
     }
 
@@ -490,7 +490,7 @@ mod tests {
             value: FormulaValue::Error(15),
             formula: vec![],
         };
-        let cell = XlsCell::from_record(&record, None).unwrap();
+        let cell = Cell::from_record(&record, None).unwrap();
         assert!(matches!(cell.value(), CellValue::Error(_)));
     }
 
@@ -503,7 +503,7 @@ mod tests {
             value: FormulaValue::Empty,
             formula: vec![],
         };
-        let cell = XlsCell::from_record(&record, None).unwrap();
+        let cell = Cell::from_record(&record, None).unwrap();
         assert!(matches!(cell.value(), CellValue::Empty));
         assert!(cell.is_formula());
         assert_eq!(cell.formula(), None);
@@ -520,7 +520,7 @@ mod tests {
             value: FormulaValue::Number(1.0),
             formula: formula.clone(),
         };
-        let cell = XlsCell::from_record(&record, None).unwrap();
+        let cell = Cell::from_record(&record, None).unwrap();
         assert!(cell.is_formula());
         assert_eq!(cell.formula(), None);
         assert_eq!(cell.formula_bytes(), Some(formula.as_slice()));
@@ -542,16 +542,16 @@ mod tests {
         };
 
         let cell =
-            XlsCell::from_record_with_formula_context(&record, None, Some(&context), None).unwrap();
+            Cell::from_record_with_formula_context(&record, None, Some(&context), None).unwrap();
         assert_eq!(cell.formula(), Some("='Data 2026'!C5"));
     }
 
     #[test]
     fn test_cell_trait_methods_via_reference() {
-        let cell = XlsCell::new(5, 10, CellValue::Float(100.0));
-        let cell_ref: &XlsCell = &cell;
+        let cell = Cell::new(5, 10, CellValue::Float(100.0));
+        let cell_ref: &Cell = &cell;
 
-        // Test that &XlsCell implements Cell trait correctly
+        // Test that &Cell implements Cell trait correctly
         assert_eq!(Cell::row(&cell_ref), 5);
         assert_eq!(Cell::column(&cell_ref), 10);
         assert_eq!(Cell::coordinate(&cell_ref), "K6");
@@ -560,7 +560,7 @@ mod tests {
 
     #[test]
     fn test_cell_clone() {
-        let cell = XlsCell::with_formula(0, 0, CellValue::Float(10.0), "=SUM(A1:A10)".to_string());
+        let cell = Cell::with_formula(0, 0, CellValue::Float(10.0), "=SUM(A1:A10)".to_string());
         let cloned = cell.clone();
         assert_eq!(cell.row(), cloned.row());
         assert_eq!(cell.column(), cloned.column());
@@ -569,20 +569,20 @@ mod tests {
 
     #[test]
     fn test_cell_debug() {
-        let cell = XlsCell::new(0, 0, CellValue::String("Test".to_string()));
+        let cell = Cell::new(0, 0, CellValue::String("Test".to_string()));
         let debug_str = format!("{:?}", cell);
-        assert!(debug_str.contains("XlsCell"));
+        assert!(debug_str.contains("Cell"));
     }
 
     #[test]
     fn test_cell_empty_value() {
-        let cell = XlsCell::new(0, 0, CellValue::Empty);
+        let cell = Cell::new(0, 0, CellValue::Empty);
         assert!(matches!(cell.value(), CellValue::Empty));
     }
 
     #[test]
     fn test_cell_int_value() {
-        let cell = XlsCell::new(0, 0, CellValue::Int(42));
+        let cell = Cell::new(0, 0, CellValue::Int(42));
         assert!(matches!(cell.value(), CellValue::Int(42)));
     }
 }

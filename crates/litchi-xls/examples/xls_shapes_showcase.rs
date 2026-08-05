@@ -26,10 +26,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("However, the XLS reader CAN extract shapes using the shared Escher module:");
     println!();
     println!("Example of reading XLS shapes:");
-    println!("  use litchi_xls::XlsWorkbook;");
+    println!("  use litchi_xls::Workbook;");
     println!("  use litchi_xls::shapes::extract_shapes_from_workbook;");
     println!();
-    println!("  let workbook = XlsWorkbook::new(File::open(\"workbook.xls\")?)?;");
+    println!("  let workbook = Workbook::new(File::open(\"workbook.xls\")?)?;");
     println!("  // Get workbook data from OLE stream");
     println!("  let shapes = extract_shapes_from_workbook(&workbook_data)?;");
     println!();

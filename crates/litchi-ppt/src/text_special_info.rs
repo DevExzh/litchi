@@ -7,10 +7,10 @@
 //! indent level per character run. They are inert: languages and smart-tag
 //! indices are never resolved or applied.
 
-use super::records::record::PptRecord;
-use super::text_si_exception::PowerPointSpellingFlags;
-use crate::consts::PptRecordType;
-use crate::package::{PptError, Result};
+use super::records::record::Record;
+use super::text_si_exception::SpellingFlags;
+use crate::consts::RecordType;
+use crate::package::{Error, Result};
 
 /// `RT_TextSpecialInfoAtom` record type (MS-PPT 2.9.54).
 const TEXT_SPECIAL_INFO_TYPE: u16 = 0x0FAA;
@@ -51,8 +51,8 @@ const MASTER_TEXT_PROP_RUN_LEN: usize = 6;
 /// Largest valid `IndentLevel` value (MS-PPT 2.2.13).
 const MAX_INDENT_LEVEL: u16 = 0x0004;
 
-fn corrupted(message: impl Into<String>) -> PptError {
-    PptError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> Error {
+    Error::Corrupted(message.into())
 }
 
 fn read_u16(data: &[u8], offset: usize) -> u16 {
@@ -75,9 +75,9 @@ fn require_bytes(data: &[u8], offset: usize, needed: usize, field: &str) -> Resu
 /// information may carry bidirectional flags, PowerPoint 10 extension data,
 /// and smart-tag indices.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointTextSIException {
+pub struct TextSIException {
     /// Spelling status, when present.
-    spelling: Option<PowerPointSpellingFlags>,
+    spelling: Option<SpellingFlags>,
     /// Primary language identifier (`TxLCID`), when present.
     language: Option<u16>,
     /// Alternate language identifier (`TxLCID`), when present.
@@ -93,9 +93,9 @@ pub struct PowerPointTextSIException {
     smart_tag_indices: Vec<u32>,
 }
 
-impl PowerPointTextSIException {
+impl TextSIException {
     /// Spelling status, when present.
-    pub const fn spelling(&self) -> Option<PowerPointSpellingFlags> {
+    pub const fn spelling(&self) -> Option<SpellingFlags> {
         self.spelling
     }
     /// Primary language identifier, when present.
@@ -143,7 +143,7 @@ impl PowerPointTextSIException {
                     "TextSIException spellInfo has grammar or reserved bits set",
                 ));
             }
-            Some(PowerPointSpellingFlags::from_bits(
+            Some(SpellingFlags::from_bits(
                 raw & SPELL_ERROR != 0,
                 raw & SPELL_CLEAN != 0,
             ))
@@ -281,33 +281,33 @@ impl PowerPointTextSIException {
 
 /// One `TextSIRun` of language and spelling information (MS-PPT 2.9.55).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointTextSIRun {
+pub struct TextSIRun {
     /// Number of characters the special information applies to.
     count: u32,
     /// Language and spelling information for the run.
-    special_info: PowerPointTextSIException,
+    special_info: TextSIException,
 }
 
-impl PowerPointTextSIRun {
+impl TextSIRun {
     /// Number of characters the special information applies to.
     pub const fn count(&self) -> u32 {
         self.count
     }
     /// Language and spelling information for the run.
-    pub const fn special_info(&self) -> &PowerPointTextSIException {
+    pub const fn special_info(&self) -> &TextSIException {
         &self.special_info
     }
 }
 
 /// Parsed payload of a `TextSpecialInfoAtom` (MS-PPT 2.9.54).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct PowerPointTextSpecialInfoRuns {
-    runs: Vec<PowerPointTextSIRun>,
+pub struct TextSpecialInfoRuns {
+    runs: Vec<TextSIRun>,
 }
 
-impl PowerPointTextSpecialInfoRuns {
+impl TextSpecialInfoRuns {
     /// The parsed runs, in source order.
-    pub fn runs(&self) -> &[PowerPointTextSIRun] {
+    pub fn runs(&self) -> &[TextSIRun] {
         &self.runs
     }
 
@@ -321,8 +321,8 @@ impl PowerPointTextSpecialInfoRuns {
     }
 
     /// Parse a complete `TextSpecialInfoAtom` record.
-    pub fn parse_record(record: &PptRecord) -> Result<Self> {
-        if record.record_type != PptRecordType::TextSpecInfoAtom
+    pub fn parse_record(record: &Record) -> Result<Self> {
+        if record.record_type != RecordType::TextSpecInfoAtom
             || record.record_type_raw != TEXT_SPECIAL_INFO_TYPE
             || record.version != 0
             || record.instance != 0
@@ -343,10 +343,9 @@ impl PowerPointTextSpecialInfoRuns {
                 return Err(corrupted("TextSIRun count must be at least one"));
             }
             offset += 4;
-            let (special_info, consumed) =
-                PowerPointTextSIException::parse_prefix(&data[offset..])?;
+            let (special_info, consumed) = TextSIException::parse_prefix(&data[offset..])?;
             offset += consumed;
-            runs.push(PowerPointTextSIRun {
+            runs.push(TextSIRun {
                 count,
                 special_info,
             });
@@ -372,14 +371,14 @@ impl PowerPointTextSpecialInfoRuns {
 
 /// One `MasterTextPropRun` of master indent-level information (MS-PPT 2.9.80).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointMasterTextPropRun {
+pub struct MasterTextPropRun {
     /// Number of characters the indent level applies to.
     count: u32,
     /// `IndentLevel` of the characters; at most 0x0004 (MS-PPT 2.2.13).
     indent_level: u16,
 }
 
-impl PowerPointMasterTextPropRun {
+impl MasterTextPropRun {
     /// Number of characters the indent level applies to.
     pub const fn count(&self) -> u32 {
         self.count
@@ -392,13 +391,13 @@ impl PowerPointMasterTextPropRun {
 
 /// Parsed payload of a `MasterTextPropAtom` (MS-PPT 2.9.79).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct PowerPointMasterTextPropLevels {
-    runs: Vec<PowerPointMasterTextPropRun>,
+pub struct MasterTextPropLevels {
+    runs: Vec<MasterTextPropRun>,
 }
 
-impl PowerPointMasterTextPropLevels {
+impl MasterTextPropLevels {
     /// The parsed runs, in source order.
-    pub fn runs(&self) -> &[PowerPointMasterTextPropRun] {
+    pub fn runs(&self) -> &[MasterTextPropRun] {
         &self.runs
     }
 
@@ -408,8 +407,8 @@ impl PowerPointMasterTextPropLevels {
     }
 
     /// Parse a complete `MasterTextPropAtom` record.
-    pub fn parse_record(record: &PptRecord) -> Result<Self> {
-        if record.record_type != PptRecordType::MasterTextPropAtom
+    pub fn parse_record(record: &Record) -> Result<Self> {
+        if record.record_type != RecordType::MasterTextPropAtom
             || record.record_type_raw != MASTER_TEXT_PROP_TYPE
             || record.version != 0
             || record.instance != 0
@@ -434,7 +433,7 @@ impl PowerPointMasterTextPropLevels {
             if indent_level > MAX_INDENT_LEVEL {
                 return Err(corrupted("MasterTextPropRun indent level exceeds 0x0004"));
             }
-            runs.push(PowerPointMasterTextPropRun {
+            runs.push(MasterTextPropRun {
                 count,
                 indent_level,
             });
@@ -462,9 +461,9 @@ impl PowerPointMasterTextPropLevels {
 mod tests {
     use super::*;
 
-    fn special_info_atom(data: &[u8]) -> PptRecord {
-        PptRecord {
-            record_type: PptRecordType::TextSpecInfoAtom,
+    fn special_info_atom(data: &[u8]) -> Record {
+        Record {
+            record_type: RecordType::TextSpecInfoAtom,
             record_type_raw: TEXT_SPECIAL_INFO_TYPE,
             version: 0,
             instance: 0,
@@ -474,9 +473,9 @@ mod tests {
         }
     }
 
-    fn master_prop_atom(data: &[u8]) -> PptRecord {
-        PptRecord {
-            record_type: PptRecordType::MasterTextPropAtom,
+    fn master_prop_atom(data: &[u8]) -> Record {
+        Record {
+            record_type: RecordType::MasterTextPropAtom,
             record_type_raw: MASTER_TEXT_PROP_TYPE,
             version: 0,
             instance: 0,
@@ -510,8 +509,7 @@ mod tests {
     #[test]
     fn parses_special_info_runs_and_round_trips() {
         let payload = sample_special_info_payload();
-        let parsed =
-            PowerPointTextSpecialInfoRuns::parse_record(&special_info_atom(&payload)).unwrap();
+        let parsed = TextSpecialInfoRuns::parse_record(&special_info_atom(&payload)).unwrap();
         assert_eq!(parsed.runs().len(), 2);
         assert_eq!(parsed.total_count(), 8);
 
@@ -540,7 +538,7 @@ mod tests {
 
     #[test]
     fn parses_empty_special_info_payload() {
-        let parsed = PowerPointTextSpecialInfoRuns::parse_record(&special_info_atom(&[])).unwrap();
+        let parsed = TextSpecialInfoRuns::parse_record(&special_info_atom(&[])).unwrap();
         assert!(parsed.runs().is_empty());
         assert_eq!(parsed.total_count(), 0);
         assert_eq!(parsed.to_bytes().len(), 8);
@@ -549,44 +547,44 @@ mod tests {
     #[test]
     fn rejects_malformed_special_info() {
         // Wrong record type.
-        assert!(PowerPointTextSpecialInfoRuns::parse_record(&master_prop_atom(&[])).is_err());
+        assert!(TextSpecialInfoRuns::parse_record(&master_prop_atom(&[])).is_err());
         // Truncated run count.
-        assert!(PowerPointTextSpecialInfoRuns::parse_record(&special_info_atom(&[1, 0])).is_err());
+        assert!(TextSpecialInfoRuns::parse_record(&special_info_atom(&[1, 0])).is_err());
         // Zero run count.
         let mut data = Vec::new();
         data.extend_from_slice(&0u32.to_le_bytes());
         data.extend_from_slice(&0u32.to_le_bytes());
-        assert!(PowerPointTextSpecialInfoRuns::parse_record(&special_info_atom(&data)).is_err());
+        assert!(TextSpecialInfoRuns::parse_record(&special_info_atom(&data)).is_err());
         // Reserved mask bits.
         let mut data = Vec::new();
         data.extend_from_slice(&1u32.to_le_bytes());
         data.extend_from_slice(&0x0100u32.to_le_bytes());
-        assert!(PowerPointTextSpecialInfoRuns::parse_record(&special_info_atom(&data)).is_err());
+        assert!(TextSpecialInfoRuns::parse_record(&special_info_atom(&data)).is_err());
         // Grammar bit in spellInfo.
         let mut data = Vec::new();
         data.extend_from_slice(&1u32.to_le_bytes());
         data.extend_from_slice(&0x0001u32.to_le_bytes());
         data.extend_from_slice(&0x0004u16.to_le_bytes());
-        assert!(PowerPointTextSpecialInfoRuns::parse_record(&special_info_atom(&data)).is_err());
+        assert!(TextSpecialInfoRuns::parse_record(&special_info_atom(&data)).is_err());
         // Invalid bidi value.
         let mut data = Vec::new();
         data.extend_from_slice(&1u32.to_le_bytes());
         data.extend_from_slice(&0x0040u32.to_le_bytes());
         data.extend_from_slice(&2u16.to_le_bytes());
-        assert!(PowerPointTextSpecialInfoRuns::parse_record(&special_info_atom(&data)).is_err());
+        assert!(TextSpecialInfoRuns::parse_record(&special_info_atom(&data)).is_err());
         // PP10 reserved bits.
         let mut data = Vec::new();
         data.extend_from_slice(&1u32.to_le_bytes());
         data.extend_from_slice(&0x0020u32.to_le_bytes());
         data.extend_from_slice(&0x0010u32.to_le_bytes());
-        assert!(PowerPointTextSpecialInfoRuns::parse_record(&special_info_atom(&data)).is_err());
+        assert!(TextSpecialInfoRuns::parse_record(&special_info_atom(&data)).is_err());
         // Truncated smart-tag indices.
         let mut data = Vec::new();
         data.extend_from_slice(&1u32.to_le_bytes());
         data.extend_from_slice(&0x0200u32.to_le_bytes());
         data.extend_from_slice(&3u32.to_le_bytes());
         data.extend_from_slice(&0u32.to_le_bytes());
-        assert!(PowerPointTextSpecialInfoRuns::parse_record(&special_info_atom(&data)).is_err());
+        assert!(TextSpecialInfoRuns::parse_record(&special_info_atom(&data)).is_err());
     }
 
     #[test]
@@ -596,8 +594,7 @@ mod tests {
         payload.extend_from_slice(&0u16.to_le_bytes());
         payload.extend_from_slice(&4u32.to_le_bytes());
         payload.extend_from_slice(&4u16.to_le_bytes());
-        let parsed =
-            PowerPointMasterTextPropLevels::parse_record(&master_prop_atom(&payload)).unwrap();
+        let parsed = MasterTextPropLevels::parse_record(&master_prop_atom(&payload)).unwrap();
         assert_eq!(parsed.runs().len(), 2);
         assert_eq!(parsed.total_count(), 16);
         assert_eq!(parsed.runs()[0].count(), 12);
@@ -610,17 +607,17 @@ mod tests {
     #[test]
     fn rejects_malformed_master_text_prop() {
         // Wrong record type.
-        assert!(PowerPointMasterTextPropLevels::parse_record(&special_info_atom(&[])).is_err());
+        assert!(MasterTextPropLevels::parse_record(&special_info_atom(&[])).is_err());
         // Payload not a whole number of runs.
-        assert!(PowerPointMasterTextPropLevels::parse_record(&master_prop_atom(&[0; 5])).is_err());
+        assert!(MasterTextPropLevels::parse_record(&master_prop_atom(&[0; 5])).is_err());
         // Indent level above the maximum.
         let mut payload = Vec::new();
         payload.extend_from_slice(&1u32.to_le_bytes());
         payload.extend_from_slice(&5u16.to_le_bytes());
-        assert!(PowerPointMasterTextPropLevels::parse_record(&master_prop_atom(&payload)).is_err());
+        assert!(MasterTextPropLevels::parse_record(&master_prop_atom(&payload)).is_err());
         // Nonzero instance.
         let mut record = master_prop_atom(&[]);
         record.instance = 1;
-        assert!(PowerPointMasterTextPropLevels::parse_record(&record).is_err());
+        assert!(MasterTextPropLevels::parse_record(&record).is_err());
     }
 }

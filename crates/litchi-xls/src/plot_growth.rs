@@ -11,7 +11,7 @@
 //!
 //! - MS-XLS 2.4.198 (PlotGrowth), MS-OSHARED 2.2.1.6 (FixedPoint)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Byte length of a `PlotGrowth` record payload.
 const PAYLOAD_LEN: usize = 8;
@@ -19,12 +19,12 @@ const PAYLOAD_LEN: usize = 8;
 /// A FixedPoint value (MS-OSHARED 2.2.1.6): a signed 16.16 fixed-point
 /// number stored as a 32-bit integer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsFixedPoint {
+pub struct FixedPoint {
     /// Raw 16.16 fixed-point value.
     raw: i32,
 }
 
-impl XlsFixedPoint {
+impl FixedPoint {
     /// Wrap a raw 16.16 fixed-point value.
     pub const fn from_raw(raw: i32) -> Self {
         Self { raw }
@@ -44,29 +44,25 @@ impl XlsFixedPoint {
 /// Typed `PlotGrowth` record content (MS-XLS 2.4.198): the horizontal and
 /// vertical growth of the plot area for font scaling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsPlotGrowth {
+pub struct PlotGrowth {
     /// Horizontal growth of the plot area, in points (`dxPlotGrowth`).
-    dx: XlsFixedPoint,
+    dx: FixedPoint,
     /// Vertical growth of the plot area, in points (`dyPlotGrowth`).
-    dy: XlsFixedPoint,
+    dy: FixedPoint,
 }
 
-impl XlsPlotGrowth {
+impl PlotGrowth {
     /// Parse a `PlotGrowth` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: PAYLOAD_LEN,
                 found: data.len(),
             });
         }
         Ok(Self {
-            dx: XlsFixedPoint::from_raw(i32::from_le_bytes(
-                data[0..4].try_into().expect("checked"),
-            )),
-            dy: XlsFixedPoint::from_raw(i32::from_le_bytes(
-                data[4..8].try_into().expect("checked"),
-            )),
+            dx: FixedPoint::from_raw(i32::from_le_bytes(data[0..4].try_into().expect("checked"))),
+            dy: FixedPoint::from_raw(i32::from_le_bytes(data[4..8].try_into().expect("checked"))),
         })
     }
 
@@ -79,12 +75,12 @@ impl XlsPlotGrowth {
     }
 
     /// Horizontal growth of the plot area (`dxPlotGrowth`).
-    pub fn dx(&self) -> XlsFixedPoint {
+    pub fn dx(&self) -> FixedPoint {
         self.dx
     }
 
     /// Vertical growth of the plot area (`dyPlotGrowth`).
-    pub fn dy(&self) -> XlsFixedPoint {
+    pub fn dy(&self) -> FixedPoint {
         self.dy
     }
 }
@@ -97,7 +93,7 @@ mod tests {
     fn round_trip_and_fixed_point_decode() {
         let mut payload = 0x0001_0000i32.to_le_bytes().to_vec();
         payload.extend_from_slice(&0x0000_8000i32.to_le_bytes());
-        let parsed = XlsPlotGrowth::parse(&payload).unwrap();
+        let parsed = PlotGrowth::parse(&payload).unwrap();
         assert_eq!(parsed.dx().raw(), 0x0001_0000);
         assert_eq!(parsed.dx().to_f64(), 1.0);
         assert_eq!(parsed.dy().to_f64(), 0.5);
@@ -108,14 +104,14 @@ mod tests {
     fn negative_growth_round_trip() {
         let mut payload = (-65536i32).to_le_bytes().to_vec();
         payload.extend_from_slice(&(-1i32).to_le_bytes());
-        let parsed = XlsPlotGrowth::parse(&payload).unwrap();
+        let parsed = PlotGrowth::parse(&payload).unwrap();
         assert_eq!(parsed.dx().to_f64(), -1.0);
         assert_eq!(parsed.to_payload(), payload);
     }
 
     #[test]
     fn rejects_bad_length() {
-        assert!(XlsPlotGrowth::parse(&[0; 7]).is_err());
-        assert!(XlsPlotGrowth::parse(&[0; 9]).is_err());
+        assert!(PlotGrowth::parse(&[0; 7]).is_err());
+        assert!(PlotGrowth::parse(&[0; 9]).is_err());
     }
 }

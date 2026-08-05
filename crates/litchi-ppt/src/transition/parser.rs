@@ -5,22 +5,22 @@
 use super::types::{
     AdvanceMode, SoundAction, TransitionDirection, TransitionInfo, TransitionSpeed, TransitionType,
 };
-use crate::consts::PptRecordType;
-use crate::package::{PptError, Result};
-use crate::records::PptRecord;
+use crate::consts::RecordType;
+use crate::package::{Error, Result};
+use crate::records::Record;
 use zerocopy::{FromBytes, byteorder::LittleEndian, byteorder::U16, byteorder::U32};
 
 /// Parse transition info from SSSlideInfoAtom record.
-pub fn parse_transition(record: &PptRecord) -> Result<TransitionInfo> {
-    if record.record_type != PptRecordType::SSSlideInfoAtom {
-        return Err(PptError::InvalidFormat(format!(
+pub fn parse_transition(record: &Record) -> Result<TransitionInfo> {
+    if record.record_type != RecordType::SSSlideInfoAtom {
+        return Err(Error::InvalidFormat(format!(
             "Expected SSSlideInfoAtom record, got {:?}",
             record.record_type
         )));
     }
 
     if record.data.len() < 16 {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "SSSlideInfoAtom record too small".to_string(),
         ));
     }
@@ -257,9 +257,9 @@ mod tests {
         assert!(!info.has_effect());
     }
 
-    fn slide_info_record(data: Vec<u8>) -> PptRecord {
-        PptRecord {
-            record_type: PptRecordType::SSSlideInfoAtom,
+    fn slide_info_record(data: Vec<u8>) -> Record {
+        Record {
+            record_type: RecordType::SSSlideInfoAtom,
             record_type_raw: 0x03F9,
             version: 0,
             instance: 0,
@@ -278,7 +278,7 @@ mod tests {
     #[test]
     fn rejects_wrong_record_type() {
         let mut record = slide_info_record(vec![0u8; 16]);
-        record.record_type = PptRecordType::CString;
+        record.record_type = RecordType::CString;
         assert!(parse_transition(&record).is_err());
     }
 

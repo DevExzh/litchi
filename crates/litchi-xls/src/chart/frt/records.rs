@@ -21,7 +21,7 @@
 //!   2.4.266 (StartBlock), 2.5.37 (CFrtId), 2.5.134 (FrtFlags),
 //!   2.5.136 (FrtHeaderOld)
 
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
 /// Record type of the `ChartFrtInfo` record (MS-XLS 2.4.49).
 pub(crate) const CHART_FRT_INFO_RECORD_TYPE: u16 = 0x0850;
@@ -55,16 +55,16 @@ const CAT_LAB_MAX_OFFSET: u16 = 1000;
 const CAT_LAB_AUTO_LABEL: u16 = 1;
 
 /// Read a little-endian `u16` from a fixed offset.
-fn read_u16(data: &[u8], offset: usize) -> XlsResult<u16> {
-    let end = offset.checked_add(2).ok_or(XlsError::InvalidLength {
+fn read_u16(data: &[u8], offset: usize) -> Result<u16> {
+    let end = offset.checked_add(2).ok_or(Error::InvalidLength {
         expected: 2,
         found: data.len(),
     })?;
-    let bytes = data.get(offset..end).ok_or(XlsError::InvalidLength {
+    let bytes = data.get(offset..end).ok_or(Error::InvalidLength {
         expected: end,
         found: data.len(),
     })?;
-    let [first, second] = bytes.try_into().map_err(|_| XlsError::InvalidLength {
+    let [first, second] = bytes.try_into().map_err(|_| Error::InvalidLength {
         expected: 2,
         found: bytes.len(),
     })?;
@@ -72,22 +72,22 @@ fn read_u16(data: &[u8], offset: usize) -> XlsResult<u16> {
 }
 
 /// Read and validate the fixed `FrtHeaderOld` prefix.
-fn read_frt_header_old(data: &[u8], record_type: u16) -> XlsResult<u16> {
+fn read_frt_header_old(data: &[u8], record_type: u16) -> Result<u16> {
     if data.len() < FRT_HEADER_OLD_LEN {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: FRT_HEADER_OLD_LEN,
             found: data.len(),
         });
     }
     if read_u16(data, 0)? != record_type {
-        return Err(XlsError::InvalidRecord {
+        return Err(Error::InvalidRecord {
             record_type,
             message: "FrtHeaderOld.rt mismatch".to_string(),
         });
     }
     let flags = read_u16(data, 2)?;
     if flags & FRT_FLAGS_FORBIDDEN != 0 {
-        return Err(XlsError::InvalidRecord {
+        return Err(Error::InvalidRecord {
             record_type,
             message: format!("FrtHeaderOld.grbitFrt {flags:#06X} sets fFrtRef or fFrtAlert"),
         });
@@ -96,9 +96,9 @@ fn read_frt_header_old(data: &[u8], record_type: u16) -> XlsResult<u16> {
 }
 
 /// Validate the `FrtHeaderOld` and the fixed payload length.
-fn validate_frt_header_old(data: &[u8], record_type: u16, expected_len: usize) -> XlsResult<u16> {
+fn validate_frt_header_old(data: &[u8], record_type: u16, expected_len: usize) -> Result<u16> {
     if data.len() != expected_len {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: expected_len,
             found: data.len(),
         });
@@ -123,13 +123,13 @@ pub enum Version {
 
 impl Version {
     /// Decode a raw version byte.
-    fn from_byte(byte: u8, record_type: u16) -> XlsResult<Self> {
+    fn from_byte(byte: u8, record_type: u16) -> Result<Self> {
         match byte {
             0x9 => Ok(Self::Version9),
             0xA => Ok(Self::Version10),
             0xC => Ok(Self::Version12),
             0xE => Ok(Self::Version14),
-            _ => Err(XlsError::InvalidRecord {
+            _ => Err(Error::InvalidRecord {
                 record_type,
                 message: format!("unsupported ChartFrtInfo application version {byte:#04X}"),
             }),
@@ -178,9 +178,9 @@ impl RecordRange {
     }
 
     /// Construct a range, rejecting an inverted interval.
-    pub(crate) fn new(first: u16, last: u16) -> XlsResult<Self> {
+    pub(crate) fn new(first: u16, last: u16) -> Result<Self> {
         if first > last {
-            return Err(XlsError::InvalidRecord {
+            return Err(Error::InvalidRecord {
                 record_type: CHART_FRT_INFO_RECORD_TYPE,
                 message: format!("CFrtId range {first:#06X}..={last:#06X} is inverted"),
             });
@@ -225,13 +225,13 @@ impl Info {
     }
 
     /// Parse a `ChartFrtInfo` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
-        let invalid = |message: String| XlsError::InvalidRecord {
+    pub fn parse(data: &[u8]) -> Result<Self> {
+        let invalid = |message: String| Error::InvalidRecord {
             record_type: CHART_FRT_INFO_RECORD_TYPE,
             message,
         };
         if data.len() < CHART_FRT_INFO_BASE_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: CHART_FRT_INFO_BASE_LEN,
                 found: data.len(),
             });
@@ -247,7 +247,7 @@ impl Info {
         }
         let expected_len = CHART_FRT_INFO_BASE_LEN + count * C_FRT_ID_LEN;
         if data.len() != expected_len {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: expected_len,
                 found: data.len(),
             });
@@ -302,12 +302,12 @@ pub enum Alignment {
 
 impl Alignment {
     /// Decode the raw `at` value.
-    fn from_u16(value: u16) -> XlsResult<Self> {
+    fn from_u16(value: u16) -> Result<Self> {
         match value {
             0x0001 => Ok(Self::TopLeft),
             0x0002 => Ok(Self::Center),
             0x0003 => Ok(Self::BottomRight),
-            _ => Err(XlsError::InvalidRecord {
+            _ => Err(Error::InvalidRecord {
                 record_type: CAT_LAB_RECORD_TYPE,
                 message: format!("unsupported CatLab alignment {value:#06X}"),
             }),
@@ -374,11 +374,11 @@ impl CatLab {
     }
 
     /// Parse a `CatLab` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         let frt_flags = validate_frt_header_old(data, CAT_LAB_RECORD_TYPE, CAT_LAB_LEN)?;
         let offset = read_u16(data, 4)?;
         if offset > CAT_LAB_MAX_OFFSET {
-            return Err(XlsError::InvalidRecord {
+            return Err(Error::InvalidRecord {
                 record_type: CAT_LAB_RECORD_TYPE,
                 message: format!("CatLab wOffset {offset} exceeds {CAT_LAB_MAX_OFFSET}"),
             });
@@ -441,7 +441,7 @@ pub enum BlockKind {
 
 impl BlockKind {
     /// Decode the raw `iObjectKind` value.
-    fn from_u16(value: u16, record_type: u16) -> XlsResult<Self> {
+    fn from_u16(value: u16, record_type: u16) -> Result<Self> {
         match value {
             0x0000 => Ok(Self::AxisGroup),
             0x0002 => Ok(Self::AttachedLabel),
@@ -455,7 +455,7 @@ impl BlockKind {
             0x000D => Ok(Self::Sheet),
             0x000E => Ok(Self::DataFormat),
             0x000F => Ok(Self::DropBar),
-            _ => Err(XlsError::InvalidRecord {
+            _ => Err(Error::InvalidRecord {
                 record_type,
                 message: format!("unsupported block object kind {value:#06X}"),
             }),
@@ -521,7 +521,7 @@ impl StartBlock {
     }
 
     /// Parse a `StartBlock` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         let frt_flags = validate_frt_header_old(data, START_BLOCK_RECORD_TYPE, START_BLOCK_LEN)?;
         Ok(Self {
             frt_flags,
@@ -571,7 +571,7 @@ impl EndBlock {
     }
 
     /// Parse an `EndBlock` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         let frt_flags = validate_frt_header_old(data, END_BLOCK_RECORD_TYPE, END_BLOCK_LEN)?;
         Ok(Self {
             frt_flags,

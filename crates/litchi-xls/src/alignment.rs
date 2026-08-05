@@ -1,11 +1,11 @@
 //! BIFF8 XF cell and style alignment metadata.
 
-use super::error::{XlsError, XlsResult};
-use super::leniency::{XlsFormattingDefect, XlsToleranceLog};
+use super::error::{Error, Result};
+use super::leniency::{FormattingDefect, ToleranceLog};
 
 /// Horizontal alignment of cell text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XlsHorizontalAlignment {
+pub enum HorizontalAlignment {
     General,
     Left,
     Center,
@@ -18,7 +18,7 @@ pub enum XlsHorizontalAlignment {
 
 /// Vertical alignment of cell text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XlsVerticalAlignment {
+pub enum VerticalAlignment {
     Top,
     Center,
     Bottom,
@@ -28,7 +28,7 @@ pub enum XlsVerticalAlignment {
 
 /// Rotation applied to cell text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XlsTextRotation {
+pub enum TextRotation {
     None,
     CounterClockwise(u8),
     Clockwise(u8),
@@ -37,7 +37,7 @@ pub enum XlsTextRotation {
 
 /// Logical reading order of cell text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XlsReadingOrder {
+pub enum ReadingOrder {
     Context,
     LeftToRight,
     RightToLeft,
@@ -45,38 +45,38 @@ pub enum XlsReadingOrder {
 
 /// Alignment properties stored in a BIFF8 cell or style XF record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct XlsCellAlignment {
-    horizontal: XlsHorizontalAlignment,
-    vertical: XlsVerticalAlignment,
+pub struct CellAlignment {
+    horizontal: HorizontalAlignment,
+    vertical: VerticalAlignment,
     wrap_text: bool,
     justify_last_line: bool,
-    rotation: XlsTextRotation,
+    rotation: TextRotation,
     indent: u8,
     shrink_to_fit: bool,
-    reading_order: XlsReadingOrder,
+    reading_order: ReadingOrder,
 }
 
-impl Default for XlsCellAlignment {
+impl Default for CellAlignment {
     fn default() -> Self {
         Self {
-            horizontal: XlsHorizontalAlignment::General,
-            vertical: XlsVerticalAlignment::Bottom,
+            horizontal: HorizontalAlignment::General,
+            vertical: VerticalAlignment::Bottom,
             wrap_text: false,
             justify_last_line: false,
-            rotation: XlsTextRotation::None,
+            rotation: TextRotation::None,
             indent: 0,
             shrink_to_fit: false,
-            reading_order: XlsReadingOrder::Context,
+            reading_order: ReadingOrder::Context,
         }
     }
 }
 
-impl XlsCellAlignment {
-    pub fn horizontal(&self) -> XlsHorizontalAlignment {
+impl CellAlignment {
+    pub fn horizontal(&self) -> HorizontalAlignment {
         self.horizontal
     }
 
-    pub fn vertical(&self) -> XlsVerticalAlignment {
+    pub fn vertical(&self) -> VerticalAlignment {
         self.vertical
     }
 
@@ -88,7 +88,7 @@ impl XlsCellAlignment {
         self.justify_last_line
     }
 
-    pub fn rotation(&self) -> XlsTextRotation {
+    pub fn rotation(&self) -> TextRotation {
         self.rotation
     }
 
@@ -100,7 +100,7 @@ impl XlsCellAlignment {
         self.shrink_to_fit
     }
 
-    pub fn reading_order(&self) -> XlsReadingOrder {
+    pub fn reading_order(&self) -> ReadingOrder {
         self.reading_order
     }
 
@@ -116,32 +116,32 @@ impl XlsCellAlignment {
         rotation: u8,
         indentation_options: u8,
         xf_index: u16,
-        tolerance: &mut XlsToleranceLog,
-    ) -> XlsResult<Self> {
+        tolerance: &mut ToleranceLog,
+    ) -> Result<Self> {
         let horizontal = match alignment_options & 0x07 {
-            0 => XlsHorizontalAlignment::General,
-            1 => XlsHorizontalAlignment::Left,
-            2 => XlsHorizontalAlignment::Center,
-            3 => XlsHorizontalAlignment::Right,
-            4 => XlsHorizontalAlignment::Fill,
-            5 => XlsHorizontalAlignment::Justify,
-            6 => XlsHorizontalAlignment::CenterAcrossSelection,
-            7 => XlsHorizontalAlignment::Distributed,
+            0 => HorizontalAlignment::General,
+            1 => HorizontalAlignment::Left,
+            2 => HorizontalAlignment::Center,
+            3 => HorizontalAlignment::Right,
+            4 => HorizontalAlignment::Fill,
+            5 => HorizontalAlignment::Justify,
+            6 => HorizontalAlignment::CenterAcrossSelection,
+            7 => HorizontalAlignment::Distributed,
             _ => unreachable!(),
         };
         let vertical_value = (alignment_options >> 4) & 0x07;
         let vertical = match vertical_value {
-            0 => XlsVerticalAlignment::Top,
-            1 => XlsVerticalAlignment::Center,
-            2 => XlsVerticalAlignment::Bottom,
-            3 => XlsVerticalAlignment::Justify,
-            4 => XlsVerticalAlignment::Distributed,
+            0 => VerticalAlignment::Top,
+            1 => VerticalAlignment::Center,
+            2 => VerticalAlignment::Bottom,
+            3 => VerticalAlignment::Justify,
+            4 => VerticalAlignment::Distributed,
             value => return Err(invalid(format!("XF vertical alignment {value} is invalid"))),
         };
         let mut justify_last_line = alignment_options & 0x80 != 0;
-        if justify_last_line && horizontal != XlsHorizontalAlignment::Distributed {
+        if justify_last_line && horizontal != HorizontalAlignment::Distributed {
             tolerance.tolerate(
-                XlsFormattingDefect::AlignmentJustifyLastLine,
+                FormattingDefect::AlignmentJustifyLastLine,
                 u32::from(xf_index),
                 u32::from(alignment_options & 0x07),
                 || invalid("XF justify-last-line requires distributed horizontal alignment"),
@@ -150,10 +150,10 @@ impl XlsCellAlignment {
         }
 
         let rotation = match rotation {
-            0 => XlsTextRotation::None,
-            1..=90 => XlsTextRotation::CounterClockwise(rotation),
-            91..=180 => XlsTextRotation::Clockwise(rotation - 90),
-            255 => XlsTextRotation::Vertical,
+            0 => TextRotation::None,
+            1..=90 => TextRotation::CounterClockwise(rotation),
+            91..=180 => TextRotation::Clockwise(rotation - 90),
+            255 => TextRotation::Vertical,
             value => return Err(invalid(format!("XF text rotation {value} is invalid"))),
         };
 
@@ -161,9 +161,9 @@ impl XlsCellAlignment {
             return Err(invalid("XF alignment reserved bit is set"));
         }
         let reading_order = match indentation_options >> 6 {
-            0 => XlsReadingOrder::Context,
-            1 => XlsReadingOrder::LeftToRight,
-            2 => XlsReadingOrder::RightToLeft,
+            0 => ReadingOrder::Context,
+            1 => ReadingOrder::LeftToRight,
+            2 => ReadingOrder::RightToLeft,
             value => return Err(invalid(format!("XF reading order {value} is invalid"))),
         };
 
@@ -180,54 +180,54 @@ impl XlsCellAlignment {
     }
 }
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidData(message.into())
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidData(message.into())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::leniency::XlsLeniency;
+    use crate::leniency::Leniency;
 
     /// Strict-mode shim for the three-byte alignment payload.
     fn parse(
         alignment_options: u8,
         rotation: u8,
         indentation_options: u8,
-    ) -> XlsResult<XlsCellAlignment> {
-        XlsCellAlignment::parse(
+    ) -> Result<CellAlignment> {
+        CellAlignment::parse(
             alignment_options,
             rotation,
             indentation_options,
             0,
-            &mut XlsToleranceLog::new(XlsLeniency::Strict),
+            &mut ToleranceLog::new(Leniency::Strict),
         )
     }
 
     #[test]
     fn parses_every_horizontal_and_vertical_alignment() {
         let horizontal = [
-            XlsHorizontalAlignment::General,
-            XlsHorizontalAlignment::Left,
-            XlsHorizontalAlignment::Center,
-            XlsHorizontalAlignment::Right,
-            XlsHorizontalAlignment::Fill,
-            XlsHorizontalAlignment::Justify,
-            XlsHorizontalAlignment::CenterAcrossSelection,
-            XlsHorizontalAlignment::Distributed,
+            HorizontalAlignment::General,
+            HorizontalAlignment::Left,
+            HorizontalAlignment::Center,
+            HorizontalAlignment::Right,
+            HorizontalAlignment::Fill,
+            HorizontalAlignment::Justify,
+            HorizontalAlignment::CenterAcrossSelection,
+            HorizontalAlignment::Distributed,
         ];
         for (value, expected) in horizontal.into_iter().enumerate() {
             let parsed = parse(value as u8 | 0x20, 0, 0).unwrap();
             assert_eq!(parsed.horizontal(), expected);
-            assert_eq!(parsed.vertical(), XlsVerticalAlignment::Bottom);
+            assert_eq!(parsed.vertical(), VerticalAlignment::Bottom);
         }
 
         let vertical = [
-            XlsVerticalAlignment::Top,
-            XlsVerticalAlignment::Center,
-            XlsVerticalAlignment::Bottom,
-            XlsVerticalAlignment::Justify,
-            XlsVerticalAlignment::Distributed,
+            VerticalAlignment::Top,
+            VerticalAlignment::Center,
+            VerticalAlignment::Bottom,
+            VerticalAlignment::Justify,
+            VerticalAlignment::Distributed,
         ];
         for (value, expected) in vertical.into_iter().enumerate() {
             let parsed = parse((value as u8) << 4, 0, 0).unwrap();
@@ -245,27 +245,27 @@ mod tests {
 
         assert_eq!(
             parse(0x20, 0, 0).unwrap().reading_order(),
-            XlsReadingOrder::Context
+            ReadingOrder::Context
         );
         assert_eq!(
             parse(0x20, 0, 0x40).unwrap().reading_order(),
-            XlsReadingOrder::LeftToRight
+            ReadingOrder::LeftToRight
         );
         assert_eq!(
             parse(0x20, 0, 0x80).unwrap().reading_order(),
-            XlsReadingOrder::RightToLeft
+            ReadingOrder::RightToLeft
         );
     }
 
     #[test]
     fn parses_rotation_boundaries() {
         for (value, expected) in [
-            (0, XlsTextRotation::None),
-            (1, XlsTextRotation::CounterClockwise(1)),
-            (90, XlsTextRotation::CounterClockwise(90)),
-            (91, XlsTextRotation::Clockwise(1)),
-            (180, XlsTextRotation::Clockwise(90)),
-            (255, XlsTextRotation::Vertical),
+            (0, TextRotation::None),
+            (1, TextRotation::CounterClockwise(1)),
+            (90, TextRotation::CounterClockwise(90)),
+            (91, TextRotation::Clockwise(1)),
+            (180, TextRotation::Clockwise(90)),
+            (255, TextRotation::Vertical),
         ] {
             assert_eq!(parse(0x20, value, 0).unwrap().rotation(), expected);
         }
@@ -289,24 +289,18 @@ mod tests {
         const NON_DISTRIBUTED_JUST_LAST: u8 = 0x80 | 0x20 | 0x01;
         const XF_INDEX: u16 = 42;
 
-        let mut tolerance = XlsToleranceLog::new(XlsLeniency::TolerateFormattingDefects);
+        let mut tolerance = ToleranceLog::new(Leniency::TolerateFormattingDefects);
         let parsed =
-            XlsCellAlignment::parse(NON_DISTRIBUTED_JUST_LAST, 0, 0, XF_INDEX, &mut tolerance)
+            CellAlignment::parse(NON_DISTRIBUTED_JUST_LAST, 0, 0, XF_INDEX, &mut tolerance)
                 .expect("a lenient policy repairs the flag");
         assert!(!parsed.justifies_last_line());
-        assert_eq!(parsed.horizontal(), XlsHorizontalAlignment::Left);
+        assert_eq!(parsed.horizontal(), HorizontalAlignment::Left);
 
         let report = tolerance.into_report();
-        assert_eq!(
-            report.count(XlsFormattingDefect::AlignmentJustifyLastLine),
-            1
-        );
+        assert_eq!(report.count(FormattingDefect::AlignmentJustifyLastLine), 1);
         let entry = report.defects()[0];
         assert_eq!(entry.ordinal(), u32::from(XF_INDEX));
-        assert_eq!(
-            entry.observed(),
-            u32::from(XlsHorizontalAlignment::Left as u8)
-        );
+        assert_eq!(entry.observed(), u32::from(HorizontalAlignment::Left as u8));
     }
 
     #[test]
@@ -314,7 +308,7 @@ mod tests {
         // Only the justify-last-line contradiction is cosmetic; an unknown
         // vertical alignment, rotation, or reading order would otherwise make
         // the reader invent a layout the file never specified.
-        let mut tolerance = XlsToleranceLog::new(XlsLeniency::TolerateFormattingDefects);
+        let mut tolerance = ToleranceLog::new(Leniency::TolerateFormattingDefects);
         for (alignment_options, rotation, indentation_options) in [
             (0x50u8, 0u8, 0u8),
             (0x20, 181, 0),
@@ -322,7 +316,7 @@ mod tests {
             (0x20, 0, 0xc0),
         ] {
             assert!(
-                XlsCellAlignment::parse(
+                CellAlignment::parse(
                     alignment_options,
                     rotation,
                     indentation_options,
@@ -338,9 +332,9 @@ mod tests {
     #[test]
     fn justify_last_line_survives_when_the_file_is_conforming() {
         const DISTRIBUTED_JUST_LAST: u8 = 0x80 | 0x20 | 0x07;
-        for leniency in [XlsLeniency::Strict, XlsLeniency::TolerateFormattingDefects] {
-            let mut tolerance = XlsToleranceLog::new(leniency);
-            let parsed = XlsCellAlignment::parse(DISTRIBUTED_JUST_LAST, 0, 0, 0, &mut tolerance)
+        for leniency in [Leniency::Strict, Leniency::TolerateFormattingDefects] {
+            let mut tolerance = ToleranceLog::new(leniency);
+            let parsed = CellAlignment::parse(DISTRIBUTED_JUST_LAST, 0, 0, 0, &mut tolerance)
                 .expect("distributed alignment permits fJustLast");
             assert!(parsed.justifies_last_line());
             assert!(tolerance.into_report().is_clean());

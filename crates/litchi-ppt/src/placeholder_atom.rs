@@ -3,16 +3,16 @@
 //! Placeholder metadata is inert. Undefined payload bytes and unrelated
 //! OfficeArt client-data records are retained for byte-exact serialization.
 
-use crate::consts::PptRecordType;
+use crate::consts::RecordType;
 
-use super::package::{PptError, Result};
-use super::records::PptRecord;
+use super::package::{Error, Result};
+use super::records::Record;
 
 const OFFICEART_CLIENT_DATA_TYPE: u16 = 0xf011;
 
 /// Slide/master owner used to validate `PlaceholderEnum` constraints.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PowerPointPlaceholderContext {
+pub enum PlaceholderContext {
     /// A main master slide.
     MainMaster,
     /// A title master slide.
@@ -30,7 +30,7 @@ pub enum PowerPointPlaceholderContext {
 /// Exact nonzero `PlaceholderEnum` values accepted by `PlaceholderAtom`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub enum PowerPointPlaceholderKind {
+pub enum PlaceholderKind {
     MasterTitle = 0x01,
     MasterBody = 0x02,
     MasterCenterTitle = 0x03,
@@ -59,8 +59,8 @@ pub enum PowerPointPlaceholderKind {
     Picture = 0x1a,
 }
 
-impl TryFrom<u8> for PowerPointPlaceholderKind {
-    type Error = PptError;
+impl TryFrom<u8> for PlaceholderKind {
+    type Error = Error;
 
     fn try_from(value: u8) -> Result<Self> {
         Ok(match value {
@@ -96,17 +96,17 @@ impl TryFrom<u8> for PowerPointPlaceholderKind {
     }
 }
 
-/// Exact `PlaceholderSize` discriminants.
+/// Exact placeholder-atom size discriminants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub enum PowerPointPlaceholderSize {
+pub enum AtomPlaceholderSize {
     Full = 0,
     Half = 1,
     Quarter = 2,
 }
 
-impl TryFrom<u8> for PowerPointPlaceholderSize {
-    type Error = PptError;
+impl TryFrom<u8> for AtomPlaceholderSize {
+    type Error = Error;
 
     fn try_from(value: u8) -> Result<Self> {
         match value {
@@ -120,22 +120,22 @@ impl TryFrom<u8> for PowerPointPlaceholderSize {
 
 /// Typed `PlaceholderAtom` payload.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointPlaceholderAtom {
+pub struct PlaceholderAtom {
     /// Placeholder position identifier; `-1` means this is not a placeholder.
     pub position: i32,
     /// Exact placeholder kind.
-    pub kind: PowerPointPlaceholderKind,
+    pub kind: PlaceholderKind,
     /// Preferred placeholder size.
-    pub size: PowerPointPlaceholderSize,
+    pub size: AtomPlaceholderSize,
     /// Spec-undefined bytes retained for lossless round trips.
     pub unused: [u8; 2],
 }
 
-impl PowerPointPlaceholderAtom {
+impl PlaceholderAtom {
     /// Parse a complete `RT_PlaceholderAtom` record for its owning slide context.
-    pub fn parse(record: &PptRecord, context: PowerPointPlaceholderContext) -> Result<Self> {
-        if record.record_type != PptRecordType::OEPlaceholderAtom
-            || record.record_type_raw != PptRecordType::OEPlaceholderAtom.as_u16()
+    pub fn parse(record: &Record, context: PlaceholderContext) -> Result<Self> {
+        if record.record_type != RecordType::OEPlaceholderAtom
+            || record.record_type_raw != RecordType::OEPlaceholderAtom.as_u16()
             || record.version != 0
             || record.instance != 0
             || record.data_length != 8
@@ -147,22 +147,22 @@ impl PowerPointPlaceholderAtom {
     }
 
     /// Parse the exact eight-byte payload for its owning slide context.
-    pub fn parse_payload(data: &[u8], context: PowerPointPlaceholderContext) -> Result<Self> {
+    pub fn parse_payload(data: &[u8], context: PlaceholderContext) -> Result<Self> {
         if data.len() != 8 {
             return corrupted("PlaceholderAtom payload must be exactly eight bytes");
         }
-        let kind = PowerPointPlaceholderKind::try_from(data[4])?;
+        let kind = PlaceholderKind::try_from(data[4])?;
         validate_context(kind, context)?;
         Ok(Self {
             position: i32::from_le_bytes([data[0], data[1], data[2], data[3]]),
             kind,
-            size: PowerPointPlaceholderSize::try_from(data[5])?,
+            size: AtomPlaceholderSize::try_from(data[5])?,
             unused: [data[6], data[7]],
         })
     }
 
     /// Serialize the exact eight-byte payload after revalidating its context.
-    pub fn to_payload(self, context: PowerPointPlaceholderContext) -> Result<[u8; 8]> {
+    pub fn to_payload(self, context: PlaceholderContext) -> Result<[u8; 8]> {
         validate_context(self.kind, context)?;
         let mut data = [0u8; 8];
         data[..4].copy_from_slice(&self.position.to_le_bytes());
@@ -173,10 +173,10 @@ impl PowerPointPlaceholderAtom {
     }
 
     /// Build a generic PPT record.
-    pub fn to_record(self, context: PowerPointPlaceholderContext) -> Result<PptRecord> {
-        Ok(PptRecord {
-            record_type: PptRecordType::OEPlaceholderAtom,
-            record_type_raw: PptRecordType::OEPlaceholderAtom.as_u16(),
+    pub fn to_record(self, context: PlaceholderContext) -> Result<Record> {
+        Ok(Record {
+            record_type: RecordType::OEPlaceholderAtom,
+            record_type_raw: RecordType::OEPlaceholderAtom.as_u16(),
             version: 0,
             instance: 0,
             data_length: 8,
@@ -186,11 +186,11 @@ impl PowerPointPlaceholderAtom {
     }
 
     /// Serialize a complete PPT atom record.
-    pub fn to_bytes(self, context: PowerPointPlaceholderContext) -> Result<Vec<u8>> {
+    pub fn to_bytes(self, context: PlaceholderContext) -> Result<Vec<u8>> {
         Ok(encode_record(
             0,
             0,
-            PptRecordType::OEPlaceholderAtom.as_u16(),
+            RecordType::OEPlaceholderAtom.as_u16(),
             &self.to_payload(context)?,
         ))
     }
@@ -198,13 +198,13 @@ impl PowerPointPlaceholderAtom {
 
 /// Resource limits for client-data placeholder projection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointPlaceholderLimits {
+pub struct PlaceholderLimits {
     pub max_client_data_bytes: usize,
     pub max_client_data_records: usize,
     pub max_retained_bytes: usize,
 }
 
-impl Default for PowerPointPlaceholderLimits {
+impl Default for PlaceholderLimits {
     fn default() -> Self {
         Self {
             max_client_data_bytes: 4 * 1024 * 1024,
@@ -216,33 +216,33 @@ impl Default for PowerPointPlaceholderLimits {
 
 /// Context-validated placeholder projected from OfficeArt `ClientData`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct PowerPointPlaceholderProjection {
-    pub placeholder: Option<PowerPointPlaceholderAtom>,
+pub struct PlaceholderProjection {
+    pub placeholder: Option<PlaceholderAtom>,
     before_records: Vec<Vec<u8>>,
     after_records: Vec<Vec<u8>>,
 }
 
 /// Slide-level placeholder result.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointPlaceholderEntry {
+pub struct PlaceholderEntry {
     pub shape_id: u32,
-    pub placeholder: PowerPointPlaceholderAtom,
+    pub placeholder: PlaceholderAtom,
 }
 
 /// Presentation-level placeholder result.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointPresentationPlaceholderEntry {
+pub struct PresentationPlaceholderEntry {
     pub slide_number: usize,
     pub shape_id: u32,
-    pub placeholder: PowerPointPlaceholderAtom,
+    pub placeholder: PlaceholderAtom,
 }
 
-impl PowerPointPlaceholderProjection {
+impl PlaceholderProjection {
     /// Parse a complete OfficeArt `ClientData` record.
     pub fn parse_officeart_client_data(
         data: &[u8],
-        context: PowerPointPlaceholderContext,
-        limits: PowerPointPlaceholderLimits,
+        context: PlaceholderContext,
+        limits: PlaceholderLimits,
     ) -> Result<Self> {
         if data.len() < 8 {
             return corrupted("Truncated OfficeArt ClientData record header");
@@ -250,7 +250,7 @@ impl PowerPointPlaceholderProjection {
         let version_instance = u16::from_le_bytes([data[0], data[1]]);
         let record_type = u16::from_le_bytes([data[2], data[3]]);
         let length = usize::try_from(u32::from_le_bytes([data[4], data[5], data[6], data[7]]))
-            .map_err(|_| PptError::Corrupted("OfficeArt ClientData size overflow".into()))?;
+            .map_err(|_| Error::Corrupted("OfficeArt ClientData size overflow".into()))?;
         if version_instance != 0x000f || record_type != OFFICEART_CLIENT_DATA_TYPE {
             return corrupted("Invalid OfficeArt ClientData record header");
         }
@@ -263,8 +263,8 @@ impl PowerPointPlaceholderProjection {
     /// Parse the direct PPT-record sequence inside OfficeArt `ClientData`.
     pub fn parse_client_data_payload(
         data: &[u8],
-        context: PowerPointPlaceholderContext,
-        limits: PowerPointPlaceholderLimits,
+        context: PlaceholderContext,
+        limits: PlaceholderLimits,
     ) -> Result<Self> {
         check_limit(
             data.len(),
@@ -279,18 +279,18 @@ impl PowerPointPlaceholderProjection {
         let mut saw_later_slot = false;
 
         for bytes in records {
-            let kind = PptRecordType::from(u16::from_le_bytes([bytes[2], bytes[3]]));
-            if kind == PptRecordType::OEPlaceholderAtom {
+            let kind = RecordType::from(u16::from_le_bytes([bytes[2], bytes[3]]));
+            if kind == RecordType::OEPlaceholderAtom {
                 if placeholder.is_some() || saw_later_slot {
                     return corrupted(
                         "PlaceholderAtom is duplicated or appears outside its ClientData slot",
                     );
                 }
-                let (record, consumed) = PptRecord::parse_strict(&bytes, 0)?;
+                let (record, consumed) = Record::parse_strict(&bytes, 0)?;
                 if consumed != bytes.len() {
                     return corrupted("PlaceholderAtom was only partially parsed");
                 }
-                placeholder = Some(PowerPointPlaceholderAtom::parse(&record, context)?);
+                placeholder = Some(PlaceholderAtom::parse(&record, context)?);
                 after_placeholder = true;
                 continue;
             }
@@ -315,9 +315,9 @@ impl PowerPointPlaceholderProjection {
                 .iter()
                 .chain(&after_records)
                 .try_fold(0usize, |total, record| {
-                    total.checked_add(record.len()).ok_or_else(|| {
-                        PptError::Corrupted("Retained ClientData size overflow".into())
-                    })
+                    total
+                        .checked_add(record.len())
+                        .ok_or_else(|| Error::Corrupted("Retained ClientData size overflow".into()))
                 })?;
         check_limit(
             retained,
@@ -342,15 +342,15 @@ impl PowerPointPlaceholderProjection {
     /// Serialize the PPT-record payload while retaining unrelated data exactly.
     pub fn to_client_data_payload(
         &self,
-        context: PowerPointPlaceholderContext,
-        limits: PowerPointPlaceholderLimits,
+        context: PlaceholderContext,
+        limits: PlaceholderLimits,
     ) -> Result<Vec<u8>> {
         let count = self
             .before_records
             .len()
             .checked_add(self.after_records.len())
             .and_then(|value| value.checked_add(usize::from(self.placeholder.is_some())))
-            .ok_or_else(|| PptError::Corrupted("ClientData record count overflow".into()))?;
+            .ok_or_else(|| Error::Corrupted("ClientData record count overflow".into()))?;
         check_limit(
             count,
             limits.max_client_data_records,
@@ -378,20 +378,17 @@ impl PowerPointPlaceholderProjection {
     /// Serialize a complete OfficeArt `ClientData` record.
     pub fn to_officeart_client_data(
         &self,
-        context: PowerPointPlaceholderContext,
-        limits: PowerPointPlaceholderLimits,
+        context: PlaceholderContext,
+        limits: PlaceholderLimits,
     ) -> Result<Vec<u8>> {
         let data = self.to_client_data_payload(context, limits)?;
         Ok(encode_record(0x0f, 0, OFFICEART_CLIENT_DATA_TYPE, &data))
     }
 }
 
-fn validate_context(
-    kind: PowerPointPlaceholderKind,
-    context: PowerPointPlaceholderContext,
-) -> Result<()> {
-    use PowerPointPlaceholderContext as C;
-    use PowerPointPlaceholderKind as K;
+fn validate_context(kind: PlaceholderKind, context: PlaceholderContext) -> Result<()> {
+    use PlaceholderContext as C;
+    use PlaceholderKind as K;
     let valid = match kind {
         K::MasterTitle | K::MasterBody => context == C::MainMaster,
         K::MasterCenterTitle | K::MasterSubTitle => context == C::TitleMaster,
@@ -424,26 +421,26 @@ fn validate_context(
     }
 }
 
-fn is_earlier_client_data_slot(kind: PptRecordType) -> bool {
+fn is_earlier_client_data_slot(kind: RecordType) -> bool {
     matches!(
         kind,
-        PptRecordType::ShapeAtom
-            | PptRecordType::ShapeFlags10Atom
-            | PptRecordType::ExternalObjectRefAtom
-            | PptRecordType::AnimationInfo
-            | PptRecordType::InteractiveInfo
+        RecordType::ShapeAtom
+            | RecordType::ShapeFlags10Atom
+            | RecordType::ExternalObjectRefAtom
+            | RecordType::AnimationInfo
+            | RecordType::InteractiveInfo
     )
 }
 
-fn is_later_client_data_slot(kind: PptRecordType) -> bool {
+fn is_later_client_data_slot(kind: RecordType) -> bool {
     matches!(
         kind,
-        PptRecordType::RecolorInfoAtom
-            | PptRecordType::ProgTags
-            | PptRecordType::RoundTripNewPlaceholderId12Atom
-            | PptRecordType::RoundTripShapeId12Atom
-            | PptRecordType::RoundTripHFPlaceholder12Atom
-            | PptRecordType::RoundTripShapeCheckSumForCustomLayouts12Atom
+        RecordType::RecolorInfoAtom
+            | RecordType::ProgTags
+            | RecordType::RoundTripNewPlaceholderId12Atom
+            | RecordType::RoundTripShapeId12Atom
+            | RecordType::RoundTripHFPlaceholder12Atom
+            | RecordType::RoundTripShapeCheckSumForCustomLayouts12Atom
     )
 }
 
@@ -456,7 +453,7 @@ fn split_records(data: &[u8], max_records: usize) -> Result<Vec<Vec<u8>>> {
         }
         let header_end = offset
             .checked_add(8)
-            .ok_or_else(|| PptError::Corrupted("ClientData header offset overflow".into()))?;
+            .ok_or_else(|| Error::Corrupted("ClientData header offset overflow".into()))?;
         if header_end > data.len() {
             return corrupted("Truncated PPT record header in ClientData");
         }
@@ -466,10 +463,10 @@ fn split_records(data: &[u8], max_records: usize) -> Result<Vec<Vec<u8>>> {
             data[offset + 6],
             data[offset + 7],
         ]))
-        .map_err(|_| PptError::Corrupted("ClientData record size overflow".into()))?;
+        .map_err(|_| Error::Corrupted("ClientData record size overflow".into()))?;
         let end = header_end
             .checked_add(length)
-            .ok_or_else(|| PptError::Corrupted("ClientData record end overflow".into()))?;
+            .ok_or_else(|| Error::Corrupted("ClientData record end overflow".into()))?;
         if end > data.len() {
             return corrupted("PPT record extends beyond ClientData");
         }
@@ -497,7 +494,7 @@ fn check_limit(actual: usize, limit: usize, field: &str) -> Result<()> {
 }
 
 fn corrupted<T>(message: impl Into<String>) -> Result<T> {
-    Err(PptError::Corrupted(message.into()))
+    Err(Error::Corrupted(message.into()))
 }
 
 #[cfg(test)]
@@ -511,24 +508,24 @@ mod tests {
     fn atom(kind: u8, size: u8, unused: [u8; 2]) -> Vec<u8> {
         let mut data = 7i32.to_le_bytes().to_vec();
         data.extend_from_slice(&[kind, size, unused[0], unused[1]]);
-        record(0, 0, PptRecordType::OEPlaceholderAtom.as_u16(), &data)
+        record(0, 0, RecordType::OEPlaceholderAtom.as_u16(), &data)
     }
 
     #[test]
     fn round_trips_every_discriminant_and_undefined_bytes() {
         for raw in 1u8..=0x1a {
             let context = match raw {
-                1 | 2 => PowerPointPlaceholderContext::MainMaster,
-                3 | 4 => PowerPointPlaceholderContext::TitleMaster,
-                5 | 6 | 10 => PowerPointPlaceholderContext::NotesMaster,
-                7..=9 => PowerPointPlaceholderContext::HandoutMaster,
-                11 | 12 => PowerPointPlaceholderContext::NotesSlide,
-                _ => PowerPointPlaceholderContext::PresentationSlide,
+                1 | 2 => PlaceholderContext::MainMaster,
+                3 | 4 => PlaceholderContext::TitleMaster,
+                5 | 6 | 10 => PlaceholderContext::NotesMaster,
+                7..=9 => PlaceholderContext::HandoutMaster,
+                11 | 12 => PlaceholderContext::NotesSlide,
+                _ => PlaceholderContext::PresentationSlide,
             };
             let bytes = atom(raw, raw % 3, [0xa5, 0x5a]);
-            let (record, consumed) = PptRecord::parse_strict(&bytes, 0).unwrap();
+            let (record, consumed) = Record::parse_strict(&bytes, 0).unwrap();
             assert_eq!(consumed, bytes.len());
-            let parsed = PowerPointPlaceholderAtom::parse(&record, context).unwrap();
+            let parsed = PlaceholderAtom::parse(&record, context).unwrap();
             assert_eq!(parsed.unused, [0xa5, 0x5a]);
             assert_eq!(parsed.to_bytes(context).unwrap(), bytes);
         }
@@ -537,63 +534,51 @@ mod tests {
     #[test]
     fn validates_context_none_unknown_size_headers_and_lengths() {
         assert!(
-            PowerPointPlaceholderAtom::parse_payload(
+            PlaceholderAtom::parse_payload(
                 &[0, 0, 0, 0, 0, 0, 0, 0],
-                PowerPointPlaceholderContext::PresentationSlide,
+                PlaceholderContext::PresentationSlide,
             )
             .is_err()
         );
         assert!(
-            PowerPointPlaceholderAtom::parse_payload(
+            PlaceholderAtom::parse_payload(
                 &[0, 0, 0, 0, 0x1b, 0, 0, 0],
-                PowerPointPlaceholderContext::PresentationSlide,
+                PlaceholderContext::PresentationSlide,
             )
             .is_err()
         );
         assert!(
-            PowerPointPlaceholderAtom::parse_payload(
+            PlaceholderAtom::parse_payload(
                 &[0, 0, 0, 0, 0x0d, 3, 0, 0],
-                PowerPointPlaceholderContext::PresentationSlide,
+                PlaceholderContext::PresentationSlide,
             )
             .is_err()
         );
         assert!(
-            PowerPointPlaceholderAtom::parse_payload(
+            PlaceholderAtom::parse_payload(
                 &[0, 0, 0, 0, 1, 0, 0, 0],
-                PowerPointPlaceholderContext::PresentationSlide,
+                PlaceholderContext::PresentationSlide,
             )
             .is_err()
         );
-        assert!(
-            PowerPointPlaceholderAtom::parse_payload(
-                &[0; 7],
-                PowerPointPlaceholderContext::MainMaster,
-            )
-            .is_err()
-        );
+        assert!(PlaceholderAtom::parse_payload(&[0; 7], PlaceholderContext::MainMaster,).is_err());
 
-        let bad_header = record(1, 0, PptRecordType::OEPlaceholderAtom.as_u16(), &[0; 8]);
-        let (record, _) = PptRecord::parse_strict(&bad_header, 0).unwrap();
-        assert!(
-            PowerPointPlaceholderAtom::parse(
-                &record,
-                PowerPointPlaceholderContext::PresentationSlide,
-            )
-            .is_err()
-        );
+        let bad_header = record(1, 0, RecordType::OEPlaceholderAtom.as_u16(), &[0; 8]);
+        let (record, _) = Record::parse_strict(&bad_header, 0).unwrap();
+        assert!(PlaceholderAtom::parse(&record, PlaceholderContext::PresentationSlide,).is_err());
     }
 
     #[test]
     fn enforces_client_data_ownership_order_and_round_trip() {
-        let before = record(0, 0, PptRecordType::ExternalObjectRefAtom.as_u16(), &[0; 4]);
+        let before = record(0, 0, RecordType::ExternalObjectRefAtom.as_u16(), &[0; 4]);
         let placeholder = atom(0x0d, 0, [7, 9]);
-        let after = record(0, 0, PptRecordType::RecolorInfoAtom.as_u16(), &[]);
+        let after = record(0, 0, RecordType::RecolorInfoAtom.as_u16(), &[]);
         let payload = [before.clone(), placeholder, after.clone()].concat();
         let complete = record(0x0f, 0, OFFICEART_CLIENT_DATA_TYPE, &payload);
-        let limits = PowerPointPlaceholderLimits::default();
-        let projection = PowerPointPlaceholderProjection::parse_officeart_client_data(
+        let limits = PlaceholderLimits::default();
+        let projection = PlaceholderProjection::parse_officeart_client_data(
             &complete,
-            PowerPointPlaceholderContext::PresentationSlide,
+            PlaceholderContext::PresentationSlide,
             limits,
         )
         .unwrap();
@@ -601,29 +586,29 @@ mod tests {
         assert_eq!(projection.after_records(), &[after]);
         assert_eq!(
             projection
-                .to_officeart_client_data(PowerPointPlaceholderContext::PresentationSlide, limits)
+                .to_officeart_client_data(PlaceholderContext::PresentationSlide, limits)
                 .unwrap(),
             complete
         );
 
         let duplicate = [atom(0x0d, 0, [0; 2]), atom(0x0e, 0, [0; 2])].concat();
         assert!(
-            PowerPointPlaceholderProjection::parse_client_data_payload(
+            PlaceholderProjection::parse_client_data_payload(
                 &duplicate,
-                PowerPointPlaceholderContext::PresentationSlide,
+                PlaceholderContext::PresentationSlide,
                 limits,
             )
             .is_err()
         );
         let late = [
-            record(0, 0, PptRecordType::RecolorInfoAtom.as_u16(), &[]),
+            record(0, 0, RecordType::RecolorInfoAtom.as_u16(), &[]),
             atom(0x0d, 0, [0; 2]),
         ]
         .concat();
         assert!(
-            PowerPointPlaceholderProjection::parse_client_data_payload(
+            PlaceholderProjection::parse_client_data_payload(
                 &late,
-                PowerPointPlaceholderContext::PresentationSlide,
+                PlaceholderContext::PresentationSlide,
                 limits,
             )
             .is_err()
@@ -632,27 +617,27 @@ mod tests {
 
     #[test]
     fn rejects_truncation_and_all_limits() {
-        let mut data = record(0, 0, PptRecordType::ExternalObjectRefAtom.as_u16(), &[0; 4]);
-        let defaults = PowerPointPlaceholderLimits::default();
+        let mut data = record(0, 0, RecordType::ExternalObjectRefAtom.as_u16(), &[0; 4]);
+        let defaults = PlaceholderLimits::default();
         let cases = [
-            PowerPointPlaceholderLimits {
+            PlaceholderLimits {
                 max_client_data_bytes: data.len() - 1,
                 ..defaults
             },
-            PowerPointPlaceholderLimits {
+            PlaceholderLimits {
                 max_client_data_records: 0,
                 ..defaults
             },
-            PowerPointPlaceholderLimits {
+            PlaceholderLimits {
                 max_retained_bytes: data.len() - 1,
                 ..defaults
             },
         ];
         for limits in cases {
             assert!(
-                PowerPointPlaceholderProjection::parse_client_data_payload(
+                PlaceholderProjection::parse_client_data_payload(
                     &data,
-                    PowerPointPlaceholderContext::PresentationSlide,
+                    PlaceholderContext::PresentationSlide,
                     limits,
                 )
                 .is_err()
@@ -660,9 +645,9 @@ mod tests {
         }
         data.pop();
         assert!(
-            PowerPointPlaceholderProjection::parse_client_data_payload(
+            PlaceholderProjection::parse_client_data_payload(
                 &data,
-                PowerPointPlaceholderContext::PresentationSlide,
+                PlaceholderContext::PresentationSlide,
                 defaults,
             )
             .is_err()

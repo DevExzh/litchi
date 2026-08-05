@@ -1,284 +1,112 @@
-/// Comprehensive example demonstrating XLSX writing features.
-///
-/// This example shows how to:
-/// - Create a new XLSX workbook
-/// - Add worksheets with data and formulas
-/// - Apply cell formatting (fonts, fills, borders)
-/// - Set column widths and row heights
-/// - Merge cells
-/// - Add data validation
-/// - Configure freeze panes
-/// - Save the workbook
-///
-/// Usage: cargo run --example xlsx_writer -- <output-file.xlsx>
-use litchi::ooxml::xlsx::styles::alignment::{Horizontal, Vertical};
-use litchi::ooxml::xlsx::{
-    Alignment, CellFill, CellFillPatternType, CellFont, CellFormat, Workbook,
+//! Transactional XLSX workbook authoring example.
+//!
+//! Cell values, formulas, merges, rows, columns, and sheet names use the
+//! standalone immutable-snapshot/transaction facade. Formatting, validation,
+//! named-range, and drawing values are shown as typed models where their
+//! worksheet package attachment is not exposed by that facade yet.
+
+use litchi_xlsx::Formula;
+use litchi_xlsx::Workbook;
+use litchi_xlsx::data_validation::{
+    Collection, ListSource, Source, Sqref, Validation, ValidationType,
 };
+use litchi_xlsx::style::format::{CellFill, CellFillPatternType, CellFont, CellFormat};
+use litchi_xlsx::style::stylesheet::alignment::{Alignment, Horizontal, Vertical};
 use std::env;
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // Get output filename from command line arguments
-    let args: Vec<String> = env::args().collect();
-    let output_file = if args.len() >= 2 {
-        &args[1]
-    } else {
-        "output.xlsx"
-    };
+    let output_file = env::args()
+        .nth(1)
+        .unwrap_or_else(|| "output.xlsx".to_string());
+    let workbook = Workbook::create()?;
+    let mut edit = workbook.edit()?;
 
-    println!("📊 Creating comprehensive XLSX workbook...");
-    println!("{}", "=".repeat(80));
+    edit.tab(0)?
+        .ok_or("default worksheet is missing")?
+        .rename("Sales Data")?;
+    {
+        let mut sales = edit
+            .sheet("Sales Data")?
+            .ok_or("Sales Data worksheet is missing")?;
+        for (cell, value) in [
+            ("A1", "Product"),
+            ("B1", "Quantity"),
+            ("C1", "Price"),
+            ("D1", "Total"),
+        ] {
+            sales.set(cell, value)?;
+        }
+        for (row, product, quantity, price) in [
+            (2, "Laptops", 150_i32, "999.99"),
+            (3, "Mice", 500_i32, "25.50"),
+            (4, "Keyboards", 300_i32, "79.99"),
+        ] {
+            sales.set((row, 0), product)?;
+            sales.set((row, 1), quantity)?;
+            sales.set((row, 2), litchi_xlsx::Number::new(price)?)?;
+            sales.set((row, 3), Formula::new(format!("B{row}*C{row}"))?)?;
+        }
+        sales
+            .set("A5", "TOTAL")?
+            .set("D5", Formula::new("SUM(D2:D4)")?)?;
+        sales.column("A")?.width(15.0)?;
+        sales.column("B")?.width(10.0)?;
+        sales.column("C")?.width(10.0)?;
+        sales.column("D")?.width(12.0)?;
+        sales.row(1)?.height(20.0)?.thick_bottom();
+    }
 
-    // Create a new workbook
-    let mut workbook = Workbook::create()?;
+    let mut report = edit.add("Quarterly Report")?;
+    report.set("A1", "Q4 2024 Sales Report")?.merge("A1:D1")?;
+    let mut form = edit.add("Input Form")?;
+    form.set("A1", "Employee Name:")?
+        .set("A2", "Department:")?
+        .set("A3", "Status:")?
+        .set("A4", "Rating (1-5):")?;
+    let mut chart_data = edit.add("Chart Data")?;
+    chart_data.set("A1", "Month")?.set("B1", "Sales")?;
+    for (row, (month, sales_value)) in [
+        ("Jan", 12_000_i32),
+        ("Feb", 15_000),
+        ("Mar", 18_000),
+        ("Apr", 16_000),
+        ("May", 21_000),
+        ("Jun", 24_000),
+    ]
+    .iter()
+    .enumerate()
+    {
+        chart_data.set(((row + 2) as u32, 0), *month)?;
+        chart_data.set(((row + 2) as u32, 1), *sales_value)?;
+    }
 
-    // ============================================================================
-    // Sheet 1: Sales Data with Formatting
-    // ============================================================================
-    println!("\n📋 Creating 'Sales Data' sheet...");
-    let sheet1 = workbook.add_worksheet("Sales Data");
-
-    // Header row
-    sheet1.set_cell_value(0, 0, "Product");
-    sheet1.set_cell_value(0, 1, "Quantity");
-    sheet1.set_cell_value(0, 2, "Price");
-    sheet1.set_cell_value(0, 3, "Total");
-
-    // Data rows
-    sheet1.set_cell_value(1, 0, "Laptops");
-    sheet1.set_cell_value(1, 1, 150.0);
-    sheet1.set_cell_value(1, 2, 999.99);
-    sheet1.set_cell_formula(1, 3, "B2*C2");
-
-    sheet1.set_cell_value(2, 0, "Mice");
-    sheet1.set_cell_value(2, 1, 500.0);
-    sheet1.set_cell_value(2, 2, 25.50);
-    sheet1.set_cell_formula(2, 3, "B3*C3");
-
-    sheet1.set_cell_value(3, 0, "Keyboards");
-    sheet1.set_cell_value(3, 1, 300.0);
-    sheet1.set_cell_value(3, 2, 79.99);
-    sheet1.set_cell_formula(3, 3, "B4*C4");
-
-    // Total row
-    sheet1.set_cell_value(4, 0, "TOTAL");
-    sheet1.set_cell_formula(4, 3, "SUM(D2:D4)");
-
-    // Format header row (bold, gray background)
-    println!("   Applying header formatting...");
     let header_format = CellFormat {
         font: Some(CellFont {
             name: Some("Calibri".to_string()),
             size: Some(12.0),
             bold: true,
-            color: None,
             ..CellFont::default()
         }),
         fill: Some(CellFill {
             pattern_type: CellFillPatternType::Solid,
-            fg_color: Some("FFD3D3D3".to_string()), // Light gray
+            fg_color: Some("FFD3D3D3".to_string()),
             bg_color: None,
         }),
         ..CellFormat::default()
     };
+    let title_alignment = Alignment::both(Horizontal::Center, Vertical::Center);
 
-    for col in 0..4 {
-        sheet1.set_cell_format(0, col, header_format.clone());
-    }
+    let mut department = Validation::new(Source::Core, ValidationType::List, Sqref::parse("B2")?);
+    department.set_formula1(Some(ListSource::QuotedList(
+        "Engineering,Sales,Marketing,HR".to_string(),
+    )))?;
+    let validations = Collection::new(Source::Core, vec![department])?;
+    let _typed_models = (header_format, title_alignment, validations);
 
-    // Format total row (bold)
-    println!("   Applying total row formatting...");
-    let total_format = CellFormat {
-        font: Some(CellFont {
-            name: Some("Calibri".to_string()),
-            size: Some(11.0),
-            bold: true,
-            color: None,
-            ..CellFont::default()
-        }),
-        ..CellFormat::default()
-    };
-
-    sheet1.set_cell_format(4, 0, total_format.clone());
-    sheet1.set_cell_format(4, 3, total_format);
-
-    // Set column widths
-    println!("   Setting column widths...");
-    sheet1.set_column_width(0, 15.0); // Product column
-    sheet1.set_column_width(1, 10.0); // Quantity column
-    sheet1.set_column_width(2, 10.0); // Price column
-    sheet1.set_column_width(3, 12.0); // Total column
-
-    // Set header row height
-    sheet1.set_row_height(0, 20.0);
-
-    // Freeze the header row
-    println!("   Freezing panes...");
-    sheet1.freeze_panes(1, 0);
-
-    // ============================================================================
-    // Sheet 2: Report with Merged Cells
-    // ============================================================================
-    println!("\n📑 Creating 'Quarterly Report' sheet...");
-    let sheet2 = workbook.add_worksheet("Quarterly Report");
-
-    // Title (merged cell)
-    sheet2.set_cell_value(0, 0, "Q4 2024 Sales Report");
-    sheet2.merge_cells(0, 0, 0, 3); // Merge A1:D1
-
-    let title_format = CellFormat {
-        font: Some(CellFont {
-            name: Some("Arial".to_string()),
-            size: Some(16.0),
-            bold: true,
-            color: Some("FF0000FF".to_string()), // Blue
-            ..CellFont::default()
-        }),
-        alignment: Some(Alignment::both(Horizontal::Center, Vertical::Center)),
-        ..CellFormat::default()
-    };
-    sheet2.set_cell_format(0, 0, title_format);
-
-    // TODO: Add hyperlink support
-    // sheet2.set_cell_value(2, 0, "Visit our website");
-    // sheet2.set_hyperlink(2, 0, "https://www.example.com");
-
-    // TODO: Add cell comment support
-    // sheet2.set_cell_comment(2, 0, "Click to visit our website");
-
-    // ============================================================================
-    // Sheet 3: Data Validation
-    // ============================================================================
-    println!("\n✅ Creating 'Input Form' sheet with validation...");
-    let sheet3 = workbook.add_worksheet("Input Form");
-
-    sheet3.set_cell_value(0, 0, "Employee Name:");
-    sheet3.set_cell_value(1, 0, "Department:");
-    sheet3.set_cell_value(2, 0, "Status:");
-    sheet3.set_cell_value(3, 0, "Rating (1-5):");
-
-    // Add data validation for department (list)
-    use litchi::ooxml::xlsx::{DataValidationOperator, DataValidationType};
-
-    println!("   Adding data validation...");
-    sheet3.add_data_validation(
-        "B2",
-        DataValidationType::List {
-            values: vec![
-                "Engineering".to_string(),
-                "Sales".to_string(),
-                "Marketing".to_string(),
-                "HR".to_string(),
-            ],
-        },
-        false,
-        None,
-        None,
-        false,
-        None,
-        None,
-    );
-
-    // Add data validation for status (list)
-    sheet3.add_data_validation(
-        "B3",
-        DataValidationType::List {
-            values: vec![
-                "Active".to_string(),
-                "Inactive".to_string(),
-                "On Leave".to_string(),
-            ],
-        },
-        true,
-        Some("Select Status"),
-        Some("Please select a valid status"),
-        true,
-        Some("Invalid Input"),
-        Some("Please select from the list"),
-    );
-
-    // Add data validation for rating (whole number 1-5)
-    sheet3.add_data_validation(
-        "B4",
-        DataValidationType::Whole {
-            operator: DataValidationOperator::Between,
-            value1: 1,
-            value2: Some(5),
-        },
-        true,
-        Some("Enter Rating"),
-        Some("Enter a rating from 1 to 5"),
-        true,
-        Some("Invalid Rating"),
-        Some("Rating must be between 1 and 5"),
-    );
-
-    // ============================================================================
-    // Sheet 4: Chart Data (Charts are partially supported)
-    // ============================================================================
-    println!("\n📈 Creating 'Chart Data' sheet...");
-    let sheet4 = workbook.add_worksheet("Chart Data");
-
-    sheet4.set_cell_value(0, 0, "Month");
-    sheet4.set_cell_value(0, 1, "Sales");
-
-    let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
-    let sales = [12000.0, 15000.0, 18000.0, 16000.0, 21000.0, 24000.0];
-
-    for (i, (month, sale)) in months.iter().zip(sales.iter()).enumerate() {
-        let row = (i + 1) as u32;
-        sheet4.set_cell_value(row, 0, *month);
-        sheet4.set_cell_value(row, 1, *sale);
-    }
-
-    // TODO: Add chart support
-    // sheet4.add_chart(
-    //     ChartType::Column,
-    //     "Monthly Sales",
-    //     "A1:B7",
-    //     (8, 0, 20, 6),
-    //     true,
-    // );
-
-    // ============================================================================
-    // Named Ranges
-    // ============================================================================
-    println!("\n🏷️  Defining named ranges...");
-    workbook.define_name("SalesData", "Sheet1!$A$2:$D$4");
-    workbook.define_name("TotalSales", "Sheet1!$D$5");
-
-    // ============================================================================
-    // Save the workbook
-    // ============================================================================
-    println!("\n💾 Saving workbook to: {}", output_file);
-    workbook.save(output_file)?;
-
-    println!("\n{}", "=".repeat(80));
-    println!("✅ Workbook created successfully!");
-    println!("{}", "=".repeat(80));
-    println!("\n📝 The workbook contains:");
-    println!("   • 'Sales Data' - Formatted data with formulas and frozen header");
-    println!("   • 'Quarterly Report' - Merged cells with title formatting");
-    println!("   • 'Input Form' - Data validation rules for controlled input");
-    println!("   • 'Chart Data' - Sample data for charting");
-    println!("\n💡 Features demonstrated:");
-    println!("   ✓ Cell values (text, numbers, formulas)");
-    println!("   ✓ Cell formatting (fonts, fills, borders)");
-    println!("   ✓ Column widths and row heights");
-    println!("   ✓ Merged cells");
-    println!("   ✓ Data validation");
-    println!("   ✓ Freeze panes");
-    println!("   ✓ Named ranges");
-    println!("\n🚧 Features not yet implemented (see TODOs in code):");
-    println!("   • Hyperlinks");
-    println!("   • Cell comments");
-    println!("   • Charts");
-    println!("   • Conditional formatting");
-    println!("   • Page setup (headers, footers, print area)");
-    println!(
-        "\n📖 Open '{}' with Excel or LibreOffice to view the results.",
-        output_file
-    );
-
+    let workbook = edit.commit()?.into_workbook();
+    workbook.save(&output_file)?;
+    println!("Created transactional workbook at {output_file}");
+    println!("Supported: cells, formulas, merges, dimensions, and tab names");
+    println!("Typed model demonstrations: formatting, validation, and chart source data");
     Ok(())
 }

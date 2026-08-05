@@ -80,13 +80,12 @@ pub mod chart;
 pub mod smart_tags;
 
 // Re-export public types from core
-pub use crate::encryption::PptEncryptionProfile;
+pub use crate::encryption::EncryptionProfile;
 pub use crate::view_info::{
-    PowerPointGuide, PowerPointGuideOrientation, PowerPointRatio, PowerPointSlideViewInfo,
-    PowerPointSlideViewPreferences, PowerPointViewKind, PowerPointViewOrigin,
-    PowerPointZoomViewInfo,
+    Guide, GuideOrientation, Ratio, SlideViewInfo, SlideViewPreferences, ViewKind, ViewOrigin,
+    ZoomViewInfo,
 };
-pub use core::{PptWriteError, PptWriter, ShapeProperties, ShapeType, TextAlignment};
+pub use core::{ShapeProperties, ShapeType, TextAlignment, WriteError, Writer};
 
 // Re-export commonly used types from submodules
 pub use crate::shapes::geometry::{GeometryRect, ShapePathType};
@@ -102,7 +101,7 @@ pub use records::{RecordBuilder, RecordHeader};
 pub use shape_style::{FillStyle, LineStyleConfig, ShadowStyle, ShapeColor, ShapeStyle};
 pub use shapes::{Shape, ShapeCollection, ShapeKind};
 pub use slide_timing::SlideTiming;
-pub use smart_tags::{PowerPointSmartTagDefinition, PowerPointSmartTagIndex};
+pub use smart_tags::{SmartTagDefinition, SmartTagIndex};
 pub use sound_collection::build_sound_collection;
 pub use table::{DEFAULT_COLUMN_WIDTH_PT, DEFAULT_ROW_HEIGHT_PT, MAX_TABLE_DIMENSION, Table};
 pub use text_format::{

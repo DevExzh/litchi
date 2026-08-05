@@ -6,14 +6,14 @@
 //! - After-effects (DimToColor)
 //! - Speed and direction variations
 
-use litchi_ppt::PptWriter;
+use litchi_ppt::Writer;
 use litchi_ppt::animation::*;
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("Creating PPT with new animation features...");
 
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
     writer.set_property("Title", "New Animation Features Demo");
 
     // Slide 1: New Entrance Effects with Sounds

@@ -9,13 +9,13 @@
 //! cargo run --example minimal_xls --features ole --no-default-features
 //! ```
 
-use litchi_xls::XlsWriter;
+use litchi_xls::Writer;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Creating minimal.xls via XlsWriter...");
+    println!("Creating minimal.xls via Writer...");
 
     // Create a new XLS writer
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
 
     // Single worksheet with a few basic cells
     let sheet = writer.add_worksheet("Sheet1")?;

@@ -11,7 +11,7 @@ use litchi_core::unit::emu_i32_to_ppt_master_i16_round;
 use crate::shapes::geometry::{GeometryRect, ShapePathType};
 
 /// Error type for PPT operations
-pub(crate) type PptError = std::io::Error;
+pub(crate) type Error = std::io::Error;
 
 // Re-export shared Escher writer functionality
 pub(crate) use crate::officeart_wire::{
@@ -175,7 +175,7 @@ impl EscherHeader {
     }
 
     /// Write header to writer
-    pub(crate) fn write<W: Write>(&self, writer: &mut W) -> Result<(), PptError> {
+    pub(crate) fn write<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         let raw =
             EscherRecordHeader::new(self.version, self.instance, self.record_type, self.length);
         writer.write_all(raw.as_bytes())?;
@@ -354,7 +354,7 @@ impl EscherBuilder {
     }
 
     /// Build the complete record
-    pub(crate) fn build(&self) -> Result<Vec<u8>, PptError> {
+    pub(crate) fn build(&self) -> Result<Vec<u8>, Error> {
         let mut record = Vec::new();
         self.header.write(&mut record)?;
         record.extend_from_slice(&self.data);
@@ -370,7 +370,7 @@ impl EscherBuilder {
 pub(crate) fn create_dgg_container(
     master_shapes: u32,
     slide_shape_counts: &[u32],
-) -> Result<Vec<u8>, PptError> {
+) -> Result<Vec<u8>, Error> {
     let mut container =
         EscherBuilder::new(header_version::CONTAINER, 0, record_type::DGG_CONTAINER);
 
@@ -457,7 +457,7 @@ pub(crate) fn create_dgg_container_with_blips(
     master_shapes: u32,
     slide_shape_counts: &[u32],
     bstore_blob: &[u8],
-) -> Result<Vec<u8>, PptError> {
+) -> Result<Vec<u8>, Error> {
     let mut container =
         EscherBuilder::new(header_version::CONTAINER, 0, record_type::DGG_CONTAINER);
 
@@ -593,7 +593,7 @@ impl FreeformGeometry {
         &self.segment_info
     }
 
-    pub(crate) fn validate(&self) -> Result<(u16, u16), PptError> {
+    pub(crate) fn validate(&self) -> Result<(u16, u16), Error> {
         if self.vertices.is_empty() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
@@ -627,7 +627,7 @@ impl FreeformGeometry {
         Ok((vertex_count, segment_count))
     }
 
-    fn encode_arrays(&self) -> Result<(Vec<u8>, Vec<u8>), PptError> {
+    fn encode_arrays(&self) -> Result<(Vec<u8>, Vec<u8>), Error> {
         let (vertex_count, segment_count) = self.validate()?;
 
         let mut vertices = Vec::with_capacity(6 + self.vertices.len() * 8);
@@ -733,7 +733,7 @@ pub(crate) struct UserShapeData {
     /// corresponding trigger.
     pub interactions: Vec<crate::Interaction>,
     /// Typed actions attached to UTF-16 ranges in this shape's text.
-    pub text_interactions: Vec<crate::PowerPointTextInteraction>,
+    pub text_interactions: Vec<crate::TextInteraction>,
     /// Picture BLIP index (for picture frames)
     pub picture_index: Option<u32>,
     /// Explicit custom/freeform geometry.
@@ -811,7 +811,7 @@ impl Default for UserShapeData {
 pub(crate) fn create_dg_container_with_shapes(
     drawing_id: u32,
     shapes: &[UserShapeData],
-) -> Result<Vec<u8>, PptError> {
+) -> Result<Vec<u8>, Error> {
     create_dg_container_with_charts(drawing_id, shapes, &[], &[])
 }
 
@@ -826,7 +826,7 @@ pub(crate) fn create_dg_container_with_tables(
     drawing_id: u32,
     shapes: &[UserShapeData],
     tables: &[super::table::PositionedTable],
-) -> Result<Vec<u8>, PptError> {
+) -> Result<Vec<u8>, Error> {
     create_dg_container_with_charts(drawing_id, shapes, tables, &[])
 }
 
@@ -840,7 +840,7 @@ pub(crate) fn create_dg_container_with_charts(
     shapes: &[UserShapeData],
     tables: &[super::table::PositionedTable],
     charts: &[super::chart::ChartFrame],
-) -> Result<Vec<u8>, PptError> {
+) -> Result<Vec<u8>, Error> {
     let table_shape_count: u32 = tables.iter().map(|table| table.table.shape_count()).sum();
     let mut container = EscherBuilder::new(header_version::CONTAINER, 0, record_type::DG_CONTAINER);
 
@@ -934,7 +934,7 @@ pub(crate) fn create_dg_container_with_charts(
 }
 
 /// Create a user shape SpContainer
-fn create_user_shape_container(shape_id: u32, shape: &UserShapeData) -> Result<Vec<u8>, PptError> {
+fn create_user_shape_container(shape_id: u32, shape: &UserShapeData) -> Result<Vec<u8>, Error> {
     if shape.adjust_values.len() > 10 {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
@@ -1089,7 +1089,7 @@ fn create_user_shape_container(shape_id: u32, shape: &UserShapeData) -> Result<V
         append_client_data_payload(&mut client_data, &programmable_tags)?;
     }
     if let Some(client_data) = client_data {
-        crate::PowerPointClientData::parse(&client_data)
+        crate::ClientData::parse(&client_data)
             .map_err(|error| std::io::Error::other(error.to_string()))?;
         container.add_data(&client_data);
     }
@@ -1129,7 +1129,7 @@ fn legacy_hyperlink_interaction(
     action: u8,
     jump: u8,
     hyperlink_type: u8,
-) -> Result<crate::Interaction, PptError> {
+) -> Result<crate::Interaction, Error> {
     let mut atom_data = [0u8; 16];
     atom_data[4..8].copy_from_slice(&hyperlink_id.to_le_bytes());
     atom_data[8] = action;
@@ -1158,7 +1158,7 @@ fn legacy_hyperlink_interaction(
 fn append_client_data_record_payload(
     client_data: &mut Option<Vec<u8>>,
     record: &[u8],
-) -> Result<(), PptError> {
+) -> Result<(), Error> {
     let payload_len = record
         .get(4..8)
         .and_then(|bytes| bytes.try_into().ok())
@@ -1179,7 +1179,7 @@ fn append_client_data_record_payload(
 fn append_client_data_payload(
     client_data: &mut Option<Vec<u8>>,
     payload: &[u8],
-) -> Result<(), PptError> {
+) -> Result<(), Error> {
     let data = client_data.get_or_insert_with(|| {
         let mut bytes = Vec::with_capacity(8);
         bytes.extend_from_slice(&0x000fu16.to_le_bytes());
@@ -1221,7 +1221,7 @@ fn build_client_data_with_hyperlink(
     action: u8,
     jump: u8,
     hyperlink_type: u8,
-) -> Result<Vec<u8>, PptError> {
+) -> Result<Vec<u8>, Error> {
     let interaction = legacy_hyperlink_interaction(hyperlink_id, action, jump, hyperlink_type)?;
     let mut client_data = None;
     append_client_data_payload(
@@ -1240,7 +1240,7 @@ fn build_client_data_with_hyperlink(
 /// The reference `sound.ppt` has AnimationInfo WITHOUT InteractiveInfo in its ClientData.
 fn build_client_data_with_animation(
     animation_info: &crate::animation::AnimationInfo,
-) -> Result<Vec<u8>, PptError> {
+) -> Result<Vec<u8>, Error> {
     use crate::animation::writer::write_animation_info;
 
     // Write AnimationInfo container (contains AnimationInfoAtom with soundRef)
@@ -1257,7 +1257,7 @@ fn build_client_data_with_animation(
 
 /// Build ClientData record with OEPlaceholderAtom for placeholder shapes
 /// Per POI HSLFSimpleShape - placeholders have OEPlaceholderAtom in ClientData
-fn build_client_data_with_placeholder(placeholder_type: u8) -> Result<Vec<u8>, PptError> {
+fn build_client_data_with_placeholder(placeholder_type: u8) -> Result<Vec<u8>, Error> {
     use super::records::RecordBuilder;
 
     // OEPlaceholderAtom (type 0x0BC3 = 3011)
@@ -1453,15 +1453,15 @@ fn build_shape_properties(shape: &UserShapeData) -> Vec<EscherProperty> {
 /// Build ClientTextBox record with plain text content (no formatting)
 /// Based on Apache POI EscherTextboxWrapper and HSLFTextShape
 /// text_type: 0=Title, 1=Body, 2=Notes, 4=Other
-pub(crate) fn build_client_textbox(text: &str, text_type: u32) -> Result<Vec<u8>, PptError> {
+pub(crate) fn build_client_textbox(text: &str, text_type: u32) -> Result<Vec<u8>, Error> {
     build_client_textbox_with_interactions(text, text_type, &[])
 }
 
 fn build_client_textbox_with_interactions(
     text: &str,
     text_type: u32,
-    interactions: &[crate::PowerPointTextInteraction],
-) -> Result<Vec<u8>, PptError> {
+    interactions: &[crate::TextInteraction],
+) -> Result<Vec<u8>, Error> {
     use super::records::{RecordBuilder, record_type as ppt_rt};
 
     let mut result = Vec::new();
@@ -1488,7 +1488,7 @@ fn build_client_textbox_with_interactions(
 
     // StyleTextPropAtom with no formatting
     let too_large = || {
-        PptError::new(
+        Error::new(
             std::io::ErrorKind::InvalidInput,
             "ClientTextbox text exceeds the PPT size limit",
         )
@@ -1506,7 +1506,7 @@ fn build_client_textbox_with_interactions(
         &mut ppt_content,
         text_units,
         interactions,
-        crate::PowerPointTextInteractionLimits::default(),
+        crate::TextInteractionLimits::default(),
     )?;
 
     let header = EscherRecordHeader::new(0x0F, 0, 0xF00D, ppt_content.len() as u32);
@@ -1522,15 +1522,15 @@ fn build_client_textbox_with_interactions(
 fn build_client_textbox_formatted(
     paragraphs: &[super::text_format::Paragraph],
     text_type: u32,
-) -> Result<Vec<u8>, PptError> {
+) -> Result<Vec<u8>, Error> {
     build_client_textbox_formatted_with_interactions(paragraphs, text_type, &[])
 }
 
 fn build_client_textbox_formatted_with_interactions(
     paragraphs: &[super::text_format::Paragraph],
     text_type: u32,
-    interactions: &[crate::PowerPointTextInteraction],
-) -> Result<Vec<u8>, PptError> {
+    interactions: &[crate::TextInteraction],
+) -> Result<Vec<u8>, Error> {
     use super::records::{RecordBuilder, record_type as ppt_rt};
     use super::text_format::TextPropsBuilder;
 
@@ -1569,7 +1569,7 @@ fn build_client_textbox_formatted_with_interactions(
         &mut ppt_content,
         text_units,
         interactions,
-        crate::PowerPointTextInteractionLimits::default(),
+        crate::TextInteractionLimits::default(),
     )?;
 
     let header = EscherRecordHeader::new(0x0F, 0, 0xF00D, ppt_content.len() as u32);
@@ -1582,9 +1582,9 @@ fn build_client_textbox_formatted_with_interactions(
 fn append_text_interactions(
     output: &mut Vec<u8>,
     text_units: u32,
-    interactions: &[crate::PowerPointTextInteraction],
-    limits: crate::PowerPointTextInteractionLimits,
-) -> Result<(), PptError> {
+    interactions: &[crate::TextInteraction],
+    limits: crate::TextInteractionLimits,
+) -> Result<(), Error> {
     if interactions.len() > limits.max_interactions {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
@@ -2091,15 +2091,15 @@ mod tests {
 
     #[test]
     fn client_textbox_writes_adjacent_trigger_matched_text_interaction_pairs() {
-        use crate::consts::PptRecordType;
+        use crate::consts::RecordType;
         use crate::{
             Interaction, InteractionAction, InteractionLinkTarget, InteractionTrigger,
-            PowerPointTextInteraction, PowerPointTextRange,
+            TextInteraction, TextRange,
         };
 
         let interactions = [
-            PowerPointTextInteraction::new(
-                PowerPointTextRange::new(0, 1).unwrap(),
+            TextInteraction::new(
+                TextRange::new(0, 1).unwrap(),
                 Interaction::new(
                     InteractionTrigger::Click,
                     InteractionAction::NoAction,
@@ -2107,8 +2107,8 @@ mod tests {
                 ),
             )
             .unwrap(),
-            PowerPointTextInteraction::new(
-                PowerPointTextRange::new(1, 3).unwrap(),
+            TextInteraction::new(
+                TextRange::new(1, 3).unwrap(),
                 Interaction::new(
                     InteractionTrigger::MouseOver,
                     InteractionAction::NoAction,
@@ -2127,10 +2127,10 @@ mod tests {
                 .map(|record| record.record_type)
                 .collect::<Vec<_>>(),
             [
-                PptRecordType::InteractiveInfo,
-                PptRecordType::TextInteractiveInfoAtom,
-                PptRecordType::InteractiveInfo,
-                PptRecordType::TextInteractiveInfoAtom,
+                RecordType::InteractiveInfo,
+                RecordType::TextInteractiveInfoAtom,
+                RecordType::InteractiveInfo,
+                RecordType::TextInteractiveInfoAtom,
             ]
         );
         assert_eq!(tail[1].instance, 0);
@@ -2248,7 +2248,7 @@ mod tests {
         complete.extend_from_slice(&record.len().to_le_bytes());
         complete.extend_from_slice(record.data());
 
-        let client_data = crate::PowerPointClientData::parse(&complete).unwrap();
+        let client_data = crate::ClientData::parse(&complete).unwrap();
         assert!(client_data.animation_info().is_some());
         assert!(client_data.mouse_click_interactive_info().is_some());
         assert!(client_data.mouse_over_interactive_info().is_some());

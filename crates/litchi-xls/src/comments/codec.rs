@@ -1,7 +1,7 @@
 //! BIFF8 comment record linkage and bounded codecs.
 
 use super::model::*;
-use crate::error::{XlsError, XlsResult};
+use crate::error::{Error, Result};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug)]
@@ -87,7 +87,7 @@ impl CommentCollector {
         Self::default()
     }
 
-    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
+    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> Result<()> {
         if matches!(
             record_type,
             OBJ_TYPE | MSODRAWING_TYPE | TXO_TYPE | CONTINUE_TYPE | RECORD_TYPE
@@ -158,7 +158,7 @@ impl CommentCollector {
                 }
                 self.object_ids
                     .try_reserve(1)
-                    .map_err(|_| XlsError::Allocation("retaining OBJ identifiers"))?;
+                    .map_err(|_| Error::Allocation("retaining OBJ identifiers"))?;
                 if !self.object_ids.insert(object_id) {
                     return invalid(format!("duplicate OBJ object id: {object_id}"));
                 }
@@ -170,13 +170,13 @@ impl CommentCollector {
                     }
                     self.comment_guids
                         .try_reserve(1)
-                        .map_err(|_| XlsError::Allocation("retaining comment identities"))?;
+                        .map_err(|_| Error::Allocation("retaining comment identities"))?;
                     if !self.comment_guids.insert(object.identity.guid) {
                         return invalid("duplicate comment FtNts GUID".to_string());
                     }
                     self.objects
                         .try_reserve(1)
-                        .map_err(|_| XlsError::Allocation("retaining worksheet comments"))?;
+                        .map_err(|_| Error::Allocation("retaining worksheet comments"))?;
                     self.objects.insert(object_id, object);
                     self.retain_object_record(object_id, RecordKind::Object, data)?;
                     self.awaiting_drawing = Some(object_id);
@@ -186,7 +186,7 @@ impl CommentCollector {
                 let mut note = parse_note_record(data)?;
                 self.note_cells
                     .try_reserve(1)
-                    .map_err(|_| XlsError::Allocation("retaining NOTE cell identities"))?;
+                    .map_err(|_| Error::Allocation("retaining NOTE cell identities"))?;
                 if !self.note_cells.insert((note.row, note.column)) {
                     return invalid(format!(
                         "duplicate NOTE for cell ({}, {})",
@@ -195,7 +195,7 @@ impl CommentCollector {
                 }
                 self.note_object_ids
                     .try_reserve(1)
-                    .map_err(|_| XlsError::Allocation("retaining NOTE object identities"))?;
+                    .map_err(|_| Error::Allocation("retaining NOTE object identities"))?;
                 if !self.note_object_ids.insert(note.object_id) {
                     return invalid(format!(
                         "duplicate NOTE object reference: {}",
@@ -211,7 +211,7 @@ impl CommentCollector {
                 note.order = self.take_order()?;
                 self.notes
                     .try_reserve(1)
-                    .map_err(|_| XlsError::Allocation("retaining worksheet NOTE records"))?;
+                    .map_err(|_| Error::Allocation("retaining worksheet NOTE records"))?;
                 self.notes.push(note);
             },
             _ => {},
@@ -219,19 +219,19 @@ impl CommentCollector {
         Ok(())
     }
 
-    fn reserve_retained(&mut self, byte_count: usize) -> XlsResult<()> {
+    fn reserve_retained(&mut self, byte_count: usize) -> Result<()> {
         if byte_count > MAX_RECORD_BYTES {
             return invalid("comment record payload exceeds the BIFF8 record bound".to_string());
         }
         let records = self
             .retained_records
             .checked_add(1)
-            .ok_or_else(|| XlsError::InvalidData("comment record count overflow".to_string()))?;
+            .ok_or_else(|| Error::InvalidData("comment record count overflow".to_string()))?;
         if records > MAX_RETAINED_RECORDS {
             return invalid("retained comment record count exceeds the safety bound".to_string());
         }
         let bytes = self.retained_bytes.checked_add(byte_count).ok_or_else(|| {
-            XlsError::InvalidData("retained comment byte count overflow".to_string())
+            Error::InvalidData("retained comment byte count overflow".to_string())
         })?;
         if bytes > MAX_RETAINED_BYTES {
             return invalid("retained comment bytes exceed the safety bound".to_string());
@@ -241,12 +241,12 @@ impl CommentCollector {
         Ok(())
     }
 
-    fn take_order(&mut self) -> XlsResult<usize> {
+    fn take_order(&mut self) -> Result<usize> {
         let order = self.next_order;
         self.next_order = self
             .next_order
             .checked_add(1)
-            .ok_or_else(|| XlsError::InvalidData("comment record order overflow".to_string()))?;
+            .ok_or_else(|| Error::InvalidData("comment record order overflow".to_string()))?;
         Ok(order)
     }
 
@@ -255,29 +255,29 @@ impl CommentCollector {
         object_id: u16,
         kind: RecordKind,
         data: &[u8],
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         self.reserve_retained(data.len())?;
         let record = CommentRecord::new(kind, data)?;
         let order = self.take_order()?;
         let object = self.objects.get_mut(&object_id).ok_or_else(|| {
-            XlsError::InvalidData(format!(
+            Error::InvalidData(format!(
                 "comment record references unknown object {object_id}"
             ))
         })?;
         object
             .records
             .try_reserve(1)
-            .map_err(|_| XlsError::Allocation("retaining comment record order"))?;
+            .map_err(|_| Error::Allocation("retaining comment record order"))?;
         object.records.push(OrderedRecord { order, record });
         Ok(())
     }
 
-    fn complete_txo(&mut self, pending: PendingTxo) -> XlsResult<()> {
+    fn complete_txo(&mut self, pending: PendingTxo) -> Result<()> {
         let text = String::from_utf16(&pending.code_units)
-            .map_err(|_| XlsError::InvalidData("TXO text contains invalid UTF-16".to_string()))?;
+            .map_err(|_| Error::InvalidData("TXO text contains invalid UTF-16".to_string()))?;
         let runs = parse_txo_runs(&pending.run_bytes, pending.character_count as u16)?;
         let object = self.objects.get_mut(&pending.object_id).ok_or_else(|| {
-            XlsError::InvalidData(format!(
+            Error::InvalidData(format!(
                 "TXO references unknown comment object {}",
                 pending.object_id
             ))
@@ -294,7 +294,7 @@ impl CommentCollector {
         Ok(())
     }
 
-    pub(crate) fn finish(self) -> XlsResult<Vec<Comment>> {
+    pub(crate) fn finish(self) -> Result<Vec<Comment>> {
         if self.awaiting_drawing.is_some()
             || self.awaiting_txo.is_some()
             || self.pending_txo.is_some()
@@ -311,19 +311,19 @@ impl CommentCollector {
         let mut comments = Vec::new();
         comments
             .try_reserve_exact(self.notes.len())
-            .map_err(|_| XlsError::Allocation("finishing worksheet comments"))?;
+            .map_err(|_| Error::Allocation("finishing worksheet comments"))?;
         for note in self.notes {
             let object = self.objects.get(&note.object_id).ok_or_else(|| {
-                XlsError::InvalidData(format!(
+                Error::InvalidData(format!(
                     "NOTE references missing comment OBJ {}",
                     note.object_id
                 ))
             })?;
             let text = object.text.as_deref().ok_or_else(|| {
-                XlsError::InvalidData(format!("comment OBJ {} has no TXO", note.object_id))
+                Error::InvalidData(format!("comment OBJ {} has no TXO", note.object_id))
             })?;
             let text_properties = object.text_properties.as_ref().ok_or_else(|| {
-                XlsError::InvalidData(format!(
+                Error::InvalidData(format!(
                     "comment OBJ {} has no TXO properties",
                     note.object_id
                 ))
@@ -334,10 +334,10 @@ impl CommentCollector {
                 .records
                 .len()
                 .checked_add(1)
-                .ok_or_else(|| XlsError::Allocation("ordering comment records"))?;
+                .ok_or_else(|| Error::Allocation("ordering comment records"))?;
             ordered
                 .try_reserve_exact(capacity)
-                .map_err(|_| XlsError::Allocation("ordering comment records"))?;
+                .map_err(|_| Error::Allocation("ordering comment records"))?;
             ordered.extend(object.records.iter().map(|value| OrderedRecord {
                 order: value.order,
                 record: value.record.clone(),
@@ -350,19 +350,19 @@ impl CommentCollector {
             let mut records = Vec::new();
             records
                 .try_reserve_exact(ordered.len())
-                .map_err(|_| XlsError::Allocation("finishing comment record order"))?;
+                .map_err(|_| Error::Allocation("finishing comment record order"))?;
             records.extend(ordered.into_iter().map(|value| value.record));
 
             let mut text_runs = Vec::new();
             text_runs
                 .try_reserve_exact(object.text_runs.len())
-                .map_err(|_| XlsError::Allocation("finishing comment text runs"))?;
+                .map_err(|_| Error::Allocation("finishing comment text runs"))?;
             text_runs.extend_from_slice(&object.text_runs);
 
             let mut subrecords = Vec::new();
             subrecords
                 .try_reserve_exact(object.subrecords.len())
-                .map_err(|_| XlsError::Allocation("finishing OBJ subrecords"))?;
+                .map_err(|_| Error::Allocation("finishing OBJ subrecords"))?;
             subrecords.extend(object.subrecords.iter().cloned());
 
             comments.push(Comment {
@@ -387,7 +387,7 @@ impl CommentCollector {
     }
 }
 
-pub(crate) fn parse_note_record(data: &[u8]) -> XlsResult<NoteRecord> {
+pub(crate) fn parse_note_record(data: &[u8]) -> Result<NoteRecord> {
     if data.len() < 13 {
         return invalid(format!("NOTE payload is too short: {}", data.len()));
     }
@@ -411,10 +411,10 @@ pub(crate) fn parse_note_record(data: &[u8]) -> XlsResult<NoteRecord> {
     let width = if string_flags & 1 == 0 { 1 } else { 2 };
     let byte_count = character_count
         .checked_mul(width)
-        .ok_or_else(|| XlsError::InvalidData("NOTE author size overflow".to_string()))?;
+        .ok_or_else(|| Error::InvalidData("NOTE author size overflow".to_string()))?;
     let expected = 12usize
         .checked_add(byte_count)
-        .ok_or_else(|| XlsError::InvalidData("NOTE size overflow".to_string()))?;
+        .ok_or_else(|| Error::InvalidData("NOTE size overflow".to_string()))?;
     if data.len() != expected {
         return invalid(format!(
             "NOTE payload length must be {expected}, got {}",
@@ -444,7 +444,7 @@ pub(crate) fn parse_note_record(data: &[u8]) -> XlsResult<NoteRecord> {
     })
 }
 
-fn parse_cmo(data: &[u8]) -> XlsResult<ObjectProperties> {
+fn parse_cmo(data: &[u8]) -> Result<ObjectProperties> {
     if data.len() < 22 {
         return invalid(format!(
             "OBJ payload is too short for FtCmo: {}",
@@ -462,7 +462,7 @@ fn parse_cmo(data: &[u8]) -> XlsResult<ObjectProperties> {
     })
 }
 
-fn parse_obj(data: &[u8]) -> XlsResult<Option<CommentObject>> {
+fn parse_obj(data: &[u8]) -> Result<Option<CommentObject>> {
     let properties = parse_cmo(data)?;
     if properties.object_type != COMMENT_OBJECT_TYPE {
         return Ok(None);
@@ -475,7 +475,7 @@ fn parse_obj(data: &[u8]) -> XlsResult<Option<CommentObject>> {
     let mut subrecords = Vec::new();
     subrecords
         .try_reserve(4)
-        .map_err(|_| XlsError::Allocation("retaining OBJ subrecords"))?;
+        .map_err(|_| Error::Allocation("retaining OBJ subrecords"))?;
     let mut padding = ObjectPadding::new(&[])?;
     let mut found_end = false;
     while position < data.len() {
@@ -488,14 +488,14 @@ fn parse_obj(data: &[u8]) -> XlsResult<Option<CommentObject>> {
         let body_start = position + 4;
         let end = body_start
             .checked_add(size)
-            .ok_or_else(|| XlsError::InvalidData("OBJ subrecord size overflow".to_string()))?;
+            .ok_or_else(|| Error::InvalidData("OBJ subrecord size overflow".to_string()))?;
         let body = data
             .get(body_start..end)
-            .ok_or_else(|| XlsError::InvalidData("truncated OBJ subrecord".to_string()))?;
+            .ok_or_else(|| Error::InvalidData("truncated OBJ subrecord".to_string()))?;
         let known = sub_type == 0 || sub_type == 0x000D;
         subrecords
             .try_reserve(1)
-            .map_err(|_| XlsError::Allocation("retaining OBJ subrecords"))?;
+            .map_err(|_| Error::Allocation("retaining OBJ subrecords"))?;
         subrecords.push(ObjectSubrecord::new(sub_type, body, known)?);
         position = end;
         if sub_type == 0 && size == 0 {
@@ -526,7 +526,7 @@ fn parse_obj(data: &[u8]) -> XlsResult<Option<CommentObject>> {
     }
     Ok(Some(CommentObject {
         identity: identity
-            .ok_or_else(|| XlsError::InvalidData("comment OBJ is missing FtNts".to_string()))?,
+            .ok_or_else(|| Error::InvalidData("comment OBJ is missing FtNts".to_string()))?,
         properties,
         subrecords,
         padding,
@@ -537,7 +537,7 @@ fn parse_obj(data: &[u8]) -> XlsResult<Option<CommentObject>> {
     }))
 }
 
-fn parse_txo(data: &[u8], object_id: u16) -> XlsResult<PendingTxo> {
+fn parse_txo(data: &[u8], object_id: u16) -> Result<PendingTxo> {
     if data.len() < 18 {
         return invalid(format!("TXO payload is too short: {}", data.len()));
     }
@@ -568,7 +568,7 @@ fn parse_txo(data: &[u8], object_id: u16) -> XlsResult<PendingTxo> {
     }
     let expected = 18usize
         .checked_add(formula_size)
-        .ok_or_else(|| XlsError::InvalidData("TXO formula size overflow".to_string()))?;
+        .ok_or_else(|| Error::InvalidData("TXO formula size overflow".to_string()))?;
     if data.len() != expected {
         return invalid(format!(
             "TXO payload length must be {expected}, got {}",
@@ -578,11 +578,11 @@ fn parse_txo(data: &[u8], object_id: u16) -> XlsResult<PendingTxo> {
     let mut code_units = Vec::new();
     code_units
         .try_reserve_exact(character_count)
-        .map_err(|_| XlsError::Allocation("retaining TXO text"))?;
+        .map_err(|_| Error::Allocation("retaining TXO text"))?;
     let mut run_bytes = Vec::new();
     run_bytes
         .try_reserve_exact(run_byte_count)
-        .map_err(|_| XlsError::Allocation("retaining TXO formatting runs"))?;
+        .map_err(|_| Error::Allocation("retaining TXO formatting runs"))?;
     Ok(PendingTxo {
         object_id,
         character_count,
@@ -626,11 +626,11 @@ fn vertical_alignment(value: u8) -> VerticalAlignment {
     }
 }
 
-fn feed_txo_continue(pending: &mut PendingTxo, data: &[u8]) -> XlsResult<bool> {
+fn feed_txo_continue(pending: &mut PendingTxo, data: &[u8]) -> Result<bool> {
     if pending.code_units.len() < pending.character_count {
         let (&flags, characters) = data
             .split_first()
-            .ok_or_else(|| XlsError::InvalidData("empty TXO text CONTINUE".to_string()))?;
+            .ok_or_else(|| Error::InvalidData("empty TXO text CONTINUE".to_string()))?;
         let wide = flags & 1 != 0;
         if wide && characters.len() % 2 != 0 {
             return invalid("TXO UTF-16 segment has an odd byte length".to_string());
@@ -644,7 +644,7 @@ fn feed_txo_continue(pending: &mut PendingTxo, data: &[u8]) -> XlsResult<bool> {
             pending
                 .code_units
                 .try_reserve(segment_count)
-                .map_err(|_| XlsError::Allocation("retaining TXO text"))?;
+                .map_err(|_| Error::Allocation("retaining TXO text"))?;
             pending.code_units.extend(
                 characters
                     .chunks_exact(2)
@@ -654,7 +654,7 @@ fn feed_txo_continue(pending: &mut PendingTxo, data: &[u8]) -> XlsResult<bool> {
             pending
                 .code_units
                 .try_reserve(segment_count)
-                .map_err(|_| XlsError::Allocation("retaining TXO text"))?;
+                .map_err(|_| Error::Allocation("retaining TXO text"))?;
             pending
                 .code_units
                 .extend(characters.iter().map(|&byte| u16::from(byte)));
@@ -669,12 +669,12 @@ fn feed_txo_continue(pending: &mut PendingTxo, data: &[u8]) -> XlsResult<bool> {
     pending
         .run_bytes
         .try_reserve(data.len())
-        .map_err(|_| XlsError::Allocation("retaining TXO formatting runs"))?;
+        .map_err(|_| Error::Allocation("retaining TXO formatting runs"))?;
     pending.run_bytes.extend_from_slice(data);
     Ok(pending.run_bytes.len() == pending.run_byte_count)
 }
 
-pub(crate) fn parse_txo_runs(data: &[u8], character_count: u16) -> XlsResult<Vec<TextRun>> {
+pub(crate) fn parse_txo_runs(data: &[u8], character_count: u16) -> Result<Vec<TextRun>> {
     if data.is_empty() {
         return Ok(Vec::new());
     }
@@ -684,7 +684,7 @@ pub(crate) fn parse_txo_runs(data: &[u8], character_count: u16) -> XlsResult<Vec
     let run_count = data.len() / 8 - 1;
     let mut runs = Vec::new();
     runs.try_reserve_exact(run_count)
-        .map_err(|_| XlsError::Allocation("retaining TXO formatting runs"))?;
+        .map_err(|_| Error::Allocation("retaining TXO formatting runs"))?;
     for index in 0..run_count {
         let offset = index * 8;
         let character_index = u16_at(data, offset)?;
@@ -705,50 +705,50 @@ pub(crate) fn parse_txo_runs(data: &[u8], character_count: u16) -> XlsResult<Vec
     Ok(runs)
 }
 
-fn decode_unicode(data: &[u8], wide: bool) -> XlsResult<String> {
+fn decode_unicode(data: &[u8], wide: bool) -> Result<String> {
     if wide {
         let mut words = Vec::new();
         words
             .try_reserve_exact(data.len() / 2)
-            .map_err(|_| XlsError::Allocation("decoding comment UTF-16 text"))?;
+            .map_err(|_| Error::Allocation("decoding comment UTF-16 text"))?;
         words.extend(
             data.chunks_exact(2)
                 .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]])),
         );
         String::from_utf16(&words)
-            .map_err(|_| XlsError::InvalidData("NOTE author contains invalid UTF-16".to_string()))
+            .map_err(|_| Error::InvalidData("NOTE author contains invalid UTF-16".to_string()))
     } else {
         let mut value = String::new();
         value
             .try_reserve(data.len())
-            .map_err(|_| XlsError::Allocation("decoding comment compressed text"))?;
+            .map_err(|_| Error::Allocation("decoding comment compressed text"))?;
         value.extend(data.iter().map(|&byte| char::from(byte)));
         Ok(value)
     }
 }
 
-fn clone_string(value: &str, context: &'static str) -> XlsResult<String> {
+fn clone_string(value: &str, context: &'static str) -> Result<String> {
     let mut copy = String::new();
     copy.try_reserve_exact(value.len())
-        .map_err(|_| XlsError::Allocation(context))?;
+        .map_err(|_| Error::Allocation(context))?;
     copy.push_str(value);
     Ok(copy)
 }
 
-fn u16_at(data: &[u8], offset: usize) -> XlsResult<u16> {
+fn u16_at(data: &[u8], offset: usize) -> Result<u16> {
     let bytes = data
         .get(offset..offset + 2)
-        .ok_or_else(|| XlsError::InvalidData("truncated comment record".to_string()))?;
+        .ok_or_else(|| Error::InvalidData("truncated comment record".to_string()))?;
     Ok(u16::from_le_bytes(bytes.try_into().unwrap()))
 }
 
-fn u32_at(data: &[u8], offset: usize) -> XlsResult<u32> {
+fn u32_at(data: &[u8], offset: usize) -> Result<u32> {
     let bytes = data
         .get(offset..offset + 4)
-        .ok_or_else(|| XlsError::InvalidData("truncated comment record".to_string()))?;
+        .ok_or_else(|| Error::InvalidData("truncated comment record".to_string()))?;
     Ok(u32::from_le_bytes(bytes.try_into().unwrap()))
 }
 
-fn invalid<T>(message: String) -> XlsResult<T> {
-    Err(XlsError::InvalidData(message))
+fn invalid<T>(message: String) -> Result<T> {
+    Err(Error::InvalidData(message))
 }

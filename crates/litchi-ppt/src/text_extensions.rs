@@ -2,8 +2,8 @@
 
 use litchi_core::binary::{read_i16_le, read_u16_le, read_u32_le};
 
-use super::package::{PptError, Result};
-use super::records::PptRecord;
+use super::package::{Error, Result};
+use super::records::Record;
 
 /// PowerPoint 9 paragraph extensions from `TextPFException9`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,7 +28,7 @@ impl TextParagraphExtension9 {
         require_bytes(data, 0, 4, "TextPFException9 mask")?;
         let mask = read_u32_le(data, 0).unwrap_or(0);
         if mask & !0x0380_0000 != 0 {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "TextPFException9 has unsupported paragraph mask bits".to_string(),
             ));
         }
@@ -38,7 +38,7 @@ impl TextParagraphExtension9 {
             require_bytes(data, offset, 2, "TextPFException9 bulletBlipRef")?;
             let value = read_i16_le(data, offset).unwrap_or(0);
             if value < -1 {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "TextPFException9 has an invalid picture-bullet reference".to_string(),
                 ));
             }
@@ -55,7 +55,7 @@ impl TextParagraphExtension9 {
                 0 => Some(false),
                 1 => Some(true),
                 _ => {
-                    return Err(PptError::Corrupted(
+                    return Err(Error::Corrupted(
                         "TextPFException9 has an invalid auto-number flag".to_string(),
                     ));
                 },
@@ -68,12 +68,12 @@ impl TextParagraphExtension9 {
             let scheme = read_u16_le(data, offset).unwrap_or(0);
             let start = read_i16_le(data, offset + 2).unwrap_or(0);
             if scheme > 0x0028 {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "TextPFException9 has an invalid auto-number scheme".to_string(),
                 ));
             }
             if start < 1 {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "TextPFException9 auto-number start must be positive".to_string(),
                 ));
             }
@@ -126,7 +126,7 @@ impl TextCharacterExtension9 {
         // Bits 3, 6, 8, 14, and 15 are undefined fields that readers ignore.
         // All other fields except pp10ext MUST be zero in TextCFException9.
         if mask & !0x0010_c148 != 0 {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "TextCFException9 has unsupported character mask bits".to_string(),
             ));
         }
@@ -171,7 +171,7 @@ impl TextSpecialInfoExtension9 {
         // StyleTextProp9 forbids spell, language, alternate language, and smart
         // tags. Bits 3, 4, and 7 are undefined and are ignored.
         if mask & !0x0000_00f8 != 0 {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "StyleTextProp9 has unsupported special-info mask bits".to_string(),
             ));
         }
@@ -185,7 +185,7 @@ impl TextSpecialInfoExtension9 {
                 0 => Some(false),
                 1 => Some(true),
                 _ => {
-                    return Err(PptError::Corrupted(
+                    return Err(Error::Corrupted(
                         "StyleTextProp9 has an invalid bidi flag".to_string(),
                     ));
                 },
@@ -198,7 +198,7 @@ impl TextSpecialInfoExtension9 {
             require_bytes(data, offset, 4, "StyleTextProp9 PP10 text extension")?;
             let value = read_u32_le(data, offset).unwrap_or(0);
             if value & 0x7fff_fff0 != 0 {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "StyleTextProp9 PP10 text extension has reserved bits".to_string(),
                 ));
             }
@@ -282,7 +282,7 @@ impl TextCharacterExtension10 {
         // Bits 3, 6, 8, 14, and 15 are undefined fields that readers ignore.
         // Only the three PowerPoint 10 fields may otherwise be set.
         if mask & !0x0700_c148 != 0 {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "TextCFException10 has unsupported character mask bits".to_string(),
             ));
         }
@@ -352,7 +352,7 @@ impl TextSpecialInfoExtension11 {
         // StyleTextProp11 permits only smart tags. Bits 3, 4, and 7 are
         // undefined and ignored; all other TextSIException fields MUST be zero.
         if mask & !0x0000_0298 != 0 {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "StyleTextProp11 has unsupported special-info mask bits".to_string(),
             ));
         }
@@ -363,10 +363,10 @@ impl TextSpecialInfoExtension11 {
             let count = read_u32_le(data, offset).unwrap_or(0);
             offset += 4;
             let count = usize::try_from(count).map_err(|_| {
-                PptError::Corrupted("StyleTextProp11 smart-tag count overflow".to_string())
+                Error::Corrupted("StyleTextProp11 smart-tag count overflow".to_string())
             })?;
             let byte_count = count.checked_mul(4).ok_or_else(|| {
-                PptError::Corrupted("StyleTextProp11 smart-tag size overflow".to_string())
+                Error::Corrupted("StyleTextProp11 smart-tag size overflow".to_string())
             })?;
             require_bytes(
                 data,
@@ -436,7 +436,7 @@ impl TextMasterStyleExtension9 {
         require_bytes(data, 0, 2, "TextMasterStyle9Atom level count")?;
         let level_count = read_u16_le(data, 0).unwrap_or(0);
         if level_count > 5 {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "TextMasterStyle9Atom has more than five levels".to_string(),
             ));
         }
@@ -453,7 +453,7 @@ impl TextMasterStyleExtension9 {
             });
         }
         if offset != data.len() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "TextMasterStyle9Atom has trailing bytes".to_string(),
             ));
         }
@@ -477,7 +477,7 @@ impl TextMasterStyleExtension10 {
         require_bytes(data, 0, 2, "TextMasterStyle10Atom level count")?;
         let level_count = read_u16_le(data, 0).unwrap_or(0);
         if level_count > 5 {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "TextMasterStyle10Atom has more than five levels".to_string(),
             ));
         }
@@ -489,7 +489,7 @@ impl TextMasterStyleExtension10 {
             levels.push(level);
         }
         if offset != data.len() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "TextMasterStyle10Atom has trailing bytes".to_string(),
             ));
         }
@@ -512,7 +512,7 @@ impl TextDefaultsExtension9 {
         let (character, consumed) = TextCharacterExtension9::parse_prefix(data)?;
         let (paragraph, paragraph_size) = TextParagraphExtension9::parse_prefix(&data[consumed..])?;
         if consumed + paragraph_size != data.len() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "TextDefaults9Atom has trailing bytes".to_string(),
             ));
         }
@@ -535,7 +535,7 @@ impl TextDefaultsExtension10 {
     pub fn parse(data: &[u8]) -> Result<Self> {
         let (character, consumed) = TextCharacterExtension10::parse_prefix(data)?;
         if consumed != data.len() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "TextDefaults10Atom has trailing bytes".to_string(),
             ));
         }
@@ -547,7 +547,7 @@ fn validate_text_type(text_type: u16, record: &str) -> Result<()> {
     if matches!(text_type, 0 | 1 | 2 | 4 | 5 | 6 | 7 | 8) {
         Ok(())
     } else {
-        Err(PptError::Corrupted(format!(
+        Err(Error::Corrupted(format!(
             "{record} has an invalid TextTypeEnum instance"
         )))
     }
@@ -564,10 +564,10 @@ pub struct VersionedTextMasterStyles {
 
 impl VersionedTextMasterStyles {
     /// Collect and parse all versioned master-style atoms below `root`.
-    pub fn parse(root: &PptRecord) -> Result<Self> {
+    pub fn parse(root: &Record) -> Result<Self> {
         let mut result = Self::default();
         for record in root.versioned_binary_tag_records(9)? {
-            if record.record_type != crate::consts::PptRecordType::TextMasterStyle9Atom {
+            if record.record_type != crate::consts::RecordType::TextMasterStyle9Atom {
                 continue;
             }
             validate_atom_header(&record, "TextMasterStyle9Atom", false)?;
@@ -577,7 +577,7 @@ impl VersionedTextMasterStyles {
             )?);
         }
         for record in root.versioned_binary_tag_records(10)? {
-            if record.record_type != crate::consts::PptRecordType::TextMasterStyle10Atom {
+            if record.record_type != crate::consts::RecordType::TextMasterStyle10Atom {
                 continue;
             }
             validate_atom_header(&record, "TextMasterStyle10Atom", false)?;
@@ -601,10 +601,10 @@ pub struct VersionedTextDefaults {
 
 impl VersionedTextDefaults {
     /// Collect and parse document-level text-default atoms below `root`.
-    pub fn parse(root: &PptRecord) -> Result<Self> {
+    pub fn parse(root: &Record) -> Result<Self> {
         let mut result = Self::default();
         for record in root.versioned_binary_tag_records(9)? {
-            if record.record_type != crate::consts::PptRecordType::TextDefaults9Atom {
+            if record.record_type != crate::consts::RecordType::TextDefaults9Atom {
                 continue;
             }
             validate_atom_header(&record, "TextDefaults9Atom", true)?;
@@ -613,13 +613,13 @@ impl VersionedTextDefaults {
                 .replace(TextDefaultsExtension9::parse(&record.data)?)
                 .is_some()
             {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "Record tree contains multiple TextDefaults9Atom records".to_string(),
                 ));
             }
         }
         for record in root.versioned_binary_tag_records(10)? {
-            if record.record_type != crate::consts::PptRecordType::TextDefaults10Atom {
+            if record.record_type != crate::consts::RecordType::TextDefaults10Atom {
                 continue;
             }
             validate_atom_header(&record, "TextDefaults10Atom", true)?;
@@ -628,7 +628,7 @@ impl VersionedTextDefaults {
                 .replace(TextDefaultsExtension10::parse(&record.data)?)
                 .is_some()
             {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "Record tree contains multiple TextDefaults10Atom records".to_string(),
                 ));
             }
@@ -637,9 +637,9 @@ impl VersionedTextDefaults {
     }
 }
 
-fn validate_atom_header(record: &PptRecord, name: &str, zero_instance: bool) -> Result<()> {
+fn validate_atom_header(record: &Record, name: &str, zero_instance: bool) -> Result<()> {
     if record.version != 0 || zero_instance && record.instance != 0 {
-        return Err(PptError::Corrupted(format!(
+        return Err(Error::Corrupted(format!(
             "{name} has an invalid record header"
         )));
     }
@@ -664,9 +664,9 @@ fn read_optional_u16(
 fn require_bytes(data: &[u8], offset: usize, size: usize, field: &str) -> Result<()> {
     let end = offset
         .checked_add(size)
-        .ok_or_else(|| PptError::Corrupted(format!("{field} offset overflow")))?;
+        .ok_or_else(|| Error::Corrupted(format!("{field} offset overflow")))?;
     if end > data.len() {
-        return Err(PptError::Corrupted(format!("Truncated {field}")));
+        return Err(Error::Corrupted(format!("Truncated {field}")));
     }
     Ok(())
 }
@@ -684,7 +684,7 @@ mod tests {
         data
     }
 
-    fn prog_tags_record(version: u8, blob_payload: &[u8]) -> PptRecord {
+    fn prog_tags_record(version: u8, blob_payload: &[u8]) -> Record {
         let tag_name: Vec<u8> = format!("___PPT{version}")
             .encode_utf16()
             .flat_map(u16::to_le_bytes)
@@ -694,8 +694,8 @@ mod tests {
         let mut tag_payload = name;
         tag_payload.extend_from_slice(&blob);
         let tag = ppt_record_bytes(0x0f, 0, 0x138a, &tag_payload);
-        PptRecord {
-            record_type: crate::consts::PptRecordType::ProgTags,
+        Record {
+            record_type: crate::consts::RecordType::ProgTags,
             record_type_raw: 0x1388,
             version: 0x0f,
             instance: 0,
@@ -943,8 +943,8 @@ mod tests {
         ppt10_blob.extend_from_slice(&ppt_record_bytes(0, 5, 4018, &0u16.to_le_bytes()));
         ppt10_blob.extend_from_slice(&ppt_record_bytes(0, 0, 4020, &[0; 4]));
 
-        let root = PptRecord {
-            record_type: crate::consts::PptRecordType::Document,
+        let root = Record {
+            record_type: crate::consts::RecordType::Document,
             record_type_raw: 1000,
             version: 0x0f,
             instance: 0,

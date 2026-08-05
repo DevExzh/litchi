@@ -1,14 +1,14 @@
 use std::io::Cursor;
 
-use litchi_xls::XlsWorkbook;
-use litchi_xls::writer::{XlsPageSetupOptions, XlsWriter};
-use litchi_xls::{XlsPrintComments, XlsPrintErrors, XlsPrintOrder, XlsPrintOrientation};
+use litchi_xls::Workbook;
+use litchi_xls::writer::{PageSetupOptions, Writer};
+use litchi_xls::{PrintComments, PrintErrors, PrintOrder, PrintOrientation};
 
 #[test]
 fn page_settings_round_trip_with_breaks_and_continued_pls() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Print").unwrap();
-    let options = XlsPageSetupOptions {
+    let options = PageSetupOptions {
         print_headers: true,
         print_gridlines: true,
         header: "&L报告&Cpage &P".to_string(),
@@ -24,12 +24,12 @@ fn page_settings_round_trip_with_breaks_and_continued_pls() {
         starting_page_number: Some(3),
         fit_width_pages: 2,
         fit_height_pages: 3,
-        print_order: XlsPrintOrder::OverThenDown,
-        orientation: Some(XlsPrintOrientation::Landscape),
+        print_order: PrintOrder::OverThenDown,
+        orientation: Some(PrintOrientation::Landscape),
         black_and_white: true,
         draft_quality: true,
-        comments: XlsPrintComments::AtEnd,
-        errors: XlsPrintErrors::Dashes,
+        comments: PrintComments::AtEnd,
+        errors: PrintErrors::Dashes,
         horizontal_resolution_dpi: 300,
         vertical_resolution_dpi: 600,
         header_margin_inches: 0.3,
@@ -45,7 +45,7 @@ fn page_settings_round_trip_with_breaks_and_continued_pls() {
 
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
     let page = workbook.xls_worksheet(0).unwrap().page_setup().unwrap();
 
     assert!(page.print_headers());
@@ -59,25 +59,22 @@ fn page_settings_round_trip_with_breaks_and_continued_pls() {
     assert_eq!(page.print_setup().paper_size(), Some(9));
     assert_eq!(page.print_setup().scale_percent(), Some(85));
     assert_eq!(page.print_setup().starting_page_number(), Some(3));
-    assert_eq!(
-        page.print_setup().print_order(),
-        XlsPrintOrder::OverThenDown
-    );
+    assert_eq!(page.print_setup().print_order(), PrintOrder::OverThenDown);
     assert_eq!(
         page.print_setup().orientation(),
-        Some(XlsPrintOrientation::Landscape)
+        Some(PrintOrientation::Landscape)
     );
-    assert_eq!(page.print_setup().comments(), XlsPrintComments::AtEnd);
-    assert_eq!(page.print_setup().errors(), XlsPrintErrors::Dashes);
+    assert_eq!(page.print_setup().comments(), PrintComments::AtEnd);
+    assert_eq!(page.print_setup().errors(), PrintErrors::Dashes);
 }
 
 #[test]
 fn writer_rejects_invalid_dimensions_and_breaks() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Print").unwrap();
-    let invalid = XlsPageSetupOptions {
+    let invalid = PageSetupOptions {
         left_margin_inches: f64::NAN,
-        ..XlsPageSetupOptions::default()
+        ..PageSetupOptions::default()
     };
     assert!(writer.set_page_setup(sheet, invalid).is_err());
     assert!(writer.add_horizontal_page_break(sheet, 1, 4, 4).is_err());

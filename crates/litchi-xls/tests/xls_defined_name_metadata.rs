@@ -3,10 +3,10 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 use litchi_cfb::OleFile;
-use litchi_xls::writer::{XlsDefinedNameRecordOptions, XlsFunctionGroupOptions, XlsWriter};
+use litchi_xls::writer::{DefinedNameRecordOptions, FunctionGroupOptions, Writer};
 use litchi_xls::{
-    XlsBuiltInFunctionCategories, XlsDefinedNameFutureRecords, XlsDefinedNameKind, XlsNameFnGrp12,
-    XlsNamePublish, XlsNameScope, XlsWorkbook,
+    BuiltInFunctionCategories, DefinedNameFutureRecords, DefinedNameKind, NameFnGrp12, NamePublish,
+    NameScope, Workbook,
 };
 
 fn fixture(name: &str) -> PathBuf {
@@ -16,21 +16,21 @@ fn fixture(name: &str) -> PathBuf {
 }
 
 fn future_record_file() -> Vec<u8> {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     writer.add_worksheet("Sheet1").unwrap();
     let categories = (0..19).map(|index| format!("Category{index}")).collect();
     writer
-        .set_function_groups(XlsFunctionGroupOptions {
-            built_in: XlsBuiltInFunctionCategories::Fourteen,
+        .set_function_groups(FunctionGroupOptions {
+            built_in: BuiltInFunctionCategories::Fourteen,
             custom_categories: categories,
         })
         .unwrap();
     writer
         .add_defined_name_record_with_future_records(
-            XlsDefinedNameRecordOptions {
+            DefinedNameRecordOptions {
                 name: "ΣRate".to_string(),
-                kind: XlsDefinedNameKind::User,
-                scope: XlsNameScope::Workbook,
+                kind: DefinedNameKind::User,
+                scope: NameScope::Workbook,
                 hidden: true,
                 function: true,
                 vba_procedure: false,
@@ -48,12 +48,12 @@ fn future_record_file() -> Vec<u8> {
                 status_bar: String::new(),
                 comment: Some("x".to_string()),
             },
-            XlsDefinedNameFutureRecords {
-                function_group: Some(XlsNameFnGrp12 {
+            DefinedNameFutureRecords {
+                function_group: Some(NameFnGrp12 {
                     function_name: "σRate".to_string(),
                     category: 32,
                 }),
-                publication: Some(XlsNamePublish {
+                publication: Some(NamePublish {
                     published: false,
                     workbook_parameter: true,
                     name: "σRate".to_string(),
@@ -102,16 +102,16 @@ fn replace_group(file: &[u8], old: &[u8], new: &[u8]) -> Vec<u8> {
 
 #[test]
 fn rich_name_and_comment_round_trip_as_inert_metadata() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     writer.add_worksheet("Sheet1").unwrap();
     writer
         .define_name_with_comment("Rate", "A1", "Unicode \u{7a0e}\u{7387}")
         .unwrap();
     writer
-        .add_defined_name_record(XlsDefinedNameRecordOptions {
+        .add_defined_name_record(DefinedNameRecordOptions {
             name: "MacroCommand".to_string(),
-            kind: XlsDefinedNameKind::User,
-            scope: XlsNameScope::Workbook,
+            kind: DefinedNameKind::User,
+            scope: NameScope::Workbook,
             hidden: true,
             function: false,
             vba_procedure: true,
@@ -135,17 +135,17 @@ fn rich_name_and_comment_round_trip_as_inert_metadata() {
         .collect::<Vec<_>>();
     categories[18] = "Extended".to_string();
     writer
-        .set_function_groups(XlsFunctionGroupOptions {
-            built_in: XlsBuiltInFunctionCategories::Fourteen,
+        .set_function_groups(FunctionGroupOptions {
+            built_in: BuiltInFunctionCategories::Fourteen,
             custom_categories: categories,
         })
         .unwrap();
     writer
         .add_defined_name_record_with_future_records(
-            XlsDefinedNameRecordOptions {
+            DefinedNameRecordOptions {
                 name: "ΣRate".to_string(),
-                kind: XlsDefinedNameKind::User,
-                scope: XlsNameScope::Workbook,
+                kind: DefinedNameKind::User,
+                scope: NameScope::Workbook,
                 hidden: false,
                 function: true,
                 vba_procedure: false,
@@ -163,12 +163,12 @@ fn rich_name_and_comment_round_trip_as_inert_metadata() {
                 status_bar: String::new(),
                 comment: Some("x".to_string()),
             },
-            XlsDefinedNameFutureRecords {
-                function_group: Some(XlsNameFnGrp12 {
+            DefinedNameFutureRecords {
+                function_group: Some(NameFnGrp12 {
                     function_name: "σRate".to_string(),
                     category: 32,
                 }),
-                publication: Some(XlsNamePublish {
+                publication: Some(NamePublish {
                     published: true,
                     workbook_parameter: true,
                     name: "σRate".to_string(),
@@ -179,7 +179,7 @@ fn rich_name_and_comment_round_trip_as_inert_metadata() {
 
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
     assert_eq!(workbook.defined_names().len(), 1);
     assert_eq!(
         workbook.defined_names()[0].comment.as_deref(),
@@ -209,7 +209,7 @@ fn rich_name_and_comment_round_trip_as_inert_metadata() {
 
 #[test]
 fn reads_poi_unicode_names_and_formula_extra() {
-    let workbook = XlsWorkbook::new(File::open(fixture("testNames.xls")).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(fixture("testNames.xls")).unwrap()).unwrap();
     assert_eq!(workbook.defined_name_records().len(), 8);
     assert!(workbook.defined_name_records()[1].is_macro());
     let array_name = workbook
@@ -219,7 +219,7 @@ fn reads_poi_unicode_names_and_formula_extra() {
         .unwrap();
     assert!(!array_name.formula_extra.is_empty());
 
-    let workbook = XlsWorkbook::new(File::open(fixture("unicodeNameRecord.xls")).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(fixture("unicodeNameRecord.xls")).unwrap()).unwrap();
     assert!(
         workbook
             .defined_name_records()
@@ -230,20 +230,20 @@ fn reads_poi_unicode_names_and_formula_extra() {
 
 #[test]
 fn poi_name_comment_corpus_round_trips_through_rich_inert_options() {
-    let source = XlsWorkbook::new(File::open(fixture("53109.xls")).unwrap()).unwrap();
+    let source = Workbook::new(File::open(fixture("53109.xls")).unwrap()).unwrap();
     let name = source
         .defined_name_records()
         .iter()
         .find(|name| name.comment.is_some() && !name.is_macro())
         .unwrap();
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     for index in 0..source.sheets().len() {
         writer
             .add_worksheet(&format!("Sheet{}", index + 1))
             .unwrap();
     }
     writer
-        .add_defined_name_record(XlsDefinedNameRecordOptions {
+        .add_defined_name_record(DefinedNameRecordOptions {
             name: name.name.clone(),
             kind: name.kind,
             scope: name.scope,
@@ -267,7 +267,7 @@ fn poi_name_comment_corpus_round_trips_through_rich_inert_options() {
         .unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let reparsed = XlsWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+    let reparsed = Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let round_tripped = &reparsed.defined_name_records()[0];
     assert_eq!(round_tripped.name, name.name);
     assert_eq!(round_tripped.comment, name.comment);
@@ -300,9 +300,8 @@ fn exact_future_records_reject_malformed_order_cardinality_names_headers_and_con
     group.extend_from_slice(comment);
     group.extend_from_slice(function);
     group.extend_from_slice(publish);
-    let parses = |replacement: &[u8]| {
-        XlsWorkbook::new(Cursor::new(replace_group(&file, &group, replacement)))
-    };
+    let parses =
+        |replacement: &[u8]| Workbook::new(Cursor::new(replace_group(&file, &group, replacement)));
     let mut out_of_order = Vec::new();
     out_of_order.extend_from_slice(function);
     out_of_order.extend_from_slice(comment);
@@ -343,10 +342,10 @@ fn exact_future_records_reject_malformed_order_cardinality_names_headers_and_con
 
 #[test]
 fn future_record_writer_enforces_caps_names_and_emitted_category_references() {
-    let options = || XlsDefinedNameRecordOptions {
+    let options = || DefinedNameRecordOptions {
         name: "Fn".to_string(),
-        kind: XlsDefinedNameKind::User,
-        scope: XlsNameScope::Workbook,
+        kind: DefinedNameKind::User,
+        scope: NameScope::Workbook,
         hidden: false,
         function: true,
         vba_procedure: false,
@@ -364,14 +363,14 @@ fn future_record_writer_enforces_caps_names_and_emitted_category_references() {
         status_bar: String::new(),
         comment: None,
     };
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     writer.add_worksheet("Sheet1").unwrap();
     assert!(
         writer
             .add_defined_name_record_with_future_records(
                 options(),
-                XlsDefinedNameFutureRecords {
-                    function_group: Some(XlsNameFnGrp12 {
+                DefinedNameFutureRecords {
+                    function_group: Some(NameFnGrp12 {
                         function_name: "Fn".to_string(),
                         category: 31
                     }),
@@ -384,9 +383,9 @@ fn future_record_writer_enforces_caps_names_and_emitted_category_references() {
         writer
             .add_defined_name_record_with_future_records(
                 options(),
-                XlsDefinedNameFutureRecords {
+                DefinedNameFutureRecords {
                     function_group: None,
-                    publication: Some(XlsNamePublish {
+                    publication: Some(NamePublish {
                         published: false,
                         workbook_parameter: false,
                         name: "X".repeat(256)
@@ -398,8 +397,8 @@ fn future_record_writer_enforces_caps_names_and_emitted_category_references() {
     writer
         .add_defined_name_record_with_future_records(
             options(),
-            XlsDefinedNameFutureRecords {
-                function_group: Some(XlsNameFnGrp12 {
+            DefinedNameFutureRecords {
+                function_group: Some(NameFnGrp12 {
                     function_name: "Fn".to_string(),
                     category: 32,
                 }),

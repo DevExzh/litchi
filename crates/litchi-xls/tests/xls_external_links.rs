@@ -3,20 +3,20 @@ use std::io::Cursor;
 use std::path::PathBuf;
 
 use litchi_xls::writer::{
-    XlsExternalCacheRowOptions, XlsExternalSheetOptions, XlsExternalWorkbookOptions, XlsWriter,
+    ExternalCacheRowOptions, ExternalSheetOptions, ExternalWorkbookOptions, Writer,
 };
-use litchi_xls::{CachedValue, ErrorValue, XlsWorkbook};
+use litchi_xls::{CachedValue, ErrorValue, Workbook};
 
 #[test]
 fn external_workbook_cache_round_trip_is_inert() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     writer.add_worksheet("Local").unwrap();
     writer
-        .add_external_workbook_link(XlsExternalWorkbookOptions {
+        .add_external_workbook_link(ExternalWorkbookOptions {
             encoded_virtual_path: "\u{1}remote-data.xls".to_string(),
-            sheets: vec![XlsExternalSheetOptions {
+            sheets: vec![ExternalSheetOptions {
                 name: "Inputs".to_string(),
-                cache_rows: vec![XlsExternalCacheRowOptions {
+                cache_rows: vec![ExternalCacheRowOptions {
                     row: 7,
                     first_column: 2,
                     values: vec![
@@ -32,7 +32,7 @@ fn external_workbook_cache_round_trip_is_inert() {
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
     let external = workbook
         .external_links()
         .external_workbooks()
@@ -51,7 +51,7 @@ fn external_workbook_cache_round_trip_is_inert() {
 fn reads_poi_and_libreoffice_external_caches() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let poi = root.join("test-data/poi/test-data/spreadsheet/XRefCalc.xls");
-    let workbook = XlsWorkbook::new(File::open(poi).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(poi).unwrap()).unwrap();
     let external = workbook
         .external_links()
         .external_workbooks()
@@ -62,7 +62,7 @@ fn reads_poi_and_libreoffice_external_caches() {
     assert!(!external.sheets()[0].cache_rows().is_empty());
 
     let libreoffice = root.join("test-data/libreoffice-core/sc/qa/unit/data/xls/external-ref.xls");
-    let workbook = XlsWorkbook::new(File::open(libreoffice).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(libreoffice).unwrap()).unwrap();
     let external = workbook
         .external_links()
         .external_workbooks()
@@ -77,10 +77,10 @@ fn reads_poi_and_libreoffice_external_caches() {
 
 #[test]
 fn writer_rejects_external_cache_resource_errors() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     assert!(
         writer
-            .add_external_workbook_link(XlsExternalWorkbookOptions {
+            .add_external_workbook_link(ExternalWorkbookOptions {
                 encoded_virtual_path: String::new(),
                 sheets: vec![],
             })
@@ -88,9 +88,9 @@ fn writer_rejects_external_cache_resource_errors() {
     );
     assert!(
         writer
-            .add_external_workbook_link(XlsExternalWorkbookOptions {
+            .add_external_workbook_link(ExternalWorkbookOptions {
                 encoded_virtual_path: "\u{1}book.xls".to_string(),
-                sheets: vec![XlsExternalSheetOptions {
+                sheets: vec![ExternalSheetOptions {
                     name: "Bad/Name".to_string(),
                     cache_rows: vec![],
                 }],

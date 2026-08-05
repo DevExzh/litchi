@@ -1,7 +1,7 @@
 //! BIFF8 worksheet row and column layout records.
 
-use crate::error::{XlsError, XlsResult};
-use crate::number_format::XlsFormatting;
+use crate::error::{Error, Result};
+use crate::number_format::Formatting;
 use crate::worksheet::layout::DEF_COL_WIDTH_RECORD_TYPE;
 use std::collections::BTreeMap;
 
@@ -18,8 +18,8 @@ pub(crate) const COLINFO_RECORD_TYPE: u16 = 0x007d;
 
 const MAX_COLINFO_RECORDS: usize = 255;
 
-fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(record_type: u16, message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type,
         message: message.into(),
     }
@@ -57,8 +57,8 @@ impl Collector {
         &mut self,
         record_type: u16,
         data: &[u8],
-        formatting: &XlsFormatting,
-    ) -> XlsResult<()> {
+        formatting: &Formatting,
+    ) -> Result<()> {
         if self.saw_default_column_width
             && record_type != COLINFO_RECORD_TYPE
             && record_type != DEF_COL_WIDTH_RECORD_TYPE
@@ -150,7 +150,7 @@ mod tests {
 
     #[test]
     fn collector_enforces_columns_and_sorted_rows() {
-        let formatting = XlsFormatting::default();
+        let formatting = Formatting::default();
         let mut collector = Collector::new();
         assert!(
             collector

@@ -2,19 +2,19 @@
 //!
 //! Based on Apache POI's HSLFSlideShow and QuickButCruddyTextExtractor.
 
-use crate::consts::PptRecordType;
-use crate::package::{PptError, Result};
-use crate::records::PptRecord;
+use crate::consts::RecordType;
+use crate::package::{Error, Result};
+use crate::records::Record;
 
 /// Parser for PPT binary format that extracts document structure and content.
-pub struct PptRecordParser {
+pub struct RecordParser {
     /// All parsed records
-    records: Vec<PptRecord>,
+    records: Vec<Record>,
     /// Slide text organized by SlideAtomsSets (following POI's architecture)
     slide_atoms_sets: Vec<Vec<u8>>,
 }
 
-impl PptRecordParser {
+impl RecordParser {
     /// Create a new PPT record parser.
     pub fn new() -> Self {
         Self {
@@ -37,7 +37,7 @@ impl PptRecordParser {
         // Parse all top-level records
         let mut offset = 0;
         while offset + 8 <= data.len() {
-            match PptRecord::parse(data, offset) {
+            match Record::parse(data, offset) {
                 Ok((record, consumed)) => {
                     self.records.push(record);
                     offset += consumed;
@@ -68,7 +68,7 @@ impl PptRecordParser {
         offsets: &[usize],
     ) -> Result<()> {
         for &offset in offsets {
-            let (record, _) = PptRecord::parse_strict(data, offset)?;
+            let (record, _) = Record::parse_strict(data, offset)?;
             self.records.push(record);
         }
         self.extract_slide_text_from_document()
@@ -99,7 +99,7 @@ impl PptRecordParser {
     }
 
     /// Find a record of a specific type.
-    pub fn find_record(&self, record_type: PptRecordType) -> Option<&PptRecord> {
+    pub fn find_record(&self, record_type: RecordType) -> Option<&Record> {
         self.records
             .iter()
             .find(|record| record.record_type == record_type)
@@ -114,7 +114,7 @@ impl PptRecordParser {
     #[deprecated(note = "Use find_records_ref() instead to avoid expensive cloning")]
     #[allow(dead_code)]
     #[allow(deprecated)]
-    pub fn find_records(&self, _record_type: PptRecordType) -> Vec<PptRecord> {
+    pub fn find_records(&self, _record_type: RecordType) -> Vec<Record> {
         // Collect all records recursively
         let mut all_records = Vec::new();
         Self::collect_records_recursive(&self.records, &mut all_records);
@@ -128,7 +128,7 @@ impl PptRecordParser {
     /// - Zero-copy: returns references instead of cloning records
     /// - Significantly faster than `find_records()` for large presentations
     /// - Preferred method for building persist mappings and iterating records
-    pub fn find_records_ref(&self) -> Vec<&PptRecord> {
+    pub fn find_records_ref(&self) -> Vec<&Record> {
         let mut all_records = Vec::new();
         Self::collect_records_recursive_ref(&self.records, &mut all_records);
         all_records
@@ -143,7 +143,7 @@ impl PptRecordParser {
     #[deprecated(note = "Use collect_records_recursive_ref instead to avoid expensive cloning")]
     #[allow(dead_code)]
     #[allow(deprecated)]
-    fn collect_records_recursive(records: &[PptRecord], collector: &mut Vec<PptRecord>) {
+    fn collect_records_recursive(records: &[Record], collector: &mut Vec<Record>) {
         for record in records {
             collector.push(record.clone());
             if !record.children.is_empty() {
@@ -153,10 +153,7 @@ impl PptRecordParser {
     }
 
     /// Recursively collect all record references including children (zero-copy).
-    fn collect_records_recursive_ref<'a>(
-        records: &'a [PptRecord],
-        collector: &mut Vec<&'a PptRecord>,
-    ) {
+    fn collect_records_recursive_ref<'a>(records: &'a [Record], collector: &mut Vec<&'a Record>) {
         for record in records {
             collector.push(record);
             if !record.children.is_empty() {
@@ -166,7 +163,7 @@ impl PptRecordParser {
     }
 
     /// Find all records matching a specific type (filtered).
-    pub fn filter_records(&self, record_type: PptRecordType) -> impl Iterator<Item = &PptRecord> {
+    pub fn filter_records(&self, record_type: RecordType) -> impl Iterator<Item = &Record> {
         self.records
             .iter()
             .filter(move |record| record.record_type == record_type)
@@ -206,11 +203,11 @@ impl PptRecordParser {
         }
 
         String::from_utf8(slide_data.to_vec())
-            .map_err(|e| PptError::InvalidFormat(format!("Invalid UTF-8 in slide text: {}", e)))
+            .map_err(|e| Error::InvalidFormat(format!("Invalid UTF-8 in slide text: {}", e)))
     }
 }
 
-impl Default for PptRecordParser {
+impl Default for RecordParser {
     fn default() -> Self {
         Self::new()
     }
@@ -222,7 +219,7 @@ mod tests {
 
     #[test]
     fn test_parser_creation() {
-        let parser = PptRecordParser::new();
+        let parser = RecordParser::new();
         assert_eq!(parser.slide_count(), 0);
         assert!(parser.slides().is_empty());
     }

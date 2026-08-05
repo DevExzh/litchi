@@ -1,4 +1,4 @@
-use litchi_ppt::{Package, PowerPointGuideOrientation};
+use litchi_ppt::{GuideOrientation, Package};
 use std::path::Path;
 
 #[test]
@@ -25,14 +25,8 @@ fn apache_poi_slide_view_zoom_and_guides_are_exposed() {
     assert!(zoom.uses_variable_scale());
     assert!(!zoom.is_draft_mode());
     assert_eq!(view.guides().len(), 2);
-    assert_eq!(
-        view.guides()[0].orientation(),
-        PowerPointGuideOrientation::Horizontal
-    );
+    assert_eq!(view.guides()[0].orientation(), GuideOrientation::Horizontal);
     assert_eq!(view.guides()[0].position(), 2160);
-    assert_eq!(
-        view.guides()[1].orientation(),
-        PowerPointGuideOrientation::Vertical
-    );
+    assert_eq!(view.guides()[1].orientation(), GuideOrientation::Vertical);
     assert_eq!(view.guides()[1].position(), 2880);
 }

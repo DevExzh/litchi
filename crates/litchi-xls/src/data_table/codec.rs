@@ -1,7 +1,7 @@
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
 use super::invalid;
-use super::model::{XlsDataTable, XlsDataTableInputCell, XlsDataTableKind, XlsDataTableRange};
+use super::model::{DataTable, DataTableInputCell, DataTableKind, DataTableRange};
 
 /// `PtgTbl` token identifier (MS-XLS 2.5.198.92).
 pub(super) const PTG_TBL: u8 = 0x02;
@@ -17,8 +17,8 @@ const DELETED2: u16 = 0x0020;
 /// Coordinate pair marking a deleted input cell.
 const DELETED_COORDINATE: u16 = 0xFFFF;
 
-impl XlsDataTableInputCell {
-    fn decode(row: u16, col: u16, deleted: bool) -> XlsResult<Self> {
+impl DataTableInputCell {
+    fn decode(row: u16, col: u16, deleted: bool) -> Result<Self> {
         if deleted {
             if row != DELETED_COORDINATE || col != DELETED_COORDINATE {
                 return Err(invalid("deleted input cell must carry the -1 coordinates"));
@@ -38,34 +38,33 @@ impl XlsDataTableInputCell {
     }
 }
 
-impl XlsDataTable {
+impl DataTable {
     /// Parse a `Table` record payload.
-    pub(crate) fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub(crate) fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: PAYLOAD_LEN,
                 found: data.len(),
             });
         }
         let read_u16 = |offset: usize| u16::from_le_bytes([data[offset], data[offset + 1]]);
-        let range = XlsDataTableRange::new(read_u16(0), read_u16(2), data[4], data[5])?;
+        let range = DataTableRange::new(read_u16(0), read_u16(2), data[4], data[5])?;
         let flags = read_u16(6);
         let always_calc = flags & ALWAYS_CALC != 0;
         let row_orientation = flags & ROW_ORIENTATION != 0;
         let two_variable = flags & TWO_VARIABLE != 0;
-        let input1 =
-            XlsDataTableInputCell::decode(read_u16(8), read_u16(10), flags & DELETED1 != 0)?;
+        let input1 = DataTableInputCell::decode(read_u16(8), read_u16(10), flags & DELETED1 != 0)?;
         let kind = if two_variable {
-            XlsDataTableKind::TwoVariable {
+            DataTableKind::TwoVariable {
                 row_input: input1,
-                column_input: XlsDataTableInputCell::decode(
+                column_input: DataTableInputCell::decode(
                     read_u16(12),
                     read_u16(14),
                     flags & DELETED2 != 0,
                 )?,
             }
         } else {
-            XlsDataTableKind::OneVariable {
+            DataTableKind::OneVariable {
                 input: input1,
                 ignored_coordinates: (read_u16(12), read_u16(14)),
                 ignored_deleted2: flags & DELETED2 != 0,
@@ -89,12 +88,12 @@ impl XlsDataTable {
             flags |= ROW_ORIENTATION;
         }
         let (input1, input2, deleted2) = match &self.kind {
-            XlsDataTableKind::OneVariable {
+            DataTableKind::OneVariable {
                 input,
                 ignored_coordinates,
                 ignored_deleted2,
             } => (*input, *ignored_coordinates, *ignored_deleted2),
-            XlsDataTableKind::TwoVariable {
+            DataTableKind::TwoVariable {
                 row_input,
                 column_input,
             } => {

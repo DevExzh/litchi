@@ -5,7 +5,7 @@
 //!     cargo run -p litchi-xls --example read_xls -- path/to/file.xls
 
 use litchi_core::sheet::{CellValue, WorkbookTrait, Worksheet as _};
-use litchi_xls::XlsWorkbook;
+use litchi_xls::Workbook;
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Opening XLS: {}", path);
 
     let reader = File::open(&path)?;
-    let workbook = XlsWorkbook::new(reader)?;
+    let workbook = Workbook::new(reader)?;
 
     println!("\n=== Workbook ===");
     println!("Worksheet count : {}", workbook.worksheet_count());

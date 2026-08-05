@@ -1,20 +1,23 @@
 /// Package implementation for legacy PowerPoint presentations (.ppt).
 use super::presentation::Presentation;
 use litchi_cfb::{OleError, OleFile};
+use litchi_ole_common::property_set::{
+    PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
+};
 use std::fs::File;
 use std::io::{self, Read, Seek};
 use std::path::Path;
 
 /// Options controlling how a legacy PowerPoint presentation is opened.
 #[derive(Debug, Clone, Copy, Default)]
-pub struct PptOpenOptions<'a> {
+pub struct OpenOptions<'a> {
     /// Password used for password-to-open encryption.
     pub password: Option<&'a str>,
 }
 
 /// Password-to-open encryption schemes identified in a PPT file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PptEncryptionKind {
+pub enum EncryptionKind {
     /// Office Binary Document RC4 CryptoAPI encryption.
     CryptoApi,
     /// An encryption version not recognized by this implementation.
@@ -23,7 +26,7 @@ pub enum PptEncryptionKind {
 
 /// Error types for PPT file parsing.
 #[derive(Debug)]
-pub enum PptError {
+pub enum Error {
     /// IO error
     Io(io::Error),
     /// OLE file error
@@ -43,60 +46,60 @@ pub enum PptError {
     /// The supplied password did not validate.
     InvalidPassword,
     /// The presentation uses a recognized but unsupported encryption scheme.
-    UnsupportedEncryption(PptEncryptionKind),
+    UnsupportedEncryption(EncryptionKind),
     /// The clear encryption bootstrap or header is malformed.
     MalformedEncryptionHeader(String),
 }
 
-impl From<io::Error> for PptError {
+impl From<io::Error> for Error {
     fn from(err: io::Error) -> Self {
-        PptError::Io(err)
+        Error::Io(err)
     }
 }
 
-impl From<OleError> for PptError {
+impl From<OleError> for Error {
     fn from(err: OleError) -> Self {
-        PptError::Ole(err)
+        Error::Ole(err)
     }
 }
 
-impl From<litchi_odraw::Error> for PptError {
+impl From<litchi_odraw::Error> for Error {
     fn from(err: litchi_odraw::Error) -> Self {
-        PptError::OfficeArt(err)
+        Error::OfficeArt(err)
     }
 }
 
-impl From<litchi_ograph::Error> for PptError {
+impl From<litchi_ograph::Error> for Error {
     fn from(err: litchi_ograph::Error) -> Self {
         Self::Graph(err)
     }
 }
 
-impl std::fmt::Display for PptError {
+impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PptError::Io(e) => write!(f, "IO error: {}", e),
-            PptError::Ole(e) => write!(f, "OLE error: {}", e),
-            PptError::OfficeArt(e) => write!(f, "OfficeArt error: {e}"),
-            PptError::Graph(e) => write!(f, "Office Graph error: {e}"),
-            PptError::InvalidFormat(s) => write!(f, "Invalid format: {}", s),
-            PptError::StreamNotFound(s) => write!(f, "Stream not found: {}", s),
-            PptError::Corrupted(s) => write!(f, "Corrupted file: {}", s),
-            PptError::PasswordRequired => {
+            Error::Io(e) => write!(f, "IO error: {}", e),
+            Error::Ole(e) => write!(f, "OLE error: {}", e),
+            Error::OfficeArt(e) => write!(f, "OfficeArt error: {e}"),
+            Error::Graph(e) => write!(f, "Office Graph error: {e}"),
+            Error::InvalidFormat(s) => write!(f, "Invalid format: {}", s),
+            Error::StreamNotFound(s) => write!(f, "Stream not found: {}", s),
+            Error::Corrupted(s) => write!(f, "Corrupted file: {}", s),
+            Error::PasswordRequired => {
                 write!(f, "a password is required to open this presentation")
             },
-            PptError::InvalidPassword => write!(f, "the presentation password is invalid"),
-            PptError::UnsupportedEncryption(kind) => {
+            Error::InvalidPassword => write!(f, "the presentation password is invalid"),
+            Error::UnsupportedEncryption(kind) => {
                 write!(f, "unsupported PPT encryption: {kind:?}")
             },
-            PptError::MalformedEncryptionHeader(s) => {
+            Error::MalformedEncryptionHeader(s) => {
                 write!(f, "malformed PPT encryption header: {s}")
             },
         }
     }
 }
 
-impl std::error::Error for PptError {
+impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Io(error) => Some(error),
@@ -115,7 +118,7 @@ impl std::error::Error for PptError {
 }
 
 /// Result type for PPT operations.
-pub type Result<T> = std::result::Result<T, PptError>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 const POWERPOINT_DOCUMENT_STREAM: &[&str] = &["PowerPoint Document"];
 
@@ -124,7 +127,7 @@ fn validate_powerpoint_document_stream<R: Read + Seek>(ole: &OleFile<R>) -> Resu
         return Ok(());
     }
 
-    Err(PptError::InvalidFormat(
+    Err(Error::InvalidFormat(
         "Not a valid PowerPoint document: PowerPoint Document stream not found or is not a stream"
             .to_string(),
     ))
@@ -248,10 +251,7 @@ impl<R: Read + Seek> Package<R> {
     }
 
     /// Get the main presentation using explicit password-to-open options.
-    pub fn presentation_with_options(
-        &mut self,
-        options: PptOpenOptions<'_>,
-    ) -> Result<Presentation> {
+    pub fn presentation_with_options(&mut self, options: OpenOptions<'_>) -> Result<Presentation> {
         Presentation::from_ole_with_options(&mut self.ole, options)
     }
 
@@ -270,7 +270,7 @@ impl<R: Read + Seek> Package<R> {
         litchi_ole_common::custom_xml::inspect(&mut self.ole)
     }
 
-    pub fn summary_information(&mut self) -> Result<Option<litchi_cfb::Stream>> {
+    pub fn summary_information(&mut self) -> Result<Option<Stream>> {
         match self
             .ole
             .property_set_stream(&["\u{0005}SummaryInformation"])
@@ -295,7 +295,7 @@ impl<R: Read + Seek> Package<R> {
         litchi_sign::cfb::verify(&mut self.ole, litchi_sign::cfb::Format::Ppt, policy)
     }
 
-    pub fn document_summary_information(&mut self) -> Result<Option<litchi_cfb::Stream>> {
+    pub fn document_summary_information(&mut self) -> Result<Option<Stream>> {
         match self
             .ole
             .property_set_stream(&["\u{0005}DocumentSummaryInformation"])
@@ -306,42 +306,40 @@ impl<R: Read + Seek> Package<R> {
         }
     }
 
-    pub fn user_defined_properties(&mut self) -> Result<Option<litchi_cfb::Section>> {
-        Ok(self.document_summary_information()?.and_then(|stream| {
-            stream
-                .section(litchi_cfb::USER_DEFINED_PROPERTIES_FMTID)
-                .cloned()
-        }))
+    pub fn user_defined_properties(&mut self) -> Result<Option<Section>> {
+        Ok(self
+            .document_summary_information()?
+            .and_then(|stream| stream.section(USER_DEFINED_PROPERTIES_FMTID).cloned()))
     }
 }
 
-// `From<PptError> for litchi_core::Error` lives here (not in the umbrella) so
+// `From<Error> for litchi_core::Error` lives here (not in the umbrella) so
 // the orphan rule is satisfied — both source and target crates are external
 // to the umbrella.
-impl From<PptError> for litchi_core::Error {
-    fn from(err: PptError) -> Self {
+impl From<Error> for litchi_core::Error {
+    fn from(err: Error) -> Self {
         match err {
-            PptError::Io(e) => litchi_core::Error::Io(e),
-            PptError::Ole(ole_err) => litchi_core::Error::from(ole_err),
-            PptError::OfficeArt(error) => {
+            Error::Io(e) => litchi_core::Error::Io(e),
+            Error::Ole(ole_err) => litchi_core::Error::from(ole_err),
+            Error::OfficeArt(error) => {
                 litchi_core::Error::CorruptedFile(format!("Invalid OfficeArt data: {error}"))
             },
-            PptError::Graph(error) => {
+            Error::Graph(error) => {
                 litchi_core::Error::CorruptedFile(format!("Invalid Office Graph data: {error}"))
             },
-            PptError::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
-            PptError::StreamNotFound(s) => litchi_core::Error::ComponentNotFound(s),
-            PptError::Corrupted(s) => litchi_core::Error::CorruptedFile(s),
-            PptError::PasswordRequired => {
+            Error::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
+            Error::StreamNotFound(s) => litchi_core::Error::ComponentNotFound(s),
+            Error::Corrupted(s) => litchi_core::Error::CorruptedFile(s),
+            Error::PasswordRequired => {
                 litchi_core::Error::InvalidFormat("presentation password is required".to_string())
             },
-            PptError::InvalidPassword => {
+            Error::InvalidPassword => {
                 litchi_core::Error::InvalidFormat("invalid presentation password".to_string())
             },
-            PptError::UnsupportedEncryption(kind) => {
+            Error::UnsupportedEncryption(kind) => {
                 litchi_core::Error::InvalidFormat(format!("unsupported PPT encryption: {kind:?}"))
             },
-            PptError::MalformedEncryptionHeader(s) => litchi_core::Error::CorruptedFile(s),
+            Error::MalformedEncryptionHeader(s) => litchi_core::Error::CorruptedFile(s),
         }
     }
 }
@@ -384,14 +382,14 @@ mod tests {
         let from_reader = Package::from_reader(Cursor::new(bytes.clone()));
         assert!(matches!(
             from_reader,
-            Err(PptError::InvalidFormat(message)) if message.contains("is not a stream")
+            Err(Error::InvalidFormat(message)) if message.contains("is not a stream")
         ));
 
         let ole = OleFile::open(Cursor::new(bytes)).unwrap();
         let from_ole_file = Package::from_ole_file(ole);
         assert!(matches!(
             from_ole_file,
-            Err(PptError::InvalidFormat(message)) if message.contains("is not a stream")
+            Err(Error::InvalidFormat(message)) if message.contains("is not a stream")
         ));
     }
 

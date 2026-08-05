@@ -12,13 +12,11 @@
 //! cargo run --example xlsb_test_comprehensive_features --features ooxml --no-default-features
 //! ```
 
-use litchi::ooxml::xlsb::conditional_formatting::{
-    CfRuleType, Cfvo, ColorScale, ConditionalFormatting, ConditionalFormattingRule,
-};
+use litchi::ooxml::xlsb::conditional_formatting::{Formatting, Rule, RuleType, Scale, Value};
 use litchi::ooxml::xlsb::data_validation::Validation;
 use litchi::ooxml::xlsb::hyperlinks::Hyperlink;
 use litchi::ooxml::xlsb::merged_cells::MergedCell;
-use litchi::ooxml::xlsb::named_ranges::{NamedRange, create_area3d_formula};
+use litchi::ooxml::xlsb::named_ranges::{Definition, area3d_formula};
 use litchi::ooxml::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use litchi::sheet::CellValue;
 use std::fs::File;
@@ -111,42 +109,42 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // === CONDITIONAL FORMATTING ===
     // Color scale for achievement percentage
-    let mut cf_achievement = ConditionalFormatting::new(vec!["D4:D8".to_string()]);
-    let mut rule_achievement = ConditionalFormattingRule::new(CfRuleType::ColorScale, 1);
-    let min_cfvo = Cfvo::new(1, Some("80".to_string()));
-    let max_cfvo = Cfvo::new(2, Some("120".to_string()));
-    let color_scale = ColorScale::new(min_cfvo, max_cfvo, 0x0000FF, 0x00FF00);
+    let mut cf_achievement = Formatting::new(vec!["D4:D8".to_string()]);
+    let mut rule_achievement = Rule::new(RuleType::ColorScale, 1);
+    let min_cfvo = Value::new(1, Some("80".to_string()));
+    let max_cfvo = Value::new(2, Some("120".to_string()));
+    let color_scale = Scale::new(min_cfvo, max_cfvo, 0x0000FF, 0x00FF00);
 
     rule_achievement.color_scale = Some(color_scale);
-    cf_achievement.rules.push(rule_achievement);
+    cf_achievement.add_rule(rule_achievement);
     sheet.add_conditional_formatting(cf_achievement);
 
     // Highlight sales above target
-    let mut cf_sales = ConditionalFormatting::new(vec!["B4:B8".to_string()]);
-    let mut rule_sales = ConditionalFormattingRule::new(CfRuleType::CellIs, 2);
+    let mut cf_sales = Formatting::new(vec!["B4:B8".to_string()]);
+    let mut rule_sales = Rule::new(RuleType::CellIs, 2);
     rule_sales.operator = Some(5); // Greater than
     rule_sales.formula_texts = vec!["C4".to_string()]; // Compare with target
     rule_sales.dxf_id = Some(0);
-    cf_sales.rules.push(rule_sales);
+    cf_sales.add_rule(rule_sales);
     sheet.add_conditional_formatting(cf_sales);
 
     workbook.add_worksheet(sheet);
 
     // === NAMED RANGES ===
     // Define named range for sales data B4:B8 (rows 3-7, col 1, 0-indexed)
-    let sales_formula = create_area3d_formula(0, 3, 7, 1, 1)?;
-    let sales_range = NamedRange::new("SalesData".to_string(), Some(0)).with_formula(sales_formula);
+    let sales_formula = area3d_formula(0, 3, 7, 1, 1)?;
+    let sales_range = Definition::new("SalesData".to_string(), Some(0)).with_formula(sales_formula);
     workbook.add_named_range(sales_range);
 
     // Define named range for targets C4:C8 (rows 3-7, col 2, 0-indexed)
-    let targets_formula = create_area3d_formula(0, 3, 7, 2, 2)?;
+    let targets_formula = area3d_formula(0, 3, 7, 2, 2)?;
     let targets_range =
-        NamedRange::new("Targets".to_string(), Some(0)).with_formula(targets_formula);
+        Definition::new("Targets".to_string(), Some(0)).with_formula(targets_formula);
     workbook.add_named_range(targets_range);
 
     // Global named range for entire data area A3:F8 (rows 2-7, cols 0-5)
-    let total_formula = create_area3d_formula(0, 2, 7, 0, 5)?;
-    let total_range = NamedRange::new("GrandTotal".to_string(), None).with_formula(total_formula);
+    let total_formula = area3d_formula(0, 2, 7, 0, 5)?;
+    let total_range = Definition::new("GrandTotal".to_string(), None).with_formula(total_formula);
     workbook.add_named_range(total_range);
 
     let file = File::create("xlsb_test_comprehensive_features.xlsb")?;

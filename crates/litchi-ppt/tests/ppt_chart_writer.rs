@@ -1,7 +1,7 @@
 use std::io::Cursor;
 
 use litchi_ppt::Package;
-use litchi_ppt::writer::{Chart, ChartKind, Hyperlink, PptWriteError, PptWriter, Table};
+use litchi_ppt::writer::{Chart, ChartKind, Hyperlink, Table, WriteError, Writer};
 
 fn chart(kind: ChartKind) -> Chart {
     let mut chart = Chart::new(kind);
@@ -13,15 +13,15 @@ fn chart(kind: ChartKind) -> Chart {
     chart
 }
 
-fn write_to_bytes(writer: &mut PptWriter) -> Vec<u8> {
+fn write_to_bytes(writer: &mut Writer) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).expect("write presentation");
     output.into_inner()
 }
 
-fn assert_unsupported(result: Result<(), PptWriteError>) {
+fn assert_unsupported(result: Result<(), WriteError>) {
     match result {
-        Err(PptWriteError::Graph(litchi_ograph::Error::UnsupportedAuthoring { reason })) => {
+        Err(WriteError::Graph(litchi_ograph::Error::UnsupportedAuthoring { reason })) => {
             assert!(!reason.is_empty());
         },
         Err(error) => panic!("expected typed unsupported-authoring error, found {error}"),
@@ -31,7 +31,7 @@ fn assert_unsupported(result: Result<(), PptWriteError>) {
 
 #[test]
 fn valid_chart_requests_are_typed_atomic_refusals() {
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
     let slide = writer.add_slide().expect("add slide");
     writer
         .add_textbox(slide, 40, 10, 300, 30, "Sales report")
@@ -69,24 +69,24 @@ fn valid_chart_requests_are_typed_atomic_refusals() {
 
 #[test]
 fn malformed_chart_requests_still_report_input_errors() {
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
     let slide = writer.add_slide().expect("add slide");
 
     assert!(matches!(
         writer.add_chart(slide, 0, 0, 100, 100, Chart::new(ChartKind::Bar)),
-        Err(PptWriteError::InvalidData(_))
+        Err(WriteError::InvalidData(_))
     ));
     assert!(matches!(
         writer.add_chart(slide, 0, 0, 0, 100, chart(ChartKind::Bar)),
-        Err(PptWriteError::InvalidData(_))
+        Err(WriteError::InvalidData(_))
     ));
     assert!(matches!(
         writer.add_chart(slide, i32::MAX, 0, 1, 100, chart(ChartKind::Bar)),
-        Err(PptWriteError::InvalidData(_))
+        Err(WriteError::InvalidData(_))
     ));
     assert!(matches!(
         writer.add_chart(9, 0, 0, 100, 100, chart(ChartKind::Bar)),
-        Err(PptWriteError::InvalidData(_))
+        Err(WriteError::InvalidData(_))
     ));
 }
 
@@ -95,10 +95,10 @@ fn chart_builder_rejects_invalid_series_before_authoring() {
     let mut chart = Chart::new(ChartKind::Line);
     assert!(matches!(
         chart.add_series(None::<String>, Vec::new()),
-        Err(PptWriteError::InvalidData(_))
+        Err(WriteError::InvalidData(_))
     ));
     assert!(matches!(
         chart.add_series(None::<String>, vec![f64::NAN]),
-        Err(PptWriteError::InvalidData(_))
+        Err(WriteError::InvalidData(_))
     ));
 }

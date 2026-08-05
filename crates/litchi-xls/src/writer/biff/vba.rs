@@ -1,4 +1,4 @@
-use crate::XlsResult;
+use crate::Result;
 use crate::vba::{
     CODE_NAME_RECORD_TYPE, OB_NO_MACROS_RECORD_TYPE, OB_PROJ_RECORD_TYPE, validate_code_name,
 };
@@ -10,13 +10,13 @@ const MARKER_RECORD_LEN: u16 = 0;
 /// `cch` plus the option byte that precede a `CodeName` string's characters.
 const CODE_NAME_HEADER_LEN: u16 = 3;
 
-pub(crate) fn write_ob_proj<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(crate) fn write_ob_proj<W: Write>(writer: &mut W) -> Result<()> {
     write_record_header(writer, OB_PROJ_RECORD_TYPE, MARKER_RECORD_LEN)
 }
-pub(crate) fn write_ob_no_macros<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(crate) fn write_ob_no_macros<W: Write>(writer: &mut W) -> Result<()> {
     write_record_header(writer, OB_NO_MACROS_RECORD_TYPE, MARKER_RECORD_LEN)
 }
-pub(crate) fn write_code_name<W: Write>(writer: &mut W, value: &str) -> XlsResult<()> {
+pub(crate) fn write_code_name<W: Write>(writer: &mut W, value: &str) -> Result<()> {
     validate_code_name(value)?;
     let count = value.encode_utf16().count() as u16;
     let wide = !value.chars().all(|character| u32::from(character) <= 0xFF);

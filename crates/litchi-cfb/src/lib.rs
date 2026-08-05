@@ -15,14 +15,9 @@
 pub mod consts;
 mod directory_name;
 mod file;
-pub mod metadata;
 pub mod writer;
 
 pub use file::{DirectoryEntry, OleError, OleFile, is_ole_file};
-pub use metadata::{
-    CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Editor, Guid, Metadata,
-    SUMMARY_INFORMATION_FMTID, Section, Standard, Stream, USER_DEFINED_PROPERTIES_FMTID, Value,
-};
 pub use writer::OleWriter;
 
 #[cfg(test)]

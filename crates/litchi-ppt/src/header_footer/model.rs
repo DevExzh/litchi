@@ -1,6 +1,6 @@
 //! Semantic PowerPoint header/footer metadata.
 
-use crate::package::{PptError, Result};
+use crate::package::{Error, Result};
 
 /// A validated PowerPoint datetime format identifier.
 ///
@@ -8,9 +8,9 @@ use crate::package::{PptError, Result};
 /// is permitted by `HeadersFootersAtom`, although producers are advised not to
 /// emit it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct PowerPointDateTimeFormatId(u8);
+pub struct DateTimeFormatId(u8);
 
-impl PowerPointDateTimeFormatId {
+impl DateTimeFormatId {
     /// Lowest valid format identifier.
     pub const MIN: u8 = 0;
     /// Highest valid format identifier.
@@ -19,7 +19,7 @@ impl PowerPointDateTimeFormatId {
     /// Construct a validated format identifier.
     pub fn new(value: u8) -> Result<Self> {
         if value > Self::MAX {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "header/footer datetime format ID is outside 0..=13".to_string(),
             ));
         }
@@ -33,29 +33,29 @@ impl PowerPointDateTimeFormatId {
     }
 }
 
-impl Default for PowerPointDateTimeFormatId {
+impl Default for DateTimeFormatId {
     fn default() -> Self {
         Self(Self::MIN)
     }
 }
 
-impl TryFrom<u8> for PowerPointDateTimeFormatId {
-    type Error = PptError;
+impl TryFrom<u8> for DateTimeFormatId {
+    type Error = Error;
 
     fn try_from(value: u8) -> Result<Self> {
         Self::new(value)
     }
 }
 
-impl From<PowerPointDateTimeFormatId> for u8 {
-    fn from(value: PowerPointDateTimeFormatId) -> Self {
+impl From<DateTimeFormatId> for u8 {
+    fn from(value: DateTimeFormatId) -> Self {
         value.get()
     }
 }
 
 /// The direct parent of a local header/footer container.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum PowerPointHeaderFooterParent {
+pub enum HeaderFooterParent {
     /// A presentation slide.
     Slide,
     /// A main-master slide.
@@ -64,9 +64,9 @@ pub enum PowerPointHeaderFooterParent {
 
 /// A zero-based ordinal among parents of the same kind in record order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct PowerPointHeaderFooterParentOrdinal(pub(super) usize);
+pub struct HeaderFooterParentOrdinal(pub(super) usize);
 
-impl PowerPointHeaderFooterParentOrdinal {
+impl HeaderFooterParentOrdinal {
     /// Construct an ordinal from a zero-based parent index.
     #[inline]
     pub const fn new(value: usize) -> Self {
@@ -82,7 +82,7 @@ impl PowerPointHeaderFooterParentOrdinal {
 
 /// The specification-defined scope of a header/footer container.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum PowerPointHeaderFooterScope {
+pub enum HeaderFooterScope {
     /// Presentation-wide defaults for ordinary slides.
     PresentationSlides,
     /// Presentation-wide defaults for notes pages and handouts.
@@ -90,17 +90,17 @@ pub enum PowerPointHeaderFooterScope {
     /// Overrides or defaults attached directly to one slide or main master.
     Local {
         /// Kind of direct parent.
-        parent: PowerPointHeaderFooterParent,
+        parent: HeaderFooterParent,
         /// Parent ordinal in PowerPoint record order.
-        parent_ordinal: PowerPointHeaderFooterParentOrdinal,
+        parent_ordinal: HeaderFooterParentOrdinal,
     },
 }
 
 /// Display options stored by `HeadersFootersAtom`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct PowerPointHeaderFooterOptions {
+pub struct HeaderFooterOptions {
     /// Locale-dependent datetime format identifier.
-    pub datetime_format: PowerPointDateTimeFormatId,
+    pub datetime_format: DateTimeFormatId,
     /// Display a date placeholder.
     pub show_date: bool,
     /// Use the current date and time.
@@ -122,7 +122,7 @@ pub struct PowerPointHeaderFooterOptions {
 /// in placeholders while leaving the corresponding CString atoms absent. This
 /// view is kept separate so record-local serialization remains lossless.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct PowerPointHeaderFooterDisplayText {
+pub struct HeaderFooterDisplayText {
     /// Custom date text visible through a datetime placeholder.
     pub user_date: Option<String>,
     /// Header text visible through a header placeholder.
@@ -137,20 +137,20 @@ pub struct PowerPointHeaderFooterDisplayText {
 /// Office 2007 binary presentations can inherit document-level options while
 /// storing slide-specific text only in placeholder shapes.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointScopedHeaderFooterDisplayText {
+pub struct ScopedHeaderFooterDisplayText {
     /// Slide, master, or document-level scope of the placeholder text.
-    pub scope: PowerPointHeaderFooterScope,
+    pub scope: HeaderFooterScope,
     /// Inert text extracted from placeholder shapes.
-    pub text: PowerPointHeaderFooterDisplayText,
+    pub text: HeaderFooterDisplayText,
 }
 
 /// Typed, inert metadata from one PowerPoint header/footer container.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointHeaderFooter {
+pub struct HeaderFooter {
     /// Container scope and parent association.
-    pub scope: PowerPointHeaderFooterScope,
+    pub scope: HeaderFooterScope,
     /// Display and datetime-format options.
-    pub options: PowerPointHeaderFooterOptions,
+    pub options: HeaderFooterOptions,
     /// Optional custom date text.
     pub user_date: Option<String>,
     /// Optional notes/handout header text.
@@ -159,10 +159,10 @@ pub struct PowerPointHeaderFooter {
     pub footer: Option<String>,
     /// Optional text derived from inert placeholders. This is never serialized
     /// into the record-local CString fields.
-    pub placeholder_display: Option<PowerPointHeaderFooterDisplayText>,
+    pub placeholder_display: Option<HeaderFooterDisplayText>,
 }
 
-impl PowerPointHeaderFooter {
+impl HeaderFooter {
     /// Return visible custom-date text, preferring an attached Office 2007
     /// placeholder and otherwise using the stored UserDateAtom.
     pub fn display_user_date(&self) -> Option<&str> {
@@ -193,16 +193,16 @@ impl PowerPointHeaderFooter {
 
 /// All strictly located header/footer containers in a presentation.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct PowerPointHeaderFooters {
-    pub(super) entries: Vec<PowerPointHeaderFooter>,
-    pub(super) placeholder_displays: Vec<PowerPointScopedHeaderFooterDisplayText>,
+pub struct HeaderFooters {
+    pub(super) entries: Vec<HeaderFooter>,
+    pub(super) placeholder_displays: Vec<ScopedHeaderFooterDisplayText>,
     pub(super) placeholder_display_bytes: usize,
 }
 
-impl PowerPointHeaderFooters {
+impl HeaderFooters {
     /// Return entries in PowerPoint record order.
     #[inline]
-    pub fn entries(&self) -> &[PowerPointHeaderFooter] {
+    pub fn entries(&self) -> &[HeaderFooter] {
         &self.entries
     }
 
@@ -211,15 +211,15 @@ impl PowerPointHeaderFooters {
     /// Unlike [`Self::entries`], these values are not necessarily backed by a
     /// local `RT_HeadersFooters` record and cannot be serialized as one.
     #[inline]
-    pub fn placeholder_displays(&self) -> &[PowerPointScopedHeaderFooterDisplayText] {
+    pub fn placeholder_displays(&self) -> &[ScopedHeaderFooterDisplayText] {
         &self.placeholder_displays
     }
 
     /// Return placeholder-derived display text for an exact scope.
     pub fn placeholder_display(
         &self,
-        scope: PowerPointHeaderFooterScope,
-    ) -> Option<&PowerPointHeaderFooterDisplayText> {
+        scope: HeaderFooterScope,
+    ) -> Option<&HeaderFooterDisplayText> {
         self.placeholder_displays
             .iter()
             .find(|display| display.scope == scope)
@@ -227,16 +227,16 @@ impl PowerPointHeaderFooters {
     }
 
     /// Return the presentation-wide ordinary-slide defaults, if present.
-    pub fn presentation_slides(&self) -> Option<&PowerPointHeaderFooter> {
+    pub fn presentation_slides(&self) -> Option<&HeaderFooter> {
         self.entries
             .iter()
-            .find(|entry| entry.scope == PowerPointHeaderFooterScope::PresentationSlides)
+            .find(|entry| entry.scope == HeaderFooterScope::PresentationSlides)
     }
 
     /// Return the presentation-wide notes/handout defaults, if present.
-    pub fn notes_and_handouts(&self) -> Option<&PowerPointHeaderFooter> {
+    pub fn notes_and_handouts(&self) -> Option<&HeaderFooter> {
         self.entries
             .iter()
-            .find(|entry| entry.scope == PowerPointHeaderFooterScope::NotesAndHandouts)
+            .find(|entry| entry.scope == HeaderFooterScope::NotesAndHandouts)
     }
 }

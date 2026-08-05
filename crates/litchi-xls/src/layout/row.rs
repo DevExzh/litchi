@@ -1,7 +1,7 @@
 //! BIFF8 `ROW` records and their worksheet-facing semantic view.
 
 use super::{ROW_RECORD_TYPE, invalid, read_u16};
-use crate::error::XlsResult;
+use crate::error::Result;
 
 /// Formatting and display metadata for one worksheet row.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -75,7 +75,7 @@ impl Row {
     }
 }
 
-pub(super) fn parse(data: &[u8]) -> XlsResult<Row> {
+pub(super) fn parse(data: &[u8]) -> Result<Row> {
     if data.len() != 16 {
         return Err(invalid(
             ROW_RECORD_TYPE,

@@ -1,15 +1,13 @@
 use super::TextRuler;
-use super::package::{PptError, Result};
+use super::package::{Error, Result};
 /// EscherTextboxWrapper implementation.
 ///
 /// Based on Apache POI's EscherTextboxWrapper, this wraps an Escher textbox record
 /// and provides access to its child PPT records (TextCharsAtom, TextBytesAtom, StyleTextPropAtom).
-use super::records::PptRecord;
-use super::text_interaction::{
-    PowerPointTextInteraction, PowerPointTextInteractionLimits, text_units_from_records,
-};
+use super::records::Record;
+use super::text_interaction::{TextInteraction, TextInteractionLimits, text_units_from_records};
 use super::text_run::{ParagraphRun, TextRun, TextRunExtractor};
-use crate::consts::PptRecordType;
+use crate::consts::RecordType;
 
 /// Wrapper around Escher textbox data.
 ///
@@ -19,7 +17,7 @@ pub struct EscherTextboxWrapper {
     /// The raw Escher textbox data
     data: Vec<u8>,
     /// Child PPT records found in the textbox
-    child_records: Vec<PptRecord>,
+    child_records: Vec<Record>,
     /// Extracted text
     text: String,
     /// Text split into character-formatting runs
@@ -29,11 +27,11 @@ pub struct EscherTextboxWrapper {
     /// Text ruler carried by the textbox, when present
     text_ruler: Option<TextRuler>,
     /// Range-anchored click and mouse-over actions.
-    text_interactions: Vec<PowerPointTextInteraction>,
+    text_interactions: Vec<TextInteraction>,
     /// Header/footer metacharacter placeholders in the textbox.
-    metachars: Vec<super::text_metachar::PowerPointTextMetachar>,
+    metachars: Vec<super::text_metachar::TextMetachar>,
     /// Outline text references tying the textbox to outline text bodies.
-    outline_text_refs: Vec<super::text_si_exception::PowerPointOutlineTextRef>,
+    outline_text_refs: Vec<super::text_si_exception::OutlineTextRef>,
 }
 
 impl EscherTextboxWrapper {
@@ -42,13 +40,13 @@ impl EscherTextboxWrapper {
     /// Based on POI's EscherTextboxWrapper constructor which calls
     /// Record.findChildRecords(data, 0, data.length).
     pub fn new(data: Vec<u8>) -> Result<Self> {
-        Self::new_with_interaction_limits(data, PowerPointTextInteractionLimits::default())
+        Self::new_with_interaction_limits(data, TextInteractionLimits::default())
     }
 
     /// Create a wrapper with explicit text-interaction resource limits.
     pub fn new_with_interaction_limits(
         data: Vec<u8>,
-        limits: PowerPointTextInteractionLimits,
+        limits: TextInteractionLimits,
     ) -> Result<Self> {
         // Parse child records from the escher data
         let child_records = Self::find_child_records(&data)?;
@@ -60,13 +58,13 @@ impl EscherTextboxWrapper {
         let paragraph_runs = extractor.paragraph_runs().to_vec();
         let mut ruler_records = child_records
             .iter()
-            .filter(|record| record.record_type == PptRecordType::TextRulerAtom);
+            .filter(|record| record.record_type == RecordType::TextRulerAtom);
         let text_ruler = ruler_records
             .next()
             .map(|record| TextRuler::parse(&record.data))
             .transpose()?;
         if ruler_records.next().is_some() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "ClientTextbox contains multiple TextRulerAtom records".to_string(),
             ));
         }
@@ -74,8 +72,8 @@ impl EscherTextboxWrapper {
         let metachars = super::text_metachar::metachars_from_records(child_records.iter())?;
         let outline_text_refs = child_records
             .iter()
-            .filter(|record| record.record_type == PptRecordType::OutlineTextRefAtom)
-            .map(super::text_si_exception::PowerPointOutlineTextRef::parse_record)
+            .filter(|record| record.record_type == RecordType::OutlineTextRefAtom)
+            .map(super::text_si_exception::OutlineTextRef::parse_record)
             .collect::<Result<Vec<_>>>()?;
 
         Ok(Self {
@@ -94,16 +92,16 @@ impl EscherTextboxWrapper {
     /// Find child PPT records in the Escher textbox data.
     ///
     /// Based on POI's Record.findChildRecords().
-    fn find_child_records(data: &[u8]) -> Result<Vec<PptRecord>> {
+    fn find_child_records(data: &[u8]) -> Result<Vec<Record>> {
         let mut records = Vec::new();
         let mut offset = 0;
 
         while offset < data.len() {
             let header_end = offset.checked_add(8).ok_or_else(|| {
-                PptError::Corrupted("ClientTextbox record offset overflow".to_string())
+                Error::Corrupted("ClientTextbox record offset overflow".to_string())
             })?;
             if header_end > data.len() {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "Truncated record header in ClientTextbox".to_string(),
                 ));
             }
@@ -114,21 +112,20 @@ impl EscherTextboxWrapper {
                 data[offset + 6],
                 data[offset + 7],
             ]);
-            let payload_length = usize::try_from(payload_length).map_err(|_| {
-                PptError::Corrupted("ClientTextbox record size overflow".to_string())
-            })?;
+            let payload_length = usize::try_from(payload_length)
+                .map_err(|_| Error::Corrupted("ClientTextbox record size overflow".to_string()))?;
             let record_end = header_end.checked_add(payload_length).ok_or_else(|| {
-                PptError::Corrupted("ClientTextbox record size overflow".to_string())
+                Error::Corrupted("ClientTextbox record size overflow".to_string())
             })?;
             if record_end > data.len() {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "Record extends beyond ClientTextbox data".to_string(),
                 ));
             }
 
-            let (record, consumed) = PptRecord::parse(&data[offset..record_end], 0)?;
+            let (record, consumed) = Record::parse(&data[offset..record_end], 0)?;
             if consumed != record_end - offset {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "ClientTextbox child record was only partially parsed".to_string(),
                 ));
             }
@@ -142,20 +139,20 @@ impl EscherTextboxWrapper {
     /// Parse only text-range actions without retaining or decoding the textbox.
     pub fn parse_text_interactions_with_limits(
         data: &[u8],
-        limits: PowerPointTextInteractionLimits,
-    ) -> Result<Vec<PowerPointTextInteraction>> {
+        limits: TextInteractionLimits,
+    ) -> Result<Vec<TextInteraction>> {
         let records = Self::find_child_records(data)?;
         Self::text_interactions_from_records(&records, limits)
     }
 
     fn text_interactions_from_records(
-        records: &[PptRecord],
-        limits: PowerPointTextInteractionLimits,
-    ) -> Result<Vec<PowerPointTextInteraction>> {
+        records: &[Record],
+        limits: TextInteractionLimits,
+    ) -> Result<Vec<TextInteraction>> {
         let has_text_interactions = records.iter().any(|record| {
             matches!(
                 record.record_type,
-                PptRecordType::InteractiveInfo | PptRecordType::TextInteractiveInfoAtom
+                RecordType::InteractiveInfo | RecordType::TextInteractiveInfoAtom
             )
         });
         if !has_text_interactions {
@@ -163,27 +160,27 @@ impl EscherTextboxWrapper {
         }
         let mut headers = records
             .iter()
-            .filter(|record| record.record_type == PptRecordType::TextHeaderAtom);
+            .filter(|record| record.record_type == RecordType::TextHeaderAtom);
         let header = headers.next().ok_or_else(|| {
-            PptError::Corrupted("Interactive ClientTextbox has no TextHeaderAtom".to_string())
+            Error::Corrupted("Interactive ClientTextbox has no TextHeaderAtom".to_string())
         })?;
         if headers.next().is_some()
             || header.version != 0
             || header.data_length != 4
             || header.data.len() != 4
         {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "Interactive ClientTextbox has an invalid TextHeaderAtom".to_string(),
             ));
         }
         let text_type = header.data.as_slice().try_into().map_err(|_| {
-            PptError::Corrupted(
+            Error::Corrupted(
                 "Interactive ClientTextbox TextHeaderAtom is not four bytes".to_string(),
             )
         })?;
-        let _ = crate::PowerPointTextType::parse(u32::from_le_bytes(text_type))?;
+        let _ = crate::TextType::parse(u32::from_le_bytes(text_type))?;
         let text_units = text_units_from_records(records)?;
-        PowerPointTextInteraction::parse_records(records, text_units, limits)
+        TextInteraction::parse_records(records, text_units, limits)
     }
 
     /// Get the extracted text.
@@ -192,7 +189,7 @@ impl EscherTextboxWrapper {
     }
 
     /// Get child records.
-    pub fn child_records(&self) -> &[PptRecord] {
+    pub fn child_records(&self) -> &[Record] {
         &self.child_records
     }
 
@@ -212,28 +209,28 @@ impl EscherTextboxWrapper {
     }
 
     /// Strictly paired text-range interactions in record order.
-    pub fn text_interactions(&self) -> &[PowerPointTextInteraction] {
+    pub fn text_interactions(&self) -> &[TextInteraction] {
         &self.text_interactions
     }
 
     /// Header/footer metacharacter placeholders in this textbox, in record
     /// order (MS-PPT 2.9.47-2.9.52). Placeholders are never substituted,
     /// formatted, or laid out.
-    pub fn metachars(&self) -> &[super::text_metachar::PowerPointTextMetachar] {
+    pub fn metachars(&self) -> &[super::text_metachar::TextMetachar] {
         &self.metachars
     }
 
     /// Outline text references (`OutlineTextRefAtom`, MS-PPT 2.9.78) tying
     /// this textbox to outline text bodies.
-    pub fn outline_text_refs(&self) -> &[super::text_si_exception::PowerPointOutlineTextRef] {
+    pub fn outline_text_refs(&self) -> &[super::text_si_exception::OutlineTextRef] {
         &self.outline_text_refs
     }
 
     /// Find a StyleTextPropAtom record.
-    pub fn find_style_text_prop_atom(&self) -> Option<&PptRecord> {
+    pub fn find_style_text_prop_atom(&self) -> Option<&Record> {
         self.child_records
             .iter()
-            .find(|r| r.record_type == PptRecordType::StyleTextPropAtom)
+            .find(|r| r.record_type == RecordType::StyleTextPropAtom)
     }
 
     /// Get the raw data.

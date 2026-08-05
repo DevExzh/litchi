@@ -15,7 +15,7 @@
 //!
 //! - MS-XLS 2.4.10 (AxesUsed), 2.4.13 (AxisParent), 2.5.14 (Boolean)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `AxesUsed` record (MS-XLS 2.4.10).
 pub(crate) const AXES_USED_RECORD_TYPE: u16 = 0x1046;
@@ -26,8 +26,8 @@ pub(crate) const AXIS_PARENT_RECORD_TYPE: u16 = 0x1041;
 /// Byte length of an `AxisParent` record payload: `iax` (2) + `unused` (16).
 const AXIS_PARENT_LEN: usize = 18;
 
-fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(record_type: u16, message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type,
         message: message.into(),
     }
@@ -36,15 +36,15 @@ fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
 /// The `cAxes` axis-group count of an `AxesUsed` record (MS-XLS 2.4.10).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
-pub enum XlsAxesUsedCount {
+pub enum AxesUsedCount {
     /// 0x0001: a single primary axis group is present.
     PrimaryOnly = 0x0001,
     /// 0x0002: both a primary and a secondary axis group are present.
     PrimaryAndSecondary = 0x0002,
 }
 
-impl XlsAxesUsedCount {
-    fn parse(value: u16) -> XlsResult<Self> {
+impl AxesUsedCount {
+    fn parse(value: u16) -> Result<Self> {
         match value {
             0x0001 => Ok(Self::PrimaryOnly),
             0x0002 => Ok(Self::PrimaryAndSecondary),
@@ -59,22 +59,22 @@ impl XlsAxesUsedCount {
 /// Typed `AxesUsed` record content (MS-XLS 2.4.10): the number of axis
 /// groups on the chart.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsAxesUsed {
+pub struct AxesUsed {
     /// The number of axis groups (`cAxes`).
-    count: XlsAxesUsedCount,
+    count: AxesUsedCount,
 }
 
-impl XlsAxesUsed {
+impl AxesUsed {
     /// Parse an `AxesUsed` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != 2 {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 2,
                 found: data.len(),
             });
         }
         Ok(Self {
-            count: XlsAxesUsedCount::parse(u16::from_le_bytes([data[0], data[1]]))?,
+            count: AxesUsedCount::parse(u16::from_le_bytes([data[0], data[1]]))?,
         })
     }
 
@@ -84,7 +84,7 @@ impl XlsAxesUsed {
     }
 
     /// The number of axis groups (`cAxes`).
-    pub fn count(&self) -> XlsAxesUsedCount {
+    pub fn count(&self) -> AxesUsedCount {
         self.count
     }
 }
@@ -92,15 +92,15 @@ impl XlsAxesUsed {
 /// The `iax` axis-group position of an `AxisParent` record (MS-XLS 2.4.13).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
-pub enum XlsAxisGroupPosition {
+pub enum AxisGroupPosition {
     /// 0x0000: the axis group is primary.
     Primary = 0x0000,
     /// 0x0001: the axis group is secondary.
     Secondary = 0x0001,
 }
 
-impl XlsAxisGroupPosition {
-    fn parse(value: u16) -> XlsResult<Self> {
+impl AxisGroupPosition {
+    fn parse(value: u16) -> Result<Self> {
         // Boolean (MS-XLS 2.5.14): only 0x0000 and 0x0001 are legal.
         match value {
             0x0000 => Ok(Self::Primary),
@@ -119,24 +119,24 @@ impl XlsAxisGroupPosition {
 /// The 16 `unused` bytes are undefined and MUST be ignored; they are
 /// preserved verbatim so the record round-trips unchanged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsAxisParent {
+pub struct AxisParent {
     /// Whether the axis group is primary or secondary (`iax`).
-    position: XlsAxisGroupPosition,
+    position: AxisGroupPosition,
     /// The undefined `unused` bytes, preserved verbatim.
     unused: [u8; 16],
 }
 
-impl XlsAxisParent {
+impl AxisParent {
     /// Parse an `AxisParent` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != AXIS_PARENT_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: AXIS_PARENT_LEN,
                 found: data.len(),
             });
         }
         Ok(Self {
-            position: XlsAxisGroupPosition::parse(u16::from_le_bytes([data[0], data[1]]))?,
+            position: AxisGroupPosition::parse(u16::from_le_bytes([data[0], data[1]]))?,
             unused: data[2..18].try_into().expect("length checked"),
         })
     }
@@ -150,7 +150,7 @@ impl XlsAxisParent {
     }
 
     /// Whether the axis group is primary or secondary (`iax`).
-    pub fn position(&self) -> XlsAxisGroupPosition {
+    pub fn position(&self) -> AxisGroupPosition {
         self.position
     }
 
@@ -167,11 +167,11 @@ mod tests {
     #[test]
     fn axes_used_round_trip() {
         for (value, expected) in [
-            (0x0001u16, XlsAxesUsedCount::PrimaryOnly),
-            (0x0002, XlsAxesUsedCount::PrimaryAndSecondary),
+            (0x0001u16, AxesUsedCount::PrimaryOnly),
+            (0x0002, AxesUsedCount::PrimaryAndSecondary),
         ] {
             let payload = value.to_le_bytes();
-            let parsed = XlsAxesUsed::parse(&payload).unwrap();
+            let parsed = AxesUsed::parse(&payload).unwrap();
             assert_eq!(parsed.count(), expected);
             assert_eq!(parsed.to_payload(), payload);
         }
@@ -179,21 +179,21 @@ mod tests {
 
     #[test]
     fn axes_used_rejects_malformed_records() {
-        assert!(XlsAxesUsed::parse(&[0x01]).is_err());
-        assert!(XlsAxesUsed::parse(&[0x01, 0x00, 0x00]).is_err());
-        assert!(XlsAxesUsed::parse(&0x0000u16.to_le_bytes()).is_err());
-        assert!(XlsAxesUsed::parse(&0x0003u16.to_le_bytes()).is_err());
+        assert!(AxesUsed::parse(&[0x01]).is_err());
+        assert!(AxesUsed::parse(&[0x01, 0x00, 0x00]).is_err());
+        assert!(AxesUsed::parse(&0x0000u16.to_le_bytes()).is_err());
+        assert!(AxesUsed::parse(&0x0003u16.to_le_bytes()).is_err());
     }
 
     #[test]
     fn axis_parent_round_trip() {
         for (value, expected) in [
-            (0x0000u16, XlsAxisGroupPosition::Primary),
-            (0x0001, XlsAxisGroupPosition::Secondary),
+            (0x0000u16, AxisGroupPosition::Primary),
+            (0x0001, AxisGroupPosition::Secondary),
         ] {
             let mut payload = value.to_le_bytes().to_vec();
             payload.extend_from_slice(&[0; 16]);
-            let parsed = XlsAxisParent::parse(&payload).unwrap();
+            let parsed = AxisParent::parse(&payload).unwrap();
             assert_eq!(parsed.position(), expected);
             assert_eq!(parsed.unused(), [0; 16]);
             assert_eq!(parsed.to_payload(), payload);
@@ -206,7 +206,7 @@ mod tests {
         // round-trip verbatim.
         let mut payload = 0x0001u16.to_le_bytes().to_vec();
         payload.extend_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
-        let parsed = XlsAxisParent::parse(&payload).unwrap();
+        let parsed = AxisParent::parse(&payload).unwrap();
         assert_eq!(parsed.unused()[15], 16);
         assert_eq!(parsed.to_payload(), payload);
     }
@@ -215,11 +215,11 @@ mod tests {
     fn axis_parent_rejects_malformed_records() {
         let mut payload = 0x0000u16.to_le_bytes().to_vec();
         payload.extend_from_slice(&[0; 16]);
-        assert!(XlsAxisParent::parse(&payload[..17]).is_err());
-        assert!(XlsAxisParent::parse(&[payload.as_slice(), &[0]].concat()).is_err());
+        assert!(AxisParent::parse(&payload[..17]).is_err());
+        assert!(AxisParent::parse(&[payload.as_slice(), &[0]].concat()).is_err());
         // iax is a Boolean (MS-XLS 2.5.14).
         let mut bad = payload.clone();
         bad[0..2].copy_from_slice(&0x0002u16.to_le_bytes());
-        assert!(XlsAxisParent::parse(&bad).is_err());
+        assert!(AxisParent::parse(&bad).is_err());
     }
 }

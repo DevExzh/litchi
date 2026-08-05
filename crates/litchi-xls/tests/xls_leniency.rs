@@ -1,4 +1,4 @@
-//! End-to-end coverage for [`XlsOpenOptions::leniency`].
+//! End-to-end coverage for [`OpenOptions::leniency`].
 //!
 //! Every case opens a real third-party workbook twice: once strictly, proving
 //! the defect is still rejected by default, and once leniently, proving the
@@ -6,9 +6,7 @@
 
 use std::path::PathBuf;
 
-use litchi_xls::{
-    XlsFormattingDefect, XlsLeniency, XlsOpenOptions, XlsToleranceReport, XlsWorkbook,
-};
+use litchi_xls::{FormattingDefect, Leniency, OpenOptions, ToleranceReport, Workbook};
 
 fn poi_fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -22,22 +20,22 @@ fn libreoffice_fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
-fn lenient_options() -> XlsOpenOptions<'static> {
-    XlsOpenOptions {
+fn lenient_options() -> OpenOptions<'static> {
+    OpenOptions {
         password: None,
-        leniency: XlsLeniency::TolerateFormattingDefects,
+        leniency: Leniency::TolerateFormattingDefects,
     }
 }
 
-fn open_lenient(path: PathBuf) -> XlsWorkbook<std::fs::File> {
+fn open_lenient(path: PathBuf) -> Workbook<std::fs::File> {
     let file = std::fs::File::open(&path).expect("fixture is readable");
-    XlsWorkbook::new_with_options(file, lenient_options())
+    Workbook::new_with_options(file, lenient_options())
         .expect("a lenient open tolerates cosmetic formatting defects")
 }
 
 fn strict_error(path: PathBuf) -> String {
     let file = std::fs::File::open(&path).expect("fixture is readable");
-    match XlsWorkbook::new(file) {
+    match Workbook::new(file) {
         Ok(_) => panic!("a strict open must still reject {}", path.display()),
         Err(error) => error.to_string(),
     }
@@ -47,9 +45,9 @@ fn strict_error(path: PathBuf) -> String {
 /// exactly `defect` as the reason. Returns the first recorded entry.
 fn assert_repaired(
     path: PathBuf,
-    defect: XlsFormattingDefect,
+    defect: FormattingDefect,
     strict_needle: &str,
-) -> litchi_xls::XlsToleratedDefect {
+) -> litchi_xls::ToleratedDefect {
     let message = strict_error(path.clone());
     assert!(
         message.contains(strict_needle),
@@ -78,11 +76,11 @@ fn assert_repaired(
 
 #[test]
 fn strict_open_is_the_default_for_every_tolerable_defect() {
-    // `XlsWorkbook::new` and a default-constructed options value must agree,
+    // `Workbook::new` and a default-constructed options value must agree,
     // and both must reject what a lenient open would repair.
     let path = poi_fixture("29942.xls");
     let explicit = std::fs::File::open(&path).expect("fixture is readable");
-    assert!(XlsWorkbook::new_with_options(explicit, XlsOpenOptions::default()).is_err());
+    assert!(Workbook::new_with_options(explicit, OpenOptions::default()).is_err());
     assert!(strict_error(path).contains("Font family"));
 }
 
@@ -90,7 +88,7 @@ fn strict_open_is_the_default_for_every_tolerable_defect() {
 fn lenient_open_repairs_an_out_of_range_font_family() {
     let entry = assert_repaired(
         poi_fixture("29942.xls"),
-        XlsFormattingDefect::FontFamily,
+        FormattingDefect::FontFamily,
         "Font family",
     );
     // The repair substitutes `NotApplicable`; the offending byte survives in
@@ -102,7 +100,7 @@ fn lenient_open_repairs_an_out_of_range_font_family() {
 fn lenient_open_repairs_an_empty_font_name() {
     let entry = assert_repaired(
         libreoffice_fixture("tdf170189.xls"),
-        XlsFormattingDefect::FontNameEmpty,
+        FormattingDefect::FontNameEmpty,
         "Font name has 0 characters",
     );
     assert_eq!(entry.observed(), 0);
@@ -112,7 +110,7 @@ fn lenient_open_repairs_an_empty_font_name() {
 fn lenient_open_repairs_an_xfcrc_count_disagreement() {
     let entry = assert_repaired(
         poi_fixture("SharedFormulaTest.xls"),
-        XlsFormattingDefect::ExtendedFormatCountMismatch,
+        FormattingDefect::ExtendedFormatCountMismatch,
         "XFCRC declares",
     );
     // `ordinal` is the number of XF records actually parsed, `observed` the
@@ -122,10 +120,10 @@ fn lenient_open_repairs_an_xfcrc_count_disagreement() {
 
 #[test]
 fn a_conforming_workbook_reports_nothing_under_either_policy() {
-    for options in [XlsOpenOptions::default(), lenient_options()] {
+    for options in [OpenOptions::default(), lenient_options()] {
         let file = std::fs::File::open(poi_fixture("colwidth.xls")).expect("fixture is readable");
         let workbook =
-            XlsWorkbook::new_with_options(file, options).expect("a conforming workbook opens");
+            Workbook::new_with_options(file, options).expect("a conforming workbook opens");
         assert!(workbook.tolerance_report().is_clean());
         assert_eq!(workbook.tolerance_report().total(), 0);
     }
@@ -133,9 +131,9 @@ fn a_conforming_workbook_reports_nothing_under_either_policy() {
 
 #[test]
 fn a_defect_free_report_is_the_default_state() {
-    let report = XlsToleranceReport::default();
+    let report = ToleranceReport::default();
     assert!(report.is_clean());
     assert_eq!(report.defects(), &[]);
-    assert_eq!(report.count(XlsFormattingDefect::FontNameEmpty), 0);
+    assert_eq!(report.count(FormattingDefect::FontNameEmpty), 0);
     assert_eq!(report.total(), 0);
 }

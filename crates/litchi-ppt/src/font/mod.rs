@@ -6,7 +6,4 @@ mod model;
 #[cfg(test)]
 mod tests;
 
-pub use model::{
-    EmbeddedPowerPointFont, PowerPointFont, PowerPointFontCollection, PowerPointFontCollections,
-    PowerPointFontEmbeddingFlags,
-};
+pub use model::{EmbeddedFont, Font, FontCollection, FontCollections, FontEmbeddingFlags};

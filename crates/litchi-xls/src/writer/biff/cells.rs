@@ -1,6 +1,6 @@
 //! Cell record BIFF8 writers.
 
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 use std::io::Write;
 
 use super::{write_record, write_record_header};
@@ -36,10 +36,10 @@ pub(crate) fn write_number<W: Write>(
     col: u16,
     xf_index: u16,
     value: f64,
-) -> XlsResult<()> {
+) -> Result<()> {
     // BIFF8 stores row as a 16-bit index (0..65535)
     let row_u16 = u16::try_from(row).map_err(|_| {
-        XlsError::InvalidData(format!(
+        Error::InvalidData(format!(
             "Row index {} exceeds BIFF8 limit 65535 for NUMBER record",
             row
         ))
@@ -64,39 +64,37 @@ pub(crate) fn write_mulrk<W: Write>(
     row: u32,
     first_col: u16,
     values: &[(u16, f64)],
-) -> XlsResult<()> {
+) -> Result<()> {
     let row_u16 = u16::try_from(row).map_err(|_| {
-        XlsError::InvalidData(format!(
+        Error::InvalidData(format!(
             "Row index {} exceeds BIFF8 limit 65535 for MULRK record",
             row
         ))
     })?;
     if values.len() < 2 {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "MULRK record requires at least two contiguous numeric cells".to_string(),
         ));
     }
     let last_col = first_col
-        .checked_add(u16::try_from(values.len() - 1).map_err(|_| {
-            XlsError::InvalidData("MULRK column span exceeds BIFF8 limit".to_string())
-        })?)
-        .ok_or_else(|| {
-            XlsError::InvalidData("MULRK last column exceeds BIFF8 limit".to_string())
-        })?;
+        .checked_add(
+            u16::try_from(values.len() - 1).map_err(|_| {
+                Error::InvalidData("MULRK column span exceeds BIFF8 limit".to_string())
+            })?,
+        )
+        .ok_or_else(|| Error::InvalidData("MULRK last column exceeds BIFF8 limit".to_string()))?;
     let data_len = 6u16
         .checked_add(u16::try_from(values.len() * 6).map_err(|_| {
-            XlsError::InvalidData("MULRK payload exceeds BIFF8 size limit".to_string())
+            Error::InvalidData("MULRK payload exceeds BIFF8 size limit".to_string())
         })?)
-        .ok_or_else(|| {
-            XlsError::InvalidData("MULRK payload exceeds BIFF8 size limit".to_string())
-        })?;
+        .ok_or_else(|| Error::InvalidData("MULRK payload exceeds BIFF8 size limit".to_string()))?;
 
     write_record_header(writer, 0x00BD, data_len)?;
     writer.write_all(&row_u16.to_le_bytes())?;
     writer.write_all(&first_col.to_le_bytes())?;
     for (xf_index, value) in values {
         let rk = encode_rk(*value).ok_or_else(|| {
-            XlsError::InvalidData(format!("Value {value} cannot be encoded as RK for MULRK"))
+            Error::InvalidData(format!("Value {value} cannot be encoded as RK for MULRK"))
         })?;
         writer.write_all(&xf_index.to_le_bytes())?;
         writer.write_all(&rk.to_le_bytes())?;
@@ -121,10 +119,10 @@ pub(crate) fn write_labelsst<W: Write>(
     col: u16,
     xf_index: u16,
     sst_index: u32,
-) -> XlsResult<()> {
+) -> Result<()> {
     // BIFF8 stores row as a 16-bit index (0..65535)
     let row_u16 = u16::try_from(row).map_err(|_| {
-        XlsError::InvalidData(format!(
+        Error::InvalidData(format!(
             "Row index {} exceeds BIFF8 limit 65535 for LABELSST record",
             row
         ))
@@ -161,10 +159,10 @@ pub(crate) fn write_boolerr<W: Write>(
     col: u16,
     xf_index: u16,
     value: bool,
-) -> XlsResult<()> {
+) -> Result<()> {
     // BIFF8 stores row as a 16-bit index (0..65535)
     let row_u16 = u16::try_from(row).map_err(|_| {
-        XlsError::InvalidData(format!(
+        Error::InvalidData(format!(
             "Row index {} exceeds BIFF8 limit 65535 for BOOLERR record",
             row
         ))
@@ -194,29 +192,29 @@ pub(crate) fn write_formula<W: Write>(
     col: u16,
     xf_index: u16,
     tokens: &[u8],
-) -> XlsResult<()> {
+) -> Result<()> {
     let row_u16 = u16::try_from(row).map_err(|_| {
-        XlsError::InvalidData(format!(
+        Error::InvalidData(format!(
             "Row index {row} exceeds BIFF8 limit 65535 for FORMULA record"
         ))
     })?;
     if tokens.is_empty() {
-        return Err(XlsError::InvalidFormula(
+        return Err(Error::InvalidFormula(
             "Formula token stream cannot be empty".to_string(),
         ));
     }
     // A BIFF record payload is limited to 8,224 bytes. FORMULA contributes
     // 22 fixed bytes before the token stream.
     if tokens.len() > 8_202 {
-        return Err(XlsError::InvalidFormula(
+        return Err(Error::InvalidFormula(
             "Formula token stream exceeds BIFF8 record limit".to_string(),
         ));
     }
     let token_len = u16::try_from(tokens.len())
-        .map_err(|_| XlsError::InvalidFormula("Formula token length exceeds u16".to_string()))?;
+        .map_err(|_| Error::InvalidFormula("Formula token length exceeds u16".to_string()))?;
     let data_len = 22u16
         .checked_add(token_len)
-        .ok_or_else(|| XlsError::InvalidFormula("Formula record length overflow".to_string()))?;
+        .ok_or_else(|| Error::InvalidFormula("Formula record length overflow".to_string()))?;
 
     write_record_header(writer, 0x0006, data_len)?;
     writer.write_all(&row_u16.to_le_bytes())?;
@@ -234,7 +232,7 @@ pub(crate) fn write_formula<W: Write>(
 /// Write a TABLE record (MS-XLS 2.4.319) for a what-if data table.
 ///
 /// Record type: 0x0236
-pub(crate) fn write_table<W: Write>(writer: &mut W, table: &crate::XlsDataTable) -> XlsResult<()> {
+pub(crate) fn write_table<W: Write>(writer: &mut W, table: &crate::DataTable) -> Result<()> {
     let payload = table.to_payload();
     write_record(writer, 0x0236, &payload)
 }
@@ -242,7 +240,7 @@ pub(crate) fn write_table<W: Write>(writer: &mut W, table: &crate::XlsDataTable)
 #[cfg(test)]
 mod tests {
     use super::write_formula;
-    use crate::records::{CellRecord, FormulaValue, XlsEncoding};
+    use crate::records::{CellRecord, Encoding, FormulaValue};
 
     #[test]
     fn writes_formula_record_with_recalculation_and_empty_cache() {
@@ -252,7 +250,7 @@ mod tests {
         assert_eq!(&bytes[..4], &[0x06, 0x00, 29, 0]);
         assert_eq!(u16::from_le_bytes([bytes[18], bytes[19]]), 1);
 
-        let record = CellRecord::parse(0x0006, &bytes[4..], &XlsEncoding::Utf16Le).unwrap();
+        let record = CellRecord::parse(0x0006, &bytes[4..], &Encoding::Utf16Le).unwrap();
         assert!(
             matches!(
                 record,

@@ -15,7 +15,7 @@ use super::{
     MAX_CACHED_CELLS, MAX_EXTERNAL_NAME_BYTES, MAX_EXTERNAL_NAMES, MAX_EXTERNAL_REFERENCES,
     MAX_SUPPORTING_BOOKS, SUP_BOOK_RECORD_TYPE, XCT_RECORD_TYPE,
 };
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
 struct PendingCache {
     book: usize,
@@ -47,7 +47,7 @@ impl ExternalLinkCollector {
         Self::default()
     }
 
-    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
+    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> Result<()> {
         if self
             .pending
             .as_ref()
@@ -77,7 +77,7 @@ impl ExternalLinkCollector {
                 self.external_name_bytes = self
                     .external_name_bytes
                     .checked_add(data.len())
-                    .ok_or_else(|| XlsError::InvalidRecord {
+                    .ok_or_else(|| Error::InvalidRecord {
                         record_type: CONTINUE_RECORD_TYPE,
                         message: "ExternName continuation size overflows".to_string(),
                     })?;
@@ -164,7 +164,7 @@ impl ExternalLinkCollector {
                     self.books
                         .len()
                         .checked_sub(1)
-                        .ok_or_else(|| XlsError::InvalidRecord {
+                        .ok_or_else(|| Error::InvalidRecord {
                             record_type,
                             message: "ExternName appears without a preceding SupBook".to_string(),
                         })?;
@@ -172,7 +172,7 @@ impl ExternalLinkCollector {
                 self.external_name_bytes = self
                     .external_name_bytes
                     .checked_add(data.len())
-                    .ok_or_else(|| XlsError::InvalidRecord {
+                    .ok_or_else(|| Error::InvalidRecord {
                         record_type,
                         message: "external name size overflows".to_string(),
                     })?;
@@ -217,21 +217,21 @@ impl ExternalLinkCollector {
         Ok(())
     }
 
-    fn parse_xct(&mut self, data: &[u8]) -> XlsResult<()> {
+    fn parse_xct(&mut self, data: &[u8]) -> Result<()> {
         if data.len() != 4 {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: 4,
                 found: data.len(),
             });
         }
-        let book_index =
-            self.books
-                .len()
-                .checked_sub(1)
-                .ok_or_else(|| XlsError::InvalidRecord {
-                    record_type: XCT_RECORD_TYPE,
-                    message: "XCT appears without a preceding SupBook".to_string(),
-                })?;
+        let book_index = self
+            .books
+            .len()
+            .checked_sub(1)
+            .ok_or_else(|| Error::InvalidRecord {
+                record_type: XCT_RECORD_TYPE,
+                message: "XCT appears without a preceding SupBook".to_string(),
+            })?;
         let declared = i16::from_le_bytes([data[0], data[1]]);
         if declared == i16::MIN {
             return invalid(XCT_RECORD_TYPE, "XCT CRN count absolute value overflows");
@@ -246,7 +246,7 @@ impl ExternalLinkCollector {
         let sheet = book
             .sheets
             .get_mut(sheet_index)
-            .ok_or_else(|| XlsError::InvalidRecord {
+            .ok_or_else(|| Error::InvalidRecord {
                 record_type: XCT_RECORD_TYPE,
                 message: "XCT sheet index exceeds SupBook sheet count".to_string(),
             })?;
@@ -264,14 +264,11 @@ impl ExternalLinkCollector {
         Ok(())
     }
 
-    fn parse_crn(&mut self, data: &[u8]) -> XlsResult<()> {
-        let pending = self
-            .pending
-            .as_mut()
-            .ok_or_else(|| XlsError::InvalidRecord {
-                record_type: CRN_RECORD_TYPE,
-                message: "CRN appears without XCT".to_string(),
-            })?;
+    fn parse_crn(&mut self, data: &[u8]) -> Result<()> {
+        let pending = self.pending.as_mut().ok_or_else(|| Error::InvalidRecord {
+            record_type: CRN_RECORD_TYPE,
+            message: "CRN appears without XCT".to_string(),
+        })?;
         if pending.remaining == 0 {
             return invalid(CRN_RECORD_TYPE, "more CRN records than declared by XCT");
         }
@@ -279,7 +276,7 @@ impl ExternalLinkCollector {
         self.cached_cells = self
             .cached_cells
             .checked_add(row.values.len())
-            .ok_or_else(|| XlsError::InvalidRecord {
+            .ok_or_else(|| Error::InvalidRecord {
                 record_type: CRN_RECORD_TYPE,
                 message: "cached cell count overflows".to_string(),
             })?;
@@ -297,7 +294,7 @@ impl ExternalLinkCollector {
         Ok(())
     }
 
-    pub(crate) fn finish(self, internal_sheet_count: usize) -> XlsResult<Links> {
+    pub(crate) fn finish(self, internal_sheet_count: usize) -> Result<Links> {
         if self
             .pending
             .as_ref()

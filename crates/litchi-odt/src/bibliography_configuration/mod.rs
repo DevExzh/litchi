@@ -17,11 +17,6 @@ mod package;
 #[cfg(test)]
 mod tests;
 
-pub use model::{BibliographyConfiguration, BibliographyField, BibliographySortKey};
-
-// The shorter vocabulary is canonical inside the layered owner. The
-// bibliography-prefixed names remain facade aliases so the crate root can be
-// left untouched by this owner migration.
 pub use model::{Configuration, Field, SortKey};
 
 pub(crate) use codec::{

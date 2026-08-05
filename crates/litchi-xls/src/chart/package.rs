@@ -14,7 +14,7 @@ use super::codec::parse_chart;
 use super::codec::serialize_chart;
 use super::model::*;
 use super::wire::*;
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
 /// Chart plus its current workbook host location.
 #[derive(Clone, Debug, PartialEq)]
@@ -39,14 +39,14 @@ struct StoredChart {
 const UNSUPPORTED_AUTHORING_REASON: &str = "fresh and replacement XLS chart authoring requires the complete Office-compatible BIFF chart grammar";
 const UNSUPPORTED_EMBEDDED_MUTATION_REASON: &str = "embedded XLS chart mutation requires complete MsoDrawing/Continue, Obj/Continue, chart-substream, and OfficeArt drawing-group ownership";
 
-pub(crate) fn unsupported_authoring<T>() -> XlsResult<T> {
+pub(crate) fn unsupported_authoring<T>() -> Result<T> {
     Err(litchi_ograph::Error::UnsupportedAuthoring {
         reason: UNSUPPORTED_AUTHORING_REASON,
     }
     .into())
 }
 
-pub(crate) fn unsupported_embedded_mutation<T>() -> XlsResult<T> {
+pub(crate) fn unsupported_embedded_mutation<T>() -> Result<T> {
     Err(litchi_ograph::Error::UnsupportedMutation {
         operation: "embedded XLS chart drawing",
         reason: UNSUPPORTED_EMBEDDED_MUTATION_REASON,
@@ -65,16 +65,16 @@ pub struct Editor {
 
 impl Editor {
     /// Takes ownership of an XLS compound file and validates its chart inventory.
-    pub fn open(bytes: Vec<u8>, limits: Limits) -> XlsResult<Self> {
+    pub fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         validate_limits(limits)?;
         let package = ObjectEditor::open(bytes, Targets::default(), ObjectLimits::default())?;
         let workbook_path = [vec!["Workbook".into()], vec!["Book".into()]]
             .into_iter()
             .find(|path| package.stream(path).is_some())
-            .ok_or_else(|| XlsError::InvalidData("Workbook stream not found".into()))?;
+            .ok_or_else(|| Error::InvalidData("Workbook stream not found".into()))?;
         let workbook = package
             .stream_shared(&workbook_path)
-            .ok_or_else(|| XlsError::InvalidData("selected Workbook stream disappeared".into()))?;
+            .ok_or_else(|| Error::InvalidData("selected Workbook stream disappeared".into()))?;
         if workbook.len() > limits.max_workbook_bytes {
             return invalid(CHART, "Workbook stream exceeds chart editor limit");
         }
@@ -99,7 +99,7 @@ impl Editor {
     }
 
     /// Looks up a chart by worksheet name and semantic position.
-    pub fn get(&self, selector: Selector<'_>) -> XlsResult<Option<&Chart>> {
+    pub fn get(&self, selector: Selector<'_>) -> Result<Option<&Chart>> {
         let Some(location) = self.resolve(selector)? else {
             return Ok(None);
         };
@@ -117,22 +117,22 @@ impl Editor {
     /// Refuses fresh embedded-chart authoring until its complete BIFF grammar is available.
     ///
     /// The editor is unchanged when this returns
-    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`XlsError::Graph`].
-    pub fn add(&mut self, _sheet: &str, _chart: Chart) -> XlsResult<Location> {
+    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
+    pub fn add(&mut self, _sheet: &str, _chart: Chart) -> Result<Location> {
         unsupported_authoring()
     }
 
     /// Refuses fresh embedded-chart authoring at a checked raw host location.
     ///
     /// The editor is unchanged when this returns
-    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`XlsError::Graph`].
+    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
     pub fn insert_at(
         &mut self,
         _sheet_index: usize,
         _object_id: u16,
         _index: usize,
         _chart: Chart,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         unsupported_authoring()
     }
 
@@ -143,7 +143,7 @@ impl Editor {
         object_id: u16,
         index: usize,
         chart: Chart,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         let (_, sheets) = bindings(&self.workbook)?;
         let sheet = sheets
             .iter()
@@ -186,26 +186,26 @@ impl Editor {
     /// Refuses fresh chart-sheet authoring until its complete BIFF grammar is available.
     ///
     /// The editor is unchanged when this returns
-    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`XlsError::Graph`].
-    pub fn add_sheet(&mut self, _name: impl Into<String>, _chart: Chart) -> XlsResult<()> {
+    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
+    pub fn add_sheet(&mut self, _name: impl Into<String>, _chart: Chart) -> Result<()> {
         unsupported_authoring()
     }
 
     /// Refuses fresh chart-sheet authoring at a checked raw tab index.
     ///
     /// The editor is unchanged when this returns
-    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`XlsError::Graph`].
+    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
     pub fn insert_sheet_at(
         &mut self,
         _index: usize,
         _name: impl Into<String>,
         _chart: Chart,
-    ) -> XlsResult<()> {
+    ) -> Result<()> {
         unsupported_authoring()
     }
 
     /// Remove a chart-sheet tab. References to that tab cause atomic failure.
-    pub fn remove_sheet_at(&mut self, sheet_index: usize) -> XlsResult<Chart> {
+    pub fn remove_sheet_at(&mut self, sheet_index: usize) -> Result<Chart> {
         let (_, sheets) = bindings(&self.workbook)?;
         let sheet = sheets
             .iter()
@@ -232,7 +232,7 @@ impl Editor {
     }
 
     /// Reorders workbook tabs by Unicode case-insensitive tab names.
-    pub fn reorder_sheets(&mut self, order: &[&str]) -> XlsResult<()> {
+    pub fn reorder_sheets(&mut self, order: &[&str]) -> Result<()> {
         let (_, sheets) = bindings(&self.workbook)?;
         if order.len() != sheets.len() {
             return invalid(BOUNDSHEET, "sheet reorder must contain every tab");
@@ -240,7 +240,7 @@ impl Editor {
         let mut indexes = Vec::new();
         indexes
             .try_reserve(order.len())
-            .map_err(|_| XlsError::InvalidData("could not allocate sheet reorder".into()))?;
+            .map_err(|_| Error::InvalidData("could not allocate sheet reorder".into()))?;
         let mut seen = HashSet::new();
         for name in order {
             let sheet = sheets
@@ -256,7 +256,7 @@ impl Editor {
     }
 
     /// Reorders all workbook tabs by checked previous zero-based indexes.
-    pub fn reorder_sheets_at(&mut self, order: &[usize]) -> XlsResult<()> {
+    pub fn reorder_sheets_at(&mut self, order: &[usize]) -> Result<()> {
         let count = bindings(&self.workbook)?.1.len();
         if order.len() != count {
             return invalid(BOUNDSHEET, "sheet reorder must contain every tab");
@@ -282,16 +282,16 @@ impl Editor {
     /// Refuses replacement authoring until its complete BIFF grammar is available.
     ///
     /// The editor is unchanged when this returns
-    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`XlsError::Graph`].
-    pub fn replace(&mut self, _selector: Selector<'_>, _chart: Chart) -> XlsResult<()> {
+    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
+    pub fn replace(&mut self, _selector: Selector<'_>, _chart: Chart) -> Result<()> {
         unsupported_authoring()
     }
 
     /// Refuses replacement authoring at a checked low-level host location.
     ///
     /// The editor is unchanged when this returns
-    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`XlsError::Graph`].
-    pub fn replace_at(&mut self, _location: &Location, _chart: Chart) -> XlsResult<()> {
+    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
+    pub fn replace_at(&mut self, _location: &Location, _chart: Chart) -> Result<()> {
         unsupported_authoring()
     }
 
@@ -300,7 +300,7 @@ impl Editor {
     /// Embedded charts participate in the worksheet OfficeArt drawing graph;
     /// until that complete ownership is modeled, the editor returns
     /// [`litchi_ograph::Error::UnsupportedMutation`] without mutation.
-    pub fn remove(&mut self, selector: Selector<'_>) -> XlsResult<Chart> {
+    pub fn remove(&mut self, selector: Selector<'_>) -> Result<Chart> {
         let location = self
             .resolve(selector)?
             .ok_or_else(|| invalid_error(CHART, "chart selector was not found"))?;
@@ -311,7 +311,7 @@ impl Editor {
     ///
     /// An existing embedded location is validated and then refused atomically
     /// until its complete OfficeArt drawing ownership can be rewritten.
-    pub fn remove_at(&mut self, location: &Location) -> XlsResult<Chart> {
+    pub fn remove_at(&mut self, location: &Location) -> Result<Chart> {
         if let Location::ChartSheet { sheet_index } = location {
             return self.remove_sheet_at(*sheet_index);
         }
@@ -329,7 +329,7 @@ impl Editor {
     ///
     /// The current identity order is a no-op. A structural reorder is refused
     /// atomically until complete OfficeArt drawing ownership is modeled.
-    pub fn reorder(&mut self, sheet: &str, order: &[usize]) -> XlsResult<()> {
+    pub fn reorder(&mut self, sheet: &str, order: &[usize]) -> Result<()> {
         let (_, sheets) = bindings(&self.workbook)?;
         let sheet = sheets
             .iter()
@@ -353,7 +353,7 @@ impl Editor {
         let mut object_ids = Vec::new();
         object_ids
             .try_reserve(order.len())
-            .map_err(|_| XlsError::InvalidData("could not allocate chart reorder".into()))?;
+            .map_err(|_| Error::InvalidData("could not allocate chart reorder".into()))?;
         for index in order {
             let id = ids
                 .get(*index)
@@ -371,7 +371,7 @@ impl Editor {
     ///
     /// The current identity order is a no-op. A structural reorder is refused
     /// atomically until complete OfficeArt drawing ownership is modeled.
-    pub fn reorder_at(&mut self, sheet_index: usize, object_ids: &[u16]) -> XlsResult<()> {
+    pub fn reorder_at(&mut self, sheet_index: usize, object_ids: &[u16]) -> Result<()> {
         let (_, sheets) = bindings(&self.workbook)?;
         let sheet = sheets
             .iter()
@@ -401,7 +401,7 @@ impl Editor {
         let mut current = Vec::new();
         current
             .try_reserve_exact(slots.len())
-            .map_err(|_| XlsError::InvalidData("could not allocate chart reorder".into()))?;
+            .map_err(|_| Error::InvalidData("could not allocate chart reorder".into()))?;
         for index in &slots {
             let object_id = self
                 .charts
@@ -436,12 +436,12 @@ impl Editor {
     }
 
     /// Consumes the editor and returns the rewritten compound-file allocation.
-    pub fn finish(self) -> XlsResult<Vec<u8>> {
+    pub fn finish(self) -> Result<Vec<u8>> {
         self.package.finish().map_err(Into::into)
     }
 
     #[cfg(test)]
-    fn commit_fixture(&mut self, original: &[StoredChart], desired: Vec<Entry>) -> XlsResult<()> {
+    fn commit_fixture(&mut self, original: &[StoredChart], desired: Vec<Entry>) -> Result<()> {
         if desired.len() > self.limits.max_charts {
             return invalid(CHART, "chart count exceeds limit");
         }
@@ -462,7 +462,7 @@ impl Editor {
         Ok(())
     }
 
-    fn install_workbook(&mut self, workbook: Vec<u8>) -> XlsResult<Vec<StoredChart>> {
+    fn install_workbook(&mut self, workbook: Vec<u8>) -> Result<Vec<StoredChart>> {
         if workbook.len() > self.limits.max_workbook_bytes {
             return invalid(CHART, "rewritten Workbook exceeds limit");
         }
@@ -474,7 +474,7 @@ impl Editor {
         Ok(std::mem::replace(&mut self.charts, charts))
     }
 
-    pub(crate) fn resolve(&self, selector: Selector<'_>) -> XlsResult<Option<Location>> {
+    pub(crate) fn resolve(&self, selector: Selector<'_>) -> Result<Option<Location>> {
         let (_, sheets) = bindings(&self.workbook)?;
         match selector {
             Selector::Sheet(name) => Ok(sheets
@@ -520,15 +520,15 @@ const GENERATED_SHEET_NAME: &str = "Sheet1";
 /// Refuses fresh standalone BIFF8 chart-workbook authoring.
 ///
 /// This public entry point returns [`litchi_ograph::Error::UnsupportedAuthoring`]
-/// through [`XlsError::Graph`] until the complete Office-compatible chart
+/// through [`Error::Graph`] until the complete Office-compatible chart
 /// grammar is implemented.
-pub fn build_workbook(_chart: Chart, _limits: Limits) -> XlsResult<Vec<u8>> {
+pub fn build_workbook(_chart: Chart, _limits: Limits) -> Result<Vec<u8>> {
     unsupported_authoring()
 }
 
 /// Builds the abbreviated workbook used only to exercise the private parser.
 #[cfg(test)]
-pub(super) fn build_workbook_fixture(chart: Chart, limits: Limits) -> XlsResult<Vec<u8>> {
+pub(super) fn build_workbook_fixture(chart: Chart, limits: Limits) -> Result<Vec<u8>> {
     validate_limits(limits)?;
     let mut package = litchi_cfb::OleWriter::new();
     package.create_stream(&["Workbook"], &minimal_workbook_stream()?)?;
@@ -543,7 +543,7 @@ pub(super) fn build_workbook_fixture(chart: Chart, limits: Limits) -> XlsResult<
 /// editor: workbook globals with a single `BoundSheet` directory entry
 /// followed by an empty worksheet substream.
 #[cfg(test)]
-fn minimal_workbook_stream() -> XlsResult<Vec<u8>> {
+fn minimal_workbook_stream() -> Result<Vec<u8>> {
     let mut output = record(BOF, &bof_body(BOF_WORKBOOK_GLOBALS))?;
     let bound_offset_position = output.len() + 4;
     output.extend(record(
@@ -552,7 +552,7 @@ fn minimal_workbook_stream() -> XlsResult<Vec<u8>> {
     )?);
     output.extend(record(EOF, &[])?);
     let sheet_offset = u32::try_from(output.len())
-        .map_err(|_| XlsError::InvalidData("BoundSheet offset exceeds u32".into()))?;
+        .map_err(|_| Error::InvalidData("BoundSheet offset exceeds u32".into()))?;
     output[bound_offset_position..bound_offset_position + 4]
         .copy_from_slice(&sheet_offset.to_le_bytes());
     output.extend(record(BOF, &bof_body(BOF_WORKSHEET))?);
@@ -564,7 +564,7 @@ fn rewrite_sheet_directory(
     input: &[u8],
     order: &[Option<usize>],
     insert: Option<(usize, Vec<u8>, Vec<u8>)>,
-) -> XlsResult<Vec<u8>> {
+) -> Result<Vec<u8>> {
     let (_, sheets) = bindings(input)?;
     let old_count = sheets.len();
     let mut logical = vec![None; old_count];
@@ -631,7 +631,7 @@ fn rewrite_sheet_directory(
     for (position, offset) in globals.bound_positions.into_iter().zip(offsets) {
         output[position..position + 4].copy_from_slice(
             &u32::try_from(offset)
-                .map_err(|_| XlsError::InvalidData("BoundSheet offset exceeds u32".into()))?
+                .map_err(|_| Error::InvalidData("BoundSheet offset exceeds u32".into()))?
                 .to_le_bytes(),
         );
     }
@@ -648,7 +648,7 @@ fn rewrite_chart_globals(
     tabs: &[(Option<usize>, Vec<u8>, Vec<u8>)],
     old_to_new: &[Option<usize>],
     insert_index: Option<usize>,
-) -> XlsResult<RewrittenGlobals> {
+) -> Result<RewrittenGlobals> {
     let records = ranges(input)?;
     let mut output = Vec::new();
     let mut bound_positions = Vec::new();
@@ -686,7 +686,7 @@ fn rewrite_chart_globals(
                 let mut value = data.to_vec();
                 value[..2].copy_from_slice(
                     &u16::try_from(tabs.len())
-                        .map_err(|_| XlsError::InvalidData("sheet count exceeds u16".into()))?
+                        .map_err(|_| Error::InvalidData("sheet count exceeds u16".into()))?
                         .to_le_bytes(),
                 );
                 value
@@ -706,7 +706,7 @@ fn rewrite_chart_globals(
     })
 }
 
-pub(crate) fn internal_sup_books(input: &[u8], records: &[Range]) -> XlsResult<HashSet<u16>> {
+pub(crate) fn internal_sup_books(input: &[u8], records: &[Range]) -> Result<HashSet<u16>> {
     let mut result = HashSet::new();
     let mut ordinal = 0u16;
     for value in records {
@@ -719,7 +719,7 @@ pub(crate) fn internal_sup_books(input: &[u8], records: &[Range]) -> XlsResult<H
         }
         ordinal = ordinal
             .checked_add(1)
-            .ok_or_else(|| XlsError::InvalidData("SupBook count overflow".into()))?;
+            .ok_or_else(|| Error::InvalidData("SupBook count overflow".into()))?;
     }
     Ok(result)
 }
@@ -729,7 +729,7 @@ pub(super) fn remap_extern_sheet(
     internal: &HashSet<u16>,
     old_to_new: &[Option<usize>],
     insert_index: Option<usize>,
-) -> XlsResult<Vec<u8>> {
+) -> Result<Vec<u8>> {
     if data.len() < 2 {
         return invalid(EXTERN_SHEET, "ExternSheet is truncated");
     }
@@ -768,7 +768,7 @@ pub(super) fn remap_extern_sheet(
                     )
                 })
             })
-            .collect::<XlsResult<Vec<_>>>()?;
+            .collect::<Result<Vec<_>>>()?;
         let minimum = *mapped
             .iter()
             .min()
@@ -789,7 +789,7 @@ pub(super) fn remap_extern_sheet(
     Ok(output)
 }
 
-pub(crate) fn remap_lbl(data: &[u8], old_to_new: &[Option<usize>]) -> XlsResult<Vec<u8>> {
+pub(crate) fn remap_lbl(data: &[u8], old_to_new: &[Option<usize>]) -> Result<Vec<u8>> {
     if data.len() < 10 {
         return invalid(LBL, "Lbl is truncated");
     }
@@ -805,13 +805,13 @@ pub(crate) fn remap_lbl(data: &[u8], old_to_new: &[Option<usize>]) -> XlsResult<
     let mut output = data.to_vec();
     output[8..10].copy_from_slice(
         &u16::try_from(new + 1)
-            .map_err(|_| XlsError::InvalidData("Lbl sheet scope exceeds u16".into()))?
+            .map_err(|_| Error::InvalidData("Lbl sheet scope exceeds u16".into()))?
             .to_le_bytes(),
     );
     Ok(output)
 }
 
-pub(crate) fn remap_window1(data: &[u8], old_to_new: &[Option<usize>]) -> XlsResult<Vec<u8>> {
+pub(crate) fn remap_window1(data: &[u8], old_to_new: &[Option<usize>]) -> Result<Vec<u8>> {
     if data.len() != 18 {
         return invalid(WINDOW1, "Window1 must contain 18 bytes");
     }
@@ -830,7 +830,7 @@ pub(crate) fn remap_window1(data: &[u8], old_to_new: &[Option<usize>]) -> XlsRes
     Ok(output)
 }
 
-pub(crate) fn parse_rr_tab_ids(data: &[u8], count: usize) -> XlsResult<Vec<u16>> {
+pub(crate) fn parse_rr_tab_ids(data: &[u8], count: usize) -> Result<Vec<u16>> {
     if data.len() != count * 2 {
         return invalid(RR_TAB_ID, "RRTabId count does not match BoundSheet count");
     }
@@ -839,14 +839,14 @@ pub(crate) fn parse_rr_tab_ids(data: &[u8], count: usize) -> XlsResult<Vec<u16>>
 pub(crate) fn write_rr_tab_ids(
     old: &[u16],
     tabs: &[(Option<usize>, Vec<u8>, Vec<u8>)],
-) -> XlsResult<Vec<u8>> {
+) -> Result<Vec<u8>> {
     let next = old
         .iter()
         .copied()
         .max()
         .unwrap_or(0)
         .checked_add(1)
-        .ok_or_else(|| XlsError::InvalidData("RRTabId identifier overflow".into()))?;
+        .ok_or_else(|| Error::InvalidData("RRTabId identifier overflow".into()))?;
     let mut output = Vec::new();
     for (old_index, _, _) in tabs {
         let value = match old_index {
@@ -866,7 +866,7 @@ pub(crate) fn names_equal(left: &str, right: &str) -> bool {
         .eq(right.chars().flat_map(char::to_lowercase))
 }
 #[cfg(test)]
-pub(crate) fn validate_sheet_name(name: &str) -> XlsResult<()> {
+pub(crate) fn validate_sheet_name(name: &str) -> Result<()> {
     let count = name.encode_utf16().count();
     if !(1..=31).contains(&count)
         || name.chars().any(|value| {
@@ -883,7 +883,7 @@ pub(crate) fn validate_sheet_name(name: &str) -> XlsResult<()> {
     Ok(())
 }
 #[cfg(test)]
-pub(crate) fn bound_sheet_body(name: &str, kind: u8) -> XlsResult<Vec<u8>> {
+pub(crate) fn bound_sheet_body(name: &str, kind: u8) -> Result<Vec<u8>> {
     validate_sheet_name(name)?;
     let units = name.encode_utf16().collect::<Vec<_>>();
     let wide = units.iter().any(|v| *v > 255);
@@ -900,17 +900,17 @@ pub(crate) fn bound_sheet_body(name: &str, kind: u8) -> XlsResult<Vec<u8>> {
     }
     Ok(output)
 }
-pub(crate) fn bound_sheet_name(data: &[u8]) -> XlsResult<String> {
+pub(crate) fn bound_sheet_name(data: &[u8]) -> Result<String> {
     if data.len() < 8 {
         return invalid(BOUNDSHEET, "BoundSheet is truncated");
     }
-    parse_biff8_string(&data[6..]).map_err(|_| XlsError::InvalidRecord {
+    parse_biff8_string(&data[6..]).map_err(|_| Error::InvalidRecord {
         record_type: BOUNDSHEET,
         message: "invalid BoundSheet name".into(),
     })
 }
 
-fn parse_workbook_charts(input: &[u8], limits: Limits) -> XlsResult<Vec<StoredChart>> {
+fn parse_workbook_charts(input: &[u8], limits: Limits) -> Result<Vec<StoredChart>> {
     let (_, sheets) = bindings(input)?;
     let mut output = Vec::new();
     for sheet in &sheets {
@@ -952,11 +952,11 @@ fn parse_workbook_charts(input: &[u8], limits: Limits) -> XlsResult<Vec<StoredCh
                 let start = sheet
                     .start
                     .checked_add(value.start)
-                    .ok_or_else(|| XlsError::InvalidData("object start offset overflow".into()))?;
+                    .ok_or_else(|| Error::InvalidData("object start offset overflow".into()))?;
                 let end = sheet
                     .start
                     .checked_add(value.end)
-                    .ok_or_else(|| XlsError::InvalidData("object end offset overflow".into()))?;
+                    .ok_or_else(|| Error::InvalidData("object end offset overflow".into()))?;
                 chart_objects.push((id, start, end));
             }
         }
@@ -970,10 +970,10 @@ fn parse_workbook_charts(input: &[u8], limits: Limits) -> XlsResult<Vec<StoredCh
             let start = sheet
                 .start
                 .checked_add(chart_ref.offset())
-                .ok_or_else(|| XlsError::InvalidData("chart start offset overflow".into()))?;
+                .ok_or_else(|| Error::InvalidData("chart start offset overflow".into()))?;
             let end = start
                 .checked_add(chart_ref.as_bytes().len())
-                .ok_or_else(|| XlsError::InvalidData("chart end offset overflow".into()))?;
+                .ok_or_else(|| Error::InvalidData("chart end offset overflow".into()))?;
             #[cfg(not(test))]
             let _ = end;
             let object = chart_objects
@@ -1015,7 +1015,7 @@ fn rewrite_workbook_charts(
     original: &[StoredChart],
     desired: &[Entry],
     limits: Limits,
-) -> XlsResult<Vec<u8>> {
+) -> Result<Vec<u8>> {
     let (refs, sheets) = bindings(input)?;
     let mut output = input[..sheets.first().map_or(input.len(), |v| v.start)].to_vec();
     let mut new_offsets = HashMap::new();
@@ -1099,7 +1099,7 @@ fn rewrite_workbook_charts(
             .ok_or_else(|| invalid_error(BOUNDSHEET, "BoundSheet target is missing"))?;
         output[reference..reference + 4].copy_from_slice(
             &u32::try_from(new)
-                .map_err(|_| XlsError::InvalidData("BoundSheet offset exceeds u32".into()))?
+                .map_err(|_| Error::InvalidData("BoundSheet offset exceeds u32".into()))?
                 .to_le_bytes(),
         );
     }
@@ -1126,7 +1126,7 @@ struct Sheet {
     name: String,
 }
 #[allow(clippy::type_complexity)]
-fn bindings(input: &[u8]) -> XlsResult<(Vec<(usize, usize)>, Vec<Sheet>)> {
+fn bindings(input: &[u8]) -> Result<(Vec<(usize, usize)>, Vec<Sheet>)> {
     let mut refs = Vec::new();
     for value in ranges(input)? {
         if value.kind == BOUNDSHEET {
@@ -1170,10 +1170,10 @@ fn bindings(input: &[u8]) -> XlsResult<(Vec<(usize, usize)>, Vec<Sheet>)> {
         sheets,
     ))
 }
-pub(super) fn ranges(input: &[u8]) -> XlsResult<Vec<Range>> {
+pub(super) fn ranges(input: &[u8]) -> Result<Vec<Range>> {
     ranges_with(input, BiffLimits::default().max_records)
 }
-pub(super) fn ranges_with(input: &[u8], max_records: usize) -> XlsResult<Vec<Range>> {
+pub(super) fn ranges_with(input: &[u8], max_records: usize) -> Result<Vec<Range>> {
     let mut out = Vec::new();
     let biff_limits = BiffLimits {
         max_records,
@@ -1181,18 +1181,18 @@ pub(super) fn ranges_with(input: &[u8], max_records: usize) -> XlsResult<Vec<Ran
         ..BiffLimits::default()
     };
     let records = Records::with_limits(input, biff_limits)
-        .map_err(|error| XlsError::InvalidData(error.to_string()))?;
+        .map_err(|error| Error::InvalidData(error.to_string()))?;
     for record in records {
-        let record = record.map_err(|error| XlsError::InvalidData(error.to_string()))?;
+        let record = record.map_err(|error| Error::InvalidData(error.to_string()))?;
         let start = record.offset();
         let body_start = start
             .checked_add(4)
-            .ok_or_else(|| XlsError::InvalidData("BIFF body offset overflow".into()))?;
+            .ok_or_else(|| Error::InvalidData("BIFF body offset overflow".into()))?;
         let end = start
             .checked_add(record.encoded().len())
-            .ok_or_else(|| XlsError::InvalidData("BIFF record length overflow".into()))?;
+            .ok_or_else(|| Error::InvalidData("BIFF record length overflow".into()))?;
         out.try_reserve(1)
-            .map_err(|_| XlsError::InvalidData("could not allocate BIFF ranges".into()))?;
+            .map_err(|_| Error::InvalidData("could not allocate BIFF ranges".into()))?;
         out.push(Range {
             start,
             end,
@@ -1204,7 +1204,7 @@ pub(super) fn ranges_with(input: &[u8], max_records: usize) -> XlsResult<Vec<Ran
     Ok(out)
 }
 #[cfg(test)]
-fn sheet_object_ids(input: &[u8], sheet: &Sheet) -> XlsResult<HashSet<u16>> {
+fn sheet_object_ids(input: &[u8], sheet: &Sheet) -> Result<HashSet<u16>> {
     let bytes = input
         .get(sheet.start..sheet.end)
         .ok_or_else(|| invalid_error(BOUNDSHEET, "worksheet range is out of bounds"))?;
@@ -1219,10 +1219,10 @@ fn sheet_object_ids(input: &[u8], sheet: &Sheet) -> XlsResult<HashSet<u16>> {
     }
     Ok(ids)
 }
-pub(crate) fn parse_chart_object(data: &[u8]) -> XlsResult<Option<u16>> {
+pub(crate) fn parse_chart_object(data: &[u8]) -> Result<Option<u16>> {
     Ok(parse_object(data)?.and_then(|(kind, id)| (kind == 5).then_some(id)))
 }
-pub(crate) fn parse_object(data: &[u8]) -> XlsResult<Option<(u16, u16)>> {
+pub(crate) fn parse_object(data: &[u8]) -> Result<Option<(u16, u16)>> {
     let mut offset = 0;
     while offset < data.len() {
         let h = data
@@ -1233,7 +1233,7 @@ pub(crate) fn parse_object(data: &[u8]) -> XlsResult<Option<(u16, u16)>> {
         offset += 4;
         let end = offset
             .checked_add(len)
-            .ok_or_else(|| XlsError::InvalidData("Obj length overflow".into()))?;
+            .ok_or_else(|| Error::InvalidData("Obj length overflow".into()))?;
         let body = data
             .get(offset..end)
             .ok_or_else(|| invalid_error(OBJ, "truncated Obj subrecord body"))?;
@@ -1248,7 +1248,7 @@ pub(crate) fn parse_object(data: &[u8]) -> XlsResult<Option<(u16, u16)>> {
     Ok(None)
 }
 #[cfg(test)]
-pub(crate) fn chart_object_record(id: u16) -> XlsResult<Vec<u8>> {
+pub(crate) fn chart_object_record(id: u16) -> Result<Vec<u8>> {
     let mut body = Vec::new();
     body.extend(0x15u16.to_le_bytes());
     body.extend(18u16.to_le_bytes());

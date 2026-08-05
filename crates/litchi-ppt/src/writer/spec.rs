@@ -150,9 +150,9 @@ impl ColorScheme {
 // =============================================================================
 
 /// PPT10 tag string - marks PowerPoint 2002 (XP) and later features
-pub struct Ppt10Tag;
+pub struct Tag10;
 
-impl Ppt10Tag {
+impl Tag10 {
     /// The tag identifier string
     pub const TAG_STRING: &'static str = "___PPT10";
 
@@ -646,17 +646,17 @@ mod tests {
     }
 
     // =============================================================================
-    // Ppt10Tag Tests
+    // Tag10 Tests
     // =============================================================================
 
     #[test]
     fn test_ppt10_tag_string() {
-        assert_eq!(Ppt10Tag::TAG_STRING, "___PPT10");
+        assert_eq!(Tag10::TAG_STRING, "___PPT10");
     }
 
     #[test]
     fn test_ppt10_tag_to_bytes() {
-        let bytes = Ppt10Tag::to_bytes();
+        let bytes = Tag10::to_bytes();
         assert_eq!(bytes.len(), 16);
 
         // Check UTF-16LE encoding of "___PPT10"

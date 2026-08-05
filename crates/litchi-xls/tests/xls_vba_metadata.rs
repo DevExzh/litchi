@@ -2,7 +2,7 @@ use litchi_vba::{
     Limits,
     build::{Module, Project},
 };
-use litchi_xls::{XlsWorkbook, XlsWriter};
+use litchi_xls::{Workbook, Writer};
 use std::fs::File;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
@@ -15,7 +15,7 @@ fn poi_fixture(name: &str) -> PathBuf {
 
 #[test]
 fn reads_macro_fixture_without_opening_project_streams() {
-    let workbook = XlsWorkbook::new(File::open(poi_fixture("SimpleMacro.xls")).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(poi_fixture("SimpleMacro.xls")).unwrap()).unwrap();
     let metadata = workbook.vba_metadata();
     assert!(metadata.has_project_marker());
     assert!(metadata.has_project_storage());
@@ -30,7 +30,7 @@ fn reads_macro_fixture_without_opening_project_streams() {
 
 #[test]
 fn empty_project_metadata_round_trips_as_non_executable() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Data").unwrap();
     let project = Project::new("VBAProject")
         .finish(&Limits::default())
@@ -41,7 +41,7 @@ fn empty_project_metadata_round_trips_as_non_executable() {
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let mut workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let mut workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
     let metadata = workbook.vba_metadata();
     assert!(metadata.has_project_marker());
     assert!(metadata.has_no_macros_marker());
@@ -62,7 +62,7 @@ fn empty_project_metadata_round_trips_as_non_executable() {
 
 #[test]
 fn complete_project_with_modules_round_trips_as_inert_source() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Data").unwrap();
     let project = Project::new("Analytics")
         .module(Module::standard(
@@ -81,7 +81,7 @@ fn complete_project_with_modules_round_trips_as_inert_source() {
 
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let mut workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let mut workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
     let metadata = workbook.vba_metadata();
     assert!(metadata.has_project_marker());
     assert!(!metadata.has_no_macros_marker());
@@ -116,7 +116,7 @@ fn complete_project_with_modules_round_trips_as_inert_source() {
 
 #[test]
 fn configured_project_and_sheet_code_names_can_be_cleared() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Data").unwrap();
     writer
         .set_vba("ThisWorkbook", Project::new("VBAProject"))
@@ -131,14 +131,14 @@ fn configured_project_and_sheet_code_names_can_be_cleared() {
 
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
     assert!(!workbook.vba_metadata().has_project_storage());
     assert_eq!(workbook.xls_worksheet(0).unwrap().vba_code_name(), None);
 }
 
 #[test]
 fn failed_project_build_does_not_replace_existing_configuration() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     writer.add_worksheet("Data").unwrap();
     writer
         .set_vba("ExistingBook", Project::new("VBAProject"))
@@ -157,7 +157,7 @@ fn failed_project_build_does_not_replace_existing_configuration() {
 
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
     assert_eq!(
         workbook.vba_metadata().workbook_code_name(),
         Some("ExistingBook")
@@ -167,7 +167,7 @@ fn failed_project_build_does_not_replace_existing_configuration() {
 
 #[test]
 fn writer_rejects_invalid_code_names_and_unscoped_sheet_names() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Data").unwrap();
     assert!(
         writer

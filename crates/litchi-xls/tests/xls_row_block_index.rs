@@ -1,6 +1,6 @@
 use std::fs::File;
 
-use litchi_xls::XlsWorkbook;
+use litchi_xls::Workbook;
 
 #[test]
 fn parses_poi_simple_and_multirow_indexes() {
@@ -8,7 +8,7 @@ fn parses_poi_simple_and_multirow_indexes() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/poi/test-data/spreadsheet/Simple.xls"
     );
-    let workbook = XlsWorkbook::new(File::open(simple_path).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(simple_path).unwrap()).unwrap();
     let index = workbook
         .xls_worksheet(0)
         .unwrap()
@@ -31,7 +31,7 @@ fn parses_poi_simple_and_multirow_indexes() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/poi/test-data/spreadsheet/48968.xls"
     );
-    let workbook = XlsWorkbook::new(File::open(multi_path).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(multi_path).unwrap()).unwrap();
     let index = workbook
         .xls_worksheet(0)
         .unwrap()
@@ -59,7 +59,7 @@ fn parses_real_sparse_and_rowless_dbcell_blocks() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/ole/xls/ConditionalFormattingSamples.xls"
     );
-    let workbook = XlsWorkbook::new(File::open(sparse_path).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(sparse_path).unwrap()).unwrap();
     let index = workbook
         .xls_worksheet(13)
         .unwrap()

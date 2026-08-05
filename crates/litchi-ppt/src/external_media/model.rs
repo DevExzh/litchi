@@ -1,6 +1,6 @@
 //! Contextual PowerPoint external-media values.
 
-use crate::records::PptRecord;
+use crate::records::Record;
 
 /// The eight-byte semantic payload carried by an `ExMediaAtom`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -93,7 +93,7 @@ pub enum Object {
 /// children. The payload is exposed only by borrow or an exact reconstruction.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UnknownRecord {
-    pub(crate) record: PptRecord,
+    pub(crate) record: Record,
     pub(crate) object_index: usize,
 }
 

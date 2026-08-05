@@ -14,25 +14,24 @@
 //! ```
 
 use super::revision_records as records;
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 use records::{
-    CONTINUE_RECORD_TYPE, EOF_RECORD_TYPE, FILE_LOCK_RECORD_TYPE, NOTE_RECORD_TYPE,
+    CONTINUE_RECORD_TYPE, EOF_RECORD_TYPE, FILE_LOCK_RECORD_TYPE, FileLock, NOTE_RECORD_TYPE,
     RECORD_HEADER_LEN, RR_AUTO_FMT_RECORD_TYPE, RR_FORMAT_RECORD_TYPE, RR_INSERT_SH_RECORD_TYPE,
     RR_TAB_ID_RECORD_TYPE, RRD_CHG_CELL_RECORD_TYPE, RRD_CONFLICT_RECORD_TYPE,
     RRD_DEF_NAME_RECORD_TYPE, RRD_HEAD_RECORD_TYPE, RRD_INFO_RECORD_TYPE,
     RRD_INS_DEL_BEGIN_RECORD_TYPE, RRD_INS_DEL_END_RECORD_TYPE, RRD_INS_DEL_RECORD_TYPE,
     RRD_MOVE_BEGIN_RECORD_TYPE, RRD_MOVE_END_RECORD_TYPE, RRD_MOVE_RECORD_TYPE,
     RRD_REN_SHEET_RECORD_TYPE, RRD_RST_ETXP_RECORD_TYPE, RRD_TQSIF_RECORD_TYPE,
-    RRD_USER_VIEW_RECORD_TYPE, USR_EXCL_RECORD_TYPE, XlsFileLock, XlsRrInsertSh, XlsRrTabId,
-    XlsRrdChgCell, XlsRrdConflict, XlsRrdHead, XlsRrdInfo, XlsRrdInsDel, XlsRrdMove,
-    XlsRrdRenSheet, XlsRrdUserView, XlsUsrExcl,
+    RRD_USER_VIEW_RECORD_TYPE, RrInsertSh, RrTabId, RrdChgCell, RrdConflict, RrdHead, RrdInfo,
+    RrdInsDel, RrdMove, RrdRenSheet, RrdUserView, USR_EXCL_RECORD_TYPE, UsrExcl,
 };
 
 /// Name of the revision stream in the CFB root storage (MS-XLS 2.1.7.14).
 pub const REVISION_LOG_STREAM_NAME: &str = "Revision Log";
 
-fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(record_type: u16, message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type,
         message: message.into(),
     }
@@ -60,14 +59,14 @@ struct FramedRecord<'a> {
 }
 
 /// Split the stream into BIFF records, validating the record framing.
-fn frame_records(data: &[u8]) -> XlsResult<Vec<FramedRecord<'_>>> {
+fn frame_records(data: &[u8]) -> Result<Vec<FramedRecord<'_>>> {
     let mut records_out = Vec::new();
     let mut offset = 0usize;
     while offset < data.len() {
         let header = data
             .get(offset..offset + RECORD_HEADER_LEN)
             .ok_or_else(|| {
-                XlsError::UnexpectedEndOfStream("truncated revision record header".to_string())
+                Error::UnexpectedEndOfStream("truncated revision record header".to_string())
             })?;
         let record_type = u16::from_le_bytes([header[0], header[1]]);
         let length = usize::from(u16::from_le_bytes([header[2], header[3]]));
@@ -94,12 +93,12 @@ fn frame_records(data: &[u8]) -> XlsResult<Vec<FramedRecord<'_>>> {
 /// records; their grammars involve differential formats, parsed formulas, and
 /// shape note substreams that are specified outside the revision records.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsOpaqueRevisionRecord {
+pub struct OpaqueRevisionRecord {
     record_type: u16,
     payload: Vec<u8>,
 }
 
-impl XlsOpaqueRevisionRecord {
+impl OpaqueRevisionRecord {
     pub fn record_type(&self) -> u16 {
         self.record_type
     }
@@ -110,23 +109,23 @@ impl XlsOpaqueRevisionRecord {
 
 /// A cell change or formatting change nested inside an insert/delete or move.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum XlsRevisionChange {
+pub enum RevisionChange {
     /// An `RRDChgCell` revision with its Continue and `RRDRstEtxp` records.
-    CellChange(Box<XlsRrdChgCellRevision>),
+    CellChange(Box<RrdChgCellRevision>),
     /// An `RRFormat` formatting revision, preserved raw.
-    Format(XlsOpaqueRevisionRecord),
+    Format(OpaqueRevisionRecord),
 }
 
 /// An `RRDChgCell` record together with the records the ABNF attaches to it.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsRrdChgCellRevision {
-    record: XlsRrdChgCell,
+pub struct RrdChgCellRevision {
+    record: RrdChgCell,
     continue_payloads: Vec<Vec<u8>>,
     formatting_runs: Vec<Vec<u8>>,
 }
 
-impl XlsRrdChgCellRevision {
-    pub fn record(&self) -> &XlsRrdChgCell {
+impl RrdChgCellRevision {
+    pub fn record(&self) -> &RrdChgCell {
         &self.record
     }
     /// Raw `Continue` payloads following the `RRDChgCell` record.
@@ -141,14 +140,14 @@ impl XlsRrdChgCellRevision {
 
 /// An insertion or deletion of rows/columns with its nested changes.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsRrdInsDelRevision {
-    record: XlsRrdInsDel,
+pub struct RrdInsDelRevision {
+    record: RrdInsDel,
     deletion: bool,
-    changes: Vec<XlsRevisionChange>,
+    changes: Vec<RevisionChange>,
 }
 
-impl XlsRrdInsDelRevision {
-    pub fn record(&self) -> &XlsRrdInsDel {
+impl RrdInsDelRevision {
+    pub fn record(&self) -> &RrdInsDel {
         &self.record
     }
     /// Whether the record was wrapped in `RRDInsDelBegin`/`RRDInsDelEnd`
@@ -156,84 +155,84 @@ impl XlsRrdInsDelRevision {
     pub fn is_deletion(&self) -> bool {
         self.deletion
     }
-    pub fn changes(&self) -> &[XlsRevisionChange] {
+    pub fn changes(&self) -> &[RevisionChange] {
         &self.changes
     }
 }
 
 /// A cell-range move with its nested changes.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsRrdMoveRevision {
-    record: XlsRrdMove,
-    changes: Vec<XlsRevisionChange>,
+pub struct RrdMoveRevision {
+    record: RrdMove,
+    changes: Vec<RevisionChange>,
 }
 
-impl XlsRrdMoveRevision {
-    pub fn record(&self) -> &XlsRrdMove {
+impl RrdMoveRevision {
+    pub fn record(&self) -> &RrdMove {
         &self.record
     }
-    pub fn changes(&self) -> &[XlsRevisionChange] {
+    pub fn changes(&self) -> &[RevisionChange] {
         &self.changes
     }
 }
 
 /// One revision inside a revision header's set.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum XlsRevision {
-    RenSheet(XlsRrdRenSheet),
-    InsDel(XlsRrdInsDelRevision),
-    Move(XlsRrdMoveRevision),
-    InsertSheet(XlsRrInsertSh),
-    CellChange(Box<XlsRrdChgCellRevision>),
-    Conflict(XlsRrdConflict),
-    UserView(XlsRrdUserView),
+pub enum Revision {
+    RenSheet(RrdRenSheet),
+    InsDel(RrdInsDelRevision),
+    Move(RrdMoveRevision),
+    InsertSheet(RrInsertSh),
+    CellChange(Box<RrdChgCellRevision>),
+    Conflict(RrdConflict),
+    UserView(RrdUserView),
     /// `RRAutoFmt`, `RRDDefName`, `Note`, or `RRDTQSIF`, preserved raw.
-    Opaque(XlsOpaqueRevisionRecord),
+    Opaque(OpaqueRevisionRecord),
 }
 
 /// One user's set of revisions: an `RRDHead`, its optional `RRTabId`, and
 /// the revisions that follow it (MS-XLS 2.1.7.14 `HEADER` production).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsRevisionHeader {
-    head: XlsRrdHead,
-    sheet_ids: Option<XlsRrTabId>,
-    revisions: Vec<XlsRevision>,
+pub struct RevisionHeader {
+    head: RrdHead,
+    sheet_ids: Option<RrTabId>,
+    revisions: Vec<Revision>,
 }
 
-impl XlsRevisionHeader {
-    pub fn head(&self) -> &XlsRrdHead {
+impl RevisionHeader {
+    pub fn head(&self) -> &RrdHead {
         &self.head
     }
     /// Sheet identifiers for this revision set; absent when the workbook has
     /// more than 4112 sheets (MS-XLS 2.4.241).
-    pub fn sheet_ids(&self) -> Option<&XlsRrTabId> {
+    pub fn sheet_ids(&self) -> Option<&RrTabId> {
         self.sheet_ids.as_ref()
     }
-    pub fn revisions(&self) -> &[XlsRevision] {
+    pub fn revisions(&self) -> &[Revision] {
         &self.revisions
     }
 }
 
 /// The parsed `Revision Log` stream of a shared workbook.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsRevisionLog {
-    info: XlsRrdInfo,
-    file_lock: Option<XlsFileLock>,
-    exclusive_lock: Option<XlsUsrExcl>,
-    headers: Vec<XlsRevisionHeader>,
+pub struct RevisionLog {
+    info: RrdInfo,
+    file_lock: Option<FileLock>,
+    exclusive_lock: Option<UsrExcl>,
+    headers: Vec<RevisionHeader>,
 }
 
-impl XlsRevisionLog {
-    pub fn info(&self) -> &XlsRrdInfo {
+impl RevisionLog {
+    pub fn info(&self) -> &RrdInfo {
         &self.info
     }
-    pub fn file_lock(&self) -> Option<&XlsFileLock> {
+    pub fn file_lock(&self) -> Option<&FileLock> {
         self.file_lock.as_ref()
     }
-    pub fn exclusive_lock(&self) -> Option<&XlsUsrExcl> {
+    pub fn exclusive_lock(&self) -> Option<&UsrExcl> {
         self.exclusive_lock.as_ref()
     }
-    pub fn headers(&self) -> &[XlsRevisionHeader] {
+    pub fn headers(&self) -> &[RevisionHeader] {
         &self.headers
     }
 }
@@ -243,10 +242,10 @@ impl XlsRevisionLog {
 fn parse_chg_cell_revision(
     stream: &[FramedRecord<'_>],
     cursor: &mut usize,
-) -> XlsResult<XlsRrdChgCellRevision> {
+) -> Result<RrdChgCellRevision> {
     let framed = &stream[*cursor];
     debug_assert_eq!(framed.record_type, RRD_CHG_CELL_RECORD_TYPE);
-    let record = XlsRrdChgCell::parse_payload(framed.payload)?;
+    let record = RrdChgCell::parse_payload(framed.payload)?;
     *cursor += 1;
     let mut continue_payloads = Vec::new();
     while stream
@@ -274,7 +273,7 @@ fn parse_chg_cell_revision(
         formatting_runs.push(next.payload.to_vec());
         *cursor += 1;
     }
-    Ok(XlsRrdChgCellRevision {
+    Ok(RrdChgCellRevision {
         record,
         continue_payloads,
         formatting_runs,
@@ -286,17 +285,17 @@ fn parse_chg_cell_revision(
 fn parse_nested_changes(
     stream: &[FramedRecord<'_>],
     cursor: &mut usize,
-) -> XlsResult<Vec<XlsRevisionChange>> {
+) -> Result<Vec<RevisionChange>> {
     let mut changes = Vec::new();
     while let Some(next) = stream.get(*cursor) {
         match next.record_type {
             RRD_CHG_CELL_RECORD_TYPE => {
-                changes.push(XlsRevisionChange::CellChange(Box::new(
+                changes.push(RevisionChange::CellChange(Box::new(
                     parse_chg_cell_revision(stream, cursor)?,
                 )));
             },
             RR_FORMAT_RECORD_TYPE => {
-                changes.push(XlsRevisionChange::Format(XlsOpaqueRevisionRecord {
+                changes.push(RevisionChange::Format(OpaqueRevisionRecord {
                     record_type: next.record_type,
                     payload: next.payload.to_vec(),
                 }));
@@ -313,7 +312,7 @@ fn expect_marker(
     cursor: &mut usize,
     expected: u16,
     name: &str,
-) -> XlsResult<()> {
+) -> Result<()> {
     let Some(next) = stream.get(*cursor) else {
         return Err(invalid(expected, format!("missing {name} record")));
     };
@@ -329,20 +328,20 @@ fn expect_marker(
 }
 
 /// Parse one revision record at `stream[*cursor]`, advancing past it.
-fn parse_revision(stream: &[FramedRecord<'_>], cursor: &mut usize) -> XlsResult<XlsRevision> {
+fn parse_revision(stream: &[FramedRecord<'_>], cursor: &mut usize) -> Result<Revision> {
     let framed = &stream[*cursor];
     match framed.record_type {
         RRD_REN_SHEET_RECORD_TYPE => {
             *cursor += 1;
-            Ok(XlsRevision::RenSheet(XlsRrdRenSheet::parse_payload(
+            Ok(Revision::RenSheet(RrdRenSheet::parse_payload(
                 framed.payload,
             )?))
         },
         RRD_INS_DEL_RECORD_TYPE => {
             *cursor += 1;
-            let record = XlsRrdInsDel::parse_payload(framed.payload)?;
+            let record = RrdInsDel::parse_payload(framed.payload)?;
             let changes = parse_nested_changes(stream, cursor)?;
-            Ok(XlsRevision::InsDel(XlsRrdInsDelRevision {
+            Ok(Revision::InsDel(RrdInsDelRevision {
                 record,
                 deletion: false,
                 changes,
@@ -367,11 +366,11 @@ fn parse_revision(stream: &[FramedRecord<'_>], cursor: &mut usize) -> XlsResult<
                     "RRDInsDelBegin is not followed by RRDInsDel",
                 ));
             }
-            let record = XlsRrdInsDel::parse_payload(next.payload)?;
+            let record = RrdInsDel::parse_payload(next.payload)?;
             *cursor += 1;
             let changes = parse_nested_changes(stream, cursor)?;
             expect_marker(stream, cursor, RRD_INS_DEL_END_RECORD_TYPE, "RRDInsDelEnd")?;
-            Ok(XlsRevision::InsDel(XlsRrdInsDelRevision {
+            Ok(Revision::InsDel(RrdInsDelRevision {
                 record,
                 deletion: true,
                 changes,
@@ -391,30 +390,30 @@ fn parse_revision(stream: &[FramedRecord<'_>], cursor: &mut usize) -> XlsResult<
                     "RRDMoveBegin is not followed by RRDMove",
                 ));
             }
-            let record = XlsRrdMove::parse_payload(next.payload)?;
+            let record = RrdMove::parse_payload(next.payload)?;
             *cursor += 1;
             let changes = parse_nested_changes(stream, cursor)?;
             expect_marker(stream, cursor, RRD_MOVE_END_RECORD_TYPE, "RRDMoveEnd")?;
-            Ok(XlsRevision::Move(XlsRrdMoveRevision { record, changes }))
+            Ok(Revision::Move(RrdMoveRevision { record, changes }))
         },
-        RRD_CHG_CELL_RECORD_TYPE => Ok(XlsRevision::CellChange(Box::new(parse_chg_cell_revision(
+        RRD_CHG_CELL_RECORD_TYPE => Ok(Revision::CellChange(Box::new(parse_chg_cell_revision(
             stream, cursor,
         )?))),
         RRD_CONFLICT_RECORD_TYPE => {
             *cursor += 1;
-            Ok(XlsRevision::Conflict(XlsRrdConflict::parse_payload(
+            Ok(Revision::Conflict(RrdConflict::parse_payload(
                 framed.payload,
             )?))
         },
         RR_INSERT_SH_RECORD_TYPE => {
             *cursor += 1;
-            Ok(XlsRevision::InsertSheet(XlsRrInsertSh::parse_payload(
+            Ok(Revision::InsertSheet(RrInsertSh::parse_payload(
                 framed.payload,
             )?))
         },
         RRD_USER_VIEW_RECORD_TYPE => {
             *cursor += 1;
-            Ok(XlsRevision::UserView(XlsRrdUserView::parse_payload(
+            Ok(Revision::UserView(RrdUserView::parse_payload(
                 framed.payload,
             )?))
         },
@@ -423,7 +422,7 @@ fn parse_revision(stream: &[FramedRecord<'_>], cursor: &mut usize) -> XlsResult<
         | NOTE_RECORD_TYPE
         | RRD_TQSIF_RECORD_TYPE => {
             *cursor += 1;
-            Ok(XlsRevision::Opaque(XlsOpaqueRevisionRecord {
+            Ok(Revision::Opaque(OpaqueRevisionRecord {
                 record_type: framed.record_type,
                 payload: framed.payload.to_vec(),
             }))
@@ -436,7 +435,7 @@ fn parse_revision(stream: &[FramedRecord<'_>], cursor: &mut usize) -> XlsResult<
 }
 
 /// Parse the `Revision Log` stream bytes into a typed, inert model.
-pub fn parse_revision_log_stream(data: &[u8]) -> XlsResult<XlsRevisionLog> {
+pub fn parse_revision_log_stream(data: &[u8]) -> Result<RevisionLog> {
     let stream = frame_records(data)?;
     if stream.len() < 2 {
         return Err(invalid(
@@ -450,7 +449,7 @@ pub fn parse_revision_log_stream(data: &[u8]) -> XlsResult<XlsRevisionLog> {
             "revision log must start with RRDInfo",
         ));
     }
-    let info = XlsRrdInfo::parse_payload(stream[0].payload)?;
+    let info = RrdInfo::parse_payload(stream[0].payload)?;
     let last = &stream[stream.len() - 1];
     if last.record_type != EOF_RECORD_TYPE {
         return Err(invalid(
@@ -467,14 +466,14 @@ pub fn parse_revision_log_stream(data: &[u8]) -> XlsResult<XlsRevisionLog> {
 
     let mut cursor = 1usize;
     let file_lock = if stream[cursor].record_type == FILE_LOCK_RECORD_TYPE {
-        let lock = XlsFileLock::parse_payload(stream[cursor].payload)?;
+        let lock = FileLock::parse_payload(stream[cursor].payload)?;
         cursor += 1;
         Some(lock)
     } else {
         None
     };
     let exclusive_lock = if stream[cursor].record_type == USR_EXCL_RECORD_TYPE {
-        let lock = XlsUsrExcl::parse_payload(stream[cursor].payload)?;
+        let lock = UsrExcl::parse_payload(stream[cursor].payload)?;
         cursor += 1;
         Some(lock)
     } else {
@@ -489,10 +488,10 @@ pub fn parse_revision_log_stream(data: &[u8]) -> XlsResult<XlsRevisionLog> {
                 "expected an RRDHead record in the revision log",
             ));
         }
-        let head = XlsRrdHead::parse_payload(stream[cursor].payload)?;
+        let head = RrdHead::parse_payload(stream[cursor].payload)?;
         cursor += 1;
         let sheet_ids = if stream[cursor].record_type == RR_TAB_ID_RECORD_TYPE {
-            let ids = XlsRrTabId::parse_payload(stream[cursor].payload)?;
+            let ids = RrTabId::parse_payload(stream[cursor].payload)?;
             cursor += 1;
             Some(ids)
         } else {
@@ -504,7 +503,7 @@ pub fn parse_revision_log_stream(data: &[u8]) -> XlsResult<XlsRevisionLog> {
         {
             revisions.push(parse_revision(&stream, &mut cursor)?);
         }
-        headers.push(XlsRevisionHeader {
+        headers.push(RevisionHeader {
             head,
             sheet_ids,
             revisions,
@@ -517,7 +516,7 @@ pub fn parse_revision_log_stream(data: &[u8]) -> XlsResult<XlsRevisionLog> {
         ));
     }
 
-    Ok(XlsRevisionLog {
+    Ok(RevisionLog {
         info,
         file_lock,
         exclusive_lock,
@@ -528,7 +527,7 @@ pub fn parse_revision_log_stream(data: &[u8]) -> XlsResult<XlsRevisionLog> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use records::XlsRevisionType;
+    use records::RevisionType;
 
     /// Frame a BIFF record: `rt`, `cb`, payload.
     fn record(record_type: u16, payload: &[u8]) -> Vec<u8> {
@@ -758,7 +757,7 @@ mod tests {
 
         let lock = log.file_lock().unwrap();
         assert_eq!(lock.user_name(), "Bob");
-        assert_eq!(lock.purpose(), records::XlsFileLockPurpose::WritingUserInfo);
+        assert_eq!(lock.purpose(), records::FileLockPurpose::WritingUserInfo);
         let exclusive = log.exclusive_lock().unwrap();
         assert!(exclusive.is_exclusive());
         assert_eq!(exclusive.user_name(), "Bob");
@@ -771,22 +770,22 @@ mod tests {
         assert_eq!(first.sheet_ids().unwrap().sheet_ids(), &[1, 2, 3]);
         assert_eq!(first.revisions().len(), 4);
         match &first.revisions()[0] {
-            XlsRevision::RenSheet(sheet) => {
+            Revision::RenSheet(sheet) => {
                 assert_eq!(sheet.old_name(), "Budget");
                 assert_eq!(sheet.new_name(), "Budget2");
             },
             other => panic!("expected RenSheet, got {other:?}"),
         }
         match &first.revisions()[1] {
-            XlsRevision::InsDel(ins_del) => {
+            Revision::InsDel(ins_del) => {
                 assert!(!ins_del.is_deletion());
                 assert_eq!(
                     ins_del.record().header().revision_type(),
-                    XlsRevisionType::InsertRow
+                    RevisionType::InsertRow
                 );
                 assert_eq!(ins_del.changes().len(), 2);
                 match &ins_del.changes()[0] {
-                    XlsRevisionChange::CellChange(cell) => {
+                    RevisionChange::CellChange(cell) => {
                         assert_eq!(cell.record().location().row(), 12);
                         assert_eq!(cell.continue_payloads(), &[vec![1, 2, 3]]);
                         assert_eq!(cell.formatting_runs(), &[vec![0, 0, 4, 0]]);
@@ -794,7 +793,7 @@ mod tests {
                     other => panic!("expected nested cell change, got {other:?}"),
                 }
                 match &ins_del.changes()[1] {
-                    XlsRevisionChange::Format(format) => {
+                    RevisionChange::Format(format) => {
                         assert_eq!(format.record_type(), RR_FORMAT_RECORD_TYPE);
                         assert_eq!(format.payload(), &[9, 9, 9]);
                     },
@@ -803,9 +802,9 @@ mod tests {
             },
             other => panic!("expected InsDel, got {other:?}"),
         }
-        assert!(matches!(first.revisions()[2], XlsRevision::Conflict(_)));
+        assert!(matches!(first.revisions()[2], Revision::Conflict(_)));
         match &first.revisions()[3] {
-            XlsRevision::Opaque(opaque) => {
+            Revision::Opaque(opaque) => {
                 assert_eq!(opaque.record_type(), RR_AUTO_FMT_RECORD_TYPE);
             },
             other => panic!("expected opaque AutoFormat, got {other:?}"),
@@ -816,17 +815,17 @@ mod tests {
         assert!(second.sheet_ids().is_none());
         assert_eq!(second.revisions().len(), 8);
         match &second.revisions()[0] {
-            XlsRevision::InsDel(ins_del) => {
+            Revision::InsDel(ins_del) => {
                 assert!(ins_del.is_deletion());
                 assert_eq!(
                     ins_del.record().header().revision_type(),
-                    XlsRevisionType::DeleteRow
+                    RevisionType::DeleteRow
                 );
             },
             other => panic!("expected deletion group, got {other:?}"),
         }
         match &second.revisions()[1] {
-            XlsRevision::Move(moved) => {
+            Revision::Move(moved) => {
                 assert_eq!(moved.record().source().first_row(), 0);
                 assert_eq!(moved.record().destination().first_row(), 5);
                 assert_eq!(moved.changes().len(), 1);
@@ -834,12 +833,12 @@ mod tests {
             other => panic!("expected move group, got {other:?}"),
         }
         match &second.revisions()[2] {
-            XlsRevision::InsertSheet(sheet) => assert_eq!(sheet.name(), "Q3 x"),
+            Revision::InsertSheet(sheet) => assert_eq!(sheet.name(), "Q3 x"),
             other => panic!("expected inserted sheet, got {other:?}"),
         }
         match &second.revisions()[3] {
-            XlsRevision::UserView(view) => {
-                assert_eq!(view.header().revision_type(), XlsRevisionType::DeleteView);
+            Revision::UserView(view) => {
+                assert_eq!(view.header().revision_type(), RevisionType::DeleteView);
             },
             other => panic!("expected user view, got {other:?}"),
         }
@@ -849,12 +848,12 @@ mod tests {
             (6, RRD_TQSIF_RECORD_TYPE),
         ] {
             match &second.revisions()[index] {
-                XlsRevision::Opaque(opaque) => assert_eq!(opaque.record_type(), expected),
+                Revision::Opaque(opaque) => assert_eq!(opaque.record_type(), expected),
                 other => panic!("expected opaque record, got {other:?}"),
             }
         }
         match &second.revisions()[7] {
-            XlsRevision::CellChange(cell) => {
+            Revision::CellChange(cell) => {
                 assert_eq!(cell.record().header().revision_id(), 28);
             },
             other => panic!("expected standalone cell change, got {other:?}"),

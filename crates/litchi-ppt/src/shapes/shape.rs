@@ -1,4 +1,4 @@
-use super::super::package::PptError;
+use super::super::package::Error;
 /// Base shape trait and common shape functionality.
 ///
 /// This module defines the core Shape trait that all shape types implement,
@@ -142,7 +142,7 @@ pub trait Shape: std::any::Any {
     }
 
     /// Get the shape's text content, if any.
-    fn text(&self) -> Result<String, PptError>;
+    fn text(&self) -> Result<String, Error>;
 
     /// Get the shape's position and size.
     fn bounds(&self) -> (i32, i32, i32, i32) {
@@ -486,7 +486,7 @@ where
         &mut self.properties
     }
 
-    fn text(&self) -> Result<String, PptError> {
+    fn text(&self) -> Result<String, Error> {
         Ok(self.text_content.clone().unwrap_or_default())
     }
 

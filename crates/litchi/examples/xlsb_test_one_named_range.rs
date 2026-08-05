@@ -2,7 +2,7 @@
 
 #![allow(clippy::all)]
 
-use litchi::ooxml::xlsb::named_ranges::NamedRange;
+use litchi::ooxml::xlsb::named_ranges::Definition;
 use litchi::ooxml::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use litchi::sheet::CellValue;
 use std::fs::File;
@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     workbook.add_worksheet(sheet);
 
     // ONE simple named range without formula bytes
-    let test_range = NamedRange::new("TestRange".to_string(), Some(0));
+    let test_range = Definition::new("TestRange".to_string(), Some(0));
     workbook.add_named_range(test_range);
 
     let file = File::create("xlsb_test_one_named_range.xlsb")?;

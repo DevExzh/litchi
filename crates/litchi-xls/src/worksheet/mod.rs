@@ -3,33 +3,34 @@
 pub mod layout;
 
 use crate::autofilter::{AutoFilterColumn, AutoFilterInfo, SortInfo};
-use crate::cell::XlsCell;
+use crate::cell::Cell;
 use crate::comments::Comment;
-use crate::conditional_format::XlsConditionalFormatting;
-use crate::error::XlsError;
-use crate::hyperlinks::XlsHyperlink;
+use crate::conditional_format::ConditionalFormatting;
+use crate::error::{Error, Result};
+use crate::hyperlinks::Hyperlink;
 use crate::layout::{Column, Row};
 use crate::merged_cells::MergedCellRange;
-use crate::number_format::{XlsExtendedFormat, XlsFormatting, XlsNumberFormat};
-use crate::page_setup::XlsPageSetup;
+use crate::number_format::{ExtendedFormat, Formatting, NumberFormat};
+use crate::page_setup::PageSetup;
 use crate::pivot_table::PivotTable;
 use crate::protection::SheetProtection;
 use crate::view::View;
 use crate::writer::sort::Config;
 use litchi_core::sheet::{
-    Cell as SheetCell, CellIterator, CellValue, Result, RowIterator, Worksheet,
+    Cell as SheetCell, CellIterator as CellIteratorTrait, CellValue, Result as SheetResult,
+    RowIterator as RowIteratorTrait, Worksheet as WorksheetTrait,
 };
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use super::data_validation::{XlsDataValidationRule, XlsDataValidationSettings};
+use super::data_validation::{DataValidationRule, DataValidationSettings};
 
 /// XLS worksheet implementation
 #[derive(Debug, Clone)]
-pub struct XlsWorksheet {
+pub struct Worksheet {
     name: String,
-    cells: BTreeMap<(u32, u32), XlsCell>,
+    cells: BTreeMap<(u32, u32), Cell>,
     max_row: u32,
     max_col: u32,
     /// Shared string table (Arc for zero-copy sharing across worksheets)
@@ -39,7 +40,7 @@ pub struct XlsWorksheet {
     /// Merged cell ranges (MERGECELLS records)
     merged_cells: Vec<MergedCellRange>,
     /// Hyperlinks (HLINK records)
-    hyperlinks: Vec<XlsHyperlink>,
+    hyperlinks: Vec<Hyperlink>,
     /// Comments/notes (NOTE records)
     comments: Vec<Comment>,
     /// AutoFilter configuration (AUTOFILTERINFO + AUTOFILTER records)
@@ -54,42 +55,42 @@ pub struct XlsWorksheet {
     pivot_tables: Vec<PivotTable>,
     /// Sheet protection state (PROTECT/OBJECTPROTECT/SCENPROTECT/PASSWORD)
     protection: SheetProtection,
-    formatting: Arc<XlsFormatting>,
-    data_validation_settings: Option<XlsDataValidationSettings>,
-    data_validations: Vec<XlsDataValidationRule>,
+    formatting: Arc<Formatting>,
+    data_validation_settings: Option<DataValidationSettings>,
+    data_validations: Vec<DataValidationRule>,
     row_layouts: BTreeMap<u16, Row>,
     column_layouts: Vec<Column>,
     layout: layout::Layout,
     worksheet_views: Vec<View>,
-    page_setup: Option<XlsPageSetup>,
-    calculation: crate::calculation::XlsWorksheetCalculation,
-    scenario_manager: Option<crate::scenario::XlsScenarioManager>,
+    page_setup: Option<PageSetup>,
+    calculation: crate::calculation::WorksheetCalculation,
+    scenario_manager: Option<crate::scenario::ScenarioManager>,
     vba_code_name: Option<String>,
-    conditional_formattings: Vec<XlsConditionalFormatting>,
-    conditional_formattings12: Vec<crate::conditional_format::XlsConditionalFormatting12>,
-    conditional_format_extensions: Vec<crate::conditional_format::XlsConditionalExtension>,
-    consolidation: Option<crate::consolidation::XlsConsolidation>,
-    formula_error_features: Vec<crate::formula_errors::XlsFormulaErrorFeature>,
-    list_objects: Vec<crate::list_object::XlsListObject>,
-    row_block_index: std::result::Result<Option<crate::row_block_index::XlsRowBlockIndex>, String>,
+    conditional_formattings: Vec<ConditionalFormatting>,
+    conditional_formattings12: Vec<crate::conditional_format::ConditionalFormatting12>,
+    conditional_format_extensions: Vec<crate::conditional_format::ConditionalExtension>,
+    consolidation: Option<crate::consolidation::Consolidation>,
+    formula_error_features: Vec<crate::formula_errors::FormulaErrorFeature>,
+    list_objects: Vec<crate::list_object::ListObject>,
+    row_block_index: Result<Option<crate::row_block_index::RowBlockIndex>, String>,
     /// Sheet tab color and publish state (SHEETEXT record).
-    sheet_ext: Option<crate::sheet_ext::XlsSheetExt>,
+    sheet_ext: Option<crate::sheet_ext::SheetExt>,
     /// What-if data tables (TABLE records), in record order.
-    data_tables: Vec<crate::data_table::XlsDataTable>,
+    data_tables: Vec<crate::data_table::DataTable>,
     /// Default phonetic format and visible phonetic ranges (PHONETICINFO).
-    phonetic_info: Option<crate::phonetic_info::XlsPhoneticInfo>,
+    phonetic_info: Option<crate::phonetic_info::PhoneticInfo>,
     /// Query tables (QUERYTABLE sequences), in record order.
-    query_tables: Vec<crate::query_table::XlsQueryTable>,
+    query_tables: Vec<crate::query_table::QueryTable>,
     /// Custom views (UserSViewBegin…UserSViewEnd brackets), in record order.
-    custom_views: Vec<crate::custom_view::XlsSheetCustomView>,
+    custom_views: Vec<crate::custom_view::SheetCustomView>,
     /// Web pages published from this sheet (`WebPub` records), in record order.
-    web_publications: Vec<crate::web_pub::XlsWebPub>,
+    web_publications: Vec<crate::web_pub::WebPub>,
 }
 
-impl XlsWorksheet {
+impl Worksheet {
     /// Create a new worksheet
     pub fn new(name: String) -> Self {
-        XlsWorksheet {
+        Worksheet {
             name,
             cells: BTreeMap::new(),
             max_row: 0,
@@ -105,7 +106,7 @@ impl XlsWorksheet {
             filter_mode: false,
             pivot_tables: Vec::new(),
             protection: SheetProtection::default(),
-            formatting: Arc::new(XlsFormatting::default()),
+            formatting: Arc::new(Formatting::default()),
             data_validation_settings: None,
             data_validations: Vec::new(),
             row_layouts: BTreeMap::new(),
@@ -113,7 +114,7 @@ impl XlsWorksheet {
             layout: layout::Layout::default(),
             worksheet_views: Vec::new(),
             page_setup: None,
-            calculation: crate::calculation::XlsWorksheetCalculation::default(),
+            calculation: crate::calculation::WorksheetCalculation::default(),
             scenario_manager: None,
             vba_code_name: None,
             conditional_formattings: Vec::new(),
@@ -134,7 +135,7 @@ impl XlsWorksheet {
 
     /// Create a new worksheet with shared strings (Arc for zero-copy sharing)
     pub fn with_shared_strings(name: String, shared_strings: Arc<Vec<String>>) -> Self {
-        XlsWorksheet {
+        Worksheet {
             name,
             cells: BTreeMap::new(),
             max_row: 0,
@@ -150,7 +151,7 @@ impl XlsWorksheet {
             filter_mode: false,
             pivot_tables: Vec::new(),
             protection: SheetProtection::default(),
-            formatting: Arc::new(XlsFormatting::default()),
+            formatting: Arc::new(Formatting::default()),
             data_validation_settings: None,
             data_validations: Vec::new(),
             row_layouts: BTreeMap::new(),
@@ -158,7 +159,7 @@ impl XlsWorksheet {
             layout: layout::Layout::default(),
             worksheet_views: Vec::new(),
             page_setup: None,
-            calculation: crate::calculation::XlsWorksheetCalculation::default(),
+            calculation: crate::calculation::WorksheetCalculation::default(),
             scenario_manager: None,
             vba_code_name: None,
             conditional_formattings: Vec::new(),
@@ -178,7 +179,7 @@ impl XlsWorksheet {
     }
 
     /// Add a cell to the worksheet
-    pub fn add_cell(&mut self, cell: XlsCell) {
+    pub fn add_cell(&mut self, cell: Cell) {
         let pos = (cell.row(), cell.column());
         self.max_row = self.max_row.max(cell.row());
         self.max_col = self.max_col.max(cell.column());
@@ -227,17 +228,17 @@ impl XlsWorksheet {
     /// Rich-text and phonetic metadata for a `LabelSst` cell.
     pub fn shared_string_properties_for_cell(
         &self,
-        cell: &XlsCell,
+        cell: &Cell,
     ) -> Option<&crate::records::SharedStringProperties> {
         self.shared_string_properties(cell.shared_string_index()?)
     }
 
     /// Get cell at position
-    pub fn get_cell(&self, row: u32, col: u32) -> Option<&XlsCell> {
+    pub fn get_cell(&self, row: u32, col: u32) -> Option<&Cell> {
         self.cells.get(&(row, col))
     }
 
-    pub(crate) fn get_cell_mut(&mut self, row: u32, col: u32) -> Option<&mut XlsCell> {
+    pub(crate) fn get_cell_mut(&mut self, row: u32, col: u32) -> Option<&mut Cell> {
         self.cells.get_mut(&(row, col))
     }
 
@@ -256,11 +257,11 @@ impl XlsWorksheet {
     // -- Hyperlinks --
 
     /// All hyperlinks in this worksheet.
-    pub fn hyperlinks(&self) -> &[XlsHyperlink] {
+    pub fn hyperlinks(&self) -> &[Hyperlink] {
         &self.hyperlinks
     }
 
-    pub(crate) fn set_hyperlinks(&mut self, hyperlinks: Vec<XlsHyperlink>) {
+    pub(crate) fn set_hyperlinks(&mut self, hyperlinks: Vec<Hyperlink>) {
         self.hyperlinks = hyperlinks;
     }
 
@@ -321,29 +322,29 @@ impl XlsWorksheet {
     // -- Sheet extensions --
 
     /// Sheet tab color and publish state from the SHEETEXT record, when present.
-    pub fn sheet_ext(&self) -> Option<&crate::sheet_ext::XlsSheetExt> {
+    pub fn sheet_ext(&self) -> Option<&crate::sheet_ext::SheetExt> {
         self.sheet_ext.as_ref()
     }
 
-    pub(crate) fn set_sheet_ext(&mut self, sheet_ext: crate::sheet_ext::XlsSheetExt) {
+    pub(crate) fn set_sheet_ext(&mut self, sheet_ext: crate::sheet_ext::SheetExt) {
         self.sheet_ext = Some(sheet_ext);
     }
 
     /// What-if data tables declared in this worksheet, in record order.
-    pub fn data_tables(&self) -> &[crate::data_table::XlsDataTable] {
+    pub fn data_tables(&self) -> &[crate::data_table::DataTable] {
         &self.data_tables
     }
 
-    pub(crate) fn add_data_table(&mut self, table: crate::data_table::XlsDataTable) {
+    pub(crate) fn add_data_table(&mut self, table: crate::data_table::DataTable) {
         self.data_tables.push(table);
     }
 
     /// Default phonetic format and visible phonetic ranges, when present.
-    pub fn phonetic_info(&self) -> Option<&crate::phonetic_info::XlsPhoneticInfo> {
+    pub fn phonetic_info(&self) -> Option<&crate::phonetic_info::PhoneticInfo> {
         self.phonetic_info.as_ref()
     }
 
-    pub(crate) fn set_phonetic_info(&mut self, value: crate::phonetic_info::XlsPhoneticInfo) {
+    pub(crate) fn set_phonetic_info(&mut self, value: crate::phonetic_info::PhoneticInfo) {
         self.phonetic_info = Some(value);
     }
 
@@ -352,36 +353,33 @@ impl XlsWorksheet {
     /// All connection strings, command text, URLs, and file paths are inert:
     /// stored verbatim and never opened, resolved, contacted, refreshed, or
     /// executed.
-    pub fn query_tables(&self) -> &[crate::query_table::XlsQueryTable] {
+    pub fn query_tables(&self) -> &[crate::query_table::QueryTable] {
         &self.query_tables
     }
 
-    pub(crate) fn set_query_tables(
-        &mut self,
-        query_tables: Vec<crate::query_table::XlsQueryTable>,
-    ) {
+    pub(crate) fn set_query_tables(&mut self, query_tables: Vec<crate::query_table::QueryTable>) {
         self.query_tables = query_tables;
     }
 
     /// Custom views of this worksheet (UserSViewBegin…UserSViewEnd
     /// brackets), in record order. The records are inert: applying a view is
     /// a UI operation this reader never performs.
-    pub fn custom_views(&self) -> &[crate::custom_view::XlsSheetCustomView] {
+    pub fn custom_views(&self) -> &[crate::custom_view::SheetCustomView] {
         &self.custom_views
     }
 
-    pub(crate) fn add_custom_view(&mut self, view: crate::custom_view::XlsSheetCustomView) {
+    pub(crate) fn add_custom_view(&mut self, view: crate::custom_view::SheetCustomView) {
         self.custom_views.push(view);
     }
 
     /// Web pages published from this worksheet (`WebPub` records), in record
     /// order. The records are inert: destination URLs and paths are never
     /// opened, resolved, or fetched.
-    pub fn web_publications(&self) -> &[crate::web_pub::XlsWebPub] {
+    pub fn web_publications(&self) -> &[crate::web_pub::WebPub] {
         &self.web_publications
     }
 
-    pub(crate) fn add_web_publication(&mut self, publication: crate::web_pub::XlsWebPub) {
+    pub(crate) fn add_web_publication(&mut self, publication: crate::web_pub::WebPub) {
         self.web_publications.push(publication);
     }
 
@@ -418,32 +416,30 @@ impl XlsWorksheet {
     }
 
     /// Formula error-checking shared features declared for this worksheet.
-    pub fn formula_error_features(&self) -> &[crate::formula_errors::XlsFormulaErrorFeature] {
+    pub fn formula_error_features(&self) -> &[crate::formula_errors::FormulaErrorFeature] {
         &self.formula_error_features
     }
 
     pub(crate) fn set_formula_error_features(
         &mut self,
-        features: Vec<crate::formula_errors::XlsFormulaErrorFeature>,
+        features: Vec<crate::formula_errors::FormulaErrorFeature>,
     ) {
         self.formula_error_features = features;
     }
 
     /// Legacy BIFF8 worksheet tables in feature-record order.
-    pub fn list_objects(&self) -> &[crate::list_object::XlsListObject] {
+    pub fn list_objects(&self) -> &[crate::list_object::ListObject] {
         &self.list_objects
     }
 
-    pub(crate) fn set_list_objects(&mut self, tables: Vec<crate::list_object::XlsListObject>) {
+    pub(crate) fn set_list_objects(&mut self, tables: Vec<crate::list_object::ListObject>) {
         self.list_objects = tables;
     }
 
     /// Optional worksheet `INDEX`/`DBCELL` accelerator.
     ///
     /// Corrupt optional metadata is reported here without preventing cell parsing.
-    pub fn row_block_index(
-        &self,
-    ) -> std::result::Result<Option<&crate::row_block_index::XlsRowBlockIndex>, &str> {
+    pub fn row_block_index(&self) -> Result<Option<&crate::row_block_index::RowBlockIndex>, &str> {
         match &self.row_block_index {
             Ok(value) => Ok(value.as_ref()),
             Err(error) => Err(error.as_str()),
@@ -452,7 +448,7 @@ impl XlsWorksheet {
 
     pub(crate) fn set_row_block_index(
         &mut self,
-        value: crate::XlsResult<Option<crate::row_block_index::XlsRowBlockIndex>>,
+        value: Result<Option<crate::row_block_index::RowBlockIndex>>,
     ) {
         self.row_block_index = value.map_err(|error| error.to_string());
     }
@@ -469,29 +465,29 @@ impl XlsWorksheet {
         &mut self.protection
     }
 
-    pub(crate) fn set_formatting(&mut self, formatting: Arc<XlsFormatting>) {
+    pub(crate) fn set_formatting(&mut self, formatting: Arc<Formatting>) {
         self.formatting = formatting;
     }
 
-    pub fn formatting(&self) -> &XlsFormatting {
+    pub fn formatting(&self) -> &Formatting {
         &self.formatting
     }
 
     /// Worksheet-level BIFF8 data-validation settings, when present.
-    pub fn data_validation_settings(&self) -> Option<&XlsDataValidationSettings> {
+    pub fn data_validation_settings(&self) -> Option<&DataValidationSettings> {
         self.data_validation_settings.as_ref()
     }
 
     /// Data-validation rules in worksheet record order.
-    pub fn data_validations(&self) -> &[XlsDataValidationRule] {
+    pub fn data_validations(&self) -> &[DataValidationRule] {
         &self.data_validations
     }
 
-    pub(crate) fn set_data_validation_settings(&mut self, settings: XlsDataValidationSettings) {
+    pub(crate) fn set_data_validation_settings(&mut self, settings: DataValidationSettings) {
         self.data_validation_settings = Some(settings);
     }
 
-    pub(crate) fn add_data_validation(&mut self, rule: XlsDataValidationRule) {
+    pub(crate) fn add_data_validation(&mut self, rule: DataValidationRule) {
         self.data_validations.push(rule);
     }
 
@@ -561,32 +557,32 @@ impl XlsWorksheet {
     }
 
     /// Print and page setup for this worksheet.
-    pub fn page_setup(&self) -> Option<&XlsPageSetup> {
+    pub fn page_setup(&self) -> Option<&PageSetup> {
         self.page_setup.as_ref()
     }
 
-    pub(crate) fn set_page_setup(&mut self, page_setup: Option<XlsPageSetup>) {
+    pub(crate) fn set_page_setup(&mut self, page_setup: Option<PageSetup>) {
         self.page_setup = page_setup;
     }
 
-    pub fn calculation(&self) -> &crate::calculation::XlsWorksheetCalculation {
+    pub fn calculation(&self) -> &crate::calculation::WorksheetCalculation {
         &self.calculation
     }
 
     pub(crate) fn set_calculation(
         &mut self,
-        calculation: crate::calculation::XlsWorksheetCalculation,
+        calculation: crate::calculation::WorksheetCalculation,
     ) {
         self.calculation = calculation;
     }
 
-    pub fn scenario_manager(&self) -> Option<&crate::scenario::XlsScenarioManager> {
+    pub fn scenario_manager(&self) -> Option<&crate::scenario::ScenarioManager> {
         self.scenario_manager.as_ref()
     }
 
     pub(crate) fn set_scenario_manager(
         &mut self,
-        scenario_manager: Option<crate::scenario::XlsScenarioManager>,
+        scenario_manager: Option<crate::scenario::ScenarioManager>,
     ) {
         self.scenario_manager = scenario_manager;
     }
@@ -599,57 +595,57 @@ impl XlsWorksheet {
     }
 
     /// Legacy conditional formatting groups in worksheet record order.
-    pub fn conditional_formattings(&self) -> &[XlsConditionalFormatting] {
+    pub fn conditional_formattings(&self) -> &[ConditionalFormatting] {
         &self.conditional_formattings
     }
 
     pub(crate) fn set_conditional_formattings(
         &mut self,
-        conditional_formattings: Vec<XlsConditionalFormatting>,
+        conditional_formattings: Vec<ConditionalFormatting>,
     ) {
         self.conditional_formattings = conditional_formattings;
     }
     pub fn conditional_formattings12(
         &self,
-    ) -> &[crate::conditional_format::XlsConditionalFormatting12] {
+    ) -> &[crate::conditional_format::ConditionalFormatting12] {
         &self.conditional_formattings12
     }
     pub fn conditional_format_extensions(
         &self,
-    ) -> &[crate::conditional_format::XlsConditionalExtension] {
+    ) -> &[crate::conditional_format::ConditionalExtension] {
         &self.conditional_format_extensions
     }
     pub(crate) fn set_conditional_formattings12(
         &mut self,
-        value: Vec<crate::conditional_format::XlsConditionalFormatting12>,
+        value: Vec<crate::conditional_format::ConditionalFormatting12>,
     ) {
         self.conditional_formattings12 = value
     }
     pub(crate) fn set_conditional_format_extensions(
         &mut self,
-        value: Vec<crate::conditional_format::XlsConditionalExtension>,
+        value: Vec<crate::conditional_format::ConditionalExtension>,
     ) {
         self.conditional_format_extensions = value
     }
 
     /// Data-consolidation settings and inert source directory for this worksheet.
-    pub fn consolidation(&self) -> Option<&crate::consolidation::XlsConsolidation> {
+    pub fn consolidation(&self) -> Option<&crate::consolidation::Consolidation> {
         self.consolidation.as_ref()
     }
 
     pub(crate) fn set_consolidation(
         &mut self,
-        consolidation: Option<crate::consolidation::XlsConsolidation>,
+        consolidation: Option<crate::consolidation::Consolidation>,
     ) {
         self.consolidation = consolidation;
     }
 
-    pub fn format_for_cell(&self, row: u32, col: u32) -> Option<&XlsExtendedFormat> {
+    pub fn format_for_cell(&self, row: u32, col: u32) -> Option<&ExtendedFormat> {
         let cell = self.get_cell(row, col)?;
         self.formatting.cell_format(cell.xf_index())
     }
 
-    pub fn number_format_for_cell(&self, row: u32, col: u32) -> Option<&XlsNumberFormat> {
+    pub fn number_format_for_cell(&self, row: u32, col: u32) -> Option<&NumberFormat> {
         let format = self.format_for_cell(row, col)?;
         self.formatting.number_format(format.number_format_id())
     }
@@ -664,7 +660,7 @@ impl XlsWorksheet {
     }
 }
 
-impl Worksheet for XlsWorksheet {
+impl WorksheetTrait for Worksheet {
     fn name(&self) -> &str {
         &self.name
     }
@@ -685,42 +681,42 @@ impl Worksheet for XlsWorksheet {
         }
     }
 
-    fn cell(&self, row: u32, column: u32) -> Result<Box<dyn SheetCell + '_>> {
+    fn cell(&self, row: u32, column: u32) -> SheetResult<Box<dyn SheetCell + '_>> {
         match self.cells.get(&(row, column)) {
             // Return reference instead of clone - zero-copy!
             Some(cell) => Ok(Box::new(cell)),
             None => {
                 // Return empty cell for missing positions (owned, unavoidable)
-                let empty_cell = XlsCell::new(row, column, CellValue::Empty);
+                let empty_cell = Cell::new(row, column, CellValue::Empty);
                 Ok(Box::new(empty_cell))
             },
         }
     }
 
-    fn cell_by_coordinate(&self, coordinate: &str) -> Result<Box<dyn SheetCell + '_>> {
+    fn cell_by_coordinate(&self, coordinate: &str) -> SheetResult<Box<dyn SheetCell + '_>> {
         let (row, col) = crate::utils::parse_cell_reference(coordinate).ok_or_else(|| {
             let error: Box<dyn std::error::Error + Send + Sync> =
-                Box::new(XlsError::InvalidCellReference(coordinate.to_string()));
+                Box::new(Error::InvalidCellReference(coordinate.to_string()));
             error
         })?;
         self.cell(row, col)
     }
 
-    fn cells(&self) -> Box<dyn CellIterator<'_> + '_> {
-        Box::new(XlsCellIterator {
+    fn cells(&self) -> Box<dyn CellIteratorTrait<'_> + '_> {
+        Box::new(CellIterator {
             cells: self.cells.values().collect(),
             index: 0,
         })
     }
 
-    fn rows(&self) -> Box<dyn RowIterator<'_> + '_> {
-        Box::new(XlsRowIterator {
+    fn rows(&self) -> Box<dyn RowIteratorTrait<'_> + '_> {
+        Box::new(RowIterator {
             worksheet: self,
             current_row: 0,
         })
     }
 
-    fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>> {
+    fn row(&self, row_idx: usize) -> SheetResult<Cow<'_, [CellValue]>> {
         let row_idx = row_idx as u32;
         let mut row_data = Vec::new();
 
@@ -735,7 +731,7 @@ impl Worksheet for XlsWorksheet {
         Ok(Cow::Owned(row_data))
     }
 
-    fn cell_value(&self, row: u32, column: u32) -> Result<Cow<'_, CellValue>> {
+    fn cell_value(&self, row: u32, column: u32) -> SheetResult<Cow<'_, CellValue>> {
         match self.cells.get(&(row, column)) {
             Some(cell) => Ok(Cow::Borrowed(cell.value())),
             None => Ok(Cow::Borrowed(CellValue::EMPTY)),
@@ -743,8 +739,8 @@ impl Worksheet for XlsWorksheet {
     }
 }
 
-// Implement Worksheet for &XlsWorksheet to allow zero-copy reference returns
-impl Worksheet for &XlsWorksheet {
+// Implement Worksheet for &Worksheet to allow zero-copy reference returns
+impl WorksheetTrait for &Worksheet {
     fn name(&self) -> &str {
         (*self).name()
     }
@@ -761,39 +757,39 @@ impl Worksheet for &XlsWorksheet {
         (*self).dimensions()
     }
 
-    fn cell(&self, row: u32, column: u32) -> Result<Box<dyn SheetCell + '_>> {
+    fn cell(&self, row: u32, column: u32) -> SheetResult<Box<dyn SheetCell + '_>> {
         (*self).cell(row, column)
     }
 
-    fn cell_by_coordinate(&self, coordinate: &str) -> Result<Box<dyn SheetCell + '_>> {
+    fn cell_by_coordinate(&self, coordinate: &str) -> SheetResult<Box<dyn SheetCell + '_>> {
         (*self).cell_by_coordinate(coordinate)
     }
 
-    fn cells(&self) -> Box<dyn CellIterator<'_> + '_> {
+    fn cells(&self) -> Box<dyn CellIteratorTrait<'_> + '_> {
         (*self).cells()
     }
 
-    fn rows(&self) -> Box<dyn RowIterator<'_> + '_> {
+    fn rows(&self) -> Box<dyn RowIteratorTrait<'_> + '_> {
         (*self).rows()
     }
 
-    fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>> {
+    fn row(&self, row_idx: usize) -> SheetResult<Cow<'_, [CellValue]>> {
         (*self).row(row_idx)
     }
 
-    fn cell_value(&self, row: u32, column: u32) -> Result<Cow<'_, CellValue>> {
+    fn cell_value(&self, row: u32, column: u32) -> SheetResult<Cow<'_, CellValue>> {
         (*self).cell_value(row, column)
     }
 }
 
 /// Cell iterator for XLS worksheets
-struct XlsCellIterator<'a> {
-    cells: Vec<&'a XlsCell>,
+struct CellIterator<'a> {
+    cells: Vec<&'a Cell>,
     index: usize,
 }
 
-impl<'a> CellIterator<'a> for XlsCellIterator<'a> {
-    fn next(&mut self) -> Option<Result<Box<dyn SheetCell + 'a>>> {
+impl<'a> CellIteratorTrait<'a> for CellIterator<'a> {
+    fn next(&mut self) -> Option<SheetResult<Box<dyn SheetCell + 'a>>> {
         if self.index >= self.cells.len() {
             None
         } else {
@@ -806,13 +802,13 @@ impl<'a> CellIterator<'a> for XlsCellIterator<'a> {
 }
 
 /// Row iterator for XLS worksheets
-struct XlsRowIterator<'a> {
-    worksheet: &'a XlsWorksheet,
+struct RowIterator<'a> {
+    worksheet: &'a Worksheet,
     current_row: usize,
 }
 
-impl<'a> RowIterator<'a> for XlsRowIterator<'a> {
-    fn next(&mut self) -> Option<Result<Cow<'a, [CellValue]>>> {
+impl<'a> RowIteratorTrait<'a> for RowIterator<'a> {
+    fn next(&mut self) -> Option<SheetResult<Cow<'a, [CellValue]>>> {
         if self.current_row >= self.worksheet.row_count() {
             None
         } else {

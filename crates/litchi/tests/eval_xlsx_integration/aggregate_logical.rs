@@ -1,5 +1,5 @@
-use litchi::ooxml::xlsx::Workbook as XlsxWorkbook;
-use litchi::sheet::{CellValue, FormulaEvaluator};
+use litchi::ooxml::xlsx::{Formula, Workbook};
+use litchi::sheet::{CellValue, FormulaEvaluator, functions::open_workbook};
 use tempfile::tempdir;
 
 const TOL: f64 = 1e-9;
@@ -12,8 +12,8 @@ async fn eval_aggregates_and_logical() {
 
     build_workbook(path_str);
 
-    let wb = XlsxWorkbook::open(path_str).expect("open workbook");
-    let evaluator = FormulaEvaluator::new(&wb);
+    let wb = open_workbook(path_str).expect("open workbook");
+    let evaluator = FormulaEvaluator::new(wb.as_ref());
 
     // Aggregate tests
     assert_float(
@@ -63,33 +63,68 @@ async fn eval_aggregates_and_logical() {
 }
 
 fn build_workbook(path: &str) {
-    let mut wb = XlsxWorkbook::create().expect("create workbook");
+    let wb = Workbook::create().expect("create workbook");
+    let mut edit = wb.edit().expect("start workbook edit");
+    edit.tab(0)
+        .expect("worksheet tab lookup")
+        .expect("worksheet tab")
+        .rename("Sheet1")
+        .expect("rename worksheet");
 
     {
-        let ws = wb.worksheet_mut(0).expect("worksheet 0");
-        ws.set_name("Sheet1".to_string());
-
+        let mut ws = edit
+            .sheet(0)
+            .expect("worksheet lookup")
+            .expect("worksheet 0");
         // Data for aggregates
-        ws.set_cell_value(1, 1, 1);
-        ws.set_cell_value(2, 1, 2);
-        ws.set_cell_value(3, 1, 3);
-        ws.set_cell_value(4, 1, 4);
+        ws.set("A1", 1).expect("A1");
+        ws.set("A2", 2).expect("A2");
+        ws.set("A3", 3).expect("A3");
+        ws.set("A4", 4).expect("A4");
 
         // Aggregate formulas
-        ws.set_cell_formula(1, 4, "SUM(A1:A4)");
-        ws.set_cell_formula(2, 4, "AVERAGE(A1:A4)");
-        ws.set_cell_formula(3, 4, "COUNT(A1:A4)");
-        ws.set_cell_formula(4, 4, "MAX(A1:A4)");
-        ws.set_cell_formula(5, 4, "MIN(A1:A4)");
+        ws.set("D1", Formula::new("SUM(A1:A4)").expect("SUM formula"))
+            .expect("D1");
+        ws.set(
+            "D2",
+            Formula::new("AVERAGE(A1:A4)").expect("AVERAGE formula"),
+        )
+        .expect("D2");
+        ws.set("D3", Formula::new("COUNT(A1:A4)").expect("COUNT formula"))
+            .expect("D3");
+        ws.set("D4", Formula::new("MAX(A1:A4)").expect("MAX formula"))
+            .expect("D4");
+        ws.set("D5", Formula::new("MIN(A1:A4)").expect("MIN formula"))
+            .expect("D5");
 
         // Logical formulas
-        ws.set_cell_formula(1, 6, "AND(TRUE, 1=1, A1=1)");
-        ws.set_cell_formula(2, 6, "OR(FALSE, 2=2, A4=5)");
-        ws.set_cell_formula(3, 6, "NOT(OR(FALSE, FALSE))");
-        ws.set_cell_formula(4, 6, "IF(AND(A1=1, A4=4), \"yes\", \"no\")");
+        ws.set(
+            "F1",
+            Formula::new("AND(TRUE, 1=1, A1=1)").expect("AND formula"),
+        )
+        .expect("F1");
+        ws.set(
+            "F2",
+            Formula::new("OR(FALSE, 2=2, A4=5)").expect("OR formula"),
+        )
+        .expect("F2");
+        ws.set(
+            "F3",
+            Formula::new("NOT(OR(FALSE, FALSE))").expect("NOT formula"),
+        )
+        .expect("F3");
+        ws.set(
+            "F4",
+            Formula::new("IF(AND(A1=1, A4=4), \"yes\", \"no\")").expect("IF formula"),
+        )
+        .expect("F4");
     }
 
-    wb.save(path).expect("save workbook");
+    edit.commit()
+        .expect("commit workbook edit")
+        .workbook()
+        .save(path)
+        .expect("save workbook");
 }
 
 fn assert_float(value: CellValue, expected: f64) {

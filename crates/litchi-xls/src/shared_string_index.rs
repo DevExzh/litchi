@@ -1,6 +1,6 @@
 //! BIFF8 extended shared-string table index (`ExtSST`).
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 pub(crate) const SST_RECORD_TYPE: u16 = 0x00FC;
 pub(crate) const EXT_SST_RECORD_TYPE: u16 = 0x00FF;
@@ -9,20 +9,20 @@ const BUCKET_LEN: usize = 8;
 const MAX_BUCKETS: usize = 128;
 const MAX_PAYLOAD_LEN: usize = FIXED_PAYLOAD_LEN + MAX_BUCKETS * BUCKET_LEN;
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: EXT_SST_RECORD_TYPE,
         message: message.into(),
     }
 }
 
-fn strings_per_bucket(unique_string_count: u32) -> XlsResult<u16> {
+fn strings_per_bucket(unique_string_count: u32) -> Result<u16> {
     let value = (unique_string_count / 128 + 1).max(8);
     u16::try_from(value)
         .map_err(|_| invalid("SST unique-string count is too large for the ExtSST dsst field"))
 }
 
-fn required_bucket_count(unique_string_count: u32, bucket_size: u16) -> XlsResult<usize> {
+fn required_bucket_count(unique_string_count: u32, bucket_size: u16) -> Result<usize> {
     if bucket_size == 0 {
         return Err(invalid("ExtSST dsst must not be zero"));
     }
@@ -41,13 +41,13 @@ fn required_bucket_count(unique_string_count: u32, bucket_size: u16) -> XlsResul
 
 /// Pointer to the first shared string in one `ExtSST` bucket.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsSharedStringBucket {
+pub struct SharedStringBucket {
     stream_position: u32,
     record_offset: u16,
 }
 
-impl XlsSharedStringBucket {
-    pub fn try_new(stream_position: u32, record_offset: u16) -> XlsResult<Self> {
+impl SharedStringBucket {
+    pub fn try_new(stream_position: u32, record_offset: u16) -> Result<Self> {
         if u32::from(record_offset) >= stream_position {
             return Err(invalid("ISSTInf cbOffset must be less than ib"));
         }
@@ -75,17 +75,14 @@ impl XlsSharedStringBucket {
 
 /// Quick-lookup bucket index for a BIFF8 shared string table.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsSharedStringIndex {
+pub struct SharedStringIndex {
     unique_string_count: u32,
     strings_per_bucket: u16,
-    buckets: Vec<XlsSharedStringBucket>,
+    buckets: Vec<SharedStringBucket>,
 }
 
-impl XlsSharedStringIndex {
-    pub fn try_new(
-        unique_string_count: u32,
-        buckets: Vec<XlsSharedStringBucket>,
-    ) -> XlsResult<Self> {
+impl SharedStringIndex {
+    pub fn try_new(unique_string_count: u32, buckets: Vec<SharedStringBucket>) -> Result<Self> {
         let strings_per_bucket = strings_per_bucket(unique_string_count)?;
         let expected = required_bucket_count(unique_string_count, strings_per_bucket)?;
         if buckets.len() != expected {
@@ -101,7 +98,7 @@ impl XlsSharedStringIndex {
         })
     }
 
-    pub fn parse_payload(unique_string_count: u32, data: &[u8]) -> XlsResult<Self> {
+    pub fn parse_payload(unique_string_count: u32, data: &[u8]) -> Result<Self> {
         if !(FIXED_PAYLOAD_LEN..=MAX_PAYLOAD_LEN).contains(&data.len()) {
             return Err(invalid(format!(
                 "ExtSST payload must be 2..={MAX_PAYLOAD_LEN} bytes, got {}",
@@ -134,10 +131,7 @@ impl XlsSharedStringIndex {
             if reserved != 0 {
                 return Err(invalid("ISSTInf reserved field must be zero"));
             }
-            buckets.push(XlsSharedStringBucket::try_new(
-                stream_position,
-                record_offset,
-            )?);
+            buckets.push(SharedStringBucket::try_new(stream_position, record_offset)?);
         }
         Self::try_new(unique_string_count, buckets)
     }
@@ -148,12 +142,12 @@ impl XlsSharedStringIndex {
     pub fn strings_per_bucket(&self) -> u16 {
         self.strings_per_bucket
     }
-    pub fn buckets(&self) -> &[XlsSharedStringBucket] {
+    pub fn buckets(&self) -> &[SharedStringBucket] {
         &self.buckets
     }
 
     /// Bucket containing the given zero-based shared-string index.
-    pub fn bucket_for_string(&self, string_index: u32) -> Option<&XlsSharedStringBucket> {
+    pub fn bucket_for_string(&self, string_index: u32) -> Option<&SharedStringBucket> {
         if string_index >= self.unique_string_count {
             return None;
         }
@@ -184,7 +178,7 @@ impl XlsSharedStringIndex {
     }
 
     /// Serialize the complete BIFF record including its four-byte record header.
-    pub fn to_record_bytes(&self) -> XlsResult<Vec<u8>> {
+    pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         let payload = self.to_payload();
         let length = u16::try_from(payload.len())
             .map_err(|_| invalid("ExtSST payload length exceeds BIFF u16"))?;
@@ -198,7 +192,7 @@ impl XlsSharedStringIndex {
 
 pub(crate) struct SharedStringIndexCollector {
     unique_string_count: Option<u32>,
-    value: XlsResult<Option<XlsSharedStringIndex>>,
+    value: Result<Option<SharedStringIndex>>,
     ext_sst_seen: bool,
 }
 
@@ -227,14 +221,13 @@ impl SharedStringIndexCollector {
                     self.value = Err(invalid("ExtSST appears before SST"));
                     return;
                 };
-                self.value =
-                    XlsSharedStringIndex::parse_payload(unique_string_count, data).map(Some);
+                self.value = SharedStringIndex::parse_payload(unique_string_count, data).map(Some);
             },
             _ => {},
         }
     }
 
-    pub(crate) fn finish(self) -> XlsResult<Option<XlsSharedStringIndex>> {
+    pub(crate) fn finish(self) -> Result<Option<SharedStringIndex>> {
         self.value
     }
 }
@@ -247,7 +240,7 @@ mod tests {
 
     #[test]
     fn parses_and_round_trips_simple_poi_reference() {
-        let index = XlsSharedStringIndex::parse_payload(1, &SIMPLE_REFERENCE).unwrap();
+        let index = SharedStringIndex::parse_payload(1, &SIMPLE_REFERENCE).unwrap();
         assert_eq!(index.unique_string_count(), 1);
         assert_eq!(index.strings_per_bucket(), 8);
         assert_eq!(index.buckets().len(), 1);
@@ -268,9 +261,9 @@ mod tests {
     #[test]
     fn constructs_spec_derived_multi_bucket_index() {
         let buckets = (0..128)
-            .map(|index| XlsSharedStringBucket::try_new(100 + index * 16, 12).unwrap())
+            .map(|index| SharedStringBucket::try_new(100 + index * 16, 12).unwrap())
             .collect::<Vec<_>>();
-        let index = XlsSharedStringIndex::try_new(1_144, buckets).unwrap();
+        let index = SharedStringIndex::try_new(1_144, buckets).unwrap();
         assert_eq!(index.strings_per_bucket(), 9);
         assert_eq!(index.buckets().len(), 128);
         assert_eq!(index.first_string_index(127), Some(1_143));
@@ -281,21 +274,21 @@ mod tests {
 
     #[test]
     fn rejects_bad_formula_lengths_pointers_reserved_and_duplicates() {
-        assert!(XlsSharedStringIndex::parse_payload(1, &[]).is_err());
-        assert!(XlsSharedStringIndex::parse_payload(1, &[8, 0, 0]).is_err());
+        assert!(SharedStringIndex::parse_payload(1, &[]).is_err());
+        assert!(SharedStringIndex::parse_payload(1, &[8, 0, 0]).is_err());
         let mut bad = SIMPLE_REFERENCE;
         bad[0] = 9;
-        assert!(XlsSharedStringIndex::parse_payload(1, &bad).is_err());
-        assert!(XlsSharedStringIndex::parse_payload(9, &SIMPLE_REFERENCE).is_err());
+        assert!(SharedStringIndex::parse_payload(1, &bad).is_err());
+        assert!(SharedStringIndex::parse_payload(9, &SIMPLE_REFERENCE).is_err());
         let mut bad = SIMPLE_REFERENCE;
         bad[8] = 1;
-        assert!(XlsSharedStringIndex::parse_payload(1, &bad).is_err());
+        assert!(SharedStringIndex::parse_payload(1, &bad).is_err());
         let mut bad = SIMPLE_REFERENCE;
         bad[2..6].copy_from_slice(&12u32.to_le_bytes());
-        assert!(XlsSharedStringIndex::parse_payload(1, &bad).is_err());
-        assert!(XlsSharedStringBucket::try_new(10, 10).is_err());
-        assert!(XlsSharedStringIndex::try_new(1, Vec::new()).is_err());
-        assert!(XlsSharedStringIndex::try_new(u32::MAX, Vec::new()).is_err());
+        assert!(SharedStringIndex::parse_payload(1, &bad).is_err());
+        assert!(SharedStringBucket::try_new(10, 10).is_err());
+        assert!(SharedStringIndex::try_new(1, Vec::new()).is_err());
+        assert!(SharedStringIndex::try_new(u32::MAX, Vec::new()).is_err());
 
         let mut collector = SharedStringIndexCollector::new();
         collector.feed_record(EXT_SST_RECORD_TYPE, &SIMPLE_REFERENCE);

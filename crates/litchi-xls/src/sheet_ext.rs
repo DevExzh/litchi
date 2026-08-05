@@ -6,7 +6,7 @@
 //! (MS-XLS 2.5.238) with a refreshed tab color, the conditional-formatting
 //! calculation flag, the published flag, and a full `CFColor`.
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `SheetExt` record.
 pub(crate) const SHEET_EXT_RECORD_TYPE: u16 = 0x0862;
@@ -44,8 +44,8 @@ const COND_FMT_CALC: u32 = 1 << 7;
 /// `SheetExtOptional` bit: the sheet is not published.
 const NOT_PUBLISHED: u32 = 1 << 8;
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: SHEET_EXT_RECORD_TYPE,
         message: message.into(),
     }
@@ -65,7 +65,7 @@ impl<'a> SheetExtReader<'a> {
         Self { data, offset: 0 }
     }
 
-    fn read_bytes<const N: usize>(&mut self) -> XlsResult<[u8; N]> {
+    fn read_bytes<const N: usize>(&mut self) -> Result<[u8; N]> {
         let end = self.offset.checked_add(N).ok_or_else(|| {
             invalid(format!(
                 "SheetExt field offset {} overflows usize",
@@ -75,11 +75,11 @@ impl<'a> SheetExtReader<'a> {
         let bytes = self
             .data
             .get(self.offset..end)
-            .ok_or(XlsError::InvalidLength {
+            .ok_or(Error::InvalidLength {
                 expected: end,
                 found: self.data.len(),
             })?;
-        let value = bytes.try_into().map_err(|_| XlsError::InvalidLength {
+        let value = bytes.try_into().map_err(|_| Error::InvalidLength {
             expected: N,
             found: bytes.len(),
         })?;
@@ -87,29 +87,29 @@ impl<'a> SheetExtReader<'a> {
         Ok(value)
     }
 
-    fn read_u16(&mut self) -> XlsResult<u16> {
+    fn read_u16(&mut self) -> Result<u16> {
         Ok(u16::from_le_bytes(self.read_bytes()?))
     }
 
-    fn read_u32(&mut self) -> XlsResult<u32> {
+    fn read_u32(&mut self) -> Result<u32> {
         Ok(u32::from_le_bytes(self.read_bytes()?))
     }
 }
 
 /// Decode a 7-bit `Icv` field into a validated palette index.
-fn decode_icv(raw: u32, record_type: u16) -> XlsResult<Option<u8>> {
+fn decode_icv(raw: u32, record_type: u16) -> Result<Option<u8>> {
     let value = raw & ICV_MASK;
     if value == ICV_NO_COLOR {
         return Ok(None);
     }
-    let index = u8::try_from(value).map_err(|_| XlsError::InvalidRecord {
+    let index = u8::try_from(value).map_err(|_| Error::InvalidRecord {
         record_type,
         message: format!("sheet tab color index {value:#04X} does not fit in an Icv"),
     })?;
     if (ICV_MIN..=ICV_MAX).contains(&index) {
         Ok(Some(index))
     } else {
-        Err(XlsError::InvalidRecord {
+        Err(Error::InvalidRecord {
             record_type,
             message: format!("sheet tab color index {index:#04X} is outside the Icv palette"),
         })
@@ -118,7 +118,7 @@ fn decode_icv(raw: u32, record_type: u16) -> XlsResult<Option<u8>> {
 
 /// The optional extension of a `SheetExt` record (MS-XLS 2.5.238).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsSheetExtOptional {
+pub struct SheetExtOptional {
     /// Refreshed tab color palette index (`icvPlain12`); the base record's
     /// `icvPlain` takes precedence when the two disagree.
     tab_color_12: Option<u8>,
@@ -130,7 +130,7 @@ pub struct XlsSheetExtOptional {
     color: [u8; CF_COLOR_LEN],
 }
 
-impl XlsSheetExtOptional {
+impl SheetExtOptional {
     /// Refreshed tab color palette index, when assigned.
     pub fn tab_color_12(&self) -> Option<u8> {
         self.tab_color_12
@@ -154,28 +154,28 @@ impl XlsSheetExtOptional {
 
 /// Typed `SheetExt` record content (MS-XLS 2.4.259).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsSheetExt {
+pub struct SheetExt {
     /// Sheet tab color palette index (`icvPlain`); `None` when unassigned.
     tab_color: Option<u8>,
     /// Optional extension, present iff the record declares the extended size.
-    optional: Option<XlsSheetExtOptional>,
+    optional: Option<SheetExtOptional>,
 }
 
-impl XlsSheetExt {
+impl SheetExt {
     /// Sheet tab color as a palette index, when assigned.
     pub fn tab_color(&self) -> Option<u8> {
         self.tab_color
     }
 
     /// The optional extension, when present.
-    pub fn optional(&self) -> Option<&XlsSheetExtOptional> {
+    pub fn optional(&self) -> Option<&SheetExtOptional> {
         self.optional.as_ref()
     }
 
     /// Parse a `SheetExt` record payload.
-    pub(crate) fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub(crate) fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < CB_BASE_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: CB_BASE_LEN,
                 found: data.len(),
             });
@@ -192,7 +192,7 @@ impl XlsSheetExt {
             _ => return Err(invalid("SheetExt declares an unsupported record size")),
         };
         if data.len() != expected_len {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: expected_len,
                 found: data.len(),
             });
@@ -201,7 +201,7 @@ impl XlsSheetExt {
         let tab_color = decode_icv(flags, SHEET_EXT_RECORD_TYPE)?;
         let optional = if cb == CB_WITH_OPTIONAL {
             let ext_flags = reader.read_u32()?;
-            Some(XlsSheetExtOptional {
+            Some(SheetExtOptional {
                 tab_color_12: decode_icv(ext_flags, SHEET_EXT_RECORD_TYPE)?,
                 cond_fmt_calc: ext_flags & COND_FMT_CALC != 0,
                 not_published: ext_flags & NOT_PUBLISHED != 0,
@@ -267,12 +267,12 @@ mod tests {
 
     #[test]
     fn parses_base_record_with_and_without_tab_color() {
-        let colored = XlsSheetExt::parse(&base_record(0x0A)).unwrap();
+        let colored = SheetExt::parse(&base_record(0x0A)).unwrap();
         assert_eq!(colored.tab_color(), Some(0x0A));
         assert!(colored.optional().is_none());
         assert_eq!(colored.to_payload(), base_record(0x0A));
 
-        let plain = XlsSheetExt::parse(&base_record(ICV_NO_COLOR)).unwrap();
+        let plain = SheetExt::parse(&base_record(ICV_NO_COLOR)).unwrap();
         assert_eq!(plain.tab_color(), None);
         assert_eq!(plain.to_payload(), base_record(ICV_NO_COLOR));
     }
@@ -285,7 +285,7 @@ mod tests {
         data.extend_from_slice(&ext_flags.to_le_bytes());
         data.extend_from_slice(&[0x5A; CF_COLOR_LEN]);
 
-        let parsed = XlsSheetExt::parse(&data).unwrap();
+        let parsed = SheetExt::parse(&data).unwrap();
         let optional = parsed.optional().unwrap();
         assert_eq!(optional.tab_color_12(), Some(0x0B));
         assert!(optional.cond_fmt_calc());
@@ -297,21 +297,21 @@ mod tests {
     #[test]
     fn rejects_malformed_records() {
         // Truncated.
-        assert!(XlsSheetExt::parse(&base_record(0x0A)[..10]).is_err());
+        assert!(SheetExt::parse(&base_record(0x0A)[..10]).is_err());
         // Wrong FrtHeader.rt.
         let mut wrong_rt = base_record(0x0A);
         wrong_rt[0..2].copy_from_slice(&0x0863u16.to_le_bytes());
-        assert!(XlsSheetExt::parse(&wrong_rt).is_err());
+        assert!(SheetExt::parse(&wrong_rt).is_err());
         // Unsupported cb.
         let mut wrong_cb = base_record(0x0A);
         wrong_cb[12..16].copy_from_slice(&24u32.to_le_bytes());
-        assert!(XlsSheetExt::parse(&wrong_cb).is_err());
+        assert!(SheetExt::parse(&wrong_cb).is_err());
         // Out-of-palette color index.
-        assert!(XlsSheetExt::parse(&base_record(0x05)).is_err());
+        assert!(SheetExt::parse(&base_record(0x05)).is_err());
         // Declared size disagreeing with the payload length.
         let mut padded = base_record(0x0A);
         padded.push(0);
-        assert!(XlsSheetExt::parse(&padded).is_err());
+        assert!(SheetExt::parse(&padded).is_err());
     }
 
     #[test]
@@ -323,7 +323,7 @@ mod tests {
 
         for length in 0..data.len() {
             assert!(
-                XlsSheetExt::parse(&data[..length]).is_err(),
+                SheetExt::parse(&data[..length]).is_err(),
                 "truncated SheetExt payload of length {length} was accepted"
             );
         }
@@ -339,7 +339,7 @@ mod tests {
         let error = reader.read_bytes::<2>().unwrap_err();
         assert!(matches!(
             error,
-            XlsError::InvalidRecord { message, .. }
+            Error::InvalidRecord { message, .. }
                 if message.contains("offset") && message.contains("overflows")
         ));
         assert_eq!(reader.offset, usize::MAX);

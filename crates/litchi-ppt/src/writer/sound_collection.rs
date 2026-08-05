@@ -11,9 +11,9 @@
 //! 3. Compare `OUString::number(nSoundRef) == aRefStr`
 //! 4. If matched, extract SoundData and play
 
-use super::records::{PptError, RecordBuilder};
+use super::records::{Error, RecordBuilder};
 use crate::animation::{BuiltinSound, SoundType};
-use crate::consts::PptRecordType;
+use crate::consts::RecordType;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Resource limits for sound collection authoring.
@@ -66,7 +66,7 @@ impl<'a> SoundCollectionBuilder<'a> {
         &mut self,
         source_id: u32,
         sound_type: &'a SoundType,
-    ) -> Result<(), PptError> {
+    ) -> Result<(), Error> {
         let sound = match sound_type {
             SoundType::Builtin(sound) => PlannedSound::Builtin(*sound),
             SoundType::Embedded { name, data } => {
@@ -87,7 +87,7 @@ impl<'a> SoundCollectionBuilder<'a> {
     ///
     /// IDs 1 through 20 use the library's typed built-in sound catalog. Other
     /// IDs must already have an explicit embedded resource.
-    pub(crate) fn register_reference(&mut self, source_id: u32) -> Result<(), PptError> {
+    pub(crate) fn register_reference(&mut self, source_id: u32) -> Result<(), Error> {
         if source_id == 0 {
             return Ok(());
         }
@@ -104,7 +104,7 @@ impl<'a> SoundCollectionBuilder<'a> {
     }
 
     /// Serialize the collection and return writer-local ID to file-ID mapping.
-    pub(crate) fn build(self) -> Result<(Vec<u8>, HashMap<u32, u32>), PptError> {
+    pub(crate) fn build(self) -> Result<(Vec<u8>, HashMap<u32, u32>), Error> {
         if self.sounds.is_empty() {
             return Ok((Vec::new(), HashMap::new()));
         }
@@ -112,7 +112,7 @@ impl<'a> SoundCollectionBuilder<'a> {
             .map_err(|_| invalid_error("sound collection count exceeds u32"))?;
         let mut mapping = HashMap::with_capacity(self.sounds.len());
         let mut children = Vec::new();
-        let mut seed_atom = RecordBuilder::new(0x00, 0, PptRecordType::SoundCollectionAtom as u16);
+        let mut seed_atom = RecordBuilder::new(0x00, 0, RecordType::SoundCollectionAtom as u16);
         seed_atom.write_data(&seed.to_le_bytes());
         children.extend(seed_atom.build()?);
 
@@ -143,12 +143,12 @@ impl<'a> SoundCollectionBuilder<'a> {
             }
         }
 
-        let mut container = RecordBuilder::new(0x0F, 5, PptRecordType::SoundCollection as u16);
+        let mut container = RecordBuilder::new(0x0F, 5, RecordType::SoundCollection as u16);
         container.write_data(&children);
         Ok((container.build()?, mapping))
     }
 
-    fn insert(&mut self, source_id: u32, sound: PlannedSound<'a>) -> Result<(), PptError> {
+    fn insert(&mut self, source_id: u32, sound: PlannedSound<'a>) -> Result<(), Error> {
         if source_id == 0 {
             return invalid("sound resource IDs must be positive");
         }
@@ -176,7 +176,7 @@ impl<'a> SoundCollectionBuilder<'a> {
         Ok(())
     }
 
-    fn validate_name(&self, name: &str) -> Result<(), PptError> {
+    fn validate_name(&self, name: &str) -> Result<(), Error> {
         let units = name.encode_utf16().count();
         if units == 0 || units > self.limits.max_name_units {
             return invalid("embedded sound name is empty or exceeds the configured limit");
@@ -187,7 +187,7 @@ impl<'a> SoundCollectionBuilder<'a> {
         Ok(())
     }
 
-    fn validate_audio(&self, data: &[u8]) -> Result<(), PptError> {
+    fn validate_audio(&self, data: &[u8]) -> Result<(), Error> {
         if data.len() > self.limits.max_sound_bytes {
             return invalid("embedded sound exceeds the configured byte limit");
         }
@@ -279,7 +279,7 @@ fn generate_wav_tone(freq: f64) -> Vec<u8> {
 }
 
 /// Write a UTF-16LE CString atom with the given instance number.
-fn write_cstring(instance: u16, text: &str) -> Result<Vec<u8>, PptError> {
+fn write_cstring(instance: u16, text: &str) -> Result<Vec<u8>, Error> {
     let mut atom = RecordBuilder::new(0x00, instance, 0x0FBA);
     for ch in text.encode_utf16() {
         atom.write_data(&ch.to_le_bytes());
@@ -301,7 +301,7 @@ fn build_sound_container(
     ref_id: u32,
     builtin_id: Option<crate::sound_collection::BuiltinId>,
     sound_data: &[u8],
-) -> Result<Vec<u8>, PptError> {
+) -> Result<Vec<u8>, Error> {
     let mut children = Vec::new();
 
     // CString instance 0 — sound name
@@ -318,12 +318,12 @@ fn build_sound_container(
     }
 
     // SoundData atom with actual WAV or AIFF binary data
-    let mut data_atom = RecordBuilder::new(0x00, 0, PptRecordType::SoundData as u16);
+    let mut data_atom = RecordBuilder::new(0x00, 0, RecordType::SoundData as u16);
     data_atom.write_data(sound_data);
     children.extend(data_atom.build()?);
 
     // Sound container
-    let mut container = RecordBuilder::new(0x0F, 0, PptRecordType::Sound as u16);
+    let mut container = RecordBuilder::new(0x0F, 0, RecordType::Sound as u16);
     container.write_data(&children);
     container.build()
 }
@@ -336,7 +336,7 @@ fn build_sound_container(
 /// Returns `(binary_data, mapping)` where mapping is `builtin_sound_id → collection_ref_id`.
 pub fn build_sound_collection(
     sound_ids: &HashSet<u32>,
-) -> Result<(Vec<u8>, HashMap<u32, u32>), PptError> {
+) -> Result<(Vec<u8>, HashMap<u32, u32>), Error> {
     let mut builder = SoundCollectionBuilder::new(SoundCollectionLimits::default());
     for sound_id in sound_ids {
         builder.register_reference(*sound_id)?;
@@ -344,7 +344,7 @@ pub fn build_sound_collection(
     builder.build()
 }
 
-fn audio_extension(data: &[u8]) -> Result<&'static str, PptError> {
+fn audio_extension(data: &[u8]) -> Result<&'static str, Error> {
     if data.len() >= 12 && &data[..4] == b"RIFF" && &data[8..12] == b"WAVE" {
         Ok(".WAV")
     } else if data.len() >= 12 && &data[..4] == b"FORM" && matches!(&data[8..12], b"AIFF" | b"AIFC")
@@ -381,11 +381,11 @@ fn builtin_description_id(sound: BuiltinSound) -> Option<crate::sound_collection
     }
 }
 
-fn invalid<T>(message: impl Into<String>) -> Result<T, PptError> {
+fn invalid<T>(message: impl Into<String>) -> Result<T, Error> {
     Err(invalid_error(message))
 }
 
-fn invalid_error(message: impl Into<String>) -> PptError {
+fn invalid_error(message: impl Into<String>) -> Error {
     std::io::Error::new(std::io::ErrorKind::InvalidInput, message.into())
 }
 
@@ -458,7 +458,7 @@ mod tests {
         let mut builder = SoundCollectionBuilder::new(SoundCollectionLimits::default());
         builder.register(42, &embedded).unwrap();
         let (bytes, mapping) = builder.build().unwrap();
-        let (record, consumed) = crate::PptRecord::parse(&bytes, 0).unwrap();
+        let (record, consumed) = crate::Record::parse(&bytes, 0).unwrap();
         assert_eq!(consumed, bytes.len());
         let collection = crate::sound_collection::Collection::parse(&record).unwrap();
         assert_eq!(collection.sounds[0].id, mapping[&42]);

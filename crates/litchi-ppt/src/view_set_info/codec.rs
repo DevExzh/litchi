@@ -1,12 +1,11 @@
 use super::model::{
-    PowerPointNormalViewSet, PowerPointNormalViewSetInfo, PowerPointNormalViewSetPayload,
-    PowerPointNotesTextViewInfo, PowerPointViewBarState,
+    NormalViewSet, NormalViewSetInfo, NormalViewSetPayload, NotesTextViewInfo, ViewBarState,
 };
-use crate::consts::PptRecordType;
-use crate::non_zoom_view::PowerPointNoZoomViewInfo;
-use crate::package::{PptError, Result};
-use crate::records::record::PptRecord;
-use crate::view_info::PowerPointRatio;
+use crate::consts::RecordType;
+use crate::non_zoom_view::NoZoomViewInfo;
+use crate::package::{Error, Result};
+use crate::records::record::Record;
+use crate::view_info::Ratio;
 
 /// `RT_NormalViewSetInfo9` record type.
 pub(super) const NORMAL_VIEW_SET_INFO_TYPE: u16 = 0x0414;
@@ -19,15 +18,15 @@ const ATOM_LEN: usize = 20;
 /// Flag bits defined by `NormalViewSetInfo9Atom`.
 const KNOWN_FLAGS: u8 = 0x03;
 
-fn corrupted(message: impl Into<String>) -> PptError {
-    PptError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> Error {
+    Error::Corrupted(message.into())
 }
 
 fn read_i32(data: &[u8], offset: usize) -> i32 {
     i32::from_le_bytes(data[offset..offset + 4].try_into().expect("length checked"))
 }
 
-impl PowerPointViewBarState {
+impl ViewBarState {
     fn from_byte(value: u8) -> Result<Self> {
         Ok(match value {
             0x00 => Self::Minimized,
@@ -58,7 +57,7 @@ fn strict_bool(value: u8, name: &str) -> Result<bool> {
     }
 }
 
-fn check_unit_portion(ratio: PowerPointRatio, name: &str) -> Result<()> {
+fn check_unit_portion(ratio: Ratio, name: &str) -> Result<()> {
     if ratio.denominator() <= 0 || ratio.numerator() < 0 || ratio.numerator() > ratio.denominator()
     {
         return Err(corrupted(format!(
@@ -68,7 +67,7 @@ fn check_unit_portion(ratio: PowerPointRatio, name: &str) -> Result<()> {
     Ok(())
 }
 
-impl PowerPointNormalViewSetInfo {
+impl NormalViewSetInfo {
     pub(super) fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != ATOM_LEN {
             return Err(corrupted(format!(
@@ -76,8 +75,8 @@ impl PowerPointNormalViewSetInfo {
                 data.len()
             )));
         }
-        let left_portion = PowerPointRatio::new(read_i32(data, 0), read_i32(data, 4))?;
-        let top_portion = PowerPointRatio::new(read_i32(data, 8), read_i32(data, 12))?;
+        let left_portion = Ratio::new(read_i32(data, 0), read_i32(data, 4))?;
+        let top_portion = Ratio::new(read_i32(data, 8), read_i32(data, 12))?;
         check_unit_portion(left_portion, "leftPortion")?;
         check_unit_portion(top_portion, "topPortion")?;
         let flags = data[19];
@@ -89,8 +88,8 @@ impl PowerPointNormalViewSetInfo {
         Ok(Self {
             left_portion,
             top_portion,
-            vert_bar_state: PowerPointViewBarState::from_byte(data[16])?,
-            horiz_bar_state: PowerPointViewBarState::from_byte(data[17])?,
+            vert_bar_state: ViewBarState::from_byte(data[16])?,
+            horiz_bar_state: ViewBarState::from_byte(data[17])?,
             prefer_single_set: strict_bool(data[18], "NormalViewSetInfo9Atom.fPreferSingleSet")?,
             hide_thumbnails: flags & 0x01 != 0,
             bar_snapped: flags & 0x02 != 0,
@@ -113,12 +112,12 @@ impl PowerPointNormalViewSetInfo {
     }
 }
 
-impl PowerPointNormalViewSet {
+impl NormalViewSet {
     /// Parse a complete container record.
-    pub fn parse_record(record: &PptRecord) -> Result<Self> {
+    pub fn parse_record(record: &Record) -> Result<Self> {
         let declared = usize::try_from(record.data_length)
             .map_err(|_| corrupted("NormalViewSetInfo9 length does not fit memory"))?;
-        if record.record_type != PptRecordType::NormalViewSetInfo9
+        if record.record_type != RecordType::NormalViewSetInfo9
             || record.record_type_raw != NORMAL_VIEW_SET_INFO_TYPE
             || record.version != 0xF
             || declared != record.data.len()
@@ -127,20 +126,20 @@ impl PowerPointNormalViewSet {
                 "NormalViewSetInfo9 container has an invalid header or size",
             ));
         }
-        let children = PptRecord::parse_sequence_strict(&record.data, "NormalViewSetInfo9")?;
+        let children = Record::parse_sequence_strict(&record.data, "NormalViewSetInfo9")?;
         let [atom] = children.as_slice() else {
             return Err(corrupted(
                 "NormalViewSetInfo9 must contain exactly one NormalViewSetInfo9Atom",
             ));
         };
-        if atom.record_type != PptRecordType::NormalViewSetInfo9Atom || atom.version != 0 {
+        if atom.record_type != RecordType::NormalViewSetInfo9Atom || atom.version != 0 {
             return Err(corrupted(
                 "NormalViewSetInfo9 child is not a NormalViewSetInfo9Atom",
             ));
         }
-        let payload = PowerPointNormalViewSetInfo::parse(&atom.data).map_or_else(
-            |_| PowerPointNormalViewSetPayload::Other(atom.data.clone()),
-            PowerPointNormalViewSetPayload::Layout,
+        let payload = NormalViewSetInfo::parse(&atom.data).map_or_else(
+            |_| NormalViewSetPayload::Other(atom.data.clone()),
+            NormalViewSetPayload::Layout,
         );
         Ok(Self { payload })
     }
@@ -148,8 +147,8 @@ impl PowerPointNormalViewSet {
     /// Serialize the complete container record, including its header.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let payload = match &self.payload {
-            PowerPointNormalViewSetPayload::Layout(layout) => layout.to_bytes()?,
-            PowerPointNormalViewSetPayload::Other(data) => data.clone(),
+            NormalViewSetPayload::Layout(layout) => layout.to_bytes()?,
+            NormalViewSetPayload::Other(data) => data.clone(),
         };
         let mut data = Vec::with_capacity(8 + payload.len());
         data.extend_from_slice(&0u16.to_le_bytes());
@@ -165,12 +164,12 @@ impl PowerPointNormalViewSet {
     }
 }
 
-impl PowerPointNotesTextViewInfo {
+impl NotesTextViewInfo {
     /// Parse a complete container record.
-    pub fn parse_record(record: &PptRecord) -> Result<Self> {
+    pub fn parse_record(record: &Record) -> Result<Self> {
         let declared = usize::try_from(record.data_length)
             .map_err(|_| corrupted("NotesTextViewInfo9 length does not fit memory"))?;
-        if record.record_type != PptRecordType::NotesTextViewInfo9
+        if record.record_type != RecordType::NotesTextViewInfo9
             || record.record_type_raw != NOTES_TEXT_VIEW_INFO_TYPE
             || record.version != 0xF
             || declared != record.data.len()
@@ -179,17 +178,17 @@ impl PowerPointNotesTextViewInfo {
                 "NotesTextViewInfo9 container has an invalid header or size",
             ));
         }
-        let children = PptRecord::parse_sequence_strict(&record.data, "NotesTextViewInfo9")?;
+        let children = Record::parse_sequence_strict(&record.data, "NotesTextViewInfo9")?;
         let [atom] = children.as_slice() else {
             return Err(corrupted(
                 "NotesTextViewInfo9 must contain exactly one zoom atom",
             ));
         };
-        if atom.record_type != PptRecordType::ViewInfoAtom || atom.version != 0 {
+        if atom.record_type != RecordType::ViewInfoAtom || atom.version != 0 {
             return Err(corrupted("NotesTextViewInfo9 child is not a ViewInfoAtom"));
         }
         Ok(Self {
-            view_info: PowerPointNoZoomViewInfo::parse(&atom.data)?,
+            view_info: NoZoomViewInfo::parse(&atom.data)?,
         })
     }
 }

@@ -1,40 +1,34 @@
 use std::io::Cursor;
 
-use litchi_xls::writer::{XlsCustomTableStyles, XlsWriter};
+use litchi_xls::writer::{CustomTableStyles, Writer};
 use litchi_xls::{
-    XlsDifferentialFormat, XlsDifferentialFormatId, XlsTableStyle, XlsTableStyleElement,
-    XlsTableStyleRegion, XlsTableStyles, XlsWorkbook, XlsXfProperty,
+    DifferentialFormat, DifferentialFormatId, TableStyle, TableStyleElement, TableStyleRegion,
+    TableStyles, Workbook, XfProperty,
 };
 
-fn configured_styles(number_format_id: u16) -> XlsCustomTableStyles {
+fn configured_styles(number_format_id: u16) -> CustomTableStyles {
     let differential_formats = vec![
-        XlsDifferentialFormat::try_new(
-            false,
-            vec![XlsXfProperty::NumberFormatId(number_format_id)],
-        )
-        .unwrap(),
-        XlsDifferentialFormat::try_new(false, vec![XlsXfProperty::Locked(true)]).unwrap(),
+        DifferentialFormat::try_new(false, vec![XfProperty::NumberFormatId(number_format_id)])
+            .unwrap(),
+        DifferentialFormat::try_new(false, vec![XfProperty::Locked(true)]).unwrap(),
     ];
-    let style = XlsTableStyle::try_new(
+    let style = TableStyle::try_new(
         "WriterCustom",
         true,
         false,
         vec![
-            XlsTableStyleElement::try_new(
-                XlsTableStyleRegion::WholeTable,
-                XlsDifferentialFormatId::new(0),
-            )
-            .unwrap(),
-            XlsTableStyleElement::try_with_stripe_size(
-                XlsTableStyleRegion::FirstRowStripe,
+            TableStyleElement::try_new(TableStyleRegion::WholeTable, DifferentialFormatId::new(0))
+                .unwrap(),
+            TableStyleElement::try_with_stripe_size(
+                TableStyleRegion::FirstRowStripe,
                 2,
-                XlsDifferentialFormatId::new(1),
+                DifferentialFormatId::new(1),
             )
             .unwrap(),
         ],
     )
     .unwrap();
-    XlsCustomTableStyles::try_from_styles(
+    CustomTableStyles::try_from_styles(
         differential_formats,
         "WriterCustom",
         "PivotStyleLight16",
@@ -45,7 +39,7 @@ fn configured_styles(number_format_id: u16) -> XlsCustomTableStyles {
 
 #[test]
 fn custom_table_styles_round_trip_from_writer_to_reader() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     writer.add_worksheet("Data").unwrap();
     let number_format_id = writer.register_number_format("0.0000\"kg\"");
     writer
@@ -54,12 +48,12 @@ fn custom_table_styles_round_trip_from_writer_to_reader() {
 
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let workbook = XlsWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
 
     assert_eq!(workbook.differential_formats().len(), 2);
     assert_eq!(
         workbook.differential_formats()[0].properties().properties(),
-        &[XlsXfProperty::NumberFormatId(number_format_id)]
+        &[XfProperty::NumberFormatId(number_format_id)]
     );
     let catalog = workbook.table_styles().unwrap();
     assert_eq!(catalog.default_table_style(), "WriterCustom");
@@ -72,27 +66,24 @@ fn custom_table_styles_round_trip_from_writer_to_reader() {
 
 #[test]
 fn custom_table_style_configuration_rejects_hostile_relationships() {
-    let dxf = XlsDifferentialFormat::try_new(false, vec![XlsXfProperty::Locked(true)]).unwrap();
+    let dxf = DifferentialFormat::try_new(false, vec![XfProperty::Locked(true)]).unwrap();
 
     let incomplete_catalog =
-        XlsTableStyles::try_new(145, "TableStyleMedium2", "PivotStyleLight16").unwrap();
-    assert!(XlsCustomTableStyles::try_new(vec![dxf.clone()], incomplete_catalog).is_err());
+        TableStyles::try_new(145, "TableStyleMedium2", "PivotStyleLight16").unwrap();
+    assert!(CustomTableStyles::try_new(vec![dxf.clone()], incomplete_catalog).is_err());
 
-    let dangling_style = XlsTableStyle::try_new(
+    let dangling_style = TableStyle::try_new(
         "Dangling",
         true,
         false,
         vec![
-            XlsTableStyleElement::try_new(
-                XlsTableStyleRegion::WholeTable,
-                XlsDifferentialFormatId::new(1),
-            )
-            .unwrap(),
+            TableStyleElement::try_new(TableStyleRegion::WholeTable, DifferentialFormatId::new(1))
+                .unwrap(),
         ],
     )
     .unwrap();
     assert!(
-        XlsCustomTableStyles::try_from_styles(
+        CustomTableStyles::try_from_styles(
             vec![dxf],
             "Dangling",
             "PivotStyleLight16",
@@ -101,30 +92,24 @@ fn custom_table_style_configuration_rejects_hostile_relationships() {
         .is_err()
     );
 
-    let duplicate_region = XlsTableStyle::try_new(
+    let duplicate_region = TableStyle::try_new(
         "Duplicate",
         true,
         false,
         vec![
-            XlsTableStyleElement::try_new(
-                XlsTableStyleRegion::WholeTable,
-                XlsDifferentialFormatId::new(0),
-            )
-            .unwrap(),
-            XlsTableStyleElement::try_new(
-                XlsTableStyleRegion::WholeTable,
-                XlsDifferentialFormatId::new(0),
-            )
-            .unwrap(),
+            TableStyleElement::try_new(TableStyleRegion::WholeTable, DifferentialFormatId::new(0))
+                .unwrap(),
+            TableStyleElement::try_new(TableStyleRegion::WholeTable, DifferentialFormatId::new(0))
+                .unwrap(),
         ],
     );
     assert!(duplicate_region.is_err());
-    assert!(XlsTableStyle::try_new("", true, false, Vec::new()).is_err());
+    assert!(TableStyle::try_new("", true, false, Vec::new()).is_err());
 }
 
 #[test]
 fn replacement_is_atomic_and_clear_restores_unset_bytes() {
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     writer.add_worksheet("Data").unwrap();
     let valid = configured_styles(0);
     writer.set_custom_table_styles(valid.clone()).unwrap();
@@ -138,17 +123,17 @@ fn replacement_is_atomic_and_clear_restores_unset_bytes() {
 
     let mut retained = Cursor::new(Vec::new());
     writer.write_to(&mut retained).unwrap();
-    let workbook = XlsWorkbook::new(Cursor::new(retained.into_inner())).unwrap();
+    let workbook = Workbook::new(Cursor::new(retained.into_inner())).unwrap();
     assert_eq!(
         workbook.differential_formats()[0].properties().properties(),
-        &[XlsXfProperty::NumberFormatId(0)]
+        &[XfProperty::NumberFormatId(0)]
     );
 
     writer.clear_custom_table_styles();
     let mut cleared = Cursor::new(Vec::new());
     writer.write_to(&mut cleared).unwrap();
 
-    let mut fresh = XlsWriter::new();
+    let mut fresh = Writer::new();
     fresh.add_worksheet("Data").unwrap();
     let mut baseline = Cursor::new(Vec::new());
     fresh.write_to(&mut baseline).unwrap();

@@ -12,7 +12,7 @@
 //!
 //! - MS-XLS 2.4.199 (Pls), 2.4.63 (Continue)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Byte length of the `Pls` `reserved` field.
 const RESERVED_LEN: usize = 2;
@@ -25,23 +25,23 @@ const MAX_RECORD_PAYLOAD: usize = 8_224;
 /// The `reserved` field (MUST be zero, and MUST be ignored) is preserved
 /// verbatim so the record round-trips unchanged.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsPrinterDriverData {
+pub struct PrinterDriverData {
     /// Raw `reserved` field, preserved verbatim.
     reserved: u16,
     /// Opaque `DEVMODE` bytes, reassembled across `Continue` records.
     devmode: Vec<u8>,
 }
 
-impl XlsPrinterDriverData {
+impl PrinterDriverData {
     /// Parse a `Pls` record payload plus the payloads of the `Continue`
     /// records that follow it.
     ///
     /// `Continue` payloads carry raw `DEVMODE` sections without any header,
     /// so they are appended verbatim; their record-type identity is
     /// established by the caller's record iteration.
-    pub fn parse(data: &[u8], continues: &[Vec<u8>]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8], continues: &[Vec<u8>]) -> Result<Self> {
         if data.len() < RESERVED_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: RESERVED_LEN,
                 found: data.len(),
             });
@@ -90,7 +90,7 @@ mod tests {
         let mut data = Vec::new();
         data.extend_from_slice(&[0; 2]);
         data.extend_from_slice(b"devmode-bytes");
-        let parsed = XlsPrinterDriverData::parse(&data, &[]).unwrap();
+        let parsed = PrinterDriverData::parse(&data, &[]).unwrap();
         assert_eq!(parsed.reserved(), 0);
         assert_eq!(parsed.driver_data(), b"devmode-bytes");
         assert_eq!(parsed.to_record_payloads(), vec![data]);
@@ -103,7 +103,7 @@ mod tests {
         first.extend_from_slice(&[0; 2]);
         first.extend_from_slice(&devmode[..6_000]);
         let continues = vec![devmode[6_000..14_000].to_vec(), devmode[14_000..].to_vec()];
-        let parsed = XlsPrinterDriverData::parse(&first, &continues).unwrap();
+        let parsed = PrinterDriverData::parse(&first, &continues).unwrap();
         assert_eq!(parsed.driver_data(), devmode.as_slice());
 
         let payloads = parsed.to_record_payloads();
@@ -111,7 +111,7 @@ mod tests {
         for payload in &payloads {
             assert!(payload.len() <= MAX_RECORD_PAYLOAD);
         }
-        let reparsed = XlsPrinterDriverData::parse(&payloads[0], &payloads[1..]).unwrap();
+        let reparsed = PrinterDriverData::parse(&payloads[0], &payloads[1..]).unwrap();
         assert_eq!(reparsed, parsed);
         assert_eq!(reparsed.driver_data(), devmode.as_slice());
     }
@@ -121,17 +121,17 @@ mod tests {
         // reserved MUST be zero and MUST be ignored; it round-trips verbatim.
         let mut data = Vec::new();
         data.extend_from_slice(&0x7F7Fu16.to_le_bytes());
-        let parsed = XlsPrinterDriverData::parse(&data, &[]).unwrap();
+        let parsed = PrinterDriverData::parse(&data, &[]).unwrap();
         assert_eq!(parsed.reserved(), 0x7F7F);
         assert!(parsed.driver_data().is_empty());
         assert_eq!(parsed.to_record_payloads(), vec![data]);
         // Truncated reserved field.
-        assert!(XlsPrinterDriverData::parse(&[0x00], &[]).is_err());
+        assert!(PrinterDriverData::parse(&[0x00], &[]).is_err());
     }
 
     #[test]
     fn empty_devmode_emits_single_record() {
-        let parsed = XlsPrinterDriverData::parse(&[0; 2], &[]).unwrap();
+        let parsed = PrinterDriverData::parse(&[0; 2], &[]).unwrap();
         let payloads = parsed.to_record_payloads();
         assert_eq!(payloads.len(), 1);
         assert_eq!(payloads[0], vec![0; 2]);

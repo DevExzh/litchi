@@ -1,27 +1,25 @@
 //! Round-trip tests for the BIFF8 Table record (what-if data tables).
 
 use litchi_core::sheet::Cell;
-use litchi_xls::writer::XlsWriter;
-use litchi_xls::{
-    XlsDataTable, XlsDataTableInputCell, XlsDataTableKind, XlsDataTableRange, XlsWorkbook,
-};
+use litchi_xls::writer::Writer;
+use litchi_xls::{DataTable, DataTableInputCell, DataTableKind, DataTableRange, Workbook};
 use std::io::Cursor;
 
 #[test]
 fn data_tables_round_trip_through_writer_and_reader() {
-    let one_variable = XlsDataTable::one_variable(
-        XlsDataTableRange::new(2, 8, 3, 5).unwrap(),
+    let one_variable = DataTable::one_variable(
+        DataTableRange::new(2, 8, 3, 5).unwrap(),
         true,
-        XlsDataTableInputCell::Present { row: 0, col: 6 },
+        DataTableInputCell::Present { row: 0, col: 6 },
     );
-    let mut two_variable = XlsDataTable::two_variable(
-        XlsDataTableRange::new(2, 8, 7, 9).unwrap(),
-        XlsDataTableInputCell::Present { row: 0, col: 10 },
-        XlsDataTableInputCell::Deleted,
+    let mut two_variable = DataTable::two_variable(
+        DataTableRange::new(2, 8, 7, 9).unwrap(),
+        DataTableInputCell::Present { row: 0, col: 10 },
+        DataTableInputCell::Deleted,
     );
     two_variable.set_always_calc(true);
 
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Tables").unwrap();
     writer.write_number(sheet, 3, 3, 1.5).unwrap();
     writer.add_data_table(sheet, 1, 2, one_variable).unwrap();
@@ -29,7 +27,7 @@ fn data_tables_round_trip_through_writer_and_reader() {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
 
-    let workbook = XlsWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let worksheet = workbook.xls_worksheet(0).unwrap();
     let tables = worksheet.data_tables();
     assert_eq!(tables, &[one_variable, two_variable]);
@@ -47,14 +45,11 @@ fn data_tables_round_trip_through_writer_and_reader() {
 
 #[test]
 fn data_table_anchor_validation() {
-    let range = XlsDataTableRange::new(2, 8, 3, 5).unwrap();
-    let table = XlsDataTable::one_variable(
-        range,
-        false,
-        XlsDataTableInputCell::Present { row: 0, col: 0 },
-    );
+    let range = DataTableRange::new(2, 8, 3, 5).unwrap();
+    let table =
+        DataTable::one_variable(range, false, DataTableInputCell::Present { row: 0, col: 0 });
 
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Tables").unwrap();
     // Anchor inside the range.
     assert!(writer.add_data_table(sheet, 4, 4, table).is_err());
@@ -72,21 +67,18 @@ fn data_table_anchor_validation() {
 
 #[test]
 fn kind_accessors_expose_input_cells() {
-    let table = XlsDataTable::two_variable(
-        XlsDataTableRange::new(2, 8, 3, 5).unwrap(),
-        XlsDataTableInputCell::Present { row: 1, col: 2 },
-        XlsDataTableInputCell::Deleted,
+    let table = DataTable::two_variable(
+        DataTableRange::new(2, 8, 3, 5).unwrap(),
+        DataTableInputCell::Present { row: 1, col: 2 },
+        DataTableInputCell::Deleted,
     );
-    let XlsDataTableKind::TwoVariable {
+    let DataTableKind::TwoVariable {
         row_input,
         column_input,
     } = table.kind()
     else {
         panic!()
     };
-    assert_eq!(
-        *row_input,
-        XlsDataTableInputCell::Present { row: 1, col: 2 }
-    );
-    assert_eq!(*column_input, XlsDataTableInputCell::Deleted);
+    assert_eq!(*row_input, DataTableInputCell::Present { row: 1, col: 2 });
+    assert_eq!(*column_input, DataTableInputCell::Deleted);
 }

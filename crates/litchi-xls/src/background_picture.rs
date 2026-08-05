@@ -10,7 +10,7 @@
 //!
 //! - MS-XLS 2.4.19 (BkHim)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `BkHim` record (MS-XLS 2.4.19).
 pub(crate) const BK_HIM_RECORD_TYPE: u16 = 0x00E9;
@@ -18,8 +18,8 @@ pub(crate) const BK_HIM_RECORD_TYPE: u16 = 0x00E9;
 /// Byte length of the fixed `BkHim` prefix: `cf` + `reserved` + `lcb`.
 const HEADER_LEN: usize = 8;
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: BK_HIM_RECORD_TYPE,
         message: message.into(),
     }
@@ -28,7 +28,7 @@ fn invalid(message: impl Into<String>) -> XlsError {
 /// The `cf` image format of a `BkHim` record (MS-XLS 2.4.19).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
-pub enum XlsBackgroundImageFormat {
+pub enum BackgroundImageFormat {
     /// 0x0009: bitmap format as described in MSDN-BMP.
     Bitmap = 0x0009,
     /// 0x000E: native format of another application; the bytes cannot be
@@ -36,8 +36,8 @@ pub enum XlsBackgroundImageFormat {
     Native = 0x000E,
 }
 
-impl XlsBackgroundImageFormat {
-    fn parse(value: u16) -> XlsResult<Self> {
+impl BackgroundImageFormat {
+    fn parse(value: u16) -> Result<Self> {
         match value {
             0x0009 => Ok(Self::Bitmap),
             0x000E => Ok(Self::Native),
@@ -53,25 +53,25 @@ impl XlsBackgroundImageFormat {
 /// The `reserved` field (MUST be 0x0001 and MUST be ignored) is preserved
 /// verbatim so the record round-trips unchanged.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsBackgroundImage {
+pub struct BackgroundImage {
     /// Image format (`cf`).
-    format: XlsBackgroundImageFormat,
+    format: BackgroundImageFormat,
     /// Raw `reserved` field, preserved verbatim.
     reserved: u16,
     /// Opaque `imageBlob` bytes. Guaranteed non-empty (`lcb` >= 1).
     image: Vec<u8>,
 }
 
-impl XlsBackgroundImage {
+impl BackgroundImage {
     /// Parse a `BkHim` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < HEADER_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: HEADER_LEN,
                 found: data.len(),
             });
         }
-        let format = XlsBackgroundImageFormat::parse(u16::from_le_bytes([data[0], data[1]]))?;
+        let format = BackgroundImageFormat::parse(u16::from_le_bytes([data[0], data[1]]))?;
         let reserved = u16::from_le_bytes([data[2], data[3]]);
         let declared = i32::from_le_bytes(data[4..8].try_into().expect("length checked"));
         // MS-XLS 2.4.19: lcb MUST be greater than or equal to 1.
@@ -105,7 +105,7 @@ impl XlsBackgroundImage {
     }
 
     /// Image format (`cf`).
-    pub fn format(&self) -> XlsBackgroundImageFormat {
+    pub fn format(&self) -> BackgroundImageFormat {
         self.format
     }
 
@@ -136,11 +136,11 @@ mod tests {
     #[test]
     fn round_trip_both_formats() {
         for (cf, expected) in [
-            (0x0009, XlsBackgroundImageFormat::Bitmap),
-            (0x000E, XlsBackgroundImageFormat::Native),
+            (0x0009, BackgroundImageFormat::Bitmap),
+            (0x000E, BackgroundImageFormat::Native),
         ] {
             let bytes = record(cf, 0x0001, b"\x42\x4Dimage-bytes");
-            let parsed = XlsBackgroundImage::parse(&bytes).unwrap();
+            let parsed = BackgroundImage::parse(&bytes).unwrap();
             assert_eq!(parsed.format(), expected);
             assert_eq!(parsed.reserved(), 0x0001);
             assert_eq!(parsed.image(), b"\x42\x4Dimage-bytes");
@@ -152,7 +152,7 @@ mod tests {
     fn preserves_nonstandard_reserved_value() {
         // reserved MUST be 0x0001 and MUST be ignored; it round-trips verbatim.
         let bytes = record(0x0009, 0x7F7F, b"x");
-        let parsed = XlsBackgroundImage::parse(&bytes).unwrap();
+        let parsed = BackgroundImage::parse(&bytes).unwrap();
         assert_eq!(parsed.reserved(), 0x7F7F);
         assert_eq!(parsed.to_payload(), bytes);
     }
@@ -161,17 +161,17 @@ mod tests {
     fn rejects_malformed_records() {
         let bytes = record(0x0009, 0x0001, b"image");
         // Truncated header.
-        assert!(XlsBackgroundImage::parse(&bytes[..7]).is_err());
+        assert!(BackgroundImage::parse(&bytes[..7]).is_err());
         // Undefined cf value.
-        assert!(XlsBackgroundImage::parse(&record(0x0002, 0x0001, b"image")).is_err());
+        assert!(BackgroundImage::parse(&record(0x0002, 0x0001, b"image")).is_err());
         // lcb smaller than 1.
-        assert!(XlsBackgroundImage::parse(&record(0x0009, 0x0001, b"")).is_err());
+        assert!(BackgroundImage::parse(&record(0x0009, 0x0001, b"")).is_err());
         let mut negative = record(0x0009, 0x0001, b"image");
         negative[4..8].copy_from_slice(&(-1i32).to_le_bytes());
-        assert!(XlsBackgroundImage::parse(&negative).is_err());
+        assert!(BackgroundImage::parse(&negative).is_err());
         // lcb does not match the imageBlob size.
         let mut mismatch = record(0x0009, 0x0001, b"image");
         mismatch[4..8].copy_from_slice(&4i32.to_le_bytes());
-        assert!(XlsBackgroundImage::parse(&mismatch).is_err());
+        assert!(BackgroundImage::parse(&mismatch).is_err());
     }
 }

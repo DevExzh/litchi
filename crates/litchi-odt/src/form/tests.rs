@@ -8,7 +8,7 @@ const SUFFIX: &str = "</f:button></f:form></o:forms></o:text></o:body></o:docume
 #[test]
 fn retains_inert_form_event_listener_metadata_and_owner() {
     let xml = format!(
-        r#"{PREFIX}<o:event-listeners><s:event-listener s:event-name="dom:click" s:language="ooo:script" s:macro-name="vnd.sun.star.script:Module.Run" x:type="simple" x:href="Scripts/Main" x:actuate="onRequest"/>{SUFFIX}"#
+        r#"{PREFIX}<o:event-listeners><s:event-listener s:event-name="dom:click" s:language="ooo:script" s:macro-name="vnd.sun.star.script:Module.Run" x:type="simple" x:href="Scripts/Main" x:actuate="onRequest"/></o:event-listeners>{SUFFIX}"#
     );
     let forms = parse_form_parts(&[(&xml, Part::Content)]).unwrap();
     assert!(forms.has_event_listeners);

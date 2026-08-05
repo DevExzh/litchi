@@ -1,4 +1,4 @@
-use crate::error::{XlsError, XlsResult};
+use crate::error::{Error, Result};
 use crate::view::{PaneType, Range, pane_exists};
 
 const MAX_SCL_TERM: u16 = i16::MAX as u16;
@@ -13,7 +13,7 @@ pub struct Scale {
 
 impl Scale {
     /// Create a scale from positive terms no larger than 32767.
-    pub fn new(numerator: u16, denominator: u16) -> XlsResult<Self> {
+    pub fn new(numerator: u16, denominator: u16) -> Result<Self> {
         let value = Self {
             numerator,
             denominator,
@@ -32,7 +32,7 @@ impl Scale {
         self.denominator
     }
 
-    pub(crate) fn validate(self) -> XlsResult<()> {
+    pub(crate) fn validate(self) -> Result<()> {
         if self.numerator == 0
             || self.denominator == 0
             || self.numerator > MAX_SCL_TERM
@@ -40,7 +40,7 @@ impl Scale {
             || u32::from(self.numerator) * 10 < u32::from(self.denominator)
             || u32::from(self.numerator) > u32::from(self.denominator) * 4
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "view scale terms must be 1..=32767 and the fraction must be between 1/10 and 4"
                     .to_string(),
             ));
@@ -71,7 +71,7 @@ pub struct Pane {
 
 impl Pane {
     /// Freeze `rows` rows and `columns` columns from the top-left corner.
-    pub fn frozen(rows: u16, columns: u8) -> XlsResult<Self> {
+    pub fn frozen(rows: u16, columns: u8) -> Result<Self> {
         let value = Self {
             mode: Mode::Frozen,
             horizontal_split: u16::from(columns),
@@ -91,7 +91,7 @@ impl Pane {
         bottom_pane_top_row: u16,
         right_pane_left_column: u8,
         active_pane: PaneType,
-    ) -> XlsResult<Self> {
+    ) -> Result<Self> {
         let value = Self {
             mode: Mode::Split,
             horizontal_split: horizontal_twips,
@@ -134,26 +134,26 @@ impl Pane {
         self.active_pane
     }
 
-    pub(crate) fn validate(self) -> XlsResult<()> {
+    pub(crate) fn validate(self) -> Result<()> {
         if self.horizontal_split == 0 && self.vertical_split == 0 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "PANE must split at least one axis".to_string(),
             ));
         }
         if self.mode == Mode::Split
             && (self.horizontal_split > i16::MAX as u16 || self.vertical_split > i16::MAX as u16)
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "split positions exceed 32767 twips".to_string(),
             ));
         }
         if self.mode == Mode::Frozen && self.horizontal_split > 255 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "frozen horizontal split exceeds 255 columns".to_string(),
             ));
         }
         if !pane_exists(self.horizontal_split, self.vertical_split, self.active_pane) {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "active pane does not exist for the split axes".to_string(),
             ));
         }
@@ -179,7 +179,7 @@ impl Selection {
         active_column: u8,
         active_range_index: u16,
         ranges: Vec<Range>,
-    ) -> XlsResult<Self> {
+    ) -> Result<Self> {
         let value = Self {
             pane,
             active_row,
@@ -420,7 +420,7 @@ impl View {
     }
 
     /// Set the first visible cell after checking pane-specific sentinels.
-    pub fn origin(&mut self, row: u16, column: u8) -> XlsResult<&mut Self> {
+    pub fn origin(&mut self, row: u16, column: u8) -> Result<&mut Self> {
         validate_origin(row, column, self.pane.as_ref())?;
         self.first_visible_row = row;
         self.first_visible_column = column;
@@ -428,9 +428,9 @@ impl View {
     }
 
     /// Set a palette index in `0..=63`, or use the default with `None`.
-    pub fn grid_color(&mut self, index: Option<u16>) -> XlsResult<&mut Self> {
+    pub fn grid_color(&mut self, index: Option<u16>) -> Result<&mut Self> {
         if index.is_some_and(|value| value > 63) {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "custom gridline color index must be <= 63".to_string(),
             ));
         }
@@ -439,14 +439,14 @@ impl View {
     }
 
     /// Set page-break preview zoom in `10..=400`, or clear it with `None`.
-    pub fn page_zoom(&mut self, percent: Option<u16>) -> XlsResult<&mut Self> {
+    pub fn page_zoom(&mut self, percent: Option<u16>) -> Result<&mut Self> {
         validate_zoom(percent)?;
         self.page_break_zoom_percent = percent;
         Ok(self)
     }
 
     /// Set normal-view zoom in `10..=400`, or clear it with `None`.
-    pub fn normal_zoom(&mut self, percent: Option<u16>) -> XlsResult<&mut Self> {
+    pub fn normal_zoom(&mut self, percent: Option<u16>) -> Result<&mut Self> {
         validate_zoom(percent)?;
         self.normal_zoom_percent = percent;
         Ok(self)
@@ -462,7 +462,7 @@ impl View {
         &mut self,
         pane: Pane,
         selections: Vec<Selection>,
-    ) -> XlsResult<(Option<Pane>, Vec<Selection>)> {
+    ) -> Result<(Option<Pane>, Vec<Selection>)> {
         self.validate_with(Some(&pane), &selections)?;
         let previous_pane = self.pane.replace(pane);
         let previous_selections = std::mem::replace(&mut self.selections, selections);
@@ -470,7 +470,7 @@ impl View {
     }
 
     /// Atomically replace selections after checking them against the pane.
-    pub fn put_selections(&mut self, selections: Vec<Selection>) -> XlsResult<Vec<Selection>> {
+    pub fn put_selections(&mut self, selections: Vec<Selection>) -> Result<Vec<Selection>> {
         self.validate_with(self.pane.as_ref(), &selections)?;
         Ok(std::mem::replace(&mut self.selections, selections))
     }
@@ -485,13 +485,13 @@ impl View {
         (previous_pane, previous_selections)
     }
 
-    pub(crate) fn validate(&self) -> XlsResult<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         self.validate_with(self.pane.as_ref(), &self.selections)
     }
 
-    fn validate_with(&self, pane: Option<&Pane>, selections: &[Selection]) -> XlsResult<()> {
+    fn validate_with(&self, pane: Option<&Pane>, selections: &[Selection]) -> Result<()> {
         if self.gridline_color_index.is_some_and(|value| value > 63) {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "custom gridline color index must be <= 63".to_string(),
             ));
         }
@@ -507,60 +507,60 @@ impl View {
         validate_selections(pane, selections)
     }
 
-    pub(crate) fn set_frozen(&mut self, rows: u16, columns: u8) -> XlsResult<()> {
+    pub(crate) fn set_frozen(&mut self, rows: u16, columns: u8) -> Result<()> {
         let pane = Pane::frozen(rows, columns)?;
         self.put_pane(pane, vec![Selection::cell(pane.active(), rows, columns)])?;
         Ok(())
     }
 }
 
-fn validate_origin(row: u16, column: u8, pane: Option<&Pane>) -> XlsResult<()> {
+fn validate_origin(row: u16, column: u8, pane: Option<&Pane>) -> Result<()> {
     if pane.is_some_and(|value| value.mode == Mode::Frozen)
         && (row == u16::MAX || column == u8::MAX)
     {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "frozen view cannot use sentinel origins".to_string(),
         ));
     }
     Ok(())
 }
 
-fn validate_zoom(percent: Option<u16>) -> XlsResult<()> {
+fn validate_zoom(percent: Option<u16>) -> Result<()> {
     if percent.is_some_and(|value| !(10..=400).contains(&value)) {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "view zoom percent must be between 10 and 400".to_string(),
         ));
     }
     Ok(())
 }
 
-pub(crate) fn validate_selection(selection: &Selection) -> XlsResult<()> {
+pub(crate) fn validate_selection(selection: &Selection) -> Result<()> {
     if selection.active_range_index & 0x8000 != 0 {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "active range index must be a signed nonnegative integer".to_string(),
         ));
     }
     if selection.ranges.is_empty() || selection.ranges.len() > MAX_SELECTION_RANGES {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "each SELECTION needs 1..=1369 ranges".to_string(),
         ));
     }
     if selection.ranges.iter().any(|range| {
         range.first_row() > range.last_row() || range.first_column() > range.last_column()
     }) {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "SELECTION contains an inverted range".to_string(),
         ));
     }
     Ok(())
 }
 
-fn validate_selections(pane: Option<&Pane>, selections: &[Selection]) -> XlsResult<()> {
+fn validate_selections(pane: Option<&Pane>, selections: &[Selection]) -> Result<()> {
     if selections.is_empty() {
         return if pane.is_none() {
             Ok(())
         } else {
-            Err(XlsError::InvalidData(
+            Err(Error::InvalidData(
                 "a pane view needs at least one SELECTION".to_string(),
             ))
         };
@@ -574,14 +574,14 @@ fn validate_selections(pane: Option<&Pane>, selections: &[Selection]) -> XlsResu
         validate_selection(first)?;
         let pane_bit = 1u8 << first.pane.code();
         if seen & pane_bit != 0 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "SELECTION pane groups must be contiguous".to_string(),
             ));
         }
         if !pane.map_or(first.pane == PaneType::UpperLeft, |value| {
             pane_exists(value.horizontal_split, value.vertical_split, first.pane)
         }) {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "SELECTION references a nonexistent pane".to_string(),
             ));
         }
@@ -599,7 +599,7 @@ fn validate_selections(pane: Option<&Pane>, selections: &[Selection]) -> XlsResu
                 first.active_column,
                 first.active_range_index,
             ) {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "contiguous SELECTION records disagree".to_string(),
                 ));
             }
@@ -609,15 +609,13 @@ fn validate_selections(pane: Option<&Pane>, selections: &[Selection]) -> XlsResu
             .iter()
             .flat_map(|selection| selection.ranges.iter())
             .nth(usize::from(first.active_range_index))
-            .ok_or_else(|| {
-                XlsError::InvalidData("active range index is out of bounds".to_string())
-            })?;
+            .ok_or_else(|| Error::InvalidData("active range index is out of bounds".to_string()))?;
         if first.active_row < active.first_row()
             || first.active_row > active.last_row()
             || first.active_column < active.first_column()
             || first.active_column > active.last_column()
         {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "active range does not contain the active cell".to_string(),
             ));
         }
@@ -625,7 +623,7 @@ fn validate_selections(pane: Option<&Pane>, selections: &[Selection]) -> XlsResu
         start = end;
     }
     if !has_active {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "active pane has no SELECTION".to_string(),
         ));
     }

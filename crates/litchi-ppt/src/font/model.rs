@@ -2,7 +2,7 @@
 
 /// One embedded OpenType font facet.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EmbeddedPowerPointFont {
+pub struct EmbeddedFont {
     /// Facet index: plain, bold, italic, or bold-italic (`0..=3`).
     pub style: u8,
     /// Embedded font bytes in the format specified by MS-PPT.
@@ -11,7 +11,7 @@ pub struct EmbeddedPowerPointFont {
 
 /// Font attributes from a `FontEntityAtom`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointFont {
+pub struct Font {
     /// Zero-based font index from the atom's record instance.
     pub index: u16,
     /// Null-terminated UTF-16 typeface name.
@@ -35,28 +35,28 @@ pub struct PowerPointFont {
     /// Windows pitch and family byte.
     pub pitch_and_family: u8,
     /// Optional embedded font facets in record order.
-    pub embedded_fonts: Vec<EmbeddedPowerPointFont>,
+    pub embedded_fonts: Vec<EmbeddedFont>,
 }
 
 /// Parsed base or PowerPoint 10 font collection.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointFontCollection {
+pub struct FontCollection {
     /// Whether this is the international `FontCollection10Container`.
     pub international: bool,
     /// Fonts in collection order.
-    pub fonts: Vec<PowerPointFont>,
+    pub fonts: Vec<Font>,
 }
 
-impl PowerPointFontCollection {
+impl FontCollection {
     /// Resolve a zero-based font reference.
-    pub fn get(&self, index: u16) -> Option<&PowerPointFont> {
+    pub fn get(&self, index: u16) -> Option<&Font> {
         self.fonts.iter().find(|font| font.index == index)
     }
 }
 
 /// PowerPoint 10 document-wide font embedding settings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointFontEmbeddingFlags {
+pub struct FontEmbeddingFlags {
     /// Raw flags word. Only bits 0 and 1 are defined by MS-PPT.
     pub raw: u32,
     /// Whether embedded fonts contain only the characters used by the presentation.
@@ -67,23 +67,23 @@ pub struct PowerPointFontEmbeddingFlags {
 
 /// Base and international font collections resolved from a PPT record tree.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct PowerPointFontCollections {
+pub struct FontCollections {
     /// Base font collection from `DocumentTextInfoContainer`.
-    pub base: Option<PowerPointFontCollection>,
+    pub base: Option<FontCollection>,
     /// PowerPoint 10 international font collection from `___PPT10`.
-    pub international: Option<PowerPointFontCollection>,
+    pub international: Option<FontCollection>,
     /// PowerPoint 10 document-wide font embedding settings from `___PPT10`.
-    pub embedding_flags: Option<PowerPointFontEmbeddingFlags>,
+    pub embedding_flags: Option<FontEmbeddingFlags>,
 }
 
-impl PowerPointFontCollections {
+impl FontCollections {
     /// Resolve a base-font reference.
-    pub fn get_base(&self, index: u16) -> Option<&PowerPointFont> {
+    pub fn get_base(&self, index: u16) -> Option<&Font> {
         self.base.as_ref()?.get(index)
     }
 
     /// Resolve a PowerPoint 10 international-font reference.
-    pub fn get_international(&self, index: u16) -> Option<&PowerPointFont> {
+    pub fn get_international(&self, index: u16) -> Option<&Font> {
         self.international.as_ref()?.get(index)
     }
 }

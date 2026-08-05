@@ -11,6 +11,5 @@ mod model;
 mod tests;
 
 pub use model::{
-    PowerPointNormalViewSet, PowerPointNormalViewSetInfo, PowerPointNormalViewSetPayload,
-    PowerPointNotesTextViewInfo, PowerPointViewBarState,
+    NormalViewSet, NormalViewSetInfo, NormalViewSetPayload, NotesTextViewInfo, ViewBarState,
 };

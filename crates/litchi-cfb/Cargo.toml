@@ -14,9 +14,7 @@ default = []
 write = []
 
 [dependencies]
-chrono          = { workspace = true }
 fixedbitset     = { workspace = true }
-litchi-codepage = { workspace = true }
 litchi-core     = { workspace = true }
 smallvec        = { workspace = true }
 zerocopy        = { workspace = true }

@@ -1,20 +1,20 @@
 use super::shape::Anchor;
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
 /// One ordered rich-text run in a comment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsCommentTextRunWrite {
+pub struct CommentTextRunWrite {
     pub character_index: u16,
     pub font_index: u16,
 }
 
 /// Options for a canonical BIFF8 cell comment.
 #[derive(Debug, Clone, Default)]
-pub struct XlsCommentWriteOptions {
+pub struct CommentWriteOptions {
     pub visible: bool,
     pub shared: bool,
     pub anchor: Option<Anchor>,
-    pub text_runs: Vec<XlsCommentTextRunWrite>,
+    pub text_runs: Vec<CommentTextRunWrite>,
     pub font_when_empty: u16,
     /// Stable GUID override. When absent, the writer derives a deterministic,
     /// worksheet- and cell-specific GUID.
@@ -27,7 +27,7 @@ pub(super) struct WritableComment {
     pub column: u8,
     pub author: String,
     pub text: String,
-    pub options: XlsCommentWriteOptions,
+    pub options: CommentWriteOptions,
 }
 
 impl WritableComment {
@@ -36,18 +36,18 @@ impl WritableComment {
         column: u8,
         author: &str,
         text: &str,
-        options: XlsCommentWriteOptions,
-    ) -> XlsResult<Self> {
+        options: CommentWriteOptions,
+    ) -> Result<Self> {
         let mut owned_author = String::new();
         owned_author
             .try_reserve_exact(author.len())
-            .map_err(|_| XlsError::Allocation("reserving comment-author storage"))?;
+            .map_err(|_| Error::Allocation("reserving comment-author storage"))?;
         owned_author.push_str(author);
 
         let mut owned_text = String::new();
         owned_text
             .try_reserve_exact(text.len())
-            .map_err(|_| XlsError::Allocation("reserving comment-text storage"))?;
+            .map_err(|_| Error::Allocation("reserving comment-text storage"))?;
         owned_text.push_str(text);
 
         Ok(Self {
@@ -71,34 +71,34 @@ pub(crate) fn validate_comment(
     column: u16,
     author: &str,
     text: &str,
-    options: &XlsCommentWriteOptions,
-) -> XlsResult<(u16, u8)> {
+    options: &CommentWriteOptions,
+) -> Result<(u16, u8)> {
     let row = u16::try_from(row).map_err(|_| {
-        XlsError::InvalidData("comment row exceeds the BIFF8 limit of 65535".to_string())
+        Error::InvalidData("comment row exceeds the BIFF8 limit of 65535".to_string())
     })?;
     let column = u8::try_from(column).map_err(|_| {
-        XlsError::InvalidData("comment column exceeds the BIFF8 limit of 255".to_string())
+        Error::InvalidData("comment column exceeds the BIFF8 limit of 255".to_string())
     })?;
     let author_len = author.encode_utf16().count();
     if !(1..=54).contains(&author_len) {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "comment author length must be 1..=54 UTF-16 code units".to_string(),
         ));
     }
     let text_len = text.encode_utf16().count();
     if text_len > usize::from(u16::MAX) {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "comment text exceeds 65535 UTF-16 code units".to_string(),
         ));
     }
     if text_len == 0 && !options.text_runs.is_empty() {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "empty comment text cannot contain formatting runs".to_string(),
         ));
     }
     if !options.text_runs.is_empty() {
         if options.text_runs[0].character_index != 0 {
-            return Err(XlsError::InvalidData(
+            return Err(Error::InvalidData(
                 "the first comment formatting run must start at character zero".to_string(),
             ));
         }
@@ -107,7 +107,7 @@ pub(crate) fn validate_comment(
             if usize::from(run.character_index) >= text_len
                 || previous.is_some_and(|value| value >= run.character_index)
             {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "comment formatting runs must be strictly ordered within the text".to_string(),
                 ));
             }
@@ -122,11 +122,9 @@ pub(crate) fn validate_comment(
     let run_bytes = run_count
         .checked_add(1)
         .and_then(|count| count.checked_mul(8))
-        .ok_or_else(|| {
-            XlsError::InvalidData("comment formatting run size overflows".to_string())
-        })?;
+        .ok_or_else(|| Error::InvalidData("comment formatting run size overflows".to_string()))?;
     if run_bytes > 65_528 {
-        return Err(XlsError::InvalidData(
+        return Err(Error::InvalidData(
             "comment formatting runs exceed the BIFF8 cbRuns limit".to_string(),
         ));
     }

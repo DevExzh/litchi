@@ -2,7 +2,7 @@
 
 use super::codec::{parse_dv, parse_dval};
 use super::model::{ErrorStyle, Kind, Operator};
-use crate::XlsResult;
+use crate::Result;
 
 fn string(data: &mut Vec<u8>, value: &str) {
     data.extend_from_slice(&(value.len() as u16).to_le_bytes());
@@ -32,7 +32,7 @@ fn valid_dv() -> Vec<u8> {
     data
 }
 
-fn assert_rejected_without_panicking<T>(parse: impl FnOnce() -> XlsResult<T>) {
+fn assert_rejected_without_panicking<T>(parse: impl FnOnce() -> Result<T>) {
     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(parse)) {
         Ok(result) => assert!(result.is_err()),
         Err(_) => panic!("malformed data-validation input must not panic"),

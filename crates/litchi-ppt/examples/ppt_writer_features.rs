@@ -11,8 +11,8 @@
 //! Run with: cargo run --example ppt_writer_features
 
 use litchi_ppt::writer::{
-    FillStyle, FontEntity, Hyperlink, LineStyleConfig, NotesPage, Paragraph, PptWriter,
-    ShadowStyle, ShapeColor, ShapeStyle, ShapeType, TextRun,
+    FillStyle, FontEntity, Hyperlink, LineStyleConfig, NotesPage, Paragraph, ShadowStyle,
+    ShapeColor, ShapeStyle, ShapeType, TextRun, Writer,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -40,7 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// Demo 1: Basic shape types
 fn create_shapes_demo() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating shapes demo...");
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
 
     let slide = writer.add_slide()?;
 
@@ -67,7 +67,7 @@ fn create_shapes_demo() -> Result<(), Box<dyn std::error::Error>> {
 /// Demo 2: Text formatting with rich text
 fn create_text_formatting_demo() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating text formatting demo...");
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
 
     let slide = writer.add_slide()?;
 
@@ -132,7 +132,7 @@ fn create_text_formatting_demo() -> Result<(), Box<dyn std::error::Error>> {
 /// Demo 3: Shape styling (fills, lines, shadows)
 fn create_styled_shapes_demo() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating styled shapes demo...");
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
 
     let slide = writer.add_slide()?;
 
@@ -244,7 +244,7 @@ fn create_styled_shapes_demo() -> Result<(), Box<dyn std::error::Error>> {
 /// Demo 4: Lines and arrows
 fn create_lines_arrows_demo() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating lines and arrows demo...");
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
 
     let slide = writer.add_slide()?;
 
@@ -305,7 +305,7 @@ fn create_lines_arrows_demo() -> Result<(), Box<dyn std::error::Error>> {
 /// Demo 5: Pictures/Images
 fn create_pictures_demo() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating pictures demo...");
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
 
     let slide = writer.add_slide()?;
     writer.add_textbox(slide, 50, 20, 600, 40, "Pictures Demo")?;
@@ -375,7 +375,7 @@ fn create_pictures_demo() -> Result<(), Box<dyn std::error::Error>> {
 /// Demo 6: Hyperlinks
 fn create_hyperlinks_demo() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating hyperlinks demo...");
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
 
     // Slide 1: External links
     let slide1 = writer.add_slide()?;
@@ -450,7 +450,7 @@ fn create_hyperlinks_demo() -> Result<(), Box<dyn std::error::Error>> {
 /// Demo 6: Notes slides
 fn create_notes_demo() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating notes demo...");
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
 
     // Slide 1 with simple notes
     let slide1 = writer.add_slide()?;
@@ -520,7 +520,7 @@ fn create_notes_demo() -> Result<(), Box<dyn std::error::Error>> {
 /// Demo 7: Comprehensive demo with all features
 fn create_comprehensive_demo() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating comprehensive demo...");
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
 
     // Add custom font
     let _times_font = writer.add_font(FontEntity::times_new_roman());

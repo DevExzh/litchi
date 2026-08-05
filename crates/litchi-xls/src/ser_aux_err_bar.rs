@@ -11,7 +11,7 @@
 //!
 //! - MS-XLS 2.4.249 (SerAuxErrBar), 2.5.14 (Boolean), 2.5.342 (Xnum)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `SerAuxErrBar` record (MS-XLS 2.4.249).
 pub(crate) const SER_AUX_ERR_BAR_RECORD_TYPE: u16 = 0x105B;
@@ -19,8 +19,8 @@ pub(crate) const SER_AUX_ERR_BAR_RECORD_TYPE: u16 = 0x105B;
 /// Byte length of a `SerAuxErrBar` record payload.
 const PAYLOAD_LEN: usize = 14;
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: SER_AUX_ERR_BAR_RECORD_TYPE,
         message: message.into(),
     }
@@ -29,7 +29,7 @@ fn invalid(message: impl Into<String>) -> XlsError {
 /// The `sertm` direction of the error bars (MS-XLS 2.4.249).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub enum XlsErrorBarDirection {
+pub enum ErrorBarDirection {
     /// 0x01: horizontal in the plus direction.
     HorizontalPlus = 0x01,
     /// 0x02: horizontal in the minus direction.
@@ -40,8 +40,8 @@ pub enum XlsErrorBarDirection {
     VerticalMinus = 0x04,
 }
 
-impl XlsErrorBarDirection {
-    fn parse(value: u8) -> XlsResult<Self> {
+impl ErrorBarDirection {
+    fn parse(value: u8) -> Result<Self> {
         match value {
             0x01 => Ok(Self::HorizontalPlus),
             0x02 => Ok(Self::HorizontalMinus),
@@ -57,7 +57,7 @@ impl XlsErrorBarDirection {
 /// The `ebsrc` error amount type of the error bars (MS-XLS 2.4.249).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub enum XlsErrorBarSource {
+pub enum ErrorBarSource {
     /// 0x01: percentage.
     Percentage = 0x01,
     /// 0x02: fixed value.
@@ -70,8 +70,8 @@ pub enum XlsErrorBarSource {
     StandardError = 0x05,
 }
 
-impl XlsErrorBarSource {
-    fn parse(value: u8) -> XlsResult<Self> {
+impl ErrorBarSource {
+    fn parse(value: u8) -> Result<Self> {
         match value {
             0x01 => Ok(Self::Percentage),
             0x02 => Ok(Self::FixedValue),
@@ -93,11 +93,11 @@ impl XlsErrorBarSource {
 /// when `ebsrc` is `Custom` or `StandardError` (where it MUST be ignored),
 /// and `cnum` is preserved when `ebsrc` is not `Custom`.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct XlsSerAuxErrBar {
+pub struct SerAuxErrBar {
     /// Direction of the error bars (`sertm`).
-    direction: XlsErrorBarDirection,
+    direction: ErrorBarDirection,
     /// Error amount type (`ebsrc`).
-    source: XlsErrorBarSource,
+    source: ErrorBarSource,
     /// Whether the error bars are T-shaped (`fTeeTop`).
     tee_top: bool,
     /// The `reserved` byte, preserved verbatim.
@@ -108,11 +108,11 @@ pub struct XlsSerAuxErrBar {
     value_count: u16,
 }
 
-impl XlsSerAuxErrBar {
+impl SerAuxErrBar {
     /// Parse a `SerAuxErrBar` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: PAYLOAD_LEN,
                 found: data.len(),
             });
@@ -128,8 +128,8 @@ impl XlsSerAuxErrBar {
             },
         };
         Ok(Self {
-            direction: XlsErrorBarDirection::parse(data[0])?,
-            source: XlsErrorBarSource::parse(data[1])?,
+            direction: ErrorBarDirection::parse(data[0])?,
+            source: ErrorBarSource::parse(data[1])?,
             tee_top,
             reserved: data[3],
             value: f64::from_le_bytes(data[4..12].try_into().expect("length checked")),
@@ -150,12 +150,12 @@ impl XlsSerAuxErrBar {
     }
 
     /// Direction of the error bars (`sertm`).
-    pub fn direction(&self) -> XlsErrorBarDirection {
+    pub fn direction(&self) -> ErrorBarDirection {
         self.direction
     }
 
     /// Error amount type (`ebsrc`).
-    pub fn source(&self) -> XlsErrorBarSource {
+    pub fn source(&self) -> ErrorBarSource {
         self.source
     }
 
@@ -196,20 +196,20 @@ mod tests {
     #[test]
     fn round_trip_all_enums() {
         for (direction, expected_direction) in [
-            (0x01, XlsErrorBarDirection::HorizontalPlus),
-            (0x02, XlsErrorBarDirection::HorizontalMinus),
-            (0x03, XlsErrorBarDirection::VerticalPlus),
-            (0x04, XlsErrorBarDirection::VerticalMinus),
+            (0x01, ErrorBarDirection::HorizontalPlus),
+            (0x02, ErrorBarDirection::HorizontalMinus),
+            (0x03, ErrorBarDirection::VerticalPlus),
+            (0x04, ErrorBarDirection::VerticalMinus),
         ] {
             for (source, expected_source) in [
-                (0x01, XlsErrorBarSource::Percentage),
-                (0x02, XlsErrorBarSource::FixedValue),
-                (0x03, XlsErrorBarSource::StandardDeviation),
-                (0x04, XlsErrorBarSource::Custom),
-                (0x05, XlsErrorBarSource::StandardError),
+                (0x01, ErrorBarSource::Percentage),
+                (0x02, ErrorBarSource::FixedValue),
+                (0x03, ErrorBarSource::StandardDeviation),
+                (0x04, ErrorBarSource::Custom),
+                (0x05, ErrorBarSource::StandardError),
             ] {
                 let bytes = record(direction, source, 0x01, 2.5, 7);
-                let parsed = XlsSerAuxErrBar::parse(&bytes).unwrap();
+                let parsed = SerAuxErrBar::parse(&bytes).unwrap();
                 assert_eq!(parsed.direction(), expected_direction);
                 assert_eq!(parsed.source(), expected_source);
                 assert!(parsed.tee_top());
@@ -226,7 +226,7 @@ mod tests {
         // cnum are preserved when ignored for the ebsrc value.
         let mut bytes = record(0x03, 0x05, 0x00, 1.0, 42);
         bytes[3] = 0xAA;
-        let parsed = XlsSerAuxErrBar::parse(&bytes).unwrap();
+        let parsed = SerAuxErrBar::parse(&bytes).unwrap();
         assert_eq!(parsed.reserved(), 0xAA);
         assert!(!parsed.tee_top());
         assert_eq!(parsed.value(), 1.0);
@@ -238,13 +238,13 @@ mod tests {
     fn rejects_malformed_records() {
         let bytes = record(0x01, 0x01, 0x01, 0.0, 0);
         // Truncated and overlong payloads.
-        assert!(XlsSerAuxErrBar::parse(&bytes[..13]).is_err());
-        assert!(XlsSerAuxErrBar::parse(&[bytes.as_slice(), &[0]].concat()).is_err());
+        assert!(SerAuxErrBar::parse(&bytes[..13]).is_err());
+        assert!(SerAuxErrBar::parse(&[bytes.as_slice(), &[0]].concat()).is_err());
         // Undefined sertm / ebsrc / fTeeTop values.
-        assert!(XlsSerAuxErrBar::parse(&record(0x00, 0x01, 0x01, 0.0, 0)).is_err());
-        assert!(XlsSerAuxErrBar::parse(&record(0x05, 0x01, 0x01, 0.0, 0)).is_err());
-        assert!(XlsSerAuxErrBar::parse(&record(0x01, 0x00, 0x01, 0.0, 0)).is_err());
-        assert!(XlsSerAuxErrBar::parse(&record(0x01, 0x06, 0x01, 0.0, 0)).is_err());
-        assert!(XlsSerAuxErrBar::parse(&record(0x01, 0x01, 0x02, 0.0, 0)).is_err());
+        assert!(SerAuxErrBar::parse(&record(0x00, 0x01, 0x01, 0.0, 0)).is_err());
+        assert!(SerAuxErrBar::parse(&record(0x05, 0x01, 0x01, 0.0, 0)).is_err());
+        assert!(SerAuxErrBar::parse(&record(0x01, 0x00, 0x01, 0.0, 0)).is_err());
+        assert!(SerAuxErrBar::parse(&record(0x01, 0x06, 0x01, 0.0, 0)).is_err());
+        assert!(SerAuxErrBar::parse(&record(0x01, 0x01, 0x02, 0.0, 0)).is_err());
     }
 }

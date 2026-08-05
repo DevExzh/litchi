@@ -18,7 +18,7 @@
 //! - MS-XLS 2.4.101 (EndObject), 2.4.130 (FrtWrapper), 2.4.267 (StartObject),
 //!   2.5.134 (FrtFlags), 2.5.136 (FrtHeaderOld)
 
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
 /// Record type of the `FrtWrapper` record (MS-XLS 2.4.130); also the required
 /// `frtHeaderOld.rt` value.
@@ -45,8 +45,8 @@ const END_OBJECT_LEN: usize = 12;
 /// `FrtWrapper` (MS-XLS 2.4.130).
 const MIN_WRAPPED_LEN: usize = 8;
 
-fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(record_type: u16, message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type,
         message: message.into(),
     }
@@ -54,7 +54,7 @@ fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
 
 /// Validate the `rt` and `grbitFrt` fields of an `FrtHeaderOld`
 /// (MS-XLS 2.5.136), returning the raw flags word.
-fn validate_frt_header_old(data: &[u8], record_type: u16, name: &str) -> XlsResult<u16> {
+fn validate_frt_header_old(data: &[u8], record_type: u16, name: &str) -> Result<u16> {
     if u16::from_le_bytes([data[0], data[1]]) != record_type {
         return Err(invalid(
             record_type,
@@ -85,7 +85,7 @@ pub enum ObjectKind {
 }
 
 impl ObjectKind {
-    fn parse(value: u16, record_type: u16, name: &str) -> XlsResult<Self> {
+    fn parse(value: u16, record_type: u16, name: &str) -> Result<Self> {
         match value {
             0x0010 => Ok(Self::YMult),
             0x0011 => Ok(Self::FrtFontList),
@@ -117,9 +117,9 @@ pub struct StartObject {
 
 impl StartObject {
     /// Parse a `StartObject` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != START_OBJECT_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: START_OBJECT_LEN,
                 found: data.len(),
             });
@@ -222,9 +222,9 @@ pub struct EndObject {
 
 impl EndObject {
     /// Parse an `EndObject` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != END_OBJECT_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: END_OBJECT_LEN,
                 found: data.len(),
             });
@@ -292,11 +292,11 @@ pub struct Wrapper {
 
 impl Wrapper {
     /// Parse an `FrtWrapper` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         // MS-XLS 2.4.130: the padded FrtWrapper is never smaller than the
         // 12-byte FrtHeader structure.
         if data.len() < FRT_HEADER_OLD_LEN + MIN_WRAPPED_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: FRT_HEADER_OLD_LEN + MIN_WRAPPED_LEN,
                 found: data.len(),
             });

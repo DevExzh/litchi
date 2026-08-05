@@ -1,9 +1,9 @@
 //! Inert PowerPoint 10 linked-slide records (MS-PPT 2.5.32-2.5.33).
 
 use super::types::SlideAnimationExtension;
-use crate::consts::PptRecordType;
+use crate::consts::RecordType;
 use crate::package::Result;
-use crate::{PptError, PptRecord};
+use crate::{Error, Record};
 
 const HEADER_LEN: usize = 8;
 const PAYLOAD_LEN: usize = 8;
@@ -37,7 +37,7 @@ impl LinkedSlide {
     /// Creates an atom without resolving or opening the referenced document.
     pub fn new(linked_slide_id_ref: u32, linked_shape_count: u32) -> Result<Self> {
         if linked_shape_count > i32::MAX as u32 {
-            return Err(PptError::InvalidFormat(
+            return Err(Error::InvalidFormat(
                 "LinkedSlide10Atom shape count exceeds signed 32-bit range".to_string(),
             ));
         }
@@ -57,14 +57,14 @@ impl LinkedSlide {
         self.linked_shape_count
     }
 
-    pub fn parse_record(record: &PptRecord) -> Result<Self> {
+    pub fn parse_record(record: &Record) -> Result<Self> {
         Self::parse_record_with_limits(record, LinkedSlideLimits::default())
     }
 
-    pub fn parse_record_with_limits(record: &PptRecord, limits: LinkedSlideLimits) -> Result<Self> {
+    pub fn parse_record_with_limits(record: &Record, limits: LinkedSlideLimits) -> Result<Self> {
         let payload = validate_record(
             record,
-            PptRecordType::LinkedSlide10Atom,
+            RecordType::LinkedSlide10Atom,
             limits,
             "LinkedSlide10Atom",
         )?;
@@ -78,7 +78,7 @@ impl LinkedSlide {
     pub fn parse_bytes_with_limits(bytes: &[u8], limits: LinkedSlideLimits) -> Result<Self> {
         let payload = validate_bytes(
             bytes,
-            PptRecordType::LinkedSlide10Atom,
+            RecordType::LinkedSlide10Atom,
             limits,
             "LinkedSlide10Atom",
         )?;
@@ -87,21 +87,21 @@ impl LinkedSlide {
 
     fn parse_payload(payload: &[u8], limits: LinkedSlideLimits) -> Result<Self> {
         let linked_slide_id_ref = u32::from_le_bytes(payload[0..4].try_into().map_err(|_| {
-            PptError::Corrupted("LinkedSlide10Atom slide identifier is truncated".to_string())
+            Error::Corrupted("LinkedSlide10Atom slide identifier is truncated".to_string())
         })?);
         let signed_count = i32::from_le_bytes(payload[4..8].try_into().map_err(|_| {
-            PptError::Corrupted("LinkedSlide10Atom shape count is truncated".to_string())
+            Error::Corrupted("LinkedSlide10Atom shape count is truncated".to_string())
         })?);
         let linked_shape_count = u32::try_from(signed_count).map_err(|_| {
-            PptError::InvalidFormat("LinkedSlide10Atom shape count cannot be negative".to_string())
+            Error::InvalidFormat("LinkedSlide10Atom shape count cannot be negative".to_string())
         })?;
         let count = usize::try_from(linked_shape_count).map_err(|_| {
-            PptError::InvalidFormat(
+            Error::InvalidFormat(
                 "LinkedSlide10Atom shape count does not fit this platform".to_string(),
             )
         })?;
         if count > limits.max_linked_shapes {
-            return Err(PptError::InvalidFormat(format!(
+            return Err(Error::InvalidFormat(format!(
                 "LinkedSlide10Atom shape count {count} exceeds configured limit {}",
                 limits.max_linked_shapes
             )));
@@ -117,11 +117,11 @@ impl LinkedSlide {
     }
 
     pub fn to_bytes(self) -> Vec<u8> {
-        serialize_atom(PptRecordType::LinkedSlide10Atom, &self.to_payload())
+        serialize_atom(RecordType::LinkedSlide10Atom, &self.to_payload())
     }
 
-    pub fn to_record(self) -> PptRecord {
-        generic_record(PptRecordType::LinkedSlide10Atom, self.to_payload().to_vec())
+    pub fn to_record(self) -> Record {
+        generic_record(RecordType::LinkedSlide10Atom, self.to_payload().to_vec())
     }
 }
 
@@ -148,14 +148,14 @@ impl LinkedShape {
         self.linked_shape_id_ref
     }
 
-    pub fn parse_record(record: &PptRecord) -> Result<Self> {
+    pub fn parse_record(record: &Record) -> Result<Self> {
         Self::parse_record_with_limits(record, LinkedSlideLimits::default())
     }
 
-    pub fn parse_record_with_limits(record: &PptRecord, limits: LinkedSlideLimits) -> Result<Self> {
+    pub fn parse_record_with_limits(record: &Record, limits: LinkedSlideLimits) -> Result<Self> {
         Self::parse_payload(validate_record(
             record,
-            PptRecordType::LinkedShape10Atom,
+            RecordType::LinkedShape10Atom,
             limits,
             "LinkedShape10Atom",
         )?)
@@ -168,7 +168,7 @@ impl LinkedShape {
     pub fn parse_bytes_with_limits(bytes: &[u8], limits: LinkedSlideLimits) -> Result<Self> {
         Self::parse_payload(validate_bytes(
             bytes,
-            PptRecordType::LinkedShape10Atom,
+            RecordType::LinkedShape10Atom,
             limits,
             "LinkedShape10Atom",
         )?)
@@ -176,12 +176,10 @@ impl LinkedShape {
 
     fn parse_payload(payload: &[u8]) -> Result<Self> {
         let shape_id_ref = u32::from_le_bytes(payload[0..4].try_into().map_err(|_| {
-            PptError::Corrupted("LinkedShape10Atom shape identifier is truncated".to_string())
+            Error::Corrupted("LinkedShape10Atom shape identifier is truncated".to_string())
         })?);
         let linked_shape_id_ref = u32::from_le_bytes(payload[4..8].try_into().map_err(|_| {
-            PptError::Corrupted(
-                "LinkedShape10Atom linked-shape identifier is truncated".to_string(),
-            )
+            Error::Corrupted("LinkedShape10Atom linked-shape identifier is truncated".to_string())
         })?);
         Ok(Self::new(shape_id_ref, linked_shape_id_ref))
     }
@@ -194,11 +192,11 @@ impl LinkedShape {
     }
 
     pub fn to_bytes(self) -> Vec<u8> {
-        serialize_atom(PptRecordType::LinkedShape10Atom, &self.to_payload())
+        serialize_atom(RecordType::LinkedShape10Atom, &self.to_payload())
     }
 
-    pub fn to_record(self) -> PptRecord {
-        generic_record(PptRecordType::LinkedShape10Atom, self.to_payload().to_vec())
+    pub fn to_record(self) -> Record {
+        generic_record(RecordType::LinkedShape10Atom, self.to_payload().to_vec())
     }
 }
 
@@ -221,33 +219,31 @@ impl SlideAnimationExtension {
 }
 
 fn validate_record<'a>(
-    record: &'a PptRecord,
-    expected_type: PptRecordType,
+    record: &'a Record,
+    expected_type: RecordType,
     limits: LinkedSlideLimits,
     name: &str,
 ) -> Result<&'a [u8]> {
     if HEADER_LEN + PAYLOAD_LEN > limits.max_record_bytes {
-        return Err(PptError::InvalidFormat(format!(
+        return Err(Error::InvalidFormat(format!(
             "{name} exceeds the configured record-size limit"
         )));
     }
     if record.record_type != expected_type || record.record_type_raw != expected_type.as_u16() {
-        return Err(PptError::InvalidFormat(format!(
-            "expected {name} record type"
-        )));
+        return Err(Error::InvalidFormat(format!("expected {name} record type")));
     }
     if record.version != 0 || record.instance != 0 {
-        return Err(PptError::InvalidFormat(format!(
+        return Err(Error::InvalidFormat(format!(
             "{name} requires record version 0 and instance 0"
         )));
     }
     if record.data_length != PAYLOAD_LEN as u32 || record.data.len() != PAYLOAD_LEN {
-        return Err(PptError::InvalidFormat(format!(
+        return Err(Error::InvalidFormat(format!(
             "{name} requires an eight-byte payload"
         )));
     }
     if !record.children.is_empty() {
-        return Err(PptError::InvalidFormat(format!(
+        return Err(Error::InvalidFormat(format!(
             "{name} is an atom and cannot contain child records"
         )));
     }
@@ -256,49 +252,47 @@ fn validate_record<'a>(
 
 fn validate_bytes<'a>(
     bytes: &'a [u8],
-    expected_type: PptRecordType,
+    expected_type: RecordType,
     limits: LinkedSlideLimits,
     name: &str,
 ) -> Result<&'a [u8]> {
     if bytes.len() > limits.max_record_bytes {
-        return Err(PptError::InvalidFormat(format!(
+        return Err(Error::InvalidFormat(format!(
             "{name} exceeds the configured record-size limit"
         )));
     }
     if bytes.len() < HEADER_LEN {
-        return Err(PptError::Corrupted(format!(
+        return Err(Error::Corrupted(format!(
             "{name} record header is truncated"
         )));
     }
     let version_instance = u16::from_le_bytes([bytes[0], bytes[1]]);
     if version_instance & 0x000f != 0 || version_instance >> 4 != 0 {
-        return Err(PptError::InvalidFormat(format!(
+        return Err(Error::InvalidFormat(format!(
             "{name} requires record version 0 and instance 0"
         )));
     }
     if u16::from_le_bytes([bytes[2], bytes[3]]) != expected_type.as_u16() {
-        return Err(PptError::InvalidFormat(format!(
-            "expected {name} record type"
-        )));
+        return Err(Error::InvalidFormat(format!("expected {name} record type")));
     }
     if u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]) != PAYLOAD_LEN as u32 {
-        return Err(PptError::InvalidFormat(format!(
+        return Err(Error::InvalidFormat(format!(
             "{name} requires an eight-byte payload"
         )));
     }
     let expected_len = HEADER_LEN + PAYLOAD_LEN;
     if bytes.len() < expected_len {
-        return Err(PptError::Corrupted(format!("{name} payload is truncated")));
+        return Err(Error::Corrupted(format!("{name} payload is truncated")));
     }
     if bytes.len() > expected_len {
-        return Err(PptError::InvalidFormat(format!(
+        return Err(Error::InvalidFormat(format!(
             "{name} record has trailing data"
         )));
     }
     Ok(&bytes[HEADER_LEN..expected_len])
 }
 
-fn serialize_atom(record_type: PptRecordType, payload: &[u8]) -> Vec<u8> {
+fn serialize_atom(record_type: RecordType, payload: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(HEADER_LEN + payload.len());
     bytes.extend_from_slice(&0u16.to_le_bytes());
     bytes.extend_from_slice(&record_type.as_u16().to_le_bytes());
@@ -307,8 +301,8 @@ fn serialize_atom(record_type: PptRecordType, payload: &[u8]) -> Vec<u8> {
     bytes
 }
 
-fn generic_record(record_type: PptRecordType, data: Vec<u8>) -> PptRecord {
-    PptRecord {
+fn generic_record(record_type: RecordType, data: Vec<u8>) -> Record {
+    Record {
         record_type,
         record_type_raw: record_type.as_u16(),
         version: 0,

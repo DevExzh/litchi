@@ -1,7 +1,7 @@
 // Example: Generate PPT files demonstrating comments, slide timings, and custom shows.
 // Open the generated files in PowerPoint to verify each feature.
 
-use litchi_ppt::PptWriter;
+use litchi_ppt::Writer;
 use litchi_ppt::writer::comments::{CommentDateTime, SlideComment};
 use litchi_ppt::writer::custom_shows::CustomShow;
 use litchi_ppt::writer::slide_timing::SlideTiming;
@@ -10,7 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ── 1. Comments ────────────────────────────────────────────────────
     // In PowerPoint: Review tab → Show Comments should display these.
     {
-        let mut w = PptWriter::new();
+        let mut w = Writer::new();
 
         let s0 = w.add_slide()?;
         w.add_textbox(s0, 50, 50, 400, 40, "Slide 1 – has two comments")?;
@@ -58,7 +58,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // In PowerPoint: Slide Show → Set Up Show / Rehearse Timings, or
     // simply run the slide show to observe auto-advance behaviour.
     {
-        let mut w = PptWriter::new();
+        let mut w = Writer::new();
 
         let s0 = w.add_slide()?;
         w.add_textbox(
@@ -106,7 +106,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ── 3. Custom slide shows ──────────────────────────────────────────
     // In PowerPoint: Slide Show → Custom Slide Show should list two shows.
     {
-        let mut w = PptWriter::new();
+        let mut w = Writer::new();
 
         let s0 = w.add_slide()?;
         w.add_textbox(s0, 50, 50, 500, 40, "Slide 1 – Introduction")?;
@@ -137,7 +137,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ── 4. Combined: all three features ────────────────────────────────
     {
-        let mut w = PptWriter::new();
+        let mut w = Writer::new();
 
         let s0 = w.add_slide()?;
         w.add_textbox(s0, 50, 50, 500, 40, "Slide 1 – Welcome")?;

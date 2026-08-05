@@ -1,7 +1,7 @@
 //! Utility functions for XLS parsing
 
-use crate::error::{XlsError, XlsResult};
-use crate::records::{FormulaValue, XlsEncoding};
+use crate::error::{Error, Result};
+use crate::records::{Encoding, FormulaValue};
 use litchi_core::binary;
 
 /// Parse a BIFF8 `ShortXLUnicodeString`.
@@ -11,7 +11,7 @@ use litchi_core::binary;
 /// - `cch` — character count
 /// - `flags` bit 0 (`fHighByte`) — 0 = compressed Latin-1 (1 byte/char),
 ///   1 = uncompressed UTF-16LE (2 bytes/char)
-pub(crate) fn parse_short_string(data: &[u8], _encoding: &XlsEncoding) -> XlsResult<String> {
+pub(crate) fn parse_short_string(data: &[u8], _encoding: &Encoding) -> Result<String> {
     if data.len() < 2 {
         return Ok(String::new());
     }
@@ -24,7 +24,7 @@ pub(crate) fn parse_short_string(data: &[u8], _encoding: &XlsEncoding) -> XlsRes
     let offset = 2; // skip cch + flags
 
     if data.len() < offset + byte_len {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: offset + byte_len,
             found: data.len(),
         });
@@ -39,7 +39,7 @@ pub(crate) fn parse_short_string(data: &[u8], _encoding: &XlsEncoding) -> XlsRes
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect();
         String::from_utf16(&utf16)
-            .map_err(|e| XlsError::Encoding(format!("UTF-16 decoding error: {}", e)))
+            .map_err(|e| Error::Encoding(format!("UTF-16 decoding error: {}", e)))
     } else {
         // Compressed Latin-1 (each byte maps directly to U+00xx)
         Ok(string_data.iter().map(|&b| b as char).collect())
@@ -47,9 +47,9 @@ pub(crate) fn parse_short_string(data: &[u8], _encoding: &XlsEncoding) -> XlsRes
 }
 
 /// Parse a BIFF8 `XLUnicodeString` with a 16-bit character count.
-pub(crate) fn parse_string_record(data: &[u8], _encoding: &XlsEncoding) -> XlsResult<String> {
+pub(crate) fn parse_string_record(data: &[u8], _encoding: &Encoding) -> Result<String> {
     if data.len() < 3 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 3,
             found: data.len(),
         });
@@ -62,10 +62,10 @@ pub(crate) fn parse_string_record(data: &[u8], _encoding: &XlsEncoding) -> XlsRe
     let offset = 3;
     let byte_len = len
         .checked_mul(if high_byte { 2 } else { 1 })
-        .ok_or_else(|| XlsError::InvalidData("XLUnicodeString length overflow".to_string()))?;
+        .ok_or_else(|| Error::InvalidData("XLUnicodeString length overflow".to_string()))?;
 
     if data.len() < offset + byte_len {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: offset + byte_len,
             found: data.len(),
         });
@@ -79,7 +79,7 @@ pub(crate) fn parse_string_record(data: &[u8], _encoding: &XlsEncoding) -> XlsRe
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect();
         String::from_utf16(&utf16_data)
-            .map_err(|error| XlsError::Encoding(format!("UTF-16 decoding error: {error}")))
+            .map_err(|error| Error::Encoding(format!("UTF-16 decoding error: {error}")))
     } else {
         // Compressed Unicode supplies an implicit zero high byte; CODEPAGE
         // does not apply to this BIFF8 structure.
@@ -113,9 +113,9 @@ pub(crate) enum StringRecordDecode {
 pub(crate) fn decode_string_record(
     first: &[u8],
     continues: &[Vec<u8>],
-) -> XlsResult<StringRecordDecode> {
+) -> Result<StringRecordDecode> {
     if first.len() < 3 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 3,
             found: first.len(),
         });
@@ -146,7 +146,7 @@ pub(crate) fn decode_string_record(
                 consumed += 2;
             }
             if chars_left > 0 && consumed < chunk.len() {
-                return Err(XlsError::InvalidData(
+                return Err(Error::InvalidData(
                     "UTF-16 character split across String Continue records".to_string(),
                 ));
             }
@@ -168,7 +168,7 @@ pub(crate) fn decode_string_record(
     }
     String::from_utf16(&units)
         .map(StringRecordDecode::Complete)
-        .map_err(|error| XlsError::Encoding(format!("UTF-16 decoding error: {error}")))
+        .map_err(|error| Error::Encoding(format!("UTF-16 decoding error: {error}")))
 }
 
 /// Convert RK value to f64
@@ -189,9 +189,9 @@ pub(crate) fn rk_to_f64(rk: u32) -> f64 {
 }
 
 /// Parse formula value from formula record
-pub(crate) fn parse_formula_value(data: &[u8]) -> XlsResult<FormulaValue> {
+pub(crate) fn parse_formula_value(data: &[u8]) -> Result<FormulaValue> {
     if data.len() < 8 {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: 8,
             found: data.len(),
         });
@@ -206,7 +206,7 @@ pub(crate) fn parse_formula_value(data: &[u8]) -> XlsResult<FormulaValue> {
         0x01 => Ok(FormulaValue::Bool(data[2] != 0)),
         0x02 => Ok(FormulaValue::Error(data[2])),
         0x03 => Ok(FormulaValue::Empty),
-        value_type => Err(XlsError::InvalidData(format!(
+        value_type => Err(Error::InvalidData(format!(
             "Invalid formula cached-value type: {value_type}"
         ))),
     }
@@ -317,13 +317,13 @@ mod tests {
     fn parses_xl_unicode_string_character_counts() {
         let utf16 = [2, 0, 1, 0x22, 0x6F, 0x57, 0x5B];
         assert_eq!(
-            parse_string_record(&utf16, &XlsEncoding::Utf16Le).unwrap(),
+            parse_string_record(&utf16, &Encoding::Utf16Le).unwrap(),
             "漢字"
         );
 
         let compressed = [1, 0, 0, 0xC0];
         assert_eq!(
-            parse_string_record(&compressed, &XlsEncoding::from_codepage(1251).unwrap()).unwrap(),
+            parse_string_record(&compressed, &Encoding::from_codepage(1251).unwrap()).unwrap(),
             "À"
         );
     }
@@ -331,7 +331,7 @@ mod tests {
     #[test]
     fn rejects_truncated_xl_unicode_string() {
         let truncated = [2, 0, 1, 0x22, 0x6F];
-        assert!(parse_string_record(&truncated, &XlsEncoding::Utf16Le).is_err());
+        assert!(parse_string_record(&truncated, &Encoding::Utf16Le).is_err());
     }
 
     #[test]

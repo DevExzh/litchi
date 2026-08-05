@@ -4,7 +4,7 @@
 //! places each `SortCond12` ([MS-XLS] 2.5.242) in a separate `ContinueFrt12`
 //! record. This module deliberately models that record group as one value.
 
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 use std::io::Write;
 use std::ops::RangeInclusive;
 
@@ -23,15 +23,15 @@ const FRT_REF_FLAG: u16 = 0x0001;
 const FRT_ALERT_FLAG: u16 = 0x0002;
 const FRT_KNOWN_FLAGS: u16 = FRT_REF_FLAG | FRT_ALERT_FLAG;
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidData(message.into())
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidData(message.into())
 }
 
-const fn allocation(context: &'static str) -> XlsError {
-    XlsError::Allocation(context)
+const fn allocation(context: &'static str) -> Error {
+    Error::Allocation(context)
 }
 
-fn copy_bytes(data: &[u8], context: &'static str) -> XlsResult<Vec<u8>> {
+fn copy_bytes(data: &[u8], context: &'static str) -> Result<Vec<u8>> {
     let mut copy = Vec::new();
     copy.try_reserve_exact(data.len())
         .map_err(|_| allocation(context))?;
@@ -39,27 +39,23 @@ fn copy_bytes(data: &[u8], context: &'static str) -> XlsResult<Vec<u8>> {
     Ok(copy)
 }
 
-fn read_u16(data: &[u8], offset: usize) -> XlsResult<u16> {
-    let bytes = data
-        .get(offset..offset + 2)
-        .ok_or(XlsError::InvalidLength {
-            expected: offset + 2,
-            found: data.len(),
-        })?;
+fn read_u16(data: &[u8], offset: usize) -> Result<u16> {
+    let bytes = data.get(offset..offset + 2).ok_or(Error::InvalidLength {
+        expected: offset + 2,
+        found: data.len(),
+    })?;
     Ok(u16::from_le_bytes([bytes[0], bytes[1]]))
 }
 
-fn read_u32(data: &[u8], offset: usize) -> XlsResult<u32> {
-    let bytes = data
-        .get(offset..offset + 4)
-        .ok_or(XlsError::InvalidLength {
-            expected: offset + 4,
-            found: data.len(),
-        })?;
+fn read_u32(data: &[u8], offset: usize) -> Result<u32> {
+    let bytes = data.get(offset..offset + 4).ok_or(Error::InvalidLength {
+        expected: offset + 4,
+        found: data.len(),
+    })?;
     Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
 }
 
-fn read_i32(data: &[u8], offset: usize) -> XlsResult<i32> {
+fn read_i32(data: &[u8], offset: usize) -> Result<i32> {
     Ok(read_u32(data, offset)? as i32)
 }
 
@@ -72,7 +68,7 @@ fn read_i32(data: &[u8], offset: usize) -> XlsResult<i32> {
 struct Rw12(i32);
 
 impl Rw12 {
-    fn new(value: u32) -> XlsResult<Self> {
+    fn new(value: u32) -> Result<Self> {
         if value > MAX_ROW_INDEX {
             return Err(invalid("sort row exceeds the Rw12 maximum"));
         }
@@ -85,7 +81,7 @@ impl Rw12 {
         self.0 as u32
     }
 
-    fn from_wire(value: i32) -> XlsResult<Self> {
+    fn from_wire(value: i32) -> Result<Self> {
         if value < 0 {
             return Err(invalid("sort Rw12 is negative"));
         }
@@ -96,7 +92,7 @@ impl Rw12 {
         self.0
     }
 
-    fn parse(data: &[u8], offset: usize) -> XlsResult<Self> {
+    fn parse(data: &[u8], offset: usize) -> Result<Self> {
         Self::from_wire(read_i32(data, offset)?)
     }
 
@@ -113,7 +109,7 @@ impl Rw12 {
 struct Col12(i16);
 
 impl Col12 {
-    fn new(value: u32) -> XlsResult<Self> {
+    fn new(value: u32) -> Result<Self> {
         if value > MAX_COLUMN_INDEX {
             return Err(invalid("sort column exceeds the Col12 maximum"));
         }
@@ -126,7 +122,7 @@ impl Col12 {
         self.0 as u16
     }
 
-    fn from_wire(value: i32) -> XlsResult<Self> {
+    fn from_wire(value: i32) -> Result<Self> {
         if value < 0 {
             return Err(invalid("sort Col12 is negative"));
         }
@@ -137,7 +133,7 @@ impl Col12 {
         self.0 as i32
     }
 
-    fn parse(data: &[u8], offset: usize) -> XlsResult<Self> {
+    fn parse(data: &[u8], offset: usize) -> Result<Self> {
         Self::from_wire(read_i32(data, offset)?)
     }
 
@@ -152,7 +148,7 @@ pub struct Row(Rw12);
 
 impl Row {
     /// Check a zero-based row index without applying the smaller BIFF8 cell grid.
-    pub fn new(index: u32) -> XlsResult<Self> {
+    pub fn new(index: u32) -> Result<Self> {
         Rw12::new(index).map(Self)
     }
 
@@ -168,7 +164,7 @@ pub struct Col(Col12);
 
 impl Col {
     /// Check a zero-based column index without applying the smaller BIFF8 cell grid.
-    pub fn new(index: u32) -> XlsResult<Self> {
+    pub fn new(index: u32) -> Result<Self> {
         Col12::new(index).map(Self)
     }
 
@@ -191,7 +187,7 @@ impl Range {
     /// Create an inclusive range with the complete `Rw12` and `Col12` domains.
     ///
     /// `Range::new(1..=20, 0..=4)` is rows 2 through 21 and columns A through E.
-    pub fn new(rows: RangeInclusive<u32>, cols: RangeInclusive<u32>) -> XlsResult<Self> {
+    pub fn new(rows: RangeInclusive<u32>, cols: RangeInclusive<u32>) -> Result<Self> {
         let first_row = Rw12::new(*rows.start())?;
         let last_row = Rw12::new(*rows.end())?;
         let first_col = Col12::new(*cols.start())?;
@@ -237,7 +233,7 @@ impl Range {
             && other.last_col.0 <= self.last_col.0
     }
 
-    fn parse(data: &[u8], offset: usize) -> XlsResult<Self> {
+    fn parse(data: &[u8], offset: usize) -> Result<Self> {
         let first_row = Rw12::parse(data, offset)?;
         let last_row = Rw12::parse(data, offset + 4)?;
         let first_col = Col12::parse(data, offset + 8)?;
@@ -359,7 +355,7 @@ impl IconSet {
         }
     }
 
-    fn from_code(code: u32) -> XlsResult<Self> {
+    fn from_code(code: u32) -> Result<Self> {
         Ok(match code {
             u32::MAX => Self::NoIcon,
             0 => Self::ThreeArrows,
@@ -407,7 +403,7 @@ impl Icon {
         }
     }
 
-    fn from_code(code: i32) -> XlsResult<Self> {
+    fn from_code(code: i32) -> Result<Self> {
         Ok(match code {
             -1 => Self::NoIcon,
             0 => Self::First,
@@ -490,7 +486,7 @@ pub struct Key {
 
 impl Key {
     /// Create a column key for a top-to-bottom row sort.
-    pub fn col(range: Range, descending: bool, on: On) -> XlsResult<Self> {
+    pub fn col(range: Range, descending: bool, on: On) -> Result<Self> {
         if range.first_col != range.last_col {
             return Err(invalid("column sort key must contain exactly one column"));
         }
@@ -506,7 +502,7 @@ impl Key {
     }
 
     /// Create a row key for a left-to-right column sort.
-    pub fn row(range: Range, descending: bool, on: On) -> XlsResult<Self> {
+    pub fn row(range: Range, descending: bool, on: On) -> Result<Self> {
         if range.first_row != range.last_row {
             return Err(invalid("row sort key must contain exactly one row"));
         }
@@ -521,7 +517,7 @@ impl Key {
         )
     }
 
-    fn new(range: KeyRange, descending: bool, on: On) -> XlsResult<Self> {
+    fn new(range: KeyRange, descending: bool, on: On) -> Result<Self> {
         validate_on(&on)?;
         Ok(Self {
             range,
@@ -578,7 +574,7 @@ impl Config {
     /// Replace the reordered axis after validating every retained key.
     ///
     /// On failure, the configuration is unchanged.
-    pub fn put_axis(&mut self, axis: Axis) -> XlsResult<Axis> {
+    pub fn put_axis(&mut self, axis: Axis) -> Result<Axis> {
         if self.keys.iter().any(|key| key.axis() != axis) {
             return Err(invalid(
                 "sort axis does not match its retained key direction",
@@ -600,7 +596,7 @@ impl Config {
     /// Append a checked key.
     ///
     /// The key direction and containment are checked before `self` changes.
-    pub fn add(&mut self, key: Key) -> XlsResult<()> {
+    pub fn add(&mut self, key: Key) -> Result<()> {
         if key.axis() != self.axis {
             return Err(invalid("sort key direction does not match the sort axis"));
         }
@@ -651,7 +647,7 @@ impl Config {
     }
 
     /// Write the `SortData` record followed by one `ContinueFrt12` per key.
-    pub(crate) fn write_biff_records<W: Write>(&self, writer: &mut W) -> XlsResult<()> {
+    pub(crate) fn write_biff_records<W: Write>(&self, writer: &mut W) -> Result<()> {
         let condition_count = u32::try_from(self.keys.len())
             .map_err(|_| invalid("SortData has more than u32::MAX keys"))?;
         let (parent_kind, parent_id) = match self.parent {
@@ -690,17 +686,17 @@ impl Config {
     }
 }
 
-fn write_record_header<W: Write>(writer: &mut W, record_type: u16, len: usize) -> XlsResult<()> {
+fn write_record_header<W: Write>(writer: &mut W, record_type: u16, len: usize) -> Result<()> {
     let len = u16::try_from(len).map_err(|_| invalid("BIFF record body exceeds u16::MAX"))?;
     writer.write_all(&record_type.to_le_bytes())?;
     writer.write_all(&len.to_le_bytes())?;
     Ok(())
 }
 
-fn validate_sort_data_frt_header(data: &[u8]) -> XlsResult<()> {
+fn validate_sort_data_frt_header(data: &[u8]) -> Result<()> {
     let echoed_type = read_u16(data, 0)?;
     if echoed_type != SORT_DATA_RECORD_TYPE {
-        return Err(XlsError::UnexpectedRecordType {
+        return Err(Error::UnexpectedRecordType {
             expected: SORT_DATA_RECORD_TYPE,
             found: echoed_type,
         });
@@ -724,10 +720,10 @@ fn validate_sort_data_frt_header(data: &[u8]) -> XlsResult<()> {
     Ok(())
 }
 
-fn validate_continue_frt_header(data: &[u8]) -> XlsResult<()> {
+fn validate_continue_frt_header(data: &[u8]) -> Result<()> {
     let echoed_type = read_u16(data, 0)?;
     if echoed_type != CONTINUE_FRT12_RECORD_TYPE {
-        return Err(XlsError::UnexpectedRecordType {
+        return Err(Error::UnexpectedRecordType {
             expected: CONTINUE_FRT12_RECORD_TYPE,
             found: echoed_type,
         });
@@ -754,7 +750,7 @@ fn validate_continue_frt_header(data: &[u8]) -> XlsResult<()> {
     Ok(())
 }
 
-fn validate_ref8(data: &[u8]) -> XlsResult<()> {
+fn validate_ref8(data: &[u8]) -> Result<()> {
     let first_row = read_u16(data, 0)?;
     let last_row = read_u16(data, 2)?;
     let first_col = read_u16(data, 4)?;
@@ -775,7 +771,7 @@ fn validate_ref8(data: &[u8]) -> XlsResult<()> {
     Ok(())
 }
 
-fn validate_on(on: &On) -> XlsResult<()> {
+fn validate_on(on: &On) -> Result<()> {
     let On::Values {
         custom_list: Some(custom_list),
     } = on
@@ -809,7 +805,7 @@ fn validate_on(on: &On) -> XlsResult<()> {
     Ok(())
 }
 
-fn encode_key(key: &Key) -> XlsResult<Vec<u8>> {
+fn encode_key(key: &Key) -> Result<Vec<u8>> {
     validate_on(&key.on)?;
     let (sort_on, cond_data, custom_list) = match &key.on {
         On::Values { custom_list } => (0u16, [0u8; 8], custom_list.as_deref()),
@@ -884,9 +880,9 @@ fn encode_key(key: &Key) -> XlsResult<Vec<u8>> {
 ///
 /// Inputs exclude the standard four-byte BIFF record headers, consistent with
 /// the rest of the XLS record parsers.
-pub(crate) fn parse_sort_data(base: &[u8], continuations: &[&[u8]]) -> XlsResult<Config> {
+pub(crate) fn parse_sort_data(base: &[u8], continuations: &[&[u8]]) -> Result<Config> {
     if base.len() != SORT_DATA_BODY_LEN {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: SORT_DATA_BODY_LEN,
             found: base.len(),
         });
@@ -952,14 +948,10 @@ pub(crate) struct SortDataCollector {
 }
 
 impl SortDataCollector {
-    pub(crate) fn feed_record(
-        &mut self,
-        record_type: u16,
-        data: &[u8],
-    ) -> XlsResult<Option<Config>> {
+    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> Result<Option<Config>> {
         if let Some(pending) = self.pending.as_mut() {
             if record_type != CONTINUE_FRT12_RECORD_TYPE {
-                return Err(XlsError::InvalidRecord {
+                return Err(Error::InvalidRecord {
                     record_type,
                     message: format!(
                         "SortData must be followed immediately by {} ContinueFrt12 records",
@@ -991,7 +983,7 @@ impl SortDataCollector {
             return Ok(None);
         }
         if data.len() != SORT_DATA_BODY_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: SORT_DATA_BODY_LEN,
                 found: data.len(),
             });
@@ -1014,9 +1006,9 @@ impl SortDataCollector {
         Ok(None)
     }
 
-    pub(crate) fn finish(self) -> XlsResult<()> {
+    pub(crate) fn finish(self) -> Result<()> {
         if let Some(pending) = self.pending {
-            return Err(XlsError::InvalidRecord {
+            return Err(Error::InvalidRecord {
                 record_type: SORT_DATA_RECORD_TYPE,
                 message: format!(
                     "worksheet ended after {} of {} SortData conditions",
@@ -1029,9 +1021,9 @@ impl SortDataCollector {
     }
 }
 
-fn parse_continuation(data: &[u8], axis: Axis) -> XlsResult<Key> {
+fn parse_continuation(data: &[u8], axis: Axis) -> Result<Key> {
     if data.len() < FRT_HEADER_LEN + SORT_CONDITION_FIXED_LEN {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: FRT_HEADER_LEN + SORT_CONDITION_FIXED_LEN,
             found: data.len(),
         });
@@ -1097,7 +1089,7 @@ fn parse_continuation(data: &[u8], axis: Axis) -> XlsResult<Key> {
     }
 }
 
-fn parse_custom_list(body: &[u8], char_count: usize) -> XlsResult<Option<String>> {
+fn parse_custom_list(body: &[u8], char_count: usize) -> Result<Option<String>> {
     if char_count == 0 {
         if body.len() != SORT_CONDITION_FIXED_LEN {
             return Err(invalid("SortCond12 has trailing bytes with zero cchSt"));
@@ -1106,7 +1098,7 @@ fn parse_custom_list(body: &[u8], char_count: usize) -> XlsResult<Option<String>
     }
     let flags = *body
         .get(SORT_CONDITION_FIXED_LEN)
-        .ok_or(XlsError::InvalidLength {
+        .ok_or(Error::InvalidLength {
             expected: SORT_CONDITION_FIXED_LEN + 1,
             found: body.len(),
         })?;
@@ -1119,7 +1111,7 @@ fn parse_custom_list(body: &[u8], char_count: usize) -> XlsResult<Option<String>
         .ok_or_else(|| invalid("SortCond12 string byte length overflow"))?;
     let expected = SORT_CONDITION_FIXED_LEN + 1 + encoded_len;
     if body.len() != expected {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected,
             found: body.len(),
         });
@@ -1137,9 +1129,11 @@ fn parse_custom_list(body: &[u8], char_count: usize) -> XlsResult<Option<String>
             .chunks_exact(2)
             .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]));
         for character in char::decode_utf16(units) {
-            value.push(character.map_err(|_| {
-                XlsError::Encoding("invalid UTF-16 in SortCond12 custom list".into())
-            })?);
+            value.push(
+                character.map_err(|_| {
+                    Error::Encoding("invalid UTF-16 in SortCond12 custom list".into())
+                })?,
+            );
         }
     } else {
         for byte in encoded {

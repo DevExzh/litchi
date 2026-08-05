@@ -5,16 +5,15 @@ use super::codec::{
     NOTES_AND_HANDOUTS_INSTANCE, PRESENTATION_SLIDES_INSTANCE, corrupted, validated_encoded_len,
 };
 use super::model::{
-    PowerPointHeaderFooter, PowerPointHeaderFooterDisplayText, PowerPointHeaderFooterParent,
-    PowerPointHeaderFooterParentOrdinal, PowerPointHeaderFooterScope, PowerPointHeaderFooters,
-    PowerPointScopedHeaderFooterDisplayText,
+    HeaderFooter, HeaderFooterDisplayText, HeaderFooterParent, HeaderFooterParentOrdinal,
+    HeaderFooterScope, HeaderFooters, ScopedHeaderFooterDisplayText,
 };
-use crate::consts::PptRecordType;
+use crate::consts::RecordType;
 use crate::package::Result;
-use crate::records::PptRecord;
+use crate::records::Record;
 
-impl PowerPointHeaderFooters {
-    pub(crate) fn parse_record_tree(records: &[&PptRecord]) -> Result<Self> {
+impl HeaderFooters {
+    pub(crate) fn parse_record_tree(records: &[&Record]) -> Result<Self> {
         if records.len() > MAX_SCANNED_RECORDS {
             return Err(corrupted(
                 "PowerPoint record tree exceeds the header/footer scan limit",
@@ -22,7 +21,7 @@ impl PowerPointHeaderFooters {
         }
         let document_count = records
             .iter()
-            .filter(|record| record.record_type == PptRecordType::Document)
+            .filter(|record| record.record_type == RecordType::Document)
             .count();
         if document_count != 1 {
             return Err(corrupted(
@@ -32,7 +31,7 @@ impl PowerPointHeaderFooters {
 
         let total_containers = records
             .iter()
-            .filter(|record| record.record_type == PptRecordType::HeadersFooters)
+            .filter(|record| record.record_type == RecordType::HeadersFooters)
             .count();
         if total_containers > MAX_HEADER_FOOTER_ENTRIES {
             return Err(corrupted("too many PowerPoint header/footer containers"));
@@ -46,23 +45,23 @@ impl PowerPointHeaderFooters {
 
         for parent in records {
             match parent.record_type {
-                PptRecordType::Document => {
+                RecordType::Document => {
                     let mut saw_slides = false;
                     let mut saw_notes = false;
                     for child in parent
                         .children
                         .iter()
-                        .filter(|child| child.record_type == PptRecordType::HeadersFooters)
+                        .filter(|child| child.record_type == RecordType::HeadersFooters)
                     {
                         located += 1;
                         let scope = match child.instance {
                             PRESENTATION_SLIDES_INSTANCE if !saw_slides => {
                                 saw_slides = true;
-                                PowerPointHeaderFooterScope::PresentationSlides
+                                HeaderFooterScope::PresentationSlides
                             },
                             NOTES_AND_HANDOUTS_INSTANCE if !saw_notes => {
                                 saw_notes = true;
-                                PowerPointHeaderFooterScope::NotesAndHandouts
+                                HeaderFooterScope::NotesAndHandouts
                             },
                             PRESENTATION_SLIDES_INSTANCE | NOTES_AND_HANDOUTS_INSTANCE => {
                                 return Err(corrupted(
@@ -75,17 +74,17 @@ impl PowerPointHeaderFooters {
                                 ));
                             },
                         };
-                        entries.push(PowerPointHeaderFooter::parse_record_bounded(
+                        entries.push(HeaderFooter::parse_record_bounded(
                             child,
                             scope,
                             &mut aggregate,
                         )?);
                     }
                 },
-                PptRecordType::Slide => {
+                RecordType::Slide => {
                     locate_local(
                         parent,
-                        PowerPointHeaderFooterParent::Slide,
+                        HeaderFooterParent::Slide,
                         slide_ordinal,
                         &mut located,
                         &mut aggregate,
@@ -93,10 +92,10 @@ impl PowerPointHeaderFooters {
                     )?;
                     slide_ordinal += 1;
                 },
-                PptRecordType::MainMaster => {
+                RecordType::MainMaster => {
                     locate_local(
                         parent,
-                        PowerPointHeaderFooterParent::MainMaster,
+                        HeaderFooterParent::MainMaster,
                         master_ordinal,
                         &mut located,
                         &mut aggregate,
@@ -121,8 +120,8 @@ impl PowerPointHeaderFooters {
 
     pub(crate) fn attach_placeholder_display(
         &mut self,
-        scope: PowerPointHeaderFooterScope,
-        display: PowerPointHeaderFooterDisplayText,
+        scope: HeaderFooterScope,
+        display: HeaderFooterDisplayText,
     ) -> Result<()> {
         if self.placeholder_displays.len() == MAX_HEADER_FOOTER_ENTRIES {
             return Err(corrupted("too many PowerPoint placeholder displays"));
@@ -160,30 +159,30 @@ impl PowerPointHeaderFooters {
             entry.placeholder_display = Some(display.clone());
         }
         self.placeholder_displays
-            .push(PowerPointScopedHeaderFooterDisplayText {
+            .push(ScopedHeaderFooterDisplayText {
                 scope,
                 text: display,
             });
         Ok(())
     }
 
-    pub(crate) fn has_scope(&self, scope: PowerPointHeaderFooterScope) -> bool {
+    pub(crate) fn has_scope(&self, scope: HeaderFooterScope) -> bool {
         self.entries.iter().any(|entry| entry.scope == scope)
     }
 }
 
 fn locate_local(
-    parent_record: &PptRecord,
-    parent: PowerPointHeaderFooterParent,
+    parent_record: &Record,
+    parent: HeaderFooterParent,
     ordinal: usize,
     located: &mut usize,
     aggregate: &mut usize,
-    entries: &mut Vec<PowerPointHeaderFooter>,
+    entries: &mut Vec<HeaderFooter>,
 ) -> Result<()> {
     let mut containers = parent_record
         .children
         .iter()
-        .filter(|child| child.record_type == PptRecordType::HeadersFooters);
+        .filter(|child| child.record_type == RecordType::HeadersFooters);
     let Some(container) = containers.next() else {
         return Ok(());
     };
@@ -198,11 +197,11 @@ fn locate_local(
         ));
     }
     *located += 1;
-    let scope = PowerPointHeaderFooterScope::Local {
+    let scope = HeaderFooterScope::Local {
         parent,
-        parent_ordinal: PowerPointHeaderFooterParentOrdinal(ordinal),
+        parent_ordinal: HeaderFooterParentOrdinal(ordinal),
     };
-    entries.push(PowerPointHeaderFooter::parse_record_bounded(
+    entries.push(HeaderFooter::parse_record_bounded(
         container, scope, aggregate,
     )?);
     Ok(())

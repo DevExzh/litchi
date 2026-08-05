@@ -12,7 +12,7 @@
 //!
 //! - MS-XLS 2.4.26 (BopPopCustom)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `BopPopCustom` record (MS-XLS 2.4.26).
 pub(crate) const BOP_POP_CUSTOM_RECORD_TYPE: u16 = 0x1067;
@@ -20,8 +20,8 @@ pub(crate) const BOP_POP_CUSTOM_RECORD_TYPE: u16 = 0x1067;
 /// Maximum `cxi` value (exclusive): MUST be less than 32000 (MS-XLS 2.4.26).
 const MAX_CXI_EXCLUSIVE: u16 = 32000;
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: BOP_POP_CUSTOM_RECORD_TYPE,
         message: message.into(),
     }
@@ -42,7 +42,7 @@ impl<'a> BopPopCustomReader<'a> {
         Self { data, offset: 0 }
     }
 
-    fn read_bytes<const N: usize>(&mut self) -> XlsResult<[u8; N]> {
+    fn read_bytes<const N: usize>(&mut self) -> Result<[u8; N]> {
         let end = self
             .offset
             .checked_add(N)
@@ -50,11 +50,11 @@ impl<'a> BopPopCustomReader<'a> {
         let bytes = self
             .data
             .get(self.offset..end)
-            .ok_or(XlsError::InvalidLength {
+            .ok_or(Error::InvalidLength {
                 expected: end,
                 found: self.data.len(),
             })?;
-        let value: [u8; N] = bytes.try_into().map_err(|_| XlsError::InvalidLength {
+        let value: [u8; N] = bytes.try_into().map_err(|_| Error::InvalidLength {
             expected: N,
             found: bytes.len(),
         })?;
@@ -62,11 +62,11 @@ impl<'a> BopPopCustomReader<'a> {
         Ok(value)
     }
 
-    fn read_u16(&mut self) -> XlsResult<u16> {
+    fn read_u16(&mut self) -> Result<u16> {
         Ok(u16::from_le_bytes(self.read_bytes()?))
     }
 
-    fn read_remaining(&mut self) -> XlsResult<&'a [u8]> {
+    fn read_remaining(&mut self) -> Result<&'a [u8]> {
         let bytes = self
             .data
             .get(self.offset..)
@@ -87,16 +87,16 @@ impl<'a> BopPopCustomReader<'a> {
 /// verbatim; use [`Self::is_secondary`] and [`Self::secondary_is_empty`] to
 /// decode them.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsBopPopCustom {
+pub struct BopPopCustom {
     /// Data point count plus one (`cxi`).
     data_point_count_plus_one: u16,
     /// The raw `rggrbit` bytes, preserved verbatim.
     bits: Vec<u8>,
 }
 
-impl XlsBopPopCustom {
+impl BopPopCustom {
     /// Parse a `BopPopCustom` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         let mut reader = BopPopCustomReader::new(data);
         let cxi = reader.read_u16()?;
         if cxi >= MAX_CXI_EXCLUSIVE {
@@ -107,7 +107,7 @@ impl XlsBopPopCustom {
         // MS-XLS 2.4.26: size of rggrbit in bytes = 1 + floor(cxi / 8).
         let expected = 2 + 1 + usize::from(cxi) / 8;
         if data.len() != expected {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected,
                 found: data.len(),
             });
@@ -199,7 +199,7 @@ mod tests {
         // follow the 3 padding bits, and the LSB is the empty marker.
         // Bits: data point 0 secondary (bit 4), data point 3 secondary (bit 1).
         let bytes = record(5, &[0b0001_0010]);
-        let parsed = XlsBopPopCustom::parse(&bytes).unwrap();
+        let parsed = BopPopCustom::parse(&bytes).unwrap();
         assert_eq!(parsed.data_point_count_plus_one(), 5);
         assert_eq!(parsed.is_secondary(0), Some(true));
         assert_eq!(parsed.is_secondary(1), Some(false));
@@ -214,7 +214,7 @@ mod tests {
     fn multi_byte_round_trip() {
         // cxi = 12 (11 data points): rggrbit is 2 bytes, 4 padding bits.
         let bytes = record(12, &[0b0010_1010, 0b1010_1100]);
-        let parsed = XlsBopPopCustom::parse(&bytes).unwrap();
+        let parsed = BopPopCustom::parse(&bytes).unwrap();
         assert_eq!(parsed.is_secondary(0), Some(true));
         assert_eq!(parsed.is_secondary(1), Some(false));
         assert_eq!(parsed.is_secondary(2), Some(true));
@@ -230,25 +230,25 @@ mod tests {
     fn empty_secondary_marker() {
         // The empty-secondary bit set with all data bits clear is legal.
         let bytes = record(5, &[0b0000_0001]);
-        let parsed = XlsBopPopCustom::parse(&bytes).unwrap();
+        let parsed = BopPopCustom::parse(&bytes).unwrap();
         assert!(parsed.secondary_is_empty());
         assert_eq!(parsed.is_secondary(0), Some(false));
         assert_eq!(parsed.to_payload(), bytes);
         // The empty-secondary bit with any data bit set is invalid.
-        assert!(XlsBopPopCustom::parse(&record(5, &[0b0001_0001])).is_err());
+        assert!(BopPopCustom::parse(&record(5, &[0b0001_0001])).is_err());
     }
 
     #[test]
     fn rejects_malformed_records() {
         // Truncated cxi.
-        assert!(XlsBopPopCustom::parse(&[0x05]).is_err());
+        assert!(BopPopCustom::parse(&[0x05]).is_err());
         // cxi at or above 32000.
         let mut too_big = 32000u16.to_le_bytes().to_vec();
         too_big.extend_from_slice(&[0; 4001]);
-        assert!(XlsBopPopCustom::parse(&too_big).is_err());
+        assert!(BopPopCustom::parse(&too_big).is_err());
         // rggrbit size mismatch.
-        assert!(XlsBopPopCustom::parse(&record(5, &[0, 0])).is_err());
-        assert!(XlsBopPopCustom::parse(&record(9, &[0])).is_err());
+        assert!(BopPopCustom::parse(&record(5, &[0, 0])).is_err());
+        assert!(BopPopCustom::parse(&record(9, &[0])).is_err());
     }
 
     #[test]
@@ -256,7 +256,7 @@ mod tests {
         let bytes = record(5, &[0b0001_0010]);
         for length in 0..bytes.len() {
             assert!(
-                XlsBopPopCustom::parse(&bytes[..length]).is_err(),
+                BopPopCustom::parse(&bytes[..length]).is_err(),
                 "length {length}"
             );
         }

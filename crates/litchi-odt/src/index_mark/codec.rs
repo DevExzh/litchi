@@ -385,7 +385,7 @@ fn required_attribute(
     Ok(value)
 }
 
-pub(super) fn is_bibliography_type(value: &str) -> bool {
+pub(crate) fn is_bibliography_type(value: &str) -> bool {
     matches!(
         value,
         "article"
@@ -437,7 +437,7 @@ fn start_mark_paragraph(pending: &mut HashMap<MarkKey, PendingMark>) -> Result<(
     Ok(())
 }
 
-pub(super) fn start_kind(local_name: &[u8]) -> Option<TextIndexMarkKind> {
+pub(crate) fn start_kind(local_name: &[u8]) -> Option<TextIndexMarkKind> {
     match local_name {
         b"toc-mark-start" => Some(TextIndexMarkKind::TableOfContents),
         b"user-index-mark-start" => Some(TextIndexMarkKind::User),
@@ -446,7 +446,7 @@ pub(super) fn start_kind(local_name: &[u8]) -> Option<TextIndexMarkKind> {
     }
 }
 
-pub(super) fn end_kind(local_name: &[u8]) -> Option<TextIndexMarkKind> {
+pub(crate) fn end_kind(local_name: &[u8]) -> Option<TextIndexMarkKind> {
     match local_name {
         b"toc-mark-end" => Some(TextIndexMarkKind::TableOfContents),
         b"user-index-mark-end" => Some(TextIndexMarkKind::User),
@@ -455,7 +455,7 @@ pub(super) fn end_kind(local_name: &[u8]) -> Option<TextIndexMarkKind> {
     }
 }
 
-pub(super) fn point_kind(local_name: &[u8]) -> Option<TextIndexMarkKind> {
+pub(crate) fn point_kind(local_name: &[u8]) -> Option<TextIndexMarkKind> {
     match local_name {
         b"toc-mark" => Some(TextIndexMarkKind::TableOfContents),
         b"user-index-mark" => Some(TextIndexMarkKind::User),

@@ -4,8 +4,8 @@
 //! visibility/customization flags, the style name as an `LPWideString`, and
 //! an `XFProps` formatting property array shared with the DXF machinery.
 
-use super::differential_format::XlsXfProperties;
-use super::{XlsError, XlsResult};
+use super::differential_format::XfProperties;
+use super::{Error, Result};
 
 /// Record type of the `StyleExt` record.
 pub(crate) const STYLE_EXT_RECORD_TYPE: u16 = 0x0892;
@@ -22,8 +22,8 @@ const BUILT_IN: u8 = 0x01;
 const HIDDEN: u8 = 0x02;
 const CUSTOM: u8 = 0x04;
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: STYLE_EXT_RECORD_TYPE,
         message: message.into(),
     }
@@ -31,7 +31,7 @@ fn invalid(message: impl Into<String>) -> XlsError {
 
 /// The style category of a `StyleExt` (`iCategory`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsStyleCategory {
+pub enum StyleCategory {
     /// Custom style.
     Custom,
     /// Good, bad, neutral style.
@@ -46,8 +46,8 @@ pub enum XlsStyleCategory {
     NumberFormat,
 }
 
-impl XlsStyleCategory {
-    fn from_code(value: u8) -> XlsResult<Self> {
+impl StyleCategory {
+    fn from_code(value: u8) -> Result<Self> {
         Ok(match value {
             0x00 => Self::Custom,
             0x01 => Self::GoodBadNeutral,
@@ -73,26 +73,26 @@ impl XlsStyleCategory {
 
 /// Typed `StyleExt` record content (MS-XLS 2.4.270).
 #[derive(Debug, Clone, PartialEq)]
-pub struct XlsStyleExt {
+pub struct StyleExt {
     built_in: bool,
     hidden: bool,
     custom: bool,
-    category: XlsStyleCategory,
+    category: StyleCategory,
     /// Raw `BuiltInStyle` data for built-in styles; `None` for custom styles.
     built_in_data: Option<u16>,
     name: String,
-    properties: XlsXfProperties,
+    properties: XfProperties,
 }
 
-impl XlsStyleExt {
+impl StyleExt {
     /// A style extension; the name is limited to 255 UTF-16 code units, and
     /// `custom` requires a built-in style.
     pub fn try_new(
         built_in: bool,
-        category: XlsStyleCategory,
+        category: StyleCategory,
         name: String,
-        properties: XlsXfProperties,
-    ) -> XlsResult<Self> {
+        properties: XfProperties,
+    ) -> Result<Self> {
         if name.encode_utf16().count() > MAX_STYLE_NAME_CHARS {
             return Err(invalid("style name exceeds 255 UTF-16 code units"));
         }
@@ -116,7 +116,7 @@ impl XlsStyleExt {
     pub const fn custom(&self) -> bool {
         self.custom
     }
-    pub const fn category(&self) -> XlsStyleCategory {
+    pub const fn category(&self) -> StyleCategory {
         self.category
     }
     pub const fn built_in_data(&self) -> Option<u16> {
@@ -125,7 +125,7 @@ impl XlsStyleExt {
     pub fn name(&self) -> &str {
         &self.name
     }
-    pub fn properties(&self) -> &XlsXfProperties {
+    pub fn properties(&self) -> &XfProperties {
         &self.properties
     }
 
@@ -134,7 +134,7 @@ impl XlsStyleExt {
     }
 
     /// Mark the built-in style as customized; requires a built-in style.
-    pub fn set_custom(&mut self, custom: bool) -> XlsResult<()> {
+    pub fn set_custom(&mut self, custom: bool) -> Result<()> {
         if custom && !self.built_in {
             return Err(invalid("fCustom requires a built-in style"));
         }
@@ -143,9 +143,9 @@ impl XlsStyleExt {
     }
 
     /// Parse a `StyleExt` record payload.
-    pub(crate) fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub(crate) fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < FRT_HEADER_LEN + 4 {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: FRT_HEADER_LEN + 4,
                 found: data.len(),
             });
@@ -159,7 +159,7 @@ impl XlsStyleExt {
         if custom && !built_in {
             return Err(invalid("fCustom requires a built-in style"));
         }
-        let category = XlsStyleCategory::from_code(data[13])?;
+        let category = StyleCategory::from_code(data[13])?;
         let built_in_data_raw = u16::from_le_bytes([data[14], data[15]]);
         let built_in_data = if built_in {
             Some(built_in_data_raw)
@@ -170,7 +170,7 @@ impl XlsStyleExt {
             None
         };
         if data.len() < FRT_HEADER_LEN + 6 {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: FRT_HEADER_LEN + 6,
                 found: data.len(),
             });
@@ -185,7 +185,7 @@ impl XlsStyleExt {
             .ok_or_else(|| invalid("style name length overflow"))?;
         let name_bytes = data
             .get(FRT_HEADER_LEN + 6..name_end)
-            .ok_or(XlsError::InvalidLength {
+            .ok_or(Error::InvalidLength {
                 expected: name_end,
                 found: data.len(),
             })?;
@@ -196,7 +196,7 @@ impl XlsStyleExt {
         let name = String::from_utf16(&units)
             .map_err(|_| invalid("style name contains invalid UTF-16"))?;
         let properties =
-            XlsXfProperties::parse(data.get(name_end..).ok_or(XlsError::InvalidLength {
+            XfProperties::parse(data.get(name_end..).ok_or(Error::InvalidLength {
                 expected: name_end,
                 found: data.len(),
             })?)?;
@@ -212,7 +212,7 @@ impl XlsStyleExt {
     }
 
     /// Serialize back to a complete `StyleExt` record payload.
-    pub(crate) fn to_payload(&self) -> XlsResult<Vec<u8>> {
+    pub(crate) fn to_payload(&self) -> Result<Vec<u8>> {
         if self.custom && !self.built_in {
             return Err(invalid("fCustom requires a built-in style"));
         }
@@ -253,7 +253,7 @@ impl XlsStyleExt {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::differential_format::XlsXfProperty;
+    use crate::differential_format::XfProperty;
 
     fn record(flags: u8, category: u8, built_in_data: u16, name: &str, xf_props: &[u8]) -> Vec<u8> {
         let mut data = Vec::new();
@@ -272,7 +272,7 @@ mod tests {
     }
 
     fn xf_props_bytes() -> Vec<u8> {
-        XlsXfProperties::try_new(vec![XlsXfProperty::Locked(true)])
+        XfProperties::try_new(vec![XfProperty::Locked(true)])
             .unwrap()
             .to_bytes()
             .unwrap()
@@ -281,16 +281,16 @@ mod tests {
     #[test]
     fn parses_built_in_style_extension() {
         let data = record(0x03, 0x04, 0x0000, "Heading 1", &xf_props_bytes());
-        let parsed = XlsStyleExt::parse(&data).unwrap();
+        let parsed = StyleExt::parse(&data).unwrap();
         assert!(parsed.built_in());
         assert!(parsed.hidden());
         assert!(!parsed.custom());
-        assert_eq!(parsed.category(), XlsStyleCategory::ThemedCell);
+        assert_eq!(parsed.category(), StyleCategory::ThemedCell);
         assert_eq!(parsed.built_in_data(), Some(0));
         assert_eq!(parsed.name(), "Heading 1");
         assert_eq!(
             parsed.properties().properties(),
-            &[XlsXfProperty::Locked(true)]
+            &[XfProperty::Locked(true)]
         );
         assert_eq!(parsed.to_payload().unwrap(), data);
     }
@@ -298,7 +298,7 @@ mod tests {
     #[test]
     fn parses_custom_style_extension() {
         let data = record(0x00, 0x00, NOT_BUILT_IN_DATA, "My Style", &xf_props_bytes());
-        let parsed = XlsStyleExt::parse(&data).unwrap();
+        let parsed = StyleExt::parse(&data).unwrap();
         assert!(!parsed.built_in());
         assert_eq!(parsed.built_in_data(), None);
         assert_eq!(parsed.to_payload().unwrap(), data);
@@ -307,14 +307,14 @@ mod tests {
     #[test]
     fn rejects_malformed_records() {
         // Truncated.
-        assert!(XlsStyleExt::parse(&[0; 8]).is_err());
+        assert!(StyleExt::parse(&[0; 8]).is_err());
         // Wrong FrtHeader.rt.
         let mut wrong_rt = record(0x00, 0x00, NOT_BUILT_IN_DATA, "x", &xf_props_bytes());
         wrong_rt[0..2].copy_from_slice(&0x087Du16.to_le_bytes());
-        assert!(XlsStyleExt::parse(&wrong_rt).is_err());
+        assert!(StyleExt::parse(&wrong_rt).is_err());
         // fCustom without fBuiltIn.
         assert!(
-            XlsStyleExt::parse(&record(
+            StyleExt::parse(&record(
                 0x04,
                 0x00,
                 NOT_BUILT_IN_DATA,
@@ -325,7 +325,7 @@ mod tests {
         );
         // Reserved category.
         assert!(
-            XlsStyleExt::parse(&record(
+            StyleExt::parse(&record(
                 0x00,
                 0x06,
                 NOT_BUILT_IN_DATA,
@@ -335,11 +335,11 @@ mod tests {
             .is_err()
         );
         // Custom style with built-in data.
-        assert!(XlsStyleExt::parse(&record(0x00, 0x00, 0x0001, "x", &xf_props_bytes())).is_err());
+        assert!(StyleExt::parse(&record(0x00, 0x00, 0x0001, "x", &xf_props_bytes())).is_err());
         // Overlong name.
         let long = "x".repeat(256);
         assert!(
-            XlsStyleExt::parse(&record(
+            StyleExt::parse(&record(
                 0x00,
                 0x00,
                 NOT_BUILT_IN_DATA,
@@ -349,9 +349,9 @@ mod tests {
             .is_err()
         );
         // Builder validation.
-        let props = XlsXfProperties::default();
+        let props = XfProperties::default();
         let mut value =
-            XlsStyleExt::try_new(false, XlsStyleCategory::Custom, "s".to_string(), props).unwrap();
+            StyleExt::try_new(false, StyleCategory::Custom, "s".to_string(), props).unwrap();
         assert!(value.set_custom(true).is_err());
     }
 }

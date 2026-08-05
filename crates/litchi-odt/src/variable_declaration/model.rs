@@ -196,11 +196,11 @@ pub struct Group {
 pub struct Declarations {
     pub groups: Vec<Group>,
     /// Inert DDE source declarations in document order.
-    pub dde_connections: Vec<crate::DdeConnectionDeclaration>,
+    pub dde_connections: Vec<crate::dde_connection::Declaration>,
     /// Validated references to DDE declarations in document order.
-    pub dde_connection_uses: Vec<crate::DdeConnectionUse>,
+    pub dde_connection_uses: Vec<crate::dde_connection::Use>,
     /// Optional document-wide bibliography formatting and sorting policy from styles metadata.
-    pub bibliography_configuration: Option<crate::BibliographyConfiguration>,
+    pub bibliography_configuration: Option<crate::bibliography_configuration::Configuration>,
     /// Inert `text:alphabetical-index-auto-mark-file` references in document order.
     pub auto_mark_files: Vec<crate::AlphabeticalIndexAutoMarkFile>,
 }
@@ -217,7 +217,7 @@ impl Declarations {
             .find(|declaration| declaration.kind() == kind && declaration.name() == name)
     }
 
-    pub fn find_dde_connection(&self, name: &str) -> Option<&crate::DdeConnectionDeclaration> {
+    pub fn find_dde_connection(&self, name: &str) -> Option<&crate::dde_connection::Declaration> {
         self.dde_connections
             .iter()
             .find(|connection| connection.name == name)

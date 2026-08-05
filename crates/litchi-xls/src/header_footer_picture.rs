@@ -12,7 +12,7 @@
 //!
 //! - MS-XLS 2.4.138 (HFPicture), 2.5.134 (FrtFlags), 2.5.135 (FrtHeader)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `HFPicture` record (MS-XLS 2.4.138); also the required
 /// `frtHeader.rt` value.
@@ -33,8 +33,8 @@ const FLAG_IS_DRAWING_GROUP: u8 = 0x02;
 /// Flags bit: this record continues the previous `HFPicture` record.
 const FLAG_CONTINUE: u8 = 0x04;
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: HF_PICTURE_RECORD_TYPE,
         message: message.into(),
     }
@@ -47,7 +47,7 @@ fn invalid(message: impl Into<String>) -> XlsError {
 /// `reserved` byte (MUST be ignored) are preserved verbatim so the record
 /// round-trips unchanged.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsHeaderFooterPicture {
+pub struct HeaderFooterPicture {
     /// Raw `frtHeader.grbitFrt` bitfield (`fFrtRef`/`fFrtAlert` are zero).
     frt_flags: u16,
     /// `frtHeader.reserved` bytes, preserved verbatim.
@@ -63,11 +63,11 @@ pub struct XlsHeaderFooterPicture {
     drawing: Vec<u8>,
 }
 
-impl XlsHeaderFooterPicture {
+impl HeaderFooterPicture {
     /// Parse an `HFPicture` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < FRT_HEADER_LEN + FLAGS_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: FRT_HEADER_LEN + FLAGS_LEN,
                 found: data.len(),
             });
@@ -162,7 +162,7 @@ mod tests {
     fn round_trip_drawing_and_drawing_group() {
         for flags in [FLAG_IS_DRAWING, FLAG_IS_DRAWING_GROUP | FLAG_CONTINUE] {
             let bytes = record(flags, b"drawing-bytes");
-            let parsed = XlsHeaderFooterPicture::parse(&bytes).unwrap();
+            let parsed = HeaderFooterPicture::parse(&bytes).unwrap();
             assert_eq!(parsed.is_drawing(), flags & FLAG_IS_DRAWING != 0);
             assert_eq!(
                 parsed.is_drawing_group(),
@@ -181,7 +181,7 @@ mod tests {
         let mut bytes = record(FLAG_IS_DRAWING | 0xF8, b"x");
         bytes[13] = 0xAA;
         bytes[4..FRT_HEADER_LEN].copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
-        let parsed = XlsHeaderFooterPicture::parse(&bytes).unwrap();
+        let parsed = HeaderFooterPicture::parse(&bytes).unwrap();
         assert_eq!(parsed.flags(), FLAG_IS_DRAWING | 0xF8);
         assert!(parsed.is_drawing());
         assert!(!parsed.is_continuation());
@@ -192,19 +192,19 @@ mod tests {
     fn rejects_malformed_records() {
         let bytes = record(FLAG_IS_DRAWING, b"drawing");
         // Truncated.
-        assert!(XlsHeaderFooterPicture::parse(&bytes[..13]).is_err());
+        assert!(HeaderFooterPicture::parse(&bytes[..13]).is_err());
         // Wrong FrtHeader.rt.
         let mut wrong_rt = bytes.clone();
         wrong_rt[0..2].copy_from_slice(&0x0867u16.to_le_bytes());
-        assert!(XlsHeaderFooterPicture::parse(&wrong_rt).is_err());
+        assert!(HeaderFooterPicture::parse(&wrong_rt).is_err());
         // fFrtRef / fFrtAlert set.
         for frt_flags in [0x0001u16, 0x0002] {
             let mut bad = bytes.clone();
             bad[2..4].copy_from_slice(&frt_flags.to_le_bytes());
-            assert!(XlsHeaderFooterPicture::parse(&bad).is_err());
+            assert!(HeaderFooterPicture::parse(&bad).is_err());
         }
         // Neither or both of fIsDrawing / fIsDrawingGroup.
-        assert!(XlsHeaderFooterPicture::parse(&record(0x00, b"drawing")).is_err());
-        assert!(XlsHeaderFooterPicture::parse(&record(0x03, b"drawing")).is_err());
+        assert!(HeaderFooterPicture::parse(&record(0x00, b"drawing")).is_err());
+        assert!(HeaderFooterPicture::parse(&record(0x03, b"drawing")).is_err());
     }
 }

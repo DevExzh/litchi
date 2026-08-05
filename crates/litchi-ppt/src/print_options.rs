@@ -1,12 +1,12 @@
 //! Typed PowerPoint document print preferences.
 
-use super::package::{PptError, Result};
-use super::records::PptRecord;
-use crate::consts::PptRecordType;
+use super::package::{Error, Result};
+use super::records::Record;
+use crate::consts::RecordType;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
-pub enum PowerPointPrintTarget {
+pub enum PrintTarget {
     Slides = 0,
     BuildSlides = 1,
     Handouts2 = 2,
@@ -19,7 +19,7 @@ pub enum PowerPointPrintTarget {
     Handouts1 = 9,
 }
 
-impl PowerPointPrintTarget {
+impl PrintTarget {
     fn parse(value: u8) -> Result<Self> {
         match value {
             0 => Ok(Self::Slides),
@@ -39,13 +39,13 @@ impl PowerPointPrintTarget {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
-pub enum PowerPointPrintColorMode {
+pub enum PrintColorMode {
     BlackAndWhite = 0,
     Grayscale = 1,
     Color = 2,
 }
 
-impl PowerPointPrintColorMode {
+impl PrintColorMode {
     fn parse(value: u8) -> Result<Self> {
         match value {
             0 => Ok(Self::BlackAndWhite),
@@ -58,20 +58,20 @@ impl PowerPointPrintColorMode {
 
 /// A validated document-level `PrintOptionsAtom`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PowerPointPrintOptions {
-    pub target: PowerPointPrintTarget,
-    pub color_mode: PowerPointPrintColorMode,
+pub struct PrintOptions {
+    pub target: PrintTarget,
+    pub color_mode: PrintColorMode,
     pub print_hidden_slides: bool,
     pub scale_to_fit_paper: bool,
     pub frame_slides: bool,
 }
 
-impl PowerPointPrintOptions {
-    pub fn parse(document: &PptRecord) -> Result<Option<Self>> {
+impl PrintOptions {
+    pub fn parse(document: &Record) -> Result<Option<Self>> {
         let records = document
             .children
             .iter()
-            .filter(|record| record.record_type_raw == PptRecordType::PrintOptionsAtom.as_u16())
+            .filter(|record| record.record_type_raw == RecordType::PrintOptionsAtom.as_u16())
             .collect::<Vec<_>>();
         if records.len() > 1 {
             return corrupted("DocumentContainer contains duplicate PrintOptionsAtom records");
@@ -87,17 +87,17 @@ impl PowerPointPrintOptions {
             return corrupted("PrintOptionsAtom has an invalid header or size");
         }
         Ok(Some(Self {
-            target: PowerPointPrintTarget::parse(record.data[0])?,
-            color_mode: PowerPointPrintColorMode::parse(record.data[1])?,
+            target: PrintTarget::parse(record.data[0])?,
+            color_mode: PrintColorMode::parse(record.data[1])?,
             print_hidden_slides: parse_bool1(record.data[2], "fPrintHidden")?,
             scale_to_fit_paper: parse_bool1(record.data[3], "fScaleToFitPaper")?,
             frame_slides: parse_bool1(record.data[4], "fFrameSlides")?,
         }))
     }
 
-    pub fn to_record(&self) -> Result<PptRecord> {
+    pub fn to_record(&self) -> Result<Record> {
         let bytes = self.to_record_bytes();
-        let (record, end) = PptRecord::parse(&bytes, 0)?;
+        let (record, end) = Record::parse(&bytes, 0)?;
         if end != bytes.len() {
             return corrupted("canonical PrintOptionsAtom did not consume its bytes");
         }
@@ -106,7 +106,7 @@ impl PowerPointPrintOptions {
 
     pub fn to_record_bytes(&self) -> [u8; 13] {
         let mut bytes = [0; 13];
-        bytes[2..4].copy_from_slice(&PptRecordType::PrintOptionsAtom.as_u16().to_le_bytes());
+        bytes[2..4].copy_from_slice(&RecordType::PrintOptionsAtom.as_u16().to_le_bytes());
         bytes[4..8].copy_from_slice(&5u32.to_le_bytes());
         bytes[8] = self.target as u8;
         bytes[9] = self.color_mode as u8;
@@ -126,19 +126,19 @@ fn parse_bool1(value: u8, field: &str) -> Result<bool> {
 }
 
 fn corrupted<T>(message: impl Into<String>) -> Result<T> {
-    Err(PptError::Corrupted(message.into()))
+    Err(Error::Corrupted(message.into()))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn root(children: Vec<PptRecord>) -> PptRecord {
-        PptRecord {
+    fn root(children: Vec<Record>) -> Record {
+        Record {
             version: 0x0f,
             instance: 0,
-            record_type: PptRecordType::Document,
-            record_type_raw: PptRecordType::Document.as_u16(),
+            record_type: RecordType::Document,
+            record_type_raw: RecordType::Document.as_u16(),
             data_length: 0,
             data: Vec::new(),
             children,
@@ -148,23 +148,23 @@ mod tests {
     #[test]
     fn all_print_targets_and_color_modes_roundtrip() {
         for target in [
-            PowerPointPrintTarget::Slides,
-            PowerPointPrintTarget::BuildSlides,
-            PowerPointPrintTarget::Handouts2,
-            PowerPointPrintTarget::Handouts3,
-            PowerPointPrintTarget::Handouts6,
-            PowerPointPrintTarget::Notes,
-            PowerPointPrintTarget::Outline,
-            PowerPointPrintTarget::Handouts4,
-            PowerPointPrintTarget::Handouts9,
-            PowerPointPrintTarget::Handouts1,
+            PrintTarget::Slides,
+            PrintTarget::BuildSlides,
+            PrintTarget::Handouts2,
+            PrintTarget::Handouts3,
+            PrintTarget::Handouts6,
+            PrintTarget::Notes,
+            PrintTarget::Outline,
+            PrintTarget::Handouts4,
+            PrintTarget::Handouts9,
+            PrintTarget::Handouts1,
         ] {
             for color_mode in [
-                PowerPointPrintColorMode::BlackAndWhite,
-                PowerPointPrintColorMode::Grayscale,
-                PowerPointPrintColorMode::Color,
+                PrintColorMode::BlackAndWhite,
+                PrintColorMode::Grayscale,
+                PrintColorMode::Color,
             ] {
-                let expected = PowerPointPrintOptions {
+                let expected = PrintOptions {
                     target,
                     color_mode,
                     print_hidden_slides: true,
@@ -172,8 +172,7 @@ mod tests {
                     frame_slides: true,
                 };
                 assert_eq!(
-                    PowerPointPrintOptions::parse(&root(vec![expected.to_record().unwrap()]))
-                        .unwrap(),
+                    PrintOptions::parse(&root(vec![expected.to_record().unwrap()])).unwrap(),
                     Some(expected)
                 );
             }
@@ -182,20 +181,20 @@ mod tests {
 
     #[test]
     fn rejects_duplicate_invalid_header_enums_and_bool1() {
-        let value = PowerPointPrintOptions {
-            target: PowerPointPrintTarget::Slides,
-            color_mode: PowerPointPrintColorMode::Color,
+        let value = PrintOptions {
+            target: PrintTarget::Slides,
+            color_mode: PrintColorMode::Color,
             print_hidden_slides: false,
             scale_to_fit_paper: false,
             frame_slides: false,
         };
         let record = value.to_record().unwrap();
-        assert!(PowerPointPrintOptions::parse(&root(vec![record.clone(), record])).is_err());
+        assert!(PrintOptions::parse(&root(vec![record.clone(), record])).is_err());
         for (offset, invalid) in [(0, 1), (8, 10), (9, 3), (10, 2), (11, 0xff), (12, 7)] {
             let mut bytes = value.to_record_bytes();
             bytes[offset] = invalid;
-            let record = PptRecord::parse(&bytes, 0).unwrap().0;
-            assert!(PowerPointPrintOptions::parse(&root(vec![record])).is_err());
+            let record = Record::parse(&bytes, 0).unwrap().0;
+            assert!(PrintOptions::parse(&root(vec![record])).is_err());
         }
     }
 }

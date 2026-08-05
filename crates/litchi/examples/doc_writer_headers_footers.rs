@@ -7,7 +7,7 @@
 //!
 //! Run with: cargo run --example doc_writer_headers_footers
 
-use litchi::doc::writer::DocWriter;
+use litchi_doc::writer::DocWriter;
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {

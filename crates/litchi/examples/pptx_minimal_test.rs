@@ -9,7 +9,7 @@
 use litchi::ooxml::pptx::*;
 use std::error::Error;
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> std::result::Result<(), Box<dyn Error>> {
     println!("Creating minimal PPTX...");
 
     let mut pkg = Package::new()?;

@@ -34,7 +34,7 @@ pub(super) fn collect_ruby_text_node(
     text_offset: &mut usize,
     range: &Range<usize>,
     stack: &[(Ns, Vec<u8>)],
-    value: &RubyAnnotation,
+    value: &Annotation,
     fragment: &str,
     target_depth: Option<usize>,
     pending: &mut Option<PendingRubyRange>,
@@ -46,9 +46,9 @@ pub(super) fn collect_ruby_text_node(
         text_offset,
         range,
         stack,
-        value,
         fragment,
         target_depth,
+        value,
         pending,
     )
 }

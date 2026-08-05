@@ -24,7 +24,7 @@
 //!     └── y (i32): position in master units
 //! ```
 
-use super::records::{PptError, RecordBuilder, record_type};
+use super::records::{Error, RecordBuilder, record_type};
 
 /// A single comment on a slide.
 #[derive(Debug, Clone)]
@@ -114,7 +114,7 @@ fn pt_to_master(pt: i32) -> i32 {
 }
 
 /// Write a CString record with the given instance and UTF-16LE text.
-fn write_cstring(instance: u16, text: &str) -> Result<Vec<u8>, PptError> {
+fn write_cstring(instance: u16, text: &str) -> Result<Vec<u8>, Error> {
     let utf16: Vec<u16> = text.encode_utf16().collect();
     let (max_len, allow_tab_cr_lf) = match instance {
         0 | 2 => (104, false),
@@ -156,7 +156,7 @@ fn write_cstring(instance: u16, text: &str) -> Result<Vec<u8>, PptError> {
 ///
 /// * `comment` - The comment to serialize
 /// * `index` - 1-based comment index within the slide
-fn build_comment_container(comment: &SlideComment, index: i32) -> Result<Vec<u8>, PptError> {
+fn build_comment_container(comment: &SlideComment, index: i32) -> Result<Vec<u8>, Error> {
     let mut children = Vec::new();
 
     // CString instance 0: author name
@@ -202,7 +202,7 @@ fn build_comment_container(comment: &SlideComment, index: i32) -> Result<Vec<u8>
 ///
 /// Returns the raw bytes to be embedded inside the slide's BinaryTagData.
 /// If there are no comments, returns an empty Vec.
-pub fn build_slide_comments(comments: &[SlideComment]) -> Result<Vec<u8>, PptError> {
+pub fn build_slide_comments(comments: &[SlideComment]) -> Result<Vec<u8>, Error> {
     if comments.is_empty() {
         return Ok(Vec::new());
     }

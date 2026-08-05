@@ -1,27 +1,27 @@
 //! Structural validation for the terminal records of a PPT `DocumentContainer`.
 
-use crate::consts::PptRecordType;
-use crate::package::{PptError, Result};
-use crate::records::PptRecord;
+use crate::consts::RecordType;
+use crate::package::{Error, Result};
+use crate::records::Record;
 
 /// Position of the optional PowerPoint 12 custom table-style package.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PowerPointCustomTableStylesPlacement {
+pub enum CustomTableStylesPlacement {
     BeforeEndDocument,
     AfterEndDocument,
 }
 
 /// Strictly validated terminal structure of a `DocumentContainer`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointDocumentStructure {
+pub struct DocumentStructure {
     pub end_document_child_index: usize,
-    pub custom_table_styles: Option<PowerPointCustomTableStylesPlacement>,
+    pub custom_table_styles: Option<CustomTableStylesPlacement>,
 }
 
-impl PowerPointDocumentStructure {
+impl DocumentStructure {
     /// Validate the exact MS-PPT document tail.
-    pub(crate) fn parse(document: &PptRecord) -> Result<Self> {
-        if document.record_type != PptRecordType::Document
+    pub(crate) fn parse(document: &Record) -> Result<Self> {
+        if document.record_type != RecordType::Document
             || document.version != 0x0f
             || document.instance != 0
         {
@@ -33,7 +33,7 @@ impl PowerPointDocumentStructure {
             .iter()
             .enumerate()
             .filter_map(|(index, record)| {
-                (record.record_type == PptRecordType::EndDocument).then_some(index)
+                (record.record_type == RecordType::EndDocument).then_some(index)
             })
             .collect();
         if end_indices.len() != 1 {
@@ -50,7 +50,7 @@ impl PowerPointDocumentStructure {
             .iter()
             .enumerate()
             .filter_map(|(index, record)| {
-                (record.record_type == PptRecordType::RoundTripCustomTableStyles12Atom)
+                (record.record_type == RecordType::RoundTripCustomTableStyles12Atom)
                     .then_some(index)
             })
             .collect();
@@ -67,13 +67,13 @@ impl PowerPointDocumentStructure {
                 if table_index.checked_add(1) == Some(end_index)
                     && end_index.checked_add(1) == Some(child_count) =>
             {
-                Some(PowerPointCustomTableStylesPlacement::BeforeEndDocument)
+                Some(CustomTableStylesPlacement::BeforeEndDocument)
             },
             Some(table_index)
                 if end_index.checked_add(1) == Some(table_index)
                     && table_index.checked_add(1) == Some(child_count) =>
             {
-                Some(PowerPointCustomTableStylesPlacement::AfterEndDocument)
+                Some(CustomTableStylesPlacement::AfterEndDocument)
             },
             _ => {
                 return corrupted(
@@ -90,15 +90,15 @@ impl PowerPointDocumentStructure {
 }
 
 fn corrupted<T>(message: &str) -> Result<T> {
-    Err(PptError::Corrupted(message.to_string()))
+    Err(Error::Corrupted(message.to_string()))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn record(record_type: PptRecordType, version: u16, data: Vec<u8>) -> PptRecord {
-        PptRecord {
+    fn record(record_type: RecordType, version: u16, data: Vec<u8>) -> Record {
+        Record {
             record_type,
             record_type_raw: record_type.as_u16(),
             version,
@@ -109,58 +109,48 @@ mod tests {
         }
     }
 
-    fn document(children: Vec<PptRecord>) -> PptRecord {
-        let mut value = record(PptRecordType::Document, 0x0f, Vec::new());
+    fn document(children: Vec<Record>) -> Record {
+        let mut value = record(RecordType::Document, 0x0f, Vec::new());
         value.children = children;
         value
     }
 
     #[test]
     fn accepts_both_defined_custom_table_style_placements() {
-        let prefix = record(PptRecordType::DocumentAtom, 0, Vec::new());
-        let end = record(PptRecordType::EndDocument, 0, Vec::new());
-        let styles = record(
-            PptRecordType::RoundTripCustomTableStyles12Atom,
-            0,
-            Vec::new(),
-        );
+        let prefix = record(RecordType::DocumentAtom, 0, Vec::new());
+        let end = record(RecordType::EndDocument, 0, Vec::new());
+        let styles = record(RecordType::RoundTripCustomTableStyles12Atom, 0, Vec::new());
         assert_eq!(
-            PowerPointDocumentStructure::parse(&document(vec![
-                prefix.clone(),
-                styles.clone(),
-                end.clone(),
-            ]))
+            DocumentStructure::parse(&document(
+                vec![prefix.clone(), styles.clone(), end.clone(),]
+            ))
             .unwrap()
             .custom_table_styles,
-            Some(PowerPointCustomTableStylesPlacement::BeforeEndDocument)
+            Some(CustomTableStylesPlacement::BeforeEndDocument)
         );
         assert_eq!(
-            PowerPointDocumentStructure::parse(&document(vec![prefix, end, styles]))
+            DocumentStructure::parse(&document(vec![prefix, end, styles]))
                 .unwrap()
                 .custom_table_styles,
-            Some(PowerPointCustomTableStylesPlacement::AfterEndDocument)
+            Some(CustomTableStylesPlacement::AfterEndDocument)
         );
     }
 
     #[test]
     fn rejects_missing_duplicate_nonempty_and_nonterminal_end_records() {
-        let end = record(PptRecordType::EndDocument, 0, Vec::new());
-        assert!(PowerPointDocumentStructure::parse(&document(Vec::new())).is_err());
+        let end = record(RecordType::EndDocument, 0, Vec::new());
+        assert!(DocumentStructure::parse(&document(Vec::new())).is_err());
+        assert!(DocumentStructure::parse(&document(vec![end.clone(), end.clone()])).is_err());
         assert!(
-            PowerPointDocumentStructure::parse(&document(vec![end.clone(), end.clone()])).is_err()
-        );
-        assert!(
-            PowerPointDocumentStructure::parse(&document(vec![record(
-                PptRecordType::EndDocument,
-                0,
-                vec![0]
-            ),]))
+            DocumentStructure::parse(&document(
+                vec![record(RecordType::EndDocument, 0, vec![0]),]
+            ))
             .is_err()
         );
         assert!(
-            PowerPointDocumentStructure::parse(&document(vec![
+            DocumentStructure::parse(&document(vec![
                 end,
-                record(PptRecordType::DocumentAtom, 0, Vec::new()),
+                record(RecordType::DocumentAtom, 0, Vec::new()),
             ]))
             .is_err()
         );

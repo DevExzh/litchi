@@ -1,27 +1,23 @@
 //! Example demonstrating how to read and extract information from Office files.
 //!
-//! This example shows various reading operations for DOCX, XLSX, and PPTX files,
-//! including text extraction, metadata reading, and content analysis.
+//! This example shows the standalone DOCX, XLSX, and PPTX package readers.
 //!
 //! Run with:
 //! ```bash
 //! cargo run --example read_office_files
 //! ```
 
-use litchi::ooxml::api::helpers;
-use litchi::ooxml::docx::Package as DocxPackage;
-use litchi::ooxml::pptx::Package as PptxPackage;
-use litchi::ooxml::xlsx::Workbook;
-use litchi::sheet::WorkbookTrait;
+use litchi::ooxml::pptx::shape::Shape;
+use litchi::ooxml::xlsx::Package as XlsxPackage;
+use litchi::ooxml::{docx::Package as DocxPackage, pptx::Package as PptxPackage};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Office File Reading Demo ===\n");
 
-    // Using the unified helper API
+    // Read each supported format through its standalone package facade.
     demo_unified_api()?;
     println!();
 
-    // Format-specific reading
     demo_docx_reading()?;
     println!();
 
@@ -34,247 +30,236 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Demonstrate unified API for reading any Office format
+/// Demonstrate format dispatch without the removed convenience helper API.
 fn demo_unified_api() -> Result<(), Box<dyn std::error::Error>> {
     println!("--- Unified API Demo ---");
 
-    // These helper functions work with any supported format
-    let files = vec![
+    let files = [
         "sample_document.docx",
         "sample_spreadsheet.xlsx",
         "sample_presentation.pptx",
     ];
 
     for file in files {
-        // Note: In a real scenario, check if file exists first
-        match helpers::extract_text(file) {
-            Ok(text) => {
-                println!("Text from {}: {} characters", file, text.len());
+        match std::path::Path::new(file)
+            .extension()
+            .and_then(|extension| extension.to_str())
+        {
+            Some("docx") => match DocxPackage::open(file) {
+                Ok(package) => {
+                    let document = package.document()?;
+                    let text = document.text()?;
+                    println!("Text from {file}: {} characters", text.len());
+                    print_props("  ", package.props());
+                },
+                Err(error) => println!("Could not read {file}: {error}"),
             },
-            Err(e) => {
-                println!("Could not read {}: {}", file, e);
+            Some("xlsx") => match XlsxPackage::open(file) {
+                Ok(package) => {
+                    let workbook = package.workbook()?;
+                    let names: Vec<_> = workbook
+                        .sheets()
+                        .map(|sheet| sheet.name().to_owned())
+                        .collect();
+                    println!("Worksheets from {file}: {}", names.join(", "));
+                },
+                Err(error) => println!("Could not read {file}: {error}"),
             },
-        }
-
-        match helpers::get_props(file) {
-            Ok(Some(props)) => {
-                if let Some(title) = props.title {
-                    println!("  Title: {}", title);
-                }
-                if let Some(creator) = props.creator {
-                    println!("  Creator: {}", creator);
-                }
+            Some("pptx") => match PptxPackage::open(file) {
+                Ok(package) => {
+                    let presentation = package.presentation()?;
+                    let text = presentation.text()?;
+                    println!("Text from {file}: {} characters", text.len());
+                    print_pptx_props("  ", &package)?;
+                },
+                Err(error) => println!("Could not read {file}: {error}"),
             },
-            Ok(None) => println!("  No core properties"),
-            Err(e) => {
-                println!("Could not read properties from {}: {}", file, e);
-            },
+            _ => println!("Unsupported Office file: {file}"),
         }
     }
 
     Ok(())
 }
 
-/// Demonstrate Word document reading
+fn print_props(prefix: &str, props: Option<&litchi::ooxml::common::Props>) {
+    if let Some(props) = props {
+        if let Some(title) = &props.title {
+            println!("{prefix}Title: {title}");
+        }
+        if let Some(creator) = &props.creator {
+            println!("{prefix}Creator: {creator}");
+        }
+    } else {
+        println!("{prefix}No core properties");
+    }
+}
+
+fn print_pptx_props(prefix: &str, package: &PptxPackage) -> Result<(), Box<dyn std::error::Error>> {
+    let props = litchi::ooxml::common::properties::read(package.opc()?)
+        .map_err(|error| format!("could not read PPTX core properties: {error}"))?;
+    print_props(prefix, props.as_ref());
+    Ok(())
+}
+
+/// Demonstrate WordprocessingML reading and core-property access.
 fn demo_docx_reading() -> Result<(), Box<dyn std::error::Error>> {
     println!("--- DOCX Reading Demo ---");
 
-    // Check if file exists (in real usage)
     let filename = "sample_document.docx";
-    println!("Analyzing: {}", filename);
+    println!("Analyzing: {filename}");
 
-    // Open document
     match DocxPackage::open(filename) {
-        Ok(pkg) => {
-            let doc = pkg.document()?;
+        Ok(package) => {
+            let document = package.document()?;
 
-            // Basic statistics
-            println!("  Paragraphs: {}", doc.paragraph_count()?);
-            println!("  Tables: {}", doc.table_count()?);
+            println!("  Paragraphs: {}", document.paragraph_count()?);
+            println!("  Tables: {}", document.table_count()?);
 
-            // Extract all text
-            let text = doc.text()?;
+            let text = document.text()?;
             println!("  Total characters: {}", text.len());
             println!("  Total words: {}", text.split_whitespace().count());
 
-            // Analyze first few paragraphs
-            let paragraphs = doc.paragraphs()?;
             println!("  First 3 paragraphs:");
-            for (idx, para) in paragraphs.iter().take(3).enumerate() {
-                let text = para.text()?;
+            for (index, paragraph) in document.paragraphs()?.iter().take(3).enumerate() {
+                let text = paragraph.text()?;
                 println!(
                     "    {}: {}",
-                    idx + 1,
-                    if text.len() > 60 {
-                        format!("{}...", &text[..60])
-                    } else {
-                        text
-                    }
+                    index + 1,
+                    text.get(..60)
+                        .map_or_else(|| format!("{text}..."), |preview| preview.to_owned())
                 );
             }
 
-            // Search for specific text
-            let search_term = "important";
-            let matches = doc.search(search_term)?;
-            println!("  Found '{}' in {} paragraphs", search_term, matches.len());
+            let matches = document.search("important")?;
+            println!("  Found 'important' in {} paragraphs", matches.len());
 
-            // Table analysis
-            if doc.has_tables()?
-                && let Some(table) = doc.table(0)?
+            if document.has_tables()?
+                && let Some(table) = document.table(0)?
             {
                 let rows = table.rows()?;
                 println!(
                     "  First table: {}x{} (rows x cols)",
                     rows.len(),
                     rows.first()
-                        .map(|r| r.cells().map(|c| c.len()).unwrap_or(0))
+                        .map(|row| row.cells().map(|cells| cells.len()).unwrap_or(0))
                         .unwrap_or(0)
                 );
             }
 
-            // Metadata
             println!("  Metadata:");
-            if let Some(props) = pkg.props() {
-                if let Some(title) = &props.title {
-                    println!("    Title: {}", title);
-                }
-                if let Some(creator) = &props.creator {
-                    println!("    Creator: {}", creator);
-                }
-                if let Some(created) = &props.created {
-                    println!("    Created: {}", created);
-                }
-            }
+            print_props("    ", package.props());
         },
-        Err(e) => {
-            println!("  File not found or error: {}", e);
-            println!("  (This is expected if sample file doesn't exist)");
+        Err(error) => {
+            println!("  File not found or error: {error}");
+            println!("  (This is expected if the sample file does not exist)");
         },
     }
 
     Ok(())
 }
 
-/// Demonstrate Excel spreadsheet reading
+/// Demonstrate SpreadsheetML package, workbook, and worksheet access.
 fn demo_xlsx_reading() -> Result<(), Box<dyn std::error::Error>> {
     println!("--- XLSX Reading Demo ---");
 
     let filename = "sample_spreadsheet.xlsx";
-    println!("Analyzing: {}", filename);
+    println!("Analyzing: {filename}");
 
-    match Workbook::open(filename) {
-        Ok(wb) => {
-            // Basic statistics
-            println!("  Worksheets: {}", wb.worksheet_count());
+    match XlsxPackage::open(filename) {
+        Ok(package) => {
+            let workbook = package.workbook()?;
+            println!("  Worksheets: {}", workbook.len());
 
-            // List all sheets
             println!("  Sheet names:");
-            for name in wb.worksheet_names() {
-                println!("    - {}", name);
+            for sheet in workbook.sheets() {
+                println!("    - {}", sheet.name());
             }
 
-            // Analyze first worksheet
-            if let Ok(ws) = wb.worksheet_by_index(0) {
-                println!("  First sheet: '{}'", ws.name());
+            if let Some(sheet) = workbook.sheet(0usize)? {
+                println!("  First sheet: '{}'", sheet.name());
+                println!("    Stored rows: {}", sheet.rows()?.len());
 
-                if let Some((min_row, min_col, max_row, max_col)) = ws.dimensions() {
-                    println!(
-                        "    Used range: {}x{} (rows x cols)",
-                        max_row - min_row + 1,
-                        max_col - min_col + 1
-                    );
-                }
+                // The worksheet reader is sparse. Scanning the checked Excel
+                // grid counts physical cells without materializing empty ones.
+                let stored_cells = sheet.cells("A1:XFD1048576")?.count();
+                println!("    Stored cells: {stored_cells}");
 
-                // Sample dimensions
-                println!("    Row count: {}", ws.row_count());
-                println!("    Column count: {}", ws.column_count());
-            }
-
-            // Metadata
-            println!("  Metadata:");
-            if let Some(props) = wb.props() {
-                if let Some(title) = &props.title {
-                    println!("    Title: {}", title);
-                }
-                if let Some(creator) = &props.creator {
-                    println!("    Creator: {}", creator);
+                if let Some((address, cell)) = sheet.cells("A1:XFD1048576")?.next() {
+                    println!("    First cell: {:?} = {:?}", address, cell);
                 }
             }
         },
-        Err(e) => {
-            println!("  File not found or error: {}", e);
-            println!("  (This is expected if sample file doesn't exist)");
+        Err(error) => {
+            println!("  File not found or error: {error}");
+            println!("  (This is expected if the sample file does not exist)");
         },
     }
 
     Ok(())
 }
 
-/// Demonstrate PowerPoint presentation reading
+/// Demonstrate PresentationML slide, shape, text, and metadata access.
 fn demo_pptx_reading() -> Result<(), Box<dyn std::error::Error>> {
     println!("--- PPTX Reading Demo ---");
 
     let filename = "sample_presentation.pptx";
-    println!("Analyzing: {}", filename);
+    println!("Analyzing: {filename}");
 
     match PptxPackage::open(filename) {
-        Ok(pkg) => {
-            let pres = pkg.presentation()?;
+        Ok(package) => {
+            let presentation = package.presentation()?;
+            let (width, height) = presentation.slide_size()?;
+            println!("  Slides: {}", presentation.slide_count()?);
+            println!(
+                "  Slide size: {:.2} x {:.2} inches",
+                emu_to_inches(width),
+                emu_to_inches(height)
+            );
 
-            // Basic statistics
-            println!("  Slides: {}", pres.slide_count()?);
-
-            if let Some(width) = pres.slide_width()? {
-                let inches = width as f64 / 914400.0;
-                println!("  Slide width: {:.2} inches", inches);
-            }
-
-            if let Some(height) = pres.slide_height()? {
-                let inches = height as f64 / 914400.0;
-                println!("  Slide height: {:.2} inches", inches);
-            }
-
-            // Analyze each slide
-            let slides = pres.slides()?;
-            for (idx, slide) in slides.iter().enumerate() {
-                println!("  Slide {}:", idx + 1);
-                println!("    Shapes: {}", slide.shape_count()?);
-                println!("    Has tables: {}", slide.has_tables()?);
-                println!("    Has pictures: {}", slide.has_pictures()?);
-
-                // Extract text
+            for (index, slide) in presentation.slides()?.into_iter().enumerate() {
+                let scene = slide.shapes()?;
+                let table_count = scene
+                    .iter()
+                    .filter(|shape| matches!(shape, Shape::Table(_)))
+                    .count();
+                let picture_count = scene
+                    .iter()
+                    .filter(|shape| matches!(shape, Shape::Picture(_)))
+                    .count();
                 let text = slide.text()?;
-                let preview = if text.len() > 80 {
-                    format!("{}...", text[..80].replace('\n', " "))
-                } else {
-                    text.replace('\n', " ")
-                };
-                println!("    Text preview: {}", preview);
 
-                // Search in this slide
-                if let Ok(matches) = slide.find_text("important")
-                    && !matches.is_empty()
-                {
-                    println!("    Contains 'important' in {} shapes", matches.len());
+                println!("  Slide {}:", index + 1);
+                println!("    Shapes: {}", scene.len());
+                println!("    Tables: {table_count}");
+                println!("    Pictures: {picture_count}");
+                println!("    Text preview: {}", preview(&text, 80));
+
+                if text.contains("important") {
+                    println!("    Contains 'important'");
                 }
             }
 
-            // Metadata
             println!("  Metadata:");
-            if let Some(props) = pkg.props() {
-                if let Some(title) = &props.title {
-                    println!("    Title: {}", title);
-                }
-                if let Some(creator) = &props.creator {
-                    println!("    Creator: {}", creator);
-                }
-            }
+            print_pptx_props("    ", &package)?;
         },
-        Err(e) => {
-            println!("  File not found or error: {}", e);
-            println!("  (This is expected if sample file doesn't exist)");
+        Err(error) => {
+            println!("  File not found or error: {error}");
+            println!("  (This is expected if the sample file does not exist)");
         },
     }
 
     Ok(())
+}
+
+fn emu_to_inches(value: i64) -> f64 {
+    value as f64 / 914_400.0
+}
+
+fn preview(text: &str, limit: usize) -> String {
+    let flattened = text.replace('\n', " ");
+    if flattened.len() > limit {
+        format!("{}...", &flattened[..limit])
+    } else {
+        flattened
+    }
 }

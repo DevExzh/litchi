@@ -4,9 +4,9 @@
 //! slide, notes, or master. It is inert: languages are never applied to any
 //! spell-checking or formatting behavior.
 
-use super::records::record::PptRecord;
-use crate::consts::PptRecordType;
-use crate::package::{PptError, Result};
+use super::records::record::Record;
+use crate::consts::RecordType;
+use crate::package::{Error, Result};
 
 /// `RT_TextSpecialInfoDefaultAtom` record type.
 const TEXT_SPECIAL_INFO_DEFAULT_TYPE: u16 = 0x0FA9;
@@ -26,20 +26,20 @@ const SPELL_ERROR: u16 = 0x0001;
 /// `SpellingFlags.clean`.
 const SPELL_CLEAN: u16 = 0x0002;
 
-fn corrupted(message: impl Into<String>) -> PptError {
-    PptError::Corrupted(message.into())
+fn corrupted(message: impl Into<String>) -> Error {
+    Error::Corrupted(message.into())
 }
 
 /// Spelling status defaults from a `SpellingFlags` structure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointSpellingFlags {
+pub struct SpellingFlags {
     /// Whether the text is spelled incorrectly.
     error: bool,
     /// Whether the text needs rechecking.
     clean: bool,
 }
 
-impl PowerPointSpellingFlags {
+impl SpellingFlags {
     /// Build spelling flags from validated bits (`TextSIException`,
     /// MS-PPT 2.9.33).
     pub(crate) const fn from_bits(error: bool, clean: bool) -> Self {
@@ -58,17 +58,17 @@ impl PowerPointSpellingFlags {
 /// Default special information for a text body (`TextSIExceptionAtom`,
 /// MS-PPT 2.9.31).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointTextSpecialInfoDefaults {
-    spelling: Option<PowerPointSpellingFlags>,
+pub struct TextSpecialInfoDefaults {
+    spelling: Option<SpellingFlags>,
     /// Primary language identifier (`TxLCID`).
     language: Option<u16>,
     /// Alternate language identifier (`TxLCID`).
     alternate_language: Option<u16>,
 }
 
-impl PowerPointTextSpecialInfoDefaults {
+impl TextSpecialInfoDefaults {
     /// Spelling status defaults, when present.
-    pub const fn spelling(&self) -> Option<PowerPointSpellingFlags> {
+    pub const fn spelling(&self) -> Option<SpellingFlags> {
         self.spelling
     }
     /// Primary language identifier, when present.
@@ -81,8 +81,8 @@ impl PowerPointTextSpecialInfoDefaults {
     }
 
     /// Parse a complete `TextSIExceptionAtom` record.
-    pub fn parse_record(record: &PptRecord) -> Result<Self> {
-        if record.record_type != PptRecordType::TextSpecialInfoDefaultAtom
+    pub fn parse_record(record: &Record) -> Result<Self> {
+        if record.record_type != RecordType::TextSpecialInfoDefaultAtom
             || record.record_type_raw != TEXT_SPECIAL_INFO_DEFAULT_TYPE
             || record.version != 0
         {
@@ -124,7 +124,7 @@ impl PowerPointTextSpecialInfoDefaults {
                         "TextSIExceptionAtom spellInfo.grammar must be zero",
                     ));
                 }
-                Ok(PowerPointSpellingFlags {
+                Ok(SpellingFlags {
                     error: raw & SPELL_ERROR != 0,
                     clean: raw & SPELL_CLEAN != 0,
                 })
@@ -178,9 +178,9 @@ impl PowerPointTextSpecialInfoDefaults {
 /// A validated index into the sequence of `TextHeaderAtom` records that
 /// follows a slide's persist record (`OutlineTextRefAtom`, MS-PPT 2.9.78).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct PowerPointOutlineTextRef(u32);
+pub struct OutlineTextRef(u32);
 
-impl PowerPointOutlineTextRef {
+impl OutlineTextRef {
     /// A validated non-negative outline text reference index.
     pub fn new(index: i32) -> Result<Self> {
         u32::try_from(index)
@@ -194,8 +194,8 @@ impl PowerPointOutlineTextRef {
     }
 
     /// Parse a complete `OutlineTextRefAtom` record.
-    pub fn parse_record(record: &PptRecord) -> Result<Self> {
-        if record.record_type != PptRecordType::OutlineTextRefAtom
+    pub fn parse_record(record: &Record) -> Result<Self> {
+        if record.record_type != RecordType::OutlineTextRefAtom
             || record.record_type_raw != 0x0F9E
             || record.version != 0
             || record.data.len() != 4
@@ -214,9 +214,9 @@ impl PowerPointOutlineTextRef {
 mod tests {
     use super::*;
 
-    fn atom(data: &[u8]) -> PptRecord {
-        PptRecord {
-            record_type: PptRecordType::TextSpecialInfoDefaultAtom,
+    fn atom(data: &[u8]) -> Record {
+        Record {
+            record_type: RecordType::TextSpecialInfoDefaultAtom,
             record_type_raw: TEXT_SPECIAL_INFO_DEFAULT_TYPE,
             version: 0,
             instance: 0,
@@ -233,7 +233,7 @@ mod tests {
         data.extend_from_slice(&0x0002u16.to_le_bytes()); // clean
         data.extend_from_slice(&0x0409u16.to_le_bytes()); // en-US
         data.extend_from_slice(&0x0809u16.to_le_bytes()); // en-GB
-        let defaults = PowerPointTextSpecialInfoDefaults::parse_record(&atom(&data)).unwrap();
+        let defaults = TextSpecialInfoDefaults::parse_record(&atom(&data)).unwrap();
         assert!(defaults.spelling().unwrap().clean());
         assert!(!defaults.spelling().unwrap().error());
         assert_eq!(defaults.language(), Some(0x0409));
@@ -244,7 +244,7 @@ mod tests {
     #[test]
     fn parses_empty_and_language_only_defaults() {
         let data = 0u32.to_le_bytes();
-        let defaults = PowerPointTextSpecialInfoDefaults::parse_record(&atom(&data)).unwrap();
+        let defaults = TextSpecialInfoDefaults::parse_record(&atom(&data)).unwrap();
         assert_eq!(defaults.spelling(), None);
         assert_eq!(defaults.language(), None);
         assert_eq!(defaults.to_bytes().unwrap()[8..], data[..]);
@@ -252,7 +252,7 @@ mod tests {
         let mut data = Vec::new();
         data.extend_from_slice(&0x0002u32.to_le_bytes());
         data.extend_from_slice(&0x0002u16.to_le_bytes());
-        let defaults = PowerPointTextSpecialInfoDefaults::parse_record(&atom(&data)).unwrap();
+        let defaults = TextSpecialInfoDefaults::parse_record(&atom(&data)).unwrap();
         assert_eq!(defaults.spelling(), None);
         assert_eq!(defaults.language(), Some(0x0002));
         assert_eq!(defaults.to_bytes().unwrap()[8..], data[..]);
@@ -261,29 +261,29 @@ mod tests {
     #[test]
     fn rejects_malformed_defaults() {
         // Truncated mask.
-        assert!(PowerPointTextSpecialInfoDefaults::parse_record(&atom(&[1, 0])).is_err());
+        assert!(TextSpecialInfoDefaults::parse_record(&atom(&[1, 0])).is_err());
         // Forbidden mask bits (fBidi / smartTag / reserved).
         let mut data = Vec::new();
         data.extend_from_slice(&0x0042u32.to_le_bytes());
         data.extend_from_slice(&0u16.to_le_bytes());
         data.extend_from_slice(&0u16.to_le_bytes());
-        assert!(PowerPointTextSpecialInfoDefaults::parse_record(&atom(&data)).is_err());
+        assert!(TextSpecialInfoDefaults::parse_record(&atom(&data)).is_err());
         // Grammar flag set.
         let mut data = Vec::new();
         data.extend_from_slice(&0x0001u32.to_le_bytes());
         data.extend_from_slice(&0x0004u16.to_le_bytes());
-        assert!(PowerPointTextSpecialInfoDefaults::parse_record(&atom(&data)).is_err());
+        assert!(TextSpecialInfoDefaults::parse_record(&atom(&data)).is_err());
         // Mask count not consuming the payload.
         let mut data = Vec::new();
         data.extend_from_slice(&0x0002u32.to_le_bytes());
         data.extend_from_slice(&[0; 4]);
-        assert!(PowerPointTextSpecialInfoDefaults::parse_record(&atom(&data)).is_err());
+        assert!(TextSpecialInfoDefaults::parse_record(&atom(&data)).is_err());
     }
 
     #[test]
     fn outline_text_ref_validates_and_parses() {
-        let record = PptRecord {
-            record_type: PptRecordType::OutlineTextRefAtom,
+        let record = Record {
+            record_type: RecordType::OutlineTextRefAtom,
             record_type_raw: 0x0F9E,
             version: 0,
             instance: 0,
@@ -291,19 +291,14 @@ mod tests {
             data: 5i32.to_le_bytes().to_vec(),
             children: Vec::new(),
         };
-        assert_eq!(
-            PowerPointOutlineTextRef::parse_record(&record)
-                .unwrap()
-                .get(),
-            5
-        );
+        assert_eq!(OutlineTextRef::parse_record(&record).unwrap().get(), 5);
 
         let mut negative = record.clone();
         negative.data = (-1i32).to_le_bytes().to_vec();
-        assert!(PowerPointOutlineTextRef::parse_record(&negative).is_err());
+        assert!(OutlineTextRef::parse_record(&negative).is_err());
 
         let mut long = record.clone();
         long.data.extend_from_slice(&[0; 4]);
-        assert!(PowerPointOutlineTextRef::parse_record(&long).is_err());
+        assert!(OutlineTextRef::parse_record(&long).is_err());
     }
 }

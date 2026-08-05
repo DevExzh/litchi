@@ -4,7 +4,7 @@
 //! including all placeholder shapes and their properties.
 
 use super::escher::{ShapeFlags, record_type as escher_rt};
-use crate::PowerPointPlaceholderKind as PlaceholderKind;
+use crate::PlaceholderKind;
 
 // =============================================================================
 // PPT Record Types

@@ -23,9 +23,9 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use litchi_ppt::PptWriter;
+//! use litchi_ppt::Writer;
 //!
-//! let mut writer = PptWriter::new();
+//! let mut writer = Writer::new();
 //!
 //! // Add a slide
 //! let slide = writer.add_slide()?;
@@ -62,23 +62,20 @@ use super::shape_style::{
 #[allow(unused_imports)]
 use super::shapes::ShapeKind;
 use super::slide_timing::SlideTiming;
-use super::smart_tags::{PowerPointSmartTagDefinition, PowerPointSmartTagIndex};
-use super::spec::{BinaryTagData, ColorScheme, Ppt10Tag, SlideLayoutType, slide_flags};
+use super::smart_tags::{SmartTagDefinition, SmartTagIndex};
+use super::spec::{BinaryTagData, ColorScheme, SlideLayoutType, Tag10, slide_flags};
 use super::table::{PositionedTable, Table};
 use super::text_format::{FontEntity, Paragraph, TextAlign};
 use crate::animation::AnimationInfo;
 use crate::encryption::{
-    PptEncryptionProfile, WriterEncryptionMaterial, encrypt_pictures_for_write,
+    EncryptionProfile, WriterEncryptionMaterial, encrypt_pictures_for_write,
     encrypt_powerpoint_document_for_write, prepare_writer_encryption, validate_writer_password,
 };
 use crate::header_footer::{
-    PowerPointHeaderFooter, PowerPointHeaderFooterParent, PowerPointHeaderFooterParentOrdinal,
-    PowerPointHeaderFooterScope,
+    HeaderFooter, HeaderFooterParent, HeaderFooterParentOrdinal, HeaderFooterScope,
 };
-use crate::modify_password::{
-    PowerPointModifyPassword, validate_value as validate_modify_password,
-};
-use crate::view_info::{PowerPointSlideViewInfo, PowerPointViewKind};
+use crate::modify_password::{ModifyPassword, validate_value as validate_modify_password};
+use crate::view_info::{SlideViewInfo, ViewKind};
 use litchi_cfb::writer::OleWriter;
 use litchi_core::unit::pt_to_emu_i32;
 use std::collections::{BTreeMap, HashMap};
@@ -86,7 +83,7 @@ use zeroize::Zeroizing;
 
 /// Error type for PPT writing
 #[derive(Debug)]
-pub enum PptWriteError {
+pub enum WriteError {
     /// I/O error
     Io(std::io::Error),
     /// Invalid data
@@ -193,43 +190,43 @@ fn build_document_summary_information_stream() -> Vec<u8> {
     s
 }
 
-impl From<std::io::Error> for PptWriteError {
+impl From<std::io::Error> for WriteError {
     fn from(err: std::io::Error) -> Self {
-        PptWriteError::Io(err)
+        WriteError::Io(err)
     }
 }
 
-impl From<litchi_cfb::OleError> for PptWriteError {
+impl From<litchi_cfb::OleError> for WriteError {
     fn from(err: litchi_cfb::OleError) -> Self {
-        PptWriteError::Ole(err)
+        WriteError::Ole(err)
     }
 }
 
-impl From<litchi_vba::Error> for PptWriteError {
+impl From<litchi_vba::Error> for WriteError {
     fn from(err: litchi_vba::Error) -> Self {
-        PptWriteError::Vba(err)
+        WriteError::Vba(err)
     }
 }
 
-impl From<litchi_ograph::Error> for PptWriteError {
+impl From<litchi_ograph::Error> for WriteError {
     fn from(err: litchi_ograph::Error) -> Self {
         Self::Graph(err)
     }
 }
 
-impl std::fmt::Display for PptWriteError {
+impl std::fmt::Display for WriteError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PptWriteError::Io(e) => write!(f, "I/O error: {}", e),
-            PptWriteError::InvalidData(s) => write!(f, "Invalid data: {}", s),
-            PptWriteError::Ole(e) => write!(f, "OLE error: {}", e),
-            PptWriteError::Vba(e) => write!(f, "VBA project error: {}", e),
-            PptWriteError::Graph(e) => write!(f, "Office Graph error: {e}"),
+            WriteError::Io(e) => write!(f, "I/O error: {}", e),
+            WriteError::InvalidData(s) => write!(f, "Invalid data: {}", s),
+            WriteError::Ole(e) => write!(f, "OLE error: {}", e),
+            WriteError::Vba(e) => write!(f, "VBA project error: {}", e),
+            WriteError::Graph(e) => write!(f, "Office Graph error: {e}"),
         }
     }
 }
 
-impl std::error::Error for PptWriteError {
+impl std::error::Error for WriteError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Io(error) => Some(error),
@@ -338,7 +335,7 @@ pub struct ShapeProperties {
     /// Typed click and mouse-over actions attached to the shape.
     pub interactions: Vec<crate::Interaction>,
     /// Typed actions attached to UTF-16 ranges in the shape text.
-    pub text_interactions: Vec<crate::PowerPointTextInteraction>,
+    pub text_interactions: Vec<crate::TextInteraction>,
 }
 
 /// Represents a shape on a slide
@@ -436,7 +433,7 @@ struct WritableSlide {
     /// Per-slide timing (auto-advance, hidden, etc.)
     timing: Option<SlideTiming>,
     /// Optional header/footer override attached directly to this slide.
-    header_footer: Option<PowerPointHeaderFooter>,
+    header_footer: Option<HeaderFooter>,
 }
 
 struct SerializedHeaderFooters {
@@ -458,7 +455,7 @@ impl WritableSlide {
 fn build_writer_sound_collection(
     slides: &[WritableSlide],
     sound_resources: &BTreeMap<u32, crate::animation::SoundType>,
-) -> Result<(Vec<u8>, HashMap<u32, u32>), PptWriteError> {
+) -> Result<(Vec<u8>, HashMap<u32, u32>), WriteError> {
     let mut builder = super::sound_collection::SoundCollectionBuilder::new(
         super::sound_collection::SoundCollectionLimits::default(),
     );
@@ -531,30 +528,30 @@ fn build_writer_sound_collection(
     builder.build().map_err(sound_collection_error)
 }
 
-fn sound_collection_error(error: std::io::Error) -> PptWriteError {
-    PptWriteError::InvalidData(error.to_string())
+fn sound_collection_error(error: std::io::Error) -> WriteError {
+    WriteError::InvalidData(error.to_string())
 }
 
 fn append_child_to_built_container(
     container: &mut Vec<u8>,
     child: &[u8],
-) -> Result<(), PptWriteError> {
+) -> Result<(), WriteError> {
     if container.len() < 8 {
-        return Err(PptWriteError::InvalidData(
+        return Err(WriteError::InvalidData(
             "PPT container is missing its record header".to_string(),
         ));
     }
     let stored_len =
         u32::from_le_bytes([container[4], container[5], container[6], container[7]]) as usize;
     if stored_len != container.len() - 8 {
-        return Err(PptWriteError::InvalidData(
+        return Err(WriteError::InvalidData(
             "PPT container length does not match its payload".to_string(),
         ));
     }
     let new_len = stored_len
         .checked_add(child.len())
         .and_then(|len| u32::try_from(len).ok())
-        .ok_or_else(|| PptWriteError::InvalidData("PPT container is too large".to_string()))?;
+        .ok_or_else(|| WriteError::InvalidData("PPT container is too large".to_string()))?;
     container.extend_from_slice(child);
     container[4..8].copy_from_slice(&new_len.to_le_bytes());
     Ok(())
@@ -862,7 +859,7 @@ fn interaction_for_hyperlink(
     Some(interaction)
 }
 
-fn shape_text_unit_count(properties: &ShapeProperties) -> Result<u32, PptWriteError> {
+fn shape_text_unit_count(properties: &ShapeProperties) -> Result<u32, WriteError> {
     let units = if let Some(paragraphs) = &properties.paragraphs {
         let mut units = 0usize;
         for (index, paragraph) in paragraphs.iter().enumerate() {
@@ -870,16 +867,14 @@ fn shape_text_unit_count(properties: &ShapeProperties) -> Result<u32, PptWriteEr
                 units = units
                     .checked_add(run.text.encode_utf16().count())
                     .ok_or_else(|| {
-                        PptWriteError::InvalidData(
+                        WriteError::InvalidData(
                             "Shape text UTF-16 length overflows usize".to_string(),
                         )
                     })?;
             }
             if index + 1 < paragraphs.len() {
                 units = units.checked_add(1).ok_or_else(|| {
-                    PptWriteError::InvalidData(
-                        "Shape text UTF-16 length overflows usize".to_string(),
-                    )
+                    WriteError::InvalidData("Shape text UTF-16 length overflows usize".to_string())
                 })?;
             }
         }
@@ -887,13 +882,12 @@ fn shape_text_unit_count(properties: &ShapeProperties) -> Result<u32, PptWriteEr
     } else if let Some(text) = &properties.text {
         text.encode_utf16().count()
     } else {
-        return Err(PptWriteError::InvalidData(
+        return Err(WriteError::InvalidData(
             "Shape has no text for a text interaction".to_string(),
         ));
     };
-    u32::try_from(units).map_err(|_| {
-        PptWriteError::InvalidData("Shape text exceeds the PPT size limit".to_string())
-    })
+    u32::try_from(units)
+        .map_err(|_| WriteError::InvalidData("Shape text exceeds the PPT size limit".to_string()))
 }
 
 /// PPT file writer
@@ -904,7 +898,7 @@ fn shape_text_unit_count(properties: &ShapeProperties) -> Result<u32, PptWriteEr
 /// - Pictures/images
 /// - Hyperlinks
 /// - Speaker notes
-pub struct PptWriter {
+pub struct Writer {
     /// Slides in the presentation
     slides: Vec<WritableSlide>,
     /// Presentation properties
@@ -926,45 +920,45 @@ pub struct PptWriter {
     /// Custom slide shows (named shows)
     custom_shows: Vec<CustomShow>,
     /// Document-wide PowerPoint 11 smart-tag property bags.
-    smart_tags: Vec<PowerPointSmartTagDefinition>,
+    smart_tags: Vec<SmartTagDefinition>,
     /// Optional typed override for the slide editing view.
-    slide_view_info: Option<PowerPointSlideViewInfo>,
+    slide_view_info: Option<SlideViewInfo>,
     /// Optional typed notes editing view.
-    notes_view_info: Option<PowerPointSlideViewInfo>,
+    notes_view_info: Option<SlideViewInfo>,
     /// Presentation-wide defaults for ordinary slides.
-    presentation_header_footer: Option<PowerPointHeaderFooter>,
+    presentation_header_footer: Option<HeaderFooter>,
     /// Presentation-wide defaults for notes pages and handouts.
-    notes_and_handouts_header_footer: Option<PowerPointHeaderFooter>,
+    notes_and_handouts_header_footer: Option<HeaderFooter>,
     /// Header/footer defaults attached directly to the main master.
-    main_master_header_footer: Option<PowerPointHeaderFooter>,
+    main_master_header_footer: Option<HeaderFooter>,
     /// Password-to-open settings, including a password wiped on replacement or drop.
-    encryption: Option<PptWriterEncryption>,
+    encryption: Option<WriterEncryption>,
     /// Inert modify password, wiped on replacement, clear, or drop.
-    modify_password: Option<PptWriterModifyPassword>,
+    modify_password: Option<WriterModifyPassword>,
     /// Standalone CFB project wrapped for a persisted `VbaProjectStg`.
     vba_project: Option<crate::embedded::storage::Storage>,
 }
 
-struct PptWriterEncryption {
-    profile: PptEncryptionProfile,
+struct WriterEncryption {
+    profile: EncryptionProfile,
     password: Zeroizing<String>,
 }
 
-struct PptWriterModifyPassword {
+struct WriterModifyPassword {
     password: Zeroizing<String>,
 }
 
-impl std::fmt::Debug for PptWriterModifyPassword {
+impl std::fmt::Debug for WriterModifyPassword {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
-            .debug_struct("PptWriterModifyPassword")
+            .debug_struct("WriterModifyPassword")
             .field("utf16_units", &self.password.encode_utf16().count())
             .field("password", &"[REDACTED]")
             .finish()
     }
 }
 
-impl PptWriter {
+impl Writer {
     /// Create a new PPT writer with standard 4:3 slide dimensions
     pub fn new() -> Self {
         Self::with_dimensions(9144000, 6858000) // 10" x 7.5" in EMUs
@@ -1011,11 +1005,11 @@ impl PptWriter {
     pub fn set_password(
         &mut self,
         password: impl Into<String>,
-        profile: PptEncryptionProfile,
-    ) -> Result<(), PptWriteError> {
+        profile: EncryptionProfile,
+    ) -> Result<(), WriteError> {
         let password = Zeroizing::new(password.into());
-        validate_writer_password(profile, password.as_str()).map_err(PptWriteError::InvalidData)?;
-        self.encryption = Some(PptWriterEncryption { profile, password });
+        validate_writer_password(profile, password.as_str()).map_err(WriteError::InvalidData)?;
+        self.encryption = Some(WriterEncryption { profile, password });
         Ok(())
     }
 
@@ -1025,16 +1019,16 @@ impl PptWriter {
     }
 
     /// Return the configured encryption profile without exposing the password.
-    pub fn encryption_profile(&self) -> Option<PptEncryptionProfile> {
+    pub fn encryption_profile(&self) -> Option<EncryptionProfile> {
         self.encryption.as_ref().map(|value| value.profile)
     }
 
     /// Configure a complete inert VBA project with safe limits and zlib storage.
-    pub fn set_vba(&mut self, project: litchi_vba::build::Project) -> Result<(), PptWriteError> {
+    pub fn set_vba(&mut self, project: litchi_vba::build::Project) -> Result<(), WriteError> {
         self.set_vba_with(
             project,
             &litchi_vba::Limits::default(),
-            crate::PowerPointVbaProjectCompression::Zlib,
+            crate::VbaProjectCompression::Zlib,
         )
     }
 
@@ -1046,15 +1040,15 @@ impl PptWriter {
         &mut self,
         project: litchi_vba::build::Project,
         limits: &litchi_vba::Limits,
-        compression: crate::PowerPointVbaProjectCompression,
-    ) -> Result<(), PptWriteError> {
+        compression: crate::VbaProjectCompression,
+    ) -> Result<(), WriteError> {
         let payload = project.finish(limits)?;
         self.put_vba_with(payload, compression)
     }
 
     /// Configure an already validated inert VBA project using zlib storage.
-    pub fn put_vba(&mut self, payload: litchi_vba::Payload) -> Result<(), PptWriteError> {
-        self.put_vba_with(payload, crate::PowerPointVbaProjectCompression::Zlib)
+    pub fn put_vba(&mut self, payload: litchi_vba::Payload) -> Result<(), WriteError> {
+        self.put_vba_with(payload, crate::VbaProjectCompression::Zlib)
     }
 
     /// Configure an already validated inert VBA project with explicit storage.
@@ -1063,22 +1057,22 @@ impl PptWriter {
     pub fn put_vba_with(
         &mut self,
         payload: litchi_vba::Payload,
-        compression: crate::PowerPointVbaProjectCompression,
-    ) -> Result<(), PptWriteError> {
+        compression: crate::VbaProjectCompression,
+    ) -> Result<(), WriteError> {
         use std::io::Write;
 
         let cfb = payload.into_bytes();
         let storage = match compression {
-            crate::PowerPointVbaProjectCompression::Uncompressed => {
+            crate::VbaProjectCompression::Uncompressed => {
                 crate::embedded::storage::Storage::uncompressed(
                     crate::embedded::storage::Kind::VbaProject,
                     cfb,
                 )
-                .map_err(|error| PptWriteError::InvalidData(error.to_string()))?
+                .map_err(|error| WriteError::InvalidData(error.to_string()))?
             },
-            crate::PowerPointVbaProjectCompression::Zlib => {
+            crate::VbaProjectCompression::Zlib => {
                 let uncompressed_len = u32::try_from(cfb.len()).map_err(|_| {
-                    PptWriteError::InvalidData(
+                    WriteError::InvalidData(
                         "PowerPoint VBA project CFB exceeds the 32-bit size limit".to_string(),
                     )
                 })?;
@@ -1091,12 +1085,12 @@ impl PptWriter {
                     uncompressed_len,
                     data,
                 )
-                .map_err(|error| PptWriteError::InvalidData(error.to_string()))?
+                .map_err(|error| WriteError::InvalidData(error.to_string()))?
             },
         };
         storage
             .to_record_bytes()
-            .map_err(|error| PptWriteError::InvalidData(error.to_string()))?;
+            .map_err(|error| WriteError::InvalidData(error.to_string()))?;
         self.vba_project = Some(storage);
         Ok(())
     }
@@ -1116,14 +1110,11 @@ impl PptWriter {
     /// The secret is stored in zeroizing memory. Password-to-open encryption
     /// must also be configured before the presentation can be written.
     /// Validation is atomic and does not replace an existing valid value.
-    pub fn set_modify_password(
-        &mut self,
-        password: impl Into<String>,
-    ) -> Result<(), PptWriteError> {
+    pub fn set_modify_password(&mut self, password: impl Into<String>) -> Result<(), WriteError> {
         let password = Zeroizing::new(password.into());
         validate_modify_password(password.as_str())
-            .map_err(|error| PptWriteError::InvalidData(error.to_string()))?;
-        self.modify_password = Some(PptWriterModifyPassword { password });
+            .map_err(|error| WriteError::InvalidData(error.to_string()))?;
+        self.modify_password = Some(WriterModifyPassword { password });
         Ok(())
     }
 
@@ -1138,14 +1129,14 @@ impl PptWriter {
     /// [`super::text_format::TextRun::with_smart_tag`].
     pub fn add_smart_tag(
         &mut self,
-        definition: PowerPointSmartTagDefinition,
-    ) -> Result<PowerPointSmartTagIndex, PptWriteError> {
+        definition: SmartTagDefinition,
+    ) -> Result<SmartTagIndex, WriteError> {
         super::smart_tags::validate_definition(&definition)?;
         let index = u32::try_from(self.smart_tags.len()).map_err(|_| {
-            PptWriteError::InvalidData("PowerPoint smart-tag count exceeds u32".to_string())
+            WriteError::InvalidData("PowerPoint smart-tag count exceeds u32".to_string())
         })?;
         self.smart_tags.push(definition);
-        Ok(PowerPointSmartTagIndex::new(index))
+        Ok(SmartTagIndex::new(index))
     }
 
     /// Return the number of document-wide smart tags.
@@ -1154,34 +1145,34 @@ impl PptWriter {
     }
 
     /// Return the configured value through the redacted typed password model.
-    pub fn modify_password(&self) -> Option<PowerPointModifyPassword> {
+    pub fn modify_password(&self) -> Option<ModifyPassword> {
         self.modify_password.as_ref().map(|value| {
-            PowerPointModifyPassword::new(value.password.as_str())
+            ModifyPassword::new(value.password.as_str())
                 .expect("stored modify password was validated before assignment")
         })
     }
 
-    fn validate_encryption(&self) -> Result<(), PptWriteError> {
+    fn validate_encryption(&self) -> Result<(), WriteError> {
         if self.modify_password.is_some() && self.encryption.is_none() {
-            return Err(PptWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "PowerPoint modify-password output requires password-to-open encryption"
                     .to_string(),
             ));
         }
         if let Some(value) = &self.encryption {
             validate_writer_password(value.profile, value.password.as_str())
-                .map_err(PptWriteError::InvalidData)?;
+                .map_err(WriteError::InvalidData)?;
         }
         if let Some(value) = &self.modify_password {
             validate_modify_password(value.password.as_str())
-                .map_err(|error| PptWriteError::InvalidData(error.to_string()))?;
+                .map_err(|error| WriteError::InvalidData(error.to_string()))?;
         }
         Ok(())
     }
 
-    fn validate_smart_tag_references(&self) -> Result<(), PptWriteError> {
+    fn validate_smart_tag_references(&self) -> Result<(), WriteError> {
         let smart_tag_count = u32::try_from(self.smart_tags.len()).map_err(|_| {
-            PptWriteError::InvalidData("PowerPoint smart-tag count exceeds u32".to_string())
+            WriteError::InvalidData("PowerPoint smart-tag count exceeds u32".to_string())
         })?;
         for run in self
             .slides
@@ -1193,13 +1184,13 @@ impl PptWriter {
             .filter(|run| !run.smart_tag_indices.is_empty())
         {
             if run.text.is_empty() {
-                return Err(PptWriteError::InvalidData(
+                return Err(WriteError::InvalidData(
                     "PowerPoint smart tags cannot be attached to an empty text run".to_string(),
                 ));
             }
             for index in &run.smart_tag_indices {
                 if index.as_u32() >= smart_tag_count {
-                    return Err(PptWriteError::InvalidData(format!(
+                    return Err(WriteError::InvalidData(format!(
                         "PowerPoint text run references missing smart tag {}",
                         index.as_u32()
                     )));
@@ -1209,12 +1200,12 @@ impl PptWriter {
         Ok(())
     }
 
-    fn build_modify_password_programmable_tag(&self) -> Result<Option<Vec<u8>>, PptWriteError> {
+    fn build_modify_password_programmable_tag(&self) -> Result<Option<Vec<u8>>, WriteError> {
         let Some(value) = &self.modify_password else {
             return Ok(None);
         };
         validate_modify_password(value.password.as_str())
-            .map_err(|error| PptWriteError::InvalidData(error.to_string()))?;
+            .map_err(|error| WriteError::InvalidData(error.to_string()))?;
 
         let mut atom = RecordBuilder::new(0x00, 3, record_type::CSTRING);
         let atom_data = value
@@ -1227,7 +1218,7 @@ impl PptWriter {
         blob.write_child(&atom.build()?);
         let mut binary_tag = RecordBuilder::new(0x0f, 0, record_type::PROG_BINARY_TAG);
         let mut name = RecordBuilder::new(0x00, 0, record_type::CSTRING);
-        name.write_data(&Ppt10Tag::to_bytes());
+        name.write_data(&Tag10::to_bytes());
         binary_tag.write_child(&name.build()?);
         binary_tag.write_child(&blob.build()?);
         let mut tags = RecordBuilder::new(0x0f, 0, record_type::PROG_TAGS);
@@ -1235,20 +1226,20 @@ impl PptWriter {
         Ok(Some(tags.build()?))
     }
 
-    fn prepare_encryption(&self) -> Result<Option<WriterEncryptionMaterial>, PptWriteError> {
+    fn prepare_encryption(&self) -> Result<Option<WriterEncryptionMaterial>, WriteError> {
         self.encryption
             .as_ref()
             .map(|value| prepare_writer_encryption(value.profile, value.password.as_str()))
             .transpose()
-            .map_err(PptWriteError::InvalidData)
+            .map_err(WriteError::InvalidData)
     }
 
     /// Add a new blank slide
     ///
     /// # Returns
     ///
-    /// * `Result<usize, PptWriteError>` - Slide index or error
-    pub fn add_slide(&mut self) -> Result<usize, PptWriteError> {
+    /// * `Result<usize, WriteError>` - Slide index or error
+    pub fn add_slide(&mut self) -> Result<usize, WriteError> {
         let index = self.slides.len();
         self.slides.push(WritableSlide {
             shapes: Vec::new(),
@@ -1268,9 +1259,9 @@ impl PptWriter {
     /// # Arguments
     ///
     /// * `index` - Slide index (0-based)
-    pub fn delete_slide(&mut self, index: usize) -> Result<(), PptWriteError> {
+    pub fn delete_slide(&mut self, index: usize) -> Result<(), WriteError> {
         if index >= self.slides.len() {
-            return Err(PptWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "Slide {} does not exist",
                 index
             )));
@@ -1286,11 +1277,9 @@ impl PptWriter {
     ///
     /// * `from_index` - Current slide index
     /// * `to_index` - New slide index
-    pub fn move_slide(&mut self, from_index: usize, to_index: usize) -> Result<(), PptWriteError> {
+    pub fn move_slide(&mut self, from_index: usize, to_index: usize) -> Result<(), WriteError> {
         if from_index >= self.slides.len() || to_index >= self.slides.len() {
-            return Err(PptWriteError::InvalidData(
-                "Invalid slide index".to_string(),
-            ));
+            return Err(WriteError::InvalidData("Invalid slide index".to_string()));
         }
 
         let slide = self.slides.remove(from_index);
@@ -1300,52 +1289,52 @@ impl PptWriter {
     }
 
     fn validated_header_footer(
-        mut value: PowerPointHeaderFooter,
-        scope: PowerPointHeaderFooterScope,
-    ) -> Result<PowerPointHeaderFooter, PptWriteError> {
+        mut value: HeaderFooter,
+        scope: HeaderFooterScope,
+    ) -> Result<HeaderFooter, WriteError> {
         value.scope = scope;
         value
             .to_record_bytes()
-            .map_err(|error| PptWriteError::InvalidData(error.to_string()))?;
+            .map_err(|error| WriteError::InvalidData(error.to_string()))?;
         Ok(value)
     }
 
     fn reindex_slide_header_footers(&mut self) {
         for (index, slide) in self.slides.iter_mut().enumerate() {
             if let Some(value) = &mut slide.header_footer {
-                value.scope = PowerPointHeaderFooterScope::Local {
-                    parent: PowerPointHeaderFooterParent::Slide,
-                    parent_ordinal: PowerPointHeaderFooterParentOrdinal::new(index),
+                value.scope = HeaderFooterScope::Local {
+                    parent: HeaderFooterParent::Slide,
+                    parent_ordinal: HeaderFooterParentOrdinal::new(index),
                 };
             }
         }
     }
 
-    fn serialize_header_footers(&self) -> Result<SerializedHeaderFooters, PptWriteError> {
-        let serialize = |value: Option<&PowerPointHeaderFooter>, scope| {
+    fn serialize_header_footers(&self) -> Result<SerializedHeaderFooters, WriteError> {
+        let serialize = |value: Option<&HeaderFooter>, scope| {
             value
                 .map(|value| {
                     let mut value = value.clone();
                     value.scope = scope;
                     value
                         .to_record_bytes()
-                        .map_err(|error| PptWriteError::InvalidData(error.to_string()))
+                        .map_err(|error| WriteError::InvalidData(error.to_string()))
                 })
                 .transpose()
         };
         let presentation_slides = serialize(
             self.presentation_header_footer.as_ref(),
-            PowerPointHeaderFooterScope::PresentationSlides,
+            HeaderFooterScope::PresentationSlides,
         )?;
         let notes_and_handouts = serialize(
             self.notes_and_handouts_header_footer.as_ref(),
-            PowerPointHeaderFooterScope::NotesAndHandouts,
+            HeaderFooterScope::NotesAndHandouts,
         )?;
         let main_master = serialize(
             self.main_master_header_footer.as_ref(),
-            PowerPointHeaderFooterScope::Local {
-                parent: PowerPointHeaderFooterParent::MainMaster,
-                parent_ordinal: PowerPointHeaderFooterParentOrdinal::new(0),
+            HeaderFooterScope::Local {
+                parent: HeaderFooterParent::MainMaster,
+                parent_ordinal: HeaderFooterParentOrdinal::new(0),
             },
         )?;
         let slides = self
@@ -1355,9 +1344,9 @@ impl PptWriter {
             .map(|(index, slide)| {
                 serialize(
                     slide.header_footer.as_ref(),
-                    PowerPointHeaderFooterScope::Local {
-                        parent: PowerPointHeaderFooterParent::Slide,
-                        parent_ordinal: PowerPointHeaderFooterParentOrdinal::new(index),
+                    HeaderFooterScope::Local {
+                        parent: HeaderFooterParent::Slide,
+                        parent_ordinal: HeaderFooterParentOrdinal::new(index),
                     },
                 )
             })
@@ -1373,10 +1362,9 @@ impl PptWriter {
     /// Set presentation-wide header/footer defaults for ordinary slides.
     pub fn set_presentation_header_footer(
         &mut self,
-        value: PowerPointHeaderFooter,
-    ) -> Result<(), PptWriteError> {
-        let value =
-            Self::validated_header_footer(value, PowerPointHeaderFooterScope::PresentationSlides)?;
+        value: HeaderFooter,
+    ) -> Result<(), WriteError> {
+        let value = Self::validated_header_footer(value, HeaderFooterScope::PresentationSlides)?;
         self.presentation_header_footer = Some(value);
         Ok(())
     }
@@ -1387,17 +1375,16 @@ impl PptWriter {
     }
 
     /// Return presentation-wide header/footer defaults for ordinary slides.
-    pub fn presentation_header_footer(&self) -> Option<&PowerPointHeaderFooter> {
+    pub fn presentation_header_footer(&self) -> Option<&HeaderFooter> {
         self.presentation_header_footer.as_ref()
     }
 
     /// Set presentation-wide header/footer defaults for notes pages and handouts.
     pub fn set_notes_and_handouts_header_footer(
         &mut self,
-        value: PowerPointHeaderFooter,
-    ) -> Result<(), PptWriteError> {
-        let value =
-            Self::validated_header_footer(value, PowerPointHeaderFooterScope::NotesAndHandouts)?;
+        value: HeaderFooter,
+    ) -> Result<(), WriteError> {
+        let value = Self::validated_header_footer(value, HeaderFooterScope::NotesAndHandouts)?;
         self.notes_and_handouts_header_footer = Some(value);
         Ok(())
     }
@@ -1408,20 +1395,17 @@ impl PptWriter {
     }
 
     /// Return presentation-wide header/footer defaults for notes pages and handouts.
-    pub fn notes_and_handouts_header_footer(&self) -> Option<&PowerPointHeaderFooter> {
+    pub fn notes_and_handouts_header_footer(&self) -> Option<&HeaderFooter> {
         self.notes_and_handouts_header_footer.as_ref()
     }
 
     /// Set the header/footer defaults attached directly to the main master.
-    pub fn set_main_master_header_footer(
-        &mut self,
-        value: PowerPointHeaderFooter,
-    ) -> Result<(), PptWriteError> {
+    pub fn set_main_master_header_footer(&mut self, value: HeaderFooter) -> Result<(), WriteError> {
         let value = Self::validated_header_footer(
             value,
-            PowerPointHeaderFooterScope::Local {
-                parent: PowerPointHeaderFooterParent::MainMaster,
-                parent_ordinal: PowerPointHeaderFooterParentOrdinal::new(0),
+            HeaderFooterScope::Local {
+                parent: HeaderFooterParent::MainMaster,
+                parent_ordinal: HeaderFooterParentOrdinal::new(0),
             },
         )?;
         self.main_master_header_footer = Some(value);
@@ -1434,7 +1418,7 @@ impl PptWriter {
     }
 
     /// Return the header/footer defaults attached directly to the main master.
-    pub fn main_master_header_footer(&self) -> Option<&PowerPointHeaderFooter> {
+    pub fn main_master_header_footer(&self) -> Option<&HeaderFooter> {
         self.main_master_header_footer.as_ref()
     }
 
@@ -1442,19 +1426,19 @@ impl PptWriter {
     pub fn set_slide_header_footer(
         &mut self,
         slide: usize,
-        value: PowerPointHeaderFooter,
-    ) -> Result<(), PptWriteError> {
+        value: HeaderFooter,
+    ) -> Result<(), WriteError> {
         if slide >= self.slides.len() {
-            return Err(PptWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "Slide {} does not exist",
                 slide
             )));
         }
         let value = Self::validated_header_footer(
             value,
-            PowerPointHeaderFooterScope::Local {
-                parent: PowerPointHeaderFooterParent::Slide,
-                parent_ordinal: PowerPointHeaderFooterParentOrdinal::new(slide),
+            HeaderFooterScope::Local {
+                parent: HeaderFooterParent::Slide,
+                parent_ordinal: HeaderFooterParentOrdinal::new(slide),
             },
         )?;
         self.slides[slide].header_footer = Some(value);
@@ -1462,24 +1446,21 @@ impl PptWriter {
     }
 
     /// Remove a header/footer override attached directly to one slide.
-    pub fn clear_slide_header_footer(&mut self, slide: usize) -> Result<(), PptWriteError> {
+    pub fn clear_slide_header_footer(&mut self, slide: usize) -> Result<(), WriteError> {
         let slide = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
         slide.header_footer = None;
         Ok(())
     }
 
     /// Return the header/footer override attached directly to one slide.
-    pub fn slide_header_footer(
-        &self,
-        slide: usize,
-    ) -> Result<Option<&PowerPointHeaderFooter>, PptWriteError> {
+    pub fn slide_header_footer(&self, slide: usize) -> Result<Option<&HeaderFooter>, WriteError> {
         self.slides
             .get(slide)
             .map(|slide| slide.header_footer.as_ref())
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))
     }
 
     /// Add a text box to a slide
@@ -1500,11 +1481,11 @@ impl PptWriter {
         width: i32,
         height: i32,
         text: &str,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
 
         let shape = WritableShape {
             properties: ShapeProperties {
@@ -1542,11 +1523,11 @@ impl PptWriter {
         width: i32,
         height: i32,
         paragraphs: Vec<Paragraph>,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
 
         let shape = WritableShape {
             properties: ShapeProperties {
@@ -1584,7 +1565,7 @@ impl PptWriter {
         y: i32,
         width: i32,
         height: i32,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         self.add_shape(slide, ShapeType::Rectangle, x, y, width, height)
     }
 
@@ -1596,7 +1577,7 @@ impl PptWriter {
         y: i32,
         width: i32,
         height: i32,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         self.add_shape(slide, ShapeType::Ellipse, x, y, width, height)
     }
 
@@ -1613,7 +1594,7 @@ impl PptWriter {
         width: i32,
         height: i32,
         geometry: FreeformGeometry,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         self.add_styled_freeform(slide, x, y, width, height, geometry, ShapeStyle::default())
     }
 
@@ -1628,12 +1609,12 @@ impl PptWriter {
         height: i32,
         geometry: FreeformGeometry,
         style: ShapeStyle,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         geometry.validate()?;
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
 
         slide_data.shapes.push(WritableShape {
             properties: ShapeProperties {
@@ -1667,11 +1648,11 @@ impl PptWriter {
         y1: i32,
         x2: i32,
         y2: i32,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
 
         let x = x1.min(x2);
         let y = y1.min(y2);
@@ -1712,11 +1693,11 @@ impl PptWriter {
         y1: i32,
         x2: i32,
         y2: i32,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
 
         let x = x1.min(x2);
         let y = y1.min(y2);
@@ -1755,11 +1736,11 @@ impl PptWriter {
         y: i32,
         width: i32,
         height: i32,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
 
         let shape = WritableShape {
             properties: ShapeProperties {
@@ -1796,16 +1777,16 @@ impl PptWriter {
         width: i32,
         height: i32,
         style: ShapeStyle,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         if shape_type == ShapeType::Freeform {
-            return Err(PptWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "freeform shapes require explicit geometry; use add_styled_freeform".to_string(),
             ));
         }
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
 
         let shape = WritableShape {
             properties: ShapeProperties {
@@ -1843,11 +1824,11 @@ impl PptWriter {
         x: i32,
         y: i32,
         table: Table,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
 
         slide_data.tables.push(PositionedTable {
             x: pt_to_emu_i32(x),
@@ -1861,9 +1842,9 @@ impl PptWriter {
     ///
     /// No presentation state is changed. A structurally valid request returns
     /// [`litchi_ograph::Error::UnsupportedAuthoring`] through
-    /// [`PptWriteError::Graph`] until the complete Office-compatible BIFF chart
+    /// [`WriteError::Graph`] until the complete Office-compatible BIFF chart
     /// grammar is implemented. Invalid chart definitions, frames, or slide
-    /// indexes continue to return [`PptWriteError::InvalidData`].
+    /// indexes continue to return [`WriteError::InvalidData`].
     ///
     /// # Arguments
     ///
@@ -1879,9 +1860,9 @@ impl PptWriter {
         width: i32,
         height: i32,
         chart: Chart,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         if width <= 0 || height <= 0 {
-            return Err(PptWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "chart frame dimensions must be positive".to_string(),
             ));
         }
@@ -1890,22 +1871,22 @@ impl PptWriter {
         let width = pt_to_emu_i32(width);
         let height = pt_to_emu_i32(height);
         x.checked_add(width).ok_or_else(|| {
-            PptWriteError::InvalidData("chart frame horizontal extent is too large".to_string())
+            WriteError::InvalidData("chart frame horizontal extent is too large".to_string())
         })?;
         y.checked_add(height).ok_or_else(|| {
-            PptWriteError::InvalidData("chart frame vertical extent is too large".to_string())
+            WriteError::InvalidData("chart frame vertical extent is too large".to_string())
         })?;
         chart.validate()?;
         let total: usize = self.slides.iter().map(|slide| slide.charts.len()).sum();
         if total >= super::chart::MAX_CHART_OBJECTS {
-            return Err(PptWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "presentation exceeds {} chart objects",
                 super::chart::MAX_CHART_OBJECTS
             )));
         }
         self.slides
             .get(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
         Err(litchi_ograph::Error::UnsupportedAuthoring {
             reason: "PPT chart creation requires the complete Office-compatible BIFF chart grammar",
         }
@@ -1919,10 +1900,10 @@ impl PptWriter {
     fn plan_charts(
         &self,
         persist_builder: &mut PersistPtrBuilder,
-    ) -> Result<Vec<ChartPlan>, PptWriteError> {
+    ) -> Result<Vec<ChartPlan>, WriteError> {
         let total: usize = self.slides.iter().map(|slide| slide.charts.len()).sum();
         if total > super::chart::MAX_CHART_OBJECTS {
-            return Err(PptWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "presentation exceeds {} chart objects",
                 super::chart::MAX_CHART_OBJECTS
             )));
@@ -1932,7 +1913,7 @@ impl PptWriter {
         for (slide_index, slide) in self.slides.iter().enumerate() {
             for chart_index in 0..slide.charts.len() {
                 next_id = next_id.checked_add(1).ok_or_else(|| {
-                    PptWriteError::InvalidData("external-object ID space exhausted".to_string())
+                    WriteError::InvalidData("external-object ID space exhausted".to_string())
                 })?;
                 plans.push(ChartPlan {
                     slide: slide_index,
@@ -1961,9 +1942,9 @@ impl PptWriter {
         width: i32,
         height: i32,
         image_data: Vec<u8>,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         if slide >= self.slides.len() {
-            return Err(PptWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "Slide {} does not exist",
                 slide
             )));
@@ -1974,7 +1955,7 @@ impl PptWriter {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
 
         let shape = WritableShape {
             properties: ShapeProperties {
@@ -2005,9 +1986,9 @@ impl PptWriter {
         height: i32,
         image_data: Vec<u8>,
         kind: PictureKind,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         if slide >= self.slides.len() {
-            return Err(PptWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "Slide {} does not exist",
                 slide
             )));
@@ -2017,7 +1998,7 @@ impl PptWriter {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
 
         let shape = WritableShape {
             properties: ShapeProperties {
@@ -2041,8 +2022,8 @@ impl PptWriter {
     ///
     /// Use the returned index with [`FillStyle::picture`] to create a picture
     /// or texture fill without adding a picture-frame shape.
-    pub fn add_picture_data(&mut self, image_data: Vec<u8>) -> Result<PictureId, PptWriteError> {
-        self.blip_store.add(image_data).map_err(PptWriteError::Io)
+    pub fn add_picture_data(&mut self, image_data: Vec<u8>) -> Result<PictureId, WriteError> {
+        self.blip_store.add(image_data).map_err(WriteError::Io)
     }
 
     /// Register explicitly typed picture data and return its checked ID.
@@ -2050,10 +2031,10 @@ impl PptWriter {
         &mut self,
         image_data: Vec<u8>,
         kind: PictureKind,
-    ) -> Result<PictureId, PptWriteError> {
+    ) -> Result<PictureId, WriteError> {
         self.blip_store
             .add_as(image_data, kind)
-            .map_err(PptWriteError::Io)
+            .map_err(WriteError::Io)
     }
 
     /// Add a hyperlink and return its ID
@@ -2069,10 +2050,10 @@ impl PptWriter {
         &mut self,
         slide: usize,
         hyperlink_id: u32,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         let interaction =
             interaction_for_hyperlink(hyperlink_id, &self.hyperlinks).ok_or_else(|| {
-                PptWriteError::InvalidData(format!("Hyperlink {hyperlink_id} does not exist"))
+                WriteError::InvalidData(format!("Hyperlink {hyperlink_id} does not exist"))
             })?;
         self.set_last_shape_interaction(slide, interaction)
     }
@@ -2085,7 +2066,7 @@ impl PptWriter {
         &mut self,
         slide: usize,
         interaction: crate::Interaction,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         self.set_last_shape_interaction_with_limits(
             slide,
             interaction,
@@ -2099,13 +2080,13 @@ impl PptWriter {
         slide: usize,
         interaction: crate::Interaction,
         limits: crate::InteractionLimits,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         interaction
             .validate_with_limits(limits)
-            .map_err(|error| PptWriteError::InvalidData(error.to_string()))?;
+            .map_err(|error| WriteError::InvalidData(error.to_string()))?;
         if interaction.hyperlink_id != 0 && self.hyperlinks.get(interaction.hyperlink_id).is_none()
         {
-            return Err(PptWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "Hyperlink {} does not exist",
                 interaction.hyperlink_id
             )));
@@ -2113,7 +2094,7 @@ impl PptWriter {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
 
         if let Some(shape) = slide_data.shapes.last_mut() {
             shape.properties.hyperlink_id = None;
@@ -2135,7 +2116,7 @@ impl PptWriter {
             }
             Ok(())
         } else {
-            Err(PptWriteError::InvalidData("No shapes on slide".to_string()))
+            Err(WriteError::InvalidData("No shapes on slide".to_string()))
         }
     }
 
@@ -2144,15 +2125,15 @@ impl PptWriter {
         &mut self,
         slide: usize,
         trigger: crate::InteractionTrigger,
-    ) -> Result<bool, PptWriteError> {
+    ) -> Result<bool, WriteError> {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
         let shape = slide_data
             .shapes
             .last_mut()
-            .ok_or_else(|| PptWriteError::InvalidData("No shapes on slide".to_string()))?;
+            .ok_or_else(|| WriteError::InvalidData("No shapes on slide".to_string()))?;
         if trigger == crate::InteractionTrigger::Click {
             shape.properties.hyperlink_id = None;
         }
@@ -2168,17 +2149,17 @@ impl PptWriter {
     pub fn set_last_shape_text_hyperlink(
         &mut self,
         slide: usize,
-        range: crate::PowerPointTextRange,
+        range: crate::TextRange,
         hyperlink_id: u32,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         let interaction =
             interaction_for_hyperlink(hyperlink_id, &self.hyperlinks).ok_or_else(|| {
-                PptWriteError::InvalidData(format!("Hyperlink {hyperlink_id} does not exist"))
+                WriteError::InvalidData(format!("Hyperlink {hyperlink_id} does not exist"))
             })?;
         self.set_last_shape_text_interaction(
             slide,
-            crate::PowerPointTextInteraction::new(range, interaction)
-                .map_err(|error| PptWriteError::InvalidData(error.to_string()))?,
+            crate::TextInteraction::new(range, interaction)
+                .map_err(|error| WriteError::InvalidData(error.to_string()))?,
         )
     }
 
@@ -2188,12 +2169,12 @@ impl PptWriter {
     pub fn set_last_shape_text_interaction(
         &mut self,
         slide: usize,
-        interaction: crate::PowerPointTextInteraction,
-    ) -> Result<(), PptWriteError> {
+        interaction: crate::TextInteraction,
+    ) -> Result<(), WriteError> {
         self.set_last_shape_text_interaction_with_limits(
             slide,
             interaction,
-            crate::PowerPointTextInteractionLimits::default(),
+            crate::TextInteractionLimits::default(),
         )
     }
 
@@ -2201,16 +2182,16 @@ impl PptWriter {
     pub fn set_last_shape_text_interaction_with_limits(
         &mut self,
         slide: usize,
-        interaction: crate::PowerPointTextInteraction,
-        limits: crate::PowerPointTextInteractionLimits,
-    ) -> Result<(), PptWriteError> {
+        interaction: crate::TextInteraction,
+        limits: crate::TextInteractionLimits,
+    ) -> Result<(), WriteError> {
         if interaction.interaction.hyperlink_id != 0
             && self
                 .hyperlinks
                 .get(interaction.interaction.hyperlink_id)
                 .is_none()
         {
-            return Err(PptWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "Hyperlink {} does not exist",
                 interaction.interaction.hyperlink_id
             )));
@@ -2218,15 +2199,15 @@ impl PptWriter {
         let slide_data = self
             .slides
             .get(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
         let shape = slide_data
             .shapes
             .last()
-            .ok_or_else(|| PptWriteError::InvalidData("No shapes on slide".to_string()))?;
+            .ok_or_else(|| WriteError::InvalidData("No shapes on slide".to_string()))?;
         let text_units = shape_text_unit_count(&shape.properties)?;
         interaction
             .validate_for_text(text_units, limits)
-            .map_err(|error| PptWriteError::InvalidData(error.to_string()))?;
+            .map_err(|error| WriteError::InvalidData(error.to_string()))?;
         let replace_index = shape
             .properties
             .text_interactions
@@ -2241,10 +2222,10 @@ impl PptWriter {
             .len()
             .checked_add(usize::from(replace_index.is_none()))
             .ok_or_else(|| {
-                PptWriteError::InvalidData("Shape text interaction count overflows".to_string())
+                WriteError::InvalidData("Shape text interaction count overflows".to_string())
             })?;
         if prospective_len > limits.max_interactions {
-            return Err(PptWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "Shape exceeds the configured text interaction count".to_string(),
             ));
         }
@@ -2253,7 +2234,7 @@ impl PptWriter {
             .slides
             .get_mut(slide)
             .and_then(|slide| slide.shapes.last_mut())
-            .ok_or_else(|| PptWriteError::InvalidData("No shapes on slide".to_string()))?;
+            .ok_or_else(|| WriteError::InvalidData("No shapes on slide".to_string()))?;
         if let Some(index) = replace_index {
             shape.properties.text_interactions[index] = interaction;
         } else {
@@ -2276,17 +2257,17 @@ impl PptWriter {
     pub fn clear_last_shape_text_interaction(
         &mut self,
         slide: usize,
-        range: crate::PowerPointTextRange,
+        range: crate::TextRange,
         trigger: crate::InteractionTrigger,
-    ) -> Result<bool, PptWriteError> {
+    ) -> Result<bool, WriteError> {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
         let shape = slide_data
             .shapes
             .last_mut()
-            .ok_or_else(|| PptWriteError::InvalidData("No shapes on slide".to_string()))?;
+            .ok_or_else(|| WriteError::InvalidData("No shapes on slide".to_string()))?;
         let old_len = shape.properties.text_interactions.len();
         shape
             .properties
@@ -2300,20 +2281,20 @@ impl PptWriter {
         &mut self,
         slide: usize,
         degrees: f32,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         if !degrees.is_finite() {
-            return Err(PptWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "shape rotation must be finite".to_string(),
             ));
         }
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
         let shape = slide_data
             .shapes
             .last_mut()
-            .ok_or_else(|| PptWriteError::InvalidData("No shapes on slide".to_string()))?;
+            .ok_or_else(|| WriteError::InvalidData("No shapes on slide".to_string()))?;
         shape.properties.rotation = degrees;
         Ok(())
     }
@@ -2324,20 +2305,20 @@ impl PptWriter {
         slide: usize,
         index: usize,
         value: i32,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         if index >= 10 {
-            return Err(PptWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "shape adjustment index must be in the range 0..10".to_string(),
             ));
         }
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
         let shape = slide_data
             .shapes
             .last_mut()
-            .ok_or_else(|| PptWriteError::InvalidData("No shapes on slide".to_string()))?;
+            .ok_or_else(|| WriteError::InvalidData("No shapes on slide".to_string()))?;
         if shape.properties.adjust_values.len() <= index {
             shape.properties.adjust_values.resize(index + 1, 0);
         }
@@ -2350,17 +2331,17 @@ impl PptWriter {
         &mut self,
         slide: usize,
         alignment: TextAlignment,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
         let shape = slide_data
             .shapes
             .last_mut()
-            .ok_or_else(|| PptWriteError::InvalidData("No shapes on slide".to_string()))?;
+            .ok_or_else(|| WriteError::InvalidData("No shapes on slide".to_string()))?;
         if shape.properties.text.is_none() && shape.properties.paragraphs.is_none() {
-            return Err(PptWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "Last shape has no text".to_string(),
             ));
         }
@@ -2387,11 +2368,11 @@ impl PptWriter {
     ///
     /// * `slide` - Slide index
     /// * `notes` - Notes text
-    pub fn set_slide_notes(&mut self, slide: usize, notes: &str) -> Result<(), PptWriteError> {
+    pub fn set_slide_notes(&mut self, slide: usize, notes: &str) -> Result<(), WriteError> {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
 
         slide_data.notes = Some(notes.to_string());
         Ok(())
@@ -2407,11 +2388,11 @@ impl PptWriter {
         &mut self,
         slide: usize,
         notes_page: NotesPage,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
 
         slide_data.notes_page = Some(notes_page);
         Ok(())
@@ -2429,14 +2410,14 @@ impl PptWriter {
         slide: usize,
         shape_index: usize,
         animation: AnimationInfo,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
 
         let shape = slide_data.shapes.get_mut(shape_index).ok_or_else(|| {
-            PptWriteError::InvalidData(format!(
+            WriteError::InvalidData(format!(
                 "Shape {} does not exist on slide {}",
                 shape_index, slide
             ))
@@ -2469,18 +2450,18 @@ impl PptWriter {
         &mut self,
         name: impl Into<String>,
         data: Vec<u8>,
-    ) -> Result<std::num::NonZeroU32, PptWriteError> {
+    ) -> Result<std::num::NonZeroU32, WriteError> {
         if self.sound_resources.len()
             >= super::sound_collection::SoundCollectionLimits::default().max_sounds
         {
-            return Err(PptWriteError::InvalidData(
+            return Err(WriteError::InvalidData(
                 "sound collection exceeds the configured sound count".to_string(),
             ));
         }
         let next = self
             .next_sound_resource_id
             .checked_add(1)
-            .ok_or_else(|| PptWriteError::InvalidData("sound resource ID overflow".to_string()))?;
+            .ok_or_else(|| WriteError::InvalidData("sound resource ID overflow".to_string()))?;
         let id = std::num::NonZeroU32::new(self.next_sound_resource_id)
             .expect("writer sound IDs start above zero");
         let sound_type = crate::animation::SoundType::Embedded {
@@ -2505,9 +2486,9 @@ impl PptWriter {
         id: std::num::NonZeroU32,
         name: impl Into<String>,
         data: Vec<u8>,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         if !self.sound_resources.contains_key(&id.get()) {
-            return Err(PptWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "sound resource {} does not exist",
                 id
             )));
@@ -2545,15 +2526,11 @@ impl PptWriter {
     ///
     /// * `slide` - Slide index (0-based)
     /// * `comment` - The comment to add
-    pub fn add_comment(
-        &mut self,
-        slide: usize,
-        comment: SlideComment,
-    ) -> Result<(), PptWriteError> {
+    pub fn add_comment(&mut self, slide: usize, comment: SlideComment) -> Result<(), WriteError> {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
         slide_data.comments.push(comment);
         Ok(())
     }
@@ -2568,11 +2545,11 @@ impl PptWriter {
         &mut self,
         slide: usize,
         timing: SlideTiming,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
         slide_data.timing = Some(timing);
         Ok(())
     }
@@ -2591,14 +2568,11 @@ impl PptWriter {
         self.custom_shows.len()
     }
 
-    fn validate_view_info_kind(
-        view: &PowerPointSlideViewInfo,
-        expected: PowerPointViewKind,
-    ) -> Result<(), PptWriteError> {
+    fn validate_view_info_kind(view: &SlideViewInfo, expected: ViewKind) -> Result<(), WriteError> {
         view.to_bytes()
-            .map_err(|error| PptWriteError::InvalidData(error.to_string()))?;
+            .map_err(|error| WriteError::InvalidData(error.to_string()))?;
         if view.kind() != expected {
-            return Err(PptWriteError::InvalidData(format!(
+            return Err(WriteError::InvalidData(format!(
                 "editing-view kind {:?} does not match {:?}",
                 view.kind(),
                 expected
@@ -2608,11 +2582,8 @@ impl PptWriter {
     }
 
     /// Set the presentation's slide editing-view preferences, zoom, and guides.
-    pub fn set_slide_view_info(
-        &mut self,
-        view: PowerPointSlideViewInfo,
-    ) -> Result<(), PptWriteError> {
-        Self::validate_view_info_kind(&view, PowerPointViewKind::Slide)?;
+    pub fn set_slide_view_info(&mut self, view: SlideViewInfo) -> Result<(), WriteError> {
+        Self::validate_view_info_kind(&view, ViewKind::Slide)?;
         self.slide_view_info = Some(view);
         Ok(())
     }
@@ -2623,16 +2594,13 @@ impl PptWriter {
     }
 
     /// Return the explicit slide editing-view override, if present.
-    pub fn slide_view_info(&self) -> Option<&PowerPointSlideViewInfo> {
+    pub fn slide_view_info(&self) -> Option<&SlideViewInfo> {
         self.slide_view_info.as_ref()
     }
 
     /// Set the presentation's notes editing-view preferences, zoom, and guides.
-    pub fn set_notes_view_info(
-        &mut self,
-        view: PowerPointSlideViewInfo,
-    ) -> Result<(), PptWriteError> {
-        Self::validate_view_info_kind(&view, PowerPointViewKind::Notes)?;
+    pub fn set_notes_view_info(&mut self, view: SlideViewInfo) -> Result<(), WriteError> {
+        Self::validate_view_info_kind(&view, ViewKind::Notes)?;
         self.notes_view_info = Some(view);
         Ok(())
     }
@@ -2643,11 +2611,11 @@ impl PptWriter {
     }
 
     /// Return the explicit notes editing-view, if present.
-    pub fn notes_view_info(&self) -> Option<&PowerPointSlideViewInfo> {
+    pub fn notes_view_info(&self) -> Option<&SlideViewInfo> {
         self.notes_view_info.as_ref()
     }
 
-    fn build_docinfo_list(&self, vba_persist_id: Option<u32>) -> Result<Vec<u8>, PptWriteError> {
+    fn build_docinfo_list(&self, vba_persist_id: Option<u32>) -> Result<Vec<u8>, WriteError> {
         let ppt11 = super::smart_tags::build_document_binary_tag(&self.smart_tags)?;
         Ok(
             super::records::create_docinfo_list_container_with_binary_tags(
@@ -2686,7 +2654,7 @@ impl PptWriter {
     ///
     /// # Returns
     ///
-    /// * `Result<(), PptWriteError>` - Success or error
+    /// * `Result<(), WriteError>` - Success or error
     ///
     /// # Implementation
     ///
@@ -2694,7 +2662,7 @@ impl PptWriter {
     /// - PPT record structures - [MS-PPT] Section 2.3
     /// - Escher drawing containers - [MS-ODRAW] Section 2.2
     /// - PersistPtr directory - [MS-PPT] Section 2.4.16
-    pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), PptWriteError> {
+    pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), WriteError> {
         self.validate_encryption()?;
         self.validate_smart_tag_references()?;
         let modify_password_tag = self.build_modify_password_programmable_tag()?;
@@ -2740,7 +2708,7 @@ impl PptWriter {
             .collect();
         // Build DggContainer with BStore if pictures are present
         let dgg = if !self.blip_store.is_empty() {
-            let bstore = self.blip_store.store().map_err(PptWriteError::Io)?;
+            let bstore = self.blip_store.store().map_err(WriteError::Io)?;
             super::escher::create_dgg_container_with_blips(
                 master_shapes,
                 &slide_shape_counts,
@@ -2935,7 +2903,7 @@ impl PptWriter {
             let mut prog_tags = RecordBuilder::new(0x0F, 0, record_type::PROG_TAGS);
             let mut prog_bin = RecordBuilder::new(0x0F, 0, record_type::PROG_BINARY_TAG);
             let mut cstr = RecordBuilder::new(0x00, 0, record_type::CSTRING);
-            cstr.write_data(&Ppt10Tag::to_bytes());
+            cstr.write_data(&Tag10::to_bytes());
             prog_bin.write_child(&cstr.build()?);
             // BinaryTagData: slide defaults + comments
             let comment_bytes = super::comments::build_slide_comments(&slide.comments)?;
@@ -2989,7 +2957,7 @@ impl PptWriter {
         // 3.4) ExOleObjStg persisted storages for embedded chart objects
         for plan in &chart_plans {
             let offset = u32::try_from(ppt_stream.len()).map_err(|_| {
-                PptWriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
+                WriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
             })?;
             persist_builder.set_offset(plan.persist_id, offset);
             let storage = super::chart::chart_storage_record(
@@ -3000,25 +2968,25 @@ impl PptWriter {
 
         if let (Some(persist_id), Some(storage)) = (vba_persist_id, &self.vba_project) {
             let offset = u32::try_from(ppt_stream.len()).map_err(|_| {
-                PptWriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
+                WriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
             })?;
             persist_builder.set_offset(persist_id, offset);
             let record = storage
                 .to_record_bytes()
-                .map_err(|error| PptWriteError::InvalidData(error.to_string()))?;
+                .map_err(|error| WriteError::InvalidData(error.to_string()))?;
             ppt_stream.extend_from_slice(&record);
         }
 
         let mut pictures_stream = if self.blip_store.is_empty() {
             None
         } else {
-            Some(self.blip_store.delay().map_err(PptWriteError::Io)?)
+            Some(self.blip_store.delay().map_err(WriteError::Io)?)
         };
         let encryption = self.prepare_encryption()?;
         let encryption_session_id = if let Some(encryption) = &encryption {
             let persist_id = persist_builder.allocate_id();
             let offset = u32::try_from(ppt_stream.len()).map_err(|_| {
-                PptWriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
+                WriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
             })?;
             persist_builder.set_offset(persist_id, offset);
             ppt_stream.extend_from_slice(&encryption.session_record);
@@ -3058,10 +3026,10 @@ impl PptWriter {
                 session_id,
                 &encryption.crypto,
             )
-            .map_err(PptWriteError::InvalidData)?;
+            .map_err(WriteError::InvalidData)?;
             if let Some(pictures) = &mut pictures_stream {
                 encrypt_pictures_for_write(pictures, &encryption.crypto)
-                    .map_err(PptWriteError::InvalidData)?;
+                    .map_err(WriteError::InvalidData)?;
             }
         }
 
@@ -3095,11 +3063,11 @@ impl PptWriter {
     ///
     /// # Returns
     ///
-    /// * `Result<(), PptWriteError>` - Success or error
+    /// * `Result<(), WriteError>` - Success or error
     pub fn write_to<W: std::io::Write + std::io::Seek>(
         &mut self,
         writer: &mut W,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         self.validate_encryption()?;
         self.validate_smart_tag_references()?;
         let modify_password_tag = self.build_modify_password_programmable_tag()?;
@@ -3138,7 +3106,7 @@ impl PptWriter {
             self.slides.iter().map(|s| s.escher_shape_count()).collect();
         // Build DggContainer with BStore if pictures are present
         let dgg = if !self.blip_store.is_empty() {
-            let bstore = self.blip_store.store().map_err(PptWriteError::Io)?;
+            let bstore = self.blip_store.store().map_err(WriteError::Io)?;
             super::escher::create_dgg_container_with_blips(
                 master_shapes,
                 &slide_shape_counts,
@@ -3297,7 +3265,7 @@ impl PptWriter {
             let mut prog_tags = RecordBuilder::new(0x0F, 0, record_type::PROG_TAGS);
             let mut prog_bin = RecordBuilder::new(0x0F, 0, record_type::PROG_BINARY_TAG);
             let mut cstr = RecordBuilder::new(0x00, 0, record_type::CSTRING);
-            cstr.write_data(&Ppt10Tag::to_bytes());
+            cstr.write_data(&Tag10::to_bytes());
             prog_bin.write_child(&cstr.build()?);
             // BinaryTagData: slide defaults + comments
             let comment_bytes = super::comments::build_slide_comments(&slide.comments)?;
@@ -3323,7 +3291,7 @@ impl PptWriter {
         // 3.4) ExOleObjStg persisted storages for embedded chart objects
         for plan in &chart_plans {
             let offset = u32::try_from(ppt_stream.len()).map_err(|_| {
-                PptWriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
+                WriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
             })?;
             persist_builder.set_offset(plan.persist_id, offset);
             let storage = super::chart::chart_storage_record(
@@ -3334,25 +3302,25 @@ impl PptWriter {
 
         if let (Some(persist_id), Some(storage)) = (vba_persist_id, &self.vba_project) {
             let offset = u32::try_from(ppt_stream.len()).map_err(|_| {
-                PptWriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
+                WriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
             })?;
             persist_builder.set_offset(persist_id, offset);
             let record = storage
                 .to_record_bytes()
-                .map_err(|error| PptWriteError::InvalidData(error.to_string()))?;
+                .map_err(|error| WriteError::InvalidData(error.to_string()))?;
             ppt_stream.extend_from_slice(&record);
         }
 
         let mut pictures_stream = if self.blip_store.is_empty() {
             None
         } else {
-            Some(self.blip_store.delay().map_err(PptWriteError::Io)?)
+            Some(self.blip_store.delay().map_err(WriteError::Io)?)
         };
         let encryption = self.prepare_encryption()?;
         let encryption_session_id = if let Some(encryption) = &encryption {
             let persist_id = persist_builder.allocate_id();
             let offset = u32::try_from(ppt_stream.len()).map_err(|_| {
-                PptWriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
+                WriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
             })?;
             persist_builder.set_offset(persist_id, offset);
             ppt_stream.extend_from_slice(&encryption.session_record);
@@ -3391,10 +3359,10 @@ impl PptWriter {
                 session_id,
                 &encryption.crypto,
             )
-            .map_err(PptWriteError::InvalidData)?;
+            .map_err(WriteError::InvalidData)?;
             if let Some(pictures) = &mut pictures_stream {
                 encrypt_pictures_for_write(pictures, &encryption.crypto)
-                    .map_err(PptWriteError::InvalidData)?;
+                    .map_err(WriteError::InvalidData)?;
             }
         }
 
@@ -3432,7 +3400,7 @@ impl PptWriter {
     // For production use, the PPTX writer is fully implemented and recommended.
 }
 
-impl Default for PptWriter {
+impl Default for Writer {
     fn default() -> Self {
         Self::new()
     }
@@ -3460,7 +3428,7 @@ mod tests {
 
     #[test]
     fn test_create_writer() {
-        let writer = PptWriter::new();
+        let writer = Writer::new();
         assert_eq!(writer.slides.len(), 0);
         assert_eq!(writer.slide_width, 9144000);
         assert_eq!(writer.slide_height, 6858000);
@@ -3468,14 +3436,14 @@ mod tests {
 
     #[test]
     fn test_create_widescreen() {
-        let writer = PptWriter::new_widescreen();
+        let writer = Writer::new_widescreen();
         assert_eq!(writer.slide_width, 9144000);
         assert_eq!(writer.slide_height, 5143500);
     }
 
     #[test]
     fn test_add_slide() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let idx = writer.add_slide().unwrap();
         assert_eq!(idx, 0);
         assert_eq!(writer.slides.len(), 1);
@@ -3483,7 +3451,7 @@ mod tests {
 
     #[test]
     fn test_add_multiple_slides() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let idx1 = writer.add_slide().unwrap();
         let idx2 = writer.add_slide().unwrap();
         let idx3 = writer.add_slide().unwrap();
@@ -3495,7 +3463,7 @@ mod tests {
 
     #[test]
     fn test_add_and_write_freeform_shape() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
         let geometry = FreeformGeometry::new(
             GeometryRect::new(0, 0, 21600, 21600),
@@ -3520,7 +3488,7 @@ mod tests {
 
     #[test]
     fn test_rejects_empty_freeform_geometry() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
         let geometry = FreeformGeometry::new(
             GeometryRect::new(0, 0, 21600, 21600),
@@ -3539,7 +3507,7 @@ mod tests {
 
     #[test]
     fn test_generic_styled_shape_rejects_geometryless_freeform() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
 
         let result = writer.add_styled_shape(
@@ -3558,7 +3526,7 @@ mod tests {
 
     #[test]
     fn test_add_textbox() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
         writer.add_textbox(slide, 10, 10, 100, 50, "Test").unwrap();
         assert_eq!(writer.slides[0].shapes.len(), 1);
@@ -3566,7 +3534,7 @@ mod tests {
 
     #[test]
     fn test_plain_text_alignment_and_rotation_reach_escher_shape() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
         writer
             .add_textbox(slide, 10, 20, 300, 100, "Centered")
@@ -3586,7 +3554,7 @@ mod tests {
 
     #[test]
     fn test_alignment_setter_updates_rich_paragraphs() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
         writer
             .add_rich_textbox(
@@ -3616,7 +3584,7 @@ mod tests {
 
     #[test]
     fn test_rotation_setter_rejects_non_finite_values() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
         writer.add_rectangle(slide, 0, 0, 100, 100).unwrap();
 
@@ -3631,7 +3599,7 @@ mod tests {
 
     #[test]
     fn test_shape_adjustment_setter_preserves_sparse_positions() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
         writer
             .add_styled_shape(
@@ -3662,14 +3630,14 @@ mod tests {
 
     #[test]
     fn test_add_textbox_invalid_slide() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let result = writer.add_textbox(0, 10, 10, 100, 50, "Test");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_delete_slide() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         writer.add_slide().unwrap();
         writer.add_slide().unwrap();
         writer.delete_slide(0).unwrap();
@@ -3678,14 +3646,14 @@ mod tests {
 
     #[test]
     fn test_delete_invalid_slide() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let result = writer.delete_slide(0);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_add_styled_shape() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
         let style = ShapeStyle::solid_no_line(ShapeColor::RED);
         writer
@@ -3696,7 +3664,7 @@ mod tests {
 
     #[test]
     fn test_add_rectangle() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
         writer.add_rectangle(slide, 10, 10, 100, 50).unwrap();
         assert_eq!(writer.slides[0].shapes.len(), 1);
@@ -3704,7 +3672,7 @@ mod tests {
 
     #[test]
     fn test_add_arrow_line() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
         writer.add_arrow_line(slide, 0, 0, 100, 100).unwrap();
         assert_eq!(writer.slides[0].shapes.len(), 1);
@@ -3712,7 +3680,7 @@ mod tests {
 
     #[test]
     fn test_set_slide_notes() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
         writer
             .set_slide_notes(slide, "These are speaker notes")
@@ -3725,8 +3693,8 @@ mod tests {
 
     #[test]
     fn test_add_font() {
-        let mut writer = PptWriter::new();
-        // PptWriter::new() already adds Arial as default font at index 0
+        let mut writer = Writer::new();
+        // Writer::new() already adds Arial as default font at index 0
         let font = FontEntity::times_new_roman();
         let idx = writer.add_font(font);
         assert_eq!(idx, 1); // Second font at index 1
@@ -3735,8 +3703,8 @@ mod tests {
 
     #[test]
     fn test_add_multiple_fonts() {
-        let mut writer = PptWriter::new();
-        // PptWriter::new() already adds Arial as default font at index 0
+        let mut writer = Writer::new();
+        // Writer::new() already adds Arial as default font at index 0
         let idx1 = writer.add_font(FontEntity::arial()); // Returns 1
         let idx2 = writer.add_font(FontEntity::times_new_roman()); // Returns 2
         let idx3 = writer.add_font(FontEntity::new("Calibri")); // Returns 3
@@ -3748,7 +3716,7 @@ mod tests {
 
     #[test]
     fn test_set_property() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         writer.set_property("Title", "My Presentation");
         writer.set_property("Author", "Test Author");
         assert_eq!(
@@ -3763,7 +3731,7 @@ mod tests {
 
     #[test]
     fn test_hyperlink_collection() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let link = Hyperlink::url("https://example.com").with_display_text("Example");
         let id = writer.add_hyperlink(link);
         assert_eq!(id, 1);
@@ -3791,7 +3759,7 @@ mod tests {
 
     #[test]
     fn test_add_comment() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
         let comment = SlideComment::new("John Doe", "Great slide!", 100, 50);
         writer.add_comment(slide, comment).unwrap();
@@ -3801,7 +3769,7 @@ mod tests {
 
     #[test]
     fn test_add_multiple_comments() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
         writer
             .add_comment(slide, SlideComment::new("Alice", "First", 10, 10))
@@ -3814,7 +3782,7 @@ mod tests {
 
     #[test]
     fn test_add_comment_invalid_slide() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let comment = SlideComment::new("John", "Test", 0, 0);
         let result = writer.add_comment(0, comment);
         assert!(result.is_err());
@@ -3854,7 +3822,7 @@ mod tests {
 
     #[test]
     fn test_slide_count() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         assert_eq!(writer.slide_count(), 0);
         writer.add_slide().unwrap();
         assert_eq!(writer.slide_count(), 1);
@@ -3864,7 +3832,7 @@ mod tests {
 
     #[test]
     fn test_default_writer() {
-        let writer: PptWriter = Default::default();
+        let writer: Writer = Default::default();
         assert_eq!(writer.slide_count(), 0);
         assert_eq!(writer.slide_width, 9144000);
         assert_eq!(writer.slide_height, 6858000);
@@ -3872,11 +3840,11 @@ mod tests {
 
     #[test]
     fn test_ppt_write_error_display() {
-        let io_err = PptWriteError::Io(std::io::Error::other("test error"));
+        let io_err = WriteError::Io(std::io::Error::other("test error"));
         let err_str = format!("{}", io_err);
         assert!(err_str.contains("I/O error"));
 
-        let data_err = PptWriteError::InvalidData("bad data".to_string());
+        let data_err = WriteError::InvalidData("bad data".to_string());
         let err_str = format!("{}", data_err);
         assert!(err_str.contains("Invalid data"));
     }
@@ -3922,7 +3890,7 @@ mod tests {
 
     #[test]
     fn test_write_to_memory() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
         writer
             .add_textbox(slide, 100, 100, 400, 200, "Hello, World!")
@@ -3936,18 +3904,16 @@ mod tests {
 
     #[test]
     fn smart_tags_round_trip_through_both_output_paths() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
         let tokyo = writer
             .add_smart_tag(
-                PowerPointSmartTagDefinition::new("urn:example:geo", "place")
-                    .with_property("city", "東京"),
+                SmartTagDefinition::new("urn:example:geo", "place").with_property("city", "東京"),
             )
             .unwrap();
         let paris = writer
             .add_smart_tag(
-                PowerPointSmartTagDefinition::new("urn:example:geo", "place")
-                    .with_property("city", "Paris"),
+                SmartTagDefinition::new("urn:example:geo", "place").with_property("city", "Paris"),
             )
             .unwrap();
         writer
@@ -4032,11 +3998,11 @@ mod tests {
 
     #[test]
     fn rejects_missing_smart_tag_references() {
-        let mut source = PptWriter::new();
+        let mut source = Writer::new();
         let dangling = source
-            .add_smart_tag(PowerPointSmartTagDefinition::new("urn:test", "dangling"))
+            .add_smart_tag(SmartTagDefinition::new("urn:test", "dangling"))
             .unwrap();
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
         writer
             .add_rich_textbox(
@@ -4052,10 +4018,10 @@ mod tests {
             .unwrap();
         assert!(writer.write_to(&mut Cursor::new(Vec::new())).is_err());
 
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
         let tag = writer
-            .add_smart_tag(PowerPointSmartTagDefinition::new("urn:test", "empty"))
+            .add_smart_tag(SmartTagDefinition::new("urn:test", "empty"))
             .unwrap();
         writer
             .add_rich_textbox(
@@ -4074,7 +4040,7 @@ mod tests {
 
     #[test]
     fn test_write_empty_presentation() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let mut buffer = Cursor::new(Vec::new());
         let result = writer.write_to(&mut buffer);
         assert!(result.is_ok());
@@ -4083,7 +4049,7 @@ mod tests {
 
     #[test]
     fn test_write_multiple_slides() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
 
         let slide1 = writer.add_slide().unwrap();
         writer
@@ -4104,7 +4070,7 @@ mod tests {
 
     #[test]
     fn test_presentation_with_hyperlink() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
 
         writer
@@ -4122,7 +4088,7 @@ mod tests {
 
     #[test]
     fn test_presentation_with_comments() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
         writer
             .add_textbox(slide, 100, 100, 400, 200, "Content")
@@ -4138,7 +4104,7 @@ mod tests {
 
     #[test]
     fn test_presentation_with_notes() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
         writer
             .add_textbox(slide, 100, 100, 400, 200, "Title")
@@ -4154,7 +4120,7 @@ mod tests {
 
     #[test]
     fn test_presentation_with_multiple_shapes() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
 
         writer.add_rectangle(slide, 50, 50, 100, 100).unwrap();
@@ -4172,7 +4138,7 @@ mod tests {
 
     #[test]
     fn test_custom_show_support() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         writer.add_slide().unwrap();
         writer.add_slide().unwrap();
         writer.add_slide().unwrap();
@@ -4185,7 +4151,7 @@ mod tests {
 
     #[test]
     fn test_multiple_custom_shows() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         for _ in 0..5 {
             writer.add_slide().unwrap();
         }
@@ -4198,7 +4164,7 @@ mod tests {
 
     #[test]
     fn test_widescreen_write() {
-        let mut writer = PptWriter::new_widescreen();
+        let mut writer = Writer::new_widescreen();
         let slide = writer.add_slide().unwrap();
         writer
             .add_textbox(slide, 100, 100, 800, 100, "Widescreen")
@@ -4211,7 +4177,7 @@ mod tests {
 
     #[test]
     fn test_shape_with_styling() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
 
         let style = ShapeStyle::new()
@@ -4232,7 +4198,7 @@ mod tests {
 
     #[test]
     fn test_extended_line_style_reaches_escher_shape() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
         let mut line = LineStyleConfig::with_color_and_width(ShapeColor::RED, 2.0);
         line.opacity = 50;
@@ -4270,7 +4236,7 @@ mod tests {
 
     #[test]
     fn test_picture_fill_registers_and_serializes_blip_reference() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide = writer.add_slide().unwrap();
         let blip_index = writer
             .add_picture_data_as(
@@ -4295,7 +4261,7 @@ mod tests {
 
     #[test]
     fn test_invalid_slide_picture_does_not_mutate_blip_store() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
 
         assert!(
             writer
@@ -4307,7 +4273,7 @@ mod tests {
 
     #[test]
     fn test_invalid_operations() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
 
         // Try to add shape to non-existent slide
         let result = writer.add_rectangle(0, 0, 0, 100, 100);
@@ -4324,7 +4290,7 @@ mod tests {
 
     #[test]
     fn test_internal_slide_data() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
         let slide_idx = writer.add_slide().unwrap();
 
         // Verify slide was created with correct defaults
@@ -4336,7 +4302,7 @@ mod tests {
 
     #[test]
     fn test_slide_persist_tracking() {
-        let mut writer = PptWriter::new();
+        let mut writer = Writer::new();
 
         let idx1 = writer.add_slide().unwrap();
         let idx2 = writer.add_slide().unwrap();

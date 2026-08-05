@@ -1,11 +1,11 @@
 //! Minimal PPT test - single empty slide
 
-use litchi_ppt::writer::PptWriter;
+use litchi_ppt::writer::Writer;
 
 fn main() {
     println!("Creating minimal PPT with empty slide...");
 
-    let mut writer = PptWriter::new();
+    let mut writer = Writer::new();
     writer.add_slide().unwrap();
     writer.save("output_minimal.ppt").unwrap();
 

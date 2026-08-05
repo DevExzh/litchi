@@ -1,11 +1,11 @@
 //! Round-trip tests for the BIFF8 Theme record.
 
-use litchi_xls::writer::XlsWriter;
-use litchi_xls::{XlsTheme, XlsWorkbook};
+use litchi_xls::writer::Writer;
+use litchi_xls::{Theme, Workbook};
 use std::io::Cursor;
 
-fn written_workbook(theme: Option<XlsTheme>) -> Vec<u8> {
-    let mut writer = XlsWriter::new();
+fn written_workbook(theme: Option<Theme>) -> Vec<u8> {
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Theme").unwrap();
     writer.write_string(sheet, 0, 0, "content").unwrap();
     writer.set_theme(theme);
@@ -16,10 +16,8 @@ fn written_workbook(theme: Option<XlsTheme>) -> Vec<u8> {
 
 #[test]
 fn default_theme_round_trips() {
-    let workbook = XlsWorkbook::new(Cursor::new(written_workbook(Some(
-        XlsTheme::default_theme(),
-    ))))
-    .unwrap();
+    let workbook =
+        Workbook::new(Cursor::new(written_workbook(Some(Theme::default_theme())))).unwrap();
     let theme = workbook.theme().expect("Theme record present");
     assert!(!theme.is_custom());
     assert_eq!(theme.version(), 124_226);
@@ -32,8 +30,8 @@ fn large_custom_theme_round_trips_across_continuations() {
     let contents: Vec<u8> = (0..40_000u32)
         .flat_map(|value| value.to_le_bytes())
         .collect();
-    let workbook = XlsWorkbook::new(Cursor::new(written_workbook(Some(
-        XlsTheme::custom(contents.clone()).unwrap(),
+    let workbook = Workbook::new(Cursor::new(written_workbook(Some(
+        Theme::custom(contents.clone()).unwrap(),
     ))))
     .unwrap();
     let theme = workbook.theme().expect("Theme record present");
@@ -43,6 +41,6 @@ fn large_custom_theme_round_trips_across_continuations() {
 
 #[test]
 fn workbook_without_theme_has_none() {
-    let workbook = XlsWorkbook::new(Cursor::new(written_workbook(None))).unwrap();
+    let workbook = Workbook::new(Cursor::new(written_workbook(None))).unwrap();
     assert!(workbook.theme().is_none());
 }

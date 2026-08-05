@@ -5,7 +5,7 @@
 //!
 //! Reference: [MS-PPT] Section 2.9 - Text Formatting
 
-use super::smart_tags::PowerPointSmartTagIndex;
+use super::smart_tags::SmartTagIndex;
 use zerocopy_derive::{Immutable, IntoBytes, KnownLayout};
 
 // =============================================================================
@@ -428,7 +428,7 @@ pub struct TextRun {
     /// Baseline position as a percentage of line height
     pub baseline_position: Option<i16>,
     /// Zero-based indices into the presentation-wide PowerPoint 11 smart-tag store.
-    pub smart_tag_indices: Vec<PowerPointSmartTagIndex>,
+    pub smart_tag_indices: Vec<SmartTagIndex>,
 }
 
 impl TextRun {
@@ -546,22 +546,19 @@ impl TextRun {
     }
 
     /// Attach one document-wide PowerPoint 11 smart tag to this text run.
-    pub fn with_smart_tag(mut self, index: PowerPointSmartTagIndex) -> Self {
+    pub fn with_smart_tag(mut self, index: SmartTagIndex) -> Self {
         self.smart_tag_indices.push(index);
         self
     }
 
     /// Attach document-wide PowerPoint 11 smart tags to this text run.
-    pub fn with_smart_tags(
-        mut self,
-        indices: impl IntoIterator<Item = PowerPointSmartTagIndex>,
-    ) -> Self {
+    pub fn with_smart_tags(mut self, indices: impl IntoIterator<Item = SmartTagIndex>) -> Self {
         self.smart_tag_indices.extend(indices);
         self
     }
 
     /// Attach one document-wide PowerPoint 11 smart tag in place.
-    pub fn add_smart_tag(&mut self, index: PowerPointSmartTagIndex) {
+    pub fn add_smart_tag(&mut self, index: SmartTagIndex) {
         self.smart_tag_indices.push(index);
     }
 
@@ -1606,8 +1603,8 @@ mod tests {
             Some(60_000)
         );
 
-        let text_record = crate::PptRecord {
-            record_type: crate::consts::PptRecordType::TextBytesAtom,
+        let text_record = crate::Record {
+            record_type: crate::consts::RecordType::TextBytesAtom,
             record_type_raw: 4008,
             version: 0,
             instance: 0,
@@ -1615,8 +1612,8 @@ mod tests {
             data: b"x".to_vec(),
             children: Vec::new(),
         };
-        let style_record = crate::PptRecord {
-            record_type: crate::consts::PptRecordType::StyleTextPropAtom,
+        let style_record = crate::Record {
+            record_type: crate::consts::RecordType::StyleTextPropAtom,
             record_type_raw: 4001,
             version: 0,
             instance: 0,

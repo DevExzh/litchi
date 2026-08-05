@@ -2,11 +2,11 @@
 
 use super::model::{ErrorStyle, Formula, ImeMode, Kind, Operator, Range, Rule, Settings};
 use crate::formula::{FormulaContext, render_formula};
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
 const MAX_VALIDATION_RANGES: usize = 432;
 
-pub(crate) fn parse_dval(data: &[u8]) -> XlsResult<Settings> {
+pub(crate) fn parse_dval(data: &[u8]) -> Result<Settings> {
     if data.len() != 18 {
         return invalid(format!(
             "DVAL payload must be exactly 18 bytes, got {}",
@@ -29,7 +29,7 @@ pub(crate) fn parse_dval(data: &[u8]) -> XlsResult<Settings> {
     let dropdown_object_id = match object_id {
         -1 => None,
         1..=32_767 => Some(u16::try_from(object_id).map_err(|_| {
-            XlsError::InvalidData(format!("invalid DVAL dropdown object id: {object_id}"))
+            Error::InvalidData(format!("invalid DVAL dropdown object id: {object_id}"))
         })?),
         _ => return invalid(format!("invalid DVAL dropdown object id: {object_id}")),
     };
@@ -43,12 +43,12 @@ pub(crate) fn parse_dval(data: &[u8]) -> XlsResult<Settings> {
         y_top,
         dropdown_object_id,
         declared_rule_count: u16::try_from(rule_count).map_err(|_| {
-            XlsError::InvalidData(format!("DVAL rule count exceeds 65534: {rule_count}"))
+            Error::InvalidData(format!("DVAL rule count exceeds 65534: {rule_count}"))
         })?,
     })
 }
 
-pub(crate) fn parse_dv(data: &[u8], formula_context: Option<&FormulaContext>) -> XlsResult<Rule> {
+pub(crate) fn parse_dv(data: &[u8], formula_context: Option<&FormulaContext>) -> Result<Rule> {
     let mut cursor = Cursor::new(data);
     let options = cursor.u32()?;
     if options & 0xFF00_0000 != 0 {
@@ -135,7 +135,7 @@ pub(crate) fn parse_dv(data: &[u8], formula_context: Option<&FormulaContext>) ->
     }
     let bytes_needed = range_count
         .checked_mul(8)
-        .ok_or_else(|| XlsError::InvalidData("DV range size overflow".to_string()))?;
+        .ok_or_else(|| Error::InvalidData("DV range size overflow".to_string()))?;
     if cursor.remaining() != bytes_needed {
         return invalid(format!(
             "DV range list length mismatch: expected {bytes_needed} bytes, got {}",
@@ -152,10 +152,10 @@ pub(crate) fn parse_dv(data: &[u8], formula_context: Option<&FormulaContext>) ->
             return invalid("DV contains an invalid or out-of-range cell range".to_string());
         }
         let first_column = u8::try_from(first_column).map_err(|_| {
-            XlsError::InvalidData("DV contains an invalid or out-of-range cell range".to_string())
+            Error::InvalidData("DV contains an invalid or out-of-range cell range".to_string())
         })?;
         let last_column = u8::try_from(last_column).map_err(|_| {
-            XlsError::InvalidData("DV contains an invalid or out-of-range cell range".to_string())
+            Error::InvalidData("DV contains an invalid or out-of-range cell range".to_string())
         })?;
         ranges.push(Range {
             first_row,
@@ -184,8 +184,8 @@ pub(crate) fn parse_dv(data: &[u8], formula_context: Option<&FormulaContext>) ->
     })
 }
 
-fn invalid<T>(message: String) -> XlsResult<T> {
-    Err(XlsError::InvalidData(message))
+fn invalid<T>(message: String) -> Result<T> {
+    Err(Error::InvalidData(message))
 }
 
 struct Cursor<'a> {
@@ -202,40 +202,40 @@ impl<'a> Cursor<'a> {
         self.data.len().saturating_sub(self.position)
     }
 
-    fn take(&mut self, count: usize) -> XlsResult<&'a [u8]> {
+    fn take(&mut self, count: usize) -> Result<&'a [u8]> {
         let end = self
             .position
             .checked_add(count)
-            .ok_or_else(|| XlsError::InvalidData("DV field size overflow".to_string()))?;
+            .ok_or_else(|| Error::InvalidData("DV field size overflow".to_string()))?;
         let bytes = self
             .data
             .get(self.position..end)
-            .ok_or_else(|| XlsError::InvalidData("truncated DV record".to_string()))?;
+            .ok_or_else(|| Error::InvalidData("truncated DV record".to_string()))?;
         self.position = end;
         Ok(bytes)
     }
 
-    fn take_array<const N: usize>(&mut self) -> XlsResult<[u8; N]> {
+    fn take_array<const N: usize>(&mut self) -> Result<[u8; N]> {
         let bytes: [u8; N] = self
             .take(N)?
             .try_into()
-            .map_err(|_| XlsError::InvalidData("truncated DV record".to_string()))?;
+            .map_err(|_| Error::InvalidData("truncated DV record".to_string()))?;
         Ok(bytes)
     }
 
-    fn u16(&mut self) -> XlsResult<u16> {
+    fn u16(&mut self) -> Result<u16> {
         Ok(u16::from_le_bytes(self.take_array()?))
     }
 
-    fn u32(&mut self) -> XlsResult<u32> {
+    fn u32(&mut self) -> Result<u32> {
         Ok(u32::from_le_bytes(self.take_array()?))
     }
 
-    fn i32(&mut self) -> XlsResult<i32> {
+    fn i32(&mut self) -> Result<i32> {
         Ok(i32::from_le_bytes(self.take_array()?))
     }
 
-    fn unicode_string(&mut self, max_units: usize) -> XlsResult<Option<String>> {
+    fn unicode_string(&mut self, max_units: usize) -> Result<Option<String>> {
         let units = usize::from(self.u16()?);
         if units > max_units {
             return invalid(format!("DV string exceeds its {max_units}-character limit"));
@@ -251,42 +251,41 @@ impl<'a> Cursor<'a> {
         };
         let extension_size = if flags & 0x04 != 0 {
             usize::try_from(self.u32()?)
-                .map_err(|_| XlsError::InvalidData("DV string size overflow".to_string()))?
+                .map_err(|_| Error::InvalidData("DV string size overflow".to_string()))?
         } else {
             0
         };
         let wide = flags & 0x01 != 0;
         let character_bytes = units
             .checked_mul(if wide { 2 } else { 1 })
-            .ok_or_else(|| XlsError::InvalidData("DV string size overflow".to_string()))?;
+            .ok_or_else(|| Error::InvalidData("DV string size overflow".to_string()))?;
         let characters = self.take(character_bytes)?;
         let value = if wide {
             let mut chunks = characters.chunks_exact(2);
             let mut utf16 = Vec::with_capacity(units);
             for bytes in &mut chunks {
                 let bytes: [u8; 2] = bytes.try_into().map_err(|_| {
-                    XlsError::InvalidData("DV string contains invalid UTF-16".to_string())
+                    Error::InvalidData("DV string contains invalid UTF-16".to_string())
                 })?;
                 utf16.push(u16::from_le_bytes(bytes));
             }
             if !chunks.remainder().is_empty() {
                 return invalid("DV string contains invalid UTF-16".to_string());
             }
-            String::from_utf16(&utf16).map_err(|_| {
-                XlsError::InvalidData("DV string contains invalid UTF-16".to_string())
-            })?
+            String::from_utf16(&utf16)
+                .map_err(|_| Error::InvalidData("DV string contains invalid UTF-16".to_string()))?
         } else {
             characters.iter().map(|&byte| char::from(byte)).collect()
         };
         let formatting_size = rich_runs
             .checked_mul(4)
-            .ok_or_else(|| XlsError::InvalidData("DV rich-text size overflow".to_string()))?;
+            .ok_or_else(|| Error::InvalidData("DV rich-text size overflow".to_string()))?;
         self.take(formatting_size)?;
         self.take(extension_size)?;
         Ok(if value == "\0" { None } else { Some(value) })
     }
 
-    fn formula(&mut self) -> XlsResult<Option<Formula>> {
+    fn formula(&mut self) -> Result<Option<Formula>> {
         let size = self.u16()? as usize;
         self.take(2)?;
         let tokens = self.take(size)?;

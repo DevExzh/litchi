@@ -15,7 +15,7 @@
 //! sent and no shared-workbook state is applied. The cross-record constraint
 //! that `CbUsr` elements at an index greater than or equal to `CUsr.iCount`
 //! MUST be zero (MS-XLS 2.4.40) is a property of the record sequence and is
-//! documented on [`XlsCbUsr`] rather than enforced by these payload readers.
+//! documented on [`CbUsr`] rather than enforced by these payload readers.
 //!
 //! # References
 //!
@@ -23,8 +23,8 @@
 //!   2.4.216 (RecipName), 2.4.340 (UsrInfo), 2.5.239 (ShortDTR),
 //!   2.5.294 (XLUnicodeString)
 
-use super::revision_records::XlsShortDtr;
-use super::{XlsError, XlsResult};
+use super::revision_records::ShortDtr;
+use super::{Error, Result};
 
 /// Record type of the `CUsr` record (MS-XLS 2.4.72).
 pub(crate) const C_USR_RECORD_TYPE: u16 = 0x0191;
@@ -108,8 +108,8 @@ fn read_u32(data: &[u8], offset: usize) -> u32 {
     u32::from_le_bytes(data[offset..offset + 4].try_into().expect("length checked"))
 }
 
-fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(record_type: u16, message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type,
         message: message.into(),
     }
@@ -124,7 +124,7 @@ fn read_nul_terminated_ansi(
     offset: &mut usize,
     count: usize,
     field: &'static str,
-) -> XlsResult<Vec<u8>> {
+) -> Result<Vec<u8>> {
     if count == 0 {
         return Ok(Vec::new());
     }
@@ -169,16 +169,16 @@ fn nul_terminated_len(content: &[u8]) -> usize {
 /// Typed `CUsr` record content (MS-XLS 2.4.72): the number of unique users
 /// that have the shared workbook open.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsCUsr {
+pub struct CUsr {
     /// Number of unique users (`iCount`).
     count: u16,
 }
 
-impl XlsCUsr {
+impl CUsr {
     /// Parse a `CUsr` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != C_USR_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: C_USR_LEN,
                 found: data.len(),
             });
@@ -211,14 +211,14 @@ impl XlsCUsr {
 /// the preceding `CUsr` record MUST be zero and MUST be ignored; that
 /// constraint spans records and is not enforced by this payload reader.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsCbUsr {
+pub struct CbUsr {
     /// Byte counts of the `UsrInfo` records (`rgCbUsr`).
     sizes: [u16; CB_USR_COUNT],
 }
 
-impl XlsCbUsr {
+impl CbUsr {
     /// Parse a `CbUsr` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != CB_USR_LEN {
             return Err(invalid(
                 CB_USR_RECORD_TYPE,
@@ -250,24 +250,24 @@ impl XlsCbUsr {
 /// Typed `UsrInfo` record content (MS-XLS 2.4.340): information about a user
 /// who currently has the shared workbook open.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsUsrInfo {
+pub struct UsrInfo {
     /// Unique user identifier (`lUsrId`).
     user_id: i32,
     /// Last set of revisions synced to by this user (`guid`).
     guid: [u8; GUID_LEN],
     /// Date and time the user opened the shared workbook (`shortdtr`).
-    opened_at: XlsShortDtr,
+    opened_at: ShortDtr,
     /// Name of this user (`stUserName`).
     user_name: String,
     /// Undefined trailing byte (`unused`), preserved verbatim.
     unused: u8,
 }
 
-impl XlsUsrInfo {
+impl UsrInfo {
     /// Parse a `UsrInfo` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < USR_INFO_PREFIX_LEN + XL_UNICODE_STRING_HEADER_LEN + 1 {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: USR_INFO_PREFIX_LEN + XL_UNICODE_STRING_HEADER_LEN + 1,
                 found: data.len(),
             });
@@ -275,7 +275,7 @@ impl XlsUsrInfo {
         let user_id = i32::from_le_bytes(data[0..4].try_into().expect("length checked"));
         let mut guid = [0u8; GUID_LEN];
         guid.copy_from_slice(&data[4..4 + GUID_LEN]);
-        let opened_at = XlsShortDtr::parse(USR_INFO_RECORD_TYPE, &data[20..20 + SHORT_DTR_LEN])?;
+        let opened_at = ShortDtr::parse(USR_INFO_RECORD_TYPE, &data[20..20 + SHORT_DTR_LEN])?;
 
         // stUserName: XLUnicodeString (MS-XLS 2.5.294).
         let cch = read_u16(data, USR_INFO_PREFIX_LEN) as usize;
@@ -300,7 +300,7 @@ impl XlsUsrInfo {
         let chars_offset = USR_INFO_PREFIX_LEN + XL_UNICODE_STRING_HEADER_LEN;
         let expected_len = chars_offset + char_bytes + 1;
         if data.len() != expected_len {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: expected_len,
                 found: data.len(),
             });
@@ -312,7 +312,7 @@ impl XlsUsrInfo {
                 .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
                 .collect();
             String::from_utf16(&units)
-                .map_err(|error| XlsError::Encoding(format!("UsrInfo stUserName: {error}")))?
+                .map_err(|error| Error::Encoding(format!("UsrInfo stUserName: {error}")))?
         } else {
             // Compressed Unicode supplies an implicit zero high byte.
             raw.iter().map(|&byte| byte as char).collect()
@@ -365,7 +365,7 @@ impl XlsUsrInfo {
     }
 
     /// Date and time the user opened the shared workbook.
-    pub fn opened_at(&self) -> XlsShortDtr {
+    pub fn opened_at(&self) -> ShortDtr {
         self.opened_at
     }
 
@@ -377,7 +377,7 @@ impl XlsUsrInfo {
 
 /// Delivery option of a routing slip (`DocRoute.delOption`, MS-XLS 2.4.91).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsRoutingDelivery {
+pub enum RoutingDelivery {
     /// Deliver to one recipient at a time.
     OneAtATime,
     /// Deliver to all recipients at once.
@@ -390,13 +390,13 @@ pub enum XlsRoutingDelivery {
 /// The ANSI strings are preserved as raw bytes without their NULL
 /// terminator; the `CODEPAGE` interpretation is left to the caller.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsDocRoute {
+pub struct DocRoute {
     /// Routing stage of the slip (`iStage`).
     stage: u16,
     /// Number of `RecipName` records that follow (`cRecip`).
     recipient_count: u16,
     /// Delivery option (`delOption`).
-    delivery: XlsRoutingDelivery,
+    delivery: RoutingDelivery,
     /// Whether the document has been routed (`fRouted`).
     routed: bool,
     /// Whether the document returns to the originator after the last
@@ -424,11 +424,11 @@ pub struct XlsDocRoute {
     originator_address: Vec<u8>,
 }
 
-impl XlsDocRoute {
+impl DocRoute {
     /// Parse a `DocRoute` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < DOC_ROUTE_HEADER_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: DOC_ROUTE_HEADER_LEN,
                 found: data.len(),
             });
@@ -442,8 +442,8 @@ impl XlsDocRoute {
             ));
         }
         let delivery = match read_u16(data, 4) {
-            DELIVER_ONE_AT_A_TIME => XlsRoutingDelivery::OneAtATime,
-            DELIVER_ALL_AT_ONCE => XlsRoutingDelivery::AllAtOnce,
+            DELIVER_ONE_AT_A_TIME => RoutingDelivery::OneAtATime,
+            DELIVER_ALL_AT_ONCE => RoutingDelivery::AllAtOnce,
             other => {
                 return Err(invalid(
                     DOC_ROUTE_RECORD_TYPE,
@@ -553,7 +553,7 @@ impl XlsDocRoute {
             "rgchSSAddr",
         )?;
         if offset != data.len() {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: offset,
                 found: data.len(),
             });
@@ -582,8 +582,8 @@ impl XlsDocRoute {
         payload.extend_from_slice(&self.stage.to_le_bytes());
         payload.extend_from_slice(&self.recipient_count.to_le_bytes());
         let del_option = match self.delivery {
-            XlsRoutingDelivery::OneAtATime => DELIVER_ONE_AT_A_TIME,
-            XlsRoutingDelivery::AllAtOnce => DELIVER_ALL_AT_ONCE,
+            RoutingDelivery::OneAtATime => DELIVER_ONE_AT_A_TIME,
+            RoutingDelivery::AllAtOnce => DELIVER_ALL_AT_ONCE,
         };
         payload.extend_from_slice(&del_option.to_le_bytes());
         let mut flags = ROUTE_FLAG_SAVE_ROUTE_INFO;
@@ -634,7 +634,7 @@ impl XlsDocRoute {
     }
 
     /// Delivery option of the routing slip.
-    pub fn delivery(&self) -> XlsRoutingDelivery {
+    pub fn delivery(&self) -> RoutingDelivery {
         self.delivery
     }
 
@@ -701,18 +701,18 @@ impl XlsDocRoute {
 /// The ANSI strings are preserved as raw bytes; the `CODEPAGE`
 /// interpretation is left to the caller.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsRecipName {
+pub struct RecipName {
     /// Recipient's friendly name (`szFriendly`, without the NULL).
     friendly_name: Vec<u8>,
     /// Recipient's messaging-system address identifier (`rgchSSAddr`).
     address: Vec<u8>,
 }
 
-impl XlsRecipName {
+impl RecipName {
     /// Parse a `RecipName` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < RECIP_NAME_HEADER_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: RECIP_NAME_HEADER_LEN,
                 found: data.len(),
             });
@@ -744,7 +744,7 @@ impl XlsRecipName {
         }
         let address = data[offset..end].to_vec();
         if end != data.len() {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: end,
                 found: data.len(),
             });
@@ -800,17 +800,17 @@ mod tests {
     #[test]
     fn cusr_round_trip() {
         let payload = [0x03, 0x00];
-        let record = XlsCUsr::parse(&payload).unwrap();
+        let record = CUsr::parse(&payload).unwrap();
         assert_eq!(record.count(), 3);
         assert_eq!(record.to_payload(), payload);
     }
 
     #[test]
     fn cusr_rejects_bad_length_and_count() {
-        assert!(XlsCUsr::parse(&[0x01]).is_err());
-        assert!(XlsCUsr::parse(&[0x01, 0x00, 0x00]).is_err());
+        assert!(CUsr::parse(&[0x01]).is_err());
+        assert!(CUsr::parse(&[0x01, 0x00, 0x00]).is_err());
         // iCount MUST be at most 255.
-        assert!(XlsCUsr::parse(&[0x00, 0x01]).is_err());
+        assert!(CUsr::parse(&[0x00, 0x01]).is_err());
     }
 
     #[test]
@@ -818,7 +818,7 @@ mod tests {
         let mut payload = vec![0u8; CB_USR_LEN];
         payload[0..2].copy_from_slice(&57u16.to_le_bytes());
         payload[2..4].copy_from_slice(&60u16.to_le_bytes());
-        let record = XlsCbUsr::parse(&payload).unwrap();
+        let record = CbUsr::parse(&payload).unwrap();
         assert_eq!(record.sizes()[0], 57);
         assert_eq!(record.sizes()[1], 60);
         assert_eq!(record.sizes()[2], 0);
@@ -827,14 +827,14 @@ mod tests {
 
     #[test]
     fn cbusr_rejects_bad_length() {
-        assert!(XlsCbUsr::parse(&[0u8; CB_USR_LEN - 1]).is_err());
-        assert!(XlsCbUsr::parse(&[0u8; CB_USR_LEN + 1]).is_err());
+        assert!(CbUsr::parse(&[0u8; CB_USR_LEN - 1]).is_err());
+        assert!(CbUsr::parse(&[0u8; CB_USR_LEN + 1]).is_err());
     }
 
     #[test]
     fn usr_info_round_trip_compressed() {
         let payload = usr_info_payload(5, 0, b"Alice");
-        let record = XlsUsrInfo::parse(&payload).unwrap();
+        let record = UsrInfo::parse(&payload).unwrap();
         assert_eq!(record.user_id(), 42);
         assert_eq!(record.guid(), &[0xAB; GUID_LEN]);
         assert_eq!(record.opened_at().year(), 2024);
@@ -849,7 +849,7 @@ mod tests {
         // "Яб": two Cyrillic characters that do not fit in one byte.
         let name: Vec<u8> = "Яб".encode_utf16().flat_map(u16::to_le_bytes).collect();
         let payload = usr_info_payload(2, STRING_HIGH_BYTE, &name);
-        let record = XlsUsrInfo::parse(&payload).unwrap();
+        let record = UsrInfo::parse(&payload).unwrap();
         assert_eq!(record.user_name(), "Яб");
         assert_eq!(record.to_payload(), payload);
     }
@@ -860,31 +860,31 @@ mod tests {
         let mut payload = usr_info_payload(5, 0, b"Alice");
         payload[USR_INFO_PREFIX_LEN] = 0;
         payload[USR_INFO_PREFIX_LEN + 1] = 0;
-        assert!(XlsUsrInfo::parse(&payload).is_err());
+        assert!(UsrInfo::parse(&payload).is_err());
         // 55 characters exceeds the maximum of 54.
         let payload = usr_info_payload(55, 0, &[b'a'; 55]);
-        assert!(XlsUsrInfo::parse(&payload).is_err());
+        assert!(UsrInfo::parse(&payload).is_err());
     }
 
     #[test]
     fn usr_info_rejects_rich_and_extended_strings() {
         let payload = usr_info_payload(5, 0x08, b"Alice"); // fRichSt
-        assert!(XlsUsrInfo::parse(&payload).is_err());
+        assert!(UsrInfo::parse(&payload).is_err());
         let payload = usr_info_payload(5, 0x04, b"Alice"); // fExtSt
-        assert!(XlsUsrInfo::parse(&payload).is_err());
+        assert!(UsrInfo::parse(&payload).is_err());
     }
 
     #[test]
     fn usr_info_rejects_truncation_and_trailing_garbage() {
         let payload = usr_info_payload(5, 0, b"Alice");
-        assert!(XlsUsrInfo::parse(&payload[..payload.len() - 1]).is_err());
+        assert!(UsrInfo::parse(&payload[..payload.len() - 1]).is_err());
         let mut longer = payload.clone();
         longer.push(0);
-        assert!(XlsUsrInfo::parse(&longer).is_err());
+        assert!(UsrInfo::parse(&longer).is_err());
         // Invalid ShortDTR month.
         let mut bad_dtr = payload;
         bad_dtr[4 + GUID_LEN + 2] = 13;
-        assert!(XlsUsrInfo::parse(&bad_dtr).is_err());
+        assert!(UsrInfo::parse(&bad_dtr).is_err());
     }
 
     /// Build a `DocRoute` payload with all strings populated.
@@ -922,10 +922,10 @@ mod tests {
     #[test]
     fn doc_route_round_trip() {
         let payload = doc_route_payload();
-        let record = XlsDocRoute::parse(&payload).unwrap();
+        let record = DocRoute::parse(&payload).unwrap();
         assert_eq!(record.stage(), 2);
         assert_eq!(record.recipient_count(), 3);
-        assert_eq!(record.delivery(), XlsRoutingDelivery::AllAtOnce);
+        assert_eq!(record.delivery(), RoutingDelivery::AllAtOnce);
         assert!(record.routed());
         assert!(record.return_to_originator());
         assert!(record.track_status());
@@ -949,7 +949,7 @@ mod tests {
         data.extend_from_slice(&ROUTE_FLAG_SAVE_ROUTE_INFO.to_le_bytes());
         data.extend_from_slice(&[0; 12]); // six zero cch fields
         data.extend_from_slice(&0u32.to_le_bytes()); // ulEIDSize
-        let record = XlsDocRoute::parse(&data).unwrap();
+        let record = DocRoute::parse(&data).unwrap();
         assert!(!record.routed());
         assert!(!record.custom_type_defined());
         assert!(record.subject().is_empty());
@@ -961,14 +961,14 @@ mod tests {
     fn doc_route_rejects_stage_past_recipients() {
         let mut payload = doc_route_payload();
         payload[0..2].copy_from_slice(&5u16.to_le_bytes()); // iStage 5 > 3 + 1
-        assert!(XlsDocRoute::parse(&payload).is_err());
+        assert!(DocRoute::parse(&payload).is_err());
     }
 
     #[test]
     fn doc_route_rejects_unknown_delivery_option() {
         let mut payload = doc_route_payload();
         payload[4..6].copy_from_slice(&2u16.to_le_bytes());
-        assert!(XlsDocRoute::parse(&payload).is_err());
+        assert!(DocRoute::parse(&payload).is_err());
     }
 
     #[test]
@@ -976,7 +976,7 @@ mod tests {
         // fSaveRouteInfo is bit 7 of the bitfield, i.e. the low flag byte.
         let mut payload = doc_route_payload();
         payload[6] &= !0x80;
-        assert!(XlsDocRoute::parse(&payload).is_err());
+        assert!(DocRoute::parse(&payload).is_err());
     }
 
     #[test]
@@ -984,11 +984,11 @@ mod tests {
         // cchSubject above the 256 maximum.
         let mut payload = doc_route_payload();
         payload[8..10].copy_from_slice(&257u16.to_le_bytes());
-        assert!(XlsDocRoute::parse(&payload).is_err());
+        assert!(DocRoute::parse(&payload).is_err());
         // cchCustType without fCustomType.
         let mut payload = doc_route_payload();
         payload[6] &= !ROUTE_FLAG_CUSTOM_TYPE as u8;
-        assert!(XlsDocRoute::parse(&payload).is_err());
+        assert!(DocRoute::parse(&payload).is_err());
     }
 
     #[test]
@@ -996,7 +996,7 @@ mod tests {
         // ulEIDSize pushes the combined length past 8202.
         let mut payload = doc_route_payload();
         payload[20..24].copy_from_slice(&9000u32.to_le_bytes());
-        assert!(XlsDocRoute::parse(&payload).is_err());
+        assert!(DocRoute::parse(&payload).is_err());
     }
 
     #[test]
@@ -1004,11 +1004,11 @@ mod tests {
         // Overwrite the terminator of szSubject.
         let mut payload = doc_route_payload();
         payload[DOC_ROUTE_HEADER_LEN + 7] = b'!';
-        assert!(XlsDocRoute::parse(&payload).is_err());
+        assert!(DocRoute::parse(&payload).is_err());
         // Truncated record.
         let payload = doc_route_payload();
-        assert!(XlsDocRoute::parse(&payload[..payload.len() - 3]).is_err());
-        assert!(XlsDocRoute::parse(&payload[..DOC_ROUTE_HEADER_LEN - 1]).is_err());
+        assert!(DocRoute::parse(&payload[..payload.len() - 3]).is_err());
+        assert!(DocRoute::parse(&payload[..DOC_ROUTE_HEADER_LEN - 1]).is_err());
     }
 
     #[test]
@@ -1018,7 +1018,7 @@ mod tests {
         payload.extend_from_slice(&16u32.to_le_bytes()); // ulEIDSize
         payload.extend_from_slice(b"Bob Doe\0");
         payload.extend_from_slice(b"bob@example.com\0"); // opaque bytes
-        let record = XlsRecipName::parse(&payload).unwrap();
+        let record = RecipName::parse(&payload).unwrap();
         assert_eq!(record.friendly_name(), b"Bob Doe");
         assert_eq!(record.address(), b"bob@example.com\0");
         assert_eq!(record.to_payload(), payload);
@@ -1030,26 +1030,26 @@ mod tests {
         let mut payload = Vec::new();
         payload.extend_from_slice(&257u16.to_le_bytes());
         payload.extend_from_slice(&0u32.to_le_bytes());
-        assert!(XlsRecipName::parse(&payload).is_err());
+        assert!(RecipName::parse(&payload).is_err());
         // Header too short.
-        assert!(XlsRecipName::parse(&[0u8; RECIP_NAME_HEADER_LEN - 1]).is_err());
+        assert!(RecipName::parse(&[0u8; RECIP_NAME_HEADER_LEN - 1]).is_err());
         // szFriendly without its NULL terminator.
         let mut payload = Vec::new();
         payload.extend_from_slice(&4u16.to_le_bytes());
         payload.extend_from_slice(&0u32.to_le_bytes());
         payload.extend_from_slice(b"Bob!");
-        assert!(XlsRecipName::parse(&payload).is_err());
+        assert!(RecipName::parse(&payload).is_err());
         // rgchSSAddr extends past the end.
         let mut payload = Vec::new();
         payload.extend_from_slice(&0u16.to_le_bytes());
         payload.extend_from_slice(&10u32.to_le_bytes());
         payload.extend_from_slice(b"abc");
-        assert!(XlsRecipName::parse(&payload).is_err());
+        assert!(RecipName::parse(&payload).is_err());
         // Trailing garbage.
         let mut payload = Vec::new();
         payload.extend_from_slice(&0u16.to_le_bytes());
         payload.extend_from_slice(&0u32.to_le_bytes());
         payload.push(0);
-        assert!(XlsRecipName::parse(&payload).is_err());
+        assert!(RecipName::parse(&payload).is_err());
     }
 }

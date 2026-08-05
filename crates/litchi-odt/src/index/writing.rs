@@ -408,7 +408,7 @@ impl TextBibliographyType {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TextBibliographyEntryToken {
     Field {
-        field: crate::BibliographyField,
+        field: crate::bibliography_configuration::Field,
         style_name: Option<String>,
     },
     Span {
@@ -2260,7 +2260,7 @@ fn scan_xml(xml: &str) -> Result<XmlScan> {
                 ))
             })?;
         let is_office = bound(&namespace, OFFICE);
-        let is_text = bound(&namespace, super::TEXT_NAMESPACE);
+        let is_text = bound(&namespace, TEXT.as_bytes());
         drop(namespace);
         let end = reader.buffer_position() as usize;
         match event {
@@ -2985,7 +2985,7 @@ mod tests {
         let mut book =
             TextBibliographyEntryTemplate::new(TextBibliographyType::Book, "Bibliography_20_1");
         book.push(TextBibliographyEntryToken::Field {
-            field: crate::BibliographyField::Identifier,
+            field: crate::bibliography_configuration::Field::Identifier,
             style_name: None,
         })
         .push(TextBibliographyEntryToken::Span {
@@ -2993,7 +2993,7 @@ mod tests {
             text: ": ".to_string(),
         })
         .push(TextBibliographyEntryToken::Field {
-            field: crate::BibliographyField::Issn,
+            field: crate::bibliography_configuration::Field::Issn,
             style_name: None,
         });
         bibliography.push_entry_template(book);

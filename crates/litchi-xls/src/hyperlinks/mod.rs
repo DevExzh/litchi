@@ -13,7 +13,7 @@ mod tests;
 
 pub use codec::parse_hlink_record;
 pub use model::{
-    RECORD_TYPE, TOOLTIP_RECORD_TYPE, XlsFileMoniker, XlsHyperlink, XlsHyperlinkMoniker,
-    XlsHyperlinkRange, XlsHyperlinkTargetKind, XlsItemMoniker, XlsUrlMoniker,
+    FileMoniker, Hyperlink, HyperlinkMoniker, HyperlinkRange, HyperlinkTargetKind, ItemMoniker,
+    RECORD_TYPE, TOOLTIP_RECORD_TYPE, UrlMoniker,
 };
 pub(crate) use package::HyperlinkCollector;

@@ -10,7 +10,7 @@
 //!
 //! - MS-XLS 2.4.25 (BopPop), 2.5.14 (Boolean), 2.5.342 (Xnum)
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `BopPop` record (MS-XLS 2.4.25).
 pub(crate) const BOP_POP_RECORD_TYPE: u16 = 0x1061;
@@ -28,8 +28,8 @@ const MAX_PIE2_SIZE: i16 = 200;
 /// Maximum `pcGap` value (MS-XLS 2.4.25).
 const MAX_GAP: i16 = 500;
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: BOP_POP_RECORD_TYPE,
         message: message.into(),
     }
@@ -50,7 +50,7 @@ impl<'a> BopPopReader<'a> {
         Self { data, offset: 0 }
     }
 
-    fn read_bytes<const N: usize>(&mut self) -> XlsResult<[u8; N]> {
+    fn read_bytes<const N: usize>(&mut self) -> Result<[u8; N]> {
         let end = self
             .offset
             .checked_add(N)
@@ -58,11 +58,11 @@ impl<'a> BopPopReader<'a> {
         let bytes = self
             .data
             .get(self.offset..end)
-            .ok_or(XlsError::InvalidLength {
+            .ok_or(Error::InvalidLength {
                 expected: end,
                 found: self.data.len(),
             })?;
-        let value: [u8; N] = bytes.try_into().map_err(|_| XlsError::InvalidLength {
+        let value: [u8; N] = bytes.try_into().map_err(|_| Error::InvalidLength {
             expected: N,
             found: bytes.len(),
         })?;
@@ -70,19 +70,19 @@ impl<'a> BopPopReader<'a> {
         Ok(value)
     }
 
-    fn read_u8(&mut self) -> XlsResult<u8> {
+    fn read_u8(&mut self) -> Result<u8> {
         Ok(u8::from_le_bytes(self.read_bytes()?))
     }
 
-    fn read_u16(&mut self) -> XlsResult<u16> {
+    fn read_u16(&mut self) -> Result<u16> {
         Ok(u16::from_le_bytes(self.read_bytes()?))
     }
 
-    fn read_i16(&mut self) -> XlsResult<i16> {
+    fn read_i16(&mut self) -> Result<i16> {
         Ok(i16::from_le_bytes(self.read_bytes()?))
     }
 
-    fn read_f64(&mut self) -> XlsResult<f64> {
+    fn read_f64(&mut self) -> Result<f64> {
         Ok(f64::from_le_bytes(self.read_bytes()?))
     }
 }
@@ -90,15 +90,15 @@ impl<'a> BopPopReader<'a> {
 /// The `pst` chart group subtype (MS-XLS 2.4.25).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub enum XlsBopPopSubtype {
+pub enum BopPopSubtype {
     /// 0x01: pie of pie chart group.
     PieOfPie = 0x01,
     /// 0x02: bar of pie chart group.
     BarOfPie = 0x02,
 }
 
-impl XlsBopPopSubtype {
-    fn parse(value: u8) -> XlsResult<Self> {
+impl BopPopSubtype {
+    fn parse(value: u8) -> Result<Self> {
         match value {
             0x01 => Ok(Self::PieOfPie),
             0x02 => Ok(Self::BarOfPie),
@@ -113,7 +113,7 @@ impl XlsBopPopSubtype {
 /// pie and the secondary bar/pie (MS-XLS 2.4.25).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
-pub enum XlsBopPopSplit {
+pub enum BopPopSplit {
     /// 0x0000: split by data point position (`iSplitPos`).
     Position = 0x0000,
     /// 0x0001: split by threshold value (`numSplitValue`).
@@ -125,8 +125,8 @@ pub enum XlsBopPopSplit {
     Custom = 0x0003,
 }
 
-impl XlsBopPopSplit {
-    fn parse(value: u16) -> XlsResult<Self> {
+impl BopPopSplit {
+    fn parse(value: u16) -> Result<Self> {
         match value {
             0x0000 => Ok(Self::Position),
             0x0001 => Ok(Self::Value),
@@ -145,13 +145,13 @@ impl XlsBopPopSplit {
 /// The 15 `reserved` flags bits (MUST be ignored) are preserved verbatim so
 /// the record round-trips unchanged.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct XlsBopPop {
+pub struct BopPop {
     /// The chart group subtype (`pst`).
-    subtype: XlsBopPopSubtype,
+    subtype: BopPopSubtype,
     /// Whether the split point is determined automatically (`fAutoSplit`).
     auto_split: bool,
     /// What determines the split (`split`).
-    split: XlsBopPopSplit,
+    split: BopPopSplit,
     /// Number of trailing data points in the secondary bar/pie (`iSplitPos`),
     /// in 0..=32000.
     split_position: i16,
@@ -170,11 +170,11 @@ pub struct XlsBopPop {
     flags: u16,
 }
 
-impl XlsBopPop {
+impl BopPop {
     /// Parse a `BopPop` record payload.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: PAYLOAD_LEN,
                 found: data.len(),
             });
@@ -217,9 +217,9 @@ impl XlsBopPop {
             )));
         }
         Ok(Self {
-            subtype: XlsBopPopSubtype::parse(subtype)?,
+            subtype: BopPopSubtype::parse(subtype)?,
             auto_split,
-            split: XlsBopPopSplit::parse(split)?,
+            split: BopPopSplit::parse(split)?,
             split_position,
             split_percent,
             pie2_size_percent,
@@ -245,7 +245,7 @@ impl XlsBopPop {
     }
 
     /// The chart group subtype (`pst`).
-    pub fn subtype(&self) -> XlsBopPopSubtype {
+    pub fn subtype(&self) -> BopPopSubtype {
         self.subtype
     }
 
@@ -255,7 +255,7 @@ impl XlsBopPop {
     }
 
     /// What determines the split (`split`).
-    pub fn split(&self) -> XlsBopPopSplit {
+    pub fn split(&self) -> BopPopSplit {
         self.split
     }
 
@@ -324,17 +324,17 @@ mod tests {
     #[test]
     fn round_trip_all_subtypes_and_splits() {
         for (subtype, expected_subtype) in [
-            (0x01, XlsBopPopSubtype::PieOfPie),
-            (0x02, XlsBopPopSubtype::BarOfPie),
+            (0x01, BopPopSubtype::PieOfPie),
+            (0x02, BopPopSubtype::BarOfPie),
         ] {
             for (split, expected_split) in [
-                (0x0000, XlsBopPopSplit::Position),
-                (0x0001, XlsBopPopSplit::Value),
-                (0x0002, XlsBopPopSplit::Percent),
-                (0x0003, XlsBopPopSplit::Custom),
+                (0x0000, BopPopSplit::Position),
+                (0x0001, BopPopSplit::Value),
+                (0x0002, BopPopSplit::Percent),
+                (0x0003, BopPopSplit::Custom),
             ] {
                 let bytes = record(subtype, 0x01, split, [3, 40, 75, 100], 2.5, 0x0001);
-                let parsed = XlsBopPop::parse(&bytes).unwrap();
+                let parsed = BopPop::parse(&bytes).unwrap();
                 assert_eq!(parsed.subtype(), expected_subtype);
                 assert!(parsed.auto_split());
                 assert_eq!(parsed.split(), expected_split);
@@ -352,13 +352,11 @@ mod tests {
     #[test]
     fn accepts_field_bounds_and_preserves_reserved_bits() {
         for (position, pie2, gap) in [(0, 5, 0), (32000, 200, 500)] {
-            assert!(
-                XlsBopPop::parse(&record(0x01, 0, 0, [position, 0, pie2, gap], 0.0, 0)).is_ok()
-            );
+            assert!(BopPop::parse(&record(0x01, 0, 0, [position, 0, pie2, gap], 0.0, 0)).is_ok());
         }
         // The 15 reserved flags bits MUST be ignored but round-trip verbatim.
         let bytes = record(0x02, 0, 0x0003, [0, 0, 5, 0], 0.0, 0xFFFE);
-        let parsed = XlsBopPop::parse(&bytes).unwrap();
+        let parsed = BopPop::parse(&bytes).unwrap();
         assert_eq!(parsed.flags(), 0xFFFE);
         assert!(!parsed.has_shadow());
         assert_eq!(parsed.to_payload(), bytes);
@@ -368,21 +366,21 @@ mod tests {
     fn rejects_malformed_records() {
         let bytes = record(0x01, 0x00, 0x0000, [0, 0, 5, 0], 0.0, 0);
         // Truncated and overlong payloads.
-        assert!(XlsBopPop::parse(&bytes[..21]).is_err());
-        assert!(XlsBopPop::parse(&[bytes.as_slice(), &[0]].concat()).is_err());
+        assert!(BopPop::parse(&bytes[..21]).is_err());
+        assert!(BopPop::parse(&[bytes.as_slice(), &[0]].concat()).is_err());
         // Undefined pst / split values.
-        assert!(XlsBopPop::parse(&record(0x00, 0, 0, [0, 0, 5, 0], 0.0, 0)).is_err());
-        assert!(XlsBopPop::parse(&record(0x03, 0, 0, [0, 0, 5, 0], 0.0, 0)).is_err());
-        assert!(XlsBopPop::parse(&record(0x01, 0, 0x0004, [0, 0, 5, 0], 0.0, 0)).is_err());
+        assert!(BopPop::parse(&record(0x00, 0, 0, [0, 0, 5, 0], 0.0, 0)).is_err());
+        assert!(BopPop::parse(&record(0x03, 0, 0, [0, 0, 5, 0], 0.0, 0)).is_err());
+        assert!(BopPop::parse(&record(0x01, 0, 0x0004, [0, 0, 5, 0], 0.0, 0)).is_err());
         // Non-Boolean fAutoSplit.
-        assert!(XlsBopPop::parse(&record(0x01, 0x02, 0, [0, 0, 5, 0], 0.0, 0)).is_err());
+        assert!(BopPop::parse(&record(0x01, 0x02, 0, [0, 0, 5, 0], 0.0, 0)).is_err());
         // Out-of-range iSplitPos / pcPie2Size / pcGap.
-        assert!(XlsBopPop::parse(&record(0x01, 0, 0, [-1, 0, 5, 0], 0.0, 0)).is_err());
-        assert!(XlsBopPop::parse(&record(0x01, 0, 0, [32001, 0, 5, 0], 0.0, 0)).is_err());
-        assert!(XlsBopPop::parse(&record(0x01, 0, 0, [0, 0, 4, 0], 0.0, 0)).is_err());
-        assert!(XlsBopPop::parse(&record(0x01, 0, 0, [0, 0, 201, 0], 0.0, 0)).is_err());
-        assert!(XlsBopPop::parse(&record(0x01, 0, 0, [0, 0, 5, -1], 0.0, 0)).is_err());
-        assert!(XlsBopPop::parse(&record(0x01, 0, 0, [0, 0, 5, 501], 0.0, 0)).is_err());
+        assert!(BopPop::parse(&record(0x01, 0, 0, [-1, 0, 5, 0], 0.0, 0)).is_err());
+        assert!(BopPop::parse(&record(0x01, 0, 0, [32001, 0, 5, 0], 0.0, 0)).is_err());
+        assert!(BopPop::parse(&record(0x01, 0, 0, [0, 0, 4, 0], 0.0, 0)).is_err());
+        assert!(BopPop::parse(&record(0x01, 0, 0, [0, 0, 201, 0], 0.0, 0)).is_err());
+        assert!(BopPop::parse(&record(0x01, 0, 0, [0, 0, 5, -1], 0.0, 0)).is_err());
+        assert!(BopPop::parse(&record(0x01, 0, 0, [0, 0, 5, 501], 0.0, 0)).is_err());
     }
 
     #[test]
@@ -390,10 +388,7 @@ mod tests {
         let bytes = record(0x01, 0, 0, [0, 0, 5, 0], 0.0, 0);
 
         for length in 0..PAYLOAD_LEN {
-            assert!(
-                XlsBopPop::parse(&bytes[..length]).is_err(),
-                "length {length}"
-            );
+            assert!(BopPop::parse(&bytes[..length]).is_err(), "length {length}");
         }
     }
 

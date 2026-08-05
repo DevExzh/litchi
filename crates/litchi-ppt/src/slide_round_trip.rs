@@ -1,8 +1,8 @@
 //! Inert PowerPoint 12 direct slide round-trip metadata.
 
-use super::package::{PptError, Result};
-use super::records::PptRecord;
-use crate::consts::PptRecordType;
+use super::package::{Error, Result};
+use super::records::Record;
+use crate::consts::RecordType;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::content_type;
 use quick_xml::XmlVersion;
@@ -21,7 +21,7 @@ const TIMING_INFO_RELATIONSHIP_TYPE: &str =
 
 /// Validated embedded ECMA-376 package containing PowerPoint 12 animation timing data.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointAnimationPackage {
+pub struct AnimationPackage {
     /// Original package bytes retained without modification for lossless round trips.
     pub data: Vec<u8>,
     /// Number of parts in the embedded OPC package.
@@ -32,7 +32,7 @@ pub struct PowerPointAnimationPackage {
 
 /// Kind of DrawingML theme stored in a PowerPoint 12 round-trip package.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PowerPointThemeKind {
+pub enum ThemeKind {
     /// Full DrawingML Theme part with a `theme` root element.
     Theme,
     /// DrawingML Theme Override part with a `themeOverride` root element.
@@ -41,7 +41,7 @@ pub enum PowerPointThemeKind {
 
 /// Validated embedded ECMA-376 package containing a theme or theme override.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointThemePackage {
+pub struct ThemePackage {
     /// Original package bytes retained without modification for lossless round trips.
     pub data: Vec<u8>,
     /// Number of parts in the embedded OPC package.
@@ -49,12 +49,12 @@ pub struct PowerPointThemePackage {
     /// Package part name of the Theme or Theme Override part.
     pub theme_part_name: String,
     /// Kind of theme part stored in the package.
-    pub kind: PowerPointThemeKind,
+    pub kind: ThemeKind,
 }
 
 /// Validated embedded ECMA-376 package containing one expected XML part.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointEmbeddedXmlPackage {
+pub struct EmbeddedXmlPackage {
     /// Original package bytes retained without modification for lossless round trips.
     pub data: Vec<u8>,
     /// Number of parts in the embedded OPC package.
@@ -65,7 +65,7 @@ pub struct PowerPointEmbeddedXmlPackage {
 
 /// XML form stored by a PowerPoint 12 color-mapping atom.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PowerPointColorMappingKind {
+pub enum ColorMappingKind {
     /// A DrawingML `clrMap` element containing a complete color mapping.
     Direct,
     /// A PresentationML override that selects the mapping inherited from the master.
@@ -76,7 +76,7 @@ pub enum PowerPointColorMappingKind {
 
 /// A DrawingML color-scheme slot referenced by a color mapping.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PowerPointColorSchemeIndex {
+pub enum ColorSchemeIndex {
     /// Dark color 1.
     Dark1,
     /// Light color 1.
@@ -105,47 +105,47 @@ pub enum PowerPointColorSchemeIndex {
 
 /// Complete DrawingML mapping from presentation roles to color-scheme slots.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointColorMappingValues {
+pub struct ColorMappingValues {
     /// First background role (`bg1`).
-    pub background1: PowerPointColorSchemeIndex,
+    pub background1: ColorSchemeIndex,
     /// First text role (`tx1`).
-    pub text1: PowerPointColorSchemeIndex,
+    pub text1: ColorSchemeIndex,
     /// Second background role (`bg2`).
-    pub background2: PowerPointColorSchemeIndex,
+    pub background2: ColorSchemeIndex,
     /// Second text role (`tx2`).
-    pub text2: PowerPointColorSchemeIndex,
+    pub text2: ColorSchemeIndex,
     /// First accent role.
-    pub accent1: PowerPointColorSchemeIndex,
+    pub accent1: ColorSchemeIndex,
     /// Second accent role.
-    pub accent2: PowerPointColorSchemeIndex,
+    pub accent2: ColorSchemeIndex,
     /// Third accent role.
-    pub accent3: PowerPointColorSchemeIndex,
+    pub accent3: ColorSchemeIndex,
     /// Fourth accent role.
-    pub accent4: PowerPointColorSchemeIndex,
+    pub accent4: ColorSchemeIndex,
     /// Fifth accent role.
-    pub accent5: PowerPointColorSchemeIndex,
+    pub accent5: ColorSchemeIndex,
     /// Sixth accent role.
-    pub accent6: PowerPointColorSchemeIndex,
+    pub accent6: ColorSchemeIndex,
     /// Hyperlink role.
-    pub hyperlink: PowerPointColorSchemeIndex,
+    pub hyperlink: ColorSchemeIndex,
     /// Followed-hyperlink role.
-    pub followed_hyperlink: PowerPointColorSchemeIndex,
+    pub followed_hyperlink: ColorSchemeIndex,
 }
 
 /// Validated PowerPoint 12 color-mapping XML.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PowerPointColorMapping {
+pub struct ColorMapping {
     /// Original UTF-8 XML retained without modification for lossless round trips.
     pub xml: String,
     /// Top-level color-mapping form.
-    pub kind: PowerPointColorMappingKind,
+    pub kind: ColorMappingKind,
     /// Complete mapping values; absent only when the override inherits its master.
-    pub values: Option<PowerPointColorMappingValues>,
+    pub values: Option<ColorMappingValues>,
 }
 
 /// Reference from a slide to its PowerPoint 12 slide layout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PowerPointContentMasterReference {
+pub struct ContentMasterReference {
     /// Record-instance bits retained because MS-PPT does not constrain them for this atom.
     pub record_instance: u16,
     /// Identifier of the owning main master slide.
@@ -158,39 +158,39 @@ pub struct PowerPointContentMasterReference {
 
 /// PowerPoint 12 round-trip metadata stored directly in a slide container.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct PowerPoint12SlideRoundTripMetadata {
+pub struct SlideRoundTripMetadata12 {
     /// Validated embedded PowerPoint 12 theme or theme-override package.
-    pub theme_package: Option<PowerPointThemePackage>,
+    pub theme_package: Option<ThemePackage>,
     /// Validated PowerPoint 12 color-mapping XML.
-    pub color_mapping: Option<PowerPointColorMapping>,
+    pub color_mapping: Option<ColorMapping>,
     /// Identifier of the main master merged into this slide layout.
     pub composite_master_id: Option<u32>,
     /// Reference from this slide to its main master and slide layout.
-    pub content_master: Option<PowerPointContentMasterReference>,
+    pub content_master: Option<ContentMasterReference>,
     /// Validated embedded PowerPoint 12 animation package.
-    pub animation_package: Option<PowerPointAnimationPackage>,
+    pub animation_package: Option<AnimationPackage>,
     /// Checksum stored for the animation data.
     pub animation_checksum: Option<u32>,
 }
 
-impl PowerPoint12SlideRoundTripMetadata {
+impl SlideRoundTripMetadata12 {
     /// Parse direct PowerPoint 12 round-trip records below `root`.
-    pub fn parse(root: &PptRecord) -> Result<Self> {
+    pub fn parse(root: &Record) -> Result<Self> {
         let mut metadata = Self::default();
         for record in &root.children {
             match record.record_type {
-                PptRecordType::RoundTripTheme12Atom => {
+                RecordType::RoundTripTheme12Atom => {
                     if metadata.theme_package.is_some() {
-                        return Err(PptError::Corrupted(
+                        return Err(Error::Corrupted(
                             "Slide contains duplicate RoundTripThemeAtom records".to_string(),
                         ));
                     }
                     validate_variable_atom(record, "RoundTripThemeAtom")?;
                     metadata.theme_package = Some(parse_theme_package(&record.data)?);
                 },
-                PptRecordType::RoundTripColorMapping12Atom => {
+                RecordType::RoundTripColorMapping12Atom => {
                     if metadata.color_mapping.is_some() {
-                        return Err(PptError::Corrupted(
+                        return Err(Error::Corrupted(
                             "Slide contains duplicate RoundTripColorMappingAtom records"
                                 .to_string(),
                         ));
@@ -198,9 +198,9 @@ impl PowerPoint12SlideRoundTripMetadata {
                     validate_variable_atom(record, "RoundTripColorMappingAtom")?;
                     metadata.color_mapping = Some(parse_color_mapping(&record.data)?);
                 },
-                PptRecordType::RoundTripCompositeMasterId12Atom => {
+                RecordType::RoundTripCompositeMasterId12Atom => {
                     if metadata.composite_master_id.is_some() {
-                        return Err(PptError::Corrupted(
+                        return Err(Error::Corrupted(
                             "Slide contains duplicate RoundTripCompositeMasterId12Atom records"
                                 .to_string(),
                         ));
@@ -213,15 +213,15 @@ impl PowerPoint12SlideRoundTripMetadata {
                         record.data[3],
                     ]));
                 },
-                PptRecordType::RoundTripContentMasterId12Atom => {
+                RecordType::RoundTripContentMasterId12Atom => {
                     if metadata.content_master.is_some() {
-                        return Err(PptError::Corrupted(
+                        return Err(Error::Corrupted(
                             "Slide contains duplicate RoundTripContentMasterId12Atom records"
                                 .to_string(),
                         ));
                     }
                     validate_atom(record, "RoundTripContentMasterId12Atom", 8, None)?;
-                    metadata.content_master = Some(PowerPointContentMasterReference {
+                    metadata.content_master = Some(ContentMasterReference {
                         record_instance: record.instance,
                         main_master_id: u32::from_le_bytes([
                             record.data[0],
@@ -233,18 +233,18 @@ impl PowerPoint12SlideRoundTripMetadata {
                         unused: u16::from_le_bytes([record.data[6], record.data[7]]),
                     });
                 },
-                PptRecordType::RoundTripAnimation12Atom => {
+                RecordType::RoundTripAnimation12Atom => {
                     if metadata.animation_package.is_some() {
-                        return Err(PptError::Corrupted(
+                        return Err(Error::Corrupted(
                             "Slide contains duplicate RoundTripAnimationAtom records".to_string(),
                         ));
                     }
                     validate_variable_atom(record, "RoundTripAnimationAtom")?;
                     metadata.animation_package = Some(parse_animation_package(&record.data)?);
                 },
-                PptRecordType::RoundTripAnimationHash12Atom => {
+                RecordType::RoundTripAnimationHash12Atom => {
                     if metadata.animation_checksum.is_some() {
-                        return Err(PptError::Corrupted(
+                        return Err(Error::Corrupted(
                             "Slide contains duplicate RoundTripAnimationHashAtom records"
                                 .to_string(),
                         ));
@@ -264,12 +264,12 @@ impl PowerPoint12SlideRoundTripMetadata {
     }
 }
 
-pub(crate) fn validate_variable_atom(record: &PptRecord, name: &str) -> Result<()> {
+pub(crate) fn validate_variable_atom(record: &Record, name: &str) -> Result<()> {
     if record.version != 0
         || record.instance != 0
         || record.data_length as usize != record.data.len()
     {
-        return Err(PptError::Corrupted(format!(
+        return Err(Error::Corrupted(format!(
             "{name} has an invalid record header or size"
         )));
     }
@@ -282,9 +282,9 @@ pub(crate) fn parse_embedded_xml_package(
     expected_content_type: &str,
     expected_namespace: &[u8],
     expected_root: &[u8],
-) -> Result<PowerPointEmbeddedXmlPackage> {
+) -> Result<EmbeddedXmlPackage> {
     let package = OpcPackage::from_bytes(data).map_err(|error| {
-        PptError::Corrupted(format!(
+        Error::Corrupted(format!(
             "{record_name} contains an invalid ECMA-376 package: {error}"
         ))
     })?;
@@ -292,17 +292,17 @@ pub(crate) fn parse_embedded_xml_package(
     for part in package.iter_parts() {
         if part.content_type() == expected_content_type {
             if xml_part_name.is_some() {
-                return Err(PptError::Corrupted(format!(
+                return Err(Error::Corrupted(format!(
                     "{record_name} package has multiple expected XML parts"
                 )));
             }
             if !xml_has_root(part.blob(), expected_namespace, expected_root).map_err(|error| {
-                PptError::Corrupted(format!(
+                Error::Corrupted(format!(
                     "{record_name} XML part {} is invalid: {error}",
                     part.partname()
                 ))
             })? {
-                return Err(PptError::Corrupted(format!(
+                return Err(Error::Corrupted(format!(
                     "{record_name} part {} has an invalid root element",
                     part.partname()
                 )));
@@ -310,7 +310,7 @@ pub(crate) fn parse_embedded_xml_package(
             xml_part_name = Some(part.partname().to_string());
         } else if is_xml_content_type(part.content_type()) {
             validate_xml_with(part.blob(), |_, _, _, _| Ok(())).map_err(|error| {
-                PptError::Corrupted(format!(
+                Error::Corrupted(format!(
                     "{record_name} XML part {} is invalid: {error}",
                     part.partname()
                 ))
@@ -318,44 +318,43 @@ pub(crate) fn parse_embedded_xml_package(
         }
     }
     let xml_part_name = xml_part_name.ok_or_else(|| {
-        PptError::Corrupted(format!("{record_name} package has no expected XML part"))
+        Error::Corrupted(format!("{record_name} package has no expected XML part"))
     })?;
-    Ok(PowerPointEmbeddedXmlPackage {
+    Ok(EmbeddedXmlPackage {
         data: data.to_vec(),
         part_count: package.part_count(),
         xml_part_name,
     })
 }
 
-pub(crate) fn parse_theme_package(data: &[u8]) -> Result<PowerPointThemePackage> {
+pub(crate) fn parse_theme_package(data: &[u8]) -> Result<ThemePackage> {
     let package = OpcPackage::from_bytes(data).map_err(|error| {
-        PptError::Corrupted(format!(
+        Error::Corrupted(format!(
             "RoundTripThemeAtom contains an invalid ECMA-376 package: {error}"
         ))
     })?;
     let mut theme_part = None;
     for part in package.iter_parts() {
         let expected = match part.content_type() {
-            content_type::OFC_THEME => Some((PowerPointThemeKind::Theme, b"theme".as_slice())),
-            content_type::OFC_THEME_OVERRIDE => Some((
-                PowerPointThemeKind::ThemeOverride,
-                b"themeOverride".as_slice(),
-            )),
+            content_type::OFC_THEME => Some((ThemeKind::Theme, b"theme".as_slice())),
+            content_type::OFC_THEME_OVERRIDE => {
+                Some((ThemeKind::ThemeOverride, b"themeOverride".as_slice()))
+            },
             _ => None,
         };
         if let Some((kind, expected_root)) = expected {
             if theme_part.is_some() {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "RoundTripThemeAtom package has multiple Theme parts".to_string(),
                 ));
             }
             if !xml_has_root(part.blob(), DRAWINGML_NAMESPACE, expected_root).map_err(|error| {
-                PptError::Corrupted(format!(
+                Error::Corrupted(format!(
                     "RoundTripThemeAtom Theme part {} is invalid: {error}",
                     part.partname()
                 ))
             })? {
-                return Err(PptError::Corrupted(format!(
+                return Err(Error::Corrupted(format!(
                     "RoundTripThemeAtom part {} has an invalid root element",
                     part.partname()
                 )));
@@ -363,7 +362,7 @@ pub(crate) fn parse_theme_package(data: &[u8]) -> Result<PowerPointThemePackage>
             theme_part = Some((part.partname().to_string(), kind));
         } else if is_xml_content_type(part.content_type()) {
             validate_xml_with(part.blob(), |_, _, _, _| Ok(())).map_err(|error| {
-                PptError::Corrupted(format!(
+                Error::Corrupted(format!(
                     "RoundTripThemeAtom XML part {} is invalid: {error}",
                     part.partname()
                 ))
@@ -371,11 +370,11 @@ pub(crate) fn parse_theme_package(data: &[u8]) -> Result<PowerPointThemePackage>
         }
     }
     let (theme_part_name, kind) = theme_part.ok_or_else(|| {
-        PptError::Corrupted(
+        Error::Corrupted(
             "RoundTripThemeAtom package has no Theme or Theme Override part".to_string(),
         )
     })?;
-    Ok(PowerPointThemePackage {
+    Ok(ThemePackage {
         data: data.to_vec(),
         part_count: package.part_count(),
         theme_part_name,
@@ -383,7 +382,7 @@ pub(crate) fn parse_theme_package(data: &[u8]) -> Result<PowerPointThemePackage>
     })
 }
 
-pub(crate) fn parse_color_mapping(data: &[u8]) -> Result<PowerPointColorMapping> {
+pub(crate) fn parse_color_mapping(data: &[u8]) -> Result<ColorMapping> {
     #[derive(Clone, Copy)]
     enum RootKind {
         Direct,
@@ -391,7 +390,7 @@ pub(crate) fn parse_color_mapping(data: &[u8]) -> Result<PowerPointColorMapping>
     }
 
     let xml = std::str::from_utf8(data).map_err(|error| {
-        PptError::Corrupted(format!(
+        Error::Corrupted(format!(
             "RoundTripColorMappingAtom is not valid UTF-8: {error}"
         ))
     })?;
@@ -402,7 +401,7 @@ pub(crate) fn parse_color_mapping(data: &[u8]) -> Result<PowerPointColorMapping>
             if xml_name(namespace, element, DRAWINGML_NAMESPACE, b"clrMap") {
                 root_kind = Some(RootKind::Direct);
                 result = Some((
-                    PowerPointColorMappingKind::Direct,
+                    ColorMappingKind::Direct,
                     Some(parse_color_mapping_values(element, decoder)?),
                 ));
             } else if xml_name(namespace, element, PRESENTATIONML_NAMESPACE, b"clrMapOvr") {
@@ -411,7 +410,7 @@ pub(crate) fn parse_color_mapping(data: &[u8]) -> Result<PowerPointColorMapping>
         } else if depth == 1 && matches!(root_kind, Some(RootKind::Override)) {
             let candidate =
                 if xml_name(namespace, element, DRAWINGML_NAMESPACE, b"masterClrMapping") {
-                    Some((PowerPointColorMappingKind::MasterOverride, None))
+                    Some((ColorMappingKind::MasterOverride, None))
                 } else if xml_name(
                     namespace,
                     element,
@@ -419,7 +418,7 @@ pub(crate) fn parse_color_mapping(data: &[u8]) -> Result<PowerPointColorMapping>
                     b"overrideClrMapping",
                 ) {
                     Some((
-                        PowerPointColorMappingKind::ExplicitOverride,
+                        ColorMappingKind::ExplicitOverride,
                         Some(parse_color_mapping_values(element, decoder)?),
                     ))
                 } else {
@@ -434,21 +433,21 @@ pub(crate) fn parse_color_mapping(data: &[u8]) -> Result<PowerPointColorMapping>
         Ok(())
     })
     .map_err(|error| {
-        PptError::Corrupted(format!(
+        Error::Corrupted(format!(
             "RoundTripColorMappingAtom contains invalid XML: {error}"
         ))
     })?;
     if root_kind.is_none() {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "RoundTripColorMappingAtom has an invalid color-mapping root element".to_string(),
         ));
     }
     let (kind, values) = result.ok_or_else(|| {
-        PptError::Corrupted(
+        Error::Corrupted(
             "RoundTripColorMappingAtom clrMapOvr has no color-mapping choice".to_string(),
         )
     })?;
-    Ok(PowerPointColorMapping {
+    Ok(ColorMapping {
         xml: xml.to_string(),
         kind,
         values,
@@ -458,7 +457,7 @@ pub(crate) fn parse_color_mapping(data: &[u8]) -> Result<PowerPointColorMapping>
 fn parse_color_mapping_values(
     element: &BytesStart<'_>,
     decoder: Decoder,
-) -> std::result::Result<PowerPointColorMappingValues, String> {
+) -> std::result::Result<ColorMappingValues, String> {
     let mut values = [None; 12];
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(|error| error.to_string())?;
@@ -498,7 +497,7 @@ fn parse_color_mapping_values(
     if values.iter().any(Option::is_none) {
         return Err("color mapping does not define all 12 required roles".to_string());
     }
-    Ok(PowerPointColorMappingValues {
+    Ok(ColorMappingValues {
         background1: values[0].unwrap(),
         text1: values[1].unwrap(),
         background2: values[2].unwrap(),
@@ -514,29 +513,27 @@ fn parse_color_mapping_values(
     })
 }
 
-fn parse_color_scheme_index(
-    value: &str,
-) -> std::result::Result<PowerPointColorSchemeIndex, String> {
+fn parse_color_scheme_index(value: &str) -> std::result::Result<ColorSchemeIndex, String> {
     match value {
-        "dk1" => Ok(PowerPointColorSchemeIndex::Dark1),
-        "lt1" => Ok(PowerPointColorSchemeIndex::Light1),
-        "dk2" => Ok(PowerPointColorSchemeIndex::Dark2),
-        "lt2" => Ok(PowerPointColorSchemeIndex::Light2),
-        "accent1" => Ok(PowerPointColorSchemeIndex::Accent1),
-        "accent2" => Ok(PowerPointColorSchemeIndex::Accent2),
-        "accent3" => Ok(PowerPointColorSchemeIndex::Accent3),
-        "accent4" => Ok(PowerPointColorSchemeIndex::Accent4),
-        "accent5" => Ok(PowerPointColorSchemeIndex::Accent5),
-        "accent6" => Ok(PowerPointColorSchemeIndex::Accent6),
-        "hlink" => Ok(PowerPointColorSchemeIndex::Hyperlink),
-        "folHlink" => Ok(PowerPointColorSchemeIndex::FollowedHyperlink),
+        "dk1" => Ok(ColorSchemeIndex::Dark1),
+        "lt1" => Ok(ColorSchemeIndex::Light1),
+        "dk2" => Ok(ColorSchemeIndex::Dark2),
+        "lt2" => Ok(ColorSchemeIndex::Light2),
+        "accent1" => Ok(ColorSchemeIndex::Accent1),
+        "accent2" => Ok(ColorSchemeIndex::Accent2),
+        "accent3" => Ok(ColorSchemeIndex::Accent3),
+        "accent4" => Ok(ColorSchemeIndex::Accent4),
+        "accent5" => Ok(ColorSchemeIndex::Accent5),
+        "accent6" => Ok(ColorSchemeIndex::Accent6),
+        "hlink" => Ok(ColorSchemeIndex::Hyperlink),
+        "folHlink" => Ok(ColorSchemeIndex::FollowedHyperlink),
         _ => Err(format!("invalid color-scheme index '{value}'")),
     }
 }
 
-pub(crate) fn parse_animation_package(data: &[u8]) -> Result<PowerPointAnimationPackage> {
+pub(crate) fn parse_animation_package(data: &[u8]) -> Result<AnimationPackage> {
     let package = OpcPackage::from_bytes(data).map_err(|error| {
-        PptError::Corrupted(format!(
+        Error::Corrupted(format!(
             "RoundTripAnimationAtom contains an invalid ECMA-376 package: {error}"
         ))
     })?;
@@ -545,36 +542,36 @@ pub(crate) fn parse_animation_package(data: &[u8]) -> Result<PowerPointAnimation
         .iter()
         .filter(|relationship| relationship.reltype() == TIMING_INFO_RELATIONSHIP_TYPE);
     let timing_relationship = timing_relationships.next().ok_or_else(|| {
-        PptError::Corrupted(
+        Error::Corrupted(
             "RoundTripAnimationAtom package has no Timing Info relationship".to_string(),
         )
     })?;
     if timing_relationships.next().is_some() || timing_relationship.is_external() {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "RoundTripAnimationAtom package has invalid Timing Info relationships".to_string(),
         ));
     }
     let timing_part_name = timing_relationship.target_partname().map_err(|error| {
-        PptError::Corrupted(format!(
+        Error::Corrupted(format!(
             "RoundTripAnimationAtom has an invalid Timing Info target: {error}"
         ))
     })?;
     let timing_part = package.get_part(&timing_part_name).map_err(|error| {
-        PptError::Corrupted(format!(
+        Error::Corrupted(format!(
             "RoundTripAnimationAtom Timing Info part is invalid: {error}"
         ))
     })?;
     if timing_part.content_type() != TIMING_INFO_CONTENT_TYPE {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "RoundTripAnimationAtom Timing Info part has an invalid content type".to_string(),
         ));
     }
     if !xml_contains_presentation_timing(timing_part.blob()).map_err(|error| {
-        PptError::Corrupted(format!(
+        Error::Corrupted(format!(
             "RoundTripAnimationAtom Timing Info XML is invalid: {error}"
         ))
     })? {
-        return Err(PptError::Corrupted(
+        return Err(Error::Corrupted(
             "RoundTripAnimationAtom Timing Info part has no PresentationML timing element"
                 .to_string(),
         ));
@@ -584,13 +581,13 @@ pub(crate) fn parse_animation_package(data: &[u8]) -> Result<PowerPointAnimation
             continue;
         }
         xml_contains_presentation_timing(part.blob()).map_err(|error| {
-            PptError::Corrupted(format!(
+            Error::Corrupted(format!(
                 "RoundTripAnimationAtom XML part {} is invalid: {error}",
                 part.partname()
             ))
         })?;
     }
-    Ok(PowerPointAnimationPackage {
+    Ok(AnimationPackage {
         data: data.to_vec(),
         part_count: package.part_count(),
         timing_part_name: timing_part_name.to_string(),
@@ -723,7 +720,7 @@ fn validate_xml_attributes(
 }
 
 fn validate_atom(
-    record: &PptRecord,
+    record: &Record,
     name: &str,
     expected_length: usize,
     expected_instance: Option<u16>,
@@ -733,7 +730,7 @@ fn validate_atom(
         || record.data_length as usize != expected_length
         || record.data.len() != expected_length
     {
-        return Err(PptError::Corrupted(format!(
+        return Err(Error::Corrupted(format!(
             "{name} has an invalid record header or size"
         )));
     }
@@ -749,8 +746,8 @@ mod tests {
 
     const COLOR_MAPPING_ATTRIBUTES: &str = r#"bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink""#;
 
-    fn record(record_type: PptRecordType, version: u16, instance: u16, data: &[u8]) -> PptRecord {
-        PptRecord {
+    fn record(record_type: RecordType, version: u16, instance: u16, data: &[u8]) -> Record {
+        Record {
             version,
             instance,
             record_type,
@@ -761,8 +758,8 @@ mod tests {
         }
     }
 
-    fn root(children: Vec<PptRecord>) -> PptRecord {
-        let mut root = record(PptRecordType::Slide, 0x0f, 0, &[]);
+    fn root(children: Vec<Record>) -> Record {
+        let mut root = record(RecordType::Slide, 0x0f, 0, &[]);
         root.children = children;
         root
     }
@@ -804,7 +801,7 @@ mod tests {
         ])
     }
 
-    fn theme_package(kind: PowerPointThemeKind, theme_xml: &[u8]) -> Vec<u8> {
+    fn theme_package(kind: ThemeKind, theme_xml: &[u8]) -> Vec<u8> {
         let mut package = OpcPackage::new();
         let mut manager = XmlPart::new(
             PackURI::new("/theme/theme/themeManager.xml").unwrap(),
@@ -813,8 +810,8 @@ mod tests {
                 .to_vec(),
         );
         let (theme_content_type, theme_relationship_type) = match kind {
-            PowerPointThemeKind::Theme => (content_type::OFC_THEME, relationship_type::THEME),
-            PowerPointThemeKind::ThemeOverride => (
+            ThemeKind::Theme => (content_type::OFC_THEME, relationship_type::THEME),
+            ThemeKind::ThemeOverride => (
                 content_type::OFC_THEME_OVERRIDE,
                 relationship_type::THEME_OVERRIDE,
             ),
@@ -847,7 +844,7 @@ mod tests {
     #[test]
     fn parses_direct_slide_master_references_and_retains_undefined_values() {
         let composite = record(
-            PptRecordType::RoundTripCompositeMasterId12Atom,
+            RecordType::RoundTripCompositeMasterId12Atom,
             0,
             0,
             &u32::MAX.to_le_bytes(),
@@ -857,18 +854,17 @@ mod tests {
         content.extend_from_slice(&u16::MAX.to_le_bytes());
         content.extend_from_slice(&0xa55au16.to_le_bytes());
         let content = record(
-            PptRecordType::RoundTripContentMasterId12Atom,
+            RecordType::RoundTripContentMasterId12Atom,
             0,
             0x0fff,
             &content,
         );
 
-        let parsed =
-            PowerPoint12SlideRoundTripMetadata::parse(&root(vec![composite, content])).unwrap();
+        let parsed = SlideRoundTripMetadata12::parse(&root(vec![composite, content])).unwrap();
         assert_eq!(parsed.composite_master_id, Some(u32::MAX));
         assert_eq!(
             parsed.content_master,
-            Some(PowerPointContentMasterReference {
+            Some(ContentMasterReference {
                 record_instance: 0x0fff,
                 main_master_id: 0,
                 layout_instance_id: u16::MAX,
@@ -876,8 +872,8 @@ mod tests {
             })
         );
         assert_eq!(
-            PowerPoint12SlideRoundTripMetadata::parse(&root(Vec::new())).unwrap(),
-            PowerPoint12SlideRoundTripMetadata::default()
+            SlideRoundTripMetadata12::parse(&root(Vec::new())).unwrap(),
+            SlideRoundTripMetadata12::default()
         );
     }
 
@@ -885,7 +881,7 @@ mod tests {
     fn rejects_malformed_or_duplicate_direct_slide_master_references() {
         let composite = |version, instance, data: &[u8]| {
             record(
-                PptRecordType::RoundTripCompositeMasterId12Atom,
+                RecordType::RoundTripCompositeMasterId12Atom,
                 version,
                 instance,
                 data,
@@ -893,7 +889,7 @@ mod tests {
         };
         let content = |version, instance, data: &[u8]| {
             record(
-                PptRecordType::RoundTripContentMasterId12Atom,
+                RecordType::RoundTripContentMasterId12Atom,
                 version,
                 instance,
                 data,
@@ -908,78 +904,73 @@ mod tests {
             content(0, 0, &[0; 7]),
             content(0, 0, &[0; 9]),
         ] {
-            assert!(PowerPoint12SlideRoundTripMetadata::parse(&root(vec![malformed])).is_err());
+            assert!(SlideRoundTripMetadata12::parse(&root(vec![malformed])).is_err());
         }
 
         let mut wrong_declared_length = composite(0, 0, &[0; 4]);
         wrong_declared_length.data_length = 5;
-        assert!(
-            PowerPoint12SlideRoundTripMetadata::parse(&root(vec![wrong_declared_length])).is_err()
-        );
+        assert!(SlideRoundTripMetadata12::parse(&root(vec![wrong_declared_length])).is_err());
 
         let duplicate_composite = root(vec![composite(0, 0, &[0; 4]), composite(0, 0, &[1; 4])]);
-        assert!(PowerPoint12SlideRoundTripMetadata::parse(&duplicate_composite).is_err());
+        assert!(SlideRoundTripMetadata12::parse(&duplicate_composite).is_err());
         let duplicate_content = root(vec![content(0, 0, &[0; 8]), content(0, 1, &[1; 8])]);
-        assert!(PowerPoint12SlideRoundTripMetadata::parse(&duplicate_content).is_err());
+        assert!(SlideRoundTripMetadata12::parse(&duplicate_content).is_err());
     }
 
     #[test]
     fn parses_theme_packages_and_all_color_mapping_forms() {
         let theme_data = theme_package(
-            PowerPointThemeKind::Theme,
+            ThemeKind::Theme,
             br#"<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Test"/>"#,
         );
         let color_xml = direct_color_mapping_xml();
-        let parsed = PowerPoint12SlideRoundTripMetadata::parse(&root(vec![
-            record(PptRecordType::RoundTripTheme12Atom, 0, 0, &theme_data),
-            record(PptRecordType::RoundTripColorMapping12Atom, 0, 0, &color_xml),
+        let parsed = SlideRoundTripMetadata12::parse(&root(vec![
+            record(RecordType::RoundTripTheme12Atom, 0, 0, &theme_data),
+            record(RecordType::RoundTripColorMapping12Atom, 0, 0, &color_xml),
         ]))
         .unwrap();
         let theme = parsed.theme_package.unwrap();
         assert_eq!(theme.data, theme_data);
         assert_eq!(theme.part_count, 2);
         assert_eq!(theme.theme_part_name, "/theme/theme/theme1.xml");
-        assert_eq!(theme.kind, PowerPointThemeKind::Theme);
+        assert_eq!(theme.kind, ThemeKind::Theme);
         let mapping = parsed.color_mapping.unwrap();
         assert_eq!(mapping.xml.as_bytes(), color_xml);
-        assert_eq!(mapping.kind, PowerPointColorMappingKind::Direct);
+        assert_eq!(mapping.kind, ColorMappingKind::Direct);
         assert_eq!(
             mapping.values,
-            Some(PowerPointColorMappingValues {
-                background1: PowerPointColorSchemeIndex::Light1,
-                text1: PowerPointColorSchemeIndex::Dark1,
-                background2: PowerPointColorSchemeIndex::Light2,
-                text2: PowerPointColorSchemeIndex::Dark2,
-                accent1: PowerPointColorSchemeIndex::Accent1,
-                accent2: PowerPointColorSchemeIndex::Accent2,
-                accent3: PowerPointColorSchemeIndex::Accent3,
-                accent4: PowerPointColorSchemeIndex::Accent4,
-                accent5: PowerPointColorSchemeIndex::Accent5,
-                accent6: PowerPointColorSchemeIndex::Accent6,
-                hyperlink: PowerPointColorSchemeIndex::Hyperlink,
-                followed_hyperlink: PowerPointColorSchemeIndex::FollowedHyperlink,
+            Some(ColorMappingValues {
+                background1: ColorSchemeIndex::Light1,
+                text1: ColorSchemeIndex::Dark1,
+                background2: ColorSchemeIndex::Light2,
+                text2: ColorSchemeIndex::Dark2,
+                accent1: ColorSchemeIndex::Accent1,
+                accent2: ColorSchemeIndex::Accent2,
+                accent3: ColorSchemeIndex::Accent3,
+                accent4: ColorSchemeIndex::Accent4,
+                accent5: ColorSchemeIndex::Accent5,
+                accent6: ColorSchemeIndex::Accent6,
+                hyperlink: ColorSchemeIndex::Hyperlink,
+                followed_hyperlink: ColorSchemeIndex::FollowedHyperlink,
             })
         );
 
         let override_data = theme_package(
-            PowerPointThemeKind::ThemeOverride,
+            ThemeKind::ThemeOverride,
             br#"<a:themeOverride xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>"#,
         );
-        let parsed = PowerPoint12SlideRoundTripMetadata::parse(&root(vec![record(
-            PptRecordType::RoundTripTheme12Atom,
+        let parsed = SlideRoundTripMetadata12::parse(&root(vec![record(
+            RecordType::RoundTripTheme12Atom,
             0,
             0,
             &override_data,
         )]))
         .unwrap();
-        assert_eq!(
-            parsed.theme_package.unwrap().kind,
-            PowerPointThemeKind::ThemeOverride
-        );
+        assert_eq!(parsed.theme_package.unwrap().kind, ThemeKind::ThemeOverride);
 
         let master_override = br#"<p:clrMapOvr xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:masterClrMapping/></p:clrMapOvr>"#;
-        let parsed = PowerPoint12SlideRoundTripMetadata::parse(&root(vec![record(
-            PptRecordType::RoundTripColorMapping12Atom,
+        let parsed = SlideRoundTripMetadata12::parse(&root(vec![record(
+            RecordType::RoundTripColorMapping12Atom,
             0,
             0,
             master_override,
@@ -987,14 +978,14 @@ mod tests {
         .unwrap()
         .color_mapping
         .unwrap();
-        assert_eq!(parsed.kind, PowerPointColorMappingKind::MasterOverride);
+        assert_eq!(parsed.kind, ColorMappingKind::MasterOverride);
         assert_eq!(parsed.values, None);
 
         let explicit_override = format!(
             r#"<p:clrMapOvr xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:overrideClrMapping {COLOR_MAPPING_ATTRIBUTES}/></p:clrMapOvr>"#
         );
-        let parsed = PowerPoint12SlideRoundTripMetadata::parse(&root(vec![record(
-            PptRecordType::RoundTripColorMapping12Atom,
+        let parsed = SlideRoundTripMetadata12::parse(&root(vec![record(
+            RecordType::RoundTripColorMapping12Atom,
             0,
             0,
             explicit_override.as_bytes(),
@@ -1002,23 +993,23 @@ mod tests {
         .unwrap()
         .color_mapping
         .unwrap();
-        assert_eq!(parsed.kind, PowerPointColorMappingKind::ExplicitOverride);
+        assert_eq!(parsed.kind, ColorMappingKind::ExplicitOverride);
         assert!(parsed.values.is_some());
     }
 
     #[test]
     fn rejects_malformed_or_duplicate_theme_and_color_mapping_records() {
         let theme_data = theme_package(
-            PowerPointThemeKind::Theme,
+            ThemeKind::Theme,
             br#"<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>"#,
         );
         let color_xml = direct_color_mapping_xml();
         let theme = |version, instance, data: &[u8]| {
-            record(PptRecordType::RoundTripTheme12Atom, version, instance, data)
+            record(RecordType::RoundTripTheme12Atom, version, instance, data)
         };
         let color = |version, instance, data: &[u8]| {
             record(
-                PptRecordType::RoundTripColorMapping12Atom,
+                RecordType::RoundTripColorMapping12Atom,
                 version,
                 instance,
                 data,
@@ -1032,28 +1023,24 @@ mod tests {
             color(0, 1, &color_xml),
             color(0, 0, &[0xff]),
         ] {
-            assert!(PowerPoint12SlideRoundTripMetadata::parse(&root(vec![malformed])).is_err());
+            assert!(SlideRoundTripMetadata12::parse(&root(vec![malformed])).is_err());
         }
 
         let mut wrong_theme_length = theme(0, 0, &theme_data);
         wrong_theme_length.data_length -= 1;
-        assert!(
-            PowerPoint12SlideRoundTripMetadata::parse(&root(vec![wrong_theme_length])).is_err()
-        );
+        assert!(SlideRoundTripMetadata12::parse(&root(vec![wrong_theme_length])).is_err());
         let mut wrong_color_length = color(0, 0, &color_xml);
         wrong_color_length.data_length += 1;
+        assert!(SlideRoundTripMetadata12::parse(&root(vec![wrong_color_length])).is_err());
         assert!(
-            PowerPoint12SlideRoundTripMetadata::parse(&root(vec![wrong_color_length])).is_err()
-        );
-        assert!(
-            PowerPoint12SlideRoundTripMetadata::parse(&root(vec![
+            SlideRoundTripMetadata12::parse(&root(vec![
                 theme(0, 0, &theme_data),
                 theme(0, 0, &theme_data),
             ]))
             .is_err()
         );
         assert!(
-            PowerPoint12SlideRoundTripMetadata::parse(&root(vec![
+            SlideRoundTripMetadata12::parse(&root(vec![
                 color(0, 0, &color_xml),
                 color(0, 0, &color_xml),
             ]))
@@ -1067,10 +1054,10 @@ mod tests {
             br#"<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>"#;
         for package_data in [
             theme_package(
-                PowerPointThemeKind::Theme,
+                ThemeKind::Theme,
                 br#"<a:themeOverride xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>"#,
             ),
-            theme_package(PowerPointThemeKind::Theme, b"<a:theme>"),
+            theme_package(ThemeKind::Theme, b"<a:theme>"),
             animation_package(&[(
                 "/theme/themeManager.xml",
                 "application/vnd.openxmlformats-officedocument.themeManager+xml",
@@ -1106,8 +1093,8 @@ mod tests {
                 ),
             ]),
         ] {
-            let theme = record(PptRecordType::RoundTripTheme12Atom, 0, 0, &package_data);
-            assert!(PowerPoint12SlideRoundTripMetadata::parse(&root(vec![theme])).is_err());
+            let theme = record(RecordType::RoundTripTheme12Atom, 0, 0, &package_data);
+            assert!(SlideRoundTripMetadata12::parse(&root(vec![theme])).is_err());
         }
 
         let missing_attribute = br#"<a:clrMap xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" bg1="lt1"/>"#;
@@ -1132,8 +1119,8 @@ mod tests {
             b"<broken>",
             br#"<a:clrMap xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" broken=>"#,
         ] {
-            let color = record(PptRecordType::RoundTripColorMapping12Atom, 0, 0, xml);
-            assert!(PowerPoint12SlideRoundTripMetadata::parse(&root(vec![color])).is_err());
+            let color = record(RecordType::RoundTripColorMapping12Atom, 0, 0, xml);
+            assert!(SlideRoundTripMetadata12::parse(&root(vec![color])).is_err());
         }
     }
 
@@ -1146,17 +1133,16 @@ mod tests {
             .unwrap()
         );
         let package_data = valid_animation_package();
-        let package_record = record(PptRecordType::RoundTripAnimation12Atom, 0, 0, &package_data);
+        let package_record = record(RecordType::RoundTripAnimation12Atom, 0, 0, &package_data);
         let checksum_record = record(
-            PptRecordType::RoundTripAnimationHash12Atom,
+            RecordType::RoundTripAnimationHash12Atom,
             0,
             0,
             &u32::MAX.to_le_bytes(),
         );
 
         let parsed =
-            PowerPoint12SlideRoundTripMetadata::parse(&root(vec![checksum_record, package_record]))
-                .unwrap();
+            SlideRoundTripMetadata12::parse(&root(vec![checksum_record, package_record])).unwrap();
         assert_eq!(parsed.animation_checksum, Some(u32::MAX));
         let package = parsed.animation_package.unwrap();
         assert_eq!(package.data, package_data);
@@ -1164,13 +1150,13 @@ mod tests {
         assert_eq!(package.timing_part_name, "/drs/timingInfo.xml");
 
         let zero_checksum = record(
-            PptRecordType::RoundTripAnimationHash12Atom,
+            RecordType::RoundTripAnimationHash12Atom,
             0,
             0,
             &0u32.to_le_bytes(),
         );
         assert_eq!(
-            PowerPoint12SlideRoundTripMetadata::parse(&root(vec![zero_checksum]))
+            SlideRoundTripMetadata12::parse(&root(vec![zero_checksum]))
                 .unwrap()
                 .animation_checksum,
             Some(0)
@@ -1182,7 +1168,7 @@ mod tests {
         let package_data = valid_animation_package();
         let animation = |version, instance, data: &[u8]| {
             record(
-                PptRecordType::RoundTripAnimation12Atom,
+                RecordType::RoundTripAnimation12Atom,
                 version,
                 instance,
                 data,
@@ -1190,7 +1176,7 @@ mod tests {
         };
         let checksum = |version, instance, data: &[u8]| {
             record(
-                PptRecordType::RoundTripAnimationHash12Atom,
+                RecordType::RoundTripAnimationHash12Atom,
                 version,
                 instance,
                 data,
@@ -1205,27 +1191,23 @@ mod tests {
             checksum(0, 0, &[0; 3]),
             checksum(0, 0, &[0; 5]),
         ] {
-            assert!(PowerPoint12SlideRoundTripMetadata::parse(&root(vec![malformed])).is_err());
+            assert!(SlideRoundTripMetadata12::parse(&root(vec![malformed])).is_err());
         }
 
         let mut wrong_package_length = animation(0, 0, &package_data);
         wrong_package_length.data_length -= 1;
-        assert!(
-            PowerPoint12SlideRoundTripMetadata::parse(&root(vec![wrong_package_length])).is_err()
-        );
+        assert!(SlideRoundTripMetadata12::parse(&root(vec![wrong_package_length])).is_err());
         let mut wrong_checksum_length = checksum(0, 0, &[0; 4]);
         wrong_checksum_length.data_length = 5;
-        assert!(
-            PowerPoint12SlideRoundTripMetadata::parse(&root(vec![wrong_checksum_length])).is_err()
-        );
+        assert!(SlideRoundTripMetadata12::parse(&root(vec![wrong_checksum_length])).is_err());
 
         let duplicate_animation = root(vec![
             animation(0, 0, &package_data),
             animation(0, 0, &package_data),
         ]);
-        assert!(PowerPoint12SlideRoundTripMetadata::parse(&duplicate_animation).is_err());
+        assert!(SlideRoundTripMetadata12::parse(&duplicate_animation).is_err());
         let duplicate_checksum = root(vec![checksum(0, 0, &[0; 4]), checksum(0, 0, &[1; 4])]);
-        assert!(PowerPoint12SlideRoundTripMetadata::parse(&duplicate_checksum).is_err());
+        assert!(SlideRoundTripMetadata12::parse(&duplicate_checksum).is_err());
     }
 
     #[test]
@@ -1285,12 +1267,12 @@ mod tests {
             ]),
         ] {
             let animation = record(
-                PptRecordType::RoundTripAnimation12Atom,
+                RecordType::RoundTripAnimation12Atom,
                 0,
                 0,
                 &package_data,
             );
-            assert!(PowerPoint12SlideRoundTripMetadata::parse(&root(vec![animation])).is_err());
+            assert!(SlideRoundTripMetadata12::parse(&root(vec![animation])).is_err());
         }
     }
 }

@@ -1,12 +1,12 @@
 use super::directory::{SlideDirectory, SlideDirectoryEntry};
 use super::notes::{NoteDescriptor, NotesIndex};
-use crate::consts::PptRecordType;
+use crate::consts::RecordType;
 /// SlideFactory - Creates slides from persist mapping with zero-copy parsing.
 ///
 /// High-performance implementation using lifetimes to avoid data copying.
-use crate::package::{PptError, Result};
+use crate::package::{Error, Result};
 use crate::persist::PersistMapping;
-use crate::records::PptRecord;
+use crate::records::Record;
 use once_cell::unsync::OnceCell;
 
 /// Factory for creating slides from document data using persist mapping.
@@ -59,14 +59,14 @@ impl<'doc> SlideFactory<'doc> {
     /// - Direct record parsing at offset
     pub fn parse_slide(&self, persist_id: u32) -> Result<SlideData<'doc>> {
         let offset = self.persist_mapping.get_offset(persist_id).ok_or_else(|| {
-            PptError::InvalidFormat(format!("No offset found for persist_id {}", persist_id))
+            Error::InvalidFormat(format!("No offset found for persist_id {}", persist_id))
         })?;
 
         let entry = self
             .slide_directory
             .get_by_persist_id(persist_id)
             .ok_or_else(|| {
-                PptError::InvalidFormat(format!(
+                Error::InvalidFormat(format!(
                     "persist ID {persist_id} is not a logical presentation slide"
                 ))
             })?;
@@ -82,17 +82,17 @@ impl<'doc> SlideFactory<'doc> {
         let offset = offset as usize;
 
         if offset + 8 > self.doc_data.len() {
-            return Err(PptError::Corrupted(format!(
+            return Err(Error::Corrupted(format!(
                 "Offset {} exceeds document length",
                 offset
             )));
         }
 
         // Parse the Slide record at this offset
-        let (record, _consumed) = PptRecord::parse(self.doc_data, offset)?;
+        let (record, _consumed) = Record::parse(self.doc_data, offset)?;
 
-        if record.record_type != PptRecordType::Slide {
-            return Err(PptError::InvalidFormat(format!(
+        if record.record_type != RecordType::Slide {
+            return Err(Error::InvalidFormat(format!(
                 "Expected Slide record, got {:?}",
                 record.record_type
             )));
@@ -144,12 +144,12 @@ pub struct SlideData<'doc> {
     /// Text records associated with this slide in SlideListWithText.
     pub(crate) slide_list_text: String,
     /// Range-anchored actions from SlideListWithText text bodies.
-    pub(crate) outline_text_interactions: Vec<crate::PowerPointTextBodyInteractions>,
-    pub(crate) outline_text_refs: Vec<crate::PowerPointOutlineTextRef>,
+    pub(crate) outline_text_interactions: Vec<crate::TextBodyInteractions>,
+    pub(crate) outline_text_refs: Vec<crate::OutlineTextRef>,
     /// Byte offset in document stream
     pub offset: usize,
     /// Parsed Slide record
-    pub record: PptRecord,
+    pub record: Record,
     /// Reference to complete document data (for lazy shape parsing)
     doc_data: &'doc [u8],
     pub(crate) note_descriptor: std::result::Result<Option<NoteDescriptor>, String>,
@@ -158,14 +158,14 @@ pub struct SlideData<'doc> {
 impl<'doc> SlideData<'doc> {
     /// Get the SlideAtom child record containing layout/master info.
     #[inline]
-    pub fn slide_atom(&self) -> Option<&PptRecord> {
-        self.record.find_child(PptRecordType::SlideAtom)
+    pub fn slide_atom(&self) -> Option<&Record> {
+        self.record.find_child(RecordType::SlideAtom)
     }
 
     /// Get the PPDrawing child record containing shapes.
     #[inline]
-    pub fn ppdrawing(&self) -> Option<&PptRecord> {
-        self.record.find_child(PptRecordType::PPDrawing)
+    pub fn ppdrawing(&self) -> Option<&Record> {
+        self.record.find_child(RecordType::PPDrawing)
     }
 
     /// Check if this slide has drawing data (shapes).
@@ -189,7 +189,7 @@ impl<'doc> SlideData<'doc> {
     pub fn new_for_test(
         persist_id: u32,
         offset: usize,
-        record: PptRecord,
+        record: Record,
         doc_data: &'doc [u8],
     ) -> Self {
         Self {

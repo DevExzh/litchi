@@ -5,14 +5,14 @@
 //!
 //! Run with: cargo run --example ppt_animations_example
 
-use litchi_ppt::PptWriter;
+use litchi_ppt::Writer;
 use litchi_ppt::animation::*;
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("Creating PPT animation showcase...");
 
-    let mut writer = PptWriter::new_widescreen();
+    let mut writer = Writer::new_widescreen();
     writer.set_property("Title", "Animation Effects Showcase");
     writer.set_property("Author", "Litchi PPT Demo");
 

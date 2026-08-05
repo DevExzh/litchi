@@ -7,7 +7,7 @@
 use litchi_biff::Records;
 use litchi_odraw::{
     Record, RecordKind,
-    shape::{self, Kind, Shape},
+    shape::{self, Kind, Shape as DrawShape},
 };
 use std::collections::VecDeque;
 
@@ -17,7 +17,7 @@ const CONTINUE: u16 = 0x003C;
 
 /// Shape information extracted from an Excel workbook.
 #[derive(Debug, Clone)]
-pub struct XlsShape {
+pub struct Shape {
     /// Shape type (rectangle, ellipse, line, etc.)
     pub shape_type: Kind,
     /// Shape ID
@@ -27,13 +27,13 @@ pub struct XlsShape {
     /// Whether this is a group shape
     pub is_group: bool,
     /// Child shapes (for group shapes)
-    pub children: Vec<XlsShape>,
+    pub children: Vec<Shape>,
 }
 
-impl XlsShape {
+impl Shape {
     /// Project a host-neutral OfficeArt shape and its following XLS TXO text.
     fn from_odraw(
-        shape: &Shape<'_>,
+        shape: &DrawShape<'_>,
         texts: &mut VecDeque<Option<String>>,
     ) -> std::io::Result<Self> {
         let text = if let Some(textbox) = shape.textbox() {
@@ -159,7 +159,7 @@ impl WorkbookDrawing {
         Ok(drawing)
     }
 
-    fn project(mut self) -> std::io::Result<Vec<XlsShape>> {
+    fn project(mut self) -> std::io::Result<Vec<Shape>> {
         let mut result = Vec::new();
         let mut offset = 0usize;
         while offset < self.officeart.len() {
@@ -174,7 +174,7 @@ impl WorkbookDrawing {
                 .ok_or_else(|| invalid_data("XLS OfficeArt drawing extent overflow"))?;
             let shapes = shape::parse(&self.officeart[offset..end]).map_err(invalid_data)?;
             for shape in &shapes {
-                result.push(XlsShape::from_odraw(shape, &mut self.texts)?);
+                result.push(Shape::from_odraw(shape, &mut self.texts)?);
             }
             offset = end;
         }
@@ -347,7 +347,7 @@ fn read_u16(data: &[u8], offset: usize, context: &str) -> std::io::Result<u16> {
     Ok(u16::from_le_bytes([bytes[0], bytes[1]]))
 }
 
-fn walk<'shape>(shapes: &'shape [XlsShape], out: &mut Vec<&'shape XlsShape>) {
+fn walk<'shape>(shapes: &'shape [Shape], out: &mut Vec<&'shape Shape>) {
     for shape in shapes {
         out.push(shape);
         walk(&shape.children, out);
@@ -363,7 +363,7 @@ fn walk<'shape>(shapes: &'shape [XlsShape], out: &mut Vec<&'shape XlsShape>) {
 /// # Returns
 ///
 /// A vector of shapes found in the workbook.
-pub fn extract_shapes_from_workbook(workbook_data: &[u8]) -> std::io::Result<Vec<XlsShape>> {
+pub fn extract_shapes_from_workbook(workbook_data: &[u8]) -> std::io::Result<Vec<Shape>> {
     WorkbookDrawing::parse(workbook_data)?.project()
 }
 
@@ -420,9 +420,9 @@ mod tests {
         shape_id: u32,
         text: Option<String>,
         is_group: bool,
-        children: Vec<XlsShape>,
-    ) -> XlsShape {
-        XlsShape {
+        children: Vec<Shape>,
+    ) -> Shape {
+        Shape {
             shape_type,
             shape_id,
             text,
@@ -485,7 +485,7 @@ mod tests {
         );
         let debug_str = format!("{:?}", shape);
 
-        assert!(debug_str.contains("XlsShape"));
+        assert!(debug_str.contains("Shape"));
     }
 
     #[test]
@@ -589,7 +589,7 @@ mod tests {
 
     #[test]
     fn test_multiple_children() {
-        let children: Vec<XlsShape> = (1..=5)
+        let children: Vec<Shape> = (1..=5)
             .map(|i| {
                 create_test_xls_shape(
                     Kind::Rectangle,

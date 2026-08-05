@@ -1,4 +1,4 @@
-use crate::XlsResult;
+use crate::Result;
 use std::io::Write;
 
 use super::write_record_header;
@@ -46,13 +46,13 @@ struct SxAddlHeader {
     id: u32,
 }
 
-fn write_frt_header<W: Write>(writer: &mut W, record_id: u16) -> XlsResult<()> {
+fn write_frt_header<W: Write>(writer: &mut W, record_id: u16) -> Result<()> {
     writer.write_all(&record_id.to_le_bytes())?;
     writer.write_all(&0u16.to_le_bytes())?;
     Ok(())
 }
 
-fn write_sxaddl_header<W: Write>(writer: &mut W, header: SxAddlHeader) -> XlsResult<()> {
+fn write_sxaddl_header<W: Write>(writer: &mut W, header: SxAddlHeader) -> Result<()> {
     write_frt_header(writer, SXADDL_RECORD_ID)?;
     writer.write_all(&[header.class as u8])?;
     writer.write_all(&[header.record_type as u8])?;
@@ -61,8 +61,8 @@ fn write_sxaddl_header<W: Write>(writer: &mut W, header: SxAddlHeader) -> XlsRes
     Ok(())
 }
 
-pub(crate) fn write_table_styles<W: Write>(writer: &mut W) -> XlsResult<()> {
-    let styles = crate::table_styles::XlsTableStyles::try_new(
+pub(crate) fn write_table_styles<W: Write>(writer: &mut W) -> Result<()> {
+    let styles = crate::table_styles::TableStyles::try_new(
         144,
         DEFAULT_TABLE_STYLE_NAME,
         DEFAULT_PIVOT_STYLE_NAME,
@@ -73,8 +73,8 @@ pub(crate) fn write_table_styles<W: Write>(writer: &mut W) -> XlsResult<()> {
 
 pub(crate) fn write_differential_formats<W: Write>(
     writer: &mut W,
-    differential_formats: &[crate::XlsDifferentialFormat],
-) -> XlsResult<()> {
+    differential_formats: &[crate::DifferentialFormat],
+) -> Result<()> {
     for differential_format in differential_formats {
         writer.write_all(&differential_format.to_record_bytes()?)?;
     }
@@ -83,14 +83,14 @@ pub(crate) fn write_differential_formats<W: Write>(
 
 pub(crate) fn write_custom_table_styles<W: Write>(
     writer: &mut W,
-    styles: &crate::XlsTableStyles,
+    styles: &crate::TableStyles,
     differential_format_count: usize,
-) -> XlsResult<()> {
+) -> Result<()> {
     writer.write_all(&styles.to_family_record_bytes(differential_format_count)?)?;
     Ok(())
 }
 
-pub(crate) fn write_pivot_cache_sxaddl_block<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(crate) fn write_pivot_cache_sxaddl_block<W: Write>(writer: &mut W) -> Result<()> {
     write_record_header(writer, SXADDL_RECORD_ID, 12)?;
     write_sxaddl_header(
         writer,
@@ -136,7 +136,7 @@ pub(crate) fn write_pivot_cache_sxaddl_block<W: Write>(writer: &mut W) -> XlsRes
     Ok(())
 }
 
-pub(crate) fn write_compress_pictures<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(crate) fn write_compress_pictures<W: Write>(writer: &mut W) -> Result<()> {
     write_record_header(writer, COMPRESS_PICTURES_RECORD_ID, 24)?;
     write_frt_header(writer, COMPRESS_PICTURES_RECORD_ID)?;
     writer.write_all(&COMPRESS_PICTURES_RESERVED)?;
@@ -146,7 +146,7 @@ pub(crate) fn write_compress_pictures<W: Write>(writer: &mut W) -> XlsResult<()>
     Ok(())
 }
 
-pub(crate) fn write_compat12<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(crate) fn write_compat12<W: Write>(writer: &mut W) -> Result<()> {
     write_record_header(writer, COMPAT12_RECORD_ID, 16)?;
     write_frt_header(writer, COMPAT12_RECORD_ID)?;
     writer.write_all(&COMPAT12_RESERVED)?;

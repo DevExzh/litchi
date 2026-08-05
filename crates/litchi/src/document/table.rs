@@ -1,11 +1,10 @@
 //! Table implementation for Word documents.
 
-#[cfg(any(feature = "doc", feature = "odf"))]
 use litchi_core::Error;
 use litchi_core::Result;
 
 #[cfg(feature = "doc")]
-use crate::doc;
+use litchi_doc as doc;
 
 #[cfg(feature = "ooxml")]
 use crate::ooxml;
@@ -605,7 +604,7 @@ mod tests {
         let invalid_path = test_data_path().join("ooxml/docx/table-indent.docx");
         if invalid_path.exists() {
             match Document::open(invalid_path) {
-                Err(Error::InvalidFormat(message)) => {
+                Err(litchi_core::Error::InvalidFormat(message)) => {
                     assert!(message.contains("core-properties part"));
                     assert!(message.contains("is orphaned"));
                 },

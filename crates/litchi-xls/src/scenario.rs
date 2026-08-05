@@ -1,6 +1,6 @@
 //! BIFF8 worksheet scenario manager and scenario records.
 
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 pub(crate) const SCEN_MAN_RECORD_TYPE: u16 = 0x00AE;
 pub(crate) const SCENARIO_RECORD_TYPE: u16 = 0x00AF;
@@ -11,24 +11,17 @@ const MAX_RESULT_RANGES: usize = 32;
 const MAX_SCENARIO_BYTES: usize = 4_200_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsScenarioRange {
+pub struct ScenarioRange {
     pub(crate) first_row: u16,
     pub(crate) last_row: u16,
     pub(crate) first_column: u8,
     pub(crate) last_column: u8,
 }
 
-impl XlsScenarioRange {
-    pub fn new(
-        first_row: u16,
-        last_row: u16,
-        first_column: u8,
-        last_column: u8,
-    ) -> XlsResult<Self> {
+impl ScenarioRange {
+    pub fn new(first_row: u16, last_row: u16, first_column: u8, last_column: u8) -> Result<Self> {
         if first_row > last_row || first_column > last_column {
-            return Err(XlsError::InvalidData(
-                "scenario range is reversed".to_string(),
-            ));
+            return Err(Error::InvalidData("scenario range is reversed".to_string()));
         }
         Ok(Self {
             first_row,
@@ -53,14 +46,14 @@ impl XlsScenarioRange {
 
 /// One inert changed-cell value from a scenario.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsScenarioCell {
+pub struct ScenarioCell {
     pub(crate) row: u16,
     pub(crate) column: u8,
     pub(crate) deleted: bool,
     pub(crate) value: String,
 }
 
-impl XlsScenarioCell {
+impl ScenarioCell {
     pub fn new(row: u16, column: u8, value: impl Into<String>) -> Self {
         Self {
             row,
@@ -93,17 +86,17 @@ impl XlsScenarioCell {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsScenario {
+pub struct Scenario {
     pub(crate) name: String,
     pub(crate) creator: Option<String>,
     pub(crate) comment: Option<String>,
     pub(crate) locked: bool,
     pub(crate) hidden: bool,
-    pub(crate) cells: Vec<XlsScenarioCell>,
+    pub(crate) cells: Vec<ScenarioCell>,
 }
 
-impl XlsScenario {
-    pub fn new(name: impl Into<String>, cells: Vec<XlsScenarioCell>) -> Self {
+impl Scenario {
+    pub fn new(name: impl Into<String>, cells: Vec<ScenarioCell>) -> Self {
         Self {
             name: name.into(),
             creator: None,
@@ -140,21 +133,21 @@ impl XlsScenario {
     pub fn is_hidden(&self) -> bool {
         self.hidden
     }
-    pub fn cells(&self) -> &[XlsScenarioCell] {
+    pub fn cells(&self) -> &[ScenarioCell] {
         &self.cells
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsScenarioManager {
+pub struct ScenarioManager {
     pub(crate) current_scenario: Option<usize>,
     pub(crate) shown_scenario: Option<usize>,
-    pub(crate) result_ranges: Vec<XlsScenarioRange>,
-    pub(crate) scenarios: Vec<XlsScenario>,
+    pub(crate) result_ranges: Vec<ScenarioRange>,
+    pub(crate) scenarios: Vec<Scenario>,
 }
 
-impl XlsScenarioManager {
-    pub fn new(scenarios: Vec<XlsScenario>) -> Self {
+impl ScenarioManager {
+    pub fn new(scenarios: Vec<Scenario>) -> Self {
         Self {
             current_scenario: None,
             shown_scenario: None,
@@ -168,7 +161,7 @@ impl XlsScenarioManager {
     pub fn set_shown_scenario(&mut self, index: Option<usize>) {
         self.shown_scenario = index;
     }
-    pub fn set_result_ranges(&mut self, ranges: Vec<XlsScenarioRange>) {
+    pub fn set_result_ranges(&mut self, ranges: Vec<ScenarioRange>) {
         self.result_ranges = ranges;
     }
     pub fn current_scenario(&self) -> Option<usize> {
@@ -177,14 +170,14 @@ impl XlsScenarioManager {
     pub fn shown_scenario(&self) -> Option<usize> {
         self.shown_scenario
     }
-    pub fn result_ranges(&self) -> &[XlsScenarioRange] {
+    pub fn result_ranges(&self) -> &[ScenarioRange] {
         &self.result_ranges
     }
-    pub fn scenarios(&self) -> &[XlsScenario] {
+    pub fn scenarios(&self) -> &[Scenario] {
         &self.scenarios
     }
 
-    pub(crate) fn validate_for_write(&self) -> XlsResult<()> {
+    pub(crate) fn validate_for_write(&self) -> Result<()> {
         if self.scenarios.len() > i16::MAX as usize {
             return invalid_data("scenario count exceeds 32767");
         }
@@ -235,12 +228,12 @@ struct ScenarioManagerHeader {
     declared_count: usize,
     current_scenario: Option<usize>,
     shown_scenario: Option<usize>,
-    result_ranges: Vec<XlsScenarioRange>,
+    result_ranges: Vec<ScenarioRange>,
 }
 
 pub(crate) struct ScenarioCollector {
     header: Option<ScenarioManagerHeader>,
-    scenarios: Vec<XlsScenario>,
+    scenarios: Vec<Scenario>,
     pending_scenario: Option<Vec<u8>>,
     scenario_slot_closed: bool,
 }
@@ -255,12 +248,12 @@ impl ScenarioCollector {
         }
     }
 
-    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
+    pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> Result<()> {
         if record_type == CONTINUE_RECORD_TYPE
             && let Some(pending) = self.pending_scenario.as_mut()
         {
             let new_len = pending.len().checked_add(data.len()).ok_or_else(|| {
-                XlsError::InvalidData("scenario continuation size overflow".to_string())
+                Error::InvalidData("scenario continuation size overflow".to_string())
             })?;
             if new_len > MAX_SCENARIO_BYTES {
                 return invalid(
@@ -281,13 +274,10 @@ impl ScenarioCollector {
                 self.header = Some(parse_scen_man(data)?);
             },
             SCENARIO_RECORD_TYPE => {
-                let header = self
-                    .header
-                    .as_ref()
-                    .ok_or_else(|| XlsError::InvalidRecord {
-                        record_type,
-                        message: "Scenario record appears without ScenMan".to_string(),
-                    })?;
+                let header = self.header.as_ref().ok_or_else(|| Error::InvalidRecord {
+                    record_type,
+                    message: "Scenario record appears without ScenMan".to_string(),
+                })?;
                 if self.scenarios.len() >= header.declared_count {
                     return invalid(
                         record_type,
@@ -319,14 +309,14 @@ impl ScenarioCollector {
         Ok(())
     }
 
-    fn finish_pending(&mut self) -> XlsResult<()> {
+    fn finish_pending(&mut self) -> Result<()> {
         if let Some(data) = self.pending_scenario.take() {
             self.scenarios.push(parse_scenario(&data)?);
         }
         Ok(())
     }
 
-    fn ensure_declared_count(&self) -> XlsResult<()> {
+    fn ensure_declared_count(&self) -> Result<()> {
         if let Some(header) = &self.header
             && self.scenarios.len() != header.declared_count
         {
@@ -338,13 +328,13 @@ impl ScenarioCollector {
         Ok(())
     }
 
-    pub(crate) fn finish(mut self) -> XlsResult<Option<XlsScenarioManager>> {
+    pub(crate) fn finish(mut self) -> Result<Option<ScenarioManager>> {
         self.finish_pending()?;
         self.ensure_declared_count()?;
         let Some(header) = self.header else {
             return Ok(None);
         };
-        Ok(Some(XlsScenarioManager {
+        Ok(Some(ScenarioManager {
             current_scenario: header.current_scenario,
             shown_scenario: header.shown_scenario,
             result_ranges: header.result_ranges,
@@ -353,7 +343,7 @@ impl ScenarioCollector {
     }
 }
 
-fn parse_scen_man(data: &[u8]) -> XlsResult<ScenarioManagerHeader> {
+fn parse_scen_man(data: &[u8]) -> Result<ScenarioManagerHeader> {
     if data.len() < 8 || !(data.len() - 8).is_multiple_of(8) {
         return invalid(SCEN_MAN_RECORD_TYPE, "ScenMan payload length is invalid");
     }
@@ -378,7 +368,7 @@ fn parse_scen_man(data: &[u8]) -> XlsResult<ScenarioManagerHeader> {
             "ScenMan result range count does not match length",
         );
     }
-    let parse_index = |value: i16| -> XlsResult<Option<usize>> {
+    let parse_index = |value: i16| -> Result<Option<usize>> {
         if value == -1 {
             return Ok(None);
         }
@@ -401,7 +391,7 @@ fn parse_scen_man(data: &[u8]) -> XlsResult<ScenarioManagerHeader> {
         if first_row > last_row || first_column > last_column || last_column > 255 {
             return invalid(SCEN_MAN_RECORD_TYPE, "invalid ScenMan result range");
         }
-        result_ranges.push(XlsScenarioRange {
+        result_ranges.push(ScenarioRange {
             first_row,
             last_row,
             first_column: first_column as u8,
@@ -416,7 +406,7 @@ fn parse_scen_man(data: &[u8]) -> XlsResult<ScenarioManagerHeader> {
     })
 }
 
-fn parse_scenario(data: &[u8]) -> XlsResult<XlsScenario> {
+fn parse_scenario(data: &[u8]) -> Result<Scenario> {
     let mut cursor = Cursor::new(data);
     let count = cursor.u16()? as usize;
     if !(1..=MAX_SCENARIO_CELLS).contains(&count) {
@@ -475,14 +465,14 @@ fn parse_scenario(data: &[u8]) -> XlsResult<XlsScenario> {
     let cells = refs
         .into_iter()
         .zip(values)
-        .map(|((row, column, deleted), value)| XlsScenarioCell {
+        .map(|((row, column, deleted), value)| ScenarioCell {
             row,
             column,
             deleted,
             value,
         })
         .collect();
-    Ok(XlsScenario {
+    Ok(Scenario {
         name,
         creator,
         comment,
@@ -503,39 +493,39 @@ impl<'a> Cursor<'a> {
     fn remaining(&self) -> usize {
         self.data.len().saturating_sub(self.position)
     }
-    fn take(&mut self, count: usize) -> XlsResult<&'a [u8]> {
+    fn take(&mut self, count: usize) -> Result<&'a [u8]> {
         let end = self
             .position
             .checked_add(count)
-            .ok_or_else(|| XlsError::InvalidData("Scenario size overflow".to_string()))?;
+            .ok_or_else(|| Error::InvalidData("Scenario size overflow".to_string()))?;
         let value = self
             .data
             .get(self.position..end)
-            .ok_or_else(|| XlsError::InvalidRecord {
+            .ok_or_else(|| Error::InvalidRecord {
                 record_type: SCENARIO_RECORD_TYPE,
                 message: "truncated Scenario record".to_string(),
             })?;
         self.position = end;
         Ok(value)
     }
-    fn u8(&mut self) -> XlsResult<u8> {
+    fn u8(&mut self) -> Result<u8> {
         Ok(self.take(1)?[0])
     }
-    fn u16(&mut self) -> XlsResult<u16> {
+    fn u16(&mut self) -> Result<u16> {
         Ok(u16::from_le_bytes(self.take(2)?.try_into().unwrap()))
     }
-    fn boolean8(&mut self) -> XlsResult<bool> {
+    fn boolean8(&mut self) -> Result<bool> {
         match self.u8()? {
             0 => Ok(false),
             1 => Ok(true),
             _ => invalid(SCENARIO_RECORD_TYPE, "Scenario Boolean must be 0 or 1"),
         }
     }
-    fn unicode(&mut self) -> XlsResult<String> {
+    fn unicode(&mut self) -> Result<String> {
         let count = self.u16()? as usize;
         self.unicode_no_cch(count)
     }
-    fn unicode_with_expected_count(&mut self, expected: usize) -> XlsResult<String> {
+    fn unicode_with_expected_count(&mut self, expected: usize) -> Result<String> {
         let count = self.u16()? as usize;
         if count != expected {
             return invalid(
@@ -545,7 +535,7 @@ impl<'a> Cursor<'a> {
         }
         self.unicode_no_cch(count)
     }
-    fn unicode_no_cch(&mut self, count: usize) -> XlsResult<String> {
+    fn unicode_no_cch(&mut self, count: usize) -> Result<String> {
         let options = self.u8()?;
         if options & 0xFE != 0 {
             return invalid(
@@ -561,13 +551,13 @@ impl<'a> Cursor<'a> {
                 .collect())
         } else {
             let bytes = self.take(count.checked_mul(2).ok_or_else(|| {
-                XlsError::InvalidData("Scenario string size overflow".to_string())
+                Error::InvalidData("Scenario string size overflow".to_string())
             })?)?;
             let units: Vec<u16> = bytes
                 .chunks_exact(2)
                 .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
                 .collect();
-            String::from_utf16(&units).map_err(|_| XlsError::InvalidRecord {
+            String::from_utf16(&units).map_err(|_| Error::InvalidRecord {
                 record_type: SCENARIO_RECORD_TYPE,
                 message: "Scenario string contains invalid UTF-16".to_string(),
             })
@@ -581,14 +571,14 @@ fn read_u16(data: &[u8], offset: usize) -> u16 {
 fn read_i16(data: &[u8], offset: usize) -> i16 {
     i16::from_le_bytes(data[offset..offset + 2].try_into().unwrap())
 }
-fn invalid<T>(record_type: u16, message: impl Into<String>) -> XlsResult<T> {
-    Err(XlsError::InvalidRecord {
+fn invalid<T>(record_type: u16, message: impl Into<String>) -> Result<T> {
+    Err(Error::InvalidRecord {
         record_type,
         message: message.into(),
     })
 }
-fn invalid_data<T>(message: impl Into<String>) -> XlsResult<T> {
-    Err(XlsError::InvalidData(message.into()))
+fn invalid_data<T>(message: impl Into<String>) -> Result<T> {
+    Err(Error::InvalidData(message.into()))
 }
 
 #[cfg(test)]

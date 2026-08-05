@@ -2,7 +2,7 @@
 
 use litchi_core::binary::{read_u16_le, read_u32_le};
 
-use super::package::{PptError, Result};
+use super::package::{Error, Result};
 use super::text_prop::{
     TextPropCollection, TextPropType, character_property_size, paragraph_property_size,
     parse_character_properties, parse_paragraph_properties, require_style_bytes,
@@ -32,14 +32,14 @@ impl TextMasterStyle {
     /// Parse a `TxMasterStyleAtom` payload for the supplied record instance.
     pub fn parse(data: &[u8], text_type: u16) -> Result<Self> {
         if !matches!(text_type, 0 | 1 | 2 | 4 | 5 | 6 | 7 | 8) {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "TxMasterStyleAtom has an invalid TextTypeEnum instance".to_string(),
             ));
         }
         require_style_bytes(data, 0, 2, "TxMasterStyleAtom level count")?;
         let level_count = read_u16_le(data, 0).unwrap_or(0);
         if level_count > 5 {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "TxMasterStyleAtom has more than five levels".to_string(),
             ));
         }
@@ -53,7 +53,7 @@ impl TextMasterStyle {
                 let level = read_u16_le(data, offset).unwrap_or(0);
                 offset += 2;
                 if level >= level_count || seen_levels[level as usize] {
-                    return Err(PptError::Corrupted(
+                    return Err(Error::Corrupted(
                         "TextMasterStyleLevel has an invalid or duplicate level".to_string(),
                     ));
                 }
@@ -77,7 +77,7 @@ impl TextMasterStyle {
             let (properties, tab_stops) =
                 parse_paragraph_properties(data, &mut offset, paragraph_mask);
             if offset != paragraph_end {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "TextMasterStyleLevel paragraph size mismatch".to_string(),
                 ));
             }
@@ -101,7 +101,7 @@ impl TextMasterStyle {
             let character_end = offset + character_size;
             let properties = parse_character_properties(data, &mut offset, character_mask);
             if offset != character_end {
-                return Err(PptError::Corrupted(
+                return Err(Error::Corrupted(
                     "TextMasterStyleLevel character size mismatch".to_string(),
                 ));
             }
@@ -117,7 +117,7 @@ impl TextMasterStyle {
         }
 
         if offset != data.len() {
-            return Err(PptError::Corrupted(
+            return Err(Error::Corrupted(
                 "TxMasterStyleAtom has trailing bytes".to_string(),
             ));
         }

@@ -12,7 +12,7 @@
 //! - MS-XLS 2.4.70 (CrtMlFrt), 2.4.71 (CrtMlFrtContinue), 2.5.134 (FrtFlags),
 //!   2.5.135 (FrtHeader)
 
-use crate::{XlsError, XlsResult};
+use crate::{Error, Result};
 
 /// Record type of the `CrtMlFrt` record (MS-XLS 2.4.70); also the required
 /// `frtHeader.rt` value. (The neighboring 0x089D is `CrtLayout12`,
@@ -33,8 +33,8 @@ const FIELD_LEN: usize = 4;
 /// Maximum `cb` value: the largest legal `XmlTkChain` size (MS-XLS 2.4.70).
 const MAX_CHAIN_LEN: u64 = 0x7FFF_FFEB;
 
-fn invalid(message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type: CRT_ML_FRT_RECORD_TYPE,
         message: message.into(),
     }
@@ -52,23 +52,23 @@ impl<'a> CrtMlFrtReader<'a> {
         Self { data, offset: 0 }
     }
 
-    fn read_bytes<const N: usize>(&mut self) -> XlsResult<[u8; N]> {
+    fn read_bytes<const N: usize>(&mut self) -> Result<[u8; N]> {
         let bytes = self.read_slice(N)?;
-        bytes.try_into().map_err(|_| XlsError::InvalidLength {
+        bytes.try_into().map_err(|_| Error::InvalidLength {
             expected: N,
             found: bytes.len(),
         })
     }
 
-    fn read_u16(&mut self) -> XlsResult<u16> {
+    fn read_u16(&mut self) -> Result<u16> {
         Ok(u16::from_le_bytes(self.read_bytes()?))
     }
 
-    fn read_u32(&mut self) -> XlsResult<u32> {
+    fn read_u32(&mut self) -> Result<u32> {
         Ok(u32::from_le_bytes(self.read_bytes()?))
     }
 
-    fn read_slice(&mut self, len: usize) -> XlsResult<&'a [u8]> {
+    fn read_slice(&mut self, len: usize) -> Result<&'a [u8]> {
         let end = self
             .offset
             .checked_add(len)
@@ -76,7 +76,7 @@ impl<'a> CrtMlFrtReader<'a> {
         let bytes = self
             .data
             .get(self.offset..end)
-            .ok_or(XlsError::InvalidLength {
+            .ok_or(Error::InvalidLength {
                 expected: end,
                 found: self.data.len(),
             })?;
@@ -84,7 +84,7 @@ impl<'a> CrtMlFrtReader<'a> {
         Ok(bytes)
     }
 
-    fn read_remaining(&mut self) -> XlsResult<&'a [u8]> {
+    fn read_remaining(&mut self) -> Result<&'a [u8]> {
         self.read_slice(self.remaining())
     }
 
@@ -100,7 +100,7 @@ fn validate_frt_header(
     reader: &mut CrtMlFrtReader<'_>,
     expected_rt: u16,
     context: &str,
-) -> XlsResult<(u16, [u8; 8])> {
+) -> Result<(u16, [u8; 8])> {
     if reader.read_u16()? != expected_rt {
         return Err(invalid(format!("{context} FrtHeader.rt mismatch")));
     }
@@ -113,9 +113,9 @@ fn validate_frt_header(
     Ok((flags, reader.read_bytes()?))
 }
 
-fn validate_record_payload_len(data: &[u8], minimum: usize, context: &str) -> XlsResult<()> {
+fn validate_record_payload_len(data: &[u8], minimum: usize, context: &str) -> Result<()> {
     if data.len() < minimum {
-        return Err(XlsError::InvalidLength {
+        return Err(Error::InvalidLength {
             expected: minimum,
             found: data.len(),
         });
@@ -129,10 +129,10 @@ fn validate_record_payload_len(data: &[u8], minimum: usize, context: &str) -> Xl
     Ok(())
 }
 
-fn append_chain_bytes(chain: &mut Vec<u8>, bytes: &[u8]) -> XlsResult<()> {
+fn append_chain_bytes(chain: &mut Vec<u8>, bytes: &[u8]) -> Result<()> {
     chain
         .try_reserve(bytes.len())
-        .map_err(|_| XlsError::Allocation("reassembling CrtMlFrt XmlTkChain"))?;
+        .map_err(|_| Error::Allocation("reassembling CrtMlFrt XmlTkChain"))?;
     chain.extend_from_slice(bytes);
     Ok(())
 }
@@ -159,7 +159,7 @@ pub struct CrtMlFrt {
 impl CrtMlFrt {
     /// Parse a `CrtMlFrt` record payload plus the payloads of the
     /// `CrtMlFrtContinue` records that follow it.
-    pub fn parse(data: &[u8], continues: &[Vec<u8>]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8], continues: &[Vec<u8>]) -> Result<Self> {
         const MIN_LEN: usize = FRT_HEADER_LEN + FIELD_LEN + FIELD_LEN;
         validate_record_payload_len(data, MIN_LEN, "CrtMlFrt")?;
         let mut reader = CrtMlFrtReader::new(data);
@@ -176,7 +176,7 @@ impl CrtMlFrt {
             reader
                 .remaining()
                 .checked_sub(FIELD_LEN)
-                .ok_or(XlsError::InvalidLength {
+                .ok_or(Error::InvalidLength {
                     expected: MIN_LEN,
                     found: data.len(),
                 })?;
@@ -184,7 +184,7 @@ impl CrtMlFrt {
         let unused = reader.read_bytes::<FIELD_LEN>()?;
 
         let declared = usize::try_from(declared)
-            .map_err(|_| XlsError::Allocation("sizing CrtMlFrt XmlTkChain"))?;
+            .map_err(|_| Error::Allocation("sizing CrtMlFrt XmlTkChain"))?;
         let mut chain_len = first_chain.len();
         for continuation in continues {
             validate_record_payload_len(continuation, FRT_HEADER_LEN, "CrtMlFrtContinue")?;
@@ -209,7 +209,7 @@ impl CrtMlFrt {
         let mut chain = Vec::new();
         chain
             .try_reserve_exact(chain_len)
-            .map_err(|_| XlsError::Allocation("reassembling CrtMlFrt XmlTkChain"))?;
+            .map_err(|_| Error::Allocation("reassembling CrtMlFrt XmlTkChain"))?;
         append_chain_bytes(&mut chain, first_chain)?;
         for continuation in continues {
             let mut reader = CrtMlFrtReader::new(continuation);

@@ -3,8 +3,8 @@
 //! Implements NamedShows/NamedShow/NamedShowSlides records per [MS-PPT].
 //! Custom shows are stored inside the DocumentContainer.
 //!
-use super::records::PptError;
-use crate::{PowerPointNamedShow, PowerPointNamedShows};
+use super::records::Error;
+use crate::{NamedShow, NamedShows};
 use std::io::ErrorKind;
 
 /// A custom (named) slide show definition.
@@ -50,7 +50,7 @@ impl CustomShow {
 /// # Arguments
 ///
 /// * `shows` - Slice of custom show definitions
-pub fn build_named_shows(shows: &[CustomShow]) -> Result<Vec<u8>, PptError> {
+pub fn build_named_shows(shows: &[CustomShow]) -> Result<Vec<u8>, Error> {
     if shows.is_empty() {
         return Ok(Vec::new());
     }
@@ -58,21 +58,21 @@ pub fn build_named_shows(shows: &[CustomShow]) -> Result<Vec<u8>, PptError> {
         .iter()
         .map(checked_named_show)
         .collect::<Result<Vec<_>, _>>()?;
-    build_named_shows_typed(&PowerPointNamedShows { shows })
+    build_named_shows_typed(&NamedShows { shows })
 }
 
 /// Serialize the strict typed named-show model, including an empty container.
-pub fn build_named_shows_typed(shows: &PowerPointNamedShows) -> Result<Vec<u8>, PptError> {
+pub fn build_named_shows_typed(shows: &NamedShows) -> Result<Vec<u8>, Error> {
     shows
         .to_record_bytes()
-        .map_err(|error| PptError::new(ErrorKind::InvalidData, error.to_string()))
+        .map_err(|error| Error::new(ErrorKind::InvalidData, error.to_string()))
 }
 
-fn checked_named_show(show: &CustomShow) -> Result<PowerPointNamedShow, PptError> {
+fn checked_named_show(show: &CustomShow) -> Result<NamedShow, Error> {
     let mut slide_ids = Vec::with_capacity(show.slide_indices.len());
     for &index in &show.slide_indices {
         let index = u32::try_from(index).map_err(|_| {
-            PptError::new(
+            Error::new(
                 ErrorKind::InvalidInput,
                 "custom-show slide index exceeds u32",
             )
@@ -81,14 +81,14 @@ fn checked_named_show(show: &CustomShow) -> Result<PowerPointNamedShow, PptError
             .checked_add(0x100)
             .filter(|id| *id <= 0x7fff_ffff)
             .ok_or_else(|| {
-                PptError::new(
+                Error::new(
                     ErrorKind::InvalidInput,
                     "custom-show slide index exceeds the SlideId range",
                 )
             })?;
         slide_ids.push(slide_id);
     }
-    Ok(PowerPointNamedShow {
+    Ok(NamedShow {
         name: show.name.clone(),
         slide_ids: Some(slide_ids),
     })
@@ -97,24 +97,24 @@ fn checked_named_show(show: &CustomShow) -> Result<PowerPointNamedShow, PptError
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consts::PptRecordType;
-    use crate::records::PptRecord;
+    use crate::consts::RecordType;
+    use crate::records::Record;
 
-    fn root(child: PptRecord) -> PptRecord {
-        PptRecord {
+    fn root(child: Record) -> Record {
+        Record {
             version: 0x0f,
             instance: 0,
-            record_type: PptRecordType::Document,
-            record_type_raw: PptRecordType::Document.as_u16(),
+            record_type: RecordType::Document,
+            record_type_raw: RecordType::Document.as_u16(),
             data_length: 0,
             data: Vec::new(),
             children: vec![child],
         }
     }
 
-    fn parse(data: &[u8]) -> PowerPointNamedShows {
-        let record = PptRecord::parse(data, 0).unwrap().0;
-        PowerPointNamedShows::parse(&root(record)).unwrap().unwrap()
+    fn parse(data: &[u8]) -> NamedShows {
+        let record = Record::parse(data, 0).unwrap().0;
+        NamedShows::parse(&root(record)).unwrap().unwrap()
     }
 
     #[test]
@@ -173,7 +173,7 @@ mod tests {
         let data =
             build_named_shows(&[CustomShow::new(name, &[0]), CustomShow::new("Second", &[1])])
                 .unwrap();
-        let outer = PptRecord::parse(&data, 0).unwrap().0;
+        let outer = Record::parse(&data, 0).unwrap().0;
         assert!(outer.children.iter().all(|show| show.instance == 0));
         assert_eq!(parse(&data).shows[0].name, name);
     }
@@ -182,7 +182,7 @@ mod tests {
     fn rejects_non_printable_names_and_overflowing_indices() {
         assert!(build_named_shows(&[CustomShow::new("bad\nname", &[0])]).is_err());
         assert!(build_named_shows(&[CustomShow::new("overflow", &[usize::MAX])]).is_err());
-        let empty = PowerPointNamedShows::default();
+        let empty = NamedShows::default();
         assert!(!build_named_shows_typed(&empty).unwrap().is_empty());
         assert!(
             parse(&build_named_shows_typed(&empty).unwrap())

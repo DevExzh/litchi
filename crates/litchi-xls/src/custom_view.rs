@@ -9,12 +9,12 @@
 //! duplicate ordinary sheet settings for the view. The records are inert:
 //! this module never applies a view, shows a window, or prints a sheet.
 
-use super::environment::XlsObjectDisplayMode;
-use super::records::XlsEncoding;
-use super::sheet_metadata::XlsSheetVisibility;
+use super::environment::ObjectDisplayMode;
+use super::records::Encoding;
+use super::sheet_metadata::SheetVisibility;
 use super::utils::parse_string_record;
 use super::view::PaneType;
-use super::{XlsError, XlsResult};
+use super::{Error, Result};
 
 /// Record type of the `UserBView` record.
 pub(crate) const USER_B_VIEW_RECORD_TYPE: u16 = 0x01A9;
@@ -97,18 +97,18 @@ const HS_STATE_SHIFT: u32 = 22;
 const HS_STATE_MASK: u32 = 0x3;
 const ZOOM_TO_FIT: u32 = 1 << 30;
 
-fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord {
+fn invalid(record_type: u16, message: impl Into<String>) -> Error {
+    Error::InvalidRecord {
         record_type,
         message: message.into(),
     }
 }
 
-fn read_bytes<const N: usize>(data: &[u8], offset: usize) -> XlsResult<[u8; N]> {
+fn read_bytes<const N: usize>(data: &[u8], offset: usize) -> Result<[u8; N]> {
     let end = offset
         .checked_add(N)
-        .ok_or_else(|| XlsError::InvalidData("custom-view field offset overflow".to_string()))?;
-    let bytes = data.get(offset..end).ok_or(XlsError::InvalidLength {
+        .ok_or_else(|| Error::InvalidData("custom-view field offset overflow".to_string()))?;
+    let bytes = data.get(offset..end).ok_or(Error::InvalidLength {
         expected: end,
         found: data.len(),
     })?;
@@ -117,30 +117,30 @@ fn read_bytes<const N: usize>(data: &[u8], offset: usize) -> XlsResult<[u8; N]> 
     Ok(value)
 }
 
-fn read_u8(data: &[u8], offset: usize) -> XlsResult<u8> {
+fn read_u8(data: &[u8], offset: usize) -> Result<u8> {
     let [value] = read_bytes(data, offset)?;
     Ok(value)
 }
 
-fn read_u16(data: &[u8], offset: usize) -> XlsResult<u16> {
+fn read_u16(data: &[u8], offset: usize) -> Result<u16> {
     Ok(u16::from_le_bytes(read_bytes(data, offset)?))
 }
 
-fn read_u32(data: &[u8], offset: usize) -> XlsResult<u32> {
+fn read_u32(data: &[u8], offset: usize) -> Result<u32> {
     Ok(u32::from_le_bytes(read_bytes(data, offset)?))
 }
 
-fn read_i32(data: &[u8], offset: usize) -> XlsResult<i32> {
+fn read_i32(data: &[u8], offset: usize) -> Result<i32> {
     Ok(i32::from_le_bytes(read_bytes(data, offset)?))
 }
 
-fn read_f64(data: &[u8], offset: usize) -> XlsResult<f64> {
+fn read_f64(data: &[u8], offset: usize) -> Result<f64> {
     Ok(f64::from_le_bytes(read_bytes(data, offset)?))
 }
 
 /// How cell comments appear in a custom view (`UserBView.mdNoteDisp`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsCustomViewNoteDisplay {
+pub enum CustomViewNoteDisplay {
     /// Comment and visual cue are off for each cell with a comment.
     Off,
     /// Only the visual cue that indicates the cell has a comment.
@@ -149,8 +149,8 @@ pub enum XlsCustomViewNoteDisplay {
     On,
 }
 
-impl XlsCustomViewNoteDisplay {
-    fn from_bits(bits: u16) -> XlsResult<Self> {
+impl CustomViewNoteDisplay {
+    fn from_bits(bits: u16) -> Result<Self> {
         match bits {
             0 => Ok(Self::Off),
             1 => Ok(Self::VisualCue),
@@ -165,15 +165,15 @@ impl XlsCustomViewNoteDisplay {
 
 /// Whether hidden rows are present in a custom view (`UserSViewBegin.fHiddenRw`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsCustomViewHiddenRows {
+pub enum CustomViewHiddenRows {
     /// At least one hidden row is present (filtered rows excluded).
     Present,
     /// No hidden row is present.
     NotPresent,
 }
 
-impl XlsCustomViewHiddenRows {
-    fn from_bits(bits: u32) -> XlsResult<Self> {
+impl CustomViewHiddenRows {
+    fn from_bits(bits: u32) -> Result<Self> {
         match bits {
             0 => Ok(Self::Present),
             1 => Ok(Self::NotPresent),
@@ -187,7 +187,7 @@ impl XlsCustomViewHiddenRows {
 
 /// Workbook-wide settings of one custom view (`UserBView`, MS-XLS 2.4.333).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsWorkbookCustomView {
+pub struct WorkbookCustomView {
     guid: [u8; 16],
     active_tab: Option<u16>,
     window_x: i32,
@@ -197,18 +197,18 @@ pub struct XlsWorkbookCustomView {
     tab_ratio: u16,
     /// Display-flag word (fields A–N); typed accessors decode the bits.
     display_flags: u16,
-    note_display: XlsCustomViewNoteDisplay,
+    note_display: CustomViewNoteDisplay,
     /// Window-flag word (fields O–P plus the undefined high bits).
     window_flags: u16,
     merge_interval: u16,
     name: String,
 }
 
-impl XlsWorkbookCustomView {
+impl WorkbookCustomView {
     /// Parse a `UserBView` record payload.
-    pub(crate) fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub(crate) fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < USER_B_VIEW_HEADER_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: USER_B_VIEW_HEADER_LEN,
                 found: data.len(),
             });
@@ -222,9 +222,8 @@ impl XlsWorkbookCustomView {
         }
         let display_flags = read_u16(data, 42)?;
         // Reject out-of-range enumerations up front so accessors stay total.
-        let note_display = XlsCustomViewNoteDisplay::from_bits(
-            (display_flags >> NOTE_DISP_SHIFT) & NOTE_DISP_MASK,
-        )?;
+        let note_display =
+            CustomViewNoteDisplay::from_bits((display_flags >> NOTE_DISP_SHIFT) & NOTE_DISP_MASK)?;
         let object_display = (display_flags >> HIDE_OBJ_SHIFT) & HIDE_OBJ_MASK;
         if object_display == HIDE_OBJ_MASK {
             return Err(invalid(
@@ -240,11 +239,11 @@ impl XlsWorkbookCustomView {
         let guid = read_bytes(data, 8)?;
         let name_data = data
             .get(USER_B_VIEW_HEADER_LEN..)
-            .ok_or(XlsError::InvalidLength {
+            .ok_or(Error::InvalidLength {
                 expected: USER_B_VIEW_HEADER_LEN,
                 found: data.len(),
             })?;
-        let name = parse_string_record(name_data, &XlsEncoding::Utf16Le)?;
+        let name = parse_string_record(name_data, &Encoding::Utf16Le)?;
         Ok(Self {
             guid,
             active_tab,
@@ -290,7 +289,7 @@ impl XlsWorkbookCustomView {
         self.display_flags & DSP_STATUS != 0
     }
     /// How cell comments appear in this view.
-    pub const fn note_display(&self) -> XlsCustomViewNoteDisplay {
+    pub const fn note_display(&self) -> CustomViewNoteDisplay {
         self.note_display
     }
     /// Whether a horizontal scroll bar is displayed.
@@ -310,11 +309,11 @@ impl XlsWorkbookCustomView {
         self.display_flags & ZOOM != 0
     }
     /// How drawing and OLE objects appear in the workbook window.
-    pub const fn object_display(&self) -> XlsObjectDisplayMode {
+    pub const fn object_display(&self) -> ObjectDisplayMode {
         match (self.display_flags >> HIDE_OBJ_SHIFT) & HIDE_OBJ_MASK {
-            1 => XlsObjectDisplayMode::ShowPlaceholders,
-            2 => XlsObjectDisplayMode::HideAll,
-            _ => XlsObjectDisplayMode::ShowAll,
+            1 => ObjectDisplayMode::ShowPlaceholders,
+            2 => ObjectDisplayMode::HideAll,
+            _ => ObjectDisplayMode::ShowAll,
         }
     }
     /// Whether the view includes the workbook print settings.
@@ -357,14 +356,14 @@ impl XlsWorkbookCustomView {
 
 /// The `Ref8U` visible area of the logical top-left pane in a sheet view.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsCustomViewTopLeft {
+pub struct CustomViewTopLeft {
     first_row: u16,
     last_row: u16,
     first_col: u16,
     last_col: u16,
 }
 
-impl XlsCustomViewTopLeft {
+impl CustomViewTopLeft {
     pub const fn first_row(&self) -> u16 {
         self.first_row
     }
@@ -381,7 +380,7 @@ impl XlsCustomViewTopLeft {
 
 /// Sheet settings of one custom view (`UserSViewBegin`, MS-XLS 2.4.334).
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct XlsSheetCustomViewBegin {
+pub struct SheetCustomViewBegin {
     guid: [u8; 16],
     tab_id: u16,
     scale: u32,
@@ -389,20 +388,20 @@ pub struct XlsSheetCustomViewBegin {
     active_pane: PaneType,
     /// Flag double-word (fields A–b); typed accessors decode the bits.
     flags: u32,
-    hidden_rows: XlsCustomViewHiddenRows,
-    top_left: XlsCustomViewTopLeft,
+    hidden_rows: CustomViewHiddenRows,
+    top_left: CustomViewTopLeft,
     split_x: f64,
     split_y: f64,
     right_pane_col: u16,
     bottom_pane_row: u16,
 }
 
-impl XlsSheetCustomViewBegin {
+impl SheetCustomViewBegin {
     /// Parse a `UserSViewBegin` record payload (worksheet/dialog/macro
-    /// layout; chart sheets use [`XlsChartSheetCustomViewBegin`]).
-    pub(crate) fn parse(data: &[u8]) -> XlsResult<Self> {
+    /// layout; chart sheets use [`ChartSheetCustomViewBegin`]).
+    pub(crate) fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != USER_S_VIEW_BEGIN_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: USER_S_VIEW_BEGIN_LEN,
                 found: data.len(),
             });
@@ -435,7 +434,7 @@ impl XlsSheetCustomViewBegin {
         };
         let flags = read_u32(data, 32)?;
         let hidden_rows =
-            XlsCustomViewHiddenRows::from_bits((flags >> HIDDEN_RW_SHIFT) & HIDDEN_RW_MASK)?;
+            CustomViewHiddenRows::from_bits((flags >> HIDDEN_RW_SHIFT) & HIDDEN_RW_MASK)?;
         let guid = read_bytes(data, 0)?;
         Ok(Self {
             guid,
@@ -445,7 +444,7 @@ impl XlsSheetCustomViewBegin {
             active_pane,
             flags,
             hidden_rows,
-            top_left: XlsCustomViewTopLeft {
+            top_left: CustomViewTopLeft {
                 first_row: read_u16(data, 36)?,
                 last_row: read_u16(data, 38)?,
                 first_col: read_u16(data, 40)?,
@@ -555,7 +554,7 @@ impl XlsSheetCustomViewBegin {
         self.flags & SPLIT_H != 0
     }
     /// Whether hidden rows (filtered rows excluded) are present.
-    pub const fn hidden_rows(&self) -> XlsCustomViewHiddenRows {
+    pub const fn hidden_rows(&self) -> CustomViewHiddenRows {
         self.hidden_rows
     }
     /// Whether at least one hidden column is present.
@@ -579,7 +578,7 @@ impl XlsSheetCustomViewBegin {
         self.flags & RULER != 0
     }
     /// The visible area of the logical top-left pane.
-    pub const fn top_left(&self) -> XlsCustomViewTopLeft {
+    pub const fn top_left(&self) -> CustomViewTopLeft {
         self.top_left
     }
     /// Left-to-right position of the split, expressed as a column number.
@@ -604,23 +603,23 @@ impl XlsSheetCustomViewBegin {
 /// MS-XLS 2.4.335). Shares the `UserSViewBegin` record type but uses a
 /// chart-sheet-specific layout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsChartSheetCustomViewBegin {
+pub struct ChartSheetCustomViewBegin {
     guid: [u8; 16],
     tab_id: u32,
     scale: u32,
-    visibility: XlsSheetVisibility,
+    visibility: SheetVisibility,
     zoom_to_fit: bool,
 }
 
-impl XlsChartSheetCustomViewBegin {
+impl ChartSheetCustomViewBegin {
     /// Parse a `UserSViewBegin_Chart` record payload.
     ///
     /// This is public because the workbook reader never walks chart-sheet
     /// substreams; callers that walk one themselves use this for the
     /// chart-specific layout of the shared `UserSViewBegin` record type.
-    pub fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != USER_S_VIEW_BEGIN_CHART_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: USER_S_VIEW_BEGIN_CHART_LEN,
                 found: data.len(),
             });
@@ -634,9 +633,9 @@ impl XlsChartSheetCustomViewBegin {
         }
         let flags = read_u32(data, 32)?;
         let visibility = match (flags >> HS_STATE_SHIFT) & HS_STATE_MASK {
-            0 => XlsSheetVisibility::Visible,
-            1 => XlsSheetVisibility::Hidden,
-            2 => XlsSheetVisibility::VeryHidden,
+            0 => SheetVisibility::Visible,
+            1 => SheetVisibility::Hidden,
+            2 => SheetVisibility::VeryHidden,
             _ => {
                 return Err(invalid(
                     USER_S_VIEW_BEGIN_RECORD_TYPE,
@@ -667,7 +666,7 @@ impl XlsChartSheetCustomViewBegin {
         self.scale
     }
     /// Hidden state of the chart sheet in this view.
-    pub const fn visibility(&self) -> XlsSheetVisibility {
+    pub const fn visibility(&self) -> SheetVisibility {
         self.visibility
     }
     /// Whether the zoom is set to "Zoom to Fit Selection".
@@ -679,15 +678,15 @@ impl XlsChartSheetCustomViewBegin {
 /// The end of a per-sheet custom-view record collection (`UserSViewEnd`,
 /// MS-XLS 2.4.336). Its 2-byte payload is defined as 1 and ignored.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsSheetCustomViewEnd {
+pub struct SheetCustomViewEnd {
     reserved: u16,
 }
 
-impl XlsSheetCustomViewEnd {
+impl SheetCustomViewEnd {
     /// Parse a `UserSViewEnd` record payload.
-    pub(crate) fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub(crate) fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != USER_S_VIEW_END_LEN {
-            return Err(XlsError::InvalidLength {
+            return Err(Error::InvalidLength {
                 expected: USER_S_VIEW_END_LEN,
                 found: data.len(),
             });
@@ -706,22 +705,22 @@ impl XlsSheetCustomViewEnd {
 /// One sheet's custom view: the bracket of records starting at
 /// `UserSViewBegin` (or `UserSViewBegin_Chart`) and ending at `UserSViewEnd`.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct XlsSheetCustomView {
-    begin: XlsSheetCustomViewBegin,
-    end: XlsSheetCustomViewEnd,
+pub struct SheetCustomView {
+    begin: SheetCustomViewBegin,
+    end: SheetCustomViewEnd,
 }
 
-impl XlsSheetCustomView {
-    pub(crate) fn new(begin: XlsSheetCustomViewBegin, end: XlsSheetCustomViewEnd) -> Self {
+impl SheetCustomView {
+    pub(crate) fn new(begin: SheetCustomViewBegin, end: SheetCustomViewEnd) -> Self {
         Self { begin, end }
     }
 
     /// The sheet-view settings that opened the custom-view bracket.
-    pub const fn begin(&self) -> &XlsSheetCustomViewBegin {
+    pub const fn begin(&self) -> &SheetCustomViewBegin {
         &self.begin
     }
     /// The record that closed the custom-view bracket.
-    pub const fn end(&self) -> XlsSheetCustomViewEnd {
+    pub const fn end(&self) -> SheetCustomViewEnd {
         self.end
     }
 }
@@ -765,7 +764,7 @@ mod tests {
 
     #[test]
     fn parses_user_b_view() {
-        let view = XlsWorkbookCustomView::parse(&user_b_view_payload()).unwrap();
+        let view = WorkbookCustomView::parse(&user_b_view_payload()).unwrap();
         assert_eq!(view.guid(), &[0xAB; 16]);
         assert_eq!(view.active_tab(), Some(2));
         assert_eq!(view.window_position(), (-10, 20));
@@ -773,12 +772,12 @@ mod tests {
         assert_eq!(view.tab_ratio(), 600);
         assert!(view.shows_formula_bar());
         assert!(view.shows_status_bar());
-        assert_eq!(view.note_display(), XlsCustomViewNoteDisplay::On);
+        assert_eq!(view.note_display(), CustomViewNoteDisplay::On);
         assert!(view.shows_horizontal_scroll_bar());
         assert!(!view.shows_vertical_scroll_bar());
         assert!(view.shows_sheet_tabs());
         assert!(!view.is_maximized());
-        assert_eq!(view.object_display(), XlsObjectDisplayMode::HideAll);
+        assert_eq!(view.object_display(), ObjectDisplayMode::HideAll);
         assert!(view.includes_print_settings());
         assert!(view.includes_hidden_rows_columns_and_filters());
         assert!(!view.timed_update());
@@ -791,26 +790,26 @@ mod tests {
     #[test]
     fn enum_accessors_cover_every_legal_encoding() {
         for (bits, expected) in [
-            (0, XlsCustomViewNoteDisplay::Off),
-            (1, XlsCustomViewNoteDisplay::VisualCue),
-            (2, XlsCustomViewNoteDisplay::On),
+            (0, CustomViewNoteDisplay::Off),
+            (1, CustomViewNoteDisplay::VisualCue),
+            (2, CustomViewNoteDisplay::On),
         ] {
             let mut payload = user_b_view_payload();
             payload[42..44]
                 .copy_from_slice(&(DSP_STATUS | (bits << NOTE_DISP_SHIFT)).to_le_bytes());
-            let view = XlsWorkbookCustomView::parse(&payload).unwrap();
+            let view = WorkbookCustomView::parse(&payload).unwrap();
             assert_eq!(view.note_display(), expected);
         }
 
         for (bits, expected) in [
-            (0, XlsCustomViewHiddenRows::Present),
-            (1, XlsCustomViewHiddenRows::NotPresent),
+            (0, CustomViewHiddenRows::Present),
+            (1, CustomViewHiddenRows::NotPresent),
         ] {
             let mut payload = user_s_view_begin_payload();
             let flags = (read_u32(&payload, 32).unwrap() & !(HIDDEN_RW_MASK << HIDDEN_RW_SHIFT))
                 | (bits << HIDDEN_RW_SHIFT);
             payload[32..36].copy_from_slice(&flags.to_le_bytes());
-            let begin = XlsSheetCustomViewBegin::parse(&payload).unwrap();
+            let begin = SheetCustomViewBegin::parse(&payload).unwrap();
             assert_eq!(begin.hidden_rows(), expected);
         }
     }
@@ -826,7 +825,7 @@ mod tests {
     fn user_b_view_honors_invalid_tab_id() {
         let mut payload = user_b_view_payload();
         payload[42..44].copy_from_slice(&(DSP_STATUS | INVALID_TAB_ID).to_le_bytes());
-        let view = XlsWorkbookCustomView::parse(&payload).unwrap();
+        let view = WorkbookCustomView::parse(&payload).unwrap();
         assert_eq!(view.active_tab(), None);
         assert!(!view.shows_formula_bar());
     }
@@ -834,23 +833,23 @@ mod tests {
     #[test]
     fn rejects_bad_user_b_view() {
         // Truncated header.
-        assert!(XlsWorkbookCustomView::parse(&[0; 49]).is_err());
+        assert!(WorkbookCustomView::parse(&[0; 49]).is_err());
         // Tab ratio above the legal maximum.
         let mut payload = user_b_view_payload();
         payload[40..42].copy_from_slice(&1001u16.to_le_bytes());
-        assert!(XlsWorkbookCustomView::parse(&payload).is_err());
+        assert!(WorkbookCustomView::parse(&payload).is_err());
         // Out-of-range note-display enumeration.
         let mut payload = user_b_view_payload();
         payload[42..44].copy_from_slice(&(3u16 << NOTE_DISP_SHIFT).to_le_bytes());
-        assert!(XlsWorkbookCustomView::parse(&payload).is_err());
+        assert!(WorkbookCustomView::parse(&payload).is_err());
         // Out-of-range object-display enumeration.
         let mut payload = user_b_view_payload();
         payload[42..44].copy_from_slice(&(3u16 << HIDE_OBJ_SHIFT).to_le_bytes());
-        assert!(XlsWorkbookCustomView::parse(&payload).is_err());
+        assert!(WorkbookCustomView::parse(&payload).is_err());
         // Truncated name string.
         let mut payload = user_b_view_payload();
         payload.truncate(USER_B_VIEW_HEADER_LEN + 2);
-        assert!(XlsWorkbookCustomView::parse(&payload).is_err());
+        assert!(WorkbookCustomView::parse(&payload).is_err());
     }
 
     fn user_s_view_begin_payload() -> Vec<u8> {
@@ -885,7 +884,7 @@ mod tests {
 
     #[test]
     fn parses_user_s_view_begin() {
-        let begin = XlsSheetCustomViewBegin::parse(&user_s_view_begin_payload()).unwrap();
+        let begin = SheetCustomViewBegin::parse(&user_s_view_begin_payload()).unwrap();
         assert_eq!(begin.guid(), &[0xCD; 16]);
         assert_eq!(begin.tab_id(), 1);
         assert_eq!(begin.scale(), 75);
@@ -900,7 +899,7 @@ mod tests {
         assert!(!begin.is_frozen_without_split());
         assert!(begin.is_split_vertically());
         assert!(!begin.is_split_horizontally());
-        assert_eq!(begin.hidden_rows(), XlsCustomViewHiddenRows::NotPresent);
+        assert_eq!(begin.hidden_rows(), CustomViewHiddenRows::NotPresent);
         assert!(begin.has_hidden_columns());
         assert!(begin.is_page_layout_view());
         assert!(!begin.is_page_break_preview());
@@ -918,24 +917,24 @@ mod tests {
     #[test]
     fn rejects_bad_user_s_view_begin() {
         // Wrong length.
-        assert!(XlsSheetCustomViewBegin::parse(&[0; 63]).is_err());
+        assert!(SheetCustomViewBegin::parse(&[0; 63]).is_err());
         // Zoom out of range.
         let mut payload = user_s_view_begin_payload();
         payload[20..24].copy_from_slice(&9u32.to_le_bytes());
-        assert!(XlsSheetCustomViewBegin::parse(&payload).is_err());
+        assert!(SheetCustomViewBegin::parse(&payload).is_err());
         // Gridline color out of range.
         let mut payload = user_s_view_begin_payload();
         payload[24..26].copy_from_slice(&65u16.to_le_bytes());
-        assert!(XlsSheetCustomViewBegin::parse(&payload).is_err());
+        assert!(SheetCustomViewBegin::parse(&payload).is_err());
         // Invalid pane type.
         let mut payload = user_s_view_begin_payload();
         payload[28] = 4;
-        assert!(XlsSheetCustomViewBegin::parse(&payload).is_err());
+        assert!(SheetCustomViewBegin::parse(&payload).is_err());
         // Out-of-range hidden-row state.
         let mut payload = user_s_view_begin_payload();
         let flags = read_u32(&payload, 32).unwrap() | (2 << HIDDEN_RW_SHIFT);
         payload[32..36].copy_from_slice(&flags.to_le_bytes());
-        assert!(XlsSheetCustomViewBegin::parse(&payload).is_err());
+        assert!(SheetCustomViewBegin::parse(&payload).is_err());
     }
 
     #[test]
@@ -954,27 +953,27 @@ mod tests {
         data.extend_from_slice(&[0x55; 2]); // unused5
         data.extend_from_slice(&[0x66; 2]); // unused6
         assert_eq!(data.len(), USER_S_VIEW_BEGIN_CHART_LEN);
-        let begin = XlsChartSheetCustomViewBegin::parse(&data).unwrap();
+        let begin = ChartSheetCustomViewBegin::parse(&data).unwrap();
         assert_eq!(begin.guid(), &[0xEF; 16]);
         assert_eq!(begin.tab_id(), 3);
         assert_eq!(begin.scale(), 100);
-        assert_eq!(begin.visibility(), XlsSheetVisibility::VeryHidden);
+        assert_eq!(begin.visibility(), SheetVisibility::VeryHidden);
         assert!(begin.zoom_to_fit());
 
         // Zoom bounds and hidden-state enumeration are validated.
         data[20..24].copy_from_slice(&401u32.to_le_bytes());
-        assert!(XlsChartSheetCustomViewBegin::parse(&data).is_err());
+        assert!(ChartSheetCustomViewBegin::parse(&data).is_err());
         data[20..24].copy_from_slice(&100u32.to_le_bytes());
         data[32..36].copy_from_slice(&(3u32 << HS_STATE_SHIFT).to_le_bytes());
-        assert!(XlsChartSheetCustomViewBegin::parse(&data).is_err());
-        assert!(XlsChartSheetCustomViewBegin::parse(&data[..63]).is_err());
+        assert!(ChartSheetCustomViewBegin::parse(&data).is_err());
+        assert!(ChartSheetCustomViewBegin::parse(&data[..63]).is_err());
     }
 
     #[test]
     fn parses_user_s_view_end() {
-        let end = XlsSheetCustomViewEnd::parse(&1u16.to_le_bytes()).unwrap();
+        let end = SheetCustomViewEnd::parse(&1u16.to_le_bytes()).unwrap();
         assert_eq!(end.reserved(), 1);
-        assert!(XlsSheetCustomViewEnd::parse(&[0; 1]).is_err());
-        assert!(XlsSheetCustomViewEnd::parse(&[0; 3]).is_err());
+        assert!(SheetCustomViewEnd::parse(&[0; 1]).is_err());
+        assert!(SheetCustomViewEnd::parse(&[0; 3]).is_err());
     }
 }

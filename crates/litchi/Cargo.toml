@@ -67,9 +67,9 @@ odf = [
     "dep:litchi-ods",
     "dep:litchi-odt",
 ]
-doc = ["dep:litchi-cfb", "dep:litchi-doc", "sign"]
-ppt = ["dep:litchi-cfb", "dep:litchi-ppt", "sign"]
-xls = ["dep:litchi-cfb", "dep:litchi-xls", "sign"]
+doc = ["dep:litchi-cfb", "dep:litchi-doc", "dep:litchi-ole-common", "sign"]
+ppt = ["dep:litchi-cfb", "dep:litchi-ole-common", "dep:litchi-ppt", "sign"]
+xls = ["dep:litchi-cfb", "dep:litchi-ole-common", "dep:litchi-xls", "sign"]
 ooxml = [
     "dep:litchi-docx",
     "dep:litchi-drawingml",
@@ -120,6 +120,7 @@ litchi-odp = { workspace = true, optional = true } # OpenDocument Presentation (
 litchi-ods = { workspace = true, optional = true } # OpenDocument Spreadsheet (.ods) parser, gated by `odf`
 litchi-odt = { workspace = true, optional = true } # OpenDocument Text (.odt) parser, gated by `odf`
 litchi-odraw = { workspace = true, optional = true } # Host-neutral OfficeArt image grammar exposed by the image facade
+litchi-ole-common = { workspace = true, optional = true } # Shared OLE2 property-set and object grammar for legacy formats
 litchi-ooxml-common = { workspace = true, optional = true } # Host-neutral OOXML package grammar exposed directly by the OOXML facade
 litchi-opc = { workspace = true, optional = true } # Open Packaging Conventions package graph used by standalone OOXML families
 litchi-ppt = { workspace = true, optional = true } # Legacy PowerPoint binary parser/writer (.ppt), independently gated by `ppt`

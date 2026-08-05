@@ -1,5 +1,5 @@
-use super::{PowerPointFontCollection, PowerPointFontCollections};
-use crate::{PptRecord, PptRecordType};
+use super::{FontCollection, FontCollections};
+use crate::{Record, RecordType};
 
 fn record_bytes(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u8> {
     let mut data = Vec::new();
@@ -10,8 +10,8 @@ fn record_bytes(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u
     data
 }
 
-fn collection(kind: PptRecordType, payload: Vec<u8>) -> PptRecord {
-    PptRecord {
+fn collection(kind: RecordType, payload: Vec<u8>) -> Record {
+    Record {
         record_type: kind,
         record_type_raw: kind.as_u16(),
         version: 0x0f,
@@ -22,7 +22,7 @@ fn collection(kind: PptRecordType, payload: Vec<u8>) -> PptRecord {
     }
 }
 
-fn prog_tags_record(version: u8, blob_payload: &[u8]) -> PptRecord {
+fn prog_tags_record(version: u8, blob_payload: &[u8]) -> Record {
     let tag_name: Vec<u8> = format!("___PPT{version}")
         .encode_utf16()
         .flat_map(u16::to_le_bytes)
@@ -32,8 +32,8 @@ fn prog_tags_record(version: u8, blob_payload: &[u8]) -> PptRecord {
     let mut tag_payload = name;
     tag_payload.extend_from_slice(&blob);
     let tag = record_bytes(0x0f, 0, 0x138a, &tag_payload);
-    PptRecord {
-        record_type: PptRecordType::ProgTags,
+    Record {
+        record_type: RecordType::ProgTags,
         record_type_raw: 0x1388,
         version: 0x0f,
         instance: 0,
@@ -61,9 +61,7 @@ fn parses_font_collections_and_embedded_facets() {
     payload.extend_from_slice(&record_bytes(0, 0, 4024, b"plain-font"));
     payload.extend_from_slice(&record_bytes(0, 3, 4024, b"bold-italic-font"));
 
-    let fonts =
-        PowerPointFontCollection::parse(&collection(PptRecordType::FontCollection10, payload))
-            .unwrap();
+    let fonts = FontCollection::parse(&collection(RecordType::FontCollection10, payload)).unwrap();
 
     assert!(fonts.international);
     let font = fonts.get(7).unwrap();
@@ -82,16 +80,11 @@ fn rejects_malformed_font_collections() {
     let mut unterminated = vec![b'A'; 68];
     unterminated[66] = 0;
     let data = record_bytes(0, 0, 4023, &unterminated);
-    assert!(
-        PowerPointFontCollection::parse(&collection(PptRecordType::FontCollection, data,)).is_err()
-    );
+    assert!(FontCollection::parse(&collection(RecordType::FontCollection, data,)).is_err());
 
     let embedded_first = record_bytes(0, 0, 4024, b"font");
     assert!(
-        PowerPointFontCollection::parse(
-            &collection(PptRecordType::FontCollection, embedded_first,)
-        )
-        .is_err()
+        FontCollection::parse(&collection(RecordType::FontCollection, embedded_first,)).is_err()
     );
 }
 
@@ -101,7 +94,7 @@ fn resolves_base_and_international_font_collections() {
     entity[..4].copy_from_slice(&[b'A', 0, 0, 0]);
     entity[66] = 4;
     let base = collection(
-        PptRecordType::FontCollection,
+        RecordType::FontCollection,
         record_bytes(0, 0, 4023, &entity),
     );
     let international_bytes = record_bytes(0, 9, 4023, &entity);
@@ -109,8 +102,8 @@ fn resolves_base_and_international_font_collections() {
     let embedding_flags = record_bytes(0, 0, 0x32c8, &0xffff_ffffu32.to_le_bytes());
     let mut extension = international;
     extension.extend_from_slice(&embedding_flags);
-    let root = PptRecord {
-        record_type: PptRecordType::Document,
+    let root = Record {
+        record_type: RecordType::Document,
         record_type_raw: 1000,
         version: 0x0f,
         instance: 0,
@@ -119,7 +112,7 @@ fn resolves_base_and_international_font_collections() {
         children: vec![base, prog_tags_record(10, &extension)],
     };
 
-    let fonts = PowerPointFontCollections::parse(&root).unwrap();
+    let fonts = FontCollections::parse(&root).unwrap();
     assert_eq!(fonts.get_base(0).unwrap().name, "A");
     assert_eq!(fonts.get_international(9).unwrap().name, "A");
     let flags = fonts.embedding_flags.unwrap();
@@ -131,8 +124,8 @@ fn resolves_base_and_international_font_collections() {
 #[test]
 fn rejects_malformed_or_duplicate_font_embedding_flags() {
     let malformed_header = record_bytes(1, 0, 0x32c8, &0u32.to_le_bytes());
-    let root = PptRecord {
-        record_type: PptRecordType::Document,
+    let root = Record {
+        record_type: RecordType::Document,
         record_type_raw: 1000,
         version: 0x0f,
         instance: 0,
@@ -140,14 +133,14 @@ fn rejects_malformed_or_duplicate_font_embedding_flags() {
         data: Vec::new(),
         children: vec![prog_tags_record(10, &malformed_header)],
     };
-    assert!(PowerPointFontCollections::parse(&root).is_err());
+    assert!(FontCollections::parse(&root).is_err());
 
     let malformed_size = record_bytes(0, 0, 0x32c8, &[0, 0, 0]);
     let mut duplicate = record_bytes(0, 0, 0x32c8, &0u32.to_le_bytes());
     duplicate.extend_from_slice(&record_bytes(0, 0, 0x32c8, &1u32.to_le_bytes()));
     for payload in [&malformed_size[..], &duplicate[..]] {
-        let root = PptRecord {
-            record_type: PptRecordType::Document,
+        let root = Record {
+            record_type: RecordType::Document,
             record_type_raw: 1000,
             version: 0x0f,
             instance: 0,
@@ -155,6 +148,6 @@ fn rejects_malformed_or_duplicate_font_embedding_flags() {
             data: Vec::new(),
             children: vec![prog_tags_record(10, payload)],
         };
-        assert!(PowerPointFontCollections::parse(&root).is_err());
+        assert!(FontCollections::parse(&root).is_err());
     }
 }

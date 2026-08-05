@@ -1,10 +1,13 @@
 //! Canonical index-mark fragments and byte-preserving inline mutation.
 
 use super::MAX_MARKS;
-use super::{TextIndexMark, TextIndexMarkFragments, TextIndexMarkKind, parse_text_index_marks};
+use super::{
+    TextAlphabeticalMarkMetadata, TextIndexMark, TextIndexMarkFragments, TextIndexMarkKind,
+    parse_text_index_marks,
+};
 use crate::elements::xml::{TEXT_NAMESPACE, is_bound, namespaced_attribute};
 use crate::index::TextIndexAttribute;
-use crate::{BibliographyField, TextBibliographyType};
+use crate::{TextBibliographyType, bibliography_configuration::Field};
 use litchi_core::{Error, Result};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::NsReader;
@@ -81,7 +84,7 @@ impl TextIndexMark {
     pub fn bibliography_point(
         bibliography_type: TextBibliographyType,
         visible_text: impl Into<String>,
-        fields: Vec<(BibliographyField, String)>,
+        fields: Vec<(Field, String)>,
     ) -> Result<Self> {
         if fields.len() > 64 {
             return invalid("bibliography mark has too many fields");

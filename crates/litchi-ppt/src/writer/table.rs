@@ -11,9 +11,9 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use litchi_ppt::writer::{PptWriter, Table};
+//! use litchi_ppt::writer::{Writer, Table};
 //!
-//! let mut writer = PptWriter::new();
+//! let mut writer = Writer::new();
 //! let slide = writer.add_slide()?;
 //!
 //! let mut table = Table::new(2, 3)?;
@@ -27,10 +27,10 @@
 use litchi_core::unit::{EMUS_PER_INCH, EMUS_PER_PT, PPT_MASTER_UNITS_PER_INCH, pt_to_emu_i32};
 use zerocopy::IntoBytes;
 
-use super::core::PptWriteError;
+use super::core::WriteError;
 use super::escher::{
-    ChildAnchor, EscherBuilder, EscherProperty, EscherSpData, EscherSpgrData,
-    PROPERTY_FLAG_COMPLEX, PptError, ShapeFlags, build_client_textbox, header_version, record_type,
+    ChildAnchor, Error, EscherBuilder, EscherProperty, EscherSpData, EscherSpgrData,
+    PROPERTY_FLAG_COMPLEX, ShapeFlags, build_client_textbox, header_version, record_type,
     shape_type,
 };
 
@@ -69,8 +69,8 @@ fn emu_to_pt_i32(emu: i32) -> i32 {
     (i64::from(emu) * 72 / EMUS_PER_INCH) as i32
 }
 
-fn invalid(message: impl Into<String>) -> PptWriteError {
-    PptWriteError::InvalidData(message.into())
+fn invalid(message: impl Into<String>) -> WriteError {
+    WriteError::InvalidData(message.into())
 }
 
 /// A table to place on a slide: a grid of text cells with configurable
@@ -94,7 +94,7 @@ impl Table {
     ///
     /// Cells start empty; every column is [`DEFAULT_COLUMN_WIDTH_PT`] points
     /// wide and every row [`DEFAULT_ROW_HEIGHT_PT`] points high.
-    pub fn new(rows: usize, columns: usize) -> Result<Self, PptWriteError> {
+    pub fn new(rows: usize, columns: usize) -> Result<Self, WriteError> {
         if rows == 0 || columns == 0 {
             return Err(invalid("table requires at least one row and one column"));
         }
@@ -138,7 +138,7 @@ impl Table {
         row: usize,
         column: usize,
         text: impl Into<String>,
-    ) -> Result<(), PptWriteError> {
+    ) -> Result<(), WriteError> {
         if row >= self.rows || column >= self.columns {
             return Err(invalid(format!(
                 "cell ({row}, {column}) is outside a {}x{} table",
@@ -157,7 +157,7 @@ impl Table {
     }
 
     /// Set the width of a column in points.
-    pub fn set_column_width(&mut self, column: usize, width_pt: i32) -> Result<(), PptWriteError> {
+    pub fn set_column_width(&mut self, column: usize, width_pt: i32) -> Result<(), WriteError> {
         let Some(slot) = self.column_widths.get_mut(column) else {
             return Err(invalid(format!(
                 "column {column} is outside a {}-column table",
@@ -180,7 +180,7 @@ impl Table {
     }
 
     /// Set the height of a row in points.
-    pub fn set_row_height(&mut self, row: usize, height_pt: i32) -> Result<(), PptWriteError> {
+    pub fn set_row_height(&mut self, row: usize, height_pt: i32) -> Result<(), WriteError> {
         let Some(slot) = self.row_heights.get_mut(row) else {
             return Err(invalid(format!(
                 "row {row} is outside a {}-row table",
@@ -247,7 +247,7 @@ pub(crate) struct PositionedTable {
 pub(crate) fn build_table_spgr_container(
     placed: &PositionedTable,
     group_spid: u32,
-) -> Result<Vec<u8>, PptError> {
+) -> Result<Vec<u8>, Error> {
     let table = &placed.table;
     let width_emu = table.width_emu().ok_or_else(|| {
         std::io::Error::new(
@@ -364,7 +364,7 @@ pub(crate) fn build_table_spgr_container(
 }
 
 /// Build the TertiaryOpt record holding the table marker and row heights.
-fn build_table_properties(row_heights_emu: &[i32]) -> Result<Vec<u8>, PptError> {
+fn build_table_properties(row_heights_emu: &[i32]) -> Result<Vec<u8>, Error> {
     let rows = row_heights_emu.len();
     let rows_u16 = u16::try_from(rows).map_err(|_| {
         std::io::Error::new(std::io::ErrorKind::InvalidInput, "too many table rows")
@@ -408,7 +408,7 @@ fn build_cell_container(
     top: i32,
     width: i32,
     height: i32,
-) -> Result<Vec<u8>, PptError> {
+) -> Result<Vec<u8>, Error> {
     let mut cell = EscherBuilder::new(header_version::CONTAINER, 0, record_type::SP_CONTAINER);
 
     let mut sp = EscherBuilder::new(header_version::SP, shape_type::RECTANGLE, record_type::SP);

@@ -4,11 +4,10 @@ use std::path::PathBuf;
 
 use litchi_core::sheet::WorkbookTrait;
 use litchi_xls::writer::sort::{Config, Key, On, Parent, Range};
-use litchi_xls::writer::{XlsCustomTableStyles, XlsWriter};
+use litchi_xls::writer::{CustomTableStyles, Writer};
 use litchi_xls::{
-    XlsListColumnId, XlsListObject, XlsListObjectColumn, XlsListObjectFeatureVersion,
-    XlsListObjectId, XlsListObjectRange, XlsListObjectStyleOptions, XlsListTotalAggregation,
-    XlsTableStyle, XlsWorkbook,
+    ListColumnId, ListObject, ListObjectColumn, ListObjectFeatureVersion, ListObjectId,
+    ListObjectRange, ListObjectStyleOptions, ListTotalAggregation, TableStyle, Workbook,
 };
 
 fn workbook_records(bytes: &[u8]) -> Vec<(u16, usize)> {
@@ -25,32 +24,32 @@ fn workbook_records(bytes: &[u8]) -> Vec<(u16, usize)> {
     records
 }
 
-fn column(id: u32, name: &str) -> XlsListObjectColumn {
-    XlsListObjectColumn::try_new(XlsListColumnId::try_new(id).unwrap(), name).unwrap()
+fn column(id: u32, name: &str) -> ListObjectColumn {
+    ListObjectColumn::try_new(ListColumnId::try_new(id).unwrap(), name).unwrap()
 }
 
-fn table(id: u32, name: &str, first_row: u16, last_row: u16, style: &str) -> XlsListObject {
-    XlsListObject::try_new(
-        XlsListObjectId::try_new(id).unwrap(),
+fn table(id: u32, name: &str, first_row: u16, last_row: u16, style: &str) -> ListObject {
+    ListObject::try_new(
+        ListObjectId::try_new(id).unwrap(),
         name,
-        XlsListObjectRange::try_new(first_row, last_row, 0, 1).unwrap(),
+        ListObjectRange::try_new(first_row, last_row, 0, 1).unwrap(),
         vec![column(1, "Region"), column(2, "Sales")],
-        XlsListObjectStyleOptions::try_new(style).unwrap(),
+        ListObjectStyleOptions::try_new(style).unwrap(),
     )
     .unwrap()
 }
 
 #[test]
 fn writer_custom_list_object_round_trips_through_reader() {
-    let custom_style = XlsTableStyle::try_new("WriterTable", true, false, Vec::new()).unwrap();
-    let styles = XlsCustomTableStyles::try_from_styles(
+    let custom_style = TableStyle::try_new("WriterTable", true, false, Vec::new()).unwrap();
+    let styles = CustomTableStyles::try_from_styles(
         Vec::new(),
         "WriterTable",
         "PivotStyleLight16",
         vec![custom_style],
     )
     .unwrap();
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     writer.set_custom_table_styles(styles).unwrap();
     let sheet = writer.add_worksheet("Data").unwrap();
     writer
@@ -60,7 +59,7 @@ fn writer_custom_list_object_round_trips_through_reader() {
     writer.write_number(sheet, 1, 1, 42.0).unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let workbook = XlsWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let table = &workbook.xls_worksheet(0).unwrap().list_objects()[0];
     assert_eq!(table.id().value(), 7);
     assert_eq!(table.name(), "SalesTable");
@@ -73,7 +72,7 @@ fn writer_custom_list_object_round_trips_through_reader() {
 fn reads_excel_producer_feature11_and_list12_tables() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls");
-    let workbook = XlsWorkbook::new(File::open(fixture).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(fixture).unwrap()).unwrap();
     let mut found = None;
     let mut observed = Vec::new();
     for index in 0..workbook.worksheet_count() {
@@ -96,7 +95,7 @@ fn reads_excel_producer_feature11_and_list12_tables() {
     let table = found.unwrap_or_else(|| panic!("producer Table6; observed {observed:?}"));
     assert_eq!(
         table.range(),
-        XlsListObjectRange::try_new(2, 11, 0, 1).unwrap()
+        ListObjectRange::try_new(2, 11, 0, 1).unwrap()
     );
     assert_eq!(table.style().unwrap().name(), "TableStyleMedium9");
     assert_eq!(table.columns()[0].name(), "Region");
@@ -105,16 +104,16 @@ fn reads_excel_producer_feature11_and_list12_tables() {
 #[test]
 fn writer_rejects_table_collisions_ranges_and_style_references_atomically() {
     assert!(
-        XlsListObject::try_new(
-            XlsListObjectId::try_new(1).unwrap(),
+        ListObject::try_new(
+            ListObjectId::try_new(1).unwrap(),
             "Bad",
-            XlsListObjectRange::try_new(0, 2, 0, 1).unwrap(),
+            ListObjectRange::try_new(0, 2, 0, 1).unwrap(),
             vec![column(1, "A"), column(1, "B")],
-            XlsListObjectStyleOptions::try_new("TableStyleMedium2").unwrap(),
+            ListObjectStyleOptions::try_new("TableStyleMedium2").unwrap(),
         )
         .is_err()
     );
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let first = writer.add_worksheet("One").unwrap();
     let second = writer.add_worksheet("Two").unwrap();
     writer
@@ -148,15 +147,15 @@ fn long_feature11_uses_strict_continue_frt11_chain_and_round_trips() {
     let columns = (0..256)
         .map(|index| column(index + 1, &format!("Column_{index:03}_{}", "x".repeat(220))))
         .collect::<Vec<_>>();
-    let table = XlsListObject::try_new(
-        XlsListObjectId::try_new(19).unwrap(),
+    let table = ListObject::try_new(
+        ListObjectId::try_new(19).unwrap(),
         "WideTable",
-        XlsListObjectRange::try_new(0, 2, 0, 255).unwrap(),
+        ListObjectRange::try_new(0, 2, 0, 255).unwrap(),
         columns,
-        XlsListObjectStyleOptions::try_new("TableStyleMedium4").unwrap(),
+        ListObjectStyleOptions::try_new("TableStyleMedium4").unwrap(),
     )
     .unwrap();
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Wide").unwrap();
     writer.add_list_object(sheet, table).unwrap();
     let mut output = Cursor::new(Vec::new());
@@ -172,7 +171,7 @@ fn long_feature11_uses_strict_continue_frt11_chain_and_round_trips() {
             .count()
             > 1
     );
-    let workbook = XlsWorkbook::new(Cursor::new(bytes)).unwrap();
+    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
     assert_eq!(
         workbook.xls_worksheet(0).unwrap().list_objects()[0]
             .columns()
@@ -198,7 +197,7 @@ fn headerless_internal_feature12_and_table_sort_continuations_round_trip_in_orde
         .unwrap(),
     )
     .unwrap();
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Extended").unwrap();
     writer.add_list_object(sheet, value).unwrap();
     assert_eq!(writer.put_sort(sheet, sort.clone()).unwrap(), None);
@@ -220,11 +219,11 @@ fn headerless_internal_feature12_and_table_sort_continuations_round_trip_in_orde
         .unwrap();
     assert!(feature < last_list12 && last_list12 < sort_position);
     assert_eq!(types[sort_position + 1], 0x087f);
-    let workbook = XlsWorkbook::new(Cursor::new(bytes)).unwrap();
+    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
     let worksheet = workbook.xls_worksheet(0).unwrap();
     assert_eq!(
         worksheet.list_objects()[0].feature_version(),
-        XlsListObjectFeatureVersion::Feature12
+        ListObjectFeatureVersion::Feature12
     );
     assert!(!worksheet.list_objects()[0].has_header_row());
     assert_eq!(worksheet.sort(), Some(&sort));
@@ -234,7 +233,7 @@ fn headerless_internal_feature12_and_table_sort_continuations_round_trip_in_orde
 fn producer_table_sort_continue_frt12_chain_remains_attached() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls");
-    let workbook = XlsWorkbook::new(File::open(fixture).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(fixture).unwrap()).unwrap();
     let mut found = false;
     for index in 0..workbook.worksheet_count() {
         let worksheet = workbook.xls_worksheet(index).unwrap();
@@ -267,31 +266,31 @@ fn feature12_total_formula_string_and_aggregation_round_trip_inertly() {
             .with_total_formula_tokens(vec![0x1e, 1, 0])
             .unwrap(),
     ];
-    let value = XlsListObject::try_new(
-        XlsListObjectId::try_new(31).unwrap(),
+    let value = ListObject::try_new(
+        ListObjectId::try_new(31).unwrap(),
         "TotalsTable",
-        XlsListObjectRange::try_new(0, 3, 0, 1).unwrap(),
+        ListObjectRange::try_new(0, 3, 0, 1).unwrap(),
         columns,
-        XlsListObjectStyleOptions::try_new("TableStyleMedium6").unwrap(),
+        ListObjectStyleOptions::try_new("TableStyleMedium6").unwrap(),
     )
     .unwrap()
     .with_totals_row(true)
     .unwrap();
-    let mut writer = XlsWriter::new();
+    let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Totals").unwrap();
     writer.add_list_object(sheet, value).unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let workbook = XlsWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let parsed = &workbook.xls_worksheet(0).unwrap().list_objects()[0];
     assert_eq!(
         parsed.feature_version(),
-        XlsListObjectFeatureVersion::Feature12
+        ListObjectFeatureVersion::Feature12
     );
     assert_eq!(parsed.columns()[0].total_string(), Some("Grand total"));
     assert_eq!(
         parsed.columns()[1].total_aggregation(),
-        XlsListTotalAggregation::Custom
+        ListTotalAggregation::Custom
     );
     assert_eq!(
         parsed.columns()[1].total_formula_tokens(),

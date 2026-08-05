@@ -430,7 +430,7 @@ impl Document {
     }
 
     /// Get typed named ruby style definitions from `styles.xml`.
-    pub fn ruby_styles(&self) -> Result<crate::RubyStyles> {
+    pub fn ruby_styles(&self) -> Result<crate::ruby_family::Styles> {
         self.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| crate::parse_ruby_styles(styles.xml_content()),
@@ -587,7 +587,9 @@ impl Document {
     ///
     /// This styles metadata remains inert: the API does not generate
     /// bibliography entries, resolve citations, or access external sources.
-    pub fn bibliography_configuration(&self) -> Result<Option<crate::BibliographyConfiguration>> {
+    pub fn bibliography_configuration(
+        &self,
+    ) -> Result<Option<crate::bibliography_configuration::Configuration>> {
         self.styles.as_ref().map_or_else(
             || Ok(None),
             |styles| {
@@ -772,12 +774,12 @@ impl Document {
     }
 
     /// Get structure-preserving ruby annotations in document order.
-    pub fn ruby_annotations(&self) -> Result<crate::RubyAnnotations> {
+    pub fn ruby_annotations(&self) -> Result<crate::ruby_family::Annotations> {
         crate::parse_ruby_annotations(self.content.xml_content())
     }
 
     /// Get simplified ruby base/pronunciation pairs in document order.
-    pub fn rubies(&self) -> Result<Vec<super::Ruby>> {
+    pub fn rubies(&self) -> Result<Vec<super::ruby::Annotation>> {
         super::ruby::parse_rubies(self.content.xml_content())
     }
 

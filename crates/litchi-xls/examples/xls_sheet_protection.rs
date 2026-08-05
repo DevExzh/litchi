@@ -7,14 +7,14 @@
 //!
 //! The file is saved to `output/xls_sheet_protection.xls`.
 
-use litchi_xls::XlsWriter;
+use litchi_xls::Writer;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output_dir = std::path::Path::new("output");
     std::fs::create_dir_all(output_dir)?;
     let output_path = output_dir.join("xls_sheet_protection.xls");
 
-    let mut w = XlsWriter::new();
+    let mut w = Writer::new();
 
     // ================================================================
     // Sheet 1 — Protected with password + object/scenario protection
@@ -98,11 +98,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// for each sheet.
 fn round_trip_verify(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
     use litchi_core::sheet::WorkbookTrait;
-    use litchi_xls::XlsWorkbook;
+    use litchi_xls::Workbook;
     use std::io::Cursor;
 
     let data = std::fs::read(path)?;
-    let wb = XlsWorkbook::new(Cursor::new(data))?;
+    let wb = Workbook::new(Cursor::new(data))?;
 
     println!("Worksheets: {:?}", wb.worksheet_names());
 

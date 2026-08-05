@@ -97,6 +97,7 @@ pub mod footnote_separator;
 pub mod form;
 pub mod generic;
 pub mod graphic_properties;
+mod graphic_property_specs;
 pub mod image_map;
 pub mod line_numbering;
 pub mod list_label_alignment;
@@ -117,10 +118,6 @@ pub mod variable_declaration;
     reason = "ODT facade exposes inert concordance metadata"
 )]
 pub(crate) use auto_mark_file::AlphabeticalIndexAutoMarkFile;
-#[allow(unused_imports, reason = "ODT facade exposes bibliography semantics")]
-pub(crate) use bibliography_configuration::{
-    BibliographyConfiguration, BibliographyField, BibliographySortKey,
-};
 #[allow(
     unused_imports,
     reason = "ODT facade exposes unambiguous chart property semantics"
@@ -143,11 +140,6 @@ pub(crate) use core::{
     PackageWriter, Profile, StartKey, Structure, TemplateMetadata, UserDefinedMetadata,
     UserDefinedValueType,
 };
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes DDE metadata used by variables"
-)]
-pub(crate) use dde_connection::{DdeConnectionDeclaration, DdeConnectionUse};
 #[allow(unused_imports, reason = "ODT facade exposes document script metadata")]
 pub(crate) use document_scripts::{
     EmbeddedScript, EventListener, ScriptBinding, ScriptEventListener, Scripts, parse_scripts,
@@ -227,8 +219,7 @@ pub(crate) use package::forms::{AuthoredForm, AuthoredFormControl, AuthoredFormN
 pub(crate) use package::scripts::{ScriptResource, ScriptResourceKind, ScriptResourceSpec};
 #[allow(unused_imports, reason = "ODT facade exposes ruby semantics")]
 pub(crate) use ruby_family::{
-    RubyAlignment, RubyAnnotation, RubyAnnotations, RubyBase, RubyPosition, RubyProperties,
-    RubyStyle, RubyStyles, insert_ruby_annotation_xml, parse_ruby_annotations, parse_ruby_styles,
+    insert_ruby_annotation_xml, parse_ruby_annotations, parse_ruby_styles,
     remove_ruby_annotation_xml, remove_ruby_style_xml, replace_ruby_annotation_xml,
     set_ruby_style_xml, wrap_ruby_annotation_xml,
 };
@@ -309,7 +300,6 @@ pub(crate) use page_sequence::Sequence;
 pub(crate) use reference_mark::{
     ReferenceMark, insert_reference_mark_xml, remove_reference_mark_xml, replace_reference_mark_xml,
 };
-pub(crate) use ruby::Ruby;
 pub(crate) use section::{
     Block, add_section_xml, clear_sections_xml, remove_section_xml, unwrap_section_xml,
     update_section_xml, wrap_section_xml,

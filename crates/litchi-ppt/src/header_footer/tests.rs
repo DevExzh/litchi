@@ -1,6 +1,6 @@
 use super::*;
-use crate::PptRecordType;
-use crate::records::PptRecord;
+use crate::RecordType;
+use crate::records::Record;
 
 const POI_SLIDE_BYTES: &[u8] = &[
     0x3F, 0x00, 0xD9, 0x0F, 0x2E, 0, 0, 0, 0, 0, 0xDA, 0x0F, 4, 0, 0, 0, 0, 0, 0x23, 0, 0x20, 0,
@@ -14,25 +14,19 @@ const POI_NOTES_BYTES: &[u8] = &[
     0, 0x20, 0, 0x46, 0, 0x6F, 0, 0x6F, 0, 0x74, 0, 0x65, 0, 0x72, 0,
 ];
 
-fn parsed(bytes: &[u8], scope: PowerPointHeaderFooterScope) -> PowerPointHeaderFooter {
-    let (record, consumed) = PptRecord::parse(bytes, 0).expect("record");
+fn parsed(bytes: &[u8], scope: HeaderFooterScope) -> HeaderFooter {
+    let (record, consumed) = Record::parse(bytes, 0).expect("record");
     assert_eq!(consumed, bytes.len());
-    PowerPointHeaderFooter::parse_record(&record, scope).expect("header/footer")
+    HeaderFooter::parse_record(&record, scope).expect("header/footer")
 }
 
 #[test]
 fn poi_record_arrays_are_byte_identical() {
-    let slide = parsed(
-        POI_SLIDE_BYTES,
-        PowerPointHeaderFooterScope::PresentationSlides,
-    );
+    let slide = parsed(POI_SLIDE_BYTES, HeaderFooterScope::PresentationSlides);
     assert_eq!(slide.footer.as_deref(), Some("My Footer - 1"));
     assert_eq!(slide.to_record_bytes().unwrap(), POI_SLIDE_BYTES);
 
-    let notes = parsed(
-        POI_NOTES_BYTES,
-        PowerPointHeaderFooterScope::NotesAndHandouts,
-    );
+    let notes = parsed(POI_NOTES_BYTES, HeaderFooterScope::NotesAndHandouts);
     assert_eq!(notes.header.as_deref(), Some("Note Header"));
     assert_eq!(notes.footer.as_deref(), Some("Note Footer"));
     assert_eq!(notes.to_record_bytes().unwrap(), POI_NOTES_BYTES);
@@ -40,13 +34,13 @@ fn poi_record_arrays_are_byte_identical() {
 
 #[test]
 fn all_flags_format_13_empty_and_local_roundtrip() {
-    let value = PowerPointHeaderFooter {
-        scope: PowerPointHeaderFooterScope::Local {
-            parent: PowerPointHeaderFooterParent::Slide,
-            parent_ordinal: PowerPointHeaderFooterParentOrdinal(7),
+    let value = HeaderFooter {
+        scope: HeaderFooterScope::Local {
+            parent: HeaderFooterParent::Slide,
+            parent_ordinal: HeaderFooterParentOrdinal(7),
         },
-        options: PowerPointHeaderFooterOptions {
-            datetime_format: PowerPointDateTimeFormatId::new(13).unwrap(),
+        options: HeaderFooterOptions {
+            datetime_format: DateTimeFormatId::new(13).unwrap(),
             show_date: true,
             use_current_datetime: true,
             use_user_date: true,
@@ -91,13 +85,10 @@ fn malformed_record_matrix_is_rejected() {
     cases.push(invalid_utf16);
 
     for bytes in cases {
-        let rejected = PptRecord::parse(&bytes, 0)
+        let rejected = Record::parse(&bytes, 0)
             .and_then(|(record, _)| {
-                PowerPointHeaderFooter::parse_record(
-                    &record,
-                    PowerPointHeaderFooterScope::PresentationSlides,
-                )
-                .map(|_| (record, 0))
+                HeaderFooter::parse_record(&record, HeaderFooterScope::PresentationSlides)
+                    .map(|_| (record, 0))
             })
             .is_err();
         assert!(rejected, "malformed bytes were accepted");
@@ -106,9 +97,9 @@ fn malformed_record_matrix_is_rejected() {
 
 #[test]
 fn illegal_header_controls_and_oversize_user_date_are_rejected() {
-    let invalid_header = PowerPointHeaderFooter {
-        scope: PowerPointHeaderFooterScope::PresentationSlides,
-        options: PowerPointHeaderFooterOptions::default(),
+    let invalid_header = HeaderFooter {
+        scope: HeaderFooterScope::PresentationSlides,
+        options: HeaderFooterOptions::default(),
         user_date: None,
         header: Some("not permitted".to_string()),
         footer: None,
@@ -116,9 +107,9 @@ fn illegal_header_controls_and_oversize_user_date_are_rejected() {
     };
     assert!(invalid_header.to_record_bytes().is_err());
 
-    let control = PowerPointHeaderFooter {
-        scope: PowerPointHeaderFooterScope::NotesAndHandouts,
-        options: PowerPointHeaderFooterOptions::default(),
+    let control = HeaderFooter {
+        scope: HeaderFooterScope::NotesAndHandouts,
+        options: HeaderFooterOptions::default(),
         user_date: None,
         header: None,
         footer: Some("bad\nfooter".to_string()),
@@ -126,9 +117,9 @@ fn illegal_header_controls_and_oversize_user_date_are_rejected() {
     };
     assert!(control.to_record_bytes().is_err());
 
-    let user_date = PowerPointHeaderFooter {
-        scope: PowerPointHeaderFooterScope::NotesAndHandouts,
-        options: PowerPointHeaderFooterOptions::default(),
+    let user_date = HeaderFooter {
+        scope: HeaderFooterScope::NotesAndHandouts,
+        options: HeaderFooterOptions::default(),
         user_date: Some("x".repeat(256)),
         header: None,
         footer: None,
@@ -139,7 +130,7 @@ fn illegal_header_controls_and_oversize_user_date_are_rejected() {
 
 #[test]
 fn placement_duplicate_and_order_violations_are_rejected() {
-    let (container, _) = PptRecord::parse(POI_SLIDE_BYTES, 0).unwrap();
+    let (container, _) = Record::parse(POI_SLIDE_BYTES, 0).unwrap();
     let atom = container.children[0].clone();
     let footer = container.children[1].clone();
 
@@ -148,15 +139,11 @@ fn placement_duplicate_and_order_violations_are_rejected() {
     out_of_order.children = vec![footer.clone(), atom.clone()];
     out_of_order.data_length = 0;
     assert!(
-        PowerPointHeaderFooter::parse_record(
-            &out_of_order,
-            PowerPointHeaderFooterScope::PresentationSlides,
-        )
-        .is_err()
+        HeaderFooter::parse_record(&out_of_order, HeaderFooterScope::PresentationSlides,).is_err()
     );
 
-    let document = PptRecord {
-        record_type: PptRecordType::Document,
+    let document = Record {
+        record_type: RecordType::Document,
         record_type_raw: 1000,
         version: 0xF,
         instance: 0,
@@ -165,10 +152,10 @@ fn placement_duplicate_and_order_violations_are_rejected() {
         children: vec![container.clone(), container.clone()],
     };
     let records = vec![&document, &document.children[0], &document.children[1]];
-    assert!(PowerPointHeaderFooters::parse_record_tree(&records).is_err());
+    assert!(HeaderFooters::parse_record_tree(&records).is_err());
 
-    let wrong_parent = PptRecord {
-        record_type: PptRecordType::Notes,
+    let wrong_parent = Record {
+        record_type: RecordType::Notes,
         record_type_raw: 1008,
         version: 0xF,
         instance: 0,
@@ -176,8 +163,8 @@ fn placement_duplicate_and_order_violations_are_rejected() {
         data: Vec::new(),
         children: vec![container],
     };
-    let empty_document = PptRecord {
-        record_type: PptRecordType::Document,
+    let empty_document = Record {
+        record_type: RecordType::Document,
         record_type_raw: 1000,
         version: 0xF,
         instance: 0,
@@ -186,5 +173,5 @@ fn placement_duplicate_and_order_violations_are_rejected() {
         children: Vec::new(),
     };
     let records = vec![&empty_document, &wrong_parent, &wrong_parent.children[0]];
-    assert!(PowerPointHeaderFooters::parse_record_tree(&records).is_err());
+    assert!(HeaderFooters::parse_record_tree(&records).is_err());
 }

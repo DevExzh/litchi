@@ -9,10 +9,10 @@ use super::{
     parse_slide_animation_extension, write_animation_info, write_build_list,
     write_extended_time_node,
 };
-use crate::consts::PptRecordType;
+use crate::consts::RecordType;
 use crate::embedded::object::editor::Editor as ObjectEditor;
-use crate::package::{PptError, Result};
-use crate::records::PptRecord;
+use crate::package::{Error, Result};
+use crate::records::Record;
 use std::collections::{BTreeSet, HashSet};
 
 const ESCHER_SP_CONTAINER: u16 = 0xF004;
@@ -97,14 +97,14 @@ impl Editor {
                 return invalid("persisted record exceeds animation editor limit");
             }
             let kind = raw_type(&record)?;
-            let scope = if kind == PptRecordType::Slide.as_u16() {
+            let scope = if kind == RecordType::Slide.as_u16() {
                 Scope::Slide
-            } else if kind == PptRecordType::MainMaster.as_u16() {
+            } else if kind == RecordType::MainMaster.as_u16() {
                 Scope::MainMaster
             } else {
                 continue;
             };
-            let (parsed, consumed) = PptRecord::parse(&record, 0)?;
+            let (parsed, consumed) = Record::parse(&record, 0)?;
             if consumed != record.len() || parsed.data_length as usize + 8 != record.len() {
                 return corrupted("persisted slide/master record has trailing or truncated bytes");
             }
@@ -199,10 +199,11 @@ impl Editor {
             .extension
             .time_node
             .as_mut()
-            .ok_or_else(|| PptError::InvalidFormat("timeline has no root node".into()))?;
-        let slot = root.children.get_mut(index).ok_or_else(|| {
-            PptError::InvalidFormat("timeline child index is out of range".into())
-        })?;
+            .ok_or_else(|| Error::InvalidFormat("timeline has no root node".into()))?;
+        let slot = root
+            .children
+            .get_mut(index)
+            .ok_or_else(|| Error::InvalidFormat("timeline child index is out of range".into()))?;
         *slot = node;
         candidate.stage(persist_id)?;
         *self = candidate;
@@ -232,7 +233,7 @@ impl Editor {
             .extension
             .time_node
             .as_mut()
-            .ok_or_else(|| PptError::InvalidFormat("timeline has no root node".into()))?;
+            .ok_or_else(|| Error::InvalidFormat("timeline has no root node".into()))?;
         if index >= root.children.len() {
             return invalid("timeline child index is out of range");
         }
@@ -249,7 +250,7 @@ impl Editor {
             .extension
             .time_node
             .as_mut()
-            .ok_or_else(|| PptError::InvalidFormat("timeline has no root node".into()))?;
+            .ok_or_else(|| Error::InvalidFormat("timeline has no root node".into()))?;
         if order.len() != root.children.len() {
             return invalid("timeline reorder must include every child");
         }
@@ -300,11 +301,11 @@ impl Editor {
             .extension
             .build_list
             .as_mut()
-            .ok_or_else(|| PptError::InvalidFormat("slide/master has no build list".into()))?;
+            .ok_or_else(|| Error::InvalidFormat("slide/master has no build list".into()))?;
         let slot = list
             .builds
             .get_mut(index)
-            .ok_or_else(|| PptError::InvalidFormat("build index is out of range".into()))?;
+            .ok_or_else(|| Error::InvalidFormat("build index is out of range".into()))?;
         *slot = build;
         candidate.stage(persist_id)?;
         *self = candidate;
@@ -318,7 +319,7 @@ impl Editor {
             .extension
             .build_list
             .as_mut()
-            .ok_or_else(|| PptError::InvalidFormat("slide/master has no build list".into()))?;
+            .ok_or_else(|| Error::InvalidFormat("slide/master has no build list".into()))?;
         if index >= list.builds.len() {
             return invalid("build index is out of range");
         }
@@ -335,7 +336,7 @@ impl Editor {
             .extension
             .build_list
             .as_mut()
-            .ok_or_else(|| PptError::InvalidFormat("slide/master has no build list".into()))?;
+            .ok_or_else(|| Error::InvalidFormat("slide/master has no build list".into()))?;
         if order.len() != list.builds.len() {
             return invalid("build reorder must include every entry");
         }
@@ -364,7 +365,7 @@ impl Editor {
             .entries
             .iter()
             .position(|entry| entry.persist_id == persist_id)
-            .ok_or_else(|| PptError::InvalidFormat("animation persist ID was not found".into()))?;
+            .ok_or_else(|| Error::InvalidFormat("animation persist ID was not found".into()))?;
         if !candidate.entries[index].shape_ids.contains(&shape_id) {
             return invalid("animation target shape does not exist");
         }
@@ -410,7 +411,7 @@ impl Editor {
         self.entries
             .iter_mut()
             .find(|entry| entry.persist_id == persist_id)
-            .ok_or_else(|| PptError::InvalidFormat("animation persist ID was not found".into()))
+            .ok_or_else(|| Error::InvalidFormat("animation persist ID was not found".into()))
     }
 
     fn stage(&mut self, persist_id: u32) -> Result<()> {
@@ -418,7 +419,7 @@ impl Editor {
             .entries
             .iter()
             .position(|entry| entry.persist_id == persist_id)
-            .ok_or_else(|| PptError::InvalidFormat("animation persist ID was not found".into()))?;
+            .ok_or_else(|| Error::InvalidFormat("animation persist ID was not found".into()))?;
         validate_extension(
             &self.entries[index].extension,
             &self.entries[index].shape_ids,
@@ -433,12 +434,12 @@ impl Editor {
             return invalid("animation extension exceeds record limit");
         }
         let record = rewrite_ppt10_payload(&self.entries[index].record, &payload)?;
-        let (parsed, consumed) = PptRecord::parse(&record, 0)?;
+        let (parsed, consumed) = Record::parse(&record, 0)?;
         if consumed != record.len() || parsed.data_length as usize + 8 != record.len() {
             return corrupted("rewritten slide/master record failed length validation");
         }
         let reparsed_payload = find_ppt10_payload(&parsed)?
-            .ok_or_else(|| PptError::Corrupted("rewritten ___PPT10 payload is missing".into()))?;
+            .ok_or_else(|| Error::Corrupted("rewritten ___PPT10 payload is missing".into()))?;
         let reparsed = parse_slide_animation_extension(&reparsed_payload)?;
         if reparsed.time_node != self.entries[index].extension.time_node
             || reparsed.build_list != self.entries[index].extension.build_list
@@ -510,7 +511,7 @@ fn validate_node(
 ) -> Result<()> {
     *count = count
         .checked_add(1)
-        .ok_or_else(|| PptError::InvalidFormat("timeline node count overflow".into()))?;
+        .ok_or_else(|| Error::InvalidFormat("timeline node count overflow".into()))?;
     if depth > limits.max_timeline_depth || *count > limits.max_timeline_nodes {
         return invalid("timeline nesting or node count exceeds limits");
     }
@@ -582,17 +583,17 @@ fn validate_modifier(_value: &TimeModifier) -> Result<()> {
     Ok(())
 }
 
-fn find_ppt10_payload(record: &PptRecord) -> Result<Option<Vec<u8>>> {
-    for prog_tags in record.find_children(PptRecordType::ProgTags) {
-        for binary in prog_tags.find_children(PptRecordType::ProgBinaryTag) {
-            let Some(name) = binary.find_child(PptRecordType::CString) else {
+fn find_ppt10_payload(record: &Record) -> Result<Option<Vec<u8>>> {
+    for prog_tags in record.find_children(RecordType::ProgTags) {
+        for binary in prog_tags.find_children(RecordType::ProgBinaryTag) {
+            let Some(name) = binary.find_child(RecordType::CString) else {
                 continue;
             };
             if is_ppt10_name(&name.data) {
                 let data = binary
-                    .find_child(PptRecordType::BinaryTagData)
+                    .find_child(RecordType::BinaryTagData)
                     .ok_or_else(|| {
-                        PptError::Corrupted("___PPT10 tag is missing BinaryTagData".into())
+                        Error::Corrupted("___PPT10 tag is missing BinaryTagData".into())
                     })?;
                 return Ok(Some(data.data.clone()));
             }
@@ -621,7 +622,7 @@ fn rewrite_extension_payload(
     while offset < data.len() {
         let raw = raw_record(data, offset)?;
         let kind = raw_type(raw)?;
-        if kind == PptRecordType::ExtTimeNode.as_u16() {
+        if kind == RecordType::ExtTimeNode.as_u16() {
             if saw_root {
                 return invalid("extension contains duplicate root timelines");
             }
@@ -629,7 +630,7 @@ fn rewrite_extension_payload(
             if let Some(value) = root {
                 output.extend(write_extended_time_node(value)?);
             }
-        } else if kind == PptRecordType::BuildList.as_u16() {
+        } else if kind == RecordType::BuildList.as_u16() {
             if saw_builds {
                 return invalid("extension contains duplicate build lists");
             }
@@ -653,7 +654,7 @@ fn rewrite_extension_payload(
 
 fn rewrite_ppt10_payload(root: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
     let (rewritten, found) = rewrite_ppt_record(root, &mut |record| {
-        if raw_type(record).ok() != Some(PptRecordType::ProgBinaryTag.as_u16()) {
+        if raw_type(record).ok() != Some(RecordType::ProgBinaryTag.as_u16()) {
             return Ok(None);
         }
         if !prog_binary_is_ppt10(record)? {
@@ -670,15 +671,15 @@ fn rewrite_ppt10_payload(root: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
     let mut binary_children = atom(
         0,
         0,
-        PptRecordType::CString.as_u16(),
+        RecordType::CString.as_u16(),
         &"___PPT10"
             .encode_utf16()
             .flat_map(u16::to_le_bytes)
             .collect::<Vec<_>>(),
     )?;
-    binary_children.extend(atom(0, 0, PptRecordType::BinaryTagData.as_u16(), payload)?);
-    let binary = container(0, PptRecordType::ProgBinaryTag.as_u16(), &binary_children)?;
-    let tags = container(0, PptRecordType::ProgTags.as_u16(), &binary)?;
+    binary_children.extend(atom(0, 0, RecordType::BinaryTagData.as_u16(), payload)?);
+    let binary = container(0, RecordType::ProgBinaryTag.as_u16(), &binary_children)?;
+    let tags = container(0, RecordType::ProgTags.as_u16(), &binary)?;
     append_container_child(&rewritten, &tags)
 }
 
@@ -686,7 +687,7 @@ fn prog_binary_is_ppt10(record: &[u8]) -> Result<bool> {
     let mut offset = 8;
     while offset < record.len() {
         let child = raw_record(record, offset)?;
-        if raw_type(child)? == PptRecordType::CString.as_u16() {
+        if raw_type(child)? == RecordType::CString.as_u16() {
             return Ok(is_ppt10_name(&child[8..]));
         }
         offset += child.len();
@@ -699,11 +700,11 @@ fn rewrite_binary_tag_data(record: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
     let mut found = false;
     while offset < record.len() {
         let child = raw_record(record, offset)?;
-        if raw_type(child)? == PptRecordType::BinaryTagData.as_u16() {
+        if raw_type(child)? == RecordType::BinaryTagData.as_u16() {
             if found {
                 return invalid("___PPT10 contains duplicate BinaryTagData");
             }
-            out.extend(atom(0, 0, PptRecordType::BinaryTagData.as_u16(), payload)?);
+            out.extend(atom(0, 0, RecordType::BinaryTagData.as_u16(), payload)?);
             found = true;
         } else {
             out.extend_from_slice(child);
@@ -719,12 +720,12 @@ fn rewrite_binary_tag_data(record: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
 fn collect_shapes_and_legacy(
     persist_id: u32,
     scope: Scope,
-    record: &PptRecord,
+    record: &Record,
     limits: EditorLimits,
 ) -> Result<(BTreeSet<u32>, Vec<LegacyShapeAnimation>)> {
     let mut ids = BTreeSet::new();
     let mut legacy = Vec::new();
-    for drawing in record.find_children(PptRecordType::PPDrawing) {
+    for drawing in record.find_children(RecordType::PPDrawing) {
         collect_escher(
             &drawing.data,
             persist_id,
@@ -758,8 +759,8 @@ fn collect_escher(
                         let mut ppt = 8;
                         while ppt < value.len() {
                             let item = raw_record(value, ppt)?;
-                            if raw_type(item)? == PptRecordType::AnimationInfo.as_u16() {
-                                let (parsed, used) = PptRecord::parse(item, 0)?;
+                            if raw_type(item)? == RecordType::AnimationInfo.as_u16() {
+                                let (parsed, used) = Record::parse(item, 0)?;
                                 if used != item.len() {
                                     return corrupted("AnimationInfo length mismatch");
                                 }
@@ -799,7 +800,7 @@ fn rewrite_shape_animation(
     animation: Option<&[u8]>,
 ) -> Result<(Vec<u8>, bool)> {
     rewrite_ppt_record(root, &mut |record| {
-        if raw_type(record).ok() != Some(PptRecordType::PPDrawing.as_u16()) {
+        if raw_type(record).ok() != Some(RecordType::PPDrawing.as_u16()) {
             return Ok(None);
         };
         let (data, found) = rewrite_escher_shapes(&record[8..], shape_id, animation)?;
@@ -864,7 +865,7 @@ fn rewrite_shape_container(record: &[u8], animation: Option<&[u8]>) -> Result<Ve
             let mut anim_found = false;
             while ppt < child.len() {
                 let item = raw_record(child, ppt)?;
-                if raw_type(item)? == PptRecordType::AnimationInfo.as_u16() {
+                if raw_type(item)? == RecordType::AnimationInfo.as_u16() {
                     if anim_found {
                         return invalid("shape has duplicate AnimationInfo records");
                     }
@@ -921,7 +922,7 @@ fn rewrite_ppt_record(
 fn append_container_child(record: &[u8], child: &[u8]) -> Result<Vec<u8>> {
     let mut payload = record
         .get(8..)
-        .ok_or_else(|| PptError::Corrupted("container header is truncated".into()))?
+        .ok_or_else(|| Error::Corrupted("container header is truncated".into()))?
         .to_vec();
     payload.extend_from_slice(child);
     rebuild_record(record, &payload)
@@ -929,11 +930,11 @@ fn append_container_child(record: &[u8], child: &[u8]) -> Result<Vec<u8>> {
 fn rebuild_record(record: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
     let mut out = record
         .get(..4)
-        .ok_or_else(|| PptError::Corrupted("record header is truncated".into()))?
+        .ok_or_else(|| Error::Corrupted("record header is truncated".into()))?
         .to_vec();
     out.extend_from_slice(
         &u32::try_from(payload.len())
-            .map_err(|_| PptError::InvalidFormat("record payload exceeds u32".into()))?
+            .map_err(|_| Error::InvalidFormat("record payload exceeds u32".into()))?
             .to_le_bytes(),
     );
     out.extend_from_slice(payload);
@@ -953,7 +954,7 @@ fn record_bytes(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Resul
     out.extend_from_slice(&kind.to_le_bytes());
     out.extend_from_slice(
         &u32::try_from(payload.len())
-            .map_err(|_| PptError::InvalidFormat("record payload exceeds u32".into()))?
+            .map_err(|_| Error::InvalidFormat("record payload exceeds u32".into()))?
             .to_le_bytes(),
     );
     out.extend_from_slice(payload);
@@ -964,32 +965,32 @@ fn raw_record(data: &[u8], offset: usize) -> Result<&[u8]> {
     let end = offset
         .checked_add(8)
         .and_then(|v| v.checked_add(len))
-        .ok_or_else(|| PptError::Corrupted("record length overflow".into()))?;
+        .ok_or_else(|| Error::Corrupted("record length overflow".into()))?;
     data.get(offset..end)
-        .ok_or_else(|| PptError::Corrupted("record is truncated".into()))
+        .ok_or_else(|| Error::Corrupted("record is truncated".into()))
 }
 fn raw_type(record: &[u8]) -> Result<u16> {
     record
         .get(2..4)
         .map(|v| u16::from_le_bytes([v[0], v[1]]))
-        .ok_or_else(|| PptError::Corrupted("record type is truncated".into()))
+        .ok_or_else(|| Error::Corrupted("record type is truncated".into()))
 }
 fn raw_version(record: &[u8]) -> Result<u16> {
     record
         .get(0..2)
         .map(|v| u16::from_le_bytes([v[0], v[1]]) & 0xF)
-        .ok_or_else(|| PptError::Corrupted("record version is truncated".into()))
+        .ok_or_else(|| Error::Corrupted("record version is truncated".into()))
 }
 fn u32_at(data: &[u8], offset: usize) -> Result<u32> {
     data.get(offset..offset + 4)
         .map(|v| u32::from_le_bytes(v.try_into().unwrap()))
-        .ok_or_else(|| PptError::Corrupted("record u32 is truncated".into()))
+        .ok_or_else(|| Error::Corrupted("record u32 is truncated".into()))
 }
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
-    Err(PptError::InvalidFormat(message.into()))
+    Err(Error::InvalidFormat(message.into()))
 }
 fn corrupted<T>(message: impl Into<String>) -> Result<T> {
-    Err(PptError::Corrupted(message.into()))
+    Err(Error::Corrupted(message.into()))
 }
 
 #[cfg(test)]
@@ -1059,8 +1060,7 @@ mod tests {
 
     #[test]
     fn legacy_shape_edit_preserves_inert_interactive_records() {
-        let interactive =
-            atom(0, 0, PptRecordType::InteractiveInfoAtom.as_u16(), &[0; 16]).unwrap();
+        let interactive = atom(0, 0, RecordType::InteractiveInfoAtom.as_u16(), &[0; 16]).unwrap();
         let animation = write_animation_info(&AnimationInfo::new()).unwrap().0;
         let mut client_payload = interactive.clone();
         client_payload.extend(animation);
@@ -1068,8 +1068,8 @@ mod tests {
         let mut shape_payload = escher_record(2, 0, ESCHER_SP, &[42, 0, 0, 0, 0, 0, 0, 0]).unwrap();
         shape_payload.extend(client);
         let shape = escher_record(0x0f, 0, ESCHER_SP_CONTAINER, &shape_payload).unwrap();
-        let drawing = atom(0, 0, PptRecordType::PPDrawing.as_u16(), &shape).unwrap();
-        let slide = container(0, PptRecordType::Slide.as_u16(), &drawing).unwrap();
+        let drawing = atom(0, 0, RecordType::PPDrawing.as_u16(), &shape).unwrap();
+        let slide = container(0, RecordType::Slide.as_u16(), &drawing).unwrap();
 
         let (rewritten, found) = rewrite_shape_animation(&slide, 42, None).unwrap();
         assert!(found);
@@ -1078,7 +1078,7 @@ mod tests {
                 .windows(interactive.len())
                 .any(|value| value == interactive)
         );
-        let (record, used) = PptRecord::parse(&rewritten, 0).unwrap();
+        let (record, used) = Record::parse(&rewritten, 0).unwrap();
         assert_eq!(used, rewritten.len());
         let (shapes, legacy) =
             collect_shapes_and_legacy(1, Scope::Slide, &record, EditorLimits::default()).unwrap();

@@ -1,141 +1,205 @@
-//! PPTX Feature Isolation Test
+//! PPTX feature isolation test.
 //!
-//! Creates multiple PPTX files to test each feature individually.
+//! Each output file contains a small inspectable summary deck. Feature-specific
+//! PresentationML is built and round-tripped through its typed owner before it
+//! is summarized in the package, keeping the package facade focused on slides.
 
-use litchi::ooxml::pptx::animations::AnimationEffect;
-use litchi::ooxml::pptx::handout::{HandoutLayout, HandoutMaster};
-use litchi::ooxml::pptx::*;
-use std::error::Error;
+use litchi_pptx::animations::{Effect, EffectInstance, Sequence, Trigger};
+use litchi_pptx::presentation_properties::metadata::custom_show::{List as ShowList, Show};
+use litchi_pptx::presentation_properties::metadata::handout::{Layout, Master};
+use litchi_pptx::presentation_properties::metadata::sections::{List as SectionList, Section};
+use litchi_pptx::{MutablePresentation, Package};
+use std::error::Error as StdError;
 
-fn main() -> Result<(), Box<dyn Error>> {
-    // Test 1: Basic slides only
+const X: i64 = 914_400;
+const Y: i64 = 1_600_000;
+const WIDTH: i64 = 7_315_200;
+const HEIGHT: i64 = 3_800_000;
+
+fn main() -> Result<(), Box<dyn StdError>> {
     test_basic()?;
-
-    // Test 2: With animations
     test_animations()?;
-
-    // Test 3: With sections
     test_sections()?;
-
-    // Test 4: With custom shows
     test_custom_shows()?;
-
-    // Test 5: With handout master
     test_handout()?;
-
-    // Test 6: All features
     test_all_features()?;
 
-    println!("\nAll tests complete! Open each file in PowerPoint to find which one fails.");
-
+    println!("\nAll tests complete! Open each file in PowerPoint to inspect the summaries.");
     Ok(())
 }
 
-fn test_basic() -> Result<(), Box<dyn Error>> {
+fn test_basic() -> Result<(), Box<dyn StdError>> {
     println!("Test 1: Basic slides...");
-    let mut pkg = Package::new()?;
+    let mut package = Package::new()?;
     {
-        let pres = pkg.presentation_mut()?;
-        let slide = pres.add_slide()?;
-        slide.set_title("Basic Test");
-        slide.add_text_box("Hello World", 914400, 1828800, 7315200, 914400);
+        let presentation = package.presentation_mut()?;
+        add_summary_slide(
+            presentation,
+            "Basic Test",
+            "Basic slide and text-box package authoring.",
+        )?;
     }
-    pkg.save("test_1_basic.pptx")?;
-    println!("  Saved: test_1_basic.pptx");
+    save_and_reopen(package, "test_1_basic.pptx")?;
     Ok(())
 }
 
-fn test_animations() -> Result<(), Box<dyn Error>> {
+fn test_animations() -> Result<(), Box<dyn StdError>> {
     println!("Test 2: With animations...");
-    let mut pkg = Package::new()?;
+    let animation_xml = animation_demo()?;
+    let mut package = Package::new()?;
     {
-        let pres = pkg.presentation_mut()?;
-        let slide = pres.add_slide()?;
-        slide.set_title("Animation Test");
-        slide.add_text_box("Animated text", 914400, 1828800, 7315200, 914400);
-        slide.add_animation(3, AnimationEffect::Fade);
+        let presentation = package.presentation_mut()?;
+        add_summary_slide(
+            presentation,
+            "Animation Test",
+            &format!(
+                "Typed animation sequence\nCanonical XML: {} bytes",
+                animation_xml.len()
+            ),
+        )?;
     }
-    pkg.save("test_2_animations.pptx")?;
-    println!("  Saved: test_2_animations.pptx");
+    save_and_reopen(package, "test_2_animations.pptx")?;
     Ok(())
 }
 
-fn test_sections() -> Result<(), Box<dyn Error>> {
+fn test_sections() -> Result<(), Box<dyn StdError>> {
     println!("Test 3: With sections...");
-    let mut pkg = Package::new()?;
+    let sections_xml = sections_demo()?;
+    let mut package = Package::new()?;
     {
-        let pres = pkg.presentation_mut()?;
-        let slide1 = pres.add_slide()?;
-        slide1.set_title("Slide 1");
-        let slide2 = pres.add_slide()?;
-        slide2.set_title("Slide 2");
-
-        pres.add_section("Section 1", vec![256]);
-        pres.add_section("Section 2", vec![257]);
+        let presentation = package.presentation_mut()?;
+        add_summary_slide(
+            presentation,
+            "Sections Test",
+            &format!(
+                "Typed section list\nCanonical XML: {} bytes",
+                sections_xml.len()
+            ),
+        )?;
     }
-    pkg.save("test_3_sections.pptx")?;
-    println!("  Saved: test_3_sections.pptx");
+    save_and_reopen(package, "test_3_sections.pptx")?;
     Ok(())
 }
 
-fn test_custom_shows() -> Result<(), Box<dyn Error>> {
+fn test_custom_shows() -> Result<(), Box<dyn StdError>> {
     println!("Test 4: With custom shows...");
-    let mut pkg = Package::new()?;
+    let shows_xml = custom_shows_demo();
+    let mut package = Package::new()?;
     {
-        let pres = pkg.presentation_mut()?;
-        let slide1 = pres.add_slide()?;
-        slide1.set_title("Slide 1");
-        let slide2 = pres.add_slide()?;
-        slide2.set_title("Slide 2");
-
-        pres.create_custom_show("My Show", vec![256, 257]);
+        let presentation = package.presentation_mut()?;
+        add_summary_slide(
+            presentation,
+            "Custom Shows Test",
+            &format!(
+                "Typed custom-show list\nCanonical XML: {} bytes",
+                shows_xml.len()
+            ),
+        )?;
     }
-    pkg.save("test_4_custom_shows.pptx")?;
-    println!("  Saved: test_4_custom_shows.pptx");
+    save_and_reopen(package, "test_4_custom_shows.pptx")?;
     Ok(())
 }
 
-fn test_handout() -> Result<(), Box<dyn Error>> {
+fn test_handout() -> Result<(), Box<dyn StdError>> {
     println!("Test 5: With handout master...");
-    let mut pkg = Package::new()?;
+    let handout_xml = handout_demo();
+    let mut package = Package::new()?;
     {
-        let pres = pkg.presentation_mut()?;
-        let slide = pres.add_slide()?;
-        slide.set_title("Handout Test");
-
-        let mut handout = HandoutMaster::new();
-        handout.layout = HandoutLayout::SixSlides;
-        pres.set_handout_master(handout);
+        let presentation = package.presentation_mut()?;
+        add_summary_slide(
+            presentation,
+            "Handout Test",
+            &format!(
+                "Typed handout master\nCanonical XML: {} bytes",
+                handout_xml.len()
+            ),
+        )?;
     }
-    pkg.save("test_5_handout.pptx")?;
-    println!("  Saved: test_5_handout.pptx");
+    save_and_reopen(package, "test_5_handout.pptx")?;
     Ok(())
 }
 
-fn test_all_features() -> Result<(), Box<dyn Error>> {
+fn test_all_features() -> Result<(), Box<dyn StdError>> {
     println!("Test 6: All features...");
-    let mut pkg = Package::new()?;
+    let animation_xml = animation_demo()?;
+    let sections_xml = sections_demo()?;
+    let shows_xml = custom_shows_demo();
+    let handout_xml = handout_demo();
+
+    let mut package = Package::new()?;
     {
-        let pres = pkg.presentation_mut()?;
-
-        let slide1 = pres.add_slide()?;
-        slide1.set_title("Slide 1");
-        slide1.add_text_box("Text", 914400, 1828800, 7315200, 914400);
-        slide1.add_animation(3, AnimationEffect::Fade);
-
-        let slide2 = pres.add_slide()?;
-        slide2.set_title("Slide 2");
-
-        pres.add_section("Section 1", vec![256]);
-        pres.add_section("Section 2", vec![257]);
-
-        pres.create_custom_show("My Show", vec![256, 257]);
-
-        let mut handout = HandoutMaster::new();
-        handout.layout = HandoutLayout::SixSlides;
-        pres.set_handout_master(handout);
+        let presentation = package.presentation_mut()?;
+        add_summary_slide(
+            presentation,
+            "All Features",
+            &format!(
+                "Typed PresentationML feature owners\n\nAnimations: {} bytes\nSections: {} bytes\nCustom shows: {} bytes\nHandout: {} bytes",
+                animation_xml.len(),
+                sections_xml.len(),
+                shows_xml.len(),
+                handout_xml.len(),
+            ),
+        )?;
     }
-    pkg.save("test_6_all_features.pptx")?;
-    println!("  Saved: test_6_all_features.pptx");
+    save_and_reopen(package, "test_6_all_features.pptx")?;
     Ok(())
+}
+
+fn add_summary_slide(
+    presentation: &mut MutablePresentation,
+    title: &str,
+    body: &str,
+) -> Result<(), Box<dyn StdError>> {
+    let slide = presentation.add_slide()?;
+    slide.set_title(title);
+    slide.add_text_box(body, X, Y, WIDTH, HEIGHT);
+    Ok(())
+}
+
+fn save_and_reopen(mut package: Package, path: &str) -> Result<(), Box<dyn StdError>> {
+    package.save(path)?;
+    let reopened = Package::open(path)?;
+    assert_eq!(reopened.presentation()?.slide_count()?, 1);
+    println!("  Saved and reopened: {path}");
+    Ok(())
+}
+
+fn animation_demo() -> Result<String, Box<dyn StdError>> {
+    let mut sequence = Sequence::new();
+    sequence.add(
+        EffectInstance::new(3, Effect::Fade)
+            .with_trigger(Trigger::OnClick)
+            .with_duration_ms(500),
+    );
+    sequence.add(
+        EffectInstance::new(4, Effect::FlyIn)
+            .with_trigger(Trigger::AfterPrevious)
+            .with_duration_ms(750),
+    );
+    let xml = sequence.to_xml();
+    let parsed = Sequence::parse_timing_xml(&xml)?;
+    assert_eq!(parsed.animations.len(), 2);
+    Ok(xml)
+}
+
+fn sections_demo() -> Result<String, Box<dyn StdError>> {
+    let mut sections = SectionList::new();
+    sections.add_section(Section::new("Section 1", "section-1").with_slides([256]));
+    sections.add_section(Section::new("Section 2", "section-2").with_slides([257]));
+    Ok(sections.to_xml()?)
+}
+
+fn custom_shows_demo() -> String {
+    let mut shows = ShowList::new();
+    shows.add(Show::new(1, "My Show").with_slides(vec![256, 257]));
+    shows.to_xml()
+}
+
+fn handout_demo() -> String {
+    Master::new()
+        .with_layout(Layout::SixSlides)
+        .with_header("Feature Test")
+        .with_footer("Created with Litchi")
+        .with_slide_numbers()
+        .to_xml()
 }

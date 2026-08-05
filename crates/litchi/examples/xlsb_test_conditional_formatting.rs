@@ -8,9 +8,7 @@
 //! cargo run --example xlsb_test_conditional_formatting --features ooxml --no-default-features
 //! ```
 
-use litchi::ooxml::xlsb::conditional_formatting::{
-    CfRuleType, ConditionalFormatting, ConditionalFormattingRule,
-};
+use litchi::ooxml::xlsb::conditional_formatting::{Formatting, Rule, RuleType};
 use litchi::ooxml::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use litchi::sheet::CellValue;
 use std::fs::File;
@@ -55,8 +53,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dxf_idx = workbook.styles_mut().add_dxf_fill(0x0092D050);
 
     // Conditional Formatting: Cell Is rule for Q4 (highlight values > 2500)
-    let mut cf_cell_is = ConditionalFormatting::new(vec!["D2:D9".to_string()]);
-    let mut rule_cell_is = ConditionalFormattingRule::new(CfRuleType::CellIs, 1);
+    let mut cf_cell_is = Formatting::new(vec!["D2:D9".to_string()]);
+    let mut rule_cell_is = Rule::new(RuleType::CellIs, 1);
     rule_cell_is.stop_if_true = false;
     rule_cell_is.operator = Some(5); // Greater than (CFOper per MS-XLSB 2.5.15)
 
@@ -66,7 +64,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     rule_cell_is.formulas = vec![formula1];
     rule_cell_is.dxf_id = Some(dxf_idx as u32); // References the DXF we just added
 
-    cf_cell_is.rules.push(rule_cell_is);
+    cf_cell_is.add_rule(rule_cell_is);
     sheet.add_conditional_formatting(cf_cell_is);
 
     workbook.add_worksheet(sheet);

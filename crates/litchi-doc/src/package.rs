@@ -1,6 +1,9 @@
 /// Package implementation for legacy Word documents (.doc).
 use super::document::Document;
 use litchi_cfb::{OleError, OleFile};
+use litchi_ole_common::property_set::{
+    PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
+};
 use std::fs::File;
 use std::io::{self, Read, Seek};
 use std::path::Path;
@@ -303,7 +306,7 @@ impl<R: Read + Seek> Package<R> {
         litchi_ole_common::custom_xml::inspect(&mut self.ole)
     }
 
-    pub fn summary_information(&mut self) -> Result<Option<litchi_cfb::Stream>> {
+    pub fn summary_information(&mut self) -> Result<Option<Stream>> {
         match self
             .ole
             .property_set_stream(&["\u{0005}SummaryInformation"])
@@ -328,7 +331,7 @@ impl<R: Read + Seek> Package<R> {
         litchi_sign::cfb::verify(&mut self.ole, litchi_sign::cfb::Format::Doc, policy)
     }
 
-    pub fn document_summary_information(&mut self) -> Result<Option<litchi_cfb::Stream>> {
+    pub fn document_summary_information(&mut self) -> Result<Option<Stream>> {
         match self
             .ole
             .property_set_stream(&["\u{0005}DocumentSummaryInformation"])
@@ -339,12 +342,10 @@ impl<R: Read + Seek> Package<R> {
         }
     }
 
-    pub fn user_defined_properties(&mut self) -> Result<Option<litchi_cfb::Section>> {
-        Ok(self.document_summary_information()?.and_then(|stream| {
-            stream
-                .section(litchi_cfb::USER_DEFINED_PROPERTIES_FMTID)
-                .cloned()
-        }))
+    pub fn user_defined_properties(&mut self) -> Result<Option<Section>> {
+        Ok(self
+            .document_summary_information()?
+            .and_then(|stream| stream.section(USER_DEFINED_PROPERTIES_FMTID).cloned()))
     }
 }
 

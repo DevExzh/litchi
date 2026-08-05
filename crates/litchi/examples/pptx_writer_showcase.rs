@@ -22,10 +22,10 @@
 //!
 //! Then open `pptx_writer_showcase.pptx` in PowerPoint to verify!
 
-use litchi::ooxml::pptx::*;
 use litchi_pptx::transition::{
     Axis, InOut, Kind, Ms, Shape as TransitionShape, Side, Speed, Spokes, Transition,
 };
+use litchi_pptx::{GradientStop, MutablePresentation, Package, PatternType, SlideBackground};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
