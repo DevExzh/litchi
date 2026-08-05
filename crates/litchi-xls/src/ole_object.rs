@@ -1,8 +1,10 @@
 //! Strict BIFF8 Obj/FtPictFmla parsing and transactional OLE-object editing.
 
 use super::{XlsError, XlsResult};
-use litchi_ole_common::object::{Editor as ObjectEditor, Format as ObjectFormat};
+use litchi_cfb::OleFile;
+use litchi_ole_common::object::{Editor as ObjectEditor, Target, Targets};
 use std::collections::{HashMap, HashSet};
+use std::io::Cursor;
 
 pub use litchi_ole_common::object::Limits;
 
@@ -770,16 +772,13 @@ pub struct XlsOleObjectEditor {
 
 impl XlsOleObjectEditor {
     pub fn new(bytes: Vec<u8>, limits: Limits) -> XlsResult<Self> {
-        let package = ObjectEditor::open(bytes, ObjectFormat::Xls, limits)?;
-        let workbook_path = [vec!["Workbook".into()], vec!["Book".into()]]
-            .into_iter()
-            .find(|path| package.stream(path).is_some())
-            .ok_or_else(|| XlsError::InvalidData("Workbook stream not found".into()))?;
-        let workbook = package
-            .stream(&workbook_path)
-            .ok_or_else(|| XlsError::InvalidData("selected Workbook stream disappeared".into()))?
-            .to_vec();
+        // Workbook metadata is XLS-owned. Read and parse it before handing
+        // the original CFB bytes to the neutral object editor so the target
+        // catalog can be derived solely from Obj/FtPictFmla records.
+        let (workbook_path, workbook) = read_workbook(&bytes)?;
         let (sheets, form_controls) = parse_workbook(&workbook)?;
+        let targets = targets_for_sheets(&sheets)?;
+        let package = ObjectEditor::open(bytes, targets, limits)?;
         Ok(Self {
             package,
             workbook_path,
@@ -829,7 +828,8 @@ impl XlsOleObjectEditor {
             .get_mut(worksheet)
             .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet index {worksheet}")))?
             .push(object);
-        candidate.package.add_storage(&storage, compound_file)?;
+        let target = target_for_storage(storage)?;
+        candidate.package.add_storage(target, compound_file)?;
         candidate.commit()?;
         *self = candidate;
         Ok(())
@@ -853,7 +853,8 @@ impl XlsOleObjectEditor {
                 .flatten()
                 .any(|value| value.storage_name().as_deref() == Some(&storage))
         {
-            candidate.package.remove_storage(&storage)?;
+            let target = target_for_storage(storage)?;
+            candidate.package.remove_storage(target.key())?;
         }
         candidate.commit()?;
         *self = candidate;
@@ -888,16 +889,19 @@ impl XlsOleObjectEditor {
     }
 
     pub fn replace_storage(&mut self, storage_name: &str, compound_file: Vec<u8>) -> XlsResult<()> {
-        if !self
+        let storage = self
             .sheets
             .iter()
             .flatten()
-            .any(|value| value.storage_name().as_deref() == Some(storage_name))
-        {
-            return Err(invalid(OBJ, "storage has no Obj reference"));
-        }
+            .find_map(|value| {
+                value
+                    .storage_name()
+                    .filter(|value| value.as_str() == storage_name)
+            })
+            .ok_or_else(|| invalid(OBJ, "storage has no Obj reference"))?;
+        let target = target_for_storage(storage)?;
         self.package
-            .replace(storage_name, compound_file)
+            .replace(target.key(), compound_file)
             .map_err(Into::into)
     }
 
@@ -913,6 +917,36 @@ impl XlsOleObjectEditor {
         self.workbook = workbook;
         Ok(())
     }
+}
+
+fn read_workbook(bytes: &[u8]) -> XlsResult<(Vec<String>, Vec<u8>)> {
+    let mut ole = OleFile::open(Cursor::new(bytes))?;
+    for name in ["Workbook", "Book"] {
+        match ole.open_stream(&[name]) {
+            Ok(workbook) => return Ok((vec![name.to_owned()], workbook)),
+            Err(litchi_cfb::OleError::StreamNotFound) => continue,
+            Err(error) => return Err(error.into()),
+        }
+    }
+    Err(XlsError::InvalidData("Workbook stream not found".into()))
+}
+
+fn target_for_storage(storage: String) -> XlsResult<Target> {
+    Ok(Target::new(storage.clone(), [storage])?)
+}
+
+fn targets_for_sheets(sheets: &[Vec<XlsOleObjectRecord>]) -> XlsResult<Targets> {
+    let mut seen = HashSet::new();
+    let mut targets = Vec::new();
+    for object in sheets.iter().flatten() {
+        let Some(storage) = object.storage_name() else {
+            continue;
+        };
+        if seen.insert(storage.clone()) {
+            targets.push(target_for_storage(storage)?);
+        }
+    }
+    Ok(Targets::new(targets)?)
 }
 
 fn parse_formula(body: &[u8]) -> XlsResult<XlsFtPictFmla> {
