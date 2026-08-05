@@ -77,7 +77,7 @@ pub use presentation_properties::{
     PrintColorMode, PrintOutput, Properties, Show, ShowExtension, ShowMode, SlideSelection, Web,
     WebColor, WebScreenSize, load_from_package as load_presentation_properties,
 };
-pub use slide::{Key as SlideKey, Slide, SlideLayout, SlideMaster};
+pub use slide::{Key, Slide, SlideLayout, SlideMaster};
 pub use view_properties::{
     CommonSlideView, CommonView, GridSpacing, Guide, GuideOrientation, NormalView, OutlineSlide,
     OutlineView, Point, Ratio, RestoredPane, SimpleView, SlideLikeView, SorterView, SplitterState,

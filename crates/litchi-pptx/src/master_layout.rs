@@ -1836,7 +1836,7 @@ mod tests {
         }));
 
         // Layout inventory: kinds, names, placeholders, and back-references.
-        let layouts = authored.slide_layouts().unwrap();
+        let layouts = authored.layouts().unwrap();
         assert_eq!(layouts.len(), 2);
         let title_layout_read = &layouts[0];
         assert_eq!(title_layout_read.kind().unwrap().as_deref(), Some("title"));
@@ -1887,7 +1887,7 @@ mod tests {
                 candidate.part().part().partname().as_str() == "/ppt/slideMasters/slideMaster1.xml"
             })
             .unwrap();
-        assert_eq!(default_master.slide_layouts().unwrap().len(), 11);
+        assert_eq!(default_master.layouts().unwrap().len(), 11);
     }
 
     #[test]
@@ -1930,7 +1930,7 @@ mod tests {
         let reopened = roundtrip(&package);
         let presentation = reopened.presentation().unwrap();
         let default_master = &presentation.slide_masters().unwrap()[0];
-        let layouts = default_master.slide_layouts().unwrap();
+        let layouts = default_master.layouts().unwrap();
         assert_eq!(layouts.len(), 12);
         let added = layouts
             .iter()
@@ -2067,7 +2067,7 @@ mod tests {
                 candidate.part().part().partname().as_str() == master.part_name.as_str()
             })
             .unwrap();
-        let layouts = authored.slide_layouts().unwrap();
+        let layouts = authored.layouts().unwrap();
         assert_eq!(layouts.len(), 1);
         assert_eq!(layouts[0].name().unwrap(), "Kept");
 

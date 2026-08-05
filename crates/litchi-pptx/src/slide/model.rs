@@ -1,10 +1,17 @@
-//! Contextual slide, layout, and master facades.
+//! Borrowed semantic slide, layout, and master views.
+//!
+//! These types retain only a package borrow and a validated low-level part
+//! view. XML decoding, shape indexing, and relationship traversal are
+//! delegated to the sibling [`super::codec`] and [`super::package`] layers so
+//! the public API stays contextual without owning duplicate buffers.
 
 use litchi_opc::OpcPackage;
 
 use crate::Result;
 use crate::parts::{SlideLayoutPart, SlideMasterPart, SlidePart};
 use crate::shape::Scene;
+
+use super::{codec, package};
 
 /// Checked selector for an ordered slide graph.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,12 +41,12 @@ pub struct Slide<'a> {
 }
 
 impl<'a> Slide<'a> {
-    /// Construct a slide view from its package and low-level part view.
+    /// Construct a slide view from its package and validated part view.
     pub fn new(package: &'a OpcPackage, part: SlidePart<'a>) -> Self {
         Self { package, part }
     }
 
-    /// Borrow the underlying slide part view.
+    /// Borrow the underlying validated slide part view.
     #[inline]
     pub fn part(&self) -> &SlidePart<'a> {
         &self.part
@@ -47,28 +54,27 @@ impl<'a> Slide<'a> {
 
     /// Return the producer name, falling back to the OPC part name.
     pub fn name(&self) -> Result<String> {
-        self.part.name()
+        codec::slide_name(&self.part)
     }
 
     /// Whether the slide is hidden in the presentation graph.
     pub fn is_hidden(&self) -> Result<bool> {
-        self.part.is_hidden()
+        codec::slide_hidden(&self.part)
     }
 
     /// Flatten DrawingML text runs in source order.
     pub fn text(&self) -> Result<String> {
-        self.part.text()
+        codec::slide_text(&self.part)
     }
 
     /// Build the bounded borrowed scene for the slide.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        self.part.shapes()
+        codec::slide_shapes(&self.part)
     }
 
     /// Read the optional direct programmable-tag list attached to this slide.
     pub fn tags(&self) -> Result<Option<crate::tag::List>> {
-        Ok(crate::tag::load(self.package, self.part.part().partname())?
-            .map(crate::tag::Source::into_list))
+        package::slide_tags(self.package, &self.part)
     }
 
     /// Read the optional programmable-tag list attached to one semantic shape.
@@ -76,32 +82,29 @@ impl<'a> Slide<'a> {
         &self,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::tag::List>> {
-        Ok(
-            crate::tag::shape::load(self.package, self.part.part().partname(), shape)?
-                .map(crate::tag::Source::into_list),
-        )
+        package::slide_shape_tags(self.package, &self.part, shape)
     }
 
     /// Inspect all tag relationships on this slide in stable relationship-ID
     /// order. Shape-owned and unanchored producer markup remains visible here
     /// but is not flattened into [`Self::tags`].
     pub fn tag_inventory(&self) -> Result<Vec<crate::tag::Source>> {
-        crate::tag::discover(self.part.part(), self.package).map_err(Into::into)
+        package::slide_tag_inventory(self.package, &self.part)
     }
 
     /// Resolve the ordinary charts attached to this slide.
     pub fn charts(&self) -> Result<Vec<crate::chart::Part<'a>>> {
-        self.part.charts(self.package)
+        package::slide_charts(self.package, &self.part)
     }
 
     /// Resolve Microsoft ChartEx parts attached to this slide.
     pub fn chart_extensions(&self) -> Result<Vec<crate::chart::extension::Part<'a>>> {
-        self.part.chart_extensions(self.package)
+        package::slide_chart_extensions(self.package, &self.part)
     }
 
     /// Resolve the optional legacy comments list attached to this slide.
     pub fn comments(&self) -> Result<Option<crate::comments::ListPart<'a>>> {
-        self.part.comments(self.package)
+        package::slide_comments(self.package, &self.part)
     }
 
     /// Count semantic shapes in the slide's scene.
@@ -113,17 +116,13 @@ impl<'a> Slide<'a> {
     pub fn slide_sync(
         &self,
     ) -> Result<Option<crate::presentation_properties::metadata::slide_sync::Properties>> {
-        let part_name = self.part.part().partname();
-        let mut matches = crate::presentation_properties::metadata::slide_sync::load(self.package)?
-            .into_iter()
-            .filter(|entry| entry.slide_part_name == *part_name);
-        Ok(matches.next().map(|entry| entry.properties))
+        package::slide_sync(self.package, &self.part)
     }
 
     /// Resolve the slide's optional layout in package context.
     pub fn layout(&self) -> Result<Option<SlideLayout<'a>>> {
-        let part = self.part.layout(self.package)?;
-        Ok(part.map(|part| SlideLayout::new(self.package, part)))
+        package::slide_layout(self.package, &self.part)
+            .map(|part| part.map(|part| SlideLayout::new(self.package, part)))
     }
 }
 
@@ -134,12 +133,12 @@ pub struct SlideLayout<'a> {
 }
 
 impl<'a> SlideLayout<'a> {
-    /// Construct a layout view from its package and low-level part view.
+    /// Construct a layout view from its package and validated part view.
     pub fn new(package: &'a OpcPackage, part: SlideLayoutPart<'a>) -> Self {
         Self { package, part }
     }
 
-    /// Borrow the underlying layout part view.
+    /// Borrow the underlying validated layout part view.
     #[inline]
     pub fn part(&self) -> &SlideLayoutPart<'a> {
         &self.part
@@ -147,30 +146,28 @@ impl<'a> SlideLayout<'a> {
 
     /// Return the producer name, falling back to the OPC part name.
     pub fn name(&self) -> Result<String> {
-        self.part.name()
+        codec::layout_name(&self.part)
     }
 
     /// Return the optional PresentationML layout kind token.
     pub fn kind(&self) -> Result<Option<String>> {
-        self.part.kind()
+        codec::layout_kind(&self.part)
     }
 
-    /// Build the bounded borrowed scene for the layout.
+    /// Build the bounded borrowed shape scene for this layout.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        self.part.shapes()
+        codec::layout_shapes(&self.part)
     }
 
     /// Read the optional theme override attached to this layout.
     pub fn theme_override(&self) -> Result<Option<crate::shape::theme::Override>> {
-        self.part.theme_override(self.package)
+        package::layout_theme_override(self.package, &self.part)
     }
 
     /// Resolve the required master in package context.
     pub fn master(&self) -> Result<SlideMaster<'a>> {
-        Ok(SlideMaster::new(
-            self.package,
-            self.part.master(self.package)?,
-        ))
+        package::layout_master(self.package, &self.part)
+            .map(|part| SlideMaster::new(self.package, part))
     }
 }
 
@@ -181,12 +178,12 @@ pub struct SlideMaster<'a> {
 }
 
 impl<'a> SlideMaster<'a> {
-    /// Construct a master view from its package and low-level part view.
+    /// Construct a master view from its package and validated part view.
     pub fn new(package: &'a OpcPackage, part: SlideMasterPart<'a>) -> Self {
         Self { package, part }
     }
 
-    /// Borrow the underlying master part view.
+    /// Borrow the underlying validated master part view.
     #[inline]
     pub fn part(&self) -> &SlideMasterPart<'a> {
         &self.part
@@ -194,36 +191,31 @@ impl<'a> SlideMaster<'a> {
 
     /// Return the producer name, falling back to the OPC part name.
     pub fn name(&self) -> Result<String> {
-        self.part.name()
+        codec::master_name(&self.part)
     }
 
     /// Whether PowerPoint should preserve the master after editing.
     pub fn is_preserved(&self) -> Result<bool> {
-        self.part.is_preserved()
+        codec::master_preserved(&self.part)
     }
 
-    /// Build the bounded borrowed scene for the master.
+    /// Build the bounded borrowed shape scene for this master.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        self.part.shapes()
+        codec::master_shapes(&self.part)
     }
 
     /// Read the theme reached from this slide master.
     pub fn theme(&self) -> Result<Option<crate::shape::theme::ThemeSummary>> {
-        self.part.theme(self.package)
+        package::master_theme(self.package, &self.part)
     }
 
-    /// Resolve all layouts reachable from this master.
+    /// Resolve all layouts reachable from this master in XML order.
     pub fn layouts(&self) -> Result<Vec<SlideLayout<'a>>> {
-        Ok(self
-            .part
-            .layouts(self.package)?
-            .into_iter()
-            .map(|part| SlideLayout::new(self.package, part))
-            .collect())
-    }
-
-    /// Compatibility spelling used by existing contextual callers.
-    pub fn slide_layouts(&self) -> Result<Vec<SlideLayout<'a>>> {
-        self.layouts()
+        package::master_layouts(self.package, &self.part).map(|parts| {
+            parts
+                .into_iter()
+                .map(|part| SlideLayout::new(self.package, part))
+                .collect()
+        })
     }
 }
