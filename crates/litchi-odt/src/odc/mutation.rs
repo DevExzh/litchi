@@ -1,8 +1,8 @@
 //! Lossless axis and series mutation for standalone and embedded chart documents.
 
-use super::authoring::{serialize_chart_axis_fragment, serialize_chart_series_fragment};
 use super::{Axis, AxisSpec, Dimension, Document, Series, SeriesSpec};
 use litchi_core::{Error, Result, xml::escape_xml};
+use litchi_odc::authoring::{serialize_axis_fragment, serialize_series_fragment};
 use litchi_odf_common::chart::read;
 use quick_xml::{
     Reader,
@@ -87,7 +87,7 @@ impl Document {
             &xml,
             &scan,
             scan.axis_insert,
-            &serialize_chart_axis_fragment(axis)?,
+            &serialize_axis_fragment(axis)?,
         )?;
         let index = scan.axes.len();
         self.commit_chart_xml(updated)?;
@@ -106,7 +106,7 @@ impl Document {
             &xml,
             span.start,
             span.end,
-            &serialize_chart_axis_fragment(axis)?,
+            &serialize_axis_fragment(axis)?,
         )?)
     }
 
@@ -123,7 +123,7 @@ impl Document {
             .style_name
             .clone()
             .unwrap_or_else(|| entry.style.clone());
-        let replacement = serialize_chart_axis_fragment(&axis)?;
+        let replacement = serialize_axis_fragment(&axis)?;
         let original = start_tag(&xml[entry.span.start..entry.span.end])?;
         let end = entry.span.start + original.len();
         let merged = merge_start(
@@ -168,7 +168,7 @@ impl Document {
             &xml,
             &scan,
             scan.series_insert,
-            &serialize_chart_series_fragment(series)?,
+            &serialize_series_fragment(series)?,
         )?;
         let index = scan.series.len();
         self.commit_chart_xml(updated)?;
@@ -187,7 +187,7 @@ impl Document {
             &xml,
             span.start,
             span.end,
-            &serialize_chart_series_fragment(series)?,
+            &serialize_series_fragment(series)?,
         )?)
     }
 
@@ -222,7 +222,7 @@ impl Document {
                 .unwrap_or_else(|| entry.style.clone()),
             ..SeriesSpec::default()
         };
-        let replacement = serialize_chart_series_fragment(&series)?;
+        let replacement = serialize_series_fragment(&series)?;
         let original = start_tag(&xml[entry.span.start..entry.span.end])?;
         let end = entry.span.start + original.len();
         let merged = merge_start(

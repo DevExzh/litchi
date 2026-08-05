@@ -2,12 +2,13 @@
 
 use crate::core::{OwnedPackage, PackageWriter};
 use crate::elements::xml::namespaced_attribute;
-use crate::odc::{Definition, Document, serialize_chart_content};
+use crate::odc::{Definition, Document};
 use crate::{
     EmbeddedObject, EmbeddedObjectKind, EmbeddedObjectPart, EmbeddedObjectSource, InlineObjectRoot,
     constants,
 };
 use litchi_core::{Error, Result};
+use litchi_odc::serialize_content;
 pub(crate) use litchi_odf_common::package::{Addition, rebuild_package, splice};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -94,7 +95,7 @@ pub(crate) fn replace_embedded_chart(
     let object = select_chart_object(&objects, index)?;
     // Opening first validates MIME type and the existing chart hierarchy.
     let _ = open_embedded_chart(package, content, styles, index)?;
-    let chart_content = serialize_chart_content(definition)?;
+    let chart_content = serialize_content(definition)?;
     match &object.source {
         EmbeddedObjectSource::PackageSubdocument { content_path, .. } => rebuild_package(
             package,
@@ -178,7 +179,7 @@ pub(crate) fn add_embedded_chart(
         .iter()
         .filter(|object| object.part == EmbeddedObjectPart::Content)
         .count();
-    let chart_content = serialize_chart_content(definition)?;
+    let chart_content = serialize_content(definition)?;
     let root = unused_object_root(package)?;
     let (object_xml, additions, directories) = match storage {
         EmbeddedChartStorage::PackageSubdocument => {

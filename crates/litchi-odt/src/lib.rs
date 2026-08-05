@@ -207,7 +207,7 @@ pub(crate) use odc::{
     DataLabelSpec, DataPoint, DataPointSpec, Definition, Dimension, DomainSpec, Element,
     EquationSpec, ExtensionAttribute, ExtensionElement, Extensions, Grid, GridSpec, Labels, Legend,
     LegendSpec, PlotArea, PlotAreaSpec, RegressionSpec, Series, SeriesSpec, SeriesUpdate,
-    StyleElement, Text, serialize_chart_content,
+    StyleElement, Text, serialize_axis_fragment, serialize_content, serialize_series_fragment,
 };
 #[allow(
     unused_imports,

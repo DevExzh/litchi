@@ -1,7 +1,8 @@
 //! Namespace-aware access to a standalone OpenDocument chart package.
 
-use crate::{OpenDocumentFamily, OpenDocumentPackage};
+use crate::{OpenDocumentFamily, OpenDocumentPackage, constants, core::PackageWriter};
 use litchi_core::{Error, Metadata, Result};
+use litchi_odc::{Definition, serialize_content};
 use litchi_odf_common::calculation::{Settings, parse};
 use litchi_odf_common::chart::{Element, read};
 use std::io::Read;
@@ -14,6 +15,24 @@ pub struct Document {
 }
 
 impl Document {
+    /// Create a new packaged `.odc` document from a typed chart definition.
+    pub fn create(definition: &Definition) -> Result<Self> {
+        Self::create_with_mimetype(definition, constants::ODF_CHART)
+    }
+
+    /// Create a new packaged `.otc` chart template.
+    pub fn create_template(definition: &Definition) -> Result<Self> {
+        Self::create_with_mimetype(definition, constants::ODF_CHART_TEMPLATE)
+    }
+
+    fn create_with_mimetype(definition: &Definition, mimetype: &str) -> Result<Self> {
+        let content = serialize_content(definition)?;
+        let mut writer = PackageWriter::new();
+        writer.set_mimetype(mimetype)?;
+        writer.add_file(constants::ODF_CONTENT, content.as_bytes())?;
+        Self::from_bytes(writer.finish_to_bytes()?)
+    }
+
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let file = std::fs::File::open(path)?;
         Self::from_reader(file)
@@ -35,6 +54,15 @@ impl Document {
         }
         let chart = read(&package.content_xml()?)?;
         Ok(Self { package, chart })
+    }
+
+    /// Replace the typed chart content while preserving package entries.
+    pub fn set_definition(&mut self, definition: &Definition) -> Result<()> {
+        let content = serialize_content(definition)?;
+        let parsed = read(&content)?;
+        self.package.replace_content_xml(content)?;
+        self.chart = parsed;
+        Ok(())
     }
 
     pub fn is_template(&self) -> bool {

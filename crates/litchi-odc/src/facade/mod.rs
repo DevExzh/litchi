@@ -5,6 +5,7 @@ use litchi_odf_common::chart::{Element, Legend, PlotArea, read};
 use std::path::Path;
 
 pub use crate::authoring::Builder;
+use crate::authoring::Definition;
 
 /// Immutable document snapshot.
 pub struct Chart {
@@ -13,6 +14,10 @@ pub struct Chart {
 }
 
 impl Chart {
+    pub fn from_definition(definition: Definition) -> Result<Self> {
+        Self::from_bytes(Builder::new().with_definition(definition).build()?)
+    }
+
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let package = crate::package::Snapshot::open(path)?;
         let chart = read(package.content_xml())?;

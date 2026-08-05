@@ -1,10 +1,16 @@
 //! OpenDocument Chart support with semantic responsibility layers.
 #![forbid(unsafe_code)]
 
-mod authoring;
+pub mod authoring;
 mod codec;
 mod facade;
 mod package;
 
+pub use authoring::{
+    AxisSpec, CachedCell, CachedRow, CachedTable, CachedValue, DataLabelSpec, DataPointSpec,
+    Definition, DomainSpec, EquationSpec, ExtensionAttribute, ExtensionElement, Extensions,
+    GridSpec, LegendSpec, PlotAreaSpec, RegressionSpec, SeriesSpec, StyleElement, Text,
+    serialize_axis_fragment, serialize_content, serialize_series_fragment,
+};
 pub use facade::{Builder, Chart};
 pub use litchi_odf_common::chart;

@@ -1,31 +1,43 @@
 //! Chart package authoring.
 
+use super::{Definition, serialize_content};
 use litchi_core::Result;
 use litchi_odf_common::core::PackageWriter;
 
-/// Detached builder; publication validates through the package facade.
+/// Detached typed builder for a standalone chart package.
 #[derive(Clone, Debug)]
 pub struct Builder {
-    content_xml: String,
+    definition: Definition,
 }
 
 impl Builder {
     pub fn new() -> Self {
         Self {
-            content_xml: empty_content().to_owned(),
+            definition: Definition::new("chart:line"),
         }
     }
 
-    pub fn content_xml(mut self, xml: impl Into<String>) -> Self {
-        self.content_xml = xml.into();
+    /// Supply the typed chart definition to publish.
+    pub fn with_definition(mut self, definition: Definition) -> Self {
+        self.definition = definition;
         self
     }
 
+    #[must_use]
+    pub fn definition(&self) -> &Definition {
+        &self.definition
+    }
+
+    pub fn definition_mut(&mut self) -> &mut Definition {
+        &mut self.definition
+    }
+
     pub fn build(self) -> Result<Vec<u8>> {
-        crate::codec::validate(&self.content_xml)?;
+        let content_xml = serialize_content(&self.definition)?;
+        crate::codec::validate(&content_xml)?;
         let mut writer = PackageWriter::new();
         writer.set_mimetype(crate::package::MIMETYPE)?;
-        writer.add_file("content.xml", self.content_xml.as_bytes())?;
+        writer.add_file("content.xml", content_xml.as_bytes())?;
         writer.finish_to_bytes()
     }
 }
@@ -34,8 +46,4 @@ impl Default for Builder {
     fn default() -> Self {
         Self::new()
     }
-}
-
-fn empty_content() -> &'static str {
-    r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" office:version="1.3"><office:body><office:chart><chart:chart><chart:plot-area/></chart:chart></office:chart></office:body></office:document-content>"#
 }

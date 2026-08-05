@@ -1,10 +1,14 @@
-//! Typed creation and canonical serialization for standalone ODF charts.
+//! Deterministic, bounded XML serialization and validation for ODF charts.
 
-use super::document::Document;
-use crate::{constants, core::PackageWriter};
+use super::data::{CachedCell, CachedRow, CachedTable, CachedValue};
+use super::extensions::{ExtensionAttribute, ExtensionElement, Extensions};
+use super::model::{
+    AxisSpec, DataLabelSpec, DataPointSpec, Definition, LegendSpec, PlotAreaSpec, RegressionSpec,
+    SeriesSpec, StyleElement, Text,
+};
 use litchi_core::{Error, Result};
-use litchi_odf_common::calculation::{Settings, write};
-use litchi_odf_common::chart::{Class, Dimension, Element, Labels, Position, read};
+use litchi_odf_common::calculation::write;
+use litchi_odf_common::chart::{Class, Dimension, Labels, Position};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 pub(crate) const OFFICE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -17,327 +21,7 @@ pub(crate) const XLINK_NAMESPACE: &str = "http://www.w3.org/1999/xlink";
 const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
 const MAX_EXPANDED_CELLS: u64 = 16_777_216;
 
-/// An extension attribute retained by expanded XML name.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExtensionAttribute {
-    pub namespace_uri: Option<String>,
-    pub local_name: String,
-    pub value: String,
-}
-
-/// An extension subtree retained without interpreting vendor behavior.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExtensionElement {
-    pub namespace_uri: Option<String>,
-    pub local_name: String,
-    pub attributes: Vec<ExtensionAttribute>,
-    pub text: String,
-    pub children: Vec<ExtensionElement>,
-}
-
-impl ExtensionElement {
-    /// Clone a retained read-only element into an owned extension subtree.
-    pub fn from_retained(element: &Element) -> Self {
-        Self {
-            namespace_uri: element.namespace_uri().map(str::to_string),
-            local_name: element.local_name().to_string(),
-            attributes: element
-                .attributes()
-                .iter()
-                .map(|attribute| ExtensionAttribute {
-                    namespace_uri: attribute.namespace_uri().map(str::to_string),
-                    local_name: attribute.local_name().to_string(),
-                    value: attribute.value().to_string(),
-                })
-                .collect(),
-            text: element.text().to_string(),
-            children: element.children().iter().map(Self::from_retained).collect(),
-        }
-    }
-}
-
-/// Unknown attributes and child elements attached to a typed chart node.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Extensions {
-    pub attributes: Vec<ExtensionAttribute>,
-    pub children: Vec<ExtensionElement>,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Text {
-    pub text: String,
-    pub cell_range: Option<String>,
-    pub style_name: Option<String>,
-    pub x: Option<String>,
-    pub y: Option<String>,
-    pub extensions: Extensions,
-}
-
-impl Text {
-    pub fn new(text: impl Into<String>) -> Self {
-        Self {
-            text: text.into(),
-            ..Self::default()
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LegendSpec {
-    pub position: Position,
-    pub style_name: Option<String>,
-    pub title: Option<String>,
-    pub x: Option<String>,
-    pub y: Option<String>,
-    pub expansion: Option<String>,
-    pub expansion_aspect_ratio: Option<String>,
-    pub extensions: Extensions,
-}
-
-impl Default for LegendSpec {
-    fn default() -> Self {
-        Self {
-            position: Position::End,
-            style_name: None,
-            title: None,
-            x: None,
-            y: None,
-            expansion: None,
-            expansion_aspect_ratio: None,
-            extensions: Extensions::default(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct StyleElement {
-    pub style_name: Option<String>,
-    pub extensions: Extensions,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct GridSpec {
-    pub class: Class,
-    pub style_name: Option<String>,
-    pub extensions: Extensions,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct DataLabelSpec {
-    pub text: Option<String>,
-    pub style_name: Option<String>,
-    pub x: Option<String>,
-    pub y: Option<String>,
-    pub extensions: Extensions,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DataPointSpec {
-    pub repeated: u32,
-    pub style_name: Option<String>,
-    pub label: Option<DataLabelSpec>,
-    pub extensions: Extensions,
-}
-
-impl Default for DataPointSpec {
-    fn default() -> Self {
-        Self {
-            repeated: 1,
-            style_name: None,
-            label: None,
-            extensions: Extensions::default(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DomainSpec {
-    pub cell_range_address: String,
-    pub extensions: Extensions,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct EquationSpec {
-    pub display_equation: bool,
-    pub display_r_square: bool,
-    pub style_name: Option<String>,
-    pub x: Option<String>,
-    pub y: Option<String>,
-    pub extensions: Extensions,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct RegressionSpec {
-    pub style_name: Option<String>,
-    pub equation: Option<EquationSpec>,
-    pub extensions: Extensions,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct SeriesSpec {
-    pub xml_id: Option<String>,
-    pub class: Option<String>,
-    pub values_cell_range_address: Option<String>,
-    pub label_cell_address: Option<String>,
-    pub attached_axis: Option<String>,
-    pub style_name: Option<String>,
-    pub domains: Vec<DomainSpec>,
-    pub data_points: Vec<DataPointSpec>,
-    pub data_label: Option<DataLabelSpec>,
-    pub mean_value: Option<StyleElement>,
-    pub error_indicator: Option<StyleElement>,
-    pub regression_curves: Vec<RegressionSpec>,
-    pub extensions: Extensions,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AxisSpec {
-    pub dimension: Dimension,
-    pub name: Option<String>,
-    pub style_name: Option<String>,
-    pub title: Option<Text>,
-    pub categories_cell_range_address: Option<String>,
-    pub grids: Vec<GridSpec>,
-    pub extensions: Extensions,
-}
-
-impl AxisSpec {
-    pub fn new(dimension: Dimension) -> Self {
-        Self {
-            dimension,
-            name: None,
-            style_name: None,
-            title: None,
-            categories_cell_range_address: None,
-            grids: Vec::new(),
-            extensions: Extensions::default(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct PlotAreaSpec {
-    pub cell_range_address: Option<String>,
-    pub data_source_labels: Option<Labels>,
-    pub style_name: Option<String>,
-    pub x: Option<String>,
-    pub y: Option<String>,
-    pub width: Option<String>,
-    pub height: Option<String>,
-    pub axes: Vec<AxisSpec>,
-    pub series: Vec<SeriesSpec>,
-    pub wall: Option<StyleElement>,
-    pub floor: Option<StyleElement>,
-    pub stock_gain_marker: Option<StyleElement>,
-    pub stock_loss_marker: Option<StyleElement>,
-    pub stock_range_line: Option<StyleElement>,
-    pub extensions: Extensions,
-}
-
-#[derive(Debug, Clone, PartialEq, Default)]
-pub enum CachedValue {
-    #[default]
-    Empty,
-    Float(f64),
-    Percentage(f64),
-    Currency {
-        value: f64,
-        currency: String,
-    },
-    Boolean(bool),
-    Date(String),
-    Time(String),
-    String(String),
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct CachedCell {
-    pub value: CachedValue,
-    /// An OpenDocument formula stored as inert text; this crate never evaluates it.
-    pub formula: Option<String>,
-    pub repeated: u32,
-}
-
-impl CachedCell {
-    pub fn new(value: CachedValue) -> Self {
-        Self {
-            value,
-            formula: None,
-            repeated: 1,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct CachedRow {
-    pub cells: Vec<CachedCell>,
-    pub repeated: u32,
-}
-
-impl CachedRow {
-    pub fn new(cells: Vec<CachedCell>) -> Self {
-        Self { cells, repeated: 1 }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct CachedTable {
-    pub name: String,
-    pub columns: u32,
-    pub header_columns: u32,
-    pub header_rows: Vec<CachedRow>,
-    pub rows: Vec<CachedRow>,
-    pub extensions: Extensions,
-}
-
-impl CachedTable {
-    pub fn new(name: impl Into<String>, columns: u32) -> Self {
-        Self {
-            name: name.into(),
-            columns,
-            header_columns: 0,
-            header_rows: Vec::new(),
-            rows: Vec::new(),
-            extensions: Extensions::default(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Definition {
-    pub class: String,
-    pub style_name: Option<String>,
-    pub width: Option<String>,
-    pub height: Option<String>,
-    pub title: Option<Text>,
-    pub subtitle: Option<Text>,
-    pub footer: Option<Text>,
-    pub legend: Option<LegendSpec>,
-    pub plot_area: PlotAreaSpec,
-    pub cached_table: Option<CachedTable>,
-    /// Inert cached-formula recalculation metadata; never executed by this crate.
-    pub calculation_settings: Option<Settings>,
-    pub extensions: Extensions,
-}
-
 impl Definition {
-    pub fn new(class: impl Into<String>) -> Self {
-        Self {
-            class: class.into(),
-            style_name: None,
-            width: None,
-            height: None,
-            title: None,
-            subtitle: None,
-            footer: None,
-            legend: None,
-            plot_area: PlotAreaSpec::default(),
-            cached_table: None,
-            calculation_settings: None,
-            extensions: Extensions::default(),
-        }
-    }
-
     pub fn validate(&self) -> Result<()> {
         validate_qname(&self.class, "chart class")?;
         validate_optional_name(self.style_name.as_deref(), "chart style name")?;
@@ -366,40 +50,11 @@ impl Definition {
     }
 }
 
-impl Document {
-    /// Create a new packaged `.odc` document from a typed chart definition.
-    pub fn create(definition: &Definition) -> Result<Self> {
-        Self::create_with_mimetype(definition, constants::ODF_CHART)
-    }
-
-    /// Create a new packaged `.otc` chart template.
-    pub fn create_template(definition: &Definition) -> Result<Self> {
-        Self::create_with_mimetype(definition, constants::ODF_CHART_TEMPLATE)
-    }
-
-    fn create_with_mimetype(definition: &Definition, mimetype: &str) -> Result<Self> {
-        let content = serialize_chart_content(definition)?;
-        let mut writer = PackageWriter::new();
-        writer.set_mimetype(mimetype)?;
-        writer.add_file(constants::ODF_CONTENT, content.as_bytes())?;
-        Self::from_bytes(writer.finish_to_bytes()?)
-    }
-
-    /// Replace the typed chart content while preserving safe package entries.
-    pub fn set_definition(&mut self, definition: &Definition) -> Result<()> {
-        let content = serialize_chart_content(definition)?;
-        let parsed = read(&content)?;
-        self.package.replace_content_xml(content)?;
-        self.chart = parsed;
-        Ok(())
-    }
-}
-
 /// Serialize a chart as canonical ODF 1.2 `content.xml`.
 ///
 /// The output contains no executable behavior. Formula attributes in cached
 /// cells are emitted only as escaped, opaque strings.
-pub fn serialize_chart_content(definition: &Definition) -> Result<String> {
+pub fn serialize_content(definition: &Definition) -> Result<String> {
     definition.validate()?;
     let namespaces = NamespaceMap::for_definition(definition)?;
     let mut out = String::with_capacity(4096);
@@ -634,7 +289,7 @@ fn write_series(out: &mut String, value: &SeriesSpec, ns: &NamespaceMap) -> Resu
     Ok(())
 }
 
-pub(crate) fn serialize_chart_axis_fragment(value: &AxisSpec) -> Result<String> {
+pub fn serialize_axis_fragment(value: &AxisSpec) -> Result<String> {
     let mut definition = Definition::new("chart:line");
     definition.plot_area.axes.push(value.clone());
     definition.validate()?;
@@ -645,7 +300,7 @@ pub(crate) fn serialize_chart_axis_fragment(value: &AxisSpec) -> Result<String> 
     Ok(output)
 }
 
-pub(crate) fn serialize_chart_series_fragment(value: &SeriesSpec) -> Result<String> {
+pub fn serialize_series_fragment(value: &SeriesSpec) -> Result<String> {
     let mut definition = Definition::new(
         value
             .class
@@ -1477,6 +1132,8 @@ fn legend_position(value: Position) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::authoring::model::{EquationSpec, GridSpec};
+    use litchi_odf_common::chart::read;
 
     fn sample() -> Definition {
         let mut chart = Definition::new("chart:line");
@@ -1526,49 +1183,80 @@ mod tests {
     }
 
     #[test]
-    fn standalone_odc_package_roundtrip() {
-        let document = Document::create(&sample()).unwrap();
-        let bytes = document.to_bytes();
-        let reopened = Document::from_bytes(bytes).unwrap();
-        assert_eq!(reopened.mimetype(), constants::ODF_CHART);
+    fn canonical_content_roundtrip_retains_typed_data() {
+        let content = serialize_content(&sample()).unwrap();
+        let chart = read(&content).unwrap();
         assert_eq!(
-            reopened.chart().attribute(Some(CHART_NAMESPACE), "class"),
+            chart.attribute(Some(CHART_NAMESPACE), "class"),
             Some("chart:line")
         );
         assert!(
-            reopened
-                .chart()
+            chart
                 .children()
                 .iter()
                 .any(|node| node.namespace_uri() == Some(TABLE_NAMESPACE)
                     && node.local_name() == "table")
         );
-        assert_eq!(reopened.plot_area().unwrap().series().count(), 1);
+        assert_eq!(chart.plot_area().unwrap().series().count(), 1);
     }
 
     #[test]
-    fn mutation_preserves_auxiliary_parts_and_formula_is_inert() {
+    fn cached_formula_is_escaped_and_inert() {
         let mut definition = sample();
         definition.cached_table.as_mut().unwrap().rows[0].cells[1].formula =
             Some("of:=SUM([.B2:.B4])&\"x\"".into());
-        let mut document = Document::create(&definition).unwrap();
-        definition.title = Some(Text::new("Changed"));
-        document.set_definition(&definition).unwrap();
-        let content = crate::OpenDocumentPackage::from_bytes(document.to_bytes())
-            .unwrap()
-            .content_xml()
-            .unwrap();
+        let content = serialize_content(&definition).unwrap();
         assert!(content.contains("table:formula=\"of:=SUM([.B2:.B4])&amp;&quot;x&quot;\""));
-        assert_eq!(document.text(), "ChangedQuarterRevenueQ1");
+        assert_eq!(
+            read(&content).unwrap().all_text(),
+            "Quarterly revenueQuarterRevenueQ1"
+        );
     }
 
     #[test]
     fn rejects_dangling_axis_and_zero_counts() {
         let mut definition = sample();
         definition.plot_area.series[0].attached_axis = Some("missing".into());
-        assert!(serialize_chart_content(&definition).is_err());
+        assert!(serialize_content(&definition).is_err());
         definition.plot_area.series[0].attached_axis = Some("y-axis".into());
         definition.plot_area.series[0].data_points[0].repeated = 0;
-        assert!(serialize_chart_content(&definition).is_err());
+        assert!(serialize_content(&definition).is_err());
+    }
+
+    #[test]
+    fn extension_namespaces_are_stable_and_retained() {
+        let mut definition = Definition::new("chart:line");
+        definition.extensions.attributes.push(ExtensionAttribute {
+            namespace_uri: Some("urn:z".into()),
+            local_name: "zeta".into(),
+            value: "1".into(),
+        });
+        definition.extensions.attributes.push(ExtensionAttribute {
+            namespace_uri: Some("urn:a".into()),
+            local_name: "alpha".into(),
+            value: "2".into(),
+        });
+        definition.extensions.children.push(ExtensionElement {
+            namespace_uri: Some("urn:z".into()),
+            local_name: "extension".into(),
+            attributes: Vec::new(),
+            text: "opaque".into(),
+            children: Vec::new(),
+        });
+        let first = serialize_content(&definition).unwrap();
+        let second = serialize_content(&definition).unwrap();
+        assert_eq!(first, second);
+        assert!(first.contains("xmlns:ns1=\"urn:a\""));
+        assert!(first.contains("xmlns:ns2=\"urn:z\""));
+        assert!(first.contains("<ns2:extension>opaque</ns2:extension>"));
+        assert_eq!(
+            read(&first)
+                .unwrap()
+                .children()
+                .last()
+                .unwrap()
+                .namespace_uri(),
+            Some("urn:z")
+        );
     }
 }
