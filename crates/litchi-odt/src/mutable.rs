@@ -13,10 +13,8 @@ use crate::elements::field::{DynamicTextField, FieldParser};
 use crate::elements::parser::OrderElement;
 use crate::elements::table::Table;
 use crate::elements::text::{Heading, Hyperlink, List, Paragraph};
-use crate::header_footer::{
-    HeaderFooterKind, MasterPage, add_master_page, parse_master_pages, set_region_text,
-    set_region_xml,
-};
+use crate::header_footer::{Master, read, set_text, set_xml};
+use crate::master_page::{add, insert, remove, replace};
 use crate::page_layout::{PageLayout, parse_page_layouts, set_page_layout_xml};
 use crate::page_sequence::{Sequence, parse_page_sequence, set_page_sequence_xml};
 use crate::variable_declaration::{Declarations, Group, Kind, Part, Scope};
@@ -76,7 +74,7 @@ pub struct MutableDocument {
     /// Authoritative original content XML used by byte-preserving inline mutations.
     content_xml: Option<String>,
     /// Authored picture payloads written into the package on save.
-    pending_images: Vec<crate::frame::PendingImage>,
+    pending_images: Vec<crate::frame::Part>,
     /// Monotonic counter for authored frame names (1-based).
     next_frame_number: usize,
 }
@@ -1978,10 +1976,10 @@ impl MutableDocument {
     }
 
     /// Parse the document's master pages and current header/footer regions.
-    pub fn master_pages(&self) -> Result<Vec<MasterPage>> {
+    pub fn master_pages(&self) -> Result<Vec<Master>> {
         self.styles_xml
             .as_deref()
-            .map_or_else(|| Ok(Vec::new()), parse_master_pages)
+            .map_or_else(|| Ok(Vec::new()), read)
     }
 
     /// Parse automatic page layouts, their properties, and header/footer styles.
@@ -2160,29 +2158,29 @@ impl MutableDocument {
         let styles = self
             .styles_xml
             .get_or_insert_with(Structure::default_styles_xml);
-        *styles = add_master_page(styles, name, page_layout_name)?;
+        *styles = add(styles, name, page_layout_name)?;
         Ok(())
     }
 
     /// Insert a complete typed master page without rewriting unrelated styles.
-    pub fn insert_master_page(&mut self, page: &MasterPage) -> Result<()> {
+    pub fn insert_master_page(&mut self, page: &Master) -> Result<()> {
         let fragment = page.to_xml_fragment()?;
         let styles = self
             .styles_xml
             .get_or_insert_with(Structure::default_styles_xml);
-        *styles = crate::insert_master_page_xml(styles, &fragment)?;
+        *styles = insert(styles, &fragment)?;
         Ok(())
     }
 
     /// Replace one named master page without rewriting unrelated styles.
-    pub fn replace_master_page(&mut self, name: &str, page: &MasterPage) -> Result<()> {
+    pub fn replace_master_page(&mut self, name: &str, page: &Master) -> Result<()> {
         let fragment = page.to_xml_fragment()?;
         let styles = self.styles_xml.as_deref().ok_or_else(|| {
             litchi_core::Error::InvalidFormat(
                 "document has no styles.xml master page to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(crate::replace_master_page_xml(styles, name, &fragment)?);
+        self.styles_xml = Some(replace(styles, name, &fragment)?);
         Ok(())
     }
 
@@ -2193,7 +2191,7 @@ impl MutableDocument {
                 "document has no styles.xml master page to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(crate::remove_master_page_xml(styles, name)?);
+        self.styles_xml = Some(remove(styles, name)?);
         Ok(())
     }
 
@@ -2203,7 +2201,7 @@ impl MutableDocument {
     pub fn set_header_footer_text(
         &mut self,
         master_page_name: &str,
-        kind: HeaderFooterKind,
+        kind: crate::header_footer::Kind,
         text: &str,
     ) -> Result<()> {
         let styles = self.styles_xml.as_deref().ok_or_else(|| {
@@ -2211,7 +2209,7 @@ impl MutableDocument {
                 "document has no styles.xml master page to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(set_region_text(styles, master_page_name, kind, Some(text))?);
+        self.styles_xml = Some(set_text(styles, master_page_name, kind, Some(text))?);
         Ok(())
     }
 
@@ -2223,7 +2221,7 @@ impl MutableDocument {
     pub fn set_header_footer_xml(
         &mut self,
         master_page_name: &str,
-        kind: HeaderFooterKind,
+        kind: crate::header_footer::Kind,
         xml: &str,
     ) -> Result<()> {
         let styles = self.styles_xml.as_deref().ok_or_else(|| {
@@ -2231,7 +2229,7 @@ impl MutableDocument {
                 "document has no styles.xml master page to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(set_region_xml(styles, master_page_name, kind, xml)?);
+        self.styles_xml = Some(set_xml(styles, master_page_name, kind, xml)?);
         Ok(())
     }
 
@@ -2239,14 +2237,14 @@ impl MutableDocument {
     pub fn clear_header_footer(
         &mut self,
         master_page_name: &str,
-        kind: HeaderFooterKind,
+        kind: crate::header_footer::Kind,
     ) -> Result<()> {
         let styles = self.styles_xml.as_deref().ok_or_else(|| {
             litchi_core::Error::InvalidFormat(
                 "document has no styles.xml master page to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(set_region_text(styles, master_page_name, kind, None)?);
+        self.styles_xml = Some(set_text(styles, master_page_name, kind, None)?);
         Ok(())
     }
 
@@ -2451,7 +2449,7 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::{MutableDocument, FrameAnchor, Length};
+    /// use litchi_odt::{MutableDocument, frame::{Anchor, Length}};
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut doc = MutableDocument::new();
@@ -2461,7 +2459,7 @@ impl MutableDocument {
     ///     png,
     ///     &Length::centimeters(10.0),
     ///     &Length::centimeters(4.0),
-    ///     FrameAnchor::AsChar,
+    ///     Anchor::AsChar,
     /// )?;
     /// assert!(path.starts_with("Pictures/"));
     /// # Ok(())
@@ -2473,17 +2471,17 @@ impl MutableDocument {
         image: &[u8],
         width: &crate::frame::Length,
         height: &crate::frame::Length,
-        anchor: crate::FrameAnchor,
+        anchor: crate::frame::Anchor,
     ) -> Result<String> {
         use crate::frame;
-        let format = frame::validate_image_payload(image)?;
+        let format = frame::validate_payload(image)?;
         let path = frame::allocate_picture_path(format.extension(), |candidate| {
             // Picture numbering is global: a stem taken by any supported
             // extension blocks the whole index.
             let taken = |path: &str| {
                 self.pending_images
                     .iter()
-                    .any(|pending| pending.path == path)
+                    .any(|pending| pending.path() == path)
                     || self
                         .source_package
                         .as_ref()
@@ -2498,7 +2496,8 @@ impl MutableDocument {
                 .any(|extension| taken(&format!("{stem}{extension}")))
         })?;
         let name = format!("Frame {}", self.next_frame_number);
-        let frame_element = frame::image_frame_element(&name, width, height, anchor, &path)?;
+        let frame = frame::Frame::new(&name, width.clone(), height.clone(), anchor)?;
+        let frame_element = frame::image_element(&frame, &path);
         let mut paragraph_element = crate::elements::element::Element::new("text:p");
         paragraph_element.add_child(frame_element);
         let paragraph = Paragraph::from_element(paragraph_element)?;
@@ -2510,13 +2509,11 @@ impl MutableDocument {
                 self.elements.len()
             )));
         }
+        let pending = frame::Part::new(path.clone(), image.to_vec())?;
         self.invalidate_content_xml();
         self.elements
             .insert(index, DocumentElement::Paragraph(paragraph));
-        self.pending_images.push(frame::PendingImage {
-            path: path.clone(),
-            bytes: image.to_vec(),
-        });
+        self.pending_images.push(pending);
         self.next_frame_number += 1;
         Ok(path)
     }
@@ -2531,11 +2528,12 @@ impl MutableDocument {
         text: &str,
         width: &crate::frame::Length,
         height: &crate::frame::Length,
-        anchor: crate::FrameAnchor,
+        anchor: crate::frame::Anchor,
     ) -> Result<String> {
         use crate::frame;
         let name = format!("Text Box {}", self.next_frame_number);
-        let frame_element = frame::text_box_frame_element(&name, width, height, anchor, text)?;
+        let frame = frame::Frame::new(&name, width.clone(), height.clone(), anchor)?;
+        let frame_element = frame::text_box_element(&frame, text)?;
 
         if index > self.elements.len() {
             return Err(litchi_core::Error::InvalidFormat(format!(
@@ -2970,7 +2968,7 @@ impl MutableDocument {
 
         // Add authored picture payloads.
         for pending in &self.pending_images {
-            writer.add_file(&pending.path, &pending.bytes)?;
+            writer.add_file(pending.path(), pending.bytes())?;
         }
 
         if let Some(package) = &self.source_package {
@@ -3407,17 +3405,28 @@ mod tests {
         );
 
         mutable
-            .set_header_footer_text("Standard", HeaderFooterKind::Header, "New & <header>")
+            .set_header_footer_text(
+                "Standard",
+                crate::header_footer::Kind::Header,
+                "New & <header>",
+            )
             .unwrap();
         mutable
-            .clear_header_footer("Standard", HeaderFooterKind::Footer)
+            .clear_header_footer("Standard", crate::header_footer::Kind::Footer)
             .unwrap();
         let pages = mutable.master_pages().unwrap();
         assert_eq!(
-            pages[0].region(HeaderFooterKind::Header).unwrap().text,
+            pages[0]
+                .region(crate::header_footer::Kind::Header)
+                .unwrap()
+                .text,
             "New & <header>"
         );
-        assert!(pages[0].region(HeaderFooterKind::Footer).is_none());
+        assert!(
+            pages[0]
+                .region(crate::header_footer::Kind::Footer)
+                .is_none()
+        );
 
         let output = OwnedPackage::from_bytes(mutable.to_bytes().unwrap()).unwrap();
         let styles = String::from_utf8(output.get_file("styles.xml").unwrap()).unwrap();
@@ -3427,7 +3436,7 @@ mod tests {
         assert_eq!(round_trip.page_layouts().unwrap(), layouts);
         assert_eq!(
             round_trip.master_pages().unwrap()[0]
-                .region(HeaderFooterKind::Header)
+                .region(crate::header_footer::Kind::Header)
                 .unwrap()
                 .text,
             "New & <header>"
@@ -3441,11 +3450,15 @@ mod tests {
         let layout = r#"<s:page-layout xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:f="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" s:name="pm1" s:page-usage="mirrored"><s:page-layout-properties f:page-width="21cm" f:page-height="29.7cm"/></s:page-layout>"#;
         mutable.set_page_layout_xml("pm1", layout).unwrap();
         mutable
-            .set_header_footer_text("Standard", HeaderFooterKind::Header, "Created header")
+            .set_header_footer_text(
+                "Standard",
+                crate::header_footer::Kind::Header,
+                "Created header",
+            )
             .unwrap();
         let rich = r#"<s:header xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><t:p>Page <t:page-number/></t:p></s:header>"#;
         mutable
-            .set_header_footer_xml("Standard", HeaderFooterKind::Header, rich)
+            .set_header_footer_xml("Standard", crate::header_footer::Kind::Header, rich)
             .unwrap();
 
         let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
@@ -3458,17 +3471,26 @@ mod tests {
         assert_eq!(pages[0].name, "Standard");
         assert_eq!(pages[0].page_layout_name.as_deref(), Some("pm1"));
         assert_eq!(
-            pages[0].region(HeaderFooterKind::Header).unwrap().text,
+            pages[0]
+                .region(crate::header_footer::Kind::Header)
+                .unwrap()
+                .text,
             "Page "
         );
-        assert_eq!(pages[0].region(HeaderFooterKind::Header).unwrap().xml, rich);
+        assert_eq!(
+            pages[0]
+                .region(crate::header_footer::Kind::Header)
+                .unwrap()
+                .xml,
+            rich
+        );
         let styles = String::from_utf8(round_trip.get_file("styles.xml").unwrap()).unwrap();
         assert!(styles.contains(layout));
     }
 
     #[test]
     fn insert_image_round_trips_through_package_and_read_api() {
-        use crate::{FrameAnchor, frame::Length};
+        use crate::frame::{Anchor, Length};
 
         let mut doc = MutableDocument::new();
         doc.add_paragraph("Before image").unwrap();
@@ -3479,7 +3501,7 @@ mod tests {
                 &png,
                 &Length::centimeters(10.0),
                 &Length::centimeters(4.0),
-                FrameAnchor::AsChar,
+                Anchor::AsChar,
             )
             .unwrap();
         assert_eq!(path, "Pictures/image1.png");
@@ -3490,7 +3512,7 @@ mod tests {
                 &png,
                 &Length::points(1.0),
                 &Length::points(1.0),
-                FrameAnchor::Page
+                Anchor::Page
             )
             .is_err()
         );
@@ -3500,7 +3522,7 @@ mod tests {
                 b"not-an-image",
                 &Length::points(1.0),
                 &Length::points(1.0),
-                FrameAnchor::Page
+                Anchor::Page
             )
             .is_err()
         );
@@ -3524,7 +3546,7 @@ mod tests {
 
     #[test]
     fn insert_image_coexists_with_existing_media() {
-        use crate::{FrameAnchor, frame::Length};
+        use crate::frame::{Anchor, Length};
 
         let mut doc = MutableDocument::new();
         let first = doc
@@ -3533,7 +3555,7 @@ mod tests {
                 &minimal_png(),
                 &Length::points(8.0),
                 &Length::points(8.0),
-                FrameAnchor::Page,
+                Anchor::Page,
             )
             .unwrap();
         let second = doc
@@ -3542,7 +3564,7 @@ mod tests {
                 &minimal_jpeg(),
                 &Length::points(8.0),
                 &Length::points(8.0),
-                FrameAnchor::Page,
+                Anchor::Page,
             )
             .unwrap();
         assert_eq!(first, "Pictures/image1.png");
@@ -3561,7 +3583,7 @@ mod tests {
 
     #[test]
     fn insert_text_box_round_trips_story_text() {
-        use crate::{FrameAnchor, frame::Length};
+        use crate::frame::{Anchor, Length};
 
         let mut doc = MutableDocument::new();
         doc.add_paragraph("Intro").unwrap();
@@ -3571,7 +3593,7 @@ mod tests {
                 "boxed <text> & more\nsecond line",
                 &Length::inches(2.0),
                 &Length::inches(1.0),
-                FrameAnchor::Paragraph,
+                Anchor::Paragraph,
             )
             .unwrap();
         assert_eq!(name, "Text Box 1");

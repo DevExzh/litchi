@@ -1,7 +1,5 @@
-use litchi_odt::header_footer::{MasterPage, MasterPageChild, MasterPageChildKind};
-use litchi_odt::master_page::{
-    insert_master_page_xml, remove_master_page_xml, replace_master_page_xml,
-};
+use litchi_odt::header_footer::{Child, ChildKind, Master};
+use litchi_odt::master_page::{insert, remove, replace};
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
@@ -22,34 +20,33 @@ fn parses_and_classifies_exact_rng_child_order_inertly() {
     let page = &document.master_pages().unwrap()[0];
     assert_eq!(page.page_layout_name.as_deref(), Some("pm1"));
     assert_eq!(page.children.len(), 12);
-    assert_eq!(page.children[6].kind, MasterPageChildKind::LayerSet);
-    assert_eq!(page.children[7].kind, MasterPageChildKind::Forms);
-    assert_eq!(page.children[8].kind, MasterPageChildKind::Shape);
-    assert_eq!(page.children[9].kind, MasterPageChildKind::Shape);
-    assert_eq!(page.children[10].kind, MasterPageChildKind::Animation);
-    assert_eq!(page.children[11].kind, MasterPageChildKind::Notes);
+    assert_eq!(page.children[6].kind, ChildKind::LayerSet);
+    assert_eq!(page.children[7].kind, ChildKind::Forms);
+    assert_eq!(page.children[8].kind, ChildKind::Shape);
+    assert_eq!(page.children[9].kind, ChildKind::Shape);
+    assert_eq!(page.children[10].kind, ChildKind::Animation);
+    assert_eq!(page.children[11].kind, ChildKind::Notes);
 }
 
 #[test]
 fn canonical_insert_replace_remove_preserves_unrelated_bytes() {
     let original = styles(r#"<s:master-page s:name="Keep" s:page-layout-name="pm0"/>"#);
-    let mut page = MasterPage::try_new("Added", "pm1").unwrap();
+    let mut page = Master::new("Added", "pm1").unwrap();
     page.display_name = Some("Added & Main".to_string());
-    page.children.push(MasterPageChild::new(
-        MasterPageChildKind::Shape,
+    page.children.push(Child::new(
+        ChildKind::Shape,
         r#"<draw:rect xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"/>"#,
     ));
     let fragment = page.to_xml_fragment().unwrap();
-    let inserted = insert_master_page_xml(&original, &fragment).unwrap();
+    let inserted = insert(&original, &fragment).unwrap();
     assert!(inserted.contains(r#"s:name="Keep""#));
     assert!(inserted.contains("Added &amp; Main"));
 
     page.children.clear();
-    let replaced =
-        replace_master_page_xml(&inserted, "Added", &page.to_xml_fragment().unwrap()).unwrap();
+    let replaced = replace(&inserted, "Added", &page.to_xml_fragment().unwrap()).unwrap();
     assert!(replaced.contains(r#"s:name="Keep""#));
     assert!(!replaced.contains("<draw:rect"));
-    let removed = remove_master_page_xml(&replaced, "Added").unwrap();
+    let removed = remove(&replaced, "Added").unwrap();
     assert_eq!(removed, original);
 }
 

@@ -507,9 +507,9 @@ pub(crate) fn set_page_sequence_xml(xml: &str, sequence: Option<&Sequence>) -> R
             range.start,
             range.end,
             replacement.as_deref().unwrap_or(""),
-        ),
+        )?,
         (PageSequenceSite::FirstChild { content_start }, Some(fragment)) => {
-            super::header_footer::replace_range(xml, content_start, content_start, &fragment)
+            super::header_footer::replace_range(xml, content_start, content_start, &fragment)?
         },
         (
             PageSequenceSite::EmptyText {
@@ -530,7 +530,7 @@ pub(crate) fn set_page_sequence_xml(xml: &str, sequence: Option<&Sequence>) -> R
             expanded.push_str("</");
             expanded.push_str(&qualified_name);
             expanded.push('>');
-            super::header_footer::replace_range(xml, start, end, &expanded)
+            super::header_footer::replace_range(xml, start, end, &expanded)?
         },
         (_, None) => return Ok(xml.to_string()),
     };

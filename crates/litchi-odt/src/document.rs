@@ -15,7 +15,7 @@ use quick_xml::reader::NsReader;
 use std::collections::HashSet;
 use std::path::Path;
 
-use super::header_footer::{MasterPage, parse_master_pages};
+use super::header_footer::{Master, read};
 use super::page_layout::{PageLayout, parse_page_layouts};
 use super::page_sequence::{Sequence, parse_page_sequence};
 
@@ -537,11 +537,10 @@ impl Document {
     }
 
     /// Parse master pages and their losslessly retained headers and footers.
-    pub fn master_pages(&self) -> Result<Vec<MasterPage>> {
-        self.styles.as_ref().map_or_else(
-            || Ok(Vec::new()),
-            |styles| parse_master_pages(styles.xml_content()),
-        )
+    pub fn master_pages(&self) -> Result<Vec<Master>> {
+        self.styles
+            .as_ref()
+            .map_or_else(|| Ok(Vec::new()), |styles| read(styles.xml_content()))
     }
 
     /// Parse automatic page layouts, their properties, and header/footer styles.

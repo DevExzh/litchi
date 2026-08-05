@@ -4,3 +4,4 @@
 //! concise without flattening unrelated vocabularies into the common facade.
 
 pub mod data;
+pub mod master;

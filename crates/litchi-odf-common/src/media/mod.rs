@@ -1,5 +1,6 @@
-//! Inert image inventory for OpenDocument XML parts.
+//! Inert image inventory and authoring resources for OpenDocument XML parts.
 
+pub mod authoring;
 mod model;
 mod reader;
 

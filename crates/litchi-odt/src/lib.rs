@@ -187,13 +187,6 @@ pub(crate) use graphic_properties::{
 };
 #[allow(unused_imports, reason = "ODT facade exposes shared drawing context")]
 pub(crate) use litchi_odf_common::drawing::{Frame, Part};
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes master-page package mutations"
-)]
-pub(crate) use master_page::{
-    insert_master_page_xml, remove_master_page_xml, replace_master_page_xml,
-};
 #[allow(unused_imports, reason = "ODT facade exposes package media models")]
 pub(crate) use media::Image;
 #[allow(
@@ -303,10 +296,6 @@ pub use document::Document;
 pub use dynamic_text::{
     insert_database_field_xml, insert_dynamic_text_field_xml, remove_database_field_xml,
     remove_dynamic_text_field_xml, replace_database_field_xml, replace_dynamic_text_field_xml,
-};
-pub(crate) use frame::FrameAnchor;
-pub(crate) use header_footer::{
-    HeaderFooterKind, MasterPage, MasterPageChild, MasterPageChildKind,
 };
 pub(crate) use index::{
     TextBibliographyType, TextIndex, insert_text_index_xml, remove_text_index_xml,

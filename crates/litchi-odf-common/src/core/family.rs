@@ -192,8 +192,7 @@ mod tests {
     fn validates_and_reuses_shared_package_state() {
         let bytes = package();
         let value =
-            Package::from_bytes(bytes.clone(), MIMETYPE, "<office:presentation", "ODP")
-                .unwrap();
+            Package::from_bytes(bytes.clone(), MIMETYPE, "<office:presentation", "ODP").unwrap();
         assert_eq!(value.content_xml(), CONTENT);
         assert!(value.styles_xml().is_some());
         assert_eq!(value.as_bytes(), bytes.as_slice());
@@ -201,8 +200,7 @@ mod tests {
 
         let owned = OwnedPackage::from_bytes(bytes.clone()).unwrap();
         let adopted =
-            Package::from_owned_package(owned, MIMETYPE, "<office:presentation", "ODP")
-                .unwrap();
+            Package::from_owned_package(owned, MIMETYPE, "<office:presentation", "ODP").unwrap();
         assert_eq!(adopted.as_bytes(), bytes.as_slice());
     }
 
