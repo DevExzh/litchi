@@ -59,7 +59,6 @@ use super::parts::table_char_cache::TableCharacterCache;
 use super::parts::text::TextExtractor;
 use super::parts::text_services::TextServicesTables;
 use super::parts::textbox_breaks::TextBoxBreakTables;
-use super::parts::xml_schemas::DocumentXmlSchemas;
 use super::table::Table;
 #[cfg(feature = "formula")]
 use crate::mtef_extractor::MtefExtractor;
@@ -136,7 +135,7 @@ pub struct Document {
     /// Word 2003 structured document tag bookmarks.
     structured_tags: Option<DocumentStructuredTags>,
     /// Word 2003 XML schema definition references (`Hplxsdr`).
-    xml_schemas: Option<DocumentXmlSchemas>,
+    xml_schemas: Option<super::parts::xml_schemas::Collection>,
     /// Custom XML save transform path (`fcCustomXForm`).
     custom_xml_transform_path: Option<String>,
     /// OLE controls recorded in the document.
@@ -311,7 +310,7 @@ impl Document {
         let protected_ranges = DocumentProtectedRanges::parse(&fib, &table_stream)?;
         let format_consistency_marks = DocumentFormatConsistencyMarks::parse(&fib, &table_stream)?;
         let structured_tags = DocumentStructuredTags::parse(&fib, &table_stream)?;
-        let xml_schemas = DocumentXmlSchemas::parse(&fib, &table_stream)?;
+        let xml_schemas = super::parts::xml_schemas::Collection::parse(&fib, &table_stream)?;
         let custom_xml_transform_path =
             super::parts::xml_schemas::parse_custom_xml_transform(&fib, &table_stream)?;
         let ole_controls = Controls::parse(&fib, &table_stream)?;
@@ -2132,7 +2131,7 @@ impl Document {
     ///
     /// The data is inert: schema URIs and name tables are exposed verbatim;
     /// no schema is fetched, resolved, or applied.
-    pub fn xml_schemas(&self) -> Option<&DocumentXmlSchemas> {
+    pub fn xml_schemas(&self) -> Option<&super::parts::xml_schemas::Collection> {
         self.xml_schemas.as_ref()
     }
 
