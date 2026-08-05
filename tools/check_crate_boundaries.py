@@ -43,7 +43,7 @@ COMMON_FAMILY_GUARDS = {
     "litchi-ole-common": OLE_FORMATS,
     "litchi-opc": OOXML_FORMATS,
 }
-RETIRED_MONOLITHS = frozenset({"litchi-ole"})
+RETIRED_MONOLITHS = frozenset({"litchi-ooxml", "litchi-ole"})
 RETIRED_FACADE_FEATURES = frozenset({"ole"})
 
 

@@ -168,14 +168,21 @@ class BoundaryPolicyTests(unittest.TestCase):
 
     def test_resolved_migration_edge_requires_policy_cleanup(self) -> None:
         snapshot = valid_snapshot(self.policy)
-        edge = self.policy.migration_debt[0].edge
+        edge = boundaries.Edge("litchi-pptx", "litchi-drawingml")
+        migration = boundaries.Debt(
+            order=1,
+            edge=edge,
+            reason="test migration",
+            exit="test cleanup",
+        )
+        policy = replace(self.policy, migration_debt=(migration,))
         edges = dict(snapshot.edges)
         del edges[edge]
         dependencies = dict(snapshot.dependencies)
         dependencies[edge.dependent] -= frozenset({edge.dependency})
         snapshot = replace(snapshot, edges=edges, dependencies=dependencies)
 
-        violations = boundaries.audit_snapshot(snapshot, self.policy)
+        violations = boundaries.audit_snapshot(snapshot, policy)
 
         self.assertIn(
             f"resolved migration debt still listed: {edge.display()}; remove its policy entry",
@@ -210,21 +217,13 @@ class BoundaryPolicyTests(unittest.TestCase):
 
         self.assertIn("workspace packages lack topology policy: litchi-new", violations)
 
-    def test_migration_host_edge_cannot_be_marked_canonical(self) -> None:
+    def test_retired_ooxml_monolith_cannot_return(self) -> None:
         raw = copy.deepcopy(self.raw_policy)
-        raw["packages"]["litchi-ooxml"] = ["litchi-core"]
-        raw["migration_debt"] = [
-            item
-            for item in raw["migration_debt"]
-            if not (
-                item["dependent"] == "litchi-ooxml"
-                and item["dependency"] == "litchi-core"
-            )
-        ]
+        raw["packages"]["litchi-ooxml"] = []
 
         with self.assertRaisesRegex(
             boundaries.PolicyError,
-            "migration-host edges must be debt, not canonical: litchi-ooxml -> litchi-core",
+            "retired monoliths cannot return as workspace packages: litchi-ooxml",
         ):
             boundaries.parse_policy(raw)
 

@@ -6,6 +6,7 @@
       "litchi-core",
       "litchi-crypto",
       "litchi-doc",
+      "litchi-docx",
       "litchi-drawingml",
       "litchi-eval",
       "litchi-fonts",
@@ -13,25 +14,20 @@
       "litchi-imgconv",
       "litchi-iwa",
       "litchi-markdown",
-      "litchi-odb",
-      "litchi-odc",
-      "litchi-odf",
       "litchi-odf-common",
-      "litchi-odf-formula",
-      "litchi-odg",
-      "litchi-odi",
-      "litchi-odm",
       "litchi-odp",
       "litchi-odraw",
       "litchi-ods",
       "litchi-odt",
       "litchi-ooxml-common",
+      "litchi-opc",
       "litchi-ppt",
       "litchi-pptx",
       "litchi-rtf",
       "litchi-sign",
       "litchi-xls",
-      "litchi-xlsb"
+      "litchi-xlsb",
+      "litchi-xlsx"
     ],
     "litchi-cfb": [
       "litchi-codepage",
@@ -55,14 +51,18 @@
       "litchi-vba"
     ],
     "litchi-docx": [
+      "litchi-core",
+      "litchi-crypto",
+      "litchi-drawingml",
+      "litchi-fonts",
       "litchi-ooxml-common",
-      "litchi-opc"
+      "litchi-opc",
+      "litchi-sign",
+      "litchi-vba"
     ],
     "litchi-drawingml": [
       "litchi-core",
-      "litchi-ooxml-common",
-      "litchi-opc",
-      "litchi-sheet"
+      "litchi-ooxml-common"
     ],
     "litchi-eval": [
       "litchi-core"
@@ -92,7 +92,6 @@
       "litchi-odf-common"
     ],
     "litchi-odf": [
-      "litchi-eval",
       "litchi-odb",
       "litchi-odc",
       "litchi-odf-common",
@@ -150,10 +149,10 @@
       "litchi-cfb",
       "litchi-codepage"
     ],
-    "litchi-ooxml": [],
     "litchi-ooxml-common": [
       "litchi-core",
-      "litchi-opc"
+      "litchi-opc",
+      "litchi-vba"
     ],
     "litchi-opc": [
       "litchi-core",
@@ -216,113 +215,27 @@
       "litchi-sign",
       "litchi-vba"
     ],
-    "litchi-xlsb": [],
+    "litchi-xlsb": [
+      "litchi-core",
+      "litchi-drawingml",
+      "litchi-ooxml-common",
+      "litchi-opc",
+      "litchi-sign",
+      "litchi-vba"
+    ],
     "litchi-xlsx": [
       "litchi-core",
       "litchi-drawingml",
       "litchi-ooxml-common",
       "litchi-opc",
-      "litchi-sheet"
+      "litchi-sheet",
+      "litchi-vba"
     ],
     "soapberry-zip": [],
     "xml-minifier": []
   },
-  "migration_hosts": [
-    "litchi-ooxml"
-  ],
-  "migration_debt": [
-    {
-      "order": 31,
-      "dependent": "litchi-ooxml",
-      "dependency": "litchi-vba",
-      "reason": "The OOXML migration host temporarily consumes the extracted inert VBA capability.",
-      "exit": "Move DOCX, PPTX, XLSB, and XLSX into concrete crates that depend directly on litchi-vba, then delete the host."
-    },
-    {
-      "order": 33,
-      "dependent": "litchi-ooxml",
-      "dependency": "litchi-core",
-      "reason": "The OOXML monolith is an active migration host.",
-      "exit": "Move remaining neutral contracts and concrete implementations out, then delete the host."
-    },
-    {
-      "order": 34,
-      "dependent": "litchi-ooxml",
-      "dependency": "litchi-drawingml",
-      "reason": "The OOXML monolith temporarily consumes the extracted DrawingML substrate.",
-      "exit": "Move all DrawingML consumers into concrete format crates and delete the host."
-    },
-    {
-      "order": 35,
-      "dependent": "litchi-ooxml",
-      "dependency": "litchi-fonts",
-      "reason": "The OOXML monolith still owns optional font integration.",
-      "exit": "Move font integration to the concrete format or rendering capability that consumes it."
-    },
-    {
-      "order": 36,
-      "dependent": "litchi-ooxml",
-      "dependency": "litchi-crypto",
-      "reason": "The OOXML migration host temporarily owns encrypted-package integration over the extracted shared cryptography capability.",
-      "exit": "Move encrypted-package integration to concrete OOXML crates or a focused adapter, then delete the host."
-    },
-    {
-      "order": 37,
-      "dependent": "litchi-ooxml",
-      "dependency": "litchi-ooxml-common",
-      "reason": "The OOXML monolith temporarily consumes its extracted common substrate.",
-      "exit": "Move remaining consumers into concrete OOXML crates and delete the host."
-    },
-    {
-      "order": 38,
-      "dependent": "litchi-ooxml",
-      "dependency": "litchi-opc",
-      "reason": "The OOXML monolith is an active migration host over OPC.",
-      "exit": "Move remaining package consumers into concrete OOXML crates and delete the host."
-    },
-    {
-      "order": 39,
-      "dependent": "litchi-ooxml",
-      "dependency": "litchi-sign",
-      "reason": "The OOXML migration host temporarily consumes the extracted trust-neutral signing capability.",
-      "exit": "Move DOCX, PPTX, XLSB, and XLSX into concrete crates that depend directly on litchi-sign, then delete the host."
-    },
-    {
-      "order": 40,
-      "dependent": "litchi-ooxml",
-      "dependency": "litchi-docx",
-      "reason": "The OOXML migration host temporarily supplies DOCX package anchoring around extracted numbering, font, alternative-format, and web-settings capabilities.",
-      "exit": "Move the remaining DOCX package and semantic model into litchi-docx, replace the focused adapters with direct ownership, then delete the host."
-    },
-    {
-      "order": 41,
-      "dependent": "litchi-ooxml",
-      "dependency": "litchi-pptx",
-      "reason": "The OOXML migration host temporarily anchors slides around extracted transition, shape, tag, notes, and table-style capabilities.",
-      "exit": "Move the remaining PPTX package and semantic model into litchi-pptx, replace the focused adapters with direct ownership, then delete the host."
-    },
-    {
-      "order": 42,
-      "dependent": "litchi-ooxml",
-      "dependency": "litchi-xlsb",
-      "reason": "The OOXML migration host temporarily consumes the extracted Binary SpreadsheetML wire kernel.",
-      "exit": "Move XLSB semantic codecs onto the canonical raw kernel and neutral sheet/drawing types, then delete the host."
-    },
-    {
-      "order": 43,
-      "dependent": "litchi-ooxml",
-      "dependency": "litchi-xlsx",
-      "reason": "The OOXML migration host temporarily anchors workbook state around extracted XLSX capabilities, including the canonical calculation-chain owner.",
-      "exit": "Move the remaining XLSX package and semantic model into litchi-xlsx, then delete the host adapter."
-    },
-    {
-      "order": 47,
-      "dependent": "litchi",
-      "dependency": "litchi-ooxml",
-      "reason": "The facade still exposes the OOXML migration host.",
-      "exit": "Re-export the concrete DOCX/PPTX/XLSB/XLSX crates and remove the host dependency."
-    }
-  ],
+  "migration_hosts": [],
+  "migration_debt": [],
   "runtime_neutral": [
     "litchi-codepage",
     "litchi-core",

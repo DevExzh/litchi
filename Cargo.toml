@@ -127,7 +127,6 @@ litchi-odt          = { version = "0.0.1", path = "crates/litchi-odt" }
 litchi-odraw        = { version = "0.0.1", path = "crates/litchi-odraw" }
 litchi-ograph       = { version = "0.0.1", path = "crates/litchi-ograph" }
 litchi-ole-common   = { version = "0.0.1", path = "crates/litchi-ole-common" }
-litchi-ooxml        = { version = "0.0.1", path = "crates/litchi-ooxml" }
 litchi-ooxml-common = { version = "0.0.1", path = "crates/litchi-ooxml-common" }
 litchi-opc          = { version = "0.0.1", path = "crates/litchi-opc" }
 litchi-oth          = { version = "0.0.1", path = "crates/litchi-oth" }
