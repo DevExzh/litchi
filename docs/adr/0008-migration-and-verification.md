@@ -4997,6 +4997,34 @@ bounded, lossless owner seams; it does not claim complete `[MS-DOC]`,
 `[MS-ODRAW]`, `[MS-OGRAPH]`, `[MS-OSHARED]`, `[MS-PPT]`, or `[MS-XLS]`
 conformance.
 
+## Layered legacy and DrawingML owner continuation
+
+The next migration batch completes another set of flat-owner removals while
+keeping format context at the facade. DOCX section/page-layout semantics now
+live under `section::{model,codec,tests}` with typed orientation, break,
+measurement, margin, column, and header/footer-reference values. XLSX
+what-if scenarios now live under `scenarios::{model,codec,tests}` with
+contextual `CellReference`, `RangeReference`, and `Collection` values.
+Both codecs keep bounded parsing, checked values, unknown markup, and source
+ordering at the owner boundary; no redundant prefix aliases remain.
+
+The same layered rule now covers PPT comments, XLS chart core records,
+DOC subdocument stories, PPTX slides, DrawingML text primitives, OLE smart
+tags, XLSB calculation properties, and OOXML embedded relationship
+inventories. Each owner separates its semantic model from XML/binary codec
+and regression tests, while shared DrawingML, OOXML, and OLE vocabulary stays
+in the corresponding common crate. Host package orchestration remains in the
+format crate, so peer formats do not become dependencies of one another.
+
+Focused all-target checks passed for the affected common, legacy, DOCX, PPTX,
+PPT, XLS, XLSB, and XLSX crates. The DOCX suite passed 655 unit tests plus
+integration targets; the XLSX suite passed 636 tests plus integration targets;
+the DOC library suite passed 829 tests with two ignored. Formatting,
+metadata, diff, and boundary-policy checks also pass. This is a structural
+and typed-object-model increment, not a claim of complete OLE2, OOXML,
+DrawingML, or legacy Office conformance; the malformed Apache POI DOC fixture
+remains the previously recorded external integration debt.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:
