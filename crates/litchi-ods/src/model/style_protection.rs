@@ -24,15 +24,15 @@ const MAX_STYLE_DEPTH: usize = 64;
 /// Rules are retained in document order. Litchi does not evaluate their
 /// conditions or compute an effective style.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ConditionalCellStyle {
+pub struct ConditionalStyle {
     pub style_name: String,
     pub parent_style_name: Option<String>,
-    pub rules: Vec<ConditionalCellStyleRule>,
+    pub rules: Vec<Rule>,
 }
 
 /// One inert `style:map` rule belonging to a table-cell style.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ConditionalCellStyleRule {
+pub struct Rule {
     /// The decoded condition text. It is never evaluated by litchi.
     pub condition: String,
     /// Namespace bound to a condition prefix, when the condition is qualified.
@@ -43,9 +43,9 @@ pub struct ConditionalCellStyleRule {
     pub base_cell_address: Option<String>,
 }
 
-impl ConditionalCellStyle {
+impl ConditionalStyle {
     /// Create an inert conditional table-cell style.
-    pub fn new(style_name: impl Into<String>, rules: Vec<ConditionalCellStyleRule>) -> Self {
+    pub fn new(style_name: impl Into<String>, rules: Vec<Rule>) -> Self {
         Self {
             style_name: style_name.into(),
             parent_style_name: None,
@@ -60,7 +60,7 @@ impl ConditionalCellStyle {
     }
 }
 
-impl ConditionalCellStyleRule {
+impl Rule {
     /// Create an inert conditional rule without a formula namespace or base address.
     pub fn new(condition: impl Into<String>, apply_style_name: impl Into<String>) -> Self {
         Self {
@@ -86,7 +86,7 @@ impl ConditionalCellStyleRule {
 
 /// The effective value of the ODF `style:cell-protect` property.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum CellStyleProtection {
+pub enum Protection {
     None,
     Protected,
     FormulaHidden,
@@ -96,14 +96,14 @@ pub enum CellStyleProtection {
 
 /// One automatic table-cell style with an explicit `style:cell-protect` value.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct TableCellProtectionStyle {
+pub struct TableStyle {
     pub style_name: String,
     pub parent_style_name: Option<String>,
-    pub protection: CellStyleProtection,
+    pub protection: Protection,
 }
 
-impl TableCellProtectionStyle {
-    pub fn new(style_name: impl Into<String>, protection: CellStyleProtection) -> Self {
+impl TableStyle {
+    pub fn new(style_name: impl Into<String>, protection: Protection) -> Self {
         Self {
             style_name: style_name.into(),
             parent_style_name: None,
@@ -117,7 +117,7 @@ impl TableCellProtectionStyle {
     }
 }
 
-impl CellStyleProtection {
+impl Protection {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "none" => Ok(Self::None),
@@ -165,12 +165,12 @@ impl CellStyleProtection {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct CellStyleRegistry {
     styles: HashMap<String, CellStyleDefinition>,
-    default: Option<CellStyleProtection>,
+    default: Option<Protection>,
     common_table_cell_styles: HashSet<String>,
     style_order: Vec<String>,
-    conditional_styles: Vec<ConditionalCellStyle>,
+    conditional_styles: Vec<ConditionalStyle>,
     conditional_style_index: HashMap<String, usize>,
-    automatic_protection_styles: Vec<TableCellProtectionStyle>,
+    automatic_protection_styles: Vec<TableStyle>,
     parsed_conditional_styles: usize,
     parsed_conditional_rules: usize,
     conditional_text_bytes: usize,
@@ -214,7 +214,7 @@ pub(crate) fn common_table_cell_style_names(styles_xml: Option<&str>) -> Result<
 pub(crate) fn validate_protection_style_document(
     styles_xml: Option<&str>,
     automatic_styles_xml: &str,
-    authored: &[TableCellProtectionStyle],
+    authored: &[TableStyle],
 ) -> Result<()> {
     let registry = CellStyleRegistry::parse(styles_xml, automatic_styles_xml)?;
     for style in authored {
@@ -246,7 +246,7 @@ pub(crate) fn validate_style_name(name: &str, label: &str) -> Result<()> {
 }
 
 pub(crate) fn validate_conditional_style_collection(
-    styles: &[ConditionalCellStyle],
+    styles: &[ConditionalStyle],
     common_styles: &HashSet<String>,
 ) -> Result<()> {
     if styles.len() > MAX_CONDITIONAL_STYLES {
@@ -330,7 +330,7 @@ pub(crate) fn validate_conditional_style_collection(
     Ok(())
 }
 
-fn validate_formula_namespace(rule: &ConditionalCellStyleRule) -> Result<()> {
+fn validate_formula_namespace(rule: &Rule) -> Result<()> {
     let lexical_prefix = formula_prefix(&rule.condition);
     match (lexical_prefix, &rule.formula_namespace) {
         (None, None) => Ok(()),
@@ -385,7 +385,7 @@ fn validate_xml_prefix(prefix: &str) -> Result<()> {
 #[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn rewrite_conditional_styles(
     fragment: Option<&PreservedXmlFragment>,
-    styles: &[ConditionalCellStyle],
+    styles: &[ConditionalStyle],
 ) -> Result<PreservedXmlFragment> {
     let canonical = write_conditional_styles(styles);
     let Some(fragment) = fragment else {
@@ -433,9 +433,7 @@ pub(crate) fn rewrite_conditional_styles(
     })
 }
 
-pub(crate) fn validate_protection_style_collection(
-    styles: &[TableCellProtectionStyle],
-) -> Result<()> {
+pub(crate) fn validate_protection_style_collection(styles: &[TableStyle]) -> Result<()> {
     if styles.len() > MAX_CONDITIONAL_STYLES {
         return Err(Error::InvalidFormat(format!(
             "document exceeds the {MAX_CONDITIONAL_STYLES} automatic protection style limit"
@@ -459,8 +457,8 @@ pub(crate) fn validate_protection_style_collection(
 
 pub(crate) fn rewrite_managed_cell_styles(
     fragment: Option<&PreservedXmlFragment>,
-    conditional_styles: &[ConditionalCellStyle],
-    protection_styles: &[TableCellProtectionStyle],
+    conditional_styles: &[ConditionalStyle],
+    protection_styles: &[TableStyle],
 ) -> Result<PreservedXmlFragment> {
     validate_protection_style_collection(protection_styles)?;
     for conditional in conditional_styles {
@@ -635,10 +633,7 @@ fn managed_style_ranges(xml: &str) -> Result<(Vec<Range<usize>>, AutomaticStyles
     ))
 }
 
-fn write_managed_styles(
-    conditionals: &[ConditionalCellStyle],
-    protections: &[TableCellProtectionStyle],
-) -> String {
+fn write_managed_styles(conditionals: &[ConditionalStyle], protections: &[TableStyle]) -> String {
     let formula_prefixes = conditionals
         .iter()
         .flat_map(|style| &style.rules)
@@ -690,8 +685,8 @@ fn write_managed_style(
     prefix: &str,
     name: &str,
     parent: Option<&str>,
-    protection: Option<CellStyleProtection>,
-    rules: &[ConditionalCellStyleRule],
+    protection: Option<Protection>,
+    rules: &[Rule],
 ) {
     out.push('<');
     out.push_str(prefix);
@@ -858,7 +853,7 @@ fn conditional_style_ranges(xml: &str) -> Result<(Vec<Range<usize>>, AutomaticSt
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
-fn write_conditional_styles(styles: &[ConditionalCellStyle]) -> String {
+fn write_conditional_styles(styles: &[ConditionalStyle]) -> String {
     let formula_prefixes = styles
         .iter()
         .flat_map(|style| &style.rules)
@@ -1047,8 +1042,8 @@ fn collect_namespaces(
 #[derive(Clone, Debug)]
 struct CellStyleDefinition {
     parent: Option<String>,
-    protection: Option<CellStyleProtection>,
-    conditional_rules: Vec<ConditionalCellStyleRule>,
+    protection: Option<Protection>,
+    conditional_rules: Vec<Rule>,
     is_common: bool,
 }
 
@@ -1065,21 +1060,21 @@ impl CellStyleRegistry {
         Ok(registry)
     }
 
-    pub(crate) fn conditional_styles(&self) -> &[ConditionalCellStyle] {
+    pub(crate) fn conditional_styles(&self) -> &[ConditionalStyle] {
         &self.conditional_styles
     }
 
-    pub(crate) fn conditional_style(&self, name: &str) -> Option<&ConditionalCellStyle> {
+    pub(crate) fn conditional_style(&self, name: &str) -> Option<&ConditionalStyle> {
         self.conditional_style_index
             .get(name)
             .and_then(|index| self.conditional_styles.get(*index))
     }
 
-    pub(crate) fn automatic_protection_styles(&self) -> &[TableCellProtectionStyle] {
+    pub(crate) fn automatic_protection_styles(&self) -> &[TableStyle] {
         &self.automatic_protection_styles
     }
 
-    pub(crate) fn resolve(&self, style_name: Option<&str>) -> Result<Option<CellStyleProtection>> {
+    pub(crate) fn resolve(&self, style_name: Option<&str>) -> Result<Option<Protection>> {
         let Some(mut name) = style_name else {
             return Ok(self.default);
         };
@@ -1213,7 +1208,7 @@ impl CellStyleRegistry {
                         &element,
                         b"cell-protect",
                     )?
-                    .map(|value| CellStyleProtection::parse(&value))
+                    .map(|value| Protection::parse(&value))
                     .transpose()?;
                     let builder = current.as_mut().expect("checked style");
                     if builder.protection.is_some() && protection.is_some() {
@@ -1287,7 +1282,7 @@ impl CellStyleRegistry {
         Ok(())
     }
 
-    fn record_conditional_rule(&mut self, rule: &ConditionalCellStyleRule) -> Result<()> {
+    fn record_conditional_rule(&mut self, rule: &Rule) -> Result<()> {
         if self.parsed_conditional_rules >= MAX_CONDITIONAL_RULES {
             return Err(Error::InvalidFormat(format!(
                 "document exceeds the {MAX_CONDITIONAL_RULES} conditional rule limit"
@@ -1334,12 +1329,11 @@ impl CellStyleRegistry {
             if !definition.is_common
                 && let Some(protection) = definition.protection
             {
-                self.automatic_protection_styles
-                    .push(TableCellProtectionStyle {
-                        style_name: name.clone(),
-                        parent_style_name: definition.parent.clone(),
-                        protection,
-                    });
+                self.automatic_protection_styles.push(TableStyle {
+                    style_name: name.clone(),
+                    parent_style_name: definition.parent.clone(),
+                    protection,
+                });
             }
             if definition.conditional_rules.is_empty() {
                 continue;
@@ -1355,7 +1349,7 @@ impl CellStyleRegistry {
                     )));
                 }
             }
-            let conditional = ConditionalCellStyle {
+            let conditional = ConditionalStyle {
                 style_name: name.clone(),
                 parent_style_name: definition.parent.clone(),
                 rules: definition.conditional_rules.clone(),
@@ -1410,8 +1404,8 @@ impl CellStyleRegistry {
 struct StyleBuilder {
     name: Option<String>,
     parent: Option<String>,
-    protection: Option<CellStyleProtection>,
-    conditional_rules: Vec<ConditionalCellStyleRule>,
+    protection: Option<Protection>,
+    conditional_rules: Vec<Rule>,
     is_default: bool,
     is_common: bool,
 }
@@ -1455,10 +1449,7 @@ fn increment_style_depth(depth: &mut usize) -> Result<()> {
     Ok(())
 }
 
-fn parse_conditional_rule(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
-) -> Result<ConditionalCellStyleRule> {
+fn parse_conditional_rule(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Rule> {
     let condition = required_conditional_attribute(reader, element, b"condition")?;
     let apply_style_name = required_conditional_attribute(reader, element, b"apply-style-name")?;
     let base_cell_address = optional_attribute(
@@ -1476,7 +1467,7 @@ fn parse_conditional_rule(
         }
     }
     let formula_namespace = condition_formula_namespace(reader.resolver(), &condition)?;
-    Ok(ConditionalCellStyleRule {
+    Ok(Rule {
         condition,
         formula_namespace,
         apply_style_name,
@@ -1588,15 +1579,13 @@ mod tests {
             xml: xml.to_string(),
             namespaces: BTreeMap::new(),
         };
-        let style = ConditionalCellStyle::new(
+        let style = ConditionalStyle::new(
             "new&style",
             vec![
-                ConditionalCellStyleRule::new("x:test()<2", "Red").with_formula_namespace(
-                    formula::Namespace {
-                        prefix: "x".to_string(),
-                        uri: "urn:example:formula".to_string(),
-                    },
-                ),
+                Rule::new("x:test()<2", "Red").with_formula_namespace(formula::Namespace {
+                    prefix: "x".to_string(),
+                    uri: "urn:example:formula".to_string(),
+                }),
             ],
         );
         let common = HashSet::from(["Red".to_string()]);
@@ -1619,12 +1608,9 @@ mod tests {
             xml: xml.to_string(),
             namespaces: BTreeMap::new(),
         };
-        let conditional = ConditionalCellStyle::new(
-            "combo",
-            vec![ConditionalCellStyleRule::new("cell-content()>0", "Red")],
-        );
-        let protection =
-            TableCellProtectionStyle::new("combo", CellStyleProtection::HiddenAndProtected);
+        let conditional =
+            ConditionalStyle::new("combo", vec![Rule::new("cell-content()>0", "Red")]);
+        let protection = TableStyle::new("combo", Protection::HiddenAndProtected);
         let rewritten =
             rewrite_managed_cell_styles(Some(&fragment), &[conditional], &[protection]).unwrap();
         assert!(rewritten.xml.contains(
@@ -1647,17 +1633,14 @@ mod tests {
         let named = r#"<o:styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><s:default-style s:family="table-cell"><s:table-cell-properties s:cell-protect="none"/></s:default-style><s:style s:name="Locked" s:family="table-cell"><s:table-cell-properties s:cell-protect="protected"/></s:style><s:style s:name="Child" s:family="table-cell" s:parent-style-name="Locked"/></o:styles>"#;
         let content = r#"<o:automatic-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><s:style s:name="Auto" s:family="table-cell" s:parent-style-name="Child"><s:table-cell-properties s:cell-protect="formula-hidden protected"/></s:style></o:automatic-styles>"#;
         let registry = CellStyleRegistry::parse(Some(named), content).unwrap();
-        assert_eq!(
-            registry.resolve(None).unwrap(),
-            Some(CellStyleProtection::None)
-        );
+        assert_eq!(registry.resolve(None).unwrap(), Some(Protection::None));
         assert_eq!(
             registry.resolve(Some("Child")).unwrap(),
-            Some(CellStyleProtection::Protected)
+            Some(Protection::Protected)
         );
         assert_eq!(
             registry.resolve(Some("Auto")).unwrap(),
-            Some(CellStyleProtection::ProtectedFormulaHidden)
+            Some(Protection::ProtectedFormulaHidden)
         );
     }
 
