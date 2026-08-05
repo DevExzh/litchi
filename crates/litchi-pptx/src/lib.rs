@@ -25,14 +25,20 @@ pub mod laser;
 pub mod media_parts;
 pub mod modern_comments;
 
+pub mod master_layout;
 pub mod notes;
+pub mod package;
+pub mod parts;
+pub mod presentation;
 pub mod presentation_properties;
 pub mod shape;
+pub mod slide;
 pub mod table;
 pub mod tag;
 pub mod time;
 pub mod transition;
 pub mod view_properties;
+pub mod writer;
 
 pub use actions::{Jump, Kind, Setting, Target, Trigger};
 pub use animations::*;
@@ -50,18 +56,26 @@ pub use comments::{
 pub use error::{Error, Result};
 pub use format::{ImageFormat, TextFormat};
 pub use hyperlinks::Hyperlink;
+pub use master_layout::{
+    AuthoredSlideLayout, AuthoredSlideMaster, MIN_MASTER_OR_LAYOUT_ID, PlaceholderKind,
+    PlaceholderSpec, SlideLayoutKind,
+};
 pub use media_parts::{
     Bookmark, Data, ExtensionList, Fade, Picture, Poster, Resource, Transform, Trim,
     load_slide_media, parse_slide_media, store_slide_media, write_slide_media_pictures,
 };
 pub use modern_comments::*;
+pub use package::Package;
+pub use presentation::Presentation;
 pub use presentation_properties::{
     BrowserSupport, Color, ColorKind, Extension, HtmlPublish, HtmlTarget, OpaqueExtension, Print,
     PrintColorMode, PrintOutput, Properties, Show, ShowExtension, ShowMode, SlideSelection, Web,
     WebColor, WebScreenSize, load_from_package as load_presentation_properties,
 };
+pub use slide::{Key as SlideKey, Slide, SlideLayout, SlideMaster};
 pub use view_properties::{
     CommonSlideView, CommonView, GridSpacing, Guide, GuideOrientation, NormalView, OutlineSlide,
     OutlineView, Point, Ratio, RestoredPane, SimpleView, SlideLikeView, SorterView, SplitterState,
     ViewKind, ViewProperties, load_from_package as load_view_properties,
 };
+pub use writer::{MutablePresentation, MutableShape, MutableSlide};

@@ -175,6 +175,19 @@ pub enum Error {
         index: usize,
     },
 
+    /// A package URI supplied to the PresentationML graph is invalid.
+    #[error("invalid PresentationML URI: {0}")]
+    Uri(String),
+
+    /// A lossless facade operation cannot safely expose or replace a graph.
+    #[error("unsafe PPTX edit during {operation}: {reason}")]
+    UnsafeEdit {
+        /// Operation that requested the edit.
+        operation: &'static str,
+        /// Reason the bounded facade rejected it.
+        reason: &'static str,
+    },
+
     /// A semantic shape selector is missing, ambiguous, or outside checked bounds.
     #[error("PresentationML shape lookup error: {0}")]
     ShapeLookup(#[from] crate::shape::LookupError),

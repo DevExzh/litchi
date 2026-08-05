@@ -4,8 +4,8 @@
 //! does not inspect, parse, decompress, or execute VBA project bytes.
 
 use crate::error::{OoxmlError, Result};
-use crate::vba_package::{
-    VbaPackageHost, read_project_part, remove_vba_project_graph, store_vba_project_graph,
+use litchi_ooxml_common::vba::{
+    Host, read_project_part, remove_project_graph, store_project_graph,
 };
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::{OpcPackage, PackURI, Part};
@@ -46,7 +46,7 @@ impl VbaProject {
 
     /// Parse the `vbaProject.bin` payload with explicit resource limits.
     pub fn project_with(&self, package: &OpcPackage, limits: &Limits) -> Result<Project> {
-        read_project_part(package, &self.project_part_name, limits)
+        Ok(read_project_part(package, &self.project_part_name, limits)?)
     }
 }
 
@@ -120,7 +120,7 @@ pub(crate) fn store_vba_project(
     payload: Payload,
 ) -> Result<VbaProject> {
     let payload = Arc::new(payload.into_bytes());
-    store_vba_project_graph(package, source, VbaPackageHost::PowerPoint, payload, None)?;
+    store_project_graph(package, source, Host::PowerPoint, payload, None)?;
     let source = package.get_part(source)?;
     discover_vba_project(package, source)?.ok_or_else(|| {
         OoxmlError::InvalidFormat("stored PowerPoint VBA project was not discoverable".to_string())
@@ -128,7 +128,7 @@ pub(crate) fn store_vba_project(
 }
 
 pub(crate) fn remove_vba_project(package: &mut OpcPackage, source: &PackURI) -> Result<bool> {
-    remove_vba_project_graph(package, source, VbaPackageHost::PowerPoint)
+    Ok(remove_project_graph(package, source, Host::PowerPoint)?)
 }
 
 #[cfg(test)]
