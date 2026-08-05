@@ -3,7 +3,7 @@
 //! Provides high-level API for working with Apple Keynote presentations.
 
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use crate::bundle::{Bundle, BundleLimits};
 use crate::detect::detect_application_from_document;
@@ -26,6 +26,8 @@ struct KeynoteDocumentState {
     bundle: Bundle,
     /// Object index for cross-referencing
     object_index: ObjectIndex,
+    /// Archive-free semantic state initialized on first semantic access.
+    semantic_document: OnceLock<Document>,
 }
 
 impl KeynoteDocument {
@@ -84,6 +86,7 @@ impl KeynoteDocument {
             state: Arc::new(KeynoteDocumentState {
                 bundle,
                 object_index,
+                semantic_document: OnceLock::new(),
             }),
         }
     }
@@ -150,7 +153,7 @@ impl KeynoteDocument {
         Ok(extractor.get_text())
     }
 
-    /// Extract slides from the presentation
+    /// Decode slides from the archive while building the semantic snapshot.
     ///
     /// Keynote presentations consist of slides with content, animations, and transitions.
     /// This method parses the presentation structure and returns all slides.
@@ -174,7 +177,7 @@ impl KeynoteDocument {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn slides(&self) -> Result<Vec<Slide>> {
+    fn decode_slides(&self) -> Result<Vec<Slide>> {
         let mut slides = Vec::new();
 
         for (index, slide_id) in self.slide_ids()?.into_iter().enumerate() {
@@ -187,6 +190,23 @@ impl KeynoteDocument {
         }
 
         Ok(slides)
+    }
+
+    /// Borrow the detached semantic slides without reparsing the archive.
+    pub fn slides(&self) -> Result<&[Slide]> {
+        Ok(self.semantic_document()?.slides())
+    }
+
+    fn semantic_document(&self) -> Result<&Document> {
+        if let Some(document) = self.state.semantic_document.get() {
+            return Ok(document);
+        }
+
+        let document = Document::from_show(self.decode_show()?);
+        let _ = self.state.semantic_document.set(document);
+        self.state.semantic_document.get().ok_or_else(|| {
+            Error::ParseError("Keynote semantic state is not initialized".to_owned())
+        })
     }
 
     fn slide_ids(&self) -> Result<Vec<u64>> {
@@ -644,28 +664,7 @@ impl KeynoteDocument {
         }
     }
 
-    /// Extract the full show structure with all slides
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the root document, show archive, settings, or a
-    /// referenced slide cannot be decoded.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// use litchi_iwa::keynote::KeynoteDocument;
-    ///
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let doc = KeynoteDocument::open("presentation.key")?;
-    /// let show = doc.show()?;
-    ///
-    /// println!("Presentation: {}", show.title().unwrap_or_default());
-    /// println!("Slides: {}", show.slide_count());
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// # }
-    /// ```
-    pub fn show(&self) -> Result<Show> {
+    fn decode_show(&self) -> Result<Show> {
         use prost::Message;
 
         let mut builder = Show::builder();
@@ -690,23 +689,47 @@ impl KeynoteDocument {
         let text_parts = crate::archive::extract_text(show_object);
         builder.set_title(text_parts.first().cloned());
 
-        // Add all slides
-        let slides = self.slides()?;
-        for slide in slides {
+        for slide in self.decode_slides()? {
             builder.push_slide(slide);
         }
 
         Ok(builder.build())
     }
 
-    /// Decode an archive into a cheap, archive-free semantic snapshot.
+    /// Extract the full detached show structure with all slides without
+    /// reparsing the archive.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the root document, show archive, settings, or a
+    /// referenced slide cannot be decoded.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi_iwa::keynote::KeynoteDocument;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let doc = KeynoteDocument::open("presentation.key")?;
+    /// let show = doc.show()?;
+    ///
+    /// println!("Presentation: {}", show.title().unwrap_or_default());
+    /// println!("Slides: {}", show.slide_count());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # }
+    /// ```
+    pub fn show(&self) -> Result<&Show> {
+        Ok(self.semantic_document()?.show())
+    }
+
+    /// Return a cheap handle to the archive-free semantic snapshot built on demand.
     ///
     /// # Errors
     ///
     /// Returns an error when the underlying show or one of its referenced
     /// slides cannot be decoded.
     pub fn semantic_snapshot(&self) -> Result<Document> {
-        Ok(Document::from_show(self.show()?))
+        Ok(self.semantic_document()?.snapshot())
     }
 
     /// Get the underlying bundle
