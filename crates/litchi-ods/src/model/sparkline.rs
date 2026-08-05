@@ -34,13 +34,13 @@ pub(crate) const MAX_SPARKLINE_ATTRIBUTE_BYTES: usize = 64 * 1024;
 
 /// The rendering kind of a sparkline group (`calcext:type`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SparklineType {
+pub enum Type {
     Line,
     Column,
     Stacked,
 }
 
-impl SparklineType {
+impl Type {
     pub(crate) fn parse(value: &str) -> Result<Self> {
         match value {
             "line" => Ok(Self::Line),
@@ -63,13 +63,13 @@ impl SparklineType {
 
 /// How a sparkline renders empty source cells (`calcext:display-empty-cells-as`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SparklineEmptyCells {
+pub enum EmptyCells {
     Gap,
     Span,
     Zero,
 }
 
-impl SparklineEmptyCells {
+impl EmptyCells {
     pub(crate) fn parse(value: &str) -> Result<Self> {
         match value {
             "gap" => Ok(Self::Gap),
@@ -93,13 +93,13 @@ impl SparklineEmptyCells {
 /// The axis scaling of a sparkline group (`calcext:min-axis-type` /
 /// `calcext:max-axis-type`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SparklineAxisType {
+pub enum AxisType {
     Individual,
     Group,
     Custom,
 }
 
-impl SparklineAxisType {
+impl AxisType {
     pub(crate) fn parse(value: &str) -> Result<Self> {
         match value {
             "individual" => Ok(Self::Individual),
@@ -122,7 +122,7 @@ impl SparklineAxisType {
 
 /// Boolean rendering switches of a sparkline group, all optional.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct SparklineFlags {
+pub struct Flags {
     /// Whether the x axis is a date axis (`calcext:date-axis`).
     pub date_axis: Option<bool>,
     /// Whether every point is marked (`calcext:markers`).
@@ -148,9 +148,9 @@ pub struct SparklineFlags {
 /// Optional `#RRGGBB` color slots of a sparkline group.
 ///
 /// Colors are never rendered by litchi. Theme-based colors are modeled
-/// separately by [`SparklineComplexColors`].
+/// separately by [`ComplexColors`].
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct SparklineColors {
+pub struct Colors {
     /// Series color (`calcext:color-series`).
     pub series: Option<String>,
     /// Negative-points color (`calcext:color-negative`).
@@ -232,14 +232,14 @@ impl ThemeColorType {
 
 /// The kind of a color transformation (`loext:type`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ColorTransformationType {
+pub enum TransformationType {
     Tint,
     Shade,
     LumMod,
     LumOff,
 }
 
-impl ColorTransformationType {
+impl TransformationType {
     pub(crate) fn parse(value: &str) -> Result<Self> {
         match value {
             "tint" => Ok(Self::Tint),
@@ -264,17 +264,17 @@ impl ColorTransformationType {
 
 /// One inert `loext:transformation` of a complex color.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct SparklineColorTransformation {
+pub struct Transformation {
     /// The transformation kind (`loext:type`).
-    pub transformation_type: ColorTransformationType,
+    pub transformation_type: TransformationType,
     /// The transformation amount (`loext:value`), an integer in the range
     /// LibreOffice accepts (`i16`).
     pub value: i16,
 }
 
-impl SparklineColorTransformation {
+impl Transformation {
     /// Create an inert color transformation.
-    pub fn new(transformation_type: ColorTransformationType, value: i16) -> Self {
+    pub fn new(transformation_type: TransformationType, value: i16) -> Self {
         Self {
             transformation_type,
             value,
@@ -286,14 +286,14 @@ impl SparklineColorTransformation {
 ///
 /// The theme family is never resolved against a theme by litchi.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SparklineComplexColor {
+pub struct ComplexColor {
     /// The theme color family (`loext:theme-type`).
     pub theme_type: ThemeColorType,
     /// Color transformations in document order.
-    pub transformations: Vec<SparklineColorTransformation>,
+    pub transformations: Vec<Transformation>,
 }
 
-impl SparklineComplexColor {
+impl ComplexColor {
     /// Create an inert theme-based color without transformations.
     pub fn new(theme_type: ThemeColorType) -> Self {
         Self {
@@ -303,32 +303,32 @@ impl SparklineComplexColor {
     }
 
     /// Append one color transformation.
-    pub fn with_transformation(mut self, transformation: SparklineColorTransformation) -> Self {
+    pub fn with_transformation(mut self, transformation: Transformation) -> Self {
         self.transformations.push(transformation);
         self
     }
 }
 
 /// Optional theme-based color slots of a sparkline group, one per plain
-/// `#RRGGBB` slot of [`SparklineColors`].
+/// `#RRGGBB` slot of [`Colors`].
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct SparklineComplexColors {
+pub struct ComplexColors {
     /// Series color (`calcext:sparkline-series-complex-color`).
-    pub series: Option<SparklineComplexColor>,
+    pub series: Option<ComplexColor>,
     /// Negative-points color (`calcext:sparkline-negative-complex-color`).
-    pub negative: Option<SparklineComplexColor>,
+    pub negative: Option<ComplexColor>,
     /// Axis color (`calcext:sparkline-axis-complex-color`).
-    pub axis: Option<SparklineComplexColor>,
+    pub axis: Option<ComplexColor>,
     /// Markers color (`calcext:sparkline-markers-complex-color`).
-    pub markers: Option<SparklineComplexColor>,
+    pub markers: Option<ComplexColor>,
     /// First-point color (`calcext:sparkline-first-complex-color`).
-    pub first: Option<SparklineComplexColor>,
+    pub first: Option<ComplexColor>,
     /// Last-point color (`calcext:sparkline-last-complex-color`).
-    pub last: Option<SparklineComplexColor>,
+    pub last: Option<ComplexColor>,
     /// Highest-point color (`calcext:sparkline-high-complex-color`).
-    pub high: Option<SparklineComplexColor>,
+    pub high: Option<ComplexColor>,
     /// Lowest-point color (`calcext:sparkline-low-complex-color`).
-    pub low: Option<SparklineComplexColor>,
+    pub low: Option<ComplexColor>,
 }
 
 /// The element names of the complex-color slots, in LibreOffice write order.
@@ -343,12 +343,9 @@ pub(crate) const COMPLEX_COLOR_SLOTS: [&str; 8] = [
     "sparkline-low-complex-color",
 ];
 
-impl SparklineComplexColors {
+impl ComplexColors {
     /// The slot for an element name, or `None` when it is not a complex color.
-    pub(crate) fn slot_mut(
-        &mut self,
-        element_name: &str,
-    ) -> Option<&mut Option<SparklineComplexColor>> {
+    pub(crate) fn slot_mut(&mut self, element_name: &str) -> Option<&mut Option<ComplexColor>> {
         Some(match element_name {
             "sparkline-series-complex-color" => &mut self.series,
             "sparkline-negative-complex-color" => &mut self.negative,
@@ -364,11 +361,7 @@ impl SparklineComplexColors {
 
     /// Assign a slot, rejecting duplicates. `element_name` must be one of
     /// [`COMPLEX_COLOR_SLOTS`].
-    pub(crate) fn assign_slot(
-        &mut self,
-        element_name: &str,
-        color: SparklineComplexColor,
-    ) -> Result<()> {
+    pub(crate) fn assign_slot(&mut self, element_name: &str, color: ComplexColor) -> Result<()> {
         let slot = self.slot_mut(element_name).ok_or_else(|| {
             Error::InvalidFormat(format!("unknown complex color slot '{element_name}'"))
         })?;
@@ -384,7 +377,7 @@ impl SparklineComplexColors {
 
 /// One inert `calcext:sparkline` cell assignment.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Sparkline {
+pub struct Item {
     /// Lexical address of the cell hosting the sparkline
     /// (`calcext:cell-address`). Never resolved by litchi.
     pub cell_address: String,
@@ -398,36 +391,36 @@ pub struct Sparkline {
 /// Numeric values (`calcext:line-width`, `calcext:manual-min`,
 /// `calcext:manual-max`) are stored lexically and never rendered.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct SparklineGroup {
+pub struct Group {
     /// Optional producer-assigned group identifier (`calcext:id`).
     pub id: Option<String>,
     /// Optional rendering kind (`calcext:type`).
-    pub sparkline_type: Option<SparklineType>,
+    pub sparkline_type: Option<Type>,
     /// Optional lexical line width with unit, such as `1pt`
     /// (`calcext:line-width`).
     pub line_width: Option<String>,
     /// Optional empty-cell rendering (`calcext:display-empty-cells-as`).
-    pub display_empty_cells_as: Option<SparklineEmptyCells>,
+    pub display_empty_cells_as: Option<EmptyCells>,
     /// Boolean rendering switches.
-    pub flags: SparklineFlags,
+    pub flags: Flags,
     /// Optional minimum axis scaling (`calcext:min-axis-type`).
-    pub min_axis_type: Option<SparklineAxisType>,
+    pub min_axis_type: Option<AxisType>,
     /// Optional maximum axis scaling (`calcext:max-axis-type`).
-    pub max_axis_type: Option<SparklineAxisType>,
+    pub max_axis_type: Option<AxisType>,
     /// Optional lexical custom minimum (`calcext:manual-min`).
     pub manual_min: Option<String>,
     /// Optional lexical custom maximum (`calcext:manual-max`).
     pub manual_max: Option<String>,
     /// Optional `#RRGGBB` color slots.
-    pub colors: SparklineColors,
+    pub colors: Colors,
     /// Optional theme-based color slots. Parsed and stored inertly; theme
     /// families are never resolved against a theme by litchi.
-    pub complex_colors: SparklineComplexColors,
+    pub complex_colors: ComplexColors,
     /// Sparkline cell assignments in document order.
-    pub sparklines: Vec<Sparkline>,
+    pub sparklines: Vec<Item>,
 }
 
-impl Sparkline {
+impl Item {
     /// Create an inert sparkline cell assignment.
     pub fn new(cell_address: impl Into<String>, data_ranges: Vec<String>) -> Self {
         Self {
@@ -437,9 +430,9 @@ impl Sparkline {
     }
 }
 
-impl SparklineGroup {
+impl Group {
     /// Create an inert sparkline group with only cell assignments set.
-    pub fn new(sparklines: Vec<Sparkline>) -> Self {
+    pub fn new(sparklines: Vec<Item>) -> Self {
         Self {
             sparklines,
             ..Self::default()
@@ -453,7 +446,7 @@ impl SparklineGroup {
     }
 
     /// Set the optional rendering kind.
-    pub fn with_type(mut self, sparkline_type: SparklineType) -> Self {
+    pub fn with_type(mut self, sparkline_type: Type) -> Self {
         self.sparkline_type = Some(sparkline_type);
         self
     }
@@ -465,13 +458,13 @@ impl SparklineGroup {
     }
 
     /// Set the optional empty-cell rendering.
-    pub fn with_display_empty_cells_as(mut self, display: SparklineEmptyCells) -> Self {
+    pub fn with_display_empty_cells_as(mut self, display: EmptyCells) -> Self {
         self.display_empty_cells_as = Some(display);
         self
     }
 
     /// Set the boolean rendering switches.
-    pub fn with_flags(mut self, flags: SparklineFlags) -> Self {
+    pub fn with_flags(mut self, flags: Flags) -> Self {
         self.flags = flags;
         self
     }
@@ -479,8 +472,8 @@ impl SparklineGroup {
     /// Set the optional axis scaling types and custom bounds.
     pub fn with_axis(
         mut self,
-        min_axis_type: Option<SparklineAxisType>,
-        max_axis_type: Option<SparklineAxisType>,
+        min_axis_type: Option<AxisType>,
+        max_axis_type: Option<AxisType>,
         manual_min: Option<String>,
         manual_max: Option<String>,
     ) -> Self {
@@ -492,19 +485,19 @@ impl SparklineGroup {
     }
 
     /// Set the optional color slots.
-    pub fn with_colors(mut self, colors: SparklineColors) -> Self {
+    pub fn with_colors(mut self, colors: Colors) -> Self {
         self.colors = colors;
         self
     }
 
     /// Set the optional theme-based color slots.
-    pub fn with_complex_colors(mut self, complex_colors: SparklineComplexColors) -> Self {
+    pub fn with_complex_colors(mut self, complex_colors: ComplexColors) -> Self {
         self.complex_colors = complex_colors;
         self
     }
 }
 
-pub(crate) fn validate_sparkline_group(group: &SparklineGroup) -> Result<()> {
+pub(crate) fn validate_sparkline_group(group: &Group) -> Result<()> {
     validate_sparkline_group_attributes(group)?;
     if group.sparklines.is_empty() {
         return Err(Error::InvalidFormat(
@@ -523,7 +516,7 @@ pub(crate) fn validate_sparkline_group(group: &SparklineGroup) -> Result<()> {
 }
 
 /// Validate only the element attributes of a group, not its sparklines.
-pub(crate) fn validate_sparkline_group_attributes(group: &SparklineGroup) -> Result<()> {
+pub(crate) fn validate_sparkline_group_attributes(group: &Group) -> Result<()> {
     if let Some(id) = &group.id {
         validate_attribute_length("calcext:id", id)?;
     }
@@ -570,7 +563,7 @@ pub(crate) fn validate_sparkline_group_attributes(group: &SparklineGroup) -> Res
     Ok(())
 }
 
-pub(crate) fn validate_complex_color(complex_color: &SparklineComplexColor) -> Result<()> {
+pub(crate) fn validate_complex_color(complex_color: &ComplexColor) -> Result<()> {
     if complex_color.transformations.len() > MAX_COLOR_TRANSFORMATIONS {
         return Err(Error::InvalidFormat(format!(
             "complex color exceeds the {MAX_COLOR_TRANSFORMATIONS} transformation safety limit"
@@ -579,7 +572,7 @@ pub(crate) fn validate_complex_color(complex_color: &SparklineComplexColor) -> R
     Ok(())
 }
 
-pub(crate) fn validate_sparkline(sparkline: &Sparkline) -> Result<()> {
+pub(crate) fn validate_sparkline(sparkline: &Item) -> Result<()> {
     if sparkline.cell_address.is_empty() || sparkline.cell_address.trim() != sparkline.cell_address
     {
         return Err(Error::InvalidFormat(format!(
@@ -600,7 +593,7 @@ pub(crate) fn validate_sparkline(sparkline: &Sparkline) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn validate_sparkline_groups(groups: &[SparklineGroup]) -> Result<()> {
+pub(crate) fn validate_sparkline_groups(groups: &[Group]) -> Result<()> {
     if groups.len() > MAX_SPARKLINE_GROUPS_PER_SHEET {
         return Err(Error::InvalidFormat(format!(
             "sheet exceeds the {MAX_SPARKLINE_GROUPS_PER_SHEET} sparkline group safety limit"
@@ -662,7 +655,7 @@ fn validate_attribute_length(name: &str, value: &str) -> Result<()> {
 
 /// Write a sheet's `calcext:sparkline-groups` container after its conditional
 /// formats, matching LibreOffice's element order inside `table:table`.
-pub(crate) fn write_sparkline_groups(out: &mut String, groups: &[SparklineGroup]) -> Result<()> {
+pub(crate) fn write_sparkline_groups(out: &mut String, groups: &[Group]) -> Result<()> {
     validate_sparkline_groups(groups)?;
     if groups.is_empty() {
         return Ok(());
@@ -759,7 +752,7 @@ pub(crate) fn write_sparkline_groups(out: &mut String, groups: &[SparklineGroup]
     Ok(())
 }
 
-fn write_complex_color(out: &mut String, slot: &str, complex_color: &SparklineComplexColor) {
+fn write_complex_color(out: &mut String, slot: &str, complex_color: &ComplexColor) {
     out.push_str("<calcext:");
     out.push_str(slot);
     out.push_str(LOEXT_NAMESPACE_DECLARATION);
@@ -803,40 +796,39 @@ fn write_optional_bool_attribute(out: &mut String, name: &str, value: Option<boo
 mod tests {
     use super::*;
 
-    fn sample_group() -> SparklineGroup {
-        SparklineGroup::new(vec![
-            Sparkline::new("Sheet1.A2", vec!["Sheet1.B1:Sheet1.M1".to_string()]),
-            Sparkline::new("Sheet1.A3", vec!["Sheet1.B2:Sheet1.M2".to_string()]),
+    fn sample_group() -> Group {
+        Group::new(vec![
+            Item::new("Sheet1.A2", vec!["Sheet1.B1:Sheet1.M1".to_string()]),
+            Item::new("Sheet1.A3", vec!["Sheet1.B2:Sheet1.M2".to_string()]),
         ])
         .with_id("{1C5C5DE0-3C09-4CB3-A3EC-9E763301EC82}")
-        .with_type(SparklineType::Column)
+        .with_type(Type::Column)
         .with_line_width("1pt")
-        .with_display_empty_cells_as(SparklineEmptyCells::Gap)
-        .with_flags(SparklineFlags {
+        .with_display_empty_cells_as(EmptyCells::Gap)
+        .with_flags(Flags {
             markers: Some(true),
             high: Some(true),
             display_x_axis: Some(true),
-            ..SparklineFlags::default()
+            ..Flags::default()
         })
         .with_axis(
-            Some(SparklineAxisType::Custom),
-            Some(SparklineAxisType::Individual),
+            Some(AxisType::Custom),
+            Some(AxisType::Individual),
             Some("-5".to_string()),
             None,
         )
-        .with_colors(SparklineColors {
+        .with_colors(Colors {
             series: Some("#0369a3".to_string()),
             low: Some("#c9211e".to_string()),
-            ..SparklineColors::default()
+            ..Colors::default()
         })
-        .with_complex_colors(SparklineComplexColors {
+        .with_complex_colors(ComplexColors {
             series: Some(
-                SparklineComplexColor::new(ThemeColorType::Accent3).with_transformation(
-                    SparklineColorTransformation::new(ColorTransformationType::LumMod, 6000),
-                ),
+                ComplexColor::new(ThemeColorType::Accent3)
+                    .with_transformation(Transformation::new(TransformationType::LumMod, 6000)),
             ),
-            last: Some(SparklineComplexColor::new(ThemeColorType::Light1)),
-            ..SparklineComplexColors::default()
+            last: Some(ComplexColor::new(ThemeColorType::Light1)),
+            ..ComplexColors::default()
         })
     }
 
@@ -870,11 +862,11 @@ mod tests {
     #[test]
     fn rejects_invalid_groups_sparklines_and_attributes() {
         // Groups require at least one sparkline.
-        assert!(validate_sparkline_group(&SparklineGroup::new(Vec::new())).is_err());
+        assert!(validate_sparkline_group(&Group::new(Vec::new())).is_err());
         // Sparklines require a cell address and at least one data range.
-        assert!(validate_sparkline(&Sparkline::new("", vec![".A1".to_string()])).is_err());
-        assert!(validate_sparkline(&Sparkline::new(" A1", vec![".A1".to_string()])).is_err());
-        assert!(validate_sparkline(&Sparkline::new(".A1", Vec::new())).is_err());
+        assert!(validate_sparkline(&Item::new("", vec![".A1".to_string()])).is_err());
+        assert!(validate_sparkline(&Item::new(" A1", vec![".A1".to_string()])).is_err());
+        assert!(validate_sparkline(&Item::new(".A1", Vec::new())).is_err());
         // Colors must be #RRGGBB and numbers must be numeric.
         let mut group = sample_group();
         group.colors.series = Some("blue".to_string());
