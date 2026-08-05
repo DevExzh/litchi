@@ -1,6 +1,8 @@
-//! Semantic access to point and range cross-reference targets.
+//! Namespace-aware reference-mark parser and validation codec.
 
-use super::index::expanded_attributes;
+use super::super::index::expanded_attributes;
+use super::model::ReferenceMark;
+use super::{MAX_DEPTH, MAX_MARKS};
 use crate::elements::xml::{
     TEXT_NAMESPACE, append_checked, append_text_control, decode_reference, is_bound,
     namespaced_attribute,
@@ -10,71 +12,6 @@ use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::NsReader;
 use std::collections::{HashMap, HashSet};
-
-mod writing;
-pub use writing::{
-    ReferenceMarkFragments, insert_reference_mark_xml, remove_reference_mark_xml,
-    replace_reference_mark_xml,
-};
-
-const MAX_DEPTH: usize = 4_096;
-const MAX_MARKS: usize = 1_000_000;
-
-/// A point or range target for `text:reference-ref` fields.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ReferenceMark {
-    name: String,
-    start: Option<(usize, usize)>,
-    end: Option<(usize, usize)>,
-    text: String,
-    range: bool,
-}
-
-impl ReferenceMark {
-    /// Create a point reference target.
-    pub fn point(name: impl Into<String>) -> Self {
-        Self {
-            name: name.into(),
-            start: None,
-            end: None,
-            text: String::new(),
-            range: false,
-        }
-    }
-
-    /// Create a range reference target.
-    pub fn range(name: impl Into<String>) -> Self {
-        Self {
-            name: name.into(),
-            start: None,
-            end: None,
-            text: String::new(),
-            range: true,
-        }
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    /// Zero-based paragraph/heading index and character offset.
-    pub fn start(&self) -> Option<(usize, usize)> {
-        self.start
-    }
-
-    /// Zero-based paragraph/heading index and character offset.
-    pub fn end(&self) -> Option<(usize, usize)> {
-        self.end
-    }
-
-    pub fn text(&self) -> &str {
-        &self.text
-    }
-
-    pub fn is_range(&self) -> bool {
-        self.range
-    }
-}
 
 struct PendingReference {
     mark: ReferenceMark,
@@ -410,65 +347,4 @@ fn checked_depth(depth: usize) -> Result<usize> {
         )));
     }
     Ok(depth)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
-
-    #[test]
-    fn parses_point_and_range_reference_marks_with_exact_positions_and_text() {
-        let xml = format!(
-            r#"<x:text xmlns:x="{TEXT}"><x:p>ab<x:reference-mark x:name="point"/>c<x:reference-mark-start x:name="range"/>D&amp;<x:span>E</x:span><x:s x:c="2"/></x:p><x:p>F<![CDATA[!]]><x:reference-mark-end x:name="range"/>z</x:p></x:text>"#
-        );
-        let marks = parse_reference_marks(&xml).unwrap();
-        assert_eq!(marks.len(), 2);
-        assert_eq!(marks[0].name(), "point");
-        assert!(!marks[0].is_range());
-        assert_eq!(marks[0].start(), Some((0, 2)));
-        assert_eq!(marks[0].end(), Some((0, 2)));
-        assert!(marks[0].text().is_empty());
-        assert_eq!(marks[1].name(), "range");
-        assert!(marks[1].is_range());
-        assert_eq!(marks[1].start(), Some((0, 3)));
-        assert_eq!(marks[1].end(), Some((1, 2)));
-        assert_eq!(marks[1].text(), "D&E  \nF!");
-    }
-
-    #[test]
-    fn reference_marks_reject_missing_duplicate_unmatched_and_nonempty_markers() {
-        let missing = format!(r#"<x:reference-mark xmlns:x="{TEXT}"/>"#);
-        assert!(parse_reference_marks(&missing).is_err());
-        let duplicate = format!(
-            r#"<x:p xmlns:x="{TEXT}"><x:reference-mark-start x:name="a"/><x:reference-mark-start x:name="a"/></x:p>"#
-        );
-        assert!(parse_reference_marks(&duplicate).is_err());
-        let unmatched = format!(r#"<x:reference-mark-end xmlns:x="{TEXT}" x:name="a"/>"#);
-        assert!(parse_reference_marks(&unmatched).is_err());
-        let unclosed = format!(r#"<x:reference-mark-start xmlns:x="{TEXT}" x:name="a"/>"#);
-        assert!(parse_reference_marks(&unclosed).is_err());
-        let nonempty =
-            format!(r#"<x:reference-mark xmlns:x="{TEXT}" x:name="a">bad</x:reference-mark>"#);
-        assert!(parse_reference_marks(&nonempty).is_err());
-        let aliases = format!(
-            r#"<x:reference-mark xmlns:x="{TEXT}" xmlns:y="{TEXT}" x:name="a" y:name="b"/>"#
-        );
-        assert!(parse_reference_marks(&aliases).is_err());
-        assert!(parse_reference_marks("<x:reference-mark>").is_err());
-    }
-
-    #[test]
-    fn reference_marks_enforce_nesting_bound() {
-        let mut xml = format!(r#"<x:p xmlns:x="{TEXT}">"#);
-        for _ in 0..MAX_DEPTH {
-            xml.push_str("<x:span>");
-        }
-        for _ in 0..MAX_DEPTH {
-            xml.push_str("</x:span>");
-        }
-        xml.push_str("</x:p>");
-        assert!(parse_reference_marks(&xml).is_err());
-    }
 }

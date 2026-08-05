@@ -1,4 +1,6 @@
-use super::{ReferenceMark, parse_reference_marks, validate_reference_name};
+use super::codec::{parse_reference_marks, validate_reference_name};
+use super::model::ReferenceMark;
+use super::{MAX_DEPTH, MAX_MARKS};
 use crate::elements::xml::{TEXT_NAMESPACE, is_bound, namespaced_attribute};
 use litchi_core::{Error, Result};
 use quick_xml::events::{BytesStart, Event};
@@ -7,8 +9,6 @@ use std::collections::HashMap;
 use std::ops::Range;
 
 const MAX_XML_BYTES: usize = 256 * 1024 * 1024;
-const MAX_DEPTH: usize = 4_096;
-const MAX_MARKS: usize = 1_000_000;
 
 /// Canonical XML emitted for a point or range reference target.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -549,108 +549,4 @@ fn apply_edits(xml: &str, mut edits: Vec<(Range<usize>, String)>) -> Result<Stri
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(Error::InvalidFormat(message.into()))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
-
-    fn wrapped(body: &str) -> String {
-        format!(
-            r#"<o:text xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="{TEXT}" xmlns:text="{TEXT}">{body}</o:text>"#
-        )
-    }
-
-    #[test]
-    fn canonical_point_and_range_fragments_round_trip() {
-        let point = ReferenceMark::point("point<&\"");
-        assert_eq!(
-            point.to_xml_fragments().unwrap(),
-            ReferenceMarkFragments::Point(
-                r#"<text:reference-mark text:name="point&lt;&amp;&quot;"/>"#.to_string()
-            )
-        );
-        let range = ReferenceMark::range("range");
-        assert_eq!(
-            range.to_xml_fragments().unwrap(),
-            ReferenceMarkFragments::Range {
-                start: r#"<text:reference-mark-start text:name="range"/>"#.to_string(),
-                end: r#"<text:reference-mark-end text:name="range"/>"#.to_string(),
-            }
-        );
-        let inserted =
-            insert_reference_mark_xml(&wrapped("<t:p>payload</t:p>"), 0, &range).unwrap();
-        let parsed = parse_reference_marks(&inserted).unwrap();
-        assert_eq!(parsed.len(), 1);
-        assert_eq!(parsed[0].name(), "range");
-        assert_eq!(parsed[0].text(), "payload");
-    }
-
-    #[test]
-    fn lossless_insert_replace_remove_preserves_unrelated_and_enclosed_xml() {
-        let source = wrapped(
-            r#"<t:p t:style-name="P">A&amp;<t:span t:style-name="S">B</t:span><!--keep--></t:p><t:p/>"#,
-        );
-        let with_range =
-            insert_reference_mark_xml(&source, 0, &ReferenceMark::range("r1")).unwrap();
-        assert!(with_range.contains(r#"<text:reference-mark-start text:name="r1"/>A&amp;<t:span t:style-name="S">B</t:span><!--keep--><text:reference-mark-end text:name="r1"/>"#));
-        let replaced =
-            replace_reference_mark_xml(&with_range, 0, &ReferenceMark::point("p2")).unwrap();
-        assert!(replaced.contains(r#"<text:reference-mark text:name="p2"/>A&amp;<t:span t:style-name="S">B</t:span><!--keep-->"#));
-        let removed = remove_reference_mark_xml(&replaced, 0).unwrap();
-        assert_eq!(removed, source);
-        let empty = insert_reference_mark_xml(&source, 1, &ReferenceMark::point("empty")).unwrap();
-        assert!(empty.contains(r#"<t:p><text:reference-mark text:name="empty"/></t:p>"#));
-    }
-
-    #[test]
-    fn hostile_namespaces_identity_content_and_resources_are_rejected() {
-        for body in [
-            r#"<t:p><t:reference-mark t:name="x" u:extra="1"/></t:p>"#,
-            r#"<t:p><t:reference-mark u:name="x"/></t:p>"#,
-            r#"<t:p><t:reference-mark t:name="x"/><t:reference-mark t:name="x"/></t:p>"#,
-            r#"<t:p><t:reference-mark t:name="x"/><t:reference-mark-start t:name="x"/><t:reference-mark-end t:name="x"/></t:p>"#,
-            r#"<t:p><t:reference-mark t:name="x">bad</t:reference-mark></t:p>"#,
-            r#"<!DOCTYPE x><t:p/>"#,
-        ] {
-            let xml = format!(
-                r#"<o:text xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="{TEXT}" xmlns:u="urn:hostile">{body}</o:text>"#
-            );
-            assert!(
-                insert_reference_mark_xml(&xml, 0, &ReferenceMark::point("new")).is_err(),
-                "accepted {body}"
-            );
-        }
-        assert!(
-            ReferenceMark::point("x".repeat(65_537))
-                .to_xml_fragments()
-                .is_err()
-        );
-        assert!(
-            ReferenceMark::point("bad\0name")
-                .to_xml_fragments()
-                .is_err()
-        );
-    }
-
-    #[test]
-    fn producer_shaped_point_field_and_overlapping_ranges_round_trip() {
-        // LibreOffice/Zotero emits long metadata-bearing names and adjacent range markers.
-        let name = r#"ZOTERO_ITEM CSL_CITATION {&quot;citationID&quot;:&quot;abc&quot;} RNDxyz"#;
-        let xml = wrapped(&format!(
-            r#"<t:p><t:reference-mark-start t:name="{name}"/>(<t:span t:style-name="T1">Author</t:span>, 2026)<t:reference-mark-start t:name="second"/> tail<t:reference-mark-end t:name="{name}"/><t:reference-mark-end t:name="second"/></t:p><t:p><t:reference-mark t:name="anchor"/><t:reference-ref t:reference-format="page" t:ref-name="anchor">1</t:reference-ref></t:p>"#
-        ));
-        let marks = parse_reference_marks(&xml).unwrap();
-        assert_eq!(marks.len(), 3);
-        assert_eq!(marks[0].text(), "(Author, 2026) tail");
-        assert_eq!(marks[1].text(), " tail");
-        let replaced =
-            replace_reference_mark_xml(&xml, 2, &ReferenceMark::point("odfpy-anchor")).unwrap();
-        assert!(replaced.contains(
-            r#"<t:reference-ref t:reference-format="page" t:ref-name="anchor">1</t:reference-ref>"#
-        ));
-        assert_eq!(parse_reference_marks(&replaced).unwrap().len(), 3);
-    }
 }
