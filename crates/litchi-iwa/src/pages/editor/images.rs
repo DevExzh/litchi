@@ -3,9 +3,9 @@
 use std::collections::HashMap;
 
 use litchi_iwa_common::media::Type as MediaType;
+use litchi_iwa_common::shape::image::ImageAdjustments;
 
 use super::*;
-use crate::ImageAdjustments;
 use crate::comments::DrawableObjectId;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
@@ -774,7 +774,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
+    use litchi_iwa_common::shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 
     const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 96.0, y: 144.0 };
     const IMAGE_SIZE: DrawableSize = DrawableSize {

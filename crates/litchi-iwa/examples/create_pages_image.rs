@@ -3,7 +3,7 @@ use std::fs;
 use litchi_iwa::comments::DrawableObjectId;
 use litchi_iwa::pages::{PagesEditor, PagesImageOptions};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
-use litchi_iwa::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
+use litchi_iwa_common::shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 
 const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 96.0, y: 144.0 };
 const IMAGE_SIZE: DrawableSize = DrawableSize {
