@@ -15,6 +15,7 @@
 
 use super::structure::validate_cell_range_addresses;
 use litchi_core::{Error, Result, xml::escape_xml};
+use litchi_odf_common::datatype::lexical;
 
 /// Namespace URI of the LibreOffice `loext` extension used by theme colors.
 pub(crate) const LOEXT_NAMESPACE_URI: &str =
@@ -518,16 +519,16 @@ pub(crate) fn validate_sparkline_group(group: &Group) -> Result<()> {
 /// Validate only the element attributes of a group, not its sparklines.
 pub(crate) fn validate_sparkline_group_attributes(group: &Group) -> Result<()> {
     if let Some(id) = &group.id {
-        validate_attribute_length("calcext:id", id)?;
+        lexical::validate_byte_limit("calcext:id", id, MAX_SPARKLINE_ATTRIBUTE_BYTES)?;
     }
     if let Some(line_width) = &group.line_width {
         validate_measure("calcext:line-width", line_width)?;
     }
     if let Some(min) = &group.manual_min {
-        validate_lexical_number("calcext:manual-min", min)?;
+        lexical::validate_finite_number("calcext:manual-min", min)?;
     }
     if let Some(max) = &group.manual_max {
-        validate_lexical_number("calcext:manual-max", max)?;
+        lexical::validate_finite_number("calcext:manual-max", max)?;
     }
     let colors = &group.colors;
     for (name, color) in [
@@ -541,7 +542,7 @@ pub(crate) fn validate_sparkline_group_attributes(group: &Group) -> Result<()> {
         ("calcext:color-low", &colors.low),
     ] {
         if let Some(color) = color {
-            validate_color(name, color)?;
+            lexical::validate_rgb_color(name, color)?;
         }
     }
     let complex_colors = &group.complex_colors;
@@ -580,7 +581,11 @@ pub(crate) fn validate_sparkline(sparkline: &Item) -> Result<()> {
             sparkline.cell_address
         )));
     }
-    validate_attribute_length("calcext:cell-address", &sparkline.cell_address)?;
+    lexical::validate_byte_limit(
+        "calcext:cell-address",
+        &sparkline.cell_address,
+        MAX_SPARKLINE_ATTRIBUTE_BYTES,
+    )?;
     if sparkline.data_ranges.is_empty() {
         return Err(Error::InvalidFormat(
             "calcext:sparkline requires at least one calcext:data-range".to_string(),
@@ -588,7 +593,7 @@ pub(crate) fn validate_sparkline(sparkline: &Item) -> Result<()> {
     }
     validate_cell_range_addresses(&sparkline.data_ranges)?;
     for range in &sparkline.data_ranges {
-        validate_attribute_length("calcext:data-range", range)?;
+        lexical::validate_byte_limit("calcext:data-range", range, MAX_SPARKLINE_ATTRIBUTE_BYTES)?;
     }
     Ok(())
 }
@@ -606,48 +611,15 @@ pub(crate) fn validate_sparkline_groups(groups: &[Group]) -> Result<()> {
 }
 
 fn validate_measure(name: &str, value: &str) -> Result<()> {
-    validate_attribute_length(name, value)?;
+    lexical::validate_byte_limit(name, value, MAX_SPARKLINE_ATTRIBUTE_BYTES)?;
     let unit_start = value
         .find(|character: char| character.is_ascii_alphabetic())
         .unwrap_or(value.len());
     let (number, unit) = value.split_at(unit_start);
-    validate_lexical_number(name, number)?;
+    lexical::validate_finite_number(name, number)?;
     if !unit.bytes().all(|byte| byte.is_ascii_alphabetic()) {
         return Err(Error::InvalidFormat(format!(
             "{name} has an invalid unit in '{value}'"
-        )));
-    }
-    Ok(())
-}
-
-fn validate_lexical_number(name: &str, value: &str) -> Result<()> {
-    let parsed: f64 = value.parse().map_err(|_| {
-        Error::InvalidFormat(format!("{name} requires a numeric value, found '{value}'"))
-    })?;
-    if !parsed.is_finite() {
-        return Err(Error::InvalidFormat(format!(
-            "{name} requires a finite numeric value, found '{value}'"
-        )));
-    }
-    Ok(())
-}
-
-fn validate_color(name: &str, color: &str) -> Result<()> {
-    if color.len() != 7
-        || !color.starts_with('#')
-        || !color[1..].bytes().all(|byte| byte.is_ascii_hexdigit())
-    {
-        return Err(Error::InvalidFormat(format!(
-            "invalid {name} color '{color}'"
-        )));
-    }
-    Ok(())
-}
-
-fn validate_attribute_length(name: &str, value: &str) -> Result<()> {
-    if value.len() > MAX_SPARKLINE_ATTRIBUTE_BYTES {
-        return Err(Error::InvalidFormat(format!(
-            "{name} exceeds the {MAX_SPARKLINE_ATTRIBUTE_BYTES} byte safety limit"
         )));
     }
     Ok(())

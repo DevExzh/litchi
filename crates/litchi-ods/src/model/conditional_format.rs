@@ -14,6 +14,7 @@
 
 use super::structure::validate_cell_range_addresses;
 use litchi_core::{Error, Result, xml::escape_xml};
+use litchi_odf_common::datatype::lexical;
 
 /// Namespace URI of the LibreOffice `calcext` extension.
 pub(crate) const CALCEXT_NAMESPACE_URI: &str =
@@ -645,7 +646,11 @@ pub(crate) fn validate_conditional_format(format: &Format) -> Result<()> {
     }
     validate_cell_range_addresses(&format.target_range_addresses)?;
     for range in &format.target_range_addresses {
-        validate_attribute_length("calcext:target-range-address", range)?;
+        lexical::validate_byte_limit(
+            "calcext:target-range-address",
+            range,
+            MAX_CONDITIONAL_ATTRIBUTE_BYTES,
+        )?;
     }
     if format.rules.is_empty() {
         return Err(Error::InvalidFormat(
@@ -691,20 +696,32 @@ pub(crate) fn validate_condition(condition: &Condition) -> Result<()> {
             "calcext:condition requires a non-empty calcext:value".to_string(),
         ));
     }
-    validate_attribute_length("calcext:value", &condition.condition)?;
+    lexical::validate_byte_limit(
+        "calcext:value",
+        &condition.condition,
+        MAX_CONDITIONAL_ATTRIBUTE_BYTES,
+    )?;
     if condition.apply_style_name.is_empty() {
         return Err(Error::InvalidFormat(
             "calcext:condition requires a non-empty calcext:apply-style-name".to_string(),
         ));
     }
-    validate_attribute_length("calcext:apply-style-name", &condition.apply_style_name)?;
+    lexical::validate_byte_limit(
+        "calcext:apply-style-name",
+        &condition.apply_style_name,
+        MAX_CONDITIONAL_ATTRIBUTE_BYTES,
+    )?;
     if let Some(address) = &condition.base_cell_address {
         if address.trim() != address || address.is_empty() {
             return Err(Error::InvalidFormat(format!(
                 "invalid calcext:base-cell-address '{address}'"
             )));
         }
-        validate_attribute_length("calcext:base-cell-address", address)?;
+        lexical::validate_byte_limit(
+            "calcext:base-cell-address",
+            address,
+            MAX_CONDITIONAL_ATTRIBUTE_BYTES,
+        )?;
     }
     Ok(())
 }
@@ -724,7 +741,7 @@ pub(crate) fn validate_color_scale(color_scale: &ColorScale) -> Result<()> {
 
 pub(crate) fn validate_color_scale_entry(entry: &ColorScaleEntry) -> Result<()> {
     validate_entry_value(entry.entry_type, &entry.value)?;
-    validate_color("calcext:color", &entry.color)
+    lexical::validate_rgb_color("calcext:color", &entry.color)
 }
 
 pub(crate) fn validate_data_bar(data_bar: &DataBar) -> Result<()> {
@@ -742,19 +759,19 @@ pub(crate) fn validate_data_bar(data_bar: &DataBar) -> Result<()> {
 /// Validate only the element attributes of a data bar, not its entries.
 pub(crate) fn validate_data_bar_attributes(data_bar: &DataBar) -> Result<()> {
     if let Some(color) = &data_bar.positive_color {
-        validate_color("calcext:positive-color", color)?;
+        lexical::validate_rgb_color("calcext:positive-color", color)?;
     }
     if let Some(color) = &data_bar.negative_color {
-        validate_color("calcext:negative-color", color)?;
+        lexical::validate_rgb_color("calcext:negative-color", color)?;
     }
     if let Some(color) = &data_bar.axis_color {
-        validate_color("calcext:axis-color", color)?;
+        lexical::validate_rgb_color("calcext:axis-color", color)?;
     }
     if let Some(length) = &data_bar.min_length {
-        validate_lexical_number("calcext:min-length", length)?;
+        lexical::validate_finite_number("calcext:min-length", length)?;
     }
     if let Some(length) = &data_bar.max_length {
-        validate_lexical_number("calcext:max-length", length)?;
+        lexical::validate_finite_number("calcext:max-length", length)?;
     }
     Ok(())
 }
@@ -791,7 +808,11 @@ pub(crate) fn validate_date_is(date_is: &DateIs) -> Result<()> {
             "calcext:date-is requires a non-empty calcext:style".to_string(),
         ));
     }
-    validate_attribute_length("calcext:style", &date_is.style)?;
+    lexical::validate_byte_limit(
+        "calcext:style",
+        &date_is.style,
+        MAX_CONDITIONAL_ATTRIBUTE_BYTES,
+    )?;
     Ok(())
 }
 
@@ -810,42 +831,9 @@ fn validate_entry_value(entry_type: EntryType, value: &str) -> Result<()> {
             "calcext formatting entries require a non-empty calcext:value".to_string(),
         ));
     }
-    validate_attribute_length("calcext:value", value)?;
+    lexical::validate_byte_limit("calcext:value", value, MAX_CONDITIONAL_ATTRIBUTE_BYTES)?;
     if !entry_type.holds_formula() {
-        validate_lexical_number("calcext:value", value)?;
-    }
-    Ok(())
-}
-
-fn validate_lexical_number(name: &str, value: &str) -> Result<()> {
-    let parsed: f64 = value.parse().map_err(|_| {
-        Error::InvalidFormat(format!("{name} requires a numeric value, found '{value}'"))
-    })?;
-    if !parsed.is_finite() {
-        return Err(Error::InvalidFormat(format!(
-            "{name} requires a finite numeric value, found '{value}'"
-        )));
-    }
-    Ok(())
-}
-
-fn validate_color(name: &str, color: &str) -> Result<()> {
-    if color.len() != 7
-        || !color.starts_with('#')
-        || !color[1..].bytes().all(|byte| byte.is_ascii_hexdigit())
-    {
-        return Err(Error::InvalidFormat(format!(
-            "invalid {name} color '{color}'"
-        )));
-    }
-    Ok(())
-}
-
-fn validate_attribute_length(name: &str, value: &str) -> Result<()> {
-    if value.len() > MAX_CONDITIONAL_ATTRIBUTE_BYTES {
-        return Err(Error::InvalidFormat(format!(
-            "{name} exceeds the {MAX_CONDITIONAL_ATTRIBUTE_BYTES} byte safety limit"
-        )));
+        lexical::validate_finite_number("calcext:value", value)?;
     }
     Ok(())
 }

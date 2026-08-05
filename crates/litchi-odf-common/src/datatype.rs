@@ -14,6 +14,8 @@
 //!
 //! - odfdo: `3rdparty/odfdo/src/odfdo/datatype.py`
 
+pub mod lexical;
+
 use chrono::{
     DateTime as ChronoDateTime, Duration as ChronoDuration, FixedOffset, NaiveDate, NaiveDateTime,
     Utc,
