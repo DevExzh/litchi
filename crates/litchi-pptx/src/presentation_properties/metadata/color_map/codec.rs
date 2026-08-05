@@ -452,10 +452,8 @@ mod tests {
         .unwrap();
         assert_eq!(layout, Some(Override::Override(master)));
 
-        let palette = Palette::new("Office").with(
-            ThemeSlot::Light1,
-            ThemeColor::Rgb("FFFFFF".to_owned()),
-        );
+        let palette =
+            Palette::new("Office").with(ThemeSlot::Light1, ThemeColor::Rgb("FFFFFF".to_owned()));
         assert!(matches!(
             master.resolve(&palette, Slot::Background1),
             Some(ThemeColor::Rgb(value)) if value == "FFFFFF"

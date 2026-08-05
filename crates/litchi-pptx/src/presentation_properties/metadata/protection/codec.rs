@@ -1,9 +1,9 @@
 //! Bounded protection XML codec.
 
-use base64::Engine;
-use base64::engine::general_purpose::STANDARD as BASE64_ENGINE;
 use super::model::{Algorithm, Settings, Verifier};
 use crate::{Error, Result};
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD as BASE64_ENGINE;
 use quick_xml::events::Event;
 use quick_xml::{Reader, XmlVersion};
 use rand::TryRng;
