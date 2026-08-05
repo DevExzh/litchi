@@ -1,5 +1,5 @@
-use super::{AxisType, ItemType, SortType};
 use super::PivotValueFunction;
+use super::{AxisType, ItemType, SortType};
 
 #[derive(Debug, Clone)]
 pub struct FieldItem {

@@ -25,17 +25,16 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use crate::error::{Error, Result};
-use crate::raw::namespace::relationship_attribute_value;
-use crate::raw::parse_catalog;
 use super::shape_geometry::CustomGeometry;
 use super::shape_geometry::parse::{CustomGeometryBuilder, GeometryElement};
+use crate::error::{Error, Result};
 use crate::raw::Sheet;
+use crate::raw::namespace::relationship_attribute_value;
+use crate::raw::parse_catalog;
 use litchi_drawingml::geom::Preset;
 use litchi_drawingml::text::parse_bool;
 pub use litchi_drawingml::text::{
-    Anchor as VerticalAnchor, Autofit as Autofit, Columns, Coordinate32,
-    Direction as Direction, TextSize, Underline as Underline, Wrap as Wrap,
+    Anchor as VerticalAnchor, Autofit, Columns, Coordinate32, Direction, TextSize, Underline, Wrap,
 };
 
 /// How a legacy OLE object is rendered inside its graphic frame.

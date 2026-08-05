@@ -713,9 +713,7 @@ pub fn write_pivot_cache_records(records: &Records) -> SheetResult<String> {
                 Item::Missing => xml.push_str("<m/>"),
                 Item::Index(index) => write!(xml, r#"<x v="{}"/>"#, index)?,
                 Item::Number(n) => write!(xml, r#"<n v="{}"/>"#, n)?,
-                Item::Boolean(b) => {
-                    write!(xml, r#"<b v="{}"/>"#, if *b { "1" } else { "0" })?
-                },
+                Item::Boolean(b) => write!(xml, r#"<b v="{}"/>"#, if *b { "1" } else { "0" })?,
                 Item::Error(e) => write!(xml, r#"<e v="{}"/>"#, escape_xml(e))?,
                 Item::String(s) => write!(xml, r#"<s v="{}"/>"#, escape_xml(s))?,
                 Item::DateTime(d) => write!(xml, r#"<d v="{}"/>"#, escape_xml(d))?,
@@ -771,10 +769,7 @@ mod tests {
             hierarchy: Some(2),
             mapping_count: Some(1),
             member_property_field: Some(true),
-            shared_items: vec![
-                Item::String("North & West".to_string()),
-                Item::Number(2.5),
-            ],
+            shared_items: vec![Item::String("North & West".to_string()), Item::Number(2.5)],
         });
 
         let xml = write_pivot_cache_definition(&definition).unwrap();

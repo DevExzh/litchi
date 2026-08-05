@@ -1,6 +1,6 @@
 //! Typed support for the MS-XLSX Slicers part.
 
-use crate::error::{OoxmlError, Result};
+use crate::error::{Error, Result};
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use quick_xml::XmlVersion;
@@ -384,7 +384,8 @@ pub fn store_slicer_part(
     validate_package_graph(package)?;
     validate_relationship_id(&value.relationship_id)?;
     let xml = write_slicers(&value.slicers)?;
-    let part_name = PackURI::new(&value.part_name).map_err(OoxmlError::InvalidUri)?;
+    let part_name = PackURI::new(&value.part_name)
+        .map_err(|error| invalid(format!("invalid Slicers part URI: {error}")))?;
     let worksheet = package.get_part(worksheet_name)?;
     require_worksheet(worksheet)?;
     let count = worksheet
@@ -450,10 +451,10 @@ pub(crate) fn validate_package_graph(package: &OpcPackage) -> Result<()> {
             let target = relationship.target_partname()?;
             let part = package.get_part(&target)?;
             if part.content_type() != SLICERS_CONTENT_TYPE {
-                return Err(OoxmlError::InvalidContentType {
-                    expected: SLICERS_CONTENT_TYPE.into(),
-                    got: part.content_type().into(),
-                });
+                return Err(invalid(format!(
+                    "Slicers part '{target}' has content type '{}', expected '{SLICERS_CONTENT_TYPE}'",
+                    part.content_type()
+                )));
             }
             if !part.rels().is_empty() {
                 return Err(invalid(format!(
@@ -858,13 +859,13 @@ fn escape(output: &mut Vec<u8>, value: &str) {
     }
 }
 
-fn xml_error(error: impl std::fmt::Display) -> OoxmlError {
-    OoxmlError::Xml(error.to_string())
+fn xml_error(error: impl std::fmt::Display) -> Error {
+    Error::Xml(litchi_ooxml_common::XmlError::Malformed(error.to_string()))
 }
-fn invalid(message: impl Into<String>) -> OoxmlError {
-    OoxmlError::InvalidFormat(message.into())
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
 }
-fn limit(name: &str) -> OoxmlError {
+fn limit(name: &str) -> Error {
     invalid(format!("Slicers {name} limit exceeded"))
 }
 

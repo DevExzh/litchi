@@ -17,7 +17,7 @@ struct Attribute {
     value: String,
 }
 #[derive(Clone)]
-struct Node {
+pub(super) struct Node {
     namespace: String,
     name: String,
     attributes: Vec<Attribute>,

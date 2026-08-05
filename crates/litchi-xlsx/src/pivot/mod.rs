@@ -17,9 +17,7 @@ pub use reader::{
     read_pivot_cache_definition, read_pivot_cache_records, read_pivot_table_definition,
     read_pivot_tables,
 };
-pub use writer::{
-    write_pivot_cache_definition, write_pivot_cache_records, write_pivot_table,
-};
+pub use writer::{write_pivot_cache_definition, write_pivot_cache_records, write_pivot_table};
 
 /// The worksheet area occupied by a pivot field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

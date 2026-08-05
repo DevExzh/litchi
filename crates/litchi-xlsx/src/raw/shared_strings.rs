@@ -8,8 +8,9 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
-use crate::error::{Error, Result};
+use crate::error::{Error, Result, allocation};
 use crate::raw::namespace::is_spreadsheetml_name;
+use litchi_core::xml::escape_xml;
 use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 
 const MAX_PREALLOCATED_STRINGS: usize = 4096;
@@ -19,6 +20,13 @@ const MAX_PREALLOCATED_STRINGS: usize = 4096;
 pub struct Table {
     strings: Vec<String>,
     rich_text: HashMap<usize, Vec<Run>>,
+    /// Lazily-built lookup for plain shared strings.
+    ///
+    /// Parsed tables stay compact until an authoring operation needs fast
+    /// interning. Rich-text entries are deliberately excluded: a plain and a
+    /// rich item with the same visible text are not interchangeable because
+    /// the latter carries formatting for every cell that references it.
+    index: Option<HashMap<String, usize>>,
 }
 
 /// One rich-text run stored inside a shared-string item.
@@ -204,6 +212,7 @@ impl SharedStringParser {
         Ok(Table {
             strings: parser.strings,
             rich_text: parser.rich_text,
+            index: None,
         })
     }
 
@@ -529,6 +538,180 @@ impl Table {
     pub fn rich_text_runs(&self, index: usize) -> Option<&[Run]> {
         self.rich_text.get(&index).map(Vec::as_slice)
     }
+
+    /// Intern one plain shared string and return its zero-based item index.
+    ///
+    /// The lookup is created lazily, so read-only parsed workbooks do not pay
+    /// for a second copy of every string. Rich-text items are never reused by
+    /// this operation because their formatting is part of their semantics.
+    pub fn intern(&mut self, value: impl Into<String>) -> Result<usize> {
+        self.ensure_index()?;
+        let value = value.into();
+        if let Some(index) = self.index.as_ref().and_then(|index| index.get(&value)) {
+            return Ok(*index);
+        }
+
+        let index = self.strings.len();
+        self.strings
+            .try_reserve(1)
+            .map_err(|source| allocation("shared-string table", source))?;
+        self.index
+            .as_mut()
+            .expect("shared-string index initialized")
+            .try_reserve(1)
+            .map_err(|source| allocation("shared-string index", source))?;
+        self.strings.push(value.clone());
+        self.index
+            .as_mut()
+            .expect("shared-string index initialized")
+            .insert(value, index);
+        Ok(index)
+    }
+
+    /// Intern one rich shared string and return its zero-based item index.
+    ///
+    /// Rich items are deduplicated by their complete run sequence, including
+    /// run properties, rather than only by their concatenated visible text.
+    pub fn intern_rich(&mut self, runs: Vec<Run>) -> Result<usize> {
+        if runs.is_empty() {
+            return self.intern(String::new());
+        }
+
+        let text_length = runs.iter().try_fold(0usize, |length, run| {
+            length
+                .checked_add(run.text.len())
+                .ok_or_else(|| invalid("shared-string rich text length overflow"))
+        })?;
+        let mut text = String::new();
+        text.try_reserve(text_length)
+            .map_err(|source| allocation("shared-string rich text", source))?;
+        for run in &runs {
+            text.push_str(&run.text);
+        }
+
+        if let Some((index, _)) = self
+            .rich_text
+            .iter()
+            .find(|(_, existing)| existing.as_slice() == runs.as_slice())
+        {
+            return Ok(*index);
+        }
+
+        let index = self.strings.len();
+        self.strings
+            .try_reserve(1)
+            .map_err(|source| allocation("shared-string table", source))?;
+        self.rich_text
+            .try_reserve(1)
+            .map_err(|source| allocation("shared-string rich text", source))?;
+        self.strings.push(text);
+        self.rich_text.insert(index, runs);
+        Ok(index)
+    }
+
+    /// Serialize the table as a Transitional SpreadsheetML shared-string
+    /// part.
+    pub fn write_xml(&self) -> Result<Vec<u8>> {
+        use std::fmt::Write as _;
+
+        let mut xml = String::with_capacity(256 + self.strings.len() * 32);
+        xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
+        write!(
+            xml,
+            r#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="{}" uniqueCount="{}">"#,
+            self.strings.len(),
+            self.strings.len()
+        )
+        .map_err(|_| invalid("shared-string XML formatting failed"))?;
+
+        for (index, value) in self.strings.iter().enumerate() {
+            if let Some(runs) = self.rich_text.get(&index) {
+                xml.push_str("<si>");
+                for run in runs {
+                    xml.push_str("<r>");
+                    if run.font_name.is_some()
+                        || run.font_size.is_some()
+                        || run.bold
+                        || run.italic
+                        || run.underline
+                        || run.color.is_some()
+                    {
+                        xml.push_str("<rPr>");
+                        if let Some(font_name) = &run.font_name {
+                            write!(xml, r#"<rFont val="{}"/>"#, escape_xml(font_name))
+                                .map_err(|_| invalid("shared-string XML formatting failed"))?;
+                        }
+                        if let Some(font_size) = run.font_size {
+                            if !font_size.is_finite() || font_size <= 0.0 {
+                                return Err(invalid(
+                                    "rich-text font size must be finite and positive",
+                                ));
+                            }
+                            write!(xml, r#"<sz val="{}"/>"#, font_size)
+                                .map_err(|_| invalid("shared-string XML formatting failed"))?;
+                        }
+                        if run.bold {
+                            xml.push_str("<b/>");
+                        }
+                        if run.italic {
+                            xml.push_str("<i/>");
+                        }
+                        if run.underline {
+                            xml.push_str("<u/>");
+                        }
+                        if let Some(color) = &run.color {
+                            write!(xml, r#"<color rgb="{}"/>"#, escape_xml(color))
+                                .map_err(|_| invalid("shared-string XML formatting failed"))?;
+                        }
+                        xml.push_str("</rPr>");
+                    }
+                    append_text(&mut xml, &run.text)?;
+                    xml.push_str("</r>");
+                }
+                xml.push_str("</si>");
+            } else {
+                xml.push_str("<si>");
+                append_text(&mut xml, value)?;
+                xml.push_str("</si>");
+            }
+        }
+        xml.push_str("</sst>");
+        Ok(xml.into_bytes())
+    }
+
+    fn ensure_index(&mut self) -> Result<()> {
+        if self.index.is_some() {
+            return Ok(());
+        }
+        let mut index = HashMap::new();
+        index
+            .try_reserve(self.strings.len())
+            .map_err(|source| allocation("shared-string index", source))?;
+        for (position, value) in self.strings.iter().enumerate() {
+            if !self.rich_text.contains_key(&position) {
+                index.entry(value.clone()).or_insert(position);
+            }
+        }
+        self.index = Some(index);
+        Ok(())
+    }
+}
+
+fn append_text(xml: &mut String, value: &str) -> Result<()> {
+    use std::fmt::Write as _;
+
+    let encoded = crate::raw::strings::encode_spreadsheet_text(value);
+    let preserve_space = value.chars().next().is_some_and(char::is_whitespace)
+        || value.chars().last().is_some_and(char::is_whitespace);
+    if preserve_space {
+        xml.push_str(r#"<t xml:space="preserve">"#);
+    } else {
+        xml.push_str("<t>");
+    }
+    write!(xml, "{}", escape_xml(&encoded))
+        .map_err(|_| invalid("shared-string XML formatting failed"))?;
+    xml.push_str("</t>");
+    Ok(())
 }
 
 fn current_context(stack: &[StringContext]) -> Result<StringContext> {
@@ -748,5 +931,35 @@ mod tests {
         let xml = format!(r#"<sst xmlns="{S}" uniqueCount="4294967295"><si><t>one</t></si></sst>"#);
         let parsed = Table::parse(&xml).unwrap();
         assert_eq!(parsed.strings(), ["one"]);
+    }
+
+    #[test]
+    fn authors_plain_and_rich_items_without_cross_format_deduplication() {
+        let mut table = Table::new();
+        assert_eq!(table.intern(" literal _x0041_\u{1} ").unwrap(), 0);
+        assert_eq!(table.intern(" literal _x0041_\u{1} ").unwrap(), 0);
+        let rich = vec![Run {
+            text: "literal _x0041_".into(),
+            font_name: Some("A&B".into()),
+            font_size: Some(11.0),
+            bold: true,
+            italic: false,
+            underline: false,
+            color: Some("FF112233".into()),
+        }];
+        assert_eq!(table.intern_rich(rich.clone()).unwrap(), 1);
+        assert_eq!(table.intern_rich(rich).unwrap(), 1);
+        assert_eq!(table.intern("literal _x0041_").unwrap(), 2);
+
+        let xml = String::from_utf8(table.write_xml().unwrap()).unwrap();
+        let parsed = Table::parse(&xml).unwrap();
+        assert_eq!(parsed.get(0), Some(" literal _x0041_\u{1} "));
+        assert_eq!(parsed.get(1), Some("literal _x0041_"));
+        assert_eq!(
+            parsed.rich_text_runs(1).unwrap()[0].font_name.as_deref(),
+            Some("A&B")
+        );
+        assert_eq!(parsed.get(2), Some("literal _x0041_"));
+        assert!(xml.contains("xml:space=\"preserve\""));
     }
 }

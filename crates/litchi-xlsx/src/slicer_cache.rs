@@ -18,6 +18,20 @@ use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::collections::{HashSet, TryReserveError};
 
+#[path = "slicer_cache/crud.rs"]
+pub mod crud;
+#[path = "slicer_cache/package.rs"]
+pub mod package;
+#[path = "slicer_cache/views.rs"]
+pub mod views;
+
+pub use crud::*;
+pub use package::{load_slicer_caches, store_slicer_cache};
+pub use views::{
+    Slicer, SlicerExtensionList, SlicerPart, Slicers, load_slicer_parts, parse_slicers,
+    store_slicer_part, write_slicers,
+};
+
 pub const SLICER_CACHE_CONTENT_TYPE: &str = "application/vnd.ms-excel.slicerCache+xml";
 pub const SLICER_CACHE_RELATIONSHIP_TYPE: &str =
     "http://schemas.microsoft.com/office/2007/relationships/slicerCache";

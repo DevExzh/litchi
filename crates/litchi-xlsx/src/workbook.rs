@@ -1,5 +1,7 @@
 //! Immutable workbook snapshots and selector-first sheet lookup.
 
+pub mod comments;
+pub mod data_model;
 pub mod edit;
 pub mod worksheet;
 

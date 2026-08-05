@@ -17,16 +17,16 @@
 
 #![allow(dead_code)]
 
-use crate::error::{Error, Result};
 use super::drawing::parse_drawing_xml;
-use crate::raw::parse_catalog;
+use crate::error::{Error, Result};
+use crate::pivot::PivotTable;
 use crate::pivot::read_pivot_tables;
+use crate::raw::parse_catalog;
 use litchi_ooxml_common::xml::{
     decode_xml_reference, is_drawingml_chart_name, unqualified_attribute_value,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI, Part};
-use crate::pivot::PivotTable;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -1760,7 +1760,7 @@ mod tests {
 
     #[test]
     fn authored_pivot_chart_round_trips_through_save() {
-        use crate::chart_sheet::{Chart, Anchor, Workbook};
+        use crate::chart_sheet::{Anchor, Chart, Workbook};
 
         let mut workbook = workbook_with_pivot_table();
         {
@@ -1821,7 +1821,7 @@ mod tests {
 
     #[test]
     fn authored_pivot_chart_with_unknown_table_fails_save() {
-        use crate::chart_sheet::{Chart, Anchor};
+        use crate::chart_sheet::{Anchor, Chart};
 
         let mut workbook = workbook_with_pivot_table();
         {
@@ -1855,7 +1855,7 @@ mod tests {
 
     #[test]
     fn authored_pivot_chartsheet_round_trips_through_save() {
-        use crate::chart_sheet::{Chart, Anchor, Workbook};
+        use crate::chart_sheet::{Anchor, Chart, Workbook};
 
         let mut workbook = workbook_with_pivot_table();
         let chart = Chart::bar_chart(

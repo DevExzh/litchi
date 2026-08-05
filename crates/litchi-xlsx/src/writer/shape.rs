@@ -28,9 +28,8 @@ use litchi_drawingml::geom::Preset;
 use crate::shape_geometry::write::write_custom_geometry;
 use crate::shape_geometry::{CustomGeometry, validate_custom_geometry};
 use crate::shapes::{
-    BodyProperties, CellMarker, Columns, EditAs, EmuExtent, EmuOffset, Geometry, GroupTransform,
-    Paragraph, Run, Anchor, Autofit, Direction, VerticalAnchor,
-    Wrap,
+    Anchor, Autofit, BodyProperties, CellMarker, Columns, Direction, EditAs, EmuExtent, EmuOffset,
+    Geometry, GroupTransform, Paragraph, Run, VerticalAnchor, Wrap,
 };
 
 /// Maximum number of authored top-level drawing objects per worksheet.
@@ -80,12 +79,7 @@ impl ShapeSpec {
     ///
     /// `text` is split into paragraphs on `\n`; each paragraph becomes one
     /// unformatted run. Body properties start at the ECMA-376 defaults.
-    pub fn text_box(
-        name: impl Into<String>,
-        anchor: Anchor,
-        preset: Preset,
-        text: &str,
-    ) -> Self {
+    pub fn text_box(name: impl Into<String>, anchor: Anchor, preset: Preset, text: &str) -> Self {
         Self {
             is_text_box: true,
             ..Self::shape(name, anchor, preset, text)
@@ -841,8 +835,7 @@ fn write_body_properties(xml: &mut String, body: &BodyProperties) {
     if body.anchor_center {
         xml.push_str(r#" anchorCtr="1""#);
     }
-    let direction =
-        (body.direction != Direction::Horizontal).then(|| body.direction.token());
+    let direction = (body.direction != Direction::Horizontal).then(|| body.direction.token());
     if let Some(token) = direction {
         let _ = write!(xml, r#" vert="{token}""#);
     }
@@ -889,11 +882,11 @@ fn write_run_properties(xml: &mut String, run: &Run) {
 
 #[cfg(any())]
 mod tests {
-    use super::*;
     use super::shapes::{
-        CellMarker, Coordinate32, Object, Emu, Run, TextInsets, TextSize, Underline,
+        CellMarker, Coordinate32, Emu, Object, Run, TextInsets, TextSize, Underline,
         parse_drawing_shapes,
     };
+    use super::*;
     use crate::writer::sheet::MutableWorksheet;
     use litchi_drawingml::coord::Unit;
 
@@ -1210,10 +1203,7 @@ mod tests {
             Anchor::OneCell { .. }
         ));
         let body = fancy.text_body.as_ref().unwrap();
-        assert_eq!(
-            body.body_properties.vertical_anchor,
-            VerticalAnchor::Bottom
-        );
+        assert_eq!(body.body_properties.vertical_anchor, VerticalAnchor::Bottom);
         assert_eq!(body.body_properties.autofit, Autofit::Normal);
         assert_eq!(body.body_properties.wrap, Wrap::None);
         assert_eq!(body.paragraphs[0].runs[0].bold, Some(true));
@@ -1240,9 +1230,9 @@ mod tests {
 
 #[cfg(any())]
 mod group_connection_tests {
-    use super::*;
     use super::shape_geometry::Path;
-    use super::shapes::{CellMarker, Object, Emu, parse_drawing_shapes};
+    use super::shapes::{CellMarker, Emu, Object, parse_drawing_shapes};
+    use super::*;
     use crate::writer::sheet::MutableWorksheet;
 
     fn marker(column: u32, row: u32) -> CellMarker {

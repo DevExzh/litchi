@@ -8,18 +8,17 @@ use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use crate::error::{OoxmlError, Result};
-use crate::xlsx::parsers::workbook_parser;
-use crate::xlsx::pivot::read_pivot_tables;
-use crate::xlsx::slicer_cache::{
-    Cache as SlicerCache, Definition as SlicerDefinition, load_slicer_caches, store_slicer_cache,
-    write_slicer_cache_definition,
-};
-use crate::xlsx::slicers::{
+use super::package::{load_slicer_caches, store_slicer_cache};
+use super::views::{
     SLICERS_CONTENT_TYPE, Slicer, SlicerPart, Slicers, load_slicer_parts, store_slicer_part,
     write_slicers,
 };
-use crate::xlsx::timelines::{
+use super::{
+    Cache as SlicerCache, Definition as SlicerDefinition, write as write_slicer_cache_definition,
+};
+use crate::error::{Error, Result};
+use crate::pivot::read_pivot_tables;
+use crate::timelines::{
     Cache, CacheDefinition, Part as TimelinePart, TIMELINE_CACHE_CONTENT_TYPE,
     TIMELINE_CACHE_EXTENSION_URI, TIMELINE_CACHE_RELATIONSHIP_TYPE, TIMELINES_EXTENSION_URI, View,
     Views, load_timeline_caches, load_timelines, store_timeline_caches, store_worksheet_timelines,
@@ -64,7 +63,7 @@ pub fn add_slicer(
         let staged = part.clone();
         validate_slicer_views(package, Some((&staged.part_name, &staged.slicers)), &caches)?;
         package
-            .get_part_mut(&PackURI::new(&staged.part_name).map_err(OoxmlError::InvalidUri)?)?
+            .get_part_mut(&uri(&staged.part_name)?)?
             .set_blob(xml);
         package.unsign();
         return Ok(staged);
@@ -118,7 +117,7 @@ where
         &caches,
     )?;
     let xml = write_slicers(&parts[index].slicers)?;
-    let part_name = PackURI::new(&parts[index].part_name).map_err(OoxmlError::InvalidUri)?;
+    let part_name = uri(&parts[index].part_name)?;
     package.get_part_mut(&part_name)?.set_blob(xml);
     package.unsign();
     Ok(true)
@@ -161,11 +160,11 @@ pub fn remove_slicer(
     parts[part_index].slicers.slicers.remove(item_index);
     if !parts[part_index].slicers.slicers.is_empty() {
         let xml = write_slicers(&parts[part_index].slicers)?;
-        let uri = PackURI::new(&parts[part_index].part_name).map_err(OoxmlError::InvalidUri)?;
+        let uri = uri(&parts[part_index].part_name)?;
         package.get_part_mut(&uri)?.set_blob(xml);
     } else {
         let removed = parts.remove(part_index);
-        let uri = PackURI::new(&removed.part_name).map_err(OoxmlError::InvalidUri)?;
+        let uri = uri(&removed.part_name)?;
         package
             .get_part_mut(worksheet_name)?
             .rels_mut()
@@ -202,12 +201,7 @@ pub fn reorder_slicers(
     validate_slicer_views(package, None, &caches)?;
     let plans: Vec<(PackURI, Vec<u8>)> = parts
         .iter()
-        .map(|part| {
-            Ok((
-                PackURI::new(&part.part_name).map_err(OoxmlError::InvalidUri)?,
-                write_slicers(&part.slicers)?,
-            ))
-        })
+        .map(|part| Ok((uri(&part.part_name)?, write_slicers(&part.slicers)?)))
         .collect::<Result<_>>()?;
     for (uri, xml) in plans {
         package.get_part_mut(&uri)?.set_blob(xml);
@@ -255,7 +249,7 @@ where
     }
     validate_slicer_cache_set(package, &caches)?;
     let xml = write_slicer_cache_definition(&caches[index].definition)?;
-    let uri = PackURI::new(&caches[index].part_name).map_err(OoxmlError::InvalidUri)?;
+    let uri = uri(&caches[index].part_name)?;
     package.get_part_mut(&uri)?.set_blob(xml);
     package.unsign();
     Ok(true)
@@ -308,7 +302,7 @@ pub fn remove_slicer_cache(package: &mut OpcPackage, name: &str) -> Result<bool>
         .get_part_mut(&workbook_name)?
         .rels_mut()
         .remove(&removed.relationship_id);
-    let uri = PackURI::new(&removed.part_name).map_err(OoxmlError::InvalidUri)?;
+    let uri = uri(&removed.part_name)?;
     if !part_is_referenced(package, &uri) {
         package.remove_part(&uri);
     }
@@ -380,7 +374,7 @@ pub fn add_timeline_cache(package: &mut OpcPackage, definition: CacheDefinition)
         "timelineCacheRef",
         &ids,
     )?;
-    let uri = PackURI::new(&value.part_name).map_err(OoxmlError::InvalidUri)?;
+    let uri = uri(&value.part_name)?;
     let xml = write_timeline_cache_definition(&value.definition)?;
     package.try_add_part(Box::new(BlobPart::new(
         uri.clone(),
@@ -419,7 +413,7 @@ where
     }
     validate_timeline_cache_set(package, &caches)?;
     let xml = write_timeline_cache_definition(&caches[index].definition)?;
-    let uri = PackURI::new(&caches[index].part_name).map_err(OoxmlError::InvalidUri)?;
+    let uri = uri(&caches[index].part_name)?;
     package.get_part_mut(&uri)?.set_blob(xml);
     package.unsign();
     Ok(true)
@@ -475,7 +469,7 @@ pub fn remove_timeline_cache(package: &mut OpcPackage, name: &str) -> Result<boo
         .get_part_mut(&workbook)?
         .rels_mut()
         .remove(&removed.relationship_id);
-    let uri = PackURI::new(&removed.part_name).map_err(OoxmlError::InvalidUri)?;
+    let uri = uri(&removed.part_name)?;
     if !part_is_referenced(package, &uri) {
         package.remove_part(&uri);
     }
@@ -556,7 +550,7 @@ pub fn add_timeline(
         sheets[index].timelines.timelines.push(timeline);
         validate_timeline_views(&sheets, &caches)?;
         let xml = write_timelines(&sheets[index].timelines)?;
-        let uri = PackURI::new(&sheets[index].part_name).map_err(OoxmlError::InvalidUri)?;
+        let uri = uri(&sheets[index].part_name)?;
         package.get_part_mut(&uri)?.set_blob(xml);
         package.unsign();
         return Ok(sheets[index].clone());
@@ -609,7 +603,7 @@ where
     }
     validate_timeline_views(&sheets, &caches)?;
     let xml = write_timelines(&sheets[sheet_index].timelines)?;
-    let uri = PackURI::new(&sheets[sheet_index].part_name).map_err(OoxmlError::InvalidUri)?;
+    let uri = uri(&sheets[sheet_index].part_name)?;
     package.get_part_mut(&uri)?.set_blob(xml);
     package.unsign();
     Ok(true)
@@ -651,7 +645,7 @@ pub fn remove_timeline(package: &mut OpcPackage, worksheet: &PackURI, name: &str
     if !sheets[sheet_index].timelines.timelines.is_empty() {
         validate_timeline_views(&sheets, &caches)?;
         let xml = write_timelines(&sheets[sheet_index].timelines)?;
-        let uri = PackURI::new(&sheets[sheet_index].part_name).map_err(OoxmlError::InvalidUri)?;
+        let uri = uri(&sheets[sheet_index].part_name)?;
         package.get_part_mut(&uri)?.set_blob(xml);
     } else {
         let removed = sheets.remove(sheet_index);
@@ -669,7 +663,7 @@ pub fn remove_timeline(package: &mut OpcPackage, worksheet: &PackURI, name: &str
             .get_part_mut(worksheet)?
             .rels_mut()
             .remove(&removed.relationship_id);
-        let uri = PackURI::new(&removed.part_name).map_err(OoxmlError::InvalidUri)?;
+        let uri = uri(&removed.part_name)?;
         if !part_is_referenced(package, &uri) {
             package.remove_part(&uri);
         }
@@ -704,7 +698,7 @@ pub fn reorder_timelines(
     sheets[sheet_index].timelines.timelines = ordered.clone();
     validate_timeline_views(&sheets, &caches)?;
     let xml = write_timelines(&sheets[sheet_index].timelines)?;
-    let uri = PackURI::new(&sheets[sheet_index].part_name).map_err(OoxmlError::InvalidUri)?;
+    let uri = uri(&sheets[sheet_index].part_name)?;
     package.get_part_mut(&uri)?.set_blob(xml);
     package.unsign();
     Ok(ordered)
@@ -737,10 +731,7 @@ fn validate_slicer_cache_set(package: &OpcPackage, caches: &[SlicerCache]) -> Re
 
 fn validate_slicer_cache_pivot_links(package: &OpcPackage, caches: &[SlicerCache]) -> Result<()> {
     let workbook = package.main_document_part()?;
-    let details = workbook_parser::parse_workbook_details(
-        std::str::from_utf8(workbook.blob()).map_err(|e| invalid(e.to_string()))?,
-    )
-    .map_err(|e| invalid(e.to_string()))?;
+    let details = crate::raw::parse_catalog(workbook.blob())?;
     if details.pivot_caches.is_empty() {
         return Ok(());
     }
@@ -802,10 +793,7 @@ fn validate_timeline_cache_set(package: &OpcPackage, caches: &[Cache]) -> Result
         }
     }
     let workbook = package.main_document_part()?;
-    let details = workbook_parser::parse_workbook_details(
-        std::str::from_utf8(workbook.blob()).map_err(|e| invalid(e.to_string()))?,
-    )
-    .map_err(|e| invalid(e.to_string()))?;
+    let details = crate::raw::parse_catalog(workbook.blob())?;
     if !details.pivot_caches.is_empty() {
         let ids: HashSet<u32> = details
             .pivot_caches
@@ -841,7 +829,7 @@ fn validate_slicer_views(
         let value = if replacement.is_some_and(|(name, _)| name == part.partname().as_str()) {
             replacement.expect("checked").1.clone()
         } else {
-            crate::xlsx::slicers::parse_slicers(part.blob())?
+            super::views::parse_slicers(part.blob())?
         };
         for slicer in value.slicers {
             if !names.insert(slicer.name.to_ascii_lowercase()) {
@@ -921,7 +909,7 @@ fn all_slicers(package: &OpcPackage) -> Result<Vec<Slicer>> {
         .iter_parts()
         .filter(|part| part.content_type() == SLICERS_CONTENT_TYPE)
     {
-        output.extend(crate::xlsx::slicers::parse_slicers(part.blob())?.slicers);
+        output.extend(super::views::parse_slicers(part.blob())?.slicers);
     }
     Ok(output)
 }
@@ -1137,7 +1125,7 @@ fn is_core_namespace(namespace: &ResolveResult<'_>, core: &str) -> bool {
 fn next_part_name(package: &OpcPackage, template: &str) -> Result<PackURI> {
     for suffix in 1..=65_537u32 {
         let candidate = PackURI::new(template.replace("%d", &suffix.to_string()))
-            .map_err(OoxmlError::InvalidUri)?;
+            .map_err(|error| invalid(format!("invalid package part URI: {error}")))?;
         if package.get_part(&candidate).is_err() {
             return Ok(candidate);
         }
@@ -1178,6 +1166,10 @@ fn xml_escape(value: &str) -> String {
         .replace('"', "&quot;")
 }
 
-fn invalid(message: impl Into<String>) -> OoxmlError {
-    OoxmlError::InvalidFormat(message.into())
+fn uri(value: &str) -> Result<PackURI> {
+    PackURI::new(value).map_err(|error| invalid(format!("invalid package part URI: {error}")))
+}
+
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
 }

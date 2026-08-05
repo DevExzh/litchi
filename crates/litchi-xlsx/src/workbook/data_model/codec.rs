@@ -1,127 +1,50 @@
-//! MS-XLSX Spreadsheet Data Model package support.
-//!
-//! The MS-XLDM payload is intentionally opaque. It can contain encrypted
-//! connection credentials and a complex virtual file system, so this module
-//! only inventories and copies bounded bytes. It never decrypts, decompresses,
-//! evaluates expressions, or accesses external resources.
+//! Bounded XML codec for the inline MS-XLDM workbook descriptor.
 
-use super::xldm::inspect_xldm;
-use crate::error::{OoxmlError, Result};
-use litchi_opc::{BlobPart, OpcPackage, PackURI};
+use std::collections::{BTreeMap, HashMap, HashSet};
+
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
-use std::collections::{BTreeMap, HashMap, HashSet};
 
-const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-const STRICT_SML: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
-const X15: &str = "http://schemas.microsoft.com/office/spreadsheetml/2010/11/main";
-const CONNECTIONS_RELATIONSHIP_TYPE: &str =
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections";
-const STRICT_CONNECTIONS_RELATIONSHIP_TYPE: &str =
-    "http://purl.oclc.org/ooxml/officeDocument/relationships/connections";
-const CONNECTIONS_CONTENT_TYPE: &str =
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml";
+use crate::error::Result;
 
-pub const DATA_MODEL_CONTENT_TYPE: &str =
-    "application/vnd.openxmlformats-officedocument.model+data";
-pub const DATA_MODEL_EXTENSION_URI: &str = "{FCE2AD5D-F65C-4FA6-A056-5C36A1767C68}";
-pub const DATA_MODEL_PART_NAME: &str = "/xl/model/item.data";
+use super::model::{Definition, OpaqueXml, Relationship, Table};
+use super::{
+    MAX_DEPTH, MAX_EXTENSION_BYTES, MAX_NODES, MAX_RELATIONSHIPS, MAX_REWRITE_BYTES,
+    MAX_STRING_BYTES, MAX_TABLES, MAX_TOTAL_STRING_BYTES, MAX_XML_BYTES, SML, STRICT_SML, X15,
+    invalid, limit, xml_error,
+};
 
-const MAX_XML_BYTES: usize = 16 * 1024 * 1024;
-const MAX_REWRITE_BYTES: usize = 32 * 1024 * 1024;
-const MAX_EXTENSION_BYTES: usize = 4 * 1024 * 1024;
-const MAX_PAYLOAD_BYTES: usize = 512 * 1024 * 1024;
-const MAX_STRING_BYTES: usize = 1024 * 1024;
-const MAX_TOTAL_STRING_BYTES: usize = 16 * 1024 * 1024;
-const MAX_NODES: usize = 200_000;
-const MAX_DEPTH: usize = 128;
-const MAX_TABLES: usize = 65_536;
-const MAX_RELATIONSHIPS: usize = 65_536;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DataModelOpaqueXml {
-    /// A self-contained `x15:extLst` subtree retained without interpretation.
-    pub xml: Vec<u8>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DataModelTable {
-    pub id: String,
+#[derive(Clone)]
+pub(crate) struct Attribute {
+    pub namespace: String,
     pub name: String,
-    pub connection: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DataModelRelationship {
-    pub from_table: String,
-    pub from_column: String,
-    pub to_table: String,
-    pub to_column: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DataModelDefinition {
-    /// Minimum application version. MS-XLSX defines 5 as the default and floor.
-    pub min_version_load: u8,
-    pub tables: Vec<DataModelTable>,
-    pub relationships: Vec<DataModelRelationship>,
-    pub extension_list: Option<DataModelOpaqueXml>,
-}
-
-impl Default for DataModelDefinition {
-    fn default() -> Self {
-        Self {
-            min_version_load: 5,
-            tables: Vec::new(),
-            relationships: Vec::new(),
-            extension_list: None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DataModelPayload {
-    pub part_name: String,
-    /// Opaque MS-XLDM bytes. No inner-file or credential processing is performed.
-    pub data: Vec<u8>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DataModel {
-    pub definition: DataModelDefinition,
-    pub payload: DataModelPayload,
+    pub value: String,
 }
 
 #[derive(Clone)]
-struct Attribute {
-    namespace: String,
-    name: String,
-    value: String,
-}
-#[derive(Clone)]
-struct Node {
-    namespace: String,
-    name: String,
-    attributes: Vec<Attribute>,
-    children: Vec<Node>,
-    text: String,
+pub(crate) struct Node {
+    pub namespace: String,
+    pub name: String,
+    pub attributes: Vec<Attribute>,
+    pub children: Vec<Node>,
+    pub text: String,
 }
 
 /// Parse an inline `x15:dataModel` descriptor.
-pub fn parse_data_model(xml: &[u8]) -> Result<DataModelDefinition> {
+pub fn parse_data_model(xml: &[u8]) -> Result<Definition> {
     let root = parse_document(xml)?;
     parse_data_model_node(&root)
 }
 
 /// Deterministically serialize an inline `x15:dataModel` descriptor.
-pub fn write_data_model(value: &DataModelDefinition) -> Result<Vec<u8>> {
+pub fn write_data_model(value: &Definition) -> Result<Vec<u8>> {
     validate_definition(value, false)?;
     let mut output = Vec::new();
     output.extend_from_slice(b"<x15:dataModel xmlns:x15=\"");
     escape(&mut output, X15);
-    output.push(b'\"');
+    output.push(b'"');
     if value.min_version_load != 5 {
         attr(
             &mut output,
@@ -167,108 +90,7 @@ pub fn write_data_model(value: &DataModelDefinition) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-/// Load the singleton workbook Data Model and retain its MS-XLDM payload inertly.
-pub fn load_data_model(package: &OpcPackage, workbook_name: &PackURI) -> Result<Option<DataModel>> {
-    let workbook = package.get_part(workbook_name)?;
-    let workbook_root = parse_document(workbook.blob())?;
-    let (_, definition) = workbook_definition(&workbook_root)?;
-    let mut parts = package
-        .iter_parts()
-        .filter(|part| part.content_type() == DATA_MODEL_CONTENT_TYPE);
-    let part = parts.next();
-    if parts.next().is_some() {
-        return Err(invalid("package contains multiple Data Model parts"));
-    }
-    let (definition, part) = match (definition, part) {
-        (Some(definition), Some(part)) => (definition, part),
-        (Some(_), None) => {
-            return Err(invalid(
-                "workbook dataModel extension has no Data Model part",
-            ));
-        },
-        (None, Some(_)) => {
-            return Err(invalid(
-                "Data Model part has no workbook dataModel extension",
-            ));
-        },
-        (None, None) => return Ok(None),
-    };
-    if part.partname().as_str() != DATA_MODEL_PART_NAME {
-        return Err(invalid(format!(
-            "Data Model part '{}' must be '{DATA_MODEL_PART_NAME}'",
-            part.partname()
-        )));
-    }
-    if part.blob().is_empty() {
-        return Err(invalid("Data Model payload cannot be empty"));
-    }
-    if part.blob().len() > MAX_PAYLOAD_BYTES {
-        return Err(limit("payload bytes"));
-    }
-    inspect_xldm(part.blob())?;
-    if !part.rels().is_empty() {
-        return Err(invalid(
-            "Data Model part has forbidden outbound relationships",
-        ));
-    }
-    reject_inbound_relationships(package, part.partname())?;
-    validate_connections(package, workbook_name, &definition)?;
-    Ok(Some(DataModel {
-        definition,
-        payload: DataModelPayload {
-            part_name: part.partname().to_string(),
-            data: part.blob().to_vec(),
-        },
-    }))
-}
-
-/// Store a singleton Data Model after validating the complete mutation plan.
-pub fn store_data_model(
-    package: &mut OpcPackage,
-    workbook_name: &PackURI,
-    value: &DataModel,
-) -> Result<()> {
-    validate_definition(&value.definition, false)?;
-    validate_payload(&value.payload)?;
-    if load_data_model(package, workbook_name)?.is_some() {
-        return Err(invalid("workbook already contains a Data Model"));
-    }
-    if package
-        .iter_parts()
-        .any(|part| part.partname().as_str() == DATA_MODEL_PART_NAME)
-    {
-        return Err(invalid(format!(
-            "part '{DATA_MODEL_PART_NAME}' already exists"
-        )));
-    }
-    validate_connections(package, workbook_name, &value.definition)?;
-    let workbook = package.get_part(workbook_name)?;
-    let root = parse_document(workbook.blob())?;
-    let (core, existing) = workbook_definition(&root)?;
-    if existing.is_some() {
-        return Err(invalid("workbook already has a dataModel extension"));
-    }
-    let descriptor = write_data_model(&value.definition)?;
-    let mut fragment = Vec::new();
-    fragment.extend_from_slice(b"<x:ext xmlns:x=\"");
-    escape(&mut fragment, core);
-    fragment.extend_from_slice(b"\" uri=\"");
-    escape(&mut fragment, DATA_MODEL_EXTENSION_URI);
-    fragment.extend_from_slice(b"\">");
-    fragment.extend_from_slice(&descriptor);
-    fragment.extend_from_slice(b"</x:ext>");
-    let updated = insert_extension(workbook.blob(), core, &fragment)?;
-    let uri = PackURI::new(&value.payload.part_name).map_err(OoxmlError::InvalidUri)?;
-    package.add_part(Box::new(BlobPart::new(
-        uri,
-        DATA_MODEL_CONTENT_TYPE.into(),
-        value.payload.data.clone(),
-    )));
-    package.get_part_mut(workbook_name)?.set_blob(updated);
-    Ok(())
-}
-
-fn parse_data_model_node(root: &Node) -> Result<DataModelDefinition> {
+pub(crate) fn parse_data_model_node(root: &Node) -> Result<Definition> {
     require(root, X15, "dataModel")?;
     no_attributes(root, &[("", "minVersionLoad")])?;
     whitespace(root)?;
@@ -300,12 +122,12 @@ fn parse_data_model_node(root: &Node) -> Result<DataModelDefinition> {
                 if xml.len() > MAX_EXTENSION_BYTES {
                     return Err(limit("extension bytes"));
                 }
-                extension_list = Some(DataModelOpaqueXml { xml });
+                extension_list = Some(OpaqueXml { xml });
             },
             _ => return Err(invalid("unexpected or out-of-order dataModel child")),
         }
     }
-    let value = DataModelDefinition {
+    let value = Definition {
         min_version_load,
         tables,
         relationships,
@@ -315,7 +137,7 @@ fn parse_data_model_node(root: &Node) -> Result<DataModelDefinition> {
     Ok(value)
 }
 
-fn parse_tables(node: &Node) -> Result<Vec<DataModelTable>> {
+fn parse_tables(node: &Node) -> Result<Vec<Table>> {
     no_attributes(node, &[])?;
     whitespace(node)?;
     if node.children.is_empty() {
@@ -330,7 +152,7 @@ fn parse_tables(node: &Node) -> Result<Vec<DataModelTable>> {
             require(child, X15, "modelTable")?;
             no_attributes(child, &[("", "id"), ("", "name"), ("", "connection")])?;
             leaf(child)?;
-            Ok(DataModelTable {
+            Ok(Table {
                 id: required(child, "", "id")?.to_owned(),
                 name: required(child, "", "name")?.to_owned(),
                 connection: required(child, "", "connection")?.to_owned(),
@@ -339,7 +161,7 @@ fn parse_tables(node: &Node) -> Result<Vec<DataModelTable>> {
         .collect()
 }
 
-fn parse_relationships(node: &Node) -> Result<Vec<DataModelRelationship>> {
+fn parse_relationships(node: &Node) -> Result<Vec<Relationship>> {
     no_attributes(node, &[])?;
     whitespace(node)?;
     if node.children.is_empty() {
@@ -364,7 +186,7 @@ fn parse_relationships(node: &Node) -> Result<Vec<DataModelRelationship>> {
                 ],
             )?;
             leaf(child)?;
-            Ok(DataModelRelationship {
+            Ok(Relationship {
                 from_table: required(child, "", "fromTable")?.to_owned(),
                 from_column: required(child, "", "fromColumn")?.to_owned(),
                 to_table: required(child, "", "toTable")?.to_owned(),
@@ -374,7 +196,10 @@ fn parse_relationships(node: &Node) -> Result<Vec<DataModelRelationship>> {
         .collect()
 }
 
-fn validate_definition(value: &DataModelDefinition, extension_already_parsed: bool) -> Result<()> {
+pub(crate) fn validate_definition(
+    value: &Definition,
+    extension_already_parsed: bool,
+) -> Result<()> {
     if value.min_version_load < 5 {
         return Err(invalid("minVersionLoad must be at least 5"));
     }
@@ -453,24 +278,7 @@ fn validate_definition(value: &DataModelDefinition, extension_already_parsed: bo
     Ok(())
 }
 
-fn validate_payload(value: &DataModelPayload) -> Result<()> {
-    if value.part_name != DATA_MODEL_PART_NAME {
-        return Err(invalid(format!(
-            "Data Model part must be '{DATA_MODEL_PART_NAME}'"
-        )));
-    }
-    if value.data.is_empty() {
-        return Err(invalid("Data Model payload cannot be empty"));
-    }
-    if value.data.len() > MAX_PAYLOAD_BYTES {
-        return Err(limit("payload bytes"));
-    }
-    inspect_xldm(&value.data)?;
-    PackURI::new(&value.part_name).map_err(OoxmlError::InvalidUri)?;
-    Ok(())
-}
-
-fn workbook_definition(root: &Node) -> Result<(&str, Option<DataModelDefinition>)> {
+pub(crate) fn workbook_definition(root: &Node) -> Result<(&str, Option<Definition>)> {
     if root.name != "workbook" || !(root.namespace == SML || root.namespace == STRICT_SML) {
         return Err(invalid("expected SpreadsheetML workbook root"));
     }
@@ -488,7 +296,7 @@ fn workbook_definition(root: &Node) -> Result<(&str, Option<DataModelDefinition>
         for extension in &list.children {
             if extension.namespace == core
                 && extension.name == "ext"
-                && optional(extension, "", "uri") == Some(DATA_MODEL_EXTENSION_URI)
+                && optional(extension, "", "uri") == Some(super::DATA_MODEL_EXTENSION_URI)
             {
                 if found.is_some() {
                     return Err(invalid("workbook has multiple dataModel extensions"));
@@ -507,88 +315,7 @@ fn workbook_definition(root: &Node) -> Result<(&str, Option<DataModelDefinition>
     Ok((core, found))
 }
 
-fn validate_connections(
-    package: &OpcPackage,
-    workbook_name: &PackURI,
-    definition: &DataModelDefinition,
-) -> Result<()> {
-    if definition.tables.is_empty() {
-        return Ok(());
-    }
-    let workbook = package.get_part(workbook_name)?;
-    let mut relationships = workbook.rels().iter().filter(|relationship| {
-        matches!(
-            relationship.reltype(),
-            CONNECTIONS_RELATIONSHIP_TYPE | STRICT_CONNECTIONS_RELATIONSHIP_TYPE
-        )
-    });
-    let relationship = relationships
-        .next()
-        .ok_or_else(|| invalid("Data Model tables require a workbook Connections part"))?;
-    if relationships.next().is_some() {
-        return Err(invalid("workbook has multiple Connections relationships"));
-    }
-    if relationship.is_external() {
-        return Err(invalid("Connections relationship cannot be external"));
-    }
-    let target = relationship.target_partname()?;
-    let part = package.get_part(&target)?;
-    if part.content_type() != CONNECTIONS_CONTENT_TYPE {
-        return Err(invalid(format!(
-            "Connections part '{target}' has content type '{}'",
-            part.content_type()
-        )));
-    }
-    if !part.rels().is_empty() {
-        return Err(invalid(
-            "Connections part has forbidden outbound relationships",
-        ));
-    }
-    let connections = super::connections::Connections::parse(part.blob())
-        .map_err(|error| invalid(format!("invalid Connections part: {error}")))?;
-    let names: HashSet<String> = connections
-        .connections
-        .iter()
-        .filter_map(|connection| connection.name.as_ref())
-        .map(|name| name.to_lowercase())
-        .collect();
-    for table in &definition.tables {
-        if !names.contains(&table.connection.to_lowercase()) {
-            return Err(invalid(format!(
-                "Data Model table '{}' references unknown workbook connection '{}'",
-                table.name, table.connection
-            )));
-        }
-    }
-    Ok(())
-}
-
-fn reject_inbound_relationships(package: &OpcPackage, target: &PackURI) -> Result<()> {
-    for relationship in package.rels().iter() {
-        if !relationship.is_external()
-            && relationship.target_partname()?.as_str() == target.as_str()
-        {
-            return Err(invalid(
-                "package relationship targets the relationship-free Data Model part",
-            ));
-        }
-    }
-    for source in package.iter_parts() {
-        for relationship in source.rels().iter() {
-            if !relationship.is_external()
-                && relationship.target_partname()?.as_str() == target.as_str()
-            {
-                return Err(invalid(format!(
-                    "part '{}' has a relationship to the relationship-free Data Model part",
-                    source.partname()
-                )));
-            }
-        }
-    }
-    Ok(())
-}
-
-fn insert_extension(xml: &[u8], core: &str, fragment: &[u8]) -> Result<Vec<u8>> {
+pub(crate) fn insert_extension(xml: &[u8], core: &str, fragment: &[u8]) -> Result<Vec<u8>> {
     let new_size = xml
         .len()
         .checked_add(fragment.len())
@@ -668,7 +395,7 @@ fn insert_extension(xml: &[u8], core: &str, fragment: &[u8]) -> Result<Vec<u8>> 
     Ok(output)
 }
 
-fn parse_document(xml: &[u8]) -> Result<Node> {
+pub(crate) fn parse_document(xml: &[u8]) -> Result<Node> {
     if xml.len() > MAX_XML_BYTES {
         return Err(limit("XML bytes"));
     }
@@ -803,6 +530,7 @@ fn attach(node: Node, stack: &mut [Node], root: &mut Option<Node>) -> Result<()>
     }
     Ok(())
 }
+
 fn serialize_node(node: &Node) -> Result<Vec<u8>> {
     let mut namespaces = BTreeMap::new();
     collect_namespaces(node, &mut namespaces);
@@ -824,6 +552,7 @@ fn serialize_node(node: &Node) -> Result<Vec<u8>> {
     write_node(node, &prefixes, true, &mut output);
     Ok(output)
 }
+
 fn collect_namespaces(node: &Node, output: &mut BTreeMap<String, ()>) {
     if !node.namespace.is_empty() {
         output.insert(node.namespace.clone(), ());
@@ -837,6 +566,7 @@ fn collect_namespaces(node: &Node, output: &mut BTreeMap<String, ()>) {
         collect_namespaces(child, output);
     }
 }
+
 fn write_node(node: &Node, prefixes: &HashMap<String, String>, root: bool, output: &mut Vec<u8>) {
     output.push(b'<');
     qname(output, &node.namespace, &node.name, prefixes);
@@ -848,7 +578,7 @@ fn write_node(node: &Node, prefixes: &HashMap<String, String>, root: bool, outpu
             output.extend_from_slice(prefix.as_bytes());
             output.extend_from_slice(b"=\"");
             escape(output, namespace);
-            output.push(b'\"');
+            output.push(b'"');
         }
     }
     for attribute in &node.attributes {
@@ -856,7 +586,7 @@ fn write_node(node: &Node, prefixes: &HashMap<String, String>, root: bool, outpu
         qname(output, &attribute.namespace, &attribute.name, prefixes);
         output.extend_from_slice(b"=\"");
         escape(output, &attribute.value);
-        output.push(b'\"');
+        output.push(b'"');
     }
     if node.children.is_empty() && node.text.is_empty() {
         output.extend_from_slice(b"/>");
@@ -871,6 +601,7 @@ fn write_node(node: &Node, prefixes: &HashMap<String, String>, root: bool, outpu
     qname(output, &node.namespace, &node.name, prefixes);
     output.push(b'>');
 }
+
 fn qname(output: &mut Vec<u8>, namespace: &str, name: &str, prefixes: &HashMap<String, String>) {
     if !namespace.is_empty() {
         output.extend_from_slice(prefixes[namespace].as_bytes());
@@ -878,6 +609,7 @@ fn qname(output: &mut Vec<u8>, namespace: &str, name: &str, prefixes: &HashMap<S
     }
     output.extend_from_slice(name.as_bytes());
 }
+
 fn require(node: &Node, namespace: &str, name: &str) -> Result<()> {
     if node.namespace == namespace && node.name == name {
         Ok(())
@@ -885,6 +617,7 @@ fn require(node: &Node, namespace: &str, name: &str) -> Result<()> {
         Err(invalid(format!("expected {{{namespace}}}{name}")))
     }
 }
+
 fn no_attributes(node: &Node, allowed: &[(&str, &str)]) -> Result<()> {
     for attribute in &node.attributes {
         if !allowed
@@ -899,16 +632,19 @@ fn no_attributes(node: &Node, allowed: &[(&str, &str)]) -> Result<()> {
     }
     Ok(())
 }
+
 fn required<'a>(node: &'a Node, namespace: &str, name: &str) -> Result<&'a str> {
     optional(node, namespace, name)
         .ok_or_else(|| invalid(format!("missing required {name} attribute")))
 }
+
 fn optional<'a>(node: &'a Node, namespace: &str, name: &str) -> Option<&'a str> {
     node.attributes
         .iter()
         .find(|attribute| attribute.namespace == namespace && attribute.name == name)
         .map(|attribute| attribute.value.as_str())
 }
+
 fn whitespace(node: &Node) -> Result<()> {
     if node.text.trim().is_empty() {
         Ok(())
@@ -916,6 +652,7 @@ fn whitespace(node: &Node) -> Result<()> {
         Err(invalid(format!("unexpected text in {}", node.name)))
     }
 }
+
 fn leaf(node: &Node) -> Result<()> {
     whitespace(node)?;
     if node.children.is_empty() {
@@ -924,6 +661,7 @@ fn leaf(node: &Node) -> Result<()> {
         Err(invalid(format!("{} cannot have children", node.name)))
     }
 }
+
 fn bounded_nonempty(value: &str, label: &str) -> Result<()> {
     if value.is_empty() {
         return Err(invalid(format!("{label} cannot be empty")));
@@ -933,6 +671,7 @@ fn bounded_nonempty(value: &str, label: &str) -> Result<()> {
     }
     Ok(())
 }
+
 fn add_strings(total: &mut usize, size: usize) -> Result<()> {
     *total = total
         .checked_add(size)
@@ -943,6 +682,7 @@ fn add_strings(total: &mut usize, size: usize) -> Result<()> {
         Ok(())
     }
 }
+
 fn resolved(value: ResolveResult<'_>) -> Result<String> {
     match value {
         ResolveResult::Bound(Namespace(value)) => {
@@ -955,13 +695,15 @@ fn resolved(value: ResolveResult<'_>) -> Result<String> {
         ))),
     }
 }
+
 fn attr(output: &mut Vec<u8>, name: &str, value: &str) {
     output.push(b' ');
     output.extend_from_slice(name.as_bytes());
     output.extend_from_slice(b"=\"");
     escape(output, value);
-    output.push(b'\"');
+    output.push(b'"');
 }
+
 fn escape(output: &mut Vec<u8>, value: &str) {
     for character in value.chars() {
         match character {
@@ -978,6 +720,7 @@ fn escape(output: &mut Vec<u8>, value: &str) {
         }
     }
 }
+
 fn escape_text(output: &mut Vec<u8>, value: &str) {
     for character in value.chars() {
         match character {
@@ -989,159 +732,5 @@ fn escape_text(output: &mut Vec<u8>, value: &str) {
                 output.extend_from_slice(character.encode_utf8(&mut bytes).as_bytes());
             },
         }
-    }
-}
-fn xml_error(error: impl std::fmt::Display) -> OoxmlError {
-    OoxmlError::Xml(error.to_string())
-}
-fn invalid(message: impl Into<String>) -> OoxmlError {
-    OoxmlError::InvalidFormat(message.into())
-}
-fn limit(name: &str) -> OoxmlError {
-    invalid(format!("Data Model {name} limit exceeded"))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use litchi_opc::Part;
-
-    fn definition() -> DataModelDefinition {
-        DataModelDefinition { min_version_load: 7, tables: vec![DataModelTable { id: "t-sales".into(), name: "Sales".into(), connection: "ModelConnection".into() }, DataModelTable { id: "t-date".into(), name: "Date".into(), connection: "ModelConnection".into() }], relationships: vec![DataModelRelationship { from_table: "Sales".into(), from_column: "DateKey".into(), to_table: "Date".into(), to_column: "DateKey".into() }], extension_list: Some(DataModelOpaqueXml { xml: format!(r#"<x15:extLst xmlns:x15="{X15}"><x15:ext uri="urn:test"><v:opaque xmlns:v="urn:vendor"/></x15:ext></x15:extLst>"#).into_bytes() }) }
-    }
-    fn package() -> (OpcPackage, PackURI) {
-        let mut package = OpcPackage::new();
-        let workbook = PackURI::new("/xl/workbook.xml").unwrap();
-        let mut part = BlobPart::new(
-            workbook.clone(),
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml".into(),
-            format!(r#"<workbook xmlns="{SML}"><sheets/></workbook>"#).into_bytes(),
-        );
-        let connections = PackURI::new("/xl/connections.xml").unwrap();
-        part.rels_mut().add_relationship(
-            CONNECTIONS_RELATIONSHIP_TYPE.into(),
-            "connections.xml".into(),
-            "rIdConnections".into(),
-            false,
-        );
-        package.add_part(Box::new(part));
-        package.add_part(Box::new(BlobPart::new(connections, CONNECTIONS_CONTENT_TYPE.into(), format!(r#"<connections xmlns="{SML}"><connection id="1" name="ModelConnection" refreshedVersion="7"/></connections>"#).into_bytes())));
-        (package, workbook)
-    }
-    fn model() -> DataModel {
-        DataModel {
-            definition: definition(),
-            payload: DataModelPayload {
-                part_name: DATA_MODEL_PART_NAME.into(),
-                data: super::super::xldm::test_xldm_bytes(),
-            },
-        }
-    }
-
-    #[test]
-    fn typed_descriptor_round_trip() {
-        let expected = definition();
-        let xml = write_data_model(&expected).unwrap();
-        let actual = parse_data_model(&xml).unwrap();
-        assert_eq!(actual.min_version_load, expected.min_version_load);
-        assert_eq!(actual.tables, expected.tables);
-        assert_eq!(actual.relationships, expected.relationships);
-        assert!(String::from_utf8_lossy(&actual.extension_list.unwrap().xml).contains("opaque"));
-    }
-
-    #[test]
-    fn package_round_trip_preserves_inert_payload_and_inline_metadata() {
-        let (mut package, workbook) = package();
-        let expected = model();
-        store_data_model(&mut package, &workbook, &expected).unwrap();
-        let actual = load_data_model(&package, &workbook).unwrap().unwrap();
-        assert_eq!(
-            actual.definition.min_version_load,
-            expected.definition.min_version_load
-        );
-        assert_eq!(actual.definition.tables, expected.definition.tables);
-        assert_eq!(
-            actual.definition.relationships,
-            expected.definition.relationships
-        );
-        assert_eq!(actual.payload, expected.payload);
-        assert!(
-            String::from_utf8_lossy(&actual.definition.extension_list.unwrap().xml)
-                .contains("opaque")
-        );
-    }
-
-    #[test]
-    fn inserts_into_existing_empty_extension_list() {
-        let (mut package, workbook) = package();
-        package.get_part_mut(&workbook).unwrap().set_blob(
-            format!(r#"<workbook xmlns="{SML}"><sheets/><extLst /></workbook>"#).into_bytes(),
-        );
-        store_data_model(&mut package, &workbook, &model()).unwrap();
-        assert!(load_data_model(&package, &workbook).unwrap().is_some());
-    }
-
-    #[test]
-    fn rejects_hostile_xml_schema_and_bounds() {
-        for xml in [
-            format!(r#"<!DOCTYPE x><x15:dataModel xmlns:x15="{X15}"/>"#),
-            format!(r#"<?bad x?><x15:dataModel xmlns:x15="{X15}"/>"#),
-            format!(r#"<x15:dataModel xmlns:x15="{X15}" minVersionLoad="4"/>"#),
-            format!(r#"<x15:dataModel xmlns:x15="{X15}"><x15:modelTables/></x15:dataModel>"#),
-            format!(
-                r#"<x15:dataModel xmlns:x15="{X15}"><x15:modelRelationships><x15:modelRelationship fromTable="Missing" fromColumn="a" toTable="Missing" toColumn="b"/></x15:modelRelationships></x15:dataModel>"#
-            ),
-        ] {
-            assert!(parse_data_model(xml.as_bytes()).is_err());
-        }
-        assert!(parse_data_model(&vec![b' '; MAX_XML_BYTES + 1]).is_err());
-    }
-
-    #[test]
-    fn rejects_missing_connection_and_unknown_table_references() {
-        let mut value = definition();
-        value.tables[0].connection = "Absent".into();
-        let (mut package, workbook) = package();
-        assert!(
-            store_data_model(
-                &mut package,
-                &workbook,
-                &DataModel {
-                    definition: value,
-                    payload: model().payload
-                }
-            )
-            .is_err()
-        );
-        let mut value = definition();
-        value.relationships[0].to_table = "Absent".into();
-        assert!(write_data_model(&value).is_err());
-    }
-
-    #[test]
-    fn rejects_orphan_duplicate_wrong_path_and_relationship_edges() {
-        let (mut pkg, workbook) = package();
-        pkg.add_part(Box::new(BlobPart::new(
-            PackURI::new(DATA_MODEL_PART_NAME).unwrap(),
-            DATA_MODEL_CONTENT_TYPE.into(),
-            vec![1],
-        )));
-        assert!(load_data_model(&pkg, &workbook).is_err());
-        let (mut pkg, workbook) = package();
-        store_data_model(&mut pkg, &workbook, &model()).unwrap();
-        pkg.get_part_mut(&workbook)
-            .unwrap()
-            .rels_mut()
-            .add_relationship(
-                "urn:forbidden".into(),
-                "model/item.data".into(),
-                "rIdModel".into(),
-                false,
-            );
-        assert!(load_data_model(&pkg, &workbook).is_err());
-        let mut wrong = model();
-        wrong.payload.part_name = "/xl/model/other.data".into();
-        let (mut pkg, workbook) = package();
-        assert!(store_data_model(&mut pkg, &workbook, &wrong).is_err());
     }
 }

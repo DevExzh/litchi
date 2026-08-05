@@ -35,6 +35,58 @@ pub enum Cell {
     Unknown(Unknown),
 }
 
+impl Cell {
+    /// Parse a checked A1 reference into one-based `(column, row)` numbers.
+    ///
+    /// This small lexical helper is shared by worksheet package codecs whose
+    /// references are not yet materialized as a [`litchi_sheet::Cell`].
+    pub fn reference_to_coords(reference: &str) -> Result<(u32, u32)> {
+        const MAX_COLUMN: u32 = 16_384;
+        const MAX_ROW: u32 = 1_048_576;
+
+        let bytes = reference.as_bytes();
+        let column_end = bytes
+            .iter()
+            .position(|byte| byte.is_ascii_digit())
+            .ok_or_else(|| invalid(format!("invalid cell reference '{reference}'")))?;
+        if column_end == 0 || column_end == bytes.len() {
+            return Err(invalid(format!("invalid cell reference '{reference}'")));
+        }
+
+        let mut column = 0u32;
+        for byte in &bytes[..column_end] {
+            if !byte.is_ascii_alphabetic() {
+                return Err(invalid(format!(
+                    "invalid column in cell reference '{reference}'"
+                )));
+            }
+            let digit = u32::from(byte.to_ascii_uppercase() - b'A' + 1);
+            column = column
+                .checked_mul(26)
+                .and_then(|value| value.checked_add(digit))
+                .ok_or_else(|| {
+                    invalid(format!("column overflows in cell reference '{reference}'"))
+                })?;
+        }
+        if column > MAX_COLUMN {
+            return Err(invalid(format!(
+                "column exceeds Excel limits in cell reference '{reference}'"
+            )));
+        }
+
+        let row = std::str::from_utf8(&bytes[column_end..])
+            .ok()
+            .and_then(|value| value.parse::<u32>().ok())
+            .filter(|value| *value != 0 && *value <= MAX_ROW)
+            .ok_or_else(|| {
+                invalid(format!(
+                    "row exceeds Excel limits in cell reference '{reference}'"
+                ))
+            })?;
+        Ok((column, row))
+    }
+}
+
 /// Exact semantic state at one logical worksheet coordinate.
 ///
 /// A covered coordinate is reported before any producer-stored follower cell,

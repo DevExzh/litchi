@@ -7,6 +7,7 @@
 mod codec;
 mod model;
 mod package;
+pub mod vba;
 
 use crate::error::{Error, Result};
 use litchi_ooxml_common::Error as CommonError;
@@ -47,6 +48,7 @@ pub use model::*;
 pub use package::{
     load_from_worksheet, remove_from_worksheet, replace_on_worksheet, store_on_worksheet,
 };
+pub use vba::Project;
 
 fn invalid(value: impl Into<String>) -> Error {
     Error::Invalid(value.into())

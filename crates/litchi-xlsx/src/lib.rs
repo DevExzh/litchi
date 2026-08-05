@@ -30,6 +30,7 @@ pub mod ignored_errors;
 pub mod layout;
 pub mod merge;
 pub mod named_sheet_view;
+pub mod ole_objects;
 mod outline;
 pub mod outline_properties;
 pub mod package;
@@ -41,14 +42,15 @@ pub mod pivot_chart;
 pub mod print_options;
 pub mod query_table;
 pub mod raw;
+pub mod revisions;
 pub mod row;
 pub mod scenarios;
+pub mod shape_geometry;
+pub mod shapes;
 pub mod sheet;
 pub mod sheet_calculation_properties;
 pub mod sheet_protection;
 pub mod sheet_view;
-pub mod shape_geometry;
-pub mod shapes;
 pub mod slicer_cache;
 pub mod sort;
 pub mod style;
@@ -129,6 +131,12 @@ pub use named_sheet_view::{
     load_worksheet_named_sheet_views, parse_named_sheet_views, remove_worksheet_named_sheet_views,
     store_worksheet_named_sheet_views, write_named_sheet_views,
 };
+pub use ole_objects::{
+    OleObject, OleObjectAnchor, OleObjectAspect, OleObjectConformance, OleObjectMarker,
+    OleObjectProperties, OleObjectRelationshipKind, OleObjectResource, OleObjectTarget,
+    OleObjectUpdate, OleObjects, load_ole_objects, parse_ole_objects, store_ole_objects,
+    write_ole_objects,
+};
 pub use outline::{Outline, OutlineAt};
 pub use outline_properties::{OutlineProperties, parse_outline_properties};
 pub use package::Package;
@@ -150,6 +158,13 @@ pub use query_table::{
     load_worksheet_query_tables, parse_query_table, remove_worksheet_query_table,
     reorder_worksheet_query_tables, replace_worksheet_query_table, update_worksheet_query_table,
     write_query_table,
+};
+pub use revisions::{
+    RevisionAttribute, RevisionAttributeNamespace, RevisionConformance, RevisionHeader,
+    RevisionHeaderProperties, RevisionHeaders, RevisionLog, RevisionLogPart, RevisionRecord,
+    RevisionRecordKind, RevisionUser, RevisionUsers, RevisionXmlElement, Revisions,
+    load_workbook_revisions, parse_revision_headers, parse_revision_log, parse_revision_users,
+    store_workbook_revisions, write_revision_headers, write_revision_log, write_revision_users,
 };
 pub use row::{Height, HeightAt, Row, Rows};
 pub use scenarios::{

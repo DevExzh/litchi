@@ -38,6 +38,7 @@ mod fill;
 pub mod font;
 mod number_format;
 mod parser;
+pub mod writer;
 
 pub use alignment::Alignment;
 pub use border::{Border, ParseRgbError, Rgb};

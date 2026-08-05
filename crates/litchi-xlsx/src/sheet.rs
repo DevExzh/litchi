@@ -2,6 +2,8 @@
 
 /// Worksheet-level `sheetPr` metadata.
 pub mod properties;
+/// Worksheet sparkline extension models and codecs.
+pub mod sparklines;
 
 use std::borrow::Cow;
 use std::convert::Infallible;

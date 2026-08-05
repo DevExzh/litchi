@@ -286,9 +286,7 @@ pub(crate) fn write_worksheet_chart_anchors(
             .checked_add(index)
             .and_then(|value| value.checked_add(1))
             .and_then(|value| u32::try_from(value).ok())
-            .ok_or_else(|| {
-                Error::Invalid("chart relationship ID overflow".to_string())
-            })?;
+            .ok_or_else(|| Error::Invalid("chart relationship ID overflow".to_string()))?;
         let anchor = &chart.anchor;
         xml.push_str("<xdr:twoCellAnchor>");
         write!(
@@ -440,12 +438,7 @@ impl Chart {
     ///     Anchor::new(1, 1, 7, 14),
     /// );
     /// ```
-    pub fn bar_chart(
-        title: &str,
-        categories: &str,
-        values: &str,
-        anchor: Anchor,
-    ) -> Result<Self> {
+    pub fn bar_chart(title: &str, categories: &str, values: &str, anchor: Anchor) -> Result<Self> {
         Self::bar_chart_with_cache(title, categories, &[], values, &[], anchor)
     }
 
@@ -492,12 +485,7 @@ impl Chart {
     }
 
     /// Create a simple line chart from data ranges.
-    pub fn line_chart(
-        title: &str,
-        categories: &str,
-        values: &str,
-        anchor: Anchor,
-    ) -> Result<Self> {
+    pub fn line_chart(title: &str, categories: &str, values: &str, anchor: Anchor) -> Result<Self> {
         Self::line_chart_with_cache(title, categories, &[], values, &[], anchor)
     }
 
@@ -544,12 +532,7 @@ impl Chart {
     }
 
     /// Create a simple pie chart from data ranges.
-    pub fn pie_chart(
-        title: &str,
-        categories: &str,
-        values: &str,
-        anchor: Anchor,
-    ) -> Result<Self> {
+    pub fn pie_chart(title: &str, categories: &str, values: &str, anchor: Anchor) -> Result<Self> {
         Self::pie_chart_with_cache(title, categories, &[], values, &[], anchor)
     }
 
@@ -589,12 +572,7 @@ impl Chart {
     }
 
     /// Create a simple area chart from data ranges.
-    pub fn area_chart(
-        title: &str,
-        categories: &str,
-        values: &str,
-        anchor: Anchor,
-    ) -> Result<Self> {
+    pub fn area_chart(title: &str, categories: &str, values: &str, anchor: Anchor) -> Result<Self> {
         Self::area_chart_with_cache(title, categories, &[], values, &[], anchor)
     }
 
@@ -861,8 +839,7 @@ pub(crate) fn chart_user_shapes_relationship_ids(xml: &[u8]) -> Result<HashSet<S
                     saw_root = true;
                 }
                 for attribute in element.attributes() {
-                    let attribute =
-                        attribute.map_err(|error| Error::Invalid(error.to_string()))?;
+                    let attribute = attribute.map_err(|error| Error::Invalid(error.to_string()))?;
                     let (attribute_namespace, _) =
                         reader.resolver().resolve_attribute(attribute.key);
                     if matches!(
@@ -884,9 +861,7 @@ pub(crate) fn chart_user_shapes_relationship_ids(xml: &[u8]) -> Result<HashSet<S
                 }
                 if matches!(event, Event::Start(_)) {
                     depth = depth.checked_add(1).ok_or_else(|| {
-                        Error::Invalid(
-                            "chart user-shapes XML nesting is too deep".into(),
-                        )
+                        Error::Invalid("chart user-shapes XML nesting is too deep".into())
                     })?;
                 } else if depth == 0 {
                     closed_root = true;

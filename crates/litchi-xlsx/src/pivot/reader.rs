@@ -1,20 +1,16 @@
 use std::collections::HashMap;
 
+use super::{PivotAxis, PivotDataField, PivotFieldRole, PivotTable, PivotValueFunction};
 use crate::raw::parse_catalog;
 use litchi_core::sheet::Result as SheetResult;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI};
-use super::{
-    PivotAxis, PivotDataField, PivotFieldRole, PivotTable, PivotValueFunction,
-};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use super::cache::{
-    CacheRecord, Definition, Field, Records, Item,
-};
+use super::cache::{CacheRecord, Definition, Field, Item, Records};
 use crate::raw::namespace::{is_spreadsheetml_name, relationship_attribute_value};
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use litchi_sheet::Rect;
@@ -1346,10 +1342,7 @@ fn validate_pivot_cache_records(
     Ok(())
 }
 
-fn parse_cache_field_element(
-    element: &BytesStart<'_>,
-    decoder: Decoder,
-) -> SheetResult<Field> {
+fn parse_cache_field_element(element: &BytesStart<'_>, decoder: Decoder) -> SheetResult<Field> {
     let mut field = Field {
         name: required_string(element, b"name", decoder, "pivot cache field name")?,
         ..Default::default()
@@ -1773,9 +1766,8 @@ mod tests {
 
     #[test]
     fn poi_fixture_with_chartsheet_reads_pivot_tables() {
-        const POI_CHARTSHEET: &[u8] = include_bytes!(
-            "../../../../test-data/poi/test-data/spreadsheet/WithChartSheet.xlsx"
-        );
+        const POI_CHARTSHEET: &[u8] =
+            include_bytes!("../../../../test-data/poi/test-data/spreadsheet/WithChartSheet.xlsx");
         let package = OpcPackage::from_bytes(POI_CHARTSHEET).unwrap();
         let tables = read_pivot_tables(&package).unwrap();
         assert_eq!(tables.len(), 5);
@@ -2018,9 +2010,7 @@ mod tests {
         assert!(matches!(field.shared_items[0], Item::Missing));
         assert!(matches!(field.shared_items[1], Item::Number(2.5)));
         assert!(matches!(field.shared_items[2], Item::Boolean(true)));
-        assert!(
-            matches!(&field.shared_items[4], Item::String(value) if value == "North & West")
-        );
+        assert!(matches!(&field.shared_items[4], Item::String(value) if value == "North & West"));
     }
 
     #[test]

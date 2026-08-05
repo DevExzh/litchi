@@ -11,8 +11,8 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use crate::error::{Error, Result};
 use super::chart::Anchor;
+use crate::error::{Error, Result};
 use crate::raw::namespace::relationship_attribute_value;
 use litchi_ooxml_common::xml::{
     decode_xml_reference, is_drawingml_chart_name, is_drawingml_name, unqualified_attribute_value,
