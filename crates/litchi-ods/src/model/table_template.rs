@@ -19,45 +19,45 @@ const MAX_EXTENSION_DEPTH: usize = 256;
 
 /// Legacy row/column selector used by deprecated table-template edge attributes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TableTemplateAxis {
+pub enum Axis {
     Row,
     Column,
 }
 
 /// Cell and optional paragraph styles for one table-template region.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct TableTemplateStyle {
+pub struct Style {
     pub style_name: String,
     pub paragraph_style_name: Option<String>,
 }
 
 /// Named cell-style regions which make up an ODF table template.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct TableTemplate {
+pub struct Template {
     pub name: String,
-    pub first_row_start_column: Option<TableTemplateAxis>,
-    pub first_row_end_column: Option<TableTemplateAxis>,
-    pub last_row_start_column: Option<TableTemplateAxis>,
-    pub last_row_end_column: Option<TableTemplateAxis>,
+    pub first_row_start_column: Option<Axis>,
+    pub first_row_end_column: Option<Axis>,
+    pub last_row_start_column: Option<Axis>,
+    pub last_row_end_column: Option<Axis>,
     pub use_first_row_styles: Option<bool>,
     pub use_last_row_styles: Option<bool>,
     pub use_first_column_styles: Option<bool>,
     pub use_last_column_styles: Option<bool>,
     pub use_banding_rows_styles: Option<bool>,
     pub use_banding_columns_styles: Option<bool>,
-    pub first_row: Option<TableTemplateStyle>,
-    pub last_row: Option<TableTemplateStyle>,
-    pub first_column: Option<TableTemplateStyle>,
-    pub last_column: Option<TableTemplateStyle>,
-    pub body: Option<TableTemplateStyle>,
-    pub even_rows: Option<TableTemplateStyle>,
-    pub odd_rows: Option<TableTemplateStyle>,
-    pub even_columns: Option<TableTemplateStyle>,
-    pub odd_columns: Option<TableTemplateStyle>,
-    pub background: Option<TableTemplateStyle>,
+    pub first_row: Option<Style>,
+    pub last_row: Option<Style>,
+    pub first_column: Option<Style>,
+    pub last_column: Option<Style>,
+    pub body: Option<Style>,
+    pub even_rows: Option<Style>,
+    pub odd_rows: Option<Style>,
+    pub even_columns: Option<Style>,
+    pub odd_columns: Option<Style>,
+    pub background: Option<Style>,
 }
 
-impl TableTemplate {
+impl Template {
     /// Validate the template's required band structure and style references.
     pub fn validate(&self) -> Result<()> {
         validate_template_value(&self.name, "table template name")?;
@@ -177,14 +177,14 @@ fn validate_template_value(value: &str, name: &str) -> Result<()> {
     Ok(())
 }
 
-fn write_axis_attribute(output: &mut String, name: &str, value: Option<TableTemplateAxis>) {
+fn write_axis_attribute(output: &mut String, name: &str, value: Option<Axis>) {
     let Some(value) = value else { return };
     output.push_str(" table:");
     output.push_str(name);
     output.push_str("=\"");
     output.push_str(match value {
-        TableTemplateAxis::Row => "row",
-        TableTemplateAxis::Column => "column",
+        Axis::Row => "row",
+        Axis::Column => "column",
     });
     output.push('"');
 }
@@ -196,7 +196,7 @@ fn write_bool_attribute(output: &mut String, name: &str, value: Option<bool>) {
     output.push_str(if value { "=\"true\"" } else { "=\"false\"" });
 }
 
-fn write_region(output: &mut String, name: &str, style: &TableTemplateStyle) {
+fn write_region(output: &mut String, name: &str, style: &Style) {
     output.push_str("<table:");
     output.push_str(name);
     output.push_str(" table:style-name=\"");
@@ -226,7 +226,7 @@ struct Attribute {
     value: String,
 }
 
-pub(crate) fn parse_table_templates(parts: &[&str]) -> Result<Vec<TableTemplate>> {
+pub(crate) fn parse_table_templates(parts: &[&str]) -> Result<Vec<Template>> {
     let mut templates = Vec::new();
     let mut names = HashSet::new();
     let mut aggregate = 0usize;
@@ -238,7 +238,7 @@ pub(crate) fn parse_table_templates(parts: &[&str]) -> Result<Vec<TableTemplate>
 
 fn parse_part(
     xml: &str,
-    templates: &mut Vec<TableTemplate>,
+    templates: &mut Vec<Template>,
     names: &mut HashSet<String>,
     aggregate: &mut usize,
 ) -> Result<()> {
@@ -334,9 +334,9 @@ fn ensure_template_name(namespace: Namespace, direct_style_child: bool) -> Resul
 }
 
 fn insert_template(
-    templates: &mut Vec<TableTemplate>,
+    templates: &mut Vec<Template>,
     names: &mut HashSet<String>,
-    template: TableTemplate,
+    template: Template,
 ) -> Result<()> {
     if !names.insert(template.name.clone()) {
         return Err(Error::InvalidFormat(format!(
@@ -352,7 +352,7 @@ fn parse_empty_template(
     reader: &NsReader<&[u8]>,
     start: &BytesStart<'_>,
     aggregate: &mut usize,
-) -> Result<TableTemplate> {
+) -> Result<Template> {
     let attributes = parse_attributes(reader.resolver(), reader.decoder(), start, aggregate)?;
     build_template(&attributes, TemplateRegions::default())
 }
@@ -361,7 +361,7 @@ fn parse_template(
     reader: &mut NsReader<&[u8]>,
     start: &BytesStart<'_>,
     aggregate: &mut usize,
-) -> Result<TableTemplate> {
+) -> Result<Template> {
     let attributes = parse_attributes(reader.resolver(), reader.decoder(), start, aggregate)?;
     let mut regions = TemplateRegions::default();
     let mut buffer = Vec::new();
@@ -449,20 +449,20 @@ fn parse_template(
 
 #[derive(Default)]
 struct TemplateRegions {
-    first_row: Option<TableTemplateStyle>,
-    last_row: Option<TableTemplateStyle>,
-    first_column: Option<TableTemplateStyle>,
-    last_column: Option<TableTemplateStyle>,
-    body: Option<TableTemplateStyle>,
-    even_rows: Option<TableTemplateStyle>,
-    odd_rows: Option<TableTemplateStyle>,
-    even_columns: Option<TableTemplateStyle>,
-    odd_columns: Option<TableTemplateStyle>,
-    background: Option<TableTemplateStyle>,
+    first_row: Option<Style>,
+    last_row: Option<Style>,
+    first_column: Option<Style>,
+    last_column: Option<Style>,
+    body: Option<Style>,
+    even_rows: Option<Style>,
+    odd_rows: Option<Style>,
+    even_columns: Option<Style>,
+    odd_columns: Option<Style>,
+    background: Option<Style>,
 }
 
 impl TemplateRegions {
-    fn set(&mut self, local: &str, style: TableTemplateStyle) -> Result<()> {
+    fn set(&mut self, local: &str, style: Style) -> Result<()> {
         let slot = match local {
             "first-row" => &mut self.first_row,
             "last-row" => &mut self.last_row,
@@ -504,7 +504,7 @@ impl TemplateRegions {
     }
 }
 
-fn build_template(attributes: &[Attribute], regions: TemplateRegions) -> Result<TableTemplate> {
+fn build_template(attributes: &[Attribute], regions: TemplateRegions) -> Result<Template> {
     reject_template_attributes(attributes)?;
     regions.validate()?;
     let name = required_attribute_either(attributes, "name")?.to_string();
@@ -513,7 +513,7 @@ fn build_template(attributes: &[Attribute], regions: TemplateRegions) -> Result<
             "table template name must not be empty".to_string(),
         ));
     }
-    Ok(TableTemplate {
+    Ok(Template {
         name,
         first_row_start_column: parse_axis_attribute(attributes, "first-row-start-column")?,
         first_row_end_column: parse_axis_attribute(attributes, "first-row-end-column")?,
@@ -544,7 +544,7 @@ fn parse_region_attributes(
     start: &BytesStart<'_>,
     background: bool,
     aggregate: &mut usize,
-) -> Result<TableTemplateStyle> {
+) -> Result<Style> {
     let attributes = parse_attributes(resolver, decoder, start, aggregate)?;
     for attribute in &attributes {
         let allowed = attribute.namespace == Namespace::Table
@@ -565,7 +565,7 @@ fn parse_region_attributes(
             "table-template style name must not be empty".to_string(),
         ));
     }
-    Ok(TableTemplateStyle {
+    Ok(Style {
         style_name,
         paragraph_style_name: attribute(&attributes, Namespace::Table, "paragraph-style-name")
             .map(str::to_string),
@@ -669,10 +669,7 @@ fn required_attribute_either<'a>(attributes: &'a [Attribute], local: &str) -> Re
     }
 }
 
-fn parse_axis_attribute(
-    attributes: &[Attribute],
-    local: &str,
-) -> Result<Option<TableTemplateAxis>> {
+fn parse_axis_attribute(attributes: &[Attribute], local: &str) -> Result<Option<Axis>> {
     let table = attribute(attributes, Namespace::Table, local);
     let legacy = attribute(attributes, Namespace::Text, local);
     let value = match (table, legacy) {
@@ -686,8 +683,8 @@ fn parse_axis_attribute(
     };
     value
         .map(|value| match value {
-            "row" => Ok(TableTemplateAxis::Row),
-            "column" => Ok(TableTemplateAxis::Column),
+            "row" => Ok(Axis::Row),
+            "column" => Ok(Axis::Column),
             _ => Err(Error::InvalidFormat(format!(
                 "invalid table-template axis '{value}'"
             ))),
@@ -860,7 +857,7 @@ mod tests {
     const PREFIX: &str = r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:styles>"#;
     const SUFFIX: &str = "</office:styles></office:document-styles>";
 
-    fn parse(fragment: &str) -> Result<Vec<TableTemplate>> {
+    fn parse(fragment: &str) -> Result<Vec<Template>> {
         parse_table_templates(&[&format!("{PREFIX}{fragment}{SUFFIX}")])
     }
 
@@ -872,14 +869,8 @@ mod tests {
         .unwrap();
         let template = &templates[0];
         assert_eq!(template.name, "Bands & Body");
-        assert_eq!(
-            template.first_row_start_column,
-            Some(TableTemplateAxis::Row)
-        );
-        assert_eq!(
-            template.first_row_end_column,
-            Some(TableTemplateAxis::Column)
-        );
+        assert_eq!(template.first_row_start_column, Some(Axis::Row));
+        assert_eq!(template.first_row_end_column, Some(Axis::Column));
         assert_eq!(template.use_first_row_styles, Some(true));
         assert_eq!(
             template
