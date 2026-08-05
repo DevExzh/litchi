@@ -1,5 +1,6 @@
 //! Immutable Keynote slide values and detached builders.
 
+pub mod audio;
 pub mod media;
 
 use litchi_iwa_text::TextStorage;
