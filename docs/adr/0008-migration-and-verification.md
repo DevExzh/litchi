@@ -6104,6 +6104,29 @@ fixture without repair prompts; Numbers rejected the source-generated chart as
 damaged, which remains the tracked Numbers chart-fixture limitation above.
 Pages, Numbers, and Keynote were quit after inspection.
 
+The next bounded migration slice introduces the common source-bound wire
+views. `litchi-iwa-common::wire::WireView<'a>` retains one borrowed source and
+compact private spans, while `WireFieldView<'a>` provides canonical key,
+length, framing, and payload checks without per-field byte ownership. Strict
+reference-line readers now use this view through the thin IWA adapter; the
+permissive mutation representation remains only in callers not yet migrated.
+Singular wire overlays now index base and overlay fields once and emit one
+exact-capacity output, removing the former quadratic reparse path while
+preserving duplicate, wire-type, field-count, and output-size checks.
+
+The Numbers editor layout follows the same staged ownership direction:
+`numbers::editor::text_box_api` now contains the ordinary sheet text-box API
+as a private child module, reducing the editor root without introducing a
+compatibility layer. The common suite passed 58 tests, the full IWA library
+passed 1,513 tests, strict `-D warnings` Clippy passed for both affected
+libraries, and the crate-boundary audit remained valid. A fresh fixture built
+from the changed branch opened in native Pages and Keynote without repair
+prompts and exposed the authored Revenue/Cost 2D line chart with numeric Y and
+categorical X axes. Native Numbers rejected the source-generated chart as
+damaged; this remains the tracked Numbers chart-fixture limitation above.
+All three applications were quit through their application menus after
+inspection.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

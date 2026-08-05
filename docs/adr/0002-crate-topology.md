@@ -91,10 +91,20 @@ identity remains explicit at the IWA application boundary where diagnostics
 need it.
 The core layer does not open packages, resolve application message IDs, or own
 document topology, while the facade retains those application-level
-responsibilities. The common wire crate is also the sole owner of parsed
-`WireField` values and bounded scalar/repeated mutation; the facade's private
-`wire.rs` is only a temporary callback/error adapter and does not copy parsed
-fields or maintain a second wire representation.
+responsibilities. The common wire crate is also the sole owner of parsed wire
+representations and bounded scalar/repeated mutation. New strict readers use
+the source-bound `WireView<'a>`/`WireFieldView<'a>` pair, which retains one
+borrowed source plus compact private spans instead of per-field byte owners;
+the older `WireField` mutation representation remains only while its callers
+are migrated. The facade's private `wire.rs` is a callback/error adapter and
+does not copy parsed fields or maintain a second wire representation.
+
+Physical organization follows the same ownership rule inside format crates:
+the Numbers text-box API is isolated in the private
+`numbers::editor::text_box_api` module, leaving the editor root focused on
+shared orchestration and the remaining migration seams. This is an internal
+layout step toward the independent `litchi-numbers` crate, not a new facade
+layer or a compatibility surface.
 
 The first extracted semantic value layer is `litchi-iwa-text`, which owns only
 the allocation-bearing rich-text values shared by the format leaves. It has no

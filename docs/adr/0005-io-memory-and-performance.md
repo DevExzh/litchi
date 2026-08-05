@@ -64,11 +64,15 @@ metadata is disabled because no production path consumes it. This reduces
 generated code and static-data footprint without changing the wire format or
 the typed schema boundary.
 
-Borrowed IWA wire readers use the common checked field views when interpreting
-recognized fields: payload ranges are sliced through validated offsets and
-schema-owned key/length framing can be required without changing the
-permissive unknown-field parser. Source-built Pages, Numbers, and Keynote
-chart updates also locate their single chart payload with one linear scan and
+Borrowed IWA wire readers use the common source-bound `WireView<'a>` and
+`WireFieldView<'a>` when interpreting recognized fields: one borrowed source
+and compact spans avoid per-field slice metadata, payload ranges are sliced
+through validated spans, and schema-owned key/length framing can be required
+without changing the permissive unknown-field parser. Singular wire overlays
+index base and overlay field numbers once and emit one exact-capacity output,
+so sparse updates do not repeatedly reparse a growing message. Source-built
+Pages, Numbers, and Keynote chart updates also locate their single chart
+payload with one linear scan and
 no temporary index allocation before decoding or invoking a mutation callback.
 These are allocation-shape and safety improvements; representative allocation,
 latency, and throughput measurements remain governed by the measurement

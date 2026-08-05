@@ -6,8 +6,189 @@
 )]
 
 use std::cell::Cell;
+use std::collections::HashMap;
 
 use crate::{Error, LimitKind, Result, WireLimits};
+
+/// A bounded, source-bound view of one protobuf-style IWA wire message.
+///
+/// The view borrows the input once and retains only compact private spans for
+/// its fields. Field views are consequently tied to this source and cannot
+/// accidentally be used with a different byte slice after parsing.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "WireView is the explicit borrowed container name used at format boundaries"
+)]
+#[derive(Debug)]
+pub struct WireView<'a> {
+    source: &'a [u8],
+    spans: Vec<WireSpan>,
+}
+
+impl<'a> WireView<'a> {
+    /// Parse one borrowed wire message under the default resource profile.
+    pub fn parse(source: &'a [u8]) -> Result<Self> {
+        Self::parse_with_limits(source, WireLimits::default())
+    }
+
+    /// Parse one borrowed wire message under an explicit finite resource
+    /// profile.
+    pub fn parse_with_limits(source: &'a [u8], limits: WireLimits) -> Result<Self> {
+        let spans = parse_wire_items_with_limits(source, limits, "wire view spans", Ok)?;
+        Ok(Self { source, spans })
+    }
+
+    /// Return the one source byte slice retained by this view.
+    #[must_use]
+    pub fn source(&self) -> &'a [u8] {
+        self.source
+    }
+
+    /// Return the source bytes without copying them.
+    #[must_use]
+    pub fn as_bytes(&self) -> &'a [u8] {
+        self.source
+    }
+
+    /// Number of parsed fields.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.spans.len()
+    }
+
+    /// Whether the source contains no fields.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.spans.is_empty()
+    }
+
+    /// Borrow a field by its zero-based source order.
+    #[must_use]
+    pub fn get(&self, index: usize) -> Option<WireFieldView<'a>> {
+        self.spans.get(index).copied().map(|span| WireFieldView {
+            source: self.source,
+            span,
+        })
+    }
+
+    /// Borrow all fields in their original source order.
+    pub fn fields(&self) -> impl Iterator<Item = WireFieldView<'a>> + '_ {
+        self.spans.iter().copied().map(|span| WireFieldView {
+            source: self.source,
+            span,
+        })
+    }
+
+    /// Alias for [`Self::fields`] for callers that prefer iterator terminology.
+    pub fn iter(&self) -> impl Iterator<Item = WireFieldView<'a>> + '_ {
+        self.fields()
+    }
+}
+
+/// A borrowed view of one field in a [`WireView`].
+///
+/// This value contains a compact span and a borrow of the parsed view's
+/// source, not an independently supplied byte slice. It is cheap to copy and
+/// remains valid only while that source is valid.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "WireFieldView is the explicit borrowed counterpart to WireField"
+)]
+#[derive(Debug, Clone, Copy)]
+pub struct WireFieldView<'a> {
+    source: &'a [u8],
+    span: WireSpan,
+}
+
+impl<'a> WireFieldView<'a> {
+    /// Protobuf field number.
+    #[must_use]
+    pub const fn number(self) -> u32 {
+        self.span.number
+    }
+
+    /// Protobuf wire type tag.
+    #[must_use]
+    pub const fn wire_type(self) -> u8 {
+        self.span.wire_type
+    }
+
+    /// Return the complete encoded field, including key and length prefix.
+    #[must_use]
+    pub fn raw(self) -> &'a [u8] {
+        &self.source[self.span.start as usize..self.span.end as usize]
+    }
+
+    /// Return the encoded field key.
+    #[must_use]
+    pub fn key(self) -> &'a [u8] {
+        &self.source[self.span.start as usize..self.span.key_end as usize]
+    }
+
+    /// Return the field payload, excluding a length prefix when present.
+    #[must_use]
+    pub fn payload(self) -> &'a [u8] {
+        &self.source[self.span.payload_start as usize..self.span.end as usize]
+    }
+
+    /// Require the field key to use its canonical varint representation.
+    pub fn validate_canonical_key(self) -> Result<()> {
+        validate_canonical_key_bytes(self.number(), self.wire_type(), self.key())
+    }
+
+    /// Return the field key after requiring canonical framing.
+    pub fn canonical_key(self) -> Result<&'a [u8]> {
+        self.validate_canonical_key()?;
+        Ok(self.key())
+    }
+
+    /// Require a length-delimited field's length prefix to be canonical.
+    pub fn validate_canonical_length(self) -> Result<()> {
+        if self.wire_type() != 2 {
+            return Err(Error::InvalidFormat(format!(
+                "protobuf field {} is not length-delimited",
+                self.number()
+            )));
+        }
+        validate_canonical_length_bytes(self.number(), self.payload(), self.length_prefix())
+    }
+
+    /// Require canonical key framing and, when applicable, a canonical length
+    /// prefix.
+    pub fn validate_canonical_framing(self) -> Result<()> {
+        self.validate_canonical_key()?;
+        if self.wire_type() == 2 {
+            self.validate_canonical_length()?;
+        }
+        Ok(())
+    }
+
+    /// Return the payload after requiring canonical field framing.
+    pub fn canonical_payload(self) -> Result<&'a [u8]> {
+        self.validate_canonical_framing()?;
+        Ok(self.payload())
+    }
+
+    /// Return the encoded length prefix of a length-delimited field.
+    fn length_prefix(self) -> &'a [u8] {
+        &self.source[self.span.key_end as usize..self.span.payload_start as usize]
+    }
+}
+
+/// Compact private field metadata retained by [`WireView`].
+///
+/// The configured input ceiling is below `u32::MAX`, so four-byte offsets are
+/// sufficient while keeping the parsed representation free of per-field slice
+/// references.
+#[derive(Debug, Clone, Copy)]
+struct WireSpan {
+    number: u32,
+    wire_type: u8,
+    start: u32,
+    key_end: u32,
+    payload_start: u32,
+    end: u32,
+}
 
 #[allow(
     clippy::module_name_repetitions,
@@ -181,12 +362,75 @@ fn checked_wire_range<'a>(
     })
 }
 
+fn validate_canonical_key_bytes(number: u32, wire_type: u8, key: &[u8]) -> Result<()> {
+    let (encoded_key, key_length) =
+        crate::varint::decode_varint_from_bytes(key).map_err(|error| {
+            Error::InvalidFormat(format!("invalid protobuf key for field {number}: {error}"))
+        })?;
+    let expected_key = (u64::from(number) << 3) | u64::from(wire_type);
+    if encoded_key != expected_key
+        || key_length != key.len()
+        || key_length != crate::varint::encoded_len(expected_key)
+    {
+        return Err(Error::InvalidFormat(format!(
+            "protobuf field {number} has a noncanonical key"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_canonical_length_bytes(
+    number: u32,
+    payload: &[u8],
+    length_prefix: &[u8],
+) -> Result<()> {
+    let (encoded_length, prefix_length) = crate::varint::decode_varint_from_bytes(length_prefix)
+        .map_err(|error| {
+            Error::InvalidFormat(format!(
+                "invalid protobuf length for field {number}: {error}"
+            ))
+        })?;
+    let expected_length = u64::try_from(payload.len()).map_err(|_conversion| {
+        Error::InvalidFormat("protobuf payload length exceeds u64".to_owned())
+    })?;
+    if encoded_length != expected_length
+        || prefix_length != length_prefix.len()
+        || prefix_length != crate::varint::encoded_len(expected_length)
+    {
+        return Err(Error::InvalidFormat(format!(
+            "protobuf field {number} has a noncanonical length prefix"
+        )));
+    }
+    Ok(())
+}
+
 pub fn parse_wire_fields(data: &[u8]) -> Result<Vec<WireField>> {
     parse_wire_fields_with_limits(data, WireLimits::default())
 }
 
 /// Parse protobuf wire fields under an explicit finite resource profile.
 pub fn parse_wire_fields_with_limits(data: &[u8], limits: WireLimits) -> Result<Vec<WireField>> {
+    parse_wire_items_with_limits(data, limits, "wire fields", |span| {
+        Ok(WireField {
+            number: span.number,
+            wire_type: span.wire_type,
+            start: span.start as usize,
+            key_end: span.key_end as usize,
+            payload_start: span.payload_start as usize,
+            end: span.end as usize,
+        })
+    })
+}
+
+fn parse_wire_items_with_limits<T, F>(
+    data: &[u8],
+    limits: WireLimits,
+    resource: &'static str,
+    mut map: F,
+) -> Result<Vec<T>>
+where
+    F: FnMut(WireSpan) -> Result<T>,
+{
     if data.len() > limits.max_input_bytes() {
         return Err(Error::LimitExceeded {
             kind: LimitKind::InputBytes,
@@ -194,101 +438,119 @@ pub fn parse_wire_fields_with_limits(data: &[u8], limits: WireLimits) -> Result<
             limit: limits.max_input_bytes(),
         });
     }
-    let mut fields = Vec::new();
+    let mut items = Vec::new();
     let mut offset = 0usize;
     while offset < data.len() {
-        let start = offset;
-        let (key, key_length) = crate::varint::decode_varint_from_bytes(&data[offset..])
-            .map_err(|error| Error::InvalidFormat(format!("invalid protobuf key: {error}")))?;
-        offset = offset
-            .checked_add(key_length)
-            .ok_or_else(|| Error::InvalidFormat("protobuf key offset overflow".to_owned()))?;
-        let number = u32::try_from(key >> 3).map_err(|error| {
-            Error::InvalidFormat(format!("protobuf field number does not fit u32: {error}"))
-        })?;
-        if number == 0 || number > 0x1fff_ffff {
-            return Err(Error::InvalidFormat(format!(
-                "invalid protobuf field number {number}"
-            )));
-        }
-        let wire_type = u8::try_from(key & 7).map_err(|error| {
-            Error::InvalidFormat(format!("protobuf wire type does not fit u8: {error}"))
-        })?;
-        let key_end = offset;
-        let mut payload_start = offset;
-        match wire_type {
-            0 => {
-                let (_, length) = crate::varint::decode_varint_from_bytes(&data[offset..])
-                    .map_err(|error| {
-                        Error::InvalidFormat(format!("invalid protobuf varint value: {error}"))
-                    })?;
-                offset = offset.checked_add(length).ok_or_else(|| {
-                    Error::InvalidFormat("protobuf varint offset overflow".to_owned())
-                })?;
-            },
-            1 => {
-                offset = offset.checked_add(8).ok_or_else(|| {
-                    Error::InvalidFormat("protobuf fixed64 offset overflow".to_owned())
-                })?;
-            },
-            2 => {
-                let (encoded_length, prefix_length) =
-                    crate::varint::decode_varint_from_bytes(&data[offset..]).map_err(|error| {
-                        Error::InvalidFormat(format!("invalid protobuf length: {error}"))
-                    })?;
-                offset = offset.checked_add(prefix_length).ok_or_else(|| {
-                    Error::InvalidFormat("protobuf length-prefix overflow".to_owned())
-                })?;
-                payload_start = offset;
-                let length = usize::try_from(encoded_length).map_err(|error| {
-                    Error::InvalidFormat(format!("protobuf field length exceeds usize: {error}"))
-                })?;
-                offset = offset.checked_add(length).ok_or_else(|| {
-                    Error::InvalidFormat("protobuf field range overflow".to_owned())
-                })?;
-            },
-            5 => {
-                offset = offset.checked_add(4).ok_or_else(|| {
-                    Error::InvalidFormat("protobuf fixed32 offset overflow".to_owned())
-                })?;
-            },
-            3 | 4 => {
-                return Err(Error::InvalidFormat(
-                    "deprecated protobuf groups are not supported".to_owned(),
-                ));
-            },
-            _ => {
-                return Err(Error::InvalidFormat(format!(
-                    "invalid protobuf wire type {wire_type}"
-                )));
-            },
-        }
-        if offset > data.len() {
-            return Err(Error::InvalidFormat("truncated protobuf field".to_owned()));
-        }
-        if fields.len() >= limits.max_fields() {
+        let span = parse_wire_span(data, offset)?;
+        offset = span.end as usize;
+        if items.len() >= limits.max_fields() {
             return Err(Error::LimitExceeded {
                 kind: LimitKind::Fields,
-                observed: fields.len() + 1,
+                observed: items.len() + 1,
                 limit: limits.max_fields(),
             });
         }
-        fields
+        items
             .try_reserve(1)
             .map_err(|_allocation| Error::Allocation {
-                resource: "wire fields",
-                amount: fields.len() + 1,
+                resource,
+                amount: items.len() + 1,
             })?;
-        fields.push(WireField {
-            number,
-            wire_type,
-            start,
-            key_end,
-            payload_start,
-            end: offset,
-        });
+        items.push(map(span)?);
     }
-    Ok(fields)
+    Ok(items)
+}
+
+fn parse_wire_span(data: &[u8], start: usize) -> Result<WireSpan> {
+    let (key, key_length) = crate::varint::decode_varint_from_bytes(&data[start..])
+        .map_err(|error| Error::InvalidFormat(format!("invalid protobuf key: {error}")))?;
+    let key_end = start
+        .checked_add(key_length)
+        .ok_or_else(|| Error::InvalidFormat("protobuf key offset overflow".to_owned()))?;
+    let number = u32::try_from(key >> 3).map_err(|error| {
+        Error::InvalidFormat(format!("protobuf field number does not fit u32: {error}"))
+    })?;
+    if number == 0 || number > 0x1fff_ffff {
+        return Err(Error::InvalidFormat(format!(
+            "invalid protobuf field number {number}"
+        )));
+    }
+    let wire_type = u8::try_from(key & 7).map_err(|error| {
+        Error::InvalidFormat(format!("protobuf wire type does not fit u8: {error}"))
+    })?;
+    let mut payload_start = key_end;
+    let end = match wire_type {
+        0 => {
+            let (_, length) =
+                crate::varint::decode_varint_from_bytes(&data[key_end..]).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid protobuf varint value: {error}"))
+                })?;
+            key_end
+                .checked_add(length)
+                .ok_or_else(|| Error::InvalidFormat("protobuf varint offset overflow".to_owned()))?
+        },
+        1 => key_end
+            .checked_add(8)
+            .ok_or_else(|| Error::InvalidFormat("protobuf fixed64 offset overflow".to_owned()))?,
+        2 => {
+            let (encoded_length, prefix_length) =
+                crate::varint::decode_varint_from_bytes(&data[key_end..]).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid protobuf length: {error}"))
+                })?;
+            let payload = key_end.checked_add(prefix_length).ok_or_else(|| {
+                Error::InvalidFormat("protobuf length-prefix overflow".to_owned())
+            })?;
+            payload_start = payload;
+            let length = usize::try_from(encoded_length).map_err(|error| {
+                Error::InvalidFormat(format!("protobuf field length exceeds usize: {error}"))
+            })?;
+            payload
+                .checked_add(length)
+                .ok_or_else(|| Error::InvalidFormat("protobuf field range overflow".to_owned()))?
+        },
+        5 => key_end
+            .checked_add(4)
+            .ok_or_else(|| Error::InvalidFormat("protobuf fixed32 offset overflow".to_owned()))?,
+        3 | 4 => {
+            return Err(Error::InvalidFormat(
+                "deprecated protobuf groups are not supported".to_owned(),
+            ));
+        },
+        _ => {
+            return Err(Error::InvalidFormat(format!(
+                "invalid protobuf wire type {wire_type}"
+            )));
+        },
+    };
+    if end > data.len() {
+        return Err(Error::InvalidFormat("truncated protobuf field".to_owned()));
+    }
+    Ok(WireSpan {
+        number,
+        wire_type,
+        start: u32::try_from(start).map_err(|_conversion| {
+            Error::InvalidFormat("protobuf offset exceeds u32".to_owned())
+        })?,
+        key_end: u32::try_from(key_end).map_err(|_conversion| {
+            Error::InvalidFormat("protobuf offset exceeds u32".to_owned())
+        })?,
+        payload_start: u32::try_from(payload_start).map_err(|_conversion| {
+            Error::InvalidFormat("protobuf offset exceeds u32".to_owned())
+        })?,
+        end: u32::try_from(end).map_err(|_conversion| {
+            Error::InvalidFormat("protobuf offset exceeds u32".to_owned())
+        })?,
+    })
+}
+
+/// Parse a borrowed source into a source-bound wire view.
+pub fn parse_wire_view(source: &[u8]) -> Result<WireView<'_>> {
+    WireView::parse(source)
+}
+
+/// Parse a borrowed source into a source-bound wire view under finite limits.
+pub fn parse_wire_view_with_limits(source: &[u8], limits: WireLimits) -> Result<WireView<'_>> {
+    WireView::parse_with_limits(source, limits)
 }
 
 /// Overlay singular protobuf fields while retaining every untouched byte.
@@ -300,66 +562,110 @@ pub fn parse_wire_fields_with_limits(data: &[u8], limits: WireLimits) -> Result<
 pub fn overlay_singular_wire_fields(base: &[u8], overlay: &[u8]) -> Result<Vec<u8>> {
     let limits = WireLimits::default();
     let base_fields = parse_wire_fields_with_limits(base, limits)?;
-    let overlay_fields = parse_wire_fields(overlay)?;
+    let overlay_fields = parse_wire_fields_with_limits(overlay, limits)?;
     ensure_rewrite_work(overlay_fields.len(), limits)?;
-    let mut seen = Vec::new();
-    seen.try_reserve(overlay_fields.len())
+    if overlay_fields.is_empty() {
+        return clone_output(base, limits);
+    }
+
+    // Index both messages once. Reparsing the growing output for every
+    // overlay field made sparse overlays quadratic in parsing and byte-scan
+    // work.
+    let mut overlay_indexes = HashMap::new();
+    overlay_indexes
+        .try_reserve(overlay_fields.len())
         .map_err(|_allocation| Error::Allocation {
             resource: "overlay field numbers",
             amount: overlay_fields.len(),
         })?;
-    let mut output_field_count = base_fields.len();
-    for field in &overlay_fields {
-        if seen.contains(&field.number) {
+    for (index, field) in overlay_fields.iter().enumerate() {
+        if overlay_indexes.insert(field.number, index).is_some() {
             return Err(Error::InvalidFormat(format!(
                 "singular protobuf overlay field {} occurs multiple times",
                 field.number
             )));
         }
-        seen.push(field.number);
     }
 
-    let mut output = clone_output(base, limits)?;
-    for overlay_field in overlay_fields {
-        let fields = parse_wire_fields(&output)?;
-        let mut match_count = 0usize;
-        let mut existing = None;
-        for field in &fields {
-            if field.number == overlay_field.number {
-                match_count += 1;
-                existing = Some(*field);
-            }
-        }
-        if match_count > 1 {
+    let mut base_entries = HashMap::new();
+    base_entries
+        .try_reserve(base_fields.len())
+        .map_err(|_allocation| Error::Allocation {
+            resource: "base field numbers",
+            amount: base_fields.len(),
+        })?;
+    for (index, field) in base_fields.iter().enumerate() {
+        let entry = base_entries.entry(field.number).or_insert((index, 0usize));
+        entry.1 = entry
+            .1
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormat("protobuf field-count overflow".to_owned()))?;
+    }
+
+    let mut appended_fields = 0usize;
+    for overlay_field in &overlay_fields {
+        let Some(&(base_index, base_count)) = base_entries.get(&overlay_field.number) else {
+            appended_fields = appended_fields
+                .checked_add(1)
+                .ok_or_else(|| Error::InvalidFormat("protobuf field-count overflow".to_owned()))?;
+            continue;
+        };
+        if base_count > 1 {
             return Err(Error::InvalidFormat(format!(
                 "singular protobuf base field {} occurs multiple times",
                 overlay_field.number
             )));
         }
-        let replacement = &overlay[overlay_field.start..overlay_field.end];
-        if let Some(existing_field) = existing {
-            if existing_field.wire_type != overlay_field.wire_type {
-                return Err(Error::InvalidFormat(format!(
-                    "protobuf field {} changes wire type during overlay",
-                    overlay_field.number
-                )));
-            }
-            let old_length = existing_field.end - existing_field.start;
-            let additional = replacement.len().saturating_sub(old_length);
-            reserve_output(&mut output, additional, limits)?;
-            output.splice(
-                existing_field.start..existing_field.end,
-                replacement.iter().copied(),
-            );
-        } else {
-            output_field_count = output_field_count
-                .checked_add(1)
-                .ok_or_else(|| Error::InvalidFormat("protobuf field-count overflow".to_owned()))?;
-            ensure_field_count(output_field_count, limits)?;
-            reserve_output(&mut output, replacement.len(), limits)?;
-            output.extend_from_slice(replacement);
+        if base_fields[base_index].wire_type != overlay_field.wire_type {
+            return Err(Error::InvalidFormat(format!(
+                "protobuf field {} changes wire type during overlay",
+                overlay_field.number
+            )));
         }
     }
+
+    let output_field_count = base_fields
+        .len()
+        .checked_add(appended_fields)
+        .ok_or_else(|| Error::InvalidFormat("protobuf field-count overflow".to_owned()))?;
+    ensure_field_count(output_field_count, limits)?;
+
+    let mut output_size = 0usize;
+    for field in &base_fields {
+        let field_size = overlay_indexes.get(&field.number).map_or_else(
+            || field.end - field.start,
+            |&index| {
+                let replacement = &overlay_fields[index];
+                replacement.end - replacement.start
+            },
+        );
+        output_size = output_size
+            .checked_add(field_size)
+            .ok_or_else(|| Error::InvalidFormat("protobuf output size overflow".to_owned()))?;
+    }
+    for field in &overlay_fields {
+        if !base_entries.contains_key(&field.number) {
+            output_size = output_size
+                .checked_add(field.end - field.start)
+                .ok_or_else(|| Error::InvalidFormat("protobuf output size overflow".to_owned()))?;
+        }
+    }
+
+    let mut output = output_with_capacity(output_size, limits)?;
+    for field in &base_fields {
+        if let Some(&index) = overlay_indexes.get(&field.number) {
+            let replacement = &overlay_fields[index];
+            output.extend_from_slice(&overlay[replacement.start..replacement.end]);
+        } else {
+            output.extend_from_slice(&base[field.start..field.end]);
+        }
+    }
+    for field in &overlay_fields {
+        if !base_entries.contains_key(&field.number) {
+            output.extend_from_slice(&overlay[field.start..field.end]);
+        }
+    }
+    debug_assert_eq!(output.len(), output_size);
     Ok(output)
 }
 
@@ -1980,6 +2286,119 @@ mod tests {
 
         assert!(length_field.checked_payload(&overlong_length[..3]).is_err());
         assert!(canonical_key_field.checked_payload(&[]).is_err());
+    }
+
+    #[test]
+    fn source_bound_wire_view_borrows_one_source_and_exposes_field_views() {
+        let mut source = varint_field(1, 7);
+        append_length_delimited_field(&mut source, 2, b"payload").unwrap();
+        let other_source = [0x08, 0x63, 0x12, 0x01, b'x'];
+        let view = parse_wire_view(&source).unwrap();
+        let fields: Vec<_> = view.fields().collect();
+
+        assert_eq!(view.source().as_ptr(), source.as_ptr());
+        assert_eq!(view.as_bytes(), source);
+        assert_eq!(view.len(), 2);
+        assert!(!view.is_empty());
+        assert!(view.get(2).is_none());
+
+        assert_eq!(fields[0].raw(), &source[..2]);
+        assert_eq!(fields[0].key(), &source[..1]);
+        assert_eq!(fields[0].payload(), &source[1..2]);
+        assert_eq!(fields[0].number(), 1);
+        assert_eq!(fields[0].wire_type(), 0);
+        assert_eq!(fields[1].raw(), &source[2..]);
+        assert_eq!(fields[1].key(), &source[2..3]);
+        assert_eq!(fields[1].payload(), b"payload");
+
+        // There is no source argument on a field view. Its payload remains
+        // tied to `source` even when another same-shaped message is present.
+        assert_ne!(other_source, fields[0].raw());
+        assert_eq!(fields[0].canonical_payload().unwrap(), [0x07]);
+        assert_eq!(fields[1].canonical_payload().unwrap(), b"payload");
+    }
+
+    #[test]
+    fn source_bound_wire_views_are_send_and_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+
+        assert_send_sync::<WireView<'static>>();
+        assert_send_sync::<WireFieldView<'static>>();
+    }
+
+    #[test]
+    fn source_bound_wire_view_helpers_reject_noncanonical_framing() {
+        let overlong_key = [0x88, 0x00, 0x07];
+        let key_field = parse_wire_view(&overlong_key).unwrap().get(0).unwrap();
+        assert_eq!(key_field.raw(), overlong_key);
+        assert_eq!(key_field.key(), &overlong_key[..2]);
+        assert_eq!(key_field.payload(), &overlong_key[2..]);
+        assert!(key_field.validate_canonical_key().is_err());
+        assert!(key_field.canonical_key().is_err());
+
+        let overlong_length = [0x0a, 0x81, 0x00, b'x'];
+        let length_field = parse_wire_view(&overlong_length).unwrap().get(0).unwrap();
+        length_field.validate_canonical_key().unwrap();
+        assert!(length_field.validate_canonical_length().is_err());
+        assert!(length_field.validate_canonical_framing().is_err());
+        assert!(length_field.canonical_payload().is_err());
+
+        let canonical = [0x0a, 0x01, b'x'];
+        let canonical_field = parse_wire_view(&canonical).unwrap().get(0).unwrap();
+        assert_eq!(canonical_field.canonical_key().unwrap(), &canonical[..1]);
+        assert_eq!(canonical_field.canonical_payload().unwrap(), b"x");
+        assert!(
+            parse_wire_view(&[0x08, 0x00])
+                .unwrap()
+                .get(0)
+                .unwrap()
+                .validate_canonical_length()
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn source_bound_wire_view_rejects_truncation_and_limits_before_publication() {
+        for truncated in [[0x08].as_slice(), &[0x09, 0x01], &[0x0a, 0x02, b'x']] {
+            assert!(parse_wire_view(truncated).is_err());
+        }
+
+        let mut data = varint_field(1, 1);
+        data.extend(varint_field(2, 2));
+        let one_field = WireLimits::default().with_fields(1).unwrap();
+        assert!(matches!(
+            parse_wire_view_with_limits(&data, one_field),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::Fields,
+                observed: 2,
+                limit: 1,
+            })
+        ));
+
+        let one_byte = WireLimits::default().with_input_bytes(1).unwrap();
+        assert!(matches!(
+            parse_wire_view_with_limits(&data, one_byte),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::InputBytes,
+                observed: 4,
+                limit: 1,
+            })
+        ));
+    }
+
+    #[test]
+    fn source_bound_wire_view_retains_compact_spans_with_fallible_growth() {
+        assert!(size_of::<WireSpan>() <= 32);
+        let data = [0x08, 0x00, 0x10, 0x01];
+        let limits = WireLimits::default().with_fields(1).unwrap();
+        assert!(matches!(
+            WireView::parse_with_limits(&data, limits),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::Fields,
+                observed: 2,
+                limit: 1,
+            })
+        ));
     }
 
     #[test]

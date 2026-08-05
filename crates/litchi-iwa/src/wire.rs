@@ -14,6 +14,10 @@ use crate::Result;
 
 pub(crate) use common_wire::WireField;
 
+pub(crate) fn parse_wire_view(data: &[u8]) -> Result<common_wire::WireView<'_>> {
+    Ok(common_wire::parse_wire_view(data)?)
+}
+
 pub(crate) fn parse_wire_fields(data: &[u8]) -> Result<Vec<WireField>> {
     Ok(common_wire::parse_wire_fields(data)?)
 }

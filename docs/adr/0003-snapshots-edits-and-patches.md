@@ -33,6 +33,13 @@ fields at every modeled reference-line nesting level and validate a staged
 opaque-field candidate before publishing it. Public format editors publish
 only after their staged CRUD operation and typed readback succeed.
 
+The strict reference-line readers now parse through the common source-bound
+`WireView<'a>` once and expose `WireFieldView<'a>` values tied to that source.
+Canonical key and length framing is checked before a recognized payload is
+interpreted; mutation continues through the shared bounded patch primitives.
+This keeps borrowed inspection allocation-conscious without weakening the
+transactional publication boundary.
+
 ## Identity and selection
 
 Handles carry snapshot lineage and stable internal identity. Public lookup is

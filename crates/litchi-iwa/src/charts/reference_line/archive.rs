@@ -20,8 +20,7 @@ use crate::package_metadata::{
 };
 use crate::protobuf::{tsch, tsp, tss};
 use crate::wire::{
-    WireField, parse_wire_fields, patch_fixed64_field, patch_length_delimited_field,
-    patch_varint_field,
+    parse_wire_view, patch_fixed64_field, patch_length_delimited_field, patch_varint_field,
 };
 use crate::{Error, IWorkPackage, Result};
 
@@ -981,7 +980,7 @@ fn strict_optional_bool(data: &[u8], field_number: u32) -> Result<Option<bool>> 
 }
 
 fn strict_optional_varint(data: &[u8], field_number: u32) -> Result<Option<u64>> {
-    let fields = parse_wire_fields(data)?;
+    let fields = parse_wire_view(data)?;
     let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
@@ -996,8 +995,8 @@ fn strict_optional_varint(data: &[u8], field_number: u32) -> Result<Option<u64>>
             "chart reference-line field {field_number} is not a varint"
         )));
     }
-    validate_canonical_field(data, field, false)?;
-    let payload = field.checked_payload(data)?;
+    field.validate_canonical_key()?;
+    let payload = field.payload();
     let (value, consumed) =
         litchi_iwa_common::varint::decode_varint_from_bytes(payload).map_err(|error| {
             Error::InvalidFormat(format!(
@@ -1013,7 +1012,7 @@ fn strict_optional_varint(data: &[u8], field_number: u32) -> Result<Option<u64>>
 }
 
 fn strict_optional_message(data: &[u8], field_number: u32) -> Result<Option<&[u8]>> {
-    let fields = parse_wire_fields(data)?;
+    let fields = parse_wire_view(data)?;
     let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
@@ -1028,8 +1027,8 @@ fn strict_optional_message(data: &[u8], field_number: u32) -> Result<Option<&[u8
             "chart reference-line field {field_number} is not length-delimited"
         )));
     }
-    validate_canonical_field(data, field, true)?;
-    Ok(Some(field.checked_payload(data)?))
+    field.validate_canonical_framing()?;
+    Ok(Some(field.payload()))
 }
 
 fn read_custom_value(data: &[u8]) -> Result<Value> {
@@ -1041,7 +1040,7 @@ fn read_custom_value(data: &[u8]) -> Result<Value> {
 }
 
 fn strict_optional_fixed64(data: &[u8], field_number: u32) -> Result<Option<u64>> {
-    let fields = parse_wire_fields(data)?;
+    let fields = parse_wire_view(data)?;
     let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
@@ -1056,22 +1055,14 @@ fn strict_optional_fixed64(data: &[u8], field_number: u32) -> Result<Option<u64>
             "chart reference-line field {field_number} is not fixed64"
         )));
     }
-    validate_canonical_field(data, field, false)?;
-    let payload = field.checked_payload(data)?;
+    field.validate_canonical_key()?;
+    let payload = field.payload();
     let bytes: [u8; 8] = payload.try_into().map_err(|_| {
         Error::InvalidFormat(format!(
             "chart reference-line field {field_number} has an invalid fixed64 payload"
         ))
     })?;
     Ok(Some(u64::from_le_bytes(bytes)))
-}
-
-fn validate_canonical_field(data: &[u8], field: &WireField, length_delimited: bool) -> Result<()> {
-    field.validate_canonical_key(data)?;
-    if length_delimited {
-        field.validate_canonical_length(data)?;
-    }
-    Ok(())
 }
 
 fn raw_i32(value: u64) -> Result<i32> {
