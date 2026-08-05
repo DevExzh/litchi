@@ -105,6 +105,62 @@ impl Native {
     }
 }
 
+/// The coordinate-space bounds carried by an OfficeArt `FSPGR` atom.
+///
+/// The bounds define the coordinate system in which child-shape anchors are
+/// expressed. The original `Spgr` record remains available through
+/// [`Shape::meta`] so future or producer-specific records stay lossless.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Bounds {
+    /// Left boundary of the group coordinate system.
+    pub left: i32,
+    /// Top boundary of the group coordinate system.
+    pub top: i32,
+    /// Right boundary of the group coordinate system.
+    pub right: i32,
+    /// Bottom boundary of the group coordinate system.
+    pub bottom: i32,
+}
+
+impl Bounds {
+    /// Creates group coordinate-space bounds from their four wire values.
+    #[inline]
+    pub const fn new(left: i32, top: i32, right: i32, bottom: i32) -> Self {
+        Self {
+            left,
+            top,
+            right,
+            bottom,
+        }
+    }
+
+    /// Returns the checked horizontal extent.
+    #[inline]
+    pub const fn width(&self) -> Option<i32> {
+        self.right.checked_sub(self.left)
+    }
+
+    /// Returns the checked vertical extent.
+    #[inline]
+    pub const fn height(&self) -> Option<i32> {
+        self.bottom.checked_sub(self.top)
+    }
+
+    /// Decodes one exact `[MS-ODRAW]` `FSPGR` record without copying its
+    /// payload. The four fixed-width coordinates are decoded by value, while
+    /// the record and any neighboring unknown records remain borrowed by the
+    /// containing shape.
+    pub fn from_record(record: &Record<'_>) -> Result<Self> {
+        validate_atom(record, RecordKind::Spgr, 1, Some(0), 16)?;
+        Ok(Self::new(
+            coordinate(record.data(), 0)?,
+            coordinate(record.data(), 4)?,
+            coordinate(record.data(), 8)?,
+            coordinate(record.data(), 12)?,
+        ))
+    }
+}
+
 /// A parsed OfficeArt shape borrowing all variable-length data from its input.
 ///
 /// The type intentionally does not implement `Clone`: callers move shape trees
@@ -118,6 +174,7 @@ pub struct Shape<'data> {
     flags: Flags,
     props: Props<'data>,
     anchor: Option<Anchor>,
+    group_bounds: Option<Bounds>,
     children: Vec<Shape<'data>>,
     container: Container<'data>,
     meta: Container<'data>,
@@ -158,6 +215,11 @@ impl<'data> Shape<'data> {
     /// PPT, and XLS callers decode those through [`Shape::client_anchor`].
     pub const fn anchor(&self) -> Option<&Anchor> {
         self.anchor.as_ref()
+    }
+
+    /// Returns the group coordinate system used by child-shape anchors.
+    pub const fn group_bounds(&self) -> Option<&Bounds> {
+        self.group_bounds.as_ref()
     }
 
     /// Borrows child shapes without copying the tree.
@@ -475,6 +537,7 @@ fn build<'data>(
 ) -> Result<Shape<'data>> {
     let mut records = scan_meta(&meta, budget)?;
     let (id, native_kind, flags, anchor) = validate_meta(&records, group, role)?;
+    let group_bounds = records.spgr.as_ref().map(Bounds::from_record).transpose()?;
     let props = records.primary.take().unwrap_or_else(Props::new);
     let kind = if group {
         if records
@@ -498,6 +561,7 @@ fn build<'data>(
         flags,
         props,
         anchor,
+        group_bounds,
         children,
         container,
         meta,
@@ -770,6 +834,19 @@ fn next_depth(depth: u16) -> Result<u16> {
     })
 }
 
+fn coordinate(data: &[u8], offset: usize) -> Result<i32> {
+    let end = offset.checked_add(4).ok_or(Error::ArithmeticOverflow {
+        context: "group coordinate extent",
+    })?;
+    let bytes = data.get(offset..end).ok_or(Error::MalformedShape {
+        reason: "group coordinate atom payload is truncated",
+    })?;
+    let bytes: [u8; 4] = bytes.try_into().map_err(|_| Error::MalformedShape {
+        reason: "group coordinate atom payload is truncated",
+    })?;
+    Ok(i32::from_le_bytes(bytes))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -831,6 +908,8 @@ mod tests {
 
         let mut group_header_body = Vec::new();
         write::spgr(&mut group_header_body, 0, 0, 1000, 500).expect("write group bounds");
+        let future = Atom::unknown(0xF123, 0).expect("future atom kind");
+        write::atom(&mut group_header_body, 0, future, &[0xAA, 0xBB]).expect("write future atom");
         ShapeBuilder::new(Native::FREEFORM, 3)
             .with_flags(Flags::GROUP | Flags::HAVE_ANCHOR)
             .write(&mut group_header_body)
@@ -878,6 +957,10 @@ mod tests {
         assert!(shapes[0].client_anchor().is_some());
         assert_eq!(shapes[1].kind(), Kind::Group);
         assert_eq!(shapes[1].id(), 3);
+        assert_eq!(
+            shapes[1].group_bounds().copied(),
+            Some(Bounds::new(0, 0, 1000, 500))
+        );
         assert_eq!(shapes[1].children()[0].kind(), Kind::Ellipse);
         assert_eq!(shapes[1].children()[0].id(), 4);
         assert!(
@@ -965,5 +1048,33 @@ mod tests {
                 maximum: 5,
             })
         ));
+    }
+
+    #[test]
+    fn rejects_a_group_coordinate_atom_with_the_wrong_length() {
+        let data = [0_u8; 12];
+        let record = Record::from_parts(RecordKind::Spgr, 1, 0, &data).expect("test record");
+
+        assert!(matches!(
+            Bounds::from_record(&record),
+            Err(Error::MalformedShape {
+                reason: "OfficeArt atom payload length is invalid",
+            })
+        ));
+    }
+
+    #[test]
+    fn typed_group_bounds_do_not_drop_future_records() {
+        let bytes = drawing();
+        let shapes = parse(&bytes).expect("parse drawing");
+        let group = &shapes[1];
+        let extension = group
+            .meta()
+            .find(RecordKind::Unknown(0xF123))
+            .expect("scan unknown record")
+            .expect("future record");
+
+        assert_eq!(extension.data(), &[0xAA, 0xBB]);
+        assert!(extension.data_offset(&bytes).is_some());
     }
 }
