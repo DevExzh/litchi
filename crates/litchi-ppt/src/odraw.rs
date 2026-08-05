@@ -8,6 +8,7 @@
 use litchi_odraw::shape::Shape;
 use litchi_odraw::{Container, Record, RecordKind};
 
+use super::embedded::reference::Reference;
 use super::package::{PptError, Result};
 
 const CLIENT_DATA_RAW_KIND: u16 = 0xf011;
@@ -593,18 +594,12 @@ fn frame(shape: &Shape<'_>) -> Result<Frame> {
         visit_host_record(&mut host_records)?;
         match record.kind {
             EX_OBJ_REF_ATOM => {
-                if record.data.len() < 4 {
-                    return Err(corrupted("ExObjRefAtom is shorter than four bytes"));
-                }
                 if frame.object_id.is_some() {
                     return Err(corrupted(
                         "Shape ClientData contains multiple ExObjRefAtom records",
                     ));
                 }
-                let object_id: [u8; 4] = record.data[..4]
-                    .try_into()
-                    .map_err(|_| corrupted("ExObjRefAtom object ID is not four bytes"))?;
-                frame.object_id = Some(u32::from_le_bytes(object_id));
+                frame.object_id = Some(Reference::parse_payload(record.data)?.id);
                 if frame.kind == FrameKind::Picture {
                     frame.kind = FrameKind::Object;
                 }

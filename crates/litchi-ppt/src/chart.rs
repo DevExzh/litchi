@@ -11,11 +11,8 @@ use litchi_cfb::consts::STGTY_STREAM;
 use litchi_ograph::chart::{Book, Refs};
 use litchi_ograph::{Limits, Package as GraphPackage, PackageRef};
 
+use super::embedded::object::{Collection, ContainerKind, ExternalObject, ObjectSubtype};
 use super::embedded::storage::{Compression, Kind as StorageKind, Storage};
-use super::ole_object::{
-    PowerPointOleContainerKind, PowerPointOleExternalObject, PowerPointOleObjectCollection,
-    PowerPointOleObjectSubtype,
-};
 use super::package::{PptError, Result};
 use super::presentation::Presentation;
 use super::shapes::{PictureFrameKind, ShapeEnum};
@@ -282,10 +279,10 @@ impl Inventory {
     }
 }
 
-fn classify(subtype: PowerPointOleObjectSubtype, program: Option<&str>) -> Option<Kind> {
+fn classify(subtype: ObjectSubtype, program: Option<&str>) -> Option<Kind> {
     match subtype {
-        PowerPointOleObjectSubtype::Graph => return Some(Kind::Graph),
-        PowerPointOleObjectSubtype::ExcelChart => return Some(Kind::Excel),
+        ObjectSubtype::Graph => return Some(Kind::Graph),
+        ObjectSubtype::ExcelChart => return Some(Kind::Excel),
         _ => {},
     }
     let base = program_base(program?);
@@ -353,7 +350,7 @@ fn decode(storage: Storage, limits: Limits) -> Result<Vec<u8>> {
 pub(crate) fn enumerate(presentation: &Presentation, limits: Limits) -> Result<Inventory> {
     let limits = limits.validate()?;
     let document = presentation.live_document_record()?;
-    let Some(objects) = PowerPointOleObjectCollection::parse(&document)? else {
+    let Some(objects) = Collection::parse(&document)? else {
         return Ok(Inventory::default());
     };
     objects.validate_persist_mapping(&presentation.persist_mapping)?;
@@ -365,10 +362,10 @@ pub(crate) fn enumerate(presentation: &Presentation, limits: Limits) -> Result<I
             resource: "PPT chart object identifiers",
         })?;
     for object in &objects.objects {
-        let PowerPointOleExternalObject::Object(definition) = object else {
+        let ExternalObject::Object(definition) = object else {
             continue;
         };
-        if matches!(definition.kind, PowerPointOleContainerKind::Embedded(_))
+        if matches!(definition.kind, ContainerKind::Embedded(_))
             && classify(definition.object.subtype, definition.program_id.as_deref()).is_some()
         {
             if wanted.len() >= MAX_CHART_OBJECTS {
@@ -389,10 +386,10 @@ pub(crate) fn enumerate(presentation: &Presentation, limits: Limits) -> Result<I
             resource: "PPT chart inventory",
         })?;
     for object in objects.objects {
-        let PowerPointOleExternalObject::Object(definition) = object else {
+        let ExternalObject::Object(definition) = object else {
             continue;
         };
-        if !matches!(definition.kind, PowerPointOleContainerKind::Embedded(_)) {
+        if !matches!(definition.kind, ContainerKind::Embedded(_)) {
             continue;
         }
         let Some(kind) = classify(definition.object.subtype, definition.program_id.as_deref())
@@ -598,14 +595,8 @@ mod tests {
 
     #[test]
     fn subtype_and_program_identify_chart_objects() {
-        assert_eq!(
-            classify(PowerPointOleObjectSubtype::Graph, None),
-            Some(Kind::Graph)
-        );
-        assert_eq!(
-            classify(PowerPointOleObjectSubtype::ExcelChart, None),
-            Some(Kind::Excel)
-        );
+        assert_eq!(classify(ObjectSubtype::Graph, None), Some(Kind::Graph));
+        assert_eq!(classify(ObjectSubtype::ExcelChart, None), Some(Kind::Excel));
         for (program, kind) in [
             ("MSGraph.Chart.8", Kind::Graph),
             ("MSGraph.Chart", Kind::Graph),
@@ -616,7 +607,7 @@ mod tests {
             ("EXCEL.CHART.8", Kind::Excel),
         ] {
             assert_eq!(
-                classify(PowerPointOleObjectSubtype::Default, Some(program)),
+                classify(ObjectSubtype::Default, Some(program)),
                 Some(kind),
                 "{program}"
             );
@@ -630,7 +621,7 @@ mod tests {
             "Excel.ChartTool.8",
         ] {
             assert_eq!(
-                classify(PowerPointOleObjectSubtype::Default, Some(program)),
+                classify(ObjectSubtype::Default, Some(program)),
                 None,
                 "{program}"
             );

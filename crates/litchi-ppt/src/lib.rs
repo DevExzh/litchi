@@ -106,7 +106,6 @@ pub mod envelope;
 pub mod envelope_data;
 pub mod escher_textbox;
 pub mod external_media;
-pub mod external_object_ref;
 pub mod font;
 pub mod header_footer;
 pub mod html_publish;
@@ -116,8 +115,6 @@ pub mod main_master;
 pub mod master_style;
 pub mod modify_password;
 pub mod named_shows;
-pub mod ole_editor;
-pub mod ole_object;
 pub mod picture_bullets;
 pub mod placeholder_atom;
 pub mod print_options;
@@ -213,6 +210,12 @@ pub use document_properties::{
     PowerPointPhotoAlbumSettings,
 };
 pub use document_structure::{PowerPointCustomTableStylesPlacement, PowerPointDocumentStructure};
+pub use embedded::object::Editor;
+pub use embedded::object::{
+    Collection, ColorFollow, ContainerKind, Control, Definition, DimensionPolicy, DrawAspect,
+    EmbedPreferences, ExternalObject, LinkInfo, Metadata, ObjectSubtype, ObjectType, UpdateMode,
+};
+pub use embedded::reference::{Reference, Target};
 pub use envelope::PowerPointEnvelopeSettings;
 pub use envelope_data::{
     MSO_ENVELOPE_CLSID, MsoAttachment, MsoEnvelope, MsoEnvelopeText, MsoEnvelopeVersion,
@@ -227,7 +230,6 @@ pub use external_media::{
     PowerPointExternalMovieKind, PowerPointExternalVideo, PowerPointLinkedAudio,
     PowerPointLinkedAudioKind,
 };
-pub use external_object_ref::{PowerPointExternalObjectReference, PowerPointExternalObjectTarget};
 pub use font::{
     EmbeddedPowerPointFont, PowerPointFont, PowerPointFontCollection, PowerPointFontCollections,
     PowerPointFontEmbeddingFlags,
@@ -258,14 +260,6 @@ pub use main_master::{
 pub use master_style::{TextMasterStyle, TextMasterStyleLevel};
 pub use modify_password::PowerPointModifyPassword;
 pub use named_shows::{PowerPointNamedShow, PowerPointNamedShows};
-pub use ole_editor::PowerPointOlePackageEditor;
-pub use ole_object::{
-    PowerPointOleColorFollow, PowerPointOleContainerKind, PowerPointOleControl,
-    PowerPointOleDimensionPolicy, PowerPointOleDrawAspect, PowerPointOleEmbedPreferences,
-    PowerPointOleExternalObject, PowerPointOleLinkInfo, PowerPointOleObjectCollection,
-    PowerPointOleObjectDefinition, PowerPointOleObjectMetadata, PowerPointOleObjectSubtype,
-    PowerPointOleObjectType, PowerPointOleUpdateMode,
-};
 pub use picture_bullets::{PictureBullet, PictureBulletCollection, PictureBulletType};
 pub use placeholder_atom::{
     PowerPointPlaceholderAtom, PowerPointPlaceholderContext, PowerPointPlaceholderEntry,

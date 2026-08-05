@@ -1,4 +1,5 @@
 use super::document_properties::PowerPoint12DocumentProperties;
+use super::embedded::object::Collection;
 use super::embedded::storage::{Kind as StorageKind, Ref as StorageRef, Storage};
 use super::encryption::decrypt_pictures;
 use super::encryption::decrypt_powerpoint_document;
@@ -10,7 +11,6 @@ use super::header_footer::{
 use super::hyperlink::Hyperlinks;
 use super::main_master::PowerPoint12MainMasterMetadata;
 use super::non_zoom_view::PowerPointOutlineSorterViewInformation;
-use super::ole_object::PowerPointOleObjectCollection;
 /// High-performance Presentation API with zero-copy slide parsing.
 use super::package::{PptError, PptOpenOptions, Result};
 use super::parsers::PptRecordParser;
@@ -491,7 +491,7 @@ impl Presentation {
         let Some(media) = PowerPointExternalMediaCollection::parse(document)? else {
             return Ok(None);
         };
-        let _ = PowerPointOleObjectCollection::parse(document)?;
+        let _ = Collection::parse(document)?;
         let sounds = self.embedded_sounds()?;
         media.validate_sound_collection(sounds.as_ref())?;
         Ok(Some(media))
@@ -506,7 +506,7 @@ impl Presentation {
     }
 
     /// Return inert embedded and linked OLE metadata without loading object storage.
-    pub fn ole_objects(&self) -> Result<Option<PowerPointOleObjectCollection>> {
+    pub fn ole_objects(&self) -> Result<Option<Collection>> {
         let records = self.parser.find_records_ref();
         let mut documents = records
             .into_iter()
@@ -519,7 +519,7 @@ impl Presentation {
                 "PowerPoint document has multiple Document containers".to_string(),
             ));
         }
-        let Some(objects) = PowerPointOleObjectCollection::parse(document)? else {
+        let Some(objects) = Collection::parse(document)? else {
             return Ok(None);
         };
         objects.validate_persist_mapping(&self.persist_mapping)?;

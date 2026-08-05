@@ -4,14 +4,12 @@ use std::path::PathBuf;
 use litchi_cfb::OleWriter;
 use litchi_ograph::chart::Kind as GraphKind;
 use litchi_ppt::chart::{Chart, Frame, Kind};
-use litchi_ppt::embedded::storage::{Kind as StorageKind, Storage};
-use litchi_ppt::ole_object::{
-    PowerPointOleColorFollow, PowerPointOleContainerKind, PowerPointOleDimensionPolicy,
-    PowerPointOleDrawAspect, PowerPointOleEmbedPreferences, PowerPointOleExternalObject,
-    PowerPointOleObjectDefinition, PowerPointOleObjectMetadata, PowerPointOleObjectSubtype,
-    PowerPointOleObjectType,
+use litchi_ppt::embedded::object::{
+    ColorFollow, ContainerKind, Definition, DimensionPolicy, DrawAspect, EmbedPreferences,
+    ExternalObject, Metadata, ObjectSubtype, ObjectType,
 };
-use litchi_ppt::{Package, PowerPointOlePackageEditor};
+use litchi_ppt::embedded::storage::{Kind as StorageKind, Storage};
+use litchi_ppt::{Editor, Package};
 
 const BOF: u16 = 0x0809;
 const EOF: u16 = 0x000A;
@@ -78,22 +76,18 @@ fn compound(workbook: &[u8]) -> Vec<u8> {
     out.into_inner()
 }
 
-fn chart_object(
-    id: u32,
-    subtype: PowerPointOleObjectSubtype,
-    program: &str,
-) -> PowerPointOleExternalObject {
-    PowerPointOleExternalObject::Object(PowerPointOleObjectDefinition {
-        kind: PowerPointOleContainerKind::Embedded(PowerPointOleEmbedPreferences {
-            color_follow: PowerPointOleColorFollow::EntireScheme,
+fn chart_object(id: u32, subtype: ObjectSubtype, program: &str) -> ExternalObject {
+    ExternalObject::Object(Definition {
+        kind: ContainerKind::Embedded(EmbedPreferences {
+            color_follow: ColorFollow::EntireScheme,
             cannot_lock_server: false,
-            dimension_policy: PowerPointOleDimensionPolicy::Send,
+            dimension_policy: DimensionPolicy::Send,
             is_word_table: false,
             unused: 0,
         }),
-        object: PowerPointOleObjectMetadata {
-            draw_aspect: PowerPointOleDrawAspect::Content,
-            object_type: PowerPointOleObjectType::Embedded,
+        object: Metadata {
+            draw_aspect: DrawAspect::Content,
+            object_type: ObjectType::Embedded,
             id,
             subtype,
             persist_id: 1, // Reassigned by the package editor.
@@ -110,7 +104,7 @@ fn uncompressed(data: Vec<u8>) -> Storage {
     Storage::uncompressed(StorageKind::OleObject, data).unwrap()
 }
 
-fn editor_with_seed(seed: u32) -> PowerPointOlePackageEditor {
+fn editor_with_seed(seed: u32) -> Editor {
     let original = std::fs::read(fixture("ppt_with_embeded.ppt")).expect("read fixture");
     let mut package = Package::from_reader(Cursor::new(original.clone())).expect("open fixture");
     let presentation = package.presentation().expect("read presentation");
@@ -126,7 +120,7 @@ fn editor_with_seed(seed: u32) -> PowerPointOlePackageEditor {
         "fixture itself must not contain native chart objects"
     );
     objects.id_seed = seed;
-    PowerPointOlePackageEditor::open(original, objects).expect("open package editor")
+    Editor::open(original, objects).expect("open package editor")
 }
 
 #[test]
@@ -134,19 +128,19 @@ fn graph_and_excel_objects_use_neutral_typed_views() {
     let mut editor = editor_with_seed(9);
     editor
         .add(
-            chart_object(7, PowerPointOleObjectSubtype::Graph, "MSGraph.Chart.8"),
+            chart_object(7, ObjectSubtype::Graph, "MSGraph.Chart.8"),
             uncompressed(compound(&graph_workbook())),
         )
         .expect("add Graph object");
     editor
         .add(
-            chart_object(8, PowerPointOleObjectSubtype::ExcelChart, "Excel.Chart.8"),
+            chart_object(8, ObjectSubtype::ExcelChart, "Excel.Chart.8"),
             uncompressed(compound(&excel_workbook())),
         )
         .expect("add Excel object");
     editor
         .add(
-            chart_object(9, PowerPointOleObjectSubtype::Graph, "MSGraph.Chart.8"),
+            chart_object(9, ObjectSubtype::Graph, "MSGraph.Chart.8"),
             uncompressed(b"not a compound file".to_vec()),
         )
         .expect("add corrupt object");
@@ -216,7 +210,7 @@ fn program_identifies_chart_when_subtype_is_default() {
     let mut editor = editor_with_seed(7);
     editor
         .add(
-            chart_object(7, PowerPointOleObjectSubtype::Default, "Excel.Chart.8"),
+            chart_object(7, ObjectSubtype::Default, "Excel.Chart.8"),
             uncompressed(compound(&excel_workbook())),
         )
         .expect("add chart");

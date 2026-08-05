@@ -10,7 +10,7 @@ use super::{
     write_extended_time_node,
 };
 use crate::consts::PptRecordType;
-use crate::ole_editor::PowerPointOlePackageEditor;
+use crate::embedded::object::editor::Editor;
 use crate::package::{PptError, Result};
 use crate::records::PptRecord;
 use std::collections::{BTreeSet, HashSet};
@@ -76,7 +76,7 @@ struct PersistAnimation {
 
 #[derive(Clone)]
 pub struct PowerPointAnimationEditor {
-    package: PowerPointOlePackageEditor,
+    package: Editor,
     entries: Vec<PersistAnimation>,
     limits: PowerPointAnimationEditorLimits,
     changed: bool,
@@ -85,7 +85,7 @@ pub struct PowerPointAnimationEditor {
 impl PowerPointAnimationEditor {
     pub fn open(bytes: Vec<u8>, limits: PowerPointAnimationEditorLimits) -> Result<Self> {
         validate_limits(limits)?;
-        let package = PowerPointOlePackageEditor::open_records(bytes)?;
+        let package = Editor::open_records(bytes)?;
         let ids = package.persist_ids();
         if ids.len() > limits.max_persist_records {
             return invalid("persisted-record count exceeds animation editor limit");

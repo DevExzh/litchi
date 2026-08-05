@@ -1,6 +1,7 @@
 //! Typed grammar for MS-PPT OfficeArtClientData containers.
 
 use super::package::{PptError, Result};
+use crate::embedded::reference::Reference;
 
 /// OfficeArt record type for OfficeArtClientData.
 pub const OFFICE_ART_CLIENT_DATA_RECORD_TYPE: u16 = 0xF011;
@@ -150,8 +151,12 @@ impl PowerPointClientDataChild {
 
     /// External object ID when this is an ExObjRefAtom.
     pub fn external_object_id(&self) -> Option<u32> {
-        (self.kind == PowerPointClientDataChildKind::ExternalObjectReference)
-            .then(|| u32_at(&self.payload, 0))
+        if self.kind != PowerPointClientDataChildKind::ExternalObjectReference {
+            return None;
+        }
+        Reference::parse_payload(&self.payload)
+            .ok()
+            .map(|reference| reference.id)
     }
 
     /// PowerPoint 12 shape ID when this is the corresponding round-trip atom.
@@ -214,7 +219,7 @@ impl PowerPointClientDataChild {
                 }
             },
             PowerPointClientDataChildKind::ExternalObjectReference => {
-                require_len(&self.payload, 4, "ExObjRefAtom")?;
+                Reference::parse_payload(&self.payload)?;
             },
             PowerPointClientDataChildKind::Placeholder => {
                 require_len(&self.payload, 8, "PlaceholderAtom")?;

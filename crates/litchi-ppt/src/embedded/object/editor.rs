@@ -1,9 +1,9 @@
 //! Transactional persisted-record rewrite for PowerPoint OLE objects.
 
-use super::PptError;
-use super::embedded::storage::Storage;
-use super::ole_object::{PowerPointOleExternalObject, PowerPointOleObjectCollection};
-use super::writer::{PersistPtrBuilder, UserEditAtom};
+use super::{Collection, ExternalObject};
+use crate::embedded::storage::Storage;
+use crate::package::PptError;
+use crate::writer::{PersistPtrBuilder, UserEditAtom};
 use litchi_cfb::{OleFile, OleWriter};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::Cursor;
@@ -18,7 +18,7 @@ const MAX_NESTED_RECORD_DEPTH: usize = 256;
 
 /// Appends a new PPT incremental edit; existing persisted bytes never move.
 #[derive(Clone)]
-pub struct PowerPointOlePackageEditor {
+pub struct Editor {
     original: Vec<u8>,
     streams: Vec<(Vec<String>, Vec<u8>)>,
     document_path: Vec<String>,
@@ -28,15 +28,15 @@ pub struct PowerPointOlePackageEditor {
     mappings: BTreeMap<u32, u32>,
     current_edit_offset: u32,
     document_persist_id: u32,
-    collection: PowerPointOleObjectCollection,
+    collection: Collection,
     staged_storage: HashMap<u32, Vec<u8>>,
     removed_persist_ids: HashSet<u32>,
     rewrite_object_list: bool,
     changed: bool,
 }
 
-impl PowerPointOlePackageEditor {
-    pub fn open(bytes: Vec<u8>, collection: PowerPointOleObjectCollection) -> Result<Self> {
+impl Editor {
+    pub fn open(bytes: Vec<u8>, collection: Collection) -> Result<Self> {
         let mut ole = OleFile::open(Cursor::new(bytes.clone()))?;
         let paths = ole.list_streams();
         if paths.iter().flatten().any(|name| {
@@ -112,7 +112,7 @@ impl PowerPointOlePackageEditor {
     pub fn open_records(bytes: Vec<u8>) -> Result<Self> {
         Self::open(
             bytes,
-            PowerPointOleObjectCollection {
+            Collection {
                 id_seed: 1,
                 objects: Vec::new(),
             },
@@ -161,15 +161,11 @@ impl PowerPointOlePackageEditor {
         Ok(())
     }
 
-    pub fn objects(&self) -> &PowerPointOleObjectCollection {
+    pub fn objects(&self) -> &Collection {
         &self.collection
     }
 
-    pub fn add(
-        &mut self,
-        mut object: PowerPointOleExternalObject,
-        storage: Storage,
-    ) -> Result<u32> {
+    pub fn add(&mut self, mut object: ExternalObject, storage: Storage) -> Result<u32> {
         let persist_id = self.next_persist_id()?;
         set_persist_id(&mut object, persist_id);
         let mut candidate = self.clone();
@@ -200,7 +196,7 @@ impl PowerPointOlePackageEditor {
         Ok(())
     }
 
-    pub fn remove(&mut self, id: u32) -> Result<PowerPointOleExternalObject> {
+    pub fn remove(&mut self, id: u32) -> Result<ExternalObject> {
         let mut candidate = self.clone();
         let removed = candidate.collection.remove(id)?;
         let persist = removed.persist_id();
@@ -325,10 +321,10 @@ impl PowerPointOlePackageEditor {
     }
 }
 
-fn set_persist_id(object: &mut PowerPointOleExternalObject, persist_id: u32) {
+fn set_persist_id(object: &mut ExternalObject, persist_id: u32) {
     match object {
-        PowerPointOleExternalObject::Object(value) => value.object.persist_id = persist_id,
-        PowerPointOleExternalObject::ActiveXControl(value) => value.object.persist_id = persist_id,
+        ExternalObject::Object(value) => value.object.persist_id = persist_id,
+        ExternalObject::ActiveXControl(value) => value.object.persist_id = persist_id,
     }
 }
 

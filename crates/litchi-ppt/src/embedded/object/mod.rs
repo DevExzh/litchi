@@ -3,13 +3,17 @@
 //! This module never loads an embedded storage, invokes COM, starts an OLE
 //! server, follows a link, or executes object content.
 
-use super::external_media::PowerPointExternalMediaCollection;
-use super::hyperlink::Hyperlinks;
-use super::package::{PptError, Result};
-use super::persist::PersistMapping;
-use super::records::PptRecord;
 use crate::consts::PptRecordType;
+use crate::external_media::PowerPointExternalMediaCollection;
+use crate::hyperlink::Hyperlinks;
+use crate::package::{PptError, Result};
+use crate::persist::PersistMapping;
+use crate::records::PptRecord;
 use std::collections::HashSet;
+
+pub mod editor;
+
+pub use editor::Editor;
 
 const MAX_OLE_NAME_UNITS: usize = 32_768;
 const MAX_METAFILE_BYTES: usize = 64 * 1_048_576;
@@ -17,14 +21,14 @@ const MAX_OLE_OBJECTS: usize = 4_096;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u32)]
-pub enum PowerPointOleDrawAspect {
+pub enum DrawAspect {
     Content = 1,
     Thumbnail = 2,
     Icon = 4,
     DocumentPrint = 8,
 }
 
-impl PowerPointOleDrawAspect {
+impl DrawAspect {
     fn parse(value: u32) -> Result<Self> {
         match value {
             1 => Ok(Self::Content),
@@ -38,13 +42,13 @@ impl PowerPointOleDrawAspect {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u32)]
-pub enum PowerPointOleObjectType {
+pub enum ObjectType {
     Embedded = 0,
     Linked = 1,
     ActiveXControl = 2,
 }
 
-impl PowerPointOleObjectType {
+impl ObjectType {
     fn parse(value: u32) -> Result<Self> {
         match value {
             0 => Ok(Self::Embedded),
@@ -57,7 +61,7 @@ impl PowerPointOleObjectType {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u32)]
-pub enum PowerPointOleObjectSubtype {
+pub enum ObjectSubtype {
     Default = 0,
     ClipArtGallery = 1,
     WordTable = 2,
@@ -76,7 +80,7 @@ pub enum PowerPointOleObjectSubtype {
     MediaPlayer = 15,
 }
 
-impl PowerPointOleObjectSubtype {
+impl ObjectSubtype {
     fn parse(value: u32) -> Result<Self> {
         match value {
             0 => Ok(Self::Default),
@@ -102,16 +106,16 @@ impl PowerPointOleObjectSubtype {
 
 /// The exact 24-byte payload of an `ExOleObjAtom`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PowerPointOleObjectMetadata {
-    pub draw_aspect: PowerPointOleDrawAspect,
-    pub object_type: PowerPointOleObjectType,
+pub struct Metadata {
+    pub draw_aspect: DrawAspect,
+    pub object_type: ObjectType,
     pub id: u32,
-    pub subtype: PowerPointOleObjectSubtype,
+    pub subtype: ObjectSubtype,
     pub persist_id: u32,
     pub unused: [u8; 4],
 }
 
-impl PowerPointOleObjectMetadata {
+impl Metadata {
     pub fn parse(record: &PptRecord) -> Result<Self> {
         require_atom(
             record,
@@ -122,10 +126,10 @@ impl PowerPointOleObjectMetadata {
             "ExOleObjAtom",
         )?;
         let value = Self {
-            draw_aspect: PowerPointOleDrawAspect::parse(u32_at(&record.data, 0))?,
-            object_type: PowerPointOleObjectType::parse(u32_at(&record.data, 4))?,
+            draw_aspect: DrawAspect::parse(u32_at(&record.data, 0))?,
+            object_type: ObjectType::parse(u32_at(&record.data, 4))?,
             id: u32_at(&record.data, 8),
-            subtype: PowerPointOleObjectSubtype::parse(u32_at(&record.data, 12))?,
+            subtype: ObjectSubtype::parse(u32_at(&record.data, 12))?,
             persist_id: u32_at(&record.data, 16),
             unused: record.data[20..24].try_into().expect("fixed slice"),
         };
@@ -162,13 +166,13 @@ impl PowerPointOleObjectMetadata {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u32)]
-pub enum PowerPointOleColorFollow {
+pub enum ColorFollow {
     None = 0,
     EntireScheme = 1,
     TextAndBackground = 2,
 }
 
-impl PowerPointOleColorFollow {
+impl ColorFollow {
     fn parse(value: u32) -> Result<Self> {
         match value {
             0 => Ok(Self::None),
@@ -181,13 +185,13 @@ impl PowerPointOleColorFollow {
 
 /// The recommendation-level dimension policy preserves producer-defined bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PowerPointOleDimensionPolicy {
+pub enum DimensionPolicy {
     Send,
     Omit,
     ProducerDefined(u8),
 }
 
-impl PowerPointOleDimensionPolicy {
+impl DimensionPolicy {
     fn parse(value: u8) -> Self {
         match value {
             0 => Self::Send,
@@ -207,15 +211,15 @@ impl PowerPointOleDimensionPolicy {
 
 /// The exact eight-byte payload of an `ExOleEmbedAtom`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PowerPointOleEmbedPreferences {
-    pub color_follow: PowerPointOleColorFollow,
+pub struct EmbedPreferences {
+    pub color_follow: ColorFollow,
     pub cannot_lock_server: bool,
-    pub dimension_policy: PowerPointOleDimensionPolicy,
+    pub dimension_policy: DimensionPolicy,
     pub is_word_table: bool,
     pub unused: u8,
 }
 
-impl PowerPointOleEmbedPreferences {
+impl EmbedPreferences {
     pub fn parse(record: &PptRecord) -> Result<Self> {
         require_atom(
             record,
@@ -226,9 +230,9 @@ impl PowerPointOleEmbedPreferences {
             "ExOleEmbedAtom",
         )?;
         Ok(Self {
-            color_follow: PowerPointOleColorFollow::parse(u32_at(&record.data, 0))?,
+            color_follow: ColorFollow::parse(u32_at(&record.data, 0))?,
             cannot_lock_server: parse_bool(record.data[4], "fCantLockServer")?,
-            dimension_policy: PowerPointOleDimensionPolicy::parse(record.data[5]),
+            dimension_policy: DimensionPolicy::parse(record.data[5]),
             is_word_table: parse_bool(record.data[6], "fIsTable")?,
             unused: record.data[7],
         })
@@ -251,12 +255,12 @@ impl PowerPointOleEmbedPreferences {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u32)]
-pub enum PowerPointOleUpdateMode {
+pub enum UpdateMode {
     Always = 0,
     OnCall = 1,
 }
 
-impl PowerPointOleUpdateMode {
+impl UpdateMode {
     fn parse(value: u32) -> Result<Self> {
         match value {
             0 => Ok(Self::Always),
@@ -268,13 +272,13 @@ impl PowerPointOleUpdateMode {
 
 /// Inert link metadata. No link is followed by this type.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PowerPointOleLinkInfo {
+pub struct LinkInfo {
     pub slide_id: Option<u32>,
-    pub update_mode: PowerPointOleUpdateMode,
+    pub update_mode: UpdateMode,
     pub unused: [u8; 4],
 }
 
-impl PowerPointOleLinkInfo {
+impl LinkInfo {
     pub fn parse(record: &PptRecord) -> Result<Self> {
         require_atom(
             record,
@@ -287,7 +291,7 @@ impl PowerPointOleLinkInfo {
         let slide_id = u32_at(&record.data, 0);
         Ok(Self {
             slide_id: (slide_id != 0).then_some(slide_id),
-            update_mode: PowerPointOleUpdateMode::parse(u32_at(&record.data, 4))?,
+            update_mode: UpdateMode::parse(u32_at(&record.data, 4))?,
             unused: record.data[8..12].try_into().expect("fixed slice"),
         })
     }
@@ -307,16 +311,16 @@ impl PowerPointOleLinkInfo {
 
 /// Container-specific metadata preceding the shared OLE object atom.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PowerPointOleContainerKind {
-    Embedded(PowerPointOleEmbedPreferences),
-    Linked(PowerPointOleLinkInfo),
+pub enum ContainerKind {
+    Embedded(EmbedPreferences),
+    Linked(LinkInfo),
 }
 
 /// A strict, inert `ExOleEmbedContainer` or `ExOleLinkContainer`.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PowerPointOleObjectDefinition {
-    pub kind: PowerPointOleContainerKind,
-    pub object: PowerPointOleObjectMetadata,
+pub struct Definition {
+    pub kind: ContainerKind,
+    pub object: Metadata,
     pub menu_name: Option<String>,
     pub program_id: Option<String>,
     pub clipboard_name: Option<String>,
@@ -326,9 +330,9 @@ pub struct PowerPointOleObjectDefinition {
 
 /// Inert metadata for an `ExControlContainer` ActiveX definition.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PowerPointOleControl {
+pub struct Control {
     pub slide_id: Option<u32>,
-    pub object: PowerPointOleObjectMetadata,
+    pub object: Metadata,
     pub menu_name: Option<String>,
     pub program_id: Option<String>,
     pub clipboard_name: Option<String>,
@@ -336,7 +340,7 @@ pub struct PowerPointOleControl {
     pub metafile: Option<Vec<u8>>,
 }
 
-impl PowerPointOleControl {
+impl Control {
     pub fn parse(record: &PptRecord) -> Result<Self> {
         if record.version != 0x0f
             || record.instance != 0
@@ -357,8 +361,8 @@ impl PowerPointOleControl {
             "ExControlAtom",
         )?;
         let slide_id = u32_at(&children[0].data, 0);
-        let object = PowerPointOleObjectMetadata::parse(&children[1])?;
-        if object.object_type != PowerPointOleObjectType::ActiveXControl {
+        let object = Metadata::parse(&children[1])?;
+        if object.object_type != ObjectType::ActiveXControl {
             return corrupted("ExControlContainer requires an ActiveX ExOleObjAtom");
         }
         let (menu_name, program_id, clipboard_name, metafile) =
@@ -378,7 +382,7 @@ impl PowerPointOleControl {
     }
 
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
-        if self.object.object_type != PowerPointOleObjectType::ActiveXControl {
+        if self.object.object_type != ObjectType::ActiveXControl {
             return corrupted("ExControlContainer requires an ActiveX ExOleObjAtom");
         }
         let mut children = record_bytes(
@@ -399,14 +403,14 @@ impl PowerPointOleControl {
     }
 }
 
-impl PowerPointOleObjectDefinition {
+impl Definition {
     pub fn parse(record: &PptRecord) -> Result<Self> {
         if record.version != 0x0f || record.instance != 0 {
             return corrupted("OLE object container has an invalid header");
         }
         let expected_type = match record.record_type {
-            PptRecordType::ExternalOleEmbed => PowerPointOleObjectType::Embedded,
-            PptRecordType::ExternalOleLink => PowerPointOleObjectType::Linked,
+            PptRecordType::ExternalOleEmbed => ObjectType::Embedded,
+            PptRecordType::ExternalOleLink => ObjectType::Linked,
             _ => return corrupted("OLE object container has an invalid record type"),
         };
         let children = PptRecord::parse_sequence_strict(&record.data, "OLE object container")?;
@@ -414,15 +418,11 @@ impl PowerPointOleObjectDefinition {
             return corrupted("OLE object container has an invalid child count");
         }
         let kind = match expected_type {
-            PowerPointOleObjectType::Embedded => PowerPointOleContainerKind::Embedded(
-                PowerPointOleEmbedPreferences::parse(&children[0])?,
-            ),
-            PowerPointOleObjectType::Linked => {
-                PowerPointOleContainerKind::Linked(PowerPointOleLinkInfo::parse(&children[0])?)
-            },
-            PowerPointOleObjectType::ActiveXControl => unreachable!("container type is bounded"),
+            ObjectType::Embedded => ContainerKind::Embedded(EmbedPreferences::parse(&children[0])?),
+            ObjectType::Linked => ContainerKind::Linked(LinkInfo::parse(&children[0])?),
+            ObjectType::ActiveXControl => unreachable!("container type is bounded"),
         };
-        let object = PowerPointOleObjectMetadata::parse(&children[1])?;
+        let object = Metadata::parse(&children[1])?;
         if object.object_type != expected_type {
             return corrupted("OLE container type disagrees with ExOleObjAtom");
         }
@@ -478,14 +478,14 @@ impl PowerPointOleObjectDefinition {
 
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         let (container_type, expected_type, first) = match self.kind {
-            PowerPointOleContainerKind::Embedded(value) => (
+            ContainerKind::Embedded(value) => (
                 PptRecordType::ExternalOleEmbed,
-                PowerPointOleObjectType::Embedded,
+                ObjectType::Embedded,
                 value.to_record_bytes()?,
             ),
-            PowerPointOleContainerKind::Linked(value) => (
+            ContainerKind::Linked(value) => (
                 PptRecordType::ExternalOleLink,
-                PowerPointOleObjectType::Linked,
+                ObjectType::Linked,
                 value.to_record_bytes()?,
             ),
         };
@@ -520,18 +520,18 @@ impl PowerPointOleObjectDefinition {
 
 /// Strict embedded and linked OLE definitions in document order.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PowerPointOleObjectCollection {
+pub struct Collection {
     pub id_seed: u32,
-    pub objects: Vec<PowerPointOleExternalObject>,
+    pub objects: Vec<ExternalObject>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum PowerPointOleExternalObject {
-    Object(PowerPointOleObjectDefinition),
-    ActiveXControl(PowerPointOleControl),
+pub enum ExternalObject {
+    Object(Definition),
+    ActiveXControl(Control),
 }
 
-impl PowerPointOleExternalObject {
+impl ExternalObject {
     pub fn id(&self) -> u32 {
         match self {
             Self::Object(value) => value.object.id,
@@ -554,7 +554,7 @@ impl PowerPointOleExternalObject {
     }
 }
 
-impl PowerPointOleObjectCollection {
+impl Collection {
     pub fn parse(root: &PptRecord) -> Result<Option<Self>> {
         let mut lists = Vec::new();
         collect_external_object_lists(root, &mut lists);
@@ -598,11 +598,9 @@ impl PowerPointOleObjectCollection {
             }
             let object = match child.record_type {
                 PptRecordType::ExternalOleControl => {
-                    PowerPointOleExternalObject::ActiveXControl(PowerPointOleControl::parse(child)?)
+                    ExternalObject::ActiveXControl(Control::parse(child)?)
                 },
-                _ => PowerPointOleExternalObject::Object(PowerPointOleObjectDefinition::parse(
-                    child,
-                )?),
+                _ => ExternalObject::Object(Definition::parse(child)?),
             };
             let id = object.id();
             if id > id_seed {
@@ -637,15 +635,15 @@ impl PowerPointOleObjectCollection {
         Ok(Some(Self { id_seed, objects }))
     }
 
-    pub fn get(&self, id: u32) -> Option<&PowerPointOleExternalObject> {
+    pub fn get(&self, id: u32) -> Option<&ExternalObject> {
         self.objects.iter().find(|object| object.id() == id)
     }
 
-    pub fn find(&self, id: u32) -> Option<&PowerPointOleExternalObject> {
+    pub fn find(&self, id: u32) -> Option<&ExternalObject> {
         self.get(id)
     }
 
-    pub fn add(&mut self, object: PowerPointOleExternalObject) -> Result<()> {
+    pub fn add(&mut self, object: ExternalObject) -> Result<()> {
         let mut candidate = self.objects.clone();
         candidate.push(object);
         validate_collection(self.id_seed, &candidate)?;
@@ -655,7 +653,7 @@ impl PowerPointOleObjectCollection {
 
     pub fn update<F>(&mut self, id: u32, edit: F) -> Result<()>
     where
-        F: FnOnce(&mut PowerPointOleExternalObject) -> Result<()>,
+        F: FnOnce(&mut ExternalObject) -> Result<()>,
     {
         let mut candidate = self.objects.clone();
         let object = candidate
@@ -668,11 +666,7 @@ impl PowerPointOleObjectCollection {
         Ok(())
     }
 
-    pub fn replace(
-        &mut self,
-        id: u32,
-        replacement: PowerPointOleExternalObject,
-    ) -> Result<PowerPointOleExternalObject> {
+    pub fn replace(&mut self, id: u32, replacement: ExternalObject) -> Result<ExternalObject> {
         let mut candidate = self.objects.clone();
         let index = candidate
             .iter()
@@ -684,7 +678,7 @@ impl PowerPointOleObjectCollection {
         Ok(previous)
     }
 
-    pub fn remove(&mut self, id: u32) -> Result<PowerPointOleExternalObject> {
+    pub fn remove(&mut self, id: u32) -> Result<ExternalObject> {
         let index = self
             .objects
             .iter()
@@ -739,7 +733,7 @@ impl PowerPointOleObjectCollection {
     }
 }
 
-fn validate_collection(id_seed: u32, objects: &[PowerPointOleExternalObject]) -> Result<()> {
+fn validate_collection(id_seed: u32, objects: &[ExternalObject]) -> Result<()> {
     if id_seed == 0 || id_seed > i32::MAX as u32 {
         return corrupted("ExObjList identifier seed must fit a positive signed integer");
     }
@@ -945,12 +939,12 @@ fn corrupted<T>(message: impl Into<String>) -> Result<T> {
 mod tests {
     use super::*;
 
-    fn metadata() -> PowerPointOleObjectMetadata {
-        PowerPointOleObjectMetadata {
-            draw_aspect: PowerPointOleDrawAspect::Icon,
-            object_type: PowerPointOleObjectType::Embedded,
+    fn metadata() -> Metadata {
+        Metadata {
+            draw_aspect: DrawAspect::Icon,
+            object_type: ObjectType::Embedded,
             id: 17,
-            subtype: PowerPointOleObjectSubtype::ExcelChart,
+            subtype: ObjectSubtype::ExcelChart,
             persist_id: 9,
             unused: [1, 2, 3, 4],
         }
@@ -959,7 +953,7 @@ mod tests {
     #[test]
     fn ole_object_metadata_roundtrips_exactly() {
         let expected = metadata();
-        let parsed = PowerPointOleObjectMetadata::parse(&expected.to_record().unwrap()).unwrap();
+        let parsed = Metadata::parse(&expected.to_record().unwrap()).unwrap();
         assert_eq!(parsed, expected);
         assert_eq!(
             parsed.to_record_bytes().unwrap(),
@@ -971,9 +965,7 @@ mod tests {
     fn ole_object_metadata_rejects_invalid_domains_and_ids() {
         let mut bytes = metadata().to_record_bytes().unwrap();
         bytes[8..12].copy_from_slice(&99u32.to_le_bytes());
-        assert!(
-            PowerPointOleObjectMetadata::parse(&PptRecord::parse(&bytes, 0).unwrap().0).is_err()
-        );
+        assert!(Metadata::parse(&PptRecord::parse(&bytes, 0).unwrap().0).is_err());
         let mut value = metadata();
         value.persist_id = 0;
         assert!(value.to_record_bytes().is_err());
@@ -981,41 +973,41 @@ mod tests {
 
     #[test]
     fn embed_preferences_preserve_recommendation_and_unused_bytes() {
-        let expected = PowerPointOleEmbedPreferences {
-            color_follow: PowerPointOleColorFollow::TextAndBackground,
+        let expected = EmbedPreferences {
+            color_follow: ColorFollow::TextAndBackground,
             cannot_lock_server: true,
-            dimension_policy: PowerPointOleDimensionPolicy::ProducerDefined(7),
+            dimension_policy: DimensionPolicy::ProducerDefined(7),
             is_word_table: false,
             unused: 0xa5,
         };
-        let parsed = PowerPointOleEmbedPreferences::parse(&expected.to_record().unwrap()).unwrap();
+        let parsed = EmbedPreferences::parse(&expected.to_record().unwrap()).unwrap();
         assert_eq!(parsed, expected);
     }
 
     #[test]
     fn link_info_roundtrips_nullable_slide_and_rejects_update_domain() {
-        let expected = PowerPointOleLinkInfo {
+        let expected = LinkInfo {
             slide_id: None,
-            update_mode: PowerPointOleUpdateMode::OnCall,
+            update_mode: UpdateMode::OnCall,
             unused: [0xde, 0xad, 0xbe, 0xef],
         };
         assert_eq!(
-            PowerPointOleLinkInfo::parse(&expected.to_record().unwrap()).unwrap(),
+            LinkInfo::parse(&expected.to_record().unwrap()).unwrap(),
             expected
         );
         let mut bytes = expected.to_record_bytes().unwrap();
         bytes[12..16].copy_from_slice(&2u32.to_le_bytes());
-        assert!(PowerPointOleLinkInfo::parse(&PptRecord::parse(&bytes, 0).unwrap().0).is_err());
+        assert!(LinkInfo::parse(&PptRecord::parse(&bytes, 0).unwrap().0).is_err());
     }
 
-    fn definition(kind: PowerPointOleContainerKind) -> PowerPointOleObjectDefinition {
+    fn definition(kind: ContainerKind) -> Definition {
         let object_type = match kind {
-            PowerPointOleContainerKind::Embedded(_) => PowerPointOleObjectType::Embedded,
-            PowerPointOleContainerKind::Linked(_) => PowerPointOleObjectType::Linked,
+            ContainerKind::Embedded(_) => ObjectType::Embedded,
+            ContainerKind::Linked(_) => ObjectType::Linked,
         };
-        PowerPointOleObjectDefinition {
+        Definition {
             kind,
-            object: PowerPointOleObjectMetadata {
+            object: Metadata {
                 object_type,
                 ..metadata()
             },
@@ -1028,41 +1020,36 @@ mod tests {
 
     #[test]
     fn embedded_and_linked_containers_roundtrip_canonically() {
-        let embedded = definition(PowerPointOleContainerKind::Embedded(
-            PowerPointOleEmbedPreferences {
-                color_follow: PowerPointOleColorFollow::EntireScheme,
-                cannot_lock_server: true,
-                dimension_policy: PowerPointOleDimensionPolicy::Omit,
-                is_word_table: false,
-                unused: 7,
-            },
-        ));
-        let linked = definition(PowerPointOleContainerKind::Linked(PowerPointOleLinkInfo {
+        let embedded = definition(ContainerKind::Embedded(EmbedPreferences {
+            color_follow: ColorFollow::EntireScheme,
+            cannot_lock_server: true,
+            dimension_policy: DimensionPolicy::Omit,
+            is_word_table: false,
+            unused: 7,
+        }));
+        let linked = definition(ContainerKind::Linked(LinkInfo {
             slide_id: Some(256),
-            update_mode: PowerPointOleUpdateMode::OnCall,
+            update_mode: UpdateMode::OnCall,
             unused: [1, 2, 3, 4],
         }));
         for expected in [embedded, linked] {
-            let parsed =
-                PowerPointOleObjectDefinition::parse(&expected.to_record().unwrap()).unwrap();
+            let parsed = Definition::parse(&expected.to_record().unwrap()).unwrap();
             assert_eq!(parsed, expected);
         }
     }
 
     #[test]
     fn containers_reject_type_mismatch_and_hostile_strings() {
-        let mut value = definition(PowerPointOleContainerKind::Embedded(
-            PowerPointOleEmbedPreferences {
-                color_follow: PowerPointOleColorFollow::None,
-                cannot_lock_server: false,
-                dimension_policy: PowerPointOleDimensionPolicy::Send,
-                is_word_table: false,
-                unused: 0,
-            },
-        ));
-        value.object.object_type = PowerPointOleObjectType::Linked;
+        let mut value = definition(ContainerKind::Embedded(EmbedPreferences {
+            color_follow: ColorFollow::None,
+            cannot_lock_server: false,
+            dimension_policy: DimensionPolicy::Send,
+            is_word_table: false,
+            unused: 0,
+        }));
+        value.object.object_type = ObjectType::Linked;
         assert!(value.to_record_bytes().is_err());
-        value.object.object_type = PowerPointOleObjectType::Embedded;
+        value.object.object_type = ObjectType::Embedded;
         value.program_id = Some("bad\nprogram".into());
         assert!(value.to_record_bytes().is_err());
         value.program_id = Some("x".repeat(MAX_OLE_NAME_UNITS + 1));
@@ -1071,15 +1058,13 @@ mod tests {
 
     #[test]
     fn containers_reject_duplicate_or_out_of_order_optional_atoms() {
-        let value = definition(PowerPointOleContainerKind::Embedded(
-            PowerPointOleEmbedPreferences {
-                color_follow: PowerPointOleColorFollow::None,
-                cannot_lock_server: false,
-                dimension_policy: PowerPointOleDimensionPolicy::Send,
-                is_word_table: false,
-                unused: 0,
-            },
-        ));
+        let value = definition(ContainerKind::Embedded(EmbedPreferences {
+            color_follow: ColorFollow::None,
+            cannot_lock_server: false,
+            dimension_policy: DimensionPolicy::Send,
+            is_word_table: false,
+            unused: 0,
+        }));
         let mut children = value.kind_embedded_bytes_for_test();
         children.extend_from_slice(&value.object.to_record_bytes().unwrap());
         children.extend_from_slice(
@@ -1101,16 +1086,14 @@ mod tests {
             .unwrap(),
         );
         let bytes = record_bytes(0x0f, 0, PptRecordType::ExternalOleEmbed, &children).unwrap();
-        assert!(
-            PowerPointOleObjectDefinition::parse(&PptRecord::parse(&bytes, 0).unwrap().0).is_err()
-        );
+        assert!(Definition::parse(&PptRecord::parse(&bytes, 0).unwrap().0).is_err());
     }
 
-    impl PowerPointOleObjectDefinition {
+    impl Definition {
         fn kind_embedded_bytes_for_test(&self) -> Vec<u8> {
             match self.kind {
-                PowerPointOleContainerKind::Embedded(value) => value.to_record_bytes().unwrap(),
-                PowerPointOleContainerKind::Linked(_) => unreachable!(),
+                ContainerKind::Embedded(value) => value.to_record_bytes().unwrap(),
+                ContainerKind::Linked(_) => unreachable!(),
             }
         }
     }
@@ -1127,37 +1110,31 @@ mod tests {
 
     #[test]
     fn ole_collection_discovers_objects_and_enforces_seed() {
-        let mut first = definition(PowerPointOleContainerKind::Embedded(
-            PowerPointOleEmbedPreferences {
-                color_follow: PowerPointOleColorFollow::None,
-                cannot_lock_server: false,
-                dimension_policy: PowerPointOleDimensionPolicy::Send,
-                is_word_table: false,
-                unused: 0,
-            },
-        ));
+        let mut first = definition(ContainerKind::Embedded(EmbedPreferences {
+            color_follow: ColorFollow::None,
+            cannot_lock_server: false,
+            dimension_policy: DimensionPolicy::Send,
+            is_word_table: false,
+            unused: 0,
+        }));
         first.object.id = 21;
         let root = external_object_list(21, &[first.to_record_bytes().unwrap()]);
-        let parsed = PowerPointOleObjectCollection::parse(&root)
-            .unwrap()
-            .unwrap();
+        let parsed = Collection::parse(&root).unwrap().unwrap();
         assert_eq!(parsed.id_seed, 21);
         assert!(parsed.get(21).is_some());
         let root = external_object_list(20, &[first.to_record_bytes().unwrap()]);
-        assert!(PowerPointOleObjectCollection::parse(&root).is_err());
+        assert!(Collection::parse(&root).is_err());
     }
 
     #[test]
     fn ole_collection_rejects_duplicate_ids() {
-        let first = definition(PowerPointOleContainerKind::Embedded(
-            PowerPointOleEmbedPreferences {
-                color_follow: PowerPointOleColorFollow::None,
-                cannot_lock_server: false,
-                dimension_policy: PowerPointOleDimensionPolicy::Send,
-                is_word_table: false,
-                unused: 0,
-            },
-        ));
+        let first = definition(ContainerKind::Embedded(EmbedPreferences {
+            color_follow: ColorFollow::None,
+            cannot_lock_server: false,
+            dimension_policy: DimensionPolicy::Send,
+            is_word_table: false,
+            unused: 0,
+        }));
         let mut second = first.clone();
         second.object.persist_id += 1;
         let root = external_object_list(
@@ -1167,15 +1144,15 @@ mod tests {
                 second.to_record_bytes().unwrap(),
             ],
         );
-        assert!(PowerPointOleObjectCollection::parse(&root).is_err());
+        assert!(Collection::parse(&root).is_err());
     }
 
     #[test]
     fn activex_control_roundtrips_as_inert_metadata() {
-        let expected = PowerPointOleControl {
+        let expected = Control {
             slide_id: Some(512),
-            object: PowerPointOleObjectMetadata {
-                object_type: PowerPointOleObjectType::ActiveXControl,
+            object: Metadata {
+                object_type: ObjectType::ActiveXControl,
                 ..metadata()
             },
             menu_name: Some("Calendar".into()),
@@ -1183,7 +1160,7 @@ mod tests {
             clipboard_name: None,
             metafile: Some(vec![1, 2, 3]),
         };
-        let parsed = PowerPointOleControl::parse(&expected.to_record().unwrap()).unwrap();
+        let parsed = Control::parse(&expected.to_record().unwrap()).unwrap();
         assert_eq!(parsed, expected);
     }
 }

@@ -46,12 +46,12 @@ use super::escher::{
 };
 use super::hyperlink::{HyperlinkCollection, record_type as hyperlink_record_type};
 use super::records::RecordBuilder;
-use crate::embedded::storage::{Kind as StorageKind, Storage};
-use crate::ole_object::{
-    PowerPointOleColorFollow, PowerPointOleContainerKind, PowerPointOleDimensionPolicy,
-    PowerPointOleDrawAspect, PowerPointOleEmbedPreferences, PowerPointOleObjectDefinition,
-    PowerPointOleObjectMetadata, PowerPointOleObjectSubtype, PowerPointOleObjectType,
+use crate::embedded::object::{
+    ColorFollow, ContainerKind, Definition, DimensionPolicy, DrawAspect, EmbedPreferences,
+    Metadata, ObjectSubtype, ObjectType,
 };
+use crate::embedded::reference::Reference;
+use crate::embedded::storage::{Kind as StorageKind, Storage};
 
 /// MSOSPT value of the OfficeArt frame used for OLE objects ([MS-ODRAW]).
 const MSOSPT_PICTURE_FRAME: u16 = 75;
@@ -221,19 +221,19 @@ pub(crate) struct ChartPlan {
 impl ChartPlan {
     /// The `ExOleEmbedContainer` record declaring this chart object.
     fn embed_container_bytes(&self) -> Result<Vec<u8>, PptWriteError> {
-        PowerPointOleObjectDefinition {
-            kind: PowerPointOleContainerKind::Embedded(PowerPointOleEmbedPreferences {
-                color_follow: PowerPointOleColorFollow::EntireScheme,
+        Definition {
+            kind: ContainerKind::Embedded(EmbedPreferences {
+                color_follow: ColorFollow::EntireScheme,
                 cannot_lock_server: false,
-                dimension_policy: PowerPointOleDimensionPolicy::Send,
+                dimension_policy: DimensionPolicy::Send,
                 is_word_table: false,
                 unused: 0,
             }),
-            object: PowerPointOleObjectMetadata {
-                draw_aspect: PowerPointOleDrawAspect::Content,
-                object_type: PowerPointOleObjectType::Embedded,
+            object: Metadata {
+                draw_aspect: DrawAspect::Content,
+                object_type: ObjectType::Embedded,
                 id: self.ex_obj_id,
-                subtype: PowerPointOleObjectSubtype::ExcelChart,
+                subtype: ObjectSubtype::ExcelChart,
                 persist_id: self.persist_id,
                 unused: [0; 4],
             },
@@ -306,6 +306,12 @@ impl ChartFrame {
         height: i32,
         ex_obj_id: u32,
     ) -> Result<Self, PptError> {
+        if ex_obj_id == 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "chart frame external-object ID must be positive",
+            ));
+        }
         let right = x.checked_add(width).ok_or_else(|| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
@@ -356,7 +362,13 @@ pub(crate) fn build_chart_sp_container(
 
     // ClientData wrapping the ExObjRefAtom that ties the frame to the chart.
     let mut reference = RecordBuilder::new(0x00, 0, EX_OBJ_REF_ATOM);
-    reference.write_data(&frame.ex_obj_id.to_le_bytes());
+    let object_ref = Reference::new(frame.ex_obj_id).map_err(|error| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, error.to_string())
+    })?;
+    let payload = object_ref.to_payload_bytes().map_err(|error| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, error.to_string())
+    })?;
+    reference.write_data(&payload);
     let mut client_data =
         EscherBuilder::new(header_version::CONTAINER, 0, record_type::CLIENT_DATA);
     client_data.add_data(&reference.build()?);
@@ -401,21 +413,17 @@ mod tests {
         }];
         let bytes = build_ex_obj_list(&hyperlinks, &plans).unwrap();
         let (record, _) = crate::records::PptRecord::parse(&bytes, 0).unwrap();
-        let collection = crate::ole_object::PowerPointOleObjectCollection::parse(&record)
+        let collection = crate::embedded::object::Collection::parse(&record)
             .unwrap()
             .expect("chart object list");
         assert_eq!(collection.objects.len(), 1);
-        let crate::ole_object::PowerPointOleExternalObject::Object(definition) =
-            &collection.objects[0]
+        let crate::embedded::object::ExternalObject::Object(definition) = &collection.objects[0]
         else {
             panic!("chart plan produces an embedded object");
         };
         assert_eq!(definition.object.id, 1);
         assert_eq!(definition.object.persist_id, 7);
-        assert_eq!(
-            definition.object.subtype,
-            PowerPointOleObjectSubtype::ExcelChart
-        );
+        assert_eq!(definition.object.subtype, ObjectSubtype::ExcelChart);
         assert_eq!(definition.program_id.as_deref(), Some(EXCEL_CHART_PROG_ID));
     }
 
