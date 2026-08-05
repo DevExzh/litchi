@@ -1,5 +1,5 @@
 use litchi_cfb::{OleFile, OleWriter};
-use litchi_ole_common::object::{Editor, Format, Kind, Limits, discover};
+use litchi_ole_common::object::{Editor, Limits, Target, Targets, discover};
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -7,8 +7,16 @@ fn write_cfb(build: impl FnOnce(&mut OleWriter)) -> Vec<u8> {
     let mut writer = OleWriter::new();
     build(&mut writer);
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.write_to(&mut output).expect("test CFB should write");
     output.into_inner()
+}
+
+fn target(key: &str, path: &[&str]) -> Target {
+    Target::new(key, path.iter().copied()).expect("test target should validate")
+}
+
+fn targets(key: &str, path: &[&str]) -> Targets {
+    Targets::one(target(key, path))
 }
 
 fn ansi(value: &str, output: &mut Vec<u8>) {
@@ -17,7 +25,7 @@ fn ansi(value: &str, output: &mut Vec<u8>) {
     output.push(0);
 }
 
-fn metadata(user_type: &str, prog_id: &str) -> Vec<u8> {
+fn comp_obj(user_type: &str, prog_id: &str) -> Vec<u8> {
     let mut output = vec![0; 28];
     output[12..28].copy_from_slice(&[
         0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0x80, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
@@ -45,167 +53,207 @@ fn native(command: &str, payload: &[u8]) -> Vec<u8> {
 }
 
 fn doc_with_object(obj_info: &[u8]) -> Vec<u8> {
-    let metadata = metadata("Package", "Package");
+    let metadata = comp_obj("Package", "Package");
     let native = native("do-not-run", b"opaque native bytes");
     write_cfb(|writer| {
         writer
             .create_stream(&["WordDocument"], b"unknown-records")
-            .unwrap();
-        writer.create_storage(&["ObjectPool", "_42"]).unwrap();
+            .expect("test stream should write");
+        writer
+            .create_storage(&["ObjectPool", "_42"])
+            .expect("test storage should write");
         writer
             .create_stream(&["ObjectPool", "_42", "\u{3}ObjInfo"], obj_info)
-            .unwrap();
+            .expect("test metadata should write");
         writer
             .create_stream(&["ObjectPool", "_42", "\u{1}CompObj"], &metadata)
-            .unwrap();
+            .expect("test metadata should write");
         writer
             .create_stream(&["ObjectPool", "_42", "\u{1}Ole10Native"], &native)
-            .unwrap();
+            .expect("test native stream should write");
         writer
             .create_stream(&["ObjectPool", "_42", "\u{3}PRINT"], b"metafile")
-            .unwrap();
+            .expect("test preview stream should write");
     })
 }
 
 #[test]
-fn discovers_doc_object_metadata_and_keeps_native_content_inert() {
+fn discovers_only_host_selected_storage_and_keeps_metadata_opaque() {
     let bytes = doc_with_object(&[0x40, 0x00, 0x02, 0x00]);
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
-    let objects = discover(&mut ole, Format::Doc, Limits::default()).unwrap();
-    let object = objects.get("_42").unwrap();
-    assert_eq!(object.storage_ref, Some(42));
-    assert_eq!(object.kind, Kind::Embedded);
-    assert_eq!(object.prog_id.as_deref(), Some("Package"));
-    assert_eq!(object.display_name.as_deref(), Some("Package"));
-    assert_eq!(object.host.as_deref(), Some(&[0x40, 0x00, 0x02, 0x00][..]));
-    assert_eq!(object.native.as_ref().unwrap().command, "do-not-run");
+    let mut ole = OleFile::open(Cursor::new(bytes)).expect("test CFB should open");
+    let selected = targets("host-object", &["ObjectPool", "_42"]);
+    let objects = discover(&mut ole, &selected, Limits::default()).expect("discovery should pass");
+    let object = objects
+        .get("host-object")
+        .expect("target should be present");
+    assert_eq!(object.key(), "host-object");
     assert_eq!(
-        object.native.as_ref().unwrap().data.as_ref(),
-        b"opaque native bytes"
+        object.path(),
+        ["ObjectPool".to_string(), "_42".to_string()].as_slice()
     );
-    assert_eq!(object.previews.len(), 1);
-    assert!(object.compound.starts_with(&[0xD0, 0xCF, 0x11, 0xE0]));
-    assert_eq!(objects.at(0).map(|value| value.id.as_str()), Some("_42"));
+    assert_eq!(
+        object.stream(&["\u{3}ObjInfo"]),
+        Some(&[0x40, 0x00, 0x02, 0x00][..])
+    );
+    assert_eq!(object.streams().len(), 4);
+    assert!(object.stream(&["\u{1}Ole10Native"]).is_some());
+    assert!(object.compound().starts_with(&[0xD0, 0xCF, 0x11, 0xE0]));
+    assert_eq!(objects.at(0).map(|value| value.key()), Some("host-object"));
 }
 
 #[test]
-fn discovers_xls_link_without_resolving_it() {
-    let metadata = metadata("Linked Worksheet", "Excel.Sheet.8");
-    let bytes = write_cfb(|writer| {
-        writer.create_stream(&["Workbook"], b"opaque-biff").unwrap();
-        writer.create_storage(&["LNK0000002A"]).unwrap();
-        writer
-            .create_stream(&["LNK0000002A", "\u{1}CompObj"], &metadata)
-            .unwrap();
-    });
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
-    let objects = discover(&mut ole, Format::Xls, Limits::default()).unwrap();
-    let object = objects.get("LNK0000002A").unwrap();
-    assert_eq!(object.storage_ref, Some(42));
-    assert_eq!(object.kind, Kind::Linked);
-    assert_eq!(object.prog_id.as_deref(), Some("Excel.Sheet.8"));
-    assert_eq!(object.link.as_deref(), Some("Linked Worksheet"));
+fn target_catalog_is_explicit_and_rejects_ambiguous_paths() {
+    let first = target("first", &["Pool", "A"]);
+    let second = target("second", &["Pool", "B"]);
+    let selected = Targets::new([first.clone(), second]).expect("targets should validate");
+    assert_eq!(selected.get("first"), Some(&first));
+    assert!(Targets::new([first.clone(), target("other", &["Pool", "A"])]).is_err());
+    assert!(Targets::new([first, target("first", &["Pool", "C"])]).is_err());
+    assert!(Targets::new([target("parent", &["Pool"]), target("child", &["Pool", "A"]),]).is_err());
 }
 
 #[test]
-fn rejects_malformed_host_and_resource_exhaustion() {
+fn malformed_format_metadata_is_retained_without_common_classification() {
     let malformed = doc_with_object(&[0x00, 0x04, 0x00, 0x00]);
-    let mut ole = OleFile::open(Cursor::new(malformed)).unwrap();
-    assert!(discover(&mut ole, Format::Doc, Limits::default(),).is_err());
+    let mut ole = OleFile::open(Cursor::new(malformed)).expect("test CFB should open");
+    let selected = targets("object", &["ObjectPool", "_42"]);
+    let objects = discover(&mut ole, &selected, Limits::default()).expect("opaque data is valid");
+    assert_eq!(
+        objects
+            .get("object")
+            .expect("object should be present")
+            .stream(&["\u{3}ObjInfo"]),
+        Some(&[0x00, 0x04, 0x00, 0x00][..])
+    );
 
     let valid = doc_with_object(&[0, 0, 0, 0]);
-    let mut ole = OleFile::open(Cursor::new(valid)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(valid)).expect("test CFB should open");
     let limits = Limits {
         max_stream_size: 4,
         ..Limits::default()
     };
-    assert!(discover(&mut ole, Format::Doc, limits,).is_err());
+    assert!(discover(&mut ole, &selected, limits).is_err());
 }
 
 #[test]
-fn collection_mutations_are_atomic_and_validate_ids() {
+fn missing_target_is_a_checked_discovery_error() {
     let bytes = doc_with_object(&[0, 0, 0, 0]);
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
-    let mut objects = discover(&mut ole, Format::Doc, Limits::default()).unwrap();
-    let duplicate = objects.get("_42").unwrap().clone();
-    assert!(objects.add(duplicate).is_err());
-    assert_eq!(objects.as_slice().len(), 1);
-    assert!(
-        objects
-            .update("_42", |object| {
-                object.id.clear();
-                Ok(())
-            })
-            .is_err()
-    );
-    assert!(objects.get("_42").is_some());
-    assert!(objects.reorder(&["missing".to_string()]).is_err());
+    let mut ole = OleFile::open(Cursor::new(bytes)).expect("test CFB should open");
+    let selected = targets("missing", &["ObjectPool", "_404"]);
+    assert!(discover(&mut ole, &selected, Limits::default()).is_err());
 }
 
 #[test]
-fn targeted_replace_preserves_unrelated_streams_and_reference() {
+fn targeted_replace_preserves_unrelated_streams_and_opaque_reference() {
     let original = doc_with_object(&[0, 0, 0, 0]);
-    let replacement_metadata = metadata("Worksheet", "Excel.Sheet.8");
     let replacement = write_cfb(|writer| {
         writer
-            .create_stream(&["\u{1}CompObj"], &replacement_metadata)
-            .unwrap();
+            .create_stream(&["\u{1}CompObj"], &comp_obj("Worksheet", "Excel.Sheet.8"))
+            .expect("replacement metadata should write");
         writer
             .create_stream(&["CONTENTS"], b"new inert workbook bytes")
-            .unwrap();
+            .expect("replacement payload should write");
     });
-    let mut editor = Editor::open(original, Format::Doc, Limits::default()).unwrap();
-    editor.replace("_42", replacement).unwrap();
+    let selected = targets("object", &["ObjectPool", "_42"]);
+    let mut editor =
+        Editor::open(original, selected.clone(), Limits::default()).expect("editor should open");
+    editor
+        .replace("object", replacement)
+        .expect("replacement should commit");
     assert!(editor.is_changed());
-    let output = editor.finish().unwrap();
-    let mut ole = OleFile::open(Cursor::new(output)).unwrap();
+    let output = editor.finish().expect("editor should finish");
+    let mut ole = OleFile::open(Cursor::new(output)).expect("output CFB should open");
     assert_eq!(
-        ole.open_stream(&["WordDocument"]).unwrap(),
+        ole.open_stream(&["WordDocument"])
+            .expect("unrelated stream should remain"),
         b"unknown-records"
     );
     assert_eq!(
-        ole.open_stream(&["ObjectPool", "_42", "CONTENTS"]).unwrap(),
+        ole.open_stream(&["ObjectPool", "_42", "CONTENTS"])
+            .expect("replacement stream should be present"),
         b"new inert workbook bytes"
     );
-    let objects = discover(&mut ole, Format::Doc, Limits::default()).unwrap();
+    let objects = discover(&mut ole, &selected, Limits::default()).expect("reopen should pass");
     assert_eq!(
-        objects.get("_42").unwrap().prog_id.as_deref(),
-        Some("Excel.Sheet.8")
+        objects
+            .get("object")
+            .expect("object should remain selected")
+            .stream(&["\u{1}CompObj"])
+            .expect("opaque metadata should remain"),
+        comp_obj("Worksheet", "Excel.Sheet.8").as_slice()
     );
 }
 
 #[test]
-fn no_op_editor_round_trip_preserves_stream_payloads() {
+fn no_op_editor_round_trip_is_byte_identical() {
     let original = doc_with_object(&[0, 0, 0, 0]);
-    let expected = original.clone();
-    let editor = Editor::open(original, Format::Doc, Limits::default()).unwrap();
+    let editor = Editor::open(
+        original.clone(),
+        targets("object", &["ObjectPool", "_42"]),
+        Limits::default(),
+    )
+    .expect("editor should open");
     assert!(!editor.is_changed());
-    let output = editor.finish().unwrap();
-    assert_eq!(output, expected);
-    let mut ole = OleFile::open(Cursor::new(output)).unwrap();
-    assert_eq!(
-        ole.open_stream(&["WordDocument"]).unwrap(),
-        b"unknown-records"
-    );
-    assert_eq!(
-        ole.open_stream(&["ObjectPool", "_42", "\u{1}Ole10Native"])
-            .unwrap(),
-        native("do-not-run", b"opaque native bytes")
-    );
+    assert_eq!(editor.finish().expect("editor should finish"), original);
 }
 
 #[test]
-fn shared_stream_replacement_reuses_the_validated_allocation() {
+fn failed_replacement_is_transactional() {
     let original = doc_with_object(&[0, 0, 0, 0]);
-    let mut editor = Editor::open(original, Format::Doc, Limits::default()).unwrap();
+    let mut editor = Editor::open(
+        original.clone(),
+        targets("object", &["ObjectPool", "_42"]),
+        Limits::default(),
+    )
+    .expect("editor should open");
+    assert!(editor.replace("object", vec![1, 2, 3]).is_err());
+    assert!(!editor.is_changed());
+    assert_eq!(editor.finish().expect("editor should finish"), original);
+}
+
+#[test]
+fn shared_stream_replacement_reuses_validated_allocation() {
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let mut editor = Editor::open(
+        original,
+        targets("object", &["ObjectPool", "_42"]),
+        Limits::default(),
+    )
+    .expect("editor should open");
     let path = vec!["WordDocument".to_string()];
     let replacement: Arc<[u8]> = Arc::from(&b"shared-word-stream"[..]);
-
     editor
         .put_stream_shared(&path, Arc::clone(&replacement))
-        .unwrap();
-
-    let installed = editor.stream_shared(&path).unwrap();
+        .expect("stream replacement should commit");
+    let installed = editor
+        .stream_shared(&path)
+        .expect("stream should remain available");
     assert!(Arc::ptr_eq(&replacement, &installed));
     assert_eq!(editor.stream(&path), Some(&b"shared-word-stream"[..]));
+}
+
+#[test]
+fn add_and_remove_use_explicit_targets() {
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let mut editor = Editor::open(
+        original,
+        targets("first", &["ObjectPool", "_42"]),
+        Limits::default(),
+    )
+    .expect("editor should open");
+    let nested = write_cfb(|writer| {
+        writer
+            .create_stream(&["CONTENTS"], b"new object")
+            .expect("nested payload should write");
+    });
+    editor
+        .add_storage(target("second", &["ObjectPool", "_43"]), nested)
+        .expect("explicit storage should be added");
+    assert!(editor.objects().get("second").is_some());
+    let removed = editor
+        .remove_storage("second")
+        .expect("explicit storage should be removed");
+    assert!(removed.starts_with(&[0xD0, 0xCF, 0x11, 0xE0]));
+    assert!(editor.objects().get("second").is_none());
+    assert!(editor.objects().get("first").is_some());
 }
