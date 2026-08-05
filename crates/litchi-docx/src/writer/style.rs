@@ -1,9 +1,9 @@
 //! Style writer support for DOCX documents.
 //!
 //! This module provides functionality for creating and writing document styles.
-use crate::enums::WdStyleType;
 use crate::error::Result;
 use crate::styles::Outline;
+use crate::styles::Type;
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
 
@@ -17,10 +17,10 @@ use std::fmt::Write as FmtWrite;
 ///
 /// ```rust,ignore
 /// use litchi_docx::writer::MutableStyle;
-/// use litchi_docx::enums::WdStyleType;
+/// use litchi_docx::styles::Type;
 ///
 /// // Create a custom paragraph style
-/// let mut style = MutableStyle::new("MyStyle", "My Custom Style", WdStyleType::Paragraph);
+/// let mut style = MutableStyle::new("MyStyle", "My Custom Style", Type::Paragraph);
 /// style.set_based_on(Some("Normal".to_string()));
 /// style.set_font_size(Some(24)); // 12pt (half-points)
 /// style.set_bold(true);
@@ -32,7 +32,7 @@ pub struct MutableStyle {
     /// UI-visible name (e.g., "Heading 1")
     name: String,
     /// Type of style (paragraph, character, table, or list)
-    style_type: WdStyleType,
+    style_type: Type,
     /// Whether this is the default style for its type
     is_default: bool,
     /// Whether this is a custom (user-defined) style
@@ -92,14 +92,10 @@ impl MutableStyle {
     /// let style = MutableStyle::new(
     ///     "MyHeading",
     ///     "My Custom Heading",
-    ///     WdStyleType::Paragraph
+    ///     Type::Paragraph
     /// );
     /// ```
-    pub fn new(
-        style_id: impl Into<String>,
-        name: impl Into<String>,
-        style_type: WdStyleType,
-    ) -> Self {
+    pub fn new(style_id: impl Into<String>, name: impl Into<String>, style_type: Type) -> Self {
         Self {
             style_id: style_id.into(),
             name: name.into(),
@@ -147,7 +143,7 @@ impl MutableStyle {
 
     /// Get the style type.
     #[inline]
-    pub fn style_type(&self) -> WdStyleType {
+    pub fn style_type(&self) -> Type {
         self.style_type
     }
 
@@ -331,7 +327,7 @@ impl MutableStyle {
         }
 
         // Paragraph properties (for paragraph and table styles)
-        if matches!(self.style_type, WdStyleType::Paragraph | WdStyleType::Table) {
+        if matches!(self.style_type, Type::Paragraph | Type::Table) {
             let has_para_props = self.alignment.is_some()
                 || self.space_before.is_some()
                 || self.space_after.is_some()
@@ -448,7 +444,7 @@ impl MutableStyle {
     ///
     /// Create a "Normal" paragraph style (base style).
     pub fn normal() -> Self {
-        let mut style = Self::new("Normal", "Normal", WdStyleType::Paragraph);
+        let mut style = Self::new("Normal", "Normal", Type::Paragraph);
         style.set_default(true);
         style.set_custom(false);
         style.set_font_name(Some("Calibri".to_string()));
@@ -458,7 +454,7 @@ impl MutableStyle {
 
     /// Create a "Heading 1" style.
     pub fn heading_1() -> Self {
-        let mut style = Self::new("Heading1", "Heading 1", WdStyleType::Paragraph);
+        let mut style = Self::new("Heading1", "Heading 1", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
         style.set_custom(false);
         style.set_font_name(Some("Calibri Light".to_string()));
@@ -474,7 +470,7 @@ impl MutableStyle {
 
     /// Create a "Heading 2" style.
     pub fn heading_2() -> Self {
-        let mut style = Self::new("Heading2", "Heading 2", WdStyleType::Paragraph);
+        let mut style = Self::new("Heading2", "Heading 2", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
         style.set_custom(false);
         style.set_font_name(Some("Calibri Light".to_string()));
@@ -490,7 +486,7 @@ impl MutableStyle {
 
     /// Create a "Heading 3" style.
     pub fn heading_3() -> Self {
-        let mut style = Self::new("Heading3", "Heading 3", WdStyleType::Paragraph);
+        let mut style = Self::new("Heading3", "Heading 3", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
         style.set_custom(false);
         style.set_font_name(Some("Calibri Light".to_string()));
@@ -506,7 +502,7 @@ impl MutableStyle {
 
     /// Create a "Heading 4" style.
     pub fn heading_4() -> Self {
-        let mut style = Self::new("Heading4", "Heading 4", WdStyleType::Paragraph);
+        let mut style = Self::new("Heading4", "Heading 4", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
         style.set_custom(false);
         style.set_font_name(Some("Calibri Light".to_string()));
@@ -523,7 +519,7 @@ impl MutableStyle {
 
     /// Create a "Heading 5" style.
     pub fn heading_5() -> Self {
-        let mut style = Self::new("Heading5", "Heading 5", WdStyleType::Paragraph);
+        let mut style = Self::new("Heading5", "Heading 5", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
         style.set_custom(false);
         style.set_font_name(Some("Calibri Light".to_string()));
@@ -539,7 +535,7 @@ impl MutableStyle {
 
     /// Create a "Heading 6" style.
     pub fn heading_6() -> Self {
-        let mut style = Self::new("Heading6", "Heading 6", WdStyleType::Paragraph);
+        let mut style = Self::new("Heading6", "Heading 6", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
         style.set_custom(false);
         style.set_font_name(Some("Calibri Light".to_string()));
@@ -556,7 +552,7 @@ impl MutableStyle {
 
     /// Create a "Heading 7" style.
     pub fn heading_7() -> Self {
-        let mut style = Self::new("Heading7", "Heading 7", WdStyleType::Paragraph);
+        let mut style = Self::new("Heading7", "Heading 7", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
         style.set_custom(false);
         style.set_font_name(Some("Calibri Light".to_string()));
@@ -573,7 +569,7 @@ impl MutableStyle {
 
     /// Create a "Heading 8" style.
     pub fn heading_8() -> Self {
-        let mut style = Self::new("Heading8", "Heading 8", WdStyleType::Paragraph);
+        let mut style = Self::new("Heading8", "Heading 8", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
         style.set_custom(false);
         style.set_font_name(Some("Calibri Light".to_string()));
@@ -589,7 +585,7 @@ impl MutableStyle {
 
     /// Create a "Heading 9" style.
     pub fn heading_9() -> Self {
-        let mut style = Self::new("Heading9", "Heading 9", WdStyleType::Paragraph);
+        let mut style = Self::new("Heading9", "Heading 9", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
         style.set_custom(false);
         style.set_font_name(Some("Calibri Light".to_string()));
@@ -606,7 +602,7 @@ impl MutableStyle {
 
     /// Create a "Title" style.
     pub fn title() -> Self {
-        let mut style = Self::new("Title", "Title", WdStyleType::Paragraph);
+        let mut style = Self::new("Title", "Title", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
         style.set_custom(false);
         style.set_font_name(Some("Calibri Light".to_string()));
@@ -622,7 +618,7 @@ impl MutableStyle {
         let mut style = Self::new(
             "DefaultParagraphFont",
             "Default Paragraph Font",
-            WdStyleType::Character,
+            Type::Character,
         );
         style.set_default(true);
         style.set_custom(false);
@@ -632,7 +628,7 @@ impl MutableStyle {
 
     /// Create a TOC heading style (for "Table of Contents" title).
     pub fn toc_heading() -> Self {
-        let mut style = Self::new("TOCHeading", "TOC Heading", WdStyleType::Paragraph);
+        let mut style = Self::new("TOCHeading", "TOC Heading", Type::Paragraph);
         style.set_based_on(Some("Heading1".to_string()));
         style.set_custom(false);
         style.set_priority(Some(39));
@@ -641,7 +637,7 @@ impl MutableStyle {
 
     /// Create a TOC level 1 style.
     pub fn toc1() -> Self {
-        let mut style = Self::new("TOC1", "toc 1", WdStyleType::Paragraph);
+        let mut style = Self::new("TOC1", "toc 1", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
         style.set_custom(false);
         style.set_priority(Some(39));
@@ -651,7 +647,7 @@ impl MutableStyle {
 
     /// Create a TOC level 2 style.
     pub fn toc2() -> Self {
-        let mut style = Self::new("TOC2", "toc 2", WdStyleType::Paragraph);
+        let mut style = Self::new("TOC2", "toc 2", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
         style.set_custom(false);
         style.set_priority(Some(39));
@@ -662,7 +658,7 @@ impl MutableStyle {
 
     /// Create a TOC level 3 style.
     pub fn toc3() -> Self {
-        let mut style = Self::new("TOC3", "toc 3", WdStyleType::Paragraph);
+        let mut style = Self::new("TOC3", "toc 3", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
         style.set_custom(false);
         style.set_priority(Some(39));
@@ -673,7 +669,7 @@ impl MutableStyle {
 
     /// Create a hyperlink character style.
     pub fn hyperlink() -> Self {
-        let mut style = Self::new("Hyperlink", "Hyperlink", WdStyleType::Character);
+        let mut style = Self::new("Hyperlink", "Hyperlink", Type::Character);
         style.set_based_on(Some("DefaultParagraphFont".to_string()));
         style.set_custom(false);
         style.set_priority(Some(99));
@@ -684,7 +680,7 @@ impl MutableStyle {
 
     /// Create a header paragraph style.
     pub fn header() -> Self {
-        let mut style = Self::new("Header", "header", WdStyleType::Paragraph);
+        let mut style = Self::new("Header", "header", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
         style.set_custom(false);
         style.set_priority(Some(99));
@@ -693,7 +689,7 @@ impl MutableStyle {
 
     /// Create a footer paragraph style.
     pub fn footer() -> Self {
-        let mut style = Self::new("Footer", "footer", WdStyleType::Paragraph);
+        let mut style = Self::new("Footer", "footer", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
         style.set_custom(false);
         style.set_priority(Some(99));
@@ -702,7 +698,7 @@ impl MutableStyle {
 
     /// Create a footnote text paragraph style.
     pub fn footnote_text() -> Self {
-        let mut style = Self::new("FootnoteText", "footnote text", WdStyleType::Paragraph);
+        let mut style = Self::new("FootnoteText", "footnote text", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
         style.set_custom(false);
         style.set_priority(Some(99));
@@ -712,7 +708,7 @@ impl MutableStyle {
 
     /// Create an endnote text paragraph style.
     pub fn endnote_text() -> Self {
-        let mut style = Self::new("EndnoteText", "endnote text", WdStyleType::Paragraph);
+        let mut style = Self::new("EndnoteText", "endnote text", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
         style.set_custom(false);
         style.set_priority(Some(99));
@@ -768,16 +764,16 @@ mod tests {
 
     #[test]
     fn test_create_basic_style() {
-        let style = MutableStyle::new("MyStyle", "My Custom Style", WdStyleType::Paragraph);
+        let style = MutableStyle::new("MyStyle", "My Custom Style", Type::Paragraph);
         assert_eq!(style.style_id(), "MyStyle");
         assert_eq!(style.name(), "My Custom Style");
-        assert_eq!(style.style_type(), WdStyleType::Paragraph);
+        assert_eq!(style.style_type(), Type::Paragraph);
         assert!(style.is_custom());
     }
 
     #[test]
     fn test_style_formatting() {
-        let mut style = MutableStyle::new("Formatted", "Formatted Style", WdStyleType::Character);
+        let mut style = MutableStyle::new("Formatted", "Formatted Style", Type::Character);
         style.set_bold(true);
         style.set_italic(true);
         style.set_underline(true);
@@ -794,7 +790,7 @@ mod tests {
 
     #[test]
     fn test_paragraph_properties() {
-        let mut style = MutableStyle::new("ParaStyle", "Paragraph Style", WdStyleType::Paragraph);
+        let mut style = MutableStyle::new("ParaStyle", "Paragraph Style", Type::Paragraph);
         style.set_alignment(Some("center".to_string()));
         style.set_space_before(Some(240));
         style.set_space_after(Some(120));
@@ -868,7 +864,7 @@ mod tests {
 
     #[test]
     fn test_xml_escaping() {
-        let mut style = MutableStyle::new("Test<>&\"'", "Name<>&\"'", WdStyleType::Paragraph);
+        let mut style = MutableStyle::new("Test<>&\"'", "Name<>&\"'", Type::Paragraph);
         style.set_based_on(Some("Base<>&\"'".to_string()));
 
         let xml = style.to_xml().unwrap();

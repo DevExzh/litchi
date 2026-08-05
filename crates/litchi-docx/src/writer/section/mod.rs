@@ -1,5 +1,6 @@
-use crate::enums::{WdHeaderFooter, WdSectionStart};
 use crate::error::{Error, Result};
+use crate::header_footer::Kind;
+use crate::section::Start;
 use quick_xml::events::Event;
 use quick_xml::{Reader, XmlVersion};
 use std::fmt::Write;
@@ -70,7 +71,7 @@ impl PageOrientation {
 /// One header or footer relationship used by a section.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SectionHeaderFooterReference {
-    pub kind: WdHeaderFooter,
+    pub kind: Kind,
     /// Existing relationship ID. `None` binds a default reference to content
     /// created through [`crate::writer::MutableDocument::header`] or `footer`.
     pub relationship_id: Option<String>,
@@ -87,7 +88,7 @@ pub struct SectionHeaderFooterPart {
 }
 
 impl SectionHeaderFooterReference {
-    pub fn existing(kind: WdHeaderFooter, relationship_id: impl Into<String>) -> Self {
+    pub fn existing(kind: Kind, relationship_id: impl Into<String>) -> Self {
         Self {
             kind,
             relationship_id: Some(relationship_id.into()),
@@ -95,7 +96,7 @@ impl SectionHeaderFooterReference {
         }
     }
 
-    pub fn owned(kind: WdHeaderFooter, key: impl Into<String>, xml: impl Into<String>) -> Self {
+    pub fn owned(kind: Kind, key: impl Into<String>, xml: impl Into<String>) -> Self {
         Self {
             kind,
             relationship_id: None,
@@ -106,7 +107,7 @@ impl SectionHeaderFooterReference {
         }
     }
 
-    pub fn managed_default(kind: WdHeaderFooter) -> Self {
+    pub fn managed_default(kind: Kind) -> Self {
         Self {
             kind,
             relationship_id: None,
@@ -970,7 +971,7 @@ pub struct SectionProperties {
     pub header_distance: u32,
     pub footer_distance: u32,
     pub gutter: u32,
-    pub start_type: Option<WdSectionStart>,
+    pub start_type: Option<Start>,
     pub headers: Vec<SectionHeaderFooterReference>,
     pub footers: Vec<SectionHeaderFooterReference>,
     pub page_numbering: Option<SectionPageNumbering>,
@@ -1065,7 +1066,7 @@ impl SectionProperties {
         self
     }
 
-    pub fn with_start_type(mut self, start_type: WdSectionStart) -> Self {
+    pub fn with_start_type(mut self, start_type: Start) -> Self {
         self.start_type = Some(start_type);
         self
     }
@@ -1073,7 +1074,7 @@ impl SectionProperties {
     /// Create or replace a section-owned header part of the selected kind.
     pub fn set_header_part(
         &mut self,
-        kind: WdHeaderFooter,
+        kind: Kind,
         key: impl Into<String>,
         xml: impl Into<String>,
     ) -> Result<()> {
@@ -1083,7 +1084,7 @@ impl SectionProperties {
     /// Create or replace a section-owned footer part of the selected kind.
     pub fn set_footer_part(
         &mut self,
-        kind: WdHeaderFooter,
+        kind: Kind,
         key: impl Into<String>,
         xml: impl Into<String>,
     ) -> Result<()> {
@@ -1091,19 +1092,19 @@ impl SectionProperties {
     }
 
     /// Remove a header reference and any section-owned replacement of that kind.
-    pub fn remove_header(&mut self, kind: WdHeaderFooter) -> bool {
+    pub fn remove_header(&mut self, kind: Kind) -> bool {
         remove_reference(&mut self.headers, kind)
     }
 
     /// Remove a footer reference and any section-owned replacement of that kind.
-    pub fn remove_footer(&mut self, kind: WdHeaderFooter) -> bool {
+    pub fn remove_footer(&mut self, kind: Kind) -> bool {
         remove_reference(&mut self.footers, kind)
     }
 
     fn set_header_footer_part(
         &mut self,
         header: bool,
-        kind: WdHeaderFooter,
+        kind: Kind,
         key: String,
         xml: String,
     ) -> Result<()> {
@@ -1151,10 +1152,9 @@ impl SectionProperties {
                 "endnotePr" => properties.endnotes = Some(parse_endnotes(&raw)?),
                 "type" => {
                     let value = required_attr(&raw, b"val")?;
-                    properties.start_type =
-                        Some(WdSectionStart::from_xml(&value).ok_or_else(|| {
-                            Error::InvalidFormat(format!("invalid section type '{value}'"))
-                        })?);
+                    properties.start_type = Some(Start::from_xml(&value).ok_or_else(|| {
+                        Error::InvalidFormat(format!("invalid section type '{value}'"))
+                    })?);
                 },
                 "pgSz" => {
                     let attrs = attributes(&raw)?;
@@ -1428,10 +1428,7 @@ fn section_child_rank(name: &str) -> Option<u8> {
     }
 }
 
-fn remove_reference(
-    references: &mut Vec<SectionHeaderFooterReference>,
-    kind: WdHeaderFooter,
-) -> bool {
+fn remove_reference(references: &mut Vec<SectionHeaderFooterReference>, kind: Kind) -> bool {
     let length = references.len();
     references.retain(|reference| reference.kind != kind);
     references.len() != length
@@ -1634,7 +1631,7 @@ fn assign_u32(attrs: &[(String, String)], name: &str, slot: &mut u32) -> Result<
 }
 
 fn parse_header_footer(xml: &str) -> Result<SectionHeaderFooterReference> {
-    let kind = WdHeaderFooter::from_xml(&required_attr(xml, b"type")?)
+    let kind = Kind::from_xml(&required_attr(xml, b"type")?)
         .ok_or_else(|| Error::InvalidFormat("invalid section header/footer type".to_string()))?;
     Ok(SectionHeaderFooterReference {
         kind,
@@ -2127,7 +2124,7 @@ mod tests {
     fn typed_section_round_trips_and_preserves_unknown_children() {
         let xml = r#"<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:test"><w:type w:val="continuous"/><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/><w:pgMar w:top="100" w:right="200" w:bottom="300" w:left="400" w:header="500" w:footer="600" w:gutter="50"/><w:cols w:num="2" w:space="720"/><x:ext x:v="keep"/></w:sectPr>"#;
         let mut section = SectionProperties::from_xml(xml).unwrap();
-        assert_eq!(section.start_type, Some(WdSectionStart::Continuous));
+        assert_eq!(section.start_type, Some(Start::Continuous));
         section.margin_left = 900;
         let mut output = String::new();
         section.write_xml(&mut output, None).unwrap();

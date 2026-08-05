@@ -1,5 +1,5 @@
 use litchi_docx::writer::{MutableDocument, SectionProperties};
-use litchi_docx::{Package, WdHeaderFooter, WdSectionStart};
+use litchi_docx::{Package, header_footer::Kind, section::Start};
 use std::io::Cursor;
 
 const TRANSITIONAL: &str = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:test"><w:body><w:p><w:pPr><w:sectPr><w:type w:val="continuous"/><w:pgSz w:w="12240" w:h="15840"/><mc:AlternateContent><mc:Choice Requires="x"><x:unsupported/></mc:Choice><mc:Fallback><x:opaque x:value="keep"/></mc:Fallback></mc:AlternateContent></w:sectPr></w:pPr><w:r><w:t>one</w:t></w:r></w:p><w:p><w:r><w:t>two</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:body></w:document>"#;
@@ -10,7 +10,7 @@ fn mutates_moves_and_removes_paragraph_section_breaks_without_losing_mce() {
     assert_eq!(document.section_break_count().unwrap(), 1);
     assert_eq!(
         document.section_break(0).unwrap().start_type,
-        Some(WdSectionStart::Continuous)
+        Some(Start::Continuous)
     );
 
     document
@@ -30,7 +30,7 @@ fn mutates_moves_and_removes_paragraph_section_breaks_without_losing_mce() {
 fn accepts_strict_sections_and_rejects_malformed_body_final_placement() {
     let strict = r#"<s:document xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:body><s:p/><s:sectPr><s:type s:val="oddPage"/></s:sectPr></s:body></s:document>"#;
     let document = MutableDocument::from_xml(strict).unwrap();
-    assert_eq!(document.section().start_type, Some(WdSectionStart::OddPage));
+    assert_eq!(document.section().start_type, Some(Start::OddPage));
     assert!(
         document
             .to_xml()
@@ -53,10 +53,10 @@ fn package_roundtrip_keeps_distinct_section_header_footer_parts() {
         let document = package.document_mut().unwrap();
         document.add_paragraph_with_text("first");
         document.add_paragraph_with_text("second");
-        let mut first = SectionProperties::default().with_start_type(WdSectionStart::NewPage);
+        let mut first = SectionProperties::default().with_start_type(Start::NewPage);
         first
             .set_header_part(
-                WdHeaderFooter::Primary,
+                Kind::Primary,
                 "first-header",
                 r#"<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:r><w:t>First header</w:t></w:r></w:p></w:hdr>"#,
             )
@@ -65,7 +65,7 @@ fn package_roundtrip_keeps_distinct_section_header_footer_parts() {
         document
             .section_mut()
             .set_header_part(
-                WdHeaderFooter::Primary,
+                Kind::Primary,
                 "last-header",
                 r#"<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:r><w:t>Last header</w:t></w:r></w:p></w:hdr>"#,
             )
@@ -73,7 +73,7 @@ fn package_roundtrip_keeps_distinct_section_header_footer_parts() {
         document
             .section_mut()
             .set_footer_part(
-                WdHeaderFooter::Primary,
+                Kind::Primary,
                 "last-footer",
                 r#"<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:r><w:t>Last footer</w:t></w:r></w:p></w:ftr>"#,
             )

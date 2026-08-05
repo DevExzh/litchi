@@ -17,7 +17,6 @@ pub mod content_control;
 pub mod custom_xml;
 pub mod document;
 pub mod drawing;
-pub mod enums;
 pub mod field;
 pub mod font;
 pub mod footnote;
@@ -61,7 +60,6 @@ pub use bibliography::{
     OOXML_BIBLIOGRAPHY_NAMESPACE, STRICT_OOXML_BIBLIOGRAPHY_NAMESPACE, is_bibliography_namespace,
     is_bibliography_node, is_bibliography_root, parse_bibliography_source_store,
 };
-pub use enums::{WdHeaderFooter, WdOrientation, WdSectionStart, WdStyleType};
 pub use error::{Error, Result};
 pub use field::{
     ActiveContent, ActiveContentKind, Advance, AdvanceAdjustment, AdvanceOperation, AutoNumber,

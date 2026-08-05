@@ -12,7 +12,7 @@
 //! 2. Regression test baseline
 //! 3. Visual reference for all capabilities
 
-use litchi::ooxml::Props;
+use litchi::ooxml::common::Props;
 use litchi::ooxml::docx::{
     Border, Borders, Color, EndnotePos, Endnotes, FootnotePos, Footnotes, ListType,
     MutableDocument, MutableTheme, Package, PageNumberFormat, PageOrientation, ParagraphAlignment,

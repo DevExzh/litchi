@@ -5,7 +5,6 @@ use crate::bookmark::Bookmark;
 use crate::comment::Comment;
 use crate::content_control::ContentControl;
 use crate::custom_xml::Part as CustomXmlPart;
-use crate::enums::WdHeaderFooter;
 use crate::error::{Error, Result};
 use crate::field::Compare;
 use crate::field::{
@@ -18,6 +17,7 @@ use crate::field::{
 };
 use crate::footnote::Note;
 use crate::header_footer::HeaderFooter;
+use crate::header_footer::Kind;
 use crate::mail_merge::{Recipients, extract_recipients, is_settings_relationship};
 use crate::numbering::parse_part;
 use crate::numbering::{Collection, Suffix};
@@ -831,7 +831,7 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn headers(&self) -> Result<Vec<(WdHeaderFooter, HeaderFooter)>> {
+    pub fn headers(&self) -> Result<Vec<(Kind, HeaderFooter)>> {
         let main_part = self.opc.main_document_part()?;
         let rels = main_part.rels();
 
@@ -847,14 +847,14 @@ impl<'a> Document<'a> {
                 let hdr_type = if target_str.contains("header1.xml")
                     || target_str.contains("Header1.xml")
                 {
-                    WdHeaderFooter::Primary
+                    Kind::Primary
                 } else if target_str.contains("header2.xml") || target_str.contains("Header2.xml") {
-                    WdHeaderFooter::FirstPage
+                    Kind::FirstPage
                 } else if target_str.contains("header3.xml") || target_str.contains("Header3.xml") {
-                    WdHeaderFooter::EvenPage
+                    Kind::EvenPage
                 } else {
                     // Default to Primary if we can't determine
-                    WdHeaderFooter::Primary
+                    Kind::Primary
                 };
 
                 let header_part = self.opc.get_part(&target)?;
@@ -897,7 +897,7 @@ impl<'a> Document<'a> {
             }
             let target = rel.target_partname()?;
             let header_part = self.opc.get_part(&target)?;
-            let header = HeaderFooter::from_part(header_part, WdHeaderFooter::Primary)?;
+            let header = HeaderFooter::from_part(header_part, Kind::Primary)?;
             for anchor in header.image_watermarks()? {
                 let image_rel = header_part
                     .rels()
@@ -948,7 +948,7 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn footers(&self) -> Result<Vec<(WdHeaderFooter, HeaderFooter)>> {
+    pub fn footers(&self) -> Result<Vec<(Kind, HeaderFooter)>> {
         let main_part = self.opc.main_document_part()?;
         let rels = main_part.rels();
 
@@ -964,14 +964,14 @@ impl<'a> Document<'a> {
                 let ftr_type = if target_str.contains("footer1.xml")
                     || target_str.contains("Footer1.xml")
                 {
-                    WdHeaderFooter::Primary
+                    Kind::Primary
                 } else if target_str.contains("footer2.xml") || target_str.contains("Footer2.xml") {
-                    WdHeaderFooter::FirstPage
+                    Kind::FirstPage
                 } else if target_str.contains("footer3.xml") || target_str.contains("Footer3.xml") {
-                    WdHeaderFooter::EvenPage
+                    Kind::EvenPage
                 } else {
                     // Default to Primary if we can't determine
-                    WdHeaderFooter::Primary
+                    Kind::Primary
                 };
 
                 let footer_part = self.opc.get_part(&target)?;
@@ -990,17 +990,17 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi_docx::{Package, WdHeaderFooter};
+    /// use litchi_docx::{header_footer::Kind, Package};
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
     ///
-    /// if let Some(header) = doc.header(WdHeaderFooter::Primary)? {
+    /// if let Some(header) = doc.header(Kind::Primary)? {
     ///     println!("Primary header: {}", header.text()?);
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn header(&self, hdr_type: WdHeaderFooter) -> Result<Option<HeaderFooter>> {
+    pub fn header(&self, hdr_type: Kind) -> Result<Option<HeaderFooter>> {
         let headers = self.headers()?;
         Ok(headers
             .into_iter()
@@ -1016,17 +1016,17 @@ impl<'a> Document<'a> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi_docx::{Package, WdHeaderFooter};
+    /// use litchi_docx::{header_footer::Kind, Package};
     ///
     /// let pkg = Package::open("document.docx")?;
     /// let doc = pkg.document()?;
     ///
-    /// if let Some(footer) = doc.footer(WdHeaderFooter::Primary)? {
+    /// if let Some(footer) = doc.footer(Kind::Primary)? {
     ///     println!("Primary footer: {}", footer.text()?);
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn footer(&self, ftr_type: WdHeaderFooter) -> Result<Option<HeaderFooter>> {
+    pub fn footer(&self, ftr_type: Kind) -> Result<Option<HeaderFooter>> {
         let footers = self.footers()?;
         Ok(footers
             .into_iter()

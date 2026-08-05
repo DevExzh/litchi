@@ -1,9 +1,118 @@
 /// Section - document section with page setup and layout properties.
-use crate::enums::{WdOrientation, WdSectionStart};
 use crate::error::Result;
 use litchi_core::unit::{EMUS_PER_CM, EMUS_PER_INCH, EMUS_PER_PT, EMUS_PER_TWIP, emu_to_twip_i64};
 use quick_xml::events::Event;
 use quick_xml::{Reader, XmlVersion};
+use std::fmt;
+
+/// Page layout orientation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum Orientation {
+    /// Portrait orientation.
+    Portrait = 0,
+    /// Landscape orientation.
+    Landscape = 1,
+}
+
+impl Orientation {
+    /// Convert the orientation to its XML attribute value.
+    #[inline]
+    pub const fn to_xml(self) -> &'static str {
+        match self {
+            Self::Portrait => "portrait",
+            Self::Landscape => "landscape",
+        }
+    }
+
+    /// Parse orientation from an XML attribute value.
+    #[inline]
+    pub fn from_xml(value: &str) -> Option<Self> {
+        match value {
+            "portrait" => Some(Self::Portrait),
+            "landscape" => Some(Self::Landscape),
+            _ => None,
+        }
+    }
+}
+
+impl Default for Orientation {
+    #[inline]
+    fn default() -> Self {
+        Self::Portrait
+    }
+}
+
+impl fmt::Display for Orientation {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Portrait => write!(formatter, "Portrait"),
+            Self::Landscape => write!(formatter, "Landscape"),
+        }
+    }
+}
+
+/// Section break start type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum Start {
+    /// Continuous section break.
+    Continuous = 0,
+    /// New column section break.
+    NewColumn = 1,
+    /// New page section break.
+    NewPage = 2,
+    /// Even pages section break.
+    EvenPage = 3,
+    /// Section begins on the next odd page.
+    OddPage = 4,
+}
+
+impl Start {
+    /// Convert the section start type to its XML attribute value.
+    #[inline]
+    pub const fn to_xml(self) -> &'static str {
+        match self {
+            Self::Continuous => "continuous",
+            Self::NewColumn => "nextColumn",
+            Self::NewPage => "nextPage",
+            Self::EvenPage => "evenPage",
+            Self::OddPage => "oddPage",
+        }
+    }
+
+    /// Parse section start type from an XML attribute value.
+    #[inline]
+    pub fn from_xml(value: &str) -> Option<Self> {
+        match value {
+            "continuous" => Some(Self::Continuous),
+            "nextColumn" => Some(Self::NewColumn),
+            "nextPage" => Some(Self::NewPage),
+            "evenPage" => Some(Self::EvenPage),
+            "oddPage" => Some(Self::OddPage),
+            _ => None,
+        }
+    }
+}
+
+impl Default for Start {
+    #[inline]
+    fn default() -> Self {
+        Self::NewPage
+    }
+}
+
+impl fmt::Display for Start {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Continuous => write!(formatter, "Continuous"),
+            Self::NewColumn => write!(formatter, "New Column"),
+            Self::NewPage => write!(formatter, "New Page"),
+            Self::EvenPage => write!(formatter, "Even Page"),
+            Self::OddPage => write!(formatter, "Odd Page"),
+        }
+    }
+}
 
 /// Length in English Metric Units (EMUs).
 ///
@@ -100,7 +209,7 @@ pub struct PageSize {
     /// Page height
     pub height: Option<Emu>,
     /// Page orientation
-    pub orientation: WdOrientation,
+    pub orientation: Orientation,
 }
 
 impl Default for PageSize {
@@ -108,7 +217,7 @@ impl Default for PageSize {
         Self {
             width: None,
             height: None,
-            orientation: WdOrientation::Portrait,
+            orientation: Orientation::Portrait,
         }
     }
 }
@@ -144,7 +253,7 @@ pub struct Section {
     /// Cached margins
     margins: Option<Margins>,
     /// Cached start type
-    start_type: Option<WdSectionStart>,
+    start_type: Option<Start>,
 }
 
 impl Section {
@@ -179,7 +288,7 @@ impl Section {
     /// Get the page orientation for this section.
     ///
     /// Defaults to `Portrait` if not specified.
-    pub fn orientation(&mut self) -> WdOrientation {
+    pub fn orientation(&mut self) -> Orientation {
         self.ensure_page_size_parsed();
         self.page_size.map(|ps| ps.orientation).unwrap_or_default()
     }
@@ -235,7 +344,7 @@ impl Section {
     /// Get the section start type.
     ///
     /// Determines how the section break is inserted (continuous, new page, etc.).
-    pub fn start_type(&mut self) -> WdSectionStart {
+    pub fn start_type(&mut self) -> Start {
         self.ensure_start_type_parsed();
         self.start_type.unwrap_or_default()
     }
@@ -279,8 +388,8 @@ impl Section {
                                     XmlVersion::Implicit1_0,
                                     reader.decoder(),
                                 ) {
-                                    page_size.orientation = WdOrientation::from_xml(&value)
-                                        .unwrap_or(WdOrientation::Portrait);
+                                    page_size.orientation = Orientation::from_xml(&value)
+                                        .unwrap_or(Orientation::Portrait);
                                 }
                             },
                             _ => {},
@@ -394,7 +503,7 @@ impl Section {
             return;
         }
 
-        let mut start_type = WdSectionStart::default();
+        let mut start_type = Start::default();
         let mut reader = Reader::from_reader(self.xml_bytes.as_slice());
         reader.config_mut().trim_text(true);
 
@@ -409,8 +518,7 @@ impl Section {
                                 reader.decoder(),
                             )
                         {
-                            start_type =
-                                WdSectionStart::from_xml(&value).unwrap_or(WdSectionStart::NewPage);
+                            start_type = Start::from_xml(&value).unwrap_or(Start::NewPage);
                         }
                     }
                 },
@@ -531,8 +639,45 @@ mod tests {
 
     #[test]
     fn test_orientation_default() {
-        let orientation = WdOrientation::default();
-        assert_eq!(orientation, WdOrientation::Portrait);
+        let orientation = Orientation::default();
+        assert_eq!(orientation, Orientation::Portrait);
+    }
+
+    #[test]
+    fn orientation_xml_and_display_round_trip() {
+        assert_eq!(Orientation::Portrait.to_xml(), "portrait");
+        assert_eq!(Orientation::Landscape.to_xml(), "landscape");
+        assert_eq!(
+            Orientation::from_xml("portrait"),
+            Some(Orientation::Portrait)
+        );
+        assert_eq!(
+            Orientation::from_xml("landscape"),
+            Some(Orientation::Landscape)
+        );
+        assert_eq!(Orientation::from_xml("invalid"), None);
+        assert_eq!(Orientation::Portrait.to_string(), "Portrait");
+        assert_eq!(Orientation::Landscape.to_string(), "Landscape");
+        assert_eq!(Orientation::Landscape as u8, 1);
+    }
+
+    #[test]
+    fn section_start_xml_and_display_round_trip() {
+        let values = [
+            (Start::Continuous, "continuous", "Continuous", 0),
+            (Start::NewColumn, "nextColumn", "New Column", 1),
+            (Start::NewPage, "nextPage", "New Page", 2),
+            (Start::EvenPage, "evenPage", "Even Page", 3),
+            (Start::OddPage, "oddPage", "Odd Page", 4),
+        ];
+        for (value, xml, display, repr) in values {
+            assert_eq!(value.to_xml(), xml);
+            assert_eq!(Start::from_xml(xml), Some(value));
+            assert_eq!(value.to_string(), display);
+            assert_eq!(value as u8, repr);
+        }
+        assert_eq!(Start::from_xml("invalid"), None);
+        assert_eq!(Start::default(), Start::NewPage);
     }
 
     #[test]

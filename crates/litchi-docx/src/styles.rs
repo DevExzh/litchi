@@ -1,5 +1,4 @@
 /// Styles - document styles and formatting definitions.
-use crate::enums::WdStyleType;
 use crate::error::{Error, Result};
 use crate::numbering::Paragraph;
 use litchi_opc::part::Part;
@@ -7,6 +6,63 @@ use quick_xml::events::Event;
 use quick_xml::{Reader, XmlVersion};
 use smallvec::SmallVec;
 use std::collections::HashSet;
+
+/// Semantic kind of a Word style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum Type {
+    /// Paragraph style.
+    Paragraph = 1,
+    /// Character style.
+    Character = 2,
+    /// Table style.
+    Table = 3,
+    /// List (numbering) style.
+    List = 4,
+}
+
+impl Type {
+    /// Convert the style kind to its XML attribute value.
+    #[inline]
+    pub const fn to_xml(self) -> &'static str {
+        match self {
+            Self::Paragraph => "paragraph",
+            Self::Character => "character",
+            Self::Table => "table",
+            Self::List => "numbering",
+        }
+    }
+
+    /// Parse a style kind from its XML attribute value.
+    #[inline]
+    pub fn from_xml(value: &str) -> Option<Self> {
+        match value {
+            "paragraph" => Some(Self::Paragraph),
+            "character" => Some(Self::Character),
+            "table" => Some(Self::Table),
+            "numbering" => Some(Self::List),
+            _ => None,
+        }
+    }
+}
+
+impl Default for Type {
+    #[inline]
+    fn default() -> Self {
+        Self::Paragraph
+    }
+}
+
+impl std::fmt::Display for Type {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Paragraph => write!(formatter, "Paragraph"),
+            Self::Character => write!(formatter, "Character"),
+            Self::Table => write!(formatter, "Table"),
+            Self::List => write!(formatter, "List"),
+        }
+    }
+}
 
 /// A Word paragraph outline level tied to a built-in heading rank.
 ///
@@ -144,7 +200,7 @@ impl<'a> Styles<'a> {
     /// Get the default style for a given style type.
     ///
     /// Returns `None` if no default style is defined for that type.
-    pub fn get_default(&mut self, style_type: WdStyleType) -> Result<Option<&Style>> {
+    pub fn get_default(&mut self, style_type: Type) -> Result<Option<&Style>> {
         self.ensure_styles_loaded()?;
         Ok(self.style_list.as_ref().and_then(|list| {
             list.iter()
@@ -213,8 +269,7 @@ impl<'a> Styles<'a> {
                                     XmlVersion::Implicit1_0,
                                     reader.decoder(),
                                 ) {
-                                    builder.style_type =
-                                        WdStyleType::from_xml(&value).unwrap_or_default();
+                                    builder.style_type = Type::from_xml(&value).unwrap_or_default();
                                 }
                             },
                             b"styleId" => {
@@ -411,7 +466,7 @@ impl<'a> Styles<'a> {
 struct StyleBuilder {
     style_id: Option<String>,
     name: Option<String>,
-    style_type: WdStyleType,
+    style_type: Type,
     is_default: bool,
     is_custom: bool,
     based_on: Option<String>,
@@ -434,7 +489,7 @@ pub struct Style {
     /// UI-visible name
     name: Option<String>,
     /// Type of style (paragraph, character, table, or list)
-    style_type: WdStyleType,
+    style_type: Type,
     /// Whether this is the default style for its type
     is_default: bool,
     /// Whether this is a custom (user-defined) style
@@ -470,7 +525,7 @@ impl Style {
 
     /// Get the style type.
     #[inline]
-    pub fn style_type(&self) -> WdStyleType {
+    pub fn style_type(&self) -> Type {
         self.style_type
     }
 
@@ -567,8 +622,25 @@ mod tests {
 
     #[test]
     fn test_style_type_default() {
-        let style_type = WdStyleType::default();
-        assert_eq!(style_type, WdStyleType::Paragraph);
+        let style_type = Type::default();
+        assert_eq!(style_type, Type::Paragraph);
+    }
+
+    #[test]
+    fn style_type_xml_and_display_round_trip() {
+        let values = [
+            (Type::Paragraph, "paragraph", "Paragraph", 1),
+            (Type::Character, "character", "Character", 2),
+            (Type::Table, "table", "Table", 3),
+            (Type::List, "numbering", "List", 4),
+        ];
+        for (value, xml, display, repr) in values {
+            assert_eq!(value.to_xml(), xml);
+            assert_eq!(Type::from_xml(xml), Some(value));
+            assert_eq!(value.to_string(), display);
+            assert_eq!(value as u8, repr);
+        }
+        assert_eq!(Type::from_xml("invalid"), None);
     }
 
     fn with_styles<T>(xml: &[u8], inspect: impl FnOnce(&mut Styles<'_>) -> T) -> T {

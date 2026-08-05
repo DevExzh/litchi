@@ -3,7 +3,6 @@
 /// This module provides types and methods for accessing headers and footers
 /// in Word documents. Headers and footers can be different for first page,
 /// even/odd pages, and sections.
-use crate::enums::WdHeaderFooter;
 use crate::error::Result;
 use crate::namespace::scan_word_element_ranges;
 use crate::paragraph::{Paragraph, extract_word_text};
@@ -11,6 +10,58 @@ use crate::table::Table;
 use crate::writer::Watermark;
 use litchi_opc::part::Part;
 use std::sync::Arc;
+
+/// Header or footer definition kind within a section.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum Kind {
+    /// Header/footer for odd pages or all pages if no even definition exists.
+    Primary = 1,
+    /// Header/footer for the first page of a section.
+    FirstPage = 2,
+    /// Header/footer for even pages of a recto/verso section.
+    EvenPage = 3,
+}
+
+impl Kind {
+    /// Convert the kind to its XML relationship attribute value.
+    #[inline]
+    pub const fn to_xml(self) -> &'static str {
+        match self {
+            Self::Primary => "default",
+            Self::FirstPage => "first",
+            Self::EvenPage => "even",
+        }
+    }
+
+    /// Parse a kind from its XML relationship attribute value.
+    #[inline]
+    pub fn from_xml(value: &str) -> Option<Self> {
+        match value {
+            "default" => Some(Self::Primary),
+            "first" => Some(Self::FirstPage),
+            "even" => Some(Self::EvenPage),
+            _ => None,
+        }
+    }
+}
+
+impl Default for Kind {
+    #[inline]
+    fn default() -> Self {
+        Self::Primary
+    }
+}
+
+impl std::fmt::Display for Kind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Primary => write!(formatter, "Primary"),
+            Self::FirstPage => write!(formatter, "First Page"),
+            Self::EvenPage => write!(formatter, "Even Page"),
+        }
+    }
+}
 
 /// A header or footer part in a Word document.
 ///
@@ -43,7 +94,7 @@ pub struct HeaderFooter {
     /// The raw XML bytes for this header/footer
     xml_bytes: Arc<Vec<u8>>,
     /// The type of header/footer (default, first, even)
-    hdr_ftr_type: WdHeaderFooter,
+    hdr_ftr_type: Kind,
 }
 
 impl HeaderFooter {
@@ -61,7 +112,7 @@ impl HeaderFooter {
     ///
     /// * `part` - The part containing the header/footer XML content
     /// * `hdr_ftr_type` - The type of header/footer
-    pub fn from_part(part: &dyn Part, hdr_ftr_type: WdHeaderFooter) -> Result<Self> {
+    pub fn from_part(part: &dyn Part, hdr_ftr_type: Kind) -> Result<Self> {
         Ok(Self {
             xml_bytes: part.blob_arc(),
             hdr_ftr_type,
@@ -75,7 +126,7 @@ impl HeaderFooter {
     /// * `xml_bytes` - The XML content of the header/footer element
     /// * `hdr_ftr_type` - The type of header/footer
     #[inline]
-    pub fn from_xml_bytes(xml_bytes: Vec<u8>, hdr_ftr_type: WdHeaderFooter) -> Self {
+    pub fn from_xml_bytes(xml_bytes: Vec<u8>, hdr_ftr_type: Kind) -> Self {
         Self {
             xml_bytes: Arc::new(xml_bytes),
             hdr_ftr_type,
@@ -84,7 +135,7 @@ impl HeaderFooter {
 
     /// Get the type of this header/footer.
     #[inline]
-    pub fn header_footer_type(&self) -> WdHeaderFooter {
+    pub fn header_footer_type(&self) -> Kind {
         self.hdr_ftr_type
     }
 
@@ -231,14 +282,14 @@ mod tests {
     #[test]
     fn test_header_text_extraction() {
         let xml = b"<w:hdr><w:p><w:r><w:t>Header Text</w:t></w:r></w:p></w:hdr>";
-        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), Kind::Primary);
         assert_eq!(header.text().unwrap(), "Header Text");
     }
 
     #[test]
     fn test_footer_text_extraction() {
         let xml = b"<w:ftr><w:p><w:r><w:t>Footer Text</w:t></w:r></w:p></w:ftr>";
-        let footer = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+        let footer = HeaderFooter::from_xml_bytes(xml.to_vec(), Kind::Primary);
         assert_eq!(footer.text().unwrap(), "Footer Text");
     }
 
@@ -246,14 +297,31 @@ mod tests {
     fn test_header_footer_type_accessors() {
         let xml = b"<w:hdr><w:p><w:r><w:t>Test</w:t></w:r></w:p></w:hdr>";
 
-        let primary = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
-        assert_eq!(primary.header_footer_type(), WdHeaderFooter::Primary);
+        let primary = HeaderFooter::from_xml_bytes(xml.to_vec(), Kind::Primary);
+        assert_eq!(primary.header_footer_type(), Kind::Primary);
 
-        let first_page = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::FirstPage);
-        assert_eq!(first_page.header_footer_type(), WdHeaderFooter::FirstPage);
+        let first_page = HeaderFooter::from_xml_bytes(xml.to_vec(), Kind::FirstPage);
+        assert_eq!(first_page.header_footer_type(), Kind::FirstPage);
 
-        let even_page = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::EvenPage);
-        assert_eq!(even_page.header_footer_type(), WdHeaderFooter::EvenPage);
+        let even_page = HeaderFooter::from_xml_bytes(xml.to_vec(), Kind::EvenPage);
+        assert_eq!(even_page.header_footer_type(), Kind::EvenPage);
+    }
+
+    #[test]
+    fn kind_xml_and_display_round_trip() {
+        let values = [
+            (Kind::Primary, "default", "Primary", 1),
+            (Kind::FirstPage, "first", "First Page", 2),
+            (Kind::EvenPage, "even", "Even Page", 3),
+        ];
+        for (value, xml, display, repr) in values {
+            assert_eq!(value.to_xml(), xml);
+            assert_eq!(Kind::from_xml(xml), Some(value));
+            assert_eq!(value.to_string(), display);
+            assert_eq!(value as u8, repr);
+        }
+        assert_eq!(Kind::from_xml("invalid"), None);
+        assert_eq!(Kind::default(), Kind::Primary);
     }
 
     #[test]
@@ -261,18 +329,18 @@ mod tests {
         let header_xml = b"<w:hdr><w:p><w:r><w:t>Header</w:t></w:r></w:p></w:hdr>";
         let footer_xml = b"<w:ftr><w:p><w:r><w:t>Footer</w:t></w:r></w:p></w:ftr>";
 
-        let header = HeaderFooter::from_xml_bytes(header_xml.to_vec(), WdHeaderFooter::Primary);
-        let footer = HeaderFooter::from_xml_bytes(footer_xml.to_vec(), WdHeaderFooter::Primary);
+        let header = HeaderFooter::from_xml_bytes(header_xml.to_vec(), Kind::Primary);
+        let footer = HeaderFooter::from_xml_bytes(footer_xml.to_vec(), Kind::Primary);
 
         // Both have the same type (Primary), but different XML elements
-        assert_eq!(header.header_footer_type(), WdHeaderFooter::Primary);
-        assert_eq!(footer.header_footer_type(), WdHeaderFooter::Primary);
+        assert_eq!(header.header_footer_type(), Kind::Primary);
+        assert_eq!(footer.header_footer_type(), Kind::Primary);
     }
 
     #[test]
     fn test_xml_bytes_access() {
         let xml = b"<w:hdr><w:p><w:r><w:t>Test Content</w:t></w:r></w:p></w:hdr>";
-        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), Kind::Primary);
 
         let bytes = header.xml_bytes();
         assert_eq!(bytes, xml);
@@ -281,7 +349,7 @@ mod tests {
     #[test]
     fn test_empty_header_footer() {
         let xml = b"<w:hdr></w:hdr>";
-        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), Kind::Primary);
         assert_eq!(header.text().unwrap(), "");
         assert_eq!(header.paragraph_count().unwrap(), 0);
         assert_eq!(header.table_count().unwrap(), 0);
@@ -293,7 +361,7 @@ mod tests {
             <w:p><w:r><w:t>First Paragraph</w:t></w:r></w:p>\
             <w:p><w:r><w:t>Second Paragraph</w:t></w:r></w:p>\
         </w:hdr>";
-        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), Kind::Primary);
 
         let text = header.text().unwrap();
         assert!(text.contains("First Paragraph"));
@@ -308,7 +376,7 @@ mod tests {
                 <w:r><w:t> Run Two</w:t></w:r>\
             </w:p>\
         </w:hdr>";
-        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), Kind::Primary);
 
         // Text extraction concatenates all text content from <w:t> elements
         let text = header.text().unwrap();
@@ -323,7 +391,7 @@ mod tests {
             <w:p><w:r><w:t>Para 2</w:t></w:r></w:p>\
             <w:p><w:r><w:t>Para 3</w:t></w:r></w:p>\
         </w:hdr>";
-        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), Kind::Primary);
 
         assert_eq!(header.paragraph_count().unwrap(), 3);
     }
@@ -334,7 +402,7 @@ mod tests {
             <w:p><w:r><w:t>First</w:t></w:r></w:p>\
             <w:p><w:r><w:t>Second</w:t></w:r></w:p>\
         </w:hdr>";
-        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), Kind::Primary);
 
         let paragraphs = header.paragraphs().unwrap();
         assert_eq!(paragraphs.len(), 2);
@@ -343,7 +411,7 @@ mod tests {
     #[test]
     fn test_table_count_no_tables() {
         let xml = b"<w:hdr><w:p><w:r><w:t>No tables here</w:t></w:r></w:p></w:hdr>";
-        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), Kind::Primary);
 
         assert_eq!(header.table_count().unwrap(), 0);
     }
@@ -354,7 +422,7 @@ mod tests {
             <w:tbl><w:tr><w:tc><w:p><w:r><w:t>Cell 1</w:t></w:r></w:p></w:tc></w:tr></w:tbl>\
             <w:tbl><w:tr><w:tc><w:p><w:r><w:t>Cell 2</w:t></w:r></w:p></w:tc></w:tr></w:tbl>\
         </w:hdr>";
-        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), Kind::Primary);
 
         assert_eq!(header.table_count().unwrap(), 2);
     }
@@ -364,7 +432,7 @@ mod tests {
         let xml = b"<w:hdr>\
             <w:tbl><w:tr><w:tc><w:p><w:r><w:t>Table 1</w:t></w:r></w:p></w:tc></w:tr></w:tbl>\
         </w:hdr>";
-        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), Kind::Primary);
 
         let tables = header.tables().unwrap();
         assert_eq!(tables.len(), 1);
@@ -379,7 +447,7 @@ mod tests {
             <h:p/>
             <false:tbl/>
         </h:hdr>"#;
-        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), Kind::Primary);
 
         assert_eq!(header.text().unwrap(), "A < Bcell");
         assert_eq!(header.paragraph_count().unwrap(), 3);
@@ -394,7 +462,7 @@ mod tests {
     #[test]
     fn header_blocks_reject_unterminated_selected_elements() {
         let xml = br#"<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:r/>"#;
-        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), Kind::Primary);
 
         assert!(header.text().is_err());
         assert!(header.paragraphs().is_err());
@@ -407,7 +475,7 @@ mod tests {
             <w:tbl><w:tr><w:tc><w:p><w:r><w:t>Table content</w:t></w:r></w:p></w:tc></w:tr></w:tbl>\
             <w:p><w:r><w:t>Paragraph after table</w:t></w:r></w:p>\
         </w:hdr>";
-        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), Kind::Primary);
 
         assert_eq!(header.paragraph_count().unwrap(), 3);
         assert_eq!(header.table_count().unwrap(), 1);
@@ -421,7 +489,7 @@ mod tests {
     #[test]
     fn test_header_with_unicode() {
         let xml = "<w:hdr><w:p><w:r><w:t>Unicode: 你好世界 🎉</w:t></w:r></w:p></w:hdr>".as_bytes();
-        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), Kind::Primary);
 
         let text = header.text().unwrap();
         assert!(text.contains("你好世界"));
@@ -433,11 +501,11 @@ mod tests {
         let header_xml = b"<w:hdr><w:p><w:r><w:t>First Page Header</w:t></w:r></w:p></w:hdr>";
         let footer_xml = b"<w:ftr><w:p><w:r><w:t>First Page Footer</w:t></w:r></w:p></w:ftr>";
 
-        let header = HeaderFooter::from_xml_bytes(header_xml.to_vec(), WdHeaderFooter::FirstPage);
-        let footer = HeaderFooter::from_xml_bytes(footer_xml.to_vec(), WdHeaderFooter::FirstPage);
+        let header = HeaderFooter::from_xml_bytes(header_xml.to_vec(), Kind::FirstPage);
+        let footer = HeaderFooter::from_xml_bytes(footer_xml.to_vec(), Kind::FirstPage);
 
-        assert_eq!(header.header_footer_type(), WdHeaderFooter::FirstPage);
-        assert_eq!(footer.header_footer_type(), WdHeaderFooter::FirstPage);
+        assert_eq!(header.header_footer_type(), Kind::FirstPage);
+        assert_eq!(footer.header_footer_type(), Kind::FirstPage);
         assert!(header.text().unwrap().contains("First Page Header"));
         assert!(footer.text().unwrap().contains("First Page Footer"));
     }
@@ -447,11 +515,11 @@ mod tests {
         let header_xml = b"<w:hdr><w:p><w:r><w:t>Even Page Header</w:t></w:r></w:p></w:hdr>";
         let footer_xml = b"<w:ftr><w:p><w:r><w:t>Even Page Footer</w:t></w:r></w:p></w:ftr>";
 
-        let header = HeaderFooter::from_xml_bytes(header_xml.to_vec(), WdHeaderFooter::EvenPage);
-        let footer = HeaderFooter::from_xml_bytes(footer_xml.to_vec(), WdHeaderFooter::EvenPage);
+        let header = HeaderFooter::from_xml_bytes(header_xml.to_vec(), Kind::EvenPage);
+        let footer = HeaderFooter::from_xml_bytes(footer_xml.to_vec(), Kind::EvenPage);
 
-        assert_eq!(header.header_footer_type(), WdHeaderFooter::EvenPage);
-        assert_eq!(footer.header_footer_type(), WdHeaderFooter::EvenPage);
+        assert_eq!(header.header_footer_type(), Kind::EvenPage);
+        assert_eq!(footer.header_footer_type(), Kind::EvenPage);
         assert!(header.text().unwrap().contains("Even Page Header"));
         assert!(footer.text().unwrap().contains("Even Page Footer"));
     }
@@ -459,7 +527,7 @@ mod tests {
     #[test]
     fn test_clone_header_footer() {
         let xml = b"<w:hdr><w:p><w:r><w:t>Clonable Content</w:t></w:r></w:p></w:hdr>";
-        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), Kind::Primary);
         let cloned = header.clone();
 
         assert_eq!(header.text().unwrap(), cloned.text().unwrap());
@@ -477,7 +545,7 @@ mod tests {
                 </w:r>\
             </w:p>\
         </w:hdr>";
-        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), Kind::Primary);
 
         assert_eq!(header.text().unwrap(), "Bold Centered Text");
         assert_eq!(header.paragraph_count().unwrap(), 1);
@@ -486,7 +554,7 @@ mod tests {
     #[test]
     fn test_empty_run_text() {
         let xml = b"<w:hdr><w:p><w:r><w:t></w:t></w:r></w:p></w:hdr>";
-        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), Kind::Primary);
 
         assert_eq!(header.text().unwrap(), "");
     }
@@ -500,7 +568,7 @@ mod tests {
                 <w:r><w:tab/><w:t>After</w:t></w:r>\
             </w:p>\
         </w:hdr>";
-        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), Kind::Primary);
 
         let text = header.text().unwrap();
         assert!(text.contains("Before"));
@@ -513,9 +581,9 @@ mod tests {
         let first_xml = b"<w:hdr><w:p><w:r><w:t>First Page Header</w:t></w:r></w:p></w:hdr>";
         let even_xml = b"<w:hdr><w:p><w:r><w:t>Even Page Header</w:t></w:r></w:p></w:hdr>";
 
-        let primary = HeaderFooter::from_xml_bytes(primary_xml.to_vec(), WdHeaderFooter::Primary);
-        let first = HeaderFooter::from_xml_bytes(first_xml.to_vec(), WdHeaderFooter::FirstPage);
-        let even = HeaderFooter::from_xml_bytes(even_xml.to_vec(), WdHeaderFooter::EvenPage);
+        let primary = HeaderFooter::from_xml_bytes(primary_xml.to_vec(), Kind::Primary);
+        let first = HeaderFooter::from_xml_bytes(first_xml.to_vec(), Kind::FirstPage);
+        let even = HeaderFooter::from_xml_bytes(even_xml.to_vec(), Kind::EvenPage);
 
         assert!(primary.text().unwrap().contains("Primary"));
         assert!(first.text().unwrap().contains("First Page"));
@@ -531,7 +599,7 @@ mod tests {
                 <v:textpath style="font-family:'Cambria';font-size:1pt" string="CONFIDENTIAL"/>
             </v:shape></w:pict></w:r></w:p>
         </w:hdr>"##;
-        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), WdHeaderFooter::Primary);
+        let header = HeaderFooter::from_xml_bytes(xml.to_vec(), Kind::Primary);
 
         let watermarks = header.watermarks().unwrap();
 

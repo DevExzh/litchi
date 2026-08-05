@@ -1,5 +1,5 @@
 use litchi_docx::writer::{MutableDocument, SectionProperties, TableOfContents};
-use litchi_docx::{Package, WdSectionStart};
+use litchi_docx::{Package, section::Start};
 use litchi_opc::packuri::PackURI;
 use std::io::Cursor;
 
@@ -93,7 +93,7 @@ fn removing_a_section_ending_paragraph_merges_sections() {
     doc.add_paragraph_with_text("second");
     doc.insert_section_break(
         0,
-        SectionProperties::default().with_start_type(WdSectionStart::NewPage),
+        SectionProperties::default().with_start_type(Start::NewPage),
     )
     .unwrap();
     assert_eq!(doc.section_break_count().unwrap(), 1);
