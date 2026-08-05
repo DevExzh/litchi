@@ -13,7 +13,7 @@ use quick_xml::{
 use super::model::{Configuration, Format, NonNegativeLength, Position, Separator, validate_value};
 use super::{
     MAX_DOCUMENT_XML_BYTES, MAX_VALUE_BYTES, MAX_XML_DEPTH, OFFICE_NAMESPACE, STYLE_NAMESPACE,
-    TEXT_NAMESPACE, invalid,
+    TEXT_NAMESPACE, invalid, xml_error,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
