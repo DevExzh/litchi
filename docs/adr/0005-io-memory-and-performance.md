@@ -59,6 +59,11 @@ decompression, cache misses, lock/contention time, CPU utilization, and scaling.
 Optimization decisions require profiles, flame graphs, and statistical evidence;
 intuition alone is not accepted.
 
+Generated IWA protobuf bindings are also kept minimal: prost runtime type-name
+metadata is disabled because no production path consumes it. This reduces
+generated code and static-data footprint without changing the wire format or
+the typed schema boundary.
+
 Instrumentation is an opt-in runtime-neutral observer with optional tracing and
 profiling adapters. It never records document content, credentials, or sensitive
 paths by default.

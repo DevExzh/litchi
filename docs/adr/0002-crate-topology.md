@@ -84,6 +84,11 @@ The physical IWA substrate is layered beneath the application crate:
 depends on it for bounded archive framing and checksum-free Snappy encoding.
 `litchi-iwa` consumes the core's typed, slice-based codecs directly; its former
 633-line duplicate Snappy implementation and 172-line varint kernel are gone.
+The raw schema build deliberately omits prost's runtime type-name metadata:
+the workspace has no type-name consumer, so generated `Name` implementations
+would add code and static strings without improving archive decoding. Schema
+identity remains explicit at the IWA application boundary where diagnostics
+need it.
 The core layer does not open packages, resolve application message IDs, or own
 document topology, while the facade retains those application-level
 responsibilities. The common wire crate is also the sole owner of parsed

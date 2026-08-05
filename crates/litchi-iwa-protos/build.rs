@@ -24,7 +24,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     prost_build::Config::new()
-        .enable_type_names()
         .include_file("iwa_protos.rs")
         .compile_protos(&proto_files, &[proto_directory])?;
 

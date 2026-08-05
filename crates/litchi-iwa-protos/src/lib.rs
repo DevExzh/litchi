@@ -29,18 +29,18 @@ pub use generated::{
 
 #[cfg(test)]
 mod tests {
-    use prost::Name;
+    use prost::Message;
 
     #[test]
-    fn generated_schema_names_remain_available() {
-        assert_eq!(super::tsp::ArchiveInfo::full_name(), "TSP.ArchiveInfo");
-        assert_eq!(
-            super::tp::DocumentArchive::full_name(),
-            "TP.DocumentArchive"
-        );
-        assert_eq!(
-            super::tsch::pre_uff::ChartInfoArchive::full_name(),
-            "TSCH.PreUFF.ChartInfoArchive"
-        );
+    fn generated_messages_round_trip_without_runtime_names() -> Result<(), prost::DecodeError> {
+        let input = super::tsp::ArchiveInfo {
+            identifier: Some(42),
+            message_infos: Vec::new(),
+            should_merge: Some(true),
+        };
+        let encoded = input.encode_to_vec();
+        let decoded = super::tsp::ArchiveInfo::decode(encoded.as_slice())?;
+        assert_eq!(decoded, input);
+        Ok(())
     }
 }
