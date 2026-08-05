@@ -2,6 +2,7 @@
 
 pub mod audio;
 pub mod media;
+pub mod table;
 
 use litchi_iwa_text::TextStorage;
 
