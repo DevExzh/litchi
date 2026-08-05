@@ -3,7 +3,7 @@
 use super::*;
 
 /// Lossless optional title settings stored by a Keynote table model.
-pub type KeynoteTableTitleSettings = crate::numbers::NumbersTableTitleSettings;
+pub type KeynoteTableTitleSettings = crate::numbers::Settings;
 
 impl KeynoteEditor {
     /// Read a slide table's lossless title visibility and outline settings.

@@ -1,5 +1,7 @@
 //! Keynote transition vocabulary independent of archive and wire models.
 
+use crate::{Error, Result};
+
 const NONE_EFFECT: &str = "none";
 const DISSOLVE_EFFECT: &str = "apple:dissolve";
 const MAGIC_MOVE_EFFECT: &str = "apple:magic-move-implied-motion-path";
@@ -12,6 +14,7 @@ const BY_OBJECT_DELIVERY: i32 = 1;
 const BY_WORD_DELIVERY: i32 = 2;
 const BY_CHARACTER_DELIVERY: i32 = 3;
 const BY_LINE_DELIVERY: i32 = 4;
+const TIMING_CURVE_SLOT_COUNT: usize = 3;
 
 /// A slide-transition effect understood by Keynote.
 ///
@@ -28,7 +31,7 @@ pub enum Effect {
     /// Keynote's Magic Move transition.
     MagicMove,
     /// An identifier introduced by a newer Keynote release.
-    Unknown(String),
+    Unknown(Box<str>),
 }
 
 impl Effect {
@@ -39,8 +42,22 @@ impl Effect {
             NONE_EFFECT => Self::None,
             DISSOLVE_EFFECT => Self::Dissolve,
             MAGIC_MOVE_EFFECT => Self::MagicMove,
-            other => Self::Unknown(other.to_owned()),
+            other => Self::Unknown(other.into()),
         }
+    }
+
+    /// Construct an unknown effect identifier while rejecting non-canonical
+    /// known identifiers and strings that cannot be written to native text
+    /// fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::NonCanonicalEffect`] when `identifier` names a known
+    /// effect, or [`Error::NulString`] when it contains a NUL byte.
+    pub fn unknown(identifier: impl Into<Box<str>>) -> Result<Self> {
+        let effect = Self::Unknown(identifier.into());
+        effect.validate()?;
+        Ok(effect)
     }
 
     /// Return the native Keynote effect identifier.
@@ -61,10 +78,30 @@ impl Effect {
             self,
             Self::Unknown(identifier)
                 if matches!(
-                    identifier.as_str(),
+                    &**identifier,
                     NONE_EFFECT | DISSOLVE_EFFECT | MAGIC_MOVE_EFFECT
                 )
         )
+    }
+
+    /// Validate the effect before it is published through a native adapter.
+    ///
+    /// Unknown identifiers are valid and remain lossless. The unknown form is
+    /// rejected only when it shadows a named native identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::NulString`] when the identifier contains a NUL byte or
+    /// [`Error::NonCanonicalEffect`] when an unknown value shadows a named
+    /// native effect.
+    pub fn validate(&self) -> Result<()> {
+        if self.identifier().contains('\0') {
+            return Err(Error::NulString);
+        }
+        if !self.is_canonical() {
+            return Err(Error::NonCanonicalEffect);
+        }
+        Ok(())
     }
 }
 
@@ -283,11 +320,182 @@ impl std::fmt::Debug for TextDelivery {
     }
 }
 
+/// Lossless animation-level values attached to a slide transition.
+///
+/// The payload fields intentionally remain opaque. Their protobuf structure,
+/// validation, and wire-preserving patching belong to the IWA adapter; this
+/// crate only owns bounded native-free storage and semantic scalar checks.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct AnimationParameters {
+    /// Exact native color payload, when one is present.
+    pub color_payload: Option<Box<[u8]>>,
+    /// Exact native timing-curve payloads for Keynote's three curve slots.
+    ///
+    /// This is a fixed-size array because the native schema has exactly three
+    /// slots. Keeping the slots inline avoids an allocation and capacity
+    /// overhead for the overwhelmingly common all-absent value.
+    pub timing_curve_payloads: [Option<Box<[u8]>>; TIMING_CURVE_SLOT_COUNT],
+    /// Native random seed used by effects with randomized motion.
+    pub random_number_seed: Option<u32>,
+    /// Native effect detail value.
+    pub detail: Option<f64>,
+    /// Native theme names for the three timing-curve slots.
+    pub timing_curve_theme_names: [Option<Box<str>>; TIMING_CURVE_SLOT_COUNT],
+    /// Whether transition text should use right-to-left writing direction.
+    pub writing_direction_is_rtl: Option<bool>,
+}
+
+impl AnimationParameters {
+    /// Validate semantic values without interpreting opaque native payloads.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidDetail`] for a non-finite detail value or
+    /// [`Error::NulString`] for a theme name containing a NUL byte.
+    pub fn validate(&self) -> Result<()> {
+        if self.detail.is_some_and(|value| !value.is_finite()) {
+            return Err(Error::InvalidDetail);
+        }
+        if self
+            .timing_curve_theme_names
+            .iter()
+            .flatten()
+            .any(|name| name.contains('\0'))
+        {
+            return Err(Error::NulString);
+        }
+        Ok(())
+    }
+
+    /// Borrow an optional color payload without copying it.
+    #[must_use]
+    pub fn color_payload(&self) -> Option<&[u8]> {
+        self.color_payload.as_deref()
+    }
+
+    /// Borrow the exact timing-curve payload slots.
+    #[must_use]
+    pub const fn timing_curve_payloads(&self) -> &[Option<Box<[u8]>>; TIMING_CURVE_SLOT_COUNT] {
+        &self.timing_curve_payloads
+    }
+
+    /// Borrow the exact timing-curve theme-name slots.
+    #[must_use]
+    pub const fn timing_curve_theme_names(&self) -> &[Option<Box<str>>; TIMING_CURVE_SLOT_COUNT] {
+        &self.timing_curve_theme_names
+    }
+}
+
+/// Lossless effect-specific values shared by Keynote transitions.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct CustomParameters {
+    /// Native twist amount, when supplied by the effect.
+    pub twist: Option<f32>,
+    /// Native mosaic size, when supplied by the effect.
+    pub mosaic_size: Option<u32>,
+    /// Native mosaic layout discriminator.
+    pub mosaic_type: Option<MosaicType>,
+    /// Whether a bounce effect is enabled.
+    pub bounce: Option<bool>,
+    /// Whether Magic Move fades unmatched objects.
+    pub magic_move_fade_unmatched_objects: Option<bool>,
+    /// Native timing-curve discriminator.
+    pub acceleration: Option<Acceleration>,
+    /// Native matching-text delivery discriminator.
+    pub text_delivery: Option<TextDelivery>,
+    /// Whether motion blur is enabled.
+    pub motion_blur: Option<bool>,
+    /// Native travel distance, when supplied by the effect.
+    pub travel_distance: Option<f32>,
+}
+
+impl CustomParameters {
+    /// Validate all custom floating-point values.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidCustomFloat`] when a custom value is NaN or
+    /// infinite. Unknown integer discriminators remain valid and lossless.
+    pub fn validate(&self) -> Result<()> {
+        if self
+            .twist
+            .into_iter()
+            .chain(self.travel_distance)
+            .any(|value| !value.is_finite())
+        {
+            return Err(Error::InvalidCustomFloat);
+        }
+        Ok(())
+    }
+}
+
+/// Lossless, archive-free semantic settings for one Keynote slide transition.
+///
+/// The fields retain native presence and unknown values, while the owned
+/// string and payload fields use exact-size boxed storage. Call [`Self::validate`]
+/// before passing settings to an IWA adapter or publishing them from an edit.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Settings {
+    /// Native animation name, when present.
+    pub animation_type: Option<Box<str>>,
+    /// Semantic transition effect.
+    pub effect: Option<Effect>,
+    /// Transition duration in seconds.
+    pub duration: Option<f64>,
+    /// Effect-specific direction discriminator.
+    pub direction: Option<Direction>,
+    /// Delay before the transition starts, in seconds.
+    pub delay: Option<f64>,
+    /// Whether the transition starts automatically.
+    pub is_automatic: Option<bool>,
+    /// Animation-level opaque payloads and semantic values.
+    pub animation_parameters: AnimationParameters,
+    /// Effect-specific scalar values.
+    pub custom_parameters: CustomParameters,
+}
+
+impl Settings {
+    /// Validate every semantic field without decoding opaque payloads.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed [`Error`] when a duration or delay is non-finite or
+    /// negative, a custom value or detail is non-finite, a string contains a
+    /// NUL byte, or an effect uses a non-canonical known identifier.
+    pub fn validate(&self) -> Result<()> {
+        if self
+            .duration
+            .is_some_and(|value| !value.is_finite() || value < 0.0)
+        {
+            return Err(Error::InvalidDuration);
+        }
+        if self
+            .delay
+            .is_some_and(|value| !value.is_finite() || value < 0.0)
+        {
+            return Err(Error::InvalidDelay);
+        }
+        if self
+            .animation_type
+            .as_deref()
+            .is_some_and(|value| value.contains('\0'))
+        {
+            return Err(Error::NulString);
+        }
+        if let Some(effect) = &self.effect {
+            effect.validate()?;
+        }
+        self.animation_parameters.validate()?;
+        self.custom_parameters.validate()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::mem::size_of;
 
-    use super::Effect;
+    use super::{AnimationParameters, CustomParameters, Effect, Settings};
+    use crate::Error;
 
     #[test]
     fn effects_map_native_identifiers_losslessly() {
@@ -295,7 +503,7 @@ mod tests {
             Effect::None,
             Effect::Dissolve,
             Effect::MagicMove,
-            Effect::Unknown("com.example.future".to_owned()),
+            Effect::Unknown("com.example.future".into()),
         ] {
             assert_eq!(Effect::from_identifier(effect.identifier()), effect);
         }
@@ -303,10 +511,104 @@ mod tests {
 
     #[test]
     fn known_identifiers_cannot_be_smuggled_as_unknown_values() {
-        assert!(!Effect::Unknown("none".to_owned()).is_canonical());
-        assert!(!Effect::Unknown("apple:dissolve".to_owned()).is_canonical());
-        assert!(!Effect::Unknown("apple:magic-move-implied-motion-path".to_owned()).is_canonical());
-        assert!(Effect::Unknown("com.example.future".to_owned()).is_canonical());
+        assert!(!Effect::Unknown("none".into()).is_canonical());
+        assert!(!Effect::Unknown("apple:dissolve".into()).is_canonical());
+        assert!(!Effect::Unknown("apple:magic-move-implied-motion-path".into()).is_canonical());
+        assert!(Effect::Unknown("com.example.future".into()).is_canonical());
+    }
+
+    #[test]
+    fn transition_owned_handles_are_compact() {
+        assert_eq!(
+            size_of::<Option<Box<[u8]>>>(),
+            size_of::<Option<Box<str>>>(),
+        );
+        assert_eq!(size_of::<Option<Box<[u8]>>>(), 2 * size_of::<usize>(),);
+        assert_eq!(size_of::<CustomParameters>() % 4, 0);
+    }
+
+    #[test]
+    fn transition_unknown_values_and_opaque_payloads_are_lossless() {
+        let settings = Settings {
+            animation_type: Some("future-transition".into()),
+            effect: Some(Effect::from_identifier("com.example.future")),
+            animation_parameters: AnimationParameters {
+                color_payload: Some(vec![0xff, 0x00, 0x7f].into_boxed_slice()),
+                timing_curve_payloads: [None, Some(vec![0xff].into_boxed_slice()), None],
+                timing_curve_theme_names: [Some("Future Curve".into()), None, None],
+                ..AnimationParameters::default()
+            },
+            custom_parameters: CustomParameters {
+                acceleration: Some(super::Acceleration::from_native(99)),
+                text_delivery: Some(super::TextDelivery::from_native(-7)),
+                mosaic_type: Some(super::MosaicType::from_native(u32::MAX)),
+                ..CustomParameters::default()
+            },
+            ..Settings::default()
+        };
+
+        assert_eq!(settings.validate(), Ok(()));
+        assert_eq!(
+            settings.effect.as_ref().map(Effect::identifier),
+            Some("com.example.future")
+        );
+        assert_eq!(
+            settings.animation_parameters.color_payload(),
+            Some(&[0xff, 0x00, 0x7f][..])
+        );
+        assert_eq!(
+            settings.animation_parameters.timing_curve_payloads()[1].as_deref(),
+            Some(&[0xff][..])
+        );
+        assert_eq!(
+            settings.animation_parameters.timing_curve_theme_names()[0].as_deref(),
+            Some("Future Curve")
+        );
+    }
+
+    #[test]
+    fn transition_validation_reports_typed_failures() {
+        let mut settings = Settings {
+            duration: Some(-0.1),
+            ..Settings::default()
+        };
+        assert_eq!(settings.validate(), Err(Error::InvalidDuration));
+
+        settings.duration = None;
+        settings.delay = Some(f64::NAN);
+        assert_eq!(settings.validate(), Err(Error::InvalidDelay));
+
+        settings.delay = None;
+        settings.custom_parameters.twist = Some(f32::INFINITY);
+        assert_eq!(settings.validate(), Err(Error::InvalidCustomFloat));
+
+        settings.custom_parameters.twist = None;
+        settings.animation_parameters.detail = Some(f64::NEG_INFINITY);
+        assert_eq!(settings.validate(), Err(Error::InvalidDetail));
+
+        settings.animation_parameters.detail = None;
+        settings.animation_type = Some("bad\0name".into());
+        assert_eq!(settings.validate(), Err(Error::NulString));
+
+        settings.animation_type = None;
+        settings.effect = Some(Effect::Unknown("none".into()));
+        assert_eq!(settings.validate(), Err(Error::NonCanonicalEffect));
+
+        settings.effect = None;
+        settings.animation_parameters.timing_curve_theme_names[2] = Some("bad\0name".into());
+        assert_eq!(settings.validate(), Err(Error::NulString));
+    }
+
+    #[test]
+    fn effect_constructors_validate_canonical_and_nul_rules() {
+        assert_eq!(Effect::unknown("none"), Err(Error::NonCanonicalEffect));
+        assert_eq!(Effect::unknown("future\0effect"), Err(Error::NulString));
+        assert_eq!(
+            Effect::unknown("com.example.future")
+                .as_ref()
+                .map(Effect::identifier),
+            Ok("com.example.future")
+        );
     }
 
     #[test]

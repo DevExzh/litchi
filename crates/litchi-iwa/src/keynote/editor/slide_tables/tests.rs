@@ -1731,14 +1731,8 @@ fn source_built_table_roundtrips_title_settings_transactionally() {
     let table = editor
         .add_slide_table(0, "Forecast", 2, 2, position, size)
         .unwrap();
-    let visible = KeynoteTableTitleSettings {
-        visible: Some(true),
-        outlined: Some(true),
-    };
-    let initially_hidden = KeynoteTableTitleSettings {
-        visible: Some(false),
-        outlined: None,
-    };
+    let visible = KeynoteTableTitleSettings::new(Some(true), Some(true));
+    let initially_hidden = KeynoteTableTitleSettings::new(Some(false), None);
     assert_eq!(
         editor
             .slide_table_title_settings(0, table.model_object_id)
@@ -1762,10 +1756,7 @@ fn source_built_table_roundtrips_title_settings_transactionally() {
         .unwrap();
     assert_eq!(reopened.to_bytes().unwrap(), unchanged);
 
-    let explicit_hidden = KeynoteTableTitleSettings {
-        visible: Some(false),
-        outlined: Some(false),
-    };
+    let explicit_hidden = KeynoteTableTitleSettings::new(Some(false), Some(false));
     reopened
         .set_slide_table_title_settings(0, table.model_object_id, explicit_hidden)
         .unwrap();

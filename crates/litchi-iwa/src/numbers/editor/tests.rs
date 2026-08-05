@@ -6988,18 +6988,12 @@ fn table_title_settings_are_lossless_transactional_and_wire_exact() {
         .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
     let baseline = editor.to_bytes().unwrap();
-    let initial = NumbersTableTitleSettings {
-        visible: Some(false),
-        outlined: None,
-    };
+    let initial = Settings::new(Some(false), None);
     assert_eq!(editor.table_title_settings(10).unwrap(), initial);
     assert!(!initial.is_visible());
     assert!(!initial.is_outlined());
 
-    let settings = NumbersTableTitleSettings {
-        visible: Some(true),
-        outlined: Some(false),
-    };
+    let settings = Settings::new(Some(true), Some(false));
     editor.set_table_title_settings(10, settings).unwrap();
     assert_eq!(editor.table_title_settings(10).unwrap(), settings);
     assert!(settings.is_visible());
@@ -7045,20 +7039,11 @@ fn table_title_settings_restore_native_presence_exactly() {
         .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
     let baseline = editor.to_bytes().unwrap();
-    let native = NumbersTableTitleSettings {
-        visible: Some(true),
-        outlined: Some(true),
-    };
+    let native = Settings::new(Some(true), Some(true));
     assert_eq!(editor.table_title_settings(10).unwrap(), native);
 
     editor
-        .set_table_title_settings(
-            10,
-            NumbersTableTitleSettings {
-                visible: Some(false),
-                outlined: Some(false),
-            },
-        )
+        .set_table_title_settings(10, Settings::new(Some(false), Some(false)))
         .unwrap();
     let changed_model = TableModelArchive::decode(
         editor
@@ -7083,13 +7068,7 @@ fn table_title_settings_reject_missing_render_styles_transactionally() {
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
-            .set_table_title_settings(
-                10,
-                NumbersTableTitleSettings {
-                    visible: Some(true),
-                    outlined: Some(false),
-                },
-            )
+            .set_table_title_settings(10, Settings::new(Some(true), Some(false)),)
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -7126,7 +7105,7 @@ fn table_title_settings_reject_malformed_wire_transactionally() {
         assert!(editor.table_title_settings(10).is_err());
         assert!(
             editor
-                .set_table_title_settings(10, NumbersTableTitleSettings::default())
+                .set_table_title_settings(10, Settings::default())
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);
@@ -7157,7 +7136,7 @@ fn table_title_settings_reject_malformed_wire_transactionally() {
     assert!(editor.table_title_settings(10).is_err());
     assert!(
         editor
-            .set_table_title_settings(10, NumbersTableTitleSettings::default())
+            .set_table_title_settings(10, Settings::default())
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -7175,7 +7154,7 @@ fn table_title_settings_reject_malformed_wire_transactionally() {
     assert!(editor.table_title_settings(10).is_err());
     assert!(
         editor
-            .set_table_title_settings(10, NumbersTableTitleSettings::default())
+            .set_table_title_settings(10, Settings::default())
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);

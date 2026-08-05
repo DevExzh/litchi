@@ -81,9 +81,9 @@ pub use editor::{
     NumbersTableCellTextShadow, NumbersTableCellTextStyle, NumbersTableHeaderCount,
     NumbersTableHeaderSettings, NumbersTableInfo, NumbersTableSortColumnIndex,
     NumbersTableSortDirection, NumbersTableSortOrder, NumbersTableSortRowRange,
-    NumbersTableSortRule, NumbersTableSortScope, NumbersTableTitleSettings, NumbersTextBoxInfo,
-    Points, RemovedNumbersSheetAudio, RemovedNumbersSheetChart, RemovedNumbersSheetImage,
-    RemovedNumbersSheetMovie, RemovedNumbersSheetShape, RemovedNumbersTextBox, Size,
+    NumbersTableSortRule, NumbersTableSortScope, NumbersTextBoxInfo, Points,
+    RemovedNumbersSheetAudio, RemovedNumbersSheetChart, RemovedNumbersSheetImage,
+    RemovedNumbersSheetMovie, RemovedNumbersSheetShape, RemovedNumbersTextBox, Settings, Size,
     TableCellConditionalHighlightInfo, TableColumnDeletion, TableColumnInsertion, TableRowDeletion,
     TableRowInsertion,
 };

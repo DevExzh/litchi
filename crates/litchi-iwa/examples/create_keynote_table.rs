@@ -60,10 +60,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_table_title_settings(
         0,
         table.model_object_id,
-        KeynoteTableTitleSettings {
-            visible: Some(true),
-            outlined: Some(true),
-        },
+        KeynoteTableTitleSettings::new(Some(true), Some(true)),
     )?;
     for (column, width) in [440.0, 390.0, 390.0].into_iter().enumerate() {
         editor.set_slide_table_column_width(

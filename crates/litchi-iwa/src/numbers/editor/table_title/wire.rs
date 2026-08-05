@@ -8,7 +8,7 @@ const TITLE_OUTLINED_FIELD: u32 = 37;
 pub(super) fn read_table_title_settings_wire(
     original: &[u8],
     model: &TableModelArchive,
-) -> Result<NumbersTableTitleSettings> {
+) -> Result<Settings> {
     require_optional_bool(
         original,
         TITLE_VISIBLE_FIELD,
@@ -21,26 +21,29 @@ pub(super) fn read_table_title_settings_wire(
         "title outline",
         model.table_name_border_enabled,
     )?;
-    Ok(NumbersTableTitleSettings::from_model(model))
+    Ok(Settings::new(
+        model.table_name_enabled,
+        model.table_name_border_enabled,
+    ))
 }
 
 pub(super) fn write_table_title_settings_wire(
     original: &[u8],
     model: &TableModelArchive,
-    settings: NumbersTableTitleSettings,
+    settings: Settings,
 ) -> Result<Vec<u8>> {
     read_table_title_settings_wire(original, model)?;
     let mut data = patch_varint_field(
         original,
         TITLE_VISIBLE_FIELD,
         model.table_name_enabled.is_some(),
-        settings.visible.map(u64::from),
+        settings.visible().map(u64::from),
     )?;
     data = patch_varint_field(
         &data,
         TITLE_OUTLINED_FIELD,
         model.table_name_border_enabled.is_some(),
-        settings.outlined.map(u64::from),
+        settings.outlined().map(u64::from),
     )?;
     let verified = TableModelArchive::decode(data.as_slice())?;
     if read_table_title_settings_wire(&data, &verified)? != settings {

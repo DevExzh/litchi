@@ -12,6 +12,8 @@ pub mod dimension;
 pub mod edit;
 /// Checked, archive-free table sort semantics.
 pub mod sort;
+/// Compact, presence-preserving table title semantics.
+pub mod title;
 
 use crate::cell::Value;
 use std::fmt;

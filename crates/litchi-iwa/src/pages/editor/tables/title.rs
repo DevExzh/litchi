@@ -3,7 +3,7 @@
 use super::*;
 
 /// Lossless optional title settings stored by a Pages table model.
-pub type PagesTableTitleSettings = crate::numbers::NumbersTableTitleSettings;
+pub type PagesTableTitleSettings = crate::numbers::Settings;
 
 impl PagesEditor {
     /// Read a body table's lossless title visibility and outline settings.

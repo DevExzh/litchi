@@ -198,6 +198,7 @@ mod text_box_duplicate;
 
 pub use crate::charts::Direction;
 pub use cell_merge::IWorkTableCellRegion;
+pub use litchi_numbers::table::title::Settings;
 use model::*;
 pub use semantic::*;
 pub use sheet_audio::{NumbersSheetAudioInfo, NumbersSheetAudioOptions, RemovedNumbersSheetAudio};
@@ -223,7 +224,6 @@ pub(crate) use table_sort::{
     clear_table_sort_order_in_package, set_table_sort_order_in_package,
     table_sort_order_in_package,
 };
-pub use table_title::NumbersTableTitleSettings;
 pub(crate) use table_title::{
     set_table_title_settings_in_package, table_title_settings_in_package,
 };

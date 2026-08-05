@@ -12,9 +12,24 @@ pub enum Error {
     /// A duration was not finite and non-negative.
     #[error("Keynote duration must be finite and non-negative")]
     InvalidDuration,
+    /// A transition delay was not finite and non-negative.
+    #[error("Keynote transition delay must be finite and non-negative")]
+    InvalidDelay,
+    /// A transition-specific floating-point value was not finite.
+    #[error("Keynote transition custom values must be finite")]
+    InvalidCustomFloat,
+    /// A transition animation detail value was not finite.
+    #[error("Keynote transition detail must be finite")]
+    InvalidDetail,
     /// A known native enum value was represented by its lossless unknown form.
     #[error("Keynote mode must use its canonical variant for a known native value")]
     NonCanonicalMode,
+    /// A known transition effect identifier was represented by its unknown form.
+    #[error("Keynote transition effect must use its canonical variant for a known identifier")]
+    NonCanonicalEffect,
+    /// A semantic transition string contained a NUL byte.
+    #[error("Keynote transition strings cannot contain NUL")]
+    NulString,
     /// A native identifier required for lossless decoding was empty.
     #[error("Keynote animation identifier cannot be empty")]
     EmptyIdentifier,

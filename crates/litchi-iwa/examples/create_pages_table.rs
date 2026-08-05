@@ -51,10 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.set_table_title_settings(
         table.model_object_id,
-        PagesTableTitleSettings {
-            visible: Some(true),
-            outlined: Some(true),
-        },
+        PagesTableTitleSettings::new(Some(true), Some(true)),
     )?;
     for (column, width) in [120.0, 160.0, 100.0].into_iter().enumerate() {
         editor.set_table_column_width(
