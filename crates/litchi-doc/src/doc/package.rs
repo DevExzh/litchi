@@ -311,7 +311,7 @@ impl<R: Read + Seek> Package<R> {
             .property_set_stream(&["\u{0005}SummaryInformation"])
         {
             Ok(value) => Ok(Some(value)),
-            Err(litchi_cfb::OleError::StreamNotFound) => Ok(None),
+            Err(OleError::StreamNotFound) => Ok(None),
             Err(error) => Err(error.into()),
         }
     }
@@ -338,7 +338,7 @@ impl<R: Read + Seek> Package<R> {
             .property_set_stream(&["\u{0005}DocumentSummaryInformation"])
         {
             Ok(value) => Ok(Some(value)),
-            Err(litchi_cfb::OleError::StreamNotFound) => Ok(None),
+            Err(OleError::StreamNotFound) => Ok(None),
             Err(error) => Err(error.into()),
         }
     }
@@ -402,7 +402,7 @@ mod tests {
     }
 
     fn poi_fixture(name: &str) -> std::path::PathBuf {
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/poi/test-data/document")
             .join(name)
     }

@@ -195,10 +195,10 @@ pub struct Document {
     stylesheet: Option<StyleSheet>,
     /// Extracted MTEF data from OLE streams (stream_name -> mtef_data)
     #[allow(dead_code)] // Stored for debugging and raw access
-    mtef_data: std::collections::HashMap<String, Vec<u8>>,
+    mtef_data: HashMap<String, Vec<u8>>,
     /// Parsed MTEF formulas rendered while their temporary parser arena is alive.
     /// Owned strings avoid a self-referential document and remain cheap to share.
-    parsed_mtef: std::collections::HashMap<String, Arc<str>>,
+    parsed_mtef: HashMap<String, Arc<str>>,
 }
 
 #[cfg(all(test, feature = "formula"))]
@@ -3073,7 +3073,9 @@ impl Document {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{Image, ImageError, Package};
+    use super::super::package::{DocError, Package};
+    use super::super::parts::fib::WORD_97_NFIB;
+    use super::super::{Image, ImageError};
     use std::path::Path;
 
     #[test]
@@ -3138,14 +3140,14 @@ mod tests {
     /// reaches the same diagnosis at the same point.
     #[test]
     fn word_6_documents_report_their_version_not_a_missing_stream() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/ole/doc/word6-no-table-stream.doc");
-        let mut package = crate::doc::Package::open(&path).expect("the CFB container opens");
+        let mut package = Package::open(&path).expect("the CFB container opens");
 
         match package.document() {
-            Err(crate::doc::DocError::UnsupportedVersion { nfib, name }) => {
+            Err(DocError::UnsupportedVersion { nfib, name }) => {
                 assert!(
-                    nfib < crate::doc::parts::fib::WORD_97_NFIB,
+                    nfib < WORD_97_NFIB,
                     "expected a pre-Word-97 nFib, got {nfib:#06x}"
                 );
                 assert!(name.contains("Word 6"), "unexpected version name: {name}");
