@@ -76,7 +76,7 @@ use crate::charts::source::{
     validate_chart_styles_registered,
 };
 use crate::charts::{
-    ChartArrangement, ChartData, Kind, Direction, DirectionKind, IWorkChartArchive,
+    ChartArrangement, ChartData, Direction, DirectionKind, IWorkChartArchive, Kind,
 };
 use crate::data_reference_registry::{
     clone_component_data_references, remove_component_data_references_for_objects,

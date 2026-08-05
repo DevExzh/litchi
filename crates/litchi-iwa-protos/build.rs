@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err(format!("no Protocol Buffer schemas found in {PROTO_DIRECTORY}").into());
     }
 
-prost_build::Config::new()
+    prost_build::Config::new()
         .enable_type_names()
         .include_file("iwa_protos.rs")
         .compile_protos(&proto_files, &[proto_directory])?;
