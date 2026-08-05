@@ -7,7 +7,7 @@ use std::num::NonZeroUsize;
 ///
 /// The link is preserved as inert metadata. Litchi never dereferences it.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CellRangeSource {
+pub struct CellRange {
     name: String,
     href: String,
     last_row_spanned: NonZeroUsize,
@@ -18,7 +18,7 @@ pub struct CellRangeSource {
     refresh_delay: Option<String>,
 }
 
-impl CellRangeSource {
+impl CellRange {
     /// Create inert external-range metadata with positive target dimensions.
     pub fn new(
         name: impl Into<String>,
@@ -138,14 +138,14 @@ impl CellRangeSource {
 
 /// How an external ODF table source is copied into a sheet.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TableSourceMode {
+pub enum TableMode {
     /// Copy values, formulas, and styles.
     CopyAll,
     /// Copy calculated values without formulas.
     CopyResultsOnly,
 }
 
-impl TableSourceMode {
+impl TableMode {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::CopyAll => "copy-all",
@@ -166,11 +166,11 @@ impl TableSourceMode {
 
 /// Metadata describing an external document linked into an ODF sheet.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SheetTableSource {
+pub struct SheetTable {
     /// URI of the external document, preserved without dereferencing it.
     pub href: String,
     /// Optional source copying mode.
-    pub mode: Option<TableSourceMode>,
+    pub mode: Option<TableMode>,
     /// Optional source table name.
     pub table_name: Option<String>,
     /// Whether the link explicitly requests `xlink:actuate="onRequest"`.
@@ -183,7 +183,7 @@ pub struct SheetTableSource {
     pub refresh_delay: Option<String>,
 }
 
-impl SheetTableSource {
+impl SheetTable {
     /// Create linked-table metadata without accessing the target URI.
     pub fn new(href: impl Into<String>) -> Self {
         Self {
@@ -198,7 +198,7 @@ impl SheetTableSource {
     }
 }
 
-pub(crate) fn validate_table_source(source: &SheetTableSource) -> Result<()> {
+pub(crate) fn validate_table_source(source: &SheetTable) -> Result<()> {
     if let Some(delay) = &source.refresh_delay
         && !is_xsd_duration(delay)
     {
@@ -209,7 +209,7 @@ pub(crate) fn validate_table_source(source: &SheetTableSource) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn write_table_source(out: &mut String, source: &SheetTableSource) -> Result<()> {
+pub(crate) fn write_table_source(out: &mut String, source: &SheetTable) -> Result<()> {
     validate_table_source(source)?;
     out.push_str("<table:table-source xlink:type=\"simple\" xlink:href=\"");
     out.push_str(&escape_xml(&source.href));
@@ -217,7 +217,7 @@ pub(crate) fn write_table_source(out: &mut String, source: &SheetTableSource) ->
     if source.actuate_on_request {
         out.push_str(" xlink:actuate=\"onRequest\"");
     }
-    write_optional_attribute(out, "table:mode", source.mode.map(TableSourceMode::as_str));
+    write_optional_attribute(out, "table:mode", source.mode.map(TableMode::as_str));
     write_optional_attribute(out, "table:table-name", source.table_name.as_deref());
     write_optional_attribute(out, "table:filter-name", source.filter_name.as_deref());
     write_optional_attribute(
@@ -230,7 +230,7 @@ pub(crate) fn write_table_source(out: &mut String, source: &SheetTableSource) ->
     Ok(())
 }
 
-pub(crate) fn write_cell_range_source(out: &mut String, source: &CellRangeSource) {
+pub(crate) fn write_cell_range_source(out: &mut String, source: &CellRange) {
     out.push_str("<table:cell-range-source table:name=\"");
     out.push_str(&escape_xml(source.name()));
     out.push_str("\" table:last-column-spanned=\"");
@@ -339,8 +339,8 @@ mod tests {
 
     #[test]
     fn writes_escaped_inert_link_metadata() {
-        let mut source = SheetTableSource::new("../A&B.ods");
-        source.mode = Some(TableSourceMode::CopyResultsOnly);
+        let mut source = SheetTable::new("../A&B.ods");
+        source.mode = Some(TableMode::CopyResultsOnly);
         source.table_name = Some("Q1 <Q2".to_string());
         source.actuate_on_request = true;
         source.refresh_delay = Some("PT15M".to_string());
@@ -354,10 +354,10 @@ mod tests {
 
     #[test]
     fn cell_range_source_enforces_positive_dimensions_and_duration() {
-        assert!(CellRangeSource::new("Range", "source.ods", 0, 1).is_err());
-        assert!(CellRangeSource::new("Range", "source.ods", 1, 0).is_err());
+        assert!(CellRange::new("Range", "source.ods", 0, 1).is_err());
+        assert!(CellRange::new("Range", "source.ods", 1, 0).is_err());
 
-        let mut source = CellRangeSource::new("Data & More", "../A&B.ods", 3, 4).unwrap();
+        let mut source = CellRange::new("Data & More", "../A&B.ods", 3, 4).unwrap();
         source.set_actuate_on_request(true);
         source.set_filter_name(Some("calc8".to_string()));
         source.set_refresh_delay(Some("PT5M".to_string())).unwrap();
