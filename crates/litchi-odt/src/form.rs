@@ -103,7 +103,7 @@ const MAX_ATTRIBUTES: usize = 256;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum FormPart {
+pub enum Part {
     Content,
     Styles,
     Flat,
@@ -111,7 +111,7 @@ pub enum FormPart {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum FormScope {
+pub enum Scope {
     Document,
     Text,
     Sheet { index: usize, name: Option<String> },
@@ -121,7 +121,7 @@ pub enum FormScope {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FormAttribute {
+pub struct Attribute {
     pub namespace_uri: Option<String>,
     pub local_name: String,
     pub value: String,
@@ -129,10 +129,10 @@ pub struct FormAttribute {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Forms {
-    pub groups: Vec<FormGroup>,
-    pub control_shapes: Vec<ControlShape>,
+    pub groups: Vec<Group>,
+    pub control_shapes: Vec<Shape>,
     /// Event declarations in document order. They are retained but never executed.
-    pub event_listeners: Vec<EventListener>,
+    pub event_listeners: Vec<Listener>,
     pub has_xforms: bool,
     pub has_event_listeners: bool,
 }
@@ -140,10 +140,10 @@ pub struct Forms {
 /// Stable identity snapshot for the element that owns an event declaration.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
-pub enum EventTarget {
+pub enum Target {
     Forms {
-        part: FormPart,
-        scope: FormScope,
+        part: Part,
+        scope: Scope,
     },
     Form {
         xml_id: Option<String>,
@@ -151,7 +151,7 @@ pub enum EventTarget {
         name: Option<String>,
     },
     Control {
-        kind: FormControlKind,
+        kind: ControlKind,
         xml_id: Option<String>,
         form_id: Option<String>,
         name: Option<String>,
@@ -160,7 +160,7 @@ pub enum EventTarget {
 
 /// XLink activation mode retained for an event declaration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EventActuate {
+pub enum Actuate {
     OnLoad,
     OnRequest,
     Other,
@@ -169,8 +169,8 @@ pub enum EventActuate {
 
 /// An inert `script:event-listener` declaration.
 #[derive(Debug, Clone, PartialEq)]
-pub struct EventListener {
-    pub target: EventTarget,
+pub struct Listener {
+    pub target: Target,
     /// Required by conforming ODF, but optional here for tolerant producer inspection.
     pub event_name: Option<String>,
     /// Required by conforming ODF, but optional here for tolerant producer inspection.
@@ -178,22 +178,22 @@ pub struct EventListener {
     pub macro_name: Option<String>,
     /// URI retained verbatim; it is never fetched or resolved.
     pub href: Option<String>,
-    pub actuate: Option<EventActuate>,
+    pub actuate: Option<Actuate>,
     /// Whether the optional XLink type was explicitly `simple`.
     pub simple_link: bool,
-    pub attributes: Vec<FormAttribute>,
+    pub attributes: Vec<Attribute>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct FormGroup {
-    pub part: FormPart,
-    pub scope: FormScope,
+pub struct Group {
+    pub part: Part,
+    pub scope: Scope,
     pub automatic_focus: Option<bool>,
     pub apply_design_mode: Option<bool>,
     pub forms: Vec<Form>,
     pub has_xforms: bool,
     pub has_event_listeners: bool,
-    pub attributes: Vec<FormAttribute>,
+    pub attributes: Vec<Attribute>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -202,21 +202,21 @@ pub struct Form {
     pub form_id: Option<String>,
     pub name: Option<String>,
     pub control_implementation: Option<String>,
-    pub properties: Vec<FormProperty>,
-    pub children: Vec<FormNode>,
-    pub attributes: Vec<FormAttribute>,
+    pub properties: Vec<Property>,
+    pub children: Vec<Node>,
+    pub attributes: Vec<Attribute>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 #[allow(clippy::large_enum_variant)] // public API; boxing would break callers
-pub enum FormNode {
+pub enum Node {
     Form(Form),
-    Control(FormControl),
+    Control(Control),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum FormControlKind {
+pub enum ControlKind {
     Text,
     TextArea,
     Password,
@@ -244,7 +244,7 @@ pub enum FormControlKind {
     Other(String),
 }
 
-impl FormControlKind {
+impl ControlKind {
     fn parse(name: &str) -> Option<Self> {
         Some(match name {
             "text" => Self::Text,
@@ -283,8 +283,8 @@ impl FormControlKind {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct FormControl {
-    pub kind: FormControlKind,
+pub struct Control {
+    pub kind: ControlKind,
     pub xml_id: Option<String>,
     pub form_id: Option<String>,
     pub name: Option<String>,
@@ -302,22 +302,22 @@ pub struct FormControl {
     pub selected: Option<bool>,
     pub current_selected: Option<bool>,
     pub text: String,
-    pub properties: Vec<FormProperty>,
-    pub children: Vec<FormNode>,
-    pub attributes: Vec<FormAttribute>,
+    pub properties: Vec<Property>,
+    pub children: Vec<Node>,
+    pub attributes: Vec<Attribute>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct FormProperty {
+pub struct Property {
     pub name: String,
-    pub value: FormPropertyValue,
+    pub value: PropertyValue,
 }
 
-impl FormProperty {
+impl Property {
     pub fn boolean(name: impl Into<String>, value: bool) -> Self {
         Self {
             name: name.into(),
-            value: FormPropertyValue::Scalar(FormScalarValue::Boolean(value)),
+            value: PropertyValue::Scalar(ScalarValue::Boolean(value)),
         }
     }
 
@@ -329,7 +329,7 @@ impl FormProperty {
     ) -> Self {
         Self {
             name: name.into(),
-            value: FormPropertyValue::Scalar(FormScalarValue::Number {
+            value: PropertyValue::Scalar(ScalarValue::Number {
                 value_type: value_type.into(),
                 lexical: lexical.into(),
                 currency,
@@ -340,39 +340,39 @@ impl FormProperty {
     pub fn text(name: impl Into<String>, value: impl Into<String>) -> Self {
         Self {
             name: name.into(),
-            value: FormPropertyValue::Scalar(FormScalarValue::Text(value.into())),
+            value: PropertyValue::Scalar(ScalarValue::Text(value.into())),
         }
     }
 
     pub fn date(name: impl Into<String>, value: impl Into<String>) -> Self {
         Self {
             name: name.into(),
-            value: FormPropertyValue::Scalar(FormScalarValue::Date(value.into())),
+            value: PropertyValue::Scalar(ScalarValue::Date(value.into())),
         }
     }
 
     pub fn time(name: impl Into<String>, value: impl Into<String>) -> Self {
         Self {
             name: name.into(),
-            value: FormPropertyValue::Scalar(FormScalarValue::Time(value.into())),
+            value: PropertyValue::Scalar(ScalarValue::Time(value.into())),
         }
     }
 
     pub fn void(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
-            value: FormPropertyValue::Scalar(FormScalarValue::Void),
+            value: PropertyValue::Scalar(ScalarValue::Void),
         }
     }
 
     pub fn list(
         name: impl Into<String>,
         value_type: impl Into<String>,
-        values: Vec<FormScalarValue>,
+        values: Vec<ScalarValue>,
     ) -> Self {
         Self {
             name: name.into(),
-            value: FormPropertyValue::List {
+            value: PropertyValue::List {
                 value_type: Some(value_type.into()),
                 values,
             },
@@ -385,17 +385,17 @@ impl FormProperty {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum FormPropertyValue {
-    Scalar(FormScalarValue),
+pub enum PropertyValue {
+    Scalar(ScalarValue),
     List {
         value_type: Option<String>,
-        values: Vec<FormScalarValue>,
+        values: Vec<ScalarValue>,
     },
 }
 
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
-pub enum FormScalarValue {
+pub enum ScalarValue {
     Boolean(bool),
     Number {
         value_type: String,
@@ -420,9 +420,9 @@ pub struct ControlRef {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ControlShape {
-    pub part: FormPart,
-    pub scope: FormScope,
+pub struct Shape {
+    pub part: Part,
+    pub scope: Scope,
     pub control_id: String,
     pub resolved_control: Option<ControlRef>,
     pub draw_name: Option<String>,
@@ -433,14 +433,14 @@ pub struct ControlShape {
     pub y: Option<String>,
     pub width: Option<String>,
     pub height: Option<String>,
-    pub attributes: Vec<FormAttribute>,
+    pub attributes: Vec<Attribute>,
 }
 
 #[allow(clippy::large_enum_variant)] // parse-stack builder; boxing would churn many match sites
 enum Builder {
     Form(usize, Form),
-    Control(usize, FormControl),
-    List(usize, String, Option<String>, Vec<FormScalarValue>),
+    Control(usize, Control),
+    List(usize, String, Option<String>, Vec<ScalarValue>),
 }
 
 impl Builder {
@@ -451,13 +451,13 @@ impl Builder {
     }
 }
 
-struct ScopeFrame(usize, FormScope);
+struct ScopeFrame(usize, Scope);
 
 struct EventListenersBuilder {
     depth: usize,
     listener_depth: Option<usize>,
-    target: EventTarget,
-    listeners: Vec<EventListener>,
+    target: Target,
+    listeners: Vec<Listener>,
 }
 
 #[derive(Default)]
@@ -467,7 +467,7 @@ struct Limits {
     decoded: usize,
 }
 
-pub(crate) fn parse_form_parts(parts: &[(&str, FormPart)]) -> Result<Forms> {
+pub(crate) fn parse_form_parts(parts: &[(&str, Part)]) -> Result<Forms> {
     let raw = parts.iter().try_fold(0usize, |sum, (xml, _)| {
         sum.checked_add(xml.len())
             .ok_or_else(|| err("form XML size overflow"))
@@ -484,7 +484,7 @@ pub(crate) fn parse_form_parts(parts: &[(&str, FormPart)]) -> Result<Forms> {
     Ok(result)
 }
 
-fn parse_part(xml: &str, part: FormPart, result: &mut Forms, limits: &mut Limits) -> Result<()> {
+fn parse_part(xml: &str, part: Part, result: &mut Forms, limits: &mut Limits) -> Result<()> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -492,7 +492,7 @@ fn parse_part(xml: &str, part: FormPart, result: &mut Forms, limits: &mut Limits
     let mut scopes = Vec::<ScopeFrame>::new();
     let mut builders = Vec::<Builder>::new();
     let mut event_listeners: Option<EventListenersBuilder> = None;
-    let mut group: Option<(usize, FormGroup)> = None;
+    let mut group: Option<(usize, Group)> = None;
     let (mut sheet, mut page, mut notes, mut master) = (0, 0, 0, 0);
     loop {
         let (resolved, event) = reader
@@ -751,14 +751,14 @@ fn parse_part(xml: &str, part: FormPart, result: &mut Forms, limits: &mut Limits
     Ok(())
 }
 
-fn event_target(part: FormPart, scope: FormScope, builders: &[Builder]) -> Result<EventTarget> {
+fn event_target(part: Part, scope: Scope, builders: &[Builder]) -> Result<Target> {
     Ok(match builders.last() {
-        Some(Builder::Form(_, form)) => EventTarget::Form {
+        Some(Builder::Form(_, form)) => Target::Form {
             xml_id: form.xml_id.clone(),
             form_id: form.form_id.clone(),
             name: form.name.clone(),
         },
-        Some(Builder::Control(_, control)) => EventTarget::Control {
+        Some(Builder::Control(_, control)) => Target::Control {
             kind: control.kind.clone(),
             xml_id: control.xml_id.clone(),
             form_id: control.form_id.clone(),
@@ -769,14 +769,11 @@ fn event_target(part: FormPart, scope: FormScope, builders: &[Builder]) -> Resul
                 "office:event-listeners cannot be nested in a form property",
             ));
         },
-        None => EventTarget::Forms { part, scope },
+        None => Target::Forms { part, scope },
     })
 }
 
-fn new_event_listener(
-    target: EventTarget,
-    attributes: Vec<FormAttribute>,
-) -> Result<EventListener> {
+fn new_event_listener(target: Target, attributes: Vec<Attribute>) -> Result<Listener> {
     let event_name = owned(&attributes, SCRIPT, "event-name");
     let language = owned(&attributes, SCRIPT, "language");
     if event_name.as_deref().is_some_and(str::is_empty)
@@ -799,14 +796,14 @@ fn new_event_listener(
     };
     let actuate = owned(&attributes, XLINK, "actuate")
         .map(|value| match value.as_str() {
-            "onLoad" => Ok(EventActuate::OnLoad),
-            "onRequest" => Ok(EventActuate::OnRequest),
-            "other" => Ok(EventActuate::Other),
-            "none" => Ok(EventActuate::None),
+            "onLoad" => Ok(Actuate::OnLoad),
+            "onRequest" => Ok(Actuate::OnRequest),
+            "other" => Ok(Actuate::Other),
+            "none" => Ok(Actuate::None),
             _ => Err(err("invalid xlink:actuate on script:event-listener")),
         })
         .transpose()?;
-    Ok(EventListener {
+    Ok(Listener {
         target,
         event_name,
         language,
@@ -829,14 +826,14 @@ fn scope_start(
     notes: &mut usize,
     master: &mut usize,
     limits: &mut Limits,
-) -> Result<Option<FormScope>> {
+) -> Result<Option<Scope>> {
     if namespace == Some(OFFICE) && local == "text" {
-        return Ok(Some(FormScope::Text));
+        return Ok(Some(Scope::Text));
     }
     if namespace == Some(TABLE) && local == "table" {
         let index = next_index(sheet)?;
         let attrs = attrs(reader, element, limits)?;
-        return Ok(Some(FormScope::Sheet {
+        return Ok(Some(Scope::Sheet {
             index,
             name: owned(&attrs, TABLE, "name"),
         }));
@@ -844,20 +841,20 @@ fn scope_start(
     if namespace == Some(DRAW) && local == "page" {
         let index = next_index(page)?;
         let attrs = attrs(reader, element, limits)?;
-        return Ok(Some(FormScope::DrawPage {
+        return Ok(Some(Scope::DrawPage {
             index,
             name: owned(&attrs, DRAW, "name"),
         }));
     }
     if namespace == Some(PRESENTATION) && local == "notes" {
-        return Ok(Some(FormScope::Notes {
+        return Ok(Some(Scope::Notes {
             index: next_index(notes)?,
         }));
     }
     if namespace == Some(STYLE) && local == "master-page" {
         let index = next_index(master)?;
         let attrs = attrs(reader, element, limits)?;
-        return Ok(Some(FormScope::MasterPage {
+        return Ok(Some(Scope::MasterPage {
             index,
             name: owned(&attrs, STYLE, "name"),
         }));
@@ -896,7 +893,7 @@ fn form_start(
             list_value(builders, &attrs)?;
         },
         _ => {
-            if let Some(kind) = FormControlKind::parse(local) {
+            if let Some(kind) = ControlKind::parse(local) {
                 node(limits)?;
                 builders.push(Builder::Control(depth, new_control(kind, attrs)?));
             }
@@ -910,7 +907,7 @@ fn form_empty(
     element: &BytesStart<'_>,
     namespace: Option<&str>,
     local: &str,
-    group: &mut Option<(usize, FormGroup)>,
+    group: &mut Option<(usize, Group)>,
     builders: &mut [Builder],
     limits: &mut Limits,
 ) -> Result<()> {
@@ -934,9 +931,9 @@ fn form_empty(
             };
             attach_property(
                 builders,
-                FormProperty {
+                Property {
                     name,
-                    value: FormPropertyValue::List { value_type, values },
+                    value: PropertyValue::List { value_type, values },
                 },
             )?;
         },
@@ -945,7 +942,7 @@ fn form_empty(
             list_value(builders, &attrs)?;
         },
         _ => {
-            if let Some(kind) = FormControlKind::parse(local) {
+            if let Some(kind) = ControlKind::parse(local) {
                 node(limits)?;
                 attach_control(builders, new_control(kind, attrs)?)?;
             }
@@ -954,30 +951,27 @@ fn form_empty(
     Ok(())
 }
 
-fn finish_builder(
-    group: &mut Option<(usize, FormGroup)>,
-    builders: &mut Vec<Builder>,
-) -> Result<()> {
+fn finish_builder(group: &mut Option<(usize, Group)>, builders: &mut Vec<Builder>) -> Result<()> {
     match builders.pop().ok_or_else(|| err("form stack underflow"))? {
         Builder::Form(_, value) => attach_form(group, builders, value),
         Builder::Control(_, value) => attach_control(builders, value),
         Builder::List(_, name, value_type, values) => attach_property(
             builders,
-            FormProperty {
+            Property {
                 name,
-                value: FormPropertyValue::List { value_type, values },
+                value: PropertyValue::List { value_type, values },
             },
         ),
     }
 }
 
 fn attach_form(
-    group: &mut Option<(usize, FormGroup)>,
+    group: &mut Option<(usize, Group)>,
     builders: &mut [Builder],
     form: Form,
 ) -> Result<()> {
     match builders.last_mut() {
-        Some(Builder::Form(_, parent)) => parent.children.push(FormNode::Form(form)),
+        Some(Builder::Form(_, parent)) => parent.children.push(Node::Form(form)),
         Some(_) => return Err(err("form:form has an invalid parent")),
         None => group
             .as_mut()
@@ -989,16 +983,16 @@ fn attach_form(
     Ok(())
 }
 
-fn attach_control(builders: &mut [Builder], control: FormControl) -> Result<()> {
+fn attach_control(builders: &mut [Builder], control: Control) -> Result<()> {
     match builders.last_mut() {
-        Some(Builder::Form(_, parent)) => parent.children.push(FormNode::Control(control)),
-        Some(Builder::Control(_, parent)) => parent.children.push(FormNode::Control(control)),
+        Some(Builder::Form(_, parent)) => parent.children.push(Node::Control(control)),
+        Some(Builder::Control(_, parent)) => parent.children.push(Node::Control(control)),
         _ => return Err(err("form control has an invalid parent")),
     }
     Ok(())
 }
 
-fn attach_property(builders: &mut [Builder], property: FormProperty) -> Result<()> {
+fn attach_property(builders: &mut [Builder], property: Property) -> Result<()> {
     for builder in builders.iter_mut().rev() {
         match builder {
             Builder::Form(_, value) => {
@@ -1034,12 +1028,8 @@ fn append_text(builders: &mut [Builder], text: &str, limits: &mut Limits) -> Res
     Ok(())
 }
 
-fn new_group(
-    part: FormPart,
-    scope: FormScope,
-    attributes: Vec<FormAttribute>,
-) -> Result<FormGroup> {
-    Ok(FormGroup {
+fn new_group(part: Part, scope: Scope, attributes: Vec<Attribute>) -> Result<Group> {
+    Ok(Group {
         part,
         scope,
         automatic_focus: bool_attr(&attributes, FORM, "automatic-focus")?,
@@ -1051,7 +1041,7 @@ fn new_group(
     })
 }
 
-fn new_form(attributes: Vec<FormAttribute>) -> Form {
+fn new_form(attributes: Vec<Attribute>) -> Form {
     Form {
         xml_id: owned(&attributes, XML, "id"),
         form_id: owned(&attributes, FORM, "id"),
@@ -1063,8 +1053,8 @@ fn new_form(attributes: Vec<FormAttribute>) -> Form {
     }
 }
 
-fn new_control(kind: FormControlKind, attributes: Vec<FormAttribute>) -> Result<FormControl> {
-    Ok(FormControl {
+fn new_control(kind: ControlKind, attributes: Vec<Attribute>) -> Result<Control> {
+    Ok(Control {
         kind,
         xml_id: owned(&attributes, XML, "id"),
         form_id: owned(&attributes, FORM, "id"),
@@ -1089,7 +1079,7 @@ fn new_control(kind: FormControlKind, attributes: Vec<FormAttribute>) -> Result<
     })
 }
 
-fn list_builder(depth: usize, attributes: &[FormAttribute]) -> Result<Builder> {
+fn list_builder(depth: usize, attributes: &[Attribute]) -> Result<Builder> {
     Ok(Builder::List(
         depth,
         required(attributes, FORM, "property-name")?.to_string(),
@@ -1098,7 +1088,7 @@ fn list_builder(depth: usize, attributes: &[FormAttribute]) -> Result<Builder> {
     ))
 }
 
-fn list_value(builders: &mut [Builder], attributes: &[FormAttribute]) -> Result<()> {
+fn list_value(builders: &mut [Builder], attributes: &[Attribute]) -> Result<()> {
     let Some(Builder::List(_, _, inherited, values)) = builders.last_mut() else {
         return Err(err("form:list-value outside form:list-property"));
     };
@@ -1106,19 +1096,19 @@ fn list_value(builders: &mut [Builder], attributes: &[FormAttribute]) -> Result<
     Ok(())
 }
 
-fn scalar_property(attributes: &[FormAttribute]) -> Result<FormProperty> {
-    Ok(FormProperty {
+fn scalar_property(attributes: &[Attribute]) -> Result<Property> {
+    Ok(Property {
         name: required(attributes, FORM, "property-name")?.to_string(),
-        value: FormPropertyValue::Scalar(scalar(attributes, None)?),
+        value: PropertyValue::Scalar(scalar(attributes, None)?),
     })
 }
 
-fn scalar(attributes: &[FormAttribute], inherited: Option<&str>) -> Result<FormScalarValue> {
+fn scalar(attributes: &[Attribute], inherited: Option<&str>) -> Result<ScalarValue> {
     let kind = attr(attributes, OFFICE, "value-type")
         .or(inherited)
         .ok_or_else(|| err("form property requires office:value-type"))?;
     Ok(match kind {
-        "boolean" => FormScalarValue::Boolean(
+        "boolean" => ScalarValue::Boolean(
             required(attributes, OFFICE, "boolean-value")?
                 .parse::<bool>()
                 .map_err(|_| err("invalid form boolean property"))?,
@@ -1131,21 +1121,21 @@ fn scalar(attributes: &[FormAttribute], inherited: Option<&str>) -> Result<FormS
             if !parsed.is_finite() {
                 return Err(err("non-finite numeric form property"));
             }
-            FormScalarValue::Number {
+            ScalarValue::Number {
                 value_type: kind.to_string(),
                 lexical: lexical.to_string(),
                 currency: owned(attributes, OFFICE, "currency"),
             }
         },
-        "string" => FormScalarValue::Text(
+        "string" => ScalarValue::Text(
             attr(attributes, OFFICE, "string-value")
                 .unwrap_or_default()
                 .to_string(),
         ),
-        "date" => FormScalarValue::Date(required(attributes, OFFICE, "date-value")?.to_string()),
-        "time" => FormScalarValue::Time(required(attributes, OFFICE, "time-value")?.to_string()),
-        "void" => FormScalarValue::Void,
-        other => FormScalarValue::Other {
+        "date" => ScalarValue::Date(required(attributes, OFFICE, "date-value")?.to_string()),
+        "time" => ScalarValue::Time(required(attributes, OFFICE, "time-value")?.to_string()),
+        "void" => ScalarValue::Void,
+        other => ScalarValue::Other {
             value_type: other.to_string(),
             lexical: attr(attributes, OFFICE, "string-value")
                 .or_else(|| attr(attributes, OFFICE, "value"))
@@ -1154,16 +1144,12 @@ fn scalar(attributes: &[FormAttribute], inherited: Option<&str>) -> Result<FormS
     })
 }
 
-fn new_shape(
-    part: FormPart,
-    scope: FormScope,
-    attributes: Vec<FormAttribute>,
-) -> Result<ControlShape> {
+fn new_shape(part: Part, scope: Scope, attributes: Vec<Attribute>) -> Result<Shape> {
     let control_id = required(&attributes, DRAW, "control")?.to_string();
     if control_id.is_empty() {
         return Err(err("empty draw:control reference"));
     }
-    Ok(ControlShape {
+    Ok(Shape {
         part,
         scope,
         control_id,
@@ -1186,7 +1172,7 @@ fn new_shape(
     })
 }
 
-fn push_shape(result: &mut Forms, shape: ControlShape, limits: &mut Limits) -> Result<()> {
+fn push_shape(result: &mut Forms, shape: Shape, limits: &mut Limits) -> Result<()> {
     limits.shapes = limits
         .shapes
         .checked_add(1)
@@ -1199,7 +1185,7 @@ fn push_shape(result: &mut Forms, shape: ControlShape, limits: &mut Limits) -> R
 }
 
 fn resolve_links(result: &mut Forms) -> Result<()> {
-    type Key = (FormPart, FormScope, String);
+    type Key = (Part, Scope, String);
     let mut index = HashMap::<Key, ControlRef>::new();
     for (group_index, group) in result.groups.iter().enumerate() {
         for (form_index, form) in group.forms.iter().enumerate() {
@@ -1230,18 +1216,16 @@ fn collect_form(
     form: &Form,
     group: usize,
     form_index: usize,
-    part: FormPart,
-    scope: &FormScope,
+    part: Part,
+    scope: &Scope,
     path: &mut Vec<usize>,
-    index: &mut HashMap<(FormPart, FormScope, String), ControlRef>,
+    index: &mut HashMap<(Part, Scope, String), ControlRef>,
 ) -> Result<()> {
     for (position, node) in form.children.iter().enumerate() {
         path.push(position);
         match node {
-            FormNode::Form(value) => {
-                collect_form(value, group, form_index, part, scope, path, index)?
-            },
-            FormNode::Control(value) => {
+            Node::Form(value) => collect_form(value, group, form_index, part, scope, path, index)?,
+            Node::Control(value) => {
                 collect_control(value, group, form_index, part, scope, path, index)?
             },
         }
@@ -1252,13 +1236,13 @@ fn collect_form(
 
 #[allow(clippy::too_many_arguments)]
 fn collect_control(
-    control: &FormControl,
+    control: &Control,
     group: usize,
     form_index: usize,
-    part: FormPart,
-    scope: &FormScope,
+    part: Part,
+    scope: &Scope,
     path: &mut Vec<usize>,
-    index: &mut HashMap<(FormPart, FormScope, String), ControlRef>,
+    index: &mut HashMap<(Part, Scope, String), ControlRef>,
 ) -> Result<()> {
     let reference = ControlRef {
         group_index: group,
@@ -1282,10 +1266,10 @@ fn collect_control(
     for (position, node) in control.children.iter().enumerate() {
         path.push(position);
         match node {
-            FormNode::Control(value) => {
+            Node::Control(value) => {
                 collect_control(value, group, form_index, part, scope, path, index)?
             },
-            FormNode::Form(_) => return Err(err("form nested inside control")),
+            Node::Form(_) => return Err(err("form nested inside control")),
         }
         path.pop();
     }
@@ -1296,7 +1280,7 @@ fn attrs(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     limits: &mut Limits,
-) -> Result<Vec<FormAttribute>> {
+) -> Result<Vec<Attribute>> {
     let mut result = Vec::new();
     for raw in element.attributes().with_checks(true) {
         let raw = raw.map_err(|e| err(format!("invalid form attribute: {e}")))?;
@@ -1312,7 +1296,7 @@ fn attrs(
             return Err(err("form attribute exceeds 64 KiB"));
         }
         decoded(limits, value.len())?;
-        result.push(FormAttribute {
+        result.push(Attribute {
             namespace_uri: ns(&resolved)?,
             local_name: name(local.as_ref())?,
             value,
@@ -1321,23 +1305,23 @@ fn attrs(
     Ok(result)
 }
 
-fn attr<'a>(attributes: &'a [FormAttribute], namespace: &str, local: &str) -> Option<&'a str> {
+fn attr<'a>(attributes: &'a [Attribute], namespace: &str, local: &str) -> Option<&'a str> {
     attributes
         .iter()
         .find(|item| item.namespace_uri.as_deref() == Some(namespace) && item.local_name == local)
         .map(|item| item.value.as_str())
 }
 
-fn required<'a>(attributes: &'a [FormAttribute], namespace: &str, local: &str) -> Result<&'a str> {
+fn required<'a>(attributes: &'a [Attribute], namespace: &str, local: &str) -> Result<&'a str> {
     attr(attributes, namespace, local)
         .ok_or_else(|| err(format!("missing required form attribute '{local}'")))
 }
 
-fn owned(attributes: &[FormAttribute], namespace: &str, local: &str) -> Option<String> {
+fn owned(attributes: &[Attribute], namespace: &str, local: &str) -> Option<String> {
     attr(attributes, namespace, local).map(str::to_owned)
 }
 
-fn bool_attr(attributes: &[FormAttribute], namespace: &str, local: &str) -> Result<Option<bool>> {
+fn bool_attr(attributes: &[Attribute], namespace: &str, local: &str) -> Result<Option<bool>> {
     attr(attributes, namespace, local)
         .map(|value| {
             value
@@ -1347,21 +1331,21 @@ fn bool_attr(attributes: &[FormAttribute], namespace: &str, local: &str) -> Resu
         .transpose()
 }
 
-fn current_scope(scopes: &[ScopeFrame]) -> FormScope {
+fn current_scope(scopes: &[ScopeFrame]) -> Scope {
     scopes
         .last()
         .map(|scope| scope.1.clone())
-        .unwrap_or(FormScope::Document)
+        .unwrap_or(Scope::Document)
 }
 
-fn mark_xforms(result: &mut Forms, group: Option<&mut (usize, FormGroup)>) {
+fn mark_xforms(result: &mut Forms, group: Option<&mut (usize, Group)>) {
     result.has_xforms = true;
     if let Some(group) = group {
         group.1.has_xforms = true;
     }
 }
 
-fn mark_events(result: &mut Forms, group: Option<&mut (usize, FormGroup)>) {
+fn mark_events(result: &mut Forms, group: Option<&mut (usize, Group)>) {
     result.has_event_listeners = true;
     if let Some(group) = group {
         group.1.has_event_listeners = true;
@@ -1461,18 +1445,18 @@ mod event_listener_tests {
         let xml = format!(
             r#"{PREFIX}<o:event-listeners><s:event-listener s:event-name="dom:click" s:language="ooo:script" s:macro-name="vnd.sun.star.script:Module.Run" x:type="simple" x:href="Scripts/Main" x:actuate="onRequest"/></o:event-listeners>{SUFFIX}"#
         );
-        let forms = parse_form_parts(&[(&xml, FormPart::Content)]).unwrap();
+        let forms = parse_form_parts(&[(&xml, Part::Content)]).unwrap();
         assert!(forms.has_event_listeners);
         assert_eq!(forms.event_listeners.len(), 1);
         let listener = &forms.event_listeners[0];
         assert_eq!(listener.event_name.as_deref(), Some("dom:click"));
         assert_eq!(listener.language.as_deref(), Some("ooo:script"));
         assert_eq!(listener.href.as_deref(), Some("Scripts/Main"));
-        assert_eq!(listener.actuate, Some(EventActuate::OnRequest));
+        assert_eq!(listener.actuate, Some(Actuate::OnRequest));
         assert!(listener.simple_link);
         assert!(matches!(
             &listener.target,
-            EventTarget::Control { name: Some(name), .. } if name == "Submit"
+            Target::Control { name: Some(name), .. } if name == "Submit"
         ));
     }
 
@@ -1482,7 +1466,7 @@ mod event_listener_tests {
             r#"{PREFIX}<o:event-listeners><s:event-listener s:event-name="change" s:language="none"></s:event-listener></o:event-listeners>{SUFFIX}"#
         );
         assert_eq!(
-            parse_form_parts(&[(&expanded, FormPart::Content)])
+            parse_form_parts(&[(&expanded, Part::Content)])
                 .unwrap()
                 .event_listeners
                 .len(),
@@ -1496,7 +1480,7 @@ mod event_listener_tests {
         ] {
             let xml = format!("{PREFIX}{body}{SUFFIX}");
             assert!(
-                parse_form_parts(&[(&xml, FormPart::Content)]).is_err(),
+                parse_form_parts(&[(&xml, Part::Content)]).is_err(),
                 "accepted {body}"
             );
         }
