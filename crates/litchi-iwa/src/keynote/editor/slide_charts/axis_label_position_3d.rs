@@ -1,7 +1,7 @@
 //! Native 3D value-axis label-position CRUD for Keynote slide charts.
 
 use super::*;
-use crate::charts::Chart3dAxisLabelPosition;
+use crate::charts::LabelPosition3d;
 use crate::charts::axis_label_position_3d::{
     chart_3d_value_axis_label_position as read_native_3d_value_axis_label_position,
     set_chart_3d_value_axis_label_position as set_native_3d_value_axis_label_position,
@@ -13,7 +13,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<Chart3dAxisLabelPosition> {
+    ) -> Result<LabelPosition3d> {
         let graph = chart_graph(self, slide_index, drawable_object_id)?;
         read_native_3d_value_axis_label_position(
             self.package(),
@@ -29,7 +29,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        position: Chart3dAxisLabelPosition,
+        position: LabelPosition3d,
     ) -> Result<()> {
         let graph = chart_graph(self, slide_index, drawable_object_id)?;
         if read_native_3d_value_axis_label_position(
@@ -89,7 +89,7 @@ mod tests {
             .set_slide_chart_3d_value_axis_label_position(
                 0,
                 chart.drawable_object_id,
-                Chart3dAxisLabelPosition::Leading,
+                LabelPosition3d::Leading,
             )
             .unwrap();
         let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -97,7 +97,7 @@ mod tests {
             reopened
                 .slide_chart_3d_value_axis_label_position(0, chart.drawable_object_id)
                 .unwrap(),
-            Chart3dAxisLabelPosition::Leading
+            LabelPosition3d::Leading
         );
     }
 

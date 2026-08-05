@@ -124,12 +124,12 @@ titles remain independent through duplicate, delete, and package round-trip
 operations.
 
 The value-axis `Min` and `Max` fields are represented without sentinel values
-by `ChartValueAxisBounds` and `ChartAxisBound`. Read them through
+by `Bounds` and `Bound`. Read them through
 `body_chart_value_axis_bounds`, `sheet_chart_value_axis_bounds`, or
 `slide_chart_value_axis_bounds`, then use the matching
 `set_*_chart_value_axis_bounds` method to modify the native
 `Axis > Value (Y) > Axis Scale` controls. Each endpoint is independently optional (`None` means
-the app's `Auto` value); `ChartValueAxisBounds::automatic()` restores both
+the app's `Auto` value); `Bounds::automatic()` restores both
 endpoints, while invalid non-finite or inverted ranges are rejected before any
 package mutation.
 

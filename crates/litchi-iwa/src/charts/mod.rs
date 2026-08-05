@@ -83,12 +83,7 @@ pub(crate) mod style;
 
 pub use archive::IWorkChartArchive;
 pub use arrangement::ChartArrangement;
-pub use axis_bounds::{ChartAxisBound, ChartValueAxisBounds};
 pub use axis_gridline_stroke::{ChartAxisGridline, ChartAxisGridlineStroke};
-pub use axis_label_angle::ChartAxisLabelAngle;
-pub use axis_label_position_3d::Chart3dAxisLabelPosition;
-pub use axis_scale::ChartValueAxisScale;
-pub use axis_steps::{ChartAxisMajorStepCount, ChartAxisMinorStepCount, ChartValueAxisSteps};
 pub use bar_shape_3d::Chart3dBarShape;
 pub use category_labels::{
     ChartCategoryLabelFrequency, ChartCategoryLabelInterval, ChartCategoryLabelLayout,
@@ -108,7 +103,10 @@ pub use legend_frame::{
 pub use legend_shadow::ChartLegendShadow;
 pub use legend_stroke::ChartLegendStroke;
 pub use lighting_3d::Chart3dLightingStyle;
-pub use litchi_iwa_common::chart::axis::{Axis, TickMarkLocation};
+pub use litchi_iwa_common::chart::axis::{
+    Axis, Bound, Bounds, LabelAngle, LabelPosition3d, MajorStepCount, MinorStepCount, Scale, Steps,
+    TickMarkLocation,
+};
 pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};
 pub use number_format::{
     ChartDecimalPlaces, ChartFixedDecimalPlaces, ChartLabelAffixes, ChartNegativeStyle,
@@ -153,6 +151,24 @@ pub use series_value_label_number_format::{
 };
 pub use series_value_labels::{ChartSeriesIndex, ChartSeriesValueLabelVisibility};
 pub use shadow::ChartShadow;
+
+impl From<litchi_iwa_common::chart::axis::bounds::Error> for crate::Error {
+    fn from(error: litchi_iwa_common::chart::axis::bounds::Error) -> Self {
+        Self::InvalidFormat(error.to_string())
+    }
+}
+
+impl From<litchi_iwa_common::chart::axis::label_angle::Error> for crate::Error {
+    fn from(error: litchi_iwa_common::chart::axis::label_angle::Error) -> Self {
+        Self::InvalidFormat(error.to_string())
+    }
+}
+
+impl From<litchi_iwa_common::chart::axis::steps::Error> for crate::Error {
+    fn from(error: litchi_iwa_common::chart::axis::steps::Error) -> Self {
+        Self::InvalidFormat(error.to_string())
+    }
+}
 
 /// Locate one chart-private object and reject ambiguous cross-component IDs.
 pub(crate) fn unique_chart_object_archive_name(

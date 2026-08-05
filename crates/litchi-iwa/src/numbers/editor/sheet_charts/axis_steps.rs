@@ -1,7 +1,7 @@
 //! Native value-axis scale-step CRUD for Numbers sheet charts.
 
 use super::*;
-use crate::charts::ChartValueAxisSteps;
+use crate::charts::Steps;
 use crate::charts::axis_steps::{
     chart_value_axis_steps as read_native_chart_value_axis_steps,
     set_chart_value_axis_steps as set_native_chart_value_axis_steps,
@@ -15,19 +15,19 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<ChartValueAxisSteps> {
+    ) -> Result<Steps> {
         sheet_chart_value_axis_steps(self, sheet_id, drawable_object_id)
     }
 
     /// Set the major and minor scale steps of a native sheet chart's value axis.
     ///
-    /// Use [`ChartValueAxisSteps::automatic`] to restore Numbers' automatic
+    /// Use [`Steps::automatic`] to restore Numbers' automatic
     /// calculation for both step counts.
     pub fn set_sheet_chart_value_axis_steps(
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        steps: ChartValueAxisSteps,
+        steps: Steps,
     ) -> Result<()> {
         set_sheet_chart_value_axis_steps(self, sheet_id, drawable_object_id, steps)
     }
@@ -37,7 +37,7 @@ fn sheet_chart_value_axis_steps(
     editor: &NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-) -> Result<ChartValueAxisSteps> {
+) -> Result<Steps> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     read_native_chart_value_axis_steps(
         &editor.package,
@@ -51,7 +51,7 @@ fn set_sheet_chart_value_axis_steps(
     editor: &mut NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    steps: ChartValueAxisSteps,
+    steps: Steps,
 ) -> Result<()> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     let mut staged = editor.package.clone();

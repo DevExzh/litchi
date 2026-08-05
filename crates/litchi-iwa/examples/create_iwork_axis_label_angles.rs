@@ -3,7 +3,7 @@
 use std::env;
 use std::path::Path;
 
-use litchi_iwa::charts::{Axis, ChartAxisLabelAngle, ChartData, ChartKind};
+use litchi_iwa::charts::{Axis, ChartData, ChartKind, LabelAngle};
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::pages::PagesDocumentBuilder;
@@ -83,7 +83,7 @@ fn set_numbers_angles(
     for (axis, angle) in angles() {
         assert_eq!(
             editor.sheet_chart_axis_label_angle(sheet_id, chart_id, axis)?,
-            ChartAxisLabelAngle::HORIZONTAL
+            LabelAngle::HORIZONTAL
         );
         editor.set_sheet_chart_axis_label_angle(sheet_id, chart_id, axis, angle)?;
         assert_eq!(
@@ -101,7 +101,7 @@ fn set_pages_angles(
     for (axis, angle) in angles() {
         assert_eq!(
             editor.body_chart_axis_label_angle(chart_id, axis)?,
-            ChartAxisLabelAngle::HORIZONTAL
+            LabelAngle::HORIZONTAL
         );
         editor.set_body_chart_axis_label_angle(chart_id, axis, angle)?;
         assert_eq!(editor.body_chart_axis_label_angle(chart_id, axis)?, angle);
@@ -116,7 +116,7 @@ fn set_keynote_angles(
     for (axis, angle) in angles() {
         assert_eq!(
             editor.slide_chart_axis_label_angle(0, chart_id, axis)?,
-            ChartAxisLabelAngle::HORIZONTAL
+            LabelAngle::HORIZONTAL
         );
         editor.set_slide_chart_axis_label_angle(0, chart_id, axis, angle)?;
         assert_eq!(
@@ -127,10 +127,10 @@ fn set_keynote_angles(
     Ok(())
 }
 
-fn angles() -> [(Axis, ChartAxisLabelAngle); 2] {
+fn angles() -> [(Axis, LabelAngle); 2] {
     [
-        (Axis::Category, ChartAxisLabelAngle::LEFT_DIAGONAL),
-        (Axis::Value, ChartAxisLabelAngle::RIGHT_DIAGONAL),
+        (Axis::Category, LabelAngle::LEFT_DIAGONAL),
+        (Axis::Value, LabelAngle::RIGHT_DIAGONAL),
     ]
 }
 

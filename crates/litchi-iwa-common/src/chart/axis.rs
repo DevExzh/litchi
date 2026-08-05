@@ -1,5 +1,17 @@
 //! Semantic selectors and style values for chart axes.
 
+pub mod bounds;
+pub mod label_angle;
+pub mod label_position_3d;
+pub mod scale;
+pub mod steps;
+
+pub use bounds::{Bound, Bounds};
+pub use label_angle::LabelAngle;
+pub use label_position_3d::LabelPosition3d;
+pub use scale::Scale;
+pub use steps::{MajorStepCount, MinorStepCount, Steps};
+
 /// One of the standard axes exposed by an iWork chart formatter.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

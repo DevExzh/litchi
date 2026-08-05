@@ -103,6 +103,14 @@ integer conversion, archive lookup, shared-object ownership, and protobuf
 patching remain in `litchi-iwa`; the common values stay copyable and free of
 package state.
 
+The child modules keep the axis vocabulary contextual and short:
+`axis::bounds::{Bound, Bounds}`, `axis::label_angle::LabelAngle`,
+`axis::label_position_3d::LabelPosition3d`, `axis::scale::Scale`, and
+`axis::steps::{MajorStepCount, MinorStepCount, Steps}`. Their constructors
+return module-owned typed errors for finite/range validation; unknown native
+integer values remain explicit in the enum variants rather than being silently
+mapped to defaults.
+
 PresentationML implements this rule as `litchi-pptx::shape::{Scene, Shape}`.
 `Scene` is a bounded semantic index over one slide-like owner, not a vector of
 detached XML allocations. Shapes are visited in depth-first pre-order, while a

@@ -1,7 +1,7 @@
 //! Native 3D value-axis label-position CRUD for Numbers sheet charts.
 
 use super::*;
-use crate::charts::Chart3dAxisLabelPosition;
+use crate::charts::LabelPosition3d;
 use crate::charts::axis_label_position_3d::{
     chart_3d_value_axis_label_position as read_native_3d_value_axis_label_position,
     set_chart_3d_value_axis_label_position as set_native_3d_value_axis_label_position,
@@ -13,7 +13,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<Chart3dAxisLabelPosition> {
+    ) -> Result<LabelPosition3d> {
         let graph = chart_graph(self, sheet_id, drawable_object_id)?;
         read_native_3d_value_axis_label_position(
             self.package(),
@@ -29,7 +29,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        position: Chart3dAxisLabelPosition,
+        position: LabelPosition3d,
     ) -> Result<()> {
         let graph = chart_graph(self, sheet_id, drawable_object_id)?;
         if read_native_3d_value_axis_label_position(
@@ -90,7 +90,7 @@ mod tests {
             .set_sheet_chart_3d_value_axis_label_position(
                 sheet_id,
                 chart.drawable_object_id,
-                Chart3dAxisLabelPosition::Leading,
+                LabelPosition3d::Leading,
             )
             .unwrap();
         let duplicate = editor
@@ -100,20 +100,20 @@ mod tests {
             .set_sheet_chart_3d_value_axis_label_position(
                 sheet_id,
                 duplicate.drawable_object_id,
-                Chart3dAxisLabelPosition::Trailing,
+                LabelPosition3d::Trailing,
             )
             .unwrap();
         assert_eq!(
             editor
                 .sheet_chart_3d_value_axis_label_position(sheet_id, chart.drawable_object_id)
                 .unwrap(),
-            Chart3dAxisLabelPosition::Leading
+            LabelPosition3d::Leading
         );
         assert_eq!(
             editor
                 .sheet_chart_3d_value_axis_label_position(sheet_id, duplicate.drawable_object_id)
                 .unwrap(),
-            Chart3dAxisLabelPosition::Trailing
+            LabelPosition3d::Trailing
         );
     }
 

@@ -1,7 +1,7 @@
 //! Native 3D value-axis label-position CRUD for Pages body charts.
 
 use super::*;
-use crate::charts::Chart3dAxisLabelPosition;
+use crate::charts::LabelPosition3d;
 use crate::charts::axis_label_position_3d::{
     chart_3d_value_axis_label_position as read_native_3d_value_axis_label_position,
     set_chart_3d_value_axis_label_position as set_native_3d_value_axis_label_position,
@@ -12,7 +12,7 @@ impl PagesEditor {
     pub fn body_chart_3d_value_axis_label_position(
         &self,
         drawable_object_id: u64,
-    ) -> Result<Chart3dAxisLabelPosition> {
+    ) -> Result<LabelPosition3d> {
         let graph = body_chart_graph(self, drawable_object_id)?;
         read_native_3d_value_axis_label_position(
             self.package(),
@@ -27,7 +27,7 @@ impl PagesEditor {
     pub fn set_body_chart_3d_value_axis_label_position(
         &mut self,
         drawable_object_id: u64,
-        position: Chart3dAxisLabelPosition,
+        position: LabelPosition3d,
     ) -> Result<()> {
         let graph = body_chart_graph(self, drawable_object_id)?;
         if read_native_3d_value_axis_label_position(
@@ -85,12 +85,12 @@ mod tests {
             editor
                 .body_chart_3d_value_axis_label_position(chart.drawable_object_id)
                 .unwrap(),
-            Chart3dAxisLabelPosition::Automatic
+            LabelPosition3d::Automatic
         );
         editor
             .set_body_chart_3d_value_axis_label_position(
                 chart.drawable_object_id,
-                Chart3dAxisLabelPosition::Trailing,
+                LabelPosition3d::Trailing,
             )
             .unwrap();
         let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -98,7 +98,7 @@ mod tests {
             reopened
                 .body_chart_3d_value_axis_label_position(chart.drawable_object_id)
                 .unwrap(),
-            Chart3dAxisLabelPosition::Trailing
+            LabelPosition3d::Trailing
         );
     }
 

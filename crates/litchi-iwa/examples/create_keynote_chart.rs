@@ -3,17 +3,16 @@
 use std::env;
 
 use litchi_iwa::charts::{
-    Axis, ChartAxisBound, ChartAxisGridline, ChartAxisGridlineStroke, ChartAxisMajorStepCount,
-    ChartAxisMinorStepCount, ChartCornerRadius, ChartData, ChartErrorBarDirection,
-    ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont, ChartFontSize, ChartGapPercentage,
-    ChartGapSpacing, ChartKind, ChartLegendFill, ChartLegendFont, ChartLegendFontSize,
-    ChartLegendShadow, ChartLegendStroke, ChartRoundedCorners, ChartSeriesErrorBarAutoFit,
-    ChartSeriesErrorBars, ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
-    ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesValueLabelAffixes,
-    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
+    Axis, Bound, Bounds, ChartAxisGridline, ChartAxisGridlineStroke, ChartCornerRadius, ChartData,
+    ChartErrorBarDirection, ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont,
+    ChartFontSize, ChartGapPercentage, ChartGapSpacing, ChartKind, ChartLegendFill,
+    ChartLegendFont, ChartLegendFontSize, ChartLegendShadow, ChartLegendStroke,
+    ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesStroke,
+    ChartSeriesStrokePattern, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
+    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
     ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
     ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
-    ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps, TickMarkLocation,
+    MajorStepCount, MinorStepCount, Scale, Steps, TickMarkLocation,
 };
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{
@@ -129,20 +128,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_chart_value_axis_bounds(
         0,
         chart.drawable_object_id,
-        ChartValueAxisBounds::fixed(ChartAxisBound::new(1.0)?, ChartAxisBound::new(30.0)?)?,
+        Bounds::fixed(Bound::new(1.0)?, Bound::new(30.0)?)?,
     )?;
-    editor.set_slide_chart_value_axis_scale(
-        0,
-        chart.drawable_object_id,
-        ChartValueAxisScale::Logarithmic,
-    )?;
+    editor.set_slide_chart_value_axis_scale(0, chart.drawable_object_id, Scale::Logarithmic)?;
     editor.set_slide_chart_value_axis_steps(
         0,
         chart.drawable_object_id,
-        ChartValueAxisSteps::fixed(
-            ChartAxisMajorStepCount::new(6)?,
-            ChartAxisMinorStepCount::new(2)?,
-        ),
+        Steps::fixed(MajorStepCount::new(6)?, MinorStepCount::new(2)?),
     )?;
     editor.set_slide_chart_value_axis_minimum_label_visible(0, chart.drawable_object_id, false)?;
     editor.set_slide_chart_category_axis_series_names_visible(0, chart.drawable_object_id, true)?;

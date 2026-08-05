@@ -5930,6 +5930,21 @@ Numbers chart generator still produces a ZIP-valid artifact that native
 Numbers rejects as damaged, so it is treated as a fixture limitation rather
 than chart-axis evidence. No native-resave claim is made; all three
 applications were quit after verification.
+The follow-on chart-axis value slice now places the archive-free vocabulary in
+focused `litchi-iwa-common::chart::axis` children:
+`bounds::{Bound, Bounds}`, `label_angle::LabelAngle`,
+`label_position_3d::LabelPosition3d`, `scale::Scale`, and
+`steps::{MajorStepCount, MinorStepCount, Steps}`. The facade retains archive,
+protobuf, capability, and lossless wire adapters and removes the former long
+`Chart*` value names. The common suite passed 43 tests, the IWA library suite
+passed 1,502 tests, selected chart examples compiled, both scoped clippy gates
+were clean, and the crate-boundary checker remained valid. The focused
+`axis-values-crate` fixtures passed typed Rust readback and ZIP validation, and
+fresh Numbers, Pages, and Keynote opens produced no repair prompts. Numbers
+and Keynote exposed Value (Y) `Logarithmic`, `Max 30`, `Min 1`, and `Right
+Diagonal` in the native Axis formatter; Pages exposed the same 2D chart with
+numeric Y and categorical X axes. The native gate makes no resave claim, and
+all three applications were quit after inspection.
 The BorderSide ownership slice
 is complete: the dependency-neutral table-cell edge selector now lives at
 `litchi-iwa-common::table::cell::BorderSide`; `Borders` and `ShapeStroke` remain

@@ -3,7 +3,7 @@
 use std::env;
 use std::path::Path;
 
-use litchi_iwa::charts::{Chart3dAxisLabelPosition, ChartData, ChartKind};
+use litchi_iwa::charts::{ChartData, ChartKind, LabelPosition3d};
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::pages::PagesDocumentBuilder;
@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     numbers.set_sheet_chart_3d_value_axis_label_position(
         sheet_id,
         chart.drawable_object_id,
-        Chart3dAxisLabelPosition::Leading,
+        LabelPosition3d::Leading,
     )?;
     numbers.save(output.join("chart-axis-label-position-crate.numbers"))?;
 
@@ -57,7 +57,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     pages.set_body_chart_title(chart.drawable_object_id, "Trailing axis labels")?;
     pages.set_body_chart_3d_value_axis_label_position(
         chart.drawable_object_id,
-        Chart3dAxisLabelPosition::Trailing,
+        LabelPosition3d::Trailing,
     )?;
     pages.save(output.join("chart-axis-label-position-crate.pages"))?;
 
@@ -78,7 +78,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     keynote.set_slide_chart_3d_value_axis_label_position(
         0,
         chart.drawable_object_id,
-        Chart3dAxisLabelPosition::Leading,
+        LabelPosition3d::Leading,
     )?;
     keynote.save(output.join("chart-axis-label-position-crate.key"))?;
 

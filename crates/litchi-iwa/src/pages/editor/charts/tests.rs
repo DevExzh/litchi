@@ -5,19 +5,19 @@ use std::path::PathBuf;
 
 use super::*;
 use crate::charts::{
-    Axis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount, ChartCornerRadius,
-    ChartDonutInnerRadius, ChartErrorBarDirection, ChartErrorBarFixedValue,
-    ChartErrorBarPercentage, ChartFont, ChartFontSize, ChartGapPercentage, ChartGapSpacing,
-    ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendFrame, ChartLegendRect,
-    ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance, ChartPieLabelVisibility,
-    ChartPieLeaderLineVisibility, ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex,
-    ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex,
-    ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
-    ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
-    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
+    Axis, Bound, Bounds, ChartCornerRadius, ChartDonutInnerRadius, ChartErrorBarDirection,
+    ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont, ChartFontSize, ChartGapPercentage,
+    ChartGapSpacing, ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendFrame,
+    ChartLegendRect, ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance,
+    ChartPieLabelVisibility, ChartPieLeaderLineVisibility, ChartPieStartAngle,
+    ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit,
+    ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke, ChartSeriesStrokePattern,
+    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
+    ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
+    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
     ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
     ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
-    ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps, TickMarkLocation,
+    MajorStepCount, MinorStepCount, Scale, Steps, TickMarkLocation,
 };
 use crate::package_metadata::{
     add_component_external_reference, add_component_object_uuids, component_identifier_for_entry,
@@ -720,14 +720,9 @@ fn scratch_document_supports_native_chart_value_axis_bounds_crud() {
             SIZE,
         )
         .unwrap();
-    let automatic = ChartValueAxisBounds::automatic();
-    let fixed = ChartValueAxisBounds::fixed(
-        ChartAxisBound::new(-10.0).unwrap(),
-        ChartAxisBound::new(40.0).unwrap(),
-    )
-    .unwrap();
-    let minimum_only =
-        ChartValueAxisBounds::new(Some(ChartAxisBound::new(-5.0).unwrap()), None).unwrap();
+    let automatic = Bounds::automatic();
+    let fixed = Bounds::fixed(Bound::new(-10.0).unwrap(), Bound::new(40.0).unwrap()).unwrap();
+    let minimum_only = Bounds::new(Some(Bound::new(-5.0).unwrap()), None).unwrap();
 
     assert_eq!(
         editor
@@ -1017,15 +1012,15 @@ fn scratch_document_supports_native_chart_value_axis_steps_crud() {
             SIZE,
         )
         .unwrap();
-    let defaults = ChartValueAxisSteps::fixed(
-        ChartAxisMajorStepCount::new(5).unwrap(),
-        ChartAxisMinorStepCount::new(1).unwrap(),
+    let defaults = Steps::fixed(
+        MajorStepCount::new(5).unwrap(),
+        MinorStepCount::new(1).unwrap(),
     );
-    let fixed = ChartValueAxisSteps::fixed(
-        ChartAxisMajorStepCount::new(6).unwrap(),
-        ChartAxisMinorStepCount::new(2).unwrap(),
+    let fixed = Steps::fixed(
+        MajorStepCount::new(6).unwrap(),
+        MinorStepCount::new(2).unwrap(),
     );
-    let major_only = ChartValueAxisSteps::new(Some(ChartAxisMajorStepCount::new(4).unwrap()), None);
+    let major_only = Steps::new(Some(MajorStepCount::new(4).unwrap()), None);
 
     assert_eq!(
         editor
@@ -1079,16 +1074,13 @@ fn scratch_document_supports_native_chart_value_axis_steps_crud() {
         fixed
     );
     reopened
-        .set_body_chart_value_axis_steps(
-            source.drawable_object_id,
-            ChartValueAxisSteps::automatic(),
-        )
+        .set_body_chart_value_axis_steps(source.drawable_object_id, Steps::automatic())
         .unwrap();
     assert_eq!(
         reopened
             .body_chart_value_axis_steps(source.drawable_object_id)
             .unwrap(),
-        ChartValueAxisSteps::automatic()
+        Steps::automatic()
     );
     reopened
         .remove_body_chart(duplicate.drawable_object_id)
@@ -2062,25 +2054,22 @@ fn scratch_document_supports_native_chart_value_axis_scale_crud() {
         editor
             .body_chart_value_axis_scale(source.drawable_object_id)
             .unwrap(),
-        ChartValueAxisScale::Linear
+        Scale::Linear
     );
     let baseline = editor.to_bytes().unwrap();
     editor
-        .set_body_chart_value_axis_scale(source.drawable_object_id, ChartValueAxisScale::Linear)
+        .set_body_chart_value_axis_scale(source.drawable_object_id, Scale::Linear)
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     editor
-        .set_body_chart_value_axis_scale(
-            source.drawable_object_id,
-            ChartValueAxisScale::Logarithmic,
-        )
+        .set_body_chart_value_axis_scale(source.drawable_object_id, Scale::Logarithmic)
         .unwrap();
     assert_eq!(
         editor
             .body_chart_value_axis_scale(source.drawable_object_id)
             .unwrap(),
-        ChartValueAxisScale::Logarithmic
+        Scale::Logarithmic
     );
 
     let duplicate = editor
@@ -2093,10 +2082,10 @@ fn scratch_document_supports_native_chart_value_axis_scale_crud() {
         editor
             .body_chart_value_axis_scale(duplicate.drawable_object_id)
             .unwrap(),
-        ChartValueAxisScale::Logarithmic
+        Scale::Logarithmic
     );
     editor
-        .set_body_chart_value_axis_scale(source.drawable_object_id, ChartValueAxisScale::Linear)
+        .set_body_chart_value_axis_scale(source.drawable_object_id, Scale::Linear)
         .unwrap();
 
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -2104,13 +2093,13 @@ fn scratch_document_supports_native_chart_value_axis_scale_crud() {
         reopened
             .body_chart_value_axis_scale(source.drawable_object_id)
             .unwrap(),
-        ChartValueAxisScale::Linear
+        Scale::Linear
     );
     assert_eq!(
         reopened
             .body_chart_value_axis_scale(duplicate.drawable_object_id)
             .unwrap(),
-        ChartValueAxisScale::Logarithmic
+        Scale::Logarithmic
     );
     reopened
         .remove_body_chart(source.drawable_object_id)

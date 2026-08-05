@@ -702,20 +702,19 @@ mod tests {
     use crate::charts::source::SERIES_NON_STYLE_MESSAGE_TYPE;
     use crate::charts::unique_chart_object_archive_name;
     use crate::charts::{
-        Axis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount, ChartCornerRadius,
-        ChartDonutInnerRadius, ChartErrorBarCustomValues, ChartErrorBarDirection,
-        ChartErrorBarFixedValue, ChartFont, ChartFontSize, ChartGapPercentage, ChartGapSpacing,
-        ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendFrame, ChartLegendRect,
-        ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance, ChartPieLabelVisibility,
-        ChartPieLeaderLineVisibility, ChartPieStartAngle, ChartPieWedgeExplosion,
-        ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars,
-        ChartSeriesIndex, ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
-        ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
-        ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit,
-        ChartSeriesValueLabelDecimalPlaces, ChartSeriesValueLabelLocation,
-        ChartSeriesValueLabelNegativeStyle, ChartSeriesValueLabelNumberFormat,
-        ChartSeriesValueLabelVisibility, ChartShadow, ChartValueAxisBounds, ChartValueAxisScale,
-        ChartValueAxisSteps, TickMarkLocation,
+        Axis, Bound, Bounds, ChartCornerRadius, ChartDonutInnerRadius, ChartErrorBarCustomValues,
+        ChartErrorBarDirection, ChartErrorBarFixedValue, ChartFont, ChartFontSize,
+        ChartGapPercentage, ChartGapSpacing, ChartLegendFill, ChartLegendFont, ChartLegendFontSize,
+        ChartLegendFrame, ChartLegendRect, ChartLegendShadow, ChartLegendStroke,
+        ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieLeaderLineVisibility,
+        ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners,
+        ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke,
+        ChartSeriesStrokePattern, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
+        ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
+        ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
+        ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
+        ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
+        MajorStepCount, MinorStepCount, Scale, Steps, TickMarkLocation,
     };
     use crate::numbers::NumbersDocumentBuilder;
     use crate::package_metadata::{component_identifier_for_entry, component_uuid_identifiers};
@@ -1365,14 +1364,9 @@ mod tests {
         let source = editor
             .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
-        let automatic = ChartValueAxisBounds::automatic();
-        let fixed = ChartValueAxisBounds::fixed(
-            ChartAxisBound::new(-10.0).unwrap(),
-            ChartAxisBound::new(40.0).unwrap(),
-        )
-        .unwrap();
-        let minimum_only =
-            ChartValueAxisBounds::new(Some(ChartAxisBound::new(-5.0).unwrap()), None).unwrap();
+        let automatic = Bounds::automatic();
+        let fixed = Bounds::fixed(Bound::new(-10.0).unwrap(), Bound::new(40.0).unwrap()).unwrap();
+        let minimum_only = Bounds::new(Some(Bound::new(-5.0).unwrap()), None).unwrap();
 
         assert_eq!(
             editor
@@ -1443,16 +1437,15 @@ mod tests {
         let source = editor
             .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
-        let defaults = ChartValueAxisSteps::fixed(
-            ChartAxisMajorStepCount::new(5).unwrap(),
-            ChartAxisMinorStepCount::new(1).unwrap(),
+        let defaults = Steps::fixed(
+            MajorStepCount::new(5).unwrap(),
+            MinorStepCount::new(1).unwrap(),
         );
-        let fixed = ChartValueAxisSteps::fixed(
-            ChartAxisMajorStepCount::new(6).unwrap(),
-            ChartAxisMinorStepCount::new(2).unwrap(),
+        let fixed = Steps::fixed(
+            MajorStepCount::new(6).unwrap(),
+            MinorStepCount::new(2).unwrap(),
         );
-        let major_only =
-            ChartValueAxisSteps::new(Some(ChartAxisMajorStepCount::new(4).unwrap()), None);
+        let major_only = Steps::new(Some(MajorStepCount::new(4).unwrap()), None);
 
         assert_eq!(
             editor
@@ -1506,14 +1499,14 @@ mod tests {
             .set_sheet_chart_value_axis_steps(
                 sheet_id,
                 source.drawable_object_id,
-                ChartValueAxisSteps::automatic(),
+                Steps::automatic(),
             )
             .unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_value_axis_steps(sheet_id, source.drawable_object_id)
                 .unwrap(),
-            ChartValueAxisSteps::automatic()
+            Steps::automatic()
         );
         reopened
             .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
@@ -2854,15 +2847,11 @@ mod tests {
             editor
                 .sheet_chart_value_axis_scale(sheet_id, source.drawable_object_id)
                 .unwrap(),
-            ChartValueAxisScale::Linear
+            Scale::Linear
         );
         let baseline = editor.to_bytes().unwrap();
         editor
-            .set_sheet_chart_value_axis_scale(
-                sheet_id,
-                source.drawable_object_id,
-                ChartValueAxisScale::Linear,
-            )
+            .set_sheet_chart_value_axis_scale(sheet_id, source.drawable_object_id, Scale::Linear)
             .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 
@@ -2870,14 +2859,14 @@ mod tests {
             .set_sheet_chart_value_axis_scale(
                 sheet_id,
                 source.drawable_object_id,
-                ChartValueAxisScale::Logarithmic,
+                Scale::Logarithmic,
             )
             .unwrap();
         assert_eq!(
             editor
                 .sheet_chart_value_axis_scale(sheet_id, source.drawable_object_id)
                 .unwrap(),
-            ChartValueAxisScale::Logarithmic
+            Scale::Logarithmic
         );
 
         let duplicate = editor
@@ -2887,14 +2876,10 @@ mod tests {
             editor
                 .sheet_chart_value_axis_scale(sheet_id, duplicate.drawable_object_id)
                 .unwrap(),
-            ChartValueAxisScale::Logarithmic
+            Scale::Logarithmic
         );
         editor
-            .set_sheet_chart_value_axis_scale(
-                sheet_id,
-                source.drawable_object_id,
-                ChartValueAxisScale::Linear,
-            )
+            .set_sheet_chart_value_axis_scale(sheet_id, source.drawable_object_id, Scale::Linear)
             .unwrap();
 
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -2902,13 +2887,13 @@ mod tests {
             reopened
                 .sheet_chart_value_axis_scale(sheet_id, source.drawable_object_id)
                 .unwrap(),
-            ChartValueAxisScale::Linear
+            Scale::Linear
         );
         assert_eq!(
             reopened
                 .sheet_chart_value_axis_scale(sheet_id, duplicate.drawable_object_id)
                 .unwrap(),
-            ChartValueAxisScale::Logarithmic
+            Scale::Logarithmic
         );
         reopened
             .remove_sheet_chart(sheet_id, source.drawable_object_id)

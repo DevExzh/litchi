@@ -155,6 +155,13 @@ module owns no archive, protobuf message, or package state; IWA retains axis
 object lookup, field mapping, and lossless wire mutation. Pages, Numbers,
 Keynote, and chart examples consume the short common names directly, and the
 former `ChartAxis*` facade names are removed rather than kept as aliases.
+The remaining archive-free axis values now use focused child modules under the
+same owner: `axis::bounds::{Bound, Bounds}`, `axis::label_angle::LabelAngle`,
+`axis::label_position_3d::LabelPosition3d`, `axis::scale::Scale`, and
+`axis::steps::{MajorStepCount, MinorStepCount, Steps}`. IWA retains only the
+native field numbers, protobuf conversion, chart-kind capability checks,
+archive lookup, and lossless wire mutation; no axis value module depends on
+the facade or protobuf crates.
 The leaf's `transition::Effect` owns the lossless native transition-effect
 identifier vocabulary, including canonical known variants and lossless unknown
 identifiers; IWA retains transition archive decoding, wire patching, and

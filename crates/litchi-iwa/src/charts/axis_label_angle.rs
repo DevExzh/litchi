@@ -5,7 +5,8 @@
 
 use prost::Message;
 
-use crate::charts::Axis;
+use litchi_iwa_common::chart::axis::{Axis, label_angle::LabelAngle};
+
 use crate::charts::axis_style::{
     GENERATED_CHART_AXIS_STYLE_EXTENSION_FIELD, axis_style_slot, generated_axis_style_extension,
 };
@@ -15,65 +16,6 @@ use crate::{Error, IWorkPackage, Result};
 
 const CATEGORY_LABEL_ANGLE_FIELD: u32 = 9;
 const VALUE_LABEL_ANGLE_FIELD: u32 = 11;
-const MINIMUM_DEGREES: f32 = 0.0;
-const MAXIMUM_DEGREES_EXCLUSIVE: f32 = 360.0;
-
-/// A normalized chart-axis label angle in degrees.
-///
-/// The associated constants correspond to the five named choices in the
-/// iWork Label Angle pop-up. Other finite values in `[0, 360)` represent the
-/// inspector's Custom choice.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct ChartAxisLabelAngle(f32);
-
-impl ChartAxisLabelAngle {
-    /// Horizontal labels.
-    pub const HORIZONTAL: Self = Self(MINIMUM_DEGREES);
-    /// Labels rising diagonally toward the left.
-    pub const LEFT_DIAGONAL: Self = Self(45.0);
-    /// Labels written vertically toward the left.
-    pub const LEFT_VERTICAL: Self = Self(90.0);
-    /// Labels written vertically toward the right.
-    pub const RIGHT_VERTICAL: Self = Self(270.0);
-    /// Labels rising diagonally toward the right.
-    pub const RIGHT_DIAGONAL: Self = Self(315.0);
-
-    /// Construct a normalized native label angle.
-    pub fn new(degrees: f32) -> Result<Self> {
-        if !degrees.is_finite() || !(MINIMUM_DEGREES..MAXIMUM_DEGREES_EXCLUSIVE).contains(&degrees)
-        {
-            return Err(Error::InvalidFormat(format!(
-                "chart axis label angle must be finite and in [{MINIMUM_DEGREES}, {MAXIMUM_DEGREES_EXCLUSIVE}) degrees"
-            )));
-        }
-        // Canonicalize negative zero so equality and wire output are stable.
-        Ok(Self(if degrees == MINIMUM_DEGREES {
-            MINIMUM_DEGREES
-        } else {
-            degrees
-        }))
-    }
-
-    /// Return the normalized angle in degrees.
-    pub const fn degrees(self) -> f32 {
-        self.0
-    }
-}
-
-impl Default for ChartAxisLabelAngle {
-    fn default() -> Self {
-        Self::HORIZONTAL
-    }
-}
-
-impl TryFrom<f32> for ChartAxisLabelAngle {
-    type Error = Error;
-
-    fn try_from(value: f32) -> Result<Self> {
-        Self::new(value)
-    }
-}
-
 /// Read the label angle for one native chart axis.
 pub(crate) fn chart_axis_label_angle(
     package: &IWorkPackage,
@@ -81,7 +23,7 @@ pub(crate) fn chart_axis_label_angle(
     drawable_object_id: u64,
     drawable_label: &str,
     axis: Axis,
-) -> Result<ChartAxisLabelAngle> {
+) -> Result<LabelAngle> {
     axis_style_slot(
         package,
         chart_archive_name,
@@ -99,7 +41,7 @@ pub(crate) fn set_chart_axis_label_angle(
     drawable_object_id: u64,
     drawable_label: &str,
     axis: Axis,
-    angle: ChartAxisLabelAngle,
+    angle: LabelAngle,
 ) -> Result<()> {
     let slot = axis_style_slot(
         package,
@@ -122,15 +64,15 @@ pub(crate) fn set_chart_axis_label_angle(
     Ok(())
 }
 
-fn read_axis_label_angle(data: &[u8], axis: Axis) -> Result<ChartAxisLabelAngle> {
+fn read_axis_label_angle(data: &[u8], axis: Axis) -> Result<LabelAngle> {
     let Some(extension) = generated_axis_style_extension(data)? else {
-        return Ok(ChartAxisLabelAngle::HORIZONTAL);
+        return Ok(LabelAngle::HORIZONTAL);
     };
     tsch::generated::ChartAxisStyleArchive::decode(extension)?;
     let Some(bits) = strict_optional_fixed32(extension, label_angle_field(axis))? else {
-        return Ok(ChartAxisLabelAngle::HORIZONTAL);
+        return Ok(LabelAngle::HORIZONTAL);
     };
-    ChartAxisLabelAngle::new(f32::from_bits(bits)).map_err(|error| {
+    LabelAngle::new(f32::from_bits(bits)).map_err(|error| {
         Error::InvalidFormat(format!(
             "native {}-axis label angle is invalid: {error}",
             axis.as_str()
@@ -138,21 +80,16 @@ fn read_axis_label_angle(data: &[u8], axis: Axis) -> Result<ChartAxisLabelAngle>
     })
 }
 
-fn patch_axis_label_angle(
-    data: &[u8],
-    axis: Axis,
-    expected: ChartAxisLabelAngle,
-) -> Result<Vec<u8>> {
+fn patch_axis_label_angle(data: &[u8], axis: Axis, expected: LabelAngle) -> Result<Vec<u8>> {
     let existing_extension = generated_axis_style_extension(data)?;
-    if existing_extension.is_none() && expected == ChartAxisLabelAngle::HORIZONTAL {
+    if existing_extension.is_none() && expected == LabelAngle::HORIZONTAL {
         return Ok(data.to_vec());
     }
     let extension = existing_extension.unwrap_or_default();
     tsch::generated::ChartAxisStyleArchive::decode(extension)?;
     let field = label_angle_field(axis);
     let present = strict_optional_fixed32(extension, field)?.is_some();
-    let replacement =
-        (expected != ChartAxisLabelAngle::HORIZONTAL).then_some(expected.degrees().to_bits());
+    let replacement = (expected != LabelAngle::HORIZONTAL).then_some(expected.degrees().to_bits());
     let patched_extension = patch_fixed32_field(extension, field, present, replacement)?;
     let patched = patch_length_delimited_field(
         data,
@@ -210,52 +147,43 @@ mod tests {
     #[test]
     fn named_and_custom_angles_are_strict_and_normalized() {
         for angle in [
-            ChartAxisLabelAngle::HORIZONTAL,
-            ChartAxisLabelAngle::LEFT_DIAGONAL,
-            ChartAxisLabelAngle::LEFT_VERTICAL,
-            ChartAxisLabelAngle::RIGHT_VERTICAL,
-            ChartAxisLabelAngle::RIGHT_DIAGONAL,
-            ChartAxisLabelAngle::new(12.5).unwrap(),
+            LabelAngle::HORIZONTAL,
+            LabelAngle::LEFT_DIAGONAL,
+            LabelAngle::LEFT_VERTICAL,
+            LabelAngle::RIGHT_VERTICAL,
+            LabelAngle::RIGHT_DIAGONAL,
+            LabelAngle::new(12.5).unwrap(),
         ] {
-            assert_eq!(ChartAxisLabelAngle::new(angle.degrees()).unwrap(), angle);
+            assert_eq!(LabelAngle::new(angle.degrees()).unwrap(), angle);
         }
         assert_eq!(
-            ChartAxisLabelAngle::new(-0.0).unwrap().degrees().to_bits(),
+            LabelAngle::new(-0.0).unwrap().degrees().to_bits(),
             0.0_f32.to_bits()
         );
         for invalid in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -0.1, 360.0] {
-            assert!(ChartAxisLabelAngle::new(invalid).is_err());
+            assert!(LabelAngle::new(invalid).is_err());
         }
     }
 
     #[test]
     fn axis_angles_patch_independently_and_restore_exactly() {
         let original = axis_style_with_unknown_fields();
-        let category = patch_axis_label_angle(
-            &original,
-            Axis::Category,
-            ChartAxisLabelAngle::LEFT_DIAGONAL,
-        )
-        .unwrap();
+        let category =
+            patch_axis_label_angle(&original, Axis::Category, LabelAngle::LEFT_DIAGONAL).unwrap();
         let both =
-            patch_axis_label_angle(&category, Axis::Value, ChartAxisLabelAngle::RIGHT_DIAGONAL)
-                .unwrap();
+            patch_axis_label_angle(&category, Axis::Value, LabelAngle::RIGHT_DIAGONAL).unwrap();
         assert_eq!(
             read_axis_label_angle(&both, Axis::Category).unwrap(),
-            ChartAxisLabelAngle::LEFT_DIAGONAL
+            LabelAngle::LEFT_DIAGONAL
         );
         assert_eq!(
             read_axis_label_angle(&both, Axis::Value).unwrap(),
-            ChartAxisLabelAngle::RIGHT_DIAGONAL
+            LabelAngle::RIGHT_DIAGONAL
         );
         let category_reset =
-            patch_axis_label_angle(&both, Axis::Category, ChartAxisLabelAngle::HORIZONTAL).unwrap();
-        let reset = patch_axis_label_angle(
-            &category_reset,
-            Axis::Value,
-            ChartAxisLabelAngle::HORIZONTAL,
-        )
-        .unwrap();
+            patch_axis_label_angle(&both, Axis::Category, LabelAngle::HORIZONTAL).unwrap();
+        let reset =
+            patch_axis_label_angle(&category_reset, Axis::Value, LabelAngle::HORIZONTAL).unwrap();
         assert_eq!(reset, original);
     }
 
@@ -263,8 +191,7 @@ mod tests {
     fn malformed_native_angles_are_rejected() {
         let original = axis_style_with_unknown_fields();
         let customized =
-            patch_axis_label_angle(&original, Axis::Value, ChartAxisLabelAngle::LEFT_VERTICAL)
-                .unwrap();
+            patch_axis_label_angle(&original, Axis::Value, LabelAngle::LEFT_VERTICAL).unwrap();
         let extension = generated_axis_style_extension(&customized)
             .unwrap()
             .unwrap();
@@ -272,7 +199,7 @@ mod tests {
             &[],
             VALUE_LABEL_ANGLE_FIELD,
             false,
-            Some(ChartAxisLabelAngle::RIGHT_VERTICAL.degrees().to_bits()),
+            Some(LabelAngle::RIGHT_VERTICAL.degrees().to_bits()),
         )
         .unwrap();
         let mut duplicate_extension = extension.to_vec();

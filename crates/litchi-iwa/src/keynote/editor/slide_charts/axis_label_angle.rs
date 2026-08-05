@@ -5,7 +5,7 @@ use crate::charts::axis_label_angle::{
     chart_axis_label_angle as read_native_axis_label_angle,
     set_chart_axis_label_angle as set_native_axis_label_angle,
 };
-use crate::charts::{Axis, ChartAxisLabelAngle};
+use crate::charts::{Axis, LabelAngle};
 
 impl KeynoteEditor {
     /// Read one slide-chart axis' normalized label angle.
@@ -14,7 +14,7 @@ impl KeynoteEditor {
         slide_index: usize,
         drawable_object_id: u64,
         axis: Axis,
-    ) -> Result<ChartAxisLabelAngle> {
+    ) -> Result<LabelAngle> {
         slide_chart_axis_label_angle(self, slide_index, drawable_object_id, axis)
     }
 
@@ -24,7 +24,7 @@ impl KeynoteEditor {
         slide_index: usize,
         drawable_object_id: u64,
         axis: Axis,
-        angle: ChartAxisLabelAngle,
+        angle: LabelAngle,
     ) -> Result<()> {
         set_slide_chart_axis_label_angle(self, slide_index, drawable_object_id, axis, angle)
     }
@@ -35,7 +35,7 @@ fn slide_chart_axis_label_angle(
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
-) -> Result<ChartAxisLabelAngle> {
+) -> Result<LabelAngle> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     read_native_axis_label_angle(
         editor.package(),
@@ -51,7 +51,7 @@ fn set_slide_chart_axis_label_angle(
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
-    angle: ChartAxisLabelAngle,
+    angle: LabelAngle,
 ) -> Result<()> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let mut staged = editor.package().clone();
@@ -100,9 +100,9 @@ mod tests {
             editor
                 .slide_chart_axis_label_angle(0, chart.drawable_object_id, Axis::Value)
                 .unwrap(),
-            ChartAxisLabelAngle::HORIZONTAL
+            LabelAngle::HORIZONTAL
         );
-        let expected = ChartAxisLabelAngle::new(12.5).unwrap();
+        let expected = LabelAngle::new(12.5).unwrap();
         editor
             .set_slide_chart_axis_label_angle(0, chart.drawable_object_id, Axis::Value, expected)
             .unwrap();
@@ -118,7 +118,7 @@ mod tests {
                 0,
                 chart.drawable_object_id,
                 Axis::Value,
-                ChartAxisLabelAngle::HORIZONTAL,
+                LabelAngle::HORIZONTAL,
             )
             .unwrap();
         assert_eq!(reopened.to_bytes().unwrap(), baseline);
