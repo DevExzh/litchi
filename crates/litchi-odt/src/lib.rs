@@ -177,40 +177,6 @@ pub(crate) use elements::bookmark::{
 pub(crate) use embedded_object::{
     EmbeddedObject, EmbeddedObjectKind, EmbeddedObjectPart, EmbeddedObjectSource, InlineObjectRoot,
 };
-#[allow(unused_imports, reason = "ODT facade exposes typed form models")]
-pub(crate) use form::{
-    ButtonControl, ButtonType, CheckboxControl, CheckboxState, ComboItem, ComboboxControl,
-    ConnectionResourceForm, ControlForm, ControlRef, ControlShape, FileControl, FixedTextControl,
-    Form, FormAttribute, FormConnectionResource, FormControl, FormControlKind, FormDate,
-    FormDouble, FormGroup, FormNode, FormPart, FormProperty, FormPropertyValue, FormScalarValue,
-    FormScope, Forms, FrameControl, GenericControl, GenericControlMetadata, GenericForm,
-    GenericFormControl, GridColumn, GridColumnControl, GridColumnControlKind, GridControl,
-    GridForm, GridNonNegativeInteger, HiddenControl, ImageButtonType, ImageControl,
-    ImageFrameControl, ImageFrameForm, InteractiveControl, InteractiveForm, ListLinkageType,
-    ListOption, ListSourceType, ListboxControl, OwnedFormConnectionResource, PasswordControl,
-    PasswordFileControl, PasswordFileForm, PropertyForm, RadioControl, RadioVisualEffect,
-    RelativeImageAlign, RelativeImagePosition, SelectionControl, SelectionForm, TextControl,
-    TextControlKind, TypedValueBound, TypedValueControl, TypedValueControlKind, TypedValueDuration,
-    TypedValueForm, TypedValueNonNegativeInteger, ValueRangeControl, ValueRangeDuration,
-    ValueRangeForm, ValueRangeInteger, ValueRangeNonNegativeInteger, ValueRangeOrientation,
-    ValueRangePositiveInteger, VisualControl, VisualForm, form_connection_resources,
-    form_properties, generic_form_controls, grid_controls, image_frame_controls,
-    insert_form_connection_resource_xml, insert_form_property_xml, insert_generic_form_control_xml,
-    insert_grid_control_xml, insert_image_frame_control_xml, insert_interactive_control_xml,
-    insert_password_file_control_xml, insert_selection_control_xml, insert_text_control_xml,
-    insert_typed_value_control_xml, insert_value_range_control_xml, insert_visual_control_xml,
-    interactive_controls, password_file_controls, remove_form_connection_resource_xml,
-    remove_form_property_xml, remove_generic_form_control_xml, remove_grid_control_xml,
-    remove_image_frame_control_xml, remove_interactive_control_xml,
-    remove_password_file_control_xml, remove_selection_control_xml, remove_text_control_xml,
-    remove_typed_value_control_xml, remove_value_range_control_xml, remove_visual_control_xml,
-    replace_form_connection_resource_xml, replace_form_property_xml,
-    replace_generic_form_control_xml, replace_grid_control_xml, replace_image_frame_control_xml,
-    replace_interactive_control_xml, replace_password_file_control_xml,
-    replace_selection_control_xml, replace_text_control_xml, replace_typed_value_control_xml,
-    replace_value_range_control_xml, replace_visual_control_xml, selection_controls, text_controls,
-    typed_value_controls, value_range_controls, visual_controls,
-};
 #[allow(
     unused_imports,
     reason = "ODT facade exposes the canonical document package types"
@@ -220,17 +186,6 @@ pub(crate) use generic::{FlatOpenDocument, OpenDocumentFamily, OpenDocumentPacka
 pub(crate) use graphic_properties::{
     Child, ChildKind, Kind, Namespace, Properties, Property, Value, parse_graphic_style_properties,
     set_graphic_style_properties_xml,
-};
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes header and footer style configurations"
-)]
-pub(crate) use header_footer_properties::{HeaderFooterStyleProperties, PageHeaderFooterRegion};
-#[allow(unused_imports, reason = "ODT facade exposes list style semantics")]
-pub(crate) use list_style::{
-    BulletRelativeSize, ListLevelBulletStyle, ListLevelImageSource, ListLevelKind,
-    ListLevelNumberStyle, ListLevelStyle, ListStyle, ListStyleSet, MAX_LIST_STYLE_LEVEL,
-    parse_list_styles,
 };
 #[allow(unused_imports, reason = "ODT facade exposes annotation semantics")]
 pub(crate) use litchi_odf_common::annotation::{AnnotationElement, AnnotationNode, CellAnnotation};
@@ -253,13 +208,6 @@ pub(crate) use odc::{
     Element, ElementKind, EquationSpec, ExtensionAttribute, ExtensionElement, Extensions, Grid,
     GridClass, GridSpec, Legend, LegendPosition, LegendSpec, PlotArea, PlotAreaSpec,
     RegressionSpec, Series, SeriesSpec, SeriesUpdate, StyleElement, Text, serialize_chart_content,
-};
-#[allow(unused_imports, reason = "ODT facade exposes outline style semantics")]
-pub(crate) use outline_style::{
-    ListLevelPositionMode, MAX_OUTLINE_LEVELS, OutlineAttribute, OutlineLevelStyle,
-    OutlineListLevelProperties, OutlineNumberFormat, OutlinePositiveInteger, OutlineStyle,
-    OutlineStyles, OutlineTextAlign, OutlineTextProperties, parse_outline_styles,
-    remove_outline_style_xml, set_outline_style_xml,
 };
 #[allow(
     unused_imports,
@@ -361,11 +309,6 @@ pub use dynamic_text::{
 pub(crate) use frame::FrameAnchor;
 pub(crate) use header_footer::{
     HeaderFooterKind, MasterPage, MasterPageChild, MasterPageChildKind,
-};
-#[allow(unused_imports)] // Library public API
-pub(crate) use header_footer_content::{
-    HeaderFooterBlock, HeaderFooterColumnRegion, HeaderFooterField, HeaderFooterFieldKind,
-    HeaderFooterInline, HeaderFooterSenderFieldKind,
 };
 pub(crate) use index::{
     TextBibliographyType, TextIndex, insert_text_index_xml, remove_text_index_xml,
