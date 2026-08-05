@@ -1,4 +1,4 @@
-use litchi_ooxml::docx::{
+use litchi_docx::{
     Package,
     web::{Conformance, Settings},
 };

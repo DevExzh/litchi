@@ -1,5 +1,5 @@
-use litchi_ooxml::docx::writer::TableOfContents;
-use litchi_ooxml::docx::{MutableDocument, Package, SectionProperties, WdSectionStart};
+use litchi_docx::writer::{MutableDocument, SectionProperties, TableOfContents};
+use litchi_docx::{Package, WdSectionStart};
 use litchi_opc::packuri::PackURI;
 use std::io::Cursor;
 

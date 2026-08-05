@@ -1,7 +1,7 @@
 use litchi_docx::glossary::{
     self, Catalog, Category, Conformance, Entry, Gallery, Id, Insert, Kind, Name, Props, raw,
 };
-use litchi_ooxml::docx::Package;
+use litchi_docx::{Error, Package};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{PackURI, part::BlobPart};
 
@@ -76,7 +76,7 @@ fn semantic_crud_is_name_first_and_numeric_fallback_is_checked() {
 }
 
 #[test]
-fn host_facade_and_document_accessor_round_trip() {
+fn package_and_document_accessor_round_trip() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("glossary.docx");
     let mut catalog = Catalog::new();
@@ -242,18 +242,18 @@ fn invalid_graph_update_is_failure_atomic() {
 
     assert!(
         package
-            .edit_opc(|opc| Ok::<_, litchi_ooxml::error::OoxmlError>(glossary::remove(opc)?))
+            .edit_opc(|opc| Ok::<_, Error>(glossary::remove(opc)?))
             .unwrap()
     );
     assert!(
         !package
-            .edit_opc(|opc| Ok::<_, litchi_ooxml::error::OoxmlError>(glossary::remove(opc)?))
+            .edit_opc(|opc| Ok::<_, Error>(glossary::remove(opc)?))
             .unwrap()
     );
 }
 
 #[test]
-fn host_graph_noop_preserves_signature_and_real_change_unsigns() {
+fn graph_noop_preserves_signature_and_real_change_unsigns() {
     let mut package = Package::new().unwrap();
     let mut catalog = Catalog::new();
     catalog.add(entry("Keep", None)).unwrap();
@@ -289,7 +289,7 @@ fn host_graph_noop_preserves_signature_and_real_change_unsigns() {
 }
 
 #[test]
-fn host_graph_failure_preserves_existing_graph_and_signature() {
+fn graph_failure_preserves_existing_graph_and_signature() {
     let mut package = Package::new().unwrap();
     let mut catalog = Catalog::new();
     catalog.add(entry("Keep", None)).unwrap();

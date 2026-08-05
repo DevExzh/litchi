@@ -1,4 +1,4 @@
-use litchi_ooxml::docx::Package;
+use litchi_docx::Package;
 use std::io::Cursor;
 
 #[test]

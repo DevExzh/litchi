@@ -1,4 +1,4 @@
-use litchi_ooxml::docx::Package;
+use litchi_docx::Package;
 use litchi_ooxml_common::custom::Value;
 use litchi_opc::OpcPackage;
 use litchi_opc::PackURI;

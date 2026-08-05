@@ -1,4 +1,5 @@
-use litchi_ooxml::docx::{NewStore, Package};
+use litchi_docx::Package;
+use litchi_docx::custom_xml::NewStore;
 use litchi_ooxml_common::custom_xml::{Conformance, TRANSITIONAL_RELATIONSHIP};
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::packuri::PackURI;

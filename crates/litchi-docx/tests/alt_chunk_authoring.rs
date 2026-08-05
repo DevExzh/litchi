@@ -1,5 +1,5 @@
 use litchi_docx::alt::{Data, Import, Kind, MAX_CHUNKS, Target};
-use litchi_ooxml::docx::{Block, Package};
+use litchi_docx::{Block, Package};
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::packuri::PackURI;

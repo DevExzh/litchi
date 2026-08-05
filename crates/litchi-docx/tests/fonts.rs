@@ -1,5 +1,5 @@
+use litchi_docx::Package;
 use litchi_docx::font::Conformance;
-use litchi_ooxml::docx::Package;
 
 #[test]
 fn package_delegates_fonts_to_the_canonical_docx_owner() {

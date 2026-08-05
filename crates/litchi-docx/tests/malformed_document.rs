@@ -1,18 +1,12 @@
-use litchi_ooxml::PackURI;
-use litchi_ooxml::docx::Package;
+use litchi_docx::{Package, Result};
+use litchi_opc::PackURI;
 use tempfile::NamedTempFile;
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 
 /// Build a package whose `/word/document.xml` has the given blob and run
 /// the document accessor battery over it. A panic anywhere fails the test.
-fn with_document_blob(
-    blob: &[u8],
-) -> (
-    litchi_ooxml::error::Result<usize>,
-    litchi_ooxml::error::Result<usize>,
-    litchi_ooxml::error::Result<String>,
-) {
+fn with_document_blob(blob: &[u8]) -> (Result<usize>, Result<usize>, Result<String>) {
     let output = NamedTempFile::with_suffix(".docx").unwrap();
     let mut package = Package::new().unwrap();
     package.save(output.path()).unwrap();

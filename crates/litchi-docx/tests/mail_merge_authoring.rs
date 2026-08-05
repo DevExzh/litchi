@@ -2,7 +2,7 @@ use litchi_docx::mail_merge::{
     Conformance, DataSourceObject, DataType, Destination, FieldMap, FieldMappingType, Recipient,
     Recipients, Settings, Source, Target,
 };
-use litchi_ooxml::docx::Package;
+use litchi_docx::{Error, Package};
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::packuri::PackURI;
 use litchi_opc::part::{BlobPart, Part};
@@ -149,9 +149,8 @@ fn unrelated_settings_xml_is_preserved_and_invalid_updates_are_atomic() {
     package
         .edit_opc(|opc| {
             let settings_part = opc.get_part_mut(&settings_uri)?;
-            let original = std::str::from_utf8(settings_part.blob()).map_err(|error| {
-                litchi_ooxml::error::OoxmlError::InvalidFormat(error.to_string())
-            })?;
+            let original = std::str::from_utf8(settings_part.blob())
+                .map_err(|error| Error::InvalidFormat(error.to_string()))?;
             let marked = original.replace(
                 "</w:settings>",
                 r#"<x:sentinel xmlns:x="urn:test" keep="exact"/></w:settings>"#,
