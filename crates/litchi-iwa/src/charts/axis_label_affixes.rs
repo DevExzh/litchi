@@ -10,7 +10,7 @@ use crate::charts::axis::{
     generated_axis_non_style_extension,
 };
 use crate::charts::number_format::{DualNumberFormatFields, patch_dual_affixes, read_dual_affixes};
-use crate::charts::{ChartAxis, ChartLabelAffixes, ChartNumberFormat};
+use crate::charts::{Axis, ChartLabelAffixes, ChartNumberFormat};
 use crate::protobuf::tsch;
 use crate::wire::patch_length_delimited_field;
 use crate::{Error, IWorkPackage, Result};
@@ -28,7 +28,7 @@ pub(crate) fn chart_axis_label_affixes(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<ChartLabelAffixes> {
     axis_non_style_slot(
         package,
@@ -46,7 +46,7 @@ pub(crate) fn set_chart_axis_label_affixes(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
+    axis: Axis,
     affixes: &ChartLabelAffixes,
 ) -> Result<()> {
     let slot = axis_non_style_slot(
@@ -64,7 +64,7 @@ pub(crate) fn set_chart_axis_label_affixes(
     if slot.read(package, read_axis_label_affixes)? != *affixes {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} chart {drawable_object_id} {}-axis label-affix update failed validation",
-            axis.label()
+            axis.as_str()
         )));
     }
     Ok(())

@@ -95,6 +95,14 @@ radius. Structural `ShapePathKind`, native path-family decoding, natural-size
 constraints, and protobuf/wire mutation remain in `litchi-iwa`, so the common
 leaf stays dependency-free and allocation-free.
 
+Chart axis controls use the focused `litchi_iwa_common::chart::axis` module.
+`Axis::{Category, Value}` is the compact semantic selector shared by all three
+iWork owners, and `TickMarkLocation` models the exclusive formatter choices
+with an explicit `Unsupported(i32)` case for future native values. Native
+integer conversion, archive lookup, shared-object ownership, and protobuf
+patching remain in `litchi-iwa`; the common values stay copyable and free of
+package state.
+
 PresentationML implements this rule as `litchi-pptx::shape::{Scene, Shape}`.
 `Scene` is a bounded semantic index over one slide-like owner, not a vector of
 detached XML allocations. Shapes are visited in depth-first pre-order, while a

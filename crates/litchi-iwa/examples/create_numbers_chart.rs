@@ -3,17 +3,17 @@
 use std::env;
 
 use litchi_iwa::charts::{
-    ChartAxis, ChartAxisBound, ChartAxisGridline, ChartAxisGridlineStroke, ChartAxisMajorStepCount,
-    ChartAxisMinorStepCount, ChartAxisTickMarkLocation, ChartCornerRadius, ChartData,
-    ChartErrorBarDirection, ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont,
-    ChartFontSize, ChartGapPercentage, ChartGapSpacing, ChartKind, ChartLegendFill,
-    ChartLegendFont, ChartLegendFontSize, ChartLegendShadow, ChartLegendStroke,
-    ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesStroke,
-    ChartSeriesStrokePattern, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
-    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
+    Axis, ChartAxisBound, ChartAxisGridline, ChartAxisGridlineStroke, ChartAxisMajorStepCount,
+    ChartAxisMinorStepCount, ChartCornerRadius, ChartData, ChartErrorBarDirection,
+    ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont, ChartFontSize, ChartGapPercentage,
+    ChartGapSpacing, ChartKind, ChartLegendFill, ChartLegendFont, ChartLegendFontSize,
+    ChartLegendShadow, ChartLegendStroke, ChartRoundedCorners, ChartSeriesErrorBarAutoFit,
+    ChartSeriesErrorBars, ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
+    ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesValueLabelAffixes,
+    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
     ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
     ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
-    ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
+    ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps, TickMarkLocation,
 };
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{
@@ -128,13 +128,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_sheet_chart_axis_title(
         sheet_id,
         chart.drawable_object_id,
-        ChartAxis::Category,
+        Axis::Category,
         "Quarter",
     )?;
     editor.set_sheet_chart_axis_title(
         sheet_id,
         chart.drawable_object_id,
-        ChartAxis::Value,
+        Axis::Value,
         "Revenue",
     )?;
     editor.set_sheet_chart_value_axis_bounds(
@@ -168,43 +168,43 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_sheet_chart_axis_labels_visible(
         sheet_id,
         chart.drawable_object_id,
-        ChartAxis::Category,
+        Axis::Category,
         false,
     )?;
     editor.set_sheet_chart_axis_minor_tick_marks_visible(
         sheet_id,
         chart.drawable_object_id,
-        ChartAxis::Category,
+        Axis::Category,
         false,
     )?;
     editor.set_sheet_chart_axis_tick_mark_location(
         sheet_id,
         chart.drawable_object_id,
-        ChartAxis::Category,
-        ChartAxisTickMarkLocation::Outside,
+        Axis::Category,
+        TickMarkLocation::Outside,
     )?;
     editor.set_sheet_chart_axis_line_visible(
         sheet_id,
         chart.drawable_object_id,
-        ChartAxis::Value,
+        Axis::Value,
         false,
     )?;
     editor.set_sheet_chart_axis_major_gridlines_visible(
         sheet_id,
         chart.drawable_object_id,
-        ChartAxis::Value,
+        Axis::Value,
         false,
     )?;
     editor.set_sheet_chart_axis_minor_gridlines_visible(
         sheet_id,
         chart.drawable_object_id,
-        ChartAxis::Value,
+        Axis::Value,
         true,
     )?;
     editor.set_sheet_chart_axis_gridline_stroke(
         sheet_id,
         chart.drawable_object_id,
-        ChartAxis::Value,
+        Axis::Value,
         ChartAxisGridline::Minor,
         ChartAxisGridlineStroke::Stroke(ShapeStroke::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb)?,

@@ -455,7 +455,10 @@ mod tests {
 
     fn find_field_bytes(data: &[u8], number: u32) -> &[u8] {
         let fields = parse_wire_fields(data).unwrap();
-        let field = fields.iter().find(|field| field.number() == number).unwrap();
+        let field = fields
+            .iter()
+            .find(|field| field.number() == number)
+            .unwrap();
         &data[field.payload_start()..field.end()]
     }
 }

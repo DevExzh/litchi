@@ -5,7 +5,7 @@ use crate::charts::axis_number_format::{
     chart_axis_number_format as read_native_chart_axis_number_format,
     set_chart_axis_number_format as set_native_chart_axis_number_format,
 };
-use crate::charts::{ChartAxis, ChartNumberFormat};
+use crate::charts::{Axis, ChartNumberFormat};
 
 impl NumbersEditor {
     /// Read the decimal-number format of one native sheet-chart axis.
@@ -13,7 +13,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
     ) -> Result<ChartNumberFormat> {
         sheet_chart_axis_number_format(self, sheet_id, drawable_object_id, axis)
     }
@@ -23,7 +23,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
         format: ChartNumberFormat,
     ) -> Result<()> {
         set_sheet_chart_axis_number_format(self, sheet_id, drawable_object_id, axis, format)
@@ -34,7 +34,7 @@ fn sheet_chart_axis_number_format(
     editor: &NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<ChartNumberFormat> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     read_native_chart_axis_number_format(
@@ -50,7 +50,7 @@ fn set_sheet_chart_axis_number_format(
     editor: &mut NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
     format: ChartNumberFormat,
 ) -> Result<()> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
@@ -103,11 +103,7 @@ mod tests {
         );
         assert_eq!(
             editor
-                .sheet_chart_axis_number_format(
-                    sheet_id,
-                    chart.drawable_object_id,
-                    ChartAxis::Value,
-                )
+                .sheet_chart_axis_number_format(sheet_id, chart.drawable_object_id, Axis::Value,)
                 .unwrap(),
             ChartNumberFormat::AXIS_NATIVE_DEFAULT
         );
@@ -116,18 +112,14 @@ mod tests {
             .set_sheet_chart_axis_number_format(
                 sheet_id,
                 chart.drawable_object_id,
-                ChartAxis::Value,
+                Axis::Value,
                 expected,
             )
             .unwrap();
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
-                .sheet_chart_axis_number_format(
-                    sheet_id,
-                    chart.drawable_object_id,
-                    ChartAxis::Value,
-                )
+                .sheet_chart_axis_number_format(sheet_id, chart.drawable_object_id, Axis::Value,)
                 .unwrap(),
             expected
         );
@@ -135,7 +127,7 @@ mod tests {
             .set_sheet_chart_axis_number_format(
                 sheet_id,
                 chart.drawable_object_id,
-                ChartAxis::Value,
+                Axis::Value,
                 ChartNumberFormat::AXIS_NATIVE_DEFAULT,
             )
             .unwrap();

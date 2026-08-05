@@ -147,6 +147,14 @@ unknown fields, and family-field position while replacing the owned family
 payload. The three concrete format owners consume the common `Preset` directly;
 the former redundant `Shape*` value names are removed rather than retained as
 compatibility aliases.
+Chart-axis selectors and tick-mark values now follow the same boundary at
+`litchi-iwa-common::chart::axis::{Axis, TickMarkLocation}`. `Axis` is a
+one-byte category/value selector, while `TickMarkLocation` is a compact
+copyable value that keeps an unrecognized native integer explicit. The common
+module owns no archive, protobuf message, or package state; IWA retains axis
+object lookup, field mapping, and lossless wire mutation. Pages, Numbers,
+Keynote, and chart examples consume the short common names directly, and the
+former `ChartAxis*` facade names are removed rather than kept as aliases.
 The leaf's `transition::Effect` owns the lossless native transition-effect
 identifier vocabulary, including canonical known variants and lossless unknown
 identifiers; IWA retains transition archive decoding, wire patching, and

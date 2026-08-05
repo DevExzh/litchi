@@ -1,7 +1,7 @@
 //! Native axis-line visibility CRUD for Pages body charts.
 
 use super::*;
-use crate::charts::ChartAxis;
+use crate::charts::Axis;
 use crate::charts::axis_style::{
     chart_axis_line_visible as read_native_chart_axis_line_visible,
     set_chart_axis_line_visible as set_native_chart_axis_line_visible,
@@ -12,7 +12,7 @@ impl PagesEditor {
     pub fn body_chart_axis_line_visible(
         &self,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
     ) -> Result<bool> {
         body_chart_axis_line_visible(self, drawable_object_id, axis)
     }
@@ -21,7 +21,7 @@ impl PagesEditor {
     pub fn set_body_chart_axis_line_visible(
         &mut self,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
         visible: bool,
     ) -> Result<()> {
         set_body_chart_axis_line_visible(self, drawable_object_id, axis, visible)
@@ -31,7 +31,7 @@ impl PagesEditor {
 fn body_chart_axis_line_visible(
     editor: &PagesEditor,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<bool> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_chart_axis_line_visible(
@@ -46,7 +46,7 @@ fn body_chart_axis_line_visible(
 fn set_body_chart_axis_line_visible(
     editor: &mut PagesEditor,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
     visible: bool,
 ) -> Result<()> {
     let graph = body_chart_graph(editor, drawable_object_id)?;

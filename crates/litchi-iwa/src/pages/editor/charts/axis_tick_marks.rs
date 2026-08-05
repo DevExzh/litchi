@@ -7,14 +7,14 @@ use crate::charts::axis_style::{
     set_chart_axis_minor_tick_marks_visible as set_native_chart_axis_minor_tick_marks_visible,
     set_chart_axis_tick_mark_location as set_native_chart_axis_tick_mark_location,
 };
-use crate::charts::{ChartAxis, ChartAxisTickMarkLocation};
+use crate::charts::{Axis, TickMarkLocation};
 
 impl PagesEditor {
     /// Read whether Pages shows minor tick marks for one native body-chart axis.
     pub fn body_chart_axis_minor_tick_marks_visible(
         &self,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
     ) -> Result<bool> {
         body_chart_axis_minor_tick_marks_visible(self, drawable_object_id, axis)
     }
@@ -23,7 +23,7 @@ impl PagesEditor {
     pub fn set_body_chart_axis_minor_tick_marks_visible(
         &mut self,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
         visible: bool,
     ) -> Result<()> {
         set_body_chart_axis_minor_tick_marks_visible(self, drawable_object_id, axis, visible)
@@ -33,8 +33,8 @@ impl PagesEditor {
     pub fn body_chart_axis_tick_mark_location(
         &self,
         drawable_object_id: u64,
-        axis: ChartAxis,
-    ) -> Result<ChartAxisTickMarkLocation> {
+        axis: Axis,
+    ) -> Result<TickMarkLocation> {
         body_chart_axis_tick_mark_location(self, drawable_object_id, axis)
     }
 
@@ -42,8 +42,8 @@ impl PagesEditor {
     pub fn set_body_chart_axis_tick_mark_location(
         &mut self,
         drawable_object_id: u64,
-        axis: ChartAxis,
-        location: ChartAxisTickMarkLocation,
+        axis: Axis,
+        location: TickMarkLocation,
     ) -> Result<()> {
         set_body_chart_axis_tick_mark_location(self, drawable_object_id, axis, location)
     }
@@ -52,7 +52,7 @@ impl PagesEditor {
 fn body_chart_axis_minor_tick_marks_visible(
     editor: &PagesEditor,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<bool> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_chart_axis_minor_tick_marks_visible(
@@ -67,7 +67,7 @@ fn body_chart_axis_minor_tick_marks_visible(
 fn set_body_chart_axis_minor_tick_marks_visible(
     editor: &mut PagesEditor,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
     visible: bool,
 ) -> Result<()> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
@@ -93,8 +93,8 @@ fn set_body_chart_axis_minor_tick_marks_visible(
 fn body_chart_axis_tick_mark_location(
     editor: &PagesEditor,
     drawable_object_id: u64,
-    axis: ChartAxis,
-) -> Result<ChartAxisTickMarkLocation> {
+    axis: Axis,
+) -> Result<TickMarkLocation> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_chart_axis_tick_mark_location(
         editor.package(),
@@ -108,8 +108,8 @@ fn body_chart_axis_tick_mark_location(
 fn set_body_chart_axis_tick_mark_location(
     editor: &mut PagesEditor,
     drawable_object_id: u64,
-    axis: ChartAxis,
-    location: ChartAxisTickMarkLocation,
+    axis: Axis,
+    location: TickMarkLocation,
 ) -> Result<()> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let mut staged = editor.package().clone();

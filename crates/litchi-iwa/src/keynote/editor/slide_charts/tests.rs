@@ -5,20 +5,19 @@ use std::path::PathBuf;
 
 use super::*;
 use crate::charts::{
-    ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
-    ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartErrorBarDirection,
-    ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont, ChartFontSize, ChartGapPercentage,
-    ChartGapSpacing, ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendFrame,
-    ChartLegendRect, ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance,
-    ChartPieLabelVisibility, ChartPieLeaderLineVisibility, ChartPieStartAngle,
-    ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit,
-    ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke, ChartSeriesStrokePattern,
-    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
-    ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
-    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
+    Axis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount, ChartCornerRadius,
+    ChartDonutInnerRadius, ChartErrorBarDirection, ChartErrorBarFixedValue,
+    ChartErrorBarPercentage, ChartFont, ChartFontSize, ChartGapPercentage, ChartGapSpacing,
+    ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendFrame, ChartLegendRect,
+    ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance, ChartPieLabelVisibility,
+    ChartPieLeaderLineVisibility, ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex,
+    ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex,
+    ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
+    ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
+    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
     ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
     ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
-    ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
+    ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps, TickMarkLocation,
 };
 use crate::keynote::KeynoteDocumentBuilder;
 use crate::shapes::{
@@ -468,7 +467,7 @@ fn scratch_presentation_supports_native_chart_axis_title_crud() {
         .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert_eq!(
             editor
                 .slide_chart_axis_title(0, source.drawable_object_id, axis)
@@ -477,19 +476,16 @@ fn scratch_presentation_supports_native_chart_axis_title_crud() {
         );
     }
     editor
-        .set_slide_chart_axis_title(0, source.drawable_object_id, ChartAxis::Category, "Month")
+        .set_slide_chart_axis_title(0, source.drawable_object_id, Axis::Category, "Month")
         .unwrap();
     editor
-        .set_slide_chart_axis_title(0, source.drawable_object_id, ChartAxis::Value, "Revenue")
+        .set_slide_chart_axis_title(0, source.drawable_object_id, Axis::Value, "Revenue")
         .unwrap();
 
     let duplicate = editor
         .duplicate_slide_chart(0, source.drawable_object_id)
         .unwrap();
-    for (axis, title) in [
-        (ChartAxis::Category, "Month"),
-        (ChartAxis::Value, "Revenue"),
-    ] {
+    for (axis, title) in [(Axis::Category, "Month"), (Axis::Value, "Revenue")] {
         assert_eq!(
             editor
                 .slide_chart_axis_title(0, source.drawable_object_id, axis)
@@ -510,48 +506,43 @@ fn scratch_presentation_supports_native_chart_axis_title_crud() {
         .set_slide_chart_axis_title(
             0,
             source.drawable_object_id,
-            ChartAxis::Category,
+            Axis::Category,
             "Updated month",
         )
         .unwrap();
     editor
-        .set_slide_chart_axis_title(
-            0,
-            source.drawable_object_id,
-            ChartAxis::Value,
-            "Updated revenue",
-        )
+        .set_slide_chart_axis_title(0, source.drawable_object_id, Axis::Value, "Updated revenue")
         .unwrap();
     assert_eq!(
         editor
-            .slide_chart_axis_title(0, source.drawable_object_id, ChartAxis::Category)
+            .slide_chart_axis_title(0, source.drawable_object_id, Axis::Category)
             .unwrap()
             .as_deref(),
         Some("Updated month")
     );
     assert_eq!(
         editor
-            .slide_chart_axis_title(0, source.drawable_object_id, ChartAxis::Value)
+            .slide_chart_axis_title(0, source.drawable_object_id, Axis::Value)
             .unwrap()
             .as_deref(),
         Some("Updated revenue")
     );
     assert_eq!(
         editor
-            .slide_chart_axis_title(0, duplicate.drawable_object_id, ChartAxis::Category)
+            .slide_chart_axis_title(0, duplicate.drawable_object_id, Axis::Category)
             .unwrap()
             .as_deref(),
         Some("Month")
     );
     assert_eq!(
         editor
-            .slide_chart_axis_title(0, duplicate.drawable_object_id, ChartAxis::Value)
+            .slide_chart_axis_title(0, duplicate.drawable_object_id, Axis::Value)
             .unwrap()
             .as_deref(),
         Some("Revenue")
     );
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             editor
                 .remove_slide_chart_axis_title(0, source.drawable_object_id, axis)
@@ -567,14 +558,14 @@ fn scratch_presentation_supports_native_chart_axis_title_crud() {
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
-            .slide_chart_axis_title(0, duplicate.drawable_object_id, ChartAxis::Category)
+            .slide_chart_axis_title(0, duplicate.drawable_object_id, Axis::Category)
             .unwrap()
             .as_deref(),
         Some("Month")
     );
     assert_eq!(
         reopened
-            .slide_chart_axis_title(0, duplicate.drawable_object_id, ChartAxis::Value)
+            .slide_chart_axis_title(0, duplicate.drawable_object_id, Axis::Value)
             .unwrap()
             .as_deref(),
         Some("Revenue")
@@ -1069,7 +1060,7 @@ fn scratch_presentation_supports_native_chart_axis_label_visibility_crud() {
         .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             editor
                 .slide_chart_axis_labels_visible(0, source.drawable_object_id, axis)
@@ -1078,16 +1069,11 @@ fn scratch_presentation_supports_native_chart_axis_label_visibility_crud() {
     }
     let baseline = editor.to_bytes().unwrap();
     editor
-        .set_slide_chart_axis_labels_visible(
-            0,
-            source.drawable_object_id,
-            ChartAxis::Category,
-            true,
-        )
+        .set_slide_chart_axis_labels_visible(0, source.drawable_object_id, Axis::Category, true)
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         editor
             .set_slide_chart_axis_labels_visible(0, source.drawable_object_id, axis, false)
             .unwrap();
@@ -1101,7 +1087,7 @@ fn scratch_presentation_supports_native_chart_axis_label_visibility_crud() {
     let duplicate = editor
         .duplicate_slide_chart(0, source.drawable_object_id)
         .unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             !editor
                 .slide_chart_axis_labels_visible(0, duplicate.drawable_object_id, axis)
@@ -1113,7 +1099,7 @@ fn scratch_presentation_supports_native_chart_axis_label_visibility_crud() {
     }
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             reopened
                 .slide_chart_axis_labels_visible(0, source.drawable_object_id, axis)
@@ -1145,7 +1131,7 @@ fn scratch_presentation_supports_native_chart_axis_line_visibility_crud() {
         .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             editor
                 .slide_chart_axis_line_visible(0, source.drawable_object_id, axis)
@@ -1164,7 +1150,7 @@ fn scratch_presentation_supports_native_chart_axis_line_visibility_crud() {
     let duplicate = editor
         .duplicate_slide_chart(0, source.drawable_object_id)
         .unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             !editor
                 .slide_chart_axis_line_visible(0, duplicate.drawable_object_id, axis)
@@ -1176,7 +1162,7 @@ fn scratch_presentation_supports_native_chart_axis_line_visibility_crud() {
     }
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             reopened
                 .slide_chart_axis_line_visible(0, source.drawable_object_id, axis)
@@ -1202,20 +1188,12 @@ fn scratch_presentation_supports_native_chart_axis_major_gridline_visibility_cru
 
     assert!(
         !editor
-            .slide_chart_axis_major_gridlines_visible(
-                0,
-                source.drawable_object_id,
-                ChartAxis::Category,
-            )
+            .slide_chart_axis_major_gridlines_visible(0, source.drawable_object_id, Axis::Category,)
             .unwrap()
     );
     assert!(
         editor
-            .slide_chart_axis_major_gridlines_visible(
-                0,
-                source.drawable_object_id,
-                ChartAxis::Value
-            )
+            .slide_chart_axis_major_gridlines_visible(0, source.drawable_object_id, Axis::Value)
             .unwrap()
     );
     let baseline = editor.to_bytes().unwrap();
@@ -1223,7 +1201,7 @@ fn scratch_presentation_supports_native_chart_axis_major_gridline_visibility_cru
         .set_slide_chart_axis_major_gridlines_visible(
             0,
             source.drawable_object_id,
-            ChartAxis::Category,
+            Axis::Category,
             false,
         )
         .unwrap();
@@ -1233,7 +1211,7 @@ fn scratch_presentation_supports_native_chart_axis_major_gridline_visibility_cru
         .set_slide_chart_axis_major_gridlines_visible(
             0,
             source.drawable_object_id,
-            ChartAxis::Category,
+            Axis::Category,
             true,
         )
         .unwrap();
@@ -1241,7 +1219,7 @@ fn scratch_presentation_supports_native_chart_axis_major_gridline_visibility_cru
         .set_slide_chart_axis_major_gridlines_visible(
             0,
             source.drawable_object_id,
-            ChartAxis::Value,
+            Axis::Value,
             false,
         )
         .unwrap();
@@ -1249,12 +1227,12 @@ fn scratch_presentation_supports_native_chart_axis_major_gridline_visibility_cru
     let duplicate = editor
         .duplicate_slide_chart(0, source.drawable_object_id)
         .unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert_eq!(
             editor
                 .slide_chart_axis_major_gridlines_visible(0, duplicate.drawable_object_id, axis)
                 .unwrap(),
-            axis == ChartAxis::Category
+            axis == Axis::Category
         );
     }
 
@@ -1262,7 +1240,7 @@ fn scratch_presentation_supports_native_chart_axis_major_gridline_visibility_cru
         .set_slide_chart_axis_major_gridlines_visible(
             0,
             source.drawable_object_id,
-            ChartAxis::Category,
+            Axis::Category,
             false,
         )
         .unwrap();
@@ -1270,24 +1248,24 @@ fn scratch_presentation_supports_native_chart_axis_major_gridline_visibility_cru
         .set_slide_chart_axis_major_gridlines_visible(
             0,
             source.drawable_object_id,
-            ChartAxis::Value,
+            Axis::Value,
             true,
         )
         .unwrap();
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert_eq!(
             reopened
                 .slide_chart_axis_major_gridlines_visible(0, source.drawable_object_id, axis)
                 .unwrap(),
-            axis == ChartAxis::Value
+            axis == Axis::Value
         );
         assert_eq!(
             reopened
                 .slide_chart_axis_major_gridlines_visible(0, duplicate.drawable_object_id, axis)
                 .unwrap(),
-            axis == ChartAxis::Category
+            axis == Axis::Category
         );
     }
     reopened
@@ -1302,7 +1280,7 @@ fn scratch_presentation_supports_native_chart_axis_minor_gridline_visibility_cru
         .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             !editor
                 .slide_chart_axis_minor_gridlines_visible(0, source.drawable_object_id, axis)
@@ -1314,13 +1292,13 @@ fn scratch_presentation_supports_native_chart_axis_minor_gridline_visibility_cru
         .set_slide_chart_axis_minor_gridlines_visible(
             0,
             source.drawable_object_id,
-            ChartAxis::Category,
+            Axis::Category,
             false,
         )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         editor
             .set_slide_chart_axis_minor_gridlines_visible(0, source.drawable_object_id, axis, true)
             .unwrap();
@@ -1328,7 +1306,7 @@ fn scratch_presentation_supports_native_chart_axis_minor_gridline_visibility_cru
     let duplicate = editor
         .duplicate_slide_chart(0, source.drawable_object_id)
         .unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             editor
                 .slide_chart_axis_minor_gridlines_visible(0, duplicate.drawable_object_id, axis)
@@ -1340,7 +1318,7 @@ fn scratch_presentation_supports_native_chart_axis_minor_gridline_visibility_cru
     }
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             !reopened
                 .slide_chart_axis_minor_gridlines_visible(0, source.drawable_object_id, axis)
@@ -1364,7 +1342,7 @@ fn scratch_presentation_supports_native_chart_axis_minor_tick_mark_visibility_cr
         .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             editor
                 .slide_chart_axis_minor_tick_marks_visible(0, source.drawable_object_id, axis)
@@ -1376,13 +1354,13 @@ fn scratch_presentation_supports_native_chart_axis_minor_tick_mark_visibility_cr
         .set_slide_chart_axis_minor_tick_marks_visible(
             0,
             source.drawable_object_id,
-            ChartAxis::Category,
+            Axis::Category,
             true,
         )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         editor
             .set_slide_chart_axis_minor_tick_marks_visible(
                 0,
@@ -1401,7 +1379,7 @@ fn scratch_presentation_supports_native_chart_axis_minor_tick_mark_visibility_cr
     let duplicate = editor
         .duplicate_slide_chart(0, source.drawable_object_id)
         .unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             !editor
                 .slide_chart_axis_minor_tick_marks_visible(0, duplicate.drawable_object_id, axis)
@@ -1413,7 +1391,7 @@ fn scratch_presentation_supports_native_chart_axis_minor_tick_mark_visibility_cr
     }
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             reopened
                 .slide_chart_axis_minor_tick_marks_visible(0, source.drawable_object_id, axis)
@@ -1450,12 +1428,12 @@ fn scratch_presentation_supports_native_chart_axis_tick_mark_location_crud() {
         .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert_eq!(
             editor
                 .slide_chart_axis_tick_mark_location(0, source.drawable_object_id, axis)
                 .unwrap(),
-            ChartAxisTickMarkLocation::Centered
+            TickMarkLocation::Centered
         );
     }
     let baseline = editor.to_bytes().unwrap();
@@ -1463,8 +1441,8 @@ fn scratch_presentation_supports_native_chart_axis_tick_mark_location_crud() {
         .set_slide_chart_axis_tick_mark_location(
             0,
             source.drawable_object_id,
-            ChartAxis::Category,
-            ChartAxisTickMarkLocation::Centered,
+            Axis::Category,
+            TickMarkLocation::Centered,
         )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -1473,29 +1451,29 @@ fn scratch_presentation_supports_native_chart_axis_tick_mark_location_crud() {
         .set_slide_chart_axis_tick_mark_location(
             0,
             source.drawable_object_id,
-            ChartAxis::Category,
-            ChartAxisTickMarkLocation::None,
+            Axis::Category,
+            TickMarkLocation::None,
         )
         .unwrap();
     editor
         .set_slide_chart_axis_tick_mark_location(
             0,
             source.drawable_object_id,
-            ChartAxis::Value,
-            ChartAxisTickMarkLocation::Outside,
+            Axis::Value,
+            TickMarkLocation::Outside,
         )
         .unwrap();
     assert_eq!(
         editor
-            .slide_chart_axis_tick_mark_location(0, source.drawable_object_id, ChartAxis::Category)
+            .slide_chart_axis_tick_mark_location(0, source.drawable_object_id, Axis::Category)
             .unwrap(),
-        ChartAxisTickMarkLocation::None
+        TickMarkLocation::None
     );
     assert_eq!(
         editor
-            .slide_chart_axis_tick_mark_location(0, source.drawable_object_id, ChartAxis::Value)
+            .slide_chart_axis_tick_mark_location(0, source.drawable_object_id, Axis::Value)
             .unwrap(),
-        ChartAxisTickMarkLocation::Outside
+        TickMarkLocation::Outside
     );
 
     let duplicate = editor
@@ -1503,66 +1481,58 @@ fn scratch_presentation_supports_native_chart_axis_tick_mark_location_crud() {
         .unwrap();
     assert_eq!(
         editor
-            .slide_chart_axis_tick_mark_location(
-                0,
-                duplicate.drawable_object_id,
-                ChartAxis::Category,
-            )
+            .slide_chart_axis_tick_mark_location(0, duplicate.drawable_object_id, Axis::Category,)
             .unwrap(),
-        ChartAxisTickMarkLocation::None
+        TickMarkLocation::None
     );
     assert_eq!(
         editor
-            .slide_chart_axis_tick_mark_location(0, duplicate.drawable_object_id, ChartAxis::Value)
+            .slide_chart_axis_tick_mark_location(0, duplicate.drawable_object_id, Axis::Value)
             .unwrap(),
-        ChartAxisTickMarkLocation::Outside
+        TickMarkLocation::Outside
     );
 
     editor
         .set_slide_chart_axis_tick_mark_location(
             0,
             source.drawable_object_id,
-            ChartAxis::Category,
-            ChartAxisTickMarkLocation::Inside,
+            Axis::Category,
+            TickMarkLocation::Inside,
         )
         .unwrap();
     editor
         .set_slide_chart_axis_tick_mark_location(
             0,
             source.drawable_object_id,
-            ChartAxis::Value,
-            ChartAxisTickMarkLocation::Centered,
+            Axis::Value,
+            TickMarkLocation::Centered,
         )
         .unwrap();
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
-            .slide_chart_axis_tick_mark_location(0, source.drawable_object_id, ChartAxis::Category)
+            .slide_chart_axis_tick_mark_location(0, source.drawable_object_id, Axis::Category)
             .unwrap(),
-        ChartAxisTickMarkLocation::Inside
+        TickMarkLocation::Inside
     );
     assert_eq!(
         reopened
-            .slide_chart_axis_tick_mark_location(0, source.drawable_object_id, ChartAxis::Value)
+            .slide_chart_axis_tick_mark_location(0, source.drawable_object_id, Axis::Value)
             .unwrap(),
-        ChartAxisTickMarkLocation::Centered
+        TickMarkLocation::Centered
     );
     assert_eq!(
         reopened
-            .slide_chart_axis_tick_mark_location(
-                0,
-                duplicate.drawable_object_id,
-                ChartAxis::Category,
-            )
+            .slide_chart_axis_tick_mark_location(0, duplicate.drawable_object_id, Axis::Category,)
             .unwrap(),
-        ChartAxisTickMarkLocation::None
+        TickMarkLocation::None
     );
     assert_eq!(
         reopened
-            .slide_chart_axis_tick_mark_location(0, duplicate.drawable_object_id, ChartAxis::Value)
+            .slide_chart_axis_tick_mark_location(0, duplicate.drawable_object_id, Axis::Value)
             .unwrap(),
-        ChartAxisTickMarkLocation::Outside
+        TickMarkLocation::Outside
     );
     reopened
         .remove_slide_chart(0, duplicate.drawable_object_id)

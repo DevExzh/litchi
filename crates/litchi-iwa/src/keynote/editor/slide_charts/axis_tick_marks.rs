@@ -7,7 +7,7 @@ use crate::charts::axis_style::{
     set_chart_axis_minor_tick_marks_visible as set_native_chart_axis_minor_tick_marks_visible,
     set_chart_axis_tick_mark_location as set_native_chart_axis_tick_mark_location,
 };
-use crate::charts::{ChartAxis, ChartAxisTickMarkLocation};
+use crate::charts::{Axis, TickMarkLocation};
 
 impl KeynoteEditor {
     /// Read whether Keynote shows minor tick marks for one native slide-chart axis.
@@ -15,7 +15,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
     ) -> Result<bool> {
         slide_chart_axis_minor_tick_marks_visible(self, slide_index, drawable_object_id, axis)
     }
@@ -25,7 +25,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
         visible: bool,
     ) -> Result<()> {
         set_slide_chart_axis_minor_tick_marks_visible(
@@ -42,8 +42,8 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        axis: ChartAxis,
-    ) -> Result<ChartAxisTickMarkLocation> {
+        axis: Axis,
+    ) -> Result<TickMarkLocation> {
         slide_chart_axis_tick_mark_location(self, slide_index, drawable_object_id, axis)
     }
 
@@ -52,8 +52,8 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        axis: ChartAxis,
-        location: ChartAxisTickMarkLocation,
+        axis: Axis,
+        location: TickMarkLocation,
     ) -> Result<()> {
         set_slide_chart_axis_tick_mark_location(
             self,
@@ -69,7 +69,7 @@ fn slide_chart_axis_minor_tick_marks_visible(
     editor: &KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<bool> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     read_native_chart_axis_minor_tick_marks_visible(
@@ -85,7 +85,7 @@ fn set_slide_chart_axis_minor_tick_marks_visible(
     editor: &mut KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
     visible: bool,
 ) -> Result<()> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
@@ -114,8 +114,8 @@ fn slide_chart_axis_tick_mark_location(
     editor: &KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    axis: ChartAxis,
-) -> Result<ChartAxisTickMarkLocation> {
+    axis: Axis,
+) -> Result<TickMarkLocation> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     read_native_chart_axis_tick_mark_location(
         editor.package(),
@@ -130,8 +130,8 @@ fn set_slide_chart_axis_tick_mark_location(
     editor: &mut KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    axis: ChartAxis,
-    location: ChartAxisTickMarkLocation,
+    axis: Axis,
+    location: TickMarkLocation,
 ) -> Result<()> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let mut staged = editor.package().clone();

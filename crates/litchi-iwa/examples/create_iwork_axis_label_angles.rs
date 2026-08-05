@@ -3,7 +3,7 @@
 use std::env;
 use std::path::Path;
 
-use litchi_iwa::charts::{ChartAxis, ChartAxisLabelAngle, ChartData, ChartKind};
+use litchi_iwa::charts::{Axis, ChartAxisLabelAngle, ChartData, ChartKind};
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::pages::PagesDocumentBuilder;
@@ -127,10 +127,10 @@ fn set_keynote_angles(
     Ok(())
 }
 
-fn angles() -> [(ChartAxis, ChartAxisLabelAngle); 2] {
+fn angles() -> [(Axis, ChartAxisLabelAngle); 2] {
     [
-        (ChartAxis::Category, ChartAxisLabelAngle::LEFT_DIAGONAL),
-        (ChartAxis::Value, ChartAxisLabelAngle::RIGHT_DIAGONAL),
+        (Axis::Category, ChartAxisLabelAngle::LEFT_DIAGONAL),
+        (Axis::Value, ChartAxisLabelAngle::RIGHT_DIAGONAL),
     ]
 }
 

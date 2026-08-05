@@ -3,7 +3,7 @@
 use std::env;
 use std::path::Path;
 
-use litchi_iwa::charts::{ChartAxis, ChartData, ChartKind, ChartLabelAffixes};
+use litchi_iwa::charts::{Axis, ChartData, ChartKind, ChartLabelAffixes};
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::pages::PagesDocumentBuilder;
@@ -36,25 +36,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     numbers.set_sheet_chart_title(sheet_id, chart.drawable_object_id, "Axis label affixes")?;
     assert_eq!(
-        numbers.sheet_chart_axis_label_affixes(
-            sheet_id,
-            chart.drawable_object_id,
-            ChartAxis::Value,
-        )?,
+        numbers.sheet_chart_axis_label_affixes(sheet_id, chart.drawable_object_id, Axis::Value,)?,
         ChartLabelAffixes::default()
     );
     numbers.set_sheet_chart_axis_label_affixes(
         sheet_id,
         chart.drawable_object_id,
-        ChartAxis::Value,
+        Axis::Value,
         affixes(),
     )?;
     assert_eq!(
-        numbers.sheet_chart_axis_label_affixes(
-            sheet_id,
-            chart.drawable_object_id,
-            ChartAxis::Value,
-        )?,
+        numbers.sheet_chart_axis_label_affixes(sheet_id, chart.drawable_object_id, Axis::Value,)?,
         affixes()
     );
     numbers.save(output.join("axis-label-affixes-crate.numbers"))?;
@@ -73,16 +65,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     pages.set_body_chart_title(chart.drawable_object_id, "Axis label affixes")?;
     assert_eq!(
-        pages.body_chart_axis_label_affixes(chart.drawable_object_id, ChartAxis::Value)?,
+        pages.body_chart_axis_label_affixes(chart.drawable_object_id, Axis::Value)?,
         ChartLabelAffixes::default()
     );
-    pages.set_body_chart_axis_label_affixes(
-        chart.drawable_object_id,
-        ChartAxis::Value,
-        affixes(),
-    )?;
+    pages.set_body_chart_axis_label_affixes(chart.drawable_object_id, Axis::Value, affixes())?;
     assert_eq!(
-        pages.body_chart_axis_label_affixes(chart.drawable_object_id, ChartAxis::Value)?,
+        pages.body_chart_axis_label_affixes(chart.drawable_object_id, Axis::Value)?,
         affixes()
     );
     pages.save(output.join("axis-label-affixes-crate.pages"))?;
@@ -102,17 +90,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     keynote.set_slide_chart_title(0, chart.drawable_object_id, "Axis label affixes")?;
     assert_eq!(
-        keynote.slide_chart_axis_label_affixes(0, chart.drawable_object_id, ChartAxis::Value)?,
+        keynote.slide_chart_axis_label_affixes(0, chart.drawable_object_id, Axis::Value)?,
         ChartLabelAffixes::default()
     );
     keynote.set_slide_chart_axis_label_affixes(
         0,
         chart.drawable_object_id,
-        ChartAxis::Value,
+        Axis::Value,
         affixes(),
     )?;
     assert_eq!(
-        keynote.slide_chart_axis_label_affixes(0, chart.drawable_object_id, ChartAxis::Value)?,
+        keynote.slide_chart_axis_label_affixes(0, chart.drawable_object_id, Axis::Value)?,
         affixes()
     );
     keynote.save(output.join("axis-label-affixes-crate.key"))?;

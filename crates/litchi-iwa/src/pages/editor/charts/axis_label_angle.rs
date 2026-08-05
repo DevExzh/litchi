@@ -5,14 +5,14 @@ use crate::charts::axis_label_angle::{
     chart_axis_label_angle as read_native_axis_label_angle,
     set_chart_axis_label_angle as set_native_axis_label_angle,
 };
-use crate::charts::{ChartAxis, ChartAxisLabelAngle};
+use crate::charts::{Axis, ChartAxisLabelAngle};
 
 impl PagesEditor {
     /// Read one body-chart axis' normalized label angle.
     pub fn body_chart_axis_label_angle(
         &self,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
     ) -> Result<ChartAxisLabelAngle> {
         body_chart_axis_label_angle(self, drawable_object_id, axis)
     }
@@ -21,7 +21,7 @@ impl PagesEditor {
     pub fn set_body_chart_axis_label_angle(
         &mut self,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
         angle: ChartAxisLabelAngle,
     ) -> Result<()> {
         set_body_chart_axis_label_angle(self, drawable_object_id, axis, angle)
@@ -31,7 +31,7 @@ impl PagesEditor {
 fn body_chart_axis_label_angle(
     editor: &PagesEditor,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<ChartAxisLabelAngle> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_axis_label_angle(
@@ -46,7 +46,7 @@ fn body_chart_axis_label_angle(
 fn set_body_chart_axis_label_angle(
     editor: &mut PagesEditor,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
     angle: ChartAxisLabelAngle,
 ) -> Result<()> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
@@ -95,25 +95,25 @@ mod tests {
         let baseline = editor.to_bytes().unwrap();
         assert_eq!(
             editor
-                .body_chart_axis_label_angle(chart.drawable_object_id, ChartAxis::Value)
+                .body_chart_axis_label_angle(chart.drawable_object_id, Axis::Value)
                 .unwrap(),
             ChartAxisLabelAngle::HORIZONTAL
         );
         let expected = ChartAxisLabelAngle::new(12.5).unwrap();
         editor
-            .set_body_chart_axis_label_angle(chart.drawable_object_id, ChartAxis::Value, expected)
+            .set_body_chart_axis_label_angle(chart.drawable_object_id, Axis::Value, expected)
             .unwrap();
         let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
-                .body_chart_axis_label_angle(chart.drawable_object_id, ChartAxis::Value)
+                .body_chart_axis_label_angle(chart.drawable_object_id, Axis::Value)
                 .unwrap(),
             expected
         );
         reopened
             .set_body_chart_axis_label_angle(
                 chart.drawable_object_id,
-                ChartAxis::Value,
+                Axis::Value,
                 ChartAxisLabelAngle::HORIZONTAL,
             )
             .unwrap();

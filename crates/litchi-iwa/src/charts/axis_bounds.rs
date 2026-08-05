@@ -7,7 +7,7 @@
 
 use prost::Message;
 
-use crate::charts::ChartAxis;
+use crate::charts::Axis;
 use crate::charts::axis::{
     GENERATED_CHART_AXIS_NON_STYLE_EXTENSION_FIELD, axis_non_style_slot,
     generated_axis_non_style_extension,
@@ -116,7 +116,7 @@ pub(crate) fn chart_value_axis_bounds(
         chart_archive_name,
         drawable_object_id,
         drawable_label,
-        ChartAxis::Value,
+        Axis::Value,
     )?
     .read(package, read_value_axis_bounds)
 }
@@ -134,7 +134,7 @@ pub(crate) fn set_chart_value_axis_bounds(
         chart_archive_name,
         drawable_object_id,
         drawable_label,
-        ChartAxis::Value,
+        Axis::Value,
     )?;
     if slot.read(package, read_value_axis_bounds)? == bounds {
         return Ok(());

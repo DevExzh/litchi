@@ -11,7 +11,7 @@ use crate::charts::axis_style::{
     set_chart_axis_major_gridlines_visible as set_native_chart_axis_major_gridlines_visible,
     set_chart_axis_minor_gridlines_visible as set_native_chart_axis_minor_gridlines_visible,
 };
-use crate::charts::{ChartAxis, ChartAxisGridline, ChartAxisGridlineStroke};
+use crate::charts::{Axis, ChartAxisGridline, ChartAxisGridlineStroke};
 
 impl NumbersEditor {
     /// Read whether Numbers shows major gridlines for one native sheet-chart axis.
@@ -19,7 +19,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
     ) -> Result<bool> {
         sheet_chart_axis_major_gridlines_visible(self, sheet_id, drawable_object_id, axis)
     }
@@ -29,7 +29,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
         visible: bool,
     ) -> Result<()> {
         set_sheet_chart_axis_major_gridlines_visible(
@@ -46,7 +46,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
     ) -> Result<bool> {
         sheet_chart_axis_minor_gridlines_visible(self, sheet_id, drawable_object_id, axis)
     }
@@ -56,7 +56,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
         visible: bool,
     ) -> Result<()> {
         set_sheet_chart_axis_minor_gridlines_visible(
@@ -73,7 +73,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
         gridline: ChartAxisGridline,
     ) -> Result<ChartAxisGridlineStroke> {
         let graph = chart_graph(self, sheet_id, drawable_object_id)?;
@@ -92,7 +92,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
         gridline: ChartAxisGridline,
         stroke: ChartAxisGridlineStroke,
     ) -> Result<()> {
@@ -128,7 +128,7 @@ fn sheet_chart_axis_major_gridlines_visible(
     editor: &NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<bool> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     read_native_chart_axis_major_gridlines_visible(
@@ -144,7 +144,7 @@ fn set_sheet_chart_axis_major_gridlines_visible(
     editor: &mut NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
     visible: bool,
 ) -> Result<()> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
@@ -173,7 +173,7 @@ fn sheet_chart_axis_minor_gridlines_visible(
     editor: &NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<bool> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     read_native_chart_axis_minor_gridlines_visible(
@@ -189,7 +189,7 @@ fn set_sheet_chart_axis_minor_gridlines_visible(
     editor: &mut NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
     visible: bool,
 ) -> Result<()> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
@@ -247,7 +247,7 @@ mod tests {
             .set_sheet_chart_axis_gridline_stroke(
                 sheet_id,
                 chart.drawable_object_id,
-                ChartAxis::Value,
+                Axis::Value,
                 ChartAxisGridline::Major,
                 stroke,
             )
@@ -257,7 +257,7 @@ mod tests {
                 .sheet_chart_axis_gridline_stroke(
                     sheet_id,
                     chart.drawable_object_id,
-                    ChartAxis::Value,
+                    Axis::Value,
                     ChartAxisGridline::Major,
                 )
                 .unwrap(),
@@ -268,7 +268,7 @@ mod tests {
                 .sheet_chart_axis_major_gridlines_visible(
                     sheet_id,
                     chart.drawable_object_id,
-                    ChartAxis::Value,
+                    Axis::Value,
                 )
                 .unwrap()
         );
@@ -276,7 +276,7 @@ mod tests {
             .set_sheet_chart_axis_gridline_stroke(
                 sheet_id,
                 chart.drawable_object_id,
-                ChartAxis::Value,
+                Axis::Value,
                 ChartAxisGridline::Major,
                 ChartAxisGridlineStroke::Inherited,
             )

@@ -5,14 +5,14 @@ use crate::charts::axis_label_affixes::{
     chart_axis_label_affixes as read_native_axis_label_affixes,
     set_chart_axis_label_affixes as set_native_axis_label_affixes,
 };
-use crate::charts::{ChartAxis, ChartLabelAffixes};
+use crate::charts::{Axis, ChartLabelAffixes};
 
 impl PagesEditor {
     /// Read the prefix and suffix applied to one body-chart axis' labels.
     pub fn body_chart_axis_label_affixes(
         &self,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
     ) -> Result<ChartLabelAffixes> {
         body_chart_axis_label_affixes(self, drawable_object_id, axis)
     }
@@ -21,7 +21,7 @@ impl PagesEditor {
     pub fn set_body_chart_axis_label_affixes(
         &mut self,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
         affixes: ChartLabelAffixes,
     ) -> Result<()> {
         set_body_chart_axis_label_affixes(self, drawable_object_id, axis, affixes)
@@ -31,7 +31,7 @@ impl PagesEditor {
 fn body_chart_axis_label_affixes(
     editor: &PagesEditor,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<ChartLabelAffixes> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_axis_label_affixes(
@@ -46,7 +46,7 @@ fn body_chart_axis_label_affixes(
 fn set_body_chart_axis_label_affixes(
     editor: &mut PagesEditor,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
     affixes: ChartLabelAffixes,
 ) -> Result<()> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
@@ -95,7 +95,7 @@ mod tests {
         let expected = ChartLabelAffixes::new("USD ", " net");
         assert_eq!(
             editor
-                .body_chart_axis_label_affixes(chart.drawable_object_id, ChartAxis::Value)
+                .body_chart_axis_label_affixes(chart.drawable_object_id, Axis::Value)
                 .unwrap(),
             ChartLabelAffixes::default()
         );
@@ -103,27 +103,27 @@ mod tests {
         editor
             .set_body_chart_axis_label_affixes(
                 chart.drawable_object_id,
-                ChartAxis::Value,
+                Axis::Value,
                 expected.clone(),
             )
             .unwrap();
         let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
-                .body_chart_axis_label_affixes(chart.drawable_object_id, ChartAxis::Value)
+                .body_chart_axis_label_affixes(chart.drawable_object_id, Axis::Value)
                 .unwrap(),
             expected
         );
         reopened
             .set_body_chart_axis_label_affixes(
                 chart.drawable_object_id,
-                ChartAxis::Value,
+                Axis::Value,
                 ChartLabelAffixes::default(),
             )
             .unwrap();
         assert_eq!(
             reopened
-                .body_chart_axis_label_affixes(chart.drawable_object_id, ChartAxis::Value)
+                .body_chart_axis_label_affixes(chart.drawable_object_id, Axis::Value)
                 .unwrap(),
             ChartLabelAffixes::default()
         );

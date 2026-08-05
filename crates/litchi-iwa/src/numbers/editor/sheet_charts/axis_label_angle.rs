@@ -5,7 +5,7 @@ use crate::charts::axis_label_angle::{
     chart_axis_label_angle as read_native_axis_label_angle,
     set_chart_axis_label_angle as set_native_axis_label_angle,
 };
-use crate::charts::{ChartAxis, ChartAxisLabelAngle};
+use crate::charts::{Axis, ChartAxisLabelAngle};
 
 impl NumbersEditor {
     /// Read one sheet-chart axis' normalized label angle.
@@ -13,7 +13,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
     ) -> Result<ChartAxisLabelAngle> {
         sheet_chart_axis_label_angle(self, sheet_id, drawable_object_id, axis)
     }
@@ -23,7 +23,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
         angle: ChartAxisLabelAngle,
     ) -> Result<()> {
         set_sheet_chart_axis_label_angle(self, sheet_id, drawable_object_id, axis, angle)
@@ -34,7 +34,7 @@ fn sheet_chart_axis_label_angle(
     editor: &NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<ChartAxisLabelAngle> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     read_native_axis_label_angle(
@@ -50,7 +50,7 @@ fn set_sheet_chart_axis_label_angle(
     editor: &mut NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
     angle: ChartAxisLabelAngle,
 ) -> Result<()> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
@@ -99,7 +99,7 @@ mod tests {
         let baseline = editor.to_bytes().unwrap();
         assert_eq!(
             editor
-                .sheet_chart_axis_label_angle(sheet_id, chart.drawable_object_id, ChartAxis::Value,)
+                .sheet_chart_axis_label_angle(sheet_id, chart.drawable_object_id, Axis::Value,)
                 .unwrap(),
             ChartAxisLabelAngle::HORIZONTAL
         );
@@ -108,14 +108,14 @@ mod tests {
             .set_sheet_chart_axis_label_angle(
                 sheet_id,
                 chart.drawable_object_id,
-                ChartAxis::Value,
+                Axis::Value,
                 expected,
             )
             .unwrap();
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
-                .sheet_chart_axis_label_angle(sheet_id, chart.drawable_object_id, ChartAxis::Value,)
+                .sheet_chart_axis_label_angle(sheet_id, chart.drawable_object_id, Axis::Value,)
                 .unwrap(),
             expected
         );
@@ -123,7 +123,7 @@ mod tests {
             .set_sheet_chart_axis_label_angle(
                 sheet_id,
                 chart.drawable_object_id,
-                ChartAxis::Value,
+                Axis::Value,
                 ChartAxisLabelAngle::HORIZONTAL,
             )
             .unwrap();

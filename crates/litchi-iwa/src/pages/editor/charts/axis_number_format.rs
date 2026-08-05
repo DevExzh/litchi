@@ -5,14 +5,14 @@ use crate::charts::axis_number_format::{
     chart_axis_number_format as read_native_chart_axis_number_format,
     set_chart_axis_number_format as set_native_chart_axis_number_format,
 };
-use crate::charts::{ChartAxis, ChartNumberFormat};
+use crate::charts::{Axis, ChartNumberFormat};
 
 impl PagesEditor {
     /// Read the decimal-number format of one native body-chart axis.
     pub fn body_chart_axis_number_format(
         &self,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
     ) -> Result<ChartNumberFormat> {
         body_chart_axis_number_format(self, drawable_object_id, axis)
     }
@@ -21,7 +21,7 @@ impl PagesEditor {
     pub fn set_body_chart_axis_number_format(
         &mut self,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
         format: ChartNumberFormat,
     ) -> Result<()> {
         set_body_chart_axis_number_format(self, drawable_object_id, axis, format)
@@ -31,7 +31,7 @@ impl PagesEditor {
 fn body_chart_axis_number_format(
     editor: &PagesEditor,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<ChartNumberFormat> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_chart_axis_number_format(
@@ -46,7 +46,7 @@ fn body_chart_axis_number_format(
 fn set_body_chart_axis_number_format(
     editor: &mut PagesEditor,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
     format: ChartNumberFormat,
 ) -> Result<()> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
@@ -99,25 +99,25 @@ mod tests {
         );
         assert_eq!(
             editor
-                .body_chart_axis_number_format(chart.drawable_object_id, ChartAxis::Value)
+                .body_chart_axis_number_format(chart.drawable_object_id, Axis::Value)
                 .unwrap(),
             ChartNumberFormat::AXIS_NATIVE_DEFAULT
         );
         let baseline = editor.to_bytes().unwrap();
         editor
-            .set_body_chart_axis_number_format(chart.drawable_object_id, ChartAxis::Value, expected)
+            .set_body_chart_axis_number_format(chart.drawable_object_id, Axis::Value, expected)
             .unwrap();
         let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
-                .body_chart_axis_number_format(chart.drawable_object_id, ChartAxis::Value)
+                .body_chart_axis_number_format(chart.drawable_object_id, Axis::Value)
                 .unwrap(),
             expected
         );
         reopened
             .set_body_chart_axis_number_format(
                 chart.drawable_object_id,
-                ChartAxis::Value,
+                Axis::Value,
                 ChartNumberFormat::AXIS_NATIVE_DEFAULT,
             )
             .unwrap();

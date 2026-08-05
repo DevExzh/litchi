@@ -6,61 +6,16 @@
 //! axis-style object, preserves both protobuf layers losslessly, and changes
 //! only the requested style switch.
 
+use litchi_iwa_common::chart::axis::{Axis, TickMarkLocation};
 use prost::Message;
 
 use crate::archive::RawMessage;
-use crate::charts::ChartAxis;
 use crate::charts::IWorkChartArchive;
 use crate::charts::source::{AXIS_STYLE_MESSAGE_TYPE, CHART_MESSAGE_TYPE};
 use crate::charts::unique_chart_object_archive_name;
 use crate::protobuf::tsch;
 use crate::wire::{parse_wire_fields, patch_length_delimited_field, patch_varint_field};
 use crate::{Error, IWorkPackage, Result};
-
-/// Where iWork draws the major tick marks for one chart axis.
-///
-/// The known values correspond to the Tick Marks pop-up in Pages, Numbers,
-/// and Keynote. `Unsupported` preserves a future native integer without
-/// collapsing it into a different location.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-#[non_exhaustive]
-pub enum ChartAxisTickMarkLocation {
-    /// Draw no major tick marks.
-    None,
-    /// Draw tick marks toward the chart's plot area.
-    Inside,
-    /// Draw tick marks centered on the axis line.
-    #[default]
-    Centered,
-    /// Draw tick marks away from the chart's plot area.
-    Outside,
-    /// Preserve an unrecognized native iWork value.
-    Unsupported(i32),
-}
-
-impl ChartAxisTickMarkLocation {
-    /// Decode the integer stored by the iWork protobuf schema.
-    pub const fn from_raw(value: i32) -> Self {
-        match value {
-            0 => Self::None,
-            1 => Self::Inside,
-            2 => Self::Centered,
-            3 => Self::Outside,
-            value => Self::Unsupported(value),
-        }
-    }
-
-    /// Return the integer used by the iWork protobuf schema.
-    pub const fn into_raw(self) -> i32 {
-        match self {
-            Self::None => 0,
-            Self::Inside => 1,
-            Self::Centered => 2,
-            Self::Outside => 3,
-            Self::Unsupported(value) => value,
-        }
-    }
-}
 
 /// Proto2 extension holding the generated chart-axis style properties.
 pub(crate) const GENERATED_CHART_AXIS_STYLE_EXTENSION_FIELD: u32 = 10_000;
@@ -107,8 +62,8 @@ enum AxisStyleSwitch {
 }
 
 impl AxisStyleSwitch {
-    fn validate_axis(self, axis: ChartAxis) -> Result<()> {
-        if matches!((self, axis), (Self::ValueMinimumLabel, ChartAxis::Category)) {
+    fn validate_axis(self, axis: Axis) -> Result<()> {
+        if matches!((self, axis), (Self::ValueMinimumLabel, Axis::Category)) {
             return Err(Error::InvalidFormat(
                 "chart minimum-value labels are only available on the value axis".to_owned(),
             ));
@@ -116,16 +71,16 @@ impl AxisStyleSwitch {
         Ok(())
     }
 
-    const fn field(self, axis: ChartAxis) -> u32 {
+    const fn field(self, axis: Axis) -> u32 {
         match (self, axis) {
-            (Self::Line, ChartAxis::Category) => CATEGORY_AXIS_LINE_VISIBLE_FIELD,
-            (Self::Line, ChartAxis::Value) => VALUE_AXIS_LINE_VISIBLE_FIELD,
-            (Self::MajorGridlines, ChartAxis::Category) => CATEGORY_MAJOR_GRIDLINES_VISIBLE_FIELD,
-            (Self::MajorGridlines, ChartAxis::Value) => VALUE_MAJOR_GRIDLINES_VISIBLE_FIELD,
-            (Self::MinorGridlines, ChartAxis::Category) => CATEGORY_MINOR_GRIDLINES_VISIBLE_FIELD,
-            (Self::MinorGridlines, ChartAxis::Value) => VALUE_MINOR_GRIDLINES_VISIBLE_FIELD,
-            (Self::MinorTickMarks, ChartAxis::Category) => CATEGORY_MINOR_TICK_MARKS_VISIBLE_FIELD,
-            (Self::MinorTickMarks, ChartAxis::Value) => VALUE_MINOR_TICK_MARKS_VISIBLE_FIELD,
+            (Self::Line, Axis::Category) => CATEGORY_AXIS_LINE_VISIBLE_FIELD,
+            (Self::Line, Axis::Value) => VALUE_AXIS_LINE_VISIBLE_FIELD,
+            (Self::MajorGridlines, Axis::Category) => CATEGORY_MAJOR_GRIDLINES_VISIBLE_FIELD,
+            (Self::MajorGridlines, Axis::Value) => VALUE_MAJOR_GRIDLINES_VISIBLE_FIELD,
+            (Self::MinorGridlines, Axis::Category) => CATEGORY_MINOR_GRIDLINES_VISIBLE_FIELD,
+            (Self::MinorGridlines, Axis::Value) => VALUE_MINOR_GRIDLINES_VISIBLE_FIELD,
+            (Self::MinorTickMarks, Axis::Category) => CATEGORY_MINOR_TICK_MARKS_VISIBLE_FIELD,
+            (Self::MinorTickMarks, Axis::Value) => VALUE_MINOR_TICK_MARKS_VISIBLE_FIELD,
             (Self::ValueMinimumLabel, _) => VALUE_AXIS_MINIMUM_LABEL_VISIBLE_FIELD,
         }
     }
@@ -151,29 +106,23 @@ impl AxisStyleSwitch {
     fn visible(
         self,
         generated: &tsch::generated::ChartAxisStyleArchive,
-        axis: ChartAxis,
+        axis: Axis,
     ) -> Option<bool> {
         match (self, axis) {
-            (Self::Line, ChartAxis::Category) => generated.tschchartaxiscategoryshowaxis,
-            (Self::Line, ChartAxis::Value) => generated.tschchartaxisvalueshowaxis,
-            (Self::MajorGridlines, ChartAxis::Category) => {
+            (Self::Line, Axis::Category) => generated.tschchartaxiscategoryshowaxis,
+            (Self::Line, Axis::Value) => generated.tschchartaxisvalueshowaxis,
+            (Self::MajorGridlines, Axis::Category) => {
                 generated.tschchartaxiscategoryshowmajorgridlines
             },
-            (Self::MajorGridlines, ChartAxis::Value) => {
-                generated.tschchartaxisvalueshowmajorgridlines
-            },
-            (Self::MinorGridlines, ChartAxis::Category) => {
+            (Self::MajorGridlines, Axis::Value) => generated.tschchartaxisvalueshowmajorgridlines,
+            (Self::MinorGridlines, Axis::Category) => {
                 generated.tschchartaxiscategoryshowminorgridlines
             },
-            (Self::MinorGridlines, ChartAxis::Value) => {
-                generated.tschchartaxisvalueshowminorgridlines
-            },
-            (Self::MinorTickMarks, ChartAxis::Category) => {
+            (Self::MinorGridlines, Axis::Value) => generated.tschchartaxisvalueshowminorgridlines,
+            (Self::MinorTickMarks, Axis::Category) => {
                 generated.tschchartaxiscategoryshowminortickmarks
             },
-            (Self::MinorTickMarks, ChartAxis::Value) => {
-                generated.tschchartaxisvalueshowminortickmarks
-            },
+            (Self::MinorTickMarks, Axis::Value) => generated.tschchartaxisvalueshowminortickmarks,
             (Self::ValueMinimumLabel, _) => generated.tschchartaxisvalueshowminimumlabel,
         }
     }
@@ -181,30 +130,28 @@ impl AxisStyleSwitch {
     fn set(
         self,
         generated: &mut tsch::generated::ChartAxisStyleArchive,
-        axis: ChartAxis,
+        axis: Axis,
         visible: bool,
     ) {
         match (self, axis) {
-            (Self::Line, ChartAxis::Category) => {
-                generated.tschchartaxiscategoryshowaxis = Some(visible)
-            },
-            (Self::Line, ChartAxis::Value) => generated.tschchartaxisvalueshowaxis = Some(visible),
-            (Self::MajorGridlines, ChartAxis::Category) => {
+            (Self::Line, Axis::Category) => generated.tschchartaxiscategoryshowaxis = Some(visible),
+            (Self::Line, Axis::Value) => generated.tschchartaxisvalueshowaxis = Some(visible),
+            (Self::MajorGridlines, Axis::Category) => {
                 generated.tschchartaxiscategoryshowmajorgridlines = Some(visible)
             },
-            (Self::MajorGridlines, ChartAxis::Value) => {
+            (Self::MajorGridlines, Axis::Value) => {
                 generated.tschchartaxisvalueshowmajorgridlines = Some(visible)
             },
-            (Self::MinorGridlines, ChartAxis::Category) => {
+            (Self::MinorGridlines, Axis::Category) => {
                 generated.tschchartaxiscategoryshowminorgridlines = Some(visible)
             },
-            (Self::MinorGridlines, ChartAxis::Value) => {
+            (Self::MinorGridlines, Axis::Value) => {
                 generated.tschchartaxisvalueshowminorgridlines = Some(visible)
             },
-            (Self::MinorTickMarks, ChartAxis::Category) => {
+            (Self::MinorTickMarks, Axis::Category) => {
                 generated.tschchartaxiscategoryshowminortickmarks = Some(visible)
             },
-            (Self::MinorTickMarks, ChartAxis::Value) => {
+            (Self::MinorTickMarks, Axis::Value) => {
                 generated.tschchartaxisvalueshowminortickmarks = Some(visible)
             },
             (Self::ValueMinimumLabel, _) => {
@@ -228,7 +175,7 @@ pub(crate) fn chart_axis_line_visible(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<bool> {
     chart_axis_style_switch_visible(
         package,
@@ -246,7 +193,7 @@ pub(crate) fn set_chart_axis_line_visible(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
+    axis: Axis,
     visible: bool,
 ) -> Result<()> {
     set_chart_axis_style_switch_visible(
@@ -266,7 +213,7 @@ pub(crate) fn chart_axis_major_gridlines_visible(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<bool> {
     chart_axis_style_switch_visible(
         package,
@@ -284,7 +231,7 @@ pub(crate) fn set_chart_axis_major_gridlines_visible(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
+    axis: Axis,
     visible: bool,
 ) -> Result<()> {
     set_chart_axis_style_switch_visible(
@@ -304,7 +251,7 @@ pub(crate) fn chart_axis_minor_gridlines_visible(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<bool> {
     chart_axis_style_switch_visible(
         package,
@@ -322,7 +269,7 @@ pub(crate) fn set_chart_axis_minor_gridlines_visible(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
+    axis: Axis,
     visible: bool,
 ) -> Result<()> {
     set_chart_axis_style_switch_visible(
@@ -342,7 +289,7 @@ pub(crate) fn chart_axis_minor_tick_marks_visible(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<bool> {
     chart_axis_style_switch_visible(
         package,
@@ -360,7 +307,7 @@ pub(crate) fn set_chart_axis_minor_tick_marks_visible(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
+    axis: Axis,
     visible: bool,
 ) -> Result<()> {
     set_chart_axis_style_switch_visible(
@@ -380,8 +327,8 @@ pub(crate) fn chart_axis_tick_mark_location(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
-) -> Result<ChartAxisTickMarkLocation> {
+    axis: Axis,
+) -> Result<TickMarkLocation> {
     axis_style_slot(
         package,
         chart_archive_name,
@@ -398,8 +345,8 @@ pub(crate) fn set_chart_axis_tick_mark_location(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
-    location: ChartAxisTickMarkLocation,
+    axis: Axis,
+    location: TickMarkLocation,
 ) -> Result<()> {
     let slot = axis_style_slot(
         package,
@@ -418,7 +365,7 @@ pub(crate) fn set_chart_axis_tick_mark_location(
     if slot.read(package, |data| read_axis_tick_mark_location(data, axis))? != location {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} chart {drawable_object_id} {}-axis tick-mark-location update failed validation",
-            axis.label(),
+            axis.as_str(),
         )));
     }
     Ok(())
@@ -436,7 +383,7 @@ pub(crate) fn chart_value_axis_minimum_label_visible(
         chart_archive_name,
         drawable_object_id,
         drawable_label,
-        ChartAxis::Value,
+        Axis::Value,
         AxisStyleSwitch::ValueMinimumLabel,
     )
 }
@@ -454,7 +401,7 @@ pub(crate) fn set_chart_value_axis_minimum_label_visible(
         chart_archive_name,
         drawable_object_id,
         drawable_label,
-        ChartAxis::Value,
+        Axis::Value,
         AxisStyleSwitch::ValueMinimumLabel,
         visible,
     )
@@ -465,7 +412,7 @@ fn chart_axis_style_switch_visible(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
+    axis: Axis,
     style_switch: AxisStyleSwitch,
 ) -> Result<bool> {
     style_switch.validate_axis(axis)?;
@@ -486,7 +433,7 @@ fn set_chart_axis_style_switch_visible(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
+    axis: Axis,
     style_switch: AxisStyleSwitch,
     visible: bool,
 ) -> Result<()> {
@@ -514,7 +461,7 @@ fn set_chart_axis_style_switch_visible(
     {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} chart {drawable_object_id} {}-axis {} update failed validation",
-            axis.label(),
+            axis.as_str(),
             style_switch.label()
         )));
     }
@@ -524,7 +471,7 @@ fn set_chart_axis_style_switch_visible(
 /// Decode a `TSCH.ChartAxisStyleArchive` and return one native style switch.
 fn read_axis_style_switch_visibility(
     data: &[u8],
-    axis: ChartAxis,
+    axis: Axis,
     style_switch: AxisStyleSwitch,
 ) -> Result<bool> {
     style_switch.validate_axis(axis)?;
@@ -538,30 +485,30 @@ fn read_axis_style_switch_visibility(
 }
 
 /// Decode the native major-tick-mark location for one chart axis.
-fn read_axis_tick_mark_location(data: &[u8], axis: ChartAxis) -> Result<ChartAxisTickMarkLocation> {
+fn read_axis_tick_mark_location(data: &[u8], axis: Axis) -> Result<TickMarkLocation> {
     let Some(extension) = generated_axis_style_extension(data)? else {
-        return Ok(ChartAxisTickMarkLocation::default());
+        return Ok(TickMarkLocation::default());
     };
     let generated = tsch::generated::ChartAxisStyleArchive::decode(extension)?;
     Ok(axis_tick_mark_location(&generated, axis)
-        .map(ChartAxisTickMarkLocation::from_raw)
+        .map(TickMarkLocation::from_native)
         .unwrap_or_default())
 }
 
-const fn tick_mark_location_field(axis: ChartAxis) -> u32 {
+const fn tick_mark_location_field(axis: Axis) -> u32 {
     match axis {
-        ChartAxis::Category => CATEGORY_TICK_MARK_LOCATION_FIELD,
-        ChartAxis::Value => VALUE_TICK_MARK_LOCATION_FIELD,
+        Axis::Category => CATEGORY_TICK_MARK_LOCATION_FIELD,
+        Axis::Value => VALUE_TICK_MARK_LOCATION_FIELD,
     }
 }
 
 fn axis_tick_mark_location(
     generated: &tsch::generated::ChartAxisStyleArchive,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Option<i32> {
     match axis {
-        ChartAxis::Category => generated.tschchartaxiscategorytickmarklocation,
-        ChartAxis::Value => generated.tschchartaxisvaluetickmarklocation,
+        Axis::Category => generated.tschchartaxiscategorytickmarklocation,
+        Axis::Value => generated.tschchartaxisvaluetickmarklocation,
     }
 }
 
@@ -570,7 +517,7 @@ pub(crate) fn axis_style_slot(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<AxisStyleSlot> {
     let chart_archive = package.archive(chart_archive_name)?;
     let chart_object = chart_archive.object(drawable_object_id).ok_or_else(|| {
@@ -598,19 +545,20 @@ pub(crate) fn axis_style_slot(
             "{drawable_label} chart {drawable_object_id} has no chart payload"
         ))
     })?;
-    let style_id = axis.primary_style_identifier(payload).ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "{drawable_label} chart {drawable_object_id} has no primary {}-axis style",
-            axis.label()
-        ))
-    })?;
+    let style_id =
+        crate::charts::axis::primary_style_identifier(axis, payload).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "{drawable_label} chart {drawable_object_id} has no primary {}-axis style",
+                axis.as_str()
+            ))
+        })?;
     let archive_name =
         unique_chart_object_archive_name(package, style_id, "chart axis-style object")?;
     let archive = package.archive(&archive_name)?;
     let style_object = archive.object(style_id).ok_or_else(|| {
         Error::InvalidFormat(format!(
             "{drawable_label} chart {}-axis style {style_id} is missing",
-            axis.label()
+            axis.as_str()
         ))
     })?;
     let mut messages = style_object
@@ -621,13 +569,13 @@ pub(crate) fn axis_style_slot(
     let Some((message_index, _)) = messages.next() else {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} chart {}-axis style {style_id} must have exactly one axis-style payload",
-            axis.label()
+            axis.as_str()
         )));
     };
     if messages.next().is_some() {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} chart {}-axis style {style_id} must have exactly one axis-style payload",
-            axis.label()
+            axis.as_str()
         )));
     }
     Ok(AxisStyleSlot {
@@ -742,7 +690,7 @@ impl AxisStyleSlot {
 
 fn patch_axis_style_switch_visibility(
     data: &[u8],
-    axis: ChartAxis,
+    axis: Axis,
     style_switch: AxisStyleSwitch,
     visible: bool,
 ) -> Result<Vec<u8>> {
@@ -781,17 +729,17 @@ fn patch_axis_style_switch_visibility(
 
 fn patch_axis_tick_mark_location(
     data: &[u8],
-    axis: ChartAxis,
-    location: ChartAxisTickMarkLocation,
+    axis: Axis,
+    location: TickMarkLocation,
 ) -> Result<Vec<u8>> {
     let Some(extension) = generated_axis_style_extension(data)? else {
         let mut generated = tsch::generated::ChartAxisStyleArchive::default();
         match axis {
-            ChartAxis::Category => {
-                generated.tschchartaxiscategorytickmarklocation = Some(location.into_raw())
+            Axis::Category => {
+                generated.tschchartaxiscategorytickmarklocation = Some(location.native_value())
             },
-            ChartAxis::Value => {
-                generated.tschchartaxisvaluetickmarklocation = Some(location.into_raw())
+            Axis::Value => {
+                generated.tschchartaxisvaluetickmarklocation = Some(location.native_value())
             },
         }
         let encoded = generated.encode_to_vec();
@@ -811,7 +759,7 @@ fn patch_axis_tick_mark_location(
         extension,
         tick_mark_location_field(axis),
         location_present,
-        Some(location.into_raw() as u64),
+        Some(location.native_value() as u64),
     )?;
     let patched = patch_length_delimited_field(
         data,
@@ -825,14 +773,14 @@ fn patch_axis_tick_mark_location(
 
 fn validate_patched_axis_style_switch(
     data: &[u8],
-    axis: ChartAxis,
+    axis: Axis,
     style_switch: AxisStyleSwitch,
     expected: bool,
 ) -> Result<()> {
     if read_axis_style_switch_visibility(data, axis, style_switch)? != expected {
         return Err(Error::InvalidFormat(format!(
             "{}-axis {} wire patch failed validation",
-            axis.label(),
+            axis.as_str(),
             style_switch.label()
         )));
     }
@@ -841,13 +789,13 @@ fn validate_patched_axis_style_switch(
 
 fn validate_patched_axis_tick_mark_location(
     data: &[u8],
-    axis: ChartAxis,
-    expected: ChartAxisTickMarkLocation,
+    axis: Axis,
+    expected: TickMarkLocation,
 ) -> Result<()> {
     if read_axis_tick_mark_location(data, axis)? != expected {
         return Err(Error::InvalidFormat(format!(
             "{}-axis tick-mark-location wire patch failed validation",
-            axis.label(),
+            axis.as_str(),
         )));
     }
     Ok(())
@@ -896,24 +844,24 @@ mod tests {
 
         let visible = patch_axis_style_switch_visibility(
             &original,
-            ChartAxis::Category,
+            Axis::Category,
             AxisStyleSwitch::Line,
             true,
         )
         .unwrap();
         assert!(
-            read_axis_style_switch_visibility(&visible, ChartAxis::Category, AxisStyleSwitch::Line)
+            read_axis_style_switch_visibility(&visible, Axis::Category, AxisStyleSwitch::Line)
                 .unwrap()
         );
         assert!(
-            read_axis_style_switch_visibility(&visible, ChartAxis::Value, AxisStyleSwitch::Line)
+            read_axis_style_switch_visibility(&visible, Axis::Value, AxisStyleSwitch::Line)
                 .unwrap()
         );
         assert_unknown_fields_retained(&original, &visible);
 
         let restored = patch_axis_style_switch_visibility(
             &visible,
-            ChartAxis::Category,
+            Axis::Category,
             AxisStyleSwitch::Line,
             false,
         )
@@ -934,7 +882,7 @@ mod tests {
 
         let visible = patch_axis_style_switch_visibility(
             &original,
-            ChartAxis::Category,
+            Axis::Category,
             AxisStyleSwitch::MajorGridlines,
             true,
         )
@@ -942,23 +890,23 @@ mod tests {
         assert!(
             read_axis_style_switch_visibility(
                 &visible,
-                ChartAxis::Category,
+                Axis::Category,
                 AxisStyleSwitch::MajorGridlines,
             )
             .unwrap()
         );
         assert!(
-            read_axis_style_switch_visibility(&visible, ChartAxis::Category, AxisStyleSwitch::Line)
+            read_axis_style_switch_visibility(&visible, Axis::Category, AxisStyleSwitch::Line)
                 .unwrap()
         );
         assert!(
-            !read_axis_style_switch_visibility(&visible, ChartAxis::Value, AxisStyleSwitch::Line)
+            !read_axis_style_switch_visibility(&visible, Axis::Value, AxisStyleSwitch::Line)
                 .unwrap()
         );
         assert!(
             read_axis_style_switch_visibility(
                 &visible,
-                ChartAxis::Value,
+                Axis::Value,
                 AxisStyleSwitch::MajorGridlines,
             )
             .unwrap()
@@ -967,7 +915,7 @@ mod tests {
 
         let restored = patch_axis_style_switch_visibility(
             &visible,
-            ChartAxis::Category,
+            Axis::Category,
             AxisStyleSwitch::MajorGridlines,
             false,
         )
@@ -990,7 +938,7 @@ mod tests {
 
         let visible = patch_axis_style_switch_visibility(
             &original,
-            ChartAxis::Category,
+            Axis::Category,
             AxisStyleSwitch::MinorGridlines,
             true,
         )
@@ -998,23 +946,23 @@ mod tests {
         assert!(
             read_axis_style_switch_visibility(
                 &visible,
-                ChartAxis::Category,
+                Axis::Category,
                 AxisStyleSwitch::MinorGridlines,
             )
             .unwrap()
         );
         assert!(
-            read_axis_style_switch_visibility(&visible, ChartAxis::Category, AxisStyleSwitch::Line)
+            read_axis_style_switch_visibility(&visible, Axis::Category, AxisStyleSwitch::Line)
                 .unwrap()
         );
         assert!(
-            !read_axis_style_switch_visibility(&visible, ChartAxis::Value, AxisStyleSwitch::Line)
+            !read_axis_style_switch_visibility(&visible, Axis::Value, AxisStyleSwitch::Line)
                 .unwrap()
         );
         assert!(
             !read_axis_style_switch_visibility(
                 &visible,
-                ChartAxis::Category,
+                Axis::Category,
                 AxisStyleSwitch::MajorGridlines,
             )
             .unwrap()
@@ -1022,7 +970,7 @@ mod tests {
         assert!(
             read_axis_style_switch_visibility(
                 &visible,
-                ChartAxis::Value,
+                Axis::Value,
                 AxisStyleSwitch::MajorGridlines,
             )
             .unwrap()
@@ -1030,7 +978,7 @@ mod tests {
         assert!(
             read_axis_style_switch_visibility(
                 &visible,
-                ChartAxis::Value,
+                Axis::Value,
                 AxisStyleSwitch::MinorGridlines,
             )
             .unwrap()
@@ -1039,7 +987,7 @@ mod tests {
 
         let restored = patch_axis_style_switch_visibility(
             &visible,
-            ChartAxis::Category,
+            Axis::Category,
             AxisStyleSwitch::MinorGridlines,
             false,
         )
@@ -1062,7 +1010,7 @@ mod tests {
 
         let hidden = patch_axis_style_switch_visibility(
             &original,
-            ChartAxis::Category,
+            Axis::Category,
             AxisStyleSwitch::MinorTickMarks,
             false,
         )
@@ -1070,7 +1018,7 @@ mod tests {
         assert!(
             !read_axis_style_switch_visibility(
                 &hidden,
-                ChartAxis::Category,
+                Axis::Category,
                 AxisStyleSwitch::MinorTickMarks,
             )
             .unwrap()
@@ -1078,19 +1026,19 @@ mod tests {
         assert!(
             read_axis_style_switch_visibility(
                 &hidden,
-                ChartAxis::Value,
+                Axis::Value,
                 AxisStyleSwitch::MinorTickMarks,
             )
             .unwrap()
         );
         assert!(
-            read_axis_style_switch_visibility(&hidden, ChartAxis::Category, AxisStyleSwitch::Line)
+            read_axis_style_switch_visibility(&hidden, Axis::Category, AxisStyleSwitch::Line)
                 .unwrap()
         );
         assert!(
             read_axis_style_switch_visibility(
                 &hidden,
-                ChartAxis::Value,
+                Axis::Value,
                 AxisStyleSwitch::MajorGridlines,
             )
             .unwrap()
@@ -1099,7 +1047,7 @@ mod tests {
 
         let restored = patch_axis_style_switch_visibility(
             &hidden,
-            ChartAxis::Category,
+            Axis::Category,
             AxisStyleSwitch::MinorTickMarks,
             true,
         )
@@ -1113,7 +1061,7 @@ mod tests {
             tschchartaxisvalueshowaxis: Some(true),
             ..Default::default()
         });
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             assert!(
                 read_axis_style_switch_visibility(&original, axis, AxisStyleSwitch::MinorTickMarks)
                     .unwrap()
@@ -1140,7 +1088,7 @@ mod tests {
         }
         .encode_to_vec();
 
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             assert!(
                 read_axis_style_switch_visibility(&original, axis, AxisStyleSwitch::MinorTickMarks)
                     .unwrap()
@@ -1163,27 +1111,24 @@ mod tests {
     #[test]
     fn tick_mark_locations_round_trip_known_and_future_native_values() {
         let known = [
-            (0, ChartAxisTickMarkLocation::None),
-            (1, ChartAxisTickMarkLocation::Inside),
-            (2, ChartAxisTickMarkLocation::Centered),
-            (3, ChartAxisTickMarkLocation::Outside),
+            (0, TickMarkLocation::None),
+            (1, TickMarkLocation::Inside),
+            (2, TickMarkLocation::Centered),
+            (3, TickMarkLocation::Outside),
         ];
         for (raw, location) in known {
-            assert_eq!(ChartAxisTickMarkLocation::from_raw(raw), location);
-            assert_eq!(location.into_raw(), raw);
+            assert_eq!(TickMarkLocation::from_native(raw), location);
+            assert_eq!(location.native_value(), raw);
         }
-        assert_eq!(
-            ChartAxisTickMarkLocation::default(),
-            ChartAxisTickMarkLocation::Centered
-        );
+        assert_eq!(TickMarkLocation::default(), TickMarkLocation::Centered);
 
         const FUTURE_LOCATION: i32 = 9_001;
         assert_eq!(
-            ChartAxisTickMarkLocation::from_raw(FUTURE_LOCATION),
-            ChartAxisTickMarkLocation::Unsupported(FUTURE_LOCATION)
+            TickMarkLocation::from_native(FUTURE_LOCATION),
+            TickMarkLocation::Unsupported(FUTURE_LOCATION)
         );
         assert_eq!(
-            ChartAxisTickMarkLocation::Unsupported(FUTURE_LOCATION).into_raw(),
+            TickMarkLocation::Unsupported(FUTURE_LOCATION).native_value(),
             FUTURE_LOCATION
         );
     }
@@ -1191,43 +1136,37 @@ mod tests {
     #[test]
     fn tick_mark_location_patch_retains_other_axis_and_unmapped_fields() {
         let generated = tsch::generated::ChartAxisStyleArchive {
-            tschchartaxiscategorytickmarklocation: Some(ChartAxisTickMarkLocation::None.into_raw()),
-            tschchartaxisvaluetickmarklocation: Some(ChartAxisTickMarkLocation::Inside.into_raw()),
+            tschchartaxiscategorytickmarklocation: Some(TickMarkLocation::None.native_value()),
+            tschchartaxisvaluetickmarklocation: Some(TickMarkLocation::Inside.native_value()),
             tschchartaxisvalueshowminorgridlines: Some(true),
             ..Default::default()
         };
         let original = axis_style_with_unknown_fields(generated);
 
-        let outside = patch_axis_tick_mark_location(
-            &original,
-            ChartAxis::Category,
-            ChartAxisTickMarkLocation::Outside,
-        )
-        .unwrap();
+        let outside =
+            patch_axis_tick_mark_location(&original, Axis::Category, TickMarkLocation::Outside)
+                .unwrap();
         assert_eq!(
-            read_axis_tick_mark_location(&outside, ChartAxis::Category).unwrap(),
-            ChartAxisTickMarkLocation::Outside
+            read_axis_tick_mark_location(&outside, Axis::Category).unwrap(),
+            TickMarkLocation::Outside
         );
         assert_eq!(
-            read_axis_tick_mark_location(&outside, ChartAxis::Value).unwrap(),
-            ChartAxisTickMarkLocation::Inside
+            read_axis_tick_mark_location(&outside, Axis::Value).unwrap(),
+            TickMarkLocation::Inside
         );
         assert!(
             read_axis_style_switch_visibility(
                 &outside,
-                ChartAxis::Value,
+                Axis::Value,
                 AxisStyleSwitch::MinorGridlines,
             )
             .unwrap()
         );
         assert_unknown_fields_retained(&original, &outside);
 
-        let restored = patch_axis_tick_mark_location(
-            &outside,
-            ChartAxis::Category,
-            ChartAxisTickMarkLocation::None,
-        )
-        .unwrap();
+        let restored =
+            patch_axis_tick_mark_location(&outside, Axis::Category, TickMarkLocation::None)
+                .unwrap();
         assert_eq!(restored, original);
     }
 
@@ -1238,17 +1177,16 @@ mod tests {
         }
         .encode_to_vec();
 
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             assert_eq!(
                 read_axis_tick_mark_location(&original, axis).unwrap(),
-                ChartAxisTickMarkLocation::Centered
+                TickMarkLocation::Centered
             );
             let none =
-                patch_axis_tick_mark_location(&original, axis, ChartAxisTickMarkLocation::None)
-                    .unwrap();
+                patch_axis_tick_mark_location(&original, axis, TickMarkLocation::None).unwrap();
             assert_eq!(
                 read_axis_tick_mark_location(&none, axis).unwrap(),
-                ChartAxisTickMarkLocation::None
+                TickMarkLocation::None
             );
             assert!(generated_axis_style_extension(&none).unwrap().is_some());
         }
@@ -1262,19 +1200,16 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(
-            read_axis_tick_mark_location(&original, ChartAxis::Value).unwrap(),
-            ChartAxisTickMarkLocation::Unsupported(FUTURE_LOCATION)
+            read_axis_tick_mark_location(&original, Axis::Value).unwrap(),
+            TickMarkLocation::Unsupported(FUTURE_LOCATION)
         );
 
-        let patched = patch_axis_tick_mark_location(
-            &original,
-            ChartAxis::Value,
-            ChartAxisTickMarkLocation::Outside,
-        )
-        .unwrap();
+        let patched =
+            patch_axis_tick_mark_location(&original, Axis::Value, TickMarkLocation::Outside)
+                .unwrap();
         assert_eq!(
-            read_axis_tick_mark_location(&patched, ChartAxis::Value).unwrap(),
-            ChartAxisTickMarkLocation::Outside
+            read_axis_tick_mark_location(&patched, Axis::Value).unwrap(),
+            TickMarkLocation::Outside
         );
         assert_unknown_fields_retained(&original, &patched);
     }
@@ -1291,7 +1226,7 @@ mod tests {
 
         let hidden = patch_axis_style_switch_visibility(
             &original,
-            ChartAxis::Value,
+            Axis::Value,
             AxisStyleSwitch::ValueMinimumLabel,
             false,
         )
@@ -1299,19 +1234,18 @@ mod tests {
         assert!(
             !read_axis_style_switch_visibility(
                 &hidden,
-                ChartAxis::Value,
+                Axis::Value,
                 AxisStyleSwitch::ValueMinimumLabel,
             )
             .unwrap()
         );
         assert!(
-            read_axis_style_switch_visibility(&hidden, ChartAxis::Value, AxisStyleSwitch::Line)
-                .unwrap()
+            read_axis_style_switch_visibility(&hidden, Axis::Value, AxisStyleSwitch::Line).unwrap()
         );
         assert!(
             read_axis_style_switch_visibility(
                 &hidden,
-                ChartAxis::Value,
+                Axis::Value,
                 AxisStyleSwitch::MajorGridlines,
             )
             .unwrap()
@@ -1320,7 +1254,7 @@ mod tests {
 
         let restored = patch_axis_style_switch_visibility(
             &hidden,
-            ChartAxis::Value,
+            Axis::Value,
             AxisStyleSwitch::ValueMinimumLabel,
             true,
         )
@@ -1337,7 +1271,7 @@ mod tests {
         assert!(
             read_axis_style_switch_visibility(
                 &original,
-                ChartAxis::Value,
+                Axis::Value,
                 AxisStyleSwitch::ValueMinimumLabel,
             )
             .unwrap()
@@ -1345,7 +1279,7 @@ mod tests {
 
         let hidden = patch_axis_style_switch_visibility(
             &original,
-            ChartAxis::Value,
+            Axis::Value,
             AxisStyleSwitch::ValueMinimumLabel,
             false,
         )
@@ -1353,14 +1287,13 @@ mod tests {
         assert!(
             !read_axis_style_switch_visibility(
                 &hidden,
-                ChartAxis::Value,
+                Axis::Value,
                 AxisStyleSwitch::ValueMinimumLabel,
             )
             .unwrap()
         );
         assert!(
-            read_axis_style_switch_visibility(&hidden, ChartAxis::Value, AxisStyleSwitch::Line)
-                .unwrap()
+            read_axis_style_switch_visibility(&hidden, Axis::Value, AxisStyleSwitch::Line).unwrap()
         );
         assert_unknown_fields_retained(&original, &hidden);
     }
@@ -1374,7 +1307,7 @@ mod tests {
 
         let visible = patch_axis_style_switch_visibility(
             &original,
-            ChartAxis::Value,
+            Axis::Value,
             AxisStyleSwitch::MajorGridlines,
             true,
         )
@@ -1382,19 +1315,19 @@ mod tests {
         assert!(
             read_axis_style_switch_visibility(
                 &visible,
-                ChartAxis::Value,
+                Axis::Value,
                 AxisStyleSwitch::MajorGridlines,
             )
             .unwrap()
         );
         assert!(
-            !read_axis_style_switch_visibility(&visible, ChartAxis::Value, AxisStyleSwitch::Line)
+            !read_axis_style_switch_visibility(&visible, Axis::Value, AxisStyleSwitch::Line)
                 .unwrap()
         );
         assert!(
             read_axis_style_switch_visibility(
                 &original,
-                ChartAxis::Value,
+                Axis::Value,
                 AxisStyleSwitch::ValueMinimumLabel,
             )
             .unwrap()
@@ -1402,7 +1335,7 @@ mod tests {
         assert!(
             read_axis_style_switch_visibility(
                 &original,
-                ChartAxis::Category,
+                Axis::Category,
                 AxisStyleSwitch::ValueMinimumLabel,
             )
             .is_err()

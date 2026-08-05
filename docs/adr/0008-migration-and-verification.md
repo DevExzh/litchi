@@ -5914,6 +5914,22 @@ shape packages for all three applications opened without repair prompts during
 the focused native gate; the matching semantic inspectors recovered the
 expected preset and path kind, and Numbers, Pages, and Keynote were quit after
 verification.
+The chart-axis vocabulary slice follows the same ownership boundary at
+`litchi-iwa-common::chart::axis::{Axis, TickMarkLocation}`. The common crate
+owns the one-byte category/value selector and copyable tick-mark value,
+including explicit preservation of unknown native integers; IWA retains the
+axis archive slots, protobuf field mapping, shared-object checks, and
+wire-preserving mutation. All Pages, Numbers, Keynote, and chart-example
+consumers now use the short canonical names, with no `ChartAxis*` compatibility
+aliases. Focused common and IWA library checks passed. The focused
+`axis-label-angles-crate` fixtures opened in Numbers, Pages, and Keynote
+without repair prompts: Numbers exposed Value (Y) `Right Diagonal`, Category
+(X) `Left Diagonal`, and `Centered` tick marks; Pages and Keynote exposed the
+same 2D chart with numeric Y and categorical X axes. The broader all-feature
+Numbers chart generator still produces a ZIP-valid artifact that native
+Numbers rejects as damaged, so it is treated as a fixture limitation rather
+than chart-axis evidence. No native-resave claim is made; all three
+applications were quit after verification.
 The BorderSide ownership slice
 is complete: the dependency-neutral table-cell edge selector now lives at
 `litchi-iwa-common::table::cell::BorderSide`; `Borders` and `ShapeStroke` remain

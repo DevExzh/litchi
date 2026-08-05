@@ -6,7 +6,7 @@
 
 use prost::Message;
 
-use crate::charts::ChartAxis;
+use crate::charts::Axis;
 use crate::charts::axis::{chart_axis_labels_visible, set_chart_axis_labels_visible};
 use crate::charts::axis_style::{
     GENERATED_CHART_AXIS_STYLE_EXTENSION_FIELD, axis_style_slot, generated_axis_style_extension,
@@ -114,14 +114,14 @@ pub(crate) fn chart_category_label_layout(
         chart_archive_name,
         drawable_object_id,
         drawable_label,
-        ChartAxis::Category,
+        Axis::Category,
     )?;
     let (stored_frequency, show_last_category) = axis_style_slot(
         package,
         chart_archive_name,
         drawable_object_id,
         drawable_label,
-        ChartAxis::Category,
+        Axis::Category,
     )?
     .read(package, read_category_label_style)?;
     Ok(ChartCategoryLabelLayout::new(
@@ -157,7 +157,7 @@ pub(crate) fn set_chart_category_label_layout(
         chart_archive_name,
         drawable_object_id,
         drawable_label,
-        ChartAxis::Category,
+        Axis::Category,
     )?;
     let (stored_frequency, stored_show_last) =
         style_slot.read(package, read_category_label_style)?;
@@ -179,7 +179,7 @@ pub(crate) fn set_chart_category_label_layout(
         chart_archive_name,
         drawable_object_id,
         drawable_label,
-        ChartAxis::Category,
+        Axis::Category,
         layout.frequency != ChartCategoryLabelFrequency::None,
     )?;
     if chart_category_label_layout(
@@ -319,11 +319,10 @@ fn strict_optional_varint(data: &[u8], field_number: u32) -> Result<Option<u64>>
             "chart category-label field {field_number} is not a varint"
         )));
     }
-    let (value, consumed) =
-        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.payload_start()..field.end()])
-            .map_err(|error| {
-                Error::InvalidFormat(format!("invalid category-label value: {error}"))
-            })?;
+    let (value, consumed) = litchi_iwa_common::varint::decode_varint_from_bytes(
+        &data[field.payload_start()..field.end()],
+    )
+    .map_err(|error| Error::InvalidFormat(format!("invalid category-label value: {error}")))?;
     if field.payload_start() + consumed != field.end() {
         return Err(Error::InvalidFormat(
             "chart category-label varint has trailing bytes".to_owned(),

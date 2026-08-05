@@ -702,12 +702,11 @@ mod tests {
     use crate::charts::source::SERIES_NON_STYLE_MESSAGE_TYPE;
     use crate::charts::unique_chart_object_archive_name;
     use crate::charts::{
-        ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
-        ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius,
-        ChartErrorBarCustomValues, ChartErrorBarDirection, ChartErrorBarFixedValue, ChartFont,
-        ChartFontSize, ChartGapPercentage, ChartGapSpacing, ChartLegendFill, ChartLegendFont,
-        ChartLegendFontSize, ChartLegendFrame, ChartLegendRect, ChartLegendShadow,
-        ChartLegendStroke, ChartPieLabelDistance, ChartPieLabelVisibility,
+        Axis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount, ChartCornerRadius,
+        ChartDonutInnerRadius, ChartErrorBarCustomValues, ChartErrorBarDirection,
+        ChartErrorBarFixedValue, ChartFont, ChartFontSize, ChartGapPercentage, ChartGapSpacing,
+        ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendFrame, ChartLegendRect,
+        ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance, ChartPieLabelVisibility,
         ChartPieLeaderLineVisibility, ChartPieStartAngle, ChartPieWedgeExplosion,
         ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars,
         ChartSeriesIndex, ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
@@ -716,7 +715,7 @@ mod tests {
         ChartSeriesValueLabelDecimalPlaces, ChartSeriesValueLabelLocation,
         ChartSeriesValueLabelNegativeStyle, ChartSeriesValueLabelNumberFormat,
         ChartSeriesValueLabelVisibility, ChartShadow, ChartValueAxisBounds, ChartValueAxisScale,
-        ChartValueAxisSteps,
+        ChartValueAxisSteps, TickMarkLocation,
     };
     use crate::numbers::NumbersDocumentBuilder;
     use crate::package_metadata::{component_identifier_for_entry, component_uuid_identifiers};
@@ -1234,7 +1233,7 @@ mod tests {
             .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
 
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             assert_eq!(
                 editor
                     .sheet_chart_axis_title(sheet_id, source.drawable_object_id, axis)
@@ -1246,26 +1245,18 @@ mod tests {
             .set_sheet_chart_axis_title(
                 sheet_id,
                 source.drawable_object_id,
-                ChartAxis::Category,
+                Axis::Category,
                 "Month",
             )
             .unwrap();
         editor
-            .set_sheet_chart_axis_title(
-                sheet_id,
-                source.drawable_object_id,
-                ChartAxis::Value,
-                "Revenue",
-            )
+            .set_sheet_chart_axis_title(sheet_id, source.drawable_object_id, Axis::Value, "Revenue")
             .unwrap();
 
         let duplicate = editor
             .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
             .unwrap();
-        for (axis, title) in [
-            (ChartAxis::Category, "Month"),
-            (ChartAxis::Value, "Revenue"),
-        ] {
+        for (axis, title) in [(Axis::Category, "Month"), (Axis::Value, "Revenue")] {
             assert_eq!(
                 editor
                     .sheet_chart_axis_title(sheet_id, source.drawable_object_id, axis)
@@ -1286,7 +1277,7 @@ mod tests {
             .set_sheet_chart_axis_title(
                 sheet_id,
                 source.drawable_object_id,
-                ChartAxis::Category,
+                Axis::Category,
                 "Updated month",
             )
             .unwrap();
@@ -1294,40 +1285,40 @@ mod tests {
             .set_sheet_chart_axis_title(
                 sheet_id,
                 source.drawable_object_id,
-                ChartAxis::Value,
+                Axis::Value,
                 "Updated revenue",
             )
             .unwrap();
         assert_eq!(
             editor
-                .sheet_chart_axis_title(sheet_id, source.drawable_object_id, ChartAxis::Category)
+                .sheet_chart_axis_title(sheet_id, source.drawable_object_id, Axis::Category)
                 .unwrap()
                 .as_deref(),
             Some("Updated month")
         );
         assert_eq!(
             editor
-                .sheet_chart_axis_title(sheet_id, source.drawable_object_id, ChartAxis::Value)
+                .sheet_chart_axis_title(sheet_id, source.drawable_object_id, Axis::Value)
                 .unwrap()
                 .as_deref(),
             Some("Updated revenue")
         );
         assert_eq!(
             editor
-                .sheet_chart_axis_title(sheet_id, duplicate.drawable_object_id, ChartAxis::Category)
+                .sheet_chart_axis_title(sheet_id, duplicate.drawable_object_id, Axis::Category)
                 .unwrap()
                 .as_deref(),
             Some("Month")
         );
         assert_eq!(
             editor
-                .sheet_chart_axis_title(sheet_id, duplicate.drawable_object_id, ChartAxis::Value)
+                .sheet_chart_axis_title(sheet_id, duplicate.drawable_object_id, Axis::Value)
                 .unwrap()
                 .as_deref(),
             Some("Revenue")
         );
 
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             assert!(
                 editor
                     .remove_sheet_chart_axis_title(sheet_id, source.drawable_object_id, axis)
@@ -1343,14 +1334,14 @@ mod tests {
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
-                .sheet_chart_axis_title(sheet_id, duplicate.drawable_object_id, ChartAxis::Category)
+                .sheet_chart_axis_title(sheet_id, duplicate.drawable_object_id, Axis::Category)
                 .unwrap()
                 .as_deref(),
             Some("Month")
         );
         assert_eq!(
             reopened
-                .sheet_chart_axis_title(sheet_id, duplicate.drawable_object_id, ChartAxis::Value)
+                .sheet_chart_axis_title(sheet_id, duplicate.drawable_object_id, Axis::Value)
                 .unwrap()
                 .as_deref(),
             Some("Revenue")
@@ -1707,7 +1698,7 @@ mod tests {
             .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
 
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             assert!(
                 editor
                     .sheet_chart_axis_labels_visible(sheet_id, source.drawable_object_id, axis)
@@ -1719,13 +1710,13 @@ mod tests {
             .set_sheet_chart_axis_labels_visible(
                 sheet_id,
                 source.drawable_object_id,
-                ChartAxis::Category,
+                Axis::Category,
                 true,
             )
             .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             editor
                 .set_sheet_chart_axis_labels_visible(
                     sheet_id,
@@ -1744,7 +1735,7 @@ mod tests {
         let duplicate = editor
             .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
             .unwrap();
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             assert!(
                 !editor
                     .sheet_chart_axis_labels_visible(sheet_id, duplicate.drawable_object_id, axis)
@@ -1761,7 +1752,7 @@ mod tests {
         }
 
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             assert!(
                 reopened
                     .sheet_chart_axis_labels_visible(sheet_id, source.drawable_object_id, axis)
@@ -1799,7 +1790,7 @@ mod tests {
             .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
 
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             assert!(
                 editor
                     .sheet_chart_axis_line_visible(sheet_id, source.drawable_object_id, axis)
@@ -1818,7 +1809,7 @@ mod tests {
         let duplicate = editor
             .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
             .unwrap();
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             assert!(
                 !editor
                     .sheet_chart_axis_line_visible(sheet_id, duplicate.drawable_object_id, axis)
@@ -1830,7 +1821,7 @@ mod tests {
         }
 
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             assert!(
                 reopened
                     .sheet_chart_axis_line_visible(sheet_id, source.drawable_object_id, axis)
@@ -1860,7 +1851,7 @@ mod tests {
                 .sheet_chart_axis_major_gridlines_visible(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartAxis::Category,
+                    Axis::Category,
                 )
                 .unwrap()
         );
@@ -1869,7 +1860,7 @@ mod tests {
                 .sheet_chart_axis_major_gridlines_visible(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartAxis::Value,
+                    Axis::Value,
                 )
                 .unwrap()
         );
@@ -1878,7 +1869,7 @@ mod tests {
             .set_sheet_chart_axis_major_gridlines_visible(
                 sheet_id,
                 source.drawable_object_id,
-                ChartAxis::Category,
+                Axis::Category,
                 false,
             )
             .unwrap();
@@ -1888,7 +1879,7 @@ mod tests {
             .set_sheet_chart_axis_major_gridlines_visible(
                 sheet_id,
                 source.drawable_object_id,
-                ChartAxis::Category,
+                Axis::Category,
                 true,
             )
             .unwrap();
@@ -1896,7 +1887,7 @@ mod tests {
             .set_sheet_chart_axis_major_gridlines_visible(
                 sheet_id,
                 source.drawable_object_id,
-                ChartAxis::Value,
+                Axis::Value,
                 false,
             )
             .unwrap();
@@ -1904,7 +1895,7 @@ mod tests {
         let duplicate = editor
             .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
             .unwrap();
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             assert_eq!(
                 editor
                     .sheet_chart_axis_major_gridlines_visible(
@@ -1913,7 +1904,7 @@ mod tests {
                         axis,
                     )
                     .unwrap(),
-                axis == ChartAxis::Category
+                axis == Axis::Category
             );
         }
 
@@ -1921,7 +1912,7 @@ mod tests {
             .set_sheet_chart_axis_major_gridlines_visible(
                 sheet_id,
                 source.drawable_object_id,
-                ChartAxis::Category,
+                Axis::Category,
                 false,
             )
             .unwrap();
@@ -1929,13 +1920,13 @@ mod tests {
             .set_sheet_chart_axis_major_gridlines_visible(
                 sheet_id,
                 source.drawable_object_id,
-                ChartAxis::Value,
+                Axis::Value,
                 true,
             )
             .unwrap();
 
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             assert_eq!(
                 reopened
                     .sheet_chart_axis_major_gridlines_visible(
@@ -1944,7 +1935,7 @@ mod tests {
                         axis,
                     )
                     .unwrap(),
-                axis == ChartAxis::Value
+                axis == Axis::Value
             );
             assert_eq!(
                 reopened
@@ -1954,7 +1945,7 @@ mod tests {
                         axis,
                     )
                     .unwrap(),
-                axis == ChartAxis::Category
+                axis == Axis::Category
             );
         }
         reopened
@@ -1970,7 +1961,7 @@ mod tests {
             .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
 
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             assert!(
                 !editor
                     .sheet_chart_axis_minor_gridlines_visible(
@@ -1986,13 +1977,13 @@ mod tests {
             .set_sheet_chart_axis_minor_gridlines_visible(
                 sheet_id,
                 source.drawable_object_id,
-                ChartAxis::Category,
+                Axis::Category,
                 false,
             )
             .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             editor
                 .set_sheet_chart_axis_minor_gridlines_visible(
                     sheet_id,
@@ -2005,7 +1996,7 @@ mod tests {
         let duplicate = editor
             .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
             .unwrap();
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             assert!(
                 editor
                     .sheet_chart_axis_minor_gridlines_visible(
@@ -2026,7 +2017,7 @@ mod tests {
         }
 
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             assert!(
                 !reopened
                     .sheet_chart_axis_minor_gridlines_visible(
@@ -2059,7 +2050,7 @@ mod tests {
             .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
 
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             assert!(
                 editor
                     .sheet_chart_axis_minor_tick_marks_visible(
@@ -2075,13 +2066,13 @@ mod tests {
             .set_sheet_chart_axis_minor_tick_marks_visible(
                 sheet_id,
                 source.drawable_object_id,
-                ChartAxis::Category,
+                Axis::Category,
                 true,
             )
             .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             editor
                 .set_sheet_chart_axis_minor_tick_marks_visible(
                     sheet_id,
@@ -2104,7 +2095,7 @@ mod tests {
         let duplicate = editor
             .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
             .unwrap();
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             assert!(
                 !editor
                     .sheet_chart_axis_minor_tick_marks_visible(
@@ -2125,7 +2116,7 @@ mod tests {
         }
 
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             assert!(
                 reopened
                     .sheet_chart_axis_minor_tick_marks_visible(
@@ -2175,12 +2166,12 @@ mod tests {
             .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
 
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             assert_eq!(
                 editor
                     .sheet_chart_axis_tick_mark_location(sheet_id, source.drawable_object_id, axis,)
                     .unwrap(),
-                ChartAxisTickMarkLocation::Centered
+                TickMarkLocation::Centered
             );
         }
         let baseline = editor.to_bytes().unwrap();
@@ -2188,8 +2179,8 @@ mod tests {
             .set_sheet_chart_axis_tick_mark_location(
                 sheet_id,
                 source.drawable_object_id,
-                ChartAxis::Category,
-                ChartAxisTickMarkLocation::Centered,
+                Axis::Category,
+                TickMarkLocation::Centered,
             )
             .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -2198,16 +2189,16 @@ mod tests {
             .set_sheet_chart_axis_tick_mark_location(
                 sheet_id,
                 source.drawable_object_id,
-                ChartAxis::Category,
-                ChartAxisTickMarkLocation::None,
+                Axis::Category,
+                TickMarkLocation::None,
             )
             .unwrap();
         editor
             .set_sheet_chart_axis_tick_mark_location(
                 sheet_id,
                 source.drawable_object_id,
-                ChartAxis::Value,
-                ChartAxisTickMarkLocation::Outside,
+                Axis::Value,
+                TickMarkLocation::Outside,
             )
             .unwrap();
         assert_eq!(
@@ -2215,20 +2206,20 @@ mod tests {
                 .sheet_chart_axis_tick_mark_location(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartAxis::Category,
+                    Axis::Category,
                 )
                 .unwrap(),
-            ChartAxisTickMarkLocation::None
+            TickMarkLocation::None
         );
         assert_eq!(
             editor
                 .sheet_chart_axis_tick_mark_location(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartAxis::Value,
+                    Axis::Value,
                 )
                 .unwrap(),
-            ChartAxisTickMarkLocation::Outside
+            TickMarkLocation::Outside
         );
 
         let duplicate = editor
@@ -2239,36 +2230,36 @@ mod tests {
                 .sheet_chart_axis_tick_mark_location(
                     sheet_id,
                     duplicate.drawable_object_id,
-                    ChartAxis::Category,
+                    Axis::Category,
                 )
                 .unwrap(),
-            ChartAxisTickMarkLocation::None
+            TickMarkLocation::None
         );
         assert_eq!(
             editor
                 .sheet_chart_axis_tick_mark_location(
                     sheet_id,
                     duplicate.drawable_object_id,
-                    ChartAxis::Value,
+                    Axis::Value,
                 )
                 .unwrap(),
-            ChartAxisTickMarkLocation::Outside
+            TickMarkLocation::Outside
         );
 
         editor
             .set_sheet_chart_axis_tick_mark_location(
                 sheet_id,
                 source.drawable_object_id,
-                ChartAxis::Category,
-                ChartAxisTickMarkLocation::Inside,
+                Axis::Category,
+                TickMarkLocation::Inside,
             )
             .unwrap();
         editor
             .set_sheet_chart_axis_tick_mark_location(
                 sheet_id,
                 source.drawable_object_id,
-                ChartAxis::Value,
-                ChartAxisTickMarkLocation::Centered,
+                Axis::Value,
+                TickMarkLocation::Centered,
             )
             .unwrap();
 
@@ -2278,40 +2269,40 @@ mod tests {
                 .sheet_chart_axis_tick_mark_location(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartAxis::Category,
+                    Axis::Category,
                 )
                 .unwrap(),
-            ChartAxisTickMarkLocation::Inside
+            TickMarkLocation::Inside
         );
         assert_eq!(
             reopened
                 .sheet_chart_axis_tick_mark_location(
                     sheet_id,
                     source.drawable_object_id,
-                    ChartAxis::Value,
+                    Axis::Value,
                 )
                 .unwrap(),
-            ChartAxisTickMarkLocation::Centered
+            TickMarkLocation::Centered
         );
         assert_eq!(
             reopened
                 .sheet_chart_axis_tick_mark_location(
                     sheet_id,
                     duplicate.drawable_object_id,
-                    ChartAxis::Category,
+                    Axis::Category,
                 )
                 .unwrap(),
-            ChartAxisTickMarkLocation::None
+            TickMarkLocation::None
         );
         assert_eq!(
             reopened
                 .sheet_chart_axis_tick_mark_location(
                     sheet_id,
                     duplicate.drawable_object_id,
-                    ChartAxis::Value,
+                    Axis::Value,
                 )
                 .unwrap(),
-            ChartAxisTickMarkLocation::Outside
+            TickMarkLocation::Outside
         );
         reopened
             .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)

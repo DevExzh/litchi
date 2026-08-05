@@ -83,14 +83,12 @@ pub(crate) mod style;
 
 pub use archive::IWorkChartArchive;
 pub use arrangement::ChartArrangement;
-pub use axis::ChartAxis;
 pub use axis_bounds::{ChartAxisBound, ChartValueAxisBounds};
 pub use axis_gridline_stroke::{ChartAxisGridline, ChartAxisGridlineStroke};
 pub use axis_label_angle::ChartAxisLabelAngle;
 pub use axis_label_position_3d::Chart3dAxisLabelPosition;
 pub use axis_scale::ChartValueAxisScale;
 pub use axis_steps::{ChartAxisMajorStepCount, ChartAxisMinorStepCount, ChartValueAxisSteps};
-pub use axis_style::ChartAxisTickMarkLocation;
 pub use bar_shape_3d::Chart3dBarShape;
 pub use category_labels::{
     ChartCategoryLabelFrequency, ChartCategoryLabelInterval, ChartCategoryLabelLayout,
@@ -110,6 +108,7 @@ pub use legend_frame::{
 pub use legend_shadow::ChartLegendShadow;
 pub use legend_stroke::ChartLegendStroke;
 pub use lighting_3d::Chart3dLightingStyle;
+pub use litchi_iwa_common::chart::axis::{Axis, TickMarkLocation};
 pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};
 pub use number_format::{
     ChartDecimalPlaces, ChartFixedDecimalPlaces, ChartLabelAffixes, ChartNegativeStyle,

@@ -7,7 +7,7 @@ use crate::charts::axis_style::{
     set_chart_axis_minor_tick_marks_visible as set_native_chart_axis_minor_tick_marks_visible,
     set_chart_axis_tick_mark_location as set_native_chart_axis_tick_mark_location,
 };
-use crate::charts::{ChartAxis, ChartAxisTickMarkLocation};
+use crate::charts::{Axis, TickMarkLocation};
 
 impl NumbersEditor {
     /// Read whether Numbers shows minor tick marks for one native sheet-chart axis.
@@ -15,7 +15,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
     ) -> Result<bool> {
         sheet_chart_axis_minor_tick_marks_visible(self, sheet_id, drawable_object_id, axis)
     }
@@ -25,7 +25,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
         visible: bool,
     ) -> Result<()> {
         set_sheet_chart_axis_minor_tick_marks_visible(
@@ -42,8 +42,8 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
-    ) -> Result<ChartAxisTickMarkLocation> {
+        axis: Axis,
+    ) -> Result<TickMarkLocation> {
         sheet_chart_axis_tick_mark_location(self, sheet_id, drawable_object_id, axis)
     }
 
@@ -52,8 +52,8 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
-        location: ChartAxisTickMarkLocation,
+        axis: Axis,
+        location: TickMarkLocation,
     ) -> Result<()> {
         set_sheet_chart_axis_tick_mark_location(self, sheet_id, drawable_object_id, axis, location)
     }
@@ -63,7 +63,7 @@ fn sheet_chart_axis_minor_tick_marks_visible(
     editor: &NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<bool> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     read_native_chart_axis_minor_tick_marks_visible(
@@ -79,7 +79,7 @@ fn set_sheet_chart_axis_minor_tick_marks_visible(
     editor: &mut NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
     visible: bool,
 ) -> Result<()> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
@@ -108,8 +108,8 @@ fn sheet_chart_axis_tick_mark_location(
     editor: &NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    axis: ChartAxis,
-) -> Result<ChartAxisTickMarkLocation> {
+    axis: Axis,
+) -> Result<TickMarkLocation> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     read_native_chart_axis_tick_mark_location(
         &editor.package,
@@ -124,8 +124,8 @@ fn set_sheet_chart_axis_tick_mark_location(
     editor: &mut NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    axis: ChartAxis,
-    location: ChartAxisTickMarkLocation,
+    axis: Axis,
+    location: TickMarkLocation,
 ) -> Result<()> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     let mut staged = editor.package.clone();

@@ -10,7 +10,7 @@ use crate::charts::axis::{
     GENERATED_CHART_AXIS_NON_STYLE_EXTENSION_FIELD, axis_non_style_slot,
     generated_axis_non_style_extension,
 };
-use crate::charts::{ChartAxis, ChartKind};
+use crate::charts::{Axis, ChartKind};
 use crate::protobuf::tsch;
 use crate::wire::{patch_length_delimited_field, patch_varint_field};
 use crate::{Error, IWorkPackage, Result};
@@ -72,7 +72,7 @@ pub(crate) fn chart_3d_value_axis_label_position(
         chart_archive_name,
         drawable_object_id,
         drawable_label,
-        ChartAxis::Value,
+        Axis::Value,
     )?
     .read(package, read_3d_value_axis_label_position)
 }
@@ -92,7 +92,7 @@ pub(crate) fn set_chart_3d_value_axis_label_position(
         chart_archive_name,
         drawable_object_id,
         drawable_label,
-        ChartAxis::Value,
+        Axis::Value,
     )?;
     if slot.read(package, read_3d_value_axis_label_position)? == position {
         return Ok(());

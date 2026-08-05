@@ -14,7 +14,7 @@ use crate::charts::number_format::{
     DualNumberFormatFields, clear_dual_number_format, patch_dual_number_format,
     read_dual_number_format,
 };
-use crate::charts::{ChartAxis, ChartNumberFormat};
+use crate::charts::{Axis, ChartNumberFormat};
 use crate::protobuf::tsch;
 use crate::wire::patch_length_delimited_field;
 use crate::{Error, IWorkPackage, Result};
@@ -32,7 +32,7 @@ pub(crate) fn chart_axis_number_format(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<ChartNumberFormat> {
     axis_non_style_slot(
         package,
@@ -50,7 +50,7 @@ pub(crate) fn set_chart_axis_number_format(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
+    axis: Axis,
     format: ChartNumberFormat,
 ) -> Result<()> {
     let slot = axis_non_style_slot(
@@ -68,7 +68,7 @@ pub(crate) fn set_chart_axis_number_format(
     if slot.read(package, read_axis_number_format)? != format {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} chart {drawable_object_id} {}-axis number-format update failed validation",
-            axis.label()
+            axis.as_str()
         )));
     }
     Ok(())
