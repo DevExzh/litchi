@@ -61,6 +61,12 @@ marker identifiers are deliberately absent. Body-footnote reads and edits use
 `Selector::At` or `Selector::Index`, resolve ambiguity or absence as adapter
 errors, and publish only after staged wire and graph validation.
 
+Keynote build values use the focused `litchi_keynote::build` module. `Settings`
+and `Effect` expose typed start relationships, bounded unknown text, finite
+effect parameters, and boxed path/node collections; failed setters validate
+the candidate before mutation. Native object identifiers, archive fields, and
+raw direction/delivery integers are not part of this leaf's ordinary API.
+
 The dependency-free Numbers formula vocabulary is an intentional naming
 exception. `litchi-numbers::formula` is consumed by Numbers, Pages, and Keynote,
 so `FormulaExpression`, `FormulaCellReference`, and the other `Formula*` names

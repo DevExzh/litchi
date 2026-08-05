@@ -6235,6 +6235,15 @@ tests and IWA body-footnote CRUD tests pass, and the migrated Pages examples
 compile against selectors. This is an ownership/API slice; native Pages
 verification remains part of the next fixture matrix run.
 
+The archive-free IWA index foundation slice is complete. `litchi-iwa-index`
+contains typed fragment/byte-span/object/reference values, deterministic
+immutable indexing, typed duplicate/null/reference failures, and graph
+queries without archive dependencies. Four leaf tests, strict Clippy, and the
+46-package/127-edge topology audit pass; private adapter integration remains
+explicit follow-up work. The Keynote build leaf likewise passes its focused
+semantic suite, strict Clippy, and formatting checks; its native adapter and
+CRUD migration remain open, so this slice makes no new native Keynote claim.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

@@ -182,6 +182,16 @@ selection, native identifiers used for lookup and diagnostics, and all raw
 unknown wire content. Keynote, Pages, and structured aggregation consume the
 short semantic types directly; invalid ranges cross the leaf boundary as its
 typed storage error.
+The archive-free object-index foundation now lives in `litchi-iwa-index`. It
+owns only typed fragment identities, checked byte spans, immutable object
+records, and deterministic reference queries over `litchi-iwa-graph`; it does
+not depend on ZIP, Snappy, protobuf, package, or concrete iWork crates. Native
+payloads, unknown fields, archive traversal, and the future private IWA index
+adapter remain below this leaf.
+Keynote build semantics use the focused `litchi-keynote::build` leaf. Its
+bounded unknown identifiers, finite effect parameters, typed actions/emphasis,
+and boxed motion-path values contain no object or archive identity; native
+build CRUD and conversion remain an adapter migration seam.
 The common color leaf now owns `color::{RgbColorSpace, Rgba}` and its typed
 `color::Error`; native protobuf conversion remains in the IWA shape adapter.
 `Rgba` is a fixed-size, copyable value that validates all four finite channels
