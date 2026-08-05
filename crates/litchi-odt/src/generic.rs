@@ -149,7 +149,7 @@ impl FlatOpenDocument {
 
     /// Discover inline and inert linked images in the flat document.
     pub fn images(&self) -> Result<Vec<crate::Image>> {
-        crate::media::scan_flat_images(&self.xml)
+        crate::media::scan_flat(&self.xml)
     }
 
     /// Inspect classic forms without executing bindings, events, or external resources.
@@ -223,8 +223,8 @@ impl FlatOpenDocument {
     }
 
     /// Discover inert inline and linked embedded objects.
-    pub fn embedded_objects(&self) -> Result<Vec<crate::EmbeddedObject>> {
-        crate::embedded_object::scan_flat_objects(&self.xml)
+    pub fn embedded_objects(&self) -> Result<Vec<crate::Object>> {
+        crate::embedded::scan_flat(&self.xml)
     }
 
     /// Return the exact original bytes.
@@ -556,12 +556,7 @@ impl OpenDocumentPackage {
         let content = self.content_xml()?;
         let styles = self.styles_xml()?;
         let package = self.package.package()?;
-        crate::media::scan_packaged_images(
-            &content,
-            styles.as_deref(),
-            |path| package.has_file(path),
-            |path| package.manifest().get_media_type(path).map(str::to_string),
-        )
+        crate::media::scan_package(&content, styles.as_deref(), &package)
     }
 
     /// Inspect classic forms in content and styles without executing behavior.
@@ -716,24 +711,21 @@ impl OpenDocumentPackage {
     }
 
     /// Discover package, inline, missing, and inert linked embedded objects.
-    pub fn embedded_objects(&self) -> Result<Vec<crate::EmbeddedObject>> {
+    pub fn embedded_objects(&self) -> Result<Vec<crate::Object>> {
         let content = self.content_xml()?;
         let styles = self.styles_xml()?;
         let package = self.package.package()?;
-        crate::embedded_object::scan_packaged_objects(
-            &content,
-            styles.as_deref(),
-            |path| package.has_file(path),
-            |path| package.manifest().get_media_type(path).map(str::to_string),
-        )
+        crate::embedded::scan_package(&content, styles.as_deref(), &package)
     }
 
     /// Return bytes only for inline or verified package-contained images.
     /// Linked images remain inert and are never fetched.
     pub fn image_bytes(&self, image: &crate::Image) -> Result<Option<Vec<u8>>> {
         match &image.source {
-            crate::ImageSource::Inline { bytes, .. } => Ok(Some(bytes.clone())),
-            crate::ImageSource::PackagePart { path, .. } => self.package.get_file(path).map(Some),
+            litchi_odf_common::media::Source::Inline { bytes, .. } => Ok(Some(bytes.clone())),
+            litchi_odf_common::media::Source::PackagePart { path, .. } => {
+                self.package.get_file(path).map(Some)
+            },
             _ => Ok(None),
         }
     }

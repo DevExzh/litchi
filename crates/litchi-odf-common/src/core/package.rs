@@ -257,6 +257,16 @@ impl<'data> Package<'data> {
     }
 }
 
+impl<'data> package::PackageLookup for Package<'data> {
+    fn has_file(&self, path: &str) -> bool {
+        self.has_file(path)
+    }
+
+    fn media_type(&self, path: &str) -> Option<&str> {
+        self.manifest.get_media_type(path)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

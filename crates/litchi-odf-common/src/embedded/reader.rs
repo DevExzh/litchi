@@ -1,15 +1,17 @@
 //! Inert semantic discovery of embedded ODF and OLE objects.
 
-use crate::ImageFrame;
-use crate::elements::xml::namespaced_attribute;
+use crate::drawing::{Frame, Part};
+use crate::namespace::namespaced_attribute;
+use crate::package::{PackageLookup, is_linked_href, resolve_package_path};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use litchi_core::{Error, Result};
-use litchi_odf_common::package::{is_linked_href, resolve_package_path};
 use quick_xml::events::{BytesRef, BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use quick_xml::{Writer, XmlVersion};
+
+use super::model::{Kind, Object, Parameter, Root, Source};
 
 const DRAW_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -32,105 +34,6 @@ const MAX_TOTAL_INLINE_BINARY_BYTES: usize = 64 * 1024 * 1024;
 const MAX_ACCESSIBILITY_TEXT_BYTES: usize = 64 * 1024;
 const MAX_TOTAL_ACCESSIBILITY_TEXT_BYTES: usize = 8 * 1024 * 1024;
 
-/// XML part containing an embedded-object occurrence.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum EmbeddedObjectPart {
-    Content,
-    Styles,
-    FlatDocument,
-}
-
-/// Normative embedded-object element kind.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum EmbeddedObjectKind {
-    Object,
-    ObjectOle,
-    Applet,
-    Plugin,
-    FloatingFrame,
-}
-
-/// One ordered, inert applet or plugin parameter.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct EmbeddedObjectParameter {
-    pub name: String,
-    pub value: String,
-}
-
-/// Root kind of an inline XML object payload.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum InlineObjectRoot {
-    OpenDocument,
-    MathMl,
-}
-
-/// Inert storage classification for an embedded object.
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum EmbeddedObjectSource {
-    InlineXml {
-        root: InlineObjectRoot,
-        xml: String,
-        ignored_href: Option<String>,
-    },
-    InlineBinary {
-        bytes: Vec<u8>,
-        ignored_href: Option<String>,
-    },
-    PackageFile {
-        href: String,
-        path: String,
-        manifest_media_type: Option<String>,
-    },
-    PackageSubdocument {
-        href: String,
-        root_path: String,
-        content_path: String,
-        manifest_media_type: Option<String>,
-    },
-    MissingPackagePart {
-        href: String,
-        resolved_path: String,
-    },
-    Linked {
-        href: String,
-    },
-    Missing,
-}
-
-/// One inert `draw:object` or `draw:object-ole` occurrence.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct EmbeddedObject {
-    pub part: EmbeddedObjectPart,
-    pub kind: EmbeddedObjectKind,
-    pub source: EmbeddedObjectSource,
-    pub frame: Option<ImageFrame>,
-    pub xml_id: Option<String>,
-    pub class_id: Option<String>,
-    pub notify_on_update_of_ranges: Option<String>,
-    pub link_type: Option<String>,
-    pub show: Option<String>,
-    pub actuate: Option<String>,
-    pub code: Option<String>,
-    pub object_name: Option<String>,
-    pub archive: Option<String>,
-    /// Stored applet scripting intent. No script or applet is ever started.
-    pub may_script: Option<bool>,
-    pub applet_name: Option<String>,
-    pub mime_type: Option<String>,
-    pub frame_name: Option<String>,
-    pub parameters: Vec<EmbeddedObjectParameter>,
-}
-
-#[derive(Clone, Copy)]
-struct PackageLookup<'a> {
-    has_file: &'a dyn Fn(&str) -> bool,
-    media_type: &'a dyn Fn(&str) -> Option<String>,
-}
-
 struct NamedContext {
     depth: usize,
     name: Option<String>,
@@ -138,7 +41,7 @@ struct NamedContext {
 
 struct FrameState {
     depth: usize,
-    frame: ImageFrame,
+    frame: Frame,
     object_indices: Vec<usize>,
 }
 
@@ -156,15 +59,15 @@ struct AccessibilityText {
 
 struct InlineXmlCapture {
     depth: usize,
-    root: InlineObjectRoot,
+    root: Root,
     writer: Writer<Vec<u8>>,
 }
 
 struct ObjectBuilder {
     depth: usize,
-    kind: EmbeddedObjectKind,
+    kind: Kind,
     href: Option<String>,
-    frame: Option<ImageFrame>,
+    frame: Option<Frame>,
     xml_id: Option<String>,
     class_id: Option<String>,
     notify_on_update_of_ranges: Option<String>,
@@ -178,31 +81,27 @@ struct ObjectBuilder {
     applet_name: Option<String>,
     mime_type: Option<String>,
     frame_name: Option<String>,
-    parameters: Vec<EmbeddedObjectParameter>,
-    inline_xml: Option<(InlineObjectRoot, String)>,
+    parameters: Vec<Parameter>,
+    inline_xml: Option<(Root, String)>,
     binary_present: bool,
     binary_depth: Option<usize>,
     binary_encoded: String,
 }
 
-pub(crate) fn scan_packaged_objects(
+/// Scan package-backed embedded-object occurrences in content and styles XML.
+pub fn scan_package(
     content_xml: &str,
     styles_xml: Option<&str>,
-    has_file: impl Fn(&str) -> bool,
-    media_type: impl Fn(&str) -> Option<String>,
-) -> Result<Vec<EmbeddedObject>> {
-    let lookup = PackageLookup {
-        has_file: &has_file,
-        media_type: &media_type,
-    };
+    package: &impl PackageLookup,
+) -> Result<Vec<Object>> {
     let mut objects = Vec::new();
     let mut total_xml = 0usize;
     let mut total_binary = 0usize;
     let mut total_accessibility = 0usize;
     scan_xml(
         content_xml,
-        EmbeddedObjectPart::Content,
-        Some(lookup),
+        Part::Content,
+        Some(package),
         &mut objects,
         &mut total_xml,
         &mut total_binary,
@@ -211,8 +110,8 @@ pub(crate) fn scan_packaged_objects(
     if let Some(styles_xml) = styles_xml {
         scan_xml(
             styles_xml,
-            EmbeddedObjectPart::Styles,
-            Some(lookup),
+            Part::Styles,
+            Some(package),
             &mut objects,
             &mut total_xml,
             &mut total_binary,
@@ -222,14 +121,15 @@ pub(crate) fn scan_packaged_objects(
     Ok(objects)
 }
 
-pub(crate) fn scan_flat_objects(xml: &str) -> Result<Vec<EmbeddedObject>> {
+/// Scan a flat OpenDocument XML document for inert embedded objects.
+pub fn scan_flat(xml: &str) -> Result<Vec<Object>> {
     let mut objects = Vec::new();
     let mut total_xml = 0usize;
     let mut total_binary = 0usize;
     let mut total_accessibility = 0usize;
     scan_xml(
         xml,
-        EmbeddedObjectPart::FlatDocument,
+        Part::FlatDocument,
         None,
         &mut objects,
         &mut total_xml,
@@ -242,9 +142,9 @@ pub(crate) fn scan_flat_objects(xml: &str) -> Result<Vec<EmbeddedObject>> {
 #[allow(clippy::too_many_arguments)]
 fn scan_xml(
     xml: &str,
-    part: EmbeddedObjectPart,
-    package: Option<PackageLookup<'_>>,
-    objects: &mut Vec<EmbeddedObject>,
+    part: Part,
+    package: Option<&dyn PackageLookup>,
+    objects: &mut Vec<Object>,
     total_xml_bytes: &mut usize,
     total_binary_bytes: &mut usize,
     total_accessibility_bytes: &mut usize,
@@ -349,7 +249,7 @@ fn scan_xml(
                     } else if depth == object.depth + 1
                         && let Some(root) = inline_root(&namespace, &element)
                     {
-                        if object.kind != EmbeddedObjectKind::Object {
+                        if object.kind != Kind::Object {
                             return Err(Error::InvalidFormat(
                                 "draw:object-ole must not contain inline XML objects".to_string(),
                             ));
@@ -370,7 +270,7 @@ fn scan_xml(
                         && bound_to(&namespace, OFFICE_NAMESPACE)
                         && element.local_name().as_ref() == b"binary-data"
                     {
-                        if object.kind != EmbeddedObjectKind::ObjectOle {
+                        if object.kind != Kind::ObjectOle {
                             return Err(Error::InvalidFormat(
                                 "draw:object must not contain office:binary-data".to_string(),
                             ));
@@ -452,8 +352,7 @@ fn scan_xml(
                     } else if depth == object.depth
                         && let Some(root) = inline_root(&namespace, &element)
                     {
-                        if object.kind != EmbeddedObjectKind::Object || object.inline_xml.is_some()
-                        {
+                        if object.kind != Kind::Object || object.inline_xml.is_some() {
                             return Err(Error::InvalidFormat(
                                 "invalid duplicate inline embedded-object payload".to_string(),
                             ));
@@ -469,7 +368,7 @@ fn scan_xml(
                         && bound_to(&namespace, OFFICE_NAMESPACE)
                         && element.local_name().as_ref() == b"binary-data"
                     {
-                        if object.kind != EmbeddedObjectKind::ObjectOle || object.binary_present {
+                        if object.kind != Kind::ObjectOle || object.binary_present {
                             return Err(Error::InvalidFormat(
                                 "invalid duplicate inline OLE payload".to_string(),
                             ));
@@ -663,19 +562,16 @@ fn ensure_object_capacity(current: usize) -> Result<()> {
     Ok(())
 }
 
-fn object_kind(
-    namespace: &ResolveResult<'_>,
-    element: &BytesStart<'_>,
-) -> Option<EmbeddedObjectKind> {
+fn object_kind(namespace: &ResolveResult<'_>, element: &BytesStart<'_>) -> Option<Kind> {
     if !bound_to(namespace, DRAW_NAMESPACE) {
         return None;
     }
     match element.local_name().as_ref() {
-        b"object" => Some(EmbeddedObjectKind::Object),
-        b"object-ole" => Some(EmbeddedObjectKind::ObjectOle),
-        b"applet" => Some(EmbeddedObjectKind::Applet),
-        b"plugin" => Some(EmbeddedObjectKind::Plugin),
-        b"floating-frame" => Some(EmbeddedObjectKind::FloatingFrame),
+        b"object" => Some(Kind::Object),
+        b"object-ole" => Some(Kind::ObjectOle),
+        b"applet" => Some(Kind::Applet),
+        b"plugin" => Some(Kind::Plugin),
+        b"floating-frame" => Some(Kind::FloatingFrame),
         _ => None,
     }
 }
@@ -685,10 +581,7 @@ fn push_parameter(
     element: &BytesStart<'_>,
     object: &mut ObjectBuilder,
 ) -> Result<()> {
-    if !matches!(
-        object.kind,
-        EmbeddedObjectKind::Applet | EmbeddedObjectKind::Plugin
-    ) {
+    if !matches!(object.kind, Kind::Applet | Kind::Plugin) {
         return Err(Error::InvalidFormat(
             "draw:param is allowed only in draw:applet or draw:plugin".to_string(),
         ));
@@ -707,20 +600,15 @@ fn push_parameter(
             "draw:param name must not be empty".to_string(),
         ));
     }
-    object
-        .parameters
-        .push(EmbeddedObjectParameter { name, value });
+    object.parameters.push(Parameter { name, value });
     Ok(())
 }
 
-fn inline_root(
-    namespace: &ResolveResult<'_>,
-    element: &BytesStart<'_>,
-) -> Option<InlineObjectRoot> {
+fn inline_root(namespace: &ResolveResult<'_>, element: &BytesStart<'_>) -> Option<Root> {
     if bound_to(namespace, OFFICE_NAMESPACE) && element.local_name().as_ref() == b"document" {
-        Some(InlineObjectRoot::OpenDocument)
+        Some(Root::OpenDocument)
     } else if bound_to(namespace, MATH_NAMESPACE) && element.local_name().as_ref() == b"math" {
-        Some(InlineObjectRoot::MathMl)
+        Some(Root::MathMl)
     } else {
         None
     }
@@ -730,7 +618,7 @@ fn start_object(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     depth: usize,
-    kind: EmbeddedObjectKind,
+    kind: Kind,
     object_index: usize,
     frame: Option<&mut FrameState>,
 ) -> Result<ObjectBuilder> {
@@ -779,12 +667,12 @@ fn start_object(
 
 fn finish_object(
     object: ObjectBuilder,
-    part: EmbeddedObjectPart,
-    package: Option<PackageLookup<'_>>,
+    part: Part,
+    package: Option<&dyn PackageLookup>,
     total_binary_bytes: &mut usize,
-) -> Result<EmbeddedObject> {
+) -> Result<Object> {
     let source = if let Some((root, xml)) = object.inline_xml {
-        EmbeddedObjectSource::InlineXml {
+        Source::InlineXml {
             root,
             xml,
             ignored_href: object.href.clone(),
@@ -818,43 +706,43 @@ fn finish_object(
                 "total inline OLE data exceeds {MAX_TOTAL_INLINE_BINARY_BYTES} bytes"
             )));
         }
-        EmbeddedObjectSource::InlineBinary {
+        Source::InlineBinary {
             bytes,
             ignored_href: object.href.clone(),
         }
     } else if let Some(href) = object.href.clone().filter(|href| !href.is_empty()) {
         if matches!(
             object.kind,
-            EmbeddedObjectKind::Applet
-                | EmbeddedObjectKind::Plugin
-                | EmbeddedObjectKind::FloatingFrame
+            Kind::Applet | Kind::Plugin | Kind::FloatingFrame
         ) {
-            EmbeddedObjectSource::Linked { href }
+            Source::Linked { href }
         } else {
             match package {
-                None => EmbeddedObjectSource::Linked { href },
-                Some(_) if is_linked_href(&href) => EmbeddedObjectSource::Linked { href },
+                None => Source::Linked { href },
+                Some(_) if is_linked_href(&href) => Source::Linked { href },
                 Some(package) => {
                     let path = resolve_package_path(&href)?;
-                    if (package.has_file)(&path) {
-                        EmbeddedObjectSource::PackageFile {
+                    if package.has_file(&path) {
+                        Source::PackageFile {
                             href,
-                            manifest_media_type: (package.media_type)(&path),
+                            manifest_media_type: package.media_type(&path).map(str::to_owned),
                             path,
                         }
                     } else {
                         let content_path = format!("{path}/content.xml");
-                        if (package.has_file)(&content_path) {
+                        if package.has_file(&content_path) {
                             let root_path = format!("{path}/");
-                            EmbeddedObjectSource::PackageSubdocument {
+                            Source::PackageSubdocument {
                                 href,
-                                manifest_media_type: (package.media_type)(&root_path)
-                                    .or_else(|| (package.media_type)(&path)),
+                                manifest_media_type: package
+                                    .media_type(&root_path)
+                                    .or_else(|| package.media_type(&path))
+                                    .map(str::to_owned),
                                 root_path,
                                 content_path,
                             }
                         } else {
-                            EmbeddedObjectSource::MissingPackagePart {
+                            Source::MissingPackagePart {
                                 href,
                                 resolved_path: path,
                             }
@@ -864,10 +752,10 @@ fn finish_object(
             }
         }
     } else {
-        EmbeddedObjectSource::Missing
+        Source::Missing
     };
 
-    Ok(EmbeddedObject {
+    Ok(Object {
         part,
         kind: object.kind,
         source,
@@ -957,8 +845,8 @@ fn parse_frame(
     element: &BytesStart<'_>,
     pages: &[NamedContext],
     sheets: &[NamedContext],
-) -> Result<ImageFrame> {
-    Ok(ImageFrame {
+) -> Result<Frame> {
+    Ok(Frame {
         name: attribute(reader, element, DRAW_NAMESPACE, b"name")?,
         xml_id: attribute(reader, element, XML_NAMESPACE, b"id")?,
         title: None,
@@ -1128,22 +1016,19 @@ mod active_object_tests {
         let xml = format!(
             r#"{PREFIX}<d:frame d:name="Applet"><d:applet x:href="https://example.invalid/app" d:code="Main" d:archive="app.jar" d:may-script="true"><d:param d:name="theme" d:value="dark"/></d:applet></d:frame><d:frame><d:plugin x:href="media.bin" d:mime-type="application/x-example"><d:param d:name="quality" d:value="high"></d:param></d:plugin></d:frame><d:frame><d:floating-frame x:href="https://example.invalid/frame" d:frame-name="preview"/></d:frame>{SUFFIX}"#
         );
-        let objects = scan_flat_objects(&xml).unwrap();
+        let objects = scan_flat(&xml).unwrap();
         assert_eq!(objects.len(), 3);
-        assert_eq!(objects[0].kind, EmbeddedObjectKind::Applet);
+        assert_eq!(objects[0].kind, Kind::Applet);
         assert_eq!(objects[0].code.as_deref(), Some("Main"));
         assert_eq!(objects[0].may_script, Some(true));
         assert_eq!(objects[0].parameters[0].name, "theme");
-        assert!(matches!(
-            objects[0].source,
-            EmbeddedObjectSource::Linked { .. }
-        ));
-        assert_eq!(objects[1].kind, EmbeddedObjectKind::Plugin);
+        assert!(matches!(objects[0].source, Source::Linked { .. }));
+        assert_eq!(objects[1].kind, Kind::Plugin);
         assert_eq!(
             objects[1].mime_type.as_deref(),
             Some("application/x-example")
         );
-        assert_eq!(objects[2].kind, EmbeddedObjectKind::FloatingFrame);
+        assert_eq!(objects[2].kind, Kind::FloatingFrame);
         assert_eq!(objects[2].frame_name.as_deref(), Some("preview"));
     }
 
@@ -1156,7 +1041,7 @@ mod active_object_tests {
             r#"<d:plugin><d:applet/></d:plugin>"#,
         ] {
             let xml = format!("{PREFIX}{body}{SUFFIX}");
-            assert!(scan_flat_objects(&xml).is_err(), "accepted {body}");
+            assert!(scan_flat(&xml).is_err(), "accepted {body}");
         }
     }
 }

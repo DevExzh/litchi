@@ -14,8 +14,50 @@
 //!
 //! - odfpy: `3rdparty/odfpy/odf/namespaces.py` (lines 24-111)
 
+use litchi_core::{Error, Result};
 use phf::{Map, phf_map};
+use quick_xml::XmlVersion;
+use quick_xml::events::BytesStart;
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
 use std::collections::HashMap;
+
+pub(crate) fn is_bound(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
+    matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == expected)
+}
+
+pub(crate) fn namespaced_attribute(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    expected_namespace: &[u8],
+    expected_local_name: &[u8],
+    context: &str,
+) -> Result<Option<String>> {
+    let mut value = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| {
+            Error::InvalidFormat(format!("invalid {context} attribute: {error}"))
+        })?;
+        let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
+        if is_bound(&namespace, expected_namespace) && local_name.as_ref() == expected_local_name {
+            if value.is_some() {
+                return Err(Error::InvalidFormat(format!(
+                    "duplicate expanded {context} attribute '{}'",
+                    String::from_utf8_lossy(expected_local_name)
+                )));
+            }
+            value = Some(
+                attribute
+                    .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid {context} attribute value: {error}"))
+                    })?
+                    .into_owned(),
+            );
+        }
+    }
+    Ok(value)
+}
 
 // ============================================================================
 // NAMESPACE CONSTANTS

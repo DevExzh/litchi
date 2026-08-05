@@ -1,14 +1,13 @@
 //! Atomic authoring of inert embedded OpenDocument chart objects.
 
+use crate::constants;
 use crate::core::{OwnedPackage, PackageWriter};
 use crate::elements::xml::namespaced_attribute;
 use crate::odc::{Definition, Document};
-use crate::{
-    EmbeddedObject, EmbeddedObjectKind, EmbeddedObjectPart, EmbeddedObjectSource, InlineObjectRoot,
-    constants,
-};
 use litchi_core::{Error, Result};
 use litchi_odc::serialize_content;
+use litchi_odf_common::drawing::Part;
+use litchi_odf_common::embedded::{Kind, Object, Source, scan_package};
 pub(crate) use litchi_odf_common::package::{Addition, rebuild_package, splice};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -70,13 +69,13 @@ pub(crate) fn open_embedded_chart(
     let current_objects = objects(package, content, styles)?;
     let object = select_chart_object(&current_objects, index)?;
     match &object.source {
-        EmbeddedObjectSource::PackageSubdocument {
+        Source::PackageSubdocument {
             root_path,
             manifest_media_type,
             ..
         } => open_subdocument(package, root_path, manifest_media_type.as_deref()),
-        EmbeddedObjectSource::InlineXml {
-            root: InlineObjectRoot::OpenDocument,
+        Source::InlineXml {
+            root: litchi_odf_common::embedded::Root::OpenDocument,
             xml,
             ..
         } => open_inline(xml),
@@ -97,7 +96,7 @@ pub(crate) fn replace_embedded_chart(
     let _ = open_embedded_chart(package, content, styles, index)?;
     let chart_content = serialize_content(definition)?;
     match &object.source {
-        EmbeddedObjectSource::PackageSubdocument { content_path, .. } => rebuild_package(
+        Source::PackageSubdocument { content_path, .. } => rebuild_package(
             package,
             content,
             vec![Addition {
@@ -109,7 +108,7 @@ pub(crate) fn replace_embedded_chart(
             vec![content_path.clone()],
             Vec::new(),
         ),
-        EmbeddedObjectSource::InlineXml { .. } => {
+        Source::InlineXml { .. } => {
             let spans = locate_objects(content)?;
             let span = spans.get(index).ok_or_else(|| {
                 Error::InvalidFormat("embedded-object scanner/span mismatch".to_string())
@@ -147,10 +146,10 @@ pub(crate) fn remove_embedded_chart(
         .ok_or_else(|| Error::InvalidFormat("embedded-object scanner/span mismatch".to_string()))?;
     let updated = splice(content, span.start, span.end, "")?;
     let mut excluded_prefixes = Vec::new();
-    if let EmbeddedObjectSource::PackageSubdocument { root_path, .. } = &object.source {
+    if let Source::PackageSubdocument { root_path, .. } = &object.source {
         let remaining = objects(package, &updated, styles)?;
         let still_referenced = remaining.iter().any(|candidate| {
-            matches!(&candidate.source, EmbeddedObjectSource::PackageSubdocument { root_path: candidate_root, .. } if candidate_root.as_str() == root_path.as_str())
+            matches!(&candidate.source, Source::PackageSubdocument { root_path: candidate_root, .. } if candidate_root.as_str() == root_path.as_str())
         });
         if !still_referenced {
             excluded_prefixes.push(root_path.clone());
@@ -177,7 +176,7 @@ pub(crate) fn add_embedded_chart(
     let current = objects(package, content, styles)?;
     let index = current
         .iter()
-        .filter(|object| object.part == EmbeddedObjectPart::Content)
+        .filter(|object| object.part == Part::Content)
         .count();
     let chart_content = serialize_content(definition)?;
     let root = unused_object_root(package)?;
@@ -221,26 +220,17 @@ pub(crate) fn add_embedded_chart(
     Ok((bytes, index))
 }
 
-fn objects(
-    package: &OwnedPackage,
-    content: &str,
-    styles: Option<&str>,
-) -> Result<Vec<EmbeddedObject>> {
+fn objects(package: &OwnedPackage, content: &str, styles: Option<&str>) -> Result<Vec<Object>> {
     let borrowed = package.package()?;
-    crate::embedded_object::scan_packaged_objects(
-        content,
-        styles,
-        |path| borrowed.has_file(path),
-        |path| borrowed.manifest().get_media_type(path).map(str::to_string),
-    )
+    scan_package(content, styles, &borrowed)
 }
 
-fn select_chart_object(objects: &[EmbeddedObject], index: usize) -> Result<&EmbeddedObject> {
+fn select_chart_object(objects: &[Object], index: usize) -> Result<&Object> {
     let object = objects.get(index).ok_or_else(|| {
         Error::InvalidFormat(format!("embedded-object index {index} is out of bounds"))
     })?;
-    if object.part != EmbeddedObjectPart::Content
-        || object.kind != EmbeddedObjectKind::Object
+    if object.part != Part::Content
+        || object.kind != Kind::Object
         || object.class_id.is_some()
         || object.code.is_some()
         || object.archive.is_some()

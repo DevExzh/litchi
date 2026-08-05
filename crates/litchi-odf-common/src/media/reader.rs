@@ -1,17 +1,18 @@
 //! Bounded XML scanning and package-path safety for image media.
 
-use crate::elements::xml::namespaced_attribute;
+use crate::drawing::{Frame, Part};
+use crate::namespace::namespaced_attribute;
+use crate::package::{PackageLookup, is_linked_href, resolve_package_path};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use litchi_core::{Error, Result};
-use litchi_odf_common::package::{is_linked_href, resolve_package_path};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::collections::HashSet;
 
-use super::{Image, ImageFrame, ImagePart, ImageSource};
+use super::{Image, Source};
 
 const DRAW_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -29,16 +30,10 @@ const MAX_TOTAL_INLINE_IMAGE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_ACCESSIBILITY_TEXT_BYTES: usize = 64 * 1024;
 const MAX_TOTAL_ACCESSIBILITY_TEXT_BYTES: usize = 8 * 1024 * 1024;
 
-#[derive(Clone, Copy)]
-struct PackageLookup<'a> {
-    has_file: &'a dyn Fn(&str) -> bool,
-    media_type: &'a dyn Fn(&str) -> Option<String>,
-}
-
 #[derive(Clone)]
 struct FrameState {
     depth: usize,
-    frame: ImageFrame,
+    frame: Frame,
     image_count: usize,
     image_indices: Vec<usize>,
 }
@@ -63,7 +58,7 @@ struct NamedContext {
 struct ImageBuilder {
     depth: usize,
     href: Option<String>,
-    frame: Option<ImageFrame>,
+    frame: Option<Frame>,
     xml_id: Option<String>,
     filter_name: Option<String>,
     declared_media_type: Option<String>,
@@ -76,23 +71,19 @@ struct ImageBuilder {
     inline_encoded: String,
 }
 
-pub fn scan_packaged_images(
+/// Scan package-backed `draw:image` occurrences in content and styles XML.
+pub fn scan_package(
     content_xml: &str,
     styles_xml: Option<&str>,
-    has_file: impl Fn(&str) -> bool,
-    media_type: impl Fn(&str) -> Option<String>,
+    package: &impl PackageLookup,
 ) -> Result<Vec<Image>> {
-    let lookup = PackageLookup {
-        has_file: &has_file,
-        media_type: &media_type,
-    };
     let mut images = Vec::new();
     let mut inline_bytes = 0usize;
     let mut accessibility_bytes = 0usize;
     scan_xml(
         content_xml,
-        ImagePart::Content,
-        Some(lookup),
+        Part::Content,
+        Some(package),
         &mut images,
         &mut inline_bytes,
         &mut accessibility_bytes,
@@ -100,8 +91,8 @@ pub fn scan_packaged_images(
     if let Some(styles_xml) = styles_xml {
         scan_xml(
             styles_xml,
-            ImagePart::Styles,
-            Some(lookup),
+            Part::Styles,
+            Some(package),
             &mut images,
             &mut inline_bytes,
             &mut accessibility_bytes,
@@ -110,13 +101,14 @@ pub fn scan_packaged_images(
     Ok(images)
 }
 
-pub fn scan_flat_images(xml: &str) -> Result<Vec<Image>> {
+/// Scan a flat OpenDocument XML document for inert image occurrences.
+pub fn scan_flat(xml: &str) -> Result<Vec<Image>> {
     let mut images = Vec::new();
     let mut inline_bytes = 0usize;
     let mut accessibility_bytes = 0usize;
     scan_xml(
         xml,
-        ImagePart::FlatDocument,
+        Part::FlatDocument,
         None,
         &mut images,
         &mut inline_bytes,
@@ -125,13 +117,14 @@ pub fn scan_flat_images(xml: &str) -> Result<Vec<Image>> {
     Ok(images)
 }
 
-pub fn scan_content_images(xml: &str) -> Result<Vec<Image>> {
+/// Scan one package XML part without resolving package-local references.
+pub fn scan_content(xml: &str) -> Result<Vec<Image>> {
     let mut images = Vec::new();
     let mut inline_bytes = 0usize;
     let mut accessibility_bytes = 0usize;
     scan_xml(
         xml,
-        ImagePart::Content,
+        Part::Content,
         None,
         &mut images,
         &mut inline_bytes,
@@ -142,8 +135,8 @@ pub fn scan_content_images(xml: &str) -> Result<Vec<Image>> {
 
 fn scan_xml(
     xml: &str,
-    part: ImagePart,
-    package: Option<PackageLookup<'_>>,
+    part: Part,
+    package: Option<&dyn PackageLookup>,
     images: &mut Vec<Image>,
     total_inline_bytes: &mut usize,
     total_accessibility_bytes: &mut usize,
@@ -539,8 +532,8 @@ fn parse_frame(
     pages: &[NamedContext],
     sheets: &[NamedContext],
     sheet_shape: bool,
-) -> Result<ImageFrame> {
-    Ok(ImageFrame {
+) -> Result<Frame> {
+    Ok(Frame {
         name: attribute(reader, element, DRAW_NAMESPACE, b"name")?,
         xml_id: attribute(reader, element, XML_NAMESPACE, b"id")?,
         title: None,
@@ -724,8 +717,8 @@ fn append_inline(image: &mut ImageBuilder, value: &str) -> Result<()> {
 
 fn finish_image(
     image: ImageBuilder,
-    part: ImagePart,
-    package: Option<PackageLookup<'_>>,
+    part: Part,
+    package: Option<&dyn PackageLookup>,
     total_inline_bytes: &mut usize,
 ) -> Result<Image> {
     let source = if image.inline_present {
@@ -757,24 +750,24 @@ fn finish_image(
                 "total inline image data exceeds {MAX_TOTAL_INLINE_IMAGE_BYTES} bytes"
             )));
         }
-        ImageSource::Inline {
+        Source::Inline {
             bytes,
             ignored_href: image.href.clone(),
         }
     } else if let Some(href) = image.href.clone().filter(|href| !href.is_empty()) {
         match package {
-            None => ImageSource::Linked { href },
-            Some(_) if is_linked_href(&href) => ImageSource::Linked { href },
+            None => Source::Linked { href },
+            Some(_) if is_linked_href(&href) => Source::Linked { href },
             Some(package) => {
                 let path = resolve_package_path(&href)?;
-                if (package.has_file)(&path) {
-                    ImageSource::PackagePart {
+                if package.has_file(&path) {
+                    Source::PackagePart {
                         href,
-                        manifest_media_type: (package.media_type)(&path),
+                        manifest_media_type: package.media_type(&path).map(str::to_owned),
                         path,
                     }
                 } else {
-                    ImageSource::MissingPackagePart {
+                    Source::MissingPackagePart {
                         href,
                         resolved_path: path,
                     }
@@ -782,7 +775,7 @@ fn finish_image(
             },
         }
     } else {
-        ImageSource::Missing
+        Source::Missing
     };
 
     Ok(Image {

@@ -4196,6 +4196,28 @@ workspace test remains blocked before project compilation because `pkg-config`
 is not available for `yeslogic-fontconfig-sys`/fontconfig. No native Office or
 performance claim is made for this batch.
 
+## XLSB formula facade canonicalization
+
+The subsequent XLSB formula migration removes the compatibility layer
+described in the earlier historical batch. `litchi-xlsb::formula` remains the
+owner of the BIFF12 RPN/Ptg codec, while the host adapter is physically layered
+as `host/formula/{mod,model,pivot,resolution,table,text}.rs`. It now consumes
+the neutral `Parser`, `ParsedFormula`, `Group`, `Range`, and `Compiler` types
+directly. Workbook-specific pivot, table, resolution, and formula-text
+semantics remain in their contextual submodules; no XLSB/XLSX formula codec
+edge was introduced.
+
+The former `FormulaParser`, `FormulaConverter`, `FormulaResolution`,
+`CellParsedFormula`, `FormulaRange`, `FormulaGroup`, `FormulaPivot*`, and
+`FormulaTableDefinition` facade names were removed without aliases. The
+canonical owner paths preserve the `[MS-XLSB]` RPN limits and conversions
+while eliminating wrapper allocations around `rgce`/`rgcb` payloads.
+
+Focused verification passes 408 XLSB library tests and two formula integration
+tests, plus all-target compilation, formatting, and the crate-boundary audit.
+The existing XLSX textual-formula owner remains independent as required by
+its different `[MS-XLSX]` grammar.
+
 ## DOCX mail-merge, PPTX presentation-properties, XLSX ActiveX, and shared web-owner layering
 
 This batch continues the layered-module and concise-name rule across three

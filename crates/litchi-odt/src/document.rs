@@ -1022,11 +1022,10 @@ impl Document {
     /// Discover referenced, inline, missing, and inert linked images.
     pub fn images(&self) -> Result<Vec<crate::Image>> {
         let package = self.package.package()?;
-        crate::media::scan_packaged_images(
+        crate::media::scan_package(
             self.content.xml_content(),
             self.styles.as_ref().map(Styles::xml_content),
-            |path| package.has_file(path),
-            |path| package.manifest().get_media_type(path).map(str::to_string),
+            &package,
         )
     }
 
@@ -1229,13 +1228,12 @@ impl Document {
     }
 
     /// Discover package, inline, missing, and inert linked embedded objects.
-    pub fn embedded_objects(&self) -> Result<Vec<crate::EmbeddedObject>> {
+    pub fn embedded_objects(&self) -> Result<Vec<crate::Object>> {
         let package = self.package.package()?;
-        crate::embedded_object::scan_packaged_objects(
+        crate::embedded::scan_package(
             self.content.xml_content(),
             self.styles.as_ref().map(Styles::xml_content),
-            |path| package.has_file(path),
-            |path| package.manifest().get_media_type(path).map(str::to_string),
+            &package,
         )
     }
 
@@ -1403,8 +1401,10 @@ impl Document {
     /// Linked images remain inert and are never fetched.
     pub fn image_bytes(&self, image: &crate::Image) -> Result<Option<Vec<u8>>> {
         match &image.source {
-            crate::ImageSource::Inline { bytes, .. } => Ok(Some(bytes.clone())),
-            crate::ImageSource::PackagePart { path, .. } => self.package.get_file(path).map(Some),
+            litchi_odf_common::media::Source::Inline { bytes, .. } => Ok(Some(bytes.clone())),
+            litchi_odf_common::media::Source::PackagePart { path, .. } => {
+                self.package.get_file(path).map(Some)
+            },
             _ => Ok(None),
         }
     }

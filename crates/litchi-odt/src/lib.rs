@@ -91,7 +91,7 @@ pub mod dde_connection;
 pub mod document_scripts;
 pub mod drawing;
 pub mod drawing_page_properties;
-pub mod embedded_object;
+pub mod embedded;
 pub mod font_face;
 pub mod footnote_separator;
 pub mod form;
@@ -174,9 +174,7 @@ pub(crate) use elements::bookmark::{
     unused_imports,
     reason = "ODT facade exposes inert embedded-resource models"
 )]
-pub(crate) use embedded_object::{
-    EmbeddedObject, EmbeddedObjectKind, EmbeddedObjectPart, EmbeddedObjectSource, InlineObjectRoot,
-};
+pub(crate) use embedded::Object;
 #[allow(
     unused_imports,
     reason = "ODT facade exposes the canonical document package types"
@@ -189,6 +187,8 @@ pub(crate) use graphic_properties::{
 };
 #[allow(unused_imports, reason = "ODT facade exposes annotation semantics")]
 pub(crate) use litchi_odf_common::annotation::{AnnotationElement, AnnotationNode, CellAnnotation};
+#[allow(unused_imports, reason = "ODT facade exposes shared drawing context")]
+pub(crate) use litchi_odf_common::drawing::{Frame, Part};
 #[allow(
     unused_imports,
     reason = "ODT facade exposes master-page package mutations"
@@ -197,7 +197,7 @@ pub(crate) use master_page::{
     insert_master_page_xml, remove_master_page_xml, replace_master_page_xml,
 };
 #[allow(unused_imports, reason = "ODT facade exposes package media models")]
-pub(crate) use media::{Image, ImageFrame, ImagePart, ImageSource};
+pub(crate) use media::Image;
 #[allow(
     unused_imports,
     reason = "ODT facade exposes ODF chart models for embedded charts"

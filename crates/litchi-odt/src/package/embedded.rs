@@ -1,18 +1,18 @@
 //! Atomic authoring of inert embedded objects, OLE payloads, and images.
 
+use crate::constants;
 use crate::core::OwnedPackage;
 use crate::package::charts::{
     Addition, EmbeddedChartHost, ObjectSpan, insert_at_host, locate_objects, rebuild_package,
     splice, unused_object_root,
 };
-use crate::{
-    EmbeddedObjectKind, EmbeddedObjectPart, EmbeddedObjectSource, ImagePart, ImageSource,
-    InlineObjectRoot, constants,
-};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use litchi_core::{Error, Result};
-use litchi_odf_common::package::{is_linked_href, resolve_package_path};
+use litchi_odf_common::core::package::Package;
+use litchi_odf_common::drawing::Part;
+use litchi_odf_common::embedded::{Kind, Object, Root, Source, scan_package};
+use litchi_odf_common::package::{PackageLookup, is_linked_href, resolve_package_path};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -66,7 +66,7 @@ pub enum EmbeddedResourceSource {
         preferred_root: Option<String>,
     },
     /// A complete inline `office:document` or `math:math` element.
-    InlineXml { root: InlineObjectRoot, xml: String },
+    InlineXml { root: Root, xml: String },
     /// Base64-encoded into an `office:binary-data` child.
     InlineBinary {
         bytes: Vec<u8>,
@@ -95,6 +95,25 @@ struct BuiltResource {
     xml: String,
     additions: Vec<Addition>,
     directories: Vec<(String, String)>,
+}
+
+struct OverlayLookup<'additions, 'package, 'data> {
+    additions: &'additions [Addition],
+    package: &'package Package<'data>,
+}
+
+impl PackageLookup for OverlayLookup<'_, '_, '_> {
+    fn has_file(&self, path: &str) -> bool {
+        self.additions.iter().any(|addition| addition.path == path) || self.package.has_file(path)
+    }
+
+    fn media_type(&self, path: &str) -> Option<&str> {
+        self.additions
+            .iter()
+            .find(|addition| addition.path == path)
+            .map(|addition| addition.media_type.as_str())
+            .or_else(|| self.package.manifest().get_media_type(path))
+    }
 }
 
 #[derive(Clone)]
@@ -395,7 +414,7 @@ fn validate_metadata(resource: &EmbeddedResource) -> Result<()> {
     Ok(())
 }
 
-fn validate_inline_xml(root: InlineObjectRoot, xml: &str) -> Result<()> {
+fn validate_inline_xml(root: Root, xml: &str) -> Result<()> {
     if xml.len() > MAX_INLINE_BYTES {
         return invalid("inline XML exceeds size limit");
     }
@@ -417,13 +436,14 @@ fn validate_inline_xml(root: InlineObjectRoot, xml: &str) -> Result<()> {
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 let expected = match root {
-                    InlineObjectRoot::OpenDocument => b"document".as_slice(),
-                    InlineObjectRoot::MathMl => b"math".as_slice(),
+                    Root::OpenDocument => b"document".as_slice(),
+                    Root::MathMl => b"math".as_slice(),
+                    _ => return invalid("unsupported inline XML root"),
                 };
                 if element.local_name().as_ref() != expected {
                     return invalid("inline XML root does not match its declared kind");
                 }
-                if root == InlineObjectRoot::OpenDocument {
+                if root == Root::OpenDocument {
                     let valid_ns = matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == OFFICE_NS);
                     if !valid_ns {
                         return invalid("inline OpenDocument root has the wrong namespace");
@@ -655,7 +675,7 @@ fn selected_spans(
             let objects = scan_objects(package, content, styles)?;
             let content_objects: Vec<_> = objects
                 .iter()
-                .filter(|object| object.part == EmbeddedObjectPart::Content)
+                .filter(|object| object.part == Part::Content)
                 .collect();
             if all_spans.len() != content_objects.len() {
                 return invalid("embedded-object XML scan disagreement");
@@ -664,11 +684,7 @@ fn selected_spans(
                 .into_iter()
                 .zip(content_objects)
                 .filter_map(|(span, object)| {
-                    matches!(
-                        object.kind,
-                        EmbeddedObjectKind::Object | EmbeddedObjectKind::ObjectOle
-                    )
-                    .then_some(span)
+                    matches!(object.kind, Kind::Object | Kind::ObjectOle).then_some(span)
                 })
                 .collect())
         },
@@ -685,16 +701,11 @@ fn selected_locations(
     match target {
         ResourceTarget::Object => Ok(scan_objects(package, content, styles)?
             .into_iter()
-            .filter(|object| object.part == EmbeddedObjectPart::Content)
-            .filter(|object| {
-                matches!(
-                    object.kind,
-                    EmbeddedObjectKind::Object | EmbeddedObjectKind::ObjectOle
-                )
-            })
+            .filter(|object| object.part == Part::Content)
+            .filter(|object| matches!(object.kind, Kind::Object | Kind::ObjectOle))
             .map(|object| match object.source {
-                EmbeddedObjectSource::PackageFile { path, .. } => Some(StoredLocation::File(path)),
-                EmbeddedObjectSource::PackageSubdocument { root_path, .. } => {
+                Source::PackageFile { path, .. } => Some(StoredLocation::File(path)),
+                Source::PackageSubdocument { root_path, .. } => {
                     Some(StoredLocation::Directory(root_path))
                 },
                 _ => None,
@@ -702,9 +713,11 @@ fn selected_locations(
             .collect()),
         ResourceTarget::Image => Ok(scan_images(package, content, styles)?
             .into_iter()
-            .filter(|image| image.part == ImagePart::Content)
+            .filter(|image| image.part == Part::Content)
             .map(|image| match image.source {
-                ImageSource::PackagePart { path, .. } => Some(StoredLocation::File(path)),
+                litchi_odf_common::media::Source::PackagePart { path, .. } => {
+                    Some(StoredLocation::File(path))
+                },
                 _ => None,
             })
             .collect()),
@@ -752,34 +765,17 @@ fn cleanup(
     let Some(old) = old else {
         return Ok((excluded_paths, excluded_prefixes));
     };
-    let additions: HashSet<&str> = built
-        .additions
-        .iter()
-        .map(|item| item.path.as_str())
-        .collect();
-    let has_file = |path: &str| additions.contains(path) || package.has_file(path).unwrap_or(false);
-    let media_type = |path: &str| {
-        built
-            .additions
-            .iter()
-            .find(|item| item.path == path)
-            .map(|item| item.media_type.clone())
-            .or_else(|| {
-                package
-                    .package()
-                    .ok()?
-                    .manifest()
-                    .get_media_type(path)
-                    .map(str::to_string)
-            })
+    let archive = package.package()?;
+    let lookup = OverlayLookup {
+        additions: &built.additions,
+        package: &archive,
     };
-    let objects =
-        crate::embedded_object::scan_packaged_objects(content, styles, has_file, media_type)?;
-    let images = crate::media::scan_packaged_images(content, styles, has_file, media_type)?;
+    let objects = scan_package(content, styles, &lookup)?;
+    let images = crate::media::scan_package(content, styles, &lookup)?;
     let referenced = match old {
-        StoredLocation::File(path) => objects.iter().any(|object| matches!(&object.source, EmbeddedObjectSource::PackageFile { path: candidate, .. } if candidate == path))
-            || images.iter().any(|image| matches!(&image.source, ImageSource::PackagePart { path: candidate, .. } if candidate == path)),
-        StoredLocation::Directory(root) => objects.iter().any(|object| matches!(&object.source, EmbeddedObjectSource::PackageSubdocument { root_path, .. } if root_path == root)),
+        StoredLocation::File(path) => objects.iter().any(|object| matches!(&object.source, Source::PackageFile { path: candidate, .. } if candidate == path))
+            || images.iter().any(|image| matches!(&image.source, litchi_odf_common::media::Source::PackagePart { path: candidate, .. } if candidate == path)),
+        StoredLocation::Directory(root) => objects.iter().any(|object| matches!(&object.source, Source::PackageSubdocument { root_path, .. } if root_path == root)),
     };
     if referenced {
         return Ok((excluded_paths, excluded_prefixes));
@@ -803,14 +799,9 @@ fn scan_objects(
     package: &OwnedPackage,
     content: &str,
     styles: Option<&str>,
-) -> Result<Vec<crate::EmbeddedObject>> {
+) -> Result<Vec<Object>> {
     let archive = package.package()?;
-    crate::embedded_object::scan_packaged_objects(
-        content,
-        styles,
-        |path| archive.has_file(path),
-        |path| archive.manifest().get_media_type(path).map(str::to_string),
-    )
+    scan_package(content, styles, &archive)
 }
 
 fn scan_images(
@@ -819,12 +810,7 @@ fn scan_images(
     styles: Option<&str>,
 ) -> Result<Vec<crate::Image>> {
     let archive = package.package()?;
-    crate::media::scan_packaged_images(
-        content,
-        styles,
-        |path| archive.has_file(path),
-        |path| archive.manifest().get_media_type(path).map(str::to_string),
-    )
+    crate::media::scan_package(content, styles, &archive)
 }
 
 fn locate_images(xml: &str) -> Result<Vec<ObjectSpan>> {
