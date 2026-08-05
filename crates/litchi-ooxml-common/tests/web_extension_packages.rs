@@ -1,12 +1,11 @@
-use litchi_ooxml::web::{
-    AddIn, Binding, Compression, Conformance, Dock, Effect, EffectKind, ExtKind, ExtList, Pane,
-    Panes, Property, Reference, Store,
+use litchi_ooxml_common::web::{
+    self, AddIn, Binding, Compression, Conformance, Dock, Effect, EffectKind, ExtKind, ExtList,
+    Pane, Panes, Property, Reference, Store,
     raw::{
         ADD_IN_CONTENT_TYPE, ADD_IN_RELATIONSHIP, TASK_PANES_CONTENT_TYPE, TASK_PANES_RELATIONSHIP,
     },
 };
-use litchi_ooxml::{OpcPackage, PackURI};
-use litchi_opc::{Part, XmlPart};
+use litchi_opc::{OpcPackage, PackURI, PackageWriter, Part, XmlPart};
 use std::sync::Arc;
 
 const LOCAL_EXTENSION: &[u8] =
@@ -16,86 +15,28 @@ const LOCAL_TASK_PANES: &[u8] =
 const SNAPSHOT_IMAGE: &[u8] = include_bytes!("../../../test-data/images/jpg/abstract1.jpg");
 
 #[test]
-fn package_wrappers_discover_local_task_panes_without_activation() {
-    let mut docx = litchi_ooxml::docx::Package::new().unwrap();
-    docx.edit_opc(|opc| {
-        install_task_panes(opc);
-        Ok(())
-    })
-    .unwrap();
-    assert_task_pane(docx.task_panes().unwrap().unwrap());
-
-    let xlsx_directory = tempfile::tempdir().unwrap();
-    let xlsx_path = xlsx_directory.path().join("raw-edit-source.xlsx");
-    let mut xlsx = litchi_ooxml::xlsx::Workbook::create().unwrap();
-    xlsx.save(&xlsx_path).unwrap();
-    let mut xlsx = litchi_ooxml::xlsx::Workbook::open(&xlsx_path).unwrap();
-    xlsx.edit_opc(|opc| {
-        install_task_panes(opc);
-        Ok(())
-    })
-    .unwrap();
-    xlsx.save(&xlsx_path).unwrap();
-    let xlsx = litchi_ooxml::xlsx::Workbook::open(&xlsx_path).unwrap();
-    assert_task_pane(xlsx.task_panes().unwrap().unwrap());
-
-    let mut pptx = litchi_ooxml::pptx::Package::new().unwrap();
-    pptx.edit_opc(|opc| {
-        install_task_panes(opc);
-        Ok(())
-    })
-    .unwrap();
-    assert_task_pane(pptx.task_panes().unwrap().unwrap());
+fn package_graph_discovers_local_task_panes_without_activation() {
+    let mut package = OpcPackage::new();
+    install_task_panes(&mut package);
+    assert_task_pane(web::load(&package).unwrap().unwrap());
 }
 
 #[test]
-fn package_wrappers_author_and_remove_inert_task_panes() {
-    let directory = tempfile::tempdir().unwrap();
+fn package_authoring_and_removal_round_trip_inert_task_panes() {
+    let mut package = OpcPackage::new();
+    web::put(
+        &mut package,
+        authored_task_panes(),
+        Conformance::Transitional,
+    )
+    .unwrap();
+    assert_task_pane(web::load(&package).unwrap().unwrap());
 
-    let mut docx = litchi_ooxml::docx::Package::new().unwrap();
-    docx.put_task_panes(authored_task_panes(), Conformance::Transitional)
-        .unwrap();
-    assert_task_pane(docx.task_panes().unwrap().unwrap());
-    let docx_path = directory.path().join("task-panes.docx");
-    docx.save(&docx_path).unwrap();
-    assert_task_pane(
-        litchi_ooxml::docx::Package::open(&docx_path)
-            .unwrap()
-            .task_panes()
-            .unwrap()
-            .unwrap(),
-    );
-    assert!(docx.remove_task_panes().unwrap());
-
-    let mut xlsx = litchi_ooxml::xlsx::Workbook::create().unwrap();
-    xlsx.put_task_panes(authored_task_panes(), Conformance::Strict)
-        .unwrap();
-    assert_task_pane(xlsx.task_panes().unwrap().unwrap());
-    let xlsx_path = directory.path().join("task-panes.xlsx");
-    xlsx.save(&xlsx_path).unwrap();
-    assert_task_pane(
-        litchi_ooxml::xlsx::Workbook::open(&xlsx_path)
-            .unwrap()
-            .task_panes()
-            .unwrap()
-            .unwrap(),
-    );
-    assert!(xlsx.remove_task_panes().unwrap());
-
-    let mut pptx = litchi_ooxml::pptx::Package::new().unwrap();
-    pptx.put_task_panes(authored_task_panes(), Conformance::Transitional)
-        .unwrap();
-    assert_task_pane(pptx.task_panes().unwrap().unwrap());
-    let pptx_path = directory.path().join("task-panes.pptx");
-    pptx.save(&pptx_path).unwrap();
-    assert_task_pane(
-        litchi_ooxml::pptx::Package::open(&pptx_path)
-            .unwrap()
-            .task_panes()
-            .unwrap()
-            .unwrap(),
-    );
-    assert!(pptx.remove_task_panes().unwrap());
+    let bytes = PackageWriter::to_bytes(&package).unwrap();
+    let mut reopened = OpcPackage::from_bytes(&bytes).unwrap();
+    assert_task_pane(web::load(&reopened).unwrap().unwrap());
+    assert!(web::remove(&mut reopened).unwrap());
+    assert!(web::load(&reopened).unwrap().is_none());
 }
 
 #[test]
@@ -240,16 +181,11 @@ fn public_web_facade_updates_and_round_trips_crud() {
     assert_eq!(panes.get(0usize).unwrap().add_in().id(), ADD_IN_ID);
     assert!(panes.get(1usize).is_none());
 
-    let directory = tempfile::tempdir().unwrap();
-    let path = directory.path().join("public-web-crud.xlsx");
-    let mut workbook = litchi_ooxml::xlsx::Workbook::create().unwrap();
-    workbook
-        .put_task_panes(panes, Conformance::Transitional)
-        .unwrap();
-    workbook.save(&path).unwrap();
-
-    let workbook = litchi_ooxml::xlsx::Workbook::open(&path).unwrap();
-    let panes = workbook.task_panes().unwrap().unwrap();
+    let mut package = OpcPackage::new();
+    web::put(&mut package, panes, Conformance::Transitional).unwrap();
+    let bytes = PackageWriter::to_bytes(&package).unwrap();
+    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let panes = web::load(&package).unwrap().unwrap();
     assert_eq!(panes.get(0usize).unwrap().add_in().id(), ADD_IN_ID);
     let pane = panes.get(ADD_IN_ID).unwrap();
     assert!(!pane.visible());

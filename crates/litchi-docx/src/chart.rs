@@ -24,7 +24,6 @@ const CHART_CT: &str = "application/vnd.openxmlformats-officedocument.drawingml.
 const STYLE_CT: &str = "application/vnd.ms-office.chartstyle+xml";
 const COLOR_STYLE_CT: &str = "application/vnd.ms-office.chartcolorstyle+xml";
 const WORKBOOK_CT: &str = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-const STYLE_NS: &str = "http://schemas.microsoft.com/office/drawing/2012/chartStyle";
 const STYLE_REL: &str = "http://schemas.microsoft.com/office/2011/relationships/chartStyle";
 const COLOR_STYLE_REL: &str =
     "http://schemas.microsoft.com/office/2011/relationships/chartColorStyle";
@@ -463,7 +462,7 @@ fn load_companion(
     validate_leaf_path(&target, "/word/charts/", label)?;
     let part = package.get_part(&target)?;
     require_content_type(part, content_type, label)?;
-    validate_leaf_xml(part.blob(), MAX_COMPANION_XML, STYLE_NS, root, label)?;
+    validate_companion_xml(part.blob(), MAX_COMPANION_XML, root, label)?;
     if part.rels().iter().next().is_some() {
         return Err(invalid(format!(
             "{label} has unsupported outbound relationships"
@@ -531,7 +530,7 @@ fn validate_graph_value(graph: &ChartGraph) -> Result<()> {
                 if !parts.insert(resource.part_name.as_str()) {
                     return Err(invalid("chart resource part names collide"));
                 }
-                validate_leaf_xml(&resource.data, MAX_COMPANION_XML, STYLE_NS, root, label)?;
+                validate_companion_xml(&resource.data, MAX_COMPANION_XML, root, label)?;
                 add_total(
                     &mut total,
                     resource.data.len(),
@@ -786,13 +785,7 @@ fn inspect_chart_element(
     Ok(())
 }
 
-fn validate_leaf_xml(
-    xml: &[u8],
-    max: usize,
-    namespace: &str,
-    root_name: &str,
-    label: &str,
-) -> Result<()> {
+fn validate_companion_xml(xml: &[u8], max: usize, root_name: &str, label: &str) -> Result<()> {
     if xml.len() > max {
         return Err(limit("companion XML bytes"));
     }
@@ -800,63 +793,12 @@ fn validate_leaf_xml(
     if processed.len() > max {
         return Err(limit("processed companion XML bytes"));
     }
-    let mut reader = NsReader::from_reader(processed.as_ref());
-    let mut buffer = Vec::new();
-    let mut depth = 0usize;
-    let mut limits = Limits::default();
-    let mut root = false;
-    loop {
-        match reader.read_event_into(&mut buffer).map_err(xml_error)? {
-            Event::Start(element) => {
-                depth += 1;
-                structure(&mut limits, depth)?;
-                let (ns, local, attrs) = element_info(&reader, &element, &mut limits)?;
-                if !root {
-                    if ns != namespace || local != root_name {
-                        return Err(invalid(format!("invalid {label} root or namespace")));
-                    }
-                    root = true;
-                }
-                if attrs.iter().any(|(ns, _, _)| matches!(ns.as_str(), R | RS)) {
-                    return Err(invalid(format!(
-                        "{label} contains an unsupported relationship reference"
-                    )));
-                }
-            },
-            Event::Empty(element) => {
-                structure(&mut limits, depth + 1)?;
-                let (ns, local, attrs) = element_info(&reader, &element, &mut limits)?;
-                if !root {
-                    if ns != namespace || local != root_name {
-                        return Err(invalid(format!("invalid {label} root or namespace")));
-                    }
-                    root = true;
-                }
-                if attrs.iter().any(|(ns, _, _)| matches!(ns.as_str(), R | RS)) {
-                    return Err(invalid(format!(
-                        "{label} contains an unsupported relationship reference"
-                    )));
-                }
-            },
-            Event::End(_) => {
-                if depth == 0 {
-                    return Err(invalid(format!("unexpected {label} closing element")));
-                }
-                depth -= 1;
-            },
-            Event::DocType(_) | Event::PI(_) => {
-                return Err(invalid("DTDs and processing instructions are rejected"));
-            },
-            Event::CData(_) => return Err(invalid("CDATA is rejected")),
-            Event::Eof => break,
-            _ => {},
-        }
-        buffer.clear();
-    }
-    if !root || depth != 0 {
-        return Err(invalid(format!("missing or unterminated {label} root")));
-    }
-    Ok(())
+    let result = match root_name {
+        "chartStyle" => litchi_drawingml::chart::style::parse(processed.as_ref()).map(|_| ()),
+        "colorStyle" => litchi_drawingml::chart::style::parse_color(processed.as_ref()).map(|_| ()),
+        _ => return Err(invalid(format!("unsupported {label} root"))),
+    };
+    result.map_err(|error| Error::Invalid(format!("{label}: {error}")))
 }
 
 fn element_info(
@@ -1046,6 +988,7 @@ fn limit(label: &str) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+    const STYLE_NS: &str = "http://schemas.microsoft.com/office/drawing/2012/chartStyle";
     const POI: &[u8] = include_bytes!("../../../test-data/poi/test-data/document/61745.docx");
     const LO_INTERNAL: &[u8] = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx"
@@ -1055,6 +998,55 @@ mod tests {
     );
     fn document() -> PackURI {
         PackURI::new("/word/document.xml").unwrap()
+    }
+    fn style_entry(name: &str) -> String {
+        format!(
+            r#"<cs:{name}><cs:lnRef idx="0"/><cs:fillRef idx="0"/><cs:effectRef idx="0"/><cs:fontRef idx="minor"/></cs:{name}>"#
+        )
+    }
+    fn style_xml() -> String {
+        let names = [
+            "axisTitle",
+            "categoryAxis",
+            "chartArea",
+            "dataLabel",
+            "dataLabelCallout",
+            "dataPoint",
+            "dataPoint3D",
+            "dataPointLine",
+            "dataPointMarker",
+            "dataPointWireframe",
+            "dataTable",
+            "downBar",
+            "dropLine",
+            "errorBar",
+            "floor",
+            "gridlineMajor",
+            "gridlineMinor",
+            "hiLoLine",
+            "leaderLine",
+            "legend",
+            "plotArea",
+            "plotArea3D",
+            "seriesAxis",
+            "seriesLine",
+            "title",
+            "trendline",
+            "trendlineLabel",
+            "upBar",
+            "valueAxis",
+            "wall",
+        ];
+        let body = names
+            .iter()
+            .map(|name| style_entry(name))
+            .collect::<String>();
+        format!(r#"<cs:chartStyle xmlns:cs="{STYLE_NS}">{body}</cs:chartStyle>"#)
+    }
+    fn color_style_xml() -> String {
+        format!(
+            r#"<cs:colorStyle xmlns:cs="{STYLE_NS}" xmlns:a="{A}" meth="cycle"><a:srgbClr val="FF0000"/></cs:colorStyle>"#
+        )
     }
     #[test]
     fn poi_and_libreoffice_internal_charts_round_trip_deterministically() {
@@ -1105,12 +1097,12 @@ mod tests {
         package.add_part(Box::new(BlobPart::new(
             PackURI::new("/word/charts/style1.xml").unwrap(),
             STYLE_CT.into(),
-            format!("<cs:chartStyle xmlns:cs=\"{STYLE_NS}\"/>").into_bytes(),
+            style_xml().into_bytes(),
         )));
         package.add_part(Box::new(BlobPart::new(
             PackURI::new("/word/charts/colors1.xml").unwrap(),
             COLOR_STYLE_CT.into(),
-            format!("<cs:colorStyle xmlns:cs=\"{STYLE_NS}\"/>").into_bytes(),
+            color_style_xml().into_bytes(),
         )));
         package.add_part(Box::new(BlobPart::new(
             PackURI::new("/word/embeddings/data1.xlsx").unwrap(),

@@ -1,6 +1,5 @@
-use litchi_ooxml::{OpcPackage, PackURI};
-use litchi_ooxml_common::ribbon::{self, Family, Version};
-use litchi_opc::{PackageWriter, XmlPart};
+use litchi_ooxml_common::ribbon::{self, Version};
+use litchi_opc::{OpcPackage, PackURI, PackageWriter, XmlPart};
 
 const OFFICE_2007_XML: &[u8] = include_bytes!("../../../test-data/ooxml/ribbonx/office2007.xml");
 const OFFICE_2010_XML: &[u8] = include_bytes!("../../../test-data/ooxml/ribbonx/office2010.xml");
@@ -79,33 +78,4 @@ fn rejects_a_root_that_does_not_match_its_relationship_family() {
     package.relate_to("customUI/customUI.xml", Version::V2007.relationship());
 
     assert!(ribbon::load(&package).is_err());
-}
-
-#[test]
-fn document_facades_offer_concise_owned_crud() {
-    let mut docx = litchi_ooxml::docx::Package::new().unwrap();
-    docx.put_ribbon(Version::V2007, OFFICE_2007_XML.to_vec())
-        .unwrap();
-    assert_eq!(
-        docx.ribbon().unwrap().effective().unwrap().xml(),
-        OFFICE_2007_XML
-    );
-    assert!(docx.remove_ribbon(Family::Legacy).unwrap());
-    assert!(docx.ribbon().unwrap().effective().is_none());
-
-    let mut xlsx = litchi_ooxml::xlsx::Workbook::create().unwrap();
-    xlsx.put_ribbon(Version::V2010, OFFICE_2010_XML.to_vec())
-        .unwrap();
-    assert_eq!(
-        xlsx.ribbon().unwrap().effective().unwrap().version(),
-        Version::V2010
-    );
-
-    let mut pptx = litchi_ooxml::pptx::Package::new().unwrap();
-    pptx.put_ribbon(Version::V2010, OFFICE_2010_XML.to_vec())
-        .unwrap();
-    assert_eq!(
-        pptx.ribbon().unwrap().effective().unwrap().xml(),
-        OFFICE_2010_XML
-    );
 }

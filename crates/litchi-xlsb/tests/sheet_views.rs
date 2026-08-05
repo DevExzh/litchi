@@ -5,13 +5,13 @@
 //! untouched worksheet streams.
 
 use litchi_core::sheet::traits::WorkbookTrait;
-use litchi_ooxml::xlsb::writer::{MutableWorksheet, WorkbookWriter};
-use litchi_ooxml::xlsb::{
-    SheetPane, SheetPanePosition, SheetPaneState, SheetSelection, SheetView, SheetViewType,
-    Workbook,
-};
 use litchi_opc::{OpcPackage, PackURI};
+use litchi_xlsb::Workbook;
+use litchi_xlsb::package::sheet_view::{
+    SheetPane, SheetPanePosition, SheetPaneState, SheetSelection, SheetView, SheetViewType,
+};
 use litchi_xlsb::raw::{Kind, Records, kind};
+use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -19,7 +19,7 @@ use std::path::PathBuf;
 /// Resolve a repository-relative fixture path.
 fn fixture(relative: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
+        .join("../../test-data")
         .join(relative)
 }
 
@@ -235,7 +235,7 @@ fn freeze_panes_conflict_with_explicit_pane_fails() {
 
 #[test]
 fn reads_excel_fixture_views_and_selections() {
-    let path = fixture("test-data/ooxml/xlsb/Simple.xlsb");
+    let path = fixture("ooxml/xlsb/Simple.xlsb");
     let workbook = Workbook::new(File::open(&path).unwrap()).unwrap();
 
     let first = workbook.worksheet(0).unwrap();
@@ -262,7 +262,7 @@ fn reads_excel_fixture_views_and_selections() {
 
 #[test]
 fn untouched_worksheet_stream_round_trips_byte_identical() {
-    let path = fixture("test-data/ooxml/xlsb/Simple.xlsb");
+    let path = fixture("ooxml/xlsb/Simple.xlsb");
     let original = std::fs::read(&path).unwrap();
     let workbook = Workbook::new(Cursor::new(&original)).unwrap();
     // Force the read path across every worksheet, then save unmodified.

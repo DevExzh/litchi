@@ -200,6 +200,10 @@ pub enum Error {
     #[error("PresentationML attribute decoding error: {0}")]
     Decode(#[from] litchi_ooxml_common::XmlError),
 
+    /// A shared DrawingML chart or primitive codec failed.
+    #[error("DrawingML error: {0}")]
+    Drawing(#[from] litchi_drawingml::Error),
+
     /// Writing into the requested text sink failed.
     #[error("could not encode PresentationML text")]
     Write,
@@ -208,11 +212,5 @@ pub enum Error {
 impl From<quick_xml::Error> for Error {
     fn from(error: quick_xml::Error) -> Self {
         Self::Xml(error.to_string())
-    }
-}
-
-impl From<litchi_drawingml::Error> for Error {
-    fn from(error: litchi_drawingml::Error) -> Self {
-        Self::Invalid(error.to_string())
     }
 }

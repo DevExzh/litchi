@@ -1,21 +1,13 @@
 //! Layered Office 2013 chart-style semantics.
 
-pub mod codec;
-pub mod model;
 pub mod package;
 
-pub use codec::{
-    COLOR_CONTENT_TYPE, COLOR_RELATIONSHIP_TYPE, STYLE_CONTENT_TYPE, STYLE_RELATIONSHIP_TYPE,
+pub use litchi_drawingml::chart::style::{
+    Color, ColorDocument, ColorInfo, ColorKind, ColorMethod, ColorValue, Document, Entry,
+    EntryKind, FontIndex, FontReference, Info, MarkerLayout, MarkerSymbol, Payload, Reference,
+    Transform, TransformKind, Variation,
 };
-pub use model::*;
-pub use package::discover;
-
-/// Borrowed chart-style companion part.
-pub struct Part<'a> {
-    pub(crate) part: &'a dyn litchi_opc::part::Part,
-}
-
-/// Borrowed chart-color-style companion part.
-pub struct ColorPart<'a> {
-    pub(crate) part: &'a dyn litchi_opc::part::Part,
-}
+pub use package::{
+    COLOR_CONTENT_TYPE, COLOR_RELATIONSHIP_TYPE, ColorPart, Part, STYLE_CONTENT_TYPE,
+    STYLE_RELATIONSHIP_TYPE, discover,
+};

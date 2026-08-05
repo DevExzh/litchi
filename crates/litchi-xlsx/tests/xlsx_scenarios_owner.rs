@@ -1,10 +1,10 @@
-use litchi_ooxml::xlsx::scenarios::{
+use litchi_xlsx::scenarios::{
     Conformance, InputCell, Scenario, ScenarioCellReference, Scenarios, parse_worksheet_scenarios,
     write_worksheet_scenarios,
 };
 
 #[test]
-fn host_reexports_the_canonical_scenarios_owner() {
+fn standalone_scenarios_round_trip_through_the_owner() {
     let scenario = Scenario::new("baseline")
         .unwrap()
         .with_input_cells(vec![
@@ -13,7 +13,7 @@ fn host_reexports_the_canonical_scenarios_owner() {
         .unwrap();
     let value = Scenarios::new(vec![scenario]).unwrap();
 
-    fn accepts_canonical_owner(_: &litchi_xlsx::scenarios::Scenarios) {}
+    fn accepts_canonical_owner(_: &Scenarios) {}
     accepts_canonical_owner(&value);
 
     for conformance in [Conformance::Transitional, Conformance::Strict] {

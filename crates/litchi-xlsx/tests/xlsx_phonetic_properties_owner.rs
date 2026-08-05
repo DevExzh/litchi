@@ -1,9 +1,9 @@
-use litchi_ooxml::xlsx::phonetic_properties::{
+use litchi_xlsx::phonetic_properties::{
     PhoneticAlignment, PhoneticProperties, PhoneticType, parse_phonetic_properties,
 };
 
 #[test]
-fn host_reexports_the_canonical_phonetic_properties_owner() {
+fn standalone_phonetic_properties_parse_through_the_owner() {
     let document = concat!(
         r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#,
         r#"<phoneticPr fontId="3" type="Hiragana" alignment="center"/>"#,
@@ -13,7 +13,7 @@ fn host_reexports_the_canonical_phonetic_properties_owner() {
         .unwrap()
         .unwrap();
 
-    fn accepts_canonical_owner(_: &litchi_xlsx::phonetic_properties::PhoneticProperties) {}
+    fn accepts_canonical_owner(_: &PhoneticProperties) {}
     accepts_canonical_owner(&value);
 
     let _: &PhoneticProperties = &value;

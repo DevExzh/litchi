@@ -1,4 +1,4 @@
-use litchi_ooxml::xlsb::formula::{
+use litchi_xlsb::formula::{
     ExternalTableReference, FormulaParser, TableColumns, TableDataType, TableNamedColumns,
     TableReference, TableRowType, Token,
 };

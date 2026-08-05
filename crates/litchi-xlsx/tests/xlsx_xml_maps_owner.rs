@@ -1,5 +1,8 @@
-use litchi_ooxml::xlsx::{
-    Workbook, XmlMap, XmlMapConformance, XmlMapInfo, XmlMapSchema, load_xml_maps_from_package,
+use litchi_opc::OpcPackage;
+use litchi_xlsx::Package;
+use litchi_xlsx::xml_maps::{
+    XmlMap, XmlMapConformance, XmlMapInfo, XmlMapSchema, load_from_package, remove_from_package,
+    store_in_package,
 };
 
 fn fixture_info() -> XmlMapInfo {
@@ -26,41 +29,29 @@ fn fixture_info() -> XmlMapInfo {
     }
 }
 
+fn package() -> OpcPackage {
+    Package::create().expect("create workbook package").into()
+}
+
 #[test]
-fn legacy_host_preserves_xml_maps_through_writer_materialization() {
-    let mut workbook = Workbook::create().expect("create workbook");
+fn xml_maps_survive_direct_package_publication() {
+    let mut package = package();
     let value = fixture_info();
-    workbook
-        .set_xml_maps(&value, XmlMapConformance::Strict)
-        .expect("set XML Maps");
-    assert_eq!(
-        workbook.xml_maps().expect("read XML Maps"),
-        Some((value.clone(), XmlMapConformance::Strict))
-    );
-    assert_eq!(
-        load_xml_maps_from_package(workbook.opc_package()).expect("read forwarded XML Maps"),
-        Some(value.clone())
-    );
+    store_in_package(&mut package, &value, XmlMapConformance::Strict).unwrap();
+    assert_eq!(load_from_package(&package).unwrap(), Some(value.clone()));
 
-    workbook
-        .worksheet_mut(0)
-        .expect("first worksheet")
-        .set_cell_value(1, 1, "materialized");
-    let directory = tempfile::tempdir().expect("temporary directory");
-    let path = directory.path().join("materialized-xml-maps.xlsx");
-    workbook.save(&path).expect("save workbook");
-    let reopened = Workbook::open(&path).expect("reopen workbook");
-    assert_eq!(
-        reopened.xml_maps().expect("read saved XML Maps"),
-        Some((value.clone(), XmlMapConformance::Strict))
-    );
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("xml-maps.xlsx");
+    package.save(&path).unwrap();
+    let reopened = OpcPackage::open(&path).unwrap();
+    assert_eq!(load_from_package(&reopened).unwrap(), Some(value));
+}
 
-    let mut reopened = reopened;
-    assert!(reopened.remove_xml_maps().expect("remove XML Maps"));
-    assert_eq!(reopened.xml_maps().expect("read removed XML Maps"), None);
-    assert!(
-        !reopened
-            .remove_xml_maps()
-            .expect("idempotent XML Maps removal")
-    );
+#[test]
+fn xml_maps_removal_is_idempotent() {
+    let mut package = package();
+    store_in_package(&mut package, &fixture_info(), XmlMapConformance::Strict).unwrap();
+    assert!(remove_from_package(&mut package).unwrap());
+    assert_eq!(load_from_package(&package).unwrap(), None);
+    assert!(!remove_from_package(&mut package).unwrap());
 }

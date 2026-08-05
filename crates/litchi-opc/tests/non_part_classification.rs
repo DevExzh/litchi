@@ -198,11 +198,11 @@ fn a_part_resolves_when_its_stored_name_differs_only_by_case() {
     let bytes = archive(&[
         (
             "[Content_Types].xml",
-            br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/></Types>"# as &[u8],
+            br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/></Types>"#,
         ),
         ("xl/sharedstrings.xml", b"<sst/>"),
     ]);
-    let package = litchi_opc::OpcPackage::from_bytes(&bytes).expect("package loads");
+    let package = OpcPackage::from_bytes(&bytes).expect("package loads");
 
     // The stored spelling resolves, as always.
     let stored = litchi_opc::PackURI::new("/xl/sharedstrings.xml").unwrap();

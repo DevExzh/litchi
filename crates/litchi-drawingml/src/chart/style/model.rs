@@ -1,4 +1,4 @@
-//! Contextual values for Office 2013 chart-style companion parts.
+//! Contextual values for DrawingML chart-style companion XML.
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Document {

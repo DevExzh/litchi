@@ -42,6 +42,7 @@ const DRAWING_MAIN: &str = "http://schemas.openxmlformats.org/drawingml/2006/mai
 const STRICT_DRAWING_MAIN: &str = "http://purl.oclc.org/ooxml/drawingml/main";
 const CHART_EX: &str = "http://schemas.microsoft.com/office/drawing/2014/chartex";
 const CHART_EX_CHOICE: &str = "http://schemas.microsoft.com/office/drawing/2015/9/8/chartex";
+#[cfg(test)]
 const CHART_STYLE: &str = "http://schemas.microsoft.com/office/drawing/2012/chartStyle";
 const CHARTSHEET_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
@@ -2494,14 +2495,16 @@ fn validate_chart_companion_xml(xml: &[u8], root_name: &str, max_bytes: usize) -
     if xml.len() > max_bytes {
         return Err(limit("chart companion bytes"));
     }
-    let root = parse_document(xml, max_bytes)?;
-    if root.namespace == CHART_STYLE && root.name == root_name {
-        Ok(())
-    } else {
-        Err(invalid(format!(
-            "invalid chart companion root '{root_name}'"
-        )))
-    }
+    let result = match root_name {
+        "chartStyle" => litchi_drawingml::chart::style::parse(xml).map(|_| ()),
+        "colorStyle" => litchi_drawingml::chart::style::parse_color(xml).map(|_| ()),
+        _ => {
+            return Err(invalid(format!(
+                "unsupported chart companion root '{root_name}'"
+            )));
+        },
+    };
+    result.map_err(Error::from)
 }
 fn validate_chart_user_shapes_xml(
     xml: &[u8],

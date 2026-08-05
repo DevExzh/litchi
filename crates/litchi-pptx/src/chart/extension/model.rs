@@ -1,6 +1,6 @@
 //! Contextual values for the bounded ChartEx container and data-index graph.
 
-use super::super::style::model::{ColorDocument, Document as StyleDocument};
+use super::super::style::{ColorDocument, Document as StyleDocument};
 
 /// Typed metadata from the bounded ChartEx container and data-index core.
 #[derive(Debug, Clone, PartialEq, Eq)]

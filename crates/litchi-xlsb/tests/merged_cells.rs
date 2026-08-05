@@ -1,8 +1,8 @@
-use litchi_ooxml::xlsb::Workbook;
-use litchi_ooxml::xlsb::merged_cells::MergedCell;
-use litchi_ooxml::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use litchi_opc::{OpcPackage, PackURI};
+use litchi_xlsb::Workbook;
+use litchi_xlsb::merged_cells::MergedCell;
 use litchi_xlsb::raw::{Kind, Records, Writer, kind};
+use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use std::io::Cursor;
 
 fn workbook_bytes(sheets: &[(&str, &[MergedCell])]) -> Vec<u8> {

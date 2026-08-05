@@ -1,12 +1,12 @@
-use litchi_ooxml::xlsx::cell_watches::{
+use litchi_xlsx::cell_watches::{
     CellWatchConformance, CellWatchReference, CellWatches, parse_cell_watches, write_cell_watches,
 };
 
 #[test]
-fn host_reexports_the_canonical_cell_watches_owner() {
+fn standalone_cell_watches_round_trip_through_the_owner() {
     let value = CellWatches::new(vec![CellWatchReference::new("B2").unwrap()]).unwrap();
 
-    fn accepts_canonical_owner(_: &litchi_xlsx::cell_watches::CellWatches) {}
+    fn accepts_canonical_owner(_: &CellWatches) {}
     accepts_canonical_owner(&value);
 
     for conformance in [

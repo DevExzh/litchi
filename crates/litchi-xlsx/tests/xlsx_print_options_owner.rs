@@ -1,7 +1,7 @@
-use litchi_ooxml::xlsx::print_options::{PrintOptions, parse_print_options};
+use litchi_xlsx::print_options::{PrintOptions, parse_print_options};
 
 #[test]
-fn host_reexports_the_canonical_print_options_owner() {
+fn standalone_print_options_parse_through_the_owner() {
     let document = concat!(
         r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#,
         r#"<printOptions horizontalCentered="1" gridLines="1" gridLinesSet="true"/>"#,
@@ -9,7 +9,7 @@ fn host_reexports_the_canonical_print_options_owner() {
     );
     let value = parse_print_options(document.as_bytes()).unwrap().unwrap();
 
-    fn accepts_canonical_owner(_: &litchi_xlsx::print_options::PrintOptions) {}
+    fn accepts_canonical_owner(_: &PrintOptions) {}
     accepts_canonical_owner(&value);
 
     let _: &PrintOptions = &value;

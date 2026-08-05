@@ -1,7 +1,9 @@
-//! Tests for the XLSX theme part reader against real workbooks.
+//! XLSX façade coverage for packages carrying DrawingML theme parts.
+//!
+//! Theme semantics are owned by `litchi-drawingml`; the XLSX façade only
+//! needs to validate and retain the package graph while opening it.
 
-use litchi_ooxml::xlsx::theme::{Theme, ThemeColorSlot, ThemeColorValue};
-use litchi_ooxml::xlsx::{Workbook, template};
+use litchi_xlsx::{Package, Workbook};
 use std::path::PathBuf;
 
 fn fixture(name: &str) -> PathBuf {
@@ -11,40 +13,19 @@ fn fixture(name: &str) -> PathBuf {
 }
 
 #[test]
-fn parses_the_default_writer_theme_template() {
-    let theme = Theme::parse(template::default_theme_xml()).unwrap();
-    assert_eq!(theme.color_scheme_name(), "Office");
-    assert!(theme.major_font().is_some());
-    assert!(theme.minor_font().is_some());
-    assert!(!theme.format_scheme_xml().is_empty());
-    for slot in ThemeColorSlot::ALL {
-        let _ = theme.rgb(slot);
-    }
+fn standalone_package_opens_a_theme_bearing_workbook() {
+    let package = Package::open(fixture("cell-borders.xlsx")).unwrap();
+    let workbook = package.workbook().unwrap();
+
+    assert!(!workbook.is_empty());
+    assert!(!package.to_bytes().unwrap().is_empty());
 }
 
 #[test]
-fn reads_theme_parts_from_real_workbooks() {
-    for name in ["cell-borders.xlsx"] {
-        let workbook = Workbook::new(litchi_opc::OpcPackage::open(fixture(name)).unwrap()).unwrap();
-        let theme = workbook
-            .theme()
-            .unwrap_or_else(|error| panic!("{name}: {error}"))
-            .unwrap_or_else(|| panic!("{name} has no theme part"));
-        // Every theme slot resolves to a concrete RGB triple.
-        for slot in ThemeColorSlot::ALL {
-            let _ = theme.rgb(slot);
-        }
-        assert!(matches!(
-            theme.color(ThemeColorSlot::Dk1),
-            ThemeColorValue::Srgb(_) | ThemeColorValue::System { .. }
-        ));
-    }
-}
-
-#[test]
-fn workbooks_without_theme_parts_report_none() {
+fn standalone_workbook_opens_xlsx_theme_variants() {
     for name in ["autofilter.xlsx", "column_style.xlsx"] {
-        let workbook = Workbook::new(litchi_opc::OpcPackage::open(fixture(name)).unwrap()).unwrap();
-        assert!(workbook.theme().unwrap().is_none(), "{name}");
+        let workbook =
+            Workbook::open(fixture(name)).unwrap_or_else(|error| panic!("{name}: {error}"));
+        assert!(!workbook.is_empty(), "{name}");
     }
 }

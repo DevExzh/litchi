@@ -1,14 +1,14 @@
-use litchi_ooxml::xlsx::connections::{
-    Connection, Connections, CredentialsMethod, load_from_package, store_in_package,
-};
-use litchi_ooxml::xlsx::query_table::{Conformance, Field, Refresh, Table};
-use litchi_ooxml::xlsx::{
-    add_worksheet_query_table, find_worksheet_query_table, load_worksheet_query_tables,
-    remove_worksheet_query_table, reorder_worksheet_query_tables, update_worksheet_query_table,
-};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI, Part};
+use litchi_xlsx::connections::{
+    Connection, Connections, CredentialsMethod, load_from_package, store_in_package,
+};
+use litchi_xlsx::query_table::{Conformance, Field, Refresh, Table};
+use litchi_xlsx::{
+    add_worksheet_query_table, find_worksheet_query_table, load_worksheet_query_tables,
+    remove_worksheet_query_table, reorder_worksheet_query_tables, update_worksheet_query_table,
+};
 
 fn connection(id: u32, name: &str) -> Connection {
     Connection {

@@ -1,15 +1,15 @@
-use litchi_ooxml::xlsx::slicer_cache::{Definition, parse_slicer_cache_definition};
-use litchi_ooxml::xlsx::timelines::{Range, State};
-use litchi_ooxml::xlsx::{
-    CacheDefinition, FilterType, Level, Slicer, View, add_slicer, add_slicer_cache, add_timeline,
-    add_timeline_cache, find_slicer, find_slicer_cache, find_timeline, find_timeline_cache,
-    parse_slicers, remove_slicer, remove_slicer_cache, remove_timeline, remove_timeline_cache,
-    reorder_slicer_caches, reorder_slicers, reorder_timeline_caches, reorder_timelines,
-    replace_slicer, replace_slicer_cache, replace_timeline, replace_timeline_cache, update_slicer,
-    update_slicer_cache, update_timeline, update_timeline_cache,
-};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
+use litchi_xlsx::slicer_cache::{Definition, parse as parse_slicer_cache_definition};
+use litchi_xlsx::slicer_cache::{
+    Slicer, add_slicer, add_slicer_cache, add_timeline, add_timeline_cache, find_slicer,
+    find_slicer_cache, find_timeline, find_timeline_cache, parse_slicers, remove_slicer,
+    remove_slicer_cache, remove_timeline, remove_timeline_cache, reorder_slicer_caches,
+    reorder_slicers, reorder_timeline_caches, reorder_timelines, replace_slicer,
+    replace_slicer_cache, replace_timeline, replace_timeline_cache, update_slicer,
+    update_slicer_cache, update_timeline, update_timeline_cache,
+};
+use litchi_xlsx::timelines::{CacheDefinition, FilterType, Level, Range, State, View};
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";

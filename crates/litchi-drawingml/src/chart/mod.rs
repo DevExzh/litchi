@@ -77,6 +77,7 @@ pub mod model;
 pub mod plot_area;
 pub mod reader;
 pub mod series;
+pub mod style;
 pub mod types;
 pub mod writer;
 

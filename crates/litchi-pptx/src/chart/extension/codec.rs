@@ -1,7 +1,7 @@
 //! Inert reader for Microsoft  (`cx:chartSpace`) parts.
 
-use super::super::style::model::{ColorDocument, Document as StyleDocument};
 use super::super::style::package::discover;
+use super::super::style::{ColorDocument, Document as StyleDocument};
 use super::model::*;
 use super::package::Part;
 use crate::{Error, Result};

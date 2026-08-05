@@ -1,21 +1,12 @@
-//! Inert readers for the Office 2013 chart-style companion parts.
+//! Bounded XML codecs for Office 2013 chart-style companion parts.
 
 use super::model::*;
-use super::{ColorPart, Part};
 use crate::{Error, Result};
-use litchi_opc::part::Part as OpcPart;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 use std::collections::HashSet;
-
-pub const STYLE_CONTENT_TYPE: &str = "application/vnd.ms-office.chartstyle+xml";
-pub const COLOR_CONTENT_TYPE: &str = "application/vnd.ms-office.chartcolorstyle+xml";
-pub const STYLE_RELATIONSHIP_TYPE: &str =
-    "http://schemas.microsoft.com/office/2012/relationships/chartStyle";
-pub const COLOR_RELATIONSHIP_TYPE: &str =
-    "http://schemas.microsoft.com/office/2012/relationships/chartColorStyle";
 
 const CS: &str = "http://schemas.microsoft.com/office/drawing/2012/chartStyle";
 const A: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
@@ -30,37 +21,6 @@ const MAX_MODIFIERS: usize = 256;
 const MAX_COLORS: usize = 4_096;
 const MAX_VARIATIONS: usize = 4_096;
 const MAX_TRANSFORMS: usize = 4_096;
-
-/// A validated Office 2013 chart-style part.
-impl<'a> Part<'a> {
-    pub fn from_part(part: &'a dyn OpcPart) -> Result<Self> {
-        require_content_type(part, STYLE_CONTENT_TYPE, "chart style")?;
-        Ok(Self { part })
-    }
-
-    pub fn parse(&self) -> Result<Document> {
-        parse_chart_style(self.part.blob())
-    }
-
-    pub fn part(&self) -> &'a dyn OpcPart {
-        self.part
-    }
-}
-
-impl<'a> ColorPart<'a> {
-    pub fn from_part(part: &'a dyn OpcPart) -> Result<Self> {
-        require_content_type(part, COLOR_CONTENT_TYPE, "chart color style")?;
-        Ok(Self { part })
-    }
-
-    pub fn parse(&self) -> Result<ColorDocument> {
-        parse_color_style(self.part.blob())
-    }
-
-    pub fn part(&self) -> &'a dyn OpcPart {
-        self.part
-    }
-}
 
 impl Document {
     pub fn info(&self) -> &Info {
@@ -99,7 +59,15 @@ struct Node {
     text: String,
 }
 
-fn parse_chart_style(xml: &[u8]) -> Result<Document> {
+/// Parse and validate a `cs:chartStyle` XML document.
+pub fn parse(xml: &[u8]) -> Result<Document> {
+    let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
+    let mut document = parse_document(processed.as_ref())?;
+    document.xml = xml.to_vec();
+    Ok(document)
+}
+
+fn parse_document(xml: &[u8]) -> Result<Document> {
     let root = parse_tree(xml)?;
     require_root(&root, "chartStyle")?;
     let ignorable = ignorable_namespaces(&root)?;
@@ -185,7 +153,15 @@ fn parse_chart_style(xml: &[u8]) -> Result<Document> {
     })
 }
 
-fn parse_color_style(xml: &[u8]) -> Result<ColorDocument> {
+/// Parse and validate a `cs:colorStyle` XML document.
+pub fn parse_color(xml: &[u8]) -> Result<ColorDocument> {
+    let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
+    let mut document = parse_color_document(processed.as_ref())?;
+    document.xml = xml.to_vec();
+    Ok(document)
+}
+
+fn parse_color_document(xml: &[u8]) -> Result<ColorDocument> {
     let root = parse_tree(xml)?;
     require_root(&root, "colorStyle")?;
     let ignorable = ignorable_namespaces(&root)?;
@@ -211,7 +187,7 @@ fn parse_color_style(xml: &[u8]) -> Result<ColorDocument> {
         if colors.len() >= MAX_COLORS {
             return limit("chart color style colors");
         }
-        colors.push(parse_color(child, &ignorable)?);
+        colors.push(parse_drawing_color(child, &ignorable)?);
         cursor += 1;
     }
     if colors.is_empty() {
@@ -379,7 +355,7 @@ fn parse_reference_colors(
         .filter(|child| is_a(&child.namespace) && color_kind(&child.name).is_some());
     let color = if let Some(color) = color {
         cursor += 1;
-        Some(parse_color(color, ignorable)?)
+        Some(parse_drawing_color(color, ignorable)?)
     } else {
         None
     };
@@ -450,7 +426,7 @@ fn parse_marker_layout(node: &Node, ignorable: &HashSet<String>) -> Result<Marke
     Ok(MarkerLayout { symbol, size })
 }
 
-fn parse_color(node: &Node, ignorable: &HashSet<String>) -> Result<Color> {
+fn parse_drawing_color(node: &Node, ignorable: &HashSet<String>) -> Result<Color> {
     let kind =
         color_kind(&node.name).ok_or_else(|| invalid_error("unsupported DrawingML color"))?;
     let mut components = Vec::new();
@@ -938,13 +914,6 @@ fn validate_double(value: &str) -> Result<()> {
     Ok(())
 }
 
-fn require_content_type(part: &dyn OpcPart, expected: &str, label: &str) -> Result<()> {
-    if part.content_type() != expected {
-        return invalid(format!("{label} part has the wrong content type"));
-    }
-    Ok(())
-}
-
 fn check_string(value: &str, maximum: usize, label: &str) -> Result<()> {
     if value.len() > maximum {
         return limit(label);
@@ -994,7 +963,6 @@ fn xml_error(error: impl std::fmt::Display) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use litchi_opc::{BlobPart, OpcPackage, PackURI};
 
     fn entry(name: &str) -> String {
         format!(
@@ -1052,18 +1020,10 @@ mod tests {
         )
     }
 
-    fn part(name: &str, content_type: &str, xml: String) -> BlobPart {
-        BlobPart::new(
-            PackURI::new(name).unwrap(),
-            content_type.into(),
-            xml.into_bytes(),
-        )
-    }
-
     #[test]
     fn parses_producer_styles_as_inert_lossless_metadata() {
-        let style = part("/ppt/charts/style1.xml", STYLE_CONTENT_TYPE, style_xml());
-        let document = Part::from_part(&style).unwrap().parse().unwrap();
+        let style = style_xml();
+        let document = parse(style.as_bytes()).unwrap();
         assert_eq!(document.info().id, Some(42));
         assert_eq!(document.info().entries.len(), 30);
         assert_eq!(document.info().entries[0].line_width_scale, "1.25");
@@ -1081,67 +1041,15 @@ mod tests {
             Some(9)
         );
         assert!(document.info().has_extension_list);
-        assert_eq!(document.to_xml(), style.blob());
+        assert_eq!(document.to_xml(), style.as_bytes());
 
-        let colors = part(
-            "/ppt/charts/colors1.xml",
-            COLOR_CONTENT_TYPE,
-            color_xml("vendorMethod"),
-        );
-        let document = ColorPart::from_part(&colors).unwrap().parse().unwrap();
+        let colors = color_xml("vendorMethod");
+        let document = parse_color(colors.as_bytes()).unwrap();
         assert_eq!(document.info().method, "vendorMethod");
         assert_eq!(document.info().effective_method, ColorMethod::Cycle);
         assert_eq!(document.info().colors.len(), 2);
         assert_eq!(document.info().variations[0].transforms.len(), 2);
-        assert_eq!(document.to_xml(), colors.blob());
-    }
-
-    #[test]
-    fn validates_package_discovery_without_following_external_targets() {
-        let mut source = part(
-            "/ppt/charts/chartEx1.xml",
-            "application/vnd.ms-office.chartex+xml",
-            String::new(),
-        );
-        source.rels_mut().add_relationship(
-            STYLE_RELATIONSHIP_TYPE.into(),
-            "style1.xml".into(),
-            "rIdStyle".into(),
-            false,
-        );
-        source.rels_mut().add_relationship(
-            COLOR_RELATIONSHIP_TYPE.into(),
-            "colors1.xml".into(),
-            "rIdColors".into(),
-            false,
-        );
-        let mut package = OpcPackage::new();
-        package.add_part(Box::new(part(
-            "/ppt/charts/style1.xml",
-            STYLE_CONTENT_TYPE,
-            style_xml(),
-        )));
-        package.add_part(Box::new(part(
-            "/ppt/charts/colors1.xml",
-            COLOR_CONTENT_TYPE,
-            color_xml("cycle"),
-        )));
-        let (style, colors) = super::super::package::discover(&package, &source).unwrap();
-        assert_eq!(style.unwrap().info().id, Some(42));
-        assert_eq!(colors.unwrap().info().id, Some(7));
-
-        let mut external = part(
-            "/ppt/charts/chartEx2.xml",
-            "application/vnd.ms-office.chartex+xml",
-            String::new(),
-        );
-        external.rels_mut().add_relationship(
-            STYLE_RELATIONSHIP_TYPE.into(),
-            "https://example.test/style.xml".into(),
-            "rIdStyle".into(),
-            true,
-        );
-        assert!(super::super::package::discover(&package, &external).is_err());
+        assert_eq!(document.to_xml(), colors.as_bytes());
     }
 
     #[test]
@@ -1160,12 +1068,7 @@ mod tests {
             format!("<!DOCTYPE x [<!ENTITY e SYSTEM 'file:///etc/passwd'>]>{base}"),
         ];
         for xml in cases {
-            assert!(
-                Part::from_part(&part("/ppt/charts/style.xml", STYLE_CONTENT_TYPE, xml))
-                    .unwrap()
-                    .parse()
-                    .is_err()
-            );
+            assert!(parse(xml.as_bytes()).is_err());
         }
         let colors = color_xml("cycle");
         for xml in [
@@ -1174,25 +1077,7 @@ mod tests {
             colors.replace("<cs:variation>", "<cs:variation><a:vendor/>"),
             colors.replace("meth=\"cycle\"", ""),
         ] {
-            assert!(
-                ColorPart::from_part(&part("/ppt/charts/colors.xml", COLOR_CONTENT_TYPE, xml))
-                    .unwrap()
-                    .parse()
-                    .is_err()
-            );
+            assert!(parse_color(xml.as_bytes()).is_err());
         }
-
-        let mut source = part(
-            "/ppt/charts/chartEx.xml",
-            "application/vnd.ms-office.chartex+xml",
-            String::new(),
-        );
-        source.rels_mut().add_relationship(
-            STYLE_RELATIONSHIP_TYPE.into(),
-            "../styles/style.xml".into(),
-            "rId1".into(),
-            false,
-        );
-        assert!(super::super::package::discover(&OpcPackage::new(), &source).is_err());
     }
 }
