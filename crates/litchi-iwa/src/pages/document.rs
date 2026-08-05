@@ -5,12 +5,9 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use prost::Message;
-
 use super::section::{PagesSection, PagesSectionType};
 use crate::bundle::{Bundle, BundleLimits};
 use crate::object_index::ObjectIndex;
-use crate::protobuf::{tp, tswp};
 use crate::registry::Application;
 use crate::text::{TextExtractor, TextStorage};
 use crate::{Error, Result};
@@ -27,6 +24,8 @@ struct PagesDocumentState {
     bundle: Bundle,
     /// Object index for cross-referencing
     object_index: ObjectIndex,
+    /// Decoded Pages root, retained for all section reads.
+    root: litchi_pages::package::Root,
 }
 
 impl PagesDocument {
@@ -50,11 +49,11 @@ impl PagesDocument {
         let bundle = Bundle::open_with_limits(path, limits)?;
 
         // Verify this is a Pages document
-        Self::verify_application(&bundle)?;
+        let root = Self::root_document(&bundle)?;
 
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
-        Ok(Self::from_parts(bundle, object_index))
+        Ok(Self::from_parts(bundle, object_index, root))
     }
 
     /// Open a Pages document from raw bytes
@@ -79,18 +78,23 @@ impl PagesDocument {
         let bundle = Bundle::from_bytes_with_limits(bytes, limits)?;
 
         // Verify this is a Pages document
-        Self::verify_application(&bundle)?;
+        let root = Self::root_document(&bundle)?;
 
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
-        Ok(Self::from_parts(bundle, object_index))
+        Ok(Self::from_parts(bundle, object_index, root))
     }
 
-    fn from_parts(bundle: Bundle, object_index: ObjectIndex) -> Self {
+    fn from_parts(
+        bundle: Bundle,
+        object_index: ObjectIndex,
+        root: litchi_pages::package::Root,
+    ) -> Self {
         Self {
             state: Arc::new(PagesDocumentState {
                 bundle,
                 object_index,
+                root,
             }),
         }
     }
@@ -114,56 +118,34 @@ impl PagesDocument {
         Self::from_bytes_with_limits(bytes, limits)
     }
 
-    /// Verify that the bundle is a Pages document
-    fn verify_application(bundle: &Bundle) -> Result<()> {
-        if Self::root_document(bundle).is_none() {
-            return Err(Error::InvalidFormat(
-                "package does not contain a Pages root document".to_owned(),
-            ));
-        }
-        Ok(())
-    }
-
-    fn root_document(bundle: &Bundle) -> Option<tp::DocumentArchive> {
-        bundle
-            .get_archive("Index/Document.iwa")?
-            .object(1)?
-            .messages
-            .iter()
-            .find(|message| message.type_ == 10000)
-            .and_then(|message| tp::DocumentArchive::decode(message.data.as_slice()).ok())
+    /// Decode and validate the Pages root from the bundle.
+    fn root_document(bundle: &Bundle) -> Result<litchi_pages::package::Root> {
+        let archive = bundle.get_archive("Index/Document.iwa").ok_or_else(|| {
+            Error::InvalidFormat("package does not contain a Pages root document".to_owned())
+        })?;
+        Ok(litchi_pages::package::Root::decode(archive)?)
     }
 
     fn body_storage(&self) -> Result<Option<TextStorage>> {
-        let Some(reference) =
-            Self::root_document(&self.state.bundle).and_then(|doc| doc.body_storage)
-        else {
+        let Some(identifier) = self.state.root.body_storage() else {
             return Ok(None);
         };
         let Some(object) = self
             .state
             .object_index
-            .resolve_ref_id(&self.state.bundle, reference.identifier)?
+            .resolve_ref_id(&self.state.bundle, identifier.get())?
         else {
             return Err(Error::InvalidFormat(format!(
                 "Pages body storage object {} is missing",
-                reference.identifier
+                identifier
             )));
         };
-        let storage = object
-            .messages
-            .iter()
-            .filter(|message| message.type_ == 2001 || message.type_ == 2022)
-            .find_map(|message| tswp::StorageArchive::decode(message.data.as_slice()).ok())
-            .ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Pages body object {} has no text storage payload",
-                    reference.identifier
-                ))
-            })?;
-        let mut result = TextStorage::from_text(storage.text.concat());
-        result.identifier = Some(reference.identifier);
-        Ok(Some(result))
+        let mut section = litchi_pages::package::decode_body_section_from_messages(
+            object.messages,
+            identifier,
+            BundleLimits::MAX_IWA_STREAM_BYTES,
+        )?;
+        Ok(section.text_storages.pop())
     }
 
     /// Extract all text content from the document
@@ -279,6 +261,8 @@ mod tests {
     use crate::IWorkPackage;
     use crate::archive::{Archive, ArchiveObject, RawMessage};
     use crate::protobuf::tsp::Reference;
+    use crate::protobuf::{tp, tswp};
+    use prost::Message;
 
     fn assert_send_sync<T: Send + Sync>() {}
 

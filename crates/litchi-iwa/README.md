@@ -1155,8 +1155,8 @@ transition.custom_parameters.text_delivery =
 keynote.set_slide_transition(0, transition)?;
 keynote.clear_slide_transition(0)?;
 let mut show = keynote.show_settings()?;
-show.loop_presentation = Some(true);
-show.mode = Some(litchi_iwa::keynote::KeynoteShowMode::SelfPlaying);
+show.set_loop_presentation(Some(true));
+show.set_mode(Some(litchi_iwa::keynote::Mode::SelfPlaying))?;
 keynote.set_show_settings(show)?;
 if let Some(drawable) = keynote.slide_drawables(0)?.first() {
     keynote.set_slide_drawable_comment(0, drawable.object_id, "Review this slide object")?;

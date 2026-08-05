@@ -252,6 +252,9 @@ pub enum Error {
     #[error(transparent)]
     IwaCommon(#[from] litchi_iwa_common::Error),
 
+    #[error(transparent)]
+    Pages(#[from] litchi_pages::package::Error),
+
     #[error("Invalid IWA format: {0}")]
     InvalidFormat(String),
 

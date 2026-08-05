@@ -3168,33 +3168,28 @@ fn show_settings_and_skip_state_are_transactional() {
     assert_eq!(editor.to_bytes().unwrap(), before);
 
     let mut settings = editor.show_settings().unwrap();
-    settings.width = 1_920.0;
-    settings.height = 1_080.0;
-    settings.slide_numbers_visible = Some(true);
-    settings.loop_presentation = Some(true);
-    settings.mode = Some(KeynoteShowMode::SelfPlaying);
-    settings.autoplay_transition_delay = Some(3.5);
-    settings.autoplay_build_delay = Some(1.25);
-    settings.idle_timer_active = Some(true);
-    settings.idle_timer_delay = Some(60.0);
-    settings.automatically_plays_upon_open = Some(false);
+    settings.set_size(1_920.0, 1_080.0).unwrap();
+    settings.set_slide_numbers_visible(Some(true));
+    settings.set_loop_presentation(Some(true));
+    settings.set_mode(Some(Mode::SelfPlaying)).unwrap();
+    settings.set_autoplay_transition_delay(Some(3.5)).unwrap();
+    settings.set_autoplay_build_delay(Some(1.25)).unwrap();
+    settings.set_idle_timer_active(Some(true));
+    settings.set_idle_timer_delay(Some(60.0)).unwrap();
+    settings.set_automatically_plays_upon_open(Some(false));
     let before = editor.to_bytes().unwrap();
-    let mut invalid = settings.clone();
-    invalid.width = f32::NAN;
-    assert!(editor.set_show_settings(invalid).is_err());
+    assert!(settings.set_size(f32::NAN, 1_080.0).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
     let mut invalid = settings.clone();
-    invalid.mode = Some(KeynoteShowMode::Unknown(1));
-    assert!(editor.set_show_settings(invalid).is_err());
+    assert_eq!(
+        invalid.set_mode(Some(Mode::Unknown(1))),
+        Err(litchi_keynote::show::Error::NonCanonicalMode)
+    );
     assert_eq!(editor.to_bytes().unwrap(), before);
     editor.set_show_settings(settings.clone()).unwrap();
     assert_eq!(editor.show_settings().unwrap(), settings);
-    for mode in [
-        KeynoteShowMode::Normal,
-        KeynoteShowMode::LinksOnly,
-        KeynoteShowMode::Unknown(19),
-    ] {
-        settings.mode = Some(mode);
+    for mode in [Mode::Normal, Mode::LinksOnly, Mode::Unknown(19)] {
+        settings.set_mode(Some(mode)).unwrap();
         editor.set_show_settings(settings.clone()).unwrap();
         let reparsed = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(reparsed.show_settings().unwrap(), settings);
@@ -4195,16 +4190,17 @@ fn scalar_updates_preserve_unknown_wire_and_restore_exact_components() {
     let original_transition = editor.slides().unwrap()[0].transition.clone().unwrap();
 
     let mut changed_show = original_show.clone();
-    changed_show.width = 1_920.0;
-    changed_show.height = 1_080.0;
-    changed_show.slide_numbers_visible = Some(true);
-    changed_show.loop_presentation = Some(true);
-    changed_show.mode = Some(KeynoteShowMode::SelfPlaying);
-    changed_show.autoplay_transition_delay = Some(3.5);
-    changed_show.autoplay_build_delay = Some(1.25);
-    changed_show.idle_timer_active = Some(true);
-    changed_show.idle_timer_delay = Some(60.0);
-    changed_show.automatically_plays_upon_open = Some(true);
+    changed_show.set_size(1_920.0, 1_080.0).unwrap();
+    changed_show.set_slide_numbers_visible(Some(true));
+    changed_show.set_loop_presentation(Some(true));
+    changed_show.set_mode(Some(Mode::SelfPlaying)).unwrap();
+    changed_show
+        .set_autoplay_transition_delay(Some(3.5))
+        .unwrap();
+    changed_show.set_autoplay_build_delay(Some(1.25)).unwrap();
+    changed_show.set_idle_timer_active(Some(true));
+    changed_show.set_idle_timer_delay(Some(60.0)).unwrap();
+    changed_show.set_automatically_plays_upon_open(Some(true));
     editor.set_show_settings(changed_show).unwrap();
     editor.set_show_settings(original_show).unwrap();
 
@@ -4257,7 +4253,7 @@ fn show_update_rejects_duplicate_scalar_fields_transactionally() {
     let mut editor = KeynoteEditor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     let mut settings = editor.show_settings().unwrap();
-    settings.loop_presentation = Some(false);
+    settings.set_loop_presentation(Some(false));
     assert!(editor.set_show_settings(settings).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
@@ -4277,7 +4273,7 @@ fn show_update_rejects_duplicate_mode_fields_transactionally() {
     let mut editor = KeynoteEditor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     let mut settings = editor.show_settings().unwrap();
-    settings.mode = Some(KeynoteShowMode::LinksOnly);
+    settings.set_mode(Some(Mode::LinksOnly)).unwrap();
     assert!(editor.set_show_settings(settings).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
 }

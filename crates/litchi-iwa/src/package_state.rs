@@ -6,6 +6,7 @@ use std::sync::{Arc, Condvar, Mutex};
 
 use crate::archive::{Archive, ArchiveLimits};
 use crate::{Error, Result};
+use litchi_iwa_package::{Entry, EntryStore, Error as EntryStoreError};
 
 type SharedArchiveResult = std::result::Result<Arc<Archive>, Arc<Error>>;
 
@@ -81,10 +82,24 @@ enum ArchiveLookup {
 /// the index, or the single bounded parsed-archive cache.
 #[derive(Debug, Default)]
 pub(crate) struct PackageState {
-    pub(crate) entries: Vec<(String, Vec<u8>)>,
-    positions: HashMap<String, usize>,
+    pub(crate) entries: EntryStore,
     archive_limits: ArchiveLimits,
     parsed_archive: Mutex<ArchiveCache>,
+}
+
+pub(crate) fn entry_store_error(error: EntryStoreError) -> Error {
+    match error {
+        EntryStoreError::DuplicateEntry(name) => {
+            Error::Bundle(format!("Duplicate package entry is ambiguous: {name}"))
+        },
+        EntryStoreError::InvalidPosition { position, len } => Error::Bundle(format!(
+            "Package entry position {position} is outside a table of length {len}"
+        )),
+        EntryStoreError::Allocation { requested } => Error::Bundle(format!(
+            "Failed to allocate package entry index for {requested} entries"
+        )),
+        error => Error::Bundle(format!("Package entry storage error: {error}")),
+    }
 }
 
 impl Clone for PackageState {
@@ -97,7 +112,6 @@ impl Clone for PackageState {
             .clone();
         Self {
             entries: self.entries.clone(),
-            positions: self.positions.clone(),
             archive_limits: self.archive_limits,
             // Never carry active flights into a copy-on-write generation. A
             // flight is tied to the exact immutable entry bytes in its source
@@ -111,32 +125,17 @@ impl Clone for PackageState {
 }
 
 impl PackageState {
-    pub(crate) fn from_entries(
-        entries: Vec<(String, Vec<u8>)>,
-        archive_limits: ArchiveLimits,
-    ) -> Self {
-        let mut state = Self {
+    pub(crate) fn from_entries(entries: Vec<Entry>, archive_limits: ArchiveLimits) -> Result<Self> {
+        let entries = EntryStore::try_from_entries(entries).map_err(entry_store_error)?;
+        Ok(Self {
             entries,
-            positions: HashMap::new(),
             archive_limits,
             parsed_archive: Mutex::new(ArchiveCache::default()),
-        };
-        state.rebuild_positions();
-        state
+        })
     }
 
     pub(crate) fn position(&self, name: &str) -> Option<usize> {
-        self.positions.get(name).copied()
-    }
-
-    pub(crate) fn rebuild_positions(&mut self) {
-        self.positions.clear();
-        self.positions.reserve(self.entries.len());
-        for (position, (name, _)) in self.entries.iter().enumerate() {
-            let previous = self.positions.insert(name.clone(), position);
-            debug_assert!(previous.is_none(), "package entry names must be unique");
-        }
-        self.clear_parsed_archive();
+        self.entries.position(name)
     }
 
     /// Parse or wait for one archive without holding the cache lock during
@@ -252,7 +251,7 @@ impl PackageState {
         }
     }
 
-    fn clear_parsed_archive(&mut self) {
+    pub(crate) fn clear_parsed_archive(&mut self) {
         let cache = self
             .parsed_archive
             .get_mut()
@@ -270,6 +269,7 @@ fn clone_error(error: &Error) -> Error {
         Error::Io(error) => Error::Io(std::io::Error::new(error.kind(), error.to_string())),
         Error::IwaCore(error) => Error::IwaCore(error.clone()),
         Error::IwaCommon(error) => Error::IwaCommon(error.clone()),
+        Error::Pages(error) => Error::Pages(error.clone()),
         Error::InvalidFormat(message) => Error::InvalidFormat(message.clone()),
         Error::Snappy(message) => Error::Snappy(message.clone()),
         Error::ProtobufDecode(error) => Error::ProtobufDecode(error.clone()),

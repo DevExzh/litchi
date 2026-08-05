@@ -15,10 +15,11 @@ use crate::archive::{Archive, ArchiveLimits as IwaArchiveLimits};
 use crate::snappy::{SnappyLimits, SnappyStream};
 use crate::zip_utils::{is_encrypted_iwork_archive, nested_index_zip_name};
 use crate::{Error, Result};
+use litchi_iwa_package::Entry;
 
 #[path = "package_state.rs"]
 mod package_state;
-use package_state::PackageState;
+use package_state::{PackageState, entry_store_error};
 
 /// A mutable single-file Pages, Numbers, or Keynote package.
 ///
@@ -235,40 +236,45 @@ impl Patch {
     fn between(source: Snapshot, target: Snapshot) -> Self {
         let mut changes = Vec::new();
 
-        for (before_position, (name, before_data)) in source.state.entries.iter().enumerate() {
+        for (before_position, before_entry) in source.state.entries.iter().enumerate() {
+            let name = before_entry.name();
             let Some(after_position) = target.state.position(name) else {
                 changes.push(EntryChange {
-                    name: name.clone(),
+                    name: name.to_owned(),
                     kind: EntryChangeKind::Removed,
                     before_position: Some(before_position),
                     after_position: None,
-                    before_len: Some(before_data.len()),
+                    before_len: Some(before_entry.data().len()),
                     after_len: None,
                 });
                 continue;
             };
-            let after_data = &target.state.entries[after_position].1;
-            if before_data != after_data {
+            let Some(after_entry) = target.state.entries.get_at(after_position) else {
+                debug_assert!(false, "entry index must resolve through the name index");
+                continue;
+            };
+            if before_entry.data() != after_entry.data() {
                 changes.push(EntryChange {
-                    name: name.clone(),
+                    name: name.to_owned(),
                     kind: EntryChangeKind::Replaced,
                     before_position: Some(before_position),
                     after_position: Some(after_position),
-                    before_len: Some(before_data.len()),
-                    after_len: Some(after_data.len()),
+                    before_len: Some(before_entry.data().len()),
+                    after_len: Some(after_entry.data().len()),
                 });
             }
         }
 
-        for (after_position, (name, after_data)) in target.state.entries.iter().enumerate() {
+        for (after_position, after_entry) in target.state.entries.iter().enumerate() {
+            let name = after_entry.name();
             if source.state.position(name).is_none() {
                 changes.push(EntryChange {
-                    name: name.clone(),
+                    name: name.to_owned(),
                     kind: EntryChangeKind::Added,
                     before_position: None,
                     after_position: Some(after_position),
                     before_len: None,
-                    after_len: Some(after_data.len()),
+                    after_len: Some(after_entry.data().len()),
                 });
             }
         }
@@ -553,11 +559,11 @@ impl IWorkPackage {
             let data = archive.read(name).map_err(|error| {
                 Error::Bundle(format!("Failed to read package entry {name}: {error}"))
             })?;
-            entries.push((name.to_owned(), data));
+            entries.push(Entry::new(name.to_owned(), data));
         }
         let archive_limits = limits.effective_archive_limits()?;
         Ok(Self {
-            state: Arc::new(PackageState::from_entries(entries, archive_limits)),
+            state: Arc::new(PackageState::from_entries(entries, archive_limits)?),
             limits,
             mutation_revision: 0,
         })
@@ -624,11 +630,11 @@ impl IWorkPackage {
                     "Failed to read legacy package entry {outer_name}: {error}"
                 ))
             })?;
-            entries.push((name.to_owned(), data));
+            entries.push(Entry::new(name.to_owned(), data));
         }
         let archive_limits = limits.effective_archive_limits()?;
         Ok(Self {
-            state: Arc::new(PackageState::from_entries(entries, archive_limits)),
+            state: Arc::new(PackageState::from_entries(entries, archive_limits)?),
             limits,
             mutation_revision: 0,
         })
@@ -666,7 +672,7 @@ impl IWorkPackage {
     }
 
     pub fn entry_names(&self) -> impl Iterator<Item = &str> {
-        self.state.entries.iter().map(|(name, _)| name.as_str())
+        self.state.entries.iter().map(Entry::name)
     }
 
     /// Enumerate package members that contain IWA object archives.
@@ -678,10 +684,11 @@ impl IWorkPackage {
         self.state
             .entries
             .iter()
-            .filter(|(name, data)| {
-                name.ends_with(".iwa") && !is_legacy_operation_storage(name, data)
+            .filter(|entry| {
+                entry.name().ends_with(".iwa")
+                    && !is_legacy_operation_storage(entry.name(), entry.data())
             })
-            .map(|(name, _)| name.as_str())
+            .map(Entry::name)
     }
 
     /// Locate the package's calculation-engine component without allocating.
@@ -711,7 +718,7 @@ impl IWorkPackage {
 
     pub fn entry(&self, name: &str) -> Option<&[u8]> {
         let position = self.entry_position(normalize_entry_name(name))?;
-        Some(self.state.entries[position].1.as_slice())
+        Some(self.state.entries.get_at(position)?.data())
     }
 
     /// Borrow a raw package member for low-level mutation.
@@ -726,7 +733,7 @@ impl IWorkPackage {
         self.mark_mutated();
         let state = Arc::make_mut(&mut self.state);
         state.invalidate_archive(name);
-        Some(&mut state.entries[position].1)
+        Some(state.entries.get_at_mut(position)?.data_mut())
     }
 
     /// Create or replace a package member.
@@ -742,12 +749,16 @@ impl IWorkPackage {
         self.validate_entry_update(position, &data)?;
         if let Some(position) = position {
             let state = Arc::make_mut(&mut self.state);
-            let previous = std::mem::replace(&mut state.entries[position].1, data);
+            let Some(previous) = state.entries.replace_data(position, data) else {
+                return Err(Error::Bundle(
+                    "package entry index became invalid during replacement".to_owned(),
+                ));
+            };
             state.invalidate_archive(&name);
             self.mark_mutated();
             return Ok(Some(previous));
         }
-        self.insert_new_entry(name, data);
+        self.insert_new_entry(name, data)?;
         self.mark_mutated();
         Ok(None)
     }
@@ -756,8 +767,8 @@ impl IWorkPackage {
     pub fn remove_entry(&mut self, name: &str) -> Option<Vec<u8>> {
         let position = self.entry_position(normalize_entry_name(name))?;
         let state = Arc::make_mut(&mut self.state);
-        let removed = state.entries.remove(position).1;
-        state.rebuild_positions();
+        let removed = state.entries.remove_at(position)?.into_parts().1;
+        state.clear_parsed_archive();
         self.mark_mutated();
         Some(removed)
     }
@@ -854,8 +865,11 @@ impl IWorkPackage {
         let compressed = SnappyStream::compress(&data)?;
         self.validate_entry_update(None, &compressed)?;
         let state = Arc::make_mut(&mut self.state);
-        state.entries.insert(position, (normalized, compressed));
-        state.rebuild_positions();
+        state
+            .entries
+            .try_insert_at(position, Entry::new(normalized, compressed))
+            .map_err(entry_store_error)?;
+        state.clear_parsed_archive();
         self.mark_mutated();
         Ok(())
     }
@@ -959,10 +973,15 @@ impl IWorkPackage {
     }
 
     fn write_entries<W: Write>(&self, writer: &mut StreamingArchiveWriter<W>) -> Result<()> {
-        for (name, data) in &self.state.entries {
-            writer.write_stored(name, data).map_err(|error| {
-                Error::Bundle(format!("Failed to write package entry {name}: {error}"))
-            })?;
+        for entry in self.state.entries.iter() {
+            writer
+                .write_stored(entry.name(), entry.data())
+                .map_err(|error| {
+                    Error::Bundle(format!(
+                        "Failed to write package entry {}: {error}",
+                        entry.name()
+                    ))
+                })?;
         }
         Ok(())
     }
@@ -982,8 +1001,8 @@ impl IWorkPackage {
         }
 
         let previous_size = position
-            .map(|index| self.state.entries[index].1.len())
-            .unwrap_or(0);
+            .and_then(|index| self.state.entries.get_at(index))
+            .map_or(0, |entry| entry.data().len());
         let previous_size = u64::try_from(previous_size)
             .map_err(|_| Error::Bundle("package member length does not fit u64".to_owned()))?;
         let data_size = u64::try_from(data.len())
@@ -1008,22 +1027,17 @@ impl IWorkPackage {
                 self.limits.max_entries
             )));
         }
-        for (name, data) in &self.state.entries {
-            validate_entry_name(name)?;
-            self.validate_entry_data(data)?;
+        for entry in self.state.entries.iter() {
+            validate_entry_name(entry.name())?;
+            self.validate_entry_data(entry.data())?;
         }
-        let total = self
-            .state
-            .entries
-            .iter()
-            .try_fold(0_u64, |total, (_, data)| {
-                let size = u64::try_from(data.len()).map_err(|_| {
-                    Error::Bundle("package member length does not fit u64".to_owned())
-                })?;
-                total
-                    .checked_add(size)
-                    .ok_or_else(|| Error::Bundle("iWork package total size overflow".to_owned()))
-            })?;
+        let total = self.state.entries.iter().try_fold(0_u64, |total, entry| {
+            let size = u64::try_from(entry.data().len())
+                .map_err(|_| Error::Bundle("package member length does not fit u64".to_owned()))?;
+            total
+                .checked_add(size)
+                .ok_or_else(|| Error::Bundle("iWork package total size overflow".to_owned()))
+        })?;
         if total > self.limits.max_total_bytes {
             return Err(Error::Bundle(format!(
                 "iWork package total size exceeds the {} byte limit",
@@ -1045,14 +1059,15 @@ impl IWorkPackage {
         Ok(())
     }
 
-    fn insert_new_entry(&mut self, name: String, data: Vec<u8>) {
+    fn insert_new_entry(&mut self, name: String, data: Vec<u8>) -> Result<()> {
         let state = Arc::make_mut(&mut self.state);
-        if name == "Index/Document.iwa" {
-            state.entries.insert(0, (name, data));
-        } else {
-            state.entries.push((name, data));
-        }
-        state.rebuild_positions();
+        let position = usize::from(name != "Index/Document.iwa") * state.entries.len();
+        state
+            .entries
+            .try_insert_at(position, Entry::new(name, data))
+            .map_err(entry_store_error)?;
+        state.clear_parsed_archive();
+        Ok(())
     }
 
     fn mark_mutated(&mut self) {
@@ -1078,14 +1093,14 @@ impl Snapshot {
 
     /// Enumerate package members in preserved source order.
     pub fn entry_names(&self) -> impl Iterator<Item = &str> {
-        self.state.entries.iter().map(|(name, _)| name.as_str())
+        self.state.entries.iter().map(Entry::name)
     }
 
     /// Borrow one package member without copying it.
     pub fn entry(&self, name: &str) -> Option<&[u8]> {
         let name = normalize_entry_name(name);
         let position = self.state.position(name)?;
-        Some(self.state.entries[position].1.as_slice())
+        Some(self.state.entries.get_at(position)?.data())
     }
 
     /// Validate this immutable snapshot without creating serialized output.
@@ -1157,10 +1172,11 @@ impl Snapshot {
         self.state
             .entries
             .iter()
-            .filter(|(name, data)| {
-                name.ends_with(".iwa") && !is_legacy_operation_storage(name, data)
+            .filter(|entry| {
+                entry.name().ends_with(".iwa")
+                    && !is_legacy_operation_storage(entry.name(), entry.data())
             })
-            .map(|(name, _)| name.as_str())
+            .map(Entry::name)
     }
 
     /// Locate the package's calculation-engine component without first
@@ -1193,7 +1209,7 @@ fn same_entries(left: &Snapshot, right: &Snapshot) -> bool {
 fn insert_unique_archive_entry(
     archive: &ArchiveReader<'_>,
     name: &str,
-    entries: &mut Vec<(String, Vec<u8>)>,
+    entries: &mut Vec<Entry>,
     seen: &mut HashSet<String>,
 ) -> Result<()> {
     if !seen.insert(name.to_owned()) {
@@ -1204,7 +1220,7 @@ fn insert_unique_archive_entry(
     let data = archive
         .read(name)
         .map_err(|error| Error::Bundle(format!("Failed to read package entry {name}: {error}")))?;
-    entries.push((name.to_owned(), data));
+    entries.push(Entry::new(name.to_owned(), data));
     Ok(())
 }
 

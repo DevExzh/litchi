@@ -85,6 +85,7 @@
       "litchi-iwa-common",
       "litchi-iwa-core",
       "litchi-iwa-graph",
+      "litchi-iwa-package",
       "litchi-iwa-protos",
       "litchi-iwa-text",
       "litchi-keynote",
@@ -97,6 +98,7 @@
       "litchi-iwa-protos"
     ],
     "litchi-iwa-graph": [],
+    "litchi-iwa-package": [],
     "litchi-iwa-protos": [],
     "litchi-iwa-text": [],
     "litchi-keynote": [
@@ -186,6 +188,8 @@
       "soapberry-zip"
     ],
     "litchi-pages": [
+      "litchi-iwa-core",
+      "litchi-iwa-protos",
       "litchi-iwa-text"
     ],
     "litchi-oth": [
@@ -285,6 +289,7 @@
     "litchi-iwa-common",
     "litchi-iwa-core",
     "litchi-iwa-graph",
+    "litchi-iwa-package",
     "litchi-iwa-protos",
     "litchi-iwa-text",
     "litchi-keynote",

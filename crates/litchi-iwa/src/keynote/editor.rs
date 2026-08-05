@@ -5070,11 +5070,11 @@ mod transition_lifecycle;
 mod transition_wire;
 
 use builds::*;
+pub use litchi_keynote::show::{Mode, Settings};
 pub use litchi_keynote::transition::Effect;
 pub use litchi_keynote::transition::{
     Acceleration, AccelerationKind, Direction, MosaicType, TextDelivery, TextDeliveryKind,
 };
-pub use show_settings::{KeynoteShowMode, KeynoteShowSettings};
 pub use slide_audio::{KeynoteSlideAudioInfo, KeynoteSlideAudioOptions, RemovedKeynoteSlideAudio};
 pub use slide_background::KeynoteSlideBackground;
 pub use slide_background_color::{KeynoteRgbColorSpace, KeynoteRgbaColor};

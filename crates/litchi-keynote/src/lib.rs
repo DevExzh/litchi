@@ -6,6 +6,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod show;
 pub mod transition;
 
 pub use transition::Effect;

@@ -99,6 +99,22 @@ the older `WireField` mutation representation remains only while its callers
 are migrated. The facade's private `wire.rs` is a callback/error adapter and
 does not copy parsed fields or maintain a second wire representation.
 
+The archive-neutral package-entry substrate now lives in
+`litchi-iwa-package`. It owns only ordered, uniquely named entry storage and
+its fallible name index; it has no ZIP, Snappy, protobuf, graph, or application
+dependency. `litchi-iwa` depends downward on this leaf while retaining
+`IWorkPackage`'s ZIP ingress, IWA decoding, resource policy, and transactional
+snapshot facade. This staged boundary lets the eventual Pages, Numbers, and
+Keynote package owners share entry storage without making the package leaf
+depend on a concrete format or leaking application message IDs upward.
+
+Pages-specific package-root and body-storage protobuf interpretation now lives
+in `litchi-pages::package`; the IWA facade retains ZIP ingress, object lookup,
+and generic text fallback. Keynote presentation settings follow the same
+boundary at `litchi-keynote::show::{Mode, Settings}`: the semantic crate owns
+validated dimensions and playback values, while `litchi-iwa` retains only the
+native `KN.ShowArchive` wire adapter and transactional publication.
+
 Physical organization follows the same ownership rule inside format crates:
 the Numbers text-box API is isolated in the private
 `numbers::editor::text_box_api` module, leaving the editor root focused on

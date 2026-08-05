@@ -5,6 +5,14 @@
 
 ## Names and types
 
+Presentation-level Keynote settings use the focused
+`litchi-keynote::show::{Mode, Settings}` module. `Settings` stores validated,
+private dimensions and exposes checked setters for playback delays and mode;
+the IWA adapter cannot publish a non-finite size or delay through the ordinary
+semantic API. Unknown native mode values remain lossless, while values already
+assigned to a named mode are rejected as non-canonical rather than silently
+rewritten.
+
 Public types use short names inside focused modules. Prefer
 `chart3d::BarShape` to `Chart3dBarShape`. Type tags plus unrelated optional
 fields are replaced by non-exhaustive data-bearing enums:

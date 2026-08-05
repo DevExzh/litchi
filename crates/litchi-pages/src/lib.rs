@@ -7,6 +7,9 @@
 
 #![forbid(unsafe_code)]
 
+/// Pages-specific package decoding over the shared IWA archive substrate.
+pub mod package;
+
 use litchi_iwa_text::TextStorage;
 
 /// A logical Pages document section.
