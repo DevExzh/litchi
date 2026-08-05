@@ -120,11 +120,11 @@ pub struct PageLayout {
     /// Exact `style:header-style` XML, including header/footer properties.
     pub header_style_xml: Option<String>,
     /// Typed standard properties from `style:header-style`.
-    pub header_properties: Option<crate::HeaderFooterStyleProperties>,
+    pub header_properties: Option<crate::header_footer_properties::StyleProperties>,
     /// Exact `style:footer-style` XML, including header/footer properties.
     pub footer_style_xml: Option<String>,
     /// Typed standard properties from `style:footer-style`.
-    pub footer_properties: Option<crate::HeaderFooterStyleProperties>,
+    pub footer_properties: Option<crate::header_footer_properties::StyleProperties>,
     /// Exact `style:page-layout` element bytes.
     pub xml: String,
 }
