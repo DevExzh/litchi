@@ -227,8 +227,8 @@ impl NumbersDocument {
     /// This is the canonical Numbers data-model boundary. Native comments
     /// and other archive/editor sidecars remain available through
     /// [`Self::sheets`] until their consumers migrate to dedicated adapters.
-    pub fn semantic_sheets(&self) -> Result<&[litchi_numbers::Sheet]> {
-        Ok(self.state.semantic_document.sheets())
+    pub fn semantic_sheets(&self) -> &[litchi_numbers::Sheet] {
+        self.state.semantic_document.sheets()
     }
 
     /// Borrow the immutable archive-free semantic Numbers document built at

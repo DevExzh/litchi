@@ -18,7 +18,10 @@ pub mod sheet;
 /// Sparse semantic table vocabulary.
 pub mod table;
 
-pub use document::{Document, Error as DocumentError, MAX_SHEETS, Result as DocumentResult};
+pub use document::{
+    DEFAULT_MAX_TEXT_BYTES, Document, Error as DocumentError, Limits as DocumentLimits,
+    MAX_MATERIALIZED_CELLS, MAX_SHEETS, MAX_TABLES, Result as DocumentResult,
+};
 pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,
     FormulaExpression, FormulaPivotCategoryReference, FormulaUuid,
