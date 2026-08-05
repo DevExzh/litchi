@@ -1,5 +1,5 @@
 use litchi_xlsx::scenarios::{
-    Conformance, InputCell, Scenario, ScenarioCellReference, Scenarios, parse_worksheet_scenarios,
+    CellReference, Collection, Conformance, InputCell, Scenario, parse_worksheet_scenarios,
     write_worksheet_scenarios,
 };
 
@@ -8,12 +8,12 @@ fn standalone_scenarios_round_trip_through_the_owner() {
     let scenario = Scenario::new("baseline")
         .unwrap()
         .with_input_cells(vec![
-            InputCell::new(ScenarioCellReference::new("A1").unwrap(), "10").unwrap(),
+            InputCell::new(CellReference::new("A1").unwrap(), "10").unwrap(),
         ])
         .unwrap();
-    let value = Scenarios::new(vec![scenario]).unwrap();
+    let value = Collection::new(vec![scenario]).unwrap();
 
-    fn accepts_canonical_owner(_: &Scenarios) {}
+    fn accepts_canonical_owner(_: &Collection) {}
     accepts_canonical_owner(&value);
 
     for conformance in [Conformance::Transitional, Conformance::Strict] {

@@ -173,7 +173,7 @@ pub(crate) fn print_options(
 }
 
 /// Parse worksheet what-if scenarios.
-pub(crate) fn scenarios(sheet: &Worksheet) -> Result<Option<crate::scenarios::Scenarios>> {
+pub(crate) fn scenarios(sheet: &Worksheet) -> Result<Option<crate::scenarios::Collection>> {
     crate::scenarios::parse_worksheet_scenarios(xml(sheet)?)
 }
 

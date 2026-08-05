@@ -570,7 +570,7 @@ impl Worksheet {
     }
 
     /// Parse worksheet what-if scenarios.
-    pub fn scenarios(&self) -> Result<Option<crate::scenarios::Scenarios>> {
+    pub fn scenarios(&self) -> Result<Option<crate::scenarios::Collection>> {
         worksheet::scenarios(self)
     }
 

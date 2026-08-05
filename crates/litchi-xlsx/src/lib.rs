@@ -167,7 +167,7 @@ pub use revisions::{
 };
 pub use row::{Height, HeightAt, Row, Rows};
 pub use scenarios::{
-    InputCell, Scenario, ScenarioCellReference, ScenarioRangeReference, Scenarios,
+    CellReference, InputCell, Scenario, UnknownAttribute, UnknownElement,
     parse_worksheet_scenarios, write_worksheet_scenarios,
 };
 pub use sheet::{Name, NameError};
