@@ -1,11 +1,8 @@
 //! ODF data-pilot (pivot-table) declarations.
 
-use super::{
-    database_range::{
-        Filter,
-        parse_filter, parse_source_query, parse_source_sql, parse_source_table, validate_filter,
-        write_database_source, write_filter,
-    },
+use super::database_range::{
+    Filter, parse_filter, parse_source_query, parse_source_sql, parse_source_table,
+    validate_filter, write_database_source, write_filter,
 };
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
