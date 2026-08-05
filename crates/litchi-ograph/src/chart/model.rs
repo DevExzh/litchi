@@ -700,21 +700,21 @@ pub struct Legend {
 /// Opaque data-label record retained as part of the semantic inventory.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Label {
-    pub kind: crate::raw::Kind,
+    pub kind: litchi_biff::Kind,
     pub data: Vec<u8>,
 }
 
 /// Opaque record observed during parsing, in original record order.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Raw {
-    kind: crate::raw::Kind,
+    kind: litchi_biff::Kind,
     data: Vec<u8>,
     offset: usize,
 }
 
 impl Raw {
     /// BIFF record identifier.
-    pub const fn kind(&self) -> crate::raw::Kind {
+    pub const fn kind(&self) -> litchi_biff::Kind {
         self.kind
     }
 
@@ -728,7 +728,7 @@ impl Raw {
         self.offset
     }
 
-    pub(super) fn parsed(kind: crate::raw::Kind, data: Vec<u8>, offset: usize) -> Self {
+    pub(super) fn parsed(kind: litchi_biff::Kind, data: Vec<u8>, offset: usize) -> Self {
         Self { kind, data, offset }
     }
 }
@@ -1494,17 +1494,17 @@ fn check_add(current: usize, maximum: usize, resource: &'static str) -> Result<(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::chart::{self, RowCol};
-    use crate::raw::{Encoder, Kind as RecordKind, Records};
+    use crate::chart::RowCol;
+    use litchi_biff::{Encoder, Kind as RecordKind, Records};
 
-    const UNKNOWN: RecordKind = RecordKind::new(0x7777);
+    const UNKNOWN: RecordKind = RecordKind::from_wire(0x7777);
 
     fn count(value: u16) -> Count {
         Count::new(value).expect("bounded fixture count")
     }
 
-    fn line_format() -> chart::format::Line {
-        chart::format::Line {
+    fn line_format() -> format::Line {
+        format::Line {
             color: [1, 2, 3, 0],
             pattern: 0,
             weight: 0,
@@ -1513,8 +1513,8 @@ mod tests {
         }
     }
 
-    fn area_format() -> chart::format::Area {
-        chart::format::Area {
+    fn area_format() -> format::Area {
+        format::Area {
             foreground: [4, 5, 6, 0],
             background: [7, 8, 9, 0],
             pattern: 1,
@@ -1524,12 +1524,12 @@ mod tests {
         }
     }
 
-    fn fixture(mut chart: Chart) -> chart::Stream {
+    fn fixture(mut chart: Chart) -> Stream {
         chart.authoring_proven = true;
         chart.encode().expect("internal parser fixture")
     }
 
-    fn omit(stream: &chart::Stream, target: RecordKind) -> Vec<u8> {
+    fn omit(stream: &Stream, target: RecordKind) -> Vec<u8> {
         let mut out = Encoder::new();
         for item in Records::new(stream.as_bytes()) {
             let record = item.expect("valid fixture record");
@@ -1540,8 +1540,8 @@ mod tests {
         out.finish()
     }
 
-    fn excel_input(bytes: &[u8]) -> chart::Ref<'_> {
-        chart::Ref::open(bytes).expect("well-framed chart rewrite")
+    fn excel_input(bytes: &[u8]) -> Ref<'_> {
+        Ref::open(bytes).expect("well-framed chart rewrite")
     }
 
     fn excel_chart() -> Chart {
@@ -1675,7 +1675,7 @@ mod tests {
         }
         let bytes = out.finish();
         let pointer = bytes.as_ptr();
-        let stream = chart::Stream::open(bytes).expect("raw chart");
+        let stream = Stream::open(bytes).expect("raw chart");
         let parsed =
             Chart::open(stream, Context::excel().with_external_sheets(1)).expect("semantic chart");
         assert_eq!(parsed.unknown().len(), 1);
@@ -1703,11 +1703,10 @@ mod tests {
         let stream = fixture(excel_chart());
         let chart =
             Chart::open(stream, Context::excel().with_external_sheets(1)).expect("parsed chart");
+        let mut limits = Limits::default();
+        limits.biff.max_output_bytes = bytes.saturating_sub(1);
         assert!(matches!(
-            chart.encode_with(Limits {
-                max_output_bytes: bytes.saturating_sub(1),
-                ..Limits::default()
-            }),
+            chart.encode_with(limits),
             Err(Error::LimitExceeded {
                 resource: "output bytes",
                 ..
@@ -1792,7 +1791,7 @@ mod tests {
             .lines
             .try_reserve_exact(1)
             .expect("line fixture allocation");
-        group.lines.push(chart::group::Line {
+        group.lines.push(group::Line {
             kind: crate::record::line::Kind::HighLow,
             format: line_format(),
         });
@@ -1800,8 +1799,8 @@ mod tests {
             .drop_bars
             .try_reserve_exact(1)
             .expect("DropBar fixture allocation");
-        group.drop_bars.push(chart::group::DropBar {
-            gap: chart::group::Gap::new(20).expect("bounded gap"),
+        group.drop_bars.push(group::DropBar {
+            gap: group::Gap::new(20).expect("bounded gap"),
             line: line_format(),
             area: area_format(),
         });
@@ -1813,18 +1812,18 @@ mod tests {
             .collect::<Vec<_>>();
         let crt = kinds
             .iter()
-            .position(|kind| *kind == RecordKind::new(0x101C))
+            .position(|kind| *kind == RecordKind::from_wire(0x101C))
             .expect("CrtLine");
-        assert_eq!(kinds.get(crt + 1), Some(&RecordKind::new(0x1007)));
+        assert_eq!(kinds.get(crt + 1), Some(&RecordKind::from_wire(0x1007)));
         let drop = kinds
             .iter()
-            .position(|kind| *kind == RecordKind::new(0x103D))
+            .position(|kind| *kind == RecordKind::from_wire(0x103D))
             .expect("DropBar");
         assert_eq!(
             kinds.get(drop..drop + 5),
             Some(
                 [0x103D, 0x1033, 0x1007, 0x100A, 0x1034]
-                    .map(RecordKind::new)
+                    .map(RecordKind::from_wire)
                     .as_slice()
             )
         );
@@ -1844,17 +1843,17 @@ mod tests {
         let mut removed = false;
         for item in Records::new(stream.as_bytes()) {
             let record = item.expect("valid record");
-            if after_series && record.kind() == RecordKind::new(0x1033) {
+            if after_series && record.kind() == RecordKind::from_wire(0x1033) {
                 removed = true;
                 after_series = false;
                 continue;
             }
-            after_series = record.kind() == RecordKind::new(0x1003);
+            after_series = record.kind() == RecordKind::from_wire(0x1003);
             out.push_ref(record).expect("record replay");
         }
         assert!(removed);
         let malformed = out.finish();
-        let input = chart::Ref::open(&malformed).expect("raw boundaries remain valid");
+        let input = Ref::open(&malformed).expect("raw boundaries remain valid");
         assert!(matches!(
             Chart::parse(input, Context::excel().with_external_sheets(1)),
             Err(Error::InvalidChart {
@@ -1882,7 +1881,7 @@ mod tests {
     #[test]
     fn regular_series_requires_one_owner_and_series_text_remains_ai_local() {
         let stream = fixture(excel_chart());
-        let missing = omit(&stream, RecordKind::new(0x1045));
+        let missing = omit(&stream, RecordKind::from_wire(0x1045));
         assert!(matches!(
             Chart::parse(
                 excel_input(&missing),
@@ -1899,13 +1898,13 @@ mod tests {
         for item in Records::new(stream.as_bytes()) {
             let record = item.expect("valid fixture record");
             out.push_ref(record).expect("record replay");
-            if record.kind() == RecordKind::new(0x1051) {
+            if record.kind() == RecordKind::from_wire(0x1051) {
                 ai += 1;
                 if ai == Role::ALL.len() {
                     let text = [0, 0, 1, 0, b'x'];
-                    out.push(RecordKind::new(0x100D), &text)
+                    out.push(RecordKind::from_wire(0x100D), &text)
                         .expect("first optional SeriesText");
-                    out.push(RecordKind::new(0x100D), &text)
+                    out.push(RecordKind::from_wire(0x100D), &text)
                         .expect("misplaced second SeriesText");
                 }
             }
@@ -2030,7 +2029,7 @@ mod tests {
         let label = stream
             .records()
             .map(|record| record.expect("valid fixture record"))
-            .find(|record| record.kind() == RecordKind::new(0x0204))
+            .find(|record| record.kind() == RecordKind::from_wire(0x0204))
             .expect("Label record");
         assert_eq!(
             label.payload().get(6..9),
@@ -2090,7 +2089,7 @@ mod tests {
     fn excel_rejects_proven_topology_violations_and_bad_siindex_order() {
         let context = Context::excel().with_external_sheets(1);
         let stream = fixture(excel_chart());
-        for kind in [0x00A0, 0x1022, 0x104F].map(RecordKind::new) {
+        for kind in [0x00A0, 0x1022, 0x104F].map(RecordKind::from_wire) {
             let malformed = omit(&stream, kind);
             assert!(Chart::parse(excel_input(&malformed), context).is_err());
         }
@@ -2099,7 +2098,7 @@ mod tests {
         let mut section = 0usize;
         for item in Records::new(stream.as_bytes()) {
             let record = item.expect("valid fixture record");
-            if record.kind() == RecordKind::new(0x1065) {
+            if record.kind() == RecordKind::from_wire(0x1065) {
                 section += 1;
                 if section == 2 {
                     out.push(record.kind(), &3u16.to_le_bytes())
@@ -2121,10 +2120,10 @@ mod tests {
         let mut out = Encoder::new();
         for item in Records::new(stream.as_bytes()) {
             let record = item.expect("valid fixture record");
-            if record.kind() == RecordKind::new(0x0200) {
-                out.push(RecordKind::new(0x1033), &[])
+            if record.kind() == RecordKind::from_wire(0x0200) {
+                out.push(RecordKind::from_wire(0x1033), &[])
                     .expect("orphan Begin");
-                out.push(RecordKind::new(0x1034), &[])
+                out.push(RecordKind::from_wire(0x1034), &[])
                     .expect("balanced orphan End");
             }
             out.push_ref(record).expect("record replay");
@@ -2142,9 +2141,9 @@ mod tests {
     #[test]
     fn graph_does_not_inherit_excel_outer_order_but_rejects_siindex() {
         let stream = fixture(Chart::new(Context::graph()).expect("Graph chart"));
-        let without_excel_scl = omit(&stream, RecordKind::new(0x00A0));
+        let without_excel_scl = omit(&stream, RecordKind::from_wire(0x00A0));
         let parsed = Chart::parse(
-            chart::Ref::open(&without_excel_scl).expect("Graph rewrite"),
+            Ref::open(&without_excel_scl).expect("Graph rewrite"),
             Context::graph(),
         )
         .expect("Graph does not require Excel CHARTFOMATS order");
@@ -2154,9 +2153,9 @@ mod tests {
             without_excel_scl
         );
 
-        let without_excel_crt_link = omit(&stream, RecordKind::new(0x1022));
+        let without_excel_crt_link = omit(&stream, RecordKind::from_wire(0x1022));
         let parsed = Chart::parse(
-            chart::Ref::open(&without_excel_crt_link).expect("Graph rewrite"),
+            Ref::open(&without_excel_crt_link).expect("Graph rewrite"),
             Context::graph(),
         )
         .expect("Graph does not require the Excel-mandatory CrtLink");
@@ -2169,13 +2168,13 @@ mod tests {
         for item in Records::new(stream.as_bytes()) {
             let record = item.expect("valid fixture record");
             if record.kind() == super::super::EOF {
-                out.push(RecordKind::new(0x1065), &1u16.to_le_bytes())
+                out.push(RecordKind::from_wire(0x1065), &1u16.to_le_bytes())
                     .expect("Graph SIIndex");
             }
             out.push_ref(record).expect("record replay");
         }
         let malformed = out.finish();
-        let input = chart::Ref::open(&malformed).expect("Graph SIIndex framing");
+        let input = Ref::open(&malformed).expect("Graph SIIndex framing");
         assert!(matches!(
             Chart::parse(input, Context::graph()),
             Err(Error::InvalidChart {
