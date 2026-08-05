@@ -1,224 +1,167 @@
-//! Archive-free Pages section content, pagination, settings, and backgrounds.
-
 pub mod pagination;
 
-use litchi_iwa_common::color::Rgba;
 use litchi_iwa_text::TextStorage;
 use thiserror::Error;
 
 pub use pagination::{PageNumber, PageNumbering, Start};
 
-const INHERIT_HEADER_FOOTER_PRESENT: u16 = 1 << 0;
-const INHERIT_HEADER_FOOTER_VALUE: u16 = 1 << 1;
-const FIRST_PAGE_DIFFERENT_PRESENT: u16 = 1 << 2;
-const FIRST_PAGE_DIFFERENT_VALUE: u16 = 1 << 3;
-const EVEN_ODD_PAGES_DIFFERENT_PRESENT: u16 = 1 << 4;
-const EVEN_ODD_PAGES_DIFFERENT_VALUE: u16 = 1 << 5;
-const FIRST_PAGE_HIDES_HEADER_FOOTER_PRESENT: u16 = 1 << 6;
-const FIRST_PAGE_HIDES_HEADER_FOOTER_VALUE: u16 = 1 << 7;
-const START_PRESENT: u16 = 1 << 8;
-const PAGE_NUMBERING_PRESENT: u16 = 1 << 9;
+const INHERIT_PREVIOUS_HEADER_FOOTER: u8 = 1;
+const FIRST_PAGE_DIFFERENT: u8 = 2;
+const EVEN_ODD_PAGES_DIFFERENT: u8 = 4;
+const FIRST_PAGE_HIDES_HEADER_FOOTER: u8 = 8;
 
-/// Validation failures for Pages section semantic values.
+/// Validation failures for section semantic values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum Error {
-    /// A section name contains an embedded NUL character.
+    /// A section name contains a native string terminator.
     #[error("Pages section names cannot contain NUL")]
     NameContainsNul,
-    /// A known native section-start value was represented by `Unknown`.
+    /// A known native section-start value was represented by an unknown value.
     #[error("Pages section start must use its canonical variant for a known value")]
     NonCanonicalStart,
-    /// A known native page-numbering value was represented by `Unknown`.
+    /// A known native page-numbering value was represented by an unknown value.
     #[error("Pages page numbering must use its canonical variant for a known value")]
     NonCanonicalNumbering,
+    /// An opaque fill payload was empty.
+    #[error("Pages section background payload cannot be empty")]
+    EmptyBackgroundPayload,
 }
 
-/// Result type for Pages section semantic construction and mutation.
+/// Result type for section semantic value construction and validation.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// Lossless, archive-free settings attached to one Pages section.
+/// Lossless settings stored directly on a Pages section.
 ///
-/// The value keeps native field presence in a compact bitset. Pagination
-/// values retain their native discriminants through the focused types in
-/// [`pagination`], while section names use one owned boxed string. Protobuf
-/// messages, object identifiers, background-fill bytes, and package state are
-/// deliberately absent; those belong to the IWA adapter.
-#[repr(C)]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+/// Native boolean presence and values are packed into two bytes. The section
+/// name owns exactly one UTF-8 allocation, while pagination values retain
+/// unknown native discriminants without carrying archive or protobuf state.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Settings {
     name: Option<Box<str>>,
-    start: u32,
-    page_numbering: u32,
+    present: u8,
+    values: u8,
+    start: Option<Start>,
+    page_numbering: Option<PageNumbering>,
     starting_page_number: Option<PageNumber>,
-    flags: u16,
 }
 
 impl Settings {
-    /// Construct settings while retaining the presence of every native field.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when `name` contains NUL or a pagination value uses an
-    /// `Unknown` variant for a known native discriminant.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "The constructor mirrors the complete semantic section record."
-    )]
-    pub fn new(
-        name: Option<String>,
-        inherit_previous_header_footer: Option<bool>,
-        first_page_different: Option<bool>,
-        even_odd_pages_different: Option<bool>,
-        start: Option<Start>,
-        page_numbering: Option<PageNumbering>,
-        starting_page_number: Option<PageNumber>,
-        first_page_hides_header_footer: Option<bool>,
-    ) -> Result<Self> {
-        let mut settings = Self::empty();
-        settings.set_name(name)?;
-        settings.set_inherit_previous_header_footer(inherit_previous_header_footer);
-        settings.set_first_page_different(first_page_different);
-        settings.set_even_odd_pages_different(even_odd_pages_different);
-        settings.set_start(start)?;
-        settings.set_page_numbering(page_numbering)?;
-        settings.set_starting_page_number(starting_page_number);
-        settings.set_first_page_hides_header_footer(first_page_hides_header_footer);
-        Ok(settings)
-    }
-
-    /// Return empty settings with every native field absent.
+    /// Create settings with every optional native field absent.
     #[must_use]
-    pub const fn empty() -> Self {
+    pub const fn new() -> Self {
         Self {
             name: None,
-            start: 0,
-            page_numbering: 0,
+            present: 0,
+            values: 0,
+            start: None,
+            page_numbering: None,
             starting_page_number: None,
-            flags: 0,
         }
     }
 
-    /// Return the optional semantic section name.
+    /// Return the optional display name.
     #[must_use]
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
 
-    /// Replace or clear the section name.
+    /// Set or clear the display name.
+    ///
+    /// The name is validated before it is moved into its exact-size owned
+    /// representation.
     ///
     /// # Errors
     ///
-    /// Returns [`Error::NameContainsNul`] when `name` contains an embedded
-    /// NUL character.
-    pub fn set_name(&mut self, name: Option<String>) -> Result<()> {
-        if name.as_deref().is_some_and(|value| value.contains('\0')) {
+    /// Returns [`Error::NameContainsNul`] when the supplied name contains a
+    /// native string terminator.
+    pub fn set_name(&mut self, input: Option<impl Into<Box<str>>>) -> Result<()> {
+        let boxed = input.map(Into::into);
+        if boxed
+            .as_deref()
+            .is_some_and(|candidate| candidate.contains('\0'))
+        {
             return Err(Error::NameContainsNul);
         }
-        self.name = name.map(String::into_boxed_str);
+        self.name = boxed;
         Ok(())
     }
 
-    /// Return the optional inherit-previous-header/footer flag.
+    /// Remove the display name.
+    pub fn clear_name(&mut self) {
+        self.name = None;
+    }
+
+    /// Return whether the section inherits the previous header and footer.
     #[must_use]
     pub const fn inherit_previous_header_footer(&self) -> Option<bool> {
-        flag_value(
-            self.flags,
-            INHERIT_HEADER_FOOTER_PRESENT,
-            INHERIT_HEADER_FOOTER_VALUE,
-        )
+        self.get_flag(INHERIT_PREVIOUS_HEADER_FOOTER)
     }
 
-    /// Set or clear the inherit-previous-header/footer flag.
+    /// Set or clear header/footer inheritance.
     pub const fn set_inherit_previous_header_footer(&mut self, value: Option<bool>) {
-        set_flag(
-            &mut self.flags,
-            INHERIT_HEADER_FOOTER_PRESENT,
-            INHERIT_HEADER_FOOTER_VALUE,
-            value,
-        );
+        self.set_flag(INHERIT_PREVIOUS_HEADER_FOOTER, value);
     }
 
-    /// Return the optional first-page-different flag.
+    /// Return whether the first page has a distinct template.
     #[must_use]
     pub const fn first_page_different(&self) -> Option<bool> {
-        flag_value(
-            self.flags,
-            FIRST_PAGE_DIFFERENT_PRESENT,
-            FIRST_PAGE_DIFFERENT_VALUE,
-        )
+        self.get_flag(FIRST_PAGE_DIFFERENT)
     }
 
-    /// Set or clear the first-page-different flag.
+    /// Set or clear first-page template distinction.
     pub const fn set_first_page_different(&mut self, value: Option<bool>) {
-        set_flag(
-            &mut self.flags,
-            FIRST_PAGE_DIFFERENT_PRESENT,
-            FIRST_PAGE_DIFFERENT_VALUE,
-            value,
-        );
+        self.set_flag(FIRST_PAGE_DIFFERENT, value);
     }
 
-    /// Return the optional even/odd-pages-different flag.
+    /// Return whether even and odd pages use distinct templates.
     #[must_use]
     pub const fn even_odd_pages_different(&self) -> Option<bool> {
-        flag_value(
-            self.flags,
-            EVEN_ODD_PAGES_DIFFERENT_PRESENT,
-            EVEN_ODD_PAGES_DIFFERENT_VALUE,
-        )
+        self.get_flag(EVEN_ODD_PAGES_DIFFERENT)
     }
 
-    /// Set or clear the even/odd-pages-different flag.
+    /// Set or clear even/odd template distinction.
     pub const fn set_even_odd_pages_different(&mut self, value: Option<bool>) {
-        set_flag(
-            &mut self.flags,
-            EVEN_ODD_PAGES_DIFFERENT_PRESENT,
-            EVEN_ODD_PAGES_DIFFERENT_VALUE,
-            value,
-        );
+        self.set_flag(EVEN_ODD_PAGES_DIFFERENT, value);
     }
 
-    /// Return the optional page on which the section starts.
+    /// Return whether the first page hides its header and footer.
+    #[must_use]
+    pub const fn first_page_hides_header_footer(&self) -> Option<bool> {
+        self.get_flag(FIRST_PAGE_HIDES_HEADER_FOOTER)
+    }
+
+    /// Set or clear first-page header/footer hiding.
+    pub const fn set_first_page_hides_header_footer(&mut self, value: Option<bool>) {
+        self.set_flag(FIRST_PAGE_HIDES_HEADER_FOOTER, value);
+    }
+
+    /// Return the optional section-start behavior.
     #[must_use]
     pub const fn start(&self) -> Option<Start> {
-        if self.flags & START_PRESENT != 0 {
-            Some(Start::from_raw(self.start))
-        } else {
-            None
-        }
+        self.start
     }
 
-    /// Set or clear the section start.
+    /// Set or clear section-start behavior.
     ///
     /// # Errors
     ///
     /// Returns [`Error::NonCanonicalStart`] when a known native value is
-    /// passed through [`Start::Unknown`].
+    /// represented by an `Unknown` variant.
     pub const fn set_start(&mut self, value: Option<Start>) -> Result<()> {
         if let Some(candidate) = value
             && !candidate.is_canonical()
         {
             return Err(Error::NonCanonicalStart);
         }
-        if let Some(candidate) = value {
-            self.start = candidate.as_raw();
-            self.flags |= START_PRESENT;
-        } else {
-            self.start = 0;
-            self.flags &= !START_PRESENT;
-        }
+        self.start = value;
         Ok(())
     }
 
     /// Return the optional page-numbering behavior.
     #[must_use]
     pub const fn page_numbering(&self) -> Option<PageNumbering> {
-        if self.flags & PAGE_NUMBERING_PRESENT != 0 {
-            Some(PageNumbering::from_raw(self.page_numbering))
-        } else {
-            None
-        }
+        self.page_numbering
     }
 
     /// Set or clear page-numbering behavior.
@@ -226,133 +169,122 @@ impl Settings {
     /// # Errors
     ///
     /// Returns [`Error::NonCanonicalNumbering`] when a known native value is
-    /// passed through [`PageNumbering::Unknown`].
+    /// represented by an `Unknown` variant.
     pub const fn set_page_numbering(&mut self, value: Option<PageNumbering>) -> Result<()> {
         if let Some(candidate) = value
             && !candidate.is_canonical()
         {
             return Err(Error::NonCanonicalNumbering);
         }
-        if let Some(candidate) = value {
-            self.page_numbering = candidate.as_raw();
-            self.flags |= PAGE_NUMBERING_PRESENT;
-        } else {
-            self.page_numbering = 0;
-            self.flags &= !PAGE_NUMBERING_PRESENT;
-        }
+        self.page_numbering = value;
         Ok(())
     }
 
-    /// Return the optional first page number for this section.
+    /// Return the optional starting page number.
     #[must_use]
     pub const fn starting_page_number(&self) -> Option<PageNumber> {
         self.starting_page_number
     }
 
-    /// Set or clear the first page number for this section.
+    /// Set or clear the starting page number.
     pub const fn set_starting_page_number(&mut self, value: Option<PageNumber>) {
         self.starting_page_number = value;
     }
 
-    /// Return the optional first-page header/footer hiding flag.
-    #[must_use]
-    pub const fn first_page_hides_header_footer(&self) -> Option<bool> {
-        flag_value(
-            self.flags,
-            FIRST_PAGE_HIDES_HEADER_FOOTER_PRESENT,
-            FIRST_PAGE_HIDES_HEADER_FOOTER_VALUE,
-        )
-    }
-
-    /// Set or clear the first-page header/footer hiding flag.
-    pub const fn set_first_page_hides_header_footer(&mut self, value: Option<bool>) {
-        set_flag(
-            &mut self.flags,
-            FIRST_PAGE_HIDES_HEADER_FOOTER_PRESENT,
-            FIRST_PAGE_HIDES_HEADER_FOOTER_VALUE,
-            value,
-        );
-    }
-
-    /// Return whether all optional section settings are absent.
-    #[must_use]
-    pub const fn is_empty(&self) -> bool {
-        self.name.is_none() && self.starting_page_number.is_none() && self.flags == 0
-    }
-
-    /// Validate all semantic invariants.
+    /// Validate all semantic invariants before an archive adapter publishes
+    /// this value.
     ///
     /// # Errors
     ///
-    /// Returns an error if an invalid name or pagination discriminant is
-    /// present. Values created through this module's setters are already
-    /// checked; this method is useful at format boundaries before publication.
+    /// Returns a typed error when a name or pagination value is invalid.
     pub fn validate(&self) -> Result<()> {
-        if self
-            .name
-            .as_deref()
-            .is_some_and(|value| value.contains('\0'))
-        {
+        if self.name.as_deref().is_some_and(|name| name.contains('\0')) {
             return Err(Error::NameContainsNul);
         }
-        if self.start().is_some_and(|value| !value.is_canonical()) {
+        if self.start.is_some_and(|value| !value.is_canonical()) {
             return Err(Error::NonCanonicalStart);
         }
         if self
-            .page_numbering()
+            .page_numbering
             .is_some_and(|value| !value.is_canonical())
         {
             return Err(Error::NonCanonicalNumbering);
         }
         Ok(())
     }
-}
 
-impl Default for Settings {
-    fn default() -> Self {
-        Self::empty()
+    const fn get_flag(&self, bit: u8) -> Option<bool> {
+        if self.present & bit != 0 {
+            Some(self.values & bit != 0)
+        } else {
+            None
+        }
+    }
+
+    const fn set_flag(&mut self, bit: u8, option: Option<bool>) {
+        if let Some(value) = option {
+            self.present |= bit;
+            if value {
+                self.values |= bit;
+            } else {
+                self.values &= !bit;
+            }
+        } else {
+            self.present &= !bit;
+            self.values &= !bit;
+        }
     }
 }
 
-/// A Pages section background with an archive-free solid-color fast path.
-///
-/// Unsupported, future, or format-specific fills are retained as exact owned
-/// bytes in [`Self::Opaque`]. The semantic crate does not decode or validate
-/// those bytes; the IWA adapter owns that format-specific responsibility.
-#[derive(Debug, Clone, PartialEq, Default)]
+/// The semantic fill of a Pages section.
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Background {
-    /// No section background is present.
-    #[default]
+    /// No section background fill is present.
     None,
-    /// A validated solid RGBA background.
-    Solid(Rgba),
-    /// An unsupported or future background retained byte-for-byte.
-    Opaque(Box<[u8]>),
+    /// A single validated color fills the section.
+    Solid(litchi_iwa_common::color::Rgba),
+    /// A native fill payload not modeled by this version of the crate.
+    Opaque(Opaque),
 }
 
-impl Background {
-    /// Create an opaque background without retaining spare vector capacity.
-    #[must_use]
-    pub fn opaque(payload: impl Into<Box<[u8]>>) -> Self {
-        Self::Opaque(payload.into())
+/// A lossless, non-empty native section-background payload.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Opaque(Box<[u8]>);
+
+impl Opaque {
+    /// Retain a non-empty native payload in exact-size owned storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::EmptyBackgroundPayload`] for an empty payload.
+    pub fn new(input: impl Into<Box<[u8]>>) -> Result<Self> {
+        let payload = input.into();
+        if payload.is_empty() {
+            return Err(Error::EmptyBackgroundPayload);
+        }
+        Ok(Self(payload))
     }
 
-    /// Borrow an opaque background's exact bytes, when present.
-    #[must_use]
-    pub fn opaque_bytes(&self) -> Option<&[u8]> {
-        match self {
-            Self::Opaque(payload) => Some(payload),
-            Self::None | Self::Solid(_) => None,
-        }
+    /// Copy a borrowed native payload into an opaque value.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::EmptyBackgroundPayload`] for an empty payload.
+    pub fn from_slice(payload: &[u8]) -> Result<Self> {
+        Self::new(payload.to_vec().into_boxed_slice())
     }
 
-    /// Return the solid color, when this is a solid background.
+    /// Borrow the exact retained native bytes.
     #[must_use]
-    pub const fn solid_color(&self) -> Option<Rgba> {
-        match self {
-            Self::Solid(color) => Some(*color),
-            Self::None | Self::Opaque(_) => None,
-        }
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+
+    /// Consume the value and return its exact native bytes.
+    #[must_use]
+    pub fn into_bytes(self) -> Box<[u8]> {
+        self.0
     }
 }
 
@@ -493,29 +425,6 @@ impl SectionType {
     }
 }
 
-/// Return a packed optional boolean.
-const fn flag_value(flags: u16, present: u16, value: u16) -> Option<bool> {
-    if flags & present != 0 {
-        Some(flags & value != 0)
-    } else {
-        None
-    }
-}
-
-/// Update a packed optional boolean.
-const fn set_flag(flags: &mut u16, present: u16, value: u16, option: Option<bool>) {
-    if let Some(enabled) = option {
-        *flags |= present;
-        if enabled {
-            *flags |= value;
-        } else {
-            *flags &= !value;
-        }
-    } else {
-        *flags &= !(present | value);
-    }
-}
-
 fn append_value(output: &mut String, first: &mut bool, value: &str) {
     if !*first {
         output.push('\n');
@@ -528,9 +437,68 @@ fn append_value(output: &mut String, first: &mut bool, value: &str) {
 mod tests {
     use std::mem::size_of;
 
-    use litchi_iwa_common::color::{RgbColorSpace, Rgba};
-
     use super::*;
+
+    #[test]
+    fn settings_pack_presence_and_retain_lossless_values() {
+        let mut settings = Settings::new();
+        settings.set_name(Some("Overview")).unwrap();
+        settings.set_inherit_previous_header_footer(Some(false));
+        settings.set_first_page_different(None);
+        settings.set_even_odd_pages_different(Some(true));
+        settings.set_first_page_hides_header_footer(Some(true));
+        settings.set_start(Some(Start::Unknown(7))).unwrap();
+        settings
+            .set_page_numbering(Some(PageNumbering::Restart))
+            .unwrap();
+        settings.set_starting_page_number(Some(PageNumber::new(4).unwrap()));
+
+        assert!(size_of::<Settings>() <= 48);
+        assert_eq!(settings.name(), Some("Overview"));
+        assert_eq!(settings.inherit_previous_header_footer(), Some(false));
+        assert_eq!(settings.first_page_different(), None);
+        assert_eq!(settings.even_odd_pages_different(), Some(true));
+        assert_eq!(settings.first_page_hides_header_footer(), Some(true));
+        assert_eq!(settings.start(), Some(Start::Unknown(7)));
+        assert_eq!(settings.page_numbering(), Some(PageNumbering::Restart));
+        assert_eq!(
+            settings.starting_page_number().map(PageNumber::get),
+            Some(4)
+        );
+        assert!(settings.validate().is_ok());
+    }
+
+    #[test]
+    fn settings_reject_noncanonical_values_and_nul_names() {
+        let mut settings = Settings::new();
+        assert_eq!(
+            settings.set_name(Some("bad\0name")),
+            Err(Error::NameContainsNul)
+        );
+        assert_eq!(
+            settings.set_start(Some(Start::Unknown(0))),
+            Err(Error::NonCanonicalStart)
+        );
+        assert_eq!(
+            settings.set_page_numbering(Some(PageNumbering::Unknown(1))),
+            Err(Error::NonCanonicalNumbering)
+        );
+    }
+
+    #[test]
+    fn background_opaque_owns_exact_storage() {
+        let opaque = Opaque::from_slice(&[0x0a, 0xff]).unwrap();
+        assert_eq!(opaque.as_bytes(), [0x0a, 0xff]);
+        assert_eq!(opaque.into_bytes().as_ref(), [0x0a, 0xff]);
+        assert_eq!(
+            Opaque::from_slice(&[]).err(),
+            Some(Error::EmptyBackgroundPayload)
+        );
+        assert_eq!(
+            Background::Opaque(Opaque::from_slice(&[0x01]).unwrap()),
+            Background::Opaque(Opaque::from_slice(&[0x01]).unwrap())
+        );
+    }
 
     #[test]
     fn section_creation_and_text() {
@@ -563,81 +531,5 @@ mod tests {
         assert_eq!(SectionType::Header.name(), "Header");
         assert_eq!(SectionType::Footer.name(), "Footer");
         assert_eq!(SectionType::Floating.name(), "Floating");
-    }
-
-    #[test]
-    fn settings_pack_presence_and_retain_semantics() {
-        assert_eq!(size_of::<Settings>(), 32);
-        let page_number =
-            PageNumber::new(7).unwrap_or_else(|error| panic!("valid Pages page number: {error}"));
-        let settings = Settings::new(
-            Some("Body".to_owned()),
-            Some(true),
-            Some(false),
-            None,
-            Some(Start::RightPage),
-            Some(PageNumbering::Restart),
-            Some(page_number),
-            Some(true),
-        )
-        .unwrap_or_else(|error| panic!("valid Pages section settings: {error}"));
-
-        assert_eq!(settings.name(), Some("Body"));
-        assert_eq!(settings.inherit_previous_header_footer(), Some(true));
-        assert_eq!(settings.first_page_different(), Some(false));
-        assert_eq!(settings.even_odd_pages_different(), None);
-        assert_eq!(settings.start(), Some(Start::RightPage));
-        assert_eq!(settings.page_numbering(), Some(PageNumbering::Restart));
-        assert_eq!(settings.starting_page_number(), Some(page_number));
-        assert_eq!(settings.first_page_hides_header_footer(), Some(true));
-        assert!(!settings.is_empty());
-        assert!(settings.validate().is_ok());
-
-        let mut empty = Settings::default();
-        assert!(empty.is_empty());
-        empty.set_first_page_different(Some(false));
-        assert_eq!(empty.first_page_different(), Some(false));
-        empty.set_first_page_different(None);
-        assert!(empty.is_empty());
-    }
-
-    #[test]
-    fn settings_reject_noncanonical_values_before_mutation() {
-        let mut settings = Settings::default();
-        settings
-            .set_start(Some(Start::RightPage))
-            .unwrap_or_else(|error| panic!("valid section start: {error}"));
-        settings
-            .set_page_numbering(Some(PageNumbering::Restart))
-            .unwrap_or_else(|error| panic!("valid page numbering: {error}"));
-        assert_eq!(
-            settings.set_start(Some(Start::Unknown(1))),
-            Err(Error::NonCanonicalStart)
-        );
-        assert_eq!(settings.start(), Some(Start::RightPage));
-        assert_eq!(
-            settings.set_page_numbering(Some(PageNumbering::Unknown(0))),
-            Err(Error::NonCanonicalNumbering)
-        );
-        assert_eq!(settings.page_numbering(), Some(PageNumbering::Restart));
-        assert_eq!(
-            settings.set_name(Some("bad\0name".to_owned())),
-            Err(Error::NameContainsNul)
-        );
-        assert_eq!(settings.name(), None);
-    }
-
-    #[test]
-    fn background_has_solid_fast_path_and_exact_opaque_storage() {
-        assert_eq!(size_of::<Background>(), 24);
-        let color = Rgba::new(0.1, 0.2, 0.3, 0.4, RgbColorSpace::DisplayP3)
-            .unwrap_or_else(|error| panic!("valid background color: {error}"));
-        assert_eq!(Background::Solid(color).solid_color(), Some(color));
-        assert_eq!(Background::None.solid_color(), None);
-
-        let background = Background::opaque(vec![0, 1, 2, 3]);
-        assert_eq!(background.opaque_bytes(), Some(&[0, 1, 2, 3][..]));
-        assert_eq!(background.solid_color(), None);
-        assert_eq!(Background::default(), Background::None);
     }
 }

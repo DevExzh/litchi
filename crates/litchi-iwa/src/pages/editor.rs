@@ -10,7 +10,7 @@ use litchi_pages::footnote::{
     Numbering as FootnoteNumbering, Settings as FootnoteSettings,
 };
 use litchi_pages::page_layout::{Layout as PageLayout, Orientation as PageOrientation};
-use litchi_pages::section::{PageNumber, PageNumbering, Start};
+use litchi_pages::section::{Background, Opaque, PageNumber, PageNumbering, Settings, Start};
 use prost::Message;
 
 use crate::archive::{ArchiveObject, RawMessage};
@@ -80,8 +80,8 @@ const BODY_DRAWABLE_DUPLICATE_OFFSET: f32 = 12.0;
 
 pub use litchi_pages::header_footer::{Kind, Template};
 pub use types::{
-    PagesDrawableTextInfo, PagesFootnote, PagesFootnoteId, PagesHeaderFooterInfo,
-    PagesSectionBackground, PagesSectionInfo, PagesSectionSettings, RemovedPagesTextBox,
+    PagesDrawableTextInfo, PagesFootnote, PagesFootnoteId, PagesHeaderFooterInfo, PagesSectionInfo,
+    RemovedPagesTextBox,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2377,7 +2377,9 @@ impl PagesEditor {
     /// Set or clear the display name of a reachable Pages section.
     pub fn set_section_name(&mut self, section_id: u64, name: Option<&str>) -> Result<()> {
         let mut settings = self.section_settings(section_id)?;
-        settings.name = name.map(str::to_owned);
+        settings
+            .set_name(name)
+            .map_err(|error| Error::ParseError(error.to_string()))?;
         self.set_section_settings(section_id, settings)
     }
 

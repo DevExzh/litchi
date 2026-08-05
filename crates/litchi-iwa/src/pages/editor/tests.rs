@@ -14,7 +14,7 @@ use litchi_pages::footnote::{
     Numbering as FootnoteNumbering, Settings as FootnoteSettings,
 };
 use litchi_pages::page_layout::{Layout as PageLayout, Orientation as PageOrientation};
-use litchi_pages::section::{PageNumber, PageNumbering, Start};
+use litchi_pages::section::{Background, Opaque, PageNumber, PageNumbering, Settings, Start};
 
 #[test]
 fn pages_native_discriminants_are_typed_and_lossless() {
@@ -510,17 +510,17 @@ fn section_settings_crud_is_lossless_validated_and_transactional() {
         .replace_archive("Index/Document.iwa", &Archive { objects })
         .unwrap();
     let mut editor = PagesEditor::from_package(package).unwrap();
-    let original = PagesSectionSettings {
-        name: Some("Blank".to_owned()),
-        inherit_previous_header_footer: Some(true),
-        first_page_different: Some(false),
-        even_odd_pages_different: Some(false),
-        start: Some(Start::NextPage),
-        page_numbering: Some(PageNumbering::ContinueFromPrevious),
-        starting_page_number: Some(PageNumber::new(1).unwrap()),
-        first_page_hides_header_footer: Some(false),
-        background_fill_payload: Some(fill_payload),
-    };
+    let mut original = Settings::new();
+    original.set_name(Some("Blank")).unwrap();
+    original.set_inherit_previous_header_footer(Some(true));
+    original.set_first_page_different(Some(false));
+    original.set_even_odd_pages_different(Some(false));
+    original.set_start(Some(Start::NextPage)).unwrap();
+    original
+        .set_page_numbering(Some(PageNumbering::ContinueFromPrevious))
+        .unwrap();
+    original.set_starting_page_number(Some(PageNumber::new(1).unwrap()));
+    original.set_first_page_hides_header_footer(Some(false));
     assert_eq!(editor.section_settings(section_id).unwrap(), original);
     let baseline = editor.to_bytes().unwrap();
     editor
@@ -529,14 +529,16 @@ fn section_settings_crud_is_lossless_validated_and_transactional() {
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     let mut updated = original.clone();
-    updated.name = Some("Chapter Two".to_owned());
-    updated.inherit_previous_header_footer = Some(false);
-    updated.first_page_different = Some(true);
-    updated.even_odd_pages_different = Some(true);
-    updated.start = Some(Start::LeftPage);
-    updated.page_numbering = Some(PageNumbering::Restart);
-    updated.starting_page_number = Some(PageNumber::new(42).unwrap());
-    updated.first_page_hides_header_footer = Some(true);
+    updated.set_name(Some("Chapter Two")).unwrap();
+    updated.set_inherit_previous_header_footer(Some(false));
+    updated.set_first_page_different(Some(true));
+    updated.set_even_odd_pages_different(Some(true));
+    updated.set_start(Some(Start::LeftPage)).unwrap();
+    updated
+        .set_page_numbering(Some(PageNumbering::Restart))
+        .unwrap();
+    updated.set_starting_page_number(Some(PageNumber::new(42).unwrap()));
+    updated.set_first_page_hides_header_footer(Some(true));
     editor
         .set_section_settings(section_id, updated.clone())
         .unwrap();
@@ -555,8 +557,10 @@ fn section_settings_crud_is_lossless_validated_and_transactional() {
     let reparsed = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(reparsed.section_settings(section_id).unwrap(), updated);
 
-    updated.start = Some(Start::Unknown(7));
-    updated.page_numbering = Some(PageNumbering::Unknown(3));
+    updated.set_start(Some(Start::Unknown(7))).unwrap();
+    updated
+        .set_page_numbering(Some(PageNumbering::Unknown(3)))
+        .unwrap();
     editor
         .set_section_settings(section_id, updated.clone())
         .unwrap();
@@ -580,27 +584,17 @@ fn section_settings_crud_is_lossless_validated_and_transactional() {
         .set_section_settings(section_id, original.clone())
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
-    for invalid in [
-        PagesSectionSettings {
-            name: Some("bad\0name".to_owned()),
-            ..original.clone()
-        },
-        PagesSectionSettings {
-            background_fill_payload: Some(vec![0xff]),
-            ..original.clone()
-        },
-        PagesSectionSettings {
-            start: Some(Start::Unknown(0)),
-            ..original.clone()
-        },
-        PagesSectionSettings {
-            page_numbering: Some(PageNumbering::Unknown(1)),
-            ..original.clone()
-        },
-    ] {
-        assert!(editor.set_section_settings(section_id, invalid).is_err());
-        assert_eq!(editor.to_bytes().unwrap(), baseline);
-    }
+    let mut invalid_name = original.clone();
+    assert!(invalid_name.set_name(Some("bad\0name")).is_err());
+    let mut invalid_start = original.clone();
+    assert!(invalid_start.set_start(Some(Start::Unknown(0))).is_err());
+    let mut invalid_numbering = original.clone();
+    assert!(
+        invalid_numbering
+            .set_page_numbering(Some(PageNumbering::Unknown(1)))
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
     assert!(editor.section_settings(999).is_err());
     assert!(editor.set_section_settings(999, original.clone()).is_err());
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -669,7 +663,7 @@ fn section_settings_reject_zero_starting_page_number_transactionally() {
     assert!(editor.section_settings(section_id).is_err());
     assert!(
         editor
-            .set_section_settings(section_id, PagesSectionSettings::default())
+            .set_section_settings(section_id, Settings::default())
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -736,11 +730,11 @@ fn solid_section_background_crud_preserves_nested_unknown_wire() {
     let mut editor = PagesEditor::from_package(package).unwrap();
     assert_eq!(
         editor.section_background(section_id).unwrap(),
-        PagesSectionBackground::Solid(original_color)
+        Background::Solid(original_color)
     );
     let baseline = editor.to_bytes().unwrap();
     editor
-        .set_section_background(section_id, PagesSectionBackground::Solid(original_color))
+        .set_section_background(section_id, Background::Solid(original_color))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
@@ -753,16 +747,25 @@ fn solid_section_background_crud_preserves_nested_unknown_wire() {
     )
     .unwrap();
     editor
-        .set_section_background(section_id, PagesSectionBackground::Solid(updated))
+        .set_section_background(section_id, Background::Solid(updated))
         .unwrap();
     assert_eq!(
         editor.section_background(section_id).unwrap(),
-        PagesSectionBackground::Solid(updated)
+        Background::Solid(updated)
     );
-    let payload = editor
-        .section_settings(section_id)
+    let section_payload = editor
+        .package()
+        .archive("Index/Document.iwa")
         .unwrap()
-        .background_fill_payload
+        .object(section_id)
+        .unwrap()
+        .messages[0]
+        .data
+        .clone();
+    let payload = repeated_length_delimited_payloads(&section_payload, 30)
+        .unwrap()
+        .into_iter()
+        .next()
         .unwrap();
     for unknown in [&unknown_color_field, &unknown_fill_field] {
         assert!(
@@ -772,7 +775,7 @@ fn solid_section_background_crud_preserves_nested_unknown_wire() {
         );
     }
     editor
-        .set_section_background(section_id, PagesSectionBackground::Solid(original_color))
+        .set_section_background(section_id, Background::Solid(original_color))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
@@ -799,17 +802,20 @@ fn solid_section_background_crud_preserves_nested_unknown_wire() {
     assert_eq!(editor.to_bytes().unwrap(), baseline);
     assert!(
         editor
-            .set_section_background(section_id, PagesSectionBackground::Opaque(vec![0xff]),)
+            .set_section_background(
+                section_id,
+                Background::Opaque(Opaque::from_slice(&[0xff]).unwrap()),
+            )
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     editor
-        .set_section_background(section_id, PagesSectionBackground::None)
+        .set_section_background(section_id, Background::None)
         .unwrap();
     assert_eq!(
         editor.section_background(section_id).unwrap(),
-        PagesSectionBackground::None
+        Background::None
     );
     let opaque = tsd::FillArchive {
         gradient: Some(tsd::GradientArchive::default()),
@@ -817,11 +823,14 @@ fn solid_section_background_crud_preserves_nested_unknown_wire() {
     }
     .encode_to_vec();
     editor
-        .set_section_background(section_id, PagesSectionBackground::Opaque(opaque.clone()))
+        .set_section_background(
+            section_id,
+            Background::Opaque(Opaque::from_slice(&opaque).unwrap()),
+        )
         .unwrap();
     assert_eq!(
         editor.section_background(section_id).unwrap(),
-        PagesSectionBackground::Opaque(opaque)
+        Background::Opaque(Opaque::from_slice(&opaque).unwrap())
     );
 }
 

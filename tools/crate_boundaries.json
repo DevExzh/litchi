@@ -189,6 +189,7 @@
       "soapberry-zip"
     ],
     "litchi-pages": [
+      "litchi-iwa-common",
       "litchi-iwa-text"
     ],
     "litchi-oth": [

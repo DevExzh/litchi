@@ -937,7 +937,7 @@ use litchi_iwa::numbers::{
 use litchi_iwa::pages::{Kind, PagesEditor};
 use litchi_iwa_common::color::{RgbColorSpace, Rgba};
 use litchi_pages::page_layout::Orientation;
-use litchi_pages::section::{Background, PageNumber, PageNumbering, Settings, Start};
+use litchi_pages::section::{Background, PageNumber, PageNumbering, Start};
 use litchi_iwa::keynote::{
     KeynoteBuildSettings, KeynoteBuildStart, KeynoteEditor, KeynoteFlipDirection,
     KeynoteHorizontalBuildDirection, KeynoteKeyboardDirection, KeynoteRotationDirection,
@@ -1075,12 +1075,12 @@ let first_header = pages
     .expect("document header");
 pages.set_header_footer_text(first_header.storage.object_id, "Quarterly report")?;
 pages.set_section_name(section_id, Some("Executive summary"))?;
-let mut section_settings: Settings = pages.section_settings(section_id)?;
-section_settings.inherit_previous_header_footer = Some(false);
-section_settings.first_page_hides_header_footer = Some(true);
-section_settings.start = Some(Start::NextPage);
-section_settings.page_numbering = Some(PageNumbering::Restart);
-section_settings.starting_page_number = Some(PageNumber::new(3)?);
+let mut section_settings = pages.section_settings(section_id)?;
+section_settings.set_inherit_previous_header_footer(Some(false));
+section_settings.set_first_page_hides_header_footer(Some(true));
+section_settings.set_start(Some(Start::NextPage))?;
+section_settings.set_page_numbering(Some(PageNumbering::Restart))?;
+section_settings.set_starting_page_number(Some(PageNumber::new(3)?));
 pages.set_section_settings(section_id, section_settings)?;
 pages.set_section_background(
     section_id,

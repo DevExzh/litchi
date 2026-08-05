@@ -2,9 +2,7 @@
 
 use crate::text::{TextPosition, TextStorageInfo};
 use crate::{Error, Result};
-use litchi_iwa_common::color::Rgba;
 use litchi_pages::header_footer::{Kind, Template};
-use litchi_pages::section::{PageNumber, PageNumbering, Start};
 
 /// A reachable header/footer slot and its current writable text storage.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -103,33 +101,4 @@ impl PagesFootnote {
             custom_mark: custom_mark.map(Into::into),
         }
     }
-}
-
-/// Writable settings stored directly on a Pages section.
-///
-/// Unknown native discriminants remain lossless through their typed `Unknown`
-/// variants. `background_fill_payload`, when present, is the exact encoded
-/// `TSD.FillArchive` payload.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct PagesSectionSettings {
-    pub name: Option<String>,
-    pub inherit_previous_header_footer: Option<bool>,
-    pub first_page_different: Option<bool>,
-    pub even_odd_pages_different: Option<bool>,
-    pub start: Option<Start>,
-    pub page_numbering: Option<PageNumbering>,
-    pub starting_page_number: Option<PageNumber>,
-    pub first_page_hides_header_footer: Option<bool>,
-    pub background_fill_payload: Option<Vec<u8>>,
-}
-
-/// Semantic Pages section background.
-///
-/// Gradient, image, extension, and future fills are exposed as `Opaque` so
-/// callers can round-trip them losslessly through the same API.
-#[derive(Debug, Clone, PartialEq)]
-pub enum PagesSectionBackground {
-    None,
-    Solid(Rgba),
-    Opaque(Vec<u8>),
 }

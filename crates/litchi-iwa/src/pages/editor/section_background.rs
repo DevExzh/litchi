@@ -13,14 +13,12 @@ const COLOR_RGB_SPACE_FIELD: u32 = 12;
 
 impl PagesEditor {
     /// Read a section background as a semantic solid color when possible.
-    pub fn section_background(&self, section_id: u64) -> Result<PagesSectionBackground> {
-        let settings = self.section_settings(section_id)?;
-        settings
-            .background_fill_payload
+    pub fn section_background(&self, section_id: u64) -> Result<Background> {
+        self.section_background_payload(section_id)?
             .as_deref()
             .map(decode_section_background)
             .transpose()
-            .map(|background| background.unwrap_or(PagesSectionBackground::None))
+            .map(|background| background.unwrap_or(Background::None))
     }
 
     /// Set, clear, or losslessly replace a section background fill.
@@ -30,49 +28,56 @@ impl PagesEditor {
     pub fn set_section_background(
         &mut self,
         section_id: u64,
-        background: PagesSectionBackground,
+        background: Background,
     ) -> Result<()> {
         validate_section_background(&background)?;
-        let mut settings = self.section_settings(section_id)?;
-        let current = settings
-            .background_fill_payload
+        let current_payload = self.section_background_payload(section_id)?;
+        let current = current_payload
             .as_deref()
             .map(decode_section_background)
             .transpose()?
-            .unwrap_or(PagesSectionBackground::None);
+            .unwrap_or(Background::None);
         if current == background {
             return Ok(());
         }
 
-        settings.background_fill_payload = match background {
-            PagesSectionBackground::None => None,
-            PagesSectionBackground::Opaque(payload) => Some(payload),
-            PagesSectionBackground::Solid(color) => {
-                let payload = match (current, settings.background_fill_payload.as_deref()) {
-                    (PagesSectionBackground::Solid(current), Some(payload)) => {
+        let payload = match background {
+            Background::None => None,
+            Background::Opaque(payload) => Some(payload.into_bytes()),
+            Background::Solid(color) => {
+                let payload = match (current, current_payload.as_deref()) {
+                    (Background::Solid(current), Some(payload)) => {
                         patch_solid_background(payload, current, color)?
                     },
                     _ => encode_solid_background(color),
                 };
-                Some(payload)
+                Some(payload.into_boxed_slice())
+            },
+            _ => {
+                return Err(Error::ParseError(
+                    "unsupported Pages section background variant".to_owned(),
+                ));
             },
         };
-        self.set_section_settings(section_id, settings)
+        self.set_section_background_payload(section_id, payload.as_deref())
     }
 }
 
-fn validate_section_background(background: &PagesSectionBackground) -> Result<()> {
+fn validate_section_background(background: &Background) -> Result<()> {
     match background {
-        PagesSectionBackground::None => Ok(()),
-        PagesSectionBackground::Solid(color) => validate_pages_color(*color),
-        PagesSectionBackground::Opaque(payload) => {
-            tsd::FillArchive::decode(payload.as_slice()).map_err(|error| {
+        Background::None => Ok(()),
+        Background::Solid(color) => validate_pages_color(*color),
+        Background::Opaque(payload) => {
+            tsd::FillArchive::decode(payload.as_bytes()).map_err(|error| {
                 Error::ParseError(format!(
                     "Opaque Pages section background is not a TSD.FillArchive: {error}"
                 ))
             })?;
             Ok(())
         },
+        _ => Err(Error::ParseError(
+            "unsupported Pages section background variant".to_owned(),
+        )),
     }
 }
 
@@ -88,10 +93,12 @@ fn validate_pages_color(color: Rgba) -> Result<()> {
     .map_err(|error| Error::ParseError(format!("invalid Pages section background color: {error}")))
 }
 
-fn decode_section_background(payload: &[u8]) -> Result<PagesSectionBackground> {
+fn decode_section_background(payload: &[u8]) -> Result<Background> {
     let fill = tsd::FillArchive::decode(payload)?;
     let Some(color) = fill.color.as_ref() else {
-        return Ok(PagesSectionBackground::Opaque(payload.to_vec()));
+        return Opaque::from_slice(payload)
+            .map(Background::Opaque)
+            .map_err(|error| Error::ParseError(error.to_string()));
     };
     if fill.gradient.is_some()
         || fill.image.is_some()
@@ -102,7 +109,9 @@ fn decode_section_background(payload: &[u8]) -> Result<PagesSectionBackground> {
         || color.k.is_some()
         || color.w.is_some()
     {
-        return Ok(PagesSectionBackground::Opaque(payload.to_vec()));
+        return Opaque::from_slice(payload)
+            .map(Background::Opaque)
+            .map_err(|error| Error::ParseError(error.to_string()));
     }
     let Some((red, green, blue)) = color
         .r
@@ -110,18 +119,26 @@ fn decode_section_background(payload: &[u8]) -> Result<PagesSectionBackground> {
         .zip(color.b)
         .map(|((red, green), blue)| (red, green, blue))
     else {
-        return Ok(PagesSectionBackground::Opaque(payload.to_vec()));
+        return Opaque::from_slice(payload)
+            .map(Background::Opaque)
+            .map_err(|error| Error::ParseError(error.to_string()));
     };
     let color_space = match color.rgbspace {
         None => RgbColorSpace::Srgb,
         Some(value) if value == tsp::color::RgbColorSpace::Srgb as i32 => RgbColorSpace::Srgb,
         Some(value) if value == tsp::color::RgbColorSpace::P3 as i32 => RgbColorSpace::DisplayP3,
-        _ => return Ok(PagesSectionBackground::Opaque(payload.to_vec())),
+        _ => {
+            return Opaque::from_slice(payload)
+                .map(Background::Opaque)
+                .map_err(|error| Error::ParseError(error.to_string()));
+        },
     };
     let Ok(semantic) = Rgba::new(red, green, blue, color.a.unwrap_or(1.0), color_space) else {
-        return Ok(PagesSectionBackground::Opaque(payload.to_vec()));
+        return Opaque::from_slice(payload)
+            .map(Background::Opaque)
+            .map_err(|error| Error::ParseError(error.to_string()));
     };
-    Ok(PagesSectionBackground::Solid(semantic))
+    Ok(Background::Solid(semantic))
 }
 
 fn encode_solid_background(color: Rgba) -> Vec<u8> {
@@ -196,7 +213,7 @@ fn patch_solid_background(payload: &[u8], current: Rgba, replacement: Rgba) -> R
             Some(rgbspace),
         )?;
     }
-    if decode_section_background(&data)? != PagesSectionBackground::Solid(replacement) {
+    if decode_section_background(&data)? != Background::Solid(replacement) {
         return Err(Error::InvalidFormat(
             "Pages solid section background patch failed validation".to_owned(),
         ));
