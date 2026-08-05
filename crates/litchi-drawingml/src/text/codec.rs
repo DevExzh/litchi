@@ -27,7 +27,7 @@ pub enum ParseError {
         max: i64,
     },
     /// The underlying coordinate spelling is invalid.
-    Coordinate(crate::coord::ParseError),
+    Coordinate(crate::coordinate::ParseError),
 }
 
 impl fmt::Display for ParseError {
@@ -49,8 +49,8 @@ impl fmt::Display for ParseError {
 
 impl std::error::Error for ParseError {}
 
-impl From<crate::coord::ParseError> for ParseError {
-    fn from(error: crate::coord::ParseError) -> Self {
+impl From<crate::coordinate::ParseError> for ParseError {
+    fn from(error: crate::coordinate::ParseError) -> Self {
         Self::Coordinate(error)
     }
 }

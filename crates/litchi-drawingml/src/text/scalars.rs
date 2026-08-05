@@ -3,7 +3,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use crate::coord::{Coordinate, Unit};
+use crate::coordinate::{Coordinate, Unit};
 
 use super::codec::ParseError;
 

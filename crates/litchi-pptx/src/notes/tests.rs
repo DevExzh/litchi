@@ -1,4 +1,4 @@
-use super::package::{is_notes_master_rel, is_notes_slide_rel};
+use super::package::is_notes_slide_rel;
 use super::*;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::{BlobPart, Part};

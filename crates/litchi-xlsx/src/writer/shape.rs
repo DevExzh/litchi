@@ -818,7 +818,7 @@ mod tests {
     };
     use super::*;
     use crate::writer::sheet::MutableWorksheet;
-    use litchi_drawingml::coord::Unit;
+    use litchi_drawingml::coordinate::Unit;
 
     fn marker(column: u32, row: u32) -> CellMarker {
         CellMarker {

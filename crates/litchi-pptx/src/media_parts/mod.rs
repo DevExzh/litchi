@@ -30,7 +30,7 @@ pub(crate) use package::{parse_time, validate_value};
 
 use crate::time::{Offset, ParseError as TimeParseError};
 use crate::{Error, Result};
-use litchi_drawingml::coord::{Coordinate, Extent, ParseError as CoordinateParseError};
+use litchi_drawingml::coordinate::{Coordinate, Extent, ParseError as CoordinateParseError};
 use litchi_ooxml_common::mce::MCE_NAMESPACE;
 use litchi_ooxml_common::{ExpandedName, MceCapabilities, MceLimits, process_markup_compatibility};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};

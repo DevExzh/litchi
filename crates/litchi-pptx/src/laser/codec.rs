@@ -7,7 +7,7 @@
 use super::model::*;
 use crate::time::{Offset, ParseError as TimeParseError};
 use crate::{Error, Result};
-use litchi_drawingml::coord::{Coordinate, ParseError as CoordinateParseError};
+use litchi_drawingml::coordinate::{Coordinate, ParseError as CoordinateParseError};
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use quick_xml::encoding::Decoder;

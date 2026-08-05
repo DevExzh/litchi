@@ -306,7 +306,7 @@ fn limit(resource: &'static str, limit: usize) -> Error {
 mod tests {
     use super::*;
     use crate::time::Offset;
-    use litchi_drawingml::coord::Coordinate;
+    use litchi_drawingml::coordinate::Coordinate;
 
     fn point() -> TracePoint {
         TracePoint::new(

@@ -97,9 +97,9 @@ fn media_transform_round_trips_coordinate_offsets_and_integer_extents() {
     let mut expected = value();
     expected.pictures[0].transform = Some(Transform::new(
         Coordinate::parse("-1.25cm").unwrap(),
-        Coordinate::emu(litchi_drawingml::coord::MIN_EMU).unwrap(),
+        Coordinate::emu(litchi_drawingml::coordinate::MIN_EMU).unwrap(),
         Extent::ZERO,
-        Extent::emu(litchi_drawingml::coord::MAX_EMU).unwrap(),
+        Extent::emu(litchi_drawingml::coordinate::MAX_EMU).unwrap(),
     ));
 
     let fragment = write_pictures(&expected, Conformance::Transitional).unwrap();
@@ -115,17 +115,17 @@ fn media_transform_round_trips_coordinate_offsets_and_integer_extents() {
 fn media_transform_construction_and_parsing_enforce_boundaries() {
     assert!(
         Transform::emu(
-            litchi_drawingml::coord::MIN_EMU,
-            litchi_drawingml::coord::MAX_EMU,
+            litchi_drawingml::coordinate::MIN_EMU,
+            litchi_drawingml::coordinate::MAX_EMU,
             1,
-            litchi_drawingml::coord::MAX_EMU,
+            litchi_drawingml::coordinate::MAX_EMU,
         )
         .is_ok()
     );
-    assert!(Transform::emu(litchi_drawingml::coord::MIN_EMU - 1, 0, 1, 1).is_err());
+    assert!(Transform::emu(litchi_drawingml::coordinate::MIN_EMU - 1, 0, 1, 1).is_err());
     assert!(Transform::emu(0, 0, 0, 1).is_ok());
     assert!(Transform::emu(0, 0, 1, -1).is_err());
-    assert!(Transform::emu(0, 0, litchi_drawingml::coord::MAX_EMU + 1, 1).is_err());
+    assert!(Transform::emu(0, 0, litchi_drawingml::coordinate::MAX_EMU + 1, 1).is_err());
 
     let fragment = write_pictures(&value(), Conformance::Transitional).unwrap();
     let invalid = String::from_utf8(fragment)

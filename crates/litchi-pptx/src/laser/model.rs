@@ -1,7 +1,7 @@
 //! Semantic laser-trace values and bounded resource state.
 
 use crate::time::Offset;
-use litchi_drawingml::coord::Coordinate;
+use litchi_drawingml::coordinate::Coordinate;
 
 pub(super) const PRESENTATIONML_NAMESPACE: &str =
     "http://schemas.openxmlformats.org/presentationml/2006/main";
