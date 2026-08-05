@@ -1,7 +1,7 @@
 //! Main Presentation structure and implementation.
 
 use crate::codec::Parser;
-use crate::core::FamilyPackage;
+use crate::core::family::Package;
 use crate::model::{Reference, Settings, Slide, declaration, page_layout, page_metadata, settings};
 use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::constants::ODF_PRESENTATION;
@@ -34,7 +34,7 @@ const BODY_MARKER: &str = "<office:presentation";
 /// # }
 /// ```
 pub struct Presentation {
-    package: FamilyPackage,
+    package: Package,
 }
 
 impl Presentation {
@@ -59,8 +59,7 @@ impl Presentation {
     /// # }
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        FamilyPackage::open(path, ODF_PRESENTATION, BODY_MARKER, "ODP")
-            .map(|package| Self { package })
+        Package::open(path, ODF_PRESENTATION, BODY_MARKER, "ODP").map(|package| Self { package })
     }
 
     /// Open a password-encrypted ODP presentation.
@@ -94,20 +93,14 @@ impl Presentation {
     /// # }
     /// ```
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        FamilyPackage::from_bytes(bytes, ODF_PRESENTATION, BODY_MARKER, "ODP")
+        Package::from_bytes(bytes, ODF_PRESENTATION, BODY_MARKER, "ODP")
             .map(|package| Self { package })
     }
 
     /// Create a presentation from password-encrypted ODP bytes.
     pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
-        FamilyPackage::from_bytes_with_password(
-            bytes,
-            password,
-            ODF_PRESENTATION,
-            BODY_MARKER,
-            "ODP",
-        )
-        .map(|package| Self { package })
+        Package::from_bytes_with_password(bytes, password, ODF_PRESENTATION, BODY_MARKER, "ODP")
+            .map(|package| Self { package })
     }
 
     /// Create an ODP presentation from raw bytes (ZIP archive data).

@@ -27,14 +27,14 @@ pub fn validate_content_part(xml: &str, body_marker: &str, family_name: &str) ->
 /// Concrete family crates retain a small contextual wrapper around this type
 /// so MIME and body validation remain visible at their package boundary while
 /// archive, content, style, metadata, and file-list ownership stays shared.
-pub struct FamilyPackage {
+pub struct Package {
     archive: OwnedPackage,
     content: Content,
     styles: Option<Styles>,
     metadata: Option<Metadata>,
 }
 
-impl FamilyPackage {
+impl Package {
     /// Open a package after validating its MIME type and content root marker.
     pub fn open(
         path: impl AsRef<Path>,
@@ -158,7 +158,7 @@ impl FamilyPackage {
 
 #[cfg(test)]
 mod tests {
-    use super::{FamilyPackage, OwnedPackage, validate_content_part};
+    use super::{OwnedPackage, Package, validate_content_part};
     use std::io::{Cursor, Write};
 
     const MIMETYPE: &str = "application/vnd.oasis.opendocument.presentation";
@@ -192,7 +192,7 @@ mod tests {
     fn validates_and_reuses_shared_package_state() {
         let bytes = package();
         let value =
-            FamilyPackage::from_bytes(bytes.clone(), MIMETYPE, "<office:presentation", "ODP")
+            Package::from_bytes(bytes.clone(), MIMETYPE, "<office:presentation", "ODP")
                 .unwrap();
         assert_eq!(value.content_xml(), CONTENT);
         assert!(value.styles_xml().is_some());
@@ -201,7 +201,7 @@ mod tests {
 
         let owned = OwnedPackage::from_bytes(bytes.clone()).unwrap();
         let adopted =
-            FamilyPackage::from_owned_package(owned, MIMETYPE, "<office:presentation", "ODP")
+            Package::from_owned_package(owned, MIMETYPE, "<office:presentation", "ODP")
                 .unwrap();
         assert_eq!(adopted.as_bytes(), bytes.as_slice());
     }
@@ -210,10 +210,10 @@ mod tests {
     fn rejects_wrong_mime_and_body_marker() {
         let bytes = package();
         assert!(
-            FamilyPackage::from_bytes(bytes.clone(), "text/plain", "<office:presentation", "ODP")
+            Package::from_bytes(bytes.clone(), "text/plain", "<office:presentation", "ODP")
                 .is_err()
         );
-        assert!(FamilyPackage::from_bytes(bytes, MIMETYPE, "<office:text", "ODP").is_err());
+        assert!(Package::from_bytes(bytes, MIMETYPE, "<office:text", "ODP").is_err());
     }
 
     #[test]

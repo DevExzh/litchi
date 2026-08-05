@@ -1,5 +1,5 @@
 use litchi_core::Result;
-use litchi_odf_common::core::{FamilyPackage, OwnedPackage};
+use litchi_odf_common::core::{OwnedPackage, family};
 use std::path::Path;
 
 use crate::model::names::Definition;
@@ -8,15 +8,15 @@ const MIMETYPE: &str = "application/vnd.oasis.opendocument.spreadsheet";
 const BODY_MARKER: &str = "<office:spreadsheet";
 
 /// Validated ownership boundary for an ODS package.
-pub struct Package(FamilyPackage);
+pub struct Package(family::Package);
 
 impl Package {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        FamilyPackage::open(path, MIMETYPE, BODY_MARKER, "ODS").map(Self)
+        family::Package::open(path, MIMETYPE, BODY_MARKER, "ODS").map(Self)
     }
 
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        FamilyPackage::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODS").map(Self)
+        family::Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODS").map(Self)
     }
 
     pub fn content_xml(&self) -> &str {

@@ -1,22 +1,22 @@
 //! Immutable master-document package ownership.
 
 use litchi_core::{Metadata, Result};
-use litchi_odf_common::core::FamilyPackage;
+use litchi_odf_common::core::family::Package;
 use std::path::Path;
 
 pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.text-master";
 const BODY_MARKER: &str = "<office:text";
 
 /// An immutable, validated package snapshot.
-pub(crate) struct Snapshot(FamilyPackage);
+pub(crate) struct Snapshot(Package);
 
 impl Snapshot {
     pub(crate) fn open(path: impl AsRef<Path>) -> Result<Self> {
-        FamilyPackage::open(path, MIMETYPE, BODY_MARKER, "ODM").map(Self)
+        Package::open(path, MIMETYPE, BODY_MARKER, "ODM").map(Self)
     }
 
     pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        FamilyPackage::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODM").map(Self)
+        Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODM").map(Self)
     }
 
     pub(crate) fn content_xml(&self) -> &str {

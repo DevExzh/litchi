@@ -69,7 +69,7 @@ pub mod xml;
 // Re-export main types for convenience
 // Manifest is internal to the package system
 pub use encryption::{Cipher, Kdf, Profile, StartKey};
-pub use family::{FamilyPackage, validate_content_part};
+pub use family::{Package, validate_content_part};
 #[allow(unused_imports)]
 pub use manifest::{
     Manifest, ManifestChecksum, ManifestChecksumAlgorithm, ManifestEncryption,
