@@ -24,6 +24,10 @@ pub enum Error {
 /// Result type for image-adjustment value construction.
 pub type Result<T> = std::result::Result<T, Error>;
 
+const EXPOSURE_PRESENT: u8 = 1 << 0;
+const SATURATION_PRESENT: u8 = 1 << 1;
+const ENHANCEMENT_PRESENT: u8 = 1 << 2;
+
 /// A normalized native image-adjustment amount.
 ///
 /// iWork exposes exposure and saturation as percentages. Values are stored as
@@ -83,10 +87,6 @@ pub enum ImageEnhancement {
     /// Let iWork automatically enhance the image colors.
     Enabled,
 }
-
-const EXPOSURE_PRESENT: u8 = 1 << 0;
-const SATURATION_PRESENT: u8 = 1 << 1;
-const ENHANCEMENT_PRESENT: u8 = 1 << 2;
 
 /// The basic controls in iWork's Image inspector.
 ///
