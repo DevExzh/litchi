@@ -64,6 +64,15 @@ before emitting wire nodes. The formula compiler also validates arity for the
 known fixed-arity functions; recognized functions without arity metadata and
 unknown functions fail closed as typed parse errors.
 
+Numbers table axis sizing uses the focused
+`litchi-numbers::table::dimension::{Dimension, Points, Size}` API. `Points`
+rejects zero, negative, infinite, and NaN values before construction, while
+`Size::Default` remains distinct from `Size::Points(_)` so native default
+sentinel semantics are not conflated with an explicit override. Archive
+bounds, header-bucket storage, wire preservation, and transactional
+publication remain in the IWA adapter; the former flat semantic owners are
+removed rather than duplicated.
+
 The same focused-module rule applies to the dependency-free iWork text leaf:
 `litchi_iwa_text::font::{Font, Name}` owns the shared font identity, while
 `NameError` reports its bounded validation failures. Format crates may expose
@@ -142,6 +151,14 @@ Drawable geometry uses the adjacent focused
 fixed-size neutral values. The IWA-only `DrawableGeometry` aggregate retains
 optional native field presence, reflection flags, rotation conventions, and
 wire conversion; those protobuf details do not leak into the common leaf.
+
+Shape fills keep their neutral gradient vocabulary in the focused
+`litchi_iwa_common::shape::fill` module. `Kind`, `Angle`, `StopPosition`,
+`StopMidpoint`, `Opacity`, `Stop`, and `Gradient` use typed validation, fixed
+scalar storage, `color::Rgba`, and boxed stops without archive or protobuf
+state. `ShapeFill` remains the IWA boundary aggregate because image fills and
+native data references are format-specific; the former `ShapeGradient*`
+semantic owners are removed rather than retained as aliases.
 
 Chart axis controls use the focused `litchi_iwa_common::chart::axis` module.
 `Axis::{Category, Value}` is the compact semantic selector shared by all three

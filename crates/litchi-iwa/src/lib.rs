@@ -284,3 +284,9 @@ impl From<litchi_iwa_core::Error> for Error {
         Self::IwaCore(error.into())
     }
 }
+
+impl From<litchi_numbers::table::dimension::Error> for Error {
+    fn from(error: litchi_numbers::table::dimension::Error) -> Self {
+        Self::ParseError(error.to_string())
+    }
+}

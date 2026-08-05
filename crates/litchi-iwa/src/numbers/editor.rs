@@ -12,6 +12,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Range;
 use std::path::Path;
 
+pub use litchi_numbers::table::dimension::{Dimension, Points, Size};
 use prost::Message;
 
 use super::bnc::{BncCell, CachedScalar, StoredValue};
@@ -208,7 +209,6 @@ use storage::*;
 pub use table_axis_deletion::{TableColumnDeletion, TableRowDeletion};
 pub use table_axis_insertion::{TableColumnInsertion, TableRowInsertion};
 pub(crate) use table_cells::TableCellBatch;
-pub use table_dimension::{NumbersTableDimension, NumbersTableDimensionSize, NumbersTablePoints};
 pub(crate) use table_duplicate::{duplicate_attached_table_graph_in_package, duplicate_table_name};
 use table_duplicate::{
     register_cloned_numbers_objects, register_numbers_component_reference, table_owned_graph,

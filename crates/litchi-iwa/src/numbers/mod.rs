@@ -39,6 +39,10 @@ pub mod table;
 pub mod table_extractor;
 
 pub(crate) use litchi_numbers::cell::wire as bnc;
+pub(crate) use litchi_numbers::table::dimension::{
+    Dimension as NumbersTableDimension, Points as NumbersTablePoints,
+    Size as NumbersTableDimensionSize,
+};
 mod formula_owner;
 mod function_map;
 mod table_uid_map;
@@ -57,31 +61,31 @@ impl From<litchi_numbers::cell::wire::Error> for crate::Error {
 pub use creation::NumbersDocumentBuilder;
 pub use document::NumbersDocument;
 pub use editor::{
-    Direction, IWorkTableCellRegion, NumbersCellCommentInfo, NumbersCellCommentReplyInfo,
-    NumbersEditor, NumbersPivotCategoryInfo, NumbersSheetAudioInfo, NumbersSheetAudioOptions,
-    NumbersSheetChartInfo, NumbersSheetImageInfo, NumbersSheetImageOptions, NumbersSheetInfo,
-    NumbersSheetMovieInfo, NumbersSheetMovieOptions, NumbersSheetShapeInfo, NumbersSheetShapeKind,
-    NumbersTableCellParagraphIndents, NumbersTableCellParagraphLineSpacing,
-    NumbersTableCellParagraphList, NumbersTableCellParagraphListBullet,
-    NumbersTableCellParagraphListBulletGeometry, NumbersTableCellParagraphListIndentation,
-    NumbersTableCellParagraphListLabelColor, NumbersTableCellParagraphListLevel,
-    NumbersTableCellParagraphListLevelPlacement, NumbersTableCellParagraphListNumberFormat,
-    NumbersTableCellParagraphListNumberScale, NumbersTableCellParagraphListNumberTiering,
-    NumbersTableCellParagraphListNumbering, NumbersTableCellParagraphListPlacement,
-    NumbersTableCellParagraphSpacing, NumbersTableCellParagraphTabStops,
-    NumbersTableCellTextAlignment, NumbersTableCellTextBackground,
-    NumbersTableCellTextBaselineShift, NumbersTableCellTextCapitalization,
-    NumbersTableCellTextCharacterSpacing, NumbersTableCellTextColor,
-    NumbersTableCellTextDecorations, NumbersTableCellTextFont, NumbersTableCellTextLigatures,
-    NumbersTableCellTextOutline, NumbersTableCellTextScript, NumbersTableCellTextShadow,
-    NumbersTableCellTextStyle, NumbersTableDimension, NumbersTableDimensionSize,
-    NumbersTableHeaderCount, NumbersTableHeaderSettings, NumbersTableInfo, NumbersTablePoints,
-    NumbersTableSortColumnIndex, NumbersTableSortDirection, NumbersTableSortOrder,
-    NumbersTableSortRowRange, NumbersTableSortRule, NumbersTableSortScope,
-    NumbersTableTitleSettings, NumbersTextBoxInfo, RemovedNumbersSheetAudio,
-    RemovedNumbersSheetChart, RemovedNumbersSheetImage, RemovedNumbersSheetMovie,
-    RemovedNumbersSheetShape, RemovedNumbersTextBox, TableCellConditionalHighlightInfo,
-    TableColumnDeletion, TableColumnInsertion, TableRowDeletion, TableRowInsertion,
+    Dimension, Direction, IWorkTableCellRegion, NumbersCellCommentInfo,
+    NumbersCellCommentReplyInfo, NumbersEditor, NumbersPivotCategoryInfo, NumbersSheetAudioInfo,
+    NumbersSheetAudioOptions, NumbersSheetChartInfo, NumbersSheetImageInfo,
+    NumbersSheetImageOptions, NumbersSheetInfo, NumbersSheetMovieInfo, NumbersSheetMovieOptions,
+    NumbersSheetShapeInfo, NumbersSheetShapeKind, NumbersTableCellParagraphIndents,
+    NumbersTableCellParagraphLineSpacing, NumbersTableCellParagraphList,
+    NumbersTableCellParagraphListBullet, NumbersTableCellParagraphListBulletGeometry,
+    NumbersTableCellParagraphListIndentation, NumbersTableCellParagraphListLabelColor,
+    NumbersTableCellParagraphListLevel, NumbersTableCellParagraphListLevelPlacement,
+    NumbersTableCellParagraphListNumberFormat, NumbersTableCellParagraphListNumberScale,
+    NumbersTableCellParagraphListNumberTiering, NumbersTableCellParagraphListNumbering,
+    NumbersTableCellParagraphListPlacement, NumbersTableCellParagraphSpacing,
+    NumbersTableCellParagraphTabStops, NumbersTableCellTextAlignment,
+    NumbersTableCellTextBackground, NumbersTableCellTextBaselineShift,
+    NumbersTableCellTextCapitalization, NumbersTableCellTextCharacterSpacing,
+    NumbersTableCellTextColor, NumbersTableCellTextDecorations, NumbersTableCellTextFont,
+    NumbersTableCellTextLigatures, NumbersTableCellTextOutline, NumbersTableCellTextScript,
+    NumbersTableCellTextShadow, NumbersTableCellTextStyle, NumbersTableHeaderCount,
+    NumbersTableHeaderSettings, NumbersTableInfo, NumbersTableSortColumnIndex,
+    NumbersTableSortDirection, NumbersTableSortOrder, NumbersTableSortRowRange,
+    NumbersTableSortRule, NumbersTableSortScope, NumbersTableTitleSettings, NumbersTextBoxInfo,
+    Points, RemovedNumbersSheetAudio, RemovedNumbersSheetChart, RemovedNumbersSheetImage,
+    RemovedNumbersSheetMovie, RemovedNumbersSheetShape, RemovedNumbersTextBox, Size,
+    TableCellConditionalHighlightInfo, TableColumnDeletion, TableColumnInsertion, TableRowDeletion,
+    TableRowInsertion,
 };
 pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,

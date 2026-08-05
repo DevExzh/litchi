@@ -6,6 +6,8 @@
 //! tables retain one immutable boxed slice. No dense grid is allocated by the
 //! semantic model.
 
+/// Checked row, column, and point-size values.
+pub mod dimension;
 /// Checked, bounded plans for applying multiple cell mutations.
 pub mod edit;
 /// Checked, archive-free table sort semantics.

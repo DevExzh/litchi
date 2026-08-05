@@ -211,6 +211,15 @@ The dependency-free shape-geometry leaf likewise owns only the compact
 aggregate `DrawableGeometry` adapter because optional native field presence,
 reflection flags, rotation conventions, and wire-preserving patching are
 format-specific; the common crate never imports those archive details.
+Shape gradients follow the same boundary at
+`litchi-iwa-common::shape::fill::{Kind, Angle, StopPosition, StopMidpoint,
+Opacity, Stop, Gradient}`. The common value layer stores validated colors as
+`color::Rgba`, keeps scalar controls fixed-size, and owns gradient stops in a
+boxed slice without protobuf or package dependencies. `litchi-iwa` retains
+`ShapeFill` because image fills and native data references are facade-owned;
+its fill adapter alone decodes and writes `GradientArchive` while preserving
+strict validation. The former `ShapeGradient*` owners are removed rather than
+retained as compatibility aliases.
 Chart-axis selectors and tick-mark values now follow the same boundary at
 `litchi-iwa-common::chart::axis::{Axis, TickMarkLocation}`. `Axis` is a
 one-byte category/value selector, while `TickMarkLocation` is a compact
@@ -307,6 +316,16 @@ unambiguous when the types are imported without a module qualifier. Their
 constructors are allocation-conscious, while archive-boundary compilation
 enforces bounded depth, node count, function arguments, and precedents.
 Package owners continue the same downward-only extraction pattern.
+
+Numbers table axis sizing follows the same boundary at
+`litchi-numbers::table::dimension::{Dimension, Points, Size}`. The leaf owns
+only the archive-free row/column selector, finite positive point validation,
+and the distinction between native-default and explicit sizing. `litchi-iwa`
+retains header-bucket discovery, the native zero sentinel, archive bounds,
+wire-preserving mutation, and transactional reparse verification. The former
+IWA semantic definitions are removed; only crate-private re-exports remain
+where untouched format modules still resolve the shared type during their
+later migrations.
 
 The Pages and Keynote table readers now consume the same leaf `Table` through
 an ownership-preserving adapter seam. Their public table facades borrow the

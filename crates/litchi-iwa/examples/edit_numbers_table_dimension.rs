@@ -1,7 +1,7 @@
 use std::env;
 use std::path::PathBuf;
 
-use litchi_iwa::numbers::{NumbersEditor, NumbersTableDimension, NumbersTableDimensionSize};
+use litchi_iwa::numbers::{Dimension, NumbersEditor, Size};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -20,14 +20,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra argument".into());
     }
     let dimension = match axis.as_str() {
-        "row" => NumbersTableDimension::Row(index),
-        "column" => NumbersTableDimension::Column(index),
+        "row" => Dimension::Row(index),
+        "column" => Dimension::Column(index),
         _ => return Err("dimension axis must be row or column".into()),
     };
     let size = if value == "default" {
-        NumbersTableDimensionSize::Default
+        Size::Default
     } else {
-        NumbersTableDimensionSize::points(value.parse::<f32>()?)?
+        Size::points(value.parse::<f32>()?)?
     };
 
     let mut editor = NumbersEditor::open(input)?;

@@ -27,6 +27,7 @@ pub use formula::{
     FormulaExpression, FormulaPivotCategoryReference, FormulaUuid,
 };
 pub use sheet::{Builder as SheetBuilder, Sheet};
+pub use table::dimension::{Dimension, Points, Size};
 pub use table::{
     Builder as TableBuilder, Cell, Dimensions, Error as TableError, Grid, GridBudget, InsertError,
     InsertResult, Position, Range, Table, View,

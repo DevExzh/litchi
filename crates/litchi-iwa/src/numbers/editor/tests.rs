@@ -7183,24 +7183,18 @@ fn table_title_settings_reject_malformed_wire_transactionally() {
 
 #[test]
 fn table_dimension_sizes_are_typed_transactional_and_wire_exact() {
-    assert!(NumbersTablePoints::new(0.0).is_err());
-    assert!(NumbersTablePoints::new(-1.0).is_err());
-    assert!(NumbersTablePoints::new(f32::INFINITY).is_err());
-    assert!(NumbersTablePoints::new(f32::NAN).is_err());
+    assert!(Points::new(0.0).is_err());
+    assert!(Points::new(-1.0).is_err());
+    assert!(Points::new(f32::INFINITY).is_err());
+    assert!(Points::new(f32::NAN).is_err());
 
     let mut editor =
         NumbersEditor::from_package(test_package_with_column_headers_and_engine()).unwrap();
     let baseline = editor.to_bytes().unwrap();
-    assert_eq!(
-        editor.table_row_height(10, 1).unwrap(),
-        NumbersTableDimensionSize::Default
-    );
-    assert_eq!(
-        editor.table_column_width(10, 2).unwrap(),
-        NumbersTableDimensionSize::Default
-    );
-    let row_height = NumbersTableDimensionSize::points(32.0).unwrap();
-    let column_width = NumbersTableDimensionSize::points(124.0).unwrap();
+    assert_eq!(editor.table_row_height(10, 1).unwrap(), Size::Default);
+    assert_eq!(editor.table_column_width(10, 2).unwrap(), Size::Default);
+    let row_height = Size::points(32.0).unwrap();
+    let column_width = Size::points(124.0).unwrap();
 
     editor.set_table_row_height(10, 1, row_height).unwrap();
     editor.set_table_column_width(10, 2, column_width).unwrap();
@@ -7229,12 +7223,8 @@ fn table_dimension_sizes_are_typed_transactional_and_wire_exact() {
     assert_eq!(reparsed.table_row_height(10, 1).unwrap(), row_height);
     assert_eq!(reparsed.table_column_width(10, 2).unwrap(), column_width);
 
-    editor
-        .set_table_row_height(10, 1, NumbersTableDimensionSize::Default)
-        .unwrap();
-    editor
-        .set_table_column_width(10, 2, NumbersTableDimensionSize::Default)
-        .unwrap();
+    editor.set_table_row_height(10, 1, Size::Default).unwrap();
+    editor.set_table_column_width(10, 2, Size::Default).unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     let before = editor.to_bytes().unwrap();
@@ -7283,7 +7273,7 @@ fn table_dimension_size_preserves_unknown_header_fields() {
     .collect::<Vec<_>>();
 
     editor
-        .set_table_column_width(10, 2, NumbersTableDimensionSize::points(124.0).unwrap())
+        .set_table_column_width(10, 2, Size::points(124.0).unwrap())
         .unwrap();
 
     let document = editor.package().archive("Index/Document.iwa").unwrap();
@@ -7327,7 +7317,7 @@ fn table_dimension_size_rejects_malformed_headers_transactionally() {
     assert!(editor.table_column_width(10, 1).is_err());
     assert!(
         editor
-            .set_table_column_width(10, 1, NumbersTableDimensionSize::points(80.0).unwrap(),)
+            .set_table_column_width(10, 1, Size::points(80.0).unwrap(),)
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
