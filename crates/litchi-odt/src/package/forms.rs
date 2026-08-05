@@ -1,12 +1,12 @@
 //! Package-safe, lossless mutation of form trees and typed controls.
 
 use crate::core::OwnedPackage;
-use crate::package::charts::{rebuild_package, splice};
-use crate::{
-    Form, FormNode, FormPart, FormProperty, GenericFormControl, GridControl, ImageFrameControl,
-    InteractiveControl, PasswordFileControl, SelectionControl, TextControl, TypedValueControl,
+use crate::form::{
+    Form, Forms, GenericFormControl, GridControl, ImageFrameControl, InteractiveControl, Node,
+    Part, PasswordFileControl, Property, SelectionControl, TextControl, TypedValueControl,
     ValueRangeControl, VisualControl,
 };
+use crate::package::charts::{rebuild_package, splice};
 use litchi_core::{Error, Result};
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -97,7 +97,7 @@ pub struct AuthoredForm {
     pub command: Option<String>,
     pub datasource: Option<String>,
     pub href: Option<String>,
-    pub properties: Vec<FormProperty>,
+    pub properties: Vec<Property>,
     pub children: Vec<AuthoredFormNode>,
 }
 
@@ -334,9 +334,9 @@ fn rebuild_validated(
     if content.len() > MAX_XML {
         return invalid("form mutation exceeds XML size limit");
     }
-    let mut parts = vec![(content, FormPart::Content)];
+    let mut parts = vec![(content, Part::Content)];
     if let Some(styles) = styles {
-        parts.push((styles, FormPart::Styles));
+        parts.push((styles, Part::Styles));
     }
     let parsed = crate::form::parse_form_parts(&parts)?;
     validate_unique(&parsed)?;
@@ -350,7 +350,7 @@ fn rebuild_validated(
     )
 }
 
-fn validate_unique(forms: &crate::Forms) -> Result<()> {
+fn validate_unique(forms: &Forms) -> Result<()> {
     let mut ids = HashSet::new();
     for group in &forms.groups {
         sibling_form_names(&group.forms)?;
@@ -386,7 +386,7 @@ fn unique_form(form: &Form, ids: &mut HashSet<String>) -> Result<()> {
         .children
         .iter()
         .filter_map(|node| match node {
-            FormNode::Form(value) => Some(value),
+            Node::Form(value) => Some(value),
             _ => None,
         })
         .collect();
@@ -401,8 +401,8 @@ fn unique_form(form: &Form, ids: &mut HashSet<String>) -> Result<()> {
     let mut control_names = HashSet::new();
     for node in &form.children {
         match node {
-            FormNode::Form(value) => unique_form(value, ids)?,
-            FormNode::Control(value) => {
+            Node::Form(value) => unique_form(value, ids)?,
+            Node::Control(value) => {
                 if let Some(name) = &value.name
                     && !control_names.insert(name.as_str())
                 {
