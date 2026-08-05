@@ -28,12 +28,12 @@ fn bad(s: impl Into<String>) -> Error {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LabelFollowedBy {
+pub enum FollowedBy {
     ListTab,
     Space,
     Nothing,
 }
-impl LabelFollowedBy {
+impl FollowedBy {
     fn parse(s: &str) -> Result<Self> {
         match s {
             "listtab" => Ok(Self::ListTab),
@@ -52,8 +52,8 @@ impl LabelFollowedBy {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ListLabelLength(String);
-impl ListLabelLength {
+pub struct Length(String);
+impl Length {
     pub fn new(s: impl Into<String>) -> Result<Self> {
         let s = s.into();
         if s.len() > MAX_VALUE || !length(&s) {
@@ -87,14 +87,14 @@ fn length(s: &str) -> bool {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ListLevelLabelAlignment {
-    pub label_followed_by: LabelFollowedBy,
-    pub list_tab_stop_position: Option<ListLabelLength>,
-    pub text_indent: Option<ListLabelLength>,
-    pub margin_left: Option<ListLabelLength>,
+pub struct Alignment {
+    pub label_followed_by: FollowedBy,
+    pub list_tab_stop_position: Option<Length>,
+    pub text_indent: Option<Length>,
+    pub margin_left: Option<Length>,
 }
-impl ListLevelLabelAlignment {
-    pub fn new(label_followed_by: LabelFollowedBy) -> Self {
+impl Alignment {
+    pub fn new(label_followed_by: FollowedBy) -> Self {
         Self {
             label_followed_by,
             list_tab_stop_position: None,
@@ -140,30 +140,26 @@ impl ListLevelLabelAlignment {
     }
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ListStyleKind {
+pub enum Kind {
     List,
     Outline,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ListStyleLevelLabelAlignment {
-    pub list_style_kind: ListStyleKind,
+pub struct Style {
+    pub list_style_kind: Kind,
     pub list_style_name: String,
     pub level: u16,
-    pub alignment: ListLevelLabelAlignment,
+    pub alignment: Alignment,
 }
-impl ListStyleLevelLabelAlignment {
-    pub fn new(
-        name: impl Into<String>,
-        level: u16,
-        alignment: ListLevelLabelAlignment,
-    ) -> Result<Self> {
-        Self::new_in(ListStyleKind::List, name, level, alignment)
+impl Style {
+    pub fn new(name: impl Into<String>, level: u16, alignment: Alignment) -> Result<Self> {
+        Self::new_in(Kind::List, name, level, alignment)
     }
     pub fn new_in(
-        list_style_kind: ListStyleKind,
+        list_style_kind: Kind,
         name: impl Into<String>,
         level: u16,
-        alignment: ListLevelLabelAlignment,
+        alignment: Alignment,
     ) -> Result<Self> {
         let x = Self {
             list_style_kind,
@@ -188,19 +184,14 @@ impl ListStyleLevelLabelAlignment {
     }
 }
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ListLevelLabelAlignmentSet {
-    pub levels: Vec<ListStyleLevelLabelAlignment>,
+pub struct Styles {
+    pub levels: Vec<Style>,
 }
-impl ListLevelLabelAlignmentSet {
-    pub fn get(&self, name: &str, level: u16) -> Option<&ListStyleLevelLabelAlignment> {
-        self.get_in(ListStyleKind::List, name, level)
+impl Styles {
+    pub fn get(&self, name: &str, level: u16) -> Option<&Style> {
+        self.get_in(Kind::List, name, level)
     }
-    pub fn get_in(
-        &self,
-        kind: ListStyleKind,
-        name: &str,
-        level: u16,
-    ) -> Option<&ListStyleLevelLabelAlignment> {
+    pub fn get_in(&self, kind: Kind, name: &str, level: u16) -> Option<&Style> {
         self.levels
             .iter()
             .find(|x| x.list_style_kind == kind && x.list_style_name == name && x.level == level)
@@ -261,24 +252,20 @@ fn one(a: &mut Vec<(Ns, Vec<u8>, String)>, n: Ns, l: &[u8]) -> Option<String> {
         .position(|x| x.0 == n && x.1 == l)
         .map(|i| a.remove(i).2)
 }
-fn parse_alignment(
-    r: &NsReader<&[u8]>,
-    v: XmlVersion,
-    e: &BytesStart<'_>,
-) -> Result<ListLevelLabelAlignment> {
+fn parse_alignment(r: &NsReader<&[u8]>, v: XmlVersion, e: &BytesStart<'_>) -> Result<Alignment> {
     let mut a = attrs(r, v, e)?;
     let followed = one(&mut a, Ns::Text, b"label-followed-by")
         .ok_or_else(|| bad("missing text:label-followed-by"))?;
-    let x = ListLevelLabelAlignment {
-        label_followed_by: LabelFollowedBy::parse(&followed)?,
+    let x = Alignment {
+        label_followed_by: FollowedBy::parse(&followed)?,
         list_tab_stop_position: one(&mut a, Ns::Text, b"list-tab-stop-position")
-            .map(ListLabelLength::new)
+            .map(Length::new)
             .transpose()?,
         text_indent: one(&mut a, Ns::Fo, b"text-indent")
-            .map(ListLabelLength::new)
+            .map(Length::new)
             .transpose()?,
         margin_left: one(&mut a, Ns::Fo, b"margin-left")
-            .map(ListLabelLength::new)
+            .map(Length::new)
             .transpose()?,
     };
     if !a.is_empty() {
@@ -289,7 +276,7 @@ fn parse_alignment(
 }
 
 /// Parse every modern list-level label alignment in styles or flat-document XML.
-pub fn parse_list_level_label_alignments(xml: &str) -> Result<ListLevelLabelAlignmentSet> {
+pub fn parse(xml: &str) -> Result<Styles> {
     if xml.len() > MAX_XML {
         return Err(bad("XML too large"));
     }
@@ -300,7 +287,7 @@ pub fn parse_list_level_label_alignments(xml: &str) -> Result<ListLevelLabelAlig
     r.config_mut().trim_text(false);
     let mut ver = XmlVersion::Implicit1_0;
     let mut stack: Vec<(Ns, Vec<u8>)> = Vec::new();
-    let mut list: Option<(usize, String, ListStyleKind, HashSet<u16>)> = None;
+    let mut list: Option<(usize, String, Kind, HashSet<u16>)> = None;
     let mut level: Option<(usize, u16, bool, bool)> = None;
     let mut entries = Vec::new();
     let mut total = 0usize;
@@ -335,9 +322,9 @@ pub fn parse_list_level_label_alignments(xml: &str) -> Result<ListLevelLabelAlig
                         return Err(bad("empty list style name"));
                     }
                     let kind = if c.1 == b"outline-style" {
-                        ListStyleKind::Outline
+                        Kind::Outline
                     } else {
-                        ListStyleKind::List
+                        Kind::List
                     };
                     list = Some((depth, name, kind, HashSet::new()));
                     continue;
@@ -388,7 +375,7 @@ pub fn parse_list_level_label_alignments(xml: &str) -> Result<ListLevelLabelAlig
                         *align = true;
                         let alignment = parse_alignment(&r, ver, &e)?;
                         let name = &list.as_ref().unwrap().1;
-                        let item = ListStyleLevelLabelAlignment::new_in(
+                        let item = Style::new_in(
                             list.as_ref().unwrap().2,
                             name.clone(),
                             level.as_ref().unwrap().1,
@@ -429,7 +416,7 @@ pub fn parse_list_level_label_alignments(xml: &str) -> Result<ListLevelLabelAlig
                         }
                         *align = true;
                         let alignment = parse_alignment(&r, ver, &e)?;
-                        let item = ListStyleLevelLabelAlignment::new_in(
+                        let item = Style::new_in(
                             list.as_ref().unwrap().2,
                             list.as_ref().unwrap().1.clone(),
                             level.as_ref().unwrap().1,
@@ -477,7 +464,7 @@ pub fn parse_list_level_label_alignments(xml: &str) -> Result<ListLevelLabelAlig
             Err(e) => return Err(bad(format!("invalid XML: {e}"))),
         }
     }
-    Ok(ListLevelLabelAlignmentSet { levels: entries })
+    Ok(Styles { levels: entries })
 }
 
 fn event_start(xml: &str, end: usize) -> Result<usize> {
@@ -486,10 +473,7 @@ fn event_start(xml: &str, end: usize) -> Result<usize> {
         .ok_or_else(|| bad("invalid XML boundary"))
 }
 /// Replace one existing alignment element, preserving every unrelated byte.
-pub(crate) fn replace_list_level_label_alignment_xml(
-    xml: &str,
-    item: &ListStyleLevelLabelAlignment,
-) -> Result<String> {
+pub(crate) fn set_xml(xml: &str, item: &Style) -> Result<String> {
     item.validate()?;
     let mut r = NsReader::from_reader(xml.as_bytes());
     let mut ver = XmlVersion::Implicit1_0;
@@ -520,9 +504,9 @@ pub(crate) fn replace_list_level_label_alignment_xml(
                         d,
                         one(&mut a, Ns::Style, b"name").as_deref() == Some(&item.list_style_name)
                             && (if c.1 == b"outline-style" {
-                                ListStyleKind::Outline
+                                Kind::Outline
                             } else {
-                                ListStyleKind::List
+                                Kind::List
                             }) == item.list_style_kind,
                     ));
                 } else if list == Some((d - 1, true))
@@ -596,15 +580,13 @@ pub(crate) fn replace_list_level_label_alignment_xml(
 }
 
 impl OpenDocumentPackage {
-    pub fn list_level_label_alignments(&self) -> Result<ListLevelLabelAlignmentSet> {
-        self.styles_xml()?.map_or_else(
-            || Ok(Default::default()),
-            |x| parse_list_level_label_alignments(&x),
-        )
+    pub fn alignments(&self) -> Result<Styles> {
+        self.styles_xml()?
+            .map_or_else(|| Ok(Default::default()), |x| parse(&x))
     }
 }
 impl FlatOpenDocument {
-    pub fn list_level_label_alignments(&self) -> Result<ListLevelLabelAlignmentSet> {
-        parse_list_level_label_alignments(self.xml())
+    pub fn alignments(&self) -> Result<Styles> {
+        parse(self.xml())
     }
 }
