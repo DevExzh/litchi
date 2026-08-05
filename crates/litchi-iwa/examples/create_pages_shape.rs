@@ -5,11 +5,12 @@ use std::{env, fs, path::Path};
 use litchi_iwa::pages::PagesEditor;
 use litchi_iwa::shapes::{
     DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeFill,
-    ShapeGradient, ShapeGradientAngle, ShapeImageFillTechnique, ShapeShadow, ShapeShadowAngle,
-    ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity,
+    ShapeImageFillTechnique, ShapeShadow, ShapeShadowAngle, ShapeShadowAppearance,
+    ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity,
 };
 use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
 use litchi_iwa_common::shape::effects::{Effects, Opacity, Reflection, ReflectionOpacity};
+use litchi_iwa_common::shape::fill::{Angle, Gradient};
 use litchi_iwa_common::shape::path::Preset;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -36,10 +37,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 150.0,
         },
         Preset::RightArrow,
-        ShapeFill::Gradient(ShapeGradient::linear(
+        ShapeFill::Gradient(Gradient::linear(
             RgbaColor::new(0.88, 0.18, 0.12, 1.0, RgbColorSpace::DisplayP3)?,
             RgbaColor::new(0.98, 0.65, 0.08, 1.0, RgbColorSpace::DisplayP3)?,
-            ShapeGradientAngle::from_degrees(45.0)?,
+            Angle::from_degrees(45.0)?,
         )),
     )?;
     if let Some(path) = fill_image {

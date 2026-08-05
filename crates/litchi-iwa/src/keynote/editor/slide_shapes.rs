@@ -1255,6 +1255,9 @@ mod tests {
     };
     use crate::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
     use litchi_iwa_common::shape::effects::{Effects, Opacity, Reflection, ReflectionOpacity};
+    use litchi_iwa_common::shape::fill::{
+        Angle, Gradient, Kind, Opacity as GradientOpacity, Stop, StopMidpoint, StopPosition,
+    };
     use litchi_iwa_common::shape::path::{
         CornerRadius, InnerRadiusRatio, PolygonSides, StarPoints,
     };
@@ -1589,22 +1592,18 @@ mod tests {
         let orange = RgbaColor::new(0.95, 0.45, 0.05, 1.0, RgbColorSpace::DisplayP3).unwrap();
         let purple = RgbaColor::new(0.45, 0.1, 0.8, 1.0, RgbColorSpace::DisplayP3).unwrap();
         let fill = ShapeFill::Gradient(
-            ShapeGradient::advanced(
-                ShapeGradientKind::Radial,
+            Gradient::advanced(
+                Kind::Radial,
                 vec![
-                    ShapeGradientStop::new(
+                    Stop::new(
                         orange,
-                        ShapeGradientStopPosition::START,
-                        ShapeGradientStopMidpoint::new(0.35).unwrap(),
+                        StopPosition::START,
+                        StopMidpoint::new(0.35).unwrap(),
                     ),
-                    ShapeGradientStop::new(
-                        purple,
-                        ShapeGradientStopPosition::END,
-                        ShapeGradientStopMidpoint::CENTER,
-                    ),
+                    Stop::new(purple, StopPosition::END, StopMidpoint::CENTER),
                 ],
-                ShapeGradientOpacity::new(0.85).unwrap(),
-                ShapeGradientAngle::from_degrees(315.0).unwrap(),
+                GradientOpacity::new(0.85).unwrap(),
+                Angle::from_degrees(315.0).unwrap(),
             )
             .unwrap(),
         );

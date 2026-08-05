@@ -5,13 +5,14 @@ use std::{env, fs, path::Path};
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{
     DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeCurvedShadow, ShapeFill,
-    ShapeGradient, ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity, ShapeGradientStop,
-    ShapeGradientStopMidpoint, ShapeGradientStopPosition, ShapeImageFillTechnique, ShapeShadow,
-    ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowCurve,
-    ShapeShadowOffset, ShapeShadowOpacity,
+    ShapeImageFillTechnique, ShapeShadow, ShapeShadowAngle, ShapeShadowAppearance,
+    ShapeShadowBlurRadius, ShapeShadowCurve, ShapeShadowOffset, ShapeShadowOpacity,
 };
 use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
 use litchi_iwa_common::shape::effects::{Effects, Opacity, Reflection, ReflectionOpacity};
+use litchi_iwa_common::shape::fill::{
+    Angle, Gradient, Kind, Opacity as GradientOpacity, Stop, StopMidpoint, StopPosition,
+};
 use litchi_iwa_common::shape::path::Preset;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -40,22 +41,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 240.0,
         },
         Preset::RightArrow,
-        ShapeFill::Gradient(ShapeGradient::advanced(
-            ShapeGradientKind::Radial,
+        ShapeFill::Gradient(Gradient::advanced(
+            Kind::Radial,
             vec![
-                ShapeGradientStop::new(
+                Stop::new(
                     RgbaColor::new(0.98, 0.62, 0.08, 1.0, RgbColorSpace::DisplayP3)?,
-                    ShapeGradientStopPosition::START,
-                    ShapeGradientStopMidpoint::new(0.4)?,
+                    StopPosition::START,
+                    StopMidpoint::new(0.4)?,
                 ),
-                ShapeGradientStop::new(
+                Stop::new(
                     RgbaColor::new(0.72, 0.08, 0.38, 1.0, RgbColorSpace::DisplayP3)?,
-                    ShapeGradientStopPosition::END,
-                    ShapeGradientStopMidpoint::CENTER,
+                    StopPosition::END,
+                    StopMidpoint::CENTER,
                 ),
             ],
-            ShapeGradientOpacity::OPAQUE,
-            ShapeGradientAngle::from_degrees(315.0)?,
+            GradientOpacity::OPAQUE,
+            Angle::from_degrees(315.0)?,
         )?),
     )?;
     if let Some(path) = fill_image {

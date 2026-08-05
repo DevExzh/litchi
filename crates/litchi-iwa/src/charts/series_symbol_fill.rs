@@ -488,8 +488,9 @@ fn adjust_data_reference(
 mod tests {
     use super::*;
     use crate::protobuf::tss;
-    use crate::shapes::{RgbColorSpace, ShapeGradient, ShapeGradientAngle};
+    use crate::shapes::RgbColorSpace;
     use crate::wire::{append_varint_field, parse_wire_fields};
+    use litchi_iwa_common::shape::fill::{Angle, Gradient};
 
     const UNKNOWN_OUTER_FIELD: u32 = 4_096;
     const UNKNOWN_GENERATED_FIELD: u32 = 4_097;
@@ -502,10 +503,10 @@ mod tests {
             ChartSeriesSymbolFill::SeriesStroke,
             ChartSeriesSymbolFill::Custom(ShapeFill::None),
             ChartSeriesSymbolFill::Custom(ShapeFill::Solid(color(0.2, 0.5, 0.8))),
-            ChartSeriesSymbolFill::Custom(ShapeFill::Gradient(ShapeGradient::linear(
+            ChartSeriesSymbolFill::Custom(ShapeFill::Gradient(Gradient::linear(
                 color(0.8, 0.1, 0.2),
                 color(0.1, 0.3, 0.9),
-                ShapeGradientAngle::from_degrees(35.0).unwrap(),
+                Angle::from_degrees(35.0).unwrap(),
             ))),
         ];
         for mode in modes {

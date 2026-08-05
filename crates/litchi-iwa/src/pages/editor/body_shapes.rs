@@ -934,6 +934,7 @@ mod tests {
     };
     use crate::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
     use litchi_iwa_common::shape::effects::{Effects, Opacity, Reflection, ReflectionOpacity};
+    use litchi_iwa_common::shape::fill::{Angle, Gradient};
     use litchi_iwa_common::shape::path::CornerRadius;
 
     const POSITION: DrawablePoint = DrawablePoint { x: 180.0, y: 240.0 };
@@ -1354,10 +1355,10 @@ mod tests {
             .iwa_entry_names()
             .map(|name| editor.package().archive(name).unwrap().objects.len())
             .sum::<usize>();
-        let replacement = ShapeFill::Gradient(ShapeGradient::linear(
+        let replacement = ShapeFill::Gradient(Gradient::linear(
             RgbaColor::new(0.1, 0.45, 0.9, 1.0, RgbColorSpace::Srgb).unwrap(),
             RgbaColor::new(0.8, 0.15, 0.55, 1.0, RgbColorSpace::DisplayP3).unwrap(),
-            ShapeGradientAngle::from_degrees(45.0).unwrap(),
+            Angle::from_degrees(45.0).unwrap(),
         ));
         editor
             .set_body_shape_fill(created.drawable_object_id, &replacement)

@@ -1721,10 +1721,10 @@ mod tests {
             .build()
             .unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
-        let fill = ShapeFill::Gradient(ShapeGradient::linear(
+        let fill = ShapeFill::Gradient(Gradient::linear(
             RgbaColor::new(0.1, 0.55, 0.85, 1.0, RgbColorSpace::Srgb).unwrap(),
             RgbaColor::new(0.05, 0.15, 0.5, 1.0, RgbColorSpace::Srgb).unwrap(),
-            ShapeGradientAngle::from_degrees(0.0).unwrap(),
+            Angle::from_degrees(0.0).unwrap(),
         ));
         let created = editor
             .add_sheet_shape(sheet_id, "Filled", POSITION, SIZE, Preset::Rectangle)

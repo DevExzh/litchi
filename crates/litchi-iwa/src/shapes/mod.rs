@@ -26,11 +26,7 @@ pub use caption::DrawableTitleCaption;
 pub use color::{RgbColorSpace, Rgba, RgbaColor};
 pub(crate) use color::{color_from_native, color_to_native};
 pub(crate) use effects::{reset_shape_effects, set_shape_effects, shape_effects};
-pub use fill::{
-    ShapeFill, ShapeGradient, ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity,
-    ShapeGradientStop, ShapeGradientStopMidpoint, ShapeGradientStopPosition,
-    ShapeImageDataIdentifier, ShapeImageFill, ShapeImageFillTechnique,
-};
+pub use fill::{ShapeFill, ShapeImageDataIdentifier, ShapeImageFill, ShapeImageFillTechnique};
 pub(crate) use fill::{
     fill_from_native, fill_to_native, image_data_identifier, remove_orphaned_image_asset,
     validate_image_asset,
@@ -51,6 +47,8 @@ pub(crate) use line_end::{
     insert_style_variation, remove_style_variation, set_shape_line_endpoints, shape_line_endpoints,
 };
 pub use litchi_iwa_common::shape::effects::{Effects, Opacity, Reflection, ReflectionOpacity};
+pub use litchi_iwa_common::shape::fill::Opacity as GradientOpacity;
+pub use litchi_iwa_common::shape::fill::{Angle, Gradient, Kind, Stop, StopMidpoint, StopPosition};
 pub use litchi_iwa_common::shape::path::{
     CornerRadius, InnerRadiusRatio, PolygonSides, Preset, StarPoints,
 };
@@ -87,3 +85,9 @@ pub(crate) use text_columns::{
 };
 pub use text_extractor::ShapeTextExtractor;
 pub(crate) use text_layout::{reset_shape_text_layout, set_shape_text_layout, shape_text_layout};
+
+impl From<litchi_iwa_common::shape::fill::Error> for crate::Error {
+    fn from(error: litchi_iwa_common::shape::fill::Error) -> Self {
+        Self::ParseError(error.to_string())
+    }
+}

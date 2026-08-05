@@ -16,10 +16,10 @@ use litchi_iwa::charts::{
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{
     DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeFill,
-    ShapeGradient, ShapeGradientAngle, ShapeShadowAngle, ShapeShadowAppearance,
-    ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity, ShapeStroke, StrokePattern,
-    StrokeWidth,
+    ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset,
+    ShapeShadowOpacity, ShapeStroke, StrokePattern, StrokeWidth,
 };
+use litchi_iwa_common::shape::fill::{Angle, Gradient};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -58,10 +58,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_body_chart_series_fills(
         chart.drawable_object_id,
         &[
-            ShapeFill::Gradient(ShapeGradient::linear(
+            ShapeFill::Gradient(Gradient::linear(
                 RgbaColor::new(0.95, 0.25, 0.18, 1.0, RgbColorSpace::Srgb)?,
                 RgbaColor::new(0.55, 0.05, 0.35, 1.0, RgbColorSpace::Srgb)?,
-                ShapeGradientAngle::from_degrees(0.0)?,
+                Angle::from_degrees(0.0)?,
             )),
             ShapeFill::Solid(RgbaColor::new(0.10, 0.65, 0.35, 1.0, RgbColorSpace::Srgb)?),
         ],
