@@ -173,6 +173,15 @@ preservation, and transactional package publication. Pages, Numbers, and
 Keynote table APIs consume the Numbers leaf directly, and the former flat
 `litchi-iwa::table_cell_data_format` and `table_cell_number_format` owners are
 deleted rather than retained as compatibility aliases.
+The rich-text storage vocabulary now follows the same boundary at
+`litchi-iwa-text::storage::{Storage, Run, Fragment}`. `Storage` owns only UTF-8
+text and validated byte ranges in one text allocation plus one boxed run slice;
+native object IDs, style-table IDs, protobuf messages, and archive terminology
+do not enter the leaf. The IWA adapter retains decoded storage-message
+selection, native identifiers used for lookup and diagnostics, and all raw
+unknown wire content. Keynote, Pages, and structured aggregation consume the
+short semantic types directly; invalid ranges cross the leaf boundary as its
+typed storage error.
 The common color leaf now owns `color::{RgbColorSpace, Rgba}` and its typed
 `color::Error`; native protobuf conversion remains in the IWA shape adapter.
 `Rgba` is a fixed-size, copyable value that validates all four finite channels

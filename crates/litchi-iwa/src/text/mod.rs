@@ -132,10 +132,7 @@ pub use text_comment_types::{
 };
 
 pub use extractor::TextExtractor;
-pub use litchi_iwa_text::{
-    TextFragment, TextFragmentIter, TextRun, TextStorage, extract_text_from_storages,
-    parse_storage_archive,
-};
+pub use litchi_iwa_text::storage::{Error as StorageError, Fragment, Run, Storage};
 pub use style::{
     CharacterError, ParagraphBackground, ParagraphBorder, ParagraphBorderOffset,
     ParagraphBorderSides, ParagraphBorders, ParagraphIndentPoints, ParagraphIndents,

@@ -103,6 +103,14 @@ control-cell metadata, custom UUID registries, BNC scalar state, protobuf
 fields, and transactional package changes. The old `TableCell*` semantic
 owners and facade aliases are removed; Pages and Keynote use the Numbers leaf
 types directly.
+Rich-text storage uses the focused `litchi_iwa_text::storage` module. `Storage`
+contains only owned UTF-8 text and validated semantic byte ranges; `Run` exposes
+range geometry rather than a native style or object identifier, and `Fragment`
+borrows text without allocating. Empty runs remain in the validated run slice
+for lossless semantic retention but do not produce fragments. Out-of-bounds,
+overflowing, or non-UTF-8-boundary ranges return typed errors before
+publication. Protobuf decoding, UTF-16/native boundary conversion, archive
+lookup, and unsupported wire-field preservation stay in the IWA adapter.
 
 Pages document state follows the same raw/semantic split:
 `litchi_pages::document::{Root, Body, Document}` owns an immutable, bounded

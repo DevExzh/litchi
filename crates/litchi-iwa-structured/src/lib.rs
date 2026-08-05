@@ -73,7 +73,7 @@ fn append_slide_text(output: &mut Vec<String>, slide: &Slide) {
             .text_storages()
             .iter()
             .filter(|storage| !storage.is_empty())
-            .map(|storage| storage.plain_text().to_owned()),
+            .map(|storage| storage.text().to_owned()),
     );
 }
 
@@ -87,7 +87,7 @@ fn append_section_text(output: &mut Vec<String>, section: &Section) {
             .text_storages
             .iter()
             .filter(|storage| !storage.is_empty())
-            .map(|storage| storage.plain_text().to_owned()),
+            .map(|storage| storage.text().to_owned()),
     );
 }
 

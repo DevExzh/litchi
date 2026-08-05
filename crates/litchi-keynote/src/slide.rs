@@ -4,7 +4,7 @@ pub mod audio;
 pub mod media;
 pub mod table;
 
-use litchi_iwa_text::TextStorage;
+use litchi_iwa_text::storage::Storage;
 
 use crate::{Build, Effect, Seconds};
 
@@ -36,41 +36,15 @@ impl Transition {
 }
 
 /// An immutable semantic slide snapshot.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Slide {
     index: usize,
     title: Option<Box<str>>,
     text_content: Box<[String]>,
     notes: Option<Box<str>>,
-    text_storages: Box<[TextStorage]>,
+    text_storages: Box<[Storage]>,
     builds: Box<[Build]>,
     transition: Option<Transition>,
-}
-
-impl PartialEq for Slide {
-    fn eq(&self, other: &Self) -> bool {
-        self.index == other.index
-            && self.title == other.title
-            && self.text_content == other.text_content
-            && self.notes == other.notes
-            && self.text_storages.iter().zip(&other.text_storages).all(
-                |(left_storage, right_storage)| {
-                    left_storage.text == right_storage.text
-                        && left_storage.identifier == right_storage.identifier
-                        && left_storage.runs.len() == right_storage.runs.len()
-                        && left_storage.runs.iter().zip(&right_storage.runs).all(
-                            |(left_run, right_run)| {
-                                left_run.offset == right_run.offset
-                                    && left_run.length == right_run.length
-                                    && left_run.style == right_run.style
-                            },
-                        )
-                },
-            )
-            && self.text_storages.len() == other.text_storages.len()
-            && self.builds == other.builds
-            && self.transition == other.transition
-    }
 }
 
 impl Slide {
@@ -106,7 +80,7 @@ impl Slide {
 
     /// Borrow rich-text storages without copying them.
     #[must_use]
-    pub fn text_storages(&self) -> &[TextStorage] {
+    pub fn text_storages(&self) -> &[Storage] {
         &self.text_storages
     }
 
@@ -141,7 +115,7 @@ impl Slide {
             self.text_storages
                 .iter()
                 .filter(|storage| !storage.is_empty())
-                .map(|storage| storage.plain_text().to_owned()),
+                .map(|storage| storage.text().to_owned()),
         );
         all
     }
@@ -171,7 +145,7 @@ pub struct Builder {
     title: Option<Box<str>>,
     text_content: Vec<String>,
     notes: Option<Box<str>>,
-    text_storages: Vec<TextStorage>,
+    text_storages: Vec<Storage>,
     builds: Vec<Build>,
     transition: Option<Transition>,
 }
@@ -202,7 +176,7 @@ impl Builder {
     }
 
     /// Append one rich-text storage.
-    pub fn push_text_storage(&mut self, storage: TextStorage) {
+    pub fn push_text_storage(&mut self, storage: Storage) {
         self.text_storages.push(storage);
     }
 

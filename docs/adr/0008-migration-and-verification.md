@@ -5793,7 +5793,7 @@ bounded owner slice.
 ## Quality gates
 
 The IWA migration has now established a value-model seam. `litchi-iwa-text`
-owns `TextStorage`, `TextRun`, and borrowed `TextFragment` values; `litchi-pages`
+owns `storage::{Storage, Run, Fragment}`; `litchi-pages`
 owns `Section` and `SectionType`; and `litchi-keynote` owns `Slide`, `Show`,
 build-animation, and transition values. Its `transition::Effect` now owns the
 lossless native transition-effect identifiers and canonical-known-value check;
@@ -5806,6 +5806,15 @@ while the monolith still has migration
 adapters where existing reader/editor surfaces need archive-boundary context.
 These adapters are staged ownership work, not a compatibility API. No archive,
 protobuf, or application decoder was moved into these value crates.
+The rich-text storage handoff is now complete for the bounded semantic seam:
+`litchi-iwa-text::storage::{Storage, Run, Fragment}` contains no native object
+or style identifiers and validates every published run against UTF-8 text.
+Keynote, Pages, and `litchi-iwa-structured` consume the leaf directly, while
+the IWA adapter performs decoded text-line joining and retains native lookup,
+UTF-16 boundary conversion, and unsupported wire content. The focused leaf,
+Keynote, Pages, and structured tests pass; the full IWA test target remains
+blocked by the pre-existing Numbers conditional-highlighting test that still
+passes the removed `TableCellCheckboxFormat` type to the new `Checkbox` API.
 The adapters and the four corresponding `litchi-iwa` dependency edges are
 staged ownership work, not compatibility API; their exit is to move the owning
 readers before deleting the adapters. The Numbers value slice now owns

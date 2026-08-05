@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 use crate::{Section, SectionType};
-use litchi_iwa_text::TextStorage;
+use litchi_iwa_text::storage::Storage;
 
 /// Default maximum UTF-8 bytes retained by one semantic Pages document.
 pub const DEFAULT_MAX_TEXT_BYTES: usize = 64 * 1024 * 1024;
@@ -52,7 +52,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// Semantic body content detached from its native package object.
 #[derive(Debug, Clone)]
 pub struct Body {
-    text_storages: Box<[TextStorage]>,
+    text_storages: Box<[Storage]>,
 }
 
 impl Body {
@@ -62,7 +62,7 @@ impl Body {
     ///
     /// Returns [`Error::TooManyBodyStorages`] or [`Error::TextTooLarge`] when
     /// the supplied values exceed the semantic bounds.
-    pub fn new(text_storages: Vec<TextStorage>) -> Result<Self> {
+    pub fn new(text_storages: Vec<Storage>) -> Result<Self> {
         Self::with_max_text_bytes(text_storages, DEFAULT_MAX_TEXT_BYTES)
     }
 
@@ -72,10 +72,7 @@ impl Body {
     ///
     /// Returns [`Error::TooManyBodyStorages`] or [`Error::TextTooLarge`] when
     /// the supplied values exceed the semantic bounds.
-    pub fn with_max_text_bytes(
-        text_storages: Vec<TextStorage>,
-        max_text_bytes: usize,
-    ) -> Result<Self> {
+    pub fn with_max_text_bytes(text_storages: Vec<Storage>, max_text_bytes: usize) -> Result<Self> {
         if text_storages.len() > MAX_BODY_STORAGES {
             return Err(Error::TooManyBodyStorages {
                 actual: text_storages.len(),
@@ -103,7 +100,7 @@ impl Body {
 
     /// Borrow the body storages in source order.
     #[must_use]
-    pub fn text_storages(&self) -> &[TextStorage] {
+    pub fn text_storages(&self) -> &[Storage] {
         &self.text_storages
     }
 
@@ -118,7 +115,7 @@ impl Body {
     /// Return whether every body storage is empty.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.text_storages.iter().all(TextStorage::is_empty)
+        self.text_storages.iter().all(Storage::is_empty)
     }
 
     fn into_section(self) -> Section {
@@ -295,7 +292,7 @@ mod tests {
     use super::*;
 
     fn body(text: &str) -> Body {
-        Body::new(vec![TextStorage::from_text(text.to_owned())])
+        Body::new(vec![Storage::from_text(text.to_owned())])
             .unwrap_or_else(|error| panic!("body should be valid: {error}"))
     }
 
@@ -315,14 +312,13 @@ mod tests {
 
     #[test]
     fn construction_rejects_over_budget_text_and_noncanonical_positions() {
-        let oversized =
-            Body::with_max_text_bytes(vec![TextStorage::from_text("12345".to_owned())], 4);
+        let oversized = Body::with_max_text_bytes(vec![Storage::from_text("12345".to_owned())], 4);
         assert!(matches!(oversized, Err(Error::TextTooLarge { limit: 4 })));
 
         let mut section = Section::new(1, SectionType::Body);
         section
             .text_storages
-            .push(TextStorage::from_text("body".to_owned()));
+            .push(Storage::from_text("body".to_owned()));
         let invalid = Document::from_sections(vec![section]);
         assert!(matches!(
             invalid,

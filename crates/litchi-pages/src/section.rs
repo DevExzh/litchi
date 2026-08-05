@@ -1,6 +1,6 @@
 pub mod pagination;
 
-use litchi_iwa_text::TextStorage;
+use litchi_iwa_text::storage::Storage;
 use thiserror::Error;
 
 pub use pagination::{PageNumber, PageNumbering, Start};
@@ -300,7 +300,7 @@ pub struct Section {
     /// Paragraph values extracted from the section.
     pub paragraphs: Vec<String>,
     /// Rich-text storages belonging to the section.
-    pub text_storages: Vec<TextStorage>,
+    pub text_storages: Vec<Storage>,
     /// Number of pages represented by the section, when known.
     pub page_count: Option<usize>,
 }
@@ -336,7 +336,7 @@ impl Section {
             self.text_storages
                 .iter()
                 .filter(|storage| !storage.is_empty())
-                .map(|storage| storage.plain_text().to_owned()),
+                .map(|storage| storage.text().to_owned()),
         );
 
         all
@@ -389,7 +389,7 @@ impl Section {
         }
         for storage in &self.text_storages {
             if !storage.is_empty() {
-                append_value(output, &mut first, storage.plain_text());
+                append_value(output, &mut first, storage.text());
             }
         }
     }
@@ -511,7 +511,7 @@ mod tests {
         section.paragraphs.push("First paragraph".to_owned());
         section
             .text_storages
-            .push(TextStorage::from_text("Storage text".to_owned()));
+            .push(Storage::from_text("Storage text".to_owned()));
 
         assert!(!section.is_empty());
         assert_eq!(

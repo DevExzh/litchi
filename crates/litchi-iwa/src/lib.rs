@@ -188,7 +188,7 @@ pub use package::IWorkPackage;
 pub use shapes::DrawableTitleCaption;
 pub use structured::StructuredData;
 pub use text::{
-    ParagraphStyle, TextDecorations, TextExtractor, TextFragment, TextPointSize, TextStorage,
+    Fragment, ParagraphStyle, Run, Storage, TextDecorations, TextExtractor, TextPointSize,
     TextStrikethrough, TextStyle, TextUnderline,
 };
 pub use theme::{IWorkThemeArchive, IWorkThemeExtensions};

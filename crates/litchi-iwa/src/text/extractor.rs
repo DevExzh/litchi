@@ -2,7 +2,7 @@
 //!
 //! Provides utilities for extracting text from iWork document objects.
 
-use super::{TextStorage, parse_storage_archive};
+use super::Storage;
 use crate::Result;
 use crate::archive::{ArchiveObject, extract_text};
 use crate::bundle::Bundle;
@@ -17,7 +17,7 @@ const fn is_storage_message_type(type_id: u32) -> bool {
 /// Text extractor for iWork documents
 pub struct TextExtractor {
     /// Extracted text storages
-    storages: Vec<TextStorage>,
+    storages: Vec<Storage>,
 }
 
 impl TextExtractor {
@@ -50,15 +50,15 @@ impl TextExtractor {
     }
 
     /// Extract text from a single archive object
-    pub fn extract_from_object(&self, object: &ArchiveObject) -> Result<TextStorage> {
+    pub fn extract_from_object(&self, object: &ArchiveObject) -> Result<Storage> {
         // Extract text from decoded messages
         let text_lines = extract_text(object);
 
         if text_lines.is_empty() {
-            return Ok(TextStorage::new());
+            return Ok(Storage::new());
         }
 
-        Ok(parse_storage_archive(&text_lines))
+        Ok(Storage::from_text(text_lines.join("\n")))
     }
 
     /// Get all extracted text as a single string
@@ -67,19 +67,19 @@ impl TextExtractor {
             .storages
             .len()
             .saturating_sub(1)
-            .saturating_add(self.storages.iter().map(TextStorage::len).sum());
+            .saturating_add(self.storages.iter().map(Storage::len).sum());
         let mut text = String::with_capacity(capacity);
         for (index, storage) in self.storages.iter().enumerate() {
             if index != 0 {
                 text.push('\n');
             }
-            text.push_str(storage.plain_text());
+            text.push_str(storage.text());
         }
         text
     }
 
     /// Get all text storages
-    pub fn storages(&self) -> &[TextStorage] {
+    pub fn storages(&self) -> &[Storage] {
         &self.storages
     }
 
@@ -135,10 +135,37 @@ mod tests {
         let mut extractor = TextExtractor::new();
         extractor
             .storages
-            .push(TextStorage::from_text("Test".to_string()));
+            .push(Storage::from_text("Test".to_string()));
         assert_eq!(extractor.storage_count(), 1);
 
         extractor.clear();
         assert_eq!(extractor.storage_count(), 0);
+    }
+
+    #[test]
+    fn adapter_joins_decoded_storage_lines_without_native_metadata() {
+        use prost::Message;
+
+        let payload = crate::protobuf::tswp::StorageArchive {
+            text: vec!["first".to_owned(), "second".to_owned()],
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let object = ArchiveObject::new(
+            42,
+            vec![crate::archive::RawMessage {
+                type_: 2001,
+                data: payload,
+            }],
+        )
+        .unwrap_or_else(|error| panic!("valid archive object: {error}"));
+
+        let storage = TextExtractor::new()
+            .extract_from_object(&object)
+            .unwrap_or_else(|error| panic!("valid storage payload: {error}"));
+        assert_eq!(storage.text(), "first\nsecond");
+        assert_eq!(storage.runs().len(), 1);
+        assert_eq!(storage.runs()[0].start(), 0);
+        assert_eq!(storage.runs()[0].len(), "first\nsecond".len());
     }
 }

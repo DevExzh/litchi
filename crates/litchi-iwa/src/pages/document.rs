@@ -12,7 +12,7 @@ use crate::application::Application;
 use crate::bundle::{Bundle, BundleLimits};
 use crate::object_index::ObjectIndex;
 use crate::protobuf::{tp, tswp};
-use crate::text::{TextExtractor, TextStorage};
+use crate::text::{Storage, TextExtractor};
 use crate::{Error, Result};
 use litchi_iwa_graph::ObjectId;
 
@@ -199,7 +199,7 @@ impl PagesDocument {
         messages: &[crate::archive::RawMessage],
         identifier: NonZeroU64,
         max_text_bytes: usize,
-    ) -> Result<TextStorage> {
+    ) -> Result<Storage> {
         let mut payload = None;
         for message in messages {
             if matches!(message.type_, 2001 | 2022)
@@ -243,9 +243,7 @@ impl PagesDocument {
         for line in &storage.text {
             text.push_str(line);
         }
-        let mut result = TextStorage::from_text(text);
-        result.identifier = Some(identifier.get());
-        Ok(result)
+        Ok(Storage::from_text(text))
     }
 
     /// Extract all text content from the document
@@ -436,7 +434,10 @@ mod tests {
         let document = PagesDocument::from_bytes(&package.to_bytes().unwrap()).unwrap();
         let sections = document.sections().unwrap();
         assert_eq!(sections.len(), 1);
-        assert_eq!(sections[0].text_storages[0].identifier, Some(body_id));
+        assert_eq!(
+            sections[0].text_storages[0].text(),
+            "Pages body — café 東京 🚀"
+        );
         assert_eq!(sections[0].plain_text(), "Pages body — café 東京 🚀");
         assert_eq!(document.text().unwrap(), "Pages body — café 東京 🚀");
 
