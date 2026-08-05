@@ -14,10 +14,6 @@ pub use action::{
     ScriptEventListener, ShapeEventListener,
 };
 pub use animation::{Attribute, Kind, Namespace, Node};
-pub use declaration::{
-    DateTimeDeclaration, DateTimeSource, DeclarationBinding, DeclarationTarget, Declarations,
-    TextDeclaration, parse as parse_declarations,
-};
 pub use media::{Actuate, Parameter, Reference, Show};
 pub use settings::{CustomShow, FeatureState, Settings, parse as parse_settings};
 pub use slide::{

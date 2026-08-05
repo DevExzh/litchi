@@ -37,7 +37,7 @@ pub struct Builder {
     metadata: Metadata,
     media_files: BTreeMap<String, EmbeddedMedia>,
     settings: Option<crate::Settings>,
-    declarations: Option<crate::Declarations>,
+    declarations: Option<crate::model::declaration::Collection>,
     page_metadata: Option<crate::model::page_metadata::Collection>,
     page_layouts: crate::model::page_layout::Collection,
 }
@@ -437,14 +437,14 @@ impl Builder {
     }
 
     /// Return inert presentation declarations and page bindings.
-    pub fn declarations(&self) -> Option<&crate::Declarations> {
+    pub fn declarations(&self) -> Option<&crate::model::declaration::Collection> {
         self.declarations.as_ref()
     }
 
     /// Set or clear validated presentation declarations and page bindings.
     pub fn set_declarations(
         &mut self,
-        declarations: Option<crate::Declarations>,
+        declarations: Option<crate::model::declaration::Collection>,
     ) -> Result<&mut Self> {
         if let Some(declarations) = &declarations {
             declarations.validate()?;
@@ -1062,7 +1062,7 @@ impl Builder {
             let declaration_attributes = crate::model::declaration::write_binding_attributes(
                 self.declarations.as_ref(),
                 i,
-                crate::DeclarationTarget::Slide,
+                crate::model::declaration::Target::Slide,
             );
             body.push_str("<draw:page");
             body.push_str(&page_attributes);
@@ -1106,7 +1106,7 @@ impl Builder {
             let notes_attributes = crate::model::declaration::write_binding_attributes(
                 self.declarations.as_ref(),
                 i,
-                crate::DeclarationTarget::Notes,
+                crate::model::declaration::Target::Notes,
             );
             body.push_str(&crate::model::declaration::apply_notes_binding(
                 Self::generate_notes_xml(slide.notes.as_deref()),

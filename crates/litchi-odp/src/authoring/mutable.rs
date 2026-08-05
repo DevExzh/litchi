@@ -3,12 +3,12 @@
 //! This module provides a mutable wrapper around ODP presentations that allows
 //! for in-place modification of slides, shapes, and content.
 
-use crate::core::{MetaXmlPatch, Structure, OwnedPackage, PackageWriter, patch_meta_xml};
 use crate::animation::validate_animation_roots;
 use crate::codec::content_source::ContentSource;
+use crate::core::{MetaXmlPatch, OwnedPackage, PackageWriter, Structure, patch_meta_xml};
 use crate::legacy_animation::validate_legacy_animation_root;
 use crate::media::{EmbeddedMedia, embed_media, validate_package_media_path};
-use crate::{Reference, Presentation, Shape, Slide};
+use crate::{Presentation, Reference, Shape, Slide};
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -55,7 +55,7 @@ pub struct MutablePresentation {
     /// Inert slide-show settings and custom shows.
     settings: Option<crate::Settings>,
     /// Inert header/footer/date-time declarations and page bindings.
-    declarations: Option<crate::Declarations>,
+    declarations: Option<crate::model::declaration::Collection>,
     /// Static page names, IDs, and layout/master references.
     page_metadata: Option<crate::model::page_metadata::Collection>,
     /// Verbatim fragments of the source `content.xml`, when one was opened.
@@ -66,8 +66,8 @@ pub struct MutablePresentation {
     content_source: Option<ContentSource>,
     /// Slides exactly as parsed, used to detect which pages are still pristine.
     source_slides: Vec<Slide>,
-    /// Declarations exactly as parsed; changing them rewrites every page.
-    source_declarations: Option<crate::Declarations>,
+    /// Declaration state exactly as parsed; changing it rewrites every page.
+    source_declarations: Option<crate::model::declaration::Collection>,
     /// Page metadata exactly as parsed; changing it rewrites every page.
     source_page_metadata: Option<crate::model::page_metadata::Collection>,
 }
@@ -267,10 +267,7 @@ impl MutablePresentation {
     }
 
     /// Set or clear validated slide-show settings without executing them.
-    pub fn set_settings(
-        &mut self,
-        settings: Option<crate::Settings>,
-    ) -> Result<()> {
+    pub fn set_settings(&mut self, settings: Option<crate::Settings>) -> Result<()> {
         if let Some(settings) = &settings {
             settings.validate()?;
         }
@@ -279,19 +276,19 @@ impl MutablePresentation {
     }
 
     /// Return inert presentation declarations and page bindings.
-    pub fn declarations(&self) -> Option<&crate::Declarations> {
+    pub fn declarations(&self) -> Option<&crate::model::declaration::Collection> {
         self.declarations.as_ref()
     }
 
     /// Mutably access presentation declarations and page bindings.
-    pub fn declarations_mut(&mut self) -> Option<&mut crate::Declarations> {
+    pub fn declarations_mut(&mut self) -> Option<&mut crate::model::declaration::Collection> {
         self.declarations.as_mut()
     }
 
     /// Set or clear validated presentation declarations and page bindings.
     pub fn set_declarations(
         &mut self,
-        declarations: Option<crate::Declarations>,
+        declarations: Option<crate::model::declaration::Collection>,
     ) -> Result<()> {
         if let Some(declarations) = &declarations {
             declarations.validate()?;
@@ -430,10 +427,7 @@ impl MutablePresentation {
                 Some(&candidate_metadata),
                 self.slides.len() + 1,
             )?;
-            super::settings::validate_page_references(
-                self.settings.as_ref(),
-                &candidate_names,
-            )?;
+            super::settings::validate_page_references(self.settings.as_ref(), &candidate_names)?;
             let slide = Slide {
                 title: Some(title.to_string()),
                 text: text.to_string(),
@@ -502,10 +496,7 @@ impl MutablePresentation {
                 candidate_metadata.as_ref(),
                 self.slides.len() - 1,
             )?;
-            super::settings::validate_page_references(
-                self.settings.as_ref(),
-                &candidate_names,
-            )?;
+            super::settings::validate_page_references(self.settings.as_ref(), &candidate_names)?;
             let slide = self.slides.remove(index);
             self.page_metadata = candidate_metadata;
 
@@ -882,7 +873,7 @@ impl MutablePresentation {
 
         let mut body = String::with_capacity(estimated);
 
-        body.push_str(&super::declaration::write_declaration_elements(
+        body.push_str(&crate::model::declaration::write_declaration_elements(
             self.declarations.as_ref(),
             self.slides.len(),
         )?);
@@ -894,10 +885,7 @@ impl MutablePresentation {
             self.page_metadata.as_ref(),
             self.slides.len(),
         )?;
-        super::settings::validate_page_references(
-            self.settings.as_ref(),
-            &page_names,
-        )?;
+        super::settings::validate_page_references(self.settings.as_ref(), &page_names)?;
 
         let mut regenerated = Vec::new();
         for (i, slide) in self.slides.iter().enumerate() {
@@ -916,10 +904,10 @@ impl MutablePresentation {
                 i,
                 &slide_style,
             )?;
-            let declaration_attributes = super::declaration::write_binding_attributes(
+            let declaration_attributes = crate::model::declaration::write_binding_attributes(
                 self.declarations.as_ref(),
                 i,
-                crate::DeclarationTarget::Slide,
+                crate::model::declaration::Target::Slide,
             );
             let _ = page_num;
             body.push_str("<draw:page");
@@ -966,12 +954,12 @@ impl MutablePresentation {
                 animation.write_xml(&mut body, &extension_namespaces)?;
             }
 
-            let notes_attributes = super::declaration::write_binding_attributes(
+            let notes_attributes = crate::model::declaration::write_binding_attributes(
                 self.declarations.as_ref(),
                 i,
-                crate::DeclarationTarget::Notes,
+                crate::model::declaration::Target::Notes,
             );
-            body.push_str(&super::declaration::apply_notes_binding(
+            body.push_str(&crate::model::declaration::apply_notes_binding(
                 super::builder::Builder::generate_notes_xml(slide.notes.as_deref()),
                 &notes_attributes,
             )?);
@@ -982,9 +970,7 @@ impl MutablePresentation {
         if let Some(source) = &self.content_source {
             source.write_trailing_extras(&mut body);
         }
-        body.push_str(&super::settings::write(
-            self.settings.as_ref(),
-        )?);
+        body.push_str(&super::settings::write(self.settings.as_ref())?);
 
         if let Some(source) = &self.content_source {
             let styles = self.generate_page_styles(&regenerated);
@@ -1160,8 +1146,8 @@ mod tests {
     use super::*;
     use crate::model::legacy_animation::{Kind as AnimationKind, Node as AnimationNode};
     use crate::{
-        Attribute, Namespace, Kind, Node, DrawingHyperlink, Action,
-        Builder, EventListener, ScriptEventListener, ShapeEventListener,
+        Action, Attribute, Builder, DrawingHyperlink, EventListener, Kind, Namespace, Node,
+        ScriptEventListener, ShapeEventListener,
     };
 
     const STYLES: &str = r#"<?xml version="1.0"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:styles><office:marker>preserve-me</office:marker></office:styles></office:document-styles>"#;
@@ -1260,10 +1246,7 @@ mod tests {
             .iter()
             .find(|shape| shape.name() == Some("Arc"))
             .unwrap();
-        assert_eq!(
-            arc.drawing_kind(),
-            Some(crate::DrawingShapeKind::Ellipse)
-        );
+        assert_eq!(arc.drawing_kind(), Some(crate::DrawingShapeKind::Ellipse));
         assert!(arc
             .drawing_attributes()
             .iter()
@@ -1363,30 +1346,15 @@ mod tests {
     #[test]
     fn builder_and_mutable_presentation_round_trip_animation_trees() {
         let mut parameter = Node::new(Kind::Parameter);
-        parameter.set_attribute(
-            Attribute::new(
-                Namespace::Animation,
-                "name",
-                "destination",
-            )
-            .unwrap(),
-        );
-        parameter.set_attribute(
-            Attribute::new(Namespace::Animation, "value", "2 & next")
-                .unwrap(),
-        );
+        parameter
+            .set_attribute(Attribute::new(Namespace::Animation, "name", "destination").unwrap());
+        parameter.set_attribute(Attribute::new(Namespace::Animation, "value", "2 & next").unwrap());
         let mut command = Node::new(Kind::Command);
-        command.set_attribute(
-            Attribute::new(Namespace::Animation, "command", "show")
-                .unwrap(),
-        );
+        command.set_attribute(Attribute::new(Namespace::Animation, "command", "show").unwrap());
         command.add_child(parameter).unwrap();
 
         let mut root = Node::new(Kind::Sequence);
-        root.set_attribute(
-            Attribute::new(Namespace::Smil, "begin", "slide.begin")
-                .unwrap(),
-        );
+        root.set_attribute(Attribute::new(Namespace::Smil, "begin", "slide.begin").unwrap());
         root.set_attribute(
             Attribute::new(
                 Namespace::Other("urn:example:timing".to_string()),
@@ -1396,8 +1364,7 @@ mod tests {
             .unwrap(),
         );
         root.add_child(command).unwrap();
-        root.add_child(Node::new(Kind::TransitionFilter))
-            .unwrap();
+        root.add_child(Node::new(Kind::TransitionFilter)).unwrap();
 
         let slide = Slide {
             title: Some("Animated".to_string()),
@@ -1430,22 +1397,16 @@ mod tests {
     #[test]
     fn rejects_invalid_mutated_animation_trees_and_xml_characters() {
         let mut leaf = Node::new(Kind::Animate);
-        leaf.children_mut()
-            .push(Node::new(Kind::Set));
+        leaf.children_mut().push(Node::new(Kind::Set));
         let mut presentation = MutablePresentation::new();
         presentation.add_slide("Invalid", "").unwrap();
         presentation.slides_mut()[0].animations.push(leaf);
         assert!(presentation.to_bytes().is_err());
 
-        assert!(
-            Attribute::new(Namespace::Smil, "begin", "bad\0value")
-                .is_err()
-        );
+        assert!(Attribute::new(Namespace::Smil, "begin", "bad\0value").is_err());
         assert!(
             Attribute::new(
-                Namespace::Other(
-                    "http://www.w3.org/XML/1998/namespace".to_string()
-                ),
+                Namespace::Other("http://www.w3.org/XML/1998/namespace".to_string()),
                 "id",
                 "bad namespace variant"
             )
@@ -1515,26 +1476,13 @@ mod tests {
 
     #[test]
     fn builder_and_mutable_round_trip_legacy_presentation_effects() {
-        let attr =
-            |namespace, name, value| Attribute::new(namespace, name, value).unwrap();
+        let attr = |namespace, name, value| Attribute::new(namespace, name, value).unwrap();
         let mut sound = AnimationNode::new(AnimationKind::Sound);
-        sound.set_attribute(attr(
-            Namespace::Xlink,
-            "href",
-            "Sounds/chime.ogg",
-        ));
+        sound.set_attribute(attr(Namespace::Xlink, "href", "Sounds/chime.ogg"));
         sound.set_attribute(attr(Namespace::Xlink, "type", "simple"));
         let mut show = AnimationNode::new(AnimationKind::ShowShape);
-        show.set_attribute(attr(
-            Namespace::Draw,
-            "shape-id",
-            "shape1",
-        ));
-        show.set_attribute(attr(
-            Namespace::Presentation,
-            "effect",
-            "fade",
-        ));
+        show.set_attribute(attr(Namespace::Draw, "shape-id", "shape1"));
+        show.set_attribute(attr(Namespace::Presentation, "effect", "fade"));
         show.add_child(sound).unwrap();
         let mut root = AnimationNode::new(AnimationKind::Animations);
         root.set_attribute(attr(

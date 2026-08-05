@@ -2,9 +2,7 @@
 
 use crate::codec::Parser;
 use crate::core::FamilyPackage;
-use crate::model::{
-    Declarations, Reference, Settings, Slide, declaration, page_layout, page_metadata, settings,
-};
+use crate::model::{Reference, Settings, Slide, declaration, page_layout, page_metadata, settings};
 use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::constants::ODF_PRESENTATION;
 use std::path::Path;
@@ -149,7 +147,7 @@ impl Presentation {
     }
 
     /// Inspect inert header, footer, date-time, and page-binding declarations.
-    pub fn declarations(&self) -> Result<Declarations> {
+    pub fn declarations(&self) -> Result<declaration::Collection> {
         declaration::parse(self.package.content_xml())
     }
 

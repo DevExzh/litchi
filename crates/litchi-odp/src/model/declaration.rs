@@ -20,12 +20,12 @@ const MAX_BINDINGS: usize = 131_072;
 
 /// A named static header or footer declaration.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TextDeclaration {
+pub struct Text {
     pub name: String,
     pub text: String,
 }
 
-impl TextDeclaration {
+impl Text {
     /// Create a validated header/footer declaration.
     pub fn new(name: impl Into<String>, text: impl Into<String>) -> Result<Self> {
         let value = Self {
@@ -40,12 +40,12 @@ impl TextDeclaration {
 
 /// Source behavior for a presentation date/time declaration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DateTimeSource {
+pub enum Source {
     Fixed,
     CurrentDate,
 }
 
-impl DateTimeSource {
+impl Source {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "fixed" => Ok(Self::Fixed),
@@ -66,15 +66,15 @@ impl DateTimeSource {
 
 /// A named presentation date/time declaration.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DateTimeDeclaration {
+pub struct DateTime {
     pub name: String,
     /// Omission is retained independently from either schema value.
-    pub source: Option<DateTimeSource>,
+    pub source: Option<Source>,
     pub data_style_name: Option<String>,
     pub text: String,
 }
 
-impl DateTimeDeclaration {
+impl DateTime {
     /// Create a validated date/time declaration.
     pub fn new(name: impl Into<String>) -> Result<Self> {
         let value = Self {
@@ -90,24 +90,24 @@ impl DateTimeDeclaration {
 
 /// Whether declaration references belong to a slide or its notes page.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum DeclarationTarget {
+pub enum Target {
     Slide,
     Notes,
 }
 
 /// Header/footer/date-time references attached to one slide or notes page.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DeclarationBinding {
+pub struct Binding {
     pub slide_index: usize,
-    pub target: DeclarationTarget,
+    pub target: Target,
     pub header_name: Option<String>,
     pub footer_name: Option<String>,
     pub date_time_name: Option<String>,
 }
 
-impl DeclarationBinding {
+impl Binding {
     /// Create an empty binding for a zero-based slide index.
-    pub fn new(slide_index: usize, target: DeclarationTarget) -> Self {
+    pub fn new(slide_index: usize, target: Target) -> Self {
         Self {
             slide_index,
             target,
@@ -124,14 +124,14 @@ impl DeclarationBinding {
 
 /// Complete declaration and page-binding metadata in document order.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Declarations {
-    pub headers: Vec<TextDeclaration>,
-    pub footers: Vec<TextDeclaration>,
-    pub date_times: Vec<DateTimeDeclaration>,
-    pub bindings: Vec<DeclarationBinding>,
+pub struct Collection {
+    pub headers: Vec<Text>,
+    pub footers: Vec<Text>,
+    pub date_times: Vec<DateTime>,
+    pub bindings: Vec<Binding>,
 }
 
-impl Declarations {
+impl Collection {
     /// Validate declaration uniqueness and reference integrity.
     pub fn validate(&self) -> Result<()> {
         self.validate_for_slide_count(None)
@@ -195,11 +195,7 @@ impl Declarations {
     }
 
     /// Find a binding for a slide or its notes page.
-    pub fn binding(
-        &self,
-        slide_index: usize,
-        target: DeclarationTarget,
-    ) -> Option<&DeclarationBinding> {
+    pub fn binding(&self, slide_index: usize, target: Target) -> Option<&Binding> {
         self.bindings
             .iter()
             .find(|value| value.slide_index == slide_index && value.target == target)
@@ -225,13 +221,13 @@ struct OpenDeclaration {
     depth: usize,
     kind: DeclarationKind,
     name: String,
-    source: Option<DateTimeSource>,
+    source: Option<Source>,
     data_style_name: Option<String>,
     text: String,
 }
 
 /// Parse all presentation declarations and their slide/notes bindings.
-pub fn parse(xml: &str) -> Result<Declarations> {
+pub fn parse(xml: &str) -> Result<Collection> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("presentation declaration XML exceeds 8 MiB"));
     }
@@ -245,7 +241,7 @@ pub fn parse(xml: &str) -> Result<Declarations> {
     let mut page_count = 0usize;
     let mut found_presentation = false;
     let mut open_declaration: Option<OpenDeclaration> = None;
-    let mut result = Declarations::default();
+    let mut result = Collection::default();
 
     loop {
         match reader.read_event_into(&mut buffer).map_err(xml_error)? {
@@ -277,7 +273,7 @@ pub fn parse(xml: &str) -> Result<Declarations> {
                         .checked_add(1)
                         .ok_or_else(|| invalid("slide count overflow"))?;
                     if let Some(binding) =
-                        parse_binding(&reader, &element, slide_index, DeclarationTarget::Slide)?
+                        parse_binding(&reader, &element, slide_index, Target::Slide)?
                     {
                         result.bindings.push(binding);
                     }
@@ -289,7 +285,7 @@ pub fn parse(xml: &str) -> Result<Declarations> {
                         return Err(invalid("nested presentation:notes element"));
                     }
                     if let Some(binding) =
-                        parse_binding(&reader, &element, page_count - 1, DeclarationTarget::Notes)?
+                        parse_binding(&reader, &element, page_count - 1, Target::Notes)?
                     {
                         result.bindings.push(binding);
                     }
@@ -309,7 +305,7 @@ pub fn parse(xml: &str) -> Result<Declarations> {
                     && page_depth.is_some()
                 {
                     if let Some(binding) =
-                        parse_binding(&reader, &element, page_count - 1, DeclarationTarget::Notes)?
+                        parse_binding(&reader, &element, page_count - 1, Target::Notes)?
                     {
                         result.bindings.push(binding);
                     }
@@ -321,7 +317,7 @@ pub fn parse(xml: &str) -> Result<Declarations> {
                         .checked_add(1)
                         .ok_or_else(|| invalid("slide count overflow"))?;
                     if let Some(binding) =
-                        parse_binding(&reader, &element, slide_index, DeclarationTarget::Slide)?
+                        parse_binding(&reader, &element, slide_index, Target::Slide)?
                     {
                         result.bindings.push(binding);
                     }
@@ -413,7 +409,7 @@ pub fn parse(xml: &str) -> Result<Declarations> {
 }
 
 pub(crate) fn write_declaration_elements(
-    declarations: Option<&Declarations>,
+    declarations: Option<&Collection>,
     slide_count: usize,
 ) -> Result<String> {
     let Some(declarations) = declarations else {
@@ -449,9 +445,9 @@ pub(crate) fn write_declaration_elements(
 }
 
 pub(crate) fn write_binding_attributes(
-    declarations: Option<&Declarations>,
+    declarations: Option<&Collection>,
     slide_index: usize,
-    target: DeclarationTarget,
+    target: Target,
 ) -> String {
     let Some(binding) = declarations.and_then(|value| value.binding(slide_index, target)) else {
         return String::new();
@@ -529,7 +525,7 @@ fn parse_declaration_start(
                     && kind == DeclarationKind::DateTime
                     && source.is_none() =>
             {
-                source = Some(DateTimeSource::parse(&value)?)
+                source = Some(Source::parse(&value)?)
             },
             (ResolveResult::Bound(found), b"data-style-name")
                 if found == Namespace(STYLE_NAMESPACE)
@@ -563,9 +559,9 @@ fn parse_binding(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     slide_index: usize,
-    target: DeclarationTarget,
-) -> Result<Option<DeclarationBinding>> {
-    let mut value = DeclarationBinding::new(slide_index, target);
+    target: Target,
+) -> Result<Option<Binding>> {
+    let mut value = Binding::new(slide_index, target);
     for attribute in element.attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
@@ -606,16 +602,12 @@ fn parse_binding(
     Ok((!value.is_empty()).then_some(value))
 }
 
-fn finish_declaration(value: OpenDeclaration, result: &mut Declarations) -> Result<()> {
+fn finish_declaration(value: OpenDeclaration, result: &mut Collection) -> Result<()> {
     match value.kind {
-        DeclarationKind::Header => result
-            .headers
-            .push(TextDeclaration::new(value.name, value.text)?),
-        DeclarationKind::Footer => result
-            .footers
-            .push(TextDeclaration::new(value.name, value.text)?),
+        DeclarationKind::Header => result.headers.push(Text::new(value.name, value.text)?),
+        DeclarationKind::Footer => result.footers.push(Text::new(value.name, value.text)?),
         DeclarationKind::DateTime => {
-            let value = DateTimeDeclaration {
+            let value = DateTime {
                 name: value.name,
                 source: value.source,
                 data_style_name: value.data_style_name,
@@ -628,10 +620,7 @@ fn finish_declaration(value: OpenDeclaration, result: &mut Declarations) -> Resu
     Ok(())
 }
 
-fn validate_text_declarations<'a>(
-    values: &'a [TextDeclaration],
-    kind: &str,
-) -> Result<HashSet<&'a str>> {
+fn validate_text_declarations<'a>(values: &'a [Text], kind: &str) -> Result<HashSet<&'a str>> {
     let mut names = HashSet::with_capacity(values.len());
     for value in values {
         validate_name(&value.name, "presentation declaration name")?;
@@ -646,7 +635,7 @@ fn validate_text_declarations<'a>(
     Ok(names)
 }
 
-fn validate_date_time(value: &DateTimeDeclaration) -> Result<()> {
+fn validate_date_time(value: &DateTime) -> Result<()> {
     validate_name(&value.name, "presentation date-time declaration name")?;
     validate_text(&value.text, "presentation date-time declaration text", true)?;
     if let Some(style) = &value.data_style_name {
@@ -705,7 +694,7 @@ fn validate_text(value: &str, description: &str, allow_empty: bool) -> Result<()
     Ok(())
 }
 
-fn write_text_declaration(output: &mut String, element: &str, value: &TextDeclaration) {
+fn write_text_declaration(output: &mut String, element: &str, value: &Text) {
     output.push_str("<presentation:");
     output.push_str(element);
     output.push_str(" presentation:name=\"");
@@ -773,27 +762,27 @@ mod tests {
     const PREFIX: &str = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><o:body><o:presentation>"#;
     const SUFFIX: &str = "</o:presentation></o:body></o:document-content>";
 
-    fn declarations() -> Declarations {
-        Declarations {
-            headers: vec![TextDeclaration::new("h1", "Quarterly & Review").unwrap()],
-            footers: vec![TextDeclaration::new("f1", "Confidential").unwrap()],
-            date_times: vec![DateTimeDeclaration {
+    fn declarations() -> Collection {
+        Collection {
+            headers: vec![Text::new("h1", "Quarterly & Review").unwrap()],
+            footers: vec![Text::new("f1", "Confidential").unwrap()],
+            date_times: vec![DateTime {
                 name: "d1".to_string(),
-                source: Some(DateTimeSource::CurrentDate),
+                source: Some(Source::CurrentDate),
                 data_style_name: Some("N2".to_string()),
                 text: String::new(),
             }],
             bindings: vec![
-                DeclarationBinding {
+                Binding {
                     slide_index: 0,
-                    target: DeclarationTarget::Slide,
+                    target: Target::Slide,
                     header_name: Some("h1".to_string()),
                     footer_name: Some("f1".to_string()),
                     date_time_name: Some("d1".to_string()),
                 },
-                DeclarationBinding {
+                Binding {
                     slide_index: 0,
-                    target: DeclarationTarget::Notes,
+                    target: Target::Notes,
                     header_name: None,
                     footer_name: Some("f1".to_string()),
                     date_time_name: None,
