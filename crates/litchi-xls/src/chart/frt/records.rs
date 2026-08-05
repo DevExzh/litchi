@@ -21,7 +21,7 @@
 //!   2.4.266 (StartBlock), 2.5.37 (CFrtId), 2.5.134 (FrtFlags),
 //!   2.5.136 (FrtHeaderOld)
 
-use super::{XlsError, XlsResult};
+use crate::{XlsError, XlsResult};
 
 /// Record type of the `ChartFrtInfo` record (MS-XLS 2.4.49).
 pub(crate) const CHART_FRT_INFO_RECORD_TYPE: u16 = 0x0850;
@@ -34,6 +34,8 @@ pub(crate) const CAT_LAB_RECORD_TYPE: u16 = 0x0856;
 
 /// Size in bytes of an `FrtHeaderOld` (MS-XLS 2.5.136): `rt` + `grbitFrt`.
 const FRT_HEADER_OLD_LEN: usize = 4;
+/// `fFrtRef` and `fFrtAlert` are not valid for these chart future records.
+const FRT_FLAGS_FORBIDDEN: u16 = 0x0003;
 /// Size in bytes of a `CFrtId` structure (MS-XLS 2.5.37).
 const C_FRT_ID_LEN: usize = 4;
 /// Size in bytes of the fixed part of a `ChartFrtInfo` record:
@@ -69,11 +71,11 @@ fn read_u16(data: &[u8], offset: usize) -> XlsResult<u16> {
     Ok(u16::from_le_bytes([first, second]))
 }
 
-/// Validate the `rt` field of an `FrtHeaderOld` and the payload length.
-fn validate_frt_header_old(data: &[u8], record_type: u16, expected_len: usize) -> XlsResult<()> {
-    if data.len() != expected_len {
+/// Read and validate the fixed `FrtHeaderOld` prefix.
+fn read_frt_header_old(data: &[u8], record_type: u16) -> XlsResult<u16> {
+    if data.len() < FRT_HEADER_OLD_LEN {
         return Err(XlsError::InvalidLength {
-            expected: expected_len,
+            expected: FRT_HEADER_OLD_LEN,
             found: data.len(),
         });
     }
@@ -83,14 +85,32 @@ fn validate_frt_header_old(data: &[u8], record_type: u16, expected_len: usize) -
             message: "FrtHeaderOld.rt mismatch".to_string(),
         });
     }
-    Ok(())
+    let flags = read_u16(data, 2)?;
+    if flags & FRT_FLAGS_FORBIDDEN != 0 {
+        return Err(XlsError::InvalidRecord {
+            record_type,
+            message: format!("FrtHeaderOld.grbitFrt {flags:#06X} sets fFrtRef or fFrtAlert"),
+        });
+    }
+    Ok(flags)
+}
+
+/// Validate the `FrtHeaderOld` and the fixed payload length.
+fn validate_frt_header_old(data: &[u8], record_type: u16, expected_len: usize) -> XlsResult<u16> {
+    if data.len() != expected_len {
+        return Err(XlsError::InvalidLength {
+            expected: expected_len,
+            found: data.len(),
+        });
+    }
+    read_frt_header_old(data, record_type)
 }
 
 /// Application version that created or last saved the file, as declared by a
 /// `ChartFrtInfo` record (MS-XLS 2.4.49). Variant names carry the numeric
 /// version value (0x9, 0xA, 0xC, 0xE).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsChartFrtVersion {
+pub enum Version {
     /// Application version 0x9; the chart uses one `CFrtId` range.
     Version9,
     /// Application version 0xA; the chart uses three `CFrtId` ranges.
@@ -101,7 +121,7 @@ pub enum XlsChartFrtVersion {
     Version14,
 }
 
-impl XlsChartFrtVersion {
+impl Version {
     /// Decode a raw version byte.
     fn from_byte(byte: u8, record_type: u16) -> XlsResult<Self> {
         match byte {
@@ -139,14 +159,14 @@ impl XlsChartFrtVersion {
 /// A `CFrtId` structure (MS-XLS 2.5.37): an inclusive range of Future Record
 /// Type identifier values used in a chart.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsChartFutureRecordRange {
+pub struct RecordRange {
     /// First Future Record Type in the range (`rtFirst`).
     first: u16,
     /// Last Future Record Type in the range (`rtLast`).
     last: u16,
 }
 
-impl XlsChartFutureRecordRange {
+impl RecordRange {
     /// First Future Record Type in the range.
     pub fn first(&self) -> u16 {
         self.first
@@ -171,28 +191,36 @@ impl XlsChartFutureRecordRange {
 
 /// Typed `ChartFrtInfo` record content (MS-XLS 2.4.49).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsChartFrtInfo {
+pub struct Info {
+    /// Raw `FrtHeaderOld.grbitFrt`; forbidden reference/alert bits are zero
+    /// and the remaining bits are retained for lossless rewriting.
+    frt_flags: u16,
     /// Application version that originally created the file (`verOriginator`).
-    originator: XlsChartFrtVersion,
+    originator: Version,
     /// Application version that last saved the file (`verWriter`).
-    writer: XlsChartFrtVersion,
+    writer: Version,
     /// Ranges of Future Record Type identifiers used in the chart (`rgCFRTID`).
-    ranges: Vec<XlsChartFutureRecordRange>,
+    ranges: Vec<RecordRange>,
 }
 
-impl XlsChartFrtInfo {
+impl Info {
     /// Application version that originally created the file.
-    pub fn originator(&self) -> XlsChartFrtVersion {
+    pub fn originator(&self) -> Version {
         self.originator
     }
 
+    /// Raw `FrtHeaderOld.grbitFrt` bits retained from the source record.
+    pub fn frt_flags(&self) -> u16 {
+        self.frt_flags
+    }
+
     /// Application version that last saved the file.
-    pub fn writer(&self) -> XlsChartFrtVersion {
+    pub fn writer(&self) -> Version {
         self.writer
     }
 
     /// Ranges of Future Record Type identifiers used in the chart.
-    pub fn ranges(&self) -> &[XlsChartFutureRecordRange] {
+    pub fn ranges(&self) -> &[RecordRange] {
         &self.ranges
     }
 
@@ -208,11 +236,9 @@ impl XlsChartFrtInfo {
                 found: data.len(),
             });
         }
-        if read_u16(data, 0)? != CHART_FRT_INFO_RECORD_TYPE {
-            return Err(invalid("ChartFrtInfo FrtHeaderOld.rt mismatch".to_string()));
-        }
-        let originator = XlsChartFrtVersion::from_byte(data[4], CHART_FRT_INFO_RECORD_TYPE)?;
-        let writer = XlsChartFrtVersion::from_byte(data[5], CHART_FRT_INFO_RECORD_TYPE)?;
+        let frt_flags = read_frt_header_old(data, CHART_FRT_INFO_RECORD_TYPE)?;
+        let originator = Version::from_byte(data[4], CHART_FRT_INFO_RECORD_TYPE)?;
+        let writer = Version::from_byte(data[5], CHART_FRT_INFO_RECORD_TYPE)?;
         let count = usize::from(read_u16(data, 6)?);
         if count != writer.expected_range_count() {
             return Err(invalid(format!(
@@ -229,12 +255,13 @@ impl XlsChartFrtInfo {
         let mut ranges = Vec::with_capacity(count);
         for index in 0..count {
             let offset = CHART_FRT_INFO_BASE_LEN + index * C_FRT_ID_LEN;
-            ranges.push(XlsChartFutureRecordRange::new(
+            ranges.push(RecordRange::new(
                 read_u16(data, offset)?,
                 read_u16(data, offset + 2)?,
             )?);
         }
         Ok(Self {
+            frt_flags,
             originator,
             writer,
             ranges,
@@ -245,9 +272,9 @@ impl XlsChartFrtInfo {
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload =
             Vec::with_capacity(CHART_FRT_INFO_BASE_LEN + self.ranges.len() * C_FRT_ID_LEN);
-        // FrtHeaderOld: rt, grbitFrt (0).
+        // FrtHeaderOld: rt and the preserved grbitFrt bits.
         payload.extend_from_slice(&CHART_FRT_INFO_RECORD_TYPE.to_le_bytes());
-        payload.extend_from_slice(&[0; FRT_HEADER_OLD_LEN - 2]);
+        payload.extend_from_slice(&self.frt_flags.to_le_bytes());
         payload.push(self.originator.to_byte());
         payload.push(self.writer.to_byte());
         payload.extend_from_slice(&(self.ranges.len() as u16).to_le_bytes());
@@ -262,7 +289,7 @@ impl XlsChartFrtInfo {
 /// Alignment of an axis label, as declared by the `at` field of a `CatLab`
 /// record (MS-XLS 2.4.38).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsCatLabAlignment {
+pub enum Alignment {
     /// Top-aligned when the axis text is rotated; left-aligned under a
     /// left-to-right reading order, right-aligned otherwise.
     TopLeft,
@@ -273,7 +300,7 @@ pub enum XlsCatLabAlignment {
     BottomRight,
 }
 
-impl XlsCatLabAlignment {
+impl Alignment {
     /// Decode the raw `at` value.
     fn from_u16(value: u16) -> XlsResult<Self> {
         match value {
@@ -299,36 +326,56 @@ impl XlsCatLabAlignment {
 
 /// Typed `CatLab` record content (MS-XLS 2.4.38): attributes of an axis label.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsCatLab {
+pub struct CatLab {
+    /// Raw `FrtHeaderOld.grbitFrt`; forbidden reference/alert bits are zero.
+    frt_flags: u16,
     /// Distance between the axis and the axis label, as a percentage of the
     /// default distance (`wOffset`, 0..=1000).
     offset: u16,
     /// Alignment of the axis label (`at`).
-    alignment: XlsCatLabAlignment,
+    alignment: Alignment,
     /// Whether the number of categories between axis labels is automatically
     /// calculated (`cAutoCatLabelReal`).
-    auto_category_label: bool,
+    /// The complete `cAutoCatLabelReal`/unused bitfield, retained verbatim.
+    category_flags: u16,
+    /// Reserved bytes following the category-label bitfield.
+    reserved: [u8; 2],
 }
 
-impl XlsCatLab {
+impl CatLab {
     /// Distance between the axis and the axis label (percent of the default).
     pub fn offset(&self) -> u16 {
         self.offset
     }
 
+    /// Raw `FrtHeaderOld.grbitFrt` bits retained from the source record.
+    pub fn frt_flags(&self) -> u16 {
+        self.frt_flags
+    }
+
     /// Alignment of the axis label.
-    pub fn alignment(&self) -> XlsCatLabAlignment {
+    pub fn alignment(&self) -> Alignment {
         self.alignment
     }
 
     /// Whether the number of categories between axis labels is automatic.
     pub fn auto_category_label(&self) -> bool {
-        self.auto_category_label
+        self.category_flags & CAT_LAB_AUTO_LABEL != 0
+    }
+
+    /// Raw `CatLab` category-label bitfield, including ignored bits.
+    pub fn category_flags(&self) -> u16 {
+        self.category_flags
+    }
+
+    /// Reserved bytes following the category-label bitfield.
+    pub fn reserved(&self) -> [u8; 2] {
+        self.reserved
     }
 
     /// Parse a `CatLab` record payload.
     pub fn parse(data: &[u8]) -> XlsResult<Self> {
-        validate_frt_header_old(data, CAT_LAB_RECORD_TYPE, CAT_LAB_LEN)?;
+        let frt_flags = validate_frt_header_old(data, CAT_LAB_RECORD_TYPE, CAT_LAB_LEN)?;
         let offset = read_u16(data, 4)?;
         if offset > CAT_LAB_MAX_OFFSET {
             return Err(XlsError::InvalidRecord {
@@ -336,32 +383,28 @@ impl XlsCatLab {
                 message: format!("CatLab wOffset {offset} exceeds {CAT_LAB_MAX_OFFSET}"),
             });
         }
-        let alignment = XlsCatLabAlignment::from_u16(read_u16(data, 6)?)?;
+        let alignment = Alignment::from_u16(read_u16(data, 6)?)?;
         let flags = read_u16(data, 8)?;
-        // Bytes 10..12 are reserved (MUST be zero) and MUST be ignored.
+        let reserved = [data[10], data[11]];
         Ok(Self {
+            frt_flags,
             offset,
             alignment,
-            auto_category_label: flags & CAT_LAB_AUTO_LABEL != 0,
+            category_flags: flags,
+            reserved,
         })
     }
 
     /// Serialize back to a complete `CatLab` record payload.
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(CAT_LAB_LEN);
-        // FrtHeaderOld: rt, grbitFrt (0).
+        // FrtHeaderOld: rt and the preserved grbitFrt bits.
         payload.extend_from_slice(&CAT_LAB_RECORD_TYPE.to_le_bytes());
-        payload.extend_from_slice(&[0; FRT_HEADER_OLD_LEN - 2]);
+        payload.extend_from_slice(&self.frt_flags.to_le_bytes());
         payload.extend_from_slice(&self.offset.to_le_bytes());
         payload.extend_from_slice(&self.alignment.to_u16().to_le_bytes());
-        let flags = if self.auto_category_label {
-            CAT_LAB_AUTO_LABEL
-        } else {
-            0
-        };
-        payload.extend_from_slice(&flags.to_le_bytes());
-        // reserved (0).
-        payload.extend_from_slice(&[0; 2]);
+        payload.extend_from_slice(&self.category_flags.to_le_bytes());
+        payload.extend_from_slice(&self.reserved);
         payload
     }
 }
@@ -369,7 +412,7 @@ impl XlsCatLab {
 /// Type of chart object encompassed by a `StartBlock`/`EndBlock` pair
 /// (`iObjectKind`, MS-XLS 2.4.266 / 2.4.100).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsChartBlockObjectKind {
+pub enum BlockKind {
     /// Axis group.
     AxisGroup,
     /// Attached label record.
@@ -396,7 +439,7 @@ pub enum XlsChartBlockObjectKind {
     DropBar,
 }
 
-impl XlsChartBlockObjectKind {
+impl BlockKind {
     /// Decode the raw `iObjectKind` value.
     fn from_u16(value: u16, record_type: u16) -> XlsResult<Self> {
         match value {
@@ -442,9 +485,11 @@ impl XlsChartBlockObjectKind {
 /// collection of chart-specific future records preserved for applications
 /// that do not support the feature.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsStartBlock {
+pub struct StartBlock {
+    /// Raw `FrtHeaderOld.grbitFrt`; forbidden reference/alert bits are zero.
+    frt_flags: u16,
     /// Type of object encompassed by the block (`iObjectKind`).
-    object_kind: XlsChartBlockObjectKind,
+    object_kind: BlockKind,
     /// Context of the object (`iObjectContext`); its meaning depends on
     /// `object_kind` and is preserved verbatim.
     object_context: u16,
@@ -454,9 +499,9 @@ pub struct XlsStartBlock {
     object_instance2: u16,
 }
 
-impl XlsStartBlock {
+impl StartBlock {
     /// Type of object encompassed by the block.
-    pub fn object_kind(&self) -> XlsChartBlockObjectKind {
+    pub fn object_kind(&self) -> BlockKind {
         self.object_kind
     }
 
@@ -477,12 +522,10 @@ impl XlsStartBlock {
 
     /// Parse a `StartBlock` record payload.
     pub fn parse(data: &[u8]) -> XlsResult<Self> {
-        validate_frt_header_old(data, START_BLOCK_RECORD_TYPE, START_BLOCK_LEN)?;
+        let frt_flags = validate_frt_header_old(data, START_BLOCK_RECORD_TYPE, START_BLOCK_LEN)?;
         Ok(Self {
-            object_kind: XlsChartBlockObjectKind::from_u16(
-                read_u16(data, 4)?,
-                START_BLOCK_RECORD_TYPE,
-            )?,
+            frt_flags,
+            object_kind: BlockKind::from_u16(read_u16(data, 4)?, START_BLOCK_RECORD_TYPE)?,
             object_context: read_u16(data, 6)?,
             object_instance1: read_u16(data, 8)?,
             object_instance2: read_u16(data, 10)?,
@@ -492,54 +535,72 @@ impl XlsStartBlock {
     /// Serialize back to a complete `StartBlock` record payload.
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(START_BLOCK_LEN);
-        // FrtHeaderOld: rt, grbitFrt (0).
+        // FrtHeaderOld: rt and the preserved grbitFrt bits.
         payload.extend_from_slice(&START_BLOCK_RECORD_TYPE.to_le_bytes());
-        payload.extend_from_slice(&[0; FRT_HEADER_OLD_LEN - 2]);
+        payload.extend_from_slice(&self.frt_flags.to_le_bytes());
         payload.extend_from_slice(&self.object_kind.to_u16().to_le_bytes());
         payload.extend_from_slice(&self.object_context.to_le_bytes());
         payload.extend_from_slice(&self.object_instance1.to_le_bytes());
         payload.extend_from_slice(&self.object_instance2.to_le_bytes());
         payload
     }
+
+    /// Raw `FrtHeaderOld.grbitFrt` bits retained from the source record.
+    pub fn frt_flags(&self) -> u16 {
+        self.frt_flags
+    }
 }
 
 /// Typed `EndBlock` record content (MS-XLS 2.4.100): the end of the collection
 /// opened by the associated `StartBlock` record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsEndBlock {
+pub struct EndBlock {
+    /// Raw `FrtHeaderOld.grbitFrt`; forbidden reference/alert bits are zero.
+    frt_flags: u16,
     /// Type of object encompassed by the block (`iObjectKind`); MUST equal the
     /// `iObjectKind` of the associated `StartBlock` record.
-    object_kind: XlsChartBlockObjectKind,
+    object_kind: BlockKind,
+    /// The three undefined fields, retained verbatim.
+    unused: [u16; 3],
 }
 
-impl XlsEndBlock {
+impl EndBlock {
     /// Type of object encompassed by the block.
-    pub fn object_kind(&self) -> XlsChartBlockObjectKind {
+    pub fn object_kind(&self) -> BlockKind {
         self.object_kind
     }
 
     /// Parse an `EndBlock` record payload.
     pub fn parse(data: &[u8]) -> XlsResult<Self> {
-        validate_frt_header_old(data, END_BLOCK_RECORD_TYPE, END_BLOCK_LEN)?;
-        // Bytes 6..12 are undefined (unused1..3) and MUST be ignored.
+        let frt_flags = validate_frt_header_old(data, END_BLOCK_RECORD_TYPE, END_BLOCK_LEN)?;
         Ok(Self {
-            object_kind: XlsChartBlockObjectKind::from_u16(
-                read_u16(data, 4)?,
-                END_BLOCK_RECORD_TYPE,
-            )?,
+            frt_flags,
+            object_kind: BlockKind::from_u16(read_u16(data, 4)?, END_BLOCK_RECORD_TYPE)?,
+            unused: [read_u16(data, 6)?, read_u16(data, 8)?, read_u16(data, 10)?],
         })
     }
 
     /// Serialize back to a complete `EndBlock` record payload.
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(END_BLOCK_LEN);
-        // FrtHeaderOld: rt, grbitFrt (0).
+        // FrtHeaderOld: rt and the preserved grbitFrt bits.
         payload.extend_from_slice(&END_BLOCK_RECORD_TYPE.to_le_bytes());
-        payload.extend_from_slice(&[0; FRT_HEADER_OLD_LEN - 2]);
+        payload.extend_from_slice(&self.frt_flags.to_le_bytes());
         payload.extend_from_slice(&self.object_kind.to_u16().to_le_bytes());
-        // unused1..3 (0).
-        payload.extend_from_slice(&[0; 6]);
+        for value in self.unused {
+            payload.extend_from_slice(&value.to_le_bytes());
+        }
         payload
+    }
+
+    /// The three undefined fields retained from the source record.
+    pub fn unused(&self) -> [u16; 3] {
+        self.unused
+    }
+
+    /// Raw `FrtHeaderOld.grbitFrt` bits retained from the source record.
+    pub fn frt_flags(&self) -> u16 {
+        self.frt_flags
     }
 }
 
@@ -606,9 +667,9 @@ mod tests {
     fn parses_chart_frt_info_for_each_writer_version() {
         // Version 0x9: a single CFrtId range.
         let payload = chart_frt_info_payload(0x9, 0x9, 1, &[(0x0850, 0x085A)]);
-        let parsed = XlsChartFrtInfo::parse(&payload).unwrap();
-        assert_eq!(parsed.originator(), XlsChartFrtVersion::Version9);
-        assert_eq!(parsed.writer(), XlsChartFrtVersion::Version9);
+        let parsed = Info::parse(&payload).unwrap();
+        assert_eq!(parsed.originator(), Version::Version9);
+        assert_eq!(parsed.writer(), Version::Version9);
         assert_eq!(parsed.ranges().len(), 1);
         assert_eq!(parsed.ranges()[0].first(), 0x0850);
         assert_eq!(parsed.ranges()[0].last(), 0x085A);
@@ -621,8 +682,8 @@ mod tests {
             3,
             &[(0x0850, 0x085A), (0x0861, 0x0861), (0x086A, 0x086B)],
         );
-        let parsed = XlsChartFrtInfo::parse(&payload).unwrap();
-        assert_eq!(parsed.writer(), XlsChartFrtVersion::Version10);
+        let parsed = Info::parse(&payload).unwrap();
+        assert_eq!(parsed.writer(), Version::Version10);
         assert_eq!(parsed.ranges().len(), 3);
         assert_eq!(parsed.to_payload(), payload);
 
@@ -639,7 +700,7 @@ mod tests {
                     (0x089D, 0x08A6),
                 ],
             );
-            let parsed = XlsChartFrtInfo::parse(&payload).unwrap();
+            let parsed = Info::parse(&payload).unwrap();
             assert_eq!(parsed.ranges().len(), 4);
             assert_eq!(parsed.to_payload(), payload);
         }
@@ -649,55 +710,46 @@ mod tests {
     fn rejects_malformed_chart_frt_info() {
         let valid = chart_frt_info_payload(0x9, 0x9, 1, &[(0x0850, 0x085A)]);
         // Truncated.
-        assert!(XlsChartFrtInfo::parse(&valid[..7]).is_err());
+        assert!(Info::parse(&valid[..7]).is_err());
         // Wrong FrtHeaderOld.rt.
         let mut wrong_rt = valid.clone();
         wrong_rt[0..2].copy_from_slice(&0x0851u16.to_le_bytes());
-        assert!(XlsChartFrtInfo::parse(&wrong_rt).is_err());
+        assert!(Info::parse(&wrong_rt).is_err());
+        // FrtFlags.fFrtRef/fFrtAlert are forbidden for ChartFrtInfo.
+        for flags in [0x0001u16, 0x0002] {
+            let mut bad_flags = valid.clone();
+            bad_flags[2..4].copy_from_slice(&flags.to_le_bytes());
+            assert!(Info::parse(&bad_flags).is_err());
+        }
         // Unsupported originator/writer versions.
-        assert!(
-            XlsChartFrtInfo::parse(&chart_frt_info_payload(0xB, 0x9, 1, &[(0x0850, 0x085A)]))
-                .is_err()
-        );
-        assert!(
-            XlsChartFrtInfo::parse(&chart_frt_info_payload(0x9, 0xF, 1, &[(0x0850, 0x085A)]))
-                .is_err()
-        );
+        assert!(Info::parse(&chart_frt_info_payload(0xB, 0x9, 1, &[(0x0850, 0x085A)])).is_err());
+        assert!(Info::parse(&chart_frt_info_payload(0x9, 0xF, 1, &[(0x0850, 0x085A)])).is_err());
         // cCFRTID disagrees with the writer version.
-        assert!(
-            XlsChartFrtInfo::parse(&chart_frt_info_payload(0x9, 0x9, 3, &[(0x0850, 0x085A); 3]))
-                .is_err()
-        );
-        assert!(
-            XlsChartFrtInfo::parse(&chart_frt_info_payload(0x9, 0xA, 1, &[(0x0850, 0x085A)]))
-                .is_err()
-        );
+        assert!(Info::parse(&chart_frt_info_payload(0x9, 0x9, 3, &[(0x0850, 0x085A); 3])).is_err());
+        assert!(Info::parse(&chart_frt_info_payload(0x9, 0xA, 1, &[(0x0850, 0x085A)])).is_err());
         // Declared count disagreeing with the payload length.
         let mut padded = valid.clone();
         padded.extend_from_slice(&[0; 4]);
-        assert!(XlsChartFrtInfo::parse(&padded).is_err());
+        assert!(Info::parse(&padded).is_err());
         // Inverted CFrtId range.
-        assert!(
-            XlsChartFrtInfo::parse(&chart_frt_info_payload(0x9, 0x9, 1, &[(0x085B, 0x085A)]))
-                .is_err()
-        );
+        assert!(Info::parse(&chart_frt_info_payload(0x9, 0x9, 1, &[(0x085B, 0x085A)])).is_err());
     }
 
     #[test]
     fn parses_cat_lab_round_trip() {
         for (at, expected) in [
-            (0x0001, XlsCatLabAlignment::TopLeft),
-            (0x0002, XlsCatLabAlignment::Center),
-            (0x0003, XlsCatLabAlignment::BottomRight),
+            (0x0001, Alignment::TopLeft),
+            (0x0002, Alignment::Center),
+            (0x0003, Alignment::BottomRight),
         ] {
             let payload = cat_lab_payload(1000, at, CAT_LAB_AUTO_LABEL);
-            let parsed = XlsCatLab::parse(&payload).unwrap();
+            let parsed = CatLab::parse(&payload).unwrap();
             assert_eq!(parsed.offset(), 1000);
             assert_eq!(parsed.alignment(), expected);
             assert!(parsed.auto_category_label());
             assert_eq!(parsed.to_payload(), payload);
         }
-        let manual = XlsCatLab::parse(&cat_lab_payload(0, 0x0002, 0)).unwrap();
+        let manual = CatLab::parse(&cat_lab_payload(0, 0x0002, 0)).unwrap();
         assert_eq!(manual.offset(), 0);
         assert!(!manual.auto_category_label());
     }
@@ -706,26 +758,32 @@ mod tests {
     fn rejects_malformed_cat_lab() {
         let valid = cat_lab_payload(100, 0x0002, 0);
         // Truncated and overlong payloads.
-        assert!(XlsCatLab::parse(&valid[..11]).is_err());
+        assert!(CatLab::parse(&valid[..11]).is_err());
         let mut padded = valid.clone();
         padded.push(0);
-        assert!(XlsCatLab::parse(&padded).is_err());
+        assert!(CatLab::parse(&padded).is_err());
         // Wrong FrtHeaderOld.rt.
         let mut wrong_rt = valid.clone();
         wrong_rt[0..2].copy_from_slice(&0x0857u16.to_le_bytes());
-        assert!(XlsCatLab::parse(&wrong_rt).is_err());
+        assert!(CatLab::parse(&wrong_rt).is_err());
+        // FrtFlags.fFrtRef/fFrtAlert are forbidden for CatLab.
+        for flags in [0x0001u16, 0x0002] {
+            let mut bad_flags = valid.clone();
+            bad_flags[2..4].copy_from_slice(&flags.to_le_bytes());
+            assert!(CatLab::parse(&bad_flags).is_err());
+        }
         // wOffset above 1000%.
-        assert!(XlsCatLab::parse(&cat_lab_payload(1001, 0x0002, 0)).is_err());
+        assert!(CatLab::parse(&cat_lab_payload(1001, 0x0002, 0)).is_err());
         // Unsupported alignment.
-        assert!(XlsCatLab::parse(&cat_lab_payload(100, 0x0000, 0)).is_err());
-        assert!(XlsCatLab::parse(&cat_lab_payload(100, 0x0004, 0)).is_err());
+        assert!(CatLab::parse(&cat_lab_payload(100, 0x0000, 0)).is_err());
+        assert!(CatLab::parse(&cat_lab_payload(100, 0x0004, 0)).is_err());
     }
 
     #[test]
     fn parses_start_block_round_trip() {
         let payload = start_block_payload(0x0002, 0x0005, 0x0007, 0x0009);
-        let parsed = XlsStartBlock::parse(&payload).unwrap();
-        assert_eq!(parsed.object_kind(), XlsChartBlockObjectKind::AttachedLabel);
+        let parsed = StartBlock::parse(&payload).unwrap();
+        assert_eq!(parsed.object_kind(), BlockKind::AttachedLabel);
         assert_eq!(parsed.object_context(), 0x0005);
         assert_eq!(parsed.object_instance1(), 0x0007);
         assert_eq!(parsed.object_instance2(), 0x0009);
@@ -733,19 +791,19 @@ mod tests {
 
         // Every iObjectKind value from the spec table is accepted.
         for (kind, expected) in [
-            (0x0000, XlsChartBlockObjectKind::AxisGroup),
-            (0x0004, XlsChartBlockObjectKind::Axis),
-            (0x0005, XlsChartBlockObjectKind::ChartGroup),
-            (0x0006, XlsChartBlockObjectKind::Dat),
-            (0x0007, XlsChartBlockObjectKind::Frame),
-            (0x0009, XlsChartBlockObjectKind::Legend),
-            (0x000A, XlsChartBlockObjectKind::LegendException),
-            (0x000C, XlsChartBlockObjectKind::Series),
-            (0x000D, XlsChartBlockObjectKind::Sheet),
-            (0x000E, XlsChartBlockObjectKind::DataFormat),
-            (0x000F, XlsChartBlockObjectKind::DropBar),
+            (0x0000, BlockKind::AxisGroup),
+            (0x0004, BlockKind::Axis),
+            (0x0005, BlockKind::ChartGroup),
+            (0x0006, BlockKind::Dat),
+            (0x0007, BlockKind::Frame),
+            (0x0009, BlockKind::Legend),
+            (0x000A, BlockKind::LegendException),
+            (0x000C, BlockKind::Series),
+            (0x000D, BlockKind::Sheet),
+            (0x000E, BlockKind::DataFormat),
+            (0x000F, BlockKind::DropBar),
         ] {
-            let parsed = XlsStartBlock::parse(&start_block_payload(kind, 0, 0, 0)).unwrap();
+            let parsed = StartBlock::parse(&start_block_payload(kind, 0, 0, 0)).unwrap();
             assert_eq!(parsed.object_kind(), expected);
         }
     }
@@ -754,34 +812,66 @@ mod tests {
     fn rejects_malformed_start_block() {
         let valid = start_block_payload(0x000D, 0, 0, 0);
         // Truncated.
-        assert!(XlsStartBlock::parse(&valid[..11]).is_err());
+        assert!(StartBlock::parse(&valid[..11]).is_err());
         // Wrong FrtHeaderOld.rt.
         let mut wrong_rt = valid.clone();
         wrong_rt[0..2].copy_from_slice(&END_BLOCK_RECORD_TYPE.to_le_bytes());
-        assert!(XlsStartBlock::parse(&wrong_rt).is_err());
+        assert!(StartBlock::parse(&wrong_rt).is_err());
         // Unknown iObjectKind.
-        assert!(XlsStartBlock::parse(&start_block_payload(0x0001, 0, 0, 0)).is_err());
-        assert!(XlsStartBlock::parse(&start_block_payload(0x0010, 0, 0, 0)).is_err());
+        assert!(StartBlock::parse(&start_block_payload(0x0001, 0, 0, 0)).is_err());
+        assert!(StartBlock::parse(&start_block_payload(0x0010, 0, 0, 0)).is_err());
     }
 
     #[test]
     fn parses_end_block_round_trip() {
         let payload = end_block_payload(0x000D);
-        let parsed = XlsEndBlock::parse(&payload).unwrap();
-        assert_eq!(parsed.object_kind(), XlsChartBlockObjectKind::Sheet);
+        let parsed = EndBlock::parse(&payload).unwrap();
+        assert_eq!(parsed.object_kind(), BlockKind::Sheet);
         assert_eq!(parsed.to_payload(), payload);
+    }
+
+    #[test]
+    fn preserves_ignored_header_and_record_bytes() {
+        let mut info = chart_frt_info_payload(0x9, 0x9, 1, &[(0x0850, 0x085A)]);
+        info[2..4].copy_from_slice(&0xFFFCu16.to_le_bytes());
+        let parsed = Info::parse(&info).unwrap();
+        assert_eq!(parsed.frt_flags(), 0xFFFC);
+        assert_eq!(parsed.to_payload(), info);
+
+        let mut cat_lab = cat_lab_payload(100, 0x0002, 0x8001);
+        cat_lab[2..4].copy_from_slice(&0xFFFCu16.to_le_bytes());
+        cat_lab[10..12].copy_from_slice(&[0xA5, 0x5A]);
+        let parsed = CatLab::parse(&cat_lab).unwrap();
+        assert_eq!(parsed.frt_flags(), 0xFFFC);
+        assert_eq!(parsed.category_flags(), 0x8001);
+        assert_eq!(parsed.reserved(), [0xA5, 0x5A]);
+        assert_eq!(parsed.to_payload(), cat_lab);
+
+        let mut start = start_block_payload(0x000D, 0x1234, 0x5678, 0x9ABC);
+        start[2..4].copy_from_slice(&0xFFFCu16.to_le_bytes());
+        let parsed = StartBlock::parse(&start).unwrap();
+        assert_eq!(parsed.frt_flags(), 0xFFFC);
+        assert_eq!(parsed.to_payload(), start);
+
+        let mut end = end_block_payload(0x000D);
+        end[2..4].copy_from_slice(&0xFFFCu16.to_le_bytes());
+        end[6..12].copy_from_slice(&[1, 2, 3, 4, 5, 6]);
+        let parsed = EndBlock::parse(&end).unwrap();
+        assert_eq!(parsed.frt_flags(), 0xFFFC);
+        assert_eq!(parsed.unused(), [0x0201, 0x0403, 0x0605]);
+        assert_eq!(parsed.to_payload(), end);
     }
 
     #[test]
     fn rejects_malformed_end_block() {
         let valid = end_block_payload(0x000D);
         // Truncated.
-        assert!(XlsEndBlock::parse(&valid[..11]).is_err());
+        assert!(EndBlock::parse(&valid[..11]).is_err());
         // Wrong FrtHeaderOld.rt.
         let mut wrong_rt = valid.clone();
         wrong_rt[0..2].copy_from_slice(&START_BLOCK_RECORD_TYPE.to_le_bytes());
-        assert!(XlsEndBlock::parse(&wrong_rt).is_err());
+        assert!(EndBlock::parse(&wrong_rt).is_err());
         // Unknown iObjectKind.
-        assert!(XlsEndBlock::parse(&end_block_payload(0x000B)).is_err());
+        assert!(EndBlock::parse(&end_block_payload(0x000B)).is_err());
     }
 }

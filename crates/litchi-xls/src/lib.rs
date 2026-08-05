@@ -32,20 +32,8 @@ mod calculation;
 /// BIFF8 chart-sheet and embedded-chart metadata and mutation.
 pub mod chart;
 
-/// BIFF8 chart future-record (FRT) records: `ChartFrtInfo`, `CatLab`,
-/// `StartBlock`, and `EndBlock`.
-mod chart_frt;
-
-/// BIFF8 chart `CrtMlFrt`/`CrtMlFrtContinue` records: additional chart-element
-/// properties as an opaque `XmlTkChain` byte chain.
-mod crt_ml_frt;
-
 /// BIFF8 chart layout future records (`CrtLayout12`, `CrtLayout12A`).
 mod chart_layout;
-
-/// BIFF8 chart future-record wrappers (`StartObject`, `EndObject`,
-/// `FrtWrapper`).
-mod chart_frt_wrapper;
 
 /// BIFF8 `MarkerFormat` record: data-marker color, size, and shape.
 mod marker_format;
@@ -327,11 +315,6 @@ pub use calculation::{
 pub use cell::XlsCell;
 pub use cell_watch::XlsCellWatch;
 pub use chart_3d::XlsChart3d;
-pub use chart_frt::{
-    XlsCatLab, XlsCatLabAlignment, XlsChartBlockObjectKind, XlsChartFrtInfo, XlsChartFrtVersion,
-    XlsChartFutureRecordRange, XlsEndBlock, XlsStartBlock,
-};
-pub use chart_frt_wrapper::{XlsEndObject, XlsFrtObjectKind, XlsFrtWrapper, XlsStartObject};
 pub use chart_layout::{XlsCrtLayout12, XlsCrtLayout12A, XlsCrtLayout12Mode};
 pub use chart_property_stream::{XlsRichTextStream, XlsShapePropsStream, XlsTextPropsStream};
 pub use comments::CommentVisibility;
@@ -346,7 +329,6 @@ pub use consolidation::{
     XlsConsolidation, XlsConsolidationBuiltInName, XlsConsolidationFile, XlsConsolidationFunction,
     XlsConsolidationRange, XlsConsolidationSource,
 };
-pub use crt_ml_frt::XlsCrtMlFrt;
 pub use custom_view::{
     XlsChartSheetCustomViewBegin, XlsCustomViewHiddenRows, XlsCustomViewNoteDisplay,
     XlsCustomViewTopLeft, XlsSheetCustomView, XlsSheetCustomViewBegin, XlsSheetCustomViewEnd,

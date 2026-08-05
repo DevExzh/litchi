@@ -12,7 +12,7 @@
 //! - MS-XLS 2.4.70 (CrtMlFrt), 2.4.71 (CrtMlFrtContinue), 2.5.134 (FrtFlags),
 //!   2.5.135 (FrtHeader)
 
-use super::{XlsError, XlsResult};
+use crate::{XlsError, XlsResult};
 
 /// Record type of the `CrtMlFrt` record (MS-XLS 2.4.70); also the required
 /// `frtHeader.rt` value. (The neighboring 0x089D is `CrtLayout12`,
@@ -143,7 +143,7 @@ fn append_chain_bytes(chain: &mut Vec<u8>, bytes: &[u8]) -> XlsResult<()> {
 /// The header bitfield, the 8 reserved header bytes, and the 4 trailing
 /// `unused` bytes are preserved verbatim so the record round-trips unchanged.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsCrtMlFrt {
+pub struct CrtMlFrt {
     /// Raw `frtHeader.grbitFrt` bitfield. `fFrtRef` and `fFrtAlert` are
     /// guaranteed zero; the undefined reserved bits are preserved.
     flags: u16,
@@ -156,7 +156,7 @@ pub struct XlsCrtMlFrt {
     unused: [u8; 4],
 }
 
-impl XlsCrtMlFrt {
+impl CrtMlFrt {
     /// Parse a `CrtMlFrt` record payload plus the payloads of the
     /// `CrtMlFrtContinue` records that follow it.
     pub fn parse(data: &[u8], continues: &[Vec<u8>]) -> XlsResult<Self> {
@@ -258,6 +258,11 @@ impl XlsCrtMlFrt {
         self.flags
     }
 
+    /// The eight `FrtHeader.reserved` bytes retained from the source record.
+    pub const fn reserved(&self) -> [u8; 8] {
+        self.reserved
+    }
+
     /// The opaque `XmlTkChain` bytes.
     pub fn chain(&self) -> &[u8] {
         &self.chain
@@ -294,7 +299,7 @@ mod tests {
     #[test]
     fn parses_single_record_and_round_trips_exactly() {
         let record = crt_ml_frt_record(b"chain-bytes", [0xDE, 0xAD, 0xBE, 0xEF]);
-        let parsed = XlsCrtMlFrt::parse(&record, &[]).unwrap();
+        let parsed = CrtMlFrt::parse(&record, &[]).unwrap();
         assert_eq!(parsed.chain(), b"chain-bytes");
         assert_eq!(parsed.flags(), 0);
         assert_eq!(parsed.unused(), [0xDE, 0xAD, 0xBE, 0xEF]);
@@ -318,7 +323,7 @@ mod tests {
             .chunks(continuation_chunk)
             .map(continuation)
             .collect::<Vec<_>>();
-        let parsed = XlsCrtMlFrt::parse(&first, &continues).unwrap();
+        let parsed = CrtMlFrt::parse(&first, &continues).unwrap();
         assert_eq!(parsed.chain(), chain.as_slice());
 
         let payloads = parsed.to_record_payloads();
@@ -326,7 +331,7 @@ mod tests {
         for payload in &payloads {
             assert!(payload.len() <= MAX_RECORD_PAYLOAD);
         }
-        let reparsed = XlsCrtMlFrt::parse(&payloads[0], &payloads[1..]).unwrap();
+        let reparsed = CrtMlFrt::parse(&payloads[0], &payloads[1..]).unwrap();
         assert_eq!(reparsed, parsed);
         assert_eq!(reparsed.chain(), chain.as_slice());
     }
@@ -334,7 +339,7 @@ mod tests {
     #[test]
     fn empty_chain_round_trips() {
         let record = crt_ml_frt_record(&[], [1, 2, 3, 4]);
-        let parsed = XlsCrtMlFrt::parse(&record, &[]).unwrap();
+        let parsed = CrtMlFrt::parse(&record, &[]).unwrap();
         assert!(parsed.chain().is_empty());
         assert_eq!(parsed.to_record_payloads(), vec![record]);
     }
@@ -343,32 +348,32 @@ mod tests {
     fn rejects_malformed_records() {
         let record = crt_ml_frt_record(b"chain", [0; 4]);
         // Truncated.
-        assert!(XlsCrtMlFrt::parse(&record[..10], &[]).is_err());
+        assert!(CrtMlFrt::parse(&record[..10], &[]).is_err());
         // Wrong FrtHeader.rt (0x089D is the neighboring CrtLayout12).
         let mut wrong_rt = record.clone();
         wrong_rt[0..2].copy_from_slice(&0x089Du16.to_le_bytes());
-        assert!(XlsCrtMlFrt::parse(&wrong_rt, &[]).is_err());
+        assert!(CrtMlFrt::parse(&wrong_rt, &[]).is_err());
         // fFrtRef / fFrtAlert set.
         for flags in [0x0001u16, 0x0002] {
             let mut bad = record.clone();
             bad[2..4].copy_from_slice(&flags.to_le_bytes());
-            assert!(XlsCrtMlFrt::parse(&bad, &[]).is_err());
+            assert!(CrtMlFrt::parse(&bad, &[]).is_err());
         }
         // cb exceeds the legal maximum.
         let mut huge = record.clone();
         huge[FRT_HEADER_LEN..FRT_HEADER_LEN + 4].copy_from_slice(&0x8000_0000u32.to_le_bytes());
-        assert!(XlsCrtMlFrt::parse(&huge, &[]).is_err());
+        assert!(CrtMlFrt::parse(&huge, &[]).is_err());
         // cb does not match the reassembled chain size.
         let mut short = record.clone();
         short[FRT_HEADER_LEN..FRT_HEADER_LEN + 4].copy_from_slice(&99u32.to_le_bytes());
-        assert!(XlsCrtMlFrt::parse(&short, &[]).is_err());
-        assert!(XlsCrtMlFrt::parse(&record, &[continuation(b"extra")]).is_err());
+        assert!(CrtMlFrt::parse(&short, &[]).is_err());
+        assert!(CrtMlFrt::parse(&record, &[continuation(b"extra")]).is_err());
         // Continuation with a wrong FrtHeader.rt.
         let mut bad = continuation(b"x");
         bad[0..2].copy_from_slice(&0x003Cu16.to_le_bytes());
         let mut first = crt_ml_frt_record(b"ab", [0; 4]);
         first[FRT_HEADER_LEN..FRT_HEADER_LEN + 4].copy_from_slice(&3u32.to_le_bytes());
-        assert!(XlsCrtMlFrt::parse(&first, &[bad]).is_err());
+        assert!(CrtMlFrt::parse(&first, &[bad]).is_err());
     }
 
     #[test]
@@ -376,7 +381,7 @@ mod tests {
         let record = crt_ml_frt_record(b"chain", [0; 4]);
         for length in 0..record.len() {
             assert!(
-                XlsCrtMlFrt::parse(&record[..length], &[]).is_err(),
+                CrtMlFrt::parse(&record[..length], &[]).is_err(),
                 "expected truncated CrtMlFrt payload of {length} bytes to fail"
             );
         }
@@ -384,24 +389,24 @@ mod tests {
         let continuation_record = continuation(b"continuation");
         for length in 0..FRT_HEADER_LEN {
             assert!(
-                XlsCrtMlFrt::parse(&record, &[continuation_record[..length].to_vec()]).is_err(),
+                CrtMlFrt::parse(&record, &[continuation_record[..length].to_vec()]).is_err(),
                 "expected truncated CrtMlFrtContinue payload of {length} bytes to fail"
             );
         }
 
         let mut oversized = record.clone();
         oversized.resize(MAX_RECORD_PAYLOAD + 1, 0);
-        assert!(XlsCrtMlFrt::parse(&oversized, &[]).is_err());
+        assert!(CrtMlFrt::parse(&oversized, &[]).is_err());
 
         let oversized_continuation =
             continuation(&vec![0; MAX_RECORD_PAYLOAD - FRT_HEADER_LEN + 1]);
-        assert!(XlsCrtMlFrt::parse(&record, &[oversized_continuation]).is_err());
+        assert!(CrtMlFrt::parse(&record, &[oversized_continuation]).is_err());
     }
 
     #[test]
     fn accepts_empty_continuation_payload() {
         let record = crt_ml_frt_record(b"", [0; 4]);
-        let parsed = XlsCrtMlFrt::parse(&record, &[continuation(&[])]).unwrap();
+        let parsed = CrtMlFrt::parse(&record, &[continuation(&[])]).unwrap();
         assert!(parsed.chain().is_empty());
         assert_eq!(parsed.to_record_payloads(), vec![record]);
     }
@@ -413,8 +418,9 @@ mod tests {
         record[4..FRT_HEADER_LEN].copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
         // The 14 reserved grbitFrt bits are also preserved (fFrtRef/fFrtAlert stay 0).
         record[2..4].copy_from_slice(&0xFFFCu16.to_le_bytes());
-        let parsed = XlsCrtMlFrt::parse(&record, &[]).unwrap();
+        let parsed = CrtMlFrt::parse(&record, &[]).unwrap();
         assert_eq!(parsed.flags(), 0xFFFC);
+        assert_eq!(parsed.reserved(), [1, 2, 3, 4, 5, 6, 7, 8]);
         assert_eq!(parsed.to_record_payloads(), vec![record]);
     }
 }

@@ -18,7 +18,7 @@
 //! - MS-XLS 2.4.101 (EndObject), 2.4.130 (FrtWrapper), 2.4.267 (StartObject),
 //!   2.5.134 (FrtFlags), 2.5.136 (FrtHeaderOld)
 
-use super::{XlsError, XlsResult};
+use crate::{XlsError, XlsResult};
 
 /// Record type of the `FrtWrapper` record (MS-XLS 2.4.130); also the required
 /// `frtHeaderOld.rt` value.
@@ -75,7 +75,7 @@ fn validate_frt_header_old(data: &[u8], record_type: u16, name: &str) -> XlsResu
 /// / 2.4.101).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
-pub enum XlsFrtObjectKind {
+pub enum ObjectKind {
     /// 0x0010: a `YMult` (axis multiplier) block.
     YMult = 0x0010,
     /// 0x0011: an `FrtFontList` block.
@@ -84,7 +84,7 @@ pub enum XlsFrtObjectKind {
     DataLabExt = 0x0012,
 }
 
-impl XlsFrtObjectKind {
+impl ObjectKind {
     fn parse(value: u16, record_type: u16, name: &str) -> XlsResult<Self> {
         match value {
             0x0010 => Ok(Self::YMult),
@@ -104,18 +104,18 @@ impl XlsFrtObjectKind {
 /// The 14 reserved `grbitFrt` bits are preserved verbatim so the record
 /// round-trips unchanged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsStartObject {
+pub struct StartObject {
     /// Raw `frtHeaderOld.grbitFrt` bitfield (`fFrtRef`/`fFrtAlert` are zero).
     frt_flags: u16,
     /// The kind of object encompassed by the block (`iObjectKind`).
-    kind: XlsFrtObjectKind,
+    kind: ObjectKind,
     /// `iObjectInstance1`: additional context. Guaranteed zero for `YMult` and
     /// `DataLabExt`; an application version (0x0008..=0x000F except 0x000D)
     /// for `FrtFontList`.
     object_instance1: u16,
 }
 
-impl XlsStartObject {
+impl StartObject {
     /// Parse a `StartObject` record payload.
     pub fn parse(data: &[u8]) -> XlsResult<Self> {
         if data.len() != START_OBJECT_LEN {
@@ -125,7 +125,7 @@ impl XlsStartObject {
             });
         }
         let frt_flags = validate_frt_header_old(data, START_OBJECT_RECORD_TYPE, "StartObject")?;
-        let kind = XlsFrtObjectKind::parse(
+        let kind = ObjectKind::parse(
             u16::from_le_bytes([data[4], data[5]]),
             START_OBJECT_RECORD_TYPE,
             "StartObject",
@@ -141,14 +141,14 @@ impl XlsStartObject {
         let object_instance1 = u16::from_le_bytes([data[8], data[9]]);
         match kind {
             // MS-XLS 2.4.267: MUST equal 0x0000 for YMult and DataLabExt.
-            XlsFrtObjectKind::YMult | XlsFrtObjectKind::DataLabExt if object_instance1 != 0 => {
+            ObjectKind::YMult | ObjectKind::DataLabExt if object_instance1 != 0 => {
                 return Err(invalid(
                     START_OBJECT_RECORD_TYPE,
                     format!("StartObject iObjectInstance1 {object_instance1:#06X} is not 0x0000"),
                 ));
             },
             // MS-XLS 2.4.267: an application version for FrtFontList.
-            XlsFrtObjectKind::FrtFontList
+            ObjectKind::FrtFontList
                 if !matches!(object_instance1, 0x0008..=0x000C | 0x000E | 0x000F) =>
             {
                 return Err(invalid(
@@ -188,7 +188,7 @@ impl XlsStartObject {
     }
 
     /// The kind of object encompassed by the block (`iObjectKind`).
-    pub fn kind(&self) -> XlsFrtObjectKind {
+    pub fn kind(&self) -> ObjectKind {
         self.kind
     }
 
@@ -211,16 +211,16 @@ impl XlsStartObject {
 /// The three `unused` fields (MUST be ignored) are preserved verbatim so the
 /// record round-trips unchanged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsEndObject {
+pub struct EndObject {
     /// Raw `frtHeaderOld.grbitFrt` bitfield (`fFrtRef`/`fFrtAlert` are zero).
     frt_flags: u16,
     /// The kind of object encompassed by the block (`iObjectKind`).
-    kind: XlsFrtObjectKind,
+    kind: ObjectKind,
     /// The `unused1`, `unused2`, and `unused3` fields, preserved verbatim.
     unused: [u16; 3],
 }
 
-impl XlsEndObject {
+impl EndObject {
     /// Parse an `EndObject` record payload.
     pub fn parse(data: &[u8]) -> XlsResult<Self> {
         if data.len() != END_OBJECT_LEN {
@@ -230,7 +230,7 @@ impl XlsEndObject {
             });
         }
         let frt_flags = validate_frt_header_old(data, END_OBJECT_RECORD_TYPE, "EndObject")?;
-        let kind = XlsFrtObjectKind::parse(
+        let kind = ObjectKind::parse(
             u16::from_le_bytes([data[4], data[5]]),
             END_OBJECT_RECORD_TYPE,
             "EndObject",
@@ -259,7 +259,7 @@ impl XlsEndObject {
     }
 
     /// The kind of object encompassed by the block (`iObjectKind`).
-    pub fn kind(&self) -> XlsFrtObjectKind {
+    pub fn kind(&self) -> ObjectKind {
         self.kind
     }
 
@@ -281,7 +281,7 @@ impl XlsEndObject {
 /// `frtWrapperPadding` bytes are stored verbatim; the wrapped record is never
 /// interpreted.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsFrtWrapper {
+pub struct Wrapper {
     /// Raw `frtHeaderOld.grbitFrt` bitfield (`fFrtRef`/`fFrtAlert` are zero).
     frt_flags: u16,
     /// The complete wrapped BIFF record bytes (`wrappedRecord`).
@@ -290,7 +290,7 @@ pub struct XlsFrtWrapper {
     padding: Vec<u8>,
 }
 
-impl XlsFrtWrapper {
+impl Wrapper {
     /// Parse an `FrtWrapper` record payload.
     pub fn parse(data: &[u8]) -> XlsResult<Self> {
         // MS-XLS 2.4.130: the padded FrtWrapper is never smaller than the
@@ -392,12 +392,12 @@ mod tests {
     #[test]
     fn start_object_round_trip_all_kinds() {
         for (kind, instance1, expected) in [
-            (0x0010, 0, XlsFrtObjectKind::YMult),
-            (0x0011, 0x000E, XlsFrtObjectKind::FrtFontList),
-            (0x0012, 0, XlsFrtObjectKind::DataLabExt),
+            (0x0010, 0, ObjectKind::YMult),
+            (0x0011, 0x000E, ObjectKind::FrtFontList),
+            (0x0012, 0, ObjectKind::DataLabExt),
         ] {
             let bytes = start_object(kind, instance1);
-            let parsed = XlsStartObject::parse(&bytes).unwrap();
+            let parsed = StartObject::parse(&bytes).unwrap();
             assert_eq!(parsed.kind(), expected);
             assert_eq!(parsed.object_instance1(), instance1);
             assert_eq!(parsed.to_payload(), bytes);
@@ -408,46 +408,46 @@ mod tests {
     fn start_object_rejects_malformed_records() {
         let bytes = start_object(0x0010, 0);
         // Truncated.
-        assert!(XlsStartObject::parse(&bytes[..11]).is_err());
+        assert!(StartObject::parse(&bytes[..11]).is_err());
         // Wrong FrtHeaderOld.rt.
         let mut wrong_rt = bytes.clone();
         wrong_rt[0..2].copy_from_slice(&0x0855u16.to_le_bytes());
-        assert!(XlsStartObject::parse(&wrong_rt).is_err());
+        assert!(StartObject::parse(&wrong_rt).is_err());
         // fFrtRef set.
         let mut bad_flags = bytes.clone();
         bad_flags[2..4].copy_from_slice(&0x0001u16.to_le_bytes());
-        assert!(XlsStartObject::parse(&bad_flags).is_err());
+        assert!(StartObject::parse(&bad_flags).is_err());
         // Undefined iObjectKind.
-        assert!(XlsStartObject::parse(&start_object(0x0013, 0)).is_err());
+        assert!(StartObject::parse(&start_object(0x0013, 0)).is_err());
         // Nonzero iObjectContext.
         let mut bad_context = bytes.clone();
         bad_context[6..8].copy_from_slice(&1u16.to_le_bytes());
-        assert!(XlsStartObject::parse(&bad_context).is_err());
+        assert!(StartObject::parse(&bad_context).is_err());
         // iObjectInstance1 rules per kind.
-        assert!(XlsStartObject::parse(&start_object(0x0010, 1)).is_err());
-        assert!(XlsStartObject::parse(&start_object(0x0012, 1)).is_err());
-        assert!(XlsStartObject::parse(&start_object(0x0011, 0)).is_err());
-        assert!(XlsStartObject::parse(&start_object(0x0011, 0x000D)).is_err());
-        assert!(XlsStartObject::parse(&start_object(0x0011, 0x0010)).is_err());
+        assert!(StartObject::parse(&start_object(0x0010, 1)).is_err());
+        assert!(StartObject::parse(&start_object(0x0012, 1)).is_err());
+        assert!(StartObject::parse(&start_object(0x0011, 0)).is_err());
+        assert!(StartObject::parse(&start_object(0x0011, 0x000D)).is_err());
+        assert!(StartObject::parse(&start_object(0x0011, 0x0010)).is_err());
         // Nonzero iObjectInstance2.
         let mut bad_instance2 = bytes.clone();
         bad_instance2[10..12].copy_from_slice(&1u16.to_le_bytes());
-        assert!(XlsStartObject::parse(&bad_instance2).is_err());
+        assert!(StartObject::parse(&bad_instance2).is_err());
     }
 
     #[test]
     fn end_object_round_trip_and_rejects() {
         let bytes = end_object(0x0011, [1, 2, 3]);
-        let parsed = XlsEndObject::parse(&bytes).unwrap();
-        assert_eq!(parsed.kind(), XlsFrtObjectKind::FrtFontList);
+        let parsed = EndObject::parse(&bytes).unwrap();
+        assert_eq!(parsed.kind(), ObjectKind::FrtFontList);
         assert_eq!(parsed.unused(), [1, 2, 3]);
         assert_eq!(parsed.to_payload(), bytes);
 
-        assert!(XlsEndObject::parse(&bytes[..9]).is_err());
-        assert!(XlsEndObject::parse(&end_object(0x0000, [0; 3])).is_err());
+        assert!(EndObject::parse(&bytes[..9]).is_err());
+        assert!(EndObject::parse(&end_object(0x0000, [0; 3])).is_err());
         let mut wrong_rt = bytes.clone();
         wrong_rt[0..2].copy_from_slice(&0x0854u16.to_le_bytes());
-        assert!(XlsEndObject::parse(&wrong_rt).is_err());
+        assert!(EndObject::parse(&wrong_rt).is_err());
     }
 
     #[test]
@@ -459,7 +459,7 @@ mod tests {
         let mut bytes = FRT_WRAPPER_RECORD_TYPE.to_le_bytes().to_vec();
         bytes.extend_from_slice(&[0; 2]);
         bytes.extend_from_slice(&wrapped);
-        let parsed = XlsFrtWrapper::parse(&bytes).unwrap();
+        let parsed = Wrapper::parse(&bytes).unwrap();
         assert_eq!(parsed.wrapped_record(), wrapped.as_slice());
         assert_eq!(parsed.wrapped_record_type(), 0x101C);
         assert!(parsed.padding().is_empty());
@@ -473,7 +473,7 @@ mod tests {
         padded.extend_from_slice(&[0; 2]);
         padded.extend_from_slice(&small);
         padded.extend_from_slice(&[0; 2]);
-        let parsed = XlsFrtWrapper::parse(&padded).unwrap();
+        let parsed = Wrapper::parse(&padded).unwrap();
         assert_eq!(parsed.wrapped_record(), small.as_slice());
         assert_eq!(parsed.padding(), &[0, 0]);
         assert_eq!(parsed.to_payload(), padded);
@@ -490,21 +490,21 @@ mod tests {
         // Below the 12-byte minimum.
         let mut tiny = FRT_WRAPPER_RECORD_TYPE.to_le_bytes().to_vec();
         tiny.extend_from_slice(&[0; 7]);
-        assert!(XlsFrtWrapper::parse(&tiny).is_err());
+        assert!(Wrapper::parse(&tiny).is_err());
         // Wrong FrtHeaderOld.rt.
         let mut wrong_rt = bytes.clone();
         wrong_rt[0..2].copy_from_slice(&0x0854u16.to_le_bytes());
-        assert!(XlsFrtWrapper::parse(&wrong_rt).is_err());
+        assert!(Wrapper::parse(&wrong_rt).is_err());
         // Trailing bytes beyond the wrapped record.
         let mut trailing = bytes.clone();
         trailing.push(0);
-        assert!(XlsFrtWrapper::parse(&trailing).is_err());
+        assert!(Wrapper::parse(&trailing).is_err());
         // Declared wrapped size does not fit.
         let mut oversize = FRT_WRAPPER_RECORD_TYPE.to_le_bytes().to_vec();
         oversize.extend_from_slice(&[0; 2]);
         oversize.extend_from_slice(&0x101Cu16.to_le_bytes());
         oversize.extend_from_slice(&0xFFFFu16.to_le_bytes());
         oversize.extend_from_slice(&[0; 4]);
-        assert!(XlsFrtWrapper::parse(&oversize).is_err());
+        assert!(Wrapper::parse(&oversize).is_err());
     }
 }

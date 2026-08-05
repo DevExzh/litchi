@@ -24,6 +24,9 @@ pub use litchi_ograph::record::{chart3d, frame, line, marker, pie, series};
 
 use super::{XlsError, XlsResult};
 
+/// BIFF8 chart future records and their inert, lossless codecs.
+pub mod frt;
+
 const BOF: u16 = 0x0809;
 const EOF: u16 = 0x000a;
 const CONTINUE: u16 = 0x003c;
