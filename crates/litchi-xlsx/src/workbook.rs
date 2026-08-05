@@ -1,6 +1,7 @@
 //! Immutable workbook snapshots and selector-first sheet lookup.
 
 pub mod edit;
+pub mod worksheet;
 
 pub use edit::{
     ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DefaultsEdit, Edit, JoinError,
@@ -393,6 +394,16 @@ impl Workbook {
         Ok(panes.as_ref())
     }
 
+    /// Workbook-level protection metadata, when `workbookProtection` is
+    /// present. The values are passive verifier and lock metadata; they do
+    /// not enforce an editing policy.
+    pub fn workbook_protection_metadata(
+        &self,
+    ) -> Result<Option<crate::workbook_metadata::protection::Metadata>> {
+        let workbook = self.inner.package.get_part(&self.inner.workbook_uri)?;
+        crate::workbook_metadata::protection::parse_workbook_protection(workbook.blob())
+    }
+
     /// Shared immutable cell formats in this workbook snapshot.
     pub fn styles(&self) -> Result<Styles> {
         let len = self.inner.style_count()?;
@@ -485,6 +496,122 @@ impl Worksheet {
             let part = self.owner.package.get_part(&self.data.part_uri)?;
             raw::web::read(part.blob())
         })
+    }
+
+    /// Parse the worksheet's direct auto-filter declaration.
+    pub fn auto_filter(&self) -> Result<Option<crate::auto_filter::AutoFilterDefinition>> {
+        worksheet::auto_filter(self)
+    }
+
+    /// Parse all conditional-formatting containers and associate their
+    /// differential formats with the workbook style resource.
+    pub fn conditional_formattings(
+        &self,
+    ) -> Result<Vec<crate::conditional_formatting::Formatting>> {
+        worksheet::conditional_formattings(self)
+    }
+
+    /// Parse worksheet data-validation collections.
+    pub fn data_validations(&self) -> Result<Vec<crate::data_validation::Collection>> {
+        worksheet::data_validations(self)
+    }
+
+    /// Parse the worksheet's optional data-consolidation declaration.
+    pub fn data_consolidation(
+        &self,
+    ) -> Result<Option<crate::data_consolidation::DataConsolidation>> {
+        worksheet::data_consolidation(self)
+    }
+
+    /// Parse core worksheet header/footer settings.
+    pub fn header_footer(&self) -> Result<Option<crate::header_footer::Settings>> {
+        worksheet::header_footer(self)
+    }
+
+    /// Parse ignored-error declarations.
+    pub fn ignored_errors(&self) -> Result<Option<crate::ignored_errors::IgnoredErrors>> {
+        worksheet::ignored_errors(self)
+    }
+
+    /// Parse the optional named-sheet-view relationship.
+    pub fn named_sheet_views(&self) -> Result<Option<crate::named_sheet_view::Views>> {
+        worksheet::named_sheet_views(self)
+    }
+
+    /// Parse worksheet outline properties.
+    pub fn outline_properties(
+        &self,
+    ) -> Result<Option<crate::outline_properties::OutlineProperties>> {
+        worksheet::outline_properties(self)
+    }
+
+    /// Parse worksheet page margins.
+    pub fn page_margins(&self) -> Result<Option<crate::page_margins::Margins>> {
+        worksheet::page_margins(self)
+    }
+
+    /// Parse worksheet page setup.
+    pub fn page_setup(&self) -> Result<Option<crate::page_setup::Setup>> {
+        worksheet::page_setup(self)
+    }
+
+    /// Parse worksheet phonetic properties.
+    pub fn phonetic_properties(
+        &self,
+    ) -> Result<Option<crate::phonetic_properties::PhoneticProperties>> {
+        worksheet::phonetic_properties(self)
+    }
+
+    /// Parse worksheet print options.
+    pub fn print_options(&self) -> Result<Option<crate::print_options::PrintOptions>> {
+        worksheet::print_options(self)
+    }
+
+    /// Parse worksheet what-if scenarios.
+    pub fn scenarios(&self) -> Result<Option<crate::scenarios::Scenarios>> {
+        worksheet::scenarios(self)
+    }
+
+    /// Parse worksheet-level calculation properties.
+    pub fn calculation_properties(
+        &self,
+    ) -> Result<Option<crate::sheet_calculation_properties::Properties>> {
+        worksheet::calculation_properties(self)
+    }
+
+    /// Parse the complete worksheet protection projection.
+    pub fn protection(&self) -> Result<crate::sheet_protection::Metadata> {
+        worksheet::protection(self)
+    }
+
+    /// Parse the worksheet's ordinary sheet-view collection.
+    pub fn views(&self) -> Result<Option<crate::sheet_view::Views>> {
+        worksheet::views(self)
+    }
+
+    /// Parse every table relationship owned by this worksheet.
+    pub fn tables(&self) -> Result<Vec<worksheet::TablePart>> {
+        worksheet::tables(self)
+    }
+
+    /// Load and validate every query-table part owned by this worksheet.
+    pub fn query_tables(&self) -> Result<Vec<crate::query_table::Part>> {
+        worksheet::query_tables(self)
+    }
+
+    /// Load this worksheet's inert ActiveX graph.
+    pub fn active_x(&self) -> Result<crate::active_x::ControlSet> {
+        worksheet::active_x(self)
+    }
+
+    /// Load timeline views associated with this worksheet.
+    pub fn timelines(&self) -> Result<Vec<crate::timelines::Part>> {
+        worksheet::timelines(self)
+    }
+
+    /// Return array-formula anchors without materializing a dense worksheet.
+    pub fn array_formulas(&self) -> Result<Vec<worksheet::ArrayFormula>> {
+        worksheet::array_formulas(self)
     }
 
     /// Look up one exact logical cell state by A1 or checked coordinate.
