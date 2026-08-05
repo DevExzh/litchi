@@ -683,10 +683,10 @@ impl MutableDocument {
     /// the document or generate line numbers.
     pub fn line_numbering_configuration(
         &self,
-    ) -> Result<Option<crate::LineNumberingConfiguration>> {
+    ) -> Result<Option<crate::line_numbering::Configuration>> {
         self.styles_xml
             .as_deref()
-            .map_or_else(|| Ok(None), crate::parse_line_numbering_configuration)
+            .map_or_else(|| Ok(None), crate::line_numbering::parse)
     }
 
     /// Insert or replace document line-numbering configuration.
@@ -695,31 +695,27 @@ impl MutableDocument {
     /// line numbers.
     pub fn set_line_numbering_configuration(
         &mut self,
-        configuration: &crate::LineNumberingConfiguration,
-    ) -> Result<Option<crate::LineNumberingConfiguration>> {
+        configuration: &crate::line_numbering::Configuration,
+    ) -> Result<Option<crate::line_numbering::Configuration>> {
         configuration.validate()?;
         let old = self.line_numbering_configuration()?;
         let styles = self
             .styles_xml
             .clone()
             .unwrap_or_else(Structure::default_styles_xml);
-        self.styles_xml = Some(crate::line_numbering::set_line_numbering_configuration_xml(
-            &styles,
-            configuration,
-        )?);
+        self.styles_xml = Some(crate::line_numbering::set_xml(&styles, configuration)?);
         Ok(old)
     }
 
     /// Remove document line-numbering configuration and return its old value.
     pub fn clear_line_numbering_configuration(
         &mut self,
-    ) -> Result<Option<crate::LineNumberingConfiguration>> {
+    ) -> Result<Option<crate::line_numbering::Configuration>> {
         let old = self.line_numbering_configuration()?;
         let Some(styles) = self.styles_xml.as_deref() else {
             return Ok(None);
         };
-        self.styles_xml =
-            Some(crate::line_numbering::remove_line_numbering_configuration_xml(styles)?);
+        self.styles_xml = Some(crate::line_numbering::remove_xml(styles)?);
         Ok(old)
     }
 
@@ -2046,7 +2042,7 @@ impl MutableDocument {
     pub fn set_page_layout_footnote_separator(
         &mut self,
         page_layout_name: &str,
-        separator: &crate::StyleFootnoteSeparator,
+        separator: &crate::footnote_separator::Separator,
     ) -> Result<()> {
         let styles = self.styles_xml.as_deref().ok_or_else(|| {
             litchi_core::Error::InvalidFormat(
@@ -2072,16 +2068,14 @@ impl MutableDocument {
     /// Replace one existing named list level's modern label alignment.
     pub fn set_list_level_label_alignment(
         &mut self,
-        item: &crate::ListStyleLevelLabelAlignment,
+        item: &crate::list_label_alignment::Style,
     ) -> Result<()> {
         let styles = self.styles_xml.as_deref().ok_or_else(|| {
             litchi_core::Error::InvalidFormat(
                 "document has no styles.xml list style to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(
-            crate::list_label_alignment::replace_list_level_label_alignment_xml(styles, item)?,
-        );
+        self.styles_xml = Some(crate::list_label_alignment::set_xml(styles, item)?);
         Ok(())
     }
 
@@ -2089,16 +2083,14 @@ impl MutableDocument {
     /// Replace, insert, or remove one existing paragraph style's direct drop cap.
     pub fn set_paragraph_style_drop_cap(
         &mut self,
-        style: &crate::ParagraphStyleDropCap,
+        style: &crate::style::paragraph::drop_cap::Style,
     ) -> Result<()> {
         let styles = self.styles_xml.as_deref().ok_or_else(|| {
             litchi_core::Error::InvalidFormat(
                 "document has no styles.xml paragraph style to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(
-            crate::style::paragraph::drop_cap::set_paragraph_style_drop_cap_xml(styles, style)?,
-        );
+        self.styles_xml = Some(crate::style::paragraph::drop_cap::set_xml(styles, style)?);
         Ok(())
     }
 
@@ -3151,27 +3143,27 @@ mod tests {
 
     #[test]
     fn mutable_line_numbering_configuration_round_trips_without_generation() {
-        let first = crate::LineNumberingConfiguration {
+        let first = crate::line_numbering::Configuration {
             number_lines: Some(true),
-            number_format: Some(crate::LineNumberFormat::LowerAlpha),
+            number_format: Some(crate::line_numbering::Format::LowerAlpha),
             letter_sync: Some(true),
             style_name: Some("LineNumbers".to_string()),
             increment: Some(2),
-            number_position: Some(crate::LineNumberPosition::Inner),
-            offset: Some(crate::NonNegativeLength::new("0.2in").unwrap()),
+            number_position: Some(crate::line_numbering::Position::Inner),
+            offset: Some(crate::line_numbering::NonNegativeLength::new("0.2in").unwrap()),
             count_empty_lines: Some(false),
             count_in_text_boxes: Some(true),
             restart_on_page: Some(false),
-            separator: Some(crate::LineNumberingSeparator {
+            separator: Some(crate::line_numbering::Separator {
                 increment: Some(4),
                 text: " · ".to_string(),
             }),
         };
-        let replacement = crate::LineNumberingConfiguration {
+        let replacement = crate::line_numbering::Configuration {
             number_lines: Some(false),
-            number_format: Some(crate::LineNumberFormat::UpperRoman),
+            number_format: Some(crate::line_numbering::Format::UpperRoman),
             increment: Some(1),
-            ..crate::LineNumberingConfiguration::default()
+            ..crate::line_numbering::Configuration::default()
         };
 
         let mut mutable = MutableDocument::new();

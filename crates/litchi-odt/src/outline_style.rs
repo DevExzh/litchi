@@ -10,10 +10,8 @@ use quick_xml::{
     reader::NsReader,
 };
 
-use crate::{
-    FlatOpenDocument, LabelFollowedBy, ListLabelLength, ListLevelLabelAlignment,
-    OpenDocumentPackage,
-};
+use crate::list_label_alignment::{Alignment, FollowedBy, Length};
+use crate::{FlatOpenDocument, OpenDocumentPackage};
 
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
@@ -181,16 +179,16 @@ impl ListLevelPositionMode {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct OutlineListLevelProperties {
     pub text_align: Option<OutlineTextAlign>,
-    pub space_before: Option<ListLabelLength>,
-    pub minimum_label_width: Option<ListLabelLength>,
-    pub minimum_label_distance: Option<ListLabelLength>,
+    pub space_before: Option<Length>,
+    pub minimum_label_width: Option<Length>,
+    pub minimum_label_distance: Option<Length>,
     pub font_name: Option<String>,
-    pub width: Option<ListLabelLength>,
-    pub height: Option<ListLabelLength>,
+    pub width: Option<Length>,
+    pub height: Option<Length>,
     pub vertical_relation: Option<String>,
     pub vertical_position: Option<String>,
     pub position_mode: Option<ListLevelPositionMode>,
-    pub label_alignment: Option<ListLevelLabelAlignment>,
+    pub label_alignment: Option<Alignment>,
     pub extensions: Vec<OutlineAttribute>,
 }
 
@@ -421,7 +419,7 @@ fn write_list_properties(
         ("fo:width", properties.width.as_ref()),
         ("fo:height", properties.height.as_ref()),
     ] {
-        write_optional_attribute(output, name, value.map(ListLabelLength::as_str));
+        write_optional_attribute(output, name, value.map(Length::as_str));
     }
     write_optional_attribute(output, "style:font-name", properties.font_name.as_deref());
     write_optional_attribute(
@@ -450,9 +448,9 @@ fn write_list_properties(
         output,
         "text:label-followed-by",
         match alignment.label_followed_by {
-            LabelFollowedBy::ListTab => "listtab",
-            LabelFollowedBy::Space => "space",
-            LabelFollowedBy::Nothing => "nothing",
+            FollowedBy::ListTab => "listtab",
+            FollowedBy::Space => "space",
+            FollowedBy::Nothing => "nothing",
         },
     );
     write_optional_attribute(
@@ -461,17 +459,17 @@ fn write_list_properties(
         alignment
             .list_tab_stop_position
             .as_ref()
-            .map(ListLabelLength::as_str),
+            .map(Length::as_str),
     );
     write_optional_attribute(
         output,
         "fo:text-indent",
-        alignment.text_indent.as_ref().map(ListLabelLength::as_str),
+        alignment.text_indent.as_ref().map(Length::as_str),
     );
     write_optional_attribute(
         output,
         "fo:margin-left",
-        alignment.margin_left.as_ref().map(ListLabelLength::as_str),
+        alignment.margin_left.as_ref().map(Length::as_str),
     );
     output.push_str("/></style:list-level-properties>");
     Ok(())
@@ -1203,30 +1201,30 @@ fn parse_alignment(
     version: XmlVersion,
     start: &BytesStart<'_>,
     total: &mut usize,
-) -> Result<ListLevelLabelAlignment> {
+) -> Result<Alignment> {
     let mut attributes = attributes(reader, version, start, total)?;
     let followed_by = take(&mut attributes, NamespaceKind::Text, "label-followed-by")
         .ok_or_else(|| invalid_error("label alignment requires text:label-followed-by"))?;
     let label_followed_by = match followed_by.as_str() {
-        "listtab" => LabelFollowedBy::ListTab,
-        "space" => LabelFollowedBy::Space,
-        "nothing" => LabelFollowedBy::Nothing,
+        "listtab" => FollowedBy::ListTab,
+        "space" => FollowedBy::Space,
+        "nothing" => FollowedBy::Nothing,
         _ => return invalid("unsupported text:label-followed-by"),
     };
-    let alignment = ListLevelLabelAlignment {
+    let alignment = Alignment {
         label_followed_by,
         list_tab_stop_position: take(
             &mut attributes,
             NamespaceKind::Text,
             "list-tab-stop-position",
         )
-        .map(ListLabelLength::new)
+        .map(Length::new)
         .transpose()?,
         text_indent: take(&mut attributes, NamespaceKind::Fo, "text-indent")
-            .map(ListLabelLength::new)
+            .map(Length::new)
             .transpose()?,
         margin_left: take(&mut attributes, NamespaceKind::Fo, "margin-left")
-            .map(ListLabelLength::new)
+            .map(Length::new)
             .transpose()?,
     };
     if !attributes.is_empty() {
@@ -1357,7 +1355,7 @@ fn length(
     local_name: &str,
     nonnegative: bool,
     positive: bool,
-) -> Result<Option<ListLabelLength>> {
+) -> Result<Option<Length>> {
     let Some(value) = take(attributes, namespace, local_name) else {
         return Ok(None);
     };
@@ -1367,7 +1365,7 @@ fn length(
     if positive && length_is_zero(&value) {
         return invalid(format!("{local_name} must be positive"));
     }
-    ListLabelLength::new(value).map(Some)
+    Length::new(value).map(Some)
 }
 
 fn length_is_zero(value: &str) -> bool {

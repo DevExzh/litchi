@@ -1,6 +1,7 @@
 //! Typed ODF paragraph drop-cap style support.
 
-use crate::{FlatOpenDocument, OpenDocumentPackage, ParagraphStyleTabStops};
+use crate::style::paragraph::tab_stop::Style as TabStyle;
+use crate::{FlatOpenDocument, OpenDocumentPackage};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::XmlVersion;
 use quick_xml::{
@@ -575,10 +576,10 @@ pub fn parse(xml: &str) -> Result<Styles> {
     Ok(Styles { styles })
 }
 
-pub(crate) fn same_style_identity(cap: &Style, tabs: &ParagraphStyleTabStops) -> bool {
+pub(crate) fn same_style_identity(cap: &Style, tabs: &TabStyle) -> bool {
     cap.is_default_style == tabs.is_default_style && cap.name == tabs.name
 }
-pub(crate) fn merge_with_tab_style(tabs: &ParagraphStyleTabStops, cap: &Style) -> Result<String> {
+pub(crate) fn merge_with_tab_style(tabs: &TabStyle, cap: &Style) -> Result<String> {
     tabs.validate()?;
     cap.validate()?;
     if !same_style_identity(cap, tabs) || cap.parent_style_name != tabs.parent_style_name {

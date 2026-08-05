@@ -177,14 +177,6 @@ pub(crate) use elements::bookmark::{
 pub(crate) use embedded_object::{
     EmbeddedObject, EmbeddedObjectKind, EmbeddedObjectPart, EmbeddedObjectSource, InlineObjectRoot,
 };
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes footnote separator semantics"
-)]
-pub(crate) use footnote_separator::{
-    FootnoteSeparatorAdjustment, FootnoteSeparatorLength, FootnoteSeparatorLineStyle,
-    FootnoteSeparatorPercent, StyleFootnoteSeparator, parse_style_footnote_separators,
-};
 #[allow(unused_imports, reason = "ODT facade exposes typed form models")]
 pub(crate) use form::{
     ButtonControl, ButtonType, CheckboxControl, CheckboxState, ComboItem, ComboboxControl,
@@ -234,19 +226,6 @@ pub(crate) use graphic_properties::{
     reason = "ODT facade exposes header and footer style configurations"
 )]
 pub(crate) use header_footer_properties::{HeaderFooterStyleProperties, PageHeaderFooterRegion};
-#[allow(unused_imports, reason = "ODT facade exposes line-numbering semantics")]
-pub(crate) use line_numbering::{
-    LineNumberFormat, LineNumberPosition, LineNumberingConfiguration, LineNumberingSeparator,
-    NonNegativeLength, parse_line_numbering_configuration,
-};
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes list and outline semantics"
-)]
-pub(crate) use list_label_alignment::{
-    LabelFollowedBy, ListLabelLength, ListLevelLabelAlignment, ListLevelLabelAlignmentSet,
-    ListStyleKind, ListStyleLevelLabelAlignment, parse_list_level_label_alignments,
-};
 #[allow(unused_imports, reason = "ODT facade exposes list style semantics")]
 pub(crate) use list_style::{
     BulletRelativeSize, ListLevelBulletStyle, ListLevelImageSource, ListLevelKind,
@@ -327,53 +306,6 @@ pub(crate) use section_properties::{
 #[allow(unused_imports, reason = "ODT facade exposes semantic ODF settings")]
 pub(crate) use settings::{
     ConfigItem, ConfigMap, ConfigMapEntry, ConfigNode, ConfigSet, ConfigValue, Settings,
-};
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes paragraph drop-cap semantics"
-)]
-pub(crate) use style::paragraph::drop_cap::{
-    DropCapDistance, DropCapLength, ParagraphDropCap, ParagraphStyleDropCap,
-    ParagraphStyleDropCapSet, parse_paragraph_style_drop_caps,
-};
-#[allow(unused_imports, reason = "ODT facade exposes paragraph flow semantics")]
-pub(crate) use style::paragraph::flow::{
-    HyphenationKeep, HyphenationLadder, Keep, LineBreak, ParagraphFlowProperties,
-    ParagraphStyleFlow, ParagraphStyleFlowSet, PunctuationWrap, parse_paragraph_style_flows,
-};
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes paragraph spacing semantics"
-)]
-pub(crate) use style::paragraph::line_spacing::{
-    LineHeight, LineHeightPercent, LineSpacingLength, ParagraphLineSpacing,
-    ParagraphStyleLineSpacing, ParagraphStyleLineSpacingSet, TextAlignLast, TextAutospace,
-    parse_paragraph_style_line_spacings,
-};
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes paragraph margin semantics"
-)]
-pub(crate) use style::paragraph::margin::{
-    ParagraphHorizontalMargin, ParagraphMargins, ParagraphStyleMargins, ParagraphStyleMarginsSet,
-    ParagraphTextIndent, ParagraphVerticalMargin, parse_paragraph_style_margins,
-    set_paragraph_style_margins_xml,
-};
-#[allow(unused_imports, reason = "ODT facade exposes paragraph tab semantics")]
-pub(crate) use style::paragraph::tab_stop::{
-    MAX_PARAGRAPH_TAB_STOPS, ParagraphStyleTabStopSet, ParagraphStyleTabStops,
-    ParagraphTabLeaderColor, ParagraphTabLeaderStyle, ParagraphTabLeaderType,
-    ParagraphTabLeaderWidth, ParagraphTabStop, ParagraphTabStopType, ParagraphTabStops,
-    TabStopPosition, parse_paragraph_style_tab_stops,
-};
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes paragraph writing-mode semantics"
-)]
-pub(crate) use style::paragraph::writing_mode::{
-    ParagraphStyleWritingMode, ParagraphStyleWritingModeSet, ParagraphWritingMode,
-    ParagraphWritingModeProperties, parse_paragraph_style_writing_modes,
-    set_paragraph_style_writing_mode_xml,
 };
 #[allow(unused_imports, reason = "ODT facade exposes text style semantics")]
 pub(crate) use style::text::{

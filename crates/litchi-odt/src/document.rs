@@ -613,10 +613,10 @@ impl Document {
     /// paginate the document or generate line numbers.
     pub fn line_numbering_configuration(
         &self,
-    ) -> Result<Option<crate::LineNumberingConfiguration>> {
+    ) -> Result<Option<crate::line_numbering::Configuration>> {
         self.styles.as_ref().map_or_else(
             || Ok(None),
-            |styles| crate::parse_line_numbering_configuration(styles.xml_content()),
+            |styles| crate::line_numbering::parse(styles.xml_content()),
         )
     }
 

@@ -1,5 +1,5 @@
 use litchi_odt::Document;
-use litchi_odt::line_numbering::LineNumberFormat;
+use litchi_odt::line_numbering::Format;
 use litchi_odt::notes_configuration::{
     Class, Configuration, Configurations, NumberingScope, Position,
 };
@@ -37,7 +37,7 @@ fn footnote() -> Configuration {
         start_value: Some(2),
         number_prefix: Some("[".to_string()),
         number_suffix: Some("]".to_string()),
-        number_format: Some(LineNumberFormat::LowerAlpha),
+        number_format: Some(Format::LowerAlpha),
         letter_sync: Some(true),
         start_numbering_at: Some(NumberingScope::Chapter),
         footnotes_position: Some(Position::Page),
@@ -49,7 +49,7 @@ fn footnote() -> Configuration {
 fn endnote() -> Configuration {
     let mut configuration = Configuration::new(Class::Endnote);
     configuration.start_value = Some(7);
-    configuration.number_format = Some(LineNumberFormat::UpperRoman);
+    configuration.number_format = Some(Format::UpperRoman);
     configuration.start_numbering_at = Some(NumberingScope::Document);
     configuration
 }

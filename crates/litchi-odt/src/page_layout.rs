@@ -88,7 +88,7 @@ pub struct PageLayoutProperties {
     /// Typed multi-column layout, if present.
     pub columns: Option<crate::style::columns::Columns>,
     /// Typed footnote separator, if present.
-    pub footnote_separator: Option<crate::StyleFootnoteSeparator>,
+    pub footnote_separator: Option<crate::footnote_separator::Separator>,
     /// The exact `style:page-layout-properties` element, including background,
     /// columns, and footnote-separator children.
     pub xml: String,

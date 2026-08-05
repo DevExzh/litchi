@@ -71,15 +71,15 @@ pub struct Builder {
     grid_forms: Vec<crate::GridForm>,
     connection_resource_forms: Vec<crate::ConnectionResourceForm>,
     metadata: Metadata,
-    paragraph_tab_styles: Vec<crate::ParagraphStyleTabStops>,
-    paragraph_drop_cap_styles: Vec<crate::ParagraphStyleDropCap>,
-    list_level_label_alignments: Vec<crate::ListStyleLevelLabelAlignment>,
-    paragraph_flow_styles: Vec<crate::ParagraphStyleFlow>,
-    paragraph_margin_styles: Vec<crate::ParagraphStyleMargins>,
+    paragraph_tab_styles: Vec<crate::style::paragraph::tab_stop::Style>,
+    paragraph_drop_cap_styles: Vec<crate::style::paragraph::drop_cap::Style>,
+    list_level_label_alignments: Vec<crate::list_label_alignment::Style>,
+    paragraph_flow_styles: Vec<crate::style::paragraph::flow::Style>,
+    paragraph_margin_styles: Vec<crate::style::paragraph::margin::Style>,
     paragraph_border_styles: Vec<crate::style::paragraph::border::Style>,
     paragraph_alignment_styles: Vec<crate::style::paragraph::alignment::Style>,
     paragraph_break_styles: Vec<crate::style::paragraph::breaks::Style>,
-    paragraph_writing_mode_styles: Vec<crate::ParagraphStyleWritingMode>,
+    paragraph_writing_mode_styles: Vec<crate::style::paragraph::writing_mode::Style>,
     table_row_property_styles: Vec<crate::style::table::row::Style>,
     table_column_property_styles: Vec<crate::style::table::column::Style>,
     table_cell_property_styles: Vec<crate::style::table::cell::Style>,
@@ -88,14 +88,14 @@ pub struct Builder {
     section_names: std::collections::HashSet<String>,
     section_xml_ids: std::collections::HashSet<String>,
     page_layout_columns: Vec<(String, crate::style::columns::Columns)>,
-    page_layout_footnote_separators: Vec<(String, crate::StyleFootnoteSeparator)>,
+    page_layout_footnote_separators: Vec<(String, crate::footnote_separator::Separator)>,
     page_layout_header_footer_properties: Vec<(
         String,
         crate::PageHeaderFooterRegion,
         crate::HeaderFooterStyleProperties,
     )>,
     notes_configurations: crate::notes_configuration::Configurations,
-    line_numbering_configuration: Option<crate::LineNumberingConfiguration>,
+    line_numbering_configuration: Option<crate::line_numbering::Configuration>,
     page_sequence: Option<crate::Sequence>,
 }
 
@@ -210,7 +210,7 @@ impl Builder {
     ///
     /// The configuration is serialized as style metadata only. Building a
     /// document never calculates page or line numbers.
-    pub fn line_numbering_configuration(&self) -> Option<&crate::LineNumberingConfiguration> {
+    pub fn line_numbering_configuration(&self) -> Option<&crate::line_numbering::Configuration> {
         self.line_numbering_configuration.as_ref()
     }
 
@@ -220,7 +220,7 @@ impl Builder {
     /// generates line numbers.
     pub fn set_line_numbering_configuration(
         &mut self,
-        configuration: crate::LineNumberingConfiguration,
+        configuration: crate::line_numbering::Configuration,
     ) -> Result<&mut Self> {
         configuration.validate()?;
         self.line_numbering_configuration = Some(configuration);
@@ -236,7 +236,7 @@ impl Builder {
     /// Add a named or default paragraph style carrying typed tab stops.
     pub fn add_paragraph_tab_style(
         &mut self,
-        style: crate::ParagraphStyleTabStops,
+        style: crate::style::paragraph::tab_stop::Style,
     ) -> Result<&mut Self> {
         style.validate()?;
         if self.paragraph_tab_styles.len() >= 4_096 {
@@ -258,7 +258,7 @@ impl Builder {
     /// Add a typed paragraph drop-cap style definition.
     pub fn add_paragraph_drop_cap_style(
         &mut self,
-        style: crate::ParagraphStyleDropCap,
+        style: crate::style::paragraph::drop_cap::Style,
     ) -> Result<&mut Self> {
         style.validate()?;
         if self.paragraph_drop_cap_styles.len() >= 4_096 {
@@ -293,14 +293,14 @@ impl Builder {
     pub fn set_numbered_list_level_label_alignment(
         &mut self,
         level: u16,
-        alignment: crate::ListLevelLabelAlignment,
+        alignment: crate::list_label_alignment::Alignment,
     ) -> Result<&mut Self> {
         if !(1..=3).contains(&level) {
             return Err(litchi_core::Error::InvalidFormat(
                 "generated numbered-list level must be 1..=3".to_string(),
             ));
         }
-        let item = crate::ListStyleLevelLabelAlignment::new("L1", level, alignment)?;
+        let item = crate::list_label_alignment::Style::new("L1", level, alignment)?;
         if let Some(old) = self
             .list_level_label_alignments
             .iter_mut()
@@ -314,7 +314,7 @@ impl Builder {
     }
     pub fn add_paragraph_flow_style(
         &mut self,
-        style: crate::ParagraphStyleFlow,
+        style: crate::style::paragraph::flow::Style,
     ) -> Result<&mut Self> {
         style.validate()?;
         if self.paragraph_flow_styles.len() >= 4096
@@ -384,7 +384,7 @@ impl Builder {
     /// Add a named or default paragraph style carrying typed margin properties.
     pub fn add_paragraph_margin_style(
         &mut self,
-        style: crate::ParagraphStyleMargins,
+        style: crate::style::paragraph::margin::Style,
     ) -> Result<&mut Self> {
         style.validate()?;
         if self.paragraph_margin_styles.len() >= 4096
@@ -489,7 +489,7 @@ impl Builder {
     /// register properties.
     pub fn add_paragraph_writing_mode_style(
         &mut self,
-        style: crate::ParagraphStyleWritingMode,
+        style: crate::style::paragraph::writing_mode::Style,
     ) -> Result<&mut Self> {
         style.validate()?;
         if self.paragraph_writing_mode_styles.len() >= 4096
@@ -642,7 +642,7 @@ impl Builder {
     pub fn add_page_layout_footnote_separator(
         &mut self,
         page_layout_name: impl Into<String>,
-        separator: crate::StyleFootnoteSeparator,
+        separator: crate::footnote_separator::Separator,
     ) -> Result<&mut Self> {
         let name = page_layout_name.into();
         separator.to_page_layout_fragment(&name)?;
@@ -2058,10 +2058,8 @@ impl Builder {
             );
         }
         for alignment in &self.list_level_label_alignments {
-            xml = crate::list_label_alignment::replace_list_level_label_alignment_xml(
-                &xml, alignment,
-            )
-            .expect("validated generated list alignment");
+            xml = crate::list_label_alignment::set_xml(&xml, alignment)
+                .expect("validated generated list alignment");
         }
         xml
     }
@@ -2690,18 +2688,18 @@ mod tests {
 
     #[test]
     fn line_numbering_configuration_round_trips_through_an_odt_package() {
-        let configuration = crate::LineNumberingConfiguration {
+        let configuration = crate::line_numbering::Configuration {
             number_lines: Some(true),
-            number_format: Some(crate::LineNumberFormat::UpperAlpha),
+            number_format: Some(crate::line_numbering::Format::UpperAlpha),
             letter_sync: Some(true),
             style_name: Some("LineNumbers".to_string()),
             increment: Some(5),
-            number_position: Some(crate::LineNumberPosition::Outer),
-            offset: Some(crate::NonNegativeLength::new("0.25in").unwrap()),
+            number_position: Some(crate::line_numbering::Position::Outer),
+            offset: Some(crate::line_numbering::NonNegativeLength::new("0.25in").unwrap()),
             count_empty_lines: Some(true),
             count_in_text_boxes: Some(false),
             restart_on_page: Some(true),
-            separator: Some(crate::LineNumberingSeparator {
+            separator: Some(crate::line_numbering::Separator {
                 increment: Some(10),
                 text: " / ".to_string(),
             }),

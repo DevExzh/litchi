@@ -10,7 +10,7 @@ use quick_xml::{
     reader::NsReader,
 };
 
-use crate::line_numbering::LineNumberFormat;
+use crate::line_numbering::Format;
 use crate::{FlatOpenDocument, OpenDocumentPackage};
 
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -123,7 +123,7 @@ pub struct Configuration {
     pub start_value: Option<u64>,
     pub number_prefix: Option<String>,
     pub number_suffix: Option<String>,
-    pub number_format: Option<LineNumberFormat>,
+    pub number_format: Option<Format>,
     pub letter_sync: Option<bool>,
     pub start_numbering_at: Option<NumberingScope>,
     pub footnotes_position: Option<Position>,
@@ -155,7 +155,7 @@ impl Configuration {
         if self.letter_sync.is_some()
             && !matches!(
                 self.number_format,
-                Some(LineNumberFormat::LowerAlpha | LineNumberFormat::UpperAlpha)
+                Some(Format::LowerAlpha | Format::UpperAlpha)
             )
         {
             return invalid("style:num-letter-sync requires style:num-format 'a' or 'A'");
@@ -251,7 +251,7 @@ impl Configuration {
         write_attr(
             &mut output,
             "style:num-format",
-            self.number_format.as_ref().map(LineNumberFormat::as_str),
+            self.number_format.as_ref().map(Format::as_str),
         );
         write_bool_attr(&mut output, "style:num-letter-sync", self.letter_sync);
         write_attr(
@@ -482,9 +482,7 @@ fn parse_attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Resul
             },
             (NamespaceKind::Style, b"num-prefix") => number_prefix = Some(value),
             (NamespaceKind::Style, b"num-suffix") => number_suffix = Some(value),
-            (NamespaceKind::Style, b"num-format") => {
-                number_format = Some(LineNumberFormat::parse(value)?)
-            },
+            (NamespaceKind::Style, b"num-format") => number_format = Some(Format::parse(value)?),
             (NamespaceKind::Style, b"num-letter-sync") => {
                 letter_sync = Some(parse_bool(&value, "style:num-letter-sync")?)
             },
@@ -1014,7 +1012,7 @@ mod tests {
         let configurations = parse(&xml).unwrap();
         let footnote = configurations.get(Class::Footnote).unwrap();
         assert_eq!(footnote.start_value, Some(2));
-        assert_eq!(footnote.number_format, Some(LineNumberFormat::LowerAlpha));
+        assert_eq!(footnote.number_format, Some(Format::LowerAlpha));
         assert_eq!(footnote.letter_sync, Some(true));
         assert_eq!(
             footnote.continuation_notice_forward.as_deref(),
@@ -1063,7 +1061,7 @@ mod tests {
                     let mut value = Configuration::new(note_class);
                     value.citation_style_name = Some(String::new());
                     value.default_style_name = Some("Style_1".to_string());
-                    value.number_format = Some(LineNumberFormat::LowerAlpha);
+                    value.number_format = Some(Format::LowerAlpha);
                     value.letter_sync = Some(false);
                     value.start_numbering_at = Some(scope);
                     value.footnotes_position = Some(position);
@@ -1073,20 +1071,17 @@ mod tests {
             }
         }
         for format in [
-            LineNumberFormat::Empty,
-            LineNumberFormat::Arabic,
-            LineNumberFormat::LowerRoman,
-            LineNumberFormat::UpperRoman,
-            LineNumberFormat::LowerAlpha,
-            LineNumberFormat::UpperAlpha,
-            LineNumberFormat::Custom("①".to_string()),
+            Format::Empty,
+            Format::Arabic,
+            Format::LowerRoman,
+            Format::UpperRoman,
+            Format::LowerAlpha,
+            Format::UpperAlpha,
+            Format::Custom("①".to_string()),
         ] {
             let mut value = Configuration::new(Class::Footnote);
-            value.letter_sync = matches!(
-                format,
-                LineNumberFormat::LowerAlpha | LineNumberFormat::UpperAlpha
-            )
-            .then_some(true);
+            value.letter_sync =
+                matches!(format, Format::LowerAlpha | Format::UpperAlpha).then_some(true);
             value.number_format = Some(format);
             assert_eq!(
                 parse(&styles(&value.to_xml().unwrap())).unwrap().footnote,
@@ -1125,11 +1120,11 @@ mod tests {
         let real = parse(fixture).unwrap();
         assert_eq!(
             real.footnote.as_ref().unwrap().number_format,
-            Some(LineNumberFormat::Arabic)
+            Some(Format::Arabic)
         );
         assert_eq!(
             real.endnote.as_ref().unwrap().number_format,
-            Some(LineNumberFormat::LowerRoman)
+            Some(Format::LowerRoman)
         );
         let flat = FlatOpenDocument::from_bytes(fixture.as_bytes().to_vec()).unwrap();
         assert_eq!(flat.notes_configurations().unwrap(), real);

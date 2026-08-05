@@ -8,7 +8,8 @@
 //! duplicates and malformed owned values are rejected.
 
 use crate::{
-    FlatOpenDocument, NonNegativeLength, OpenDocumentPackage,
+    FlatOpenDocument, OpenDocumentPackage,
+    line_numbering::NonNegativeLength,
     style::paragraph::margin::rewrite_start_tag,
     style::table::row::{
         BackgroundColor, BackgroundImage, BackgroundPosition, BackgroundSource,

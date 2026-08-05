@@ -1,7 +1,5 @@
 use litchi_odt::style::paragraph::drop_cap::{Distance, DropCap, Length, Style, parse};
-use litchi_odt::style::paragraph::tab_stop::{
-    ParagraphStyleTabStops, ParagraphTabStop, ParagraphTabStops, TabStopPosition,
-};
+use litchi_odt::style::paragraph::tab_stop::{Position, Stop, Stops, Style as TabStyle};
 use litchi_odt::{Builder, Document};
 use std::io::Cursor;
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -96,11 +94,8 @@ fn builder_package_composition_and_mutation_round_trip() {
     };
     let mut drop_style = Style::named("Opening", Some(cap)).unwrap();
     drop_style.parent_style_name = Some("Standard".into());
-    let stops = ParagraphTabStops::try_from_vec(vec![ParagraphTabStop::new(
-        TabStopPosition::new("2cm").unwrap(),
-    )])
-    .unwrap();
-    let mut tab_style = ParagraphStyleTabStops::named("Opening", Some(stops)).unwrap();
+    let stops = Stops::try_from_vec(vec![Stop::new(Position::new("2cm").unwrap())]).unwrap();
+    let mut tab_style = TabStyle::named("Opening", Some(stops)).unwrap();
     tab_style.parent_style_name = Some("Standard".into());
     let mut builder = Builder::new();
     builder.add_paragraph_tab_style(tab_style).unwrap();

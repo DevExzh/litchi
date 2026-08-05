@@ -1,4 +1,4 @@
-use litchi_odt::list_label_alignment::LabelFollowedBy;
+use litchi_odt::list_label_alignment::FollowedBy;
 use litchi_odt::outline_style::{ListLevelPositionMode, OutlineTextAlign, parse_outline_styles};
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -37,7 +37,7 @@ fn parses_complete_typed_outline_style_and_extensions() {
             .as_ref()
             .unwrap()
             .label_followed_by,
-        LabelFollowedBy::ListTab
+        FollowedBy::ListTab
     );
     assert_eq!(properties.extensions[0].value(), "kept");
     assert_eq!(level.text_properties.as_ref().unwrap().attributes.len(), 2);

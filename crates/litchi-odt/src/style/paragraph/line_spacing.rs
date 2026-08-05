@@ -6,7 +6,7 @@
 //! `style:justify-single-word`, `style:auto-text-indent`,
 //! `style:snap-to-layout-grid`, `style:tab-stop-distance`, `fo:text-align-last`).
 
-use crate::{FlatOpenDocument, NonNegativeLength, OpenDocumentPackage};
+use crate::{FlatOpenDocument, OpenDocumentPackage, line_numbering::NonNegativeLength};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
