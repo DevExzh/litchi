@@ -226,14 +226,6 @@ pub(super) fn locate_balanced_ruby_ranges(
     Ok(spans)
 }
 
-pub(super) struct PendingRubyRange {
-    xml_start: usize,
-    xml_end: usize,
-    prefix: String,
-    selected: String,
-    stack: Vec<(Ns, Vec<u8>)>,
-}
-
 #[allow(clippy::too_many_arguments)]
 pub(super) fn collect_ruby_text_node(
     xml: &str,

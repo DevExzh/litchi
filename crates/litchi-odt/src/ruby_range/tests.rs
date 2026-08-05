@@ -11,12 +11,12 @@ fn paragraph(body: &str) -> String {
 
 #[test]
 fn locates_a_balanced_inline_range() {
-    let xml = paragraph(r#"A<text:span>漢</text:span>字Z"#);
+    let xml = paragraph(r#"A<text:span>漢</text:span><text:span>字</text:span>Z"#);
     let spans = locate_balanced_ruby_ranges(&xml, 0, &(1.."漢字".len() + 1)).unwrap();
     assert_eq!(spans.len(), 1);
     assert_eq!(
         &xml[spans[0].start..spans[0].end],
-        "<text:span>漢</text:span>字"
+        "<text:span>漢</text:span><text:span>字</text:span>"
     );
 }
 

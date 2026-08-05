@@ -15,7 +15,7 @@ pub(super) struct RangeBoundary {
     pub(super) ruby_epoch: usize,
 }
 
-pub(super) struct PendingRubyRange {
+pub(in crate::ruby_family) struct PendingRubyRange {
     pub(super) xml_start: usize,
     pub(super) xml_end: usize,
     pub(super) prefix: String,
