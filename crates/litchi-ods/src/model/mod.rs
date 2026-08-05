@@ -7,7 +7,7 @@
 mod conditional_format;
 mod consolidation;
 mod data_pilot;
-mod data_validation;
+pub mod data_validation;
 mod database_range;
 mod detective;
 pub mod hyperlink;
@@ -31,7 +31,6 @@ pub use conditional_format::{
 };
 pub use consolidation::{Consolidation, ConsolidationUseLabels};
 pub use data_pilot::*;
-pub use data_validation::*;
 pub use database_range::*;
 pub use detective::{
     CellDetective, DetectiveDirection, DetectiveHighlightedRange, DetectiveOperation,

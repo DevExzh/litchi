@@ -23,14 +23,14 @@ const OPENOFFICE_CALC_NAMESPACE: &str = "http://openoffice.org/2004/calc";
 
 /// How a validation list is displayed in the spreadsheet UI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum ValidationDisplayList {
+pub enum DisplayList {
     #[default]
     None,
     Unsorted,
     SortAscending,
 }
 
-impl ValidationDisplayList {
+impl DisplayList {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "none" => Ok(Self::None),
@@ -53,13 +53,13 @@ impl ValidationDisplayList {
 
 /// Severity associated with an invalid cell value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ValidationMessageType {
+pub enum MessageType {
     Stop,
     Warning,
     Information,
 }
 
-impl ValidationMessageType {
+impl MessageType {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "stop" => Ok(Self::Stop),
@@ -82,7 +82,7 @@ impl ValidationMessageType {
 
 /// Help or error text associated with a validation definition.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct ValidationMessage {
+pub struct Message {
     pub title: Option<String>,
     /// `None` preserves the ODF default rather than forcing an explicit value.
     pub display: Option<bool>,
@@ -92,16 +92,16 @@ pub struct ValidationMessage {
 
 /// Error behavior and text for a validation definition.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct ValidationErrorMessage {
+pub struct ErrorMessage {
     pub title: Option<String>,
     pub display: Option<bool>,
-    pub message_type: Option<ValidationMessageType>,
+    pub message_type: Option<MessageType>,
     pub paragraphs: Vec<String>,
 }
 
 /// A script event listener preserved as inert metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ValidationScriptEventListener {
+pub struct ScriptEventListener {
     pub event_name: String,
     pub language: String,
     /// Exactly one of `macro_name` and `href` is required by ODF.
@@ -112,7 +112,7 @@ pub struct ValidationScriptEventListener {
 
 /// Sound metadata attached to a presentation event listener.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ValidationPresentationSound {
+pub struct PresentationSound {
     pub href: String,
     pub actuate: Option<String>,
     pub show: Option<String>,
@@ -122,7 +122,7 @@ pub struct ValidationPresentationSound {
 
 /// A presentation event listener preserved as inert metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ValidationPresentationEventListener {
+pub struct PresentationEventListener {
     pub event_name: String,
     pub action: String,
     pub effect: Option<String>,
@@ -133,30 +133,30 @@ pub struct ValidationPresentationEventListener {
     pub show: Option<String>,
     pub actuate: Option<String>,
     pub verb: Option<u64>,
-    pub sound: Option<ValidationPresentationSound>,
+    pub sound: Option<PresentationSound>,
 }
 
 /// An event listener following a validation error macro.
 ///
 /// Litchi reads and writes this metadata but never invokes it.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ValidationEventListener {
-    Script(ValidationScriptEventListener),
-    Presentation(Box<ValidationPresentationEventListener>),
+pub enum EventListener {
+    Script(ScriptEventListener),
+    Presentation(Box<PresentationEventListener>),
 }
 
 /// Macro metadata attached to invalid input. Litchi preserves it but never executes it.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct ValidationErrorMacro {
+pub struct ErrorMacro {
     pub execute: Option<bool>,
-    pub event_listeners: Vec<ValidationEventListener>,
+    pub event_listeners: Vec<EventListener>,
 }
 
-impl ValidationErrorMacro {
+impl ErrorMacro {
     fn validate(&self) -> Result<()> {
         for listener in &self.event_listeners {
             match listener {
-                ValidationEventListener::Script(listener) => {
+                EventListener::Script(listener) => {
                     if listener.event_name.is_empty() || listener.language.is_empty() {
                         return Err(Error::InvalidFormat(
                             "validation script event listener requires an event name and language"
@@ -175,7 +175,7 @@ impl ValidationErrorMacro {
                         ));
                     }
                 },
-                ValidationEventListener::Presentation(listener) => {
+                EventListener::Presentation(listener) => {
                     if listener.event_name.is_empty() || listener.action.is_empty() {
                         return Err(Error::InvalidFormat(
                             "validation presentation event listener requires an event name and action"
@@ -213,10 +213,10 @@ pub struct ContentValidation {
     pub formula_namespace: Option<formula::Namespace>,
     pub base_cell_address: Option<String>,
     pub allow_empty_cell: Option<bool>,
-    pub display_list: Option<ValidationDisplayList>,
-    pub help_message: Option<ValidationMessage>,
-    pub error_message: Option<ValidationErrorMessage>,
-    pub error_macro: Option<ValidationErrorMacro>,
+    pub display_list: Option<DisplayList>,
+    pub help_message: Option<Message>,
+    pub error_message: Option<ErrorMessage>,
+    pub error_macro: Option<ErrorMacro>,
 }
 
 impl ContentValidation {
@@ -350,7 +350,7 @@ pub(crate) fn validate_collection(validations: &[ContentValidation]) -> Result<(
     Ok(())
 }
 
-pub(crate) fn write_content_validations(out: &mut String, validations: &[ContentValidation]) {
+pub(crate) fn write(out: &mut String, validations: &[ContentValidation]) {
     if validations.is_empty() {
         return;
     }
@@ -418,14 +418,14 @@ pub(crate) fn write_content_validations(out: &mut String, validations: &[Content
     out.push_str("</table:content-validations>");
 }
 
-fn write_event_listeners(out: &mut String, listeners: &[ValidationEventListener]) {
+fn write_event_listeners(out: &mut String, listeners: &[EventListener]) {
     if listeners.is_empty() {
         return;
     }
     out.push_str("<office:event-listeners>");
     for listener in listeners {
         match listener {
-            ValidationEventListener::Script(listener) => {
+            EventListener::Script(listener) => {
                 out.push_str("<script:event-listener");
                 write_optional_attribute(out, "script:event-name", Some(&listener.event_name));
                 write_optional_attribute(out, "script:language", Some(&listener.language));
@@ -437,7 +437,7 @@ fn write_event_listeners(out: &mut String, listeners: &[ValidationEventListener]
                 }
                 out.push_str("/>");
             },
-            ValidationEventListener::Presentation(listener) => {
+            EventListener::Presentation(listener) => {
                 out.push_str("<presentation:event-listener");
                 write_optional_attribute(out, "script:event-name", Some(&listener.event_name));
                 write_optional_attribute(out, "presentation:action", Some(&listener.action));
@@ -488,7 +488,7 @@ fn write_message(
     element: &str,
     title: Option<&str>,
     display: Option<bool>,
-    message_type: Option<ValidationMessageType>,
+    message_type: Option<MessageType>,
     paragraphs: &[String],
 ) {
     out.push_str("<table:");
@@ -568,7 +568,7 @@ fn write_bool_attribute(out: &mut String, name: &str, value: bool) {
     write_optional_attribute(out, name, Some(if value { "true" } else { "false" }));
 }
 
-pub(crate) fn parse_content_validations(xml: &str) -> Result<Vec<ContentValidation>> {
+pub(crate) fn parse(xml: &str) -> Result<Vec<ContentValidation>> {
     let mut reader = NsReader::from_str(xml);
     let mut buf = Vec::new();
     let mut validations = Vec::new();
@@ -576,8 +576,8 @@ pub(crate) fn parse_content_validations(xml: &str) -> Result<Vec<ContentValidati
     let mut inside_event_listeners = false;
     let mut event_listeners_seen = false;
     let mut current: Option<ContentValidation> = None;
-    let mut message: Option<(bool, ValidationMessageBuilder)> = None;
-    let mut presentation_listener: Option<ValidationPresentationEventListener> = None;
+    let mut message: Option<(bool, MessageBuilder)> = None;
+    let mut presentation_listener: Option<PresentationEventListener> = None;
 
     loop {
         let (namespace, event) = reader
@@ -601,7 +601,7 @@ pub(crate) fn parse_content_validations(xml: &str) -> Result<Vec<ContentValidati
                             ));
                         }
                         event_listeners_seen = false;
-                        current = Some(parse_validation_attributes(&reader, &element)?);
+                        current = Some(parse_attributes(&reader, &element)?);
                     },
                     b"help-message" | b"error-message" if current.is_some() => {
                         if message.is_some() {
@@ -611,7 +611,7 @@ pub(crate) fn parse_content_validations(xml: &str) -> Result<Vec<ContentValidati
                         }
                         message = Some((
                             element.local_name().as_ref() == b"error-message",
-                            ValidationMessageBuilder::new(&reader, &element)?,
+                            MessageBuilder::new(&reader, &element)?,
                         ));
                     },
                     b"error-macro" if current.is_some() => {
@@ -682,7 +682,7 @@ pub(crate) fn parse_content_validations(xml: &str) -> Result<Vec<ContentValidati
                     .and_then(|validation| validation.error_macro.as_mut())
                     .expect("event-listeners require an error macro")
                     .event_listeners
-                    .push(ValidationEventListener::Script(listener));
+                    .push(EventListener::Script(listener));
             },
             Event::Start(element)
                 if is_namespace(&namespace, PRESENTATION_NAMESPACE)
@@ -707,7 +707,7 @@ pub(crate) fn parse_content_validations(xml: &str) -> Result<Vec<ContentValidati
                     .and_then(|validation| validation.error_macro.as_mut())
                     .expect("event-listeners require an error macro")
                     .event_listeners
-                    .push(ValidationEventListener::Presentation(Box::new(listener)));
+                    .push(EventListener::Presentation(Box::new(listener)));
             },
             Event::Start(element) | Event::Empty(element)
                 if is_namespace(&namespace, PRESENTATION_NAMESPACE)
@@ -725,13 +725,13 @@ pub(crate) fn parse_content_validations(xml: &str) -> Result<Vec<ContentValidati
             Event::Empty(element) if is_namespace(&namespace, TABLE_NAMESPACE) => {
                 match element.local_name().as_ref() {
                     b"content-validation" if inside_collection => {
-                        let validation = parse_validation_attributes(&reader, &element)?;
+                        let validation = parse_attributes(&reader, &element)?;
                         validation.validate()?;
                         validations.push(validation);
                     },
                     b"help-message" | b"error-message" if current.is_some() => {
                         let is_error = element.local_name().as_ref() == b"error-message";
-                        let builder = ValidationMessageBuilder::new(&reader, &element)?;
+                        let builder = MessageBuilder::new(&reader, &element)?;
                         finish_message(
                             current.as_mut().expect("checked validation"),
                             is_error,
@@ -861,7 +861,7 @@ pub(crate) fn parse_content_validations(xml: &str) -> Result<Vec<ContentValidati
                     .and_then(|validation| validation.error_macro.as_mut())
                     .expect("event-listeners require an error macro")
                     .event_listeners
-                    .push(ValidationEventListener::Presentation(Box::new(listener)));
+                    .push(EventListener::Presentation(Box::new(listener)));
             },
             Event::End(element)
                 if is_namespace(&namespace, OFFICE_NAMESPACE)
@@ -894,7 +894,7 @@ pub(crate) fn parse_content_validations(xml: &str) -> Result<Vec<ContentValidati
     Ok(validations)
 }
 
-fn parse_validation_attributes(
+fn parse_attributes(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
 ) -> Result<ContentValidation> {
@@ -926,7 +926,7 @@ fn parse_validation_attributes(
             element,
             b"display-list",
         )?
-        .map(|value| ValidationDisplayList::parse(&value))
+        .map(|value| DisplayList::parse(&value))
         .transpose()?,
         help_message: None,
         error_message: None,
@@ -940,7 +940,7 @@ fn set_error_macro(validation: &mut ContentValidation, execute: Option<bool>) ->
             "duplicate validation error behavior".to_string(),
         ));
     }
-    validation.error_macro = Some(ValidationErrorMacro {
+    validation.error_macro = Some(ErrorMacro {
         execute,
         event_listeners: Vec::new(),
     });
@@ -950,8 +950,8 @@ fn set_error_macro(validation: &mut ContentValidation, execute: Option<bool>) ->
 fn parse_script_event_listener(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-) -> Result<ValidationScriptEventListener> {
-    Ok(ValidationScriptEventListener {
+) -> Result<ScriptEventListener> {
+    Ok(ScriptEventListener {
         event_name: required_attribute_ns(
             reader.resolver(),
             reader.decoder(),
@@ -993,7 +993,7 @@ fn parse_script_event_listener(
 fn parse_presentation_event_listener(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-) -> Result<ValidationPresentationEventListener> {
+) -> Result<PresentationEventListener> {
     let verb = optional_attribute_ns(
         reader.resolver(),
         reader.decoder(),
@@ -1007,7 +1007,7 @@ fn parse_presentation_event_listener(
             .map_err(|_| Error::InvalidFormat(format!("invalid presentation:verb '{value}'")))
     })
     .transpose()?;
-    Ok(ValidationPresentationEventListener {
+    Ok(PresentationEventListener {
         event_name: required_attribute_ns(
             reader.resolver(),
             reader.decoder(),
@@ -1079,8 +1079,8 @@ fn parse_presentation_event_listener(
 fn parse_presentation_sound(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-) -> Result<ValidationPresentationSound> {
-    Ok(ValidationPresentationSound {
+) -> Result<PresentationSound> {
+    Ok(PresentationSound {
         href: required_attribute_ns(
             reader.resolver(),
             reader.decoder(),
@@ -1122,7 +1122,7 @@ fn parse_presentation_sound(
 fn finish_message(
     validation: &mut ContentValidation,
     is_error: bool,
-    builder: ValidationMessageBuilder,
+    builder: MessageBuilder,
 ) -> Result<()> {
     if is_error {
         if validation.error_message.is_some() || validation.error_macro.is_some() {
@@ -1130,7 +1130,7 @@ fn finish_message(
                 "duplicate validation error behavior".to_string(),
             ));
         }
-        validation.error_message = Some(ValidationErrorMessage {
+        validation.error_message = Some(ErrorMessage {
             title: builder.title,
             display: builder.display,
             message_type: builder.message_type,
@@ -1142,7 +1142,7 @@ fn finish_message(
                 "duplicate validation help message".to_string(),
             ));
         }
-        validation.help_message = Some(ValidationMessage {
+        validation.help_message = Some(Message {
             title: builder.title,
             display: builder.display,
             paragraphs: builder.paragraphs,
@@ -1151,15 +1151,15 @@ fn finish_message(
     Ok(())
 }
 
-struct ValidationMessageBuilder {
+struct MessageBuilder {
     title: Option<String>,
     display: Option<bool>,
-    message_type: Option<ValidationMessageType>,
+    message_type: Option<MessageType>,
     paragraphs: Vec<String>,
     paragraph: Option<String>,
 }
 
-impl ValidationMessageBuilder {
+impl MessageBuilder {
     fn new(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Self> {
         Ok(Self {
             title: optional_attribute(reader.resolver(), reader.decoder(), element, b"title")?,
@@ -1175,7 +1175,7 @@ impl ValidationMessageBuilder {
                 element,
                 b"message-type",
             )?
-            .map(|value| ValidationMessageType::parse(&value))
+            .map(|value| MessageType::parse(&value))
             .transpose()?,
             paragraphs: Vec::new(),
             paragraph: None,
@@ -1404,7 +1404,7 @@ mod tests {
             <t:error-message t:title="Invalid" t:display="true" t:message-type="stop"><x:p>Try again</x:p></t:error-message>
           </t:content-validation></t:content-validations>
         </office:spreadsheet>"#;
-        let parsed = parse_content_validations(xml).unwrap();
+        let parsed = parse(xml).unwrap();
         assert_eq!(parsed.len(), 1);
         assert_eq!(parsed[0].name, "whole");
         assert_eq!(
@@ -1414,21 +1414,18 @@ mod tests {
                 uri: OPENFORMULA_NAMESPACE.to_string(),
             })
         );
-        assert_eq!(
-            parsed[0].display_list,
-            Some(ValidationDisplayList::Unsorted)
-        );
+        assert_eq!(parsed[0].display_list, Some(DisplayList::Unsorted));
         assert_eq!(
             parsed[0].help_message.as_ref().unwrap().paragraphs,
             ["Enter a whole number"]
         );
         assert_eq!(
             parsed[0].error_message.as_ref().unwrap().message_type,
-            Some(ValidationMessageType::Stop)
+            Some(MessageType::Stop)
         );
         let mut encoded = String::new();
-        write_content_validations(&mut encoded, &parsed);
-        assert_eq!(parse_content_validations(&format!(
+        write(&mut encoded, &parsed);
+        assert_eq!(parse(&format!(
             r#"<office:spreadsheet xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">{encoded}</office:spreadsheet>"#
         )).unwrap(), parsed);
     }
@@ -1436,26 +1433,26 @@ mod tests {
     #[test]
     fn rejects_duplicates_invalid_enums_and_conflicting_error_actions() {
         let duplicate = r#"<t:content-validations xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:content-validation t:name="x"/><t:content-validation t:name="x"/></t:content-validations>"#;
-        assert!(parse_content_validations(duplicate).is_err());
+        assert!(parse(duplicate).is_err());
         let invalid = r#"<t:content-validations xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:content-validation t:name="x" t:display-list="bad"/></t:content-validations>"#;
-        assert!(parse_content_validations(invalid).is_err());
+        assert!(parse(invalid).is_err());
         let mut validation = ContentValidation::new("x").unwrap();
-        validation.error_message = Some(ValidationErrorMessage::default());
-        validation.error_macro = Some(ValidationErrorMacro::default());
+        validation.error_message = Some(ErrorMessage::default());
+        validation.error_macro = Some(ErrorMacro::default());
         assert!(validation.validate().is_err());
     }
 
     #[test]
     fn preserves_odf_whitespace_elements_in_messages() {
         let xml = r#"<t:content-validations xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:x="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><t:content-validation t:name="x"><t:help-message><x:p>two<x:s x:c="2"/>spaces<x:tab/>tab<x:line-break/>line</x:p></t:help-message></t:content-validation></t:content-validations>"#;
-        let parsed = parse_content_validations(xml).unwrap();
+        let parsed = parse(xml).unwrap();
         assert_eq!(
             parsed[0].help_message.as_ref().unwrap().paragraphs,
             ["two  spaces\ttab\nline"]
         );
 
         let mut encoded = String::new();
-        write_content_validations(&mut encoded, &parsed);
+        write(&mut encoded, &parsed);
         assert!(encoded.contains("<text:s text:c=\"2\"/>"));
         assert!(encoded.contains("<text:tab/>"));
         assert!(encoded.contains("<text:line-break/>"));
@@ -1478,12 +1475,11 @@ mod tests {
             </o:event-listeners>
           </t:content-validation>
         </t:content-validations>"#;
-        let parsed = parse_content_validations(xml).unwrap();
+        let parsed = parse(xml).unwrap();
         let error_macro = parsed[0].error_macro.as_ref().unwrap();
         assert_eq!(error_macro.execute, Some(false));
         assert_eq!(error_macro.event_listeners.len(), 2);
-        let ValidationEventListener::Presentation(listener) = &error_macro.event_listeners[1]
-        else {
+        let EventListener::Presentation(listener) = &error_macro.event_listeners[1] else {
             panic!("expected presentation listener");
         };
         assert_eq!(listener.verb, Some(2));
@@ -1493,10 +1489,10 @@ mod tests {
         );
 
         let mut encoded = String::new();
-        write_content_validations(&mut encoded, &parsed);
+        write(&mut encoded, &parsed);
         let document = format!(
             r#"<office:spreadsheet xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:xlink="http://www.w3.org/1999/xlink">{encoded}</office:spreadsheet>"#
         );
-        assert_eq!(parse_content_validations(&document).unwrap(), parsed);
+        assert_eq!(parse(&document).unwrap(), parsed);
     }
 }
