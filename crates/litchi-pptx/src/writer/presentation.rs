@@ -4,16 +4,6 @@ use crate::error::{Error, Result};
 
 use super::slide::MutableSlide;
 
-/// Placeholder for chart-part publication while chart ownership finishes its
-/// move into the standalone owner.
-#[derive(Debug, Clone, Default)]
-pub struct ChartParts;
-
-/// Placeholder for SmartArt-part publication while diagram ownership finishes
-/// its move into the standalone owner.
-#[derive(Debug, Clone, Default)]
-pub struct SmartArtParts;
-
 /// First legal slide ID used by the writer.
 pub const FIRST_SLIDE_ID: u32 = 256;
 

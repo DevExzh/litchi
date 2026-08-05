@@ -119,6 +119,7 @@ fn xy_worksheet(chart: &Chart) -> String {
                 .len()
                 .max(series.x_values.len())
                 .max(series.bubble_sizes.len())
+                .max(series.categories.len())
         })
         .max()
         .unwrap_or(0);
@@ -128,9 +129,9 @@ fn xy_worksheet(chart: &Chart) -> String {
     for (series_index, series) in chart.series.iter().enumerate() {
         let first = series_index * stride;
         for (offset, suffix) in if bubble {
-            vec![(0, " X"), (1, " Y"), (2, " Size")]
+            vec![(0, " X"), (1, ""), (2, " Size")]
         } else {
-            vec![(0, " X"), (1, " Y")]
+            vec![(0, " X"), (1, "")]
         } {
             let _ = write!(
                 xml,
@@ -146,7 +147,16 @@ fn xy_worksheet(chart: &Chart) -> String {
         let _ = write!(xml, r#"<row r="{number}">"#);
         for (series_index, series) in chart.series.iter().enumerate() {
             let first = series_index * stride;
-            if let Some(value) = series.x_values.get(row) {
+            let x_value = series.x_values.get(row).copied().or_else(|| {
+                (!bubble).then(|| {
+                    series
+                        .categories
+                        .get(row)
+                        .and_then(|value| value.parse::<f64>().ok())
+                        .unwrap_or(row as f64)
+                })
+            });
+            if let Some(value) = x_value {
                 let _ = write!(
                     xml,
                     r#"<c r="{}{number}"><v>{value}</v></c>"#,
@@ -230,5 +240,35 @@ mod tests {
                 .with_bubble_sizes(vec![4.0]),
         );
         assert!(generate(&chart).is_err());
+    }
+
+    #[test]
+    fn keeps_categories_in_column_a_and_series_in_following_columns() {
+        let chart = Chart::new(Kind::Column, 0, 0, 100, 100).add_series(
+            super::super::Series::new("Sales")
+                .with_categories(vec!["Q1".into(), "Q2".into()])
+                .with_values(vec![10.0, 20.0]),
+        );
+
+        let xml = worksheet(&chart);
+        assert!(xml.contains(r#"r="B1" t="inlineStr""#));
+        assert!(xml.contains(r#"r="A2" t="inlineStr"#));
+        assert!(xml.contains(r#"r="B2"><v>10</v>"#));
+        assert!(!xml.contains(r#"r="A2"><v>10</v>"#));
+    }
+
+    #[test]
+    fn scatter_charts_use_numeric_categories_when_x_values_are_absent() {
+        let chart = Chart::new(Kind::Scatter, 0, 0, 100, 100).add_series(
+            super::super::Series::new("Trend")
+                .with_categories(vec!["2".into(), "not numeric".into()])
+                .with_values(vec![10.0, 20.0]),
+        );
+
+        let xml = worksheet(&chart);
+        assert!(xml.contains(r#"r="A2"><v>2</v>"#));
+        assert!(xml.contains(r#"r="B2"><v>10</v>"#));
+        assert!(xml.contains(r#"r="A3"><v>1</v>"#));
+        assert!(xml.contains(r#"r="B3"><v>20</v>"#));
     }
 }

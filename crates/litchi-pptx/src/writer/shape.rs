@@ -3,17 +3,6 @@
 use crate::format::TextFormat;
 use crate::{Error, Result};
 
-/// Optional relationship identifiers supplied by a package writer.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct ShapeRelIds<'a> {
-    /// Image relationship identifier.
-    pub image_rel_id: Option<&'a str>,
-    /// Chart relationship identifier.
-    pub chart_rel_id: Option<&'a str>,
-    /// SmartArt relationship identifiers.
-    pub smartart_rel_ids: Option<(&'a str, &'a str, &'a str, &'a str)>,
-}
-
 /// The bounded set of shape kinds emitted by the standalone writer slice.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
