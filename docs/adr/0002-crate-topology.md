@@ -203,6 +203,15 @@ values. `litchi-iwa` retains movie protobuf decoding, legacy/modern loop-field
 reconciliation, wire-preserving replacement, package transactions, and IWA
 error mapping; Pages, Numbers, Keynote, and their creation examples import the
 canonical common types directly, with no facade compatibility aliases.
+Keynote slide-audio creation uses the adjacent archive-free
+`litchi_keynote::slide::audio::Options` value. It owns only a common geometry
+point and one canonical native `f32` duration, validating finite coordinates
+and a positive representable duration before an IWA adapter can mutate a
+package. `litchi-iwa` retains slide and drawable identifiers, `TSD.MovieArchive`
+decoding, object-graph discovery, zero-size control geometry, media insertion,
+raw-wire updates, build construction, and transaction-scoped readback. The
+audio info and removal result remain IWA-owned because they carry native IDs,
+drawable properties, playback presence, and package-GC results.
 The shape-path value slice follows the same ownership boundary at
 `litchi-iwa-common::shape::path::{Preset, CornerRadius, PolygonSides,
 StarPoints, InnerRadiusRatio}`. These compact, copyable controls and the

@@ -5,11 +5,12 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteSlideAudioOptions};
-use litchi_iwa::shapes::DrawablePoint;
+use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
+use litchi_iwa_common::shape::geometry::Point;
+use litchi_keynote::slide::audio::Options as SlideAudioOptions;
 
-const SLIDE_CENTER: DrawablePoint = DrawablePoint { x: 960.0, y: 540.0 };
+const SLIDE_CENTER: Point = Point { x: 960.0, y: 540.0 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -35,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         0,
         preferred_filename,
         &audio,
-        KeynoteSlideAudioOptions::new(SLIDE_CENTER, Duration::try_from_secs_f64(duration_seconds)?),
+        SlideAudioOptions::new(SLIDE_CENTER, Duration::try_from_secs_f64(duration_seconds)?)?,
     )?;
     let mut properties = editor.slide_audio_properties(0, created.drawable_object_id)?;
     properties.accessibility_description = Some(format!("Embedded audio: {preferred_filename}"));

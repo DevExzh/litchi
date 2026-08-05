@@ -3,6 +3,7 @@
 use super::*;
 use crate::IWorkThemeArchive;
 use crate::image_caption::CaptionThemeStyle;
+use litchi_keynote::slide::audio::Options as SlideAudioOptions;
 
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
 const MEDIA_STYLE_MESSAGE_TYPE: u32 = 3_016;
@@ -103,11 +104,10 @@ pub(in crate::keynote::editor) fn movie_creation_values(
 }
 
 pub(in crate::keynote::editor) fn audio_creation_values(
-    position: DrawablePoint,
-    duration: Duration,
+    options: SlideAudioOptions,
 ) -> Result<(DrawableGeometry, f32)> {
     let geometry = DrawableGeometry {
-        position: Some(position),
+        position: Some(options.position()),
         size: Some(DrawableSize {
             width: 0.0,
             height: 0.0,
@@ -116,7 +116,7 @@ pub(in crate::keynote::editor) fn audio_creation_values(
         angle: Some(DEFAULT_MOVIE_ROTATION_DEGREES),
     }
     .validate()?;
-    Ok((geometry, media_duration_seconds(duration, "audio")?))
+    Ok((geometry, options.duration_seconds()))
 }
 
 fn media_duration_seconds(duration: Duration, kind: &str) -> Result<f32> {

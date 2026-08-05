@@ -155,6 +155,17 @@ archive, package, or native media identifiers. `litchi-iwa` retains
 `KeynoteSlideMovieInfo`/options, graph-aware CRUD, native media identifiers,
 and the mapping from native movie flags to this product value.
 
+Keynote slide-audio creation uses the focused
+`litchi_keynote::slide::audio::Options` value. The fields are private, and
+construction validates finite placement plus a positive duration that fits
+the native finite `f32`-seconds domain; accessors expose the canonical point
+and duration without archive state. The IWA adapter retains audio graph
+discovery, native identifiers, zero-size geometry, wire-preserving mutations,
+package transactions, and the IWA-owned info/removal values. Shared
+`MediaPlaybackSettings` optional fields, loop discriminants, and volume
+validation remain format-neutral IWA playback semantics until their own
+cross-format extraction.
+
 Shape paths use the focused `litchi_iwa_common::shape::path` module. Its
 `Preset`, `CornerRadius`, `PolygonSides`, `StarPoints`, and `InnerRadiusRatio`
 names are concise in their path context, fixed-size where scalar, and

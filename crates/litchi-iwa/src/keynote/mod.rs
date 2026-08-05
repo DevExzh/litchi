@@ -44,7 +44,7 @@ pub use editor::{
     KeynoteJiggleIntensity, KeynoteKeyboardBuild, KeynoteKeyboardDirection, KeynoteMotionPath,
     KeynoteMotionPathNode, KeynoteMotionPathNodeType, KeynoteMotionPathPoint, KeynoteMotionSubpath,
     KeynoteMoveAction, KeynoteObjectBuildEffect, KeynoteOpacityAction, KeynoteRotationAction,
-    KeynoteRotationDirection, KeynoteScaleAction, KeynoteSlideAudioInfo, KeynoteSlideAudioOptions,
+    KeynoteRotationDirection, KeynoteScaleAction, KeynoteSlideAudioInfo,
     KeynoteSlideChartInfo, KeynoteSlideImageInfo, KeynoteSlideImageKind, KeynoteSlideImageOptions,
     KeynoteSlideInfo, KeynoteSlideLayoutId, KeynoteSlideLayoutInfo, KeynoteSlideMovieInfo,
     KeynoteSlideMovieOptions, KeynoteSlideShapeInfo, KeynoteSlideShapeKind, KeynoteSlideTable,

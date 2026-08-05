@@ -6164,6 +6164,20 @@ both changed crates passed no-dependency `-D warnings` Clippy, and the crate
 boundary checker remained valid. No native application claim is made for this
 structural ownership slice.
 
+The Keynote slide-audio options slice now follows the archive boundary at
+`litchi_keynote::slide::audio::Options`. The semantic value is a compact,
+12-byte archive-free placement/duration pair: finite coordinates and positive
+native `f32` duration representation are checked before package work begins.
+The IWA adapter alone retains drawable and data identifiers, `TSD.MovieArchive`
+decoding, graph lookup, zero-size geometry, raw wire updates, automatic build
+objects, media records, and transactional publication. `KeynoteSlideAudioInfo`
+and the removal result remain IWA-owned because they expose native IDs,
+drawable properties, optional playback state, and package-GC disposition. The
+shared playback settings continue to preserve explicit absence versus native
+defaults, unknown loop values, and strict volume validation in their existing
+IWA boundary. The old `KeynoteSlideAudioOptions` definition and re-exports are
+removed rather than retained as compatibility aliases.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

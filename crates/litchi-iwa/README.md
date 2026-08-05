@@ -886,8 +886,9 @@ without copying a package or drawable:
 ```rust
 use std::fs;
 use std::time::Duration;
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteSlideAudioOptions};
-use litchi_iwa::shapes::DrawablePoint;
+use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa_common::shape::geometry::Point;
+use litchi_keynote::slide::audio::Options as SlideAudioOptions;
 
 let audio = fs::read("narration.aiff")?;
 let mut keynote = KeynoteDocumentBuilder::new().build()?;
@@ -895,10 +896,7 @@ let source = keynote.add_slide_audio(
     0,
     "narration.aiff",
     &audio,
-    KeynoteSlideAudioOptions::new(
-        DrawablePoint { x: 960.0, y: 540.0 },
-        Duration::from_secs(12),
-    ),
+    SlideAudioOptions::new(Point { x: 960.0, y: 540.0 }, Duration::from_secs(12))?,
 )?;
 let duplicate = keynote.duplicate_slide_audio(0, source.drawable_object_id)?;
 assert_eq!(duplicate.audio_data_identifier, source.audio_data_identifier);

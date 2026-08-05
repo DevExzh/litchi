@@ -5055,7 +5055,7 @@ pub use litchi_keynote::transition::{
     TextDelivery, TextDeliveryKind,
 };
 pub use litchi_keynote::{Mode, Seconds, Settings, Size};
-pub use slide_audio::{KeynoteSlideAudioInfo, KeynoteSlideAudioOptions, RemovedKeynoteSlideAudio};
+pub use slide_audio::{KeynoteSlideAudioInfo, RemovedKeynoteSlideAudio};
 pub use slide_charts::{KeynoteSlideChartInfo, RemovedKeynoteSlideChart};
 use slide_graph::*;
 pub use slide_images::{
