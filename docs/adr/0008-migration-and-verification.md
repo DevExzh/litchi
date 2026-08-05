@@ -5867,8 +5867,8 @@ archive-free and heap-free; `Inset` rejects negative, NaN, and infinite input
 with a typed allocation-free error. IWA retains only native alignment and
 padding conversion, style inheritance, and package transactions. The Numbers,
 Pages, Keynote, and layout-generator consumers now import the common owner
-directly; the old flat module is reduced to migration aliases while the
-concurrent root API change remains in progress.
+directly; the old public `litchi-iwa::table_cell_layout` module and its
+migration aliases are removed rather than retained for compatibility.
 
 Native Computer Use verification of a fresh
 `/tmp/litchi-iwa-layout.ONYCvR` fixture opened `table-layouts.numbers` and

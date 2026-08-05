@@ -3,6 +3,12 @@
 use super::*;
 use litchi_iwa_common::table::cell::layout::{Inset, Insets, Layout, TextWrap, VerticalAlignment};
 
+impl From<litchi_iwa_common::table::cell::layout::Error> for Error {
+    fn from(error: litchi_iwa_common::table::cell::layout::Error) -> Self {
+        Self::ParseError(error.to_string())
+    }
+}
+
 const NATIVE_ALIGN_TOP: i32 =
     tswp::shape_style_properties_archive::VerticalAlignmentType::KFrameAlignTop as i32;
 const NATIVE_ALIGN_MIDDLE: i32 =

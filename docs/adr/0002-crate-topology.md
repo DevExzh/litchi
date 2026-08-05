@@ -171,8 +171,10 @@ The archive-free table-cell text layout now follows the same ownership rule at
 Insets, Layout}`. The common leaf owns compact fixed-size values and its
 allocation-free inset validation error; the IWA Numbers adapter retains native
 alignment identifiers, padding archives, cell-style inheritance, and
-transactional package mutation. The remaining flat facade module is a thin
-error/re-export adapter pending the concurrent root-module migration.
+transactional package mutation. All concrete table editors consume the common
+module directly; the former public `litchi-iwa::table_cell_layout` facade and
+its contextual aliases are removed rather than retained as compatibility
+paths.
 The archive-free hidden-axis value now follows the same boundary at
 `litchi-iwa-common::table::axis::{AxisIndex, HiddenAxes}`. `HiddenAxes` stores a
 sorted, duplicate-free boxed slice and reports duplicate positions through its
