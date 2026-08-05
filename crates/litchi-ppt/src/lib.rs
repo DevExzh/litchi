@@ -199,7 +199,7 @@ pub use color_scheme::{
     PowerPointColorScheme, PowerPointColorSchemeAtom, PowerPointColorSchemeAtomKind,
     PowerPointSchemeColor,
 };
-pub use comments::{PowerPointCommentAuthor, PowerPointCommentAuthors};
+pub use comments::{Author, Authors};
 pub use current_user::CurrentUser;
 pub use document_atom::{
     PowerPointDocumentAtom, PowerPointDocumentDimensions, PowerPointSlideSizeType,
