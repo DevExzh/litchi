@@ -145,28 +145,28 @@ macro_rules! chart_xml_fragment {
 
 chart_xml_fragment!(
     /// Complete chart-space shape properties, including arbitrary DrawingML children.
-    ChartShapeProperties,
+    ShapeProperties,
     b"spPr",
     "chart shape properties"
 );
 
 chart_xml_fragment!(
     /// Complete chart-space text properties, including arbitrary DrawingML children.
-    ChartTextProperties,
+    TextProperties,
     b"txPr",
     "chart text properties"
 );
 
 chart_xml_fragment!(
     /// Complete chart-space extension list, including extension namespace content.
-    ChartExtensionList,
+    ExtensionList,
     b"extLst",
     "chart extension list"
 );
 
 /// Printed chart header and footer strings and selection flags.
 #[derive(Debug, Clone)]
-pub struct ChartHeaderFooter {
+pub struct HeaderFooter {
     /// Odd-page header
     pub odd_header: Option<String>,
     /// Odd-page footer
@@ -187,7 +187,7 @@ pub struct ChartHeaderFooter {
     pub different_first: bool,
 }
 
-impl ChartHeaderFooter {
+impl HeaderFooter {
     /// Create an empty header/footer using schema defaults.
     #[inline]
     pub fn new() -> Self {
@@ -205,7 +205,7 @@ impl ChartHeaderFooter {
     }
 }
 
-impl Default for ChartHeaderFooter {
+impl Default for HeaderFooter {
     #[inline]
     fn default() -> Self {
         Self::new()
@@ -214,7 +214,7 @@ impl Default for ChartHeaderFooter {
 
 /// Page margins for printing a chart, in inches.
 #[derive(Debug, Clone, Copy)]
-pub struct ChartPageMargins {
+pub struct PageMargins {
     /// Left margin
     pub left: f64,
     /// Right margin
@@ -229,7 +229,7 @@ pub struct ChartPageMargins {
     pub footer: f64,
 }
 
-impl ChartPageMargins {
+impl PageMargins {
     /// Create a complete page-margin set.
     #[inline]
     pub fn new(left: f64, right: f64, top: f64, bottom: f64, header: f64, footer: f64) -> Self {
@@ -246,7 +246,7 @@ impl ChartPageMargins {
 
 /// Printed chart page orientation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum ChartPageOrientation {
+pub enum PageOrientation {
     /// Use the printer default
     #[default]
     Default,
@@ -256,7 +256,7 @@ pub enum ChartPageOrientation {
     Landscape,
 }
 
-impl ChartPageOrientation {
+impl PageOrientation {
     pub(crate) const fn xml_value(self) -> &'static str {
         match self {
             Self::Default => "default",
@@ -268,13 +268,13 @@ impl ChartPageOrientation {
 
 /// Page setup used when printing a chart.
 #[derive(Debug, Clone, Copy)]
-pub struct ChartPageSetup {
+pub struct PageSetup {
     /// Printer paper-size code
     pub paper_size: u32,
     /// First printed page number
     pub first_page_number: u32,
     /// Page orientation
-    pub orientation: ChartPageOrientation,
+    pub orientation: PageOrientation,
     /// Print in black and white
     pub black_and_white: bool,
     /// Use draft quality
@@ -289,14 +289,14 @@ pub struct ChartPageSetup {
     pub copies: u32,
 }
 
-impl ChartPageSetup {
+impl PageSetup {
     /// Create page setup using schema defaults.
     #[inline]
     pub fn new() -> Self {
         Self {
             paper_size: 1,
             first_page_number: 1,
-            orientation: ChartPageOrientation::Default,
+            orientation: PageOrientation::Default,
             black_and_white: false,
             draft: false,
             use_first_page_number: false,
@@ -307,7 +307,7 @@ impl ChartPageSetup {
     }
 }
 
-impl Default for ChartPageSetup {
+impl Default for PageSetup {
     #[inline]
     fn default() -> Self {
         Self::new()
@@ -316,16 +316,16 @@ impl Default for ChartPageSetup {
 
 /// Optional chart printing configuration.
 #[derive(Debug, Clone, Default)]
-pub struct ChartPrintSettings {
+pub struct PrintSettings {
     /// Header and footer settings
-    pub header_footer: Option<ChartHeaderFooter>,
+    pub header_footer: Option<HeaderFooter>,
     /// Page margins
-    pub page_margins: Option<ChartPageMargins>,
+    pub page_margins: Option<PageMargins>,
     /// Page setup
-    pub page_setup: Option<ChartPageSetup>,
+    pub page_setup: Option<PageSetup>,
 }
 
-impl ChartPrintSettings {
+impl PrintSettings {
     /// Create an explicitly empty print-settings container.
     #[inline]
     pub fn new() -> Self {
@@ -339,15 +339,15 @@ pub struct PivotFormat {
     /// Zero-based data-point index
     pub index: u32,
     /// Shape properties for the pivot-format point
-    pub shape_properties: Option<ChartShapeProperties>,
+    pub shape_properties: Option<ShapeProperties>,
     /// Text properties for the pivot-format point
-    pub text_properties: Option<ChartTextProperties>,
+    pub text_properties: Option<TextProperties>,
     /// Optional marker override
     pub marker: Option<Marker>,
     /// Optional data-label override
     pub data_label: Option<DataLabel>,
     /// Pivot-format extension list
-    pub extension_list: Option<ChartExtensionList>,
+    pub extension_list: Option<ExtensionList>,
 }
 
 /// Pivot-table source metadata for a pivot chart.
@@ -375,7 +375,7 @@ impl PivotSource {
 /// Each switch is optional because an omitted switch is distinct from an
 /// explicitly enabled or disabled switch in the chart XML.
 #[derive(Debug, Clone, Default)]
-pub struct ChartProtection {
+pub struct Protection {
     /// Prevent changes to the chart object
     pub chart_object: Option<bool>,
     /// Prevent changes to chart data
@@ -495,7 +495,7 @@ pub enum ColorMapOverride {
 
 /// Relationship metadata for the data source embedded in or linked from a chart.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartExternalData {
+pub struct ExternalData {
     /// Relationship identifier in the chart part, if already allocated
     pub relationship_id: Option<String>,
     /// Automatic-update setting; `None` preserves an omitted child element
@@ -504,12 +504,12 @@ pub struct ChartExternalData {
 
 /// Relationship metadata for a chart user-shapes drawing part.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChartUserShapes {
+pub struct UserShapes {
     /// Relationship identifier in the chart part, if already allocated
     pub relationship_id: Option<String>,
 }
 
-impl ChartUserShapes {
+impl UserShapes {
     /// Create user-shapes metadata for an existing chart relationship.
     pub fn new(relationship_id: impl Into<String>) -> Self {
         Self {
@@ -525,7 +525,7 @@ impl ChartUserShapes {
     }
 }
 
-impl ChartExternalData {
+impl ExternalData {
     /// Create external-data metadata for an existing chart relationship.
     pub fn new(relationship_id: impl Into<String>) -> Self {
         Self {
@@ -654,11 +654,11 @@ pub struct WallFloor {
     /// Thickness (0-4096 points)
     pub thickness: Option<u32>,
     /// DrawingML shape properties for the surface
-    pub shape_properties: Option<ChartShapeProperties>,
+    pub shape_properties: Option<ShapeProperties>,
     /// Picture-fill placement options
     pub picture_options: Option<PictureOptions>,
     /// Surface extension list
-    pub extension_list: Option<ChartExtensionList>,
+    pub extension_list: Option<ExtensionList>,
 }
 
 impl WallFloor {
@@ -698,11 +698,11 @@ pub struct Chart {
     /// Whether the chart title overlays the plot area
     pub title_overlay: bool,
     /// DrawingML shape properties for the chart title
-    pub title_shape_properties: Option<ChartShapeProperties>,
+    pub title_shape_properties: Option<ShapeProperties>,
     /// DrawingML text properties for the chart title
-    pub title_text_properties: Option<ChartTextProperties>,
+    pub title_text_properties: Option<TextProperties>,
     /// Chart-title extension list
-    pub title_extension_list: Option<ChartExtensionList>,
+    pub title_extension_list: Option<ExtensionList>,
     /// Whether auto-generated title has been deleted
     pub auto_title_deleted: bool,
     /// Optional pivot-chart formatting collection; `Some` preserves an empty wrapper
@@ -726,7 +726,7 @@ pub struct Chart {
     /// Show data in hidden rows and columns
     pub show_data_labels_over_max: bool,
     /// Optional extension list inside the chart element
-    pub chart_extension_list: Option<ChartExtensionList>,
+    pub chart_extension_list: Option<ExtensionList>,
     /// Chart style index
     pub style: Option<u32>,
     /// Optional DrawingML theme color-map override
@@ -736,23 +736,23 @@ pub struct Chart {
     /// Optional pivot-table source metadata
     pub pivot_source: Option<PivotSource>,
     /// Optional chart interaction protection; `Some` preserves an empty wrapper
-    pub protection: Option<ChartProtection>,
+    pub protection: Option<Protection>,
     /// Use 1904 date system
     pub date_1904: bool,
     /// Rounding corners
     pub rounded_corners: bool,
     /// Optional external or embedded chart data relationship metadata
-    pub external_data: Option<ChartExternalData>,
+    pub external_data: Option<ExternalData>,
     /// Optional chart user-shapes drawing relationship metadata
-    pub user_shapes: Option<ChartUserShapes>,
+    pub user_shapes: Option<UserShapes>,
     /// Optional chart-space DrawingML shape properties
-    pub shape_properties: Option<ChartShapeProperties>,
+    pub shape_properties: Option<ShapeProperties>,
     /// Optional chart-space DrawingML text properties
-    pub text_properties: Option<ChartTextProperties>,
+    pub text_properties: Option<TextProperties>,
     /// Optional chart printing configuration
-    pub print_settings: Option<ChartPrintSettings>,
+    pub print_settings: Option<PrintSettings>,
     /// Optional chart-space extension list
-    pub extension_list: Option<ChartExtensionList>,
+    pub extension_list: Option<ExtensionList>,
 }
 
 impl Chart {

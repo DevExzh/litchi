@@ -4,8 +4,8 @@
 //! data points, and their associated properties.
 
 use crate::chart::data::{Layout, NumberFormat, NumericData, StringData, TitleText};
-use crate::chart::model::{ChartExtensionList, ChartShapeProperties, PictureOptions};
-use crate::chart::plot_area::{BarShape, ChartLines};
+use crate::chart::model::{ExtensionList, PictureOptions, ShapeProperties};
+use crate::chart::plot_area::{BarShape, Lines};
 use crate::chart::types::{DataLabelPosition, MarkerStyle};
 
 /// Marker formatting shared by chart elements that support point symbols.
@@ -16,9 +16,9 @@ pub struct Marker {
     /// Marker size in points (2-72)
     pub size: Option<u32>,
     /// DrawingML shape properties for the marker
-    pub shape_properties: Option<ChartShapeProperties>,
+    pub shape_properties: Option<ShapeProperties>,
     /// Marker extension list
-    pub extension_list: Option<ChartExtensionList>,
+    pub extension_list: Option<ExtensionList>,
 }
 
 impl Marker {
@@ -51,19 +51,19 @@ pub struct DataPoint {
     /// Whether an explicit marker element is present, including an empty default marker
     pub marker_present: bool,
     /// DrawingML shape properties for the marker
-    pub marker_shape_properties: Option<ChartShapeProperties>,
+    pub marker_shape_properties: Option<ShapeProperties>,
     /// Marker extension list
-    pub marker_extension_list: Option<ChartExtensionList>,
+    pub marker_extension_list: Option<ExtensionList>,
     /// Invert colors if negative
     pub invert_if_negative: bool,
     /// Show bubble in 3D
     pub bubble_3d: Option<bool>,
     /// DrawingML shape properties
-    pub shape_properties: Option<ChartShapeProperties>,
+    pub shape_properties: Option<ShapeProperties>,
     /// Picture-fill placement options
     pub picture_options: Option<PictureOptions>,
     /// Data-point extension list
-    pub extension_list: Option<ChartExtensionList>,
+    pub extension_list: Option<ExtensionList>,
 }
 
 impl DataPoint {
@@ -111,9 +111,9 @@ pub struct DataLabels {
     /// Number format for label values
     pub number_format: Option<NumberFormat>,
     /// DrawingML shape properties for all labels
-    pub shape_properties: Option<ChartShapeProperties>,
+    pub shape_properties: Option<ShapeProperties>,
     /// DrawingML text properties for all labels
-    pub text_properties: Option<crate::chart::model::ChartTextProperties>,
+    pub text_properties: Option<crate::chart::model::TextProperties>,
     /// Position of data labels
     pub position: Option<DataLabelPosition>,
     /// Show legend key
@@ -131,13 +131,13 @@ pub struct DataLabels {
     /// Show leader lines between labels and data points
     pub show_leader_lines: bool,
     /// Leader-line formatting
-    pub leader_lines: Option<ChartLines>,
+    pub leader_lines: Option<Lines>,
     /// Separator between label components
     pub separator: Option<String>,
     /// Whether data labels are deleted
     pub deleted: bool,
     /// Data-label collection extension list
-    pub extension_list: Option<ChartExtensionList>,
+    pub extension_list: Option<ExtensionList>,
 }
 
 impl DataLabels {
@@ -193,9 +193,9 @@ pub struct DataLabel {
     /// Number format for the label value
     pub number_format: Option<NumberFormat>,
     /// DrawingML shape properties for this label
-    pub shape_properties: Option<ChartShapeProperties>,
+    pub shape_properties: Option<ShapeProperties>,
     /// DrawingML text properties for this label
-    pub text_properties: Option<crate::chart::model::ChartTextProperties>,
+    pub text_properties: Option<crate::chart::model::TextProperties>,
     /// Position of the label
     pub position: Option<DataLabelPosition>,
     /// Show legend key
@@ -213,7 +213,7 @@ pub struct DataLabel {
     /// Separator between label components
     pub separator: Option<String>,
     /// Point data-label extension list
-    pub extension_list: Option<ChartExtensionList>,
+    pub extension_list: Option<ExtensionList>,
 }
 
 impl DataLabel {
@@ -266,9 +266,9 @@ pub struct ErrorBar {
     /// No end cap on error bars
     pub no_end_cap: bool,
     /// DrawingML shape properties for the error bars
-    pub shape_properties: Option<ChartShapeProperties>,
+    pub shape_properties: Option<ShapeProperties>,
     /// Error-bar extension list
-    pub extension_list: Option<ChartExtensionList>,
+    pub extension_list: Option<ExtensionList>,
 }
 
 /// Error bar direction.
@@ -314,7 +314,7 @@ pub struct Trendline {
     /// Name of the trendline
     pub name: Option<String>,
     /// DrawingML shape properties for the trendline
-    pub shape_properties: Option<ChartShapeProperties>,
+    pub shape_properties: Option<ShapeProperties>,
     /// Polynomial order (for polynomial trendlines, 2-6)
     pub order: Option<u32>,
     /// Moving average period (for moving average, 2-255)
@@ -338,13 +338,13 @@ pub struct Trendline {
     /// Number format for the trendline label
     pub label_number_format: Option<NumberFormat>,
     /// DrawingML shape properties for the trendline label
-    pub label_shape_properties: Option<ChartShapeProperties>,
+    pub label_shape_properties: Option<ShapeProperties>,
     /// DrawingML text properties for the trendline label
-    pub label_text_properties: Option<crate::chart::model::ChartTextProperties>,
+    pub label_text_properties: Option<crate::chart::model::TextProperties>,
     /// Trendline-label extension list
-    pub label_extension_list: Option<ChartExtensionList>,
+    pub label_extension_list: Option<ExtensionList>,
     /// Trendline extension list
-    pub extension_list: Option<ChartExtensionList>,
+    pub extension_list: Option<ExtensionList>,
 }
 
 /// Trendline type.
@@ -421,9 +421,9 @@ pub struct Series {
     /// Whether an explicit series marker is present, including an empty default marker
     pub marker_present: bool,
     /// DrawingML shape properties for the series marker
-    pub marker_shape_properties: Option<ChartShapeProperties>,
+    pub marker_shape_properties: Option<ShapeProperties>,
     /// Series-marker extension list
-    pub marker_extension_list: Option<ChartExtensionList>,
+    pub marker_extension_list: Option<ExtensionList>,
     /// Explosion (for pie/doughnut, in percent)
     pub explosion: Option<u32>,
     /// Smooth line (for line/scatter charts)
@@ -437,13 +437,13 @@ pub struct Series {
     /// Trendlines
     pub trendlines: Vec<Trendline>,
     /// DrawingML shape properties
-    pub shape_properties: Option<ChartShapeProperties>,
+    pub shape_properties: Option<ShapeProperties>,
     /// Area- and bar-series picture-fill placement options
     pub picture_options: Option<PictureOptions>,
     /// Per-series shape override for bar and column charts
     pub bar_shape: Option<BarShape>,
     /// Series extension list
-    pub extension_list: Option<ChartExtensionList>,
+    pub extension_list: Option<ExtensionList>,
 }
 
 impl Series {

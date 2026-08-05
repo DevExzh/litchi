@@ -6,7 +6,7 @@
 use crate::chart::axis::Axis;
 use crate::chart::bubble::{Scale as BubbleScale, Size as BubbleSize};
 use crate::chart::data::Layout;
-use crate::chart::model::{ChartExtensionList, ChartShapeProperties, ChartTextProperties};
+use crate::chart::model::{ExtensionList, ShapeProperties, TextProperties};
 use crate::chart::series::{DataLabels, Series};
 use crate::chart::types::{
     BarDirection, BarGrouping, OfPieSplitType, OfPieType, RadarStyle, ScatterStyle,
@@ -24,9 +24,9 @@ pub struct PlotArea {
     /// Optional chart data table
     pub data_table: Option<DataTable>,
     /// DrawingML shape properties for the plot area
-    pub shape_properties: Option<ChartShapeProperties>,
+    pub shape_properties: Option<ShapeProperties>,
     /// Plot-area extension list
-    pub extension_list: Option<ChartExtensionList>,
+    pub extension_list: Option<ExtensionList>,
 }
 
 impl PlotArea {
@@ -70,11 +70,11 @@ pub struct DataTable {
     /// Show legend keys beside series rows
     pub show_legend_keys: bool,
     /// DrawingML shape properties
-    pub shape_properties: Option<ChartShapeProperties>,
+    pub shape_properties: Option<ShapeProperties>,
     /// DrawingML text properties
-    pub text_properties: Option<ChartTextProperties>,
+    pub text_properties: Option<TextProperties>,
     /// Data-table extension list
-    pub extension_list: Option<ChartExtensionList>,
+    pub extension_list: Option<ExtensionList>,
 }
 
 impl Default for PlotArea {
@@ -179,7 +179,7 @@ pub struct TypeGroupCommon {
     /// Identifiers of the axes used by this chart group
     pub axis_ids: Vec<u32>,
     /// Chart-type extension list
-    pub extension_list: Option<ChartExtensionList>,
+    pub extension_list: Option<ExtensionList>,
 }
 
 impl TypeGroupCommon {
@@ -211,12 +211,12 @@ impl Default for TypeGroupCommon {
 
 /// A schema-defined chart line whose DrawingML styling is optional.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ChartLines {
+pub struct Lines {
     /// DrawingML shape properties for the line
-    pub shape_properties: Option<ChartShapeProperties>,
+    pub shape_properties: Option<ShapeProperties>,
 }
 
-impl ChartLines {
+impl Lines {
     /// Create an unformatted chart line.
     #[inline]
     pub fn new() -> Self {
@@ -230,11 +230,11 @@ pub struct UpDownBars {
     /// Gap between bars (0-500 percent)
     pub gap_width: Option<u32>,
     /// Optional formatting container for rising-value bars
-    pub up_bars: Option<ChartLines>,
+    pub up_bars: Option<Lines>,
     /// Optional formatting container for falling-value bars
-    pub down_bars: Option<ChartLines>,
+    pub down_bars: Option<Lines>,
     /// Up/down-bar extension list
-    pub extension_list: Option<ChartExtensionList>,
+    pub extension_list: Option<ExtensionList>,
 }
 
 /// Area chart type group.
@@ -245,7 +245,7 @@ pub struct AreaTypeGroup {
     /// Grouping type
     pub grouping: BarGrouping,
     /// Drop lines connecting points to the category axis
-    pub drop_lines: Option<ChartLines>,
+    pub drop_lines: Option<Lines>,
 }
 
 impl AreaTypeGroup {
@@ -270,7 +270,7 @@ pub struct Area3DTypeGroup {
     /// Gap depth (0-500%)
     pub gap_depth: Option<u32>,
     /// Drop lines connecting points to the category axis
-    pub drop_lines: Option<ChartLines>,
+    pub drop_lines: Option<Lines>,
 }
 
 impl Area3DTypeGroup {
@@ -300,7 +300,7 @@ pub struct BarTypeGroup {
     /// Overlap (-100% to 100%)
     pub overlap: Option<i32>,
     /// Connector-line formatting entries
-    pub series_lines: Vec<ChartLines>,
+    pub series_lines: Vec<Lines>,
 }
 
 impl BarTypeGroup {
@@ -497,9 +497,9 @@ pub struct LineTypeGroup {
     /// Smooth the chart-group lines
     pub smooth: bool,
     /// Drop lines connecting points to the category axis
-    pub drop_lines: Option<ChartLines>,
+    pub drop_lines: Option<Lines>,
     /// Lines connecting the highest and lowest values
-    pub high_low_lines: Option<ChartLines>,
+    pub high_low_lines: Option<Lines>,
     /// Up/down bars between corresponding series points
     pub up_down_bars: Option<UpDownBars>,
 }
@@ -530,7 +530,7 @@ pub struct Line3DTypeGroup {
     /// Gap depth (0-500%)
     pub gap_depth: Option<u32>,
     /// Drop lines connecting points to the category axis
-    pub drop_lines: Option<ChartLines>,
+    pub drop_lines: Option<Lines>,
 }
 
 impl Line3DTypeGroup {
@@ -591,7 +591,7 @@ pub struct OfPieTypeGroup {
     /// Secondary plot size (5-200 percent)
     pub second_pie_size: Option<u32>,
     /// Connector-line formatting entries between the primary and secondary plots
-    pub series_lines: Vec<ChartLines>,
+    pub series_lines: Vec<Lines>,
 }
 
 impl OfPieTypeGroup {
@@ -681,9 +681,9 @@ pub struct StockTypeGroup {
     /// Common properties
     pub common: TypeGroupCommon,
     /// Drop lines connecting points to the category axis
-    pub drop_lines: Option<ChartLines>,
+    pub drop_lines: Option<Lines>,
     /// Lines connecting the highest and lowest values
-    pub high_low_lines: Option<ChartLines>,
+    pub high_low_lines: Option<Lines>,
     /// Up/down bars between corresponding series points
     pub up_down_bars: Option<UpDownBars>,
 }
@@ -714,7 +714,7 @@ pub struct BandFormat {
     /// Zero-based band index
     pub index: u32,
     /// DrawingML shape properties for the surface band
-    pub shape_properties: Option<ChartShapeProperties>,
+    pub shape_properties: Option<ShapeProperties>,
 }
 
 impl BandFormat {

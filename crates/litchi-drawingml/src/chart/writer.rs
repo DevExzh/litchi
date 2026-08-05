@@ -6,14 +6,13 @@ use crate::chart::axis::{Axis, AxisCommon, CategoryAxis, DateAxis, SeriesAxis, V
 use crate::chart::data::{Layout, NumericData, StringData, TitleText};
 use crate::chart::legend::Legend;
 use crate::chart::model::{
-    Chart, ChartExtensionList, ChartExternalData, ChartHeaderFooter, ChartPageMargins,
-    ChartPageSetup, ChartPrintSettings, ChartProtection, ChartShapeProperties, ChartTextProperties,
-    ChartUserShapes, ColorMapOverride, ColorMapping, PictureOptions, PivotFormat, PivotSource,
-    View3D, WallFloor,
+    Chart, ColorMapOverride, ColorMapping, ExtensionList, ExternalData, HeaderFooter, PageMargins,
+    PageSetup, PictureOptions, PivotFormat, PivotSource, PrintSettings, Protection,
+    ShapeProperties, TextProperties, UserShapes, View3D, WallFloor,
 };
 use crate::chart::plot_area::{
     Area3DTypeGroup, AreaTypeGroup, BandFormat, Bar3DTypeGroup, BarTypeGroup, BubbleTypeGroup,
-    ChartLines, DataTable, DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, OfPieTypeGroup,
+    DataTable, DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, Lines, OfPieTypeGroup,
     Pie3DTypeGroup, PieTypeGroup, PlotArea, RadarTypeGroup, ScatterTypeGroup, StockTypeGroup,
     Surface3DTypeGroup, SurfaceTypeGroup, TypeGroup, TypeGroupCommon, UpDownBars,
 };
@@ -262,7 +261,7 @@ pub fn write_with_rels<W: Write>(
 
 fn write_user_shapes<W: Write>(
     writer: &mut W,
-    user_shapes: &ChartUserShapes,
+    user_shapes: &UserShapes,
     relationship_id_override: Option<&str>,
 ) -> std::io::Result<()> {
     let relationship_id = relationship_id_override
@@ -279,7 +278,7 @@ fn write_user_shapes<W: Write>(
 
 fn write_external_data<W: Write>(
     writer: &mut W,
-    external_data: &ChartExternalData,
+    external_data: &ExternalData,
     relationship_id_override: Option<&str>,
 ) -> std::io::Result<()> {
     let relationship_id = relationship_id_override
@@ -307,9 +306,9 @@ fn write_title<W: Write>(
     title: &TitleText,
     layout: Option<&Layout>,
     overlay: bool,
-    shape_properties: Option<&ChartShapeProperties>,
-    text_properties: Option<&ChartTextProperties>,
-    extension_list: Option<&ChartExtensionList>,
+    shape_properties: Option<&ShapeProperties>,
+    text_properties: Option<&TextProperties>,
+    extension_list: Option<&ExtensionList>,
 ) -> std::io::Result<()> {
     write!(writer, "<c:title>")?;
 
@@ -390,7 +389,7 @@ fn write_color_mapping_attributes<W: Write>(
 
 fn write_chart_protection<W: Write>(
     writer: &mut W,
-    protection: &ChartProtection,
+    protection: &Protection,
 ) -> std::io::Result<()> {
     write!(writer, "<c:protection>")?;
     for (name, value) in [
@@ -444,10 +443,7 @@ fn write_pivot_formats<W: Write>(writer: &mut W, formats: &[PivotFormat]) -> std
     Ok(())
 }
 
-fn write_print_settings<W: Write>(
-    writer: &mut W,
-    settings: &ChartPrintSettings,
-) -> std::io::Result<()> {
+fn write_print_settings<W: Write>(writer: &mut W, settings: &PrintSettings) -> std::io::Result<()> {
     write!(writer, "<c:printSettings>")?;
     if let Some(header_footer) = settings.header_footer.as_ref() {
         write_chart_header_footer(writer, header_footer)?;
@@ -464,7 +460,7 @@ fn write_print_settings<W: Write>(
 
 fn write_chart_header_footer<W: Write>(
     writer: &mut W,
-    header_footer: &ChartHeaderFooter,
+    header_footer: &HeaderFooter,
 ) -> std::io::Result<()> {
     write!(
         writer,
@@ -503,7 +499,7 @@ fn write_chart_header_footer<W: Write>(
 
 fn write_chart_page_margins<W: Write>(
     writer: &mut W,
-    margins: &ChartPageMargins,
+    margins: &PageMargins,
 ) -> std::io::Result<()> {
     for (name, value) in [
         ("left", margins.left),
@@ -527,7 +523,7 @@ fn write_chart_page_margins<W: Write>(
     Ok(())
 }
 
-fn write_chart_page_setup<W: Write>(writer: &mut W, setup: &ChartPageSetup) -> std::io::Result<()> {
+fn write_chart_page_setup<W: Write>(writer: &mut W, setup: &PageSetup) -> std::io::Result<()> {
     write!(
         writer,
         r#"<c:pageSetup paperSize="{}" firstPageNumber="{}" orientation="{}" blackAndWhite="{}" draft="{}" useFirstPageNumber="{}" horizontalDpi="{}" verticalDpi="{}" copies="{}"/>"#,
@@ -567,8 +563,8 @@ fn write_marker_parts<W: Write>(
     writer: &mut W,
     symbol: Option<MarkerStyle>,
     size: Option<u32>,
-    shape_properties: Option<&ChartShapeProperties>,
-    extension_list: Option<&ChartExtensionList>,
+    shape_properties: Option<&ShapeProperties>,
+    extension_list: Option<&ExtensionList>,
     description: &str,
 ) -> std::io::Result<()> {
     if size.is_some_and(|size| !(2..=72).contains(&size)) {
@@ -2225,7 +2221,7 @@ fn write_up_down_bars<W: Write>(writer: &mut W, bars: &UpDownBars) -> std::io::R
 fn write_chart_lines<W: Write>(
     writer: &mut W,
     element_name: &str,
-    lines: &ChartLines,
+    lines: &Lines,
 ) -> std::io::Result<()> {
     if let Some(shape_properties) = lines.shape_properties.as_ref() {
         write!(writer, "<c:{element_name}>")?;

@@ -92,16 +92,16 @@ pub use data::{
 };
 pub use legend::Legend;
 pub use model::{
-    Chart, ChartExtensionList, ChartExternalData, ChartHeaderFooter, ChartPageMargins,
-    ChartPageOrientation, ChartPageSetup, ChartPrintSettings, ChartProtection,
-    ChartShapeProperties, ChartTextProperties, ChartUserShapes, ColorMapOverride, ColorMapping,
-    ColorSchemeIndex, PictureFormat, PictureOptions, PivotFormat, PivotSource, View3D, WallFloor,
+    Chart, ColorMapOverride, ColorMapping, ColorSchemeIndex, ExtensionList, ExternalData,
+    HeaderFooter, PageMargins, PageOrientation, PageSetup, PictureFormat, PictureOptions,
+    PivotFormat, PivotSource, PrintSettings, Protection, ShapeProperties, TextProperties,
+    UserShapes, View3D, WallFloor,
 };
 pub use plot_area::{
     Area3DTypeGroup, AreaTypeGroup, BandFormat, Bar3DTypeGroup, BarShape, BarTypeGroup,
-    BubbleTypeGroup, ChartLines, DataTable, DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup,
+    BubbleTypeGroup, DataTable, DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, Lines,
     OfPieTypeGroup, Pie3DTypeGroup, PieTypeGroup, PlotArea, RadarTypeGroup, ScatterTypeGroup,
     StockTypeGroup, Surface3DTypeGroup, SurfaceTypeGroup, TypeGroup, UpDownBars,
 };
 pub use series::{DataLabel, DataLabels, DataPoint, Marker, Series};
-pub use types::{ChartType, OfPieSplitType, OfPieType};
+pub use types::{OfPieSplitType, OfPieType, Type};

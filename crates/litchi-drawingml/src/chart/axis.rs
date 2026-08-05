@@ -4,8 +4,8 @@
 //! including category, value, date, and series axes.
 
 use crate::chart::data::{Layout, NumberFormat, TitleText};
-use crate::chart::model::{ChartExtensionList, ChartShapeProperties, ChartTextProperties};
-use crate::chart::plot_area::ChartLines;
+use crate::chart::model::{ExtensionList, ShapeProperties, TextProperties};
+use crate::chart::plot_area::Lines;
 use crate::chart::types::{AxisOrientation, AxisPosition, AxisType, TickLabelPosition, TickMark};
 
 /// Axis crossing mode.
@@ -129,11 +129,11 @@ pub struct DisplayUnits {
     /// Layout for the label
     pub layout: Option<Layout>,
     /// Shape properties for the display-units label
-    pub label_shape_properties: Option<ChartShapeProperties>,
+    pub label_shape_properties: Option<ShapeProperties>,
     /// Text properties for the display-units label
-    pub label_text_properties: Option<ChartTextProperties>,
+    pub label_text_properties: Option<TextProperties>,
     /// Display-units extension list
-    pub extension_list: Option<ChartExtensionList>,
+    pub extension_list: Option<ExtensionList>,
 }
 
 impl DisplayUnits {
@@ -202,25 +202,25 @@ pub struct AxisCommon {
     /// Show minor gridlines
     pub show_minor_gridlines: bool,
     /// Optional formatting for major gridlines; also implies they are visible
-    pub major_gridlines: Option<ChartLines>,
+    pub major_gridlines: Option<Lines>,
     /// Optional formatting for minor gridlines; also implies they are visible
-    pub minor_gridlines: Option<ChartLines>,
+    pub minor_gridlines: Option<Lines>,
     /// DrawingML shape properties for the axis
-    pub shape_properties: Option<ChartShapeProperties>,
+    pub shape_properties: Option<ShapeProperties>,
     /// DrawingML text properties for axis labels
-    pub text_properties: Option<ChartTextProperties>,
+    pub text_properties: Option<TextProperties>,
     /// Extension list inside the axis scaling container
-    pub scaling_extension_list: Option<ChartExtensionList>,
+    pub scaling_extension_list: Option<ExtensionList>,
     /// Extension list at the end of the concrete axis
-    pub extension_list: Option<ChartExtensionList>,
+    pub extension_list: Option<ExtensionList>,
     /// Manual layout for the axis title
     pub layout: Option<Layout>,
     /// DrawingML shape properties for the axis title
-    pub title_shape_properties: Option<ChartShapeProperties>,
+    pub title_shape_properties: Option<ShapeProperties>,
     /// DrawingML text properties for the axis title
-    pub title_text_properties: Option<ChartTextProperties>,
+    pub title_text_properties: Option<TextProperties>,
     /// Axis-title extension list
-    pub title_extension_list: Option<ChartExtensionList>,
+    pub title_extension_list: Option<ExtensionList>,
 }
 
 impl AxisCommon {

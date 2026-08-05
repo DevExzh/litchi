@@ -4,7 +4,7 @@
 //! and their positioning.
 
 use crate::chart::data::Layout;
-use crate::chart::model::{ChartExtensionList, ChartShapeProperties, ChartTextProperties};
+use crate::chart::model::{ExtensionList, ShapeProperties, TextProperties};
 use crate::chart::types::LegendPosition;
 
 /// Chart legend configuration.
@@ -19,11 +19,11 @@ pub struct Legend {
     /// Individual legend entries
     pub entries: Vec<LegendEntry>,
     /// DrawingML shape properties for the legend container
-    pub shape_properties: Option<ChartShapeProperties>,
+    pub shape_properties: Option<ShapeProperties>,
     /// DrawingML text properties for the legend container
-    pub text_properties: Option<ChartTextProperties>,
+    pub text_properties: Option<TextProperties>,
     /// Legend extension list
-    pub extension_list: Option<ChartExtensionList>,
+    pub extension_list: Option<ExtensionList>,
 }
 
 impl Legend {
@@ -77,9 +77,9 @@ pub struct LegendEntry {
     /// Whether entry is deleted
     pub deleted: bool,
     /// DrawingML text properties used instead of the delete choice
-    pub text_properties: Option<ChartTextProperties>,
+    pub text_properties: Option<TextProperties>,
     /// Legend-entry extension list
-    pub extension_list: Option<ChartExtensionList>,
+    pub extension_list: Option<ExtensionList>,
 }
 
 impl LegendEntry {

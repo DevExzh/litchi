@@ -7,7 +7,7 @@ use std::fmt;
 
 /// Chart type enumeration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ChartType {
+pub enum Type {
     /// Area chart (2D)
     Area,
     /// Area chart (3D)
@@ -44,7 +44,7 @@ pub enum ChartType {
     Unknown,
 }
 
-impl ChartType {
+impl Type {
     /// Returns the XML element name for this chart type.
     #[inline]
     pub fn xml_element_name(&self) -> &'static str {
@@ -134,7 +134,7 @@ impl OfPieSplitType {
     }
 }
 
-impl fmt::Display for ChartType {
+impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.xml_element_name())
     }

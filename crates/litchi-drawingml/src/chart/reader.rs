@@ -13,14 +13,14 @@ use crate::chart::data::{
 };
 use crate::chart::legend::{Legend, LegendEntry};
 use crate::chart::model::{
-    Chart, ChartExtensionList, ChartExternalData, ChartHeaderFooter, ChartPageMargins,
-    ChartPageOrientation, ChartPageSetup, ChartPrintSettings, ChartProtection,
-    ChartShapeProperties, ChartTextProperties, ChartUserShapes, ColorMapOverride, ColorMapping,
-    ColorSchemeIndex, PictureFormat, PictureOptions, PivotFormat, PivotSource, View3D, WallFloor,
+    Chart, ColorMapOverride, ColorMapping, ColorSchemeIndex, ExtensionList, ExternalData,
+    HeaderFooter, PageMargins, PageOrientation, PageSetup, PictureFormat, PictureOptions,
+    PivotFormat, PivotSource, PrintSettings, Protection, ShapeProperties, TextProperties,
+    UserShapes, View3D, WallFloor,
 };
 use crate::chart::plot_area::{
     Area3DTypeGroup, AreaTypeGroup, BandFormat, Bar3DTypeGroup, BarShape, BarTypeGroup,
-    BubbleTypeGroup, ChartLines, DataTable, DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup,
+    BubbleTypeGroup, DataTable, DoughnutTypeGroup, Line3DTypeGroup, LineTypeGroup, Lines,
     OfPieTypeGroup, Pie3DTypeGroup, PieTypeGroup, PlotArea, RadarTypeGroup, ScatterTypeGroup,
     StockTypeGroup, Surface3DTypeGroup, SurfaceTypeGroup, TypeGroup, TypeGroupCommon, UpDownBars,
 };
@@ -466,7 +466,7 @@ pub fn read<R: BufRead>(reader: R) -> Result<Chart> {
                         "chart contains duplicate protection settings".into(),
                     ));
                 }
-                chart.protection = Some(ChartProtection::default());
+                chart.protection = Some(Protection::default());
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"pivotFmts" => {
                 if chart.pivot_formats.is_some() {
@@ -555,7 +555,7 @@ pub fn read<R: BufRead>(reader: R) -> Result<Chart> {
                         "chart contains duplicate print settings".into(),
                     ));
                 }
-                chart.print_settings = Some(ChartPrintSettings::new());
+                chart.print_settings = Some(PrintSettings::new());
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"externalData" => {
                 if chart.external_data.is_some() {
@@ -572,7 +572,7 @@ pub fn read<R: BufRead>(reader: R) -> Result<Chart> {
                         "chart contains duplicate external-data relationships".into(),
                     ));
                 }
-                chart.external_data = Some(ChartExternalData::new(required_chart_relationship_id(
+                chart.external_data = Some(ExternalData::new(required_chart_relationship_id(
                     &xml_reader,
                     e,
                 )?));
@@ -583,7 +583,7 @@ pub fn read<R: BufRead>(reader: R) -> Result<Chart> {
                         "chart contains duplicate chart-space shape properties".into(),
                     ));
                 }
-                chart.shape_properties = Some(ChartShapeProperties::from_xml(
+                chart.shape_properties = Some(ShapeProperties::from_xml(
                     xml_reader.capture_fragment(e, "chart-space shape properties")?,
                 )?);
             },
@@ -593,7 +593,7 @@ pub fn read<R: BufRead>(reader: R) -> Result<Chart> {
                         "chart contains duplicate chart-space shape properties".into(),
                     ));
                 }
-                chart.shape_properties = Some(ChartShapeProperties::from_xml(
+                chart.shape_properties = Some(ShapeProperties::from_xml(
                     xml_reader.capture_empty_fragment(e)?,
                 )?);
             },
@@ -603,7 +603,7 @@ pub fn read<R: BufRead>(reader: R) -> Result<Chart> {
                         "chart contains duplicate chart-space text properties".into(),
                     ));
                 }
-                chart.text_properties = Some(ChartTextProperties::from_xml(
+                chart.text_properties = Some(TextProperties::from_xml(
                     xml_reader.capture_fragment(e, "chart-space text properties")?,
                 )?);
             },
@@ -613,7 +613,7 @@ pub fn read<R: BufRead>(reader: R) -> Result<Chart> {
                         "chart contains duplicate chart-space text properties".into(),
                     ));
                 }
-                chart.text_properties = Some(ChartTextProperties::from_xml(
+                chart.text_properties = Some(TextProperties::from_xml(
                     xml_reader.capture_empty_fragment(e)?,
                 )?);
             },
@@ -623,7 +623,7 @@ pub fn read<R: BufRead>(reader: R) -> Result<Chart> {
                         "chart contains duplicate user-shapes relationships".into(),
                     ));
                 }
-                chart.user_shapes = Some(ChartUserShapes::new(required_chart_relationship_id(
+                chart.user_shapes = Some(UserShapes::new(required_chart_relationship_id(
                     &xml_reader,
                     e,
                 )?));
@@ -639,7 +639,7 @@ pub fn read<R: BufRead>(reader: R) -> Result<Chart> {
                         "chart contains duplicate user-shapes relationships".into(),
                     ));
                 }
-                chart.user_shapes = Some(ChartUserShapes::new(required_chart_relationship_id(
+                chart.user_shapes = Some(UserShapes::new(required_chart_relationship_id(
                     &xml_reader,
                     e,
                 )?));
@@ -652,7 +652,7 @@ pub fn read<R: BufRead>(reader: R) -> Result<Chart> {
                         "chart contains duplicate chart extension lists".into(),
                     ));
                 }
-                chart.chart_extension_list = Some(ChartExtensionList::from_xml(
+                chart.chart_extension_list = Some(ExtensionList::from_xml(
                     xml_reader.capture_fragment(e, "chart extension list")?,
                 )?);
             },
@@ -664,7 +664,7 @@ pub fn read<R: BufRead>(reader: R) -> Result<Chart> {
                         "chart contains duplicate chart extension lists".into(),
                     ));
                 }
-                chart.chart_extension_list = Some(ChartExtensionList::from_xml(
+                chart.chart_extension_list = Some(ExtensionList::from_xml(
                     xml_reader.capture_empty_fragment(e)?,
                 )?);
             },
@@ -674,7 +674,7 @@ pub fn read<R: BufRead>(reader: R) -> Result<Chart> {
                         "chart contains duplicate chart-space extension lists".into(),
                     ));
                 }
-                chart.extension_list = Some(ChartExtensionList::from_xml(
+                chart.extension_list = Some(ExtensionList::from_xml(
                     xml_reader.capture_fragment(e, "chart-space extension list")?,
                 )?);
             },
@@ -684,7 +684,7 @@ pub fn read<R: BufRead>(reader: R) -> Result<Chart> {
                         "chart contains duplicate chart-space extension lists".into(),
                     ));
                 }
-                chart.extension_list = Some(ChartExtensionList::from_xml(
+                chart.extension_list = Some(ExtensionList::from_xml(
                     xml_reader.capture_empty_fragment(e)?,
                 )?);
             },
@@ -807,8 +807,8 @@ fn parse_pivot_source<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
     ))
 }
 
-fn parse_chart_protection<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ChartProtection> {
-    let mut protection = ChartProtection::default();
+fn parse_chart_protection<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Protection> {
+    let mut protection = Protection::default();
     let mut buf = Vec::new();
 
     loop {
@@ -984,8 +984,8 @@ fn required_chart_relationship_id<R: BufRead>(
 fn parse_external_data<R: BufRead>(
     reader: &mut ChartXmlReader<R>,
     relationship_id: String,
-) -> Result<ChartExternalData> {
-    let mut external_data = ChartExternalData::new(relationship_id);
+) -> Result<ExternalData> {
+    let mut external_data = ExternalData::new(relationship_id);
     let mut saw_auto_update = false;
     let mut buf = Vec::new();
     loop {
@@ -1111,7 +1111,7 @@ fn parse_pivot_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
                         "chart pivot format contains duplicate shape properties".into(),
                     ));
                 }
-                shape_properties = Some(ChartShapeProperties::from_xml(
+                shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_fragment(element, "chart pivot-format shape properties")?,
                 )?);
             },
@@ -1121,7 +1121,7 @@ fn parse_pivot_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
                         "chart pivot format contains duplicate shape properties".into(),
                     ));
                 }
-                shape_properties = Some(ChartShapeProperties::from_xml(
+                shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -1131,7 +1131,7 @@ fn parse_pivot_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
                         "chart pivot format contains duplicate text properties".into(),
                     ));
                 }
-                text_properties = Some(ChartTextProperties::from_xml(
+                text_properties = Some(TextProperties::from_xml(
                     reader.capture_fragment(element, "chart pivot-format text properties")?,
                 )?);
             },
@@ -1141,7 +1141,7 @@ fn parse_pivot_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
                         "chart pivot format contains duplicate text properties".into(),
                     ));
                 }
-                text_properties = Some(ChartTextProperties::from_xml(
+                text_properties = Some(TextProperties::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -1190,7 +1190,7 @@ fn parse_pivot_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
                         "chart pivot format contains duplicate extension lists".into(),
                     ));
                 }
-                extension_list = Some(ChartExtensionList::from_xml(
+                extension_list = Some(ExtensionList::from_xml(
                     reader.capture_fragment(element, "chart pivot-format extension list")?,
                 )?);
             },
@@ -1200,7 +1200,7 @@ fn parse_pivot_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
                         "chart pivot format contains duplicate extension lists".into(),
                     ));
                 }
-                extension_list = Some(ChartExtensionList::from_xml(
+                extension_list = Some(ExtensionList::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -1224,8 +1224,8 @@ fn parse_pivot_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Pivo
     Ok(format)
 }
 
-fn parse_print_settings<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ChartPrintSettings> {
-    let mut settings = ChartPrintSettings::new();
+fn parse_print_settings<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PrintSettings> {
+    let mut settings = PrintSettings::new();
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
@@ -1293,8 +1293,8 @@ fn parse_print_settings<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Ch
     Ok(settings)
 }
 
-fn parse_chart_header_footer_attributes(element: &BytesStart<'_>) -> Result<ChartHeaderFooter> {
-    let mut header_footer = ChartHeaderFooter::new();
+fn parse_chart_header_footer_attributes(element: &BytesStart<'_>) -> Result<HeaderFooter> {
+    let mut header_footer = HeaderFooter::new();
     header_footer.align_with_margins = optional_bool_attr(
         element,
         b"alignWithMargins",
@@ -1319,7 +1319,7 @@ fn parse_chart_header_footer_attributes(element: &BytesStart<'_>) -> Result<Char
 fn parse_chart_header_footer<R: BufRead>(
     reader: &mut ChartXmlReader<R>,
     element: &BytesStart<'_>,
-) -> Result<ChartHeaderFooter> {
+) -> Result<HeaderFooter> {
     let mut header_footer = parse_chart_header_footer_attributes(element)?;
     let mut buf = Vec::new();
     loop {
@@ -1385,8 +1385,8 @@ fn parse_chart_header_footer<R: BufRead>(
     Ok(header_footer)
 }
 
-fn parse_chart_page_margins(element: &BytesStart<'_>) -> Result<ChartPageMargins> {
-    Ok(ChartPageMargins::new(
+fn parse_chart_page_margins(element: &BytesStart<'_>) -> Result<PageMargins> {
+    Ok(PageMargins::new(
         required_named_f64_attr(element, b"l", "chart left page margin")?,
         required_named_f64_attr(element, b"r", "chart right page margin")?,
         required_named_f64_attr(element, b"t", "chart top page margin")?,
@@ -1396,15 +1396,15 @@ fn parse_chart_page_margins(element: &BytesStart<'_>) -> Result<ChartPageMargins
     ))
 }
 
-fn parse_chart_page_setup(element: &BytesStart<'_>) -> Result<ChartPageSetup> {
-    let mut setup = ChartPageSetup::new();
+fn parse_chart_page_setup(element: &BytesStart<'_>) -> Result<PageSetup> {
+    let mut setup = PageSetup::new();
     setup.paper_size = optional_u32_attr(element, b"paperSize", 1, "chart printer paper size")?;
     setup.first_page_number =
         optional_u32_attr(element, b"firstPageNumber", 1, "chart first page number")?;
     setup.orientation = match get_attr(element, b"orientation").as_deref() {
-        None | Some(b"default") => ChartPageOrientation::Default,
-        Some(b"portrait") => ChartPageOrientation::Portrait,
-        Some(b"landscape") => ChartPageOrientation::Landscape,
+        None | Some(b"default") => PageOrientation::Default,
+        Some(b"portrait") => PageOrientation::Portrait,
+        Some(b"landscape") => PageOrientation::Landscape,
         Some(value) => return Err(invalid_attribute("chart page orientation", value)),
     };
     setup.black_and_white = optional_bool_attr(
@@ -1477,9 +1477,9 @@ struct ParsedTitle {
     text: TitleText,
     layout: Option<Layout>,
     overlay: bool,
-    shape_properties: Option<ChartShapeProperties>,
-    text_properties: Option<ChartTextProperties>,
-    extension_list: Option<ChartExtensionList>,
+    shape_properties: Option<ShapeProperties>,
+    text_properties: Option<TextProperties>,
+    extension_list: Option<ExtensionList>,
 }
 
 fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle> {
@@ -1532,7 +1532,7 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle
                         "chart title contains duplicate shape properties".into(),
                     ));
                 }
-                shape_properties = Some(ChartShapeProperties::from_xml(
+                shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_fragment(element, "chart title shape properties")?,
                 )?);
             },
@@ -1542,7 +1542,7 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle
                         "chart title contains duplicate shape properties".into(),
                     ));
                 }
-                shape_properties = Some(ChartShapeProperties::from_xml(
+                shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -1552,7 +1552,7 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle
                         "chart title contains duplicate text properties".into(),
                     ));
                 }
-                text_properties = Some(ChartTextProperties::from_xml(
+                text_properties = Some(TextProperties::from_xml(
                     reader.capture_fragment(element, "chart title text properties")?,
                 )?);
             },
@@ -1562,7 +1562,7 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle
                         "chart title contains duplicate text properties".into(),
                     ));
                 }
-                text_properties = Some(ChartTextProperties::from_xml(
+                text_properties = Some(TextProperties::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -1572,7 +1572,7 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle
                         "chart title contains duplicate extension lists".into(),
                     ));
                 }
-                extension_list = Some(ChartExtensionList::from_xml(
+                extension_list = Some(ExtensionList::from_xml(
                     reader.capture_fragment(element, "chart title extension list")?,
                 )?);
             },
@@ -1582,7 +1582,7 @@ fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle
                         "chart title contains duplicate extension lists".into(),
                     ));
                 }
-                extension_list = Some(ChartExtensionList::from_xml(
+                extension_list = Some(ExtensionList::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -1712,7 +1712,7 @@ fn parse_wall_floor<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<WallFl
                         "chart surface contains duplicate shape properties".into(),
                     ));
                 }
-                wall_floor.shape_properties = Some(ChartShapeProperties::from_xml(
+                wall_floor.shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_fragment(e, "chart surface shape properties")?,
                 )?);
             },
@@ -1722,7 +1722,7 @@ fn parse_wall_floor<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<WallFl
                         "chart surface contains duplicate shape properties".into(),
                     ));
                 }
-                wall_floor.shape_properties = Some(ChartShapeProperties::from_xml(
+                wall_floor.shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_empty_fragment(e)?,
                 )?);
             },
@@ -1748,7 +1748,7 @@ fn parse_wall_floor<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<WallFl
                         "chart surface contains duplicate extension lists".into(),
                     ));
                 }
-                wall_floor.extension_list = Some(ChartExtensionList::from_xml(
+                wall_floor.extension_list = Some(ExtensionList::from_xml(
                     reader.capture_fragment(e, "chart surface extension list")?,
                 )?);
             },
@@ -1758,9 +1758,8 @@ fn parse_wall_floor<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<WallFl
                         "chart surface contains duplicate extension lists".into(),
                     ));
                 }
-                wall_floor.extension_list = Some(ChartExtensionList::from_xml(
-                    reader.capture_empty_fragment(e)?,
-                )?);
+                wall_floor.extension_list =
+                    Some(ExtensionList::from_xml(reader.capture_empty_fragment(e)?)?);
             },
             Ok(Event::End(ref e)) => {
                 let tag_name = e.local_name();
@@ -1916,7 +1915,7 @@ fn parse_plot_area<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PlotAre
                         "chart plot area contains duplicate shape properties".into(),
                     ));
                 }
-                plot_area.shape_properties = Some(ChartShapeProperties::from_xml(
+                plot_area.shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_fragment(e, "chart plot-area shape properties")?,
                 )?);
             },
@@ -1926,7 +1925,7 @@ fn parse_plot_area<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PlotAre
                         "chart plot area contains duplicate shape properties".into(),
                     ));
                 }
-                plot_area.shape_properties = Some(ChartShapeProperties::from_xml(
+                plot_area.shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_empty_fragment(e)?,
                 )?);
             },
@@ -1936,7 +1935,7 @@ fn parse_plot_area<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PlotAre
                         "chart plot area contains duplicate extension lists".into(),
                     ));
                 }
-                plot_area.extension_list = Some(ChartExtensionList::from_xml(
+                plot_area.extension_list = Some(ExtensionList::from_xml(
                     reader.capture_fragment(e, "chart plot-area extension list")?,
                 )?);
             },
@@ -1946,9 +1945,8 @@ fn parse_plot_area<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<PlotAre
                         "chart plot area contains duplicate extension lists".into(),
                     ));
                 }
-                plot_area.extension_list = Some(ChartExtensionList::from_xml(
-                    reader.capture_empty_fragment(e)?,
-                )?);
+                plot_area.extension_list =
+                    Some(ExtensionList::from_xml(reader.capture_empty_fragment(e)?)?);
             },
             Ok(Event::Empty(ref e))
                 if is_chart_type_group_name(e.local_name().as_ref())
@@ -2115,7 +2113,7 @@ fn parse_data_table<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataTa
                         "chart data table contains duplicate shape properties".into(),
                     ));
                 }
-                data_table.shape_properties = Some(ChartShapeProperties::from_xml(
+                data_table.shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_fragment(element, "chart data-table shape properties")?,
                 )?);
             },
@@ -2125,7 +2123,7 @@ fn parse_data_table<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataTa
                         "chart data table contains duplicate shape properties".into(),
                     ));
                 }
-                data_table.shape_properties = Some(ChartShapeProperties::from_xml(
+                data_table.shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -2135,7 +2133,7 @@ fn parse_data_table<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataTa
                         "chart data table contains duplicate text properties".into(),
                     ));
                 }
-                data_table.text_properties = Some(ChartTextProperties::from_xml(
+                data_table.text_properties = Some(TextProperties::from_xml(
                     reader.capture_fragment(element, "chart data-table text properties")?,
                 )?);
             },
@@ -2145,7 +2143,7 @@ fn parse_data_table<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataTa
                         "chart data table contains duplicate text properties".into(),
                     ));
                 }
-                data_table.text_properties = Some(ChartTextProperties::from_xml(
+                data_table.text_properties = Some(TextProperties::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -2155,7 +2153,7 @@ fn parse_data_table<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataTa
                         "chart data table contains duplicate extension lists".into(),
                     ));
                 }
-                data_table.extension_list = Some(ChartExtensionList::from_xml(
+                data_table.extension_list = Some(ExtensionList::from_xml(
                     reader.capture_fragment(element, "chart data-table extension list")?,
                 )?);
             },
@@ -2165,7 +2163,7 @@ fn parse_data_table<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataTa
                         "chart data table contains duplicate extension lists".into(),
                     ));
                 }
-                data_table.extension_list = Some(ChartExtensionList::from_xml(
+                data_table.extension_list = Some(ExtensionList::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -2255,7 +2253,7 @@ fn parse_common_type_group<R: BufRead>(
     end_name: &[u8],
     supports_data_labels: bool,
     supports_axes: bool,
-    mut drop_lines: Option<&mut Option<ChartLines>>,
+    mut drop_lines: Option<&mut Option<Lines>>,
     mut extra: impl FnMut(&BytesStart<'_>) -> Result<()>,
 ) -> Result<TypeGroupCommon> {
     let mut common = TypeGroupCommon::new();
@@ -2275,7 +2273,7 @@ fn parse_common_type_group<R: BufRead>(
                 if drop_lines.is_some() && element.local_name().as_ref() == b"dropLines" =>
             {
                 if let Some(target) = drop_lines.as_deref_mut() {
-                    set_chart_lines(target, ChartLines::new(), "chart drop lines")?;
+                    set_chart_lines(target, Lines::new(), "chart drop lines")?;
                 }
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
@@ -2338,7 +2336,7 @@ fn parse_type_group_extension<R: BufRead>(
     } else {
         reader.capture_fragment(element, "chart type-group extension list")?
     };
-    common.extension_list = Some(ChartExtensionList::from_xml(xml)?);
+    common.extension_list = Some(ExtensionList::from_xml(xml)?);
     Ok(())
 }
 
@@ -2352,22 +2350,15 @@ fn begin_group_data_labels(seen: &mut bool) -> Result<()> {
     Ok(())
 }
 
-fn set_chart_lines(
-    target: &mut Option<ChartLines>,
-    lines: ChartLines,
-    description: &str,
-) -> Result<()> {
+fn set_chart_lines(target: &mut Option<Lines>, lines: Lines, description: &str) -> Result<()> {
     if target.replace(lines).is_some() {
         return Err(Error::Invalid(format!("{description} are duplicated")));
     }
     Ok(())
 }
 
-fn parse_chart_lines<R: BufRead>(
-    reader: &mut ChartXmlReader<R>,
-    end_name: &[u8],
-) -> Result<ChartLines> {
-    let mut lines = ChartLines::new();
+fn parse_chart_lines<R: BufRead>(reader: &mut ChartXmlReader<R>, end_name: &[u8]) -> Result<Lines> {
+    let mut lines = Lines::new();
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
@@ -2377,7 +2368,7 @@ fn parse_chart_lines<R: BufRead>(
                         "chart lines contain duplicate shape properties".into(),
                     ));
                 }
-                lines.shape_properties = Some(ChartShapeProperties::from_xml(
+                lines.shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_fragment(element, "chart-line shape properties")?,
                 )?);
             },
@@ -2387,7 +2378,7 @@ fn parse_chart_lines<R: BufRead>(
                         "chart lines contain duplicate shape properties".into(),
                     ));
                 }
-                lines.shape_properties = Some(ChartShapeProperties::from_xml(
+                lines.shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -2578,7 +2569,7 @@ fn parse_of_pie_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<OfPi
                     .push(parse_chart_lines(reader, b"serLines")?);
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"serLines" => {
-                group.series_lines.push(ChartLines::new());
+                group.series_lines.push(Lines::new());
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 parse_type_group_extension(reader, &mut group.common, element, false)?;
@@ -2746,14 +2737,14 @@ fn parse_up_down_bars<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<UpDo
                 set_chart_lines(&mut bars.up_bars, lines, "chart up bars")?;
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"upBars" => {
-                set_chart_lines(&mut bars.up_bars, ChartLines::new(), "chart up bars")?;
+                set_chart_lines(&mut bars.up_bars, Lines::new(), "chart up bars")?;
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"downBars" => {
                 let lines = parse_chart_lines(reader, b"downBars")?;
                 set_chart_lines(&mut bars.down_bars, lines, "chart down bars")?;
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"downBars" => {
-                set_chart_lines(&mut bars.down_bars, ChartLines::new(), "chart down bars")?;
+                set_chart_lines(&mut bars.down_bars, Lines::new(), "chart down bars")?;
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 if bars.extension_list.is_some() {
@@ -2761,7 +2752,7 @@ fn parse_up_down_bars<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<UpDo
                         "chart up/down bars contain duplicate extension lists".into(),
                     ));
                 }
-                bars.extension_list = Some(ChartExtensionList::from_xml(
+                bars.extension_list = Some(ExtensionList::from_xml(
                     reader.capture_fragment(element, "chart up/down-bar extension list")?,
                 )?);
             },
@@ -2771,7 +2762,7 @@ fn parse_up_down_bars<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<UpDo
                         "chart up/down bars contain duplicate extension lists".into(),
                     ));
                 }
-                bars.extension_list = Some(ChartExtensionList::from_xml(
+                bars.extension_list = Some(ExtensionList::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -2837,7 +2828,7 @@ fn parse_stock_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Stock
                 set_chart_lines(&mut drop_lines, lines, "stock chart drop lines")?;
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"dropLines" => {
-                set_chart_lines(&mut drop_lines, ChartLines::new(), "stock chart drop lines")?;
+                set_chart_lines(&mut drop_lines, Lines::new(), "stock chart drop lines")?;
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"hiLowLines" => {
                 let lines = parse_chart_lines(reader, b"hiLowLines")?;
@@ -2846,7 +2837,7 @@ fn parse_stock_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Stock
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"hiLowLines" => {
                 set_chart_lines(
                     &mut high_low_lines,
-                    ChartLines::new(),
+                    Lines::new(),
                     "stock chart high/low lines",
                 )?;
             },
@@ -3040,7 +3031,7 @@ fn parse_surface_band_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Resu
                         "surface chart band format contains duplicate shape properties".into(),
                     ));
                 }
-                shape_properties = Some(ChartShapeProperties::from_xml(
+                shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_fragment(element, "surface chart band shape properties")?,
                 )?);
             },
@@ -3050,7 +3041,7 @@ fn parse_surface_band_format<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Resu
                         "surface chart band format contains duplicate shape properties".into(),
                     ));
                 }
-                shape_properties = Some(ChartShapeProperties::from_xml(
+                shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -3097,7 +3088,7 @@ fn parse_bar_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<
                 series_lines.push(parse_chart_lines(reader, b"serLines")?);
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"serLines" => {
-                series_lines.push(ChartLines::new());
+                series_lines.push(Lines::new());
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 parse_type_group_extension(reader, &mut common, element, false)?;
@@ -3284,7 +3275,7 @@ fn parse_line_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
                 set_chart_lines(&mut drop_lines, lines, "line chart drop lines")?;
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"dropLines" => {
-                set_chart_lines(&mut drop_lines, ChartLines::new(), "line chart drop lines")?;
+                set_chart_lines(&mut drop_lines, Lines::new(), "line chart drop lines")?;
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"hiLowLines" => {
                 let lines = parse_chart_lines(reader, b"hiLowLines")?;
@@ -3293,7 +3284,7 @@ fn parse_line_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"hiLowLines" => {
                 set_chart_lines(
                     &mut high_low_lines,
-                    ChartLines::new(),
+                    Lines::new(),
                     "line chart high/low lines",
                 )?;
             },
@@ -3436,7 +3427,7 @@ fn parse_area_chart<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option
                 set_chart_lines(&mut drop_lines, lines, "area chart drop lines")?;
             },
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"dropLines" => {
-                set_chart_lines(&mut drop_lines, ChartLines::new(), "area chart drop lines")?;
+                set_chart_lines(&mut drop_lines, Lines::new(), "area chart drop lines")?;
             },
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"extLst" => {
                 parse_type_group_extension(reader, &mut common, element, false)?;
@@ -3575,7 +3566,7 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
                         "chart series contains duplicate shape properties".into(),
                     ));
                 }
-                series.shape_properties = Some(ChartShapeProperties::from_xml(
+                series.shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_fragment(e, "chart series shape properties")?,
                 )?);
             },
@@ -3585,7 +3576,7 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
                         "chart series contains duplicate shape properties".into(),
                     ));
                 }
-                series.shape_properties = Some(ChartShapeProperties::from_xml(
+                series.shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_empty_fragment(e)?,
                 )?);
             },
@@ -3611,7 +3602,7 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
                         "chart series contains duplicate extension lists".into(),
                     ));
                 }
-                series.extension_list = Some(ChartExtensionList::from_xml(
+                series.extension_list = Some(ExtensionList::from_xml(
                     reader.capture_fragment(e, "chart series extension list")?,
                 )?);
             },
@@ -3621,9 +3612,8 @@ fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Ser
                         "chart series contains duplicate extension lists".into(),
                     ));
                 }
-                series.extension_list = Some(ChartExtensionList::from_xml(
-                    reader.capture_empty_fragment(e)?,
-                )?);
+                series.extension_list =
+                    Some(ExtensionList::from_xml(reader.capture_empty_fragment(e)?)?);
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"marker" => {
                 if saw_marker {
@@ -3792,7 +3782,7 @@ fn parse_series_marker<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Mar
                         "chart marker has duplicate shape properties".into(),
                     ));
                 }
-                shape_properties = Some(ChartShapeProperties::from_xml(
+                shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_fragment(element, "chart marker shape properties")?,
                 )?);
             },
@@ -3802,7 +3792,7 @@ fn parse_series_marker<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Mar
                         "chart marker has duplicate shape properties".into(),
                     ));
                 }
-                shape_properties = Some(ChartShapeProperties::from_xml(
+                shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -3812,7 +3802,7 @@ fn parse_series_marker<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Mar
                         "chart marker has duplicate extension lists".into(),
                     ));
                 }
-                extension_list = Some(ChartExtensionList::from_xml(
+                extension_list = Some(ExtensionList::from_xml(
                     reader.capture_fragment(element, "chart marker extension list")?,
                 )?);
             },
@@ -3822,7 +3812,7 @@ fn parse_series_marker<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Mar
                         "chart marker has duplicate extension lists".into(),
                     ));
                 }
-                extension_list = Some(ChartExtensionList::from_xml(
+                extension_list = Some(ExtensionList::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -3900,7 +3890,7 @@ fn parse_data_point<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataPo
                         "chart data point contains duplicate shape properties".into(),
                     ));
                 }
-                shape_properties = Some(ChartShapeProperties::from_xml(
+                shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_fragment(element, "chart data-point shape properties")?,
                 )?);
             },
@@ -3910,7 +3900,7 @@ fn parse_data_point<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataPo
                         "chart data point contains duplicate shape properties".into(),
                     ));
                 }
-                shape_properties = Some(ChartShapeProperties::from_xml(
+                shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -3936,7 +3926,7 @@ fn parse_data_point<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataPo
                         "chart data point contains duplicate extension lists".into(),
                     ));
                 }
-                extension_list = Some(ChartExtensionList::from_xml(
+                extension_list = Some(ExtensionList::from_xml(
                     reader.capture_fragment(element, "chart data-point extension list")?,
                 )?);
             },
@@ -3946,7 +3936,7 @@ fn parse_data_point<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataPo
                         "chart data point contains duplicate extension lists".into(),
                     ));
                 }
-                extension_list = Some(ChartExtensionList::from_xml(
+                extension_list = Some(ExtensionList::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -4023,7 +4013,7 @@ fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataL
                         "chart data labels contain duplicate shape properties".into(),
                     ));
                 }
-                labels.shape_properties = Some(ChartShapeProperties::from_xml(
+                labels.shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_fragment(element, "chart data-label shape properties")?,
                 )?);
                 saw_shared_settings = true;
@@ -4034,7 +4024,7 @@ fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataL
                         "chart data labels contain duplicate shape properties".into(),
                     ));
                 }
-                labels.shape_properties = Some(ChartShapeProperties::from_xml(
+                labels.shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
                 saw_shared_settings = true;
@@ -4045,7 +4035,7 @@ fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataL
                         "chart data labels contain duplicate text properties".into(),
                     ));
                 }
-                labels.text_properties = Some(ChartTextProperties::from_xml(
+                labels.text_properties = Some(TextProperties::from_xml(
                     reader.capture_fragment(element, "chart data-label text properties")?,
                 )?);
                 saw_shared_settings = true;
@@ -4056,7 +4046,7 @@ fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataL
                         "chart data labels contain duplicate text properties".into(),
                     ));
                 }
-                labels.text_properties = Some(ChartTextProperties::from_xml(
+                labels.text_properties = Some(TextProperties::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
                 saw_shared_settings = true;
@@ -4072,7 +4062,7 @@ fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataL
             Ok(Event::Empty(ref element)) if element.local_name().as_ref() == b"leaderLines" => {
                 set_chart_lines(
                     &mut labels.leader_lines,
-                    ChartLines::new(),
+                    Lines::new(),
                     "chart data-label leader lines",
                 )?;
                 saw_shared_settings = true;
@@ -4083,7 +4073,7 @@ fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataL
                         "chart data labels contain duplicate extension lists".into(),
                     ));
                 }
-                labels.extension_list = Some(ChartExtensionList::from_xml(
+                labels.extension_list = Some(ExtensionList::from_xml(
                     reader.capture_fragment(element, "chart data-label extension list")?,
                 )?);
             },
@@ -4093,7 +4083,7 @@ fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataL
                         "chart data labels contain duplicate extension lists".into(),
                     ));
                 }
-                labels.extension_list = Some(ChartExtensionList::from_xml(
+                labels.extension_list = Some(ExtensionList::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -4222,7 +4212,7 @@ fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLa
                         "chart point data label contains duplicate shape properties".into(),
                     ));
                 }
-                label.shape_properties = Some(ChartShapeProperties::from_xml(
+                label.shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_fragment(element, "chart point data-label shape properties")?,
                 )?);
                 saw_settings = true;
@@ -4233,7 +4223,7 @@ fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLa
                         "chart point data label contains duplicate shape properties".into(),
                     ));
                 }
-                label.shape_properties = Some(ChartShapeProperties::from_xml(
+                label.shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
                 saw_settings = true;
@@ -4244,7 +4234,7 @@ fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLa
                         "chart point data label contains duplicate text properties".into(),
                     ));
                 }
-                label.text_properties = Some(ChartTextProperties::from_xml(
+                label.text_properties = Some(TextProperties::from_xml(
                     reader.capture_fragment(element, "chart point data-label text properties")?,
                 )?);
                 saw_settings = true;
@@ -4255,7 +4245,7 @@ fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLa
                         "chart point data label contains duplicate text properties".into(),
                     ));
                 }
-                label.text_properties = Some(ChartTextProperties::from_xml(
+                label.text_properties = Some(TextProperties::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
                 saw_settings = true;
@@ -4266,7 +4256,7 @@ fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLa
                         "chart point data label contains duplicate extension lists".into(),
                     ));
                 }
-                label.extension_list = Some(ChartExtensionList::from_xml(
+                label.extension_list = Some(ExtensionList::from_xml(
                     reader.capture_fragment(element, "chart point data-label extension list")?,
                 )?);
             },
@@ -4276,7 +4266,7 @@ fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLa
                         "chart point data label contains duplicate extension lists".into(),
                     ));
                 }
-                label.extension_list = Some(ChartExtensionList::from_xml(
+                label.extension_list = Some(ExtensionList::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -4454,7 +4444,7 @@ fn parse_trendline<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Trendli
                         "chart trendline contains duplicate shape properties".into(),
                     ));
                 }
-                trendline.shape_properties = Some(ChartShapeProperties::from_xml(
+                trendline.shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_fragment(e, "chart trendline shape properties")?,
                 )?);
             },
@@ -4464,7 +4454,7 @@ fn parse_trendline<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Trendli
                         "chart trendline contains duplicate shape properties".into(),
                     ));
                 }
-                trendline.shape_properties = Some(ChartShapeProperties::from_xml(
+                trendline.shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_empty_fragment(e)?,
                 )?);
             },
@@ -4474,7 +4464,7 @@ fn parse_trendline<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Trendli
                         "chart trendline contains duplicate extension lists".into(),
                     ));
                 }
-                trendline.extension_list = Some(ChartExtensionList::from_xml(
+                trendline.extension_list = Some(ExtensionList::from_xml(
                     reader.capture_fragment(e, "chart trendline extension list")?,
                 )?);
             },
@@ -4484,9 +4474,8 @@ fn parse_trendline<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Trendli
                         "chart trendline contains duplicate extension lists".into(),
                     ));
                 }
-                trendline.extension_list = Some(ChartExtensionList::from_xml(
-                    reader.capture_empty_fragment(e)?,
-                )?);
+                trendline.extension_list =
+                    Some(ExtensionList::from_xml(reader.capture_empty_fragment(e)?)?);
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"trendlineLbl" => {
                 if trendline.show_label {
@@ -4584,9 +4573,9 @@ struct ParsedTrendlineLabel {
     text: Option<TitleText>,
     layout: Option<Layout>,
     number_format: Option<NumberFormat>,
-    shape_properties: Option<ChartShapeProperties>,
-    text_properties: Option<ChartTextProperties>,
-    extension_list: Option<ChartExtensionList>,
+    shape_properties: Option<ShapeProperties>,
+    text_properties: Option<TextProperties>,
+    extension_list: Option<ExtensionList>,
 }
 
 fn parse_trendline_label<R: BufRead>(
@@ -4649,7 +4638,7 @@ fn parse_trendline_label<R: BufRead>(
                         "chart trendline label contains duplicate shape properties".into(),
                     ));
                 }
-                shape_properties = Some(ChartShapeProperties::from_xml(
+                shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_fragment(element, "chart trendline-label shape properties")?,
                 )?);
             },
@@ -4659,7 +4648,7 @@ fn parse_trendline_label<R: BufRead>(
                         "chart trendline label contains duplicate shape properties".into(),
                     ));
                 }
-                shape_properties = Some(ChartShapeProperties::from_xml(
+                shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -4669,7 +4658,7 @@ fn parse_trendline_label<R: BufRead>(
                         "chart trendline label contains duplicate text properties".into(),
                     ));
                 }
-                text_properties = Some(ChartTextProperties::from_xml(
+                text_properties = Some(TextProperties::from_xml(
                     reader.capture_fragment(element, "chart trendline-label text properties")?,
                 )?);
             },
@@ -4679,7 +4668,7 @@ fn parse_trendline_label<R: BufRead>(
                         "chart trendline label contains duplicate text properties".into(),
                     ));
                 }
-                text_properties = Some(ChartTextProperties::from_xml(
+                text_properties = Some(TextProperties::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -4689,7 +4678,7 @@ fn parse_trendline_label<R: BufRead>(
                         "chart trendline label contains duplicate extension lists".into(),
                     ));
                 }
-                extension_list = Some(ChartExtensionList::from_xml(
+                extension_list = Some(ExtensionList::from_xml(
                     reader.capture_fragment(element, "chart trendline-label extension list")?,
                 )?);
             },
@@ -4699,7 +4688,7 @@ fn parse_trendline_label<R: BufRead>(
                         "chart trendline label contains duplicate extension lists".into(),
                     ));
                 }
-                extension_list = Some(ChartExtensionList::from_xml(
+                extension_list = Some(ExtensionList::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -4743,7 +4732,7 @@ fn parse_error_bar<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ErrorBa
                         "chart error bars contain duplicate shape properties".into(),
                     ));
                 }
-                shape_properties = Some(ChartShapeProperties::from_xml(
+                shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_fragment(e, "chart error-bar shape properties")?,
                 )?);
             },
@@ -4753,7 +4742,7 @@ fn parse_error_bar<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ErrorBa
                         "chart error bars contain duplicate shape properties".into(),
                     ));
                 }
-                shape_properties = Some(ChartShapeProperties::from_xml(
+                shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_empty_fragment(e)?,
                 )?);
             },
@@ -4763,7 +4752,7 @@ fn parse_error_bar<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ErrorBa
                         "chart error bars contain duplicate extension lists".into(),
                     ));
                 }
-                extension_list = Some(ChartExtensionList::from_xml(
+                extension_list = Some(ExtensionList::from_xml(
                     reader.capture_fragment(e, "chart error-bar extension list")?,
                 )?);
             },
@@ -4773,9 +4762,7 @@ fn parse_error_bar<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ErrorBa
                         "chart error bars contain duplicate extension lists".into(),
                     ));
                 }
-                extension_list = Some(ChartExtensionList::from_xml(
-                    reader.capture_empty_fragment(e)?,
-                )?);
+                extension_list = Some(ExtensionList::from_xml(reader.capture_empty_fragment(e)?)?);
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"plus" => {
                 plus_values = parse_numeric_data(reader)?
@@ -5109,9 +5096,9 @@ struct ParsedAxisCommon {
     title: Option<TitleText>,
     title_layout: Option<Layout>,
     title_overlay: bool,
-    title_shape_properties: Option<ChartShapeProperties>,
-    title_text_properties: Option<ChartTextProperties>,
-    title_extension_list: Option<ChartExtensionList>,
+    title_shape_properties: Option<ShapeProperties>,
+    title_text_properties: Option<TextProperties>,
+    title_extension_list: Option<ExtensionList>,
     number_format: Option<NumberFormat>,
     orientation: AxisOrientation,
     major_tick_mark: TickMark,
@@ -5122,12 +5109,12 @@ struct ParsedAxisCommon {
     crosses_at: Option<f64>,
     show_major_gridlines: bool,
     show_minor_gridlines: bool,
-    major_gridlines: Option<ChartLines>,
-    minor_gridlines: Option<ChartLines>,
-    shape_properties: Option<ChartShapeProperties>,
-    text_properties: Option<ChartTextProperties>,
-    scaling_extension_list: Option<ChartExtensionList>,
-    extension_list: Option<ChartExtensionList>,
+    major_gridlines: Option<Lines>,
+    minor_gridlines: Option<Lines>,
+    shape_properties: Option<ShapeProperties>,
+    text_properties: Option<TextProperties>,
+    scaling_extension_list: Option<ExtensionList>,
+    extension_list: Option<ExtensionList>,
 }
 
 impl ParsedAxisCommon {
@@ -5261,7 +5248,7 @@ fn parse_axis_common_fragment<R: BufRead>(
     match element.local_name().as_ref() {
         b"majorGridlines" => {
             let lines = if empty {
-                ChartLines::new()
+                Lines::new()
             } else {
                 parse_chart_lines(reader, b"majorGridlines")?
             };
@@ -5274,7 +5261,7 @@ fn parse_axis_common_fragment<R: BufRead>(
         },
         b"minorGridlines" => {
             let lines = if empty {
-                ChartLines::new()
+                Lines::new()
             } else {
                 parse_chart_lines(reader, b"minorGridlines")?
             };
@@ -5296,7 +5283,7 @@ fn parse_axis_common_fragment<R: BufRead>(
             } else {
                 reader.capture_fragment(element, "chart axis shape properties")?
             };
-            common.shape_properties = Some(ChartShapeProperties::from_xml(xml)?);
+            common.shape_properties = Some(ShapeProperties::from_xml(xml)?);
         },
         b"txPr" => {
             if common.text_properties.is_some() {
@@ -5309,7 +5296,7 @@ fn parse_axis_common_fragment<R: BufRead>(
             } else {
                 reader.capture_fragment(element, "chart axis text properties")?
             };
-            common.text_properties = Some(ChartTextProperties::from_xml(xml)?);
+            common.text_properties = Some(TextProperties::from_xml(xml)?);
         },
         _ => {},
     }
@@ -5346,7 +5333,7 @@ fn parse_axis_extension<R: BufRead>(
             },
         )?
     };
-    *target = Some(ChartExtensionList::from_xml(xml)?);
+    *target = Some(ExtensionList::from_xml(xml)?);
     Ok(())
 }
 
@@ -5566,7 +5553,7 @@ fn parse_display_units<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Dis
                         "chart display units contain duplicate extension lists".into(),
                     ));
                 }
-                extension_list = Some(ChartExtensionList::from_xml(
+                extension_list = Some(ExtensionList::from_xml(
                     reader.capture_fragment(element, "chart display-units extension list")?,
                 )?);
             },
@@ -5576,7 +5563,7 @@ fn parse_display_units<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Dis
                         "chart display units contain duplicate extension lists".into(),
                     ));
                 }
-                extension_list = Some(ChartExtensionList::from_xml(
+                extension_list = Some(ExtensionList::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -5635,8 +5622,8 @@ fn parse_display_units<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Dis
 struct ParsedDisplayUnitsLabel {
     label: Option<TitleText>,
     layout: Option<Layout>,
-    shape_properties: Option<ChartShapeProperties>,
-    text_properties: Option<ChartTextProperties>,
+    shape_properties: Option<ShapeProperties>,
+    text_properties: Option<TextProperties>,
 }
 
 fn parse_display_units_label<R: BufRead>(
@@ -5677,7 +5664,7 @@ fn parse_display_units_label<R: BufRead>(
                         "chart display-units label contains duplicate shape properties".into(),
                     ));
                 }
-                shape_properties = Some(ChartShapeProperties::from_xml(
+                shape_properties = Some(ShapeProperties::from_xml(
                     reader
                         .capture_fragment(element, "chart display-units label shape properties")?,
                 )?);
@@ -5688,7 +5675,7 @@ fn parse_display_units_label<R: BufRead>(
                         "chart display-units label contains duplicate shape properties".into(),
                     ));
                 }
-                shape_properties = Some(ChartShapeProperties::from_xml(
+                shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -5698,7 +5685,7 @@ fn parse_display_units_label<R: BufRead>(
                         "chart display-units label contains duplicate text properties".into(),
                     ));
                 }
-                text_properties = Some(ChartTextProperties::from_xml(
+                text_properties = Some(TextProperties::from_xml(
                     reader
                         .capture_fragment(element, "chart display-units label text properties")?,
                 )?);
@@ -5709,7 +5696,7 @@ fn parse_display_units_label<R: BufRead>(
                         "chart display-units label contains duplicate text properties".into(),
                     ));
                 }
-                text_properties = Some(ChartTextProperties::from_xml(
+                text_properties = Some(TextProperties::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -6007,7 +5994,7 @@ fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Legend> {
                         "chart legend contains duplicate shape properties".into(),
                     ));
                 }
-                shape_properties = Some(ChartShapeProperties::from_xml(
+                shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_fragment(element, "chart legend shape properties")?,
                 )?);
             },
@@ -6017,7 +6004,7 @@ fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Legend> {
                         "chart legend contains duplicate shape properties".into(),
                     ));
                 }
-                shape_properties = Some(ChartShapeProperties::from_xml(
+                shape_properties = Some(ShapeProperties::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -6027,7 +6014,7 @@ fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Legend> {
                         "chart legend contains duplicate text properties".into(),
                     ));
                 }
-                text_properties = Some(ChartTextProperties::from_xml(
+                text_properties = Some(TextProperties::from_xml(
                     reader.capture_fragment(element, "chart legend text properties")?,
                 )?);
             },
@@ -6037,7 +6024,7 @@ fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Legend> {
                         "chart legend contains duplicate text properties".into(),
                     ));
                 }
-                text_properties = Some(ChartTextProperties::from_xml(
+                text_properties = Some(TextProperties::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -6047,7 +6034,7 @@ fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Legend> {
                         "chart legend contains duplicate extension lists".into(),
                     ));
                 }
-                extension_list = Some(ChartExtensionList::from_xml(
+                extension_list = Some(ExtensionList::from_xml(
                     reader.capture_fragment(element, "chart legend extension list")?,
                 )?);
             },
@@ -6057,7 +6044,7 @@ fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Legend> {
                         "chart legend contains duplicate extension lists".into(),
                     ));
                 }
-                extension_list = Some(ChartExtensionList::from_xml(
+                extension_list = Some(ExtensionList::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -6117,7 +6104,7 @@ fn parse_legend_entry<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Lege
                         "chart legend entry contains multiple choice values".into(),
                     ));
                 }
-                text_properties = Some(ChartTextProperties::from_xml(
+                text_properties = Some(TextProperties::from_xml(
                     reader.capture_fragment(element, "chart legend-entry text properties")?,
                 )?);
             },
@@ -6127,7 +6114,7 @@ fn parse_legend_entry<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Lege
                         "chart legend entry contains multiple choice values".into(),
                     ));
                 }
-                text_properties = Some(ChartTextProperties::from_xml(
+                text_properties = Some(TextProperties::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -6137,7 +6124,7 @@ fn parse_legend_entry<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Lege
                         "chart legend entry contains duplicate extension lists".into(),
                     ));
                 }
-                extension_list = Some(ChartExtensionList::from_xml(
+                extension_list = Some(ExtensionList::from_xml(
                     reader.capture_fragment(element, "chart legend-entry extension list")?,
                 )?);
             },
@@ -6147,7 +6134,7 @@ fn parse_legend_entry<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Lege
                         "chart legend entry contains duplicate extension lists".into(),
                     ));
                 }
-                extension_list = Some(ChartExtensionList::from_xml(
+                extension_list = Some(ExtensionList::from_xml(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
@@ -6770,7 +6757,7 @@ mod tests {
         }
 
         let mut pending = Chart::new();
-        pending.external_data = Some(ChartExternalData::pending());
+        pending.external_data = Some(ExternalData::pending());
         assert!(crate::chart::writer::write(&mut Vec::new(), &pending).is_err());
     }
 
@@ -6865,14 +6852,14 @@ mod tests {
         assert_eq!(reparsed.chart_extension_list, chart.chart_extension_list);
 
         assert!(
-            ChartShapeProperties::from_xml(
+            ShapeProperties::from_xml(
                 br#"<c:txPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>"#
                     .to_vec()
             )
             .is_err()
         );
         assert!(
-            ChartExtensionList::from_xml(
+            ExtensionList::from_xml(
                 br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/><c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>"#
                     .to_vec()
             )
@@ -7106,7 +7093,7 @@ mod tests {
         let setup = settings.page_setup.as_ref().unwrap();
         assert_eq!(setup.paper_size, 9);
         assert_eq!(setup.first_page_number, 4);
-        assert_eq!(setup.orientation, ChartPageOrientation::Landscape);
+        assert_eq!(setup.orientation, PageOrientation::Landscape);
         assert!(setup.black_and_white);
         assert!(setup.draft);
         assert!(setup.use_first_page_number);
@@ -7152,8 +7139,8 @@ mod tests {
         }
 
         let mut invalid = Chart::new();
-        let mut settings = ChartPrintSettings::new();
-        settings.page_margins = Some(ChartPageMargins::new(f64::NAN, 0.3, 0.4, 0.5, 0.1, 0.15));
+        let mut settings = PrintSettings::new();
+        settings.page_margins = Some(PageMargins::new(f64::NAN, 0.3, 0.4, 0.5, 0.1, 0.15));
         invalid.print_settings = Some(settings);
         assert!(crate::chart::writer::write(&mut Vec::new(), &invalid).is_err());
     }
@@ -8092,7 +8079,7 @@ mod tests {
         let mut entry = LegendEntry::new(1);
         entry.deleted = true;
         entry.text_properties = Some(
-            ChartTextProperties::from_xml(
+            TextProperties::from_xml(
                 br#"<c:txPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>"#
                     .to_vec(),
             )
@@ -8298,13 +8285,13 @@ mod tests {
         scatter_series.marker_symbol = Some(MarkerStyle::Star);
         scatter_series.marker_size = Some(9);
         scatter_series.marker_shape_properties = Some(
-            ChartShapeProperties::from_xml(
+            ShapeProperties::from_xml(
                 br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:solidFill><a:srgbClr val="AABBCC"/></a:solidFill></c:spPr>"#.to_vec(),
             )
             .unwrap(),
         );
         scatter_series.marker_extension_list = Some(
-            ChartExtensionList::from_xml(
+            ExtensionList::from_xml(
                 br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:x="urn:example:marker"><c:ext uri="series-marker"><x:payload/></c:ext></c:extLst>"#.to_vec(),
             )
             .unwrap(),
@@ -8312,13 +8299,13 @@ mod tests {
         scatter_series.smooth = true;
         let mut point = DataPoint::new(2).with_marker(7, MarkerStyle::Diamond);
         point.marker_shape_properties = Some(
-            ChartShapeProperties::from_xml(
+            ShapeProperties::from_xml(
                 br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:ln w="12700"/></c:spPr>"#.to_vec(),
             )
             .unwrap(),
         );
         point.marker_extension_list = Some(
-            ChartExtensionList::from_xml(
+            ExtensionList::from_xml(
                 br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:x="urn:example:marker"><c:ext uri="point-marker"><x:payload/></c:ext></c:extLst>"#.to_vec(),
             )
             .unwrap(),
@@ -8334,27 +8321,27 @@ mod tests {
         labels.show_series_name = true;
         labels.show_leader_lines = true;
         labels.shape_properties = Some(
-            ChartShapeProperties::from_xml(
+            ShapeProperties::from_xml(
                 br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:solidFill><a:srgbClr val="DDEEFF"/></a:solidFill></c:spPr>"#.to_vec(),
             )
             .unwrap(),
         );
         labels.text_properties = Some(
-            ChartTextProperties::from_xml(
+            TextProperties::from_xml(
                 br#"<c:txPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:bodyPr rot="1200000"/><a:lstStyle/><a:p/></c:txPr>"#.to_vec(),
             )
             .unwrap(),
         );
-        labels.leader_lines = Some(ChartLines {
+        labels.leader_lines = Some(Lines {
             shape_properties: Some(
-                ChartShapeProperties::from_xml(
+                ShapeProperties::from_xml(
                     br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:ln w="38100"/></c:spPr>"#.to_vec(),
                 )
                 .unwrap(),
             ),
         });
         labels.extension_list = Some(
-            ChartExtensionList::from_xml(
+            ExtensionList::from_xml(
                 br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:x="urn:example:labels"><c:ext uri="labels"><x:payload/></c:ext></c:extLst>"#.to_vec(),
             )
             .unwrap(),
@@ -8368,19 +8355,19 @@ mod tests {
         point_label.show_category_name = true;
         point_label.separator = Some(" / ".to_string());
         point_label.shape_properties = Some(
-            ChartShapeProperties::from_xml(
+            ShapeProperties::from_xml(
                 br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:noFill/></c:spPr>"#.to_vec(),
             )
             .unwrap(),
         );
         point_label.text_properties = Some(
-            ChartTextProperties::from_xml(
+            TextProperties::from_xml(
                 br#"<c:txPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:bodyPr vert="vert"/><a:lstStyle/><a:p/></c:txPr>"#.to_vec(),
             )
             .unwrap(),
         );
         point_label.extension_list = Some(
-            ChartExtensionList::from_xml(
+            ExtensionList::from_xml(
                 br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:x="urn:example:labels"><c:ext uri="point-label"><x:payload/></c:ext></c:extLst>"#.to_vec(),
             )
             .unwrap(),
@@ -8398,31 +8385,31 @@ mod tests {
         trendline.label_layout = Some(Layout::new().with_size(0.3, 0.2));
         trendline.label_number_format = Some(NumberFormat::new("0.000").with_source_linked(false));
         trendline.shape_properties = Some(
-            ChartShapeProperties::from_xml(
+            ShapeProperties::from_xml(
                 br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:ln w="63500"/></c:spPr>"#.to_vec(),
             )
             .unwrap(),
         );
         trendline.label_shape_properties = Some(
-            ChartShapeProperties::from_xml(
+            ShapeProperties::from_xml(
                 br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:solidFill><a:srgbClr val="FEDCBA"/></a:solidFill></c:spPr>"#.to_vec(),
             )
             .unwrap(),
         );
         trendline.label_text_properties = Some(
-            ChartTextProperties::from_xml(
+            TextProperties::from_xml(
                 br#"<c:txPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:bodyPr rot="1800000"/><a:lstStyle/><a:p/></c:txPr>"#.to_vec(),
             )
             .unwrap(),
         );
         trendline.label_extension_list = Some(
-            ChartExtensionList::from_xml(
+            ExtensionList::from_xml(
                 br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:x="urn:example:trendline"><c:ext uri="label"><x:payload/></c:ext></c:extLst>"#.to_vec(),
             )
             .unwrap(),
         );
         trendline.extension_list = Some(
-            ChartExtensionList::from_xml(
+            ExtensionList::from_xml(
                 br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:x="urn:example:trendline"><c:ext uri="trendline"><x:payload/></c:ext></c:extLst>"#.to_vec(),
             )
             .unwrap(),
@@ -8437,13 +8424,13 @@ mod tests {
             minus_values: None,
             no_end_cap: true,
             shape_properties: Some(
-                ChartShapeProperties::from_xml(
+                ShapeProperties::from_xml(
                     br#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:ln w="50800"/></c:spPr>"#.to_vec(),
                 )
                 .unwrap(),
             ),
             extension_list: Some(
-                ChartExtensionList::from_xml(
+                ExtensionList::from_xml(
                     br#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:x="urn:example:error-bars"><c:ext uri="error-bars"><x:payload/></c:ext></c:extLst>"#.to_vec(),
                 )
                 .unwrap(),
@@ -8512,7 +8499,7 @@ mod tests {
         ];
         for (index, group) in chart.plot_area.type_groups.iter_mut().enumerate() {
             group.common_mut().extension_list = Some(
-                ChartExtensionList::from_xml(
+                ExtensionList::from_xml(
                     format!(
                         r#"<c:extLst xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:x="urn:example:group"><c:ext uri="group-{index}"><x:payload/></c:ext></c:extLst>"#
                     )
