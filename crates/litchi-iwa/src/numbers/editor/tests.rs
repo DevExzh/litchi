@@ -6525,7 +6525,7 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
 
 #[test]
 fn table_sort_keeps_user_hidden_axes_at_their_physical_positions() {
-    use crate::table_hidden_axes::{TableAxisIndex, TableHiddenAxes};
+    use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
 
     let mut editor = NumbersDocumentBuilder::new()
         .table_dimensions(5, 2)
@@ -6559,7 +6559,7 @@ fn table_sort_keeps_user_hidden_axes_at_their_physical_positions() {
             ],
         )
         .unwrap();
-    let hidden = TableHiddenAxes::new([TableAxisIndex::row(2)]).unwrap();
+    let hidden = HiddenAxes::new([AxisIndex::row(2)]).unwrap();
     editor.set_table_hidden_axes(table_id, &hidden).unwrap();
     editor
         .set_table_sort_order(

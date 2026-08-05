@@ -90,6 +90,15 @@ through finite, non-negative validation, and `Layout` is a fixed-size
 composable value. Native alignment and padding conversion remain outside this
 leaf; the facade only adapts its typed error at the archive boundary.
 
+Table hidden-axis semantics use the focused
+`litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes}` module. `AxisIndex`
+is a zero-based row-or-column value, while `HiddenAxes` validates duplicates
+and stores canonical row-then-column ordering in one boxed slice. Its typed
+duplicate error is independent of archive state. Native hidden-state UUIDs,
+protobuf field mapping, graph traversal, bounds validation, and transactional
+package mutation remain in the IWA adapter, and concrete Numbers, Pages, and
+Keynote APIs consume the common values without contextual compatibility aliases.
+
 Shape and ordinary text-box frame layout uses a separate focused module:
 `litchi_iwa_common::text::layout::{VerticalAlignment, AutoSize, Inset, Insets,
 Layout}`. It deliberately does not reuse table-cell `TextWrap` semantics: shape

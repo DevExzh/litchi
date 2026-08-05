@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use litchi_iwa::numbers::{NumbersEditor, TableColumnDeletion, TableRowDeletion};
-use litchi_iwa::table_hidden_axes::{TableAxisIndex, TableHiddenAxes};
+use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = std::env::args().skip(1);
@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .next()
             .ok_or("usage: delete_numbers_hidden_table_axes <source.numbers> <output.numbers>")?,
     );
-    let initial = TableHiddenAxes::new([TableAxisIndex::row(2), TableAxisIndex::column(1)])?;
+    let initial = HiddenAxes::new([AxisIndex::row(2), AxisIndex::column(1)])?;
 
     let mut editor = NumbersEditor::open(source)?;
     let table = editor.tables()?.remove(0);

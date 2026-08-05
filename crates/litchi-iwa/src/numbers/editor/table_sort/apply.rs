@@ -13,9 +13,8 @@ use crate::numbers::editor::table_topology::{
     category_grouping_is_enabled, deprecated_category_grouping_is_enabled, filter_has_row_state,
     table_has_spill_state,
 };
-use crate::table_hidden_axes::{
-    TableHiddenAxes, positional_user_hidden_axes, restore_positional_user_hidden_axes,
-};
+use crate::table_hidden_axes::{positional_user_hidden_axes, restore_positional_user_hidden_axes};
+use litchi_iwa_common::table::axis::HiddenAxes;
 
 use super::*;
 
@@ -298,7 +297,7 @@ fn validate_sort_features(
     package: &IWorkPackage,
     locations: &HashMap<u64, String>,
     descriptor: &TableDescriptor,
-) -> Result<TableHiddenAxes> {
+) -> Result<HiddenAxes> {
     let model = &descriptor.model;
     if model.number_of_filtered_rows.unwrap_or(0) != 0
         || model.pivot_owner.is_some()
@@ -355,7 +354,7 @@ fn validate_sort_features(
     if declares_hidden_storage {
         positional_user_hidden_axes(package, descriptor.object_id)
     } else {
-        Ok(TableHiddenAxes::empty())
+        Ok(HiddenAxes::empty())
     }
 }
 

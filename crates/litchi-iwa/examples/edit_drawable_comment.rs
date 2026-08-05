@@ -1,6 +1,7 @@
 use std::env;
 
 use litchi_iwa::IWorkDrawableCommentEditor;
+use litchi_iwa::comments::DrawableObjectId;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -14,6 +15,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .next()
         .ok_or("missing drawable object identifier")?
         .parse::<u64>()?;
+    let drawable_id =
+        DrawableObjectId::new(drawable_id).ok_or("drawable object identifier must be non-zero")?;
     let replacement = arguments
         .next()
         .ok_or("missing replacement text or --clear")?;

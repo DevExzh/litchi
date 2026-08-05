@@ -1,11 +1,7 @@
 //! Typed hidden-row and hidden-column CRUD for Keynote slide tables.
 
 use super::*;
-
-/// One zero-based row or column position in a Keynote slide table.
-pub type KeynoteTableAxisIndex = crate::table_hidden_axes::TableAxisIndex;
-/// Canonical, duplicate-free user-hidden axes of a Keynote slide table.
-pub type KeynoteTableHiddenAxes = crate::table_hidden_axes::TableHiddenAxes;
+use litchi_iwa_common::table::axis::HiddenAxes;
 
 impl KeynoteEditor {
     /// Read the canonical user-hidden rows and columns of a slide table.
@@ -13,7 +9,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         model_object_id: u64,
-    ) -> Result<KeynoteTableHiddenAxes> {
+    ) -> Result<HiddenAxes> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::table_hidden_axes::table_hidden_axes(self.package(), model_object_id)
     }
@@ -23,7 +19,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         model_object_id: u64,
-        hidden: &KeynoteTableHiddenAxes,
+        hidden: &HiddenAxes,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
         if self.slide_table_hidden_axes(slide_index, model_object_id)? == *hidden {
@@ -48,6 +44,7 @@ mod tests {
     use super::*;
     use crate::keynote::KeynoteDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize};
+    use litchi_iwa_common::table::axis::AxisIndex;
 
     #[test]
     fn scratch_slide_table_roundtrips_hidden_axes_transactionally() {
@@ -65,11 +62,7 @@ mod tests {
                 },
             )
             .unwrap();
-        let hidden = KeynoteTableHiddenAxes::new([
-            KeynoteTableAxisIndex::row(2),
-            KeynoteTableAxisIndex::column(1),
-        ])
-        .unwrap();
+        let hidden = HiddenAxes::new([AxisIndex::row(2), AxisIndex::column(1)]).unwrap();
 
         editor
             .set_slide_table_hidden_axes(0, table.model_object_id, &hidden)
@@ -89,7 +82,7 @@ mod tests {
         );
 
         let before = editor.to_bytes().unwrap();
-        let invalid = KeynoteTableHiddenAxes::new([KeynoteTableAxisIndex::column(3)]).unwrap();
+        let invalid = HiddenAxes::new([AxisIndex::column(3)]).unwrap();
         assert!(
             editor
                 .set_slide_table_hidden_axes(0, table.model_object_id, &invalid)
@@ -98,7 +91,7 @@ mod tests {
         assert_eq!(editor.to_bytes().unwrap(), before);
 
         editor
-            .set_slide_table_hidden_axes(0, table.model_object_id, &KeynoteTableHiddenAxes::empty())
+            .set_slide_table_hidden_axes(0, table.model_object_id, &HiddenAxes::empty())
             .unwrap();
         assert!(
             editor

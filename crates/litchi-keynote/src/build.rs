@@ -2,6 +2,117 @@
 
 use crate::{Error, Result, Seconds};
 
+const NONE_ACCELERATION: i32 = 0;
+const EASE_IN_ACCELERATION: i32 = 1;
+const EASE_OUT_ACCELERATION: i32 = 2;
+const EASE_IN_OUT_ACCELERATION: i32 = 3;
+const CUSTOM_ACCELERATION: i32 = 4;
+
+/// The relationship between one build event and the preceding presentation
+/// event.
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Start {
+    /// Advance to this build with a presenter click.
+    OnClick,
+    /// Start automatically after the slide transition.
+    AfterTransition,
+    /// Start concurrently with the preceding build event.
+    WithPrevious,
+    /// Start after the preceding build event completes.
+    AfterPrevious,
+}
+
+/// Recognized timing curves for a build action.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AccelerationKind {
+    /// Constant speed.
+    None,
+    /// Ease into the action.
+    EaseIn,
+    /// Ease out of the action.
+    EaseOut,
+    /// Ease into and out of the action.
+    EaseInOut,
+    /// Use a custom timing curve.
+    Custom,
+}
+
+/// The compact native timing-curve value used by build actions.
+///
+/// Known curves have named associated constants. Future native values are
+/// retained losslessly so an adapter can read and write them unchanged.
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Acceleration(i32);
+
+impl Acceleration {
+    /// Constant-speed action.
+    #[allow(
+        non_upper_case_globals,
+        reason = "enum-style associated constants are the ergonomic public API"
+    )]
+    pub const None: Self = Self(NONE_ACCELERATION);
+    /// Ease into the action.
+    #[allow(
+        non_upper_case_globals,
+        reason = "enum-style associated constants are the ergonomic public API"
+    )]
+    pub const EaseIn: Self = Self(EASE_IN_ACCELERATION);
+    /// Ease out of the action.
+    #[allow(
+        non_upper_case_globals,
+        reason = "enum-style associated constants are the ergonomic public API"
+    )]
+    pub const EaseOut: Self = Self(EASE_OUT_ACCELERATION);
+    /// Ease into and out of the action.
+    #[allow(
+        non_upper_case_globals,
+        reason = "enum-style associated constants are the ergonomic public API"
+    )]
+    pub const EaseInOut: Self = Self(EASE_IN_OUT_ACCELERATION);
+    /// Use a custom timing curve.
+    #[allow(
+        non_upper_case_globals,
+        reason = "enum-style associated constants are the ergonomic public API"
+    )]
+    pub const Custom: Self = Self(CUSTOM_ACCELERATION);
+
+    /// Wrap a native build timing-curve value.
+    #[must_use]
+    pub const fn from_native(value: i32) -> Self {
+        Self(value)
+    }
+
+    /// Return the native build timing-curve value.
+    #[must_use]
+    pub const fn native_value(self) -> i32 {
+        self.0
+    }
+
+    /// Return the recognized timing-curve kind, if known.
+    #[must_use]
+    pub const fn kind(self) -> Option<AccelerationKind> {
+        match self.0 {
+            NONE_ACCELERATION => Some(AccelerationKind::None),
+            EASE_IN_ACCELERATION => Some(AccelerationKind::EaseIn),
+            EASE_OUT_ACCELERATION => Some(AccelerationKind::EaseOut),
+            EASE_IN_OUT_ACCELERATION => Some(AccelerationKind::EaseInOut),
+            CUSTOM_ACCELERATION => Some(AccelerationKind::Custom),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Debug for Acceleration {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.kind() {
+            Some(kind) => kind.fmt(formatter),
+            None => formatter.debug_tuple("Unsupported").field(&self.0).finish(),
+        }
+    }
+}
+
 /// A lossless semantic build effect identifier.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -108,6 +219,19 @@ impl Build {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::mem::size_of;
+
+    #[test]
+    fn scalar_values_are_compact_and_lossless() {
+        assert_eq!(size_of::<Start>(), 1);
+        assert_eq!(size_of::<Acceleration>(), size_of::<i32>());
+        assert_eq!(Acceleration::None.kind(), Some(AccelerationKind::None));
+        assert_eq!(Acceleration::EaseInOut.native_value(), 3);
+
+        let unknown = Acceleration::from_native(99);
+        assert_eq!(unknown.native_value(), 99);
+        assert_eq!(unknown.kind(), None);
+    }
 
     #[test]
     fn identifiers_are_lossless_and_typed() -> Result<()> {

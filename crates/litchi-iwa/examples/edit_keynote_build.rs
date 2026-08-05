@@ -3,10 +3,9 @@
 use std::env;
 
 use litchi_iwa::keynote::{
-    KeynoteBuildAcceleration, KeynoteBuildSettings, KeynoteBuildStart, KeynoteEditor,
-    KeynoteFlipDirection, KeynoteHorizontalBuildDirection, KeynoteJiggleIntensity,
-    KeynoteKeyboardDirection, KeynoteMotionPathPoint, KeynoteRotationDirection,
-    KeynoteSwooshDirection,
+    BuildAcceleration, BuildStart, KeynoteBuildSettings, KeynoteEditor, KeynoteFlipDirection,
+    KeynoteHorizontalBuildDirection, KeynoteJiggleIntensity, KeynoteKeyboardDirection,
+    KeynoteMotionPathPoint, KeynoteRotationDirection, KeynoteSwooshDirection,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -51,10 +50,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .as_mut()
                     .ok_or("Rotate constructor omitted its parameters")?
                     .acceleration = match acceleration.as_str() {
-                    "none" => KeynoteBuildAcceleration::None,
-                    "ease-in" => KeynoteBuildAcceleration::EaseIn,
-                    "ease-out" => KeynoteBuildAcceleration::EaseOut,
-                    "ease-in-out" => KeynoteBuildAcceleration::EaseInOut,
+                    "none" => BuildAcceleration::None,
+                    "ease-in" => BuildAcceleration::EaseIn,
+                    "ease-out" => BuildAcceleration::EaseOut,
+                    "ease-in-out" => BuildAcceleration::EaseInOut,
                     _ => return Err(usage().into()),
                 };
             }
@@ -361,10 +360,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         "timing" => {
             let start = match arguments.next().ok_or(usage())?.as_str() {
-                "on-click" => KeynoteBuildStart::OnClick,
-                "after-transition" => KeynoteBuildStart::AfterTransition,
-                "with-previous" => KeynoteBuildStart::WithPrevious,
-                "after-previous" => KeynoteBuildStart::AfterPrevious,
+                "on-click" => BuildStart::OnClick,
+                "after-transition" => BuildStart::AfterTransition,
+                "with-previous" => BuildStart::WithPrevious,
+                "after-previous" => BuildStart::AfterPrevious,
                 _ => return Err(usage().into()),
             };
             let delay = arguments.next().ok_or(usage())?.parse()?;
@@ -453,12 +452,12 @@ fn parse_toggle(value: &str, enabled: &str, disabled: &str) -> Result<bool, &'st
     }
 }
 
-fn parse_acceleration(value: &str) -> Result<KeynoteBuildAcceleration, &'static str> {
+fn parse_acceleration(value: &str) -> Result<BuildAcceleration, &'static str> {
     match value {
-        "none" => Ok(KeynoteBuildAcceleration::None),
-        "ease-in" => Ok(KeynoteBuildAcceleration::EaseIn),
-        "ease-out" => Ok(KeynoteBuildAcceleration::EaseOut),
-        "ease-in-out" => Ok(KeynoteBuildAcceleration::EaseInOut),
+        "none" => Ok(BuildAcceleration::None),
+        "ease-in" => Ok(BuildAcceleration::EaseIn),
+        "ease-out" => Ok(BuildAcceleration::EaseOut),
+        "ease-in-out" => Ok(BuildAcceleration::EaseInOut),
         _ => Err(usage()),
     }
 }

@@ -7,7 +7,7 @@ mod dimension;
 mod row;
 mod uid;
 
-use crate::table_hidden_axes::{TableAxisIndex, remove_table_hidden_axis};
+use crate::table_hidden_axes::remove_table_hidden_axis;
 use cell_merge::{
     MergeAnchorRelocation, MergeAxis, merge_anchor_relocations_for_axis_deletion,
     regions_in_package, shift_merges_for_axis_deletion,
@@ -17,6 +17,7 @@ use dimension::set_table_dimensions;
 use formula_dependency_shift::{
     DependencyAxis, FormulaHostCoordinate, delete_formula_dependencies,
 };
+use litchi_iwa_common::table::axis::AxisIndex;
 use row::{delete_row_headers, delete_table_tile_row};
 use stroke_layers::{StrokeAxis, delete as delete_stroke_layers};
 use table_headers::set_attached_table_header_settings;
@@ -132,7 +133,7 @@ pub(super) fn remove_attached_table_row(
             )
         })?;
     if descriptor.model.hidden_states_owner.is_some() {
-        remove_table_hidden_axis(package, table_id, TableAxisIndex::row(row))?;
+        remove_table_hidden_axis(package, table_id, AxisIndex::row(row))?;
     }
     delete_row_uid(package, &locations, uid.identifier, old_rows, row)?;
     if let Some(sidecar) = &descriptor.model.stroke_sidecar {
@@ -224,7 +225,7 @@ pub(super) fn remove_attached_table_column(
             )
         })?;
     if descriptor.model.hidden_states_owner.is_some() {
-        remove_table_hidden_axis(package, table_id, TableAxisIndex::column(column))?;
+        remove_table_hidden_axis(package, table_id, AxisIndex::column(column))?;
     }
     delete_column_uid(package, &locations, uid.identifier, old_columns, column)?;
     if let Some(sidecar) = &descriptor.model.stroke_sidecar {

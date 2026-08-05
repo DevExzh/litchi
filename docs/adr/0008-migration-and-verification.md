@@ -6127,6 +6127,21 @@ damaged; this remains the tracked Numbers chart-fixture limitation above.
 All three applications were quit through their application menus after
 inspection.
 
+The table hidden-axis ownership slice now follows the focused table seam:
+`litchi-iwa-common::table::axis::{AxisIndex, HiddenAxes}` owns the archive-free
+row/column positions and the canonical duplicate-free hidden set. The set is a
+single boxed slice sorted deterministically by row, then column, and duplicate
+construction returns the typed axis-module error. The IWA implementation is
+now a private archive adapter retaining native hidden-state UUIDs, protobuf
+field mapping, package traversal, axis bounds, and transactional mutation.
+Numbers, Pages, Keynote, and all five hidden-axis examples import the common
+types directly; the former flat semantic definitions and contextual facade
+aliases are gone. The focused common suite passed 3 axis tests, the IWA hidden-
+axis suite passed 7 adapter/API tests, all five migrated examples compiled,
+both changed crates passed no-dependency `-D warnings` Clippy, and the crate
+boundary checker remained valid. No native application claim is made for this
+structural ownership slice.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

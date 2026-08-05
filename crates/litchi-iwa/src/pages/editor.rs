@@ -4671,8 +4671,8 @@ pub use charts::{PagesBodyChartInfo, RemovedPagesBodyChart};
 pub use images::{PagesImageInfo, PagesImageOptions, RemovedPagesImage};
 pub use movies::{PagesMovieInfo, PagesMovieOptions, RemovedPagesMovie};
 pub use tables::{
-    PagesCellValue, PagesTable, PagesTableAxisIndex, PagesTableCellCheckboxFormat,
-    PagesTableCellComment, PagesTableCellCommentInfo, PagesTableCellCommentReplyInfo,
+    PagesCellValue, PagesTable, PagesTableCellCheckboxFormat, PagesTableCellComment,
+    PagesTableCellCommentInfo, PagesTableCellCommentReplyInfo,
     PagesTableCellConditionalHighlightInfo, PagesTableCellCurrencyFormat, PagesTableCellDataFormat,
     PagesTableCellDateTimeFormat, PagesTableCellDecimalPlaces, PagesTableCellDurationFormat,
     PagesTableCellDurationStyle, PagesTableCellDurationUnit, PagesTableCellDurationUnitRange,
@@ -4701,8 +4701,8 @@ pub use tables::{
     PagesTableColumnDeletion, PagesTableColumnInsertion, PagesTableDimension,
     PagesTableDimensionSize, PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator,
     PagesTableFormulaCachedValue, PagesTableFormulaCellReference, PagesTableFormulaExpression,
-    PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableHiddenAxes, PagesTableInfo,
-    PagesTablePoints, PagesTableRowDeletion, PagesTableRowInsertion, PagesTableSortColumnIndex,
+    PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableInfo, PagesTablePoints,
+    PagesTableRowDeletion, PagesTableRowInsertion, PagesTableSortColumnIndex,
     PagesTableSortDirection, PagesTableSortOrder, PagesTableSortRowRange, PagesTableSortRule,
     PagesTableSortScope, PagesTableTitleSettings,
 };

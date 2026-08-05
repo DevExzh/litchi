@@ -16,7 +16,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .into_iter()
         .next()
         .ok_or("the initial slide has no drawable")?;
-    keynote.add_slide_build(0, drawable.object_id, KeynoteBuildSettings::dissolve_in())?;
+    keynote.add_slide_build(
+        0,
+        drawable.object_id.into(),
+        KeynoteBuildSettings::dissolve_in(),
+    )?;
     keynote.save(output)?;
     Ok(())
 }

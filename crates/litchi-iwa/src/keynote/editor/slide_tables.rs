@@ -34,7 +34,6 @@ pub use formula::{
     KeynoteTableFormulaExpression,
 };
 use graph::{require_table_model, slide_table_graph, table_template};
-pub use hidden_axes::{KeynoteTableAxisIndex, KeynoteTableHiddenAxes};
 pub use sort::{
     KeynoteTableSortColumnIndex, KeynoteTableSortDirection, KeynoteTableSortOrder,
     KeynoteTableSortRowRange, KeynoteTableSortRule, KeynoteTableSortScope,

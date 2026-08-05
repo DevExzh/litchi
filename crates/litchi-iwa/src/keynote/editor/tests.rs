@@ -741,7 +741,7 @@ fn slide_build_crud_is_transactional_and_updates_native_caches() {
     let mut updated = KeynoteBuildSettings::dissolve_in();
     updated.duration = 2.5;
     updated.delay = 0.25;
-    updated.start = KeynoteBuildStart::AfterTransition;
+    updated.start = BuildStart::AfterTransition;
     editor
         .set_slide_build(0, created.object_id, updated.clone())
         .unwrap();
@@ -793,7 +793,7 @@ fn slide_rotate_action_crud_maps_native_parameters_and_is_transactional() {
     let mut settings =
         KeynoteBuildSettings::rotate_action(810.0, KeynoteRotationDirection::Clockwise);
     settings.duration = 2.5;
-    settings.rotation.as_mut().unwrap().acceleration = KeynoteBuildAcceleration::EaseIn;
+    settings.rotation.as_mut().unwrap().acceleration = BuildAcceleration::EaseIn;
     let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
     assert_eq!(created.settings, settings);
 
@@ -831,7 +831,7 @@ fn slide_rotate_action_crud_maps_native_parameters_and_is_transactional() {
     );
     assert_eq!(editor.to_bytes().unwrap(), before_invalid);
     let mut custom = settings.clone();
-    custom.rotation.as_mut().unwrap().acceleration = KeynoteBuildAcceleration::Custom;
+    custom.rotation.as_mut().unwrap().acceleration = BuildAcceleration::Custom;
     assert!(editor.add_slide_build(0, 6, custom).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before_invalid);
 
@@ -840,7 +840,7 @@ fn slide_rotate_action_crud_maps_native_parameters_and_is_transactional() {
     updated.rotation = Some(KeynoteRotationAction {
         total_degrees: 270.0,
         direction: KeynoteRotationDirection::Counterclockwise,
-        acceleration: KeynoteBuildAcceleration::EaseOut,
+        acceleration: BuildAcceleration::EaseOut,
     });
     editor
         .set_slide_build(0, created.object_id, updated.clone())
@@ -908,7 +908,7 @@ fn slide_custom_timing_curve_actions_create_update_and_clear_natively() {
     assert_eq!(editor.slide_builds(0).unwrap()[0].settings, updated);
 
     let mut builtin = updated;
-    builtin.rotation.as_mut().unwrap().acceleration = KeynoteBuildAcceleration::EaseOut;
+    builtin.rotation.as_mut().unwrap().acceleration = BuildAcceleration::EaseOut;
     builtin.timing_curve = None;
     editor
         .set_slide_build(0, created.object_id, builtin.clone())
@@ -963,7 +963,7 @@ fn slide_custom_timing_curve_rejects_invalid_pairing_and_shape_transactionally()
             .is_err()
     );
     let mut invalid = settings.clone();
-    invalid.rotation.as_mut().unwrap().acceleration = KeynoteBuildAcceleration::Custom;
+    invalid.rotation.as_mut().unwrap().acceleration = BuildAcceleration::Custom;
     invalid.timing_curve = Some(invalid_curve);
     assert!(
         editor
@@ -1156,12 +1156,12 @@ fn slide_scale_and_opacity_action_crud_maps_native_parameters_and_is_transaction
     let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
     let mut scale = KeynoteBuildSettings::scale_action(0.280_904_227_638_190_7);
     scale.duration = 1.75;
-    scale.scale.as_mut().unwrap().acceleration = KeynoteBuildAcceleration::EaseOut;
+    scale.scale.as_mut().unwrap().acceleration = BuildAcceleration::EaseOut;
     let scale_build = editor.add_slide_build(0, 5, scale.clone()).unwrap();
 
     let mut opacity = KeynoteBuildSettings::opacity_action(37.0);
     opacity.duration = 2.25;
-    opacity.opacity.as_mut().unwrap().acceleration = KeynoteBuildAcceleration::EaseIn;
+    opacity.opacity.as_mut().unwrap().acceleration = BuildAcceleration::EaseIn;
     let opacity_build = editor.add_slide_build(0, 6, opacity.clone()).unwrap();
     assert_eq!(editor.slide_builds(0).unwrap()[0].settings, scale);
     assert_eq!(editor.slide_builds(0).unwrap()[1].settings, opacity);
@@ -1209,7 +1209,7 @@ fn slide_scale_and_opacity_action_crud_maps_native_parameters_and_is_transaction
     let mut mismatched = scale.clone();
     mismatched.opacity = Some(KeynoteOpacityAction {
         opacity_percent: 50.0,
-        acceleration: KeynoteBuildAcceleration::None,
+        acceleration: BuildAcceleration::None,
     });
     assert!(
         editor
@@ -2115,7 +2115,7 @@ fn slide_move_action_crud_maps_editable_bezier_path_and_is_transactional() {
     settings.duration = 2.25;
     let move_action = settings.move_action.as_mut().unwrap();
     move_action.align_to_path = true;
-    move_action.acceleration = KeynoteBuildAcceleration::EaseOut;
+    move_action.acceleration = BuildAcceleration::EaseOut;
     let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
     assert_eq!(created.settings, settings);
 
@@ -2392,19 +2392,19 @@ fn unsupported_action_timing_updates_preserve_opaque_native_parameters() {
 fn slide_build_start_modes_map_to_native_chunks_and_guard_sequence_edges() {
     let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
     let mut first_settings = KeynoteBuildSettings::appear_in();
-    first_settings.start = KeynoteBuildStart::AfterTransition;
+    first_settings.start = BuildStart::AfterTransition;
     first_settings.delay = 0.25;
     let first = editor.add_slide_build(0, 5, first_settings).unwrap();
     assert_eq!(
         editor.slide_builds(0).unwrap()[0].settings.start,
-        KeynoteBuildStart::AfterTransition
+        BuildStart::AfterTransition
     );
 
     let mut second_settings = KeynoteBuildSettings::appear_in();
-    second_settings.start = KeynoteBuildStart::WithPrevious;
+    second_settings.start = BuildStart::WithPrevious;
     let second = editor.add_slide_build(0, 6, second_settings).unwrap();
     let builds = editor.slide_builds(0).unwrap();
-    assert_eq!(builds[1].settings.start, KeynoteBuildStart::WithPrevious);
+    assert_eq!(builds[1].settings.start, BuildStart::WithPrevious);
     assert_eq!(builds[1].chunks[0].automatic, Some(true));
     assert_eq!(builds[1].chunks[0].referent, Some(false));
 
@@ -2415,22 +2415,19 @@ fn slide_build_start_modes_map_to_native_chunks_and_guard_sequence_edges() {
     assert_eq!(editor.to_bytes().unwrap(), before_invalid);
 
     let mut after_previous = builds[1].settings.clone();
-    after_previous.start = KeynoteBuildStart::AfterPrevious;
+    after_previous.start = BuildStart::AfterPrevious;
     after_previous.delay = 0.5;
     editor
         .set_slide_build(0, second.object_id, after_previous)
         .unwrap();
     let after_builds = editor.slide_builds(0).unwrap();
     let second_after = &after_builds[1];
-    assert_eq!(
-        second_after.settings.start,
-        KeynoteBuildStart::AfterPrevious
-    );
+    assert_eq!(second_after.settings.start, BuildStart::AfterPrevious);
     assert_eq!(second_after.chunks[0].automatic, Some(true));
     assert_eq!(second_after.chunks[0].referent, Some(true));
 
     let mut invalid_delay = second_after.settings.clone();
-    invalid_delay.start = KeynoteBuildStart::OnClick;
+    invalid_delay.start = BuildStart::OnClick;
     assert!(
         editor
             .set_slide_build(0, second.object_id, invalid_delay)
@@ -2438,25 +2435,25 @@ fn slide_build_start_modes_map_to_native_chunks_and_guard_sequence_edges() {
     );
 
     let mut on_click = second_after.settings.clone();
-    on_click.start = KeynoteBuildStart::OnClick;
+    on_click.start = BuildStart::OnClick;
     on_click.delay = 0.0;
     editor
         .set_slide_build(0, second.object_id, on_click)
         .unwrap();
     let click_builds = editor.slide_builds(0).unwrap();
     let second_click = &click_builds[1];
-    assert_eq!(second_click.settings.start, KeynoteBuildStart::OnClick);
+    assert_eq!(second_click.settings.start, BuildStart::OnClick);
     assert_eq!(second_click.chunks[0].automatic, Some(false));
     assert_eq!(second_click.chunks[0].referent, Some(true));
 
     let mut empty = KeynoteEditor::from_package(test_package()).unwrap();
     let mut invalid_first = KeynoteBuildSettings::appear_in();
-    invalid_first.start = KeynoteBuildStart::AfterPrevious;
+    invalid_first.start = BuildStart::AfterPrevious;
     assert!(empty.add_slide_build(0, 5, invalid_first).is_err());
     assert!(empty.slide_builds(0).unwrap().is_empty());
 
     let mut invalid_second = KeynoteBuildSettings::appear_in();
-    invalid_second.start = KeynoteBuildStart::AfterTransition;
+    invalid_second.start = BuildStart::AfterTransition;
     assert!(editor.add_slide_build(0, 5, invalid_second).is_err());
 }
 

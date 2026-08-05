@@ -7,7 +7,7 @@ use litchi_iwa::numbers::{
     NumbersTableSortColumnIndex, NumbersTableSortDirection, NumbersTableSortOrder,
     NumbersTableSortRule,
 };
-use litchi_iwa::table_hidden_axes::{TableAxisIndex, TableHiddenAxes};
+use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
 use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             TableCellUpdate::new(4, 1, CellValue::Number(323.0)),
         ],
     )?;
-    editor.set_table_hidden_axes(table_id, &TableHiddenAxes::new([TableAxisIndex::row(2)])?)?;
+    editor.set_table_hidden_axes(table_id, &HiddenAxes::new([AxisIndex::row(2)])?)?;
     editor.set_table_sort_order(
         table_id,
         NumbersTableSortOrder::new([NumbersTableSortRule::new(
@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if !editor.apply_table_sort_order(table_id)? {
         return Err("expected the hidden-row table to be reordered".into());
     }
-    let hidden = TableHiddenAxes::new([TableAxisIndex::row(2)])?;
+    let hidden = HiddenAxes::new([AxisIndex::row(2)])?;
     if editor.table_hidden_axes(table_id)? != hidden {
         return Err("sort did not preserve the hidden row position".into());
     }

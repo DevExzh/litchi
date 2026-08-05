@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
-use litchi_iwa::table_hidden_axes::{TableAxisIndex, TableHiddenAxes};
+use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = PathBuf::from(
@@ -11,7 +11,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .nth(1)
             .ok_or("usage: create_numbers_table_hidden_axes <output.numbers>")?,
     );
-    let hidden = TableHiddenAxes::new([TableAxisIndex::row(2), TableAxisIndex::column(1)])?;
+    let hidden = HiddenAxes::new([AxisIndex::row(2), AxisIndex::column(1)])?;
     let mut editor = NumbersDocumentBuilder::new()
         .table_name("Hidden Axes")
         .table_dimensions(6, 4)

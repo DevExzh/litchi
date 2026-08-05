@@ -2,18 +2,19 @@
 
 use super::*;
 use crate::table_hidden_axes::{
-    TableHiddenAxes, set_table_hidden_axes as set_native_table_hidden_axes,
+    set_table_hidden_axes as set_native_table_hidden_axes,
     table_hidden_axes as read_native_table_hidden_axes,
 };
+use litchi_iwa_common::table::axis::HiddenAxes;
 
 impl NumbersEditor {
     /// Read the canonical user-hidden rows and columns of one attached table.
-    pub fn table_hidden_axes(&self, table_id: u64) -> Result<TableHiddenAxes> {
+    pub fn table_hidden_axes(&self, table_id: u64) -> Result<HiddenAxes> {
         read_native_table_hidden_axes(&self.package, table_id)
     }
 
     /// Replace all user-hidden rows and columns transactionally.
-    pub fn set_table_hidden_axes(&mut self, table_id: u64, hidden: &TableHiddenAxes) -> Result<()> {
+    pub fn set_table_hidden_axes(&mut self, table_id: u64, hidden: &HiddenAxes) -> Result<()> {
         if self.table_hidden_axes(table_id)? == *hidden {
             return Ok(());
         }
@@ -35,8 +36,9 @@ mod tests {
     use super::*;
     use crate::numbers::NumbersDocumentBuilder;
     use crate::table_hidden_axes::{
-        FILTER_SET_MESSAGE_TYPE, HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE, TableAxisIndex,
+        FILTER_SET_MESSAGE_TYPE, HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE,
     };
+    use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
 
     #[test]
     fn scratch_table_hidden_axes_round_trip_transactionally() {
@@ -45,8 +47,7 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        let hidden =
-            TableHiddenAxes::new([TableAxisIndex::row(2), TableAxisIndex::column(1)]).unwrap();
+        let hidden = HiddenAxes::new([AxisIndex::row(2), AxisIndex::column(1)]).unwrap();
 
         editor.set_table_hidden_axes(table_id, &hidden).unwrap();
         assert_eq!(editor.table_hidden_axes(table_id).unwrap(), hidden);
@@ -69,12 +70,12 @@ mod tests {
         assert_eq!((filter_sets, formula_owners), (2, 2));
 
         let before = editor.package.to_bytes().unwrap();
-        let invalid = TableHiddenAxes::new([TableAxisIndex::row(4)]).unwrap();
+        let invalid = HiddenAxes::new([AxisIndex::row(4)]).unwrap();
         assert!(editor.set_table_hidden_axes(table_id, &invalid).is_err());
         assert_eq!(editor.package.to_bytes().unwrap(), before);
 
         editor
-            .set_table_hidden_axes(table_id, &TableHiddenAxes::empty())
+            .set_table_hidden_axes(table_id, &HiddenAxes::empty())
             .unwrap();
         assert!(editor.table_hidden_axes(table_id).unwrap().is_empty());
     }
@@ -89,7 +90,7 @@ mod tests {
         editor
             .set_table_hidden_axes(
                 table_id,
-                &TableHiddenAxes::new([TableAxisIndex::row(2), TableAxisIndex::column(1)]).unwrap(),
+                &HiddenAxes::new([AxisIndex::row(2), AxisIndex::column(1)]).unwrap(),
             )
             .unwrap();
 
@@ -101,7 +102,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             editor.table_hidden_axes(table_id).unwrap(),
-            TableHiddenAxes::new([TableAxisIndex::row(3), TableAxisIndex::column(2),]).unwrap()
+            HiddenAxes::new([AxisIndex::row(3), AxisIndex::column(2),]).unwrap()
         );
 
         editor
@@ -112,7 +113,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             editor.table_hidden_axes(table_id).unwrap(),
-            TableHiddenAxes::new([TableAxisIndex::row(2), TableAxisIndex::column(1),]).unwrap()
+            HiddenAxes::new([AxisIndex::row(2), AxisIndex::column(1),]).unwrap()
         );
 
         editor

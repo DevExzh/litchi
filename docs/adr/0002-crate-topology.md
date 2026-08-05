@@ -166,6 +166,13 @@ allocation-free inset validation error; the IWA Numbers adapter retains native
 alignment identifiers, padding archives, cell-style inheritance, and
 transactional package mutation. The remaining flat facade module is a thin
 error/re-export adapter pending the concurrent root-module migration.
+The archive-free hidden-axis value now follows the same boundary at
+`litchi-iwa-common::table::axis::{AxisIndex, HiddenAxes}`. `HiddenAxes` stores a
+sorted, duplicate-free boxed slice and reports duplicate positions through its
+typed module error; the IWA adapter retains hidden-state UUID ownership,
+protobuf fields, archive traversal, bounds checks, and package mutation.
+Numbers, Pages, and Keynote consume the common types directly, and the former
+flat IWA semantic definitions and contextual aliases are removed.
 Shape and ordinary text-box frame layout is a distinct, table-independent value
 module at `litchi-iwa-common::text::layout::{VerticalAlignment, AutoSize, Inset,
 Insets, Layout}`. These values are heap-free, fixed-size, and archive-free; the

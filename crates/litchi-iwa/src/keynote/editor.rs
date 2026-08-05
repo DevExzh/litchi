@@ -52,6 +52,7 @@ use crate::wire::{
     transform_length_delimited_field, transform_length_delimited_fields_at_path,
 };
 use crate::{EmbeddedMediaAsset, Error, IWorkMediaEditor, IWorkPackage, Result};
+pub use litchi_keynote::build::{Acceleration as BuildAcceleration, Start as BuildStart};
 
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
 const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3_097;
@@ -205,29 +206,6 @@ fn required_length_delimited_payload<'a>(
     })
 }
 
-/// Native start relationship for one Keynote build event.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KeynoteBuildStart {
-    /// Advance to this build with a presenter click.
-    OnClick,
-    /// Start automatically after the slide transition.
-    AfterTransition,
-    /// Start concurrently with the preceding build event.
-    WithPrevious,
-    /// Start after the preceding build event completes.
-    AfterPrevious,
-}
-
-/// Speed curve for a Keynote action build.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KeynoteBuildAcceleration {
-    None,
-    EaseIn,
-    EaseOut,
-    EaseInOut,
-    Custom,
-}
-
 /// Rotation direction for a Keynote Rotate action build.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum KeynoteRotationDirection {
@@ -241,7 +219,7 @@ pub struct KeynoteRotationAction {
     /// Total rotation in degrees. For example, two full turns plus 90° is 810°.
     pub total_degrees: f64,
     pub direction: KeynoteRotationDirection,
-    pub acceleration: KeynoteBuildAcceleration,
+    pub acceleration: BuildAcceleration,
 }
 
 /// Typed parameters for Keynote's object Scale action.
@@ -249,7 +227,7 @@ pub struct KeynoteRotationAction {
 pub struct KeynoteScaleAction {
     /// Final size as a factor of the object's original size (`1.5` is 150%).
     pub scale_factor: f64,
-    pub acceleration: KeynoteBuildAcceleration,
+    pub acceleration: BuildAcceleration,
 }
 
 /// Typed parameters for Keynote's object Opacity action.
@@ -257,7 +235,7 @@ pub struct KeynoteScaleAction {
 pub struct KeynoteOpacityAction {
     /// Final opacity in Keynote percentage points (`37.0` is 37%).
     pub opacity_percent: f64,
-    pub acceleration: KeynoteBuildAcceleration,
+    pub acceleration: BuildAcceleration,
 }
 
 /// Node kind used by Keynote's editable Bézier motion paths.
@@ -429,7 +407,7 @@ impl KeynoteBuildTimingCurve {
 pub struct KeynoteMoveAction {
     pub path: KeynoteMotionPath,
     pub align_to_path: bool,
-    pub acceleration: KeynoteBuildAcceleration,
+    pub acceleration: BuildAcceleration,
 }
 
 /// Horizontal direction used by Keynote's Flip emphasis action.
@@ -554,7 +532,7 @@ pub struct KeynoteBuildSettings {
     pub duration: f64,
     /// Delay before an `AfterTransition` or `AfterPrevious` build starts.
     pub delay: f64,
-    pub start: KeynoteBuildStart,
+    pub start: BuildStart,
     pub direction: Option<u32>,
     /// Raw `BuildAttributesTextDelivery` value for forward compatibility.
     pub text_delivery: Option<i32>,
@@ -576,7 +554,7 @@ pub struct KeynoteBuildSettings {
     /// Present for typed Dissolve, Shimmer, Skid, Swoosh, and Trace builds.
     pub object_effect: Option<KeynoteObjectBuildEffect>,
     /// Inline curve for a typed action whose acceleration is
-    /// [`KeynoteBuildAcceleration::Custom`].
+    /// [`BuildAcceleration::Custom`].
     ///
     /// `None` preserves an opaque app-native custom curve while updating an
     /// existing build. New custom-curve actions require `Some`.
@@ -616,7 +594,7 @@ impl KeynoteBuildSettings {
             effect: "apple:bc-appear".to_owned(),
             duration: 1.0,
             delay: 0.0,
-            start: KeynoteBuildStart::OnClick,
+            start: BuildStart::OnClick,
             direction: None,
             text_delivery: Some(
                 kn::build_attributes_archive::BuildAttributesTextDelivery::KTextDeliveryByObject
@@ -730,7 +708,7 @@ impl KeynoteBuildSettings {
             rotation: Some(KeynoteRotationAction {
                 total_degrees,
                 direction,
-                acceleration: KeynoteBuildAcceleration::EaseInOut,
+                acceleration: BuildAcceleration::EaseInOut,
             }),
             scale: None,
             opacity: None,
@@ -749,7 +727,7 @@ impl KeynoteBuildSettings {
             rotation: None,
             scale: Some(KeynoteScaleAction {
                 scale_factor,
-                acceleration: KeynoteBuildAcceleration::EaseInOut,
+                acceleration: BuildAcceleration::EaseInOut,
             }),
             opacity: None,
             move_action: None,
@@ -768,7 +746,7 @@ impl KeynoteBuildSettings {
             scale: None,
             opacity: Some(KeynoteOpacityAction {
                 opacity_percent,
-                acceleration: KeynoteBuildAcceleration::EaseInOut,
+                acceleration: BuildAcceleration::EaseInOut,
             }),
             move_action: None,
             ..Self::appear_in()
@@ -793,7 +771,7 @@ impl KeynoteBuildSettings {
             move_action: Some(KeynoteMoveAction {
                 path,
                 align_to_path: false,
-                acceleration: KeynoteBuildAcceleration::EaseInOut,
+                acceleration: BuildAcceleration::EaseInOut,
             }),
             ..Self::appear_in()
         }
@@ -802,7 +780,7 @@ impl KeynoteBuildSettings {
     /// Attach a custom timing curve to a typed action.
     ///
     /// This changes the action's acceleration to
-    /// [`KeynoteBuildAcceleration::Custom`]. It returns an error when this is
+    /// [`BuildAcceleration::Custom`]. It returns an error when this is
     /// not a Rotate, Scale, Opacity, or Move action.
     pub fn with_custom_timing_curve(
         mut self,
@@ -815,7 +793,7 @@ impl KeynoteBuildSettings {
     /// Replace the custom timing curve of a typed action.
     ///
     /// This changes the action's acceleration to
-    /// [`KeynoteBuildAcceleration::Custom`]. It returns an error when this is
+    /// [`BuildAcceleration::Custom`]. It returns an error when this is
     /// not a Rotate, Scale, Opacity, or Move action.
     pub fn set_custom_timing_curve(&mut self, timing_curve: KeynoteBuildTimingCurve) -> Result<()> {
         validate_timing_curve(&timing_curve)?;
@@ -832,7 +810,7 @@ impl KeynoteBuildSettings {
                 "Keynote custom timing curves require a typed action".to_owned(),
             ));
         };
-        *acceleration = KeynoteBuildAcceleration::Custom;
+        *acceleration = BuildAcceleration::Custom;
         self.timing_curve = Some(timing_curve);
         Ok(())
     }
@@ -3836,7 +3814,7 @@ impl KeynoteEditor {
         settings: KeynoteBuildSettings,
     ) -> Result<KeynoteBuildInfo> {
         validate_build_settings(&settings)?;
-        if typed_action_acceleration(&settings) == Some(KeynoteBuildAcceleration::Custom)
+        if typed_action_acceleration(&settings) == Some(BuildAcceleration::Custom)
             && settings.timing_curve.is_none()
         {
             return Err(Error::ParseError(
@@ -3943,8 +3921,8 @@ impl KeynoteEditor {
                     "Keynote build {build_object_id} is not owned by slide {slide_index}"
                 ))
             })?;
-        if typed_action_acceleration(&settings) == Some(KeynoteBuildAcceleration::Custom)
-            && typed_action_acceleration(&build.settings) != Some(KeynoteBuildAcceleration::Custom)
+        if typed_action_acceleration(&settings) == Some(BuildAcceleration::Custom)
+            && typed_action_acceleration(&build.settings) != Some(BuildAcceleration::Custom)
             && settings.timing_curve.is_none()
         {
             return Err(Error::ParseError(
@@ -5093,12 +5071,12 @@ pub use slide_movies::{
 };
 pub use slide_shapes::{KeynoteSlideShapeInfo, KeynoteSlideShapeKind, RemovedKeynoteSlideShape};
 pub use slide_tables::{
-    KeynoteSlideTable, KeynoteSlideTableInfo, KeynoteTableAxisIndex,
-    KeynoteTableCellCheckboxFormat, KeynoteTableCellComment, KeynoteTableCellCommentInfo,
-    KeynoteTableCellCommentReplyInfo, KeynoteTableCellConditionalHighlightInfo,
-    KeynoteTableCellCurrencyFormat, KeynoteTableCellDataFormat, KeynoteTableCellDateTimeFormat,
-    KeynoteTableCellDecimalPlaces, KeynoteTableCellDurationFormat, KeynoteTableCellDurationStyle,
-    KeynoteTableCellDurationUnit, KeynoteTableCellDurationUnitRange, KeynoteTableCellDurationUnits,
+    KeynoteSlideTable, KeynoteSlideTableInfo, KeynoteTableCellCheckboxFormat,
+    KeynoteTableCellComment, KeynoteTableCellCommentInfo, KeynoteTableCellCommentReplyInfo,
+    KeynoteTableCellConditionalHighlightInfo, KeynoteTableCellCurrencyFormat,
+    KeynoteTableCellDataFormat, KeynoteTableCellDateTimeFormat, KeynoteTableCellDecimalPlaces,
+    KeynoteTableCellDurationFormat, KeynoteTableCellDurationStyle, KeynoteTableCellDurationUnit,
+    KeynoteTableCellDurationUnitRange, KeynoteTableCellDurationUnits,
     KeynoteTableCellFixedDecimalPlaces, KeynoteTableCellFractionFormat, KeynoteTableCellInset,
     KeynoteTableCellInsets, KeynoteTableCellLayout, KeynoteTableCellNegativeNumberStyle,
     KeynoteTableCellNumberFormat, KeynoteTableCellNumeralSystemFormat,
@@ -5126,11 +5104,10 @@ pub use slide_tables::{
     KeynoteTableDimension, KeynoteTableDimensionSize, KeynoteTableFormulaAxisReference,
     KeynoteTableFormulaBinaryOperator, KeynoteTableFormulaCachedValue,
     KeynoteTableFormulaCellReference, KeynoteTableFormulaExpression, KeynoteTableHeaderCount,
-    KeynoteTableHeaderSettings, KeynoteTableHiddenAxes, KeynoteTablePoints,
-    KeynoteTableRowDeletion, KeynoteTableRowInsertion, KeynoteTableSortColumnIndex,
-    KeynoteTableSortDirection, KeynoteTableSortOrder, KeynoteTableSortRowRange,
-    KeynoteTableSortRule, KeynoteTableSortScope, KeynoteTableTitleSettings,
-    RemovedKeynoteSlideTable,
+    KeynoteTableHeaderSettings, KeynoteTablePoints, KeynoteTableRowDeletion,
+    KeynoteTableRowInsertion, KeynoteTableSortColumnIndex, KeynoteTableSortDirection,
+    KeynoteTableSortOrder, KeynoteTableSortRowRange, KeynoteTableSortRule, KeynoteTableSortScope,
+    KeynoteTableTitleSettings, RemovedKeynoteSlideTable,
 };
 pub use soundtrack::{KeynoteSoundtrackMode, KeynoteSoundtrackSettings};
 pub use soundtrack_items::KeynoteSoundtrackItemInfo;

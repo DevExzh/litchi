@@ -11,6 +11,7 @@ use crate::table_cell_data_format::{
     TableCellNumeralSystemBase, TableCellNumeralSystemFixedPlaces,
     TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces,
 };
+use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
 use litchi_iwa_common::table::cell::BorderSide;
 
 fn table_geometry() -> (DrawablePoint, DrawableSize) {
@@ -1189,7 +1190,7 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
         .unwrap()
         .unwrap()
         .storage_object_id;
-    let hidden = KeynoteTableHiddenAxes::new([KeynoteTableAxisIndex::row(2)]).unwrap();
+    let hidden = HiddenAxes::new([AxisIndex::row(2)]).unwrap();
     editor
         .set_slide_table_hidden_axes(0, model_id, &hidden)
         .unwrap();

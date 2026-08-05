@@ -9,6 +9,13 @@ use crate::package_metadata::{next_object_identifier, set_package_last_object_id
 use crate::protobuf::{tsce, tsp, tst};
 use crate::wire::{parse_wire_fields, patch_length_delimited_field, patch_varint_field};
 use crate::{Error, IWorkPackage, Result};
+use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
+
+impl From<litchi_iwa_common::table::axis::Error> for crate::Error {
+    fn from(error: litchi_iwa_common::table::axis::Error) -> Self {
+        Self::ParseError(error.to_string())
+    }
+}
 
 const TABLE_INFO_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
 const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
@@ -26,83 +33,10 @@ const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
 const TABLE_HIDDEN_STATES_UID_OFFSET: u64 = 4;
 const COLUMN_HIDDEN_EXTENT_UID_OFFSET: u64 = 7;
 
-/// One zero-based row or column position in a native iWork table.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum TableAxisIndex {
-    /// A zero-based row index.
-    Row(usize),
-    /// A zero-based column index.
-    Column(usize),
-}
-
-impl TableAxisIndex {
-    /// Address one row by zero-based index.
-    pub const fn row(index: usize) -> Self {
-        Self::Row(index)
-    }
-
-    /// Address one column by zero-based index.
-    pub const fn column(index: usize) -> Self {
-        Self::Column(index)
-    }
-
-    /// Return the zero-based index within this position's axis.
-    pub const fn index(self) -> usize {
-        match self {
-            Self::Row(index) | Self::Column(index) => index,
-        }
-    }
-}
-
-/// Canonical, duplicate-free set of user-hidden table axes.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct TableHiddenAxes {
-    axes: Vec<TableAxisIndex>,
-}
-
-impl TableHiddenAxes {
-    /// No rows or columns are hidden.
-    pub const fn empty() -> Self {
-        Self { axes: Vec::new() }
-    }
-
-    /// Construct a sorted hidden-axis set, rejecting duplicate positions.
-    pub fn new(axes: impl IntoIterator<Item = TableAxisIndex>) -> Result<Self> {
-        let mut axes = axes.into_iter().collect::<Vec<_>>();
-        axes.sort_unstable();
-        if axes.windows(2).any(|pair| pair[0] == pair[1]) {
-            return Err(Error::ParseError(
-                "hidden iWork table axes contain a duplicate position".to_owned(),
-            ));
-        }
-        Ok(Self { axes })
-    }
-
-    /// Borrow the canonical row-then-column positions.
-    pub fn as_slice(&self) -> &[TableAxisIndex] {
-        &self.axes
-    }
-
-    /// Iterate over canonical row-then-column positions.
-    pub fn iter(&self) -> impl ExactSizeIterator<Item = TableAxisIndex> + '_ {
-        self.axes.iter().copied()
-    }
-
-    /// Return whether every table axis is visible.
-    pub fn is_empty(&self) -> bool {
-        self.axes.is_empty()
-    }
-
-    /// Return whether one row or column is hidden.
-    pub fn contains(&self, axis: TableAxisIndex) -> bool {
-        self.axes.binary_search(&axis).is_ok()
-    }
-}
-
 pub(crate) fn table_hidden_axes(
     package: &IWorkPackage,
     model_object_id: u64,
-) -> Result<TableHiddenAxes> {
+) -> Result<HiddenAxes> {
     let graph = table_hidden_graph(package, model_object_id)?;
     hidden_axes_from_graph(&graph)
 }
@@ -114,7 +48,7 @@ pub(crate) fn table_hidden_axes(
 pub(crate) fn positional_user_hidden_axes(
     package: &IWorkPackage,
     model_object_id: u64,
-) -> Result<TableHiddenAxes> {
+) -> Result<HiddenAxes> {
     let graph = table_hidden_graph(package, model_object_id)?;
     let axes = hidden_axes_from_graph(&graph)?;
     let Some(owner) = &graph.model.hidden_states_owner else {
@@ -154,7 +88,7 @@ pub(crate) fn positional_user_hidden_axes(
 pub(crate) fn restore_positional_user_hidden_axes(
     package: &mut IWorkPackage,
     model_object_id: u64,
-    expected: &TableHiddenAxes,
+    expected: &HiddenAxes,
 ) -> Result<()> {
     if table_hidden_axes(package, model_object_id)? == *expected {
         return Ok(());
@@ -174,8 +108,8 @@ pub(crate) fn restore_positional_user_hidden_axes(
         &mut active.row_hidden_state_extent,
         &graph.row_uids,
         expected.iter().filter_map(|axis| match axis {
-            TableAxisIndex::Row(index) => Some(index),
-            TableAxisIndex::Column(_) => None,
+            AxisIndex::Row(index) => Some(index),
+            AxisIndex::Column(_) => None,
         }),
         "row",
     )?;
@@ -183,8 +117,8 @@ pub(crate) fn restore_positional_user_hidden_axes(
         &mut active.column_hidden_state_extent,
         &graph.column_uids,
         expected.iter().filter_map(|axis| match axis {
-            TableAxisIndex::Column(index) => Some(index),
-            TableAxisIndex::Row(_) => None,
+            AxisIndex::Column(index) => Some(index),
+            AxisIndex::Row(_) => None,
         }),
         "column",
     )?;
@@ -200,7 +134,7 @@ pub(crate) fn restore_positional_user_hidden_axes(
 pub(crate) fn set_table_hidden_axes(
     package: &mut IWorkPackage,
     model_object_id: u64,
-    hidden: &TableHiddenAxes,
+    hidden: &HiddenAxes,
 ) -> Result<()> {
     let graph = table_hidden_graph(package, model_object_id)?;
     validate_axis_bounds(&graph.model, hidden)?;
@@ -260,8 +194,8 @@ pub(crate) fn set_table_hidden_axes(
         &mut active.row_hidden_state_extent,
         &graph.row_uids,
         hidden.iter().filter_map(|axis| match axis {
-            TableAxisIndex::Row(index) => Some(index),
-            TableAxisIndex::Column(_) => None,
+            AxisIndex::Row(index) => Some(index),
+            AxisIndex::Column(_) => None,
         }),
         "row",
     )?;
@@ -269,8 +203,8 @@ pub(crate) fn set_table_hidden_axes(
         &mut active.column_hidden_state_extent,
         &graph.column_uids,
         hidden.iter().filter_map(|axis| match axis {
-            TableAxisIndex::Column(index) => Some(index),
-            TableAxisIndex::Row(_) => None,
+            AxisIndex::Column(index) => Some(index),
+            AxisIndex::Row(_) => None,
         }),
         "column",
     )?;
@@ -300,15 +234,15 @@ pub(crate) fn set_table_hidden_axes(
 pub(crate) fn remove_table_hidden_axis(
     package: &mut IWorkPackage,
     model_object_id: u64,
-    axis: TableAxisIndex,
+    axis: AxisIndex,
 ) -> Result<()> {
     let graph = table_hidden_graph(package, model_object_id)?;
     let hidden = hidden_axes_from_graph(&graph)?;
     if !hidden.contains(axis) {
         return Ok(());
     }
-    validate_axis_bounds(&graph.model, &TableHiddenAxes::new([axis])?)?;
-    let retained = TableHiddenAxes::new(hidden.iter().filter(|candidate| *candidate != axis))?;
+    validate_axis_bounds(&graph.model, &HiddenAxes::new([axis])?)?;
+    let retained = HiddenAxes::new(hidden.iter().filter(|candidate| *candidate != axis))?;
     let mut owner = graph.model.hidden_states_owner.clone().ok_or_else(|| {
         Error::InvalidFormat("iWork table hidden-state owner is absent".to_owned())
     })?;
@@ -323,8 +257,8 @@ pub(crate) fn remove_table_hidden_axis(
         &mut active.row_hidden_state_extent,
         &graph.row_uids,
         retained.iter().filter_map(|candidate| match candidate {
-            TableAxisIndex::Row(index) => Some(index),
-            TableAxisIndex::Column(_) => None,
+            AxisIndex::Row(index) => Some(index),
+            AxisIndex::Column(_) => None,
         }),
         "row",
     )?;
@@ -332,8 +266,8 @@ pub(crate) fn remove_table_hidden_axis(
         &mut active.column_hidden_state_extent,
         &graph.column_uids,
         retained.iter().filter_map(|candidate| match candidate {
-            TableAxisIndex::Column(index) => Some(index),
-            TableAxisIndex::Row(_) => None,
+            AxisIndex::Column(index) => Some(index),
+            AxisIndex::Row(_) => None,
         }),
         "column",
     )?;
@@ -555,7 +489,7 @@ fn physical_uids(
     Ok(physical)
 }
 
-fn hidden_axes_from_graph(graph: &TableHiddenGraph) -> Result<TableHiddenAxes> {
+fn hidden_axes_from_graph(graph: &TableHiddenGraph) -> Result<HiddenAxes> {
     let Some(owner) = &graph.model.hidden_states_owner else {
         if graph.info.hidden_states_uuid.is_some() {
             return Err(Error::InvalidFormat(format!(
@@ -563,7 +497,7 @@ fn hidden_axes_from_graph(graph: &TableHiddenGraph) -> Result<TableHiddenAxes> {
                 graph.info_object_id
             )));
         }
-        return Ok(TableHiddenAxes::empty());
+        return Ok(HiddenAxes::empty());
     };
     if owner.owner_uid != hidden_states_uid_for_formula_owner(&graph.formula_owner_uid)? {
         return Err(Error::InvalidFormat(format!(
@@ -582,18 +516,18 @@ fn hidden_axes_from_graph(graph: &TableHiddenGraph) -> Result<TableHiddenAxes> {
     read_extent(
         &active.row_hidden_state_extent,
         &graph.row_uids,
-        TableAxisIndex::Row,
+        AxisIndex::Row,
         "row",
         &mut axes,
     )?;
     read_extent(
         &active.column_hidden_state_extent,
         &graph.column_uids,
-        TableAxisIndex::Column,
+        AxisIndex::Column,
         "column",
         &mut axes,
     )?;
-    TableHiddenAxes::new(axes)
+    HiddenAxes::new(axes).map_err(|error| Error::ParseError(error.to_string()))
 }
 
 fn unique_active_state<'a>(
@@ -636,9 +570,9 @@ fn unique_active_state_mut<'a>(
 fn read_extent(
     extent: &tst::HiddenStateExtentArchive,
     physical_uids: &[tsp::Uuid],
-    axis: impl Fn(usize) -> TableAxisIndex,
+    axis: impl Fn(usize) -> AxisIndex,
     label: &str,
-    output: &mut Vec<TableAxisIndex>,
+    output: &mut Vec<AxisIndex>,
 ) -> Result<()> {
     let expected_direction = match label {
         "row" => tst::hidden_state_extent_archive::RowOrColumnDirection::RowDirection,
@@ -675,15 +609,15 @@ fn read_extent(
     Ok(())
 }
 
-fn validate_axis_bounds(model: &tst::TableModelArchive, hidden: &TableHiddenAxes) -> Result<()> {
+fn validate_axis_bounds(model: &tst::TableModelArchive, hidden: &HiddenAxes) -> Result<()> {
     let rows = usize::try_from(model.number_of_rows)
         .map_err(|_| Error::InvalidFormat("iWork row count exceeds usize".to_owned()))?;
     let columns = usize::try_from(model.number_of_columns)
         .map_err(|_| Error::InvalidFormat("iWork column count exceeds usize".to_owned()))?;
     for axis in hidden.iter() {
         let (index, length, label) = match axis {
-            TableAxisIndex::Row(index) => (index, rows, "row"),
-            TableAxisIndex::Column(index) => (index, columns, "column"),
+            AxisIndex::Row(index) => (index, rows, "row"),
+            AxisIndex::Column(index) => (index, columns, "column"),
         };
         if index >= length {
             return Err(Error::ParseError(format!(
@@ -1074,22 +1008,14 @@ mod tests {
 
     #[test]
     fn hidden_axes_are_canonical_and_reject_duplicates() {
-        let hidden = TableHiddenAxes::new([
-            TableAxisIndex::column(2),
-            TableAxisIndex::row(3),
-            TableAxisIndex::row(1),
-        ])
-        .unwrap();
+        let hidden =
+            HiddenAxes::new([AxisIndex::column(2), AxisIndex::row(3), AxisIndex::row(1)]).unwrap();
 
         assert_eq!(
             hidden.as_slice(),
-            [
-                TableAxisIndex::row(1),
-                TableAxisIndex::row(3),
-                TableAxisIndex::column(2),
-            ]
+            [AxisIndex::row(1), AxisIndex::row(3), AxisIndex::column(2),]
         );
-        assert!(TableHiddenAxes::new([TableAxisIndex::row(1), TableAxisIndex::row(1)]).is_err());
+        assert!(HiddenAxes::new([AxisIndex::row(1), AxisIndex::row(1)]).is_err());
     }
 
     #[test]
