@@ -1,4 +1,8 @@
+pub mod pagination;
+
 use litchi_iwa_text::TextStorage;
+
+pub use pagination::{PageNumber, PageNumbering, Start};
 
 /// A logical Pages document section.
 #[derive(Debug, Clone)]
@@ -109,6 +113,10 @@ impl Section {
 
 /// Semantic section kinds used by Pages.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "SectionType is the established public semantic name for this module."
+)]
 pub enum SectionType {
     /// Main body content.
     Body,

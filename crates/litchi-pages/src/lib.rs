@@ -8,8 +8,11 @@
 #![forbid(unsafe_code)]
 
 mod document;
+pub mod document_options;
+pub mod footnote;
 pub mod header_footer;
-mod section;
+pub mod page_layout;
+pub mod section;
 
 pub use document::{
     Body, DEFAULT_MAX_TEXT_BYTES, Document, Error, MAX_BODY_STORAGES, MAX_SECTIONS, Result, Root,

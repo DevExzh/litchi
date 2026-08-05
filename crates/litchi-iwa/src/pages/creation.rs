@@ -7,7 +7,9 @@ pub(super) use table_bootstrap::bootstrap_first_table_graph;
 use plist::Value;
 use prost::Message;
 
-use super::editor::{PagesEditor, PagesSectionPageNumbering, PagesSectionStart};
+use litchi_pages::section::{PageNumbering, Start};
+
+use super::editor::PagesEditor;
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::identity::IWorkDocumentIdentity;
 use crate::protobuf::{tp, tsa, tsd, tsk, tsp, tss, tst, tswp};
@@ -799,10 +801,8 @@ fn document_archive(
                 inherit_previous_header_footer: Some(true),
                 section_template_first_page_different: Some(false),
                 section_template_even_odd_pages_different: Some(false),
-                section_start_kind: Some(PagesSectionStart::NextPage.as_raw()),
-                section_page_number_kind: Some(
-                    PagesSectionPageNumbering::ContinueFromPrevious.as_raw(),
-                ),
+                section_start_kind: Some(Start::NextPage.as_raw()),
+                section_page_number_kind: Some(PageNumbering::ContinueFromPrevious.as_raw()),
                 section_page_number_start: Some(INITIAL_PAGE_NUMBER),
                 first_section_template_page: Some(reference(PagesObjectId::SectionTemplate)),
                 even_section_template_page: Some(reference(PagesObjectId::SectionTemplate)),

@@ -2,7 +2,8 @@
 
 use std::env;
 
-use litchi_iwa::pages::{PagesEditor, PagesPageOrientation};
+use litchi_iwa::pages::PagesEditor;
+use litchi_pages::page_layout::Orientation;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -20,8 +21,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("missing page height")?
         .parse::<f32>()?;
     let orientation = match arguments.next().ok_or("missing page orientation")?.as_str() {
-        "portrait" => PagesPageOrientation::Portrait,
-        "landscape" => PagesPageOrientation::Landscape,
+        "portrait" => Orientation::Portrait,
+        "landscape" => Orientation::Landscape,
         _ => return Err("page orientation must be portrait or landscape".into()),
     };
     if arguments.next().is_some() {
@@ -30,9 +31,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut editor = PagesEditor::open(input)?;
     let mut layout = editor.page_layout()?;
-    layout.page_width = Some(width);
-    layout.page_height = Some(height);
-    layout.orientation = Some(orientation);
+    layout.set_page_width(Some(width))?;
+    layout.set_page_height(Some(height))?;
+    layout.set_orientation(Some(orientation))?;
     editor.set_page_layout(layout)?;
     editor.save(output)?;
     Ok(())

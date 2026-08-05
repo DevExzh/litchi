@@ -122,22 +122,18 @@ impl PagesEditor {
             for (field_number, before, after) in [
                 (
                     SECTION_START_FIELD,
-                    current.start.map(PagesSectionStart::as_raw),
-                    settings.start.map(PagesSectionStart::as_raw),
+                    current.start.map(Start::as_raw),
+                    settings.start.map(Start::as_raw),
                 ),
                 (
                     PAGE_NUMBERING_FIELD,
-                    current
-                        .page_numbering
-                        .map(PagesSectionPageNumbering::as_raw),
-                    settings
-                        .page_numbering
-                        .map(PagesSectionPageNumbering::as_raw),
+                    current.page_numbering.map(PageNumbering::as_raw),
+                    settings.page_numbering.map(PageNumbering::as_raw),
                 ),
                 (
                     STARTING_PAGE_NUMBER_FIELD,
-                    current.starting_page_number.map(PagesPageNumber::get),
-                    settings.starting_page_number.map(PagesPageNumber::get),
+                    current.starting_page_number.map(PageNumber::get),
+                    settings.starting_page_number.map(PageNumber::get),
                 ),
             ] {
                 if before != after {
@@ -302,14 +298,14 @@ fn decode_section_settings(data: &[u8]) -> Result<PagesSectionSettings> {
         inherit_previous_header_footer: section.inherit_previous_header_footer,
         first_page_different: section.section_template_first_page_different,
         even_odd_pages_different: section.section_template_even_odd_pages_different,
-        start: section.section_start_kind.map(PagesSectionStart::from_raw),
+        start: section.section_start_kind.map(Start::from_raw),
         page_numbering: section
             .section_page_number_kind
-            .map(PagesSectionPageNumbering::from_raw),
+            .map(PageNumbering::from_raw),
         starting_page_number: section
             .section_page_number_start
             .map(|value| {
-                PagesPageNumber::new(value).map_err(|_| {
+                PageNumber::new(value).map_err(|_| {
                     Error::InvalidFormat(format!(
                         "Pages section has invalid starting page number {value}"
                     ))

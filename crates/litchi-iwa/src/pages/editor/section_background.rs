@@ -1,5 +1,7 @@
 //! Semantic Pages section-background CRUD.
 
+use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+
 use super::*;
 
 const FILL_COLOR_FIELD: u32 = 1;
@@ -74,20 +76,16 @@ fn validate_section_background(background: &PagesSectionBackground) -> Result<()
     }
 }
 
-fn validate_pages_color(color: PagesRgbaColor) -> Result<()> {
-    for (name, value) in [
-        ("red", color.red),
-        ("green", color.green),
-        ("blue", color.blue),
-        ("alpha", color.alpha),
-    ] {
-        if !value.is_finite() || !(0.0..=1.0).contains(&value) {
-            return Err(Error::ParseError(format!(
-                "Pages section background {name} must be finite and between zero and one"
-            )));
-        }
-    }
-    Ok(())
+fn validate_pages_color(color: Rgba) -> Result<()> {
+    Rgba::new(
+        color.red(),
+        color.green(),
+        color.blue(),
+        color.alpha(),
+        color.color_space(),
+    )
+    .map(|_| ())
+    .map_err(|error| Error::ParseError(format!("invalid Pages section background color: {error}")))
 }
 
 fn decode_section_background(payload: &[u8]) -> Result<PagesSectionBackground> {
@@ -115,38 +113,29 @@ fn decode_section_background(payload: &[u8]) -> Result<PagesSectionBackground> {
         return Ok(PagesSectionBackground::Opaque(payload.to_vec()));
     };
     let color_space = match color.rgbspace {
-        None => PagesRgbColorSpace::Srgb,
-        Some(value) if value == tsp::color::RgbColorSpace::Srgb as i32 => PagesRgbColorSpace::Srgb,
-        Some(value) if value == tsp::color::RgbColorSpace::P3 as i32 => {
-            PagesRgbColorSpace::DisplayP3
-        },
+        None => RgbColorSpace::Srgb,
+        Some(value) if value == tsp::color::RgbColorSpace::Srgb as i32 => RgbColorSpace::Srgb,
+        Some(value) if value == tsp::color::RgbColorSpace::P3 as i32 => RgbColorSpace::DisplayP3,
         _ => return Ok(PagesSectionBackground::Opaque(payload.to_vec())),
     };
-    let semantic = PagesRgbaColor {
-        red,
-        green,
-        blue,
-        alpha: color.a.unwrap_or(1.0),
-        color_space,
-    };
-    if validate_pages_color(semantic).is_err() {
+    let Ok(semantic) = Rgba::new(red, green, blue, color.a.unwrap_or(1.0), color_space) else {
         return Ok(PagesSectionBackground::Opaque(payload.to_vec()));
-    }
+    };
     Ok(PagesSectionBackground::Solid(semantic))
 }
 
-fn encode_solid_background(color: PagesRgbaColor) -> Vec<u8> {
+fn encode_solid_background(color: Rgba) -> Vec<u8> {
     tsd::FillArchive {
         color: Some(tsp::Color {
             model: tsp::color::ColorModel::Rgb as i32,
-            r: Some(color.red),
-            g: Some(color.green),
-            b: Some(color.blue),
-            rgbspace: Some(match color.color_space {
-                PagesRgbColorSpace::Srgb => tsp::color::RgbColorSpace::Srgb as i32,
-                PagesRgbColorSpace::DisplayP3 => tsp::color::RgbColorSpace::P3 as i32,
+            r: Some(color.red()),
+            g: Some(color.green()),
+            b: Some(color.blue()),
+            rgbspace: Some(match color.color_space() {
+                RgbColorSpace::Srgb => tsp::color::RgbColorSpace::Srgb as i32,
+                RgbColorSpace::DisplayP3 => tsp::color::RgbColorSpace::P3 as i32,
             }),
-            a: Some(color.alpha),
+            a: Some(color.alpha()),
             ..Default::default()
         }),
         ..Default::default()
@@ -154,11 +143,7 @@ fn encode_solid_background(color: PagesRgbaColor) -> Vec<u8> {
     .encode_to_vec()
 }
 
-fn patch_solid_background(
-    payload: &[u8],
-    current: PagesRgbaColor,
-    replacement: PagesRgbaColor,
-) -> Result<Vec<u8>> {
+fn patch_solid_background(payload: &[u8], current: Rgba, replacement: Rgba) -> Result<Vec<u8>> {
     let fill = tsd::FillArchive::decode(payload)?;
     let color = fill.color.ok_or_else(|| {
         Error::InvalidFormat("Pages solid section background lost its color".to_owned())
@@ -168,26 +153,26 @@ fn patch_solid_background(
         (
             COLOR_RED_FIELD,
             color.r.is_some(),
-            current.red,
-            replacement.red,
+            current.red(),
+            replacement.red(),
         ),
         (
             COLOR_GREEN_FIELD,
             color.g.is_some(),
-            current.green,
-            replacement.green,
+            current.green(),
+            replacement.green(),
         ),
         (
             COLOR_BLUE_FIELD,
             color.b.is_some(),
-            current.blue,
-            replacement.blue,
+            current.blue(),
+            replacement.blue(),
         ),
         (
             COLOR_ALPHA_FIELD,
             color.a.is_some(),
-            current.alpha,
-            replacement.alpha,
+            current.alpha(),
+            replacement.alpha(),
         ),
     ] {
         if before != after {
@@ -199,10 +184,10 @@ fn patch_solid_background(
             )?;
         }
     }
-    if current.color_space != replacement.color_space {
-        let rgbspace = match replacement.color_space {
-            PagesRgbColorSpace::Srgb => tsp::color::RgbColorSpace::Srgb as u64,
-            PagesRgbColorSpace::DisplayP3 => tsp::color::RgbColorSpace::P3 as u64,
+    if current.color_space() != replacement.color_space() {
+        let rgbspace = match replacement.color_space() {
+            RgbColorSpace::Srgb => tsp::color::RgbColorSpace::Srgb as u64,
+            RgbColorSpace::DisplayP3 => tsp::color::RgbColorSpace::P3 as u64,
         };
         data = patch_nested_varint_field(
             &data,

@@ -934,7 +934,10 @@ use litchi_iwa::numbers::{
     NumbersTableHeaderCount,
     NumbersTableTitleSettings,
 };
-use litchi_iwa::pages::{PagesDocumentOptions, PagesEditor};
+use litchi_iwa::pages::{Kind, PagesEditor, PagesSectionBackground};
+use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+use litchi_pages::page_layout::Orientation;
+use litchi_pages::section::{PageNumber, PageNumbering, Start};
 use litchi_iwa::keynote::{
     KeynoteBuildSettings, KeynoteBuildStart, KeynoteEditor, KeynoteFlipDirection,
     KeynoteHorizontalBuildDirection, KeynoteKeyboardDirection, KeynoteRotationDirection,
@@ -1061,47 +1064,37 @@ numbers.save("updated.numbers")?;
 
 let mut pages = PagesEditor::open("input.pages")?;
 let mut document_options = pages.document_options()?;
-document_options.facing_pages = Some(true);
-document_options.automatic_hyphenation = Some(true);
-document_options.ligatures_enabled = Some(false);
+document_options.set_facing_pages(Some(true));
+document_options.set_automatic_hyphenation(Some(true));
+document_options.set_ligatures_enabled(Some(false));
 pages.set_document_options(document_options)?;
 let section_id = pages.sections()[0].object_id;
 pages.set_section_text(section_id, "Updated body")?;
 let first_header = pages
     .header_footers()?
     .into_iter()
-    .find(|region| matches!(region.kind, litchi_iwa::pages::PagesHeaderFooterKind::Header))
+    .find(|region| matches!(region.kind, Kind::Header))
     .expect("document header");
 pages.set_header_footer_text(first_header.storage.object_id, "Quarterly report")?;
 pages.set_section_name(section_id, Some("Executive summary"))?;
 let mut section_settings = pages.section_settings(section_id)?;
 section_settings.inherit_previous_header_footer = Some(false);
 section_settings.first_page_hides_header_footer = Some(true);
-section_settings.start = Some(litchi_iwa::pages::PagesSectionStart::NextPage);
-section_settings.page_numbering = Some(
-    litchi_iwa::pages::PagesSectionPageNumbering::Restart,
-);
-section_settings.starting_page_number = Some(
-    litchi_iwa::pages::PagesPageNumber::new(3)?,
-);
+section_settings.start = Some(Start::NextPage);
+section_settings.page_numbering = Some(PageNumbering::Restart);
+section_settings.starting_page_number = Some(PageNumber::new(3)?);
 pages.set_section_settings(section_id, section_settings)?;
 pages.set_section_background(
     section_id,
-    litchi_iwa::pages::PagesSectionBackground::Solid(litchi_iwa::pages::PagesRgbaColor {
-        red: 1.0,
-        green: 0.59,
-        blue: 0.55,
-        alpha: 1.0,
-        color_space: litchi_iwa::pages::PagesRgbColorSpace::Srgb,
-    }),
+    PagesSectionBackground::Solid(Rgba::new(1.0, 0.59, 0.55, 1.0, RgbColorSpace::Srgb)?),
 )?;
 let inserted = pages.insert_section(section_id, 8, "Methods")?;
 pages.remove_section(inserted.object_id)?;
 let appended = pages.append_section(section_id, "Appendix")?;
 pages.remove_section(appended.object_id)?;
 let mut layout = pages.page_layout()?;
-layout.top_margin = Some(54.0);
-layout.orientation = Some(litchi_iwa::pages::PagesPageOrientation::Portrait);
+layout.set_top_margin(Some(54.0))?;
+layout.set_orientation(Some(Orientation::Portrait))?;
 pages.set_page_layout(layout)?;
 if let Some(text_box) = pages.drawable_text_storages()?.first() {
     pages.set_drawable_text(text_box.drawable_object_id, "Updated text box")?;

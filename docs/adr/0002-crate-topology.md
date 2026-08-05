@@ -141,6 +141,13 @@ The Pages `header_footer::{Template, Kind}` role vocabulary is likewise
 owned by `litchi-pages`: it is fixed-size and archive-free, while IWA retains
 header/footer object discovery, native identifiers, text-storage resolution,
 and package mutation.
+Pages formatter values now follow the same boundary in
+`litchi-pages::{section, page_layout, document_options, footnote}`. Section
+pagination, validated page geometry/orientation, document formatter flags, and
+footnote formatter values retain only compact semantic state and lossless
+native discriminants; the IWA adapter retains document/package identifiers,
+protobuf codecs, discovery aggregates, opaque background payloads, and
+transactional mutation.
 The shared text leaf now also owns the strict `font::{Font, Name}` vocabulary
 and its typed `NameError`; the IWA facade keeps only a thin error conversion and
 native archive adapters. `Name` stores one boxed UTF-8 identifier, validates

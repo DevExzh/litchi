@@ -3,13 +3,12 @@ use std::env;
 
 use litchi_iwa::IWorkPackage;
 use litchi_iwa::archive::ArchiveObject;
-use litchi_iwa::pages::{
-    PagesPageNumber, PagesPageOrientation, PagesSectionPageNumbering, PagesSectionStart,
-};
 use litchi_iwa::protobuf::tp::{
     DocumentArchive, SectionArchive, SectionTemplateArchive, SettingsArchive,
 };
 use litchi_iwa::protobuf::tswp::StorageArchive;
+use litchi_pages::page_layout::Orientation;
+use litchi_pages::section::{PageNumber, PageNumbering, Start};
 use prost::Message;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -45,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         document.bottom_margin,
         document.header_margin,
         document.footer_margin,
-        document.orientation.map(PagesPageOrientation::from_raw),
+        document.orientation.map(Orientation::from_raw),
         document.uses_single_header_footer,
     );
     if let Some(reference) = &document.settings {
@@ -118,16 +117,16 @@ fn inspect_section(
     let section = decode::<SectionArchive>(object).ok_or("section payload is invalid")?;
     let starting_page_number = section
         .section_page_number_start
-        .map(PagesPageNumber::new)
+        .map(PageNumber::new)
         .transpose()?;
     println!(
         "section={identifier} at={character_index} archive={name} name={:?} start={:?} \
          numbering={:?} starting_page={starting_page_number:?} first={:?} even={:?} odd={:?}",
         section.name,
-        section.section_start_kind.map(PagesSectionStart::from_raw),
+        section.section_start_kind.map(Start::from_raw),
         section
             .section_page_number_kind
-            .map(PagesSectionPageNumbering::from_raw),
+            .map(PageNumbering::from_raw),
         section
             .first_section_template_page
             .as_ref()

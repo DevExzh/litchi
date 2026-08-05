@@ -37,13 +37,10 @@ pub use creation::PagesDocumentBuilder;
 pub use document::PagesDocument;
 pub use editor::{
     Kind, PagesAudioInfo, PagesAudioOptions, PagesBodyChartInfo, PagesBodyShapeInfo,
-    PagesBodyShapeKind, PagesCellValue, PagesDocumentOptions, PagesDrawableTextInfo, PagesEditor,
-    PagesFootnote, PagesFootnoteFormat, PagesFootnoteGap, PagesFootnoteId, PagesFootnoteKind,
-    PagesFootnoteNumbering, PagesFootnoteSettings, PagesHeaderFooterInfo, PagesImageInfo,
-    PagesImageOptions, PagesMovieInfo, PagesMovieOptions, PagesPageLayout, PagesPageNumber,
-    PagesPageOrientation, PagesRgbColorSpace, PagesRgbaColor, PagesSectionBackground,
-    PagesSectionInfo, PagesSectionPageNumbering, PagesSectionSettings, PagesSectionStart,
-    PagesTable, PagesTableCellCheckboxFormat, PagesTableCellCurrencyFormat,
+    PagesBodyShapeKind, PagesCellValue, PagesDrawableTextInfo, PagesEditor, PagesFootnote,
+    PagesFootnoteId, PagesHeaderFooterInfo, PagesImageInfo, PagesImageOptions, PagesMovieInfo,
+    PagesMovieOptions, PagesSectionBackground, PagesSectionInfo, PagesSectionSettings, PagesTable,
+    PagesTableCellCheckboxFormat, PagesTableCellCurrencyFormat,
     PagesTableCellDataFormat, PagesTableCellDateTimeFormat, PagesTableCellDecimalPlaces,
     PagesTableCellDurationFormat, PagesTableCellDurationStyle, PagesTableCellDurationUnit,
     PagesTableCellDurationUnitRange, PagesTableCellDurationUnits, PagesTableCellFixedDecimalPlaces,

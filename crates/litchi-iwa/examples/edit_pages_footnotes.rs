@@ -2,10 +2,8 @@
 
 use std::env;
 
-use litchi_iwa::pages::{
-    PagesEditor, PagesFootnoteFormat, PagesFootnoteGap, PagesFootnoteKind, PagesFootnoteNumbering,
-    PagesFootnoteSettings,
-};
+use litchi_iwa::pages::PagesEditor;
+use litchi_pages::footnote::{Format, Gap, Kind, Numbering, Settings};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -16,7 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
          <unset|continuous|page|section> <unset|gap-points>",
     )?;
     let output = arguments.next().ok_or("missing output path")?;
-    let settings = PagesFootnoteSettings {
+    let settings = Settings {
         kind: parse_kind(arguments.next())?,
         format: parse_format(arguments.next())?,
         numbering: parse_numbering(arguments.next())?,
@@ -32,25 +30,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn parse_kind(value: Option<String>) -> Result<Option<PagesFootnoteKind>, &'static str> {
+fn parse_kind(value: Option<String>) -> Result<Option<Kind>, &'static str> {
     match value.as_deref().ok_or("missing footnote kind")? {
         "unset" => Ok(None),
-        "footnotes" => Ok(Some(PagesFootnoteKind::Footnotes)),
-        "document-endnotes" => Ok(Some(PagesFootnoteKind::DocumentEndnotes)),
-        "section-endnotes" => Ok(Some(PagesFootnoteKind::SectionEndnotes)),
+        "footnotes" => Ok(Some(Kind::Footnotes)),
+        "document-endnotes" => Ok(Some(Kind::DocumentEndnotes)),
+        "section-endnotes" => Ok(Some(Kind::SectionEndnotes)),
         _ => Err("footnote kind must be unset, footnotes, document-endnotes, or section-endnotes"),
     }
 }
 
-fn parse_format(value: Option<String>) -> Result<Option<PagesFootnoteFormat>, &'static str> {
+fn parse_format(value: Option<String>) -> Result<Option<Format>, &'static str> {
     match value.as_deref().ok_or("missing footnote format")? {
         "unset" => Ok(None),
-        "numeric" => Ok(Some(PagesFootnoteFormat::Numeric)),
-        "roman" => Ok(Some(PagesFootnoteFormat::Roman)),
-        "symbolic" => Ok(Some(PagesFootnoteFormat::Symbolic)),
-        "japanese-numeric" => Ok(Some(PagesFootnoteFormat::JapaneseNumeric)),
-        "japanese-ideographic" => Ok(Some(PagesFootnoteFormat::JapaneseIdeographic)),
-        "arabic-numeric" => Ok(Some(PagesFootnoteFormat::ArabicNumeric)),
+        "numeric" => Ok(Some(Format::Numeric)),
+        "roman" => Ok(Some(Format::Roman)),
+        "symbolic" => Ok(Some(Format::Symbolic)),
+        "japanese-numeric" => Ok(Some(Format::JapaneseNumeric)),
+        "japanese-ideographic" => Ok(Some(Format::JapaneseIdeographic)),
+        "arabic-numeric" => Ok(Some(Format::ArabicNumeric)),
         _ => Err(
             "footnote format must be unset, numeric, roman, symbolic, japanese-numeric, \
              japanese-ideographic, or arabic-numeric",
@@ -58,22 +56,20 @@ fn parse_format(value: Option<String>) -> Result<Option<PagesFootnoteFormat>, &'
     }
 }
 
-fn parse_numbering(value: Option<String>) -> Result<Option<PagesFootnoteNumbering>, &'static str> {
+fn parse_numbering(value: Option<String>) -> Result<Option<Numbering>, &'static str> {
     match value.as_deref().ok_or("missing footnote numbering")? {
         "unset" => Ok(None),
-        "continuous" => Ok(Some(PagesFootnoteNumbering::Continuous)),
-        "page" => Ok(Some(PagesFootnoteNumbering::RestartEachPage)),
-        "section" => Ok(Some(PagesFootnoteNumbering::RestartEachSection)),
+        "continuous" => Ok(Some(Numbering::Continuous)),
+        "page" => Ok(Some(Numbering::RestartEachPage)),
+        "section" => Ok(Some(Numbering::RestartEachSection)),
         _ => Err("footnote numbering must be unset, continuous, page, or section"),
     }
 }
 
-fn parse_gap(
-    value: Option<String>,
-) -> Result<Option<PagesFootnoteGap>, Box<dyn std::error::Error>> {
+fn parse_gap(value: Option<String>) -> Result<Option<Gap>, Box<dyn std::error::Error>> {
     let value = value.ok_or("missing footnote gap")?;
     if value == "unset" {
         return Ok(None);
     }
-    Ok(Some(PagesFootnoteGap::new(value.parse::<u32>()?)?))
+    Ok(Some(Gap::new(value.parse::<u32>()?)?))
 }

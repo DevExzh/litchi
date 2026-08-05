@@ -41,6 +41,18 @@ Pages header/footer roles follow the focused-module rule at
 only semantic page-template and region roles; IWA keeps native object lookup,
 storage metadata, protobuf decoding, and package mutation at the boundary.
 
+Pages formatter values use focused modules and short names:
+`litchi_pages::section::{Start, PageNumbering, PageNumber}`,
+`litchi_pages::page_layout::{Layout, Orientation}`,
+`litchi_pages::document_options::Options`, and
+`litchi_pages::footnote::{Kind, Format, Numbering, Gap, Settings}`. Unknown
+native discriminants remain lossless but cannot shadow named values, page
+geometry validates finite positive dimensions and non-negative margins before
+construction, and layout/options presence is packed into compact values. The
+IWA side retains only native field mapping, protobuf validation, opaque fill
+payloads, discovery/package identifiers, and transactional publication; the
+former flat `Pages*` formatter aliases are removed.
+
 The dependency-free Numbers formula vocabulary is an intentional naming
 exception. `litchi-numbers::formula` is consumed by Numbers, Pages, and Keynote,
 so `FormulaExpression`, `FormulaCellReference`, and the other `Formula*` names

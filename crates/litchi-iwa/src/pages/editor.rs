@@ -4,6 +4,13 @@ use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 use std::path::Path;
 
+use litchi_pages::document_options::Options as DocumentOptions;
+use litchi_pages::footnote::{
+    Format as FootnoteFormat, Gap as FootnoteGap, Kind as FootnoteKind,
+    Numbering as FootnoteNumbering, Settings as FootnoteSettings,
+};
+use litchi_pages::page_layout::{Layout as PageLayout, Orientation as PageOrientation};
+use litchi_pages::section::{PageNumber, PageNumbering, Start};
 use prost::Message;
 
 use crate::archive::{ArchiveObject, RawMessage};
@@ -71,14 +78,10 @@ const DRAWABLE_ATTACHMENT_MESSAGE_TYPE: u32 = 2003;
 const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3097;
 const BODY_DRAWABLE_DUPLICATE_OFFSET: f32 = 12.0;
 
-pub use document_options::PagesDocumentOptions;
 pub use litchi_pages::header_footer::{Kind, Template};
 pub use types::{
-    PagesDrawableTextInfo, PagesFootnote, PagesFootnoteFormat, PagesFootnoteGap, PagesFootnoteId,
-    PagesFootnoteKind, PagesFootnoteNumbering, PagesFootnoteSettings, PagesHeaderFooterInfo,
-    PagesPageLayout, PagesPageNumber, PagesPageOrientation, PagesRgbColorSpace, PagesRgbaColor,
-    PagesSectionBackground, PagesSectionInfo, PagesSectionPageNumbering, PagesSectionSettings,
-    PagesSectionStart, RemovedPagesTextBox,
+    PagesDrawableTextInfo, PagesFootnote, PagesFootnoteId, PagesHeaderFooterInfo,
+    PagesSectionBackground, PagesSectionInfo, PagesSectionSettings, RemovedPagesTextBox,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]

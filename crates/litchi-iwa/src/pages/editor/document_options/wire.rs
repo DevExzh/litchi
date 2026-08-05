@@ -12,7 +12,7 @@ const FACING_PAGES_FIELD: u32 = 34;
 pub(super) fn read_document_options_wire(
     original: &[u8],
     settings: &SettingsArchive,
-) -> Result<PagesDocumentOptions> {
+) -> Result<DocumentOptions> {
     for (field, label, decoded) in [
         (BODY_FIELD, "document body", settings.body),
         (HEADERS_FIELD, "headers", settings.headers),
@@ -23,42 +23,42 @@ pub(super) fn read_document_options_wire(
     ] {
         require_optional_bool(original, field, label, decoded)?;
     }
-    Ok(PagesDocumentOptions::from_settings(settings))
+    Ok(options_from_settings(settings))
 }
 
 pub(super) fn write_document_options_wire(
     original: &[u8],
     settings: &SettingsArchive,
-    options: PagesDocumentOptions,
+    options: DocumentOptions,
 ) -> Result<Vec<u8>> {
     read_document_options_wire(original, settings)?;
     let mut data = original.to_vec();
     for (field, present, replacement) in [
-        (BODY_FIELD, settings.body.is_some(), options.body_enabled),
+        (BODY_FIELD, settings.body.is_some(), options.body_enabled()),
         (
             HEADERS_FIELD,
             settings.headers.is_some(),
-            options.headers_enabled,
+            options.headers_enabled(),
         ),
         (
             FOOTERS_FIELD,
             settings.footers.is_some(),
-            options.footers_enabled,
+            options.footers_enabled(),
         ),
         (
             HYPHENATION_FIELD,
             settings.hyphenation.is_some(),
-            options.automatic_hyphenation,
+            options.automatic_hyphenation(),
         ),
         (
             LIGATURES_FIELD,
             settings.use_ligatures.is_some(),
-            options.ligatures_enabled,
+            options.ligatures_enabled(),
         ),
         (
             FACING_PAGES_FIELD,
             settings.facing_pages.is_some(),
-            options.facing_pages,
+            options.facing_pages(),
         ),
     ] {
         data = patch_varint_field(&data, field, present, replacement.map(u64::from))?;

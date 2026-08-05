@@ -3,7 +3,8 @@
 use std::env;
 use std::path::PathBuf;
 
-use litchi_iwa::pages::{PagesDocumentOptions, PagesEditor};
+use litchi_iwa::pages::PagesEditor;
+use litchi_pages::document_options::Options;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -11,14 +12,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "usage: edit_pages_document_options <input.pages> <output.pages> <unset|true|false:body> <unset|true|false:headers> <unset|true|false:footers> <unset|true|false:facing-pages> <unset|true|false:hyphenation> <unset|true|false:ligatures>",
     )?);
     let output = PathBuf::from(arguments.next().ok_or("missing output path")?);
-    let options = PagesDocumentOptions {
-        body_enabled: parse_optional_bool(arguments.next(), "body")?,
-        headers_enabled: parse_optional_bool(arguments.next(), "headers")?,
-        footers_enabled: parse_optional_bool(arguments.next(), "footers")?,
-        facing_pages: parse_optional_bool(arguments.next(), "facing pages")?,
-        automatic_hyphenation: parse_optional_bool(arguments.next(), "hyphenation")?,
-        ligatures_enabled: parse_optional_bool(arguments.next(), "ligatures")?,
-    };
+    let options = Options::new(
+        parse_optional_bool(arguments.next(), "body")?,
+        parse_optional_bool(arguments.next(), "headers")?,
+        parse_optional_bool(arguments.next(), "footers")?,
+        parse_optional_bool(arguments.next(), "facing pages")?,
+        parse_optional_bool(arguments.next(), "hyphenation")?,
+        parse_optional_bool(arguments.next(), "ligatures")?,
+    );
     if arguments.next().is_some() {
         return Err("unexpected extra argument".into());
     }
