@@ -14,6 +14,8 @@ pub mod edit;
 pub mod sort;
 /// Compact, presence-preserving table title semantics.
 pub mod title;
+/// Section-relative table topology edits.
+pub mod topology;
 
 use crate::cell::Value;
 use std::fmt;
