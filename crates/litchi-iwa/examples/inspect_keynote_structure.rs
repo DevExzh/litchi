@@ -3,9 +3,7 @@ use std::env;
 
 use litchi_iwa::IWorkPackage;
 use litchi_iwa::archive::ArchiveObject;
-use litchi_iwa::keynote::{
-    KeynoteEditor, KeynoteShowMode, KeynoteTransitionAcceleration, KeynoteTransitionTextDelivery,
-};
+use litchi_iwa::keynote::{Acceleration, KeynoteEditor, KeynoteShowMode, TextDelivery};
 use litchi_iwa::protobuf::kn::{
     BuildArchive, BuildChunkArchive, DocumentArchive, PlaceholderArchive, ShowArchive,
     SlideArchive, SlideNodeArchive, Soundtrack, ThemeArchive,
@@ -288,10 +286,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     transition.animation_attributes,
                     transition
                         .custom_timing_curve
-                        .map(KeynoteTransitionAcceleration::from_raw),
+                        .map(Acceleration::from_native),
                     transition
                         .custom_text_delivery_type
-                        .map(KeynoteTransitionTextDelivery::from_raw),
+                        .map(TextDelivery::from_native),
                     transition.custom_mosaic_type,
                     transition.database_animation_type,
                     transition.database_effect,

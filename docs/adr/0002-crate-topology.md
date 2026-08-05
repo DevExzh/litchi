@@ -185,6 +185,13 @@ The leaf's `transition::Effect` owns the lossless native transition-effect
 identifier vocabulary, including canonical known variants and lossless unknown
 identifiers; IWA retains transition archive decoding, wire patching, and
 transactional validation at the format boundary.
+The same leaf now owns Keynote's archive-free transition scalars:
+`transition::{Direction, MosaicType, Acceleration, TextDelivery}`. Each is a
+four-byte transparent, copyable value with named projections for known native
+values and lossless `from_native`/`native_value` conversion for future values.
+IWA retains the aggregate transition settings, protobuf field mapping, and
+wire-preserving transactional mutation; no protobuf or archive dependency was
+introduced into `litchi-keynote`.
 The existing `litchi-iwa` package reader temporarily consumes these leaf values
 through private migration adapters. The direct edges are present in the
 canonical boundary graph because the adapters are already dependency-safe;

@@ -1149,9 +1149,9 @@ let mut transition = keynote.slides()?[0].transition.clone().expect("transition"
 transition.effect = Some(litchi_iwa::keynote::Effect::Dissolve);
 transition.duration = Some(1.5);
 transition.custom_parameters.acceleration =
-    Some(litchi_iwa::keynote::KeynoteTransitionAcceleration::EaseInOut);
+    Some(litchi_iwa::keynote::Acceleration::EaseInOut);
 transition.custom_parameters.text_delivery =
-    Some(litchi_iwa::keynote::KeynoteTransitionTextDelivery::ByWord);
+    Some(litchi_iwa::keynote::TextDelivery::ByWord);
 keynote.set_slide_transition(0, transition)?;
 keynote.clear_slide_transition(0)?;
 let mut show = keynote.show_settings()?;

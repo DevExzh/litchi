@@ -131,6 +131,15 @@ lossless integer conversion; protobuf field mapping, archive lookup, and
 mutation remain in the IWA adapter. The long `ChartSeriesDirection` name is
 removed rather than retained as a facade alias.
 
+Keynote transition settings use the same strict leaf rule. `Direction` and
+`MosaicType` preserve native `u32` discriminators, while `Acceleration` and
+`TextDelivery` preserve signed `i32` values. Known values are ergonomic
+associated constants with `kind()` projections; unknown values remain valid
+and lossless rather than being rejected or collapsed into an `Unknown` enum
+variant. All four values are `Copy`, hashable, and four bytes wide, so the
+aggregate settings avoid enum payload overhead without weakening the archive
+boundary's validation or transactional guarantees.
+
 PresentationML implements this rule as `litchi-pptx::shape::{Scene, Shape}`.
 `Scene` is a bounded semantic index over one slide-like owner, not a vector of
 detached XML allocations. Shapes are visited in depth-first pre-order, while a

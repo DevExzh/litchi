@@ -6031,6 +6031,20 @@ values. Pages reported the generated package as damaged; the warning was
 dismissed without repair, so Pages native opening remains a tracked limitation
 of this fixture rather than a claimed success.
 
+The Keynote transition-scalar ownership slice is complete. The archive-free
+`litchi-keynote::transition` module now owns compact `Direction`, `MosaicType`,
+`Acceleration`, and `TextDelivery` values; `litchi-iwa` retains only aggregate
+transition settings, archive decoding, protobuf field mapping, and
+wire-preserving transactions. The leaf suite passed 6 tests and the IWA
+library suite passed all 1,503 tests. The focused
+`create_keynote_transition` example wrote
+`/tmp/litchi-keynote-transition.n7Msjg/transition-vocabulary.key`, which passed
+ZIP integrity validation and typed in-memory reopen checks. Native Keynote
+opened it without a repair or recovery prompt; its Animate inspector exposed
+`Magic Move`, `By Word`, and `Ease In & Out`, matching the authored effect,
+text-delivery, and acceleration values. No native-resave claim is made, and
+Keynote was quit after inspection.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

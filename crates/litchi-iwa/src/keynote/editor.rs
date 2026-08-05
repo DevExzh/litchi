@@ -5071,6 +5071,9 @@ mod transition_wire;
 
 use builds::*;
 pub use litchi_keynote::transition::Effect;
+pub use litchi_keynote::transition::{
+    Acceleration, AccelerationKind, Direction, MosaicType, TextDelivery, TextDeliveryKind,
+};
 pub use show_settings::{KeynoteShowMode, KeynoteShowSettings};
 pub use slide_audio::{KeynoteSlideAudioInfo, KeynoteSlideAudioOptions, RemovedKeynoteSlideAudio};
 pub use slide_background::KeynoteSlideBackground;
@@ -5132,9 +5135,8 @@ pub use slide_tables::{
 pub use soundtrack::{KeynoteSoundtrackMode, KeynoteSoundtrackSettings};
 pub use soundtrack_items::KeynoteSoundtrackItemInfo;
 pub use transition::{
-    KeynoteTransitionAcceleration, KeynoteTransitionAnimationParameters,
-    KeynoteTransitionCustomParameters, KeynoteTransitionDirection, KeynoteTransitionMosaicType,
-    KeynoteTransitionSettings, KeynoteTransitionTextDelivery,
+    KeynoteTransitionAnimationParameters, KeynoteTransitionCustomParameters,
+    KeynoteTransitionSettings,
 };
 use transition_wire::{transition_settings_from_wire, validate_transition_wire};
 #[cfg(test)]

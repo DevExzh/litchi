@@ -2,9 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::keynote::{
-    KeynoteEditor, KeynoteTransitionAcceleration, KeynoteTransitionTextDelivery,
-};
+use litchi_iwa::keynote::{Acceleration, KeynoteEditor, TextDelivery};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -24,11 +22,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .parse::<bool>()?;
     let acceleration = match arguments.next().ok_or("missing acceleration")?.as_str() {
         "unchanged" => None,
-        "linear" => Some(KeynoteTransitionAcceleration::Linear),
-        "ease-in" => Some(KeynoteTransitionAcceleration::EaseIn),
-        "ease-out" => Some(KeynoteTransitionAcceleration::EaseOut),
-        "ease-in-out" => Some(KeynoteTransitionAcceleration::EaseInOut),
-        "custom" => Some(KeynoteTransitionAcceleration::Custom),
+        "linear" => Some(Acceleration::Linear),
+        "ease-in" => Some(Acceleration::EaseIn),
+        "ease-out" => Some(Acceleration::EaseOut),
+        "ease-in-out" => Some(Acceleration::EaseInOut),
+        "custom" => Some(Acceleration::Custom),
         _ => {
             return Err(
                 "acceleration must be unchanged, linear, ease-in, ease-out, ease-in-out, or custom"
@@ -38,10 +36,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let text_delivery = match arguments.next().ok_or("missing text delivery")?.as_str() {
         "unchanged" => None,
-        "object" => Some(KeynoteTransitionTextDelivery::ByObject),
-        "word" => Some(KeynoteTransitionTextDelivery::ByWord),
-        "character" => Some(KeynoteTransitionTextDelivery::ByCharacter),
-        "line" => Some(KeynoteTransitionTextDelivery::ByLine),
+        "object" => Some(TextDelivery::ByObject),
+        "word" => Some(TextDelivery::ByWord),
+        "character" => Some(TextDelivery::ByCharacter),
+        "line" => Some(TextDelivery::ByLine),
         _ => {
             return Err("text delivery must be unchanged, object, word, character, or line".into());
         },

@@ -116,7 +116,7 @@ pub(super) fn patch_transition_settings_wire(
         animation.direction.is_some(),
         settings
             .direction
-            .map(|direction| u64::from(direction.as_raw())),
+            .map(|direction| u64::from(direction.native_value())),
     )?;
     data = patch_nested_varint_field(
         &data,
@@ -226,15 +226,15 @@ pub(super) fn patch_transition_settings_wire(
     let mosaic_type = settings
         .custom_parameters
         .mosaic_type
-        .map(|value| u64::from(value.as_raw()));
+        .map(|value| u64::from(value.native_value()));
     let acceleration = settings
         .custom_parameters
         .acceleration
-        .map(|value| i64::from(value.as_raw()) as u64);
+        .map(|value| i64::from(value.native_value()) as u64);
     let text_delivery = settings
         .custom_parameters
         .text_delivery
-        .map(|value| i64::from(value.as_raw()) as u64);
+        .map(|value| i64::from(value.native_value()) as u64);
     for (field_number, current, replacement) in [
         (
             CUSTOM_MOSAIC_SIZE_FIELD,
