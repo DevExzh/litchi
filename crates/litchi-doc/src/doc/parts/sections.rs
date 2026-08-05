@@ -5,15 +5,14 @@ use super::numbering::NumberFormat;
 use super::revisions::RevisionAuthorTable;
 use crate::doc::package::{DocError, Result};
 use crate::doc::revision::{SectionRevisionMark, decode_dttm};
+use crate::doc::section::borders::{self, Borders};
 use crate::doc::section::columns::{Column, Layout};
 use crate::doc::section::{
     ChapterNumberSeparator, DocSection, LineNumberRestart, NoteNumberRestart, PageOrientation,
     SectionBehavior, SectionBreakKind, SectionFootnotePosition, SectionLineNumbering,
-    SectionMargins, SectionNoteSettings, SectionPageBorder, SectionPageBorderApplyTo,
-    SectionPageBorderArt, SectionPageBorderColor, SectionPageBorderDepth,
-    SectionPageBorderOffsetFrom, SectionPageBorderStyle, SectionPageBorders, SectionPageGrid,
-    SectionPageGridMode, SectionPageLayout, SectionPageNumbering, SectionPaperSettings,
-    SectionProtection, SectionTextFlow, SectionVerticalJustification, VerticalMargin,
+    SectionMargins, SectionNoteSettings, SectionPageGrid, SectionPageGridMode, SectionPageLayout,
+    SectionPageNumbering, SectionPaperSettings, SectionProtection, SectionTextFlow,
+    SectionVerticalJustification, VerticalMargin,
 };
 use crate::sprm::{Sprm, parse_sprms};
 
@@ -183,7 +182,7 @@ struct SectionProperties {
     notes: SectionNoteSettings,
     behavior: SectionBehavior,
     paper: SectionPaperSettings,
-    page_borders: SectionPageBorders,
+    page_borders: Borders,
     page_grid: SectionPageGrid,
     text_flow: SectionTextFlow,
 }
@@ -218,7 +217,7 @@ impl Default for SectionProperties {
             notes: SectionNoteSettings::default(),
             behavior: SectionBehavior::default(),
             paper: SectionPaperSettings::default(),
-            page_borders: SectionPageBorders::default(),
+            page_borders: Borders::default(),
             page_grid: SectionPageGrid::default(),
             text_flow: SectionTextFlow::default(),
         }
@@ -396,19 +395,19 @@ impl SectionProperties {
                 self.behavior.right_to_left_gutter = bool_operand(sprm, "sprmSFRTLGutter")?;
             },
             0x702B => {
-                self.page_borders.top = page_border_operand(sprm, "sprmSBrcTop80")?;
+                self.page_borders.top = borders::decode_brc80(sprm, "sprmSBrcTop80")?;
             },
             0x702C => {
-                self.page_borders.left = page_border_operand(sprm, "sprmSBrcLeft80")?;
+                self.page_borders.left = borders::decode_brc80(sprm, "sprmSBrcLeft80")?;
             },
             0x702D => {
-                self.page_borders.bottom = page_border_operand(sprm, "sprmSBrcBottom80")?;
+                self.page_borders.bottom = borders::decode_brc80(sprm, "sprmSBrcBottom80")?;
             },
             0x702E => {
-                self.page_borders.right = page_border_operand(sprm, "sprmSBrcRight80")?;
+                self.page_borders.right = borders::decode_brc80(sprm, "sprmSBrcRight80")?;
             },
             0x522F => {
-                apply_page_border_properties(&mut self.page_borders, sprm)?;
+                borders::decode_pgb_prop(&mut self.page_borders, sprm)?;
             },
             0x7030 => {
                 let value = dword_operand(sprm, "sprmSDxtCharSpace")? as i32;
@@ -559,110 +558,6 @@ impl SectionProperties {
             text_flow: self.text_flow,
         })
     }
-}
-
-fn page_border_operand(sprm: &Sprm, name: &str) -> Result<Option<SectionPageBorder>> {
-    let operand = sprm.operand_bytes();
-    if operand.len() != 4 {
-        return corrupted(&format!("{name} operand must contain exactly 4 bytes"));
-    }
-    let style = match operand[1] {
-        0x00 => None,
-        0x01 => Some(SectionPageBorderStyle::Single),
-        0x03 => Some(SectionPageBorderStyle::Double),
-        0x05 => Some(SectionPageBorderStyle::Thick),
-        0x06 => Some(SectionPageBorderStyle::Dotted),
-        0x07 => Some(SectionPageBorderStyle::Dashed),
-        0x08 => Some(SectionPageBorderStyle::DotDash),
-        0x09 => Some(SectionPageBorderStyle::DotDotDash),
-        0x0A => Some(SectionPageBorderStyle::Triple),
-        0x0B => Some(SectionPageBorderStyle::ThinThickSmallGap),
-        0x0C => Some(SectionPageBorderStyle::ThickThinSmallGap),
-        0x0D => Some(SectionPageBorderStyle::ThinThickThinSmallGap),
-        0x0E => Some(SectionPageBorderStyle::ThinThickMediumGap),
-        0x0F => Some(SectionPageBorderStyle::ThickThinMediumGap),
-        0x10 => Some(SectionPageBorderStyle::ThinThickThinMediumGap),
-        0x11 => Some(SectionPageBorderStyle::ThinThickLargeGap),
-        0x12 => Some(SectionPageBorderStyle::ThickThinLargeGap),
-        0x13 => Some(SectionPageBorderStyle::ThinThickThinLargeGap),
-        0x14 => Some(SectionPageBorderStyle::Wave),
-        0x15 => Some(SectionPageBorderStyle::DoubleWave),
-        0x16 => Some(SectionPageBorderStyle::DashSmallGap),
-        0x17 => Some(SectionPageBorderStyle::DashDotStroked),
-        0x18 => Some(SectionPageBorderStyle::ThreeDEmboss),
-        0x19 => Some(SectionPageBorderStyle::ThreeDEngrave),
-        code @ 0x40..=0xE3 => Some(SectionPageBorderStyle::Art(
-            SectionPageBorderArt::try_from(code).expect("validated page-border art range"),
-        )),
-        invalid => {
-            return corrupted(&format!(
-                "{name} contains invalid Brc80 border type {invalid:#04x}"
-            ));
-        },
-    };
-    let color = match operand[2] {
-        0x00 => SectionPageBorderColor::Automatic,
-        0x01 => SectionPageBorderColor::Black,
-        0x02 => SectionPageBorderColor::Blue,
-        0x03 => SectionPageBorderColor::Cyan,
-        0x04 => SectionPageBorderColor::Green,
-        0x05 => SectionPageBorderColor::Magenta,
-        0x06 => SectionPageBorderColor::Red,
-        0x07 => SectionPageBorderColor::Yellow,
-        0x08 => SectionPageBorderColor::White,
-        0x09 => SectionPageBorderColor::DarkBlue,
-        0x0A => SectionPageBorderColor::DarkCyan,
-        0x0B => SectionPageBorderColor::DarkGreen,
-        0x0C => SectionPageBorderColor::DarkMagenta,
-        0x0D => SectionPageBorderColor::DarkRed,
-        0x0E => SectionPageBorderColor::DarkYellow,
-        0x0F => SectionPageBorderColor::DarkGray,
-        0x10 => SectionPageBorderColor::LightGray,
-        invalid => {
-            return corrupted(&format!(
-                "{name} contains invalid Ico color index {invalid:#04x}"
-            ));
-        },
-    };
-    let Some(style) = style else {
-        return Ok(None);
-    };
-    let effects = operand[3];
-    Ok(Some(SectionPageBorder {
-        style,
-        width_eighth_points: operand[0],
-        color,
-        spacing_points: effects & 0x1F,
-        shadow: effects & 0x20 != 0,
-        frame: effects & 0x40 != 0,
-    }))
-}
-
-fn apply_page_border_properties(borders: &mut SectionPageBorders, sprm: &Sprm) -> Result<()> {
-    let operand = sprm.operand_bytes();
-    if operand.len() != 2 {
-        return corrupted("sprmSPgbProp operand must contain exactly 2 bytes");
-    }
-    if operand[1] != 0 {
-        return corrupted("sprmSPgbProp reserved byte must be zero");
-    }
-    borders.apply_to = match operand[0] & 0x07 {
-        0 => SectionPageBorderApplyTo::AllPages,
-        1 => SectionPageBorderApplyTo::FirstPage,
-        2 => SectionPageBorderApplyTo::AllButFirstPage,
-        _ => return corrupted("sprmSPgbProp contains an invalid PgbApplyTo value"),
-    };
-    borders.depth = match (operand[0] >> 3) & 0x03 {
-        0 => SectionPageBorderDepth::InFront,
-        1 => SectionPageBorderDepth::Behind,
-        _ => return corrupted("sprmSPgbProp contains an invalid PgbPageDepth value"),
-    };
-    borders.offset_from = match (operand[0] >> 5) & 0x07 {
-        0 => SectionPageBorderOffsetFrom::Text,
-        1 => SectionPageBorderOffsetFrom::PageEdge,
-        _ => return corrupted("sprmSPgbProp contains an invalid PgbOffsetFrom value"),
-    };
-    Ok(())
 }
 
 fn parse_revision(
@@ -1215,15 +1110,12 @@ mod tests {
     #[test]
     fn page_border_defaults_and_later_operands_win() {
         let defaults = parse_synthetic(&[None]).unwrap();
-        assert_eq!(
-            defaults.sections()[0].page_borders,
-            SectionPageBorders::default()
-        );
+        assert_eq!(defaults.sections()[0].page_borders, Borders::default());
 
         let mut grpprl = Vec::new();
         grpprl.extend(fixed_sprm(0x702B, &[4, 0x06, 1, 0]));
         grpprl.extend(fixed_sprm(0x702B, &[8, 0x01, 6, 3]));
-        grpprl.extend(fixed_sprm(0x702C, &[16, 0x03, 0, 0xA4]));
+        grpprl.extend(fixed_sprm(0x702C, &[16, 0x03, 0, 0x64]));
         grpprl.extend(fixed_sprm(0x702D, &[24, 0x40, 16, 0x45]));
         grpprl.extend(fixed_sprm(0x702E, &[0, 0, 0, 0]));
         grpprl.extend(fixed_sprm(0x522F, &[0, 0]));
@@ -1233,10 +1125,10 @@ mod tests {
 
         assert_eq!(
             borders.top,
-            Some(SectionPageBorder {
-                style: SectionPageBorderStyle::Single,
+            Some(borders::Border {
+                style: borders::Style::Single,
                 width_eighth_points: 8,
-                color: SectionPageBorderColor::Red,
+                color: borders::Color::Red,
                 spacing_points: 3,
                 shadow: false,
                 frame: false,
@@ -1244,15 +1136,15 @@ mod tests {
         );
         assert_eq!(borders.left.unwrap().spacing_points, 4);
         assert!(borders.left.unwrap().shadow);
-        let SectionPageBorderStyle::Art(art) = borders.bottom.unwrap().style else {
+        let borders::Style::Art(art) = borders.bottom.unwrap().style else {
             panic!("expected an art page border");
         };
         assert_eq!(art.code(), 0x40);
         assert!(borders.bottom.unwrap().frame);
         assert_eq!(borders.right, None);
-        assert_eq!(borders.apply_to, SectionPageBorderApplyTo::AllButFirstPage);
-        assert_eq!(borders.depth, SectionPageBorderDepth::Behind);
-        assert_eq!(borders.offset_from, SectionPageBorderOffsetFrom::PageEdge);
+        assert_eq!(borders.apply_to, borders::ApplyTo::AllButFirstPage);
+        assert_eq!(borders.depth, borders::Depth::Behind);
+        assert_eq!(borders.offset_from, borders::Offset::PageEdge);
     }
 
     #[test]
@@ -1264,6 +1156,7 @@ mod tests {
             fixed_sprm(0x702B, &[8, 0xE4, 0, 0]),
             fixed_sprm(0x702B, &[8, 0x01, 0x11, 0]),
             fixed_sprm(0x702B, &[8, 0x00, 0x11, 0]),
+            fixed_sprm(0x702B, &[8, 0x01, 0, 0x80]),
         ] {
             assert!(parse_synthetic(&[Some(border)]).is_err());
         }

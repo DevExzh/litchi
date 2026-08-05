@@ -4,6 +4,8 @@
 //! Based on Microsoft's "[MS-DOC]" specification Section 2.9.245 and
 //! Apache POI's SectionTable implementation.
 
+use crate::doc::section::borders;
+use crate::doc::section::borders::Borders;
 use crate::doc::section::columns::{Layout, WireView};
 
 /// Generate SEPX (Section Properties) structure with optional first/odd-even header/footer flags
@@ -42,7 +44,7 @@ pub(crate) fn generate_sepx_with_properties(
     columns: Option<&Layout>,
     right_to_left: bool,
     text_flow: crate::doc::SectionTextFlow,
-    page_borders: Option<&crate::doc::SectionPageBorders>,
+    page_borders: Option<&Borders>,
 ) -> Result<Vec<u8>, String> {
     let mut grpprl: Vec<u8> = Vec::with_capacity(8);
     if first_page_header {
@@ -128,44 +130,7 @@ pub(crate) fn generate_sepx_with_properties(
         push_bool(&mut grpprl, crate::sprm_operations::SPRM_S_F_BIDI, true);
     }
     if let Some(page_borders) = page_borders {
-        page_borders.validate().map_err(|error| error.to_string())?;
-        for (opcode, border) in [
-            (crate::sprm_operations::SPRM_S_BRC_TOP80, page_borders.top),
-            (crate::sprm_operations::SPRM_S_BRC_LEFT80, page_borders.left),
-            (
-                crate::sprm_operations::SPRM_S_BRC_BOTTOM80,
-                page_borders.bottom,
-            ),
-            (
-                crate::sprm_operations::SPRM_S_BRC_RIGHT80,
-                page_borders.right,
-            ),
-        ] {
-            if let Some(border) = border {
-                push_page_border(&mut grpprl, opcode, border);
-            }
-        }
-        if page_borders.apply_to != crate::doc::SectionPageBorderApplyTo::AllPages
-            || page_borders.depth != crate::doc::SectionPageBorderDepth::InFront
-            || page_borders.offset_from != crate::doc::SectionPageBorderOffsetFrom::Text
-        {
-            let apply_to = match page_borders.apply_to {
-                crate::doc::SectionPageBorderApplyTo::AllPages => 0,
-                crate::doc::SectionPageBorderApplyTo::FirstPage => 1,
-                crate::doc::SectionPageBorderApplyTo::AllButFirstPage => 2,
-            };
-            let depth = match page_borders.depth {
-                crate::doc::SectionPageBorderDepth::InFront => 0,
-                crate::doc::SectionPageBorderDepth::Behind => 1,
-            };
-            let offset_from = match page_borders.offset_from {
-                crate::doc::SectionPageBorderOffsetFrom::Text => 0,
-                crate::doc::SectionPageBorderOffsetFrom::PageEdge => 1,
-            };
-            grpprl.extend_from_slice(&crate::sprm_operations::SPRM_S_PGB_PROP.to_le_bytes());
-            grpprl.push(apply_to | depth << 3 | offset_from << 5);
-            grpprl.push(0);
-        }
+        borders::encode_sepx(&mut grpprl, page_borders).map_err(|error| error.to_string())?;
     }
     if text_flow != crate::doc::SectionTextFlow::HorizontalNonAsian {
         let value = match text_flow {
@@ -215,61 +180,6 @@ fn push_indexed_twips(
     output.push(index);
     output.extend_from_slice(&value.to_le_bytes());
     Ok(())
-}
-
-fn push_page_border(output: &mut Vec<u8>, opcode: u16, border: crate::doc::SectionPageBorder) {
-    let style = match border.style {
-        crate::doc::SectionPageBorderStyle::Single => 0x01,
-        crate::doc::SectionPageBorderStyle::Double => 0x03,
-        crate::doc::SectionPageBorderStyle::Thick => 0x05,
-        crate::doc::SectionPageBorderStyle::Dotted => 0x06,
-        crate::doc::SectionPageBorderStyle::Dashed => 0x07,
-        crate::doc::SectionPageBorderStyle::DotDash => 0x08,
-        crate::doc::SectionPageBorderStyle::DotDotDash => 0x09,
-        crate::doc::SectionPageBorderStyle::Triple => 0x0A,
-        crate::doc::SectionPageBorderStyle::ThinThickSmallGap => 0x0B,
-        crate::doc::SectionPageBorderStyle::ThickThinSmallGap => 0x0C,
-        crate::doc::SectionPageBorderStyle::ThinThickThinSmallGap => 0x0D,
-        crate::doc::SectionPageBorderStyle::ThinThickMediumGap => 0x0E,
-        crate::doc::SectionPageBorderStyle::ThickThinMediumGap => 0x0F,
-        crate::doc::SectionPageBorderStyle::ThinThickThinMediumGap => 0x10,
-        crate::doc::SectionPageBorderStyle::ThinThickLargeGap => 0x11,
-        crate::doc::SectionPageBorderStyle::ThickThinLargeGap => 0x12,
-        crate::doc::SectionPageBorderStyle::ThinThickThinLargeGap => 0x13,
-        crate::doc::SectionPageBorderStyle::Wave => 0x14,
-        crate::doc::SectionPageBorderStyle::DoubleWave => 0x15,
-        crate::doc::SectionPageBorderStyle::DashSmallGap => 0x16,
-        crate::doc::SectionPageBorderStyle::DashDotStroked => 0x17,
-        crate::doc::SectionPageBorderStyle::ThreeDEmboss => 0x18,
-        crate::doc::SectionPageBorderStyle::ThreeDEngrave => 0x19,
-        crate::doc::SectionPageBorderStyle::Art(art) => art.code(),
-    };
-    let color = match border.color {
-        crate::doc::SectionPageBorderColor::Automatic => 0x00,
-        crate::doc::SectionPageBorderColor::Black => 0x01,
-        crate::doc::SectionPageBorderColor::Blue => 0x02,
-        crate::doc::SectionPageBorderColor::Cyan => 0x03,
-        crate::doc::SectionPageBorderColor::Green => 0x04,
-        crate::doc::SectionPageBorderColor::Magenta => 0x05,
-        crate::doc::SectionPageBorderColor::Red => 0x06,
-        crate::doc::SectionPageBorderColor::Yellow => 0x07,
-        crate::doc::SectionPageBorderColor::White => 0x08,
-        crate::doc::SectionPageBorderColor::DarkBlue => 0x09,
-        crate::doc::SectionPageBorderColor::DarkCyan => 0x0A,
-        crate::doc::SectionPageBorderColor::DarkGreen => 0x0B,
-        crate::doc::SectionPageBorderColor::DarkMagenta => 0x0C,
-        crate::doc::SectionPageBorderColor::DarkRed => 0x0D,
-        crate::doc::SectionPageBorderColor::DarkYellow => 0x0E,
-        crate::doc::SectionPageBorderColor::DarkGray => 0x0F,
-        crate::doc::SectionPageBorderColor::LightGray => 0x10,
-    };
-    output.extend_from_slice(&opcode.to_le_bytes());
-    output.extend_from_slice(&[
-        border.width_eighth_points,
-        style,
-        color,
-        border.spacing_points | u8::from(border.shadow) << 5 | u8::from(border.frame) << 6,
-    ]);
 }
 
 /// Generate minimal SEPX (Section Properties) structure (no section SPRMs)
@@ -325,7 +235,7 @@ mod tests {
 
     #[test]
     fn page_border_default_is_omitted_and_nondefault_is_canonical() {
-        let default = crate::doc::SectionPageBorders::default();
+        let default = crate::doc::section::borders::Borders::default();
         assert_eq!(
             generate_sepx_with_properties(
                 false,
@@ -340,16 +250,16 @@ mod tests {
             [0, 0]
         );
 
-        let borders = crate::doc::SectionPageBorders {
-            top: Some(crate::doc::SectionPageBorder {
-                style: crate::doc::SectionPageBorderStyle::Single,
+        let borders = crate::doc::section::borders::Borders {
+            top: Some(crate::doc::section::borders::Border {
+                style: crate::doc::section::borders::Style::Single,
                 width_eighth_points: 8,
-                color: crate::doc::SectionPageBorderColor::Red,
+                color: crate::doc::section::borders::Color::Red,
                 spacing_points: 3,
                 shadow: true,
                 frame: false,
             }),
-            apply_to: crate::doc::SectionPageBorderApplyTo::FirstPage,
+            apply_to: crate::doc::section::borders::ApplyTo::FirstPage,
             ..default
         };
         assert_eq!(

@@ -931,7 +931,7 @@ pub struct DocWriter {
     /// Section-wide glyph and line flow.
     section_text_flow: crate::doc::SectionTextFlow,
     /// Explicit page-border edges and placement for the single section.
-    section_page_borders: Option<crate::doc::SectionPageBorders>,
+    section_page_borders: Option<crate::doc::section::borders::Borders>,
     /// Numbering writer for list tables
     numbering: NumberingWriter,
     /// User-defined styles appended after the fifteen fixed style slots
@@ -3286,7 +3286,7 @@ impl DocWriter {
     /// Set validated page borders for the writer's single section.
     pub fn set_section_page_borders(
         &mut self,
-        borders: crate::doc::SectionPageBorders,
+        borders: crate::doc::section::borders::Borders,
     ) -> Result<(), DocWriteError> {
         borders
             .validate()
@@ -3296,7 +3296,7 @@ impl DocWriter {
     }
 
     /// Return explicit page borders, or `None` for the file-format default.
-    pub fn section_page_borders(&self) -> Option<&crate::doc::SectionPageBorders> {
+    pub fn section_page_borders(&self) -> Option<&crate::doc::section::borders::Borders> {
         self.section_page_borders.as_ref()
     }
 

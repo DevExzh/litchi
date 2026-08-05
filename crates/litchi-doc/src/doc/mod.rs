@@ -183,14 +183,13 @@ pub use revision::{
     DisplayFieldRevisionMark, NumberingRevisionMark, RevisionKind, RevisionMark, RevisionReason,
     SectionRevisionMark,
 };
+pub use section::borders::{ApplyTo, Art, Border, Borders, Color, Depth, Error, Offset, Style};
 pub use section::{
     ChapterNumberSeparator, DocSection, LineNumberRestart, NoteNumberRestart, PageOrientation,
     SectionBehavior, SectionBreakKind, SectionFootnotePosition, SectionLineNumbering,
-    SectionMargins, SectionNoteSettings, SectionPageBorder, SectionPageBorderApplyTo,
-    SectionPageBorderArt, SectionPageBorderColor, SectionPageBorderDepth, SectionPageBorderError,
-    SectionPageBorderOffsetFrom, SectionPageBorderStyle, SectionPageBorders, SectionPageGrid,
-    SectionPageGridMode, SectionPageLayout, SectionPageNumbering, SectionPaperSettings,
-    SectionProtection, SectionTextFlow, SectionVerticalJustification, VerticalMargin,
+    SectionMargins, SectionNoteSettings, SectionPageGrid, SectionPageGridMode, SectionPageLayout,
+    SectionPageNumbering, SectionPaperSettings, SectionProtection, SectionTextFlow,
+    SectionVerticalJustification, VerticalMargin,
 };
 pub use shapes::DocShape;
 pub use table::{Cell, Row, Table};

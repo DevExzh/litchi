@@ -1,8 +1,8 @@
 //! Public section-layout model for Word 97+ documents.
 
 use crate::doc::NumberFormat;
-use std::fmt;
 
+pub mod borders;
 pub mod columns;
 
 /// A section and the character-position range to which its properties apply.
@@ -29,7 +29,7 @@ pub struct DocSection {
     /// Printer-specific paper-source and paper-kind selections.
     pub paper: SectionPaperSettings,
     /// Page-border edges and their section-wide placement controls.
-    pub page_borders: SectionPageBorders,
+    pub page_borders: borders::Borders,
     /// East Asian document-grid settings for this section.
     pub page_grid: SectionPageGrid,
     /// Orientation and sequencing of glyphs and lines in this section.
@@ -211,184 +211,6 @@ pub struct SectionPaperSettings {
     pub first_page_source: Option<u16>,
     pub other_page_source: Option<u16>,
     pub requested_paper_kind: Option<u16>,
-}
-
-/// Pages in a section to which its page borders apply.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SectionPageBorderApplyTo {
-    AllPages,
-    FirstPage,
-    AllButFirstPage,
-}
-
-/// Z-order of page borders relative to the section contents.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SectionPageBorderDepth {
-    InFront,
-    Behind,
-}
-
-/// Reference from which a page border's spacing is measured.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SectionPageBorderOffsetFrom {
-    Text,
-    PageEdge,
-}
-
-/// A validated Word page-border art code.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SectionPageBorderArt(u8);
-
-impl SectionPageBorderArt {
-    /// Return the `BrcType` art code in the inclusive range `0x40..=0xE3`.
-    pub fn code(self) -> u8 {
-        self.0
-    }
-}
-
-impl TryFrom<u8> for SectionPageBorderArt {
-    type Error = u8;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        if (0x40..=0xE3).contains(&value) {
-            Ok(Self(value))
-        } else {
-            Err(value)
-        }
-    }
-}
-
-/// Line or image style of a Word 97 `Brc80` page border.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SectionPageBorderStyle {
-    Single,
-    Double,
-    Thick,
-    Dotted,
-    Dashed,
-    DotDash,
-    DotDotDash,
-    Triple,
-    ThinThickSmallGap,
-    ThickThinSmallGap,
-    ThinThickThinSmallGap,
-    ThinThickMediumGap,
-    ThickThinMediumGap,
-    ThinThickThinMediumGap,
-    ThinThickLargeGap,
-    ThickThinLargeGap,
-    ThinThickThinLargeGap,
-    Wave,
-    DoubleWave,
-    DashSmallGap,
-    DashDotStroked,
-    ThreeDEmboss,
-    ThreeDEngrave,
-    Art(SectionPageBorderArt),
-}
-
-/// Palette color selected by a Word `Ico` value.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SectionPageBorderColor {
-    Automatic,
-    Black,
-    Blue,
-    Cyan,
-    Green,
-    Magenta,
-    Red,
-    Yellow,
-    White,
-    DarkBlue,
-    DarkCyan,
-    DarkGreen,
-    DarkMagenta,
-    DarkRed,
-    DarkYellow,
-    DarkGray,
-    LightGray,
-}
-
-/// One section page-border edge decoded from `Brc80`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SectionPageBorder {
-    pub style: SectionPageBorderStyle,
-    /// Width in eighths of a point. Values below two render as two.
-    pub width_eighth_points: u8,
-    pub color: SectionPageBorderColor,
-    /// Distance from text or the page edge, in points.
-    pub spacing_points: u8,
-    pub shadow: bool,
-    pub frame: bool,
-}
-
-/// Invalid caller-supplied `Brc80` page-border data.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SectionPageBorderError {
-    /// `Brc80.dptSpace` is a five-bit value.
-    InvalidSpacing(u8),
-}
-
-impl fmt::Display for SectionPageBorderError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::InvalidSpacing(value) => write!(
-                formatter,
-                "section page-border spacing {value} exceeds the 31-point Brc80 limit"
-            ),
-        }
-    }
-}
-
-impl std::error::Error for SectionPageBorderError {}
-
-impl SectionPageBorder {
-    /// Validate fields whose domains are wider in Rust than in `Brc80`.
-    pub fn validate(self) -> Result<(), SectionPageBorderError> {
-        if self.spacing_points > 31 {
-            return Err(SectionPageBorderError::InvalidSpacing(self.spacing_points));
-        }
-        Ok(())
-    }
-}
-
-/// Page borders and shared placement controls for one section.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SectionPageBorders {
-    pub top: Option<SectionPageBorder>,
-    pub left: Option<SectionPageBorder>,
-    pub bottom: Option<SectionPageBorder>,
-    pub right: Option<SectionPageBorder>,
-    pub apply_to: SectionPageBorderApplyTo,
-    pub depth: SectionPageBorderDepth,
-    pub offset_from: SectionPageBorderOffsetFrom,
-}
-
-impl Default for SectionPageBorders {
-    fn default() -> Self {
-        Self {
-            top: None,
-            left: None,
-            bottom: None,
-            right: None,
-            apply_to: SectionPageBorderApplyTo::AllPages,
-            depth: SectionPageBorderDepth::InFront,
-            offset_from: SectionPageBorderOffsetFrom::Text,
-        }
-    }
-}
-
-impl SectionPageBorders {
-    /// Validate every present border edge.
-    pub fn validate(self) -> Result<(), SectionPageBorderError> {
-        for border in [self.top, self.left, self.bottom, self.right]
-            .into_iter()
-            .flatten()
-        {
-            border.validate()?;
-        }
-        Ok(())
-    }
 }
 
 /// Document-grid mode applied to a section.
