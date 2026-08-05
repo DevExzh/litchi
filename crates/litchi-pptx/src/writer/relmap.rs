@@ -54,7 +54,12 @@ impl RelationshipMapper {
     /// * `slide_index` - The index of the slide (0-based)
     /// * `image_index_in_slide` - The index of the image within that slide (0-based)
     /// * `rel_id` - The relationship ID (e.g., "rId2")
-    pub(crate) fn add_image(&mut self, slide_index: usize, image_index_in_slide: usize, rel_id: String) {
+    pub(crate) fn add_image(
+        &mut self,
+        slide_index: usize,
+        image_index_in_slide: usize,
+        rel_id: String,
+    ) {
         self.image_ids
             .insert((slide_index, image_index_in_slide), rel_id);
     }
@@ -73,7 +78,11 @@ impl RelationshipMapper {
     /// # Arguments
     /// * `slide_index` - The index of the slide (0-based)
     /// * `image_index_in_slide` - The index of the image within that slide (0-based)
-    pub(crate) fn get_image_id(&self, slide_index: usize, image_index_in_slide: usize) -> Option<&str> {
+    pub(crate) fn get_image_id(
+        &self,
+        slide_index: usize,
+        image_index_in_slide: usize,
+    ) -> Option<&str> {
         self.image_ids
             .get(&(slide_index, image_index_in_slide))
             .map(|s| s.as_str())

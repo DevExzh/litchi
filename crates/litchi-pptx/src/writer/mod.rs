@@ -1,7 +1,7 @@
 //! Layered mutable PresentationML authoring.
 
-pub(crate) mod relmap;
 pub mod presentation;
+pub(crate) mod relmap;
 pub mod shape;
 pub mod slide;
 
