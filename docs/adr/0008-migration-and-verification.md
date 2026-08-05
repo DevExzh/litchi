@@ -4544,6 +4544,30 @@ embedded-package integration targets, and the ODF common-package suite. No
 new ODF specification or native Office claim is made by these structural
 refactors.
 
+## ODF chart read and semantic layering
+
+The ODF chart read boundary is now shared by `litchi-odc` and ODT embedded
+charts through `litchi-odf-common::chart`. Its layered modules own the bounded
+namespace-aware `reader`, scalar chart vocabulary under `axis`, `grid`,
+`legend`, and `plot_area`, and zero-copy semantic `view` types. `Attribute`,
+`Element`, and `Kind` retain expanded names, unknown namespaces, extension
+subtrees, and inert text while rejecting duplicate expanded attributes,
+unsupported entities, malformed roots, excessive depth, element counts, and
+text/attribute sizes. The common crate has no package-family dependency.
+
+ODC now validates and exposes this retained chart model from its concise
+`Chart` facade; its incomplete duplicate axis/legend/series models were
+removed. ODT’s standalone chart wrapper, authoring, and mutation code consume
+the same common reader and views, while ODT-specific `Object_N/` package
+paths, manifest topology, inline roots, and host placement remain in the ODT
+owner. Chart authoring and mutation are intentionally separate follow-up
+layers, so this extraction does not claim complete ODF chart conformance.
+
+The common chart reader and semantic tests, ODC all-target tests, and the full
+ODT all-target suite (530 library tests plus integration targets) pass, along
+with affected-crate checks and formatting. This slice also removes the former
+ODT-local chart reader/semantic duplicate without compatibility aliases.
+
 ## Shared BIFF framing and legacy binary owner migration
 
 The legacy binary migration now has a neutral physical-record owner:
