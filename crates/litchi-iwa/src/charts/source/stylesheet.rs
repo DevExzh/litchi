@@ -446,10 +446,10 @@ fn unique_stylesheet_message_index(
     })
 }
 
-fn stylesheet_message<'a>(
+fn stylesheet_message(
     stylesheet_id: u64,
-    stylesheet: &'a crate::archive::ArchiveObject,
-) -> Result<(usize, &'a [u8], &'a crate::archive::MessageInfo)> {
+    stylesheet: &crate::archive::ArchiveObject,
+) -> Result<(usize, &[u8], &crate::archive::MessageInfo)> {
     let message_index = unique_stylesheet_message_index(stylesheet_id, stylesheet)?;
     let message = stylesheet.messages.get(message_index).ok_or_else(|| {
         Error::InvalidFormat(format!(
