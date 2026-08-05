@@ -1,40 +1,27 @@
-//! Typed paragraph base-writing direction.
+//! IWA-native adapters for archive-free paragraph writing direction.
 
 use crate::{Error, Result};
 
-/// Base direction used to lay out bidirectional paragraph text.
-///
-/// `Natural` lets iWork infer the direction from the paragraph contents. The
-/// explicit variants are useful for neutral or mixed-direction content.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum ParagraphWritingDirection {
-    /// Infer direction from the paragraph contents.
-    #[default]
-    Natural,
-    /// Lay out the paragraph from left to right.
-    LeftToRight,
-    /// Lay out the paragraph from right to left.
-    RightToLeft,
+pub use litchi_iwa_text::paragraph::direction::WritingDirection as ParagraphWritingDirection;
+
+/// Decode native iWork's paragraph writing-direction discriminant.
+pub(crate) fn from_native(value: i32) -> Result<ParagraphWritingDirection> {
+    match value {
+        -1 => Ok(ParagraphWritingDirection::Natural),
+        0 => Ok(ParagraphWritingDirection::LeftToRight),
+        1 => Ok(ParagraphWritingDirection::RightToLeft),
+        _ => Err(Error::InvalidFormat(format!(
+            "unsupported native iWork paragraph writing direction {value}"
+        ))),
+    }
 }
 
-impl ParagraphWritingDirection {
-    pub(crate) const fn native_value(self) -> i32 {
-        match self {
-            Self::Natural => -1,
-            Self::LeftToRight => 0,
-            Self::RightToLeft => 1,
-        }
-    }
-
-    pub(crate) fn from_native_value(value: i32) -> Result<Self> {
-        match value {
-            -1 => Ok(Self::Natural),
-            0 => Ok(Self::LeftToRight),
-            1 => Ok(Self::RightToLeft),
-            _ => Err(Error::InvalidFormat(format!(
-                "unsupported iWork paragraph writing direction {value}"
-            ))),
-        }
+/// Encode a semantic writing direction as native iWork's discriminant.
+pub(crate) const fn to_native(value: ParagraphWritingDirection) -> i32 {
+    match value {
+        ParagraphWritingDirection::Natural => -1,
+        ParagraphWritingDirection::LeftToRight => 0,
+        ParagraphWritingDirection::RightToLeft => 1,
     }
 }
 
@@ -43,21 +30,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn native_values_round_trip() {
+    fn native_values_round_trip_at_the_iwa_boundary() {
         for direction in [
             ParagraphWritingDirection::Natural,
             ParagraphWritingDirection::LeftToRight,
             ParagraphWritingDirection::RightToLeft,
         ] {
-            assert_eq!(
-                ParagraphWritingDirection::from_native_value(direction.native_value()).unwrap(),
-                direction
-            );
+            assert_eq!(from_native(to_native(direction)).unwrap(), direction);
         }
     }
 
     #[test]
-    fn rejects_unknown_native_value() {
-        assert!(ParagraphWritingDirection::from_native_value(2).is_err());
+    fn rejects_unknown_native_value_at_the_iwa_boundary() {
+        assert!(from_native(2).is_err());
     }
 }

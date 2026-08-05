@@ -9,6 +9,7 @@
 
 pub mod character;
 pub mod font;
+pub mod paragraph;
 
 pub use character::{
     Error as CharacterError, TextBaselineShift, TextCapitalization, TextCharacterSpacing,

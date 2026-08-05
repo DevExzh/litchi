@@ -5,11 +5,14 @@ use std::collections::HashSet;
 use crate::protobuf::tswp;
 use crate::shapes::RgbaColor;
 use crate::text::font::TextFont;
-use crate::text::paragraph_direction::ParagraphWritingDirection;
-use crate::text::paragraph_flow::{ParagraphFlow, ParagraphHyphenation};
+use crate::text::paragraph_direction::{
+    ParagraphWritingDirection, from_native as writing_direction_from_native,
+};
+use crate::text::paragraph_flow::{ParagraphFlow, hyphenation_from_native};
 use crate::text::paragraph_following_style::{ParagraphFollowingStyle, ParagraphStyleId};
 use crate::text::paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
+    decimal_character_from_native,
 };
 use crate::text::style::{
     ParagraphBackground, ParagraphBorders, ParagraphIndentPoints, ParagraphIndents,
@@ -304,9 +307,7 @@ pub(super) fn paragraph_flow(package: &IWorkPackage, first_style_id: u64) -> Res
         |(hyphenation, keep_lines, keep_next, new_page, widow_orphan), style| {
             if let Some(properties) = style.para_properties.as_ref() {
                 if hyphenation.is_none() {
-                    *hyphenation = properties
-                        .hyphenate
-                        .map(ParagraphHyphenation::from_native_value);
+                    *hyphenation = properties.hyphenate.map(hyphenation_from_native);
                 }
                 if keep_lines.is_none() {
                     *keep_lines = properties.keep_lines_together;
@@ -358,7 +359,7 @@ pub(super) fn paragraph_writing_direction(
         else {
             return Ok(InheritanceControl::Continue);
         };
-        *value = Some(ParagraphWritingDirection::from_native_value(direction)?);
+        *value = Some(writing_direction_from_native(direction)?);
         Ok(InheritanceControl::Complete)
     })?;
     Ok(value.unwrap_or_default())
@@ -518,7 +519,7 @@ pub(super) fn decimal_tab_character(
         let Some(character) = properties.decimal_tab.as_deref() else {
             return Ok(InheritanceControl::Continue);
         };
-        *value = Some(ParagraphDecimalTabCharacter::from_native(character)?);
+        *value = Some(decimal_character_from_native(character)?);
         Ok(InheritanceControl::Complete)
     })?;
     Ok(value.unwrap_or_default())

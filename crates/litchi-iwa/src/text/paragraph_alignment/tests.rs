@@ -919,7 +919,9 @@ fn native_writing_direction_override_is_minimal_and_reversible() {
             .char_properties
             .as_ref()
             .and_then(|properties| properties.writing_direction),
-        Some(ParagraphWritingDirection::RightToLeft.native_value())
+        Some(crate::text::paragraph_direction::to_native(
+            ParagraphWritingDirection::RightToLeft,
+        ))
     );
     assert_eq!(
         archive
@@ -1531,11 +1533,12 @@ fn native_paragraph_flow_rejects_noncanonical_boolean_wire() {
         .into_iter()
         .find(|field| field.number() == PARAGRAPH_PROPERTIES_FIELD)
         .unwrap();
-    let hyphenate = crate::wire::parse_wire_fields(&data[paragraph.payload_start()..paragraph.end()])
-        .unwrap()
-        .into_iter()
-        .find(|field| field.number() == HYPHENATE_FIELD)
-        .unwrap();
+    let hyphenate =
+        crate::wire::parse_wire_fields(&data[paragraph.payload_start()..paragraph.end()])
+            .unwrap()
+            .into_iter()
+            .find(|field| field.number() == HYPHENATE_FIELD)
+            .unwrap();
     data[paragraph.payload_start() + hyphenate.payload_start()] = NONCANONICAL_TRUE;
     let archive = tswp::ParagraphStyleArchive::decode(data.as_slice()).unwrap();
     assert!(native::direct_overrides(&archive, &data).unwrap().is_none());

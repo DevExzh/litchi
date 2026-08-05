@@ -19,13 +19,19 @@ use crate::wire::{
 use crate::{Error, IWorkPackage, IWorkThemeArchive, Result};
 
 use super::super::font::{TextFont, TextFontName};
-use super::super::paragraph_direction::ParagraphWritingDirection;
-use super::super::paragraph_flow::{ParagraphFlow, ParagraphHyphenation};
+use super::super::paragraph_direction::{
+    ParagraphWritingDirection, from_native as writing_direction_from_native,
+    to_native as writing_direction_to_native,
+};
+use super::super::paragraph_flow::{
+    ParagraphFlow, ParagraphHyphenation, hyphenation_from_native, hyphenation_to_native,
+};
 use super::super::paragraph_following_style::{
     NamedParagraphStyle, ParagraphFollowingStyle, ParagraphStyleId,
 };
 use super::super::paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
+    decimal_character_from_native,
 };
 use super::super::style::{
     ParagraphBackground, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
@@ -678,16 +684,14 @@ pub(crate) fn direct_overrides(
     let background = text_background_from_character(character_properties)?;
     let paragraph_background = paragraph_background_from_properties(properties)?;
     let paragraph_borders = paragraph_borders_from_properties(properties)?;
-    let hyphenation = properties
-        .hyphenate
-        .map(ParagraphHyphenation::from_native_value);
+    let hyphenation = properties.hyphenate.map(hyphenation_from_native);
     let keep_lines_together = properties.keep_lines_together;
     let keep_with_next = properties.keep_with_next;
     let start_on_new_page = properties.page_break_before;
     let prevent_widow_orphan_lines = properties.widow_control;
     let writing_direction = character_properties
         .writing_direction
-        .map(ParagraphWritingDirection::from_native_value)
+        .map(writing_direction_from_native)
         .transpose()?;
     let following_style = if properties.following_style_null == Some(true) {
         if properties.following_style.is_some() {
@@ -752,7 +756,7 @@ pub(crate) fn direct_overrides(
         properties
             .decimal_tab
             .as_deref()
-            .map(ParagraphDecimalTabCharacter::from_native)
+            .map(decimal_character_from_native)
             .transpose()?
     };
     let default_tab_interval = properties
@@ -1208,9 +1212,7 @@ pub(crate) fn variation_object(
             capitalization_uses_linguistics: overrides
                 .capitalization
                 .and_then(TextCapitalization::uses_linguistics),
-            writing_direction: overrides
-                .writing_direction
-                .map(ParagraphWritingDirection::native_value),
+            writing_direction: overrides.writing_direction.map(writing_direction_to_native),
             ..Default::default()
         }),
         para_properties: Some(tswp::ParagraphStylePropertiesArchive {
@@ -1232,9 +1234,7 @@ pub(crate) fn variation_object(
             stroke: native_borders.stroke,
             border_positions: native_borders.positions,
             rounded_corners: native_borders.rounded_corners,
-            hyphenate: overrides
-                .hyphenation
-                .map(ParagraphHyphenation::native_value),
+            hyphenate: overrides.hyphenation.map(hyphenation_to_native),
             keep_lines_together: overrides.keep_lines_together,
             keep_with_next: overrides.keep_with_next,
             page_break_before: overrides.start_on_new_page,
