@@ -4,6 +4,43 @@ use std::f32::consts::TAU;
 
 use crate::color::Rgba;
 
+#[allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "The macro keeps three identical validated scalar declarations concise"
+)]
+macro_rules! normalized_value {
+    ($name:ident, $non_finite:ident, $out_of_range:ident, $doc:literal) => {
+        #[doc = $doc]
+        #[repr(transparent)]
+        #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+        pub struct $name(f32);
+
+        impl $name {
+            /// Construct a finite normalized value in the inclusive range `0.0..=1.0`.
+            ///
+            /// # Errors
+            ///
+            /// Returns a typed error when `value` is non-finite or outside
+            /// the normalized interval.
+            pub fn new(value: f32) -> Result<Self> {
+                if !value.is_finite() {
+                    return Err(Error::$non_finite);
+                }
+                if !(0.0..=1.0).contains(&value) {
+                    return Err(Error::$out_of_range);
+                }
+                Ok(Self(value))
+            }
+
+            /// Return the normalized value.
+            #[must_use]
+            pub const fn get(self) -> f32 {
+                self.0
+            }
+        }
+    };
+}
+
 const MINIMUM_STOP_COUNT: usize = 2;
 const SIMPLE_STOP_COUNT: usize = 2;
 
@@ -47,43 +84,6 @@ pub enum Error {
 
 /// Result type for shape-gradient value construction.
 pub type Result<T> = std::result::Result<T, Error>;
-
-#[allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The macro keeps three identical validated scalar declarations concise"
-)]
-macro_rules! normalized_value {
-    ($name:ident, $non_finite:ident, $out_of_range:ident, $doc:literal) => {
-        #[doc = $doc]
-        #[repr(transparent)]
-        #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-        pub struct $name(f32);
-
-        impl $name {
-            /// Construct a finite normalized value in the inclusive range `0.0..=1.0`.
-            ///
-            /// # Errors
-            ///
-            /// Returns a typed error when `value` is non-finite or outside
-            /// the normalized interval.
-            pub fn new(value: f32) -> Result<Self> {
-                if !value.is_finite() {
-                    return Err(Error::$non_finite);
-                }
-                if !(0.0..=1.0).contains(&value) {
-                    return Err(Error::$out_of_range);
-                }
-                Ok(Self(value))
-            }
-
-            /// Return the normalized value.
-            #[must_use]
-            pub const fn get(self) -> f32 {
-                self.0
-            }
-        }
-    };
-}
 
 /// Geometry used to paint a shape gradient.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
