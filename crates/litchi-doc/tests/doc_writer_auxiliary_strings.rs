@@ -101,10 +101,7 @@ fn write_to_emits_the_mandatory_default_associated_string_table() {
             .get_table_pointer(ASSOCIATED_STRINGS_FIB_INDEX)
             .is_some_and(|(_, length)| length > 0)
     );
-    assert_eq!(
-        document.saved_by_table().unwrap().entries(),
-        &[] as &[SavedByEntry]
-    );
+    assert_eq!(document.saved_by_table().unwrap().entries(), &[]);
     assert!(
         document
             .fib()

@@ -1,8 +1,6 @@
 use super::parts::chp::CharacterProperties;
 use std::mem::size_of;
 
-use zerocopy_derive::{FromBytes, Immutable, KnownLayout};
-
 const BLOCK_TYPE_OFFSET: usize = 0xE;
 const MM_MODE_TYPE_OFFSET: usize = 0x6;
 
@@ -118,7 +116,7 @@ pub fn has_picture(
 ///
 /// The fields ordered as they appear in the PICF structure.
 /// Total size: 0x44 (68) bytes
-#[derive(Debug, Clone, FromBytes, Immutable, KnownLayout)]
+#[derive(Debug, Clone)]
 #[repr(C, packed)]
 pub struct PictureFields {
     /// Total length of picture data including header (offset 0x00)
@@ -188,12 +186,41 @@ impl PictureFields {
     /// * `Some(PictureFields)` if parsing succeeds
     /// * `None` if data is too short
     pub fn try_parse(data: &[u8], offset: usize) -> Option<Self> {
-        use zerocopy::FromBytes;
-
-        let slice = data.get(offset..)?;
-        let (fields, _) = Self::read_from_prefix(slice).ok()?;
-        Some(fields)
+        let fields = data.get(offset..offset.checked_add(size_of::<Self>())?)?;
+        Some(Self {
+            lcb: i32::from_le_bytes(read_bytes(fields, 0)?),
+            cb_header: i16::from_le_bytes(read_bytes(fields, 4)?),
+            mm: i16::from_le_bytes(read_bytes(fields, 6)?),
+            x_ext: i16::from_le_bytes(read_bytes(fields, 8)?),
+            y_ext: i16::from_le_bytes(read_bytes(fields, 10)?),
+            sw_hmf: i16::from_le_bytes(read_bytes(fields, 12)?),
+            grf: i32::from_le_bytes(read_bytes(fields, 14)?),
+            padding: i32::from_le_bytes(read_bytes(fields, 18)?),
+            mm_pm: i16::from_le_bytes(read_bytes(fields, 22)?),
+            padding2: i32::from_le_bytes(read_bytes(fields, 24)?),
+            dxa_goal: i16::from_le_bytes(read_bytes(fields, 28)?),
+            dya_goal: i16::from_le_bytes(read_bytes(fields, 30)?),
+            mx: i16::from_le_bytes(read_bytes(fields, 32)?),
+            my: i16::from_le_bytes(read_bytes(fields, 34)?),
+            dxa_reserved1: i16::from_le_bytes(read_bytes(fields, 36)?),
+            dya_reserved1: i16::from_le_bytes(read_bytes(fields, 38)?),
+            dxa_reserved2: i16::from_le_bytes(read_bytes(fields, 40)?),
+            dya_reserved2: i16::from_le_bytes(read_bytes(fields, 42)?),
+            f_reserved: read_bytes::<1>(fields, 44)?[0],
+            bpp: read_bytes::<1>(fields, 45)?[0],
+            brc_top80: read_bytes(fields, 46)?,
+            brc_left80: read_bytes(fields, 50)?,
+            brc_bottom80: read_bytes(fields, 54)?,
+            brc_right80: read_bytes(fields, 58)?,
+            dxa_reserved3: i16::from_le_bytes(read_bytes(fields, 62)?),
+            dya_reserved3: i16::from_le_bytes(read_bytes(fields, 64)?),
+            c_props: i16::from_le_bytes(read_bytes(fields, 66)?),
+        })
     }
+}
+
+fn read_bytes<const N: usize>(data: &[u8], offset: usize) -> Option<[u8; N]> {
+    data.get(offset..offset.checked_add(N)?)?.try_into().ok()
 }
 
 const _: () = {

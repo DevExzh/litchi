@@ -18,15 +18,15 @@ const MIN_MTEF_HEADER_SIZE: usize = 5;
 const MAX_MTEF_OBJECT_SIZE: u32 = 16 * 1024 * 1024;
 
 /// MTEF extractor for OLE documents
-pub struct MtefExtractor<'arena> {
+pub(crate) struct MtefExtractor<'arena> {
     #[allow(dead_code)] // Kept for future use in instance methods
     arena: &'arena bumpalo::Bump,
 }
 
 impl<'arena> MtefExtractor<'arena> {
     /// Create a new MTEF extractor
-    #[allow(dead_code)] // Public API for future use
-    pub fn new(arena: &'arena bumpalo::Bump) -> Self {
+    #[allow(dead_code)] // Reserved for future formula integration
+    pub(crate) fn new(arena: &'arena bumpalo::Bump) -> Self {
         Self { arena }
     }
 
@@ -278,8 +278,8 @@ impl<'arena> MtefExtractor<'arena> {
     /// # Returns
     ///
     /// Returns a vector of MathNode AST nodes representing the parsed formula
-    #[allow(dead_code)] // Public API for future use
-    pub fn parse_mtef_to_ast(
+    #[allow(dead_code)] // Reserved for future formula integration
+    pub(crate) fn parse_mtef_to_ast(
         &self,
         mtef_data: Vec<u8>,
     ) -> Result<Vec<MathNode<'arena>>, MtefExtractionError> {
@@ -306,8 +306,8 @@ impl<'arena> MtefExtractor<'arena> {
     /// # Returns
     ///
     /// Returns parsed formula AST nodes if MTEF data is found and valid
-    #[allow(dead_code)] // Public API for future use
-    pub fn extract_and_parse_mtef<R: Read + Seek>(
+    #[allow(dead_code)] // Reserved for future formula integration
+    pub(crate) fn extract_and_parse_mtef<R: Read + Seek>(
         &self,
         ole_file: &mut OleFile<R>,
         stream_names: &[&str],
@@ -327,7 +327,7 @@ impl<'arena> MtefExtractor<'arena> {
 
 /// Errors that can occur during MTEF extraction
 #[derive(Debug)]
-pub enum MtefExtractionError {
+pub(crate) enum MtefExtractionError {
     IoError(std::io::Error),
     #[allow(dead_code)] // Kept for completeness
     InvalidOleHeader,
