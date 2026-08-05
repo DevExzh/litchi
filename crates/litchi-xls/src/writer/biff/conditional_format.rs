@@ -130,7 +130,7 @@ pub(crate) fn write_cfex12_marker<W: Write>(
     Ok(())
 }
 
-pub fn write_cfheader<W: Write>(
+pub(crate) fn write_cfheader<W: Write>(
     writer: &mut W,
     ranges: &[(u32, u32, u16, u16)],
     num_rules: u16,
@@ -251,7 +251,7 @@ pub(crate) fn write_cfheader_with_identifier<W: Write>(
     Ok(())
 }
 
-pub fn write_cfrule<W: Write>(
+pub(crate) fn write_cfrule<W: Write>(
     writer: &mut W,
     condition_type: u8,
     comparison_op: u8,

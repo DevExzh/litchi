@@ -32,7 +32,7 @@ pub(crate) struct DvalConfig {
     pub dv_count: u32,
 }
 
-pub fn write_dval<W: Write>(writer: &mut W, cfg: DvalConfig) -> XlsResult<()> {
+pub(crate) fn write_dval<W: Write>(writer: &mut W, cfg: DvalConfig) -> XlsResult<()> {
     if cfg.x_left > 65_535
         || cfg.y_top > 65_535
         || cfg.dv_count > 65_534
@@ -60,7 +60,7 @@ pub fn write_dval<W: Write>(writer: &mut W, cfg: DvalConfig) -> XlsResult<()> {
     Ok(())
 }
 
-pub fn write_dv<W: Write>(
+pub(crate) fn write_dv<W: Write>(
     writer: &mut W,
     cfg: &DvConfig<'_>,
     ranges: &[(u16, u16, u8, u8)],

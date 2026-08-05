@@ -11,7 +11,7 @@ use litchi_core::binary;
 /// - `cch` — character count
 /// - `flags` bit 0 (`fHighByte`) — 0 = compressed Latin-1 (1 byte/char),
 ///   1 = uncompressed UTF-16LE (2 bytes/char)
-pub fn parse_short_string(data: &[u8], _encoding: &XlsEncoding) -> XlsResult<String> {
+pub(crate) fn parse_short_string(data: &[u8], _encoding: &XlsEncoding) -> XlsResult<String> {
     if data.len() < 2 {
         return Ok(String::new());
     }
@@ -47,7 +47,7 @@ pub fn parse_short_string(data: &[u8], _encoding: &XlsEncoding) -> XlsResult<Str
 }
 
 /// Parse a BIFF8 `XLUnicodeString` with a 16-bit character count.
-pub fn parse_string_record(data: &[u8], _encoding: &XlsEncoding) -> XlsResult<String> {
+pub(crate) fn parse_string_record(data: &[u8], _encoding: &XlsEncoding) -> XlsResult<String> {
     if data.len() < 3 {
         return Err(XlsError::InvalidLength {
             expected: 3,
@@ -92,7 +92,7 @@ const STRING_HIGH_BYTE: u8 = 0x01;
 
 /// Outcome of decoding a possibly continued BIFF8 `String` record payload.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum StringRecordDecode {
+pub(crate) enum StringRecordDecode {
     /// All declared characters were decoded.
     Complete(String),
     /// The declared characters extend past the supplied payloads; another
@@ -110,7 +110,7 @@ pub enum StringRecordDecode {
 /// encoding may switch between compressed and UTF-16 at record boundaries.
 /// Returns [`StringRecordDecode::NeedContinue`] when the declared characters
 /// extend past every supplied payload.
-pub fn decode_string_record(first: &[u8], continues: &[Vec<u8>]) -> XlsResult<StringRecordDecode> {
+pub(crate) fn decode_string_record(first: &[u8], continues: &[Vec<u8>]) -> XlsResult<StringRecordDecode> {
     if first.len() < 3 {
         return Err(XlsError::InvalidLength {
             expected: 3,
@@ -173,7 +173,7 @@ pub fn decode_string_record(first: &[u8], continues: &[Vec<u8>]) -> XlsResult<St
 /// RK values are compressed numeric values used in Excel.
 /// Bit 0 requests division by 100; bit 1 selects a signed 30-bit integer.
 /// Otherwise the upper 30 bits are the most-significant bits of an IEEE-754 double.
-pub fn rk_to_f64(rk: u32) -> f64 {
+pub(crate) fn rk_to_f64(rk: u32) -> f64 {
     let mut value = if rk & 0x02 != 0 {
         f64::from((rk as i32) >> 2)
     } else {
@@ -186,7 +186,7 @@ pub fn rk_to_f64(rk: u32) -> f64 {
 }
 
 /// Parse formula value from formula record
-pub fn parse_formula_value(data: &[u8]) -> XlsResult<FormulaValue> {
+pub(crate) fn parse_formula_value(data: &[u8]) -> XlsResult<FormulaValue> {
     if data.len() < 8 {
         return Err(XlsError::InvalidLength {
             expected: 8,
@@ -212,7 +212,7 @@ pub fn parse_formula_value(data: &[u8]) -> XlsResult<FormulaValue> {
 /// Convert column number to Excel column name (A, B, ..., Z, AA, AB, etc.)
 ///
 /// Input is 1-based (1=A, 2=B, 26=Z, 27=AA, etc.)
-pub fn column_index_to_name(mut col: u32) -> String {
+pub(crate) fn column_index_to_name(mut col: u32) -> String {
     if col == 0 {
         return String::new(); // Invalid input
     }
@@ -230,7 +230,7 @@ pub fn column_index_to_name(mut col: u32) -> String {
 }
 
 /// Convert Excel column name to column index (A=0, B=1, ..., Z=25, AA=26, etc.)
-pub fn column_name_to_index(name: &str) -> Option<u32> {
+pub(crate) fn column_name_to_index(name: &str) -> Option<u32> {
     let mut result: u32 = 0;
 
     for ch in name.chars() {
@@ -247,12 +247,12 @@ pub fn column_name_to_index(name: &str) -> Option<u32> {
 }
 
 /// Convert row and column to Excel cell reference (e.g., "A1", "B2")
-pub fn cell_reference(row: u32, col: u32) -> String {
+pub(crate) fn cell_reference(row: u32, col: u32) -> String {
     format!("{}{}", column_index_to_name(col + 1), row + 1)
 }
 
 /// Parse Excel cell reference to row and column indices
-pub fn parse_cell_reference(ref_str: &str) -> Option<(u32, u32)> {
+pub(crate) fn parse_cell_reference(ref_str: &str) -> Option<(u32, u32)> {
     let ref_str = ref_str.to_ascii_uppercase();
     let mut col_str = String::new();
     let mut row_str = String::new();
@@ -288,7 +288,7 @@ pub fn parse_cell_reference(ref_str: &str) -> Option<(u32, u32)> {
 
 /// Convert serial date to datetime
 #[allow(dead_code)]
-pub fn excel_date_to_datetime(serial: f64, is_1904: bool) -> Option<chrono::NaiveDateTime> {
+pub(crate) fn excel_date_to_datetime(serial: f64, is_1904: bool) -> Option<chrono::NaiveDateTime> {
     use chrono::{Duration, NaiveDate};
 
     let base_date = if is_1904 {

@@ -9,7 +9,7 @@ use super::list_object::{XlsListObjectId, XlsListObjectRange};
 use super::{XlsError, XlsResult};
 
 pub const AUTO_FILTER12_RECORD_TYPE: u16 = 0x087E;
-pub const CONTINUE_FRT12_RECORD_TYPE: u16 = 0x087F;
+pub(crate) const CONTINUE_FRT12_RECORD_TYPE: u16 = 0x087F;
 const MAX_RECORD_PAYLOAD: usize = 8_224;
 const MAX_AGGREGATE_BYTES: usize = 1_048_576;
 

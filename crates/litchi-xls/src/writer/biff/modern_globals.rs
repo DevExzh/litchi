@@ -61,7 +61,7 @@ fn write_sxaddl_header<W: Write>(writer: &mut W, header: SxAddlHeader) -> XlsRes
     Ok(())
 }
 
-pub fn write_table_styles<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(crate) fn write_table_styles<W: Write>(writer: &mut W) -> XlsResult<()> {
     let styles = crate::table_styles::XlsTableStyles::try_new(
         144,
         DEFAULT_TABLE_STYLE_NAME,
@@ -71,7 +71,7 @@ pub fn write_table_styles<W: Write>(writer: &mut W) -> XlsResult<()> {
     Ok(())
 }
 
-pub fn write_differential_formats<W: Write>(
+pub(crate) fn write_differential_formats<W: Write>(
     writer: &mut W,
     differential_formats: &[crate::XlsDifferentialFormat],
 ) -> XlsResult<()> {
@@ -81,7 +81,7 @@ pub fn write_differential_formats<W: Write>(
     Ok(())
 }
 
-pub fn write_custom_table_styles<W: Write>(
+pub(crate) fn write_custom_table_styles<W: Write>(
     writer: &mut W,
     styles: &crate::XlsTableStyles,
     differential_format_count: usize,
@@ -90,7 +90,7 @@ pub fn write_custom_table_styles<W: Write>(
     Ok(())
 }
 
-pub fn write_pivot_cache_sxaddl_block<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(crate) fn write_pivot_cache_sxaddl_block<W: Write>(writer: &mut W) -> XlsResult<()> {
     write_record_header(writer, SXADDL_RECORD_ID, 12)?;
     write_sxaddl_header(
         writer,
@@ -136,7 +136,7 @@ pub fn write_pivot_cache_sxaddl_block<W: Write>(writer: &mut W) -> XlsResult<()>
     Ok(())
 }
 
-pub fn write_compress_pictures<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(crate) fn write_compress_pictures<W: Write>(writer: &mut W) -> XlsResult<()> {
     write_record_header(writer, COMPRESS_PICTURES_RECORD_ID, 24)?;
     write_frt_header(writer, COMPRESS_PICTURES_RECORD_ID)?;
     writer.write_all(&COMPRESS_PICTURES_RESERVED)?;
@@ -146,13 +146,13 @@ pub fn write_compress_pictures<W: Write>(writer: &mut W) -> XlsResult<()> {
     Ok(())
 }
 
-pub fn write_compat12<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(crate) fn write_compat12<W: Write>(writer: &mut W) -> XlsResult<()> {
     write_record_header(writer, COMPAT12_RECORD_ID, 16)?;
     write_frt_header(writer, COMPAT12_RECORD_ID)?;
     writer.write_all(&COMPAT12_RESERVED)?;
     Ok(())
 }
 
-pub fn sxdbex_creation_timestamp_bytes() -> [u8; 8] {
+pub(crate) fn sxdbex_creation_timestamp_bytes() -> [u8; 8] {
     SXDBEX_CREATION_TIMESTAMP
 }

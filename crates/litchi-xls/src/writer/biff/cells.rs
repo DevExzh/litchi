@@ -30,7 +30,7 @@ fn encode_rk(value: f64) -> Option<u32> {
 /// * `row` - Row index (0-based)
 /// * `col` - Column index (0-based)
 /// * `value` - Cell value (f64)
-pub fn write_number<W: Write>(
+pub(crate) fn write_number<W: Write>(
     writer: &mut W,
     row: u32,
     col: u16,
@@ -59,7 +59,7 @@ pub fn write_number<W: Write>(
     Ok(())
 }
 
-pub fn write_mulrk<W: Write>(
+pub(crate) fn write_mulrk<W: Write>(
     writer: &mut W,
     row: u32,
     first_col: u16,
@@ -115,7 +115,7 @@ pub fn write_mulrk<W: Write>(
 /// * `row` - Row index (0-based)
 /// * `col` - Column index (0-based)
 /// * `sst_index` - Index into shared string table
-pub fn write_labelsst<W: Write>(
+pub(crate) fn write_labelsst<W: Write>(
     writer: &mut W,
     row: u32,
     col: u16,
@@ -155,7 +155,7 @@ pub fn write_labelsst<W: Write>(
 /// * `row` - Row index (0-based)
 /// * `col` - Column index (0-based)
 /// * `value` - Boolean value
-pub fn write_boolerr<W: Write>(
+pub(crate) fn write_boolerr<W: Write>(
     writer: &mut W,
     row: u32,
     col: u16,
@@ -188,7 +188,7 @@ pub fn write_boolerr<W: Write>(
 /// Write a BIFF8 FORMULA record with an empty cached result.
 ///
 /// The `fAlwaysCalc` flag requests recalculation when Excel opens the file.
-pub fn write_formula<W: Write>(
+pub(crate) fn write_formula<W: Write>(
     writer: &mut W,
     row: u32,
     col: u16,
@@ -234,7 +234,7 @@ pub fn write_formula<W: Write>(
 /// Write a TABLE record (MS-XLS 2.4.319) for a what-if data table.
 ///
 /// Record type: 0x0236
-pub fn write_table<W: Write>(writer: &mut W, table: &crate::XlsDataTable) -> XlsResult<()> {
+pub(crate) fn write_table<W: Write>(writer: &mut W, table: &crate::XlsDataTable) -> XlsResult<()> {
     let payload = table.to_payload();
     write_record_header(writer, 0x0236, payload.len() as u16)?;
     writer.write_all(&payload)?;

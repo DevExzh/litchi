@@ -51,7 +51,7 @@ fn write_xfext<W: Write>(writer: &mut W, xf_index: u16) -> XlsResult<()> {
     Ok(())
 }
 
-pub fn write_pivot_xfext_block<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(crate) fn write_pivot_xfext_block<W: Write>(writer: &mut W) -> XlsResult<()> {
     write_xfcrc(writer)?;
 
     for xf_index in [64u16, 65u16, 66u16] {
