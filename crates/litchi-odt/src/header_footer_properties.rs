@@ -40,8 +40,8 @@ fn ns(result: ResolveResult<'_>) -> Vec<u8> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct HeaderFooterLength(String);
-impl HeaderFooterLength {
+pub struct Length(String);
+impl Length {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         if value.is_empty() || value.len() > MAX_VALUE || value.chars().any(char::is_control) {
@@ -78,11 +78,11 @@ impl HeaderFooterLength {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum HeaderFooterColor {
+pub enum Color {
     Transparent,
     Rgb(u8, u8, u8),
 }
-impl HeaderFooterColor {
+impl Color {
     fn parse(value: &str, transparent: bool) -> Result<Self> {
         if transparent && value == "transparent" {
             return Ok(Self::Transparent);
@@ -102,7 +102,7 @@ impl HeaderFooterColor {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum HeaderFooterBorderStyle {
+pub enum BorderStyle {
     Hidden,
     Dotted,
     Dashed,
@@ -113,7 +113,7 @@ pub enum HeaderFooterBorderStyle {
     Inset,
     Outset,
 }
-impl HeaderFooterBorderStyle {
+impl BorderStyle {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "hidden" => Ok(Self::Hidden),
@@ -144,15 +144,15 @@ impl HeaderFooterBorderStyle {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum HeaderFooterBorder {
+pub enum Border {
     None,
     Line {
-        width: HeaderFooterLength,
-        style: HeaderFooterBorderStyle,
-        color: HeaderFooterColor,
+        width: Length,
+        style: BorderStyle,
+        color: Color,
     },
 }
-impl HeaderFooterBorder {
+impl Border {
     fn parse(value: &str) -> Result<Self> {
         if value == "none" {
             return Ok(Self::None);
@@ -162,9 +162,9 @@ impl HeaderFooterBorder {
             return Err(bad("border must be none or width style color"));
         }
         Ok(Self::Line {
-            width: HeaderFooterLength::nonnegative(parts[0].into(), "border width")?,
-            style: HeaderFooterBorderStyle::parse(parts[1])?,
-            color: HeaderFooterColor::parse(parts[2], false)?,
+            width: Length::nonnegative(parts[0].into(), "border width")?,
+            style: BorderStyle::parse(parts[1])?,
+            color: Color::parse(parts[2], false)?,
         })
     }
     fn xml(&self) -> String {
@@ -180,21 +180,21 @@ impl HeaderFooterBorder {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct HeaderFooterBorderLineWidth {
-    pub inner: HeaderFooterLength,
-    pub spacing: HeaderFooterLength,
-    pub outer: HeaderFooterLength,
+pub struct BorderLineWidth {
+    pub inner: Length,
+    pub spacing: Length,
+    pub outer: Length,
 }
-impl HeaderFooterBorderLineWidth {
+impl BorderLineWidth {
     fn parse(value: &str) -> Result<Self> {
         let parts: Vec<_> = value.split_ascii_whitespace().collect();
         if parts.len() != 3 {
             return Err(bad("border-line-width requires three lengths"));
         }
         Ok(Self {
-            inner: HeaderFooterLength::nonnegative(parts[0].into(), "inner border width")?,
-            spacing: HeaderFooterLength::nonnegative(parts[1].into(), "border spacing")?,
-            outer: HeaderFooterLength::nonnegative(parts[2].into(), "outer border width")?,
+            inner: Length::nonnegative(parts[0].into(), "inner border width")?,
+            spacing: Length::nonnegative(parts[1].into(), "border spacing")?,
+            outer: Length::nonnegative(parts[2].into(), "outer border width")?,
         })
     }
     fn xml(&self) -> String {
@@ -208,15 +208,15 @@ impl HeaderFooterBorderLineWidth {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum HeaderFooterShadow {
+pub enum Shadow {
     None,
     Drop {
-        color: HeaderFooterColor,
-        offset_x: HeaderFooterLength,
-        offset_y: HeaderFooterLength,
+        color: Color,
+        offset_x: Length,
+        offset_y: Length,
     },
 }
-impl HeaderFooterShadow {
+impl Shadow {
     fn parse(value: &str) -> Result<Self> {
         if value == "none" {
             return Ok(Self::None);
@@ -226,9 +226,9 @@ impl HeaderFooterShadow {
             return Err(bad("shadow must be none or color x-offset y-offset"));
         }
         Ok(Self::Drop {
-            color: HeaderFooterColor::parse(parts[0], false)?,
-            offset_x: HeaderFooterLength::new(parts[1])?,
-            offset_y: HeaderFooterLength::new(parts[2])?,
+            color: Color::parse(parts[0], false)?,
+            offset_x: Length::new(parts[1])?,
+            offset_y: Length::new(parts[2])?,
         })
     }
     fn xml(&self) -> String {
@@ -249,14 +249,14 @@ impl HeaderFooterShadow {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct HeaderFooterEdges<T> {
+pub struct Edges<T> {
     pub all: Option<T>,
     pub left: Option<T>,
     pub right: Option<T>,
     pub top: Option<T>,
     pub bottom: Option<T>,
 }
-impl<T> Default for HeaderFooterEdges<T> {
+impl<T> Default for Edges<T> {
     fn default() -> Self {
         Self {
             all: None,
@@ -269,11 +269,11 @@ impl<T> Default for HeaderFooterEdges<T> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PageHeaderFooterRegion {
+pub enum Region {
     Header,
     Footer,
 }
-impl PageHeaderFooterRegion {
+impl Region {
     fn wrapper(self) -> &'static str {
         match self {
             Self::Header => "header-style",
@@ -283,20 +283,20 @@ impl PageHeaderFooterRegion {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct HeaderFooterStyleProperties {
-    pub height: Option<HeaderFooterLength>,
-    pub min_height: Option<HeaderFooterLength>,
-    pub margins: HeaderFooterEdges<HeaderFooterLength>,
-    pub borders: HeaderFooterEdges<HeaderFooterBorder>,
-    pub border_line_widths: HeaderFooterEdges<HeaderFooterBorderLineWidth>,
-    pub padding: HeaderFooterEdges<HeaderFooterLength>,
-    pub background_color: Option<HeaderFooterColor>,
-    pub shadow: Option<HeaderFooterShadow>,
+pub struct StyleProperties {
+    pub height: Option<Length>,
+    pub min_height: Option<Length>,
+    pub margins: Edges<Length>,
+    pub borders: Edges<Border>,
+    pub border_line_widths: Edges<BorderLineWidth>,
+    pub padding: Edges<Length>,
+    pub background_color: Option<Color>,
+    pub shadow: Option<Shadow>,
     pub dynamic_spacing: Option<bool>,
     pub background_image: Option<crate::SectionBackgroundImage>,
 }
 
-impl HeaderFooterStyleProperties {
+impl StyleProperties {
     pub fn validate(&self) -> Result<()> {
         if let Some(image) = &self.background_image {
             image.validate()?;
@@ -322,17 +322,12 @@ impl HeaderFooterStyleProperties {
         write_edges(&mut xml, "fo:margin", &self.margins, |v| {
             v.as_str().to_string()
         });
-        write_edges(
-            &mut xml,
-            "fo:border",
-            &self.borders,
-            HeaderFooterBorder::xml,
-        );
+        write_edges(&mut xml, "fo:border", &self.borders, Border::xml);
         write_edges(
             &mut xml,
             "style:border-line-width",
             &self.border_line_widths,
-            HeaderFooterBorderLineWidth::xml,
+            BorderLineWidth::xml,
         );
         write_edges(&mut xml, "fo:padding", &self.padding, |v| {
             v.as_str().to_string()
@@ -359,7 +354,7 @@ impl HeaderFooterStyleProperties {
         }
         Ok(xml)
     }
-    pub fn to_region_fragment(&self, region: PageHeaderFooterRegion) -> Result<String> {
+    pub fn to_region_fragment(&self, region: Region) -> Result<String> {
         Ok(format!(
             "<style:{} xmlns:style=\"{}\">{}</style:{}>",
             region.wrapper(),
@@ -371,10 +366,10 @@ impl HeaderFooterStyleProperties {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PageLayoutHeaderFooterProperties {
+pub struct Properties {
     pub page_layout_name: String,
-    pub region: PageHeaderFooterRegion,
-    pub properties: HeaderFooterStyleProperties,
+    pub region: Region,
+    pub properties: StyleProperties,
 }
 
 fn attr(xml: &mut String, name: &str, value: &str) {
@@ -384,12 +379,7 @@ fn attr(xml: &mut String, name: &str, value: &str) {
     xml.push_str(&escape(value));
     xml.push('"');
 }
-fn write_edges<T>(
-    xml: &mut String,
-    base: &str,
-    edges: &HeaderFooterEdges<T>,
-    lexical: impl Fn(&T) -> String,
-) {
+fn write_edges<T>(xml: &mut String, base: &str, edges: &Edges<T>, lexical: impl Fn(&T) -> String) {
     if let Some(v) = &edges.all {
         attr(xml, base, &lexical(v));
     }
@@ -492,7 +482,7 @@ fn parse_edges<T>(
     namespace: &[u8],
     base: &[u8],
     parse: impl Fn(String) -> Result<T>,
-) -> Result<HeaderFooterEdges<T>> {
+) -> Result<Edges<T>> {
     let mut name = base.to_vec();
     let all = take(a, namespace, &name).map(&parse).transpose()?;
     let mut side = |suffix: &[u8]| {
@@ -501,7 +491,7 @@ fn parse_edges<T>(
         name.extend_from_slice(suffix);
         take(a, namespace, &name).map(&parse).transpose()
     };
-    Ok(HeaderFooterEdges {
+    Ok(Edges {
         all,
         left: side(b"left")?,
         right: side(b"right")?,
@@ -514,28 +504,28 @@ fn parse_properties(
     version: XmlVersion,
     element: &BytesStart<'_>,
     total: &mut usize,
-) -> Result<HeaderFooterStyleProperties> {
+) -> Result<StyleProperties> {
     let mut a = attributes(reader, version, element, total)?;
-    let p = HeaderFooterStyleProperties {
+    let p = StyleProperties {
         height: take(&mut a, SVG, b"height")
-            .map(|v| HeaderFooterLength::nonnegative(v, "svg:height"))
+            .map(|v| Length::nonnegative(v, "svg:height"))
             .transpose()?,
         min_height: take(&mut a, FO, b"min-height")
-            .map(|v| HeaderFooterLength::nonnegative(v, "fo:min-height"))
+            .map(|v| Length::nonnegative(v, "fo:min-height"))
             .transpose()?,
-        margins: parse_edges(&mut a, FO, b"margin", HeaderFooterLength::new)?,
-        borders: parse_edges(&mut a, FO, b"border", |v| HeaderFooterBorder::parse(&v))?,
+        margins: parse_edges(&mut a, FO, b"margin", Length::new)?,
+        borders: parse_edges(&mut a, FO, b"border", |v| Border::parse(&v))?,
         border_line_widths: parse_edges(&mut a, STYLE, b"border-line-width", |v| {
-            HeaderFooterBorderLineWidth::parse(&v)
+            BorderLineWidth::parse(&v)
         })?,
         padding: parse_edges(&mut a, FO, b"padding", |v| {
-            HeaderFooterLength::nonnegative(v, "padding")
+            Length::nonnegative(v, "padding")
         })?,
         background_color: take(&mut a, FO, b"background-color")
-            .map(|v| HeaderFooterColor::parse(&v, true))
+            .map(|v| Color::parse(&v, true))
             .transpose()?,
         shadow: take(&mut a, STYLE, b"shadow")
-            .map(|v| HeaderFooterShadow::parse(&v))
+            .map(|v| Shadow::parse(&v))
             .transpose()?,
         dynamic_spacing: take(&mut a, STYLE, b"dynamic-spacing")
             .map(|v| match v.as_str() {
@@ -602,9 +592,7 @@ fn element(reader: &NsReader<&[u8]>, name: quick_xml::name::QName<'_>) -> (Vec<u
     (ns(n), l.as_ref().to_vec())
 }
 
-pub fn parse_page_layout_header_footer_properties(
-    xml: &str,
-) -> Result<Vec<PageLayoutHeaderFooterProperties>> {
+pub fn parse_page_layout_header_footer_properties(xml: &str) -> Result<Vec<Properties>> {
     if xml.len() > MAX_XML {
         return Err(bad("header/footer XML exceeds size cap"));
     }
@@ -612,8 +600,8 @@ pub fn parse_page_layout_header_footer_properties(
     let mut version = XmlVersion::Implicit1_0;
     let mut stack: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
     let mut layout: Option<(usize, String)> = None;
-    let mut region: Option<(usize, PageHeaderFooterRegion)> = None;
-    let mut active: Option<(usize, HeaderFooterStyleProperties, bool)> = None;
+    let mut region: Option<(usize, Region)> = None;
+    let mut active: Option<(usize, StyleProperties, bool)> = None;
     let mut total = 0usize;
     let mut out = Vec::new();
     loop {
@@ -645,9 +633,9 @@ pub fn parse_page_layout_header_footer_properties(
                     region = Some((
                         depth,
                         if c.1 == b"header-style" {
-                            PageHeaderFooterRegion::Header
+                            Region::Header
                         } else {
-                            PageHeaderFooterRegion::Footer
+                            Region::Footer
                         },
                     ));
                 } else if region.as_ref().is_some_and(|x| depth == x.0 + 1)
@@ -730,10 +718,10 @@ pub fn parse_page_layout_header_footer_properties(
     Ok(out)
 }
 fn push_entry(
-    out: &mut Vec<PageLayoutHeaderFooterProperties>,
+    out: &mut Vec<Properties>,
     layout: &Option<(usize, String)>,
-    region: &Option<(usize, PageHeaderFooterRegion)>,
-    properties: HeaderFooterStyleProperties,
+    region: &Option<(usize, Region)>,
+    properties: StyleProperties,
 ) -> Result<()> {
     let name = layout
         .as_ref()
@@ -752,7 +740,7 @@ fn push_entry(
     {
         return Err(bad("duplicate header/footer properties for page layout"));
     }
-    out.push(PageLayoutHeaderFooterProperties {
+    out.push(Properties {
         page_layout_name: name,
         region,
         properties,
@@ -760,7 +748,7 @@ fn push_entry(
     Ok(())
 }
 
-pub(crate) fn parse_region_properties(xml: &str) -> Result<Option<HeaderFooterStyleProperties>> {
+pub(crate) fn parse_region_properties(xml: &str) -> Result<Option<StyleProperties>> {
     let wrapped = format!(
         "<office:document-styles xmlns:office=\"{}\" xmlns:style=\"{}\"><office:automatic-styles><style:page-layout style:name=\"x\">{xml}</style:page-layout></office:automatic-styles></office:document-styles>",
         String::from_utf8_lossy(OFFICE),
@@ -774,13 +762,13 @@ pub(crate) fn parse_region_properties(xml: &str) -> Result<Option<HeaderFooterSt
 
 pub(crate) fn replace_page_layout_region_properties(
     layout: &crate::PageLayout,
-    region: PageHeaderFooterRegion,
-    properties: &HeaderFooterStyleProperties,
+    region: Region,
+    properties: &StyleProperties,
 ) -> Result<String> {
     let property = properties.to_xml_fragment()?;
     let wrapper = match region {
-        PageHeaderFooterRegion::Header => layout.header_style_xml.as_deref(),
-        PageHeaderFooterRegion::Footer => layout.footer_style_xml.as_deref(),
+        Region::Header => layout.header_style_xml.as_deref(),
+        Region::Footer => layout.footer_style_xml.as_deref(),
     };
     let mut replacement = layout.xml.clone();
     if let Some(wrapper) = wrapper {
@@ -791,7 +779,7 @@ pub(crate) fn replace_page_layout_region_properties(
         replacement.replace_range(start..start + wrapper.len(), &updated);
     } else {
         let fragment = properties.to_region_fragment(region)?;
-        let insertion = if region == PageHeaderFooterRegion::Header {
+        let insertion = if region == Region::Header {
             layout
                 .footer_style_xml
                 .as_ref()
@@ -876,9 +864,7 @@ fn replace_in_wrapper(wrapper: &str, property: &str) -> Result<String> {
 }
 
 impl crate::OpenDocumentPackage {
-    pub fn page_layout_header_footer_properties(
-        &self,
-    ) -> Result<Vec<PageLayoutHeaderFooterProperties>> {
+    pub fn page_layout_header_footer_properties(&self) -> Result<Vec<Properties>> {
         self.styles_xml()?.map_or_else(
             || Ok(Vec::new()),
             |xml| parse_page_layout_header_footer_properties(&xml),
@@ -886,9 +872,7 @@ impl crate::OpenDocumentPackage {
     }
 }
 impl crate::FlatOpenDocument {
-    pub fn page_layout_header_footer_properties(
-        &self,
-    ) -> Result<Vec<PageLayoutHeaderFooterProperties>> {
+    pub fn page_layout_header_footer_properties(&self) -> Result<Vec<Properties>> {
         parse_page_layout_header_footer_properties(self.xml())
     }
 }
