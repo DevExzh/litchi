@@ -6090,6 +6090,20 @@ payloads. Formatting, diff, and scoped lint checks are the applicable gates for
 this structural/performance slice; no additional native application run was
 needed because serialized chart semantics were unchanged.
 
+The reference-line graph preservation follow-up is now implemented in the IWA
+archive codec. `set_reference_lines` performs a bounded, occurrence-aware
+raw-wire merge for graph, axis, item, style, sparse-reference, `Reference`,
+UUID, and axis-ID messages; it preserves unknown fields in their existing
+positions and recursively validates every modeled known field before read,
+update, or removal. The staged opaque-field candidate is validated before
+assignment, and malformed deep-node updates remain atomic. The focused archive
+module passed 10 tests, the reference-line semantic filter passed 15 tests,
+the full IWA library passed 1,513 tests, and both affected crates passed
+`-D warnings` clippy. Native Pages and Keynote opened the generated chart
+fixture without repair prompts; Numbers rejected the source-generated chart as
+damaged, which remains the tracked Numbers chart-fixture limitation above.
+Pages, Numbers, and Keynote were quit after inspection.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

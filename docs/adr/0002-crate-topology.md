@@ -212,7 +212,10 @@ two visibility flags; and `Kind::Unsupported` can only be created through a
 checked lossless constructor. The public IWA path is the focused
 `charts::reference_line` module. IWA retains generated protobuf schemas,
 extension framing, graph/object ownership, and package transactions, including
-pre-decode graph budgets and wire-preserving nested custom-value patches.
+pre-decode graph budgets and wire-preserving nested custom-value patches. Typed
+graph updates use an occurrence-aware raw-wire merge that preserves unknown
+fields inside graph, axis, item, style, sparse-reference, reference, and UUID
+messages instead of rebuilding those messages through Prost.
 The former flat `ChartReferenceLine*` model is removed rather than kept as an
 alias.
 The existing `litchi-iwa` package reader temporarily consumes these leaf values

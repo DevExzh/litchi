@@ -28,8 +28,10 @@ IWA reference-line edits apply the same boundary at the archive adapter:
 malformed existing line payloads are rejected before patching, recognized
 fields are checked for canonical framing, nested custom-value unknown fields
 survive scalar replacement, and repeated graph nodes are bounded before
-generated protobuf materialization. Public format editors publish only after
-their staged CRUD operation and typed readback succeed.
+generated protobuf materialization. Typed graph updates preserve unknown raw
+fields at every modeled reference-line nesting level and validate a staged
+opaque-field candidate before publishing it. Public format editors publish
+only after their staged CRUD operation and typed readback succeed.
 
 ## Identity and selection
 

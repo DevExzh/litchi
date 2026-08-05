@@ -74,6 +74,13 @@ These are allocation-shape and safety improvements; representative allocation,
 latency, and throughput measurements remain governed by the measurement
 contract above and are not claimed by this slice.
 
+Reference-line graph updates likewise avoid a full generated-Prost round-trip:
+bounded raw fields are merged by repeated-field occurrence and only recognized
+values are replaced, so unknown graph bytes are copied once at their original
+nesting positions. The candidate field collection is validated before
+publication. This reduces avoidable graph allocations while remaining a
+structural optimization rather than a measured throughput claim.
+
 Instrumentation is an opt-in runtime-neutral observer with optional tracing and
 profiling adapters. It never records document content, credentials, or sensitive
 paths by default.
