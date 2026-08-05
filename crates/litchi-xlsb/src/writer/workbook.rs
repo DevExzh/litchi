@@ -1484,8 +1484,8 @@ mod tests {
     use super::*;
     use crate::calc::{Delta, Mode, Opts, Threads};
     use crate::conditional_formatting::{
-        Bar, Bar14, Color, Formatting, IconSet, RecordKind, Rule, RuleMetadata, RuleType, Scale,
-        Value,
+        Bar, Bar14, Color, Formatting, IconSet, RecordKind as ConditionalRecordKind, Rule,
+        RuleMetadata, RuleType, Scale, Value,
     };
     use crate::named_ranges::area3d_formula;
     use crate::package::SharedStringRun;
@@ -2384,7 +2384,7 @@ mod tests {
         let mut sheet = MutableWorksheet::new("Formatted");
         sheet.set_cell(0, 0, 5);
         let mut formatting = Formatting::new(vec!["A1:A10".to_string()]);
-        formatting.record_kind = RecordKind::Extension14;
+        formatting.record_kind = ConditionalRecordKind::Extension14;
 
         let mut rule = Rule::new(RuleType::DataBar, 1);
         rule.extension14 = Some(RuleMetadata {
@@ -2414,7 +2414,7 @@ mod tests {
         let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
         let worksheet = reader.worksheet(0).unwrap();
         let formatting = &worksheet.conditional_formattings()[0];
-        assert_eq!(formatting.record_kind, RecordKind::Extension14);
+        assert_eq!(formatting.record_kind, ConditionalRecordKind::Extension14);
         let rule = &formatting.rules[0];
         assert_eq!(rule.extension14.unwrap().unused, 0xCAFE_BABE);
         let bar = rule.data_bar14.as_ref().unwrap();
@@ -2445,7 +2445,7 @@ mod tests {
         sheet.add_conditional_formatting(classic);
 
         let mut extension = Formatting::new(vec!["A1:A10".to_string()]);
-        extension.record_kind = RecordKind::Extension14;
+        extension.record_kind = ConditionalRecordKind::Extension14;
         let mut extension_rule = Rule::new(RuleType::DataBar, 0);
         extension_rule.template = 0;
         extension_rule.extension14 = Some(RuleMetadata {

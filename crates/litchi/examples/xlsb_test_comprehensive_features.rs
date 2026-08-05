@@ -15,7 +15,7 @@
 use litchi::ooxml::xlsb::conditional_formatting::{
     CfRuleType, Cfvo, ColorScale, ConditionalFormatting, ConditionalFormattingRule,
 };
-use litchi::ooxml::xlsb::data_validation::DataValidation;
+use litchi::ooxml::xlsb::data_validation::Validation;
 use litchi::ooxml::xlsb::hyperlinks::Hyperlink;
 use litchi::ooxml::xlsb::merged_cells::MergedCell;
 use litchi::ooxml::xlsb::named_ranges::{NamedRange, create_area3d_formula};
@@ -88,7 +88,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // === DATA VALIDATION ===
     // Status column must be from predefined list
-    let mut status_validation = DataValidation::new(3, "E4:E8".to_string()); // Type 3 = list
+    let mut status_validation = Validation::new(3, "E4:E8".to_string()); // Type 3 = list
     status_validation.operator = 0;
     status_validation.formula1 = Some("\"Excellent,Good,Needs Improvement,Poor\"".to_string());
     status_validation.allow_blank = false;
@@ -100,7 +100,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     sheet.add_data_validation(status_validation);
 
     // Sales must be positive numbers
-    let mut sales_validation = DataValidation::new(2, "B4:B8".to_string()); // Type 2 = decimal
+    let mut sales_validation = Validation::new(2, "B4:B8".to_string()); // Type 2 = decimal
     sales_validation.operator = 3; // Greater than
     sales_validation.formula1 = Some("0".to_string());
     sales_validation.allow_blank = false;

@@ -8,7 +8,7 @@
 //! cargo run --example xlsb_test_data_validation --features ooxml --no-default-features
 //! ```
 
-use litchi::ooxml::xlsb::data_validation::DataValidation;
+use litchi::ooxml::xlsb::data_validation::Validation;
 use litchi::ooxml::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use litchi::sheet::CellValue;
 use std::fs::File;
@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     sheet.set_cell(1, 3, CellValue::Float(85.5));
 
     // Data Validation 1: Age must be whole number between 18 and 65
-    let mut age_validation = DataValidation::new(1, "A2:A100".to_string()); // Type 1 = whole number
+    let mut age_validation = Validation::new(1, "A2:A100".to_string()); // Type 1 = whole number
     age_validation.operator = 0; // Between (MS-XLSB 2.5.15)
     age_validation.formula1 = Some("18".to_string());
     age_validation.formula2 = Some("65".to_string());
@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     sheet.add_data_validation(age_validation);
 
     // Data Validation 2: Email must contain @ (custom text validation)
-    let mut email_validation = DataValidation::new(7, "B2:B100".to_string()); // Type 7 = custom
+    let mut email_validation = Validation::new(7, "B2:B100".to_string()); // Type 7 = custom
     email_validation.operator = 0; // No operator for custom
     email_validation.formula1 = Some("ISNUMBER(FIND(\"@\",B2))".to_string());
     email_validation.allow_blank = true;
@@ -63,7 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     sheet.add_data_validation(email_validation);
 
     // Data Validation 3: Priority must be from a list
-    let mut priority_validation = DataValidation::new(3, "C2:C100".to_string()); // Type 3 = list
+    let mut priority_validation = Validation::new(3, "C2:C100".to_string()); // Type 3 = list
     priority_validation.operator = 0;
     priority_validation.formula1 = Some("\"Low,Medium,High,Critical\"".to_string());
     priority_validation.allow_blank = false;
@@ -76,7 +76,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     sheet.add_data_validation(priority_validation);
 
     // Data Validation 4: Score must be decimal between 0 and 100
-    let mut score_validation = DataValidation::new(2, "D2:D100".to_string()); // Type 2 = decimal
+    let mut score_validation = Validation::new(2, "D2:D100".to_string()); // Type 2 = decimal
     score_validation.operator = 0; // Between
     score_validation.formula1 = Some("0".to_string());
     score_validation.formula2 = Some("100".to_string());
