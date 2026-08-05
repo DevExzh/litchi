@@ -3,6 +3,8 @@
 //! This module provides integration between the XLSX worksheet API and the
 //! comprehensive chart implementation in `litchi_drawingml::chart`.
 
+#![allow(dead_code)]
+
 use crate::error::{Error, Result};
 use litchi_drawingml::chart::{
     axis::{Axis, CategoryAxis, ValueAxis},

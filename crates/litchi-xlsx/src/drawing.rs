@@ -4,6 +4,8 @@
 //! (chartsheets) are understood; absolute anchors record a zero placeholder
 //! anchor because they carry EMU positions rather than cell markers.
 
+#![allow(dead_code)]
+
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};

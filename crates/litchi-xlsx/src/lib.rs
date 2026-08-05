@@ -11,6 +11,7 @@ pub mod calculation_properties;
 pub mod cell;
 pub mod cell_watches;
 pub mod chain;
+pub mod chart;
 pub mod chart_sheet;
 pub mod color;
 pub mod column;
@@ -19,6 +20,7 @@ pub mod connections;
 pub mod custom_data;
 pub mod data_consolidation;
 pub mod data_validation;
+pub mod drawing;
 pub mod edit;
 mod error;
 pub mod external_links;
@@ -35,6 +37,7 @@ pub mod page_margins;
 pub mod page_setup;
 pub mod phonetic_properties;
 pub mod pivot;
+pub mod pivot_chart;
 pub mod print_options;
 pub mod query_table;
 pub mod raw;
@@ -44,6 +47,8 @@ pub mod sheet;
 pub mod sheet_calculation_properties;
 pub mod sheet_protection;
 pub mod sheet_view;
+pub mod shape_geometry;
+pub mod shapes;
 pub mod slicer_cache;
 pub mod sort;
 pub mod style;
@@ -77,10 +82,6 @@ pub use cell_watches::{
     CellWatchConformance, CellWatchReference, CellWatches, parse_cell_watches, write_cell_watches,
 };
 pub use chart_sheet::{parse_chartsheet, validate_chartsheet, write_chartsheet};
-// Drawing, chart, shape-geometry, and pivot-chart owners are layered under
-// the chartsheet package boundary while remaining available through the
-// focused XLSX facade.
-pub use chart_sheet::{chart, drawing, pivot_chart, shape_geometry, shapes};
 pub use color::{ParseRgbError, Rgb};
 pub use column::{Column, Columns, Width, WidthAt};
 pub use conditional_formatting::{

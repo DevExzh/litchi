@@ -15,6 +15,8 @@
 //! Everything here is read-only and inert: no pivot refresh, no cache
 //! rebuild, and no rendering.
 
+#![allow(dead_code)]
+
 use crate::error::{Error, Result};
 use super::drawing::parse_drawing_xml;
 use crate::raw::parse_catalog;

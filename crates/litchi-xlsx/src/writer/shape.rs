@@ -25,9 +25,9 @@ use std::fmt::Write as _;
 use litchi_core::xml::escape::escape_xml;
 use litchi_drawingml::geom::Preset;
 
-use crate::chart_sheet::shape_geometry::write::write_custom_geometry;
-use crate::chart_sheet::shape_geometry::{CustomGeometry, validate_custom_geometry};
-use crate::chart_sheet::shapes::{
+use crate::shape_geometry::write::write_custom_geometry;
+use crate::shape_geometry::{CustomGeometry, validate_custom_geometry};
+use crate::shapes::{
     BodyProperties, CellMarker, Columns, EditAs, EmuExtent, EmuOffset, Geometry, GroupTransform,
     Paragraph, Run, Anchor, Autofit, Direction, VerticalAnchor,
     Wrap,
