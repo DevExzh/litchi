@@ -3,11 +3,13 @@
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{Namespace, NamespaceResolver, PrefixDeclaration, ResolveResult};
+use quick_xml::name::{
+    Namespace as XmlNamespace, NamespaceResolver, PrefixDeclaration, ResolveResult,
+};
 use quick_xml::reader::NsReader;
 use std::collections::HashSet;
 
-use super::FormulaNamespace;
+use super::names::formula;
 
 const TABLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
@@ -208,7 +210,7 @@ pub struct ContentValidation {
     pub name: String,
     pub condition: Option<String>,
     /// Namespace binding used by a qualified validation condition.
-    pub formula_namespace: Option<FormulaNamespace>,
+    pub formula_namespace: Option<formula::Namespace>,
     pub base_cell_address: Option<String>,
     pub allow_empty_cell: Option<bool>,
     pub display_list: Option<ValidationDisplayList>,
@@ -261,7 +263,7 @@ impl ContentValidation {
                     .to_string(),
             )
         })?;
-        let namespace = FormulaNamespace {
+        let namespace = formula::Namespace {
             prefix: prefix.to_string(),
             uri: namespace_uri.into(),
         };
@@ -1213,7 +1215,7 @@ impl ValidationMessageBuilder {
 }
 
 fn is_namespace(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
-    matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == expected)
+    matches!(namespace, ResolveResult::Bound(XmlNamespace(value)) if *value == expected)
 }
 
 fn required_attribute(
@@ -1328,13 +1330,13 @@ fn condition_prefix(condition: &str) -> Option<&str> {
     }
 }
 
-fn default_formula_namespace(condition: &str) -> Option<FormulaNamespace> {
+fn default_formula_namespace(condition: &str) -> Option<formula::Namespace> {
     match condition_prefix(condition) {
-        Some("of") => Some(FormulaNamespace {
+        Some("of") => Some(formula::Namespace {
             prefix: "of".to_string(),
             uri: OPENFORMULA_NAMESPACE.to_string(),
         }),
-        Some("oooc") => Some(FormulaNamespace {
+        Some("oooc") => Some(formula::Namespace {
             prefix: "oooc".to_string(),
             uri: OPENOFFICE_CALC_NAMESPACE.to_string(),
         }),
@@ -1345,7 +1347,7 @@ fn default_formula_namespace(condition: &str) -> Option<FormulaNamespace> {
 fn formula_namespace(
     resolver: &NamespaceResolver,
     condition: &str,
-) -> Result<Option<FormulaNamespace>> {
+) -> Result<Option<formula::Namespace>> {
     let Some(prefix) = condition_prefix(condition) else {
         return Ok(None);
     };
@@ -1358,7 +1360,7 @@ fn formula_namespace(
                     "validation formula namespace for prefix '{prefix}' is not UTF-8"
                 ))
             })?;
-            return Ok(Some(FormulaNamespace {
+            return Ok(Some(formula::Namespace {
                 prefix: prefix.to_string(),
                 uri,
             }));
@@ -1407,7 +1409,7 @@ mod tests {
         assert_eq!(parsed[0].name, "whole");
         assert_eq!(
             parsed[0].formula_namespace,
-            Some(FormulaNamespace {
+            Some(formula::Namespace {
                 prefix: "f".to_string(),
                 uri: OPENFORMULA_NAMESPACE.to_string(),
             })

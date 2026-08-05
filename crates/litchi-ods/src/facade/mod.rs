@@ -4,15 +4,13 @@ use litchi_core::Result;
 use std::path::Path;
 
 pub use crate::authoring::{Builder, MutableSpreadsheet};
-pub use crate::model::{
-    NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, NamedRangeUsage,
-};
+use crate::model::names::{Definition, Expression, Range, Scope};
 pub use litchi_odf_common::rdf::{Graph, Object, Subject, Triple};
 
 /// Immutable ODS document facade.
 pub struct Spreadsheet {
     package: crate::package::Package,
-    named_definitions: Vec<NamedDefinition>,
+    definitions: Vec<Definition>,
 }
 
 impl Spreadsheet {
@@ -27,10 +25,10 @@ impl Spreadsheet {
     }
 
     fn from_package(package: crate::package::Package) -> Result<Self> {
-        let named_definitions = package.named_definitions()?;
+        let definitions = package.definitions()?;
         Ok(Self {
             package,
-            named_definitions,
+            definitions,
         })
     }
 
@@ -47,70 +45,65 @@ impl Spreadsheet {
     }
 
     /// Return all global and sheet-local named definitions in document order.
-    pub fn named_definitions(&self) -> &[NamedDefinition] {
-        &self.named_definitions
+    pub fn definitions(&self) -> &[Definition] {
+        &self.definitions
     }
 
     /// Return named ranges in their document order.
-    pub fn named_ranges(&self) -> impl Iterator<Item = &NamedRange> {
-        self.named_definitions
+    pub fn ranges(&self) -> impl Iterator<Item = &Range> {
+        self.definitions
             .iter()
             .filter_map(|definition| match definition {
-                NamedDefinition::Range(range) => Some(range),
-                NamedDefinition::Expression(_) => None,
+                Definition::Range(range) => Some(range),
+                Definition::Expression(_) => None,
             })
     }
 
     /// Return named expressions in their document order.
-    pub fn named_expressions(&self) -> impl Iterator<Item = &NamedExpression> {
-        self.named_definitions
+    pub fn expressions(&self) -> impl Iterator<Item = &Expression> {
+        self.definitions
             .iter()
             .filter_map(|definition| match definition {
-                NamedDefinition::Range(_) => None,
-                NamedDefinition::Expression(expression) => Some(expression),
+                Definition::Range(_) => None,
+                Definition::Expression(expression) => Some(expression),
             })
     }
 
     /// Find a named range by its exact name and visibility scope.
-    pub fn named_range(&self, name: &str, scope: &NamedDefinitionScope) -> Option<&NamedRange> {
-        self.named_ranges()
+    pub fn range(&self, name: &str, scope: &Scope) -> Option<&Range> {
+        self.ranges()
             .find(|range| range.name == name && &range.scope == scope)
     }
 
     /// Find a named expression by its exact name and visibility scope.
-    pub fn named_expression(
-        &self,
-        name: &str,
-        scope: &NamedDefinitionScope,
-    ) -> Option<&NamedExpression> {
-        self.named_expressions()
+    pub fn expression(&self, name: &str, scope: &Scope) -> Option<&Expression> {
+        self.expressions()
             .find(|expression| expression.name == name && &expression.scope == scope)
     }
 
     /// Atomically append a validated named range.
-    pub fn add_named_range(&mut self, range: NamedRange) -> Result<()> {
-        self.add_named_definition(range.into())
+    pub fn add_range(&mut self, range: Range) -> Result<()> {
+        self.add_definition(range.into())
     }
 
     /// Atomically append a validated named expression.
-    pub fn add_named_expression(&mut self, expression: NamedExpression) -> Result<()> {
-        self.add_named_definition(expression.into())
+    pub fn add_expression(&mut self, expression: Expression) -> Result<()> {
+        self.add_definition(expression.into())
     }
 
     /// Atomically append a validated named definition while preserving catalog order.
-    pub fn add_named_definition(&mut self, definition: NamedDefinition) -> Result<()> {
-        let mut candidate = self.named_definitions.clone();
+    pub fn add_definition(&mut self, definition: Definition) -> Result<()> {
+        let mut candidate = self.definitions.clone();
         candidate.push(definition);
-        self.set_named_definitions(candidate)
+        self.set_definitions(candidate)
     }
 
     /// Atomically replace the complete ordered named-definition catalog.
-    pub fn set_named_definitions(&mut self, definitions: Vec<NamedDefinition>) -> Result<()> {
-        let updated =
-            crate::codec::named_expression::replace(self.package.content_xml(), &definitions)?;
+    pub fn set_definitions(&mut self, definitions: Vec<Definition>) -> Result<()> {
+        let updated = crate::codec::names::replace(self.package.content_xml(), &definitions)?;
         let package = self.package.replace_content_xml(&updated)?;
         self.package = package;
-        self.named_definitions = definitions;
+        self.definitions = definitions;
         Ok(())
     }
 

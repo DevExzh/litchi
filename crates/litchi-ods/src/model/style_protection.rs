@@ -1,11 +1,11 @@
 //! Resolution of ODF table-cell protection styles.
 
-use super::FormulaNamespace;
+use super::names::formula;
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
     events::{BytesStart, Event},
-    name::{Namespace, NamespaceResolver, QName, ResolveResult},
+    name::{Namespace as XmlNamespace, NamespaceResolver, QName, ResolveResult},
     reader::NsReader,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -36,7 +36,7 @@ pub struct ConditionalCellStyleRule {
     /// The decoded condition text. It is never evaluated by litchi.
     pub condition: String,
     /// Namespace bound to a condition prefix, when the condition is qualified.
-    pub formula_namespace: Option<FormulaNamespace>,
+    pub formula_namespace: Option<formula::Namespace>,
     /// Name of the common table-cell style referenced by the rule.
     pub apply_style_name: String,
     /// Optional lexical base cell address for relative formula references.
@@ -72,7 +72,7 @@ impl ConditionalCellStyleRule {
     }
 
     /// Bind the lexical condition prefix to a namespace URI.
-    pub fn with_formula_namespace(mut self, namespace: FormulaNamespace) -> Self {
+    pub fn with_formula_namespace(mut self, namespace: formula::Namespace) -> Self {
         self.formula_namespace = Some(namespace);
         self
     }
@@ -1513,7 +1513,7 @@ fn check_conditional_attribute_size(name: &str, value: &str) -> Result<()> {
 fn condition_formula_namespace(
     resolver: &NamespaceResolver,
     condition: &str,
-) -> Result<Option<FormulaNamespace>> {
+) -> Result<Option<formula::Namespace>> {
     let Some((prefix, _)) = condition.split_once(':') else {
         return Ok(None);
     };
@@ -1528,7 +1528,7 @@ fn condition_formula_namespace(
         return Ok(None);
     }
     let (namespace, _) = resolver.resolve_attribute(QName(condition.as_bytes()));
-    let ResolveResult::Bound(Namespace(uri)) = namespace else {
+    let ResolveResult::Bound(XmlNamespace(uri)) = namespace else {
         return Err(Error::InvalidFormat(format!(
             "conditional style condition uses unbound namespace prefix '{prefix}'"
         )));
@@ -1536,7 +1536,7 @@ fn condition_formula_namespace(
     let uri = String::from_utf8(uri.to_vec()).map_err(|_| {
         Error::InvalidFormat("conditional style namespace URI is not valid UTF-8".to_string())
     })?;
-    Ok(Some(FormulaNamespace {
+    Ok(Some(formula::Namespace {
         prefix: prefix.to_string(),
         uri,
     }))
@@ -1574,7 +1574,7 @@ fn optional_attribute(
 }
 
 fn is_namespace(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
-    matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == expected)
+    matches!(namespace, ResolveResult::Bound(XmlNamespace(value)) if *value == expected)
 }
 
 #[cfg(test)]
@@ -1592,7 +1592,7 @@ mod tests {
             "new&style",
             vec![
                 ConditionalCellStyleRule::new("x:test()<2", "Red").with_formula_namespace(
-                    FormulaNamespace {
+                    formula::Namespace {
                         prefix: "x".to_string(),
                         uri: "urn:example:formula".to_string(),
                     },
@@ -1703,7 +1703,7 @@ mod tests {
         );
         assert_eq!(
             style.rules[1].formula_namespace,
-            Some(FormulaNamespace {
+            Some(formula::Namespace {
                 prefix: "f".to_string(),
                 uri: "urn:example:formula".to_string(),
             })

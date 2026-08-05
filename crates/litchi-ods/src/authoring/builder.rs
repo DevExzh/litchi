@@ -1,4 +1,4 @@
-use crate::model::{NamedDefinition, NamedExpression, NamedRange};
+use crate::model::names::{Definition, Expression, Range};
 use litchi_core::Result;
 use litchi_odf_common::core::PackageWriter;
 
@@ -8,7 +8,7 @@ const MIMETYPE: &str = "application/vnd.oasis.opendocument.spreadsheet";
 #[derive(Clone, Debug)]
 pub struct Builder {
     content_xml: String,
-    named_definitions: Vec<NamedDefinition>,
+    definitions: Vec<Definition>,
 }
 
 impl Default for Builder {
@@ -21,7 +21,7 @@ impl Builder {
     pub fn new() -> Self {
         Self {
             content_xml: empty_content().to_owned(),
-            named_definitions: Vec::new(),
+            definitions: Vec::new(),
         }
     }
 
@@ -31,34 +31,34 @@ impl Builder {
     }
 
     /// Return authored named definitions in their insertion order.
-    pub fn named_definitions(&self) -> &[NamedDefinition] {
-        &self.named_definitions
+    pub fn definitions(&self) -> &[Definition] {
+        &self.definitions
     }
 
     /// Append a validated named range to the builder.
-    pub fn add_named_range(&mut self, range: NamedRange) -> Result<&mut Self> {
-        self.add_named_definition(range.into())
+    pub fn add_range(&mut self, range: Range) -> Result<&mut Self> {
+        self.add_definition(range.into())
     }
 
     /// Append a validated named expression to the builder.
-    pub fn add_named_expression(&mut self, expression: NamedExpression) -> Result<&mut Self> {
-        self.add_named_definition(expression.into())
+    pub fn add_expression(&mut self, expression: Expression) -> Result<&mut Self> {
+        self.add_definition(expression.into())
     }
 
     /// Append a named definition while preserving authored order.
-    pub fn add_named_definition(&mut self, definition: NamedDefinition) -> Result<&mut Self> {
-        let mut candidate = self.named_definitions.clone();
+    pub fn add_definition(&mut self, definition: Definition) -> Result<&mut Self> {
+        let mut candidate = self.definitions.clone();
         candidate.push(definition);
-        crate::model::named_expression::validate_named_definition_collection(&candidate)?;
-        self.named_definitions = candidate;
+        crate::model::names::validate_collection(&candidate)?;
+        self.definitions = candidate;
         Ok(self)
     }
 
     pub fn build(self) -> Result<Vec<u8>> {
-        let content_xml = if self.named_definitions.is_empty() {
+        let content_xml = if self.definitions.is_empty() {
             self.content_xml
         } else {
-            crate::codec::named_expression::replace(&self.content_xml, &self.named_definitions)?
+            crate::codec::names::replace(&self.content_xml, &self.definitions)?
         };
         let mut writer = PackageWriter::new();
         writer.set_mimetype(MIMETYPE)?;

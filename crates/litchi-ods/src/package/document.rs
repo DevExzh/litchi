@@ -2,7 +2,7 @@ use litchi_core::Result;
 use litchi_odf_common::core::{FamilyPackage, OwnedPackage};
 use std::path::Path;
 
-use crate::model::NamedDefinition;
+use crate::model::names::Definition;
 
 const MIMETYPE: &str = "application/vnd.oasis.opendocument.spreadsheet";
 const BODY_MARKER: &str = "<office:spreadsheet";
@@ -32,8 +32,8 @@ impl Package {
     }
 
     /// Read the ordered named-definition catalog from `content.xml`.
-    pub fn named_definitions(&self) -> Result<Vec<NamedDefinition>> {
-        crate::codec::named_expression::parse(self.content_xml())
+    pub fn definitions(&self) -> Result<Vec<Definition>> {
+        crate::codec::names::parse(self.content_xml())
     }
 
     /// Rebuild this package with a replacement `content.xml`.

@@ -2,9 +2,10 @@
 
 use crate::{
     Spreadsheet,
-    model::{NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Triple},
+    model::names::{Definition, Expression, Range, Scope},
 };
 use litchi_core::Result;
+use litchi_odf_common::rdf::Triple;
 use std::path::Path;
 
 /// Mutable ODS snapshot.
@@ -33,42 +34,38 @@ impl MutableSpreadsheet {
     }
 
     /// Return the ordered named-definition catalog of the edited snapshot.
-    pub fn named_definitions(&self) -> &[NamedDefinition] {
-        self.spreadsheet.named_definitions()
+    pub fn definitions(&self) -> &[Definition] {
+        self.spreadsheet.definitions()
     }
 
     /// Append a validated named range atomically.
-    pub fn add_named_range(&mut self, range: NamedRange) -> Result<()> {
-        self.spreadsheet.add_named_range(range)
+    pub fn add_range(&mut self, range: Range) -> Result<()> {
+        self.spreadsheet.add_range(range)
     }
 
     /// Append a validated named expression atomically.
-    pub fn add_named_expression(&mut self, expression: NamedExpression) -> Result<()> {
-        self.spreadsheet.add_named_expression(expression)
+    pub fn add_expression(&mut self, expression: Expression) -> Result<()> {
+        self.spreadsheet.add_expression(expression)
     }
 
     /// Append a validated named definition atomically.
-    pub fn add_named_definition(&mut self, definition: NamedDefinition) -> Result<()> {
-        self.spreadsheet.add_named_definition(definition)
+    pub fn add_definition(&mut self, definition: Definition) -> Result<()> {
+        self.spreadsheet.add_definition(definition)
     }
 
     /// Replace the complete ordered named-definition catalog atomically.
-    pub fn set_named_definitions(&mut self, definitions: Vec<NamedDefinition>) -> Result<()> {
-        self.spreadsheet.set_named_definitions(definitions)
+    pub fn set_definitions(&mut self, definitions: Vec<Definition>) -> Result<()> {
+        self.spreadsheet.set_definitions(definitions)
     }
 
     /// Find a named range in the current snapshot.
-    pub fn named_range(&self, name: &str, scope: &NamedDefinitionScope) -> Option<&NamedRange> {
-        self.spreadsheet.named_range(name, scope)
+    pub fn range(&self, name: &str, scope: &Scope) -> Option<&Range> {
+        self.spreadsheet.range(name, scope)
     }
 
     /// Find a named expression in the current snapshot.
-    pub fn named_expression(
-        &self,
-        name: &str,
-        scope: &NamedDefinitionScope,
-    ) -> Option<&NamedExpression> {
-        self.spreadsheet.named_expression(name, scope)
+    pub fn expression(&self, name: &str, scope: &Scope) -> Option<&Expression> {
+        self.spreadsheet.expression(name, scope)
     }
 
     pub fn add_rdf_graph(&mut self, path: Option<&str>, triples: &[Triple]) -> Result<String> {

@@ -17,14 +17,14 @@ const MAX_NAMED_AGGREGATE_BYTES: usize = 16 * 1_048_576;
 
 /// Scope in which a named range or expression is visible.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum NamedDefinitionScope {
+pub enum Scope {
     /// The definition is visible throughout the spreadsheet.
     Global,
     /// The definition is local to the named sheet.
     Sheet(String),
 }
 
-impl NamedDefinitionScope {
+impl Scope {
     /// Construct a sheet-local scope.
     pub fn sheet(name: impl Into<String>) -> Self {
         Self::Sheet(name.into())
@@ -41,7 +41,7 @@ impl NamedDefinitionScope {
 
 /// A special use declared by `table:range-usable-as`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum NamedRangeUsage {
+pub enum Usage {
     /// The range can be used as a print range.
     PrintRange,
     /// The range can be used as filter criteria.
@@ -52,7 +52,7 @@ pub enum NamedRangeUsage {
     RepeatColumn,
 }
 
-impl NamedRangeUsage {
+impl Usage {
     /// The ODF token used in `table:range-usable-as`.
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -78,7 +78,7 @@ impl NamedRangeUsage {
 
 /// A named cell range (`table:named-range`).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NamedRange {
+pub struct Range {
     /// Name by which formulas can refer to the range.
     pub name: String,
     /// ODF cell-range address, for example `$Sheet1.$A$1:.$B$5`.
@@ -86,17 +86,17 @@ pub struct NamedRange {
     /// Optional base cell used to resolve relative addresses.
     pub base_cell_address: Option<String>,
     /// Special uses permitted for this range.
-    pub usable_as: Vec<NamedRangeUsage>,
+    pub usable_as: Vec<Usage>,
     /// Visibility of the definition.
-    pub scope: NamedDefinitionScope,
+    pub scope: Scope,
 }
 
-impl NamedRange {
+impl Range {
     /// Create a named range with no special usage or base cell.
     pub fn new(
         name: impl Into<String>,
         cell_range_address: impl Into<String>,
-        scope: NamedDefinitionScope,
+        scope: Scope,
     ) -> Result<Self> {
         let range = Self {
             name: name.into(),
@@ -117,7 +117,7 @@ impl NamedRange {
     }
 
     /// Add a special use, ignoring a duplicate use already present.
-    pub fn with_usage(mut self, usage: NamedRangeUsage) -> Self {
+    pub fn with_usage(mut self, usage: Usage) -> Self {
         if !self.usable_as.contains(&usage) {
             self.usable_as.push(usage);
         }
@@ -166,7 +166,7 @@ impl NamedRange {
 
 /// A named OpenFormula expression (`table:named-expression`).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NamedExpression {
+pub struct Expression {
     /// Name by which formulas can refer to the expression.
     pub name: String,
     /// The OpenFormula expression, including its namespace prefix when present.
@@ -174,34 +174,39 @@ pub struct NamedExpression {
     /// Optional base cell used to resolve relative references.
     pub base_cell_address: Option<String>,
     /// Namespace binding used by the expression's formula prefix.
-    pub formula_namespace: Option<FormulaNamespace>,
+    pub formula_namespace: Option<Namespace>,
     /// Visibility of the definition.
-    pub scope: NamedDefinitionScope,
+    pub scope: Scope,
 }
 
-/// Namespace binding for a qualified formula expression.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FormulaNamespace {
-    /// Prefix appearing before `:` in the expression.
-    pub prefix: String,
-    /// Namespace URI bound to the prefix.
-    pub uri: String,
+/// Formula-specific vocabulary used by named expressions and conditions.
+pub mod formula {
+    /// Namespace binding for a qualified formula expression.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct Namespace {
+        /// Prefix appearing before `:` in the expression.
+        pub prefix: String,
+        /// Namespace URI bound to the prefix.
+        pub uri: String,
+    }
 }
 
-impl NamedExpression {
+use formula::Namespace;
+
+impl Expression {
     /// Create a named expression with no base cell.
     pub fn new(
         name: impl Into<String>,
         expression: impl Into<String>,
-        scope: NamedDefinitionScope,
+        scope: Scope,
     ) -> Result<Self> {
         let expression = expression.into();
         let formula_namespace = match formula_prefix(&expression) {
-            Some("of") => Some(FormulaNamespace {
+            Some("of") => Some(Namespace {
                 prefix: "of".to_string(),
                 uri: OPENFORMULA_NAMESPACE.to_string(),
             }),
-            Some("oooc") => Some(FormulaNamespace {
+            Some("oooc") => Some(Namespace {
                 prefix: "oooc".to_string(),
                 uri: OPENOFFICE_CALC_NAMESPACE.to_string(),
             }),
@@ -226,7 +231,7 @@ impl NamedExpression {
         name: impl Into<String>,
         expression: impl Into<String>,
         namespace_uri: impl Into<String>,
-        scope: NamedDefinitionScope,
+        scope: Scope,
     ) -> Result<Self> {
         let expression = expression.into();
         let prefix = formula_prefix(&expression).ok_or_else(|| {
@@ -236,7 +241,7 @@ impl NamedExpression {
         })?;
         let value = Self {
             name: name.into(),
-            formula_namespace: Some(FormulaNamespace {
+            formula_namespace: Some(Namespace {
                 prefix: prefix.to_string(),
                 uri: namespace_uri.into(),
             }),
@@ -314,14 +319,14 @@ impl NamedExpression {
 
 /// Either kind of named spreadsheet definition, preserving document order.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum NamedDefinition {
+pub enum Definition {
     /// A named cell range.
-    Range(NamedRange),
+    Range(Range),
     /// A named OpenFormula expression.
-    Expression(NamedExpression),
+    Expression(Expression),
 }
 
-impl NamedDefinition {
+impl Definition {
     /// Definition name.
     pub fn name(&self) -> &str {
         match self {
@@ -331,7 +336,7 @@ impl NamedDefinition {
     }
 
     /// Definition scope.
-    pub fn scope(&self) -> &NamedDefinitionScope {
+    pub fn scope(&self) -> &Scope {
         match self {
             Self::Range(value) => &value.scope,
             Self::Expression(value) => &value.scope,
@@ -353,21 +358,21 @@ impl NamedDefinition {
     }
 }
 
-impl From<NamedRange> for NamedDefinition {
-    fn from(value: NamedRange) -> Self {
+impl From<Range> for Definition {
+    fn from(value: Range) -> Self {
         Self::Range(value)
     }
 }
 
-impl From<NamedExpression> for NamedDefinition {
-    fn from(value: NamedExpression) -> Self {
+impl From<Expression> for Definition {
+    fn from(value: Expression) -> Self {
         Self::Expression(value)
     }
 }
 
-pub(crate) fn write_named_definitions<'a>(
+pub(crate) fn write_definitions<'a>(
     out: &mut String,
-    definitions: impl Iterator<Item = &'a NamedDefinition>,
+    definitions: impl Iterator<Item = &'a Definition>,
 ) {
     let mut definitions = definitions.peekable();
     if definitions.peek().is_none() {
@@ -380,11 +385,11 @@ pub(crate) fn write_named_definitions<'a>(
     out.push_str("</table:named-expressions>");
 }
 
-pub(crate) fn write_named_definition_fragment(definition: &NamedDefinition) -> Result<String> {
+pub(crate) fn write_definition_fragment(definition: &Definition) -> Result<String> {
     definition.validate()?;
     let mut output = String::with_capacity(256);
     match definition {
-        NamedDefinition::Range(value) => {
+        Definition::Range(value) => {
             output.push_str("<table:named-range xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\" table:name=\"");
             output.push_str(&escape_xml(&value.name));
             output.push_str("\" table:cell-range-address=\"");
@@ -407,7 +412,7 @@ pub(crate) fn write_named_definition_fragment(definition: &NamedDefinition) -> R
             }
             output.push_str("/>");
         },
-        NamedDefinition::Expression(value) => {
+        Definition::Expression(value) => {
             output.push_str("<table:named-expression xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\" table:name=\"");
             output.push_str(&escape_xml(&value.name));
             if let Some(namespace) = &value.formula_namespace {
@@ -430,7 +435,7 @@ pub(crate) fn write_named_definition_fragment(definition: &NamedDefinition) -> R
     Ok(output)
 }
 
-pub(crate) fn validate_named_definition_collection(definitions: &[NamedDefinition]) -> Result<()> {
+pub(crate) fn validate_collection(definitions: &[Definition]) -> Result<()> {
     if definitions.len() > MAX_NAMED_DEFINITIONS {
         return Err(Error::InvalidFormat(format!(
             "named definition count exceeds {MAX_NAMED_DEFINITIONS}"
@@ -448,12 +453,12 @@ pub(crate) fn validate_named_definition_collection(definitions: &[NamedDefinitio
             )));
         }
         let values: Vec<&str> = match definition {
-            NamedDefinition::Range(value) => vec![
+            Definition::Range(value) => vec![
                 value.name.as_str(),
                 value.cell_range_address.as_str(),
                 value.base_cell_address.as_deref().unwrap_or(""),
             ],
-            NamedDefinition::Expression(value) => vec![
+            Definition::Expression(value) => vec![
                 value.name.as_str(),
                 value.expression.as_str(),
                 value.base_cell_address.as_deref().unwrap_or(""),
@@ -488,19 +493,19 @@ pub(crate) fn expression_references_name(expression: &str, name: &str) -> bool {
         .any(|identifier| identifier == name)
 }
 
-fn validate_named_dependencies(definitions: &[NamedDefinition]) -> Result<()> {
+fn validate_named_dependencies(definitions: &[Definition]) -> Result<()> {
     let mut indexes = HashMap::with_capacity(definitions.len());
     for (index, definition) in definitions.iter().enumerate() {
         indexes.insert((definition.scope().clone(), definition.name()), index);
     }
     let mut edges = vec![Vec::new(); definitions.len()];
     for (index, definition) in definitions.iter().enumerate() {
-        let NamedDefinition::Expression(expression) = definition else {
+        let Definition::Expression(expression) = definition else {
             continue;
         };
         for identifier in formula_identifiers(&expression.expression) {
             let local = (expression.scope.clone(), identifier);
-            let global = (NamedDefinitionScope::Global, identifier);
+            let global = (Scope::Global, identifier);
             if let Some(target) = indexes.get(&local).or_else(|| indexes.get(&global))
                 && !edges[index].contains(target)
             {
@@ -571,10 +576,7 @@ fn formula_identifiers(expression: &str) -> Vec<&str> {
     identifiers
 }
 
-pub(crate) fn ensure_unique(
-    definitions: &[NamedDefinition],
-    candidate: &NamedDefinition,
-) -> Result<()> {
+pub(crate) fn ensure_unique(definitions: &[Definition], candidate: &Definition) -> Result<()> {
     if definitions.iter().any(|existing| {
         existing.name() == candidate.name() && existing.scope() == candidate.scope()
     }) {
@@ -587,9 +589,9 @@ pub(crate) fn ensure_unique(
     Ok(())
 }
 
-fn validate_common(name: &str, scope: &NamedDefinitionScope) -> Result<()> {
+fn validate_common(name: &str, scope: &Scope) -> Result<()> {
     validate_nonempty("named definition name", name)?;
-    if let NamedDefinitionScope::Sheet(sheet) = scope {
+    if let Scope::Sheet(sheet) = scope {
         validate_nonempty("named definition sheet scope", sheet)?;
     }
     Ok(())
@@ -639,17 +641,13 @@ mod tests {
 
     #[test]
     fn writes_all_range_usages_and_escapes_attributes() {
-        let range = NamedRange::new(
-            "Revenue&Tax",
-            "$'Sales & Tax'.$A$1:.$B$2",
-            NamedDefinitionScope::Global,
-        )
-        .unwrap()
-        .with_base_cell("$'Sales & Tax'.$A$1")
-        .unwrap()
-        .with_usage(NamedRangeUsage::PrintRange)
-        .with_usage(NamedRangeUsage::Filter)
-        .with_usage(NamedRangeUsage::Filter);
+        let range = Range::new("Revenue&Tax", "$'Sales & Tax'.$A$1:.$B$2", Scope::Global)
+            .unwrap()
+            .with_base_cell("$'Sales & Tax'.$A$1")
+            .unwrap()
+            .with_usage(Usage::PrintRange)
+            .with_usage(Usage::Filter)
+            .with_usage(Usage::Filter);
 
         let mut xml = String::new();
         range.write_xml(&mut xml);
@@ -660,36 +658,29 @@ mod tests {
 
     #[test]
     fn rejects_empty_required_values() {
-        assert!(NamedRange::new("", "$Sheet1.$A$1", NamedDefinitionScope::Global).is_err());
-        assert!(NamedExpression::new("Total", " ", NamedDefinitionScope::Global).is_err());
-        assert!(
-            NamedExpression::new(
-                "Total",
-                "of:=SUM([.A1:.A2])",
-                NamedDefinitionScope::sheet("")
-            )
-            .is_err()
-        );
+        assert!(Range::new("", "$Sheet1.$A$1", Scope::Global).is_err());
+        assert!(Expression::new("Total", " ", Scope::Global).is_err());
+        assert!(Expression::new("Total", "of:=SUM([.A1:.A2])", Scope::sheet("")).is_err());
     }
 
     #[test]
     fn explicit_formula_namespace_is_safely_serialized() {
-        let expression = NamedExpression::new_with_namespace(
+        let expression = Expression::new_with_namespace(
             "Custom",
             "calc:=SUM([.A1:.A2])",
             "urn:example:calc&formula",
-            NamedDefinitionScope::Global,
+            Scope::Global,
         )
         .unwrap();
         let mut xml = String::new();
         expression.write_xml(&mut xml);
         assert!(xml.contains("xmlns:calc=\"urn:example:calc&amp;formula\""));
         assert!(
-            NamedExpression::new_with_namespace(
+            Expression::new_with_namespace(
                 "Unsafe",
                 "bad prefix:=1",
                 "urn:example",
-                NamedDefinitionScope::Global,
+                Scope::Global,
             )
             .is_err()
         );

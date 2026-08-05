@@ -12,7 +12,7 @@ mod database_range;
 mod detective;
 mod hyperlink;
 mod label_range;
-pub(crate) mod named_expression;
+pub mod names;
 mod protection;
 mod source;
 mod sparkline;
@@ -41,10 +41,6 @@ pub use hyperlink::{CellHyperlink, HyperlinkActuate, HyperlinkShow};
 pub use label_range::{LabelRange, LabelRangeOrientation};
 pub use litchi_odf_common::calculation::{Iteration, IterationStatus, NullDate, Settings};
 pub use litchi_odf_common::rdf::{Graph, Object, Subject, Triple};
-pub use named_expression::{
-    FormulaNamespace, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,
-    NamedRangeUsage,
-};
 pub use protection::{Protection, ProtectionKey, SheetProtection, SheetProtectionOptions};
 pub use source::{CellRangeSource, SheetTableSource, TableSourceMode};
 pub use sparkline::*;

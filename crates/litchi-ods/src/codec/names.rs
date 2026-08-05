@@ -1,9 +1,7 @@
 //! Bounded XML codec for spreadsheet named definitions.
 
-use crate::model::{
-    NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, NamedRangeUsage,
-    named_expression::{validate_named_definition_collection, write_named_definitions},
-};
+use crate::model::names::{Definition, Expression, Range, Scope, Usage};
+use crate::model::names::{validate_collection, write_definitions};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -21,7 +19,7 @@ const MAX_DEFINITIONS: usize = 262_144;
 struct Span {
     start: usize,
     end: usize,
-    scope: NamedDefinitionScope,
+    scope: Scope,
 }
 
 #[derive(Debug, Clone)]
@@ -40,22 +38,22 @@ struct TableFrame {
 
 #[derive(Debug)]
 struct Scan {
-    definitions: Vec<NamedDefinition>,
+    definitions: Vec<Definition>,
     containers: Vec<Span>,
     spreadsheet: Option<Host>,
     tables: Vec<Host>,
 }
 
 /// Parse and validate the ordered named-definition catalog in content XML.
-pub(crate) fn parse(xml: &str) -> Result<Vec<NamedDefinition>> {
+pub(crate) fn parse(xml: &str) -> Result<Vec<Definition>> {
     let scan = scan(xml)?;
-    validate_named_definition_collection(&scan.definitions)?;
+    validate_collection(&scan.definitions)?;
     Ok(scan.definitions)
 }
 
 /// Replace the complete named-definition catalog without rewriting unrelated XML.
-pub(crate) fn replace(xml: &str, definitions: &[NamedDefinition]) -> Result<String> {
-    validate_named_definition_collection(definitions)?;
+pub(crate) fn replace(xml: &str, definitions: &[Definition]) -> Result<String> {
+    validate_collection(definitions)?;
     let scan = scan(xml)?;
 
     let groups = groups(definitions);
@@ -86,8 +84,8 @@ pub(crate) fn replace(xml: &str, definitions: &[NamedDefinition]) -> Result<Stri
         }
         let container = container_xml(values);
         let host = match scope {
-            NamedDefinitionScope::Global => scan.spreadsheet.as_ref(),
-            NamedDefinitionScope::Sheet(name) => scan
+            Scope::Global => scan.spreadsheet.as_ref(),
+            Scope::Sheet(name) => scan
                 .tables
                 .iter()
                 .find(|table| table.name.as_deref() == Some(name.as_str())),
@@ -153,9 +151,7 @@ struct Edit {
     replacement: String,
 }
 
-fn groups<'a>(
-    definitions: &'a [NamedDefinition],
-) -> HashMap<NamedDefinitionScope, Vec<&'a NamedDefinition>> {
+fn groups<'a>(definitions: &'a [Definition]) -> HashMap<Scope, Vec<&'a Definition>> {
     let mut groups = HashMap::new();
     for definition in definitions {
         groups
@@ -166,9 +162,9 @@ fn groups<'a>(
     groups
 }
 
-fn container_xml(definitions: &[&NamedDefinition]) -> String {
+fn container_xml(definitions: &[&Definition]) -> String {
     let mut output = String::with_capacity(64 + definitions.len() * 96);
-    write_named_definitions(&mut output, definitions.iter().copied());
+    write_definitions(&mut output, definitions.iter().copied());
     let declaration = " xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\"";
     let insertion = output
         .find('>')
@@ -194,12 +190,12 @@ fn expand_empty_host(xml: &str, host: &Host, child: &str) -> Result<String> {
     Ok(output)
 }
 
-fn missing_host(scope: &NamedDefinitionScope) -> Error {
+fn missing_host(scope: &Scope) -> Error {
     Error::InvalidFormat(match scope {
-        NamedDefinitionScope::Global => {
+        Scope::Global => {
             "global named definitions require an office:spreadsheet element".to_string()
         },
-        NamedDefinitionScope::Sheet(name) => {
+        Scope::Sheet(name) => {
             format!("sheet-local named definitions reference missing sheet '{name}'")
         },
     })
@@ -216,7 +212,7 @@ fn scan(xml: &str) -> Result<Scan> {
     let mut table_stack = Vec::<TableFrame>::new();
     let mut containers = Vec::new();
     let mut definitions = Vec::new();
-    let mut active: Option<(usize, NamedDefinitionScope)> = None;
+    let mut active: Option<(usize, Scope)> = None;
     let mut spreadsheet = None;
 
     loop {
@@ -360,13 +356,13 @@ fn host(
     })
 }
 
-fn scope(tables: &[TableFrame]) -> Result<NamedDefinitionScope> {
+fn scope(tables: &[TableFrame]) -> Result<Scope> {
     match tables.last() {
-        Some(TableFrame { name: Some(name) }) => Ok(NamedDefinitionScope::Sheet(name.clone())),
+        Some(TableFrame { name: Some(name) }) => Ok(Scope::Sheet(name.clone())),
         Some(TableFrame { name: None }) => {
             invalid("sheet-local named definitions require table:name")
         },
-        None => Ok(NamedDefinitionScope::Global),
+        None => Ok(Scope::Global),
     }
 }
 
@@ -378,8 +374,8 @@ fn parse_definition(
     resolver: &NamespaceResolver,
     decoder: Decoder,
     element: &BytesStart<'_>,
-    scope: NamedDefinitionScope,
-) -> Result<NamedDefinition> {
+    scope: Scope,
+) -> Result<Definition> {
     let name = required_table_attribute(resolver, decoder, element, b"name")?;
     let base_cell_address = table_attribute(resolver, decoder, element, b"base-cell-address")?;
 
@@ -387,7 +383,7 @@ fn parse_definition(
         b"named-range" => {
             let cell_range_address =
                 required_table_attribute(resolver, decoder, element, b"cell-range-address")?;
-            let mut range = NamedRange::new(name, cell_range_address, scope)?;
+            let mut range = Range::new(name, cell_range_address, scope)?;
             range.base_cell_address = base_cell_address;
             if let Some(usable_as) =
                 table_attribute(resolver, decoder, element, b"range-usable-as")?
@@ -397,7 +393,7 @@ fn parse_definition(
                 }
                 if usable_as != "none" {
                     for token in usable_as.split_whitespace() {
-                        let usage = NamedRangeUsage::parse(token)?;
+                        let usage = Usage::parse(token)?;
                         if !range.usable_as.contains(&usage) {
                             range.usable_as.push(usage);
                         }
@@ -411,8 +407,8 @@ fn parse_definition(
             let expression = required_table_attribute(resolver, decoder, element, b"expression")?;
             let namespace_uri = formula_namespace_uri(resolver, &expression)?;
             let mut value = match namespace_uri {
-                Some(uri) => NamedExpression::new_with_namespace(name, expression, uri, scope)?,
-                None => NamedExpression::new(name, expression, scope)?,
+                Some(uri) => Expression::new_with_namespace(name, expression, uri, scope)?,
+                None => Expression::new(name, expression, scope)?,
             };
             value.base_cell_address = base_cell_address;
             value.validate()?;
