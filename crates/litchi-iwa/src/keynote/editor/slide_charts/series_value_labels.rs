@@ -301,7 +301,7 @@ fn set_slide_chart_series_value_label_locations(
 }
 
 pub(super) fn value_label_series_count(
-    kind: ChartKind,
+    kind: Kind,
     direction: Direction,
     data: &ChartData,
     drawable_label: &str,

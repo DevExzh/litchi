@@ -556,7 +556,7 @@ pub(super) fn body_chart_graph(
         info: PagesBodyChartInfo {
             anchor_character_index: *anchor_character_index,
             drawable_object_id,
-            kind: ChartKind::from_raw(
+            kind: Kind::from_native(
                 payload
                     .chart_type
                     .unwrap_or(tsch::ChartType::UndefinedChartType as i32),

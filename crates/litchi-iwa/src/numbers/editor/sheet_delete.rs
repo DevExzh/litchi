@@ -234,7 +234,7 @@ mod tests {
     use std::time::Duration;
 
     use super::*;
-    use crate::charts::{ChartData, ChartKind};
+    use crate::charts::{ChartData, Kind};
     use crate::numbers::{
         NumbersDocumentBuilder, NumbersSheetAudioOptions, NumbersSheetImageOptions,
         NumbersSheetMovieOptions,
@@ -307,7 +307,7 @@ mod tests {
         editor
             .add_sheet_chart(
                 sheet.object_id,
-                ChartKind::Column2d,
+                Kind::Column2d,
                 ChartData::new(
                     vec!["Series".to_owned()],
                     vec!["Item".to_owned()],

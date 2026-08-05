@@ -71,7 +71,7 @@ fn set_slide_chart_reference_lines(
 mod tests {
     use super::*;
     use crate::charts::reference_line::Value;
-    use crate::charts::{ChartData, ChartKind};
+    use crate::charts::{ChartData, Kind};
     use crate::keynote::KeynoteDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
@@ -81,7 +81,7 @@ mod tests {
         let chart = editor
             .add_slide_chart(
                 0,
-                ChartKind::Line2d,
+                Kind::Line2d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {

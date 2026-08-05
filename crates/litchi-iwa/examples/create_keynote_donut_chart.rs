@@ -3,7 +3,7 @@
 use std::env;
 
 use litchi_iwa::charts::{
-    ChartData, ChartDonutInnerRadius, ChartKind, ChartPieLabelDistance, LabelVisibility,
+    ChartData, ChartDonutInnerRadius, Kind, ChartPieLabelDistance, LabelVisibility,
 };
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
     let chart = editor.add_slide_chart(
         0,
-        ChartKind::Donut2d,
+        Kind::Donut2d,
         donut_data()?,
         DrawablePoint { x: 610.0, y: 220.0 },
         DrawableSize {

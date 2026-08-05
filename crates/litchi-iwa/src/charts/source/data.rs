@@ -140,8 +140,8 @@ pub(crate) fn chart_geometry(
     .validate()
 }
 
-pub(crate) fn require_creatable_kind(kind: ChartKind) -> Result<()> {
-    if matches!(kind, ChartKind::Undefined | ChartKind::Unsupported(_)) {
+pub(crate) fn require_creatable_kind(kind: Kind) -> Result<()> {
+    if kind == Kind::Undefined || kind.is_unsupported() {
         return Err(Error::ParseError(
             "chart kind must be a supported concrete iWork kind".to_owned(),
         ));

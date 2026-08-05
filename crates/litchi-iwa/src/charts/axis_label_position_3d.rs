@@ -12,7 +12,7 @@ use crate::charts::axis::{
     GENERATED_CHART_AXIS_NON_STYLE_EXTENSION_FIELD, axis_non_style_slot,
     generated_axis_non_style_extension,
 };
-use crate::charts::{Axis, ChartKind};
+use crate::charts::{Axis, Kind};
 use crate::protobuf::tsch;
 use crate::wire::{patch_length_delimited_field, patch_varint_field};
 use crate::{Error, IWorkPackage, Result};
@@ -25,7 +25,7 @@ pub(crate) fn chart_3d_value_axis_label_position(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
 ) -> Result<LabelPosition3d> {
     require_supported_kind(kind, drawable_object_id, drawable_label)?;
     axis_non_style_slot(
@@ -44,7 +44,7 @@ pub(crate) fn set_chart_3d_value_axis_label_position(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     position: LabelPosition3d,
 ) -> Result<()> {
     require_supported_kind(kind, drawable_object_id, drawable_label)?;
@@ -71,7 +71,7 @@ pub(crate) fn set_chart_3d_value_axis_label_position(
 }
 
 fn require_supported_kind(
-    kind: ChartKind,
+    kind: Kind,
     drawable_object_id: u64,
     drawable_label: &str,
 ) -> Result<()> {
@@ -186,17 +186,17 @@ mod tests {
     #[test]
     fn capability_matches_all_axis_bearing_3d_kinds() {
         for kind in [
-            ChartKind::Column3d,
-            ChartKind::Bar3d,
-            ChartKind::Line3d,
-            ChartKind::Area3d,
-            ChartKind::StackedColumn3d,
-            ChartKind::StackedBar3d,
-            ChartKind::StackedArea3d,
+            Kind::Column3d,
+            Kind::Bar3d,
+            Kind::Line3d,
+            Kind::Area3d,
+            Kind::StackedColumn3d,
+            Kind::StackedBar3d,
+            Kind::StackedArea3d,
         ] {
             assert!(kind.supports_3d_value_axis_label_position(), "{kind:?}");
         }
-        for kind in [ChartKind::Column2d, ChartKind::Pie3d, ChartKind::Donut3d] {
+        for kind in [Kind::Column2d, Kind::Pie3d, Kind::Donut3d] {
             assert!(!kind.supports_3d_value_axis_label_position(), "{kind:?}");
         }
     }

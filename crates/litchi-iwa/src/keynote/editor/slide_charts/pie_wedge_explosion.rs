@@ -133,7 +133,7 @@ fn set_slide_chart_pie_wedge_explosions(
     Ok(())
 }
 
-fn require_pie_wedges(kind: ChartKind, drawable_object_id: u64) -> Result<()> {
+fn require_pie_wedges(kind: Kind, drawable_object_id: u64) -> Result<()> {
     if !kind.supports_pie_start_angle() {
         return Err(Error::InvalidFormat(format!(
             "Keynote chart {drawable_object_id} kind {kind:?} has no pie wedges"

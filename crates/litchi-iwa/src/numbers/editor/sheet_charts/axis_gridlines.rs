@@ -217,7 +217,7 @@ fn set_sheet_chart_axis_minor_gridlines_visible(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::{ChartData, ChartKind};
+    use crate::charts::{ChartData, Kind};
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{
         DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeStroke, StrokePattern,
@@ -231,7 +231,7 @@ mod tests {
         let chart = editor
             .add_sheet_chart(
                 sheet_id,
-                ChartKind::Column2d,
+                Kind::Column2d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {

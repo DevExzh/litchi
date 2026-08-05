@@ -8,7 +8,7 @@ use prost::Message;
 
 use litchi_iwa_common::chart::number_format::LabelAffixes;
 
-use crate::charts::ChartKind;
+use crate::charts::Kind;
 use crate::charts::number_format::{DualNumberFormatFields, patch_dual_affixes, read_dual_affixes};
 use crate::charts::series_non_style::{
     NewChartSeriesNonStyleBase, chart_series_non_style_values,
@@ -31,7 +31,7 @@ pub(crate) fn chart_series_value_label_affixes(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
 ) -> Result<Vec<LabelAffixes>> {
     ensure_supported_kind(kind)?;
@@ -52,7 +52,7 @@ pub(crate) fn set_chart_series_value_label_affixes(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     expected: &[LabelAffixes],
 ) -> Result<()> {
     ensure_supported_kind(kind)?;
@@ -70,8 +70,8 @@ pub(crate) fn set_chart_series_value_label_affixes(
     )
 }
 
-fn ensure_supported_kind(kind: ChartKind) -> Result<()> {
-    if matches!(kind, ChartKind::Undefined | ChartKind::Unsupported(_)) {
+fn ensure_supported_kind(kind: Kind) -> Result<()> {
+    if matches!(kind, Kind::Undefined | Kind::Unsupported(_)) {
         return Err(Error::InvalidFormat(format!(
             "chart kind {kind:?} has no supported series value-label affixes"
         )));

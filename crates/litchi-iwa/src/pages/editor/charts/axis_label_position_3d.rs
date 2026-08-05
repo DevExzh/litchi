@@ -72,7 +72,7 @@ mod tests {
         let chart = editor
             .add_body_chart(
                 0,
-                ChartKind::Column3d,
+                Kind::Column3d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {
@@ -105,7 +105,7 @@ mod tests {
     #[test]
     fn charts_without_3d_value_axes_reject_label_position_access() {
         let mut editor = PagesDocumentBuilder::new().build().unwrap();
-        for kind in [ChartKind::Column2d, ChartKind::Pie3d] {
+        for kind in [Kind::Column2d, Kind::Pie3d] {
             let chart = editor
                 .add_body_chart(
                     0,

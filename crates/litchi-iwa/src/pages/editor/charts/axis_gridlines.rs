@@ -185,7 +185,7 @@ fn set_body_chart_axis_minor_gridlines_visible(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::{ChartData, ChartKind};
+    use crate::charts::{ChartData, Kind};
     use crate::pages::PagesDocumentBuilder;
     use crate::shapes::{
         DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeStroke, StrokePattern,
@@ -199,7 +199,7 @@ mod tests {
         let chart = editor
             .add_body_chart(
                 body.encode_utf16().count(),
-                ChartKind::Column2d,
+                Kind::Column2d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {

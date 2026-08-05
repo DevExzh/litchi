@@ -80,7 +80,7 @@ mod tests {
         let chart = editor
             .add_body_chart(
                 body.encode_utf16().count(),
-                ChartKind::Radar2d,
+                Kind::Radar2d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {

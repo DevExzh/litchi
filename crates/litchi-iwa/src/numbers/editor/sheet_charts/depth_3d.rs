@@ -63,7 +63,7 @@ impl NumbersEditor {
     }
 }
 
-fn require_3d_depth(kind: ChartKind, drawable_object_id: u64) -> Result<()> {
+fn require_3d_depth(kind: Kind, drawable_object_id: u64) -> Result<()> {
     if !kind.supports_3d_depth() {
         return Err(Error::InvalidFormat(format!(
             "Numbers chart {drawable_object_id} kind {kind:?} has no 3D depth"
@@ -85,7 +85,7 @@ mod tests {
         let chart = editor
             .add_sheet_chart(
                 sheet_id,
-                ChartKind::Bar3d,
+                Kind::Bar3d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {

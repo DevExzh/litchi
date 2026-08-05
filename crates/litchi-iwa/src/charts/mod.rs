@@ -34,7 +34,7 @@ pub(crate) mod donut_inner_radius;
 pub(crate) mod font;
 pub(crate) mod gaps;
 pub(crate) mod hidden_data;
-mod kind;
+pub use litchi_iwa_common::chart::kind::Kind;
 pub(crate) mod legend_fill;
 pub(crate) mod legend_font;
 pub(crate) mod legend_frame;
@@ -92,7 +92,6 @@ pub use depth_3d::Chart3dDepth;
 pub use donut_inner_radius::ChartDonutInnerRadius;
 pub use font::{ChartFont, ChartFontSize};
 pub use gaps::{ChartGapPercentage, ChartGapSpacing};
-pub use kind::ChartKind;
 pub use legend_fill::ChartLegendFill;
 pub use legend_font::{ChartLegendFont, ChartLegendFontSize};
 pub use legend_frame::{

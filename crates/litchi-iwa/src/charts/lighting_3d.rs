@@ -9,7 +9,7 @@ mod presets;
 use prost::Message;
 
 use self::presets::native_lighting_package;
-use crate::charts::ChartKind;
+use crate::charts::Kind;
 use crate::charts::style::{
     GENERATED_CHART_STYLE_EXTENSION_FIELD, chart_style_slot, generated_chart_style_extension,
 };
@@ -95,13 +95,13 @@ enum LightingField {
 }
 
 impl LightingField {
-    const fn for_kind(kind: ChartKind) -> Option<Self> {
+    const fn for_kind(kind: Kind) -> Option<Self> {
         match kind {
-            ChartKind::Area3d | ChartKind::StackedArea3d => Some(Self::Area),
-            ChartKind::Bar3d | ChartKind::StackedBar3d => Some(Self::Bar),
-            ChartKind::Column3d | ChartKind::StackedColumn3d => Some(Self::Column),
-            ChartKind::Line3d => Some(Self::Line),
-            ChartKind::Pie3d | ChartKind::Donut3d => Some(Self::Pie),
+            Kind::Area3d | Kind::StackedArea3d => Some(Self::Area),
+            Kind::Bar3d | Kind::StackedBar3d => Some(Self::Bar),
+            Kind::Column3d | Kind::StackedColumn3d => Some(Self::Column),
+            Kind::Line3d => Some(Self::Line),
+            Kind::Pie3d | Kind::Donut3d => Some(Self::Pie),
             _ => None,
         }
     }
@@ -150,7 +150,7 @@ pub(crate) fn chart_3d_lighting_style(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
 ) -> Result<Chart3dLightingStyle> {
     let field = require_lighting_field(kind, drawable_object_id, drawable_label)?;
     chart_style_slot(
@@ -168,7 +168,7 @@ pub(crate) fn set_chart_3d_lighting_style(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     style: Chart3dLightingStyle,
 ) -> Result<()> {
     let field = require_lighting_field(kind, drawable_object_id, drawable_label)?;
@@ -194,7 +194,7 @@ pub(crate) fn set_chart_3d_lighting_style(
 }
 
 fn require_lighting_field(
-    kind: ChartKind,
+    kind: Kind,
     drawable_object_id: u64,
     drawable_label: &str,
 ) -> Result<LightingField> {
@@ -360,20 +360,20 @@ mod tests {
     #[test]
     fn every_native_3d_kind_selects_its_lighting_family() {
         let cases = [
-            (ChartKind::Area3d, AREA_3D_LIGHTING_FIELD),
-            (ChartKind::StackedArea3d, AREA_3D_LIGHTING_FIELD),
-            (ChartKind::Bar3d, BAR_3D_LIGHTING_FIELD),
-            (ChartKind::StackedBar3d, BAR_3D_LIGHTING_FIELD),
-            (ChartKind::Column3d, COLUMN_3D_LIGHTING_FIELD),
-            (ChartKind::StackedColumn3d, COLUMN_3D_LIGHTING_FIELD),
-            (ChartKind::Line3d, LINE_3D_LIGHTING_FIELD),
-            (ChartKind::Pie3d, PIE_3D_LIGHTING_FIELD),
-            (ChartKind::Donut3d, PIE_3D_LIGHTING_FIELD),
+            (Kind::Area3d, AREA_3D_LIGHTING_FIELD),
+            (Kind::StackedArea3d, AREA_3D_LIGHTING_FIELD),
+            (Kind::Bar3d, BAR_3D_LIGHTING_FIELD),
+            (Kind::StackedBar3d, BAR_3D_LIGHTING_FIELD),
+            (Kind::Column3d, COLUMN_3D_LIGHTING_FIELD),
+            (Kind::StackedColumn3d, COLUMN_3D_LIGHTING_FIELD),
+            (Kind::Line3d, LINE_3D_LIGHTING_FIELD),
+            (Kind::Pie3d, PIE_3D_LIGHTING_FIELD),
+            (Kind::Donut3d, PIE_3D_LIGHTING_FIELD),
         ];
         for (kind, expected) in cases {
             assert_eq!(LightingField::for_kind(kind).unwrap().number(), expected);
         }
-        assert!(LightingField::for_kind(ChartKind::Column2d).is_none());
+        assert!(LightingField::for_kind(Kind::Column2d).is_none());
     }
 
     #[test]

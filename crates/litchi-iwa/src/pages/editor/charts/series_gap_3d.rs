@@ -69,7 +69,7 @@ mod tests {
         let chart = editor
             .add_body_chart(
                 0,
-                ChartKind::Area3d,
+                Kind::Area3d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {
@@ -100,11 +100,7 @@ mod tests {
     #[test]
     fn charts_without_between_series_control_reject_access() {
         let mut editor = PagesDocumentBuilder::new().build().unwrap();
-        for kind in [
-            ChartKind::Area2d,
-            ChartKind::StackedArea3d,
-            ChartKind::Column3d,
-        ] {
+        for kind in [Kind::Area2d, Kind::StackedArea3d, Kind::Column3d] {
             let chart = editor
                 .add_body_chart(
                     0,

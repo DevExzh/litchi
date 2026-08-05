@@ -8,7 +8,7 @@ use prost::Message;
 
 use litchi_iwa_common::media::Type as MediaType;
 
-use crate::charts::ChartKind;
+use crate::charts::Kind;
 use crate::charts::series_style::{
     ChartSeriesStyleSlot, GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD,
     effective_chart_series_style_slots, generated_chart_series_style_extension,
@@ -55,22 +55,22 @@ pub enum ChartSeriesFillKind {
 
 impl ChartSeriesFillKind {
     /// Resolve the fill family displayed by iWork for a chart kind.
-    pub fn for_chart_kind(kind: ChartKind) -> Result<Self> {
+    pub fn for_chart_kind(kind: Kind) -> Result<Self> {
         match kind {
-            ChartKind::Area2d | ChartKind::StackedArea2d => Ok(Self::Area2d),
-            ChartKind::Bar2d | ChartKind::StackedBar2d | ChartKind::MultiDataBar2d => {
+            Kind::Area2d | Kind::StackedArea2d => Ok(Self::Area2d),
+            Kind::Bar2d | Kind::StackedBar2d | Kind::MultiDataBar2d => {
                 Ok(Self::Bar2d)
             },
-            ChartKind::Column2d | ChartKind::StackedColumn2d | ChartKind::MultiDataColumn2d => {
+            Kind::Column2d | Kind::StackedColumn2d | Kind::MultiDataColumn2d => {
                 Ok(Self::Column2d)
             },
-            ChartKind::Pie2d | ChartKind::Donut2d => Ok(Self::Pie2d),
-            ChartKind::Radar2d => Ok(Self::Radar2d),
-            ChartKind::Area3d | ChartKind::StackedArea3d => Ok(Self::Area3d),
-            ChartKind::Bar3d | ChartKind::StackedBar3d => Ok(Self::Bar3d),
-            ChartKind::Column3d | ChartKind::StackedColumn3d => Ok(Self::Column3d),
-            ChartKind::Line3d => Ok(Self::Line3d),
-            ChartKind::Pie3d | ChartKind::Donut3d => Ok(Self::Pie3d),
+            Kind::Pie2d | Kind::Donut2d => Ok(Self::Pie2d),
+            Kind::Radar2d => Ok(Self::Radar2d),
+            Kind::Area3d | Kind::StackedArea3d => Ok(Self::Area3d),
+            Kind::Bar3d | Kind::StackedBar3d => Ok(Self::Bar3d),
+            Kind::Column3d | Kind::StackedColumn3d => Ok(Self::Column3d),
+            Kind::Line3d => Ok(Self::Line3d),
+            Kind::Pie3d | Kind::Donut3d => Ok(Self::Pie3d),
             _ => Err(Error::InvalidFormat(format!(
                 "chart kind {kind:?} has no unambiguous series fill"
             ))),
@@ -99,7 +99,7 @@ pub(crate) fn chart_series_fills(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
 ) -> Result<Vec<ShapeFill>> {
     let storage = ChartSeriesFillKind::for_chart_kind(kind)?;
@@ -121,7 +121,7 @@ pub(crate) fn set_chart_series_fills(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     expected: &[ShapeFill],
 ) -> Result<()> {
@@ -185,7 +185,7 @@ pub(crate) fn reset_chart_series_fill(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     series_index: usize,
 ) -> Result<ShapeFill> {
@@ -226,7 +226,7 @@ pub(crate) fn set_chart_series_image_fill_data(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     series_index: usize,
     preferred_filename: &str,
@@ -398,35 +398,35 @@ mod tests {
     #[test]
     fn every_unambiguous_fill_kind_has_a_typed_storage_family() {
         for kind in [
-            ChartKind::Area2d,
-            ChartKind::StackedArea2d,
-            ChartKind::Bar2d,
-            ChartKind::StackedBar2d,
-            ChartKind::MultiDataBar2d,
-            ChartKind::Column2d,
-            ChartKind::StackedColumn2d,
-            ChartKind::MultiDataColumn2d,
-            ChartKind::Pie2d,
-            ChartKind::Donut2d,
-            ChartKind::Radar2d,
-            ChartKind::Area3d,
-            ChartKind::StackedArea3d,
-            ChartKind::Bar3d,
-            ChartKind::StackedBar3d,
-            ChartKind::Column3d,
-            ChartKind::StackedColumn3d,
-            ChartKind::Line3d,
-            ChartKind::Pie3d,
-            ChartKind::Donut3d,
+            Kind::Area2d,
+            Kind::StackedArea2d,
+            Kind::Bar2d,
+            Kind::StackedBar2d,
+            Kind::MultiDataBar2d,
+            Kind::Column2d,
+            Kind::StackedColumn2d,
+            Kind::MultiDataColumn2d,
+            Kind::Pie2d,
+            Kind::Donut2d,
+            Kind::Radar2d,
+            Kind::Area3d,
+            Kind::StackedArea3d,
+            Kind::Bar3d,
+            Kind::StackedBar3d,
+            Kind::Column3d,
+            Kind::StackedColumn3d,
+            Kind::Line3d,
+            Kind::Pie3d,
+            Kind::Donut3d,
         ] {
             assert!(ChartSeriesFillKind::for_chart_kind(kind).is_ok());
         }
         for kind in [
-            ChartKind::Line2d,
-            ChartKind::Scatter2d,
-            ChartKind::Bubble2d,
-            ChartKind::Mixed2d,
-            ChartKind::TwoAxis2d,
+            Kind::Line2d,
+            Kind::Scatter2d,
+            Kind::Bubble2d,
+            Kind::Mixed2d,
+            Kind::TwoAxis2d,
         ] {
             assert!(ChartSeriesFillKind::for_chart_kind(kind).is_err());
         }

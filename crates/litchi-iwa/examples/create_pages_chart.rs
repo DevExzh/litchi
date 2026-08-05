@@ -5,7 +5,7 @@ use std::env;
 use litchi_iwa::charts::{
     Axis, Bound, Bounds, ChartAxisGridline, ChartAxisGridlineStroke, ChartCornerRadius, ChartData,
     ChartErrorBarDirection, ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont,
-    ChartFontSize, ChartGapPercentage, ChartGapSpacing, ChartKind, ChartLegendFill,
+    ChartFontSize, ChartGapPercentage, ChartGapSpacing, Kind, ChartLegendFill,
     ChartLegendFont, ChartLegendFontSize, ChartLegendShadow, ChartLegendStroke,
     ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesStroke,
     ChartSeriesStrokePattern, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let chart = editor.add_body_chart(
         body.encode_utf16().count(),
-        ChartKind::Column2d,
+        Kind::Column2d,
         data,
         DrawablePoint { x: 96.0, y: 144.0 },
         DrawableSize {

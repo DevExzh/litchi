@@ -5,7 +5,7 @@
 
 use prost::Message;
 
-use crate::charts::ChartKind;
+use crate::charts::Kind;
 use crate::charts::series_stroke::ChartSeriesStroke;
 use crate::charts::series_style::{
     ChartSeriesStyleSlot, GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD,
@@ -33,13 +33,13 @@ pub enum ChartSeriesSymbolOutlineKind {
 }
 
 impl ChartSeriesSymbolOutlineKind {
-    pub fn for_chart_kind(kind: ChartKind) -> Result<Self> {
+    pub fn for_chart_kind(kind: Kind) -> Result<Self> {
         match kind {
-            ChartKind::Area2d | ChartKind::StackedArea2d => Ok(Self::Area2d),
-            ChartKind::Bubble2d => Ok(Self::Bubble2d),
-            ChartKind::Line2d => Ok(Self::Line2d),
-            ChartKind::Radar2d => Ok(Self::Radar2d),
-            ChartKind::Scatter2d => Ok(Self::Scatter2d),
+            Kind::Area2d | Kind::StackedArea2d => Ok(Self::Area2d),
+            Kind::Bubble2d => Ok(Self::Bubble2d),
+            Kind::Line2d => Ok(Self::Line2d),
+            Kind::Radar2d => Ok(Self::Radar2d),
+            Kind::Scatter2d => Ok(Self::Scatter2d),
             _ => Err(Error::InvalidFormat(format!(
                 "chart kind {kind:?} has no unambiguous data-symbol outline family"
             ))),
@@ -62,7 +62,7 @@ pub(crate) fn chart_series_symbol_outlines(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
 ) -> Result<Vec<Option<ChartSeriesStroke>>> {
     let storage = ChartSeriesSymbolOutlineKind::for_chart_kind(kind)?;
@@ -84,7 +84,7 @@ pub(crate) fn set_chart_series_symbol_outlines(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     expected: &[Option<ChartSeriesStroke>],
 ) -> Result<()> {
@@ -137,7 +137,7 @@ pub(crate) fn reset_chart_series_symbol_outline(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     series_index: usize,
 ) -> Result<Option<ChartSeriesStroke>> {
@@ -255,21 +255,21 @@ mod tests {
     #[test]
     fn every_unambiguous_symbol_outline_kind_has_a_typed_storage_family() {
         for kind in [
-            ChartKind::Area2d,
-            ChartKind::StackedArea2d,
-            ChartKind::Bubble2d,
-            ChartKind::Line2d,
-            ChartKind::Radar2d,
-            ChartKind::Scatter2d,
+            Kind::Area2d,
+            Kind::StackedArea2d,
+            Kind::Bubble2d,
+            Kind::Line2d,
+            Kind::Radar2d,
+            Kind::Scatter2d,
         ] {
             assert!(ChartSeriesSymbolOutlineKind::for_chart_kind(kind).is_ok());
         }
         for kind in [
-            ChartKind::Bar2d,
-            ChartKind::Mixed2d,
-            ChartKind::TwoAxis2d,
-            ChartKind::Area3d,
-            ChartKind::Line3d,
+            Kind::Bar2d,
+            Kind::Mixed2d,
+            Kind::TwoAxis2d,
+            Kind::Area3d,
+            Kind::Line3d,
         ] {
             assert!(ChartSeriesSymbolOutlineKind::for_chart_kind(kind).is_err());
         }

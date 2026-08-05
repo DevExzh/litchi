@@ -290,7 +290,7 @@ pub(super) fn chart_graph(
         info: NumbersSheetChartInfo {
             sheet_id,
             drawable_object_id,
-            kind: ChartKind::from_raw(
+            kind: Kind::from_native(
                 payload
                     .chart_type
                     .unwrap_or(tsch::ChartType::UndefinedChartType as i32),

@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::charts::{ChartData, ChartKind, ChartPieStartAngle, ChartPieWedgeExplosion};
+use litchi_iwa::charts::{ChartData, ChartPieStartAngle, ChartPieWedgeExplosion, Kind};
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sheet_id = editor.sheets()?[0].object_id;
     let chart = editor.add_sheet_chart(
         sheet_id,
-        ChartKind::Pie2d,
+        Kind::Pie2d,
         pie_data()?,
         DrawablePoint { x: 420.0, y: 120.0 },
         DrawableSize {

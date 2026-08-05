@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::charts::{ChartData, ChartKind, ChartPieStartAngle, ChartPieWedgeExplosion};
+use litchi_iwa::charts::{ChartData, ChartPieStartAngle, ChartPieWedgeExplosion, Kind};
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
     let chart = editor.add_slide_chart(
         0,
-        ChartKind::Pie2d,
+        Kind::Pie2d,
         pie_data()?,
         DrawablePoint { x: 610.0, y: 220.0 },
         DrawableSize {

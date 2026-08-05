@@ -131,7 +131,7 @@ impl NumbersEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::{ChartData, ChartKind};
+    use crate::charts::{ChartData, Kind};
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
@@ -142,7 +142,7 @@ mod tests {
         let chart = editor
             .add_sheet_chart(
                 sheet_id,
-                ChartKind::Line2d,
+                Kind::Line2d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {

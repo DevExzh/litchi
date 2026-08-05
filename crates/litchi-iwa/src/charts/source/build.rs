@@ -31,7 +31,7 @@ const DEFAULT_RADAR_FILL_STROKE_ALPHA_MULTIPLIER: f32 = 0.15;
 pub(crate) fn source_chart_objects(
     ids: SourceChartObjectIds,
     parent_id: u64,
-    kind: ChartKind,
+    kind: Kind,
     data: ChartData,
     geometry: DrawableGeometry,
     stylesheet_id: u64,
@@ -65,7 +65,7 @@ pub(crate) fn source_chart_objects(
             }),
         },
         tsch::ChartArchive {
-            chart_type: Some(kind.into_raw()),
+            chart_type: Some(kind.native_value()),
             scatter_format: Some(tsch::ScatterFormat::SharedX as i32),
             preset: Some(reference(ids.preset)),
             series_direction: Some(tsch::SeriesDirection::ByRow as i32),

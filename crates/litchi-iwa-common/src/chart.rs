@@ -2,6 +2,7 @@
 
 pub mod axis;
 pub mod direction;
+pub mod kind;
 pub mod number_format;
 pub mod pie;
 pub mod reference_line;

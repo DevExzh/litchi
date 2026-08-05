@@ -5,7 +5,7 @@
 
 use prost::Message;
 
-use crate::charts::ChartKind;
+use crate::charts::Kind;
 use crate::charts::series_style::{
     GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD, chart_series_style_slots,
     generated_chart_series_style_extension,
@@ -61,7 +61,7 @@ pub(crate) fn chart_series_value_label_locations(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
 ) -> Result<Vec<ChartSeriesValueLabelLocation>> {
     let storage = LocationStorage::for_kind(kind)?;
@@ -90,7 +90,7 @@ pub(crate) fn set_chart_series_value_label_locations(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     expected: &[ChartSeriesValueLabelLocation],
 ) -> Result<()> {
@@ -142,18 +142,18 @@ enum LocationStorage {
 }
 
 impl LocationStorage {
-    fn for_kind(kind: ChartKind) -> Result<Self> {
+    fn for_kind(kind: Kind) -> Result<Self> {
         match kind {
-            ChartKind::Column2d
-            | ChartKind::Column3d
-            | ChartKind::Bar2d
-            | ChartKind::Bar3d
-            | ChartKind::MultiDataColumn2d
-            | ChartKind::MultiDataBar2d => Ok(Self::Bar),
-            ChartKind::StackedColumn2d
-            | ChartKind::StackedColumn3d
-            | ChartKind::StackedBar2d
-            | ChartKind::StackedBar3d => Ok(Self::StackedBar),
+            Kind::Column2d
+            | Kind::Column3d
+            | Kind::Bar2d
+            | Kind::Bar3d
+            | Kind::MultiDataColumn2d
+            | Kind::MultiDataBar2d => Ok(Self::Bar),
+            Kind::StackedColumn2d
+            | Kind::StackedColumn3d
+            | Kind::StackedBar2d
+            | Kind::StackedBar3d => Ok(Self::StackedBar),
             _ => Err(Error::InvalidFormat(format!(
                 "chart kind {kind:?} has no supported series value-label location"
             ))),
@@ -271,9 +271,9 @@ mod tests {
     fn bar_and_stacked_bar_use_distinct_native_fields() {
         assert_eq!(LocationStorage::Bar.field_number(), 88);
         assert_eq!(LocationStorage::StackedBar.field_number(), 97);
-        assert!(LocationStorage::for_kind(ChartKind::Column2d).is_ok());
-        assert!(LocationStorage::for_kind(ChartKind::StackedColumn2d).is_ok());
-        assert!(LocationStorage::for_kind(ChartKind::Pie2d).is_err());
+        assert!(LocationStorage::for_kind(Kind::Column2d).is_ok());
+        assert!(LocationStorage::for_kind(Kind::StackedColumn2d).is_ok());
+        assert!(LocationStorage::for_kind(Kind::Pie2d).is_err());
     }
 
     #[test]

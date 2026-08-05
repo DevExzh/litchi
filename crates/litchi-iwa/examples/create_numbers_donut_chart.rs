@@ -3,7 +3,7 @@
 use std::env;
 
 use litchi_iwa::charts::{
-    ChartData, ChartDonutInnerRadius, ChartKind, ChartPieLabelDistance, LabelVisibility,
+    ChartData, ChartDonutInnerRadius, Kind, ChartPieLabelDistance, LabelVisibility,
 };
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sheet_id = editor.sheets()?[0].object_id;
     let chart = editor.add_sheet_chart(
         sheet_id,
-        ChartKind::Donut2d,
+        Kind::Donut2d,
         donut_data()?,
         DrawablePoint { x: 420.0, y: 120.0 },
         DrawableSize {

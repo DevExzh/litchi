@@ -7,7 +7,7 @@
 
 use prost::Message;
 
-use crate::charts::ChartKind;
+use crate::charts::Kind;
 use crate::charts::style::{
     GENERATED_CHART_STYLE_EXTENSION_FIELD, chart_style_slot, generated_chart_style_extension,
 };
@@ -56,7 +56,7 @@ pub(crate) fn chart_radar_grid_shape(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
 ) -> Result<ChartRadarGridShape> {
     require_radar_chart(kind)?;
     chart_style_slot(
@@ -74,7 +74,7 @@ pub(crate) fn set_chart_radar_grid_shape(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     shape: ChartRadarGridShape,
 ) -> Result<()> {
     require_radar_chart(kind)?;
@@ -97,7 +97,7 @@ pub(crate) fn set_chart_radar_grid_shape(
     Ok(())
 }
 
-fn require_radar_chart(kind: ChartKind) -> Result<()> {
+fn require_radar_chart(kind: Kind) -> Result<()> {
     if !kind.supports_radar_grid_shape() {
         return Err(Error::InvalidFormat(format!(
             "chart kind {kind:?} does not expose radar grid shape"

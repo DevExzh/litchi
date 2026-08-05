@@ -4,7 +4,7 @@
 //! in sparse series non-style objects. Line and radar charts default to
 //! straight segments; scatter charts default to no connecting lines.
 
-use crate::charts::ChartKind;
+use crate::charts::Kind;
 use crate::charts::series_non_style::{
     GENERATED_CHART_SERIES_NON_STYLE_EXTENSION_FIELD, NewChartSeriesNonStyleBase,
     chart_series_non_style_values, generated_chart_series_non_style_extension,
@@ -64,11 +64,11 @@ pub enum ChartSeriesConnectionLineKind {
 
 impl ChartSeriesConnectionLineKind {
     /// Resolve the native field family used by a chart kind.
-    pub fn for_chart_kind(kind: ChartKind) -> Result<Self> {
+    pub fn for_chart_kind(kind: Kind) -> Result<Self> {
         match kind {
-            ChartKind::Line2d => Ok(Self::Line2d),
-            ChartKind::Radar2d => Ok(Self::Radar2d),
-            ChartKind::Scatter2d => Ok(Self::Scatter2d),
+            Kind::Line2d => Ok(Self::Line2d),
+            Kind::Radar2d => Ok(Self::Radar2d),
+            Kind::Scatter2d => Ok(Self::Scatter2d),
             _ => Err(Error::InvalidFormat(format!(
                 "chart kind {kind:?} has no unambiguous series connection-line family"
             ))),
@@ -106,7 +106,7 @@ pub(crate) fn chart_series_connection_lines(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
 ) -> Result<Vec<ChartSeriesConnectionLine>> {
     let storage = ChartSeriesConnectionLineKind::for_chart_kind(kind)?;
@@ -128,7 +128,7 @@ pub(crate) fn set_chart_series_connection_lines(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     expected: &[ChartSeriesConnectionLine],
 ) -> Result<()> {
@@ -322,16 +322,16 @@ mod tests {
 
     #[test]
     fn every_unambiguous_connection_line_kind_has_a_typed_storage_family() {
-        for kind in [ChartKind::Line2d, ChartKind::Radar2d, ChartKind::Scatter2d] {
+        for kind in [Kind::Line2d, Kind::Radar2d, Kind::Scatter2d] {
             assert!(ChartSeriesConnectionLineKind::for_chart_kind(kind).is_ok());
         }
         for kind in [
-            ChartKind::Area2d,
-            ChartKind::Bubble2d,
-            ChartKind::MultiDataScatter2d,
-            ChartKind::Mixed2d,
-            ChartKind::TwoAxis2d,
-            ChartKind::Line3d,
+            Kind::Area2d,
+            Kind::Bubble2d,
+            Kind::MultiDataScatter2d,
+            Kind::Mixed2d,
+            Kind::TwoAxis2d,
+            Kind::Line3d,
         ] {
             assert!(ChartSeriesConnectionLineKind::for_chart_kind(kind).is_err());
         }

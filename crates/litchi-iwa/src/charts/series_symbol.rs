@@ -5,7 +5,7 @@
 
 use prost::Message;
 
-use crate::charts::ChartKind;
+use crate::charts::Kind;
 use crate::charts::series_non_style::{
     NewChartSeriesNonStyleBase, chart_series_non_style_values,
     generated_chart_series_non_style_extension, patch_chart_series_non_style_extension,
@@ -132,12 +132,12 @@ pub enum ChartSeriesSymbolKind {
 }
 
 impl ChartSeriesSymbolKind {
-    pub fn for_chart_kind(kind: ChartKind) -> Result<Self> {
+    pub fn for_chart_kind(kind: Kind) -> Result<Self> {
         match kind {
-            ChartKind::Area2d | ChartKind::StackedArea2d => Ok(Self::Area2d),
-            ChartKind::Line2d => Ok(Self::Line2d),
-            ChartKind::Radar2d => Ok(Self::Radar2d),
-            ChartKind::Scatter2d => Ok(Self::Scatter2d),
+            Kind::Area2d | Kind::StackedArea2d => Ok(Self::Area2d),
+            Kind::Line2d => Ok(Self::Line2d),
+            Kind::Radar2d => Ok(Self::Radar2d),
+            Kind::Scatter2d => Ok(Self::Scatter2d),
             _ => Err(Error::InvalidFormat(format!(
                 "chart kind {kind:?} has no unambiguous data-symbol family"
             ))),
@@ -183,7 +183,7 @@ pub(crate) fn chart_series_symbols(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
 ) -> Result<Vec<Option<ChartSeriesSymbol>>> {
     let storage = ChartSeriesSymbolKind::for_chart_kind(kind)?;
@@ -229,7 +229,7 @@ pub(crate) fn set_chart_series_symbols(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     expected: &[Option<ChartSeriesSymbol>],
 ) -> Result<()> {

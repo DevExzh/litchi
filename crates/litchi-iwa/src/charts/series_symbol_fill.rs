@@ -8,7 +8,7 @@ use prost::Message;
 
 use litchi_iwa_common::media::Type as MediaType;
 
-use crate::charts::ChartKind;
+use crate::charts::Kind;
 use crate::charts::series_style::{
     ChartSeriesStyleSlot, GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD,
     effective_chart_series_style_slots, generated_chart_series_style_extension,
@@ -77,13 +77,13 @@ struct SymbolFillFields {
 }
 
 impl ChartSeriesSymbolFillKind {
-    pub fn for_chart_kind(kind: ChartKind) -> Result<Self> {
+    pub fn for_chart_kind(kind: Kind) -> Result<Self> {
         match kind {
-            ChartKind::Area2d | ChartKind::StackedArea2d => Ok(Self::Area2d),
-            ChartKind::Bubble2d => Ok(Self::Bubble2d),
-            ChartKind::Line2d => Ok(Self::Line2d),
-            ChartKind::Radar2d => Ok(Self::Radar2d),
-            ChartKind::Scatter2d => Ok(Self::Scatter2d),
+            Kind::Area2d | Kind::StackedArea2d => Ok(Self::Area2d),
+            Kind::Bubble2d => Ok(Self::Bubble2d),
+            Kind::Line2d => Ok(Self::Line2d),
+            Kind::Radar2d => Ok(Self::Radar2d),
+            Kind::Scatter2d => Ok(Self::Scatter2d),
             _ => Err(Error::InvalidFormat(format!(
                 "chart kind {kind:?} has no unambiguous data-symbol fill family"
             ))),
@@ -133,7 +133,7 @@ pub(crate) fn chart_series_symbol_fills(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
 ) -> Result<Vec<ChartSeriesSymbolFill>> {
     let storage = ChartSeriesSymbolFillKind::for_chart_kind(kind)?;
@@ -155,7 +155,7 @@ pub(crate) fn set_chart_series_symbol_fills(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     expected: &[ChartSeriesSymbolFill],
 ) -> Result<()> {
@@ -223,7 +223,7 @@ pub(crate) fn reset_chart_series_symbol_fill(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     series_index: usize,
 ) -> Result<ChartSeriesSymbolFill> {
@@ -263,7 +263,7 @@ pub(crate) fn set_chart_series_symbol_image_fill_data(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     series_index: usize,
     preferred_filename: &str,

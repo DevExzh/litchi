@@ -74,7 +74,7 @@ mod tests {
         let chart = editor
             .add_slide_chart(
                 0,
-                ChartKind::Area3d,
+                Kind::Area3d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {

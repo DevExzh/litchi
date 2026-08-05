@@ -6,7 +6,7 @@
 
 use prost::Message;
 
-use crate::charts::ChartKind;
+use crate::charts::Kind;
 use crate::charts::series_style::{
     ChartSeriesStyleSlot, GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD,
     effective_chart_series_style_slots, generated_chart_series_style_extension,
@@ -101,20 +101,20 @@ pub enum ChartSeriesStrokeKind {
 
 impl ChartSeriesStrokeKind {
     /// Resolve the stroke family displayed by iWork for a chart kind.
-    pub fn for_chart_kind(kind: ChartKind) -> Result<Self> {
+    pub fn for_chart_kind(kind: Kind) -> Result<Self> {
         match kind {
-            ChartKind::Area2d | ChartKind::StackedArea2d => Ok(Self::Area2d),
-            ChartKind::Bar2d
-            | ChartKind::StackedBar2d
-            | ChartKind::MultiDataBar2d
-            | ChartKind::Column2d
-            | ChartKind::StackedColumn2d
-            | ChartKind::MultiDataColumn2d => Ok(Self::BarOrColumn2d),
-            ChartKind::Bubble2d => Ok(Self::Bubble2d),
-            ChartKind::Line2d => Ok(Self::Line2d),
-            ChartKind::Pie2d | ChartKind::Donut2d => Ok(Self::Pie2d),
-            ChartKind::Radar2d => Ok(Self::Radar2d),
-            ChartKind::Scatter2d => Ok(Self::Scatter2d),
+            Kind::Area2d | Kind::StackedArea2d => Ok(Self::Area2d),
+            Kind::Bar2d
+            | Kind::StackedBar2d
+            | Kind::MultiDataBar2d
+            | Kind::Column2d
+            | Kind::StackedColumn2d
+            | Kind::MultiDataColumn2d => Ok(Self::BarOrColumn2d),
+            Kind::Bubble2d => Ok(Self::Bubble2d),
+            Kind::Line2d => Ok(Self::Line2d),
+            Kind::Pie2d | Kind::Donut2d => Ok(Self::Pie2d),
+            Kind::Radar2d => Ok(Self::Radar2d),
+            Kind::Scatter2d => Ok(Self::Scatter2d),
             _ => Err(Error::InvalidFormat(format!(
                 "chart kind {kind:?} has no unambiguous series stroke"
             ))),
@@ -140,7 +140,7 @@ pub(crate) fn chart_series_strokes(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
 ) -> Result<Vec<Option<ChartSeriesStroke>>> {
     let storage = ChartSeriesStrokeKind::for_chart_kind(kind)?;
@@ -162,7 +162,7 @@ pub(crate) fn set_chart_series_strokes(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     expected: &[Option<ChartSeriesStroke>],
 ) -> Result<()> {
@@ -215,7 +215,7 @@ pub(crate) fn reset_chart_series_stroke(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     series_index: usize,
 ) -> Result<Option<ChartSeriesStroke>> {
@@ -334,31 +334,31 @@ mod tests {
     #[test]
     fn every_unambiguous_stroke_kind_has_a_typed_storage_family() {
         for kind in [
-            ChartKind::Area2d,
-            ChartKind::StackedArea2d,
-            ChartKind::Bar2d,
-            ChartKind::StackedBar2d,
-            ChartKind::MultiDataBar2d,
-            ChartKind::Column2d,
-            ChartKind::StackedColumn2d,
-            ChartKind::MultiDataColumn2d,
-            ChartKind::Bubble2d,
-            ChartKind::Line2d,
-            ChartKind::Pie2d,
-            ChartKind::Donut2d,
-            ChartKind::Radar2d,
-            ChartKind::Scatter2d,
+            Kind::Area2d,
+            Kind::StackedArea2d,
+            Kind::Bar2d,
+            Kind::StackedBar2d,
+            Kind::MultiDataBar2d,
+            Kind::Column2d,
+            Kind::StackedColumn2d,
+            Kind::MultiDataColumn2d,
+            Kind::Bubble2d,
+            Kind::Line2d,
+            Kind::Pie2d,
+            Kind::Donut2d,
+            Kind::Radar2d,
+            Kind::Scatter2d,
         ] {
             assert!(ChartSeriesStrokeKind::for_chart_kind(kind).is_ok());
         }
         for kind in [
-            ChartKind::Mixed2d,
-            ChartKind::TwoAxis2d,
-            ChartKind::Area3d,
-            ChartKind::Bar3d,
-            ChartKind::Column3d,
-            ChartKind::Line3d,
-            ChartKind::Pie3d,
+            Kind::Mixed2d,
+            Kind::TwoAxis2d,
+            Kind::Area3d,
+            Kind::Bar3d,
+            Kind::Column3d,
+            Kind::Line3d,
+            Kind::Pie3d,
         ] {
             assert!(ChartSeriesStrokeKind::for_chart_kind(kind).is_err());
         }

@@ -4,7 +4,7 @@ use std::env;
 use std::path::Path;
 
 use litchi_iwa::charts::{
-    ChartData, ChartKind, ChartPieLabelDistance, LabelVisibility, LeaderLineVisibility,
+    ChartData, Kind, ChartPieLabelDistance, LabelVisibility, LeaderLineVisibility,
 };
 use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
@@ -40,7 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sheet_id = numbers.sheets()?[0].object_id;
     let chart = numbers.add_sheet_chart(
         sheet_id,
-        ChartKind::Pie2d,
+        Kind::Pie2d,
         data()?,
         DrawablePoint { x: 360.0, y: 100.0 },
         DrawableSize {
@@ -88,7 +88,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut pages = PagesDocumentBuilder::new().body_text(body).build()?;
     let chart = pages.add_body_chart(
         body.encode_utf16().count(),
-        ChartKind::Pie2d,
+        Kind::Pie2d,
         data()?,
         DrawablePoint { x: 72.0, y: 120.0 },
         DrawableSize {
@@ -121,7 +121,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
     let chart = keynote.add_slide_chart(
         0,
-        ChartKind::Pie2d,
+        Kind::Pie2d,
         data()?,
         DrawablePoint { x: 470.0, y: 190.0 },
         DrawableSize {

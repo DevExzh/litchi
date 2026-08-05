@@ -20,7 +20,7 @@ pub(crate) use stylesheet::{
 
 use prost::Message;
 
-use super::{ChartData, ChartGapSpacing, ChartKind, IWorkChartArchive};
+use super::{ChartData, ChartGapSpacing, IWorkChartArchive, Kind};
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::protobuf::{tn, tsch, tsd, tsk, tsp, tss};
 use crate::shapes::{

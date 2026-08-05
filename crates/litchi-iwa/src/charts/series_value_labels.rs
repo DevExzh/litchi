@@ -6,7 +6,7 @@
 
 use prost::Message;
 
-use crate::charts::ChartKind;
+use crate::charts::Kind;
 use crate::charts::series_non_style::{
     NewChartSeriesNonStyleBase, chart_series_non_style_values,
     generated_chart_series_non_style_extension, patch_chart_series_non_style_extension,
@@ -73,7 +73,7 @@ pub(crate) fn chart_series_value_label_visibilities(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
 ) -> Result<Vec<ChartSeriesValueLabelVisibility>> {
     let storage = ValueLabelStorage::for_kind(kind)?;
@@ -94,7 +94,7 @@ pub(crate) fn set_chart_series_value_label_visibilities(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     expected: &[ChartSeriesValueLabelVisibility],
 ) -> Result<()> {
     let storage = ValueLabelStorage::for_kind(kind)?;
@@ -125,31 +125,28 @@ enum ValueLabelStorage {
 }
 
 impl ValueLabelStorage {
-    fn for_kind(kind: ChartKind) -> Result<Self> {
+    fn for_kind(kind: Kind) -> Result<Self> {
         match kind {
-            ChartKind::Area2d
-            | ChartKind::Area3d
-            | ChartKind::StackedArea2d
-            | ChartKind::StackedArea3d => Ok(Self::Area),
-            ChartKind::Column2d
-            | ChartKind::Column3d
-            | ChartKind::Bar2d
-            | ChartKind::Bar3d
-            | ChartKind::StackedColumn2d
-            | ChartKind::StackedColumn3d
-            | ChartKind::StackedBar2d
-            | ChartKind::StackedBar3d
-            | ChartKind::MultiDataColumn2d
-            | ChartKind::MultiDataBar2d => Ok(Self::Bar),
-            ChartKind::Bubble2d | ChartKind::MultiDataBubble2d => Ok(Self::Bubble),
-            ChartKind::Line2d | ChartKind::Line3d => Ok(Self::Line),
-            ChartKind::Mixed2d | ChartKind::TwoAxis2d => Ok(Self::Mixed),
-            ChartKind::Pie2d | ChartKind::Pie3d | ChartKind::Donut2d | ChartKind::Donut3d => {
-                Ok(Self::Pie)
+            Kind::Area2d | Kind::Area3d | Kind::StackedArea2d | Kind::StackedArea3d => {
+                Ok(Self::Area)
             },
-            ChartKind::Radar2d => Ok(Self::Radar),
-            ChartKind::Scatter2d | ChartKind::MultiDataScatter2d => Ok(Self::Scatter),
-            ChartKind::Undefined | ChartKind::Unsupported(_) => Err(Error::InvalidFormat(format!(
+            Kind::Column2d
+            | Kind::Column3d
+            | Kind::Bar2d
+            | Kind::Bar3d
+            | Kind::StackedColumn2d
+            | Kind::StackedColumn3d
+            | Kind::StackedBar2d
+            | Kind::StackedBar3d
+            | Kind::MultiDataColumn2d
+            | Kind::MultiDataBar2d => Ok(Self::Bar),
+            Kind::Bubble2d | Kind::MultiDataBubble2d => Ok(Self::Bubble),
+            Kind::Line2d | Kind::Line3d => Ok(Self::Line),
+            Kind::Mixed2d | Kind::TwoAxis2d => Ok(Self::Mixed),
+            Kind::Pie2d | Kind::Pie3d | Kind::Donut2d | Kind::Donut3d => Ok(Self::Pie),
+            Kind::Radar2d => Ok(Self::Radar),
+            Kind::Scatter2d | Kind::MultiDataScatter2d => Ok(Self::Scatter),
+            _ => Err(Error::InvalidFormat(format!(
                 "chart kind {kind:?} has no supported series value labels"
             ))),
         }
@@ -294,10 +291,10 @@ mod tests {
     #[test]
     fn every_known_chart_family_has_typed_value_label_storage() {
         for raw in 1..=tsch::ChartType::RadarChartType2D as i32 {
-            assert!(ValueLabelStorage::for_kind(ChartKind::from_raw(raw)).is_ok());
+            assert!(ValueLabelStorage::for_kind(Kind::from_native(raw)).is_ok());
         }
-        assert!(ValueLabelStorage::for_kind(ChartKind::Undefined).is_err());
-        assert!(ValueLabelStorage::for_kind(ChartKind::Unsupported(9_001)).is_err());
+        assert!(ValueLabelStorage::for_kind(Kind::Undefined).is_err());
+        assert!(ValueLabelStorage::for_kind(Kind::from_native(9_001)).is_err());
     }
 
     #[test]

@@ -74,7 +74,7 @@ fn set_body_chart_donut_inner_radius(
     Ok(())
 }
 
-fn require_donut_inner_radius(kind: ChartKind, drawable_object_id: u64) -> Result<()> {
+fn require_donut_inner_radius(kind: Kind, drawable_object_id: u64) -> Result<()> {
     if !kind.supports_donut_inner_radius() {
         return Err(Error::InvalidFormat(format!(
             "Pages chart {drawable_object_id} kind {kind:?} has no Segments inner radius"

@@ -4,7 +4,7 @@ use std::env;
 use std::path::Path;
 
 use litchi_iwa::charts::reference_line::{Line, Value};
-use litchi_iwa::charts::{ChartData, ChartKind};
+use litchi_iwa::charts::{ChartData, Kind};
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::pages::PagesDocumentBuilder;
@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sheet_id = numbers.sheets()?[0].object_id;
     let chart = numbers.add_sheet_chart(
         sheet_id,
-        ChartKind::Line2d,
+        Kind::Line2d,
         data()?,
         DrawablePoint { x: 360.0, y: 100.0 },
         DrawableSize {
@@ -52,7 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut pages = PagesDocumentBuilder::new().body_text(body).build()?;
     let chart = pages.add_body_chart(
         body.encode_utf16().count(),
-        ChartKind::Line2d,
+        Kind::Line2d,
         data()?,
         DrawablePoint { x: 72.0, y: 120.0 },
         DrawableSize {
@@ -73,7 +73,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
     let chart = keynote.add_slide_chart(
         0,
-        ChartKind::Line2d,
+        Kind::Line2d,
         data()?,
         DrawablePoint { x: 260.0, y: 220.0 },
         DrawableSize {

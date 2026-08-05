@@ -8,7 +8,7 @@
 
 use prost::Message;
 
-use crate::charts::ChartKind;
+use crate::charts::Kind;
 use crate::charts::series_style::{
     ChartSeriesStyleSlot, GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD,
     effective_chart_series_style_slots, generated_chart_series_style_extension,
@@ -49,7 +49,7 @@ pub(crate) fn chart_radar_series_style(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
 ) -> Result<ChartRadarSeriesStyle> {
     require_radar_chart(kind)?;
@@ -85,7 +85,7 @@ pub(crate) fn set_chart_radar_series_style(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     style: ChartRadarSeriesStyle,
 ) -> Result<()> {
@@ -129,7 +129,7 @@ pub(crate) fn set_chart_radar_series_style(
     Ok(())
 }
 
-fn require_radar_chart(kind: ChartKind) -> Result<()> {
+fn require_radar_chart(kind: Kind) -> Result<()> {
     if !kind.supports_radar_series_style() {
         return Err(Error::InvalidFormat(format!(
             "chart kind {kind:?} does not expose Radar series styles"

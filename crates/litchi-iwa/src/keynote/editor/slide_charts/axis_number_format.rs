@@ -76,7 +76,7 @@ fn set_slide_chart_axis_number_format(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::{ChartData, ChartKind, DecimalPlaces, NegativeStyle};
+    use crate::charts::{ChartData, Kind, DecimalPlaces, NegativeStyle};
     use crate::keynote::KeynoteDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
@@ -86,7 +86,7 @@ mod tests {
         let chart = editor
             .add_slide_chart(
                 0,
-                ChartKind::Line2d,
+                Kind::Line2d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {
