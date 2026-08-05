@@ -4671,6 +4671,18 @@ aliases.
 The common all-target suite (182 unit tests plus integration targets), ODT
 library suite (525 tests), formatting, and boundary checks pass.
 
+## ODF family package layering
+
+The shared packaged-family owner is now `litchi-odf-common::core::family::Package`.
+Each ODF family keeps its own contextual `package` facade and validation
+policy; ODS refers to the shared owner through `core::family::Package` so its
+public `package::Package` remains unambiguous. The former
+`FamilyPackage` prefix was removed without a compatibility alias across ODB,
+ODC, ODG, ODI, ODM, ODP, ODS, and OTH.
+
+All affected family crates and the common crate pass formatting and all-target
+compilation; the focused common, ODS, and ODG tests remain green.
+
 ## Shared BIFF framing and legacy binary owner migration
 
 The legacy binary migration now has a neutral physical-record owner:
