@@ -6,9 +6,9 @@ use super::codec::{
     validate_id, validate_leaf_path,
 };
 use super::model::{
-    CHART_CT, COLOR_STYLE_CT, COLOR_STYLE_REL, Companion, DOCUMENT_CT,
-    EmbeddedWorkbook, EmbeddedWorkbookContentType, Graph, MAX_CHARTS, MAX_COMPANION_XML,
-    MAX_COMPANIONS, MAX_RELATIONSHIPS, MAX_WORKBOOK_BYTES, Resource, STYLE_CT, STYLE_REL,
+    CHART_CT, COLOR_STYLE_CT, COLOR_STYLE_REL, Companion, DOCUMENT_CT, EmbeddedWorkbook,
+    EmbeddedWorkbookContentType, Graph, MAX_CHARTS, MAX_COMPANION_XML, MAX_COMPANIONS,
+    MAX_RELATIONSHIPS, MAX_WORKBOOK_BYTES, Resource, STYLE_CT, STYLE_REL,
 };
 use crate::error::{Error, Result};
 use litchi_opc::part::{BlobPart, Part};

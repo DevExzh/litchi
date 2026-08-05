@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
-use litchi_ooxml_common::xml::unqualified_attribute_value;
 use litchi_ooxml_common::mce::{Capabilities, process_markup_compatibility};
+use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};

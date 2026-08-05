@@ -126,7 +126,6 @@ impl OpaqueFields {
         self.order.push(value);
         Ok(())
     }
-
 }
 
 pub(crate) fn opaque_mut(slot: &mut Option<Box<OpaqueFields>>) -> &mut OpaqueFields {

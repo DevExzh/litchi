@@ -3,9 +3,7 @@
 //! MCE preprocessing and retained extension fragments stay inert; this layer
 //! owns only XML validation, conversion, and serialization.
 
-use crate::auto_filter::{
-    Definition, Column, parse_auto_filter, write_auto_filter_fragment,
-};
+use crate::auto_filter::{Column, Definition, parse_auto_filter, write_auto_filter_fragment};
 use crate::error::Result;
 use crate::sort::{SortBy, SortMethod};
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
@@ -1565,10 +1563,7 @@ mod tests {
         remove_worksheet_named_sheet_views, store_worksheet_named_sheet_views,
     };
     use super::*;
-    use crate::auto_filter::{
-        Calendar, DateGroup, Grouping, Payload, Item,
-        Values, Icon, Top10,
-    };
+    use crate::auto_filter::{Calendar, DateGroup, Grouping, Icon, Item, Payload, Top10, Values};
     use litchi_opc::{OpcPackage, PackURI};
 
     fn libreoffice_fixture() -> OpcPackage {
@@ -1679,16 +1674,8 @@ mod tests {
                 vec![
                     Item::Value("North".into()),
                     Item::DateGroup(
-                        DateGroup::new(
-                            2026,
-                            Some(7),
-                            Some(26),
-                            None,
-                            None,
-                            None,
-                            Grouping::Day,
-                        )
-                        .unwrap(),
+                        DateGroup::new(2026, Some(7), Some(26), None, None, None, Grouping::Day)
+                            .unwrap(),
                     ),
                 ],
             )
@@ -1744,23 +1731,8 @@ mod tests {
     #[test]
     fn detailed_authoring_rejects_invalid_relationships_and_filter_values() {
         let mut column = ColumnFilter::new(3).unwrap();
-        assert!(
-            column
-                .add_filter(Column::new(2).unwrap())
-                .is_err()
-        );
-        assert!(
-            DateGroup::new(
-                2026,
-                None,
-                Some(26),
-                None,
-                None,
-                None,
-                Grouping::Day,
-            )
-            .is_err()
-        );
+        assert!(column.add_filter(Column::new(2).unwrap()).is_err());
+        assert!(DateGroup::new(2026, None, Some(26), None, None, None, Grouping::Day,).is_err());
         assert!(Top10::new(true, true, 101.0, None).is_err());
         assert!(Icon::new(crate::auto_filter::IconSet::ThreeArrows, 3).is_err());
 

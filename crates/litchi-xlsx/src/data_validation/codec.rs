@@ -12,8 +12,8 @@ use super::{
 use crate::error::{Error, Result};
 use litchi_core::xml::escape::escape_xml;
 use litchi_ooxml_common::custom_xml::valid_guid;
+use litchi_ooxml_common::mce::{Capabilities, Limits, Name, process_markup_compatibility};
 use litchi_ooxml_common::xml::decode_xml_reference;
-use litchi_ooxml_common::mce::{Name, Capabilities, Limits, process_markup_compatibility};
 use quick_xml::Writer;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};

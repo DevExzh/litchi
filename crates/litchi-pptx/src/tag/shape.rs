@@ -20,7 +20,7 @@ use super::{
     replace_xml, staged_xml, validate_relative_target, validate_selected_relationship,
 };
 use crate::{Error, Result};
-use litchi_ooxml_common::mce::{OffsetLimits, Capabilities, active_offsets};
+use litchi_ooxml_common::mce::{Capabilities, OffsetLimits, active_offsets};
 use litchi_opc::{OpcPackage, PackURI, Part as OpcPart, XmlPart};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};

@@ -119,11 +119,7 @@ fn retains_reserved_bits_and_rejects_broken_order_or_bad_last_run() {
 
     let mut collector = CommentCollector::new();
     collector.feed_record(OBJ_TYPE, &obj(2)).unwrap();
-    assert!(
-        collector
-            .feed_record(MSODRAWING_TYPE, &[0; 8])
-            .is_err()
-    );
+    assert!(collector.feed_record(MSODRAWING_TYPE, &[0; 8]).is_err());
 
     let mut bad_runs = runs(2);
     bad_runs[8..10].copy_from_slice(&1u16.to_le_bytes());

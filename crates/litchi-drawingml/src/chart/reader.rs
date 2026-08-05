@@ -378,9 +378,9 @@ pub fn read<R: BufRead>(reader: R) -> Result<Chart> {
         .take((limits.max_input_bytes as u64).saturating_add(1))
         .read_to_end(&mut input)?;
     if input.len() > limits.max_input_bytes {
-        return Err(Error::Mce(
-            litchi_ooxml_common::mce::Error::LimitExceeded("input bytes".into()),
-        ));
+        return Err(Error::Mce(litchi_ooxml_common::mce::Error::LimitExceeded(
+            "input bytes".into(),
+        )));
     }
     let xml = litchi_ooxml_common::mce::process_markup_compatibility(
         &input,

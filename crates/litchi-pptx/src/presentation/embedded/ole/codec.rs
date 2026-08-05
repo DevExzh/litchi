@@ -41,8 +41,7 @@ pub(crate) fn parse_tree(xml_bytes: &[u8]) -> Result<Node> {
         max_directive_tokens: 4096,
         max_choices_per_alternate: 1024,
     };
-    let xml =
-        process_markup_compatibility(xml_bytes, &Capabilities::ooxml_baseline(), &mce)?.xml;
+    let xml = process_markup_compatibility(xml_bytes, &Capabilities::ooxml_baseline(), &mce)?.xml;
     let mut reader = NsReader::from_reader(xml.as_ref());
     let mut stack: Vec<Node> = Vec::new();
     let mut root = None;

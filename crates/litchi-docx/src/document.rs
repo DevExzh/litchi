@@ -913,9 +913,7 @@ impl<'a> Document<'a> {
     /// ```
     pub fn header(&self, hdr_type: Kind) -> Result<Option<Story>> {
         let headers = self.headers()?;
-        Ok(headers
-            .into_iter()
-            .find(|header| header.kind() == hdr_type))
+        Ok(headers.into_iter().find(|header| header.kind() == hdr_type))
     }
 
     /// Get a specific footer by type.
@@ -938,9 +936,7 @@ impl<'a> Document<'a> {
     /// ```
     pub fn footer(&self, ftr_type: Kind) -> Result<Option<Story>> {
         let footers = self.footers()?;
-        Ok(footers
-            .into_iter()
-            .find(|footer| footer.kind() == ftr_type))
+        Ok(footers.into_iter().find(|footer| footer.kind() == ftr_type))
     }
 
     /// Get all `<w:hyperlink>` element hyperlinks in the document.

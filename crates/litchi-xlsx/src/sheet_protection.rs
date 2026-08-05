@@ -13,7 +13,7 @@ use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use crate::error::{Error, Result};
-use litchi_ooxml_common::mce::{Name, Capabilities, Limits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Capabilities, Limits, Name, process_markup_compatibility};
 
 const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";

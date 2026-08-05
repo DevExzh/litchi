@@ -72,8 +72,7 @@ pub use active_x::{
 };
 pub use auto_filter::{
     Calendar, Condition, Custom, Customs, DateGroup, Definition, Dynamic, DynamicType, Grouping,
-    Item, Top10, Values, parse_auto_filter,
-    parse_auto_filter_fragment, write_auto_filter_fragment,
+    Item, Top10, Values, parse_auto_filter, parse_auto_filter_fragment, write_auto_filter_fragment,
 };
 pub use calculation_properties::{Mode, ReferenceMode};
 pub use cell::{Cell, Cells, Content, Date, ErrorValue, Extents, Number, Text, Value};
@@ -108,8 +107,8 @@ pub use error::{
     Result, RowEditBlock, TabEditBlock,
 };
 pub use external_links::{
-    CellType, Dde, DdeItem, DdeValue, DdeValueType, DdeValues, DefinedName, Entry, ItemSource, Link,
-    Ole, OleItem, SheetData, Target, build_external_link_part,
+    CellType, Dde, DdeItem, DdeValue, DdeValueType, DdeValues, DefinedName, Entry, ItemSource,
+    Link, Ole, OleItem, SheetData, Target, build_external_link_part,
     build_external_link_part_with_conformance, load_external_link,
 };
 pub use formula::Formula;

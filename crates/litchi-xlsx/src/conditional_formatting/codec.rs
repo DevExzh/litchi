@@ -9,7 +9,7 @@ use super::model::{
     NumberFormat, Operator, Payload, Period, Range, Rule, Source, Value, ValueKind,
 };
 
-use litchi_ooxml_common::mce::{Name, Capabilities, Limits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Capabilities, Limits, Name, process_markup_compatibility};
 
 use quick_xml::encoding::Decoder;
 

@@ -5,8 +5,8 @@ use crate::presentation::embedded::{
     MAX_XML_ATTRIBUTES, MAX_XML_DEPTH, bounded, increment_nodes, invalid, is_presentationml_name,
     limit, relationship_value, validate_root,
 };
-use litchi_ooxml_common::xml::unqualified_attribute_value;
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
+use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
@@ -34,8 +34,7 @@ pub(crate) fn scan(xml_bytes: &[u8], count: &mut usize) -> Result<Vec<Parsed>> {
         max_directive_tokens: 4096,
         max_choices_per_alternate: 1024,
     };
-    let xml =
-        process_markup_compatibility(xml_bytes, &Capabilities::ooxml_baseline(), &mce)?.xml;
+    let xml = process_markup_compatibility(xml_bytes, &Capabilities::ooxml_baseline(), &mce)?.xml;
     let mut reader = NsReader::from_reader(xml.as_ref());
     let mut values = Vec::new();
     let mut nodes = 0usize;

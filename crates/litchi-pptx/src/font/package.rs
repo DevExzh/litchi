@@ -7,7 +7,7 @@ use super::{
     MAX_XML_BYTES, MCE_NS, PML, STRICT_PML, invalid, limit,
 };
 use crate::error::{Error, Result};
-use litchi_ooxml_common::mce::{OffsetLimits, Capabilities, Limits, active_offsets};
+use litchi_ooxml_common::mce::{Capabilities, Limits, OffsetLimits, active_offsets};
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use quick_xml::XmlVersion;

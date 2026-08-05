@@ -7,8 +7,8 @@
 use crate::presentation_properties::metadata::is_presentationml_name;
 use crate::time::{Offset, ParseError as TimeParseError};
 use crate::{Error, Result};
-use litchi_ooxml_common::xml::unqualified_attribute_value;
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
+use litchi_ooxml_common::xml::unqualified_attribute_value;
 use litchi_opc::Part;
 use litchi_opc::constants::content_type as ct;
 use quick_xml::encoding::Decoder;

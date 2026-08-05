@@ -1,6 +1,6 @@
 use super::*;
 use litchi_ooxml_common::mce::{
-    Capabilities, Limits, Name, NAMESPACE, process_markup_compatibility,
+    Capabilities, Limits, NAMESPACE, Name, process_markup_compatibility,
 };
 
 #[derive(Clone)]

@@ -2,7 +2,7 @@ use super::codec::{parse_profiled, pml, xml_error};
 use super::model::*;
 use super::*;
 use litchi_ooxml_common::mce::{
-    OffsetLimits, Capabilities, Limits, active_offsets, process_markup_compatibility,
+    Capabilities, Limits, OffsetLimits, active_offsets, process_markup_compatibility,
 };
 use litchi_opc::{OpcPackage, PackURI, Part as OpcPart, XmlPart};
 use quick_xml::events::{BytesStart, Event};

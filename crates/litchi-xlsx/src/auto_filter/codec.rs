@@ -170,9 +170,7 @@ fn write_payload(x: &mut Vec<u8>, p: &Payload) -> Result<()> {
             if let Some(opaque) = v.opaque.as_deref() {
                 for order in &opaque.order {
                     match *order {
-                        ChildOrder::Custom(index)
-                            if index < v.filters.len() && !written[index] =>
-                        {
+                        ChildOrder::Custom(index) if index < v.filters.len() && !written[index] => {
                             write_custom(x, &v.filters[index])?;
                             written[index] = true;
                         },
@@ -833,9 +831,7 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
                     && e.local_name().as_ref() == b"filters"
                 {
                     let (_, b) = values.take().unwrap();
-                    let order = (0..b.items.len())
-                        .map(ChildOrder::Item)
-                        .collect::<Vec<_>>();
+                    let order = (0..b.items.len()).map(ChildOrder::Item).collect::<Vec<_>>();
                     column.as_mut().unwrap().1.payload = Some(Payload::Values(Values {
                         blank: b.blank,
                         calendar_type: b.calendar_type,
@@ -925,7 +921,7 @@ fn parse_column(e: &BytesStart<'_>, d: Decoder, width: Option<u32>) -> Result<Co
         hidden_button: optional_bool(e, b"hiddenButton", d)?.unwrap_or(false),
         show_button: optional_bool(e, b"showButton", d)?.unwrap_or(true),
         payload: None,
-        opaque: unknown_attributes(e, d, &[b"colId", b"hiddenButton", b"showButton"] )?,
+        opaque: unknown_attributes(e, d, &[b"colId", b"hiddenButton", b"showButton"])?,
     })
 }
 
@@ -982,16 +978,17 @@ fn unknown_owner(
     }
 }
 
-fn capture_unknown(
-    reader: &mut NsReader<&[u8]>,
-    first: Event<'static>,
-) -> Result<UnknownElement> {
+fn capture_unknown(reader: &mut NsReader<&[u8]>, first: Event<'static>) -> Result<UnknownElement> {
     let mut writer = Writer::new(Vec::new());
     writer.write_event(first.clone()).map_err(xml_error)?;
     let mut depth = match first {
         Event::Start(_) => 1usize,
         Event::Empty(_) => 0,
-        _ => return Err(invalid("unknown autoFilter capture did not start at an element")),
+        _ => {
+            return Err(invalid(
+                "unknown autoFilter capture did not start at an element",
+            ));
+        },
     };
     while depth != 0 {
         let event = reader.read_event().map_err(xml_error)?.into_owned();
@@ -1002,9 +999,11 @@ fn capture_unknown(
                     .checked_add(1)
                     .ok_or_else(|| invalid("unknown autoFilter nesting is too deep"))?;
             },
-            Event::End(_) => depth = depth
-                .checked_sub(1)
-                .ok_or_else(|| invalid("unknown autoFilter nesting underflow"))?,
+            Event::End(_) => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("unknown autoFilter nesting underflow"))?
+            },
             Event::Eof => return Err(invalid("unterminated unknown autoFilter element")),
             _ => {},
         }
@@ -1181,7 +1180,7 @@ fn push_custom(v: &mut (usize, CustomBuilder), e: &BytesStart<'_>, d: Decoder) -
                 .unwrap_or("equal"),
         )?,
         value,
-        opaque: unknown_attributes(e, d, &[b"operator", b"val"] )?,
+        opaque: unknown_attributes(e, d, &[b"operator", b"val"])?,
     });
     Ok(v.1.filters.len() - 1)
 }
@@ -1210,13 +1209,13 @@ fn set_simple_payload(
                 filter_type: DynamicType::parse(&required_attr(e, b"type", d)?)?,
                 value,
                 max_value,
-                opaque: unknown_attributes(e, d, &[b"type", b"val", b"maxVal"] )?,
+                opaque: unknown_attributes(e, d, &[b"type", b"val", b"maxVal"])?,
             })
         },
         b"colorFilter" => Payload::Color(Color {
             differential_format_id: required_u32(e, b"dxfId", d)?,
             cell_color: optional_bool(e, b"cellColor", d)?.unwrap_or(true),
-            opaque: unknown_attributes(e, d, &[b"dxfId", b"cellColor"] )?,
+            opaque: unknown_attributes(e, d, &[b"dxfId", b"cellColor"])?,
         }),
         b"iconFilter" => {
             let set = IconSet::parse(&required_attr(e, b"iconSet", d)?)?;
@@ -1229,7 +1228,7 @@ fn set_simple_payload(
             Payload::Icon(Icon {
                 icon_set: set,
                 icon_id: id,
-                opaque: unknown_attributes(e, d, &[b"iconSet", b"iconId"] )?,
+                opaque: unknown_attributes(e, d, &[b"iconSet", b"iconId"])?,
             })
         },
         b"top10" => {
@@ -1245,7 +1244,7 @@ fn set_simple_payload(
                 percent,
                 value,
                 filter_value: optional_f64(e, b"filterVal", d)?,
-                opaque: unknown_attributes(e, d, &[b"top", b"percent", b"val", b"filterVal"] )?,
+                opaque: unknown_attributes(e, d, &[b"top", b"percent", b"val", b"filterVal"])?,
             })
         },
         _ => return Err(invalid("unsupported filterColumn payload")),
@@ -1269,7 +1268,11 @@ fn parse_sort_state(e: &BytesStart<'_>, d: Decoder) -> Result<SortBuilder> {
         case_sensitive: optional_bool(e, b"caseSensitive", d)?.unwrap_or(false),
         sort_method: method,
         conditions: Vec::new(),
-        opaque: unknown_attributes(e, d, &[b"ref", b"columnSort", b"caseSensitive", b"sortMethod"] )?,
+        opaque: unknown_attributes(
+            e,
+            d,
+            &[b"ref", b"columnSort", b"caseSensitive", b"sortMethod"],
+        )?,
     })
 }
 fn push_sort(s: &mut (usize, SortBuilder), e: &BytesStart<'_>, d: Decoder) -> Result<usize> {
