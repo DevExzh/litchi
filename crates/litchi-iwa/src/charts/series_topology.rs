@@ -5,7 +5,7 @@
 //! and `X + Y + size`, while their multi-data forms switch datasets
 //! interactively instead of displaying multiple series at once.
 
-use crate::charts::{ChartData, ChartKind, ChartSeriesDirection};
+use crate::charts::{ChartData, ChartKind, Direction, DirectionKind};
 use crate::{Error, Result};
 
 const SCATTER_COMPONENT_COUNT: usize = 2;
@@ -48,17 +48,18 @@ impl ChartSeriesTopology {
 /// Count visible native series from typed chart data and orientation.
 pub(crate) fn chart_series_count(
     kind: ChartKind,
-    direction: ChartSeriesDirection,
+    direction: Direction,
     data: &ChartData,
     drawable_label: &str,
     drawable_object_id: u64,
 ) -> Result<usize> {
-    let component_count = match direction {
-        ChartSeriesDirection::Rows => data.row_names().len(),
-        ChartSeriesDirection::Columns => data.column_names().len(),
-        ChartSeriesDirection::Unsupported(value) => {
+    let component_count = match direction.kind() {
+        Some(DirectionKind::Rows) => data.row_names().len(),
+        Some(DirectionKind::Columns) => data.column_names().len(),
+        None => {
             return Err(Error::InvalidFormat(format!(
-                "{drawable_label} chart {drawable_object_id} has unsupported series direction {value}"
+                "{drawable_label} chart {drawable_object_id} has unsupported series direction {}",
+                direction.native_value()
             )));
         },
     };
@@ -87,20 +88,13 @@ mod tests {
     fn ordinary_and_interactive_point_topologies_count_visible_series() {
         let data = data_with_rows(6);
         assert_eq!(
-            chart_series_count(
-                ChartKind::Line2d,
-                ChartSeriesDirection::Rows,
-                &data,
-                "test",
-                1
-            )
-            .unwrap(),
+            chart_series_count(ChartKind::Line2d, Direction::Rows, &data, "test", 1).unwrap(),
             6
         );
         assert_eq!(
             chart_series_count(
                 ChartKind::MultiDataScatter2d,
-                ChartSeriesDirection::Rows,
+                Direction::Rows,
                 &data,
                 "test",
                 1
@@ -111,7 +105,7 @@ mod tests {
         assert_eq!(
             chart_series_count(
                 ChartKind::MultiDataBubble2d,
-                ChartSeriesDirection::Rows,
+                Direction::Rows,
                 &data,
                 "test",
                 1
@@ -126,7 +120,7 @@ mod tests {
         assert_eq!(
             chart_series_count(
                 ChartKind::Scatter2d,
-                ChartSeriesDirection::Rows,
+                Direction::Rows,
                 &data_with_rows(2),
                 "test",
                 1
@@ -137,7 +131,7 @@ mod tests {
         assert_eq!(
             chart_series_count(
                 ChartKind::Bubble2d,
-                ChartSeriesDirection::Rows,
+                Direction::Rows,
                 &data_with_rows(3),
                 "test",
                 1
@@ -153,7 +147,7 @@ mod tests {
             assert!(
                 chart_series_count(
                     ChartKind::Scatter2d,
-                    ChartSeriesDirection::Rows,
+                    Direction::Rows,
                     &data_with_rows(rows),
                     "test",
                     1
@@ -165,7 +159,7 @@ mod tests {
             assert!(
                 chart_series_count(
                     ChartKind::Bubble2d,
-                    ChartSeriesDirection::Rows,
+                    Direction::Rows,
                     &data_with_rows(rows),
                     "test",
                     1
@@ -177,6 +171,32 @@ mod tests {
 
     #[test]
     fn column_orientation_uses_column_components() {
+        let rectangular = ChartData::new(
+            vec!["Revenue".to_owned(), "Cost".to_owned()],
+            vec!["Q1".to_owned(), "Q2".to_owned(), "Q3".to_owned()],
+            vec![
+                vec![Some(1.0), Some(2.0), Some(3.0)],
+                vec![Some(4.0), Some(5.0), Some(6.0)],
+            ],
+        )
+        .unwrap();
+        assert_eq!(
+            chart_series_count(ChartKind::Line2d, Direction::Rows, &rectangular, "test", 1)
+                .unwrap(),
+            2
+        );
+        assert_eq!(
+            chart_series_count(
+                ChartKind::Line2d,
+                Direction::Columns,
+                &rectangular,
+                "test",
+                1,
+            )
+            .unwrap(),
+            3
+        );
+
         let data = ChartData::new(
             vec!["row".to_owned()],
             (0..4).map(|index| format!("column {index}")).collect(),
@@ -186,13 +206,30 @@ mod tests {
         assert_eq!(
             chart_series_count(
                 ChartKind::MultiDataScatter2d,
-                ChartSeriesDirection::Columns,
+                Direction::Columns,
                 &data,
                 "test",
                 1
             )
             .unwrap(),
             1
+        );
+    }
+
+    #[test]
+    fn unsupported_direction_is_rejected() {
+        let error = chart_series_count(
+            ChartKind::Line2d,
+            Direction::from_native(9_001),
+            &data_with_rows(2),
+            "test",
+            1,
+        )
+        .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("unsupported series direction 9001")
         );
     }
 

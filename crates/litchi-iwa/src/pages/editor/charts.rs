@@ -75,7 +75,7 @@ use crate::charts::source::{
     source_chart_objects, unregister_chart_styles, validate_chart_styles_registered,
 };
 use crate::charts::{
-    ChartArrangement, ChartData, ChartKind, ChartSeriesDirection, IWorkChartArchive,
+    ChartArrangement, ChartData, ChartKind, Direction, DirectionKind, IWorkChartArchive,
 };
 use crate::data_reference_registry::{
     clone_component_data_references, remove_component_data_references_for_objects,
@@ -95,7 +95,7 @@ pub struct PagesBodyChartInfo {
     pub anchor_character_index: u32,
     pub drawable_object_id: u64,
     pub kind: ChartKind,
-    pub direction: ChartSeriesDirection,
+    pub direction: Direction,
     pub data: ChartData,
     pub geometry: DrawableGeometry,
     pub arrangement: ChartArrangement,
@@ -249,7 +249,7 @@ impl PagesEditor {
             .map_err(|_| Error::ParseError("Pages body attachment index exceeds u32".into()))?;
         if created.info.anchor_character_index != expected_anchor
             || created.info.kind != kind
-            || created.info.direction != ChartSeriesDirection::Rows
+            || created.info.direction != Direction::Rows
             || created.info.data != data
             || created.info.geometry != geometry
             || created.object_ids != expected_object_ids
@@ -309,9 +309,9 @@ impl PagesEditor {
     pub fn set_body_chart_direction(
         &mut self,
         drawable_object_id: u64,
-        direction: ChartSeriesDirection,
+        direction: Direction,
     ) -> Result<()> {
-        if matches!(direction, ChartSeriesDirection::Unsupported(_)) {
+        if direction.is_unsupported() {
             return Err(Error::ParseError(
                 "cannot assign an unsupported chart series direction".into(),
             ));
@@ -325,7 +325,7 @@ impl PagesEditor {
                         "Pages chart {drawable_object_id} has no chart payload"
                     ))
                 })?
-                .series_direction = Some(direction.into_raw());
+                .series_direction = Some(direction.native_value());
             Ok(())
         })?;
         if body_chart_graph(self, drawable_object_id)?.info.direction != direction {

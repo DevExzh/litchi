@@ -172,6 +172,15 @@ legacy/current reconciliation, and lossless wire patching. Axis and series
 defaults remain explicit because their native thousands-separator defaults
 differ; the former long `Chart*` number-format names are removed rather than
 kept as compatibility aliases.
+Chart series orientation now follows the same boundary at
+`litchi-iwa-common::chart::Direction`. It is a small, copyable value with
+enum-style `Rows` and `Columns` constants plus a `DirectionKind` projection;
+unknown native integers remain lossless. The common crate owns only this
+archive-free semantic vocabulary and its compact native representation. IWA
+retains protobuf field mapping, archive lookup, and mutation validation; Pages,
+Numbers, Keynote, and chart readers consume `Direction` directly. The former
+`ChartSeriesDirection` facade type and protobuf-dependent implementation are
+removed.
 The leaf's `transition::Effect` owns the lossless native transition-effect
 identifier vocabulary, including canonical known variants and lossless unknown
 identifiers; IWA retains transition archive decoding, wire patching, and

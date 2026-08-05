@@ -113,7 +113,7 @@ fn scratch_presentation_supports_standalone_chart_crud() {
         .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     assert_eq!(created.kind, ChartKind::Column2d);
-    assert_eq!(created.direction, ChartSeriesDirection::Rows);
+    assert_eq!(created.direction, Direction::Rows);
     assert_eq!(created.data, sample_data());
 
     let replacement = ChartData::new(
@@ -129,7 +129,7 @@ fn scratch_presentation_supports_standalone_chart_crud() {
         .set_slide_chart_data(0, created.drawable_object_id, replacement.clone())
         .unwrap();
     editor
-        .set_slide_chart_direction(0, created.drawable_object_id, ChartSeriesDirection::Columns)
+        .set_slide_chart_direction(0, created.drawable_object_id, Direction::Columns)
         .unwrap();
     let changed_geometry = chart_geometry(
         "Keynote",
@@ -147,7 +147,7 @@ fn scratch_presentation_supports_standalone_chart_crud() {
     let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let chart = &reopened.slide_charts(0).unwrap()[0];
     assert_eq!(chart.kind, ChartKind::Bar2d);
-    assert_eq!(chart.direction, ChartSeriesDirection::Columns);
+    assert_eq!(chart.direction, Direction::Columns);
     assert_eq!(chart.data, replacement);
     assert_eq!(chart.geometry, changed_geometry);
 

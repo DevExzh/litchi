@@ -123,6 +123,14 @@ those defaults differ on thousands separators. Native field IDs, protobuf
 decoding, dual-field conflict checks, and wire-preserving patching remain
 outside the semantic module.
 
+Chart series orientation uses the focused `litchi_iwa_common::chart` module's
+four-byte `Direction` value. `Rows` and `Columns` are ergonomic named
+constants, while `DirectionKind` projects recognized values and every other
+native integer is preserved losslessly. The common value owns only this
+lossless integer conversion; protobuf field mapping, archive lookup, and
+mutation remain in the IWA adapter. The long `ChartSeriesDirection` name is
+removed rather than retained as a facade alias.
+
 PresentationML implements this rule as `litchi-pptx::shape::{Scene, Shape}`.
 `Scene` is a bounded semantic index over one slide-like owner, not a vector of
 detached XML allocations. Shapes are visited in depth-first pre-order, while a

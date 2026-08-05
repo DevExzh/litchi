@@ -561,7 +561,7 @@ pub(super) fn body_chart_graph(
                     .chart_type
                     .unwrap_or(tsch::ChartType::UndefinedChartType as i32),
             ),
-            direction: ChartSeriesDirection::from_raw(
+            direction: Direction::from_native(
                 payload
                     .series_direction
                     .unwrap_or(tsch::SeriesDirection::Unknown as i32),

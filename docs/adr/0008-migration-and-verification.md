@@ -5958,6 +5958,21 @@ minus sign), thousands separator, two decimals, and the authored prefix and
 suffix fields. Pages visibly rendered `14,000.00`, `(2,800.00)`, and `USD …
 net` axis labels. No native-resave claim is made; Numbers, Pages, and Keynote
 were quit after inspection.
+The chart-series direction ownership slice is complete: the archive-free
+`litchi-iwa-common::chart::Direction` value now owns row/column semantics and
+lossless unknown-native preservation. IWA retains only protobuf field mapping,
+archive lookup, and mutation validation; all three chart owners use the short
+canonical value and the former `ChartSeriesDirection` implementation is gone.
+The common suite passed 46 tests, the IWA library suite passed all 1,503
+tests, and the focused axis-value fixture compiled, wrote three valid ZIP
+packages, and set `Direction::Columns` in all three in-memory editors before
+native inspection. Existing CRUD tests round-tripped the serialized direction
+through each editor. Fresh Numbers, Pages, and Keynote opens produced no repair
+prompts. Numbers' Add Chart Data popover reported `Plot Columns as Series`;
+Keynote's Edit Chart Data dialog showed `Plot columns as series` selected with
+the `Revenue`/`Cost` rows and `Q1`/`Q2`/`Q3` reference columns; Pages exposed the
+same three chart series and visibly rendered `Revenue`/`Cost` categories. All
+three applications were quit after inspection.
 The BorderSide ownership slice
 is complete: the dependency-neutral table-cell edge selector now lives at
 `litchi-iwa-common::table::cell::BorderSide`; `Borders` and `ShapeStroke` remain

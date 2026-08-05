@@ -77,7 +77,7 @@ use crate::charts::source::{
     validate_chart_styles_registered,
 };
 use crate::charts::{
-    ChartArrangement, ChartData, ChartKind, ChartSeriesDirection, IWorkChartArchive,
+    ChartArrangement, ChartData, ChartKind, Direction, DirectionKind, IWorkChartArchive,
 };
 use crate::data_reference_registry::{
     clone_component_data_references, remove_component_data_references_for_objects,
@@ -96,7 +96,7 @@ pub struct NumbersSheetChartInfo {
     pub sheet_id: u64,
     pub drawable_object_id: u64,
     pub kind: ChartKind,
-    pub direction: ChartSeriesDirection,
+    pub direction: Direction,
     pub data: ChartData,
     pub geometry: DrawableGeometry,
     pub arrangement: ChartArrangement,
@@ -249,7 +249,7 @@ impl NumbersEditor {
         )?;
         let created = chart_graph(&verified, sheet_id, ids.drawable)?;
         if created.info.kind != kind
-            || created.info.direction != ChartSeriesDirection::Rows
+            || created.info.direction != Direction::Rows
             || created.info.data != data
             || created.info.geometry != geometry
             || created.object_ids != ids.all()
@@ -320,9 +320,9 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        direction: ChartSeriesDirection,
+        direction: Direction,
     ) -> Result<()> {
-        if matches!(direction, ChartSeriesDirection::Unsupported(_)) {
+        if direction.is_unsupported() {
             return Err(Error::ParseError(
                 "cannot assign an unsupported chart series direction".to_owned(),
             ));
@@ -336,7 +336,7 @@ impl NumbersEditor {
                         "Numbers chart {drawable_object_id} has no chart payload"
                     ))
                 })?
-                .series_direction = Some(direction.into_raw());
+                .series_direction = Some(direction.native_value());
             Ok(())
         })?;
         if chart_graph(self, sheet_id, drawable_object_id)?
@@ -862,7 +862,7 @@ mod tests {
             .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
         assert_eq!(created.kind, ChartKind::Column2d);
-        assert_eq!(created.direction, ChartSeriesDirection::Rows);
+        assert_eq!(created.direction, Direction::Rows);
         assert_eq!(created.data, sample_data());
 
         let replacement = ChartData::new(
@@ -878,11 +878,7 @@ mod tests {
             .set_sheet_chart_data(sheet_id, created.drawable_object_id, replacement.clone())
             .unwrap();
         editor
-            .set_sheet_chart_direction(
-                sheet_id,
-                created.drawable_object_id,
-                ChartSeriesDirection::Columns,
-            )
+            .set_sheet_chart_direction(sheet_id, created.drawable_object_id, Direction::Columns)
             .unwrap();
         let changed_geometry = chart_geometry(
             "Numbers",
@@ -900,7 +896,7 @@ mod tests {
         let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let chart = &reopened.sheet_charts(sheet_id).unwrap()[0];
         assert_eq!(chart.kind, ChartKind::Bar2d);
-        assert_eq!(chart.direction, ChartSeriesDirection::Columns);
+        assert_eq!(chart.direction, Direction::Columns);
         assert_eq!(chart.data, replacement);
         assert_eq!(chart.geometry, changed_geometry);
 

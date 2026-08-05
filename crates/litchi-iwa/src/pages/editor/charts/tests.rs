@@ -181,7 +181,7 @@ fn scratch_document_supports_body_chart_crud() {
         .unwrap();
     assert_eq!(created.anchor_character_index, anchor as u32);
     assert_eq!(created.kind, ChartKind::Column2d);
-    assert_eq!(created.direction, ChartSeriesDirection::Rows);
+    assert_eq!(created.direction, Direction::Rows);
     assert_eq!(created.data, sample_data());
     assert_eq!(editor.body_text().unwrap(), "Quarterly results\u{fffc}");
 
@@ -198,7 +198,7 @@ fn scratch_document_supports_body_chart_crud() {
         .set_body_chart_data(created.drawable_object_id, replacement.clone())
         .unwrap();
     editor
-        .set_body_chart_direction(created.drawable_object_id, ChartSeriesDirection::Columns)
+        .set_body_chart_direction(created.drawable_object_id, Direction::Columns)
         .unwrap();
     let changed_geometry = chart_geometry(
         "Pages",
@@ -217,7 +217,7 @@ fn scratch_document_supports_body_chart_crud() {
     let charts = reopened.body_charts().unwrap();
     assert_eq!(charts.len(), 1);
     assert_eq!(charts[0].kind, ChartKind::Bar2d);
-    assert_eq!(charts[0].direction, ChartSeriesDirection::Columns);
+    assert_eq!(charts[0].direction, Direction::Columns);
     assert_eq!(charts[0].data, replacement);
     assert_eq!(charts[0].geometry, changed_geometry);
 

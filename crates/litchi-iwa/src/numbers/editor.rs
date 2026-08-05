@@ -195,7 +195,7 @@ mod table_topology;
 mod text_box_create;
 mod text_box_duplicate;
 
-pub use crate::charts::ChartSeriesDirection;
+pub use crate::charts::Direction;
 pub use cell_merge::IWorkTableCellRegion;
 use model::*;
 pub use semantic::*;

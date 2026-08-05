@@ -76,7 +76,7 @@ use crate::charts::source::{
     validate_chart_styles_registered,
 };
 use crate::charts::{
-    ChartArrangement, ChartData, ChartKind, ChartSeriesDirection, IWorkChartArchive,
+    ChartArrangement, ChartData, ChartKind, Direction, DirectionKind, IWorkChartArchive,
 };
 use crate::data_reference_registry::{
     clone_component_data_references, remove_component_data_references_for_objects,
@@ -96,7 +96,7 @@ pub struct KeynoteSlideChartInfo {
     pub slide_id: u64,
     pub drawable_object_id: u64,
     pub kind: ChartKind,
-    pub direction: ChartSeriesDirection,
+    pub direction: Direction,
     pub data: ChartData,
     pub geometry: DrawableGeometry,
     pub arrangement: ChartArrangement,
@@ -229,7 +229,7 @@ impl KeynoteEditor {
         )?;
         let created = chart_graph(&verified, slide_index, ids.drawable)?;
         if created.info.kind != kind
-            || created.info.direction != ChartSeriesDirection::Rows
+            || created.info.direction != Direction::Rows
             || created.info.data != data
             || created.info.geometry != geometry
             || created.object_ids != object_ids
@@ -308,9 +308,9 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        direction: ChartSeriesDirection,
+        direction: Direction,
     ) -> Result<()> {
-        if matches!(direction, ChartSeriesDirection::Unsupported(_)) {
+        if direction.is_unsupported() {
             return Err(Error::ParseError(
                 "cannot assign an unsupported chart series direction".to_owned(),
             ));
@@ -324,7 +324,7 @@ impl KeynoteEditor {
                         "Keynote chart {drawable_object_id} has no chart payload"
                     ))
                 })?
-                .series_direction = Some(direction.into_raw());
+                .series_direction = Some(direction.native_value());
             Ok(())
         })?;
         if chart_graph(self, slide_index, drawable_object_id)?

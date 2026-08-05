@@ -30,7 +30,6 @@ pub(crate) mod border_stroke;
 pub(crate) mod category_labels;
 mod data;
 pub(crate) mod depth_3d;
-mod direction;
 pub(crate) mod donut_inner_radius;
 pub(crate) mod font;
 pub(crate) mod gaps;
@@ -90,7 +89,6 @@ pub use category_labels::{
 };
 pub use data::ChartData;
 pub use depth_3d::Chart3dDepth;
-pub use direction::ChartSeriesDirection;
 pub use donut_inner_radius::ChartDonutInnerRadius;
 pub use font::{ChartFont, ChartFontSize};
 pub use gaps::{ChartGapPercentage, ChartGapSpacing};
@@ -110,6 +108,7 @@ pub use litchi_iwa_common::chart::axis::{
 pub use litchi_iwa_common::chart::number_format::{
     DecimalPlaces, FixedDecimalPlaces, LabelAffixes, NegativeStyle, NumberFormat,
 };
+pub use litchi_iwa_common::chart::{Direction, DirectionKind};
 pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};
 pub use pie_label_distance::ChartPieLabelDistance;
 pub use pie_labels::ChartPieLabelVisibility;

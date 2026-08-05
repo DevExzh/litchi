@@ -4,8 +4,8 @@ use std::env;
 use std::path::Path;
 
 use litchi_iwa::charts::{
-    Axis, Bound, Bounds, ChartData, ChartKind, LabelAngle, MajorStepCount, MinorStepCount, Scale,
-    Steps,
+    Axis, Bound, Bounds, ChartData, ChartKind, Direction, LabelAngle, MajorStepCount,
+    MinorStepCount, Scale, Steps,
 };
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::NumbersDocumentBuilder;
@@ -40,6 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 300.0,
         },
     )?;
+    numbers.set_sheet_chart_direction(sheet_id, chart.drawable_object_id, Direction::Columns)?;
     numbers.set_sheet_chart_title(sheet_id, chart.drawable_object_id, "Axis values")?;
     set_numbers_axis_values(
         &mut numbers,
@@ -62,6 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 280.0,
         },
     )?;
+    pages.set_body_chart_direction(chart.drawable_object_id, Direction::Columns)?;
     pages.set_body_chart_title(chart.drawable_object_id, "Axis values")?;
     set_pages_axis_values(&mut pages, chart.drawable_object_id, bounds, steps)?;
     pages.save(output.join("axis-values-crate.pages"))?;
@@ -77,6 +79,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 650.0,
         },
     )?;
+    keynote.set_slide_chart_direction(0, chart.drawable_object_id, Direction::Columns)?;
     keynote.set_slide_chart_title(0, chart.drawable_object_id, "Axis values")?;
     set_keynote_axis_values(&mut keynote, chart.drawable_object_id, bounds, steps)?;
     keynote.save(output.join("axis-values-crate.key"))?;
