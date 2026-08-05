@@ -4459,10 +4459,12 @@ parser returns `litchi_iwa_common::wire::WireField` directly, so the facade no
 longer copies parsed fields into a second vector; all consumers use the common
 typed accessors. Scalar, nested, repeated, and append mutation paths delegate
 to the bounded common kernel, including its typed limit/allocation errors.
-The adapter retains only callbacks whose closures still return the facade
-error type and a small removal seam; those callbacks use the common parser,
-fallible reservations, and nesting/output limits. Moving those callbacks to a
-generic common error boundary is the final deletion step for this file.
+The callback traversal, fallible reservations, nesting/output limits, and
+removal seam now live in `litchi-iwa-common::wire` and are generic over the
+caller's error type; shared wire failures convert through `From<common::Error>`.
+The facade `wire.rs` retains only thin adapters that infer `litchi-iwa::Error`
+for existing callers. Deleting that file is now an import-migration task, not
+a second wire implementation.
 Canonical chart readers use the common `encoded_len` check instead of
 allocating temporary varint vectors, and the reference-line reader decodes
 directly from its borrowed payload while mapping malformed values to the typed
@@ -5798,9 +5800,10 @@ The physical IWA substrate slice is complete as well: raw schemas remain in
 use the allocation-conscious slice API. The core framing suite has 17 passing
 tests. The facade varint exit is now complete too: `varint.rs` was deleted,
 all callers use the common bounded implementation, and the IWA suite still
-passes 1,502 tests. The facade `WireField` representation and direct wire
-mutation exit is complete without a compatibility shim; only the callback
-error boundary remains before `wire.rs` itself can be deleted. The Numbers
+passes 1,503 tests. The facade `WireField` representation and direct wire
+mutation exit is complete without a compatibility shim; the generic callback
+error boundary is now common-owned, while `wire.rs` retains only thin
+crate-error adapters pending the final import migration. The Numbers
 table/sheet semantic slice is now extracted into dependency-free
 `litchi-numbers::table` and `litchi-numbers::sheet`: finished tables use compact
 coordinates and immutable boxed sparse storage, while builders provide
@@ -5810,7 +5813,7 @@ finished tables into immutable leaf sheets without rebuilding cell maps; the
 legacy archive adapter remains available for comments and native sidecars
 during the staged reader migration. Dense views remain explicitly budgeted and
 reject ranges outside the declared extent. The leaf suite has 26 tests, the
-IWA suite has 1,502 tests, and the generated Numbers round trip passes. Formula
+IWA suite has 1,503 tests, and the generated Numbers round trip passes. Formula
 values and the generic structured-facade handoff remain the next ownership
 slices. Pages and Keynote table readers now borrow canonical sparse leaf tables
 directly while retaining their format-owned comment and merge sidecars;

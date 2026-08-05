@@ -3,12 +3,14 @@
 //! The wire parser and scalar/repeated mutation algorithms live in
 //! `litchi-iwa-common`. This module keeps only the application crate's
 //! visibility boundary and the few callbacks that return the facade error
-//! type. It is intentionally not a second wire implementation.
+//! type. It is intentionally not a second wire implementation; the callbacks
+//! delegate to the common generic error boundary below.
 
-use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::wire as common_wire;
 
-use crate::{Error, Result};
+#[cfg(test)]
+use crate::Error;
+use crate::Result;
 
 pub(crate) use common_wire::WireField;
 
@@ -140,21 +142,7 @@ pub(crate) fn transform_length_delimited_field<F>(
 where
     F: FnOnce(&[u8]) -> Result<Vec<u8>>,
 {
-    let fields = parse_wire_fields(data)?;
-    let mut matches = fields.iter().filter(|field| field.number() == field_number);
-    let Some(field) = matches.next() else {
-        return Err(Error::InvalidFormat(format!(
-            "singular protobuf field {field_number} must occur exactly once, found 0"
-        )));
-    };
-    if matches.next().is_some() {
-        return Err(Error::InvalidFormat(format!(
-            "singular protobuf field {field_number} must occur exactly once"
-        )));
-    }
-    require_length_delimited(field)?;
-    let replacement = transform(&data[field.payload_start()..field.end()])?;
-    patch_length_delimited_field(data, field_number, true, Some(&replacement))
+    common_wire::transform_length_delimited_field(data, field_number, transform)
 }
 
 pub(crate) fn append_repeated_length_delimited_field(
@@ -243,106 +231,34 @@ pub(crate) fn rewrite_repeated_fixed64_fields(
 pub(crate) fn transform_repeated_length_delimited_fields<F>(
     data: &[u8],
     field_number: u32,
-    mut transform: F,
+    transform: F,
 ) -> Result<Vec<u8>>
 where
     F: FnMut(&[u8]) -> Result<Vec<u8>>,
 {
-    let payloads = repeated_length_delimited_payloads(data, field_number)?;
-    let mut replacements = Vec::new();
-    replacements.try_reserve(payloads.len()).map_err(|_| {
-        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
-            resource: "facade transformed length-delimited payloads",
-            amount: payloads.len(),
-        })
-    })?;
-    for payload in payloads {
-        replacements.push(transform(payload)?);
-    }
-    rewrite_repeated_length_delimited_fields(data, field_number, &replacements)
+    common_wire::transform_repeated_length_delimited_fields(data, field_number, transform)
 }
 
 pub(crate) fn transform_length_delimited_fields_at_path<F>(
     data: &[u8],
     path: &[u32],
-    mut transform: F,
+    transform: F,
 ) -> Result<Vec<u8>>
 where
     F: FnMut(&[u8]) -> Result<Vec<u8>>,
 {
-    if path.len() > WireLimits::default().max_nesting() {
-        return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
-            kind: litchi_iwa_common::LimitKind::Nesting,
-            observed: path.len(),
-            limit: WireLimits::default().max_nesting(),
-        }));
-    }
-
-    fn visit(
-        data: &[u8],
-        path: &[u32],
-        transform: &mut dyn FnMut(&[u8]) -> Result<Vec<u8>>,
-    ) -> Result<Vec<u8>> {
-        let (&field_number, remainder) = path.first().zip(path.get(1..)).ok_or_else(|| {
-            Error::InvalidFormat("protobuf field path cannot be empty".to_owned())
-        })?;
-        if remainder.is_empty() {
-            return transform_repeated_length_delimited_fields(data, field_number, transform);
-        }
-        transform_repeated_length_delimited_fields(data, field_number, |nested| {
-            visit(nested, remainder, transform)
-        })
-    }
-
-    visit(data, path, &mut transform)
+    common_wire::transform_length_delimited_fields_at_path(data, path, transform)
 }
 
 pub(crate) fn remove_repeated_length_delimited_field_where<F>(
     data: &[u8],
     field_number: u32,
-    mut remove: F,
+    remove: F,
 ) -> Result<Vec<u8>>
 where
     F: FnMut(&[u8]) -> Result<bool>,
 {
-    let fields = parse_wire_fields(data)?;
-    let mut removed = Vec::new();
-    removed.try_reserve(fields.len()).map_err(|_| {
-        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
-            resource: "facade removed wire fields",
-            amount: fields.len(),
-        })
-    })?;
-    for field in &fields {
-        if field.number() != field_number {
-            continue;
-        }
-        require_length_delimited(field)?;
-        if remove(&data[field.payload_start()..field.end()])? {
-            removed.push(*field);
-        }
-    }
-    if removed.len() != 1 {
-        return Err(Error::InvalidFormat(format!(
-            "expected to remove one protobuf field {field_number}, matched {}",
-            removed.len()
-        )));
-    }
-    remove_fields(data, removed)
-}
-
-fn require_length_delimited(field: &WireField) -> Result<()> {
-    require_wire_type(field, 2, "length-delimited")
-}
-
-fn require_wire_type(field: &WireField, expected: u8, name: &str) -> Result<()> {
-    if field.wire_type() != expected {
-        return Err(Error::InvalidFormat(format!(
-            "protobuf field {} is not {name}",
-            field.number()
-        )));
-    }
-    Ok(())
+    common_wire::remove_repeated_length_delimited_field_where(data, field_number, remove)
 }
 
 pub(crate) fn append_length_delimited_field(
@@ -392,46 +308,6 @@ fn append_scalar_field(
     );
     output.extend_from_slice(payload);
     Ok(())
-}
-
-fn remove_fields(data: &[u8], mut fields: Vec<WireField>) -> Result<Vec<u8>> {
-    fields.sort_by_key(|field| field.start());
-    let removed_length = fields.iter().try_fold(0usize, |total, field| {
-        total.checked_add(field.end() - field.start())
-    });
-    let capacity = data
-        .len()
-        .checked_sub(removed_length.ok_or_else(|| {
-            Error::InvalidFormat("protobuf removed-field size overflow".to_owned())
-        })?)
-        .ok_or_else(|| Error::InvalidFormat("protobuf removed-field range overflow".to_owned()))?;
-    let limits = WireLimits::default();
-    if capacity > limits.max_output_bytes() {
-        return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
-            kind: litchi_iwa_common::LimitKind::OutputBytes,
-            observed: capacity,
-            limit: limits.max_output_bytes(),
-        }));
-    }
-    let mut output = Vec::new();
-    output.try_reserve(capacity).map_err(|_| {
-        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
-            resource: "facade removed wire output",
-            amount: capacity,
-        })
-    })?;
-    let mut copied = 0usize;
-    for field in fields {
-        if field.start() < copied || field.end() > data.len() {
-            return Err(Error::InvalidFormat(
-                "protobuf fields to remove overlap or exceed the payload".to_owned(),
-            ));
-        }
-        output.extend_from_slice(&data[copied..field.start()]);
-        copied = field.end();
-    }
-    output.extend_from_slice(&data[copied..]);
-    Ok(output)
 }
 
 #[cfg(test)]
@@ -671,6 +547,17 @@ mod tests {
         assert!(
             transform_length_delimited_fields_at_path(&original, &[], |_| Ok(Vec::new())).is_err()
         );
+    }
+
+    #[test]
+    fn common_callback_boundary_preserves_facade_errors() {
+        let mut data = Vec::new();
+        append_length_delimited_field(&mut data, 2, b"payload").unwrap();
+        let error = transform_length_delimited_field(&data, 2, |_| {
+            Err(Error::InvalidFormat("callback sentinel".to_owned()))
+        })
+        .unwrap_err();
+        assert!(matches!(error, Error::InvalidFormat(message) if message == "callback sentinel"));
     }
 
     #[test]

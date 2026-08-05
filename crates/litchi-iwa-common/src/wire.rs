@@ -421,13 +421,19 @@ pub fn patch_fixed64_field(
     }
 }
 
-pub fn transform_length_delimited_field<F>(
+/// Transform one singular length-delimited field.
+///
+/// The callback may use a caller-owned error type. Shared wire failures are
+/// converted through `From<Error>`, so format facades can retain their own
+/// structured error taxonomy without duplicating the mutation algorithm.
+pub fn transform_length_delimited_field<F, E>(
     data: &[u8],
     field_number: u32,
     transform: F,
-) -> Result<Vec<u8>>
+) -> std::result::Result<Vec<u8>, E>
 where
-    F: FnOnce(&[u8]) -> Result<Vec<u8>>,
+    F: FnOnce(&[u8]) -> std::result::Result<Vec<u8>, E>,
+    E: From<Error>,
 {
     let field = singular_field(data, field_number, true)?.ok_or_else(|| {
         Error::InvalidFormat(format!(
@@ -436,7 +442,11 @@ where
     })?;
     require_length_delimited(&field)?;
     let replacement = transform(&data[field.payload_start..field.end])?;
-    replace_existing_length_delimited_field(data, &field, &replacement)
+    Ok(replace_existing_length_delimited_field(
+        data,
+        &field,
+        &replacement,
+    )?)
 }
 
 pub fn append_repeated_length_delimited_field(
@@ -923,13 +933,16 @@ pub fn rewrite_repeated_fixed64_fields(
 
 /// Transform every occurrence of a repeated length-delimited field while
 /// preserving its original key bytes and the position of unrelated fields.
-pub fn transform_repeated_length_delimited_fields<F>(
+/// Callback errors may use any type that converts shared wire errors through
+/// `From<Error>`.
+pub fn transform_repeated_length_delimited_fields<F, E>(
     data: &[u8],
     field_number: u32,
     mut transform: F,
-) -> Result<Vec<u8>>
+) -> std::result::Result<Vec<u8>, E>
 where
-    F: FnMut(&[u8]) -> Result<Vec<u8>>,
+    F: FnMut(&[u8]) -> std::result::Result<Vec<u8>, E>,
+    E: From<Error>,
 {
     let limits = WireLimits::default();
     let work = Cell::new(0usize);
@@ -942,15 +955,16 @@ where
     )
 }
 
-fn transform_repeated_length_delimited_fields_with_budget<F>(
+fn transform_repeated_length_delimited_fields_with_budget<F, E>(
     data: &[u8],
     field_number: u32,
     mut transform: F,
     limits: WireLimits,
     work: &Cell<usize>,
-) -> Result<Vec<u8>>
+) -> std::result::Result<Vec<u8>, E>
 where
-    F: FnMut(&[u8]) -> Result<Vec<u8>>,
+    F: FnMut(&[u8]) -> std::result::Result<Vec<u8>, E>,
+    E: From<Error>,
 {
     let payloads = repeated_length_delimited_payloads(data, field_number)?;
     let total_work = work
@@ -969,29 +983,39 @@ where
     for payload in payloads {
         replacements.push(transform(payload)?);
     }
-    rewrite_repeated_length_delimited_fields(data, field_number, &replacements)
+    Ok(rewrite_repeated_length_delimited_fields(
+        data,
+        field_number,
+        &replacements,
+    )?)
 }
 
 /// Transform all length-delimited leaves at a protobuf field path.
 ///
 /// Every path component may occur zero, one, or many times. This makes the
 /// operation suitable for schema-known paths that cross optional and repeated
-/// messages without normalizing untouched siblings or unknown fields.
-pub fn transform_length_delimited_fields_at_path<F>(
+/// messages without normalizing untouched siblings or unknown fields. Callback
+/// errors may use any type that converts shared wire errors through
+/// `From<Error>`.
+pub fn transform_length_delimited_fields_at_path<F, E>(
     data: &[u8],
     path: &[u32],
     mut transform: F,
-) -> Result<Vec<u8>>
+) -> std::result::Result<Vec<u8>, E>
 where
-    F: FnMut(&[u8]) -> Result<Vec<u8>>,
+    F: FnMut(&[u8]) -> std::result::Result<Vec<u8>, E>,
+    E: From<Error>,
 {
-    fn visit(
+    fn visit<E>(
         data: &[u8],
         path: &[u32],
-        transform: &mut dyn FnMut(&[u8]) -> Result<Vec<u8>>,
+        transform: &mut dyn FnMut(&[u8]) -> std::result::Result<Vec<u8>, E>,
         limits: WireLimits,
         work: &Cell<usize>,
-    ) -> Result<Vec<u8>> {
+    ) -> std::result::Result<Vec<u8>, E>
+    where
+        E: From<Error>,
+    {
         ensure_nesting(path.len(), limits)?;
         let (&field_number, remainder) = path.first().zip(path.get(1..)).ok_or_else(|| {
             Error::InvalidFormat("protobuf field path cannot be empty".to_owned())
@@ -1020,13 +1044,17 @@ where
     visit(data, path, &mut transform, limits, &work)
 }
 
-pub fn remove_repeated_length_delimited_field_where<F>(
+/// Remove exactly one repeated field selected by a caller-owned predicate.
+/// Predicate errors may use any type that converts shared wire errors through
+/// `From<Error>`.
+pub fn remove_repeated_length_delimited_field_where<F, E>(
     data: &[u8],
     field_number: u32,
     mut remove: F,
-) -> Result<Vec<u8>>
+) -> std::result::Result<Vec<u8>, E>
 where
-    F: FnMut(&[u8]) -> Result<bool>,
+    F: FnMut(&[u8]) -> std::result::Result<bool, E>,
+    E: From<Error>,
 {
     let limits = WireLimits::default();
     let fields = parse_wire_fields_with_limits(data, limits)?;
@@ -1051,9 +1079,10 @@ where
         return Err(Error::InvalidFormat(format!(
             "expected to remove one protobuf field {field_number}, matched {}",
             removed.len()
-        )));
+        ))
+        .into());
     }
-    remove_fields(data, removed)
+    Ok(remove_fields(data, removed)?)
 }
 
 fn require_length_delimited(field: &WireField) -> Result<()> {
@@ -1456,10 +1485,50 @@ fn remove_fields(data: &[u8], mut fields: Vec<WireField>) -> Result<Vec<u8>> {
 mod tests {
     use super::*;
 
+    #[derive(Debug, PartialEq, Eq)]
+    enum CallbackError {
+        Wire(Error),
+        Sentinel,
+    }
+
+    impl From<Error> for CallbackError {
+        fn from(error: Error) -> Self {
+            Self::Wire(error)
+        }
+    }
+
     fn varint_field(number: u32, value: u64) -> Vec<u8> {
         let mut field = crate::varint::encode_varint(u64::from(number) << 3);
         field.extend(crate::varint::encode_varint(value));
         field
+    }
+
+    #[test]
+    fn generic_callback_boundary_preserves_caller_errors() {
+        let mut repeated = Vec::new();
+        append_length_delimited_field(&mut repeated, 2, b"first").unwrap();
+        append_length_delimited_field(&mut repeated, 2, b"second").unwrap();
+        let repeated_error = transform_repeated_length_delimited_fields(&repeated, 2, |_| {
+            Err::<Vec<u8>, _>(CallbackError::Sentinel)
+        })
+        .unwrap_err();
+        assert_eq!(repeated_error, CallbackError::Sentinel);
+
+        let mut nested = Vec::new();
+        append_length_delimited_field(&mut nested, 2, b"leaf").unwrap();
+        let mut outer = Vec::new();
+        append_length_delimited_field(&mut outer, 3, &nested).unwrap();
+        let path_error = transform_length_delimited_fields_at_path(&outer, &[3, 2], |_| {
+            Err::<Vec<u8>, _>(CallbackError::Sentinel)
+        })
+        .unwrap_err();
+        assert_eq!(path_error, CallbackError::Sentinel);
+
+        let removal_error = remove_repeated_length_delimited_field_where(&repeated, 2, |_| {
+            Err::<bool, _>(CallbackError::Sentinel)
+        })
+        .unwrap_err();
+        assert_eq!(removal_error, CallbackError::Sentinel);
     }
 
     #[test]
@@ -1656,7 +1725,10 @@ mod tests {
         .unwrap();
         assert_eq!(restored, original);
         assert!(
-            transform_length_delimited_fields_at_path(&original, &[], |_| Ok(Vec::new())).is_err()
+            transform_length_delimited_fields_at_path(&original, &[], |_| {
+                Ok::<Vec<u8>, Error>(Vec::new())
+            })
+            .is_err()
         );
     }
 
