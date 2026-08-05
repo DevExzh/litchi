@@ -86,7 +86,7 @@ impl PageLayoutAttribute {
 pub struct PageLayoutProperties {
     attributes: Vec<PageLayoutAttribute>,
     /// Typed multi-column layout, if present.
-    pub columns: Option<crate::StyleColumns>,
+    pub columns: Option<crate::style::columns::Columns>,
     /// Typed footnote separator, if present.
     pub footnote_separator: Option<crate::StyleFootnoteSeparator>,
     /// The exact `style:page-layout-properties` element, including background,

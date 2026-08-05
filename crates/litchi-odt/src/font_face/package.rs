@@ -2,9 +2,9 @@
 
 use super::{
     MAX_XML_DEPTH, NamespaceKind,
-    codec::{namespace_kind, parse_font_face_declarations},
+    codec::{namespace_kind, parse},
     invalid,
-    model::Faces,
+    model::Declarations,
     xml_error,
 };
 use crate::{FlatOpenDocument, OpenDocumentPackage};
@@ -47,15 +47,15 @@ struct Location {
     insertion: usize,
 }
 
-fn parse_font_face_declarations_in_part(xml: &str, part: Part) -> Result<Option<Faces>> {
+fn parse_font_face_declarations_in_part(xml: &str, part: Part) -> Result<Option<Declarations>> {
     Ok(locate_font_face_declarations(xml, part)?.0)
 }
 
-pub(crate) fn parse_content_font_face_declarations(xml: &str) -> Result<Option<Faces>> {
+pub(crate) fn parse_content_font_face_declarations(xml: &str) -> Result<Option<Declarations>> {
     parse_font_face_declarations_in_part(xml, Part::Content)
 }
 
-pub(crate) fn parse_styles_font_face_declarations(xml: &str) -> Result<Option<Faces>> {
+pub(crate) fn parse_styles_font_face_declarations(xml: &str) -> Result<Option<Declarations>> {
     parse_font_face_declarations_in_part(xml, Part::Styles)
 }
 
@@ -63,8 +63,8 @@ pub(crate) fn parse_styles_font_face_declarations(xml: &str) -> Result<Option<Fa
 /// unrelated content XML.
 pub(crate) fn set_content_font_face_declarations_xml(
     xml: &str,
-    declarations: &Faces,
-) -> Result<(String, Option<Faces>)> {
+    declarations: &Declarations,
+) -> Result<(String, Option<Declarations>)> {
     set_font_face_declarations_xml(xml, declarations, Part::Content)
 }
 
@@ -72,8 +72,8 @@ pub(crate) fn set_content_font_face_declarations_xml(
 /// unrelated styles XML.
 pub(crate) fn set_styles_font_face_declarations_xml(
     xml: &str,
-    declarations: &Faces,
-) -> Result<(String, Option<Faces>)> {
+    declarations: &Declarations,
+) -> Result<(String, Option<Declarations>)> {
     set_font_face_declarations_xml(xml, declarations, Part::Styles)
 }
 
@@ -81,7 +81,7 @@ pub(crate) fn set_styles_font_face_declarations_xml(
 /// content XML.
 pub(crate) fn remove_content_font_face_declarations_xml(
     xml: &str,
-) -> Result<(String, Option<Faces>)> {
+) -> Result<(String, Option<Declarations>)> {
     remove_font_face_declarations_xml(xml, Part::Content)
 }
 
@@ -89,15 +89,15 @@ pub(crate) fn remove_content_font_face_declarations_xml(
 /// styles XML.
 pub(crate) fn remove_styles_font_face_declarations_xml(
     xml: &str,
-) -> Result<(String, Option<Faces>)> {
+) -> Result<(String, Option<Declarations>)> {
     remove_font_face_declarations_xml(xml, Part::Styles)
 }
 
 fn set_font_face_declarations_xml(
     xml: &str,
-    declarations: &Faces,
+    declarations: &Declarations,
     part: Part,
-) -> Result<(String, Option<Faces>)> {
+) -> Result<(String, Option<Declarations>)> {
     declarations.validate()?;
     let (old, location) = locate_font_face_declarations(xml, part)?;
     let fragment = declarations.to_xml()?;
@@ -110,7 +110,10 @@ fn set_font_face_declarations_xml(
     Ok((updated, old))
 }
 
-fn remove_font_face_declarations_xml(xml: &str, part: Part) -> Result<(String, Option<Faces>)> {
+fn remove_font_face_declarations_xml(
+    xml: &str,
+    part: Part,
+) -> Result<(String, Option<Declarations>)> {
     let (old, location) = locate_font_face_declarations(xml, part)?;
     let Some(target) = location.target else {
         return Ok((xml.to_owned(), old));
@@ -120,8 +123,11 @@ fn remove_font_face_declarations_xml(xml: &str, part: Part) -> Result<(String, O
     Ok((updated, old))
 }
 
-fn locate_font_face_declarations(xml: &str, part: Part) -> Result<(Option<Faces>, Location)> {
-    let declarations = parse_font_face_declarations(xml)?;
+fn locate_font_face_declarations(
+    xml: &str,
+    part: Part,
+) -> Result<(Option<Declarations>, Location)> {
+    let declarations = parse(xml)?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
@@ -268,7 +274,7 @@ impl OpenDocumentPackage {
     ///
     /// Font resource links are retained as inert metadata only. This method
     /// does not fetch a URI, load a font, or inspect embedded font data.
-    pub fn content_font_face_declarations(&self) -> Result<Option<Faces>> {
+    pub fn content_font_face_declarations(&self) -> Result<Option<Declarations>> {
         let xml = self.content_xml()?;
         parse_content_font_face_declarations(&xml)
     }
@@ -277,7 +283,7 @@ impl OpenDocumentPackage {
     ///
     /// Font resource links are retained as inert metadata only. This method
     /// does not fetch a URI, load a font, or inspect embedded font data.
-    pub fn styles_font_face_declarations(&self) -> Result<Option<Faces>> {
+    pub fn styles_font_face_declarations(&self) -> Result<Option<Declarations>> {
         self.styles_xml()?
             .map_or_else(|| Ok(None), |xml| parse_styles_font_face_declarations(&xml))
     }
@@ -288,7 +294,7 @@ impl FlatOpenDocument {
     ///
     /// Font resource links are retained as inert metadata only. This method
     /// does not fetch a URI, load a font, or inspect embedded font data.
-    pub fn font_face_declarations(&self) -> Result<Option<Faces>> {
+    pub fn font_face_declarations(&self) -> Result<Option<Declarations>> {
         parse_font_face_declarations_in_part(self.xml(), Part::Flat)
     }
 }

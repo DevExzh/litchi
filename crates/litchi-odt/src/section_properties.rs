@@ -718,7 +718,7 @@ pub fn parse_section_style_properties(xml: &[u8]) -> Result<SectionStyleProperti
         }
         buffer.clear();
     }
-    crate::notes_configuration::parse_notes_configurations(xml_text)?;
+    crate::notes_configuration::parse(xml_text)?;
     Ok(result)
 }
 

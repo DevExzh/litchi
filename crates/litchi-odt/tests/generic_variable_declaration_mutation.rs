@@ -1,7 +1,4 @@
-use litchi_odt::variable_declaration::{
-    VariableBody, VariableDeclaration, VariableDeclarationGroup, VariableKind, VariablePart,
-    VariableScope, VariableValueType,
-};
+use litchi_odt::variable_declaration::{Body, Declaration, Group, Kind, Part, Scope, ValueType};
 mod support;
 
 const MIMETYPE: &str = "application/vnd.oasis.opendocument.text";
@@ -22,14 +19,14 @@ fn package(content: &str) -> Vec<u8> {
     )
 }
 
-fn group(name: &str) -> VariableDeclarationGroup {
-    VariableDeclarationGroup {
-        kind: VariableKind::Simple,
-        part: VariablePart::Content,
-        scope: VariableScope::Body(VariableBody::Text),
-        declarations: vec![VariableDeclaration::Simple {
+fn group(name: &str) -> Group {
+    Group {
+        kind: Kind::Simple,
+        part: Part::Content,
+        scope: Scope::Body(Body::Text),
+        declarations: vec![Declaration::Simple {
             name: name.to_string(),
-            value_type: VariableValueType::String,
+            value_type: ValueType::String,
         }],
     }
 }
@@ -68,9 +65,9 @@ fn mutates_packaged_declarations_and_preserves_auxiliary_parts() {
     assert_eq!(
         document
             .remove_variable_declaration_group(
-                VariablePart::Content,
-                &VariableScope::Body(VariableBody::Text),
-                VariableKind::Simple,
+                Part::Content,
+                &Scope::Body(Body::Text),
+                Kind::Simple,
             )
             .unwrap(),
         Some(replacement)
@@ -86,9 +83,9 @@ fn referenced_declaration_removal_is_atomic() {
     assert!(
         document
             .remove_variable_declaration_group(
-                VariablePart::Content,
-                &VariableScope::Body(VariableBody::Text),
-                VariableKind::Simple,
+                Part::Content,
+                &Scope::Body(Body::Text),
+                Kind::Simple,
             )
             .is_err()
     );

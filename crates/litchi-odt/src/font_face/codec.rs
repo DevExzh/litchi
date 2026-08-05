@@ -1,8 +1,8 @@
 //! XML codec for ODF font-face declarations.
 
 use super::model::{
-    Face, Faces, GenericFamily, Link, Metric, MetricKind, Pitch, PositiveLength, Source, Stretch,
-    Style, Variant, Weight, add_text_bytes, validate_text_encoding, validate_value,
+    Declarations, Face, Family, Length, Link, Metric, MetricKind, Pitch, Source, Stretch, Style,
+    Variant, Weight, add_text_bytes, validate_text_encoding, validate_value,
 };
 use super::{
     MAX_DOCUMENT_XML_BYTES, MAX_FONT_FACES, MAX_FORMATS_PER_SOURCE, MAX_SOURCES_PER_FACE,
@@ -18,7 +18,7 @@ use quick_xml::{
 };
 use std::collections::HashSet;
 
-pub(super) fn write_declarations(declarations: &Faces) -> Result<String> {
+pub(super) fn write_declarations(declarations: &Declarations) -> Result<String> {
     declarations.validate()?;
     let mut output = String::with_capacity(256 + declarations.faces.len() * 128);
     output.push_str("<office:font-face-decls xmlns:office=\"");
@@ -41,7 +41,7 @@ pub(super) fn write_declarations(declarations: &Faces) -> Result<String> {
         write_attr(
             &mut output,
             "style:font-family-generic",
-            face.generic_family.map(GenericFamily::as_str),
+            face.generic_family.map(Family::as_str),
         );
         write_attr(
             &mut output,
@@ -69,7 +69,7 @@ pub(super) fn write_declarations(declarations: &Faces) -> Result<String> {
         write_attr(
             &mut output,
             "svg:font-size",
-            face.size.as_ref().map(PositiveLength::as_str),
+            face.size.as_ref().map(Length::as_str),
         );
         write_attr(
             &mut output,
@@ -134,7 +134,7 @@ pub(super) fn write_declarations(declarations: &Faces) -> Result<String> {
 }
 
 /// Parse an optional direct `office:font-face-decls` child from ODF XML.
-pub fn parse_font_face_declarations(xml: &str) -> Result<Option<Faces>> {
+pub fn parse(xml: &str) -> Result<Option<Declarations>> {
     if xml.len() > MAX_DOCUMENT_XML_BYTES {
         return invalid(format!(
             "ODF XML exceeds the {MAX_DOCUMENT_XML_BYTES} byte font-face limit"
@@ -170,7 +170,7 @@ pub fn parse_font_face_declarations(xml: &str) -> Result<Option<Faces>> {
                 if depth != 1 {
                     return invalid("office:font-face-decls must be a direct document child");
                 }
-                if result.replace(Faces::default()).is_some() {
+                if result.replace(Declarations::default()).is_some() {
                     return invalid("ODF XML contains duplicate office:font-face-decls");
                 }
             },
@@ -196,7 +196,7 @@ pub fn parse_font_face_declarations(xml: &str) -> Result<Option<Faces>> {
     Ok(result)
 }
 
-fn parse_declarations(reader: &mut NsReader<&[u8]>) -> Result<Faces> {
+fn parse_declarations(reader: &mut NsReader<&[u8]>) -> Result<Declarations> {
     let mut faces = Vec::new();
     let mut names = HashSet::new();
     let mut text_bytes = 0usize;
@@ -248,7 +248,7 @@ fn parse_declarations(reader: &mut NsReader<&[u8]>) -> Result<Faces> {
         }
         buffer.clear();
     }
-    Ok(Faces { faces })
+    Ok(Declarations { faces })
 }
 
 fn parse_face_attributes(
@@ -273,7 +273,7 @@ fn parse_face_attributes(
             },
             (NamespaceKind::Style, b"font-adornments") => face.font_adornments = Some(value),
             (NamespaceKind::Style, b"font-family-generic") => {
-                face.generic_family = Some(GenericFamily::parse(&value)?)
+                face.generic_family = Some(Family::parse(&value)?)
             },
             (NamespaceKind::Style, b"font-pitch") => face.pitch = Some(Pitch::parse(&value)?),
             (NamespaceKind::Style, b"font-charset") => {
@@ -285,7 +285,7 @@ fn parse_face_attributes(
             (NamespaceKind::Svg, b"font-variant") => face.variant = Some(Variant::parse(&value)?),
             (NamespaceKind::Svg, b"font-weight") => face.weight = Some(Weight::parse(&value)?),
             (NamespaceKind::Svg, b"font-stretch") => face.stretch = Some(Stretch::parse(&value)?),
-            (NamespaceKind::Svg, b"font-size") => face.size = Some(PositiveLength::new(value)?),
+            (NamespaceKind::Svg, b"font-size") => face.size = Some(Length::new(value)?),
             (NamespaceKind::Svg, b"unicode-range") => face.unicode_range = Some(value),
             (NamespaceKind::Svg, b"panose-1") => face.panose_1 = Some(value),
             (NamespaceKind::Svg, b"widths") => face.widths = Some(value),

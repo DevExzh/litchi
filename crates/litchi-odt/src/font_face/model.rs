@@ -9,7 +9,7 @@ use std::collections::HashSet;
 
 /// Generic CSS font family used by `style:font-family-generic`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GenericFamily {
+pub enum Family {
     Roman,
     Swiss,
     Modern,
@@ -18,7 +18,7 @@ pub enum GenericFamily {
     System,
 }
 
-impl GenericFamily {
+impl Family {
     pub(super) fn parse(value: &str) -> Result<Self> {
         match value {
             "roman" => Ok(Self::Roman),
@@ -216,9 +216,9 @@ impl Stretch {
 
 /// A validated positive ODF length used by `svg:font-size`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PositiveLength(String);
+pub struct Length(String);
 
-impl PositiveLength {
+impl Length {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         validate_positive_length(&value)?;
@@ -374,7 +374,7 @@ pub enum Source {
 pub struct Face {
     pub name: String,
     pub font_adornments: Option<String>,
-    pub generic_family: Option<GenericFamily>,
+    pub generic_family: Option<Family>,
     pub pitch: Option<Pitch>,
     pub charset: Option<String>,
     pub family: Option<String>,
@@ -382,7 +382,7 @@ pub struct Face {
     pub variant: Option<Variant>,
     pub weight: Option<Weight>,
     pub stretch: Option<Stretch>,
-    pub size: Option<PositiveLength>,
+    pub size: Option<Length>,
     pub unicode_range: Option<String>,
     pub panose_1: Option<String>,
     pub widths: Option<String>,
@@ -394,11 +394,11 @@ pub struct Face {
 
 /// Semantic contents of one optional `office:font-face-decls` element.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Faces {
+pub struct Declarations {
     pub faces: Vec<Face>,
 }
 
-impl Faces {
+impl Declarations {
     pub fn face(&self, name: &str) -> Option<&Face> {
         self.faces.iter().find(|face| face.name == name)
     }

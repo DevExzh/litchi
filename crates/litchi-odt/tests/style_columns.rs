@@ -1,6 +1,5 @@
 use litchi_odt::style::columns::{
-    StyleColumn, StyleColumnLength, StyleColumnSeparator, StyleColumnSeparatorAlignment,
-    StyleColumnSeparatorStyle, StyleColumns, parse_style_columns,
+    Column, Columns, Length, Separator, SeparatorAlignment, SeparatorStyle, parse,
 };
 use litchi_odt::{Builder, Document};
 mod support;
@@ -20,18 +19,18 @@ fn parses_libreoffice_section_separator_and_other_property_contexts() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sw/qa/uitest/data/section-columns-separator.fodt"
     ));
-    let parsed = parse_style_columns(section).unwrap();
+    let parsed = parse(section).unwrap();
     let columns = &parsed[0];
     assert_eq!(columns.column_count, 2);
     assert_eq!(columns.column_gap.as_ref().unwrap().as_str(), "0.6cm");
     assert_eq!(columns.columns()[0].relative_width, 32_767);
     let separator = columns.separator.as_ref().unwrap();
     assert_eq!(separator.width.as_str(), "0.009cm");
-    assert_eq!(separator.style, Some(StyleColumnSeparatorStyle::Dotted));
+    assert_eq!(separator.style, Some(SeparatorStyle::Dotted));
     assert_eq!(separator.height_percent, Some(50));
     assert_eq!(
         separator.vertical_alignment,
-        Some(StyleColumnSeparatorAlignment::Bottom)
+        Some(SeparatorAlignment::Bottom)
     );
     assert_eq!(separator.color, Some((0x99, 0xAA, 0xBB)));
 
@@ -58,18 +57,18 @@ fn parses_libreoffice_section_separator_and_other_property_contexts() {
 
 #[test]
 fn parses_aliases_equal_width_and_round_trips_deterministically() {
-    let equal = parse_style_columns(&wrap(r#"<s:columns f:column-count="3"/>"#)).unwrap();
+    let equal = parse(&wrap(r#"<s:columns f:column-count="3"/>"#)).unwrap();
     assert_eq!(equal.len(), 1);
     assert!(equal[0].columns().is_empty());
 
     let xml = wrap(
         r##"<s:columns f:column-count="2" f:column-gap="0.5cm"><s:column-sep s:width="0.01cm" s:style="dot-dashed" s:height="75%" s:vertical-align="top" s:color="#abcdef"/><s:column s:rel-width="1*" f:start-indent="0cm" f:end-indent=".2cm"/><s:column s:rel-width="2*" f:space-before="0.1cm" f:space-after="0.2cm"/></s:columns>"##,
     );
-    let parsed = parse_style_columns(&xml).unwrap().remove(0);
+    let parsed = parse(&xml).unwrap().remove(0);
     let fragment = parsed.to_xml_fragment().unwrap();
     assert!(fragment.starts_with(r#"<style:columns xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" fo:column-count="2" fo:column-gap="0.5cm">"#));
     assert!(fragment.contains(r##"<style:column-sep style:color="#ABCDEF" style:height="75%" style:style="dot-dashed" style:vertical-align="top" style:width="0.01cm"/>"##));
-    assert_eq!(parse_style_columns(&wrap(&fragment)).unwrap(), vec![parsed]);
+    assert_eq!(parse(&wrap(&fragment)).unwrap(), vec![parsed]);
 }
 
 #[test]
@@ -105,7 +104,7 @@ fn rejects_wrong_namespace_order_cardinality_values_and_caps() {
         ),
     ];
     for xml in malformed {
-        assert!(parse_style_columns(&xml).is_err(), "accepted {xml}");
+        assert!(parse(&xml).is_err(), "accepted {xml}");
     }
 
     let explicit = (0..65)
@@ -114,19 +113,19 @@ fn rejects_wrong_namespace_order_cardinality_values_and_caps() {
     let overflow = wrap(&format!(
         r#"<s:columns f:column-count="64">{explicit}</s:columns>"#
     ));
-    assert!(parse_style_columns(&overflow).is_err());
+    assert!(parse(&overflow).is_err());
 }
 
 #[test]
 fn builder_package_page_layout_and_mutable_update_round_trip() {
-    let mut left = StyleColumn::new(1).unwrap();
-    left.end_indent = Some(StyleColumnLength::new("0.2cm").unwrap());
-    let mut right = StyleColumn::new(1).unwrap();
-    right.start_indent = Some(StyleColumnLength::new("0.2cm").unwrap());
-    let mut columns = StyleColumns::try_with_columns(2, vec![left, right]).unwrap();
-    columns.column_gap = Some(StyleColumnLength::new("0.4cm").unwrap());
-    let mut separator = StyleColumnSeparator::new(StyleColumnLength::new("0.01cm").unwrap());
-    separator.style = Some(StyleColumnSeparatorStyle::Solid);
+    let mut left = Column::new(1).unwrap();
+    left.end_indent = Some(Length::new("0.2cm").unwrap());
+    let mut right = Column::new(1).unwrap();
+    right.start_indent = Some(Length::new("0.2cm").unwrap());
+    let mut columns = Columns::try_with_columns(2, vec![left, right]).unwrap();
+    columns.column_gap = Some(Length::new("0.4cm").unwrap());
+    let mut separator = Separator::new(Length::new("0.01cm").unwrap());
+    separator.style = Some(SeparatorStyle::Solid);
     columns.separator = Some(separator);
 
     let mut builder = Builder::new();
@@ -147,7 +146,7 @@ fn builder_package_page_layout_and_mutable_update_round_trip() {
     assert_eq!(layout.properties.unwrap().columns, Some(columns));
 
     let mut mutable = litchi_odt::mutable::MutableDocument::from_document(document).unwrap();
-    let replacement = StyleColumns::new(3).unwrap();
+    let replacement = Columns::new(3).unwrap();
     mutable
         .set_page_layout_columns("Columns&Layout", &replacement)
         .unwrap();
@@ -189,7 +188,7 @@ fn mutable_update_preserves_inherited_aliases() {
     );
     let mut mutable = litchi_odt::mutable::MutableDocument::from_document(document).unwrap();
     mutable
-        .set_page_layout_columns("Alias", &StyleColumns::new(4).unwrap())
+        .set_page_layout_columns("Alias", &Columns::new(4).unwrap())
         .unwrap();
     let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
     assert_eq!(

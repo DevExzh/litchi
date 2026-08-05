@@ -1,6 +1,7 @@
 //! Bounded OpenDocument bibliography configuration metadata.
 
-use crate::{FlatOpenDocument, OpenDocumentPackage, VariablePart};
+use crate::variable_declaration::Part;
+use crate::{FlatOpenDocument, OpenDocumentPackage};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -344,11 +345,11 @@ type Attributes = HashMap<(String, String), String>;
 pub(crate) fn parse_bibliography_configuration(
     xml: &str,
 ) -> Result<Option<BibliographyConfiguration>> {
-    parse_bibliography_configuration_parts(&[(xml, VariablePart::Styles)])
+    parse_bibliography_configuration_parts(&[(xml, Part::Styles)])
 }
 
 pub(crate) fn parse_bibliography_configuration_parts(
-    parts: &[(&str, VariablePart)],
+    parts: &[(&str, Part)],
 ) -> Result<Option<BibliographyConfiguration>> {
     if !parts
         .iter()
@@ -375,7 +376,7 @@ pub(crate) fn parse_bibliography_configuration_parts(
 
 fn parse_part(
     xml: &str,
-    part: VariablePart,
+    part: Part,
     result: &mut Option<BibliographyConfiguration>,
     aggregate: &mut usize,
 ) -> Result<()> {
@@ -723,7 +724,7 @@ impl FlatOpenDocument {
     /// The policy is metadata in the flat document's `office:styles` element.
     /// This method does not generate bibliography entries or resolve citations.
     pub fn bibliography_configuration(&self) -> Result<Option<BibliographyConfiguration>> {
-        parse_bibliography_configuration_parts(&[(self.xml(), VariablePart::Flat)])
+        parse_bibliography_configuration_parts(&[(self.xml(), Part::Flat)])
     }
 }
 
@@ -731,7 +732,7 @@ impl FlatOpenDocument {
 fn start_configuration(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-    part: VariablePart,
+    part: Part,
     depth: usize,
     stack: &[Frame],
     result: &Option<BibliographyConfiguration>,
@@ -741,7 +742,7 @@ fn start_configuration(
     if result.is_some() {
         return invalid("duplicate document bibliography configuration");
     }
-    if part == VariablePart::Content {
+    if part == Part::Content {
         return invalid("bibliography configuration must reside in styles metadata");
     }
     let parent = stack
@@ -986,7 +987,7 @@ mod tests {
             xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
             <o:body><o:text><t:bibliography-configuration/></o:text></o:body>
         </o:document-content>"#;
-        assert!(parse_bibliography_configuration_parts(&[(xml, VariablePart::Content)]).is_err());
+        assert!(parse_bibliography_configuration_parts(&[(xml, Part::Content)]).is_err());
     }
 
     #[test]

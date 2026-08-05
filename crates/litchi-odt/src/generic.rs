@@ -158,10 +158,10 @@ impl FlatOpenDocument {
     }
 
     /// Inspect ordered ODF variable declarations without evaluating fields or formulas.
-    pub fn variable_declarations(&self) -> Result<crate::VariableDeclarations> {
-        crate::variable_declaration::parse_variable_declaration_parts(&[(
+    pub fn variable_declarations(&self) -> Result<crate::variable_declaration::Declarations> {
+        crate::variable_declaration::parse_parts(&[(
             self.xml(),
-            crate::VariablePart::Flat,
+            crate::variable_declaration::Part::Flat,
         )])
     }
 
@@ -171,11 +171,11 @@ impl FlatOpenDocument {
     /// inert; this method only updates XML metadata and never evaluates fields.
     pub fn set_variable_declaration_group(
         &mut self,
-        group: &crate::VariableDeclarationGroup,
-    ) -> Result<Option<crate::VariableDeclarationGroup>> {
-        if group.part != crate::VariablePart::Flat {
+        group: &crate::variable_declaration::Group,
+    ) -> Result<Option<crate::variable_declaration::Group>> {
+        if group.part != crate::variable_declaration::Part::Flat {
             return Err(Error::InvalidFormat(
-                "FlatOpenDocument requires VariablePart::Flat".to_string(),
+                "FlatOpenDocument requires Part::Flat".to_string(),
             ));
         }
         let current = self.variable_declarations()?;
@@ -184,11 +184,11 @@ impl FlatOpenDocument {
             .iter()
             .find(|candidate| candidate.scope == group.scope && candidate.kind == group.kind)
             .cloned();
-        let updated = crate::set_variable_declaration_group_xml(&self.xml, group)?;
+        let updated = crate::variable_declaration::set_xml(&self.xml, group)?;
         validate_flat_document(&updated, self.family)?;
-        crate::variable_declaration::parse_variable_declaration_parts(&[(
+        crate::variable_declaration::parse_parts(&[(
             updated.as_str(),
-            crate::VariablePart::Flat,
+            crate::variable_declaration::Part::Flat,
         )])?;
         self.xml = updated;
         Ok(old)
@@ -200,9 +200,9 @@ impl FlatOpenDocument {
     /// declaration owned by the container.
     pub fn remove_variable_declaration_group(
         &mut self,
-        scope: &crate::VariableScope,
-        kind: crate::VariableKind,
-    ) -> Result<Option<crate::VariableDeclarationGroup>> {
+        scope: &crate::variable_declaration::Scope,
+        kind: crate::variable_declaration::Kind,
+    ) -> Result<Option<crate::variable_declaration::Group>> {
         let current = self.variable_declarations()?;
         let Some(old) = current
             .groups
@@ -212,11 +212,11 @@ impl FlatOpenDocument {
         else {
             return Ok(None);
         };
-        let updated = crate::remove_variable_declaration_group_xml(&self.xml, scope, kind)?;
+        let updated = crate::variable_declaration::remove_xml(&self.xml, scope, kind)?;
         validate_flat_document(&updated, self.family)?;
-        crate::variable_declaration::parse_variable_declaration_parts(&[(
+        crate::variable_declaration::parse_parts(&[(
             updated.as_str(),
-            crate::VariablePart::Flat,
+            crate::variable_declaration::Part::Flat,
         )])?;
         self.xml = updated;
         Ok(Some(old))
@@ -576,14 +576,14 @@ impl OpenDocumentPackage {
     }
 
     /// Inspect ordered ODF variable declarations in content and styles.
-    pub fn variable_declarations(&self) -> Result<crate::VariableDeclarations> {
+    pub fn variable_declarations(&self) -> Result<crate::variable_declaration::Declarations> {
         let content = self.content_xml()?;
         let styles = self.styles_xml()?;
-        let mut parts = vec![(content.as_str(), crate::VariablePart::Content)];
+        let mut parts = vec![(content.as_str(), crate::variable_declaration::Part::Content)];
         if let Some(styles) = styles.as_deref() {
-            parts.push((styles, crate::VariablePart::Styles));
+            parts.push((styles, crate::variable_declaration::Part::Styles));
         }
-        crate::variable_declaration::parse_variable_declaration_parts(&parts)
+        crate::variable_declaration::parse_parts(&parts)
     }
 
     /// Atomically insert or replace one variable declaration container.
@@ -592,11 +592,11 @@ impl OpenDocumentPackage {
     /// entries remain byte-for-byte intact, and formulas remain inert.
     pub fn set_variable_declaration_group(
         &mut self,
-        group: &crate::VariableDeclarationGroup,
-    ) -> Result<Option<crate::VariableDeclarationGroup>> {
-        if group.part == crate::VariablePart::Flat {
+        group: &crate::variable_declaration::Group,
+    ) -> Result<Option<crate::variable_declaration::Group>> {
+        if group.part == crate::variable_declaration::Part::Flat {
             return Err(Error::InvalidFormat(
-                "OpenDocumentPackage cannot write VariablePart::Flat".to_string(),
+                "OpenDocumentPackage cannot write Part::Flat".to_string(),
             ));
         }
 
@@ -613,11 +613,11 @@ impl OpenDocumentPackage {
         let content = self.content_xml()?;
         let styles = self.styles_xml()?;
         let (content, styles) = match group.part {
-            crate::VariablePart::Content => (
-                crate::set_variable_declaration_group_xml(&content, group)?,
+            crate::variable_declaration::Part::Content => (
+                crate::variable_declaration::set_xml(&content, group)?,
                 styles,
             ),
-            crate::VariablePart::Styles => {
+            crate::variable_declaration::Part::Styles => {
                 let styles = styles.ok_or_else(|| {
                     Error::InvalidFormat(
                         "cannot write a styles declaration without styles.xml".to_string(),
@@ -625,10 +625,10 @@ impl OpenDocumentPackage {
                 })?;
                 (
                     content,
-                    Some(crate::set_variable_declaration_group_xml(&styles, group)?),
+                    Some(crate::variable_declaration::set_xml(&styles, group)?),
                 )
             },
-            crate::VariablePart::Flat => unreachable!(),
+            crate::variable_declaration::Part::Flat => unreachable!(),
         };
 
         self.replace_variable_xml(content, styles, old)
@@ -640,13 +640,13 @@ impl OpenDocumentPackage {
     /// declaration owned by the container.
     pub fn remove_variable_declaration_group(
         &mut self,
-        part: crate::VariablePart,
-        scope: &crate::VariableScope,
-        kind: crate::VariableKind,
-    ) -> Result<Option<crate::VariableDeclarationGroup>> {
-        if part == crate::VariablePart::Flat {
+        part: crate::variable_declaration::Part,
+        scope: &crate::variable_declaration::Scope,
+        kind: crate::variable_declaration::Kind,
+    ) -> Result<Option<crate::variable_declaration::Group>> {
+        if part == crate::variable_declaration::Part::Flat {
             return Err(Error::InvalidFormat(
-                "OpenDocumentPackage cannot remove VariablePart::Flat".to_string(),
+                "OpenDocumentPackage cannot remove Part::Flat".to_string(),
             ));
         }
 
@@ -664,11 +664,11 @@ impl OpenDocumentPackage {
         let content = self.content_xml()?;
         let styles = self.styles_xml()?;
         let (content, styles) = match part {
-            crate::VariablePart::Content => (
-                crate::remove_variable_declaration_group_xml(&content, scope, kind)?,
+            crate::variable_declaration::Part::Content => (
+                crate::variable_declaration::remove_xml(&content, scope, kind)?,
                 styles,
             ),
-            crate::VariablePart::Styles => {
+            crate::variable_declaration::Part::Styles => {
                 let styles = styles.ok_or_else(|| {
                     Error::InvalidFormat(
                         "cannot remove a styles declaration without styles.xml".to_string(),
@@ -676,12 +676,12 @@ impl OpenDocumentPackage {
                 })?;
                 (
                     content,
-                    Some(crate::remove_variable_declaration_group_xml(
+                    Some(crate::variable_declaration::remove_xml(
                         &styles, scope, kind,
                     )?),
                 )
             },
-            crate::VariablePart::Flat => unreachable!(),
+            crate::variable_declaration::Part::Flat => unreachable!(),
         };
 
         self.replace_variable_xml(content, styles, Some(old))
@@ -691,13 +691,13 @@ impl OpenDocumentPackage {
         &mut self,
         content: String,
         styles: Option<String>,
-        old: Option<crate::VariableDeclarationGroup>,
-    ) -> Result<Option<crate::VariableDeclarationGroup>> {
-        let mut parts = vec![(content.as_str(), crate::VariablePart::Content)];
+        old: Option<crate::variable_declaration::Group>,
+    ) -> Result<Option<crate::variable_declaration::Group>> {
+        let mut parts = vec![(content.as_str(), crate::variable_declaration::Part::Content)];
         if let Some(styles) = styles.as_deref() {
-            parts.push((styles, crate::VariablePart::Styles));
+            parts.push((styles, crate::variable_declaration::Part::Styles));
         }
-        crate::variable_declaration::parse_variable_declaration_parts(&parts)?;
+        crate::variable_declaration::parse_parts(&parts)?;
 
         let mut writer = crate::core::PackageWriter::new();
         writer.set_mimetype(&self.mimetype)?;
@@ -993,14 +993,15 @@ mod tests {
             constants::ODF_TEXT,
         );
         let mut document = FlatOpenDocument::from_bytes(xml.into_bytes()).unwrap();
-        let scope = crate::VariableScope::Body(crate::VariableBody::Text);
-        let first = crate::VariableDeclarationGroup {
-            kind: crate::VariableKind::Simple,
-            part: crate::VariablePart::Flat,
+        let scope =
+            crate::variable_declaration::Scope::Body(crate::variable_declaration::Body::Text);
+        let first = crate::variable_declaration::Group {
+            kind: crate::variable_declaration::Kind::Simple,
+            part: crate::variable_declaration::Part::Flat,
             scope: scope.clone(),
-            declarations: vec![crate::VariableDeclaration::Simple {
+            declarations: vec![crate::variable_declaration::Declaration::Simple {
                 name: "counter".to_string(),
-                value_type: crate::VariableValueType::Float,
+                value_type: crate::variable_declaration::ValueType::Float,
             }],
         };
         assert!(
@@ -1014,14 +1015,14 @@ mod tests {
             document
                 .variable_declarations()
                 .unwrap()
-                .find(crate::VariableKind::Simple, "counter")
+                .find(crate::variable_declaration::Kind::Simple, "counter")
                 .is_some()
         );
 
-        let second = crate::VariableDeclarationGroup {
-            declarations: vec![crate::VariableDeclaration::Simple {
+        let second = crate::variable_declaration::Group {
+            declarations: vec![crate::variable_declaration::Declaration::Simple {
                 name: "replacement".to_string(),
-                value_type: crate::VariableValueType::String,
+                value_type: crate::variable_declaration::ValueType::String,
             }],
             ..first.clone()
         };
@@ -1033,12 +1034,15 @@ mod tests {
             document
                 .variable_declarations()
                 .unwrap()
-                .find(crate::VariableKind::Simple, "replacement")
+                .find(crate::variable_declaration::Kind::Simple, "replacement")
                 .is_some()
         );
         assert_eq!(
             document
-                .remove_variable_declaration_group(&scope, crate::VariableKind::Simple)
+                .remove_variable_declaration_group(
+                    &scope,
+                    crate::variable_declaration::Kind::Simple
+                )
                 .unwrap(),
             Some(second),
         );

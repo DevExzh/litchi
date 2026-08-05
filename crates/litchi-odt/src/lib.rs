@@ -177,11 +177,6 @@ pub(crate) use elements::bookmark::{
 pub(crate) use embedded_object::{
     EmbeddedObject, EmbeddedObjectKind, EmbeddedObjectPart, EmbeddedObjectSource, InlineObjectRoot,
 };
-#[allow(unused_imports, reason = "ODT facade exposes font-face semantics")]
-pub(crate) use font_face::{
-    Face, Faces, GenericFamily, Link, Metric, MetricKind, Pitch, PositiveLength, Source, Stretch,
-    Style, Variant, Weight, parse_font_face_declarations,
-};
 #[allow(
     unused_imports,
     reason = "ODT facade exposes footnote separator semantics"
@@ -271,14 +266,6 @@ pub(crate) use master_page::{
 pub(crate) use media::{Image, ImageFrame, ImagePart, ImageSource};
 #[allow(
     unused_imports,
-    reason = "ODT facade exposes note configuration semantics"
-)]
-pub(crate) use notes_configuration::{
-    FootnotePosition, NoteNumberingScope, NotesConfiguration, NotesConfigurations,
-    parse_notes_configurations, remove_notes_configuration_xml, set_notes_configuration_xml,
-};
-#[allow(
-    unused_imports,
     reason = "ODT facade exposes ODF chart models for embedded charts"
 )]
 pub(crate) use odc::{
@@ -340,14 +327,6 @@ pub(crate) use section_properties::{
 #[allow(unused_imports, reason = "ODT facade exposes semantic ODF settings")]
 pub(crate) use settings::{
     ConfigItem, ConfigMap, ConfigMapEntry, ConfigNode, ConfigSet, ConfigValue, Settings,
-};
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes named page-layout style semantics"
-)]
-pub(crate) use style::columns::{
-    MAX_STYLE_COLUMNS, StyleColumn, StyleColumnLength, StyleColumnSeparator,
-    StyleColumnSeparatorAlignment, StyleColumnSeparatorStyle, StyleColumns, parse_style_columns,
 };
 #[allow(
     unused_imports,
@@ -419,17 +398,6 @@ pub(crate) use style::text::{
     TextStylePropertiesSet, TextStyleRecord, parse_text_style_properties,
     set_text_style_properties_xml,
 };
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes semantic ODF metadata models"
-)]
-pub(crate) use variable_declaration::{
-    VariableBody, VariableDateValue, VariableDeclaration, VariableDeclarationGroup,
-    VariableDeclarations, VariableHeaderFooter, VariableKind, VariablePart, VariableScope,
-    VariableValue, VariableValueType, remove_variable_declaration_group_xml,
-    set_variable_declaration_group_xml,
-};
-
 pub mod elements;
 #[allow(
     unused_imports,
@@ -475,7 +443,7 @@ pub use dynamic_text::{
     insert_database_field_xml, insert_dynamic_text_field_xml, remove_database_field_xml,
     remove_dynamic_text_field_xml, replace_database_field_xml, replace_dynamic_text_field_xml,
 };
-pub(crate) use frame::{FrameAnchor, Length};
+pub(crate) use frame::FrameAnchor;
 pub(crate) use header_footer::{
     HeaderFooterKind, MasterPage, MasterPageChild, MasterPageChildKind,
 };

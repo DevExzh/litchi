@@ -1,7 +1,7 @@
 use litchi_odt::Document;
 use litchi_odt::line_numbering::LineNumberFormat;
 use litchi_odt::notes_configuration::{
-    FootnotePosition, NoteClass, NoteNumberingScope, NotesConfiguration, NotesConfigurations,
+    Class, Configuration, Configurations, NumberingScope, Position,
 };
 mod support;
 
@@ -27,9 +27,9 @@ fn document(styles_body: &str) -> Document {
     .unwrap()
 }
 
-fn footnote() -> NotesConfiguration {
-    NotesConfiguration {
-        note_class: NoteClass::Footnote,
+fn footnote() -> Configuration {
+    Configuration {
+        note_class: Class::Footnote,
         citation_style_name: Some("FootnoteCitation".to_string()),
         citation_body_style_name: Some("FootnoteAnchor".to_string()),
         default_style_name: Some("Footnote".to_string()),
@@ -39,18 +39,18 @@ fn footnote() -> NotesConfiguration {
         number_suffix: Some("]".to_string()),
         number_format: Some(LineNumberFormat::LowerAlpha),
         letter_sync: Some(true),
-        start_numbering_at: Some(NoteNumberingScope::Chapter),
-        footnotes_position: Some(FootnotePosition::Page),
+        start_numbering_at: Some(NumberingScope::Chapter),
+        footnotes_position: Some(Position::Page),
         continuation_notice_forward: Some("Continued on next page".to_string()),
         continuation_notice_backward: Some("Continued from previous page".to_string()),
     }
 }
 
-fn endnote() -> NotesConfiguration {
-    let mut configuration = NotesConfiguration::new(NoteClass::Endnote);
+fn endnote() -> Configuration {
+    let mut configuration = Configuration::new(Class::Endnote);
     configuration.start_value = Some(7);
     configuration.number_format = Some(LineNumberFormat::UpperRoman);
-    configuration.start_numbering_at = Some(NoteNumberingScope::Document);
+    configuration.start_numbering_at = Some(NumberingScope::Document);
     configuration
 }
 
@@ -64,7 +64,7 @@ fn document_reads_note_configurations_from_styles() {
 
     assert_eq!(
         source.notes_configurations().unwrap(),
-        NotesConfigurations {
+        Configurations {
             footnote: Some(footnote),
             endnote: Some(endnote),
         }
@@ -89,7 +89,7 @@ fn mutable_document_updates_note_configurations_without_touching_unrelated_style
 
     assert_eq!(
         mutable
-            .set_notes_configurations(&NotesConfigurations {
+            .set_notes_configurations(&Configurations {
                 footnote: None,
                 endnote: Some(endnote.clone()),
             })
@@ -99,7 +99,7 @@ fn mutable_document_updates_note_configurations_without_touching_unrelated_style
     );
     assert_eq!(
         mutable.notes_configurations().unwrap(),
-        NotesConfigurations {
+        Configurations {
             footnote: None,
             endnote: Some(endnote.clone()),
         }
@@ -114,9 +114,7 @@ fn mutable_document_updates_note_configurations_without_touching_unrelated_style
     assert!(styles.contains(r#"<s:style s:name="Keep"/>"#));
 
     assert_eq!(
-        mutable
-            .clear_notes_configuration(NoteClass::Endnote)
-            .unwrap(),
+        mutable.clear_notes_configuration(Class::Endnote).unwrap(),
         Some(endnote)
     );
     assert_eq!(mutable.notes_configurations().unwrap(), Default::default());

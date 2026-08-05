@@ -30,12 +30,12 @@ enum NamespaceKind {
 
 /// Note class selected by `text:note-class`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum NoteClass {
+pub enum Class {
     Footnote,
     Endnote,
 }
 
-impl NoteClass {
+impl Class {
     pub const ALL: [Self; 2] = [Self::Footnote, Self::Endnote];
     fn parse(value: &str) -> Result<Self> {
         match value {
@@ -55,13 +55,13 @@ impl NoteClass {
 
 /// Scope at which note numbering restarts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NoteNumberingScope {
+pub enum NumberingScope {
     Document,
     Chapter,
     Page,
 }
 
-impl NoteNumberingScope {
+impl NumberingScope {
     pub const ALL: [Self; 3] = [Self::Document, Self::Chapter, Self::Page];
     fn parse(value: &str) -> Result<Self> {
         match value {
@@ -83,14 +83,14 @@ impl NoteNumberingScope {
 
 /// Placement of footnotes in the document.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FootnotePosition {
+pub enum Position {
     Text,
     Page,
     Section,
     Document,
 }
 
-impl FootnotePosition {
+impl Position {
     pub const ALL: [Self; 4] = [Self::Text, Self::Page, Self::Section, Self::Document];
     fn parse(value: &str) -> Result<Self> {
         match value {
@@ -114,8 +114,8 @@ impl FootnotePosition {
 
 /// One `text:notes-configuration` declaration.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NotesConfiguration {
-    pub note_class: NoteClass,
+pub struct Configuration {
+    pub note_class: Class,
     pub citation_style_name: Option<String>,
     pub citation_body_style_name: Option<String>,
     pub default_style_name: Option<String>,
@@ -125,14 +125,14 @@ pub struct NotesConfiguration {
     pub number_suffix: Option<String>,
     pub number_format: Option<LineNumberFormat>,
     pub letter_sync: Option<bool>,
-    pub start_numbering_at: Option<NoteNumberingScope>,
-    pub footnotes_position: Option<FootnotePosition>,
+    pub start_numbering_at: Option<NumberingScope>,
+    pub footnotes_position: Option<Position>,
     pub continuation_notice_forward: Option<String>,
     pub continuation_notice_backward: Option<String>,
 }
 
-impl NotesConfiguration {
-    pub fn new(note_class: NoteClass) -> Self {
+impl Configuration {
+    pub fn new(note_class: Class) -> Self {
         Self {
             note_class,
             citation_style_name: None,
@@ -257,12 +257,12 @@ impl NotesConfiguration {
         write_attr(
             &mut output,
             "text:start-numbering-at",
-            self.start_numbering_at.map(NoteNumberingScope::as_str),
+            self.start_numbering_at.map(NumberingScope::as_str),
         );
         write_attr(
             &mut output,
             "text:footnotes-position",
-            self.footnotes_position.map(FootnotePosition::as_str),
+            self.footnotes_position.map(Position::as_str),
         );
         if self.continuation_notice_forward.is_none() && self.continuation_notice_backward.is_none()
         {
@@ -287,28 +287,28 @@ impl NotesConfiguration {
 
 /// The at-most-one configuration for each standard note class.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct NotesConfigurations {
-    pub footnote: Option<NotesConfiguration>,
-    pub endnote: Option<NotesConfiguration>,
+pub struct Configurations {
+    pub footnote: Option<Configuration>,
+    pub endnote: Option<Configuration>,
 }
 
-impl NotesConfigurations {
-    pub fn get(&self, note_class: NoteClass) -> Option<&NotesConfiguration> {
+impl Configurations {
+    pub fn get(&self, note_class: Class) -> Option<&Configuration> {
         match note_class {
-            NoteClass::Footnote => self.footnote.as_ref(),
-            NoteClass::Endnote => self.endnote.as_ref(),
+            Class::Footnote => self.footnote.as_ref(),
+            Class::Endnote => self.endnote.as_ref(),
         }
     }
 
     pub fn validate(&self) -> Result<()> {
         if let Some(configuration) = &self.footnote {
-            if configuration.note_class != NoteClass::Footnote {
+            if configuration.note_class != Class::Footnote {
                 return invalid("footnote slot contains an endnote configuration");
             }
             configuration.validate()?;
         }
         if let Some(configuration) = &self.endnote {
-            if configuration.note_class != NoteClass::Endnote {
+            if configuration.note_class != Class::Endnote {
                 return invalid("endnote slot contains a footnote configuration");
             }
             configuration.validate()?;
@@ -331,7 +331,7 @@ impl NotesConfigurations {
 }
 
 /// Parse footnote/endnote configurations from an ODF styles document.
-pub fn parse_notes_configurations(xml: &str) -> Result<NotesConfigurations> {
+pub fn parse(xml: &str) -> Result<Configurations> {
     if xml.len() > MAX_DOCUMENT_XML_BYTES {
         return invalid(format!(
             "ODF XML exceeds the {MAX_DOCUMENT_XML_BYTES} byte notes limit"
@@ -343,7 +343,7 @@ pub fn parse_notes_configurations(xml: &str) -> Result<NotesConfigurations> {
     let mut depth = 0usize;
     let mut styles_content_depth = None;
     let mut section_properties_depth = None;
-    let mut result = NotesConfigurations::default();
+    let mut result = Configurations::default();
     loop {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
@@ -439,10 +439,7 @@ pub fn parse_notes_configurations(xml: &str) -> Result<NotesConfigurations> {
     Ok(result)
 }
 
-fn parse_attributes(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
-) -> Result<NotesConfiguration> {
+fn parse_attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Configuration> {
     let mut note_class = None;
     let mut citation_style_name = None;
     let mut citation_body_style_name = None;
@@ -473,7 +470,7 @@ fn parse_attributes(
             .into_owned();
         validate_value(&value, "notes configuration attribute", true)?;
         match (namespace, local.as_ref()) {
-            (NamespaceKind::Text, b"note-class") => note_class = Some(NoteClass::parse(&value)?),
+            (NamespaceKind::Text, b"note-class") => note_class = Some(Class::parse(&value)?),
             (NamespaceKind::Text, b"citation-style-name") => citation_style_name = Some(value),
             (NamespaceKind::Text, b"citation-body-style-name") => {
                 citation_body_style_name = Some(value)
@@ -492,10 +489,10 @@ fn parse_attributes(
                 letter_sync = Some(parse_bool(&value, "style:num-letter-sync")?)
             },
             (NamespaceKind::Text, b"start-numbering-at") => {
-                start_numbering_at = Some(NoteNumberingScope::parse(&value)?)
+                start_numbering_at = Some(NumberingScope::parse(&value)?)
             },
             (NamespaceKind::Text, b"footnotes-position") => {
-                footnotes_position = Some(FootnotePosition::parse(&value)?)
+                footnotes_position = Some(Position::parse(&value)?)
             },
             _ => return invalid("unsupported text:notes-configuration attribute"),
         }
@@ -503,7 +500,7 @@ fn parse_attributes(
     let note_class = note_class.ok_or_else(|| {
         Error::InvalidFormat("notes configuration requires text:note-class".to_string())
     })?;
-    Ok(NotesConfiguration {
+    Ok(Configuration {
         note_class,
         citation_style_name,
         citation_body_style_name,
@@ -521,10 +518,7 @@ fn parse_attributes(
     })
 }
 
-fn parse_notices(
-    reader: &mut NsReader<&[u8]>,
-    configuration: &mut NotesConfiguration,
-) -> Result<()> {
+fn parse_notices(reader: &mut NsReader<&[u8]>, configuration: &mut Configuration) -> Result<()> {
     let mut buffer = Vec::new();
     loop {
         let (namespace, event) = reader
@@ -636,13 +630,10 @@ fn reject_attributes(element: &BytesStart<'_>) -> Result<()> {
     Ok(())
 }
 
-fn insert_configuration(
-    result: &mut NotesConfigurations,
-    configuration: NotesConfiguration,
-) -> Result<()> {
+fn insert_configuration(result: &mut Configurations, configuration: Configuration) -> Result<()> {
     let slot = match configuration.note_class {
-        NoteClass::Footnote => &mut result.footnote,
-        NoteClass::Endnote => &mut result.endnote,
+        Class::Footnote => &mut result.footnote,
+        Class::Endnote => &mut result.endnote,
     };
     if slot.replace(configuration).is_some() {
         return invalid("duplicate notes configuration for the same note class");
@@ -675,8 +666,8 @@ fn event_start(xml: &str, end: usize) -> Result<usize> {
         .ok_or_else(|| Error::InvalidFormat("invalid notes XML event boundary".to_string()))
 }
 
-fn locate_configuration(xml: &str, note_class: NoteClass) -> Result<(Option<XmlSpan>, StylesSite)> {
-    parse_notes_configurations(xml)?;
+fn locate_configuration(xml: &str, note_class: Class) -> Result<(Option<XmlSpan>, StylesSite)> {
+    parse(xml)?;
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut stack: Vec<(NamespaceKind, Vec<u8>)> = Vec::new();
@@ -759,10 +750,7 @@ fn locate_configuration(xml: &str, note_class: NoteClass) -> Result<(Option<XmlS
 }
 
 /// Insert or replace one note-class configuration without rewriting unrelated XML.
-pub fn set_notes_configuration_xml(
-    xml: &str,
-    configuration: &NotesConfiguration,
-) -> Result<String> {
+pub fn set_xml(xml: &str, configuration: &Configuration) -> Result<String> {
     configuration.validate()?;
     let (target, site) = locate_configuration(xml, configuration.note_class)?;
     let fragment = configuration.to_xml()?;
@@ -799,7 +787,7 @@ pub fn set_notes_configuration_xml(
 }
 
 /// Remove one note-class configuration without rewriting unrelated XML.
-pub fn remove_notes_configuration_xml(xml: &str, note_class: NoteClass) -> Result<String> {
+pub fn remove_xml(xml: &str, note_class: Class) -> Result<String> {
     let (target, _) = locate_configuration(xml, note_class)?;
     let Some(span) = target else {
         return Ok(xml.to_string());
@@ -808,17 +796,15 @@ pub fn remove_notes_configuration_xml(xml: &str, note_class: NoteClass) -> Resul
 }
 
 impl OpenDocumentPackage {
-    pub fn notes_configurations(&self) -> Result<NotesConfigurations> {
-        self.styles_xml()?.map_or_else(
-            || Ok(NotesConfigurations::default()),
-            |xml| parse_notes_configurations(&xml),
-        )
+    pub fn notes_configurations(&self) -> Result<Configurations> {
+        self.styles_xml()?
+            .map_or_else(|| Ok(Configurations::default()), |xml| parse(&xml))
     }
 }
 
 impl FlatOpenDocument {
-    pub fn notes_configurations(&self) -> Result<NotesConfigurations> {
-        parse_notes_configurations(self.xml())
+    pub fn notes_configurations(&self) -> Result<Configurations> {
+        parse(self.xml())
     }
 }
 
@@ -1025,8 +1011,8 @@ mod tests {
         let xml = styles(
             r#"<t:notes-configuration t:note-class="footnote" t:citation-style-name="Footnote_20_Symbol" t:citation-body-style-name="Footnote_20_anchor" t:default-style-name="Footnote" t:master-page-name="Standard" t:start-value="2" s:num-prefix="[" s:num-suffix="]" s:num-format="a" s:num-letter-sync="true" t:start-numbering-at="chapter" t:footnotes-position="page"><t:note-continuation-notice-forward>Continued &amp; next</t:note-continuation-notice-forward><t:note-continuation-notice-backward><![CDATA[From <previous>]]></t:note-continuation-notice-backward></t:notes-configuration><t:notes-configuration t:note-class="endnote" s:num-format="I" t:start-numbering-at="document"/>"#,
         );
-        let configurations = parse_notes_configurations(&xml).unwrap();
-        let footnote = configurations.get(NoteClass::Footnote).unwrap();
+        let configurations = parse(&xml).unwrap();
+        let footnote = configurations.get(Class::Footnote).unwrap();
         assert_eq!(footnote.start_value, Some(2));
         assert_eq!(footnote.number_format, Some(LineNumberFormat::LowerAlpha));
         assert_eq!(footnote.letter_sync, Some(true));
@@ -1038,10 +1024,10 @@ mod tests {
             footnote.continuation_notice_backward.as_deref(),
             Some("From <previous>")
         );
-        assert!(configurations.get(NoteClass::Endnote).is_some());
+        assert!(configurations.get(Class::Endnote).is_some());
 
         let serialized = configurations.to_xml_fragment().unwrap();
-        let reparsed = parse_notes_configurations(&styles(&serialized)).unwrap();
+        let reparsed = parse(&styles(&serialized)).unwrap();
         assert_eq!(reparsed, configurations);
     }
 
@@ -1057,7 +1043,7 @@ mod tests {
             r#"<t:notes-configuration t:note-class="footnote"><t:note-continuation-notice-forward><t:span/></t:note-continuation-notice-forward></t:notes-configuration>"#,
             r#"<t:notes-configuration t:note-class="footnote"/><t:notes-configuration t:note-class="footnote"/>"#,
         ] {
-            assert!(parse_notes_configurations(&styles(body)).is_err(), "{body}");
+            assert!(parse(&styles(body)).is_err(), "{body}");
         }
     }
 
@@ -1066,23 +1052,22 @@ mod tests {
         let xml = format!(
             r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TEXT}"><o:body><t:notes-configuration t:note-class="footnote"/></o:body></o:document-content>"#
         );
-        assert!(parse_notes_configurations(&xml).is_err());
+        assert!(parse(&xml).is_err());
     }
 
     #[test]
     fn exhaustive_enums_and_number_formats_round_trip() {
-        for note_class in NoteClass::ALL {
-            for scope in NoteNumberingScope::ALL {
-                for position in FootnotePosition::ALL {
-                    let mut value = NotesConfiguration::new(note_class);
+        for note_class in Class::ALL {
+            for scope in NumberingScope::ALL {
+                for position in Position::ALL {
+                    let mut value = Configuration::new(note_class);
                     value.citation_style_name = Some(String::new());
                     value.default_style_name = Some("Style_1".to_string());
                     value.number_format = Some(LineNumberFormat::LowerAlpha);
                     value.letter_sync = Some(false);
                     value.start_numbering_at = Some(scope);
                     value.footnotes_position = Some(position);
-                    let parsed =
-                        parse_notes_configurations(&styles(&value.to_xml().unwrap())).unwrap();
+                    let parsed = parse(&styles(&value.to_xml().unwrap())).unwrap();
                     assert_eq!(parsed.get(note_class), Some(&value));
                 }
             }
@@ -1096,7 +1081,7 @@ mod tests {
             LineNumberFormat::UpperAlpha,
             LineNumberFormat::Custom("①".to_string()),
         ] {
-            let mut value = NotesConfiguration::new(NoteClass::Footnote);
+            let mut value = Configuration::new(Class::Footnote);
             value.letter_sync = matches!(
                 format,
                 LineNumberFormat::LowerAlpha | LineNumberFormat::UpperAlpha
@@ -1104,9 +1089,7 @@ mod tests {
             .then_some(true);
             value.number_format = Some(format);
             assert_eq!(
-                parse_notes_configurations(&styles(&value.to_xml().unwrap()))
-                    .unwrap()
-                    .footnote,
+                parse(&styles(&value.to_xml().unwrap())).unwrap().footnote,
                 Some(value)
             );
         }
@@ -1117,7 +1100,7 @@ mod tests {
         let reverse = styles(
             r#"<t:notes-configuration t:note-class="footnote"><t:note-continuation-notice-backward>back</t:note-continuation-notice-backward><t:note-continuation-notice-forward>forward</t:note-continuation-notice-forward></t:notes-configuration>"#,
         );
-        let parsed = parse_notes_configurations(&reverse).unwrap();
+        let parsed = parse(&reverse).unwrap();
         assert_eq!(
             parsed
                 .footnote
@@ -1139,7 +1122,7 @@ mod tests {
 
         let fixture =
             include_str!("../../../test-data/libreoffice-core/sw/qa/uitest/data/tdf145178.fodt");
-        let real = parse_notes_configurations(fixture).unwrap();
+        let real = parse(fixture).unwrap();
         assert_eq!(
             real.footnote.as_ref().unwrap().number_format,
             Some(LineNumberFormat::Arabic)
@@ -1162,16 +1145,13 @@ mod tests {
             r#"<t:notes-configuration t:note-class="footnote"><t:note-continuation-notice-forward t:bad="1"/></t:notes-configuration>"#,
             r#"<t:notes-configuration xmlns:x="urn:wrong" t:note-class="footnote" x:note-class="endnote"/>"#,
         ] {
-            assert!(
-                parse_notes_configurations(&styles(body)).is_err(),
-                "accepted {body}"
-            );
+            assert!(parse(&styles(body)).is_err(), "accepted {body}");
         }
         let wrong_namespace = format!(
             r#"<o:document-styles xmlns:o="{OFFICE}" xmlns:t="{TEXT}" xmlns:x="urn:wrong"><o:styles><x:notes-configuration t:note-class="footnote"/></o:styles></o:document-styles>"#
         );
-        assert!(parse_notes_configurations(&wrong_namespace).is_err());
-        let mut capped = NotesConfiguration::new(NoteClass::Footnote);
+        assert!(parse(&wrong_namespace).is_err());
+        let mut capped = Configuration::new(Class::Footnote);
         capped.continuation_notice_forward = Some("x".repeat(MAX_VALUE_BYTES + 1));
         assert!(capped.validate().is_err());
     }
@@ -1183,18 +1163,15 @@ mod tests {
         let original = styles(
             r#"<!--keep--><style:list-style xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" style:name="L"/>"#,
         );
-        let mut value = NotesConfiguration::new(NoteClass::Footnote);
+        let mut value = Configuration::new(Class::Footnote);
         value.start_value = Some(2);
-        let inserted = set_notes_configuration_xml(&original, &value).unwrap();
+        let inserted = set_xml(&original, &value).unwrap();
         assert!(inserted.contains("<!--keep--><style:list-style"));
         value.start_value = Some(3);
-        let replaced = set_notes_configuration_xml(&inserted, &value).unwrap();
+        let replaced = set_xml(&inserted, &value).unwrap();
         assert!(replaced.contains("text:start-value=\"3\""));
         assert!(!replaced.contains("text:start-value=\"2\""));
-        assert_eq!(
-            remove_notes_configuration_xml(&replaced, NoteClass::Footnote).unwrap(),
-            original
-        );
+        assert_eq!(remove_xml(&replaced, Class::Footnote).unwrap(), original);
 
         let mut builder = Builder::new();
         builder.set_notes_configuration(value.clone()).unwrap();

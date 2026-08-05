@@ -87,14 +87,14 @@ pub struct Builder {
     section_property_styles: Vec<crate::SectionStyleProperties>,
     section_names: std::collections::HashSet<String>,
     section_xml_ids: std::collections::HashSet<String>,
-    page_layout_columns: Vec<(String, crate::StyleColumns)>,
+    page_layout_columns: Vec<(String, crate::style::columns::Columns)>,
     page_layout_footnote_separators: Vec<(String, crate::StyleFootnoteSeparator)>,
     page_layout_header_footer_properties: Vec<(
         String,
         crate::PageHeaderFooterRegion,
         crate::HeaderFooterStyleProperties,
     )>,
-    notes_configurations: crate::NotesConfigurations,
+    notes_configurations: crate::notes_configuration::Configurations,
     line_numbering_configuration: Option<crate::LineNumberingConfiguration>,
     page_sequence: Option<crate::Sequence>,
 }
@@ -157,7 +157,7 @@ impl Builder {
             page_layout_columns: Vec::new(),
             page_layout_footnote_separators: Vec::new(),
             page_layout_header_footer_properties: Vec::new(),
-            notes_configurations: crate::NotesConfigurations::default(),
+            notes_configurations: crate::notes_configuration::Configurations::default(),
             line_numbering_configuration: None,
             page_sequence: None,
         }
@@ -175,14 +175,14 @@ impl Builder {
     }
 
     /// Return footnote and endnote configurations emitted to `styles.xml`.
-    pub fn notes_configurations(&self) -> &crate::NotesConfigurations {
+    pub fn notes_configurations(&self) -> &crate::notes_configuration::Configurations {
         &self.notes_configurations
     }
 
     /// Replace the validated footnote and endnote configurations.
     pub fn set_notes_configurations(
         &mut self,
-        configurations: crate::NotesConfigurations,
+        configurations: crate::notes_configuration::Configurations,
     ) -> Result<&mut Self> {
         configurations.validate()?;
         self.notes_configurations = configurations;
@@ -192,14 +192,14 @@ impl Builder {
     /// Set one validated note-class configuration.
     pub fn set_notes_configuration(
         &mut self,
-        configuration: crate::NotesConfiguration,
+        configuration: crate::notes_configuration::Configuration,
     ) -> Result<&mut Self> {
         configuration.validate()?;
         match configuration.note_class {
-            crate::notes_configuration::NoteClass::Footnote => {
+            crate::notes_configuration::Class::Footnote => {
                 self.notes_configurations.footnote = Some(configuration)
             },
-            crate::notes_configuration::NoteClass::Endnote => {
+            crate::notes_configuration::Class::Endnote => {
                 self.notes_configurations.endnote = Some(configuration)
             },
         }
@@ -616,7 +616,7 @@ impl Builder {
     pub fn add_page_layout_columns(
         &mut self,
         page_layout_name: impl Into<String>,
-        columns: crate::StyleColumns,
+        columns: crate::style::columns::Columns,
     ) -> Result<&mut Self> {
         let name = page_layout_name.into();
         columns.to_page_layout_fragment(&name)?;

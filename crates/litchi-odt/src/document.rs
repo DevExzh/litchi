@@ -441,7 +441,7 @@ impl Document {
     ///
     /// This preserves stored metadata only. It does not fetch linked font
     /// resources, load fonts, or inspect embedded font data.
-    pub fn content_font_face_declarations(&self) -> Result<Option<crate::font_face::Faces>> {
+    pub fn content_font_face_declarations(&self) -> Result<Option<crate::font_face::Declarations>> {
         crate::font_face::parse_content_font_face_declarations(self.content.xml_content())
     }
 
@@ -449,7 +449,7 @@ impl Document {
     ///
     /// This preserves stored metadata only. It does not fetch linked font
     /// resources, load fonts, or inspect embedded font data.
-    pub fn styles_font_face_declarations(&self) -> Result<Option<crate::font_face::Faces>> {
+    pub fn styles_font_face_declarations(&self) -> Result<Option<crate::font_face::Declarations>> {
         self.styles.as_ref().map_or_else(
             || Ok(None),
             |styles| crate::font_face::parse_styles_font_face_declarations(styles.xml_content()),
@@ -566,10 +566,10 @@ impl Document {
     /// These style declarations are retained as metadata only. This API does
     /// not renumber notes, resolve style references, or render continuation
     /// notices.
-    pub fn notes_configurations(&self) -> Result<crate::NotesConfigurations> {
+    pub fn notes_configurations(&self) -> Result<crate::notes_configuration::Configurations> {
         self.styles.as_ref().map_or_else(
             || Ok(Default::default()),
-            |styles| crate::parse_notes_configurations(styles.xml_content()),
+            |styles| crate::notes_configuration::parse(styles.xml_content()),
         )
     }
 
@@ -1209,12 +1209,15 @@ impl Document {
     }
 
     /// Inspect ordered ODF variable declarations without evaluating fields or formulas.
-    pub fn variable_declarations(&self) -> Result<crate::VariableDeclarations> {
-        let mut parts = vec![(self.content.xml_content(), crate::VariablePart::Content)];
+    pub fn variable_declarations(&self) -> Result<crate::variable_declaration::Declarations> {
+        let mut parts = vec![(
+            self.content.xml_content(),
+            crate::variable_declaration::Part::Content,
+        )];
         if let Some(styles) = self.styles.as_ref().map(Styles::xml_content) {
-            parts.push((styles, crate::VariablePart::Styles));
+            parts.push((styles, crate::variable_declaration::Part::Styles));
         }
-        crate::variable_declaration::parse_variable_declaration_parts(&parts)
+        crate::variable_declaration::parse_parts(&parts)
     }
 
     /// Discover package, inline, missing, and inert linked embedded objects.

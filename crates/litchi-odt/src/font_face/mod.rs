@@ -40,10 +40,10 @@ pub(super) fn xml_error(error: impl std::fmt::Display) -> Error {
     Error::InvalidFormat(format!("invalid ODF font-face XML: {error}"))
 }
 
-pub use codec::parse_font_face_declarations;
+pub use codec::parse;
 pub use model::{
-    Face, Faces, GenericFamily, Link, Metric, MetricKind, Pitch, PositiveLength, Source, Stretch,
-    Style, Variant, Weight,
+    Declarations, Face, Family, Length, Link, Metric, MetricKind, Pitch, Source, Stretch, Style,
+    Variant, Weight,
 };
 pub(crate) use package::{
     parse_content_font_face_declarations, parse_styles_font_face_declarations,

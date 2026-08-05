@@ -22,7 +22,7 @@ const MAX_AGGREGATE_BYTES: usize = 16 * 1_048_576;
 
 /// XML part containing a declaration group.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum VariablePart {
+pub enum Part {
     Content,
     Styles,
     Flat,
@@ -30,7 +30,7 @@ pub enum VariablePart {
 
 /// Standard body family containing declarations.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum VariableBody {
+pub enum Body {
     Text,
     Spreadsheet,
     Presentation,
@@ -40,7 +40,7 @@ pub enum VariableBody {
 
 /// Header or footer variant containing declarations.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum VariableHeaderFooter {
+pub enum HeaderFooter {
     Header,
     HeaderFirst,
     HeaderLeft,
@@ -51,17 +51,17 @@ pub enum VariableHeaderFooter {
 
 /// Structural scope in which a declaration group occurs.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum VariableScope {
-    Body(VariableBody),
+pub enum Scope {
+    Body(Body),
     HeaderFooter {
-        kind: VariableHeaderFooter,
+        kind: HeaderFooter,
         master_page_name: Option<String>,
     },
 }
 
 /// One of the three variable classes defined by ODF 1.3 section 7.4.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum VariableKind {
+pub enum Kind {
     Simple,
     User,
     Sequence,
@@ -69,7 +69,7 @@ pub enum VariableKind {
 
 /// Declared ODF value type.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum VariableValueType {
+pub enum ValueType {
     Float,
     Percentage,
     Currency,
@@ -82,14 +82,14 @@ pub enum VariableValueType {
 
 /// Typed date or date-time value.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum VariableDateValue {
+pub enum DateValue {
     Date(NaiveDate),
     DateTime(DateTime<FixedOffset>),
 }
 
 /// Typed user-field value retaining its exact lexical representation.
 #[derive(Clone, Debug, PartialEq)]
-pub enum VariableValue {
+pub enum Value {
     Float {
         value: f64,
         lexical: String,
@@ -104,7 +104,7 @@ pub enum VariableValue {
         currency: String,
     },
     Date {
-        value: VariableDateValue,
+        value: DateValue,
         lexical: String,
     },
     Time {
@@ -121,17 +121,17 @@ pub enum VariableValue {
     Void,
 }
 
-impl VariableValue {
-    pub fn value_type(&self) -> VariableValueType {
+impl Value {
+    pub fn value_type(&self) -> ValueType {
         match self {
-            Self::Float { .. } => VariableValueType::Float,
-            Self::Percentage { .. } => VariableValueType::Percentage,
-            Self::Currency { .. } => VariableValueType::Currency,
-            Self::Date { .. } => VariableValueType::Date,
-            Self::Time { .. } => VariableValueType::Time,
-            Self::Boolean { .. } => VariableValueType::Boolean,
-            Self::String { .. } => VariableValueType::String,
-            Self::Void => VariableValueType::Void,
+            Self::Float { .. } => ValueType::Float,
+            Self::Percentage { .. } => ValueType::Percentage,
+            Self::Currency { .. } => ValueType::Currency,
+            Self::Date { .. } => ValueType::Date,
+            Self::Time { .. } => ValueType::Time,
+            Self::Boolean { .. } => ValueType::Boolean,
+            Self::String { .. } => ValueType::String,
+            Self::Void => ValueType::Void,
         }
     }
 
@@ -152,14 +152,14 @@ impl VariableValue {
 /// One variable declaration.
 #[derive(Clone, Debug, PartialEq)]
 #[allow(clippy::large_enum_variant)] // public API; boxing would break callers
-pub enum VariableDeclaration {
+pub enum Declaration {
     Simple {
         name: String,
-        value_type: VariableValueType,
+        value_type: ValueType,
     },
     User {
         name: String,
-        value: Option<VariableValue>,
+        value: Option<Value>,
         formula: Option<String>,
     },
     Sequence {
@@ -169,12 +169,12 @@ pub enum VariableDeclaration {
     },
 }
 
-impl VariableDeclaration {
-    pub fn kind(&self) -> VariableKind {
+impl Declaration {
+    pub fn kind(&self) -> Kind {
         match self {
-            Self::Simple { .. } => VariableKind::Simple,
-            Self::User { .. } => VariableKind::User,
-            Self::Sequence { .. } => VariableKind::Sequence,
+            Self::Simple { .. } => Kind::Simple,
+            Self::User { .. } => Kind::User,
+            Self::Sequence { .. } => Kind::Sequence,
         }
     }
 
@@ -201,14 +201,14 @@ impl VariableDeclaration {
 
 /// One declaration container in source order.
 #[derive(Clone, Debug, PartialEq)]
-pub struct VariableDeclarationGroup {
-    pub kind: VariableKind,
-    pub part: VariablePart,
-    pub scope: VariableScope,
-    pub declarations: Vec<VariableDeclaration>,
+pub struct Group {
+    pub kind: Kind,
+    pub part: Part,
+    pub scope: Scope,
+    pub declarations: Vec<Declaration>,
 }
 
-impl VariableDeclarationGroup {
+impl Group {
     /// Serialize this declaration container as a self-contained XML fragment.
     ///
     /// Namespace declarations are emitted on the container so the fragment can
@@ -222,7 +222,7 @@ impl VariableDeclarationGroup {
 
 #[derive(Clone, Copy)]
 struct GroupSpan {
-    kind: VariableKind,
+    kind: Kind,
     start: usize,
     end: usize,
 }
@@ -245,10 +245,7 @@ struct EmptyParentSpan {
 /// The source XML is otherwise retained byte-for-byte. The returned XML should
 /// be validated together with the document's other XML parts before commit so
 /// cross-part field references remain valid.
-pub fn set_variable_declaration_group_xml(
-    xml: &str,
-    group: &VariableDeclarationGroup,
-) -> Result<String> {
+pub fn set_xml(xml: &str, group: &Group) -> Result<String> {
     let replacement = group.to_xml()?;
     let scan = scan_scope(xml, &group.scope)?;
     if let Some(parent) = scan.empty_parent.as_ref() {
@@ -275,11 +272,7 @@ pub fn set_variable_declaration_group_xml(
 }
 
 /// Remove one declaration container from a structural scope.
-pub fn remove_variable_declaration_group_xml(
-    xml: &str,
-    scope: &VariableScope,
-    kind: VariableKind,
-) -> Result<String> {
+pub fn remove_xml(xml: &str, scope: &Scope, kind: Kind) -> Result<String> {
     let scan = scan_scope(xml, scope)?;
     let existing = scan
         .groups
@@ -289,11 +282,11 @@ pub fn remove_variable_declaration_group_xml(
     replace_range(xml, existing.start, existing.end, "")
 }
 
-fn serialize_group_unchecked(group: &VariableDeclarationGroup) -> String {
+fn serialize_group_unchecked(group: &Group) -> String {
     let container = match group.kind {
-        VariableKind::Simple => "variable-decls",
-        VariableKind::User => "user-field-decls",
-        VariableKind::Sequence => "sequence-decls",
+        Kind::Simple => "variable-decls",
+        Kind::User => "user-field-decls",
+        Kind::Sequence => "sequence-decls",
     };
     let mut xml = String::with_capacity(
         group
@@ -318,15 +311,15 @@ fn serialize_group_unchecked(group: &VariableDeclarationGroup) -> String {
     xml
 }
 
-fn serialize_declaration(xml: &mut String, declaration: &VariableDeclaration) {
+fn serialize_declaration(xml: &mut String, declaration: &Declaration) {
     xml.push_str("<text:");
     xml.push_str(declaration_local(declaration.kind()));
     push_attribute(xml, "text:name", declaration.name());
     match declaration {
-        VariableDeclaration::Simple { value_type, .. } => {
+        Declaration::Simple { value_type, .. } => {
             push_attribute(xml, "office:value-type", value_type_name(*value_type));
         },
-        VariableDeclaration::User { value, formula, .. } => {
+        Declaration::User { value, formula, .. } => {
             if let Some(formula) = formula {
                 push_attribute(xml, "text:formula", formula);
             }
@@ -337,33 +330,32 @@ fn serialize_declaration(xml: &mut String, declaration: &VariableDeclaration) {
                     value_type_name(value.value_type()),
                 );
                 match value {
-                    VariableValue::Float { lexical, .. }
-                    | VariableValue::Percentage { lexical, .. } => {
+                    Value::Float { lexical, .. } | Value::Percentage { lexical, .. } => {
                         push_attribute(xml, "office:value", lexical);
                     },
-                    VariableValue::Currency {
+                    Value::Currency {
                         lexical, currency, ..
                     } => {
                         push_attribute(xml, "office:value", lexical);
                         push_attribute(xml, "office:currency", currency);
                     },
-                    VariableValue::Date { lexical, .. } => {
+                    Value::Date { lexical, .. } => {
                         push_attribute(xml, "office:date-value", lexical);
                     },
-                    VariableValue::Time { lexical, .. } => {
+                    Value::Time { lexical, .. } => {
                         push_attribute(xml, "office:time-value", lexical);
                     },
-                    VariableValue::Boolean { lexical, .. } => {
+                    Value::Boolean { lexical, .. } => {
                         push_attribute(xml, "office:boolean-value", lexical);
                     },
-                    VariableValue::String { value } => {
+                    Value::String { value } => {
                         push_attribute(xml, "office:string-value", value);
                     },
-                    VariableValue::Void => {},
+                    Value::Void => {},
                 }
             }
         },
-        VariableDeclaration::Sequence {
+        Declaration::Sequence {
             display_outline_level,
             separation_character,
             ..
@@ -381,16 +373,16 @@ fn serialize_declaration(xml: &mut String, declaration: &VariableDeclaration) {
     xml.push_str("/>");
 }
 
-fn value_type_name(value_type: VariableValueType) -> &'static str {
+fn value_type_name(value_type: ValueType) -> &'static str {
     match value_type {
-        VariableValueType::Float => "float",
-        VariableValueType::Percentage => "percentage",
-        VariableValueType::Currency => "currency",
-        VariableValueType::Date => "date",
-        VariableValueType::Time => "time",
-        VariableValueType::Boolean => "boolean",
-        VariableValueType::String => "string",
-        VariableValueType::Void => "void",
+        ValueType::Float => "float",
+        ValueType::Percentage => "percentage",
+        ValueType::Currency => "currency",
+        ValueType::Date => "date",
+        ValueType::Time => "time",
+        ValueType::Boolean => "boolean",
+        ValueType::String => "string",
+        ValueType::Void => "void",
     }
 }
 
@@ -411,11 +403,11 @@ fn push_attribute(xml: &mut String, name: &str, value: &str) {
     xml.push('\"');
 }
 
-fn validate_serialized_group(group: &VariableDeclarationGroup, xml: &str) -> Result<()> {
+fn validate_serialized_group(group: &Group, xml: &str) -> Result<()> {
     let document = format!(
         r#"<office:document-content xmlns:office="{OFFICE}"><office:body><office:text>{xml}</office:text></office:body></office:document-content>"#
     );
-    let parsed = parse_variable_declaration_parts(&[(document.as_str(), group.part)])?;
+    let parsed = parse_parts(&[(document.as_str(), group.part)])?;
     if parsed.groups.len() != 1
         || parsed.groups[0].kind != group.kind
         || parsed.groups[0].declarations.len() != group.declarations.len()
@@ -427,11 +419,11 @@ fn validate_serialized_group(group: &VariableDeclarationGroup, xml: &str) -> Res
     Ok(())
 }
 
-fn kind_order(kind: VariableKind) -> u8 {
+fn kind_order(kind: Kind) -> u8 {
     match kind {
-        VariableKind::Simple => 0,
-        VariableKind::Sequence => 1,
-        VariableKind::User => 2,
+        Kind::Simple => 0,
+        Kind::Sequence => 1,
+        Kind::User => 2,
     }
 }
 
@@ -477,7 +469,7 @@ fn expand_empty_parent(xml: &str, parent: &EmptyParentSpan, child: &str) -> Resu
     replace_range(xml, parent.start, parent.end, &replacement)
 }
 
-fn scan_scope(xml: &str, scope: &VariableScope) -> Result<ScopeScan> {
+fn scan_scope(xml: &str, scope: &Scope) -> Result<ScopeScan> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("variable declaration XML exceeds 64 MiB"));
     }
@@ -487,7 +479,7 @@ fn scan_scope(xml: &str, scope: &VariableScope) -> Result<ScopeScan> {
     let mut depth = 0usize;
     let mut parent_depth = None;
     let mut opening_end = None;
-    let mut active_group: Option<(VariableKind, usize, usize)> = None;
+    let mut active_group: Option<(Kind, usize, usize)> = None;
     let mut groups = Vec::new();
     let mut first_other_child = None;
     let mut empty_parent = None;
@@ -625,34 +617,34 @@ fn scan_scope(xml: &str, scope: &VariableScope) -> Result<ScopeScan> {
 }
 
 fn scope_matches_parent(
-    scope: &VariableScope,
+    scope: &Scope,
     namespace: Option<&str>,
     local: &str,
     stack: &[Frame],
 ) -> bool {
     match scope {
-        VariableScope::Body(body) => {
+        Scope::Body(body) => {
             namespace == Some(OFFICE)
                 && local
                     == match body {
-                        VariableBody::Text => "text",
-                        VariableBody::Spreadsheet => "spreadsheet",
-                        VariableBody::Presentation => "presentation",
-                        VariableBody::Drawing => "drawing",
-                        VariableBody::Chart => "chart",
+                        Body::Text => "text",
+                        Body::Spreadsheet => "spreadsheet",
+                        Body::Presentation => "presentation",
+                        Body::Drawing => "drawing",
+                        Body::Chart => "chart",
                     }
         },
-        VariableScope::HeaderFooter {
+        Scope::HeaderFooter {
             kind,
             master_page_name,
         } => {
             let expected_local = match kind {
-                VariableHeaderFooter::Header => "header",
-                VariableHeaderFooter::HeaderFirst => "header-first",
-                VariableHeaderFooter::HeaderLeft => "header-left",
-                VariableHeaderFooter::Footer => "footer",
-                VariableHeaderFooter::FooterFirst => "footer-first",
-                VariableHeaderFooter::FooterLeft => "footer-left",
+                HeaderFooter::Header => "header",
+                HeaderFooter::HeaderFirst => "header-first",
+                HeaderFooter::HeaderLeft => "header-left",
+                HeaderFooter::Footer => "footer",
+                HeaderFooter::FooterFirst => "footer-first",
+                HeaderFooter::FooterLeft => "footer-left",
             };
             let actual_master_page = stack.iter().rev().find_map(|frame| {
                 (frame.namespace.as_deref() == Some(STYLE) && frame.local == "master-page")
@@ -668,8 +660,8 @@ fn scope_matches_parent(
 
 /// Ordered declaration groups from all scanned XML parts.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct VariableDeclarations {
-    pub groups: Vec<VariableDeclarationGroup>,
+pub struct Declarations {
+    pub groups: Vec<Group>,
     /// Inert DDE source declarations in document order.
     pub dde_connections: Vec<crate::DdeConnectionDeclaration>,
     /// Validated references to DDE declarations in document order.
@@ -680,14 +672,14 @@ pub struct VariableDeclarations {
     pub auto_mark_files: Vec<crate::AlphabeticalIndexAutoMarkFile>,
 }
 
-impl VariableDeclarations {
-    pub fn declarations(&self) -> impl Iterator<Item = &VariableDeclaration> {
+impl Declarations {
+    pub fn declarations(&self) -> impl Iterator<Item = &Declaration> {
         self.groups
             .iter()
             .flat_map(|group| group.declarations.iter())
     }
 
-    pub fn find(&self, kind: VariableKind, name: &str) -> Option<&VariableDeclaration> {
+    pub fn find(&self, kind: Kind, name: &str) -> Option<&Declaration> {
         self.declarations()
             .find(|declaration| declaration.kind() == kind && declaration.name() == name)
     }
@@ -708,25 +700,23 @@ struct Frame {
 
 struct ActiveGroup {
     depth: usize,
-    group: VariableDeclarationGroup,
+    group: Group,
 }
 
 struct PendingDeclaration {
     depth: usize,
-    declaration: VariableDeclaration,
+    declaration: Declaration,
 }
 
 #[derive(Hash, PartialEq, Eq)]
 struct ScopedName {
-    part: VariablePart,
-    scope: VariableScope,
-    kind: VariableKind,
+    part: Part,
+    scope: Scope,
+    kind: Kind,
     name: String,
 }
 
-pub(crate) fn parse_variable_declaration_parts(
-    parts: &[(&str, VariablePart)],
-) -> Result<VariableDeclarations> {
+pub(crate) fn parse_parts(parts: &[(&str, Part)]) -> Result<Declarations> {
     let total = parts.iter().try_fold(0usize, |size, (xml, _)| {
         size.checked_add(xml.len())
             .ok_or_else(|| invalid("variable declaration XML size overflow"))
@@ -734,11 +724,11 @@ pub(crate) fn parse_variable_declaration_parts(
     if total > MAX_XML_BYTES {
         return Err(invalid("variable declaration XML exceeds 64 MiB"));
     }
-    let mut result = VariableDeclarations::default();
-    let mut names = HashSet::<(VariableKind, String)>::new();
-    let mut containers = HashSet::<(VariablePart, VariableScope, VariableKind)>::new();
+    let mut result = Declarations::default();
+    let mut names = HashSet::<(Kind, String)>::new();
+    let mut containers = HashSet::<(Part, Scope, Kind)>::new();
     let mut uses = HashSet::<ScopedName>::new();
-    let mut all_uses = Vec::<(VariableKind, String)>::new();
+    let mut all_uses = Vec::<(Kind, String)>::new();
     let mut aggregate = 0usize;
     let mut declaration_count = 0usize;
     for (xml, part) in parts {
@@ -774,12 +764,12 @@ pub(crate) fn parse_variable_declaration_parts(
 #[allow(clippy::too_many_arguments)]
 fn parse_part(
     xml: &str,
-    part: VariablePart,
-    result: &mut VariableDeclarations,
-    names: &mut HashSet<(VariableKind, String)>,
-    containers: &mut HashSet<(VariablePart, VariableScope, VariableKind)>,
+    part: Part,
+    result: &mut Declarations,
+    names: &mut HashSet<(Kind, String)>,
+    containers: &mut HashSet<(Part, Scope, Kind)>,
     uses: &mut HashSet<ScopedName>,
-    all_uses: &mut Vec<(VariableKind, String)>,
+    all_uses: &mut Vec<(Kind, String)>,
     aggregate: &mut usize,
     declaration_count: &mut usize,
 ) -> Result<()> {
@@ -969,12 +959,12 @@ fn parse_part(
 fn start_group(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-    part: VariablePart,
-    kind: VariableKind,
+    part: Part,
+    kind: Kind,
     depth: usize,
     stack: &[Frame],
-    result: &VariableDeclarations,
-    containers: &mut HashSet<(VariablePart, VariableScope, VariableKind)>,
+    result: &Declarations,
+    containers: &mut HashSet<(Part, Scope, Kind)>,
     active: &mut Option<ActiveGroup>,
 ) -> Result<()> {
     for attribute in element.attributes() {
@@ -1003,7 +993,7 @@ fn start_group(
     }
     *active = Some(ActiveGroup {
         depth: depth + 1,
-        group: VariableDeclarationGroup {
+        group: Group {
             kind,
             part,
             scope,
@@ -1015,11 +1005,11 @@ fn start_group(
 }
 
 fn add_declaration(
-    declaration: VariableDeclaration,
-    group: &mut VariableDeclarationGroup,
-    names: &mut HashSet<(VariableKind, String)>,
+    declaration: Declaration,
+    group: &mut Group,
+    names: &mut HashSet<(Kind, String)>,
     uses: &HashSet<ScopedName>,
-    part: VariablePart,
+    part: Part,
     declaration_count: &mut usize,
 ) -> Result<()> {
     if *declaration_count >= MAX_DECLARATIONS {
@@ -1054,21 +1044,21 @@ fn add_declaration(
 fn parse_declaration(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-    kind: VariableKind,
+    kind: Kind,
     aggregate: &mut usize,
-) -> Result<VariableDeclaration> {
+) -> Result<Declaration> {
     let attributes = collect_attributes(reader, element, aggregate)?;
     let name = required(&attributes, TEXT, "name")?.to_string();
     validate_string(&name, MAX_NAME_BYTES, "variable name")?;
     match kind {
-        VariableKind::Simple => {
+        Kind::Simple => {
             reject_unexpected(&attributes, &[(TEXT, "name"), (OFFICE, "value-type")])?;
-            Ok(VariableDeclaration::Simple {
+            Ok(Declaration::Simple {
                 name,
                 value_type: parse_value_type(required(&attributes, OFFICE, "value-type")?)?,
             })
         },
-        VariableKind::User => {
+        Kind::User => {
             reject_unexpected(
                 &attributes,
                 &[
@@ -1096,13 +1086,13 @@ fn parse_declaration(
             if value.is_none() {
                 reject_typed_value_attributes(&attributes, &[])?;
             }
-            Ok(VariableDeclaration::User {
+            Ok(Declaration::User {
                 name,
                 value,
                 formula,
             })
         },
-        VariableKind::Sequence => {
+        Kind::Sequence => {
             reject_unexpected(
                 &attributes,
                 &[
@@ -1134,7 +1124,7 @@ fn parse_declaration(
                     "level-zero sequence declaration cannot have a separator",
                 ));
             }
-            Ok(VariableDeclaration::Sequence {
+            Ok(Declaration::Sequence {
                 name,
                 display_outline_level: level,
                 separation_character,
@@ -1175,74 +1165,74 @@ fn collect_attributes(
     Ok(result)
 }
 
-fn parse_user_value(kind: VariableValueType, attributes: &Attributes) -> Result<VariableValue> {
+fn parse_user_value(kind: ValueType, attributes: &Attributes) -> Result<Value> {
     let allowed = match kind {
-        VariableValueType::Float | VariableValueType::Percentage => &["value"][..],
-        VariableValueType::Currency => &["value", "currency"][..],
-        VariableValueType::Date => &["date-value"][..],
-        VariableValueType::Time => &["time-value"][..],
-        VariableValueType::Boolean => &["boolean-value"][..],
-        VariableValueType::String => &["string-value"][..],
-        VariableValueType::Void => &[][..],
+        ValueType::Float | ValueType::Percentage => &["value"][..],
+        ValueType::Currency => &["value", "currency"][..],
+        ValueType::Date => &["date-value"][..],
+        ValueType::Time => &["time-value"][..],
+        ValueType::Boolean => &["boolean-value"][..],
+        ValueType::String => &["string-value"][..],
+        ValueType::Void => &[][..],
     };
     reject_typed_value_attributes(attributes, allowed)?;
     let value = match kind {
-        VariableValueType::Float => {
+        ValueType::Float => {
             let lexical = required(attributes, OFFICE, "value")?.to_string();
-            VariableValue::Float {
+            Value::Float {
                 value: parse_double(&lexical)?,
                 lexical,
             }
         },
-        VariableValueType::Percentage => {
+        ValueType::Percentage => {
             let lexical = required(attributes, OFFICE, "value")?.to_string();
-            VariableValue::Percentage {
+            Value::Percentage {
                 value: parse_double(&lexical)?,
                 lexical,
             }
         },
-        VariableValueType::Currency => {
+        ValueType::Currency => {
             let lexical = required(attributes, OFFICE, "value")?.to_string();
             let currency = required(attributes, OFFICE, "currency")?.to_string();
             if currency.is_empty() {
                 return Err(invalid("currency value requires a currency code"));
             }
-            VariableValue::Currency {
+            Value::Currency {
                 value: parse_double(&lexical)?,
                 lexical,
                 currency,
             }
         },
-        VariableValueType::Date => {
+        ValueType::Date => {
             let lexical = required(attributes, OFFICE, "date-value")?.to_string();
             let value = if lexical.contains('T') {
-                VariableDateValue::DateTime(
+                DateValue::DateTime(
                     crate::datatype::DateTime::decode(&lexical)
                         .map_err(|_| invalid("invalid user-field date-time"))?,
                 )
             } else {
-                VariableDateValue::Date(
+                DateValue::Date(
                     Date::decode(&lexical).map_err(|_| invalid("invalid user-field date"))?,
                 )
             };
-            VariableValue::Date { value, lexical }
+            Value::Date { value, lexical }
         },
-        VariableValueType::Time => {
+        ValueType::Time => {
             let lexical = required(attributes, OFFICE, "time-value")?.to_string();
             let value = crate::datatype::Duration::decode_exact(&lexical)
                 .map_err(|_| invalid("invalid user-field duration"))?;
-            VariableValue::Time { value, lexical }
+            Value::Time { value, lexical }
         },
-        VariableValueType::Boolean => {
+        ValueType::Boolean => {
             let lexical = required(attributes, OFFICE, "boolean-value")?.to_string();
             let value =
                 Boolean::decode(&lexical).map_err(|_| invalid("invalid user-field boolean"))?;
-            VariableValue::Boolean { value, lexical }
+            Value::Boolean { value, lexical }
         },
-        VariableValueType::String => VariableValue::String {
+        ValueType::String => Value::String {
             value: required(attributes, OFFICE, "string-value")?.to_string(),
         },
-        VariableValueType::Void => VariableValue::Void,
+        ValueType::Void => Value::Void,
     };
     Ok(value)
 }
@@ -1265,16 +1255,16 @@ fn reject_typed_value_attributes(attributes: &Attributes, allowed: &[&str]) -> R
     Ok(())
 }
 
-fn parse_value_type(value: &str) -> Result<VariableValueType> {
+fn parse_value_type(value: &str) -> Result<ValueType> {
     match value {
-        "float" => Ok(VariableValueType::Float),
-        "percentage" => Ok(VariableValueType::Percentage),
-        "currency" => Ok(VariableValueType::Currency),
-        "date" => Ok(VariableValueType::Date),
-        "time" => Ok(VariableValueType::Time),
-        "boolean" => Ok(VariableValueType::Boolean),
-        "string" => Ok(VariableValueType::String),
-        "void" => Ok(VariableValueType::Void),
+        "float" => Ok(ValueType::Float),
+        "percentage" => Ok(ValueType::Percentage),
+        "currency" => Ok(ValueType::Currency),
+        "date" => Ok(ValueType::Date),
+        "time" => Ok(ValueType::Time),
+        "boolean" => Ok(ValueType::Boolean),
+        "string" => Ok(ValueType::String),
+        "void" => Ok(ValueType::Void),
         _ => Err(invalid(format!(
             "unsupported ODF variable value type '{value}'"
         ))),
@@ -1296,11 +1286,11 @@ fn parse_double(value: &str) -> Result<f64> {
 fn record_use(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-    part: VariablePart,
-    kind: VariableKind,
+    part: Part,
+    kind: Kind,
     stack: &[Frame],
     uses: &mut HashSet<ScopedName>,
-    all_uses: &mut Vec<(VariableKind, String)>,
+    all_uses: &mut Vec<(Kind, String)>,
     aggregate: &mut usize,
 ) -> Result<()> {
     let name = required_attribute(reader, element, TEXT, "name")?;
@@ -1323,28 +1313,28 @@ fn record_use(
     Ok(())
 }
 
-fn scope_for_parent(parent: &Frame, stack: &[Frame]) -> Result<VariableScope> {
+fn scope_for_parent(parent: &Frame, stack: &[Frame]) -> Result<Scope> {
     if parent.namespace.as_deref() == Some(OFFICE) {
         let body = match parent.local.as_str() {
-            "text" => Some(VariableBody::Text),
-            "spreadsheet" => Some(VariableBody::Spreadsheet),
-            "presentation" => Some(VariableBody::Presentation),
-            "drawing" => Some(VariableBody::Drawing),
-            "chart" => Some(VariableBody::Chart),
+            "text" => Some(Body::Text),
+            "spreadsheet" => Some(Body::Spreadsheet),
+            "presentation" => Some(Body::Presentation),
+            "drawing" => Some(Body::Drawing),
+            "chart" => Some(Body::Chart),
             _ => None,
         };
         if let Some(body) = body {
-            return Ok(VariableScope::Body(body));
+            return Ok(Scope::Body(body));
         }
     }
     if parent.namespace.as_deref() == Some(STYLE) {
         let kind = match parent.local.as_str() {
-            "header" => Some(VariableHeaderFooter::Header),
-            "header-first" => Some(VariableHeaderFooter::HeaderFirst),
-            "header-left" => Some(VariableHeaderFooter::HeaderLeft),
-            "footer" => Some(VariableHeaderFooter::Footer),
-            "footer-first" => Some(VariableHeaderFooter::FooterFirst),
-            "footer-left" => Some(VariableHeaderFooter::FooterLeft),
+            "header" => Some(HeaderFooter::Header),
+            "header-first" => Some(HeaderFooter::HeaderFirst),
+            "header-left" => Some(HeaderFooter::HeaderLeft),
+            "footer" => Some(HeaderFooter::Footer),
+            "footer-first" => Some(HeaderFooter::FooterFirst),
+            "footer-left" => Some(HeaderFooter::FooterLeft),
             _ => None,
         };
         if let Some(kind) = kind {
@@ -1352,7 +1342,7 @@ fn scope_for_parent(parent: &Frame, stack: &[Frame]) -> Result<VariableScope> {
                 .iter()
                 .rev()
                 .find_map(|frame| frame.master_page_name.clone());
-            return Ok(VariableScope::HeaderFooter {
+            return Ok(Scope::HeaderFooter {
                 kind,
                 master_page_name,
             });
@@ -1361,7 +1351,7 @@ fn scope_for_parent(parent: &Frame, stack: &[Frame]) -> Result<VariableScope> {
     Err(invalid("misplaced variable declaration container"))
 }
 
-fn nearest_scope(stack: &[Frame]) -> Result<Option<VariableScope>> {
+fn nearest_scope(stack: &[Frame]) -> Result<Option<Scope>> {
     for (index, frame) in stack.iter().enumerate().rev() {
         if frame.namespace.as_deref() == Some(OFFICE)
             && matches!(
@@ -1388,31 +1378,31 @@ fn nearest_scope(stack: &[Frame]) -> Result<Option<VariableScope>> {
     Ok(None)
 }
 
-fn container_kind(namespace: Option<&str>, local: &str) -> Option<VariableKind> {
+fn container_kind(namespace: Option<&str>, local: &str) -> Option<Kind> {
     (namespace == Some(TEXT)).then_some(match local {
-        "variable-decls" => Some(VariableKind::Simple),
-        "user-field-decls" => Some(VariableKind::User),
-        "sequence-decls" => Some(VariableKind::Sequence),
+        "variable-decls" => Some(Kind::Simple),
+        "user-field-decls" => Some(Kind::User),
+        "sequence-decls" => Some(Kind::Sequence),
         _ => None,
     })?
 }
 
-fn declaration_local(kind: VariableKind) -> &'static str {
+fn declaration_local(kind: Kind) -> &'static str {
     match kind {
-        VariableKind::Simple => "variable-decl",
-        VariableKind::User => "user-field-decl",
-        VariableKind::Sequence => "sequence-decl",
+        Kind::Simple => "variable-decl",
+        Kind::User => "user-field-decl",
+        Kind::Sequence => "sequence-decl",
     }
 }
 
-fn usage_kind(namespace: Option<&str>, local: &str) -> Option<VariableKind> {
+fn usage_kind(namespace: Option<&str>, local: &str) -> Option<Kind> {
     if namespace != Some(TEXT) {
         return None;
     }
     match local {
-        "variable-set" | "variable-get" | "variable-input" => Some(VariableKind::Simple),
-        "user-field-get" | "user-field-input" => Some(VariableKind::User),
-        "sequence" => Some(VariableKind::Sequence),
+        "variable-set" | "variable-get" | "variable-input" => Some(Kind::Simple),
+        "user-field-get" | "user-field-input" => Some(Kind::User),
+        "sequence" => Some(Kind::Sequence),
         _ => None,
     }
 }

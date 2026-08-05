@@ -1,13 +1,12 @@
 use litchi_odt::variable_declaration::{
-    VariableBody, VariableDeclaration, VariableDeclarationGroup, VariableKind, VariablePart,
-    VariableScope, VariableValue, VariableValueType,
+    Body, Declaration, Group, Kind, Part, Scope, Value, ValueType,
 };
 
-fn group(kind: VariableKind, declarations: Vec<VariableDeclaration>) -> VariableDeclarationGroup {
-    VariableDeclarationGroup {
+fn group(kind: Kind, declarations: Vec<Declaration>) -> Group {
+    Group {
         kind,
-        part: VariablePart::Content,
-        scope: VariableScope::Body(VariableBody::Text),
+        part: Part::Content,
+        scope: Scope::Body(Body::Text),
         declarations,
     }
 }
@@ -15,25 +14,25 @@ fn group(kind: VariableKind, declarations: Vec<VariableDeclaration>) -> Variable
 #[test]
 fn canonical_writer_escapes_and_round_trips_every_declaration_kind() {
     let simple = group(
-        VariableKind::Simple,
-        vec![VariableDeclaration::Simple {
+        Kind::Simple,
+        vec![Declaration::Simple {
             name: "amount<&\"".to_string(),
-            value_type: VariableValueType::Currency,
+            value_type: ValueType::Currency,
         }],
     );
     let user = group(
-        VariableKind::User,
-        vec![VariableDeclaration::User {
+        Kind::User,
+        vec![Declaration::User {
             name: "caption".to_string(),
-            value: Some(VariableValue::String {
+            value: Some(Value::String {
                 value: "cached <&> value".to_string(),
             }),
             formula: Some("of:=CONCATENATE(&quot;a&quot;;&quot;b&quot;)".to_string()),
         }],
     );
     let sequence = group(
-        VariableKind::Sequence,
-        vec![VariableDeclaration::Sequence {
+        Kind::Sequence,
+        vec![Declaration::Sequence {
             name: "Figure".to_string(),
             display_outline_level: 3,
             separation_character: Some('#'),
@@ -58,20 +57,20 @@ fn canonical_writer_escapes_and_round_trips_every_declaration_kind() {
 fn mutable_document_upserts_orders_replaces_and_removes_groups_atomically() {
     let mut document = litchi_odt::mutable::MutableDocument::new();
     let user = group(
-        VariableKind::User,
-        vec![VariableDeclaration::User {
+        Kind::User,
+        vec![Declaration::User {
             name: "customer".to_string(),
-            value: Some(VariableValue::String {
+            value: Some(Value::String {
                 value: "A".to_string(),
             }),
             formula: None,
         }],
     );
     let simple = group(
-        VariableKind::Simple,
-        vec![VariableDeclaration::Simple {
+        Kind::Simple,
+        vec![Declaration::Simple {
             name: "counter".to_string(),
-            value_type: VariableValueType::Float,
+            value_type: ValueType::Float,
         }],
     );
 
@@ -89,14 +88,14 @@ fn mutable_document_upserts_orders_replaces_and_removes_groups_atomically() {
     );
     let declarations = document.variable_declarations().unwrap();
     assert_eq!(declarations.groups.len(), 2);
-    assert_eq!(declarations.groups[0].kind, VariableKind::Simple);
-    assert_eq!(declarations.groups[1].kind, VariableKind::User);
+    assert_eq!(declarations.groups[0].kind, Kind::Simple);
+    assert_eq!(declarations.groups[1].kind, Kind::User);
 
     let replacement = group(
-        VariableKind::User,
-        vec![VariableDeclaration::User {
+        Kind::User,
+        vec![Declaration::User {
             name: "customer".to_string(),
-            value: Some(VariableValue::String {
+            value: Some(Value::String {
                 value: "B".to_string(),
             }),
             formula: None,
@@ -111,16 +110,12 @@ fn mutable_document_upserts_orders_replaces_and_removes_groups_atomically() {
         document
             .variable_declarations()
             .unwrap()
-            .find(VariableKind::User, "customer"),
+            .find(Kind::User, "customer"),
         replacement.declarations.first(),
     );
 
     let removed = document
-        .remove_variable_declaration_group(
-            VariablePart::Content,
-            &VariableScope::Body(VariableBody::Text),
-            VariableKind::Simple,
-        )
+        .remove_variable_declaration_group(Part::Content, &Scope::Body(Body::Text), Kind::Simple)
         .unwrap()
         .unwrap();
     assert_eq!(removed, simple);
@@ -128,7 +123,7 @@ fn mutable_document_upserts_orders_replaces_and_removes_groups_atomically() {
         document
             .variable_declarations()
             .unwrap()
-            .find(VariableKind::Simple, "counter")
+            .find(Kind::Simple, "counter")
             .is_none()
     );
 }
@@ -136,8 +131,8 @@ fn mutable_document_upserts_orders_replaces_and_removes_groups_atomically() {
 #[test]
 fn writer_rejects_kind_mismatch_invalid_sequence_and_duplicate_names() {
     let mismatch = group(
-        VariableKind::Simple,
-        vec![VariableDeclaration::Sequence {
+        Kind::Simple,
+        vec![Declaration::Sequence {
             name: "wrong".to_string(),
             display_outline_level: 1,
             separation_character: None,
@@ -146,8 +141,8 @@ fn writer_rejects_kind_mismatch_invalid_sequence_and_duplicate_names() {
     assert!(mismatch.to_xml().is_err());
 
     let invalid_sequence = group(
-        VariableKind::Sequence,
-        vec![VariableDeclaration::Sequence {
+        Kind::Sequence,
+        vec![Declaration::Sequence {
             name: "bad".to_string(),
             display_outline_level: 0,
             separation_character: Some('.'),
@@ -156,15 +151,15 @@ fn writer_rejects_kind_mismatch_invalid_sequence_and_duplicate_names() {
     assert!(invalid_sequence.to_xml().is_err());
 
     let duplicates = group(
-        VariableKind::Simple,
+        Kind::Simple,
         vec![
-            VariableDeclaration::Simple {
+            Declaration::Simple {
                 name: "same".to_string(),
-                value_type: VariableValueType::Float,
+                value_type: ValueType::Float,
             },
-            VariableDeclaration::Simple {
+            Declaration::Simple {
                 name: "same".to_string(),
-                value_type: VariableValueType::String,
+                value_type: ValueType::String,
             },
         ],
     );

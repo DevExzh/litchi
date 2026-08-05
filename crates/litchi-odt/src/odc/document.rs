@@ -207,7 +207,7 @@ impl Document {
     }
 
     /// Inspect ordered ODF variable declarations without evaluating fields or formulas.
-    pub fn variable_declarations(&self) -> Result<crate::VariableDeclarations> {
+    pub fn variable_declarations(&self) -> Result<crate::variable_declaration::Declarations> {
         self.package.variable_declarations()
     }
 

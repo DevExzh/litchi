@@ -19,10 +19,8 @@ use crate::header_footer::{
 };
 use crate::page_layout::{PageLayout, parse_page_layouts, set_page_layout_xml};
 use crate::page_sequence::{Sequence, parse_page_sequence, set_page_sequence_xml};
+use crate::variable_declaration::{Declarations, Group, Kind, Part, Scope};
 use crate::{FormProperty, InteractiveControl, SelectionControl, TextControl};
-use crate::{
-    VariableDeclarationGroup, VariableDeclarations, VariableKind, VariablePart, VariableScope,
-};
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::{ops::Range, path::Path};
 
@@ -367,7 +365,7 @@ impl MutableDocument {
     ///
     /// Linked font resources remain inert metadata. This does not fetch a URI,
     /// load a font, or inspect embedded font data.
-    pub fn content_font_face_declarations(&self) -> Result<Option<crate::font_face::Faces>> {
+    pub fn content_font_face_declarations(&self) -> Result<Option<crate::font_face::Declarations>> {
         self.with_content_xml(crate::font_face::parse_content_font_face_declarations)
     }
 
@@ -377,8 +375,8 @@ impl MutableDocument {
     /// load a font, or inspect embedded font data.
     pub fn set_content_font_face_declarations(
         &mut self,
-        declarations: &crate::font_face::Faces,
-    ) -> Result<Option<crate::font_face::Faces>> {
+        declarations: &crate::font_face::Declarations,
+    ) -> Result<Option<crate::font_face::Declarations>> {
         let (updated, old) = self.with_content_xml(|xml| {
             crate::font_face::set_content_font_face_declarations_xml(xml, declarations)
         })?;
@@ -392,7 +390,7 @@ impl MutableDocument {
     /// verbatim so callers can manage their lifecycle separately.
     pub fn clear_content_font_face_declarations(
         &mut self,
-    ) -> Result<Option<crate::font_face::Faces>> {
+    ) -> Result<Option<crate::font_face::Declarations>> {
         let (updated, old) =
             self.with_content_xml(crate::font_face::remove_content_font_face_declarations_xml)?;
         self.content_xml = Some(updated);
@@ -403,7 +401,7 @@ impl MutableDocument {
     ///
     /// Linked font resources remain inert metadata. This does not fetch a URI,
     /// load a font, or inspect embedded font data.
-    pub fn styles_font_face_declarations(&self) -> Result<Option<crate::font_face::Faces>> {
+    pub fn styles_font_face_declarations(&self) -> Result<Option<crate::font_face::Declarations>> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(None),
             crate::font_face::parse_styles_font_face_declarations,
@@ -416,8 +414,8 @@ impl MutableDocument {
     /// load a font, or inspect embedded font data.
     pub fn set_styles_font_face_declarations(
         &mut self,
-        declarations: &crate::font_face::Faces,
-    ) -> Result<Option<crate::font_face::Faces>> {
+        declarations: &crate::font_face::Declarations,
+    ) -> Result<Option<crate::font_face::Declarations>> {
         let styles = self
             .styles_xml
             .clone()
@@ -434,7 +432,7 @@ impl MutableDocument {
     /// verbatim so callers can manage their lifecycle separately.
     pub fn clear_styles_font_face_declarations(
         &mut self,
-    ) -> Result<Option<crate::font_face::Faces>> {
+    ) -> Result<Option<crate::font_face::Declarations>> {
         let Some(styles) = self.styles_xml.as_deref() else {
             return Ok(None);
         };
@@ -515,10 +513,10 @@ impl MutableDocument {
     ///
     /// The result describes style metadata only. It never renumbers, lays out,
     /// or renders notes.
-    pub fn notes_configurations(&self) -> Result<crate::NotesConfigurations> {
+    pub fn notes_configurations(&self) -> Result<crate::notes_configuration::Configurations> {
         self.styles_xml
             .as_deref()
-            .map_or_else(|| Ok(Default::default()), crate::parse_notes_configurations)
+            .map_or_else(|| Ok(Default::default()), crate::notes_configuration::parse)
     }
 
     /// Return stored outline numbering styles from current styles metadata.
@@ -568,8 +566,8 @@ impl MutableDocument {
     /// same note class. It never changes note anchors, citations, or numbering.
     pub fn set_notes_configuration(
         &mut self,
-        configuration: &crate::NotesConfiguration,
-    ) -> Result<Option<crate::NotesConfiguration>> {
+        configuration: &crate::notes_configuration::Configuration,
+    ) -> Result<Option<crate::notes_configuration::Configuration>> {
         configuration.validate()?;
         let old = self
             .notes_configurations()?
@@ -579,7 +577,7 @@ impl MutableDocument {
             .styles_xml
             .clone()
             .unwrap_or_else(Structure::default_styles_xml);
-        self.styles_xml = Some(crate::set_notes_configuration_xml(&styles, configuration)?);
+        self.styles_xml = Some(crate::notes_configuration::set_xml(&styles, configuration)?);
         Ok(old)
     }
 
@@ -589,8 +587,8 @@ impl MutableDocument {
     /// never recalculates citations, sequence numbers, or page layout.
     pub fn set_notes_configurations(
         &mut self,
-        configurations: &crate::NotesConfigurations,
-    ) -> Result<crate::NotesConfigurations> {
+        configurations: &crate::notes_configuration::Configurations,
+    ) -> Result<crate::notes_configuration::Configurations> {
         configurations.validate()?;
         let old = self.notes_configurations()?;
         if self.styles_xml.is_none()
@@ -603,10 +601,10 @@ impl MutableDocument {
             .styles_xml
             .clone()
             .unwrap_or_else(Structure::default_styles_xml);
-        for note_class in crate::notes_configuration::NoteClass::ALL {
+        for note_class in crate::notes_configuration::Class::ALL {
             styles = match configurations.get(note_class) {
-                Some(configuration) => crate::set_notes_configuration_xml(&styles, configuration)?,
-                None => crate::remove_notes_configuration_xml(&styles, note_class)?,
+                Some(configuration) => crate::notes_configuration::set_xml(&styles, configuration)?,
+                None => crate::notes_configuration::remove_xml(&styles, note_class)?,
             };
         }
         self.styles_xml = Some(styles);
@@ -619,13 +617,13 @@ impl MutableDocument {
     /// are preserved verbatim.
     pub fn clear_notes_configuration(
         &mut self,
-        note_class: crate::notes_configuration::NoteClass,
-    ) -> Result<Option<crate::NotesConfiguration>> {
+        note_class: crate::notes_configuration::Class,
+    ) -> Result<Option<crate::notes_configuration::Configuration>> {
         let old = self.notes_configurations()?.get(note_class).cloned();
         let Some(styles) = self.styles_xml.as_deref() else {
             return Ok(None);
         };
-        self.styles_xml = Some(crate::remove_notes_configuration_xml(styles, note_class)?);
+        self.styles_xml = Some(crate::notes_configuration::remove_xml(styles, note_class)?);
         Ok(old)
     }
 
@@ -1635,18 +1633,15 @@ impl MutableDocument {
     }
 
     /// Return validated variable, user-field, sequence, and DDE declarations.
-    pub fn variable_declarations(&self) -> Result<VariableDeclarations> {
+    pub fn variable_declarations(&self) -> Result<Declarations> {
         self.with_content_xml(|content| {
             if let Some(styles) = self.styles_xml.as_deref() {
-                crate::variable_declaration::parse_variable_declaration_parts(&[
-                    (content, VariablePart::Content),
-                    (styles, VariablePart::Styles),
+                crate::variable_declaration::parse_parts(&[
+                    (content, Part::Content),
+                    (styles, Part::Styles),
                 ])
             } else {
-                crate::variable_declaration::parse_variable_declaration_parts(&[(
-                    content,
-                    VariablePart::Content,
-                )])
+                crate::variable_declaration::parse_parts(&[(content, Part::Content)])
             }
         })
     }
@@ -1655,10 +1650,7 @@ impl MutableDocument {
     ///
     /// Content and styles are reparsed together before commit, preserving all
     /// cross-part declaration and field-reference invariants.
-    pub fn set_variable_declaration_group(
-        &mut self,
-        group: &VariableDeclarationGroup,
-    ) -> Result<Option<VariableDeclarationGroup>> {
+    pub fn set_variable_declaration_group(&mut self, group: &Group) -> Result<Option<Group>> {
         let current = self.variable_declarations()?;
         let old = current
             .groups
@@ -1670,37 +1662,33 @@ impl MutableDocument {
             })
             .cloned();
         match group.part {
-            VariablePart::Content => {
-                let updated = self.with_content_xml(|xml| {
-                    crate::set_variable_declaration_group_xml(xml, group)
-                })?;
+            Part::Content => {
+                let updated =
+                    self.with_content_xml(|xml| crate::variable_declaration::set_xml(xml, group))?;
                 if let Some(styles) = self.styles_xml.as_deref() {
-                    crate::variable_declaration::parse_variable_declaration_parts(&[
-                        (&updated, VariablePart::Content),
-                        (styles, VariablePart::Styles),
+                    crate::variable_declaration::parse_parts(&[
+                        (&updated, Part::Content),
+                        (styles, Part::Styles),
                     ])?;
                 } else {
-                    crate::variable_declaration::parse_variable_declaration_parts(&[(
-                        &updated,
-                        VariablePart::Content,
-                    )])?;
+                    crate::variable_declaration::parse_parts(&[(&updated, Part::Content)])?;
                 }
                 self.content_xml = Some(updated);
             },
-            VariablePart::Styles => {
+            Part::Styles => {
                 let styles = self.styles_xml.as_deref().ok_or_else(|| {
                     litchi_core::Error::InvalidFormat("styles.xml is absent".to_string())
                 })?;
-                let updated = crate::set_variable_declaration_group_xml(styles, group)?;
+                let updated = crate::variable_declaration::set_xml(styles, group)?;
                 self.with_content_xml(|content| {
-                    crate::variable_declaration::parse_variable_declaration_parts(&[
-                        (content, VariablePart::Content),
-                        (&updated, VariablePart::Styles),
+                    crate::variable_declaration::parse_parts(&[
+                        (content, Part::Content),
+                        (&updated, Part::Styles),
                     ])
                 })?;
                 self.styles_xml = Some(updated);
             },
-            VariablePart::Flat => {
+            Part::Flat => {
                 return Err(litchi_core::Error::InvalidFormat(
                     "MutableDocument cannot edit flat-document declarations".to_string(),
                 ));
@@ -1715,10 +1703,10 @@ impl MutableDocument {
     /// declaration from the removed container.
     pub fn remove_variable_declaration_group(
         &mut self,
-        part: VariablePart,
-        scope: &VariableScope,
-        kind: VariableKind,
-    ) -> Result<Option<VariableDeclarationGroup>> {
+        part: Part,
+        scope: &Scope,
+        kind: Kind,
+    ) -> Result<Option<Group>> {
         let current = self.variable_declarations()?;
         let Some(old) = current
             .groups
@@ -1731,37 +1719,34 @@ impl MutableDocument {
             return Ok(None);
         };
         match part {
-            VariablePart::Content => {
+            Part::Content => {
                 let updated = self.with_content_xml(|xml| {
-                    crate::remove_variable_declaration_group_xml(xml, scope, kind)
+                    crate::variable_declaration::remove_xml(xml, scope, kind)
                 })?;
                 if let Some(styles) = self.styles_xml.as_deref() {
-                    crate::variable_declaration::parse_variable_declaration_parts(&[
-                        (&updated, VariablePart::Content),
-                        (styles, VariablePart::Styles),
+                    crate::variable_declaration::parse_parts(&[
+                        (&updated, Part::Content),
+                        (styles, Part::Styles),
                     ])?;
                 } else {
-                    crate::variable_declaration::parse_variable_declaration_parts(&[(
-                        &updated,
-                        VariablePart::Content,
-                    )])?;
+                    crate::variable_declaration::parse_parts(&[(&updated, Part::Content)])?;
                 }
                 self.content_xml = Some(updated);
             },
-            VariablePart::Styles => {
+            Part::Styles => {
                 let styles = self.styles_xml.as_deref().ok_or_else(|| {
                     litchi_core::Error::InvalidFormat("styles.xml is absent".to_string())
                 })?;
-                let updated = crate::remove_variable_declaration_group_xml(styles, scope, kind)?;
+                let updated = crate::variable_declaration::remove_xml(styles, scope, kind)?;
                 self.with_content_xml(|content| {
-                    crate::variable_declaration::parse_variable_declaration_parts(&[
-                        (content, VariablePart::Content),
-                        (&updated, VariablePart::Styles),
+                    crate::variable_declaration::parse_parts(&[
+                        (content, Part::Content),
+                        (&updated, Part::Styles),
                     ])
                 })?;
                 self.styles_xml = Some(updated);
             },
-            VariablePart::Flat => {
+            Part::Flat => {
                 return Err(litchi_core::Error::InvalidFormat(
                     "MutableDocument cannot edit flat-document declarations".to_string(),
                 ));
@@ -2036,7 +2021,7 @@ impl MutableDocument {
     pub fn set_page_layout_columns(
         &mut self,
         page_layout_name: &str,
-        columns: &crate::StyleColumns,
+        columns: &crate::style::columns::Columns,
     ) -> Result<()> {
         let styles = self.styles_xml.as_deref().ok_or_else(|| {
             litchi_core::Error::InvalidFormat(
@@ -2464,8 +2449,8 @@ impl MutableDocument {
         &mut self,
         index: usize,
         image: &[u8],
-        width: &crate::Length,
-        height: &crate::Length,
+        width: &crate::frame::Length,
+        height: &crate::frame::Length,
         anchor: crate::FrameAnchor,
     ) -> Result<String> {
         use crate::frame;
@@ -2522,8 +2507,8 @@ impl MutableDocument {
         &mut self,
         index: usize,
         text: &str,
-        width: &crate::Length,
-        height: &crate::Length,
+        width: &crate::frame::Length,
+        height: &crate::frame::Length,
         anchor: crate::FrameAnchor,
     ) -> Result<String> {
         use crate::frame;
@@ -3461,7 +3446,7 @@ mod tests {
 
     #[test]
     fn insert_image_round_trips_through_package_and_read_api() {
-        use crate::{FrameAnchor, Length};
+        use crate::{FrameAnchor, frame::Length};
 
         let mut doc = MutableDocument::new();
         doc.add_paragraph("Before image").unwrap();
@@ -3517,7 +3502,7 @@ mod tests {
 
     #[test]
     fn insert_image_coexists_with_existing_media() {
-        use crate::{FrameAnchor, Length};
+        use crate::{FrameAnchor, frame::Length};
 
         let mut doc = MutableDocument::new();
         let first = doc
@@ -3554,7 +3539,7 @@ mod tests {
 
     #[test]
     fn insert_text_box_round_trips_story_text() {
-        use crate::{FrameAnchor, Length};
+        use crate::{FrameAnchor, frame::Length};
 
         let mut doc = MutableDocument::new();
         doc.add_paragraph("Intro").unwrap();

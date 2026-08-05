@@ -1,5 +1,5 @@
 use litchi_odt::Document;
-use litchi_odt::font_face::{Face, Faces};
+use litchi_odt::font_face::{Declarations, Face};
 mod support;
 
 const CONTENT: &str = include_str!("../../../test-data/odf/odt/font-face-declarations-content.xml");
@@ -7,8 +7,8 @@ const STYLES: &str = include_str!("../../../test-data/odf/odt/font-face-declarat
 const FLAT: &str = include_str!("../../../test-data/odf/odt/font-face-declarations-flat.fodt");
 const MIMETYPE: &str = "application/vnd.oasis.opendocument.text";
 
-fn declarations(name: &str) -> Faces {
-    Faces {
+fn declarations(name: &str) -> Declarations {
+    Declarations {
         faces: vec![Face {
             name: name.to_string(),
             family: Some(format!("'{name}'")),

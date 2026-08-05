@@ -1,6 +1,6 @@
 //! Inert, bounded OpenDocument text DDE connection declarations.
 
-use crate::{VariableBody, VariableHeaderFooter, VariablePart, VariableScope};
+use crate::variable_declaration::{Body, HeaderFooter, Part, Scope};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -21,8 +21,8 @@ const MAX_AGGREGATE_BYTES: usize = 16 * 1_048_576;
 /// A named DDE source declaration. It is retained but never contacted.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DdeConnectionDeclaration {
-    pub part: VariablePart,
-    pub scope: VariableScope,
+    pub part: Part,
+    pub scope: Scope,
     pub name: String,
     pub application: String,
     pub topic: String,
@@ -40,8 +40,8 @@ impl DdeConnectionDeclaration {
 /// One `text:dde-connection` occurrence referring to a declaration.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DdeConnectionUse {
-    pub part: VariablePart,
-    pub scope: VariableScope,
+    pub part: Part,
+    pub scope: Scope,
     pub connection_name: String,
 }
 
@@ -60,8 +60,8 @@ struct Frame {
 
 struct ActiveGroup {
     depth: usize,
-    part: VariablePart,
-    scope: VariableScope,
+    part: Part,
+    scope: Scope,
 }
 
 struct PendingElement {
@@ -70,9 +70,7 @@ struct PendingElement {
 
 type Attributes = HashMap<(String, String), String>;
 
-pub(crate) fn parse_dde_connection_parts(
-    parts: &[(&str, VariablePart)],
-) -> Result<ParsedDdeConnections> {
+pub(crate) fn parse_dde_connection_parts(parts: &[(&str, Part)]) -> Result<ParsedDdeConnections> {
     let total = parts.iter().try_fold(0usize, |total, (xml, _)| {
         total
             .checked_add(xml.len())
@@ -84,7 +82,7 @@ pub(crate) fn parse_dde_connection_parts(
 
     let mut parsed = ParsedDdeConnections::default();
     let mut names = HashSet::<String>::new();
-    let mut containers = HashSet::<(VariablePart, VariableScope)>::new();
+    let mut containers = HashSet::<(Part, Scope)>::new();
     let mut aggregate = 0usize;
     for (xml, part) in parts {
         parse_part(
@@ -109,10 +107,10 @@ pub(crate) fn parse_dde_connection_parts(
 
 fn parse_part(
     xml: &str,
-    part: VariablePart,
+    part: Part,
     parsed: &mut ParsedDdeConnections,
     names: &mut HashSet<String>,
-    containers: &mut HashSet<(VariablePart, VariableScope)>,
+    containers: &mut HashSet<(Part, Scope)>,
     aggregate: &mut usize,
 ) -> Result<()> {
     let mut reader = NsReader::from_str(xml);
@@ -281,10 +279,10 @@ fn parse_part(
 
 fn start_group(
     element: &BytesStart<'_>,
-    part: VariablePart,
+    part: Part,
     depth: usize,
     stack: &[Frame],
-    containers: &mut HashSet<(VariablePart, VariableScope)>,
+    containers: &mut HashSet<(Part, Scope)>,
     active: &mut Option<ActiveGroup>,
 ) -> Result<()> {
     if element.attributes().next().is_some() {
@@ -308,8 +306,8 @@ fn start_group(
 fn parse_declaration(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-    part: VariablePart,
-    scope: VariableScope,
+    part: Part,
+    scope: Scope,
     aggregate: &mut usize,
 ) -> Result<DdeConnectionDeclaration> {
     let attributes = collect_attributes(reader, element, aggregate)?;
@@ -344,7 +342,7 @@ fn parse_declaration(
 fn parse_use(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-    part: VariablePart,
+    part: Part,
     stack: &[Frame],
     aggregate: &mut usize,
 ) -> Result<DdeConnectionUse> {
@@ -448,22 +446,22 @@ fn optional_attribute(
     Ok(value)
 }
 
-fn body_scope(parent: &Frame) -> Result<VariableScope> {
+fn body_scope(parent: &Frame) -> Result<Scope> {
     if parent.namespace.as_deref() != Some(OFFICE) {
         return invalid("DDE declarations must be direct children of an office body element");
     }
     let body = match parent.local.as_str() {
-        "text" => VariableBody::Text,
-        "spreadsheet" => VariableBody::Spreadsheet,
-        "presentation" => VariableBody::Presentation,
-        "drawing" => VariableBody::Drawing,
-        "chart" => VariableBody::Chart,
+        "text" => Body::Text,
+        "spreadsheet" => Body::Spreadsheet,
+        "presentation" => Body::Presentation,
+        "drawing" => Body::Drawing,
+        "chart" => Body::Chart,
         _ => return invalid("DDE declarations must be direct children of an office body element"),
     };
-    Ok(VariableScope::Body(body))
+    Ok(Scope::Body(body))
 }
 
-fn nearest_scope(stack: &[Frame]) -> Result<Option<VariableScope>> {
+fn nearest_scope(stack: &[Frame]) -> Result<Option<Scope>> {
     for (index, frame) in stack.iter().enumerate().rev() {
         if frame.namespace.as_deref() == Some(OFFICE)
             && matches!(
@@ -475,12 +473,12 @@ fn nearest_scope(stack: &[Frame]) -> Result<Option<VariableScope>> {
         }
         if frame.namespace.as_deref() == Some(STYLE) {
             let kind = match frame.local.as_str() {
-                "header" => Some(VariableHeaderFooter::Header),
-                "header-first" => Some(VariableHeaderFooter::HeaderFirst),
-                "header-left" => Some(VariableHeaderFooter::HeaderLeft),
-                "footer" => Some(VariableHeaderFooter::Footer),
-                "footer-first" => Some(VariableHeaderFooter::FooterFirst),
-                "footer-left" => Some(VariableHeaderFooter::FooterLeft),
+                "header" => Some(HeaderFooter::Header),
+                "header-first" => Some(HeaderFooter::HeaderFirst),
+                "header-left" => Some(HeaderFooter::HeaderLeft),
+                "footer" => Some(HeaderFooter::Footer),
+                "footer-first" => Some(HeaderFooter::FooterFirst),
+                "footer-left" => Some(HeaderFooter::FooterLeft),
                 _ => None,
             };
             if let Some(kind) = kind {
@@ -488,7 +486,7 @@ fn nearest_scope(stack: &[Frame]) -> Result<Option<VariableScope>> {
                     .iter()
                     .rev()
                     .find_map(|candidate| candidate.master_page_name.clone());
-                return Ok(Some(VariableScope::HeaderFooter {
+                return Ok(Some(Scope::HeaderFooter {
                     kind,
                     master_page_name,
                 }));
@@ -572,7 +570,7 @@ fn make_error(message: impl Into<String>) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::variable_declaration::parse_variable_declaration_parts;
+    use crate::variable_declaration::parse_parts;
 
     const PREFIX: &str = r#"<o:document-content
         xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
@@ -589,8 +587,7 @@ mod tests {
                     o:automatic-update="true"/>
             </t:dde-connection-decls><t:p><t:dde-connection t:connection-name="Prices"/></t:p>{SUFFIX}"#
         );
-        let inventory =
-            parse_variable_declaration_parts(&[(xml.as_str(), VariablePart::Content)]).unwrap();
+        let inventory = parse_parts(&[(xml.as_str(), Part::Content)]).unwrap();
         assert_eq!(inventory.dde_connections.len(), 1);
         assert_eq!(inventory.dde_connection_uses.len(), 1);
         let declaration = &inventory.dde_connections[0];
@@ -610,9 +607,9 @@ mod tests {
                 o:dde-application="app" o:dde-topic="topic" o:dde-item="item"/>
                 </t:dde-connection-decls><t:dde-connection t:connection-name="Feed"/>{SUFFIX}"#
         );
-        let parsed = parse_variable_declaration_parts(&[
-            (styles.as_str(), VariablePart::Styles),
-            (content.as_str(), VariablePart::Content),
+        let parsed = parse_parts(&[
+            (styles.as_str(), Part::Styles),
+            (content.as_str(), Part::Content),
         ])
         .unwrap();
         assert!(!parsed.dde_connections[0].effective_automatic_update());
@@ -630,8 +627,7 @@ mod tests {
         for body in bodies {
             let xml = format!("{PREFIX}{body}{SUFFIX}");
             assert!(
-                parse_variable_declaration_parts(&[(xml.as_str(), VariablePart::Content,)])
-                    .is_err(),
+                parse_parts(&[(xml.as_str(), Part::Content,)]).is_err(),
                 "accepted {body}"
             );
         }

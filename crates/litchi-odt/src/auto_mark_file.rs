@@ -4,7 +4,7 @@
 //! words generate alphabetical index entries automatically. The reference is
 //! retained for inspection only; the file is never fetched or loaded.
 
-use crate::{VariableBody, VariablePart, VariableScope};
+use crate::variable_declaration::{Body, Part, Scope};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -28,9 +28,9 @@ const MAX_AGGREGATE_BYTES: usize = 16 * 1_048_576;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AlphabeticalIndexAutoMarkFile {
     /// The package part (content or styles) declaring the reference.
-    pub part: VariablePart,
+    pub part: Part,
     /// The `office:text` scope declaring the reference.
-    pub scope: VariableScope,
+    pub scope: Scope,
     /// The external concordance file URI from `xlink:href`.
     pub href: String,
 }
@@ -71,7 +71,7 @@ fn child_rank(namespace: Option<&str>, local: &str) -> u8 {
 type Attributes = HashMap<(String, String), String>;
 
 pub(crate) fn parse_auto_mark_file_parts(
-    parts: &[(&str, VariablePart)],
+    parts: &[(&str, Part)],
 ) -> Result<Vec<AlphabeticalIndexAutoMarkFile>> {
     let total = parts.iter().try_fold(0usize, |total, (xml, _)| {
         total
@@ -83,7 +83,7 @@ pub(crate) fn parse_auto_mark_file_parts(
     }
 
     let mut references = Vec::new();
-    let mut scopes = HashSet::<(VariablePart, VariableScope)>::new();
+    let mut scopes = HashSet::<(Part, Scope)>::new();
     let mut aggregate = 0usize;
     for (xml, part) in parts {
         parse_part(xml, *part, &mut references, &mut scopes, &mut aggregate)?;
@@ -93,9 +93,9 @@ pub(crate) fn parse_auto_mark_file_parts(
 
 fn parse_part(
     xml: &str,
-    part: VariablePart,
+    part: Part,
     references: &mut Vec<AlphabeticalIndexAutoMarkFile>,
-    scopes: &mut HashSet<(VariablePart, VariableScope)>,
+    scopes: &mut HashSet<(Part, Scope)>,
     aggregate: &mut usize,
 ) -> Result<()> {
     let mut reader = NsReader::from_str(xml);
@@ -250,10 +250,10 @@ fn is_auto_mark_file(namespace: Option<&str>, local: &str) -> bool {
 fn register_reference(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-    part: VariablePart,
+    part: Part,
     scope: &mut TextScope,
     references: &mut Vec<AlphabeticalIndexAutoMarkFile>,
-    scopes: &mut HashSet<(VariablePart, VariableScope)>,
+    scopes: &mut HashSet<(Part, Scope)>,
     aggregate: &mut usize,
 ) -> Result<()> {
     if scope.seen_auto_mark_file {
@@ -276,7 +276,7 @@ fn register_reference(
         },
     }
 
-    let scope_value = VariableScope::Body(VariableBody::Text);
+    let scope_value = Scope::Body(Body::Text);
     if !scopes.insert((part, scope_value.clone())) {
         return invalid("duplicate text:alphabetical-index-auto-mark-file in one document part");
     }
@@ -394,7 +394,7 @@ mod tests {
 
     fn parse(content: &str) -> Result<Vec<AlphabeticalIndexAutoMarkFile>> {
         let xml = format!("{CONTENT_PREFIX}{content}{CONTENT_SUFFIX}");
-        parse_auto_mark_file_parts(&[(xml.as_str(), VariablePart::Content)])
+        parse_auto_mark_file_parts(&[(xml.as_str(), Part::Content)])
     }
 
     #[test]
@@ -403,8 +403,8 @@ mod tests {
             parse(r#"<t:alphabetical-index-auto-mark-file xlink:type="simple" xlink:href="concordance.sdi"/><t:p>Text</t:p>"#).unwrap();
         assert_eq!(references.len(), 1);
         let reference = &references[0];
-        assert_eq!(reference.part, VariablePart::Content);
-        assert_eq!(reference.scope, VariableScope::Body(VariableBody::Text));
+        assert_eq!(reference.part, Part::Content);
+        assert_eq!(reference.scope, Scope::Body(Body::Text));
         assert_eq!(reference.href, "concordance.sdi");
     }
 
@@ -458,7 +458,7 @@ mod tests {
     fn rejects_misplaced_or_spoofed_elements() {
         // Outside office:text.
         let floating = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><o:body><t:alphabetical-index-auto-mark-file xlink:type="simple" xlink:href="a.sdi"/></o:body></o:document-content>"#;
-        assert!(parse_auto_mark_file_parts(&[(floating, VariablePart::Content)]).is_err());
+        assert!(parse_auto_mark_file_parts(&[(floating, Part::Content)]).is_err());
         // Nested inside document content.
         assert!(
             parse(r#"<t:p><t:alphabetical-index-auto-mark-file xlink:type="simple" xlink:href="a.sdi"/></t:p>"#).is_err()
