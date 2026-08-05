@@ -1,4 +1,4 @@
-use litchi_ooxml::pptx::Package;
+use litchi_pptx::Package;
 use tempfile::NamedTempFile;
 
 #[test]
@@ -24,7 +24,15 @@ fn duplicated_slide_takes_requested_position_after_round_trip() {
     let reopened = Package::open(output.path()).unwrap();
     let presentation = reopened.presentation().unwrap();
     // The copy received the next slide ID and sits at position 2.
-    assert_eq!(presentation.slide_ids().unwrap(), [256, 257, 259, 258]);
+    assert_eq!(
+        presentation
+            .slide_references()
+            .unwrap()
+            .iter()
+            .map(|reference| reference.id())
+            .collect::<Vec<_>>(),
+        [256, 257, 259, 258]
+    );
 
     let slides = presentation.slides().unwrap();
     for (slide, expected) in slides.iter().zip(["one", "two", "one", "three"]) {
@@ -35,7 +43,7 @@ fn duplicated_slide_takes_requested_position_after_round_trip() {
 
 #[test]
 fn insert_duplicate_at_end_matches_duplicate_slide() {
-    let mut presentation = litchi_ooxml::pptx::MutablePresentation::new();
+    let mut presentation = litchi_pptx::MutablePresentation::new();
     presentation.add_slide().unwrap().set_title("only");
 
     let position = presentation.insert_duplicate_slide(0, 1).unwrap();
@@ -45,6 +53,6 @@ fn insert_duplicate_at_end_matches_duplicate_slide() {
     assert_eq!(presentation.slide_mut(1).unwrap().title(), Some("only"));
 
     // Empty decks reject every index without panicking.
-    let mut empty = litchi_ooxml::pptx::MutablePresentation::new();
+    let mut empty = litchi_pptx::MutablePresentation::new();
     assert!(empty.insert_duplicate_slide(0, 0).is_err());
 }

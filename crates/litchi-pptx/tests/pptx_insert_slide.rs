@@ -1,4 +1,4 @@
-use litchi_ooxml::pptx::Package;
+use litchi_pptx::Package;
 use tempfile::NamedTempFile;
 
 #[test]
@@ -22,7 +22,7 @@ fn inserted_slides_keep_position_and_ids_after_round_trip() {
             presentation
                 .slides()
                 .iter()
-                .map(|s| s.slide_id())
+                .map(|slide| slide.slide_id())
                 .collect::<Vec<_>>(),
             [260, 256, 259, 257, 258, 261]
         );
@@ -32,7 +32,12 @@ fn inserted_slides_keep_position_and_ids_after_round_trip() {
     let reopened = Package::open(output.path()).unwrap();
     let presentation = reopened.presentation().unwrap();
     assert_eq!(
-        presentation.slide_ids().unwrap(),
+        presentation
+            .slide_references()
+            .unwrap()
+            .iter()
+            .map(|reference| reference.id())
+            .collect::<Vec<_>>(),
         [260, 256, 259, 257, 258, 261]
     );
 
@@ -49,7 +54,7 @@ fn inserted_slides_keep_position_and_ids_after_round_trip() {
 
 #[test]
 fn insert_slide_into_empty_presentation_is_append() {
-    let mut presentation = litchi_ooxml::pptx::MutablePresentation::new();
+    let mut presentation = litchi_pptx::MutablePresentation::new();
     presentation.insert_slide(0).unwrap().set_title("only");
     assert!(presentation.insert_slide(2).is_err());
     assert_eq!(presentation.slide_count(), 1);
