@@ -66,12 +66,12 @@ fn parse_bool(value: &str, field: &str) -> Result<bool> {
 
 /// An `fo:break-before`/`fo:break-after` value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ParagraphBreak {
+pub enum Break {
     Auto,
     Column,
     Page,
 }
-impl ParagraphBreak {
+impl Break {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "auto" => Ok(Self::Auto),
@@ -91,11 +91,11 @@ impl ParagraphBreak {
 
 /// The `style:page-number` value: `auto` or a positive integer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ParagraphPageNumber {
+pub enum PageNumber {
     Auto,
     Number(u64),
 }
-impl ParagraphPageNumber {
+impl PageNumber {
     fn parse(value: &str) -> Result<Self> {
         if value == "auto" {
             return Ok(Self::Auto);
@@ -119,14 +119,14 @@ impl ParagraphPageNumber {
 /// The break, page-number, and line-numbering group of one
 /// `style:paragraph-properties` element.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ParagraphBreaks {
-    pub break_before: Option<ParagraphBreak>,
-    pub break_after: Option<ParagraphBreak>,
-    pub page_number: Option<ParagraphPageNumber>,
+pub struct Breaks {
+    pub break_before: Option<Break>,
+    pub break_after: Option<Break>,
+    pub page_number: Option<PageNumber>,
     pub number_lines: Option<bool>,
     pub line_number: Option<u64>,
 }
-impl ParagraphBreaks {
+impl Breaks {
     pub fn new() -> Self {
         Self::default()
     }
@@ -172,14 +172,14 @@ impl ParagraphBreaks {
 
 /// A named or default paragraph style and its break properties.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParagraphStyleBreaks {
+pub struct Style {
     pub name: Option<String>,
     pub parent_style_name: Option<String>,
     pub is_default_style: bool,
-    pub properties: Option<ParagraphBreaks>,
+    pub properties: Option<Breaks>,
 }
-impl ParagraphStyleBreaks {
-    pub fn named(name: impl Into<String>, properties: Option<ParagraphBreaks>) -> Result<Self> {
+impl Style {
+    pub fn named(name: impl Into<String>, properties: Option<Breaks>) -> Result<Self> {
         let result = Self {
             name: Some(name.into()),
             parent_style_name: None,
@@ -189,7 +189,7 @@ impl ParagraphStyleBreaks {
         result.validate()?;
         Ok(result)
     }
-    pub fn default_style(properties: Option<ParagraphBreaks>) -> Self {
+    pub fn default_style(properties: Option<Breaks>) -> Self {
         Self {
             name: None,
             parent_style_name: None,
@@ -244,16 +244,16 @@ impl ParagraphStyleBreaks {
 
 /// All paragraph styles of a styles part that carry break properties.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ParagraphStyleBreaksSet {
-    pub styles: Vec<ParagraphStyleBreaks>,
+pub struct Styles {
+    pub styles: Vec<Style>,
 }
-impl ParagraphStyleBreaksSet {
-    pub fn get(&self, name: &str) -> Option<&ParagraphStyleBreaks> {
+impl Styles {
+    pub fn get(&self, name: &str) -> Option<&Style> {
         self.styles
             .iter()
             .find(|style| style.name.as_deref() == Some(name))
     }
-    pub fn default_style(&self) -> Option<&ParagraphStyleBreaks> {
+    pub fn default_style(&self) -> Option<&Style> {
         self.styles.iter().find(|style| style.is_default_style)
     }
 }
@@ -294,7 +294,7 @@ fn style_attributes(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<Option<ParagraphStyleBreaks>> {
+) -> Result<Option<Style>> {
     let mut name = None;
     let mut parent = None;
     let mut family = None;
@@ -326,7 +326,7 @@ fn style_attributes(
     if family.as_deref() != Some("paragraph") {
         return Ok(None);
     }
-    let result = ParagraphStyleBreaks {
+    let result = Style {
         name,
         parent_style_name: parent,
         is_default_style: start.local_name().as_ref() == b"default-style",
@@ -340,8 +340,8 @@ fn break_attributes(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<ParagraphBreaks> {
-    let mut properties = ParagraphBreaks::new();
+) -> Result<Breaks> {
+    let mut properties = Breaks::new();
     let mut seen = HashSet::new();
     let mut count = 0;
     for attribute in start.attributes().with_checks(true) {
@@ -366,13 +366,13 @@ fn break_attributes(
         }
         match (namespace, local.as_ref()) {
             (Ns::Fo, b"break-before") => {
-                properties.break_before = Some(ParagraphBreak::parse(&value)?);
+                properties.break_before = Some(Break::parse(&value)?);
             },
             (Ns::Fo, b"break-after") => {
-                properties.break_after = Some(ParagraphBreak::parse(&value)?);
+                properties.break_after = Some(Break::parse(&value)?);
             },
             (Ns::Style, b"page-number") => {
-                properties.page_number = Some(ParagraphPageNumber::parse(&value)?);
+                properties.page_number = Some(PageNumber::parse(&value)?);
             },
             (Ns::Text, b"number-lines") => {
                 properties.number_lines = Some(parse_bool(&value, "text:number-lines")?);
@@ -389,11 +389,7 @@ fn break_attributes(
     Ok(properties)
 }
 
-fn push_style(
-    styles: &mut Vec<ParagraphStyleBreaks>,
-    style: ParagraphStyleBreaks,
-    total: &mut usize,
-) -> Result<()> {
+fn push_style(styles: &mut Vec<Style>, style: Style, total: &mut usize) -> Result<()> {
     if styles.len() >= MAX_STYLES {
         return Err(bad("too many paragraph styles"));
     }
@@ -421,17 +417,17 @@ fn is_paragraph_style(current: &(Ns, Vec<u8>), parent: Option<&(Ns, Vec<u8>)>) -
 
 struct Active {
     depth: usize,
-    style: ParagraphStyleBreaks,
+    style: Style,
     seen_properties: bool,
 }
 
 /// Parse paragraph styles and their break properties from a styles part.
-pub fn parse_paragraph_style_breaks(xml: &str) -> Result<ParagraphStyleBreaksSet> {
+pub fn parse(xml: &str) -> Result<Styles> {
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
     }
     if !xml.contains("paragraph-properties") {
-        return Ok(ParagraphStyleBreaksSet::default());
+        return Ok(Styles::default());
     }
     let mut reader = NsReader::from_reader(xml.as_bytes());
     reader.config_mut().trim_text(false);
@@ -517,7 +513,7 @@ pub fn parse_paragraph_style_breaks(xml: &str) -> Result<ParagraphStyleBreaksSet
     if !stack.is_empty() || active.is_some() {
         return Err(bad("truncated styles XML"));
     }
-    Ok(ParagraphStyleBreaksSet { styles })
+    Ok(Styles { styles })
 }
 
 #[derive(Default)]
@@ -610,10 +606,7 @@ fn qualify_insert(insert: &str, missing: (bool, bool, bool)) -> String {
 /// Losslessly replace, insert, or remove this module's break attributes on one
 /// existing paragraph style's `style:paragraph-properties` element. Attributes
 /// owned by sibling modules and child elements are preserved.
-pub fn set_paragraph_style_breaks_xml(
-    xml: &str,
-    requested: &ParagraphStyleBreaks,
-) -> Result<String> {
+pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
     requested.validate()?;
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
@@ -748,7 +741,7 @@ pub fn set_paragraph_style_breaks_xml(
     let insert = requested
         .properties
         .as_ref()
-        .map(ParagraphBreaks::attributes_xml)
+        .map(Breaks::attributes_xml)
         .unwrap_or_default();
     if let Some(properties) = &spans.properties {
         let raw = &xml[properties.start..properties.end];
@@ -777,15 +770,13 @@ pub fn set_paragraph_style_breaks_xml(
 }
 
 impl OpenDocumentPackage {
-    pub fn paragraph_style_breaks(&self) -> Result<ParagraphStyleBreaksSet> {
-        self.styles_xml()?.map_or_else(
-            || Ok(ParagraphStyleBreaksSet::default()),
-            |xml| parse_paragraph_style_breaks(&xml),
-        )
+    pub fn paragraph_style_breaks(&self) -> Result<Styles> {
+        self.styles_xml()?
+            .map_or_else(|| Ok(Styles::default()), |xml| parse(&xml))
     }
 }
 impl FlatOpenDocument {
-    pub fn paragraph_style_breaks(&self) -> Result<ParagraphStyleBreaksSet> {
-        parse_paragraph_style_breaks(self.xml())
+    pub fn paragraph_style_breaks(&self) -> Result<Styles> {
+        parse(self.xml())
     }
 }

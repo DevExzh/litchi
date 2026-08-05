@@ -78,7 +78,7 @@ pub struct Builder {
     paragraph_margin_styles: Vec<crate::ParagraphStyleMargins>,
     paragraph_border_styles: Vec<crate::style::paragraph::border::Style>,
     paragraph_alignment_styles: Vec<crate::style::paragraph::alignment::Style>,
-    paragraph_break_styles: Vec<crate::ParagraphStyleBreaks>,
+    paragraph_break_styles: Vec<crate::style::paragraph::breaks::Style>,
     paragraph_writing_mode_styles: Vec<crate::ParagraphStyleWritingMode>,
     table_row_property_styles: Vec<crate::style::table::row::Style>,
     table_column_property_styles: Vec<crate::style::table::column::Style>,
@@ -463,7 +463,7 @@ impl Builder {
     /// and line-numbering properties.
     pub fn add_paragraph_break_style(
         &mut self,
-        style: crate::ParagraphStyleBreaks,
+        style: crate::style::paragraph::breaks::Style,
     ) -> Result<&mut Self> {
         style.validate()?;
         if self.paragraph_break_styles.len() >= 4096

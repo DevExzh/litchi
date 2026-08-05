@@ -330,14 +330,6 @@ pub(crate) use settings::{
 };
 #[allow(
     unused_imports,
-    reason = "ODT facade exposes paragraph break semantics"
-)]
-pub(crate) use style::paragraph::breaks::{
-    ParagraphBreak, ParagraphBreaks, ParagraphPageNumber, ParagraphStyleBreaks,
-    ParagraphStyleBreaksSet, parse_paragraph_style_breaks, set_paragraph_style_breaks_xml,
-};
-#[allow(
-    unused_imports,
     reason = "ODT facade exposes paragraph drop-cap semantics"
 )]
 pub(crate) use style::paragraph::drop_cap::{
