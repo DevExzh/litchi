@@ -1,6 +1,7 @@
 //! Typed ODF `text:list-style` declarations (numbered, bullet, and image levels).
 
-use crate::{FlatOpenDocument, OpenDocumentPackage, OutlineNumberFormat, OutlinePositiveInteger};
+use crate::outline_style::{NumberFormat, PositiveInteger};
+use crate::{FlatOpenDocument, OpenDocumentPackage};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
@@ -84,12 +85,12 @@ impl BulletRelativeSize {
 /// Level numbering decoration of a `text:list-level-style-number`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct NumberStyle {
-    pub format: Option<OutlineNumberFormat>,
+    pub format: Option<NumberFormat>,
     pub prefix: Option<String>,
     pub suffix: Option<String>,
     pub letter_sync: Option<bool>,
-    pub display_levels: Option<OutlinePositiveInteger>,
-    pub start_value: Option<OutlinePositiveInteger>,
+    pub display_levels: Option<PositiveInteger>,
+    pub start_value: Option<PositiveInteger>,
 }
 impl NumberStyle {
     pub fn validate(&self) -> Result<()> {
@@ -447,7 +448,7 @@ fn parse_number_level(mut attrs: Attrs) -> Result<LevelStyle> {
     let number = NumberStyle {
         format: attrs
             .take(Ns::Style, b"num-format")
-            .map(OutlineNumberFormat::new)
+            .map(NumberFormat::new)
             .transpose()?,
         prefix: attrs.take(Ns::Style, b"num-prefix"),
         suffix: attrs.take(Ns::Style, b"num-suffix"),
@@ -457,11 +458,11 @@ fn parse_number_level(mut attrs: Attrs) -> Result<LevelStyle> {
             .transpose()?,
         display_levels: attrs
             .take(Ns::Text, b"display-levels")
-            .map(OutlinePositiveInteger::new)
+            .map(PositiveInteger::new)
             .transpose()?,
         start_value: attrs
             .take(Ns::Text, b"start-value")
-            .map(OutlinePositiveInteger::new)
+            .map(PositiveInteger::new)
             .transpose()?,
     };
     attrs.reject_unknown("text:list-level-style-number")?;
