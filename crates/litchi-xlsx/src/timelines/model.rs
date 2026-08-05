@@ -5,7 +5,7 @@ use super::{
     MAX_CACHES, MAX_PIVOT_TABLES, MAX_TIMELINES, MAX_TOTAL_OPAQUE_BYTES, SML, STRICT_SML, X15,
     bounded, bounded_nonempty, invalid, limit,
 };
-use crate::auto_filter::{AutoFilterDefinition, write_auto_filter_fragment};
+use crate::auto_filter::{Definition, write_auto_filter_fragment};
 use crate::error::Result;
 use litchi_ooxml_common::custom_xml::valid_guid;
 use std::collections::HashSet;
@@ -308,7 +308,7 @@ pub struct PivotFilter {
     pub id: u32,
     pub name: Option<String>,
     pub description: Option<String>,
-    pub auto_filter: Option<AutoFilterDefinition>,
+    pub auto_filter: Option<Definition>,
 }
 impl PivotFilter {
     pub fn new(field: u32, id: u32) -> Self {
@@ -974,3 +974,4 @@ pub(super) fn validate_relationship_id(value: &str) -> Result<()> {
         Ok(())
     }
 }
+

@@ -4,7 +4,7 @@
 //! owns only XML validation, conversion, and serialization.
 
 use crate::auto_filter::{
-    AutoFilterDefinition, FilterColumnDefinition, parse_auto_filter, write_auto_filter_fragment,
+    Definition, Column, parse_auto_filter, write_auto_filter_fragment,
 };
 use crate::error::Result;
 use crate::sort::{SortBy, SortMethod};
@@ -239,7 +239,7 @@ fn write_column_filter(
 
 fn write_filter_payload(
     output: &mut Vec<u8>,
-    filter: &FilterColumnDefinition,
+    filter: &Column,
     spreadsheet_prefix_needs_local_binding: bool,
 ) -> Result<()> {
     output.extend_from_slice(b"<filter");
@@ -263,11 +263,12 @@ fn write_filter_payload(
     Ok(())
 }
 
-pub(crate) fn filter_payload_markup(filter: &FilterColumnDefinition) -> Result<Vec<u8>> {
-    let fragment = write_auto_filter_fragment(&AutoFilterDefinition {
+pub(crate) fn filter_payload_markup(filter: &Column) -> Result<Vec<u8>> {
+    let fragment = write_auto_filter_fragment(&Definition {
         reference: None,
         columns: vec![filter.clone()],
         sort_state: None,
+        opaque: None,
     })?;
     let mut reader = NsReader::from_reader(fragment.as_slice());
     let mut writer = Writer::new(Vec::new());
@@ -1074,7 +1075,7 @@ impl Parser {
     }
 }
 
-fn parse_filter_payload(markup: &[u8]) -> Result<FilterColumnDefinition> {
+fn parse_filter_payload(markup: &[u8]) -> Result<Column> {
     let mut reader = NsReader::from_reader(markup);
     let mut writer = Writer::new(Vec::new());
     let mut worksheet = BytesStart::new("x:worksheet");
@@ -1565,8 +1566,8 @@ mod tests {
     };
     use super::*;
     use crate::auto_filter::{
-        CalendarType, DateGroupItem, DateTimeGrouping, FilterColumnPayload, FilterItem,
-        FilterValues, IconFilter, Top10Filter,
+        Calendar, DateGroup, Grouping, Payload, Item,
+        Values, Icon, Top10,
     };
     use litchi_opc::{OpcPackage, PackURI};
 
@@ -1603,12 +1604,12 @@ mod tests {
         let columns = v.views()[1].filters()[0].column_filters();
         assert_eq!(columns.len(), 2);
         match columns[0].filters()[0].payload().unwrap() {
-            FilterColumnPayload::Values(x) => assert_eq!(x.items().len(), 4),
+            Payload::Values(x) => assert_eq!(x.items().len(), 4),
             _ => panic!("wrong payload"),
         }
         match columns[1].filters()[0].payload().unwrap() {
-            FilterColumnPayload::Values(x) => {
-                assert!(matches!(&x.items()[0], FilterItem::DateGroup(_)))
+            Payload::Values(x) => {
+                assert!(matches!(&x.items()[0], Item::DateGroup(_)))
             },
             _ => panic!("wrong payload"),
         }
@@ -1670,22 +1671,22 @@ mod tests {
     fn authors_detailed_value_date_and_sort_metadata() {
         let filter_id = Guid::new("{11111111-2222-3333-4444-555555555555}").unwrap();
         let mut column = ColumnFilter::new(1).unwrap();
-        let mut payload = FilterColumnDefinition::new(1).unwrap();
-        payload.set_payload(Some(FilterColumnPayload::Values(
-            FilterValues::new(
+        let mut payload = Column::new(1).unwrap();
+        payload.set_payload(Some(Payload::Values(
+            Values::new(
                 true,
-                CalendarType::Gregorian,
+                Calendar::Gregorian,
                 vec![
-                    FilterItem::Value("North".into()),
-                    FilterItem::DateGroup(
-                        DateGroupItem::new(
+                    Item::Value("North".into()),
+                    Item::DateGroup(
+                        DateGroup::new(
                             2026,
                             Some(7),
                             Some(26),
                             None,
                             None,
                             None,
-                            DateTimeGrouping::Day,
+                            Grouping::Day,
                         )
                         .unwrap(),
                     ),
@@ -1745,23 +1746,23 @@ mod tests {
         let mut column = ColumnFilter::new(3).unwrap();
         assert!(
             column
-                .add_filter(FilterColumnDefinition::new(2).unwrap())
+                .add_filter(Column::new(2).unwrap())
                 .is_err()
         );
         assert!(
-            DateGroupItem::new(
+            DateGroup::new(
                 2026,
                 None,
                 Some(26),
                 None,
                 None,
                 None,
-                DateTimeGrouping::Day,
+                Grouping::Day,
             )
             .is_err()
         );
-        assert!(Top10Filter::new(true, true, 101.0, None).is_err());
-        assert!(IconFilter::new(crate::auto_filter::FilterIconSet::ThreeArrows, Some(3)).is_err());
+        assert!(Top10::new(true, true, 101.0, None).is_err());
+        assert!(Icon::new(crate::auto_filter::IconSet::ThreeArrows, 3).is_err());
 
         assert!(ColumnFilter::new(MAX_COLUMNS as u32).is_err());
     }

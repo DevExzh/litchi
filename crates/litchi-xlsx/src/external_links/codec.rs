@@ -1,227 +1,29 @@
-//! Typed SpreadsheetML external-link values and inert external-workbook part codec.
-//!
-//! This owner implements the bounded externalLink grammar described by the
-//! checked-in [MS-XLSX] ToC entry 2.2.4.3 and its CT_OleItem/CT_DdeValues
-//! structures in 2 Structures section 2.6.46, together with the
-//! external-workbook relationship rules in the checked-in [MS-OE376] ToC
-//! entry 2.1.18 (Part 1 section 12.4). External targets are retained as
-//! opaque relationship metadata;
-//! this module never opens, fetches, executes, or dereferences them.
+//! Bounded SpreadsheetML external-link XML codec.
 
 use crate::error::{Error, Result};
 use crate::raw::namespace::{is_spreadsheetml_name, relationship_attribute_value};
-use litchi_ooxml_common::external_link::{
-    EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES, is_external_workbook_relationship,
-};
+use litchi_ooxml_common::external_link::EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES;
 use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 use litchi_opc::constants::relationship_type as rt;
-use litchi_opc::part::BlobPart;
-use litchi_opc::{PackURI, Part};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
-const MAX_SHEET_NAMES: usize = 65_536;
-const MAX_DEFINED_NAMES: usize = 65_536;
-const MAX_CACHED_SHEETS: usize = 65_536;
-const MAX_CACHED_ROWS: usize = 1_048_576;
-const MAX_CACHED_CELLS: usize = 1_000_000;
-const MAX_LINK_ITEMS: usize = 65_536;
-const MAX_CACHE_TEXT_BYTES: usize = 64 * 1024 * 1024;
-const X14: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main";
-const TRANSITIONAL_SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-const STRICT_SML: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
-const TRANSITIONAL_REL: &str =
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
-const MAX_EXTERNAL_TARGET_BYTES: usize = 32 * 1024;
-/// Highest column index addressable by a SpreadsheetML cell reference (`XFD`).
-const MAX_CELL_COLUMN: u32 = 16_384;
-/// Highest row index addressable by a SpreadsheetML cell reference.
-const MAX_CELL_ROW: u32 = 1_048_576;
-/// Longest column prefix a valid reference can carry (`XFD` is three letters).
-const MAX_COLUMN_LETTERS: usize = 3;
+use super::model::*;
+use super::{invalid, limit};
 
-/// Namespace conformance used when authoring an external-link part.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum ExternalLinkConformance {
-    #[default]
-    Transitional,
-    Strict,
-}
-
-impl ExternalLinkConformance {
-    fn sml(self) -> &'static str {
-        match self {
-            Self::Transitional => TRANSITIONAL_SML,
-            Self::Strict => STRICT_SML,
-        }
-    }
-
-    fn rel(self) -> &'static str {
-        match self {
-            Self::Transitional => TRANSITIONAL_REL,
-            Self::Strict => STRICT_REL,
-        }
-    }
-
-    pub fn external_link_relationship(self) -> &'static str {
-        match self {
-            Self::Transitional => rt::EXTERNAL_LINK,
-            Self::Strict => rt::STRICT_EXTERNAL_LINK,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExternalLinkEntry {
-    pub index: u32,
-    pub relationship_id: String,
-    pub part_uri: PackURI,
-    pub kind: ExternalLinkKind,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ExternalLinkKind {
-    Workbook(ExternalWorkbookLink),
-    Dde(ExternalDdeLink),
-    Ole(ExternalOleLink),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExternalDdeLink {
-    pub service: String,
-    pub topic: String,
-    pub items: Vec<ExternalDdeItem>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExternalOleLink {
-    pub target: ExternalOleTarget,
-    pub program_id: String,
-    pub items: Vec<ExternalOleItem>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExternalOleTarget {
-    pub relationship_id: String,
-    pub target: String,
-    pub relationship_type: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExternalDdeItem {
-    pub name: Option<String>,
-    pub use_ole: bool,
-    pub advise: bool,
-    pub prefer_picture: bool,
-    pub values: Option<ExternalDdeValues>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ExternalOleItemSource {
-    SpreadsheetMl,
-    Office2010,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExternalOleItem {
-    pub source: ExternalOleItemSource,
-    pub name: String,
-    pub icon: bool,
-    pub advise: bool,
-    pub prefer_picture: bool,
-    pub values: Option<ExternalDdeValues>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExternalDdeValues {
-    pub rows: u32,
-    pub columns: u32,
-    pub values: Vec<ExternalDdeValue>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ExternalDdeValueType {
-    Nil,
-    Boolean,
-    Number,
-    Error,
-    String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExternalDdeValue {
-    pub value_type: ExternalDdeValueType,
-    pub raw_value: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExternalWorkbookLink {
-    pub target: ExternalWorkbookTarget,
-    pub sheet_names: Vec<String>,
-    pub defined_names: Vec<ExternalDefinedName>,
-    pub cached_sheets: Vec<ExternalSheetData>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExternalWorkbookTarget {
-    pub relationship_id: String,
-    pub target: String,
-    pub relationship_type: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExternalDefinedName {
-    pub name: String,
-    pub refers_to: Option<String>,
-    pub sheet_id: Option<u32>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExternalSheetData {
-    pub sheet_id: u32,
-    pub refresh_error: bool,
-    pub rows: Vec<ExternalRow>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExternalRow {
-    pub row: u32,
-    pub cells: Vec<ExternalCell>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ExternalCellType {
-    Number,
-    Boolean,
-    Date,
-    Error,
-    InlineString,
-    SharedString,
-    String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExternalCell {
-    pub reference: Option<String>,
-    pub cell_type: ExternalCellType,
-    pub raw_value: Option<String>,
-    pub value_metadata_index: u32,
-}
-
-impl ExternalLinkKind {
+impl Link {
     /// Serialize this link as a canonical transitional SpreadsheetML external-link part.
     ///
     /// External targets are represented only as OPC relationship metadata and are never opened.
     pub fn to_xml(&self) -> Result<Vec<u8>> {
-        self.to_xml_with_conformance(ExternalLinkConformance::Transitional)
+        self.to_xml_with_conformance(Conformance::Transitional)
     }
 
     /// Serialize this link without dereferencing or executing any target metadata.
-    pub fn to_xml_with_conformance(&self, conformance: ExternalLinkConformance) -> Result<Vec<u8>> {
-        let has_x14 = matches!(self, Self::Ole(link) if link.items.iter().any(|item| item.source == ExternalOleItemSource::Office2010));
+    pub fn to_xml_with_conformance(&self, conformance: Conformance) -> Result<Vec<u8>> {
+        let has_x14 = matches!(self, Self::Ole(link) if link.items.iter().any(|item| item.source == ItemSource::Office2010));
         let mut xml = format!(
             r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><externalLink xmlns="{}""#,
             conformance.sml()
@@ -251,123 +53,42 @@ impl ExternalLinkKind {
     }
 }
 
-pub fn build_external_link_part(part_uri: PackURI, kind: &ExternalLinkKind) -> Result<BlobPart> {
-    build_external_link_part_with_conformance(part_uri, kind, ExternalLinkConformance::Transitional)
-}
-
-pub fn build_external_link_part_with_conformance(
-    part_uri: PackURI,
-    kind: &ExternalLinkKind,
-    conformance: ExternalLinkConformance,
-) -> Result<BlobPart> {
-    let xml = kind.to_xml_with_conformance(conformance)?;
-    let mut part = BlobPart::new(
-        part_uri,
-        litchi_opc::constants::content_type::SML_EXTERNAL_LINK.into(),
-        xml,
-    );
-    match kind {
-        ExternalLinkKind::Workbook(link) => add_external_target_relationship(
-            &mut part,
-            &link.target,
-            EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES,
-            "external workbook",
-        )?,
-        ExternalLinkKind::Ole(link) => add_external_target_relationship(
-            &mut part,
-            &link.target,
-            &[rt::OLE_OBJECT, rt::STRICT_OLE_OBJECT],
-            "OLE",
-        )?,
-        ExternalLinkKind::Dde(_) => {},
-    }
-    Ok(part)
-}
-
-trait ExternalTargetMetadata {
-    fn relationship_id(&self) -> &str;
-    fn target(&self) -> &str;
-    fn relationship_type(&self) -> &str;
-}
-
-impl ExternalTargetMetadata for ExternalWorkbookTarget {
-    fn relationship_id(&self) -> &str {
-        &self.relationship_id
-    }
-    fn target(&self) -> &str {
-        &self.target
-    }
-    fn relationship_type(&self) -> &str {
-        &self.relationship_type
-    }
-}
-
-impl ExternalTargetMetadata for ExternalOleTarget {
-    fn relationship_id(&self) -> &str {
-        &self.relationship_id
-    }
-    fn target(&self) -> &str {
-        &self.target
-    }
-    fn relationship_type(&self) -> &str {
-        &self.relationship_type
-    }
-}
-
-fn add_external_target_relationship(
-    part: &mut BlobPart,
-    target: &impl ExternalTargetMetadata,
-    allowed_types: &[&str],
-    description: &str,
-) -> Result<()> {
-    validate_external_target(target, allowed_types, description)?;
-    part.rels_mut().add_relationship(
-        target.relationship_type().to_string(),
-        target.target().to_string(),
-        target.relationship_id().to_string(),
-        true,
-    );
-    Ok(())
-}
-
 fn validate_external_target(
-    target: &impl ExternalTargetMetadata,
+    target: &Target,
     allowed_types: &[&str],
     description: &str,
 ) -> Result<()> {
-    if target.relationship_id().is_empty() {
+    if target.relationship_id.is_empty() {
         return Err(invalid(format!(
             "{description} relationship ID must not be empty"
         )));
     }
-    if target.target().is_empty() {
+    if target.target.is_empty() {
         return Err(invalid(format!("{description} target must not be empty")));
     }
-    if target.target().len() > MAX_EXTERNAL_TARGET_BYTES {
+    if target.target.len() > MAX_EXTERNAL_TARGET_BYTES {
         return Err(limit(&format!("{description} target URI")));
     }
-    if target.target().chars().any(|character| {
+    if target.target.chars().any(|character| {
         character.is_control() || character == '\u{fffe}' || character == '\u{ffff}'
     }) {
         return Err(invalid(format!(
             "{description} target URI contains an invalid character"
         )));
     }
-    if target.relationship_id().len() > 1024
-        || target.relationship_id().chars().any(char::is_control)
-    {
+    if target.relationship_id.len() > 1024 || target.relationship_id.chars().any(char::is_control) {
         return Err(invalid(format!("{description} relationship ID is invalid")));
     }
-    if !allowed_types.contains(&target.relationship_type()) {
+    if !allowed_types.contains(&target.relationship_type.as_str()) {
         return Err(invalid(format!(
             "{description} has invalid relationship type '{}'",
-            target.relationship_type()
+            target.relationship_type
         )));
     }
     Ok(())
 }
 
-fn write_external_workbook(xml: &mut String, link: &ExternalWorkbookLink) -> Result<()> {
+fn write_external_workbook(xml: &mut String, link: &Workbook) -> Result<()> {
     validate_external_target(
         &link.target,
         EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES,
@@ -467,7 +188,7 @@ fn write_external_workbook(xml: &mut String, link: &ExternalWorkbookLink) -> Res
                     if let Some(reference) = &cell.reference {
                         push_xml_attr(xml, "r", reference)?;
                     }
-                    if cell.cell_type != ExternalCellType::Number {
+                    if cell.cell_type != CellType::Number {
                         push_xml_attr(xml, "t", external_cell_type_token(cell.cell_type))?;
                     }
                     if cell.value_metadata_index != 0 {
@@ -491,7 +212,7 @@ fn write_external_workbook(xml: &mut String, link: &ExternalWorkbookLink) -> Res
     Ok(())
 }
 
-fn write_dde_link(xml: &mut String, link: &ExternalDdeLink) -> Result<()> {
+fn write_dde_link(xml: &mut String, link: &Dde) -> Result<()> {
     xml.push_str("<ddeLink");
     push_xml_attr(xml, "ddeService", &link.service)?;
     push_xml_attr(xml, "ddeTopic", &link.topic)?;
@@ -523,7 +244,7 @@ fn write_dde_link(xml: &mut String, link: &ExternalDdeLink) -> Result<()> {
     Ok(())
 }
 
-fn write_ole_link(xml: &mut String, link: &ExternalOleLink) -> Result<()> {
+fn write_ole_link(xml: &mut String, link: &Ole) -> Result<()> {
     validate_external_target(
         &link.target,
         &[rt::OLE_OBJECT, rt::STRICT_OLE_OBJECT],
@@ -547,7 +268,7 @@ fn write_ole_link(xml: &mut String, link: &ExternalOleLink) -> Result<()> {
         if item.name.is_empty() {
             return Err(invalid("OLE item name must not be empty"));
         }
-        let element = if item.source == ExternalOleItemSource::Office2010 {
+        let element = if item.source == ItemSource::Office2010 {
             "x14:oleItem"
         } else {
             "oleItem"
@@ -559,12 +280,12 @@ fn write_ole_link(xml: &mut String, link: &ExternalOleLink) -> Result<()> {
         push_true_attr(xml, "advise", item.advise);
         push_true_attr(xml, "preferPic", item.prefer_picture);
         match (&item.values, item.source) {
-            (Some(values), ExternalOleItemSource::Office2010) => {
+            (Some(values), ItemSource::Office2010) => {
                 xml.push('>');
                 write_dde_values(xml, "x14:values", values)?;
                 xml.push_str("</x14:oleItem>");
             },
-            (Some(_), ExternalOleItemSource::SpreadsheetMl) => {
+            (Some(_), ItemSource::SpreadsheetMl) => {
                 return Err(invalid("cached OLE values require an Office 2010 oleItem"));
             },
             (None, _) => xml.push_str("/>"),
@@ -574,7 +295,7 @@ fn write_ole_link(xml: &mut String, link: &ExternalOleLink) -> Result<()> {
     Ok(())
 }
 
-fn write_dde_values(xml: &mut String, element: &str, values: &ExternalDdeValues) -> Result<()> {
+fn write_dde_values(xml: &mut String, element: &str, values: &DdeValues) -> Result<()> {
     let expected = u64::from(values.rows)
         .checked_mul(u64::from(values.columns))
         .ok_or_else(|| limit("DDE/OLE matrix dimensions"))?;
@@ -594,7 +315,7 @@ fn write_dde_values(xml: &mut String, element: &str, values: &ExternalDdeValues)
     xml.push('>');
     for value in &values.values {
         xml.push_str("<value");
-        if value.value_type != ExternalDdeValueType::Nil {
+        if value.value_type != DdeValueType::Nil {
             push_xml_attr(xml, "t", dde_value_type_token(value.value_type))?;
         }
         xml.push_str("><val>");
@@ -607,25 +328,25 @@ fn write_dde_values(xml: &mut String, element: &str, values: &ExternalDdeValues)
     Ok(())
 }
 
-fn external_cell_type_token(value: ExternalCellType) -> &'static str {
+fn external_cell_type_token(value: CellType) -> &'static str {
     match value {
-        ExternalCellType::Number => "n",
-        ExternalCellType::Boolean => "b",
-        ExternalCellType::Date => "d",
-        ExternalCellType::Error => "e",
-        ExternalCellType::InlineString => "inlineStr",
-        ExternalCellType::SharedString => "s",
-        ExternalCellType::String => "str",
+        CellType::Number => "n",
+        CellType::Boolean => "b",
+        CellType::Date => "d",
+        CellType::Error => "e",
+        CellType::InlineString => "inlineStr",
+        CellType::SharedString => "s",
+        CellType::String => "str",
     }
 }
 
-fn dde_value_type_token(value: ExternalDdeValueType) -> &'static str {
+fn dde_value_type_token(value: DdeValueType) -> &'static str {
     match value {
-        ExternalDdeValueType::Nil => "nil",
-        ExternalDdeValueType::Boolean => "b",
-        ExternalDdeValueType::Number => "n",
-        ExternalDdeValueType::Error => "e",
-        ExternalDdeValueType::String => "str",
+        DdeValueType::Nil => "nil",
+        DdeValueType::Boolean => "b",
+        DdeValueType::Number => "n",
+        DdeValueType::Error => "e",
+        DdeValueType::String => "str",
     }
 }
 
@@ -703,7 +424,7 @@ enum Context {
     Other,
 }
 
-enum ParsedKind {
+enum ParsedLink {
     Workbook(ParsedExternalBook),
     Dde(ParsedDdeLink),
     Ole(ParsedOleLink),
@@ -732,7 +453,7 @@ struct ParsedDdeItem {
 }
 
 struct ParsedOleItem {
-    source: ExternalOleItemSource,
+    source: ItemSource,
     name: String,
     icon: bool,
     advise: bool,
@@ -747,22 +468,22 @@ struct ParsedDdeValues {
 }
 
 struct ParsedDdeValue {
-    value_type: ExternalDdeValueType,
+    value_type: DdeValueType,
     raw_value: Option<String>,
 }
 
 struct ParsedExternalBook {
     target_relationship_id: String,
     sheet_names: Vec<String>,
-    defined_names: Vec<ExternalDefinedName>,
-    cached_sheets: Vec<ExternalSheetData>,
+    defined_names: Vec<DefinedName>,
+    cached_sheets: Vec<SheetData>,
     saw_sheet_names: bool,
     saw_defined_names: bool,
     saw_sheet_data_set: bool,
 }
 
 struct Parser {
-    kind: Option<ParsedKind>,
+    kind: Option<ParsedLink>,
     cached_rows: usize,
     cached_cells: usize,
     text_bytes: usize,
@@ -780,21 +501,21 @@ impl Parser {
 
     fn book_mut(&mut self) -> Result<&mut ParsedExternalBook> {
         match self.kind.as_mut() {
-            Some(ParsedKind::Workbook(book)) => Ok(book),
+            Some(ParsedLink::Workbook(book)) => Ok(book),
             _ => Err(invalid("external-link content is outside externalBook")),
         }
     }
 
     fn dde_mut(&mut self) -> Result<&mut ParsedDdeLink> {
         match self.kind.as_mut() {
-            Some(ParsedKind::Dde(link)) => Ok(link),
+            Some(ParsedLink::Dde(link)) => Ok(link),
             _ => Err(invalid("DDE content is outside ddeLink")),
         }
     }
 
     fn ole_mut(&mut self) -> Result<&mut ParsedOleLink> {
         match self.kind.as_mut() {
-            Some(ParsedKind::Ole(link)) => Ok(link),
+            Some(ParsedLink::Ole(link)) => Ok(link),
             _ => Err(invalid("OLE content is outside oleLink")),
         }
     }
@@ -816,7 +537,7 @@ impl Parser {
             let relationship_id = relationship_attribute_value(element, b"id", decoder, resolver)?
                 .filter(|value| !value.is_empty())
                 .ok_or_else(|| invalid("externalBook is missing relationship ID"))?;
-            self.kind = Some(ParsedKind::Workbook(ParsedExternalBook {
+            self.kind = Some(ParsedLink::Workbook(ParsedExternalBook {
                 target_relationship_id: relationship_id,
                 sheet_names: Vec::new(),
                 defined_names: Vec::new(),
@@ -834,7 +555,7 @@ impl Parser {
             let service = required_attr(element, b"ddeService", decoder, "DDE service")?;
             let topic = required_attr(element, b"ddeTopic", decoder, "DDE topic")?;
             self.add_text(service.len() + topic.len())?;
-            self.kind = Some(ParsedKind::Dde(ParsedDdeLink {
+            self.kind = Some(ParsedLink::Dde(ParsedDdeLink {
                 service,
                 topic,
                 items: Vec::new(),
@@ -854,7 +575,7 @@ impl Parser {
                 return Err(invalid("OLE program ID must not be empty"));
             }
             self.add_text(relationship_id.len() + program_id.len())?;
-            self.kind = Some(ParsedKind::Ole(ParsedOleLink {
+            self.kind = Some(ParsedLink::Ole(ParsedOleLink {
                 target_relationship_id: relationship_id,
                 program_id,
                 items: Vec::new(),
@@ -900,7 +621,12 @@ impl Parser {
             let rows = optional_u32(element, b"rows", decoder, "DDE value rows")?.unwrap_or(1);
             let columns =
                 optional_u32(element, b"cols", decoder, "DDE value columns")?.unwrap_or(1);
-            let target = &mut self.dde_mut()?.items[item].values;
+            let target = &mut self
+                .dde_mut()?
+                .items
+                .get_mut(item)
+                .ok_or_else(|| invalid("invalid DDE item context"))?
+                .values;
             if target
                 .replace(ParsedDdeValues {
                     rows,
@@ -926,10 +652,12 @@ impl Parser {
             if self.cached_cells > MAX_CACHED_CELLS {
                 return Err(limit("DDE values"));
             }
-            let values = &mut self.dde_mut()?.items[item]
-                .values
-                .as_mut()
-                .expect("values context")
+            let values = &mut self
+                .dde_mut()?
+                .items
+                .get_mut(item)
+                .and_then(|item| item.values.as_mut())
+                .ok_or_else(|| invalid("invalid DDE values context"))?
                 .values;
             let index = values.len();
             values.push(ParsedDdeValue {
@@ -941,13 +669,14 @@ impl Parser {
         if let Context::DdeValue(item, value) = parent
             && is_spreadsheetml_name(namespace, element.name(), b"val")
         {
-            let raw = &mut self.dde_mut()?.items[item]
-                .values
-                .as_mut()
-                .expect("values context")
-                .values[value]
-                .raw_value;
-            if raw.replace(String::new()).is_some() {
+            let parsed_value = self
+                .dde_mut()?
+                .items
+                .get_mut(item)
+                .and_then(|item| item.values.as_mut())
+                .and_then(|values| values.values.get_mut(value))
+                .ok_or_else(|| invalid("invalid DDE value context"))?;
+            if parsed_value.raw_value.replace(String::new()).is_some() {
                 return Err(invalid("duplicate DDE val element"));
             }
             return Ok(Context::DdeValueText(item, value));
@@ -964,9 +693,9 @@ impl Parser {
                 || is_exact_name(namespace, element.name(), X14, b"oleItem"))
         {
             let source = if is_exact_name(namespace, element.name(), X14, b"oleItem") {
-                ExternalOleItemSource::Office2010
+                ItemSource::Office2010
             } else {
-                ExternalOleItemSource::SpreadsheetMl
+                ItemSource::SpreadsheetMl
             };
             let name = required_attr(element, b"name", decoder, "OLE item name")?;
             if name.is_empty() {
@@ -997,7 +726,7 @@ impl Parser {
         if let Context::OleItem(item) = parent
             && is_exact_name(namespace, element.name(), X14, b"values")
         {
-            if self.ole_mut()?.items[item].source != ExternalOleItemSource::Office2010 {
+            if self.ole_mut()?.items[item].source != ItemSource::Office2010 {
                 return Err(invalid("cached OLE values require an Office 2010 oleItem"));
             }
             let rows = optional_u32(element, b"rows", decoder, "OLE value rows")?.unwrap_or(1);
@@ -1029,10 +758,12 @@ impl Parser {
             if self.cached_cells > MAX_CACHED_CELLS {
                 return Err(limit("OLE values"));
             }
-            let values = &mut self.ole_mut()?.items[item]
-                .values
-                .as_mut()
-                .expect("values context")
+            let values = &mut self
+                .ole_mut()?
+                .items
+                .get_mut(item)
+                .and_then(|item| item.values.as_mut())
+                .ok_or_else(|| invalid("invalid OLE values context"))?
                 .values;
             let index = values.len();
             values.push(ParsedDdeValue {
@@ -1044,13 +775,14 @@ impl Parser {
         if let Context::OleValue(item, value) = parent
             && is_spreadsheetml_name(namespace, element.name(), b"val")
         {
-            let raw = &mut self.ole_mut()?.items[item]
-                .values
-                .as_mut()
-                .expect("values context")
-                .values[value]
-                .raw_value;
-            if raw.replace(String::new()).is_some() {
+            let parsed_value = self
+                .ole_mut()?
+                .items
+                .get_mut(item)
+                .and_then(|item| item.values.as_mut())
+                .and_then(|values| values.values.get_mut(value))
+                .ok_or_else(|| invalid("invalid OLE value context"))?;
+            if parsed_value.raw_value.replace(String::new()).is_some() {
                 return Err(invalid("duplicate OLE val element"));
             }
             return Ok(Context::OleValueText(item, value));
@@ -1104,7 +836,7 @@ impl Parser {
             if book.defined_names.len() >= MAX_DEFINED_NAMES {
                 return Err(limit("defined names"));
             }
-            book.defined_names.push(ExternalDefinedName {
+            book.defined_names.push(DefinedName {
                 name,
                 refers_to,
                 sheet_id,
@@ -1132,7 +864,7 @@ impl Parser {
                 )));
             }
             let index = book.cached_sheets.len();
-            book.cached_sheets.push(ExternalSheetData {
+            book.cached_sheets.push(SheetData {
                 sheet_id,
                 refresh_error,
                 rows: Vec::new(),
@@ -1159,7 +891,7 @@ impl Parser {
                 return Err(invalid(format!("duplicate external cached row {row}")));
             }
             let index = rows.len();
-            rows.push(ExternalRow {
+            rows.push(Row {
                 row,
                 cells: Vec::new(),
             });
@@ -1196,7 +928,7 @@ impl Parser {
                 )));
             }
             let index = cells.len();
-            cells.push(ExternalCell {
+            cells.push(Cell {
                 reference,
                 cell_type,
                 raw_value: None,
@@ -1236,28 +968,34 @@ impl Parser {
 
     fn push_dde_value(&mut self, item: usize, value: usize, text: &str) -> Result<()> {
         self.add_text(text.len())?;
-        self.dde_mut()?.items[item]
-            .values
-            .as_mut()
-            .expect("values context")
-            .values[value]
+        let value = self
+            .dde_mut()?
+            .items
+            .get_mut(item)
+            .and_then(|item| item.values.as_mut())
+            .and_then(|values| values.values.get_mut(value))
+            .ok_or_else(|| invalid("invalid DDE value context"))?;
+        value
             .raw_value
             .as_mut()
-            .expect("val context")
+            .ok_or_else(|| invalid("invalid DDE value text context"))?
             .push_str(text);
         Ok(())
     }
 
     fn push_ole_value(&mut self, item: usize, value: usize, text: &str) -> Result<()> {
         self.add_text(text.len())?;
-        self.ole_mut()?.items[item]
-            .values
-            .as_mut()
-            .expect("values context")
-            .values[value]
+        let value = self
+            .ole_mut()?
+            .items
+            .get_mut(item)
+            .and_then(|item| item.values.as_mut())
+            .and_then(|values| values.values.get_mut(value))
+            .ok_or_else(|| invalid("invalid OLE value context"))?;
+        value
             .raw_value
             .as_mut()
-            .expect("val context")
+            .ok_or_else(|| invalid("invalid OLE value text context"))?
             .push_str(text);
         Ok(())
     }
@@ -1274,106 +1012,7 @@ impl Parser {
     }
 }
 
-pub fn load_external_link(
-    part: &dyn Part,
-    workbook_relationship_id: String,
-    index: u32,
-) -> Result<ExternalLinkEntry> {
-    let parsed = parse_external_link(part.blob())?;
-    let kind = match parsed {
-        ParsedKind::Workbook(book) => {
-            let relationship = part
-                .rels()
-                .get(&book.target_relationship_id)
-                .ok_or_else(|| {
-                    invalid(format!(
-                        "externalBook references missing relationship '{}'",
-                        book.target_relationship_id
-                    ))
-                })?;
-            if !relationship.is_external() {
-                return Err(invalid("externalBook target relationship must be external"));
-            }
-            if !is_external_workbook_relationship(relationship.reltype()) {
-                return Err(invalid(format!(
-                    "externalBook target has invalid relationship type '{}'",
-                    relationship.reltype()
-                )));
-            }
-            ExternalLinkKind::Workbook(ExternalWorkbookLink {
-                target: ExternalWorkbookTarget {
-                    relationship_id: book.target_relationship_id,
-                    target: relationship.target_ref().to_string(),
-                    relationship_type: relationship.reltype().to_string(),
-                },
-                sheet_names: book.sheet_names,
-                defined_names: book.defined_names,
-                cached_sheets: book.cached_sheets,
-            })
-        },
-        ParsedKind::Dde(link) => {
-            if link.saw_items && link.items.is_empty() {
-                return Err(invalid("ddeItems must contain at least one ddeItem"));
-            }
-            ExternalLinkKind::Dde(ExternalDdeLink {
-                service: link.service,
-                topic: link.topic,
-                items: link
-                    .items
-                    .into_iter()
-                    .map(finalize_dde_item)
-                    .collect::<Result<_>>()?,
-            })
-        },
-        ParsedKind::Ole(link) => {
-            if link.saw_items && link.items.is_empty() {
-                return Err(invalid("oleItems must contain at least one oleItem"));
-            }
-            let relationship = part
-                .rels()
-                .get(&link.target_relationship_id)
-                .ok_or_else(|| {
-                    invalid(format!(
-                        "oleLink references missing relationship '{}'",
-                        link.target_relationship_id
-                    ))
-                })?;
-            if !relationship.is_external() {
-                return Err(invalid("oleLink target relationship must be external"));
-            }
-            if !matches!(
-                relationship.reltype(),
-                rt::OLE_OBJECT | rt::STRICT_OLE_OBJECT
-            ) {
-                return Err(invalid(format!(
-                    "oleLink target has invalid relationship type '{}'",
-                    relationship.reltype()
-                )));
-            }
-            ExternalLinkKind::Ole(ExternalOleLink {
-                target: ExternalOleTarget {
-                    relationship_id: link.target_relationship_id,
-                    target: relationship.target_ref().to_string(),
-                    relationship_type: relationship.reltype().to_string(),
-                },
-                program_id: link.program_id,
-                items: link
-                    .items
-                    .into_iter()
-                    .map(finalize_ole_item)
-                    .collect::<Result<_>>()?,
-            })
-        },
-    };
-    Ok(ExternalLinkEntry {
-        index,
-        relationship_id: workbook_relationship_id,
-        part_uri: part.partname().clone(),
-        kind,
-    })
-}
-
-fn parse_external_link(xml: &[u8]) -> Result<ParsedKind> {
+pub fn parse_external_link(xml: &[u8]) -> Result<Link> {
     let xml = litchi_ooxml_common::mce::process_ooxml(xml)?;
     let mut reader = NsReader::from_reader(xml.as_ref());
     let mut parser = Parser::new();
@@ -1453,9 +1092,53 @@ fn parse_external_link(xml: &[u8]) -> Result<ParsedKind> {
             _ => {},
         }
     }
-    parser
+    match parser
         .kind
-        .ok_or_else(|| invalid("externalLink must contain a link kind"))
+        .ok_or_else(|| invalid("externalLink must contain a link kind"))?
+    {
+        ParsedLink::Workbook(book) => Ok(Link::Workbook(Workbook {
+            target: Target {
+                relationship_id: book.target_relationship_id,
+                target: String::new(),
+                relationship_type: String::new(),
+            },
+            sheet_names: book.sheet_names,
+            defined_names: book.defined_names,
+            cached_sheets: book.cached_sheets,
+        })),
+        ParsedLink::Dde(link) => {
+            if link.saw_items && link.items.is_empty() {
+                return Err(invalid("ddeItems must contain at least one ddeItem"));
+            }
+            Ok(Link::Dde(Dde {
+                service: link.service,
+                topic: link.topic,
+                items: link
+                    .items
+                    .into_iter()
+                    .map(finalize_dde_item)
+                    .collect::<Result<_>>()?,
+            }))
+        },
+        ParsedLink::Ole(link) => {
+            if link.saw_items && link.items.is_empty() {
+                return Err(invalid("oleItems must contain at least one oleItem"));
+            }
+            Ok(Link::Ole(Ole {
+                target: Target {
+                    relationship_id: link.target_relationship_id,
+                    target: String::new(),
+                    relationship_type: String::new(),
+                },
+                program_id: link.program_id,
+                items: link
+                    .items
+                    .into_iter()
+                    .map(finalize_ole_item)
+                    .collect::<Result<_>>()?,
+            }))
+        },
+    }
 }
 
 fn push_context_text(parser: &mut Parser, context: Option<Context>, text: &str) -> Result<()> {
@@ -1479,8 +1162,8 @@ fn push_context_text(parser: &mut Parser, context: Option<Context>, text: &str) 
     }
 }
 
-fn finalize_dde_item(item: ParsedDdeItem) -> Result<ExternalDdeItem> {
-    Ok(ExternalDdeItem {
+fn finalize_dde_item(item: ParsedDdeItem) -> Result<DdeItem> {
+    Ok(DdeItem {
         name: item.name,
         use_ole: item.use_ole,
         advise: item.advise,
@@ -1489,8 +1172,8 @@ fn finalize_dde_item(item: ParsedDdeItem) -> Result<ExternalDdeItem> {
     })
 }
 
-fn finalize_ole_item(item: ParsedOleItem) -> Result<ExternalOleItem> {
-    Ok(ExternalOleItem {
+fn finalize_ole_item(item: ParsedOleItem) -> Result<OleItem> {
+    Ok(OleItem {
         source: item.source,
         name: item.name,
         icon: item.icon,
@@ -1500,7 +1183,7 @@ fn finalize_ole_item(item: ParsedOleItem) -> Result<ExternalOleItem> {
     })
 }
 
-fn finalize_dde_values(values: ParsedDdeValues) -> Result<ExternalDdeValues> {
+fn finalize_dde_values(values: ParsedDdeValues) -> Result<DdeValues> {
     let ParsedDdeValues {
         rows,
         columns,
@@ -1521,7 +1204,7 @@ fn finalize_dde_values(values: ParsedDdeValues) -> Result<ExternalDdeValues> {
     let values = values
         .into_iter()
         .map(|value| {
-            Ok(ExternalDdeValue {
+            Ok(DdeValue {
                 value_type: value.value_type,
                 raw_value: value
                     .raw_value
@@ -1529,20 +1212,20 @@ fn finalize_dde_values(values: ParsedDdeValues) -> Result<ExternalDdeValues> {
             })
         })
         .collect::<Result<_>>()?;
-    Ok(ExternalDdeValues {
+    Ok(DdeValues {
         rows,
         columns,
         values,
     })
 }
 
-fn parse_dde_value_type(value: Option<&str>) -> Result<ExternalDdeValueType> {
+fn parse_dde_value_type(value: Option<&str>) -> Result<DdeValueType> {
     match value.unwrap_or("nil") {
-        "nil" => Ok(ExternalDdeValueType::Nil),
-        "b" => Ok(ExternalDdeValueType::Boolean),
-        "n" => Ok(ExternalDdeValueType::Number),
-        "e" => Ok(ExternalDdeValueType::Error),
-        "str" => Ok(ExternalDdeValueType::String),
+        "nil" => Ok(DdeValueType::Nil),
+        "b" => Ok(DdeValueType::Boolean),
+        "n" => Ok(DdeValueType::Number),
+        "e" => Ok(DdeValueType::Error),
+        "str" => Ok(DdeValueType::String),
         value => Err(invalid(format!("invalid DDE value type '{value}'"))),
     }
 }
@@ -1557,15 +1240,15 @@ fn is_exact_name(
         && name.local_name().as_ref() == local
 }
 
-fn parse_cell_type(value: Option<&str>) -> Result<ExternalCellType> {
+fn parse_cell_type(value: Option<&str>) -> Result<CellType> {
     match value.unwrap_or("n") {
-        "n" => Ok(ExternalCellType::Number),
-        "b" => Ok(ExternalCellType::Boolean),
-        "d" => Ok(ExternalCellType::Date),
-        "e" => Ok(ExternalCellType::Error),
-        "inlineStr" => Ok(ExternalCellType::InlineString),
-        "s" => Ok(ExternalCellType::SharedString),
-        "str" => Ok(ExternalCellType::String),
+        "n" => Ok(CellType::Number),
+        "b" => Ok(CellType::Boolean),
+        "d" => Ok(CellType::Date),
+        "e" => Ok(CellType::Error),
+        "inlineStr" => Ok(CellType::InlineString),
+        "s" => Ok(CellType::SharedString),
+        "str" => Ok(CellType::String),
         value => Err(invalid(format!(
             "invalid external cached cell type '{value}'"
         ))),
@@ -1657,10 +1340,4 @@ fn mark_once(seen: &mut bool, description: &str) -> Result<()> {
     } else {
         Ok(())
     }
-}
-fn invalid(message: impl Into<String>) -> Error {
-    Error::Invalid(message.into())
-}
-fn limit(name: &str) -> Error {
-    invalid(format!("external-link {name} limit exceeded"))
 }

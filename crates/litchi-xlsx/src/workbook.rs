@@ -501,7 +501,7 @@ impl Worksheet {
     }
 
     /// Parse the worksheet's direct auto-filter declaration.
-    pub fn auto_filter(&self) -> Result<Option<crate::auto_filter::AutoFilterDefinition>> {
+    pub fn auto_filter(&self) -> Result<Option<crate::auto_filter::Definition>> {
         worksheet::auto_filter(self)
     }
 
@@ -1683,3 +1683,4 @@ mod tests {
         package
     }
 }
+

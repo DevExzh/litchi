@@ -3,7 +3,7 @@
 //! The owner module supplies the contextual namespace, so its semantic types
 //! use concise names without repeating the module prefix.
 
-use crate::auto_filter::FilterColumnDefinition;
+use crate::auto_filter::Column;
 use crate::error::Result;
 use crate::sort::{SortBy, SortMethod};
 
@@ -458,7 +458,7 @@ pub struct ColumnFilter {
     pub(crate) column_id: u32,
     pub(crate) id: Option<Guid>,
     pub(crate) differential_format: Option<Markup>,
-    pub(crate) filters: Vec<FilterColumnDefinition>,
+    pub(crate) filters: Vec<Column>,
     pub(crate) extensions: Vec<Extension>,
 }
 impl ColumnFilter {
@@ -482,7 +482,7 @@ impl ColumnFilter {
     ///
     /// The shared SpreadsheetML auto-filter serializer validates the payload
     /// before this model is mutated.
-    pub fn add_filter(&mut self, filter: FilterColumnDefinition) -> Result<&mut Self> {
+    pub fn add_filter(&mut self, filter: Column) -> Result<&mut Self> {
         if self.filters.len() >= MAX_FILTERS {
             return Err(invalid("too many filter payloads"));
         }
@@ -523,7 +523,7 @@ impl ColumnFilter {
     pub fn differential_format(&self) -> Option<&Markup> {
         self.differential_format.as_ref()
     }
-    pub fn filters(&self) -> &[FilterColumnDefinition] {
+    pub fn filters(&self) -> &[Column] {
         &self.filters
     }
     pub fn extensions(&self) -> &[Extension] {
@@ -766,3 +766,4 @@ impl Views {
         write_named_sheet_views(self)
     }
 }
+

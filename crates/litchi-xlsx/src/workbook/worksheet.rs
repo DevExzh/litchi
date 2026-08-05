@@ -75,9 +75,7 @@ fn relationships(sheet: &Worksheet) -> Result<&Relationships> {
 }
 
 /// Parse the worksheet's direct auto-filter declaration.
-pub(crate) fn auto_filter(
-    sheet: &Worksheet,
-) -> Result<Option<crate::auto_filter::AutoFilterDefinition>> {
+pub(crate) fn auto_filter(sheet: &Worksheet) -> Result<Option<crate::auto_filter::Definition>> {
     crate::auto_filter::parse_auto_filter(xml(sheet)?)
 }
 
