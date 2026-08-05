@@ -4,12 +4,12 @@ use std::{env, fs, path::Path};
 
 use litchi_iwa::pages::PagesEditor;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeEffects,
-    ShapeFill, ShapeGradient, ShapeGradientAngle, ShapeImageFillTechnique, ShapeOpacity,
-    ShapeReflection, ShapeReflectionOpacity, ShapeShadow, ShapeShadowAngle, ShapeShadowAppearance,
-    ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity,
+    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeFill,
+    ShapeGradient, ShapeGradientAngle, ShapeImageFillTechnique, ShapeShadow, ShapeShadowAngle,
+    ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity,
 };
 use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
+use litchi_iwa_common::shape::effects::{Effects, Opacity, Reflection, ReflectionOpacity};
 use litchi_iwa_common::shape::path::Preset;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -54,9 +54,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     editor.set_body_shape_effects(
         created.drawable_object_id,
-        ShapeEffects::new(
-            ShapeOpacity::new(0.72)?,
-            ShapeReflection::Enabled(ShapeReflectionOpacity::new(0.35)?),
+        Effects::new(
+            Opacity::new(0.72)?,
+            Reflection::Enabled(ReflectionOpacity::new(0.35)?),
         ),
     )?;
     editor.set_body_shape_shadow(

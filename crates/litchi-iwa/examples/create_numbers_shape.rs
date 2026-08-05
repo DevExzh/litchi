@@ -4,12 +4,12 @@ use std::{env, fs, path::Path};
 
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeContactShadow, ShapeEffects,
-    ShapeFill, ShapeGradient, ShapeGradientAngle, ShapeImageFillTechnique, ShapeOpacity,
-    ShapeReflection, ShapeReflectionOpacity, ShapeShadow, ShapeShadowAppearance,
+    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeContactShadow, ShapeFill,
+    ShapeGradient, ShapeGradientAngle, ShapeImageFillTechnique, ShapeShadow, ShapeShadowAppearance,
     ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity, ShapeShadowPerspective,
 };
 use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
+use litchi_iwa_common::shape::effects::{Effects, Opacity, Reflection, ReflectionOpacity};
 use litchi_iwa_common::shape::path::Preset;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -59,9 +59,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_sheet_shape_effects(
         sheet_id,
         created.drawable_object_id,
-        ShapeEffects::new(
-            ShapeOpacity::new(0.84)?,
-            ShapeReflection::Enabled(ShapeReflectionOpacity::new(0.65)?),
+        Effects::new(
+            Opacity::new(0.84)?,
+            Reflection::Enabled(ReflectionOpacity::new(0.65)?),
         ),
     )?;
     editor.set_sheet_shape_shadow(

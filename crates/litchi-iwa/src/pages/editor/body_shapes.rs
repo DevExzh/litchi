@@ -9,7 +9,7 @@ use crate::package_metadata::{
 };
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
-    LineEndpoints, LineSegment, LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill,
+    LineEndpoints, LineSegment, LineStyle, RgbaColor, ShapeFill, ShapeImageFill,
     ShapeImageFillTechnique, ShapePathKind, ShapeShadow, ShapeStroke, flip_drawable_geometry,
     line_geometry, line_path_source, line_segments_match, reset_shape_effects, reset_shape_fill,
     reset_shape_shadow, reset_shape_stroke, reset_shape_text_layout, set_shape_effects,
@@ -19,6 +19,7 @@ use crate::shapes::{
     shape_shadow, shape_stroke, shape_text_layout,
 };
 use crate::text::layout::Layout;
+use litchi_iwa_common::shape::effects::Effects;
 use litchi_iwa_common::shape::path::Preset;
 
 use super::text_box_create::{
@@ -456,7 +457,7 @@ impl PagesEditor {
     }
 
     /// Read effective whole-object opacity and reflection settings.
-    pub fn body_shape_effects(&self, drawable_object_id: u64) -> Result<ShapeEffects> {
+    pub fn body_shape_effects(&self, drawable_object_id: u64) -> Result<Effects> {
         let source = body_shape_graph(self, drawable_object_id)?;
         shape_effects(self.package(), &source.archive_name, drawable_object_id)
     }
@@ -465,7 +466,7 @@ impl PagesEditor {
     pub fn set_body_shape_effects(
         &mut self,
         drawable_object_id: u64,
-        effects: ShapeEffects,
+        effects: Effects,
     ) -> Result<()> {
         let source = body_shape_graph(self, drawable_object_id)?;
         let mut staged = self.package().clone();
@@ -928,11 +929,11 @@ mod tests {
     use super::*;
     use crate::shapes::{
         LineEndpoint, RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeGradient, ShapeGradientAngle,
-        ShapeOpacity, ShapeReflection, ShapeReflectionOpacity, ShapeShadowAngle,
-        ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity,
-        StrokePattern, StrokeWidth,
+        ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset,
+        ShapeShadowOpacity, StrokePattern, StrokeWidth,
     };
     use crate::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
+    use litchi_iwa_common::shape::effects::{Effects, Opacity, Reflection, ReflectionOpacity};
     use litchi_iwa_common::shape::path::CornerRadius;
 
     const POSITION: DrawablePoint = DrawablePoint { x: 180.0, y: 240.0 };
@@ -1479,9 +1480,9 @@ mod tests {
         let inherited = editor
             .body_shape_effects(created.drawable_object_id)
             .unwrap();
-        let effects = ShapeEffects::new(
-            ShapeOpacity::new(0.72).unwrap(),
-            ShapeReflection::Enabled(ShapeReflectionOpacity::new(0.35).unwrap()),
+        let effects = Effects::new(
+            Opacity::new(0.72).unwrap(),
+            Reflection::Enabled(ReflectionOpacity::new(0.35).unwrap()),
         );
         editor
             .set_body_shape_effects(created.drawable_object_id, effects)
@@ -1497,8 +1498,7 @@ mod tests {
             fill
         );
 
-        let replacement =
-            ShapeEffects::new(ShapeOpacity::new(0.48).unwrap(), ShapeReflection::Disabled);
+        let replacement = Effects::new(Opacity::new(0.48).unwrap(), Reflection::Disabled);
         editor
             .set_body_shape_effects(created.drawable_object_id, replacement)
             .unwrap();

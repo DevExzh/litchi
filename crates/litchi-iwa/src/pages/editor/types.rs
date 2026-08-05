@@ -2,6 +2,8 @@
 
 use std::num::NonZeroU32;
 
+use litchi_pages::header_footer::{Kind, Template};
+
 use crate::protobuf::tp::DocumentArchive;
 use crate::text::{TextPosition, TextStorageInfo};
 use crate::{Error, Result};
@@ -26,21 +28,6 @@ const RAW_FOOTNOTE_NUMBERING_CONTINUOUS: i32 = 0;
 const RAW_FOOTNOTE_NUMBERING_RESTART_EACH_PAGE: i32 = 1;
 const RAW_FOOTNOTE_NUMBERING_RESTART_EACH_SECTION: i32 = 2;
 
-/// Which page variant owns a Pages header/footer storage.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum PagesTemplateKind {
-    First,
-    Even,
-    Odd,
-}
-
-/// Whether a reachable Pages text region is a header or a footer.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum PagesHeaderFooterKind {
-    Header,
-    Footer,
-}
-
 /// A reachable header/footer slot and its current writable text storage.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PagesHeaderFooterInfo {
@@ -49,8 +36,8 @@ pub struct PagesHeaderFooterInfo {
     /// UTF-16 position where the section begins in the body storage.
     pub section_character_index: u32,
     pub template_id: u64,
-    pub template: PagesTemplateKind,
-    pub kind: PagesHeaderFooterKind,
+    pub template: Template,
+    pub kind: Kind,
     /// Archive order within the header/footer list, normally left/center/right.
     pub slot: usize,
     pub storage: TextStorageInfo,

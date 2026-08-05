@@ -71,7 +71,9 @@ impl ChartFontSize {
 
     /// Construct a finite chart character size greater than zero.
     pub fn from_points(points: f32) -> Result<Self> {
-        TextPointSize::from_points(points).map(Self)
+        TextPointSize::from_points(points)
+            .map(Self)
+            .map_err(crate::Error::from)
     }
 
     /// Return the character size in typographic points.

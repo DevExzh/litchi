@@ -36,6 +36,7 @@ use super::super::style::{
     TextShadow, TextStrikethrough, TextStyle, TextUnderline,
 };
 use super::super::style_registry::object_archive;
+use super::{NativeTextCapitalization, NativeTextCharacterSpacing, NativeTextValue};
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
 const THEME_MESSAGE_TYPES: &[u32] = &[10, 10_001, 12_009];

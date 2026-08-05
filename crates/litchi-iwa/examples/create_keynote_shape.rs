@@ -4,14 +4,14 @@ use std::{env, fs, path::Path};
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeCurvedShadow, ShapeEffects,
-    ShapeFill, ShapeGradient, ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity,
-    ShapeGradientStop, ShapeGradientStopMidpoint, ShapeGradientStopPosition,
-    ShapeImageFillTechnique, ShapeOpacity, ShapeReflection, ShapeReflectionOpacity, ShapeShadow,
+    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeCurvedShadow, ShapeFill,
+    ShapeGradient, ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity, ShapeGradientStop,
+    ShapeGradientStopMidpoint, ShapeGradientStopPosition, ShapeImageFillTechnique, ShapeShadow,
     ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowCurve,
     ShapeShadowOffset, ShapeShadowOpacity,
 };
 use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
+use litchi_iwa_common::shape::effects::{Effects, Opacity, Reflection, ReflectionOpacity};
 use litchi_iwa_common::shape::path::Preset;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -72,9 +72,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_shape_effects(
         0,
         created.drawable_object_id,
-        ShapeEffects::new(
-            ShapeOpacity::new(0.61)?,
-            ShapeReflection::Enabled(ShapeReflectionOpacity::new(0.2)?),
+        Effects::new(
+            Opacity::new(0.61)?,
+            Reflection::Enabled(ReflectionOpacity::new(0.2)?),
         ),
     )?;
     editor.set_slide_shape_shadow(

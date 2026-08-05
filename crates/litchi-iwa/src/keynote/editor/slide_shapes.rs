@@ -7,7 +7,7 @@ use super::*;
 use crate::image_caption::DrawableCaptionKind;
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
-    LineEndpoints, LineSegment, LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill,
+    LineEndpoints, LineSegment, LineStyle, RgbaColor, ShapeFill, ShapeImageFill,
     ShapeImageFillTechnique, ShapePathKind, ShapeShadow, ShapeStroke, flip_drawable_geometry,
     line_geometry, line_path_source, line_segments_match, reset_shape_effects, reset_shape_fill,
     reset_shape_shadow, reset_shape_stroke, reset_shape_text_layout, set_shape_effects,
@@ -19,6 +19,7 @@ use crate::shapes::{
 };
 use crate::text::TextStorageInfo;
 use crate::text::layout::Layout;
+use litchi_iwa_common::shape::effects::Effects;
 use litchi_iwa_common::shape::path::Preset;
 
 use super::text_box_create::{
@@ -492,7 +493,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<ShapeEffects> {
+    ) -> Result<Effects> {
         let source = shape_graph(self, slide_index, drawable_object_id)?;
         shape_effects(self.package(), &source.archive_name, drawable_object_id)
     }
@@ -502,7 +503,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        effects: ShapeEffects,
+        effects: Effects,
     ) -> Result<()> {
         let source = shape_graph(self, slide_index, drawable_object_id)?;
         let mut staged = self.package().clone();
@@ -1248,11 +1249,12 @@ mod tests {
     use crate::shapes::{
         LineEndpoint, RgbColorSpace, RgbaColor, ShapeCurvedShadow, ShapeGradient,
         ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity, ShapeGradientStop,
-        ShapeGradientStopMidpoint, ShapeGradientStopPosition, ShapeOpacity, ShapeReflection,
-        ShapeReflectionOpacity, ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius,
-        ShapeShadowCurve, ShapeShadowOffset, ShapeShadowOpacity, StrokePattern, StrokeWidth,
+        ShapeGradientStopMidpoint, ShapeGradientStopPosition, ShapeShadowAngle,
+        ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowCurve, ShapeShadowOffset,
+        ShapeShadowOpacity, StrokePattern, StrokeWidth,
     };
     use crate::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
+    use litchi_iwa_common::shape::effects::{Effects, Opacity, Reflection, ReflectionOpacity};
     use litchi_iwa_common::shape::path::{
         CornerRadius, InnerRadiusRatio, PolygonSides, StarPoints,
     };
@@ -1702,9 +1704,9 @@ mod tests {
         let inherited = editor
             .slide_shape_effects(0, created.drawable_object_id)
             .unwrap();
-        let effects = ShapeEffects::new(
-            ShapeOpacity::new(0.61).unwrap(),
-            ShapeReflection::Enabled(ShapeReflectionOpacity::new(0.2).unwrap()),
+        let effects = Effects::new(
+            Opacity::new(0.61).unwrap(),
+            Reflection::Enabled(ReflectionOpacity::new(0.2).unwrap()),
         );
         editor
             .set_slide_shape_effects(0, created.drawable_object_id, effects)

@@ -12,6 +12,9 @@ use crate::shapes::{RgbaColor, insert_style_variation, remove_style_variation};
 use crate::{Error, IWorkPackage, Result};
 
 use self::native::ParagraphStyleOverrides;
+pub(crate) use super::character::{
+    NativeTextCapitalization, NativeTextCharacterSpacing, NativeTextValue,
+};
 use super::font::TextFont;
 use super::paragraph_direction::ParagraphWritingDirection;
 use super::paragraph_flow::ParagraphFlow;

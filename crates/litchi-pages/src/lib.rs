@@ -8,6 +8,7 @@
 #![forbid(unsafe_code)]
 
 mod document;
+pub mod header_footer;
 mod section;
 
 pub use document::{

@@ -7,7 +7,7 @@ use super::*;
 use crate::image_caption::DrawableCaptionKind;
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
-    LineEndpoints, LineSegment, LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill,
+    LineEndpoints, LineSegment, LineStyle, RgbaColor, ShapeFill, ShapeImageFill,
     ShapeImageFillTechnique, ShapePathKind, ShapeShadow, ShapeStroke, flip_drawable_geometry,
     line_geometry, line_path_source, line_segments_match, reset_shape_effects, reset_shape_fill,
     reset_shape_shadow, reset_shape_stroke, reset_shape_text_layout, set_shape_effects,
@@ -18,6 +18,7 @@ use crate::shapes::{
     shape_text_layout,
 };
 use crate::text::layout::Layout;
+use litchi_iwa_common::shape::effects::Effects;
 use litchi_iwa_common::shape::path::Preset;
 
 use super::text_box_create::{
@@ -488,11 +489,7 @@ impl NumbersEditor {
     }
 
     /// Read effective whole-object opacity and reflection settings.
-    pub fn sheet_shape_effects(
-        &self,
-        sheet_id: u64,
-        drawable_object_id: u64,
-    ) -> Result<ShapeEffects> {
+    pub fn sheet_shape_effects(&self, sheet_id: u64, drawable_object_id: u64) -> Result<Effects> {
         let source = shape_graph(self, sheet_id, drawable_object_id)?;
         shape_effects(&self.package, &source.archive_name, drawable_object_id)
     }
@@ -502,7 +499,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        effects: ShapeEffects,
+        effects: Effects,
     ) -> Result<()> {
         let source = shape_graph(self, sheet_id, drawable_object_id)?;
         let mut staged = self.package.clone();
@@ -1375,11 +1372,11 @@ mod tests {
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{
         LineEndpoint, RgbColorSpace, RgbaColor, ShapeContactShadow, ShapeGradient,
-        ShapeGradientAngle, ShapeOpacity, ShapeReflection, ShapeReflectionOpacity,
-        ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity,
-        ShapeShadowPerspective, StrokePattern, StrokeWidth,
+        ShapeGradientAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset,
+        ShapeShadowOpacity, ShapeShadowPerspective, StrokePattern, StrokeWidth,
     };
     use crate::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
+    use litchi_iwa_common::shape::effects::{Effects, Opacity, Reflection, ReflectionOpacity};
     use litchi_iwa_common::shape::path::CornerRadius;
 
     const POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 300.0 };
@@ -1825,9 +1822,9 @@ mod tests {
         let inherited = editor
             .sheet_shape_effects(sheet_id, created.drawable_object_id)
             .unwrap();
-        let effects = ShapeEffects::new(
-            ShapeOpacity::new(0.84).unwrap(),
-            ShapeReflection::Enabled(ShapeReflectionOpacity::new(0.65).unwrap()),
+        let effects = Effects::new(
+            Opacity::new(0.84).unwrap(),
+            Reflection::Enabled(ReflectionOpacity::new(0.65).unwrap()),
         );
         editor
             .set_sheet_shape_effects(sheet_id, created.drawable_object_id, effects)

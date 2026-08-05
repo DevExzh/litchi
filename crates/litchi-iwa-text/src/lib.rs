@@ -7,8 +7,14 @@
 
 #![forbid(unsafe_code)]
 
+pub mod character;
 pub mod font;
 
+pub use character::{
+    Error as CharacterError, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
+    TextDecorations, TextLigatures, TextPointSize, TextScript, TextStrikethrough, TextStyle,
+    TextUnderline,
+};
 pub use font::{Font, Name, NameError};
 
 /// A contiguous rich-text storage value.

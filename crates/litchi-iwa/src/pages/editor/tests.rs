@@ -874,10 +874,10 @@ fn reachable_header_footer_crud_is_typed_and_transactional() {
     let regions = editor.header_footers().unwrap();
     assert_eq!(regions.len(), 2);
     assert_eq!(regions[0].section_name.as_deref(), Some("Chapter"));
-    assert_eq!(regions[0].template, PagesTemplateKind::Odd);
-    assert_eq!(regions[0].kind, PagesHeaderFooterKind::Header);
+    assert_eq!(regions[0].template, Template::Odd);
+    assert_eq!(regions[0].kind, Kind::Header);
     assert_eq!(regions[0].storage.text, "A🚀B");
-    assert_eq!(regions[1].kind, PagesHeaderFooterKind::Footer);
+    assert_eq!(regions[1].kind, Kind::Footer);
 
     let before = editor.to_bytes().unwrap();
     assert!(

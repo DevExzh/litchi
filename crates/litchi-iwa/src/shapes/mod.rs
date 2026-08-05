@@ -25,7 +25,6 @@ mod text_layout;
 pub use caption::DrawableTitleCaption;
 pub use color::{RgbColorSpace, Rgba, RgbaColor};
 pub(crate) use color::{color_from_native, color_to_native};
-pub use effects::{ShapeEffects, ShapeOpacity, ShapeReflection, ShapeReflectionOpacity};
 pub(crate) use effects::{reset_shape_effects, set_shape_effects, shape_effects};
 pub use fill::{
     ShapeFill, ShapeGradient, ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity,
@@ -51,6 +50,7 @@ pub use line_end::{LineEndpoint, LineEndpoints};
 pub(crate) use line_end::{
     insert_style_variation, remove_style_variation, set_shape_line_endpoints, shape_line_endpoints,
 };
+pub use litchi_iwa_common::shape::effects::{Effects, Opacity, Reflection, ReflectionOpacity};
 pub use litchi_iwa_common::shape::path::{
     CornerRadius, InnerRadiusRatio, PolygonSides, Preset, StarPoints,
 };

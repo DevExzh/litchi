@@ -72,13 +72,13 @@ const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3097;
 const BODY_DRAWABLE_DUPLICATE_OFFSET: f32 = 12.0;
 
 pub use document_options::PagesDocumentOptions;
+pub use litchi_pages::header_footer::{Kind, Template};
 pub use types::{
     PagesDrawableTextInfo, PagesFootnote, PagesFootnoteFormat, PagesFootnoteGap, PagesFootnoteId,
     PagesFootnoteKind, PagesFootnoteNumbering, PagesFootnoteSettings, PagesHeaderFooterInfo,
-    PagesHeaderFooterKind, PagesPageLayout, PagesPageNumber, PagesPageOrientation,
-    PagesRgbColorSpace, PagesRgbaColor, PagesSectionBackground, PagesSectionInfo,
-    PagesSectionPageNumbering, PagesSectionSettings, PagesSectionStart, PagesTemplateKind,
-    RemovedPagesTextBox,
+    PagesPageLayout, PagesPageNumber, PagesPageOrientation, PagesRgbColorSpace, PagesRgbaColor,
+    PagesSectionBackground, PagesSectionInfo, PagesSectionPageNumbering, PagesSectionSettings,
+    PagesSectionStart, RemovedPagesTextBox,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -87,8 +87,8 @@ struct HeaderFooterLocation {
     section_name: Option<String>,
     section_character_index: u32,
     template_id: u64,
-    template: PagesTemplateKind,
-    kind: PagesHeaderFooterKind,
+    template: Template,
+    kind: Kind,
     slot: usize,
     storage_id: u64,
 }
@@ -4564,17 +4564,11 @@ fn discover_structure(
         });
         for (template_kind, reference) in [
             (
-                PagesTemplateKind::First,
+                Template::First,
                 section.first_section_template_page.as_ref(),
             ),
-            (
-                PagesTemplateKind::Even,
-                section.even_section_template_page.as_ref(),
-            ),
-            (
-                PagesTemplateKind::Odd,
-                section.odd_section_template_page.as_ref(),
-            ),
+            (Template::Even, section.even_section_template_page.as_ref()),
+            (Template::Odd, section.odd_section_template_page.as_ref()),
         ] {
             let Some(reference) = reference else {
                 continue;
@@ -4586,8 +4580,8 @@ fn discover_structure(
                 ))
             })?;
             for (kind, references) in [
-                (PagesHeaderFooterKind::Header, &template.headers),
-                (PagesHeaderFooterKind::Footer, &template.footers),
+                (Kind::Header, &template.headers),
+                (Kind::Footer, &template.footers),
             ] {
                 for (slot, reference) in references.iter().enumerate() {
                     if !writable_storages.contains(&reference.identifier) {

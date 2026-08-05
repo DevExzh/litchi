@@ -20,6 +20,7 @@ use crate::text::style::{
 };
 use crate::{Error, IWorkPackage, Result};
 
+use super::super::{NativeTextCharacterSpacing, NativeTextValue};
 use super::{
     capitalization_from_character, line_spacing_from_archive, locate_style,
     paragraph_background_from_properties, paragraph_borders_from_properties, tabs,
