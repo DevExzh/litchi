@@ -8,11 +8,10 @@ use crate::revision::{SectionRevisionMark, decode_dttm};
 use crate::section::borders::{self, Borders};
 use crate::section::columns::{Column, Layout};
 use crate::section::{
-    ChapterNumberSeparator, DocSection, LineNumberRestart, NoteNumberRestart, PageOrientation,
-    SectionBehavior, SectionBreakKind, SectionFootnotePosition, SectionLineNumbering,
-    SectionMargins, SectionNoteSettings, SectionPageGrid, SectionPageGridMode, SectionPageLayout,
-    SectionPageNumbering, SectionPaperSettings, SectionProtection, SectionTextFlow,
-    SectionVerticalJustification, VerticalMargin,
+    Behavior, BreakKind, ChapterNumberSeparator, DocSection, FootnotePosition, LineNumberRestart,
+    LineNumbering, Margins, NoteNumberRestart, NoteSettings, PageGrid, PageGridMode, PageLayout,
+    PageNumbering, PageOrientation, PaperSettings, Protection, TextFlow, VerticalJustification,
+    VerticalMargin,
 };
 use crate::sprm::{Sprm, parse_sprms};
 
@@ -88,7 +87,7 @@ impl SectionsTable {
                     DocError::Corrupted("PlcfSed record offset overflows".to_string())
                 })?;
             let fc_sepx = read_i32(data, record_offset + 2, "Sed.fcSepx")?;
-            let mut properties = SectionProperties::default();
+            let mut properties = Properties::default();
             let mut revision = None;
 
             if fc_sepx != -1 {
@@ -168,34 +167,34 @@ impl SectionsTable {
 }
 
 #[derive(Debug, Clone)]
-struct SectionProperties {
-    break_kind: SectionBreakKind,
-    page: SectionPageLayout,
+struct Properties {
+    break_kind: BreakKind,
+    page: PageLayout,
     column_count: u8,
     evenly_spaced: bool,
     column_spacing_twips: u16,
     line_between: bool,
     column_widths: [Option<u16>; Layout::MAX_COLUMNS],
     column_spacings: [Option<u16>; Layout::MAX_COLUMNS],
-    page_numbering: SectionPageNumbering,
-    line_numbering: SectionLineNumbering,
-    notes: SectionNoteSettings,
-    behavior: SectionBehavior,
-    paper: SectionPaperSettings,
+    page_numbering: PageNumbering,
+    line_numbering: LineNumbering,
+    notes: NoteSettings,
+    behavior: Behavior,
+    paper: PaperSettings,
     page_borders: Borders,
-    page_grid: SectionPageGrid,
-    text_flow: SectionTextFlow,
+    page_grid: PageGrid,
+    text_flow: TextFlow,
 }
 
-impl Default for SectionProperties {
+impl Default for Properties {
     fn default() -> Self {
         Self {
-            break_kind: SectionBreakKind::NewPage,
-            page: SectionPageLayout {
+            break_kind: BreakKind::NewPage,
+            page: PageLayout {
                 width_twips: 12_240,
                 height_twips: 15_840,
                 orientation: PageOrientation::Portrait,
-                margins: SectionMargins {
+                margins: Margins {
                     left_twips: 1_800,
                     right_twips: 1_800,
                     top: VerticalMargin::Minimum(1_440),
@@ -204,7 +203,7 @@ impl Default for SectionProperties {
                 },
                 header_distance_twips: 720,
                 footer_distance_twips: 720,
-                vertical_justification: SectionVerticalJustification::Top,
+                vertical_justification: VerticalJustification::Top,
             },
             column_count: 1,
             evenly_spaced: true,
@@ -212,19 +211,19 @@ impl Default for SectionProperties {
             line_between: false,
             column_widths: [None; Layout::MAX_COLUMNS],
             column_spacings: [None; Layout::MAX_COLUMNS],
-            page_numbering: SectionPageNumbering::default(),
-            line_numbering: SectionLineNumbering::default(),
-            notes: SectionNoteSettings::default(),
-            behavior: SectionBehavior::default(),
-            paper: SectionPaperSettings::default(),
+            page_numbering: PageNumbering::default(),
+            line_numbering: LineNumbering::default(),
+            notes: NoteSettings::default(),
+            behavior: Behavior::default(),
+            paper: PaperSettings::default(),
             page_borders: Borders::default(),
-            page_grid: SectionPageGrid::default(),
-            text_flow: SectionTextFlow::default(),
+            page_grid: PageGrid::default(),
+            text_flow: TextFlow::default(),
         }
     }
 }
 
-impl SectionProperties {
+impl Properties {
     fn apply(&mut self, sprm: &Sprm) -> Result<()> {
         match sprm.opcode {
             0x3000 => {
@@ -262,9 +261,9 @@ impl SectionProperties {
             0x3005 => self.evenly_spaced = bool_operand(sprm, "sprmSFEvenlySpaced")?,
             0x3006 => {
                 self.behavior.protection = if bool_operand(sprm, "sprmSFProtected")? {
-                    SectionProtection::Unprotected
+                    Protection::Unprotected
                 } else {
-                    SectionProtection::Protected
+                    Protection::Protected
                 };
             },
             0x5007 => {
@@ -275,11 +274,11 @@ impl SectionProperties {
             },
             0x3009 => {
                 self.break_kind = match byte_operand(sprm, "sprmSBkc")? {
-                    0 => SectionBreakKind::Continuous,
-                    1 => SectionBreakKind::NewColumn,
-                    2 => SectionBreakKind::NewPage,
-                    3 => SectionBreakKind::EvenPage,
-                    4 => SectionBreakKind::OddPage,
+                    0 => BreakKind::Continuous,
+                    1 => BreakKind::NewColumn,
+                    2 => BreakKind::NewPage,
+                    3 => BreakKind::EvenPage,
+                    4 => BreakKind::OddPage,
                     _ => return corrupted("sprmSBkc contains an invalid section break kind"),
                 };
             },
@@ -334,10 +333,10 @@ impl SectionProperties {
             0x3019 => self.line_between = bool_operand(sprm, "sprmSLBetween")?,
             0x301A => {
                 self.page.vertical_justification = match byte_operand(sprm, "sprmSVjc")? {
-                    0 => SectionVerticalJustification::Top,
-                    1 => SectionVerticalJustification::Center,
-                    2 => SectionVerticalJustification::Justified,
-                    3 => SectionVerticalJustification::Bottom,
+                    0 => VerticalJustification::Top,
+                    1 => VerticalJustification::Center,
+                    2 => VerticalJustification::Justified,
+                    3 => VerticalJustification::Bottom,
                     _ => return corrupted("sprmSVjc contains an invalid Vjc value"),
                 };
             },
@@ -425,21 +424,21 @@ impl SectionProperties {
             },
             0x5032 => {
                 self.page_grid.mode = match word_operand(sprm, "sprmSClm")? {
-                    0 => SectionPageGridMode::Disabled,
-                    1 => SectionPageGridMode::CharactersAndLines,
-                    2 => SectionPageGridMode::LinesOnly,
-                    3 => SectionPageGridMode::EnforceCharacterGrid,
+                    0 => PageGridMode::Disabled,
+                    1 => PageGridMode::CharactersAndLines,
+                    2 => PageGridMode::LinesOnly,
+                    3 => PageGridMode::EnforceCharacterGrid,
                     _ => return corrupted("sprmSClm contains an invalid SClmOperand value"),
                 };
             },
             0x5033 => {
                 self.text_flow = match word_operand(sprm, "sprmSTextFlow")? {
-                    0 => SectionTextFlow::HorizontalNonAsian,
-                    1 => SectionTextFlow::TopToBottomAsian,
-                    2 => SectionTextFlow::BottomToTop,
-                    3 => SectionTextFlow::TopToBottomNonAsian,
-                    4 => SectionTextFlow::HorizontalAsian,
-                    5 => SectionTextFlow::VerticalNonAsian,
+                    0 => TextFlow::HorizontalNonAsian,
+                    1 => TextFlow::TopToBottomAsian,
+                    2 => TextFlow::BottomToTop,
+                    3 => TextFlow::TopToBottomNonAsian,
+                    4 => TextFlow::HorizontalAsian,
+                    5 => TextFlow::VerticalNonAsian,
                     _ => return corrupted("sprmSTextFlow contains an invalid MSOTXFL value"),
                 };
             },
@@ -451,8 +450,8 @@ impl SectionProperties {
             },
             0x303B => {
                 self.notes.footnote_position = match byte_operand(sprm, "sprmSFpc")? {
-                    1 => SectionFootnotePosition::BottomOfPage,
-                    2 => SectionFootnotePosition::BeneathText,
+                    1 => FootnotePosition::BottomOfPage,
+                    2 => FootnotePosition::BeneathText,
                     _ => return corrupted("sprmSFpc contains an invalid SFpcOperand"),
                 };
             },
@@ -495,7 +494,7 @@ impl SectionProperties {
     }
 
     fn finish(self, start_cp: u32, end_cp: u32) -> Result<DocSection> {
-        if self.page_grid.mode != SectionPageGridMode::Disabled
+        if self.page_grid.mode != PageGridMode::Disabled
             && self.page_grid.line_pitch_twips.is_none()
         {
             return corrupted("an enabled section document grid requires sprmSDyaLinePitch");
@@ -772,16 +771,13 @@ mod tests {
         grpprls.push(None);
         let parsed = parse_synthetic(&grpprls).unwrap();
         assert_eq!(parsed.sections().len(), 6);
-        assert_eq!(
-            parsed.sections()[0].break_kind,
-            SectionBreakKind::Continuous
-        );
-        assert_eq!(parsed.sections()[1].break_kind, SectionBreakKind::NewColumn);
-        assert_eq!(parsed.sections()[2].break_kind, SectionBreakKind::NewPage);
-        assert_eq!(parsed.sections()[3].break_kind, SectionBreakKind::EvenPage);
-        assert_eq!(parsed.sections()[4].break_kind, SectionBreakKind::OddPage);
+        assert_eq!(parsed.sections()[0].break_kind, BreakKind::Continuous);
+        assert_eq!(parsed.sections()[1].break_kind, BreakKind::NewColumn);
+        assert_eq!(parsed.sections()[2].break_kind, BreakKind::NewPage);
+        assert_eq!(parsed.sections()[3].break_kind, BreakKind::EvenPage);
+        assert_eq!(parsed.sections()[4].break_kind, BreakKind::OddPage);
         let defaults = &parsed.sections()[5];
-        assert_eq!(defaults.break_kind, SectionBreakKind::NewPage);
+        assert_eq!(defaults.break_kind, BreakKind::NewPage);
         assert_eq!(
             (defaults.page.width_twips, defaults.page.height_twips),
             (12_240, 15_840)
@@ -948,12 +944,12 @@ mod tests {
         assert_eq!(section.line_numbering.start_at, 7);
         assert_eq!(
             section.page.vertical_justification,
-            SectionVerticalJustification::Bottom
+            VerticalJustification::Bottom
         );
         assert!(!section.notes.show_endnotes_at_section_end);
         assert_eq!(
             section.notes.footnote_position,
-            SectionFootnotePosition::BeneathText
+            FootnotePosition::BeneathText
         );
         assert_eq!(section.notes.footnote_restart, NoteNumberRestart::EachPage);
         assert_eq!(
@@ -1006,7 +1002,7 @@ mod tests {
         grpprl.extend(fixed_sprm(0x703A, &0xAABB_CCDDu32.to_le_bytes()));
         let parsed = parse_synthetic(&[Some(grpprl)]).unwrap();
         let section = &parsed.sections()[0];
-        assert_eq!(section.behavior.protection, SectionProtection::Unprotected);
+        assert_eq!(section.behavior.protection, Protection::Unprotected);
         assert!(section.behavior.different_first_page);
         assert!(section.behavior.right_to_left);
         assert!(section.behavior.right_to_left_gutter);
@@ -1175,10 +1171,10 @@ mod tests {
     #[test]
     fn parses_page_grid_text_flow_defaults_and_later_overrides() {
         let defaults = parse_synthetic(&[None]).unwrap();
-        assert_eq!(defaults.sections()[0].page_grid, SectionPageGrid::default());
+        assert_eq!(defaults.sections()[0].page_grid, PageGrid::default());
         assert_eq!(
             defaults.sections()[0].text_flow,
-            SectionTextFlow::HorizontalNonAsian
+            TextFlow::HorizontalNonAsian
         );
 
         let mut grpprl = Vec::new();
@@ -1193,16 +1189,13 @@ mod tests {
         let parsed = parse_synthetic(&[Some(grpprl)]).unwrap();
         assert_eq!(
             parsed.sections()[0].page_grid,
-            SectionPageGrid {
-                mode: SectionPageGridMode::EnforceCharacterGrid,
+            PageGrid {
+                mode: PageGridMode::EnforceCharacterGrid,
                 character_pitch_adjustment: 6_144,
                 line_pitch_twips: Some(480),
             }
         );
-        assert_eq!(
-            parsed.sections()[0].text_flow,
-            SectionTextFlow::VerticalNonAsian
-        );
+        assert_eq!(parsed.sections()[0].text_flow, TextFlow::VerticalNonAsian);
 
         let mut disabled = Vec::new();
         disabled.extend(fixed_sprm(0x7030, &1_024i32.to_le_bytes()));
@@ -1210,10 +1203,7 @@ mod tests {
         disabled.extend(fixed_sprm(0x5032, &2u16.to_le_bytes()));
         disabled.extend(fixed_sprm(0x5032, &0u16.to_le_bytes()));
         let parsed = parse_synthetic(&[Some(disabled)]).unwrap();
-        assert_eq!(
-            parsed.sections()[0].page_grid.mode,
-            SectionPageGridMode::Disabled
-        );
+        assert_eq!(parsed.sections()[0].page_grid.mode, PageGridMode::Disabled);
         assert_eq!(
             parsed.sections()[0].page_grid.character_pitch_adjustment,
             1_024

@@ -1,0 +1,83 @@
+use super::*;
+use std::path::Path;
+
+#[test]
+#[ignore] // Requires test file
+fn test_open_package() {
+    let result = Package::open("test.doc");
+    assert!(result.is_ok());
+}
+
+#[test]
+#[ignore] // Requires test file
+fn test_invalid_file() {
+    // Create a non-DOC file
+    std::fs::write("test_invalid.tmp", b"Not a DOC file").unwrap();
+    let result = Package::open("test_invalid.tmp");
+    assert!(result.is_err());
+    std::fs::remove_file("test_invalid.tmp").ok();
+}
+
+fn poi_fixture(name: &str) -> std::path::PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/poi/test-data/document")
+        .join(name)
+}
+
+#[test]
+fn opens_apache_poi_binary_rc4_document() {
+    let path = poi_fixture("password_tika_binaryrc4.doc");
+
+    let mut package = Package::open(&path).unwrap();
+    assert!(matches!(
+        package.document(),
+        Err(DocError::PasswordRequired)
+    ));
+
+    let mut package = Package::open(&path).unwrap();
+    assert!(matches!(
+        package.document_with_options(DocOpenOptions {
+            password: Some("wrong"),
+            ..Default::default()
+        }),
+        Err(DocError::InvalidPassword)
+    ));
+
+    let mut package = Package::open(path).unwrap();
+    let document = package
+        .document_with_options(DocOpenOptions {
+            password: Some("tika"),
+            ..Default::default()
+        })
+        .unwrap();
+    assert!(!document.text().unwrap().trim().is_empty());
+}
+
+#[test]
+fn opens_apache_poi_cryptoapi_document() {
+    let path = poi_fixture("password_password_cryptoapi.doc");
+
+    let mut package = Package::open(&path).unwrap();
+    assert!(matches!(
+        package.document(),
+        Err(DocError::PasswordRequired)
+    ));
+
+    let mut package = Package::open(&path).unwrap();
+    assert!(matches!(
+        package.document_with_options(DocOpenOptions {
+            password: Some("wrong"),
+            ..Default::default()
+        }),
+        Err(DocError::InvalidPassword)
+    ));
+
+    let mut package = Package::open(path).unwrap();
+    let document = package
+        .document_with_options(DocOpenOptions {
+            password: Some("password"),
+            ..Default::default()
+        })
+        .unwrap();
+    assert!(!document.text().unwrap().trim().is_empty());
+}

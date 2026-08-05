@@ -929,7 +929,7 @@ pub struct DocWriter {
     /// Whether section columns are populated from right to left.
     section_right_to_left: bool,
     /// Section-wide glyph and line flow.
-    section_text_flow: crate::SectionTextFlow,
+    section_text_flow: crate::TextFlow,
     /// Explicit page-border edges and placement for the single section.
     section_page_borders: Option<crate::section::borders::Borders>,
     /// Numbering writer for list tables
@@ -1020,7 +1020,7 @@ impl DocWriter {
             section_formatting_revision: None,
             section_columns: None,
             section_right_to_left: false,
-            section_text_flow: crate::SectionTextFlow::default(),
+            section_text_flow: crate::TextFlow::default(),
             section_page_borders: None,
             numbering: NumberingWriter::new(),
             styles: Vec::new(),
@@ -3273,11 +3273,11 @@ impl DocWriter {
     }
 
     /// Set the section-wide text-flow mode.
-    pub fn set_section_text_flow(&mut self, value: crate::SectionTextFlow) {
+    pub fn set_section_text_flow(&mut self, value: crate::TextFlow) {
         self.section_text_flow = value;
     }
 
-    pub fn section_text_flow(&self) -> crate::SectionTextFlow {
+    pub fn section_text_flow(&self) -> crate::TextFlow {
         self.section_text_flow
     }
 

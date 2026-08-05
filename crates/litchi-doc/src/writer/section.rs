@@ -30,7 +30,7 @@ pub(crate) fn generate_sepx_with_revision(
         revision,
         None,
         false,
-        crate::SectionTextFlow::HorizontalNonAsian,
+        crate::TextFlow::HorizontalNonAsian,
         None,
     )
     .expect("default section properties are valid")
@@ -43,7 +43,7 @@ pub(crate) fn generate_sepx_with_properties(
     revision: Option<(u16, u32)>,
     columns: Option<&Layout>,
     right_to_left: bool,
-    text_flow: crate::SectionTextFlow,
+    text_flow: crate::TextFlow,
     page_borders: Option<&Borders>,
 ) -> Result<Vec<u8>, String> {
     let mut grpprl: Vec<u8> = Vec::with_capacity(8);
@@ -132,14 +132,14 @@ pub(crate) fn generate_sepx_with_properties(
     if let Some(page_borders) = page_borders {
         borders::encode_sepx(&mut grpprl, page_borders).map_err(|error| error.to_string())?;
     }
-    if text_flow != crate::SectionTextFlow::HorizontalNonAsian {
+    if text_flow != crate::TextFlow::HorizontalNonAsian {
         let value = match text_flow {
-            crate::SectionTextFlow::HorizontalNonAsian => 0,
-            crate::SectionTextFlow::TopToBottomAsian => 1,
-            crate::SectionTextFlow::BottomToTop => 2,
-            crate::SectionTextFlow::TopToBottomNonAsian => 3,
-            crate::SectionTextFlow::HorizontalAsian => 4,
-            crate::SectionTextFlow::VerticalNonAsian => 5,
+            crate::TextFlow::HorizontalNonAsian => 0,
+            crate::TextFlow::TopToBottomAsian => 1,
+            crate::TextFlow::BottomToTop => 2,
+            crate::TextFlow::TopToBottomNonAsian => 3,
+            crate::TextFlow::HorizontalAsian => 4,
+            crate::TextFlow::VerticalNonAsian => 5,
         };
         push_word(&mut grpprl, crate::sprm_operations::SPRM_S_TEXT_FLOW, value);
     }
@@ -243,7 +243,7 @@ mod tests {
                 None,
                 None,
                 false,
-                crate::SectionTextFlow::HorizontalNonAsian,
+                crate::TextFlow::HorizontalNonAsian,
                 Some(&default),
             )
             .unwrap(),
@@ -269,7 +269,7 @@ mod tests {
                 None,
                 None,
                 false,
-                crate::SectionTextFlow::HorizontalNonAsian,
+                crate::TextFlow::HorizontalNonAsian,
                 Some(&borders),
             )
             .unwrap(),

@@ -1,5 +1,5 @@
 use litchi_doc::{
-    DocWriter, Package, SectionTextFlow,
+    DocWriter, Package, TextFlow,
     section::columns::{Column, Error, Layout},
 };
 use std::io::Cursor;
@@ -17,7 +17,7 @@ fn omitted_layout_reads_as_the_normative_single_column_default() {
     let section = round_trip(&mut DocWriter::new());
     assert_eq!(section.columns, Layout::even(1, 720, false).unwrap());
     assert!(!section.behavior.right_to_left);
-    assert_eq!(section.text_flow, SectionTextFlow::HorizontalNonAsian);
+    assert_eq!(section.text_flow, TextFlow::HorizontalNonAsian);
 }
 
 #[test]
@@ -27,18 +27,15 @@ fn equal_columns_rtl_and_vertical_flow_round_trip() {
     layout.set_line_between(true);
     writer.set_section_columns(layout.clone()).unwrap();
     writer.set_section_right_to_left(true);
-    writer.set_section_text_flow(SectionTextFlow::VerticalNonAsian);
+    writer.set_section_text_flow(TextFlow::VerticalNonAsian);
     assert_eq!(writer.section_columns(), Some(&layout));
     assert!(writer.section_right_to_left());
-    assert_eq!(
-        writer.section_text_flow(),
-        SectionTextFlow::VerticalNonAsian
-    );
+    assert_eq!(writer.section_text_flow(), TextFlow::VerticalNonAsian);
 
     let section = round_trip(&mut writer);
     assert_eq!(section.columns, layout);
     assert!(section.behavior.right_to_left);
-    assert_eq!(section.text_flow, SectionTextFlow::VerticalNonAsian);
+    assert_eq!(section.text_flow, TextFlow::VerticalNonAsian);
 }
 
 #[test]

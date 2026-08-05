@@ -1,22 +1,9 @@
-//! Structural validation for the terminal records of a PPT `DocumentContainer`.
+//! MS-PPT validation for a document container's terminal records.
 
+use super::model::{CustomTableStylesPlacement, DocumentStructure};
 use crate::consts::RecordType;
 use crate::package::{Error, Result};
 use crate::records::Record;
-
-/// Position of the optional PowerPoint 12 custom table-style package.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CustomTableStylesPlacement {
-    BeforeEndDocument,
-    AfterEndDocument,
-}
-
-/// Strictly validated terminal structure of a `DocumentContainer`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct DocumentStructure {
-    pub end_document_child_index: usize,
-    pub custom_table_styles: Option<CustomTableStylesPlacement>,
-}
 
 impl DocumentStructure {
     /// Validate the exact MS-PPT document tail.
@@ -91,68 +78,4 @@ impl DocumentStructure {
 
 fn corrupted<T>(message: &str) -> Result<T> {
     Err(Error::Corrupted(message.to_string()))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn record(record_type: RecordType, version: u16, data: Vec<u8>) -> Record {
-        Record {
-            record_type,
-            record_type_raw: record_type.as_u16(),
-            version,
-            instance: 0,
-            data_length: data.len() as u32,
-            data,
-            children: Vec::new(),
-        }
-    }
-
-    fn document(children: Vec<Record>) -> Record {
-        let mut value = record(RecordType::Document, 0x0f, Vec::new());
-        value.children = children;
-        value
-    }
-
-    #[test]
-    fn accepts_both_defined_custom_table_style_placements() {
-        let prefix = record(RecordType::DocumentAtom, 0, Vec::new());
-        let end = record(RecordType::EndDocument, 0, Vec::new());
-        let styles = record(RecordType::RoundTripCustomTableStyles12Atom, 0, Vec::new());
-        assert_eq!(
-            DocumentStructure::parse(&document(
-                vec![prefix.clone(), styles.clone(), end.clone(),]
-            ))
-            .unwrap()
-            .custom_table_styles,
-            Some(CustomTableStylesPlacement::BeforeEndDocument)
-        );
-        assert_eq!(
-            DocumentStructure::parse(&document(vec![prefix, end, styles]))
-                .unwrap()
-                .custom_table_styles,
-            Some(CustomTableStylesPlacement::AfterEndDocument)
-        );
-    }
-
-    #[test]
-    fn rejects_missing_duplicate_nonempty_and_nonterminal_end_records() {
-        let end = record(RecordType::EndDocument, 0, Vec::new());
-        assert!(DocumentStructure::parse(&document(Vec::new())).is_err());
-        assert!(DocumentStructure::parse(&document(vec![end.clone(), end.clone()])).is_err());
-        assert!(
-            DocumentStructure::parse(&document(
-                vec![record(RecordType::EndDocument, 0, vec![0]),]
-            ))
-            .is_err()
-        );
-        assert!(
-            DocumentStructure::parse(&document(vec![
-                end,
-                record(RecordType::DocumentAtom, 0, Vec::new()),
-            ]))
-            .is_err()
-        );
-    }
 }

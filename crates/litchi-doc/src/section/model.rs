@@ -1,9 +1,7 @@
-//! Public section-layout model for Word 97+ documents.
+//! Typed semantic section-layout values for Word 97+ documents.
 
+use super::{borders, columns};
 use crate::NumberFormat;
-
-pub mod borders;
-pub mod columns;
 
 /// A section and the character-position range to which its properties apply.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -13,32 +11,32 @@ pub struct DocSection {
     /// Exclusive end character position in the main document story.
     pub end_cp: u32,
     /// The break that terminates this section.
-    pub break_kind: SectionBreakKind,
+    pub break_kind: BreakKind,
     /// Page geometry for this section.
-    pub page: SectionPageLayout,
+    pub page: PageLayout,
     /// Column geometry for this section.
     pub columns: columns::Layout,
     /// Page-number field behavior for this section.
-    pub page_numbering: SectionPageNumbering,
+    pub page_numbering: PageNumbering,
     /// Printed line-number behavior for this section.
-    pub line_numbering: SectionLineNumbering,
+    pub line_numbering: LineNumbering,
     /// Footnote and endnote placement and numbering overrides.
-    pub notes: SectionNoteSettings,
+    pub notes: NoteSettings,
     /// Section-level protection, direction, title-page, and revision behavior.
-    pub behavior: SectionBehavior,
+    pub behavior: Behavior,
     /// Printer-specific paper-source and paper-kind selections.
-    pub paper: SectionPaperSettings,
+    pub paper: PaperSettings,
     /// Page-border edges and their section-wide placement controls.
     pub page_borders: borders::Borders,
     /// East Asian document-grid settings for this section.
-    pub page_grid: SectionPageGrid,
+    pub page_grid: PageGrid,
     /// Orientation and sequencing of glyphs and lines in this section.
-    pub text_flow: SectionTextFlow,
+    pub text_flow: TextFlow,
 }
 
 /// The kind of break that terminates a section.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SectionBreakKind {
+pub enum BreakKind {
     Continuous,
     NewColumn,
     NewPage,
@@ -65,7 +63,7 @@ pub enum ChapterNumberSeparator {
 
 /// Page-number field behavior for a section.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SectionPageNumbering {
+pub struct PageNumbering {
     pub chapter_separator: ChapterNumberSeparator,
     /// Heading level 1 through 9, or `None` when chapter numbers are hidden.
     pub chapter_heading_level: Option<u8>,
@@ -74,7 +72,7 @@ pub struct SectionPageNumbering {
     pub start_at: u32,
 }
 
-impl Default for SectionPageNumbering {
+impl Default for PageNumbering {
     fn default() -> Self {
         Self {
             chapter_separator: ChapterNumberSeparator::Hyphen,
@@ -96,7 +94,7 @@ pub enum LineNumberRestart {
 
 /// Printed line-number behavior for a section.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SectionLineNumbering {
+pub struct LineNumbering {
     /// Distance in lines between labels; zero disables line numbering.
     pub interval: u16,
     pub restart: LineNumberRestart,
@@ -105,7 +103,7 @@ pub struct SectionLineNumbering {
     pub start_at: u16,
 }
 
-impl Default for SectionLineNumbering {
+impl Default for LineNumbering {
     fn default() -> Self {
         Self {
             interval: 0,
@@ -118,7 +116,7 @@ impl Default for SectionLineNumbering {
 
 /// Vertical alignment of the section contents between the page margins.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SectionVerticalJustification {
+pub enum VerticalJustification {
     Top,
     Center,
     Justified,
@@ -127,7 +125,7 @@ pub enum SectionVerticalJustification {
 
 /// Position of footnotes on a section page.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SectionFootnotePosition {
+pub enum FootnotePosition {
     BottomOfPage,
     BeneathText,
 }
@@ -142,9 +140,9 @@ pub enum NoteNumberRestart {
 
 /// Footnote and endnote overrides stored in one section's SEPX.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SectionNoteSettings {
+pub struct NoteSettings {
     pub show_endnotes_at_section_end: bool,
-    pub footnote_position: SectionFootnotePosition,
+    pub footnote_position: FootnotePosition,
     pub footnote_restart: NoteNumberRestart,
     pub endnote_restart: NoteNumberRestart,
     /// Stored `sprmSNFtn` value. For continuous numbering, the added offset is
@@ -157,11 +155,11 @@ pub struct SectionNoteSettings {
     pub endnote_number_format: NumberFormat,
 }
 
-impl Default for SectionNoteSettings {
+impl Default for NoteSettings {
     fn default() -> Self {
         Self {
             show_endnotes_at_section_end: true,
-            footnote_position: SectionFootnotePosition::BottomOfPage,
+            footnote_position: FootnotePosition::BottomOfPage,
             footnote_restart: NoteNumberRestart::Continuous,
             endnote_restart: NoteNumberRestart::Continuous,
             footnote_offset_operand: 1,
@@ -174,7 +172,7 @@ impl Default for SectionNoteSettings {
 
 /// Section protection relative to the document's form-field protection mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SectionProtection {
+pub enum Protection {
     /// No SEPX override; use the document-wide protection setting.
     DocumentDefault,
     Protected,
@@ -183,8 +181,8 @@ pub enum SectionProtection {
 
 /// Section-level behavior that is independent of page geometry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SectionBehavior {
-    pub protection: SectionProtection,
+pub struct Behavior {
+    pub protection: Protection,
     pub different_first_page: bool,
     pub right_to_left: bool,
     pub right_to_left_gutter: bool,
@@ -192,10 +190,10 @@ pub struct SectionBehavior {
     pub revision_save_id: Option<u32>,
 }
 
-impl Default for SectionBehavior {
+impl Default for Behavior {
     fn default() -> Self {
         Self {
-            protection: SectionProtection::DocumentDefault,
+            protection: Protection::DocumentDefault,
             different_first_page: false,
             right_to_left: false,
             right_to_left_gutter: false,
@@ -207,7 +205,7 @@ impl Default for SectionBehavior {
 
 /// Printer-specific paper selections retained without platform interpretation.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct SectionPaperSettings {
+pub struct PaperSettings {
     pub first_page_source: Option<u16>,
     pub other_page_source: Option<u16>,
     pub requested_paper_kind: Option<u16>,
@@ -215,7 +213,7 @@ pub struct SectionPaperSettings {
 
 /// Document-grid mode applied to a section.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SectionPageGridMode {
+pub enum PageGridMode {
     Disabled,
     CharactersAndLines,
     LinesOnly,
@@ -224,18 +222,18 @@ pub enum SectionPageGridMode {
 
 /// Character and line pitch used by a section's document grid.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SectionPageGrid {
-    pub mode: SectionPageGridMode,
+pub struct PageGrid {
+    pub mode: PageGridMode,
     /// Difference from the Normal-style font pitch, in 1/4096-point units.
     pub character_pitch_adjustment: i32,
     /// Explicit grid line height in twips. Required whenever `mode` is enabled.
     pub line_pitch_twips: Option<u16>,
 }
 
-impl Default for SectionPageGrid {
+impl Default for PageGrid {
     fn default() -> Self {
         Self {
-            mode: SectionPageGridMode::Disabled,
+            mode: PageGridMode::Disabled,
             character_pitch_adjustment: 0,
             line_pitch_twips: None,
         }
@@ -244,7 +242,7 @@ impl Default for SectionPageGrid {
 
 /// Text-flow rules applied to all text in a section.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum SectionTextFlow {
+pub enum TextFlow {
     #[default]
     HorizontalNonAsian,
     TopToBottomAsian,
@@ -292,7 +290,7 @@ impl VerticalMargin {
 
 /// Page margins for one section.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SectionMargins {
+pub struct Margins {
     pub left_twips: u16,
     pub right_twips: u16,
     pub top: VerticalMargin,
@@ -302,12 +300,12 @@ pub struct SectionMargins {
 
 /// Page geometry and header/footer distances for one section.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SectionPageLayout {
+pub struct PageLayout {
     pub width_twips: u16,
     pub height_twips: u16,
     pub orientation: PageOrientation,
-    pub margins: SectionMargins,
+    pub margins: Margins,
     pub header_distance_twips: u16,
     pub footer_distance_twips: u16,
-    pub vertical_justification: SectionVerticalJustification,
+    pub vertical_justification: VerticalJustification,
 }

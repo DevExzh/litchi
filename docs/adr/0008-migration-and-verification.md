@@ -5102,6 +5102,35 @@ compilation. These checks establish the current typed/layered migration
 boundary; they do not claim complete `[MS-DOC]`, `[MS-ODRAW]`, `[MS-OGRAPH]`,
 `[MS-OSHARED]`, `[MS-PPT]`, or `[MS-XLS]` conformance.
 
+## Layered OLE2 host-owner continuation
+
+The next host-owner cut removes six more high-value flat modules while keeping
+their existing crate facades. DOC now layers section semantics under
+`section::{model,borders,columns}`, paragraph content under
+`paragraph::{model,tests}`, and OLE package orchestration under
+`package::{model,codec,tests}`. Section value types use contextual names such
+as `BreakKind`, `PageLayout`, and `TextFlow`; redundant `Section` prefixes and
+compatibility aliases are not retained.
+
+PPT now layers document-tail validation, host-specific OfficeArt projections,
+and OLE package orchestration under `document_structure`, `odraw`, and
+`package` facades. The shared `[MS-ODRAW]` grammar remains owned by
+`litchi-odraw`; this cut only separates PPT models, codecs, package seams, and
+tests. XLS now layers the BIFF8 OLE-object owner under
+`ole_object::{model,codec,package,tests}`, separating typed object records from
+checked binary parsing and CFB rewrite orchestration.
+
+Public `crate::{section,paragraph,package,odraw,ole_object}` paths remain
+ergonomic and the moves do not add peer-format dependencies. DOC, PPT, and XLS
+all-target checks pass; focused suites pass 832 DOC tests with two ignored,
+882 PPT tests with one ignored plus integration targets, and 844 XLS tests
+plus integration targets. OLE-common passes its 22 unit, 9 integration, and 4
+additional-target tests; CFB passes 96 tests. The umbrella facade passes its
+all-target tests, and formatting, diff, and 46-package boundary checks pass.
+This remains a typed/layered ownership increment, not a claim of complete
+`[MS-DOC]`, `[MS-ODRAW]`, `[MS-OGRAPH]`, `[MS-OSHARED]`, `[MS-PPT]`, or
+`[MS-XLS]` conformance.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

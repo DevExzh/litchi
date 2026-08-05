@@ -1,8 +1,8 @@
-/// Paragraph and Run structures for legacy Word documents.
-use super::package::Result;
-use super::parts::chp::{CharacterProperties, UnderlineStyle, VerticalPosition};
-use super::parts::revisions::RevisionAuthorTable;
-use super::revision::{
+/// Paragraph and Run semantic models for legacy Word documents.
+use crate::package::Result;
+use crate::parts::chp::{CharacterProperties, UnderlineStyle, VerticalPosition};
+use crate::parts::revisions::RevisionAuthorTable;
+use crate::revision::{
     DisplayFieldRevisionMark, NumberingRevisionMark, RevisionKind, RevisionMark, RevisionReason,
     decode_dttm,
 };
@@ -26,7 +26,7 @@ pub struct Paragraph {
     /// Runs within this paragraph
     runs: Vec<Run>,
     /// Paragraph formatting properties (PAP)
-    properties: super::parts::pap::ParagraphProperties,
+    properties: crate::parts::pap::ParagraphProperties,
     /// Resolved paragraph-formatting revision metadata.
     formatting_revision: Option<RevisionMark>,
     /// Resolved paragraph numbering revision metadata.
@@ -57,7 +57,7 @@ impl Paragraph {
         Self {
             text,
             runs,
-            properties: super::parts::pap::ParagraphProperties::default(),
+            properties: crate::parts::pap::ParagraphProperties::default(),
             formatting_revision: None,
             numbering_revision: None,
             table_formatting_revision: None,
@@ -75,7 +75,7 @@ impl Paragraph {
         Self {
             text,
             runs,
-            properties: super::parts::pap::ParagraphProperties::default(),
+            properties: crate::parts::pap::ParagraphProperties::default(),
             formatting_revision: None,
             numbering_revision: None,
             table_formatting_revision: None,
@@ -86,7 +86,7 @@ impl Paragraph {
     #[allow(dead_code)] // TODO: remove this once we use this function
     pub(crate) fn with_properties(
         text: String,
-        properties: super::parts::pap::ParagraphProperties,
+        properties: crate::parts::pap::ParagraphProperties,
     ) -> Self {
         Self {
             text,
@@ -129,12 +129,12 @@ impl Paragraph {
     }
 
     /// Set the paragraph properties (internal use).
-    pub(crate) fn set_properties(&mut self, properties: super::parts::pap::ParagraphProperties) {
+    pub(crate) fn set_properties(&mut self, properties: crate::parts::pap::ParagraphProperties) {
         self.properties = properties;
     }
 
     /// Get the paragraph properties.
-    pub fn properties(&self) -> &super::parts::pap::ParagraphProperties {
+    pub fn properties(&self) -> &crate::parts::pap::ParagraphProperties {
         &self.properties
     }
 
@@ -164,7 +164,7 @@ impl Paragraph {
                 .formatting_revision_author_index
                 .unwrap_or(0);
             let author = authors.get(author_index).ok_or_else(|| {
-                super::package::DocError::Corrupted(
+                crate::package::DocError::Corrupted(
                     "paragraph revision author index exceeds SttbfRMark".to_string(),
                 )
             })?;
@@ -185,7 +185,7 @@ impl Paragraph {
         }
         if let Some(revision) = &self.properties.numbering_revision {
             let author = authors.get(revision.author_index).ok_or_else(|| {
-                super::package::DocError::Corrupted(
+                crate::package::DocError::Corrupted(
                     "numbering revision author index exceeds SttbfRMark".to_string(),
                 )
             })?;
@@ -206,7 +206,7 @@ impl Paragraph {
                 .table_formatting_revision_author_index
                 .unwrap_or(0);
             let author = authors.get(author_index).ok_or_else(|| {
-                super::package::DocError::Corrupted(
+                crate::package::DocError::Corrupted(
                     "table-row revision author index exceeds SttbfRMark".to_string(),
                 )
             })?;
@@ -290,7 +290,7 @@ pub struct Run {
     /// Owned LaTeX rendered from MTEF while its scoped parser arena is alive.
     mtef_formula_latex: Option<Arc<str>>,
     /// Embedded image (metadata only, data loaded lazily via Document::image_data)
-    image: Option<super::image::Image>,
+    image: Option<crate::image::Image>,
     /// Resolved insertion revision metadata.
     insertion_revision: Option<RevisionMark>,
     /// Resolved deletion revision metadata.
@@ -358,7 +358,7 @@ impl Run {
     pub(crate) fn with_image(
         text: String,
         properties: CharacterProperties,
-        image: super::image::Image,
+        image: crate::image::Image,
     ) -> Self {
         Self {
             text,
@@ -515,7 +515,7 @@ impl Run {
             && revision.active
         {
             let author = authors.get(revision.author_index).ok_or_else(|| {
-                super::package::DocError::Corrupted(
+                crate::package::DocError::Corrupted(
                     "display-field revision author index exceeds SttbfRMark".to_string(),
                 )
             })?;
@@ -538,7 +538,7 @@ impl Run {
         authors: &RevisionAuthorTable,
     ) -> Result<RevisionMark> {
         let author = authors.get(author_index).ok_or_else(|| {
-            super::package::DocError::Corrupted(
+            crate::package::DocError::Corrupted(
                 "revision author index exceeds SttbfRMark".to_string(),
             )
         })?;
@@ -625,128 +625,7 @@ impl Run {
     ///     // Process image data...
     /// }
     /// ```
-    pub fn image(&self) -> Option<&super::image::Image> {
+    pub fn image(&self) -> Option<&crate::image::Image> {
         self.image.as_ref()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn resolves_run_revision_authors_and_timestamps() {
-        let timestamp =
-            30u32 | (14u32 << 6) | (15u32 << 11) | (7u32 << 16) | (126u32 << 20) | (3u32 << 29);
-        let mut run = Run::new(
-            "changed".to_string(),
-            CharacterProperties {
-                is_revision_inserted: Some(true),
-                revision_author_index: Some(1),
-                revision_timestamp: Some(timestamp),
-                revision_id: Some(42),
-                insertion_revision_save_id: Some(0x11223344),
-                ..CharacterProperties::default()
-            },
-        );
-        let authors = RevisionAuthorTable::from_authors(&["Unknown", "Alice"]);
-        run.resolve_revisions(&authors).unwrap();
-        let revision = run.insertion_revision().unwrap();
-        assert_eq!(revision.kind, RevisionKind::Insertion);
-        assert_eq!(revision.author, "Alice");
-        assert_eq!(revision.revision_id, Some(42));
-        assert_eq!(revision.reason.unwrap().raw(), 42);
-        assert_eq!(revision.revision_save_id, Some(0x11223344));
-        assert_eq!(revision.timestamp.unwrap().year, 2026);
-        assert!(run.deletion_revision().is_none());
-        assert!(run.formatting_revision().is_none());
-
-        let mut formatted = Run::new(
-            "formatted".to_string(),
-            CharacterProperties {
-                has_formatting_revision: Some(true),
-                formatting_revision_author_index: Some(1),
-                formatting_revision_timestamp: Some(timestamp),
-                formatting_revision_save_id: Some(0x55667788),
-                ..CharacterProperties::default()
-            },
-        );
-        formatted.resolve_revisions(&authors).unwrap();
-        let revision = formatted.formatting_revision().unwrap();
-        assert_eq!(revision.kind, RevisionKind::Formatting);
-        assert_eq!(revision.author, "Alice");
-        assert_eq!(revision.timestamp.unwrap().year, 2026);
-        assert_eq!(revision.revision_id, None);
-        assert_eq!(revision.reason, None);
-        assert_eq!(revision.revision_save_id, Some(0x55667788));
-
-        let mut bad_author = Run::new(
-            "changed".to_string(),
-            CharacterProperties {
-                is_revision_inserted: Some(true),
-                revision_author_index: Some(2),
-                ..CharacterProperties::default()
-            },
-        );
-        assert!(bad_author.resolve_revisions(&authors).is_err());
-
-        let mut bad_time = Run::new(
-            "changed".to_string(),
-            CharacterProperties {
-                is_revision_inserted: Some(true),
-                revision_timestamp: Some(63),
-                ..CharacterProperties::default()
-            },
-        );
-        assert!(bad_time.resolve_revisions(&authors).is_err());
-    }
-
-    #[test]
-    fn resolves_table_row_revision_authors_and_timestamps() {
-        let timestamp =
-            30u32 | (14u32 << 6) | (15u32 << 11) | (7u32 << 16) | (126u32 << 20) | (3u32 << 29);
-        let mut paragraph = Paragraph::with_properties(
-            String::new(),
-            super::super::parts::pap::ParagraphProperties {
-                has_table_formatting_revision: Some(true),
-                table_formatting_revision_author_index: Some(1),
-                table_formatting_revision_timestamp: Some(timestamp),
-                ..Default::default()
-            },
-        );
-        let authors = RevisionAuthorTable::from_authors(&["Unknown", "Table Editor"]);
-        paragraph.resolve_revision(&authors).unwrap();
-        let revision = paragraph.table_formatting_revision().unwrap();
-        assert_eq!(revision.kind, RevisionKind::Formatting);
-        assert_eq!(revision.author, "Table Editor");
-        assert_eq!(revision.timestamp.unwrap().year, 2026);
-    }
-
-    #[test]
-    fn test_paragraph_text() {
-        let para = Paragraph::new("Hello, World!".to_string());
-        assert_eq!(para.text().unwrap(), "Hello, World!");
-    }
-
-    #[test]
-    fn test_run_text() {
-        let run = Run::new("Test text".to_string(), CharacterProperties::default());
-        assert_eq!(run.text().unwrap(), "Test text");
-        assert_eq!(run.bold(), None);
-        assert_eq!(run.italic(), None);
-    }
-
-    #[test]
-    #[allow(clippy::field_reassign_with_default)]
-    fn test_run_with_formatting() {
-        let mut props = CharacterProperties::default();
-        props.is_bold = Some(true);
-        props.is_italic = Some(true);
-        props.font_size = Some(24); // 12pt
-
-        let run = Run::new("Formatted text".to_string(), props);
-        assert!(run.bold().unwrap_or(false));
-        assert!(run.italic().unwrap_or(false));
-        assert_eq!(run.font_size(), Some(24));
     }
 }

@@ -231,11 +231,10 @@ pub use revision::{
 };
 pub use section::borders::{ApplyTo, Art, Border, Borders, Color, Depth, Error, Offset, Style};
 pub use section::{
-    ChapterNumberSeparator, DocSection, LineNumberRestart, NoteNumberRestart, PageOrientation,
-    SectionBehavior, SectionBreakKind, SectionFootnotePosition, SectionLineNumbering,
-    SectionMargins, SectionNoteSettings, SectionPageGrid, SectionPageGridMode, SectionPageLayout,
-    SectionPageNumbering, SectionPaperSettings, SectionProtection, SectionTextFlow,
-    SectionVerticalJustification, VerticalMargin,
+    Behavior, BreakKind, ChapterNumberSeparator, DocSection, FootnotePosition, LineNumberRestart,
+    LineNumbering, Margins, NoteNumberRestart, NoteSettings, PageGrid, PageGridMode, PageLayout,
+    PageNumbering, PageOrientation, PaperSettings, Protection, TextFlow, VerticalJustification,
+    VerticalMargin,
 };
 pub use shape::{Bounds, Kind as ShapeKind, Shape, UnknownRecord};
 pub use shape::{count_shapes, extract_drawing_shapes, extract_shape_text, extract_shapes};
