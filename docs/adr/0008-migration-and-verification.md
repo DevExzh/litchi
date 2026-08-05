@@ -4780,6 +4780,26 @@ tests, and the affected default-feature DOCX/PPTX all-target suites (704 and
 all-feature aggregate remains environment-blocked by the missing system
 `pkg-config`/Fontconfig dependency, as recorded above.
 
+## DrawingML text-body vocabulary layering
+
+The first SpreadsheetDrawing text extraction moves the neutral `a:CT_TextBody`
+vocabulary into `litchi-drawingml::text::body::{Body,Properties,Insets,
+Paragraph,Run}`. The model owns DrawingML defaults, text insets, paragraph
+joining, run formatting values, and body properties; the duplicated XLSX and
+XLSB model structs and repeated `XlsxText*` spellings are removed. This follows
+the shared text-body structures in the checked-in `[MS-ODRAWXML]` and
+`[MS-PPTX]` specifications.
+
+XLSX and XLSB retain their SpreadsheetDrawing anchors, bounded XML state
+machines, worksheet/BrtDrawing package wiring, and authoring emission around
+the common model. XML parser/writer extraction and PPTX `p:txBody` wrappers are
+separate follow-up layers, so this slice does not claim complete DrawingML
+text conformance. No compatibility aliases were retained.
+
+Focused verification passes 87 DrawingML tests, 621 XLSX library/integration
+tests, 408 XLSB library/integration tests, formatting, and boundary policy
+checks.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:
