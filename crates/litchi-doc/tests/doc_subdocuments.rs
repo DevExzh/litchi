@@ -10,7 +10,7 @@
 
 use litchi_cfb::OleFile;
 use litchi_doc::parts::fib::FileInformationBlock;
-use litchi_doc::parts::subdocuments::DocumentSubdocuments;
+use litchi_doc::parts::subdocuments::Collection;
 use std::fs::File;
 use std::path::PathBuf;
 
@@ -20,7 +20,7 @@ fn fixture(relative: &str) -> PathBuf {
         .join(relative)
 }
 
-fn parse(relative: &str) -> Option<DocumentSubdocuments> {
+fn parse(relative: &str) -> Option<Collection> {
     let path = fixture(relative);
     let mut ole = OleFile::open(File::open(&path).unwrap()).unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
@@ -31,7 +31,7 @@ fn parse(relative: &str) -> Option<DocumentSubdocuments> {
         "0Table"
     };
     let table_stream = ole.open_stream(&[table_name]).unwrap();
-    DocumentSubdocuments::parse(&fib, &table_stream).unwrap()
+    Collection::parse(&fib, &table_stream).unwrap()
 }
 
 #[test]

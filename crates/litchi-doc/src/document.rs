@@ -54,7 +54,7 @@ use super::parts::sections::SectionsTable;
 use super::parts::smart_tags::DocumentSmartTags;
 use super::parts::structured_tags::DocumentStructuredTags;
 use super::parts::styles::StyleSheet;
-use super::parts::subdocuments::DocumentSubdocuments;
+use super::parts::subdocuments::Collection;
 use super::parts::table_char_cache::TableCharacterCache;
 use super::parts::text::TextExtractor;
 use super::parts::text_services::TextServicesTables;
@@ -144,7 +144,7 @@ pub struct Document {
     /// Mail-merge data-source state (`Pms` and the ODSO property set).
     mail_merge: Option<DocumentMailMerge>,
     /// Master-document subdocument directory and referenced-file name table.
-    subdocuments: Option<DocumentSubdocuments>,
+    subdocuments: Option<Collection>,
     /// Revision-mark authors
     revision_authors: RevisionAuthorTable,
     /// Fixed associated-document strings
@@ -316,7 +316,7 @@ impl Document {
             super::parts::xml_schemas::parse_custom_xml_transform(&fib, &table_stream)?;
         let ole_controls = Controls::parse(&fib, &table_stream)?;
         let mail_merge = DocumentMailMerge::parse(&fib, &table_stream)?;
-        let subdocuments = DocumentSubdocuments::parse(&fib, &table_stream)?;
+        let subdocuments = Collection::parse(&fib, &table_stream)?;
         let revision_authors = RevisionAuthorTable::parse(&fib, &table_stream)?;
         let associated_strings = DocumentAssociatedStrings::parse(&fib, &table_stream)?;
         let list_names = ListNamesTable::parse(&fib, &table_stream)?;
@@ -2171,7 +2171,7 @@ impl Document {
     ///
     /// The metadata is inert: file paths are exposed verbatim and are never
     /// opened, resolved, or followed, and no subdocument content is loaded.
-    pub fn subdocuments(&self) -> Option<&DocumentSubdocuments> {
+    pub fn subdocuments(&self) -> Option<&Collection> {
         self.subdocuments.as_ref()
     }
 

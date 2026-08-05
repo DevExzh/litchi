@@ -221,9 +221,7 @@ pub use parts::styles::{
     StyleDefinition, StyleFlags, StyleKind, StylePost2000, StyleRevisionMark, StyleSheet,
     StyleSheetHeader,
 };
-pub use parts::subdocuments::{
-    DocumentSubdocuments, ReferencedFileKind, ReferencedFileName, Subdocument,
-};
+pub use parts::subdocuments::{Collection, Kind, Name, Reference};
 pub use parts::table_char_cache::{TableCharEntry, TableCharInfo, TableCharacterCache};
 pub use parts::tap::TableStyleCondition;
 pub use parts::text_services::{TextServicesTables, Uim, UimEntry, UimGuidTable, UimTable};
