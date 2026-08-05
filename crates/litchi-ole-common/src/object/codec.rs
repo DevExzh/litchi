@@ -392,7 +392,7 @@ fn capture_container<R: Read + Seek>(
     limits: Limits,
 ) -> Result<(), OleError> {
     let entries = ole
-        .list_directory_entries(&path_refs(&path))?
+        .list_directory_entries(&path_refs(path))?
         .into_iter()
         .cloned()
         .collect::<Vec<_>>();
@@ -448,7 +448,7 @@ fn capture_subtree<R: Read + Seek>(
             "object storage nesting limit exceeded".into(),
         ));
     }
-    let current = join(absolute, &relative);
+    let current = join(absolute, relative);
     let entries = ole
         .list_directory_entries(&path_refs(&current))?
         .into_iter()

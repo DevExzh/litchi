@@ -99,7 +99,6 @@ impl Targets {
     }
 
     /// Borrows the targets in caller-provided order.
-    #[must_use]
     pub fn iter(&self) -> std::slice::Iter<'_, Target> {
         self.targets.iter()
     }
