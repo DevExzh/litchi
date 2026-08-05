@@ -38,7 +38,7 @@ pub mod page_margins;
 pub mod page_setup;
 pub mod phonetic_properties;
 pub mod pivot;
-pub mod pivot_chart;
+mod pivot_chart;
 pub mod print_options;
 pub mod query_table;
 pub mod raw;

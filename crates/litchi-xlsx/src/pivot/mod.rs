@@ -7,6 +7,7 @@
 use std::collections::HashMap;
 
 pub mod cache;
+pub mod chart;
 pub mod fields;
 pub mod filters;
 pub mod reader;
