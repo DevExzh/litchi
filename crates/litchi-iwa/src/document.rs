@@ -23,10 +23,10 @@ use crate::detect::detect_application_from_document;
 use crate::media::{MediaLimits, MediaManager, MediaStats};
 use crate::object_index::{ObjectIndex, ResolvedObject, ResolvedObjectRef};
 use crate::package::PackageLimits;
-use crate::ref_graph::ObjectId;
 use crate::structured::{self, StructuredData};
 use crate::text::TextExtractor;
 use crate::{Error, Result};
+use litchi_iwa_graph::ObjectId;
 
 /// Unified iWork document interface
 #[derive(Debug, Clone)]

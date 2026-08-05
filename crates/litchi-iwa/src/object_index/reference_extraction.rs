@@ -2,7 +2,7 @@
 
 use crate::Result;
 use crate::archive::ArchiveObject;
-use crate::ref_graph::{ObjectId, ReferenceGraph};
+use litchi_iwa_graph::{ObjectId, ReferenceGraph};
 
 pub(super) fn extract(
     source_id: ObjectId,

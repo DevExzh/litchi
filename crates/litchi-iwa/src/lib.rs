@@ -128,9 +128,9 @@
 use std::sync::Arc;
 
 // Core parsing modules
-mod archive;
 /// Semantic iWork application families.
 pub mod application;
+mod archive;
 pub mod bundle;
 /// Typed native drawable stacking-order controls.
 pub mod drawable_order;
@@ -144,7 +144,6 @@ pub mod object_index;
 mod package;
 mod package_metadata;
 mod protobuf;
-pub mod ref_graph;
 #[cfg(test)]
 mod registry;
 mod snappy;
@@ -191,7 +190,6 @@ pub use drawable_order::DrawableLayerMove;
 pub use identity::IWorkDocumentIdentity;
 pub use media::{EmbeddedMediaAsset, IWorkMediaEditor, MediaAsset, MediaManager, MediaStats};
 pub use package::IWorkPackage;
-pub use ref_graph::ReferenceGraph;
 pub use shapes::DrawableTitleCaption;
 pub use structured::StructuredData;
 pub use text::{

@@ -2,16 +2,13 @@
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
+use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor, KeynoteTableCellCheckboxFormat};
 use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
-use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
+use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor, PagesTableCellCheckboxFormat};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
-use litchi_iwa_common::table::cell::conditional_highlight::{
-    Condition, Rule,
-    Style,
-};
-use litchi_iwa::table_cell_data_format::TableCellCheckboxFormat;
+use litchi_iwa_common::table::cell::conditional_highlight::{Condition, Rule, Style};
 use litchi_numbers::cell::Value as CellValue;
+use litchi_numbers::cell::data_format::Checkbox;
 
 const CHECKBOX_ROW: usize = 1;
 const CHECKED_COLUMN: usize = 1;
@@ -34,14 +31,8 @@ fn checkbox_rules() -> Result<[Rule; 2], Box<dyn std::error::Error>> {
     let red = RgbaColor::new(0.96, 0.22, 0.18, 1.0, RgbColorSpace::Srgb)?;
     let style = Style::new(Some(red), None, true)?;
     Ok([
-        Rule::new(
-            Condition::CheckboxIsChecked,
-            style,
-        ),
-        Rule::new(
-            Condition::CheckboxIsNotChecked,
-            style,
-        ),
+        Rule::new(Condition::CheckboxIsChecked, style),
+        Rule::new(Condition::CheckboxIsNotChecked, style),
     ])
 }
 
@@ -53,12 +44,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let table_id = editor.tables()?.remove(0).object_id;
     for (column, value) in [(CHECKED_COLUMN, true), (UNCHECKED_COLUMN, false)] {
         editor.set_cell(table_id, CHECKBOX_ROW, column, CellValue::Boolean(value))?;
-        editor.set_table_cell_checkbox_format(
-            table_id,
-            CHECKBOX_ROW,
-            column,
-            TableCellCheckboxFormat,
-        )?;
+        editor.set_table_cell_checkbox_format(table_id, CHECKBOX_ROW, column, Checkbox)?;
     }
     let rules = checkbox_rules()?;
     for (column, rule) in [CHECKED_COLUMN, UNCHECKED_COLUMN].into_iter().zip(&rules) {
@@ -93,7 +79,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
             table_id,
             CHECKBOX_ROW,
             column,
-            TableCellCheckboxFormat,
+            PagesTableCellCheckboxFormat,
         )?;
     }
     let rules = checkbox_rules()?;
@@ -145,7 +131,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
             table.model_object_id,
             CHECKBOX_ROW,
             column,
-            TableCellCheckboxFormat,
+            KeynoteTableCellCheckboxFormat,
         )?;
     }
     let rules = checkbox_rules()?;

@@ -40,6 +40,7 @@ impl TableCellStepperRange {
         self.0.increment()
     }
 
+    #[cfg(test)]
     pub(crate) const fn native_initial_value(self) -> f64 {
         self.minimum()
     }

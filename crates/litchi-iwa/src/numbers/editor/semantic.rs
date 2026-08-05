@@ -22,6 +22,10 @@ use prost::Message;
 
 use super::super::cell::{CellValue, TableCellUpdate};
 use super::super::formula::{FormulaCachedValue, FormulaExpression, FormulaPivotCategoryReference};
+use litchi_numbers::cell::data_format::{
+    Checkbox, Currency, Custom, DataFormat, DateTime, Duration, Fraction, Number, NumeralSystem,
+    Percentage, PopUpMenu, Scientific, Slider, StarRating, Stepper, Text,
+};
 use crate::archive::RawMessage;
 use litchi_iwa_common::comment::{
     Comment, DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId,

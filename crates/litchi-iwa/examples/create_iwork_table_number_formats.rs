@@ -26,6 +26,15 @@ use litchi_iwa_common::table::cell::number_format::{
     NumberFormat as SemanticNumberFormat, ThousandsSeparator as SemanticThousandsSeparator,
 };
 use litchi_numbers::cell::Value as CellValue;
+use litchi_numbers::cell::data_format::duration::{Style as DurationStyle, UnitRange};
+use litchi_numbers::cell::data_format::numeral_system::{
+    Base, FixedPlaces, NegativeStyle as NumeralNegativeStyle, Places,
+};
+use litchi_numbers::cell::data_format::{
+    self as numbers, Checkbox, Currency, CurrencyCode, CurrencyStyle, DateTime, DecimalPlaces,
+    Duration, FixedDecimalPlaces, Fraction, FractionAccuracy, NegativeStyle, Number, NumeralSystem,
+    Percentage, PopUpMenu, Scientific, Slider, StarRating, Stepper,
+};
 
 const ROW: usize = 1;
 const NUMBER_COLUMN: usize = 1;
@@ -70,20 +79,112 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn format() -> Result<TableCellNumberFormat, litchi_iwa::Error> {
-    Ok(TableCellNumberFormat::new(
-        TableCellDecimalPlaces::fixed(2)?,
-        TableCellNegativeNumberStyle::Parentheses,
-        TableCellThousandsSeparator::Shown,
-    ))
-}
-
 fn semantic_format() -> Result<SemanticNumberFormat, litchi_iwa::Error> {
     Ok(SemanticNumberFormat::new(
         SemanticDecimalPlaces::fixed(2)?,
         SemanticNegativeStyle::Parentheses,
         SemanticThousandsSeparator::Shown,
     ))
+}
+
+fn numbers_format() -> Result<Number, Box<dyn std::error::Error>> {
+    Ok(Number::new(
+        DecimalPlaces::fixed(2)?,
+        NegativeStyle::Parentheses,
+        numbers::ThousandsSeparator::Shown,
+    ))
+}
+
+fn numbers_percentage_format() -> Result<Percentage, Box<dyn std::error::Error>> {
+    Ok(Percentage::new(
+        DecimalPlaces::fixed(2)?,
+        NegativeStyle::Parentheses,
+        numbers::ThousandsSeparator::Shown,
+    ))
+}
+
+fn numbers_currency_format() -> Result<Currency, Box<dyn std::error::Error>> {
+    Ok(Currency::new(
+        CurrencyCode::USD,
+        DecimalPlaces::fixed(2)?,
+        NegativeStyle::Parentheses,
+        numbers::ThousandsSeparator::Shown,
+        CurrencyStyle::Accounting,
+    ))
+}
+
+fn numbers_scientific_format() -> Result<Scientific, Box<dyn std::error::Error>> {
+    Ok(Scientific::new(FixedDecimalPlaces::new(5)?))
+}
+
+const fn numbers_fraction_format() -> Fraction {
+    Fraction::new(FractionAccuracy::Eighths)
+}
+
+fn numbers_numeral_system_format() -> Result<NumeralSystem, Box<dyn std::error::Error>> {
+    Ok(NumeralSystem::new(
+        Base::HEXADECIMAL,
+        Places::Fixed(FixedPlaces::EIGHT),
+        NumeralNegativeStyle::TwosComplement,
+    )?)
+}
+
+fn numbers_date_time_format() -> DateTime {
+    DateTime::iso_date_time_24_hour_with_seconds()
+}
+
+const fn numbers_duration_format() -> Duration {
+    Duration::custom(
+        DurationStyle::Abbreviated,
+        UnitRange::hours_to_milliseconds(),
+    )
+}
+
+fn numbers_slider_format() -> Result<Slider, Box<dyn std::error::Error>> {
+    Ok(Slider::new(
+        numbers::control::Range::new(-10.0, 30.0, 0.5)?,
+        numbers_format()?.into(),
+    ))
+}
+
+fn numbers_stepper_format() -> Result<Stepper, Box<dyn std::error::Error>> {
+    Ok(Stepper::new(
+        numbers::control::Range::new(-10.0, 30.0, 0.5)?,
+        numbers_format()?.into(),
+    ))
+}
+
+fn numbers_pop_up_menu_format() -> Result<PopUpMenu, Box<dyn std::error::Error>> {
+    Ok(PopUpMenu::new(["Low", "Medium", "High"])?)
+}
+
+fn numbers_custom_number_format() -> Result<numbers::Custom, Box<dyn std::error::Error>> {
+    Ok(numbers::custom::Number::try_with_rules(
+        numbers::custom::Name::try_new("Grouped Integer")?,
+        numbers::custom::NumberPattern::try_new("#,###")?,
+        [numbers::custom::NumberRule::new(
+            numbers::custom::Condition::LessThan(numbers::custom::ConditionValue::try_new(0.0)?),
+            numbers::custom::NumberPattern::try_new("(#,###)")?,
+        )],
+    )?
+    .into())
+}
+
+fn numbers_custom_date_time_format() -> Result<numbers::Custom, Box<dyn std::error::Error>> {
+    Ok(numbers::custom::DateTime::new(
+        numbers::custom::Name::try_new("Month Day Year")?,
+        numbers::custom::DateTimePattern::try_new("MMM d, y")?,
+    )
+    .into())
+}
+
+fn numbers_custom_text_format() -> Result<numbers::Custom, Box<dyn std::error::Error>> {
+    Ok(numbers::custom::Text::try_new(
+        numbers::custom::Name::try_new("Text With ID Suffix")?,
+        "",
+        "ID: ",
+    )?
+    .into())
 }
 
 fn percentage_format() -> Result<TableCellPercentageFormat, litchi_iwa::Error> {
@@ -204,7 +305,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         NUMBER_COLUMN,
         CellValue::Number(NUMBER_VALUE),
     )?;
-    editor.set_table_cell_number_format(table_id, ROW, NUMBER_COLUMN, format()?)?;
+    editor.set_table_cell_number_format(table_id, ROW, NUMBER_COLUMN, numbers_format()?)?;
     editor.set_cell(
         table_id,
         ROW,
@@ -215,7 +316,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         PERCENTAGE_COLUMN,
-        percentage_format()?,
+        numbers_percentage_format()?,
     )?;
     editor.set_cell(
         table_id,
@@ -223,7 +324,12 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         CURRENCY_COLUMN,
         CellValue::Number(CURRENCY_VALUE),
     )?;
-    editor.set_table_cell_currency_format(table_id, ROW, CURRENCY_COLUMN, currency_format()?)?;
+    editor.set_table_cell_currency_format(
+        table_id,
+        ROW,
+        CURRENCY_COLUMN,
+        numbers_currency_format()?,
+    )?;
     editor.set_cell(
         table_id,
         ROW,
@@ -234,7 +340,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         SCIENTIFIC_COLUMN,
-        scientific_format()?,
+        numbers_scientific_format()?,
     )?;
     editor.set_cell(
         table_id,
@@ -242,7 +348,12 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         FRACTION_COLUMN,
         CellValue::Number(FRACTION_VALUE),
     )?;
-    editor.set_table_cell_fraction_format(table_id, ROW, FRACTION_COLUMN, fraction_format())?;
+    editor.set_table_cell_fraction_format(
+        table_id,
+        ROW,
+        FRACTION_COLUMN,
+        numbers_fraction_format(),
+    )?;
     editor.set_cell(
         table_id,
         ROW,
@@ -253,7 +364,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         NUMERAL_SYSTEM_COLUMN,
-        numeral_system_format()?,
+        numbers_numeral_system_format()?,
     )?;
     editor.set_cell(
         table_id,
@@ -261,52 +372,57 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         DATE_TIME_COLUMN,
         CellValue::Date(DATE_TIME_VALUE),
     )?;
-    editor.set_table_cell_date_time_format(table_id, ROW, DATE_TIME_COLUMN, date_time_format())?;
+    editor.set_table_cell_date_time_format(
+        table_id,
+        ROW,
+        DATE_TIME_COLUMN,
+        numbers_date_time_format(),
+    )?;
     editor.set_cell(
         table_id,
         ROW,
         DURATION_COLUMN,
         CellValue::Duration(DURATION_VALUE),
     )?;
-    editor.set_table_cell_duration_format(table_id, ROW, DURATION_COLUMN, duration_format())?;
-    editor.set_cell(table_id, ROW, CHECKBOX_COLUMN, CellValue::Boolean(true))?;
-    editor.set_table_cell_checkbox_format(
+    editor.set_table_cell_duration_format(
         table_id,
         ROW,
-        CHECKBOX_COLUMN,
-        TableCellCheckboxFormat,
+        DURATION_COLUMN,
+        numbers_duration_format(),
     )?;
+    editor.set_cell(table_id, ROW, CHECKBOX_COLUMN, CellValue::Boolean(true))?;
+    editor.set_table_cell_checkbox_format(table_id, ROW, CHECKBOX_COLUMN, Checkbox)?;
     editor.set_cell(
         table_id,
         ROW,
         STAR_RATING_COLUMN,
         CellValue::Number(STAR_RATING_VALUE),
     )?;
-    editor.set_table_cell_star_rating_format(
-        table_id,
-        ROW,
-        STAR_RATING_COLUMN,
-        TableCellStarRatingFormat,
-    )?;
+    editor.set_table_cell_star_rating_format(table_id, ROW, STAR_RATING_COLUMN, StarRating)?;
     editor.set_cell(
         table_id,
         ROW,
         SLIDER_COLUMN,
         CellValue::Number(SLIDER_VALUE),
     )?;
-    editor.set_table_cell_slider_format(table_id, ROW, SLIDER_COLUMN, slider_format()?)?;
+    editor.set_table_cell_slider_format(table_id, ROW, SLIDER_COLUMN, numbers_slider_format()?)?;
     editor.set_cell(
         table_id,
         ROW,
         STEPPER_COLUMN,
         CellValue::Number(STEPPER_VALUE),
     )?;
-    editor.set_table_cell_stepper_format(table_id, ROW, STEPPER_COLUMN, stepper_format()?)?;
+    editor.set_table_cell_stepper_format(
+        table_id,
+        ROW,
+        STEPPER_COLUMN,
+        numbers_stepper_format()?,
+    )?;
     editor.set_table_cell_pop_up_menu_format(
         table_id,
         ROW,
         POP_UP_MENU_COLUMN,
-        pop_up_menu_format()?,
+        numbers_pop_up_menu_format()?,
     )?;
     editor.set_cell(
         table_id,
@@ -325,7 +441,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         CUSTOM_NUMBER_COLUMN,
-        custom_number_format()?,
+        numbers_custom_number_format()?,
     )?;
     editor.set_cell(
         table_id,
@@ -337,7 +453,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         CUSTOM_DATE_TIME_COLUMN,
-        custom_date_time_format()?,
+        numbers_custom_date_time_format()?,
     )?;
     editor.set_cell(
         table_id,
@@ -349,7 +465,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         CUSTOM_TEXT_COLUMN,
-        custom_text_format()?,
+        numbers_custom_text_format()?,
     )?;
     editor.save(output)?;
     Ok(())

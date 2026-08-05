@@ -14,6 +14,10 @@ use std::path::Path;
 
 pub use litchi_numbers::table::dimension::{Dimension, Points, Size};
 use litchi_iwa_common::table::cell::number_format::NumberFormat;
+use litchi_numbers::cell::data_format::{
+    Checkbox, Currency, Custom, DataFormat, DateTime, Duration, Fraction, Number, NumeralSystem,
+    Percentage, PopUpMenu, Scientific, Slider, StarRating, Stepper, Text,
+};
 use prost::Message;
 
 use super::bnc::{BncCell, CachedScalar, StoredValue};

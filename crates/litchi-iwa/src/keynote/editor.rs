@@ -5,7 +5,9 @@ use std::ops::Range;
 use std::path::Path;
 use std::rc::Rc;
 
-use litchi_iwa_common::comment::{DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId};
+use litchi_iwa_common::comment::{
+    DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId,
+};
 use prost::Message;
 
 use crate::archive::{Archive, ArchiveObject, RawMessage};
@@ -20,7 +22,6 @@ use crate::package_metadata::{
     set_package_last_object_identifier,
 };
 use crate::protobuf::{kn, tsd, tsp, tss, tswp};
-use crate::ref_graph::ObjectId;
 use crate::shapes::{
     DrawableGeometry, DrawableProperties, RgbaColor, reset_shape_text_columns,
     reset_shape_text_layout, set_shape_geometry, set_shape_properties, set_shape_text_columns,
@@ -50,6 +51,7 @@ use crate::wire::{
     transform_length_delimited_field, transform_length_delimited_fields_at_path,
 };
 use crate::{EmbeddedMediaAsset, Error, IWorkMediaEditor, IWorkPackage, Result};
+use litchi_iwa_graph::ObjectId;
 pub use litchi_keynote::build::{Acceleration as BuildAcceleration, Start as BuildStart};
 use litchi_keynote::transition::Settings as TransitionSettings;
 
@@ -3521,8 +3523,7 @@ impl KeynoteEditor {
     ) -> Result<u64> {
         self.require_slide_drawable(slide_index, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        let reply_id =
-            comments.add_reply(DrawableId::from_raw(drawable_object_id)?, text)?;
+        let reply_id = comments.add_reply(DrawableId::from_raw(drawable_object_id)?, text)?;
         let staged = comments.into_package();
         Self::from_package(staged.clone())?;
         self.text = IWorkTextEditor::from_package(staged);
@@ -5094,13 +5095,9 @@ pub use slide_tables::{
     KeynoteTableCellTextShadow, KeynoteTableCellTextStyle, KeynoteTableCellTextWrap,
     KeynoteTableCellThousandsSeparator, KeynoteTableCellUpdate, KeynoteTableCellValue,
     KeynoteTableCellVerticalAlignment, KeynoteTableColumnDeletion, KeynoteTableColumnInsertion,
-    KeynoteTableDimension, KeynoteTableDimensionSize, KeynoteTableFormulaAxisReference,
-    KeynoteTableFormulaBinaryOperator, KeynoteTableFormulaCachedValue,
-    KeynoteTableFormulaCellReference, KeynoteTableFormulaExpression, KeynoteTableHeaderCount,
+    KeynoteTableDimension, KeynoteTableDimensionSize, KeynoteTableHeaderCount,
     KeynoteTableHeaderSettings, KeynoteTablePoints, KeynoteTableRowDeletion,
-    KeynoteTableRowInsertion, KeynoteTableSortColumnIndex, KeynoteTableSortDirection,
-    KeynoteTableSortOrder, KeynoteTableSortRowRange, KeynoteTableSortRule, KeynoteTableSortScope,
-    KeynoteTableTitleSettings, RemovedKeynoteSlideTable,
+    KeynoteTableRowInsertion, KeynoteTableTitleSettings, RemovedKeynoteSlideTable,
 };
 pub use soundtrack_items::KeynoteSoundtrackItemInfo;
 use transition_wire::{transition_settings_from_wire, validate_transition_wire};

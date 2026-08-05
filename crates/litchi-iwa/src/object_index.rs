@@ -9,8 +9,8 @@ use std::sync::Arc;
 
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::bundle::Bundle;
-use crate::ref_graph::{ObjectId, ObjectIdIter, ReferenceGraph};
 use crate::{Error, Result};
+use litchi_iwa_graph::{ObjectId, ObjectIdIter, ReferenceGraph};
 
 mod reference_extraction;
 

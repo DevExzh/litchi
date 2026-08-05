@@ -871,7 +871,9 @@ pub(crate) fn table_cell_number_format_in_package(
     row: usize,
     column: usize,
 ) -> Result<Option<crate::table_cell_data_format::TableCellNumberFormat>> {
-    cell_data_format::cell_number_format(package, table_id, row, column)
+    cell_data_format::cell_number_format(package, table_id, row, column)?
+        .map(cell_data_format::semantic_number_to_legacy)
+        .transpose()
 }
 
 pub(crate) fn set_table_cell_number_format_in_package(
@@ -881,7 +883,13 @@ pub(crate) fn set_table_cell_number_format_in_package(
     column: usize,
     format: crate::table_cell_data_format::TableCellNumberFormat,
 ) -> Result<()> {
-    cell_data_format::set_cell_number_format(package, table_id, row, column, format)
+    cell_data_format::set_cell_number_format(
+        package,
+        table_id,
+        row,
+        column,
+        cell_data_format::legacy_number_to_semantic(format)?,
+    )
 }
 
 pub(crate) fn common_table_cell_number_format_in_package(
@@ -922,6 +930,7 @@ pub(crate) fn table_cell_text_format_in_package(
     column: usize,
 ) -> Result<Option<crate::table_cell_data_format::TableCellTextFormat>> {
     cell_data_format::cell_text_format(package, table_id, row, column)
+        .map(|format| format.map(|_| crate::table_cell_data_format::TableCellTextFormat))
 }
 
 pub(crate) fn reset_table_cell_text_format_in_package(
@@ -939,7 +948,9 @@ pub(crate) fn table_cell_custom_format_in_package(
     row: usize,
     column: usize,
 ) -> Result<Option<crate::table_cell_data_format::TableCellCustomFormat>> {
-    cell_data_format::cell_custom_format(package, table_id, row, column)
+    cell_data_format::cell_custom_format(package, table_id, row, column)?
+        .map(cell_data_format::semantic_custom_to_legacy)
+        .transpose()
 }
 
 pub(crate) fn reset_table_cell_custom_format_in_package(
@@ -957,7 +968,9 @@ pub(crate) fn table_cell_currency_format_in_package(
     row: usize,
     column: usize,
 ) -> Result<Option<crate::table_cell_data_format::TableCellCurrencyFormat>> {
-    cell_data_format::cell_currency_format(package, table_id, row, column)
+    cell_data_format::cell_currency_format(package, table_id, row, column)?
+        .map(cell_data_format::semantic_currency_to_legacy)
+        .transpose()
 }
 
 pub(crate) fn reset_table_cell_currency_format_in_package(
@@ -975,7 +988,9 @@ pub(crate) fn table_cell_data_format_in_package(
     row: usize,
     column: usize,
 ) -> Result<crate::table_cell_data_format::TableCellDataFormat> {
-    cell_data_format::cell_data_format(package, table_id, row, column)
+    cell_data_format::semantic_data_format_to_legacy(
+        cell_data_format::cell_data_format(package, table_id, row, column)?,
+    )
 }
 
 pub(crate) fn set_table_cell_data_format_in_package(
@@ -985,7 +1000,8 @@ pub(crate) fn set_table_cell_data_format_in_package(
     column: usize,
     format: &crate::table_cell_data_format::TableCellDataFormat,
 ) -> Result<()> {
-    cell_data_format::set_cell_data_format(package, table_id, row, column, format)
+    let format = cell_data_format::legacy_data_format_to_semantic(format.clone())?;
+    cell_data_format::set_cell_data_format(package, table_id, row, column, &format)
 }
 
 pub(crate) fn table_cell_percentage_format_in_package(
@@ -994,7 +1010,9 @@ pub(crate) fn table_cell_percentage_format_in_package(
     row: usize,
     column: usize,
 ) -> Result<Option<crate::table_cell_data_format::TableCellPercentageFormat>> {
-    cell_data_format::cell_percentage_format(package, table_id, row, column)
+    cell_data_format::cell_percentage_format(package, table_id, row, column)?
+        .map(cell_data_format::semantic_percentage_to_legacy)
+        .transpose()
 }
 
 pub(crate) fn reset_table_cell_percentage_format_in_package(
@@ -1012,7 +1030,9 @@ pub(crate) fn table_cell_scientific_format_in_package(
     row: usize,
     column: usize,
 ) -> Result<Option<crate::table_cell_data_format::TableCellScientificFormat>> {
-    cell_data_format::cell_scientific_format(package, table_id, row, column)
+    cell_data_format::cell_scientific_format(package, table_id, row, column)?
+        .map(cell_data_format::semantic_scientific_to_legacy)
+        .transpose()
 }
 
 pub(crate) fn reset_table_cell_scientific_format_in_package(
@@ -1030,7 +1050,39 @@ pub(crate) fn table_cell_fraction_format_in_package(
     row: usize,
     column: usize,
 ) -> Result<Option<crate::table_cell_data_format::TableCellFractionFormat>> {
-    cell_data_format::cell_fraction_format(package, table_id, row, column)
+    cell_data_format::cell_fraction_format(package, table_id, row, column)?
+        .map(|format| Ok(crate::table_cell_data_format::TableCellFractionFormat::new(
+            match format.accuracy() {
+                litchi_numbers::cell::data_format::number::FractionAccuracy::UpToOneDigit => {
+                    crate::table_cell_data_format::TableCellFractionAccuracy::UpToOneDigit
+                }
+                litchi_numbers::cell::data_format::number::FractionAccuracy::UpToTwoDigits => {
+                    crate::table_cell_data_format::TableCellFractionAccuracy::UpToTwoDigits
+                }
+                litchi_numbers::cell::data_format::number::FractionAccuracy::UpToThreeDigits => {
+                    crate::table_cell_data_format::TableCellFractionAccuracy::UpToThreeDigits
+                }
+                litchi_numbers::cell::data_format::number::FractionAccuracy::Halves => {
+                    crate::table_cell_data_format::TableCellFractionAccuracy::Halves
+                }
+                litchi_numbers::cell::data_format::number::FractionAccuracy::Quarters => {
+                    crate::table_cell_data_format::TableCellFractionAccuracy::Quarters
+                }
+                litchi_numbers::cell::data_format::number::FractionAccuracy::Eighths => {
+                    crate::table_cell_data_format::TableCellFractionAccuracy::Eighths
+                }
+                litchi_numbers::cell::data_format::number::FractionAccuracy::Sixteenths => {
+                    crate::table_cell_data_format::TableCellFractionAccuracy::Sixteenths
+                }
+                litchi_numbers::cell::data_format::number::FractionAccuracy::Tenths => {
+                    crate::table_cell_data_format::TableCellFractionAccuracy::Tenths
+                }
+                litchi_numbers::cell::data_format::number::FractionAccuracy::Hundredths => {
+                    crate::table_cell_data_format::TableCellFractionAccuracy::Hundredths
+                }
+            },
+        )))
+        .transpose()
 }
 
 pub(crate) fn reset_table_cell_fraction_format_in_package(
@@ -1048,7 +1100,9 @@ pub(crate) fn table_cell_numeral_system_format_in_package(
     row: usize,
     column: usize,
 ) -> Result<Option<crate::table_cell_data_format::TableCellNumeralSystemFormat>> {
-    cell_data_format::cell_numeral_system_format(package, table_id, row, column)
+    cell_data_format::cell_numeral_system_format(package, table_id, row, column)?
+        .map(cell_data_format::semantic_numeral_system_to_legacy)
+        .transpose()
 }
 
 pub(crate) fn reset_table_cell_numeral_system_format_in_package(
@@ -1066,7 +1120,13 @@ pub(crate) fn table_cell_date_time_format_in_package(
     row: usize,
     column: usize,
 ) -> Result<Option<crate::table_cell_data_format::TableCellDateTimeFormat>> {
-    cell_data_format::cell_date_time_format(package, table_id, row, column)
+    cell_data_format::cell_date_time_format(package, table_id, row, column)?
+        .map(|format| {
+            crate::table_cell_data_format::TableCellDateTimeFormat::new(
+                format.pattern().to_owned(),
+            )
+        })
+        .transpose()
 }
 
 pub(crate) fn reset_table_cell_date_time_format_in_package(
@@ -1084,7 +1144,9 @@ pub(crate) fn table_cell_duration_format_in_package(
     row: usize,
     column: usize,
 ) -> Result<Option<crate::table_cell_data_format::TableCellDurationFormat>> {
-    cell_data_format::cell_duration_format(package, table_id, row, column)
+    cell_data_format::cell_duration_format(package, table_id, row, column)?
+        .map(cell_data_format::semantic_duration_to_legacy)
+        .transpose()
 }
 
 pub(crate) fn reset_table_cell_duration_format_in_package(
@@ -1103,6 +1165,7 @@ pub(crate) fn table_cell_checkbox_format_in_package(
     column: usize,
 ) -> Result<Option<crate::table_cell_data_format::TableCellCheckboxFormat>> {
     cell_data_format::cell_checkbox_format(package, table_id, row, column)
+        .map(|format| format.map(|_| crate::table_cell_data_format::TableCellCheckboxFormat))
 }
 
 pub(crate) fn reset_table_cell_checkbox_format_in_package(
@@ -1121,6 +1184,7 @@ pub(crate) fn table_cell_star_rating_format_in_package(
     column: usize,
 ) -> Result<Option<crate::table_cell_data_format::TableCellStarRatingFormat>> {
     cell_data_format::cell_star_rating_format(package, table_id, row, column)
+        .map(|format| format.map(|_| crate::table_cell_data_format::TableCellStarRatingFormat))
 }
 
 pub(crate) fn reset_table_cell_star_rating_format_in_package(
@@ -1138,7 +1202,9 @@ pub(crate) fn table_cell_slider_format_in_package(
     row: usize,
     column: usize,
 ) -> Result<Option<crate::table_cell_data_format::TableCellSliderFormat>> {
-    cell_data_format::cell_slider_format(package, table_id, row, column)
+    cell_data_format::cell_slider_format(package, table_id, row, column)?
+        .map(cell_data_format::semantic_slider_to_legacy)
+        .transpose()
 }
 
 pub(crate) fn reset_table_cell_slider_format_in_package(
@@ -1156,7 +1222,9 @@ pub(crate) fn table_cell_stepper_format_in_package(
     row: usize,
     column: usize,
 ) -> Result<Option<crate::table_cell_data_format::TableCellStepperFormat>> {
-    cell_data_format::cell_stepper_format(package, table_id, row, column)
+    cell_data_format::cell_stepper_format(package, table_id, row, column)?
+        .map(cell_data_format::semantic_stepper_to_legacy)
+        .transpose()
 }
 
 pub(crate) fn reset_table_cell_stepper_format_in_package(
@@ -1174,7 +1242,9 @@ pub(crate) fn table_cell_pop_up_menu_format_in_package(
     row: usize,
     column: usize,
 ) -> Result<Option<crate::table_cell_data_format::TableCellPopUpMenuFormat>> {
-    cell_data_format::cell_pop_up_menu_format(package, table_id, row, column)
+    cell_data_format::cell_pop_up_menu_format(package, table_id, row, column)?
+        .map(cell_data_format::semantic_pop_up_menu_to_legacy)
+        .transpose()
 }
 
 pub(crate) fn reset_table_cell_pop_up_menu_format_in_package(

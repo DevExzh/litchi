@@ -14,7 +14,6 @@ mod numeric_control;
 mod pop_up_menu;
 mod slider;
 mod stepper;
-pub(crate) use custom::NATIVE_CUSTOM_TEXT_VALUE_TOKEN;
 pub use custom::{
     TableCellCustomDateTimeFormat, TableCellCustomDateTimePattern, TableCellCustomFormat,
     TableCellCustomFormatName, TableCellCustomNumberCondition, TableCellCustomNumberConditionValue,

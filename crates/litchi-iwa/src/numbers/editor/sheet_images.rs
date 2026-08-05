@@ -5,19 +5,19 @@ use std::collections::HashMap;
 use litchi_iwa_common::media::Type as MediaType;
 
 use super::*;
-use litchi_iwa_common::comment::DrawableId;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
 use crate::image_adjustments::replace_image_adjustments;
 use crate::image_caption::{CaptionObjectIds, DrawableCaptionKind};
-use crate::ref_graph::ObjectId;
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
     ShapeImageDataIdentifier, flip_drawable_geometry, offset_drawable_geometry,
     restore_drawable_original_size,
 };
+use litchi_iwa_common::comment::DrawableId;
 use litchi_iwa_common::shape::image::ImageAdjustments;
+use litchi_iwa_graph::ObjectId;
 
 mod graph;
 

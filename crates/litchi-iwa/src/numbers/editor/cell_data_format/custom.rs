@@ -7,12 +7,12 @@ use prost::Message;
 use crate::archive::RawMessage;
 use crate::numbers::bnc;
 use crate::protobuf::{tsk, tsp, tst};
-use crate::table_cell_data_format::{
-    NATIVE_CUSTOM_TEXT_VALUE_TOKEN, TableCellCustomDateTimeFormat, TableCellCustomDateTimePattern,
-    TableCellCustomFormat, TableCellCustomFormatName, TableCellCustomNumberCondition,
-    TableCellCustomNumberConditionValue, TableCellCustomNumberFormat, TableCellCustomNumberPattern,
-    TableCellCustomNumberRule, TableCellCustomTextFormat,
+use litchi_numbers::cell::data_format::custom::{
+    Condition, ConditionValue, Custom, DateTime as CustomDateTime, DateTimePattern, Name,
+    Number as CustomNumber, NumberPattern, NumberRule, Text as CustomText,
 };
+
+const NATIVE_CUSTOM_TEXT_VALUE_TOKEN: char = '\u{e421}';
 use crate::{Error, IWorkPackage, Result, wire};
 
 const CUSTOM_FORMAT_LIST_MESSAGE_TYPE: u32 = 222;
@@ -37,7 +37,7 @@ struct RegistryLocation {
 
 pub(super) fn acquire_reference(
     package: &mut IWorkPackage,
-    format: &TableCellCustomFormat,
+    format: &Custom,
 ) -> Result<tsk::FormatStructArchive> {
     let location = locate_registry(package)?;
     validate_registry(&location)?;
@@ -85,7 +85,7 @@ pub(super) fn acquire_reference(
 pub(super) fn resolve_reference(
     package: &IWorkPackage,
     reference: &tsk::FormatStructArchive,
-) -> Result<TableCellCustomFormat> {
+) -> Result<Custom> {
     let uuid = reference_uuid(reference)?.ok_or_else(|| {
         Error::InvalidFormat("custom table-cell format has no registry UUID".to_owned())
     })?;
@@ -182,31 +182,31 @@ pub(super) fn reference_uuid(native: &tsk::FormatStructArchive) -> Result<Option
     Ok(Some(uuid))
 }
 
-pub(super) const fn scalar_kind(format: &TableCellCustomFormat) -> bnc::CellDataFormatKind {
+pub(super) const fn scalar_kind(format: &Custom) -> bnc::CellDataFormatKind {
     match format {
-        TableCellCustomFormat::Number(_) => bnc::CellDataFormatKind::NumberOrPercentage,
-        TableCellCustomFormat::Text(_) => bnc::CellDataFormatKind::Text,
-        TableCellCustomFormat::DateTime(_) => bnc::CellDataFormatKind::DateTime,
+        Custom::Number(_) => bnc::CellDataFormatKind::NumberOrPercentage,
+        Custom::Text(_) => bnc::CellDataFormatKind::Text,
+        Custom::DateTime(_) => bnc::CellDataFormatKind::DateTime,
     }
 }
 
-fn custom_format_to_native(format: &TableCellCustomFormat) -> tsk::CustomFormatArchive {
+fn custom_format_to_native(format: &Custom) -> tsk::CustomFormatArchive {
     match format {
-        TableCellCustomFormat::Number(format) => tsk::CustomFormatArchive {
+        Custom::Number(format) => tsk::CustomFormatArchive {
             name: format.name().as_str().to_owned(),
             format_type_pre_bnc: NATIVE_CUSTOM_NUMBER_FORMAT_TYPE,
             default_format: Box::new(number_pattern_to_native(format.default_pattern())),
             conditions: format.rules().iter().map(number_rule_to_native).collect(),
             format_type: Some(NATIVE_CUSTOM_NUMBER_FORMAT_TYPE),
         },
-        TableCellCustomFormat::Text(format) => tsk::CustomFormatArchive {
+        Custom::Text(format) => tsk::CustomFormatArchive {
             name: format.name().as_str().to_owned(),
             format_type_pre_bnc: NATIVE_CUSTOM_TEXT_FORMAT_TYPE,
             default_format: Box::new(text_pattern_to_native(format)),
             conditions: Vec::new(),
             format_type: Some(NATIVE_CUSTOM_TEXT_FORMAT_TYPE),
         },
-        TableCellCustomFormat::DateTime(format) => tsk::CustomFormatArchive {
+        Custom::DateTime(format) => tsk::CustomFormatArchive {
             name: format.name().as_str().to_owned(),
             format_type_pre_bnc: NATIVE_CUSTOM_DATE_TIME_FORMAT_TYPE,
             default_format: Box::new(date_time_pattern_to_native(format.pattern())),
@@ -216,8 +216,8 @@ fn custom_format_to_native(format: &TableCellCustomFormat) -> tsk::CustomFormatA
     }
 }
 
-fn custom_format_from_native(native: &tsk::CustomFormatArchive) -> Result<TableCellCustomFormat> {
-    let name = TableCellCustomFormatName::try_new(native.name.clone())?;
+fn custom_format_from_native(native: &tsk::CustomFormatArchive) -> Result<Custom> {
+    let name = Name::try_new(native.name.clone())?;
     let format_type = native.format_type.ok_or_else(|| {
         Error::InvalidFormat("custom table-cell registry entry has no format family".to_owned())
     })?;
@@ -234,8 +234,9 @@ fn custom_format_from_native(native: &tsk::CustomFormatArchive) -> Result<TableC
                 .iter()
                 .map(number_rule_from_native)
                 .collect::<Result<Vec<_>>>()?;
-            TableCellCustomNumberFormat::try_with_rules(name, default_pattern, rules)
-                .map(TableCellCustomFormat::Number)
+            CustomNumber::try_with_rules(name, default_pattern, rules)
+                .map(Custom::Number)
+                .map_err(Into::into)
         },
         NATIVE_CUSTOM_TEXT_FORMAT_TYPE => {
             if !native.conditions.is_empty() {
@@ -243,7 +244,7 @@ fn custom_format_from_native(native: &tsk::CustomFormatArchive) -> Result<TableC
                     "custom Text format cannot contain numeric conditions".to_owned(),
                 ));
             }
-            text_pattern_from_native(name, &native.default_format).map(TableCellCustomFormat::Text)
+            text_pattern_from_native(name, &native.default_format).map(Custom::Text)
         },
         NATIVE_CUSTOM_DATE_TIME_FORMAT_TYPE => {
             if !native.conditions.is_empty() {
@@ -252,9 +253,7 @@ fn custom_format_from_native(native: &tsk::CustomFormatArchive) -> Result<TableC
                 ));
             }
             let pattern = date_time_pattern_from_native(&native.default_format)?;
-            Ok(TableCellCustomFormat::DateTime(
-                TableCellCustomDateTimeFormat::new(name, pattern),
-            ))
+            Ok(Custom::DateTime(CustomDateTime::new(name, pattern)))
         },
         _ => Err(Error::InvalidFormat(format!(
             "unsupported custom table-cell format family {format_type}"
@@ -262,16 +261,14 @@ fn custom_format_from_native(native: &tsk::CustomFormatArchive) -> Result<TableC
     }
 }
 
-fn number_rule_to_native(
-    rule: &TableCellCustomNumberRule,
-) -> tsk::custom_format_archive::Condition {
+fn number_rule_to_native(rule: &NumberRule) -> tsk::custom_format_archive::Condition {
     tsk::custom_format_archive::Condition {
         condition_type: match rule.condition() {
-            TableCellCustomNumberCondition::EqualTo(_) => 0,
-            TableCellCustomNumberCondition::LessThan(_) => 1,
-            TableCellCustomNumberCondition::LessThanOrEqualTo(_) => 2,
-            TableCellCustomNumberCondition::GreaterThan(_) => 3,
-            TableCellCustomNumberCondition::GreaterThanOrEqualTo(_) => 4,
+            Condition::EqualTo(_) => 0,
+            Condition::LessThan(_) => 1,
+            Condition::LessThanOrEqualTo(_) => 2,
+            Condition::GreaterThan(_) => 3,
+            Condition::GreaterThanOrEqualTo(_) => 4,
         },
         condition_value: None,
         condition_format: number_pattern_to_native(rule.pattern()),
@@ -279,9 +276,7 @@ fn number_rule_to_native(
     }
 }
 
-fn number_rule_from_native(
-    native: &tsk::custom_format_archive::Condition,
-) -> Result<TableCellCustomNumberRule> {
+fn number_rule_from_native(native: &tsk::custom_format_archive::Condition) -> Result<NumberRule> {
     let threshold = match (native.condition_value, native.condition_value_dbl) {
         (None, Some(value)) => value,
         (Some(value), None) => f64::from(value),
@@ -291,26 +286,26 @@ fn number_rule_from_native(
             ));
         },
     };
-    let threshold = TableCellCustomNumberConditionValue::try_new(threshold)?;
+    let threshold = ConditionValue::try_new(threshold)?;
     let condition = match native.condition_type {
-        0 => TableCellCustomNumberCondition::EqualTo(threshold),
-        1 => TableCellCustomNumberCondition::LessThan(threshold),
-        2 => TableCellCustomNumberCondition::LessThanOrEqualTo(threshold),
-        3 => TableCellCustomNumberCondition::GreaterThan(threshold),
-        4 => TableCellCustomNumberCondition::GreaterThanOrEqualTo(threshold),
+        0 => Condition::EqualTo(threshold),
+        1 => Condition::LessThan(threshold),
+        2 => Condition::LessThanOrEqualTo(threshold),
+        3 => Condition::GreaterThan(threshold),
+        4 => Condition::GreaterThanOrEqualTo(threshold),
         value => {
             return Err(Error::InvalidFormat(format!(
                 "unsupported custom Number condition type {value}"
             )));
         },
     };
-    Ok(TableCellCustomNumberRule::new(
+    Ok(NumberRule::new(
         condition,
         number_pattern_from_native(&native.condition_format)?,
     ))
 }
 
-fn number_pattern_to_native(pattern: &TableCellCustomNumberPattern) -> tsk::FormatStructArchive {
+fn number_pattern_to_native(pattern: &NumberPattern) -> tsk::FormatStructArchive {
     custom_pattern_archive(
         NATIVE_CUSTOM_NUMBER_FORMAT_TYPE,
         pattern.as_str().to_owned(),
@@ -320,22 +315,19 @@ fn number_pattern_to_native(pattern: &TableCellCustomNumberPattern) -> tsk::Form
     )
 }
 
-fn number_pattern_from_native(
-    native: &tsk::FormatStructArchive,
-) -> Result<TableCellCustomNumberPattern> {
+fn number_pattern_from_native(native: &tsk::FormatStructArchive) -> Result<NumberPattern> {
     validate_custom_pattern_archive(native, NATIVE_CUSTOM_NUMBER_FORMAT_TYPE)?;
-    TableCellCustomNumberPattern::try_new(
+    NumberPattern::try_new(
         native
             .custom_format_string
             .as_ref()
             .expect("validated custom format string")
             .clone(),
     )
+    .map_err(Into::into)
 }
 
-fn date_time_pattern_to_native(
-    pattern: &TableCellCustomDateTimePattern,
-) -> tsk::FormatStructArchive {
+fn date_time_pattern_to_native(pattern: &DateTimePattern) -> tsk::FormatStructArchive {
     custom_pattern_archive(
         NATIVE_CUSTOM_DATE_TIME_FORMAT_TYPE,
         pattern.as_str().to_owned(),
@@ -345,33 +337,43 @@ fn date_time_pattern_to_native(
     )
 }
 
-fn date_time_pattern_from_native(
-    native: &tsk::FormatStructArchive,
-) -> Result<TableCellCustomDateTimePattern> {
+fn date_time_pattern_from_native(native: &tsk::FormatStructArchive) -> Result<DateTimePattern> {
     validate_custom_pattern_archive(native, NATIVE_CUSTOM_DATE_TIME_FORMAT_TYPE)?;
-    TableCellCustomDateTimePattern::try_new(
+    DateTimePattern::try_new(
         native
             .custom_format_string
             .as_ref()
             .expect("validated custom format string")
             .clone(),
     )
+    .map_err(Into::into)
 }
 
-fn text_pattern_to_native(format: &TableCellCustomTextFormat) -> tsk::FormatStructArchive {
+fn text_pattern_to_native(format: &CustomText) -> tsk::FormatStructArchive {
     custom_pattern_archive(
         NATIVE_CUSTOM_TEXT_FORMAT_TYPE,
-        format.native_pattern(),
+        native_text_pattern(format),
         false,
         false,
         u32::try_from(format.suffix().encode_utf16().count()).unwrap_or(u32::MAX),
     )
 }
 
-fn text_pattern_from_native(
-    name: TableCellCustomFormatName,
-    native: &tsk::FormatStructArchive,
-) -> Result<TableCellCustomTextFormat> {
+fn native_text_pattern(format: &CustomText) -> String {
+    let mut pattern = String::with_capacity(
+        format.prefix().len()
+            + format.suffix().len()
+            + usize::from(format.includes_cell_text()) * NATIVE_CUSTOM_TEXT_VALUE_TOKEN.len_utf8(),
+    );
+    pattern.push_str(format.prefix());
+    if format.includes_cell_text() {
+        pattern.push(NATIVE_CUSTOM_TEXT_VALUE_TOKEN);
+    }
+    pattern.push_str(format.suffix());
+    pattern
+}
+
+fn text_pattern_from_native(name: Name, native: &tsk::FormatStructArchive) -> Result<CustomText> {
     validate_custom_pattern_archive(native, NATIVE_CUSTOM_TEXT_FORMAT_TYPE)?;
     let pattern = native
         .custom_format_string
@@ -387,13 +389,14 @@ fn text_pattern_from_native(
     match first {
         Some((offset, _)) => {
             let suffix_offset = offset + NATIVE_CUSTOM_TEXT_VALUE_TOKEN.len_utf8();
-            TableCellCustomTextFormat::try_new(
+            CustomText::try_new(
                 name,
                 pattern[..offset].to_owned(),
                 pattern[suffix_offset..].to_owned(),
             )
+            .map_err(Into::into)
         },
-        None => TableCellCustomTextFormat::try_literal(name, pattern.clone()),
+        None => CustomText::try_literal(name, pattern.clone()).map_err(Into::into),
     }
 }
 
@@ -500,11 +503,11 @@ fn pattern_suffix_width(pattern: &str) -> u32 {
     u32::try_from(suffix.encode_utf16().count()).unwrap_or(u32::MAX)
 }
 
-fn format_type(format: &TableCellCustomFormat) -> u32 {
+fn format_type(format: &Custom) -> u32 {
     match format {
-        TableCellCustomFormat::Number(_) => NATIVE_CUSTOM_NUMBER_FORMAT_TYPE,
-        TableCellCustomFormat::Text(_) => NATIVE_CUSTOM_TEXT_FORMAT_TYPE,
-        TableCellCustomFormat::DateTime(_) => NATIVE_CUSTOM_DATE_TIME_FORMAT_TYPE,
+        Custom::Number(_) => NATIVE_CUSTOM_NUMBER_FORMAT_TYPE,
+        Custom::Text(_) => NATIVE_CUSTOM_TEXT_FORMAT_TYPE,
+        Custom::DateTime(_) => NATIVE_CUSTOM_DATE_TIME_FORMAT_TYPE,
     }
 }
 

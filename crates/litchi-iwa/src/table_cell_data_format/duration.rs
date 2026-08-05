@@ -30,26 +30,6 @@ pub enum TableCellDurationUnit {
     Milliseconds = 32,
 }
 
-impl TableCellDurationUnit {
-    pub(crate) const fn native_value(self) -> u32 {
-        self as u32
-    }
-
-    pub(crate) fn from_native(value: u32) -> Result<Self> {
-        match value {
-            1 => Ok(Self::Weeks),
-            2 => Ok(Self::Days),
-            4 => Ok(Self::Hours),
-            8 => Ok(Self::Minutes),
-            16 => Ok(Self::Seconds),
-            32 => Ok(Self::Milliseconds),
-            _ => Err(Error::InvalidFormat(format!(
-                "Unsupported native Duration unit {value}"
-            ))),
-        }
-    }
-}
-
 /// Inclusive, contiguous range of units displayed by a Duration formatter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TableCellDurationUnitRange {
@@ -117,10 +97,6 @@ impl TableCellDurationUnits {
         match self {
             Self::Automatic(range) | Self::Custom(range) => range,
         }
-    }
-
-    pub(crate) const fn uses_automatic_units(self) -> bool {
-        matches!(self, Self::Automatic(_))
     }
 }
 

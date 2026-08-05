@@ -383,6 +383,15 @@ sorted boxed pairs, and the former tuple-keyed cell maps are no longer rebuilt
 in either reader. The generic structured extractor remains the last current
 `NumbersTable::into_parts` consumer and is staged separately.
 
+The archive-free result aggregation is now isolated in
+`litchi-iwa-structured`. Its `StructuredData` value depends only on the
+semantic `litchi-keynote`, `litchi-numbers`, and `litchi-pages` leaves; it has
+no protobuf, ZIP, package, graph, or facade dependency. `litchi-iwa` retains
+the private application-specific archive traversal and constructs this value
+at the adapter boundary. This keeps cross-format result composition below the
+physical reader and gives the eventual concrete format crates a reusable
+semantic handoff without making the common vocabulary crate depend upward.
+
 The first Numbers wire seam is now `litchi-numbers::cell::wire`. It owns the
 dependency-free, byte-preserving BNC codec, stored-value and cached-scalar
 views, data-format identifiers, and decimal128 codec; it preserves unknown
@@ -402,6 +411,16 @@ Sparse offset ranges are decoded into one fallibly reserved vector, with
 count, slot, storage, and monotonicity checks performed before allocation.
 These limits belong temporarily to the adapter and are not a dense-grid
 compatibility promise.
+
+The Numbers display-format seam now follows the same rule at
+`litchi-numbers::cell::data_format`. Checked number, currency, percentage,
+scientific, fraction, numeral-system, date/time, duration, custom, and
+interactive-control values are archive-free leaf types with bounded text,
+finite numeric ranges, and typed construction errors. Native identifiers,
+protobuf fields, custom-format registries, and package publication remain in
+`litchi-iwa`'s private adapter; legacy IWA format structs are no longer used
+as the semantic API. The leaf intentionally uses compact scalar wrappers and
+boxed variable-length values so ordinary formats do not carry archive state.
 
 `litchi-drawingml::chart` owns the host-neutral classic-chart model and bounded
 XML codec. Its contextual modules are `model`, `data`, `axis`, `series`,

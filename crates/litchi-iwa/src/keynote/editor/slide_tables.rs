@@ -24,18 +24,9 @@ mod storage;
 mod title;
 mod topology;
 
-use litchi_iwa_common::comment::Comment;
 pub use conditional_highlight::KeynoteTableCellConditionalHighlightInfo;
-pub use formula::{
-    KeynoteTableFormulaAxisReference, KeynoteTableFormulaBinaryOperator,
-    KeynoteTableFormulaCachedValue, KeynoteTableFormulaCellReference,
-    KeynoteTableFormulaExpression,
-};
 use graph::{require_table_model, slide_table_graph, table_template};
-pub use sort::{
-    KeynoteTableSortColumnIndex, KeynoteTableSortDirection, KeynoteTableSortOrder,
-    KeynoteTableSortRowRange, KeynoteTableSortRule, KeynoteTableSortScope,
-};
+use litchi_iwa_common::comment::Comment;
 use storage::{remove_objects, set_table_geometry_in_package, set_uniform_table_dimensions};
 pub use title::KeynoteTableTitleSettings;
 
@@ -92,8 +83,6 @@ pub use crate::table_cell_data_format::{
     TableCellNegativeNumberStyle as KeynoteTableCellNegativeNumberStyle,
     TableCellThousandsSeparator as KeynoteTableCellThousandsSeparator,
 };
-pub use litchi_iwa_common::table::cell::number_format::NumberFormat
-    as KeynoteTableCellNumberFormat;
 pub use crate::text::ParagraphIndents as KeynoteTableCellParagraphIndents;
 pub use crate::text::ParagraphLineSpacing as KeynoteTableCellParagraphLineSpacing;
 pub use crate::text::ParagraphList as KeynoteTableCellParagraphList;
@@ -127,6 +116,7 @@ pub use litchi_iwa_common::table::cell::layout::{
     Layout as KeynoteTableCellLayout, TextWrap as KeynoteTableCellTextWrap,
     VerticalAlignment as KeynoteTableCellVerticalAlignment,
 };
+pub use litchi_iwa_common::table::cell::number_format::NumberFormat as KeynoteTableCellNumberFormat;
 /// A validated non-zero native header or footer count.
 pub type KeynoteTableHeaderCount = crate::numbers::NumbersTableHeaderCount;
 /// Lossless header/footer configuration shared by native iWork tables.
@@ -199,9 +189,7 @@ impl KeynoteSlideTable {
     }
 
     /// Iterate over cell comments without exposing the backing map.
-    pub fn iter_comments(
-        &self,
-    ) -> impl Iterator<Item = ((usize, usize), &Comment)> + '_ {
+    pub fn iter_comments(&self) -> impl Iterator<Item = ((usize, usize), &Comment)> + '_ {
         self.comments
             .iter()
             .map(|(position, comment)| (*position, comment))

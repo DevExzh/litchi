@@ -2,11 +2,13 @@ use std::env;
 
 use litchi_iwa::keynote::{
     KeynoteDocumentBuilder, KeynoteTableCellUpdate, KeynoteTableCellValue,
-    KeynoteTableColumnInsertion, KeynoteTableDimensionSize, KeynoteTableFormulaCachedValue,
-    KeynoteTableFormulaCellReference, KeynoteTableFormulaExpression, KeynoteTableHeaderCount,
+    KeynoteTableColumnInsertion, KeynoteTableDimensionSize, KeynoteTableHeaderCount,
     KeynoteTableHeaderSettings, KeynoteTableRowInsertion, KeynoteTableTitleSettings,
 };
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_keynote::slide::table::formula::{
+    FormulaCachedValue, FormulaCellReference, FormulaExpression,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = env::args()
@@ -83,14 +85,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         3,
         1,
-        KeynoteTableFormulaExpression::function(
+        FormulaExpression::function(
             "SUM",
-            [KeynoteTableFormulaExpression::range(
-                KeynoteTableFormulaCellReference::relative(1, 1),
-                KeynoteTableFormulaCellReference::relative(2, 1),
+            [FormulaExpression::range(
+                FormulaCellReference::relative(1, 1),
+                FormulaCellReference::relative(2, 1),
             )],
         ),
-        KeynoteTableFormulaCachedValue::Number(218.0),
+        FormulaCachedValue::Number(218.0),
     )?;
     editor.insert_slide_table_row(0, table.model_object_id, KeynoteTableRowInsertion::body(2))?;
     editor.insert_slide_table_column(

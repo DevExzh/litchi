@@ -1,19 +1,7 @@
 //! Typed sort-rule editing and execution for Keynote slide tables.
 
 use super::*;
-
-/// A validated zero-based physical column index used by a Keynote sort rule.
-pub type KeynoteTableSortColumnIndex = crate::numbers::NumbersTableSortColumnIndex;
-/// Sort direction for one Keynote table column.
-pub type KeynoteTableSortDirection = crate::numbers::NumbersTableSortDirection;
-/// One sort-configuration rule in priority order.
-pub type KeynoteTableSortRule = crate::numbers::NumbersTableSortRule;
-/// Rows targeted by a persisted Keynote table sort configuration.
-pub type KeynoteTableSortScope = crate::numbers::NumbersTableSortScope;
-/// A non-empty body-relative half-open row range for selected-row sorting.
-pub type KeynoteTableSortRowRange = crate::numbers::NumbersTableSortRowRange;
-/// An ordered, non-empty Keynote sort-rule configuration.
-pub type KeynoteTableSortOrder = crate::numbers::NumbersTableSortOrder;
+use litchi_keynote::slide::table::sort::{Order, RowRange};
 
 impl KeynoteEditor {
     /// Read a slide table's persisted native sort-rule configuration.
@@ -25,7 +13,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         model_object_id: u64,
-    ) -> Result<Option<KeynoteTableSortOrder>> {
+    ) -> Result<Option<Order>> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_sort_order_in_package(self.package(), model_object_id)
     }
@@ -39,7 +27,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         model_object_id: u64,
-        order: KeynoteTableSortOrder,
+        order: Order,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
         if self
@@ -158,7 +146,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         model_object_id: u64,
-        rows: KeynoteTableSortRowRange,
+        rows: RowRange,
     ) -> Result<bool> {
         require_table_model(self, slide_index, model_object_id)?;
         let order = self

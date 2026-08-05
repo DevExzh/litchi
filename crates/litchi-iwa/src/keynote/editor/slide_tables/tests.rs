@@ -1,9 +1,6 @@
 use super::*;
 use crate::keynote::KeynoteDocumentBuilder;
 use crate::numbers::cell::CellValue;
-use litchi_iwa_common::table::cell::conditional_highlight::{
-    Condition, Rule, Style, Text,
-};
 use crate::table_cell_data_format::{
     TableCellCurrencyCode, TableCellCurrencyStyle, TableCellCustomFormatName,
     TableCellCustomNumberFormat, TableCellCustomNumberPattern, TableCellFractionAccuracy,
@@ -12,9 +9,14 @@ use crate::table_cell_data_format::{
 };
 use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
 use litchi_iwa_common::table::cell::BorderSide;
+use litchi_iwa_common::table::cell::conditional_highlight::{Condition, Rule, Style, Text};
 use litchi_iwa_common::table::cell::number_format::{
     DecimalPlaces as NumberDecimalPlaces, NegativeStyle as NumberNegativeStyle,
     ThousandsSeparator as NumberThousandsSeparator,
+};
+use litchi_keynote::slide::table::{
+    formula::{FormulaCachedValue, FormulaCellReference, FormulaExpression},
+    sort::{ColumnIndex, Direction, Order, RowRange, Rule as SortRule},
 };
 
 fn table_geometry() -> (DrawablePoint, DrawableSize) {
@@ -70,9 +72,7 @@ fn source_built_table_creates_and_replaces_conditional_highlighting() {
         )
         .unwrap();
     let rule = Rule::new(
-        Condition::TextContains(
-            Text::new("grain").unwrap(),
-        ),
+        Condition::TextContains(Text::new("grain").unwrap()),
         Style::with_text_color(
             crate::shapes::RgbaColor::new(0.1, 0.6, 0.2, 1.0, crate::shapes::RgbColorSpace::Srgb)
                 .unwrap(),
@@ -678,11 +678,10 @@ fn source_built_table_roundtrips_slider_format_crud() {
         .add_slide_table(0, "Sliders", 3, 3, position, size)
         .unwrap();
     let range = KeynoteTableCellSliderRange::new(-10.0, 30.0, 0.5).unwrap();
-    let format =
-        KeynoteTableCellSliderFormat::new(
-            range,
-            crate::table_cell_data_format::TableCellNumberFormat::default().into(),
-        );
+    let format = KeynoteTableCellSliderFormat::new(
+        range,
+        crate::table_cell_data_format::TableCellNumberFormat::default().into(),
+    );
     editor
         .set_slide_table_cell_slider_format(0, table.model_object_id, 1, 1, format.clone())
         .unwrap();
@@ -722,11 +721,10 @@ fn source_built_table_roundtrips_stepper_format_crud() {
         .add_slide_table(0, "Steppers", 3, 3, position, size)
         .unwrap();
     let range = KeynoteTableCellStepperRange::new(-10.0, 30.0, 0.5).unwrap();
-    let format =
-        KeynoteTableCellStepperFormat::new(
-            range,
-            crate::table_cell_data_format::TableCellNumberFormat::default().into(),
-        );
+    let format = KeynoteTableCellStepperFormat::new(
+        range,
+        crate::table_cell_data_format::TableCellNumberFormat::default().into(),
+    );
     editor
         .set_slide_table_cell_stepper_format(0, table.model_object_id, 1, 1, format.clone())
         .unwrap();
@@ -1066,14 +1064,14 @@ fn source_built_table_duplication_clones_formula_storage_and_geometry() {
             source.model_object_id,
             2,
             1,
-            KeynoteTableFormulaExpression::function(
+            FormulaExpression::function(
                 "SUM",
                 [
-                    KeynoteTableFormulaExpression::Number(100.0),
-                    KeynoteTableFormulaExpression::Number(25.0),
+                    FormulaExpression::Number(100.0),
+                    FormulaExpression::Number(25.0),
                 ],
             ),
-            KeynoteTableFormulaCachedValue::Number(125.0),
+            FormulaCachedValue::Number(125.0),
         )
         .unwrap();
 
@@ -1198,14 +1196,14 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
         .slide_table_cell_comment(0, model_id, 1, 1)
         .unwrap()
         .unwrap()
-            .storage_id;
+        .storage_id;
     let hidden = HiddenAxes::new([AxisIndex::row(2)]).unwrap();
     editor
         .set_slide_table_hidden_axes(0, model_id, &hidden)
         .unwrap();
-    let order = KeynoteTableSortOrder::new([KeynoteTableSortRule::new(
-        KeynoteTableSortColumnIndex::new(0).unwrap(),
-        KeynoteTableSortDirection::Ascending,
+    let order = Order::new([SortRule::new(
+        ColumnIndex::new(0).unwrap(),
+        Direction::Ascending,
     )])
     .unwrap();
 
@@ -1297,9 +1295,9 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
         .unwrap();
     assert_eq!(reopened.to_bytes().unwrap(), unchanged);
 
-    let invalid = KeynoteTableSortOrder::new([KeynoteTableSortRule::new(
-        KeynoteTableSortColumnIndex::new(2).unwrap(),
-        KeynoteTableSortDirection::Ascending,
+    let invalid = Order::new([SortRule::new(
+        ColumnIndex::new(2).unwrap(),
+        Direction::Ascending,
     )])
     .unwrap();
     let before_invalid = reopened.to_bytes().unwrap();
@@ -1310,9 +1308,9 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_invalid);
 
-    let selected_order = KeynoteTableSortOrder::selected_rows([KeynoteTableSortRule::new(
-        KeynoteTableSortColumnIndex::new(0).unwrap(),
-        KeynoteTableSortDirection::Descending,
+    let selected_order = Order::selected_rows([SortRule::new(
+        ColumnIndex::new(0).unwrap(),
+        Direction::Descending,
     )])
     .unwrap();
     reopened
@@ -1327,11 +1325,7 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
     assert_eq!(reopened.to_bytes().unwrap(), before_wrong_executor);
     assert!(
         reopened
-            .apply_slide_table_sort_order_to_rows(
-                0,
-                model_id,
-                KeynoteTableSortRowRange::new(1, 4).unwrap(),
-            )
+            .apply_slide_table_sort_order_to_rows(0, model_id, RowRange::new(1, 4).unwrap(),)
             .unwrap()
     );
     let table = reopened.slide_table(0, model_id).unwrap();
@@ -1405,14 +1399,14 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
             table.model_object_id,
             2,
             1,
-            KeynoteTableFormulaExpression::function(
+            FormulaExpression::function(
                 "SUM",
                 [
-                    KeynoteTableFormulaExpression::Number(1.0),
-                    KeynoteTableFormulaExpression::Number(2.0),
+                    FormulaExpression::Number(1.0),
+                    FormulaExpression::Number(2.0),
                 ],
             ),
-            KeynoteTableFormulaCachedValue::Number(3.0),
+            FormulaCachedValue::Number(3.0),
         )
         .unwrap();
 
@@ -1430,14 +1424,14 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
             table.model_object_id,
             2,
             1,
-            KeynoteTableFormulaExpression::function(
+            FormulaExpression::function(
                 "SUM",
                 [
-                    KeynoteTableFormulaExpression::Number(3.0),
-                    KeynoteTableFormulaExpression::Number(4.0),
+                    FormulaExpression::Number(3.0),
+                    FormulaExpression::Number(4.0),
                 ],
             ),
-            KeynoteTableFormulaCachedValue::Number(7.0),
+            FormulaCachedValue::Number(7.0),
         )
         .unwrap();
     assert_eq!(
@@ -1456,8 +1450,8 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
                 table.model_object_id,
                 usize::MAX,
                 1,
-                KeynoteTableFormulaExpression::Number(1.0),
-                KeynoteTableFormulaCachedValue::Number(1.0),
+                FormulaExpression::Number(1.0),
+                FormulaCachedValue::Number(1.0),
             )
             .is_err()
     );
@@ -1508,8 +1502,8 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
             model_id,
             2,
             2,
-            KeynoteTableFormulaExpression::cell(KeynoteTableFormulaCellReference::relative(1, 1)),
-            KeynoteTableFormulaCachedValue::Number(7.0),
+            FormulaExpression::cell(FormulaCellReference::relative(1, 1)),
+            FormulaCachedValue::Number(7.0),
         )
         .unwrap();
     editor
@@ -1598,14 +1592,14 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
             model_id,
             3,
             1,
-            KeynoteTableFormulaExpression::function(
+            FormulaExpression::function(
                 "SUM",
-                [KeynoteTableFormulaExpression::range(
-                    KeynoteTableFormulaCellReference::relative(1, 1),
-                    KeynoteTableFormulaCellReference::relative(2, 1),
+                [FormulaExpression::range(
+                    FormulaCellReference::relative(1, 1),
+                    FormulaCellReference::relative(2, 1),
                 )],
             ),
-            KeynoteTableFormulaCachedValue::Number(3.0),
+            FormulaCachedValue::Number(3.0),
         )
         .unwrap();
     let mut package = editor.into_package();

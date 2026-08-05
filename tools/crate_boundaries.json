@@ -87,6 +87,7 @@
       "litchi-iwa-graph",
       "litchi-iwa-package",
       "litchi-iwa-protos",
+      "litchi-iwa-structured",
       "litchi-iwa-text",
       "litchi-keynote",
       "litchi-numbers",
@@ -100,10 +101,16 @@
     "litchi-iwa-graph": [],
     "litchi-iwa-package": [],
     "litchi-iwa-protos": [],
+    "litchi-iwa-structured": [
+      "litchi-keynote",
+      "litchi-numbers",
+      "litchi-pages"
+    ],
     "litchi-iwa-text": [],
     "litchi-keynote": [
       "litchi-iwa-common",
-      "litchi-iwa-text"
+      "litchi-iwa-text",
+      "litchi-numbers"
     ],
     "litchi-markdown": [
       "litchi-core"
@@ -291,6 +298,7 @@
     "litchi-iwa-graph",
     "litchi-iwa-package",
     "litchi-iwa-protos",
+    "litchi-iwa-structured",
     "litchi-iwa-text",
     "litchi-keynote",
     "litchi-numbers",

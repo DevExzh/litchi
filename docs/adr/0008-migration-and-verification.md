@@ -6178,6 +6178,25 @@ defaults, unknown loop values, and strict volume validation in their existing
 IWA boundary. The old `KeynoteSlideAudioOptions` definition and re-exports are
 removed rather than retained as compatibility aliases.
 
+The next structural handoff isolates archive-free structured aggregation in
+`litchi-iwa-structured`. `StructuredData` owns only the semantic table, slide,
+and section vectors supplied by `litchi-numbers`, `litchi-keynote`, and
+`litchi-pages`; native archive traversal remains in private `litchi-iwa`
+extractors. The new leaf has no protobuf, package, ZIP, or facade dependency,
+and the executable boundary policy records its three downward format edges.
+The new leaf's focused tests, the IWA structured extractor tests, the boundary
+policy tests, and strict no-dependency Clippy all pass. This is a crate-topology
+handoff, not native application evidence; the existing native iWork fixture
+matrix remains the authoritative verification for serialized packages.
+
+The Numbers cell display-format seam is also complete for this migration
+slice. `litchi-numbers::cell::data_format` now owns the archive-free checked
+format values, while the IWA adapter retains native registry IDs, protobuf
+codec details, and package mutation. Its 63 leaf tests, the 1,505-test IWA
+library suite, and strict no-dependency Clippy passed after the adapter
+conversion; no native application claim is made for this ownership-only
+change.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

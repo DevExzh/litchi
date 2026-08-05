@@ -3,20 +3,40 @@
 use super::*;
 use crate::numbers::bnc;
 use crate::protobuf::tsk::FormatStructArchive;
-use crate::table_cell_data_format::{
-    TableCellCheckboxFormat, TableCellCurrencyFormat, TableCellCustomFormat, TableCellDataFormat,
-    TableCellDateTimeFormat, TableCellDurationFormat, TableCellFractionFormat,
-    TableCellNumberFormat, TableCellNumeralSystemFormat, TableCellNumericControlDisplayFormat,
-    TableCellPercentageFormat, TableCellPopUpMenuFormat, TableCellPopUpMenuInitialSelection,
-    TableCellScientificFormat, TableCellSliderFormat, TableCellStarRatingFormat,
-    TableCellStepperFormat, TableCellTextFormat,
+use crate::table_cell_data_format as legacy;
+use litchi_numbers::cell::data_format::control::DisplayFormat;
+use litchi_numbers::cell::data_format::control::Range;
+use litchi_numbers::cell::data_format::duration::{Style, Unit, UnitRange, Units};
+use litchi_numbers::cell::data_format::number::{
+    CurrencyCode, CurrencyStyle, DecimalPlaces, FixedDecimalPlaces, FractionAccuracy,
+    NegativeStyle, ThousandsSeparator,
 };
-#[cfg(test)]
-use crate::table_cell_data_format::{
-    TableCellCurrencyCode, TableCellCurrencyStyle, TableCellDecimalPlaces,
-    TableCellFixedDecimalPlaces, TableCellNegativeNumberStyle, TableCellSliderRange,
-    TableCellStepperRange, TableCellThousandsSeparator,
+use litchi_numbers::cell::data_format::numeral_system::{
+    Base, FixedPlaces, NegativeStyle as NumeralNegativeStyle, Places,
 };
+use litchi_numbers::cell::data_format::pop_up_menu::InitialSelection;
+use litchi_numbers::cell::data_format::{
+    Checkbox, Currency, Custom, DataFormat, DateTime, Duration, Fraction, Number, NumeralSystem,
+    Percentage, PopUpMenu, Scientific, Slider, StarRating, Stepper, Text,
+};
+
+macro_rules! map_semantic_format_error {
+    ($error:ty) => {
+        impl From<$error> for crate::Error {
+            fn from(error: $error) -> Self {
+                Self::InvalidFormat(error.to_string())
+            }
+        }
+    };
+}
+
+map_semantic_format_error!(litchi_numbers::cell::data_format::control::Error);
+map_semantic_format_error!(litchi_numbers::cell::data_format::custom::Error);
+map_semantic_format_error!(litchi_numbers::cell::data_format::date_time::Error);
+map_semantic_format_error!(litchi_numbers::cell::data_format::duration::Error);
+map_semantic_format_error!(litchi_numbers::cell::data_format::number::Error);
+map_semantic_format_error!(litchi_numbers::cell::data_format::numeral_system::Error);
+map_semantic_format_error!(litchi_numbers::cell::data_format::pop_up_menu::Error);
 
 mod codec;
 mod control;
@@ -29,7 +49,7 @@ pub(super) fn cell_data_format(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<TableCellDataFormat> {
+) -> Result<DataFormat> {
     let location = model::locate_attached_cell(package, table_id, row, column)?;
     let Some(data) = storage::read_tile_cell(
         package,
@@ -39,11 +59,11 @@ pub(super) fn cell_data_format(
         column,
     )?
     else {
-        return Ok(TableCellDataFormat::Automatic);
+        return Ok(DataFormat::Automatic);
     };
     let cell = BncCell::parse(&data)?;
     match format_reference(&cell)? {
-        CellFormatReference::Automatic { .. } => Ok(TableCellDataFormat::Automatic),
+        CellFormatReference::Automatic { .. } => Ok(DataFormat::Automatic),
         CellFormatReference::Explicit { identifier, .. } => {
             let resolved = resolve_format_table(package, &location)?;
             let entry = required_format_entry(&resolved, identifier)?;
@@ -59,17 +79,17 @@ pub(super) fn cell_data_format(
             match control {
                 None => {
                     let format = if custom::reference_uuid(native)?.is_some() {
-                        TableCellDataFormat::Custom(custom::resolve_reference(package, native)?)
+                        DataFormat::Custom(custom::resolve_reference(package, native)?)
                     } else {
                         data_format_from_native(native)?
                     };
                     if matches!(
                         format,
-                        TableCellDataFormat::Checkbox(_)
-                            | TableCellDataFormat::StarRating(_)
-                            | TableCellDataFormat::Slider(_)
-                            | TableCellDataFormat::Stepper(_)
-                            | TableCellDataFormat::PopUpMenu(_)
+                        DataFormat::Checkbox(_)
+                            | DataFormat::StarRating(_)
+                            | DataFormat::Slider(_)
+                            | DataFormat::Stepper(_)
+                            | DataFormat::PopUpMenu(_)
                     ) {
                         return Err(Error::InvalidFormat(
                             "Interactive cell format has no control-cell-spec reference".to_owned(),
@@ -84,7 +104,7 @@ pub(super) fn cell_data_format(
                         ));
                     }
                     let format = data_format_from_native(native)?;
-                    if !matches!(format, TableCellDataFormat::Checkbox(_)) {
+                    if !matches!(format, DataFormat::Checkbox(_)) {
                         return Err(Error::InvalidFormat(
                             "Checkbox control references a non-Checkbox format".to_owned(),
                         ));
@@ -98,7 +118,7 @@ pub(super) fn cell_data_format(
                         ));
                     }
                     let format = data_format_from_native(native)?;
-                    if !matches!(format, TableCellDataFormat::StarRating(_)) {
+                    if !matches!(format, DataFormat::StarRating(_)) {
                         return Err(Error::InvalidFormat(
                             "Star Rating control references a non-Star-Rating format".to_owned(),
                         ));
@@ -108,9 +128,7 @@ pub(super) fn cell_data_format(
                 Some(control::ControlCellSpecKind::Slider(range)) => {
                     let display_format = numeric_control_display_from_native(native)?;
                     let expected_kind = match display_format {
-                        TableCellNumericControlDisplayFormat::Currency(_) => {
-                            bnc::CURRENCY_CELL_FORMAT_KIND
-                        },
+                        DisplayFormat::Currency(_) => bnc::CURRENCY_CELL_FORMAT_KIND,
                         _ => bnc::DECIMAL_CELL_FORMAT_KIND,
                     };
                     if cell.cell_format_kind() != Some(expected_kind) {
@@ -118,17 +136,12 @@ pub(super) fn cell_data_format(
                             "Slider control uses inconsistent BNC format metadata".to_owned(),
                         ));
                     }
-                    Ok(TableCellDataFormat::Slider(TableCellSliderFormat::new(
-                        range,
-                        display_format,
-                    )))
+                    Ok(DataFormat::Slider(Slider::new(range, display_format)))
                 },
                 Some(control::ControlCellSpecKind::Stepper(range)) => {
                     let display_format = numeric_control_display_from_native(native)?;
                     let expected_kind = match display_format {
-                        TableCellNumericControlDisplayFormat::Currency(_) => {
-                            bnc::CURRENCY_CELL_FORMAT_KIND
-                        },
+                        DisplayFormat::Currency(_) => bnc::CURRENCY_CELL_FORMAT_KIND,
                         _ => bnc::DECIMAL_CELL_FORMAT_KIND,
                     };
                     if cell.cell_format_kind() != Some(expected_kind) {
@@ -136,10 +149,7 @@ pub(super) fn cell_data_format(
                             "Stepper control uses inconsistent BNC format metadata".to_owned(),
                         ));
                     }
-                    Ok(TableCellDataFormat::Stepper(TableCellStepperFormat::new(
-                        range,
-                        display_format,
-                    )))
+                    Ok(DataFormat::Stepper(Stepper::new(range, display_format)))
                 },
                 Some(control::ControlCellSpecKind::PopUpMenu(format)) => {
                     validate_text_format(native)?;
@@ -148,7 +158,7 @@ pub(super) fn cell_data_format(
                             "Pop-Up Menu control uses inconsistent BNC format metadata".to_owned(),
                         ));
                     }
-                    Ok(TableCellDataFormat::PopUpMenu(format))
+                    Ok(DataFormat::PopUpMenu(format))
                 },
             }
         },
@@ -160,24 +170,24 @@ pub(super) fn cell_number_format(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<TableCellNumberFormat>> {
+) -> Result<Option<Number>> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(None),
-        TableCellDataFormat::Number(format) => Ok(Some(format)),
-        TableCellDataFormat::Currency(_)
-        | TableCellDataFormat::Percentage(_)
-        | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::NumeralSystem(_)
-        | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_)
-        | TableCellDataFormat::Checkbox(_)
-        | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_)
-        | TableCellDataFormat::Text(_)
-        | TableCellDataFormat::Custom(_)
-        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
+        DataFormat::Automatic => Ok(None),
+        DataFormat::Number(format) => Ok(Some(format)),
+        DataFormat::Currency(_)
+        | DataFormat::Percentage(_)
+        | DataFormat::Scientific(_)
+        | DataFormat::Fraction(_)
+        | DataFormat::NumeralSystem(_)
+        | DataFormat::DateTime(_)
+        | DataFormat::Duration(_)
+        | DataFormat::Checkbox(_)
+        | DataFormat::StarRating(_)
+        | DataFormat::Slider(_)
+        | DataFormat::Stepper(_)
+        | DataFormat::Text(_)
+        | DataFormat::Custom(_)
+        | DataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Number data format".to_owned(),
         )),
     }
@@ -188,10 +198,10 @@ pub(super) fn cell_custom_format(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<TableCellCustomFormat>> {
+) -> Result<Option<Custom>> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(None),
-        TableCellDataFormat::Custom(format) => Ok(Some(format)),
+        DataFormat::Automatic => Ok(None),
+        DataFormat::Custom(format) => Ok(Some(format)),
         _ => Err(Error::InvalidFormat(
             "Table cell does not use a Custom data format".to_owned(),
         )),
@@ -205,8 +215,8 @@ pub(super) fn reset_cell_custom_format(
     column: usize,
 ) -> Result<bool> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(false),
-        TableCellDataFormat::Custom(_) => reset_cell_data_format(package, table_id, row, column),
+        DataFormat::Automatic => Ok(false),
+        DataFormat::Custom(_) => reset_cell_data_format(package, table_id, row, column),
         _ => Err(Error::InvalidFormat(
             "Cannot reset Custom format from a non-Custom cell".to_owned(),
         )),
@@ -218,10 +228,10 @@ pub(super) fn cell_text_format(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<TableCellTextFormat>> {
+) -> Result<Option<Text>> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(None),
-        TableCellDataFormat::Text(format) => Ok(Some(format)),
+        DataFormat::Automatic => Ok(None),
+        DataFormat::Text(format) => Ok(Some(format)),
         _ => Err(Error::InvalidFormat(
             "Table cell does not use the Text data format".to_owned(),
         )),
@@ -235,8 +245,8 @@ pub(super) fn reset_cell_text_format(
     column: usize,
 ) -> Result<bool> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(false),
-        TableCellDataFormat::Text(_) => reset_cell_data_format(package, table_id, row, column),
+        DataFormat::Automatic => Ok(false),
+        DataFormat::Text(_) => reset_cell_data_format(package, table_id, row, column),
         _ => Err(Error::InvalidFormat(
             "Cannot reset Text format from a non-Text cell".to_owned(),
         )),
@@ -248,24 +258,24 @@ pub(super) fn cell_currency_format(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<TableCellCurrencyFormat>> {
+) -> Result<Option<Currency>> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(None),
-        TableCellDataFormat::Currency(format) => Ok(Some(format)),
-        TableCellDataFormat::Number(_)
-        | TableCellDataFormat::Percentage(_)
-        | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::NumeralSystem(_)
-        | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_)
-        | TableCellDataFormat::Checkbox(_)
-        | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_)
-        | TableCellDataFormat::Text(_)
-        | TableCellDataFormat::Custom(_)
-        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
+        DataFormat::Automatic => Ok(None),
+        DataFormat::Currency(format) => Ok(Some(format)),
+        DataFormat::Number(_)
+        | DataFormat::Percentage(_)
+        | DataFormat::Scientific(_)
+        | DataFormat::Fraction(_)
+        | DataFormat::NumeralSystem(_)
+        | DataFormat::DateTime(_)
+        | DataFormat::Duration(_)
+        | DataFormat::Checkbox(_)
+        | DataFormat::StarRating(_)
+        | DataFormat::Slider(_)
+        | DataFormat::Stepper(_)
+        | DataFormat::Text(_)
+        | DataFormat::Custom(_)
+        | DataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Currency data format".to_owned(),
         )),
     }
@@ -278,22 +288,22 @@ pub(super) fn reset_cell_currency_format(
     column: usize,
 ) -> Result<bool> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(false),
-        TableCellDataFormat::Currency(_) => reset_cell_data_format(package, table_id, row, column),
-        TableCellDataFormat::Number(_)
-        | TableCellDataFormat::Percentage(_)
-        | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::NumeralSystem(_)
-        | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_)
-        | TableCellDataFormat::Checkbox(_)
-        | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_)
-        | TableCellDataFormat::Text(_)
-        | TableCellDataFormat::Custom(_)
-        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
+        DataFormat::Automatic => Ok(false),
+        DataFormat::Currency(_) => reset_cell_data_format(package, table_id, row, column),
+        DataFormat::Number(_)
+        | DataFormat::Percentage(_)
+        | DataFormat::Scientific(_)
+        | DataFormat::Fraction(_)
+        | DataFormat::NumeralSystem(_)
+        | DataFormat::DateTime(_)
+        | DataFormat::Duration(_)
+        | DataFormat::Checkbox(_)
+        | DataFormat::StarRating(_)
+        | DataFormat::Slider(_)
+        | DataFormat::Stepper(_)
+        | DataFormat::Text(_)
+        | DataFormat::Custom(_)
+        | DataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Currency format from a non-Currency cell".to_owned(),
         )),
     }
@@ -304,24 +314,24 @@ pub(super) fn cell_percentage_format(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<TableCellPercentageFormat>> {
+) -> Result<Option<Percentage>> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(None),
-        TableCellDataFormat::Percentage(format) => Ok(Some(format)),
-        TableCellDataFormat::Number(_)
-        | TableCellDataFormat::Currency(_)
-        | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::NumeralSystem(_)
-        | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_)
-        | TableCellDataFormat::Checkbox(_)
-        | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_)
-        | TableCellDataFormat::Text(_)
-        | TableCellDataFormat::Custom(_)
-        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
+        DataFormat::Automatic => Ok(None),
+        DataFormat::Percentage(format) => Ok(Some(format)),
+        DataFormat::Number(_)
+        | DataFormat::Currency(_)
+        | DataFormat::Scientific(_)
+        | DataFormat::Fraction(_)
+        | DataFormat::NumeralSystem(_)
+        | DataFormat::DateTime(_)
+        | DataFormat::Duration(_)
+        | DataFormat::Checkbox(_)
+        | DataFormat::StarRating(_)
+        | DataFormat::Slider(_)
+        | DataFormat::Stepper(_)
+        | DataFormat::Text(_)
+        | DataFormat::Custom(_)
+        | DataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Percentage data format".to_owned(),
         )),
     }
@@ -332,24 +342,24 @@ pub(super) fn cell_scientific_format(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<TableCellScientificFormat>> {
+) -> Result<Option<Scientific>> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(None),
-        TableCellDataFormat::Scientific(format) => Ok(Some(format)),
-        TableCellDataFormat::Number(_)
-        | TableCellDataFormat::Currency(_)
-        | TableCellDataFormat::Percentage(_)
-        | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::NumeralSystem(_)
-        | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_)
-        | TableCellDataFormat::Checkbox(_)
-        | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_)
-        | TableCellDataFormat::Text(_)
-        | TableCellDataFormat::Custom(_)
-        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
+        DataFormat::Automatic => Ok(None),
+        DataFormat::Scientific(format) => Ok(Some(format)),
+        DataFormat::Number(_)
+        | DataFormat::Currency(_)
+        | DataFormat::Percentage(_)
+        | DataFormat::Fraction(_)
+        | DataFormat::NumeralSystem(_)
+        | DataFormat::DateTime(_)
+        | DataFormat::Duration(_)
+        | DataFormat::Checkbox(_)
+        | DataFormat::StarRating(_)
+        | DataFormat::Slider(_)
+        | DataFormat::Stepper(_)
+        | DataFormat::Text(_)
+        | DataFormat::Custom(_)
+        | DataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Scientific data format".to_owned(),
         )),
     }
@@ -362,24 +372,22 @@ pub(super) fn reset_cell_scientific_format(
     column: usize,
 ) -> Result<bool> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(false),
-        TableCellDataFormat::Scientific(_) => {
-            reset_cell_data_format(package, table_id, row, column)
-        },
-        TableCellDataFormat::Number(_)
-        | TableCellDataFormat::Currency(_)
-        | TableCellDataFormat::Percentage(_)
-        | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::NumeralSystem(_)
-        | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_)
-        | TableCellDataFormat::Checkbox(_)
-        | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_)
-        | TableCellDataFormat::Text(_)
-        | TableCellDataFormat::Custom(_)
-        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
+        DataFormat::Automatic => Ok(false),
+        DataFormat::Scientific(_) => reset_cell_data_format(package, table_id, row, column),
+        DataFormat::Number(_)
+        | DataFormat::Currency(_)
+        | DataFormat::Percentage(_)
+        | DataFormat::Fraction(_)
+        | DataFormat::NumeralSystem(_)
+        | DataFormat::DateTime(_)
+        | DataFormat::Duration(_)
+        | DataFormat::Checkbox(_)
+        | DataFormat::StarRating(_)
+        | DataFormat::Slider(_)
+        | DataFormat::Stepper(_)
+        | DataFormat::Text(_)
+        | DataFormat::Custom(_)
+        | DataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Scientific format from a non-Scientific cell".to_owned(),
         )),
     }
@@ -390,24 +398,24 @@ pub(super) fn cell_fraction_format(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<TableCellFractionFormat>> {
+) -> Result<Option<Fraction>> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(None),
-        TableCellDataFormat::Fraction(format) => Ok(Some(format)),
-        TableCellDataFormat::Number(_)
-        | TableCellDataFormat::Currency(_)
-        | TableCellDataFormat::Percentage(_)
-        | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::NumeralSystem(_)
-        | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_)
-        | TableCellDataFormat::Checkbox(_)
-        | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_)
-        | TableCellDataFormat::Text(_)
-        | TableCellDataFormat::Custom(_)
-        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
+        DataFormat::Automatic => Ok(None),
+        DataFormat::Fraction(format) => Ok(Some(format)),
+        DataFormat::Number(_)
+        | DataFormat::Currency(_)
+        | DataFormat::Percentage(_)
+        | DataFormat::Scientific(_)
+        | DataFormat::NumeralSystem(_)
+        | DataFormat::DateTime(_)
+        | DataFormat::Duration(_)
+        | DataFormat::Checkbox(_)
+        | DataFormat::StarRating(_)
+        | DataFormat::Slider(_)
+        | DataFormat::Stepper(_)
+        | DataFormat::Text(_)
+        | DataFormat::Custom(_)
+        | DataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Fraction data format".to_owned(),
         )),
     }
@@ -420,22 +428,22 @@ pub(super) fn reset_cell_fraction_format(
     column: usize,
 ) -> Result<bool> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(false),
-        TableCellDataFormat::Fraction(_) => reset_cell_data_format(package, table_id, row, column),
-        TableCellDataFormat::Number(_)
-        | TableCellDataFormat::Currency(_)
-        | TableCellDataFormat::Percentage(_)
-        | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::NumeralSystem(_)
-        | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_)
-        | TableCellDataFormat::Checkbox(_)
-        | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_)
-        | TableCellDataFormat::Text(_)
-        | TableCellDataFormat::Custom(_)
-        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
+        DataFormat::Automatic => Ok(false),
+        DataFormat::Fraction(_) => reset_cell_data_format(package, table_id, row, column),
+        DataFormat::Number(_)
+        | DataFormat::Currency(_)
+        | DataFormat::Percentage(_)
+        | DataFormat::Scientific(_)
+        | DataFormat::NumeralSystem(_)
+        | DataFormat::DateTime(_)
+        | DataFormat::Duration(_)
+        | DataFormat::Checkbox(_)
+        | DataFormat::StarRating(_)
+        | DataFormat::Slider(_)
+        | DataFormat::Stepper(_)
+        | DataFormat::Text(_)
+        | DataFormat::Custom(_)
+        | DataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Fraction format from a non-Fraction cell".to_owned(),
         )),
     }
@@ -446,24 +454,24 @@ pub(super) fn cell_numeral_system_format(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<TableCellNumeralSystemFormat>> {
+) -> Result<Option<NumeralSystem>> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(None),
-        TableCellDataFormat::NumeralSystem(format) => Ok(Some(format)),
-        TableCellDataFormat::Number(_)
-        | TableCellDataFormat::Currency(_)
-        | TableCellDataFormat::Percentage(_)
-        | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_)
-        | TableCellDataFormat::Checkbox(_)
-        | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_)
-        | TableCellDataFormat::Text(_)
-        | TableCellDataFormat::Custom(_)
-        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
+        DataFormat::Automatic => Ok(None),
+        DataFormat::NumeralSystem(format) => Ok(Some(format)),
+        DataFormat::Number(_)
+        | DataFormat::Currency(_)
+        | DataFormat::Percentage(_)
+        | DataFormat::Scientific(_)
+        | DataFormat::Fraction(_)
+        | DataFormat::DateTime(_)
+        | DataFormat::Duration(_)
+        | DataFormat::Checkbox(_)
+        | DataFormat::StarRating(_)
+        | DataFormat::Slider(_)
+        | DataFormat::Stepper(_)
+        | DataFormat::Text(_)
+        | DataFormat::Custom(_)
+        | DataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Numeral System data format".to_owned(),
         )),
     }
@@ -476,24 +484,22 @@ pub(super) fn reset_cell_numeral_system_format(
     column: usize,
 ) -> Result<bool> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(false),
-        TableCellDataFormat::NumeralSystem(_) => {
-            reset_cell_data_format(package, table_id, row, column)
-        },
-        TableCellDataFormat::Number(_)
-        | TableCellDataFormat::Currency(_)
-        | TableCellDataFormat::Percentage(_)
-        | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_)
-        | TableCellDataFormat::Checkbox(_)
-        | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_)
-        | TableCellDataFormat::Text(_)
-        | TableCellDataFormat::Custom(_)
-        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
+        DataFormat::Automatic => Ok(false),
+        DataFormat::NumeralSystem(_) => reset_cell_data_format(package, table_id, row, column),
+        DataFormat::Number(_)
+        | DataFormat::Currency(_)
+        | DataFormat::Percentage(_)
+        | DataFormat::Scientific(_)
+        | DataFormat::Fraction(_)
+        | DataFormat::DateTime(_)
+        | DataFormat::Duration(_)
+        | DataFormat::Checkbox(_)
+        | DataFormat::StarRating(_)
+        | DataFormat::Slider(_)
+        | DataFormat::Stepper(_)
+        | DataFormat::Text(_)
+        | DataFormat::Custom(_)
+        | DataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Numeral System format from a non-Numeral-System cell".to_owned(),
         )),
     }
@@ -504,24 +510,24 @@ pub(super) fn cell_date_time_format(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<TableCellDateTimeFormat>> {
+) -> Result<Option<DateTime>> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(None),
-        TableCellDataFormat::DateTime(format) => Ok(Some(format)),
-        TableCellDataFormat::Number(_)
-        | TableCellDataFormat::Currency(_)
-        | TableCellDataFormat::Percentage(_)
-        | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::NumeralSystem(_)
-        | TableCellDataFormat::Duration(_)
-        | TableCellDataFormat::Checkbox(_)
-        | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_)
-        | TableCellDataFormat::Text(_)
-        | TableCellDataFormat::Custom(_)
-        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
+        DataFormat::Automatic => Ok(None),
+        DataFormat::DateTime(format) => Ok(Some(format)),
+        DataFormat::Number(_)
+        | DataFormat::Currency(_)
+        | DataFormat::Percentage(_)
+        | DataFormat::Scientific(_)
+        | DataFormat::Fraction(_)
+        | DataFormat::NumeralSystem(_)
+        | DataFormat::Duration(_)
+        | DataFormat::Checkbox(_)
+        | DataFormat::StarRating(_)
+        | DataFormat::Slider(_)
+        | DataFormat::Stepper(_)
+        | DataFormat::Text(_)
+        | DataFormat::Custom(_)
+        | DataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Date & Time data format".to_owned(),
         )),
     }
@@ -534,22 +540,22 @@ pub(super) fn reset_cell_date_time_format(
     column: usize,
 ) -> Result<bool> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(false),
-        TableCellDataFormat::DateTime(_) => reset_cell_data_format(package, table_id, row, column),
-        TableCellDataFormat::Number(_)
-        | TableCellDataFormat::Currency(_)
-        | TableCellDataFormat::Percentage(_)
-        | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::NumeralSystem(_)
-        | TableCellDataFormat::Duration(_)
-        | TableCellDataFormat::Checkbox(_)
-        | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_)
-        | TableCellDataFormat::Text(_)
-        | TableCellDataFormat::Custom(_)
-        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
+        DataFormat::Automatic => Ok(false),
+        DataFormat::DateTime(_) => reset_cell_data_format(package, table_id, row, column),
+        DataFormat::Number(_)
+        | DataFormat::Currency(_)
+        | DataFormat::Percentage(_)
+        | DataFormat::Scientific(_)
+        | DataFormat::Fraction(_)
+        | DataFormat::NumeralSystem(_)
+        | DataFormat::Duration(_)
+        | DataFormat::Checkbox(_)
+        | DataFormat::StarRating(_)
+        | DataFormat::Slider(_)
+        | DataFormat::Stepper(_)
+        | DataFormat::Text(_)
+        | DataFormat::Custom(_)
+        | DataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Date & Time format from a non-Date-Time cell".to_owned(),
         )),
     }
@@ -560,24 +566,24 @@ pub(super) fn cell_duration_format(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<TableCellDurationFormat>> {
+) -> Result<Option<Duration>> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(None),
-        TableCellDataFormat::Duration(format) => Ok(Some(format)),
-        TableCellDataFormat::Number(_)
-        | TableCellDataFormat::Currency(_)
-        | TableCellDataFormat::Percentage(_)
-        | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::NumeralSystem(_)
-        | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Checkbox(_)
-        | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_)
-        | TableCellDataFormat::Text(_)
-        | TableCellDataFormat::Custom(_)
-        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
+        DataFormat::Automatic => Ok(None),
+        DataFormat::Duration(format) => Ok(Some(format)),
+        DataFormat::Number(_)
+        | DataFormat::Currency(_)
+        | DataFormat::Percentage(_)
+        | DataFormat::Scientific(_)
+        | DataFormat::Fraction(_)
+        | DataFormat::NumeralSystem(_)
+        | DataFormat::DateTime(_)
+        | DataFormat::Checkbox(_)
+        | DataFormat::StarRating(_)
+        | DataFormat::Slider(_)
+        | DataFormat::Stepper(_)
+        | DataFormat::Text(_)
+        | DataFormat::Custom(_)
+        | DataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Duration data format".to_owned(),
         )),
     }
@@ -590,22 +596,22 @@ pub(super) fn reset_cell_duration_format(
     column: usize,
 ) -> Result<bool> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(false),
-        TableCellDataFormat::Duration(_) => reset_cell_data_format(package, table_id, row, column),
-        TableCellDataFormat::Number(_)
-        | TableCellDataFormat::Currency(_)
-        | TableCellDataFormat::Percentage(_)
-        | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::NumeralSystem(_)
-        | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Checkbox(_)
-        | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_)
-        | TableCellDataFormat::Text(_)
-        | TableCellDataFormat::Custom(_)
-        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
+        DataFormat::Automatic => Ok(false),
+        DataFormat::Duration(_) => reset_cell_data_format(package, table_id, row, column),
+        DataFormat::Number(_)
+        | DataFormat::Currency(_)
+        | DataFormat::Percentage(_)
+        | DataFormat::Scientific(_)
+        | DataFormat::Fraction(_)
+        | DataFormat::NumeralSystem(_)
+        | DataFormat::DateTime(_)
+        | DataFormat::Checkbox(_)
+        | DataFormat::StarRating(_)
+        | DataFormat::Slider(_)
+        | DataFormat::Stepper(_)
+        | DataFormat::Text(_)
+        | DataFormat::Custom(_)
+        | DataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Duration format from a non-Duration cell".to_owned(),
         )),
     }
@@ -616,10 +622,10 @@ pub(super) fn cell_checkbox_format(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<TableCellCheckboxFormat>> {
+) -> Result<Option<Checkbox>> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(None),
-        TableCellDataFormat::Checkbox(format) => Ok(Some(format)),
+        DataFormat::Automatic => Ok(None),
+        DataFormat::Checkbox(format) => Ok(Some(format)),
         _ => Err(Error::InvalidFormat(
             "Table cell does not use the Checkbox data format".to_owned(),
         )),
@@ -633,8 +639,8 @@ pub(super) fn reset_cell_checkbox_format(
     column: usize,
 ) -> Result<bool> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(false),
-        TableCellDataFormat::Checkbox(_) => reset_cell_data_format(package, table_id, row, column),
+        DataFormat::Automatic => Ok(false),
+        DataFormat::Checkbox(_) => reset_cell_data_format(package, table_id, row, column),
         _ => Err(Error::InvalidFormat(
             "Cannot reset Checkbox format from a non-Checkbox cell".to_owned(),
         )),
@@ -646,10 +652,10 @@ pub(super) fn cell_star_rating_format(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<TableCellStarRatingFormat>> {
+) -> Result<Option<StarRating>> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(None),
-        TableCellDataFormat::StarRating(format) => Ok(Some(format)),
+        DataFormat::Automatic => Ok(None),
+        DataFormat::StarRating(format) => Ok(Some(format)),
         _ => Err(Error::InvalidFormat(
             "Table cell does not use the Star Rating data format".to_owned(),
         )),
@@ -663,10 +669,8 @@ pub(super) fn reset_cell_star_rating_format(
     column: usize,
 ) -> Result<bool> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(false),
-        TableCellDataFormat::StarRating(_) => {
-            reset_cell_data_format(package, table_id, row, column)
-        },
+        DataFormat::Automatic => Ok(false),
+        DataFormat::StarRating(_) => reset_cell_data_format(package, table_id, row, column),
         _ => Err(Error::InvalidFormat(
             "Cannot reset Star Rating format from a non-Star-Rating cell".to_owned(),
         )),
@@ -678,10 +682,10 @@ pub(super) fn cell_slider_format(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<TableCellSliderFormat>> {
+) -> Result<Option<Slider>> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(None),
-        TableCellDataFormat::Slider(format) => Ok(Some(format)),
+        DataFormat::Automatic => Ok(None),
+        DataFormat::Slider(format) => Ok(Some(format)),
         _ => Err(Error::InvalidFormat(
             "Table cell does not use the Slider data format".to_owned(),
         )),
@@ -695,8 +699,8 @@ pub(super) fn reset_cell_slider_format(
     column: usize,
 ) -> Result<bool> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(false),
-        TableCellDataFormat::Slider(_) => reset_cell_data_format(package, table_id, row, column),
+        DataFormat::Automatic => Ok(false),
+        DataFormat::Slider(_) => reset_cell_data_format(package, table_id, row, column),
         _ => Err(Error::InvalidFormat(
             "Cannot reset Slider format from a non-Slider cell".to_owned(),
         )),
@@ -708,10 +712,10 @@ pub(super) fn cell_stepper_format(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<TableCellStepperFormat>> {
+) -> Result<Option<Stepper>> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(None),
-        TableCellDataFormat::Stepper(format) => Ok(Some(format)),
+        DataFormat::Automatic => Ok(None),
+        DataFormat::Stepper(format) => Ok(Some(format)),
         _ => Err(Error::InvalidFormat(
             "Table cell does not use the Stepper data format".to_owned(),
         )),
@@ -725,8 +729,8 @@ pub(super) fn reset_cell_stepper_format(
     column: usize,
 ) -> Result<bool> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(false),
-        TableCellDataFormat::Stepper(_) => reset_cell_data_format(package, table_id, row, column),
+        DataFormat::Automatic => Ok(false),
+        DataFormat::Stepper(_) => reset_cell_data_format(package, table_id, row, column),
         _ => Err(Error::InvalidFormat(
             "Cannot reset Stepper format from a non-Stepper cell".to_owned(),
         )),
@@ -738,10 +742,10 @@ pub(super) fn cell_pop_up_menu_format(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<TableCellPopUpMenuFormat>> {
+) -> Result<Option<PopUpMenu>> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(None),
-        TableCellDataFormat::PopUpMenu(format) => Ok(Some(format)),
+        DataFormat::Automatic => Ok(None),
+        DataFormat::PopUpMenu(format) => Ok(Some(format)),
         _ => Err(Error::InvalidFormat(
             "Table cell does not use the Pop-Up Menu data format".to_owned(),
         )),
@@ -755,8 +759,8 @@ pub(super) fn reset_cell_pop_up_menu_format(
     column: usize,
 ) -> Result<bool> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(false),
-        TableCellDataFormat::PopUpMenu(_) => reset_cell_data_format(package, table_id, row, column),
+        DataFormat::Automatic => Ok(false),
+        DataFormat::PopUpMenu(_) => reset_cell_data_format(package, table_id, row, column),
         _ => Err(Error::InvalidFormat(
             "Cannot reset Pop-Up Menu format from a non-Pop-Up-Menu cell".to_owned(),
         )),
@@ -768,7 +772,7 @@ pub(super) fn set_cell_number_format(
     table_id: u64,
     row: usize,
     column: usize,
-    format: TableCellNumberFormat,
+    format: Number,
 ) -> Result<()> {
     set_cell_data_format(package, table_id, row, column, &format.into())
 }
@@ -778,9 +782,9 @@ pub(super) fn set_cell_data_format(
     table_id: u64,
     row: usize,
     column: usize,
-    format: &TableCellDataFormat,
+    format: &DataFormat,
 ) -> Result<()> {
-    if format == &TableCellDataFormat::Automatic {
+    if format == &DataFormat::Automatic {
         reset_cell_data_format(package, table_id, row, column)?;
         return Ok(());
     }
@@ -804,63 +808,59 @@ pub(super) fn set_cell_data_format(
     let old_identifiers = old_reference.identifiers();
     let old_control_identifier = cell.control_cell_spec_identifier();
     let cell_format_kind = match format {
-        TableCellDataFormat::Currency(_) => bnc::CellDataFormatKind::Currency,
-        TableCellDataFormat::DateTime(_) => bnc::CellDataFormatKind::DateTime,
-        TableCellDataFormat::Duration(_) => bnc::CellDataFormatKind::Duration,
-        TableCellDataFormat::Text(_) => bnc::CellDataFormatKind::Text,
-        TableCellDataFormat::Checkbox(_) => bnc::CellDataFormatKind::Checkbox,
-        TableCellDataFormat::StarRating(_) => bnc::CellDataFormatKind::StarRating,
-        TableCellDataFormat::Slider(format) => match format.display_format() {
-            TableCellNumericControlDisplayFormat::Currency(_) => {
-                bnc::CellDataFormatKind::NumericControlCurrency
-            },
+        DataFormat::Currency(_) => bnc::CellDataFormatKind::Currency,
+        DataFormat::DateTime(_) => bnc::CellDataFormatKind::DateTime,
+        DataFormat::Duration(_) => bnc::CellDataFormatKind::Duration,
+        DataFormat::Text(_) => bnc::CellDataFormatKind::Text,
+        DataFormat::Checkbox(_) => bnc::CellDataFormatKind::Checkbox,
+        DataFormat::StarRating(_) => bnc::CellDataFormatKind::StarRating,
+        DataFormat::Slider(format) => match format.display_format() {
+            DisplayFormat::Currency(_) => bnc::CellDataFormatKind::NumericControlCurrency,
             _ => bnc::CellDataFormatKind::NumericControlNumberOrPercentage,
         },
-        TableCellDataFormat::Stepper(format) => match format.display_format() {
-            TableCellNumericControlDisplayFormat::Currency(_) => {
-                bnc::CellDataFormatKind::NumericControlCurrency
-            },
+        DataFormat::Stepper(format) => match format.display_format() {
+            DisplayFormat::Currency(_) => bnc::CellDataFormatKind::NumericControlCurrency,
             _ => bnc::CellDataFormatKind::NumericControlNumberOrPercentage,
         },
-        TableCellDataFormat::PopUpMenu(_) => bnc::CellDataFormatKind::PopUpMenu,
-        TableCellDataFormat::Custom(format) => custom::scalar_kind(format),
-        TableCellDataFormat::Number(_)
-        | TableCellDataFormat::Percentage(_)
-        | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::NumeralSystem(_) => bnc::CellDataFormatKind::NumberOrPercentage,
-        TableCellDataFormat::Automatic => unreachable!("handled above"),
+        DataFormat::PopUpMenu(_) => bnc::CellDataFormatKind::PopUpMenu,
+        DataFormat::Custom(format) => custom::scalar_kind(format),
+        DataFormat::Number(_)
+        | DataFormat::Percentage(_)
+        | DataFormat::Scientific(_)
+        | DataFormat::Fraction(_)
+        | DataFormat::NumeralSystem(_) => bnc::CellDataFormatKind::NumberOrPercentage,
+        DataFormat::Automatic => unreachable!("handled above"),
     };
     let native = match format {
-        TableCellDataFormat::Custom(format) => custom::acquire_reference(package, format)?,
+        DataFormat::Custom(format) => custom::acquire_reference(package, format)?,
         _ => data_format_to_native(format)?,
     };
     let new_control_identifier = match format {
-        TableCellDataFormat::Checkbox(_) => Some(control::acquire_spec(
+        DataFormat::Checkbox(_) => Some(control::acquire_spec(
             package,
             &location,
             old_control_identifier,
             control::ControlCellSpecKind::Checkbox,
         )?),
-        TableCellDataFormat::StarRating(_) => Some(control::acquire_spec(
+        DataFormat::StarRating(_) => Some(control::acquire_spec(
             package,
             &location,
             old_control_identifier,
             control::ControlCellSpecKind::StarRating,
         )?),
-        TableCellDataFormat::Slider(format) => Some(control::acquire_spec(
+        DataFormat::Slider(format) => Some(control::acquire_spec(
             package,
             &location,
             old_control_identifier,
             control::ControlCellSpecKind::Slider(format.range()),
         )?),
-        TableCellDataFormat::Stepper(format) => Some(control::acquire_spec(
+        DataFormat::Stepper(format) => Some(control::acquire_spec(
             package,
             &location,
             old_control_identifier,
             control::ControlCellSpecKind::Stepper(format.range()),
         )?),
-        TableCellDataFormat::PopUpMenu(format) => Some(control::acquire_pop_up_menu_spec(
+        DataFormat::PopUpMenu(format) => Some(control::acquire_pop_up_menu_spec(
             package,
             &location,
             old_control_identifier,
@@ -921,21 +921,18 @@ pub(super) fn set_cell_data_format(
         append_format_entry(package, &resolved, native)?
     };
 
-    if let TableCellDataFormat::Slider(format) = format
+    if let DataFormat::Slider(format) = format
         && cell.cached_scalar()?.is_none()
     {
-        cell.set_plain_number(format.range().native_initial_value())?;
+        cell.set_plain_number(format.range().midpoint())?;
     }
-    if let TableCellDataFormat::Stepper(format) = format
+    if let DataFormat::Stepper(format) = format
         && cell.cached_scalar()?.is_none()
     {
-        cell.set_plain_number(format.range().native_initial_value())?;
+        cell.set_plain_number(format.range().minimum())?;
     }
-    if let TableCellDataFormat::PopUpMenu(format) = format
-        && matches!(
-            format.initial_selection(),
-            TableCellPopUpMenuInitialSelection::FirstItem
-        )
+    if let DataFormat::PopUpMenu(format) = format
+        && matches!(format.initial_selection(), InitialSelection::FirstItem)
         && matches!(cell.stored_value(), StoredValue::Empty)
     {
         let identifier = storage::update_string_table(
@@ -1002,22 +999,22 @@ pub(super) fn reset_cell_number_format(
     column: usize,
 ) -> Result<bool> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(false),
-        TableCellDataFormat::Number(_) => reset_cell_data_format(package, table_id, row, column),
-        TableCellDataFormat::Currency(_)
-        | TableCellDataFormat::Percentage(_)
-        | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::NumeralSystem(_)
-        | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_)
-        | TableCellDataFormat::Checkbox(_)
-        | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_)
-        | TableCellDataFormat::Text(_)
-        | TableCellDataFormat::Custom(_)
-        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
+        DataFormat::Automatic => Ok(false),
+        DataFormat::Number(_) => reset_cell_data_format(package, table_id, row, column),
+        DataFormat::Currency(_)
+        | DataFormat::Percentage(_)
+        | DataFormat::Scientific(_)
+        | DataFormat::Fraction(_)
+        | DataFormat::NumeralSystem(_)
+        | DataFormat::DateTime(_)
+        | DataFormat::Duration(_)
+        | DataFormat::Checkbox(_)
+        | DataFormat::StarRating(_)
+        | DataFormat::Slider(_)
+        | DataFormat::Stepper(_)
+        | DataFormat::Text(_)
+        | DataFormat::Custom(_)
+        | DataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Number format from a non-Number cell".to_owned(),
         )),
     }
@@ -1030,24 +1027,22 @@ pub(super) fn reset_cell_percentage_format(
     column: usize,
 ) -> Result<bool> {
     match cell_data_format(package, table_id, row, column)? {
-        TableCellDataFormat::Automatic => Ok(false),
-        TableCellDataFormat::Percentage(_) => {
-            reset_cell_data_format(package, table_id, row, column)
-        },
-        TableCellDataFormat::Number(_)
-        | TableCellDataFormat::Currency(_)
-        | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::Fraction(_)
-        | TableCellDataFormat::NumeralSystem(_)
-        | TableCellDataFormat::DateTime(_)
-        | TableCellDataFormat::Duration(_)
-        | TableCellDataFormat::Checkbox(_)
-        | TableCellDataFormat::StarRating(_)
-        | TableCellDataFormat::Slider(_)
-        | TableCellDataFormat::Stepper(_)
-        | TableCellDataFormat::Text(_)
-        | TableCellDataFormat::Custom(_)
-        | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
+        DataFormat::Automatic => Ok(false),
+        DataFormat::Percentage(_) => reset_cell_data_format(package, table_id, row, column),
+        DataFormat::Number(_)
+        | DataFormat::Currency(_)
+        | DataFormat::Scientific(_)
+        | DataFormat::Fraction(_)
+        | DataFormat::NumeralSystem(_)
+        | DataFormat::DateTime(_)
+        | DataFormat::Duration(_)
+        | DataFormat::Checkbox(_)
+        | DataFormat::StarRating(_)
+        | DataFormat::Slider(_)
+        | DataFormat::Stepper(_)
+        | DataFormat::Text(_)
+        | DataFormat::Custom(_)
+        | DataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Percentage format from a non-Percentage cell".to_owned(),
         )),
     }
@@ -1439,15 +1434,674 @@ fn append_format_entry(
     Ok(key)
 }
 
+pub(super) fn legacy_data_format_to_semantic(
+    format: legacy::TableCellDataFormat,
+) -> Result<DataFormat> {
+    Ok(match format {
+        legacy::TableCellDataFormat::Automatic => DataFormat::Automatic,
+        legacy::TableCellDataFormat::Number(format) => {
+            DataFormat::Number(legacy_number_to_semantic(format)?)
+        },
+        legacy::TableCellDataFormat::Text(_) => DataFormat::Text(Text),
+        legacy::TableCellDataFormat::Currency(format) => {
+            DataFormat::Currency(legacy_currency_to_semantic(format)?)
+        },
+        legacy::TableCellDataFormat::Percentage(format) => {
+            DataFormat::Percentage(legacy_percentage_to_semantic(format)?)
+        },
+        legacy::TableCellDataFormat::Scientific(format) => {
+            DataFormat::Scientific(legacy_scientific_to_semantic(format)?)
+        },
+        legacy::TableCellDataFormat::Fraction(format) => {
+            DataFormat::Fraction(legacy_fraction_to_semantic(format))
+        },
+        legacy::TableCellDataFormat::NumeralSystem(format) => {
+            DataFormat::NumeralSystem(legacy_numeral_system_to_semantic(format)?)
+        },
+        legacy::TableCellDataFormat::DateTime(format) => {
+            DataFormat::DateTime(DateTime::new(format.pattern())?)
+        },
+        legacy::TableCellDataFormat::Duration(format) => {
+            DataFormat::Duration(legacy_duration_to_semantic(format)?)
+        },
+        legacy::TableCellDataFormat::Checkbox(_) => DataFormat::Checkbox(Checkbox),
+        legacy::TableCellDataFormat::StarRating(_) => DataFormat::StarRating(StarRating),
+        legacy::TableCellDataFormat::Slider(format) => {
+            DataFormat::Slider(legacy_slider_to_semantic(format)?)
+        },
+        legacy::TableCellDataFormat::Stepper(format) => {
+            DataFormat::Stepper(legacy_stepper_to_semantic(format)?)
+        },
+        legacy::TableCellDataFormat::PopUpMenu(format) => {
+            DataFormat::PopUpMenu(legacy_pop_up_menu_to_semantic(format)?)
+        },
+        legacy::TableCellDataFormat::Custom(format) => {
+            DataFormat::Custom(legacy_custom_to_semantic(format)?)
+        },
+    })
+}
+
+pub(super) fn semantic_data_format_to_legacy(
+    format: DataFormat,
+) -> Result<legacy::TableCellDataFormat> {
+    Ok(match format {
+        DataFormat::Automatic => legacy::TableCellDataFormat::Automatic,
+        DataFormat::Number(format) => {
+            legacy::TableCellDataFormat::Number(semantic_number_to_legacy(format)?)
+        },
+        DataFormat::Text(_) => legacy::TableCellDataFormat::Text(legacy::TableCellTextFormat),
+        DataFormat::Currency(format) => {
+            legacy::TableCellDataFormat::Currency(semantic_currency_to_legacy(format)?)
+        },
+        DataFormat::Percentage(format) => {
+            legacy::TableCellDataFormat::Percentage(semantic_percentage_to_legacy(format)?)
+        },
+        DataFormat::Scientific(format) => {
+            legacy::TableCellDataFormat::Scientific(semantic_scientific_to_legacy(format)?)
+        },
+        DataFormat::Fraction(format) => {
+            legacy::TableCellDataFormat::Fraction(semantic_fraction_to_legacy(format))
+        },
+        DataFormat::NumeralSystem(format) => {
+            legacy::TableCellDataFormat::NumeralSystem(semantic_numeral_system_to_legacy(format)?)
+        },
+        DataFormat::DateTime(format) => legacy::TableCellDataFormat::DateTime(
+            legacy::TableCellDateTimeFormat::new(format.pattern().to_owned())?,
+        ),
+        DataFormat::Duration(format) => {
+            legacy::TableCellDataFormat::Duration(semantic_duration_to_legacy(format)?)
+        },
+        DataFormat::Checkbox(_) => {
+            legacy::TableCellDataFormat::Checkbox(legacy::TableCellCheckboxFormat)
+        },
+        DataFormat::StarRating(_) => {
+            legacy::TableCellDataFormat::StarRating(legacy::TableCellStarRatingFormat)
+        },
+        DataFormat::Slider(format) => {
+            legacy::TableCellDataFormat::Slider(semantic_slider_to_legacy(format)?)
+        },
+        DataFormat::Stepper(format) => {
+            legacy::TableCellDataFormat::Stepper(semantic_stepper_to_legacy(format)?)
+        },
+        DataFormat::PopUpMenu(format) => {
+            legacy::TableCellDataFormat::PopUpMenu(semantic_pop_up_menu_to_legacy(format)?)
+        },
+        DataFormat::Custom(format) => {
+            legacy::TableCellDataFormat::Custom(semantic_custom_to_legacy(format)?)
+        },
+    })
+}
+
+fn legacy_decimal_places_to_semantic(
+    value: legacy::TableCellDecimalPlaces,
+) -> Result<DecimalPlaces> {
+    Ok(match value {
+        legacy::TableCellDecimalPlaces::Automatic => DecimalPlaces::Automatic,
+        legacy::TableCellDecimalPlaces::Fixed(value) => {
+            DecimalPlaces::Fixed(FixedDecimalPlaces::new(value.value())?)
+        },
+    })
+}
+
+fn semantic_decimal_places_to_legacy(
+    value: DecimalPlaces,
+) -> Result<legacy::TableCellDecimalPlaces> {
+    Ok(match value {
+        DecimalPlaces::Automatic => legacy::TableCellDecimalPlaces::Automatic,
+        DecimalPlaces::Fixed(value) => legacy::TableCellDecimalPlaces::Fixed(
+            legacy::TableCellFixedDecimalPlaces::new(value.value())?,
+        ),
+    })
+}
+
+fn legacy_negative_style_to_semantic(value: legacy::TableCellNegativeNumberStyle) -> NegativeStyle {
+    match value {
+        legacy::TableCellNegativeNumberStyle::MinusSign => NegativeStyle::MinusSign,
+        legacy::TableCellNegativeNumberStyle::Red => NegativeStyle::Red,
+        legacy::TableCellNegativeNumberStyle::Parentheses => NegativeStyle::Parentheses,
+        legacy::TableCellNegativeNumberStyle::RedParentheses => NegativeStyle::RedParentheses,
+    }
+}
+
+const fn semantic_negative_style_to_legacy(
+    value: NegativeStyle,
+) -> legacy::TableCellNegativeNumberStyle {
+    match value {
+        NegativeStyle::MinusSign => legacy::TableCellNegativeNumberStyle::MinusSign,
+        NegativeStyle::Red => legacy::TableCellNegativeNumberStyle::Red,
+        NegativeStyle::Parentheses => legacy::TableCellNegativeNumberStyle::Parentheses,
+        NegativeStyle::RedParentheses => legacy::TableCellNegativeNumberStyle::RedParentheses,
+    }
+}
+
+const fn legacy_thousands_to_semantic(
+    value: legacy::TableCellThousandsSeparator,
+) -> ThousandsSeparator {
+    match value {
+        legacy::TableCellThousandsSeparator::Hidden => ThousandsSeparator::Hidden,
+        legacy::TableCellThousandsSeparator::Shown => ThousandsSeparator::Shown,
+    }
+}
+
+const fn semantic_thousands_to_legacy(
+    value: ThousandsSeparator,
+) -> legacy::TableCellThousandsSeparator {
+    match value {
+        ThousandsSeparator::Hidden => legacy::TableCellThousandsSeparator::Hidden,
+        ThousandsSeparator::Shown => legacy::TableCellThousandsSeparator::Shown,
+    }
+}
+
+pub(super) fn legacy_number_to_semantic(value: legacy::TableCellNumberFormat) -> Result<Number> {
+    Ok(Number::new(
+        legacy_decimal_places_to_semantic(value.decimal_places())?,
+        legacy_negative_style_to_semantic(value.negative_style()),
+        legacy_thousands_to_semantic(value.thousands_separator()),
+    ))
+}
+
+pub(super) fn semantic_number_to_legacy(value: Number) -> Result<legacy::TableCellNumberFormat> {
+    Ok(legacy::TableCellNumberFormat::new(
+        semantic_decimal_places_to_legacy(value.decimal_places())?,
+        semantic_negative_style_to_legacy(value.negative_style()),
+        semantic_thousands_to_legacy(value.thousands_separator()),
+    ))
+}
+
+pub(super) fn legacy_percentage_to_semantic(
+    value: legacy::TableCellPercentageFormat,
+) -> Result<Percentage> {
+    Ok(Percentage::new(
+        legacy_decimal_places_to_semantic(value.decimal_places())?,
+        legacy_negative_style_to_semantic(value.negative_style()),
+        legacy_thousands_to_semantic(value.thousands_separator()),
+    ))
+}
+
+pub(super) fn semantic_percentage_to_legacy(
+    value: Percentage,
+) -> Result<legacy::TableCellPercentageFormat> {
+    Ok(legacy::TableCellPercentageFormat::new(
+        semantic_decimal_places_to_legacy(value.decimal_places())?,
+        semantic_negative_style_to_legacy(value.negative_style()),
+        semantic_thousands_to_legacy(value.thousands_separator()),
+    ))
+}
+
+pub(super) fn legacy_currency_to_semantic(
+    value: legacy::TableCellCurrencyFormat,
+) -> Result<Currency> {
+    Ok(Currency::new(
+        CurrencyCode::new(value.currency_code().as_str())?,
+        legacy_decimal_places_to_semantic(value.decimal_places())?,
+        legacy_negative_style_to_semantic(value.negative_style()),
+        legacy_thousands_to_semantic(value.thousands_separator()),
+        match value.style() {
+            legacy::TableCellCurrencyStyle::Standard => CurrencyStyle::Standard,
+            legacy::TableCellCurrencyStyle::Accounting => CurrencyStyle::Accounting,
+        },
+    ))
+}
+
+pub(super) fn semantic_currency_to_legacy(
+    value: Currency,
+) -> Result<legacy::TableCellCurrencyFormat> {
+    Ok(legacy::TableCellCurrencyFormat::new(
+        legacy::TableCellCurrencyCode::new(value.code().as_str())?,
+        semantic_decimal_places_to_legacy(value.decimal_places())?,
+        semantic_negative_style_to_legacy(value.negative_style()),
+        semantic_thousands_to_legacy(value.thousands_separator()),
+        match value.style() {
+            CurrencyStyle::Standard => legacy::TableCellCurrencyStyle::Standard,
+            CurrencyStyle::Accounting => legacy::TableCellCurrencyStyle::Accounting,
+        },
+    ))
+}
+
+pub(super) fn legacy_scientific_to_semantic(
+    value: legacy::TableCellScientificFormat,
+) -> Result<Scientific> {
+    Ok(Scientific::new(FixedDecimalPlaces::new(
+        value.decimal_places().value(),
+    )?))
+}
+
+pub(super) fn semantic_scientific_to_legacy(
+    value: Scientific,
+) -> Result<legacy::TableCellScientificFormat> {
+    Ok(legacy::TableCellScientificFormat::new(
+        legacy::TableCellFixedDecimalPlaces::new(value.decimal_places().value())?,
+    ))
+}
+
+const fn legacy_fraction_accuracy_to_semantic(
+    value: legacy::TableCellFractionAccuracy,
+) -> FractionAccuracy {
+    match value {
+        legacy::TableCellFractionAccuracy::UpToOneDigit => FractionAccuracy::UpToOneDigit,
+        legacy::TableCellFractionAccuracy::UpToTwoDigits => FractionAccuracy::UpToTwoDigits,
+        legacy::TableCellFractionAccuracy::UpToThreeDigits => FractionAccuracy::UpToThreeDigits,
+        legacy::TableCellFractionAccuracy::Halves => FractionAccuracy::Halves,
+        legacy::TableCellFractionAccuracy::Quarters => FractionAccuracy::Quarters,
+        legacy::TableCellFractionAccuracy::Eighths => FractionAccuracy::Eighths,
+        legacy::TableCellFractionAccuracy::Sixteenths => FractionAccuracy::Sixteenths,
+        legacy::TableCellFractionAccuracy::Tenths => FractionAccuracy::Tenths,
+        legacy::TableCellFractionAccuracy::Hundredths => FractionAccuracy::Hundredths,
+    }
+}
+
+const fn semantic_fraction_accuracy_to_legacy(
+    value: FractionAccuracy,
+) -> legacy::TableCellFractionAccuracy {
+    match value {
+        FractionAccuracy::UpToOneDigit => legacy::TableCellFractionAccuracy::UpToOneDigit,
+        FractionAccuracy::UpToTwoDigits => legacy::TableCellFractionAccuracy::UpToTwoDigits,
+        FractionAccuracy::UpToThreeDigits => legacy::TableCellFractionAccuracy::UpToThreeDigits,
+        FractionAccuracy::Halves => legacy::TableCellFractionAccuracy::Halves,
+        FractionAccuracy::Quarters => legacy::TableCellFractionAccuracy::Quarters,
+        FractionAccuracy::Eighths => legacy::TableCellFractionAccuracy::Eighths,
+        FractionAccuracy::Sixteenths => legacy::TableCellFractionAccuracy::Sixteenths,
+        FractionAccuracy::Tenths => legacy::TableCellFractionAccuracy::Tenths,
+        FractionAccuracy::Hundredths => legacy::TableCellFractionAccuracy::Hundredths,
+    }
+}
+
+const fn legacy_fraction_to_semantic(value: legacy::TableCellFractionFormat) -> Fraction {
+    Fraction::new(legacy_fraction_accuracy_to_semantic(value.accuracy()))
+}
+
+pub(super) const fn semantic_fraction_to_legacy(
+    value: Fraction,
+) -> legacy::TableCellFractionFormat {
+    legacy::TableCellFractionFormat::new(semantic_fraction_accuracy_to_legacy(value.accuracy()))
+}
+
+pub(super) fn legacy_numeral_system_to_semantic(
+    value: legacy::TableCellNumeralSystemFormat,
+) -> Result<NumeralSystem> {
+    let base = Base::new(value.base().value())?;
+    let places = match value.places() {
+        legacy::TableCellNumeralSystemPlaces::Minimum => Places::Minimum,
+        legacy::TableCellNumeralSystemPlaces::Fixed(value) => {
+            Places::Fixed(FixedPlaces::new(value.value())?)
+        },
+    };
+    let negative_style = match value.negative_style() {
+        legacy::TableCellNumeralSystemNegativeStyle::MinusSign => NumeralNegativeStyle::MinusSign,
+        legacy::TableCellNumeralSystemNegativeStyle::TwosComplement => {
+            NumeralNegativeStyle::TwosComplement
+        },
+    };
+    Ok(NumeralSystem::new(base, places, negative_style)?)
+}
+
+pub(super) fn semantic_numeral_system_to_legacy(
+    value: NumeralSystem,
+) -> Result<legacy::TableCellNumeralSystemFormat> {
+    let base = legacy::TableCellNumeralSystemBase::new(value.base().value())?;
+    let places = match value.places() {
+        Places::Minimum => legacy::TableCellNumeralSystemPlaces::Minimum,
+        Places::Fixed(value) => legacy::TableCellNumeralSystemPlaces::Fixed(
+            legacy::TableCellNumeralSystemFixedPlaces::new(value.value())?,
+        ),
+    };
+    let negative_style = match value.negative_style() {
+        NumeralNegativeStyle::MinusSign => legacy::TableCellNumeralSystemNegativeStyle::MinusSign,
+        NumeralNegativeStyle::TwosComplement => {
+            legacy::TableCellNumeralSystemNegativeStyle::TwosComplement
+        },
+    };
+    legacy::TableCellNumeralSystemFormat::new(base, places, negative_style)
+}
+
+const fn legacy_duration_style_to_semantic(value: legacy::TableCellDurationStyle) -> Style {
+    match value {
+        legacy::TableCellDurationStyle::Colon => Style::Colon,
+        legacy::TableCellDurationStyle::Abbreviated => Style::Abbreviated,
+        legacy::TableCellDurationStyle::FullNames => Style::FullNames,
+    }
+}
+
+const fn semantic_duration_style_to_legacy(value: Style) -> legacy::TableCellDurationStyle {
+    match value {
+        Style::Colon => legacy::TableCellDurationStyle::Colon,
+        Style::Abbreviated => legacy::TableCellDurationStyle::Abbreviated,
+        Style::FullNames => legacy::TableCellDurationStyle::FullNames,
+    }
+}
+
+const fn legacy_duration_unit_to_semantic(value: legacy::TableCellDurationUnit) -> Unit {
+    match value {
+        legacy::TableCellDurationUnit::Weeks => Unit::Weeks,
+        legacy::TableCellDurationUnit::Days => Unit::Days,
+        legacy::TableCellDurationUnit::Hours => Unit::Hours,
+        legacy::TableCellDurationUnit::Minutes => Unit::Minutes,
+        legacy::TableCellDurationUnit::Seconds => Unit::Seconds,
+        legacy::TableCellDurationUnit::Milliseconds => Unit::Milliseconds,
+    }
+}
+
+const fn semantic_duration_unit_to_legacy(value: Unit) -> legacy::TableCellDurationUnit {
+    match value {
+        Unit::Weeks => legacy::TableCellDurationUnit::Weeks,
+        Unit::Days => legacy::TableCellDurationUnit::Days,
+        Unit::Hours => legacy::TableCellDurationUnit::Hours,
+        Unit::Minutes => legacy::TableCellDurationUnit::Minutes,
+        Unit::Seconds => legacy::TableCellDurationUnit::Seconds,
+        Unit::Milliseconds => legacy::TableCellDurationUnit::Milliseconds,
+    }
+}
+
+pub(super) fn legacy_duration_to_semantic(
+    value: legacy::TableCellDurationFormat,
+) -> Result<Duration> {
+    let range = value.units().range();
+    let range = UnitRange::new(
+        legacy_duration_unit_to_semantic(range.largest()),
+        legacy_duration_unit_to_semantic(range.smallest()),
+    )?;
+    let units = match value.units() {
+        legacy::TableCellDurationUnits::Automatic(_) => Units::Automatic(range),
+        legacy::TableCellDurationUnits::Custom(_) => Units::Custom(range),
+    };
+    Ok(Duration::new(
+        legacy_duration_style_to_semantic(value.style()),
+        units,
+    ))
+}
+
+pub(super) fn semantic_duration_to_legacy(
+    value: Duration,
+) -> Result<legacy::TableCellDurationFormat> {
+    let range = value.units().range();
+    let range = legacy::TableCellDurationUnitRange::new(
+        semantic_duration_unit_to_legacy(range.largest()),
+        semantic_duration_unit_to_legacy(range.smallest()),
+    )?;
+    let units = if value.units().is_automatic() {
+        legacy::TableCellDurationUnits::Automatic(range)
+    } else {
+        legacy::TableCellDurationUnits::Custom(range)
+    };
+    Ok(legacy::TableCellDurationFormat::new(
+        semantic_duration_style_to_legacy(value.style()),
+        units,
+    ))
+}
+
+fn legacy_display_to_semantic(
+    value: legacy::TableCellNumericControlDisplayFormat,
+) -> Result<DisplayFormat> {
+    Ok(match value {
+        legacy::TableCellNumericControlDisplayFormat::Number(value) => {
+            DisplayFormat::Number(legacy_number_to_semantic(value)?)
+        },
+        legacy::TableCellNumericControlDisplayFormat::Currency(value) => {
+            DisplayFormat::Currency(legacy_currency_to_semantic(value)?)
+        },
+        legacy::TableCellNumericControlDisplayFormat::Percentage(value) => {
+            DisplayFormat::Percentage(legacy_percentage_to_semantic(value)?)
+        },
+        legacy::TableCellNumericControlDisplayFormat::Fraction(value) => {
+            DisplayFormat::Fraction(legacy_fraction_to_semantic(value))
+        },
+        legacy::TableCellNumericControlDisplayFormat::Scientific(value) => {
+            DisplayFormat::Scientific(legacy_scientific_to_semantic(value)?)
+        },
+        legacy::TableCellNumericControlDisplayFormat::NumeralSystem(value) => {
+            DisplayFormat::NumeralSystem(legacy_numeral_system_to_semantic(value)?)
+        },
+    })
+}
+
+fn semantic_display_to_legacy(
+    value: &DisplayFormat,
+) -> Result<legacy::TableCellNumericControlDisplayFormat> {
+    Ok(match value {
+        DisplayFormat::Number(value) => {
+            legacy::TableCellNumericControlDisplayFormat::Number(semantic_number_to_legacy(*value)?)
+        },
+        DisplayFormat::Currency(value) => legacy::TableCellNumericControlDisplayFormat::Currency(
+            semantic_currency_to_legacy(*value)?,
+        ),
+        DisplayFormat::Percentage(value) => {
+            legacy::TableCellNumericControlDisplayFormat::Percentage(semantic_percentage_to_legacy(
+                *value,
+            )?)
+        },
+        DisplayFormat::Fraction(value) => legacy::TableCellNumericControlDisplayFormat::Fraction(
+            semantic_fraction_to_legacy(*value),
+        ),
+        DisplayFormat::Scientific(value) => {
+            legacy::TableCellNumericControlDisplayFormat::Scientific(semantic_scientific_to_legacy(
+                *value,
+            )?)
+        },
+        DisplayFormat::NumeralSystem(value) => {
+            legacy::TableCellNumericControlDisplayFormat::NumeralSystem(
+                semantic_numeral_system_to_legacy(*value)?,
+            )
+        },
+    })
+}
+
+pub(super) fn legacy_slider_to_semantic(value: legacy::TableCellSliderFormat) -> Result<Slider> {
+    let range = value.range();
+    Ok(Slider::new(
+        Range::new(range.minimum(), range.maximum(), range.increment())?,
+        legacy_display_to_semantic(value.display_format().clone())?,
+    ))
+}
+
+pub(super) fn semantic_slider_to_legacy(value: Slider) -> Result<legacy::TableCellSliderFormat> {
+    let range = value.range();
+    Ok(legacy::TableCellSliderFormat::new(
+        legacy::TableCellSliderRange::new(range.minimum(), range.maximum(), range.increment())?,
+        semantic_display_to_legacy(value.display_format())?,
+    ))
+}
+
+pub(super) fn legacy_stepper_to_semantic(value: legacy::TableCellStepperFormat) -> Result<Stepper> {
+    let range = value.range();
+    Ok(Stepper::new(
+        Range::new(range.minimum(), range.maximum(), range.increment())?,
+        legacy_display_to_semantic(value.display_format().clone())?,
+    ))
+}
+
+pub(super) fn semantic_stepper_to_legacy(value: Stepper) -> Result<legacy::TableCellStepperFormat> {
+    let range = value.range();
+    Ok(legacy::TableCellStepperFormat::new(
+        legacy::TableCellStepperRange::new(range.minimum(), range.maximum(), range.increment())?,
+        semantic_display_to_legacy(value.display_format())?,
+    ))
+}
+
+pub(super) fn legacy_pop_up_menu_to_semantic(
+    value: legacy::TableCellPopUpMenuFormat,
+) -> Result<PopUpMenu> {
+    let items = value
+        .items()
+        .iter()
+        .map(|item| item.as_str().to_owned())
+        .collect::<Vec<_>>();
+    let initial_selection = match value.initial_selection() {
+        legacy::TableCellPopUpMenuInitialSelection::FirstItem => InitialSelection::FirstItem,
+        legacy::TableCellPopUpMenuInitialSelection::Blank => InitialSelection::Blank,
+    };
+    Ok(PopUpMenu::new(items)?.with_initial_selection(initial_selection))
+}
+
+pub(super) fn semantic_pop_up_menu_to_legacy(
+    value: PopUpMenu,
+) -> Result<legacy::TableCellPopUpMenuFormat> {
+    let format = legacy::TableCellPopUpMenuFormat::try_new(
+        value.items().iter().map(|item| item.as_str().to_owned()),
+    )?;
+    Ok(
+        format.with_initial_selection(match value.initial_selection() {
+            InitialSelection::FirstItem => legacy::TableCellPopUpMenuInitialSelection::FirstItem,
+            InitialSelection::Blank => legacy::TableCellPopUpMenuInitialSelection::Blank,
+        }),
+    )
+}
+
+pub(super) fn legacy_custom_to_semantic(
+    value: legacy::TableCellCustomFormat,
+) -> Result<litchi_numbers::cell::data_format::Custom> {
+    use litchi_numbers::cell::data_format::custom as semantic;
+
+    Ok(match value {
+        legacy::TableCellCustomFormat::Number(value) => {
+            let name = semantic::Name::try_new(value.name().as_str())?;
+            let default_pattern =
+                semantic::NumberPattern::try_new(value.default_pattern().as_str())?;
+            let rules = value
+                .rules()
+                .iter()
+                .map(|rule| {
+                    Ok(semantic::NumberRule::new(
+                        legacy_condition_to_semantic(rule.condition())?,
+                        semantic::NumberPattern::try_new(rule.pattern().as_str())?,
+                    ))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            semantic::Custom::Number(semantic::Number::try_with_rules(
+                name,
+                default_pattern,
+                rules,
+            )?)
+        },
+        legacy::TableCellCustomFormat::Text(value) => {
+            let name = semantic::Name::try_new(value.name().as_str())?;
+            if value.includes_cell_text() {
+                semantic::Custom::Text(semantic::Text::try_new(
+                    name,
+                    value.prefix().to_owned(),
+                    value.suffix().to_owned(),
+                )?)
+            } else {
+                semantic::Custom::Text(semantic::Text::try_literal(
+                    name,
+                    value.prefix().to_owned(),
+                )?)
+            }
+        },
+        legacy::TableCellCustomFormat::DateTime(value) => {
+            semantic::Custom::DateTime(semantic::DateTime::new(
+                semantic::Name::try_new(value.name().as_str())?,
+                semantic::DateTimePattern::try_new(value.pattern().as_str())?,
+            ))
+        },
+    })
+}
+
+pub(super) fn semantic_custom_to_legacy(
+    value: litchi_numbers::cell::data_format::Custom,
+) -> Result<legacy::TableCellCustomFormat> {
+    use litchi_numbers::cell::data_format::custom as semantic;
+
+    Ok(match value {
+        semantic::Custom::Number(value) => {
+            let name = legacy::TableCellCustomFormatName::try_new(value.name().as_str())?;
+            let default_pattern =
+                legacy::TableCellCustomNumberPattern::try_new(value.default_pattern().as_str())?;
+            let rules = value
+                .rules()
+                .iter()
+                .map(|rule| {
+                    Ok(legacy::TableCellCustomNumberRule::new(
+                        semantic_condition_to_legacy(rule.condition())?,
+                        legacy::TableCellCustomNumberPattern::try_new(rule.pattern().as_str())?,
+                    ))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            legacy::TableCellCustomFormat::Number(
+                legacy::TableCellCustomNumberFormat::try_with_rules(name, default_pattern, rules)?,
+            )
+        },
+        semantic::Custom::Text(value) => {
+            let name = legacy::TableCellCustomFormatName::try_new(value.name().as_str())?;
+            if value.includes_cell_text() {
+                legacy::TableCellCustomFormat::Text(legacy::TableCellCustomTextFormat::try_new(
+                    name,
+                    value.prefix().to_owned(),
+                    value.suffix().to_owned(),
+                )?)
+            } else {
+                legacy::TableCellCustomFormat::Text(legacy::TableCellCustomTextFormat::try_literal(
+                    name,
+                    value.prefix().to_owned(),
+                )?)
+            }
+        },
+        semantic::Custom::DateTime(value) => {
+            legacy::TableCellCustomFormat::DateTime(legacy::TableCellCustomDateTimeFormat::new(
+                legacy::TableCellCustomFormatName::try_new(value.name().as_str())?,
+                legacy::TableCellCustomDateTimePattern::try_new(value.pattern().as_str())?,
+            ))
+        },
+    })
+}
+
+fn legacy_condition_to_semantic(
+    value: legacy::TableCellCustomNumberCondition,
+) -> Result<litchi_numbers::cell::data_format::custom::Condition> {
+    use litchi_numbers::cell::data_format::custom as semantic;
+
+    let threshold = semantic::ConditionValue::try_new(value.threshold().value())?;
+    Ok(match value {
+        legacy::TableCellCustomNumberCondition::EqualTo(_) => {
+            semantic::Condition::EqualTo(threshold)
+        },
+        legacy::TableCellCustomNumberCondition::LessThan(_) => {
+            semantic::Condition::LessThan(threshold)
+        },
+        legacy::TableCellCustomNumberCondition::LessThanOrEqualTo(_) => {
+            semantic::Condition::LessThanOrEqualTo(threshold)
+        },
+        legacy::TableCellCustomNumberCondition::GreaterThan(_) => {
+            semantic::Condition::GreaterThan(threshold)
+        },
+        legacy::TableCellCustomNumberCondition::GreaterThanOrEqualTo(_) => {
+            semantic::Condition::GreaterThanOrEqualTo(threshold)
+        },
+    })
+}
+
+fn semantic_condition_to_legacy(
+    value: litchi_numbers::cell::data_format::custom::Condition,
+) -> Result<legacy::TableCellCustomNumberCondition> {
+    let threshold =
+        legacy::TableCellCustomNumberConditionValue::try_new(value.threshold().value())?;
+    Ok(match value {
+        litchi_numbers::cell::data_format::custom::Condition::EqualTo(_) => {
+            legacy::TableCellCustomNumberCondition::EqualTo(threshold)
+        },
+        litchi_numbers::cell::data_format::custom::Condition::LessThan(_) => {
+            legacy::TableCellCustomNumberCondition::LessThan(threshold)
+        },
+        litchi_numbers::cell::data_format::custom::Condition::LessThanOrEqualTo(_) => {
+            legacy::TableCellCustomNumberCondition::LessThanOrEqualTo(threshold)
+        },
+        litchi_numbers::cell::data_format::custom::Condition::GreaterThan(_) => {
+            legacy::TableCellCustomNumberCondition::GreaterThan(threshold)
+        },
+        litchi_numbers::cell::data_format::custom::Condition::GreaterThanOrEqualTo(_) => {
+            legacy::TableCellCustomNumberCondition::GreaterThanOrEqualTo(threshold)
+        },
+    })
+}
+
 #[cfg(test)]
-fn number_format_to_native(format: TableCellNumberFormat) -> FormatStructArchive {
+fn number_format_to_native(format: Number) -> FormatStructArchive {
     data_format_to_native(&format.into()).expect("number format is explicit")
 }
 
 #[cfg(test)]
-fn number_format_from_native(native: &FormatStructArchive) -> Result<TableCellNumberFormat> {
+fn number_format_from_native(native: &FormatStructArchive) -> Result<Number> {
     match data_format_from_native(native)? {
-        TableCellDataFormat::Number(format) => Ok(format),
+        DataFormat::Number(format) => Ok(format),
         format => Err(Error::InvalidFormat(format!(
             "Expected a Number cell format, found {format:?}"
         ))),
@@ -1459,23 +2113,22 @@ mod tests {
     use super::*;
     use crate::numbers::cell::CellValue;
     use crate::numbers::{NumbersDocument, NumbersDocumentBuilder, NumbersEditor};
-    use crate::table_cell_data_format::{
-        TableCellCustomDateTimeFormat, TableCellCustomDateTimePattern, TableCellCustomFormat,
-        TableCellCustomFormatName, TableCellCustomNumberCondition,
-        TableCellCustomNumberConditionValue, TableCellCustomNumberFormat,
-        TableCellCustomNumberPattern, TableCellCustomNumberRule, TableCellCustomTextFormat,
-        TableCellDurationStyle, TableCellDurationUnit, TableCellDurationUnitRange,
-        TableCellFractionAccuracy, TableCellFractionFormat, TableCellNumeralSystemBase,
-        TableCellNumeralSystemFixedPlaces, TableCellNumeralSystemFormat,
-        TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces,
+    use litchi_numbers::cell::data_format::custom::{
+        Condition, ConditionValue, Custom, DateTime as CustomDateTime, DateTimePattern, Name,
+        Number as CustomNumber, NumberPattern, NumberRule, Text as CustomText,
+    };
+    use litchi_numbers::cell::data_format::duration::{Style, Unit, UnitRange};
+    use litchi_numbers::cell::data_format::number::FractionAccuracy;
+    use litchi_numbers::cell::data_format::numeral_system::{
+        Base, FixedPlaces, NegativeStyle as NumeralSystemNegativeStyle, Places,
     };
 
     #[test]
     fn number_format_native_codec_is_strict_and_roundtrips() {
-        let format = TableCellNumberFormat::new(
-            TableCellDecimalPlaces::fixed(2).unwrap(),
-            TableCellNegativeNumberStyle::Parentheses,
-            TableCellThousandsSeparator::Shown,
+        let format = Number::new(
+            DecimalPlaces::fixed(2).unwrap(),
+            NegativeStyle::Parentheses,
+            ThousandsSeparator::Shown,
         );
         assert_eq!(
             number_format_from_native(&number_format_to_native(format)).unwrap(),
@@ -1489,24 +2142,24 @@ mod tests {
         invalid.format_type = Some(999);
         assert!(number_format_from_native(&invalid).is_err());
 
-        let percentage = TableCellPercentageFormat::new(
-            TableCellDecimalPlaces::fixed(3).unwrap(),
-            TableCellNegativeNumberStyle::RedParentheses,
-            TableCellThousandsSeparator::Hidden,
+        let percentage = Percentage::new(
+            DecimalPlaces::fixed(3).unwrap(),
+            NegativeStyle::RedParentheses,
+            ThousandsSeparator::Hidden,
         );
         let native = data_format_to_native(&percentage.into()).unwrap();
         assert_eq!(native.format_type, Some(NATIVE_PERCENTAGE_FORMAT_TYPE));
         assert_eq!(
             data_format_from_native(&native).unwrap(),
-            TableCellDataFormat::Percentage(percentage)
+            DataFormat::Percentage(percentage)
         );
 
-        let currency = TableCellCurrencyFormat::new(
-            TableCellCurrencyCode::EUR,
-            TableCellDecimalPlaces::fixed(2).unwrap(),
-            TableCellNegativeNumberStyle::Parentheses,
-            TableCellThousandsSeparator::Shown,
-            TableCellCurrencyStyle::Accounting,
+        let currency = Currency::new(
+            CurrencyCode::EUR,
+            DecimalPlaces::fixed(2).unwrap(),
+            NegativeStyle::Parentheses,
+            ThousandsSeparator::Shown,
+            CurrencyStyle::Accounting,
         );
         let mut native = data_format_to_native(&currency.into()).unwrap();
         assert_eq!(native.format_type, Some(NATIVE_CURRENCY_FORMAT_TYPE));
@@ -1514,7 +2167,7 @@ mod tests {
         assert_eq!(native.use_accounting_style, Some(true));
         assert_eq!(
             data_format_from_native(&native).unwrap(),
-            TableCellDataFormat::Currency(currency)
+            DataFormat::Currency(currency)
         );
 
         native.currency_code = Some("euro".to_owned());
@@ -1523,14 +2176,13 @@ mod tests {
         native.use_accounting_style = None;
         assert!(data_format_from_native(&native).is_err());
 
-        let scientific =
-            TableCellScientificFormat::new(TableCellFixedDecimalPlaces::new(5).unwrap());
+        let scientific = Scientific::new(FixedDecimalPlaces::new(5).unwrap());
         let mut native = data_format_to_native(&scientific.into()).unwrap();
         assert_eq!(native.format_type, Some(NATIVE_SCIENTIFIC_FORMAT_TYPE));
         assert_eq!(native.decimal_places, Some(5));
         assert_eq!(
             data_format_from_native(&native).unwrap(),
-            TableCellDataFormat::Scientific(scientific)
+            DataFormat::Scientific(scientific)
         );
         native.negative_style = Some(2);
         assert!(data_format_from_native(&native).is_err());
@@ -1542,38 +2194,37 @@ mod tests {
         assert!(data_format_from_native(&native).is_err());
 
         let accuracies = [
-            (TableCellFractionAccuracy::UpToOneDigit, u32::MAX),
-            (TableCellFractionAccuracy::UpToTwoDigits, u32::MAX - 1),
-            (TableCellFractionAccuracy::UpToThreeDigits, u32::MAX - 2),
-            (TableCellFractionAccuracy::Halves, 2),
-            (TableCellFractionAccuracy::Quarters, 4),
-            (TableCellFractionAccuracy::Eighths, 8),
-            (TableCellFractionAccuracy::Sixteenths, 16),
-            (TableCellFractionAccuracy::Tenths, 10),
-            (TableCellFractionAccuracy::Hundredths, 100),
+            (FractionAccuracy::UpToOneDigit, u32::MAX),
+            (FractionAccuracy::UpToTwoDigits, u32::MAX - 1),
+            (FractionAccuracy::UpToThreeDigits, u32::MAX - 2),
+            (FractionAccuracy::Halves, 2),
+            (FractionAccuracy::Quarters, 4),
+            (FractionAccuracy::Eighths, 8),
+            (FractionAccuracy::Sixteenths, 16),
+            (FractionAccuracy::Tenths, 10),
+            (FractionAccuracy::Hundredths, 100),
         ];
         for (accuracy, native_accuracy) in accuracies {
-            let fraction = TableCellFractionFormat::new(accuracy);
+            let fraction = Fraction::new(accuracy);
             let native = data_format_to_native(&fraction.into()).unwrap();
             assert_eq!(native.format_type, Some(NATIVE_FRACTION_FORMAT_TYPE));
             assert_eq!(native.fraction_accuracy, Some(native_accuracy));
             assert_eq!(
                 data_format_from_native(&native).unwrap(),
-                TableCellDataFormat::Fraction(fraction)
+                DataFormat::Fraction(fraction)
             );
         }
-        let mut invalid =
-            data_format_to_native(&TableCellFractionFormat::default().into()).unwrap();
+        let mut invalid = data_format_to_native(&Fraction::default().into()).unwrap();
         invalid.fraction_accuracy = Some(3);
         assert!(data_format_from_native(&invalid).is_err());
-        invalid = data_format_to_native(&TableCellFractionFormat::default().into()).unwrap();
+        invalid = data_format_to_native(&Fraction::default().into()).unwrap();
         invalid.decimal_places = Some(2);
         assert!(data_format_from_native(&invalid).is_err());
 
-        let numeral_system = TableCellNumeralSystemFormat::new(
-            TableCellNumeralSystemBase::HEXADECIMAL,
-            TableCellNumeralSystemPlaces::Fixed(TableCellNumeralSystemFixedPlaces::EIGHT),
-            TableCellNumeralSystemNegativeStyle::TwosComplement,
+        let numeral_system = NumeralSystem::new(
+            Base::HEXADECIMAL,
+            Places::Fixed(FixedPlaces::EIGHT),
+            NumeralSystemNegativeStyle::TwosComplement,
         )
         .unwrap();
         let mut native = data_format_to_native(&numeral_system.into()).unwrap();
@@ -1583,7 +2234,7 @@ mod tests {
         assert_eq!(native.base_use_minus_sign, Some(false));
         assert_eq!(
             data_format_from_native(&native).unwrap(),
-            TableCellDataFormat::NumeralSystem(numeral_system)
+            DataFormat::NumeralSystem(numeral_system)
         );
         native.base = Some(37);
         assert!(data_format_from_native(&native).is_err());
@@ -1597,9 +2248,8 @@ mod tests {
         native.decimal_places = Some(2);
         assert!(data_format_from_native(&native).is_err());
 
-        let date_time = TableCellDateTimeFormat::iso_date_time_24_hour_with_seconds();
-        let mut native =
-            data_format_to_native(&TableCellDataFormat::DateTime(date_time.clone())).unwrap();
+        let date_time = DateTime::iso_date_time_24_hour_with_seconds();
+        let mut native = data_format_to_native(&DataFormat::DateTime(date_time.clone())).unwrap();
         assert_eq!(native.format_type, Some(NATIVE_DATE_TIME_FORMAT_TYPE));
         assert_eq!(
             native.date_time_format.as_deref(),
@@ -1607,20 +2257,16 @@ mod tests {
         );
         assert_eq!(
             data_format_from_native(&native).unwrap(),
-            TableCellDataFormat::DateTime(date_time.clone())
+            DataFormat::DateTime(date_time.clone())
         );
         native.date_time_format = None;
         assert!(data_format_from_native(&native).is_err());
-        native = data_format_to_native(&TableCellDataFormat::DateTime(date_time.clone())).unwrap();
+        native = data_format_to_native(&DataFormat::DateTime(date_time.clone())).unwrap();
         native.suppress_time_format = Some(false);
         assert!(data_format_from_native(&native).is_err());
 
-        let range = TableCellDurationUnitRange::new(
-            TableCellDurationUnit::Hours,
-            TableCellDurationUnit::Milliseconds,
-        )
-        .unwrap();
-        let duration = TableCellDurationFormat::custom(TableCellDurationStyle::Abbreviated, range);
+        let range = UnitRange::new(Unit::Hours, Unit::Milliseconds).unwrap();
+        let duration = Duration::custom(Style::Abbreviated, range);
         let mut native = data_format_to_native(&duration.into()).unwrap();
         assert_eq!(native.format_type, Some(NATIVE_DURATION_FORMAT_TYPE));
         assert_eq!(native.duration_style, Some(1));
@@ -1629,7 +2275,7 @@ mod tests {
         assert_eq!(native.use_automatic_duration_units, Some(false));
         assert_eq!(
             data_format_from_native(&native).unwrap(),
-            TableCellDataFormat::Duration(duration)
+            DataFormat::Duration(duration)
         );
         native.duration_style = Some(3);
         assert!(data_format_from_native(&native).is_err());
@@ -1643,14 +2289,14 @@ mod tests {
         native.decimal_places = Some(2);
         assert!(data_format_from_native(&native).is_err());
 
-        let checkbox = TableCellDataFormat::Checkbox(TableCellCheckboxFormat);
+        let checkbox = DataFormat::Checkbox(Checkbox);
         let mut native = data_format_to_native(&checkbox).unwrap();
         assert_eq!(native.format_type, Some(NATIVE_CHECKBOX_FORMAT_TYPE));
         assert_eq!(data_format_from_native(&native).unwrap(), checkbox);
         native.bool_true_string = Some("Yes".to_owned());
         assert!(data_format_from_native(&native).is_err());
 
-        let star_rating = TableCellDataFormat::StarRating(TableCellStarRatingFormat);
+        let star_rating = DataFormat::StarRating(StarRating);
         let mut native = data_format_to_native(&star_rating).unwrap();
         assert_eq!(native.format_type, Some(NATIVE_STAR_RATING_FORMAT_TYPE));
         assert_eq!(data_format_from_native(&native).unwrap(), star_rating);
@@ -1658,14 +2304,12 @@ mod tests {
         assert!(data_format_from_native(&native).is_err());
 
         let numeric_control_displays = [
-            TableCellNumericControlDisplayFormat::Number(TableCellNumberFormat::default()),
-            TableCellNumericControlDisplayFormat::Currency(TableCellCurrencyFormat::default()),
-            TableCellNumericControlDisplayFormat::Percentage(TableCellPercentageFormat::default()),
-            TableCellNumericControlDisplayFormat::Fraction(TableCellFractionFormat::default()),
-            TableCellNumericControlDisplayFormat::Scientific(TableCellScientificFormat::default()),
-            TableCellNumericControlDisplayFormat::NumeralSystem(
-                TableCellNumeralSystemFormat::default(),
-            ),
+            DisplayFormat::Number(Number::default()),
+            DisplayFormat::Currency(Currency::default()),
+            DisplayFormat::Percentage(Percentage::default()),
+            DisplayFormat::Fraction(Fraction::default()),
+            DisplayFormat::Scientific(Scientific::default()),
+            DisplayFormat::NumeralSystem(NumeralSystem::default()),
         ];
         for display in numeric_control_displays {
             let native = numeric_control_display_to_native(&display).unwrap();
@@ -1675,7 +2319,7 @@ mod tests {
             );
         }
         let invalid_numeric_control_native =
-            data_format_to_native(&TableCellDataFormat::DateTime(date_time)).unwrap();
+            data_format_to_native(&DataFormat::DateTime(date_time)).unwrap();
         assert!(numeric_control_display_from_native(&invalid_numeric_control_native).is_err());
     }
 
@@ -1691,10 +2335,10 @@ mod tests {
             .set_cell(table_id, 1, 1, CellValue::Boolean(true))
             .unwrap();
         editor
-            .set_table_cell_checkbox_format(table_id, 1, 1, TableCellCheckboxFormat)
+            .set_table_cell_checkbox_format(table_id, 1, 1, Checkbox)
             .unwrap();
         editor
-            .set_table_cell_checkbox_format(table_id, 1, 2, TableCellCheckboxFormat)
+            .set_table_cell_checkbox_format(table_id, 1, 2, Checkbox)
             .unwrap();
 
         let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
@@ -1722,7 +2366,7 @@ mod tests {
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened.table_cell_checkbox_format(table_id, 1, 1).unwrap(),
-            Some(TableCellCheckboxFormat)
+            Some(Checkbox)
         );
         let document = NumbersDocument::from_bytes(&reopened.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -1736,7 +2380,7 @@ mod tests {
         );
         assert_eq!(
             reopened.table_cell_checkbox_format(table_id, 1, 2).unwrap(),
-            Some(TableCellCheckboxFormat)
+            Some(Checkbox)
         );
         assert!(
             reopened
@@ -1766,10 +2410,10 @@ mod tests {
             .set_cell(table_id, 1, 1, CellValue::Number(3.0))
             .unwrap();
         editor
-            .set_table_cell_star_rating_format(table_id, 1, 1, TableCellStarRatingFormat)
+            .set_table_cell_star_rating_format(table_id, 1, 1, StarRating)
             .unwrap();
         editor
-            .set_table_cell_star_rating_format(table_id, 1, 2, TableCellStarRatingFormat)
+            .set_table_cell_star_rating_format(table_id, 1, 2, StarRating)
             .unwrap();
 
         let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
@@ -1809,7 +2453,7 @@ mod tests {
             reopened
                 .table_cell_star_rating_format(table_id, 1, 1)
                 .unwrap(),
-            Some(TableCellStarRatingFormat)
+            Some(StarRating)
         );
         let document = NumbersDocument::from_bytes(&reopened.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -1825,7 +2469,7 @@ mod tests {
             reopened
                 .table_cell_star_rating_format(table_id, 1, 2)
                 .unwrap(),
-            Some(TableCellStarRatingFormat)
+            Some(StarRating)
         );
         assert!(
             reopened
@@ -1851,13 +2495,13 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        let range = TableCellSliderRange::new(-10.0, 30.0, 0.5).unwrap();
-        let number_display = TableCellNumberFormat::new(
-            TableCellDecimalPlaces::fixed(2).unwrap(),
-            TableCellNegativeNumberStyle::MinusSign,
-            TableCellThousandsSeparator::Hidden,
+        let range = Range::new(-10.0, 30.0, 0.5).unwrap();
+        let number_display = Number::new(
+            DecimalPlaces::fixed(2).unwrap(),
+            NegativeStyle::MinusSign,
+            ThousandsSeparator::Hidden,
         );
-        let number_slider = TableCellSliderFormat::new(range, number_display.into());
+        let number_slider = Slider::new(range, number_display.into());
         editor
             .set_cell(table_id, 1, 1, CellValue::Number(25.0))
             .unwrap();
@@ -1911,8 +2555,7 @@ mod tests {
             Some(&CellValue::Number(10.0))
         );
 
-        let currency_slider =
-            TableCellSliderFormat::new(range, TableCellCurrencyFormat::default().into());
+        let currency_slider = Slider::new(range, Currency::default().into());
         reopened
             .set_table_cell_slider_format(table_id, 1, 1, currency_slider.clone())
             .unwrap();
@@ -1953,13 +2596,13 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        let range = TableCellStepperRange::new(-10.0, 30.0, 0.5).unwrap();
-        let number_display = TableCellNumberFormat::new(
-            TableCellDecimalPlaces::fixed(2).unwrap(),
-            TableCellNegativeNumberStyle::MinusSign,
-            TableCellThousandsSeparator::Hidden,
+        let range = Range::new(-10.0, 30.0, 0.5).unwrap();
+        let number_display = Number::new(
+            DecimalPlaces::fixed(2).unwrap(),
+            NegativeStyle::MinusSign,
+            ThousandsSeparator::Hidden,
         );
-        let number_stepper = TableCellStepperFormat::new(range, number_display.into());
+        let number_stepper = Stepper::new(range, number_display.into());
         editor
             .set_cell(table_id, 1, 1, CellValue::Number(25.0))
             .unwrap();
@@ -2013,8 +2656,7 @@ mod tests {
             Some(&CellValue::Number(-10.0))
         );
 
-        let currency_stepper =
-            TableCellStepperFormat::new(range, TableCellCurrencyFormat::default().into());
+        let currency_stepper = Stepper::new(range, Currency::default().into());
         reopened
             .set_table_cell_stepper_format(table_id, 1, 1, currency_stepper.clone())
             .unwrap();
@@ -2073,11 +2715,11 @@ mod tests {
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened.table_cell_text_format(table_id, 1, 1).unwrap(),
-            Some(TableCellTextFormat)
+            Some(Text)
         );
         assert_eq!(
             reopened.table_cell_text_format(table_id, 1, 2).unwrap(),
-            Some(TableCellTextFormat)
+            Some(Text)
         );
         let document = NumbersDocument::from_bytes(&reopened.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -2119,27 +2761,24 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        let name = |value| TableCellCustomFormatName::try_new(value).unwrap();
-        let number = TableCellCustomNumberFormat::try_with_rules(
+        let name = |value| Name::try_new(value).unwrap();
+        let number = CustomNumber::try_with_rules(
             name("Grouped Integer"),
-            TableCellCustomNumberPattern::try_new("#,###").unwrap(),
-            [TableCellCustomNumberRule::new(
-                TableCellCustomNumberCondition::LessThan(
-                    TableCellCustomNumberConditionValue::try_new(0.0).unwrap(),
-                ),
-                TableCellCustomNumberPattern::try_new("(#,###)").unwrap(),
+            NumberPattern::try_new("#,###").unwrap(),
+            [NumberRule::new(
+                Condition::LessThan(ConditionValue::try_new(0.0).unwrap()),
+                NumberPattern::try_new("(#,###)").unwrap(),
             )],
         )
         .unwrap();
-        let date_time = TableCellCustomDateTimeFormat::new(
+        let date_time = CustomDateTime::new(
             name("Month Day Year"),
-            TableCellCustomDateTimePattern::try_new("MMM d, y").unwrap(),
+            DateTimePattern::try_new("MMM d, y").unwrap(),
         );
-        let text =
-            TableCellCustomTextFormat::try_new(name("Text With ID Suffix"), "", "ID: ").unwrap();
-        let number = TableCellCustomFormat::Number(number);
-        let date_time = TableCellCustomFormat::DateTime(date_time);
-        let text = TableCellCustomFormat::Text(text);
+        let text = CustomText::try_new(name("Text With ID Suffix"), "", "ID: ").unwrap();
+        let number = Custom::Number(number);
+        let date_time = Custom::DateTime(date_time);
+        let text = Custom::Text(text);
 
         editor
             .set_cell(table_id, 1, 1, CellValue::Number(-12_345.0))
@@ -2219,7 +2858,7 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        let priority = TableCellPopUpMenuFormat::try_new(["Low", "Medium", "High"]).unwrap();
+        let priority = PopUpMenu::new(["Low", "Medium", "High"]).unwrap();
         editor
             .set_table_cell_pop_up_menu_format(table_id, 1, 1, priority.clone())
             .unwrap();
@@ -2285,9 +2924,9 @@ mod tests {
         );
         assert_eq!(reopened.to_bytes().unwrap(), before);
 
-        let blank_priority = TableCellPopUpMenuFormat::try_new(["Low", "Medium", "High"])
+        let blank_priority = PopUpMenu::new(["Low", "Medium", "High"])
             .unwrap()
-            .with_initial_selection(TableCellPopUpMenuInitialSelection::Blank);
+            .with_initial_selection(InitialSelection::Blank);
         reopened
             .set_table_cell_pop_up_menu_format(table_id, 1, 1, blank_priority.clone())
             .unwrap();
@@ -2350,8 +2989,8 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        let range = TableCellDurationUnitRange::hours_to_milliseconds();
-        let duration = TableCellDurationFormat::custom(TableCellDurationStyle::Abbreviated, range);
+        let range = UnitRange::hours_to_milliseconds();
+        let duration = Duration::custom(Style::Abbreviated, range);
         editor
             .set_cell(table_id, 1, 1, CellValue::Duration(3_723.5))
             .unwrap();
@@ -2429,7 +3068,7 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        let date_time = TableCellDateTimeFormat::iso_date_time_24_hour_with_seconds();
+        let date_time = DateTime::iso_date_time_24_hour_with_seconds();
         editor
             .set_cell(table_id, 1, 1, CellValue::Date(789_332_889.0))
             .unwrap();
@@ -2488,10 +3127,10 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        let numeral_system = TableCellNumeralSystemFormat::new(
-            TableCellNumeralSystemBase::HEXADECIMAL,
-            TableCellNumeralSystemPlaces::Fixed(TableCellNumeralSystemFixedPlaces::EIGHT),
-            TableCellNumeralSystemNegativeStyle::TwosComplement,
+        let numeral_system = NumeralSystem::new(
+            Base::HEXADECIMAL,
+            Places::Fixed(FixedPlaces::EIGHT),
+            NumeralSystemNegativeStyle::TwosComplement,
         )
         .unwrap();
         editor
@@ -2549,7 +3188,7 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        let fraction = TableCellFractionFormat::new(TableCellFractionAccuracy::Eighths);
+        let fraction = Fraction::new(FractionAccuracy::Eighths);
         editor
             .set_cell(table_id, 1, 1, CellValue::Number(-12.375))
             .unwrap();
@@ -2601,8 +3240,7 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        let scientific =
-            TableCellScientificFormat::new(TableCellFixedDecimalPlaces::new(5).unwrap());
+        let scientific = Scientific::new(FixedDecimalPlaces::new(5).unwrap());
         editor
             .set_cell(table_id, 1, 1, CellValue::Number(-1_234.5))
             .unwrap();
@@ -2658,12 +3296,12 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        let currency = TableCellCurrencyFormat::new(
-            TableCellCurrencyCode::USD,
-            TableCellDecimalPlaces::fixed(2).unwrap(),
-            TableCellNegativeNumberStyle::Parentheses,
-            TableCellThousandsSeparator::Shown,
-            TableCellCurrencyStyle::Accounting,
+        let currency = Currency::new(
+            CurrencyCode::USD,
+            DecimalPlaces::fixed(2).unwrap(),
+            NegativeStyle::Parentheses,
+            ThousandsSeparator::Shown,
+            CurrencyStyle::Accounting,
         );
         editor
             .set_cell(table_id, 1, 1, CellValue::Number(-1_234.5))
@@ -2716,10 +3354,10 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        let format = TableCellNumberFormat::new(
-            TableCellDecimalPlaces::fixed(2).unwrap(),
-            TableCellNegativeNumberStyle::Parentheses,
-            TableCellThousandsSeparator::Shown,
+        let format = Number::new(
+            DecimalPlaces::fixed(2).unwrap(),
+            NegativeStyle::Parentheses,
+            ThousandsSeparator::Shown,
         );
         assert_eq!(
             editor.table_cell_number_format(table_id, 1, 1).unwrap(),
@@ -2790,7 +3428,7 @@ mod tests {
         let before = editor.to_bytes().unwrap();
         assert!(
             editor
-                .set_table_cell_number_format(table_id, 2, 0, TableCellNumberFormat::default())
+                .set_table_cell_number_format(table_id, 2, 0, Number::default())
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);
@@ -2804,15 +3442,15 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        let number = TableCellNumberFormat::new(
-            TableCellDecimalPlaces::fixed(1).unwrap(),
-            TableCellNegativeNumberStyle::MinusSign,
-            TableCellThousandsSeparator::Hidden,
+        let number = Number::new(
+            DecimalPlaces::fixed(1).unwrap(),
+            NegativeStyle::MinusSign,
+            ThousandsSeparator::Hidden,
         );
-        let percentage = TableCellPercentageFormat::new(
-            TableCellDecimalPlaces::fixed(2).unwrap(),
-            TableCellNegativeNumberStyle::Parentheses,
-            TableCellThousandsSeparator::Shown,
+        let percentage = Percentage::new(
+            DecimalPlaces::fixed(2).unwrap(),
+            NegativeStyle::Parentheses,
+            ThousandsSeparator::Shown,
         );
         editor
             .set_table_cell_data_format(table_id, 1, 1, number.into())
@@ -2822,7 +3460,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             editor.table_cell_data_format(table_id, 1, 2).unwrap(),
-            TableCellDataFormat::Automatic
+            DataFormat::Automatic
         );
         editor
             .set_table_cell_percentage_format(table_id, 1, 1, percentage)
@@ -2833,7 +3471,7 @@ mod tests {
 
         assert_eq!(
             editor.table_cell_data_format(table_id, 1, 1).unwrap(),
-            TableCellDataFormat::Percentage(percentage)
+            DataFormat::Percentage(percentage)
         );
         assert!(editor.table_cell_number_format(table_id, 1, 1).is_err());
         let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
@@ -2857,11 +3495,11 @@ mod tests {
             Some(percentage)
         );
         reopened
-            .set_table_cell_data_format(table_id, 1, 1, TableCellDataFormat::Automatic)
+            .set_table_cell_data_format(table_id, 1, 1, DataFormat::Automatic)
             .unwrap();
         assert_eq!(
             reopened.table_cell_data_format(table_id, 1, 1).unwrap(),
-            TableCellDataFormat::Automatic
+            DataFormat::Automatic
         );
         assert_eq!(
             reopened

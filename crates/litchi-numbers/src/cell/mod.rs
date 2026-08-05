@@ -1,5 +1,7 @@
 //! Numbers cell vocabulary and its native wire codec.
 
+/// Checked, archive-free cell display formats.
+pub mod data_format;
 pub mod wire;
 
 use std::fmt;

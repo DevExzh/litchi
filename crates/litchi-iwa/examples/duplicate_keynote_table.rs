@@ -1,10 +1,8 @@
 use std::env;
 
-use litchi_iwa::keynote::{
-    KeynoteDocumentBuilder, KeynoteTableCellUpdate, KeynoteTableCellValue,
-    KeynoteTableFormulaCachedValue, KeynoteTableFormulaExpression,
-};
+use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteTableCellUpdate, KeynoteTableCellValue};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_keynote::slide::table::formula::{FormulaCachedValue, FormulaExpression};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = env::args()
@@ -39,14 +37,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         source.model_object_id,
         2,
         1,
-        KeynoteTableFormulaExpression::function(
+        FormulaExpression::function(
             "SUM",
             [
-                KeynoteTableFormulaExpression::Number(100.0),
-                KeynoteTableFormulaExpression::Number(25.0),
+                FormulaExpression::Number(100.0),
+                FormulaExpression::Number(25.0),
             ],
         ),
-        KeynoteTableFormulaCachedValue::Number(125.0),
+        FormulaCachedValue::Number(125.0),
     )?;
 
     let copy = editor.duplicate_slide_table(0, source.drawable_object_id)?;

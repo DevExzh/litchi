@@ -4,10 +4,10 @@ use std::env;
 
 use litchi_iwa::keynote::{
     KeynoteDocumentBuilder, KeynoteTableCellUpdate, KeynoteTableCellValue, KeynoteTableHeaderCount,
-    KeynoteTableHeaderSettings, KeynoteTableSortColumnIndex, KeynoteTableSortDirection,
-    KeynoteTableSortOrder, KeynoteTableSortRule,
+    KeynoteTableHeaderSettings,
 };
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_numbers::table::sort::{ColumnIndex, Direction, Order, Rule};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = env::args()
@@ -77,10 +77,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_table_sort_order(
         0,
         table.model_object_id,
-        KeynoteTableSortOrder::new([KeynoteTableSortRule::new(
-            KeynoteTableSortColumnIndex::new(0)?,
-            KeynoteTableSortDirection::Ascending,
-        )])?,
+        Order::new([Rule::new(ColumnIndex::new(0)?, Direction::Ascending)])?,
     )?;
     if !editor.apply_slide_table_sort_order(0, table.model_object_id)? {
         return Err("expected the source table to be reordered".into());

@@ -103,6 +103,7 @@ impl NumericControlRange {
         self.increment
     }
 
+    #[cfg(test)]
     pub(crate) fn midpoint_grid_value(self) -> f64 {
         let midpoint_steps = ((self.maximum - self.minimum) / self.increment / 2.0).floor();
         self.minimum + midpoint_steps * self.increment

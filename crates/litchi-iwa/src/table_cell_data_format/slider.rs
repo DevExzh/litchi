@@ -40,6 +40,7 @@ impl TableCellSliderRange {
         self.0.increment()
     }
 
+    #[cfg(test)]
     pub(crate) fn native_initial_value(self) -> f64 {
         self.0.midpoint_grid_value()
     }

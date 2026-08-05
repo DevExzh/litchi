@@ -375,6 +375,7 @@ impl TableCellCustomTextFormat {
         self.includes_cell_text
     }
 
+    #[cfg(test)]
     pub(crate) fn native_pattern(&self) -> String {
         let mut pattern = String::with_capacity(
             self.prefix.len() + self.suffix.len() + usize::from(self.includes_cell_text) * 3,

@@ -12,9 +12,9 @@ use crate::application::Application;
 use crate::bundle::{Bundle, BundleLimits};
 use crate::object_index::ObjectIndex;
 use crate::protobuf::{tp, tswp};
-use crate::ref_graph::ObjectId;
 use crate::text::{TextExtractor, TextStorage};
 use crate::{Error, Result};
+use litchi_iwa_graph::ObjectId;
 
 /// High-level interface for Pages documents
 #[derive(Debug, Clone)]

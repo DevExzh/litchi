@@ -96,7 +96,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<crate::table_cell_data_format::TableCellDataFormat> {
+    ) -> Result<DataFormat> {
         cell_data_format::cell_data_format(&self.package, table_id, row, column)
     }
 
@@ -106,7 +106,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellDataFormat,
+        format: DataFormat,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_data_format::set_cell_data_format(&mut staged, table_id, row, column, &format)?;
@@ -128,7 +128,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellNumberFormat>> {
+    ) -> Result<Option<Number>> {
         cell_data_format::cell_number_format(&self.package, table_id, row, column)
     }
 
@@ -138,7 +138,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellNumberFormat,
+        format: Number,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -176,7 +176,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellTextFormat>> {
+    ) -> Result<Option<Text>> {
         cell_data_format::cell_text_format(&self.package, table_id, row, column)
     }
 
@@ -191,7 +191,7 @@ impl NumbersEditor {
             table_id,
             row,
             column,
-            crate::table_cell_data_format::TableCellTextFormat.into(),
+            Text.into(),
         )
     }
 
@@ -207,7 +207,7 @@ impl NumbersEditor {
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Numbers Text-format reset failed package validation".to_owned(),
@@ -226,7 +226,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellCustomFormat>> {
+    ) -> Result<Option<Custom>> {
         cell_data_format::cell_custom_format(&self.package, table_id, row, column)
     }
 
@@ -236,7 +236,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellCustomFormat,
+        format: Custom,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -254,7 +254,7 @@ impl NumbersEditor {
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Numbers Custom-format reset failed package validation".to_owned(),
@@ -273,7 +273,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellCurrencyFormat>> {
+    ) -> Result<Option<Currency>> {
         cell_data_format::cell_currency_format(&self.package, table_id, row, column)
     }
 
@@ -283,7 +283,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellCurrencyFormat,
+        format: Currency,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -301,7 +301,7 @@ impl NumbersEditor {
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Numbers currency-format reset failed package validation".to_owned(),
@@ -320,7 +320,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellPercentageFormat>> {
+    ) -> Result<Option<Percentage>> {
         cell_data_format::cell_percentage_format(&self.package, table_id, row, column)
     }
 
@@ -330,7 +330,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellPercentageFormat,
+        format: Percentage,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -348,7 +348,7 @@ impl NumbersEditor {
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Numbers percentage-format reset failed package validation".to_owned(),
@@ -367,7 +367,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellScientificFormat>> {
+    ) -> Result<Option<Scientific>> {
         cell_data_format::cell_scientific_format(&self.package, table_id, row, column)
     }
 
@@ -377,7 +377,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellScientificFormat,
+        format: Scientific,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -395,7 +395,7 @@ impl NumbersEditor {
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Numbers scientific-format reset failed package validation".to_owned(),
@@ -414,7 +414,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellFractionFormat>> {
+    ) -> Result<Option<Fraction>> {
         cell_data_format::cell_fraction_format(&self.package, table_id, row, column)
     }
 
@@ -424,7 +424,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellFractionFormat,
+        format: Fraction,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -442,7 +442,7 @@ impl NumbersEditor {
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Numbers fraction-format reset failed package validation".to_owned(),
@@ -461,7 +461,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellNumeralSystemFormat>> {
+    ) -> Result<Option<NumeralSystem>> {
         cell_data_format::cell_numeral_system_format(&self.package, table_id, row, column)
     }
 
@@ -471,7 +471,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellNumeralSystemFormat,
+        format: NumeralSystem,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -489,7 +489,7 @@ impl NumbersEditor {
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Numbers numeral-system reset failed package validation".to_owned(),
@@ -508,7 +508,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellDateTimeFormat>> {
+    ) -> Result<Option<DateTime>> {
         cell_data_format::cell_date_time_format(&self.package, table_id, row, column)
     }
 
@@ -518,7 +518,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellDateTimeFormat,
+        format: DateTime,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -536,7 +536,7 @@ impl NumbersEditor {
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Numbers Date & Time reset failed package validation".to_owned(),
@@ -555,7 +555,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellDurationFormat>> {
+    ) -> Result<Option<Duration>> {
         cell_data_format::cell_duration_format(&self.package, table_id, row, column)
     }
 
@@ -565,7 +565,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellDurationFormat,
+        format: Duration,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -583,7 +583,7 @@ impl NumbersEditor {
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Numbers Duration reset failed package validation".to_owned(),
@@ -600,7 +600,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellCheckboxFormat>> {
+    ) -> Result<Option<Checkbox>> {
         cell_data_format::cell_checkbox_format(&self.package, table_id, row, column)
     }
 
@@ -610,7 +610,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellCheckboxFormat,
+        format: Checkbox,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -628,7 +628,7 @@ impl NumbersEditor {
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Numbers Checkbox reset failed package validation".to_owned(),
@@ -645,7 +645,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellStarRatingFormat>> {
+    ) -> Result<Option<StarRating>> {
         cell_data_format::cell_star_rating_format(&self.package, table_id, row, column)
     }
 
@@ -655,7 +655,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellStarRatingFormat,
+        format: StarRating,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -673,7 +673,7 @@ impl NumbersEditor {
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Numbers Star Rating reset failed package validation".to_owned(),
@@ -690,7 +690,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellSliderFormat>> {
+    ) -> Result<Option<Slider>> {
         cell_data_format::cell_slider_format(&self.package, table_id, row, column)
     }
 
@@ -700,7 +700,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellSliderFormat,
+        format: Slider,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -718,7 +718,7 @@ impl NumbersEditor {
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Numbers Slider reset failed package validation".to_owned(),
@@ -735,7 +735,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellStepperFormat>> {
+    ) -> Result<Option<Stepper>> {
         cell_data_format::cell_stepper_format(&self.package, table_id, row, column)
     }
 
@@ -745,7 +745,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellStepperFormat,
+        format: Stepper,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -763,7 +763,7 @@ impl NumbersEditor {
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Numbers Stepper reset failed package validation".to_owned(),
@@ -780,7 +780,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellPopUpMenuFormat>> {
+    ) -> Result<Option<PopUpMenu>> {
         cell_data_format::cell_pop_up_menu_format(&self.package, table_id, row, column)
     }
 
@@ -790,7 +790,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellPopUpMenuFormat,
+        format: PopUpMenu,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -808,7 +808,7 @@ impl NumbersEditor {
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Numbers Pop-Up Menu reset failed package validation".to_owned(),

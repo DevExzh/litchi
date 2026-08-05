@@ -869,7 +869,7 @@ fn keynote_paragraph_indents() -> Result<ParagraphIndents, litchi_iwa::Error> {
 fn numbers_paragraph_tab_stops() -> Result<ParagraphTabStops, litchi_iwa::Error> {
     const CENTER_POINTS: f32 = 36.0;
     const DECIMAL_POINTS: f32 = 72.0;
-    ParagraphTabStops::new(vec![
+    Ok(ParagraphTabStops::new(vec![
         ParagraphTabStop::new(
             ParagraphTabPosition::from_points(CENTER_POINTS)?,
             ParagraphTabAlignment::Center,
@@ -879,13 +879,13 @@ fn numbers_paragraph_tab_stops() -> Result<ParagraphTabStops, litchi_iwa::Error>
             ParagraphTabAlignment::Decimal,
         )
         .with_leader(ParagraphTabLeader::new(".")?),
-    ])
+    ])?)
 }
 
 fn pages_paragraph_tab_stops() -> Result<ParagraphTabStops, litchi_iwa::Error> {
     const LEFT_POINTS: f32 = 42.0;
     const RIGHT_POINTS: f32 = 78.0;
-    ParagraphTabStops::new(vec![
+    Ok(ParagraphTabStops::new(vec![
         ParagraphTabStop::new(
             ParagraphTabPosition::from_points(LEFT_POINTS)?,
             ParagraphTabAlignment::Left,
@@ -895,13 +895,13 @@ fn pages_paragraph_tab_stops() -> Result<ParagraphTabStops, litchi_iwa::Error> {
             ParagraphTabAlignment::Right,
         )
         .with_leader(ParagraphTabLeader::new("-")?),
-    ])
+    ])?)
 }
 
 fn keynote_paragraph_tab_stops() -> Result<ParagraphTabStops, litchi_iwa::Error> {
     const CENTER_POINTS: f32 = 48.0;
     const RIGHT_POINTS: f32 = 84.0;
-    ParagraphTabStops::new(vec![
+    Ok(ParagraphTabStops::new(vec![
         ParagraphTabStop::new(
             ParagraphTabPosition::from_points(CENTER_POINTS)?,
             ParagraphTabAlignment::Center,
@@ -910,7 +910,7 @@ fn keynote_paragraph_tab_stops() -> Result<ParagraphTabStops, litchi_iwa::Error>
             ParagraphTabPosition::from_points(RIGHT_POINTS)?,
             ParagraphTabAlignment::Right,
         ),
-    ])
+    ])?)
 }
 
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
