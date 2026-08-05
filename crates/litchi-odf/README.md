@@ -20,20 +20,23 @@ litchi-odf = "0.0.1"
 ```
 
 ```rust
-use litchi_odt::Document;
-use litchi_ods::Spreadsheet;
-use litchi_odp::Presentation;
+use litchi_odf::{odp, ods, odt};
 
-let mut doc = Document::open("document.odt")?;
+let doc = odt::Document::open("document.odt")?;
 let text = doc.text()?;
 
-let mut sheet = Spreadsheet::open("data.ods")?;
+let sheet = ods::Spreadsheet::open("data.ods")?;
 let csv = sheet.to_csv()?;
 
-let mut pres = Presentation::open("slides.odp")?;
+let pres = odp::Presentation::open("slides.odp")?;
 let slides = pres.slide_count()?;
 # Ok::<(), litchi_core::Error>(())
 ```
+
+The umbrella root intentionally exposes only detection and the selected family
+modules. Shared vocabulary and package primitives remain under the separate
+`litchi-odf-common` crate, so applications that need only one family can keep
+their dependency and memory footprint minimal.
 
 ## Features
 

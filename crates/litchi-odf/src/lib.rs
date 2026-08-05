@@ -7,7 +7,6 @@
 #![forbid(unsafe_code)]
 
 pub use litchi_odf_common::detect;
-pub use litchi_odf_common::{annotation, constants, coordinates, core, datatype, namespace, rdf};
 
 /// Dedicated OpenDocument Database implementation.
 #[cfg(feature = "odb")]
@@ -39,11 +38,3 @@ pub use litchi_odt as odt;
 /// Dedicated OpenDocument Web Template implementation.
 #[cfg(feature = "oth")]
 pub use litchi_oth as oth;
-
-pub use litchi_odf_common::core::{
-    AutoReloadMetadata, Cipher, DocumentStatistics, HyperlinkBehaviourMetadata, Kdf, Manifest,
-    ManifestChecksum, ManifestChecksumAlgorithm, ManifestEncryption, ManifestEncryptionAlgorithm,
-    ManifestEntry, ManifestKeyDerivation, ManifestStartKeyGeneration, Metadata, OwnedPackage,
-    PackageWriter, Profile, StartKey, Structure, TemplateMetadata, UserDefinedMetadata,
-    UserDefinedValueType,
-};

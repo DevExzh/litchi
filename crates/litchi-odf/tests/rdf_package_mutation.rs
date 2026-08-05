@@ -1,11 +1,9 @@
+use litchi_odf::{odp, ods, odt};
 use litchi_odf_common::core::{OwnedPackage, PackageWriter};
 use litchi_odf_common::{
     constants,
     rdf::{Object, Subject, Triple},
 };
-use litchi_odp::Presentation;
-use litchi_ods::Spreadsheet;
-use litchi_odt::Document;
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
@@ -63,7 +61,7 @@ fn literal(subject: &str, predicate: &str, value: &str) -> Triple {
 #[test]
 fn generated_graph_triple_crud_manifest_and_atomic_refs() {
     let mut document =
-        Document::from_bytes(package(constants::ODF_TEXT, "text", &[], true)).unwrap();
+        odt::Document::from_bytes(package(constants::ODF_TEXT, "text", &[], true)).unwrap();
     let first = literal("#anchor", "https://example.invalid/schema#label", "first");
     let second = Triple {
         subject: Subject::Iri("#anchor".to_string()),
@@ -106,7 +104,7 @@ fn generated_graph_triple_crud_manifest_and_atomic_refs() {
 #[test]
 fn shared_graph_references_block_dangling_removal() {
     let mut document =
-        Document::from_bytes(package(constants::ODF_TEXT, "text", &[], false)).unwrap();
+        odt::Document::from_bytes(package(constants::ODF_TEXT, "text", &[], false)).unwrap();
     let target = document
         .add_rdf_graph(Some("Metadata/target.rdf"), &[])
         .unwrap();
@@ -133,7 +131,7 @@ fn libreoffice_rdf_and_malformed_xml_discovery() {
         "/../../test-data/libreoffice-core/extras/source/autotext/lang/szl/standard/FN/manifest.rdf"
     ))
     .unwrap();
-    let document = Document::from_bytes(package(
+    let document = odt::Document::from_bytes(package(
         constants::ODF_TEXT,
         "text",
         &[("manifest.rdf", fixture.as_slice())],
@@ -150,7 +148,7 @@ fn libreoffice_rdf_and_malformed_xml_discovery() {
     );
 
     let hostile = br#"<?xml version="1.0"?><!DOCTYPE rdf:RDF [<!ENTITY x "bad">]><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"/>"#;
-    let malformed = Document::from_bytes(package(
+    let malformed = odt::Document::from_bytes(package(
         constants::ODF_TEXT,
         "text",
         &[("manifest.rdf", hostile)],
@@ -171,7 +169,7 @@ fn ods_and_odp_facades_roundtrip_blank_nodes_and_datatypes() {
             language: None,
         },
     };
-    let mut sheet = Spreadsheet::from_bytes(package(
+    let mut sheet = ods::Spreadsheet::from_bytes(package(
         constants::ODF_SPREADSHEET,
         "spreadsheet",
         &[],
@@ -185,7 +183,7 @@ fn ods_and_odp_facades_roundtrip_blank_nodes_and_datatypes() {
     sheet.replace_rdf_graph("manifest.rdf", &[]).unwrap();
     assert!(sheet.rdf_graphs().unwrap()[0].triples.is_empty());
 
-    let mut slides = Presentation::from_bytes(package(
+    let mut slides = odp::Presentation::from_bytes(package(
         constants::ODF_PRESENTATION,
         "presentation",
         &[],
