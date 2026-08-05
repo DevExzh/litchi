@@ -12,6 +12,12 @@
 use crate::{Error, IWorkPackage, Result};
 
 mod archive;
+
+/// Native protobuf-backed chart data for advanced format-level integrations.
+pub mod raw {
+    pub use super::archive::IWorkChartArchive;
+}
+
 pub(crate) mod arrangement;
 pub(crate) mod axis;
 pub(crate) mod axis_bounds;
@@ -82,7 +88,7 @@ pub(crate) mod style;
 
 pub use litchi_iwa_common::chart::gaps::{Percentage, Spacing};
 
-pub use archive::IWorkChartArchive;
+pub(crate) use archive::IWorkChartArchive;
 pub use arrangement::ChartArrangement;
 pub use axis_gridline_stroke::{ChartAxisGridline, ChartAxisGridlineStroke};
 pub use bar_shape_3d::Chart3dBarShape;

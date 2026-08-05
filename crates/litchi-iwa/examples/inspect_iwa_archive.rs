@@ -4,7 +4,7 @@ use std::env;
 
 use litchi_iwa::IWorkPackage;
 use litchi_iwa::IWorkThemeArchive;
-use litchi_iwa::charts::IWorkChartArchive;
+use litchi_iwa::charts::raw::IWorkChartArchive;
 use litchi_iwa_protos::kn;
 use litchi_iwa_protos::tn;
 use litchi_iwa_protos::tp::{
