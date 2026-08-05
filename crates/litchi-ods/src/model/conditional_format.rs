@@ -38,62 +38,62 @@ pub(crate) const MAX_CONDITIONAL_ATTRIBUTE_BYTES: usize = 64 * 1024;
 /// Rules are retained in document order. Litchi does not evaluate them or
 /// compute an effective style.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ConditionalFormat {
+pub struct Format {
     /// ODF cell-range addresses the format applies to
     /// (`calcext:target-range-address`, split on unquoted whitespace).
     pub target_range_addresses: Vec<String>,
     /// Inert rules in document order.
-    pub rules: Vec<ConditionalFormatRule>,
+    pub rules: Vec<Rule>,
 }
 
 /// One inert rule of a `calcext:conditional-format` element.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ConditionalFormatRule {
+pub enum Rule {
     /// A `calcext:condition` expression rule.
-    Condition(ConditionalFormatCondition),
+    Condition(Condition),
     /// A `calcext:color-scale` gradient rule.
-    ColorScale(ConditionalColorScale),
+    ColorScale(ColorScale),
     /// A `calcext:data-bar` rule.
-    DataBar(ConditionalDataBar),
+    DataBar(DataBar),
     /// A `calcext:icon-set` rule.
-    IconSet(ConditionalIconSet),
+    IconSet(IconSet),
     /// A `calcext:date-is` date rule.
-    DateIs(ConditionalDateIs),
+    DateIs(DateIs),
 }
 
-impl From<ConditionalFormatCondition> for ConditionalFormatRule {
-    fn from(condition: ConditionalFormatCondition) -> Self {
+impl From<Condition> for Rule {
+    fn from(condition: Condition) -> Self {
         Self::Condition(condition)
     }
 }
 
-impl From<ConditionalColorScale> for ConditionalFormatRule {
-    fn from(color_scale: ConditionalColorScale) -> Self {
+impl From<ColorScale> for Rule {
+    fn from(color_scale: ColorScale) -> Self {
         Self::ColorScale(color_scale)
     }
 }
 
-impl From<ConditionalDataBar> for ConditionalFormatRule {
-    fn from(data_bar: ConditionalDataBar) -> Self {
+impl From<DataBar> for Rule {
+    fn from(data_bar: DataBar) -> Self {
         Self::DataBar(data_bar)
     }
 }
 
-impl From<ConditionalIconSet> for ConditionalFormatRule {
-    fn from(icon_set: ConditionalIconSet) -> Self {
+impl From<IconSet> for Rule {
+    fn from(icon_set: IconSet) -> Self {
         Self::IconSet(icon_set)
     }
 }
 
-impl From<ConditionalDateIs> for ConditionalFormatRule {
-    fn from(date_is: ConditionalDateIs) -> Self {
+impl From<DateIs> for Rule {
+    fn from(date_is: DateIs) -> Self {
         Self::DateIs(date_is)
     }
 }
 
 /// One inert `calcext:condition` rule of a conditional format.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ConditionalFormatCondition {
+pub struct Condition {
     /// The decoded condition expression (`calcext:value`). It is never
     /// evaluated by litchi.
     pub condition: String,
@@ -107,7 +107,7 @@ pub struct ConditionalFormatCondition {
 
 /// The threshold kind of a color-scale, data-bar, or icon-set entry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ConditionalFormatEntryType {
+pub enum EntryType {
     /// The lowest value of the range (`minimum`).
     Minimum,
     /// The highest value of the range (`maximum`).
@@ -126,7 +126,7 @@ pub enum ConditionalFormatEntryType {
     AutomaticMaximum,
 }
 
-impl ConditionalFormatEntryType {
+impl EntryType {
     pub(crate) fn parse(value: &str) -> Result<Self> {
         match value {
             "minimum" => Ok(Self::Minimum),
@@ -164,11 +164,11 @@ impl ConditionalFormatEntryType {
 
 /// One inert `calcext:color-scale-entry` threshold of a color scale.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ConditionalColorScaleEntry {
+pub struct ColorScaleEntry {
     /// The threshold kind (`calcext:type`).
-    pub entry_type: ConditionalFormatEntryType,
+    pub entry_type: EntryType,
     /// The lexical threshold (`calcext:value`): a number, or an inert formula
-    /// when `entry_type` is [`ConditionalFormatEntryType::Formula`].
+    /// when `entry_type` is [`EntryType::Formula`].
     pub value: String,
     /// The entry color in `#RRGGBB` form (`calcext:color`).
     pub color: String,
@@ -176,18 +176,18 @@ pub struct ConditionalColorScaleEntry {
 
 /// An inert `calcext:color-scale` gradient rule.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ConditionalColorScale {
+pub struct ColorScale {
     /// Threshold entries in document order.
-    pub entries: Vec<ConditionalColorScaleEntry>,
+    pub entries: Vec<ColorScaleEntry>,
 }
 
 /// One inert `calcext:formatting-entry` limit of a data bar.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ConditionalDataBarEntry {
+pub struct DataBarEntry {
     /// The limit kind (`calcext:type`).
-    pub entry_type: ConditionalFormatEntryType,
+    pub entry_type: EntryType,
     /// The lexical limit (`calcext:value`): a number, or an inert formula when
-    /// `entry_type` is [`ConditionalFormatEntryType::Formula`].
+    /// `entry_type` is [`EntryType::Formula`].
     pub value: String,
 }
 
@@ -225,7 +225,7 @@ impl DataBarAxisPosition {
 ///
 /// Numeric lengths are stored lexically and are never rendered by litchi.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ConditionalDataBar {
+pub struct DataBar {
     /// Optional bar color for positive values in `#RRGGBB` form
     /// (`calcext:positive-color`).
     pub positive_color: Option<String>,
@@ -245,16 +245,16 @@ pub struct ConditionalDataBar {
     /// Optional maximum bar length as a lexical number (`calcext:max-length`).
     pub max_length: Option<String>,
     /// Exactly two limit entries: lower bound first, upper bound second.
-    pub entries: Vec<ConditionalDataBarEntry>,
+    pub entries: Vec<DataBarEntry>,
 }
 
 /// One inert `calcext:formatting-entry` threshold of an icon set.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ConditionalIconSetEntry {
+pub struct IconSetEntry {
     /// The threshold kind (`calcext:type`).
-    pub entry_type: ConditionalFormatEntryType,
+    pub entry_type: EntryType,
     /// The lexical threshold (`calcext:value`): a number, or an inert formula
-    /// when `entry_type` is [`ConditionalFormatEntryType::Formula`].
+    /// when `entry_type` is [`EntryType::Formula`].
     pub value: String,
     /// Whether the threshold comparison includes equality
     /// (`calcext:greater-equal`, defaulting to true when absent).
@@ -355,7 +355,7 @@ impl IconSetType {
 /// mixes icons from different families (`calcext:custom="true"`). Litchi
 /// stores the assignment as typed data and never renders it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ConditionalCustomIcon {
+pub struct CustomIcon {
     /// The icon family the replacement icon comes from
     /// (`calcext:custom-iconset-name`).
     pub icon_set_type: IconSetType,
@@ -363,7 +363,7 @@ pub struct ConditionalCustomIcon {
     pub index: u32,
 }
 
-impl ConditionalCustomIcon {
+impl CustomIcon {
     /// Create an inert custom icon assignment.
     pub fn new(icon_set_type: IconSetType, index: u32) -> Self {
         Self {
@@ -375,7 +375,7 @@ impl ConditionalCustomIcon {
 
 /// An inert `calcext:icon-set` rule.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ConditionalIconSet {
+pub struct IconSet {
     /// The icon family (`calcext:icon-set-type`).
     pub icon_set_type: IconSetType,
     /// Whether the cell value is shown next to the icon (`calcext:show-value`).
@@ -384,14 +384,14 @@ pub struct ConditionalIconSet {
     pub custom: Option<bool>,
     /// Inert custom icon assignments (`calcext:custom-iconset` children) in
     /// document order.
-    pub custom_icons: Vec<ConditionalCustomIcon>,
+    pub custom_icons: Vec<CustomIcon>,
     /// Threshold entries in document order.
-    pub entries: Vec<ConditionalIconSetEntry>,
+    pub entries: Vec<IconSetEntry>,
 }
 
 /// The date bucket of a `calcext:date-is` rule (`calcext:date`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ConditionalDateType {
+pub enum DateType {
     Today,
     Yesterday,
     Tomorrow,
@@ -407,7 +407,7 @@ pub enum ConditionalDateType {
     NextYear,
 }
 
-impl ConditionalDateType {
+impl DateType {
     pub(crate) fn parse(value: &str) -> Result<Self> {
         Ok(match value {
             "today" => Self::Today,
@@ -452,20 +452,17 @@ impl ConditionalDateType {
 
 /// An inert `calcext:date-is` date rule.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ConditionalDateIs {
+pub struct DateIs {
     /// The date bucket (`calcext:date`).
-    pub date: ConditionalDateType,
+    pub date: DateType,
     /// Name of the table-cell style applied on a match (`calcext:style`). It
     /// is never resolved by litchi.
     pub style: String,
 }
 
-impl ConditionalFormat {
+impl Format {
     /// Create a validated inert conditional format.
-    pub fn new(
-        target_range_addresses: Vec<String>,
-        rules: Vec<ConditionalFormatRule>,
-    ) -> Result<Self> {
+    pub fn new(target_range_addresses: Vec<String>, rules: Vec<Rule>) -> Result<Self> {
         let format = Self {
             target_range_addresses,
             rules,
@@ -475,15 +472,15 @@ impl ConditionalFormat {
     }
 
     /// Iterate over the `calcext:condition` expression rules, in document order.
-    pub fn conditions(&self) -> impl Iterator<Item = &ConditionalFormatCondition> {
+    pub fn conditions(&self) -> impl Iterator<Item = &Condition> {
         self.rules.iter().filter_map(|rule| match rule {
-            ConditionalFormatRule::Condition(condition) => Some(condition),
+            Rule::Condition(condition) => Some(condition),
             _ => None,
         })
     }
 }
 
-impl ConditionalFormatCondition {
+impl Condition {
     /// Create an inert condition rule without a base cell address.
     pub fn new(condition: impl Into<String>, apply_style_name: impl Into<String>) -> Self {
         Self {
@@ -500,13 +497,9 @@ impl ConditionalFormatCondition {
     }
 }
 
-impl ConditionalColorScaleEntry {
+impl ColorScaleEntry {
     /// Create an inert color-scale threshold entry.
-    pub fn new(
-        entry_type: ConditionalFormatEntryType,
-        value: impl Into<String>,
-        color: impl Into<String>,
-    ) -> Self {
+    pub fn new(entry_type: EntryType, value: impl Into<String>, color: impl Into<String>) -> Self {
         Self {
             entry_type,
             value: value.into(),
@@ -515,16 +508,16 @@ impl ConditionalColorScaleEntry {
     }
 }
 
-impl ConditionalColorScale {
+impl ColorScale {
     /// Create an inert color-scale rule.
-    pub fn new(entries: Vec<ConditionalColorScaleEntry>) -> Self {
+    pub fn new(entries: Vec<ColorScaleEntry>) -> Self {
         Self { entries }
     }
 }
 
-impl ConditionalDataBarEntry {
+impl DataBarEntry {
     /// Create an inert data-bar limit entry.
-    pub fn new(entry_type: ConditionalFormatEntryType, value: impl Into<String>) -> Self {
+    pub fn new(entry_type: EntryType, value: impl Into<String>) -> Self {
         Self {
             entry_type,
             value: value.into(),
@@ -532,9 +525,9 @@ impl ConditionalDataBarEntry {
     }
 }
 
-impl ConditionalDataBar {
+impl DataBar {
     /// Create an inert data-bar rule with only limit entries set.
-    pub fn new(entries: Vec<ConditionalDataBarEntry>) -> Self {
+    pub fn new(entries: Vec<DataBarEntry>) -> Self {
         Self {
             positive_color: None,
             negative_color: None,
@@ -586,9 +579,9 @@ impl ConditionalDataBar {
     }
 }
 
-impl ConditionalIconSetEntry {
+impl IconSetEntry {
     /// Create an inert icon-set threshold entry.
-    pub fn new(entry_type: ConditionalFormatEntryType, value: impl Into<String>) -> Self {
+    pub fn new(entry_type: EntryType, value: impl Into<String>) -> Self {
         Self {
             entry_type,
             value: value.into(),
@@ -603,9 +596,9 @@ impl ConditionalIconSetEntry {
     }
 }
 
-impl ConditionalIconSet {
+impl IconSet {
     /// Create an inert icon-set rule.
-    pub fn new(icon_set_type: IconSetType, entries: Vec<ConditionalIconSetEntry>) -> Self {
+    pub fn new(icon_set_type: IconSetType, entries: Vec<IconSetEntry>) -> Self {
         Self {
             icon_set_type,
             show_value: None,
@@ -628,15 +621,15 @@ impl ConditionalIconSet {
     }
 
     /// Set the inert custom icon assignments.
-    pub fn with_custom_icons(mut self, custom_icons: Vec<ConditionalCustomIcon>) -> Self {
+    pub fn with_custom_icons(mut self, custom_icons: Vec<CustomIcon>) -> Self {
         self.custom_icons = custom_icons;
         self
     }
 }
 
-impl ConditionalDateIs {
+impl DateIs {
     /// Create an inert date rule referencing a table-cell style.
-    pub fn new(date: ConditionalDateType, style: impl Into<String>) -> Self {
+    pub fn new(date: DateType, style: impl Into<String>) -> Self {
         Self {
             date,
             style: style.into(),
@@ -644,7 +637,7 @@ impl ConditionalDateIs {
     }
 }
 
-pub(crate) fn validate_conditional_format(format: &ConditionalFormat) -> Result<()> {
+pub(crate) fn validate_conditional_format(format: &Format) -> Result<()> {
     if format.target_range_addresses.is_empty() {
         return Err(Error::InvalidFormat(
             "conditional formats require at least one target range".to_string(),
@@ -670,7 +663,7 @@ pub(crate) fn validate_conditional_format(format: &ConditionalFormat) -> Result<
     Ok(())
 }
 
-pub(crate) fn validate_conditional_formats(formats: &[ConditionalFormat]) -> Result<()> {
+pub(crate) fn validate_conditional_formats(formats: &[Format]) -> Result<()> {
     if formats.len() > MAX_CONDITIONAL_FORMATS_PER_SHEET {
         return Err(Error::InvalidFormat(format!(
             "sheet exceeds the {MAX_CONDITIONAL_FORMATS_PER_SHEET} conditional format safety limit"
@@ -682,17 +675,17 @@ pub(crate) fn validate_conditional_formats(formats: &[ConditionalFormat]) -> Res
     Ok(())
 }
 
-pub(crate) fn validate_rule(rule: &ConditionalFormatRule) -> Result<()> {
+pub(crate) fn validate_rule(rule: &Rule) -> Result<()> {
     match rule {
-        ConditionalFormatRule::Condition(condition) => validate_condition(condition),
-        ConditionalFormatRule::ColorScale(color_scale) => validate_color_scale(color_scale),
-        ConditionalFormatRule::DataBar(data_bar) => validate_data_bar(data_bar),
-        ConditionalFormatRule::IconSet(icon_set) => validate_icon_set(icon_set),
-        ConditionalFormatRule::DateIs(date_is) => validate_date_is(date_is),
+        Rule::Condition(condition) => validate_condition(condition),
+        Rule::ColorScale(color_scale) => validate_color_scale(color_scale),
+        Rule::DataBar(data_bar) => validate_data_bar(data_bar),
+        Rule::IconSet(icon_set) => validate_icon_set(icon_set),
+        Rule::DateIs(date_is) => validate_date_is(date_is),
     }
 }
 
-pub(crate) fn validate_condition(condition: &ConditionalFormatCondition) -> Result<()> {
+pub(crate) fn validate_condition(condition: &Condition) -> Result<()> {
     if condition.condition.is_empty() {
         return Err(Error::InvalidFormat(
             "calcext:condition requires a non-empty calcext:value".to_string(),
@@ -716,7 +709,7 @@ pub(crate) fn validate_condition(condition: &ConditionalFormatCondition) -> Resu
     Ok(())
 }
 
-pub(crate) fn validate_color_scale(color_scale: &ConditionalColorScale) -> Result<()> {
+pub(crate) fn validate_color_scale(color_scale: &ColorScale) -> Result<()> {
     if color_scale.entries.is_empty() {
         return Err(Error::InvalidFormat(
             "calcext:color-scale requires at least one calcext:color-scale-entry".to_string(),
@@ -729,12 +722,12 @@ pub(crate) fn validate_color_scale(color_scale: &ConditionalColorScale) -> Resul
     Ok(())
 }
 
-pub(crate) fn validate_color_scale_entry(entry: &ConditionalColorScaleEntry) -> Result<()> {
+pub(crate) fn validate_color_scale_entry(entry: &ColorScaleEntry) -> Result<()> {
     validate_entry_value(entry.entry_type, &entry.value)?;
     validate_color("calcext:color", &entry.color)
 }
 
-pub(crate) fn validate_data_bar(data_bar: &ConditionalDataBar) -> Result<()> {
+pub(crate) fn validate_data_bar(data_bar: &DataBar) -> Result<()> {
     if data_bar.entries.len() != DATA_BAR_ENTRY_COUNT {
         return Err(Error::InvalidFormat(format!(
             "calcext:data-bar requires exactly {DATA_BAR_ENTRY_COUNT} calcext:formatting-entry elements"
@@ -747,7 +740,7 @@ pub(crate) fn validate_data_bar(data_bar: &ConditionalDataBar) -> Result<()> {
 }
 
 /// Validate only the element attributes of a data bar, not its entries.
-pub(crate) fn validate_data_bar_attributes(data_bar: &ConditionalDataBar) -> Result<()> {
+pub(crate) fn validate_data_bar_attributes(data_bar: &DataBar) -> Result<()> {
     if let Some(color) = &data_bar.positive_color {
         validate_color("calcext:positive-color", color)?;
     }
@@ -766,11 +759,11 @@ pub(crate) fn validate_data_bar_attributes(data_bar: &ConditionalDataBar) -> Res
     Ok(())
 }
 
-pub(crate) fn validate_data_bar_entry(entry: &ConditionalDataBarEntry) -> Result<()> {
+pub(crate) fn validate_data_bar_entry(entry: &DataBarEntry) -> Result<()> {
     validate_entry_value(entry.entry_type, &entry.value)
 }
 
-pub(crate) fn validate_icon_set(icon_set: &ConditionalIconSet) -> Result<()> {
+pub(crate) fn validate_icon_set(icon_set: &IconSet) -> Result<()> {
     if icon_set.entries.is_empty() {
         return Err(Error::InvalidFormat(
             "calcext:icon-set requires at least one calcext:formatting-entry".to_string(),
@@ -788,11 +781,11 @@ pub(crate) fn validate_icon_set(icon_set: &ConditionalIconSet) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn validate_icon_set_entry(entry: &ConditionalIconSetEntry) -> Result<()> {
+pub(crate) fn validate_icon_set_entry(entry: &IconSetEntry) -> Result<()> {
     validate_entry_value(entry.entry_type, &entry.value)
 }
 
-pub(crate) fn validate_date_is(date_is: &ConditionalDateIs) -> Result<()> {
+pub(crate) fn validate_date_is(date_is: &DateIs) -> Result<()> {
     if date_is.style.is_empty() {
         return Err(Error::InvalidFormat(
             "calcext:date-is requires a non-empty calcext:style".to_string(),
@@ -811,7 +804,7 @@ fn validate_entry_count(count: usize, element: &str) -> Result<()> {
     Ok(())
 }
 
-fn validate_entry_value(entry_type: ConditionalFormatEntryType, value: &str) -> Result<()> {
+fn validate_entry_value(entry_type: EntryType, value: &str) -> Result<()> {
     if value.is_empty() {
         return Err(Error::InvalidFormat(
             "calcext formatting entries require a non-empty calcext:value".to_string(),
@@ -858,10 +851,7 @@ fn validate_attribute_length(name: &str, value: &str) -> Result<()> {
 }
 
 /// Write a sheet's `calcext:conditional-formats` container after its rows.
-pub(crate) fn write_conditional_formats(
-    out: &mut String,
-    formats: &[ConditionalFormat],
-) -> Result<()> {
+pub(crate) fn write_conditional_formats(out: &mut String, formats: &[Format]) -> Result<()> {
     validate_conditional_formats(formats)?;
     if formats.is_empty() {
         return Ok(());
@@ -880,17 +870,17 @@ pub(crate) fn write_conditional_formats(
     Ok(())
 }
 
-fn write_rule(out: &mut String, rule: &ConditionalFormatRule) {
+fn write_rule(out: &mut String, rule: &Rule) {
     match rule {
-        ConditionalFormatRule::Condition(condition) => write_condition(out, condition),
-        ConditionalFormatRule::ColorScale(color_scale) => write_color_scale(out, color_scale),
-        ConditionalFormatRule::DataBar(data_bar) => write_data_bar(out, data_bar),
-        ConditionalFormatRule::IconSet(icon_set) => write_icon_set(out, icon_set),
-        ConditionalFormatRule::DateIs(date_is) => write_date_is(out, date_is),
+        Rule::Condition(condition) => write_condition(out, condition),
+        Rule::ColorScale(color_scale) => write_color_scale(out, color_scale),
+        Rule::DataBar(data_bar) => write_data_bar(out, data_bar),
+        Rule::IconSet(icon_set) => write_icon_set(out, icon_set),
+        Rule::DateIs(date_is) => write_date_is(out, date_is),
     }
 }
 
-fn write_condition(out: &mut String, condition: &ConditionalFormatCondition) {
+fn write_condition(out: &mut String, condition: &Condition) {
     out.push_str("<calcext:condition calcext:apply-style-name=\"");
     out.push_str(&escape_xml(&condition.apply_style_name));
     out.push_str("\" calcext:value=\"");
@@ -904,7 +894,7 @@ fn write_condition(out: &mut String, condition: &ConditionalFormatCondition) {
     out.push_str("/>");
 }
 
-fn write_color_scale(out: &mut String, color_scale: &ConditionalColorScale) {
+fn write_color_scale(out: &mut String, color_scale: &ColorScale) {
     out.push_str("<calcext:color-scale>");
     for entry in &color_scale.entries {
         out.push_str("<calcext:color-scale-entry calcext:value=\"");
@@ -918,7 +908,7 @@ fn write_color_scale(out: &mut String, color_scale: &ConditionalColorScale) {
     out.push_str("</calcext:color-scale>");
 }
 
-fn write_data_bar(out: &mut String, data_bar: &ConditionalDataBar) {
+fn write_data_bar(out: &mut String, data_bar: &DataBar) {
     out.push_str("<calcext:data-bar");
     write_optional_bool_attribute(out, "calcext:gradient", data_bar.gradient);
     write_optional_bool_attribute(out, "calcext:show-value", data_bar.show_value);
@@ -951,7 +941,7 @@ fn write_data_bar(out: &mut String, data_bar: &ConditionalDataBar) {
     out.push_str("</calcext:data-bar>");
 }
 
-fn write_icon_set(out: &mut String, icon_set: &ConditionalIconSet) {
+fn write_icon_set(out: &mut String, icon_set: &IconSet) {
     out.push_str("<calcext:icon-set calcext:icon-set-type=\"");
     out.push_str(icon_set.icon_set_type.as_str());
     out.push('"');
@@ -981,7 +971,7 @@ fn write_icon_set(out: &mut String, icon_set: &ConditionalIconSet) {
     out.push_str("</calcext:icon-set>");
 }
 
-fn write_date_is(out: &mut String, date_is: &ConditionalDateIs) {
+fn write_date_is(out: &mut String, date_is: &DateIs) {
     out.push_str("<calcext:date-is calcext:style=\"");
     out.push_str(&escape_xml(&date_is.style));
     out.push_str("\" calcext:date=\"");
@@ -1015,27 +1005,22 @@ fn bool_str(value: bool) -> &'static str {
 mod tests {
     use super::*;
 
-    fn sample_condition() -> ConditionalFormatCondition {
-        ConditionalFormatCondition::new("cell-content()>5", "Good")
-            .with_base_cell_address("Sheet1.A1")
+    fn sample_condition() -> Condition {
+        Condition::new("cell-content()>5", "Good").with_base_cell_address("Sheet1.A1")
     }
 
-    fn sample_color_scale() -> ConditionalColorScale {
-        ConditionalColorScale::new(vec![
-            ConditionalColorScaleEntry::new(ConditionalFormatEntryType::Minimum, "0", "#ff0000"),
-            ConditionalColorScaleEntry::new(
-                ConditionalFormatEntryType::Percentile,
-                "50",
-                "#ffff00",
-            ),
-            ConditionalColorScaleEntry::new(ConditionalFormatEntryType::Maximum, "0", "#00ff00"),
+    fn sample_color_scale() -> ColorScale {
+        ColorScale::new(vec![
+            ColorScaleEntry::new(EntryType::Minimum, "0", "#ff0000"),
+            ColorScaleEntry::new(EntryType::Percentile, "50", "#ffff00"),
+            ColorScaleEntry::new(EntryType::Maximum, "0", "#00ff00"),
         ])
     }
 
-    fn sample_data_bar() -> ConditionalDataBar {
-        ConditionalDataBar::new(vec![
-            ConditionalDataBarEntry::new(ConditionalFormatEntryType::AutomaticMinimum, "0"),
-            ConditionalDataBarEntry::new(ConditionalFormatEntryType::AutomaticMaximum, "0"),
+    fn sample_data_bar() -> DataBar {
+        DataBar::new(vec![
+            DataBarEntry::new(EntryType::AutomaticMinimum, "0"),
+            DataBarEntry::new(EntryType::AutomaticMaximum, "0"),
         ])
         .with_colors("#638ec6", Some("#ff0000".to_string()))
         .with_gradient(false)
@@ -1044,27 +1029,26 @@ mod tests {
         .with_lengths(Some("10".to_string()), Some("90".to_string()))
     }
 
-    fn sample_icon_set() -> ConditionalIconSet {
-        ConditionalIconSet::new(
+    fn sample_icon_set() -> IconSet {
+        IconSet::new(
             IconSetType::ThreeTrafficLights1,
             vec![
-                ConditionalIconSetEntry::new(ConditionalFormatEntryType::Percent, "0"),
-                ConditionalIconSetEntry::new(ConditionalFormatEntryType::Percent, "33")
-                    .with_greater_equal(false),
-                ConditionalIconSetEntry::new(ConditionalFormatEntryType::Percent, "67"),
+                IconSetEntry::new(EntryType::Percent, "0"),
+                IconSetEntry::new(EntryType::Percent, "33").with_greater_equal(false),
+                IconSetEntry::new(EntryType::Percent, "67"),
             ],
         )
         .with_show_value(false)
         .with_custom(true)
-        .with_custom_icons(vec![ConditionalCustomIcon::new(IconSetType::ThreeStars, 0)])
+        .with_custom_icons(vec![CustomIcon::new(IconSetType::ThreeStars, 0)])
     }
 
-    fn sample_date_is() -> ConditionalDateIs {
-        ConditionalDateIs::new(ConditionalDateType::Last7Days, "Recent")
+    fn sample_date_is() -> DateIs {
+        DateIs::new(DateType::Last7Days, "Recent")
     }
 
-    fn sample_format() -> ConditionalFormat {
-        ConditionalFormat::new(
+    fn sample_format() -> Format {
+        Format::new(
             vec!["Sheet1.A1:Sheet1.A5".to_string()],
             vec![
                 sample_condition().into(),
@@ -1118,27 +1102,27 @@ mod tests {
 
     #[test]
     fn rejects_missing_ranges_rules_and_blank_values() {
-        assert!(ConditionalFormat::new(Vec::new(), vec![sample_condition().into()]).is_err());
-        assert!(ConditionalFormat::new(vec![".A1".to_string()], Vec::new()).is_err());
+        assert!(Format::new(Vec::new(), vec![sample_condition().into()]).is_err());
+        assert!(Format::new(vec![".A1".to_string()], Vec::new()).is_err());
         assert!(
-            ConditionalFormat::new(
+            Format::new(
                 vec![".A1".to_string()],
-                vec![ConditionalFormatCondition::new("", "S").into()],
+                vec![Condition::new("", "S").into()],
             )
             .is_err()
         );
         assert!(
-            ConditionalFormat::new(
+            Format::new(
                 vec![".A1".to_string()],
-                vec![ConditionalFormatCondition::new("x", "").into()],
+                vec![Condition::new("x", "").into()],
             )
             .is_err()
         );
         assert!(
-            ConditionalFormat::new(
+            Format::new(
                 vec![".A1".to_string()],
                 vec![
-                    ConditionalFormatCondition::new("x", "S")
+                    Condition::new("x", "S")
                         .with_base_cell_address(" A1 ")
                         .into()
                 ],
@@ -1149,26 +1133,19 @@ mod tests {
 
     #[test]
     fn rejects_invalid_rule_bodies() {
-        let format = |rule: ConditionalFormatRule| {
-            ConditionalFormat::new(vec![".A1".to_string()], vec![rule])
-        };
+        let format = |rule: Rule| Format::new(vec![".A1".to_string()], vec![rule]);
         // Color scale without entries, with a bad color, or a non-numeric value.
-        assert!(format(ConditionalColorScale::new(Vec::new()).into()).is_err());
+        assert!(format(ColorScale::new(Vec::new()).into()).is_err());
         assert!(
             format(
-                ConditionalColorScale::new(vec![ConditionalColorScaleEntry::new(
-                    ConditionalFormatEntryType::Minimum,
-                    "0",
-                    "red",
-                )])
-                .into(),
+                ColorScale::new(vec![ColorScaleEntry::new(EntryType::Minimum, "0", "red",)]).into(),
             )
             .is_err()
         );
         assert!(
             format(
-                ConditionalColorScale::new(vec![ConditionalColorScaleEntry::new(
-                    ConditionalFormatEntryType::Percent,
+                ColorScale::new(vec![ColorScaleEntry::new(
+                    EntryType::Percent,
                     "soon",
                     "#ff0000",
                 )])
@@ -1178,20 +1155,14 @@ mod tests {
         );
         // Data bars require exactly two limit entries and numeric lengths.
         assert!(
-            format(
-                ConditionalDataBar::new(vec![ConditionalDataBarEntry::new(
-                    ConditionalFormatEntryType::AutomaticMinimum,
-                    "0",
-                )])
-                .into()
-            )
-            .is_err()
+            format(DataBar::new(vec![DataBarEntry::new(EntryType::AutomaticMinimum, "0",)]).into())
+                .is_err()
         );
         assert!(
             format(
-                ConditionalDataBar::new(vec![
-                    ConditionalDataBarEntry::new(ConditionalFormatEntryType::AutomaticMinimum, "0"),
-                    ConditionalDataBarEntry::new(ConditionalFormatEntryType::AutomaticMaximum, "0"),
+                DataBar::new(vec![
+                    DataBarEntry::new(EntryType::AutomaticMinimum, "0"),
+                    DataBarEntry::new(EntryType::AutomaticMaximum, "0"),
                 ])
                 .with_lengths(Some("wide".to_string()), None)
                 .into(),
@@ -1199,22 +1170,16 @@ mod tests {
             .is_err()
         );
         // Icon sets require entries; date rules require a style.
-        assert!(
-            format(ConditionalIconSet::new(IconSetType::FiveBoxes, Vec::new()).into()).is_err()
-        );
-        assert!(format(ConditionalDateIs::new(ConditionalDateType::Today, "").into()).is_err());
+        assert!(format(IconSet::new(IconSetType::FiveBoxes, Vec::new()).into()).is_err());
+        assert!(format(DateIs::new(DateType::Today, "").into()).is_err());
     }
 
     #[test]
     fn formula_entries_keep_inert_formula_values() {
-        let scale = ConditionalColorScale::new(vec![
-            ConditionalColorScaleEntry::new(ConditionalFormatEntryType::Minimum, "0", "#ff0000"),
-            ConditionalColorScaleEntry::new(
-                ConditionalFormatEntryType::Formula,
-                "MAX([.A1:.A9])/2",
-                "#00ff00",
-            ),
+        let scale = ColorScale::new(vec![
+            ColorScaleEntry::new(EntryType::Minimum, "0", "#ff0000"),
+            ColorScaleEntry::new(EntryType::Formula, "MAX([.A1:.A9])/2", "#00ff00"),
         ]);
-        ConditionalFormat::new(vec![".A1".to_string()], vec![scale.into()]).unwrap();
+        Format::new(vec![".A1".to_string()], vec![scale.into()]).unwrap();
     }
 }
