@@ -6,5 +6,6 @@ pub mod kind;
 pub mod number_format;
 pub mod pie;
 pub mod reference_line;
+pub mod series_labels;
 
 pub use direction::{Direction, Kind as DirectionKind};
