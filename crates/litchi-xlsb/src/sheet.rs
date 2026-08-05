@@ -3,7 +3,7 @@
 use crate::conditional_formatting::Formatting;
 use crate::package::cell::Cell;
 use crate::package::comments::Comment;
-use crate::package::data_validation::{DataValidationSettings, Validation};
+use crate::package::data_validation::{Settings, Validation};
 use crate::package::hyperlinks::Hyperlink;
 use crate::package::merged_cells::MergedCell;
 use crate::package::sheet_view::SheetView;
@@ -130,8 +130,8 @@ pub struct Worksheet {
     sheet_protection: Option<SheetProtection>,
     strong_sheet_protection: Option<StrongProtection>,
     data_validations: Vec<Validation>,
-    data_validation_settings: Option<DataValidationSettings>,
-    data_validation14_settings: Option<DataValidationSettings>,
+    data_validation_settings: Option<Settings>,
+    data_validation14_settings: Option<Settings>,
     conditional_formattings: Vec<Formatting>,
     web_extension_bindings: Vec<Binding>,
     sheet_views: Vec<SheetView>,
@@ -212,8 +212,8 @@ impl Worksheet {
 
     pub(crate) fn set_data_validations(
         &mut self,
-        settings: Option<DataValidationSettings>,
-        extension14_settings: Option<DataValidationSettings>,
+        settings: Option<Settings>,
+        extension14_settings: Option<Settings>,
         validations: Vec<Validation>,
     ) {
         self.data_validation_settings = settings;
@@ -279,12 +279,12 @@ impl Worksheet {
     }
 
     /// Worksheet-level UI settings for classic data validation.
-    pub fn data_validation_settings(&self) -> Option<DataValidationSettings> {
+    pub fn data_validation_settings(&self) -> Option<Settings> {
         self.data_validation_settings
     }
 
     /// Worksheet-level UI settings for Office 2013 data validation.
-    pub fn data_validation14_settings(&self) -> Option<DataValidationSettings> {
+    pub fn data_validation14_settings(&self) -> Option<Settings> {
         self.data_validation14_settings
     }
 

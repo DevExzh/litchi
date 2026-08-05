@@ -30,7 +30,7 @@
 //! | 20-23 | Operator        |
 
 use crate::package::data_validation::{
-    DataValidationRecordKind, DataValidationSettings, Validation, validate_dval_list_formula,
+    RecordKind, Settings, Validation, validate_dval_list_formula,
 };
 use crate::package::error::{Error, Result};
 use crate::package::formula::ParsedFormula;
@@ -43,8 +43,8 @@ use std::io::Write;
 pub fn write_data_validations<W: Write>(
     writer: &mut Writer<W>,
     validations: &[Validation],
-    classic_settings: DataValidationSettings,
-    extension14_settings: DataValidationSettings,
+    classic_settings: Settings,
+    extension14_settings: Settings,
 ) -> Result<()> {
     if validations.is_empty() {
         return Ok(());
@@ -55,11 +55,11 @@ pub fn write_data_validations<W: Write>(
 
     let classic = validations
         .iter()
-        .filter(|rule| rule.record_kind == DataValidationRecordKind::Classic)
+        .filter(|rule| rule.record_kind == RecordKind::Classic)
         .collect::<Vec<_>>();
     let extension14 = validations
         .iter()
-        .filter(|rule| rule.record_kind == DataValidationRecordKind::Extension14)
+        .filter(|rule| rule.record_kind == RecordKind::Extension14)
         .collect::<Vec<_>>();
     if classic.len() > 65_534 || extension14.len() > 65_534 {
         return Err(invalid("a validation collection exceeds 65,534 rules"));
@@ -71,7 +71,7 @@ pub fn write_data_validations<W: Write>(
 fn write_classic_collection<W: Write>(
     writer: &mut Writer<W>,
     validations: &[&Validation],
-    settings: DataValidationSettings,
+    settings: Settings,
 ) -> Result<()> {
     if validations.is_empty() {
         return Ok(());
@@ -110,7 +110,7 @@ fn write_classic_collection<W: Write>(
 fn write_extension14_collection<W: Write>(
     writer: &mut Writer<W>,
     validations: &[&Validation],
-    settings: DataValidationSettings,
+    settings: Settings,
 ) -> Result<()> {
     if validations.is_empty() {
         return Ok(());
@@ -384,7 +384,7 @@ fn validate_rule(dv: &Validation) -> Result<()> {
     if !matches!(dv.validation_type, 0 | 3 | 7) && dv.operator > 7 {
         return Err(invalid(format!("operator {} exceeds 7", dv.operator)));
     }
-    if dv.record_kind == DataValidationRecordKind::Extension14 && dv.list_formula.is_some() {
+    if dv.record_kind == RecordKind::Extension14 && dv.list_formula.is_some() {
         return Err(invalid(
             "BrtDValList overrides are only valid for classic BrtDVal rules",
         ));
@@ -456,7 +456,7 @@ fn validate_rule(dv: &Validation) -> Result<()> {
         )));
     }
     let ranges = parse_range_list(&dv.cell_ranges)?;
-    let maximum = if dv.record_kind == DataValidationRecordKind::Classic {
+    let maximum = if dv.record_kind == RecordKind::Classic {
         8_191
     } else {
         usize::MAX
@@ -668,8 +668,8 @@ mod tests {
         let result = write_data_validations(
             &mut writer,
             &validations,
-            DataValidationSettings::default(),
-            DataValidationSettings::default(),
+            Settings::default(),
+            Settings::default(),
         );
         assert!(result.is_ok());
         assert!(buffer.is_empty()); // No records written for empty list
@@ -705,8 +705,8 @@ mod tests {
         let result = write_data_validations(
             &mut writer,
             &validations,
-            DataValidationSettings::default(),
-            DataValidationSettings::default(),
+            Settings::default(),
+            Settings::default(),
         );
         assert!(result.is_ok());
         assert!(!buffer.is_empty());
@@ -810,12 +810,12 @@ mod tests {
     fn extension14_payload_parses_frt_ranges_and_formulas() {
         let mut rule = Validation::new(7, "B2:B12 D2:D12".to_string());
         rule.formula1 = Some("B2>0".to_string());
-        rule.record_kind = DataValidationRecordKind::Extension14;
+        rule.record_kind = RecordKind::Extension14;
         validate_rule(&rule).unwrap();
         let payload = serialize_extension14_validation(&rule).unwrap();
         let parsed = Validation::parse_extension14(&payload, &Context::default()).unwrap();
 
-        assert_eq!(parsed.record_kind, DataValidationRecordKind::Extension14);
+        assert_eq!(parsed.record_kind, RecordKind::Extension14);
         assert_eq!(parsed.cell_ranges, "B2:B12 D2:D12");
         assert_eq!(parsed.formula1.as_deref(), Some("(B2>0)"));
         assert!(parsed.formula1_binary.is_some());

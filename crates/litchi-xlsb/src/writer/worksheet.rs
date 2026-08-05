@@ -2,7 +2,7 @@
 
 use crate::conditional_formatting::{Formatting, Rule, Value};
 use crate::package::comments::Comment;
-use crate::package::data_validation::{DataValidationSettings, Validation};
+use crate::package::data_validation::{Settings, Validation};
 use crate::package::error::{Error, Result};
 use crate::package::formula::{
     CompilationContext, Compiler, Group, GroupKind, ParsedFormula, Parser, Range,
@@ -130,8 +130,8 @@ pub struct MutableWorksheet {
     freeze_panes: Option<FreezePanes>,
     /// Data validation rules.
     data_validations: Vec<Validation>,
-    data_validation_settings: DataValidationSettings,
-    data_validation14_settings: DataValidationSettings,
+    data_validation_settings: Settings,
+    data_validation14_settings: Settings,
     /// Conditional formatting rules.
     conditional_formattings: Vec<Formatting>,
     /// Inert Office Add-in range bindings.
@@ -267,8 +267,8 @@ impl MutableWorksheet {
             sheet_view: None,
             freeze_panes: None,
             data_validations: Vec::new(),
-            data_validation_settings: DataValidationSettings::default(),
-            data_validation14_settings: DataValidationSettings::default(),
+            data_validation_settings: Settings::default(),
+            data_validation14_settings: Settings::default(),
             conditional_formattings: Vec::new(),
             web_extension_bindings: Vec::new(),
             formula_groups: Vec::new(),
@@ -870,8 +870,8 @@ impl MutableWorksheet {
         self.auto_filter = None;
         self.sheet_protection = None;
         self.data_validations.clear();
-        self.data_validation_settings = DataValidationSettings::default();
-        self.data_validation14_settings = DataValidationSettings::default();
+        self.data_validation_settings = Settings::default();
+        self.data_validation14_settings = Settings::default();
         self.conditional_formattings.clear();
         self.charts.clear();
         self.images.clear();
@@ -1397,12 +1397,12 @@ impl MutableWorksheet {
     }
 
     /// Set UI prompt settings for classic `BrtDVal` rules.
-    pub fn set_data_validation_settings(&mut self, settings: DataValidationSettings) {
+    pub fn set_data_validation_settings(&mut self, settings: Settings) {
         self.data_validation_settings = settings;
     }
 
     /// Set UI prompt settings for Office 2013 `BrtDVal14` rules.
-    pub fn set_data_validation14_settings(&mut self, settings: DataValidationSettings) {
+    pub fn set_data_validation14_settings(&mut self, settings: Settings) {
         self.data_validation14_settings = settings;
     }
 

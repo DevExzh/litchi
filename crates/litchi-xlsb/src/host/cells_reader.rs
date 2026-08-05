@@ -6,7 +6,7 @@ use crate::conditional_formatting::{
 };
 use crate::package::cell::{Cell, CellHeader};
 use crate::package::data_validation::{
-    DataValidationSettings, Validation, parse_collection_settings, parse_dval_list,
+    Settings, Validation, parse_collection_settings, parse_dval_list,
 };
 use crate::package::error::{Error, Result};
 use crate::package::formula::{Context, Group, GroupKind, ParsedFormula};
@@ -122,9 +122,9 @@ where
     /// Classic worksheet data-validation rules.
     pub data_validations: Vec<Validation>,
     /// UI settings from the classic validation collection.
-    pub data_validation_settings: Option<DataValidationSettings>,
+    pub data_validation_settings: Option<Settings>,
     /// UI settings from the Office 2013 validation collection.
-    pub data_validation14_settings: Option<DataValidationSettings>,
+    pub data_validation14_settings: Option<Settings>,
     /// Classic and Office 2013 conditional-formatting blocks in stream order.
     pub conditional_formattings: Vec<Formatting>,
     /// Inert Office Add-in bindings from the worksheet WEBEXTENSIONS collection.

@@ -1490,9 +1490,7 @@ mod tests {
     use crate::named_ranges::area3d_formula;
     use crate::package::SharedStringRun;
     use crate::package::comments::Comment;
-    use crate::package::data_validation::{
-        DataValidationRecordKind, DataValidationSettings, Validation,
-    };
+    use crate::package::data_validation::{RecordKind, Settings, Validation};
     use crate::writer::SheetProtection;
     use litchi_core::sheet::{CellValue, WorkbookTrait};
     use std::io::Cursor;
@@ -2251,14 +2249,14 @@ mod tests {
 
         let mut extension = Validation::new(7, "B1:B20".to_string());
         extension.formula1 = Some("Source!A1>0".to_string());
-        extension.record_kind = DataValidationRecordKind::Extension14;
+        extension.record_kind = RecordKind::Extension14;
         sheet.add_data_validation(extension);
-        sheet.set_data_validation_settings(DataValidationSettings {
+        sheet.set_data_validation_settings(Settings {
             input_prompts_disabled: true,
             prompt_x: 120,
             prompt_y: 240,
         });
-        sheet.set_data_validation14_settings(DataValidationSettings {
+        sheet.set_data_validation14_settings(Settings {
             input_prompts_disabled: false,
             prompt_x: 12,
             prompt_y: 24,
@@ -2275,7 +2273,7 @@ mod tests {
         assert_eq!(worksheet.data_validations().len(), 2);
         assert_eq!(
             worksheet.data_validations()[0].record_kind,
-            DataValidationRecordKind::Classic
+            RecordKind::Classic
         );
         assert_eq!(worksheet.data_validations()[0].cell_ranges, "A1:A10 C1:C10");
         assert_eq!(
@@ -2289,7 +2287,7 @@ mod tests {
         assert_eq!(worksheet.data_validations()[0].ime_mode, 4);
         assert_eq!(
             worksheet.data_validations()[1].record_kind,
-            DataValidationRecordKind::Extension14
+            RecordKind::Extension14
         );
         assert_eq!(
             worksheet.data_validations()[1].formula1.as_deref(),
@@ -2297,7 +2295,7 @@ mod tests {
         );
         assert_eq!(
             worksheet.data_validation_settings(),
-            Some(DataValidationSettings {
+            Some(Settings {
                 input_prompts_disabled: true,
                 prompt_x: 120,
                 prompt_y: 240,
@@ -2305,7 +2303,7 @@ mod tests {
         );
         assert_eq!(
             worksheet.data_validation14_settings(),
-            Some(DataValidationSettings {
+            Some(Settings {
                 input_prompts_disabled: false,
                 prompt_x: 12,
                 prompt_y: 24,

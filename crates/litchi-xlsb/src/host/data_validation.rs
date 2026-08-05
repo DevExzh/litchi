@@ -8,10 +8,10 @@ use crate::data_validation as owner;
 use crate::formula::ParsedFormula;
 use crate::package::error::{Error, Result};
 
-pub use owner::{DataValidationRecordKind, DataValidationSettings};
+pub use owner::{RecordKind, Settings};
 
 /// Validation rule bound to the OOXML host formula representation.
-pub type Validation = owner::DataValidation<ParsedFormula>;
+pub type Validation = owner::Validation<ParsedFormula>;
 
 impl From<owner::Error> for Error {
     fn from(error: owner::Error) -> Self {
@@ -31,10 +31,7 @@ impl From<owner::Error> for Error {
     }
 }
 
-pub(crate) fn parse_collection_settings(
-    data: &[u8],
-    extension14: bool,
-) -> Result<(DataValidationSettings, u32)> {
+pub(crate) fn parse_collection_settings(data: &[u8], extension14: bool) -> Result<(Settings, u32)> {
     owner::parse_collection_settings(data, extension14).map_err(Into::into)
 }
 

@@ -33,9 +33,7 @@ pub use workbook::Workbook;
 
 pub use pivot_view::Part;
 
-pub use data_validation::{
-    DataValidation, DataValidationRecordKind, DataValidationSettings, FormulaBinary,
-};
+pub use data_validation::{FormulaBinary, RecordKind, Settings, Validation};
 pub use formula::ptg_types;
 pub use formula::{
     ArrayValue, BinaryOperator, Compiler, Error as FormulaError, ExternalTableReference, Group,
