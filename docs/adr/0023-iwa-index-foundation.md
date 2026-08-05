@@ -31,6 +31,9 @@ The public model is deliberately small:
 - `IndexBuilder` reports duplicate fragments, duplicate objects, duplicate
   references, missing endpoints, and allocation failures through
   `IndexError`.
+  `build` requires both endpoints to be indexed; the explicit
+  `build_allow_missing_targets` adapter path permits an absent target while
+  continuing to require an indexed source.
 - `ObjectIndex` is immutable. It stores sorted boxed slices, exposes borrowed
   lookups and deterministic iteration, and provides incoming, outgoing,
   reachability, and cycle queries through an immutable graph snapshot. It does
@@ -39,6 +42,12 @@ The public model is deliberately small:
 Native unknown fields and payload bytes remain with the format adapter. The
 neutral index stores only location and graph metadata, so constructing it does
 not discard unsupported content.
+
+The dangling-target build path preserves a graph edge even when the target has
+no `ObjectRecord`. Graph queries can therefore report the reference and its
+reachable identity, while object lookup remains absent for the target. This
+keeps incomplete archive sets observable without making the neutral leaf aware
+of archives or package state.
 
 ## Adapter boundary
 

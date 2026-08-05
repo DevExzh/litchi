@@ -97,8 +97,10 @@ impl IndexBuilder {
     /// Register one directed object reference.
     ///
     /// The endpoints may be registered before or after this call. Missing
-    /// endpoints are reported by [`Self::build`]; duplicate references are
-    /// rejected immediately.
+    /// endpoints are validated by the selected build method: [`Self::build`]
+    /// requires both endpoints, while [`Self::build_allow_missing_targets`]
+    /// permits an absent target. Duplicate references are rejected
+    /// immediately.
     ///
     /// # Errors
     ///
@@ -132,12 +134,37 @@ impl IndexBuilder {
     ///
     /// Returns [`IndexError::UnknownSource`] or [`IndexError::UnknownTarget`]
     /// when a reference endpoint was not registered.
-    pub fn build(mut self) -> Result<ObjectIndex, IndexError> {
+    pub fn build(self) -> Result<ObjectIndex, IndexError> {
+        self.build_with_target_validation(true)
+    }
+
+    /// Finish the builder while preserving references to unindexed targets.
+    ///
+    /// This is the explicit adapter path for formats that can publish a
+    /// reference before its target is present in the current archive set. The
+    /// source must still be an indexed object; only the target may be absent.
+    /// Dangling targets remain available to graph queries, while
+    /// [`ObjectIndex::object`] correctly returns `None` for their missing
+    /// location record.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::UnknownSource`] when a reference source was not
+    /// registered. Duplicate and allocation failures are reported while
+    /// references are added, before this method is called.
+    pub fn build_allow_missing_targets(self) -> Result<ObjectIndex, IndexError> {
+        self.build_with_target_validation(false)
+    }
+
+    fn build_with_target_validation(
+        mut self,
+        require_indexed_targets: bool,
+    ) -> Result<ObjectIndex, IndexError> {
         for reference in &self.references {
             if !self.object_catalog.contains(&reference.source()) {
                 return Err(IndexError::UnknownSource(reference.source()));
             }
-            if !self.object_catalog.contains(&reference.target()) {
+            if require_indexed_targets && !self.object_catalog.contains(&reference.target()) {
                 return Err(IndexError::UnknownTarget(reference.target()));
             }
         }
@@ -443,5 +470,54 @@ mod tests {
                 .map(ByteSpan::length),
             Some(2)
         );
+    }
+
+    #[test]
+    fn dangling_targets_remain_queryable_without_object_records() {
+        let fragment = fragment(1);
+        let source = object(1);
+        let dangling = object(99);
+        let mut builder = IndexBuilder::new();
+        builder.add_fragment(fragment).expect("fragment");
+        builder
+            .add_object(ObjectRecord::new(source, fragment, span(0, 4)))
+            .expect("source");
+        builder
+            .add_reference(source, dangling)
+            .expect("dangling edge");
+
+        let index = builder
+            .build_allow_missing_targets()
+            .expect("dangling targets are supported");
+
+        assert_eq!(index.len(), 1);
+        assert_eq!(index.object(source).map(ObjectRecord::id), Some(source));
+        assert_eq!(index.object(dangling), None);
+        assert_eq!(
+            index.outgoing(source).map(|ids| ids.collect::<Vec<_>>()),
+            Some(vec![dangling])
+        );
+        assert_eq!(
+            index.incoming(dangling).map(|ids| ids.collect::<Vec<_>>()),
+            Some(vec![source])
+        );
+        assert_eq!(index.reachable(source), [source, dangling]);
+    }
+
+    #[test]
+    fn dangling_target_mode_still_rejects_unindexed_sources() {
+        let fragment = fragment(1);
+        let source = object(1);
+        let target = object(2);
+        let mut builder = IndexBuilder::new();
+        builder.add_fragment(fragment).expect("fragment");
+        builder
+            .add_reference(source, target)
+            .expect("reference can precede object registration");
+
+        assert!(matches!(
+            builder.build_allow_missing_targets(),
+            Err(IndexError::UnknownSource(actual)) if actual == source
+        ));
     }
 }
