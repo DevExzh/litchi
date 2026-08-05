@@ -13,6 +13,7 @@ use litchi_pages::footnote::{
     Format as FootnoteFormat, Gap as FootnoteGap, Kind as FootnoteKind,
     Numbering as FootnoteNumbering, Settings as FootnoteSettings,
 };
+use litchi_pages::header_footer::{Kind, Template};
 use litchi_pages::page_layout::{Layout as PageLayout, Orientation as PageOrientation};
 use litchi_pages::section::{Background, Opaque, PageNumber, PageNumbering, Settings, Start};
 
@@ -953,6 +954,10 @@ fn reachable_header_footer_crud_is_typed_and_transactional() {
 
     let reparsed = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let regions = reparsed.header_footers().unwrap();
+    assert_eq!(regions[0].template, Template::Odd);
+    assert_eq!(regions[0].kind, Kind::Header);
+    assert_eq!(regions[1].template, Template::Odd);
+    assert_eq!(regions[1].kind, Kind::Footer);
     assert_eq!(regions[0].storage.text, "A東京B");
     assert_eq!(regions[1].storage.text, "");
     assert_eq!(reparsed.sections()[0].name.as_deref(), Some("Renamed"));

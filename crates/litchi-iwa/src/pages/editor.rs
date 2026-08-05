@@ -76,7 +76,7 @@ const DRAWABLE_ATTACHMENT_MESSAGE_TYPE: u32 = 2003;
 const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3097;
 const BODY_DRAWABLE_DUPLICATE_OFFSET: f32 = 12.0;
 
-pub use litchi_pages::header_footer::{Kind, Template};
+use litchi_pages::header_footer::{Kind, Template};
 pub use types::{
     PagesDrawableTextInfo, PagesFootnote, PagesFootnoteId, PagesHeaderFooterInfo, PagesSectionInfo,
     RemovedPagesTextBox,

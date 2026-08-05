@@ -36,7 +36,7 @@ pub mod editor;
 pub use creation::PagesDocumentBuilder;
 pub use document::PagesDocument;
 pub use editor::{
-    Kind, PagesAudioInfo, PagesAudioOptions, PagesBodyChartInfo, PagesBodyShapeInfo,
+    PagesAudioInfo, PagesAudioOptions, PagesBodyChartInfo, PagesBodyShapeInfo,
     PagesBodyShapeKind, PagesCellValue, PagesDrawableTextInfo, PagesEditor, PagesFootnote,
     PagesFootnoteId, PagesHeaderFooterInfo, PagesImageInfo, PagesImageOptions, PagesMovieInfo,
     PagesMovieOptions, PagesSectionInfo, PagesTable,
@@ -72,6 +72,6 @@ pub use editor::{
     PagesTableRowDeletion, PagesTableRowInsertion, PagesTableSortColumnIndex,
     PagesTableSortDirection, PagesTableSortOrder, PagesTableSortRowRange, PagesTableSortRule,
     PagesTableSortScope, PagesTableTitleSettings, RemovedPagesAudio, RemovedPagesBodyChart,
-    RemovedPagesBodyShape, RemovedPagesImage, RemovedPagesMovie, RemovedPagesTextBox, Template,
+    RemovedPagesBodyShape, RemovedPagesImage, RemovedPagesMovie, RemovedPagesTextBox,
 };
 pub use litchi_pages::{Section, SectionType};

@@ -935,8 +935,9 @@ use litchi_iwa::numbers::{
     NumbersTableHeaderCount,
     Settings as TableTitleSettings,
 };
-use litchi_iwa::pages::{Kind, PagesEditor};
+use litchi_iwa::pages::PagesEditor;
 use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+use litchi_pages::header_footer::Kind;
 use litchi_pages::page_layout::Orientation;
 use litchi_pages::section::{Background, PageNumber, PageNumbering, Start};
 use litchi_iwa::keynote::{
