@@ -33,7 +33,7 @@ pub(crate) mod cell;
 pub mod creation;
 pub mod document;
 pub mod editor;
-pub mod formula;
+pub(crate) mod formula;
 pub mod sheet;
 pub mod table;
 pub mod table_extractor;

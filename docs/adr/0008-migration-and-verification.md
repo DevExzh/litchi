@@ -5738,6 +5738,13 @@ one Office-resave/re-edit cycle. They do not certify other spreadsheet CRUD
 families, automatic calculation under a manual application setting, Windows
 Office, older Office versions, or performance.
 
+For the Numbers formula ownership slice, a fresh Litchi-authored archive opened
+in native Numbers with the generated formula result `323`. Numbers then changed
+the input cell from `120` to `43` through its real cell editor, recalculated the
+formula to `246`, saved, closed, and reopened the archive. The reopened document
+retained both `43` and `246`; the archive passed ZIP integrity checks, and the
+Numbers application was closed after verification.
+
 The worksheet parser also matches checked-in Apache POI and LibreOffice shared-
 formula fixtures, including translated follower expressions and stored cached
 results. Synthetic tests cover missing versus explicit empty cells, grid-bound
@@ -5787,8 +5794,18 @@ private adapter for the remaining reader/editor migration. The BNC wire slice
 now also owns `litchi-numbers::cell::wire::{BncCell, StoredValue,
 CachedScalar, CellDataFormatKind}` and the dependency-free decimal128 codec;
 the monolith retains only a private module alias plus its archive/protobuf
-callers. The combined Numbers leaf suite has 26 tests, the IWA suite has 1,502
-tests, and the boundary check plus native Numbers smoke cover the extraction.
+callers. The combined Numbers cell/semantic leaf suite has 26 tests, the new
+formula vocabulary suite has 4 tests, and the IWA suite has 1,504 tests. The
+boundary check plus native Numbers smoke cover the extraction. The dependency-
+free `litchi-numbers::formula` module now owns formula caches, references,
+operators, and expression construction; `litchi-iwa` retains only the
+archive-boundary compiler, protobuf AST, and calculation-engine mutation.
+The former IWA formula module is crate-private, and its root-level re-exports
+are documented ergonomic aliases rather than compatibility shims. Formula
+compilation performs an iterative preflight for bounded depth, AST nodes,
+function arguments, and aggregate precedents before the recursive wire walk;
+known fixed-arity functions and unary constructors are covered by focused
+tests, while functions without validated arity metadata fail closed.
 The BorderSide ownership slice
 is complete: the dependency-neutral table-cell edge selector now lives at
 `litchi-iwa-common::table::cell::BorderSide`; `Borders` and `ShapeStroke` remain
@@ -5800,7 +5817,7 @@ The physical IWA substrate slice is complete as well: raw schemas remain in
 use the allocation-conscious slice API. The core framing suite has 17 passing
 tests. The facade varint exit is now complete too: `varint.rs` was deleted,
 all callers use the common bounded implementation, and the IWA suite still
-passes 1,503 tests. The facade `WireField` representation and direct wire
+passes 1,504 tests. The facade `WireField` representation and direct wire
 mutation exit is complete without a compatibility shim; the generic callback
 error boundary is now common-owned, while `wire.rs` retains only thin
 crate-error adapters pending the final import migration. The Numbers
@@ -5812,10 +5829,11 @@ reader now exposes `NumbersDocument::semantic_sheets`, which moves those
 finished tables into immutable leaf sheets without rebuilding cell maps; the
 legacy archive adapter remains available for comments and native sidecars
 during the staged reader migration. Dense views remain explicitly budgeted and
-reject ranges outside the declared extent. The leaf suite has 26 tests, the
-IWA suite has 1,503 tests, and the generated Numbers round trip passes. Formula
-values and the generic structured-facade handoff remain the next ownership
-slices. Pages and Keynote table readers now borrow canonical sparse leaf tables
+reject ranges outside the declared extent. The leaf suite has 26 cell/semantic
+tests plus 4 formula-vocabulary tests, the IWA suite has 1,504 tests, and the
+generated Numbers round trip passes. The generic structured-facade handoff
+remains the next ownership slice. Pages and Keynote table readers now borrow
+canonical sparse leaf tables
 directly while retaining their format-owned comment and merge sidecars;
 read-only comment snapshots use sorted boxed pairs, and Numbers ingress moves
 table names into the adapter without a redundant clone.

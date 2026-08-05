@@ -28,6 +28,17 @@ other sum types. `Unknown` retains bounded lossless content. Common read methods
 live on the enum or narrow static-dispatch traits; the facade does not use boxed
 trait objects.
 
+The dependency-free Numbers formula vocabulary is an intentional naming
+exception. `litchi-numbers::formula` is consumed by Numbers, Pages, and Keynote,
+so `FormulaExpression`, `FormulaCellReference`, and the other `Formula*` names
+remain explicit when re-exported from format facades; this prevents collisions
+between otherwise identical cross-format concepts without restoring a flat
+monolith. The compact reference and UUID structs are copyable value inputs, and
+the archive compiler validates their table bounds and formula resource budgets
+before emitting wire nodes. The formula compiler also validates arity for the
+known fixed-arity functions; recognized functions without arity metadata and
+unknown functions fail closed as typed parse errors.
+
 PresentationML implements this rule as `litchi-pptx::shape::{Scene, Shape}`.
 `Scene` is a bounded semantic index over one slide-like owner, not a vector of
 detached XML allocations. Shapes are visited in depth-first pre-order, while a

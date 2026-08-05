@@ -18,7 +18,7 @@ use super::bnc::{BncCell, CachedScalar, StoredValue};
 use super::cell::{CellValue, TableCellUpdate};
 use super::formula::{
     ExternalFormulaTable, ExternalPivotCategory, FormulaCachedValue, FormulaExpression,
-    FormulaPivotCategoryReference, FormulaUuid, PivotFormulaKey,
+    FormulaPivotCategoryReference, FormulaUuid, PivotFormulaKey, compile_formula,
 };
 use super::table::{NumbersCellComment, NumbersCommentUuid};
 use crate::archive::{Archive, ArchiveObject, RawMessage};

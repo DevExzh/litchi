@@ -2963,7 +2963,7 @@ pub(super) fn formula_pivot_categories(
         let Some(root) = root else {
             continue;
         };
-        let group_uid = FormulaUuid::from(group.group_by_uid);
+        let group_uid = FormulaUuid::new(group.group_by_uid.lower, group.group_by_uid.upper);
         let mut stack = vec![(root, 0u32)];
         let mut visited_references = HashSet::new();
         if let Some(reference) = &group.group_node_root_ref {
@@ -2996,8 +2996,11 @@ pub(super) fn formula_pivot_categories(
                 };
                 let key = PivotFormulaKey::new(
                     group_uid,
-                    FormulaUuid::from(aggregate_column.column_uid),
-                    FormulaUuid::from(node.group_uid),
+                    FormulaUuid::new(
+                        aggregate_column.column_uid.lower,
+                        aggregate_column.column_uid.upper,
+                    ),
+                    FormulaUuid::new(node.group_uid.lower, node.group_uid.upper),
                 );
                 let value = ExternalPivotCategory {
                     internal_owner_id,

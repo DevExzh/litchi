@@ -1,8 +1,11 @@
 //! Typed construction of native iWork table formula ASTs and dependency edges.
+//!
+//! The dependency-free formula vocabulary is owned by
+//! `litchi_numbers::formula`; this module retains only archive-boundary
+//! compilation and calculation-engine metadata.
 
 use std::collections::{BTreeSet, HashMap};
 
-use super::CellValue;
 use super::function_map::function_identifier;
 use crate::protobuf::tsce;
 use crate::{Error, Result};
@@ -10,547 +13,313 @@ use crate::{Error, Result};
 use tsce::ast_node_array_archive::AstNodeArchive;
 use tsce::ast_node_array_archive::AstNodeType;
 
+pub use litchi_numbers::formula::{
+    FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,
+    FormulaExpression, FormulaPivotCategoryReference, FormulaUuid,
+};
+
 const MAX_FORMULA_PRECEDENTS: usize = 1_100_000;
+const MAX_FORMULA_NODES: usize = 65_536;
+const MAX_FORMULA_DEPTH: usize = 512;
+const MAX_FUNCTION_ARGUMENTS: usize = 256;
+const MAX_TOTAL_FUNCTION_ARGUMENTS: usize = 16_384;
 const WHOLE_ROW_COLUMN_SENTINEL: u32 = i16::MAX as u32;
 const WHOLE_COLUMN_ROW_SENTINEL: u32 = i32::MAX as u32;
 
-/// A typed display cache stored alongside a native formula reference.
+/// Compile a leaf formula expression using the owning workbook's archive
+/// context and calculation-engine tables.
+pub(crate) fn compile_formula(
+    expression: &FormulaExpression,
+    host_row: usize,
+    host_column: usize,
+    table_rows: usize,
+    table_columns: usize,
+    external_tables: &HashMap<u64, ExternalFormulaTable>,
+    pivot_categories: &HashMap<PivotFormulaKey, ExternalPivotCategory>,
+) -> Result<CompiledFormula> {
+    let host_row = u32::try_from(host_row)
+        .map_err(|_| Error::ParseError("Numbers formula host row exceeds u32".to_owned()))?;
+    let host_column = u32::try_from(host_column)
+        .map_err(|_| Error::ParseError("Numbers formula host column exceeds u32".to_owned()))?;
+    let table_rows = u32::try_from(table_rows)
+        .map_err(|_| Error::ParseError("Numbers table row count exceeds u32".to_owned()))?;
+    let table_columns = u32::try_from(table_columns)
+        .map_err(|_| Error::ParseError("Numbers table column count exceeds u32".to_owned()))?;
+    if host_row >= table_rows || host_column >= table_columns {
+        return Err(Error::ParseError(format!(
+            "Numbers formula host cell ({host_row}, {host_column}) is outside the {table_rows}x{table_columns} table"
+        )));
+    }
+
+    let node_count = validate_expression(expression)?;
+    let mut ast_node = Vec::with_capacity(node_count);
+    let mut context = FormulaCompileContext {
+        host_row,
+        host_column,
+        table_rows,
+        table_columns,
+        external_tables,
+        pivot_categories,
+        local_precedents: BTreeSet::new(),
+        external_precedents: BTreeSet::new(),
+        contains_pivot_category: false,
+    };
+    append_nodes(expression, &mut ast_node, &mut context)?;
+    if ast_node.is_empty() {
+        return Err(Error::ParseError(
+            "Numbers formula AST cannot be empty".to_owned(),
+        ));
+    }
+    Ok(CompiledFormula {
+        archive: tsce::FormulaArchive {
+            ast_node_array: tsce::AstNodeArrayArchive { ast_node },
+            translation_flags: context.contains_pivot_category.then_some(
+                tsce::FormulaTranslationFlagsArchive {
+                    excel_import_translation: Some(false),
+                    number_to_date_coercion_removal_translation: Some(false),
+                    contains_uid_form_references: Some(false),
+                    contains_frozen_references: Some(false),
+                    returns_percent_formatted: Some(true),
+                },
+            ),
+            ..Default::default()
+        },
+        local_precedents: context.local_precedents.into_iter().collect(),
+        external_precedents: context.external_precedents.into_iter().collect(),
+    })
+}
+
+/// Validate the expression graph before the recursive archive walk.
 ///
-/// iWork does not always recalculate formulas when opening a package written
-/// by another process. Supplying the initial result ensures the document
-/// displays a correct value immediately. Later precedent writes refresh
-/// supported numeric and Boolean formula caches transactionally.
-#[derive(Debug, Clone, PartialEq)]
-pub enum FormulaCachedValue {
-    Number(f64),
-    Text(String),
-    Boolean(bool),
-    Date(f64),
-    Duration(f64),
-}
+/// Formula values are built by callers, so the compiler must bound both the
+/// work it performs and the temporary memory it reserves. The iterative
+/// preflight also makes the recursion depth used by `append_nodes` explicit.
+fn validate_expression(expression: &FormulaExpression) -> Result<usize> {
+    let mut pending = vec![(expression, 1_usize)];
+    let mut node_count = 0_usize;
+    let mut function_argument_count = 0_usize;
 
-impl FormulaCachedValue {
-    pub(crate) fn into_cell_value(self) -> CellValue {
-        match self {
-            Self::Number(value) => CellValue::Number(value),
-            Self::Text(value) => CellValue::Text(value),
-            Self::Boolean(value) => CellValue::Boolean(value),
-            Self::Date(value) => CellValue::Date(value),
-            Self::Duration(value) => CellValue::Duration(value),
-        }
-    }
-}
-
-/// A cell address used by an iWork table formula.
-///
-/// The row and column are zero-based logical table coordinates. Absolute flags
-/// control how the address behaves when an iWork app fills or moves the formula;
-/// they do not change which cell is referenced at the formula's current host.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct FormulaCellReference {
-    pub row: usize,
-    pub column: usize,
-    pub absolute_row: bool,
-    pub absolute_column: bool,
-}
-
-impl FormulaCellReference {
-    pub fn relative(row: usize, column: usize) -> Self {
-        Self {
-            row,
-            column,
-            absolute_row: false,
-            absolute_column: false,
-        }
-    }
-
-    pub fn absolute(row: usize, column: usize) -> Self {
-        Self {
-            row,
-            column,
-            absolute_row: true,
-            absolute_column: true,
-        }
-    }
-
-    pub fn mixed(row: usize, column: usize, absolute_row: bool, absolute_column: bool) -> Self {
-        Self {
-            row,
-            column,
-            absolute_row,
-            absolute_column,
-        }
-    }
-}
-
-/// A row or column endpoint used by a whole-axis formula reference.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct FormulaAxisReference {
-    pub index: usize,
-    pub absolute: bool,
-}
-
-/// A 128-bit identifier used by Numbers' pivot formula model.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct FormulaUuid {
-    pub lower: u64,
-    pub upper: u64,
-}
-
-impl FormulaUuid {
-    pub const fn new(lower: u64, upper: u64) -> Self {
-        Self { lower, upper }
-    }
-}
-
-impl From<crate::protobuf::tsp::Uuid> for FormulaUuid {
-    fn from(value: crate::protobuf::tsp::Uuid) -> Self {
-        Self::new(value.lower, value.upper)
-    }
-}
-
-/// An absolute category aggregate in a Numbers pivot table.
-///
-/// These identifiers can be obtained from the pivot/group-by archives. The
-/// editor validates that the group, aggregate column, level, and aggregate
-/// type still exist before it mutates the workbook.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct FormulaPivotCategoryReference {
-    pub group_by_uid: FormulaUuid,
-    pub column_uid: FormulaUuid,
-    pub group_uid: FormulaUuid,
-    pub aggregate_type: u32,
-    pub group_level: i32,
-}
-
-impl FormulaPivotCategoryReference {
-    pub const fn new(
-        group_by_uid: FormulaUuid,
-        column_uid: FormulaUuid,
-        group_uid: FormulaUuid,
-        aggregate_type: u32,
-        group_level: i32,
-    ) -> Self {
-        Self {
-            group_by_uid,
-            column_uid,
-            group_uid,
-            aggregate_type,
-            group_level,
-        }
-    }
-}
-
-impl FormulaAxisReference {
-    pub fn relative(index: usize) -> Self {
-        Self {
-            index,
-            absolute: false,
-        }
-    }
-
-    pub fn absolute(index: usize) -> Self {
-        Self {
-            index,
-            absolute: true,
-        }
-    }
-}
-
-/// A binary operator in an iWork table formula.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FormulaBinaryOperator {
-    Add,
-    Subtract,
-    Multiply,
-    Divide,
-    Power,
-    Concatenate,
-    GreaterThan,
-    GreaterThanOrEqual,
-    LessThan,
-    LessThanOrEqual,
-    Equal,
-    NotEqual,
-}
-
-/// A typed formula expression compiled to iWork's postfix protobuf AST.
-///
-/// Local and cross-table cells, rectangles, and whole-axis ranges are encoded
-/// relative to the host cell and mirrored into CalculationEngine records by
-/// the host table's calculation engine. Functions with lazy/thunk arguments,
-/// volatile behavior, remote data, or spill results are rejected until their
-/// additional records can be generated and validated.
-#[derive(Debug, Clone, PartialEq)]
-pub enum FormulaExpression {
-    Number(f64),
-    Text(String),
-    Boolean(bool),
-    PivotCategory(FormulaPivotCategoryReference),
-    Cell(FormulaCellReference),
-    TableCell {
-        table_id: u64,
-        reference: FormulaCellReference,
-    },
-    TableRange {
-        table_id: u64,
-        start: FormulaCellReference,
-        end: FormulaCellReference,
-    },
-    Rows {
-        start: FormulaAxisReference,
-        end: FormulaAxisReference,
-    },
-    Columns {
-        start: FormulaAxisReference,
-        end: FormulaAxisReference,
-    },
-    TableRows {
-        table_id: u64,
-        start: FormulaAxisReference,
-        end: FormulaAxisReference,
-    },
-    TableColumns {
-        table_id: u64,
-        start: FormulaAxisReference,
-        end: FormulaAxisReference,
-    },
-    Range {
-        start: FormulaCellReference,
-        end: FormulaCellReference,
-    },
-    Function {
-        name: String,
-        arguments: Vec<FormulaExpression>,
-    },
-    Binary {
-        operator: FormulaBinaryOperator,
-        left: Box<FormulaExpression>,
-        right: Box<FormulaExpression>,
-    },
-    Negate(Box<FormulaExpression>),
-    Percent(Box<FormulaExpression>),
-}
-
-impl FormulaExpression {
-    pub fn function(
-        name: impl Into<String>,
-        arguments: impl IntoIterator<Item = FormulaExpression>,
-    ) -> Self {
-        Self::Function {
-            name: name.into(),
-            arguments: arguments.into_iter().collect(),
-        }
-    }
-
-    pub fn binary(
-        operator: FormulaBinaryOperator,
-        left: FormulaExpression,
-        right: FormulaExpression,
-    ) -> Self {
-        Self::Binary {
-            operator,
-            left: Box::new(left),
-            right: Box::new(right),
-        }
-    }
-
-    pub fn cell(reference: FormulaCellReference) -> Self {
-        Self::Cell(reference)
-    }
-
-    pub fn pivot_category(reference: FormulaPivotCategoryReference) -> Self {
-        Self::PivotCategory(reference)
-    }
-
-    pub fn relative_cell(row: usize, column: usize) -> Self {
-        Self::Cell(FormulaCellReference::relative(row, column))
-    }
-
-    pub fn table_cell(table_id: u64, reference: FormulaCellReference) -> Self {
-        Self::TableCell {
-            table_id,
-            reference,
-        }
-    }
-
-    pub fn table_range(
-        table_id: u64,
-        start: FormulaCellReference,
-        end: FormulaCellReference,
-    ) -> Self {
-        Self::TableRange {
-            table_id,
-            start,
-            end,
-        }
-    }
-
-    pub fn rows(start: FormulaAxisReference, end: FormulaAxisReference) -> Self {
-        Self::Rows { start, end }
-    }
-
-    pub fn columns(start: FormulaAxisReference, end: FormulaAxisReference) -> Self {
-        Self::Columns { start, end }
-    }
-
-    pub fn table_rows(
-        table_id: u64,
-        start: FormulaAxisReference,
-        end: FormulaAxisReference,
-    ) -> Self {
-        Self::TableRows {
-            table_id,
-            start,
-            end,
-        }
-    }
-
-    pub fn table_columns(
-        table_id: u64,
-        start: FormulaAxisReference,
-        end: FormulaAxisReference,
-    ) -> Self {
-        Self::TableColumns {
-            table_id,
-            start,
-            end,
-        }
-    }
-
-    pub fn range(start: FormulaCellReference, end: FormulaCellReference) -> Self {
-        Self::Range { start, end }
-    }
-
-    pub(crate) fn compile(
-        &self,
-        host_row: usize,
-        host_column: usize,
-        table_rows: usize,
-        table_columns: usize,
-        external_tables: &HashMap<u64, ExternalFormulaTable>,
-        pivot_categories: &HashMap<PivotFormulaKey, ExternalPivotCategory>,
-    ) -> Result<CompiledFormula> {
-        let host_row = u32::try_from(host_row)
-            .map_err(|_| Error::ParseError("Numbers formula host row exceeds u32".to_owned()))?;
-        let host_column = u32::try_from(host_column)
-            .map_err(|_| Error::ParseError("Numbers formula host column exceeds u32".to_owned()))?;
-        let table_rows = u32::try_from(table_rows)
-            .map_err(|_| Error::ParseError("Numbers table row count exceeds u32".to_owned()))?;
-        let table_columns = u32::try_from(table_columns)
-            .map_err(|_| Error::ParseError("Numbers table column count exceeds u32".to_owned()))?;
-        if host_row >= table_rows || host_column >= table_columns {
+    while let Some((expression, depth)) = pending.pop() {
+        if depth > MAX_FORMULA_DEPTH {
             return Err(Error::ParseError(format!(
-                "Numbers formula host cell ({host_row}, {host_column}) is outside the {table_rows}x{table_columns} table"
+                "Numbers formula nesting exceeds the safety limit {MAX_FORMULA_DEPTH}"
+            )));
+        }
+        node_count = node_count
+            .checked_add(1)
+            .ok_or_else(|| Error::ParseError("Numbers formula node count overflow".to_owned()))?;
+        if node_count > MAX_FORMULA_NODES {
+            return Err(Error::ParseError(format!(
+                "Numbers formula has more than {MAX_FORMULA_NODES} expression nodes"
             )));
         }
 
-        let mut ast_node = Vec::new();
-        let mut context = FormulaCompileContext {
-            host_row,
-            host_column,
-            table_rows,
-            table_columns,
-            external_tables,
-            pivot_categories,
-            local_precedents: BTreeSet::new(),
-            external_precedents: BTreeSet::new(),
-            contains_pivot_category: false,
-        };
-        self.append_nodes(&mut ast_node, &mut context)?;
-        if ast_node.is_empty() {
-            return Err(Error::ParseError(
-                "Numbers formula AST cannot be empty".to_owned(),
-            ));
-        }
-        Ok(CompiledFormula {
-            archive: tsce::FormulaArchive {
-                ast_node_array: tsce::AstNodeArrayArchive { ast_node },
-                translation_flags: context.contains_pivot_category.then_some(
-                    tsce::FormulaTranslationFlagsArchive {
-                        excel_import_translation: Some(false),
-                        number_to_date_coercion_removal_translation: Some(false),
-                        contains_uid_form_references: Some(false),
-                        contains_frozen_references: Some(false),
-                        returns_percent_formatted: Some(true),
-                    },
-                ),
-                ..Default::default()
+        match expression {
+            FormulaExpression::Function { arguments, .. } => {
+                if arguments.len() > MAX_FUNCTION_ARGUMENTS {
+                    return Err(Error::ParseError(format!(
+                        "Numbers formula function has more than {MAX_FUNCTION_ARGUMENTS} arguments"
+                    )));
+                }
+                function_argument_count = function_argument_count
+                    .checked_add(arguments.len())
+                    .ok_or_else(|| {
+                        Error::ParseError("Numbers formula argument count overflow".to_owned())
+                    })?;
+                if function_argument_count > MAX_TOTAL_FUNCTION_ARGUMENTS {
+                    return Err(Error::ParseError(format!(
+                        "Numbers formula has more than {MAX_TOTAL_FUNCTION_ARGUMENTS} function arguments"
+                    )));
+                }
+                pending.extend(arguments.iter().rev().map(|argument| (argument, depth + 1)));
             },
-            local_precedents: context.local_precedents.into_iter().collect(),
-            external_precedents: context.external_precedents.into_iter().collect(),
-        })
+            FormulaExpression::Binary { left, right, .. } => {
+                pending.push((right, depth + 1));
+                pending.push((left, depth + 1));
+            },
+            FormulaExpression::Negate(value) | FormulaExpression::Percent(value) => {
+                pending.push((value, depth + 1));
+            },
+            FormulaExpression::Number(_)
+            | FormulaExpression::Text(_)
+            | FormulaExpression::Boolean(_)
+            | FormulaExpression::PivotCategory(_)
+            | FormulaExpression::Cell(_)
+            | FormulaExpression::TableCell { .. }
+            | FormulaExpression::TableRange { .. }
+            | FormulaExpression::Rows { .. }
+            | FormulaExpression::Columns { .. }
+            | FormulaExpression::TableRows { .. }
+            | FormulaExpression::TableColumns { .. }
+            | FormulaExpression::Range { .. } => {},
+        }
     }
 
-    fn append_nodes(
-        &self,
-        output: &mut Vec<AstNodeArchive>,
-        context: &mut FormulaCompileContext,
-    ) -> Result<()> {
-        match self {
-            Self::Number(value) => append_number(*value, output),
-            Self::Text(value) => {
-                if value.contains('\0') {
-                    return Err(Error::ParseError(
-                        "Numbers formula strings cannot contain NUL".to_owned(),
-                    ));
+    Ok(node_count)
+}
+
+fn append_nodes(
+    expression: &FormulaExpression,
+    output: &mut Vec<AstNodeArchive>,
+    context: &mut FormulaCompileContext,
+) -> Result<()> {
+    match expression {
+        FormulaExpression::Number(value) => append_number(*value, output),
+        FormulaExpression::Text(value) => {
+            if value.contains('\0') {
+                return Err(Error::ParseError(
+                    "Numbers formula strings cannot contain NUL".to_owned(),
+                ));
+            }
+            output.push(AstNodeArchive {
+                ast_node_type: AstNodeType::StringNode as i32,
+                ast_string_node_string: Some(value.clone()),
+                ..Default::default()
+            });
+            Ok(())
+        },
+        FormulaExpression::Boolean(value) => {
+            output.push(AstNodeArchive {
+                ast_node_type: AstNodeType::BooleanNode as i32,
+                ast_boolean_node_boolean: Some(*value),
+                ..Default::default()
+            });
+            Ok(())
+        },
+        FormulaExpression::PivotCategory(reference) => {
+            append_pivot_category_reference(*reference, output, context)
+        },
+        FormulaExpression::Cell(reference) => append_cell_reference(*reference, output, context),
+        FormulaExpression::TableCell {
+            table_id,
+            reference,
+        } => append_table_cell_reference(*table_id, *reference, output, context),
+        FormulaExpression::TableRange {
+            table_id,
+            start,
+            end,
+        } => append_table_range_reference(*table_id, *start, *end, output, context),
+        FormulaExpression::Rows { start, end } => {
+            append_axis_range_reference(Axis::Row, *start, *end, None, output, context)
+        },
+        FormulaExpression::Columns { start, end } => {
+            append_axis_range_reference(Axis::Column, *start, *end, None, output, context)
+        },
+        FormulaExpression::TableRows {
+            table_id,
+            start,
+            end,
+        } => append_axis_range_reference(Axis::Row, *start, *end, Some(*table_id), output, context),
+        FormulaExpression::TableColumns {
+            table_id,
+            start,
+            end,
+        } => append_axis_range_reference(
+            Axis::Column,
+            *start,
+            *end,
+            Some(*table_id),
+            output,
+            context,
+        ),
+        FormulaExpression::Range { start, end } => {
+            append_cell_reference(*start, output, context)?;
+            append_cell_reference(*end, output, context)?;
+            output.push(AstNodeArchive {
+                ast_node_type: AstNodeType::ColonNode as i32,
+                ..Default::default()
+            });
+            let start_row = u32::try_from(start.row).map_err(|_| {
+                Error::ParseError("Numbers formula range row exceeds u32".to_owned())
+            })?;
+            let end_row = u32::try_from(end.row).map_err(|_| {
+                Error::ParseError("Numbers formula range row exceeds u32".to_owned())
+            })?;
+            let start_column = u32::try_from(start.column).map_err(|_| {
+                Error::ParseError("Numbers formula range column exceeds u32".to_owned())
+            })?;
+            let end_column = u32::try_from(end.column).map_err(|_| {
+                Error::ParseError("Numbers formula range column exceeds u32".to_owned())
+            })?;
+            let top = start_row.min(end_row);
+            let bottom = start_row.max(end_row);
+            let left = start_column.min(end_column);
+            let right = start_column.max(end_column);
+            let rows = u64::from(bottom - top) + 1;
+            let columns = u64::from(right - left) + 1;
+            let cells = rows.checked_mul(columns).ok_or_else(|| {
+                Error::ParseError("Numbers formula range size overflow".to_owned())
+            })?;
+            if cells > MAX_FORMULA_PRECEDENTS as u64 {
+                return Err(Error::ParseError(format!(
+                    "Numbers formula range expands to {cells} precedents, exceeding the safety limit {MAX_FORMULA_PRECEDENTS}"
+                )));
+            }
+            for row in top..=bottom {
+                for column in left..=right {
+                    context.insert_local_precedent((row, column))?;
                 }
-                output.push(AstNodeArchive {
-                    ast_node_type: AstNodeType::StringNode as i32,
-                    ast_string_node_string: Some(value.clone()),
-                    ..Default::default()
-                });
-                Ok(())
-            },
-            Self::Boolean(value) => {
-                output.push(AstNodeArchive {
-                    ast_node_type: AstNodeType::BooleanNode as i32,
-                    ast_boolean_node_boolean: Some(*value),
-                    ..Default::default()
-                });
-                Ok(())
-            },
-            Self::PivotCategory(reference) => {
-                append_pivot_category_reference(*reference, output, context)
-            },
-            Self::Cell(reference) => append_cell_reference(*reference, output, context),
-            Self::TableCell {
-                table_id,
-                reference,
-            } => append_table_cell_reference(*table_id, *reference, output, context),
-            Self::TableRange {
-                table_id,
-                start,
-                end,
-            } => append_table_range_reference(*table_id, *start, *end, output, context),
-            Self::Rows { start, end } => {
-                append_axis_range_reference(Axis::Row, *start, *end, None, output, context)
-            },
-            Self::Columns { start, end } => {
-                append_axis_range_reference(Axis::Column, *start, *end, None, output, context)
-            },
-            Self::TableRows {
-                table_id,
-                start,
-                end,
-            } => append_axis_range_reference(
-                Axis::Row,
-                *start,
-                *end,
-                Some(*table_id),
-                output,
-                context,
-            ),
-            Self::TableColumns {
-                table_id,
-                start,
-                end,
-            } => append_axis_range_reference(
-                Axis::Column,
-                *start,
-                *end,
-                Some(*table_id),
-                output,
-                context,
-            ),
-            Self::Range { start, end } => {
-                append_cell_reference(*start, output, context)?;
-                append_cell_reference(*end, output, context)?;
-                output.push(AstNodeArchive {
-                    ast_node_type: AstNodeType::ColonNode as i32,
-                    ..Default::default()
-                });
-                let start_row = u32::try_from(start.row).map_err(|_| {
-                    Error::ParseError("Numbers formula range row exceeds u32".to_owned())
-                })?;
-                let end_row = u32::try_from(end.row).map_err(|_| {
-                    Error::ParseError("Numbers formula range row exceeds u32".to_owned())
-                })?;
-                let start_column = u32::try_from(start.column).map_err(|_| {
-                    Error::ParseError("Numbers formula range column exceeds u32".to_owned())
-                })?;
-                let end_column = u32::try_from(end.column).map_err(|_| {
-                    Error::ParseError("Numbers formula range column exceeds u32".to_owned())
-                })?;
-                let top = start_row.min(end_row);
-                let bottom = start_row.max(end_row);
-                let left = start_column.min(end_column);
-                let right = start_column.max(end_column);
-                let rows = u64::from(bottom - top) + 1;
-                let columns = u64::from(right - left) + 1;
-                let cells = rows.checked_mul(columns).ok_or_else(|| {
-                    Error::ParseError("Numbers formula range size overflow".to_owned())
-                })?;
-                if cells > MAX_FORMULA_PRECEDENTS as u64 {
-                    return Err(Error::ParseError(format!(
-                        "Numbers formula range expands to {cells} precedents, exceeding the safety limit {MAX_FORMULA_PRECEDENTS}"
-                    )));
-                }
-                for row in top..=bottom {
-                    for column in left..=right {
-                        context.local_precedents.insert((row, column));
-                    }
-                }
-                Ok(())
-            },
-            Self::Function { name, arguments } => {
-                let identifier = function_identifier(name).ok_or_else(|| {
-                    Error::ParseError(format!("Unknown Numbers formula function {name:?}"))
-                })?;
-                if is_lazy_function(identifier) {
-                    return Err(Error::ParseError(format!(
-                        "Numbers function {name} uses thunk/lambda AST nodes that are not yet writable"
-                    )));
-                }
-                if requires_dependency_records(identifier) {
-                    return Err(Error::ParseError(format!(
-                        "Numbers function {name} requires volatile, reference, remote-data, or spill dependency records that are not yet writable"
-                    )));
-                }
-                for argument in arguments {
-                    argument.append_nodes(output, context)?;
-                }
-                let argument_count = u32::try_from(arguments.len()).map_err(|_| {
-                    Error::ParseError("Numbers formula has too many function arguments".to_owned())
-                })?;
-                output.push(AstNodeArchive {
-                    ast_node_type: AstNodeType::FunctionNode as i32,
-                    ast_function_node_index: Some(identifier),
-                    ast_function_node_num_args: Some(argument_count),
-                    ..Default::default()
-                });
-                Ok(())
-            },
-            Self::Binary {
-                operator,
-                left,
-                right,
-            } => {
-                left.append_nodes(output, context)?;
-                right.append_nodes(output, context)?;
-                output.push(AstNodeArchive {
-                    ast_node_type: binary_node_type(*operator) as i32,
-                    ..Default::default()
-                });
-                Ok(())
-            },
-            Self::Negate(value) => {
-                value.append_nodes(output, context)?;
-                output.push(AstNodeArchive {
-                    ast_node_type: AstNodeType::NegationNode as i32,
-                    ..Default::default()
-                });
-                Ok(())
-            },
-            Self::Percent(value) => {
-                value.append_nodes(output, context)?;
-                output.push(AstNodeArchive {
-                    ast_node_type: AstNodeType::PercentNode as i32,
-                    ..Default::default()
-                });
-                Ok(())
-            },
-        }
+            }
+            Ok(())
+        },
+        FormulaExpression::Function { name, arguments } => {
+            let identifier = function_identifier(name).ok_or_else(|| {
+                Error::ParseError(format!("Unknown Numbers formula function {name:?}"))
+            })?;
+            validate_function_arity(name, identifier, arguments.len())?;
+            if is_lazy_function(identifier) {
+                return Err(Error::ParseError(format!(
+                    "Numbers function {name} uses thunk/lambda AST nodes that are not yet writable"
+                )));
+            }
+            if requires_dependency_records(identifier) {
+                return Err(Error::ParseError(format!(
+                    "Numbers function {name} requires volatile, reference, remote-data, or spill dependency records that are not yet writable"
+                )));
+            }
+            for argument in arguments {
+                append_nodes(argument, output, context)?;
+            }
+            let argument_count = u32::try_from(arguments.len()).map_err(|_| {
+                Error::ParseError("Numbers formula has too many function arguments".to_owned())
+            })?;
+            output.push(AstNodeArchive {
+                ast_node_type: AstNodeType::FunctionNode as i32,
+                ast_function_node_index: Some(identifier),
+                ast_function_node_num_args: Some(argument_count),
+                ..Default::default()
+            });
+            Ok(())
+        },
+        FormulaExpression::Binary {
+            operator,
+            left,
+            right,
+        } => {
+            append_nodes(left, output, context)?;
+            append_nodes(right, output, context)?;
+            output.push(AstNodeArchive {
+                ast_node_type: binary_node_type(*operator) as i32,
+                ..Default::default()
+            });
+            Ok(())
+        },
+        FormulaExpression::Negate(value) => {
+            append_nodes(value, output, context)?;
+            output.push(AstNodeArchive {
+                ast_node_type: AstNodeType::NegationNode as i32,
+                ..Default::default()
+            });
+            Ok(())
+        },
+        FormulaExpression::Percent(value) => {
+            append_nodes(value, output, context)?;
+            output.push(AstNodeArchive {
+                ast_node_type: AstNodeType::PercentNode as i32,
+                ..Default::default()
+            });
+            Ok(())
+        },
     }
 }
 
@@ -613,6 +382,34 @@ struct FormulaCompileContext<'a> {
     contains_pivot_category: bool,
 }
 
+impl FormulaCompileContext<'_> {
+    fn insert_local_precedent(&mut self, precedent: (u32, u32)) -> Result<()> {
+        if !self.local_precedents.contains(&precedent)
+            && self.local_precedents.len() + self.external_precedents.len()
+                >= MAX_FORMULA_PRECEDENTS
+        {
+            return Err(Error::ParseError(format!(
+                "Numbers formula has more than {MAX_FORMULA_PRECEDENTS} aggregate precedents"
+            )));
+        }
+        self.local_precedents.insert(precedent);
+        Ok(())
+    }
+
+    fn insert_external_precedent(&mut self, precedent: (u32, u32, u32)) -> Result<()> {
+        if !self.external_precedents.contains(&precedent)
+            && self.local_precedents.len() + self.external_precedents.len()
+                >= MAX_FORMULA_PRECEDENTS
+        {
+            return Err(Error::ParseError(format!(
+                "Numbers formula has more than {MAX_FORMULA_PRECEDENTS} aggregate precedents"
+            )));
+        }
+        self.external_precedents.insert(precedent);
+        Ok(())
+    }
+}
+
 fn append_pivot_category_reference(
     reference: FormulaPivotCategoryReference,
     output: &mut Vec<AstNodeArchive>,
@@ -665,9 +462,7 @@ fn append_pivot_category_reference(
         ..Default::default()
     });
     for &(row, column) in &[category.grouping_columns, category.aggregate] {
-        context
-            .external_precedents
-            .insert((category.internal_owner_id, row, column));
+        context.insert_external_precedent((category.internal_owner_id, row, column))?;
     }
     Ok(())
 }
@@ -714,8 +509,7 @@ fn append_cell_reference(
         }),
         ..Default::default()
     });
-    context.local_precedents.insert((row, column));
-    Ok(())
+    context.insert_local_precedent((row, column))
 }
 
 fn append_table_cell_reference(
@@ -765,10 +559,7 @@ fn append_table_cell_reference(
         ),
         ..Default::default()
     });
-    context
-        .external_precedents
-        .insert((table.internal_owner_id, row, column));
-    Ok(())
+    context.insert_external_precedent((table.internal_owner_id, row, column))
 }
 
 fn append_table_range_reference(
@@ -863,9 +654,7 @@ fn append_table_range_reference(
     }
     for row in top..=bottom {
         for column in left..=right {
-            context
-                .external_precedents
-                .insert((internal_owner_id, row, column));
+            context.insert_external_precedent((internal_owner_id, row, column))?;
         }
     }
     Ok(())
@@ -995,28 +784,28 @@ fn append_axis_range_reference(
         (Axis::Row, Some((owner_id, _))) => {
             for row in begin..=finish {
                 for column in 0..columns {
-                    context.external_precedents.insert((owner_id, row, column));
+                    context.insert_external_precedent((owner_id, row, column))?;
                 }
             }
         },
         (Axis::Column, Some((owner_id, _))) => {
             for row in 0..rows {
                 for column in begin..=finish {
-                    context.external_precedents.insert((owner_id, row, column));
+                    context.insert_external_precedent((owner_id, row, column))?;
                 }
             }
         },
         (Axis::Row, None) => {
             for row in begin..=finish {
                 for column in 0..columns {
-                    context.local_precedents.insert((row, column));
+                    context.insert_local_precedent((row, column))?;
                 }
             }
         },
         (Axis::Column, None) => {
             for row in 0..rows {
                 for column in begin..=finish {
-                    context.local_precedents.insert((row, column));
+                    context.insert_local_precedent((row, column))?;
                 }
             }
         },
@@ -1155,6 +944,102 @@ fn is_lazy_function(identifier: u32) -> bool {
     )
 }
 
+fn validate_function_arity(name: &str, identifier: u32, actual: usize) -> Result<()> {
+    let (minimum, maximum) = match identifier {
+        1
+        | 4
+        | 5
+        | 9
+        | 10
+        | 11
+        | 13
+        | 18
+        | 20
+        | 21
+        | 28
+        | 29
+        | 32
+        | 41
+        | 44
+        | 48
+        | 50
+        | 51
+        | 60
+        | 65
+        | 69..=72
+        | 77
+        | 78
+        | 80
+        | 82
+        | 90
+        | 94
+        | 96
+        | 104
+        | 117
+        | 124
+        | 125
+        | 129
+        | 132
+        | 133
+        | 134
+        | 135
+        | 139
+        | 149
+        | 150..=151
+        | 155
+        | 157..=159
+        | 167 => (1, 1),
+        7 | 15..=16 | 25 | 30..=31 | 84..=89 | 102 | 113 | 138 | 140..=143 | 160..=163 | 168 => {
+            (1, MAX_FUNCTION_ARGUMENTS)
+        },
+        12
+        | 19
+        | 24
+        | 27
+        | 49
+        | 53
+        | 66
+        | 74
+        | 75
+        | 81
+        | 83
+        | 92
+        | 95
+        | 103
+        | 107
+        | 120
+        | 126..=128
+        | 137
+        | 145
+        | 146
+        | 148
+        | 152
+        | 164
+        | 216..=218
+        | 221
+        | 223
+        | 225
+        | 226
+        | 231..=234
+        | 314 => (2, 2),
+        39 => (3, 3),
+        52 | 156 | 97 => (0, 0),
+        62 => (3, 3),
+        212 => (2, 2),
+        _ => {
+            return Err(Error::ParseError(format!(
+                "Numbers function {name} has no validated arity metadata"
+            )));
+        },
+    };
+    if actual < minimum || actual > maximum {
+        return Err(Error::ParseError(format!(
+            "Numbers function {name} expects {minimum}..={maximum} arguments, got {actual}"
+        )));
+    }
+    Ok(())
+}
+
 fn requires_dependency_records(identifier: u32) -> bool {
     matches!(
         identifier,
@@ -1166,10 +1051,24 @@ fn requires_dependency_records(identifier: u32) -> bool {
 mod tests {
     use super::*;
 
-    fn compile(expression: &FormulaExpression) -> CompiledFormula {
-        expression
-            .compile(5, 2, 20, 10, &HashMap::new(), &HashMap::new())
-            .unwrap()
+    fn compile(
+        expression: &FormulaExpression,
+        host_row: usize,
+        host_column: usize,
+        table_rows: usize,
+        table_columns: usize,
+        external_tables: &HashMap<u64, ExternalFormulaTable>,
+        pivot_categories: &HashMap<PivotFormulaKey, ExternalPivotCategory>,
+    ) -> Result<CompiledFormula> {
+        compile_formula(
+            expression,
+            host_row,
+            host_column,
+            table_rows,
+            table_columns,
+            external_tables,
+            pivot_categories,
+        )
     }
 
     #[test]
@@ -1181,7 +1080,7 @@ mod tests {
                 FormulaExpression::Number(2.0),
             ],
         );
-        let compiled = compile(&formula);
+        let compiled = compile(&formula, 5, 2, 20, 10, &HashMap::new(), &HashMap::new()).unwrap();
         let nodes = &compiled.archive.ast_node_array.ast_node;
         assert_eq!(nodes.len(), 3);
         assert_eq!(nodes[0].ast_node_type(), AstNodeType::NumberNode);
@@ -1229,9 +1128,7 @@ mod tests {
             FormulaExpression::pivot_category(north_reference),
             FormulaExpression::pivot_category(total_reference),
         );
-        let compiled = expression
-            .compile(0, 0, 1, 1, &HashMap::new(), &categories)
-            .unwrap();
+        let compiled = compile(&expression, 0, 0, 1, 1, &HashMap::new(), &categories).unwrap();
         assert_eq!(
             compiled.external_precedents,
             [(38, 0, 1), (38, 0, 8), (38, 0, 18)]
@@ -1258,11 +1155,7 @@ mod tests {
         let mismatched = FormulaExpression::pivot_category(FormulaPivotCategoryReference::new(
             group_by, column, north, 2, 1,
         ));
-        assert!(
-            mismatched
-                .compile(0, 0, 1, 1, &HashMap::new(), &categories)
-                .is_err()
-        );
+        assert!(compile(&mismatched, 0, 0, 1, 1, &HashMap::new(), &categories,).is_err());
     }
 
     #[test]
@@ -1287,32 +1180,124 @@ mod tests {
     #[test]
     fn rejects_unknown_and_lazy_functions() {
         assert!(
-            FormulaExpression::function("MISSING", [])
-                .compile(0, 0, 1, 1, &HashMap::new(), &HashMap::new())
-                .is_err()
+            compile(
+                &FormulaExpression::function("MISSING", []),
+                0,
+                0,
+                1,
+                1,
+                &HashMap::new(),
+                &HashMap::new(),
+            )
+            .is_err()
         );
         assert!(
-            FormulaExpression::function("IF", [FormulaExpression::Boolean(true)])
-                .compile(0, 0, 1, 1, &HashMap::new(), &HashMap::new())
-                .is_err()
+            compile(
+                &FormulaExpression::function("IF", [FormulaExpression::Boolean(true)]),
+                0,
+                0,
+                1,
+                1,
+                &HashMap::new(),
+                &HashMap::new(),
+            )
+            .is_err()
         );
         assert!(
-            FormulaExpression::function("NOW", [])
-                .compile(0, 0, 1, 1, &HashMap::new(), &HashMap::new())
-                .is_err()
+            compile(
+                &FormulaExpression::function("NOW", []),
+                0,
+                0,
+                1,
+                1,
+                &HashMap::new(),
+                &HashMap::new(),
+            )
+            .is_err()
         );
         assert!(
-            FormulaExpression::function("SEQUENCE", [FormulaExpression::Number(2.0)])
-                .compile(0, 0, 1, 1, &HashMap::new(), &HashMap::new())
-                .is_err()
+            compile(
+                &FormulaExpression::function("COUNTBLANK", []),
+                0,
+                0,
+                1,
+                1,
+                &HashMap::new(),
+                &HashMap::new(),
+            )
+            .is_err()
+        );
+        assert!(
+            compile(
+                &FormulaExpression::function("SEQUENCE", [FormulaExpression::Number(2.0)]),
+                0,
+                0,
+                1,
+                1,
+                &HashMap::new(),
+                &HashMap::new(),
+            )
+            .is_err()
         );
     }
 
     #[test]
+    fn rejects_invalid_arity_and_unbounded_expression_work() {
+        assert!(
+            compile(
+                &FormulaExpression::function(
+                    "SIN",
+                    [
+                        FormulaExpression::Number(1.0),
+                        FormulaExpression::Number(2.0)
+                    ],
+                ),
+                0,
+                0,
+                1,
+                1,
+                &HashMap::new(),
+                &HashMap::new(),
+            )
+            .is_err()
+        );
+
+        let too_many_arguments = FormulaExpression::function(
+            "SUM",
+            (0..=MAX_FUNCTION_ARGUMENTS).map(|value| FormulaExpression::Number(value as f64)),
+        );
+        assert!(
+            compile(
+                &too_many_arguments,
+                0,
+                0,
+                1,
+                1,
+                &HashMap::new(),
+                &HashMap::new(),
+            )
+            .is_err()
+        );
+
+        let deeply_nested = (0..MAX_FORMULA_DEPTH)
+            .fold(FormulaExpression::Number(1.0), |expression, _| {
+                FormulaExpression::negate(expression)
+            });
+        assert!(compile(&deeply_nested, 0, 0, 1, 1, &HashMap::new(), &HashMap::new(),).is_err());
+    }
+
+    #[test]
     fn cell_coordinates_match_app_generated_relative_and_mixed_references() {
-        let relative = FormulaExpression::relative_cell(4, 1)
-            .compile(5, 2, 20, 10, &HashMap::new(), &HashMap::new())
-            .unwrap();
+        let relative = compile(
+            &FormulaExpression::relative_cell(4, 1),
+            5,
+            2,
+            20,
+            10,
+            &HashMap::new(),
+            &HashMap::new(),
+        )
+        .unwrap();
         let node = &relative.archive.ast_node_array.ast_node[0];
         assert_eq!(node.ast_node_type(), AstNodeType::CellReferenceNode);
         assert_eq!(node.ast_column.as_ref().unwrap().column, -1);
@@ -1321,9 +1306,16 @@ mod tests {
         assert_eq!(node.ast_row.as_ref().unwrap().absolute, Some(false));
         assert_eq!(relative.local_precedents, [(4, 1)]);
 
-        let mixed = FormulaExpression::cell(FormulaCellReference::mixed(1, 0, true, false))
-            .compile(5, 2, 20, 10, &HashMap::new(), &HashMap::new())
-            .unwrap();
+        let mixed = compile(
+            &FormulaExpression::cell(FormulaCellReference::mixed(1, 0, true, false)),
+            5,
+            2,
+            20,
+            10,
+            &HashMap::new(),
+            &HashMap::new(),
+        )
+        .unwrap();
         let node = &mixed.archive.ast_node_array.ast_node[0];
         assert_eq!(node.ast_column.as_ref().unwrap().column, -2);
         assert_eq!(node.ast_row.as_ref().unwrap().row, 1);
@@ -1339,9 +1331,8 @@ mod tests {
                 FormulaCellReference::absolute(1, 0),
             )],
         );
-        let compiled = expression
-            .compile(5, 2, 20, 10, &HashMap::new(), &HashMap::new())
-            .unwrap();
+        let compiled =
+            compile(&expression, 5, 2, 20, 10, &HashMap::new(), &HashMap::new()).unwrap();
         assert_eq!(compiled.local_precedents, [(1, 0), (1, 1), (2, 0), (2, 1)]);
         assert_eq!(
             compiled
@@ -1374,9 +1365,16 @@ mod tests {
                 internal_owner_id: 7,
             },
         )]);
-        let compiled = FormulaExpression::table_cell(42, FormulaCellReference::relative(0, 1))
-            .compile(4, 1, 5, 4, &tables, &HashMap::new())
-            .unwrap();
+        let compiled = compile(
+            &FormulaExpression::table_cell(42, FormulaCellReference::relative(0, 1)),
+            4,
+            1,
+            5,
+            4,
+            &tables,
+            &HashMap::new(),
+        )
+        .unwrap();
         let node = &compiled.archive.ast_node_array.ast_node[0];
         assert_eq!(node.ast_node_type(), AstNodeType::CellReferenceNode);
         assert_eq!(node.ast_column.as_ref().unwrap().column, 0);
@@ -1408,12 +1406,19 @@ mod tests {
                 internal_owner_id: 7,
             },
         )]);
-        let compiled = FormulaExpression::table_range(
-            42,
-            FormulaCellReference::relative(0, 2),
-            FormulaCellReference::relative(1, 2),
+        let compiled = compile(
+            &FormulaExpression::table_range(
+                42,
+                FormulaCellReference::relative(0, 2),
+                FormulaCellReference::relative(1, 2),
+            ),
+            4,
+            2,
+            5,
+            4,
+            &tables,
+            &HashMap::new(),
         )
-        .compile(4, 2, 5, 4, &tables, &HashMap::new())
         .unwrap();
         let node = &compiled.archive.ast_node_array.ast_node[0];
         assert_eq!(node.ast_node_type(), AstNodeType::ColonTractNode);
@@ -1446,12 +1451,19 @@ mod tests {
         assert_eq!(compiled.local_precedents, []);
         assert_eq!(compiled.external_precedents, [(7, 0, 2), (7, 1, 2)]);
 
-        let mixed = FormulaExpression::table_range(
-            42,
-            FormulaCellReference::absolute(1, 0),
-            FormulaCellReference::relative(3, 1),
+        let mixed = compile(
+            &FormulaExpression::table_range(
+                42,
+                FormulaCellReference::absolute(1, 0),
+                FormulaCellReference::relative(3, 1),
+            ),
+            4,
+            2,
+            5,
+            4,
+            &tables,
+            &HashMap::new(),
         )
-        .compile(4, 2, 5, 4, &tables, &HashMap::new())
         .unwrap();
         let mixed = mixed.archive.ast_node_array.ast_node[0]
             .ast_colon_tract
@@ -1477,12 +1489,19 @@ mod tests {
                 internal_owner_id: 7,
             },
         )]);
-        let rows = FormulaExpression::table_rows(
-            42,
-            FormulaAxisReference::relative(0),
-            FormulaAxisReference::relative(1),
+        let rows = compile(
+            &FormulaExpression::table_rows(
+                42,
+                FormulaAxisReference::relative(0),
+                FormulaAxisReference::relative(1),
+            ),
+            1,
+            0,
+            5,
+            4,
+            &tables,
+            &HashMap::new(),
         )
-        .compile(1, 0, 5, 4, &tables, &HashMap::new())
         .unwrap();
         let node = &rows.archive.ast_node_array.ast_node[0];
         assert_eq!(node.ast_node_type(), AstNodeType::ColonTractNode);
@@ -1524,12 +1543,19 @@ mod tests {
             ]
         );
 
-        let columns = FormulaExpression::table_columns(
-            42,
-            FormulaAxisReference::relative(1),
-            FormulaAxisReference::absolute(2),
+        let columns = compile(
+            &FormulaExpression::table_columns(
+                42,
+                FormulaAxisReference::relative(1),
+                FormulaAxisReference::absolute(2),
+            ),
+            2,
+            0,
+            5,
+            4,
+            &tables,
+            &HashMap::new(),
         )
-        .compile(2, 0, 5, 4, &tables, &HashMap::new())
         .unwrap();
         let node = &columns.archive.ast_node_array.ast_node[0];
         let tract = node.ast_colon_tract.as_ref().unwrap();
@@ -1552,11 +1578,18 @@ mod tests {
         );
         assert_eq!(columns.external_precedents.len(), 8);
 
-        let local = FormulaExpression::rows(
-            FormulaAxisReference::absolute(2),
-            FormulaAxisReference::absolute(2),
+        let local = compile(
+            &FormulaExpression::rows(
+                FormulaAxisReference::absolute(2),
+                FormulaAxisReference::absolute(2),
+            ),
+            3,
+            1,
+            5,
+            4,
+            &HashMap::new(),
+            &HashMap::new(),
         )
-        .compile(3, 1, 5, 4, &HashMap::new(), &HashMap::new())
         .unwrap();
         assert_eq!(local.local_precedents, [(2, 0), (2, 1), (2, 2), (2, 3)]);
         assert!(local.external_precedents.is_empty());
@@ -1565,24 +1598,38 @@ mod tests {
     #[test]
     fn rejects_out_of_bounds_references_transactionally() {
         assert!(
-            FormulaExpression::relative_cell(10, 0)
-                .compile(0, 0, 10, 1, &HashMap::new(), &HashMap::new())
-                .is_err()
-        );
-        assert!(
-            FormulaExpression::rows(
-                FormulaAxisReference::relative(0),
-                FormulaAxisReference::relative(10),
+            compile(
+                &FormulaExpression::relative_cell(10, 0),
+                0,
+                0,
+                10,
+                1,
+                &HashMap::new(),
+                &HashMap::new(),
             )
-            .compile(0, 0, 10, 1, &HashMap::new(), &HashMap::new())
             .is_err()
         );
         assert!(
-            FormulaExpression::columns(
-                FormulaAxisReference::relative(0),
-                FormulaAxisReference::relative(0),
+            compile(
+                &FormulaExpression::rows(
+                    FormulaAxisReference::relative(0),
+                    FormulaAxisReference::relative(10),
+                ),
+                0,
+                0,
+                10,
+                1,
+                &HashMap::new(),
+                &HashMap::new(),
             )
-            .compile(
+            .is_err()
+        );
+        assert!(
+            compile(
+                &FormulaExpression::columns(
+                    FormulaAxisReference::relative(0),
+                    FormulaAxisReference::relative(0),
+                ),
                 0,
                 0,
                 MAX_FORMULA_PRECEDENTS + 1,

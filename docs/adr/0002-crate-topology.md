@@ -118,8 +118,18 @@ Neither module depends on archives, protobufs, comments, or application
 topology. `NumbersDocument::semantic_sheets` now provides the consuming IWA
 reader seam into the immutable `litchi_numbers::Sheet` model; it transfers
 finished sparse tables without rebuilding cell maps and intentionally leaves
-comments/native sidecars on the archive adapter. The remaining Numbers formula
-and package owners follow the same downward-only extraction pattern.
+comments/native sidecars on the archive adapter. The dependency-free formula
+vocabulary now follows the same boundary: `litchi-numbers::formula` owns
+formula caches, references, operators, and expression construction, while
+`litchi-iwa` retains protobuf compilation and calculation-engine mutation.
+The former `litchi-iwa::numbers::formula` module is crate-private; the facade's
+root re-exports are deliberate ergonomic aliases, not a compatibility layer.
+The shared formula types retain their `Formula*` prefix as a cross-format
+vocabulary exception so Pages, Keynote, and Numbers call sites remain
+unambiguous when the types are imported without a module qualifier. Their
+constructors are allocation-conscious, while archive-boundary compilation
+enforces bounded depth, node count, function arguments, and precedents.
+Package owners continue the same downward-only extraction pattern.
 
 The Pages and Keynote table readers now consume the same leaf `Table` through
 an ownership-preserving adapter seam. Their public table facades borrow the
