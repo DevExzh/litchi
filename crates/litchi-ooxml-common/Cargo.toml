@@ -13,6 +13,7 @@ caseless = { workspace = true }
 chrono = { workspace = true }
 litchi-core = { workspace = true }
 litchi-opc = { workspace = true }
+litchi-vba = { workspace = true }
 quick-xml = { workspace = true }
 ryu = { workspace = true }
 thiserror = { workspace = true }

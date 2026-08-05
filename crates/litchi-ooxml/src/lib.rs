@@ -49,7 +49,6 @@ pub mod opc {
 }
 pub mod pivot;
 pub mod pptx;
-mod vba_package;
 pub mod xlsb;
 pub mod xlsx;
 

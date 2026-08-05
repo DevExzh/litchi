@@ -12,6 +12,7 @@ pub mod mce;
 pub mod properties;
 pub mod relationships;
 pub mod ribbon;
+pub mod vba;
 pub mod web;
 pub mod xml;
 

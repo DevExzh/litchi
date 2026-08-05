@@ -53,6 +53,10 @@ pub enum Error {
     #[error("invalid OOXML URI: {0}")]
     Uri(String),
 
+    /// A bounded inert MS-OVBA project payload failed to decode or validate.
+    #[error("VBA error: {0}")]
+    Vba(#[from] litchi_vba::Error),
+
     /// Markup-compatibility preprocessing failed.
     #[error("OOXML markup compatibility error: {0}")]
     Mce(#[from] crate::MceError),

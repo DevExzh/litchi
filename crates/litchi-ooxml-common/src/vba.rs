@@ -1,6 +1,10 @@
 //! Shared, inert MS-OFFMACRO2 package-graph mutation.
+//!
+//! The `project` payload itself remains owned by [`litchi-vba`]. This module
+//! only validates and mutates the OPC relationship graph shared by DOCX,
+//! PPTX, XLSX, and XLSB hosts.
 
-use crate::error::{OoxmlError, Result};
+use crate::{Error, Result};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::{OpcPackage, PackURI};
@@ -18,7 +22,7 @@ const POWERPOINT_PROJECT_TARGET: &str = "vbaProject.bin";
 
 /// OOXML application family that owns a VBA project.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum VbaPackageHost {
+pub enum Host {
     Word,
     Excel,
     PowerPoint,
@@ -31,7 +35,7 @@ struct ExistingGraph {
     supplemental: Option<(PackURI, String)>,
 }
 
-impl VbaPackageHost {
+impl Host {
     fn project_part(self) -> &'static str {
         match self {
             Self::Word => WORD_PROJECT_PART,
@@ -96,25 +100,25 @@ impl VbaPackageHost {
 }
 
 /// Parse one validated package part as inert MS-OVBA source.
-pub(crate) fn read_project_part(
+pub fn read_project_part(
     package: &OpcPackage,
     part_name: &PackURI,
     limits: &Limits,
 ) -> Result<Project> {
     let part = package.get_part(part_name)?;
-    Project::read_with(part.blob(), limits).map_err(Into::into)
+    Project::read_with(part.blob(), limits).map_err(Error::from)
 }
 
 /// Replace or attach the one VBA graph allowed for an OOXML main part.
-pub(crate) fn store_vba_project_graph(
+pub fn store_project_graph(
     package: &mut OpcPackage,
     source_part: &PackURI,
-    host: VbaPackageHost,
+    host: Host,
     project_payload: Arc<Vec<u8>>,
     word_supplemental_xml: Option<Vec<u8>>,
 ) -> Result<()> {
     let mut staged = package.clone();
-    store_vba_project_graph_in_place(
+    store_project_graph_in_place(
         &mut staged,
         source_part,
         host,
@@ -125,10 +129,10 @@ pub(crate) fn store_vba_project_graph(
     Ok(())
 }
 
-fn store_vba_project_graph_in_place(
+fn store_project_graph_in_place(
     package: &mut OpcPackage,
     source_part: &PackURI,
-    host: VbaPackageHost,
+    host: Host,
     project_payload: Arc<Vec<u8>>,
     word_supplemental_xml: Option<Vec<u8>>,
 ) -> Result<()> {
@@ -136,13 +140,13 @@ fn store_vba_project_graph_in_place(
         let source = package.get_part(source_part)?;
         host.macro_content_type(source.content_type())?
     };
-    if host == VbaPackageHost::Word && word_supplemental_xml.is_none() {
-        return Err(OoxmlError::InvalidFormat(
+    if host == Host::Word && word_supplemental_xml.is_none() {
+        return Err(Error::Invalid(
             "Word VBA project storage requires supplemental-data XML".to_string(),
         ));
     }
-    if host != VbaPackageHost::Word && word_supplemental_xml.is_some() {
-        return Err(OoxmlError::InvalidFormat(
+    if host != Host::Word && word_supplemental_xml.is_some() {
+        return Err(Error::Invalid(
             "VBA supplemental-data XML is only valid for Word".to_string(),
         ));
     }
@@ -177,14 +181,14 @@ fn store_vba_project_graph_in_place(
         }
     }
 
-    let project_name = PackURI::new(host.project_part())
-        .map_err(|error| OoxmlError::InvalidUri(error.to_string()))?;
+    let project_name =
+        PackURI::new(host.project_part()).map_err(|error| Error::Uri(error.to_string()))?;
     let mut project = BlobPart::new(project_name, ct::OFC_VBA_PROJECT.to_string(), Vec::new());
     project.set_blob_shared(project_payload);
     if let Some(xml) = word_supplemental_xml {
         project.relate_to(WORD_SUPPLEMENTAL_TARGET, rt::WORD_VBA_DATA);
-        let supplemental_name = PackURI::new(WORD_SUPPLEMENTAL_PART)
-            .map_err(|error| OoxmlError::InvalidUri(error.to_string()))?;
+        let supplemental_name =
+            PackURI::new(WORD_SUPPLEMENTAL_PART).map_err(|error| Error::Uri(error.to_string()))?;
         package.try_add_part(Box::new(BlobPart::new(
             supplemental_name,
             ct::WML_VBA_DATA.to_string(),
@@ -201,10 +205,10 @@ fn store_vba_project_graph_in_place(
 }
 
 /// Remove the complete VBA graph and restore the corresponding non-macro main type.
-pub(crate) fn remove_vba_project_graph(
+pub fn remove_project_graph(
     package: &mut OpcPackage,
     source_part: &PackURI,
-    host: VbaPackageHost,
+    host: Host,
 ) -> Result<bool> {
     let non_macro_content_type = {
         let source = package.get_part(source_part)?;
@@ -230,12 +234,12 @@ pub(crate) fn remove_vba_project_graph(
     }
 
     let mut staged = package.clone();
-    remove_vba_project_graph_in_place(&mut staged, source_part, graph, non_macro_content_type)?;
+    remove_project_graph_in_place(&mut staged, source_part, graph, non_macro_content_type)?;
     *package = staged;
     Ok(true)
 }
 
-fn remove_vba_project_graph_in_place(
+fn remove_project_graph_in_place(
     package: &mut OpcPackage,
     source_part: &PackURI,
     graph: ExistingGraph,
@@ -255,7 +259,7 @@ fn remove_vba_project_graph_in_place(
 fn inspect_existing_graph(
     package: &OpcPackage,
     source_part: &PackURI,
-    host: VbaPackageHost,
+    host: Host,
 ) -> Result<Option<ExistingGraph>> {
     let source = package.get_part(source_part)?;
     let mut matches = source
@@ -266,12 +270,12 @@ fn inspect_existing_graph(
         return Ok(None);
     };
     if matches.next().is_some() {
-        return Err(OoxmlError::InvalidFormat(
+        return Err(Error::Invalid(
             "OOXML main part has multiple VBA Project relationships".to_string(),
         ));
     }
     if relationship.is_external() {
-        return Err(OoxmlError::InvalidFormat(
+        return Err(Error::Invalid(
             "VBA Project relationship cannot be external".to_string(),
         ));
     }
@@ -279,19 +283,19 @@ fn inspect_existing_graph(
     let project_part = relationship.target_partname()?;
     let project = package.get_part(&project_part)?;
     if project.content_type() != ct::OFC_VBA_PROJECT {
-        return Err(OoxmlError::InvalidContentType {
+        return Err(Error::ContentType {
             expected: ct::OFC_VBA_PROJECT.to_string(),
-            got: project.content_type().to_string(),
+            actual: project.content_type().to_string(),
         });
     }
 
-    let supplemental = if host == VbaPackageHost::Word {
+    let supplemental = if host == Host::Word {
         let mut supplemental = project
             .rels()
             .iter()
             .filter(|relationship| relationship.reltype() == rt::WORD_VBA_DATA);
         let Some(relationship) = supplemental.next() else {
-            return Err(OoxmlError::InvalidFormat(
+            return Err(Error::Invalid(
                 "Word VBA Project part is missing supplemental data".to_string(),
             ));
         };
@@ -301,32 +305,32 @@ fn inspect_existing_graph(
                 .iter()
                 .any(|candidate| candidate.reltype() != rt::WORD_VBA_DATA)
         {
-            return Err(OoxmlError::InvalidFormat(
+            return Err(Error::Invalid(
                 "Word VBA Project part has invalid relationships".to_string(),
             ));
         }
         if relationship.is_external() {
-            return Err(OoxmlError::InvalidFormat(
+            return Err(Error::Invalid(
                 "Word VBA supplemental-data relationship cannot be external".to_string(),
             ));
         }
         let part_name = relationship.target_partname()?;
         let part = package.get_part(&part_name)?;
         if part.content_type() != ct::WML_VBA_DATA {
-            return Err(OoxmlError::InvalidContentType {
+            return Err(Error::ContentType {
                 expected: ct::WML_VBA_DATA.to_string(),
-                got: part.content_type().to_string(),
+                actual: part.content_type().to_string(),
             });
         }
         if !part.rels().is_empty() {
-            return Err(OoxmlError::InvalidFormat(
+            return Err(Error::Invalid(
                 "Word VBA supplemental-data part cannot have relationships".to_string(),
             ));
         }
         Some((part_name, relationship.r_id().to_string()))
     } else {
         if !project.rels().is_empty() {
-            return Err(OoxmlError::InvalidFormat(
+            return Err(Error::Invalid(
                 "Excel or PowerPoint VBA Project part cannot have relationships".to_string(),
             ));
         }
@@ -342,18 +346,18 @@ fn inspect_existing_graph(
 
 fn ensure_replacement_targets_available(
     package: &OpcPackage,
-    host: VbaPackageHost,
+    host: Host,
     existing: Option<&ExistingGraph>,
 ) -> Result<()> {
-    let canonical_project = PackURI::new(host.project_part())
-        .map_err(|error| OoxmlError::InvalidUri(error.to_string()))?;
+    let canonical_project =
+        PackURI::new(host.project_part()).map_err(|error| Error::Uri(error.to_string()))?;
     if existing.is_none_or(|graph| graph.project_part != canonical_project) {
         package.validate_new_part_name(&canonical_project)?;
         ensure_no_inbound_reference(package, &canonical_project)?;
     }
-    if host == VbaPackageHost::Word {
-        let canonical_supplemental = PackURI::new(WORD_SUPPLEMENTAL_PART)
-            .map_err(|error| OoxmlError::InvalidUri(error.to_string()))?;
+    if host == Host::Word {
+        let canonical_supplemental =
+            PackURI::new(WORD_SUPPLEMENTAL_PART).map_err(|error| Error::Uri(error.to_string()))?;
         if existing
             .and_then(|graph| graph.supplemental.as_ref())
             .map(|(part, _)| part)
@@ -366,7 +370,7 @@ fn ensure_replacement_targets_available(
     Ok(())
 }
 
-pub(crate) fn ensure_no_inbound_reference(package: &OpcPackage, target: &PackURI) -> Result<()> {
+pub fn ensure_no_inbound_reference(package: &OpcPackage, target: &PackURI) -> Result<()> {
     let package_relationship = package.rels().iter().any(|relationship| {
         !relationship.is_external() && relationship.target_partname().ok().as_ref() == Some(target)
     });
@@ -377,7 +381,7 @@ pub(crate) fn ensure_no_inbound_reference(package: &OpcPackage, target: &PackURI
         })
     });
     if package_relationship || part_relationship {
-        return Err(OoxmlError::InvalidFormat(format!(
+        return Err(Error::Invalid(format!(
             "VBA graph target '{}' already has an inbound relationship",
             target.as_str()
         )));
@@ -385,7 +389,7 @@ pub(crate) fn ensure_no_inbound_reference(package: &OpcPackage, target: &PackURI
     Ok(())
 }
 
-pub(crate) fn ensure_exclusive_inbound_reference(
+pub fn ensure_exclusive_inbound_reference(
     package: &OpcPackage,
     target: &PackURI,
     expected_source: &PackURI,
@@ -413,7 +417,7 @@ pub(crate) fn ensure_exclusive_inbound_reference(
         }
     }
     if unexpected {
-        return Err(OoxmlError::InvalidFormat(format!(
+        return Err(Error::Invalid(format!(
             "VBA graph part '{}' has an unexpected inbound relationship",
             target.as_str()
         )));
@@ -421,8 +425,8 @@ pub(crate) fn ensure_exclusive_inbound_reference(
     Ok(())
 }
 
-fn invalid_main_content_type(host: VbaPackageHost, actual: &str) -> OoxmlError {
-    OoxmlError::InvalidFormat(format!(
+fn invalid_main_content_type(host: Host, actual: &str) -> Error {
+    Error::Invalid(format!(
         "{host:?} main part has unsupported content type '{actual}'"
     ))
 }
@@ -484,7 +488,7 @@ mod tests {
 
         assert!(matches!(
             read_project_part(&package, &part_name, &limits),
-            Err(OoxmlError::Vba(litchi_vba::Error::LimitExceeded {
+            Err(Error::Vba(litchi_vba::Error::LimitExceeded {
                 limit: "standalone VBA CFB bytes",
                 actual: 4,
                 maximum: 3,
@@ -496,37 +500,33 @@ mod tests {
     fn maps_every_supported_main_part_kind_both_directions() {
         for (host, plain, macro_enabled) in [
             (
-                VbaPackageHost::Word,
+                Host::Word,
                 ct::WML_DOCUMENT_MAIN,
                 ct::WML_DOCUMENT_MACRO_MAIN,
             ),
             (
-                VbaPackageHost::Word,
+                Host::Word,
                 ct::WML_TEMPLATE_MAIN,
                 ct::WML_TEMPLATE_MACRO_MAIN,
             ),
+            (Host::Excel, ct::SML_SHEET_MAIN, ct::SML_SHEET_MACRO_MAIN),
             (
-                VbaPackageHost::Excel,
-                ct::SML_SHEET_MAIN,
-                ct::SML_SHEET_MACRO_MAIN,
-            ),
-            (
-                VbaPackageHost::Excel,
+                Host::Excel,
                 ct::SML_TEMPLATE_MAIN,
                 ct::SML_TEMPLATE_MACRO_MAIN,
             ),
             (
-                VbaPackageHost::PowerPoint,
+                Host::PowerPoint,
                 ct::PML_PRESENTATION_MAIN,
                 ct::PML_PRES_MACRO_MAIN,
             ),
             (
-                VbaPackageHost::PowerPoint,
+                Host::PowerPoint,
                 ct::PML_SLIDESHOW_MAIN,
                 ct::PML_SLIDESHOW_MACRO_MAIN,
             ),
             (
-                VbaPackageHost::PowerPoint,
+                Host::PowerPoint,
                 ct::PML_TEMPLATE_MAIN,
                 ct::PML_TEMPLATE_MACRO_MAIN,
             ),
@@ -585,10 +585,10 @@ mod tests {
             );
 
             assert!(
-                store_vba_project_graph(
+                store_project_graph(
                     &mut package,
                     &source_name,
-                    VbaPackageHost::Word,
+                    Host::Word,
                     Arc::new(b"validated payload".to_vec()),
                     Some(b"<wne:vbaSuppData/>".to_vec()),
                 )
@@ -631,9 +631,7 @@ mod tests {
             .unwrap();
         let before_parts = package.part_count();
 
-        assert!(
-            remove_vba_project_graph(&mut package, &source_name, VbaPackageHost::Excel).is_err()
-        );
+        assert!(remove_project_graph(&mut package, &source_name, Host::Excel).is_err());
 
         assert_eq!(package.part_count(), before_parts);
         assert!(package.get_part(&project_name).is_ok());
