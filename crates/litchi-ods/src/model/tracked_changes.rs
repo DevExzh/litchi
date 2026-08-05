@@ -20,7 +20,7 @@ const MAX_AGGREGATE_BYTES: usize = 16 * 1_048_576;
 
 /// Whether a recorded spreadsheet change is pending, accepted, or rejected.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum ChangeAcceptance {
+pub enum Acceptance {
     Accepted,
     Rejected,
     #[default]
@@ -29,7 +29,7 @@ pub enum ChangeAcceptance {
 
 /// The structural unit affected by a row, column, or table insertion/deletion.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ChangeDimension {
+pub enum Dimension {
     Row,
     Column,
     Table,
@@ -37,7 +37,7 @@ pub enum ChangeDimension {
 
 /// Author, date, and comments stored for one change.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct ChangeInfo {
+pub struct Info {
     pub creator: Option<String>,
     pub date: Option<String>,
     pub comments: Vec<String>,
@@ -113,9 +113,9 @@ pub enum CutOff {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Metadata {
     pub id: String,
-    pub acceptance: ChangeAcceptance,
+    pub acceptance: Acceptance,
     pub rejecting_change_id: Option<String>,
-    pub info: ChangeInfo,
+    pub info: Info,
     pub dependencies: Vec<String>,
     pub deletions: Vec<NestedDeletion>,
 }
@@ -124,7 +124,7 @@ pub struct Metadata {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Insertion {
     pub metadata: Metadata,
-    pub dimension: ChangeDimension,
+    pub dimension: Dimension,
     pub position: i64,
     pub count: NonZeroUsize,
     pub table: Option<i64>,
@@ -134,7 +134,7 @@ pub struct Insertion {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Deletion {
     pub metadata: Metadata,
-    pub dimension: ChangeDimension,
+    pub dimension: Dimension,
     pub position: i64,
     pub table: Option<i64>,
     pub multi_deletion_spanned: Option<i64>,
@@ -689,7 +689,7 @@ fn parse_metadata(node: &Node) -> Result<Metadata> {
     })
 }
 
-fn parse_change_info(node: &Node) -> Result<ChangeInfo> {
+fn parse_change_info(node: &Node) -> Result<Info> {
     reject_attributes(node, &[])?;
     require_whitespace(node)?;
     let creator = optional_child(node, Namespace::Dc, "creator")?
@@ -709,7 +709,7 @@ fn parse_change_info(node: &Node) -> Result<ChangeInfo> {
             reject_known_child(child, "office:change-info")?;
         }
     }
-    Ok(ChangeInfo {
+    Ok(Info {
         creator,
         date,
         comments,
@@ -1403,9 +1403,9 @@ fn write_common_tracked_attributes(output: &mut String, metadata: &Metadata) {
         output,
         "table:acceptance-state",
         match metadata.acceptance {
-            ChangeAcceptance::Accepted => "accepted",
-            ChangeAcceptance::Rejected => "rejected",
-            ChangeAcceptance::Pending => "pending",
+            Acceptance::Accepted => "accepted",
+            Acceptance::Rejected => "rejected",
+            Acceptance::Pending => "pending",
         },
     );
     if let Some(id) = &metadata.rejecting_change_id {
@@ -1597,11 +1597,11 @@ fn write_tracked_value(output: &mut String, value_type: &str, name: &str, value:
     push_tracked_attr(output, name, value);
 }
 
-fn tracked_dimension(value: ChangeDimension) -> &'static str {
+fn tracked_dimension(value: Dimension) -> &'static str {
     match value {
-        ChangeDimension::Row => "row",
-        ChangeDimension::Column => "column",
-        ChangeDimension::Table => "table",
+        Dimension::Row => "row",
+        Dimension::Column => "column",
+        Dimension::Table => "table",
     }
 }
 
@@ -1659,22 +1659,22 @@ fn common_attributes(extra: &[&'static str]) -> Vec<(Namespace, &'static str)> {
     attributes
 }
 
-fn parse_acceptance(value: &str) -> Result<ChangeAcceptance> {
+fn parse_acceptance(value: &str) -> Result<Acceptance> {
     match value {
-        "accepted" => Ok(ChangeAcceptance::Accepted),
-        "rejected" => Ok(ChangeAcceptance::Rejected),
-        "pending" => Ok(ChangeAcceptance::Pending),
+        "accepted" => Ok(Acceptance::Accepted),
+        "rejected" => Ok(Acceptance::Rejected),
+        "pending" => Ok(Acceptance::Pending),
         _ => Err(Error::InvalidFormat(format!(
             "invalid table:acceptance-state '{value}'"
         ))),
     }
 }
 
-fn parse_dimension(value: &str) -> Result<ChangeDimension> {
+fn parse_dimension(value: &str) -> Result<Dimension> {
     match value {
-        "row" => Ok(ChangeDimension::Row),
-        "column" => Ok(ChangeDimension::Column),
-        "table" => Ok(ChangeDimension::Table),
+        "row" => Ok(Dimension::Row),
+        "column" => Ok(Dimension::Column),
+        "table" => Ok(Dimension::Table),
         _ => Err(Error::InvalidFormat(format!(
             "invalid tracked-change table:type '{value}'"
         ))),
@@ -2017,7 +2017,7 @@ mod tests {
         let Change::CellContent(change) = &tracked.changes[3] else {
             panic!("expected cell change")
         };
-        assert_eq!(change.metadata.acceptance, ChangeAcceptance::Accepted);
+        assert_eq!(change.metadata.acceptance, Acceptance::Accepted);
         assert_eq!(change.metadata.info.comments, ["A & B"]);
         assert_eq!(change.previous.value, CellValue::Text("old".into()));
     }
