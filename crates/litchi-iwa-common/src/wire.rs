@@ -59,6 +59,126 @@ impl WireField {
     pub const fn end(self) -> usize {
         self.end
     }
+
+    /// Return this field's payload through checked slice boundaries.
+    ///
+    /// For a length-delimited field, the returned slice excludes the encoded
+    /// length prefix. For the other supported wire types, it contains the
+    /// complete encoded scalar payload. This method validates the offsets
+    /// against `data` but intentionally does not require canonical varints;
+    /// callers handling opaque fields can therefore continue to preserve
+    /// their original representation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when this field's recorded offsets are inconsistent
+    /// or do not fit within `data`.
+    pub fn checked_payload(self, data: &[u8]) -> Result<&[u8]> {
+        if self.start > self.key_end
+            || self.key_end > self.payload_start
+            || self.payload_start > self.end
+        {
+            return Err(Error::InvalidFormat(format!(
+                "protobuf field {} has invalid byte offsets",
+                self.number
+            )));
+        }
+        data.get(self.payload_start..self.end).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "protobuf field {} extends beyond the supplied data",
+                self.number
+            ))
+        })
+    }
+
+    /// Require the encoded field key to use its canonical varint form.
+    ///
+    /// The parser remains permissive so unknown fields can be retained
+    /// byte-for-byte. Use this method when a schema-recognized field is about
+    /// to be interpreted or rewritten.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the field offsets are invalid, the key is
+    /// malformed, or the key uses an overlong varint representation.
+    pub fn validate_canonical_key(self, data: &[u8]) -> Result<()> {
+        let key = checked_wire_range(data, self.start, self.key_end, "field key")?;
+        let (encoded_key, key_length) =
+            crate::varint::decode_varint_from_bytes(key).map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "invalid protobuf key for field {}: {error}",
+                    self.number
+                ))
+            })?;
+        let expected_key = (u64::from(self.number) << 3) | u64::from(self.wire_type);
+        if encoded_key != expected_key
+            || key_length != key.len()
+            || key_length != crate::varint::encoded_len(expected_key)
+        {
+            return Err(Error::InvalidFormat(format!(
+                "protobuf field {} has a noncanonical key",
+                self.number
+            )));
+        }
+        Ok(())
+    }
+
+    /// Require a length-delimited field's length prefix to be canonical.
+    ///
+    /// This validates both the prefix encoding and its correspondence with
+    /// the checked payload range. It does not validate the field key; callers
+    /// that need both invariants should call [`Self::validate_canonical_key`]
+    /// as well.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the field is not length-delimited, its offsets
+    /// are invalid, or its length prefix is malformed, overlong, or does not
+    /// describe the payload range.
+    pub fn validate_canonical_length(self, data: &[u8]) -> Result<()> {
+        if self.wire_type != 2 {
+            return Err(Error::InvalidFormat(format!(
+                "protobuf field {} is not length-delimited",
+                self.number
+            )));
+        }
+        let payload = self.checked_payload(data)?;
+        let length_prefix =
+            checked_wire_range(data, self.key_end, self.payload_start, "length prefix")?;
+        let (encoded_length, prefix_length) =
+            crate::varint::decode_varint_from_bytes(length_prefix).map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "invalid protobuf length for field {}: {error}",
+                    self.number
+                ))
+            })?;
+        let expected_length = u64::try_from(payload.len()).map_err(|_conversion| {
+            Error::InvalidFormat("protobuf payload length exceeds u64".to_owned())
+        })?;
+        if encoded_length != expected_length
+            || prefix_length != length_prefix.len()
+            || prefix_length != crate::varint::encoded_len(expected_length)
+        {
+            return Err(Error::InvalidFormat(format!(
+                "protobuf field {} has a noncanonical length prefix",
+                self.number
+            )));
+        }
+        Ok(())
+    }
+}
+
+fn checked_wire_range<'a>(
+    data: &'a [u8],
+    start: usize,
+    end: usize,
+    name: &str,
+) -> Result<&'a [u8]> {
+    data.get(start..end).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "protobuf {name} range {start}..{end} is outside the supplied data"
+        ))
+    })
 }
 
 pub fn parse_wire_fields(data: &[u8]) -> Result<Vec<WireField>> {
@@ -1795,6 +1915,71 @@ mod tests {
         assert_eq!(field.key_end(), 1);
         assert_eq!(field.payload_start(), 1);
         assert_eq!(field.end(), data.len());
+    }
+
+    #[test]
+    fn wire_field_helpers_validate_canonical_framing_without_tightening_parser() {
+        let overlong_key = [0x88, 0x00, 0x07];
+        let key_field = parse_wire_fields(&overlong_key).unwrap().pop().unwrap();
+        assert_eq!(key_field.checked_payload(&overlong_key).unwrap(), [0x07]);
+        assert!(key_field.validate_canonical_key(&overlong_key).is_err());
+        assert!(
+            key_field
+                .validate_canonical_key(&overlong_key[..2])
+                .is_err()
+        );
+
+        let canonical_key = varint_field(1, 7);
+        let canonical_key_field = parse_wire_fields(&canonical_key).unwrap().pop().unwrap();
+        canonical_key_field
+            .validate_canonical_key(&canonical_key)
+            .unwrap();
+        assert!(
+            canonical_key_field
+                .validate_canonical_length(&canonical_key)
+                .is_err()
+        );
+
+        let fixed32 = [0x1d, 0x78, 0x56, 0x34, 0x12];
+        let fixed32_field = parse_wire_fields(&fixed32).unwrap().pop().unwrap();
+        assert_eq!(
+            fixed32_field.checked_payload(&fixed32).unwrap(),
+            &fixed32[1..]
+        );
+
+        let fixed64 = [0x09, 0xef, 0xcd, 0xab, 0x89, 0x67, 0x45, 0x23, 0x01];
+        let fixed64_field = parse_wire_fields(&fixed64).unwrap().pop().unwrap();
+        assert_eq!(
+            fixed64_field.checked_payload(&fixed64).unwrap(),
+            &fixed64[1..]
+        );
+
+        let overlong_length = [0x0a, 0x81, 0x00, b'x'];
+        let length_field = parse_wire_fields(&overlong_length).unwrap().pop().unwrap();
+        assert_eq!(
+            length_field.checked_payload(&overlong_length).unwrap(),
+            b"x"
+        );
+        length_field
+            .validate_canonical_key(&overlong_length)
+            .unwrap();
+        assert!(
+            length_field
+                .validate_canonical_length(&overlong_length)
+                .is_err()
+        );
+
+        let canonical_length = [0x0a, 0x01, b'x'];
+        let canonical_length_field = parse_wire_fields(&canonical_length).unwrap().pop().unwrap();
+        canonical_length_field
+            .validate_canonical_key(&canonical_length)
+            .unwrap();
+        canonical_length_field
+            .validate_canonical_length(&canonical_length)
+            .unwrap();
+
+        assert!(length_field.checked_payload(&overlong_length[..3]).is_err());
+        assert!(canonical_key_field.checked_payload(&[]).is_err());
     }
 
     #[test]
