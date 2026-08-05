@@ -18,10 +18,11 @@ use crate::text::{
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStyleId,
     ParagraphStyleName, ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition,
     ParagraphTabStop, ParagraphTabStops, ParagraphWritingDirection, TextBackground,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumns,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing,
     TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow,
     TextStrikethrough, TextStyle, TextUnderline,
 };
+use litchi_iwa_text::columns::{Columns, Count};
 
 const SOURCE_PAGES_OBJECT_TITLE_STYLE_ID: u64 = 121;
 
@@ -4028,7 +4029,7 @@ fn pages_paragraph_overrides_compose_and_reset_independently() {
             },
         )
         .unwrap();
-    let columns = TextColumns::equal(TextColumnCount::new(2).unwrap(), None);
+    let columns = Columns::equal(Count::new(2).unwrap(), None);
     editor
         .set_text_box_columns(first.drawable_object_id, &columns)
         .unwrap();

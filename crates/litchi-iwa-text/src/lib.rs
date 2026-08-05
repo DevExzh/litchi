@@ -8,6 +8,7 @@
 #![forbid(unsafe_code)]
 
 pub mod character;
+pub mod columns;
 pub mod font;
 pub mod paragraph;
 

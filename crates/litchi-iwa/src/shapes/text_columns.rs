@@ -9,9 +9,9 @@ use crate::package_metadata::{
     next_object_identifier, set_package_last_object_identifier,
 };
 use crate::protobuf::tswp;
-use crate::text::TextColumns;
 use crate::text::columns::{from_native, to_native};
 use crate::{Error, IWorkPackage, Result};
+use litchi_iwa_text::columns::Columns;
 
 use super::line_end::{
     ShapeStyleOverrides, ShapeStyleVariationLocation, collapse_style_variation,
@@ -26,7 +26,7 @@ pub(crate) fn shape_text_columns(
     package: &IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
-) -> Result<TextColumns> {
+) -> Result<Columns> {
     let style_id = shape_payload(package, archive_name, drawable_id)?
         .super_
         .style
@@ -40,7 +40,7 @@ pub(crate) fn set_shape_text_columns(
     mut package: IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
-    columns: &TextColumns,
+    columns: &Columns,
 ) -> Result<IWorkPackage> {
     if &shape_text_columns(&package, archive_name, drawable_id)? == columns {
         return Ok(package);
@@ -151,14 +151,14 @@ pub(crate) fn reset_shape_text_columns(
     Ok((package, true))
 }
 
-fn columns_overrides(columns: &TextColumns) -> ShapeStyleOverrides {
+fn columns_overrides(columns: &Columns) -> ShapeStyleOverrides {
     ShapeStyleOverrides {
         columns: Some(to_native(columns)),
         ..Default::default()
     }
 }
 
-fn apply_columns(overrides: &mut ShapeStyleOverrides, columns: &TextColumns) {
+fn apply_columns(overrides: &mut ShapeStyleOverrides, columns: &Columns) {
     overrides.columns_null = None;
     overrides.columns = Some(to_native(columns));
 }
@@ -180,7 +180,7 @@ fn insert_columns_variation(
     mut package: IWorkPackage,
     location: ColumnsVariationLocation<'_>,
     overrides: ShapeStyleOverrides,
-    expected: &TextColumns,
+    expected: &Columns,
 ) -> Result<IWorkPackage> {
     let new_style_id = next_object_identifier(&package)?;
     let new_style = shape_style_variation_object(
@@ -230,12 +230,12 @@ fn insert_columns_variation(
     Ok(package)
 }
 
-fn inherited_columns(package: &IWorkPackage, first_style_id: u64) -> Result<TextColumns> {
+fn inherited_columns(package: &IWorkPackage, first_style_id: u64) -> Result<Columns> {
     let mut visited = HashSet::new();
     let mut style_id = Some(first_style_id);
     for _ in 0..MAX_STYLE_INHERITANCE_DEPTH {
         let Some(identifier) = style_id else {
-            return Ok(TextColumns::default());
+            return Ok(Columns::default());
         };
         if !visited.insert(identifier) {
             return Err(Error::InvalidFormat(format!(
@@ -260,9 +260,9 @@ fn inherited_columns(package: &IWorkPackage, first_style_id: u64) -> Result<Text
     )))
 }
 
-fn direct_columns(properties: &tswp::ShapeStylePropertiesArchive) -> Result<Option<TextColumns>> {
+fn direct_columns(properties: &tswp::ShapeStylePropertiesArchive) -> Result<Option<Columns>> {
     match (properties.columns_null, properties.columns.as_ref()) {
-        (Some(true), None) => Ok(Some(TextColumns::default())),
+        (Some(true), None) => Ok(Some(Columns::default())),
         (Some(true), Some(_)) => Err(Error::InvalidFormat(
             "iWork shape text columns are both null and populated".into(),
         )),
@@ -315,7 +315,7 @@ fn validate_columns(
     package: &IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
-    expected: &TextColumns,
+    expected: &Columns,
 ) -> Result<()> {
     if &shape_text_columns(package, archive_name, drawable_id)? != expected {
         return Err(Error::InvalidFormat(
@@ -328,11 +328,11 @@ fn validate_columns(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_iwa_text::columns::{Count, Gap};
     use crate::keynote::KeynoteEditor;
     use crate::numbers::NumbersEditor;
     use crate::pages::PagesEditor;
     use crate::shapes::{DrawablePoint, DrawableSize};
-    use crate::text::{TextColumnCount, TextColumnGap};
 
     const POSITION: DrawablePoint = DrawablePoint { x: 96.0, y: 120.0 };
     const SIZE: DrawableSize = DrawableSize {
@@ -354,11 +354,11 @@ mod tests {
 
     #[test]
     fn scratch_suite_text_boxes_support_column_crud() {
-        let two = TextColumns::equal(
-            TextColumnCount::new(2).unwrap(),
-            Some(TextColumnGap::from_points(12.0).unwrap()),
+        let two = Columns::equal(
+            Count::new(2).unwrap(),
+            Some(Gap::from_points(12.0).unwrap()),
         );
-        let three = TextColumns::equal(TextColumnCount::new(3).unwrap(), None);
+        let three = Columns::equal(Count::new(3).unwrap(), None);
 
         let mut pages = PagesEditor::create_with_text("Body").unwrap();
         let pages_box = pages
@@ -386,7 +386,7 @@ mod tests {
             pages
                 .text_box_columns(pages_box.drawable_object_id)
                 .unwrap(),
-            TextColumns::default()
+            Columns::default()
         );
         assert!(
             !pages

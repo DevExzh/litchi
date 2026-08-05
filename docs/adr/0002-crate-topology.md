@@ -154,6 +154,14 @@ native archive adapters. `Name` stores one boxed UTF-8 identifier, validates
 before allocating borrowed input, and consumes owned `String` input directly.
 The leaf therefore remains archive-free while Pages, Numbers, and Keynote use
 one canonical font model instead of maintaining format-local copies.
+The shared text-frame column vocabulary now follows the same boundary at
+`litchi-iwa-text::columns::{Columns, Count, Gap, Width, Equal, Following,
+Variable}`. The leaf owns only the bounded, archive-free equal/variable layout
+and its typed validation error; variable layouts use one boxed following-column
+slice. `litchi-iwa` retains `ColumnsArchive` decoding, native presence checks,
+protobuf construction, and format-specific error mapping in its private text
+adapter. The former flat `TextColumn*` definitions and facade reexports are
+removed rather than retained as compatibility aliases.
 The common color leaf now owns `color::{RgbColorSpace, Rgba}` and its typed
 `color::Error`; native protobuf conversion remains in the IWA shape adapter.
 `Rgba` is a fixed-size, copyable value that validates all four finite channels

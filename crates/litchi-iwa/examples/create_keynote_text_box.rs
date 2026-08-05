@@ -5,6 +5,7 @@ use std::env;
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Pattern, RgbColorSpace, RgbaColor, Width};
 use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
+use litchi_iwa_text::columns::{Columns, Count};
 use litchi_iwa::text::{
     DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
     DropCapWrap, ParagraphBackground, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
@@ -14,7 +15,7 @@ use litchi_iwa::text::{
     ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart, ParagraphStyleName,
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
     ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumns, TextCommentBody,
+    TextCapitalization, TextCharacterSpacing, TextCommentBody,
     TextCommentReplyBody, TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage,
     TextLigatures, TextOutline, TextPointSize, TextPosition, TextRange, TextScript, TextShadow,
     TextStrikethrough, TextStyle, TextUnderline,
@@ -49,7 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_text_box_columns(
         0,
         created.drawable_object_id,
-        &TextColumns::equal(TextColumnCount::new(4)?, None),
+        &Columns::equal(Count::new(4)?, None),
     )?;
     editor.set_slide_text_box_text_layout(
         0,

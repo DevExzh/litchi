@@ -6197,6 +6197,22 @@ library suite, and strict no-dependency Clippy passed after the adapter
 conversion; no native application claim is made for this ownership-only
 change.
 
+The shared text-column ownership slice is complete. The archive-free
+`litchi-iwa-text::columns` module now owns the focused `Columns`, `Count`,
+`Gap`, `Width`, `Equal`, `Following`, and `Variable` values, with typed finite
+validation, a 256-column budget, canonical negative-zero rejection, and one
+boxed allocation for variable following columns. The IWA adapter retains only
+`ColumnsArchive` decoding/encoding and native malformed-state mapping; Pages,
+Numbers, Keynote, shape-style tests, and all three text-box creation examples
+consume the leaf directly. The former flat `TextColumn*` owners and facade
+reexports are gone. This structural slice is verified by the focused leaf and
+library/example checks, strict no-dependency Clippy, and the crate-boundary
+checks; the IWA library test target currently cannot compile because an
+unrelated pre-existing Numbers conditional-highlighting test passes the old
+`TableCellCheckboxFormat` to the new `Checkbox` API, so that file was left
+untouched. No additional native iWork claim is made because serialized column
+semantics are unchanged.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

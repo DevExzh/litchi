@@ -65,7 +65,7 @@ use crate::text::{
     ParagraphListNumberScale, ParagraphListNumberTiering, ParagraphListNumbering,
     ParagraphListPlacement, ParagraphSpacing, ParagraphStart, ParagraphTabStops,
     ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextColumns, TextComment, TextCommentBody,
+    TextCapitalization, TextCharacterSpacing, TextComment, TextCommentBody,
     TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
     TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
     TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,

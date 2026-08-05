@@ -5,6 +5,7 @@ use std::env;
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Pattern, RgbColorSpace, RgbaColor, Width};
 use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
+use litchi_iwa_text::columns::{Columns, Count, Gap};
 use litchi_iwa::text::{
     DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
     ParagraphBackground, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
@@ -14,7 +15,7 @@ use litchi_iwa::text::{
     ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart, ParagraphStyleName,
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
     ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumnGap, TextColumns,
+    TextCapitalization, TextCharacterSpacing,
     TextCommentBody, TextCommentReplyBody, TextDecorations, TextFont, TextHyperlinkTarget,
     TextLanguage, TextLigatures, TextOutline, TextPointSize, TextPosition, TextRange, TextScript,
     TextShadow, TextStrikethrough, TextStyle, TextUnderline,
@@ -49,9 +50,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_sheet_text_box_columns(
         sheet_id,
         created.drawable_object_id,
-        &TextColumns::equal(
-            TextColumnCount::new(3)?,
-            Some(TextColumnGap::from_points(12.0)?),
+        &Columns::equal(
+            Count::new(3)?,
+            Some(Gap::from_points(12.0)?),
         ),
     )?;
     editor.set_sheet_text_box_text_layout(

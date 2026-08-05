@@ -11,6 +11,7 @@ use litchi_pages::footnote::{
 };
 use litchi_pages::page_layout::{Layout as PageLayout, Orientation as PageOrientation};
 use litchi_pages::section::{Background, Opaque, PageNumber, PageNumbering, Settings, Start};
+use litchi_iwa_text::columns::Columns;
 use prost::Message;
 use litchi_iwa_common::comment::{DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId};
 
@@ -44,7 +45,7 @@ use crate::text::{
     ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberScale,
     ParagraphListNumberTiering, ParagraphListNumbering, ParagraphSpacing, ParagraphStart,
     ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextColumns, TextComment, TextCommentBody,
+    TextCapitalization, TextCharacterSpacing, TextComment, TextCommentBody,
     TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
     TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
     TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
@@ -334,7 +335,7 @@ impl PagesEditor {
     }
 
     /// Read the uniform column layout of a reachable ordinary text box.
-    pub fn text_box_columns(&self, drawable_object_id: u64) -> Result<TextColumns> {
+    pub fn text_box_columns(&self, drawable_object_id: u64) -> Result<Columns> {
         self.text_box_graph(drawable_object_id)?;
         let archive_name = find_object_archive(self.package(), drawable_object_id)?;
         shape_text_columns(self.package(), &archive_name, drawable_object_id)
@@ -344,7 +345,7 @@ impl PagesEditor {
     pub fn set_text_box_columns(
         &mut self,
         drawable_object_id: u64,
-        columns: &TextColumns,
+        columns: &Columns,
     ) -> Result<()> {
         self.text_box_graph(drawable_object_id)?;
         let archive_name = find_object_archive(self.package(), drawable_object_id)?;

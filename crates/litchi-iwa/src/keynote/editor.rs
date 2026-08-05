@@ -8,6 +8,7 @@ use std::rc::Rc;
 use litchi_iwa_common::comment::{
     DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId,
 };
+use litchi_iwa_text::columns::Columns;
 use prost::Message;
 
 use crate::archive::{Archive, ArchiveObject, RawMessage};
@@ -36,7 +37,7 @@ use crate::text::{
     ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumberFormat,
     ParagraphListNumberScale, ParagraphListNumberTiering, ParagraphListNumbering, ParagraphSpacing,
     ParagraphStart, ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextComment,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextComment,
     TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId,
     TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId,
     TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition,
@@ -1439,7 +1440,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<TextColumns> {
+    ) -> Result<Columns> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         shape_text_columns(self.package(), &graph.archive_name, drawable_object_id)
     }
@@ -1449,7 +1450,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        columns: &TextColumns,
+        columns: &Columns,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let staged = set_shape_text_columns(

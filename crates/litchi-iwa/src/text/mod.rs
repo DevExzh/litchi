@@ -68,10 +68,6 @@ mod text_comment_tests;
 pub use bookmark_types::{
     TextBookmark, TextBookmarkId, TextBookmarkName, TextBookmarkSettings, TextBookmarkVisibility,
 };
-pub use columns::{
-    EqualTextColumns, FollowingTextColumn, TextColumnCount, TextColumnGap, TextColumnWidth,
-    TextColumns, VariableTextColumns,
-};
 pub use date_time_types::{
     TextDateTimeDisplayText, TextDateTimeField, TextDateTimeFieldId, TextDateTimeFieldSettings,
     TextDateTimeFormat, TextDateTimeFormatterStyle, TextDateTimeInstant,

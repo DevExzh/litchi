@@ -81,6 +81,17 @@ allocation-bearing model or publish a flat `TextFontName` implementation in
 each application owner. `Name` validates before allocating borrowed input and
 stores exactly one boxed identifier; no unchecked font-name constructor exists.
 
+Text-frame columns use the adjacent focused
+`litchi_iwa_text::columns::{Columns, Count, Gap, Width, Equal, Following,
+Variable}` module. `Count` rejects zero and values above the explicit 256-column
+budget, gaps reject non-finite and negative (including negative-zero) values,
+and widths reject non-finite or non-positive values. `Variable` requires at
+least two columns and stores the following widths and gaps in one bounded boxed
+slice. Native `ColumnsArchive` presence, protobuf conversion, and package
+mutation remain in `litchi-iwa`; no archive type or facade-wide error enters
+the semantic leaf, and the former `TextColumn*` names are removed rather than
+aliased.
+
 Pages document state follows the same raw/semantic split:
 `litchi_pages::document::{Root, Body, Document}` owns an immutable, bounded
 semantic snapshot, while `litchi-iwa` decodes native root and body payloads

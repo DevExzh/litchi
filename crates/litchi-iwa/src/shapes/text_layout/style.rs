@@ -365,7 +365,7 @@ mod tests {
     use crate::numbers::NumbersEditor;
     use crate::pages::PagesEditor;
     use crate::shapes::{DrawablePoint, DrawableSize};
-    use crate::text::{TextColumnCount, TextColumns};
+    use litchi_iwa_text::columns::{Columns, Count};
     use litchi_iwa_common::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
 
     const POSITION: DrawablePoint = DrawablePoint { x: 96.0, y: 120.0 };
@@ -412,7 +412,7 @@ mod tests {
             Insets::uniform(inset),
             AutoSize::ShrinkToFit,
         );
-        let columns = TextColumns::equal(TextColumnCount::new(2).unwrap(), None);
+        let columns = Columns::equal(Count::new(2).unwrap(), None);
 
         let mut pages = PagesEditor::create_with_text("Body").unwrap();
         let pages_box = pages
