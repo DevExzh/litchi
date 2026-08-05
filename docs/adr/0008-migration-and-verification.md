@@ -4614,6 +4614,29 @@ mutation tests, formatting, and affected-crate compilation. A concurrent
 attempt to link every ODT integration target exhausted the generated build
 volume; this is an environment resource limit, not a source or test failure.
 
+## ODF inert drawing-resource inventory
+
+The ODF common boundary now also owns read-only inventory for resources that
+can be embedded by multiple document families. `litchi-odf-common::drawing`
+retains frame geometry and host placement metadata, while `embedded` and
+`media` provide bounded package/flat-document scanners with contextual
+`Object` and `Image` models. Their `Source` values distinguish inline data,
+package parts, links, and missing resources without interpreting host-specific
+mutation semantics. The package abstraction is the small `PackageLookup`
+trait, so common scanners do not depend on an ODT package implementation.
+
+ODT now exposes these common inventories through its ergonomic document
+facades. ODT-specific package placement, cleanup overlays, object paths,
+manifest mutation, and byte replacement remain in the ODT owner; ODS and the
+other ODF families can adopt the same scanners without inheriting ODT
+mechanics. No compatibility aliases or duplicated scanner model are kept,
+and authoring/mutation remains separate from this read-only inventory layer.
+
+The common ODF all-target suite (178 unit tests plus integration targets),
+ODT library suite (525 tests), boundary policy checks, formatting, and
+affected-crate compilation pass. This is a structural inventory extraction;
+it makes no new ODF conformance or native Office interoperability claim.
+
 ## Shared BIFF framing and legacy binary owner migration
 
 The legacy binary migration now has a neutral physical-record owner:
