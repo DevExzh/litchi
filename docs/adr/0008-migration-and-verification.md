@@ -4658,6 +4658,19 @@ retaining its own MIME and package facade.
 No duplicate helper bodies or compatibility aliases remain. The affected
 common, ODS, and ODG suites, formatting, and boundary checks pass.
 
+## ODF annotation vocabulary layering
+
+The shared `litchi-odf-common::annotation` module now exposes contextual
+vocabulary directly as `Annotation`, `Element`, `Node`, and `Builder`. The
+common annotation owns lossless mixed-content and typed metadata; ODT keeps
+position, host scanning, and package mutation in its annotation facade, while
+ODS consumers use the same neutral tree for rich cell content. The former
+`Annotation*` and `CellAnnotation` names were removed without compatibility
+aliases.
+
+The common all-target suite (182 unit tests plus integration targets), ODT
+library suite (525 tests), formatting, and boundary checks pass.
+
 ## Shared BIFF framing and legacy binary owner migration
 
 The legacy binary migration now has a neutral physical-record owner:
