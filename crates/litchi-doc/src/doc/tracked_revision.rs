@@ -10,7 +10,7 @@ use crate::doc::parts::fkp::{ChpxFkp, PapxFkp, ParagraphHeight};
 use crate::doc::writer::ChpxFkpBuilder;
 use crate::sprm::parse_sprms;
 use crate::sprm_operations::*;
-use litchi_ole_common::object::{Editor as ObjectEditor, Format as ObjectFormat};
+use litchi_ole_common::object::{Editor as ObjectEditor, Targets};
 use std::collections::{BTreeSet, HashMap};
 
 pub use litchi_ole_common::object::Limits;
@@ -149,7 +149,7 @@ pub struct DocTrackedRevisionEditor {
 impl DocTrackedRevisionEditor {
     pub fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         let package =
-            ObjectEditor::open(bytes, ObjectFormat::Doc, limits).map_err(DocError::from)?;
+            ObjectEditor::open(bytes, Targets::default(), limits).map_err(DocError::from)?;
         let word_path = vec!["WordDocument".to_string()];
         let word = package
             .stream(&word_path)

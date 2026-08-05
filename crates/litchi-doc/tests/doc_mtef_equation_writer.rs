@@ -4,7 +4,7 @@ use litchi_doc::writer::{DocPicture, DocWriter};
 use litchi_doc::{
     DocEmbeddedObjectEditor, DocMtefEquationWriteOptions, EQUATION_3_CLSID, MtefEquation, Package,
 };
-use litchi_ole_common::object::{Editor, Format};
+use litchi_ole_common::object::{Editor, Limits as ObjectLimits, Target, Targets};
 use std::io::Cursor;
 
 const MINIMAL_MTEF_HEX: &str =
@@ -76,16 +76,21 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
     assert!(ole.exists(&["ObjectPool", "_314159", "\u{1}Ole"]));
     assert!(ole.exists(&["ObjectPool", "_314159", "\u{3}ObjInfo"]));
 
-    let objects = Editor::open(bytes.clone(), Format::Doc, Limits::default()).unwrap();
+    let target = Target::new("_314159", ["ObjectPool", "_314159"]).unwrap();
+    let objects =
+        Editor::open(bytes.clone(), Targets::one(target), ObjectLimits::default()).unwrap();
     let object = objects.objects().get("_314159").unwrap();
-    assert_eq!(object.storage_ref, Some(314_159));
-    assert_eq!(object.prog_id.as_deref(), Some("Equation.3"));
-    assert_eq!(object.metadata.as_ref().unwrap().clsid, storage.clsid);
+    assert_eq!(object.path(), ["ObjectPool", "_314159"]);
+    assert_eq!(object.storage().clsid(), Some(storage.clsid.as_str()));
+    assert_eq!(
+        object.stream(&["\u{3}ObjInfo"]),
+        Some(&[0x00, 0x82, 0x03, 0x00, 0x00, 0x00][..])
+    );
     let descriptor = Info::of(object).unwrap().unwrap();
     assert!(descriptor.recompose_on_resize);
     assert!(descriptor.view_object);
     assert_eq!(descriptor.clipboard_format, 3);
-    let mut nested = OleFile::open(Cursor::new(object.compound.clone())).unwrap();
+    let mut nested = OleFile::open(Cursor::new(object.compound())).unwrap();
     assert_eq!(
         nested.root_entry().unwrap().clsid,
         "0002CE02-0000-0000-C000-000000000046"
