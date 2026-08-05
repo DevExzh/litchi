@@ -241,6 +241,16 @@ lossless unknown-field patching, and the styled versus geometry-only series
 allocation boundary. Concrete Numbers, Pages, and Keynote APIs consume these
 short semantic values directly.
 
+Chart category-label settings use the focused
+`litchi_iwa_common::chart::category_labels::{Interval, Frequency, Layout}`
+module. `Interval` validates the explicit native range before construction;
+`Frequency` distinguishes hidden, automatic, all, and custom labels while
+retaining unknown signed native intervals losslessly; and `Layout` composes
+that frequency with final-category visibility. The IWA adapter owns native
+field mapping, strict int32/boolean validation, unknown-field-preserving wire
+patches, axis visibility, and package transactions. The old long semantic
+owners are removed rather than retained as aliases.
+
 Chart reference-line settings use the focused
 `litchi_iwa_common::chart::reference_line` module. `Value` rejects non-finite
 custom positions, `Kind` keeps known calculations distinct from checked

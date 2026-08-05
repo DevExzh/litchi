@@ -27,7 +27,7 @@ pub(crate) mod background_fill;
 pub(crate) mod bar_shape_3d;
 pub(crate) mod border;
 pub(crate) mod border_stroke;
-pub(crate) mod category_labels;
+pub mod category_labels;
 mod data;
 pub(crate) mod depth_3d;
 pub(crate) mod donut_inner_radius;
@@ -84,9 +84,6 @@ pub use archive::IWorkChartArchive;
 pub use arrangement::ChartArrangement;
 pub use axis_gridline_stroke::{ChartAxisGridline, ChartAxisGridlineStroke};
 pub use bar_shape_3d::Chart3dBarShape;
-pub use category_labels::{
-    ChartCategoryLabelFrequency, ChartCategoryLabelInterval, ChartCategoryLabelLayout,
-};
 pub use data::ChartData;
 pub use depth_3d::Chart3dDepth;
 pub use donut_inner_radius::ChartDonutInnerRadius;
@@ -158,6 +155,12 @@ impl From<litchi_iwa_common::chart::axis::label_angle::Error> for crate::Error {
 
 impl From<litchi_iwa_common::chart::axis::steps::Error> for crate::Error {
     fn from(error: litchi_iwa_common::chart::axis::steps::Error) -> Self {
+        Self::InvalidFormat(error.to_string())
+    }
+}
+
+impl From<litchi_iwa_common::chart::category_labels::Error> for crate::Error {
+    fn from(error: litchi_iwa_common::chart::category_labels::Error) -> Self {
         Self::InvalidFormat(error.to_string())
     }
 }

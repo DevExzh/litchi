@@ -285,6 +285,14 @@ future states losslessly. IWA retains the pie field identifiers, strict
 varint validation, series graph, stylesheet/object-container ownership, and
 transactional package mutation; the former `ChartPie*Visibility` names are
 removed rather than retained as aliases.
+Chart category-label semantics follow the focused
+`litchi-iwa-common::chart::category_labels::{Interval, Frequency, Layout}`
+module. The common values are heap-free and archive-free: `Interval` admits
+only explicit values from 2 through the native signed maximum, while
+`Frequency` retains canonical automatic/all modes and unknown signed native
+values losslessly. IWA retains interval field numbers, strict int32/boolean
+wire validation, axis visibility, style-slot ownership, and transactional
+package mutation; the former `ChartCategoryLabel*` owners are removed.
 Chart reference lines follow the same ownership boundary at
 `litchi-iwa-common::chart::reference_line::{Value, Kind, Line}`. `Value` is a
 finite transparent scalar; `Line` stores a bounded optional label and packs its

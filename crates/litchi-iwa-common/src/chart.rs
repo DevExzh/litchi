@@ -1,6 +1,7 @@
 //! Archive-free chart vocabulary shared by concrete iWork owners.
 
 pub mod axis;
+pub mod category_labels;
 pub mod direction;
 pub mod kind;
 pub mod number_format;

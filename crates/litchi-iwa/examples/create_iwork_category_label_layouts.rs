@@ -3,10 +3,8 @@
 use std::env;
 use std::path::Path;
 
-use litchi_iwa::charts::{
-    ChartCategoryLabelFrequency, ChartCategoryLabelInterval, ChartCategoryLabelLayout, ChartData,
-    Kind,
-};
+use litchi_iwa::charts::category_labels::{Frequency, Interval, Layout};
+use litchi_iwa::charts::{ChartData, Kind};
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::pages::PagesDocumentBuilder;
@@ -22,10 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let output = Path::new(&output);
     std::fs::create_dir_all(output)?;
-    let layout = ChartCategoryLabelLayout::new(
-        ChartCategoryLabelFrequency::Every(ChartCategoryLabelInterval::new(3)?),
-        false,
-    );
+    let layout = Layout::new(Frequency::Every(Interval::new(3)?), false);
 
     let mut numbers = NumbersDocumentBuilder::new()
         .sheet_name("Category Label Layout")

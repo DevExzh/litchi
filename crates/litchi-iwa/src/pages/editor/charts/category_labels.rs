@@ -1,18 +1,14 @@
 //! Native category-label layout CRUD for Pages body charts.
 
 use super::*;
-use crate::charts::ChartCategoryLabelLayout;
 use crate::charts::category_labels::{
-    chart_category_label_layout as read_native_category_label_layout,
+    Layout, chart_category_label_layout as read_native_category_label_layout,
     set_chart_category_label_layout as set_native_category_label_layout,
 };
 
 impl PagesEditor {
     /// Read the complete category-label menu state for one body chart.
-    pub fn body_chart_category_label_layout(
-        &self,
-        drawable_object_id: u64,
-    ) -> Result<ChartCategoryLabelLayout> {
+    pub fn body_chart_category_label_layout(&self, drawable_object_id: u64) -> Result<Layout> {
         body_chart_category_label_layout(self, drawable_object_id)
     }
 
@@ -20,7 +16,7 @@ impl PagesEditor {
     pub fn set_body_chart_category_label_layout(
         &mut self,
         drawable_object_id: u64,
-        layout: ChartCategoryLabelLayout,
+        layout: Layout,
     ) -> Result<()> {
         set_body_chart_category_label_layout(self, drawable_object_id, layout)
     }
@@ -29,7 +25,7 @@ impl PagesEditor {
 fn body_chart_category_label_layout(
     editor: &PagesEditor,
     drawable_object_id: u64,
-) -> Result<ChartCategoryLabelLayout> {
+) -> Result<Layout> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_category_label_layout(
         editor.package(),
@@ -42,7 +38,7 @@ fn body_chart_category_label_layout(
 fn set_body_chart_category_label_layout(
     editor: &mut PagesEditor,
     drawable_object_id: u64,
-    layout: ChartCategoryLabelLayout,
+    layout: Layout,
 ) -> Result<()> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let mut staged = editor.package().clone();
@@ -66,7 +62,8 @@ fn set_body_chart_category_label_layout(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::{ChartCategoryLabelFrequency, ChartCategoryLabelInterval, ChartData, Kind};
+    use crate::charts::category_labels::{Frequency, Interval};
+    use crate::charts::{ChartData, Kind};
     use crate::pages::PagesDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
@@ -91,11 +88,11 @@ mod tests {
             editor
                 .body_chart_category_label_layout(chart.drawable_object_id)
                 .unwrap(),
-            ChartCategoryLabelLayout::default()
+            Layout::default()
         );
         for layout in [
-            ChartCategoryLabelLayout::new(ChartCategoryLabelFrequency::None, true),
-            ChartCategoryLabelLayout::new(ChartCategoryLabelFrequency::All, true),
+            Layout::new(Frequency::None, true),
+            Layout::new(Frequency::All, true),
         ] {
             editor
                 .set_body_chart_category_label_layout(chart.drawable_object_id, layout)
@@ -107,10 +104,7 @@ mod tests {
                 layout
             );
         }
-        let customized = ChartCategoryLabelLayout::new(
-            ChartCategoryLabelFrequency::Every(ChartCategoryLabelInterval::new(3).unwrap()),
-            false,
-        );
+        let customized = Layout::new(Frequency::Every(Interval::new(3).unwrap()), false);
         editor
             .set_body_chart_category_label_layout(chart.drawable_object_id, customized)
             .unwrap();
@@ -122,10 +116,7 @@ mod tests {
             customized
         );
         reopened
-            .set_body_chart_category_label_layout(
-                chart.drawable_object_id,
-                ChartCategoryLabelLayout::default(),
-            )
+            .set_body_chart_category_label_layout(chart.drawable_object_id, Layout::default())
             .unwrap();
         assert_eq!(reopened.to_bytes().unwrap(), baseline);
     }
