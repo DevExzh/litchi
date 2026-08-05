@@ -18,7 +18,7 @@ use super::persist::PersistMapping;
 use super::records::PptRecord;
 use super::routing_slip::Slip;
 use super::slide::{ParsedComment, Slide, SlideDirectory, SlideFactory};
-use super::sound_collection::PowerPointSoundCollection;
+use super::sound_collection::Collection;
 use super::view_info::PowerPointSlideViewInformation;
 use crate::consts::PptRecordType;
 use litchi_cfb::OleFile;
@@ -405,7 +405,7 @@ impl Presentation {
     ///
     /// Sound bytes remain borrowed and inert. This method never decodes audio,
     /// invokes a codec, plays media, or resolves an external resource.
-    pub fn embedded_sounds(&self) -> Result<Option<PowerPointSoundCollection<'_>>> {
+    pub fn embedded_sounds(&self) -> Result<Option<Collection<'_>>> {
         let records = self.parser.find_records_ref();
         let mut documents = records
             .into_iter()
@@ -430,7 +430,7 @@ impl Presentation {
                 "PowerPoint document has multiple SoundCollection containers".to_string(),
             ));
         }
-        PowerPointSoundCollection::parse(collection).map(Some)
+        Collection::parse(collection).map(Some)
     }
 
     /// Validate every shape, text-range, and outline-text sound reference.

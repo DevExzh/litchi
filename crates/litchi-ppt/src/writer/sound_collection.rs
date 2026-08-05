@@ -299,7 +299,7 @@ fn build_sound_container(
     name: &str,
     extension: &str,
     ref_id: u32,
-    builtin_id: Option<crate::PowerPointBuiltinSoundId>,
+    builtin_id: Option<crate::sound_collection::BuiltinId>,
     sound_data: &[u8],
 ) -> Result<Vec<u8>, PptError> {
     let mut children = Vec::new();
@@ -355,8 +355,8 @@ fn audio_extension(data: &[u8]) -> Result<&'static str, PptError> {
     }
 }
 
-fn builtin_description_id(sound: BuiltinSound) -> Option<crate::PowerPointBuiltinSoundId> {
-    use crate::PowerPointBuiltinSoundId as Id;
+fn builtin_description_id(sound: BuiltinSound) -> Option<crate::sound_collection::BuiltinId> {
+    use crate::sound_collection::BuiltinId as Id;
     match sound {
         BuiltinSound::Applause => Some(Id::Applause),
         BuiltinSound::Arrow => Some(Id::Arrow),
@@ -460,7 +460,7 @@ mod tests {
         let (bytes, mapping) = builder.build().unwrap();
         let (record, consumed) = crate::PptRecord::parse(&bytes, 0).unwrap();
         assert_eq!(consumed, bytes.len());
-        let collection = crate::PowerPointSoundCollection::parse(&record).unwrap();
+        let collection = crate::sound_collection::Collection::parse(&record).unwrap();
         assert_eq!(collection.sounds[0].id, mapping[&42]);
         assert_eq!(collection.sounds[0].name, "Custom tone");
         assert_eq!(collection.sounds[0].extension.as_deref(), Some(".AIF"));

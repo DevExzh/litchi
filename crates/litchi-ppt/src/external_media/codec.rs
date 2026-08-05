@@ -8,7 +8,7 @@ use crate::consts::PptRecordType;
 use crate::hyperlink::Hyperlinks;
 use crate::package::{PptError, Result};
 use crate::records::PptRecord;
-use crate::sound_collection::PowerPointSoundCollection;
+use crate::sound_collection::Collection as SoundCollection;
 use std::collections::HashSet;
 
 pub(crate) const MEDIA_FLAGS_MASK: u16 = 0x0007;
@@ -240,7 +240,7 @@ impl EmbeddedWav {
         })
     }
 
-    pub fn validate_sound_collection(&self, sounds: &PowerPointSoundCollection<'_>) -> Result<()> {
+    pub fn validate_sound_collection(&self, sounds: &SoundCollection<'_>) -> Result<()> {
         if let Some(id) = self.sound_id
             && sounds.get(id).is_none()
         {
@@ -392,7 +392,7 @@ impl Collection {
     /// Validate every non-null embedded WAV reference without decoding sound data.
     pub fn validate_sound_collection(
         &self,
-        sounds: Option<&PowerPointSoundCollection<'_>>,
+        sounds: Option<&SoundCollection<'_>>,
     ) -> Result<()> {
         for object in &self.objects {
             let Object::EmbeddedWav(value) = object else {

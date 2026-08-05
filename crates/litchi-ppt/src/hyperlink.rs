@@ -464,15 +464,15 @@ impl Interaction {
     /// Resolve this action's embedded sound reference.
     pub fn sound<'collection, 'data>(
         &self,
-        sounds: &'collection crate::PowerPointSoundCollection<'data>,
-    ) -> Option<&'collection crate::EmbeddedPowerPointSound<'data>> {
+        sounds: &'collection crate::sound_collection::Collection<'data>,
+    ) -> Option<&'collection crate::sound_collection::Sound<'data>> {
         sounds.get(self.sound_id)
     }
 
     /// Validate this action's non-null sound reference.
     pub fn validate_sound_collection(
         &self,
-        sounds: &crate::PowerPointSoundCollection<'_>,
+        sounds: &crate::sound_collection::Collection<'_>,
     ) -> Result<()> {
         if self.sound_id != 0 && sounds.get(self.sound_id).is_none() {
             return corrupted(format!(

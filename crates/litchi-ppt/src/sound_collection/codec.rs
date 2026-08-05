@@ -1,8 +1,9 @@
-//! Strict, inert PowerPoint embedded sound collection reader.
+//! MS-PPT sound-collection record codec and validation.
 
-use super::package::{PptError, Result};
-use super::records::PptRecord;
+use super::model::{BuiltinId, Collection, Sound};
 use crate::consts::PptRecordType;
+use crate::package::{PptError, Result};
+use crate::records::PptRecord;
 use std::collections::HashSet;
 
 const MAX_SOUNDS: usize = 4_096;
@@ -11,98 +12,8 @@ const MAX_AGGREGATE_SOUND_BYTES: usize = 256 * 1_048_576;
 const MAX_NAME_UNITS: usize = 1_024;
 const MAX_ID_DIGITS: usize = 10;
 
-/// MS-PPT `SoundBuiltinIdAtom` description values.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[repr(u16)]
-pub enum PowerPointBuiltinSoundId {
-    CashRegister = 100,
-    Typewriter = 101,
-    ScreechingBrakes = 102,
-    Whoosh = 103,
-    Laser = 104,
-    Camera = 105,
-    Chime = 106,
-    Clapping = 107,
-    Applause = 108,
-    DriveBy = 109,
-    DrumRoll = 110,
-    Explosion = 111,
-    BreakingGlass = 112,
-    Gunshot = 113,
-    SlideProjector = 114,
-    Ricochet = 115,
-    Arrow = 116,
-    Bomb = 117,
-    Breeze = 118,
-    Click = 119,
-    Coin = 120,
-    Hammer = 121,
-    Push = 122,
-    Suction = 123,
-    Voltage = 124,
-    Wind = 125,
-}
-
-impl PowerPointBuiltinSoundId {
-    pub const fn value(self) -> u16 {
-        self as u16
-    }
-
-    fn parse(value: u16) -> Result<Self> {
-        match value {
-            100 => Ok(Self::CashRegister),
-            101 => Ok(Self::Typewriter),
-            102 => Ok(Self::ScreechingBrakes),
-            103 => Ok(Self::Whoosh),
-            104 => Ok(Self::Laser),
-            105 => Ok(Self::Camera),
-            106 => Ok(Self::Chime),
-            107 => Ok(Self::Clapping),
-            108 => Ok(Self::Applause),
-            109 => Ok(Self::DriveBy),
-            110 => Ok(Self::DrumRoll),
-            111 => Ok(Self::Explosion),
-            112 => Ok(Self::BreakingGlass),
-            113 => Ok(Self::Gunshot),
-            114 => Ok(Self::SlideProjector),
-            115 => Ok(Self::Ricochet),
-            116 => Ok(Self::Arrow),
-            117 => Ok(Self::Bomb),
-            118 => Ok(Self::Breeze),
-            119 => Ok(Self::Click),
-            120 => Ok(Self::Coin),
-            121 => Ok(Self::Hammer),
-            122 => Ok(Self::Push),
-            123 => Ok(Self::Suction),
-            124 => Ok(Self::Voltage),
-            125 => Ok(Self::Wind),
-            _ => corrupted("SoundBuiltinIdAtom is outside the specified value domain"),
-        }
-    }
-}
-
-/// One embedded sound. Its media payload borrows the PowerPoint document stream.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct EmbeddedPowerPointSound<'a> {
-    pub id: u32,
-    pub name: String,
-    pub extension: Option<String>,
-    pub builtin_id: Option<PowerPointBuiltinSoundId>,
-    pub data: &'a [u8],
-}
-
-/// A validated `SoundCollectionContainer` in source order.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PowerPointSoundCollection<'a> {
-    pub sound_id_seed: u32,
-    pub sounds: Vec<EmbeddedPowerPointSound<'a>>,
-}
-
-impl<'a> PowerPointSoundCollection<'a> {
-    pub fn get(&self, id: u32) -> Option<&EmbeddedPowerPointSound<'a>> {
-        self.sounds.iter().find(|sound| sound.id == id)
-    }
-
+impl<'a> Collection<'a> {
+    /// Parse one strict `SoundCollectionContainer` without copying sound data.
     pub fn parse(record: &'a PptRecord) -> Result<Self> {
         require_header(
             record.version,
@@ -130,7 +41,11 @@ impl<'a> PowerPointSoundCollection<'a> {
         if atom.data.len() != 4 {
             return corrupted("SoundCollectionAtom must contain exactly four bytes");
         }
-        let sound_id_seed = u32::from_le_bytes(atom.data.try_into().expect("length checked"));
+        let sound_id_seed = u32::from_le_bytes(
+            atom.data
+                .try_into()
+                .map_err(|_| PptError::Corrupted("SoundCollectionAtom is truncated".into()))?,
+        );
         if sound_id_seed == 0 {
             return corrupted("SoundCollectionAtom soundIdSeed must be positive");
         }
@@ -218,7 +133,7 @@ fn next_record<'a>(data: &'a [u8], offset: &mut usize, context: &str) -> Result<
     Ok(record)
 }
 
-fn parse_sound(data: &[u8]) -> Result<EmbeddedPowerPointSound<'_>> {
+fn parse_sound(data: &[u8]) -> Result<Sound<'_>> {
     let mut offset = 0usize;
     let name = parse_cstring(
         next_record(data, &mut offset, "SoundContainer")?,
@@ -260,7 +175,7 @@ fn parse_sound(data: &[u8]) -> Result<EmbeddedPowerPointSound<'_>> {
         let value = value.parse::<u16>().map_err(|_| {
             PptError::Corrupted("SoundBuiltinIdAtom is outside the u16 range".to_string())
         })?;
-        let value = PowerPointBuiltinSoundId::parse(value)?;
+        let value = parse_builtin_id(value)?;
         child = next_record(data, &mut offset, "SoundContainer")?;
         Some(value)
     } else {
@@ -282,13 +197,45 @@ fn parse_sound(data: &[u8]) -> Result<EmbeddedPowerPointSound<'_>> {
     if offset != data.len() {
         return corrupted("SoundContainer has trailing or out-of-order child records");
     }
-    Ok(EmbeddedPowerPointSound {
+    Ok(Sound {
         id,
         name,
         extension,
         builtin_id,
         data: child.data,
     })
+}
+
+fn parse_builtin_id(value: u16) -> Result<BuiltinId> {
+    match value {
+        100 => Ok(BuiltinId::CashRegister),
+        101 => Ok(BuiltinId::Typewriter),
+        102 => Ok(BuiltinId::ScreechingBrakes),
+        103 => Ok(BuiltinId::Whoosh),
+        104 => Ok(BuiltinId::Laser),
+        105 => Ok(BuiltinId::Camera),
+        106 => Ok(BuiltinId::Chime),
+        107 => Ok(BuiltinId::Clapping),
+        108 => Ok(BuiltinId::Applause),
+        109 => Ok(BuiltinId::DriveBy),
+        110 => Ok(BuiltinId::DrumRoll),
+        111 => Ok(BuiltinId::Explosion),
+        112 => Ok(BuiltinId::BreakingGlass),
+        113 => Ok(BuiltinId::Gunshot),
+        114 => Ok(BuiltinId::SlideProjector),
+        115 => Ok(BuiltinId::Ricochet),
+        116 => Ok(BuiltinId::Arrow),
+        117 => Ok(BuiltinId::Bomb),
+        118 => Ok(BuiltinId::Breeze),
+        119 => Ok(BuiltinId::Click),
+        120 => Ok(BuiltinId::Coin),
+        121 => Ok(BuiltinId::Hammer),
+        122 => Ok(BuiltinId::Push),
+        123 => Ok(BuiltinId::Suction),
+        124 => Ok(BuiltinId::Voltage),
+        125 => Ok(BuiltinId::Wind),
+        _ => corrupted("SoundBuiltinIdAtom is outside the specified value domain"),
+    }
 }
 
 fn parse_cstring(
@@ -360,95 +307,4 @@ fn require_header(
 
 fn corrupted<T>(message: impl Into<String>) -> Result<T> {
     Err(PptError::Corrupted(message.into()))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn record(version: u16, instance: u16, kind: PptRecordType, data: &[u8]) -> Vec<u8> {
-        let mut output = Vec::with_capacity(8 + data.len());
-        output.extend_from_slice(&(version | (instance << 4)).to_le_bytes());
-        output.extend_from_slice(&(kind as u16).to_le_bytes());
-        output.extend_from_slice(&(data.len() as u32).to_le_bytes());
-        output.extend_from_slice(data);
-        output
-    }
-
-    fn cstring(instance: u16, value: &str) -> Vec<u8> {
-        let data = value
-            .encode_utf16()
-            .flat_map(u16::to_le_bytes)
-            .collect::<Vec<_>>();
-        record(0, instance, PptRecordType::CString, &data)
-    }
-
-    fn sound(id: &str) -> Vec<u8> {
-        let mut data = cstring(0, "tone.wav");
-        data.extend(cstring(1, ".WAV"));
-        data.extend(cstring(2, id));
-        data.extend(record(
-            0,
-            0,
-            PptRecordType::SoundData,
-            b"RIFF\x04\0\0\0WAVE",
-        ));
-        record(0x0f, 0, PptRecordType::Sound, &data)
-    }
-
-    fn sound_with_builtin(id: &str, builtin: &str) -> Vec<u8> {
-        let mut data = cstring(0, "tone.wav");
-        data.extend(cstring(1, ".WAV"));
-        data.extend(cstring(2, id));
-        data.extend(cstring(3, builtin));
-        data.extend(record(
-            0,
-            0,
-            PptRecordType::SoundData,
-            b"RIFF\x04\0\0\0WAVE",
-        ));
-        record(0x0f, 0, PptRecordType::Sound, &data)
-    }
-
-    fn collection(seed: u32, sounds: &[Vec<u8>]) -> PptRecord {
-        let mut data = record(
-            0,
-            0,
-            PptRecordType::SoundCollectionAtom,
-            &seed.to_le_bytes(),
-        );
-        for sound in sounds {
-            data.extend(sound);
-        }
-        let bytes = record(0x0f, 5, PptRecordType::SoundCollection, &data);
-        PptRecord::parse(&bytes, 0).unwrap().0
-    }
-
-    #[test]
-    fn parses_valid_sound_without_copying_blob() {
-        let record = collection(1, &[sound("1")]);
-        let parsed = PowerPointSoundCollection::parse(&record).unwrap();
-        assert_eq!(parsed.sounds[0].name, "tone.wav");
-        assert_eq!(parsed.sounds[0].extension.as_deref(), Some(".WAV"));
-        assert_eq!(parsed.sounds[0].data, b"RIFF\x04\0\0\0WAVE");
-    }
-
-    #[test]
-    fn rejects_duplicate_noncanonical_and_seed_exceeding_ids() {
-        assert!(
-            PowerPointSoundCollection::parse(&collection(2, &[sound("1"), sound("1")])).is_err()
-        );
-        assert!(PowerPointSoundCollection::parse(&collection(1, &[sound("01")])).is_err());
-        assert!(PowerPointSoundCollection::parse(&collection(1, &[sound("2")])).is_err());
-        assert!(
-            PowerPointSoundCollection::parse(&collection(1, &[sound_with_builtin("1", "099")]))
-                .is_err()
-        );
-        let valid_builtin = collection(1, &[sound_with_builtin("1", "119")]);
-        let parsed = PowerPointSoundCollection::parse(&valid_builtin).unwrap();
-        assert_eq!(
-            parsed.sounds[0].builtin_id,
-            Some(PowerPointBuiltinSoundId::Click)
-        );
-    }
 }

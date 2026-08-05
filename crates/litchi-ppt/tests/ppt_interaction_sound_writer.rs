@@ -2,7 +2,7 @@ use litchi_ppt::animation::{AnimationInfo, AnimationSound, BuiltinSound};
 use litchi_ppt::writer::PptWriter;
 use litchi_ppt::{
     Interaction, InteractionAction, InteractionLinkTarget, InteractionTrigger, Package,
-    PowerPointBuiltinSoundId, PowerPointTextInteraction, PowerPointTextRange,
+    BuiltinId, PowerPointTextInteraction, PowerPointTextRange,
 };
 use std::{io::Cursor, num::NonZeroU32};
 
@@ -62,7 +62,7 @@ fn action_only_builtin_sounds_are_collected_remapped_and_repeatable() {
     assert_eq!(shape_sound.name, "Click");
     assert_eq!(
         shape_sound.builtin_id,
-        Some(PowerPointBuiltinSoundId::Click)
+        Some(BuiltinId::Click)
     );
     shape.validate_sound_collection(&sounds).unwrap();
 
@@ -71,7 +71,7 @@ fn action_only_builtin_sounds_are_collected_remapped_and_repeatable() {
     assert_eq!(text_sound.name, "Whoosh");
     assert_eq!(
         text_sound.builtin_id,
-        Some(PowerPointBuiltinSoundId::Whoosh)
+        Some(BuiltinId::Whoosh)
     );
     text.validate_sound_collection(&sounds).unwrap();
 }

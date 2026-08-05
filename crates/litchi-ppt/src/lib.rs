@@ -164,9 +164,7 @@ pub use slide::{
     ParsedComment, ParsedSlideTiming, Slide, SlideData, SlideDirectory, SlideDirectoryEntry,
     SlideFactory, SpeakerNotes,
 };
-pub use sound_collection::{
-    EmbeddedPowerPointSound, PowerPointBuiltinSoundId, PowerPointSoundCollection,
-};
+pub use sound_collection::{BuiltinId, Sound};
 pub use view_info::{
     PowerPointGuide, PowerPointGuideOrientation, PowerPointRatio, PowerPointSlideViewInfo,
     PowerPointSlideViewInformation, PowerPointSlideViewPreferences, PowerPointViewKind,
