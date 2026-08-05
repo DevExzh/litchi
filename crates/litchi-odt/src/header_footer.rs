@@ -8,9 +8,7 @@ use quick_xml::{
     reader::NsReader,
 };
 
-use super::header_footer_content::{
-    HeaderFooterBlock, MAX_EXPANDED_SPACES, parse_header_footer_blocks,
-};
+use super::header_footer_content::{Block, MAX_EXPANDED_SPACES, parse_header_footer_blocks};
 
 const STYLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
@@ -73,7 +71,7 @@ pub struct HeaderFooter {
     /// Best-effort visible literal text. Dynamic field values remain represented in `xml`.
     pub text: String,
     /// Ordered paragraphs/headings with explicit inline text, whitespace, and fields.
-    pub blocks: Vec<HeaderFooterBlock>,
+    pub blocks: Vec<Block>,
 }
 
 /// An ODF master page and all of its header/footer regions.
