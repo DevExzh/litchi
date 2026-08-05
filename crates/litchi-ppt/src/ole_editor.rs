@@ -1,8 +1,8 @@
 //! Transactional persisted-record rewrite for PowerPoint OLE objects.
 
 use super::PptError;
+use super::embedded::storage::Storage;
 use super::ole_object::{PowerPointOleExternalObject, PowerPointOleObjectCollection};
-use super::ole_storage::PowerPointOleStorage;
 use super::writer::{PersistPtrBuilder, UserEditAtom};
 use litchi_cfb::{OleFile, OleWriter};
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -168,7 +168,7 @@ impl PowerPointOlePackageEditor {
     pub fn add(
         &mut self,
         mut object: PowerPointOleExternalObject,
-        storage: PowerPointOleStorage,
+        storage: Storage,
     ) -> Result<u32> {
         let persist_id = self.next_persist_id()?;
         set_persist_id(&mut object, persist_id);
@@ -183,11 +183,7 @@ impl PowerPointOlePackageEditor {
         Ok(persist_id)
     }
 
-    pub fn replace_storage(
-        &mut self,
-        persist_id: u32,
-        storage: PowerPointOleStorage,
-    ) -> Result<()> {
+    pub fn replace_storage(&mut self, persist_id: u32, storage: Storage) -> Result<()> {
         if !self
             .collection
             .objects

@@ -11,12 +11,10 @@ use litchi_cfb::consts::STGTY_STREAM;
 use litchi_ograph::chart::{Book, Refs};
 use litchi_ograph::{Limits, Package as GraphPackage, PackageRef};
 
+use super::embedded::storage::{Compression, Kind as StorageKind, Storage};
 use super::ole_object::{
     PowerPointOleContainerKind, PowerPointOleExternalObject, PowerPointOleObjectCollection,
     PowerPointOleObjectSubtype,
-};
-use super::ole_storage::{
-    PowerPointOleStorage, PowerPointOleStorageCompression, PowerPointOleStorageKind,
 };
 use super::package::{PptError, Result};
 use super::presentation::Presentation;
@@ -311,20 +309,23 @@ fn program_base(program: &str) -> &str {
     }
 }
 
-fn decode(storage: PowerPointOleStorage, limits: Limits) -> Result<Vec<u8>> {
-    if storage.kind != PowerPointOleStorageKind::OleObject {
+fn decode(storage: Storage, limits: Limits) -> Result<Vec<u8>> {
+    if storage.kind() != StorageKind::OleObject {
         return corrupted("chart persist ID does not reference an OLE object storage");
     }
-    match storage.compression {
-        PowerPointOleStorageCompression::Uncompressed => {
+    match storage.compression() {
+        Compression::Uncompressed => {
             check_limit(
                 "chart package bytes",
-                storage.data.len(),
+                storage.stored_payload_len(),
                 limits.max_package_bytes,
             )?;
-            Ok(storage.data)
+            Ok(storage.into_stored_bytes())
         },
-        PowerPointOleStorageCompression::Zlib { uncompressed_len } => {
+        Compression::Zlib => {
+            let uncompressed_len = storage.declared_uncompressed_len().ok_or_else(|| {
+                PptError::Corrupted("compressed chart storage is missing its size".into())
+            })?;
             let declared = usize::try_from(uncompressed_len)
                 .map_err(|_| PptError::Corrupted("chart storage size exceeds usize".into()))?;
             check_limit("chart package bytes", declared, limits.max_package_bytes)?;
@@ -337,7 +338,7 @@ fn decode(storage: PowerPointOleStorage, limits: Limits) -> Result<Vec<u8>> {
                 .map_err(|_| litchi_ograph::Error::Allocation {
                     resource: "PPT chart package bytes",
                 })?;
-            flate2::read::ZlibDecoder::new(storage.data.as_slice())
+            flate2::read::ZlibDecoder::new(storage.stored_bytes())
                 .take(u64::from(uncompressed_len).saturating_add(1))
                 .read_to_end(&mut bytes)?;
             if bytes.len() != declared {
@@ -644,15 +645,12 @@ mod tests {
         assert_eq!(program_base("Excel.Chart."), "Excel.Chart.");
     }
 
-    fn storage(
-        compression: PowerPointOleStorageCompression,
-        data: Vec<u8>,
-    ) -> PowerPointOleStorage {
-        PowerPointOleStorage {
-            kind: PowerPointOleStorageKind::OleObject,
-            compression,
-            data,
+    fn storage(compression: Compression, declared: u32, data: Vec<u8>) -> Storage {
+        match compression {
+            Compression::Uncompressed => Storage::uncompressed(StorageKind::OleObject, data),
+            Compression::Zlib => Storage::compressed(StorageKind::OleObject, declared, data),
         }
+        .unwrap()
     }
 
     #[test]
@@ -660,7 +658,7 @@ mod tests {
         let bytes = b"compound".to_vec();
         let pointer = bytes.as_ptr();
         let decoded = decode(
-            storage(PowerPointOleStorageCompression::Uncompressed, bytes),
+            storage(Compression::Uncompressed, 0, bytes),
             Limits::default(),
         )
         .expect("uncompressed payload");
@@ -672,12 +670,7 @@ mod tests {
         encoder.write_all(&raw).expect("compress");
         let compressed = encoder.finish().expect("finish compression");
         let decoded = decode(
-            storage(
-                PowerPointOleStorageCompression::Zlib {
-                    uncompressed_len: raw.len() as u32,
-                },
-                compressed,
-            ),
+            storage(Compression::Zlib, raw.len() as u32, compressed),
             Limits::default(),
         )
         .expect("compressed payload");
@@ -687,12 +680,7 @@ mod tests {
             max_package_bytes: 1024,
             ..Limits::default()
         };
-        let bomb = storage(
-            PowerPointOleStorageCompression::Zlib {
-                uncompressed_len: 4096,
-            },
-            vec![0x78, 0x9c],
-        );
+        let bomb = storage(Compression::Zlib, 4096, vec![0x78, 0x9c]);
         assert!(decode(bomb, limits).is_err());
     }
 

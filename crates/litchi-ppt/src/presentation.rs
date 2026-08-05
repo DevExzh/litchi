@@ -1,4 +1,5 @@
 use super::document_properties::PowerPoint12DocumentProperties;
+use super::embedded::storage::{Kind as StorageKind, Ref as StorageRef, Storage};
 use super::encryption::decrypt_pictures;
 use super::encryption::decrypt_powerpoint_document;
 use super::external_media::PowerPointExternalMediaCollection;
@@ -10,7 +11,6 @@ use super::hyperlink::Hyperlinks;
 use super::main_master::PowerPoint12MainMasterMetadata;
 use super::non_zoom_view::PowerPointOutlineSorterViewInformation;
 use super::ole_object::PowerPointOleObjectCollection;
-use super::ole_storage::{PowerPointOleStorage, PowerPointOleStorageRef};
 /// High-performance Presentation API with zero-copy slide parsing.
 use super::package::{PptError, PptOpenOptions, Result};
 use super::parsers::PptRecordParser;
@@ -527,16 +527,12 @@ impl Presentation {
     }
 
     /// Resolve a persisted embedded OLE-object storage as bounded inert bytes.
-    pub fn ole_storage(&self, persist_id: u32) -> Result<Option<PowerPointOleStorage>> {
-        self.ole_storage_as(persist_id, crate::PowerPointOleStorageKind::OleObject)
+    pub fn ole_storage(&self, persist_id: u32) -> Result<Option<Storage>> {
+        self.ole_storage_as(persist_id, StorageKind::OleObject)
     }
 
     /// Resolve a persisted storage with the kind supplied by its referencing record.
-    pub fn ole_storage_as(
-        &self,
-        persist_id: u32,
-        kind: crate::PowerPointOleStorageKind,
-    ) -> Result<Option<PowerPointOleStorage>> {
+    pub fn ole_storage_as(&self, persist_id: u32, kind: StorageKind) -> Result<Option<Storage>> {
         let Some(offset) = self.persist_mapping.get_offset(persist_id) else {
             return Ok(None);
         };
@@ -548,7 +544,7 @@ impl Presentation {
                 "persist ID {persist_id} does not reference ExOleObjStg"
             )));
         }
-        PowerPointOleStorage::parse_as(&record, kind).map(Some)
+        Storage::parse_as(&record, kind).map(Some)
     }
 
     /// Enumerate inert native charts as neutral Office Graph views.
@@ -599,7 +595,7 @@ impl Presentation {
         let storage = self.resolve_vba_storage(info)?;
         crate::PowerPointVbaProjectStorage::from_info_and_metadata(
             info,
-            storage.map(PowerPointOleStorageRef::metadata),
+            storage.map(StorageRef::metadata),
         )
         .map(Some)
     }
@@ -640,7 +636,7 @@ impl Presentation {
         let storage = self.resolve_vba_storage(info)?;
         let summary = crate::PowerPointVbaProjectStorage::from_info_and_metadata(
             info,
-            storage.map(PowerPointOleStorageRef::metadata),
+            storage.map(StorageRef::metadata),
         )?;
         if !summary.has_persisted_storage() {
             return Ok(None);
@@ -665,7 +661,7 @@ impl Presentation {
     fn resolve_vba_storage(
         &self,
         info: crate::PowerPointVbaInfo,
-    ) -> Result<Option<PowerPointOleStorageRef<'_>>> {
+    ) -> Result<Option<StorageRef<'_>>> {
         if info.persist_id_ref == 0 {
             return Ok(None);
         }
@@ -680,12 +676,7 @@ impl Presentation {
             })?;
         let offset = usize::try_from(offset)
             .map_err(|_| PptError::Corrupted("VBA storage offset exceeds usize".to_string()))?;
-        PowerPointOleStorageRef::parse_at(
-            &self.powerpoint_document,
-            offset,
-            crate::PowerPointOleStorageKind::VbaProject,
-        )
-        .map(Some)
+        StorageRef::parse_at(&self.powerpoint_document, offset, StorageKind::VbaProject).map(Some)
     }
 
     /// Return the PPT10 modify-password metadata without verifying it.
@@ -1566,9 +1557,7 @@ mod tests {
         assert_eq!(storage.declared_uncompressed_len(), Some(4096));
         assert_eq!(
             storage.compression(),
-            Some(crate::PowerPointOleStorageCompression::Zlib {
-                uncompressed_len: 4096,
-            })
+            Some(crate::embedded::storage::Compression::Zlib)
         );
         assert!(storage.may_contain_macro_code());
         assert_eq!(presentation.vba_info().unwrap(), Some(storage.info()));

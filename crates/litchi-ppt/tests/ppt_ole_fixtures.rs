@@ -30,7 +30,7 @@ fn bundled_poi_ole_presentations_expose_inert_metadata_and_storage() {
                 .expect("resolve inert ExOleObjStg")
                 .expect("OLE object has persisted storage");
             assert!(
-                !storage.data.is_empty(),
+                !storage.stored_bytes().is_empty(),
                 "{name} has empty persisted storage"
             );
         }

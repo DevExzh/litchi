@@ -1,8 +1,8 @@
+use litchi_ppt::embedded::storage::{Compression, Kind};
 use litchi_ppt::writer::{PptEncryptionProfile, PptWriter};
 use litchi_ppt::{
-    Package, PowerPointOleStorageCompression, PowerPointOleStorageKind,
-    PowerPointVbaProjectCompression, PowerPointVbaProjectError, PowerPointVbaProjectLimits,
-    PptOpenOptions,
+    Package, PowerPointVbaProjectCompression, PowerPointVbaProjectError,
+    PowerPointVbaProjectLimits, PptOpenOptions,
 };
 use litchi_vba::{
     Limits,
@@ -46,17 +46,11 @@ fn compressed_complete_project_round_trips_as_inert_source() {
     assert!(storage.declared_uncompressed_len().unwrap() > 0);
 
     let outer = presentation
-        .ole_storage_as(
-            storage.persist_id_ref(),
-            PowerPointOleStorageKind::VbaProject,
-        )
+        .ole_storage_as(storage.persist_id_ref(), Kind::VbaProject)
         .unwrap()
         .unwrap();
-    assert_eq!(outer.kind, PowerPointOleStorageKind::VbaProject);
-    assert!(matches!(
-        outer.compression,
-        PowerPointOleStorageCompression::Zlib { .. }
-    ));
+    assert_eq!(outer.kind(), Kind::VbaProject);
+    assert!(matches!(outer.compression(), Compression::Zlib));
 
     let project = presentation.vba().unwrap().unwrap();
     assert_eq!(project.name(), "PresentationTools");

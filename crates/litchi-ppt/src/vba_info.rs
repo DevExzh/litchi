@@ -2,11 +2,10 @@
 
 use crate::consts::PptRecordType;
 
+use super::embedded::storage::Metadata;
 #[cfg(test)]
-use super::ole_storage::PowerPointOleStorage;
-use super::ole_storage::{
-    PowerPointOleStorageCompression, PowerPointOleStorageKind, PowerPointOleStorageMetadata,
-};
+use super::embedded::storage::Storage;
+use super::embedded::storage::{Compression, Kind as StorageKind};
 use super::package::{PptError, Result};
 use super::records::PptRecord;
 
@@ -106,7 +105,8 @@ pub struct PowerPointVbaInfo {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PowerPointVbaProjectStorage {
     info: PowerPointVbaInfo,
-    compression: Option<PowerPointOleStorageCompression>,
+    compression: Option<Compression>,
+    declared_uncompressed_len: Option<u32>,
     stored_payload_len: Option<usize>,
 }
 
@@ -114,14 +114,14 @@ impl PowerPointVbaProjectStorage {
     #[cfg(test)]
     pub(crate) fn from_info_and_storage(
         info: PowerPointVbaInfo,
-        storage: Option<&PowerPointOleStorage>,
+        storage: Option<&Storage>,
     ) -> Result<Self> {
-        Self::from_info_and_metadata(info, storage.map(PowerPointOleStorage::metadata))
+        Self::from_info_and_metadata(info, storage.map(Storage::metadata))
     }
 
     pub(crate) fn from_info_and_metadata(
         info: PowerPointVbaInfo,
-        storage: Option<PowerPointOleStorageMetadata>,
+        storage: Option<Metadata>,
     ) -> Result<Self> {
         info.validate()?;
         if info.persist_id_ref == 0 && storage.is_some() {
@@ -136,7 +136,7 @@ impl PowerPointVbaProjectStorage {
             )));
         }
         if let Some(storage) = storage
-            && storage.kind != PowerPointOleStorageKind::VbaProject
+            && storage.kind != StorageKind::VbaProject
         {
             return Err(PptError::Corrupted(format!(
                 "VBAInfoAtom persist ID {} does not reference VBA project storage",
@@ -153,6 +153,8 @@ impl PowerPointVbaProjectStorage {
         Ok(Self {
             info,
             compression: storage.map(|storage| storage.compression),
+            declared_uncompressed_len: storage
+                .and_then(|storage| storage.declared_uncompressed_len),
             stored_payload_len: storage.map(|storage| storage.stored_payload_len),
         })
     }
@@ -183,7 +185,7 @@ impl PowerPointVbaProjectStorage {
     }
 
     /// Return outer-record compression metadata without decompressing data.
-    pub fn compression(&self) -> Option<PowerPointOleStorageCompression> {
+    pub fn compression(&self) -> Option<Compression> {
         self.compression
     }
 
@@ -197,20 +199,12 @@ impl PowerPointVbaProjectStorage {
     /// This is untrusted metadata from the outer record. Bounded project
     /// parsing verifies it against the actual decompressed byte count.
     pub fn declared_uncompressed_len(&self) -> Option<u32> {
-        match self.compression {
-            Some(PowerPointOleStorageCompression::Zlib { uncompressed_len }) => {
-                Some(uncompressed_len)
-            },
-            Some(PowerPointOleStorageCompression::Uncompressed) | None => None,
-        }
+        self.declared_uncompressed_len
     }
 
     /// Whether outer metadata declares a compressed VBA project storage.
     pub fn is_compressed(&self) -> bool {
-        matches!(
-            self.compression,
-            Some(PowerPointOleStorageCompression::Zlib { .. })
-        )
+        matches!(self.compression, Some(Compression::Zlib))
     }
 
     /// Whether persisted metadata conservatively indicates macro data.
@@ -409,13 +403,8 @@ mod tests {
             has_macros: true,
             runtime_version: 2,
         };
-        let storage = PowerPointOleStorage {
-            kind: PowerPointOleStorageKind::VbaProject,
-            compression: PowerPointOleStorageCompression::Zlib {
-                uncompressed_len: 4096,
-            },
-            data: vec![0x78, 0x9c, 1, 2, 3],
-        };
+        let storage =
+            Storage::compressed(StorageKind::VbaProject, 4096, vec![0x78, 0x9c, 1, 2, 3]).unwrap();
         let summary =
             PowerPointVbaProjectStorage::from_info_and_storage(info, Some(&storage)).unwrap();
 
@@ -438,20 +427,12 @@ mod tests {
         };
         assert!(PowerPointVbaProjectStorage::from_info_and_storage(info, None).is_err());
 
-        let wrong_storage = PowerPointOleStorage {
-            kind: PowerPointOleStorageKind::OleObject,
-            compression: PowerPointOleStorageCompression::Uncompressed,
-            data: vec![0x01],
-        };
+        let wrong_storage = Storage::uncompressed(StorageKind::OleObject, vec![0x01]).unwrap();
         assert!(
             PowerPointVbaProjectStorage::from_info_and_storage(info, Some(&wrong_storage)).is_err()
         );
 
-        let contradictory = PowerPointOleStorage {
-            kind: PowerPointOleStorageKind::VbaProject,
-            compression: PowerPointOleStorageCompression::Uncompressed,
-            data: vec![0x01],
-        };
+        let contradictory = Storage::uncompressed(StorageKind::VbaProject, vec![0x01]).unwrap();
         assert!(
             PowerPointVbaProjectStorage::from_info_and_storage(
                 PowerPointVbaInfo {

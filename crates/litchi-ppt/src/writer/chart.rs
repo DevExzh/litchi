@@ -46,13 +46,11 @@ use super::escher::{
 };
 use super::hyperlink::{HyperlinkCollection, record_type as hyperlink_record_type};
 use super::records::RecordBuilder;
+use crate::embedded::storage::{Kind as StorageKind, Storage};
 use crate::ole_object::{
     PowerPointOleColorFollow, PowerPointOleContainerKind, PowerPointOleDimensionPolicy,
     PowerPointOleDrawAspect, PowerPointOleEmbedPreferences, PowerPointOleObjectDefinition,
     PowerPointOleObjectMetadata, PowerPointOleObjectSubtype, PowerPointOleObjectType,
-};
-use crate::ole_storage::{
-    PowerPointOleStorage, PowerPointOleStorageCompression, PowerPointOleStorageKind,
 };
 
 /// MSOSPT value of the OfficeArt frame used for OLE objects ([MS-ODRAW]).
@@ -278,13 +276,10 @@ pub(crate) fn build_ex_obj_list(
 
 /// Build the uncompressed `ExOleObjStg` record persisting a chart workbook.
 pub(crate) fn chart_storage_record(workbook: &[u8]) -> Result<Vec<u8>, PptWriteError> {
-    PowerPointOleStorage {
-        kind: PowerPointOleStorageKind::OleObject,
-        compression: PowerPointOleStorageCompression::Uncompressed,
-        data: workbook.to_vec(),
-    }
-    .to_record_bytes()
-    .map_err(|error| invalid(format!("chart storage record is invalid: {error}")))
+    Storage::uncompressed(StorageKind::OleObject, workbook.to_vec())
+        .map_err(|error| invalid(format!("chart storage is invalid: {error}")))?
+        .to_record_bytes()
+        .map_err(|error| invalid(format!("chart storage record is invalid: {error}")))
 }
 
 /// A chart frame shape placed into a slide's drawing at save time.

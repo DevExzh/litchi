@@ -4,14 +4,12 @@ use std::path::PathBuf;
 use litchi_cfb::OleWriter;
 use litchi_ograph::chart::Kind as GraphKind;
 use litchi_ppt::chart::{Chart, Frame, Kind};
+use litchi_ppt::embedded::storage::{Kind as StorageKind, Storage};
 use litchi_ppt::ole_object::{
     PowerPointOleColorFollow, PowerPointOleContainerKind, PowerPointOleDimensionPolicy,
     PowerPointOleDrawAspect, PowerPointOleEmbedPreferences, PowerPointOleExternalObject,
     PowerPointOleObjectDefinition, PowerPointOleObjectMetadata, PowerPointOleObjectSubtype,
     PowerPointOleObjectType,
-};
-use litchi_ppt::ole_storage::{
-    PowerPointOleStorage, PowerPointOleStorageCompression, PowerPointOleStorageKind,
 };
 use litchi_ppt::{Package, PowerPointOlePackageEditor};
 
@@ -108,12 +106,8 @@ fn chart_object(
     })
 }
 
-fn uncompressed(data: Vec<u8>) -> PowerPointOleStorage {
-    PowerPointOleStorage {
-        kind: PowerPointOleStorageKind::OleObject,
-        compression: PowerPointOleStorageCompression::Uncompressed,
-        data,
-    }
+fn uncompressed(data: Vec<u8>) -> Storage {
+    Storage::uncompressed(StorageKind::OleObject, data).unwrap()
 }
 
 fn editor_with_seed(seed: u32) -> PowerPointOlePackageEditor {

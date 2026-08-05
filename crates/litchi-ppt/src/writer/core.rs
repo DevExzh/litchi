@@ -942,7 +942,7 @@ pub struct PptWriter {
     /// Inert modify password, wiped on replacement, clear, or drop.
     modify_password: Option<PptWriterModifyPassword>,
     /// Standalone CFB project wrapped for a persisted `VbaProjectStg`.
-    vba_project: Option<crate::PowerPointOleStorage>,
+    vba_project: Option<crate::embedded::storage::Storage>,
 }
 
 struct PptWriterEncryption {
@@ -1069,10 +1069,12 @@ impl PptWriter {
 
         let cfb = payload.into_bytes();
         let storage = match compression {
-            crate::PowerPointVbaProjectCompression::Uncompressed => crate::PowerPointOleStorage {
-                kind: crate::PowerPointOleStorageKind::VbaProject,
-                compression: crate::PowerPointOleStorageCompression::Uncompressed,
-                data: cfb,
+            crate::PowerPointVbaProjectCompression::Uncompressed => {
+                crate::embedded::storage::Storage::uncompressed(
+                    crate::embedded::storage::Kind::VbaProject,
+                    cfb,
+                )
+                .map_err(|error| PptWriteError::InvalidData(error.to_string()))?
             },
             crate::PowerPointVbaProjectCompression::Zlib => {
                 let uncompressed_len = u32::try_from(cfb.len()).map_err(|_| {
@@ -1084,11 +1086,12 @@ impl PptWriter {
                     flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
                 encoder.write_all(&cfb)?;
                 let data = encoder.finish()?;
-                crate::PowerPointOleStorage {
-                    kind: crate::PowerPointOleStorageKind::VbaProject,
-                    compression: crate::PowerPointOleStorageCompression::Zlib { uncompressed_len },
+                crate::embedded::storage::Storage::compressed(
+                    crate::embedded::storage::Kind::VbaProject,
+                    uncompressed_len,
                     data,
-                }
+                )
+                .map_err(|error| PptWriteError::InvalidData(error.to_string()))?
             },
         };
         storage

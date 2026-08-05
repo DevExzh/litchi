@@ -80,6 +80,9 @@ pub mod records;
 pub mod shapes;
 pub mod text;
 
+/// Semantic owners for content embedded in a legacy presentation.
+pub mod embedded;
+
 // PowerPoint projections over the format-neutral OfficeArt substrate.
 pub mod odraw;
 
@@ -115,7 +118,6 @@ pub mod modify_password;
 pub mod named_shows;
 pub mod ole_editor;
 pub mod ole_object;
-pub mod ole_storage;
 pub mod picture_bullets;
 pub mod placeholder_atom;
 pub mod print_options;
@@ -263,9 +265,6 @@ pub use ole_object::{
     PowerPointOleExternalObject, PowerPointOleLinkInfo, PowerPointOleObjectCollection,
     PowerPointOleObjectDefinition, PowerPointOleObjectMetadata, PowerPointOleObjectSubtype,
     PowerPointOleObjectType, PowerPointOleUpdateMode,
-};
-pub use ole_storage::{
-    PowerPointOleStorage, PowerPointOleStorageCompression, PowerPointOleStorageKind,
 };
 pub use picture_bullets::{PictureBullet, PictureBulletCollection, PictureBulletType};
 pub use placeholder_atom::{
