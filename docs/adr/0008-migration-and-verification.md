@@ -4840,6 +4840,79 @@ Focused verification passes 89 DrawingML tests, 621 XLSX library/integration
 tests, 408 XLSB library/integration tests, formatting, and boundary policy
 checks.
 
+## ODF master-page and authoring layering
+
+The ODF style and authoring seam now has a neutral owner in
+`litchi-odf-common`. `style::master::{Master,Child,ChildKind,Region,Kind}`
+provides a bounded, namespace-aware, lossless model for master-page children
+and header/footer regions, including ordered inert XML and typed text fields.
+Its reader and writer validate the ODF master-page structure and apply
+region/master edits without moving package orchestration into the common
+crate. ODT retains the contextual XML element and package mutation facade.
+
+The same rule applies to `drawing::authoring::{Anchor,Frame,Length}` and
+`media::authoring::{Format,Part}`. Geometry, anchor semantics, image sniffing,
+safe part paths, and bounded payload ownership are shared; ODT retains only
+ODT element construction and package insertion. The former flat frame model
+and prefix-expanded names were removed without compatibility aliases, and
+the ODT facade is now layered as `frame::{mod,xml}`.
+
+The common all-target suite passes 206 unit tests plus its integration targets;
+ODT passes 501 library tests plus its integration targets. Formatting,
+metadata, diff, and boundary checks pass for the affected crates. This slice
+does not claim complete ODF master-page, drawing, or media conformance; it
+establishes the shared semantic and authoring foundations for ODP, ODS, and
+the remaining ODF owners.
+
+## OLE Property Set version layering
+
+`litchi-cfb::metadata` now models the versioned type constraints of
+`[MS-OLEPS]` rather than accepting only version-zero property sets. Version
+one permits the documented `VT_ARRAY|VT_I1` and `Behavior` special property
+forms; `Behavior` remains a typed `VT_UI4` value with only the specified
+values, and version-zero input is rejected when a version-one-only type is
+used. The property-set editor keeps validation failure-atomic and preserves
+unknown properties and exact source bytes at the existing snapshot boundary.
+
+This is a focused typed-object-model increment, not a claim that every
+property type or OLE metadata profile is complete. The CFB library suite (109
+tests plus four integration targets) and all-target compilation pass.
+
+## Legacy DOC facade and OLE object preservation
+
+The outer `litchi-doc/src/doc` wrapper has been removed. Root declarations now
+expose the semantic owners directly, while `parts`, `section`, and `writer`
+remain nested where they represent real document layers. Internal imports and
+tests use the canonical paths; no wrapper or compatibility alias remains.
+
+The DOC, PPT, and XLS object-list paths also retain unsupported binary records
+at their owning boundaries. DOC keeps its OLE package topology and typed
+`ObjectPool` interpretation in the DOC owner; common CFB capture stays
+format-neutral. The DOC suite passes 831 library tests with two ignored tests;
+one checked-in malformed Apache POI fixture still fails with an invalid FAT
+entry and is recorded as external fixture debt rather than hidden.
+
+## Legacy XLS, PPT, and OfficeArt typed OLE layering
+
+The legacy host facades now use contextual, prefix-free owners. XLS exposes
+`ole_object::{Editor,OleObjectRecord,ObjectType,Ft*,Lbs*}` with strict
+`[MS-XLS]` validation for OLE flags, form-control records, dropdown bounds,
+and list-item sizes while retaining malformed/unknown records losslessly.
+PPT's `embedded::object::UnknownRecord` preserves unmodeled `ExObjList`
+children, source ordering slots, and borrowed payloads through collection
+edits. OfficeArt exposes typed `shape::Bounds` for the exact 16-byte `FSPGR`
+group-coordinate record, preserving unknown records around it. These seams
+are host-specific and therefore remain outside `litchi-biff` and
+`litchi-ole-common` until a neutral vocabulary is proven from the relevant
+`[MS-ODRAW]`, `[MS-OGRAPH]`, `[MS-OSHARED]`, `[MS-PPT]`, and `[MS-XLS]`
+grammars.
+
+Focused verification passes the XLS OLE/form-control tests (18 and 4), PPT
+object tests (15) plus its 881-test library suite, and 59 OfficeArt shape
+tests; affected all-target checks and formatting pass. This is incremental
+read/preserve/edit coverage, not a claim of complete legacy Office
+conformance.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:
