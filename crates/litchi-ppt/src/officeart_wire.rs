@@ -8,13 +8,13 @@ use bitflags::bitflags;
 use std::io::{self, Write};
 #[cfg(test)]
 use zerocopy::IntoBytes;
-use zerocopy_derive::*;
+use zerocopy_derive::{Immutable, IntoBytes, KnownLayout};
 
 /// OfficeArtFOPTEOPID `fBid`: the property value is a BLIP identifier.
 #[cfg(test)]
-pub const PROPERTY_FLAG_BLIP_ID: u16 = 0x4000;
+const PROPERTY_FLAG_BLIP_ID: u16 = 0x4000;
 /// OfficeArtFOPTEOPID `fComplex`: the property value is stored after the table.
-pub const PROPERTY_FLAG_COMPLEX: u16 = 0x8000;
+pub(crate) const PROPERTY_FLAG_COMPLEX: u16 = 0x8000;
 
 // =============================================================================
 // Shape Flags (MS-ODRAW 2.2.40)
@@ -23,7 +23,7 @@ pub const PROPERTY_FLAG_COMPLEX: u16 = 0x8000;
 bitflags! {
     /// Shape flags for EscherSpRecord (MS-ODRAW 2.2.40)
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub struct ShapeFlags: u32 {
+    pub(crate) struct ShapeFlags: u32 {
         /// Shape is a group
         const GROUP = 0x0001;
         /// Shape is a child of a group
@@ -55,55 +55,55 @@ bitflags! {
 // Escher Record Types Constants
 // =============================================================================
 
-pub mod record_type {
-    pub const DGG_CONTAINER: u16 = 0xF000;
-    pub const DG_CONTAINER: u16 = 0xF002;
-    pub const SPGR_CONTAINER: u16 = 0xF003;
-    pub const SP_CONTAINER: u16 = 0xF004;
-    pub const DGG: u16 = 0xF006;
-    pub const DG: u16 = 0xF008;
-    pub const SPGR: u16 = 0xF009;
-    pub const SP: u16 = 0xF00A;
-    pub const OPT: u16 = 0xF00B;
-    pub const CLIENT_ANCHOR: u16 = 0xF010;
-    pub const CLIENT_DATA: u16 = 0xF011;
+pub(crate) mod record_type {
+    pub(crate) const DGG_CONTAINER: u16 = 0xF000;
+    pub(crate) const DG_CONTAINER: u16 = 0xF002;
+    pub(crate) const SPGR_CONTAINER: u16 = 0xF003;
+    pub(crate) const SP_CONTAINER: u16 = 0xF004;
+    pub(crate) const DGG: u16 = 0xF006;
+    pub(crate) const DG: u16 = 0xF008;
+    pub(crate) const SPGR: u16 = 0xF009;
+    pub(crate) const SP: u16 = 0xF00A;
+    pub(crate) const OPT: u16 = 0xF00B;
+    pub(crate) const CLIENT_ANCHOR: u16 = 0xF010;
+    pub(crate) const CLIENT_DATA: u16 = 0xF011;
     #[cfg(test)]
-    pub const CLIENT_TEXTBOX: u16 = 0xF00D;
+    pub(crate) const CLIENT_TEXTBOX: u16 = 0xF00D;
     #[cfg(test)]
-    pub const CHILD_ANCHOR: u16 = 0xF00F;
-    pub const SPLIT_MENU_COLORS: u16 = 0xF11E;
+    pub(crate) const CHILD_ANCHOR: u16 = 0xF00F;
+    pub(crate) const SPLIT_MENU_COLORS: u16 = 0xF11E;
 }
 
 // =============================================================================
 // Shape Type Constants (MS-ODRAW 2.4.6 MSOSPT)
 // =============================================================================
 
-pub mod shape_type {
-    pub const NOT_PRIMITIVE: u16 = 0;
-    pub const RECTANGLE: u16 = 1;
-    pub const ROUND_RECTANGLE: u16 = 2;
-    pub const ELLIPSE: u16 = 3;
-    pub const DIAMOND: u16 = 4;
-    pub const LINE: u16 = 20;
-    pub const TEXT_BOX: u16 = 202;
+pub(crate) mod shape_type {
+    pub(crate) const NOT_PRIMITIVE: u16 = 0;
+    pub(crate) const RECTANGLE: u16 = 1;
+    pub(crate) const ROUND_RECTANGLE: u16 = 2;
+    pub(crate) const ELLIPSE: u16 = 3;
+    pub(crate) const DIAMOND: u16 = 4;
+    pub(crate) const LINE: u16 = 20;
+    pub(crate) const TEXT_BOX: u16 = 202;
 }
 
 // =============================================================================
 // Property Value Constants
 // =============================================================================
 
-pub mod prop_value {
-    pub const SCHEME_COLOR: u32 = 0x0800_0000;
-    pub const SCHEME_FILL: u32 = SCHEME_COLOR | 0x04;
-    pub const SCHEME_FILL_BACK: u32 = SCHEME_COLOR;
-    pub const SCHEME_LINE: u32 = SCHEME_COLOR | 0x01;
-    pub const SCHEME_SHADOW: u32 = SCHEME_COLOR | 0x02;
-    pub const LINE_STYLE_DEFAULT: u32 = 0x0010_0010;
-    pub const LINE_STYLE_BOOL_DEFAULT: u32 = 0x0008_0008;
-    pub const FILL_STYLE_DISABLED: u32 = 0x0010_0000;
-    pub const FILL_STYLE_ENABLED: u32 = 0x0015_0011;
-    pub const SHADOW_STYLE_DISABLED: u32 = 0x0002_0000;
-    pub const SHADOW_STYLE_ENABLED: u32 = 0x0002_0002;
+pub(crate) mod prop_value {
+    pub(crate) const SCHEME_COLOR: u32 = 0x0800_0000;
+    pub(crate) const SCHEME_FILL: u32 = SCHEME_COLOR | 0x04;
+    pub(crate) const SCHEME_FILL_BACK: u32 = SCHEME_COLOR;
+    pub(crate) const SCHEME_LINE: u32 = SCHEME_COLOR | 0x01;
+    pub(crate) const SCHEME_SHADOW: u32 = SCHEME_COLOR | 0x02;
+    pub(crate) const LINE_STYLE_DEFAULT: u32 = 0x0010_0010;
+    pub(crate) const LINE_STYLE_BOOL_DEFAULT: u32 = 0x0008_0008;
+    pub(crate) const FILL_STYLE_DISABLED: u32 = 0x0010_0000;
+    pub(crate) const FILL_STYLE_ENABLED: u32 = 0x0015_0011;
+    pub(crate) const SHADOW_STYLE_DISABLED: u32 = 0x0002_0000;
+    pub(crate) const SHADOW_STYLE_ENABLED: u32 = 0x0002_0002;
 }
 
 // =============================================================================
@@ -111,17 +111,17 @@ pub mod prop_value {
 // =============================================================================
 
 /// Escher record header (8 bytes) - zerocopy compatible
-#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Debug, Clone, Copy, IntoBytes, Immutable, KnownLayout)]
 #[repr(C, packed)]
-pub struct EscherRecordHeader {
-    pub ver_inst: u16,
-    pub rec_type: u16,
-    pub length: u32,
+pub(crate) struct EscherRecordHeader {
+    pub(crate) ver_inst: u16,
+    pub(crate) rec_type: u16,
+    pub(crate) length: u32,
 }
 
 impl EscherRecordHeader {
-    pub const fn new(version: u8, instance: u16, rec_type: u16, length: u32) -> Self {
-        let ver_inst = (version as u16 & 0x0F) | ((instance & 0x0FFF) << 4);
+    pub(crate) const fn new(version: u8, instance: u16, rec_type: u16, length: u32) -> Self {
+        let ver_inst = (u16::from(version) & 0x0F) | ((instance & 0x0FFF) << 4);
         Self {
             ver_inst,
             rec_type,
@@ -131,15 +131,15 @@ impl EscherRecordHeader {
 }
 
 /// Shape record data (8 bytes)
-#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Debug, Clone, Copy, IntoBytes, Immutable, KnownLayout)]
 #[repr(C)]
-pub struct EscherSpData {
-    pub spid: u32,
-    pub flags: u32,
+pub(crate) struct EscherSpData {
+    pub(crate) spid: u32,
+    pub(crate) flags: u32,
 }
 
 impl EscherSpData {
-    pub const fn with_flags(spid: u32, flags: ShapeFlags) -> Self {
+    pub(crate) const fn with_flags(spid: u32, flags: ShapeFlags) -> Self {
         Self {
             spid,
             flags: flags.bits(),
@@ -148,15 +148,15 @@ impl EscherSpData {
 }
 
 /// Property entry (6 bytes)
-#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Debug, Clone, Copy, IntoBytes, Immutable, KnownLayout)]
 #[repr(C, packed)]
-pub struct EscherProperty {
-    pub prop_id: u16,
-    pub value: u32,
+pub(crate) struct EscherProperty {
+    pub(crate) prop_id: u16,
+    pub(crate) value: u32,
 }
 
 impl EscherProperty {
-    pub const fn new(prop_id: u16, value: u32) -> Self {
+    pub(crate) const fn new(prop_id: u16, value: u32) -> Self {
         Self { prop_id, value }
     }
 }
@@ -173,7 +173,7 @@ impl EscherProperty {
 /// - Bytes 2-3: Record Type
 /// - Bytes 4-7: Record Length (32-bit)
 #[cfg(test)]
-pub fn write_record_header<W: Write>(
+pub(crate) fn write_record_header<W: Write>(
     writer: &mut W,
     version: u8,
     instance: u16,
@@ -187,7 +187,7 @@ pub fn write_record_header<W: Write>(
 
 /// Write a container record with pre-calculated child data.
 #[cfg(test)]
-pub fn write_container<W: Write>(
+pub(crate) fn write_container<W: Write>(
     writer: &mut W,
     instance: u16,
     record_type: u16,
@@ -200,7 +200,7 @@ pub fn write_container<W: Write>(
 
 /// Write a simple atom record.
 #[cfg(test)]
-pub fn write_atom<W: Write>(
+pub(crate) fn write_atom<W: Write>(
     writer: &mut W,
     version: u8,
     instance: u16,
@@ -214,14 +214,14 @@ pub fn write_atom<W: Write>(
 
 /// Helper to build property records (Opt records).
 #[cfg(test)]
-pub struct PropertyBuilder {
+pub(crate) struct PropertyBuilder {
     properties: Vec<(u16, i32)>,
     complex_data: Vec<u8>,
 }
 
 #[cfg(test)]
 impl PropertyBuilder {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             properties: Vec::new(),
             complex_data: Vec::new(),
@@ -229,18 +229,18 @@ impl PropertyBuilder {
     }
 
     /// Add a simple property.
-    pub fn add_simple(&mut self, property_id: u16, value: i32) {
+    pub(crate) fn add_simple(&mut self, property_id: u16, value: i32) {
         self.properties.push((property_id, value));
     }
 
     /// Add a simple property whose value identifies an entry in the BLIP store.
-    pub fn add_blip_id(&mut self, property_id: u16, blip_id: i32) {
+    pub(crate) fn add_blip_id(&mut self, property_id: u16, blip_id: i32) {
         self.properties
             .push((property_id | PROPERTY_FLAG_BLIP_ID, blip_id));
     }
 
     /// Add a complex property.
-    pub fn add_complex(&mut self, property_id: u16, data: &[u8]) {
+    pub(crate) fn add_complex(&mut self, property_id: u16, data: &[u8]) {
         let property_id_with_flag = property_id | PROPERTY_FLAG_COMPLEX;
         self.properties
             .push((property_id_with_flag, data.len() as i32));
@@ -248,9 +248,9 @@ impl PropertyBuilder {
     }
 
     /// Write the Opt record.
-    pub fn write<W: Write>(&self, writer: &mut W) -> io::Result<()> {
+    pub(crate) fn write<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         let num_properties = self.properties.len() as u16;
-        let header_size = num_properties as usize * 6;
+        let header_size = usize::from(num_properties) * 6;
         let total_size = header_size + self.complex_data.len();
 
         write_record_header(writer, 0x03, num_properties, 0xF00B, total_size as u32)?;
@@ -265,7 +265,7 @@ impl PropertyBuilder {
     }
 
     /// Get the total size that would be written.
-    pub fn size(&self) -> usize {
+    pub(crate) fn size(&self) -> usize {
         8 + (self.properties.len() * 6) + self.complex_data.len()
     }
 }
@@ -279,7 +279,7 @@ impl Default for PropertyBuilder {
 
 /// Helper to build shape records.
 #[cfg(test)]
-pub struct ShapeBuilder {
+pub(crate) struct ShapeBuilder {
     shape_type: u16,
     shape_id: u32,
     flags: u32,
@@ -287,7 +287,7 @@ pub struct ShapeBuilder {
 
 #[cfg(test)]
 impl ShapeBuilder {
-    pub fn new(shape_type: u16, shape_id: u32) -> Self {
+    pub(crate) fn new(shape_type: u16, shape_id: u32) -> Self {
         Self {
             shape_type,
             shape_id,
@@ -295,13 +295,13 @@ impl ShapeBuilder {
         }
     }
 
-    pub fn with_flags(mut self, flags: u32) -> Self {
+    pub(crate) fn with_flags(mut self, flags: u32) -> Self {
         self.flags = flags;
         self
     }
 
     /// Write the Sp record.
-    pub fn write<W: Write>(&self, writer: &mut W) -> io::Result<()> {
+    pub(crate) fn write<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         write_record_header(writer, 0x02, self.shape_type, 0xF00A, 8)?;
         writer.write_all(&self.shape_id.to_le_bytes())?;
         writer.write_all(&self.flags.to_le_bytes())?;
@@ -311,7 +311,7 @@ impl ShapeBuilder {
 
 /// Write a ChildAnchor record.
 #[cfg(test)]
-pub fn write_child_anchor<W: Write>(
+pub(crate) fn write_child_anchor<W: Write>(
     writer: &mut W,
     left: i32,
     top: i32,
@@ -328,7 +328,7 @@ pub fn write_child_anchor<W: Write>(
 
 /// Write an Spgr record (group shape coordinates).
 #[cfg(test)]
-pub fn write_spgr<W: Write>(
+pub(crate) fn write_spgr<W: Write>(
     writer: &mut W,
     left: i32,
     top: i32,
