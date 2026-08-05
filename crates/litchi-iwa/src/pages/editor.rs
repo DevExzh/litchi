@@ -24,12 +24,12 @@ use crate::protobuf::tsp;
 use crate::protobuf::tswp::{
     DrawableAttachmentArchive, StorageArchive, object_attribute_table::ObjectAttribute,
 };
-use crate::shapes::ShapeTextLayout;
 use crate::shapes::{
     DrawableGeometry, DrawableProperties, RgbaColor, reset_shape_text_columns,
     reset_shape_text_layout, set_shape_geometry, set_shape_properties, set_shape_text_columns,
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
+use crate::text::layout::Layout;
 use crate::text::{
     AppliedParagraphStyle, IWorkTextEditor, NamedParagraphStyle, ParagraphBackground,
     ParagraphBorders, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphDropCap,
@@ -290,7 +290,7 @@ impl PagesEditor {
     }
 
     /// Read vertical alignment, edge insets, and autosizing for a text box.
-    pub fn text_box_text_layout(&self, drawable_object_id: u64) -> Result<ShapeTextLayout> {
+    pub fn text_box_text_layout(&self, drawable_object_id: u64) -> Result<Layout> {
         self.text_box_graph(drawable_object_id)?;
         let archive_name = find_object_archive(self.package(), drawable_object_id)?;
         shape_text_layout(self.package(), &archive_name, drawable_object_id)
@@ -300,7 +300,7 @@ impl PagesEditor {
     pub fn set_text_box_text_layout(
         &mut self,
         drawable_object_id: u64,
-        layout: ShapeTextLayout,
+        layout: Layout,
     ) -> Result<()> {
         self.text_box_graph(drawable_object_id)?;
         let archive_name = find_object_archive(self.package(), drawable_object_id)?;

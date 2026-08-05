@@ -79,7 +79,4 @@ pub(crate) use text_columns::{
     reset_shape_text_columns, set_shape_text_columns, shape_text_columns,
 };
 pub use text_extractor::ShapeTextExtractor;
-pub use text_layout::{
-    ShapeTextAutoSize, ShapeTextInset, ShapeTextInsets, ShapeTextLayout, ShapeTextVerticalAlignment,
-};
 pub(crate) use text_layout::{reset_shape_text_layout, set_shape_text_layout, shape_text_layout};

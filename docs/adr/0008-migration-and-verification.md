@@ -5868,6 +5868,21 @@ layout. `table-layouts.pages` reproduced the known generated-table damaged-file
 limitation; the warning was dismissed without repair or save. All three ZIP
 archives passed integrity checks, and Numbers, Pages, and Keynote were quit
 after verification.
+The shape text-layout ownership slice now follows that table-cell precedent at
+`litchi-iwa-common::text::layout::{VerticalAlignment, AutoSize, Inset, Insets,
+Layout}`. The common suite pins 4/16/20-byte value sizes and typed rejection of
+negative, NaN, and infinite insets; the IWA suite keeps native enum/padding
+conversion, bounded style inheritance, and transactional archive mutation. The
+six shape and text-box creation examples import the common owner directly, and
+the focused native gate opened fresh Numbers, Pages, and Keynote shape
+artifacts without repair prompts. Numbers exposed `Bottom`, `Fixed`, and a
+9-point inset; Pages exposed `Middle`, `Fixed`, and a 12-point inset; Keynote
+exposed `Middle`, `ShrinkToFit`, a 14-point inset, and a checked `Autosize Text`
+control. Each app accepted a real text edit and Save, and reverse-read through
+the public layout APIs preserved those values and the edited text. All three
+ZIP archives passed integrity checks, and Numbers, Pages, and Keynote were
+quit after verification. The old `ShapeText*` model is deleted rather than
+retained as a compatibility alias.
 The BorderSide ownership slice
 is complete: the dependency-neutral table-cell edge selector now lives at
 `litchi-iwa-common::table::cell::BorderSide`; `Borders` and `ShapeStroke` remain

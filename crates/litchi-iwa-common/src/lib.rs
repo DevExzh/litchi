@@ -8,6 +8,7 @@
 
 pub mod color;
 pub mod table;
+pub mod text;
 pub mod varint;
 pub mod wire;
 

@@ -8,9 +8,8 @@ use litchi_iwa::shapes::{
     ShapeFill, ShapeGradient, ShapeGradientAngle, ShapeImageFillTechnique, ShapeOpacity,
     ShapePreset, ShapeReflection, ShapeReflectionOpacity, ShapeShadow, ShapeShadowAngle,
     ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity,
-    ShapeTextAutoSize, ShapeTextInset, ShapeTextInsets, ShapeTextLayout,
-    ShapeTextVerticalAlignment,
 };
+use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -73,10 +72,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.set_body_shape_text_layout(
         created.drawable_object_id,
-        ShapeTextLayout::new(
-            ShapeTextVerticalAlignment::Middle,
-            ShapeTextInsets::uniform(ShapeTextInset::from_points(12.0)?),
-            ShapeTextAutoSize::Fixed,
+        Layout::new(
+            VerticalAlignment::Middle,
+            Insets::uniform(Inset::from_points(12.0)?),
+            AutoSize::Fixed,
         ),
     )?;
     editor.set_body_shape_title(created.drawable_object_id, "Typed Pages shape")?;

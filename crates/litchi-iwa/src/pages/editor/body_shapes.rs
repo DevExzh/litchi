@@ -10,7 +10,7 @@ use crate::package_metadata::{
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
     LineEndpoints, LineSegment, LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill,
-    ShapeImageFillTechnique, ShapePathKind, ShapePreset, ShapeShadow, ShapeStroke, ShapeTextLayout,
+    ShapeImageFillTechnique, ShapePathKind, ShapePreset, ShapeShadow, ShapeStroke,
     flip_drawable_geometry, line_geometry, line_path_source, line_segments_match,
     reset_shape_effects, reset_shape_fill, reset_shape_shadow, reset_shape_stroke,
     reset_shape_text_layout, set_shape_effects, set_shape_fill, set_shape_geometry,
@@ -18,6 +18,7 @@ use crate::shapes::{
     set_shape_shadow, set_shape_stroke, set_shape_text_layout, shape_effects, shape_fill,
     shape_line_endpoints, shape_path_source, shape_shadow, shape_stroke, shape_text_layout,
 };
+use crate::text::layout::Layout;
 
 use super::text_box_create::{
     BodyTextShapeObjectIds, BodyTextShapeRole, body_text_shape_objects, body_text_storage,
@@ -538,7 +539,7 @@ impl PagesEditor {
     }
 
     /// Read effective vertical alignment, edge insets, and autosizing.
-    pub fn body_shape_text_layout(&self, drawable_object_id: u64) -> Result<ShapeTextLayout> {
+    pub fn body_shape_text_layout(&self, drawable_object_id: u64) -> Result<Layout> {
         let source = body_shape_graph(self, drawable_object_id)?;
         shape_text_layout(self.package(), &source.archive_name, drawable_object_id)
     }
@@ -547,7 +548,7 @@ impl PagesEditor {
     pub fn set_body_shape_text_layout(
         &mut self,
         drawable_object_id: u64,
-        layout: ShapeTextLayout,
+        layout: Layout,
     ) -> Result<()> {
         let source = body_shape_graph(self, drawable_object_id)?;
         let staged = set_shape_text_layout(
@@ -932,9 +933,9 @@ mod tests {
         LineEndpoint, RgbColorSpace, RgbaColor, ShapeCornerRadius, ShapeDropShadow, ShapeGradient,
         ShapeGradientAngle, ShapeOpacity, ShapeReflection, ShapeReflectionOpacity,
         ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset,
-        ShapeShadowOpacity, ShapeTextAutoSize, ShapeTextInset, ShapeTextInsets,
-        ShapeTextVerticalAlignment, StrokePattern, StrokeWidth,
+        ShapeShadowOpacity, StrokePattern, StrokeWidth,
     };
+    use crate::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
 
     const POSITION: DrawablePoint = DrawablePoint { x: 180.0, y: 240.0 };
     const SIZE: DrawableSize = DrawableSize {
@@ -1620,10 +1621,10 @@ mod tests {
         editor
             .set_body_shape_shadow(created.drawable_object_id, shadow)
             .unwrap();
-        let layout = ShapeTextLayout::new(
-            ShapeTextVerticalAlignment::Middle,
-            ShapeTextInsets::uniform(ShapeTextInset::from_points(12.0).unwrap()),
-            ShapeTextAutoSize::Fixed,
+        let layout = Layout::new(
+            VerticalAlignment::Middle,
+            Insets::uniform(Inset::from_points(12.0).unwrap()),
+            AutoSize::Fixed,
         );
         editor
             .set_body_shape_text_layout(created.drawable_object_id, layout)

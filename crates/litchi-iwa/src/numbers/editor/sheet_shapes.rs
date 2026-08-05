@@ -8,7 +8,7 @@ use crate::image_caption::DrawableCaptionKind;
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
     LineEndpoints, LineSegment, LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill,
-    ShapeImageFillTechnique, ShapePathKind, ShapePreset, ShapeShadow, ShapeStroke, ShapeTextLayout,
+    ShapeImageFillTechnique, ShapePathKind, ShapePreset, ShapeShadow, ShapeStroke,
     flip_drawable_geometry, line_geometry, line_path_source, line_segments_match,
     reset_shape_effects, reset_shape_fill, reset_shape_shadow, reset_shape_stroke,
     reset_shape_text_layout, set_shape_effects, set_shape_fill, set_shape_geometry,
@@ -17,6 +17,7 @@ use crate::shapes::{
     shape_line_endpoints, shape_line_segment, shape_path_kind, shape_path_source, shape_preset,
     shape_shadow, shape_stroke, shape_text_layout,
 };
+use crate::text::layout::Layout;
 
 use super::text_box_create::{
     TextBoxObjectIds, text_box_objects, text_box_storage, text_box_theme_styles,
@@ -592,7 +593,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<ShapeTextLayout> {
+    ) -> Result<Layout> {
         let source = shape_graph(self, sheet_id, drawable_object_id)?;
         shape_text_layout(&self.package, &source.archive_name, drawable_object_id)
     }
@@ -602,7 +603,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        layout: ShapeTextLayout,
+        layout: Layout,
     ) -> Result<()> {
         let source = shape_graph(self, sheet_id, drawable_object_id)?;
         let staged = set_shape_text_layout(
@@ -1375,9 +1376,9 @@ mod tests {
         LineEndpoint, RgbColorSpace, RgbaColor, ShapeContactShadow, ShapeCornerRadius,
         ShapeGradient, ShapeGradientAngle, ShapeOpacity, ShapeReflection, ShapeReflectionOpacity,
         ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity,
-        ShapeShadowPerspective, ShapeTextAutoSize, ShapeTextInset, ShapeTextInsets,
-        ShapeTextVerticalAlignment, StrokePattern, StrokeWidth,
+        ShapeShadowPerspective, StrokePattern, StrokeWidth,
     };
+    use crate::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
 
     const POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 300.0 };
     const SIZE: DrawableSize = DrawableSize {
@@ -1917,10 +1918,10 @@ mod tests {
         let inherited = editor
             .sheet_shape_text_layout(sheet_id, created.drawable_object_id)
             .unwrap();
-        let layout = ShapeTextLayout::new(
-            ShapeTextVerticalAlignment::Bottom,
-            ShapeTextInsets::uniform(ShapeTextInset::from_points(9.0).unwrap()),
-            ShapeTextAutoSize::Fixed,
+        let layout = Layout::new(
+            VerticalAlignment::Bottom,
+            Insets::uniform(Inset::from_points(9.0).unwrap()),
+            AutoSize::Fixed,
         );
         editor
             .set_sheet_shape_text_layout(sheet_id, created.drawable_object_id, layout)

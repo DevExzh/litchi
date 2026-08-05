@@ -8,7 +8,7 @@ use crate::image_caption::DrawableCaptionKind;
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
     LineEndpoints, LineSegment, LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill,
-    ShapeImageFillTechnique, ShapePathKind, ShapePreset, ShapeShadow, ShapeStroke, ShapeTextLayout,
+    ShapeImageFillTechnique, ShapePathKind, ShapePreset, ShapeShadow, ShapeStroke,
     flip_drawable_geometry, line_geometry, line_path_source, line_segments_match,
     reset_shape_effects, reset_shape_fill, reset_shape_shadow, reset_shape_stroke,
     reset_shape_text_layout, set_shape_effects, set_shape_fill, set_shape_geometry,
@@ -18,6 +18,7 @@ use crate::shapes::{
     shape_shadow, shape_stroke, shape_text_layout,
 };
 use crate::text::TextStorageInfo;
+use crate::text::layout::Layout;
 
 use super::text_box_create::{
     TextBoxObjectIds, slide_text_storage_template, text_box_context, text_box_objects,
@@ -592,7 +593,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<ShapeTextLayout> {
+    ) -> Result<Layout> {
         let source = shape_graph(self, slide_index, drawable_object_id)?;
         shape_text_layout(self.package(), &source.archive_name, drawable_object_id)
     }
@@ -602,7 +603,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        layout: ShapeTextLayout,
+        layout: Layout,
     ) -> Result<()> {
         let source = shape_graph(self, slide_index, drawable_object_id)?;
         let staged = set_shape_text_layout(
@@ -1249,9 +1250,9 @@ mod tests {
         ShapeGradientStop, ShapeGradientStopMidpoint, ShapeGradientStopPosition, ShapeOpacity,
         ShapePolygonSides, ShapeReflection, ShapeReflectionOpacity, ShapeShadowAngle,
         ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowCurve, ShapeShadowOffset,
-        ShapeShadowOpacity, ShapeStarInnerRatio, ShapeStarPoints, ShapeTextAutoSize,
-        ShapeTextInset, ShapeTextInsets, ShapeTextVerticalAlignment, StrokePattern, StrokeWidth,
+        ShapeShadowOpacity, ShapeStarInnerRatio, ShapeStarPoints, StrokePattern, StrokeWidth,
     };
+    use crate::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
 
     const POSITION: DrawablePoint = DrawablePoint { x: 320.0, y: 240.0 };
     const SIZE: DrawableSize = DrawableSize {
@@ -1786,10 +1787,10 @@ mod tests {
         let inherited = editor
             .slide_shape_text_layout(0, created.drawable_object_id)
             .unwrap();
-        let layout = ShapeTextLayout::new(
-            ShapeTextVerticalAlignment::Middle,
-            ShapeTextInsets::uniform(ShapeTextInset::from_points(14.0).unwrap()),
-            ShapeTextAutoSize::ShrinkToFit,
+        let layout = Layout::new(
+            VerticalAlignment::Middle,
+            Insets::uniform(Inset::from_points(14.0).unwrap()),
+            AutoSize::ShrinkToFit,
         );
         editor
             .set_slide_shape_text_layout(0, created.drawable_object_id, layout)

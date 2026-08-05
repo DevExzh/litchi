@@ -9,9 +9,9 @@ use litchi_iwa::shapes::{
     ShapeGradientStop, ShapeGradientStopMidpoint, ShapeGradientStopPosition,
     ShapeImageFillTechnique, ShapeOpacity, ShapePreset, ShapeReflection, ShapeReflectionOpacity,
     ShapeShadow, ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowCurve,
-    ShapeShadowOffset, ShapeShadowOpacity, ShapeTextAutoSize, ShapeTextInset, ShapeTextInsets,
-    ShapeTextLayout, ShapeTextVerticalAlignment,
+    ShapeShadowOffset, ShapeShadowOpacity,
 };
+use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -93,10 +93,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_shape_text_layout(
         0,
         created.drawable_object_id,
-        ShapeTextLayout::new(
-            ShapeTextVerticalAlignment::Middle,
-            ShapeTextInsets::uniform(ShapeTextInset::from_points(14.0)?),
-            ShapeTextAutoSize::ShrinkToFit,
+        Layout::new(
+            VerticalAlignment::Middle,
+            Insets::uniform(Inset::from_points(14.0)?),
+            AutoSize::ShrinkToFit,
         ),
     )?;
     editor.set_slide_shape_title(0, created.drawable_object_id, "Typed Keynote shape")?;

@@ -121,6 +121,14 @@ allocation-free inset validation error; the IWA Numbers adapter retains native
 alignment identifiers, padding archives, cell-style inheritance, and
 transactional package mutation. The remaining flat facade module is a thin
 error/re-export adapter pending the concurrent root-module migration.
+Shape and ordinary text-box frame layout is a distinct, table-independent value
+module at `litchi-iwa-common::text::layout::{VerticalAlignment, AutoSize, Inset,
+Insets, Layout}`. These values are heap-free, fixed-size, and archive-free; the
+common module owns finite non-negative inset validation, while `litchi-iwa`
+retains protobuf conversion, style inheritance, shared-style ownership, and
+transactional package mutation. The old `ShapeText*` value family is removed,
+so Pages, Numbers, Keynote, and their creation examples use the contextual
+`text::layout` module directly without a second facade model.
 The leaf's `transition::Effect` owns the lossless native transition-effect
 identifier vocabulary, including canonical known variants and lossless unknown
 identifiers; IWA retains transition archive decoding, wire patching, and

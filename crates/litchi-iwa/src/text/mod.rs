@@ -86,6 +86,7 @@ pub use font::{Font, Name, NameError, TextFont, TextFontName};
 pub use highlight_types::{TextHighlight, TextHighlightId};
 pub use hyperlink_types::{TextHyperlink, TextHyperlinkId, TextHyperlinkTarget};
 pub use language_types::{TextLanguage, TextLanguageRun, TextLanguageTag};
+pub use litchi_iwa_common::text::layout;
 pub use number_attachment_types::{
     TextNumberAttachment, TextNumberAttachmentFormat, TextNumberAttachmentId,
     TextNumberAttachmentKind, TextNumberAttachmentSettings, TextNumberAttachmentText,

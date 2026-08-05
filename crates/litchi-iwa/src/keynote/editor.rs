@@ -24,10 +24,11 @@ use crate::package_metadata::{
 use crate::protobuf::{kn, tsd, tsp, tss, tswp};
 use crate::ref_graph::ObjectId;
 use crate::shapes::{
-    DrawableGeometry, DrawableProperties, RgbaColor, ShapeTextLayout, reset_shape_text_columns,
+    DrawableGeometry, DrawableProperties, RgbaColor, reset_shape_text_columns,
     reset_shape_text_layout, set_shape_geometry, set_shape_properties, set_shape_text_columns,
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
+use crate::text::layout::Layout;
 use crate::text::{
     IWorkTextEditor, ParagraphBackground, ParagraphBorders, ParagraphDecimalTabCharacter,
     ParagraphDefaultTabInterval, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphFlow,
@@ -1407,7 +1408,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<ShapeTextLayout> {
+    ) -> Result<Layout> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         shape_text_layout(self.package(), &graph.archive_name, drawable_object_id)
     }
@@ -1417,7 +1418,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        layout: ShapeTextLayout,
+        layout: Layout,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let staged = set_shape_text_layout(

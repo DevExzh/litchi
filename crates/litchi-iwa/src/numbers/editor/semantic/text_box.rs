@@ -3,6 +3,7 @@
 #![allow(unused_imports)]
 
 use super::*;
+use crate::text::layout::Layout;
 
 impl NumbersEditor {
     /// List ordinary text boxes owned by a reachable Numbers sheet.
@@ -156,7 +157,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<ShapeTextLayout> {
+    ) -> Result<Layout> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         shape_text_layout(&self.package, &graph.archive_name, drawable_object_id)
     }
@@ -166,7 +167,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        layout: ShapeTextLayout,
+        layout: Layout,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let staged = set_shape_text_layout(

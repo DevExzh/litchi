@@ -8,9 +8,8 @@ use litchi_iwa::shapes::{
     ShapeFill, ShapeGradient, ShapeGradientAngle, ShapeImageFillTechnique, ShapeOpacity,
     ShapePreset, ShapeReflection, ShapeReflectionOpacity, ShapeShadow, ShapeShadowAppearance,
     ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity, ShapeShadowPerspective,
-    ShapeTextAutoSize, ShapeTextInset, ShapeTextInsets, ShapeTextLayout,
-    ShapeTextVerticalAlignment,
 };
+use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -80,10 +79,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_sheet_shape_text_layout(
         sheet_id,
         created.drawable_object_id,
-        ShapeTextLayout::new(
-            ShapeTextVerticalAlignment::Bottom,
-            ShapeTextInsets::uniform(ShapeTextInset::from_points(9.0)?),
-            ShapeTextAutoSize::Fixed,
+        Layout::new(
+            VerticalAlignment::Bottom,
+            Insets::uniform(Inset::from_points(9.0)?),
+            AutoSize::Fixed,
         ),
     )?;
     editor.set_sheet_shape_title(sheet_id, created.drawable_object_id, "Typed Numbers shape")?;

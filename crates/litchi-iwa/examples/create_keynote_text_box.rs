@@ -4,9 +4,9 @@ use std::env;
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeTextAutoSize, ShapeTextInset,
-    ShapeTextInsets, ShapeTextLayout, ShapeTextVerticalAlignment, StrokePattern, StrokeWidth,
+    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, StrokePattern, StrokeWidth,
 };
+use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
 use litchi_iwa::text::{
     DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
     DropCapWrap, ParagraphBackground, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
@@ -56,10 +56,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_text_box_text_layout(
         0,
         created.drawable_object_id,
-        ShapeTextLayout::new(
-            ShapeTextVerticalAlignment::Middle,
-            ShapeTextInsets::uniform(ShapeTextInset::from_points(12.0)?),
-            ShapeTextAutoSize::ShrinkToFit,
+        Layout::new(
+            VerticalAlignment::Middle,
+            Insets::uniform(Inset::from_points(12.0)?),
+            AutoSize::ShrinkToFit,
         ),
     )?;
     editor.set_slide_text_box_text_style(

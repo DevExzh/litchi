@@ -69,6 +69,15 @@ through finite, non-negative validation, and `Layout` is a fixed-size
 composable value. Native alignment and padding conversion remain outside this
 leaf; the facade only adapts its typed error at the archive boundary.
 
+Shape and ordinary text-box frame layout uses a separate focused module:
+`litchi_iwa_common::text::layout::{VerticalAlignment, AutoSize, Inset, Insets,
+Layout}`. It deliberately does not reuse table-cell `TextWrap` semantics: shape
+autosizing and four-way frame alignment are independent values. All five values
+are copyable and heap-free; `Inset::from_points` returns a typed, allocation-free
+error for non-finite or negative input. Native protobuf conversion, bounded
+style inheritance, and package transactions remain in `litchi-iwa`, and the
+facade exposes the common module through `litchi_iwa::text::layout`.
+
 PresentationML implements this rule as `litchi-pptx::shape::{Scene, Shape}`.
 `Scene` is a bounded semantic index over one slide-like owner, not a vector of
 detached XML allocations. Shapes are visited in depth-first pre-order, while a
