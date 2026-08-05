@@ -159,3 +159,6 @@ pub(crate) fn build_minimal_package() -> Result<OpcPackage> {
     )?;
     Ok(package)
 }
+
+/// Inert analytical-model package resources.
+pub mod xldm;
