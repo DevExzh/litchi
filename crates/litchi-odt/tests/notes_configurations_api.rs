@@ -1,7 +1,7 @@
-use litchi_odt::notes_configuration::NoteClass;
-use litchi_odt::{
-    Document, FootnotePosition, LineNumberFormat, MutableDocument, NoteNumberingScope,
-    NotesConfiguration, NotesConfigurations,
+use litchi_odt::Document;
+use litchi_odt::line_numbering::LineNumberFormat;
+use litchi_odt::notes_configuration::{
+    FootnotePosition, NoteClass, NoteNumberingScope, NotesConfiguration, NotesConfigurations,
 };
 mod support;
 
@@ -75,8 +75,10 @@ fn document_reads_note_configurations_from_styles() {
 fn mutable_document_updates_note_configurations_without_touching_unrelated_styles() {
     let footnote = footnote();
     let endnote = endnote();
-    let mut mutable =
-        MutableDocument::from_document(document(r#"<s:style s:name="Keep"/>"#)).unwrap();
+    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(document(
+        r#"<s:style s:name="Keep"/>"#,
+    ))
+    .unwrap();
 
     assert_eq!(mutable.notes_configurations().unwrap(), Default::default());
     assert_eq!(mutable.set_notes_configuration(&footnote).unwrap(), None);

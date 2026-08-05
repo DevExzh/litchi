@@ -6,8 +6,9 @@
 //! paragraphs is real user content, so the readers surface each as its own
 //! block in document order rather than rejecting the document.
 
+use litchi_odt::Document;
 use litchi_odt::elements::text::TextElements;
-use litchi_odt::{Document, FlatOpenDocument, OpenDocumentFamily};
+use litchi_odt::generic::OpenDocumentFamily;
 
 /// Namespace preamble shared by the hand-written content fragments.
 const CONTENT_PREFIX: &str = concat!(
@@ -159,8 +160,10 @@ fn producer_written_frame_captions_round_trip_through_the_flat_reader() {
     // LibreOffice writes an anchored caption frame as a `text:p` that contains a
     // `draw:text-box` with its own `text:p`. Before frames were reachable this
     // shape made `text()` fail outright for the whole document.
-    let flat =
-        FlatOpenDocument::open("../../test-data/odf/odt/nested-frame-paragraphs.fodt").unwrap();
+    let flat = litchi_odt::generic::FlatOpenDocument::open(
+        "../../test-data/odf/odt/nested-frame-paragraphs.fodt",
+    )
+    .unwrap();
     assert_eq!(flat.family(), OpenDocumentFamily::Text);
     assert!(flat.xml().contains("bar"));
     assert!(flat.xml().contains("Illustration"));

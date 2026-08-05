@@ -5,7 +5,7 @@
 //! `style:use-optimal-column-width`, `fo:break-before`, `fo:break-after`) and no child
 //! elements. Unknown attributes, children, or text are rejected.
 
-use super::row::TableRowBreak;
+use super::row::Break;
 use crate::{FlatOpenDocument, OpenDocumentPackage};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
@@ -40,8 +40,8 @@ fn safe(x: &str, name: &str, empty: bool) -> Result<()> {
 
 /// A positive ODF physical length used by `style:column-width`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TableColumnLength(String);
-impl TableColumnLength {
+pub struct Length(String);
+impl Length {
     pub fn new(x: impl Into<String>) -> Result<Self> {
         let x = x.into();
         if x.len() > MAX_VALUE {
@@ -79,8 +79,8 @@ impl TableColumnLength {
 
 /// An ODF relative column width (`relativeLength`, digits followed by `*`).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TableColumnRelWidth(String);
-impl TableColumnRelWidth {
+pub struct RelativeWidth(String);
+impl RelativeWidth {
     pub fn new(x: impl Into<String>) -> Result<Self> {
         let x = x.into();
         let Some(number) = x.strip_suffix('*') else {
@@ -98,14 +98,14 @@ impl TableColumnRelWidth {
 
 /// Complete `style:table-column-properties` value.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct TableColumnProperties {
-    pub column_width: Option<TableColumnLength>,
-    pub rel_column_width: Option<TableColumnRelWidth>,
+pub struct Properties {
+    pub column_width: Option<Length>,
+    pub rel_column_width: Option<RelativeWidth>,
     pub use_optimal_column_width: Option<bool>,
-    pub break_before: Option<TableRowBreak>,
-    pub break_after: Option<TableRowBreak>,
+    pub break_before: Option<Break>,
+    pub break_after: Option<Break>,
 }
-impl TableColumnProperties {
+impl Properties {
     pub fn validate(&self) -> Result<()> {
         Ok(())
     }
@@ -133,27 +133,24 @@ impl TableColumnProperties {
         Ok(xml)
     }
 }
-fn break_xml(x: TableRowBreak) -> &'static str {
+fn break_xml(x: Break) -> &'static str {
     match x {
-        TableRowBreak::Auto => "auto",
-        TableRowBreak::Column => "column",
-        TableRowBreak::Page => "page",
+        Break::Auto => "auto",
+        Break::Column => "column",
+        Break::Page => "page",
     }
 }
 
 /// A named or default table-column style declaration carrying typed column properties.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TableColumnStyleProperties {
+pub struct Style {
     pub name: Option<String>,
     pub parent_style_name: Option<String>,
     pub is_default_style: bool,
-    pub properties: Option<TableColumnProperties>,
+    pub properties: Option<Properties>,
 }
-impl TableColumnStyleProperties {
-    pub fn named(
-        name: impl Into<String>,
-        properties: Option<TableColumnProperties>,
-    ) -> Result<Self> {
+impl Style {
+    pub fn named(name: impl Into<String>, properties: Option<Properties>) -> Result<Self> {
         let value = Self {
             name: Some(name.into()),
             parent_style_name: None,
@@ -163,7 +160,7 @@ impl TableColumnStyleProperties {
         value.validate()?;
         Ok(value)
     }
-    pub fn default_style(properties: Option<TableColumnProperties>) -> Self {
+    pub fn default_style(properties: Option<Properties>) -> Self {
         Self {
             name: None,
             parent_style_name: None,
@@ -218,16 +215,16 @@ impl TableColumnStyleProperties {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct TableColumnStylePropertiesSet {
-    pub styles: Vec<TableColumnStyleProperties>,
+pub struct Styles {
+    pub styles: Vec<Style>,
 }
-impl TableColumnStylePropertiesSet {
-    pub fn get(&self, name: &str) -> Option<&TableColumnStyleProperties> {
+impl Styles {
+    pub fn get(&self, name: &str) -> Option<&Style> {
         self.styles
             .iter()
             .find(|style| style.name.as_deref() == Some(name))
     }
-    pub fn default_style(&self) -> Option<&TableColumnStyleProperties> {
+    pub fn default_style(&self) -> Option<&Style> {
         self.styles.iter().find(|style| style.is_default_style)
     }
 }
@@ -296,11 +293,11 @@ fn boolean(value: &str) -> Result<bool> {
         _ => Err(bad("ODF boolean must be true or false")),
     }
 }
-fn parse_break(value: &str) -> Result<TableRowBreak> {
+fn parse_break(value: &str) -> Result<Break> {
     match value {
-        "auto" => Ok(TableRowBreak::Auto),
-        "column" => Ok(TableRowBreak::Column),
-        "page" => Ok(TableRowBreak::Page),
+        "auto" => Ok(Break::Auto),
+        "column" => Ok(Break::Column),
+        "page" => Ok(Break::Page),
         _ => Err(bad("invalid table-column break value")),
     }
 }
@@ -309,12 +306,12 @@ fn style_header(
     version: XmlVersion,
     start: &BytesStart<'_>,
     default: bool,
-) -> Result<Option<TableColumnStyleProperties>> {
+) -> Result<Option<Style>> {
     let mut attrs = attributes(reader, version, start)?;
     if take(&mut attrs, Ns::Style, b"family").as_deref() != Some("table-column") {
         return Ok(None);
     }
-    let value = TableColumnStyleProperties {
+    let value = Style {
         name: take(&mut attrs, Ns::Style, b"name"),
         parent_style_name: take(&mut attrs, Ns::Style, b"parent-style-name"),
         is_default_style: default,
@@ -327,14 +324,14 @@ fn column_properties(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<TableColumnProperties> {
+) -> Result<Properties> {
     let mut attrs = attributes(reader, version, start)?;
-    let value = TableColumnProperties {
+    let value = Properties {
         column_width: take(&mut attrs, Ns::Style, b"column-width")
-            .map(TableColumnLength::new)
+            .map(Length::new)
             .transpose()?,
         rel_column_width: take(&mut attrs, Ns::Style, b"rel-column-width")
-            .map(TableColumnRelWidth::new)
+            .map(RelativeWidth::new)
             .transpose()?,
         use_optimal_column_width: take(&mut attrs, Ns::Style, b"use-optimal-column-width")
             .map(|x| boolean(&x))
@@ -353,15 +350,11 @@ fn column_properties(
 }
 struct Active {
     depth: usize,
-    style: TableColumnStyleProperties,
+    style: Style,
     seen_properties: bool,
     properties_depth: Option<usize>,
 }
-fn push_style(
-    out: &mut Vec<TableColumnStyleProperties>,
-    style: TableColumnStyleProperties,
-    total: &mut usize,
-) -> Result<()> {
+fn push_style(out: &mut Vec<Style>, style: Style, total: &mut usize) -> Result<()> {
     if out.len() >= MAX_STYLES
         || out
             .iter()
@@ -378,7 +371,7 @@ fn push_style(
 }
 
 /// Parse direct table-column styles in `office:styles` and `office:automatic-styles`.
-pub fn parse_table_column_style_properties(xml: &str) -> Result<TableColumnStylePropertiesSet> {
+pub fn parse(xml: &str) -> Result<Styles> {
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
     }
@@ -521,7 +514,7 @@ pub fn parse_table_column_style_properties(xml: &str) -> Result<TableColumnStyle
     if !stack.is_empty() || active.is_some() {
         return Err(bad("truncated styles XML"));
     }
-    Ok(TableColumnStylePropertiesSet { styles: out })
+    Ok(Styles { styles: out })
 }
 
 #[derive(Default)]
@@ -558,10 +551,7 @@ fn expand_span(xml: &str, span: &Span, value: &str) -> Result<String> {
 }
 
 /// Losslessly replace, insert, or remove one existing column style's property element.
-pub fn set_table_column_style_properties_xml(
-    xml: &str,
-    requested: &TableColumnStyleProperties,
-) -> Result<String> {
+pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
     requested.validate()?;
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
@@ -695,7 +685,7 @@ pub fn set_table_column_style_properties_xml(
     let replacement = requested
         .properties
         .as_ref()
-        .map(TableColumnProperties::to_xml_fragment)
+        .map(Properties::to_xml_fragment)
         .transpose()?;
     if let Some(properties) = &spans.properties {
         return Ok(replace_span(
@@ -716,15 +706,13 @@ pub fn set_table_column_style_properties_xml(
 }
 
 impl OpenDocumentPackage {
-    pub fn table_column_style_properties(&self) -> Result<TableColumnStylePropertiesSet> {
-        self.styles_xml()?.map_or_else(
-            || Ok(Default::default()),
-            |xml| parse_table_column_style_properties(&xml),
-        )
+    pub fn column_style_properties(&self) -> Result<Styles> {
+        self.styles_xml()?
+            .map_or_else(|| Ok(Default::default()), |xml| parse(&xml))
     }
 }
 impl FlatOpenDocument {
-    pub fn table_column_style_properties(&self) -> Result<TableColumnStylePropertiesSet> {
-        parse_table_column_style_properties(self.xml())
+    pub fn column_style_properties(&self) -> Result<Styles> {
+        parse(self.xml())
     }
 }

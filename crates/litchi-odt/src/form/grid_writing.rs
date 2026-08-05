@@ -1281,7 +1281,7 @@ mod tests {
         let mut builder = crate::Builder::new();
         builder.add_grid_form(&form).unwrap();
         let document = crate::Document::from_bytes(builder.build().unwrap()).unwrap();
-        let mut mutable = crate::MutableDocument::from_document(document).unwrap();
+        let mut mutable = crate::mutable::MutableDocument::from_document(document).unwrap();
         assert_eq!(mutable.grid_controls().unwrap(), [inserted]);
         mutable.insert_grid_control(0, &replacement).unwrap();
         assert_eq!(mutable.remove_grid_control(1).unwrap().name, "Replacement");

@@ -1184,7 +1184,7 @@ mod tests {
 
     #[test]
     fn builder_and_mutable_document_round_trip() {
-        use crate::{Builder, Document, MutableDocument};
+        use crate::{Builder, Document, mutable::MutableDocument};
         let mut initial = FileControl::new("File", "file");
         initial.current_value = Some("/host/path/is/not/read".into());
         let mut form = PasswordFileForm::new("Main");

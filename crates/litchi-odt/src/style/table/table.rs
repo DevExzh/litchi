@@ -1,9 +1,8 @@
 //! Complete typed ODF `style:table-properties` support.
 
 use super::row::{
-    HorizontalBackgroundPosition, TableRowBackgroundColor, TableRowBackgroundImage,
-    TableRowBackgroundPosition, TableRowBackgroundRepeat, TableRowBackgroundSource, TableRowBreak,
-    TableRowKeepTogether, TableRowOpacity, VerticalBackgroundPosition,
+    BackgroundColor, BackgroundImage, BackgroundPosition, BackgroundSource, Break,
+    HorizontalBackgroundPosition, KeepTogether, Opacity, Repeat, VerticalBackgroundPosition,
 };
 use crate::{FlatOpenDocument, OpenDocumentPackage};
 use litchi_core::{Error, Result, xml::escape_xml};
@@ -72,8 +71,8 @@ fn physical(x: &str, signed: bool, positive: bool) -> bool {
 
 /// ODF percentage lexical value, including signed percentages where the RNG permits them.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TableStylePercent(String);
-impl TableStylePercent {
+pub struct Percent(String);
+impl Percent {
     pub fn new(x: impl Into<String>) -> Result<Self> {
         let x = x.into();
         let Some(n) = x.strip_suffix('%') else {
@@ -90,15 +89,15 @@ impl TableStylePercent {
 }
 /// An ODF physical length or percentage used by table margins.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TableStyleMeasure {
+pub enum Measure {
     Length(String),
-    Percent(TableStylePercent),
+    Percent(Percent),
 }
-impl TableStyleMeasure {
+impl Measure {
     pub fn new(x: impl Into<String>) -> Result<Self> {
         let x = x.into();
         if x.ends_with('%') {
-            Ok(Self::Percent(TableStylePercent::new(x)?))
+            Ok(Self::Percent(Percent::new(x)?))
         } else if physical(&x, true, false) && x.len() <= MAX_VALUE {
             Ok(Self::Length(x))
         } else {
@@ -117,8 +116,8 @@ impl TableStyleMeasure {
 }
 /// Positive physical table width.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TableStyleWidth(String);
-impl TableStyleWidth {
+pub struct Width(String);
+impl Width {
     pub fn new(x: impl Into<String>) -> Result<Self> {
         let x = x.into();
         if x.len() > MAX_VALUE || !physical(&x, false, true) {
@@ -132,13 +131,13 @@ impl TableStyleWidth {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TableAlignment {
+pub enum Alignment {
     Left,
     Center,
     Right,
     Margins,
 }
-impl TableAlignment {
+impl Alignment {
     fn parse(x: &str) -> Result<Self> {
         match x {
             "left" => Ok(Self::Left),
@@ -158,11 +157,11 @@ impl TableAlignment {
     }
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TablePageNumber {
+pub enum PageNumber {
     Auto,
     Number(u64),
 }
-impl TablePageNumber {
+impl PageNumber {
     fn parse(x: &str) -> Result<Self> {
         if x == "auto" {
             return Ok(Self::Auto);
@@ -181,8 +180,8 @@ impl TablePageNumber {
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TableShadow(String);
-impl TableShadow {
+pub struct Shadow(String);
+impl Shadow {
     pub fn new(x: impl Into<String>) -> Result<Self> {
         let x = x.into();
         safe(&x, "style:shadow", true)?;
@@ -193,11 +192,11 @@ impl TableShadow {
     }
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TableBorderModel {
+pub enum BorderModel {
     Collapsing,
     Separating,
 }
-impl TableBorderModel {
+impl BorderModel {
     fn parse(x: &str) -> Result<Self> {
         match x {
             "collapsing" => Ok(Self::Collapsing),
@@ -213,7 +212,7 @@ impl TableBorderModel {
     }
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TableWritingMode {
+pub enum WritingMode {
     LrTb,
     RlTb,
     TbRl,
@@ -223,7 +222,7 @@ pub enum TableWritingMode {
     Tb,
     Page,
 }
-impl TableWritingMode {
+impl WritingMode {
     fn parse(x: &str) -> Result<Self> {
         match x {
             "lr-tb" => Ok(Self::LrTb),
@@ -253,28 +252,28 @@ impl TableWritingMode {
 
 /// Complete `style:table-properties` value.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct TableProperties {
-    pub width: Option<TableStyleWidth>,
-    pub relative_width: Option<TableStylePercent>,
-    pub align: Option<TableAlignment>,
-    pub margin_left: Option<TableStyleMeasure>,
-    pub margin_right: Option<TableStyleMeasure>,
-    pub margin_top: Option<TableStyleMeasure>,
-    pub margin_bottom: Option<TableStyleMeasure>,
-    pub margin: Option<TableStyleMeasure>,
-    pub page_number: Option<TablePageNumber>,
-    pub break_before: Option<TableRowBreak>,
-    pub break_after: Option<TableRowBreak>,
-    pub background_color: Option<TableRowBackgroundColor>,
-    pub background_image: Option<TableRowBackgroundImage>,
-    pub shadow: Option<TableShadow>,
-    pub keep_with_next: Option<TableRowKeepTogether>,
+pub struct Properties {
+    pub width: Option<Width>,
+    pub relative_width: Option<Percent>,
+    pub align: Option<Alignment>,
+    pub margin_left: Option<Measure>,
+    pub margin_right: Option<Measure>,
+    pub margin_top: Option<Measure>,
+    pub margin_bottom: Option<Measure>,
+    pub margin: Option<Measure>,
+    pub page_number: Option<PageNumber>,
+    pub break_before: Option<Break>,
+    pub break_after: Option<Break>,
+    pub background_color: Option<BackgroundColor>,
+    pub background_image: Option<BackgroundImage>,
+    pub shadow: Option<Shadow>,
+    pub keep_with_next: Option<KeepTogether>,
     pub may_break_between_rows: Option<bool>,
-    pub border_model: Option<TableBorderModel>,
-    pub writing_mode: Option<TableWritingMode>,
+    pub border_model: Option<BorderModel>,
+    pub writing_mode: Option<WritingMode>,
     pub display: Option<bool>,
 }
-impl TableProperties {
+impl Properties {
     pub fn validate(&self) -> Result<()> {
         for (x, n) in [
             (&self.margin_top, "fo:margin-top"),
@@ -285,7 +284,7 @@ impl TableProperties {
                 return Err(bad(format!("{n} length cannot be negative")));
             }
         }
-        if let Some(TablePageNumber::Number(n)) = self.page_number
+        if let Some(PageNumber::Number(n)) = self.page_number
             && (n == 0 || n > MAX_PAGE)
         {
             return Err(bad("style:page-number out of range"));
@@ -360,29 +359,29 @@ impl TableProperties {
         Ok(x)
     }
 }
-fn break_xml(x: TableRowBreak) -> &'static str {
+fn break_xml(x: Break) -> &'static str {
     match x {
-        TableRowBreak::Auto => "auto",
-        TableRowBreak::Column => "column",
-        TableRowBreak::Page => "page",
+        Break::Auto => "auto",
+        Break::Column => "column",
+        Break::Page => "page",
     }
 }
-fn keep_xml(x: TableRowKeepTogether) -> &'static str {
+fn keep_xml(x: KeepTogether) -> &'static str {
     match x {
-        TableRowKeepTogether::Auto => "auto",
-        TableRowKeepTogether::Always => "always",
+        KeepTogether::Auto => "auto",
+        KeepTogether::Always => "always",
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TableStyleProperties {
+pub struct Style {
     pub name: Option<String>,
     pub parent_style_name: Option<String>,
     pub is_default_style: bool,
-    pub properties: Option<TableProperties>,
+    pub properties: Option<Properties>,
 }
-impl TableStyleProperties {
-    pub fn named(name: impl Into<String>, properties: Option<TableProperties>) -> Result<Self> {
+impl Style {
+    pub fn named(name: impl Into<String>, properties: Option<Properties>) -> Result<Self> {
         let x = Self {
             name: Some(name.into()),
             parent_style_name: None,
@@ -392,7 +391,7 @@ impl TableStyleProperties {
         x.validate()?;
         Ok(x)
     }
-    pub fn default_style(properties: Option<TableProperties>) -> Self {
+    pub fn default_style(properties: Option<Properties>) -> Self {
         Self {
             name: None,
             parent_style_name: None,
@@ -442,14 +441,14 @@ impl TableStyleProperties {
     }
 }
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct TableStylePropertiesSet {
-    pub styles: Vec<TableStyleProperties>,
+pub struct Styles {
+    pub styles: Vec<Style>,
 }
-impl TableStylePropertiesSet {
-    pub fn get(&self, n: &str) -> Option<&TableStyleProperties> {
+impl Styles {
+    pub fn get(&self, n: &str) -> Option<&Style> {
         self.styles.iter().find(|x| x.name.as_deref() == Some(n))
     }
-    pub fn default_style(&self) -> Option<&TableStyleProperties> {
+    pub fn default_style(&self) -> Option<&Style> {
         self.styles.iter().find(|x| x.is_default_style)
     }
 }
@@ -522,18 +521,18 @@ fn boolean(x: &str) -> Result<bool> {
         _ => Err(bad("ODF boolean must be true or false")),
     }
 }
-fn parse_break(x: &str) -> Result<TableRowBreak> {
+fn parse_break(x: &str) -> Result<Break> {
     match x {
-        "auto" => Ok(TableRowBreak::Auto),
-        "column" => Ok(TableRowBreak::Column),
-        "page" => Ok(TableRowBreak::Page),
+        "auto" => Ok(Break::Auto),
+        "column" => Ok(Break::Column),
+        "page" => Ok(Break::Page),
         _ => Err(bad("invalid table break")),
     }
 }
-fn parse_keep(x: &str) -> Result<TableRowKeepTogether> {
+fn parse_keep(x: &str) -> Result<KeepTogether> {
     match x {
-        "auto" => Ok(TableRowKeepTogether::Auto),
-        "always" => Ok(TableRowKeepTogether::Always),
+        "auto" => Ok(KeepTogether::Auto),
+        "always" => Ok(KeepTogether::Always),
         _ => Err(bad("invalid fo:keep-with-next")),
     }
 }
@@ -542,7 +541,7 @@ fn header(
     v: XmlVersion,
     e: &BytesStart<'_>,
     default: bool,
-) -> Result<Option<TableStyleProperties>> {
+) -> Result<Option<Style>> {
     let mut a = attrs(r, v, e)?;
     if a.iter().any(|(n, l, _)| {
         *n != Ns::S && matches!(l.as_slice(), b"family" | b"name" | b"parent-style-name")
@@ -552,7 +551,7 @@ fn header(
     if take(&mut a, Ns::S, b"family").as_deref() != Some("table") {
         return Ok(None);
     }
-    let x = TableStyleProperties {
+    let x = Style {
         name: take(&mut a, Ns::S, b"name"),
         parent_style_name: take(&mut a, Ns::S, b"parent-style-name"),
         is_default_style: default,
@@ -561,35 +560,33 @@ fn header(
     x.validate()?;
     Ok(Some(x))
 }
-fn properties(r: &NsReader<&[u8]>, v: XmlVersion, e: &BytesStart<'_>) -> Result<TableProperties> {
+fn properties(r: &NsReader<&[u8]>, v: XmlVersion, e: &BytesStart<'_>) -> Result<Properties> {
     let mut a = attrs(r, v, e)?;
-    let p = TableProperties {
-        width: take(&mut a, Ns::S, b"width")
-            .map(TableStyleWidth::new)
-            .transpose()?,
+    let p = Properties {
+        width: take(&mut a, Ns::S, b"width").map(Width::new).transpose()?,
         relative_width: take(&mut a, Ns::S, b"rel-width")
-            .map(TableStylePercent::new)
+            .map(Percent::new)
             .transpose()?,
         align: take(&mut a, Ns::T, b"align")
-            .map(|x| TableAlignment::parse(&x))
+            .map(|x| Alignment::parse(&x))
             .transpose()?,
         margin_left: take(&mut a, Ns::F, b"margin-left")
-            .map(TableStyleMeasure::new)
+            .map(Measure::new)
             .transpose()?,
         margin_right: take(&mut a, Ns::F, b"margin-right")
-            .map(TableStyleMeasure::new)
+            .map(Measure::new)
             .transpose()?,
         margin_top: take(&mut a, Ns::F, b"margin-top")
-            .map(TableStyleMeasure::new)
+            .map(Measure::new)
             .transpose()?,
         margin_bottom: take(&mut a, Ns::F, b"margin-bottom")
-            .map(TableStyleMeasure::new)
+            .map(Measure::new)
             .transpose()?,
         margin: take(&mut a, Ns::F, b"margin")
-            .map(TableStyleMeasure::new)
+            .map(Measure::new)
             .transpose()?,
         page_number: take(&mut a, Ns::S, b"page-number")
-            .map(|x| TablePageNumber::parse(&x))
+            .map(|x| PageNumber::parse(&x))
             .transpose()?,
         break_before: take(&mut a, Ns::F, b"break-before")
             .map(|x| parse_break(&x))
@@ -598,11 +595,11 @@ fn properties(r: &NsReader<&[u8]>, v: XmlVersion, e: &BytesStart<'_>) -> Result<
             .map(|x| parse_break(&x))
             .transpose()?,
         background_color: take(&mut a, Ns::F, b"background-color")
-            .map(TableRowBackgroundColor::new)
+            .map(BackgroundColor::new)
             .transpose()?,
         background_image: None,
         shadow: take(&mut a, Ns::S, b"shadow")
-            .map(TableShadow::new)
+            .map(Shadow::new)
             .transpose()?,
         keep_with_next: take(&mut a, Ns::F, b"keep-with-next")
             .map(|x| parse_keep(&x))
@@ -611,10 +608,10 @@ fn properties(r: &NsReader<&[u8]>, v: XmlVersion, e: &BytesStart<'_>) -> Result<
             .map(|x| boolean(&x))
             .transpose()?,
         border_model: take(&mut a, Ns::T, b"border-model")
-            .map(|x| TableBorderModel::parse(&x))
+            .map(|x| BorderModel::parse(&x))
             .transpose()?,
         writing_mode: take(&mut a, Ns::S, b"writing-mode")
-            .map(|x| TableWritingMode::parse(&x))
+            .map(|x| WritingMode::parse(&x))
             .transpose()?,
         display: take(&mut a, Ns::T, b"display")
             .map(|x| boolean(&x))
@@ -626,7 +623,7 @@ fn properties(r: &NsReader<&[u8]>, v: XmlVersion, e: &BytesStart<'_>) -> Result<
     p.validate()?;
     Ok(p)
 }
-fn position(x: &str) -> Result<TableRowBackgroundPosition> {
+fn position(x: &str) -> Result<BackgroundPosition> {
     let w: Vec<_> = x.split_ascii_whitespace().collect();
     let h = |x| match x {
         "left" => Some(HorizontalBackgroundPosition::Left),
@@ -641,30 +638,30 @@ fn position(x: &str) -> Result<TableRowBackgroundPosition> {
         _ => None,
     };
     match w.as_slice() {
-        ["left"] => Ok(TableRowBackgroundPosition::Left),
-        ["center"] => Ok(TableRowBackgroundPosition::Center),
-        ["right"] => Ok(TableRowBackgroundPosition::Right),
-        ["top"] => Ok(TableRowBackgroundPosition::Top),
-        ["bottom"] => Ok(TableRowBackgroundPosition::Bottom),
+        ["left"] => Ok(BackgroundPosition::Left),
+        ["center"] => Ok(BackgroundPosition::Center),
+        ["right"] => Ok(BackgroundPosition::Right),
+        ["top"] => Ok(BackgroundPosition::Top),
+        ["bottom"] => Ok(BackgroundPosition::Bottom),
         [a, b] => h(a)
             .zip(v(b))
             .or_else(|| h(b).zip(v(a)))
-            .map(|(h, v)| TableRowBackgroundPosition::Pair(h, v))
+            .map(|(h, v)| BackgroundPosition::Pair(h, v))
             .ok_or_else(|| bad("invalid background position")),
         _ => Err(bad("invalid background position")),
     }
 }
 struct Image {
-    value: TableRowBackgroundImage,
+    value: BackgroundImage,
     linked: bool,
 }
 fn image(r: &NsReader<&[u8]>, v: XmlVersion, e: &BytesStart<'_>) -> Result<Image> {
     let mut a = attrs(r, v, e)?;
     let repeat = take(&mut a, Ns::S, b"repeat")
         .map(|x| match x.as_str() {
-            "no-repeat" => Ok(TableRowBackgroundRepeat::NoRepeat),
-            "repeat" => Ok(TableRowBackgroundRepeat::Repeat),
-            "stretch" => Ok(TableRowBackgroundRepeat::Stretch),
+            "no-repeat" => Ok(Repeat::NoRepeat),
+            "repeat" => Ok(Repeat::Repeat),
+            "stretch" => Ok(Repeat::Stretch),
             _ => Err(bad("invalid background repeat")),
         })
         .transpose()?;
@@ -676,7 +673,7 @@ fn image(r: &NsReader<&[u8]>, v: XmlVersion, e: &BytesStart<'_>) -> Result<Image
         safe(x, "style:filter-name", true)?
     }
     let opacity = take(&mut a, Ns::D, b"opacity")
-        .map(TableRowOpacity::new)
+        .map(Opacity::new)
         .transpose()?;
     let kind = take(&mut a, Ns::X, b"type");
     let href = take(&mut a, Ns::X, b"href");
@@ -694,15 +691,15 @@ fn image(r: &NsReader<&[u8]>, v: XmlVersion, e: &BytesStart<'_>) -> Result<Image
         {
             return Err(bad("invalid background-image link group"));
         }
-        TableRowBackgroundSource::Link {
+        BackgroundSource::Link {
             href: href.unwrap(),
             show_embed: show.is_some(),
             actuate_on_load: actuate.is_some(),
         }
     } else {
-        TableRowBackgroundSource::Empty
+        BackgroundSource::Empty
     };
-    let value = TableRowBackgroundImage {
+    let value = BackgroundImage {
         repeat,
         position: pos,
         filter_name: filter,
@@ -714,7 +711,7 @@ fn image(r: &NsReader<&[u8]>, v: XmlVersion, e: &BytesStart<'_>) -> Result<Image
 }
 struct Active {
     depth: usize,
-    style: TableStyleProperties,
+    style: Style,
     seen: bool,
     pd: Option<usize>,
     id: Option<usize>,
@@ -722,11 +719,7 @@ struct Active {
     binary: String,
     linked: bool,
 }
-fn push(
-    out: &mut Vec<TableStyleProperties>,
-    x: TableStyleProperties,
-    total: &mut usize,
-) -> Result<()> {
+fn push(out: &mut Vec<Style>, x: Style, total: &mut usize) -> Result<()> {
     if out.len() >= MAX_STYLES
         || out
             .iter()
@@ -742,7 +735,7 @@ fn push(
     Ok(())
 }
 /// Parse direct table styles from regular and automatic style containers.
-pub fn parse_table_style_properties(xml: &str) -> Result<TableStylePropertiesSet> {
+pub fn parse(xml: &str) -> Result<Styles> {
     if xml.len() > MAX_XML {
         return Err(bad("styles XML too large"));
     }
@@ -883,7 +876,7 @@ pub fn parse_table_style_properties(xml: &str) -> Result<TableStylePropertiesSet
                             .background_image
                             .as_mut()
                             .unwrap()
-                            .source = TableRowBackgroundSource::Embedded(Vec::new())
+                            .source = BackgroundSource::Embedded(Vec::new())
                     } else if s.pd.is_some_and(|p| d > p) {
                         return Err(bad("unexpected table-properties child"));
                     }
@@ -927,7 +920,7 @@ pub fn parse_table_style_properties(xml: &str) -> Result<TableStylePropertiesSet
                             .background_image
                             .as_mut()
                             .unwrap()
-                            .source = TableRowBackgroundSource::Embedded(data);
+                            .source = BackgroundSource::Embedded(data);
                         s.bd = None
                     }
                     if s.id == Some(d) {
@@ -958,7 +951,7 @@ pub fn parse_table_style_properties(xml: &str) -> Result<TableStylePropertiesSet
     if !stack.is_empty() || active.is_some() {
         return Err(bad("truncated styles XML"));
     }
-    Ok(TableStylePropertiesSet { styles: out })
+    Ok(Styles { styles: out })
 }
 fn b64_decode(x: &str) -> Result<Vec<u8>> {
     let x: Vec<_> = x.bytes().filter(|x| !x.is_ascii_whitespace()).collect();
@@ -1040,7 +1033,7 @@ fn expand(x: &str, s: &Span, v: &str) -> Result<String> {
     ))
 }
 /// Losslessly replace, insert, or remove one existing table style's property element.
-pub fn set_table_style_properties_xml(xml: &str, want: &TableStyleProperties) -> Result<String> {
+pub fn set_xml(xml: &str, want: &Style) -> Result<String> {
     want.validate()?;
     if xml.len() > MAX_XML {
         return Err(bad("styles XML too large"));
@@ -1172,7 +1165,7 @@ pub fn set_table_style_properties_xml(xml: &str, want: &TableStyleProperties) ->
     let value = want
         .properties
         .as_ref()
-        .map(TableProperties::to_xml_fragment)
+        .map(Properties::to_xml_fragment)
         .transpose()?;
     if let Some(p) = &s.properties {
         return Ok(replace(xml, p, value.as_deref().unwrap_or("")));
@@ -1188,15 +1181,13 @@ pub fn set_table_style_properties_xml(xml: &str, want: &TableStyleProperties) ->
     Ok(out)
 }
 impl OpenDocumentPackage {
-    pub fn table_style_properties(&self) -> Result<TableStylePropertiesSet> {
-        self.styles_xml()?.map_or_else(
-            || Ok(Default::default()),
-            |x| parse_table_style_properties(&x),
-        )
+    pub fn table_style_properties(&self) -> Result<Styles> {
+        self.styles_xml()?
+            .map_or_else(|| Ok(Default::default()), |x| parse(&x))
     }
 }
 impl FlatOpenDocument {
-    pub fn table_style_properties(&self) -> Result<TableStylePropertiesSet> {
-        parse_table_style_properties(self.xml())
+    pub fn table_style_properties(&self) -> Result<Styles> {
+        parse(self.xml())
     }
 }

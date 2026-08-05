@@ -1,10 +1,11 @@
-use litchi_odt::{
-    Builder, FlatOpenDocument, NonNegativeLength, OpenDocumentPackage,
+use litchi_odt::Builder;
+use litchi_odt::line_numbering::NonNegativeLength;
+use litchi_odt::style::paragraph::border::{
     ParagraphBackgroundTransparency, ParagraphBorder, ParagraphBorderProperties,
-    ParagraphBorderWidth, ParagraphBorderWidths, ParagraphStyleBorder, TableRowBackgroundColor,
-    TableRowBackgroundImage, TableRowBackgroundRepeat, TableRowBackgroundSource, TableShadow,
+    ParagraphBorderWidth, ParagraphBorderWidths, ParagraphStyleBorder,
     parse_paragraph_style_borders, set_paragraph_style_border_xml,
 };
+use litchi_odt::style::table::{row, table};
 use std::io::Cursor;
 const O: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const S: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
@@ -52,10 +53,10 @@ fn parses_all_border_attributes() {
         Some(ParagraphBackgroundTransparency::new("25%").unwrap())
     );
     let image = p.background_image.as_ref().unwrap();
-    assert_eq!(image.repeat, Some(TableRowBackgroundRepeat::NoRepeat));
+    assert_eq!(image.repeat, Some(row::Repeat::NoRepeat));
     assert_eq!(
         image.source,
-        TableRowBackgroundSource::Link {
+        row::BackgroundSource::Link {
             href: "Pictures/a.png".to_string(),
             show_embed: true,
             actuate_on_load: true,
@@ -85,7 +86,7 @@ fn round_trip_serialize_reparse() {
             .as_ref()
             .unwrap()
             .source,
-        TableRowBackgroundSource::Embedded(vec![1, 2, 3, 4])
+        row::BackgroundSource::Embedded(vec![1, 2, 3, 4])
     );
     let fragment = set.default_style().unwrap().to_xml_fragment().unwrap();
     assert_eq!(
@@ -209,12 +210,12 @@ fn mutation_replaces_inserts_and_removes() {
     let with_image = ParagraphStyleBorder::named(
         "E",
         Some(ParagraphBorderProperties {
-            background_image: Some(TableRowBackgroundImage {
+            background_image: Some(row::BackgroundImage {
                 repeat: None,
                 position: None,
                 filter_name: None,
                 opacity: None,
-                source: TableRowBackgroundSource::Link {
+                source: row::BackgroundSource::Link {
                     href: "Pictures/b.png".to_string(),
                     show_embed: false,
                     actuate_on_load: false,
@@ -241,8 +242,8 @@ fn mutation_replaces_inserts_and_removes() {
         ParagraphStyleBorder::named(
             name,
             Some(ParagraphBorderProperties {
-                shadow: Some(TableShadow::new("none").unwrap()),
-                background_color: Some(TableRowBackgroundColor::new("transparent").unwrap()),
+                shadow: Some(table::Shadow::new("none").unwrap()),
+                background_color: Some(row::BackgroundColor::new("transparent").unwrap()),
                 ..Default::default()
             }),
         )
@@ -274,7 +275,7 @@ fn builder_package_round_trip() {
                 outer_width: ParagraphBorderWidth::new("0.002cm").unwrap(),
             }),
             padding: Some(NonNegativeLength::new("0cm").unwrap()),
-            background_color: Some(TableRowBackgroundColor::new("transparent").unwrap()),
+            background_color: Some(row::BackgroundColor::new("transparent").unwrap()),
             ..Default::default()
         }),
     )
@@ -287,7 +288,8 @@ fn builder_package_round_trip() {
             .is_err()
     );
     builder.add_paragraph("x").unwrap();
-    let package = OpenDocumentPackage::from_bytes(builder.build().unwrap()).unwrap();
+    let package =
+        litchi_odt::generic::OpenDocumentPackage::from_bytes(builder.build().unwrap()).unwrap();
     assert_eq!(
         package.paragraph_style_borders().unwrap().get("Box"),
         Some(&style)
@@ -299,7 +301,7 @@ fn parses_real_libreoffice_fixture() {
     let bytes = include_bytes!(
         "../../../test-data/libreoffice-core/vcl/qa/cppunit/pdfexport/data/tdf159817.fodt"
     );
-    let flat = FlatOpenDocument::from_reader(Cursor::new(bytes)).unwrap();
+    let flat = litchi_odt::generic::FlatOpenDocument::from_reader(Cursor::new(bytes)).unwrap();
     let set = flat.paragraph_style_borders().unwrap();
     assert!(!set.styles.is_empty());
     assert!(

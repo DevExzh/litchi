@@ -43,8 +43,8 @@ fn safe(value: &str, field: &str, empty: bool) -> Result<()> {
 
 /// A positive or non-negative ODF physical length.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TableRowLength(String);
-impl TableRowLength {
+pub struct Length(String);
+impl Length {
     pub fn positive(value: impl Into<String>) -> Result<Self> {
         Self::new(value.into(), false)
     }
@@ -87,12 +87,12 @@ impl TableRowLength {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TableRowBreak {
+pub enum Break {
     Auto,
     Column,
     Page,
 }
-impl TableRowBreak {
+impl Break {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "auto" => Ok(Self::Auto),
@@ -111,11 +111,11 @@ impl TableRowBreak {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TableRowKeepTogether {
+pub enum KeepTogether {
     Auto,
     Always,
 }
-impl TableRowKeepTogether {
+impl KeepTogether {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "auto" => Ok(Self::Auto),
@@ -132,8 +132,8 @@ impl TableRowKeepTogether {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TableRowBackgroundColor(String);
-impl TableRowBackgroundColor {
+pub struct BackgroundColor(String);
+impl BackgroundColor {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         let color = value == "transparent"
@@ -151,12 +151,12 @@ impl TableRowBackgroundColor {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TableRowBackgroundRepeat {
+pub enum Repeat {
     NoRepeat,
     Repeat,
     Stretch,
 }
-impl TableRowBackgroundRepeat {
+impl Repeat {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "no-repeat" => Ok(Self::NoRepeat),
@@ -187,7 +187,7 @@ pub enum VerticalBackgroundPosition {
     Bottom,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TableRowBackgroundPosition {
+pub enum BackgroundPosition {
     Left,
     Center,
     Right,
@@ -195,7 +195,7 @@ pub enum TableRowBackgroundPosition {
     Bottom,
     Pair(HorizontalBackgroundPosition, VerticalBackgroundPosition),
 }
-impl TableRowBackgroundPosition {
+impl BackgroundPosition {
     fn horizontal(value: &str) -> Option<HorizontalBackgroundPosition> {
         match value {
             "left" => Some(HorizontalBackgroundPosition::Left),
@@ -251,8 +251,8 @@ impl TableRowBackgroundPosition {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TableRowOpacity(String);
-impl TableRowOpacity {
+pub struct Opacity(String);
+impl Opacity {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         let Some(number) = value.strip_suffix('%') else {
@@ -278,7 +278,7 @@ impl TableRowOpacity {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TableRowBackgroundSource {
+pub enum BackgroundSource {
     Empty,
     Link {
         href: String,
@@ -289,34 +289,34 @@ pub enum TableRowBackgroundSource {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TableRowBackgroundImage {
-    pub repeat: Option<TableRowBackgroundRepeat>,
-    pub position: Option<TableRowBackgroundPosition>,
+pub struct BackgroundImage {
+    pub repeat: Option<Repeat>,
+    pub position: Option<BackgroundPosition>,
     pub filter_name: Option<String>,
-    pub opacity: Option<TableRowOpacity>,
-    pub source: TableRowBackgroundSource,
+    pub opacity: Option<Opacity>,
+    pub source: BackgroundSource,
 }
-impl Default for TableRowBackgroundImage {
+impl Default for BackgroundImage {
     fn default() -> Self {
         Self {
             repeat: None,
             position: None,
             filter_name: None,
             opacity: None,
-            source: TableRowBackgroundSource::Empty,
+            source: BackgroundSource::Empty,
         }
     }
 }
-impl TableRowBackgroundImage {
+impl BackgroundImage {
     pub fn validate(&self) -> Result<()> {
         if let Some(value) = &self.filter_name {
             safe(value, "style:filter-name", true)?;
         }
         match &self.source {
-            TableRowBackgroundSource::Empty => {},
-            TableRowBackgroundSource::Link { href, .. } => safe(href, "xlink:href", true)?,
-            TableRowBackgroundSource::Embedded(data) if data.len() <= MAX_BINARY => {},
-            TableRowBackgroundSource::Embedded(_) => {
+            BackgroundSource::Empty => {},
+            BackgroundSource::Link { href, .. } => safe(href, "xlink:href", true)?,
+            BackgroundSource::Embedded(data) if data.len() <= MAX_BINARY => {},
+            BackgroundSource::Embedded(_) => {
                 return Err(bad("office:binary-data is too large"));
             },
         }
@@ -340,8 +340,8 @@ impl TableRowBackgroundImage {
             xml.push_str(&format!(r#" draw:opacity="{}""#, value.as_str()));
         }
         match &self.source {
-            TableRowBackgroundSource::Empty => xml.push_str("/>"),
-            TableRowBackgroundSource::Link {
+            BackgroundSource::Empty => xml.push_str("/>"),
+            BackgroundSource::Link {
                 href,
                 show_embed,
                 actuate_on_load,
@@ -358,7 +358,7 @@ impl TableRowBackgroundImage {
                 }
                 xml.push_str("/>");
             },
-            TableRowBackgroundSource::Embedded(data) => {
+            BackgroundSource::Embedded(data) => {
                 xml.push_str("><office:binary-data>");
                 xml.push_str(&base64_encode(data));
                 xml.push_str("</office:binary-data></style:background-image>");
@@ -369,17 +369,17 @@ impl TableRowBackgroundImage {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct TableRowProperties {
-    pub row_height: Option<TableRowLength>,
-    pub min_row_height: Option<TableRowLength>,
+pub struct Properties {
+    pub row_height: Option<Length>,
+    pub min_row_height: Option<Length>,
     pub use_optimal_row_height: Option<bool>,
-    pub background_color: Option<TableRowBackgroundColor>,
-    pub break_before: Option<TableRowBreak>,
-    pub break_after: Option<TableRowBreak>,
-    pub keep_together: Option<TableRowKeepTogether>,
-    pub background_image: Option<TableRowBackgroundImage>,
+    pub background_color: Option<BackgroundColor>,
+    pub break_before: Option<Break>,
+    pub break_after: Option<Break>,
+    pub keep_together: Option<KeepTogether>,
+    pub background_image: Option<BackgroundImage>,
 }
-impl TableRowProperties {
+impl Properties {
     pub fn validate(&self) -> Result<()> {
         if let Some(image) = &self.background_image {
             image.validate()?;
@@ -424,14 +424,14 @@ impl TableRowProperties {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TableRowStyleProperties {
+pub struct Style {
     pub name: Option<String>,
     pub parent_style_name: Option<String>,
     pub is_default_style: bool,
-    pub properties: Option<TableRowProperties>,
+    pub properties: Option<Properties>,
 }
-impl TableRowStyleProperties {
-    pub fn named(name: impl Into<String>, properties: Option<TableRowProperties>) -> Result<Self> {
+impl Style {
+    pub fn named(name: impl Into<String>, properties: Option<Properties>) -> Result<Self> {
         let value = Self {
             name: Some(name.into()),
             parent_style_name: None,
@@ -441,7 +441,7 @@ impl TableRowStyleProperties {
         value.validate()?;
         Ok(value)
     }
-    pub fn default_style(properties: Option<TableRowProperties>) -> Self {
+    pub fn default_style(properties: Option<Properties>) -> Self {
         Self {
             name: None,
             parent_style_name: None,
@@ -495,16 +495,16 @@ impl TableRowStyleProperties {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct TableRowStylePropertiesSet {
-    pub styles: Vec<TableRowStyleProperties>,
+pub struct Styles {
+    pub styles: Vec<Style>,
 }
-impl TableRowStylePropertiesSet {
-    pub fn get(&self, name: &str) -> Option<&TableRowStyleProperties> {
+impl Styles {
+    pub fn get(&self, name: &str) -> Option<&Style> {
         self.styles
             .iter()
             .find(|style| style.name.as_deref() == Some(name))
     }
-    pub fn default_style(&self) -> Option<&TableRowStyleProperties> {
+    pub fn default_style(&self) -> Option<&Style> {
         self.styles.iter().find(|style| style.is_default_style)
     }
 }
@@ -582,12 +582,12 @@ fn style_header(
     version: XmlVersion,
     start: &BytesStart<'_>,
     default: bool,
-) -> Result<Option<TableRowStyleProperties>> {
+) -> Result<Option<Style>> {
     let mut attrs = attributes(reader, version, start)?;
     if take(&mut attrs, Ns::Style, b"family").as_deref() != Some("table-row") {
         return Ok(None);
     }
-    let value = TableRowStyleProperties {
+    let value = Style {
         name: take(&mut attrs, Ns::Style, b"name"),
         parent_style_name: take(&mut attrs, Ns::Style, b"parent-style-name"),
         is_default_style: default,
@@ -600,29 +600,29 @@ fn row_properties(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<TableRowProperties> {
+) -> Result<Properties> {
     let mut attrs = attributes(reader, version, start)?;
-    let value = TableRowProperties {
+    let value = Properties {
         row_height: take(&mut attrs, Ns::Style, b"row-height")
-            .map(TableRowLength::positive)
+            .map(Length::positive)
             .transpose()?,
         min_row_height: take(&mut attrs, Ns::Style, b"min-row-height")
-            .map(TableRowLength::non_negative)
+            .map(Length::non_negative)
             .transpose()?,
         use_optimal_row_height: take(&mut attrs, Ns::Style, b"use-optimal-row-height")
             .map(|x| bool_value(&x))
             .transpose()?,
         background_color: take(&mut attrs, Ns::Fo, b"background-color")
-            .map(TableRowBackgroundColor::new)
+            .map(BackgroundColor::new)
             .transpose()?,
         break_before: take(&mut attrs, Ns::Fo, b"break-before")
-            .map(|x| TableRowBreak::parse(&x))
+            .map(|x| Break::parse(&x))
             .transpose()?,
         break_after: take(&mut attrs, Ns::Fo, b"break-after")
-            .map(|x| TableRowBreak::parse(&x))
+            .map(|x| Break::parse(&x))
             .transpose()?,
         keep_together: take(&mut attrs, Ns::Fo, b"keep-together")
-            .map(|x| TableRowKeepTogether::parse(&x))
+            .map(|x| KeepTogether::parse(&x))
             .transpose()?,
         background_image: None,
     };
@@ -632,7 +632,7 @@ fn row_properties(
     Ok(value)
 }
 struct ParsedImage {
-    image: TableRowBackgroundImage,
+    image: BackgroundImage,
     linked: bool,
 }
 fn image_attributes(
@@ -642,17 +642,17 @@ fn image_attributes(
 ) -> Result<ParsedImage> {
     let mut attrs = attributes(reader, version, start)?;
     let repeat = take(&mut attrs, Ns::Style, b"repeat")
-        .map(|x| TableRowBackgroundRepeat::parse(&x))
+        .map(|x| Repeat::parse(&x))
         .transpose()?;
     let position = take(&mut attrs, Ns::Style, b"position")
-        .map(|x| TableRowBackgroundPosition::parse(&x))
+        .map(|x| BackgroundPosition::parse(&x))
         .transpose()?;
     let filter_name = take(&mut attrs, Ns::Style, b"filter-name");
     if let Some(x) = &filter_name {
         safe(x, "style:filter-name", true)?;
     }
     let opacity = take(&mut attrs, Ns::Draw, b"opacity")
-        .map(TableRowOpacity::new)
+        .map(Opacity::new)
         .transpose()?;
     let kind = take(&mut attrs, Ns::Xlink, b"type");
     let href = take(&mut attrs, Ns::Xlink, b"href");
@@ -670,15 +670,15 @@ fn image_attributes(
         {
             return Err(bad("invalid background-image xlink group"));
         }
-        TableRowBackgroundSource::Link {
+        BackgroundSource::Link {
             href: href.unwrap(),
             show_embed: show.is_some(),
             actuate_on_load: actuate.is_some(),
         }
     } else {
-        TableRowBackgroundSource::Empty
+        BackgroundSource::Empty
     };
-    let image = TableRowBackgroundImage {
+    let image = BackgroundImage {
         repeat,
         position,
         filter_name,
@@ -691,7 +691,7 @@ fn image_attributes(
 
 struct Active {
     depth: usize,
-    style: TableRowStyleProperties,
+    style: Style,
     seen_properties: bool,
     properties_depth: Option<usize>,
     image_depth: Option<usize>,
@@ -699,11 +699,7 @@ struct Active {
     binary: String,
     image_linked: bool,
 }
-fn push_style(
-    out: &mut Vec<TableRowStyleProperties>,
-    style: TableRowStyleProperties,
-    total: &mut usize,
-) -> Result<()> {
+fn push_style(out: &mut Vec<Style>, style: Style, total: &mut usize) -> Result<()> {
     if out.len() >= MAX_STYLES
         || out
             .iter()
@@ -720,7 +716,7 @@ fn push_style(
 }
 
 /// Parse direct table-row styles in `office:styles` and `office:automatic-styles`.
-pub fn parse_table_row_style_properties(xml: &str) -> Result<TableRowStylePropertiesSet> {
+pub fn parse(xml: &str) -> Result<Styles> {
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
     }
@@ -886,7 +882,7 @@ pub fn parse_table_row_style_properties(xml: &str) -> Result<TableRowStyleProper
                             .background_image
                             .as_mut()
                             .unwrap()
-                            .source = TableRowBackgroundSource::Embedded(Vec::new());
+                            .source = BackgroundSource::Embedded(Vec::new());
                     } else if state.properties_depth.is_some()
                         && depth > state.properties_depth.unwrap()
                     {
@@ -937,7 +933,7 @@ pub fn parse_table_row_style_properties(xml: &str) -> Result<TableRowStyleProper
                             .background_image
                             .as_mut()
                             .unwrap()
-                            .source = TableRowBackgroundSource::Embedded(data);
+                            .source = BackgroundSource::Embedded(data);
                         state.binary_depth = None;
                     }
                     if state.image_depth == Some(depth) {
@@ -968,7 +964,7 @@ pub fn parse_table_row_style_properties(xml: &str) -> Result<TableRowStyleProper
     if !stack.is_empty() || active.is_some() {
         return Err(bad("truncated styles XML"));
     }
-    Ok(TableRowStylePropertiesSet { styles: out })
+    Ok(Styles { styles: out })
 }
 
 fn base64_encode(data: &[u8]) -> String {
@@ -1074,10 +1070,7 @@ fn expand_span(xml: &str, span: &Span, value: &str) -> Result<String> {
 }
 
 /// Losslessly replace, insert, or remove one existing row style's property element.
-pub fn set_table_row_style_properties_xml(
-    xml: &str,
-    requested: &TableRowStyleProperties,
-) -> Result<String> {
+pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
     requested.validate()?;
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
@@ -1211,7 +1204,7 @@ pub fn set_table_row_style_properties_xml(
     let replacement = requested
         .properties
         .as_ref()
-        .map(TableRowProperties::to_xml_fragment)
+        .map(Properties::to_xml_fragment)
         .transpose()?;
     if let Some(properties) = &spans.properties {
         return Ok(replace_span(
@@ -1232,15 +1225,13 @@ pub fn set_table_row_style_properties_xml(
 }
 
 impl OpenDocumentPackage {
-    pub fn table_row_style_properties(&self) -> Result<TableRowStylePropertiesSet> {
-        self.styles_xml()?.map_or_else(
-            || Ok(Default::default()),
-            |xml| parse_table_row_style_properties(&xml),
-        )
+    pub fn row_style_properties(&self) -> Result<Styles> {
+        self.styles_xml()?
+            .map_or_else(|| Ok(Default::default()), |xml| parse(&xml))
     }
 }
 impl FlatOpenDocument {
-    pub fn table_row_style_properties(&self) -> Result<TableRowStylePropertiesSet> {
-        parse_table_row_style_properties(self.xml())
+    pub fn row_style_properties(&self) -> Result<Styles> {
+        parse(self.xml())
     }
 }

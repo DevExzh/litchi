@@ -1,8 +1,8 @@
+use litchi_odt::Builder;
 use litchi_odt::section_properties::{
     BackgroundRepeat, SectionBackgroundColor, SectionBackgroundImage, SectionLength,
     SectionProperties, SectionStyleProperties, SectionWritingMode, parse_section_style_properties,
 };
-use litchi_odt::{Builder, OpenDocumentPackage};
 
 const PREFIX: &str = r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:f="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:x="http://www.w3.org/1999/xlink"><office:styles>"#;
 const SUFFIX: &str = "</office:styles></office:document-styles>";
@@ -61,7 +61,7 @@ fn builder_and_package_accessor() {
         .add_section_property_style(SectionStyleProperties::new("S1", properties).unwrap())
         .unwrap();
     let package = builder.build().unwrap();
-    let parsed = OpenDocumentPackage::from_bytes(package)
+    let parsed = litchi_odt::generic::OpenDocumentPackage::from_bytes(package)
         .unwrap()
         .section_style_properties()
         .unwrap();

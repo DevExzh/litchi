@@ -1,4 +1,4 @@
-use litchi_odt::{Document, MutableDocument};
+use litchi_odt::Document;
 mod support;
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -52,7 +52,7 @@ fn mutable_document_manages_outline_styles_without_rewriting_other_styles() {
     let mut replacement = original.clone();
     replacement.levels[0].number_prefix = Some("(".to_string());
     replacement.levels[0].number_suffix = Some(")".to_string());
-    let mut mutable = MutableDocument::from_document(source).unwrap();
+    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(source).unwrap();
 
     assert_eq!(
         mutable.set_outline_style(&replacement).unwrap(),

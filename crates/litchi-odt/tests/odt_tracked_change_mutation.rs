@@ -1,6 +1,7 @@
-use litchi_odt::{
-    ChangeType, Document, MutableDocument, Position, Story, TrackChange, TrackedChanges,
-    mark_tracked_change_range_xml, set_tracked_changes_xml,
+use litchi_odt::Document;
+use litchi_odt::parser::{ChangeType, TrackChange, TrackedChanges};
+use litchi_odt::tracked_changes::{
+    Position, Story, mark_tracked_change_range_xml, set_tracked_changes_xml,
 };
 
 fn change(id: &str, kind: ChangeType) -> TrackChange {
@@ -72,7 +73,7 @@ fn declarations() -> TrackedChanges {
 
 #[test]
 fn marks_unicode_ranges_points_and_reopens_package() {
-    let mut document = MutableDocument::new();
+    let mut document = litchi_odt::mutable::MutableDocument::new();
     document.add_paragraph("A😀B<&").unwrap();
     document.add_paragraph("again").unwrap();
     document.set_tracked_changes(declarations()).unwrap();
@@ -107,7 +108,7 @@ fn marks_unicode_ranges_points_and_reopens_package() {
 
 #[test]
 fn declaration_and_marker_mutations_roll_back_atomically() {
-    let mut document = MutableDocument::new();
+    let mut document = litchi_odt::mutable::MutableDocument::new();
     document.add_paragraph("abcdef").unwrap();
     document.set_tracked_changes(declarations()).unwrap();
     document

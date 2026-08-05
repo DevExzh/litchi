@@ -1,7 +1,7 @@
+use litchi_odt::Builder;
 use litchi_odt::style::paragraph::alignment::{
     Horizontal, Properties, Style, Vertical, parse, set_xml,
 };
-use litchi_odt::{Builder, FlatOpenDocument, OpenDocumentPackage};
 use std::io::Cursor;
 const O: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const S: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
@@ -223,7 +223,8 @@ fn builder_package_round_trip() {
             .is_err()
     );
     builder.add_paragraph("x").unwrap();
-    let package = OpenDocumentPackage::from_bytes(builder.build().unwrap()).unwrap();
+    let package =
+        litchi_odt::generic::OpenDocumentPackage::from_bytes(builder.build().unwrap()).unwrap();
     assert_eq!(
         package.paragraph_style_alignments().unwrap().get("Body"),
         Some(&style)
@@ -241,7 +242,7 @@ fn parses_real_odf_fixture() {
             .filter_map(|x| x.properties.as_ref())
             .any(|p| p.horizontal == Some(Horizontal::End))
     );
-    let flat = FlatOpenDocument::from_reader(Cursor::new(xml)).unwrap();
+    let flat = litchi_odt::generic::FlatOpenDocument::from_reader(Cursor::new(xml)).unwrap();
     assert_eq!(
         flat.paragraph_style_alignments().unwrap().styles.len(),
         set.styles.len()

@@ -1,6 +1,5 @@
-use litchi_odt::{
-    FlatOpenDocument, FormControlKind, FormNode, FormPropertyValue, FormScalarValue,
-    OpenDocumentPackage,
+use litchi_odt::form::{
+    FormControl, FormControlKind, FormNode, FormPropertyValue, FormScalarValue,
 };
 use std::path::{Path, PathBuf};
 
@@ -25,7 +24,7 @@ fn fixture(relative: &str) -> PathBuf {
         .join(relative)
 }
 
-fn collect<'a>(nodes: &'a [FormNode], out: &mut Vec<&'a litchi_odt::FormControl>) {
+fn collect<'a>(nodes: &'a [FormNode], out: &mut Vec<&'a FormControl>) {
     for node in nodes {
         match node {
             FormNode::Form(form) => collect(&form.children, out),
@@ -70,7 +69,7 @@ fn parses_all_controls_nesting_typed_properties_and_links() {
         .enumerate()
         .map(|(i, name)| format!(r#"<f:{name} xml:id="c{i}" f:id="c{i}"/>"#))
         .collect::<String>();
-    let document = FlatOpenDocument::from_bytes(flat(&format!(
+    let document = litchi_odt::generic::FlatOpenDocument::from_bytes(flat(&format!(
         r#"<o:forms f:automatic-focus="false" f:apply-design-mode="true"><f:form f:name="outer"><f:properties><f:property f:property-name="enabled" o:value-type="boolean" o:boolean-value="true"/><f:list-property f:property-name="choices" o:value-type="string"><f:list-value o:string-value="a"/><f:list-value o:string-value="b"/></f:list-property></f:properties><f:form f:name="nested">{controls}</f:form></f:form></o:forms><d:control d:control="c0" d:z-index="7"/>"#
     )))
     .unwrap();
@@ -98,7 +97,10 @@ fn flags_behavior_but_preserves_external_values_inertly() {
     let xml = flat(
         r#"<o:forms><xf:model><xf:instance src="file:///never"/></xf:model><f:form f:datasource="https://never.test/db" f:command="DROP TABLE x"><f:image f:id="c" f:image-data="https://never.test/image"><o:event-listeners><s:event-listener s:macro-name="macro://never"/></o:event-listeners></f:image></f:form></o:forms><d:control d:control="c"/>"#,
     );
-    let forms = FlatOpenDocument::from_bytes(xml).unwrap().forms().unwrap();
+    let forms = litchi_odt::generic::FlatOpenDocument::from_bytes(xml)
+        .unwrap()
+        .forms()
+        .unwrap();
     assert!(forms.has_xforms && forms.has_event_listeners);
     assert!(
         forms.groups[0].forms[0]
@@ -124,11 +126,16 @@ fn rejects_malformed_spoofed_unresolved_and_limited_inputs() {
         ),
         flat(r#"<o:forms f:automatic-focus="yes"><f:form/></o:forms>"#),
     ] {
-        assert!(FlatOpenDocument::from_bytes(xml).unwrap().forms().is_err());
+        assert!(
+            litchi_odt::generic::FlatOpenDocument::from_bytes(xml)
+                .unwrap()
+                .forms()
+                .is_err()
+        );
     }
     let spoofed = format!(r#"<o:document xmlns:o="{OFFICE}" xmlns:f="urn:not-form" o:mimetype="application/vnd.oasis.opendocument.text"><o:body><o:text><o:forms><f:form/></o:forms></o:text></o:body></o:document>"#).into_bytes();
     assert!(
-        FlatOpenDocument::from_bytes(spoofed)
+        litchi_odt::generic::FlatOpenDocument::from_bytes(spoofed)
             .unwrap()
             .forms()
             .unwrap()
@@ -141,7 +148,7 @@ fn rejects_malformed_spoofed_unresolved_and_limited_inputs() {
         r#"<o:forms><f:form f:name="{oversized}"/></o:forms>"#
     ));
     assert!(
-        FlatOpenDocument::from_bytes(limited)
+        litchi_odt::generic::FlatOpenDocument::from_bytes(limited)
             .unwrap()
             .forms()
             .is_err()
@@ -155,7 +162,7 @@ fn rejects_malformed_spoofed_unresolved_and_limited_inputs() {
     }
     nested.push_str("</o:forms>");
     assert!(
-        FlatOpenDocument::from_bytes(flat(&nested))
+        litchi_odt::generic::FlatOpenDocument::from_bytes(flat(&nested))
             .unwrap()
             .forms()
             .is_err()
@@ -171,7 +178,7 @@ fn parses_all_bundled_fixtures_without_rewriting_packages() {
         "test-data/libreoffice-core/xmloff/qa/unit/data/tdf167358_label_form_control_borders.odt",
     ] {
         let bytes = std::fs::read(fixture(relative)).unwrap();
-        let package = OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
+        let package = litchi_odt::generic::OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
         let forms = package.forms().unwrap();
         assert!(!forms.groups.is_empty(), "{relative}");
         assert!(!forms.control_shapes.is_empty(), "{relative}");
@@ -181,7 +188,7 @@ fn parses_all_bundled_fixtures_without_rewriting_packages() {
         "test-data/libreoffice-core/vcl/qa/cppunit/pdfexport/data/formcontrol.fodt",
     ))
     .unwrap();
-    let forms = FlatOpenDocument::from_bytes(bytes)
+    let forms = litchi_odt::generic::FlatOpenDocument::from_bytes(bytes)
         .unwrap()
         .forms()
         .unwrap();

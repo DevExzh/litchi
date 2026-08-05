@@ -21,14 +21,14 @@ const MAX_AGGREGATE_BYTES: usize = 16 * 1_048_576;
 
 /// The four integer components of an SVG marker view box.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct MarkerViewBox {
+pub struct ViewBox {
     pub min_x: i64,
     pub min_y: i64,
     pub width: i64,
     pub height: i64,
 }
 
-impl MarkerViewBox {
+impl ViewBox {
     pub const fn new(min_x: i64, min_y: i64, width: i64, height: i64) -> Self {
         Self {
             min_x,
@@ -39,7 +39,7 @@ impl MarkerViewBox {
     }
 }
 
-impl FromStr for MarkerViewBox {
+impl FromStr for ViewBox {
     type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
@@ -63,7 +63,7 @@ impl FromStr for MarkerViewBox {
     }
 }
 
-impl fmt::Display for MarkerViewBox {
+impl fmt::Display for ViewBox {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
@@ -78,9 +78,9 @@ impl fmt::Display for MarkerViewBox {
 /// ODF 1.2 intentionally declares `pathData` as an unrestricted string, so the
 /// lexical value is retained rather than narrowed to one SVG command dialect.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct MarkerPathData(String);
+pub struct PathData(String);
 
-impl MarkerPathData {
+impl PathData {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         validate_text(&value, "svg:d", true, MAX_PATH_BYTES)?;
@@ -92,13 +92,13 @@ impl MarkerPathData {
     }
 }
 
-impl fmt::Display for MarkerPathData {
+impl fmt::Display for PathData {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.0)
     }
 }
 
-impl FromStr for MarkerPathData {
+impl FromStr for PathData {
     type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
@@ -108,14 +108,14 @@ impl FromStr for MarkerPathData {
 
 /// One named `draw:marker` resource.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Marker {
+pub struct Definition {
     pub name: String,
     pub display_name: Option<String>,
-    pub view_box: MarkerViewBox,
-    pub path_data: MarkerPathData,
+    pub view_box: ViewBox,
+    pub path_data: PathData,
 }
 
-impl Marker {
+impl Definition {
     pub fn validate(&self) -> Result<()> {
         validate_text(&self.name, "draw:name", false, MAX_VALUE_BYTES)?;
         if let Some(display_name) = &self.display_name {
@@ -134,12 +134,12 @@ impl Marker {
 
 /// Ordered marker resources from `office:styles`.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Markers {
-    pub markers: Vec<Marker>,
+pub struct Collection {
+    pub markers: Vec<Definition>,
 }
 
-impl Markers {
-    pub fn get(&self, name: &str) -> Option<&Marker> {
+impl Collection {
+    pub fn get(&self, name: &str) -> Option<&Definition> {
         self.markers.iter().find(|marker| marker.name == name)
     }
 
@@ -188,7 +188,7 @@ impl Markers {
 
 impl crate::OpenDocumentPackage {
     /// Parse named marker resources from the package `styles.xml` part.
-    pub fn drawing_markers(&self) -> Result<Markers> {
+    pub fn drawing_markers(&self) -> Result<Collection> {
         let styles = self.styles_xml()?;
         parse_drawing_markers(styles.as_deref().unwrap_or_default())
     }
@@ -196,7 +196,7 @@ impl crate::OpenDocumentPackage {
 
 impl crate::FlatOpenDocument {
     /// Parse named marker resources from this flat OpenDocument.
-    pub fn drawing_markers(&self) -> Result<Markers> {
+    pub fn drawing_markers(&self) -> Result<Collection> {
         parse_drawing_markers(self.xml())
     }
 }
@@ -216,17 +216,17 @@ struct Frame {
     local: String,
 }
 
-struct ActiveMarker {
+struct ActiveDefinition {
     parent_depth: usize,
-    value: Marker,
+    value: Definition,
 }
 
 type Attributes = HashMap<(NamespaceKind, String), String>;
 
 /// Parse marker resources from an ODF styles or flat-document XML part.
-pub fn parse_drawing_markers(xml: &str) -> Result<Markers> {
+pub fn parse_drawing_markers(xml: &str) -> Result<Collection> {
     if !xml.contains("marker") {
-        return Ok(Markers::default());
+        return Ok(Collection::default());
     }
     if xml.len() > MAX_XML_BYTES {
         return invalid("drawing marker XML exceeds 64 MiB");
@@ -236,8 +236,8 @@ pub fn parse_drawing_markers(xml: &str) -> Result<Markers> {
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
-    let mut active: Option<ActiveMarker> = None;
-    let mut result = Markers::default();
+    let mut active: Option<ActiveDefinition> = None;
+    let mut result = Collection::default();
     let mut aggregate = 0usize;
 
     loop {
@@ -255,7 +255,7 @@ pub fn parse_drawing_markers(xml: &str) -> Result<Markers> {
                 if namespace == NamespaceKind::Draw && local == "marker" {
                     ensure_location(&stack)?;
                     ensure_count(result.markers.len())?;
-                    active = Some(ActiveMarker {
+                    active = Some(ActiveDefinition {
                         parent_depth: stack.len(),
                         value: parse_marker(&reader, element, &mut aggregate)?,
                     });
@@ -333,14 +333,14 @@ fn parse_marker(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
-) -> Result<Marker> {
+) -> Result<Definition> {
     let mut values = attributes(reader, element, aggregate)?;
     let name = required(&mut values, NamespaceKind::Draw, "name", "draw:name")?;
     let display_name = take(&mut values, NamespaceKind::Draw, "display-name");
     let view_box = required(&mut values, NamespaceKind::Svg, "viewBox", "svg:viewBox")?.parse()?;
-    let path_data = MarkerPathData::new(required(&mut values, NamespaceKind::Svg, "d", "svg:d")?)?;
+    let path_data = PathData::new(required(&mut values, NamespaceKind::Svg, "d", "svg:d")?)?;
     reject_attributes(&values)?;
-    let marker = Marker {
+    let marker = Definition {
         name,
         display_name,
         view_box,
@@ -463,7 +463,7 @@ fn validate_text(value: &str, name: &str, allow_empty: bool, limit: usize) -> Re
     Ok(())
 }
 
-fn write_marker(output: &mut String, marker: &Marker, standalone: bool) {
+fn write_marker(output: &mut String, marker: &Definition, standalone: bool) {
     output.push_str("<draw:marker");
     if standalone {
         output.push_str(
@@ -573,7 +573,7 @@ mod tests {
         let document = crate::FlatOpenDocument::from_bytes(xml.as_bytes().to_vec()).unwrap();
         let markers = document.drawing_markers().unwrap();
         let marker = markers.get("Arrowheads_20_1").unwrap();
-        assert_eq!(marker.view_box, MarkerViewBox::new(0, 0, 20, 30));
+        assert_eq!(marker.view_box, ViewBox::new(0, 0, 20, 30));
         assert_eq!(marker.path_data.as_str(), "M10 0l-10 30h20z");
     }
 }

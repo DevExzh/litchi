@@ -28,7 +28,7 @@ const MAX_AGGREGATE_BYTES: usize = 96 * 1_048_576;
 /// Unit for an optional fill-image intrinsic size.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum FillImageLengthUnit {
+pub enum LengthUnit {
     Centimeter,
     Millimeter,
     Inch,
@@ -37,7 +37,7 @@ pub enum FillImageLengthUnit {
     Pixel,
 }
 
-impl FillImageLengthUnit {
+impl LengthUnit {
     const fn suffix(self) -> &'static str {
         match self {
             Self::Centimeter => "cm",
@@ -52,13 +52,13 @@ impl FillImageLengthUnit {
 
 /// A finite, nonnegative ODF length.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct FillImageLength {
+pub struct Length {
     value: f64,
-    unit: FillImageLengthUnit,
+    unit: LengthUnit,
 }
 
-impl FillImageLength {
-    pub fn new(value: f64, unit: FillImageLengthUnit) -> Result<Self> {
+impl Length {
+    pub fn new(value: f64, unit: LengthUnit) -> Result<Self> {
         if !value.is_finite() || value < 0.0 {
             return invalid("fill-image length must be finite and nonnegative");
         }
@@ -69,12 +69,12 @@ impl FillImageLength {
         self.value
     }
 
-    pub const fn unit(self) -> FillImageLengthUnit {
+    pub const fn unit(self) -> LengthUnit {
         self.unit
     }
 }
 
-impl FromStr for FillImageLength {
+impl FromStr for Length {
     type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
@@ -87,7 +87,7 @@ impl FromStr for FillImageLength {
     }
 }
 
-impl fmt::Display for FillImageLength {
+impl fmt::Display for Length {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
@@ -101,26 +101,26 @@ impl fmt::Display for FillImageLength {
 /// Whether an inert href is a safe relative package path.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum FillImageLinkKind {
+pub enum LinkKind {
     PackagePart,
     InertExternal,
 }
 
 /// A retained link which is never automatically dereferenced.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct FillImageLink {
+pub struct Link {
     href: String,
-    kind: FillImageLinkKind,
+    kind: LinkKind,
 }
 
-impl FillImageLink {
+impl Link {
     pub fn new(href: impl Into<String>) -> Result<Self> {
         let href = href.into();
         validate_text(&href, "xlink:href", true, MAX_VALUE_BYTES)?;
         let kind = if safe_package_path(&href) {
-            FillImageLinkKind::PackagePart
+            LinkKind::PackagePart
         } else {
-            FillImageLinkKind::InertExternal
+            LinkKind::InertExternal
         };
         Ok(Self { href, kind })
     }
@@ -129,28 +129,28 @@ impl FillImageLink {
         &self.href
     }
 
-    pub const fn kind(&self) -> FillImageLinkKind {
+    pub const fn kind(&self) -> LinkKind {
         self.kind
     }
 
     pub fn package_path(&self) -> Option<&str> {
-        (self.kind == FillImageLinkKind::PackagePart).then_some(&self.href)
+        (self.kind == LinkKind::PackagePart).then_some(&self.href)
     }
 }
 
 /// The source of a fill-image resource.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum FillImageSource {
-    Linked(FillImageLink),
+pub enum Source {
+    Linked(Link),
     Inline {
         bytes: Vec<u8>,
         /// ODF consumers ignore this link when inline data is present.
-        ignored_link: Option<FillImageLink>,
+        ignored_link: Option<Link>,
     },
 }
 
-impl FillImageSource {
+impl Source {
     pub fn inline_bytes(&self) -> Option<&[u8]> {
         match self {
             Self::Inline { bytes, .. } => Some(bytes),
@@ -158,7 +158,7 @@ impl FillImageSource {
         }
     }
 
-    pub fn link(&self) -> Option<&FillImageLink> {
+    pub fn link(&self) -> Option<&Link> {
         match self {
             Self::Linked(link) => Some(link),
             Self::Inline { ignored_link, .. } => ignored_link.as_ref(),
@@ -168,40 +168,40 @@ impl FillImageSource {
 
 /// The only schema-defined `xlink:show` mode for fill images.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum FillImageShow {
+pub enum Show {
     Embed,
 }
 
 /// The only schema-defined `xlink:actuate` mode for fill images.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum FillImageActuate {
+pub enum Actuate {
     OnLoad,
 }
 
 /// One named `draw:fill-image` resource.
 #[derive(Clone, Debug, PartialEq)]
-pub struct FillImage {
+pub struct Image {
     pub name: String,
     pub display_name: Option<String>,
-    pub width: Option<FillImageLength>,
-    pub height: Option<FillImageLength>,
-    pub source: FillImageSource,
-    pub show: Option<FillImageShow>,
-    pub actuate: Option<FillImageActuate>,
+    pub width: Option<Length>,
+    pub height: Option<Length>,
+    pub source: Source,
+    pub show: Option<Show>,
+    pub actuate: Option<Actuate>,
 }
 
-impl FillImage {
+impl Image {
     pub fn validate(&self) -> Result<()> {
         validate_text(&self.name, "draw:name", false, MAX_VALUE_BYTES)?;
         if let Some(display_name) = &self.display_name {
             validate_text(display_name, "draw:display-name", true, MAX_VALUE_BYTES)?;
         }
         for length in [self.width, self.height].into_iter().flatten() {
-            FillImageLength::new(length.value, length.unit)?;
+            Length::new(length.value, length.unit)?;
         }
         match &self.source {
-            FillImageSource::Linked(link) => validate_link(link)?,
-            FillImageSource::Inline {
+            Source::Linked(link) => validate_link(link)?,
+            Source::Inline {
                 bytes,
                 ignored_link,
             } => {
@@ -228,12 +228,12 @@ impl FillImage {
 
 /// Ordered fill-image resources from `office:styles`.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct FillImages {
-    pub images: Vec<FillImage>,
+pub struct Collection {
+    pub images: Vec<Image>,
 }
 
-impl FillImages {
-    pub fn get(&self, name: &str) -> Option<&FillImage> {
+impl Collection {
+    pub fn get(&self, name: &str) -> Option<&Image> {
         self.images.iter().find(|image| image.name == name)
     }
 
@@ -291,19 +291,16 @@ impl FillImages {
 }
 
 impl crate::OpenDocumentPackage {
-    pub fn drawing_fill_images(&self) -> Result<FillImages> {
+    pub fn drawing_fill_images(&self) -> Result<Collection> {
         let styles = self.styles_xml()?;
         parse_drawing_fill_images(styles.as_deref().unwrap_or_default())
     }
 
     /// Load a safe package image or borrow inline bytes without copying.
-    pub fn drawing_fill_image_bytes<'a>(
-        &self,
-        image: &'a FillImage,
-    ) -> Result<Option<Cow<'a, [u8]>>> {
+    pub fn drawing_fill_image_bytes<'a>(&self, image: &'a Image) -> Result<Option<Cow<'a, [u8]>>> {
         match &image.source {
-            FillImageSource::Inline { bytes, .. } => Ok(Some(Cow::Borrowed(bytes))),
-            FillImageSource::Linked(link) => {
+            Source::Inline { bytes, .. } => Ok(Some(Cow::Borrowed(bytes))),
+            Source::Linked(link) => {
                 let Some(path) = link.package_path() else {
                     return Ok(None);
                 };
@@ -318,7 +315,7 @@ impl crate::OpenDocumentPackage {
 }
 
 impl crate::FlatOpenDocument {
-    pub fn drawing_fill_images(&self) -> Result<FillImages> {
+    pub fn drawing_fill_images(&self) -> Result<Collection> {
         parse_drawing_fill_images(self.xml())
     }
 }
@@ -343,11 +340,11 @@ struct FillBuilder {
     parent_depth: usize,
     name: String,
     display_name: Option<String>,
-    width: Option<FillImageLength>,
-    height: Option<FillImageLength>,
-    link: Option<FillImageLink>,
-    show: Option<FillImageShow>,
-    actuate: Option<FillImageActuate>,
+    width: Option<Length>,
+    height: Option<Length>,
+    link: Option<Link>,
+    show: Option<Show>,
+    actuate: Option<Actuate>,
     binary_present: bool,
     binary_parent_depth: Option<usize>,
     encoded: String,
@@ -355,9 +352,9 @@ struct FillBuilder {
 
 type Attributes = HashMap<(NamespaceKind, String), String>;
 
-pub fn parse_drawing_fill_images(xml: &str) -> Result<FillImages> {
+pub fn parse_drawing_fill_images(xml: &str) -> Result<Collection> {
     if !xml.contains("fill-image") {
-        return Ok(FillImages::default());
+        return Ok(Collection::default());
     }
     if xml.len() > MAX_XML_BYTES {
         return invalid("drawing fill-image XML exceeds 64 MiB");
@@ -367,7 +364,7 @@ pub fn parse_drawing_fill_images(xml: &str) -> Result<FillImages> {
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
     let mut active: Option<FillBuilder> = None;
-    let mut result = FillImages::default();
+    let mut result = Collection::default();
     let mut aggregate = 0usize;
     let mut inline_total = 0usize;
 
@@ -523,18 +520,18 @@ fn parse_fill_start(
     let link_type = take(&mut values, NamespaceKind::Xlink, "type");
     let show = take(&mut values, NamespaceKind::Xlink, "show")
         .map(|value| match value.as_str() {
-            "embed" => Ok(FillImageShow::Embed),
+            "embed" => Ok(Show::Embed),
             _ => invalid(format!("unsupported xlink:show '{value}'")),
         })
         .transpose()?;
     let actuate = take(&mut values, NamespaceKind::Xlink, "actuate")
         .map(|value| match value.as_str() {
-            "onLoad" => Ok(FillImageActuate::OnLoad),
+            "onLoad" => Ok(Actuate::OnLoad),
             _ => invalid(format!("unsupported xlink:actuate '{value}'")),
         })
         .transpose()?;
     reject_attributes(&values)?;
-    let link = href.map(FillImageLink::new).transpose()?;
+    let link = href.map(Link::new).transpose()?;
     match (&link, link_type.as_deref()) {
         (Some(_), Some("simple")) => {},
         (Some(_), _) => return invalid("linked fill image requires xlink:type='simple'"),
@@ -556,7 +553,7 @@ fn parse_fill_start(
     })
 }
 
-fn finish_fill(builder: FillBuilder, inline_total: &mut usize) -> Result<FillImage> {
+fn finish_fill(builder: FillBuilder, inline_total: &mut usize) -> Result<Image> {
     let source = if builder.binary_present {
         let bytes = BASE64_STANDARD
             .decode(builder.encoded.as_bytes())
@@ -570,18 +567,18 @@ fn finish_fill(builder: FillBuilder, inline_total: &mut usize) -> Result<FillIma
         if *inline_total > MAX_TOTAL_INLINE_BYTES {
             return invalid("inline fill images exceed 64 MiB");
         }
-        FillImageSource::Inline {
+        Source::Inline {
             bytes,
             ignored_link: builder.link,
         }
     } else {
-        FillImageSource::Linked(
+        Source::Linked(
             builder
                 .link
                 .ok_or_else(|| make_error("fill image requires xlink:href or binary data"))?,
         )
     };
-    let image = FillImage {
+    let image = Image {
         name: builder.name,
         display_name: builder.display_name,
         width: builder.width,
@@ -724,13 +721,13 @@ fn reject_attributes(values: &Attributes) -> Result<()> {
     Ok(())
 }
 
-fn validate_link(link: &FillImageLink) -> Result<()> {
+fn validate_link(link: &Link) -> Result<()> {
     validate_text(link.href(), "xlink:href", true, MAX_VALUE_BYTES)?;
     if link.kind
         != if safe_package_path(link.href()) {
-            FillImageLinkKind::PackagePart
+            LinkKind::PackagePart
         } else {
-            FillImageLinkKind::InertExternal
+            LinkKind::InertExternal
         }
     {
         return invalid("fill-image link classification is inconsistent");
@@ -749,14 +746,14 @@ fn safe_package_path(value: &str) -> bool {
             .all(|segment| !segment.is_empty() && segment != "." && segment != "..")
 }
 
-fn split_length(value: &str) -> Result<(&str, FillImageLengthUnit)> {
+fn split_length(value: &str) -> Result<(&str, LengthUnit)> {
     for (suffix, unit) in [
-        ("cm", FillImageLengthUnit::Centimeter),
-        ("mm", FillImageLengthUnit::Millimeter),
-        ("in", FillImageLengthUnit::Inch),
-        ("pt", FillImageLengthUnit::Point),
-        ("pc", FillImageLengthUnit::Pica),
-        ("px", FillImageLengthUnit::Pixel),
+        ("cm", LengthUnit::Centimeter),
+        ("mm", LengthUnit::Millimeter),
+        ("in", LengthUnit::Inch),
+        ("pt", LengthUnit::Point),
+        ("pc", LengthUnit::Pica),
+        ("px", LengthUnit::Pixel),
     ] {
         if let Some(number) = value.strip_suffix(suffix) {
             return Ok((number, unit));
@@ -803,7 +800,7 @@ fn validate_text(value: &str, name: &str, allow_empty: bool, limit: usize) -> Re
     Ok(())
 }
 
-fn write_fill_image(output: &mut String, image: &FillImage, standalone: bool) {
+fn write_fill_image(output: &mut String, image: &Image, standalone: bool) {
     output.push_str("<draw:fill-image");
     if standalone {
         output.push_str(
@@ -831,8 +828,8 @@ fn write_fill_image(output: &mut String, image: &FillImage, standalone: bool) {
         }
     }
     match &image.source {
-        FillImageSource::Linked(_) => output.push_str("/>"),
-        FillImageSource::Inline { bytes, .. } => {
+        Source::Linked(_) => output.push_str("/>"),
+        Source::Inline { bytes, .. } => {
             output.push_str("><office:binary-data>");
             BASE64_STANDARD.encode_string(bytes, output);
             output.push_str("</office:binary-data></draw:fill-image>");
@@ -840,7 +837,7 @@ fn write_fill_image(output: &mut String, image: &FillImage, standalone: bool) {
     }
 }
 
-fn encoded_size(source: &FillImageSource) -> usize {
+fn encoded_size(source: &Source) -> usize {
     source
         .inline_bytes()
         .map_or(0, |bytes| bytes.len().saturating_add(2) / 3 * 4)
@@ -917,11 +914,11 @@ mod tests {
         );
         assert_eq!(
             parsed.get("package").unwrap().source.link().unwrap().kind(),
-            FillImageLinkKind::PackagePart
+            LinkKind::PackagePart
         );
         assert_eq!(
             parsed.get("remote").unwrap().source.link().unwrap().kind(),
-            FillImageLinkKind::InertExternal
+            LinkKind::InertExternal
         );
         let serialized = parsed.to_xml().unwrap();
         assert_eq!(parse_drawing_fill_images(&serialized).unwrap(), parsed);
@@ -958,8 +955,8 @@ mod tests {
             assert!(parse_drawing_fill_images(&xml).is_err(), "accepted {xml}");
         }
         assert_eq!(
-            FillImageLink::new("../Pictures/x.png").unwrap().kind(),
-            FillImageLinkKind::InertExternal
+            Link::new("../Pictures/x.png").unwrap().kind(),
+            LinkKind::InertExternal
         );
     }
 
@@ -977,7 +974,7 @@ mod tests {
                 .link()
                 .unwrap()
                 .kind(),
-            FillImageLinkKind::InertExternal
+            LinkKind::InertExternal
         );
 
         let inline_xml =

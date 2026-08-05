@@ -1,7 +1,7 @@
-use litchi_odt::{
-    Builder, FlatOpenDocument, OpenDocumentPackage, ParagraphBreak, ParagraphBreaks,
-    ParagraphPageNumber, ParagraphStyleBreaks, parse_paragraph_style_breaks,
-    set_paragraph_style_breaks_xml,
+use litchi_odt::Builder;
+use litchi_odt::style::paragraph::breaks::{
+    ParagraphBreak, ParagraphBreaks, ParagraphPageNumber, ParagraphStyleBreaks,
+    parse_paragraph_style_breaks, set_paragraph_style_breaks_xml,
 };
 use std::io::Cursor;
 const O: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -223,7 +223,8 @@ fn builder_package_round_trip() {
             .is_err()
     );
     builder.add_paragraph("x").unwrap();
-    let package = OpenDocumentPackage::from_bytes(builder.build().unwrap()).unwrap();
+    let package =
+        litchi_odt::generic::OpenDocumentPackage::from_bytes(builder.build().unwrap()).unwrap();
     assert_eq!(
         package.paragraph_style_breaks().unwrap().get("Body"),
         Some(&style)
@@ -251,7 +252,7 @@ fn parses_real_odf_fixtures() {
             .iter()
             .any(|p| p.page_number == Some(ParagraphPageNumber::Auto))
     );
-    let flat = FlatOpenDocument::from_reader(Cursor::new(xml)).unwrap();
+    let flat = litchi_odt::generic::FlatOpenDocument::from_reader(Cursor::new(xml)).unwrap();
     assert_eq!(
         flat.paragraph_style_breaks().unwrap().styles.len(),
         set.styles.len()

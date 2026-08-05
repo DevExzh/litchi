@@ -1,11 +1,5 @@
-use litchi_odt::{
-    Builder, FlatOpenDocument, OpenDocumentPackage, TableAlignment, TableBorderModel,
-    TablePageNumber, TableProperties, TableRowBackgroundColor, TableRowBackgroundImage,
-    TableRowBackgroundPosition, TableRowBackgroundRepeat, TableRowBackgroundSource, TableRowBreak,
-    TableRowKeepTogether, TableShadow, TableStyleMeasure, TableStylePercent, TableStyleProperties,
-    TableStyleWidth, TableWritingMode, parse_table_style_properties,
-    set_table_style_properties_xml,
-};
+use litchi_odt::Builder;
+use litchi_odt::style::table::{row, table};
 use std::io::Cursor;
 const O: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const S: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
@@ -23,28 +17,23 @@ fn complete_round_trip_and_lossless_mutation() {
     let xml = wrap(
         r##"<s:style s:name="Table" s:family="table"><s:table-properties s:width="6.5cm" s:rel-width="80%" t:align="margins" f:margin-left="-1cm" f:margin-right="2%" f:margin-top="0cm" f:margin-bottom="3%" f:margin="1cm" s:page-number="4" f:break-before="column" f:break-after="page" f:background-color="#A0b1C2" s:shadow="none" f:keep-with-next="always" s:may-break-between-rows="false" t:border-model="separating" s:writing-mode="rl-tb" t:display="true"><s:background-image s:repeat="no-repeat" s:position="right" x:type="simple" x:href="Pictures/a.png"/></s:table-properties></s:style>"##,
     );
-    let set = parse_table_style_properties(&xml).unwrap();
+    let set = table::parse(&xml).unwrap();
     let style = set.get("Table").unwrap();
     let p = style.properties.as_ref().unwrap();
-    assert_eq!(p.align, Some(TableAlignment::Margins));
-    assert_eq!(p.page_number, Some(TablePageNumber::Number(4)));
-    assert_eq!(p.writing_mode, Some(TableWritingMode::RlTb));
+    assert_eq!(p.align, Some(table::Alignment::Margins));
+    assert_eq!(p.page_number, Some(table::PageNumber::Number(4)));
+    assert_eq!(p.writing_mode, Some(table::WritingMode::RlTb));
     let out = style.to_xml_fragment().unwrap();
-    assert_eq!(
-        parse_table_style_properties(&wrap(&out))
-            .unwrap()
-            .get("Table"),
-        Some(style)
-    );
-    let changed = TableStyleProperties::named(
+    assert_eq!(table::parse(&wrap(&out)).unwrap().get("Table"), Some(style));
+    let changed = table::Style::named(
         "Table",
-        Some(TableProperties {
+        Some(table::Properties {
             display: Some(false),
             ..Default::default()
         }),
     )
     .unwrap();
-    let updated = set_table_style_properties_xml(&xml, &changed).unwrap();
+    let updated = table::set_xml(&xml, &changed).unwrap();
     assert!(!updated.contains("t:align"));
     assert!(updated.contains("table:display=\"false\""));
 }
@@ -53,7 +42,7 @@ fn embedded_image_round_trip() {
     let xml = wrap(
         r#"<s:default-style s:family="table"><s:table-properties><s:background-image><o:binary-data>AQID</o:binary-data></s:background-image></s:table-properties></s:default-style>"#,
     );
-    let set = parse_table_style_properties(&xml).unwrap();
+    let set = table::parse(&xml).unwrap();
     assert_eq!(
         set.default_style()
             .unwrap()
@@ -64,10 +53,10 @@ fn embedded_image_round_trip() {
             .as_ref()
             .unwrap()
             .source,
-        TableRowBackgroundSource::Embedded(vec![1, 2, 3])
+        row::BackgroundSource::Embedded(vec![1, 2, 3])
     );
     assert_eq!(
-        parse_table_style_properties(&wrap(
+        table::parse(&wrap(
             &set.default_style().unwrap().to_xml_fragment().unwrap()
         ))
         .unwrap(),
@@ -77,16 +66,11 @@ fn embedded_image_round_trip() {
 #[test]
 fn parses_real_odfdo_and_libreoffice() {
     let odfdo = include_str!("../../../test-data/odfdo/tests/samples/example.xml");
-    assert!(
-        !parse_table_style_properties(odfdo)
-            .unwrap()
-            .styles
-            .is_empty()
-    );
+    assert!(!table::parse(odfdo).unwrap().styles.is_empty());
     let lo = include_bytes!(
         "../../../test-data/libreoffice-core/xmloff/qa/unit/data/floattable-wrap-all-pages2.fodt"
     );
-    let flat = FlatOpenDocument::from_reader(Cursor::new(lo)).unwrap();
+    let flat = litchi_odt::generic::FlatOpenDocument::from_reader(Cursor::new(lo)).unwrap();
     let styles = flat.table_style_properties().unwrap();
     assert!(styles.styles.iter().any(|x| {
         x.properties
@@ -96,30 +80,30 @@ fn parses_real_odfdo_and_libreoffice() {
 }
 #[test]
 fn builder_package_round_trip() {
-    let p = TableProperties {
-        width: Some(TableStyleWidth::new("8cm").unwrap()),
-        relative_width: Some(TableStylePercent::new("100%").unwrap()),
-        align: Some(TableAlignment::Center),
-        margin_left: Some(TableStyleMeasure::new("-1cm").unwrap()),
-        background_color: Some(TableRowBackgroundColor::new("transparent").unwrap()),
-        background_image: Some(TableRowBackgroundImage {
-            repeat: Some(TableRowBackgroundRepeat::Repeat),
-            position: Some(TableRowBackgroundPosition::Center),
+    let p = table::Properties {
+        width: Some(table::Width::new("8cm").unwrap()),
+        relative_width: Some(table::Percent::new("100%").unwrap()),
+        align: Some(table::Alignment::Center),
+        margin_left: Some(table::Measure::new("-1cm").unwrap()),
+        background_color: Some(row::BackgroundColor::new("transparent").unwrap()),
+        background_image: Some(row::BackgroundImage {
+            repeat: Some(row::Repeat::Repeat),
+            position: Some(row::BackgroundPosition::Center),
             filter_name: None,
             opacity: None,
-            source: TableRowBackgroundSource::Empty,
+            source: row::BackgroundSource::Empty,
         }),
-        break_before: Some(TableRowBreak::Auto),
-        keep_with_next: Some(TableRowKeepTogether::Auto),
-        shadow: Some(TableShadow::new("none").unwrap()),
-        border_model: Some(TableBorderModel::Collapsing),
+        break_before: Some(row::Break::Auto),
+        keep_with_next: Some(row::KeepTogether::Auto),
+        shadow: Some(table::Shadow::new("none").unwrap()),
+        border_model: Some(table::BorderModel::Collapsing),
         ..Default::default()
     };
-    let style = TableStyleProperties::named("Table", Some(p)).unwrap();
+    let style = table::Style::named("Table", Some(p)).unwrap();
     let mut b = Builder::new();
     b.add_table_property_style(style.clone()).unwrap();
     b.add_paragraph("x").unwrap();
-    let package = OpenDocumentPackage::from_bytes(b.build().unwrap()).unwrap();
+    let package = litchi_odt::generic::OpenDocumentPackage::from_bytes(b.build().unwrap()).unwrap();
     assert_eq!(
         package.table_style_properties().unwrap().get("Table"),
         Some(&style)
@@ -130,7 +114,7 @@ fn accepts_rng_trailing_dot_and_rejects_identity_namespace_lookalikes() {
     let xml = wrap(
         r#"<s:style s:name="Edge" s:family="table"><s:table-properties s:width="1.cm" s:rel-width="80.%"/></s:style>"#,
     );
-    let p = parse_table_style_properties(&xml).unwrap();
+    let p = table::parse(&xml).unwrap();
     assert_eq!(
         p.get("Edge")
             .unwrap()
@@ -144,7 +128,7 @@ fn accepts_rng_trailing_dot_and_rejects_identity_namespace_lookalikes() {
         "1.cm"
     );
     assert!(
-        parse_table_style_properties(&wrap(
+        table::parse(&wrap(
             r#"<s:style s:name="X" family="table"><s:table-properties/></s:style>"#
         ))
         .is_err()
@@ -180,6 +164,6 @@ fn rejects_malformed() {
         ),
     ];
     for x in bad {
-        assert!(parse_table_style_properties(&x).is_err(), "accepted {x}")
+        assert!(table::parse(&x).is_err(), "accepted {x}")
     }
 }

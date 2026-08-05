@@ -1175,7 +1175,7 @@ mod tests {
 
     #[test]
     fn builder_and_mutable_document_round_trip() {
-        use crate::{Builder, Document, MutableDocument};
+        use crate::{Builder, Document, mutable::MutableDocument};
         let mut form = GenericForm::new("Main");
         form.add_control(HiddenControl::new("Hidden", "hidden"))
             .unwrap();

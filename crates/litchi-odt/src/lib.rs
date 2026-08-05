@@ -117,16 +117,16 @@ pub mod variable_declaration;
     unused_imports,
     reason = "ODT facade exposes inert concordance metadata"
 )]
-pub use auto_mark_file::AlphabeticalIndexAutoMarkFile;
+pub(crate) use auto_mark_file::AlphabeticalIndexAutoMarkFile;
 #[allow(unused_imports, reason = "ODT facade exposes bibliography semantics")]
-pub use bibliography_configuration::{
+pub(crate) use bibliography_configuration::{
     BibliographyConfiguration, BibliographyField, BibliographySortKey,
 };
 #[allow(
     unused_imports,
     reason = "ODT facade exposes unambiguous chart property semantics"
 )]
-pub use chart_properties::{
+pub(crate) use chart_properties::{
     Angle, AxisLabelPosition, AxisPosition, DataLabelNumber, Direction, Double, EmptyCellTreatment,
     ErrorCategory, Integer, Interpolation, LabelArrangement, LabelPosition, LabelSeparator,
     PositiveInteger, RegressionType, SeriesSource, SolidType, StylePropertiesSet, StyleRecord,
@@ -137,7 +137,7 @@ pub use chart_properties::{
     unused_imports,
     reason = "ODT facade exposes the canonical shared package types"
 )]
-pub use core::{
+pub(crate) use core::{
     AutoReloadMetadata, Cipher, DocumentStatistics, HyperlinkBehaviourMetadata, Kdf, Manifest,
     ManifestChecksum, ManifestChecksumAlgorithm, ManifestEncryption, ManifestEncryptionAlgorithm,
     ManifestEntry, ManifestKeyDerivation, ManifestStartKeyGeneration, Metadata, OwnedPackage,
@@ -148,30 +148,13 @@ pub use core::{
     unused_imports,
     reason = "ODT facade exposes DDE metadata used by variables"
 )]
-pub use dde_connection::{DdeConnectionDeclaration, DdeConnectionUse};
+pub(crate) use dde_connection::{DdeConnectionDeclaration, DdeConnectionUse};
 #[allow(unused_imports, reason = "ODT facade exposes document script metadata")]
-pub use document_scripts::{
+pub(crate) use document_scripts::{
     EmbeddedScript, EventListener, ScriptBinding, ScriptEventListener, Scripts, parse_scripts,
 };
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes drawing resource semantics"
-)]
-pub use drawing::resources::{
-    FillImage, FillImageActuate, FillImageLength, FillImageLengthUnit, FillImageLink,
-    FillImageLinkKind, FillImageShow, FillImageSource, FillImages, Gradient, GradientAngle,
-    GradientCoordinate, GradientCoordinateUnit, GradientIntensity, GradientPercent,
-    GradientSpreadMethod, GradientStopOffset, Gradients, Hatch, HatchLength, HatchLengthUnit,
-    HatchRotation, HatchStyle, Hatches, LegacyGradient, LegacyGradientStyle,
-    LibreOfficeGradientColorType, LibreOfficeGradientStop, Marker, MarkerPathData, MarkerViewBox,
-    Markers, Opacities, Opacity, OpacityAngle, OpacityGeometryPercent, OpacityPercent, OpacityStop,
-    OpacityStopValue, OpacityStyle, RgbColor, StrokeDash, StrokeDashMeasure, StrokeDashMeasureUnit,
-    StrokeDashStyle, StrokeDashes, SvgGradientCommon, SvgGradientStop, SvgLinearGradient,
-    SvgRadialGradient, parse_drawing_fill_images, parse_drawing_gradients, parse_drawing_hatches,
-    parse_drawing_markers, parse_drawing_opacities, parse_drawing_stroke_dashes,
-};
 #[allow(unused_imports, reason = "ODT facade exposes drawing style resources")]
-pub use drawing_page_properties::{
+pub(crate) use drawing_page_properties::{
     BackgroundSize, Color, Duration, Fill, FillRule, ImageRefPoint, LengthOrPercent,
     NonNegativeInteger, Percent, Repeat, Sound, SoundShow, StyleNameRef, StyleProperties, Styles,
     TileDirection, TileRepeatOffset, TransitionDirection, TransitionSpeed, TransitionStyle,
@@ -182,7 +165,7 @@ pub use drawing_page_properties::{
     unused_imports,
     reason = "ODT facade exposes bookmark mutation primitives"
 )]
-pub use elements::bookmark::{
+pub(crate) use elements::bookmark::{
     Bookmark, BookmarkEnd, BookmarkFragments, BookmarkParser, BookmarkRange, BookmarkStart,
     BookmarkTarget, insert_bookmark_xml, parse_bookmark_targets, remove_bookmark_xml,
     replace_bookmark_xml,
@@ -191,11 +174,11 @@ pub use elements::bookmark::{
     unused_imports,
     reason = "ODT facade exposes inert embedded-resource models"
 )]
-pub use embedded_object::{
+pub(crate) use embedded_object::{
     EmbeddedObject, EmbeddedObjectKind, EmbeddedObjectPart, EmbeddedObjectSource, InlineObjectRoot,
 };
 #[allow(unused_imports, reason = "ODT facade exposes font-face semantics")]
-pub use font_face::{
+pub(crate) use font_face::{
     Face, Faces, GenericFamily, Link, Metric, MetricKind, Pitch, PositiveLength, Source, Stretch,
     Style, Variant, Weight, parse_font_face_declarations,
 };
@@ -203,12 +186,12 @@ pub use font_face::{
     unused_imports,
     reason = "ODT facade exposes footnote separator semantics"
 )]
-pub use footnote_separator::{
+pub(crate) use footnote_separator::{
     FootnoteSeparatorAdjustment, FootnoteSeparatorLength, FootnoteSeparatorLineStyle,
     FootnoteSeparatorPercent, StyleFootnoteSeparator, parse_style_footnote_separators,
 };
 #[allow(unused_imports, reason = "ODT facade exposes typed form models")]
-pub use form::{
+pub(crate) use form::{
     ButtonControl, ButtonType, CheckboxControl, CheckboxState, ComboItem, ComboboxControl,
     ConnectionResourceForm, ControlForm, ControlRef, ControlShape, FileControl, FixedTextControl,
     Form, FormAttribute, FormConnectionResource, FormControl, FormControlKind, FormDate,
@@ -245,9 +228,9 @@ pub use form::{
     unused_imports,
     reason = "ODT facade exposes the canonical document package types"
 )]
-pub use generic::{FlatOpenDocument, OpenDocumentFamily, OpenDocumentPackage};
+pub(crate) use generic::{FlatOpenDocument, OpenDocumentFamily, OpenDocumentPackage};
 #[allow(unused_imports, reason = "ODT facade exposes graphic style semantics")]
-pub use graphic_properties::{
+pub(crate) use graphic_properties::{
     Child, ChildKind, Kind, Namespace, Properties, Property, Value, parse_graphic_style_properties,
     set_graphic_style_properties_xml,
 };
@@ -255,9 +238,9 @@ pub use graphic_properties::{
     unused_imports,
     reason = "ODT facade exposes header and footer style configurations"
 )]
-pub use header_footer_properties::{HeaderFooterStyleProperties, PageHeaderFooterRegion};
+pub(crate) use header_footer_properties::{HeaderFooterStyleProperties, PageHeaderFooterRegion};
 #[allow(unused_imports, reason = "ODT facade exposes line-numbering semantics")]
-pub use line_numbering::{
+pub(crate) use line_numbering::{
     LineNumberFormat, LineNumberPosition, LineNumberingConfiguration, LineNumberingSeparator,
     NonNegativeLength, parse_line_numbering_configuration,
 };
@@ -265,30 +248,32 @@ pub use line_numbering::{
     unused_imports,
     reason = "ODT facade exposes list and outline semantics"
 )]
-pub use list_label_alignment::{
+pub(crate) use list_label_alignment::{
     LabelFollowedBy, ListLabelLength, ListLevelLabelAlignment, ListLevelLabelAlignmentSet,
     ListStyleKind, ListStyleLevelLabelAlignment, parse_list_level_label_alignments,
 };
 #[allow(unused_imports, reason = "ODT facade exposes list style semantics")]
-pub use list_style::{
+pub(crate) use list_style::{
     BulletRelativeSize, ListLevelBulletStyle, ListLevelImageSource, ListLevelKind,
     ListLevelNumberStyle, ListLevelStyle, ListStyle, ListStyleSet, MAX_LIST_STYLE_LEVEL,
     parse_list_styles,
 };
 #[allow(unused_imports, reason = "ODT facade exposes annotation semantics")]
-pub use litchi_odf_common::annotation::{AnnotationElement, AnnotationNode, CellAnnotation};
+pub(crate) use litchi_odf_common::annotation::{AnnotationElement, AnnotationNode, CellAnnotation};
 #[allow(
     unused_imports,
     reason = "ODT facade exposes master-page package mutations"
 )]
-pub use master_page::{insert_master_page_xml, remove_master_page_xml, replace_master_page_xml};
+pub(crate) use master_page::{
+    insert_master_page_xml, remove_master_page_xml, replace_master_page_xml,
+};
 #[allow(unused_imports, reason = "ODT facade exposes package media models")]
-pub use media::{Image, ImageFrame, ImagePart, ImageSource};
+pub(crate) use media::{Image, ImageFrame, ImagePart, ImageSource};
 #[allow(
     unused_imports,
     reason = "ODT facade exposes note configuration semantics"
 )]
-pub use notes_configuration::{
+pub(crate) use notes_configuration::{
     FootnotePosition, NoteNumberingScope, NotesConfiguration, NotesConfigurations,
     parse_notes_configurations, remove_notes_configuration_xml, set_notes_configuration_xml,
 };
@@ -296,7 +281,7 @@ pub use notes_configuration::{
     unused_imports,
     reason = "ODT facade exposes ODF chart models for embedded charts"
 )]
-pub use odc::{
+pub(crate) use odc::{
     Attribute, Axis, AxisSpec, AxisUpdate, CachedCell, CachedRow, CachedTable, CachedValue,
     DataLabelSpec, DataPoint, DataPointSpec, DataSourceLabels, Definition, Dimension, DomainSpec,
     Element, ElementKind, EquationSpec, ExtensionAttribute, ExtensionElement, Extensions, Grid,
@@ -304,7 +289,7 @@ pub use odc::{
     RegressionSpec, Series, SeriesSpec, SeriesUpdate, StyleElement, Text, serialize_chart_content,
 };
 #[allow(unused_imports, reason = "ODT facade exposes outline style semantics")]
-pub use outline_style::{
+pub(crate) use outline_style::{
     ListLevelPositionMode, MAX_OUTLINE_LEVELS, OutlineAttribute, OutlineLevelStyle,
     OutlineListLevelProperties, OutlineNumberFormat, OutlinePositiveInteger, OutlineStyle,
     OutlineStyles, OutlineTextAlign, OutlineTextProperties, parse_outline_styles,
@@ -314,30 +299,30 @@ pub use outline_style::{
     unused_imports,
     reason = "ODT facade exposes package annotation operations"
 )]
-pub use package::annotation::{
+pub(crate) use package::annotation::{
     Annotation, AnnotationAnchor, AnnotationInfo, AnnotationPosition, AnnotationUpdate,
 };
 #[allow(
     unused_imports,
     reason = "ODT facade exposes embedded-chart storage policy"
 )]
-pub use package::charts::EmbeddedChartStorage;
+pub(crate) use package::charts::EmbeddedChartStorage;
 #[allow(
     unused_imports,
     reason = "ODT facade exposes inert embedded-resource updates"
 )]
-pub use package::embedded::{
+pub(crate) use package::embedded::{
     EmbeddedResource, EmbeddedResourceFile, EmbeddedResourceKind, EmbeddedResourceSource,
 };
 #[allow(unused_imports, reason = "ODT facade exposes authored form operations")]
-pub use package::forms::{AuthoredForm, AuthoredFormControl, AuthoredFormNode};
+pub(crate) use package::forms::{AuthoredForm, AuthoredFormControl, AuthoredFormNode};
 #[allow(
     unused_imports,
     reason = "ODT facade exposes inert package script resources"
 )]
-pub use package::scripts::{ScriptResource, ScriptResourceKind, ScriptResourceSpec};
+pub(crate) use package::scripts::{ScriptResource, ScriptResourceKind, ScriptResourceSpec};
 #[allow(unused_imports, reason = "ODT facade exposes ruby semantics")]
-pub use ruby_family::{
+pub(crate) use ruby_family::{
     RubyAlignment, RubyAnnotation, RubyAnnotations, RubyBase, RubyPosition, RubyProperties,
     RubyStyle, RubyStyles, insert_ruby_annotation_xml, parse_ruby_annotations, parse_ruby_styles,
     remove_ruby_annotation_xml, remove_ruby_style_xml, replace_ruby_annotation_xml,
@@ -347,20 +332,20 @@ pub use ruby_family::{
     unused_imports,
     reason = "ODT facade exposes common style configurations"
 )]
-pub use section_properties::{BackgroundRepeat, SectionBackgroundImage};
+pub(crate) use section_properties::{BackgroundRepeat, SectionBackgroundImage};
 #[allow(unused_imports, reason = "ODT facade exposes section style semantics")]
-pub use section_properties::{
+pub(crate) use section_properties::{
     SectionStyleProperties, SectionStylePropertiesSet, parse_section_style_properties,
 };
 #[allow(unused_imports, reason = "ODT facade exposes semantic ODF settings")]
-pub use settings::{
+pub(crate) use settings::{
     ConfigItem, ConfigMap, ConfigMapEntry, ConfigNode, ConfigSet, ConfigValue, Settings,
 };
 #[allow(
     unused_imports,
     reason = "ODT facade exposes named page-layout style semantics"
 )]
-pub use style::columns::{
+pub(crate) use style::columns::{
     MAX_STYLE_COLUMNS, StyleColumn, StyleColumnLength, StyleColumnSeparator,
     StyleColumnSeparatorAlignment, StyleColumnSeparatorStyle, StyleColumns, parse_style_columns,
 };
@@ -368,7 +353,7 @@ pub use style::columns::{
     unused_imports,
     reason = "ODT facade exposes paragraph style semantics"
 )]
-pub use style::paragraph::border::{
+pub(crate) use style::paragraph::border::{
     ParagraphBackgroundTransparency, ParagraphBorder, ParagraphBorderProperties,
     ParagraphBorderWidth, ParagraphBorderWidths, ParagraphStyleBorder, ParagraphStyleBorderSet,
     parse_paragraph_style_borders, set_paragraph_style_border_xml,
@@ -377,7 +362,7 @@ pub use style::paragraph::border::{
     unused_imports,
     reason = "ODT facade exposes paragraph break semantics"
 )]
-pub use style::paragraph::breaks::{
+pub(crate) use style::paragraph::breaks::{
     ParagraphBreak, ParagraphBreaks, ParagraphPageNumber, ParagraphStyleBreaks,
     ParagraphStyleBreaksSet, parse_paragraph_style_breaks, set_paragraph_style_breaks_xml,
 };
@@ -385,12 +370,12 @@ pub use style::paragraph::breaks::{
     unused_imports,
     reason = "ODT facade exposes paragraph drop-cap semantics"
 )]
-pub use style::paragraph::drop_cap::{
+pub(crate) use style::paragraph::drop_cap::{
     DropCapDistance, DropCapLength, ParagraphDropCap, ParagraphStyleDropCap,
     ParagraphStyleDropCapSet, parse_paragraph_style_drop_caps,
 };
 #[allow(unused_imports, reason = "ODT facade exposes paragraph flow semantics")]
-pub use style::paragraph::flow::{
+pub(crate) use style::paragraph::flow::{
     HyphenationKeep, HyphenationLadder, Keep, LineBreak, ParagraphFlowProperties,
     ParagraphStyleFlow, ParagraphStyleFlowSet, PunctuationWrap, parse_paragraph_style_flows,
 };
@@ -398,7 +383,7 @@ pub use style::paragraph::flow::{
     unused_imports,
     reason = "ODT facade exposes paragraph spacing semantics"
 )]
-pub use style::paragraph::line_spacing::{
+pub(crate) use style::paragraph::line_spacing::{
     LineHeight, LineHeightPercent, LineSpacingLength, ParagraphLineSpacing,
     ParagraphStyleLineSpacing, ParagraphStyleLineSpacingSet, TextAlignLast, TextAutospace,
     parse_paragraph_style_line_spacings,
@@ -407,13 +392,13 @@ pub use style::paragraph::line_spacing::{
     unused_imports,
     reason = "ODT facade exposes paragraph margin semantics"
 )]
-pub use style::paragraph::margin::{
+pub(crate) use style::paragraph::margin::{
     ParagraphHorizontalMargin, ParagraphMargins, ParagraphStyleMargins, ParagraphStyleMarginsSet,
     ParagraphTextIndent, ParagraphVerticalMargin, parse_paragraph_style_margins,
     set_paragraph_style_margins_xml,
 };
 #[allow(unused_imports, reason = "ODT facade exposes paragraph tab semantics")]
-pub use style::paragraph::tab_stop::{
+pub(crate) use style::paragraph::tab_stop::{
     MAX_PARAGRAPH_TAB_STOPS, ParagraphStyleTabStopSet, ParagraphStyleTabStops,
     ParagraphTabLeaderColor, ParagraphTabLeaderStyle, ParagraphTabLeaderType,
     ParagraphTabLeaderWidth, ParagraphTabStop, ParagraphTabStopType, ParagraphTabStops,
@@ -423,47 +408,13 @@ pub use style::paragraph::tab_stop::{
     unused_imports,
     reason = "ODT facade exposes paragraph writing-mode semantics"
 )]
-pub use style::paragraph::writing_mode::{
+pub(crate) use style::paragraph::writing_mode::{
     ParagraphStyleWritingMode, ParagraphStyleWritingModeSet, ParagraphWritingMode,
     ParagraphWritingModeProperties, parse_paragraph_style_writing_modes,
     set_paragraph_style_writing_mode_xml,
 };
-#[allow(unused_imports, reason = "ODT facade exposes table style semantics")]
-pub use style::table::cell::{
-    CellBorder, CellBorderWidths, CellDirection, CellGlyphOrientationVertical, CellLength,
-    CellProtect, CellRotationAlign, CellRotationAngle, CellTextAlignSource, CellVerticalAlign,
-    CellWrapOption, TableCellProperties, TableCellStyleProperties, TableCellStylePropertiesSet,
-    parse_table_cell_style_properties, set_table_cell_style_properties_xml,
-};
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes table-column style semantics"
-)]
-pub use style::table::column::{
-    TableColumnLength, TableColumnProperties, TableColumnRelWidth, TableColumnStyleProperties,
-    TableColumnStylePropertiesSet, parse_table_column_style_properties,
-    set_table_column_style_properties_xml,
-};
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes table-row style semantics"
-)]
-pub use style::table::row::{
-    HorizontalBackgroundPosition, TableRowBackgroundColor, TableRowBackgroundImage,
-    TableRowBackgroundPosition, TableRowBackgroundRepeat, TableRowBackgroundSource, TableRowBreak,
-    TableRowKeepTogether, TableRowLength, TableRowOpacity, TableRowProperties,
-    TableRowStyleProperties, TableRowStylePropertiesSet, VerticalBackgroundPosition,
-    parse_table_row_style_properties, set_table_row_style_properties_xml,
-};
-#[allow(unused_imports, reason = "ODT facade exposes table style semantics")]
-pub use style::table::table::{
-    TableAlignment, TableBorderModel, TablePageNumber, TableProperties, TableShadow,
-    TableStyleMeasure, TableStylePercent, TableStyleProperties, TableStylePropertiesSet,
-    TableStyleWidth, TableWritingMode, parse_table_style_properties,
-    set_table_style_properties_xml,
-};
 #[allow(unused_imports, reason = "ODT facade exposes text style semantics")]
-pub use style::text::{
+pub(crate) use style::text::{
     TextProperty, TextPropertyKind, TextPropertyNamespace, TextPropertyValue, TextStyleProperties,
     TextStylePropertiesSet, TextStyleRecord, parse_text_style_properties,
     set_text_style_properties_xml,
@@ -472,7 +423,7 @@ pub use style::text::{
     unused_imports,
     reason = "ODT facade exposes semantic ODF metadata models"
 )]
-pub use variable_declaration::{
+pub(crate) use variable_declaration::{
     VariableBody, VariableDateValue, VariableDeclaration, VariableDeclarationGroup,
     VariableDeclarations, VariableHeaderFooter, VariableKind, VariablePart, VariableScope,
     VariableValue, VariableValueType, remove_variable_declaration_group_xml,
@@ -484,14 +435,14 @@ pub mod elements;
     unused_imports,
     reason = "ODT facade exposes rich field and text element models"
 )]
-pub use elements::field::{
+pub(crate) use elements::field::{
     MetaFieldAttribute, MetaFieldContent, MetaFieldElement, MetaFieldNode, NoteBodyContent,
 };
 #[allow(
     unused_imports,
     reason = "ODT facade exposes hyperlink element vocabulary"
 )]
-pub use elements::text::{Hyperlink, TextHyperlinkActuate, TextHyperlinkShow};
+pub(crate) use elements::text::{Hyperlink, TextHyperlinkActuate, TextHyperlinkShow};
 
 mod builder;
 mod document;
@@ -524,50 +475,42 @@ pub use dynamic_text::{
     insert_database_field_xml, insert_dynamic_text_field_xml, remove_database_field_xml,
     remove_dynamic_text_field_xml, replace_database_field_xml, replace_dynamic_text_field_xml,
 };
-pub use frame::{FrameAnchor, ImageFormat, Length};
-pub use header_footer::{
-    HeaderFooter, HeaderFooterKind, MasterPage, MasterPageChild, MasterPageChildKind,
+pub(crate) use frame::{FrameAnchor, Length};
+pub(crate) use header_footer::{
+    HeaderFooterKind, MasterPage, MasterPageChild, MasterPageChildKind,
 };
 #[allow(unused_imports)] // Library public API
-pub use header_footer_content::{
+pub(crate) use header_footer_content::{
     HeaderFooterBlock, HeaderFooterColumnRegion, HeaderFooterField, HeaderFooterFieldKind,
     HeaderFooterInline, HeaderFooterSenderFieldKind,
 };
-pub use index::{
-    AlphabeticalIndexSource, BibliographyIndexSource, IllustrationIndexSource, ObjectIndexSource,
-    TableOfContentsSource, TextAlphabeticalIndexEntryTemplate, TextAlphabeticalIndexLevel,
-    TextBibliographyEntryTemplate, TextBibliographyEntryToken, TextBibliographyType, TextIndex,
-    TextIndexAttribute, TextIndexBody, TextIndexBodyParagraph, TextIndexBodyTitle,
-    TextIndexCaptionSequenceFormat, TextIndexChapterDisplay, TextIndexContent, TextIndexElement,
-    TextIndexEntryTemplate, TextIndexEntryToken, TextIndexKind, TextIndexScope,
-    TextIndexSimpleEntryTemplate, TextIndexSourceStyles, TextIndexTabStop, TextIndexTitleTemplate,
-    UserIndexSource, insert_text_index_xml, remove_text_index_xml, replace_text_index_xml,
+pub(crate) use index::{
+    TextBibliographyType, TextIndex, insert_text_index_xml, remove_text_index_xml,
+    replace_text_index_xml,
 };
-pub use index_mark::{
-    TextAlphabeticalMarkMetadata, TextIndexMark, TextIndexMarkFragments, TextIndexMarkKind,
-    insert_text_index_mark_xml, remove_text_index_mark_xml, replace_text_index_mark_xml,
+pub(crate) use index_mark::{
+    TextIndexMark, insert_text_index_mark_xml, remove_text_index_mark_xml,
+    replace_text_index_mark_xml,
 };
-pub use mutable::MutableDocument;
-pub use note::{Note, NoteClass, insert_note_xml, remove_note_xml, replace_note_xml};
-pub use page_layout::{PageLayout, PageLayoutAttribute, PageLayoutProperties, PageUsage};
-pub use page_sequence::Sequence;
-pub use reference_mark::{
-    ReferenceMark, ReferenceMarkFragments, insert_reference_mark_xml, remove_reference_mark_xml,
-    replace_reference_mark_xml,
+pub(crate) use note::{Note, NoteClass, insert_note_xml, remove_note_xml, replace_note_xml};
+pub(crate) use page_layout::PageLayout;
+pub(crate) use page_sequence::Sequence;
+pub(crate) use reference_mark::{
+    ReferenceMark, insert_reference_mark_xml, remove_reference_mark_xml, replace_reference_mark_xml,
 };
-pub use ruby::Ruby;
-pub use section::{
+pub(crate) use ruby::Ruby;
+pub(crate) use section::{
     Block, add_section_xml, clear_sections_xml, remove_section_xml, unwrap_section_xml,
     update_section_xml, wrap_section_xml,
 };
-pub use tracked_changes::{
-    Position, Story, mark_tracked_change_range_xml, mark_tracked_deletion_xml,
-    set_tracked_changes_xml, unmark_tracked_change_xml,
+pub(crate) use tracked_changes::{
+    Position, mark_tracked_change_range_xml, mark_tracked_deletion_xml, set_tracked_changes_xml,
+    unmark_tracked_change_xml,
 };
 
 // Re-export ODT-specific types for external use
 #[allow(unused_imports)] // Library public API
-pub use parser::{
+pub(crate) use parser::{
     ChangeType, Comment, Parser, Section, SectionDdeSource, SectionDisplay, SectionSource,
     TrackChange, TrackedChanges,
 };

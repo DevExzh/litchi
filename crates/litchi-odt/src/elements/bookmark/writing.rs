@@ -669,7 +669,7 @@ mod tests {
         assert_eq!(targets.len(), 1);
         assert_eq!(targets[0].name, "built");
 
-        let mut mutable = crate::MutableDocument::from_document(document).unwrap();
+        let mut mutable = crate::mutable::MutableDocument::from_document(document).unwrap();
         let old = mutable
             .replace_bookmark_target(0, &BookmarkTarget::point("changed"))
             .unwrap();

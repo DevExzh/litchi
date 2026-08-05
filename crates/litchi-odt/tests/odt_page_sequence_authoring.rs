@@ -1,10 +1,11 @@
 //! Authoring of explicit ODT page sequences (`text:page-sequence`, ODF 1.3
-//! §5.3) through `Builder` and `MutableDocument`.
+//! §5.3) through `Builder` and `litchi_odt::mutable::MutableDocument`.
 //!
 //! The model preserves only the ordered `text:master-page-name` assignments;
 //! litchi never paginates or resolves the referenced master pages.
 
-use litchi_odt::{Builder, Document, MutableDocument, Sequence};
+use litchi_odt::page_sequence::Sequence;
+use litchi_odt::{Builder, Document};
 
 fn sequence() -> Sequence {
     Sequence::new(vec![
@@ -74,7 +75,7 @@ fn mutable_sets_replaces_and_removes_page_sequence() {
     let mut builder = Builder::new();
     builder.add_paragraph("Existing body").unwrap();
     let document = Document::from_bytes(builder.build().unwrap()).unwrap();
-    let mut mutable = MutableDocument::from_document(document).unwrap();
+    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(document).unwrap();
     assert_eq!(mutable.page_sequence().unwrap(), None);
 
     // Insert ahead of the existing content.
@@ -84,13 +85,13 @@ fn mutable_sets_replaces_and_removes_page_sequence() {
 
     // Replace the assignments in place.
     let replacement = Sequence::new(vec!["Standard".to_string()]).unwrap();
-    let mut mutable = MutableDocument::from_document(reopened).unwrap();
+    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(reopened).unwrap();
     mutable.set_page_sequence(Some(&replacement)).unwrap();
     let reopened = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.page_sequence().unwrap(), Some(replacement));
 
     // Remove the sequence; removing again is a no-op.
-    let mut mutable = MutableDocument::from_document(reopened).unwrap();
+    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(reopened).unwrap();
     mutable.set_page_sequence(None).unwrap();
     mutable.set_page_sequence(None).unwrap();
     let reopened = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();

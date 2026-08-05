@@ -1,6 +1,7 @@
-use litchi_odt::{
-    FlatOpenDocument, LineHeight, LineHeightPercent, LineSpacingLength, NonNegativeLength,
-    ParagraphLineSpacing, TextAlignLast, TextAutospace, parse_paragraph_style_line_spacings,
+use litchi_odt::line_numbering::NonNegativeLength;
+use litchi_odt::style::paragraph::line_spacing::{
+    LineHeight, LineHeightPercent, LineSpacingLength, ParagraphLineSpacing, TextAlignLast,
+    TextAutospace, parse_paragraph_style_line_spacings,
 };
 use std::io::Cursor;
 const O: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -132,7 +133,7 @@ fn parses_flat_fixtures() {
     let bytes = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/uibase/shells/data/protectedLinkCopy.fodt"
     );
-    let flat = FlatOpenDocument::from_reader(Cursor::new(bytes)).unwrap();
+    let flat = litchi_odt::generic::FlatOpenDocument::from_reader(Cursor::new(bytes)).unwrap();
     let set = flat.paragraph_style_line_spacings().unwrap();
     assert!(
         set.styles

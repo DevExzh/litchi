@@ -447,7 +447,7 @@ impl MutableDocument {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites, load external data, or render gradients.
-    pub fn drawing_gradients(&self) -> Result<crate::drawing::resources::gradient::Gradients> {
+    pub fn drawing_gradients(&self) -> Result<crate::drawing::resources::gradient::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
             crate::drawing::resources::gradient::parse_drawing_gradients,
@@ -458,7 +458,7 @@ impl MutableDocument {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites or render hatches.
-    pub fn drawing_hatches(&self) -> Result<crate::drawing::resources::hatch::Hatches> {
+    pub fn drawing_hatches(&self) -> Result<crate::drawing::resources::hatch::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
             crate::drawing::resources::hatch::parse_drawing_hatches,
@@ -471,7 +471,7 @@ impl MutableDocument {
     /// style use sites or render strokes.
     pub fn drawing_stroke_dashes(
         &self,
-    ) -> Result<crate::drawing::resources::stroke_dash::StrokeDashes> {
+    ) -> Result<crate::drawing::resources::stroke_dash::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
             crate::drawing::resources::stroke_dash::parse_drawing_stroke_dashes,
@@ -482,7 +482,7 @@ impl MutableDocument {
     ///
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites, follow links, load linked resources, or render images.
-    pub fn drawing_fill_images(&self) -> Result<crate::drawing::resources::fill_image::FillImages> {
+    pub fn drawing_fill_images(&self) -> Result<crate::drawing::resources::fill_image::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
             crate::drawing::resources::fill_image::parse_drawing_fill_images,
@@ -493,7 +493,7 @@ impl MutableDocument {
     ///
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites or render marker paths.
-    pub fn drawing_markers(&self) -> Result<crate::drawing::resources::marker::Markers> {
+    pub fn drawing_markers(&self) -> Result<crate::drawing::resources::marker::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
             crate::drawing::resources::marker::parse_drawing_markers,
@@ -504,7 +504,7 @@ impl MutableDocument {
     ///
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites or render opacity gradients.
-    pub fn drawing_opacities(&self) -> Result<crate::drawing::resources::opacity::Opacities> {
+    pub fn drawing_opacities(&self) -> Result<crate::drawing::resources::opacity::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
             crate::drawing::resources::opacity::parse_drawing_opacities,
@@ -2120,28 +2120,28 @@ impl MutableDocument {
     /// Replace, insert, or remove typed row properties on an existing table-row style.
     pub fn set_table_row_style_properties(
         &mut self,
-        style: &crate::TableRowStyleProperties,
+        style: &crate::style::table::row::Style,
     ) -> Result<()> {
         let styles = self.styles_xml.as_deref().ok_or_else(|| {
             litchi_core::Error::InvalidFormat(
                 "document has no styles.xml table-row style to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(crate::set_table_row_style_properties_xml(styles, style)?);
+        self.styles_xml = Some(crate::style::table::row::set_xml(styles, style)?);
         Ok(())
     }
 
     /// Replace, insert, or remove typed properties on an existing table style.
     pub fn set_table_style_properties(
         &mut self,
-        style: &crate::TableStyleProperties,
+        style: &crate::style::table::table::Style,
     ) -> Result<()> {
         let styles = self.styles_xml.as_deref().ok_or_else(|| {
             litchi_core::Error::InvalidFormat(
                 "document has no styles.xml table style to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(crate::set_table_style_properties_xml(styles, style)?);
+        self.styles_xml = Some(crate::style::table::table::set_xml(styles, style)?);
         Ok(())
     }
 
@@ -2986,7 +2986,7 @@ mod tests {
     use crate::elements::parser::OrderElement;
     use crate::elements::table::{TableCell, TableRow};
     use crate::elements::text::{ListItem, Paragraph};
-    use crate::{Builder, PageUsage};
+    use crate::{Builder, page_layout::PageUsage};
 
     const MINIMAL_CONTENT: &str = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text><text:p>Original</text:p></office:text></office:body></office:document-content>"#;
 

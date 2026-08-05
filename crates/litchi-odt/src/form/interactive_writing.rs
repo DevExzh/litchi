@@ -1318,7 +1318,7 @@ mod tests {
 
     #[test]
     fn builder_and_mutable_package_round_trip() {
-        use crate::{Builder, Document, MutableDocument};
+        use crate::{Builder, Document, mutable::MutableDocument};
         let mut form = InteractiveForm::new("Main");
         form.add_control(ButtonControl::new("Run", "run_1"))
             .unwrap();

@@ -460,7 +460,7 @@ impl Document {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites, load external data, or render gradients.
-    pub fn drawing_gradients(&self) -> Result<crate::drawing::resources::gradient::Gradients> {
+    pub fn drawing_gradients(&self) -> Result<crate::drawing::resources::gradient::Collection> {
         self.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| {
@@ -473,7 +473,7 @@ impl Document {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites or render hatches.
-    pub fn drawing_hatches(&self) -> Result<crate::drawing::resources::hatch::Hatches> {
+    pub fn drawing_hatches(&self) -> Result<crate::drawing::resources::hatch::Collection> {
         self.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| crate::drawing::resources::hatch::parse_drawing_hatches(styles.xml_content()),
@@ -486,7 +486,7 @@ impl Document {
     /// style use sites or render strokes.
     pub fn drawing_stroke_dashes(
         &self,
-    ) -> Result<crate::drawing::resources::stroke_dash::StrokeDashes> {
+    ) -> Result<crate::drawing::resources::stroke_dash::Collection> {
         self.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| {
@@ -501,7 +501,7 @@ impl Document {
     ///
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites, follow links, load linked resources, or render images.
-    pub fn drawing_fill_images(&self) -> Result<crate::drawing::resources::fill_image::FillImages> {
+    pub fn drawing_fill_images(&self) -> Result<crate::drawing::resources::fill_image::Collection> {
         self.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| {
@@ -516,7 +516,7 @@ impl Document {
     ///
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites or render marker paths.
-    pub fn drawing_markers(&self) -> Result<crate::drawing::resources::marker::Markers> {
+    pub fn drawing_markers(&self) -> Result<crate::drawing::resources::marker::Collection> {
         self.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| crate::drawing::resources::marker::parse_drawing_markers(styles.xml_content()),
@@ -527,7 +527,7 @@ impl Document {
     ///
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites or render opacity gradients.
-    pub fn drawing_opacities(&self) -> Result<crate::drawing::resources::opacity::Opacities> {
+    pub fn drawing_opacities(&self) -> Result<crate::drawing::resources::opacity::Collection> {
         self.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| {

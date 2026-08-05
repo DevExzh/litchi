@@ -1,7 +1,7 @@
-use litchi_odt::{
-    Builder, FlatOpenDocument, HyphenationKeep, HyphenationLadder, Keep, LineBreak,
-    OpenDocumentPackage, ParagraphFlowProperties, ParagraphStyleFlow, PunctuationWrap,
-    parse_paragraph_style_flows,
+use litchi_odt::Builder;
+use litchi_odt::style::paragraph::flow::{
+    HyphenationKeep, HyphenationLadder, Keep, LineBreak, ParagraphFlowProperties,
+    ParagraphStyleFlow, PunctuationWrap, parse_paragraph_style_flows,
 };
 use std::io::Cursor;
 const O: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -42,7 +42,7 @@ fn parses_real_odfdo_and_libreoffice() {
     let lo = include_bytes!(
         "../../../test-data/libreoffice-core/xmloff/qa/unit/data/scale-width-redline.fodt"
     );
-    let flat = FlatOpenDocument::from_reader(Cursor::new(lo)).unwrap();
+    let flat = litchi_odt::generic::FlatOpenDocument::from_reader(Cursor::new(lo)).unwrap();
     assert!(!flat.paragraph_style_flows().unwrap().styles.is_empty());
 }
 #[test]
@@ -61,7 +61,7 @@ fn builder_package_round_trip() {
     let mut b = Builder::new();
     b.add_paragraph_flow_style(style.clone()).unwrap();
     b.add_paragraph("x").unwrap();
-    let package = OpenDocumentPackage::from_bytes(b.build().unwrap()).unwrap();
+    let package = litchi_odt::generic::OpenDocumentPackage::from_bytes(b.build().unwrap()).unwrap();
     assert_eq!(
         package.paragraph_style_flows().unwrap().get("Flow"),
         Some(&style)

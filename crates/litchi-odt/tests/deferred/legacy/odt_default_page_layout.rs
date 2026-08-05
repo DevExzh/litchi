@@ -1,6 +1,5 @@
 //! Tests for `style:default-page-layout` against real documents.
 
-use litchi_odt::FlatOpenDocument;
 use std::path::PathBuf;
 
 fn fixture(name: &str) -> PathBuf {
@@ -13,7 +12,7 @@ const STYLE_NS: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 
 #[test]
 fn reads_default_page_layout_from_a_flat_document() {
-    let document = FlatOpenDocument::open(fixture("note-tracked-changes.fodt")).unwrap();
+    let document = litchi_odt::generic::FlatOpenDocument::open(fixture("note-tracked-changes.fodt")).unwrap();
     let layout = document
         .default_page_layout()
         .unwrap()
@@ -29,6 +28,6 @@ fn reads_default_page_layout_from_a_flat_document() {
 
 #[test]
 fn documents_without_default_page_layout_report_none() {
-    let document = FlatOpenDocument::open(fixture("drawing-style-resources.fodt")).unwrap();
+    let document = litchi_odt::generic::FlatOpenDocument::open(fixture("drawing-style-resources.fodt")).unwrap();
     assert!(document.default_page_layout().unwrap().is_none());
 }

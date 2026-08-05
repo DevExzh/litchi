@@ -7,11 +7,10 @@
 //! rejected.
 
 use super::row::{
-    HorizontalBackgroundPosition, TableRowBackgroundColor, TableRowBackgroundImage,
-    TableRowBackgroundPosition, TableRowBackgroundRepeat, TableRowBackgroundSource,
-    TableRowOpacity, VerticalBackgroundPosition,
+    BackgroundColor, BackgroundImage, BackgroundPosition, BackgroundSource,
+    HorizontalBackgroundPosition, Opacity, Repeat, VerticalBackgroundPosition,
 };
-use super::table::{TableShadow, TableWritingMode};
+use super::table::{Shadow, WritingMode};
 use crate::{FlatOpenDocument, OpenDocumentPackage};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
@@ -56,8 +55,8 @@ fn safe(x: &str, name: &str, empty: bool) -> Result<()> {
 
 /// A positive or non-negative ODF physical length used by cell paddings and border widths.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CellLength(String);
-impl CellLength {
+pub struct Length(String);
+impl Length {
     pub fn positive(x: impl Into<String>) -> Result<Self> {
         Self::new(x.into(), false)
     }
@@ -100,8 +99,8 @@ impl CellLength {
 
 /// An `fo:border*` or `style:diagonal-*` border description.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CellBorder(String);
-impl CellBorder {
+pub struct Border(String);
+impl Border {
     pub fn new(x: impl Into<String>) -> Result<Self> {
         let x = x.into();
         safe(&x, "table-cell border", false)?;
@@ -114,21 +113,21 @@ impl CellBorder {
 
 /// A three-part border line width: inner line, space between lines, outer line.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CellBorderWidths {
-    pub inner_width: CellLength,
-    pub space: CellLength,
-    pub outer_width: CellLength,
+pub struct BorderWidths {
+    pub inner_width: Length,
+    pub space: Length,
+    pub outer_width: Length,
 }
-impl CellBorderWidths {
+impl BorderWidths {
     fn parse(x: &str) -> Result<Self> {
         let words: Vec<_> = x.split_ascii_whitespace().collect();
         let [inner, space, outer] = words.as_slice() else {
             return Err(bad("border line width needs exactly three lengths"));
         };
         Ok(Self {
-            inner_width: CellLength::positive(*inner)?,
-            space: CellLength::positive(*space)?,
-            outer_width: CellLength::positive(*outer)?,
+            inner_width: Length::positive(*inner)?,
+            space: Length::positive(*space)?,
+            outer_width: Length::positive(*outer)?,
         })
     }
     fn xml(&self) -> String {
@@ -142,13 +141,13 @@ impl CellBorderWidths {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CellVerticalAlign {
+pub enum VerticalAlign {
     Top,
     Middle,
     Bottom,
     Automatic,
 }
-impl CellVerticalAlign {
+impl VerticalAlign {
     fn parse(x: &str) -> Result<Self> {
         match x {
             "top" => Ok(Self::Top),
@@ -169,11 +168,11 @@ impl CellVerticalAlign {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CellTextAlignSource {
+pub enum TextAlignSource {
     Fix,
     ValueType,
 }
-impl CellTextAlignSource {
+impl TextAlignSource {
     fn parse(x: &str) -> Result<Self> {
         match x {
             "fix" => Ok(Self::Fix),
@@ -190,11 +189,11 @@ impl CellTextAlignSource {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CellDirection {
+pub enum Direction {
     Ltr,
     Ttb,
 }
-impl CellDirection {
+impl Direction {
     fn parse(x: &str) -> Result<Self> {
         match x {
             "ltr" => Ok(Self::Ltr),
@@ -212,8 +211,8 @@ impl CellDirection {
 
 /// `style:glyph-orientation-vertical`: `auto` or a zero angle in any unit.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CellGlyphOrientationVertical(String);
-impl CellGlyphOrientationVertical {
+pub struct GlyphOrientation(String);
+impl GlyphOrientation {
     pub fn new(x: impl Into<String>) -> Result<Self> {
         let x = x.into();
         match x.as_str() {
@@ -227,11 +226,11 @@ impl CellGlyphOrientationVertical {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CellWrapOption {
+pub enum Wrap {
     NoWrap,
     Wrap,
 }
-impl CellWrapOption {
+impl Wrap {
     fn parse(x: &str) -> Result<Self> {
         match x {
             "no-wrap" => Ok(Self::NoWrap),
@@ -249,8 +248,8 @@ impl CellWrapOption {
 
 /// `style:rotation-angle` as a whole number of degrees below a full turn.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CellRotationAngle(u16);
-impl CellRotationAngle {
+pub struct RotationAngle(u16);
+impl RotationAngle {
     pub fn new(degrees: u16) -> Result<Self> {
         if degrees > MAX_ROTATION_DEGREES {
             return Err(bad("style:rotation-angle is out of range"));
@@ -267,13 +266,13 @@ impl CellRotationAngle {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CellRotationAlign {
+pub enum RotationAlign {
     None,
     Bottom,
     Top,
     Center,
 }
-impl CellRotationAlign {
+impl RotationAlign {
     fn parse(x: &str) -> Result<Self> {
         match x {
             "none" => Ok(Self::None),
@@ -296,14 +295,14 @@ impl CellRotationAlign {
 /// `style:cell-protect`: `none`, `hidden-and-protected`, or a combination of the
 /// `protected` and `formula-hidden` flags.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CellProtect {
+pub enum Protection {
     None,
     HiddenAndProtected,
     Protected,
     FormulaHidden,
     ProtectedFormulaHidden,
 }
-impl CellProtect {
+impl Protection {
     fn parse(x: &str) -> Result<Self> {
         match x {
             "none" => return Ok(Self::None),
@@ -339,44 +338,44 @@ impl CellProtect {
 
 /// Complete `style:table-cell-properties` value.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct TableCellProperties {
-    pub vertical_align: Option<CellVerticalAlign>,
-    pub text_align_source: Option<CellTextAlignSource>,
-    pub direction: Option<CellDirection>,
-    pub glyph_orientation_vertical: Option<CellGlyphOrientationVertical>,
-    pub writing_mode: Option<TableWritingMode>,
-    pub shadow: Option<TableShadow>,
-    pub background_color: Option<TableRowBackgroundColor>,
-    pub border: Option<CellBorder>,
-    pub border_top: Option<CellBorder>,
-    pub border_bottom: Option<CellBorder>,
-    pub border_left: Option<CellBorder>,
-    pub border_right: Option<CellBorder>,
-    pub diagonal_tl_br: Option<CellBorder>,
-    pub diagonal_tl_br_widths: Option<CellBorderWidths>,
-    pub diagonal_bl_tr: Option<CellBorder>,
-    pub diagonal_bl_tr_widths: Option<CellBorderWidths>,
-    pub border_line_width: Option<CellBorderWidths>,
-    pub border_line_width_top: Option<CellBorderWidths>,
-    pub border_line_width_bottom: Option<CellBorderWidths>,
-    pub border_line_width_left: Option<CellBorderWidths>,
-    pub border_line_width_right: Option<CellBorderWidths>,
-    pub padding: Option<CellLength>,
-    pub padding_top: Option<CellLength>,
-    pub padding_bottom: Option<CellLength>,
-    pub padding_left: Option<CellLength>,
-    pub padding_right: Option<CellLength>,
-    pub wrap_option: Option<CellWrapOption>,
-    pub rotation_angle: Option<CellRotationAngle>,
-    pub rotation_align: Option<CellRotationAlign>,
-    pub cell_protect: Option<CellProtect>,
+pub struct Properties {
+    pub vertical_align: Option<VerticalAlign>,
+    pub text_align_source: Option<TextAlignSource>,
+    pub direction: Option<Direction>,
+    pub glyph_orientation_vertical: Option<GlyphOrientation>,
+    pub writing_mode: Option<WritingMode>,
+    pub shadow: Option<Shadow>,
+    pub background_color: Option<BackgroundColor>,
+    pub border: Option<Border>,
+    pub border_top: Option<Border>,
+    pub border_bottom: Option<Border>,
+    pub border_left: Option<Border>,
+    pub border_right: Option<Border>,
+    pub diagonal_tl_br: Option<Border>,
+    pub diagonal_tl_br_widths: Option<BorderWidths>,
+    pub diagonal_bl_tr: Option<Border>,
+    pub diagonal_bl_tr_widths: Option<BorderWidths>,
+    pub border_line_width: Option<BorderWidths>,
+    pub border_line_width_top: Option<BorderWidths>,
+    pub border_line_width_bottom: Option<BorderWidths>,
+    pub border_line_width_left: Option<BorderWidths>,
+    pub border_line_width_right: Option<BorderWidths>,
+    pub padding: Option<Length>,
+    pub padding_top: Option<Length>,
+    pub padding_bottom: Option<Length>,
+    pub padding_left: Option<Length>,
+    pub padding_right: Option<Length>,
+    pub wrap_option: Option<Wrap>,
+    pub rotation_angle: Option<RotationAngle>,
+    pub rotation_align: Option<RotationAlign>,
+    pub cell_protect: Option<Protection>,
     pub print_content: Option<bool>,
     pub decimal_places: Option<u32>,
     pub repeat_content: Option<bool>,
     pub shrink_to_fit: Option<bool>,
-    pub background_image: Option<TableRowBackgroundImage>,
+    pub background_image: Option<BackgroundImage>,
 }
-impl TableCellProperties {
+impl Properties {
     pub fn validate(&self) -> Result<()> {
         if let Some(value) = self.decimal_places
             && value > MAX_DECIMAL_PLACES
@@ -497,42 +496,42 @@ impl TableCellProperties {
         Ok(xml)
     }
 }
-fn parse_writing(x: &str) -> Result<TableWritingMode> {
+fn parse_writing(x: &str) -> Result<WritingMode> {
     match x {
-        "lr-tb" => Ok(TableWritingMode::LrTb),
-        "rl-tb" => Ok(TableWritingMode::RlTb),
-        "tb-rl" => Ok(TableWritingMode::TbRl),
-        "tb-lr" => Ok(TableWritingMode::TbLr),
-        "lr" => Ok(TableWritingMode::Lr),
-        "rl" => Ok(TableWritingMode::Rl),
-        "tb" => Ok(TableWritingMode::Tb),
-        "page" => Ok(TableWritingMode::Page),
+        "lr-tb" => Ok(WritingMode::LrTb),
+        "rl-tb" => Ok(WritingMode::RlTb),
+        "tb-rl" => Ok(WritingMode::TbRl),
+        "tb-lr" => Ok(WritingMode::TbLr),
+        "lr" => Ok(WritingMode::Lr),
+        "rl" => Ok(WritingMode::Rl),
+        "tb" => Ok(WritingMode::Tb),
+        "page" => Ok(WritingMode::Page),
         _ => Err(bad("invalid style:writing-mode")),
     }
 }
-fn writing_xml(x: TableWritingMode) -> &'static str {
+fn writing_xml(x: WritingMode) -> &'static str {
     match x {
-        TableWritingMode::LrTb => "lr-tb",
-        TableWritingMode::RlTb => "rl-tb",
-        TableWritingMode::TbRl => "tb-rl",
-        TableWritingMode::TbLr => "tb-lr",
-        TableWritingMode::Lr => "lr",
-        TableWritingMode::Rl => "rl",
-        TableWritingMode::Tb => "tb",
-        TableWritingMode::Page => "page",
+        WritingMode::LrTb => "lr-tb",
+        WritingMode::RlTb => "rl-tb",
+        WritingMode::TbRl => "tb-rl",
+        WritingMode::TbLr => "tb-lr",
+        WritingMode::Lr => "lr",
+        WritingMode::Rl => "rl",
+        WritingMode::Tb => "tb",
+        WritingMode::Page => "page",
     }
 }
 
 /// A named or default table-cell style declaration carrying typed cell properties.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TableCellStyleProperties {
+pub struct Style {
     pub name: Option<String>,
     pub parent_style_name: Option<String>,
     pub is_default_style: bool,
-    pub properties: Option<TableCellProperties>,
+    pub properties: Option<Properties>,
 }
-impl TableCellStyleProperties {
-    pub fn named(name: impl Into<String>, properties: Option<TableCellProperties>) -> Result<Self> {
+impl Style {
+    pub fn named(name: impl Into<String>, properties: Option<Properties>) -> Result<Self> {
         let value = Self {
             name: Some(name.into()),
             parent_style_name: None,
@@ -542,7 +541,7 @@ impl TableCellStyleProperties {
         value.validate()?;
         Ok(value)
     }
-    pub fn default_style(properties: Option<TableCellProperties>) -> Self {
+    pub fn default_style(properties: Option<Properties>) -> Self {
         Self {
             name: None,
             parent_style_name: None,
@@ -596,16 +595,16 @@ impl TableCellStyleProperties {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct TableCellStylePropertiesSet {
-    pub styles: Vec<TableCellStyleProperties>,
+pub struct Styles {
+    pub styles: Vec<Style>,
 }
-impl TableCellStylePropertiesSet {
-    pub fn get(&self, name: &str) -> Option<&TableCellStyleProperties> {
+impl Styles {
+    pub fn get(&self, name: &str) -> Option<&Style> {
         self.styles
             .iter()
             .find(|style| style.name.as_deref() == Some(name))
     }
-    pub fn default_style(&self) -> Option<&TableCellStyleProperties> {
+    pub fn default_style(&self) -> Option<&Style> {
         self.styles.iter().find(|style| style.is_default_style)
     }
 }
@@ -683,12 +682,12 @@ fn style_header(
     version: XmlVersion,
     start: &BytesStart<'_>,
     default: bool,
-) -> Result<Option<TableCellStyleProperties>> {
+) -> Result<Option<Style>> {
     let mut attrs = attributes(reader, version, start)?;
     if take(&mut attrs, Ns::Style, b"family").as_deref() != Some("table-cell") {
         return Ok(None);
     }
-    let value = TableCellStyleProperties {
+    let value = Style {
         name: take(&mut attrs, Ns::Style, b"name"),
         parent_style_name: take(&mut attrs, Ns::Style, b"parent-style-name"),
         is_default_style: default,
@@ -701,98 +700,98 @@ fn cell_properties(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
     start: &BytesStart<'_>,
-) -> Result<TableCellProperties> {
+) -> Result<Properties> {
     let mut attrs = attributes(reader, version, start)?;
-    let value = TableCellProperties {
+    let value = Properties {
         vertical_align: take(&mut attrs, Ns::Style, b"vertical-align")
-            .map(|x| CellVerticalAlign::parse(&x))
+            .map(|x| VerticalAlign::parse(&x))
             .transpose()?,
         text_align_source: take(&mut attrs, Ns::Style, b"text-align-source")
-            .map(|x| CellTextAlignSource::parse(&x))
+            .map(|x| TextAlignSource::parse(&x))
             .transpose()?,
         direction: take(&mut attrs, Ns::Style, b"direction")
-            .map(|x| CellDirection::parse(&x))
+            .map(|x| Direction::parse(&x))
             .transpose()?,
         glyph_orientation_vertical: take(&mut attrs, Ns::Style, b"glyph-orientation-vertical")
-            .map(CellGlyphOrientationVertical::new)
+            .map(GlyphOrientation::new)
             .transpose()?,
         writing_mode: take(&mut attrs, Ns::Style, b"writing-mode")
             .map(|x| parse_writing(&x))
             .transpose()?,
         shadow: take(&mut attrs, Ns::Style, b"shadow")
-            .map(TableShadow::new)
+            .map(Shadow::new)
             .transpose()?,
         background_color: take(&mut attrs, Ns::Fo, b"background-color")
-            .map(TableRowBackgroundColor::new)
+            .map(BackgroundColor::new)
             .transpose()?,
         border: take(&mut attrs, Ns::Fo, b"border")
-            .map(CellBorder::new)
+            .map(Border::new)
             .transpose()?,
         border_top: take(&mut attrs, Ns::Fo, b"border-top")
-            .map(CellBorder::new)
+            .map(Border::new)
             .transpose()?,
         border_bottom: take(&mut attrs, Ns::Fo, b"border-bottom")
-            .map(CellBorder::new)
+            .map(Border::new)
             .transpose()?,
         border_left: take(&mut attrs, Ns::Fo, b"border-left")
-            .map(CellBorder::new)
+            .map(Border::new)
             .transpose()?,
         border_right: take(&mut attrs, Ns::Fo, b"border-right")
-            .map(CellBorder::new)
+            .map(Border::new)
             .transpose()?,
         diagonal_tl_br: take(&mut attrs, Ns::Style, b"diagonal-tl-br")
-            .map(CellBorder::new)
+            .map(Border::new)
             .transpose()?,
         diagonal_tl_br_widths: take(&mut attrs, Ns::Style, b"diagonal-tl-br-widths")
-            .map(|x| CellBorderWidths::parse(&x))
+            .map(|x| BorderWidths::parse(&x))
             .transpose()?,
         diagonal_bl_tr: take(&mut attrs, Ns::Style, b"diagonal-bl-tr")
-            .map(CellBorder::new)
+            .map(Border::new)
             .transpose()?,
         diagonal_bl_tr_widths: take(&mut attrs, Ns::Style, b"diagonal-bl-tr-widths")
-            .map(|x| CellBorderWidths::parse(&x))
+            .map(|x| BorderWidths::parse(&x))
             .transpose()?,
         border_line_width: take(&mut attrs, Ns::Style, b"border-line-width")
-            .map(|x| CellBorderWidths::parse(&x))
+            .map(|x| BorderWidths::parse(&x))
             .transpose()?,
         border_line_width_top: take(&mut attrs, Ns::Style, b"border-line-width-top")
-            .map(|x| CellBorderWidths::parse(&x))
+            .map(|x| BorderWidths::parse(&x))
             .transpose()?,
         border_line_width_bottom: take(&mut attrs, Ns::Style, b"border-line-width-bottom")
-            .map(|x| CellBorderWidths::parse(&x))
+            .map(|x| BorderWidths::parse(&x))
             .transpose()?,
         border_line_width_left: take(&mut attrs, Ns::Style, b"border-line-width-left")
-            .map(|x| CellBorderWidths::parse(&x))
+            .map(|x| BorderWidths::parse(&x))
             .transpose()?,
         border_line_width_right: take(&mut attrs, Ns::Style, b"border-line-width-right")
-            .map(|x| CellBorderWidths::parse(&x))
+            .map(|x| BorderWidths::parse(&x))
             .transpose()?,
         padding: take(&mut attrs, Ns::Fo, b"padding")
-            .map(CellLength::non_negative)
+            .map(Length::non_negative)
             .transpose()?,
         padding_top: take(&mut attrs, Ns::Fo, b"padding-top")
-            .map(CellLength::non_negative)
+            .map(Length::non_negative)
             .transpose()?,
         padding_bottom: take(&mut attrs, Ns::Fo, b"padding-bottom")
-            .map(CellLength::non_negative)
+            .map(Length::non_negative)
             .transpose()?,
         padding_left: take(&mut attrs, Ns::Fo, b"padding-left")
-            .map(CellLength::non_negative)
+            .map(Length::non_negative)
             .transpose()?,
         padding_right: take(&mut attrs, Ns::Fo, b"padding-right")
-            .map(CellLength::non_negative)
+            .map(Length::non_negative)
             .transpose()?,
         wrap_option: take(&mut attrs, Ns::Fo, b"wrap-option")
-            .map(|x| CellWrapOption::parse(&x))
+            .map(|x| Wrap::parse(&x))
             .transpose()?,
         rotation_angle: take(&mut attrs, Ns::Style, b"rotation-angle")
-            .map(|x| CellRotationAngle::parse(&x))
+            .map(|x| RotationAngle::parse(&x))
             .transpose()?,
         rotation_align: take(&mut attrs, Ns::Style, b"rotation-align")
-            .map(|x| CellRotationAlign::parse(&x))
+            .map(|x| RotationAlign::parse(&x))
             .transpose()?,
         cell_protect: take(&mut attrs, Ns::Style, b"cell-protect")
-            .map(|x| CellProtect::parse(&x))
+            .map(|x| Protection::parse(&x))
             .transpose()?,
         print_content: take(&mut attrs, Ns::Style, b"print-content")
             .map(|x| boolean(&x))
@@ -817,7 +816,7 @@ fn cell_properties(
     value.validate()?;
     Ok(value)
 }
-fn position(x: &str) -> Result<TableRowBackgroundPosition> {
+fn position(x: &str) -> Result<BackgroundPosition> {
     let words: Vec<_> = x.split_ascii_whitespace().collect();
     let horizontal = |x| match x {
         "left" => Some(HorizontalBackgroundPosition::Left),
@@ -832,21 +831,21 @@ fn position(x: &str) -> Result<TableRowBackgroundPosition> {
         _ => None,
     };
     match words.as_slice() {
-        ["left"] => Ok(TableRowBackgroundPosition::Left),
-        ["center"] => Ok(TableRowBackgroundPosition::Center),
-        ["right"] => Ok(TableRowBackgroundPosition::Right),
-        ["top"] => Ok(TableRowBackgroundPosition::Top),
-        ["bottom"] => Ok(TableRowBackgroundPosition::Bottom),
+        ["left"] => Ok(BackgroundPosition::Left),
+        ["center"] => Ok(BackgroundPosition::Center),
+        ["right"] => Ok(BackgroundPosition::Right),
+        ["top"] => Ok(BackgroundPosition::Top),
+        ["bottom"] => Ok(BackgroundPosition::Bottom),
         [a, b] => horizontal(a)
             .zip(vertical(b))
             .or_else(|| horizontal(b).zip(vertical(a)))
-            .map(|(h, v)| TableRowBackgroundPosition::Pair(h, v))
+            .map(|(h, v)| BackgroundPosition::Pair(h, v))
             .ok_or_else(|| bad("invalid background position")),
         _ => Err(bad("invalid background position")),
     }
 }
 struct ParsedImage {
-    image: TableRowBackgroundImage,
+    image: BackgroundImage,
     linked: bool,
 }
 fn image_attributes(
@@ -857,9 +856,9 @@ fn image_attributes(
     let mut attrs = attributes(reader, version, start)?;
     let repeat = take(&mut attrs, Ns::Style, b"repeat")
         .map(|x| match x.as_str() {
-            "no-repeat" => Ok(TableRowBackgroundRepeat::NoRepeat),
-            "repeat" => Ok(TableRowBackgroundRepeat::Repeat),
-            "stretch" => Ok(TableRowBackgroundRepeat::Stretch),
+            "no-repeat" => Ok(Repeat::NoRepeat),
+            "repeat" => Ok(Repeat::Repeat),
+            "stretch" => Ok(Repeat::Stretch),
             _ => Err(bad("invalid background repeat")),
         })
         .transpose()?;
@@ -871,7 +870,7 @@ fn image_attributes(
         safe(x, "style:filter-name", true)?;
     }
     let opacity = take(&mut attrs, Ns::Draw, b"opacity")
-        .map(TableRowOpacity::new)
+        .map(Opacity::new)
         .transpose()?;
     let kind = take(&mut attrs, Ns::Xlink, b"type");
     let href = take(&mut attrs, Ns::Xlink, b"href");
@@ -889,15 +888,15 @@ fn image_attributes(
         {
             return Err(bad("invalid background-image xlink group"));
         }
-        TableRowBackgroundSource::Link {
+        BackgroundSource::Link {
             href: href.unwrap(),
             show_embed: show.is_some(),
             actuate_on_load: actuate.is_some(),
         }
     } else {
-        TableRowBackgroundSource::Empty
+        BackgroundSource::Empty
     };
-    let image = TableRowBackgroundImage {
+    let image = BackgroundImage {
         repeat,
         position: pos,
         filter_name,
@@ -910,7 +909,7 @@ fn image_attributes(
 
 struct Active {
     depth: usize,
-    style: TableCellStyleProperties,
+    style: Style,
     seen_properties: bool,
     properties_depth: Option<usize>,
     image_depth: Option<usize>,
@@ -918,11 +917,7 @@ struct Active {
     binary: String,
     image_linked: bool,
 }
-fn push_style(
-    out: &mut Vec<TableCellStyleProperties>,
-    style: TableCellStyleProperties,
-    total: &mut usize,
-) -> Result<()> {
+fn push_style(out: &mut Vec<Style>, style: Style, total: &mut usize) -> Result<()> {
     if out.len() >= MAX_STYLES
         || out
             .iter()
@@ -939,7 +934,7 @@ fn push_style(
 }
 
 /// Parse direct table-cell styles in `office:styles` and `office:automatic-styles`.
-pub fn parse_table_cell_style_properties(xml: &str) -> Result<TableCellStylePropertiesSet> {
+pub fn parse(xml: &str) -> Result<Styles> {
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
     }
@@ -1105,7 +1100,7 @@ pub fn parse_table_cell_style_properties(xml: &str) -> Result<TableCellStyleProp
                             .background_image
                             .as_mut()
                             .unwrap()
-                            .source = TableRowBackgroundSource::Embedded(Vec::new());
+                            .source = BackgroundSource::Embedded(Vec::new());
                     } else if state.properties_depth.is_some()
                         && depth > state.properties_depth.unwrap()
                     {
@@ -1156,7 +1151,7 @@ pub fn parse_table_cell_style_properties(xml: &str) -> Result<TableCellStyleProp
                             .background_image
                             .as_mut()
                             .unwrap()
-                            .source = TableRowBackgroundSource::Embedded(data);
+                            .source = BackgroundSource::Embedded(data);
                         state.binary_depth = None;
                     }
                     if state.image_depth == Some(depth) {
@@ -1187,7 +1182,7 @@ pub fn parse_table_cell_style_properties(xml: &str) -> Result<TableCellStyleProp
     if !stack.is_empty() || active.is_some() {
         return Err(bad("truncated styles XML"));
     }
-    Ok(TableCellStylePropertiesSet { styles: out })
+    Ok(Styles { styles: out })
 }
 
 #[derive(Default)]
@@ -1224,10 +1219,7 @@ fn expand_span(xml: &str, span: &Span, value: &str) -> Result<String> {
 }
 
 /// Losslessly replace, insert, or remove one existing cell style's property element.
-pub fn set_table_cell_style_properties_xml(
-    xml: &str,
-    requested: &TableCellStyleProperties,
-) -> Result<String> {
+pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
     requested.validate()?;
     if xml.len() > MAX_XML {
         return Err(bad("styles XML is too large"));
@@ -1361,7 +1353,7 @@ pub fn set_table_cell_style_properties_xml(
     let replacement = requested
         .properties
         .as_ref()
-        .map(TableCellProperties::to_xml_fragment)
+        .map(Properties::to_xml_fragment)
         .transpose()?;
     if let Some(properties) = &spans.properties {
         return Ok(replace_span(
@@ -1429,15 +1421,13 @@ fn base64_decode(value: &str) -> Result<Vec<u8>> {
 }
 
 impl OpenDocumentPackage {
-    pub fn table_cell_style_properties(&self) -> Result<TableCellStylePropertiesSet> {
-        self.styles_xml()?.map_or_else(
-            || Ok(Default::default()),
-            |xml| parse_table_cell_style_properties(&xml),
-        )
+    pub fn cell_style_properties(&self) -> Result<Styles> {
+        self.styles_xml()?
+            .map_or_else(|| Ok(Default::default()), |xml| parse(&xml))
     }
 }
 impl FlatOpenDocument {
-    pub fn table_cell_style_properties(&self) -> Result<TableCellStylePropertiesSet> {
-        parse_table_cell_style_properties(self.xml())
+    pub fn cell_style_properties(&self) -> Result<Styles> {
+        parse(self.xml())
     }
 }

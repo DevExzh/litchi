@@ -8,10 +8,13 @@
 //! duplicates and malformed owned values are rejected.
 
 use crate::{
-    FlatOpenDocument, HorizontalBackgroundPosition, NonNegativeLength, OpenDocumentPackage,
-    TableRowBackgroundColor, TableRowBackgroundImage, TableRowBackgroundPosition,
-    TableRowBackgroundRepeat, TableRowBackgroundSource, TableRowOpacity, TableShadow,
-    VerticalBackgroundPosition, style::paragraph::margin::rewrite_start_tag,
+    FlatOpenDocument, NonNegativeLength, OpenDocumentPackage,
+    style::paragraph::margin::rewrite_start_tag,
+    style::table::row::{
+        BackgroundColor, BackgroundImage, BackgroundPosition, BackgroundSource,
+        HorizontalBackgroundPosition, Opacity, Repeat, VerticalBackgroundPosition,
+    },
+    style::table::table::Shadow,
 };
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
@@ -219,10 +222,10 @@ pub struct ParagraphBorderProperties {
     pub padding_bottom: Option<NonNegativeLength>,
     pub padding_left: Option<NonNegativeLength>,
     pub padding_right: Option<NonNegativeLength>,
-    pub shadow: Option<TableShadow>,
-    pub background_color: Option<TableRowBackgroundColor>,
+    pub shadow: Option<Shadow>,
+    pub background_color: Option<BackgroundColor>,
     pub background_transparency: Option<ParagraphBackgroundTransparency>,
-    pub background_image: Option<TableRowBackgroundImage>,
+    pub background_image: Option<BackgroundImage>,
 }
 impl ParagraphBorderProperties {
     pub fn new() -> Self {
@@ -522,10 +525,10 @@ fn border_properties(
         padding_left: padding(&mut attrs, b"padding-left")?,
         padding_right: padding(&mut attrs, b"padding-right")?,
         shadow: take(&mut attrs, Ns::Style, b"shadow")
-            .map(TableShadow::new)
+            .map(Shadow::new)
             .transpose()?,
         background_color: take(&mut attrs, Ns::Fo, b"background-color")
-            .map(TableRowBackgroundColor::new)
+            .map(BackgroundColor::new)
             .transpose()?,
         background_transparency: take(&mut attrs, Ns::Style, b"background-transparency")
             .map(ParagraphBackgroundTransparency::new)
@@ -537,7 +540,7 @@ fn border_properties(
     Ok(value)
 }
 
-fn position(value: &str) -> Result<TableRowBackgroundPosition> {
+fn position(value: &str) -> Result<BackgroundPosition> {
     let words: Vec<_> = value.split_ascii_whitespace().collect();
     let horizontal = |word| match word {
         "left" => Some(HorizontalBackgroundPosition::Left),
@@ -552,22 +555,22 @@ fn position(value: &str) -> Result<TableRowBackgroundPosition> {
         _ => None,
     };
     match words.as_slice() {
-        ["left"] => Ok(TableRowBackgroundPosition::Left),
-        ["center"] => Ok(TableRowBackgroundPosition::Center),
-        ["right"] => Ok(TableRowBackgroundPosition::Right),
-        ["top"] => Ok(TableRowBackgroundPosition::Top),
-        ["bottom"] => Ok(TableRowBackgroundPosition::Bottom),
+        ["left"] => Ok(BackgroundPosition::Left),
+        ["center"] => Ok(BackgroundPosition::Center),
+        ["right"] => Ok(BackgroundPosition::Right),
+        ["top"] => Ok(BackgroundPosition::Top),
+        ["bottom"] => Ok(BackgroundPosition::Bottom),
         [a, b] => horizontal(a)
             .zip(vertical(b))
             .or_else(|| horizontal(b).zip(vertical(a)))
-            .map(|(h, v)| TableRowBackgroundPosition::Pair(h, v))
+            .map(|(h, v)| BackgroundPosition::Pair(h, v))
             .ok_or_else(|| bad("invalid background position")),
         _ => Err(bad("invalid background position")),
     }
 }
 
 struct ParsedImage {
-    image: TableRowBackgroundImage,
+    image: BackgroundImage,
     linked: bool,
 }
 fn image_attributes(
@@ -578,9 +581,9 @@ fn image_attributes(
     let mut attrs = attributes(reader, version, start)?;
     let repeat = take(&mut attrs, Ns::Style, b"repeat")
         .map(|x| match x.as_str() {
-            "no-repeat" => Ok(TableRowBackgroundRepeat::NoRepeat),
-            "repeat" => Ok(TableRowBackgroundRepeat::Repeat),
-            "stretch" => Ok(TableRowBackgroundRepeat::Stretch),
+            "no-repeat" => Ok(Repeat::NoRepeat),
+            "repeat" => Ok(Repeat::Repeat),
+            "stretch" => Ok(Repeat::Stretch),
             _ => Err(bad("invalid background repeat")),
         })
         .transpose()?;
@@ -592,7 +595,7 @@ fn image_attributes(
         safe(x, "style:filter-name", true)?;
     }
     let opacity = take(&mut attrs, Ns::Draw, b"opacity")
-        .map(TableRowOpacity::new)
+        .map(Opacity::new)
         .transpose()?;
     let kind = take(&mut attrs, Ns::Xlink, b"type");
     let href = take(&mut attrs, Ns::Xlink, b"href");
@@ -610,15 +613,15 @@ fn image_attributes(
         {
             return Err(bad("invalid background-image xlink group"));
         }
-        TableRowBackgroundSource::Link {
+        BackgroundSource::Link {
             href: href.unwrap(),
             show_embed: show.is_some(),
             actuate_on_load: actuate.is_some(),
         }
     } else {
-        TableRowBackgroundSource::Empty
+        BackgroundSource::Empty
     };
-    let image = TableRowBackgroundImage {
+    let image = BackgroundImage {
         repeat,
         position: pos,
         filter_name,
@@ -804,7 +807,7 @@ pub fn parse_paragraph_style_borders(xml: &str) -> Result<ParagraphStyleBorderSe
                             .background_image
                             .as_mut()
                             .unwrap()
-                            .source = TableRowBackgroundSource::Embedded(Vec::new());
+                            .source = BackgroundSource::Embedded(Vec::new());
                     }
                 }
             },
@@ -840,7 +843,7 @@ pub fn parse_paragraph_style_borders(xml: &str) -> Result<ParagraphStyleBorderSe
                             .background_image
                             .as_mut()
                             .unwrap()
-                            .source = TableRowBackgroundSource::Embedded(data);
+                            .source = BackgroundSource::Embedded(data);
                         state.binary_depth = None;
                     }
                     if state.image_depth == Some(depth) {
@@ -1134,7 +1137,7 @@ pub fn set_paragraph_style_border_xml(
         .properties
         .as_ref()
         .and_then(|properties| properties.background_image.as_ref())
-        .map(TableRowBackgroundImage::to_xml_fragment)
+        .map(BackgroundImage::to_xml_fragment)
         .transpose()?;
     if let Some(properties) = &spans.properties {
         // Edit the deeper spans first so earlier offsets stay valid.

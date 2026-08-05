@@ -1431,7 +1431,7 @@ mod tests {
     }
     #[test]
     fn builder_mutable_package_round_trip() {
-        use crate::{Builder, Document, MutableDocument};
+        use crate::{Builder, Document, mutable::MutableDocument};
         let mut form = SelectionForm::new("Main");
         form.add_control(ComboboxControl::new("Combo", "combo"))
             .unwrap();

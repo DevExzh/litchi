@@ -80,10 +80,10 @@ pub struct Builder {
     paragraph_alignment_styles: Vec<crate::style::paragraph::alignment::Style>,
     paragraph_break_styles: Vec<crate::ParagraphStyleBreaks>,
     paragraph_writing_mode_styles: Vec<crate::ParagraphStyleWritingMode>,
-    table_row_property_styles: Vec<crate::TableRowStyleProperties>,
-    table_column_property_styles: Vec<crate::TableColumnStyleProperties>,
-    table_cell_property_styles: Vec<crate::TableCellStyleProperties>,
-    table_property_styles: Vec<crate::TableStyleProperties>,
+    table_row_property_styles: Vec<crate::style::table::row::Style>,
+    table_column_property_styles: Vec<crate::style::table::column::Style>,
+    table_cell_property_styles: Vec<crate::style::table::cell::Style>,
+    table_property_styles: Vec<crate::style::table::table::Style>,
     section_property_styles: Vec<crate::SectionStyleProperties>,
     section_names: std::collections::HashSet<String>,
     section_xml_ids: std::collections::HashSet<String>,
@@ -515,7 +515,7 @@ impl Builder {
     /// Add a named or default table-row style carrying typed row properties.
     pub fn add_table_row_property_style(
         &mut self,
-        style: crate::TableRowStyleProperties,
+        style: crate::style::table::row::Style,
     ) -> Result<&mut Self> {
         style.validate()?;
         if self.table_row_property_styles.len() >= 4096
@@ -535,7 +535,7 @@ impl Builder {
     /// Add a named or default table-column style carrying typed column properties.
     pub fn add_table_column_property_style(
         &mut self,
-        style: crate::TableColumnStyleProperties,
+        style: crate::style::table::column::Style,
     ) -> Result<&mut Self> {
         style.validate()?;
         if self.table_column_property_styles.len() >= 4096
@@ -555,7 +555,7 @@ impl Builder {
     /// Add a named or default table-cell style carrying typed cell properties.
     pub fn add_table_cell_property_style(
         &mut self,
-        style: crate::TableCellStyleProperties,
+        style: crate::style::table::cell::Style,
     ) -> Result<&mut Self> {
         style.validate()?;
         if self.table_cell_property_styles.len() >= 4096
@@ -575,7 +575,7 @@ impl Builder {
     /// Add a named or default table style carrying typed table properties.
     pub fn add_table_property_style(
         &mut self,
-        style: crate::TableStyleProperties,
+        style: crate::style::table::table::Style,
     ) -> Result<&mut Self> {
         style.validate()?;
         if self.table_property_styles.len() >= 4096

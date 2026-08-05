@@ -1,4 +1,6 @@
-use litchi_odt::{parse_outline_styles, remove_outline_style_xml, set_outline_style_xml};
+use litchi_odt::outline_style::{
+    parse_outline_styles, remove_outline_style_xml, set_outline_style_xml,
+};
 
 const XML: &str = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:f="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:x="urn:producer"><o:styles><!--keep--><t:outline-style s:name="Outline"><t:outline-level-style t:level="1" s:num-format="A" s:num-letter-sync="true" x:num-list-format="%1%"><s:text-properties f:font-weight="bold"/></t:outline-level-style></t:outline-style><s:style s:name="keep" s:family="paragraph"/></o:styles></o:document-styles>"#;
 

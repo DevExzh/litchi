@@ -1,6 +1,6 @@
-use litchi_odt::{
-    OpenDocumentPackage, VariableBody, VariableDeclaration, VariableDeclarationGroup, VariableKind,
-    VariablePart, VariableScope, VariableValueType,
+use litchi_odt::variable_declaration::{
+    VariableBody, VariableDeclaration, VariableDeclarationGroup, VariableKind, VariablePart,
+    VariableScope, VariableValueType,
 };
 mod support;
 
@@ -36,7 +36,8 @@ fn group(name: &str) -> VariableDeclarationGroup {
 
 #[test]
 fn mutates_packaged_declarations_and_preserves_auxiliary_parts() {
-    let mut document = OpenDocumentPackage::from_bytes(package(CONTENT)).unwrap();
+    let mut document =
+        litchi_odt::generic::OpenDocumentPackage::from_bytes(package(CONTENT)).unwrap();
     let first = group("counter");
     assert_eq!(
         document.set_variable_declaration_group(&first).unwrap(),
@@ -79,7 +80,8 @@ fn mutates_packaged_declarations_and_preserves_auxiliary_parts() {
 
 #[test]
 fn referenced_declaration_removal_is_atomic() {
-    let mut document = OpenDocumentPackage::from_bytes(package(REFERENCED_CONTENT)).unwrap();
+    let mut document =
+        litchi_odt::generic::OpenDocumentPackage::from_bytes(package(REFERENCED_CONTENT)).unwrap();
     let before = document.as_bytes().to_vec();
     assert!(
         document

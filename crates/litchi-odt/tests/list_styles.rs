@@ -1,8 +1,8 @@
-use litchi_odt::{
-    BulletRelativeSize, FlatOpenDocument, ListLevelBulletStyle, ListLevelImageSource,
-    ListLevelKind, ListLevelStyle, ListStyle, OutlineNumberFormat, OutlinePositiveInteger,
-    parse_list_styles,
+use litchi_odt::list_style::{
+    BulletRelativeSize, ListLevelBulletStyle, ListLevelImageSource, ListLevelKind,
+    ListLevelNumberStyle, ListLevelStyle, ListStyle, parse_list_styles,
 };
+use litchi_odt::outline_style::{OutlineNumberFormat, OutlinePositiveInteger};
 use std::io::Cursor;
 const O: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const S: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
@@ -72,7 +72,7 @@ fn round_trip_fragment_reparses_identically() {
     style.levels.push(ListLevelStyle {
         level: 1,
         style_name: None,
-        kind: ListLevelKind::Number(litchi_odt::ListLevelNumberStyle {
+        kind: ListLevelKind::Number(ListLevelNumberStyle {
             format: Some(OutlineNumberFormat::new("I").unwrap()),
             prefix: None,
             suffix: Some(".".to_string()),
@@ -123,7 +123,7 @@ fn linked_image_round_trip() {
 #[test]
 fn parses_flat_odt_fixture() {
     let bytes = include_bytes!("../../../test-data/odf/odt/note-ordinary-numbering.fodt");
-    let flat = FlatOpenDocument::from_reader(Cursor::new(bytes)).unwrap();
+    let flat = litchi_odt::generic::FlatOpenDocument::from_reader(Cursor::new(bytes)).unwrap();
     let set = flat.list_styles().unwrap();
     let l1 = set.get("L1").expect("fixture declares list style L1");
     let ListLevelKind::Number(number) = &l1.level(1).unwrap().kind else {
@@ -143,7 +143,7 @@ fn parses_libreoffice_list_style_fixture() {
     let bytes = include_bytes!(
         "../../../test-data/libreoffice-core/xmloff/qa/unit/data/differentListStylesInOneList.fodt"
     );
-    let flat = FlatOpenDocument::from_reader(Cursor::new(bytes)).unwrap();
+    let flat = litchi_odt::generic::FlatOpenDocument::from_reader(Cursor::new(bytes)).unwrap();
     let set = flat.list_styles().unwrap();
     let one = set
         .get("ListStyleOne")

@@ -1,8 +1,8 @@
-use litchi_odt::{
-    Builder, Document, FlatOpenDocument, LabelFollowedBy, ListLabelLength, ListLevelLabelAlignment,
-    ListStyleKind, ListStyleLevelLabelAlignment, MutableDocument, OpenDocumentPackage,
-    parse_list_level_label_alignments,
+use litchi_odt::list_label_alignment::{
+    LabelFollowedBy, ListLabelLength, ListLevelLabelAlignment, ListStyleKind,
+    ListStyleLevelLabelAlignment, parse_list_level_label_alignments,
 };
+use litchi_odt::{Builder, Document};
 use std::io::Cursor;
 const O: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const S: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
@@ -38,7 +38,7 @@ fn parses_odfdo_and_libreoffice_fixtures() {
     let lo = include_bytes!(
         "../../../test-data/libreoffice-core/xmloff/qa/unit/data/differentListStylesInOneList.fodt"
     );
-    let flat = FlatOpenDocument::from_reader(Cursor::new(lo)).unwrap();
+    let flat = litchi_odt::generic::FlatOpenDocument::from_reader(Cursor::new(lo)).unwrap();
     assert!(
         !flat
             .list_level_label_alignments()
@@ -57,7 +57,7 @@ fn builder_package_and_mutable_round_trip() {
         .unwrap();
     b.add_paragraph("x").unwrap();
     let bytes = b.build().unwrap();
-    let p = OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
+    let p = litchi_odt::generic::OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
     assert_eq!(
         &p.list_level_label_alignments()
             .unwrap()
@@ -66,13 +66,15 @@ fn builder_package_and_mutable_round_trip() {
             .alignment,
         &a
     );
-    let mut m = MutableDocument::from_document(Document::from_bytes(bytes).unwrap()).unwrap();
+    let mut m =
+        litchi_odt::mutable::MutableDocument::from_document(Document::from_bytes(bytes).unwrap())
+            .unwrap();
     let replacement = ListLevelLabelAlignment::new(LabelFollowedBy::Nothing);
     m.set_list_level_label_alignment(
         &ListStyleLevelLabelAlignment::new("L1", 1, replacement.clone()).unwrap(),
     )
     .unwrap();
-    let p = OpenDocumentPackage::from_bytes(m.to_bytes().unwrap()).unwrap();
+    let p = litchi_odt::generic::OpenDocumentPackage::from_bytes(m.to_bytes().unwrap()).unwrap();
     assert_eq!(
         &p.list_level_label_alignments()
             .unwrap()

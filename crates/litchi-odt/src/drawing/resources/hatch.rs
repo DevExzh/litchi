@@ -21,13 +21,13 @@ const MAX_AGGREGATE_BYTES: usize = 16 * 1_048_576;
 /// Number of line directions in an ODF hatch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum HatchStyle {
+pub enum Style {
     Single,
     Double,
     Triple,
 }
 
-impl HatchStyle {
+impl Style {
     fn parse(value: &str) -> Result<Self> {
         Ok(match value {
             "single" => Self::Single,
@@ -49,7 +49,7 @@ impl HatchStyle {
 /// Physical unit accepted by ODF hatch spacing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum HatchLengthUnit {
+pub enum LengthUnit {
     Centimeter,
     Millimeter,
     Inch,
@@ -58,7 +58,7 @@ pub enum HatchLengthUnit {
     Pixel,
 }
 
-impl HatchLengthUnit {
+impl LengthUnit {
     const fn suffix(self) -> &'static str {
         match self {
             Self::Centimeter => "cm",
@@ -73,13 +73,13 @@ impl HatchLengthUnit {
 
 /// A finite signed physical hatch spacing.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct HatchLength {
+pub struct Length {
     value: f64,
-    unit: HatchLengthUnit,
+    unit: LengthUnit,
 }
 
-impl HatchLength {
-    pub fn new(value: f64, unit: HatchLengthUnit) -> Result<Self> {
+impl Length {
+    pub fn new(value: f64, unit: LengthUnit) -> Result<Self> {
         if !value.is_finite() {
             return invalid("hatch distance must be finite");
         }
@@ -90,12 +90,12 @@ impl HatchLength {
         self.value
     }
 
-    pub const fn unit(self) -> HatchLengthUnit {
+    pub const fn unit(self) -> LengthUnit {
         self.unit
     }
 }
 
-impl FromStr for HatchLength {
+impl FromStr for Length {
     type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
@@ -104,12 +104,12 @@ impl FromStr for HatchLength {
         }
         let (number, suffix) = value.split_at(value.len() - 2);
         let unit = match suffix {
-            "cm" => HatchLengthUnit::Centimeter,
-            "mm" => HatchLengthUnit::Millimeter,
-            "in" => HatchLengthUnit::Inch,
-            "pt" => HatchLengthUnit::Point,
-            "pc" => HatchLengthUnit::Pica,
-            "px" => HatchLengthUnit::Pixel,
+            "cm" => LengthUnit::Centimeter,
+            "mm" => LengthUnit::Millimeter,
+            "in" => LengthUnit::Inch,
+            "pt" => LengthUnit::Point,
+            "pc" => LengthUnit::Pica,
+            "px" => LengthUnit::Pixel,
             _ => return invalid(format!("invalid hatch distance '{value}'")),
         };
         validate_decimal(number, value)?;
@@ -120,7 +120,7 @@ impl FromStr for HatchLength {
     }
 }
 
-impl fmt::Display for HatchLength {
+impl fmt::Display for Length {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let value = if self.value == 0.0 { 0.0 } else { self.value };
         write!(formatter, "{}{}", value, self.unit.suffix())
@@ -132,9 +132,9 @@ impl fmt::Display for HatchLength {
 /// ODF 1.2 deliberately leaves the angle datatype open. Keeping a validated
 /// newtype preserves degrees, grads, radians, and unitless producer values.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct HatchRotation(String);
+pub struct Rotation(String);
 
-impl HatchRotation {
+impl Rotation {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         validate_text(&value, "hatch rotation", false)?;
@@ -148,17 +148,17 @@ impl HatchRotation {
 
 /// One named `draw:hatch` resource.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Hatch {
+pub struct Definition {
     pub name: String,
     pub display_name: Option<String>,
-    pub style: HatchStyle,
+    pub style: Style,
     pub color: Option<RgbColor>,
-    pub distance: Option<HatchLength>,
-    pub rotation: Option<HatchRotation>,
+    pub distance: Option<Length>,
+    pub rotation: Option<Rotation>,
 }
 
-impl Hatch {
-    pub fn new(name: impl Into<String>, style: HatchStyle) -> Result<Self> {
+impl Definition {
+    pub fn new(name: impl Into<String>, style: Style) -> Result<Self> {
         let value = Self {
             name: name.into(),
             display_name: None,
@@ -197,12 +197,12 @@ impl Hatch {
 
 /// Ordered hatch resources from `office:styles`.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct Hatches {
-    pub hatches: Vec<Hatch>,
+pub struct Collection {
+    pub hatches: Vec<Definition>,
 }
 
-impl Hatches {
-    pub fn get(&self, name: &str) -> Option<&Hatch> {
+impl Collection {
+    pub fn get(&self, name: &str) -> Option<&Definition> {
         self.hatches.iter().find(|hatch| hatch.name == name)
     }
 
@@ -270,9 +270,9 @@ struct Frame {
 type Attributes = HashMap<(NamespaceKind, String), String>;
 
 /// Parse named hatch resources from an ODF styles or flat-document XML part.
-pub fn parse_drawing_hatches(xml: &str) -> Result<Hatches> {
+pub fn parse_drawing_hatches(xml: &str) -> Result<Collection> {
     if !xml.contains("hatch") {
-        return Ok(Hatches::default());
+        return Ok(Collection::default());
     }
     if xml.len() > MAX_XML_BYTES {
         return invalid("drawing hatch XML exceeds 64 MiB");
@@ -282,7 +282,7 @@ pub fn parse_drawing_hatches(xml: &str) -> Result<Hatches> {
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
-    let mut result = Hatches::default();
+    let mut result = Collection::default();
 
     loop {
         let (resolved, event) = reader
@@ -333,11 +333,11 @@ pub fn parse_drawing_hatches(xml: &str) -> Result<Hatches> {
     Ok(result)
 }
 
-fn parse_hatch(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Hatch> {
+fn parse_hatch(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Definition> {
     let mut values = attributes(reader, element)?;
     let name = required(&mut values, "name", "draw:name")?;
     let display_name = take(&mut values, "display-name");
-    let style = HatchStyle::parse(&required(&mut values, "style", "draw:style")?)?;
+    let style = Style::parse(&required(&mut values, "style", "draw:style")?)?;
     let color = take(&mut values, "color")
         .map(|value| value.parse())
         .transpose()?;
@@ -345,10 +345,10 @@ fn parse_hatch(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Hat
         .map(|value| value.parse())
         .transpose()?;
     let rotation = take(&mut values, "rotation")
-        .map(HatchRotation::new)
+        .map(Rotation::new)
         .transpose()?;
     reject_attributes(&values)?;
-    let value = Hatch {
+    let value = Definition {
         name,
         display_name,
         style,
@@ -430,7 +430,7 @@ fn reject_spoofed_name(namespace: NamespaceKind, local: &str) -> Result<()> {
     Ok(())
 }
 
-fn write_hatch(output: &mut String, hatch: &Hatch, standalone: bool) {
+fn write_hatch(output: &mut String, hatch: &Definition, standalone: bool) {
     output.push_str("<draw:hatch");
     if standalone {
         output.push_str(r#" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0""#);

@@ -4,7 +4,7 @@ use litchi_odt::header_footer_properties::{
     parse_page_layout_header_footer_properties,
 };
 use litchi_odt::section_properties::BackgroundRepeat;
-use litchi_odt::{Builder, Document, MutableDocument, OpenDocumentPackage};
+use litchi_odt::{Builder, Document};
 
 const PREFIX: &str = r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:f="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:v="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:x="http://www.w3.org/1999/xlink"><office:automatic-styles><s:page-layout s:name="pm1">"#;
 fn doc(body: &str) -> String {
@@ -119,7 +119,7 @@ fn builder_package_and_mutable_paths_preserve_siblings() {
         )
         .unwrap();
     let bytes = builder.build().unwrap();
-    let package = OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
+    let package = litchi_odt::generic::OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
     let entries = package.page_layout_header_footer_properties().unwrap();
     assert_eq!(entries.len(), 2);
     let styles = package.styles_xml().unwrap().unwrap();
@@ -131,7 +131,7 @@ fn builder_package_and_mutable_paths_preserve_siblings() {
     );
     assert!(styles.contains("Numbered list style"));
     let document = Document::from_bytes(bytes).unwrap();
-    let mut mutable = MutableDocument::from_document(document).unwrap();
+    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(document).unwrap();
     let replacement = HeaderFooterStyleProperties {
         min_height: Some(HeaderFooterLength::new("3cm").unwrap()),
         shadow: Some(HeaderFooterShadow::None),
@@ -144,7 +144,8 @@ fn builder_package_and_mutable_paths_preserve_siblings() {
             &replacement,
         )
         .unwrap();
-    let output = OpenDocumentPackage::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let output =
+        litchi_odt::generic::OpenDocumentPackage::from_bytes(mutable.to_bytes().unwrap()).unwrap();
     let entries = output.page_layout_header_footer_properties().unwrap();
     assert_eq!(
         entries

@@ -1429,7 +1429,7 @@ mod tests {
 
     #[test]
     fn builder_and_mutable_document_round_trip() {
-        use crate::{Builder, Document, MutableDocument};
+        use crate::{Builder, Document, mutable::MutableDocument};
         let mut form = VisualForm::new("Main");
         form.add_control(RadioControl::new("Group", "radio"))
             .unwrap();

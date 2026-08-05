@@ -1,8 +1,8 @@
-use litchi_odt::{
-    Builder, Document, FlatOpenDocument, MutableDocument, OpenDocumentPackage, StyleColumn,
-    StyleColumnLength, StyleColumnSeparator, StyleColumnSeparatorAlignment,
+use litchi_odt::style::columns::{
+    StyleColumn, StyleColumnLength, StyleColumnSeparator, StyleColumnSeparatorAlignment,
     StyleColumnSeparatorStyle, StyleColumns, parse_style_columns,
 };
+use litchi_odt::{Builder, Document};
 mod support;
 
 const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
@@ -45,7 +45,8 @@ fn parses_libreoffice_section_separator_and_other_property_contexts() {
             "/../../test-data/libreoffice-core/sw/qa/extras/pagelinespacing/data/frameWithColumns.fodt"
         )),
     ] {
-        let flat = FlatOpenDocument::from_bytes(fixture.as_bytes().to_vec()).unwrap();
+        let flat =
+            litchi_odt::generic::FlatOpenDocument::from_bytes(fixture.as_bytes().to_vec()).unwrap();
         let parsed = flat.style_columns().unwrap();
         assert!(
             parsed
@@ -134,7 +135,7 @@ fn builder_package_page_layout_and_mutable_update_round_trip() {
         .unwrap();
     builder.add_paragraph("body").unwrap();
     let bytes = builder.build().unwrap();
-    let package = OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
+    let package = litchi_odt::generic::OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
     assert!(package.style_columns().unwrap().contains(&columns));
     let document = Document::from_bytes(bytes).unwrap();
     let layout = document
@@ -145,7 +146,7 @@ fn builder_package_page_layout_and_mutable_update_round_trip() {
         .unwrap();
     assert_eq!(layout.properties.unwrap().columns, Some(columns));
 
-    let mut mutable = MutableDocument::from_document(document).unwrap();
+    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(document).unwrap();
     let replacement = StyleColumns::new(3).unwrap();
     mutable
         .set_page_layout_columns("Columns&Layout", &replacement)
@@ -186,7 +187,7 @@ fn mutable_update_preserves_inherited_aliases() {
             .column_count,
         2
     );
-    let mut mutable = MutableDocument::from_document(document).unwrap();
+    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(document).unwrap();
     mutable
         .set_page_layout_columns("Alias", &StyleColumns::new(4).unwrap())
         .unwrap();

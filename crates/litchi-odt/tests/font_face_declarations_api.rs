@@ -1,4 +1,5 @@
-use litchi_odt::{Document, Face, Faces, FlatOpenDocument, MutableDocument, OpenDocumentPackage};
+use litchi_odt::Document;
+use litchi_odt::font_face::{Face, Faces};
 mod support;
 
 const CONTENT: &str = include_str!("../../../test-data/odf/odt/font-face-declarations-content.xml");
@@ -42,7 +43,8 @@ fn document_and_generic_package_keep_content_and_styles_declarations_separate() 
         Some(styles.clone())
     );
 
-    let package = OpenDocumentPackage::from_bytes(source.to_bytes().unwrap()).unwrap();
+    let package =
+        litchi_odt::generic::OpenDocumentPackage::from_bytes(source.to_bytes().unwrap()).unwrap();
     assert_eq!(
         package.content_font_face_declarations().unwrap(),
         Some(content)
@@ -59,7 +61,7 @@ fn mutable_document_replaces_and_clears_each_font_face_part_without_rewriting_ne
     let original_styles = declarations("Styles Body");
     let replacement_content = declarations("Content Replacement");
     let replacement_styles = declarations("Styles Replacement");
-    let mut mutable = MutableDocument::from_document(document()).unwrap();
+    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(document()).unwrap();
 
     assert_eq!(
         mutable
@@ -149,7 +151,8 @@ fn mutable_document_replaces_and_clears_each_font_face_part_without_rewriting_ne
 
 #[test]
 fn flat_document_exposes_its_single_font_face_declarations_part() {
-    let document = FlatOpenDocument::from_bytes(FLAT.as_bytes().to_vec()).unwrap();
+    let document =
+        litchi_odt::generic::FlatOpenDocument::from_bytes(FLAT.as_bytes().to_vec()).unwrap();
 
     assert_eq!(
         document.font_face_declarations().unwrap(),

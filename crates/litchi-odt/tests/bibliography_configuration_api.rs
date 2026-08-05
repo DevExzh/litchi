@@ -1,6 +1,6 @@
-use litchi_odt::{
-    BibliographyConfiguration, BibliographyField, BibliographySortKey, Document, MutableDocument,
-    OpenDocumentPackage,
+use litchi_odt::Document;
+use litchi_odt::bibliography_configuration::{
+    BibliographyConfiguration, BibliographyField, BibliographySortKey,
 };
 mod support;
 
@@ -84,7 +84,8 @@ fn document_reads_styles_bibliography_configuration() {
             .bibliography_configuration,
         Some(expected.clone())
     );
-    let generic = OpenDocumentPackage::from_bytes(source.to_bytes().unwrap()).unwrap();
+    let generic =
+        litchi_odt::generic::OpenDocumentPackage::from_bytes(source.to_bytes().unwrap()).unwrap();
     assert_eq!(
         generic.bibliography_configuration().unwrap(),
         Some(expected)
@@ -95,7 +96,8 @@ fn document_reads_styles_bibliography_configuration() {
 fn mutable_document_replaces_removes_and_inserts_bibliography_configuration() {
     let original = fixture_configuration();
     let replacement = replacement_configuration();
-    let mut mutable = MutableDocument::from_document(document(STYLES)).unwrap();
+    let mut mutable =
+        litchi_odt::mutable::MutableDocument::from_document(document(STYLES)).unwrap();
 
     assert_eq!(
         mutable

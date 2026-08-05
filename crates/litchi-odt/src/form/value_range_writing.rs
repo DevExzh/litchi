@@ -1027,7 +1027,7 @@ mod tests {
         let mut builder = crate::Builder::new();
         builder.add_value_range_form(&form).unwrap();
         let document = crate::Document::from_bytes(builder.build().unwrap()).unwrap();
-        let mut mutable = crate::MutableDocument::from_document(document).unwrap();
+        let mut mutable = crate::mutable::MutableDocument::from_document(document).unwrap();
         assert_eq!(mutable.value_range_controls().unwrap().len(), 1);
         mutable.insert_value_range_control(0, &inserted).unwrap();
         assert_eq!(

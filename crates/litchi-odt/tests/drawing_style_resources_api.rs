@@ -1,7 +1,5 @@
-use litchi_odt::{
-    Document, FlatOpenDocument, MutableDocument, OpenDocumentPackage,
-    drawing::resources::gradient::Gradient, drawing::resources::stroke_dash::StrokeDashStyle,
-};
+use litchi_odt::Document;
+use litchi_odt::drawing::resources::{fill_image, gradient, hatch, marker, opacity, stroke_dash};
 mod support;
 
 const CONTENT: &str =
@@ -22,12 +20,12 @@ fn document() -> Document {
 }
 
 fn assert_resources(
-    fill_images: &litchi_odt::drawing::resources::fill_image::FillImages,
-    gradients: &litchi_odt::drawing::resources::gradient::Gradients,
-    hatches: &litchi_odt::drawing::resources::hatch::Hatches,
-    markers: &litchi_odt::drawing::resources::marker::Markers,
-    opacities: &litchi_odt::drawing::resources::opacity::Opacities,
-    dashes: &litchi_odt::drawing::resources::stroke_dash::StrokeDashes,
+    fill_images: &fill_image::Collection,
+    gradients: &gradient::Collection,
+    hatches: &hatch::Collection,
+    markers: &marker::Collection,
+    opacities: &opacity::Collection,
+    dashes: &stroke_dash::Collection,
 ) {
     assert_eq!(fill_images.images.len(), 1);
     assert_eq!(
@@ -42,7 +40,10 @@ fn assert_resources(
     );
     assert_eq!(gradients.gradients.len(), 2);
     assert!(gradients.get("Legacy").is_some());
-    assert!(matches!(gradients.get("Linear"), Some(Gradient::Linear(_))));
+    assert!(matches!(
+        gradients.get("Linear"),
+        Some(gradient::Definition::Linear(_))
+    ));
     assert_eq!(hatches.hatches.len(), 1);
     assert!(hatches.get("Hatch").is_some());
     assert_eq!(markers.markers.len(), 1);
@@ -55,7 +56,7 @@ fn assert_resources(
     assert_eq!(dashes.dashes.len(), 1);
     assert_eq!(
         dashes.get("Dash").unwrap().effective_style(),
-        StrokeDashStyle::Round
+        stroke_dash::Style::Round
     );
 }
 
@@ -77,7 +78,8 @@ fn document_generic_package_and_mutable_document_expose_named_style_resources() 
         &dashes,
     );
 
-    let package = OpenDocumentPackage::from_bytes(source.to_bytes().unwrap()).unwrap();
+    let package =
+        litchi_odt::generic::OpenDocumentPackage::from_bytes(source.to_bytes().unwrap()).unwrap();
     assert_eq!(package.drawing_fill_images().unwrap(), fill_images);
     assert_eq!(package.drawing_gradients().unwrap(), gradients);
     assert_eq!(package.drawing_hatches().unwrap(), hatches);
@@ -85,7 +87,7 @@ fn document_generic_package_and_mutable_document_expose_named_style_resources() 
     assert_eq!(package.drawing_opacities().unwrap(), opacities);
     assert_eq!(package.drawing_stroke_dashes().unwrap(), dashes);
 
-    let mutable = MutableDocument::from_document(source).unwrap();
+    let mutable = litchi_odt::mutable::MutableDocument::from_document(source).unwrap();
     assert_eq!(mutable.drawing_fill_images().unwrap(), fill_images);
     assert_eq!(mutable.drawing_gradients().unwrap(), gradients);
     assert_eq!(mutable.drawing_hatches().unwrap(), hatches);
@@ -96,7 +98,8 @@ fn document_generic_package_and_mutable_document_expose_named_style_resources() 
 
 #[test]
 fn flat_document_exposes_named_style_resources() {
-    let document = FlatOpenDocument::from_bytes(FLAT.as_bytes().to_vec()).unwrap();
+    let document =
+        litchi_odt::generic::FlatOpenDocument::from_bytes(FLAT.as_bytes().to_vec()).unwrap();
     let fill_images = document.drawing_fill_images().unwrap();
     let gradients = document.drawing_gradients().unwrap();
     let hatches = document.drawing_hatches().unwrap();

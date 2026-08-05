@@ -1,7 +1,5 @@
-use litchi_odt::{
-    FlatOpenDocument, LabelFollowedBy, ListLevelPositionMode, OutlineTextAlign,
-    parse_outline_styles,
-};
+use litchi_odt::list_label_alignment::LabelFollowedBy;
+use litchi_odt::outline_style::{ListLevelPositionMode, OutlineTextAlign, parse_outline_styles};
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
@@ -50,7 +48,7 @@ fn flat_document_exposes_outline_styles_without_interpreting_headings() {
     let xml = document(
         r#"<t:outline-style s:name="Outline"><t:outline-level-style t:level="1" s:num-format="1"/></t:outline-style>"#,
     );
-    let document = FlatOpenDocument::from_bytes(xml.into_bytes()).unwrap();
+    let document = litchi_odt::generic::FlatOpenDocument::from_bytes(xml.into_bytes()).unwrap();
     assert_eq!(document.outline_styles().unwrap().styles.len(), 1);
 }
 

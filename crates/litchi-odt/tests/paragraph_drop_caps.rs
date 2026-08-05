@@ -1,8 +1,11 @@
-use litchi_odt::{
-    Builder, Document, DropCapDistance, DropCapLength, FlatOpenDocument, MutableDocument,
-    OpenDocumentPackage, ParagraphDropCap, ParagraphStyleDropCap, ParagraphStyleTabStops,
-    ParagraphTabStop, ParagraphTabStops, TabStopPosition, parse_paragraph_style_drop_caps,
+use litchi_odt::style::paragraph::drop_cap::{
+    DropCapDistance, DropCapLength, ParagraphDropCap, ParagraphStyleDropCap,
+    parse_paragraph_style_drop_caps,
 };
+use litchi_odt::style::paragraph::tab_stop::{
+    ParagraphStyleTabStops, ParagraphTabStop, ParagraphTabStops, TabStopPosition,
+};
+use litchi_odt::{Builder, Document};
 use std::io::Cursor;
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
@@ -36,7 +39,7 @@ fn parses_real_libreoffice_fixture() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sw/qa/extras/layout/data/drop_asian_word.fodt"
     ));
-    let flat = FlatOpenDocument::from_reader(Cursor::new(bytes)).unwrap();
+    let flat = litchi_odt::generic::FlatOpenDocument::from_reader(Cursor::new(bytes)).unwrap();
     let parsed = flat.paragraph_style_drop_caps().unwrap();
     assert!(parsed.styles.iter().any(|style| {
         style
@@ -112,7 +115,7 @@ fn builder_package_composition_and_mutation_round_trip() {
         .unwrap();
     builder.add_paragraph("Opening text").unwrap();
     let bytes = builder.build().unwrap();
-    let package = OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
+    let package = litchi_odt::generic::OpenDocumentPackage::from_bytes(bytes.clone()).unwrap();
     assert_eq!(
         package.paragraph_style_drop_caps().unwrap().get("Opening"),
         Some(&drop_style)
@@ -124,7 +127,9 @@ fn builder_package_composition_and_mutation_round_trip() {
             .get("Opening")
             .is_some()
     );
-    let mut mutable = MutableDocument::from_document(Document::from_bytes(bytes).unwrap()).unwrap();
+    let mut mutable =
+        litchi_odt::mutable::MutableDocument::from_document(Document::from_bytes(bytes).unwrap())
+            .unwrap();
     let replacement = ParagraphDropCap {
         length: Some(DropCapLength::Word),
         lines: Some(4),
@@ -133,7 +138,8 @@ fn builder_package_composition_and_mutation_round_trip() {
     };
     drop_style.drop_cap = Some(replacement.clone());
     mutable.set_paragraph_style_drop_cap(&drop_style).unwrap();
-    let package = OpenDocumentPackage::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let package =
+        litchi_odt::generic::OpenDocumentPackage::from_bytes(mutable.to_bytes().unwrap()).unwrap();
     assert_eq!(
         package
             .paragraph_style_drop_caps()

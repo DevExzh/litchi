@@ -1,7 +1,10 @@
-use litchi_odt::{
-    Block, Builder, ChangeType, Document, MutableDocument, Position, Section, SectionDdeSource,
-    SectionDisplay, SectionSource, Story, TrackChange, TrackedChanges, wrap_section_xml,
+use litchi_odt::parser::{
+    ChangeType, Section, SectionDdeSource, SectionDisplay, SectionSource, TrackChange,
+    TrackedChanges,
 };
+use litchi_odt::section::{Block, add_section_xml, wrap_section_xml};
+use litchi_odt::tracked_changes::{Position, Story};
+use litchi_odt::{Builder, Document};
 
 fn section(name: &str) -> Section {
     Section {
@@ -76,7 +79,7 @@ fn builder_authors_linked_conditional_protected_and_dde_sections() {
 
 #[test]
 fn mutable_wraps_nested_sections_and_preserves_tracked_changes() {
-    let mut document = MutableDocument::new();
+    let mut document = litchi_odt::mutable::MutableDocument::new();
     document.add_paragraph("A😀B").unwrap();
     document.add_paragraph("Second").unwrap();
     document
@@ -162,7 +165,7 @@ fn mixed_body_and_table_cell_ranges_are_lossless_and_errors_roll_back() {
     assert!(wrapped.contains("Cell 2"));
 
     let duplicate = section("BodyMixed");
-    assert!(litchi_odt::add_section_xml(&wrapped, &duplicate).is_err());
+    assert!(add_section_xml(&wrapped, &duplicate).is_err());
     let crossing = wrap_section_xml(
         &wrapped,
         &section("Crossing"),
@@ -174,7 +177,7 @@ fn mixed_body_and_table_cell_ranges_are_lossless_and_errors_roll_back() {
 
 #[test]
 fn remove_deletes_content_while_unwrap_and_clear_retain_it() {
-    let mut unwrap = MutableDocument::new();
+    let mut unwrap = litchi_odt::mutable::MutableDocument::new();
     unwrap.add_paragraph("keep me").unwrap();
     let mut wrapper = section("Wrapper");
     wrapper.content.clear();
@@ -190,7 +193,7 @@ fn remove_deletes_content_while_unwrap_and_clear_retain_it() {
         "keep me"
     );
 
-    let mut remove = MutableDocument::new();
+    let mut remove = litchi_odt::mutable::MutableDocument::new();
     remove.add_paragraph("delete me").unwrap();
     remove
         .wrap_section(&wrapper, Block::BodyParagraph(0), Block::BodyParagraph(0))

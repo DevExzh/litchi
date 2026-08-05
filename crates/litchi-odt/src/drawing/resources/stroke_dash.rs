@@ -21,12 +21,12 @@ const MAX_DOT_COUNT: u32 = 1_000_000;
 /// The cap shape used for each segment in a stroke-dash pattern.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum StrokeDashStyle {
+pub enum Style {
     Rect,
     Round,
 }
 
-impl StrokeDashStyle {
+impl Style {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "rect" => Ok(Self::Rect),
@@ -46,7 +46,7 @@ impl StrokeDashStyle {
 /// Unit for a stroke-dash length or percentage.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum StrokeDashMeasureUnit {
+pub enum MeasureUnit {
     Centimeter,
     Millimeter,
     Inch,
@@ -56,7 +56,7 @@ pub enum StrokeDashMeasureUnit {
     Percent,
 }
 
-impl StrokeDashMeasureUnit {
+impl MeasureUnit {
     const fn suffix(self) -> &'static str {
         match self {
             Self::Centimeter => "cm",
@@ -72,13 +72,13 @@ impl StrokeDashMeasureUnit {
 
 /// A finite, nonnegative ODF length or percentage.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct StrokeDashMeasure {
+pub struct Measure {
     value: f64,
-    unit: StrokeDashMeasureUnit,
+    unit: MeasureUnit,
 }
 
-impl StrokeDashMeasure {
-    pub fn new(value: f64, unit: StrokeDashMeasureUnit) -> Result<Self> {
+impl Measure {
+    pub fn new(value: f64, unit: MeasureUnit) -> Result<Self> {
         if !value.is_finite() || value < 0.0 {
             return invalid("stroke-dash measure must be finite and nonnegative");
         }
@@ -89,12 +89,12 @@ impl StrokeDashMeasure {
         self.value
     }
 
-    pub const fn unit(self) -> StrokeDashMeasureUnit {
+    pub const fn unit(self) -> MeasureUnit {
         self.unit
     }
 }
 
-impl FromStr for StrokeDashMeasure {
+impl FromStr for Measure {
     type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
@@ -107,7 +107,7 @@ impl FromStr for StrokeDashMeasure {
     }
 }
 
-impl fmt::Display for StrokeDashMeasure {
+impl fmt::Display for Measure {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
@@ -120,21 +120,21 @@ impl fmt::Display for StrokeDashMeasure {
 
 /// One named `draw:stroke-dash` resource.
 #[derive(Clone, Debug, PartialEq)]
-pub struct StrokeDash {
+pub struct Definition {
     pub name: String,
     pub display_name: Option<String>,
-    pub style: Option<StrokeDashStyle>,
+    pub style: Option<Style>,
     pub dots1: Option<u32>,
-    pub dots1_length: Option<StrokeDashMeasure>,
+    pub dots1_length: Option<Measure>,
     pub dots2: Option<u32>,
-    pub dots2_length: Option<StrokeDashMeasure>,
-    pub distance: Option<StrokeDashMeasure>,
+    pub dots2_length: Option<Measure>,
+    pub distance: Option<Measure>,
 }
 
-impl StrokeDash {
+impl Definition {
     /// ODF defaults an omitted cap style to `rect`.
-    pub fn effective_style(&self) -> StrokeDashStyle {
-        self.style.unwrap_or(StrokeDashStyle::Rect)
+    pub fn effective_style(&self) -> Style {
+        self.style.unwrap_or(Style::Rect)
     }
 
     pub fn validate(&self) -> Result<()> {
@@ -151,7 +151,7 @@ impl StrokeDash {
             .into_iter()
             .flatten()
         {
-            StrokeDashMeasure::new(measure.value, measure.unit)?;
+            Measure::new(measure.value, measure.unit)?;
         }
         Ok(())
     }
@@ -166,12 +166,12 @@ impl StrokeDash {
 
 /// Ordered stroke-dash resources from `office:styles`.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct StrokeDashes {
-    pub dashes: Vec<StrokeDash>,
+pub struct Collection {
+    pub dashes: Vec<Definition>,
 }
 
-impl StrokeDashes {
-    pub fn get(&self, name: &str) -> Option<&StrokeDash> {
+impl Collection {
+    pub fn get(&self, name: &str) -> Option<&Definition> {
         self.dashes.iter().find(|dash| dash.name == name)
     }
 
@@ -233,15 +233,15 @@ struct Frame {
 
 struct ActiveDash {
     parent_depth: usize,
-    value: StrokeDash,
+    value: Definition,
 }
 
 type Attributes = HashMap<(NamespaceKind, String), String>;
 
 /// Parse stroke-dash resources from an ODF styles or flat-document XML part.
-pub fn parse_drawing_stroke_dashes(xml: &str) -> Result<StrokeDashes> {
+pub fn parse_drawing_stroke_dashes(xml: &str) -> Result<Collection> {
     if !xml.contains("stroke-dash") {
-        return Ok(StrokeDashes::default());
+        return Ok(Collection::default());
     }
     if xml.len() > MAX_XML_BYTES {
         return invalid("drawing stroke-dash XML exceeds 64 MiB");
@@ -252,7 +252,7 @@ pub fn parse_drawing_stroke_dashes(xml: &str) -> Result<StrokeDashes> {
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
     let mut active: Option<ActiveDash> = None;
-    let mut result = StrokeDashes::default();
+    let mut result = Collection::default();
     let mut aggregate = 0usize;
 
     loop {
@@ -352,12 +352,12 @@ fn parse_dash(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
-) -> Result<StrokeDash> {
+) -> Result<Definition> {
     let mut values = attributes(reader, element, aggregate)?;
     let name = required(&mut values, NamespaceKind::Draw, "name", "draw:name")?;
     let display_name = take(&mut values, NamespaceKind::Draw, "display-name");
     let style = take(&mut values, NamespaceKind::Draw, "style")
-        .map(|value| StrokeDashStyle::parse(&value))
+        .map(|value| Style::parse(&value))
         .transpose()?;
     let dots1 = take_count(&mut values, "dots1")?;
     let dots1_length = take_measure(&mut values, "dots1-length")?;
@@ -365,7 +365,7 @@ fn parse_dash(
     let dots2_length = take_measure(&mut values, "dots2-length")?;
     let distance = take_measure(&mut values, "distance")?;
     reject_attributes(&values)?;
-    let value = StrokeDash {
+    let value = Definition {
         name,
         display_name,
         style,
@@ -396,7 +396,7 @@ fn take_count(values: &mut Attributes, local: &str) -> Result<Option<u32>> {
         .transpose()
 }
 
-fn take_measure(values: &mut Attributes, local: &str) -> Result<Option<StrokeDashMeasure>> {
+fn take_measure(values: &mut Attributes, local: &str) -> Result<Option<Measure>> {
     take(values, NamespaceKind::Draw, local)
         .map(|value| value.parse())
         .transpose()
@@ -491,15 +491,15 @@ fn reject_attributes(values: &Attributes) -> Result<()> {
     Ok(())
 }
 
-fn split_measure(value: &str) -> Result<(&str, StrokeDashMeasureUnit)> {
+fn split_measure(value: &str) -> Result<(&str, MeasureUnit)> {
     for (suffix, unit) in [
-        ("cm", StrokeDashMeasureUnit::Centimeter),
-        ("mm", StrokeDashMeasureUnit::Millimeter),
-        ("in", StrokeDashMeasureUnit::Inch),
-        ("pt", StrokeDashMeasureUnit::Point),
-        ("pc", StrokeDashMeasureUnit::Pica),
-        ("px", StrokeDashMeasureUnit::Pixel),
-        ("%", StrokeDashMeasureUnit::Percent),
+        ("cm", MeasureUnit::Centimeter),
+        ("mm", MeasureUnit::Millimeter),
+        ("in", MeasureUnit::Inch),
+        ("pt", MeasureUnit::Point),
+        ("pc", MeasureUnit::Pica),
+        ("px", MeasureUnit::Pixel),
+        ("%", MeasureUnit::Percent),
     ] {
         if let Some(number) = value.strip_suffix(suffix) {
             return Ok((number, unit));
@@ -547,7 +547,7 @@ fn validate_text(value: &str, name: &str, allow_empty: bool) -> Result<()> {
     Ok(())
 }
 
-fn write_dash(output: &mut String, value: &StrokeDash, standalone: bool) {
+fn write_dash(output: &mut String, value: &Definition, standalone: bool) {
     output.push_str("<draw:stroke-dash");
     if standalone {
         output.push_str(r#" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0""#);
@@ -636,15 +636,15 @@ mod tests {
         assert_eq!(parsed.dashes.len(), 2);
         assert_eq!(
             parsed.get("mixed&units").unwrap().effective_style(),
-            StrokeDashStyle::Round
+            Style::Round
         );
         assert_eq!(
             parsed.dashes[0].distance.unwrap().unit(),
-            StrokeDashMeasureUnit::Percent
+            MeasureUnit::Percent
         );
         assert_eq!(
             parsed.dashes[1].dots2_length.unwrap().unit(),
-            StrokeDashMeasureUnit::Inch
+            MeasureUnit::Inch
         );
         let serialized = parsed.to_xml().unwrap();
         assert_eq!(parse_drawing_stroke_dashes(&serialized).unwrap(), parsed);

@@ -22,7 +22,7 @@ const MAX_AGGREGATE_BYTES: usize = 16 * 1_048_576;
 /// One of the six ODF opacity-gradient geometries.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum OpacityStyle {
+pub enum Style {
     Linear,
     Axial,
     Radial,
@@ -31,7 +31,7 @@ pub enum OpacityStyle {
     Rectangular,
 }
 
-impl OpacityStyle {
+impl Style {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "linear" => Ok(Self::Linear),
@@ -58,9 +58,9 @@ impl OpacityStyle {
 
 /// A finite percentage constrained to the ODF `0%..=100%` datatype.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct OpacityPercent(f64);
+pub struct Percent(f64);
 
-impl OpacityPercent {
+impl Percent {
     pub fn new(value: f64) -> Result<Self> {
         if !value.is_finite() || !(0.0..=100.0).contains(&value) {
             return invalid("opacity percentage must be between 0% and 100%");
@@ -73,7 +73,7 @@ impl OpacityPercent {
     }
 }
 
-impl fmt::Display for OpacityPercent {
+impl fmt::Display for Percent {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}%", canonical_number(self.0))
     }
@@ -81,9 +81,9 @@ impl fmt::Display for OpacityPercent {
 
 /// A finite signed percentage used by ODF gradient geometry.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct OpacityGeometryPercent(f64);
+pub struct GeometryPercent(f64);
 
-impl OpacityGeometryPercent {
+impl GeometryPercent {
     pub fn new(value: f64) -> Result<Self> {
         if !value.is_finite() {
             return invalid("opacity geometry percentage must be finite");
@@ -96,7 +96,7 @@ impl OpacityGeometryPercent {
     }
 }
 
-impl fmt::Display for OpacityGeometryPercent {
+impl fmt::Display for GeometryPercent {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}%", canonical_number(self.0))
     }
@@ -104,9 +104,9 @@ impl fmt::Display for OpacityGeometryPercent {
 
 /// A validated lexical ODF angle, retained because ODF leaves its unit grammar open.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct OpacityAngle(String);
+pub struct Angle(String);
 
-impl OpacityAngle {
+impl Angle {
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         validate_text(&value, "draw:angle", false)?;
@@ -121,12 +121,12 @@ impl OpacityAngle {
 /// A LibreOffice extension stop coordinate or opacity.
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[non_exhaustive]
-pub enum OpacityStopValue {
+pub enum StopValue {
     Fraction(f64),
-    Percent(OpacityPercent),
+    Percent(Percent),
 }
 
-impl OpacityStopValue {
+impl StopValue {
     pub fn fraction(value: f64) -> Result<Self> {
         if !value.is_finite() || !(0.0..=1.0).contains(&value) {
             return invalid("opacity stop fraction must be between 0 and 1");
@@ -143,7 +143,7 @@ impl OpacityStopValue {
     }
 }
 
-impl fmt::Display for OpacityStopValue {
+impl fmt::Display for StopValue {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Fraction(value) => formatter.write_str(&canonical_number(*value)),
@@ -154,27 +154,27 @@ impl fmt::Display for OpacityStopValue {
 
 /// One ordered LibreOffice opacity stop.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct OpacityStop {
-    pub offset: OpacityStopValue,
-    pub opacity: OpacityStopValue,
+pub struct Stop {
+    pub offset: StopValue,
+    pub opacity: StopValue,
 }
 
 /// One `draw:opacity` resource.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Opacity {
+pub struct Definition {
     pub name: Option<String>,
     pub display_name: Option<String>,
-    pub style: OpacityStyle,
-    pub center_x: Option<OpacityGeometryPercent>,
-    pub center_y: Option<OpacityGeometryPercent>,
-    pub start: Option<OpacityPercent>,
-    pub end: Option<OpacityPercent>,
-    pub angle: Option<OpacityAngle>,
-    pub border: Option<OpacityGeometryPercent>,
-    pub extension_stops: Vec<OpacityStop>,
+    pub style: Style,
+    pub center_x: Option<GeometryPercent>,
+    pub center_y: Option<GeometryPercent>,
+    pub start: Option<Percent>,
+    pub end: Option<Percent>,
+    pub angle: Option<Angle>,
+    pub border: Option<GeometryPercent>,
+    pub extension_stops: Vec<Stop>,
 }
 
-impl Opacity {
+impl Definition {
     pub fn validate(&self) -> Result<()> {
         if let Some(name) = &self.name {
             validate_text(name, "draw:name", false)?;
@@ -183,22 +183,22 @@ impl Opacity {
             validate_text(display_name, "draw:display-name", true)?;
         }
         if let Some(value) = self.center_x {
-            OpacityGeometryPercent::new(value.0)?;
+            GeometryPercent::new(value.0)?;
         }
         if let Some(value) = self.center_y {
-            OpacityGeometryPercent::new(value.0)?;
+            GeometryPercent::new(value.0)?;
         }
         if let Some(value) = self.start {
-            OpacityPercent::new(value.0)?;
+            Percent::new(value.0)?;
         }
         if let Some(value) = self.end {
-            OpacityPercent::new(value.0)?;
+            Percent::new(value.0)?;
         }
         if let Some(angle) = &self.angle {
             validate_text(angle.as_str(), "draw:angle", false)?;
         }
         if let Some(value) = self.border {
-            OpacityGeometryPercent::new(value.0)?;
+            GeometryPercent::new(value.0)?;
         }
         if self.extension_stops.len() > MAX_STOPS {
             return invalid(format!("opacity gradient exceeds {MAX_STOPS} stops"));
@@ -220,12 +220,12 @@ impl Opacity {
 
 /// Ordered opacity resources from `office:styles`.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct Opacities {
-    pub opacities: Vec<Opacity>,
+pub struct Collection {
+    pub opacities: Vec<Definition>,
 }
 
-impl Opacities {
-    pub fn get(&self, name: &str) -> Option<&Opacity> {
+impl Collection {
+    pub fn get(&self, name: &str) -> Option<&Definition> {
         self.opacities
             .iter()
             .find(|opacity| opacity.name.as_deref() == Some(name))
@@ -280,14 +280,14 @@ impl Opacities {
 }
 
 impl crate::OpenDocumentPackage {
-    pub fn drawing_opacities(&self) -> Result<Opacities> {
+    pub fn drawing_opacities(&self) -> Result<Collection> {
         let styles = self.styles_xml()?;
         parse_drawing_opacities(styles.as_deref().unwrap_or_default())
     }
 }
 
 impl crate::FlatOpenDocument {
-    pub fn drawing_opacities(&self) -> Result<Opacities> {
+    pub fn drawing_opacities(&self) -> Result<Collection> {
         parse_drawing_opacities(self.xml())
     }
 }
@@ -308,16 +308,16 @@ struct Frame {
     local: String,
 }
 
-struct ActiveOpacity {
+struct ActiveDefinition {
     parent_depth: usize,
-    value: Opacity,
+    value: Definition,
 }
 
 type Attributes = HashMap<(NamespaceKind, String), String>;
 
-pub fn parse_drawing_opacities(xml: &str) -> Result<Opacities> {
+pub fn parse_drawing_opacities(xml: &str) -> Result<Collection> {
     if !xml.contains("opacity") {
-        return Ok(Opacities::default());
+        return Ok(Collection::default());
     }
     if xml.len() > MAX_XML_BYTES {
         return invalid("drawing opacity XML exceeds 64 MiB");
@@ -326,8 +326,8 @@ pub fn parse_drawing_opacities(xml: &str) -> Result<Opacities> {
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
-    let mut active: Option<ActiveOpacity> = None;
-    let mut result = Opacities::default();
+    let mut active: Option<ActiveDefinition> = None;
+    let mut result = Collection::default();
     let mut aggregate = 0usize;
     let mut stop_count = 0usize;
 
@@ -349,7 +349,7 @@ pub fn parse_drawing_opacities(xml: &str) -> Result<Opacities> {
                 if namespace == NamespaceKind::Draw && local == "opacity" {
                     ensure_location(&stack)?;
                     ensure_count(result.opacities.len(), MAX_OPACITIES, "opacity resources")?;
-                    active = Some(ActiveOpacity {
+                    active = Some(ActiveDefinition {
                         parent_depth: stack.len(),
                         value: parse_opacity(&reader, element, &mut aggregate)?,
                     });
@@ -432,11 +432,11 @@ fn parse_opacity(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
-) -> Result<Opacity> {
+) -> Result<Definition> {
     let mut values = attributes(reader, element, aggregate)?;
     let name = take(&mut values, NamespaceKind::Draw, "name");
     let display_name = take(&mut values, NamespaceKind::Draw, "display-name");
-    let style = OpacityStyle::parse(&required(
+    let style = Style::parse(&required(
         &mut values,
         NamespaceKind::Draw,
         "style",
@@ -447,11 +447,11 @@ fn parse_opacity(
     let start = take_bounded_percent(&mut values, "start")?;
     let end = take_bounded_percent(&mut values, "end")?;
     let angle = take(&mut values, NamespaceKind::Draw, "angle")
-        .map(OpacityAngle::new)
+        .map(Angle::new)
         .transpose()?;
     let border = take_geometry_percent(&mut values, "border")?;
     reject_attributes(&values, "draw:opacity")?;
-    Ok(Opacity {
+    Ok(Definition {
         name,
         display_name,
         style,
@@ -469,13 +469,13 @@ fn parse_stop(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
-) -> Result<OpacityStop> {
+) -> Result<Stop> {
     let mut values = attributes(reader, element, aggregate)?;
-    let offset = OpacityStopValue::parse(
+    let offset = StopValue::parse(
         &required(&mut values, NamespaceKind::Svg, "offset", "svg:offset")?,
         "svg:offset",
     )?;
-    let opacity = OpacityStopValue::parse(
+    let opacity = StopValue::parse(
         &required(
             &mut values,
             NamespaceKind::Svg,
@@ -485,10 +485,10 @@ fn parse_stop(
         "svg:stop-opacity",
     )?;
     reject_attributes(&values, "loext:opacity-stop")?;
-    Ok(OpacityStop { offset, opacity })
+    Ok(Stop { offset, opacity })
 }
 
-fn take_bounded_percent(values: &mut Attributes, local: &str) -> Result<Option<OpacityPercent>> {
+fn take_bounded_percent(values: &mut Attributes, local: &str) -> Result<Option<Percent>> {
     take(values, NamespaceKind::Draw, local)
         .map(|value| {
             let number = value
@@ -499,22 +499,19 @@ fn take_bounded_percent(values: &mut Attributes, local: &str) -> Result<Option<O
         .transpose()
 }
 
-fn take_geometry_percent(
-    values: &mut Attributes,
-    local: &str,
-) -> Result<Option<OpacityGeometryPercent>> {
+fn take_geometry_percent(values: &mut Attributes, local: &str) -> Result<Option<GeometryPercent>> {
     take(values, NamespaceKind::Draw, local)
         .map(|value| {
             let number = value
                 .strip_suffix('%')
                 .ok_or_else(|| make_error(format!("draw:{local} must be a percentage")))?;
-            OpacityGeometryPercent::new(parse_decimal(number, true, &format!("draw:{local}"))?)
+            GeometryPercent::new(parse_decimal(number, true, &format!("draw:{local}"))?)
         })
         .transpose()
 }
 
-fn parse_bounded_percent(number: &str, name: &str) -> Result<OpacityPercent> {
-    OpacityPercent::new(parse_decimal(number, false, name)?)
+fn parse_bounded_percent(number: &str, name: &str) -> Result<Percent> {
+    Percent::new(parse_decimal(number, false, name)?)
 }
 
 fn parse_decimal(value: &str, signed: bool, name: &str) -> Result<f64> {
@@ -648,10 +645,10 @@ fn reject_attributes(values: &Attributes, element: &str) -> Result<()> {
     Ok(())
 }
 
-fn validate_stop_value(value: OpacityStopValue) -> Result<()> {
+fn validate_stop_value(value: StopValue) -> Result<()> {
     match value {
-        OpacityStopValue::Fraction(value) => OpacityStopValue::fraction(value).map(|_| ()),
-        OpacityStopValue::Percent(value) => OpacityPercent::new(value.0).map(|_| ()),
+        StopValue::Fraction(value) => StopValue::fraction(value).map(|_| ()),
+        StopValue::Percent(value) => Percent::new(value.0).map(|_| ()),
     }
 }
 
@@ -668,7 +665,7 @@ fn validate_text(value: &str, name: &str, allow_empty: bool) -> Result<()> {
     Ok(())
 }
 
-fn write_opacity(output: &mut String, opacity: &Opacity, standalone: bool) {
+fn write_opacity(output: &mut String, opacity: &Definition, standalone: bool) {
     output.push_str("<draw:opacity");
     if standalone {
         output.push_str(
@@ -785,7 +782,7 @@ mod tests {
         let body = styles.iter().enumerate().map(|(index, style)| format!(r#"<draw:opacity draw:name="o{index}" draw:style="{style}" draw:cx="-5.5%" draw:cy=".5%" draw:start="0%" draw:end="100.0%" draw:angle="1rad" draw:border="25.%"><loext:opacity-stop svg:offset="0" svg:stop-opacity="20%"/><loext:opacity-stop svg:offset="1" svg:stop-opacity=".5"/></draw:opacity>"#)).collect::<String>();
         let parsed = parse_drawing_opacities(&wrap(&body)).unwrap();
         assert_eq!(parsed.opacities.len(), 6);
-        assert_eq!(parsed.get("o3").unwrap().style, OpacityStyle::Ellipsoid);
+        assert_eq!(parsed.get("o3").unwrap().style, Style::Ellipsoid);
         assert_eq!(parsed.opacities[0].extension_stops.len(), 2);
         let serialized = parsed.to_xml().unwrap();
         assert_eq!(parse_drawing_opacities(&serialized).unwrap(), parsed);
@@ -843,7 +840,7 @@ mod tests {
         let stops = crate::FlatOpenDocument::from_bytes(stops_xml.as_bytes().to_vec()).unwrap();
         let values = stops.drawing_opacities().unwrap();
         let value = values.get("Transparency_20_1").unwrap();
-        assert_eq!(value.style, OpacityStyle::Ellipsoid);
+        assert_eq!(value.style, Style::Ellipsoid);
         assert_eq!(value.extension_stops.len(), 2);
     }
 }

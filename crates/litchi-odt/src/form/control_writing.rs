@@ -990,7 +990,7 @@ mod tests {
 
     #[test]
     fn builder_and_mutable_document_round_trip_controls() {
-        use crate::{Builder, Document, MutableDocument};
+        use crate::{Builder, Document, mutable::MutableDocument};
 
         let mut form = ControlForm::new("Main");
         form.add_control(TextControl::text("Query", "query_1"))

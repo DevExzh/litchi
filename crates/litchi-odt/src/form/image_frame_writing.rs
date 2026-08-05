@@ -921,7 +921,7 @@ mod tests {
 
     #[test]
     fn builder_and_mutable_document_round_trip_without_image_io() {
-        use crate::{Builder, Document, MutableDocument};
+        use crate::{Builder, Document, mutable::MutableDocument};
         let mut initial = ImageFrameControl::new("Image", "image");
         initial.image_data = Some("Pictures/intentionally-missing.png".into());
         let mut form = ImageFrameForm::new("Main");

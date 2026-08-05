@@ -1,7 +1,6 @@
 //! Tests for `draw:image-map` through the package and flat-document APIs.
 
 use litchi_odt::image_map::ImageMapAreaShape;
-use litchi_odt::{FlatOpenDocument, OpenDocumentPackage};
 mod support;
 
 const CONTENT: &str = concat!(
@@ -22,8 +21,8 @@ const CONTENT: &str = concat!(
 
 const MIMETYPE: &str = "application/vnd.oasis.opendocument.text";
 
-fn package() -> OpenDocumentPackage {
-    OpenDocumentPackage::from_bytes(support::package(
+fn package() -> litchi_odt::generic::OpenDocumentPackage {
+    litchi_odt::generic::OpenDocumentPackage::from_bytes(support::package(
         MIMETYPE,
         &[("content.xml", CONTENT.as_bytes())],
     ))
@@ -54,7 +53,8 @@ fn reads_image_maps_from_a_package() {
 
 #[test]
 fn reads_image_maps_from_a_flat_document() {
-    let document = FlatOpenDocument::from_bytes(CONTENT.as_bytes().to_vec()).unwrap();
+    let document =
+        litchi_odt::generic::FlatOpenDocument::from_bytes(CONTENT.as_bytes().to_vec()).unwrap();
     let maps = document.image_maps().unwrap();
     assert_eq!(maps.len(), 1);
     assert_eq!(maps[0].areas.len(), 2);
@@ -66,6 +66,7 @@ fn packages_without_image_maps_report_empty() {
         "<draw:image-map><draw:area-rectangle svg:x=\"1cm\" svg:y=\"2cm\" svg:width=\"3cm\" svg:height=\"4cm\" xlink:href=\"https://example.org/a\" xlink:type=\"simple\"/><draw:area-polygon svg:x=\"0cm\" svg:y=\"0cm\" svg:width=\"9cm\" svg:height=\"8cm\" svg:viewBox=\"0 0 100 100\" svg:points=\"10,10 90,10 50,90\" draw:nohref=\"true\"/></draw:image-map>",
         "",
     );
-    let document = FlatOpenDocument::from_bytes(plain.as_bytes().to_vec()).unwrap();
+    let document =
+        litchi_odt::generic::FlatOpenDocument::from_bytes(plain.as_bytes().to_vec()).unwrap();
     assert!(document.image_maps().unwrap().is_empty());
 }
