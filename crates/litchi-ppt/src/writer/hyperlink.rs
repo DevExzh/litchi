@@ -6,7 +6,7 @@
 //! Reference: [MS-PPT] Section 2.8 - Interactive Information
 
 use zerocopy::IntoBytes;
-use zerocopy_derive::*;
+use zerocopy_derive::{Immutable, IntoBytes, KnownLayout};
 
 // =============================================================================
 // PPT Record Types for Hyperlinks
@@ -87,7 +87,7 @@ pub enum JumpAction {
 // =============================================================================
 
 /// InteractiveInfoAtom structure (16 bytes)
-#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Debug, Clone, Copy, IntoBytes, Immutable, KnownLayout)]
 #[repr(C, packed)]
 pub struct InteractiveInfoAtom {
     /// Sound reference (0 if none)
@@ -216,7 +216,7 @@ impl InteractiveInfoAtom {
 // =============================================================================
 
 /// ExHyperlinkAtom structure (4 bytes)
-#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Debug, Clone, Copy, IntoBytes, Immutable, KnownLayout)]
 #[repr(C, packed)]
 pub struct ExHyperlinkAtom {
     /// Hyperlink ID (1-based)

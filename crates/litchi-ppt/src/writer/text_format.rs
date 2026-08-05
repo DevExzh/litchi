@@ -6,7 +6,7 @@
 //! Reference: [MS-PPT] Section 2.9 - Text Formatting
 
 use super::smart_tags::PowerPointSmartTagIndex;
-use zerocopy_derive::*;
+use zerocopy_derive::{Immutable, IntoBytes, KnownLayout};
 
 // =============================================================================
 // Text Property Mask Flags (MS-PPT 2.9.20 TextPFException)
@@ -950,7 +950,7 @@ pub enum TextHeaderType {
 }
 
 /// StyleTextPropAtom header
-#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Debug, Clone, Copy, IntoBytes, Immutable, KnownLayout)]
 #[repr(C, packed)]
 pub struct StyleTextPropHeader {
     /// Total character count

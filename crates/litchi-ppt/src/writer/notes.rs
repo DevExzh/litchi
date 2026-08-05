@@ -7,7 +7,7 @@
 
 use std::io::Write;
 use zerocopy::IntoBytes;
-use zerocopy_derive::*;
+use zerocopy_derive::{Immutable, IntoBytes, KnownLayout};
 
 use litchi_core::unit::ppt_master_i64_to_emu_i32;
 
@@ -50,7 +50,7 @@ pub mod record_type {
 // =============================================================================
 
 /// NotesAtom structure (8 bytes)
-#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Debug, Clone, Copy, IntoBytes, Immutable, KnownLayout)]
 #[repr(C, packed)]
 pub struct NotesAtom {
     /// Slide persist ID reference

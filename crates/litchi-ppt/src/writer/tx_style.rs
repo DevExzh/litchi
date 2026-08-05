@@ -4,7 +4,7 @@
 //! using zerocopy for binary serialization.
 
 use bitflags::bitflags;
-use zerocopy_derive::{FromBytes, Immutable, IntoBytes, KnownLayout};
+use zerocopy_derive::{Immutable, IntoBytes, KnownLayout};
 
 // =============================================================================
 // TxMasterStyleAtom Instance Types (MS-PPT 2.9.45)
@@ -239,7 +239,7 @@ pub mod position {
 // =============================================================================
 
 /// Simple level entry for minimal styles (8 bytes)
-#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Debug, Clone, Copy, IntoBytes, Immutable, KnownLayout)]
 #[repr(C, packed)]
 pub struct SimpleLevelEntry {
     /// PF mask (usually 0 or simple flags)
@@ -277,7 +277,7 @@ impl SimpleLevelEntry {
 }
 
 /// Indented level entry (12 bytes)
-#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Debug, Clone, Copy, IntoBytes, Immutable, KnownLayout)]
 #[repr(C, packed)]
 pub struct IndentedLevelEntry {
     /// PF mask with indent flags

@@ -4,79 +4,79 @@
 
 use std::io::Write;
 use zerocopy::IntoBytes;
-use zerocopy_derive::*;
+use zerocopy_derive::{Immutable, IntoBytes, KnownLayout};
 
 use litchi_core::unit::emu_i32_to_ppt_master_i16_round;
 
 use crate::shapes::geometry::{GeometryRect, ShapePathType};
 
 /// Error type for PPT operations
-pub type PptError = std::io::Error;
+pub(crate) type PptError = std::io::Error;
 
 // Re-export shared Escher writer functionality
-pub use crate::officeart_wire::{
+pub(crate) use crate::officeart_wire::{
     EscherProperty, EscherRecordHeader, EscherSpData, PROPERTY_FLAG_COMPLEX,
 };
-pub use crate::officeart_wire::{ShapeFlags, record_type, shape_type};
+pub(crate) use crate::officeart_wire::{ShapeFlags, record_type, shape_type};
 
 // =============================================================================
 // Property IDs (MS-ODRAW 2.3.1)
 // =============================================================================
 
 /// Escher property IDs
-pub mod prop_id {
+pub(crate) mod prop_id {
     // Transform group
-    pub const ROTATION: u16 = 0x0004;
+    pub(crate) const ROTATION: u16 = 0x0004;
 
     // Geometry group
-    pub const GEOM_LEFT: u16 = 0x0140;
-    pub const GEOM_TOP: u16 = 0x0141;
-    pub const GEOM_RIGHT: u16 = 0x0142;
-    pub const GEOM_BOTTOM: u16 = 0x0143;
-    pub const SHAPE_PATH: u16 = 0x0144;
-    pub const VERTICES: u16 = 0x0145;
-    pub const SEGMENT_INFO: u16 = 0x0146;
-    pub const ADJUST_VALUE: u16 = 0x0147;
+    pub(crate) const GEOM_LEFT: u16 = 0x0140;
+    pub(crate) const GEOM_TOP: u16 = 0x0141;
+    pub(crate) const GEOM_RIGHT: u16 = 0x0142;
+    pub(crate) const GEOM_BOTTOM: u16 = 0x0143;
+    pub(crate) const SHAPE_PATH: u16 = 0x0144;
+    pub(crate) const VERTICES: u16 = 0x0145;
+    pub(crate) const SEGMENT_INFO: u16 = 0x0146;
+    pub(crate) const ADJUST_VALUE: u16 = 0x0147;
 
     // Fill style (MS-ODRAW section 2.3.7)
-    pub const FILL_TYPE: u16 = 0x0180;
-    pub const FILL_COLOR: u16 = 0x0181;
-    pub const FILL_OPACITY: u16 = 0x0182;
-    pub const FILL_BACK_COLOR: u16 = 0x0183;
-    pub const FILL_BLIP: u16 = 0x4186;
-    pub const FILL_ANGLE: u16 = 0x018B; // fillAngle for gradients (degrees * 65536)
-    pub const FILL_RECT_RIGHT: u16 = 0x0193; // fillRectRight per MS-ODRAW
-    pub const FILL_RECT_BOTTOM: u16 = 0x0194; // fillRectBottom per MS-ODRAW
-    pub const NO_FILL_HIT_TEST: u16 = 0x01BF;
+    pub(crate) const FILL_TYPE: u16 = 0x0180;
+    pub(crate) const FILL_COLOR: u16 = 0x0181;
+    pub(crate) const FILL_OPACITY: u16 = 0x0182;
+    pub(crate) const FILL_BACK_COLOR: u16 = 0x0183;
+    pub(crate) const FILL_BLIP: u16 = 0x4186;
+    pub(crate) const FILL_ANGLE: u16 = 0x018B; // fillAngle for gradients (degrees * 65536)
+    pub(crate) const FILL_RECT_RIGHT: u16 = 0x0193; // fillRectRight per MS-ODRAW
+    pub(crate) const FILL_RECT_BOTTOM: u16 = 0x0194; // fillRectBottom per MS-ODRAW
+    pub(crate) const NO_FILL_HIT_TEST: u16 = 0x01BF;
 
     // Line style
-    pub const LINE_COLOR: u16 = 0x01C0;
-    pub const LINE_OPACITY: u16 = 0x01C1;
-    pub const LINE_WIDTH: u16 = 0x01CB;
-    pub const LINE_STYLE: u16 = 0x01CD;
-    pub const LINE_DASH_STYLE: u16 = 0x01CE;
-    pub const LINE_START_ARROW: u16 = 0x01D0;
-    pub const LINE_END_ARROW: u16 = 0x01D1;
-    pub const LINE_START_ARROW_WIDTH: u16 = 0x01D2;
-    pub const LINE_START_ARROW_LENGTH: u16 = 0x01D3;
-    pub const LINE_END_ARROW_WIDTH: u16 = 0x01D4;
-    pub const LINE_END_ARROW_LENGTH: u16 = 0x01D5;
-    pub const LINE_JOIN_STYLE: u16 = 0x01D6;
-    pub const LINE_END_CAP_STYLE: u16 = 0x01D7;
-    pub const LINE_BLIP: u16 = 0x41C5;
-    pub const LINE_STYLE_BOOL: u16 = 0x01FF;
+    pub(crate) const LINE_COLOR: u16 = 0x01C0;
+    pub(crate) const LINE_OPACITY: u16 = 0x01C1;
+    pub(crate) const LINE_WIDTH: u16 = 0x01CB;
+    pub(crate) const LINE_STYLE: u16 = 0x01CD;
+    pub(crate) const LINE_DASH_STYLE: u16 = 0x01CE;
+    pub(crate) const LINE_START_ARROW: u16 = 0x01D0;
+    pub(crate) const LINE_END_ARROW: u16 = 0x01D1;
+    pub(crate) const LINE_START_ARROW_WIDTH: u16 = 0x01D2;
+    pub(crate) const LINE_START_ARROW_LENGTH: u16 = 0x01D3;
+    pub(crate) const LINE_END_ARROW_WIDTH: u16 = 0x01D4;
+    pub(crate) const LINE_END_ARROW_LENGTH: u16 = 0x01D5;
+    pub(crate) const LINE_JOIN_STYLE: u16 = 0x01D6;
+    pub(crate) const LINE_END_CAP_STYLE: u16 = 0x01D7;
+    pub(crate) const LINE_BLIP: u16 = 0x41C5;
+    pub(crate) const LINE_STYLE_BOOL: u16 = 0x01FF;
 
     // Shadow style
-    pub const SHADOW_TYPE: u16 = 0x0200;
-    pub const SHADOW_COLOR: u16 = 0x0201;
-    pub const SHADOW_OPACITY: u16 = 0x0204;
-    pub const SHADOW_OFFSET_X: u16 = 0x0205;
-    pub const SHADOW_OFFSET_Y: u16 = 0x0206;
-    pub const SHADOW_BOOL: u16 = 0x023F; // shadowObscured
+    pub(crate) const SHADOW_TYPE: u16 = 0x0200;
+    pub(crate) const SHADOW_COLOR: u16 = 0x0201;
+    pub(crate) const SHADOW_OPACITY: u16 = 0x0204;
+    pub(crate) const SHADOW_OFFSET_X: u16 = 0x0205;
+    pub(crate) const SHADOW_OFFSET_Y: u16 = 0x0206;
+    pub(crate) const SHADOW_BOOL: u16 = 0x023F; // shadowObscured
 
     // Shape
-    pub const BW_MODE: u16 = 0x0304;
-    pub const BACKGROUND_SHAPE: u16 = 0x033F;
+    pub(crate) const BW_MODE: u16 = 0x0304;
+    pub(crate) const BACKGROUND_SHAPE: u16 = 0x033F;
 }
 
 // =============================================================================
@@ -84,33 +84,33 @@ pub mod prop_id {
 // =============================================================================
 
 /// PPT-specific property values (extends shared prop_value)
-pub mod ppt_prop_value {
-    pub use crate::officeart_wire::prop_value::*;
+pub(crate) mod ppt_prop_value {
+    pub(crate) use crate::officeart_wire::prop_value::*;
 
     /// Background fill color
-    pub const BG_FILL_COLOR: u32 = 134_217_728; // 0x0800_0000
-    pub const BG_FILL_BACK_COLOR: u32 = 134_217_733; // 0x0800_0005
+    pub(crate) const BG_FILL_COLOR: u32 = 134_217_728; // 0x0800_0000
+    pub(crate) const BG_FILL_BACK_COLOR: u32 = 134_217_733; // 0x0800_0005
 
     /// Slide dimensions (EMUs)
-    pub const SLIDE_WIDTH_EMU: u32 = 10_064_750; // 914400 * 11
-    pub const SLIDE_HEIGHT_EMU: u32 = 7_778_750; // 914400 * 8.5
+    pub(crate) const SLIDE_WIDTH_EMU: u32 = 10_064_750; // 914400 * 11
+    pub(crate) const SLIDE_HEIGHT_EMU: u32 = 7_778_750; // 914400 * 8.5
 
     /// No fill hit test value
-    pub const NO_FILL_HIT_TEST: u32 = 1_179_666; // 0x0012_0012
-    pub const NO_LINE_DRAW_DASH: u32 = 524_288; // 0x0008_0000
+    pub(crate) const NO_FILL_HIT_TEST: u32 = 1_179_666; // 0x0012_0012
+    pub(crate) const NO_LINE_DRAW_DASH: u32 = 524_288; // 0x0008_0000
 
     /// Black and white mode
-    pub const BW_MODE_AUTO: u32 = 9;
+    pub(crate) const BW_MODE_AUTO: u32 = 9;
 
     /// Background shape flag
-    pub const BACKGROUND_SHAPE: u32 = 65_537; // 0x0001_0001
+    pub(crate) const BACKGROUND_SHAPE: u32 = 65_537; // 0x0001_0001
 
     /// Reserved cluster cspidCur
-    pub const RESERVED_CSPID_CUR: u32 = 4;
+    pub(crate) const RESERVED_CSPID_CUR: u32 = 4;
 
     /// POI master shape count
-    pub const POI_MASTER_SHAPE_COUNT: u32 = 6;
-    pub const POI_SPID_MAX: u32 = 3076;
+    pub(crate) const POI_MASTER_SHAPE_COUNT: u32 = 6;
+    pub(crate) const POI_SPID_MAX: u32 = 3076;
 }
 
 // =============================================================================
@@ -118,17 +118,17 @@ pub mod ppt_prop_value {
 // =============================================================================
 
 /// Split menu colors structure
-#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Debug, Clone, Copy, IntoBytes, Immutable, KnownLayout)]
 #[repr(C)]
-pub struct SplitMenuColors {
-    pub fill_color: u32,
-    pub line_color: u32,
-    pub shadow_color: u32,
-    pub color_3d: u32,
+pub(crate) struct SplitMenuColors {
+    pub(crate) fill_color: u32,
+    pub(crate) line_color: u32,
+    pub(crate) shadow_color: u32,
+    pub(crate) color_3d: u32,
 }
 
 impl SplitMenuColors {
-    pub const DEFAULT: Self = Self {
+    pub(crate) const DEFAULT: Self = Self {
         fill_color: crate::officeart_wire::prop_value::SCHEME_FILL,
         line_color: crate::officeart_wire::prop_value::SCHEME_LINE,
         shadow_color: crate::officeart_wire::prop_value::SCHEME_SHADOW,
@@ -141,31 +141,31 @@ impl SplitMenuColors {
 // =============================================================================
 
 /// Escher record header versions
-pub mod header_version {
-    pub const CONTAINER: u8 = 0x0F;
-    pub const SIMPLE: u8 = 0x00;
-    pub const SPGR: u8 = 0x01;
-    pub const SP: u8 = 0x02;
-    pub const OPT: u8 = 0x03;
-    pub const DG: u8 = 0x00; // instance is drawing_id
+pub(crate) mod header_version {
+    pub(crate) const CONTAINER: u8 = 0x0F;
+    pub(crate) const SIMPLE: u8 = 0x00;
+    pub(crate) const SPGR: u8 = 0x01;
+    pub(crate) const SP: u8 = 0x02;
+    pub(crate) const OPT: u8 = 0x03;
+    pub(crate) const DG: u8 = 0x00; // instance is drawing_id
 }
 
 /// Escher record header (8 bytes) - builder-friendly version
 #[derive(Debug, Clone)]
-pub struct EscherHeader {
+pub(crate) struct EscherHeader {
     /// Version (4 bits)
-    pub version: u8,
+    pub(crate) version: u8,
     /// Instance (12 bits)
-    pub instance: u16,
+    pub(crate) instance: u16,
     /// Record type
-    pub record_type: u16,
+    pub(crate) record_type: u16,
     /// Length
-    pub length: u32,
+    pub(crate) length: u32,
 }
 
 impl EscherHeader {
     /// Create a new Escher header
-    pub fn new(version: u8, instance: u16, record_type: u16, length: u32) -> Self {
+    pub(crate) fn new(version: u8, instance: u16, record_type: u16, length: u32) -> Self {
         Self {
             version: version & 0x0F,
             instance: instance & 0x0FFF,
@@ -175,7 +175,7 @@ impl EscherHeader {
     }
 
     /// Write header to writer
-    pub fn write<W: Write>(&self, writer: &mut W) -> Result<(), PptError> {
+    pub(crate) fn write<W: Write>(&self, writer: &mut W) -> Result<(), PptError> {
         let raw =
             EscherRecordHeader::new(self.version, self.instance, self.record_type, self.length);
         writer.write_all(raw.as_bytes())?;
@@ -188,21 +188,21 @@ impl EscherHeader {
 // =============================================================================
 
 /// File ID cluster entry
-#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Debug, Clone, Copy, IntoBytes, Immutable, KnownLayout)]
 #[repr(C)]
-pub struct FileIdCluster {
+pub(crate) struct FileIdCluster {
     /// Drawing group ID
-    pub dgid: u32,
+    pub(crate) dgid: u32,
     /// Next available shape ID in cluster
-    pub cspid_cur: u32,
+    pub(crate) cspid_cur: u32,
 }
 
 impl FileIdCluster {
-    pub const fn new(dgid: u32, cspid_cur: u32) -> Self {
+    pub(crate) const fn new(dgid: u32, cspid_cur: u32) -> Self {
         Self { dgid, cspid_cur }
     }
 
-    pub const fn reserved() -> Self {
+    pub(crate) const fn reserved() -> Self {
         Self {
             dgid: 0,
             cspid_cur: ppt_prop_value::RESERVED_CSPID_CUR,
@@ -211,17 +211,17 @@ impl FileIdCluster {
 }
 
 /// Drawing group header (without clusters)
-#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Debug, Clone, Copy, IntoBytes, Immutable, KnownLayout)]
 #[repr(C)]
-pub struct EscherDggHeader {
+pub(crate) struct EscherDggHeader {
     /// Maximum shape ID
-    pub spid_max: u32,
+    pub(crate) spid_max: u32,
     /// Number of clusters + 1
-    pub cidcl: u32,
+    pub(crate) cidcl: u32,
     /// Number of shapes saved
-    pub csp_saved: u32,
+    pub(crate) csp_saved: u32,
     /// Number of drawings saved
-    pub cdg_saved: u32,
+    pub(crate) cdg_saved: u32,
 }
 
 // =============================================================================
@@ -229,17 +229,17 @@ pub struct EscherDggHeader {
 // =============================================================================
 
 /// Drawing record data
-#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Debug, Clone, Copy, IntoBytes, Immutable, KnownLayout)]
 #[repr(C)]
-pub struct EscherDgData {
+pub(crate) struct EscherDgData {
     /// Number of shapes in this drawing
-    pub csp: u32,
+    pub(crate) csp: u32,
     /// Next available shape ID
-    pub spid_cur: u32,
+    pub(crate) spid_cur: u32,
 }
 
 impl EscherDgData {
-    pub fn new(shape_count: u32, drawing_id: u32) -> Self {
+    pub(crate) fn new(shape_count: u32, drawing_id: u32) -> Self {
         Self {
             csp: shape_count,
             spid_cur: (drawing_id << 10) + shape_count,
@@ -252,17 +252,17 @@ impl EscherDgData {
 // =============================================================================
 
 /// Shape group bounding rectangle
-#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Debug, Clone, Copy, IntoBytes, Immutable, KnownLayout)]
 #[repr(C)]
-pub struct EscherSpgrData {
-    pub left: i32,
-    pub top: i32,
-    pub right: i32,
-    pub bottom: i32,
+pub(crate) struct EscherSpgrData {
+    pub(crate) left: i32,
+    pub(crate) top: i32,
+    pub(crate) right: i32,
+    pub(crate) bottom: i32,
 }
 
 impl EscherSpgrData {
-    pub const ZERO: Self = Self {
+    pub(crate) const ZERO: Self = Self {
         left: 0,
         top: 0,
         right: 0,
@@ -275,14 +275,14 @@ impl EscherSpgrData {
 // =============================================================================
 
 impl EscherSpData {
-    pub const fn group_patriarch(spid: u32) -> Self {
+    pub(crate) const fn group_patriarch(spid: u32) -> Self {
         Self {
             spid,
             flags: ShapeFlags::GROUP.bits() | ShapeFlags::PATRIARCH.bits(),
         }
     }
 
-    pub const fn background(spid: u32) -> Self {
+    pub(crate) const fn background(spid: u32) -> Self {
         Self {
             spid,
             flags: ShapeFlags::BACKGROUND.bits() | ShapeFlags::HAVE_SPT.bits(),
@@ -293,7 +293,7 @@ impl EscherSpData {
 // Re-use EscherProperty from shared module
 
 /// Default drawing group properties (8 properties = 48 bytes)
-pub const DGG_DEFAULT_PROPERTIES: [EscherProperty; 8] = [
+pub(crate) const DGG_DEFAULT_PROPERTIES: [EscherProperty; 8] = [
     EscherProperty::new(prop_id::FILL_COLOR, ppt_prop_value::SCHEME_FILL),
     EscherProperty::new(prop_id::FILL_BACK_COLOR, ppt_prop_value::SCHEME_FILL_BACK),
     EscherProperty::new(prop_id::FILL_BLIP, 0),
@@ -311,7 +311,7 @@ pub const DGG_DEFAULT_PROPERTIES: [EscherProperty; 8] = [
 ];
 
 /// Background shape properties (8 properties = 48 bytes)
-pub const BG_SHAPE_PROPERTIES: [EscherProperty; 8] = [
+pub(crate) const BG_SHAPE_PROPERTIES: [EscherProperty; 8] = [
     EscherProperty::new(prop_id::FILL_COLOR, ppt_prop_value::BG_FILL_COLOR),
     EscherProperty::new(prop_id::FILL_BACK_COLOR, ppt_prop_value::BG_FILL_BACK_COLOR),
     EscherProperty::new(prop_id::FILL_RECT_RIGHT, ppt_prop_value::SLIDE_WIDTH_EMU),
@@ -327,20 +327,20 @@ pub const BG_SHAPE_PROPERTIES: [EscherProperty; 8] = [
 // =============================================================================
 
 /// PPT-specific record types embedded in Escher
-pub mod ppt_record_type {
+pub(crate) mod ppt_record_type {
     /// OEPlaceholderAtom
-    pub const OE_PLACEHOLDER_ATOM: u16 = 0x0BC3;
+    pub(crate) const OE_PLACEHOLDER_ATOM: u16 = 0x0BC3;
 }
 
 /// Escher record builder
-pub struct EscherBuilder {
+pub(crate) struct EscherBuilder {
     header: EscherHeader,
     data: Vec<u8>,
 }
 
 impl EscherBuilder {
     /// Create a new Escher record builder
-    pub fn new(version: u8, instance: u16, record_type: u16) -> Self {
+    pub(crate) fn new(version: u8, instance: u16, record_type: u16) -> Self {
         Self {
             header: EscherHeader::new(version, instance, record_type, 0),
             data: Vec::new(),
@@ -348,13 +348,13 @@ impl EscherBuilder {
     }
 
     /// Add data to the record
-    pub fn add_data(&mut self, data: &[u8]) {
+    pub(crate) fn add_data(&mut self, data: &[u8]) {
         self.data.extend_from_slice(data);
         self.header.length = self.data.len() as u32;
     }
 
     /// Build the complete record
-    pub fn build(&self) -> Result<Vec<u8>, PptError> {
+    pub(crate) fn build(&self) -> Result<Vec<u8>, PptError> {
         let mut record = Vec::new();
         self.header.write(&mut record)?;
         record.extend_from_slice(&self.data);
@@ -367,7 +367,7 @@ impl EscherBuilder {
 /// # Arguments
 /// * `master_shapes` - Number of shapes in the master (6 for POI template)
 /// * `slide_shape_counts` - Shape count for each slide (including group+background, so user_shapes+2)
-pub fn create_dgg_container(
+pub(crate) fn create_dgg_container(
     master_shapes: u32,
     slide_shape_counts: &[u32],
 ) -> Result<Vec<u8>, PptError> {
@@ -453,7 +453,7 @@ pub fn create_dgg_container(
 ///
 /// Same as `create_dgg_container` but includes a BStoreContainer for pictures.
 /// `bstore_blob` is the raw output of `Pictures::store`.
-pub fn create_dgg_container_with_blips(
+pub(crate) fn create_dgg_container_with_blips(
     master_shapes: u32,
     slide_shape_counts: &[u32],
     bstore_blob: &[u8],
@@ -535,13 +535,13 @@ pub fn create_dgg_container_with_blips(
 }
 
 /// Child anchor with full coordinates (16 bytes)
-#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Debug, Clone, Copy, IntoBytes, Immutable, KnownLayout)]
 #[repr(C)]
-pub struct ChildAnchor {
-    pub left: i32,
-    pub top: i32,
-    pub right: i32,
-    pub bottom: i32,
+pub(crate) struct ChildAnchor {
+    pub(crate) left: i32,
+    pub(crate) top: i32,
+    pub(crate) right: i32,
+    pub(crate) bottom: i32,
 }
 
 // =============================================================================
@@ -653,7 +653,7 @@ impl FreeformGeometry {
 
 /// Shape data for building user shapes
 #[derive(Debug, Clone)]
-pub struct UserShapeData {
+pub(crate) struct UserShapeData {
     /// Shape type (Escher MSOSPT value)
     pub shape_type: u16,
     /// Position and size in EMUs
@@ -808,7 +808,7 @@ impl Default for UserShapeData {
 }
 
 /// Create a DgContainer with user shapes
-pub fn create_dg_container_with_shapes(
+pub(crate) fn create_dg_container_with_shapes(
     drawing_id: u32,
     shapes: &[UserShapeData],
 ) -> Result<Vec<u8>, PptError> {
@@ -2234,11 +2234,11 @@ mod tests {
         };
 
         let bytes = create_user_shape_container(45, &shape).unwrap();
-        let (root, consumed) = litchi_odraw::Record::parse(&bytes, 0).unwrap();
+        let (root, consumed) = Record::parse(&bytes, 0).unwrap();
         assert_eq!(consumed, bytes.len());
-        let root = litchi_odraw::Container::try_new(root).expect("shape container");
+        let root = Container::try_new(root).expect("shape container");
         let record = root
-            .find(litchi_odraw::RecordKind::ClientData)
+            .find(RecordKind::ClientData)
             .unwrap()
             .expect("ClientData");
         let mut complete = Vec::with_capacity(8 + record.data().len());
