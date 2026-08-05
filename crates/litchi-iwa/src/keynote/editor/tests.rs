@@ -5,7 +5,6 @@ use crate::protobuf::tsp::{ComponentInfo, ObjectUuidMapEntry, PackageMetadata, R
 use crate::protobuf::tswp::StorageArchive;
 use crate::shapes::{DrawablePoint, DrawableSize};
 use crate::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
-use litchi_iwa_common::media::Type as MediaType;
 use std::time::Duration;
 
 const TEST_SLIDE_MESSAGE_TYPE: u32 = 5;
@@ -3168,29 +3167,25 @@ fn show_settings_and_skip_state_are_transactional() {
     assert_eq!(editor.to_bytes().unwrap(), before);
 
     let mut settings = editor.show_settings().unwrap();
-    settings.set_size(1_920.0, 1_080.0).unwrap();
+    settings.set_size(Size::new(1_920.0, 1_080.0).unwrap());
     settings.set_slide_numbers_visible(Some(true));
     settings.set_loop_presentation(Some(true));
     settings.set_mode(Some(Mode::SelfPlaying)).unwrap();
-    settings.set_autoplay_transition_delay(Some(3.5)).unwrap();
-    settings.set_autoplay_build_delay(Some(1.25)).unwrap();
+    settings.set_autoplay_transition_delay(Some(Seconds::new(3.5).unwrap()));
+    settings.set_autoplay_build_delay(Some(Seconds::new(1.25).unwrap()));
     settings.set_idle_timer_active(Some(true));
-    settings.set_idle_timer_delay(Some(60.0)).unwrap();
+    settings.set_idle_timer_delay(Some(Seconds::new(60.0).unwrap()));
     settings.set_automatically_plays_upon_open(Some(false));
     let before = editor.to_bytes().unwrap();
-    assert!(settings.set_size(f32::NAN, 1_080.0).is_err());
+    assert!(Size::new(f32::NAN, 1_080.0).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
-    let mut invalid = settings.clone();
-    assert_eq!(
-        invalid.set_mode(Some(Mode::Unknown(1))),
-        Err(litchi_keynote::show::Error::NonCanonicalMode)
-    );
+    assert!(settings.set_mode(Some(Mode::Unknown(1))).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
-    editor.set_show_settings(settings.clone()).unwrap();
+    editor.set_show_settings(settings).unwrap();
     assert_eq!(editor.show_settings().unwrap(), settings);
     for mode in [Mode::Normal, Mode::LinksOnly, Mode::Unknown(19)] {
         settings.set_mode(Some(mode)).unwrap();
-        editor.set_show_settings(settings.clone()).unwrap();
+        editor.set_show_settings(settings).unwrap();
         let reparsed = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(reparsed.show_settings().unwrap(), settings);
     }
@@ -3372,7 +3367,7 @@ fn soundtrack_item_crud_is_ordered_transactional_and_wire_exact() {
 
     let first = editor.add_soundtrack_item("first.aiff", FIRST).unwrap();
     assert_eq!(first.index, 0);
-    assert_eq!(first.asset.media_type, MediaType::Audio);
+    assert_eq!(first.asset.media_type, crate::MediaType::Audio);
     let second = editor
         .insert_soundtrack_item(0, "second.aiff", SECOND)
         .unwrap();
@@ -3783,7 +3778,7 @@ fn transition_lifecycle_is_typed_transactional_and_wire_exact() {
     let mut dissolve = original.clone();
     dissolve.effect = Some(Effect::Dissolve);
     dissolve.duration = Some(1.5);
-    dissolve.direction = Some(Direction::from_native(2));
+    dissolve.direction = Some(KeynoteTransitionDirection::from_raw(2));
     dissolve.animation_parameters.detail = Some(0.75);
     dissolve.custom_parameters.bounce = Some(true);
     editor.set_slide_transition(0, dissolve.clone()).unwrap();
@@ -3809,15 +3804,15 @@ fn transition_custom_parameter_crud_is_lossless_and_transactional() {
     let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
     let mut settings = editor.slides().unwrap()[0].transition.clone().unwrap();
     settings.effect = Some(Effect::Unknown("com.example.future-transition".to_owned()));
-    settings.direction = Some(Direction::from_native(42));
+    settings.direction = Some(KeynoteTransitionDirection::from_raw(42));
     settings.custom_parameters = KeynoteTransitionCustomParameters {
         twist: Some(-0.375),
         mosaic_size: Some(0),
-        mosaic_type: Some(MosaicType::from_native(7)),
+        mosaic_type: Some(KeynoteTransitionMosaicType::from_raw(7)),
         bounce: Some(false),
         magic_move_fade_unmatched_objects: Some(true),
-        acceleration: Some(Acceleration::Custom),
-        text_delivery: Some(TextDelivery::ByCharacter),
+        acceleration: Some(KeynoteTransitionAcceleration::Custom),
+        text_delivery: Some(KeynoteTransitionTextDelivery::ByCharacter),
         motion_blur: Some(false),
         travel_distance: Some(275.5),
     };
@@ -3845,8 +3840,8 @@ fn transition_custom_parameter_crud_is_lossless_and_transactional() {
     editor.set_slide_transition(0, settings.clone()).unwrap();
     assert_eq!(editor.to_bytes().unwrap(), before_noop);
 
-    settings.custom_parameters.acceleration = Some(Acceleration::from_native(19));
-    settings.custom_parameters.text_delivery = Some(TextDelivery::from_native(-1));
+    settings.custom_parameters.acceleration = Some(KeynoteTransitionAcceleration::Unknown(19));
+    settings.custom_parameters.text_delivery = Some(KeynoteTransitionTextDelivery::Unknown(-1));
     editor.set_slide_transition(0, settings.clone()).unwrap();
     let reparsed = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
@@ -3860,6 +3855,12 @@ fn transition_custom_parameter_crud_is_lossless_and_transactional() {
     assert!(editor.set_slide_transition(0, invalid).is_err());
     let mut invalid = settings.clone();
     invalid.custom_parameters.travel_distance = Some(f32::INFINITY);
+    assert!(editor.set_slide_transition(0, invalid).is_err());
+    let mut invalid = settings.clone();
+    invalid.custom_parameters.acceleration = Some(KeynoteTransitionAcceleration::Unknown(5));
+    assert!(editor.set_slide_transition(0, invalid).is_err());
+    let mut invalid = settings.clone();
+    invalid.custom_parameters.text_delivery = Some(KeynoteTransitionTextDelivery::Unknown(3));
     assert!(editor.set_slide_transition(0, invalid).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before_invalid);
 
@@ -3887,11 +3888,11 @@ fn transition_custom_parameters_reject_malformed_wire_transactionally() {
         settings.custom_parameters = KeynoteTransitionCustomParameters {
             twist: Some(0.25),
             mosaic_size: Some(16),
-            mosaic_type: Some(MosaicType::from_native(2)),
+            mosaic_type: Some(KeynoteTransitionMosaicType::from_raw(2)),
             bounce: Some(true),
             magic_move_fade_unmatched_objects: Some(false),
-            acceleration: Some(Acceleration::EaseInOut),
-            text_delivery: Some(TextDelivery::ByWord),
+            acceleration: Some(KeynoteTransitionAcceleration::EaseInOut),
+            text_delivery: Some(KeynoteTransitionTextDelivery::ByWord),
             motion_blur: Some(true),
             travel_distance: Some(80.0),
         };
@@ -4189,17 +4190,15 @@ fn scalar_updates_preserve_unknown_wire_and_restore_exact_components() {
     let original_show = editor.show_settings().unwrap();
     let original_transition = editor.slides().unwrap()[0].transition.clone().unwrap();
 
-    let mut changed_show = original_show.clone();
-    changed_show.set_size(1_920.0, 1_080.0).unwrap();
+    let mut changed_show = original_show;
+    changed_show.set_size(Size::new(1_920.0, 1_080.0).unwrap());
     changed_show.set_slide_numbers_visible(Some(true));
     changed_show.set_loop_presentation(Some(true));
     changed_show.set_mode(Some(Mode::SelfPlaying)).unwrap();
-    changed_show
-        .set_autoplay_transition_delay(Some(3.5))
-        .unwrap();
-    changed_show.set_autoplay_build_delay(Some(1.25)).unwrap();
+    changed_show.set_autoplay_transition_delay(Some(Seconds::new(3.5).unwrap()));
+    changed_show.set_autoplay_build_delay(Some(Seconds::new(1.25).unwrap()));
     changed_show.set_idle_timer_active(Some(true));
-    changed_show.set_idle_timer_delay(Some(60.0)).unwrap();
+    changed_show.set_idle_timer_delay(Some(Seconds::new(60.0).unwrap()));
     changed_show.set_automatically_plays_upon_open(Some(true));
     editor.set_show_settings(changed_show).unwrap();
     editor.set_show_settings(original_show).unwrap();
@@ -4210,7 +4209,7 @@ fn scalar_updates_preserve_unknown_wire_and_restore_exact_components() {
     changed_transition.animation_type = Some("Transition".to_owned());
     changed_transition.effect = Some(Effect::Unknown("dissolve".to_owned()));
     changed_transition.duration = Some(2.5);
-    changed_transition.direction = Some(Direction::from_native(2));
+    changed_transition.direction = Some(KeynoteTransitionDirection::from_raw(2));
     changed_transition.delay = Some(1.0);
     changed_transition.is_automatic = Some(true);
     editor.set_slide_transition(0, changed_transition).unwrap();

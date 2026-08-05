@@ -1,7 +1,10 @@
-//! Presentation-level Keynote show settings.
+//! Protobuf adaptation for Keynote show settings.
+//!
+//! The validated semantic model lives in `litchi-keynote::show`; this module
+//! only resolves archive objects and patches the native wire representation.
 
 use super::*;
-use litchi_keynote::show::{Mode, Settings};
+use litchi_keynote::{Mode, Seconds, Settings, Size};
 
 const DOCUMENT_OBJECT_ID: u64 = 1;
 const SHOW_ARCHIVE_MESSAGE_TYPE: u32 = 2;
@@ -17,8 +20,49 @@ const IDLE_TIMER_ACTIVE_FIELD: u32 = 15;
 const IDLE_TIMER_DELAY_FIELD: u32 = 16;
 const AUTOMATICALLY_PLAYS_UPON_OPEN_FIELD: u32 = 18;
 
+fn semantic_error(error: litchi_keynote::Error) -> Error {
+    Error::ParseError(format!("invalid Keynote show settings: {error}"))
+}
+
+fn settings_from_archive(show: &kn::ShowArchive) -> Result<Settings> {
+    let size = Size::new(show.size.width, show.size.height).map_err(semantic_error)?;
+    let mut settings = Settings::new(size);
+    settings.set_slide_numbers_visible(show.slide_numbers_visible);
+    settings.set_loop_presentation(show.loop_presentation);
+    settings
+        .set_mode(show.mode.map(Mode::from_raw))
+        .map_err(semantic_error)?;
+    settings.set_autoplay_transition_delay(
+        show.autoplay_transition_delay
+            .map(Seconds::new)
+            .transpose()
+            .map_err(semantic_error)?,
+    );
+    settings.set_autoplay_build_delay(
+        show.autoplay_build_delay
+            .map(Seconds::new)
+            .transpose()
+            .map_err(semantic_error)?,
+    );
+    settings.set_idle_timer_active(show.idle_timer_active);
+    settings.set_idle_timer_delay(
+        show.idle_timer_delay
+            .map(Seconds::new)
+            .transpose()
+            .map_err(semantic_error)?,
+    );
+    settings.set_automatically_plays_upon_open(show.automatically_plays_upon_open);
+    settings.validate().map_err(semantic_error)?;
+    Ok(settings)
+}
+
 impl KeynoteEditor {
-    /// Read presentation-level dimensions and playback behavior.
+    /// Read validated presentation dimensions and playback behavior.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the document/show archive is missing, malformed,
+    /// or contains invalid semantic values.
     pub fn show_settings(&self) -> Result<Settings> {
         let graph = ObjectGraph::read(self.text.package())?;
         let document: kn::DocumentArchive =
@@ -28,8 +72,13 @@ impl KeynoteEditor {
     }
 
     /// Replace presentation-level dimensions and playback behavior transactionally.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the settings are invalid, the native show archive
+    /// cannot be decoded, or the staged wire patch fails verification.
     pub fn set_show_settings(&mut self, settings: Settings) -> Result<()> {
-        validate_show_settings(&settings)?;
+        settings.validate().map_err(semantic_error)?;
         let graph = ObjectGraph::read(self.text.package())?;
         let document: kn::DocumentArchive =
             graph.decode(DOCUMENT_OBJECT_ID, "KN.DocumentArchive")?;
@@ -86,17 +135,18 @@ fn patch_show_settings_wire(
     show: &kn::ShowArchive,
     settings: &Settings,
 ) -> Result<Vec<u8>> {
+    let size = settings.size();
     let mut data = patch_nested_fixed32_field(
         original,
         &[SHOW_SIZE_FIELD, SIZE_WIDTH_FIELD],
         true,
-        Some(settings.size().width().to_bits()),
+        Some(size.width().to_bits()),
     )?;
     data = patch_nested_fixed32_field(
         &data,
         &[SHOW_SIZE_FIELD, SIZE_HEIGHT_FIELD],
         true,
-        Some(settings.size().height().to_bits()),
+        Some(size.height().to_bits()),
     )?;
     for (field_number, current, replacement) in [
         (
@@ -154,39 +204,10 @@ fn patch_show_settings_wire(
             &data,
             field_number,
             current.is_some(),
-            replacement.map(f64::to_bits),
+            replacement.map(Seconds::as_f64).map(f64::to_bits),
         )?;
     }
     Ok(data)
-}
-
-fn validate_show_settings(settings: &Settings) -> Result<()> {
-    settings.validate().map_err(show_error)
-}
-
-fn settings_from_archive(show: &kn::ShowArchive) -> Result<Settings> {
-    let mut settings = Settings::new(show.size.width, show.size.height).map_err(show_error)?;
-    settings.set_slide_numbers_visible(show.slide_numbers_visible);
-    settings.set_loop_presentation(show.loop_presentation);
-    settings
-        .set_mode(show.mode.map(Mode::from_raw))
-        .map_err(show_error)?;
-    settings
-        .set_autoplay_transition_delay(show.autoplay_transition_delay)
-        .map_err(show_error)?;
-    settings
-        .set_autoplay_build_delay(show.autoplay_build_delay)
-        .map_err(show_error)?;
-    settings.set_idle_timer_active(show.idle_timer_active);
-    settings
-        .set_idle_timer_delay(show.idle_timer_delay)
-        .map_err(show_error)?;
-    settings.set_automatically_plays_upon_open(show.automatically_plays_upon_open);
-    Ok(settings)
-}
-
-fn show_error(error: litchi_keynote::show::Error) -> Error {
-    Error::ParseError(error.to_string())
 }
 
 #[cfg(test)]
@@ -194,7 +215,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn show_modes_map_native_values_losslessly() {
+    fn show_modes_map_native_values_losslessly() -> Result<()> {
         for (raw, mode) in [
             (0, Mode::Normal),
             (1, Mode::SelfPlaying),
@@ -205,5 +226,6 @@ mod tests {
             assert_eq!(Mode::from_raw(raw), mode);
             assert_eq!(mode.as_raw(), raw);
         }
+        Ok(())
     }
 }

@@ -10,6 +10,7 @@ rust-version.workspace = true
 
 [dependencies]
 litchi-iwa-text = { workspace = true }
+thiserror = { workspace = true }
 
 [lints]
 workspace = true

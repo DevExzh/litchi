@@ -20,10 +20,10 @@
 //! let slides = doc.slides()?;
 //!
 //! for slide in slides {
-//!     if let Some(title) = &slide.title {
-//!         println!("Slide {}: {}", slide.index + 1, title);
+//!     if let Some(title) = slide.title() {
+//!         println!("Slide {}: {}", slide.index() + 1, title);
 //!     }
-//!     for text in &slide.text_content {
+//!     for text in slide.text_content() {
 //!         println!("  - {}", text);
 //!     }
 //! }
@@ -96,4 +96,5 @@ pub use editor::{
 pub use litchi_keynote::transition::{
     Acceleration, AccelerationKind, Direction, MosaicType, TextDelivery, TextDeliveryKind,
 };
-pub use litchi_keynote::{BuildAnimation, BuildAnimationType, Show, Slide, SlideTransition};
+pub use litchi_keynote::{AnimationType, Build, Document, Show, Slide, Transition};
+pub use litchi_keynote::{Mode, Seconds, Settings, Size};

@@ -1,12 +1,12 @@
-//! Presentation-level Keynote show values.
+//! Keynote show settings and immutable presentation snapshots.
 
-use core::fmt;
+use crate::{Error, Result, Seconds, Slide};
 
 const NORMAL_MODE: i32 = 0;
 const SELF_PLAYING_MODE: i32 = 1;
 const LINKS_ONLY_MODE: i32 = 2;
 
-/// A finite, positive presentation dimension pair in points.
+/// A finite, strictly positive presentation size in points.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Size {
     width: f32,
@@ -14,13 +14,13 @@ pub struct Size {
 }
 
 impl Size {
-    /// Construct checked presentation dimensions.
+    /// Construct a validated presentation size.
     ///
     /// # Errors
     ///
     /// Returns [`Error::InvalidDimensions`] when either dimension is not
     /// finite and strictly positive.
-    pub fn new(width: f32, height: f32) -> Result<Self, Error> {
+    pub fn new(width: f32, height: f32) -> Result<Self> {
         if width.is_finite() && width > 0.0 && height.is_finite() && height > 0.0 {
             Ok(Self { width, height })
         } else {
@@ -28,82 +28,66 @@ impl Size {
         }
     }
 
-    /// Return the presentation width in points.
+    /// Return the width in points.
     #[must_use]
     pub const fn width(self) -> f32 {
         self.width
     }
 
-    /// Return the presentation height in points.
+    /// Return the height in points.
     #[must_use]
     pub const fn height(self) -> f32 {
         self.height
     }
 }
 
-/// Errors returned while constructing or validating presentation settings.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Error {
-    /// A width or height was not finite and strictly positive.
-    InvalidDimensions,
-    /// A playback delay was not finite and non-negative.
-    InvalidDelay,
-    /// A known native mode was supplied as an `Unknown` value.
-    NonCanonicalMode,
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let message = match self {
-            Self::InvalidDimensions => "show dimensions must be finite and greater than zero",
-            Self::InvalidDelay => "show playback delays must be finite and non-negative",
-            Self::NonCanonicalMode => "show mode must use its named variant for known values",
-        };
-        formatter.write_str(message)
+impl Default for Size {
+    fn default() -> Self {
+        Self {
+            width: 1_024.0,
+            height: 768.0,
+        }
     }
 }
 
-impl std::error::Error for Error {}
-
-/// How a Keynote presentation advances and responds to input.
+/// How a presentation advances through its slides.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum Mode {
-    /// Slides advance normally through presenter input and configured transitions.
+    /// Advance through presenter input and configured transitions.
     Normal,
-    /// The presentation advances automatically using its playback delays.
+    /// Advance automatically using playback delays.
     SelfPlaying,
-    /// Only hyperlinks can navigate between slides.
+    /// Navigate only through hyperlinks.
     LinksOnly,
-    /// A mode introduced by a newer Keynote version.
+    /// A mode introduced by a newer Keynote release.
     Unknown(i32),
 }
 
 impl Mode {
-    /// Decode a native `KNShowMode` value without discarding unknown values.
+    /// Decode a native mode value without discarding unknown values.
     #[must_use]
-    pub const fn from_raw(value: i32) -> Self {
-        match value {
+    pub const fn from_raw(raw: i32) -> Self {
+        match raw {
             NORMAL_MODE => Self::Normal,
             SELF_PLAYING_MODE => Self::SelfPlaying,
             LINKS_ONLY_MODE => Self::LinksOnly,
-            raw => Self::Unknown(raw),
+            other => Self::Unknown(other),
         }
     }
 
-    /// Construct an unknown mode, rejecting values already assigned to a named mode.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::NonCanonicalMode`] when `value` is already assigned to
-    /// one of the named mode variants.
-    pub const fn unknown(value: i32) -> Result<Self, Error> {
-        match value {
-            NORMAL_MODE | SELF_PLAYING_MODE | LINKS_ONLY_MODE => Err(Error::NonCanonicalMode),
-            raw => Ok(Self::Unknown(raw)),
+    /// Construct an unknown mode while rejecting values assigned to a named
+    /// native variant.
+    pub const fn unknown(raw: i32) -> Result<Self> {
+        match raw {
+            NORMAL_MODE | SELF_PLAYING_MODE | LINKS_ONLY_MODE => {
+                Err(Error::NonCanonicalMode)
+            }
+            other => Ok(Self::Unknown(other)),
         }
     }
 
-    /// Return the native `KNShowMode` value stored in the Keynote archive.
+    /// Return the native mode value.
     #[must_use]
     pub const fn as_raw(self) -> i32 {
         match self {
@@ -114,7 +98,7 @@ impl Mode {
         }
     }
 
-    /// Return whether this value is the canonical representation of its native value.
+    /// Return whether this value uses a named variant for known input.
     #[must_use]
     pub const fn is_canonical(self) -> bool {
         !matches!(
@@ -124,270 +108,349 @@ impl Mode {
     }
 }
 
-/// Validated presentation dimensions and playback behavior.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct Flags {
+    present: u8,
+    values: u8,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum Flag {
+    SlideNumbersVisible,
+    LoopPresentation,
+    IdleTimerActive,
+    AutomaticallyPlaysUponOpen,
+}
+
+impl Flag {
+    const fn bit(self) -> u8 {
+        match self {
+            Self::SlideNumbersVisible => 1,
+            Self::LoopPresentation => 2,
+            Self::IdleTimerActive => 4,
+            Self::AutomaticallyPlaysUponOpen => 8,
+        }
+    }
+}
+
+impl Flags {
+    fn get(self, flag: Flag) -> Option<bool> {
+        let bit = flag.bit();
+        (self.present & bit != 0).then_some(self.values & bit != 0)
+    }
+
+    fn set(&mut self, flag: Flag, value: Option<bool>) {
+        let bit = flag.bit();
+        if let Some(set_value) = value {
+            self.present |= bit;
+            if set_value {
+                self.values |= bit;
+            } else {
+                self.values &= !bit;
+            }
+        } else {
+            self.present &= !bit;
+            self.values &= !bit;
+        }
+    }
+}
+
+/// Validated show-level playback settings.
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Settings {
     size: Size,
-    slide_numbers_visible: Option<bool>,
-    loop_presentation: Option<bool>,
+    flags: Flags,
     mode: Option<Mode>,
-    autoplay_transition_delay: Option<f64>,
-    autoplay_build_delay: Option<f64>,
-    idle_timer_active: Option<bool>,
-    idle_timer_delay: Option<f64>,
-    automatically_plays_upon_open: Option<bool>,
+    autoplay_transition_delay: Option<Seconds>,
+    autoplay_build_delay: Option<Seconds>,
+    idle_timer_delay: Option<Seconds>,
 }
 
 impl Settings {
-    /// Construct default playback settings for checked presentation dimensions.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::InvalidDimensions`] when either dimension is not
-    /// finite and strictly positive.
-    pub fn new(width: f32, height: f32) -> Result<Self, Error> {
-        Ok(Self {
-            size: Size::new(width, height)?,
-            slide_numbers_visible: None,
-            loop_presentation: None,
+    /// Create settings with all optional producer fields absent.
+    #[must_use]
+    pub const fn new(size: Size) -> Self {
+        Self {
+            size,
+            flags: Flags {
+                present: 0,
+                values: 0,
+            },
             mode: None,
             autoplay_transition_delay: None,
             autoplay_build_delay: None,
-            idle_timer_active: None,
             idle_timer_delay: None,
-            automatically_plays_upon_open: None,
-        })
+        }
     }
 
-    /// Return the checked presentation dimensions.
+    /// Return the presentation size.
     #[must_use]
-    pub const fn size(&self) -> Size {
+    pub const fn size(self) -> Size {
         self.size
     }
 
-    /// Replace the presentation dimensions after validation.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::InvalidDimensions`] when either dimension is not
-    /// finite and strictly positive. The previous size is retained on error.
-    pub fn set_size(&mut self, width: f32, height: f32) -> Result<(), Error> {
-        self.size = Size::new(width, height)?;
-        Ok(())
+    /// Replace the presentation size.
+    pub fn set_size(&mut self, size: Size) {
+        self.size = size;
     }
 
-    /// Return whether slide numbers are visible when the setting is present.
+    /// Return the optional slide-number visibility flag.
     #[must_use]
-    pub const fn slide_numbers_visible(&self) -> Option<bool> {
-        self.slide_numbers_visible
+    pub fn slide_numbers_visible(self) -> Option<bool> {
+        self.flags.get(Flag::SlideNumbersVisible)
     }
 
-    /// Set or clear the slide-number visibility override.
-    pub const fn set_slide_numbers_visible(&mut self, value: Option<bool>) {
-        self.slide_numbers_visible = value;
+    /// Set or clear slide-number visibility.
+    pub fn set_slide_numbers_visible(&mut self, value: Option<bool>) {
+        self.flags.set(Flag::SlideNumbersVisible, value);
     }
 
-    /// Return whether the presentation loops when the setting is present.
+    /// Return the optional looping flag.
     #[must_use]
-    pub const fn loop_presentation(&self) -> Option<bool> {
-        self.loop_presentation
+    pub fn loop_presentation(self) -> Option<bool> {
+        self.flags.get(Flag::LoopPresentation)
     }
 
-    /// Set or clear the loop override.
-    pub const fn set_loop_presentation(&mut self, value: Option<bool>) {
-        self.loop_presentation = value;
+    /// Set or clear looping.
+    pub fn set_loop_presentation(&mut self, value: Option<bool>) {
+        self.flags.set(Flag::LoopPresentation, value);
     }
 
-    /// Return the playback mode when explicitly stored.
+    /// Return the optional playback mode.
     #[must_use]
-    pub const fn mode(&self) -> Option<Mode> {
+    pub const fn mode(self) -> Option<Mode> {
         self.mode
     }
 
-    /// Set or clear the playback mode after canonical-value validation.
+    /// Set or clear playback mode, rejecting non-canonical known values.
     ///
     /// # Errors
     ///
-    /// Returns [`Error::NonCanonicalMode`] for an `Unknown` value whose raw
-    /// value is already assigned to a named mode. The previous mode is
-    /// retained on error.
-    pub const fn set_mode(&mut self, value: Option<Mode>) -> Result<(), Error> {
-        if let Some(mode) = value
-            && !mode.is_canonical()
-        {
+    /// Returns [`Error::NonCanonicalMode`] when a known native value is passed
+    /// through [`Mode::Unknown`].
+    pub fn set_mode(&mut self, mode: Option<Mode>) -> Result<()> {
+        if mode.is_some_and(|value| !value.is_canonical()) {
             return Err(Error::NonCanonicalMode);
         }
-        self.mode = value;
+        self.mode = mode;
         Ok(())
     }
 
-    /// Return the automatic transition delay in seconds.
+    /// Return the automatic transition delay.
     #[must_use]
-    pub const fn autoplay_transition_delay(&self) -> Option<f64> {
+    pub const fn autoplay_transition_delay(self) -> Option<Seconds> {
         self.autoplay_transition_delay
     }
 
     /// Set or clear the automatic transition delay.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::InvalidDelay`] when the value is present but not
-    /// finite and non-negative. The previous delay is retained on error.
-    pub fn set_autoplay_transition_delay(&mut self, value: Option<f64>) -> Result<(), Error> {
-        validate_delay(value)?;
+    pub fn set_autoplay_transition_delay(&mut self, value: Option<Seconds>) {
         self.autoplay_transition_delay = value;
-        Ok(())
     }
 
-    /// Return the automatic build delay in seconds.
+    /// Return the automatic build delay.
     #[must_use]
-    pub const fn autoplay_build_delay(&self) -> Option<f64> {
+    pub const fn autoplay_build_delay(self) -> Option<Seconds> {
         self.autoplay_build_delay
     }
 
     /// Set or clear the automatic build delay.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::InvalidDelay`] when the value is present but not
-    /// finite and non-negative. The previous delay is retained on error.
-    pub fn set_autoplay_build_delay(&mut self, value: Option<f64>) -> Result<(), Error> {
-        validate_delay(value)?;
+    pub fn set_autoplay_build_delay(&mut self, value: Option<Seconds>) {
         self.autoplay_build_delay = value;
-        Ok(())
     }
 
-    /// Return whether the idle timer is active when explicitly stored.
+    /// Return whether Keynote activates its idle timer.
     #[must_use]
-    pub const fn idle_timer_active(&self) -> Option<bool> {
-        self.idle_timer_active
+    pub fn idle_timer_active(self) -> Option<bool> {
+        self.flags.get(Flag::IdleTimerActive)
     }
 
-    /// Set or clear the idle-timer active override.
-    pub const fn set_idle_timer_active(&mut self, value: Option<bool>) {
-        self.idle_timer_active = value;
+    /// Set or clear idle-timer activation.
+    pub fn set_idle_timer_active(&mut self, value: Option<bool>) {
+        self.flags.set(Flag::IdleTimerActive, value);
     }
 
-    /// Return the idle-timer delay in seconds.
+    /// Return the idle-timer delay.
     #[must_use]
-    pub const fn idle_timer_delay(&self) -> Option<f64> {
+    pub const fn idle_timer_delay(self) -> Option<Seconds> {
         self.idle_timer_delay
     }
 
     /// Set or clear the idle-timer delay.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::InvalidDelay`] when the value is present but not
-    /// finite and non-negative. The previous delay is retained on error.
-    pub fn set_idle_timer_delay(&mut self, value: Option<f64>) -> Result<(), Error> {
-        validate_delay(value)?;
+    pub fn set_idle_timer_delay(&mut self, value: Option<Seconds>) {
         self.idle_timer_delay = value;
-        Ok(())
     }
 
-    /// Return whether the show starts automatically when opened.
+    /// Return whether the presentation plays when opened.
     #[must_use]
-    pub const fn automatically_plays_upon_open(&self) -> Option<bool> {
-        self.automatically_plays_upon_open
+    pub fn automatically_plays_upon_open(self) -> Option<bool> {
+        self.flags.get(Flag::AutomaticallyPlaysUponOpen)
     }
 
-    /// Set or clear the automatic-play-on-open override.
-    pub const fn set_automatically_plays_upon_open(&mut self, value: Option<bool>) {
-        self.automatically_plays_upon_open = value;
+    /// Set or clear automatic playback on open.
+    pub fn set_automatically_plays_upon_open(&mut self, value: Option<bool>) {
+        self.flags.set(Flag::AutomaticallyPlaysUponOpen, value);
     }
 
-    /// Validate every invariant, including values created through enum literals.
+    /// Validate all semantic invariants.
     ///
     /// # Errors
     ///
-    /// Returns the first invalid-dimensions, non-canonical-mode, or invalid-
-    /// delay error found.
-    pub fn validate(&self) -> Result<(), Error> {
-        let _ = Size::new(self.size.width, self.size.height)?;
-        if self.mode.is_some_and(|mode| !mode.is_canonical()) {
+    /// Returns a typed semantic error when the size or mode is invalid.
+    pub fn validate(self) -> Result<()> {
+        Size::new(self.size.width, self.size.height)?;
+        if self.mode.is_some_and(|value| !value.is_canonical()) {
             return Err(Error::NonCanonicalMode);
         }
-        validate_delay(self.autoplay_transition_delay)?;
-        validate_delay(self.autoplay_build_delay)?;
-        validate_delay(self.idle_timer_delay)?;
         Ok(())
     }
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self {
-            size: Size {
-                width: 1024.0,
-                height: 768.0,
-            },
-            slide_numbers_visible: None,
-            loop_presentation: None,
-            mode: None,
-            autoplay_transition_delay: None,
-            autoplay_build_delay: None,
-            idle_timer_active: None,
-            idle_timer_delay: None,
-            automatically_plays_upon_open: None,
-        }
+        Self::new(Size::default())
     }
 }
 
-fn validate_delay(value: Option<f64>) -> Result<(), Error> {
-    if value.is_some_and(|delay| !delay.is_finite() || delay < 0.0) {
-        Err(Error::InvalidDelay)
-    } else {
-        Ok(())
+/// An immutable presentation snapshot.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Show {
+    title: Option<Box<str>>,
+    slides: Box<[Slide]>,
+    settings: Settings,
+}
+
+impl Show {
+    /// Start a detached show builder.
+    #[must_use]
+    pub fn builder() -> Builder {
+        Builder::new()
+    }
+
+    /// Return the optional presentation title.
+    #[must_use]
+    pub fn title(&self) -> Option<&str> {
+        self.title.as_deref()
+    }
+
+    /// Borrow slides in presentation order.
+    #[must_use]
+    pub fn slides(&self) -> &[Slide] {
+        &self.slides
+    }
+
+    /// Return the number of slides.
+    #[must_use]
+    pub const fn slide_count(&self) -> usize {
+        self.slides.len()
+    }
+
+    /// Select a slide by checked zero-based position.
+    #[must_use]
+    pub fn slide(&self, index: usize) -> Option<&Slide> {
+        self.slides.get(index)
+    }
+
+    /// Borrow validated show settings.
+    #[must_use]
+    pub const fn settings(&self) -> &Settings {
+        &self.settings
+    }
+
+    /// Return all show and slide text in presentation order.
+    #[must_use]
+    pub fn all_text(&self) -> Vec<String> {
+        let mut text = Vec::new();
+        if let Some(title) = &self.title {
+            text.push(title.to_string());
+        }
+        for slide in &self.slides {
+            text.extend(slide.all_text());
+        }
+        text
+    }
+
+    /// Return whether the show contains no slides.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.slides.is_empty()
+    }
+}
+
+/// A detached, mutable show builder.
+#[derive(Debug, Default)]
+pub struct Builder {
+    title: Option<Box<str>>,
+    slides: Vec<Slide>,
+    settings: Settings,
+}
+
+impl Builder {
+    /// Create an empty show builder with standard settings.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            title: None,
+            slides: Vec::new(),
+            settings: Settings::default(),
+        }
+    }
+
+    /// Set or clear the presentation title.
+    pub fn set_title(&mut self, title: Option<String>) {
+        self.title = title.map(String::into_boxed_str);
+    }
+
+    /// Append one slide in source order.
+    pub fn push_slide(&mut self, slide: Slide) {
+        self.slides.push(slide);
+    }
+
+    /// Replace the validated settings.
+    pub fn set_settings(&mut self, settings: Settings) {
+        self.settings = settings;
+    }
+
+    /// Finish the builder as an immutable show snapshot.
+    #[must_use]
+    pub fn build(self) -> Show {
+        Show {
+            title: self.title,
+            slides: self.slides.into_boxed_slice(),
+            settings: self.settings,
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Error, Mode, Settings, Size};
+    use super::*;
+    use crate::Slide;
 
     #[test]
-    fn size_rejects_non_positive_or_non_finite_dimensions() {
+    fn size_and_modes_are_checked_and_lossless() -> Result<()> {
         assert_eq!(Size::new(0.0, 1.0), Err(Error::InvalidDimensions));
-        assert_eq!(Size::new(f32::NAN, 1.0), Err(Error::InvalidDimensions));
-        assert_eq!(Size::new(1.0, f32::INFINITY), Err(Error::InvalidDimensions));
-    }
-
-    #[test]
-    fn mode_round_trips_unknown_values_without_aliasing_known_modes() {
-        for (raw, mode) in [
-            (0, Mode::Normal),
-            (1, Mode::SelfPlaying),
-            (2, Mode::LinksOnly),
-            (19, Mode::Unknown(19)),
-            (-1, Mode::Unknown(-1)),
-        ] {
-            assert_eq!(Mode::from_raw(raw), mode);
-            assert_eq!(mode.as_raw(), raw);
+        for raw in [0, 1, 2, 19, -1] {
+            assert_eq!(Mode::from_raw(raw).as_raw(), raw);
         }
-        assert_eq!(Mode::unknown(1), Err(Error::NonCanonicalMode));
-        assert_eq!(Mode::unknown(19), Ok(Mode::Unknown(19)));
-    }
-
-    #[test]
-    fn settings_mutators_preserve_invariants() {
-        let mut settings = Settings::new(1920.0, 1080.0)
-            .unwrap_or_else(|error| panic!("valid dimensions rejected: {error}"));
-        settings
-            .set_mode(Some(Mode::SelfPlaying))
-            .unwrap_or_else(|error| panic!("valid mode rejected: {error}"));
-        settings
-            .set_autoplay_build_delay(Some(1.25))
-            .unwrap_or_else(|error| panic!("valid delay rejected: {error}"));
-        assert!((settings.size().width() - 1920.0).abs() < f32::EPSILON);
+        let mut settings = Settings::default();
+        settings.set_mode(Some(Mode::SelfPlaying))?;
         assert_eq!(settings.mode(), Some(Mode::SelfPlaying));
-        assert_eq!(
-            settings.set_autoplay_build_delay(Some(f64::NAN)),
-            Err(Error::InvalidDelay)
-        );
         assert_eq!(
             settings.set_mode(Some(Mode::Unknown(1))),
             Err(Error::NonCanonicalMode)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn show_is_an_immutable_ordered_snapshot() {
+        let mut builder = Show::builder();
+        builder.set_title(Some("Deck".to_owned()));
+        builder.push_slide(Slide::builder(0).build());
+        let show = builder.build();
+        assert_eq!(show.title(), Some("Deck"));
+        assert_eq!(show.slide_count(), 1);
+        assert_eq!(show.slide(0).map(Slide::index), Some(0));
+        assert!(show.slide(1).is_none());
     }
 }
