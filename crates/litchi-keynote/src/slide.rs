@@ -1,5 +1,7 @@
 //! Immutable Keynote slide values and detached builders.
 
+pub mod media;
+
 use litchi_iwa_text::TextStorage;
 
 use crate::{Build, Effect, Seconds};

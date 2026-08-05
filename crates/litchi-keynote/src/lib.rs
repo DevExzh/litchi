@@ -21,6 +21,7 @@ pub use build::{AnimationType, Build};
 pub use document::Document;
 pub use error::{Error, Result};
 pub use show::{Mode, Settings, Show, Size};
+pub use slide::media::MovieKind;
 pub use slide::{Slide, Transition};
 pub use time::Seconds;
 pub use transition::Effect;

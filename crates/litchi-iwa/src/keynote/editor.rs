@@ -5050,6 +5050,7 @@ mod transition_wire;
 use builds::*;
 pub use litchi_iwa_common::color::{RgbColorSpace, Rgba};
 pub use litchi_keynote::background::{Angle, Background, Gradient, Kind, Opaque, Stop};
+pub use litchi_keynote::slide::media::MovieKind;
 pub use litchi_keynote::transition::Effect;
 pub use litchi_keynote::transition::{
     Acceleration, AccelerationKind, AnimationParameters, CustomParameters, Direction, MosaicType,
@@ -5063,10 +5064,7 @@ pub use slide_images::{
     KeynoteSlideImageInfo, KeynoteSlideImageKind, KeynoteSlideImageOptions,
     RemovedKeynoteSlideImage,
 };
-pub use slide_movies::{
-    KeynoteSlideMovieInfo, KeynoteSlideMovieKind, KeynoteSlideMovieOptions,
-    RemovedKeynoteSlideMovie,
-};
+pub use slide_movies::{KeynoteSlideMovieInfo, KeynoteSlideMovieOptions, RemovedKeynoteSlideMovie};
 pub use slide_shapes::{KeynoteSlideShapeInfo, KeynoteSlideShapeKind, RemovedKeynoteSlideShape};
 pub use slide_tables::{
     KeynoteSlideTable, KeynoteSlideTableInfo, KeynoteTableCellCheckboxFormat,

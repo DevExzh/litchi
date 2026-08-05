@@ -10,6 +10,7 @@ use litchi_keynote::transition::{
     Acceleration, AnimationParameters, CustomParameters, Direction, Effect, MosaicType, Settings,
     TextDelivery,
 };
+use litchi_keynote::slide::media::MovieKind;
 use std::time::Duration;
 
 const TEST_SLIDE_MESSAGE_TYPE: u32 = 5;
@@ -4592,7 +4593,7 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
     let movies = editor.slide_movies(0).unwrap();
     assert_eq!(movies.len(), 1);
     let original = movies[0].clone();
-    assert_eq!(original.kind, KeynoteSlideMovieKind::File);
+    assert_eq!(original.kind, MovieKind::File);
     assert_eq!(original.drawable_object_id, 70);
     assert_eq!(original.movie_data_identifier, Some(1));
     assert_eq!(original.poster_image_data_identifier, Some(2));
@@ -4721,7 +4722,7 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
 fn slide_movie_playback_can_initialize_legacy_file_metadata() {
     let mut editor = KeynoteEditor::from_package(test_package_with_slide_movie()).unwrap();
     let movie = editor.slide_movies(0).unwrap().pop().unwrap();
-    assert_eq!(movie.kind, KeynoteSlideMovieKind::File);
+    assert_eq!(movie.kind, MovieKind::File);
     assert_eq!(movie.playback, None);
 
     let settings = MediaPlaybackSettings::new(Duration::from_secs(8))
@@ -4769,7 +4770,7 @@ fn slide_movie_mutations_reject_wrong_targets_transactionally() {
         .id;
     placeholder.set_slide_layout(0, layout).unwrap();
     let movie = placeholder.slide_movies(0).unwrap().remove(0);
-    assert_eq!(movie.kind, KeynoteSlideMovieKind::MediaPlaceholder);
+    assert_eq!(movie.kind, MovieKind::Placeholder);
     let before = placeholder.to_bytes().unwrap();
     assert!(
         placeholder

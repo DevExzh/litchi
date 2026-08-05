@@ -2,7 +2,8 @@
 
 use std::env;
 
-use litchi_iwa::keynote::{KeynoteEditor, KeynoteSlideMovieKind};
+use litchi_iwa::keynote::KeynoteEditor;
+use litchi_keynote::slide::media::MovieKind;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -20,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let source = editor
         .slide_movies(slide_index)?
         .into_iter()
-        .filter(|movie| movie.kind == KeynoteSlideMovieKind::File)
+        .filter(|movie| movie.kind == MovieKind::File)
         .nth(movie_index)
         .ok_or("ordinary movie index is out of bounds")?;
     let created = editor.duplicate_slide_movie(slide_index, source.drawable_object_id)?;

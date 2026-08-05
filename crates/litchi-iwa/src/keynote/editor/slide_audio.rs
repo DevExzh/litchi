@@ -3,6 +3,7 @@
 use std::time::Duration;
 
 use litchi_iwa_common::media::Type as MediaType;
+use litchi_keynote::slide::media::MovieKind;
 
 use super::slide_movies::geometry::{set_movie_geometry, set_movie_properties};
 use super::slide_movies::graph::{
@@ -61,7 +62,7 @@ impl KeynoteEditor {
     pub fn slide_audio(&self, slide_index: usize) -> Result<Vec<KeynoteSlideAudioInfo>> {
         self.slide_media_infos(slide_index)?
             .into_iter()
-            .filter(|media| media.kind == KeynoteSlideMovieKind::Audio)
+            .filter(|media| media.kind == MovieKind::Audio)
             .map(|media| audio_info(self, slide_index, media.drawable_object_id))
             .collect()
     }
@@ -137,7 +138,7 @@ impl KeynoteEditor {
         if created.audio_data_identifier != asset.data_identifier
             || created.position != options.position
             || created.duration != expected_duration
-            || created_graph.info.kind != KeynoteSlideMovieKind::Audio
+            || created_graph.info.kind != MovieKind::Audio
             || created_graph.object_ids != ids.all()
             || verified.extract_media(asset.data_identifier)? != data
         {
@@ -220,7 +221,7 @@ impl KeynoteEditor {
         properties: DrawableProperties,
     ) -> Result<()> {
         let source = self.slide_movie_graph(slide_index, drawable_object_id)?;
-        if source.info.kind != KeynoteSlideMovieKind::Audio {
+        if source.info.kind != MovieKind::Audio {
             return Err(Error::ParseError(format!(
                 "Keynote media {drawable_object_id} is {:?}, not slide audio",
                 source.info.kind
@@ -260,7 +261,7 @@ impl KeynoteEditor {
         settings: MediaPlaybackSettings,
     ) -> Result<()> {
         let source = self.slide_movie_graph(slide_index, drawable_object_id)?;
-        if source.info.kind != KeynoteSlideMovieKind::Audio {
+        if source.info.kind != MovieKind::Audio {
             return Err(Error::ParseError(format!(
                 "Keynote media {drawable_object_id} is {:?}, not slide audio",
                 source.info.kind
@@ -296,11 +297,8 @@ impl KeynoteEditor {
         source_drawable_object_id: u64,
     ) -> Result<KeynoteSlideAudioInfo> {
         let source = require_audio(self, slide_index, source_drawable_object_id)?;
-        let media = self.duplicate_slide_media(
-            slide_index,
-            source_drawable_object_id,
-            KeynoteSlideMovieKind::Audio,
-        )?;
+        let media =
+            self.duplicate_slide_media(slide_index, source_drawable_object_id, MovieKind::Audio)?;
         let created = require_audio(self, slide_index, media.drawable_object_id)?;
         let media_position = media.geometry.position.ok_or_else(|| {
             Error::InvalidFormat("Keynote audio clone has no position".to_owned())
@@ -337,11 +335,7 @@ impl KeynoteEditor {
         drawable_object_id: u64,
     ) -> Result<RemovedKeynoteSlideAudio> {
         let audio = require_audio(self, slide_index, drawable_object_id)?;
-        let removed = self.remove_slide_media(
-            slide_index,
-            drawable_object_id,
-            KeynoteSlideMovieKind::Audio,
-        )?;
+        let removed = self.remove_slide_media(slide_index, drawable_object_id, MovieKind::Audio)?;
         if removed.movie.movie_data_identifier != Some(audio.audio_data_identifier) {
             return Err(Error::InvalidFormat(
                 "Keynote audio deletion removed a mismatched media graph".to_owned(),
@@ -360,7 +354,7 @@ fn require_audio(
     drawable_object_id: u64,
 ) -> Result<KeynoteSlideAudioInfo> {
     let graph = editor.slide_movie_graph(slide_index, drawable_object_id)?;
-    if graph.info.kind != KeynoteSlideMovieKind::Audio {
+    if graph.info.kind != MovieKind::Audio {
         return Err(Error::ParseError(format!(
             "Keynote media {drawable_object_id} is {:?}, not slide audio",
             graph.info.kind

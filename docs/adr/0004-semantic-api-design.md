@@ -137,6 +137,13 @@ while an unrecognized ISO-BMFF brand remains conservatively classified as
 `Video` to match iWork replacement semantics. Archive discovery, asset
 metadata, limits, and replacement validation remain in the IWA adapter.
 
+Keynote slide movie classification uses the focused
+`litchi_keynote::slide::media::MovieKind` value. Its compact, non-exhaustive
+variants (`File`, `Audio`, `Placeholder`, and `LiveVideo`) contain no
+archive, package, or native media identifiers. `litchi-iwa` retains
+`KeynoteSlideMovieInfo`/options, graph-aware CRUD, native media identifiers,
+and the mapping from native movie flags to this product value.
+
 Shape paths use the focused `litchi_iwa_common::shape::path` module. Its
 `Preset`, `CornerRadius`, `PolygonSides`, `StarPoints`, and `InnerRadiusRatio`
 names are concise in their path context, fixed-size where scalar, and

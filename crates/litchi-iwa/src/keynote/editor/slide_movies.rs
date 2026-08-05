@@ -1,6 +1,7 @@
 //! Standalone movie-object CRUD for Keynote slides.
 
 use litchi_iwa_common::media::Type as MediaType;
+use litchi_keynote::slide::media::MovieKind;
 
 use super::*;
 use crate::MediaPlaybackSettings;
@@ -31,25 +32,12 @@ const SLIDE_BUILDS_FIELD: u32 = 2;
 const SLIDE_BUILD_CHUNKS_FIELD: u32 = 43;
 const MOVIE_MEDIA_PLACEHOLDER_FLAG: u32 = 1;
 
-/// Semantic role of a movie drawable owned directly by a Keynote slide.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KeynoteSlideMovieKind {
-    /// Ordinary file-backed movie inserted by the user.
-    File,
-    /// Independently positioned audio clip stored in a movie archive.
-    Audio,
-    /// File-backed replacement target materialized from a slide layout.
-    MediaPlaceholder,
-    /// Camera-backed live-video drawable.
-    LiveVideo,
-}
-
 /// One movie drawable owned directly by a Keynote slide.
 #[derive(Debug, Clone, PartialEq)]
 pub struct KeynoteSlideMovieInfo {
     pub slide_index: usize,
     pub drawable_object_id: u64,
-    pub kind: KeynoteSlideMovieKind,
+    pub kind: MovieKind,
     pub movie_data_identifier: Option<u64>,
     pub poster_image_data_identifier: Option<u64>,
     pub geometry: DrawableGeometry,
@@ -119,7 +107,7 @@ impl KeynoteEditor {
         Ok(self
             .slide_media_infos(slide_index)?
             .into_iter()
-            .filter(|movie| movie.kind != KeynoteSlideMovieKind::Audio)
+            .filter(|movie| movie.kind != MovieKind::Audio)
             .collect())
     }
 
@@ -238,7 +226,7 @@ impl KeynoteEditor {
                 Error::InvalidFormat("Keynote movie creation failed validation".to_owned())
             })?;
         let created_graph = verified.slide_movie_graph(slide_index, ids.drawable)?;
-        if created.kind != KeynoteSlideMovieKind::File
+        if created.kind != MovieKind::File
             || created.movie_data_identifier != Some(movie_asset.data_identifier)
             || created.poster_image_data_identifier != Some(poster_asset.data_identifier)
             || created.geometry != geometry
@@ -494,18 +482,14 @@ impl KeynoteEditor {
         slide_index: usize,
         source_drawable_object_id: u64,
     ) -> Result<KeynoteSlideMovieInfo> {
-        self.duplicate_slide_media(
-            slide_index,
-            source_drawable_object_id,
-            KeynoteSlideMovieKind::File,
-        )
+        self.duplicate_slide_media(slide_index, source_drawable_object_id, MovieKind::File)
     }
 
     pub(in crate::keynote::editor) fn duplicate_slide_media(
         &mut self,
         slide_index: usize,
         source_drawable_object_id: u64,
-        expected_kind: KeynoteSlideMovieKind,
+        expected_kind: MovieKind,
     ) -> Result<KeynoteSlideMovieInfo> {
         let source =
             self.require_slide_media_kind(slide_index, source_drawable_object_id, expected_kind)?;
@@ -707,14 +691,14 @@ impl KeynoteEditor {
         slide_index: usize,
         drawable_object_id: u64,
     ) -> Result<RemovedKeynoteSlideMovie> {
-        self.remove_slide_media(slide_index, drawable_object_id, KeynoteSlideMovieKind::File)
+        self.remove_slide_media(slide_index, drawable_object_id, MovieKind::File)
     }
 
     pub(in crate::keynote::editor) fn remove_slide_media(
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        expected_kind: KeynoteSlideMovieKind,
+        expected_kind: MovieKind,
     ) -> Result<RemovedKeynoteSlideMovie> {
         let source =
             self.require_slide_media_kind(slide_index, drawable_object_id, expected_kind)?;
@@ -816,7 +800,7 @@ impl KeynoteEditor {
         drawable_object_id: u64,
     ) -> Result<SlideMovieGraph> {
         let source = self.slide_movie_graph(slide_index, drawable_object_id)?;
-        if source.info.kind != KeynoteSlideMovieKind::File {
+        if source.info.kind != MovieKind::File {
             return Err(Error::ParseError(format!(
                 "Keynote movie {drawable_object_id} is {:?}, not an ordinary file-backed movie",
                 source.info.kind
@@ -829,7 +813,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        expected_kind: KeynoteSlideMovieKind,
+        expected_kind: MovieKind,
     ) -> Result<SlideMovieGraph> {
         let source = self.slide_movie_graph(slide_index, drawable_object_id)?;
         if source.info.kind != expected_kind {
@@ -947,16 +931,16 @@ fn movie_info(
     let movie: tsd::MovieArchive =
         graph.decode_type(identifier, MOVIE_MESSAGE_TYPE, "TSD.MovieArchive")?;
     let kind = if movie.is_live_video == Some(true) {
-        KeynoteSlideMovieKind::LiveVideo
+        MovieKind::LiveVideo
     } else if movie.audio_only == Some(true) {
-        KeynoteSlideMovieKind::Audio
+        MovieKind::Audio
     } else if movie
         .flags
         .is_some_and(|flags| flags & MOVIE_MEDIA_PLACEHOLDER_FLAG != 0)
     {
-        KeynoteSlideMovieKind::MediaPlaceholder
+        MovieKind::Placeholder
     } else {
-        KeynoteSlideMovieKind::File
+        MovieKind::File
     };
     let playback = movie
         .end_time
@@ -1047,7 +1031,7 @@ mod tests {
         let created = editor
             .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
             .unwrap();
-        assert_eq!(created.kind, KeynoteSlideMovieKind::File);
+        assert_eq!(created.kind, MovieKind::File);
         assert_eq!(created.original_size, Some(NATURAL_SIZE));
         assert_eq!(created.natural_size, Some(NATURAL_SIZE));
         assert_eq!(created.geometry.position, Some(POSITION));
