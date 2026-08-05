@@ -4,12 +4,12 @@
 //! This module projects host-neutral OfficeArt shapes and Excel TXO text into
 //! an XLS-specific facade.
 
-use crate::records::RecordIter;
+use litchi_biff::Records;
 use litchi_odraw::{
     Record, RecordKind,
     shape::{self, Kind, Shape},
 };
-use std::{collections::VecDeque, io::Cursor};
+use std::collections::VecDeque;
 
 const MSO_DRAWING: u16 = 0x00EC;
 const TXO: u16 = 0x01B6;
@@ -82,11 +82,11 @@ impl WorkbookDrawing {
         let mut pending: Option<(PendingTxo, bool)> = None;
         let mut drawing_run = false;
         let mut external_txo = false;
-        let records = RecordIter::new(Cursor::new(data)).map_err(invalid_data)?;
+        let records = Records::new(data);
 
         for record in records {
             let record = record.map_err(invalid_data)?;
-            let kind = record.header.record_type;
+            let kind = record.kind().get();
             if pending.is_some() && kind != CONTINUE {
                 return Err(invalid_data(
                     "XLS TXO text is not followed by the required CONTINUE record",
@@ -103,11 +103,11 @@ impl WorkbookDrawing {
 
             match kind {
                 MSO_DRAWING => {
-                    let textbox = standalone_textbox(&record.data)?;
+                    let textbox = standalone_textbox(record.payload())?;
                     if textbox && !officeart_needs_continuation(&drawing.officeart)? {
                         external_txo = true;
                     } else {
-                        drawing.officeart.extend_from_slice(&record.data);
+                        drawing.officeart.extend_from_slice(record.payload());
                         drawing_run = true;
                     }
                 },
@@ -117,7 +117,7 @@ impl WorkbookDrawing {
                             "XLS TXO text is incomplete before the next TXO record",
                         ));
                     }
-                    let next = PendingTxo::new(&record.data)?;
+                    let next = PendingTxo::new(record.payload())?;
                     let attach = !std::mem::take(&mut external_txo);
                     if next.is_complete() {
                         if attach {
@@ -132,7 +132,7 @@ impl WorkbookDrawing {
                         .as_mut()
                         .ok_or_else(|| invalid_data("missing XLS TXO state"))?
                         .0
-                        .feed(&record.data)?;
+                        .feed(record.payload())?;
                     if complete {
                         let (text, attach) = pending
                             .take()
@@ -143,7 +143,7 @@ impl WorkbookDrawing {
                     }
                 },
                 CONTINUE if drawing_run => {
-                    drawing.officeart.extend_from_slice(&record.data);
+                    drawing.officeart.extend_from_slice(record.payload());
                 },
                 _ => {},
             }

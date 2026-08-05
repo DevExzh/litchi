@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use super::error::{XlsError, XlsResult};
 use super::leniency::{XlsFormattingDefect, XlsToleranceLog};
-use super::records::Record;
+use litchi_biff::RecordRef;
 
 const DATE1904_RECORD: u16 = 0x0022;
 /// MS-XLS 2.4.126 `Format` record type.
@@ -388,7 +388,7 @@ impl XlsFormatting {
     /// See [`XlsFormattingDefect`] for the exhaustive list of defects a lenient
     /// policy repairs here; every other validation is unchanged.
     pub(crate) fn parse_globals(
-        records: &[Record],
+        records: &[RecordRef<'_>],
         tolerance: &mut XlsToleranceLog,
     ) -> XlsResult<Self> {
         let mut date_system = None;
@@ -400,12 +400,12 @@ impl XlsFormatting {
         let mut xf_extensions = Vec::new();
 
         for record in records {
-            match record.header.record_type {
+            match record.kind().get() {
                 DATE1904_RECORD => {
                     if date_system.is_some() {
                         return Err(invalid(DATE1904_RECORD, "duplicate Date1904 record"));
                     }
-                    date_system = Some(parse_date_system(&record.data)?);
+                    date_system = Some(parse_date_system(record.payload())?);
                 },
                 FORMAT_RECORD => {
                     if number_formats.len() == MAX_FORMAT_RECORDS {
@@ -414,7 +414,7 @@ impl XlsFormatting {
                     let ordinal = u32::try_from(number_formats.len()).map_err(|_| {
                         invalid(FORMAT_RECORD, "Format record ordinal does not fit in u32")
                     })?;
-                    let format = parse_number_format(&record.data, ordinal, tolerance)?;
+                    let format = parse_number_format(record.payload(), ordinal, tolerance)?;
                     if format_by_id.contains_key(&format.id) {
                         return Err(invalid(
                             FORMAT_RECORD,
@@ -431,13 +431,13 @@ impl XlsFormatting {
                     let index = u16::try_from(extended_formats.len()).map_err(|_| {
                         invalid(XF_RECORD, "XF index does not fit in the BIFF index field")
                     })?;
-                    extended_formats.push(parse_xf(&record.data, index, tolerance)?);
+                    extended_formats.push(parse_xf(record.payload(), index, tolerance)?);
                 },
                 XFCRC_RECORD => {
                     if xfcrc.is_some() {
                         return Err(invalid(XFCRC_RECORD, "duplicate XFCRC record"));
                     }
-                    xfcrc = Some(parse_xfcrc(&record.data)?);
+                    xfcrc = Some(parse_xfcrc(record.payload())?);
                 },
                 crate::xf_ext::XF_EXT_RECORD_TYPE => {
                     if xf_extensions.len() == MAX_XF_RECORDS {
@@ -446,7 +446,7 @@ impl XlsFormatting {
                             "more than 65,536 XFExt records",
                         ));
                     }
-                    xf_extensions.push(crate::xf_ext::XlsXfExt::parse(&record.data)?);
+                    xf_extensions.push(crate::xf_ext::XlsXfExt::parse(record.payload())?);
                 },
                 crate::differential_format::DXF_RECORD_TYPE => {
                     if differential_formats.len() == MAX_DXF_RECORDS {
@@ -457,7 +457,7 @@ impl XlsFormatting {
                     }
                     differential_formats.push(
                         crate::differential_format::XlsDifferentialFormat::parse_payload(
-                            &record.data,
+                            record.payload(),
                         )?,
                     );
                 },
@@ -883,9 +883,13 @@ fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
 /// Strict-mode shim used by both test modules: the production reader threads a
 /// tolerance log, but these tests exercise the default reject-everything policy.
 #[cfg(test)]
-fn parse_globals_strict(records: &[Record]) -> XlsResult<XlsFormatting> {
+fn parse_globals_strict(records: &[litchi_biff::Record]) -> XlsResult<XlsFormatting> {
+    let refs = records
+        .iter()
+        .map(|record| record.as_ref())
+        .collect::<Vec<_>>();
     XlsFormatting::parse_globals(
-        records,
+        &refs,
         &mut XlsToleranceLog::new(crate::leniency::XlsLeniency::Strict),
     )
 }
@@ -893,6 +897,7 @@ fn parse_globals_strict(records: &[Record]) -> XlsResult<XlsFormatting> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_biff::{Encoder, Kind, Record as Frame};
 
     /// Strict-mode shim: the production reader threads a tolerance log, but
     /// these tests exercise the default (reject-everything) policy.
@@ -990,24 +995,22 @@ mod tests {
         ));
     }
     use crate::cell::XlsCell;
-    use crate::records::{CellRecord, RecordHeader};
+    use crate::records::CellRecord;
     use crate::workbook::XlsWorkbook;
     use litchi_core::sheet::{Cell, CellValue, Worksheet};
     use std::fs::{self, File};
     use std::io::Cursor;
     use std::path::{Path, PathBuf};
 
-    fn record(record_type: u16, data: Vec<u8>) -> Record {
-        Record {
-            header: RecordHeader {
-                record_type,
-                data_len: data.len() as u16,
-            },
-            data,
-        }
+    fn record(record_type: u16, data: Vec<u8>) -> Frame {
+        let mut encoder = Encoder::new();
+        encoder
+            .push(Kind::from_wire(record_type), &data)
+            .expect("test frame fits the BIFF wire limit");
+        Frame::open(encoder.finish()).expect("test frame is complete")
     }
 
-    fn xf(style: bool, parent: u16, format_id: u16) -> Record {
+    fn xf(style: bool, parent: u16, format_id: u16) -> Frame {
         let mut data = vec![0u8; 20];
         data[2..4].copy_from_slice(&format_id.to_le_bytes());
         let flags = (parent << 4) | u16::from(style) << 2 | 1;
@@ -1015,7 +1018,7 @@ mod tests {
         record(XF_RECORD, data)
     }
 
-    fn format_record(id: u16, code: &str) -> Record {
+    fn format_record(id: u16, code: &str) -> Frame {
         let mut data = Vec::new();
         data.extend_from_slice(&id.to_le_bytes());
         data.extend_from_slice(&(code.len() as u16).to_le_bytes());
@@ -1273,19 +1276,17 @@ mod tests {
 #[cfg(test)]
 mod real_world_tolerance_tests {
     use super::*;
-    use crate::records::{Record, RecordHeader};
+    use litchi_biff::{Encoder, Kind, Record as Frame};
 
-    fn record(record_type: u16, data: Vec<u8>) -> Record {
-        Record {
-            header: RecordHeader {
-                record_type,
-                data_len: data.len() as u16,
-            },
-            data,
-        }
+    fn record(record_type: u16, data: Vec<u8>) -> Frame {
+        let mut encoder = Encoder::new();
+        encoder
+            .push(Kind::from_wire(record_type), &data)
+            .expect("test frame fits the BIFF wire limit");
+        Frame::open(encoder.finish()).expect("test frame is complete")
     }
 
-    fn format_record(id: u16, code: &str) -> Record {
+    fn format_record(id: u16, code: &str) -> Frame {
         let mut data = id.to_le_bytes().to_vec();
         data.extend_from_slice(&(code.len() as u16).to_le_bytes());
         data.push(0); // compressed characters, no reserved bits
@@ -1295,15 +1296,15 @@ mod real_world_tolerance_tests {
 
     /// `MIN_XF_RECORDS` style XFs plus one cell XF, the smallest set
     /// `parse_globals` accepts.
-    fn minimal_xf_records() -> Vec<Record> {
-        fn xf(style: bool, parent: u16, format_id: u16) -> Record {
+    fn minimal_xf_records() -> Vec<Frame> {
+        fn xf(style: bool, parent: u16, format_id: u16) -> Frame {
             let mut data = vec![0u8; 20];
             data[2..4].copy_from_slice(&format_id.to_le_bytes());
             let flags = (parent << 4) | u16::from(style) << 2 | 1;
             data[4..6].copy_from_slice(&flags.to_le_bytes());
             record(XF_RECORD, data)
         }
-        let mut records: Vec<Record> = (0..MIN_XF_RECORDS - 1)
+        let mut records: Vec<Frame> = (0..MIN_XF_RECORDS - 1)
             .map(|_| xf(true, 0x0fff, 0))
             .collect();
         records.push(xf(false, 0, 164));
@@ -1395,7 +1396,11 @@ mod real_world_tolerance_tests {
 
         let mut tolerance =
             XlsToleranceLog::new(crate::leniency::XlsLeniency::TolerateFormattingDefects);
-        let formatting = XlsFormatting::parse_globals(&records, &mut tolerance)
+        let refs = records
+            .iter()
+            .map(|record| record.as_ref())
+            .collect::<Vec<_>>();
+        let formatting = XlsFormatting::parse_globals(&refs, &mut tolerance)
             .expect("a lenient policy trusts the XF records that were parsed");
         assert_eq!(formatting.extended_formats().len(), MIN_XF_RECORDS);
 

@@ -198,6 +198,29 @@ impl From<litchi_core::binary::BinaryError> for XlsError {
     }
 }
 
+impl From<litchi_biff::Error> for XlsError {
+    fn from(err: litchi_biff::Error) -> Self {
+        match err {
+            litchi_biff::Error::TruncatedHeader { available, .. } => XlsError::InvalidLength {
+                expected: 4,
+                found: available,
+            },
+            litchi_biff::Error::TruncatedPayload {
+                kind,
+                declared,
+                available,
+                ..
+            } => XlsError::InvalidRecord {
+                record_type: kind.get(),
+                message: format!(
+                    "truncated BIFF payload: declared {declared} bytes, only {available} available"
+                ),
+            },
+            other => XlsError::InvalidData(other.to_string()),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

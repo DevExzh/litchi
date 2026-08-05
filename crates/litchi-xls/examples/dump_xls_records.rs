@@ -6,11 +6,12 @@
 //! cargo run --example dump_xls_records --features ole --no-default-features -- path/to/file.xls
 //! ```
 
+use litchi_biff::Records;
 use litchi_cfb::OleFile;
-use litchi_xls::records::{BiffVersion, RecordIter};
+use litchi_xls::records::BiffVersion;
 use std::env;
 use std::fs::File;
-use std::io::{BufReader, Cursor};
+use std::io::BufReader;
 
 fn name_for_sid(sid: u16) -> &'static str {
     match sid {
@@ -50,23 +51,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let len = workbook_stream.len();
     eprintln!("Workbook stream size: {len} bytes\n");
 
-    let cursor = Cursor::new(&workbook_stream[..]);
-    let iter = RecordIter::new(cursor)?;
+    let iter = Records::new(&workbook_stream);
 
-    let mut offset: u64 = 0;
     let mut in_workbook = true;
     let mut sheet_index: usize = 0;
 
     for rec in iter {
         let rec = rec?;
-        let sid = rec.header.record_type;
-        let len = rec.header.data_len;
+        let offset = rec.offset();
+        let sid = rec.kind().get();
+        let len = rec.payload().len();
         let name = name_for_sid(sid);
 
         if sid == 0x0809 {
             // BOF: determine substream type
-            let version_raw = u16::from_le_bytes([rec.data[0], rec.data[1]]);
-            let dt = u16::from_le_bytes([rec.data[2], rec.data[3]]);
+            let version_raw = u16::from_le_bytes([rec.payload()[0], rec.payload()[1]]);
+            let dt = u16::from_le_bytes([rec.payload()[2], rec.payload()[3]]);
             let ver = BiffVersion::from_bof_version(version_raw).unwrap_or(BiffVersion::Biff8);
             if in_workbook {
                 println!("{offset:06X}: BOF(Workbook) ver={ver:?} dt=0x{dt:04X} len={len}",);
@@ -87,8 +87,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             println!("{offset:06X}: [Sheet#{sheet_index}] {name} (0x{sid:04X}) len={len}",);
         }
-
-        offset += 4 + len as u64;
     }
 
     Ok(())

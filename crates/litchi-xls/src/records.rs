@@ -4,116 +4,11 @@
 //! records used in Excel XLS files. BIFF records contain various types of
 //! data including cell values, formatting, formulas, and metadata.
 
-use std::io::{Read, Seek, SeekFrom};
-use zerocopy::{FromBytes, LE, U16};
-
 use crate::error::{XlsError, XlsResult};
 use crate::utils;
+use litchi_biff::RecordRef;
 use litchi_codepage::{Mbcs, Page};
 use litchi_core::binary;
-
-/// BIFF record header (4 bytes: type + length)
-#[derive(Debug, Clone)]
-pub struct RecordHeader {
-    pub record_type: u16,
-    pub data_len: u16,
-}
-
-impl RecordHeader {
-    /// Parse record header from stream
-    pub fn read<R: Read>(reader: &mut R) -> XlsResult<Self> {
-        let mut buf = [0u8; 4];
-        reader.read_exact(&mut buf)?;
-        let record_type = U16::<LE>::read_from_bytes(&buf[0..2])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let data_len = U16::<LE>::read_from_bytes(&buf[2..4])
-            .map(|v| v.get())
-            .unwrap_or(0);
-
-        Ok(RecordHeader {
-            record_type,
-            data_len,
-        })
-    }
-}
-
-/// Iterator over BIFF records in a stream
-pub struct RecordIter<R> {
-    reader: R,
-    stream_len: u64,
-    current_pos: u64,
-}
-
-impl<R: Read + Seek> RecordIter<R> {
-    pub fn new(mut reader: R) -> XlsResult<Self> {
-        let stream_len = reader.seek(SeekFrom::End(0))?;
-        reader.seek(SeekFrom::Start(0))?;
-
-        Ok(RecordIter {
-            reader,
-            stream_len,
-            current_pos: 0,
-        })
-    }
-
-    /// Seek to a specific position in the stream
-    pub fn seek(&mut self, pos: u64) -> XlsResult<()> {
-        self.reader.seek(SeekFrom::Start(pos))?;
-        self.current_pos = pos;
-        Ok(())
-    }
-
-    pub(crate) fn stream_len(&self) -> u64 {
-        self.stream_len
-    }
-
-    pub(crate) fn current_position(&self) -> u64 {
-        self.current_pos
-    }
-
-    pub(crate) fn next_positioned(&mut self) -> Option<(u64, XlsResult<Record>)> {
-        let position = self.current_pos;
-        self.next().map(|record| (position, record))
-    }
-}
-
-impl<R: Read + Seek> Iterator for RecordIter<R> {
-    type Item = XlsResult<Record>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.current_pos >= self.stream_len {
-            return None;
-        }
-
-        match Record::read(&mut self.reader) {
-            Ok(record) => {
-                self.current_pos += 4 + record.header.data_len as u64;
-                Some(Ok(record))
-            },
-            Err(e) => Some(Err(e)),
-        }
-    }
-}
-
-/// A BIFF record with header and data
-#[derive(Debug, Clone)]
-pub struct Record {
-    pub header: RecordHeader,
-    pub data: Vec<u8>,
-}
-
-impl Record {
-    /// Read a complete record from the stream
-    pub fn read<R: Read>(reader: &mut R) -> XlsResult<Self> {
-        let header = RecordHeader::read(reader)?;
-
-        let mut data = vec![0u8; header.data_len as usize];
-        reader.read_exact(&mut data)?;
-
-        Ok(Record { header, data })
-    }
-}
 
 /// BIFF versions supported
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -458,7 +353,10 @@ pub struct PhoneticRun {
 
 impl SharedStringTable {
     /// Parse SST from potentially multiple records (SST + CONTINUE)
-    pub fn parse_from_records(records: &[Record], encoding: &XlsEncoding) -> XlsResult<Self> {
+    pub fn parse_from_records(
+        records: &[RecordRef<'_>],
+        encoding: &XlsEncoding,
+    ) -> XlsResult<Self> {
         if records.is_empty() {
             return Ok(SharedStringTable {
                 strings: Vec::new(),
@@ -467,27 +365,24 @@ impl SharedStringTable {
             });
         }
 
-        if records[0].header.record_type != 0x00FC {
+        if records[0].kind().get() != 0x00FC {
             return Err(XlsError::UnexpectedRecordType {
                 expected: 0x00FC,
-                found: records[0].header.record_type,
+                found: records[0].kind().get(),
             });
         }
         if let Some(record) = records
             .iter()
             .skip(1)
-            .find(|record| record.header.record_type != 0x003C)
+            .find(|record| record.kind().get() != 0x003C)
         {
             return Err(XlsError::UnexpectedRecordType {
                 expected: 0x003C,
-                found: record.header.record_type,
+                found: record.kind().get(),
             });
         }
 
-        let segments: Vec<&[u8]> = records
-            .iter()
-            .map(|record| record.data.as_slice())
-            .collect();
+        let segments: Vec<&[u8]> = records.iter().map(|record| record.payload()).collect();
         Self::parse_segments(&segments, encoding)
     }
 
@@ -890,15 +785,18 @@ fn parse_phonetic_string(
 #[cfg(test)]
 mod shared_string_tests {
     use super::*;
+    use litchi_biff::{Encoder, Kind, Record as Frame, RecordRef, Records};
 
-    fn record(record_type: u16, data: Vec<u8>) -> Record {
-        Record {
-            header: RecordHeader {
-                record_type,
-                data_len: data.len() as u16,
-            },
-            data,
-        }
+    fn record(record_type: u16, data: Vec<u8>) -> Frame {
+        let mut encoder = Encoder::new();
+        encoder
+            .push(Kind::from_wire(record_type), &data)
+            .expect("test frame fits the BIFF wire limit");
+        Frame::open(encoder.finish()).expect("test frame is complete")
+    }
+
+    fn record_refs(records: &[Frame]) -> Vec<RecordRef<'_>> {
+        records.iter().map(|record| record.as_ref()).collect()
     }
 
     fn sst_header(total: u32, unique: u32) -> Vec<u8> {
@@ -1033,7 +931,8 @@ mod shared_string_tests {
         }
 
         let records = [record(0x00FC, first), record(0x003C, second)];
-        let table = SharedStringTable::parse_from_records(&records, &XlsEncoding::Utf16Le).unwrap();
+        let refs = record_refs(&records);
+        let table = SharedStringTable::parse_from_records(&refs, &XlsEncoding::Utf16Le).unwrap();
 
         assert_eq!(table.strings, ["AB漢字"]);
     }
@@ -1049,9 +948,10 @@ mod shared_string_tests {
             record(0x003C, Vec::new()),
             record(0x003C, Vec::new()),
         ];
+        let refs = record_refs(&records);
 
         assert!(matches!(
-            SharedStringTable::parse_from_records(&records, &XlsEncoding::Utf16Le),
+            SharedStringTable::parse_from_records(&refs, &XlsEncoding::Utf16Le),
             Err(XlsError::UnexpectedEndOfStream(_))
         ));
     }
@@ -1067,7 +967,8 @@ mod shared_string_tests {
         let second = vec![0, 9, 0];
 
         let records = [record(0x00FC, first), record(0x003C, second)];
-        let table = SharedStringTable::parse_from_records(&records, &XlsEncoding::Utf16Le).unwrap();
+        let refs = record_refs(&records);
+        let table = SharedStringTable::parse_from_records(&refs, &XlsEncoding::Utf16Le).unwrap();
 
         assert_eq!(
             table.properties[0].as_deref().unwrap().formatting_runs,
@@ -1085,7 +986,8 @@ mod shared_string_tests {
         first.push(0);
         first.push(b'A');
         let bad_flags = [record(0x00FC, first), record(0x003C, vec![2, b'B'])];
-        assert!(SharedStringTable::parse_from_records(&bad_flags, &XlsEncoding::Utf16Le).is_err());
+        let bad_refs = record_refs(&bad_flags);
+        assert!(SharedStringTable::parse_from_records(&bad_refs, &XlsEncoding::Utf16Le).is_err());
 
         let mut truncated = sst_header(1, 1);
         truncated.extend_from_slice(&1u16.to_le_bytes());
@@ -1100,14 +1002,29 @@ mod shared_string_tests {
         let expected = vec!["a".repeat(9000), "漢".repeat(5000)];
         let mut bytes = Vec::new();
         crate::writer::biff::write_sst(&mut bytes, &expected, 2).unwrap();
-        let records: Vec<Record> = RecordIter::new(std::io::Cursor::new(bytes))
-            .unwrap()
-            .collect::<XlsResult<_>>()
-            .unwrap();
+        let records: Vec<RecordRef<'_>> = Records::new(&bytes).collect::<Result<_, _>>().unwrap();
 
         let table = SharedStringTable::parse_from_records(&records, &XlsEncoding::Utf16Le).unwrap();
 
         assert_eq!(table.strings, expected);
+    }
+
+    #[test]
+    fn maps_truncated_shared_frame_errors_at_the_xls_boundary() {
+        let truncated = [0xFC, 0x00, 0x04, 0x00, 0x01, 0x02];
+        let error = Records::new(&truncated)
+            .next()
+            .expect("the malformed input yields one framing error")
+            .expect_err("the payload is shorter than its declared length");
+        let error = XlsError::from(error);
+
+        assert!(matches!(
+            error,
+            XlsError::InvalidRecord {
+                record_type: 0x00FC,
+                ..
+            }
+        ));
     }
 }
 

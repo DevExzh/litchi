@@ -12,7 +12,7 @@ use crate::leniency::{XlsLeniency, XlsToleranceLog, XlsToleranceReport};
 use crate::number_format::{XlsDateSystem, XlsExtendedFormat, XlsFormatting, XlsNumberFormat};
 use crate::records::{
     BiffVersion, BofRecord, BoundSheetRecord, CellRecord, DimensionsRecord, FormulaValue,
-    RecordIter, SharedStringProperties, SharedStringTable, XlsEncoding,
+    SharedStringProperties, SharedStringTable, XlsEncoding,
 };
 use crate::sheet_metadata::XlsSheetMetadata;
 use crate::worksheet::XlsWorksheet;
@@ -20,6 +20,7 @@ use crate::{
     autofilter, comments, conditional_format, hyperlinks, layout, merged_cells, page_setup,
     pivot_table, protection, utils, view,
 };
+use litchi_biff::Records;
 use litchi_cfb::OleFile;
 use litchi_core::sheet::{Result, Worksheet as SheetTrait, WorksheetIterator};
 use std::collections::{HashMap, HashSet};
@@ -361,7 +362,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         let workbook_data = prepare_workbook_stream(workbook_data, options.password)?;
         let mut tolerance = XlsToleranceLog::new(options.leniency);
 
-        let mut record_iter = RecordIter::new(std::io::Cursor::new(&workbook_data))?;
+        let mut records = Records::new(&workbook_data);
         let mut encoding = XlsEncoding::from_codepage(1252)?; // Default codepage
         let mut bound_sheets = Vec::new();
         let mut strings = Vec::new();
@@ -370,7 +371,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         // Parse workbook globals
         let mut defined_name_slots = Vec::new();
         self.parse_workbook_globals(
-            &mut record_iter,
+            &mut records,
             &mut encoding,
             WorkbookGlobalsSink {
                 bound_sheets: &mut bound_sheets,
@@ -429,7 +430,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             if bound_sheet.sheet_type != crate::records::SheetType::WorkSheet {
                 continue;
             }
-            match self.parse_worksheet_from_position(bound_sheet, &encoding, &mut record_iter) {
+            match self.parse_worksheet_from_position(&workbook_data, bound_sheet, &encoding) {
                 Ok(worksheet) => {
                     let worksheet_index = self.worksheets.len();
                     self.worksheet_names.push(bound_sheet.name.clone());
@@ -498,9 +499,9 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     }
 
     /// Parse workbook globals (SST, bound sheets, etc.)
-    fn parse_workbook_globals<Reader: Read + Seek>(
+    fn parse_workbook_globals(
         &mut self,
-        record_iter: &mut RecordIter<Reader>,
+        records_iter: &mut Records<'_>,
         encoding: &mut XlsEncoding,
         sink: WorkbookGlobalsSink<'_>,
     ) -> XlsResult<()> {
@@ -513,9 +514,9 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         } = sink;
         // Collect all records first for easier processing
         let mut records = Vec::new();
-        for record_result in record_iter.by_ref() {
+        for record_result in records_iter.by_ref() {
             let record = record_result?;
-            let is_globals_eof = record.header.record_type == 0x000A;
+            let is_globals_eof = record.kind().get() == 0x000A;
             records.push(record);
             if is_globals_eof {
                 break;
@@ -542,7 +543,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         while i < records.len() {
             let record = &records[i];
             if !matches!(
-                record.header.record_type,
+                record.kind().get(),
                 LBL_RECORD_TYPE
                     | NAME_CMT_RECORD_TYPE
                     | crate::defined_names::NAME_FN_GRP12_RECORD_TYPE
@@ -551,37 +552,37 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             ) {
                 name_optional_target = None;
             }
-            if record.header.record_type == 0x003c && name_optional_target.is_some() {
+            if record.kind().get() == 0x003c && name_optional_target.is_some() {
                 return Err(XlsError::InvalidRecord {
                     record_type: 0x003c,
                     message: "CONTINUE is not permitted after a post-Lbl optional record"
                         .to_string(),
                 });
             }
-            protection_collector.feed_record(record.header.record_type, &record.data)?;
-            calculation_collector.feed_record(record.header.record_type, &record.data)?;
-            vba_collector.feed_record(record.header.record_type, &record.data)?;
-            environment_collector.feed_record(record.header.record_type, &record.data)?;
-            write_access_collector.feed_record(record.header.record_type, &record.data);
-            table_styles_collector.feed_record(record.header.record_type, &record.data)?;
-            shared_string_index_collector.feed_record(record.header.record_type, &record.data);
-            workbook_view_collector.feed_record(record.header.record_type, &record.data)?;
-            function_group_collector.feed_record(record.header.record_type, &record.data)?;
-            external_link_collector.feed_record(record.header.record_type, &record.data)?;
+            protection_collector.feed_record(record.kind().get(), record.payload())?;
+            calculation_collector.feed_record(record.kind().get(), record.payload())?;
+            vba_collector.feed_record(record.kind().get(), record.payload())?;
+            environment_collector.feed_record(record.kind().get(), record.payload())?;
+            write_access_collector.feed_record(record.kind().get(), record.payload());
+            table_styles_collector.feed_record(record.kind().get(), record.payload())?;
+            shared_string_index_collector.feed_record(record.kind().get(), record.payload());
+            workbook_view_collector.feed_record(record.kind().get(), record.payload())?;
+            function_group_collector.feed_record(record.kind().get(), record.payload())?;
+            external_link_collector.feed_record(record.kind().get(), record.payload())?;
 
-            match record.header.record_type {
+            match record.kind().get() {
                 crate::font::FONT_RECORD_TYPE => {
                     let index = crate::font::logical_font_index(self.fonts.len())?;
                     self.fonts
                         .push(crate::font::XlsFont::parse_record(
                             index,
-                            &record.data,
+                            record.payload(),
                             tolerance,
                         )?);
                 },
                 0x0092 => {
                     self.palette = crate::palette::XlsPalette::parse_unique_record(
-                        &record.data,
+                        record.payload(),
                         &mut palette_seen,
                     )?;
                 },
@@ -595,33 +596,33 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     let mut continues = Vec::new();
                     while records
                         .get(i + 1)
-                        .is_some_and(|next| next.header.record_type
+                        .is_some_and(|next| next.kind().get()
                             == crate::theme::CONTINUE_FRT12_RECORD_TYPE)
                     {
                         i += 1;
-                        continues.push(records[i].data.clone());
+                        continues.push(records[i].payload().to_vec());
                     }
-                    self.theme = Some(crate::theme::XlsTheme::parse(&record.data, &continues)?);
+                    self.theme = Some(crate::theme::XlsTheme::parse(record.payload(), &continues)?);
                 },
                 crate::style_ext::STYLE_EXT_RECORD_TYPE => {
                     self.style_extensions
-                        .push(crate::style_ext::XlsStyleExt::parse(&record.data)?);
+                        .push(crate::style_ext::XlsStyleExt::parse(record.payload())?);
                 },
                 crate::custom_view::USER_B_VIEW_RECORD_TYPE => {
                     self.custom_views
-                        .push(crate::custom_view::XlsWorkbookCustomView::parse(&record.data)?);
+                        .push(crate::custom_view::XlsWorkbookCustomView::parse(record.payload())?);
                 },
                 crate::real_time_data::REAL_TIME_DATA_RECORD_TYPE => {
                     // RTD = RealTimeData *ContinueFrt (MS-XLS 2.1): the
                     // logical payload is the record body plus any trailing
                     // ContinueFrt bodies.
-                    let mut payload = record.data.clone();
+                    let mut payload = record.payload().to_vec();
                     while records.get(i + 1).is_some_and(|next| {
-                        next.header.record_type
+                        next.kind().get()
                             == crate::real_time_data::CONTINUE_FRT_RECORD_TYPE
                     }) {
                         i += 1;
-                        payload.extend_from_slice(&records[i].data);
+                        payload.extend_from_slice(records[i].payload());
                     }
                     let previous_topic =
                         self.real_time_data.last().map(|topic| topic.topic.as_str());
@@ -631,7 +632,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 },
                 crate::web_pub::WEB_PUB_RECORD_TYPE => {
                     self.web_publications
-                        .push(crate::web_pub::XlsWebPub::parse(&record.data)?);
+                        .push(crate::web_pub::XlsWebPub::parse(record.payload())?);
                 },
                 crate::mdx_metadata::MDT_INFO_RECORD_TYPE
                 | crate::mdx_metadata::MDX_STR_RECORD_TYPE
@@ -643,16 +644,16 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     // METADATA records are continued by ContinueFrt12 (MS-XLS
                     // 2.1): the logical payload is the record body plus any
                     // trailing ContinueFrt12 bodies.
-                    let mut payload = record.data.clone();
+                    let mut payload = record.payload().to_vec();
                     while records.get(i + 1).is_some_and(|next| {
-                        next.header.record_type
+                        next.kind().get()
                             == crate::mdx_metadata::CONTINUE_FRT12_RECORD_TYPE
                     }) {
                         i += 1;
-                        payload.extend_from_slice(&records[i].data);
+                        payload.extend_from_slice(records[i].payload());
                     }
                     self.mdx_metadata
-                        .push_record(record.header.record_type, &payload)?;
+                        .push_record(record.kind().get(), &payload)?;
                 },
                 crate::book_ext::BOOK_EXT_RECORD_TYPE => {
                     if self.book_ext.is_some() {
@@ -661,36 +662,36 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                             message: "workbook contains more than one BookExt record".to_string(),
                         });
                     }
-                    self.book_ext = Some(crate::book_ext::XlsBookExt::parse(&record.data)?);
+                    self.book_ext = Some(crate::book_ext::XlsBookExt::parse(record.payload())?);
                 },
                 0x0809 => {
                     // BOF
-                    let bof = BofRecord::parse(&record.data)?;
+                    let bof = BofRecord::parse(record.payload())?;
                     self.biff_version = bof.version;
                     self.is_1904_date_system = bof.is_1904_date_system;
                 },
                 0x0042
                     // CodePage
-                    if record.data.len() >= 2 => {
-                        let codepage = litchi_core::binary::read_u16_le_at(&record.data, 0)?;
+                    if record.payload().len() >= 2 => {
+                        let codepage = litchi_core::binary::read_u16_le_at(record.payload(), 0)?;
                         *encoding = XlsEncoding::from_codepage(codepage)?;
                     },
                 0x0022
                     // Date1904
-                    if record.data.len() >= 2 => {
-                        let flag = litchi_core::binary::read_u16_le_at(&record.data, 0)?;
+                    if record.payload().len() >= 2 => {
+                        let flag = litchi_core::binary::read_u16_le_at(record.payload(), 0)?;
                         self.is_1904_date_system = flag == 1;
                     },
                 0x0085 => {
                     // BoundSheet8
-                    let sheet = BoundSheetRecord::parse(&record.data, encoding)?;
+                    let sheet = BoundSheetRecord::parse(record.payload(), encoding)?;
                     bound_sheets.push(sheet);
                 },
                 0x00D5 => {
-                    if record.data.len() != 2 {
-                        return Err(XlsError::InvalidLength { expected: 2, found: record.data.len() });
+                    if record.payload().len() != 2 {
+                        return Err(XlsError::InvalidLength { expected: 2, found: record.payload().len() });
                     }
-                    let stream_id = litchi_core::binary::read_u16_le_at(&record.data, 0)?;
+                    let stream_id = litchi_core::binary::read_u16_le_at(record.payload(), 0)?;
                     if stream_id == 0 || self.pivot_cache_stream_ids.contains(&stream_id) {
                         return Err(XlsError::InvalidRecord {
                             record_type: 0x00D5,
@@ -702,12 +703,12 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 0x01AE => {
                     // SUPBOOK: retain its position and whether it references
                     // this workbook so EXTERNSHEET indices remain stable.
-                    self.formula_context.add_sup_book(&record.data);
+                    self.formula_context.add_sup_book(record.payload());
                 },
                 0x0017 => {
                     // EXTERNSHEET: XTI entries used by PtgRef3d/PtgArea3d.
                     self.formula_context
-                        .add_extern_sheet(&record.data)
+                        .add_extern_sheet(record.payload())
                         .map_err(|message| XlsError::InvalidRecord {
                             record_type: 0x0017,
                             message: message.to_string(),
@@ -725,18 +726,22 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                             record_type: LBL_RECORD_TYPE,
                             message: "Lbl record index overflows".to_string(),
                         })?;
-                    let mut combined = record.data.clone();
+                    let mut combined = record.payload().to_vec();
                     let mut continuation_chunks = Vec::new();
                     let mut next = i + 1;
-                    while next < records.len() && records[next].header.record_type == 0x003c {
-                        if combined.len().checked_add(records[next].data.len()).is_none_or(|len| len > 1_048_576) {
+                    while next < records.len() && records[next].kind().get() == 0x003c {
+                        if combined
+                            .len()
+                            .checked_add(records[next].payload().len())
+                            .is_none_or(|len| len > 1_048_576)
+                        {
                             return Err(XlsError::InvalidRecord {
                                 record_type: LBL_RECORD_TYPE,
                                 message: "Lbl continuation data exceeds resource bound".to_string(),
                             });
                         }
-                        continuation_chunks.push(records[next].data.clone());
-                        combined.extend_from_slice(&records[next].data);
+                        continuation_chunks.push(records[next].payload().to_vec());
+                        combined.extend_from_slice(records[next].payload());
                         next += 1;
                     }
                     defined_name_slots.push(DefinedNameSlot::parse_with_continuations(
@@ -751,20 +756,20 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                         message: "NameCmt does not immediately follow a Lbl record".to_string(),
                     })?;
                     if stage!=0{return Err(XlsError::InvalidRecord{record_type:NAME_CMT_RECORD_TYPE,message:"NameCmt is duplicated or out of order in the Lbl optional-record sequence".to_string()})}
-                    defined_name_slots[target].attach_comment(&record.data)?;
+                    defined_name_slots[target].attach_comment(record.payload())?;
                     name_optional_target=Some((target,1));
                 },
-                crate::defined_names::NAME_FN_GRP12_RECORD_TYPE=>{let(target,stage)=name_optional_target.ok_or_else(||XlsError::InvalidRecord{record_type:crate::defined_names::NAME_FN_GRP12_RECORD_TYPE,message:"NameFnGrp12 does not follow a Lbl record".to_string()})?;if stage>1{return Err(XlsError::InvalidRecord{record_type:crate::defined_names::NAME_FN_GRP12_RECORD_TYPE,message:"NameFnGrp12 is duplicated or out of order in the Lbl optional-record sequence".to_string()})}defined_name_slots[target].attach_function_group(&record.data)?;name_optional_target=Some((target,2));},
-                crate::defined_names::NAME_PUBLISH_RECORD_TYPE=>{let(target,stage)=name_optional_target.ok_or_else(||XlsError::InvalidRecord{record_type:crate::defined_names::NAME_PUBLISH_RECORD_TYPE,message:"NamePublish does not follow a Lbl record".to_string()})?;if stage>2{return Err(XlsError::InvalidRecord{record_type:crate::defined_names::NAME_PUBLISH_RECORD_TYPE,message:"NamePublish is duplicated or out of order in the Lbl optional-record sequence".to_string()})}defined_name_slots[target].attach_publication(&record.data)?;name_optional_target=Some((target,3));},
+                crate::defined_names::NAME_FN_GRP12_RECORD_TYPE=>{let(target,stage)=name_optional_target.ok_or_else(||XlsError::InvalidRecord{record_type:crate::defined_names::NAME_FN_GRP12_RECORD_TYPE,message:"NameFnGrp12 does not follow a Lbl record".to_string()})?;if stage>1{return Err(XlsError::InvalidRecord{record_type:crate::defined_names::NAME_FN_GRP12_RECORD_TYPE,message:"NameFnGrp12 is duplicated or out of order in the Lbl optional-record sequence".to_string()})}defined_name_slots[target].attach_function_group(record.payload())?;name_optional_target=Some((target,2));},
+                crate::defined_names::NAME_PUBLISH_RECORD_TYPE=>{let(target,stage)=name_optional_target.ok_or_else(||XlsError::InvalidRecord{record_type:crate::defined_names::NAME_PUBLISH_RECORD_TYPE,message:"NamePublish does not follow a Lbl record".to_string()})?;if stage>2{return Err(XlsError::InvalidRecord{record_type:crate::defined_names::NAME_PUBLISH_RECORD_TYPE,message:"NamePublish is duplicated or out of order in the Lbl optional-record sequence".to_string()})}defined_name_slots[target].attach_publication(record.payload())?;name_optional_target=Some((target,3));},
                 0x00FC => {
                     // SST
                     // SST may span multiple records, collect them all
-                    let mut sst_records = vec![record.clone()];
+                    let mut sst_records = vec![*record];
                     let mut sst_idx = i + 1;
 
                     // Collect all following CONTINUE records
-                    while sst_idx < records.len() && records[sst_idx].header.record_type == 0x003C {
-                        sst_records.push(records[sst_idx].clone());
+                    while sst_idx < records.len() && records[sst_idx].kind().get() == 0x003C {
+                        sst_records.push(records[sst_idx]);
                         sst_idx += 1;
                     }
 
@@ -804,27 +809,39 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     }
 
     /// Parse a worksheet from its position in the workbook stream
-    fn parse_worksheet_from_position<Reader: Read + Seek>(
+    fn parse_worksheet_from_position(
         &self,
+        workbook_data: &[u8],
         bound_sheet: &BoundSheetRecord,
         encoding: &XlsEncoding,
-        record_iter: &mut RecordIter<Reader>,
     ) -> XlsResult<XlsWorksheet> {
-        // Seek to the worksheet position
-        record_iter.seek(bound_sheet.position as u64)?;
+        let worksheet_position = usize::try_from(bound_sheet.position).map_err(|_| {
+            XlsError::InvalidData("worksheet position does not fit in usize".to_string())
+        })?;
+        let mut records = Records::new(workbook_data);
 
-        // Skip the BOF record at the beginning of the worksheet
-        if let Some(record_result) = record_iter.next() {
+        // Consume the borrowed stream until the exact worksheet BOF offset.
+        let bof = loop {
+            let Some(record_result) = records.next() else {
+                return Err(XlsError::Eof("Expected BOF record for worksheet"));
+            };
             let record = record_result?;
-            if record.header.record_type != 0x0809 {
-                // BOF
-                return Err(XlsError::UnexpectedRecordType {
-                    expected: 0x0809,
-                    found: record.header.record_type,
-                });
+            if record.offset() < worksheet_position {
+                continue;
             }
-        } else {
-            return Err(XlsError::Eof("Expected BOF record for worksheet"));
+            if record.offset() != worksheet_position {
+                return Err(XlsError::InvalidData(
+                    "BoundSheet8 points into the middle of a BIFF record".to_string(),
+                ));
+            }
+            break record;
+        };
+
+        if bof.kind().get() != 0x0809 {
+            return Err(XlsError::UnexpectedRecordType {
+                expected: 0x0809,
+                found: bof.kind().get(),
+            });
         }
 
         // Parse worksheet records (clone Arc is cheap - just increments ref count)
@@ -837,7 +854,9 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             .clone()
             .unwrap_or_else(|| Arc::new(Vec::new()));
         Self::parse_worksheet_records(
-            record_iter,
+            &mut records,
+            workbook_data.len() as u64,
+            bof.offset() as u64 + bof.encoded().len() as u64,
             encoding,
             &bound_sheet.name,
             shared_strings,
@@ -848,8 +867,10 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     }
 
     /// Parse worksheet records sequentially
-    fn parse_worksheet_records<Reader: Read + Seek>(
-        record_iter: &mut RecordIter<Reader>,
+    fn parse_worksheet_records(
+        records_iter: &mut Records<'_>,
+        stream_len: u64,
+        current_position: u64,
         encoding: &XlsEncoding,
         name: &str,
         shared_strings: Arc<Vec<String>>,
@@ -886,83 +907,82 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         // (0x0895) that must not be mistaken for the sheet-level sort.
         let mut query_table_collector = crate::query_table::QueryTableCollector::new();
         let mut sort_data_collector = crate::sort_data::SortDataCollector::default();
-        let mut row_block_index_collector = crate::row_block_index::RowBlockIndexCollector::new(
-            record_iter.stream_len(),
-            record_iter.current_position(),
-        );
+        let mut row_block_index_collector =
+            crate::row_block_index::RowBlockIndexCollector::new(stream_len, current_position);
         let mut pending_string_formula: Option<CellRecord> = None;
         let mut shared_formulas = HashMap::<(u16, u16), SharedFormulaTemplate>::new();
         let mut remaining_data_validations: Option<usize> = None;
 
-        while let Some((record_position, record_result)) = record_iter.next_positioned() {
+        while let Some(record_result) = records_iter.next() {
             let record = record_result?;
-            sheet_layout_collector.feed_record(record.header.record_type, &record.data)?;
-            comment_collector.feed_record(record.header.record_type, &record.data)?;
-            hyperlink_collector.feed_record(record.header.record_type, &record.data)?;
-            layout_collector.feed_record(record.header.record_type, &record.data, &formatting)?;
-            view_collector.feed_record(record.header.record_type, &record.data)?;
-            page_setup_collector.feed_record(record.header.record_type, &record.data)?;
-            protection_collector.feed_record(record.header.record_type, &record.data)?;
+            let record_position = record.offset() as u64;
+            sheet_layout_collector.feed_record(record.kind().get(), record.payload())?;
+            comment_collector.feed_record(record.kind().get(), record.payload())?;
+            hyperlink_collector.feed_record(record.kind().get(), record.payload())?;
+            layout_collector.feed_record(record.kind().get(), record.payload(), &formatting)?;
+            view_collector.feed_record(record.kind().get(), record.payload())?;
+            page_setup_collector.feed_record(record.kind().get(), record.payload())?;
+            protection_collector.feed_record(record.kind().get(), record.payload())?;
             conditional_format_collector.feed_record(
-                record.header.record_type,
-                &record.data,
+                record.kind().get(),
+                record.payload(),
                 formula_context,
             )?;
-            calculation_collector.feed_record(record.header.record_type, &record.data)?;
-            scenario_collector.feed_record(record.header.record_type, &record.data)?;
-            vba_collector.feed_record(record.header.record_type, &record.data)?;
-            consolidation_collector.feed_record(record.header.record_type, &record.data)?;
-            formula_error_collector.feed_record(record.header.record_type, &record.data)?;
-            list_object_collector.feed_record(record.header.record_type, &record.data)?;
+            calculation_collector.feed_record(record.kind().get(), record.payload())?;
+            scenario_collector.feed_record(record.kind().get(), record.payload())?;
+            vba_collector.feed_record(record.kind().get(), record.payload())?;
+            consolidation_collector.feed_record(record.kind().get(), record.payload())?;
+            formula_error_collector.feed_record(record.kind().get(), record.payload())?;
+            list_object_collector.feed_record(record.kind().get(), record.payload())?;
             let query_table_consumed =
-                query_table_collector.feed_record(record.header.record_type, &record.data);
+                query_table_collector.feed_record(record.kind().get(), record.payload());
             if !query_table_consumed
                 && let Some(sort_data) =
-                    sort_data_collector.feed_record(record.header.record_type, &record.data)?
+                    sort_data_collector.feed_record(record.kind().get(), record.payload())?
             {
                 worksheet.set_extended_sort(sort_data);
             }
             row_block_index_collector.feed_record(
                 record_position,
-                record.header.record_type,
-                &record.data,
+                record.kind().get(),
+                record.payload(),
             );
 
             if matches!(remaining_data_validations, Some(1..))
-                && record.header.record_type != super::data_validation::DV_RECORD_TYPE
+                && record.kind().get() != super::data_validation::DV_RECORD_TYPE
             {
                 return Err(XlsError::InvalidRecord {
-                    record_type: record.header.record_type,
+                    record_type: record.kind().get(),
                     message: "DVAL must be followed immediately by its declared DV records"
                         .to_string(),
                 });
             }
 
             if let Some(mut formula) = pending_string_formula.take() {
-                if record.header.record_type == 0x0207 {
+                if record.kind().get() == 0x0207 {
                     // The cached string result may span Continue records
                     // (MS-XLS 2.1: FORMULA = ... [String *Continue]).
                     let mut continues = Vec::new();
                     let text = loop {
-                        match utils::decode_string_record(&record.data, &continues)? {
+                        match utils::decode_string_record(record.payload(), &continues)? {
                             utils::StringRecordDecode::Complete(text) => break text,
                             utils::StringRecordDecode::NeedContinue => {
-                                let next = record_iter.next().ok_or_else(|| {
+                                let next = records_iter.next().ok_or_else(|| {
                                     XlsError::InvalidRecord {
                                         record_type: 0x0207,
                                         message: "String result ends before its Continue records"
                                             .to_string(),
                                     }
                                 })??;
-                                if next.header.record_type != 0x003C {
+                                if next.kind().get() != 0x003C {
                                     return Err(XlsError::InvalidRecord {
-                                        record_type: next.header.record_type,
+                                        record_type: next.kind().get(),
                                         message:
                                             "String result continuation must be a Continue record"
                                                 .to_string(),
                                     });
                                 }
-                                continues.push(next.data);
+                                continues.push(next.payload().to_vec());
                             },
                         }
                     };
@@ -994,9 +1014,9 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 // SUB] [String *Continue]) these records legally intervene
                 // between the Formula and its String; keep the formula pending
                 // and let the records flow through the normal walk.
-                if !matches!(record.header.record_type, 0x0221 | 0x0236 | 0x04BC | 0x0091) {
+                if !matches!(record.kind().get(), 0x0221 | 0x0236 | 0x04BC | 0x0091) {
                     return Err(XlsError::InvalidRecord {
-                        record_type: record.header.record_type,
+                        record_type: record.kind().get(),
                         message: "String-valued Formula must be followed by a String record"
                             .to_string(),
                     });
@@ -1006,16 +1026,16 @@ impl<R: Read + Seek> XlsWorkbook<R> {
 
             if !query_table_consumed
                 && pivot_table_collector
-                    .feed_record(record.header.record_type, &record.data)
+                    .feed_record(record.kind().get(), record.payload())
                     .map_err(|error| XlsError::InvalidRecord {
-                        record_type: record.header.record_type,
+                        record_type: record.kind().get(),
                         message: error.to_string(),
                     })?
             {
                 continue;
             }
 
-            match record.header.record_type {
+            match record.kind().get() {
                 0x0809 => { // BOF - Beginning of worksheet
                     // This marks the start of a worksheet
                 }
@@ -1026,7 +1046,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                             message: "worksheet contains more than one DVAL record".to_string(),
                         });
                     }
-                    let settings = super::data_validation::parse_dval(&record.data)?;
+                    let settings = super::data_validation::parse_dval(record.payload())?;
                     remaining_data_validations = Some(usize::from(settings.declared_rule_count()));
                     worksheet.set_data_validation_settings(settings);
                 }
@@ -1043,7 +1063,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                             message: "DV record exceeds the count declared by DVAL".to_string(),
                         });
                     }
-                    worksheet.add_data_validation(super::data_validation::parse_dv(&record.data, formula_context)?);
+                    worksheet.add_data_validation(super::data_validation::parse_dv(record.payload(), formula_context)?);
                     *remaining -= 1;
                 }
                 0x000A => { // EOF - End of worksheet
@@ -1057,38 +1077,38 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                             message: "worksheet contains more than one SheetExt record".to_string(),
                         });
                     }
-                    worksheet.set_sheet_ext(crate::sheet_ext::XlsSheetExt::parse(&record.data)?);
+                    worksheet.set_sheet_ext(crate::sheet_ext::XlsSheetExt::parse(record.payload())?);
                 }
                 crate::data_table::TABLE_RECORD_TYPE => { // Table
-                    worksheet.add_data_table(crate::data_table::XlsDataTable::parse(&record.data)?);
+                    worksheet.add_data_table(crate::data_table::XlsDataTable::parse(record.payload())?);
                 }
                 crate::web_pub::WEB_PUB_RECORD_TYPE => { // WebPub
                     worksheet
-                        .add_web_publication(crate::web_pub::XlsWebPub::parse(&record.data)?);
+                        .add_web_publication(crate::web_pub::XlsWebPub::parse(record.payload())?);
                 }
                 crate::custom_view::USER_S_VIEW_BEGIN_RECORD_TYPE => { // UserSViewBegin
                     let begin =
-                        crate::custom_view::XlsSheetCustomViewBegin::parse(&record.data)?;
+                        crate::custom_view::XlsSheetCustomViewBegin::parse(record.payload())?;
                     // CUSTOMVIEW = UserSViewBegin *CUSTOMVIEWCONTENT
                     // UserSViewEnd: the inner records duplicate ordinary
                     // sheet settings for the view, so consume them inertly
                     // instead of feeding them to the sheet collectors.
                     let end = loop {
-                        let next = record_iter.next().ok_or_else(|| XlsError::InvalidRecord {
+                        let next = records_iter.next().ok_or_else(|| XlsError::InvalidRecord {
                             record_type: crate::custom_view::USER_S_VIEW_BEGIN_RECORD_TYPE,
                             message: "UserSViewBegin is not closed by a UserSViewEnd".to_string(),
                         })??;
-                        if next.header.record_type
+                        if next.kind().get()
                             == crate::custom_view::USER_S_VIEW_END_RECORD_TYPE
                         {
                             let end = crate::custom_view::XlsSheetCustomViewEnd::parse(
-                                &next.data,
+                                next.payload(),
                             )?;
                             // The closing record is consumed by this loop rather than the
                             // normal collector feed path. Close the stateful page-setup
                             // collector explicitly so primary records after the custom-view
                             // bracket are not mistaken for custom-view content.
-                            page_setup_collector.feed_record(next.header.record_type, &next.data)?;
+                            page_setup_collector.feed_record(next.kind().get(), next.payload())?;
                             break end;
                         }
                     };
@@ -1111,29 +1131,29 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     }
                     // PHONETICINFO = PhoneticInfo *Continue: pull Continue
                     // records while the declared range list is incomplete.
-                    let mut payload = record.data.clone();
+                    let mut payload = record.payload().to_vec();
                     while payload.len() < 6
                         || payload.len()
                             < 6 + usize::from(u16::from_le_bytes([payload[4], payload[5]])) * 6
                     {
-                        let next = record_iter.next().ok_or(XlsError::InvalidLength {
+                        let next = records_iter.next().ok_or(XlsError::InvalidLength {
                             expected: payload.len() + 1,
                             found: payload.len(),
                         })??;
-                        if next.header.record_type != 0x003C {
+                        if next.kind().get() != 0x003C {
                             return Err(XlsError::InvalidRecord {
-                                record_type: next.header.record_type,
+                                record_type: next.kind().get(),
                                 message: "PhoneticInfo continuation must be a Continue record"
                                     .to_string(),
                             });
                         }
-                        payload.extend_from_slice(&next.data);
+                        payload.extend_from_slice(next.payload());
                     }
                     worksheet
                         .set_phonetic_info(crate::phonetic_info::XlsPhoneticInfo::parse(&payload)?);
                 }
                 0x0200 => { // Dimensions
-                    if let Ok(dimensions) = DimensionsRecord::parse(&record.data) {
+                    if let Ok(dimensions) = DimensionsRecord::parse(record.payload()) {
                         worksheet.set_dimensions(dimensions.first_row, dimensions.last_row,
                                                dimensions.first_col, dimensions.last_col);
                     }
@@ -1147,7 +1167,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 0x00FD | // LabelSst
                 0x0006   // Formula
                 => {
-                    let cell_record = CellRecord::parse(record.header.record_type, &record.data, encoding)?;
+                    let cell_record = CellRecord::parse(record.kind().get(), record.payload(), encoding)?;
                     formatting.validate_cell_xf(cell_record_xf(&cell_record))?;
                     if matches!(
                         &cell_record,
@@ -1181,8 +1201,8 @@ impl<R: Read + Seek> XlsWorkbook<R> {
 
                 0x04BC | 0x0221 => { // ShrFmla or Array
                     let template = parse_shared_formula_template(
-                        record.header.record_type,
-                        &record.data,
+                        record.kind().get(),
+                        record.payload(),
                     )?;
                     let anchor = (template.first_row, template.first_col);
                     let rendered = template.render(formula_context, anchor.0, anchor.1);
@@ -1196,7 +1216,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 }
 
                 0x00BD => { // MulRk
-                    for cell_record in CellRecord::parse_mul_rk(&record.data)? {
+                    for cell_record in CellRecord::parse_mul_rk(record.payload())? {
                         formatting.validate_cell_xf(cell_record_xf(&cell_record))?;
                         if let Some(cell) = XlsCell::from_record_with_formula_context(
                             &cell_record,
@@ -1210,7 +1230,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 }
 
                 0x00BE => { // MulBlank
-                    for cell_record in CellRecord::parse_mul_blank(&record.data)? {
+                    for cell_record in CellRecord::parse_mul_blank(record.payload())? {
                         formatting.validate_cell_xf(cell_record_xf(&cell_record))?;
                         if let Some(cell) = XlsCell::from_record_with_formula_context(
                             &cell_record,
@@ -1226,35 +1246,35 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 // --- Merged cells (MERGECELLS 0x00E5) ---
                 rt if rt == merged_cells::RECORD_TYPE => {
                     let mut ranges = Vec::new();
-                    if merged_cells::parse_mergecells_record(&record.data, &mut ranges).is_ok() {
+                    if merged_cells::parse_mergecells_record(record.payload(), &mut ranges).is_ok() {
                         worksheet.add_merged_cells(&ranges);
                     }
                 }
 
                 // --- AutoFilter (AUTOFILTERINFO 0x009D) ---
                 rt if rt == autofilter::AUTOFILTERINFO_TYPE => {
-                    if let Ok(count) = autofilter::parse_autofilterinfo(&record.data) {
+                    if let Ok(count) = autofilter::parse_autofilterinfo(record.payload()) {
                         worksheet.set_autofilter_info(count);
                     }
                 }
 
                 // --- AutoFilter column (AUTOFILTER 0x009E) ---
                 rt if rt == autofilter::AUTOFILTER_TYPE => {
-                    if let Ok(col) = autofilter::parse_autofilter(&record.data) {
+                    if let Ok(col) = autofilter::parse_autofilter(record.payload()) {
                         worksheet.add_autofilter_column(col);
                     }
                 }
 
                 // --- Sort (SORT 0x0090) ---
                 rt if rt == autofilter::SORT_TYPE => {
-                    if let Ok(info) = autofilter::parse_sort(&record.data) {
+                    if let Ok(info) = autofilter::parse_sort(record.payload()) {
                         worksheet.set_sort_info(info);
                     }
                 }
 
                 // --- Filter mode (FILTERMODE 0x009B) ---
                 rt if rt == autofilter::FILTERMODE_TYPE
-                    && autofilter::parse_filtermode(&record.data).is_ok() =>
+                    && autofilter::parse_filtermode(record.payload()).is_ok() =>
                 {
                     worksheet.set_filter_mode(true);
                 }
@@ -2013,10 +2033,12 @@ mod tests {
         push_record(&mut stream, 0x00BD, &mul_rk);
         push_record(&mut stream, 0x00BE, &mul_blank);
         push_record(&mut stream, 0x000A, &[]);
-        let mut records = RecordIter::new(Cursor::new(stream)).unwrap();
+        let mut records = Records::new(&stream);
 
         let worksheet = XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
             &mut records,
+            stream.len() as u64,
+            0,
             &XlsEncoding::Utf16Le,
             "Sheet1",
             Arc::new(Vec::new()),
@@ -2051,10 +2073,12 @@ mod tests {
         push_record(&mut stream, 0x0006, &string_formula_data(4, 5));
         push_record(&mut stream, 0x0207, &string_data);
         push_record(&mut stream, 0x000A, &[]);
-        let mut records = RecordIter::new(Cursor::new(stream)).unwrap();
+        let mut records = Records::new(&stream);
 
         let worksheet = XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
             &mut records,
+            stream.len() as u64,
+            0,
             &XlsEncoding::Utf16Le,
             "Sheet1",
             Arc::new(Vec::new()),
@@ -2077,10 +2101,12 @@ mod tests {
         let mut stream = Vec::new();
         push_record(&mut stream, 0x0006, &string_formula_data(0, 0));
         push_record(&mut stream, 0x000A, &[]);
-        let mut records = RecordIter::new(Cursor::new(stream)).unwrap();
+        let mut records = Records::new(&stream);
 
         let result = XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
             &mut records,
+            stream.len() as u64,
+            0,
             &XlsEncoding::Utf16Le,
             "Sheet1",
             Arc::new(Vec::new()),
@@ -2114,9 +2140,11 @@ mod tests {
         push_record(&mut stream, 0x0014, &[]);
         push_record(&mut stream, 0x000A, &[]);
 
-        let mut records = RecordIter::new(Cursor::new(stream)).unwrap();
+        let mut records = Records::new(&stream);
         let worksheet = XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
             &mut records,
+            stream.len() as u64,
+            0,
             &XlsEncoding::Utf16Le,
             "Sheet1",
             Arc::new(Vec::new()),
@@ -2153,10 +2181,12 @@ mod tests {
         push_record(&mut stream, 0x0221, &array);
         push_record(&mut stream, 0x0207, &string_data);
         push_record(&mut stream, 0x000A, &[]);
-        let mut records = RecordIter::new(Cursor::new(stream)).unwrap();
+        let mut records = Records::new(&stream);
 
         let worksheet = XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
             &mut records,
+            stream.len() as u64,
+            0,
             &XlsEncoding::Utf16Le,
             "Sheet1",
             Arc::new(Vec::new()),
@@ -2192,10 +2222,12 @@ mod tests {
         push_record(&mut stream, 0x0207, &string_data);
         push_record(&mut stream, 0x003C, &continues);
         push_record(&mut stream, 0x000A, &[]);
-        let mut records = RecordIter::new(Cursor::new(stream)).unwrap();
+        let mut records = Records::new(&stream);
 
         let worksheet = XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
             &mut records,
+            stream.len() as u64,
+            0,
             &XlsEncoding::Utf16Le,
             "Sheet1",
             Arc::new(Vec::new()),
@@ -2222,9 +2254,11 @@ mod tests {
             &dval_data(0),
         );
         push_record(&mut stream, 0x000A, &[]);
-        let mut records = RecordIter::new(Cursor::new(stream)).unwrap();
+        let mut records = Records::new(&stream);
         let worksheet = XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
             &mut records,
+            stream.len() as u64,
+            0,
             &XlsEncoding::Utf16Le,
             "Sheet1",
             Arc::new(Vec::new()),
@@ -2249,10 +2283,12 @@ mod tests {
             &dval_data(1),
         );
         push_record(&mut stream, 0x000A, &[]);
-        let mut records = RecordIter::new(Cursor::new(stream)).unwrap();
+        let mut records = Records::new(&stream);
         assert!(
             XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
                 &mut records,
+                stream.len() as u64,
+                0,
                 &XlsEncoding::Utf16Le,
                 "Sheet1",
                 Arc::new(Vec::new()),
@@ -2364,10 +2400,12 @@ mod tests {
                 stream
             },
         ] {
-            let mut records = RecordIter::new(Cursor::new(stream)).unwrap();
+            let mut records = Records::new(&stream);
             assert!(
                 XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
                     &mut records,
+                    stream.len() as u64,
+                    0,
                     &XlsEncoding::Utf16Le,
                     "Sheet1",
                     Arc::new(Vec::new()),
@@ -2399,9 +2437,11 @@ mod tests {
         push_record(&mut stream, 0x04bc, &shared);
         push_record(&mut stream, 0x0006, &formula_data(1, 1, &anchor));
         push_record(&mut stream, 0x000a, &[]);
-        let mut records = RecordIter::new(Cursor::new(stream)).unwrap();
+        let mut records = Records::new(&stream);
         let worksheet = XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
             &mut records,
+            stream.len() as u64,
+            0,
             &XlsEncoding::Utf16Le,
             "Sheet1",
             Arc::new(Vec::new()),
@@ -2437,9 +2477,11 @@ mod tests {
         push_record(&mut stream, 0x0221, &array);
         push_record(&mut stream, 0x0006, &formula_data(1, 2, &anchor));
         push_record(&mut stream, 0x000a, &[]);
-        let mut records = RecordIter::new(Cursor::new(stream)).unwrap();
+        let mut records = Records::new(&stream);
         let worksheet = XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
             &mut records,
+            stream.len() as u64,
+            0,
             &XlsEncoding::Utf16Le,
             "Sheet1",
             Arc::new(Vec::new()),
