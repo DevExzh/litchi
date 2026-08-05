@@ -17,11 +17,19 @@ pub mod formula;
 pub mod hyperlinks;
 pub mod merged_cells;
 pub mod named_ranges;
+pub mod package;
 pub mod pivot_view;
 pub mod raw;
+pub mod sheet;
 pub mod styles;
+pub mod workbook;
+pub mod writer;
 
 pub use raw::Error;
+
+pub use package::Package;
+pub use sheet::Worksheet;
+pub use workbook::Workbook;
 
 pub use pivot_view::Part;
 
