@@ -145,9 +145,7 @@ fn validate_root(xml: &str) -> litchi_pptx::Result<()> {
         match reader.read_event()? {
             Event::Start(element) | Event::Empty(element) => {
                 if element.local_name().as_ref() != b"handoutMaster" {
-                    return Err(Error::Invalid(
-                        "handoutMaster root is invalid".to_string(),
-                    ));
+                    return Err(Error::Invalid("handoutMaster root is invalid".to_string()));
                 }
                 return Ok(());
             },

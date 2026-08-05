@@ -17,17 +17,26 @@ fn presentation_photo_album_metadata_is_preserved_as_an_opaque_extension() {
     // The lossless OPC facade still preserves and exposes its exact source
     // bytes, so migration does not discard the producer's metadata.
     let xml = presentation.blob();
-    assert!(xml.windows(b"<p:photoAlbum".len()).any(|window| window == b"<p:photoAlbum"));
-    assert!(xml.windows(b"bw=\"1\"".len()).any(|window| window == b"bw=\"1\""));
-    assert!(xml
-        .windows(b"showCaptions=\"true\"".len())
-        .any(|window| window == b"showCaptions=\"true\""));
-    assert!(xml
-        .windows(b"layout=\"2picTitle\"".len())
-        .any(|window| window == b"layout=\"2picTitle\""));
-    assert!(xml
-        .windows(b"frame=\"frameStyle5\"".len())
-        .any(|window| window == b"frame=\"frameStyle5\""));
+    assert!(
+        xml.windows(b"<p:photoAlbum".len())
+            .any(|window| window == b"<p:photoAlbum")
+    );
+    assert!(
+        xml.windows(b"bw=\"1\"".len())
+            .any(|window| window == b"bw=\"1\"")
+    );
+    assert!(
+        xml.windows(b"showCaptions=\"true\"".len())
+            .any(|window| window == b"showCaptions=\"true\"")
+    );
+    assert!(
+        xml.windows(b"layout=\"2picTitle\"".len())
+            .any(|window| window == b"layout=\"2picTitle\"")
+    );
+    assert!(
+        xml.windows(b"frame=\"frameStyle5\"".len())
+            .any(|window| window == b"frame=\"frameStyle5\"")
+    );
 }
 
 fn package_with_presentation_xml() -> Package {

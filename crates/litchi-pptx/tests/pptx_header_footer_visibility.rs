@@ -66,10 +66,8 @@ fn parse_visibility(part: &dyn Part) -> Visibility {
                         b"sldNum" => &mut value.slide_number,
                         _ => continue,
                     };
-                    *target = matches!(
-                        attribute.value.as_ref(),
-                        b"1" | b"true" | b"TRUE" | b"True"
-                    );
+                    *target =
+                        matches!(attribute.value.as_ref(), b"1" | b"true" | b"TRUE" | b"True");
                 }
                 return value;
             },

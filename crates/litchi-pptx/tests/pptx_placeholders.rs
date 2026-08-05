@@ -1,5 +1,5 @@
-use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use litchi_pptx::{Error, Package};
 
 const PRESENTATION_XML: &[u8] =
@@ -14,12 +14,7 @@ fn slide_shape_placeholders_return_declared_types() {
     let package = package_with_slide(VALID_SLIDE_XML);
     let slide = package.presentation().unwrap().slide(0).unwrap().unwrap();
     let shapes = slide.shapes().unwrap();
-    let placeholder = shapes
-        .placeholders()
-        .next()
-        .unwrap()
-        .placeholder()
-        .unwrap();
+    let placeholder = shapes.placeholders().next().unwrap().placeholder().unwrap();
 
     assert_eq!(placeholder.kind(), Some("ctrTitle"));
     assert_eq!(placeholder.index(), 0);

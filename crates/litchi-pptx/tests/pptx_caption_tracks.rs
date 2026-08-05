@@ -1,10 +1,10 @@
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI};
+use litchi_pptx::Error;
 use litchi_pptx::presentation_properties::metadata::tracks::{
     Block, CONTENT_TYPE, RELATIONSHIP_TYPE, Target, load,
 };
-use litchi_pptx::Error;
 
 const SLIDE_XML: &[u8] = include_bytes!("../../../test-data/ooxml/pptx/caption-tracks/slide.xml");
 const TRACK_DATA: &[u8] =

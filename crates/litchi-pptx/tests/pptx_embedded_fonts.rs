@@ -29,14 +29,14 @@ fn presentation_embedded_fonts_validate_font_relationships() {
     let mut package = package_with_embedded_font();
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
     package = edit_package(package, |opc| {
-            let presentation = opc.get_part_mut(&presentation_name).unwrap();
-            presentation.rels_mut().remove("rIdFontRegular");
-            presentation.rels_mut().add_relationship(
-                rt::THEME.to_string(),
-                "fonts/example.odttf".to_string(),
-                "rIdFontRegular".to_string(),
-                false,
-            );
+        let presentation = opc.get_part_mut(&presentation_name).unwrap();
+        presentation.rels_mut().remove("rIdFontRegular");
+        presentation.rels_mut().add_relationship(
+            rt::THEME.to_string(),
+            "fonts/example.odttf".to_string(),
+            "rIdFontRegular".to_string(),
+            false,
+        );
     });
 
     assert!(matches!(
@@ -54,19 +54,19 @@ fn package_with_embedded_font() -> Package {
     let bytes = package.to_bytes().unwrap();
     let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
     {
-            let presentation = opc.get_part_mut(&presentation_name).unwrap();
-            presentation.set_blob(PRESENTATION_XML.to_vec());
-            presentation.rels_mut().add_relationship(
-                rt::FONT.to_string(),
-                "fonts/example.odttf".to_string(),
-                "rIdFontRegular".to_string(),
-                false,
-            );
-            opc.add_part(Box::new(BlobPart::new(
-                font_name,
-                FONT_CONTENT_TYPE.to_string(),
-                FONT_DATA.to_vec(),
-            )));
+        let presentation = opc.get_part_mut(&presentation_name).unwrap();
+        presentation.set_blob(PRESENTATION_XML.to_vec());
+        presentation.rels_mut().add_relationship(
+            rt::FONT.to_string(),
+            "fonts/example.odttf".to_string(),
+            "rIdFontRegular".to_string(),
+            false,
+        );
+        opc.add_part(Box::new(BlobPart::new(
+            font_name,
+            FONT_CONTENT_TYPE.to_string(),
+            FONT_DATA.to_vec(),
+        )));
     }
     Package::from_opc_package(opc).unwrap()
 }

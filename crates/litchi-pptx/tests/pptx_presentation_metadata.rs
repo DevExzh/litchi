@@ -23,23 +23,32 @@ fn presentation_root_metadata_is_retained_by_the_main_owner() {
 
     // These root attributes are intentionally retained as wire metadata while
     // the focused graph facade exposes only typed graph operations.
-    assert_eq!(attributes.get("serverZoom").map(String::as_str), Some("125000"));
+    assert_eq!(
+        attributes.get("serverZoom").map(String::as_str),
+        Some("125000")
+    );
     assert_eq!(
         attributes.get("firstSlideNum").map(String::as_str),
         Some("7")
     );
     assert_eq!(
-        attributes.get("showSpecialPlsOnTitleSld").map(String::as_str),
+        attributes
+            .get("showSpecialPlsOnTitleSld")
+            .map(String::as_str),
         Some("0")
     );
     assert_eq!(attributes.get("rtl").map(String::as_str), Some("1"));
     assert_eq!(
-        attributes.get("removePersonalInfoOnSave").map(String::as_str),
+        attributes
+            .get("removePersonalInfoOnSave")
+            .map(String::as_str),
         Some("true")
     );
     assert_eq!(attributes.get("compatMode").map(String::as_str), Some("1"));
     assert_eq!(
-        attributes.get("strictFirstAndLastChars").map(String::as_str),
+        attributes
+            .get("strictFirstAndLastChars")
+            .map(String::as_str),
         Some("false")
     );
     assert_eq!(
@@ -85,10 +94,10 @@ fn root_attributes(xml: &[u8]) -> BTreeMap<String, String> {
                         )
                     })
                     .collect();
-            }
-            Event::Decl(_) | Event::Comment(_) => {}
+            },
+            Event::Decl(_) | Event::Comment(_) => {},
             Event::Eof => panic!("presentation XML has no root element"),
-            _ => {}
+            _ => {},
         }
     }
 }

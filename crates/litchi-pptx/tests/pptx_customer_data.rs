@@ -12,10 +12,7 @@ fn presentation_customer_data_relationships_are_exposed_by_the_part_owner() {
     // an umbrella compatibility API.
     let (custom_data, tags) = relationship_ids(PRESENTATION_XML);
 
-    assert_eq!(
-        custom_data,
-        ["rIdCustomerDataOne", "rIdCustomerDataTwo"]
-    );
+    assert_eq!(custom_data, ["rIdCustomerDataOne", "rIdCustomerDataTwo"]);
     assert_eq!(tags.as_deref(), Some("rIdCustomerDataTags"));
 }
 

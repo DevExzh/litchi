@@ -1,6 +1,6 @@
+use litchi_opc::PackURI;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::part::{BlobPart, Part};
-use litchi_opc::PackURI;
 use litchi_pptx::parts::PresentationPart;
 
 const PRESENTATION_XML: &[u8] =

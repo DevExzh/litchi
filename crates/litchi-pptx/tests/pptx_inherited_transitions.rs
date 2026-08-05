@@ -25,9 +25,7 @@ fn layout_and_master_read_local_powerpoint_2010_transition_choices() {
     let layouts = master.layouts(&package).unwrap();
     let layout = layouts
         .iter()
-        .find(|layout| {
-            layout.part().partname().as_str() == "/ppt/slideLayouts/slideLayout1.xml"
-        })
+        .find(|layout| layout.part().partname().as_str() == "/ppt/slideLayouts/slideLayout1.xml")
         .unwrap();
     assert_ripple(&read(layout.part().blob()).unwrap().unwrap());
     let inherited_master = layout.master(&package).unwrap();
@@ -43,7 +41,11 @@ fn layout_and_master_read_local_powerpoint_2010_transition_choices() {
     assert_eq!(reference.relationship_id(), "rId4");
     let layout = slide.layout(&package).unwrap().unwrap();
     assert_ripple(&read(layout.part().blob()).unwrap().unwrap());
-    assert_ripple(&read(layout.master(&package).unwrap().part().blob()).unwrap().unwrap());
+    assert_ripple(
+        &read(layout.master(&package).unwrap().part().blob())
+            .unwrap()
+            .unwrap(),
+    );
 }
 
 #[test]

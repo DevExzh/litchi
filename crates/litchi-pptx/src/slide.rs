@@ -76,8 +76,10 @@ impl<'a> Slide<'a> {
         &self,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::tag::List>> {
-        Ok(crate::tag::shape::load(self.package, self.part.part().partname(), shape)?
-            .map(crate::tag::Source::into_list))
+        Ok(
+            crate::tag::shape::load(self.package, self.part.part().partname(), shape)?
+                .map(crate::tag::Source::into_list),
+        )
     }
 
     /// Inspect all tag relationships on this slide in stable relationship-ID

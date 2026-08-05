@@ -74,7 +74,10 @@ fn picture_background_rejects_external_image_relationships() {
         .get(&relationship_id)
         .unwrap();
     assert!(relationship.is_external());
-    assert_eq!(relationship.target_ref(), "https://example.invalid/background.png");
+    assert_eq!(
+        relationship.target_ref(),
+        "https://example.invalid/background.png"
+    );
 }
 
 fn expected_background() -> SlideBackground {
@@ -102,10 +105,7 @@ fn package_with_picture_background() -> Package {
         .edit_opc(|opc| {
             let slide = opc.get_part_mut(&slide_name)?;
             let xml = std::str::from_utf8(slide.blob()).unwrap();
-            let updated = xml.replace(
-                "<a:blip/>",
-                r#"<a:blip r:embed="rIdBackground"/>"#,
-            );
+            let updated = xml.replace("<a:blip/>", r#"<a:blip r:embed="rIdBackground"/>"#);
             assert_ne!(updated, xml, "generated slide must contain a picture fill");
             slide.set_blob(updated.into_bytes());
             slide.rels_mut().add_relationship(

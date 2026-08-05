@@ -27,10 +27,7 @@ fn package_inventory_reports_local_laser_traces() {
     assert_eq!(inventory[1].points()[0].time(), &Offset::ms(52000));
     assert_eq!(inventory[1].points()[1].y().as_emu(), Some(0));
 
-    assert_eq!(
-        traces(&package),
-        inventory
-    );
+    assert_eq!(traces(&package), inventory);
 }
 
 #[test]

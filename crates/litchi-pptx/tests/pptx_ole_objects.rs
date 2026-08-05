@@ -47,10 +47,7 @@ fn package_inventory_reports_local_ole_objects() {
     let package_object = &inventory[1];
     assert_eq!(package_object.index(), 1);
     assert_eq!(package_object.mode(), Mode::Embedded);
-    assert_eq!(
-        package_object.kind(),
-        Some(Kind::Package)
-    );
+    assert_eq!(package_object.kind(), Some(Kind::Package));
     assert!(matches!(
         package_object.target(),
         Some(Target::Internal {
@@ -75,10 +72,7 @@ fn package_inventory_reports_local_ole_objects() {
             && relationship_type == OLE_OBJECT
     ));
 
-    assert_eq!(
-        objects(&package),
-        inventory
-    );
+    assert_eq!(objects(&package), inventory);
 }
 
 #[test]
@@ -86,7 +80,10 @@ fn package_inventory_rejects_missing_ole_relationships() {
     let mut package = package_with_local_ole_objects();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
     package = edit_package(package, |opc| {
-        opc.get_part_mut(&slide_name).unwrap().rels_mut().remove("rIdOle");
+        opc.get_part_mut(&slide_name)
+            .unwrap()
+            .rels_mut()
+            .remove("rIdOle");
     });
 
     assert!(matches!(
@@ -100,12 +97,12 @@ fn package_inventory_rejects_wrong_ole_payload_content_type() {
     let mut package = package_with_local_ole_objects();
     let payload_name = PackURI::new("/ppt/embeddings/oleObject1.bin").unwrap();
     package = edit_package(package, |opc| {
-            assert!(opc.remove_part(&payload_name));
-            opc.add_part(Box::new(BlobPart::new(
-                payload_name,
-                OFC_PACKAGE.to_string(),
-                b"inert package payload with an OLE relationship".to_vec(),
-            )));
+        assert!(opc.remove_part(&payload_name));
+        opc.add_part(Box::new(BlobPart::new(
+            payload_name,
+            OFC_PACKAGE.to_string(),
+            b"inert package payload with an OLE relationship".to_vec(),
+        )));
     });
 
     assert!(matches!(
@@ -120,14 +117,14 @@ fn package_inventory_ignores_non_ole_graphic_data() {
     let mut package = package_with_local_ole_objects();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
     package = edit_package(package, |opc| {
-            let slide = opc.get_part_mut(&slide_name).unwrap();
-            let xml = std::str::from_utf8(slide.blob()).unwrap();
-            let updated = xml.replace(
-                "http://schemas.openxmlformats.org/presentationml/2006/ole",
-                "urn:example:not-ole",
-            );
-            assert_ne!(updated, xml);
-            slide.set_blob(updated.into_bytes());
+        let slide = opc.get_part_mut(&slide_name).unwrap();
+        let xml = std::str::from_utf8(slide.blob()).unwrap();
+        let updated = xml.replace(
+            "http://schemas.openxmlformats.org/presentationml/2006/ole",
+            "urn:example:not-ole",
+        );
+        assert_ne!(updated, xml);
+        slide.set_blob(updated.into_bytes());
     });
 
     assert!(objects(&package).is_empty());

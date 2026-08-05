@@ -26,10 +26,7 @@ fn reopened_deck_removes_notes_by_physical_slide_and_preserves_slide_content() {
     let (next, removed) = remove_notes(package, "/ppt/slides/slide1.xml");
     package = next;
     assert!(!removed.unwrap());
-    assert_eq!(
-        slide_notes(&package),
-        vec!["", "Appendix secret"]
-    );
+    assert_eq!(slide_notes(&package), vec!["", "Appendix secret"]);
 
     let graph = notes_graph(&package).unwrap();
     assert_eq!(graph.slides().len(), 1);
@@ -227,11 +224,7 @@ fn slide_notes(package: &Package) -> Vec<String> {
 }
 
 fn notes_graph(package: &Package) -> Option<notes::Graph> {
-    notes::load(
-        package.opc().unwrap(),
-        &PackURI::new(PRESENTATION).unwrap(),
-    )
-    .unwrap()
+    notes::load(package.opc().unwrap(), &PackURI::new(PRESENTATION).unwrap()).unwrap()
 }
 
 fn assert_no_speaker_notes(package: &Package) {
@@ -257,10 +250,7 @@ fn assert_no_speaker_notes(package: &Package) {
     }));
 }
 
-fn remove_notes(
-    package: Package,
-    slide_name: &str,
-) -> (Package, litchi_pptx::Result<bool>) {
+fn remove_notes(package: Package, slide_name: &str) -> (Package, litchi_pptx::Result<bool>) {
     edit_package(package, |opc| {
         notes::remove(
             opc,

@@ -250,7 +250,10 @@ impl Package {
     /// Names are the ordinary selector and zero-based presentation positions
     /// remain available for ordered repair workflows. The returned list owns
     /// its bounded strings, so the read does not borrow the package graph.
-    pub fn tags<'a>(&self, slide: impl Into<crate::slide::Key<'a>>) -> Result<Option<crate::tag::List>> {
+    pub fn tags<'a>(
+        &self,
+        slide: impl Into<crate::slide::Key<'a>>,
+    ) -> Result<Option<crate::tag::List>> {
         self.ensure_graph_current("tags")?;
         let slide_name = self.resolve_slide(slide.into())?;
         Ok(crate::tag::load(&self.opc, &slide_name)?.map(crate::tag::Source::into_list))
@@ -385,7 +388,9 @@ impl Package {
         &mut self,
         value: &crate::presentation_properties::metadata::slide_sync::Part,
     ) -> Result<()> {
-        self.edit_typed(|opc| crate::presentation_properties::metadata::slide_sync::store(opc, value))
+        self.edit_typed(|opc| {
+            crate::presentation_properties::metadata::slide_sync::store(opc, value)
+        })
     }
 
     /// Run one transactional low-level OPC edit.
@@ -407,10 +412,7 @@ impl Package {
         Ok(value)
     }
 
-    fn edit_typed<T>(
-        &mut self,
-        operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
-    ) -> Result<T> {
+    fn edit_typed<T>(&mut self, operation: impl FnOnce(&mut OpcPackage) -> Result<T>) -> Result<T> {
         self.flush_presentation()?;
         let before = self.opc.clone();
         match operation(&mut self.opc) {
@@ -539,19 +541,14 @@ impl Package {
             self.opc.add_part(Box::new(slide_part));
 
             if let Some(text) = slide.notes() {
-                let notes_name = pack_uri(&format!(
-                    "/ppt/notesSlides/notesSlide{}.xml",
-                    index + 1
-                ))?;
+                let notes_name =
+                    pack_uri(&format!("/ppt/notesSlides/notesSlide{}.xml", index + 1))?;
                 let mut notes_part = BlobPart::new(
                     notes_name,
                     ct::PML_NOTES_SLIDE.to_string(),
                     crate::notes::write_text(text)?,
                 );
-                notes_part.relate_to(
-                    &format!("../slides/slide{}.xml", index + 1),
-                    rt::SLIDE,
-                );
+                notes_part.relate_to(&format!("../slides/slide{}.xml", index + 1), rt::SLIDE);
                 notes_part.relate_to("../notesMasters/notesMaster1.xml", rt::NOTES_MASTER);
                 self.opc.add_part(Box::new(notes_part));
             }

@@ -1,15 +1,15 @@
-use litchi_pptx::comments::{
-    add_presentation_comment, add_presentation_comment_author, find_presentation_comment,
-    find_presentation_comment_author, remove_presentation_comment,
-    remove_presentation_comment_author, reorder_presentation_comment_authors,
-    reorder_presentation_comments, replace_presentation_comment,
-    replace_presentation_comment_author, store_presentation_comments, update_presentation_comment,
-    update_presentation_comment_author, Author as LegacyAuthor, Comment as LegacyComment,
-    Comments as LegacyComments, Conformance as LegacyConformance, List as LegacyList,
-};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI, Part};
+use litchi_pptx::comments::{
+    Author as LegacyAuthor, Comment as LegacyComment, Comments as LegacyComments,
+    Conformance as LegacyConformance, List as LegacyList, add_presentation_comment,
+    add_presentation_comment_author, find_presentation_comment, find_presentation_comment_author,
+    remove_presentation_comment, remove_presentation_comment_author,
+    reorder_presentation_comment_authors, reorder_presentation_comments,
+    replace_presentation_comment, replace_presentation_comment_author, store_presentation_comments,
+    update_presentation_comment, update_presentation_comment_author,
+};
 use litchi_pptx::modern_comments::{
     Author, Comment, Progress, Reply, add_modern_comment, add_modern_comment_author,
     add_modern_comment_reply, find_modern_comment, find_modern_comment_reply,
@@ -128,12 +128,7 @@ fn legacy_author_and_slide_comment_crud_preserves_shared_target() {
             comments: vec![legacy_comment(1, 1, "first")],
         }],
     };
-    store_presentation_comments(
-        &mut package,
-        &graph,
-        LegacyConformance::Transitional,
-    )
-    .unwrap();
+    store_presentation_comments(&mut package, &graph, LegacyConformance::Transitional).unwrap();
 
     add_presentation_comment_author(
         &mut package,
@@ -175,12 +170,8 @@ fn legacy_author_and_slide_comment_crud_preserves_shared_target() {
         LegacyConformance::Transitional,
     )
     .unwrap();
-    reorder_presentation_comment_authors(
-        &mut package,
-        &[2, 1],
-        LegacyConformance::Transitional,
-    )
-    .unwrap();
+    reorder_presentation_comment_authors(&mut package, &[2, 1], LegacyConformance::Transitional)
+        .unwrap();
     let mut grace = find_presentation_comment_author(&package, 2)
         .unwrap()
         .unwrap();
@@ -192,13 +183,8 @@ fn legacy_author_and_slide_comment_crud_preserves_shared_target() {
         LegacyConformance::Transitional,
     )
     .unwrap();
-    replace_presentation_comment_author(
-        &mut package,
-        2,
-        grace,
-        LegacyConformance::Transitional,
-    )
-    .unwrap();
+    replace_presentation_comment_author(&mut package, 2, grace, LegacyConformance::Transitional)
+        .unwrap();
     assert_eq!(
         find_presentation_comment(&package, SLIDE, 2, 1)
             .unwrap()
@@ -207,12 +193,8 @@ fn legacy_author_and_slide_comment_crud_preserves_shared_target() {
         "updated"
     );
     assert!(
-        remove_presentation_comment_author(
-            &mut package,
-            2,
-            LegacyConformance::Transitional
-        )
-        .is_err()
+        remove_presentation_comment_author(&mut package, 2, LegacyConformance::Transitional)
+            .is_err()
     );
 
     let comment_part = PackURI::new("/ppt/comments/comment1.xml").unwrap();
@@ -224,32 +206,16 @@ fn legacy_author_and_slide_comment_crud_preserves_shared_target() {
     shared_owner.relate_to("comments/comment1.xml", "urn:test:shared");
     package.add_part(Box::new(shared_owner));
     assert!(
-        remove_presentation_comment(
-            &mut package,
-            SLIDE,
-            2,
-            1,
-            LegacyConformance::Transitional
-        )
-        .unwrap()
+        remove_presentation_comment(&mut package, SLIDE, 2, 1, LegacyConformance::Transitional)
+            .unwrap()
     );
     assert!(
-        remove_presentation_comment_author(
-            &mut package,
-            2,
-            LegacyConformance::Transitional
-        )
-        .unwrap()
+        remove_presentation_comment_author(&mut package, 2, LegacyConformance::Transitional)
+            .unwrap()
     );
     assert!(
-        remove_presentation_comment(
-            &mut package,
-            SLIDE,
-            1,
-            1,
-            LegacyConformance::Transitional
-        )
-        .unwrap()
+        remove_presentation_comment(&mut package, SLIDE, 1, 1, LegacyConformance::Transitional)
+            .unwrap()
     );
     assert!(package.get_part(&comment_part).is_ok());
 }

@@ -61,19 +61,14 @@ fn omitted_master_visibility_flags_default_to_true() {
         true
     );
     assert_eq!(
-        root_bool(layout.part().part().blob(), "showMasterPhAnim")
-            .unwrap_or(true),
+        root_bool(layout.part().part().blob(), "showMasterPhAnim").unwrap_or(true),
         true
     );
 }
 
 fn package_with_visibility(slide_xml: &[u8], layout_xml: &[u8]) -> Package {
     let mut package = Package::new().unwrap();
-    package
-        .presentation_mut()
-        .unwrap()
-        .add_slide()
-        .unwrap();
+    package.presentation_mut().unwrap().add_slide().unwrap();
     let package_bytes = package.to_bytes().unwrap();
     let mut opc = OpcPackage::from_bytes(&package_bytes).unwrap();
     replace_part(&mut opc, "/ppt/slides/slide1.xml", slide_xml);
@@ -110,10 +105,10 @@ fn root_bool(xml: &[u8], attribute_name: &str) -> Option<bool> {
                     }
                 }
                 return None;
-            }
-            Event::Decl(_) | Event::Comment(_) => {}
+            },
+            Event::Decl(_) | Event::Comment(_) => {},
             Event::Eof => return None,
-            _ => {}
+            _ => {},
         }
     }
 }

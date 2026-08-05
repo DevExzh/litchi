@@ -58,7 +58,7 @@ fn parse_text_styles(xml: &[u8]) -> BTreeMap<String, (bool, Vec<u8>)> {
                         styles.get_mut(style).unwrap().1.push(level);
                     }
                 }
-            }
+            },
             Event::Empty(element) => {
                 let name = element.local_name();
                 if matches!(name.as_ref(), b"titleStyle" | b"bodyStyle" | b"otherStyle") {
@@ -73,7 +73,7 @@ fn parse_text_styles(xml: &[u8]) -> BTreeMap<String, (bool, Vec<u8>)> {
                         styles.get_mut(style).unwrap().1.push(level);
                     }
                 }
-            }
+            },
             Event::End(element)
                 if matches!(
                     element.local_name().as_ref(),
@@ -81,9 +81,9 @@ fn parse_text_styles(xml: &[u8]) -> BTreeMap<String, (bool, Vec<u8>)> {
                 ) =>
             {
                 current = None;
-            }
+            },
             Event::Eof => break,
-            _ => {}
+            _ => {},
         }
     }
     styles

@@ -17,12 +17,14 @@ fn package_inventory_reports_generated_native_chart_with_identity() {
     assert_eq!(info.chart_type, Type::Bar);
     assert_eq!(info.title.as_deref(), Some("Quarterly sales"));
     assert!(info.has_legend);
-    assert!(slide
-        .part()
-        .part()
-        .rels()
-        .iter()
-        .any(|relationship| relationship.reltype() == CHART));
+    assert!(
+        slide
+            .part()
+            .part()
+            .rels()
+            .iter()
+            .any(|relationship| relationship.reltype() == CHART)
+    );
 
     let discovered = slide
         .charts()
@@ -51,21 +53,21 @@ fn package_inventory_accepts_strict_chart_relationships() {
     };
 
     package = edit_package(package, |opc| {
-            let slide = opc.get_part_mut(&slide_name).unwrap();
-            assert!(slide.rels_mut().remove(&relationship_id).is_some());
-            slide.rels_mut().add_relationship(
-                STRICT_CHART.to_string(),
-                target,
-                relationship_id,
-                false,
-            );
+        let slide = opc.get_part_mut(&slide_name).unwrap();
+        assert!(slide.rels_mut().remove(&relationship_id).is_some());
+        slide
+            .rels_mut()
+            .add_relationship(STRICT_CHART.to_string(), target, relationship_id, false);
     });
 
     let charts = package.presentation().unwrap().slides().unwrap()[0]
         .charts()
         .unwrap();
     assert_eq!(charts.len(), 1);
-    assert_eq!(charts[0].part().partname().as_str(), "/ppt/charts/chart1.xml");
+    assert_eq!(
+        charts[0].part().partname().as_str(),
+        "/ppt/charts/chart1.xml"
+    );
 }
 
 #[test]
@@ -76,13 +78,7 @@ fn package_inventory_rejects_missing_chart_targets() {
         assert!(opc.remove_part(&chart_name));
     });
 
-    let error = match package
-        .presentation()
-        .unwrap()
-        .slides()
-        .unwrap()[0]
-        .charts()
-    {
+    let error = match package.presentation().unwrap().slides().unwrap()[0].charts() {
         Ok(_) => panic!("a removed chart target must not be discovered"),
         Err(error) => error,
     };

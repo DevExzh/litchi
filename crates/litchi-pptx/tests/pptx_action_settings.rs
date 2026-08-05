@@ -1,7 +1,7 @@
 use litchi_opc::constants::relationship_type::{HYPERLINK, SLIDE};
 use litchi_opc::{OpcPackage, PackURI};
-use litchi_pptx::Package;
 use litchi_pptx::Error;
+use litchi_pptx::Package;
 use litchi_pptx::actions::{Jump, Kind, Limits, Target, Trigger, load_slide_action_settings};
 
 const LOCAL_ACTIONS: &[u8] =

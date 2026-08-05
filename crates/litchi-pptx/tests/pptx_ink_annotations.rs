@@ -22,10 +22,7 @@ fn package_inventory_reports_local_ink_content_parts() {
     assert_eq!(annotation.trace_count(), 2);
     assert_eq!(annotation.trace_group_count(), 1);
 
-    assert_eq!(
-        annotations(&package),
-        inventory
-    );
+    assert_eq!(annotations(&package), inventory);
 }
 
 #[test]
@@ -51,9 +48,9 @@ fn package_inventory_rejects_malformed_inkml() {
     let mut package = package_with_ink();
     let part_name = PackURI::new("/ppt/ink/ink1.xml").unwrap();
     package = edit_package(package, |opc| {
-            opc.get_part_mut(&part_name)
-                .unwrap()
-                .set_blob(b"<ink/>".to_vec());
+        opc.get_part_mut(&part_name)
+            .unwrap()
+            .set_blob(b"<ink/>".to_vec());
     });
 
     let error = match annotations_result(&package) {

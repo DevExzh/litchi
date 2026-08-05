@@ -39,9 +39,7 @@ fn parse_default_text_style(xml: &[u8]) -> DefaultTextStyle {
                     in_style = true;
                 } else if in_style && local.as_ref() == b"defPPr" {
                     style.has_default_paragraph_properties = true;
-                } else if in_style
-                    && let Some(level) = level_number(local.as_ref())
-                {
+                } else if in_style && let Some(level) = level_number(local.as_ref()) {
                     style.levels.push(level);
                 }
             },
@@ -49,9 +47,7 @@ fn parse_default_text_style(xml: &[u8]) -> DefaultTextStyle {
                 let local = element.local_name();
                 if in_style && local.as_ref() == b"defPPr" {
                     style.has_default_paragraph_properties = true;
-                } else if in_style
-                    && let Some(level) = level_number(local.as_ref())
-                {
+                } else if in_style && let Some(level) = level_number(local.as_ref()) {
                     style.levels.push(level);
                 }
             },
@@ -72,8 +68,6 @@ fn level_number(name: &[u8]) -> Option<u8> {
         .iter()
         .copied()
         .try_fold(0u8, |value, digit| {
-            value
-                .checked_mul(10)?
-                .checked_add(digit.checked_sub(b'0')?)
+            value.checked_mul(10)?.checked_add(digit.checked_sub(b'0')?)
         })
 }

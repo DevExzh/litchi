@@ -2,7 +2,7 @@ use litchi_opc::{OpcPackage, PackURI};
 use litchi_pptx::{
     Error, Package,
     presentation_properties::{
-        self, PrintColorMode, PrintOutput, ShowMode, SlideSelection, ShowExtension,
+        self, PrintColorMode, PrintOutput, ShowExtension, ShowMode, SlideSelection,
     },
     view_properties::{self, ViewKind},
 };
@@ -26,8 +26,9 @@ fn package_loads_local_view_and_presentation_settings() {
     assert_eq!(view_properties.show_comments, Some(true));
     assert_eq!(view_properties.grid_spacing.as_ref().unwrap().cx, 72_000);
 
-    let presentation_properties =
-        presentation_properties::load_from_package(opc).unwrap().unwrap();
+    let presentation_properties = presentation_properties::load_from_package(opc)
+        .unwrap()
+        .unwrap();
     let web = presentation_properties.web.as_ref().unwrap();
     assert_eq!(web.allow_png, Some(true));
     assert_eq!(
@@ -59,7 +60,10 @@ fn package_readers_report_absent_settings() {
     remove_presentation_relationships(&mut opc, PRESENTATION_PROPERTIES_RELATIONSHIP_TYPE);
 
     assert_eq!(view_properties::load_from_package(&opc).unwrap(), None);
-    assert_eq!(presentation_properties::load_from_package(&opc).unwrap(), None);
+    assert_eq!(
+        presentation_properties::load_from_package(&opc).unwrap(),
+        None
+    );
 }
 
 #[test]

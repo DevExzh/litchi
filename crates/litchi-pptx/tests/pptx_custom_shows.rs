@@ -2,8 +2,8 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_pptx::Error;
-use litchi_pptx::presentation_properties::metadata::structure::load;
 use litchi_pptx::Package;
+use litchi_pptx::presentation_properties::metadata::structure::load;
 
 const PRESENTATION_XML: &[u8] =
     include_bytes!("../../../test-data/ooxml/pptx/custom-shows/presentation.xml");

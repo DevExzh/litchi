@@ -29,10 +29,7 @@ fn event_owner_stores_the_local_show_event_inventory() {
     assert!(xml.contains(r#"type="onClick" time="6950" objId="6""#));
     assert!(xml.contains(r#"<p14:seekEvt time="38839" objId="4" seek="10379"/>"#));
     assert!(xml.contains(r#"<p14:nullEvt time="50000" objId="4"/>"#));
-    assert!(matches!(
-        events[0].kind(),
-        Kind::Trigger(Trigger::OnClick)
-    ));
+    assert!(matches!(events[0].kind(), Kind::Trigger(Trigger::OnClick)));
     assert_eq!(events[0].time(), &Offset::ms(6950));
     assert_eq!(events[3].seek_time(), Some(&Offset::ms(10379)));
 }

@@ -1,5 +1,5 @@
-use litchi_opc::{OpcPackage, PackURI};
 use litchi_opc::constants::relationship_type as rt;
+use litchi_opc::{OpcPackage, PackURI};
 use litchi_pptx::{Error, Package};
 
 #[test]
@@ -20,9 +20,11 @@ fn master_theme_inventory_resolves_through_the_standalone_owner() {
         .find(|relationship| relationship.reltype() == rt::THEME)
         .unwrap();
     let theme_name = relationship.target_partname().unwrap();
-    let summary =
-        litchi_pptx::shape::theme::package::load_summary(presentation.package(), theme_name.as_str())
-            .unwrap();
+    let summary = litchi_pptx::shape::theme::package::load_summary(
+        presentation.package(),
+        theme_name.as_str(),
+    )
+    .unwrap();
     assert_eq!(summary.name, master_theme.name);
     assert_eq!(summary.colors.len(), master_theme.colors.len());
 }
@@ -41,11 +43,7 @@ fn master_theme_accessor_rejects_external_theme_relationships() {
 
 fn package_with_slide() -> Package {
     let mut package = Package::new().unwrap();
-    package
-        .presentation_mut()
-        .unwrap()
-        .add_slide()
-        .unwrap();
+    package.presentation_mut().unwrap().add_slide().unwrap();
     let package_bytes = package.to_bytes().unwrap();
     Package::from_bytes(&package_bytes).unwrap()
 }

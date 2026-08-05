@@ -60,8 +60,7 @@ fn slide_override_wins_and_absent_slide_mapping_uses_layout() {
         parse_override(SLIDE_WITHOUT_OVERRIDE_XML, b"sld", "slide").unwrap();
     assert_eq!(slide_without_override, None);
     assert_eq!(
-        effective_map(Some(layout), slide_without_override, master)
-            .color(Slot::Background1),
+        effective_map(Some(layout), slide_without_override, master).color(Slot::Background1),
         Role::Accent1
     );
 }

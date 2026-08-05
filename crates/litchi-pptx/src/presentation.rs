@@ -84,10 +84,7 @@ impl<'a> Presentation<'a> {
         let mut hyperlinks = Vec::new();
         for (slide_index, slide) in self.slides()?.into_iter().enumerate() {
             for relationship in slide.part().part().rels().iter().filter(|relationship| {
-                matches!(
-                    relationship.reltype(),
-                    rt::HYPERLINK | rt::STRICT_HYPERLINK
-                )
+                matches!(relationship.reltype(), rt::HYPERLINK | rt::STRICT_HYPERLINK)
             }) {
                 let target = relationship.target_ref();
                 if target.is_empty() {
@@ -243,9 +240,7 @@ impl<'a> Presentation<'a> {
         SlidePart::from_part(part)
     }
 
-    fn parse_inline_hyperlinks(
-        xml: &[u8],
-    ) -> Result<Vec<crate::hyperlinks::Hyperlink>> {
+    fn parse_inline_hyperlinks(xml: &[u8]) -> Result<Vec<crate::hyperlinks::Hyperlink>> {
         let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
         let mut reader = NsReader::from_reader(processed.as_ref());
         reader.config_mut().trim_text(true);
@@ -262,14 +257,10 @@ impl<'a> Presentation<'a> {
                     ) =>
                 {
                     let action = litchi_ooxml_common::xml::unqualified_attribute_value(
-                        &element,
-                        b"action",
-                        decoder,
+                        &element, b"action", decoder,
                     )?;
                     let tooltip = litchi_ooxml_common::xml::unqualified_attribute_value(
-                        &element,
-                        b"tooltip",
-                        decoder,
+                        &element, b"tooltip", decoder,
                     )?;
                     if let Some(action) = action {
                         if action.is_empty() {
@@ -277,9 +268,7 @@ impl<'a> Presentation<'a> {
                                 "inline hyperlink action cannot be empty".into(),
                             ));
                         }
-                        hyperlinks.push(crate::hyperlinks::Hyperlink::from_xml(
-                            &action, tooltip,
-                        )?);
+                        hyperlinks.push(crate::hyperlinks::Hyperlink::from_xml(&action, tooltip)?);
                     }
                 },
                 Event::Eof => break,

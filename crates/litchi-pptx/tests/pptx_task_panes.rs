@@ -1,8 +1,8 @@
 use litchi_ooxml_common::Error as CommonError;
-use litchi_ooxml_common::web::{Conformance, Store, load, put, remove};
 use litchi_ooxml_common::web::raw::{
     ADD_IN_CONTENT_TYPE, ADD_IN_RELATIONSHIP, TASK_PANES_CONTENT_TYPE, TASK_PANES_RELATIONSHIP,
 };
+use litchi_ooxml_common::web::{Conformance, Store, load, put, remove};
 use litchi_opc::part::{Part, XmlPart};
 use litchi_opc::{OpcPackage, PackURI};
 

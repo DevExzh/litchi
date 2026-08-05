@@ -242,7 +242,7 @@ pub(crate) fn parse_descriptor(
                         reader.resolver(),
                         ACTIVEX_NAMESPACE,
                     )?
-                        .ok_or_else(|| invalid("control descriptor is missing ax:classid"))?;
+                    .ok_or_else(|| invalid("control descriptor is missing ax:classid"))?;
                     let license = attribute(
                         &element,
                         b"license",
@@ -288,7 +288,7 @@ pub(crate) fn parse_descriptor(
                         reader.resolver(),
                         ACTIVEX_NAMESPACE,
                     )?
-                        .ok_or_else(|| invalid("control descriptor is missing ax:classid"))?;
+                    .ok_or_else(|| invalid("control descriptor is missing ax:classid"))?;
                     let license = attribute(
                         &element,
                         b"license",
