@@ -95,7 +95,7 @@ mod tests {
             .set_slide_chart_3d_bar_shape(0, chart.drawable_object_id, Chart3dBarShape::Cylinder)
             .unwrap();
         let duplicate = editor
-            .duplicate_slide_chart(0, chart.drawable_object_id)
+            .duplicate_slide_chart(0, chart_selector(&editor, &chart))
             .unwrap();
         let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(

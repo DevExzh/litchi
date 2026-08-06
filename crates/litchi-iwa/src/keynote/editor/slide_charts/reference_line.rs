@@ -107,7 +107,7 @@ mod tests {
             .set_slide_chart_reference_lines(0, chart.drawable_object_id, &initial)
             .unwrap();
         let duplicate = editor
-            .duplicate_slide_chart(0, chart.drawable_object_id)
+            .duplicate_slide_chart(0, chart_selector(&editor, &chart))
             .unwrap();
         assert_eq!(
             editor
@@ -133,7 +133,7 @@ mod tests {
             initial
         );
         editor
-            .remove_slide_chart(0, duplicate.drawable_object_id)
+            .remove_slide_chart(0, chart_selector(&editor, &duplicate))
             .unwrap();
         let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(

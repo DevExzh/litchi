@@ -1,6 +1,6 @@
 //! Archive-free semantic selectors for Keynote charts.
 
-/// Selects one chart by its semantic name or checked zero-based position.
+/// Selects one chart by its visible native title or checked zero-based position.
 ///
 /// A selector carries no native object identifier and does not depend on a
 /// package or archive representation. The concrete Keynote adapter resolves
@@ -14,7 +14,7 @@
 pub enum ChartSelector<'a> {
     /// Select the chart at a checked zero-based position in slide chart order.
     Index(usize),
-    /// Select the chart with this exact semantic name.
+    /// Select the chart with this exact visible native title.
     Name(&'a str),
 }
 

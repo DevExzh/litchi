@@ -24,8 +24,8 @@ use crate::shapes::{
     Appearance, BlurRadius, Drop, Offset, Pattern, RgbColorSpace, RgbaColor, ShapeFill,
     ShapeImageFillTechnique, Stroke, Width,
 };
-use litchi_iwa_common::comment::DrawableId;
 use litchi_iwa_common::shape::shadow::{Angle, Opacity};
+use litchi_keynote::ChartSelector;
 
 const POSITION: DrawablePoint = DrawablePoint { x: 240.0, y: 260.0 };
 const SIZE: DrawableSize = DrawableSize {
@@ -125,13 +125,13 @@ fn scratch_presentation_supports_standalone_chart_crud() {
     )
     .unwrap();
     editor
-        .set_slide_chart_kind(0, created.drawable_object_id, Kind::Bar2d)
+        .set_slide_chart_kind(0, chart_selector(&editor, &created), Kind::Bar2d)
         .unwrap();
     editor
-        .set_slide_chart_data(0, created.drawable_object_id, replacement.clone())
+        .set_slide_chart_data(0, chart_selector(&editor, &created), replacement.clone())
         .unwrap();
     editor
-        .set_slide_chart_direction(0, created.drawable_object_id, Direction::Columns)
+        .set_slide_chart_direction(0, chart_selector(&editor, &created), Direction::Columns)
         .unwrap();
     let changed_geometry = chart_geometry(
         "Keynote",
@@ -143,7 +143,7 @@ fn scratch_presentation_supports_standalone_chart_crud() {
     )
     .unwrap();
     editor
-        .set_slide_chart_geometry(0, created.drawable_object_id, changed_geometry)
+        .set_slide_chart_geometry(0, chart_selector(&editor, &created), changed_geometry)
         .unwrap();
 
     let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -154,7 +154,7 @@ fn scratch_presentation_supports_standalone_chart_crud() {
     assert_eq!(chart.geometry, changed_geometry);
 
     let removed = editor
-        .remove_slide_chart(0, created.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&editor, &created))
         .unwrap();
     assert_eq!(removed.chart.drawable_object_id, created.drawable_object_id);
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -192,22 +192,78 @@ fn chart_creation_rejects_invalid_inputs_transactionally() {
 }
 
 #[test]
-fn lifecycle_chart_apis_accept_checked_selectors_and_reject_zero() {
+fn lifecycle_chart_apis_accept_semantic_selectors_and_reject_out_of_range_positions() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let chart = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
-    let selector = DrawableId::from_raw(chart.drawable_object_id).unwrap();
 
     editor
-        .set_slide_chart_kind(0, selector, Kind::Bar2d)
+        .set_slide_chart_kind(0, ChartSelector::index(0), Kind::Bar2d)
         .unwrap();
     assert_eq!(editor.slide_charts(0).unwrap()[0].kind, Kind::Bar2d);
 
     let baseline = editor.to_bytes().unwrap();
-    assert!(editor.set_slide_chart_kind(0, 0_u64, Kind::Line2d).is_err());
+    assert!(
+        editor
+            .set_slide_chart_kind(0, ChartSelector::index(usize::MAX), Kind::Line2d)
+            .is_err()
+    );
     assert_eq!(editor.to_bytes().unwrap(), baseline);
-    assert!(DrawableId::new(0).is_none());
+    assert_eq!(
+        editor.slide_charts(0).unwrap()[0].drawable_object_id,
+        chart.drawable_object_id
+    );
+}
+
+#[test]
+fn chart_name_selectors_match_titles_exactly_and_reject_ambiguity() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let first = editor
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let second = editor
+        .add_slide_chart(
+            0,
+            Kind::Line2d,
+            sample_data(),
+            DrawablePoint {
+                x: POSITION.x + SIZE.width,
+                y: POSITION.y,
+            },
+            SIZE,
+        )
+        .unwrap();
+    editor
+        .set_slide_chart_title(0, first.drawable_object_id, "Revenue")
+        .unwrap();
+    editor
+        .set_slide_chart_title(0, second.drawable_object_id, "Cost")
+        .unwrap();
+
+    editor
+        .set_slide_chart_kind(0, ChartSelector::name("Cost"), Kind::Bar2d)
+        .unwrap();
+    assert_eq!(editor.slide_charts(0).unwrap()[1].kind, Kind::Bar2d);
+
+    let before_missing = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .set_slide_chart_kind(0, ChartSelector::name("cost"), Kind::Pie2d)
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before_missing);
+
+    editor
+        .set_slide_chart_title(0, first.drawable_object_id, "Cost")
+        .unwrap();
+    let before_ambiguous = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .set_slide_chart_kind(0, ChartSelector::name("Cost"), Kind::Pie2d)
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before_ambiguous);
 }
 
 #[test]
@@ -231,7 +287,7 @@ fn multiple_chart_theme_registrations_are_removed_independently() {
         .unwrap();
 
     editor
-        .remove_slide_chart(0, first.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&editor, &first))
         .unwrap();
     assert_eq!(
         editor
@@ -243,7 +299,7 @@ fn multiple_chart_theme_registrations_are_removed_independently() {
         vec![second.drawable_object_id]
     );
     editor
-        .remove_slide_chart(0, second.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&editor, &second))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 }
@@ -256,11 +312,15 @@ fn duplicate_slide_chart_clones_the_private_graph_and_inline_data() {
         .unwrap();
     let source_graph = chart_graph(&editor, 0, source.drawable_object_id).unwrap();
     let baseline = editor.to_bytes().unwrap();
-    assert!(editor.duplicate_slide_chart(0, u64::MAX).is_err());
+    assert!(
+        editor
+            .duplicate_slide_chart(0, ChartSelector::index(usize::MAX))
+            .is_err()
+    );
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     let duplicate_graph = chart_graph(&editor, 0, duplicate.drawable_object_id).unwrap();
     let expected_geometry =
@@ -289,7 +349,7 @@ fn duplicate_slide_chart_clones_the_private_graph_and_inline_data() {
     )
     .unwrap();
     editor
-        .set_slide_chart_data(0, duplicate.drawable_object_id, replacement.clone())
+        .set_slide_chart_data(0, chart_selector(&editor, &duplicate), replacement.clone())
         .unwrap();
     assert_eq!(
         chart_graph(&editor, 0, source.drawable_object_id)
@@ -307,7 +367,7 @@ fn duplicate_slide_chart_clones_the_private_graph_and_inline_data() {
     );
 
     editor
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -319,7 +379,7 @@ fn duplicate_slide_chart_clones_the_private_graph_and_inline_data() {
         vec![duplicate.drawable_object_id]
     );
     editor
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&editor, &duplicate))
         .unwrap();
     assert!(editor.slide_charts(0).unwrap().is_empty());
 }
@@ -348,7 +408,7 @@ fn scratch_presentation_supports_native_chart_caption_crud() {
     );
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -385,7 +445,7 @@ fn scratch_presentation_supports_native_chart_caption_crud() {
         Some("Revenue by region".to_owned())
     );
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(
         reopened
@@ -420,7 +480,7 @@ fn scratch_presentation_supports_native_chart_title_crud() {
     );
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -469,7 +529,7 @@ fn scratch_presentation_supports_native_chart_title_crud() {
         Some("Revenue by region".to_owned())
     );
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(
         reopened
@@ -503,7 +563,7 @@ fn scratch_presentation_supports_native_chart_axis_title_crud() {
         .unwrap();
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     for (axis, title) in [(Axis::Category, "Month"), (Axis::Value, "Revenue")] {
         assert_eq!(
@@ -591,7 +651,7 @@ fn scratch_presentation_supports_native_chart_axis_title_crud() {
         Some("Revenue")
     );
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(
         reopened
@@ -628,7 +688,7 @@ fn scratch_presentation_supports_native_chart_value_axis_bounds_crud() {
         .set_slide_chart_value_axis_bounds(0, source.drawable_object_id, fixed)
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -670,7 +730,7 @@ fn scratch_presentation_supports_native_chart_value_axis_bounds_crud() {
         automatic
     );
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
 }
 
@@ -702,7 +762,7 @@ fn scratch_presentation_supports_native_chart_border_crud() {
     );
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert!(
         editor
@@ -725,10 +785,10 @@ fn scratch_presentation_supports_native_chart_border_crud() {
             .unwrap()
     );
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -765,7 +825,7 @@ fn scratch_presentation_supports_native_chart_rounded_corner_crud() {
     );
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -791,10 +851,10 @@ fn scratch_presentation_supports_native_chart_rounded_corner_crud() {
         rounded
     );
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -824,7 +884,7 @@ fn scratch_presentation_supports_native_chart_gap_crud() {
         .set_slide_chart_gap_spacing(0, source.drawable_object_id, customized)
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -850,10 +910,10 @@ fn scratch_presentation_supports_native_chart_gap_crud() {
         customized
     );
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -890,7 +950,7 @@ fn scratch_presentation_supports_native_chart_value_axis_steps_crud() {
         .set_slide_chart_value_axis_steps(0, source.drawable_object_id, fixed)
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -932,7 +992,7 @@ fn scratch_presentation_supports_native_chart_value_axis_steps_crud() {
         Steps::automatic()
     );
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
 }
 
@@ -973,7 +1033,7 @@ fn scratch_presentation_supports_native_chart_value_axis_minimum_label_visibilit
             .is_visible()
     );
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert!(
         !editor
@@ -1016,7 +1076,7 @@ fn scratch_presentation_supports_native_chart_value_axis_minimum_label_visibilit
             .is_visible()
     );
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
 }
 
@@ -1047,7 +1107,7 @@ fn scratch_presentation_supports_native_chart_category_axis_series_names_visibil
             .unwrap()
     );
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert!(
         editor
@@ -1078,7 +1138,7 @@ fn scratch_presentation_supports_native_chart_category_axis_series_names_visibil
             .unwrap()
     );
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
 }
 
@@ -1114,7 +1174,7 @@ fn scratch_presentation_supports_native_chart_axis_label_visibility_crud() {
     }
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     for axis in [Axis::Category, Axis::Value] {
         assert!(
@@ -1149,7 +1209,7 @@ fn scratch_presentation_supports_native_chart_axis_label_visibility_crud() {
         );
     }
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
 }
 
@@ -1184,7 +1244,7 @@ fn scratch_presentation_supports_native_chart_axis_line_visibility_crud() {
     }
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     for axis in [Axis::Category, Axis::Value] {
         assert!(
@@ -1219,7 +1279,7 @@ fn scratch_presentation_supports_native_chart_axis_line_visibility_crud() {
         );
     }
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
 }
 
@@ -1271,7 +1331,7 @@ fn scratch_presentation_supports_native_chart_axis_major_gridline_visibility_cru
         .unwrap();
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     for axis in [Axis::Category, Axis::Value] {
         assert_eq!(
@@ -1318,7 +1378,7 @@ fn scratch_presentation_supports_native_chart_axis_major_gridline_visibility_cru
         );
     }
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
 }
 
@@ -1359,7 +1419,7 @@ fn scratch_presentation_supports_native_chart_axis_minor_gridline_visibility_cru
             .unwrap();
     }
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     for axis in [Axis::Category, Axis::Value] {
         assert!(
@@ -1394,7 +1454,7 @@ fn scratch_presentation_supports_native_chart_axis_minor_gridline_visibility_cru
         );
     }
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
 }
 
@@ -1442,7 +1502,7 @@ fn scratch_presentation_supports_native_chart_axis_minor_tick_mark_visibility_cr
     }
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     for axis in [Axis::Category, Axis::Value] {
         assert!(
@@ -1491,7 +1551,7 @@ fn scratch_presentation_supports_native_chart_axis_minor_tick_mark_visibility_cr
         );
     }
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
 }
 
@@ -1551,7 +1611,7 @@ fn scratch_presentation_supports_native_chart_axis_tick_mark_location_crud() {
     );
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -1609,7 +1669,7 @@ fn scratch_presentation_supports_native_chart_axis_tick_mark_location_crud() {
         TickMarkLocation::Outside
     );
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
 }
 
@@ -1640,7 +1700,7 @@ fn scratch_presentation_supports_native_chart_legend_visibility_crud() {
     );
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert!(
         !editor
@@ -1674,10 +1734,10 @@ fn scratch_presentation_supports_native_chart_legend_visibility_crud() {
             .unwrap()
     );
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -1848,7 +1908,7 @@ fn duplicated_legend_typography_is_copy_on_write() {
         .set_slide_chart_legend_font(0, chart.drawable_object_id, &bold)
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, chart.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &chart))
         .unwrap();
     let sixteen = ChartLegendFontSize::Size(ChartFontSize::from_points(16.0).unwrap());
     editor
@@ -2041,7 +2101,7 @@ fn scratch_presentation_supports_native_chart_value_axis_scale_crud() {
     );
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -2067,10 +2127,10 @@ fn scratch_presentation_supports_native_chart_value_axis_scale_crud() {
         Scale::Logarithmic
     );
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
 }
 
@@ -2100,7 +2160,7 @@ fn scratch_presentation_supports_native_chart_border_stroke_crud() {
         .set_slide_chart_border_stroke(0, source.drawable_object_id, Some(customized))
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -2129,10 +2189,10 @@ fn scratch_presentation_supports_native_chart_border_stroke_crud() {
         None
     );
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -2166,7 +2226,7 @@ fn scratch_presentation_supports_native_chart_background_fill_crud() {
         )
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -2198,11 +2258,11 @@ fn scratch_presentation_supports_native_chart_background_fill_crud() {
         image_bytes
     );
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.media_assets().unwrap().is_empty());
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -2247,7 +2307,7 @@ fn scratch_presentation_supports_inherited_series_fill_crud() {
         )
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -2282,11 +2342,11 @@ fn scratch_presentation_supports_inherited_series_fill_crud() {
         image_bytes
     );
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     assert_eq!(reopened.media_assets().unwrap().len(), 1);
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.media_assets().unwrap().is_empty());
 }
@@ -2322,7 +2382,7 @@ fn scratch_presentation_supports_inherited_series_stroke_crud() {
         )
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -2385,7 +2445,7 @@ fn scratch_presentation_supports_native_chart_shadow_crud() {
         .set_slide_chart_shadow(0, source.drawable_object_id, customized)
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -2414,10 +2474,10 @@ fn scratch_presentation_supports_native_chart_shadow_crud() {
         .set_slide_chart_shadow(0, duplicate.drawable_object_id, native_default)
         .unwrap();
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -2445,10 +2505,10 @@ fn scratch_presentation_supports_native_pie_start_angle_crud() {
         .set_slide_chart_pie_start_angle(0, source.drawable_object_id, customized)
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     editor
-        .set_slide_chart_kind(0, duplicate.drawable_object_id, Kind::Donut2d)
+        .set_slide_chart_kind(0, chart_selector(&editor, &duplicate), Kind::Donut2d)
         .unwrap();
     assert_eq!(
         editor
@@ -2502,13 +2562,13 @@ fn scratch_presentation_supports_native_pie_start_angle_crud() {
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected_update);
 
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     reopened
-        .remove_slide_chart(0, column.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &column))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -2540,7 +2600,7 @@ fn scratch_presentation_supports_native_donut_inner_radius_crud() {
         .set_slide_chart_donut_inner_radius(0, source.drawable_object_id, customized)
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -2549,7 +2609,7 @@ fn scratch_presentation_supports_native_donut_inner_radius_crud() {
         customized
     );
     editor
-        .set_slide_chart_kind(0, duplicate.drawable_object_id, Kind::Pie2d)
+        .set_slide_chart_kind(0, chart_selector(&editor, &duplicate), Kind::Pie2d)
         .unwrap();
     let before_rejected_update = editor.to_bytes().unwrap();
     assert!(
@@ -2568,7 +2628,7 @@ fn scratch_presentation_supports_native_donut_inner_radius_crud() {
     );
     assert_eq!(editor.to_bytes().unwrap(), before_rejected_update);
     editor
-        .set_slide_chart_kind(0, duplicate.drawable_object_id, Kind::Donut3d)
+        .set_slide_chart_kind(0, chart_selector(&editor, &duplicate), Kind::Donut3d)
         .unwrap();
 
     editor
@@ -2599,10 +2659,10 @@ fn scratch_presentation_supports_native_donut_inner_radius_crud() {
         )
         .unwrap();
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -2653,10 +2713,10 @@ fn scratch_presentation_supports_native_pie_wedge_explosion_crud() {
         .set_slide_chart_pie_wedge_explosions(0, source.drawable_object_id, &customized)
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     editor
-        .set_slide_chart_kind(0, duplicate.drawable_object_id, Kind::Donut2d)
+        .set_slide_chart_kind(0, chart_selector(&editor, &duplicate), Kind::Donut2d)
         .unwrap();
     assert_eq!(
         editor
@@ -2727,13 +2787,13 @@ fn scratch_presentation_supports_native_pie_wedge_explosion_crud() {
     assert_eq!(reopened.to_bytes().unwrap(), before_wrong_kind);
 
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     reopened
-        .remove_slide_chart(0, column.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &column))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -2805,10 +2865,10 @@ fn scratch_presentation_supports_native_pie_label_visibility_crud() {
         .set_slide_chart_pie_label_visibilities(0, source.drawable_object_id, &customized)
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     editor
-        .set_slide_chart_kind(0, duplicate.drawable_object_id, Kind::Donut2d)
+        .set_slide_chart_kind(0, chart_selector(&editor, &duplicate), Kind::Donut2d)
         .unwrap();
     editor
         .set_slide_chart_pie_label_visibility(
@@ -2833,10 +2893,10 @@ fn scratch_presentation_supports_native_pie_label_visibility_crud() {
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -2960,10 +3020,10 @@ fn scratch_presentation_supports_native_pie_label_distance_crud() {
         )
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     editor
-        .set_slide_chart_kind(0, duplicate.drawable_object_id, Kind::Donut2d)
+        .set_slide_chart_kind(0, chart_selector(&editor, &duplicate), Kind::Donut2d)
         .unwrap();
     editor
         .set_slide_chart_pie_label_distance(
@@ -3039,10 +3099,10 @@ fn scratch_presentation_supports_native_pie_label_distance_crud() {
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -3090,7 +3150,7 @@ fn scratch_presentation_supports_native_series_value_label_crud() {
         .set_slide_chart_series_value_label_visibilities(0, source.drawable_object_id, &customized)
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     editor
         .set_slide_chart_series_value_label_visibility(
@@ -3135,10 +3195,10 @@ fn scratch_presentation_supports_native_series_value_label_crud() {
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -3189,7 +3249,7 @@ fn scratch_presentation_supports_native_series_value_label_location_crud() {
         .set_slide_chart_series_value_label_locations(0, source.drawable_object_id, &customized)
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     editor
         .set_slide_chart_series_value_label_location(
@@ -3234,10 +3294,10 @@ fn scratch_presentation_supports_native_series_value_label_location_crud() {
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -3281,7 +3341,7 @@ fn scratch_presentation_supports_native_series_value_label_affix_crud() {
         "$"
     );
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     editor
         .set_slide_chart_series_value_label_affix(
@@ -3335,10 +3395,10 @@ fn scratch_presentation_supports_native_series_value_label_affix_crud() {
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -3387,7 +3447,7 @@ fn scratch_presentation_supports_native_series_value_label_number_format_crud() 
     );
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     editor
         .set_slide_chart_series_value_label_number_format(
@@ -3432,10 +3492,10 @@ fn scratch_presentation_supports_native_series_value_label_number_format_crud() 
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -3478,7 +3538,7 @@ fn scratch_presentation_supports_native_series_value_label_auto_fit_crud() {
     );
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     editor
         .set_slide_chart_series_value_label_auto_fit(
@@ -3523,10 +3583,10 @@ fn scratch_presentation_supports_native_series_value_label_auto_fit_crud() {
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -3575,7 +3635,7 @@ fn scratch_presentation_supports_native_series_trendline_crud() {
     );
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     for series in 0..2 {
         editor
@@ -3616,10 +3676,10 @@ fn scratch_presentation_supports_native_series_trendline_crud() {
     assert!(ChartSeriesTrendlinePolynomialOrder::new(7).is_err());
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -3692,7 +3752,7 @@ fn scratch_presentation_supports_native_series_error_bar_crud() {
     );
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     for series in 0..2 {
         editor
@@ -3759,10 +3819,10 @@ fn scratch_presentation_supports_native_series_error_bar_crud() {
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }

@@ -91,7 +91,7 @@ mod tests {
             .set_slide_chart_arrangement(0, chart.drawable_object_id, constrained)
             .unwrap();
         let duplicate = editor
-            .duplicate_slide_chart(0, chart.drawable_object_id)
+            .duplicate_slide_chart(0, chart_selector(&editor, &chart))
             .unwrap();
         assert_eq!(
             editor
@@ -118,7 +118,7 @@ mod tests {
         );
 
         editor
-            .remove_slide_chart(0, duplicate.drawable_object_id)
+            .remove_slide_chart(0, chart_selector(&editor, &duplicate))
             .unwrap();
         editor
             .set_slide_chart_arrangement(0, chart.drawable_object_id, ChartArrangement::default())

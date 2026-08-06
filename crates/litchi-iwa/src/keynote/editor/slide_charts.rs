@@ -64,6 +64,7 @@ use theme::{chart_theme_context, patch_theme_chart_preset};
 
 use super::*;
 use crate::IWorkThemeArchive;
+use crate::charts::options::chart_title;
 use crate::charts::reference_line::chart_reference_line_objects;
 use crate::charts::source::{
     AXIS_NON_STYLE_MESSAGE_TYPE, AXIS_STYLE_MESSAGE_TYPE, CHART_MESSAGE_TYPE,
@@ -86,7 +87,7 @@ use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableSize, offset_drawable_geometry,
     remove_orphaned_image_asset,
 };
-use litchi_iwa_common::comment::DrawableId;
+use litchi_keynote::ChartSelector;
 
 const KEYNOTE_THEME_MESSAGE_TYPE: u32 = 10;
 
@@ -244,17 +245,14 @@ impl KeynoteEditor {
     }
 
     /// Change the native kind of one slide chart while preserving its data.
-    pub fn set_slide_chart_kind<Selector>(
+    /// `selector` uses checked chart order or an exact visible chart title.
+    pub fn set_slide_chart_kind(
         &mut self,
         slide_index: usize,
-        selector: Selector,
+        selector: ChartSelector<'_>,
         kind: Kind,
-    ) -> Result<()>
-    where
-        Selector: TryInto<DrawableId>,
-        Selector::Error: std::fmt::Debug,
-    {
-        let drawable_object_id = checked_chart_selector(selector)?.get();
+    ) -> Result<()> {
+        let drawable_object_id = self.resolve_chart_selector(slide_index, selector)?;
         require_creatable_kind(kind)?;
         self.update_slide_chart(
             slide_index,
@@ -288,17 +286,14 @@ impl KeynoteEditor {
     }
 
     /// Replace the complete inline data grid of one slide chart.
-    pub fn set_slide_chart_data<Selector>(
+    /// `selector` uses checked chart order or an exact visible chart title.
+    pub fn set_slide_chart_data(
         &mut self,
         slide_index: usize,
-        selector: Selector,
+        selector: ChartSelector<'_>,
         data: ChartData,
-    ) -> Result<()>
-    where
-        Selector: TryInto<DrawableId>,
-        Selector::Error: std::fmt::Debug,
-    {
-        let drawable_object_id = checked_chart_selector(selector)?.get();
+    ) -> Result<()> {
+        let drawable_object_id = self.resolve_chart_selector(slide_index, selector)?;
         self.update_slide_chart(
             slide_index,
             drawable_object_id,
@@ -329,17 +324,14 @@ impl KeynoteEditor {
     }
 
     /// Set whether rows or columns form one slide chart's series.
-    pub fn set_slide_chart_direction<Selector>(
+    /// `selector` uses checked chart order or an exact visible chart title.
+    pub fn set_slide_chart_direction(
         &mut self,
         slide_index: usize,
-        selector: Selector,
+        selector: ChartSelector<'_>,
         direction: Direction,
-    ) -> Result<()>
-    where
-        Selector: TryInto<DrawableId>,
-        Selector::Error: std::fmt::Debug,
-    {
-        let drawable_object_id = checked_chart_selector(selector)?.get();
+    ) -> Result<()> {
+        let drawable_object_id = self.resolve_chart_selector(slide_index, selector)?;
         if direction.is_unsupported() {
             return Err(Error::ParseError(
                 "cannot assign an unsupported chart series direction".to_owned(),
@@ -377,17 +369,14 @@ impl KeynoteEditor {
     }
 
     /// Update one chart's slide-space geometry.
-    pub fn set_slide_chart_geometry<Selector>(
+    /// `selector` uses checked chart order or an exact visible chart title.
+    pub fn set_slide_chart_geometry(
         &mut self,
         slide_index: usize,
-        selector: Selector,
+        selector: ChartSelector<'_>,
         geometry: DrawableGeometry,
-    ) -> Result<()>
-    where
-        Selector: TryInto<DrawableId>,
-        Selector::Error: std::fmt::Debug,
-    {
-        let drawable_object_id = checked_chart_selector(selector)?.get();
+    ) -> Result<()> {
+        let drawable_object_id = self.resolve_chart_selector(slide_index, selector)?;
         geometry.validate()?;
         self.update_slide_chart(
             slide_index,
@@ -423,16 +412,13 @@ impl KeynoteEditor {
     /// identities while retaining editable inline data and opaque protobuf
     /// fields. It is owned by the same slide but has an independent chart grid
     /// and geometry.
-    pub fn duplicate_slide_chart<Selector>(
+    /// `selector` uses checked chart order or an exact visible chart title.
+    pub fn duplicate_slide_chart(
         &mut self,
         slide_index: usize,
-        selector: Selector,
-    ) -> Result<KeynoteSlideChartInfo>
-    where
-        Selector: TryInto<DrawableId>,
-        Selector::Error: std::fmt::Debug,
-    {
-        let source_drawable_object_id = checked_chart_selector(selector)?.get();
+        selector: ChartSelector<'_>,
+    ) -> Result<KeynoteSlideChartInfo> {
+        let source_drawable_object_id = self.resolve_chart_selector(slide_index, selector)?;
         let source = chart_graph(self, slide_index, source_drawable_object_id)?;
         let source_style_ids =
             local_chart_style_ids(self.package(), &source.archive_name, &source.object_ids)?;
@@ -571,16 +557,13 @@ impl KeynoteEditor {
     }
 
     /// Remove a standalone slide chart and its private title, caption, and styles.
-    pub fn remove_slide_chart<Selector>(
+    /// `selector` uses checked chart order or an exact visible chart title.
+    pub fn remove_slide_chart(
         &mut self,
         slide_index: usize,
-        selector: Selector,
-    ) -> Result<RemovedKeynoteSlideChart>
-    where
-        Selector: TryInto<DrawableId>,
-        Selector::Error: std::fmt::Debug,
-    {
-        let drawable_object_id = checked_chart_selector(selector)?.get();
+        selector: ChartSelector<'_>,
+    ) -> Result<RemovedKeynoteSlideChart> {
+        let drawable_object_id = self.resolve_chart_selector(slide_index, selector)?;
         let source = chart_graph(self, slide_index, drawable_object_id)?;
         let style_ids =
             local_chart_style_ids(self.package(), &source.archive_name, &source.object_ids)?;
@@ -655,6 +638,56 @@ impl KeynoteEditor {
         Ok(RemovedKeynoteSlideChart { chart: source.info })
     }
 
+    fn resolve_chart_selector(
+        &self,
+        slide_index: usize,
+        selector: ChartSelector<'_>,
+    ) -> Result<u64> {
+        let charts = self.slide_charts(slide_index)?;
+        match selector {
+            ChartSelector::Index(index) => charts
+                .get(index)
+                .map(|chart| chart.drawable_object_id)
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote slide {slide_index} has no chart at position {index}"
+                    ))
+                }),
+            ChartSelector::Name(name) => {
+                if name.is_empty() {
+                    return Err(Error::ParseError(
+                        "Keynote chart selector name cannot be empty".to_owned(),
+                    ));
+                }
+                let graph = ObjectGraph::read(self.package())?;
+                let context = text_box_create::text_box_context(&graph, slide_index)?;
+                let archive_name = graph.archive_name(context.slide_id)?;
+                let mut match_id = None;
+                for chart in charts {
+                    let title = chart_title(
+                        self.package(),
+                        archive_name,
+                        chart.drawable_object_id,
+                        "Keynote",
+                    )?;
+                    if title.as_deref() != Some(name) {
+                        continue;
+                    }
+                    if match_id.replace(chart.drawable_object_id).is_some() {
+                        return Err(Error::InvalidFormat(format!(
+                            "Keynote slide {slide_index} has multiple charts named {name:?}"
+                        )));
+                    }
+                }
+                match_id.ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote slide {slide_index} has no chart named {name:?}"
+                    ))
+                })
+            },
+        }
+    }
+
     fn update_slide_chart(
         &mut self,
         slide_index: usize,
@@ -677,14 +710,18 @@ impl KeynoteEditor {
     }
 }
 
-fn checked_chart_selector<Selector>(selector: Selector) -> Result<DrawableId>
-where
-    Selector: TryInto<DrawableId>,
-    Selector::Error: std::fmt::Debug,
-{
-    selector
-        .try_into()
-        .map_err(|error| Error::ParseError(format!("Keynote chart selector is invalid: {error:?}")))
+#[cfg(test)]
+pub(crate) fn chart_selector(
+    editor: &KeynoteEditor,
+    chart: &KeynoteSlideChartInfo,
+) -> ChartSelector<'static> {
+    let index = editor
+        .slide_charts(chart.slide_index)
+        .expect("chart selector test catalog")
+        .iter()
+        .position(|candidate| candidate.drawable_object_id == chart.drawable_object_id)
+        .expect("chart selector test chart");
+    ChartSelector::index(index)
 }
 
 fn update_chart_payload(
