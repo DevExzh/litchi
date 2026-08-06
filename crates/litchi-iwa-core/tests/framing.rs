@@ -521,7 +521,7 @@ fn message_info_reader_and_io_errors_are_reported() -> Result<(), Error> {
 }
 
 #[test]
-fn unknown_header_fields_and_untouched_payloads_round_trip_byte_for_byte() -> Result<(), Error> {
+fn unknown_and_noncanonical_header_bytes_round_trip_byte_for_byte() -> Result<(), Error> {
     let archive = Archive {
         objects: vec![ArchiveObject::new(
             71,
@@ -533,12 +533,14 @@ fn unknown_header_fields_and_untouched_payloads_round_trip_byte_for_byte() -> Re
     };
     let encoded = archive.to_bytes()?;
     let (header_length, prefix_length) = decode_test_varint(&encoded);
+    let duplicate_identifier = [0x08, 71];
     let unknown_field = [0xa2, 0x06, 0x01, 0xff];
-    let new_header_length = header_length + unknown_field.len();
+    let noncanonical_header_suffix = [duplicate_identifier.as_slice(), &unknown_field].concat();
+    let new_header_length = header_length + noncanonical_header_suffix.len();
     let mut modified = Vec::new();
     modified.push(new_header_length as u8);
     modified.extend_from_slice(&encoded[prefix_length..prefix_length + header_length]);
-    modified.extend_from_slice(&unknown_field);
+    modified.extend_from_slice(&noncanonical_header_suffix);
     modified.extend_from_slice(&encoded[prefix_length + header_length..]);
 
     let parsed = Archive::parse(&modified)?;

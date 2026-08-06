@@ -333,10 +333,12 @@ pub struct ArchiveObject {
     pub data_offset: u64,
     /// Total bytes occupied by the object's payloads.
     pub data_length: u64,
-    /// Original encoded header, retained so untouched unknown protobuf fields
-    /// survive a parse/serialize round trip.
+    /// Original encoded header, retained only when it differs from the
+    /// canonical encoding so untouched unknown protobuf fields survive a
+    /// parse/serialize round trip.
     original_header: Option<Box<[u8]>>,
-    /// Canonical encoding of the known header fields at parse time.
+    /// Canonical encoding paired with `original_header` for a non-canonical
+    /// source header. Both fields are absent for a canonical source header.
     original_canonical_header: Option<Box<[u8]>>,
 }
 
@@ -595,6 +597,12 @@ impl Archive {
             })?;
             let archive_info = ArchiveInfo::decode_with_limits(header, limits)?;
             let canonical_header = encode_archive_info(&archive_info, limits)?;
+            let (original_header, original_canonical_header) =
+                if header == canonical_header.as_slice() {
+                    (None, None)
+                } else {
+                    (Some(header.into()), Some(canonical_header.into()))
+                };
             cursor = header_end;
             add_limited(
                 &mut total_messages,
@@ -669,8 +677,8 @@ impl Archive {
                     .map_err(|_| Error::invalid_archive(payload_start, "offset exceeds u64"))?,
                 data_length: u64::try_from(payload_length)
                     .map_err(|_| Error::invalid_archive(payload_start, "payload exceeds u64"))?,
-                original_header: Some(header.into()),
-                original_canonical_header: Some(canonical_header.into()),
+                original_header,
+                original_canonical_header,
             });
         }
         let archive = Self { objects };
@@ -1042,4 +1050,36 @@ fn encode_varint(mut value: u64, output: &mut [u8; MAX_VARINT_BYTES]) -> &[u8] {
     }
     output[length] = u8::try_from(value).unwrap_or_default();
     &output[..=length]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Archive, ArchiveObject, Error, RawMessage};
+    use crate::Result;
+
+    #[test]
+    fn canonical_headers_use_compact_retention_path() -> Result<()> {
+        let archive = Archive {
+            objects: vec![ArchiveObject::new(
+                1,
+                vec![RawMessage {
+                    type_: 2,
+                    data: vec![3, 4],
+                }],
+            )?],
+        };
+        let encoded = archive.to_bytes()?;
+        let parsed = Archive::parse(&encoded)?;
+        let [object] = parsed.objects.as_slice() else {
+            return Err(Error::invalid_archive(
+                0,
+                "test archive did not contain exactly one object",
+            ));
+        };
+
+        assert!(object.original_header.is_none());
+        assert!(object.original_canonical_header.is_none());
+        assert_eq!(parsed.to_bytes()?, encoded);
+        Ok(())
+    }
 }
