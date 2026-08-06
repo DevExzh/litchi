@@ -8,6 +8,9 @@ mod codec;
 mod model;
 mod validation;
 
+/// Main-master design-name metadata.
+pub mod template;
+
 #[cfg(test)]
 mod tests;
 
@@ -79,6 +82,11 @@ impl Snapshot {
         codec::read(self.context(), self.record())
     }
 
+    /// Read the optional main-master design name.
+    pub fn template_name(&self) -> Result<Option<template::Name>> {
+        template::codec::read(self.context(), self.record())
+    }
+
     /// Open an isolated semantic edit.
     pub fn edit(&self) -> Editor {
         Editor {
@@ -102,6 +110,16 @@ impl Editor {
     /// Read the candidate name without committing the edit.
     pub fn name(&self) -> Result<Option<Name>> {
         codec::read(self.context(), self.inner.record())
+    }
+
+    /// Read the candidate main-master design name.
+    pub fn template_name(&self) -> Result<Option<template::Name>> {
+        template::codec::read(self.context(), self.inner.record())
+    }
+
+    /// Borrow the transaction-local master record.
+    pub fn record(&self) -> &Record {
+        self.inner.record()
     }
 
     /// Whether this editor contains an uncommitted change.
@@ -133,9 +151,43 @@ impl Editor {
         Ok(())
     }
 
+    /// Set or replace the main-master design name atomically.
+    pub fn set_template_name(&mut self, value: impl Into<String>) -> Result<()> {
+        let name = template::Name::new(value)?;
+        let replacement = template::codec::encode(&name)?;
+        let index = template::validation::template_index(self.context(), self.inner.record())?;
+        match index {
+            Some(index) => {
+                self.inner
+                    .replace(master_layout::Path::root().child(index), replacement)?;
+            },
+            None => {
+                let index = template::validation::template_insertion_index(
+                    self.context(),
+                    self.inner.record(),
+                )?;
+                self.inner
+                    .add(master_layout::Path::root(), index, replacement)?;
+            },
+        }
+        Ok(())
+    }
+
     /// Remove the master name atom, returning whether one was present.
     pub fn clear_name(&mut self) -> Result<bool> {
         let Some(index) = validation::name_index(self.context(), self.inner.record())? else {
+            return Ok(false);
+        };
+        self.inner
+            .remove(master_layout::Path::root().child(index))?;
+        Ok(true)
+    }
+
+    /// Remove the main-master design name atom, returning whether one was present.
+    pub fn clear_template_name(&mut self) -> Result<bool> {
+        let Some(index) =
+            template::validation::template_index(self.context(), self.inner.record())?
+        else {
             return Ok(false);
         };
         self.inner
