@@ -6,6 +6,8 @@
 
 mod codec;
 mod model;
+mod storage;
+mod transaction;
 
 #[cfg(test)]
 mod tests;

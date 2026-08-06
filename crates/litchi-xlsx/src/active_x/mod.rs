@@ -7,6 +7,7 @@
 mod codec;
 mod model;
 mod package;
+mod validation;
 pub mod vba;
 
 use crate::error::{Error, Result};

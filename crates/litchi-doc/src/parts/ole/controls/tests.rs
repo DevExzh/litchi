@@ -1,5 +1,5 @@
 use super::codec::PLCOCX;
-use super::{Control, Controls};
+use super::{Controls, Document};
 use crate::parts::fib::FileInformationBlock;
 
 const FIB_POINTERS: usize = 93;
@@ -42,12 +42,12 @@ fn parses_ole_controls() {
     assert_eq!(parsed.len(), 3);
     assert!(!parsed.is_empty());
     assert_eq!(
-        parsed.controls(),
-        [
-            Control { cookie: 3 },
-            Control { cookie: 0 },
-            Control { cookie: 17 },
-        ]
+        parsed
+            .controls()
+            .iter()
+            .map(|control| control.cookie)
+            .collect::<Vec<_>>(),
+        [3, 0, 17]
     );
 }
 
@@ -86,14 +86,44 @@ fn accepts_word_padded_entries() {
     data.extend_from_slice(&1u32.to_le_bytes());
     data.extend_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
     data.extend_from_slice(&[0xFF, 0xFF, 0xFF, 0xFF]);
-    data.extend_from_slice(&[0; 12]);
+    data.extend_from_slice(&[0; 4]);
+    data.extend_from_slice(&[0; 2]);
+    data.extend_from_slice(&[1, 0]);
+    data.extend_from_slice(&[0; 4]);
     let parsed = Controls::parse_bytes(&data).unwrap();
+    assert_eq!(parsed.controls()[0].cookie, 0xFFFF_FFFF);
+    assert!(parsed.controls()[0].metadata.is_some());
+    assert_eq!(parsed.entry_stride(), 20);
     assert_eq!(
-        parsed.controls(),
-        [Control {
-            cookie: 0xFFFF_FFFF
-        }]
+        parsed.entry_padding(0),
+        Some(&[0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0][..])
     );
+    assert_eq!(parsed.to_bytes(), data);
+}
+
+#[test]
+fn decodes_the_specified_ocx_info_body() {
+    let mut data = Vec::new();
+    data.extend_from_slice(&1u32.to_le_bytes());
+    data.extend_from_slice(&17u32.to_le_bytes());
+    data.extend_from_slice(&29u32.to_le_bytes());
+    data.extend_from_slice(&0xAABB_CCDDu32.to_le_bytes());
+    data.extend_from_slice(&3u16.to_le_bytes());
+    data.extend_from_slice(&0x22CBu16.to_le_bytes());
+    data.extend_from_slice(&8u16.to_le_bytes());
+    data.extend_from_slice(&0x3344u16.to_le_bytes());
+
+    let parsed = Controls::parse_bytes(&data).unwrap();
+    let metadata = parsed.controls()[0].metadata.unwrap();
+    assert_eq!(metadata.field_index, 29);
+    assert_eq!(metadata.accelerator_handle, 0xAABB_CCDD);
+    assert_eq!(metadata.accelerator_count, 3);
+    assert!(metadata.flags.eats_return);
+    assert!(metadata.flags.default_button);
+    assert!(metadata.flags.right_to_left);
+    assert!(metadata.flags.corrupt);
+    assert_eq!(metadata.document, Document::HeaderTextbox);
+    assert_eq!(parsed.to_bytes(), data);
 }
 
 #[test]

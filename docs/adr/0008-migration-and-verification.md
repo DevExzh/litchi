@@ -5482,6 +5482,32 @@ bounded implementation evidence, not a claim of complete `[MS-DOC]`,
 `[MS-ODRAW]`, `[MS-OGRAPH]`, `[MS-PPT]`, `[MS-XLS]`, OOXML, or ODF
 conformance.
 
+## Layered OLE2 and OOXML continuation with typed control metadata
+
+This wave applies the same contextual hierarchy to another disjoint set of
+dense owners. DOC embedded-object transactions, field parsing, writer package
+semantics, and writer tests; ODS data-pilot parsing; PPT embedded objects,
+animation behavior parsing, text-format and text-style writing; XLS OLE-object
+and writer-stream owners; XLSB formula text and worksheet writing; and XLSX
+ActiveX and XLDM package owners now use nested facades over semantic models,
+wire/XML or BIFF codecs, validation, package/transaction seams, and focused
+tests. The format facades remain prefix-free and no compatibility aliases were
+added; one PPT editor finalization path also avoids an unnecessary output
+buffer clone.
+
+DOC `parts::ole::controls` now decodes the specified 20-byte `[MS-DOC]`
+`OcxInfo` body (`dwCookie`, field index, accelerator metadata, flags, and
+document selector) when present, retains shorter producer entries and
+undefined tails, and provides deterministic `RgxOcxInfo` serialization. The
+owner remains passive: it does not expose a control runtime, ObjectPool
+activation, event dispatch, rendering, or macro execution.
+
+Strict all-target checks pass for DOC, ODS, PPT, XLS, XLSB, and XLSX. With lint
+caps, the library matrix passes DOC (851 with two ignored), ODS (67), PPT (888
+with one ignored), XLS (862), XLSB (413), and XLSX (653). Formatting, diff,
+and the 46-package boundary check pass. This is layered-owner and bounded
+metadata evidence, not a claim of complete OLE2, OOXML, or ODF conformance.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

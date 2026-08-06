@@ -1,8 +1,9 @@
 //! Regression tests for the DOC embedded-object model and codec.
 
 use super::Limits;
-use super::codec::{OBJECT_POOL, discover_targets, is_object_storage_name};
-use super::model::Info;
+use super::codec::{discover_targets, validate_existing_fields};
+use super::model::{FieldMarker, Info};
+use super::storage::{OBJECT_POOL, is_object_storage_name};
 use litchi_cfb::OleWriter;
 use std::io::Cursor;
 
@@ -92,4 +93,28 @@ fn obj_info_rejects_invalid_required_bits_without_ole_access() {
     info.reserved_persist1 = 0;
     info.reserved_persist2 = 1 << 1;
     assert!(info.to_bytes().is_err());
+}
+
+#[test]
+fn field_validation_rejects_orphan_and_unclosed_markers() {
+    assert!(
+        validate_existing_fields(
+            &[FieldMarker {
+                cp: 0,
+                descriptor: [0x14, 0],
+            }],
+            1,
+        )
+        .is_err()
+    );
+    assert!(
+        validate_existing_fields(
+            &[FieldMarker {
+                cp: 0,
+                descriptor: [0x13, 0x3A],
+            }],
+            1,
+        )
+        .is_err()
+    );
 }

@@ -213,6 +213,17 @@ writing; XLSB pivot writing; XLSX package metadata; DOCX package tests; and
 PPTX shape anchors now follow the same nested facade/model/codec/validation/
 test organization.
 
+The current owner continuation further layers DOC embedded-object
+transactions, field parsing, writer package semantics, and writer tests; ODS
+data-pilot parsing; PPT embedded objects, animation behavior, text-format, and
+text-style writers; XLS OLE objects and writer streams; XLSB formula text and
+worksheet writing; and XLSX ActiveX and XLDM package owners. DOC's
+`parts/ole/controls` facade also decodes the specified 20-byte `OcxInfo` body
+while preserving shorter entries and undefined tails. These additions keep
+semantic, wire/XML or BIFF, validation, package, and test ownership nested;
+they remain inert with respect to control activation, macros, and external
+behavior.
+
 ## Historical terminology
 
 References to `litchi-ooxml` in ADR 0002, ADR 0008, ADR 0011, ADR 0013, ADR

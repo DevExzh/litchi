@@ -4,15 +4,16 @@
 //! stay in contextual layers while this module remains the ergonomic facade.
 
 mod codec;
-mod model;
 mod package;
+mod semantic;
+mod validation;
 
 #[cfg(test)]
 mod tests;
 
 pub use litchi_ole_common::object::Limits;
-pub use model::*;
 pub use package::Editor;
+pub use semantic::*;
 
 const OBJ: u16 = 0x005D;
 const TXO: u16 = 0x01B6;

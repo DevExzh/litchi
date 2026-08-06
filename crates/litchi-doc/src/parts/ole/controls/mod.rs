@@ -6,4 +6,4 @@ mod model;
 #[cfg(test)]
 mod tests;
 
-pub use model::{Control, Controls};
+pub use model::{Control, Controls, Document, Flags, Metadata};
