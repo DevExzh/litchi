@@ -3,12 +3,12 @@
 use super::super::super::model::*;
 use super::super::semantic::{MAX_PROPERTY_COUNT, validate_section};
 use super::super::support::allocation;
-use super::parse_typed_property;
-use super::semantic::serialize_typed;
+use super::semantic::serialize_typed_for_property;
 use super::wire::{
     ValueReader, append_u32, checked_range, decode_ansi, decode_utf16, encode_ansi, pad4,
     read_guid, read_u16, read_u32, reserve_bytes, try_zeroed_vec,
 };
+use super::{parse_typed_property, parse_typed_property_for_property};
 use litchi_cfb::OleError;
 use litchi_cfb::consts::*;
 use std::collections::HashMap;
@@ -205,7 +205,7 @@ fn serialize_section(section: &Section) -> Result<Vec<u8>, OleError> {
                 .properties
                 .get(id)
                 .ok_or_else(|| invalid(format!("Property order references missing PID {id}")))?;
-            serialize_typed(value, codepage)?
+            serialize_typed_for_property(*id, value, codepage)?
         })
     }
     let table_size = align4_len(table_end, "property descriptor table")?;
@@ -408,11 +408,13 @@ fn parse_section(data: &[u8], format_identifier: Guid, version: u16) -> Result<S
             .get(index + 1)
             .map_or(data.len(), |(offset, _)| *offset);
         let bytes = &data[*start..end];
-        let value = parse_typed_property(bytes, effective_codepage, *start).map_err(|error| {
-            invalid(format!(
-                "Property {identifier} at section offset {start} is invalid: {error}"
-            ))
-        })?;
+        let value =
+            parse_typed_property_for_property(bytes, effective_codepage, *start, *identifier)
+                .map_err(|error| {
+                    invalid(format!(
+                        "Property {identifier} at section offset {start} is invalid: {error}"
+                    ))
+                })?;
         properties.insert(*identifier, value);
     }
     let mut property_order = try_vec_with_capacity(descriptors.len(), "property order")?;

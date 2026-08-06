@@ -8,6 +8,11 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 use std::hash::{Hash, Hasher};
 
+#[path = "model/composite.rs"]
+mod composite;
+
+pub use composite::{DocParts, HeadingPair, HeadingPairs, TextEncoding};
+
 fn allocation(resource: &'static str, source: std::collections::TryReserveError) -> OleError {
     OleError::Allocation { resource, source }
 }
@@ -18,7 +23,10 @@ pub(crate) const PID_DICTIONARY: u32 = 0;
 pub(crate) const PID_CODEPAGE: u32 = 1;
 pub(crate) const PID_LOCALE: u32 = 0x8000_0000;
 pub(crate) const PID_BEHAVIOR: u32 = 0x8000_0003;
+pub const PID_HEADING_PAIRS: u32 = 0x0000_000C;
+pub const PID_DOC_PARTS: u32 = 0x0000_000D;
 pub(crate) const MAX_NAMED_PROPERTY_ID: u32 = 0x7fff_ffff;
+pub(crate) const MAX_COMPOSITE_ELEMENTS: usize = 1_000_000;
 pub(crate) const VT_ARRAY: u16 = 0x2000;
 pub(crate) const VT_VERSIONED_STREAM: u16 = 0x0049;
 
@@ -955,6 +963,8 @@ pub enum Value {
     Clipboard { format: i32, data: Vec<u8> },
     Clsid(Guid),
     VersionedStream(VersionedStream),
+    HeadingPairs(HeadingPairs),
+    DocParts(DocParts),
     Vector(Vector),
     Array(Array),
     Unknown { variant_type: u16, data: Vec<u8> },
@@ -1024,6 +1034,8 @@ pub(crate) fn try_clone_property_value(value: &Value) -> Result<Value, OleError>
             version_guid: value.version_guid,
             stream_name: try_clone_string(&value.stream_name, "indirect property name")?,
         }),
+        Value::HeadingPairs(value) => Value::HeadingPairs(value.try_clone()?),
+        Value::DocParts(value) => Value::DocParts(value.try_clone()?),
         Value::Vector(vector) => {
             let mut cloned = try_vec_with_capacity(vector.values.len(), "property value vector")?;
             for value in &vector.values {

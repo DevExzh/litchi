@@ -33,6 +33,7 @@ pub(super) fn validate_section(section: &Section, version: u16) -> Result<(), Ol
     if section.properties.len() > MAX_PROPERTY_COUNT {
         return Err(invalid("Property count exceeds safety limit"));
     }
+    let effective_codepage = section.codepage.map_or(DEFAULT_CODEPAGE, |page| page.id());
     for identifier in section.properties.keys() {
         if !valid_property_identifier(*identifier) {
             return Err(invalid(format!(
@@ -49,6 +50,23 @@ pub(super) fn validate_section(section: &Section, version: u16) -> Result<(), Ol
         }
         if let Value::VersionedStream(value) = value {
             value.validate_for_property(*identifier)?;
+        }
+        match value {
+            Value::HeadingPairs(value) => value.validate()?,
+            Value::DocParts(value) => value.validate_for_codepage(effective_codepage)?,
+            _ => {},
+        }
+    }
+    if let (Some(Value::HeadingPairs(headings)), Some(Value::DocParts(parts))) = (
+        section.properties.get(&PID_HEADING_PAIRS),
+        section.properties.get(&PID_DOC_PARTS),
+    ) {
+        let expected = headings.document_part_count();
+        let actual = parts.len() as u64;
+        if expected != actual {
+            return Err(invalid(format!(
+                "Heading pair part count {expected} does not match document-part count {actual}"
+            )));
         }
     }
     if let Some(value) = section.properties.get(&PID_BEHAVIOR) {

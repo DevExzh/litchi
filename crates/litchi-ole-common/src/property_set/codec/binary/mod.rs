@@ -1,5 +1,8 @@
 //! Binary MS-OLEPS stream and VARIANT codec facade.
 
+mod composite;
+#[cfg(test)]
+mod composite_tests;
 mod semantic;
 #[cfg(test)]
 mod tests;
@@ -18,6 +21,20 @@ pub(crate) fn parse_typed_property(
     property_offset: usize,
 ) -> Result<Value, OleError> {
     semantic::parse_typed_property(data, codepage, property_offset)
+}
+
+pub(crate) fn parse_typed_property_for_property(
+    data: &[u8],
+    codepage: u16,
+    property_offset: usize,
+    property_identifier: u32,
+) -> Result<Value, OleError> {
+    semantic::parse_typed_property_for_property(
+        data,
+        codepage,
+        property_offset,
+        property_identifier,
+    )
 }
 
 impl Stream {

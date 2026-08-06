@@ -1,6 +1,7 @@
 //! Typed VARIANT semantic codec for Property Set values.
 
 use super::super::super::model::*;
+use super::composite;
 use super::wire::{
     ValueReader, append_bytes, append_u16, append_u32, append_u64, encode_ansi, pad4,
     read_codepage_string, read_u16, read_unicode_string, reserve_bytes,
@@ -15,6 +16,23 @@ pub(super) fn serialize_typed(value: &Value, codepage: u16) -> Result<Vec<u8>, O
     let mut out = try_vec_with_capacity(4, "serialized property value")?;
     append_typed(&mut out, value, codepage)?;
     Ok(out)
+}
+
+pub(super) fn serialize_typed_for_property(
+    property_identifier: u32,
+    value: &Value,
+    codepage: u16,
+) -> Result<Vec<u8>, OleError> {
+    match (property_identifier, value) {
+        (PID_HEADING_PAIRS, Value::HeadingPairs(_)) | (PID_DOC_PARTS, Value::DocParts(_)) => {
+            serialize_typed(value, codepage)
+        },
+        (_, Value::HeadingPairs(_)) => {
+            Err(invalid("HeadingPairs is only valid for PID_HEADING_PAIRS"))
+        },
+        (_, Value::DocParts(_)) => Err(invalid("DocParts is only valid for PID_DOC_PARTS")),
+        _ => serialize_typed(value, codepage),
+    }
 }
 fn append_typed(out: &mut Vec<u8>, value: &Value, codepage: u16) -> Result<(), OleError> {
     let vt = variant_type(value);
@@ -52,6 +70,11 @@ fn variant_type(value: &Value) -> u16 {
         Value::Clipboard { .. } => VT_CF,
         Value::Clsid(_) => VT_CLSID,
         Value::VersionedStream(_) => VT_VERSIONED_STREAM,
+        Value::HeadingPairs(_) => composite::HEADING_PAIRS_TYPE,
+        Value::DocParts(value) => match value.encoding() {
+            TextEncoding::Ansi => composite::DOC_PARTS_ANSI_TYPE,
+            TextEncoding::Unicode => composite::DOC_PARTS_UNICODE_TYPE,
+        },
         Value::Vector(vector) => VT_VECTOR | vector.scalar().raw(),
         Value::Array(array) => VT_ARRAY | array.scalar().raw(),
         Value::Unknown { variant_type, .. } => *variant_type,
@@ -126,6 +149,8 @@ fn append_body(out: &mut Vec<u8>, value: &Value, codepage: u16) -> Result<(), Ol
             )?;
             append_codepage_string(out, value.stream_name(), codepage)?;
         },
+        Value::HeadingPairs(value) => composite::append_heading_pairs(out, value, codepage)?,
+        Value::DocParts(value) => composite::append_doc_parts(out, value, codepage)?,
         Value::Vector(vector) => {
             vector.validate()?;
             append_u32(
@@ -211,6 +236,24 @@ pub(crate) fn parse_typed_property(
     codepage: u16,
     property_offset: usize,
 ) -> Result<Value, OleError> {
+    parse_typed_property_context(data, codepage, property_offset, None)
+}
+
+pub(crate) fn parse_typed_property_for_property(
+    data: &[u8],
+    codepage: u16,
+    property_offset: usize,
+    property_identifier: u32,
+) -> Result<Value, OleError> {
+    parse_typed_property_context(data, codepage, property_offset, Some(property_identifier))
+}
+
+fn parse_typed_property_context(
+    data: &[u8],
+    codepage: u16,
+    property_offset: usize,
+    property_identifier: Option<u32>,
+) -> Result<Value, OleError> {
     if data.len() < 4 {
         return Err(invalid("Typed property value is truncated"));
     }
@@ -222,7 +265,7 @@ pub(crate) fn parse_typed_property(
         .checked_add(4)
         .ok_or_else(|| invalid("Property value offset overflow"))?;
     let mut reader = ValueReader::new(&data[4..], value_offset);
-    let value = parse_value_body(&mut reader, variant_type, codepage, 0)?;
+    let value = parse_value_body(&mut reader, variant_type, codepage, 0, property_identifier)?;
     let allows_opaque_tail = matches!(
         variant_type,
         VT_EMPTY | VT_NULL | VT_BSTR | VT_LPSTR | VT_LPWSTR
@@ -250,9 +293,24 @@ fn parse_value_body(
     variant_type: u16,
     codepage: u16,
     depth: usize,
+    property_identifier: Option<u32>,
 ) -> Result<Value, OleError> {
     if depth > 8 {
         return Err(invalid("Property value nesting exceeds the safety limit"));
+    }
+    if depth == 0 {
+        match (property_identifier, variant_type) {
+            (Some(PID_HEADING_PAIRS), composite::HEADING_PAIRS_TYPE) => {
+                return composite::parse_heading_pairs(reader, codepage);
+            },
+            (Some(PID_DOC_PARTS), composite::DOC_PARTS_ANSI_TYPE) => {
+                return composite::parse_doc_parts(reader, TextEncoding::Ansi, codepage);
+            },
+            (Some(PID_DOC_PARTS), composite::DOC_PARTS_UNICODE_TYPE) => {
+                return composite::parse_doc_parts(reader, TextEncoding::Unicode, codepage);
+            },
+            _ => {},
+        }
     }
     if variant_type & VT_VECTOR != 0 {
         let base_type = variant_type & !VT_VECTOR;
@@ -429,11 +487,11 @@ fn parse_vector(
             if reader.read_u16("variant vector reserved field")? != 0 {
                 return Err(invalid("Variant vector reserved field must be zero"));
             }
-            let value = parse_value_body(reader, nested_type, codepage, depth + 1)?;
+            let value = parse_value_body(reader, nested_type, codepage, depth + 1, None)?;
             reader.align4(false, "variant vector element padding")?;
             value
         } else {
-            parse_value_body(reader, scalar.raw(), codepage, depth + 1)?
+            parse_value_body(reader, scalar.raw(), codepage, depth + 1, None)?
         };
         values.push(value);
     }
@@ -482,11 +540,11 @@ fn parse_array(
             if reader.read_u16("array variant reserved field")? != 0 {
                 return Err(invalid("Array variant reserved field must be zero"));
             }
-            let value = parse_value_body(reader, nested_type, codepage, depth + 1)?;
+            let value = parse_value_body(reader, nested_type, codepage, depth + 1, None)?;
             reader.align4(false, "array variant element padding")?;
             value
         } else {
-            parse_value_body(reader, scalar.raw(), codepage, depth + 1)?
+            parse_value_body(reader, scalar.raw(), codepage, depth + 1, None)?
         };
         values.push(value);
     }
