@@ -2,6 +2,7 @@
 
 use super::codec::{self, Package};
 use super::discovery;
+use super::link::{self, Link};
 use super::model::{Limits, Objects};
 use super::patch::{Commit, Patch};
 use super::snapshot::Snapshot;
@@ -216,6 +217,33 @@ impl Editor {
             .add_stream(path, data.into(), self.limits)?;
         *self = candidate.commit_candidate()?;
         Ok(())
+    }
+
+    /// Atomically edits one selected object's OLEDS `\x01Ole` metadata.
+    ///
+    /// The callback only receives the inert typed link fields.  The edited
+    /// stream is published through the same candidate-render-and-reopen path
+    /// as every other object edit, so callback or CFB failures leave this
+    /// editor unchanged.
+    pub fn update_link<F>(&mut self, key: &str, edit: F) -> Result<(), OleError>
+    where
+        F: FnOnce(&mut Link) -> Result<(), OleError>,
+    {
+        let object_path = self
+            .objects
+            .get(key)
+            .ok_or_else(|| OleError::InvalidFormat(format!("object target {key:?} not found")))?
+            .path()
+            .to_vec();
+        let mut stream_path = object_path;
+        stream_path.push(link::NAME.to_string());
+        let bytes = self
+            .package
+            .stream_shared(&stream_path)
+            .ok_or(OleError::StreamNotFound)?;
+        let mut link = Link::parse_shared(bytes)?;
+        edit(&mut link)?;
+        self.put_stream(&stream_path, link.to_bytes())
     }
 
     /// Adds a target-selected storage after the host has staged its reference.

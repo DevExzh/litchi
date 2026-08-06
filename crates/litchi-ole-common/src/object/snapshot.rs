@@ -7,6 +7,7 @@
 
 use super::codec::Package;
 use super::editor::Editor;
+use super::link::Link;
 use super::model::Objects;
 use super::target::Targets;
 use litchi_cfb::OleError;
@@ -97,6 +98,17 @@ impl Snapshot {
     #[must_use]
     pub fn stream_shared(&self, path: &[String]) -> Option<Arc<[u8]>> {
         self.state.package.stream_shared(path)
+    }
+
+    /// Parses one selected object's OLEDS `\x01Ole` metadata, when present.
+    ///
+    /// The returned link is inert and retains unknown wire bytes.
+    pub fn link(&self, key: &str) -> Result<Option<Link>, OleError> {
+        self.state
+            .objects
+            .get(key)
+            .ok_or_else(|| OleError::InvalidFormat(format!("object target {key:?} not found")))?
+            .link()
     }
 
     /// Creates an independent transactional editor from this snapshot.

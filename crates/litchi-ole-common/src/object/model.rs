@@ -1,6 +1,7 @@
 //! Host-neutral object and captured-stream views.
 
 use super::directory::{self, Metadata};
+use super::link::{self, Link};
 use super::target::Target;
 use crate::property_set::Guid;
 use litchi_cfb::OleError;
@@ -151,6 +152,17 @@ impl Stream {
         self.directory.as_ref()
     }
 
+    /// Parses this stream as OLEDS link metadata when it is the standard
+    /// `\x01Ole` stream.  The returned value shares the captured allocation.
+    ///
+    /// No link is resolved and no embedded payload is activated.
+    pub fn link(&self) -> Result<Option<Link>, OleError> {
+        if self.name() != Some(link::NAME) {
+            return Ok(None);
+        }
+        Link::parse_shared(Arc::clone(&self.data)).map(Some)
+    }
+
     pub(crate) fn replace_data(&mut self, data: Arc<[u8]>) {
         self.data = data;
     }
@@ -217,6 +229,21 @@ impl Object {
     #[must_use]
     pub fn streams(&self) -> &[Stream] {
         &self.streams
+    }
+
+    /// Parses the direct-child OLEDS link stream, when present.
+    ///
+    /// This is a format-neutral view used by DOC, PPT, and XLS owners.  It
+    /// never resolves external references or activates embedded content.
+    pub fn link(&self) -> Result<Option<Link>, OleError> {
+        match self
+            .streams
+            .iter()
+            .find(|stream| stream.path().len() == 1 && stream.name() == Some(link::NAME))
+        {
+            Some(stream) => stream.link(),
+            None => Ok(None),
+        }
     }
 
     /// Finds a captured stream by its path relative to the selected storage.
