@@ -1,4 +1,4 @@
-# ADR 0025: XLS sheet-anchor ownership
+# ADR 0027: XLS sheet-anchor ownership
 
 - Status: Accepted
 - Date: 2026-08-06

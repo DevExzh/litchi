@@ -37,8 +37,13 @@ Office round trips.
 | [0022](0022-pptx-embedded-font-ownership.md) | Typed PPTX embedded-font ownership |
 | [0023](0023-odf-family-crate-split.md) | Dedicated ODF family crates and umbrella facade |
 | [0024](0024-current-topology.md) | Current post-migration workspace topology |
-| [0025](0025-xls-sheet-anchor-ownership.md) | Typed XLS sheet-anchor ownership |
+| [0025](0025-ograph-chart-area-transactions.md) | Typed OGraph chart-area snapshot transactions |
 | [0026](0026-ole-directory-metadata-binding.md) | Typed shared OLE CFB directory metadata |
+| [0027](0027-xls-sheet-anchor-ownership.md) | Typed XLS sheet-anchor ownership |
+
+The OGraph record retains its original 0025 identity. The later XLS record,
+which duplicated that number, is indexed as 0027; its decision text remains
+unchanged apart from the corrected identifier.
 
 ## Decision hierarchy
 

@@ -41,10 +41,11 @@ owns shared OOXML package vocabulary and services,
 host-neutral DrawingML, and [`litchi-opc`](../../crates/litchi-opc/Cargo.toml)
 owns physical OPC packaging.
 
-The root [`litchi` manifest](../../crates/litchi/Cargo.toml) retains an
-`ooxml` feature and its [`ooxml` facade](../../crates/litchi/src/lib.rs), but
-that facade re-exports the standalone owners; it is not a replacement package
-named `litchi-ooxml`.
+The root [`litchi` manifest](../../crates/litchi/Cargo.toml) retains the
+`ooxml` feature gate, but its public facade exposes the standalone owners
+directly as `litchi::{docx, pptx, xlsx, xlsb}` (alongside `opc` and
+`ooxml_common`); no public `litchi::ooxml` wrapper remains. This is not a
+replacement package named `litchi-ooxml`.
 
 Within the concrete owners, large package and semantic domains are layered
 under contextual folders rather than kept as one source file. DOCX now has
@@ -357,11 +358,12 @@ unknown XML, BIFF12 records, and OLE wire tails remain opaque and inactive.
 This turn extends the same topology with typed OLE Document Summary
 Information (`property_set::document_summary`) over the shared PIDDSI codec;
 DOC `parts/annotation_bookmarks`; DOCX `section/footnote_columns`; PPT
-`document_comparison`; PPTX shape `designer` metadata; XLS
+`document_comparison`; PPTX `shape::designer` `p15:designElem` metadata; XLS
 `picture_compression`; and ODP embedded-chart package transactions. OOXML
 common now also owns bounded MCE `AlternateContent` choices, while
 `litchi-drawingml::color` owns checked color choices and ordered transforms.
-The top-level `litchi` facade exposes standalone OOXML and ODF owners directly,
+The top-level `litchi` facade exposes `docx`, `pptx`, `xlsx`, `xlsb`, `odp`,
+`ods`, and `odt` directly (alongside `opc`, `ooxml_common`, and `odf_common`),
 and `litchi-odf` remains a thin feature-gated detector/family umbrella. Every
 new edit path retains opaque source material, uses bounded validation, and
 publishes only source-checked snapshots or package transactions; no macro,
