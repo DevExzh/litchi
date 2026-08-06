@@ -246,7 +246,7 @@ fn source_built_table_roundtrips_number_format_crud() {
             table.model_object_id,
             1,
             1,
-            KeynoteTableCellValue::Number(1_234.5),
+            CellValue::number(1_234.5).expect("finite cell number"),
         )
         .unwrap();
     editor
@@ -291,7 +291,7 @@ fn source_built_table_roundtrips_percentage_data_format() {
             table.model_object_id,
             1,
             1,
-            KeynoteTableCellValue::Number(-12.345),
+            CellValue::number(-12.345).expect("finite cell number"),
         )
         .unwrap();
     editor
@@ -342,7 +342,7 @@ fn source_built_table_roundtrips_currency_format_crud() {
             table.model_object_id,
             1,
             1,
-            KeynoteTableCellValue::Number(-1_234.5),
+            CellValue::number(-1_234.5).expect("finite cell number"),
         )
         .unwrap();
     editor
@@ -383,7 +383,7 @@ fn source_built_table_roundtrips_scientific_format_crud() {
             table.model_object_id,
             1,
             1,
-            KeynoteTableCellValue::Number(-1_234.5),
+            CellValue::number(-1_234.5).expect("finite cell number"),
         )
         .unwrap();
     editor
@@ -424,7 +424,7 @@ fn source_built_table_roundtrips_fraction_format_crud() {
             table.model_object_id,
             1,
             1,
-            KeynoteTableCellValue::Number(-12.375),
+            CellValue::number(-12.375).expect("finite cell number"),
         )
         .unwrap();
     editor
@@ -470,7 +470,7 @@ fn source_built_table_roundtrips_numeral_system_format_crud() {
             table.model_object_id,
             1,
             1,
-            KeynoteTableCellValue::Number(-1_234.5),
+            CellValue::number(-1_234.5).expect("finite cell number"),
         )
         .unwrap();
     editor
@@ -511,7 +511,7 @@ fn source_built_table_roundtrips_date_time_format_crud() {
             table.model_object_id,
             1,
             1,
-            KeynoteTableCellValue::Date(789_332_889.0),
+            CellValue::date(789_332_889.0).expect("finite cell date"),
         )
         .unwrap();
     editor
@@ -553,7 +553,7 @@ fn source_built_table_roundtrips_duration_format_crud() {
             table.model_object_id,
             1,
             1,
-            KeynoteTableCellValue::Duration(3_723.5),
+            CellValue::duration(3_723.5).expect("finite cell duration"),
         )
         .unwrap();
     editor
@@ -641,7 +641,7 @@ fn source_built_table_roundtrips_star_rating_format_crud() {
             .slide_table(0, table.model_object_id)
             .unwrap()
             .get_cell(1, 1),
-        Some(&KeynoteTableCellValue::Number(0.0))
+        Some(&CellValue::number(0.0).expect("finite cell number"))
     );
     assert!(
         reopened
@@ -681,7 +681,7 @@ fn source_built_table_roundtrips_slider_format_crud() {
             .slide_table(0, table.model_object_id)
             .unwrap()
             .get_cell(1, 1),
-        Some(&KeynoteTableCellValue::Number(10.0))
+        Some(&CellValue::number(10.0).expect("finite cell number"))
     );
     assert!(
         reopened
@@ -721,7 +721,7 @@ fn source_built_table_roundtrips_stepper_format_crud() {
             .slide_table(0, table.model_object_id)
             .unwrap()
             .get_cell(1, 1),
-        Some(&KeynoteTableCellValue::Number(-10.0))
+        Some(&CellValue::number(-10.0).expect("finite cell number"))
     );
     assert!(
         reopened
@@ -800,7 +800,7 @@ fn source_built_table_roundtrips_custom_format_crud() {
             table.model_object_id,
             1,
             1,
-            KeynoteTableCellValue::Number(12_345.0),
+            CellValue::number(12_345.0).expect("finite cell number"),
         )
         .unwrap();
     editor
@@ -894,7 +894,11 @@ fn source_built_table_roundtrips_full_crud() {
                         0,
                         KeynoteTableCellValue::Text("Region".to_owned()),
                     ),
-                    KeynoteTableCellUpdate::new(1, 1, KeynoteTableCellValue::Number(42.5)),
+                    KeynoteTableCellUpdate::new(
+                        1,
+                        1,
+                        CellValue::number(42.5).expect("finite cell number"),
+                    ),
                 ],
             )
             .unwrap(),
@@ -995,7 +999,7 @@ fn source_built_table_roundtrips_full_crud() {
     );
     assert_eq!(
         materialized.get_cell(1, 1),
-        Some(&KeynoteTableCellValue::Number(42.5))
+        Some(&CellValue::number(42.5).expect("finite cell number"))
     );
 
     reopened
@@ -1034,7 +1038,11 @@ fn source_built_table_duplication_clones_formula_storage_and_geometry() {
                     KeynoteTableCellValue::Text("Category".to_owned()),
                 ),
                 KeynoteTableCellUpdate::new(1, 0, KeynoteTableCellValue::Text("Travel".to_owned())),
-                KeynoteTableCellUpdate::new(1, 1, KeynoteTableCellValue::Number(125.0)),
+                KeynoteTableCellUpdate::new(
+                    1,
+                    1,
+                    CellValue::number(125.0).expect("finite cell number"),
+                ),
             ],
         )
         .unwrap();
@@ -1051,7 +1059,7 @@ fn source_built_table_duplication_clones_formula_storage_and_geometry() {
                     FormulaExpression::Number(25.0),
                 ],
             ),
-            FormulaCachedValue::Number(125.0),
+            FormulaCachedValue::number(125.0).expect("finite cached number"),
         )
         .unwrap();
 
@@ -1386,7 +1394,7 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
                     FormulaExpression::Number(2.0),
                 ],
             ),
-            FormulaCachedValue::Number(3.0),
+            FormulaCachedValue::number(3.0).expect("finite cached number"),
         )
         .unwrap();
 
@@ -1411,7 +1419,7 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
                     FormulaExpression::Number(4.0),
                 ],
             ),
-            FormulaCachedValue::Number(7.0),
+            FormulaCachedValue::number(7.0).expect("finite cached number"),
         )
         .unwrap();
     assert_eq!(
@@ -1431,7 +1439,7 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
                 usize::MAX,
                 1,
                 FormulaExpression::Number(1.0),
-                FormulaCachedValue::Number(1.0),
+                FormulaCachedValue::number(1.0).expect("finite cached number"),
             )
             .is_err()
     );
@@ -1483,7 +1491,7 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
             2,
             2,
             FormulaExpression::cell(FormulaCellReference::relative(1, 1)),
-            FormulaCachedValue::Number(7.0),
+            FormulaCachedValue::number(7.0).expect("finite cached number"),
         )
         .unwrap();
     editor
@@ -1579,7 +1587,7 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
                     FormulaCellReference::relative(2, 1),
                 )],
             ),
-            FormulaCachedValue::Number(3.0),
+            FormulaCachedValue::number(3.0).expect("finite cached number"),
         )
         .unwrap();
     let mut package = editor.into_package();

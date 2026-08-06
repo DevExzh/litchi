@@ -1,5 +1,6 @@
 use super::*;
 use crate::archive::{Archive, ArchiveObject};
+use crate::media::MediaAssetId;
 use crate::package_metadata::{PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_TYPE};
 use crate::protobuf::tsp::{ComponentInfo, ObjectUuidMapEntry, PackageMetadata, Reference, Uuid};
 use crate::protobuf::tswp::StorageArchive;
@@ -3429,7 +3430,7 @@ fn soundtrack_item_replacement_isolated_from_duplicate_references() {
     crate::data_reference_registry::add_component_data_reference(
         &mut package,
         1,
-        original.asset.data_identifier,
+        original.asset.data_identifier.get(),
         TEST_SOUNDTRACK_ID,
     )
     .unwrap();
@@ -4822,11 +4823,12 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
             .and_then(|identifier| identifier.build_id)
     );
     let assets = editor.media_assets().unwrap();
-    for identifier in [1, 2] {
+    for raw_identifier in [1, 2] {
+        let identifier = MediaAssetId::try_from(raw_identifier).expect("valid media ID");
         let asset = assets
             .iter()
             .find(|asset| asset.data_identifier == identifier)
-            .unwrap_or_else(|| panic!("missing media {identifier} in {assets:?}"));
+            .unwrap_or_else(|| panic!("missing media {raw_identifier} in {assets:?}"));
         assert_eq!(asset.component_reference_count, 2);
         assert_eq!(asset.message_reference_count, 2);
     }
@@ -6665,10 +6667,10 @@ fn test_package_with_slide_movie() -> IWorkPackage {
                         ..Default::default()
                     },
                     movie_data: Some(tsp::DataReference {
-                        identifier: video.data_identifier,
+                        identifier: video.data_identifier.get(),
                     }),
                     poster_image_data: Some(tsp::DataReference {
-                        identifier: poster.data_identifier,
+                        identifier: poster.data_identifier.get(),
                     }),
                     style: Some(reference(50)),
                     original_size: Some(tsp::Size {
@@ -6685,7 +6687,7 @@ fn test_package_with_slide_movie() -> IWorkPackage {
             );
             movie.archive_info.message_infos[0].object_references = vec![71, 72, 50];
             movie.archive_info.message_infos[0].data_references =
-                vec![video.data_identifier, poster.data_identifier];
+                vec![video.data_identifier.get(), poster.data_identifier.get()];
             archive.insert_object(movie)?;
             archive.insert_object(object(
                 71,
@@ -6750,14 +6752,14 @@ fn test_package_with_slide_movie() -> IWorkPackage {
     crate::data_reference_registry::add_component_data_reference(
         &mut package,
         4,
-        video.data_identifier,
+        video.data_identifier.get(),
         70,
     )
     .unwrap();
     crate::data_reference_registry::add_component_data_reference(
         &mut package,
         4,
-        poster.data_identifier,
+        poster.data_identifier.get(),
         70,
     )
     .unwrap();

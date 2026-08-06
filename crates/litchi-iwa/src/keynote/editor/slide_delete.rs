@@ -158,6 +158,7 @@ fn remove_dedicated_slide_component(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::media::MediaAssetId;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 80.0, y: 90.0 };
@@ -229,9 +230,11 @@ mod tests {
 
         let assets = editor.media_assets().unwrap();
         assert_eq!(assets.len(), 1);
-        assert_eq!(assets[0].data_identifier, created.image_data_identifier);
+        let image_data_identifier =
+            MediaAssetId::try_from(created.image_data_identifier).expect("valid image media ID");
+        assert_eq!(assets[0].data_identifier, image_data_identifier);
         assert_eq!(
-            editor.extract_media(created.image_data_identifier).unwrap(),
+            editor.extract_media(image_data_identifier.get()).unwrap(),
             include_bytes!("../../../../../media/litchi_logo.png")
         );
         assert_eq!(editor.slide_images(1).unwrap(), [created]);

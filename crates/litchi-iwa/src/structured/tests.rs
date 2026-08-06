@@ -311,7 +311,7 @@ fn numbers_table_creation_uses_the_leaf_model() {
         builder
             .set(
                 litchi_numbers::Position::new(1, 0),
-                litchi_numbers::cell::Value::Number(42.0),
+                litchi_numbers::cell::Value::number(42.0).expect("finite cell number"),
             )
             .is_ok()
     );
