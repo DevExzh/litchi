@@ -61,19 +61,72 @@ impl Mode {
 /// with native data-reference metadata and are edited through the IWA
 /// soundtrack-item API. Settings edits therefore preserve that collection
 /// without exposing archive topology in this semantic value.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct Settings {
     /// Native playback volume in the inclusive range `0.0..=1.0`.
-    pub volume: Option<f64>,
+    volume: Option<f64>,
     /// Optional native playback mode.
-    pub mode: Option<Mode>,
+    mode: Option<Mode>,
 }
 
 impl Settings {
-    /// Construct playback settings from their optional native values.
+    /// Construct playback settings from optional native values.
+    ///
+    /// Values are checked before the settings are returned, so a safe caller
+    /// cannot publish an out-of-range volume or a known mode disguised as an
+    /// unknown value through this semantic type.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when either optional value is invalid.
+    pub const fn new(volume: Option<f64>, mode: Option<Mode>) -> Result<Self, Error> {
+        let settings = Self { volume, mode };
+        match settings.validate() {
+            Ok(()) => Ok(settings),
+            Err(error) => Err(error),
+        }
+    }
+
+    /// Return the optional native playback volume.
     #[must_use]
-    pub const fn new(volume: Option<f64>, mode: Option<Mode>) -> Self {
-        Self { volume, mode }
+    pub const fn volume(self) -> Option<f64> {
+        self.volume
+    }
+
+    /// Replace or clear the native playback volume after validating it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::NonFiniteVolume`] or [`Error::VolumeOutOfRange`] when
+    /// `volume` is not representable by the native field.
+    pub const fn set_volume(&mut self, volume: Option<f64>) -> Result<(), Error> {
+        if let Err(error) = validate_volume(volume) {
+            return Err(error);
+        }
+        self.volume = volume;
+        Ok(())
+    }
+
+    /// Return the optional native playback mode.
+    #[must_use]
+    pub const fn mode(self) -> Option<Mode> {
+        self.mode
+    }
+
+    /// Replace or clear the native playback mode after validating it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::NonCanonicalMode`] when a known native discriminant
+    /// is passed through [`Mode::Unknown`].
+    pub const fn set_mode(&mut self, mode: Option<Mode>) -> Result<(), Error> {
+        if let Some(candidate_mode) = mode
+            && !candidate_mode.is_canonical()
+        {
+            return Err(Error::NonCanonicalMode);
+        }
+        self.mode = mode;
+        Ok(())
     }
 
     /// Validate values before they cross into a package adapter.
@@ -84,13 +137,8 @@ impl Settings {
     /// an invalid volume, and [`Error::NonCanonicalMode`] when a known native
     /// discriminant is wrapped in [`Mode::Unknown`].
     pub const fn validate(self) -> Result<(), Error> {
-        if let Some(volume) = self.volume {
-            if !volume.is_finite() {
-                return Err(Error::NonFiniteVolume);
-            }
-            if volume < 0.0 || volume > 1.0 {
-                return Err(Error::VolumeOutOfRange);
-            }
+        if let Err(error) = validate_volume(self.volume) {
+            return Err(error);
         }
         if let Some(mode) = self.mode
             && !mode.is_canonical()
@@ -98,12 +146,6 @@ impl Settings {
             return Err(Error::NonCanonicalMode);
         }
         Ok(())
-    }
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        Self::new(None, None)
     }
 }
 
@@ -133,6 +175,19 @@ impl std::fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+const fn validate_volume(candidate: Option<f64>) -> Result<(), Error> {
+    let Some(volume) = candidate else {
+        return Ok(());
+    };
+    if !volume.is_finite() {
+        return Err(Error::NonFiniteVolume);
+    }
+    if volume < 0.0 || volume > 1.0 {
+        return Err(Error::VolumeOutOfRange);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -160,11 +215,7 @@ mod tests {
     #[test]
     fn settings_validate_volume_boundaries_and_modes() {
         for volume in [None, Some(0.0), Some(1.0)] {
-            assert!(
-                Settings::new(volume, Some(Mode::PlayOnce))
-                    .validate()
-                    .is_ok()
-            );
+            assert!(Settings::new(volume, Some(Mode::PlayOnce)).is_ok());
         }
         for volume in [
             Some(-f64::EPSILON),
@@ -173,16 +224,31 @@ mod tests {
             Some(f64::INFINITY),
             Some(f64::NEG_INFINITY),
         ] {
-            assert!(Settings::new(volume, None).validate().is_err());
+            assert!(Settings::new(volume, None).is_err());
         }
-        assert!(
-            Settings::new(None, Some(Mode::Unknown(19)))
-                .validate()
-                .is_ok()
-        );
+        assert!(Settings::new(None, Some(Mode::Unknown(19))).is_ok());
         assert_eq!(
-            Settings::new(None, Some(Mode::Unknown(1))).validate(),
+            Settings::new(None, Some(Mode::Unknown(1))).map(|_| ()),
             Err(Error::NonCanonicalMode)
         );
+    }
+
+    #[test]
+    fn setters_validate_before_mutating() {
+        let mut settings = Settings::default();
+        assert_eq!(settings.set_volume(Some(0.5)), Ok(()));
+        assert_eq!(settings.volume(), Some(0.5));
+        assert_eq!(
+            settings.set_volume(Some(f64::NAN)),
+            Err(Error::NonFiniteVolume)
+        );
+        assert_eq!(settings.volume(), Some(0.5));
+        assert_eq!(settings.set_mode(Some(Mode::Loop)), Ok(()));
+        assert_eq!(settings.mode(), Some(Mode::Loop));
+        assert_eq!(
+            settings.set_mode(Some(Mode::Unknown(2))),
+            Err(Error::NonCanonicalMode)
+        );
+        assert_eq!(settings.mode(), Some(Mode::Loop));
     }
 }

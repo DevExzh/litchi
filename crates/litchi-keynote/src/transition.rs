@@ -21,6 +21,33 @@ pub const MAX_IDENTIFIER_BYTES: usize = 64 * 1024;
 /// Maximum size of one opaque color or timing-curve payload.
 pub const MAX_OPAQUE_PAYLOAD_BYTES: usize = 4 * 1024 * 1024;
 
+/// One of the fixed timing-curve slots carried by a Keynote transition.
+///
+/// A closed slot type keeps indexed access panic-free while preserving the
+/// native three-slot layout without allocating a collection for the index.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TimingCurveSlot {
+    /// The first timing-curve slot.
+    First,
+    /// The second timing-curve slot.
+    Second,
+    /// The third timing-curve slot.
+    Third,
+}
+
+impl TimingCurveSlot {
+    const fn index(self) -> usize {
+        match self {
+            Self::First => 0,
+            Self::Second => 1,
+            Self::Third => 2,
+        }
+    }
+
+    /// All native timing-curve slots in wire order.
+    pub const ALL: [Self; TIMING_CURVE_SLOT_COUNT] = [Self::First, Self::Second, Self::Third];
+}
+
 /// A slide-transition effect understood by Keynote.
 ///
 /// Named variants cover identifiers verified in native Keynote documents.
@@ -36,18 +63,22 @@ pub enum Effect {
     /// Keynote's Magic Move transition.
     MagicMove,
     /// An identifier introduced by a newer Keynote release.
-    Unknown(Box<str>),
+    Unknown { identifier: Box<str> },
 }
 
 impl Effect {
     /// Decode a native effect identifier without discarding unknown values.
-    #[must_use]
-    pub fn from_identifier(identifier: &str) -> Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when an unknown identifier is empty, contains a
+    /// NUL byte, or exceeds the bounded semantic storage budget.
+    pub fn from_identifier(identifier: &str) -> Result<Self> {
         match identifier {
-            NONE_EFFECT => Self::None,
-            DISSOLVE_EFFECT => Self::Dissolve,
-            MAGIC_MOVE_EFFECT => Self::MagicMove,
-            other => Self::Unknown(other.into()),
+            NONE_EFFECT => Ok(Self::None),
+            DISSOLVE_EFFECT => Ok(Self::Dissolve),
+            MAGIC_MOVE_EFFECT => Ok(Self::MagicMove),
+            other => Self::unknown(other),
         }
     }
 
@@ -59,10 +90,18 @@ impl Effect {
     ///
     /// Returns [`Error::NonCanonicalEffect`] when `identifier` names a known
     /// effect, or [`Error::NulString`] when it contains a NUL byte.
-    pub fn unknown(identifier: impl Into<Box<str>>) -> Result<Self> {
-        let effect = Self::Unknown(identifier.into());
-        effect.validate()?;
-        Ok(effect)
+    pub fn unknown(identifier: impl AsRef<str>) -> Result<Self> {
+        let identifier_text = identifier.as_ref();
+        Self::validate_identifier(identifier_text)?;
+        if matches!(
+            identifier_text,
+            NONE_EFFECT | DISSOLVE_EFFECT | MAGIC_MOVE_EFFECT
+        ) {
+            return Err(Error::NonCanonicalEffect);
+        }
+        Ok(Self::Unknown {
+            identifier: identifier_text.into(),
+        })
     }
 
     /// Return the native Keynote effect identifier.
@@ -72,7 +111,7 @@ impl Effect {
             Self::None => NONE_EFFECT,
             Self::Dissolve => DISSOLVE_EFFECT,
             Self::MagicMove => MAGIC_MOVE_EFFECT,
-            Self::Unknown(identifier) => identifier,
+            Self::Unknown { identifier } => identifier,
         }
     }
 
@@ -81,7 +120,7 @@ impl Effect {
     pub fn is_canonical(&self) -> bool {
         !matches!(
             self,
-            Self::Unknown(identifier)
+            Self::Unknown { identifier }
                 if matches!(
                     &**identifier,
                     NONE_EFFECT | DISSOLVE_EFFECT | MAGIC_MOVE_EFFECT
@@ -100,17 +139,22 @@ impl Effect {
     /// [`Error::NonCanonicalEffect`] when an unknown value shadows a named
     /// native effect.
     pub fn validate(&self) -> Result<()> {
-        if self.identifier().is_empty() {
-            return Err(Error::EmptyIdentifier);
-        }
-        if self.identifier().len() > MAX_IDENTIFIER_BYTES {
-            return Err(Error::IdentifierTooLarge);
-        }
-        if self.identifier().contains('\0') {
-            return Err(Error::NulString);
-        }
+        Self::validate_identifier(self.identifier())?;
         if !self.is_canonical() {
             return Err(Error::NonCanonicalEffect);
+        }
+        Ok(())
+    }
+
+    fn validate_identifier(identifier: &str) -> Result<()> {
+        if identifier.is_empty() {
+            return Err(Error::EmptyIdentifier);
+        }
+        if identifier.len() > MAX_IDENTIFIER_BYTES {
+            return Err(Error::IdentifierTooLarge);
+        }
+        if identifier.contains('\0') {
+            return Err(Error::NulString);
         }
         Ok(())
     }
@@ -339,24 +383,37 @@ impl std::fmt::Debug for TextDelivery {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct AnimationParameters {
     /// Exact native color payload, when one is present.
-    pub color_payload: Option<Box<[u8]>>,
+    color_payload: Option<Box<[u8]>>,
     /// Exact native timing-curve payloads for Keynote's three curve slots.
     ///
     /// This is a fixed-size array because the native schema has exactly three
     /// slots. Keeping the slots inline avoids an allocation and capacity
     /// overhead for the overwhelmingly common all-absent value.
-    pub timing_curve_payloads: [Option<Box<[u8]>>; TIMING_CURVE_SLOT_COUNT],
+    timing_curve_payloads: [Option<Box<[u8]>>; TIMING_CURVE_SLOT_COUNT],
     /// Native random seed used by effects with randomized motion.
-    pub random_number_seed: Option<u32>,
+    random_number_seed: Option<u32>,
     /// Native effect detail value.
-    pub detail: Option<f64>,
+    detail: Option<f64>,
     /// Native theme names for the three timing-curve slots.
-    pub timing_curve_theme_names: [Option<Box<str>>; TIMING_CURVE_SLOT_COUNT],
+    timing_curve_theme_names: [Option<Box<str>>; TIMING_CURVE_SLOT_COUNT],
     /// Whether transition text should use right-to-left writing direction.
-    pub writing_direction_is_rtl: Option<bool>,
+    writing_direction_is_rtl: Option<bool>,
 }
 
 impl AnimationParameters {
+    /// Construct empty animation parameters.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            color_payload: None,
+            timing_curve_payloads: [None, None, None],
+            random_number_seed: None,
+            detail: None,
+            timing_curve_theme_names: [None, None, None],
+            writing_direction_is_rtl: None,
+        }
+    }
+
     /// Validate semantic values without interpreting opaque native payloads.
     ///
     /// # Errors
@@ -405,16 +462,112 @@ impl AnimationParameters {
         self.color_payload.as_deref()
     }
 
-    /// Borrow the exact timing-curve payload slots.
-    #[must_use]
-    pub const fn timing_curve_payloads(&self) -> &[Option<Box<[u8]>>; TIMING_CURVE_SLOT_COUNT] {
-        &self.timing_curve_payloads
+    /// Replace or clear the optional color payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PayloadTooLarge`] when `payload` exceeds the bounded
+    /// semantic storage budget.
+    pub fn set_color_payload(&mut self, payload: Option<&[u8]>) -> Result<()> {
+        self.color_payload = bounded_payload(payload)?;
+        Ok(())
     }
 
-    /// Borrow the exact timing-curve theme-name slots.
+    /// Return the optional payload for one fixed timing-curve slot.
     #[must_use]
-    pub const fn timing_curve_theme_names(&self) -> &[Option<Box<str>>; TIMING_CURVE_SLOT_COUNT] {
-        &self.timing_curve_theme_names
+    pub fn timing_curve_payload(&self, slot: TimingCurveSlot) -> Option<&[u8]> {
+        self.timing_curve_payloads[slot.index()].as_deref()
+    }
+
+    /// Borrow all timing-curve payload slots in native wire order.
+    #[must_use]
+    pub fn timing_curve_payloads(&self) -> [Option<&[u8]>; TIMING_CURVE_SLOT_COUNT] {
+        std::array::from_fn(|index| self.timing_curve_payloads[index].as_deref())
+    }
+
+    /// Replace or clear one fixed timing-curve payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PayloadTooLarge`] when `payload` exceeds the bounded
+    /// semantic storage budget.
+    pub fn set_timing_curve_payload(
+        &mut self,
+        slot: TimingCurveSlot,
+        payload: Option<&[u8]>,
+    ) -> Result<()> {
+        self.timing_curve_payloads[slot.index()] = bounded_payload(payload)?;
+        Ok(())
+    }
+
+    /// Return the native random seed, when present.
+    #[must_use]
+    pub const fn random_number_seed(&self) -> Option<u32> {
+        self.random_number_seed
+    }
+
+    /// Replace or clear the native random seed.
+    pub const fn set_random_number_seed(&mut self, value: Option<u32>) {
+        self.random_number_seed = value;
+    }
+
+    /// Return the optional finite effect detail value.
+    #[must_use]
+    pub const fn detail(&self) -> Option<f64> {
+        self.detail
+    }
+
+    /// Replace or clear the effect detail value after validating finiteness.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidDetail`] when `value` is non-finite.
+    pub const fn set_detail(&mut self, value: Option<f64>) -> Result<()> {
+        if let Some(detail) = value
+            && !detail.is_finite()
+        {
+            return Err(Error::InvalidDetail);
+        }
+        self.detail = value;
+        Ok(())
+    }
+
+    /// Return the optional theme name for one fixed timing-curve slot.
+    #[must_use]
+    pub fn timing_curve_theme_name(&self, slot: TimingCurveSlot) -> Option<&str> {
+        self.timing_curve_theme_names[slot.index()].as_deref()
+    }
+
+    /// Borrow all timing-curve theme names in native wire order.
+    #[must_use]
+    pub fn timing_curve_theme_names(&self) -> [Option<&str>; TIMING_CURVE_SLOT_COUNT] {
+        std::array::from_fn(|index| self.timing_curve_theme_names[index].as_deref())
+    }
+
+    /// Replace or clear one timing-curve theme name.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::IdentifierTooLarge`] or [`Error::NulString`] when the
+    /// candidate name cannot be represented by the semantic text field.
+    pub fn set_timing_curve_theme_name(
+        &mut self,
+        slot: TimingCurveSlot,
+        value: Option<&str>,
+    ) -> Result<()> {
+        self.timing_curve_theme_names[slot.index()] = bounded_text(value)?;
+        Ok(())
+    }
+
+    /// Return whether transition text uses right-to-left writing direction.
+    #[must_use]
+    pub const fn writing_direction_is_rtl(&self) -> Option<bool> {
+        self.writing_direction_is_rtl
+    }
+
+    /// Replace or clear the right-to-left writing-direction flag.
+    pub const fn set_writing_direction_is_rtl(&mut self, value: Option<bool>) {
+        self.writing_direction_is_rtl = value;
     }
 }
 
@@ -422,26 +575,153 @@ impl AnimationParameters {
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct CustomParameters {
     /// Native twist amount, when supplied by the effect.
-    pub twist: Option<f32>,
+    twist: Option<f32>,
     /// Native mosaic size, when supplied by the effect.
-    pub mosaic_size: Option<u32>,
+    mosaic_size: Option<u32>,
     /// Native mosaic layout discriminator.
-    pub mosaic_type: Option<MosaicType>,
+    mosaic_type: Option<MosaicType>,
     /// Whether a bounce effect is enabled.
-    pub bounce: Option<bool>,
+    bounce: Option<bool>,
     /// Whether Magic Move fades unmatched objects.
-    pub magic_move_fade_unmatched_objects: Option<bool>,
+    magic_move_fade_unmatched_objects: Option<bool>,
     /// Native timing-curve discriminator.
-    pub acceleration: Option<Acceleration>,
+    acceleration: Option<Acceleration>,
     /// Native matching-text delivery discriminator.
-    pub text_delivery: Option<TextDelivery>,
+    text_delivery: Option<TextDelivery>,
     /// Whether motion blur is enabled.
-    pub motion_blur: Option<bool>,
+    motion_blur: Option<bool>,
     /// Native travel distance, when supplied by the effect.
-    pub travel_distance: Option<f32>,
+    travel_distance: Option<f32>,
 }
 
 impl CustomParameters {
+    /// Construct empty effect-specific parameters.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            twist: None,
+            mosaic_size: None,
+            mosaic_type: None,
+            bounce: None,
+            magic_move_fade_unmatched_objects: None,
+            acceleration: None,
+            text_delivery: None,
+            motion_blur: None,
+            travel_distance: None,
+        }
+    }
+
+    /// Return the optional finite twist amount.
+    #[must_use]
+    pub const fn twist(&self) -> Option<f32> {
+        self.twist
+    }
+
+    /// Replace or clear the twist amount after validating finiteness.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidCustomFloat`] when `value` is non-finite.
+    pub fn set_twist(&mut self, value: Option<f32>) -> Result<()> {
+        validate_custom_float(value)?;
+        self.twist = value;
+        Ok(())
+    }
+
+    /// Return the optional mosaic size.
+    #[must_use]
+    pub const fn mosaic_size(&self) -> Option<u32> {
+        self.mosaic_size
+    }
+
+    /// Replace or clear the mosaic size.
+    pub const fn set_mosaic_size(&mut self, value: Option<u32>) {
+        self.mosaic_size = value;
+    }
+
+    /// Return the optional mosaic layout discriminator.
+    #[must_use]
+    pub const fn mosaic_type(&self) -> Option<MosaicType> {
+        self.mosaic_type
+    }
+
+    /// Replace or clear the mosaic layout discriminator.
+    pub const fn set_mosaic_type(&mut self, value: Option<MosaicType>) {
+        self.mosaic_type = value;
+    }
+
+    /// Return whether bounce is enabled.
+    #[must_use]
+    pub const fn bounce(&self) -> Option<bool> {
+        self.bounce
+    }
+
+    /// Replace or clear the bounce flag.
+    pub const fn set_bounce(&mut self, value: Option<bool>) {
+        self.bounce = value;
+    }
+
+    /// Return whether unmatched Magic Move objects fade.
+    #[must_use]
+    pub const fn magic_move_fade_unmatched_objects(&self) -> Option<bool> {
+        self.magic_move_fade_unmatched_objects
+    }
+
+    /// Replace or clear the unmatched-object fade flag.
+    pub const fn set_magic_move_fade_unmatched_objects(&mut self, value: Option<bool>) {
+        self.magic_move_fade_unmatched_objects = value;
+    }
+
+    /// Return the optional timing-curve discriminator.
+    #[must_use]
+    pub const fn acceleration(&self) -> Option<Acceleration> {
+        self.acceleration
+    }
+
+    /// Replace or clear the timing-curve discriminator.
+    pub const fn set_acceleration(&mut self, value: Option<Acceleration>) {
+        self.acceleration = value;
+    }
+
+    /// Return the optional matching-text delivery discriminator.
+    #[must_use]
+    pub const fn text_delivery(&self) -> Option<TextDelivery> {
+        self.text_delivery
+    }
+
+    /// Replace or clear the matching-text delivery discriminator.
+    pub const fn set_text_delivery(&mut self, value: Option<TextDelivery>) {
+        self.text_delivery = value;
+    }
+
+    /// Return whether motion blur is enabled.
+    #[must_use]
+    pub const fn motion_blur(&self) -> Option<bool> {
+        self.motion_blur
+    }
+
+    /// Replace or clear the motion-blur flag.
+    pub const fn set_motion_blur(&mut self, value: Option<bool>) {
+        self.motion_blur = value;
+    }
+
+    /// Return the optional finite travel distance.
+    #[must_use]
+    pub const fn travel_distance(&self) -> Option<f32> {
+        self.travel_distance
+    }
+
+    /// Replace or clear the travel distance after validating finiteness.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidCustomFloat`] when `value` is non-finite.
+    pub fn set_travel_distance(&mut self, value: Option<f32>) -> Result<()> {
+        validate_custom_float(value)?;
+        self.travel_distance = value;
+        Ok(())
+    }
+
     /// Validate all custom floating-point values.
     ///
     /// # Errors
@@ -466,27 +746,180 @@ impl CustomParameters {
 /// The fields retain native presence and unknown values, while the owned
 /// string and payload fields use exact-size boxed storage. Call [`Self::validate`]
 /// before passing settings to an IWA adapter or publishing them from an edit.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Settings {
     /// Native animation name, when present.
-    pub animation_type: Option<Box<str>>,
+    animation_type: Option<Box<str>>,
     /// Semantic transition effect.
-    pub effect: Option<Effect>,
+    effect: Option<Effect>,
     /// Transition duration in seconds.
-    pub duration: Option<f64>,
+    duration: Option<f64>,
     /// Effect-specific direction discriminator.
-    pub direction: Option<Direction>,
+    direction: Option<Direction>,
     /// Delay before the transition starts, in seconds.
-    pub delay: Option<f64>,
+    delay: Option<f64>,
     /// Whether the transition starts automatically.
-    pub is_automatic: Option<bool>,
+    is_automatic: Option<bool>,
     /// Animation-level opaque payloads and semantic values.
-    pub animation_parameters: AnimationParameters,
+    animation_parameters: AnimationParameters,
     /// Effect-specific scalar values.
-    pub custom_parameters: CustomParameters,
+    custom_parameters: CustomParameters,
 }
 
 impl Settings {
+    /// Construct empty transition settings.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            animation_type: None,
+            effect: None,
+            duration: None,
+            direction: None,
+            delay: None,
+            is_automatic: None,
+            animation_parameters: AnimationParameters::new(),
+            custom_parameters: CustomParameters::new(),
+        }
+    }
+
+    /// Start a checked transition-settings builder.
+    #[must_use]
+    pub fn builder() -> SettingsBuilder {
+        SettingsBuilder::default()
+    }
+
+    /// Return the optional native animation name.
+    #[must_use]
+    pub fn animation_type(&self) -> Option<&str> {
+        self.animation_type.as_deref()
+    }
+
+    /// Replace or clear the native animation name after validating its text
+    /// and bounded storage budget.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::IdentifierTooLarge`] or [`Error::NulString`] when the
+    /// candidate name cannot be represented by the semantic text field.
+    pub fn set_animation_type(&mut self, value: Option<&str>) -> Result<()> {
+        self.animation_type = bounded_text(value)?;
+        Ok(())
+    }
+
+    /// Return the optional semantic transition effect.
+    #[must_use]
+    pub fn effect(&self) -> Option<&Effect> {
+        self.effect.as_ref()
+    }
+
+    /// Replace or clear the transition effect after validating its canonical
+    /// representation.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed effect validation error when `value` is not a valid
+    /// semantic effect.
+    pub fn set_effect(&mut self, value: Option<Effect>) -> Result<()> {
+        if let Some(effect) = &value {
+            effect.validate()?;
+        }
+        self.effect = value;
+        Ok(())
+    }
+
+    /// Return the optional transition duration in seconds.
+    #[must_use]
+    pub const fn duration(&self) -> Option<f64> {
+        self.duration
+    }
+
+    /// Replace or clear the transition duration after validating it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidDuration`] when `value` is non-finite or
+    /// negative.
+    pub fn set_duration(&mut self, value: Option<f64>) -> Result<()> {
+        validate_non_negative(value, Error::InvalidDuration)?;
+        self.duration = value;
+        Ok(())
+    }
+
+    /// Return the optional effect-specific direction.
+    #[must_use]
+    pub const fn direction(&self) -> Option<Direction> {
+        self.direction
+    }
+
+    /// Replace or clear the effect-specific direction.
+    pub const fn set_direction(&mut self, value: Option<Direction>) {
+        self.direction = value;
+    }
+
+    /// Return the optional transition delay in seconds.
+    #[must_use]
+    pub const fn delay(&self) -> Option<f64> {
+        self.delay
+    }
+
+    /// Replace or clear the transition delay after validating it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidDelay`] when `value` is non-finite or negative.
+    pub fn set_delay(&mut self, value: Option<f64>) -> Result<()> {
+        validate_non_negative(value, Error::InvalidDelay)?;
+        self.delay = value;
+        Ok(())
+    }
+
+    /// Return whether the transition starts automatically.
+    #[must_use]
+    pub const fn is_automatic(&self) -> Option<bool> {
+        self.is_automatic
+    }
+
+    /// Replace or clear the automatic-start flag.
+    pub const fn set_is_automatic(&mut self, value: Option<bool>) {
+        self.is_automatic = value;
+    }
+
+    /// Borrow the animation-level parameters.
+    #[must_use]
+    pub const fn animation_parameters(&self) -> &AnimationParameters {
+        &self.animation_parameters
+    }
+
+    /// Replace the animation-level parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed animation-parameter validation error when `value` is
+    /// not a valid semantic value.
+    pub fn set_animation_parameters(&mut self, value: AnimationParameters) -> Result<()> {
+        value.validate()?;
+        self.animation_parameters = value;
+        Ok(())
+    }
+
+    /// Borrow the effect-specific parameters.
+    #[must_use]
+    pub const fn custom_parameters(&self) -> &CustomParameters {
+        &self.custom_parameters
+    }
+
+    /// Replace the effect-specific parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidCustomFloat`] when `value` contains a non-finite
+    /// custom floating-point value.
+    pub fn set_custom_parameters(&mut self, value: CustomParameters) -> Result<()> {
+        value.validate()?;
+        self.custom_parameters = value;
+        Ok(())
+    }
+
     /// Return whether this setting describes a visible transition effect.
     #[must_use]
     pub fn has_effect(&self) -> bool {
@@ -536,31 +969,178 @@ impl Settings {
     }
 }
 
+impl Default for Settings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Checked builder for [`Settings`].
+#[derive(Debug, Clone, Default)]
+pub struct SettingsBuilder {
+    settings: Settings,
+}
+
+impl SettingsBuilder {
+    /// Set or clear the native animation name.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::IdentifierTooLarge`] or [`Error::NulString`] for an
+    /// invalid candidate name.
+    pub fn animation_type(mut self, value: Option<&str>) -> Result<Self> {
+        self.settings.set_animation_type(value)?;
+        Ok(self)
+    }
+
+    /// Set or clear the semantic transition effect.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed effect validation error for an invalid candidate.
+    pub fn effect(mut self, value: Option<Effect>) -> Result<Self> {
+        self.settings.set_effect(value)?;
+        Ok(self)
+    }
+
+    /// Set or clear the transition duration in seconds.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidDuration`] for a non-finite or negative value.
+    pub fn duration(mut self, value: Option<f64>) -> Result<Self> {
+        self.settings.set_duration(value)?;
+        Ok(self)
+    }
+
+    /// Set or clear the effect-specific direction.
+    #[must_use]
+    pub fn direction(mut self, value: Option<Direction>) -> Self {
+        self.settings.set_direction(value);
+        self
+    }
+
+    /// Set or clear the transition delay in seconds.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidDelay`] for a non-finite or negative value.
+    pub fn delay(mut self, value: Option<f64>) -> Result<Self> {
+        self.settings.set_delay(value)?;
+        Ok(self)
+    }
+
+    /// Set or clear the automatic-start flag.
+    #[must_use]
+    pub fn is_automatic(mut self, value: Option<bool>) -> Self {
+        self.settings.set_is_automatic(value);
+        self
+    }
+
+    /// Set the animation-level parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed animation-parameter validation error for an invalid
+    /// candidate.
+    pub fn animation_parameters(mut self, value: AnimationParameters) -> Result<Self> {
+        self.settings.set_animation_parameters(value)?;
+        Ok(self)
+    }
+
+    /// Set the effect-specific parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidCustomFloat`] for a non-finite custom value.
+    pub fn custom_parameters(mut self, value: CustomParameters) -> Result<Self> {
+        self.settings.set_custom_parameters(value)?;
+        Ok(self)
+    }
+
+    /// Finish the builder with a validated semantic value.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed semantic validation error if any candidate was not
+    /// representable by the transition model.
+    pub fn build(self) -> Result<Settings> {
+        self.settings.validate()?;
+        Ok(self.settings)
+    }
+}
+
+fn bounded_payload(candidate: Option<&[u8]>) -> Result<Option<Box<[u8]>>> {
+    let Some(bytes) = candidate else {
+        return Ok(None);
+    };
+    if bytes.len() > MAX_OPAQUE_PAYLOAD_BYTES {
+        return Err(Error::PayloadTooLarge);
+    }
+    Ok(Some(bytes.to_vec().into_boxed_slice()))
+}
+
+fn bounded_text(candidate: Option<&str>) -> Result<Option<Box<str>>> {
+    let Some(text) = candidate else {
+        return Ok(None);
+    };
+    if text.len() > MAX_IDENTIFIER_BYTES {
+        return Err(Error::IdentifierTooLarge);
+    }
+    if text.contains('\0') {
+        return Err(Error::NulString);
+    }
+    Ok(Some(text.into()))
+}
+
+fn validate_custom_float(candidate: Option<f32>) -> Result<()> {
+    if candidate.is_some_and(|number| !number.is_finite()) {
+        return Err(Error::InvalidCustomFloat);
+    }
+    Ok(())
+}
+
+fn validate_non_negative(candidate: Option<f64>, error: Error) -> Result<()> {
+    if candidate.is_some_and(|number| !number.is_finite() || number < 0.0) {
+        return Err(error);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use std::mem::size_of;
 
-    use super::{AnimationParameters, CustomParameters, Effect, Settings};
+    use super::{
+        AnimationParameters, CustomParameters, Effect, Settings, TextDelivery, TimingCurveSlot,
+    };
     use crate::Error;
 
     #[test]
     fn effects_map_native_identifiers_losslessly() {
-        for effect in [
-            Effect::None,
-            Effect::Dissolve,
-            Effect::MagicMove,
-            Effect::Unknown("com.example.future".into()),
-        ] {
-            assert_eq!(Effect::from_identifier(effect.identifier()), effect);
+        let future = Effect::unknown("com.example.future").unwrap();
+        for effect in [Effect::None, Effect::Dissolve, Effect::MagicMove, future] {
+            assert_eq!(
+                Effect::from_identifier(effect.identifier()).unwrap(),
+                effect
+            );
         }
     }
 
     #[test]
-    fn known_identifiers_cannot_be_smuggled_as_unknown_values() {
-        assert!(!Effect::Unknown("none".into()).is_canonical());
-        assert!(!Effect::Unknown("apple:dissolve".into()).is_canonical());
-        assert!(!Effect::Unknown("apple:magic-move-implied-motion-path".into()).is_canonical());
-        assert!(Effect::Unknown("com.example.future".into()).is_canonical());
+    fn effect_constructors_reject_non_canonical_unknown_values() {
+        for identifier in [
+            "none",
+            "apple:dissolve",
+            "apple:magic-move-implied-motion-path",
+        ] {
+            assert_eq!(Effect::unknown(identifier), Err(Error::NonCanonicalEffect));
+        }
+        assert!(
+            Effect::unknown("com.example.future")
+                .unwrap()
+                .is_canonical()
+        );
     }
 
     #[test]
@@ -575,88 +1155,118 @@ mod tests {
 
     #[test]
     fn transition_unknown_values_and_opaque_payloads_are_lossless() {
-        let settings = Settings {
-            animation_type: Some("future-transition".into()),
-            effect: Some(Effect::from_identifier("com.example.future")),
-            animation_parameters: AnimationParameters {
-                color_payload: Some(vec![0xff, 0x00, 0x7f].into_boxed_slice()),
-                timing_curve_payloads: [None, Some(vec![0xff].into_boxed_slice()), None],
-                timing_curve_theme_names: [Some("Future Curve".into()), None, None],
-                ..AnimationParameters::default()
-            },
-            custom_parameters: CustomParameters {
-                acceleration: Some(super::Acceleration::from_native(99)),
-                text_delivery: Some(super::TextDelivery::from_native(-7)),
-                mosaic_type: Some(super::MosaicType::from_native(u32::MAX)),
-                ..CustomParameters::default()
-            },
-            ..Settings::default()
-        };
+        let mut animation_parameters = AnimationParameters::new();
+        animation_parameters
+            .set_color_payload(Some(&[0xff, 0x00, 0x7f]))
+            .unwrap();
+        animation_parameters
+            .set_timing_curve_payload(TimingCurveSlot::Second, Some(&[0xff]))
+            .unwrap();
+        animation_parameters
+            .set_timing_curve_theme_name(TimingCurveSlot::First, Some("Future Curve"))
+            .unwrap();
+
+        let mut custom_parameters = CustomParameters::new();
+        custom_parameters.set_acceleration(Some(super::Acceleration::from_native(99)));
+        custom_parameters.set_text_delivery(Some(TextDelivery::from_native(-7)));
+        custom_parameters.set_mosaic_type(Some(super::MosaicType::from_native(u32::MAX)));
+
+        let settings = Settings::builder()
+            .animation_type(Some("future-transition"))
+            .unwrap()
+            .effect(Some(Effect::from_identifier("com.example.future").unwrap()))
+            .unwrap()
+            .animation_parameters(animation_parameters)
+            .unwrap()
+            .custom_parameters(custom_parameters)
+            .unwrap()
+            .build()
+            .unwrap();
 
         assert_eq!(settings.validate(), Ok(()));
         assert_eq!(
-            settings.effect.as_ref().map(Effect::identifier),
+            settings.effect().map(Effect::identifier),
             Some("com.example.future")
         );
         assert_eq!(
-            settings.animation_parameters.color_payload(),
+            settings.animation_parameters().color_payload(),
             Some(&[0xff, 0x00, 0x7f][..])
         );
         assert_eq!(
-            settings.animation_parameters.timing_curve_payloads()[1].as_deref(),
+            settings
+                .animation_parameters()
+                .timing_curve_payload(TimingCurveSlot::Second),
             Some(&[0xff][..])
         );
         assert_eq!(
-            settings.animation_parameters.timing_curve_theme_names()[0].as_deref(),
+            settings
+                .animation_parameters()
+                .timing_curve_theme_name(TimingCurveSlot::First),
             Some("Future Curve")
         );
     }
 
     #[test]
-    fn transition_validation_reports_typed_failures() {
-        let mut settings = Settings {
-            duration: Some(-0.1),
-            ..Settings::default()
-        };
-        assert_eq!(settings.validate(), Err(Error::InvalidDuration));
+    fn checked_setters_reject_invalid_candidates_before_mutation() {
+        let mut settings = Settings::new();
+        assert_eq!(
+            settings.set_duration(Some(-0.1)),
+            Err(Error::InvalidDuration)
+        );
+        assert_eq!(settings.duration(), None);
+        assert_eq!(settings.set_delay(Some(f64::NAN)), Err(Error::InvalidDelay));
+        assert_eq!(settings.delay(), None);
+        assert_eq!(
+            settings.set_animation_type(Some("bad\0name")),
+            Err(Error::NulString)
+        );
+        assert_eq!(settings.animation_type(), None);
 
-        settings.duration = None;
-        settings.delay = Some(f64::NAN);
-        assert_eq!(settings.validate(), Err(Error::InvalidDelay));
+        let mut custom_parameters = CustomParameters::new();
+        assert_eq!(
+            custom_parameters.set_twist(Some(f32::INFINITY)),
+            Err(Error::InvalidCustomFloat)
+        );
+        assert_eq!(custom_parameters.twist(), None);
+        assert_eq!(
+            custom_parameters.set_travel_distance(Some(f32::NAN)),
+            Err(Error::InvalidCustomFloat)
+        );
 
-        settings.delay = None;
-        settings.custom_parameters.twist = Some(f32::INFINITY);
-        assert_eq!(settings.validate(), Err(Error::InvalidCustomFloat));
-
-        settings.custom_parameters.twist = None;
-        settings.animation_parameters.detail = Some(f64::NEG_INFINITY);
-        assert_eq!(settings.validate(), Err(Error::InvalidDetail));
-
-        settings.animation_parameters.detail = None;
-        settings.animation_type = Some("bad\0name".into());
-        assert_eq!(settings.validate(), Err(Error::NulString));
-
-        settings.animation_type = None;
-        settings.effect = Some(Effect::Unknown("none".into()));
-        assert_eq!(settings.validate(), Err(Error::NonCanonicalEffect));
-
-        settings.effect = None;
-        settings.animation_parameters.timing_curve_theme_names[2] = Some("bad\0name".into());
-        assert_eq!(settings.validate(), Err(Error::NulString));
+        let mut animation_parameters = AnimationParameters::new();
+        assert_eq!(
+            animation_parameters.set_detail(Some(f64::NEG_INFINITY)),
+            Err(Error::InvalidDetail)
+        );
+        assert_eq!(animation_parameters.detail(), None);
+        assert_eq!(
+            animation_parameters
+                .set_timing_curve_theme_name(TimingCurveSlot::Third, Some("bad\0name"),),
+            Err(Error::NulString)
+        );
+        assert_eq!(
+            animation_parameters.timing_curve_theme_name(TimingCurveSlot::Third),
+            None
+        );
     }
 
     #[test]
     fn transition_owned_storage_is_bounded_before_publication() {
         assert_eq!(Effect::unknown(""), Err(Error::EmptyIdentifier),);
 
-        let mut settings = Settings::default();
-        settings.animation_type = Some("x".repeat(super::MAX_IDENTIFIER_BYTES + 1).into());
-        assert_eq!(settings.validate(), Err(Error::IdentifierTooLarge));
+        let mut settings = Settings::new();
+        let long_identifier = "x".repeat(super::MAX_IDENTIFIER_BYTES + 1);
+        assert_eq!(
+            settings.set_animation_type(Some(&long_identifier)),
+            Err(Error::IdentifierTooLarge)
+        );
 
-        settings.animation_type = None;
-        settings.animation_parameters.color_payload =
-            Some(vec![0; super::MAX_OPAQUE_PAYLOAD_BYTES + 1].into_boxed_slice());
-        assert_eq!(settings.validate(), Err(Error::PayloadTooLarge));
+        let mut animation_parameters = AnimationParameters::new();
+        let long_payload = vec![0; super::MAX_OPAQUE_PAYLOAD_BYTES + 1];
+        assert_eq!(
+            animation_parameters.set_color_payload(Some(&long_payload)),
+            Err(Error::PayloadTooLarge)
+        );
     }
 
     #[test]
@@ -676,7 +1286,7 @@ mod tests {
         assert_eq!(size_of::<super::Direction>(), 4);
         assert_eq!(size_of::<super::MosaicType>(), 4);
         assert_eq!(size_of::<super::Acceleration>(), 4);
-        assert_eq!(size_of::<super::TextDelivery>(), 4);
+        assert_eq!(size_of::<TextDelivery>(), 4);
         assert_eq!(super::Acceleration::EaseInOut.native_value(), 4);
         assert_eq!(super::Acceleration::from_native(19).native_value(), 19);
         assert_eq!(
@@ -687,18 +1297,15 @@ mod tests {
             super::Acceleration::from_native(i32::MAX).native_value(),
             i32::MAX
         );
-        assert_eq!(super::TextDelivery::from_native(-1).native_value(), -1);
-        assert_eq!(
-            super::TextDelivery::from_native(i32::MAX).native_value(),
-            i32::MAX
-        );
+        assert_eq!(TextDelivery::from_native(-1).native_value(), -1);
+        assert_eq!(TextDelivery::from_native(i32::MAX).native_value(), i32::MAX);
         assert_eq!(
             super::Direction::from_native(u32::MAX).native_value(),
             u32::MAX
         );
         assert_eq!(super::Acceleration::from_native(19).kind(), None);
         assert_eq!(
-            super::TextDelivery::ByCharacter.kind(),
+            TextDelivery::ByCharacter.kind(),
             Some(super::TextDeliveryKind::ByCharacter)
         );
     }
