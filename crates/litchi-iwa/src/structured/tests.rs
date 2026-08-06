@@ -1,5 +1,11 @@
 use super::*;
 
+use crate::archive::{Archive, ArchiveObject, RawMessage};
+use crate::package::IWorkPackage;
+use crate::protobuf::tsp::Reference;
+use crate::protobuf::{kn, tp, tswp};
+use prost::Message;
+
 fn empty_inputs() -> (Bundle, ObjectIndex) {
     let bytes = crate::package::IWorkPackage::new()
         .to_bytes()
@@ -9,17 +15,266 @@ fn empty_inputs() -> (Bundle, ObjectIndex) {
     (bundle, object_index)
 }
 
+fn bundle_with_archives(
+    archives: impl IntoIterator<Item = (&'static str, Archive)>,
+) -> (Bundle, ObjectIndex) {
+    let mut package = IWorkPackage::new();
+    for (name, archive) in archives {
+        package
+            .replace_archive(name, &archive)
+            .expect("synthetic archive should be accepted");
+    }
+    let bytes = package
+        .to_bytes()
+        .expect("synthetic package should serialize");
+    let bundle = Bundle::from_bytes(&bytes).expect("synthetic package should parse");
+    let object_index = ObjectIndex::from_bundle(&bundle).expect("synthetic package should index");
+    (bundle, object_index)
+}
+
+fn object<T: Message>(identifier: u64, message_type: u32, message: T) -> ArchiveObject {
+    ArchiveObject::new(
+        identifier,
+        vec![RawMessage {
+            type_: message_type,
+            data: message.encode_to_vec(),
+        }],
+    )
+    .expect("synthetic object should be valid")
+}
+
+fn raw_object(identifier: u64, message_type: u32, data: Vec<u8>) -> ArchiveObject {
+    ArchiveObject::new(
+        identifier,
+        vec![RawMessage {
+            type_: message_type,
+            data,
+        }],
+    )
+    .expect("synthetic object should be valid")
+}
+
+fn reference(identifier: u64) -> Reference {
+    Reference {
+        identifier,
+        ..Default::default()
+    }
+}
+
 #[test]
 fn each_focused_extractor_returns_leaf_owned_empty_results() {
     let (bundle, object_index) = empty_inputs();
 
     let tables: Vec<litchi_numbers::Table> = extract_tables(&bundle, &object_index).unwrap();
-    let slides: Vec<litchi_keynote::Slide> = extract_slides(&bundle, &object_index).unwrap();
-    let sections: Vec<litchi_pages::Section> = extract_sections(&bundle, &object_index).unwrap();
 
     assert!(tables.is_empty());
+    assert!(matches!(
+        extract_slides(&bundle, &object_index),
+        Err(crate::Error::InvalidFormat(_))
+    ));
+    assert!(matches!(
+        extract_sections(&bundle, &object_index),
+        Err(crate::Error::InvalidFormat(_))
+    ));
+}
+
+#[test]
+fn empty_pages_root_is_a_valid_empty_section() {
+    let root = object(1, 10_000, tp::DocumentArchive::default());
+    let (bundle, object_index) = bundle_with_archives([(
+        "Index/Document.iwa",
+        Archive {
+            objects: vec![root],
+        },
+    )]);
+
+    let sections = extract_sections(&bundle, &object_index).unwrap();
+
+    assert_eq!(sections.len(), 1);
+    assert!(sections[0].all_text().is_empty());
+    assert!(sections[0].paragraphs().is_empty());
+    let structured = extract_all(&bundle, &object_index).unwrap();
+    assert_eq!(structured.summary(), "Tables: 0, Slides: 0, Sections: 1");
+}
+
+#[test]
+fn pages_root_and_referenced_storage_fail_closed() {
+    let (bundle, object_index) = bundle_with_archives([(
+        "Index/Document.iwa",
+        Archive {
+            objects: vec![raw_object(1, 10_000, vec![0x80])],
+        },
+    )]);
+    assert!(matches!(
+        extract_sections(&bundle, &object_index),
+        Err(crate::Error::InvalidFormat(message)) if message.contains("root payload is invalid")
+    ));
+
+    let root = object(
+        1,
+        10_000,
+        tp::DocumentArchive {
+            body_storage: Some(reference(42)),
+            ..Default::default()
+        },
+    );
+    let body = raw_object(42, 2_001, vec![0x80]);
+    let (bundle, object_index) = bundle_with_archives([(
+        "Index/Document.iwa",
+        Archive {
+            objects: vec![root, body],
+        },
+    )]);
+    assert!(matches!(
+        extract_sections(&bundle, &object_index),
+        Err(crate::Error::InvalidFormat(message)) if message.contains("text storage payload is invalid")
+    ));
+}
+
+#[test]
+fn empty_keynote_show_is_a_valid_empty_presentation() {
+    let root = object(1, 1, kn::DocumentArchive::default());
+    let (bundle, object_index) = bundle_with_archives([(
+        "Index/Document.iwa",
+        Archive {
+            objects: vec![root],
+        },
+    )]);
+    assert!(extract_slides(&bundle, &object_index).unwrap().is_empty());
+
+    let root = object(
+        1,
+        1,
+        kn::DocumentArchive {
+            show: reference(2),
+            ..Default::default()
+        },
+    );
+    let show = object(
+        2,
+        2,
+        kn::ShowArchive {
+            slide_tree: kn::SlideTreeArchive::default(),
+            ..Default::default()
+        },
+    );
+    let (bundle, object_index) = bundle_with_archives([(
+        "Index/Document.iwa",
+        Archive {
+            objects: vec![root, show],
+        },
+    )]);
+
+    let slides = extract_slides(&bundle, &object_index).unwrap();
+
     assert!(slides.is_empty());
-    assert!(sections.is_empty());
+    assert!(extract_all(&bundle, &object_index).unwrap().is_empty());
+}
+
+#[test]
+fn keynote_required_chain_does_not_return_partial_slides() {
+    let root = object(
+        1,
+        1,
+        kn::DocumentArchive {
+            show: reference(2),
+            ..Default::default()
+        },
+    );
+    let show = object(
+        2,
+        2,
+        kn::ShowArchive {
+            slide_tree: kn::SlideTreeArchive {
+                slides: vec![reference(3)],
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    );
+    let (bundle, object_index) = bundle_with_archives([(
+        "Index/Document.iwa",
+        Archive {
+            objects: vec![root, show],
+        },
+    )]);
+
+    assert!(matches!(
+        extract_slides(&bundle, &object_index),
+        Err(crate::Error::InvalidFormat(message)) if message.contains("slide-tree node object 3 is missing")
+    ));
+}
+
+#[test]
+fn keynote_invalid_root_and_dangling_text_are_typed_errors() {
+    let (bundle, object_index) = bundle_with_archives([(
+        "Index/Document.iwa",
+        Archive {
+            objects: vec![raw_object(1, 1, vec![0x80])],
+        },
+    )]);
+    assert!(matches!(
+        extract_slides(&bundle, &object_index),
+        Err(crate::Error::InvalidFormat(message)) if message.contains("root payload is invalid")
+    ));
+
+    let root = object(
+        1,
+        1,
+        kn::DocumentArchive {
+            show: reference(2),
+            ..Default::default()
+        },
+    );
+    let show = object(
+        2,
+        2,
+        kn::ShowArchive {
+            slide_tree: kn::SlideTreeArchive {
+                slides: vec![reference(3)],
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    );
+    let node = object(
+        3,
+        4,
+        kn::SlideNodeArchive {
+            slide: Some(reference(4)),
+            ..Default::default()
+        },
+    );
+    let slide = object(
+        4,
+        5,
+        kn::SlideArchive {
+            body_placeholder: Some(reference(7)),
+            ..Default::default()
+        },
+    );
+    let placeholder = object(
+        7,
+        7,
+        kn::PlaceholderArchive {
+            super_: tswp::ShapeInfoArchive {
+                owned_storage: Some(reference(8)),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    );
+    let (bundle, object_index) = bundle_with_archives([(
+        "Index/Document.iwa",
+        Archive {
+            objects: vec![root, show, node, slide, placeholder],
+        },
+    )]);
+
+    assert!(matches!(
+        extract_slides(&bundle, &object_index),
+        Err(crate::Error::InvalidFormat(message)) if message.contains("object 8 is missing")
+    ));
 }
 
 #[test]

@@ -6,24 +6,28 @@ use crate::object_index::ObjectIndex;
 use litchi_pages::{Section, SectionType};
 use prost::Message;
 
+const DOCUMENT_ARCHIVE_NAME: &str = "Index/Document.iwa";
+const DOCUMENT_OBJECT_ID: u64 = 1;
+const DOCUMENT_MESSAGE_TYPE: u32 = 10_000;
+const DOCUMENT_MESSAGE_TYPES: &[u32] = &[DOCUMENT_MESSAGE_TYPE];
+const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
+
 /// Extract the main body section while keeping Pages wire details private.
 pub(super) fn extract(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec<Section>> {
-    let Some(document_object) = bundle
-        .get_archive("Index/Document.iwa")
-        .and_then(|archive| archive.object(1))
-    else {
-        return Ok(Vec::new());
-    };
-    let Some(document) = document_object
-        .messages
-        .iter()
-        .find(|message| message.type_ == 10000)
-        .and_then(|message| {
-            crate::protobuf::tp::DocumentArchive::decode(message.data.as_slice()).ok()
-        })
-    else {
-        return Ok(Vec::new());
-    };
+    let archive = bundle.get_archive(DOCUMENT_ARCHIVE_NAME).ok_or_else(|| {
+        crate::Error::InvalidFormat("Pages structured root archive is missing".to_owned())
+    })?;
+    let document_object = archive.object(DOCUMENT_OBJECT_ID).ok_or_else(|| {
+        crate::Error::InvalidFormat("Pages structured root object 1 is missing".to_owned())
+    })?;
+    let payload = unique_payload(
+        document_object.messages.as_slice(),
+        DOCUMENT_MESSAGE_TYPES,
+        "Pages structured root",
+    )?;
+    let document = crate::protobuf::tp::DocumentArchive::decode(payload).map_err(|error| {
+        crate::Error::InvalidFormat(format!("Pages structured root payload is invalid: {error}"))
+    })?;
 
     let mut section_builder = Section::builder(0, SectionType::Body);
     if let Some(reference) = document.body_storage {
@@ -35,19 +39,17 @@ pub(super) fn extract(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec
                     reference.identifier
                 ))
             })?;
-        let storage = object
-            .messages
-            .iter()
-            .filter(|message| message.type_ == 2001 || message.type_ == 2022)
-            .find_map(|message| {
-                crate::protobuf::tswp::StorageArchive::decode(message.data.as_slice()).ok()
-            })
-            .ok_or_else(|| {
-                crate::Error::InvalidFormat(format!(
-                    "Pages body object {} has no text storage payload",
-                    reference.identifier
-                ))
-            })?;
+        let payload = unique_payload(
+            object.messages,
+            STORAGE_MESSAGE_TYPES,
+            &format!("Pages body object {}", reference.identifier),
+        )?;
+        let storage = crate::protobuf::tswp::StorageArchive::decode(payload).map_err(|error| {
+            crate::Error::InvalidFormat(format!(
+                "Pages body object {} text storage payload is invalid: {error}",
+                reference.identifier
+            ))
+        })?;
         let text = storage.text.concat();
         if !text.is_empty() {
             section_builder.push_paragraph(text);
@@ -55,4 +57,31 @@ pub(super) fn extract(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec
     }
 
     Ok(vec![section_builder.build()])
+}
+
+fn unique_payload<'a>(
+    messages: &'a [crate::archive::RawMessage],
+    message_types: &[u32],
+    context: &str,
+) -> Result<&'a [u8]> {
+    let mut payload = None;
+    for message in messages {
+        if !message_types.contains(&message.type_) {
+            continue;
+        }
+        if payload.is_some() {
+            return Err(crate::Error::InvalidFormat(format!(
+                "{context} contains duplicate text payloads"
+            )));
+        }
+        payload = Some(message.data.as_slice());
+    }
+    payload.ok_or_else(|| {
+        let expected = message_types
+            .iter()
+            .map(|message_type| format!("type-{message_type}"))
+            .collect::<Vec<_>>()
+            .join("/");
+        crate::Error::InvalidFormat(format!("{context} has no {expected} payload"))
+    })
 }
