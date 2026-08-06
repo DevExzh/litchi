@@ -1,4 +1,4 @@
-use super::comment::CommentDateTime;
+use super::comment::DateTime;
 use super::package::{Error as PackageError, Result};
 
 /// Kind of tracked text revision.
@@ -48,7 +48,7 @@ pub struct RevisionMark {
     /// Resolved revision author name.
     pub author: String,
     /// Revision date and time, when the DTTM is not an ignored zero date.
-    pub timestamp: Option<CommentDateTime>,
+    pub timestamp: Option<DateTime>,
     /// Structured edit reason, when an Idsl reason operand is present.
     pub reason: Option<RevisionReason>,
     /// Legacy raw alias for [`Self::reason`].
@@ -70,7 +70,7 @@ pub struct NumberingRevisionMark {
     /// Resolved revision author name.
     pub author: String,
     /// Revision date and time, when the packed DTTM is not an ignored zero date.
-    pub timestamp: Option<CommentDateTime>,
+    pub timestamp: Option<DateTime>,
     /// Placeholder positions for the nine numbering levels.
     pub placeholder_positions: [u8; 9],
     /// MSONFC values for the nine numbering levels.
@@ -89,7 +89,7 @@ pub struct DisplayFieldRevisionMark {
     /// Resolved revision author name.
     pub author: String,
     /// Revision date and time, when the packed DTTM is not an ignored zero date.
-    pub timestamp: Option<CommentDateTime>,
+    pub timestamp: Option<DateTime>,
     /// Previous LISTNUM field result.
     pub previous_result: String,
 }
@@ -106,10 +106,10 @@ pub struct SectionRevisionMark {
     /// Resolved revision author name.
     pub author: String,
     /// Revision date and time, when the packed DTTM is not an ignored zero date.
-    pub timestamp: Option<CommentDateTime>,
+    pub timestamp: Option<DateTime>,
 }
 
-pub(crate) fn decode_dttm(value: u32) -> Result<Option<CommentDateTime>> {
+pub(crate) fn decode_dttm(value: u32) -> Result<Option<DateTime>> {
     let minute = (value & 0x3F) as u8;
     let hour = ((value >> 6) & 0x1F) as u8;
     let day = ((value >> 11) & 0x1F) as u8;
@@ -124,7 +124,7 @@ pub(crate) fn decode_dttm(value: u32) -> Result<Option<CommentDateTime>> {
     if day == 0 || month == 0 {
         return Ok(None);
     }
-    Ok(Some(CommentDateTime {
+    Ok(Some(DateTime {
         year,
         month,
         day,

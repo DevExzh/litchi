@@ -4,7 +4,7 @@
 //! comment subdocument (`PlcfandTxt`), and a separate array of author names.
 
 use super::super::package::{Error as PackageError, Result};
-use super::super::{CommentDateTime, CommentExtendedMetadata};
+use super::super::{DateTime, ExtendedMetadata};
 use super::fib::FileInformationBlock;
 use crate::plcf::Plcf;
 use std::collections::{HashMap, HashSet};
@@ -91,7 +91,7 @@ pub struct CommentReference {
     /// Exclusive end CP of the commented main-document range.
     pub range_end_cp: Option<u32>,
     /// Word 2002+ timestamp, reply-tree, and ink metadata, when present.
-    pub extended_metadata: Option<CommentExtendedMetadata>,
+    pub extended_metadata: Option<ExtendedMetadata>,
 }
 
 /// Parsed Word comment tables.
@@ -232,7 +232,7 @@ fn parse_extended_metadata(
     fib: &FileInformationBlock,
     table_stream: &[u8],
     comment_count: usize,
-) -> Result<Option<Vec<CommentExtendedMetadata>>> {
+) -> Result<Option<Vec<ExtendedMetadata>>> {
     let Some((_, length)) = fib.get_table_pointer(112) else {
         return Ok(None);
     };
@@ -272,7 +272,7 @@ fn parse_extended_metadata(
                 "ATRDPost10 reserved flag bits must be zero".to_string(),
             ));
         }
-        metadata.push(CommentExtendedMetadata {
+        metadata.push(ExtendedMetadata {
             modified_at,
             depth,
             parent_index: None,
@@ -322,7 +322,7 @@ fn parse_extended_metadata(
     Ok(Some(metadata))
 }
 
-fn parse_dttm(value: u32) -> Result<Option<CommentDateTime>> {
+fn parse_dttm(value: u32) -> Result<Option<DateTime>> {
     let minute = (value & 0x3F) as u8;
     let hour = ((value >> 6) & 0x1F) as u8;
     let day = ((value >> 11) & 0x1F) as u8;
@@ -337,7 +337,7 @@ fn parse_dttm(value: u32) -> Result<Option<CommentDateTime>> {
     if day == 0 || month == 0 {
         return Ok(None);
     }
-    Ok(Some(CommentDateTime {
+    Ok(Some(DateTime {
         year,
         month,
         day,
@@ -754,8 +754,8 @@ mod tests {
         assert_eq!(reference.range_end_cp, None);
         assert_eq!(
             reference.extended_metadata,
-            Some(CommentExtendedMetadata {
-                modified_at: Some(CommentDateTime {
+            Some(ExtendedMetadata {
+                modified_at: Some(DateTime {
                     year: 2026,
                     month: 7,
                     day: 15,
@@ -872,7 +872,7 @@ mod tests {
         let metadata = parse_extended_metadata(&fib, &table, 3).unwrap().unwrap();
         assert_eq!(
             metadata[0].modified_at,
-            Some(CommentDateTime {
+            Some(DateTime {
                 year: 2026,
                 month: 7,
                 day: 15,

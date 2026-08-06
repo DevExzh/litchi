@@ -8,8 +8,8 @@ fn comments_round_trip_with_other_subdocuments() {
     writer.add_comment(
         CommentEntry::new(1, "Review 🦀", "Alice 😀", "A😀")
             .with_range(2, 6)
-            .with_extended_metadata(crate::CommentExtendedMetadata {
-                modified_at: Some(CommentDateTime {
+            .with_extended_metadata(crate::ExtendedMetadata {
+                modified_at: Some(DateTime {
                     year: 2026,
                     month: 7,
                     day: 15,
@@ -25,7 +25,7 @@ fn comments_round_trip_with_other_subdocuments() {
     writer.add_comment(
         CommentEntry::new(3, "Second review", "Alice 😀", "AL")
             .with_range(0, 7)
-            .with_extended_metadata(crate::CommentExtendedMetadata {
+            .with_extended_metadata(crate::ExtendedMetadata {
                 modified_at: None,
                 depth: 1,
                 parent_index: Some(0),
@@ -57,7 +57,7 @@ fn comments_round_trip_with_other_subdocuments() {
     assert_eq!(first_metadata.parent_index, None);
     assert_eq!(
         first_metadata.modified_at,
-        Some(CommentDateTime {
+        Some(DateTime {
             year: 2026,
             month: 7,
             day: 15,
@@ -125,8 +125,8 @@ fn rejects_invalid_comment_ranges_timestamps_and_reply_trees() {
 
     let error = write_error(
         CommentEntry::new(0, "Body", "Author", "A").with_extended_metadata(
-            crate::CommentExtendedMetadata {
-                modified_at: Some(CommentDateTime {
+            crate::ExtendedMetadata {
+                modified_at: Some(DateTime {
                     year: 2026,
                     month: 13,
                     day: 1,
@@ -144,7 +144,7 @@ fn rejects_invalid_comment_ranges_timestamps_and_reply_trees() {
 
     let error = write_error(
         CommentEntry::new(0, "Body", "Author", "A").with_extended_metadata(
-            crate::CommentExtendedMetadata {
+            crate::ExtendedMetadata {
                 modified_at: None,
                 depth: 1,
                 parent_index: Some(0),

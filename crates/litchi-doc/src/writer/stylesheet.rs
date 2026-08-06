@@ -1,6 +1,6 @@
 //! Validated Word 97+ stylesheet (`STSH`) generation.
 
-use crate::CommentDateTime;
+use crate::DateTime;
 use crate::parts::styles::{StyleFlags, StyleKind, StylePost2000, StyleSheet};
 use std::collections::HashMap;
 
@@ -15,7 +15,7 @@ pub struct StyleRevision {
     /// Revision author name, stored through the document's `SttbfRMark` table.
     pub author: String,
     /// Date and time at which the style was revision-marked.
-    pub timestamp: Option<CommentDateTime>,
+    pub timestamp: Option<DateTime>,
     /// Previous paragraph formatting; present only for a paragraph style.
     pub paragraph_properties: Option<Vec<u8>>,
     /// Previous character formatting.
@@ -48,7 +48,7 @@ impl StyleRevision {
     }
 
     /// Set the style-revision timestamp.
-    pub fn with_timestamp(mut self, timestamp: CommentDateTime) -> Self {
+    pub fn with_timestamp(mut self, timestamp: DateTime) -> Self {
         self.timestamp = Some(timestamp);
         self
     }
@@ -569,7 +569,7 @@ mod tests {
         let current_chpx = [SPRM_C_F_BOLD.to_le_bytes().as_slice(), &[1]].concat();
         let previous_papx = [SPRM_P_F_KEEP.to_le_bytes().as_slice(), &[0]].concat();
         let previous_chpx = [SPRM_C_F_BOLD.to_le_bytes().as_slice(), &[0]].concat();
-        let timestamp = CommentDateTime {
+        let timestamp = DateTime {
             year: 2026,
             month: 7,
             day: 16,

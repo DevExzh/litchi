@@ -1,4 +1,4 @@
-use super::{CommentDateTime, WriteError};
+use super::{DateTime, WriteError};
 
 pub(in crate::writer::core) fn utf16_code_unit_len(text: &str) -> Result<u32, WriteError> {
     let length = u32::try_from(text.encode_utf16().count())
@@ -11,7 +11,7 @@ pub(in crate::writer::core) fn utf16_code_unit_len(text: &str) -> Result<u32, Wr
     Ok(length)
 }
 
-pub(crate) fn pack_dttm(value: Option<CommentDateTime>) -> Result<u32, WriteError> {
+pub(crate) fn pack_dttm(value: Option<DateTime>) -> Result<u32, WriteError> {
     let Some(value) = value else {
         return Ok(0);
     };

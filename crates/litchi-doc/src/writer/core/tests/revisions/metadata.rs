@@ -59,7 +59,7 @@ fn rejects_invalid_writer_revision_metadata() {
     assert!(error_for(conflicting_formatting_reason).contains("insertion and formatting"));
 
     let invalid_time = CharacterFormatting {
-        insertion_revision: Some(TextRevision::new("Alice").with_timestamp(CommentDateTime {
+        insertion_revision: Some(TextRevision::new("Alice").with_timestamp(DateTime {
             year: 2026,
             month: 13,
             day: 1,
@@ -73,7 +73,7 @@ fn rejects_invalid_writer_revision_metadata() {
 
     let mut writer = Writer::new();
     writer.set_section_formatting_revision(FormattingRevision::new("Editor").with_timestamp(
-        CommentDateTime {
+        DateTime {
             year: 2026,
             month: 0,
             day: 1,

@@ -1,6 +1,6 @@
 //! Writer-facing document state, input models, and authoring methods.
 
-use crate::CommentDateTime;
+use crate::DateTime;
 use crate::encryption::{EncryptionProfile, validate_writer_password};
 use crate::parts::pap::{
     Borders as ParagraphBorders, DropCap, FontAlignment, FrameAnchor, FrameHeight,

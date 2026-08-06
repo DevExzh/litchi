@@ -87,7 +87,7 @@ fn writes_custom_styles_into_document_stylesheet() {
 
 #[test]
 fn writes_revision_marked_style_and_author_table() {
-    let timestamp = CommentDateTime {
+    let timestamp = DateTime {
         year: 2026,
         month: 7,
         day: 16,

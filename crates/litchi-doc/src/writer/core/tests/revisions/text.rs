@@ -2,7 +2,7 @@ use super::super::support::*;
 
 #[test]
 fn tracked_text_revisions_round_trip_through_both_output_paths() {
-    let timestamp = CommentDateTime {
+    let timestamp = DateTime {
         year: 2026,
         month: 7,
         day: 15,

@@ -5,7 +5,7 @@
 //! metadata: message identifiers are stored verbatim and no message is ever
 //! contacted, opened, or rendered.
 
-use super::super::CommentDateTime;
+use super::super::DateTime;
 use super::super::package::{Error as PackageError, Result};
 use super::super::revision::decode_dttm;
 use super::fib::FileInformationBlock;
@@ -33,14 +33,14 @@ fn read_u16(data: &[u8], offset: usize, field: &str) -> Result<u16> {
 pub struct MessageDisplayProperties {
     /// Creation time of the message, when the packed DTTM is not an ignored
     /// zero date.
-    created: Option<CommentDateTime>,
+    created: Option<DateTime>,
     /// Index into the document's `SttbfRMark` author table.
     author_index: i16,
 }
 
 impl MessageDisplayProperties {
     /// Creation time of the e-mail message.
-    pub fn created(&self) -> Option<CommentDateTime> {
+    pub fn created(&self) -> Option<DateTime> {
         self.created
     }
 

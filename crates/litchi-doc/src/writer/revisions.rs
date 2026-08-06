@@ -1,6 +1,6 @@
 //! Tracked text revision input types for the legacy Word writer.
 
-use crate::{CommentDateTime, RevisionReason};
+use crate::{DateTime, RevisionReason};
 
 /// Metadata for an inserted or deleted text run.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -8,7 +8,7 @@ pub struct TextRevision {
     /// Revision author name.
     pub author: String,
     /// Revision timestamp.
-    pub timestamp: Option<CommentDateTime>,
+    pub timestamp: Option<DateTime>,
     /// Legacy raw edit-reason code.
     pub revision_id: Option<u16>,
     /// Structured edit reason.
@@ -30,7 +30,7 @@ impl TextRevision {
     }
 
     /// Set the revision timestamp.
-    pub fn with_timestamp(mut self, timestamp: CommentDateTime) -> Self {
+    pub fn with_timestamp(mut self, timestamp: DateTime) -> Self {
         self.timestamp = Some(timestamp);
         self
     }
@@ -62,7 +62,7 @@ pub struct FormattingRevision {
     /// Revision author name.
     pub author: String,
     /// Revision timestamp.
-    pub timestamp: Option<CommentDateTime>,
+    pub timestamp: Option<DateTime>,
     /// ECMA-376 single-session revision-save ID for the formatting change.
     pub revision_save_id: Option<u32>,
     /// Edit reason for the formatting change.
@@ -81,7 +81,7 @@ impl FormattingRevision {
     }
 
     /// Set the revision timestamp.
-    pub fn with_timestamp(mut self, timestamp: CommentDateTime) -> Self {
+    pub fn with_timestamp(mut self, timestamp: DateTime) -> Self {
         self.timestamp = Some(timestamp);
         self
     }
@@ -105,7 +105,7 @@ pub struct NumberingRevision {
     /// Revision author name.
     pub author: String,
     /// Revision timestamp.
-    pub timestamp: Option<CommentDateTime>,
+    pub timestamp: Option<DateTime>,
     /// Whether the paragraph was already numbered when tracking began.
     pub was_numbered: bool,
     /// Placeholder positions for the nine numbering levels.
@@ -133,7 +133,7 @@ impl NumberingRevision {
     }
 
     /// Set the revision timestamp.
-    pub fn with_timestamp(mut self, timestamp: CommentDateTime) -> Self {
+    pub fn with_timestamp(mut self, timestamp: DateTime) -> Self {
         self.timestamp = Some(timestamp);
         self
     }
@@ -145,7 +145,7 @@ pub struct DisplayFieldRevision {
     /// Revision author name.
     pub author: String,
     /// Revision timestamp.
-    pub timestamp: Option<CommentDateTime>,
+    pub timestamp: Option<DateTime>,
     /// Previous LISTNUM display-field result.
     pub previous_result: String,
 }
@@ -161,7 +161,7 @@ impl DisplayFieldRevision {
     }
 
     /// Set the revision timestamp.
-    pub fn with_timestamp(mut self, timestamp: CommentDateTime) -> Self {
+    pub fn with_timestamp(mut self, timestamp: DateTime) -> Self {
         self.timestamp = Some(timestamp);
         self
     }

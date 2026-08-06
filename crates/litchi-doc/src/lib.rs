@@ -96,7 +96,8 @@ pub use parts::annotation_bookmarks;
 pub mod writer;
 
 pub use bookmark::Bookmark;
-pub use comment::{Comment, CommentDateTime, CommentExtendedMetadata};
+pub(crate) use comment::DateTime as CommentDateTime;
+pub use comment::{Comment, DateTime, ExtendedMetadata};
 pub use document::Document;
 pub use embedded_object::{Editor, WriteOptions};
 pub use encryption::EncryptionProfile;

@@ -154,14 +154,12 @@ impl Writer {
         let mut extended_metadata = Vec::with_capacity(ordered.len() * 18);
         let mut active_ancestors = Vec::<usize>::new();
         for (index, (entry, _)) in ordered.iter().enumerate() {
-            let metadata = entry
-                .extended_metadata
-                .unwrap_or(crate::CommentExtendedMetadata {
-                    modified_at: None,
-                    depth: 0,
-                    parent_index: None,
-                    is_ink: false,
-                });
+            let metadata = entry.extended_metadata.unwrap_or(crate::ExtendedMetadata {
+                modified_at: None,
+                depth: 0,
+                parent_index: None,
+                is_ink: false,
+            });
             let depth = usize::try_from(metadata.depth).map_err(|_| {
                 WriteError::InvalidData("DOC comment reply depth is too large".to_string())
             })?;

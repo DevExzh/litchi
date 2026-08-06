@@ -4,7 +4,7 @@ use super::paragraph::Paragraph;
 
 /// A date and time stored in Word's packed DTTM representation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CommentDateTime {
+pub struct DateTime {
     /// Calendar year.
     pub year: u16,
     /// Month in the range 1 through 12.
@@ -21,12 +21,12 @@ pub struct CommentDateTime {
 
 /// Word 2002+ metadata associated with a comment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CommentExtendedMetadata {
+pub struct ExtendedMetadata {
     /// Date and time when the comment was created or last modified.
     ///
     /// This is `None` when the packed DTTM has a zero month or day and Word
     /// requires the timestamp to be ignored.
-    pub modified_at: Option<CommentDateTime>,
+    pub modified_at: Option<DateTime>,
     /// Depth in the reply tree. Top-level comments have depth zero.
     pub depth: u32,
     /// Zero-based index of the parent comment in main-document reference order.
@@ -51,7 +51,7 @@ pub struct Comment {
     /// Exclusive end CP of the commented main-document range.
     pub range_end: Option<u32>,
     /// Word 2002+ timestamp, reply-tree, and ink metadata, when present.
-    pub extended_metadata: Option<CommentExtendedMetadata>,
+    pub extended_metadata: Option<ExtendedMetadata>,
     /// Comment body text, excluding its structural U+0005 marker.
     pub text: String,
     /// Paragraphs in the comment body.

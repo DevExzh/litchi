@@ -1,5 +1,5 @@
 pub(super) use super::super::{codec::*, model::*};
-pub(super) use crate::CommentDateTime;
+pub(super) use crate::DateTime;
 pub(super) use crate::SmartTagRecognizerRange;
 pub(super) use crate::parts::numbering::NumberFormat;
 pub(super) use crate::parts::pap::{

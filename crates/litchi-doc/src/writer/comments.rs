@@ -1,6 +1,6 @@
 //! Comment input types for the legacy Word writer.
 
-use crate::CommentExtendedMetadata;
+use crate::ExtendedMetadata;
 
 /// A comment to add to a DOC main story.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,7 +23,7 @@ pub struct CommentEntry {
     /// Parent indexes refer to comments in emitted main-document reference
     /// order. The writer emits a default top-level metadata record when this is
     /// absent because `AtrdExtra` is parallel to all comment descriptors.
-    pub extended_metadata: Option<CommentExtendedMetadata>,
+    pub extended_metadata: Option<ExtendedMetadata>,
 }
 
 impl CommentEntry {
@@ -51,7 +51,7 @@ impl CommentEntry {
     }
 
     /// Set Word 2002+ timestamp, reply-tree, and ink metadata.
-    pub fn with_extended_metadata(mut self, metadata: CommentExtendedMetadata) -> Self {
+    pub fn with_extended_metadata(mut self, metadata: ExtendedMetadata) -> Self {
         self.extended_metadata = Some(metadata);
         self
     }
