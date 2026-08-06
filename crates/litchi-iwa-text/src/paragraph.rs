@@ -5,6 +5,7 @@ pub mod direction;
 pub mod drop_cap;
 pub mod flow;
 pub mod list;
+pub mod style;
 pub mod tabs;
 
 pub use direction::WritingDirection;
