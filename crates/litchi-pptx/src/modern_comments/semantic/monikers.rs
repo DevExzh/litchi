@@ -1,5 +1,5 @@
 use super::super::MAX_STRING_BYTES;
-use super::OpaqueXml;
+use super::extensions::OpaqueXml;
 use crate::Error;
 use crate::Result;
 use litchi_ooxml_common::custom_xml::valid_guid;
@@ -28,14 +28,14 @@ fn validate_guid(value: &str) -> Result<()> {
 
 /// The typed terminal expected by a 2.18 moniker list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MonikerKind {
+pub enum Kind {
     Comment,
     Reply,
 }
 
 /// A known comment/reply moniker or an inert inherited moniker fragment.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum MonikerNode {
+pub enum Node {
     Opaque(OpaqueXml),
     Comment { id: String },
     Reply { id: String },
@@ -47,24 +47,24 @@ pub enum MonikerNode {
 /// command schemas are intentionally retained as opaque nodes. The terminal
 /// comment and reply IDs remain typed and validated.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MonikerList {
-    pub kind: MonikerKind,
-    pub nodes: Vec<MonikerNode>,
+pub struct List {
+    pub kind: Kind,
+    pub nodes: Vec<Node>,
 }
 
-impl MonikerList {
-    pub fn comment(nodes: Vec<MonikerNode>) -> Result<Self> {
+impl List {
+    pub fn comment(nodes: Vec<Node>) -> Result<Self> {
         let value = Self {
-            kind: MonikerKind::Comment,
+            kind: Kind::Comment,
             nodes,
         };
         value.validate()?;
         Ok(value)
     }
 
-    pub fn reply(nodes: Vec<MonikerNode>) -> Result<Self> {
+    pub fn reply(nodes: Vec<Node>) -> Result<Self> {
         let value = Self {
-            kind: MonikerKind::Reply,
+            kind: Kind::Reply,
             nodes,
         };
         value.validate()?;
@@ -76,17 +76,17 @@ impl MonikerList {
         let mut replies = 0usize;
         for node in &self.nodes {
             match node {
-                MonikerNode::Opaque(value) => {
+                Node::Opaque(value) => {
                     if value.xml.len() > super::super::MAX_BYTES {
                         return Err(invalid("modern comment moniker fragment is too large"));
                     }
                 },
-                MonikerNode::Comment { id } => {
+                Node::Comment { id } => {
                     validate_guid(id)?;
                     bounded(id)?;
                     comments += 1;
                 },
-                MonikerNode::Reply { id } => {
+                Node::Reply { id } => {
                     validate_guid(id)?;
                     bounded(id)?;
                     replies += 1;
@@ -94,12 +94,12 @@ impl MonikerList {
             }
         }
         match self.kind {
-            MonikerKind::Comment if comments == 1 && replies == 0 => Ok(()),
-            MonikerKind::Reply if comments == 1 && replies == 1 => Ok(()),
-            MonikerKind::Comment => Err(invalid(
+            Kind::Comment if comments == 1 && replies == 0 => Ok(()),
+            Kind::Reply if comments == 1 && replies == 1 => Ok(()),
+            Kind::Comment => Err(invalid(
                 "comment moniker list requires exactly one comment moniker",
             )),
-            MonikerKind::Reply => Err(invalid(
+            Kind::Reply => Err(invalid(
                 "reply moniker list requires one comment and one reply moniker",
             )),
         }
@@ -107,14 +107,14 @@ impl MonikerList {
 
     pub fn comment_id(&self) -> Option<&str> {
         self.nodes.iter().find_map(|node| match node {
-            MonikerNode::Comment { id } => Some(id.as_str()),
+            Node::Comment { id } => Some(id.as_str()),
             _ => None,
         })
     }
 
     pub fn reply_id(&self) -> Option<&str> {
         self.nodes.iter().find_map(|node| match node {
-            MonikerNode::Reply { id } => Some(id.as_str()),
+            Node::Reply { id } => Some(id.as_str()),
             _ => None,
         })
     }

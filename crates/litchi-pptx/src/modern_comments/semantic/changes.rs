@@ -1,5 +1,6 @@
 use super::super::model::NamespaceDeclaration;
-use super::{MonikerList, OpaqueXml};
+use super::extensions::OpaqueXml;
+use super::monikers::List as Monikers;
 use crate::{Error, Result};
 use chrono::{DateTime, NaiveDateTime};
 use litchi_ooxml_common::custom_xml::valid_guid;
@@ -30,7 +31,7 @@ fn date_time(value: &str, label: &str) -> Result<()> {
 
 /// Typed `ac:CT_ChangesData` metadata. It is storage metadata only.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ChangeMetadata {
+pub struct Metadata {
     pub name: Option<String>,
     pub user_id: Option<String>,
     pub provider_id: Option<String>,
@@ -43,7 +44,7 @@ pub struct ChangeMetadata {
     pub extension_xml: Option<OpaqueXml>,
 }
 
-impl ChangeMetadata {
+impl Metadata {
     pub fn validate(&self) -> Result<()> {
         for value in [
             self.name.as_deref(),
@@ -77,7 +78,7 @@ impl ChangeMetadata {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum CommentChange {
+pub enum Change {
     Add,
     Delete,
     Modify,
@@ -85,7 +86,7 @@ pub enum CommentChange {
     ModifyReaction,
 }
 
-impl CommentChange {
+impl Change {
     pub(crate) fn parse(value: &str) -> Result<Self> {
         match value {
             "add" => Ok(Self::Add),
@@ -111,14 +112,14 @@ impl CommentChange {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ReplyChange {
+pub enum Reply {
     Add,
     Delete,
     Modify,
     ModifyReaction,
 }
 
-impl ReplyChange {
+impl Reply {
     pub(crate) fn parse(value: &str) -> Result<Self> {
         match value {
             "add" => Ok(Self::Add),
@@ -155,18 +156,18 @@ fn validate_bits<T: Copy + Eq>(bits: &[T], label: &str) -> Result<()> {
 
 /// A typed 2.19 `CT_CommentReplyV2Changes` descriptor.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ReplyChanges {
-    pub changes: Vec<ReplyChange>,
-    pub metadata: Option<ChangeMetadata>,
-    pub monikers: MonikerList,
+pub struct Replies {
+    pub changes: Vec<Reply>,
+    pub metadata: Option<Metadata>,
+    pub monikers: Monikers,
     pub extension_xml: Option<OpaqueXml>,
     pub namespace_declarations: Vec<NamespaceDeclaration>,
 }
 
-impl ReplyChanges {
+impl Replies {
     pub fn validate(&self) -> Result<()> {
         validate_bits(&self.changes, "comment reply changes")?;
-        if self.monikers.kind != super::MonikerKind::Reply {
+        if self.monikers.kind != super::monikers::Kind::Reply {
             return Err(invalid("reply changes require a reply moniker list"));
         }
         self.monikers.validate()?;
@@ -184,19 +185,19 @@ impl ReplyChanges {
 
 /// A typed 2.19 `CT_CommentV2Changes` descriptor.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CommentChanges {
-    pub changes: Vec<CommentChange>,
-    pub metadata: Option<ChangeMetadata>,
-    pub monikers: MonikerList,
-    pub reply_changes: Vec<ReplyChanges>,
+pub struct Changes {
+    pub changes: Vec<Change>,
+    pub metadata: Option<Metadata>,
+    pub monikers: Monikers,
+    pub reply_changes: Vec<Replies>,
     pub extension_xml: Option<OpaqueXml>,
     pub namespace_declarations: Vec<NamespaceDeclaration>,
 }
 
-impl CommentChanges {
+impl Changes {
     pub fn validate(&self) -> Result<()> {
         validate_bits(&self.changes, "comment changes")?;
-        if self.monikers.kind != super::MonikerKind::Comment {
+        if self.monikers.kind != super::monikers::Kind::Comment {
             return Err(invalid("comment changes require a comment moniker list"));
         }
         self.monikers.validate()?;

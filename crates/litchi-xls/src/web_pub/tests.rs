@@ -293,3 +293,140 @@ fn serialize_rejects_inconsistent_conditional_fields() {
     value.title = "x".repeat(300);
     assert!(value.to_payload().is_err());
 }
+
+#[test]
+fn snapshot_noop_and_edits_preserve_opaque_wire_bytes() {
+    let mut builder = WebPubBuilder::new(0x00);
+    builder.flags = 0x4000;
+    builder.file_destination = "https://example.invalid/publish.mht".to_string();
+    builder.div_id = "top".to_string();
+    builder.title = "Original".to_string();
+    builder.reserved = vec![0xAA, 0xBB, 0xCC];
+    let mut bytes = builder.build();
+    bytes[16..20].copy_from_slice(&[0x11, 0x22, 0x33, 0x44]);
+    let trailing = bytes.len() - 2;
+    bytes[trailing..].copy_from_slice(&[0xD1, 0xD2]);
+
+    let snapshot = Snapshot::parse(bytes.clone()).expect("snapshot");
+    assert_eq!(snapshot.finish(), bytes);
+
+    let noop = snapshot.edit().commit().expect("no-op commit");
+    assert!(!noop.changed());
+    assert!(noop.patch().is_noop());
+    assert_eq!(noop.into_bytes(), bytes);
+
+    let mut transaction = snapshot.edit();
+    transaction
+        .set_title("A changed publication title")
+        .expect("title edit")
+        .set_file_destination("https://example.invalid/café.mht")
+        .expect("inert URL edit")
+        .set_auto_republish(true)
+        .expect("flag edit")
+        .set_style_id(0x1122_3344)
+        .expect("style edit");
+    let commit = transaction.commit().expect("commit");
+    let after = commit.snapshot().bytes();
+    assert_eq!(&after[16..20], &[0x11, 0x22, 0x33, 0x44]);
+    assert_eq!(&after[after.len() - 2..], &[0xD1, 0xD2]);
+    assert!(after.windows(3).any(|window| window == [0xAA, 0xBB, 0xCC]));
+    assert_eq!(
+        commit.snapshot().publication().title,
+        "A changed publication title"
+    );
+    assert_eq!(
+        commit.snapshot().publication().file_destination,
+        "https://example.invalid/café.mht"
+    );
+    assert_eq!(commit.snapshot().publication().style_id, 0x1122_3344);
+    assert!(commit.snapshot().publication().auto_republish);
+    assert_eq!(u16::from_le_bytes([after[14], after[15]]) & 0x4000, 0x4000);
+
+    let applied = commit.patch().apply(&snapshot).expect("apply");
+    let reverted = commit.patch().inverse().apply(&applied).expect("inverse");
+    assert_eq!(reverted.finish(), bytes);
+}
+
+#[test]
+fn bounded_conditional_edits_and_invalid_edits_are_atomic() {
+    let mut workbook = WebPubBuilder::new(0x00);
+    workbook.file_destination = "book.htm".to_string();
+    workbook.title = "Book".to_string();
+    let snapshot = Snapshot::parse(workbook.build()).expect("snapshot");
+    let mut transaction = snapshot.edit();
+    let before = transaction.snapshot().expect("candidate").finish();
+
+    assert!(transaction.set_title("x".repeat(256)).is_err());
+    assert!(transaction.set_source_name("unexpected").is_err());
+    assert!(
+        transaction
+            .set_range(WebPubRange::new(0, 1, 0, 1).unwrap())
+            .is_err()
+    );
+    assert!(transaction.set_chart_shape_id(7).is_err());
+    assert_eq!(
+        transaction
+            .snapshot()
+            .expect("unchanged candidate")
+            .finish(),
+        before
+    );
+
+    let mut range = WebPubBuilder::new(0x04);
+    range.file_destination = "range.htm".to_string();
+    range.title = "Range".to_string();
+    let range_snapshot = Snapshot::parse(range.build()).expect("range snapshot");
+    let mut range_edit = range_snapshot.edit();
+    range_edit
+        .set_range(WebPubRange::new(10, 20, 3, 8).unwrap())
+        .expect("range edit");
+    assert_eq!(
+        range_edit
+            .commit()
+            .expect("range commit")
+            .snapshot()
+            .publication()
+            .range,
+        Some(WebPubRange::new(10, 20, 3, 8).unwrap())
+    );
+
+    let mut chart = WebPubBuilder::new(0x05);
+    chart.source_name = Some("Chart 1".to_string());
+    chart.chart_shape_id = Some(4);
+    chart.file_destination = "chart.htm".to_string();
+    chart.title = "Chart".to_string();
+    let chart_snapshot = Snapshot::parse(chart.build()).expect("chart snapshot");
+    let mut chart_edit = chart_snapshot.edit();
+    chart_edit
+        .set_source_name("Chart 2")
+        .expect("source name edit")
+        .set_chart_shape_id(8)
+        .expect("shape edit");
+    let chart_commit = chart_edit.commit().expect("chart commit");
+    assert_eq!(
+        chart_commit.snapshot().publication().source_name.as_deref(),
+        Some("Chart 2")
+    );
+    assert_eq!(
+        chart_commit.snapshot().publication().chart_shape_id,
+        Some(8)
+    );
+}
+
+#[test]
+fn patch_rejects_stale_source_without_mutating_it() {
+    let mut builder = WebPubBuilder::new(0x00);
+    builder.file_destination = "source.htm".to_string();
+    builder.title = "Source".to_string();
+    let snapshot = Snapshot::parse(builder.build()).expect("snapshot");
+    let mut transaction = snapshot.edit();
+    transaction.set_title("Changed").expect("edit");
+    let commit = transaction.commit().expect("commit");
+
+    let mut stale_bytes = snapshot.finish();
+    stale_bytes[16] ^= 1;
+    let stale = Snapshot::parse(stale_bytes).expect("stale snapshot");
+    let stale_before = stale.finish();
+    assert!(commit.patch().apply(&stale).is_err());
+    assert_eq!(stale.finish(), stale_before);
+}

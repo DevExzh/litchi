@@ -7,7 +7,7 @@ mod codec;
 mod commands;
 mod model;
 mod package;
-mod semantic;
+pub mod semantic;
 #[cfg(test)]
 mod tests;
 mod wire;
@@ -29,12 +29,10 @@ pub use package::{
     update_modern_comment_reply, update_modern_comment_reply_extensions,
     validate_modern_comment_author_references,
 };
-pub use semantic::{
-    ChangeMetadata, CommentChange, CommentChanges, ExtensionEntry, ExtensionList, ExtensionPayload,
-    MonikerKind, MonikerList, MonikerNode, OpaqueXml, Reaction, ReactionInstance, Reactions,
-    ReplyChange, ReplyChanges, TaskAction, TaskAnchor, TaskAssign, TaskDetails, TaskEvent,
-    TaskHistory, TaskSchedule, TaskTitle, TaskUndo, TaskUser,
-};
+pub use semantic::changes::{Change, Changes, Metadata};
+pub use semantic::extensions::{Entry, OpaqueXml, Payload};
+pub use semantic::reactions::{Instance, Reaction};
+pub use semantic::tasks::{Action, Assign, Details, Event, History, Schedule, Title, Undo, User};
 
 pub const MODERN_COMMENT_CONTENT_TYPE: &str = "application/vnd.ms-powerpoint.comments+xml";
 pub const MODERN_COMMENT_RELATIONSHIP_TYPE: &str =

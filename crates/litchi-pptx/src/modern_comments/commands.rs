@@ -1,7 +1,7 @@
 //! Package facade for typed `cmChg` descriptors in the existing Changes
 //! Information part. The surrounding document-change graph remains inert.
 
-use super::semantic::CommentChanges;
+use super::semantic::changes::Changes;
 use super::wire;
 use crate::{Error, Result};
 use litchi_opc::{OpcPackage, PackURI};
@@ -19,7 +19,7 @@ pub struct ChangeCommand {
     pub part_name: String,
     pub list_index: usize,
     pub descriptor_index: usize,
-    pub value: CommentChanges,
+    pub value: Changes,
 }
 
 /// Load every typed modern-comment command while leaving all other change XML

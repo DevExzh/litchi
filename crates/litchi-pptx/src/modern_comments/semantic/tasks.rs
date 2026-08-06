@@ -1,5 +1,5 @@
 use super::super::model::{NamespaceDeclaration, Progress};
-use super::OpaqueXml;
+use super::extensions::OpaqueXml;
 use crate::{Error, Result};
 use chrono::{DateTime, NaiveDateTime};
 use litchi_ooxml_common::custom_xml::valid_guid;
@@ -37,24 +37,24 @@ fn date_time(value: &str, label: &str) -> Result<()> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TaskUser {
+pub struct User {
     pub author_id: String,
 }
 
-impl TaskUser {
+impl User {
     pub fn validate(&self) -> Result<()> {
         guid(&self.author_id, "task author")
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TaskAnchor {
+pub struct Anchor {
     pub comment_id: String,
     pub extension_xml: Option<OpaqueXml>,
     pub namespace_declarations: Vec<NamespaceDeclaration>,
 }
 
-impl TaskAnchor {
+impl Anchor {
     pub fn validate(&self) -> Result<()> {
         guid(&self.comment_id, "task anchor")?;
         if let Some(value) = &self.extension_xml {
@@ -67,34 +67,34 @@ impl TaskAnchor {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TaskAssign {
+pub struct Assign {
     pub author_id: String,
 }
 
-impl TaskAssign {
+impl Assign {
     pub fn validate(&self) -> Result<()> {
         guid(&self.author_id, "assigned task author")
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TaskTitle {
+pub struct Title {
     pub value: String,
 }
 
-impl TaskTitle {
+impl Title {
     pub fn validate(&self) -> Result<()> {
         bounded(&self.value, "task title")
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TaskSchedule {
+pub struct Schedule {
     pub start_date: Option<String>,
     pub end_date: Option<String>,
 }
 
-impl TaskSchedule {
+impl Schedule {
     pub fn validate(&self) -> Result<()> {
         if let Some(value) = &self.start_date {
             date_time(value, "task start date")?;
@@ -107,11 +107,11 @@ impl TaskSchedule {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TaskUndo {
+pub struct Undo {
     pub event_id: String,
 }
 
-impl TaskUndo {
+impl Undo {
     pub fn validate(&self) -> Result<()> {
         guid(&self.event_id, "undone task event")
     }
@@ -120,18 +120,18 @@ impl TaskUndo {
 /// The schema's single task-history choice. `Unknown` retains future event
 /// records without assigning them behavior.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TaskAction {
-    Assign(TaskAssign),
+pub enum Action {
+    Assign(Assign),
     Add,
-    Title(TaskTitle),
-    Schedule(TaskSchedule),
+    Title(Title),
+    Schedule(Schedule),
     Progress(Progress),
     UnassignAll,
-    Undo(TaskUndo),
+    Undo(Undo),
     Unknown(OpaqueXml),
 }
 
-impl TaskAction {
+impl Action {
     pub fn validate(&self) -> Result<()> {
         match self {
             Self::Assign(value) => value.validate(),
@@ -147,17 +147,17 @@ impl TaskAction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TaskEvent {
+pub struct Event {
     pub time: String,
     pub id: String,
-    pub attributed_by: TaskUser,
-    pub anchor: Option<TaskAnchor>,
-    pub action: Option<TaskAction>,
+    pub attributed_by: User,
+    pub anchor: Option<Anchor>,
+    pub action: Option<Action>,
     pub extension_xml: Option<OpaqueXml>,
     pub namespace_declarations: Vec<NamespaceDeclaration>,
 }
 
-impl TaskEvent {
+impl Event {
     pub fn validate(&self) -> Result<()> {
         date_time(&self.time, "task history event")?;
         guid(&self.id, "task history event")?;
@@ -178,11 +178,11 @@ impl TaskEvent {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct TaskHistory {
-    pub events: Vec<TaskEvent>,
+pub struct History {
+    pub events: Vec<Event>,
 }
 
-impl TaskHistory {
+impl History {
     pub fn validate(&self) -> Result<()> {
         if self.events.len() > MAX_EVENTS {
             return Err(invalid("task history events exceed implementation limit"));
@@ -195,13 +195,13 @@ impl TaskHistory {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TaskDetails {
-    pub history: TaskHistory,
+pub struct Details {
+    pub history: History,
     pub extension_xml: Option<OpaqueXml>,
     pub namespace_declarations: Vec<NamespaceDeclaration>,
 }
 
-impl TaskDetails {
+impl Details {
     pub fn validate(&self) -> Result<()> {
         self.history.validate()?;
         if let Some(value) = &self.extension_xml {

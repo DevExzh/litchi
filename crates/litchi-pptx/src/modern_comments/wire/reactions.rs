@@ -1,4 +1,5 @@
-use super::super::semantic::{OpaqueXml, Reaction, ReactionInstance, Reactions};
+use super::super::semantic::extensions::OpaqueXml;
+use super::super::semantic::reactions::{Instance, List, Reaction};
 use super::super::{P, P223};
 use super::xml::{
     attr, attribute, close, no_attributes, only_attributes, open, scan, scan_with_context,
@@ -9,7 +10,7 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-pub(super) fn parse_reactions(xml: &[u8]) -> Result<Reactions> {
+pub(super) fn parse_reactions(xml: &[u8]) -> Result<List> {
     let scan = scan(xml, "reactions")?;
     if scan.root.namespace != P223 || scan.root.local != "reactions" {
         return Err(invalid("reactions root must be p223:reactions"));
@@ -22,7 +23,7 @@ pub(super) fn parse_reactions(xml: &[u8]) -> Result<Reactions> {
         }
         reactions.push(parse_reaction(child, &scan.namespaces)?);
     }
-    let value = Reactions {
+    let value = List {
         reactions,
         namespace_declarations: scan.namespaces,
     };
@@ -56,7 +57,7 @@ fn parse_reaction(
 fn parse_instance(
     fragment: &super::xml::Fragment,
     context: &[super::super::model::NamespaceDeclaration],
-) -> Result<ReactionInstance> {
+) -> Result<Instance> {
     only_attributes(
         &fragment.attributes,
         &["time", "authorId"],
@@ -77,7 +78,7 @@ fn parse_instance(
             return Err(invalid("unexpected reaction instance child"));
         }
     }
-    Ok(ReactionInstance {
+    Ok(Instance {
         time,
         author_id,
         extension_xml: extension,
@@ -85,7 +86,7 @@ fn parse_instance(
     })
 }
 
-pub(super) fn write_reactions(value: &Reactions) -> Result<Vec<u8>> {
+pub(super) fn write_reactions(value: &List) -> Result<Vec<u8>> {
     value.validate()?;
     let mut out = Vec::new();
     open(&mut out, "p223", "reactions");

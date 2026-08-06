@@ -1,6 +1,5 @@
-use super::super::semantic::{
-    ChangeMetadata, CommentChange, CommentChanges, OpaqueXml, ReplyChange, ReplyChanges,
-};
+use super::super::semantic::changes::{Change, Changes, Metadata, Replies, Reply};
+use super::super::semantic::extensions::OpaqueXml;
 use super::super::{A, AC, P, PC2, PC226};
 use super::monikers::{parse_monikers, write_monikers};
 use super::xml::{
@@ -14,7 +13,7 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-pub(super) fn parse_comment_changes(xml: &[u8]) -> Result<CommentChanges> {
+pub(super) fn parse_comment_changes(xml: &[u8]) -> Result<Changes> {
     let scan = scan(xml, "comment change")?;
     if scan.root.namespace != PC226 || scan.root.local != "cmChg" {
         return Err(invalid("comment change root must be pc226:cmChg"));
@@ -61,7 +60,7 @@ pub(super) fn parse_comment_changes(xml: &[u8]) -> Result<CommentChanges> {
             return Err(invalid("unexpected comment change child"));
         }
     }
-    let value = CommentChanges {
+    let value = Changes {
         changes,
         metadata,
         monikers: monikers.ok_or_else(|| invalid("comment change requires cmMkLst"))?,
@@ -73,7 +72,7 @@ pub(super) fn parse_comment_changes(xml: &[u8]) -> Result<CommentChanges> {
     Ok(value)
 }
 
-fn parse_reply_changes(fragment: &Fragment) -> Result<ReplyChanges> {
+fn parse_reply_changes(fragment: &Fragment) -> Result<Replies> {
     only_attributes(&fragment.attributes, &["chg"], "comment reply change")?;
     let changes = parse_reply_bits(attribute(&fragment.attributes, "chg", true)?.unwrap())?;
     let scan = scan(&fragment.xml, "comment reply change")?;
@@ -108,7 +107,7 @@ fn parse_reply_changes(fragment: &Fragment) -> Result<ReplyChanges> {
             return Err(invalid("unexpected comment reply change child"));
         }
     }
-    let value = ReplyChanges {
+    let value = Replies {
         changes,
         metadata,
         monikers: monikers.ok_or_else(|| invalid("reply change requires cmRplyMkLst"))?,
@@ -121,10 +120,10 @@ fn parse_reply_changes(fragment: &Fragment) -> Result<ReplyChanges> {
 
 // The schema has two distinct token lists. Keeping the parsers separate avoids
 // accepting a reply-only bit in a comment command or vice versa.
-fn parse_comment_bits(value: &str) -> Result<Vec<CommentChange>> {
+fn parse_comment_bits(value: &str) -> Result<Vec<Change>> {
     let mut output = Vec::new();
     for token in value.split_whitespace() {
-        let bit = CommentChange::parse(token)?;
+        let bit = Change::parse(token)?;
         if output.contains(&bit) {
             return Err(invalid("duplicate comment change bit"));
         }
@@ -136,10 +135,10 @@ fn parse_comment_bits(value: &str) -> Result<Vec<CommentChange>> {
     Ok(output)
 }
 
-fn parse_reply_bits(value: &str) -> Result<Vec<ReplyChange>> {
+fn parse_reply_bits(value: &str) -> Result<Vec<Reply>> {
     let mut output = Vec::new();
     for token in value.split_whitespace() {
-        let bit = ReplyChange::parse(token)?;
+        let bit = Reply::parse(token)?;
         if output.contains(&bit) {
             return Err(invalid("duplicate reply change bit"));
         }
@@ -151,8 +150,8 @@ fn parse_reply_bits(value: &str) -> Result<Vec<ReplyChange>> {
     Ok(output)
 }
 
-fn parse_metadata(fragment: &Fragment) -> Result<ChangeMetadata> {
-    let mut value = ChangeMetadata::default();
+fn parse_metadata(fragment: &Fragment) -> Result<Metadata> {
+    let mut value = Metadata::default();
     for (key, text) in &fragment.attributes {
         match key.as_str() {
             "name" => value.name = Some(text.clone()),
@@ -193,7 +192,7 @@ fn parse_metadata(fragment: &Fragment) -> Result<ChangeMetadata> {
     Ok(value)
 }
 
-pub(super) fn write_comment_changes(value: &CommentChanges) -> Result<Vec<u8>> {
+pub(super) fn write_comment_changes(value: &Changes) -> Result<Vec<u8>> {
     value.validate()?;
     let mut out = Vec::new();
     open(&mut out, "pc226", "cmChg");
@@ -226,7 +225,7 @@ pub(super) fn write_comment_changes(value: &CommentChanges) -> Result<Vec<u8>> {
     Ok(out)
 }
 
-fn write_reply_changes(out: &mut Vec<u8>, value: &ReplyChanges) -> Result<()> {
+fn write_reply_changes(out: &mut Vec<u8>, value: &Replies) -> Result<()> {
     open(out, "pc226", "cmRplyChg");
     attr(out, "chg", &reply_bits(&value.changes));
     out.push(b'>');
@@ -241,7 +240,7 @@ fn write_reply_changes(out: &mut Vec<u8>, value: &ReplyChanges) -> Result<()> {
     Ok(())
 }
 
-fn write_metadata(out: &mut Vec<u8>, value: &ChangeMetadata) {
+fn write_metadata(out: &mut Vec<u8>, value: &Metadata) {
     open(out, "ac", "chgData");
     for (name, text) in [
         ("name", value.name.as_deref()),
@@ -271,7 +270,7 @@ fn write_metadata(out: &mut Vec<u8>, value: &ChangeMetadata) {
     }
 }
 
-fn comment_bits(value: &[CommentChange]) -> String {
+fn comment_bits(value: &[Change]) -> String {
     value
         .iter()
         .map(|value| value.token())
@@ -279,7 +278,7 @@ fn comment_bits(value: &[CommentChange]) -> String {
         .join(" ")
 }
 
-fn reply_bits(value: &[ReplyChange]) -> String {
+fn reply_bits(value: &[Reply]) -> String {
     value
         .iter()
         .map(|value| value.token())
@@ -287,17 +286,14 @@ fn reply_bits(value: &[ReplyChange]) -> String {
         .join(" ")
 }
 
-pub(crate) fn collect_change_commands(xml: &[u8]) -> Result<Vec<CommentChanges>> {
+pub(crate) fn collect_change_commands(xml: &[u8]) -> Result<Vec<Changes>> {
     locate_commands(xml)?
         .into_iter()
         .map(|(_, _, value)| Ok(value))
         .collect()
 }
 
-pub(crate) fn replace_change_commands(
-    xml: &[u8],
-    replacements: &[CommentChanges],
-) -> Result<Vec<u8>> {
+pub(crate) fn replace_change_commands(xml: &[u8], replacements: &[Changes]) -> Result<Vec<u8>> {
     let locations = locate_commands(xml)?;
     if locations.len() != replacements.len() {
         return Err(invalid(
@@ -321,7 +317,7 @@ pub(crate) fn replace_change_commands(
     Ok(output)
 }
 
-fn locate_commands(xml: &[u8]) -> Result<Vec<(usize, usize, CommentChanges)>> {
+fn locate_commands(xml: &[u8]) -> Result<Vec<(usize, usize, Changes)>> {
     if xml.len() > super::super::MAX_BYTES {
         return Err(invalid("comment change descriptor is too large"));
     }

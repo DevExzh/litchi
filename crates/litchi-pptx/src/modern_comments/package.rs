@@ -1,7 +1,7 @@
 //! OPC graph lifecycle and transactional CRUD for modern comments.
 
 use super::model::{Author, AuthorPart, Authors, Comment, Graph, List, Part, Reply};
-use super::semantic::ExtensionList;
+use super::semantic::extensions::List as Extensions;
 use super::{
     MODERN_COMMENT_AUTHOR_CONTENT_TYPE, MODERN_COMMENT_AUTHOR_RELATIONSHIP_TYPE,
     MODERN_COMMENT_CONTENT_TYPE, MODERN_COMMENT_RELATIONSHIP_TYPE, SLIDE_CONTENT_TYPE,
@@ -458,7 +458,7 @@ mod comments {
         package: &OpcPackage,
         slide_part_name: &PackURI,
         comment_id: &str,
-    ) -> Result<Option<ExtensionList>> {
+    ) -> Result<Option<Extensions>> {
         find_modern_comment(package, slide_part_name, comment_id)?
             .map(|comment| comment.extensions())
             .transpose()
@@ -473,7 +473,7 @@ mod comments {
         update: F,
     ) -> Result<bool>
     where
-        F: FnOnce(&mut ExtensionList),
+        F: FnOnce(&mut Extensions),
     {
         let mut update = Some(update);
         let mut failure = None;
@@ -506,7 +506,7 @@ mod comments {
         slide_part_name: &PackURI,
         comment_id: &str,
         reply_id: &str,
-    ) -> Result<Option<ExtensionList>> {
+    ) -> Result<Option<Extensions>> {
         find_modern_comment_reply(package, slide_part_name, comment_id, reply_id)?
             .map(|reply| reply.extensions())
             .transpose()
@@ -521,7 +521,7 @@ mod comments {
         update: F,
     ) -> Result<bool>
     where
-        F: FnOnce(&mut ExtensionList),
+        F: FnOnce(&mut Extensions),
     {
         let mut update = Some(update);
         let mut failure = None;

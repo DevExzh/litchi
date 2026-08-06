@@ -1,4 +1,4 @@
-use super::super::semantic::{ExtensionEntry, ExtensionList, ExtensionPayload, OpaqueXml};
+use super::super::semantic::extensions::{Entry, List, OpaqueXml, Payload};
 use super::super::{P, P188, P223, P228};
 use super::reactions::{parse_reactions, write_reactions};
 use super::tasks::{parse_task_details, write_task_details};
@@ -11,9 +11,9 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-pub(crate) fn parse_extensions(xml: Option<&[u8]>) -> Result<ExtensionList> {
+pub(crate) fn parse_extensions(xml: Option<&[u8]>) -> Result<List> {
     let Some(xml) = xml else {
-        return Ok(ExtensionList::default());
+        return Ok(List::default());
     };
     let root_scan = scan(xml, "modern comment extension list")?;
     if root_scan.root.namespace != P188 || root_scan.root.local != "extLst" {
@@ -39,19 +39,19 @@ pub(crate) fn parse_extensions(xml: Option<&[u8]>) -> Result<ExtensionList> {
             let payload = &payloads[0];
             if payload.namespace == P228 && payload.local == "taskDetails" {
                 let xml = scan_with_context(&payload.xml, "task details", &root_scan.namespaces)?;
-                ExtensionPayload::TaskDetails(parse_task_details(&xml.root.xml)?)
+                Payload::TaskDetails(parse_task_details(&xml.root.xml)?)
             } else if payload.namespace == P223 && payload.local == "reactions" {
                 let xml = scan_with_context(&payload.xml, "reactions", &root_scan.namespaces)?;
-                ExtensionPayload::Reactions(parse_reactions(&xml.root.xml)?)
+                Payload::Reactions(parse_reactions(&xml.root.xml)?)
             } else {
-                ExtensionPayload::Opaque(OpaqueXml::new(child.xml.clone())?)
+                Payload::Opaque(OpaqueXml::new(child.xml.clone())?)
             }
         } else {
-            ExtensionPayload::Opaque(OpaqueXml::new(child.xml.clone())?)
+            Payload::Opaque(OpaqueXml::new(child.xml.clone())?)
         };
-        entries.push(ExtensionEntry { uri, payload });
+        entries.push(Entry { uri, payload });
     }
-    let value = ExtensionList {
+    let value = List {
         root_prefix: String::new(),
         namespace_declarations: root_scan.namespaces,
         entries,
@@ -60,7 +60,7 @@ pub(crate) fn parse_extensions(xml: Option<&[u8]>) -> Result<ExtensionList> {
     Ok(value)
 }
 
-pub(crate) fn write_extensions(value: &ExtensionList) -> Result<Option<Vec<u8>>> {
+pub(crate) fn write_extensions(value: &List) -> Result<Option<Vec<u8>>> {
     value.validate()?;
     if value.entries.is_empty() {
         return Ok(None);
@@ -87,15 +87,15 @@ pub(crate) fn write_extensions(value: &ExtensionList) -> Result<Option<Vec<u8>>>
     out.push(b'>');
     for entry in &value.entries {
         match &entry.payload {
-            ExtensionPayload::Opaque(raw) => out.extend_from_slice(raw.as_bytes()),
-            ExtensionPayload::TaskDetails(task) => {
+            Payload::Opaque(raw) => out.extend_from_slice(raw.as_bytes()),
+            Payload::TaskDetails(task) => {
                 open(&mut out, "p", "ext");
                 attr(&mut out, "uri", &entry.uri);
                 out.push(b'>');
                 out.extend_from_slice(&write_task_details(task)?);
                 close(&mut out, "p", "ext");
             },
-            ExtensionPayload::Reactions(reactions) => {
+            Payload::Reactions(reactions) => {
                 open(&mut out, "p", "ext");
                 attr(&mut out, "uri", &entry.uri);
                 out.push(b'>');

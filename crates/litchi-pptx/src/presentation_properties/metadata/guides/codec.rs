@@ -4,6 +4,8 @@ use super::model::*;
 use crate::{Error, Result};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
 use quick_xml::{Reader, XmlVersion};
 use std::collections::HashSet;
 use std::fmt::Write;
@@ -15,7 +17,7 @@ const AS: &str = "http://purl.oclc.org/ooxml/drawingml/main";
 const P15: &str = "http://schemas.microsoft.com/office/powerpoint/2012/main";
 const SLIDE_GUIDES_URI: &str = "{EFAFB233-063F-42B5-8137-9DF3F51BA10A}";
 const NOTES_GUIDES_URI: &str = "{2D200454-40CA-4A62-9FC3-DE9A4176ACB9}";
-const MAX_BYTES: usize = 8 * 1024 * 1024;
+pub(crate) const MAX_BYTES: usize = 8 * 1024 * 1024;
 const MAX_DEPTH: usize = 128;
 const MAX_NODES: usize = 100_000;
 const MAX_GUIDES: usize = 16_384;
@@ -55,6 +57,433 @@ impl Guides {
         }
         Ok(xml)
     }
+}
+
+/// Validate a programmatically staged guide value before package publication.
+pub(crate) fn validate_value(value: &Guides) -> Result<()> {
+    validate(value)
+}
+
+/// Replace only the known guide extension entries in one presentation source.
+///
+/// The source is preprocessed through the shared MCE baseline before a changed
+/// edit is written. The no-op transaction path deliberately skips this helper,
+/// so an untouched source is returned byte-for-byte unchanged.
+pub(crate) fn rewrite_source(source: &[u8], value: &Guides) -> Result<Vec<u8>> {
+    if source.len() > MAX_BYTES {
+        return Err(invalid("presentation guides exceed 8 MiB"));
+    }
+    validate(value)?;
+    let processed = litchi_ooxml_common::mce::process_ooxml(source)?;
+    if processed.len() > MAX_BYTES {
+        return Err(invalid("processed presentation guides exceed 8 MiB"));
+    }
+    let source = processed.as_ref();
+    let layout = scan_source(source)?;
+    let entries = target_entries(value, layout.strict, layout.presentation_namespace)?;
+
+    let Some(ext_list) = layout.ext_list.as_ref() else {
+        if entries.iter().all(Option::is_none) {
+            return Ok(source.to_vec());
+        }
+        let fragment = format!(
+            "<p:extLst xmlns:p=\"{}\">{}</p:extLst>",
+            layout.presentation_namespace,
+            entries
+                .iter()
+                .filter_map(Option::as_deref)
+                .collect::<String>()
+        );
+        return if layout.root.empty {
+            let replacement = expand_empty(source, &layout.root, &fragment)?;
+            replace_spans(source, &[(layout.root.start, layout.root.end, replacement)])
+        } else {
+            let root_close = layout
+                .root_close
+                .ok_or_else(|| invalid("presentation root is missing its end tag"))?;
+            insert_bytes(source, root_close, fragment.as_bytes())
+        };
+    };
+
+    let mut replacements = Vec::new();
+    for (index, _) in [Target::Slide, Target::Notes].into_iter().enumerate() {
+        let replacement = entries[index].as_deref().unwrap_or_default().as_bytes();
+        if let Some(span) = layout.targets[index].as_ref() {
+            replacements.push((span.start, span.end, replacement.to_vec()));
+        } else if !replacement.is_empty() {
+            if ext_list.empty {
+                let body = entries
+                    .iter()
+                    .filter_map(|entry| entry.as_deref())
+                    .collect::<String>();
+                let replacement = expand_empty_bytes(source, ext_list, body.as_bytes())?;
+                return replace_spans(source, &[(ext_list.start, ext_list.end, replacement)]);
+            }
+            replacements.push((
+                ext_list.close_start,
+                ext_list.close_start,
+                replacement.to_vec(),
+            ));
+        }
+    }
+    replace_spans(source, &replacements)
+}
+
+#[derive(Clone, Copy)]
+enum Target {
+    Slide,
+    Notes,
+}
+
+#[derive(Clone)]
+struct SourceSpan {
+    start: usize,
+    end: usize,
+    close_start: usize,
+    empty: bool,
+    qname: String,
+}
+
+struct SourceFrame {
+    start: usize,
+    local: String,
+    qname: String,
+    ext_list: bool,
+    target: Option<Target>,
+}
+
+struct SourceLayout {
+    root: SourceSpan,
+    root_close: Option<usize>,
+    ext_list: Option<SourceSpan>,
+    targets: [Option<SourceSpan>; 2],
+    presentation_namespace: &'static str,
+    strict: bool,
+}
+
+fn scan_source(source: &[u8]) -> Result<SourceLayout> {
+    let mut reader = NsReader::from_reader(source);
+    let mut stack: Vec<SourceFrame> = Vec::new();
+    let mut root = None;
+    let mut root_close = None;
+    let mut ext_list = None;
+    let mut targets = [None, None];
+    let mut root_namespace = None;
+    let mut nodes = 0usize;
+
+    loop {
+        let start = usize::try_from(reader.buffer_position())
+            .map_err(|_| invalid("presentation-guide XML offset overflow"))?;
+        let decoder = reader.decoder();
+        let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
+        match event {
+            Event::Start(element) => {
+                nodes += 1;
+                if nodes > MAX_NODES || stack.len() >= MAX_DEPTH {
+                    return Err(invalid("presentation-guide XML resource limit exceeded"));
+                }
+                let local = local_name(element.local_name().as_ref())?;
+                let qname = std::str::from_utf8(element.name().as_ref())
+                    .map_err(xml_error)?
+                    .to_owned();
+                let is_presentation = presentation_namespace(&namespace).is_some();
+                if stack.is_empty() {
+                    if root.is_some() || !is_presentation || local != "presentation" {
+                        return Err(invalid("expected one PresentationML presentation root"));
+                    }
+                    root_namespace = presentation_namespace(&namespace);
+                }
+                let is_ext_list = stack.len() == 1 && is_presentation && local == "extLst";
+                if is_ext_list && ext_list.is_some() {
+                    return Err(invalid("duplicate presentation extLst"));
+                }
+                let target = if stack.last().is_some_and(|frame| frame.ext_list)
+                    && is_presentation
+                    && local == "ext"
+                {
+                    target_from_uri(element_uri(&element, decoder)?)
+                } else {
+                    None
+                };
+                stack.push(SourceFrame {
+                    start,
+                    local,
+                    qname,
+                    ext_list: is_ext_list,
+                    target,
+                });
+            },
+            Event::Empty(element) => {
+                nodes += 1;
+                if nodes > MAX_NODES {
+                    return Err(invalid("presentation-guide XML node limit exceeded"));
+                }
+                let local = local_name(element.local_name().as_ref())?;
+                let qname = std::str::from_utf8(element.name().as_ref())
+                    .map_err(xml_error)?
+                    .to_owned();
+                let is_presentation = presentation_namespace(&namespace).is_some();
+                if stack.is_empty() {
+                    if root.is_some() || !is_presentation || local != "presentation" {
+                        return Err(invalid("expected one PresentationML presentation root"));
+                    }
+                    root_namespace = presentation_namespace(&namespace);
+                    root = Some(SourceSpan {
+                        start,
+                        end: reader.buffer_position() as usize,
+                        close_start: start,
+                        empty: true,
+                        qname,
+                    });
+                } else if stack.len() == 1 && is_presentation && local == "extLst" {
+                    if ext_list.is_some() {
+                        return Err(invalid("duplicate presentation extLst"));
+                    }
+                    ext_list = Some(SourceSpan {
+                        start,
+                        end: reader.buffer_position() as usize,
+                        close_start: start,
+                        empty: true,
+                        qname,
+                    });
+                } else if stack.len() == 2
+                    && stack.last().is_some_and(|frame| frame.ext_list)
+                    && is_presentation
+                    && local == "ext"
+                    && let Some(target) = target_from_uri(element_uri(&element, decoder)?)
+                {
+                    let index = target_index(target);
+                    if targets[index].is_some() {
+                        return Err(invalid("duplicate extended-guide extension"));
+                    }
+                    targets[index] = Some(SourceSpan {
+                        start,
+                        end: reader.buffer_position() as usize,
+                        close_start: start,
+                        empty: true,
+                        qname,
+                    });
+                }
+            },
+            Event::End(element) => {
+                let frame = stack
+                    .pop()
+                    .ok_or_else(|| invalid("unexpected presentation-guide closing element"))?;
+                let local = local_name(element.local_name().as_ref())?;
+                if frame.local != local {
+                    return Err(invalid("mismatched presentation-guide closing element"));
+                }
+                let end = usize::try_from(reader.buffer_position())
+                    .map_err(|_| invalid("presentation-guide XML offset overflow"))?;
+                let span = SourceSpan {
+                    start: frame.start,
+                    end,
+                    close_start: start,
+                    empty: false,
+                    qname: frame.qname,
+                };
+                if stack.is_empty() {
+                    if root.is_some() {
+                        return Err(invalid("multiple PresentationML presentation roots"));
+                    }
+                    root_close = Some(start);
+                    root = Some(span);
+                } else if frame.ext_list {
+                    if ext_list.is_some() {
+                        return Err(invalid("duplicate presentation extLst"));
+                    }
+                    ext_list = Some(span);
+                } else if let Some(target) = frame.target {
+                    let index = target_index(target);
+                    if targets[index].is_some() {
+                        return Err(invalid("duplicate extended-guide extension"));
+                    }
+                    targets[index] = Some(span);
+                }
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid("DTDs and processing instructions are rejected"));
+            },
+            Event::Eof => break,
+            Event::Decl(_) | Event::Text(_) | Event::CData(_) | Event::Comment(_) => {},
+            Event::GeneralRef(_) => {},
+        }
+    }
+    if !stack.is_empty() {
+        return Err(invalid("unterminated presentation-guide XML"));
+    }
+    let root = root.ok_or_else(|| invalid("missing presentation root"))?;
+    let presentation_namespace =
+        root_namespace.ok_or_else(|| invalid("missing PresentationML presentation namespace"))?;
+    Ok(SourceLayout {
+        strict: presentation_namespace == PS,
+        root,
+        root_close,
+        ext_list,
+        targets,
+        presentation_namespace,
+    })
+}
+
+fn local_name(name: &[u8]) -> Result<String> {
+    let name = std::str::from_utf8(name).map_err(xml_error)?;
+    Ok(name
+        .rsplit_once(':')
+        .map_or(name, |(_, local)| local)
+        .to_owned())
+}
+
+fn presentation_namespace(namespace: &ResolveResult<'_>) -> Option<&'static str> {
+    match namespace {
+        ResolveResult::Bound(Namespace(value)) if *value == P.as_bytes() => Some(P),
+        ResolveResult::Bound(Namespace(value)) if *value == PS.as_bytes() => Some(PS),
+        _ => None,
+    }
+}
+
+fn element_uri(element: &BytesStart<'_>, decoder: Decoder) -> Result<Option<String>> {
+    let mut value = None;
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(xml_error)?;
+        if attribute.key.as_ref() == b"uri" {
+            if value.is_some() {
+                return Err(invalid("duplicate presentation-guide extension URI"));
+            }
+            value = Some(
+                attribute
+                    .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+                    .map_err(xml_error)?
+                    .into_owned(),
+            );
+        }
+    }
+    Ok(value)
+}
+
+fn target_from_uri(uri: Option<String>) -> Option<Target> {
+    match uri.as_deref() {
+        Some(SLIDE_GUIDES_URI) => Some(Target::Slide),
+        Some(NOTES_GUIDES_URI) => Some(Target::Notes),
+        _ => None,
+    }
+}
+
+fn target_index(target: Target) -> usize {
+    match target {
+        Target::Slide => 0,
+        Target::Notes => 1,
+    }
+}
+
+fn target_entries(
+    value: &Guides,
+    strict: bool,
+    presentation_namespace: &str,
+) -> Result<[Option<String>; 2]> {
+    Ok([
+        value
+            .slide
+            .as_ref()
+            .map(|list| {
+                extension_xml(
+                    SLIDE_GUIDES_URI,
+                    "sldGuideLst",
+                    list,
+                    strict,
+                    presentation_namespace,
+                )
+            })
+            .transpose()?,
+        value
+            .notes
+            .as_ref()
+            .map(|list| {
+                extension_xml(
+                    NOTES_GUIDES_URI,
+                    "notesGuideLst",
+                    list,
+                    strict,
+                    presentation_namespace,
+                )
+            })
+            .transpose()?,
+    ])
+}
+
+fn extension_xml(
+    uri: &str,
+    local: &str,
+    list: &List,
+    strict: bool,
+    presentation_namespace: &str,
+) -> Result<String> {
+    let mut xml = String::new();
+    write_list_extension(&mut xml, uri, local, list, strict)?;
+    let declaration = format!("<p:ext xmlns:p=\"{presentation_namespace}\" ");
+    Ok(xml.replacen("<p:ext ", &declaration, 1))
+}
+
+fn expand_empty(source: &[u8], span: &SourceSpan, body: &str) -> Result<Vec<u8>> {
+    let replacement = expand_empty_bytes(source, span, body.as_bytes())?;
+    Ok(replacement)
+}
+
+fn expand_empty_bytes(source: &[u8], span: &SourceSpan, body: &[u8]) -> Result<Vec<u8>> {
+    let token = source[span.start..span.end].trim_ascii_end();
+    let open = token
+        .strip_suffix(b"/>")
+        .ok_or_else(|| invalid("presentation-guide empty element has no self-close"))?;
+    let mut replacement = Vec::with_capacity(
+        open.len()
+            .saturating_add(1)
+            .saturating_add(body.len())
+            .saturating_add(span.qname.len())
+            .saturating_add(3),
+    );
+    replacement.extend_from_slice(open);
+    replacement.push(b'>');
+    replacement.extend_from_slice(body);
+    replacement.extend_from_slice(b"</");
+    replacement.extend_from_slice(span.qname.as_bytes());
+    replacement.push(b'>');
+    if replacement.len() > MAX_BYTES {
+        return Err(invalid("patched presentation guides exceed 8 MiB"));
+    }
+    Ok(replacement)
+}
+
+fn replace_spans(source: &[u8], spans: &[(usize, usize, Vec<u8>)]) -> Result<Vec<u8>> {
+    let mut ordered = spans.to_vec();
+    ordered.sort_by_key(|(start, _, _)| *start);
+    for pair in ordered.windows(2) {
+        if pair[0].1 > pair[1].0 {
+            return Err(invalid("overlapping presentation-guide patch ranges"));
+        }
+    }
+    let mut output = source.to_vec();
+    for (start, end, replacement) in ordered.iter().rev() {
+        output.splice(*start..*end, replacement.iter().copied());
+    }
+    if output.len() > MAX_BYTES {
+        return Err(invalid("patched presentation guides exceed 8 MiB"));
+    }
+    Ok(output)
+}
+
+fn insert_bytes(source: &[u8], offset: usize, replacement: &[u8]) -> Result<Vec<u8>> {
+    if offset > source.len() {
+        return Err(invalid(
+            "presentation-guide insertion offset is out of bounds",
+        ));
+    }
+    let mut output = Vec::with_capacity(source.len().saturating_add(replacement.len()));
+    output.extend_from_slice(&source[..offset]);
+    output.extend_from_slice(replacement);
+    output.extend_from_slice(&source[offset..]);
+    if output.len() > MAX_BYTES {
+        return Err(invalid("patched presentation guides exceed 8 MiB"));
+    }
+    Ok(output)
 }
 
 #[derive(Clone)]

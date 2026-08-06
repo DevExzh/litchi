@@ -270,29 +270,29 @@ pub struct Graph {
 impl Comment {
     /// Decode the inert `p188:extLst` envelope into its typed known payloads
     /// and preserved unknown entries.
-    pub fn extensions(&self) -> Result<super::semantic::ExtensionList> {
+    pub fn extensions(&self) -> Result<super::semantic::extensions::List> {
         super::wire::parse_extensions(self.extension_xml.as_deref())
     }
 
     /// Replace the extension envelope atomically after validating every typed
     /// payload. Empty lists remove the optional XML element.
-    pub fn set_extensions(&mut self, value: super::semantic::ExtensionList) -> Result<()> {
+    pub fn set_extensions(&mut self, value: super::semantic::extensions::List) -> Result<()> {
         self.extension_xml = super::wire::write_extensions(&value)?;
         Ok(())
     }
 
-    pub fn task_details(&self) -> Result<Option<super::semantic::TaskDetails>> {
+    pub fn task_details(&self) -> Result<Option<super::semantic::tasks::Details>> {
         Ok(self.extensions()?.task_details().cloned())
     }
 
-    pub fn reactions(&self) -> Result<Option<super::semantic::Reactions>> {
+    pub fn reactions(&self) -> Result<Option<super::semantic::reactions::List>> {
         Ok(self.extensions()?.reactions().cloned())
     }
 
     pub fn replace_task_details(
         &mut self,
         uri: Option<&str>,
-        value: Option<super::semantic::TaskDetails>,
+        value: Option<super::semantic::tasks::Details>,
     ) -> Result<()> {
         let mut extensions = self.extensions()?;
         extensions.replace_task_details(uri, value)?;
@@ -302,7 +302,7 @@ impl Comment {
     pub fn replace_reactions(
         &mut self,
         uri: Option<&str>,
-        value: Option<super::semantic::Reactions>,
+        value: Option<super::semantic::reactions::List>,
     ) -> Result<()> {
         let mut extensions = self.extensions()?;
         extensions.replace_reactions(uri, value)?;
@@ -311,23 +311,23 @@ impl Comment {
 }
 
 impl Reply {
-    pub fn extensions(&self) -> Result<super::semantic::ExtensionList> {
+    pub fn extensions(&self) -> Result<super::semantic::extensions::List> {
         super::wire::parse_extensions(self.extension_xml.as_deref())
     }
 
-    pub fn set_extensions(&mut self, value: super::semantic::ExtensionList) -> Result<()> {
+    pub fn set_extensions(&mut self, value: super::semantic::extensions::List) -> Result<()> {
         self.extension_xml = super::wire::write_extensions(&value)?;
         Ok(())
     }
 
-    pub fn reactions(&self) -> Result<Option<super::semantic::Reactions>> {
+    pub fn reactions(&self) -> Result<Option<super::semantic::reactions::List>> {
         Ok(self.extensions()?.reactions().cloned())
     }
 
     pub fn replace_reactions(
         &mut self,
         uri: Option<&str>,
-        value: Option<super::semantic::Reactions>,
+        value: Option<super::semantic::reactions::List>,
     ) -> Result<()> {
         let mut extensions = self.extensions()?;
         extensions.replace_reactions(uri, value)?;

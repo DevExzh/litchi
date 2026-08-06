@@ -1,6 +1,6 @@
-use super::super::semantic::{
-    OpaqueXml, TaskAction, TaskAnchor, TaskAssign, TaskDetails, TaskEvent, TaskHistory,
-    TaskSchedule, TaskTitle, TaskUndo, TaskUser,
+use super::super::semantic::extensions::OpaqueXml;
+use super::super::semantic::tasks::{
+    Action, Anchor, Assign, Details, Event, History, Schedule, Title, Undo, User,
 };
 use super::super::{P, P228};
 use super::xml::scan_with_context;
@@ -12,7 +12,7 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-pub(super) fn parse_task_details(xml: &[u8]) -> Result<TaskDetails> {
+pub(super) fn parse_task_details(xml: &[u8]) -> Result<Details> {
     let scan = scan(xml, "task details")?;
     if scan.root.namespace != P228 || scan.root.local != "taskDetails" {
         return Err(invalid("task details root must be p228:taskDetails"));
@@ -31,7 +31,7 @@ pub(super) fn parse_task_details(xml: &[u8]) -> Result<TaskDetails> {
             _ => return Err(invalid("unexpected task details child")),
         }
     }
-    let value = TaskDetails {
+    let value = Details {
         history: history.ok_or_else(|| invalid("task details requires history"))?,
         extension_xml: extension,
         namespace_declarations: scan.namespaces,
@@ -43,7 +43,7 @@ pub(super) fn parse_task_details(xml: &[u8]) -> Result<TaskDetails> {
 fn parse_history(
     xml: &[u8],
     context: &[super::super::model::NamespaceDeclaration],
-) -> Result<TaskHistory> {
+) -> Result<History> {
     let scan = scan_with_context(xml, "task history", context)?;
     if scan.root.namespace != P228 || scan.root.local != "history" {
         return Err(invalid("task history root must be p228:history"));
@@ -56,7 +56,7 @@ fn parse_history(
         }
         events.push(parse_event(child, &scan.namespaces)?);
     }
-    let value = TaskHistory { events };
+    let value = History { events };
     value.validate()?;
     Ok(value)
 }
@@ -64,7 +64,7 @@ fn parse_history(
 fn parse_event(
     fragment: &Fragment,
     context: &[super::super::model::NamespaceDeclaration],
-) -> Result<TaskEvent> {
+) -> Result<Event> {
     only_attributes(&fragment.attributes, &["time", "id"], "task history event")?;
     let time = attribute(&fragment.attributes, "time", true)?
         .unwrap()
@@ -107,7 +107,7 @@ fn parse_event(
             return Err(invalid("unexpected task history event child"));
         }
     }
-    let value = TaskEvent {
+    let value = Event {
         time,
         id,
         attributed_by: attributed_by.ok_or_else(|| invalid("task event requires atrbtn"))?,
@@ -120,18 +120,18 @@ fn parse_event(
     Ok(value)
 }
 
-fn parse_user(fragment: &Fragment) -> Result<TaskUser> {
+fn parse_user(fragment: &Fragment) -> Result<User> {
     only_attributes(&fragment.attributes, &["authorId"], "task user")?;
     let author_id = attribute(&fragment.attributes, "authorId", true)?
         .unwrap()
         .to_owned();
-    Ok(TaskUser { author_id })
+    Ok(User { author_id })
 }
 
 fn parse_anchor(
     fragment: &Fragment,
     context: &[super::super::model::NamespaceDeclaration],
-) -> Result<TaskAnchor> {
+) -> Result<Anchor> {
     only_attributes(&fragment.attributes, &[], "task anchor")?;
     no_attributes(&fragment.attributes, "task anchor")?;
     let scan = scan_with_context(&fragment.xml, "task anchor", context)?;
@@ -155,18 +155,18 @@ fn parse_anchor(
             _ => return Err(invalid("unexpected task anchor child")),
         }
     }
-    Ok(TaskAnchor {
+    Ok(Anchor {
         comment_id: comment_id.ok_or_else(|| invalid("task anchor requires comment"))?,
         extension_xml: extension,
         namespace_declarations: context.to_vec(),
     })
 }
 
-fn parse_action(fragment: &Fragment) -> Result<TaskAction> {
+fn parse_action(fragment: &Fragment) -> Result<Action> {
     match fragment.local.as_str() {
         "asgn" => {
             only_attributes(&fragment.attributes, &["authorId"], "task assignment")?;
-            Ok(TaskAction::Assign(TaskAssign {
+            Ok(Action::Assign(Assign {
                 author_id: attribute(&fragment.attributes, "authorId", true)?
                     .unwrap()
                     .to_owned(),
@@ -174,11 +174,11 @@ fn parse_action(fragment: &Fragment) -> Result<TaskAction> {
         },
         "add" => {
             no_attributes(&fragment.attributes, "task add")?;
-            Ok(TaskAction::Add)
+            Ok(Action::Add)
         },
         "title" => {
             only_attributes(&fragment.attributes, &["val"], "task title")?;
-            Ok(TaskAction::Title(TaskTitle {
+            Ok(Action::Title(Title {
                 value: attribute(&fragment.attributes, "val", true)?
                     .unwrap()
                     .to_owned(),
@@ -186,7 +186,7 @@ fn parse_action(fragment: &Fragment) -> Result<TaskAction> {
         },
         "date" => {
             only_attributes(&fragment.attributes, &["stDt", "endDt"], "task schedule")?;
-            Ok(TaskAction::Schedule(TaskSchedule {
+            Ok(Action::Schedule(Schedule {
                 start_date: attribute(&fragment.attributes, "stDt", false)?.map(str::to_owned),
                 end_date: attribute(&fragment.attributes, "endDt", false)?.map(str::to_owned),
             }))
@@ -194,17 +194,17 @@ fn parse_action(fragment: &Fragment) -> Result<TaskAction> {
         "pcntCmplt" => {
             only_attributes(&fragment.attributes, &["val"], "task progress")?;
             let value = attribute(&fragment.attributes, "val", true)?.unwrap();
-            Ok(TaskAction::Progress(
-                super::super::model::Progress::from_str(value)?,
-            ))
+            Ok(Action::Progress(super::super::model::Progress::from_str(
+                value,
+            )?))
         },
         "unasgnAll" => {
             no_attributes(&fragment.attributes, "task unassign-all")?;
-            Ok(TaskAction::UnassignAll)
+            Ok(Action::UnassignAll)
         },
         "undo" => {
             only_attributes(&fragment.attributes, &["id"], "task undo")?;
-            Ok(TaskAction::Undo(TaskUndo {
+            Ok(Action::Undo(Undo {
                 event_id: attribute(&fragment.attributes, "id", true)?
                     .unwrap()
                     .to_owned(),
@@ -212,13 +212,13 @@ fn parse_action(fragment: &Fragment) -> Result<TaskAction> {
         },
         "unknown" => {
             no_attributes(&fragment.attributes, "unknown task event")?;
-            Ok(TaskAction::Unknown(OpaqueXml::new(fragment.xml.clone())?))
+            Ok(Action::Unknown(OpaqueXml::new(fragment.xml.clone())?))
         },
-        _ => Ok(TaskAction::Unknown(OpaqueXml::new(fragment.xml.clone())?)),
+        _ => Ok(Action::Unknown(OpaqueXml::new(fragment.xml.clone())?)),
     }
 }
 
-pub(super) fn write_task_details(value: &TaskDetails) -> Result<Vec<u8>> {
+pub(super) fn write_task_details(value: &Details) -> Result<Vec<u8>> {
     value.validate()?;
     let mut out = Vec::new();
     open(&mut out, "p228", "taskDetails");
@@ -246,7 +246,7 @@ pub(super) fn write_task_details(value: &TaskDetails) -> Result<Vec<u8>> {
     Ok(out)
 }
 
-fn write_history(out: &mut Vec<u8>, value: &TaskHistory) {
+fn write_history(out: &mut Vec<u8>, value: &History) {
     open(out, "p228", "history");
     if value.events.is_empty() {
         out.extend_from_slice(b"/>");
@@ -259,7 +259,7 @@ fn write_history(out: &mut Vec<u8>, value: &TaskHistory) {
     close(out, "p228", "history");
 }
 
-fn write_event(out: &mut Vec<u8>, value: &TaskEvent) {
+fn write_event(out: &mut Vec<u8>, value: &Event) {
     open(out, "p228", "event");
     attr(out, "time", &value.time);
     attr(out, "id", &value.id);
@@ -283,7 +283,7 @@ fn write_user(out: &mut Vec<u8>, local: &str, author_id: &str) {
     out.extend_from_slice(b"/>");
 }
 
-fn write_anchor(out: &mut Vec<u8>, value: &TaskAnchor) {
+fn write_anchor(out: &mut Vec<u8>, value: &Anchor) {
     open(out, "p228", "anchr");
     out.push(b'>');
     open(out, "p228", "comment");
@@ -295,16 +295,16 @@ fn write_anchor(out: &mut Vec<u8>, value: &TaskAnchor) {
     close(out, "p228", "anchr");
 }
 
-fn write_action(out: &mut Vec<u8>, value: &TaskAction) {
+fn write_action(out: &mut Vec<u8>, value: &Action) {
     match value {
-        TaskAction::Assign(value) => write_user(out, "asgn", &value.author_id),
-        TaskAction::Add => empty(out, "add"),
-        TaskAction::Title(value) => {
+        Action::Assign(value) => write_user(out, "asgn", &value.author_id),
+        Action::Add => empty(out, "add"),
+        Action::Title(value) => {
             open(out, "p228", "title");
             attr(out, "val", &value.value);
             out.extend_from_slice(b"/>");
         },
-        TaskAction::Schedule(value) => {
+        Action::Schedule(value) => {
             open(out, "p228", "date");
             if let Some(date) = &value.start_date {
                 attr(out, "stDt", date);
@@ -314,18 +314,18 @@ fn write_action(out: &mut Vec<u8>, value: &TaskAction) {
             }
             out.extend_from_slice(b"/>");
         },
-        TaskAction::Progress(value) => {
+        Action::Progress(value) => {
             open(out, "p228", "pcntCmplt");
             attr(out, "val", &value.thousandths().to_string());
             out.extend_from_slice(b"/>");
         },
-        TaskAction::UnassignAll => empty(out, "unasgnAll"),
-        TaskAction::Undo(value) => {
+        Action::UnassignAll => empty(out, "unasgnAll"),
+        Action::Undo(value) => {
             open(out, "p228", "undo");
             attr(out, "id", &value.event_id);
             out.extend_from_slice(b"/>");
         },
-        TaskAction::Unknown(value) => out.extend_from_slice(value.as_bytes()),
+        Action::Unknown(value) => out.extend_from_slice(value.as_bytes()),
     }
 }
 

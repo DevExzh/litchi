@@ -1,5 +1,7 @@
 //! BIFF8 `WebPub` payload codec (MS-XLS 2.4.344).
 
+use std::ops::Range;
+
 use crate::{Error, Result};
 
 use super::model::{WebPageType, WebPub, WebPubRange, WebSourceType};
@@ -15,6 +17,22 @@ const MAX_WEB_PUB_STRING_CHARS: usize = 255;
 
 /// `fHighByte` bit of a BIFF8 string option byte.
 const HIGH_BYTE: u8 = 0x01;
+
+/// Wire spans for the fields owned by the semantic `WebPub` model.
+///
+/// Keeping these spans beside the parsed value lets the edit layer replace a
+/// single owned field without normalizing producer-specific string options,
+/// reserved bytes, or trailing padding.
+#[derive(Debug, Clone)]
+pub(super) struct WebPubLayout {
+    source_name: Option<Range<usize>>,
+    file_destination: Range<usize>,
+    div_id: Range<usize>,
+    title: Range<usize>,
+    chart_shape_id: Option<Range<usize>>,
+    reserved: Range<usize>,
+    trailing_unused: Range<usize>,
+}
 
 fn read_u16(data: &[u8], offset: usize) -> u16 {
     u16::from_le_bytes([data[offset], data[offset + 1]])
@@ -32,6 +50,11 @@ fn read_u32(data: &[u8], offset: usize) -> u32 {
 impl WebPub {
     /// Parse a `WebPub` record payload.
     pub fn parse(data: &[u8]) -> Result<Self> {
+        Self::parse_with_layout(data).map(|(value, _)| value)
+    }
+
+    /// Parse a `WebPub` payload and retain the owned/opaque wire spans.
+    pub(super) fn parse_with_layout(data: &[u8]) -> Result<(Self, WebPubLayout)> {
         if data.len() < FIXED_LEN + TRAILING_UNUSED_LEN {
             return Err(Error::InvalidLength {
                 expected: FIXED_LEN + TRAILING_UNUSED_LEN,
@@ -68,25 +91,33 @@ impl WebPub {
 
         let mut offset = FIXED_LEN;
         let source_name = if source.code() > WebSourceType::Range.code() {
+            let start = offset;
             let (name, used) = parse_web_pub_string(&data[offset..])?;
             offset += used;
-            Some(name)
+            Some((name, start..offset))
         } else {
             None
         };
+        let start = offset;
         let (file_destination, used) = parse_web_pub_string(&data[offset..])?;
         offset += used;
+        let file_destination_span = start..offset;
+        let start = offset;
         let (div_id, used) = parse_web_pub_string(&data[offset..])?;
         offset += used;
+        let div_id_span = start..offset;
+        let start = offset;
         let (title, used) = parse_web_pub_string(&data[offset..])?;
         offset += used;
+        let title_span = start..offset;
         let chart_shape_id = if source == WebSourceType::Chart {
+            let start = offset;
             let raw = data.get(offset..offset + 4).ok_or(Error::InvalidLength {
                 expected: offset + 4,
                 found: data.len(),
             })?;
             offset += 4;
-            Some(read_u32(raw, 0))
+            Some((read_u32(raw, 0), start..offset))
         } else {
             None
         };
@@ -96,9 +127,10 @@ impl WebPub {
         if offset > reserved_end {
             return Err(invalid("WebPub strings overrun the record"));
         }
-        let reserved = data[offset..reserved_end].to_vec();
+        let reserved_span = offset..reserved_end;
+        let reserved = data[reserved_span.clone()].to_vec();
 
-        Ok(WebPub {
+        let value = WebPub {
             source,
             page_type,
             range: (source == WebSourceType::Range)
@@ -107,13 +139,24 @@ impl WebPub {
             auto_republish: flags & AUTO_REPUBLISH != 0,
             single_file: flags & MHTML != 0,
             style_id,
-            source_name,
+            source_name: source_name.as_ref().map(|(name, _)| name.clone()),
             file_destination,
             div_id,
             title,
-            chart_shape_id,
+            chart_shape_id: chart_shape_id.as_ref().map(|(shape_id, _)| *shape_id),
             reserved,
-        })
+        };
+        let layout = WebPubLayout {
+            source_name: source_name.map(|(_, span)| span),
+            file_destination: file_destination_span,
+            div_id: div_id_span,
+            title: title_span,
+            chart_shape_id: chart_shape_id.map(|(_, span)| span),
+            reserved: reserved_span,
+            trailing_unused: reserved_end..data.len(),
+        };
+
+        Ok((value, layout))
     }
 
     /// Serialize back to a complete `WebPub` record payload.
@@ -203,6 +246,128 @@ impl WebPub {
     }
 }
 
+/// Rewrite only semantic `WebPub` fields while retaining all source-owned
+/// bytes outside the requested fields.
+pub(super) fn rewrite_preserving_source(
+    source: &[u8],
+    current: &WebPub,
+    replacement: &WebPub,
+) -> Result<Vec<u8>> {
+    let (parsed, layout) = WebPub::parse_with_layout(source)?;
+    if &parsed != current {
+        return Err(Error::UnsafeEdit(
+            "WebPub transaction candidate is out of sync with its source bytes".into(),
+        ));
+    }
+    replacement.validate_for_write()?;
+    if replacement.source != current.source
+        || replacement.range.is_some() != current.range.is_some()
+        || replacement.source_name.is_some() != current.source_name.is_some()
+        || replacement.chart_shape_id.is_some() != current.chart_shape_id.is_some()
+    {
+        return Err(Error::UnsafeEdit(
+            "WebPub edits cannot change conditional record topology".into(),
+        ));
+    }
+
+    let mut tail = Vec::new();
+    if let Some(span) = &layout.source_name {
+        let before = current.source_name.as_deref().ok_or_else(|| {
+            Error::UnsafeEdit("WebPub source-name span has no semantic owner".into())
+        })?;
+        let after = replacement
+            .source_name
+            .as_deref()
+            .ok_or_else(|| Error::UnsafeEdit("WebPub source-name replacement is missing".into()))?;
+        append_string(&mut tail, source, span, before, after)?;
+    }
+    append_string(
+        &mut tail,
+        source,
+        &layout.file_destination,
+        &current.file_destination,
+        &replacement.file_destination,
+    )?;
+    append_string(
+        &mut tail,
+        source,
+        &layout.div_id,
+        &current.div_id,
+        &replacement.div_id,
+    )?;
+    append_string(
+        &mut tail,
+        source,
+        &layout.title,
+        &current.title,
+        &replacement.title,
+    )?;
+
+    if let Some(span) = &layout.chart_shape_id {
+        let before = current.chart_shape_id.ok_or_else(|| {
+            Error::UnsafeEdit("WebPub chart-shape span has no semantic owner".into())
+        })?;
+        let after = replacement
+            .chart_shape_id
+            .ok_or_else(|| Error::UnsafeEdit("WebPub chart-shape replacement is missing".into()))?;
+        if before == after {
+            tail.extend_from_slice(&source[span.clone()]);
+        } else {
+            tail.extend_from_slice(&after.to_le_bytes());
+        }
+    }
+    tail.extend_from_slice(&source[layout.reserved.clone()]);
+    tail.extend_from_slice(&source[layout.trailing_unused.clone()]);
+
+    let tail_len = u32::try_from(tail.len())
+        .map_err(|_| Error::InvalidData("WebPub payload tail exceeds u32".into()))?;
+    let mut payload = source[..FIXED_LEN].to_vec();
+    if replacement.range != current.range {
+        let (first_row, last_row, first_column, last_column) =
+            replacement.range.map_or((0, 0, 0, 0), WebPubRange::fields);
+        payload[4..6].copy_from_slice(&first_row.to_le_bytes());
+        payload[6..8].copy_from_slice(&last_row.to_le_bytes());
+        payload[8..10].copy_from_slice(&u16::from(first_column).to_le_bytes());
+        payload[10..12].copy_from_slice(&u16::from(last_column).to_le_bytes());
+    }
+    if replacement.page_type != current.page_type {
+        payload[13] = replacement.page_type.code();
+    }
+    if replacement.auto_republish != current.auto_republish
+        || replacement.single_file != current.single_file
+    {
+        let mut flags = read_u16(source, 14) & !(AUTO_REPUBLISH | MHTML);
+        if replacement.auto_republish {
+            flags |= AUTO_REPUBLISH;
+        }
+        if replacement.single_file {
+            flags |= MHTML;
+        }
+        payload[14..16].copy_from_slice(&flags.to_le_bytes());
+    }
+    if replacement.style_id != current.style_id {
+        payload[20..24].copy_from_slice(&replacement.style_id.to_le_bytes());
+    }
+    payload[24..28].copy_from_slice(&tail_len.to_le_bytes());
+    payload.extend_from_slice(&tail);
+    Ok(payload)
+}
+
+fn append_string(
+    out: &mut Vec<u8>,
+    source: &[u8],
+    span: &Range<usize>,
+    before: &str,
+    after: &str,
+) -> Result<()> {
+    if before == after {
+        out.extend_from_slice(&source[span.clone()]);
+    } else {
+        write_web_pub_string(out, after)?;
+    }
+    Ok(())
+}
+
 /// Serialize a `WebPubString` (MS-XLS 2.5.278), compressed when every
 /// character is in U+0000..=U+00FF and wide otherwise.
 fn write_web_pub_string(out: &mut Vec<u8>, text: &str) -> Result<()> {
@@ -223,7 +388,7 @@ fn write_web_pub_string(out: &mut Vec<u8>, text: &str) -> Result<()> {
 fn web_pub_string_layout(text: &str) -> Result<(bool, usize)> {
     let compressible = text.chars().all(|ch| u32::from(ch) <= 0xFF);
     let char_count = if compressible {
-        text.len()
+        text.chars().count()
     } else {
         text.encode_utf16().count()
     };

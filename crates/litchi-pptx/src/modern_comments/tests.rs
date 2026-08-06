@@ -3,6 +3,37 @@
 use super::*;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 
+#[test]
+fn semantic_facade_uses_contextual_names() {
+    fn assert_type<T>() {}
+
+    assert_type::<Change>();
+    assert_type::<Changes>();
+    assert_type::<Metadata>();
+    assert_type::<Entry>();
+    assert_type::<OpaqueXml>();
+    assert_type::<Payload>();
+    assert_type::<Instance>();
+    assert_type::<Reaction>();
+    assert_type::<Action>();
+    assert_type::<Assign>();
+    assert_type::<Details>();
+    assert_type::<Event>();
+    assert_type::<History>();
+    assert_type::<Schedule>();
+    assert_type::<Title>();
+    assert_type::<Undo>();
+    assert_type::<User>();
+
+    assert_type::<semantic::changes::Reply>();
+    assert_type::<semantic::changes::Replies>();
+    assert_type::<semantic::extensions::List>();
+    assert_type::<semantic::monikers::Kind>();
+    assert_type::<semantic::monikers::List>();
+    assert_type::<semantic::monikers::Node>();
+    assert_type::<semantic::reactions::List>();
+}
+
 mod comment_tests {
     use super::*;
     use crate::modern_comments::{AC, MAX_BYTES, P188, PC};

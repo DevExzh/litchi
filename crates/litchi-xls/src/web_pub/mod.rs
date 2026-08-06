@@ -10,6 +10,7 @@
 //! verbatim and are never opened, resolved, or fetched.
 
 mod codec;
+mod edit;
 mod model;
 
 #[cfg(test)]
@@ -34,4 +35,6 @@ fn invalid(message: impl Into<String>) -> Error {
     }
 }
 
+#[allow(unused_imports, unreachable_pub)]
+pub use edit::{Commit, Patch, Snapshot, Transaction};
 pub use model::{WebPageType, WebPub, WebPubRange, WebSourceType};

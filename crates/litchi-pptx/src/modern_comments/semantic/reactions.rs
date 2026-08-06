@@ -1,5 +1,5 @@
 use super::super::model::NamespaceDeclaration;
-use super::OpaqueXml;
+use super::extensions::OpaqueXml;
 use crate::{Error, Result};
 use chrono::{DateTime, NaiveDateTime};
 use litchi_ooxml_common::custom_xml::valid_guid;
@@ -22,14 +22,14 @@ fn date_time(value: &str) -> Result<()> {
 
 /// One user instance from `p223:reaction/instance`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ReactionInstance {
+pub struct Instance {
     pub time: String,
     pub author_id: String,
     pub extension_xml: Option<OpaqueXml>,
     pub namespace_declarations: Vec<NamespaceDeclaration>,
 }
 
-impl ReactionInstance {
+impl Instance {
     pub fn validate(&self) -> Result<()> {
         date_time(&self.time)?;
         if !valid_guid(&self.author_id) {
@@ -51,7 +51,7 @@ impl ReactionInstance {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Reaction {
     pub reaction_type: String,
-    pub instances: Vec<ReactionInstance>,
+    pub instances: Vec<Instance>,
     pub namespace_declarations: Vec<NamespaceDeclaration>,
 }
 
@@ -74,12 +74,12 @@ impl Reaction {
 
 /// The 2.21 `p223:reactions` payload.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Reactions {
+pub struct List {
     pub reactions: Vec<Reaction>,
     pub namespace_declarations: Vec<NamespaceDeclaration>,
 }
 
-impl Reactions {
+impl List {
     pub fn validate(&self) -> Result<()> {
         if self.reactions.len() > MAX_REACTIONS {
             return Err(invalid("reactions exceed implementation limit"));

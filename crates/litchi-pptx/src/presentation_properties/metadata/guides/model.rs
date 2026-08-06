@@ -6,6 +6,15 @@ pub enum Orientation {
     Vertical,
 }
 
+/// The presentation owner of an extended-guide list.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ListKind {
+    /// Guides visible on ordinary slides.
+    Slide,
+    /// Guides visible while editing notes pages.
+    Notes,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ColorKind {
     ScRgb,
@@ -46,4 +55,14 @@ pub struct List {
 pub struct Guides {
     pub slide: Option<List>,
     pub notes: Option<List>,
+}
+
+impl Guides {
+    /// Borrow one owner list without exposing its storage selector.
+    pub fn list(&self, kind: ListKind) -> Option<&List> {
+        match kind {
+            ListKind::Slide => self.slide.as_ref(),
+            ListKind::Notes => self.notes.as_ref(),
+        }
+    }
 }

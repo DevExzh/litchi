@@ -33,16 +33,16 @@ impl OpaqueXml {
 
 /// One `p:ext` entry in a modern comment extension list.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExtensionEntry {
+pub struct Entry {
     pub uri: String,
-    pub payload: ExtensionPayload,
+    pub payload: Payload,
 }
 
 /// Known versioned payloads and an inert preservation branch for all others.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ExtensionPayload {
-    TaskDetails(super::TaskDetails),
-    Reactions(super::Reactions),
+pub enum Payload {
+    TaskDetails(super::tasks::Details),
+    Reactions(super::reactions::List),
     /// Contains the complete original `p:ext` element, including its URI and
     /// namespace declarations. `uri` is retained for inspection only.
     Opaque(OpaqueXml),
@@ -50,13 +50,13 @@ pub enum ExtensionPayload {
 
 /// The complete `p188:extLst` envelope attached to a comment or reply.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ExtensionList {
+pub struct List {
     pub root_prefix: String,
     pub namespace_declarations: Vec<NamespaceDeclaration>,
-    pub entries: Vec<ExtensionEntry>,
+    pub entries: Vec<Entry>,
 }
 
-impl ExtensionList {
+impl List {
     pub fn validate(&self) -> Result<()> {
         if self.root_prefix.len() > MAX_STRING_BYTES {
             return Err(invalid("modern comment extension prefix is too long"));
@@ -70,15 +70,15 @@ impl ExtensionList {
                 ));
             }
             match &entry.payload {
-                ExtensionPayload::TaskDetails(value) => {
+                Payload::TaskDetails(value) => {
                     task_count += 1;
                     value.validate()?;
                 },
-                ExtensionPayload::Reactions(value) => {
+                Payload::Reactions(value) => {
                     reaction_count += 1;
                     value.validate()?;
                 },
-                ExtensionPayload::Opaque(value) => {
+                Payload::Opaque(value) => {
                     if value.xml.len() > MAX_BYTES {
                         return Err(invalid("modern comment opaque extension is too large"));
                     }
@@ -93,16 +93,16 @@ impl ExtensionList {
         Ok(())
     }
 
-    pub fn task_details(&self) -> Option<&super::TaskDetails> {
+    pub fn task_details(&self) -> Option<&super::tasks::Details> {
         self.entries.iter().find_map(|entry| match &entry.payload {
-            ExtensionPayload::TaskDetails(value) => Some(value),
+            Payload::TaskDetails(value) => Some(value),
             _ => None,
         })
     }
 
-    pub fn reactions(&self) -> Option<&super::Reactions> {
+    pub fn reactions(&self) -> Option<&super::reactions::List> {
         self.entries.iter().find_map(|entry| match &entry.payload {
-            ExtensionPayload::Reactions(value) => Some(value),
+            Payload::Reactions(value) => Some(value),
             _ => None,
         })
     }
@@ -113,28 +113,24 @@ impl ExtensionList {
     pub fn replace_task_details(
         &mut self,
         uri: Option<&str>,
-        value: Option<super::TaskDetails>,
+        value: Option<super::tasks::Details>,
     ) -> Result<()> {
-        self.replace_known(
-            uri,
-            value.map(ExtensionPayload::TaskDetails),
-            "task details",
-        )
+        self.replace_known(uri, value.map(Payload::TaskDetails), "task details")
     }
 
     /// Replace or remove reactions while retaining all opaque entries.
     pub fn replace_reactions(
         &mut self,
         uri: Option<&str>,
-        value: Option<super::Reactions>,
+        value: Option<super::reactions::List>,
     ) -> Result<()> {
-        self.replace_known(uri, value.map(ExtensionPayload::Reactions), "reactions")
+        self.replace_known(uri, value.map(Payload::Reactions), "reactions")
     }
 
     fn replace_known(
         &mut self,
         uri: Option<&str>,
-        value: Option<ExtensionPayload>,
+        value: Option<Payload>,
         label: &str,
     ) -> Result<()> {
         let matches: Vec<usize> = self
@@ -144,9 +140,9 @@ impl ExtensionList {
             .filter_map(|(index, entry)| {
                 let known = match label {
                     "task details" => {
-                        matches!(&entry.payload, ExtensionPayload::TaskDetails(_))
+                        matches!(&entry.payload, Payload::TaskDetails(_))
                     },
-                    "reactions" => matches!(&entry.payload, ExtensionPayload::Reactions(_)),
+                    "reactions" => matches!(&entry.payload, Payload::Reactions(_)),
                     _ => false,
                 };
                 known.then_some(index)
@@ -166,7 +162,7 @@ impl ExtensionList {
                 let uri = uri
                     .filter(|value| !value.trim().is_empty())
                     .ok_or_else(|| invalid(format!("a URI is required to insert {label}")))?;
-                self.entries.push(ExtensionEntry {
+                self.entries.push(Entry {
                     uri: uri.to_owned(),
                     payload,
                 });
