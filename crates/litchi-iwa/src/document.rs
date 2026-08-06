@@ -181,17 +181,15 @@ impl Document {
         self.state.bundle.validate()
     }
 
-    /// Get the media manager (if available)
-    pub fn media_manager(&self) -> Option<&MediaManager> {
-        self.state.media_manager.as_ref()
-    }
-
-    /// Get media statistics
+    /// Get statistics for materialized media assets.
+    ///
+    /// Package and directory-backed media state remains private to the
+    /// document. Use the bounded extraction methods below for payload access.
     pub fn media_stats(&self) -> Option<MediaStats> {
         self.state.media_manager.as_ref().map(|m| m.stats())
     }
 
-    /// Extract a media asset by filename
+    /// Extract a media asset by filename under the document's resource limits.
     pub fn extract_media(&self, filename: &str) -> Result<Vec<u8>> {
         let manager = self
             .state
@@ -468,6 +466,11 @@ mod tests {
             .unwrap();
 
         let document = Document::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        let media_stats = document
+            .media_stats()
+            .expect("the materialized media catalog should be available");
+        assert_eq!(media_stats.total_count, 1);
+        assert_eq!(media_stats.total_size, 11);
         let mut streamed = Vec::new();
         document
             .extract_media_to_writer("image.png", &mut streamed)
