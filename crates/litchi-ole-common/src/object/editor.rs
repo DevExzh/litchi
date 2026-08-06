@@ -40,6 +40,20 @@ impl Editor {
         let original = Arc::new(bytes);
         let mut ole = OleFile::open(Cursor::new(original.as_slice()))?;
         codec::open(&ole)?;
+        if targets
+            .iter()
+            .any(|target| target.path().len() > limits.max_storage_depth)
+        {
+            return Err(OleError::InvalidFormat(
+                "object target path exceeds storage depth limit".into(),
+            ));
+        }
+        let targets = targets
+            .as_slice()
+            .iter()
+            .map(|target| target.resolve(&ole))
+            .collect::<Result<Vec<_>, _>>()?;
+        let targets = Targets::new(targets)?;
         let package = Package::capture(&mut ole, limits)?;
         package.check(limits)?;
         let objects = discovery::from_package(&package, &targets, limits)?;

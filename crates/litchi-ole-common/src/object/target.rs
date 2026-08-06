@@ -4,13 +4,16 @@
 //! The common layer never infers that key from a directory name: concrete
 //! format crates derive targets from their own records and pass them here.
 
+use super::cfb_path::CfbPath;
 use litchi_cfb::OleError;
+use litchi_cfb::OleFile;
+use std::io::{Read, Seek};
 
 /// One host-resolved CFB storage target.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Target {
     key: String,
-    path: Vec<String>,
+    path: CfbPath,
 }
 
 impl Target {
@@ -18,15 +21,20 @@ impl Target {
     ///
     /// # Errors
     ///
-    /// Returns an error when the key or path contains an empty/repeated part.
+    /// Returns an error when the key is empty or a path component is not a
+    /// valid `[MS-CFB]` directory name.
     pub fn new<S, I>(key_source: impl Into<String>, path_source: I) -> Result<Self, OleError>
     where
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
         let key = key_source.into();
-        let path = path_source.into_iter().map(Into::into).collect::<Vec<_>>();
-        validate_parts(&key, &path)?;
+        let path = CfbPath::new(path_source.into_iter().map(Into::into).collect())?;
+        if key.is_empty() {
+            return Err(OleError::InvalidFormat(
+                "object target key must not be empty".into(),
+            ));
+        }
         Ok(Self { key, path })
     }
 
@@ -54,10 +62,21 @@ impl Target {
         &self.key
     }
 
-    /// The exact CFB storage path selected by this target.
+    /// The CFB storage path requested by this target.
+    ///
+    /// An editor resolves case variants to the stored directory spelling
+    /// before capturing an object, so its target catalog exposes the exact
+    /// physical path used for subsequent edits.
     #[must_use]
     pub fn path(&self) -> &[String] {
-        &self.path
+        self.path.as_slice()
+    }
+
+    pub(crate) fn resolve<R: Read + Seek>(&self, ole: &OleFile<R>) -> Result<Self, OleError> {
+        Ok(Self {
+            key: self.key.clone(),
+            path: CfbPath::new(self.path.resolve(ole)?)?,
+        })
     }
 }
 
@@ -140,11 +159,11 @@ impl Targets {
                 target.key
             )));
         }
-        if self.targets.iter().any(|value| {
-            value.path == target.path
-                || value.path.starts_with(&target.path)
-                || target.path.starts_with(&value.path)
-        }) {
+        if self
+            .targets
+            .iter()
+            .any(|value| value.path.overlaps(&target.path))
+        {
             return Err(OleError::InvalidFormat(format!(
                 "object target path overlaps {:?}",
                 target.path
@@ -173,18 +192,4 @@ impl<'a> IntoIterator for &'a Targets {
     fn into_iter(self) -> Self::IntoIter {
         self.targets.iter()
     }
-}
-
-fn validate_parts(key: &str, path: &[String]) -> Result<(), OleError> {
-    if key.is_empty() {
-        return Err(OleError::InvalidFormat(
-            "object target key must not be empty".into(),
-        ));
-    }
-    if path.is_empty() || path.iter().any(String::is_empty) {
-        return Err(OleError::InvalidFormat(
-            "object target path must contain non-empty storage names".into(),
-        ));
-    }
-    Ok(())
 }

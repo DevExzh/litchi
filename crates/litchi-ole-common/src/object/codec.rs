@@ -40,6 +40,12 @@ impl Package {
         target: &Target,
         limits: Limits,
     ) -> Result<Object, OleError> {
+        if target.path().len() > limits.max_storage_depth {
+            return Err(OleError::InvalidFormat(
+                "object target path exceeds storage depth limit".into(),
+            ));
+        }
+        let target = target.resolve(ole)?;
         let storage = find_storage(ole, target.path())?;
         let mut package = Self {
             sector_size: ole.sector_size(),
@@ -49,7 +55,7 @@ impl Package {
         };
         let mut budget = Budget::new(limits.max_streams_per_object, limits.max_object_size);
         capture_subtree(ole, target.path(), &[], &mut package, &mut budget, limits)?;
-        package.object_from_root(target.clone(), storage, limits)
+        package.object_from_root(target, storage, limits)
     }
 
     pub(crate) fn object(&self, target: Target, limits: Limits) -> Result<Object, OleError> {

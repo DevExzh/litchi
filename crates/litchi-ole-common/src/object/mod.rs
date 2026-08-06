@@ -7,6 +7,7 @@
 //! format crates can interpret their own metadata without a common-owned
 //! classification leak.
 
+mod cfb_path;
 mod codec;
 mod discovery;
 mod editor;

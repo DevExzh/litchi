@@ -113,6 +113,45 @@ fn target_catalog_is_explicit_and_rejects_ambiguous_paths() {
 }
 
 #[test]
+fn target_paths_follow_cfb_name_limits_and_simple_uppercase_identity() {
+    assert!(Target::new("empty", [""]).is_err());
+    assert!(Target::new("forbidden", ["Pool/Child"]).is_err());
+    assert!(Target::new("nul", ["Pool\0Child"]).is_err());
+    assert!(Target::new("too-long", ["😀".repeat(16)]).is_err());
+    assert!(Target::new("control-is-allowed", ["\u{3}ObjInfo"]).is_ok());
+
+    let upper = target("upper", &["Pool", "Child"]);
+    let lower = target("lower", &["pool", "child"]);
+    assert!(Targets::new([upper, lower]).is_err());
+}
+
+#[test]
+fn discovery_resolves_case_variant_target_paths_to_stored_cfb_names() {
+    let bytes = doc_with_object(&[0, 0, 0, 0]);
+    let mut ole = OleFile::open(Cursor::new(bytes)).expect("test CFB should open");
+    let selected = targets("object", &["objectpool", "_42"]);
+    let objects = discover(&mut ole, &selected, Limits::default()).expect("target should resolve");
+    assert_eq!(
+        objects
+            .get("object")
+            .expect("object should be present")
+            .path(),
+        ["ObjectPool".to_string(), "_42".to_string()].as_slice()
+    );
+
+    let editor = Editor::open(doc_with_object(&[0, 0, 0, 0]), selected, Limits::default())
+        .expect("editor target should resolve");
+    assert_eq!(
+        editor
+            .targets()
+            .get("object")
+            .expect("resolved target should be present")
+            .path(),
+        ["ObjectPool".to_string(), "_42".to_string()].as_slice()
+    );
+}
+
+#[test]
 fn malformed_format_metadata_is_retained_without_common_classification() {
     let malformed = doc_with_object(&[0x00, 0x04, 0x00, 0x00]);
     let mut ole = OleFile::open(Cursor::new(malformed)).expect("test CFB should open");
