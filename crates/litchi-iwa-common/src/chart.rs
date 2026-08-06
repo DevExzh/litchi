@@ -4,6 +4,7 @@ pub mod gaps;
 pub mod axis;
 pub mod category_labels;
 pub mod direction;
+pub mod error_bar;
 pub mod kind;
 pub mod number_format;
 pub mod pie;

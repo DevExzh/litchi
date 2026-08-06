@@ -692,19 +692,22 @@ mod tests {
 
     use super::*;
     use litchi_iwa_common::chart::axis::style::Visibility as AxisVisibility;
+    use litchi_iwa_common::chart::error_bar::{
+        CustomValues as ErrorBarCustomValues, Direction as ErrorBarDirection,
+        FixedValue as ErrorBarFixedValue, Series,
+    };
     use litchi_iwa_common::chart::gaps::{Percentage, Spacing};
 
     use crate::charts::object_container::is_object_container_archive;
     use crate::charts::source::SERIES_NON_STYLE_MESSAGE_TYPE;
     use crate::charts::unique_chart_object_archive_name;
     use crate::charts::{
-        Axis, Bound, Bounds, ChartCornerRadius, ChartDonutInnerRadius, ChartErrorBarCustomValues,
-        ChartErrorBarDirection, ChartErrorBarFixedValue, ChartFont, ChartFontSize,
-        ChartLegendFill, ChartLegendFont, ChartLegendFontSize,
-        ChartLegendFrame, ChartLegendRect, ChartLegendShadow, ChartLegendStroke,
-        ChartPieLabelDistance, ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex,
-        ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesStroke,
-        ChartSeriesStrokePattern, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
+        Axis, Bound, Bounds, ChartCornerRadius, ChartDonutInnerRadius, ChartFont, ChartFontSize,
+        ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendFrame, ChartLegendRect,
+        ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance, ChartPieStartAngle,
+        ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners,
+        ChartSeriesErrorBarAutoFit, ChartSeriesStroke, ChartSeriesStrokePattern,
+        ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
         ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAutoFit,
         ChartSeriesValueLabelLocation, ChartShadow, DecimalPlaces, Index, LabelAffixes,
         LabelVisibility, LeaderLineVisibility, MajorStepCount, MinorStepCount, NegativeStyle,
@@ -4898,15 +4901,15 @@ mod tests {
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
             .unwrap();
-        let defaults = vec![ChartSeriesErrorBars::None; 2];
+        let defaults = vec![Series::None; 2];
         let customized = vec![
-            ChartSeriesErrorBars::FixedValue {
-                direction: ChartErrorBarDirection::PositiveAndNegative,
-                value: ChartErrorBarFixedValue::new(12.5).unwrap(),
+            Series::FixedValue {
+                direction: ErrorBarDirection::PositiveAndNegative,
+                value: ErrorBarFixedValue::new(12.5).unwrap(),
             },
-            ChartSeriesErrorBars::CustomValues {
-                direction: ChartErrorBarDirection::PositiveOnly,
-                values: ChartErrorBarCustomValues::new([1.0, 2.0, 3.0], []).unwrap(),
+            Series::CustomValues {
+                direction: ErrorBarDirection::PositiveOnly,
+                values: ErrorBarCustomValues::new([1.0, 2.0, 3.0], []).unwrap(),
             },
         ];
         let default_auto_fits = vec![ChartSeriesErrorBarAutoFit::Enabled; 2];
@@ -4972,7 +4975,7 @@ mod tests {
                     sheet_id,
                     source.drawable_object_id,
                     Index::from_zero_based(series),
-                    ChartSeriesErrorBars::None,
+                    Series::None,
                 )
                 .unwrap();
         }

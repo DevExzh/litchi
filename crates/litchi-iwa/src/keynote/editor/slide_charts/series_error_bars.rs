@@ -6,7 +6,8 @@ use crate::charts::series_error_bars::{
     chart_series_error_bars as read_native_error_bars,
     set_chart_series_error_bars as set_native_error_bars,
 };
-use crate::charts::{ChartSeriesErrorBars, Index};
+use crate::charts::Index;
+use litchi_iwa_common::chart::error_bar::Series;
 
 impl KeynoteEditor {
     /// Read every series' error bars in native series order.
@@ -14,7 +15,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<Vec<ChartSeriesErrorBars>> {
+    ) -> Result<Vec<Series>> {
         slide_chart_series_error_bars(self, slide_index, drawable_object_id)
     }
 
@@ -24,7 +25,7 @@ impl KeynoteEditor {
         slide_index: usize,
         drawable_object_id: u64,
         series: Index,
-    ) -> Result<ChartSeriesErrorBars> {
+    ) -> Result<Series> {
         let values = slide_chart_series_error_bars(self, slide_index, drawable_object_id)?;
         values.get(series.zero_based()).cloned().ok_or_else(|| {
             error_bar_index_error("Keynote", drawable_object_id, series, values.len())
@@ -36,7 +37,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        values: &[ChartSeriesErrorBars],
+        values: &[Series],
     ) -> Result<()> {
         set_slide_chart_series_error_bars(self, slide_index, drawable_object_id, values)
     }
@@ -47,7 +48,7 @@ impl KeynoteEditor {
         slide_index: usize,
         drawable_object_id: u64,
         series: Index,
-        value: ChartSeriesErrorBars,
+        value: Series,
     ) -> Result<()> {
         let mut values = slide_chart_series_error_bars(self, slide_index, drawable_object_id)?;
         let count = values.len();
@@ -66,7 +67,7 @@ fn slide_chart_series_error_bars(
     editor: &KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-) -> Result<Vec<ChartSeriesErrorBars>> {
+) -> Result<Vec<Series>> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let series_count = value_label_series_count(
         graph.info.kind,
@@ -88,7 +89,7 @@ fn set_slide_chart_series_error_bars(
     editor: &mut KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    values: &[ChartSeriesErrorBars],
+    values: &[Series],
 ) -> Result<()> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let series_count = value_label_series_count(

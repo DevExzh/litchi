@@ -5,14 +5,18 @@ use std::path::PathBuf;
 
 use super::*;
 use litchi_iwa_common::chart::axis::style::Visibility as AxisVisibility;
+use litchi_iwa_common::chart::error_bar::{
+    Direction as ErrorBarDirection, FixedValue as ErrorBarFixedValue,
+    Percentage as ErrorBarPercentage, Series,
+};
 use litchi_iwa_common::chart::gaps::{Percentage, Spacing};
 
 use crate::charts::{
-    Axis, Bound, Bounds, ChartCornerRadius, ChartDonutInnerRadius, ChartErrorBarDirection,
-    ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont, ChartFontSize, ChartLegendFill,
+    Axis, Bound, Bounds, ChartCornerRadius, ChartDonutInnerRadius, ChartFont, ChartFontSize,
+    ChartLegendFill,
     ChartLegendFont, ChartLegendFontSize, ChartLegendFrame, ChartLegendRect, ChartLegendShadow,
     ChartLegendStroke, ChartPieLabelDistance, ChartPieStartAngle, ChartPieWedgeExplosion,
-    ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars,
+    ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit,
     ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
     ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
     ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelLocation, ChartShadow, DecimalPlaces, Index,
@@ -3690,15 +3694,15 @@ fn scratch_presentation_supports_native_series_error_bar_crud() {
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
-    let defaults = vec![ChartSeriesErrorBars::None; 2];
+    let defaults = vec![Series::None; 2];
     let customized = vec![
-        ChartSeriesErrorBars::FixedValue {
-            direction: ChartErrorBarDirection::PositiveAndNegative,
-            value: ChartErrorBarFixedValue::new(12.5).unwrap(),
+        Series::FixedValue {
+            direction: ErrorBarDirection::PositiveAndNegative,
+            value: ErrorBarFixedValue::new(12.5).unwrap(),
         },
-        ChartSeriesErrorBars::Percentage {
-            direction: ChartErrorBarDirection::PositiveOnly,
-            percentage: ChartErrorBarPercentage::new(17).unwrap(),
+        Series::Percentage {
+            direction: ErrorBarDirection::PositiveOnly,
+            percentage: ErrorBarPercentage::new(17).unwrap(),
         },
     ];
     let default_auto_fits = vec![ChartSeriesErrorBarAutoFit::Enabled; 2];
@@ -3760,7 +3764,7 @@ fn scratch_presentation_supports_native_series_error_bar_crud() {
                 0,
                 source.drawable_object_id,
                 Index::from_zero_based(series),
-                ChartSeriesErrorBars::None,
+                Series::None,
             )
             .unwrap();
     }

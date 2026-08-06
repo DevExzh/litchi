@@ -4,15 +4,18 @@ use std::env;
 
 use litchi_iwa_common::chart::axis::style::Visibility as AxisVisibility;
 use litchi_iwa_common::chart::axis::{Axis, TickMarkLocation};
+use litchi_iwa_common::chart::error_bar::{
+    Direction as ErrorBarDirection, FixedValue as ErrorBarFixedValue,
+    Percentage as ErrorBarPercentage, Series as ErrorBarSeries,
+};
 use litchi_iwa_common::chart::gaps::{Percentage, Spacing};
 
 use litchi_iwa::charts::{
     Bound, Bounds, ChartAxisGridline, ChartAxisGridlineStroke, ChartCornerRadius, ChartData,
-    ChartErrorBarDirection, ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont,
-    ChartFontSize, ChartLegendFill, ChartLegendFont,
-    ChartLegendFontSize, ChartLegendShadow, ChartLegendStroke, ChartRoundedCorners,
-    ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesStroke, ChartSeriesStrokePattern,
-    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesValueLabelAutoFit,
+    ChartFont, ChartFontSize, ChartLegendFill, ChartLegendFont, ChartLegendFontSize,
+    ChartLegendShadow, ChartLegendStroke, ChartRoundedCorners, ChartSeriesErrorBarAutoFit,
+    ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
+    ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesValueLabelAutoFit,
     ChartSeriesValueLabelLocation, ChartShadow, DecimalPlaces, Kind, LabelAffixes, MajorStepCount,
     MinorStepCount, NegativeStyle, NumberFormat, Scale, Steps, Visibility,
 };
@@ -247,13 +250,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_body_chart_series_error_bars(
         chart.drawable_object_id,
         &[
-            ChartSeriesErrorBars::FixedValue {
-                direction: ChartErrorBarDirection::PositiveAndNegative,
-                value: ChartErrorBarFixedValue::new(12.5)?,
+            ErrorBarSeries::FixedValue {
+                direction: ErrorBarDirection::PositiveAndNegative,
+                value: ErrorBarFixedValue::new(12.5)?,
             },
-            ChartSeriesErrorBars::Percentage {
-                direction: ChartErrorBarDirection::PositiveOnly,
-                percentage: ChartErrorBarPercentage::new(17)?,
+            ErrorBarSeries::Percentage {
+                direction: ErrorBarDirection::PositiveOnly,
+                percentage: ErrorBarPercentage::new(17)?,
             },
         ],
     )?;

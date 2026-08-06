@@ -37,6 +37,13 @@ pub mod category_labels;
 mod data;
 pub(crate) mod depth_3d;
 pub(crate) mod donut_inner_radius;
+/// Archive-free error-bar values used by native chart adapters.
+pub mod error_bar {
+    pub use litchi_iwa_common::chart::error_bar::{
+        CustomValue, CustomValues, Direction, Error, FixedValue, Kind, MAX_CUSTOM_VALUES_PER_SIDE,
+        Percentage, Result, Series, Side, StandardDeviationCount, Unknown,
+    };
+}
 pub(crate) mod font;
 pub(crate) mod gaps;
 pub(crate) mod hidden_data;
@@ -127,11 +134,6 @@ pub use rounded_corners::{ChartCornerRadius, ChartRoundedCorners};
 pub use scene_3d::Chart3dRotation;
 pub use series_connection_line::{ChartSeriesConnectionLine, ChartSeriesConnectionLineKind};
 pub use series_error_bar_auto_fit::ChartSeriesErrorBarAutoFit;
-pub use series_error_bars::{
-    ChartErrorBarCustomValue, ChartErrorBarCustomValues, ChartErrorBarDirection,
-    ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartErrorBarStandardDeviationCount,
-    ChartSeriesErrorBars,
-};
 pub use series_fill::ChartSeriesFillKind;
 pub use series_gap_3d::Chart3dSeriesGap;
 pub use series_stroke::{ChartSeriesStroke, ChartSeriesStrokeKind, ChartSeriesStrokePattern};
@@ -180,6 +182,12 @@ impl From<litchi_iwa_common::chart::number_format::Error> for crate::Error {
 
 impl From<litchi_iwa_common::chart::reference_line::Error> for crate::Error {
     fn from(error: litchi_iwa_common::chart::reference_line::Error) -> Self {
+        Self::InvalidFormat(error.to_string())
+    }
+}
+
+impl From<litchi_iwa_common::chart::error_bar::Error> for crate::Error {
+    fn from(error: litchi_iwa_common::chart::error_bar::Error) -> Self {
         Self::InvalidFormat(error.to_string())
     }
 }
