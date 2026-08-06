@@ -4665,11 +4665,11 @@ mod tables;
 mod text_box_create;
 mod types;
 
-pub use audio::{PagesAudioInfo, PagesAudioOptions, RemovedPagesAudio};
+pub use audio::{PagesAudioInfo, RemovedPagesAudio};
 pub use body_shapes::{PagesBodyShapeInfo, PagesBodyShapeKind, RemovedPagesBodyShape};
 pub use charts::{PagesBodyChartInfo, RemovedPagesBodyChart};
 pub use images::{PagesImageInfo, PagesImageOptions, RemovedPagesImage};
-pub use movies::{PagesMovieInfo, PagesMovieOptions, RemovedPagesMovie};
+pub use movies::{PagesMovieInfo, RemovedPagesMovie};
 pub use tables::{
     PagesCellValue, PagesTable, PagesTableCellConditionalHighlightInfo, PagesTableCellInset,
     PagesTableCellInsets, PagesTableCellLayout, PagesTableCellParagraphIndents,
