@@ -195,7 +195,7 @@ impl KeynoteEditor {
                 Error::InvalidFormat("Keynote movie creation failed validation".to_owned())
             })?;
         let created_graph = verified.slide_movie_graph(slide_index, ids.drawable)?;
-        if created.kind != KeynoteSlideMovieKind::File
+        if created.kind != MovieKind::File
             || created.movie_data_identifier != Some(movie_asset.data_identifier.get())
             || created.poster_image_data_identifier != Some(poster_asset.data_identifier.get())
             || created.geometry != geometry
