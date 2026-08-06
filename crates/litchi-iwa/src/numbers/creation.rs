@@ -1559,7 +1559,12 @@ mod tests {
             .set_cell(table_id, 1, 1, CellValue::Text("Litchi".to_owned()))
             .unwrap();
         editor
-            .set_cell(table_id, 2, 2, CellValue::Number(42.5))
+            .set_cell(
+                table_id,
+                2,
+                2,
+                CellValue::number(42.5).expect("finite test number"),
+            )
             .unwrap();
         editor
             .set_cell(table_id, 3, 3, CellValue::Boolean(true))
@@ -1574,7 +1579,10 @@ mod tests {
             table.get_cell(1, 1),
             Some(&CellValue::Text("Litchi".to_owned()))
         );
-        assert_eq!(table.get_cell(2, 2), Some(&CellValue::Number(42.5)));
+        assert_eq!(
+            table.get_cell(2, 2),
+            Some(&CellValue::number(42.5).expect("finite test number"))
+        );
         assert!(table.get_cell(3, 3).is_none_or(CellValue::is_empty));
     }
 
@@ -1583,10 +1591,20 @@ mod tests {
         let mut editor = NumbersEditor::create().unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
         editor
-            .set_cell(table_id, 0, 0, CellValue::Number(40.0))
+            .set_cell(
+                table_id,
+                0,
+                0,
+                CellValue::number(40.0).expect("finite test number"),
+            )
             .unwrap();
         editor
-            .set_cell(table_id, 0, 1, CellValue::Number(2.0))
+            .set_cell(
+                table_id,
+                0,
+                1,
+                CellValue::number(2.0).expect("finite test number"),
+            )
             .unwrap();
         let baseline = editor.to_bytes().unwrap();
 
@@ -1620,10 +1638,20 @@ mod tests {
             .add_empty_table(sheet_id, "Calculated", 4, 3)
             .unwrap();
         editor
-            .set_cell(table.object_id, 0, 0, CellValue::Number(21.0))
+            .set_cell(
+                table.object_id,
+                0,
+                0,
+                CellValue::number(21.0).expect("finite test number"),
+            )
             .unwrap();
         editor
-            .set_cell(table.object_id, 0, 1, CellValue::Number(2.0))
+            .set_cell(
+                table.object_id,
+                0,
+                1,
+                CellValue::number(2.0).expect("finite test number"),
+            )
             .unwrap();
         let baseline = editor.to_bytes().unwrap();
 
@@ -1734,7 +1762,12 @@ mod tests {
             .add_empty_table(sheet_id, "Referenced", 2, 2)
             .unwrap();
         editor
-            .set_cell(target.object_id, 0, 0, CellValue::Number(7.0))
+            .set_cell(
+                target.object_id,
+                0,
+                0,
+                CellValue::number(7.0).expect("finite test number"),
+            )
             .unwrap();
         editor
             .set_formula(

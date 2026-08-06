@@ -1742,7 +1742,12 @@ mod tests {
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
         editor
-            .set_cell(table_id, 1, 1, CellValue::Number(3.0))
+            .set_cell(
+                table_id,
+                1,
+                1,
+                CellValue::number(3.0).expect("finite test number"),
+            )
             .unwrap();
         editor
             .set_table_cell_star_rating_format(table_id, 1, 1, StarRating)
@@ -1793,7 +1798,7 @@ mod tests {
         let document = NumbersDocument::from_bytes(&reopened.to_bytes().unwrap()).unwrap();
         assert_eq!(
             document.sheets().unwrap()[0].tables[0].get_cell(1, 2),
-            Some(&CellValue::Number(0.0))
+            Some(&CellValue::number(0.0).expect("finite test number"))
         );
         assert!(
             reopened
@@ -1838,7 +1843,12 @@ mod tests {
         );
         let number_slider = Slider::new(range, number_display.into());
         editor
-            .set_cell(table_id, 1, 1, CellValue::Number(25.0))
+            .set_cell(
+                table_id,
+                1,
+                1,
+                CellValue::number(25.0).expect("finite test number"),
+            )
             .unwrap();
         editor
             .set_table_cell_slider_format(table_id, 1, 1, number_slider.clone())
@@ -1887,7 +1897,7 @@ mod tests {
         let document = NumbersDocument::from_bytes(&reopened.to_bytes().unwrap()).unwrap();
         assert_eq!(
             document.sheets().unwrap()[0].tables[0].get_cell(1, 2),
-            Some(&CellValue::Number(10.0))
+            Some(&CellValue::number(10.0).expect("finite test number"))
         );
 
         let currency_slider = Slider::new(range, Currency::default().into());
@@ -1939,7 +1949,12 @@ mod tests {
         );
         let number_stepper = Stepper::new(range, number_display.into());
         editor
-            .set_cell(table_id, 1, 1, CellValue::Number(25.0))
+            .set_cell(
+                table_id,
+                1,
+                1,
+                CellValue::number(25.0).expect("finite test number"),
+            )
             .unwrap();
         editor
             .set_table_cell_stepper_format(table_id, 1, 1, number_stepper.clone())
@@ -1988,7 +2003,7 @@ mod tests {
         let document = NumbersDocument::from_bytes(&reopened.to_bytes().unwrap()).unwrap();
         assert_eq!(
             document.sheets().unwrap()[0].tables[0].get_cell(1, 2),
-            Some(&CellValue::Number(-10.0))
+            Some(&CellValue::number(-10.0).expect("finite test number"))
         );
 
         let currency_stepper = Stepper::new(range, Currency::default().into());
@@ -2067,7 +2082,12 @@ mod tests {
         );
 
         reopened
-            .set_cell(table_id, 2, 1, CellValue::Number(42.0))
+            .set_cell(
+                table_id,
+                2,
+                1,
+                CellValue::number(42.0).expect("finite test number"),
+            )
             .unwrap();
         let before = reopened.to_bytes().unwrap();
         assert!(reopened.set_table_cell_text_format(table_id, 2, 1).is_err());
@@ -2116,13 +2136,28 @@ mod tests {
         let text = Custom::Text(text);
 
         editor
-            .set_cell(table_id, 1, 1, CellValue::Number(-12_345.0))
+            .set_cell(
+                table_id,
+                1,
+                1,
+                CellValue::number(-12_345.0).expect("finite test number"),
+            )
             .unwrap();
         editor
-            .set_cell(table_id, 1, 2, CellValue::Number(42.0))
+            .set_cell(
+                table_id,
+                1,
+                2,
+                CellValue::number(42.0).expect("finite test number"),
+            )
             .unwrap();
         editor
-            .set_cell(table_id, 2, 1, CellValue::Date(789_004_800.0))
+            .set_cell(
+                table_id,
+                2,
+                1,
+                CellValue::date(789_004_800.0).expect("finite test date"),
+            )
             .unwrap();
         editor
             .set_cell(table_id, 2, 2, CellValue::Text("Invoice 001".to_owned()))
@@ -2249,7 +2284,12 @@ mod tests {
             Some(&CellValue::Text("Low".to_owned()))
         );
         reopened
-            .set_cell(table_id, 2, 1, CellValue::Number(42.0))
+            .set_cell(
+                table_id,
+                2,
+                1,
+                CellValue::number(42.0).expect("finite test number"),
+            )
             .unwrap();
         let before = reopened.to_bytes().unwrap();
         assert!(
@@ -2327,10 +2367,20 @@ mod tests {
         let range = UnitRange::hours_to_milliseconds();
         let duration = Duration::custom(Style::Abbreviated, range);
         editor
-            .set_cell(table_id, 1, 1, CellValue::Duration(3_723.5))
+            .set_cell(
+                table_id,
+                1,
+                1,
+                CellValue::duration(3_723.5).expect("finite test duration"),
+            )
             .unwrap();
         editor
-            .set_cell(table_id, 1, 2, CellValue::Number(1.5))
+            .set_cell(
+                table_id,
+                1,
+                2,
+                CellValue::number(1.5).expect("finite test number"),
+            )
             .unwrap();
         editor
             .set_table_cell_duration_format(table_id, 1, 1, duration)
@@ -2352,7 +2402,7 @@ mod tests {
         let document = NumbersDocument::from_bytes(&reopened.to_bytes().unwrap()).unwrap();
         assert_eq!(
             document.sheets().unwrap()[0].tables[0].get_cell(1, 2),
-            Some(&CellValue::Duration(129_600.0))
+            Some(&CellValue::duration(129_600.0).expect("finite test duration"))
         );
         assert!(
             reopened
@@ -2405,10 +2455,20 @@ mod tests {
         let table_id = editor.tables().unwrap()[0].object_id;
         let date_time = DateTime::iso_date_time_24_hour_with_seconds();
         editor
-            .set_cell(table_id, 1, 1, CellValue::Date(789_332_889.0))
+            .set_cell(
+                table_id,
+                1,
+                1,
+                CellValue::date(789_332_889.0).expect("finite test date"),
+            )
             .unwrap();
         editor
-            .set_cell(table_id, 1, 2, CellValue::Date(789_332_889.0))
+            .set_cell(
+                table_id,
+                1,
+                2,
+                CellValue::date(789_332_889.0).expect("finite test date"),
+            )
             .unwrap();
         editor
             .set_table_cell_date_time_format(table_id, 1, 1, date_time.clone())
@@ -2469,7 +2529,12 @@ mod tests {
         )
         .unwrap();
         editor
-            .set_cell(table_id, 1, 1, CellValue::Number(-1_234.5))
+            .set_cell(
+                table_id,
+                1,
+                1,
+                CellValue::number(-1_234.5).expect("finite test number"),
+            )
             .unwrap();
         editor
             .set_table_cell_numeral_system_format(table_id, 1, 1, numeral_system)
@@ -2525,7 +2590,12 @@ mod tests {
         let table_id = editor.tables().unwrap()[0].object_id;
         let fraction = Fraction::new(FractionAccuracy::Eighths);
         editor
-            .set_cell(table_id, 1, 1, CellValue::Number(-12.375))
+            .set_cell(
+                table_id,
+                1,
+                1,
+                CellValue::number(-12.375).expect("finite test number"),
+            )
             .unwrap();
         editor
             .set_table_cell_fraction_format(table_id, 1, 1, fraction)
@@ -2577,7 +2647,12 @@ mod tests {
         let table_id = editor.tables().unwrap()[0].object_id;
         let scientific = Scientific::new(FixedDecimalPlaces::new(5).unwrap());
         editor
-            .set_cell(table_id, 1, 1, CellValue::Number(-1_234.5))
+            .set_cell(
+                table_id,
+                1,
+                1,
+                CellValue::number(-1_234.5).expect("finite test number"),
+            )
             .unwrap();
         editor
             .set_table_cell_scientific_format(table_id, 1, 1, scientific)
@@ -2639,7 +2714,12 @@ mod tests {
             CurrencyStyle::Accounting,
         );
         editor
-            .set_cell(table_id, 1, 1, CellValue::Number(-1_234.5))
+            .set_cell(
+                table_id,
+                1,
+                1,
+                CellValue::number(-1_234.5).expect("finite test number"),
+            )
             .unwrap();
         editor
             .set_table_cell_currency_format(table_id, 1, 1, currency)
@@ -2699,7 +2779,12 @@ mod tests {
             None
         );
         editor
-            .set_cell(table_id, 1, 1, CellValue::Number(1_234.5))
+            .set_cell(
+                table_id,
+                1,
+                1,
+                CellValue::number(1_234.5).expect("finite test number"),
+            )
             .unwrap();
         editor
             .set_table_cell_number_format(table_id, 1, 1, format)
@@ -2791,7 +2876,12 @@ mod tests {
             .set_table_cell_data_format(table_id, 1, 1, number.into())
             .unwrap();
         editor
-            .set_cell(table_id, 1, 2, CellValue::Number(-12.345))
+            .set_cell(
+                table_id,
+                1,
+                2,
+                CellValue::number(-12.345).expect("finite test number"),
+            )
             .unwrap();
         assert_eq!(
             editor.table_cell_data_format(table_id, 1, 2).unwrap(),
