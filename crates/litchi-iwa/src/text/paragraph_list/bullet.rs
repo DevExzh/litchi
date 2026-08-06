@@ -30,8 +30,8 @@ pub(crate) fn paragraph_list_bullet(
         )));
     }
     let strings = native::effective_bullet_strings(package, style_id)?;
-    Ok(ParagraphListBullet::new(
-        strings[usize::from(level.get())].clone(),
+    Ok(ParagraphListBullet::from_boxed(
+        strings[usize::from(level.get())].clone().into_boxed_str(),
     )?)
 }
 

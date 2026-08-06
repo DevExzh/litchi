@@ -12,6 +12,7 @@ rust-version.workspace = true
 chrono        = { workspace = true }
 litchi-core   = { workspace = true }
 litchi-iwa-archive = { workspace = true }
+litchi-iwa-cache = { workspace = true }
 litchi-iwa-common = { workspace = true }
 litchi-iwa-core = { workspace = true }
 litchi-iwa-detect = { workspace = true }

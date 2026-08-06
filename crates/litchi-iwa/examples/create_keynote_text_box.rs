@@ -5,21 +5,22 @@ use std::env;
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Pattern, RgbColorSpace, RgbaColor, Width};
 use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
-use litchi_iwa_text::columns::{Columns, Count};
 use litchi_iwa::text::{
     DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
-    DropCapWrap, ParagraphBackground, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
-    ParagraphBorders, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphDropCap,
-    ParagraphFlow, ParagraphHyphenation, ParagraphIndentPoints, ParagraphIndents,
-    ParagraphLineSpacing, ParagraphLineSpacingPoints, ParagraphList, ParagraphListLevel,
-    ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart, ParagraphStyleName,
-    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextCommentBody,
-    TextCommentReplyBody, TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage,
-    TextLigatures, TextOutline, TextPointSize, TextPosition, TextRange, TextScript, TextShadow,
-    TextStrikethrough, TextStyle, TextUnderline,
+    DropCapWrap, ParagraphBackground, ParagraphBorder, ParagraphBorders,
+    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphDropCap, ParagraphFlow,
+    ParagraphHyphenation, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,
+    ParagraphLineSpacingPoints, ParagraphList, ParagraphListLevel, ParagraphSpacing,
+    ParagraphSpacingPoints, ParagraphStart, ParagraphStyleName, ParagraphTabAlignment,
+    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
+    ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
+    TextCapitalization, TextCharacterSpacing, TextCommentBody, TextCommentReplyBody,
+    TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage, TextLigatures, TextOutline,
+    TextPointSize, TextPosition, TextRange, TextScript, TextShadow, TextStrikethrough, TextStyle,
+    TextUnderline,
 };
+use litchi_iwa_text::columns::{Columns, Count};
+use litchi_iwa_text::paragraph::border::{Offset as BorderOffset, Sides as BorderSides};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -137,8 +138,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             RgbaColor::black(),
             Width::new(3.0)?,
             Pattern::Solid,
-            ParagraphBorderSides::ALL,
-            ParagraphBorderOffset::from_points(9.0)?,
+            BorderSides::ALL,
+            BorderOffset::from_points(9.0)?,
             true,
         )?),
     )?;

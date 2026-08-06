@@ -1,5 +1,7 @@
 use std::fmt;
 
+use litchi_core::SourceVersion;
+
 /// A resource category enforced before an ingress allocation or decode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LimitKind {
@@ -69,6 +71,17 @@ pub enum Error {
     /// The package uses an encrypted iWork container marker.
     #[error("password-protected iWork documents are not supported")]
     Encrypted,
+
+    /// The positional source changed while the package was being snapshotted.
+    #[error(
+        "iWork archive source changed during read (expected {expected:?}, observed {observed:?})"
+    )]
+    SourceChanged {
+        /// Source identity and revision captured before reading.
+        expected: SourceVersion,
+        /// Source identity and revision observed after reading.
+        observed: SourceVersion,
+    },
 
     /// The input is a ZIP container but not a valid iWork bundle shape.
     #[error("invalid iWork bundle: {0}")]

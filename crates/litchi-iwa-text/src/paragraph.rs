@@ -1,5 +1,6 @@
 //! Dependency-free paragraph formatting vocabulary shared by iWork formats.
 
+pub mod border;
 pub mod direction;
 pub mod flow;
 pub mod list;

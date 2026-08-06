@@ -9,6 +9,7 @@ repository.workspace   = true
 rust-version.workspace = true
 
 [dependencies]
+litchi-core     = { workspace = true }
 litchi-iwa-core = { workspace = true }
 soapberry-zip   = { workspace = true }
 thiserror       = { workspace = true }

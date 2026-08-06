@@ -10,6 +10,8 @@ use std::io::Write;
 use std::ops::Range;
 use std::sync::Arc;
 
+use litchi_core::ReadAt;
+
 use crate::zip::{PhysicalEntry, PhysicalHeader, ZipArchive};
 use crate::{Error, Limits, Result};
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -292,6 +294,7 @@ impl Entry {
 pub struct Catalog {
     entries: Vec<Entry>,
     source: Arc<[u8]>,
+    source_is_exact: bool,
 }
 
 impl Catalog {
@@ -338,6 +341,22 @@ impl Catalog {
         Self::from_source_with_checked_limits(source, checked_limits)
     }
 
+    /// Parse a package from an immutable positional source under the default
+    /// physical limits.
+    ///
+    /// The source is snapshotted through [`ReadAt`] without using a shared
+    /// cursor. Its [`litchi_core::SourceVersion`] must remain unchanged for
+    /// the complete bounded read; otherwise the package is rejected rather
+    /// than publishing a mixed-source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source cannot be read, changes during the
+    /// snapshot, exceeds the physical limits, or is not a valid package.
+    pub fn from_read_at(source: &dyn ReadAt) -> Result<Self> {
+        Self::from_read_at_with_limits(source, Limits::default())
+    }
+
     /// Parse an immutable, already-owned package source under caller-selected
     /// physical limits.
     ///
@@ -357,6 +376,23 @@ impl Catalog {
         Self::from_source_with_checked_limits(source, checked_limits)
     }
 
+    /// Parse a package from an immutable positional source under caller-
+    /// selected physical limits.
+    ///
+    /// The source is read only after its length has passed the input ceiling,
+    /// so a rejected source cannot trigger an unbounded allocation. The
+    /// source version is checked again before the snapshot is parsed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source cannot be read, changes during the
+    /// snapshot, exceeds the physical limits, or is not a valid package.
+    pub fn from_read_at_with_limits(source: &dyn ReadAt, limits: Limits) -> Result<Self> {
+        let checked_limits = limits.validate()?;
+        let source = read_source(source, checked_limits)?;
+        Self::from_source_with_checked_limits(source, checked_limits)
+    }
+
     fn from_source_with_checked_limits(source: Arc<[u8]>, checked_limits: Limits) -> Result<Self> {
         let archive = ZipArchive::new_with_limits(source.as_ref(), checked_limits)?;
         if crate::zip::is_encrypted(&archive) {
@@ -370,14 +406,21 @@ impl Catalog {
                 "iWork package mixes direct IWA members with a legacy Index.zip".to_owned(),
             ));
         }
-        let entries = if has_direct_iwa {
-            collect_flat(&archive, &source)?
+        let (entries, source_is_exact) = if has_direct_iwa {
+            (collect_flat(&archive, &source)?, true)
         } else if let Some(index_name) = nested_name {
-            collect_legacy(&archive, &index_name, checked_limits, &source)?
+            (
+                collect_legacy(&archive, &index_name, checked_limits, &source)?,
+                false,
+            )
         } else {
-            collect_flat(&archive, &source)?
+            (collect_flat(&archive, &source)?, true)
         };
-        Ok(Catalog { entries, source })
+        Ok(Catalog {
+            entries,
+            source,
+            source_is_exact,
+        })
     }
 
     /// Return the number of extracted entries.
@@ -390,6 +433,23 @@ impl Catalog {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
+    }
+
+    /// Clone the immutable source handle without copying its bytes.
+    ///
+    /// The handle is useful to a higher-level package owner that wants to
+    /// retain an exact preserve-mode no-op path while it builds its own
+    /// semantic entry index.
+    #[must_use]
+    pub fn shared_source(&self) -> Arc<[u8]> {
+        Arc::clone(&self.source)
+    }
+
+    /// Return whether the catalog's logical entries still describe the
+    /// original ZIP envelope exactly.
+    #[must_use]
+    pub const fn source_is_exact(&self) -> bool {
+        self.source_is_exact
     }
 
     /// Borrow entries in their preserved source order.
@@ -427,6 +487,35 @@ impl Catalog {
         bytes.extend_from_slice(&self.source);
         Ok(bytes)
     }
+}
+
+fn read_source(source: &dyn ReadAt, limits: Limits) -> Result<Arc<[u8]>> {
+    let expected = source.version()?;
+    let length = source.len()?;
+    limits.check_input_size(length, "ReadAt input")?;
+    let length = usize::try_from(length).map_err(|_error| {
+        Error::InvalidBundle("ReadAt input length does not fit usize".to_owned())
+    })?;
+
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(length)
+        .map_err(|_error| Error::Allocation {
+            resource: "ReadAt source bytes",
+            amount: length,
+        })?;
+    bytes.resize(length, 0);
+
+    let read_error = source.read_exact_at(0, &mut bytes).err();
+    let observed = source.version()?;
+    if observed != expected {
+        return Err(Error::SourceChanged { expected, observed });
+    }
+    if let Some(error) = read_error {
+        return Err(error.into());
+    }
+
+    Ok(bytes.into())
 }
 
 impl IntoIterator for Catalog {
@@ -682,9 +771,63 @@ fn push_entry(
 
 #[cfg(test)]
 mod tests {
+    use std::io;
+    use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+
+    use litchi_core::SourceVersion;
     use soapberry_zip::office::StreamingArchiveWriter;
 
     use super::*;
+
+    #[derive(Debug)]
+    struct TestSource {
+        bytes: Arc<[u8]>,
+        max_read: usize,
+        reads: AtomicUsize,
+        revision: AtomicU64,
+        change_on_read: bool,
+    }
+
+    impl TestSource {
+        fn new(bytes: Vec<u8>, max_read: usize, change_on_read: bool) -> Self {
+            Self {
+                bytes: bytes.into(),
+                max_read,
+                reads: AtomicUsize::new(0),
+                revision: AtomicU64::new(0),
+                change_on_read,
+            }
+        }
+    }
+
+    impl ReadAt for TestSource {
+        fn len(&self) -> io::Result<u64> {
+            u64::try_from(self.bytes.len())
+                .map_err(|_error| io::Error::other("test source length overflow"))
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+            self.reads.fetch_add(1, Ordering::Relaxed);
+            if self.change_on_read {
+                self.revision.store(1, Ordering::Relaxed);
+            }
+            let start = usize::try_from(offset)
+                .map_err(|_error| io::Error::other("test source offset overflow"))?;
+            let Some(input) = self.bytes.get(start..) else {
+                return Ok(0);
+            };
+            let count = input.len().min(output.len()).min(self.max_read);
+            output[..count].copy_from_slice(&input[..count]);
+            Ok(count)
+        }
+
+        fn version(&self) -> io::Result<SourceVersion> {
+            Ok(SourceVersion::new(
+                41,
+                self.revision.load(Ordering::Relaxed),
+            ))
+        }
+    }
 
     fn zip(entries: &[(&str, &[u8])]) -> Result<Vec<u8>> {
         let mut writer = StreamingArchiveWriter::new();
@@ -887,6 +1030,54 @@ mod tests {
         catalog.write_to(&mut streamed)?;
         assert_eq!(streamed.as_slice(), source.as_ref());
         Ok(())
+    }
+
+    #[test]
+    fn snapshots_a_positional_source_in_bounded_reads() -> Result<()> {
+        let bytes = zip(&[("Metadata/a", b"a"), ("Data/b", b"b")])?;
+        let source = TestSource::new(bytes.clone(), 3, false);
+        let catalog = Catalog::from_read_at(&source)?;
+
+        assert!(source.reads.load(Ordering::Relaxed) > 1);
+        assert_eq!(catalog.to_bytes()?, bytes);
+        assert_eq!(
+            catalog.iter().map(Entry::name).collect::<Vec<_>>(),
+            ["Metadata/a", "Data/b"]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn checks_positional_source_limits_before_reading() -> Result<()> {
+        let bytes = zip(&[("Data/a", b"a")])?;
+        let source = TestSource::new(bytes, 4, false);
+        let limits = Limits::new(1, 10, 100, 100, 100)?;
+
+        assert!(matches!(
+            Catalog::from_read_at_with_limits(&source, limits),
+            Err(Error::Limit {
+                kind: crate::LimitKind::InputBytes,
+                ..
+            })
+        ));
+        assert_eq!(source.reads.load(Ordering::Relaxed), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_a_positional_source_that_changes_during_snapshot() {
+        let bytes = zip(&[("Data/a", b"a")]).unwrap();
+        let source = TestSource::new(bytes, 4, true);
+        let error = Catalog::from_read_at(&source).unwrap_err();
+
+        assert!(matches!(
+            error,
+            Error::SourceChanged { expected, observed }
+                if expected.id() == 41
+                    && expected.revision() == 0
+                    && observed.id() == 41
+                    && observed.revision() == 1
+        ));
     }
 
     #[test]

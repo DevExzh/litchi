@@ -129,6 +129,8 @@
 
 use std::sync::Arc;
 
+use litchi_core::SourceVersion;
+
 // Core parsing modules
 /// Semantic iWork application families.
 pub mod application;
@@ -251,6 +253,14 @@ pub enum Error {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
+    #[error(
+        "source changed during iWork package read (expected {expected:?}, observed {observed:?})"
+    )]
+    SourceChanged {
+        expected: SourceVersion,
+        observed: SourceVersion,
+    },
+
     #[error(transparent)]
     IwaCore(#[from] IwaCoreError),
 
@@ -293,7 +303,12 @@ impl From<litchi_iwa_core::Error> for Error {
 
 impl From<litchi_iwa_archive::Error> for Error {
     fn from(error: litchi_iwa_archive::Error) -> Self {
-        Self::Bundle(format!("archive ingress: {error}"))
+        match error {
+            litchi_iwa_archive::Error::SourceChanged { expected, observed } => {
+                Self::SourceChanged { expected, observed }
+            },
+            error => Self::Bundle(format!("archive ingress: {error}")),
+        }
     }
 }
 

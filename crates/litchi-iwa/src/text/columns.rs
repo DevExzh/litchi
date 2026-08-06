@@ -1,7 +1,7 @@
 //! Native/protobuf adaptation for archive-free text-column layouts.
 
 use litchi_iwa_text::columns::{
-    Columns, Count, Following, Gap, Variable, Width, MAX_VARIABLE_COLUMNS,
+    Columns, Count, Following, Gap, MAX_VARIABLE_COLUMNS, Variable, Width,
 };
 
 use crate::protobuf::tswp;
@@ -18,9 +18,9 @@ pub(crate) fn from_native(native: &tswp::ColumnsArchive) -> Result<Columns> {
             })?;
             Ok(Columns::equal(
                 Count::new(count).map_err(|error| match error {
-                    litchi_iwa_text::columns::Error::ZeroCount => Error::InvalidFormat(
-                        "iWork equal text columns have a zero count".into(),
-                    ),
+                    litchi_iwa_text::columns::Error::ZeroCount => {
+                        Error::InvalidFormat("iWork equal text columns have a zero count".into())
+                    },
                     litchi_iwa_text::columns::Error::TooManyColumns => Error::InvalidFormat(
                         "iWork equal text columns exceed the supported column limit".into(),
                     ),
@@ -28,13 +28,9 @@ pub(crate) fn from_native(native: &tswp::ColumnsArchive) -> Result<Columns> {
                         "iWork equal text columns contain an invalid count".into(),
                     ),
                 })?,
-                equal
-                    .gap
-                    .map(Gap::from_points)
-                    .transpose()
-                    .map_err(|_| {
-                        Error::InvalidFormat("iWork equal text columns have an invalid gap".into())
-                    })?,
+                equal.gap.map(Gap::from_points).transpose().map_err(|_| {
+                    Error::InvalidFormat("iWork equal text columns have an invalid gap".into())
+                })?,
             ))
         },
         (None, Some(variable)) => {
@@ -63,9 +59,11 @@ pub(crate) fn from_native(native: &tswp::ColumnsArchive) -> Result<Columns> {
                     litchi_iwa_text::columns::Error::TooManyColumns => Error::InvalidFormat(
                         "iWork equal text columns exceed the supported column limit".into(),
                     ),
-                    litchi_iwa_text::columns::Error::TooManyVariableColumns => Error::InvalidFormat(
-                        "iWork variable text columns exceed the supported column limit".into(),
-                    ),
+                    litchi_iwa_text::columns::Error::TooManyVariableColumns => {
+                        Error::InvalidFormat(
+                            "iWork variable text columns exceed the supported column limit".into(),
+                        )
+                    },
                     _ => Error::InvalidFormat(
                         "iWork variable text columns contain invalid layout values".into(),
                     ),

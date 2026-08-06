@@ -307,6 +307,9 @@ fn map_archive_error(archive_error: litchi_iwa_archive::Error) -> Error {
         litchi_iwa_archive::Error::Allocation { resource, amount } => {
             Error::IwaCommon(litchi_iwa_common::Error::Allocation { resource, amount })
         },
+        litchi_iwa_archive::Error::SourceChanged { expected, observed } => Error::Archive(format!(
+            "iWork archive source changed during read: expected {expected:?}, observed {observed:?}"
+        )),
     }
 }
 

@@ -1,9 +1,9 @@
 use super::{
     TextNumberAttachmentKind, TextNumberAttachmentSettings, TextNumberAttachmentText, TextPosition,
 };
-use litchi_iwa_common::comment::DrawableId;
 use crate::pages::PagesEditor;
 use crate::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa_common::comment::DrawableId;
 
 const PREFIX: &str = "Page ";
 const POSITION: DrawablePoint = DrawablePoint { x: 40.0, y: 80.0 };

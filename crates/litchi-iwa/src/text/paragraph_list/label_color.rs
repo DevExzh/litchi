@@ -9,12 +9,12 @@ use crate::text::style_registry::{
 };
 use crate::{Error, IWorkPackage, Result};
 
-use litchi_iwa_text::paragraph::list::{ParagraphList, ParagraphListLabelColor};
-use litchi_iwa_text::position::TextPosition;
 use super::variation::{
     effective_style_id, paragraph_boundaries_with_style, style_isolated_to_paragraph,
 };
 use super::{native, storage};
+use litchi_iwa_text::paragraph::list::{ParagraphList, ParagraphListLabelColor};
+use litchi_iwa_text::position::TextPosition;
 
 pub(crate) fn paragraph_list_label_color(
     package: &IWorkPackage,

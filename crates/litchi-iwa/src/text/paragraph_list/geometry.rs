@@ -8,15 +8,15 @@ use crate::text::style_registry::unregister_private_style;
 use crate::text::style_registry::{object_archive_name, register_private_style};
 use crate::{Error, IWorkPackage, Result};
 
+use super::variation::{
+    effective_style_id, paragraph_boundaries_with_style, style_isolated_to_paragraph,
+};
+use super::{levels, native, storage};
 use litchi_iwa_text::paragraph::list::{
     ParagraphList, ParagraphListBulletBaselineOffset, ParagraphListBulletGeometry,
     ParagraphListBulletScale,
 };
 use litchi_iwa_text::position::TextPosition;
-use super::variation::{
-    effective_style_id, paragraph_boundaries_with_style, style_isolated_to_paragraph,
-};
-use super::{levels, native, storage};
 
 pub(crate) fn paragraph_list_bullet_geometry(
     package: &IWorkPackage,

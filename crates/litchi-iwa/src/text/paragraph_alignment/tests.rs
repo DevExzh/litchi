@@ -12,17 +12,17 @@ use crate::shapes::{
     ShapeShadowOpacity, ShapeShadowPerspective, StrokePattern, StrokeWidth,
 };
 use crate::text::{
-    IWorkTextEditor, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
-    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFollowingStyle,
-    ParagraphHyphenation, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacingMultiple,
-    ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStyleId,
-    ParagraphStyleName, ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition,
-    ParagraphTabStop, ParagraphTabStops, ParagraphWritingDirection, TextBackground,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing,
-    TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow,
-    TextStrikethrough, TextStyle, TextUnderline,
+    IWorkTextEditor, ParagraphBorder, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval,
+    ParagraphFollowingStyle, ParagraphHyphenation, ParagraphIndentPoints, ParagraphIndents,
+    ParagraphLineSpacingMultiple, ParagraphLineSpacingPoints, ParagraphSpacing,
+    ParagraphSpacingPoints, ParagraphStyleId, ParagraphStyleName, ParagraphTabAlignment,
+    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
+    ParagraphWritingDirection, TextBackground, TextBaselineShift, TextCapitalization,
+    TextCharacterSpacing, TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize,
+    TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
 };
 use litchi_iwa_text::columns::{Columns, Count};
+use litchi_iwa_text::paragraph::border::{Offset as BorderOffset, Sides as BorderSides};
 
 const SOURCE_PAGES_OBJECT_TITLE_STYLE_ID: u64 = 121;
 
@@ -1393,8 +1393,8 @@ fn native_paragraph_border_overrides_match_app_authored_wire() {
         RgbaColor::black(),
         StrokeWidth::new(3.0).unwrap(),
         StrokePattern::Solid,
-        ParagraphBorderSides::ALL,
-        ParagraphBorderOffset::from_points(9.0).unwrap(),
+        BorderSides::ALL,
+        BorderOffset::from_points(9.0).unwrap(),
         true,
     )
     .unwrap();
@@ -1455,8 +1455,8 @@ fn native_paragraph_border_parser_rejects_conflicting_wire() {
                 RgbaColor::black(),
                 StrokeWidth::new(1.0).unwrap(),
                 StrokePattern::Solid,
-                ParagraphBorderSides::TOP,
-                ParagraphBorderOffset::DEFAULT,
+                BorderSides::TOP,
+                BorderOffset::DEFAULT,
                 false,
             )
             .unwrap()
@@ -1473,8 +1473,8 @@ fn native_paragraph_border_parser_rejects_conflicting_wire() {
                 RgbaColor::black(),
                 StrokeWidth::new(1.0).unwrap(),
                 StrokePattern::Solid,
-                ParagraphBorderSides::TOP,
-                ParagraphBorderOffset::DEFAULT,
+                BorderSides::TOP,
+                BorderOffset::DEFAULT,
                 false,
             )
             .unwrap()
@@ -2730,8 +2730,8 @@ fn paragraph_borders_round_trip_isolate_and_reset_in_every_suite() {
             RgbaColor::black(),
             StrokeWidth::new(3.0).unwrap(),
             StrokePattern::Solid,
-            ParagraphBorderSides::ALL,
-            ParagraphBorderOffset::from_points(9.0).unwrap(),
+            BorderSides::ALL,
+            BorderOffset::from_points(9.0).unwrap(),
             true,
         )
         .unwrap(),

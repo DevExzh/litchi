@@ -17,6 +17,7 @@ use crate::shapes::{
     Appearance, BlurRadius, Cap, Drop, Join, Offset, Pattern, RgbaColor, Shadow, Stroke, Width,
 };
 use litchi_iwa_common::shape::shadow::{Angle, Opacity};
+use litchi_iwa_text::paragraph::border::{Offset as BorderOffset, Sides as BorderSides};
 
 /// Effective outline applied to uniformly styled text.
 ///
@@ -116,124 +117,14 @@ pub enum ParagraphBackground {
     Color(RgbaColor),
 }
 
-const PARAGRAPH_BORDER_TOP_BIT: u8 = 1 << 0;
-const PARAGRAPH_BORDER_BOTTOM_BIT: u8 = 1 << 1;
-const PARAGRAPH_BORDER_LEFT_BIT: u8 = 1 << 2;
-const PARAGRAPH_BORDER_RIGHT_BIT: u8 = 1 << 3;
-const PARAGRAPH_BORDER_ALL_BITS: u8 = PARAGRAPH_BORDER_TOP_BIT
-    | PARAGRAPH_BORDER_BOTTOM_BIT
-    | PARAGRAPH_BORDER_LEFT_BIT
-    | PARAGRAPH_BORDER_RIGHT_BIT;
-const DEFAULT_PARAGRAPH_BORDER_OFFSET_POINTS: f32 = 6.0;
-
-/// Selected edges of a paragraph layout box.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct ParagraphBorderSides(u8);
-
-impl ParagraphBorderSides {
-    pub const NONE: Self = Self(0);
-    pub const TOP: Self = Self(PARAGRAPH_BORDER_TOP_BIT);
-    pub const BOTTOM: Self = Self(PARAGRAPH_BORDER_BOTTOM_BIT);
-    pub const LEFT: Self = Self(PARAGRAPH_BORDER_LEFT_BIT);
-    pub const RIGHT: Self = Self(PARAGRAPH_BORDER_RIGHT_BIT);
-    pub const ALL: Self = Self(PARAGRAPH_BORDER_ALL_BITS);
-
-    /// Construct any combination of paragraph-border edges.
-    pub const fn new(top: bool, bottom: bool, left: bool, right: bool) -> Self {
-        Self(
-            if top { PARAGRAPH_BORDER_TOP_BIT } else { 0 }
-                | if bottom {
-                    PARAGRAPH_BORDER_BOTTOM_BIT
-                } else {
-                    0
-                }
-                | if left { PARAGRAPH_BORDER_LEFT_BIT } else { 0 }
-                | if right { PARAGRAPH_BORDER_RIGHT_BIT } else { 0 },
-        )
-    }
-
-    pub const fn contains(self, side: Self) -> bool {
-        self.0 & side.0 == side.0
-    }
-
-    pub const fn is_empty(self) -> bool {
-        self.0 == 0
-    }
-
-    pub const fn is_all(self) -> bool {
-        self.0 == PARAGRAPH_BORDER_ALL_BITS
-    }
-
-    pub(crate) const fn native_bits(self) -> i32 {
-        self.0 as i32
-    }
-
-    pub(crate) fn from_native_bits(bits: i32) -> crate::Result<Self> {
-        let bits = u8::try_from(bits).map_err(|_| {
-            crate::Error::InvalidFormat("native paragraph-border sides are negative".to_owned())
-        })?;
-        if bits & !PARAGRAPH_BORDER_ALL_BITS != 0 {
-            return Err(crate::Error::InvalidFormat(
-                "native paragraph-border sides contain unknown bits".to_owned(),
-            ));
-        }
-        Ok(Self(bits))
-    }
-}
-
-impl std::ops::BitOr for ParagraphBorderSides {
-    type Output = Self;
-
-    fn bitor(self, rhs: Self) -> Self::Output {
-        Self(self.0 | rhs.0)
-    }
-}
-
-/// Inspector-visible gap between paragraph text and its border, in points.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct ParagraphBorderOffset(f32);
-
-impl ParagraphBorderOffset {
-    /// The six-point offset used when an iWork paragraph border is enabled.
-    pub const DEFAULT: Self = Self(DEFAULT_PARAGRAPH_BORDER_OFFSET_POINTS);
-
-    /// Construct a finite, nonnegative paragraph-border offset.
-    pub fn from_points(points: f32) -> crate::Result<Self> {
-        if !points.is_finite() || points < 0.0 {
-            return Err(crate::Error::InvalidFormat(
-                "paragraph-border offset must be finite and nonnegative".to_owned(),
-            ));
-        }
-        Ok(Self(points))
-    }
-
-    pub const fn points(self) -> f32 {
-        self.0
-    }
-
-    pub(crate) const fn native_inset(self) -> f32 {
-        self.0 - DEFAULT_PARAGRAPH_BORDER_OFFSET_POINTS
-    }
-
-    pub(crate) fn from_native_inset(inset: f32) -> crate::Result<Self> {
-        Self::from_points(inset + DEFAULT_PARAGRAPH_BORDER_OFFSET_POINTS)
-    }
-}
-
-impl Default for ParagraphBorderOffset {
-    fn default() -> Self {
-        Self::DEFAULT
-    }
-}
-
 /// One uniform native paragraph-border appearance.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ParagraphBorder {
     color: RgbaColor,
     width: Width,
     pattern: Pattern,
-    sides: ParagraphBorderSides,
-    offset: ParagraphBorderOffset,
+    sides: BorderSides,
+    offset: BorderOffset,
     rounded_corners: bool,
 }
 
@@ -243,8 +134,8 @@ impl ParagraphBorder {
         color: RgbaColor,
         width: Width,
         pattern: Pattern,
-        sides: ParagraphBorderSides,
-        offset: ParagraphBorderOffset,
+        sides: BorderSides,
+        offset: BorderOffset,
         rounded_corners: bool,
     ) -> crate::Result<Self> {
         if sides.is_empty() {
@@ -279,11 +170,11 @@ impl ParagraphBorder {
         self.pattern
     }
 
-    pub const fn sides(self) -> ParagraphBorderSides {
+    pub const fn sides(self) -> BorderSides {
         self.sides
     }
 
-    pub const fn offset(self) -> ParagraphBorderOffset {
+    pub const fn offset(self) -> BorderOffset {
         self.offset
     }
 
@@ -599,17 +490,14 @@ mod tests {
 
     #[test]
     fn paragraph_border_types_enforce_native_invariants() {
-        assert!(ParagraphBorderOffset::from_points(-0.1).is_err());
-        assert!(ParagraphBorderOffset::from_points(f32::NAN).is_err());
-        assert_eq!(
-            ParagraphBorderOffset::from_points(9.0).unwrap().points(),
-            9.0
-        );
+        assert!(BorderOffset::from_points(-0.1).is_err());
+        assert!(BorderOffset::from_points(f32::NAN).is_err());
+        assert_eq!(BorderOffset::from_points(9.0).unwrap().points(), 9.0);
 
-        let top_left = ParagraphBorderSides::TOP | ParagraphBorderSides::LEFT;
-        assert!(top_left.contains(ParagraphBorderSides::TOP));
-        assert!(top_left.contains(ParagraphBorderSides::LEFT));
-        assert!(!top_left.contains(ParagraphBorderSides::RIGHT));
+        let top_left = BorderSides::TOP | BorderSides::LEFT;
+        assert!(top_left.contains(BorderSides::TOP));
+        assert!(top_left.contains(BorderSides::LEFT));
+        assert!(!top_left.contains(BorderSides::RIGHT));
 
         let width = Width::new(3.0).unwrap();
         assert!(
@@ -617,8 +505,8 @@ mod tests {
                 RgbaColor::black(),
                 width,
                 Pattern::Solid,
-                ParagraphBorderSides::NONE,
-                ParagraphBorderOffset::DEFAULT,
+                BorderSides::NONE,
+                BorderOffset::DEFAULT,
                 false,
             )
             .is_err()
@@ -628,8 +516,8 @@ mod tests {
                 RgbaColor::black(),
                 width,
                 Pattern::Solid,
-                ParagraphBorderSides::TOP,
-                ParagraphBorderOffset::DEFAULT,
+                BorderSides::TOP,
+                BorderOffset::DEFAULT,
                 true,
             )
             .is_err()
@@ -639,8 +527,8 @@ mod tests {
                 RgbaColor::black(),
                 width,
                 Pattern::Solid,
-                ParagraphBorderSides::ALL,
-                ParagraphBorderOffset::from_points(9.0).unwrap(),
+                BorderSides::ALL,
+                BorderOffset::from_points(9.0).unwrap(),
                 true,
             )
             .is_ok()

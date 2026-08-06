@@ -10,6 +10,7 @@ use tempfile::NamedTempFile;
 use crate::archive::{Archive, ArchiveLimits as IwaArchiveLimits};
 use crate::snappy::{SnappyLimits, SnappyStream};
 use crate::{Error, Result};
+use litchi_core::ReadAt;
 use litchi_iwa_package::{Entry, Patch};
 
 #[path = "package_state.rs"]
@@ -31,6 +32,7 @@ pub struct IWorkPackage {
     state: Arc<PackageState>,
     limits: PackageLimits,
     mutation_revision: u64,
+    source: Option<Arc<[u8]>>,
 }
 
 /// An immutable, cheaply shareable package snapshot.
@@ -38,6 +40,7 @@ pub struct IWorkPackage {
 pub struct Snapshot {
     state: Arc<PackageState>,
     limits: PackageLimits,
+    source: Option<Arc<[u8]>>,
 }
 
 /// The published result of an atomic package-level snapshot edit.
@@ -329,6 +332,30 @@ impl IWorkPackage {
         Self::from_shared_bytes_with_limits(source, PackageLimits::default())
     }
 
+    /// Parse a package from an immutable positional source under the default
+    /// package limits.
+    ///
+    /// The source is read without a shared cursor and its version is checked
+    /// before the parsed package is published. Semantic IWA archives remain
+    /// lazy and use the package's bounded archive cache after ingress.
+    pub fn from_read_at(source: &dyn ReadAt) -> Result<Self> {
+        Self::from_read_at_with_limits(source, PackageLimits::default())
+    }
+
+    /// Parse a package from an immutable positional source under caller-
+    /// selected package limits.
+    ///
+    /// The physical archive owner checks the source length before allocating,
+    /// snapshots through [`ReadAt`], and rejects a changed source revision.
+    pub fn from_read_at_with_limits(source: &dyn ReadAt, limits: PackageLimits) -> Result<Self> {
+        let catalog = litchi_iwa_archive::package::Catalog::from_read_at_with_limits(
+            source,
+            limits.physical_archive_limits()?,
+        )?;
+        let source = catalog.source_is_exact().then(|| catalog.shared_source());
+        Self::from_catalog(catalog, limits, source)
+    }
+
     /// Parse a package under caller-selected ingress ceilings.
     ///
     /// The same ceilings are applied to the outer ZIP and, when present, the
@@ -342,7 +369,7 @@ impl IWorkPackage {
             bytes,
             limits.physical_archive_limits()?,
         )?;
-        Self::from_catalog(catalog, limits)
+        Self::from_catalog(catalog, limits, None)
     }
 
     /// Parse an already-owned package source under caller-selected ingress
@@ -353,15 +380,17 @@ impl IWorkPackage {
         })?;
         limits.check_input_size(input_size, "iWork package input")?;
         let catalog = litchi_iwa_archive::package::Catalog::from_shared_bytes_with_limits(
-            source,
+            Arc::clone(&source),
             limits.physical_archive_limits()?,
         )?;
-        Self::from_catalog(catalog, limits)
+        let source = catalog.source_is_exact().then_some(source);
+        Self::from_catalog(catalog, limits, source)
     }
 
     fn from_catalog(
         catalog: litchi_iwa_archive::package::Catalog,
         limits: PackageLimits,
+        source: Option<Arc<[u8]>>,
     ) -> Result<Self> {
         let mut entries = Vec::new();
         entries.try_reserve(catalog.len()).map_err(|_error| {
@@ -380,6 +409,7 @@ impl IWorkPackage {
             state: Arc::new(PackageState::from_entries(entries, archive_limits)?),
             limits,
             mutation_revision: 0,
+            source,
         };
         package.validate_state()?;
         Ok(package)
@@ -413,6 +443,7 @@ impl IWorkPackage {
         Snapshot {
             state: Arc::clone(&self.state),
             limits: self.limits,
+            source: self.source.clone(),
         }
     }
 
@@ -510,10 +541,11 @@ impl IWorkPackage {
 
     /// Delete a package member.
     pub fn remove_entry(&mut self, name: &str) -> Option<Vec<u8>> {
-        let position = self.entry_position(normalize_entry_name(name))?;
+        let normalized = normalize_entry_name(name);
+        let position = self.entry_position(normalized)?;
         let state = Arc::make_mut(&mut self.state);
         let removed = state.entries.remove_at(position)?.into_parts().1;
-        state.clear_parsed_archive();
+        state.invalidate_archive(normalized);
         self.mark_mutated();
         Some(removed)
     }
@@ -530,10 +562,9 @@ impl IWorkPackage {
 
     /// Borrow a parsed `.iwa` package member through a bounded read cache.
     ///
-    /// The callback never observes package-owned mutable state. A single
-    /// parsed archive is retained per copy-on-write package state, which
-    /// avoids repeating decompression and archive parsing for hot metadata
-    /// lookups without retaining every component's expanded representation.
+    /// The callback never observes package-owned mutable state. Parsed
+    /// archives are retained per copy-on-write package state under the
+    /// decompressed-byte budget carried by the archive limits.
     pub(crate) fn with_parsed_archive<T, F>(&self, name: &str, read: F) -> Result<T>
     where
         F: FnOnce(&Archive) -> Result<T>,
@@ -548,7 +579,11 @@ impl IWorkPackage {
             .get_or_parse_archive(normalized, |limits| self.parse_archive(normalized, limits))
     }
 
-    fn parse_archive(&self, normalized: &str, archive_limits: IwaArchiveLimits) -> Result<Archive> {
+    fn parse_archive(
+        &self,
+        normalized: &str,
+        archive_limits: IwaArchiveLimits,
+    ) -> Result<(Archive, usize)> {
         if !normalized.ends_with(".iwa") {
             return Err(Error::Bundle(format!(
                 "Package entry {normalized} is not an IWA component"
@@ -564,10 +599,9 @@ impl IWorkPackage {
         }
         let stream =
             SnappyStream::decompress_with_limits(compressed, self.limits.snappy_limits()?)?;
-        Ok(Archive::parse_with_limits(
-            stream.as_bytes(),
-            archive_limits,
-        )?)
+        let weight = stream.as_bytes().len().max(1);
+        let archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)?;
+        Ok((archive, weight))
     }
 
     /// Serialize and replace a parsed `.iwa` package member.
@@ -617,7 +651,6 @@ impl IWorkPackage {
             .entries
             .try_insert_at(position, Entry::new(normalized, compressed))
             .map_err(entry_store_error)?;
-        state.clear_parsed_archive();
         self.mark_mutated();
         Ok(())
     }
@@ -651,6 +684,17 @@ impl IWorkPackage {
     /// discovery, so newly-created document indexes are inserted first.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         self.validate_state()?;
+        if let Some(source) = self.source.as_deref() {
+            let mut bytes = Vec::new();
+            bytes.try_reserve_exact(source.len()).map_err(|_error| {
+                Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                    resource: "iWork package source bytes",
+                    amount: source.len(),
+                })
+            })?;
+            bytes.extend_from_slice(source);
+            return Ok(bytes);
+        }
         litchi_iwa_archive::package::to_bytes(
             self.state
                 .entries
@@ -669,6 +713,11 @@ impl IWorkPackage {
     /// not allocate a second buffer containing the complete package.
     pub fn write_to<W: Write>(&self, sink: W) -> Result<()> {
         self.validate_state()?;
+        if let Some(source) = self.source.as_deref() {
+            let mut sink = sink;
+            sink.write_all(source)?;
+            return Ok(());
+        }
         litchi_iwa_archive::package::write_to(
             self.state
                 .entries
@@ -808,12 +857,12 @@ impl IWorkPackage {
             .entries
             .try_insert_at(position, Entry::new(name, data))
             .map_err(entry_store_error)?;
-        state.clear_parsed_archive();
         Ok(())
     }
 
     fn mark_mutated(&mut self) {
         self.mutation_revision = self.mutation_revision.wrapping_add(1);
+        self.source = None;
     }
 }
 
@@ -863,6 +912,7 @@ impl Snapshot {
         let target = Self {
             state: Arc::new(state),
             limits: self.limits,
+            source: None,
         };
         target.validate()?;
         Ok(target)
@@ -874,6 +924,7 @@ impl Snapshot {
             state: Arc::clone(&self.state),
             limits: self.limits,
             mutation_revision: 0,
+            source: self.source.clone(),
         }
     }
 
@@ -1072,12 +1123,30 @@ mod tests {
 
     #[test]
     fn shared_bytes_preserve_the_source_for_noop_writes() {
-        let bytes = zip(&[("preview.jpg", b"preview")]);
+        let mut bytes = zip(&[("preview.jpg", b"preview")]);
+        let end_of_central_directory = bytes.len() - 22;
+        let comment = b"preserve-mode-comment";
+        bytes[end_of_central_directory + 20..end_of_central_directory + 22]
+            .copy_from_slice(&(comment.len() as u16).to_le_bytes());
+        bytes.extend_from_slice(comment);
         let source: Arc<[u8]> = bytes.into();
         let package = IWorkPackage::from_shared_bytes(source.clone()).unwrap();
 
         assert_eq!(package.to_bytes().unwrap(), source.as_ref());
+        let mut written = Vec::new();
+        package.write_to(&mut written).unwrap();
+        assert_eq!(written, source.as_ref());
         assert_eq!(package.entry_names().collect::<Vec<_>>(), ["preview.jpg"]);
+    }
+
+    #[test]
+    fn reads_a_package_from_a_positional_source() {
+        let bytes = zip(&[("preview.jpg", b"preview")]);
+        let source = litchi_core::OwnedSource::new(bytes.clone());
+        let package = IWorkPackage::from_read_at(&source).unwrap();
+
+        assert_eq!(package.entry("preview.jpg"), Some(&b"preview"[..]));
+        assert_eq!(package.to_bytes().unwrap(), bytes);
     }
 
     #[test]
@@ -1408,7 +1477,7 @@ mod tests {
                         if parse_count.fetch_add(1, Ordering::SeqCst) == 0 {
                             first_parse_started.wait();
                         }
-                        Ok(archive())
+                        Ok((archive(), 1))
                     })
                 })
             })
@@ -1461,7 +1530,7 @@ mod tests {
         let retry = state
             .get_or_parse_archive("Index/Document.iwa", |_| {
                 retry_count.fetch_add(1, Ordering::SeqCst);
-                Ok(archive())
+                Ok((archive(), 1))
             })
             .unwrap();
         assert!(retry.object(1).is_some());

@@ -2,8 +2,8 @@
 
 use std::collections::HashSet;
 
-use prost::Message;
 use litchi_iwa_common::comment::Uuid;
+use prost::Message;
 
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::comments::{fresh_comment_storage_uuid, insert_comment_storage};

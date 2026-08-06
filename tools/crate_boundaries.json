@@ -82,6 +82,7 @@
     "litchi-iwa": [
       "litchi-core",
       "litchi-iwa-archive",
+      "litchi-iwa-cache",
       "litchi-iwa-common",
       "litchi-iwa-core",
       "litchi-iwa-detect",
@@ -96,6 +97,7 @@
       "litchi-pages"
     ],
     "litchi-iwa-archive": [
+      "litchi-core",
       "litchi-iwa-core",
       "soapberry-zip"
     ],

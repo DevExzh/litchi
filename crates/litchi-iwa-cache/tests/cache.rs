@@ -27,6 +27,10 @@ fn rejects_invalid_capacity_and_weights() {
         WeightedCache::<&str, usize>::new(0),
         Err(WeightError::ZeroCapacity)
     ));
+    assert!(matches!(
+        WeightedCache::<&str, usize>::new_with_limits(1, 0),
+        Err(WeightError::ZeroFlightCapacity)
+    ));
 
     let cache = cache(3);
     assert_eq!(
@@ -141,6 +145,58 @@ fn failed_parse_is_not_cached_and_allows_retry() {
         .unwrap_or_else(|error| panic!("retry unexpectedly failed: {error}"));
     assert_eq!(*retry, 9);
     assert_eq!(parse_count.load(Ordering::SeqCst), 2);
+}
+
+#[test]
+fn active_parser_flights_are_bounded() {
+    let cache = Arc::new(
+        WeightedCache::<&'static str, usize>::new_with_limits(4, 1)
+            .unwrap_or_else(|error| panic!("test cache construction failed: {error}")),
+    );
+    let parser_started = Arc::new(Barrier::new(2));
+    let release_parser = Arc::new(Barrier::new(2));
+    let owner_cache = Arc::clone(&cache);
+    let owner_started = Arc::clone(&parser_started);
+    let owner_release = Arc::clone(&release_parser);
+    let owner = thread::spawn(move || {
+        owner_cache.get_or_insert_with("first", 1, || {
+            owner_started.wait();
+            owner_release.wait();
+            1
+        })
+    });
+
+    parser_started.wait();
+    assert!(matches!(
+        cache.get_or_insert_with("second", 1, || 2),
+        Err(GetOrInsertError::Cache(CacheError::FlightsLimit {
+            active: 1,
+            limit: 1,
+        }))
+    ));
+    release_parser.wait();
+    assert_eq!(*join_success(owner), 1);
+}
+
+#[test]
+fn reported_weights_are_validated_after_parsing() {
+    let cache = cache(4);
+    assert!(matches!(
+        cache.get_or_try_insert_with_weight("large", || {
+            Ok::<(usize, usize), ParseError>((7, 5))
+        }),
+        Err(GetOrInsertError::Cache(CacheError::Weight(
+            WeightError::ExceedsCapacity {
+                weight: 5,
+                capacity: 4,
+            }
+        )))
+    ));
+    let value = cache
+        .get_or_try_insert_with_weight("large", || Ok::<(usize, usize), ParseError>((9, 4)))
+        .unwrap_or_else(|error| panic!("weighted retry unexpectedly failed: {error}"));
+    assert_eq!(*value, 9);
+    assert_eq!(cache.total_weight(), 4);
 }
 
 #[test]

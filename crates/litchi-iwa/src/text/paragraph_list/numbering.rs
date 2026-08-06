@@ -17,9 +17,7 @@ use super::super::storage_wire::{
 };
 use super::levels::{paragraph_starts, require_paragraph_start};
 use super::paragraph_lists;
-use litchi_iwa_text::paragraph::list::{
-    ParagraphList, ParagraphListNumbering, ParagraphListStart,
-};
+use litchi_iwa_text::paragraph::list::{ParagraphList, ParagraphListNumbering, ParagraphListStart};
 use litchi_iwa_text::position::TextPosition;
 
 const PARAGRAPH_START_TABLE_FIELD: u32 = 14;
@@ -30,7 +28,9 @@ fn numbering_from_native(value: u32) -> Result<ParagraphListNumbering> {
     if value == 0 {
         Ok(ParagraphListNumbering::Continue)
     } else {
-        Ok(ParagraphListNumbering::StartAt(ParagraphListStart::new(value)?))
+        Ok(ParagraphListNumbering::StartAt(ParagraphListStart::new(
+            value,
+        )?))
     }
 }
 

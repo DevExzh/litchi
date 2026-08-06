@@ -238,22 +238,18 @@ impl ParagraphListBullet {
     ///
     /// Returns a typed validation error when `bullet` is empty, too long, or
     /// contains a control character.
-    pub fn new(bullet: impl Into<Box<str>>) -> Result<Self> {
-        let value = bullet.into();
-        let character_count = value.chars().count();
-        if character_count == 0 {
-            return Err(Error::BulletEmpty);
-        }
-        if character_count > MAX_PARAGRAPH_LIST_BULLET_CHARACTERS {
-            return Err(Error::BulletTooLong {
-                characters: character_count,
-                maximum: MAX_PARAGRAPH_LIST_BULLET_CHARACTERS,
-            });
-        }
-        if value.chars().any(char::is_control) {
-            return Err(Error::BulletControlCharacter);
-        }
-        Ok(Self(value))
+    pub fn new(bullet: &str) -> Result<Self> {
+        validate_bullet(bullet)?;
+        Ok(Self(bullet.into()))
+    }
+
+    /// Construct a validated marker while reusing an owned string allocation.
+    ///
+    /// The caller must already own the marker; validation still happens before
+    /// the value is published.
+    pub fn from_boxed(bullet: Box<str>) -> Result<Self> {
+        validate_bullet(&bullet)?;
+        Ok(Self(bullet))
     }
 
     /// Borrow the marker exactly as iWork displays it.
@@ -261,6 +257,26 @@ impl ParagraphListBullet {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+}
+
+fn validate_bullet(value: &str) -> Result<()> {
+    let mut character_count = 0;
+    for character in value.chars() {
+        character_count += 1;
+        if character_count > MAX_PARAGRAPH_LIST_BULLET_CHARACTERS {
+            return Err(Error::BulletTooLong {
+                characters: character_count,
+                maximum: MAX_PARAGRAPH_LIST_BULLET_CHARACTERS,
+            });
+        }
+        if character.is_control() {
+            return Err(Error::BulletControlCharacter);
+        }
+    }
+    if character_count == 0 {
+        return Err(Error::BulletEmpty);
+    }
+    Ok(())
 }
 
 impl Default for ParagraphListBullet {
@@ -745,7 +761,8 @@ mod tests {
         assert_eq!(ParagraphListBullet::new("➡").unwrap().as_str(), "➡");
         assert!(ParagraphListBullet::new("").is_err());
         assert!(ParagraphListBullet::new("a\nb").is_err());
-        assert!(ParagraphListBullet::new("x".repeat(33)).is_err());
+        let oversized = "x".repeat(33);
+        assert!(ParagraphListBullet::new(&oversized).is_err());
     }
 
     #[test]

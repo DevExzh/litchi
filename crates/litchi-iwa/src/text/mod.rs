@@ -134,13 +134,12 @@ pub use text_comment_types::{
 pub(crate) use extractor::TextExtractor;
 pub use litchi_iwa_text::storage::{Error as StorageError, Fragment, Run, Storage};
 pub use style::{
-    CharacterError, ParagraphBackground, ParagraphBorder, ParagraphBorderOffset,
-    ParagraphBorderSides, ParagraphBorders, ParagraphIndentPoints, ParagraphIndents,
-    ParagraphLineSpacing, ParagraphLineSpacingMultiple, ParagraphLineSpacingPoints,
-    ParagraphSpacing, ParagraphSpacingPoints, ParagraphStyle, TextAlignment, TextBackground,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures,
-    TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough, TextStyle,
-    TextUnderline,
+    CharacterError, ParagraphBackground, ParagraphBorder, ParagraphBorders, ParagraphIndentPoints,
+    ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
+    ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStyle,
+    TextAlignment, TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
+    TextDecorations, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow,
+    TextStrikethrough, TextStyle, TextUnderline,
 };
 
 impl From<litchi_iwa_text::NameError> for crate::Error {

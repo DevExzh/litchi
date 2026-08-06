@@ -9,12 +9,12 @@ use crate::text::style_registry::{
 };
 use crate::{Error, IWorkPackage, Result};
 
-use litchi_iwa_text::paragraph::list::{ParagraphList, ParagraphListNumberFormat};
-use litchi_iwa_text::position::TextPosition;
 use super::variation::{
     effective_style_id, paragraph_boundaries_with_style, style_isolated_to_paragraph,
 };
 use super::{levels, native, storage};
+use litchi_iwa_text::paragraph::list::{ParagraphList, ParagraphListNumberFormat};
+use litchi_iwa_text::position::TextPosition;
 
 pub(crate) fn paragraph_list_number_format(
     package: &IWorkPackage,

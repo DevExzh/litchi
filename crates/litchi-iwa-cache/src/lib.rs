@@ -88,6 +88,8 @@ impl Error for AllocationError {}
 pub enum WeightError {
     /// A cache cannot be constructed with no positive weight budget.
     ZeroCapacity,
+    /// A cache cannot permit no active parser flights.
+    ZeroFlightCapacity,
     /// Zero-weight values are rejected so the weight bound also bounds the
     /// number of retained entries in every usable cache.
     ZeroWeight,
@@ -111,6 +113,9 @@ impl fmt::Display for WeightError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ZeroCapacity => formatter.write_str("cache weight capacity must be non-zero"),
+            Self::ZeroFlightCapacity => {
+                formatter.write_str("active parser flight capacity must be non-zero")
+            },
             Self::ZeroWeight => formatter.write_str("cached value weight must be non-zero"),
             Self::ExceedsCapacity { weight, capacity } => write!(
                 formatter,
@@ -137,6 +142,13 @@ pub enum CacheError {
     Allocation(AllocationError),
     /// A supplied capacity or value weight is invalid.
     Weight(WeightError),
+    /// The bounded active-parser budget is currently exhausted.
+    FlightsLimit {
+        /// Number of active parser generations when the request was rejected.
+        active: usize,
+        /// Maximum number of active parser generations.
+        limit: usize,
+    },
 }
 
 impl fmt::Display for CacheError {
@@ -144,6 +156,10 @@ impl fmt::Display for CacheError {
         match self {
             Self::Allocation(error) => error.fmt(formatter),
             Self::Weight(error) => error.fmt(formatter),
+            Self::FlightsLimit { active, limit } => write!(
+                formatter,
+                "active parser flight limit {limit} reached with {active} flight(s)"
+            ),
         }
     }
 }
@@ -153,6 +169,7 @@ impl Error for CacheError {
         match self {
             Self::Allocation(error) => Some(error),
             Self::Weight(error) => Some(error),
+            Self::FlightsLimit { .. } => None,
         }
     }
 }
@@ -205,6 +222,17 @@ struct Entry<V> {
     renumbered: bool,
 }
 
+impl<V> Clone for Entry<V> {
+    fn clone(&self) -> Self {
+        Self {
+            value: Arc::clone(&self.value),
+            weight: self.weight,
+            last_used: self.last_used,
+            renumbered: self.renumbered,
+        }
+    }
+}
+
 enum FlightOutcome<V> {
     Success(Arc<V>),
     Cache(CacheError),
@@ -224,13 +252,13 @@ impl<V> Clone for FlightOutcome<V> {
 }
 
 struct Flight<V> {
-    weight: usize,
+    weight: Option<usize>,
     state: Mutex<Option<FlightOutcome<V>>>,
     completed: Condvar,
 }
 
 impl<V> Flight<V> {
-    fn new(weight: usize) -> Self {
+    fn new(weight: Option<usize>) -> Self {
         Self {
             weight,
             state: Mutex::new(None),
@@ -365,24 +393,55 @@ enum Lookup<K, V> {
 /// lookups return a cloned [`Arc`] handle.
 pub struct WeightedCache<K, V> {
     max_weight: usize,
+    max_flights: usize,
     state: Mutex<State<K, V>>,
+}
+
+impl<K, V> fmt::Debug for WeightedCache<K, V>
+where
+    K: Eq + Hash + Clone,
+{
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("WeightedCache")
+            .field("max_weight", &self.max_weight)
+            .field("max_flights", &self.max_flights)
+            .field("len", &self.len())
+            .field("total_weight", &self.total_weight())
+            .finish_non_exhaustive()
+    }
 }
 
 impl<K, V> WeightedCache<K, V>
 where
     K: Eq + Hash + Clone,
 {
+    /// Default bound for distinct active parser generations.
+    pub const DEFAULT_MAX_FLIGHTS: usize = 64;
+
     /// Construct a cache with a positive total-weight budget.
     ///
     /// # Errors
     ///
     /// Returns [`WeightError::ZeroCapacity`] when `max_weight` is zero.
     pub fn new(max_weight: usize) -> Result<Self, WeightError> {
+        Self::new_with_limits(max_weight, Self::DEFAULT_MAX_FLIGHTS)
+    }
+
+    /// Construct a cache with explicit value-weight and active-flight budgets.
+    ///
+    /// Bounding active flights prevents a burst of distinct slow parser keys
+    /// from growing an unbounded wait registry before any value is cacheable.
+    pub fn new_with_limits(max_weight: usize, max_flights: usize) -> Result<Self, WeightError> {
         if max_weight == 0 {
             return Err(WeightError::ZeroCapacity);
         }
+        if max_flights == 0 {
+            return Err(WeightError::ZeroFlightCapacity);
+        }
         Ok(Self {
             max_weight,
+            max_flights,
             state: Mutex::new(State::default()),
         })
     }
@@ -391,6 +450,32 @@ where
     #[must_use]
     pub const fn max_weight(&self) -> usize {
         self.max_weight
+    }
+
+    /// Return the maximum number of distinct active parser generations.
+    #[must_use]
+    pub const fn max_flights(&self) -> usize {
+        self.max_flights
+    }
+
+    /// Fork the completed cache state for an immutable copy-on-write generation.
+    ///
+    /// Retained values keep sharing their [`Arc`] allocations, while active
+    /// parser flights are deliberately omitted because they belong to the
+    /// source generation's exact input state.
+    #[must_use]
+    pub fn fork(&self) -> Self {
+        let state = lock(&self.state);
+        Self {
+            max_weight: self.max_weight,
+            max_flights: self.max_flights,
+            state: Mutex::new(State {
+                entries: state.entries.clone(),
+                flights: HashMap::new(),
+                total_weight: state.total_weight,
+                next_recency: state.next_recency,
+            }),
+        }
     }
 
     /// Return the number of completed values currently retained.
@@ -545,7 +630,7 @@ where
     where
         F: FnOnce() -> Result<V, ParseError>,
     {
-        let lookup = self.begin_lookup(key, weight)?;
+        let lookup = self.begin_lookup(key, Some(weight))?;
         match lookup {
             Lookup::Cached(value) => Ok(value),
             Lookup::Wait(flight) => flight.wait().into_result(),
@@ -556,7 +641,32 @@ where
         }
     }
 
-    fn begin_lookup(&self, key: K, weight: usize) -> Result<Lookup<K, V>, GetOrInsertError> {
+    /// Return a cached value or run one fallible parser whose retained weight
+    /// is known only after parsing.
+    pub fn get_or_try_insert_with_weight<F>(
+        &self,
+        key: K,
+        parse: F,
+    ) -> Result<Arc<V>, GetOrInsertError>
+    where
+        F: FnOnce() -> Result<(V, usize), ParseError>,
+    {
+        let lookup = self.begin_lookup(key, None)?;
+        match lookup {
+            Lookup::Cached(value) => Ok(value),
+            Lookup::Wait(flight) => flight.wait().into_result(),
+            Lookup::Parse {
+                key: parse_key,
+                flight,
+            } => self.run_weighted_parser(parse_key, &flight, parse),
+        }
+    }
+
+    fn begin_lookup(
+        &self,
+        key: K,
+        weight: Option<usize>,
+    ) -> Result<Lookup<K, V>, GetOrInsertError> {
         let mut state = lock(&self.state);
         if let Some(value) = state
             .entries
@@ -568,17 +678,28 @@ where
         }
 
         if let Some(flight) = state.flights.get(&key) {
-            if flight.weight != weight {
+            if let (Some(expected), Some(requested)) = (flight.weight, weight)
+                && expected != requested
+            {
                 return Err(CacheError::Weight(WeightError::InFlightMismatch {
-                    expected: flight.weight,
-                    requested: weight,
+                    expected,
+                    requested,
                 })
                 .into());
             }
             return Ok(Lookup::Wait(Arc::clone(flight)));
         }
 
-        self.validate_weight(weight)?;
+        if let Some(weight) = weight {
+            self.validate_weight(weight)?;
+        }
+        if state.flights.len() >= self.max_flights {
+            return Err(CacheError::FlightsLimit {
+                active: state.flights.len(),
+                limit: self.max_flights,
+            }
+            .into());
+        }
         if state.flights.try_reserve(1).is_err() {
             return Err(allocation_error(AllocationKind::Flights).into());
         }
@@ -600,6 +721,41 @@ where
         let parsed = panic::catch_unwind(AssertUnwindSafe(parse));
         match parsed {
             Ok(Ok(parsed_value)) => {
+                let shared_value = Arc::new(parsed_value);
+                self.publish_success(key, weight, flight, &shared_value)
+            },
+            Ok(Err(parse_error)) => {
+                let shared_error: SharedParseError = Arc::from(parse_error);
+                self.complete_detached_flight(
+                    &key,
+                    flight,
+                    FlightOutcome::Parse(Arc::clone(&shared_error)),
+                );
+                Err(GetOrInsertError::Parse(shared_error))
+            },
+            Err(payload) => {
+                self.complete_detached_flight(&key, flight, FlightOutcome::ParserPanicked);
+                panic::resume_unwind(payload);
+            },
+        }
+    }
+
+    fn run_weighted_parser<F>(
+        &self,
+        key: K,
+        flight: &Arc<Flight<V>>,
+        parse: F,
+    ) -> Result<Arc<V>, GetOrInsertError>
+    where
+        F: FnOnce() -> Result<(V, usize), ParseError>,
+    {
+        let parsed = panic::catch_unwind(AssertUnwindSafe(parse));
+        match parsed {
+            Ok(Ok((parsed_value, weight))) => {
+                if let Err(error) = self.validate_weight(weight) {
+                    self.complete_detached_flight(&key, flight, FlightOutcome::Cache(error));
+                    return Err(GetOrInsertError::Cache(error));
+                }
                 let shared_value = Arc::new(parsed_value);
                 self.publish_success(key, weight, flight, &shared_value)
             },

@@ -34,15 +34,16 @@ use super::super::paragraph_tabs::{
     decimal_character_from_native,
 };
 use super::super::style::{
-    ParagraphBackground, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
-    ParagraphBorders, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,
-    ParagraphLineSpacingMultiple, ParagraphLineSpacingPoints, ParagraphSpacing,
-    ParagraphSpacingPoints, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextDecorations, TextLigatures, TextOutline, TextPointSize, TextScript,
-    TextShadow, TextStrikethrough, TextStyle, TextUnderline,
+    ParagraphBackground, ParagraphBorder, ParagraphBorders, ParagraphIndentPoints,
+    ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
+    ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, TextAlignment,
+    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations,
+    TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
+    TextStyle, TextUnderline,
 };
 use super::super::style_registry::object_archive;
 use super::{NativeTextCapitalization, NativeTextCharacterSpacing, NativeTextValue};
+use litchi_iwa_text::paragraph::border::{Offset as BorderOffset, Sides as BorderSides};
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
 const THEME_MESSAGE_TYPES: &[u32] = &[10, 10_001, 12_009];
@@ -1994,7 +1995,7 @@ pub(super) fn paragraph_borders_from_properties(
         .transpose()?;
     let modern_sides = properties
         .border_positions
-        .map(ParagraphBorderSides::from_native_bits)
+        .map(border_sides_from_native_bits)
         .transpose()?;
     if legacy_sides
         .zip(modern_sides)
@@ -2004,9 +2005,7 @@ pub(super) fn paragraph_borders_from_properties(
             "native paragraph-border side encodings disagree".to_owned(),
         ));
     }
-    let sides = modern_sides
-        .or(legacy_sides)
-        .unwrap_or(ParagraphBorderSides::NONE);
+    let sides = modern_sides.or(legacy_sides).unwrap_or(BorderSides::NONE);
     let native_stroke = properties
         .stroke
         .as_ref()
@@ -2041,12 +2040,11 @@ pub(super) fn paragraph_borders_from_properties(
                     "native paragraph-border offset must contain equal finite axes".to_owned(),
                 ));
             }
-            ParagraphBorderOffset::from_native_inset(point.x)?
+            border_offset_from_native_inset(point.x)?
         },
-        None => ParagraphBorderOffset::DEFAULT,
+        None => BorderOffset::DEFAULT,
     };
-    let rounded_corners =
-        properties.rounded_corners.unwrap_or(false) && sides == ParagraphBorderSides::ALL;
+    let rounded_corners = properties.rounded_corners.unwrap_or(false) && sides == BorderSides::ALL;
     Ok(Some(ParagraphBorders::Bordered(ParagraphBorder::new(
         stroke.color,
         stroke.width,
@@ -2063,20 +2061,20 @@ fn paragraph_borders_to_native(borders: Option<ParagraphBorders>) -> NativeParag
         Some(ParagraphBorders::None) => NativeParagraphBorderFields {
             deprecated_borders: Some(0),
             stroke_null: Some(true),
-            positions: Some(ParagraphBorderSides::NONE.native_bits()),
+            positions: Some(border_sides_native_bits(BorderSides::NONE)),
             rounded_corners: Some(false),
             ..Default::default()
         },
         Some(ParagraphBorders::Bordered(border)) => {
-            let offset = (border.offset() != ParagraphBorderOffset::DEFAULT).then(|| {
-                let inset = border.offset().native_inset();
+            let offset = (border.offset() != BorderOffset::DEFAULT).then(|| {
+                let inset = border_offset_native_inset(border.offset());
                 tsp::Point { x: inset, y: inset }
             });
             NativeParagraphBorderFields {
                 deprecated_borders: Some(paragraph_border_legacy_value(border.sides())),
                 historical_rule_offset: offset,
                 stroke: Some(stroke_to_native(border.native_stroke())),
-                positions: Some(border.sides().native_bits()),
+                positions: Some(border_sides_native_bits(border.sides())),
                 rounded_corners: Some(border.has_rounded_corners()),
                 ..Default::default()
             }
@@ -2084,19 +2082,56 @@ fn paragraph_borders_to_native(borders: Option<ParagraphBorders>) -> NativeParag
     }
 }
 
-fn paragraph_border_legacy_value(sides: ParagraphBorderSides) -> i32 {
-    if sides == ParagraphBorderSides::ALL {
-        return LEGACY_BORDER_ALL;
-    }
-    i32::from(sides.contains(ParagraphBorderSides::TOP)) * LEGACY_BORDER_TOP
-        + i32::from(sides.contains(ParagraphBorderSides::BOTTOM)) * LEGACY_BORDER_BOTTOM
-        + i32::from(sides.contains(ParagraphBorderSides::LEFT)) * LEGACY_BORDER_LEFT
-        + i32::from(sides.contains(ParagraphBorderSides::RIGHT)) * LEGACY_BORDER_RIGHT
+const PARAGRAPH_BORDER_ALL_BITS: u8 = 0b1111;
+const DEFAULT_PARAGRAPH_BORDER_OFFSET_POINTS: f32 = 6.0;
+
+fn border_sides_native_bits(sides: BorderSides) -> i32 {
+    i32::from(sides.contains(BorderSides::TOP))
+        | (i32::from(sides.contains(BorderSides::BOTTOM)) << 1)
+        | (i32::from(sides.contains(BorderSides::LEFT)) << 2)
+        | (i32::from(sides.contains(BorderSides::RIGHT)) << 3)
 }
 
-fn paragraph_border_sides_from_legacy(value: i32) -> Result<ParagraphBorderSides> {
+fn border_sides_from_native_bits(bits: i32) -> Result<BorderSides> {
+    let bits = u8::try_from(bits).map_err(|_| {
+        Error::InvalidFormat("native paragraph-border sides are negative".to_owned())
+    })?;
+    if bits & !PARAGRAPH_BORDER_ALL_BITS != 0 {
+        return Err(Error::InvalidFormat(
+            "native paragraph-border sides contain unknown bits".to_owned(),
+        ));
+    }
+    Ok(BorderSides::new(
+        bits & 1 != 0,
+        bits & 2 != 0,
+        bits & 4 != 0,
+        bits & 8 != 0,
+    ))
+}
+
+fn border_offset_from_native_inset(inset: f32) -> Result<BorderOffset> {
+    BorderOffset::from_points(inset + DEFAULT_PARAGRAPH_BORDER_OFFSET_POINTS).map_err(|error| {
+        Error::InvalidFormat(format!("invalid native paragraph-border offset: {error}"))
+    })
+}
+
+fn border_offset_native_inset(offset: BorderOffset) -> f32 {
+    offset.points() - DEFAULT_PARAGRAPH_BORDER_OFFSET_POINTS
+}
+
+fn paragraph_border_legacy_value(sides: BorderSides) -> i32 {
+    if sides == BorderSides::ALL {
+        return LEGACY_BORDER_ALL;
+    }
+    i32::from(sides.contains(BorderSides::TOP)) * LEGACY_BORDER_TOP
+        + i32::from(sides.contains(BorderSides::BOTTOM)) * LEGACY_BORDER_BOTTOM
+        + i32::from(sides.contains(BorderSides::LEFT)) * LEGACY_BORDER_LEFT
+        + i32::from(sides.contains(BorderSides::RIGHT)) * LEGACY_BORDER_RIGHT
+}
+
+fn paragraph_border_sides_from_legacy(value: i32) -> Result<BorderSides> {
     if value == LEGACY_BORDER_ALL {
-        return Ok(ParagraphBorderSides::ALL);
+        return Ok(BorderSides::ALL);
     }
     let known = LEGACY_BORDER_TOP | LEGACY_BORDER_BOTTOM | LEGACY_BORDER_LEFT | LEGACY_BORDER_RIGHT;
     if value < 0 || value & !known != 0 {
@@ -2104,7 +2139,7 @@ fn paragraph_border_sides_from_legacy(value: i32) -> Result<ParagraphBorderSides
             "native paragraph border has an unknown legacy side value".to_owned(),
         ));
     }
-    Ok(ParagraphBorderSides::new(
+    Ok(BorderSides::new(
         value & LEGACY_BORDER_TOP != 0,
         value & LEGACY_BORDER_BOTTOM != 0,
         value & LEGACY_BORDER_LEFT != 0,
