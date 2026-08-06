@@ -7,6 +7,7 @@
 
 mod codec;
 mod model;
+mod transaction;
 mod validation;
 
 #[cfg(test)]
@@ -17,6 +18,7 @@ pub use model::{
     RevisionRecordHeader, RevisionType, RrInsertSh, RrTabId, RrdChgCell, RrdConflict, RrdHead,
     RrdInfo, RrdInsDel, RrdMove, RrdRenSheet, RrdUserView, ShortDtr, UsrExcl,
 };
+pub use transaction::{Commit, Patch, RevisionFlags, Snapshot, Transaction};
 
 pub(crate) use codec::{
     CONTINUE_RECORD_TYPE, EOF_RECORD_TYPE, FILE_LOCK_RECORD_TYPE, NOTE_RECORD_TYPE,
