@@ -1,5 +1,6 @@
 use super::codec::{BROADCAST_INFO_RECORD_TYPE, C_STRING_RECORD_TYPE, validate_system_time};
 use super::model::{Broadcast, BroadcastProperties};
+use super::transaction::Snapshot;
 use crate::records::Record;
 use crate::slide_sync::SystemTime;
 
@@ -131,4 +132,99 @@ fn validates_system_time_and_exact_strict_string_bounds() {
     value = broadcast();
     value.user_name = "bad/name".into();
     assert!(value.validate().is_err());
+}
+
+fn record_bytes(record: &Record) -> Vec<u8> {
+    super::codec::record_bytes(
+        record.version,
+        record.instance,
+        record.record_type_raw,
+        &record.data,
+    )
+    .unwrap()
+}
+
+#[test]
+fn snapshot_no_op_keeps_exact_source_bytes() {
+    let source = record_bytes(&broadcast().to_record().unwrap());
+    let snapshot = Snapshot::parse(source.clone()).unwrap();
+    let commit = snapshot.edit().commit().unwrap();
+
+    assert!(commit.patch().is_empty());
+    assert!(commit.patch().changes().is_empty());
+    assert_eq!(commit.patch().before(), source.as_slice());
+    assert_eq!(commit.patch().after(), source.as_slice());
+    assert_eq!(commit.snapshot().bytes(), source.as_slice());
+}
+
+#[test]
+fn invalid_inert_targets_are_failure_atomic() {
+    let source = record_bytes(&broadcast().to_record().unwrap());
+    let snapshot = Snapshot::parse(source).unwrap();
+    let mut transaction = snapshot.edit();
+    let before = transaction.broadcast().clone();
+
+    assert!(
+        transaction
+            .set_chat_url(Some("https://chat.example.test".into()))
+            .is_err()
+    );
+    assert_eq!(transaction.broadcast(), &before);
+    assert!(!transaction.is_changed());
+
+    assert!(transaction.set_remote_server_name(None).is_err());
+    assert_eq!(transaction.broadcast(), &before);
+    assert!(transaction.changes().is_empty());
+}
+
+#[test]
+fn edits_retain_unknown_children_and_support_inverse_and_stale_rejection() {
+    let canonical = broadcast().to_record().unwrap();
+    let opaque = super::codec::record_bytes(0, 7, 0x7ffe, &[0xde, 0xad, 0xbe, 0xef]).unwrap();
+    let mut data = opaque.clone();
+    data.extend_from_slice(&canonical.data);
+    let source = super::codec::record_bytes(
+        canonical.version,
+        canonical.instance,
+        canonical.record_type_raw,
+        &data,
+    )
+    .unwrap();
+    let snapshot = Snapshot::parse(source.clone()).unwrap();
+    assert_eq!(snapshot.unknown_records().len(), 1);
+    assert_eq!(
+        snapshot.unknown_records()[0].to_record_bytes().unwrap(),
+        opaque
+    );
+
+    let mut transaction = snapshot.edit();
+    transaction.set_title(Some("Updated title".into())).unwrap();
+    let commit = transaction.commit().unwrap();
+    let target = commit.snapshot();
+    assert_eq!(target.unknown_records().len(), 1);
+    assert_eq!(
+        target.unknown_records()[0].to_record_bytes().unwrap(),
+        opaque
+    );
+    let (target_record, consumed) = Record::parse_strict(target.bytes(), 0).unwrap();
+    assert_eq!(consumed, target.bytes().len());
+    let children = Record::parse_sequence_strict(&target_record.data, "test").unwrap();
+    assert_eq!(children[0].record_type_raw, 0x7ffe);
+    assert_eq!(children[0].data, [0xde, 0xad, 0xbe, 0xef]);
+
+    let applied = commit.patch().apply(&snapshot).unwrap();
+    assert_eq!(applied.bytes(), target.bytes());
+    assert_eq!(
+        commit.patch().undo(target).unwrap().bytes(),
+        source.as_slice()
+    );
+    assert_eq!(
+        commit.patch().inverse().apply(target).unwrap().bytes(),
+        source.as_slice()
+    );
+
+    let mut stale_bytes = source;
+    stale_bytes[16] = b'R';
+    let stale = Snapshot::parse(stale_bytes).unwrap();
+    assert!(commit.patch().apply(&stale).is_err());
 }

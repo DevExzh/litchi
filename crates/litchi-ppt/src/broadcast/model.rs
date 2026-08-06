@@ -1,5 +1,6 @@
 //! Typed PowerPoint presentation-broadcast metadata.
 
+use crate::records::Record;
 use crate::slide_sync::SystemTime;
 
 /// Fixed `BroadcastDocInfoAtom` values.
@@ -55,4 +56,55 @@ pub struct Broadcast {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Broadcasts {
     pub broadcasts: Vec<Broadcast>,
+}
+
+/// One unmodeled child retained by a broadcast snapshot.
+///
+/// The record is inert and is never interpreted as a command, path, URL, or
+/// network target. Its header and payload are retained so a semantic edit to
+/// known broadcast fields does not discard future-version or producer-
+/// specific children.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnknownRecord {
+    pub(crate) record: Record,
+    pub(crate) known_before: usize,
+}
+
+impl UnknownRecord {
+    /// Original raw record type value.
+    pub fn record_type(&self) -> u16 {
+        self.record.record_type_raw
+    }
+
+    /// Original record version nibble.
+    pub fn version(&self) -> u16 {
+        self.record.version
+    }
+
+    /// Original record instance.
+    pub fn instance(&self) -> u16 {
+        self.record.instance
+    }
+
+    /// Borrow the opaque record payload.
+    pub fn data(&self) -> &[u8] {
+        &self.record.data
+    }
+
+    /// Reconstruct the exact opaque record header and payload.
+    pub fn to_record_bytes(&self) -> crate::package::Result<Vec<u8>> {
+        super::codec::record_bytes(
+            self.record.version,
+            self.record.instance,
+            self.record.record_type_raw,
+            &self.record.data,
+        )
+    }
+
+    pub(crate) fn from_record(record: &Record, known_before: usize) -> Self {
+        Self {
+            record: record.clone(),
+            known_before,
+        }
+    }
 }

@@ -3,8 +3,10 @@
 mod codec;
 mod model;
 mod package;
+mod transaction;
 
 #[cfg(test)]
 mod tests;
 
-pub use model::{Broadcast, BroadcastProperties, Broadcasts};
+pub use model::{Broadcast, BroadcastProperties, Broadcasts, UnknownRecord};
+pub use transaction::{Change, Commit, Patch, Revision, Snapshot, Transaction};
