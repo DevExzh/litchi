@@ -1535,7 +1535,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         level: PagesTableCellParagraphListLevel,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
@@ -1571,7 +1571,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -1596,7 +1596,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<PagesTableCellParagraphListNumbering> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_numbering_in_package(
@@ -1614,7 +1614,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         numbering: PagesTableCellParagraphListNumbering,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
@@ -1646,7 +1646,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<PagesTableCellParagraphListNumberFormat> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_number_format_in_package(
@@ -1664,7 +1664,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         format: PagesTableCellParagraphListNumberFormat,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
@@ -1701,7 +1701,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -1727,7 +1727,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<PagesTableCellParagraphListNumberTiering> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_number_tiering_in_package(
@@ -1745,7 +1745,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         tiering: PagesTableCellParagraphListNumberTiering,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
@@ -1776,13 +1776,194 @@ impl PagesEditor {
         Ok(())
     }
 
+    /// Restore flat numbering for one body-table list level.
+    pub fn reset_table_cell_paragraph_list_number_tiering(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: TextPosition,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed =
+            crate::numbers::editor::reset_table_cell_paragraph_list_number_tiering_in_package(
+                &mut staged,
+                model_object_id,
+                row,
+                column,
+                paragraph,
+            )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read one numbered body-table paragraph's number-label size.
+    pub fn table_cell_paragraph_list_number_scale(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: TextPosition,
+    ) -> Result<PagesTableCellParagraphListNumberScale> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_list_number_scale_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Set one numbered body-table paragraph's number-label size.
+    pub fn set_table_cell_paragraph_list_number_scale(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: TextPosition,
+        scale: PagesTableCellParagraphListNumberScale,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_paragraph_list_number_scale_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            paragraph,
+            scale,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_paragraph_list_number_scale(
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )? != scale
+        {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell paragraph list-number scale failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the standard 100% number-label size.
+    pub fn reset_table_cell_paragraph_list_number_scale(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: TextPosition,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed =
+            crate::numbers::editor::reset_table_cell_paragraph_list_number_scale_in_package(
+                &mut staged,
+                model_object_id,
+                row,
+                column,
+                paragraph,
+            )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read one body-table paragraph's effective text-bullet marker.
+    pub fn table_cell_paragraph_list_bullet(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: TextPosition,
+    ) -> Result<PagesTableCellParagraphListBullet> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_list_bullet_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Set one body-table paragraph's text-bullet marker.
+    pub fn set_table_cell_paragraph_list_bullet(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: TextPosition,
+        bullet: &PagesTableCellParagraphListBullet,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_paragraph_list_bullet_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            paragraph,
+            bullet,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_paragraph_list_bullet(model_object_id, row, column, paragraph)?
+            != *bullet
+        {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell paragraph text bullet failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore Apple's standard `•` marker for one body-table paragraph.
+    pub fn reset_table_cell_paragraph_list_bullet(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: TextPosition,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_paragraph_list_bullet_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
     /// Read one body-table paragraph's effective bullet size and baseline.
     pub fn table_cell_paragraph_list_bullet_geometry(
         &self,
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<PagesTableCellParagraphListBulletGeometry> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_bullet_geometry_in_package(
@@ -1800,7 +1981,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         geometry: PagesTableCellParagraphListBulletGeometry,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
@@ -1836,7 +2017,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -1862,7 +2043,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<PagesTableCellParagraphListIndentation> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_indentation_in_package(
@@ -1880,7 +2061,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         indentation: PagesTableCellParagraphListIndentation,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
@@ -1916,7 +2097,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -1942,7 +2123,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<PagesTableCellParagraphListLabelColor> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_label_color_in_package(
@@ -1960,7 +2141,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         color: PagesTableCellParagraphListLabelColor,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
@@ -1996,7 +2177,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();

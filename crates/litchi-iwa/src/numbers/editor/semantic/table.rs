@@ -1092,7 +1092,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         level: NumbersTableCellParagraphListLevel,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -1127,7 +1127,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = cell_paragraph_list::reset_paragraph_list_level(
@@ -1149,7 +1149,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<NumbersTableCellParagraphListNumbering> {
         cell_paragraph_list::paragraph_list_numbering(
             &self.package,
@@ -1166,7 +1166,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         numbering: NumbersTableCellParagraphListNumbering,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -1201,7 +1201,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<NumbersTableCellParagraphListNumberFormat> {
         cell_paragraph_list::paragraph_list_number_format(
             &self.package,
@@ -1218,7 +1218,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         format: NumbersTableCellParagraphListNumberFormat,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -1249,7 +1249,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = cell_paragraph_list::reset_paragraph_list_number_format(
@@ -1271,7 +1271,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<NumbersTableCellParagraphListNumberTiering> {
         cell_paragraph_list::paragraph_list_number_tiering(
             &self.package,
@@ -1288,7 +1288,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         tiering: NumbersTableCellParagraphListNumberTiering,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -1319,7 +1319,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = cell_paragraph_list::reset_paragraph_list_number_tiering(
@@ -1341,7 +1341,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<NumbersTableCellParagraphListNumberScale> {
         cell_paragraph_list::paragraph_list_number_scale(
             &self.package,
@@ -1358,7 +1358,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         scale: NumbersTableCellParagraphListNumberScale,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -1389,7 +1389,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = cell_paragraph_list::reset_paragraph_list_number_scale(
@@ -1411,7 +1411,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<NumbersTableCellParagraphListBullet> {
         cell_paragraph_list::paragraph_list_bullet(&self.package, table_id, row, column, paragraph)
     }
@@ -1422,7 +1422,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         bullet: &NumbersTableCellParagraphListBullet,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -1450,7 +1450,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = cell_paragraph_list::reset_paragraph_list_bullet(
@@ -1472,7 +1472,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<NumbersTableCellParagraphListBulletGeometry> {
         cell_paragraph_list::paragraph_list_bullet_geometry(
             &self.package,
@@ -1489,7 +1489,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         geometry: NumbersTableCellParagraphListBulletGeometry,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -1519,7 +1519,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = cell_paragraph_list::reset_paragraph_list_bullet_geometry(
@@ -1541,7 +1541,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<NumbersTableCellParagraphListIndentation> {
         cell_paragraph_list::paragraph_list_indentation(
             &self.package,
@@ -1558,7 +1558,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         indentation: NumbersTableCellParagraphListIndentation,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -1589,7 +1589,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = cell_paragraph_list::reset_paragraph_list_indentation(
@@ -1611,7 +1611,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<NumbersTableCellParagraphListLabelColor> {
         cell_paragraph_list::paragraph_list_label_color(
             &self.package,
@@ -1628,7 +1628,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         color: NumbersTableCellParagraphListLabelColor,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -1659,7 +1659,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = cell_paragraph_list::reset_paragraph_list_label_color(

@@ -190,7 +190,7 @@ pub(crate) fn set_table_cell_paragraph_list_level_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
     level: ParagraphListLevel,
 ) -> Result<()> {
     cell_paragraph_list::set_paragraph_list_level(package, table_id, row, column, paragraph, level)
@@ -201,7 +201,7 @@ pub(crate) fn reset_table_cell_paragraph_list_level_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
 ) -> Result<bool> {
     cell_paragraph_list::reset_paragraph_list_level(package, table_id, row, column, paragraph)
 }
@@ -211,7 +211,7 @@ pub(crate) fn table_cell_paragraph_list_numbering_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
 ) -> Result<ParagraphListNumbering> {
     cell_paragraph_list::paragraph_list_numbering(package, table_id, row, column, paragraph)
 }
@@ -221,7 +221,7 @@ pub(crate) fn set_table_cell_paragraph_list_numbering_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
     numbering: ParagraphListNumbering,
 ) -> Result<()> {
     cell_paragraph_list::set_paragraph_list_numbering(
@@ -234,7 +234,7 @@ pub(crate) fn table_cell_paragraph_list_number_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
 ) -> Result<ParagraphListNumberFormat> {
     cell_paragraph_list::paragraph_list_number_format(package, table_id, row, column, paragraph)
 }
@@ -244,7 +244,7 @@ pub(crate) fn set_table_cell_paragraph_list_number_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
     format: ParagraphListNumberFormat,
 ) -> Result<()> {
     cell_paragraph_list::set_paragraph_list_number_format(
@@ -257,7 +257,7 @@ pub(crate) fn reset_table_cell_paragraph_list_number_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
 ) -> Result<bool> {
     cell_paragraph_list::reset_paragraph_list_number_format(
         package, table_id, row, column, paragraph,
@@ -269,7 +269,7 @@ pub(crate) fn table_cell_paragraph_list_number_tiering_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
 ) -> Result<ParagraphListNumberTiering> {
     cell_paragraph_list::paragraph_list_number_tiering(package, table_id, row, column, paragraph)
 }
@@ -279,7 +279,7 @@ pub(crate) fn set_table_cell_paragraph_list_number_tiering_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
     tiering: ParagraphListNumberTiering,
 ) -> Result<()> {
     cell_paragraph_list::set_paragraph_list_number_tiering(
@@ -292,7 +292,7 @@ pub(crate) fn reset_table_cell_paragraph_list_number_tiering_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
 ) -> Result<bool> {
     cell_paragraph_list::reset_paragraph_list_number_tiering(
         package, table_id, row, column, paragraph,
@@ -304,7 +304,7 @@ pub(crate) fn table_cell_paragraph_list_number_scale_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
 ) -> Result<ParagraphListNumberScale> {
     cell_paragraph_list::paragraph_list_number_scale(package, table_id, row, column, paragraph)
 }
@@ -314,7 +314,7 @@ pub(crate) fn set_table_cell_paragraph_list_number_scale_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
     scale: ParagraphListNumberScale,
 ) -> Result<()> {
     cell_paragraph_list::set_paragraph_list_number_scale(
@@ -327,7 +327,7 @@ pub(crate) fn reset_table_cell_paragraph_list_number_scale_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
 ) -> Result<bool> {
     cell_paragraph_list::reset_paragraph_list_number_scale(
         package, table_id, row, column, paragraph,
@@ -339,7 +339,7 @@ pub(crate) fn table_cell_paragraph_list_bullet_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
 ) -> Result<ParagraphListBullet> {
     cell_paragraph_list::paragraph_list_bullet(package, table_id, row, column, paragraph)
 }
@@ -349,7 +349,7 @@ pub(crate) fn set_table_cell_paragraph_list_bullet_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
     bullet: &ParagraphListBullet,
 ) -> Result<()> {
     cell_paragraph_list::set_paragraph_list_bullet(
@@ -362,7 +362,7 @@ pub(crate) fn reset_table_cell_paragraph_list_bullet_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
 ) -> Result<bool> {
     cell_paragraph_list::reset_paragraph_list_bullet(package, table_id, row, column, paragraph)
 }
@@ -372,7 +372,7 @@ pub(crate) fn table_cell_paragraph_list_bullet_geometry_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
 ) -> Result<ParagraphListBulletGeometry> {
     cell_paragraph_list::paragraph_list_bullet_geometry(package, table_id, row, column, paragraph)
 }
@@ -382,7 +382,7 @@ pub(crate) fn set_table_cell_paragraph_list_bullet_geometry_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
     geometry: ParagraphListBulletGeometry,
 ) -> Result<()> {
     cell_paragraph_list::set_paragraph_list_bullet_geometry(
@@ -395,7 +395,7 @@ pub(crate) fn reset_table_cell_paragraph_list_bullet_geometry_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
 ) -> Result<bool> {
     cell_paragraph_list::reset_paragraph_list_bullet_geometry(
         package, table_id, row, column, paragraph,
@@ -407,7 +407,7 @@ pub(crate) fn table_cell_paragraph_list_indentation_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
 ) -> Result<ParagraphListIndentation> {
     cell_paragraph_list::paragraph_list_indentation(package, table_id, row, column, paragraph)
 }
@@ -417,7 +417,7 @@ pub(crate) fn set_table_cell_paragraph_list_indentation_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
     indentation: ParagraphListIndentation,
 ) -> Result<()> {
     cell_paragraph_list::set_paragraph_list_indentation(
@@ -435,7 +435,7 @@ pub(crate) fn reset_table_cell_paragraph_list_indentation_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
 ) -> Result<bool> {
     cell_paragraph_list::reset_paragraph_list_indentation(package, table_id, row, column, paragraph)
 }
@@ -445,7 +445,7 @@ pub(crate) fn table_cell_paragraph_list_label_color_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
 ) -> Result<ParagraphListLabelColor> {
     cell_paragraph_list::paragraph_list_label_color(package, table_id, row, column, paragraph)
 }
@@ -455,7 +455,7 @@ pub(crate) fn set_table_cell_paragraph_list_label_color_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
     color: ParagraphListLabelColor,
 ) -> Result<()> {
     cell_paragraph_list::set_paragraph_list_label_color(
@@ -468,7 +468,7 @@ pub(crate) fn reset_table_cell_paragraph_list_label_color_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+        paragraph: TextPosition,
 ) -> Result<bool> {
     cell_paragraph_list::reset_paragraph_list_label_color(package, table_id, row, column, paragraph)
 }

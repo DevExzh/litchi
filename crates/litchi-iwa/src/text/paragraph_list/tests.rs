@@ -8,7 +8,7 @@ use crate::pages::PagesEditor;
 use crate::protobuf::tsp;
 use crate::protobuf::tswp::{self, object_attribute_table::ObjectAttribute};
 use crate::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
-use crate::text::{IWorkTextEditor, ParagraphStart, TextPointSize};
+use crate::text::{IWorkTextEditor, TextPointSize, TextPosition};
 
 const POSITION: DrawablePoint = DrawablePoint { x: 40.0, y: 80.0 };
 const SIZE: DrawableSize = DrawableSize {
@@ -111,7 +111,7 @@ fn canonical_lists_round_trip_update_and_reset_in_every_suite() {
 
 #[test]
 fn text_boxes_round_trip_custom_bullets_in_every_suite() {
-    let paragraph = ParagraphStart::from_utf16_index(6).unwrap();
+    let paragraph = TextPosition::from_utf16_index(6).unwrap();
     let arrow = ParagraphListBullet::new("➡").unwrap();
 
     let mut pages = PagesEditor::create_with_text("Bullets").unwrap();
@@ -197,7 +197,7 @@ fn text_boxes_round_trip_custom_bullets_in_every_suite() {
 
 #[test]
 fn text_boxes_round_trip_bullet_geometry_in_every_suite() {
-    let paragraph = ParagraphStart::from_utf16_index(6).unwrap();
+    let paragraph = TextPosition::from_utf16_index(6).unwrap();
     let geometry = ParagraphListBulletGeometry::new(
         ParagraphListBulletScale::from_percent(150.0).unwrap(),
         ParagraphListBulletBaselineOffset::from_points(2.0).unwrap(),
@@ -294,7 +294,7 @@ fn text_boxes_round_trip_bullet_geometry_in_every_suite() {
 
 #[test]
 fn text_boxes_round_trip_list_indentation_in_every_suite() {
-    let paragraph = ParagraphStart::from_utf16_index(6).unwrap();
+    let paragraph = TextPosition::from_utf16_index(6).unwrap();
     let indentation = ParagraphListIndentation::new(
         ParagraphListLabelIndent::from_points(20.0).unwrap(),
         ParagraphListTextGap::from_points(18.0, TextPointSize::TWELVE).unwrap(),
@@ -391,7 +391,7 @@ fn text_boxes_round_trip_list_indentation_in_every_suite() {
 
 #[test]
 fn text_boxes_round_trip_list_label_colors_in_every_suite() {
-    let paragraph = ParagraphStart::from_utf16_index(6).unwrap();
+    let paragraph = TextPosition::from_utf16_index(6).unwrap();
     let color = ParagraphListLabelColor::Explicit(
         RgbaColor::new(0.9, 0.2, 0.1, 0.8, RgbColorSpace::DisplayP3).unwrap(),
     );
@@ -483,7 +483,7 @@ fn text_boxes_round_trip_list_label_colors_in_every_suite() {
 
 #[test]
 fn text_boxes_round_trip_number_formats_in_every_suite() {
-    let paragraph = ParagraphStart::from_utf16_index(6).unwrap();
+    let paragraph = TextPosition::from_utf16_index(6).unwrap();
     let format = ParagraphListNumberFormat::affixed(
         ParagraphListNumberSequence::RomanLowercase,
         ParagraphListNumberPunctuation::Parentheses,
@@ -580,7 +580,7 @@ fn text_boxes_round_trip_number_formats_in_every_suite() {
 
 #[test]
 fn text_boxes_round_trip_number_tiering_in_every_suite() {
-    let paragraph = ParagraphStart::from_utf16_index(6).unwrap();
+    let paragraph = TextPosition::from_utf16_index(6).unwrap();
     let tiered = ParagraphListNumberTiering::Tiered;
 
     let mut pages = PagesEditor::create_with_text("Number Tiering").unwrap();
@@ -674,7 +674,7 @@ fn text_boxes_round_trip_number_tiering_in_every_suite() {
 
 #[test]
 fn text_boxes_round_trip_number_scale_in_every_suite() {
-    let paragraph = ParagraphStart::from_utf16_index(6).unwrap();
+    let paragraph = TextPosition::from_utf16_index(6).unwrap();
     let scale = ParagraphListNumberScale::from_percent(135.0).unwrap();
 
     let mut pages = PagesEditor::create_with_text("Number Scale").unwrap();
@@ -808,7 +808,7 @@ fn custom_list_updates_reject_nonlist_and_invalid_paragraphs_transactionally() {
         pages
             .set_text_box_paragraph_list_bullet(
                 text_box.drawable_object_id,
-                ParagraphStart::ZERO,
+                TextPosition::ZERO,
                 &arrow,
             )
             .is_err()
@@ -818,7 +818,7 @@ fn custom_list_updates_reject_nonlist_and_invalid_paragraphs_transactionally() {
         pages
             .set_text_box_paragraph_list_indentation(
                 text_box.drawable_object_id,
-                ParagraphStart::ZERO,
+                TextPosition::ZERO,
                 indentation,
             )
             .is_err()
@@ -828,7 +828,7 @@ fn custom_list_updates_reject_nonlist_and_invalid_paragraphs_transactionally() {
         pages
             .set_text_box_paragraph_list_number_format(
                 text_box.drawable_object_id,
-                ParagraphStart::ZERO,
+                TextPosition::ZERO,
                 ParagraphListNumberFormat::Circled,
             )
             .is_err()
@@ -838,7 +838,7 @@ fn custom_list_updates_reject_nonlist_and_invalid_paragraphs_transactionally() {
         pages
             .set_text_box_paragraph_list_number_tiering(
                 text_box.drawable_object_id,
-                ParagraphStart::ZERO,
+                TextPosition::ZERO,
                 ParagraphListNumberTiering::Tiered,
             )
             .is_err()
@@ -853,7 +853,7 @@ fn custom_list_updates_reject_nonlist_and_invalid_paragraphs_transactionally() {
         pages
             .set_text_box_paragraph_list_bullet(
                 text_box.drawable_object_id,
-                ParagraphStart::from_utf16_index(1).unwrap(),
+                TextPosition::from_utf16_index(1).unwrap(),
                 &arrow,
             )
             .is_err()
@@ -863,7 +863,7 @@ fn custom_list_updates_reject_nonlist_and_invalid_paragraphs_transactionally() {
         pages
             .set_text_box_paragraph_list_indentation(
                 text_box.drawable_object_id,
-                ParagraphStart::from_utf16_index(1).unwrap(),
+                TextPosition::from_utf16_index(1).unwrap(),
                 indentation,
             )
             .is_err()
@@ -873,7 +873,7 @@ fn custom_list_updates_reject_nonlist_and_invalid_paragraphs_transactionally() {
         pages
             .set_text_box_paragraph_list_number_format(
                 text_box.drawable_object_id,
-                ParagraphStart::ZERO,
+                TextPosition::ZERO,
                 ParagraphListNumberFormat::Circled,
             )
             .is_err()
@@ -883,7 +883,7 @@ fn custom_list_updates_reject_nonlist_and_invalid_paragraphs_transactionally() {
         pages
             .set_text_box_paragraph_list_number_tiering(
                 text_box.drawable_object_id,
-                ParagraphStart::ZERO,
+                TextPosition::ZERO,
                 ParagraphListNumberTiering::Tiered,
             )
             .is_err()

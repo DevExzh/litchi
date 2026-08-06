@@ -2002,7 +2002,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         level: KeynoteTableCellParagraphListLevel,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
@@ -2045,7 +2045,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -2071,7 +2071,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<KeynoteTableCellParagraphListNumbering> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_numbering_in_package(
@@ -2090,7 +2090,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         numbering: KeynoteTableCellParagraphListNumbering,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
@@ -2128,7 +2128,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<KeynoteTableCellParagraphListNumberFormat> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_number_format_in_package(
@@ -2147,7 +2147,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         format: KeynoteTableCellParagraphListNumberFormat,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
@@ -2186,7 +2186,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -2213,7 +2213,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<KeynoteTableCellParagraphListNumberTiering> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_number_tiering_in_package(
@@ -2232,7 +2232,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         tiering: KeynoteTableCellParagraphListNumberTiering,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
@@ -2271,7 +2271,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -2298,7 +2298,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<KeynoteTableCellParagraphListNumberScale> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_number_scale_in_package(
@@ -2317,7 +2317,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         scale: KeynoteTableCellParagraphListNumberScale,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
@@ -2356,7 +2356,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -2383,7 +2383,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<KeynoteTableCellParagraphListBullet> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_bullet_in_package(
@@ -2402,7 +2402,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         bullet: &KeynoteTableCellParagraphListBullet,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
@@ -2440,7 +2440,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -2466,7 +2466,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<KeynoteTableCellParagraphListBulletGeometry> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_bullet_geometry_in_package(
@@ -2485,7 +2485,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         geometry: KeynoteTableCellParagraphListBulletGeometry,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
@@ -2523,7 +2523,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -2550,7 +2550,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<KeynoteTableCellParagraphListIndentation> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_indentation_in_package(
@@ -2569,7 +2569,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         indentation: KeynoteTableCellParagraphListIndentation,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
@@ -2608,7 +2608,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -2635,7 +2635,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<KeynoteTableCellParagraphListLabelColor> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_label_color_in_package(
@@ -2654,7 +2654,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         color: KeynoteTableCellParagraphListLabelColor,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
@@ -2693,7 +2693,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();

@@ -2402,7 +2402,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListLevel> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text.paragraph_list_level(graph.storage_id, paragraph)
@@ -2413,7 +2413,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         level: ParagraphListLevel,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
@@ -2428,7 +2428,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -2444,7 +2444,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListNumbering> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text
@@ -2456,7 +2456,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         numbering: ParagraphListNumbering,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
@@ -2471,7 +2471,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListNumberFormat> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text
@@ -2483,7 +2483,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         format: ParagraphListNumberFormat,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
@@ -2498,7 +2498,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -2514,7 +2514,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListNumberTiering> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text
@@ -2526,7 +2526,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         tiering: ParagraphListNumberTiering,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
@@ -2541,7 +2541,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -2557,7 +2557,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListNumberScale> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text
@@ -2569,7 +2569,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         scale: ParagraphListNumberScale,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
@@ -2584,7 +2584,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -2600,7 +2600,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListBullet> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text.paragraph_list_bullet(graph.storage_id, paragraph)
@@ -2611,7 +2611,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         bullet: &ParagraphListBullet,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
@@ -2626,7 +2626,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -2642,7 +2642,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListBulletGeometry> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text
@@ -2654,7 +2654,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         geometry: ParagraphListBulletGeometry,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
@@ -2669,7 +2669,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -2685,7 +2685,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListIndentation> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text
@@ -2697,7 +2697,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         indentation: ParagraphListIndentation,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
@@ -2712,7 +2712,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -2728,7 +2728,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListLabelColor> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text
@@ -2740,7 +2740,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         color: ParagraphListLabelColor,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
@@ -2755,7 +2755,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();

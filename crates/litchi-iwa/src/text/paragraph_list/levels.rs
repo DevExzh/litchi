@@ -10,16 +10,23 @@ use crate::wire::{
 };
 use crate::{Error, IWorkPackage, Result};
 
-use super::super::drop_cap::ParagraphStart;
 use super::super::storage_wire::{
     LocatedStorage, StorageLocation, locate_storage as locate_native_storage,
     locate_storage_with_archive as locate_native_storage_with_archive, update_parsed_archive,
 };
-use super::types::{ParagraphListLevel, ParagraphListLevelPlacement};
+use litchi_iwa_text::paragraph::list::{ParagraphListLevel, ParagraphListLevelPlacement};
+use litchi_iwa_text::position::TextPosition;
 
 const PARAGRAPH_DATA_TABLE_FIELD: u32 = 6;
 const TABLE_ENTRIES_FIELD: u32 = 1;
 const ENTRY_LIST_LEVEL_FIELD: u32 = 2;
+
+fn level_from_native(value: u32) -> Result<ParagraphListLevel> {
+    let level = u8::try_from(value).map_err(|_| {
+        Error::InvalidFormat(format!("native paragraph list level {value} exceeds u8"))
+    })?;
+    Ok(ParagraphListLevel::new(level)?)
+}
 
 pub(crate) fn paragraph_list_levels(
     package: &IWorkPackage,
@@ -38,8 +45,8 @@ pub(crate) fn paragraph_list_levels(
         .iter()
         .map(|entry| {
             Ok(ParagraphListLevelPlacement::new(
-                ParagraphStart::from_utf16_index(entry.character_index as usize)?,
-                ParagraphListLevel::from_native(entry.first)?,
+                TextPosition::from_utf16_index(entry.character_index as usize)?,
+                level_from_native(entry.first)?,
             ))
         })
         .collect()
@@ -48,7 +55,7 @@ pub(crate) fn paragraph_list_levels(
 pub(crate) fn paragraph_list_level(
     package: &IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<ParagraphListLevel> {
     let location = locate_storage(package, storage_id)?;
     let storage = &location.storage;
@@ -69,13 +76,13 @@ pub(crate) fn paragraph_list_level(
                 "iWork text storage {storage_id} has no paragraph-data boundary at zero"
             ))
         })?;
-    ParagraphListLevel::from_native(value.first)
+    level_from_native(value.first)
 }
 
 pub(in crate::text) fn set_paragraph_list_level(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     level: ParagraphListLevel,
 ) -> Result<()> {
     if paragraph_list_level(package, storage_id, paragraph)? == level {
@@ -96,7 +103,7 @@ pub(in crate::text) fn set_paragraph_list_level(
 pub(in crate::text) fn reset_paragraph_list_level(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<bool> {
     if paragraph_list_level(package, storage_id, paragraph)? == ParagraphListLevel::ZERO {
         return Ok(false);
@@ -109,7 +116,7 @@ fn patch_level(
     package: &mut IWorkPackage,
     located: LocatedStorage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     level: ParagraphListLevel,
 ) -> Result<()> {
     let LocatedStorage { location, archive } = located;
@@ -172,7 +179,7 @@ fn patch_level(
 fn patch_table(
     table: &[u8],
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     level: ParagraphListLevel,
     paragraph_starts: &[u32],
 ) -> Result<Vec<u8>> {
@@ -318,7 +325,7 @@ fn validate_entries(
                 entry.character_index
             )));
         }
-        ParagraphListLevel::from_native(entry.first)?;
+        level_from_native(entry.first)?;
         previous = Some(entry.character_index);
     }
     Ok(())
@@ -326,7 +333,7 @@ fn validate_entries(
 
 pub(super) fn require_paragraph_start(
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     starts: &[u32],
 ) -> Result<()> {
     if starts.binary_search(&paragraph.utf16_index()).is_ok() {
@@ -391,7 +398,7 @@ mod tests {
             }],
         }
         .encode_to_vec();
-        let paragraph = ParagraphStart::from_utf16_index(4).unwrap();
+        let paragraph = TextPosition::from_utf16_index(4).unwrap();
         let patched = patch_table(&table, 99, paragraph, ParagraphListLevel::ONE, &[0, 4]).unwrap();
         let decoded = tswp::ParaDataAttributeTable::decode(patched.as_slice()).unwrap();
         assert_eq!(decoded.entries.len(), 2);
@@ -420,7 +427,7 @@ mod tests {
             }],
         }
         .encode_to_vec();
-        let paragraph = ParagraphStart::from_utf16_index(4).unwrap();
+        let paragraph = TextPosition::from_utf16_index(4).unwrap();
         let patched =
             patch_table(&table, 99, paragraph, ParagraphListLevel::ONE, &[0, 4, 9]).unwrap();
         let decoded = tswp::ParaDataAttributeTable::decode(patched.as_slice()).unwrap();

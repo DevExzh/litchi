@@ -8,11 +8,11 @@ use crate::text::style_registry::unregister_private_style;
 use crate::text::style_registry::{object_archive_name, register_private_style};
 use crate::{Error, IWorkPackage, Result};
 
-use super::super::drop_cap::ParagraphStart;
-use super::types::{
+use litchi_iwa_text::paragraph::list::{
     ParagraphList, ParagraphListBulletBaselineOffset, ParagraphListBulletGeometry,
     ParagraphListBulletScale,
 };
+use litchi_iwa_text::position::TextPosition;
 use super::variation::{
     effective_style_id, paragraph_boundaries_with_style, style_isolated_to_paragraph,
 };
@@ -21,7 +21,7 @@ use super::{levels, native, storage};
 pub(crate) fn paragraph_list_bullet_geometry(
     package: &IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<ParagraphListBulletGeometry> {
     let level = levels::paragraph_list_level(package, storage_id, paragraph)?;
     let boundaries = storage::locate_boundaries(package, storage_id)?;
@@ -51,7 +51,7 @@ pub(crate) fn paragraph_list_bullet_geometry(
 pub(in crate::text) fn set_paragraph_list_bullet_geometry(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     geometry: ParagraphListBulletGeometry,
 ) -> Result<()> {
     if paragraph_list_bullet_geometry(package, storage_id, paragraph)? == geometry {
@@ -129,7 +129,7 @@ pub(in crate::text) fn set_paragraph_list_bullet_geometry(
 pub(in crate::text) fn reset_paragraph_list_bullet_geometry(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<bool> {
     let level = levels::paragraph_list_level(package, storage_id, paragraph)?;
     let standard = ParagraphListBulletGeometry::standard(level);
@@ -144,7 +144,7 @@ pub(in crate::text) fn reset_paragraph_list_bullet_geometry(
 fn collapse_or_clear_redundant_geometry(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<()> {
     let located = storage::locate_boundaries_with_archive(package, storage_id)?;
     let boundaries = &located.location;

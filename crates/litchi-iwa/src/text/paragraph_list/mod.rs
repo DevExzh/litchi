@@ -11,7 +11,6 @@ mod number_scale;
 mod number_tiering;
 mod numbering;
 mod storage;
-mod types;
 mod variation;
 
 use crate::package_metadata::{next_object_identifier, set_package_last_object_identifier};
@@ -20,8 +19,9 @@ use crate::text::style_registry::{
     register_style_reference, unregister_owner_reference_if_unused,
 };
 use crate::{Error, IWorkPackage, Result};
+use litchi_iwa_text::position::TextPosition;
 
-pub use types::{
+pub use litchi_iwa_text::paragraph::list::{
     ParagraphList, ParagraphListBullet, ParagraphListBulletBaselineOffset,
     ParagraphListBulletGeometry, ParagraphListBulletScale, ParagraphListIndentation,
     ParagraphListLabelColor, ParagraphListLabelIndent, ParagraphListLevel,
@@ -92,7 +92,7 @@ pub(crate) fn paragraph_lists(
         .into_iter()
         .map(|(index, style_id)| {
             Ok(ParagraphListPlacement::new(
-                crate::text::ParagraphStart::from_utf16_index(index as usize)?,
+                TextPosition::from_utf16_index(index as usize)?,
                 native::resolved_paragraph_list(package, style_id)?,
             ))
         })
@@ -138,7 +138,7 @@ pub(super) fn set_paragraph_lists(
     let mut staged = package.clone();
     let mut style_ids = [None; 3];
     for placement in &normalized {
-        let slot = placement.list.preset_index();
+        let slot = preset_index(placement.list);
         if style_ids[slot].is_some() {
             continue;
         }
@@ -183,7 +183,7 @@ pub(super) fn set_paragraph_lists(
         .map(|placement| {
             Ok((
                 placement.paragraph.utf16_index(),
-                style_ids[placement.list.preset_index()].ok_or_else(|| {
+                style_ids[preset_index(placement.list)].ok_or_else(|| {
                     Error::InvalidFormat("paragraph list preset was not registered".to_owned())
                 })?,
             ))
@@ -218,6 +218,14 @@ pub(super) fn set_paragraph_lists(
     }
     *package = staged;
     Ok(())
+}
+
+fn preset_index(list: ParagraphList) -> usize {
+    match list {
+        ParagraphList::None => 0,
+        ParagraphList::Bullet => 1,
+        ParagraphList::Numbered => 2,
+    }
 }
 
 fn normalize_placements(

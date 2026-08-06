@@ -9,8 +9,8 @@ use crate::text::style_registry::{
 };
 use crate::{Error, IWorkPackage, Result};
 
-use super::super::drop_cap::ParagraphStart;
-use super::types::{ParagraphList, ParagraphListLabelColor};
+use litchi_iwa_text::paragraph::list::{ParagraphList, ParagraphListLabelColor};
+use litchi_iwa_text::position::TextPosition;
 use super::variation::{
     effective_style_id, paragraph_boundaries_with_style, style_isolated_to_paragraph,
 };
@@ -19,7 +19,7 @@ use super::{native, storage};
 pub(crate) fn paragraph_list_label_color(
     package: &IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<ParagraphListLabelColor> {
     let boundaries = storage::locate_boundaries(package, storage_id)?;
     let style_id = effective_style_id(&boundaries, paragraph)?;
@@ -35,7 +35,7 @@ pub(crate) fn paragraph_list_label_color(
 pub(in crate::text) fn set_paragraph_list_label_color(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     color: ParagraphListLabelColor,
 ) -> Result<()> {
     if paragraph_list_label_color(package, storage_id, paragraph)? == color {
@@ -102,7 +102,7 @@ pub(in crate::text) fn set_paragraph_list_label_color(
 pub(in crate::text) fn reset_paragraph_list_label_color(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<bool> {
     if paragraph_list_label_color(package, storage_id, paragraph)?
         == ParagraphListLabelColor::Automatic
@@ -122,7 +122,7 @@ pub(in crate::text) fn reset_paragraph_list_label_color(
 fn collapse_or_clear_redundant_color(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<()> {
     let located = storage::locate_boundaries_with_archive(package, storage_id)?;
     let boundaries = &located.location;

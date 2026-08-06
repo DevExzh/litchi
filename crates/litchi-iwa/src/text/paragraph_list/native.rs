@@ -15,7 +15,7 @@ use crate::wire::{
 };
 use crate::{Error, IWorkPackage, Result};
 
-use super::types::{
+use litchi_iwa_text::paragraph::list::{
     ParagraphList, ParagraphListLabelColor, ParagraphListNumberFormat,
     ParagraphListNumberPunctuation, ParagraphListNumberSequence,
 };
@@ -1515,6 +1515,14 @@ pub(super) fn find_preset_style_in_archive(
     Ok(identifiers.into_iter().next())
 }
 
+const fn native_name(preset: ParagraphList) -> &'static str {
+    match preset {
+        ParagraphList::None => "None",
+        ParagraphList::Bullet => "Bullet",
+        ParagraphList::Numbered => "Numbered",
+    }
+}
+
 pub(super) fn style_object(
     identifier: u64,
     stylesheet_id: u64,
@@ -1522,7 +1530,7 @@ pub(super) fn style_object(
 ) -> Result<ArchiveObject> {
     let mut style = canonical_archive(preset);
     style.super_ = tss::StyleArchive {
-        name: Some(preset.native_name().to_owned()),
+        name: Some(native_name(preset).to_owned()),
         stylesheet: Some(reference(stylesheet_id)),
         ..Default::default()
     };

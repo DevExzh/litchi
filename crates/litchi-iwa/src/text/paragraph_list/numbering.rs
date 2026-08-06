@@ -17,17 +17,34 @@ use super::super::storage_wire::{
 };
 use super::levels::{paragraph_starts, require_paragraph_start};
 use super::paragraph_lists;
-use super::types::{ParagraphList, ParagraphListNumbering};
-use crate::text::ParagraphStart;
+use litchi_iwa_text::paragraph::list::{
+    ParagraphList, ParagraphListNumbering, ParagraphListStart,
+};
+use litchi_iwa_text::position::TextPosition;
 
 const PARAGRAPH_START_TABLE_FIELD: u32 = 14;
 const TABLE_ENTRIES_FIELD: u32 = 1;
 const ENTRY_START_NUMBER_FIELD: u32 = 2;
 
+fn numbering_from_native(value: u32) -> Result<ParagraphListNumbering> {
+    if value == 0 {
+        Ok(ParagraphListNumbering::Continue)
+    } else {
+        Ok(ParagraphListNumbering::StartAt(ParagraphListStart::new(value)?))
+    }
+}
+
+const fn numbering_to_native(numbering: ParagraphListNumbering) -> u32 {
+    match numbering {
+        ParagraphListNumbering::Continue => 0,
+        ParagraphListNumbering::StartAt(start) => start.get(),
+    }
+}
+
 pub(crate) fn paragraph_list_numbering(
     package: &IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<ParagraphListNumbering> {
     let location = locate_storage(package, storage_id)?;
     let storage = &location.storage;
@@ -42,14 +59,14 @@ pub(crate) fn paragraph_list_numbering(
         .iter()
         .find(|entry| entry.character_index == paragraph.utf16_index())
         .map_or(Ok(ParagraphListNumbering::Continue), |entry| {
-            ParagraphListNumbering::from_native(entry.first)
+            numbering_from_native(entry.first)
         })
 }
 
 pub(in crate::text) fn set_paragraph_list_numbering(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     numbering: ParagraphListNumbering,
 ) -> Result<()> {
     if paragraph_list_numbering(package, storage_id, paragraph)? == numbering {
@@ -73,7 +90,7 @@ pub(in crate::text) fn set_paragraph_list_numbering(
 fn require_numbered_paragraph(
     package: &IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<()> {
     let placements = paragraph_lists(package, storage_id)?;
     let list = placements
@@ -99,7 +116,7 @@ fn patch_numbering(
     package: &mut IWorkPackage,
     located: LocatedStorage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     numbering: ParagraphListNumbering,
 ) -> Result<()> {
     let LocatedStorage { location, archive } = located;
@@ -175,7 +192,7 @@ fn patch_numbering(
 fn patch_table(
     table: &[u8],
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     numbering: ParagraphListNumbering,
 ) -> Result<Vec<u8>> {
     let payloads = repeated_length_delimited_payloads(table, TABLE_ENTRIES_FIELD)?;
@@ -187,7 +204,7 @@ fn patch_table(
         })
         .collect::<std::result::Result<Vec<_>, _>>()?;
     let target = paragraph.utf16_index();
-    let native_start = numbering.native_start();
+    let native_start = numbering_to_native(numbering);
     if numbering == ParagraphListNumbering::Continue && target != 0 {
         let mut retained = Vec::with_capacity(entries.len());
         for (mut entry, raw) in entries {
@@ -259,7 +276,7 @@ fn entry_has_parallel_data(
 }
 
 fn new_table(
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     numbering: ParagraphListNumbering,
 ) -> tswp::ParaDataAttributeTable {
     let target = paragraph.utf16_index();
@@ -273,7 +290,7 @@ fn new_table(
     }
     entries.push(tswp::para_data_attribute_table::ParaDataAttribute {
         character_index: target,
-        first: numbering.native_start(),
+        first: numbering_to_native(numbering),
         second: 0,
     });
     tswp::ParaDataAttributeTable { entries }
@@ -334,7 +351,7 @@ fn validate_entries(
                 entry.character_index
             )));
         }
-        ParagraphListNumbering::from_native(entry.first)?;
+        numbering_from_native(entry.first)?;
         previous = Some(entry.character_index);
     }
     Ok(())
@@ -344,7 +361,7 @@ fn validate_entries(
 mod tests {
     use super::*;
     use crate::archive::{Archive, ArchiveObject};
-    use crate::text::ParagraphListStart;
+    use litchi_iwa_text::paragraph::list::ParagraphListStart;
 
     #[test]
     fn numbering_lookup_rejects_malformed_recognized_storage() {
@@ -353,7 +370,7 @@ mod tests {
             data: vec![0x80],
         }]);
 
-        assert!(paragraph_list_numbering(&package, 42, ParagraphStart::ZERO).is_err());
+        assert!(paragraph_list_numbering(&package, 42, TextPosition::ZERO).is_err());
     }
 
     #[test]
@@ -373,7 +390,7 @@ mod tests {
             ],
         }
         .encode_to_vec();
-        let paragraph = ParagraphStart::from_utf16_index(4).unwrap();
+        let paragraph = TextPosition::from_utf16_index(4).unwrap();
         let restart = ParagraphListNumbering::StartAt(ParagraphListStart::new(7).unwrap());
         let patched = patch_table(&table, 99, paragraph, restart).unwrap();
         let decoded = tswp::ParaDataAttributeTable::decode(patched.as_slice()).unwrap();

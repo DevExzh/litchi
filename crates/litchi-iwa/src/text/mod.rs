@@ -160,3 +160,9 @@ impl From<litchi_iwa_text::position::Error> for crate::Error {
         Self::ParseError(error.to_string())
     }
 }
+
+impl From<litchi_iwa_text::paragraph::list::Error> for crate::Error {
+    fn from(error: litchi_iwa_text::paragraph::list::Error) -> Self {
+        Self::InvalidFormat(error.to_string())
+    }
+}

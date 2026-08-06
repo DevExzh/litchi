@@ -671,7 +671,7 @@ impl IWorkTextEditor {
     /// Atomically replace all list-preset boundaries in a text storage.
     ///
     /// Placements must be strictly increasing validated paragraph starts and
-    /// begin at [`ParagraphStart::ZERO`]. Adjacent equal presets are coalesced.
+    /// begin at [`TextPosition::ZERO`]. Adjacent equal presets are coalesced.
     pub fn set_paragraph_lists(
         &mut self,
         object_id: u64,
@@ -703,7 +703,7 @@ impl IWorkTextEditor {
     pub fn paragraph_list_level(
         &self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListLevel> {
         paragraph_list_level(&self.package, object_id, paragraph)
     }
@@ -712,7 +712,7 @@ impl IWorkTextEditor {
     pub fn set_paragraph_list_level(
         &mut self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         level: ParagraphListLevel,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -732,7 +732,7 @@ impl IWorkTextEditor {
     pub fn reset_paragraph_list_level(
         &mut self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = reset_paragraph_list_level(&mut staged, object_id, paragraph)?;
@@ -753,7 +753,7 @@ impl IWorkTextEditor {
     pub fn paragraph_list_numbering(
         &self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListNumbering> {
         paragraph_list_numbering(&self.package, object_id, paragraph)
     }
@@ -762,7 +762,7 @@ impl IWorkTextEditor {
     pub fn set_paragraph_list_numbering(
         &mut self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         numbering: ParagraphListNumbering,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -782,7 +782,7 @@ impl IWorkTextEditor {
     pub fn paragraph_list_number_format(
         &self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListNumberFormat> {
         paragraph_list_number_format(&self.package, object_id, paragraph)
     }
@@ -791,7 +791,7 @@ impl IWorkTextEditor {
     pub fn set_paragraph_list_number_format(
         &mut self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         format: ParagraphListNumberFormat,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -811,7 +811,7 @@ impl IWorkTextEditor {
     pub fn reset_paragraph_list_number_format(
         &mut self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = reset_paragraph_list_number_format(&mut staged, object_id, paragraph)?;
@@ -835,7 +835,7 @@ impl IWorkTextEditor {
     pub fn paragraph_list_number_tiering(
         &self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListNumberTiering> {
         paragraph_list_number_tiering(&self.package, object_id, paragraph)
     }
@@ -844,7 +844,7 @@ impl IWorkTextEditor {
     pub fn set_paragraph_list_number_tiering(
         &mut self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         tiering: ParagraphListNumberTiering,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -865,7 +865,7 @@ impl IWorkTextEditor {
     pub fn reset_paragraph_list_number_tiering(
         &mut self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = reset_paragraph_list_number_tiering(&mut staged, object_id, paragraph)?;
@@ -889,7 +889,7 @@ impl IWorkTextEditor {
     pub fn paragraph_list_number_scale(
         &self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListNumberScale> {
         paragraph_list_number_scale(&self.package, object_id, paragraph)
     }
@@ -898,7 +898,7 @@ impl IWorkTextEditor {
     pub fn set_paragraph_list_number_scale(
         &mut self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         scale: ParagraphListNumberScale,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -918,7 +918,7 @@ impl IWorkTextEditor {
     pub fn reset_paragraph_list_number_scale(
         &mut self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = reset_paragraph_list_number_scale(&mut staged, object_id, paragraph)?;
@@ -942,7 +942,7 @@ impl IWorkTextEditor {
     pub fn paragraph_list_bullet(
         &self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListBullet> {
         paragraph_list_bullet(&self.package, object_id, paragraph)
     }
@@ -951,7 +951,7 @@ impl IWorkTextEditor {
     pub fn set_paragraph_list_bullet(
         &mut self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         bullet: &ParagraphListBullet,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -971,7 +971,7 @@ impl IWorkTextEditor {
     pub fn reset_paragraph_list_bullet(
         &mut self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = reset_paragraph_list_bullet(&mut staged, object_id, paragraph)?;
@@ -994,7 +994,7 @@ impl IWorkTextEditor {
     pub fn paragraph_list_bullet_geometry(
         &self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListBulletGeometry> {
         paragraph_list_bullet_geometry(&self.package, object_id, paragraph)
     }
@@ -1003,7 +1003,7 @@ impl IWorkTextEditor {
     pub fn set_paragraph_list_bullet_geometry(
         &mut self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         geometry: ParagraphListBulletGeometry,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -1024,7 +1024,7 @@ impl IWorkTextEditor {
     pub fn reset_paragraph_list_bullet_geometry(
         &mut self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = reset_paragraph_list_bullet_geometry(&mut staged, object_id, paragraph)?;
@@ -1049,7 +1049,7 @@ impl IWorkTextEditor {
     pub fn paragraph_list_indentation(
         &self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListIndentation> {
         paragraph_list_indentation(&self.package, object_id, paragraph)
     }
@@ -1058,7 +1058,7 @@ impl IWorkTextEditor {
     pub fn set_paragraph_list_indentation(
         &mut self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         indentation: ParagraphListIndentation,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -1078,7 +1078,7 @@ impl IWorkTextEditor {
     pub fn reset_paragraph_list_indentation(
         &mut self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = reset_paragraph_list_indentation(&mut staged, object_id, paragraph)?;
@@ -1113,7 +1113,7 @@ impl IWorkTextEditor {
     pub fn paragraph_list_label_color(
         &self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListLabelColor> {
         paragraph_list_label_color(&self.package, object_id, paragraph)
     }
@@ -1122,7 +1122,7 @@ impl IWorkTextEditor {
     pub fn set_paragraph_list_label_color(
         &mut self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         color: ParagraphListLabelColor,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -1142,7 +1142,7 @@ impl IWorkTextEditor {
     pub fn reset_paragraph_list_label_color(
         &mut self,
         object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = reset_paragraph_list_label_color(&mut staged, object_id, paragraph)?;
