@@ -79,6 +79,27 @@ impl Spreadsheet {
         &self.sheets
     }
 
+    /// Discover embedded charts in content-level drawing order.
+    pub fn charts(&self) -> Result<crate::charts::Inventory<'_>> {
+        self.charts_with(crate::charts::Limits::default())
+    }
+
+    /// Discover embedded charts with an explicit resource budget.
+    pub fn charts_with(
+        &self,
+        limits: crate::charts::Limits,
+    ) -> Result<crate::charts::Inventory<'_>> {
+        crate::charts::inventory(&self.package, limits)
+    }
+
+    /// Select one embedded chart by exact drawing name or checked position.
+    pub fn chart<'a, S>(&self, selector: S) -> Result<Option<crate::charts::Chart>>
+    where
+        S: Into<crate::charts::Selector<'a>>,
+    {
+        self.charts()?.get(selector).map(|chart| chart.cloned())
+    }
+
     /// Find a worksheet by its exact ODF name.
     pub fn sheet(&self, name: &str) -> Option<&crate::worksheet::Sheet> {
         self.sheets.iter().find(|sheet| sheet.name == name)

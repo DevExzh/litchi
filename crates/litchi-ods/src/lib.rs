@@ -5,6 +5,7 @@
 //! construction in [`authoring`], and the concise entry points in [`facade`].
 
 pub mod authoring;
+pub mod charts;
 pub mod codec;
 pub mod drawing;
 pub mod embedded;
@@ -17,6 +18,7 @@ pub mod settings;
 pub mod styles;
 pub mod worksheet;
 
+pub use charts::Chart;
 pub use drawing::{Frame, Part};
 pub use embedded::{Kind, Object, Parameter, Root};
 pub use facade::{Builder, MutableSpreadsheet, Spreadsheet};

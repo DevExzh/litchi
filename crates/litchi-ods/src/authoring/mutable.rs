@@ -98,6 +98,29 @@ impl MutableSpreadsheet {
         self.spreadsheet.sheets()
     }
 
+    /// Discover embedded charts in the current immutable package snapshot.
+    pub fn charts(&self) -> Result<crate::charts::Inventory<'_>> {
+        self.spreadsheet.charts()
+    }
+
+    /// Clone-stage chart replacements and publish them as one package edit.
+    ///
+    /// A failed closure or commit leaves this mutable facade unchanged. An
+    /// empty transaction does not rebuild the archive, preserving exact bytes.
+    pub fn edit_charts<F>(&mut self, edit: F) -> Result<()>
+    where
+        F: for<'source> FnOnce(&mut crate::charts::Transaction<'source>) -> Result<()>,
+    {
+        let inventory = self.spreadsheet.charts()?;
+        let mut transaction = inventory.transaction();
+        edit(&mut transaction)?;
+        let commit = transaction.commit()?;
+        if commit.changed() {
+            self.spreadsheet = Spreadsheet::from_bytes(commit.into_owned_bytes())?;
+        }
+        Ok(())
+    }
+
     /// Find a worksheet by its exact ODF name.
     pub fn sheet(&self, name: &str) -> Option<&Sheet> {
         self.spreadsheet.sheet(name)
