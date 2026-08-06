@@ -13,9 +13,9 @@ use litchi::Result;
 #[cfg(feature = "odf")]
 use litchi::common::Metadata;
 #[cfg(feature = "odf")]
-use litchi::odf::CellValue;
+use litchi::ods::CellValue;
 #[cfg(feature = "odf")]
-use litchi::odf::ods::Builder;
+use litchi::ods::Builder;
 
 #[cfg(feature = "odf")]
 fn main() -> Result<()> {

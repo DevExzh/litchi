@@ -206,6 +206,21 @@ impl Document {
         to_bytes(self)
     }
 
+    /// Replace document interaction and protection policy metadata.
+    ///
+    /// Only `settings.xml` is changed; all other package parts remain under
+    /// the package writer's lossless auxiliary-copy policy.
+    pub fn set_protection(&mut self, policy: &crate::protection::Policy) -> Result<()> {
+        let before = self.protection()?;
+        if &before == policy {
+            return Ok(());
+        }
+        let mimetype = self.package.mimetype()?;
+        let bytes = crate::protection::rewrite_owned_package(&self.package, &mimetype, policy)?;
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
     pub fn add_rdf_graph(
         &mut self,
         preferred_path: Option<&str>,

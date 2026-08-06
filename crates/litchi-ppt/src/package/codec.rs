@@ -117,6 +117,11 @@ impl<R: Read + Seek> Package<R> {
         Presentation::from_ole_with_options(&mut self.ole, options)
     }
 
+    /// Read the live document-comparison snapshot from the presentation.
+    pub fn document_comparison(&mut self) -> Result<crate::document_comparison::Snapshot> {
+        self.presentation()?.document_comparison()
+    }
+
     /// Get the underlying OLE file.
     ///
     /// This provides access to lower-level OLE operations and streams.

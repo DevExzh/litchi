@@ -13,7 +13,7 @@ use litchi::Result;
 #[cfg(feature = "odf")]
 use litchi::common::Metadata;
 #[cfg(feature = "odf")]
-use litchi::odf::odt::Builder;
+use litchi::odt::Builder;
 
 #[cfg(feature = "odf")]
 fn main() -> Result<()> {

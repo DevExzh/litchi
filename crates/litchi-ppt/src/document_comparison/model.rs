@@ -350,6 +350,12 @@ impl DiffNode {
         self.ignored_flag_bits
     }
 
+    /// Replace the typed display flags while retaining source-reserved bits.
+    pub fn set_flags(&mut self, flags: DiffFlags) -> Result<()> {
+        self.flags = flags;
+        self.validate_node()
+    }
+
     pub fn children(&self) -> &[Self] {
         &self.children
     }
@@ -386,6 +392,11 @@ impl DiffTree10 {
 
     pub const fn document_diff(&self) -> &DiffNode {
         &self.document_diff
+    }
+
+    /// Return the document-level display flags for this reviewer tree.
+    pub const fn document_flags(&self) -> DiffFlags {
+        self.document_diff.flags()
     }
 }
 
@@ -553,12 +564,23 @@ impl Review {
         })
     }
 
+    /// Return the `index`th reviewer tree in source order.
+    pub fn diff_tree(&self, index: usize) -> Option<&DiffTree10> {
+        self.diff_trees().nth(index)
+    }
+
+    /// Return the number of reviewer trees in this payload.
+    pub fn diff_tree_count(&self) -> usize {
+        self.diff_trees().count()
+    }
+
     /// Whether this PP10 payload has no records.
     pub const fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
-    pub(crate) fn unknown_records(&self) -> impl Iterator<Item = &Unknown> {
+    /// Return opaque records retained in their source order.
+    pub fn unknown_records(&self) -> impl Iterator<Item = &Unknown> {
         self.entries.iter().filter_map(|entry| match entry {
             Entry::Unknown(value) => Some(value),
             Entry::Toolbar(_) | Entry::SlideList(_) | Entry::Diff(_) => None,

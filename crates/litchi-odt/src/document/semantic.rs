@@ -204,6 +204,18 @@ impl Document {
         self.meta.as_ref().map(Meta::odf_metadata).transpose()
     }
 
+    /// Return document interaction and protection policy metadata.
+    ///
+    /// The policy is inert: reading it never enforces protection or unlocks
+    /// tracked changes.
+    pub fn protection(&self) -> Result<crate::protection::Policy> {
+        let package = self.package.package()?;
+        if !package.has_file(crate::constants::ODF_SETTINGS) {
+            return Ok(crate::protection::Policy::default());
+        }
+        crate::protection::parse_package(&package.get_file(crate::constants::ODF_SETTINGS)?)
+    }
+
     /// Get the style registry for this document.
     ///
     /// The style registry contains all styles defined in the document,

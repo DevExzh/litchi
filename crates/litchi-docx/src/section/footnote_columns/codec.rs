@@ -6,19 +6,91 @@ use crate::namespace::is_wordprocessing_namespace;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
+use quick_xml::name::{Namespace, NamespaceResolver, PrefixDeclaration, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::fmt::Write;
 
 use super::model::Layout;
 use super::validation::{
-    self, has_ignorable_prefix, is_inherited_markup_compatibility, is_word_2012,
-    is_word_2012_element, is_word_value_attribute,
+    self, has_ignorable_prefix, is_inherited_markup_compatibility, is_word_2012_element,
+    is_word_value_attribute,
 };
 
 const ROOT: &[u8] = b"sectPr";
 const EXTENSION: &[u8] = b"footnoteColumns";
 const VALUE: &[u8] = b"val";
+
+/// Namespace and markup-compatibility state inherited by a detached section
+/// fragment. The source bytes stay untouched; this context is only used to
+/// resolve names that were declared on an enclosing document element.
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
+pub(crate) struct Context {
+    bindings: Vec<Binding>,
+    ignorable: Option<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+struct Binding {
+    prefix: Option<Vec<u8>>,
+    namespace: Vec<u8>,
+}
+
+impl Context {
+    /// Capture the currently effective bindings without retaining the reader.
+    pub(crate) fn from_resolver(
+        resolver: &NamespaceResolver,
+        ignorable: Option<String>,
+    ) -> Result<Self> {
+        let mut bindings = Vec::new();
+        let mut bytes = ignorable.as_ref().map_or(0, String::len);
+        for (prefix, namespace) in resolver.bindings() {
+            if bindings.len() >= validation::MAX_CONTEXT_BINDINGS {
+                return Err(Error::InvalidFormat(format!(
+                    "section namespace context exceeds {} bindings",
+                    validation::MAX_CONTEXT_BINDINGS
+                )));
+            }
+            let prefix = match prefix {
+                PrefixDeclaration::Default => None,
+                PrefixDeclaration::Named(prefix) => Some(prefix.to_vec()),
+            };
+            bytes = bytes
+                .checked_add(prefix.as_ref().map_or(0, Vec::len))
+                .and_then(|bytes| bytes.checked_add(namespace.as_ref().len()))
+                .ok_or_else(|| {
+                    Error::InvalidFormat("section namespace context size overflow".into())
+                })?;
+            if bytes > validation::MAX_CONTEXT_BYTES {
+                return Err(Error::InvalidFormat(format!(
+                    "section namespace context exceeds {} bytes",
+                    validation::MAX_CONTEXT_BYTES
+                )));
+            }
+            bindings.push(Binding {
+                prefix,
+                namespace: namespace.as_ref().to_vec(),
+            });
+        }
+        Ok(Self {
+            bindings,
+            ignorable,
+        })
+    }
+
+    fn install(&self, reader: &mut NsReader<&[u8]>) -> Result<()> {
+        for binding in &self.bindings {
+            let prefix = match binding.prefix.as_deref() {
+                None => PrefixDeclaration::Default,
+                Some(prefix) => PrefixDeclaration::Named(prefix),
+            };
+            reader
+                .resolver_mut()
+                .add(prefix, Namespace(&binding.namespace))
+                .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        }
+        Ok(())
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 struct Range {
@@ -31,8 +103,7 @@ pub(crate) struct Parsed {
     pub(crate) value: Option<Layout>,
     root: Root,
     extension: Option<Range>,
-    extension_prefix: Option<Vec<u8>>,
-    value_prefix: Option<Vec<u8>>,
+    value_range: Option<Range>,
 }
 
 #[derive(Debug, Clone)]
@@ -51,11 +122,14 @@ struct Root {
 struct Attribute {
     name: Vec<u8>,
     value: Vec<u8>,
+    value_start: usize,
     value_end: usize,
 }
 
-/// Parse a complete `w:sectPr` fragment and expose its typed extension value.
-pub(crate) fn read(xml: &[u8]) -> Result<Parsed> {
+/// Parse a section fragment using namespace state captured from its owning
+/// document part. The supplied context is never serialized into the source
+/// snapshot.
+pub(crate) fn read_with_context(xml: &[u8], context: &Context) -> Result<Parsed> {
     if xml.len() > validation::MAX_XML_BYTES {
         return Err(Error::InvalidFormat(format!(
             "section XML exceeds {} bytes",
@@ -64,6 +138,7 @@ pub(crate) fn read(xml: &[u8]) -> Result<Parsed> {
     }
 
     let mut reader = NsReader::from_reader(xml);
+    context.install(&mut reader)?;
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
     let mut nodes = 0usize;
@@ -74,6 +149,7 @@ pub(crate) fn read(xml: &[u8]) -> Result<Parsed> {
     let mut extension = None;
     let mut extension_prefix = None;
     let mut value_prefix = None;
+    let mut value_range = None;
     let mut extension_depth = None;
     let mut extension_start = None;
     let mut root_ignorable = None;
@@ -113,7 +189,8 @@ pub(crate) fn read(xml: &[u8]) -> Result<Parsed> {
                         ));
                     }
                     root_seen = true;
-                    root_ignorable = root_ignorable_value(&element, &resolver, decoder)?;
+                    root_ignorable = root_ignorable_value(&element, &resolver, decoder)?
+                        .or_else(|| context.ignorable.clone());
                     root = Some(Root {
                         start: event_start,
                         open_end: event_end,
@@ -145,15 +222,18 @@ pub(crate) fn read(xml: &[u8]) -> Result<Parsed> {
                         let (layout, attribute_prefix) =
                             parse_extension(&element, &resolver, decoder, None)?;
                         let prefix = element_prefix(&element);
+                        let value_span =
+                            find_value_range(xml, event_start, event_end, &attribute_prefix)?;
                         require_ignorable(
                             root_ignorable.as_deref(),
                             prefix.as_deref().unwrap_or_default(),
-                            !is_word_2012(&namespace),
+                            matches!(namespace, ResolveResult::Unknown(_)),
                         )?;
                         extension_depth = Some(2);
                         extension_start = Some(event_start);
                         extension_prefix = prefix;
                         value_prefix = Some(attribute_prefix);
+                        value_range = Some(value_span);
                         // The value is assigned when the matching end event
                         // closes the extension, so a malformed nested event
                         // cannot publish a partial state.
@@ -177,7 +257,8 @@ pub(crate) fn read(xml: &[u8]) -> Result<Parsed> {
                     }
                     root_seen = true;
                     root_closed = true;
-                    root_ignorable = root_ignorable_value(&element, &resolver, decoder)?;
+                    root_ignorable = root_ignorable_value(&element, &resolver, decoder)?
+                        .or_else(|| context.ignorable.clone());
                     root = Some(Root {
                         start: event_start,
                         open_end: event_end,
@@ -206,10 +287,12 @@ pub(crate) fn read(xml: &[u8]) -> Result<Parsed> {
                     let (layout, attribute_prefix) =
                         parse_extension(&element, &resolver, decoder, None)?;
                     let prefix = element_prefix(&element);
+                    let value_span =
+                        find_value_range(xml, event_start, event_end, &attribute_prefix)?;
                     require_ignorable(
                         root_ignorable.as_deref(),
                         prefix.as_deref().unwrap_or_default(),
-                        !is_word_2012(&namespace),
+                        matches!(namespace, ResolveResult::Unknown(_)),
                     )?;
                     extension = Some(Range {
                         start: event_start,
@@ -217,6 +300,7 @@ pub(crate) fn read(xml: &[u8]) -> Result<Parsed> {
                     });
                     extension_prefix = prefix;
                     value_prefix = Some(attribute_prefix);
+                    value_range = Some(value_span);
                     let _ = layout;
                 }
             },
@@ -307,15 +391,18 @@ pub(crate) fn read(xml: &[u8]) -> Result<Parsed> {
         value,
         root,
         extension,
-        extension_prefix,
-        value_prefix,
+        value_range,
     })
 }
 
-/// Rewrite only the extension seam of a complete section-property fragment.
-pub(crate) fn rewrite(xml: &[u8], value: Option<Layout>) -> Result<Vec<u8>> {
+/// Rewrite only the extension seam using inherited package context.
+pub(crate) fn rewrite_with_context(
+    xml: &[u8],
+    value: Option<Layout>,
+    context: &Context,
+) -> Result<Vec<u8>> {
     validation::validate_layout(value)?;
-    let parsed = read(xml)?;
+    let parsed = read_with_context(xml, context)?;
     let Some(range) = parsed.extension else {
         return match value {
             None => Ok(xml.to_vec()),
@@ -323,15 +410,7 @@ pub(crate) fn rewrite(xml: &[u8], value: Option<Layout>) -> Result<Vec<u8>> {
         };
     };
     match value {
-        Some(value) => replace(
-            xml,
-            range,
-            render(
-                parsed.extension_prefix.as_deref().unwrap_or(b"w12"),
-                parsed.value_prefix.as_deref().unwrap_or(b"w12"),
-                value,
-            )?,
-        ),
+        Some(value) => replace_value(xml, parsed.value_range, value),
         None => Ok(splice(xml, range, &[])),
     }
 }
@@ -363,8 +442,12 @@ fn insert_extension(xml: &[u8], parsed: &Parsed, value: Layout) -> Result<Vec<u8
     Ok(output)
 }
 
-fn replace(xml: &[u8], range: Range, replacement: Vec<u8>) -> Result<Vec<u8>> {
-    Ok(splice(xml, range, &replacement))
+fn replace_value(xml: &[u8], range: Option<Range>, value: Layout) -> Result<Vec<u8>> {
+    let range = range.ok_or_else(|| {
+        Error::InvalidFormat("footnoteColumns val source range is missing".into())
+    })?;
+    let replacement = value.columns().to_string();
+    Ok(splice(xml, range, replacement.as_bytes()))
 }
 
 fn parse_extension(
@@ -415,6 +498,35 @@ fn parse_extension(
     let prefix = prefix.or_else(|| element_prefix(element));
     let prefix = prefix.unwrap_or_else(|| b"w12".to_vec());
     Ok((validation::parse_columns(&value)?, prefix))
+}
+
+fn find_value_range(
+    xml: &[u8],
+    event_start: usize,
+    event_end: usize,
+    prefix: &[u8],
+) -> Result<Range> {
+    let tag = xml.get(event_start..event_end).ok_or_else(|| {
+        Error::InvalidFormat("footnoteColumns value range is outside the section".into())
+    })?;
+    let attributes = scan_attributes(tag)?;
+    let mut expected = Vec::with_capacity(prefix.len() + 1 + VALUE.len());
+    expected.extend_from_slice(prefix);
+    expected.push(b':');
+    expected.extend_from_slice(VALUE);
+    let attribute = attributes
+        .iter()
+        .find(|attribute| attribute.name == expected)
+        .ok_or_else(|| {
+            Error::InvalidFormat("footnoteColumns val source range is missing".into())
+        })?;
+    let start = event_start
+        .checked_add(attribute.value_start)
+        .ok_or_else(|| Error::InvalidFormat("footnoteColumns value offset overflow".into()))?;
+    let end = event_start
+        .checked_add(attribute.value_end)
+        .ok_or_else(|| Error::InvalidFormat("footnoteColumns value offset overflow".into()))?;
+    Ok(Range { start, end })
 }
 
 fn parse_extension_range(
@@ -635,6 +747,7 @@ fn scan_attributes(tag: &[u8]) -> Result<Vec<Attribute>> {
         output.push(Attribute {
             name,
             value: tag[value_start..value_end].to_vec(),
+            value_start,
             value_end,
         });
         index += 1;

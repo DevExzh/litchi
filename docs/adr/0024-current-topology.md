@@ -369,6 +369,17 @@ new edit path retains opaque source material, uses bounded validation, and
 publishes only source-checked snapshots or package transactions; no macro,
 link, rendering, collaboration, or external-code behavior is activated.
 
+This continuation completes another cross-format wave: shared OLE2 now owns
+typed SummaryInformation metadata; ODT owns inert protection-policy snapshots
+with opaque-settings preservation; ODS owns DataPilot package transactions;
+DrawingML owns typed transform snapshots; DOC owns MsoEnvelope package edits;
+DOCX footnote columns retain inherited namespace context and authored lexical
+values; PPT document-comparison edits publish through the live OLE record; and
+XLS chart-area edits patch only the fixed BIFF payload. These owners keep
+semantic, codec, validation, package, transaction, and focused-test layers
+nested by responsibility, with reserved wire bits and unknown XML/records
+preserved through edits.
+
 ## Historical terminology
 
 References to `litchi-ooxml` in ADR 0002, ADR 0008, ADR 0011, ADR 0013, ADR

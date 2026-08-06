@@ -41,7 +41,7 @@ fn diff_enums_are_exhaustive_and_reject_gaps() {
 }
 
 #[test]
-fn diff_tree_round_trips_and_canonicalizes_ignored_bits() {
+fn diff_tree_round_trips_and_preserves_ignored_bits() {
     let named_show = node(DiffType::NamedShow, false, vec![]);
     let named_show_list = node(DiffType::NamedShowList, false, vec![named_show]);
     let document = DiffNode::new(
@@ -63,8 +63,8 @@ fn diff_tree_round_trips_and_canonicalizes_ignored_bits() {
     let parsed = DiffTree10::parse(&record).unwrap();
     assert_eq!(parsed.reviewer_name(), "Reviewer");
     assert_eq!(parsed.document_diff().ignored_flag_bits(), 0x8000_0000);
-    let canonical = parsed.to_record_bytes().unwrap();
-    assert_eq!(canonical[doc_flags_offset + 3] & 0x80, 0);
+    let round_tripped = parsed.to_record_bytes().unwrap();
+    assert_eq!(round_tripped[doc_flags_offset + 3] & 0x80, 0x80);
 }
 
 #[test]

@@ -448,6 +448,14 @@ impl Presentation {
         crate::chart::enumerate(self, limits)
     }
 
+    /// Return the live document-comparison snapshot.
+    ///
+    /// Review metadata is inert: this accessor never compares presentations,
+    /// opens the embedded reviewer document, or applies/rejects a change.
+    pub fn document_comparison(&self) -> Result<crate::document_comparison::Snapshot> {
+        crate::document_comparison::package::from_presentation(self)
+    }
+
     /// Resolve the live `DocumentContainer` record via the persist directory.
     ///
     /// Incrementally saved presentations can hold several `DocumentContainer`

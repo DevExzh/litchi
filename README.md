@@ -86,8 +86,8 @@ pkg.save("output.pptx")?;
 // OpenDocument formats (requires "odf" feature)
 #[cfg(feature = "odf")]
 {
-    use litchi::odf;
-    let odt = odf::odt::Document::open("document.odt")?;
+    use litchi::odt::Document;
+    let odt = Document::open("document.odt")?;
     let text = odt.text()?;
 }
 

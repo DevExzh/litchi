@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::error::{Error, Result};
 
-use super::codec;
+use super::codec::{self, Context};
 use super::model::Layout;
 use super::validation;
 
@@ -13,16 +13,24 @@ use super::validation;
 pub struct Snapshot {
     xml: Arc<[u8]>,
     value: Option<Layout>,
+    context: Arc<Context>,
 }
 
 impl Snapshot {
     /// Parse and retain a bounded section-property snapshot.
     pub fn from_xml(xml: impl Into<Vec<u8>>) -> Result<Self> {
+        Self::from_xml_with_context(xml, Context::default())
+    }
+
+    /// Parse a detached section with namespace state inherited from its
+    /// owning document part. The inherited state is not added to `xml_bytes`.
+    pub(crate) fn from_xml_with_context(xml: impl Into<Vec<u8>>, context: Context) -> Result<Self> {
         let xml = xml.into();
-        let value = codec::read(&xml)?.value;
+        let value = codec::read_with_context(&xml, &context)?.value;
         Ok(Self {
             xml: Arc::from(xml.into_boxed_slice()),
             value,
+            context: Arc::new(context),
         })
     }
 
@@ -89,13 +97,34 @@ impl Transaction {
 
     /// Validate and publish the edit without changing the source snapshot.
     pub fn commit(self) -> Result<Commit> {
-        let xml = codec::rewrite(self.base.xml_bytes(), self.next)?;
-        let snapshot = Snapshot::from_xml(xml)?;
+        if self.next == self.base.value {
+            return Ok(Commit {
+                patch: Patch::new(
+                    self.base.value,
+                    self.next,
+                    self.base.xml.clone(),
+                    self.base.xml.clone(),
+                    self.base.context.clone(),
+                    self.base.context.clone(),
+                ),
+                snapshot: self.base,
+            });
+        }
+        let xml = codec::rewrite_with_context(
+            self.base.xml_bytes(),
+            self.next,
+            self.base.context.as_ref(),
+        )?;
+        let snapshot = Snapshot::from_xml_with_context(xml, self.base.context.as_ref().clone())?;
         Ok(Commit {
-            patch: Patch {
-                before: self.base.value,
-                after: self.next,
-            },
+            patch: Patch::new(
+                self.base.value,
+                self.next,
+                self.base.xml.clone(),
+                snapshot.xml.clone(),
+                self.base.context.clone(),
+                snapshot.context.clone(),
+            ),
             snapshot,
         })
     }
@@ -135,13 +164,35 @@ impl Commit {
 }
 
 /// A lineage-independent, preconditioned reversible layout patch.
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Patch {
     before: Option<Layout>,
     after: Option<Layout>,
+    before_xml: Arc<[u8]>,
+    after_xml: Arc<[u8]>,
+    before_context: Arc<Context>,
+    after_context: Arc<Context>,
 }
 
 impl Patch {
+    fn new(
+        before: Option<Layout>,
+        after: Option<Layout>,
+        before_xml: Arc<[u8]>,
+        after_xml: Arc<[u8]>,
+        before_context: Arc<Context>,
+        after_context: Arc<Context>,
+    ) -> Self {
+        Self {
+            before,
+            after,
+            before_xml,
+            after_xml,
+            before_context,
+            after_context,
+        }
+    }
+
     /// Return the expected source state.
     #[must_use]
     pub const fn before(&self) -> Option<Layout> {
@@ -156,21 +207,34 @@ impl Patch {
 
     /// Return the inverse operation.
     #[must_use]
-    pub const fn inverse(self) -> Self {
+    pub fn inverse(&self) -> Self {
         Self {
             before: self.after,
             after: self.before,
+            before_xml: self.after_xml.clone(),
+            after_xml: self.before_xml.clone(),
+            before_context: self.after_context.clone(),
+            after_context: self.before_context.clone(),
         }
     }
 
-    /// Apply the patch only when the target has its expected source state.
+    /// Apply the patch only when the target has the exact expected source
+    /// bytes, inherited namespace context, and semantic state.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
-        if source.value != self.before {
+        if source.value != self.before
+            || source.xml.as_ref() != self.before_xml.as_ref()
+            || source.context.as_ref() != self.before_context.as_ref()
+        {
             return Err(Error::InvalidFormat(
-                "footnote-columns patch source state does not match its precondition".into(),
+                "footnote-columns patch source snapshot does not match its precondition".into(),
             ));
         }
-        let xml = codec::rewrite(source.xml_bytes(), self.after)?;
-        Snapshot::from_xml(xml)
+        if self.before == self.after {
+            return Ok(source.clone());
+        }
+        Snapshot::from_xml_with_context(
+            self.after_xml.to_vec(),
+            self.after_context.as_ref().clone(),
+        )
     }
 }

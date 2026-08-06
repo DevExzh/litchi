@@ -18,6 +18,12 @@ pub(crate) const MAX_XML_BYTES: usize = 4 * 1024 * 1024;
 pub(crate) const MAX_XML_DEPTH: usize = 64;
 /// Maximum XML elements accepted by this focused owner.
 pub(crate) const MAX_XML_NODES: usize = 4096;
+/// Maximum number of namespace bindings retained from an enclosing document
+/// when a section is detached from its package part.
+pub(crate) const MAX_CONTEXT_BINDINGS: usize = 4096;
+/// Maximum bytes retained by a detached namespace/markup-compatibility
+/// context.
+pub(crate) const MAX_CONTEXT_BYTES: usize = 256 * 1024;
 
 pub(crate) fn validate_layout(value: Option<Layout>) -> Result<()> {
     if value.is_some_and(|value| value.columns() < 0) {

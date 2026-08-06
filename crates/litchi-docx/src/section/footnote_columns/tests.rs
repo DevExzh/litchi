@@ -105,6 +105,128 @@ fn package_discovery_reads_all_sections() {
 }
 
 #[test]
+fn package_discovery_retains_inherited_namespace_context() {
+    let source = format!(
+        r#"<q:document xmlns:q="{W}" xmlns:x12="{W12}" xmlns:m="{MC}" m:Ignorable="x12"><q:body><q:sectPr><x12:footnoteColumns q:val="02"/></q:sectPr></q:body></q:document>"#
+    );
+    let part = BlobPart::new(
+        PackURI::new("/word/document.xml").expect("URI"),
+        "application/xml".into(),
+        source.into_bytes(),
+    );
+    let sections = parse_part(&part).expect("document sections");
+    assert_eq!(sections.len(), 1);
+    assert_eq!(sections[0].layout(), Some(layout(2)));
+    assert_eq!(
+        sections[0].xml_bytes(),
+        br#"<q:sectPr><x12:footnoteColumns q:val="02"/></q:sectPr>"#
+    );
+
+    let mut edit = sections[0].edit();
+    edit.set_layout(Some(layout(6))).expect("valid edit");
+    let commit = edit.commit().expect("commit");
+    assert_eq!(
+        commit.snapshot().xml_bytes(),
+        br#"<q:sectPr><x12:footnoteColumns q:val="6"/></q:sectPr>"#
+    );
+    let restored = commit
+        .patch()
+        .inverse()
+        .apply(commit.snapshot())
+        .expect("inverse");
+    assert_eq!(
+        restored.xml_bytes(),
+        br#"<q:sectPr><x12:footnoteColumns q:val="02"/></q:sectPr>"#
+    );
+}
+
+#[test]
+fn package_discovery_rejects_unignorable_inherited_extension() {
+    let part = BlobPart::new(
+        PackURI::new("/word/document.xml").expect("URI"),
+        "application/xml".into(),
+        format!(
+            r#"<q:document xmlns:q="{W}" xmlns:x12="{W12}"><q:body><q:sectPr><x12:footnoteColumns q:val="2"/></q:sectPr></q:body></q:document>"#
+        )
+        .into_bytes(),
+    );
+    assert!(parse_part(&part).is_err());
+}
+
+#[test]
+fn value_edits_preserve_extension_attributes_and_lexical_source() {
+    let source = Snapshot::from_xml(
+        format!(
+            r#"<w:sectPr xmlns:w="{W}" xmlns:w12="{W12}" xmlns:mc="{MC}" mc:Ignorable="w12"><w12:footnoteColumns foo:extra="keep" w:val='02' xmlns:foo="urn:opaque"  /></w:sectPr>"#
+        )
+        .into_bytes(),
+    )
+    .expect("valid section");
+    let mut edit = source.edit();
+    edit.set_layout(Some(layout(3))).expect("valid edit");
+    let commit = edit.commit().expect("commit");
+    assert_eq!(
+        commit.snapshot().xml_bytes(),
+        format!(
+            r#"<w:sectPr xmlns:w="{W}" xmlns:w12="{W12}" xmlns:mc="{MC}" mc:Ignorable="w12"><w12:footnoteColumns foo:extra="keep" w:val='3' xmlns:foo="urn:opaque"  /></w:sectPr>"#
+        )
+        .as_bytes()
+    );
+
+    let no_op =
+        Snapshot::from_xml(section_xml(r#"<w12:footnoteColumns w:val="02"/>"#).into_bytes())
+            .expect("valid section");
+    let mut no_op_edit = no_op.edit();
+    no_op_edit
+        .set_layout(Some(layout(2)))
+        .expect("valid no-op edit");
+    let no_op_commit = no_op_edit.commit().expect("no-op commit");
+    assert_eq!(no_op_commit.snapshot().xml_bytes(), no_op.xml_bytes());
+    assert_eq!(
+        no_op_commit
+            .patch()
+            .apply(&no_op)
+            .expect("no-op patch")
+            .xml_bytes(),
+        no_op.xml_bytes()
+    );
+}
+
+#[test]
+fn patches_require_exact_source_bytes() {
+    let source = Snapshot::from_xml(
+        section_xml(r#"<x:opaque xmlns:x="urn:first"/><w12:footnoteColumns w:val="2"/>"#)
+            .into_bytes(),
+    )
+    .expect("valid source");
+    let same_value_different_source = Snapshot::from_xml(
+        section_xml(r#"<x:opaque xmlns:x="urn:second"/><w12:footnoteColumns w:val="2"/>"#)
+            .into_bytes(),
+    )
+    .expect("valid alternate source");
+    let mut edit = source.edit();
+    edit.set_layout(Some(layout(4))).expect("valid edit");
+    let commit = edit.commit().expect("commit");
+    assert!(commit.patch().apply(&same_value_different_source).is_err());
+}
+
+#[test]
+fn rejects_values_outside_schema_int_bounds() {
+    assert!(
+        Snapshot::from_xml(
+            section_xml(r#"<w12:footnoteColumns w:val="2147483648"/>"#).into_bytes()
+        )
+        .is_err()
+    );
+    assert!(
+        Snapshot::from_xml(
+            section_xml(r#"<w12:footnoteColumns w:val="-2147483649"/>"#).into_bytes()
+        )
+        .is_err()
+    );
+}
+
+#[test]
 fn malformed_extension_and_missing_ignorable_are_rejected() {
     assert!(
         Snapshot::from_xml(section_xml(r#"<w12:footnoteColumns w:val="-1"/>"#).into_bytes())

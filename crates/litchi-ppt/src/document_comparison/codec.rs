@@ -128,11 +128,11 @@ impl DiffNode {
         self.validate_node()?;
         let mut atom = Vec::with_capacity(12);
         atom.push(u8::from(self.headers.index));
-        atom.extend_from_slice(&[0; 3]);
+        atom.extend_from_slice(&self.headers.ignored_prefix);
         atom.extend_from_slice(&self.headers.diff_type.as_u32().to_le_bytes());
-        atom.extend_from_slice(&0u32.to_le_bytes());
+        atom.extend_from_slice(&self.headers.ignored_tail.to_le_bytes());
         let mut payload = encode_record(0, 0, RecordType::Diff10Atom, &atom);
-        payload.extend_from_slice(&self.flags.to_raw().to_le_bytes());
+        payload.extend_from_slice(&(self.flags.to_raw() | self.ignored_flag_bits).to_le_bytes());
         for child in &self.children {
             payload.extend_from_slice(&child.encode(depth + 1, count)?);
         }
@@ -407,7 +407,7 @@ fn parse_payload(data: &[u8], limits: Limits) -> Result<Review> {
         if end > data.len() {
             return corrupted("review record extends beyond its payload");
         }
-        let (record, consumed) = Record::parse(&data[offset..end], 0)?;
+        let (record, consumed) = Record::parse_strict(&data[offset..end], 0)?;
         if consumed != end - offset {
             return corrupted("review record was only partially parsed");
         }
@@ -521,36 +521,57 @@ pub(crate) fn encode_document(root: &Record) -> Result<Vec<u8>> {
 }
 
 fn find_pp10_blob(root: &Record) -> Result<Option<Vec<usize>>> {
-    let mut matches = Vec::new();
-    find_pp10(root, &mut Vec::new(), &mut matches)?;
-    if matches.len() > 1 {
-        return corrupted("document contains duplicate ___PPT10 review payloads");
+    if root.record_type != RecordType::Document {
+        return corrupted("document-comparison owner requires a DocumentContainer root");
     }
-    Ok(matches.pop())
-}
 
-fn find_pp10(record: &Record, path: &mut Vec<usize>, matches: &mut Vec<Vec<usize>>) -> Result<()> {
-    if record.record_type == RecordType::ProgBinaryTag && is_pp10_tag(record)? {
+    let doc_info_iter = root
+        .children
+        .iter()
+        .enumerate()
+        .filter(|(_, child)| child.record_type == RecordType::DocInfoList);
+    let mut doc_info_iter = doc_info_iter;
+    let Some((doc_info_index, doc_info)) = doc_info_iter.next() else {
+        return Ok(None);
+    };
+    if doc_info_iter.next().is_some() {
+        return corrupted("document contains duplicate DocInfoList containers");
+    }
+
+    let prog_tags_iter = doc_info
+        .children
+        .iter()
+        .enumerate()
+        .filter(|(_, child)| child.record_type == RecordType::ProgTags);
+    let mut prog_tags_iter = prog_tags_iter;
+    let Some((prog_tags_index, prog_tags)) = prog_tags_iter.next() else {
+        return Ok(None);
+    };
+    if prog_tags_iter.next().is_some() {
+        return corrupted("document info contains duplicate ProgTags containers");
+    }
+
+    let mut match_path = None;
+    for (tag_index, tag) in prog_tags.children.iter().enumerate() {
+        if tag.record_type != RecordType::ProgBinaryTag || !is_pp10_tag(tag)? {
+            continue;
+        }
+        if match_path.is_some() {
+            return corrupted("document contains duplicate ___PPT10 review payloads");
+        }
         let mut blob = None;
-        for (index, child) in record.children.iter().enumerate() {
+        for (child_index, child) in tag.children.iter().enumerate() {
             if child.record_type == RecordType::BinaryTagData {
-                if blob.replace(index).is_some() {
+                if blob.replace(child_index).is_some() {
                     return corrupted("___PPT10 tag contains duplicate BinaryTagData records");
                 }
             }
         }
         let blob =
             blob.ok_or_else(|| Error::Corrupted("___PPT10 tag is missing BinaryTagData".into()))?;
-        let mut blob_path = path.clone();
-        blob_path.push(blob);
-        matches.push(blob_path);
+        match_path = Some(vec![doc_info_index, prog_tags_index, tag_index, blob]);
     }
-    for (index, child) in record.children.iter().enumerate() {
-        path.push(index);
-        find_pp10(child, path, matches)?;
-        path.pop();
-    }
-    Ok(())
+    Ok(match_path)
 }
 
 fn is_pp10_tag(record: &Record) -> Result<bool> {
@@ -615,11 +636,7 @@ fn parse_reviewer_name(data: &[u8]) -> Result<(String, usize)> {
     }
     let mut units = Vec::with_capacity(byte_len / 2);
     for chunk in data[RECORD_HEADER_SIZE..total_len].chunks_exact(2) {
-        let unit = u16::from_le_bytes([chunk[0], chunk[1]]);
-        if unit == 0 {
-            break;
-        }
-        units.push(unit);
+        units.push(u16::from_le_bytes([chunk[0], chunk[1]]));
     }
     let name = String::from_utf16(&units)
         .map_err(|_| Error::Corrupted("ReviewerNameAtom contains invalid UTF-16".to_string()))?;

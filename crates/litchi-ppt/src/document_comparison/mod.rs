@@ -8,6 +8,7 @@
 
 mod codec;
 mod model;
+pub(crate) mod package;
 mod transaction;
 mod validation;
 
@@ -18,7 +19,8 @@ pub use model::{
     TableDiffFlags, TextDiffFlags, Unknown,
 };
 
-pub use transaction::{Change, Commit, Editor, Patch, Revision, Snapshot};
+pub use package::{MAX_PACKAGE_BYTES, PackageCommit, PackagePatch, PackageSnapshot};
+pub use transaction::{Change, ChangeKind, Commit, Editor, Patch, Revision, Snapshot};
 
 #[cfg(test)]
 mod tests;

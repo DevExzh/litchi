@@ -11,7 +11,7 @@
 #[cfg(feature = "odf")]
 use litchi::Result;
 #[cfg(feature = "odf")]
-use litchi::odf::odp::Presentation;
+use litchi::odp::Presentation;
 
 #[cfg(feature = "odf")]
 fn main() -> Result<()> {

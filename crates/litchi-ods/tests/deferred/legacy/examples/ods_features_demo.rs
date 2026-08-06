@@ -3,8 +3,8 @@
 
 use litchi::Result;
 use litchi::common::Metadata;
-use litchi::odf::ods::Builder;
-use litchi::odf::{CellValue, Spreadsheet};
+use litchi::ods::Builder;
+use litchi::ods::{CellValue, Spreadsheet};
 
 fn main() -> Result<()> {
     println!("Creating comprehensive ODS file with supported features...");

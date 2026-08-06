@@ -166,6 +166,7 @@ metadata rather than performing the behavior implied by the format.
 | RDF metadata graphs | ✅ | ✅ | ✅ | RDF package graph and triple CRUD are available where the package carries ODF RDF metadata. |
 | Settings tree | ✅ | ✅ | ✅ | `office:settings`, config sets, maps, items, scalar values, and flat/package adapters support structural inspection and mutation. |
 | Settings-driven application behavior | ❌ | 🟡 | ❌ | View, update, compatibility, spell-check, printer, cursor, and other configuration values may be preserved, but no office UI/runtime consumes them. |
+| Document protection policy metadata | 🟡 | ✅ | ✅ | Typed form, bookmark, read-only, and tracked-change key metadata is read and transactionally rewritten while unknown settings XML remains opaque; no policy enforcement or unlock behavior is provided. |
 | Protection and visibility settings | 🟡 | ✅ | ✅ | Document/section protection flags, hidden conditions, and related policy metadata are retained; they are not enforced or evaluated. |
 | Package graph mutation and signature invalidation | ✅ | ✅ | ✅ | Known resource edits update manifest/package relationships through transactional writers and do not pretend that a prior signature remains valid after mutation. |
 

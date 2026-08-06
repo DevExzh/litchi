@@ -56,7 +56,8 @@
 //! - ⚠️ Advanced drawing objects (complex shapes, connectors)
 //! - ⚠️ Master page editing
 //! - ⚠️ Header and footer manipulation
-//! - ⚠️ Document protection
+//! - ✅ Document protection metadata (`Document::protection()` and
+//!   `Document::set_protection()`); policy is typed and inert, not enforced
 //!
 //! # References
 //! - ODF Specification: §4-5 (Text Content)
@@ -107,6 +108,7 @@ pub mod media;
 pub mod notes_configuration;
 pub mod outline_style;
 pub mod package;
+pub mod protection;
 pub mod ruby_family;
 pub mod section_properties;
 pub mod settings;
@@ -297,6 +299,7 @@ pub(crate) use index_mark::{
 pub(crate) use note::{Note, NoteClass, insert_note_xml, remove_note_xml, replace_note_xml};
 pub(crate) use page_layout::PageLayout;
 pub(crate) use page_sequence::Sequence;
+pub use protection::{Key, Policy};
 pub(crate) use reference_mark::{
     ReferenceMark, insert_reference_mark_xml, remove_reference_mark_xml, replace_reference_mark_xml,
 };

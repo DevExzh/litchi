@@ -19,6 +19,7 @@ fn allocation(resource: &'static str, source: std::collections::TryReserveError)
 
 pub(crate) const DEFAULT_CODEPAGE: u16 = 1252;
 pub(crate) const UNICODE_CODEPAGE: u16 = 1200;
+pub(crate) const MAX_TYPED_TEXT_BYTES: usize = 1 << 20;
 pub(crate) const PID_DICTIONARY: u32 = 0;
 pub(crate) const PID_CODEPAGE: u32 = 1;
 pub(crate) const PID_LOCALE: u32 = 0x8000_0000;

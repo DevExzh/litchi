@@ -1,7 +1,7 @@
 //! Immutable document-comparison snapshots and atomic review edits.
 
 use super::codec;
-use super::model::{Entry, Limits, Review, ReviewingToolbarStates, Unknown};
+use super::model::{DiffFlags, Entry, Limits, Review, ReviewingToolbarStates, Unknown};
 use super::validation;
 use crate::package::{Error, Result};
 use crate::records::Record;
@@ -27,19 +27,61 @@ impl Revision {
     }
 }
 
-/// A semantic change to the review-owned toolbar atom.
+/// The review metadata facet changed by one transaction operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChangeKind {
+    Toolbar,
+    ReviewerName,
+    DocumentFlags,
+}
+
+/// One semantic change to the inert review metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Change {
-    before: Option<ReviewingToolbarStates>,
-    after: Option<ReviewingToolbarStates>,
+pub enum Change {
+    Toolbar {
+        before: Option<ReviewingToolbarStates>,
+        after: Option<ReviewingToolbarStates>,
+    },
+    ReviewerName {
+        tree_index: usize,
+        before: String,
+        after: String,
+    },
+    DocumentFlags {
+        tree_index: usize,
+        before: DiffFlags,
+        after: DiffFlags,
+    },
 }
 
 impl Change {
-    pub const fn before(&self) -> Option<ReviewingToolbarStates> {
-        self.before
+    pub const fn kind(&self) -> ChangeKind {
+        match self {
+            Self::Toolbar { .. } => ChangeKind::Toolbar,
+            Self::ReviewerName { .. } => ChangeKind::ReviewerName,
+            Self::DocumentFlags { .. } => ChangeKind::DocumentFlags,
+        }
     }
-    pub const fn after(&self) -> Option<ReviewingToolbarStates> {
-        self.after
+
+    pub const fn toolbar(
+        &self,
+    ) -> Option<(
+        Option<ReviewingToolbarStates>,
+        Option<ReviewingToolbarStates>,
+    )> {
+        match self {
+            Self::Toolbar { before, after } => Some((*before, *after)),
+            Self::ReviewerName { .. } | Self::DocumentFlags { .. } => None,
+        }
+    }
+
+    pub const fn tree_index(&self) -> Option<usize> {
+        match self {
+            Self::ReviewerName { tree_index, .. } | Self::DocumentFlags { tree_index, .. } => {
+                Some(*tree_index)
+            },
+            Self::Toolbar { .. } => None,
+        }
     }
 }
 
@@ -73,7 +115,7 @@ impl Patch {
 
     /// Undo this patch against its exact committed target snapshot.
     pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
-        if current.revision() != self.target {
+        if current.revision() != self.target || current.bytes() != self.after.as_ref() {
             return Err(Error::InvalidFormat(
                 "cannot undo review edits against a different revision".into(),
             ));
@@ -83,7 +125,7 @@ impl Patch {
 
     /// Redo this patch against its exact source snapshot.
     pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
-        if current.revision() != self.base {
+        if current.revision() != self.base || current.bytes() != self.before.as_ref() {
             return Err(Error::InvalidFormat(
                 "cannot redo review edits against a different revision".into(),
             ));
@@ -116,7 +158,7 @@ impl Snapshot {
                 "document-comparison snapshot exceeds the byte limit".into(),
             ));
         }
-        let (parsed, consumed) = Record::parse(&bytes, 0)?;
+        let (parsed, consumed) = Record::parse_strict(&bytes, 0)?;
         if consumed != bytes.len() {
             return Err(Error::Corrupted(
                 "document-comparison snapshot has trailing bytes".into(),
@@ -140,7 +182,7 @@ impl Snapshot {
     pub fn parse_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
         let snapshot = Self::from_record_with_limits(
             {
-                let (record, consumed) = Record::parse(bytes, 0)?;
+                let (record, consumed) = Record::parse_strict(bytes, 0)?;
                 if consumed != bytes.len() {
                     return Err(Error::Corrupted(
                         "document-comparison input contains trailing bytes".into(),
@@ -176,6 +218,11 @@ impl Snapshot {
     /// Return the typed reviewing-toolbar state, when present.
     pub fn toolbar(&self) -> Result<Option<ReviewingToolbarStates>> {
         Ok(self.review()?.toolbar())
+    }
+
+    /// Return the `index`th reviewer tree in the document-comparison payload.
+    pub fn diff_tree(&self, index: usize) -> Result<Option<super::model::DiffTree10>> {
+        Ok(self.review()?.diff_tree(index).cloned())
     }
 
     /// Return opaque records retained by the review owner.
@@ -216,6 +263,9 @@ impl Editor {
     pub fn toolbar(&self) -> Result<Option<ReviewingToolbarStates>> {
         Ok(self.review()?.toolbar())
     }
+    pub fn diff_tree(&self, index: usize) -> Result<Option<super::model::DiffTree10>> {
+        Ok(self.review()?.diff_tree(index).cloned())
+    }
     pub fn changes(&self) -> &[Change] {
         &self.changes
     }
@@ -226,6 +276,62 @@ impl Editor {
     /// Set or replace the reviewing toolbar atom without touching other records.
     pub fn set_toolbar(&mut self, value: ReviewingToolbarStates) -> Result<()> {
         self.replace_toolbar(Some(value))
+    }
+
+    /// Replace one reviewer name in source order.
+    pub fn set_reviewer_name(&mut self, tree_index: usize, value: impl Into<String>) -> Result<()> {
+        let value = value.into();
+        validation::validate_reviewer_name(&value)?;
+        let mut review = self.review()?;
+        let entry = review
+            .entries
+            .iter_mut()
+            .filter(|entry| matches!(entry, Entry::Diff(_)))
+            .nth(tree_index)
+            .ok_or_else(|| Error::InvalidFormat("reviewer tree index is out of range".into()))?;
+        let Entry::Diff(tree) = entry else {
+            unreachable!("filtered reviewer tree entry")
+        };
+        if tree.reviewer_name == value {
+            return Ok(());
+        }
+        let before = std::mem::replace(&mut tree.reviewer_name, value.clone());
+        codec::write_review(&mut self.root, &review, self.source.limits)?;
+        self.changes.push(Change::ReviewerName {
+            tree_index,
+            before,
+            after: value,
+        });
+        Ok(())
+    }
+
+    /// Replace the document-level display flags of one reviewer tree.
+    ///
+    /// This changes only what the legacy reviewing UI displays. It never
+    /// applies, rejects, or generates any underlying presentation change.
+    pub fn set_document_flags(&mut self, tree_index: usize, value: DiffFlags) -> Result<()> {
+        let mut review = self.review()?;
+        let entry = review
+            .entries
+            .iter_mut()
+            .filter(|entry| matches!(entry, Entry::Diff(_)))
+            .nth(tree_index)
+            .ok_or_else(|| Error::InvalidFormat("reviewer tree index is out of range".into()))?;
+        let Entry::Diff(tree) = entry else {
+            unreachable!("filtered reviewer tree entry")
+        };
+        let before = tree.document_flags();
+        if before == value {
+            return Ok(());
+        }
+        tree.document_diff.set_flags(value)?;
+        codec::write_review(&mut self.root, &review, self.source.limits)?;
+        self.changes.push(Change::DocumentFlags {
+            tree_index,
+            before,
+            after: value,
+        });
+        Ok(())
     }
 
     /// Remove the reviewing toolbar atom, preserving the rest of the payload.
@@ -263,7 +369,7 @@ impl Editor {
             review.entries.insert(index, Entry::Toolbar(value));
         }
         codec::write_review(&mut self.root, &review, self.source.limits)?;
-        self.changes.push(Change { before, after });
+        self.changes.push(Change::Toolbar { before, after });
         Ok(())
     }
 

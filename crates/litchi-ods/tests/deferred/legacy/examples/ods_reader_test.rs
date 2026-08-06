@@ -11,7 +11,7 @@
 #[cfg(feature = "odf")]
 use litchi::Result;
 #[cfg(feature = "odf")]
-use litchi::odf::{CellValue, Spreadsheet};
+use litchi::ods::{CellValue, Spreadsheet};
 
 #[cfg(feature = "odf")]
 fn main() -> Result<()> {

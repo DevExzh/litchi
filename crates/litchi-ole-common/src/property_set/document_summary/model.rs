@@ -69,7 +69,7 @@ pub const DOCUMENT_VERSION: u32 = 0x0000_001D;
 ///
 /// The limit keeps a single semantic field below the conservative simple
 /// Property Set stream budget while allowing ordinary Office metadata values.
-pub const MAX_TEXT_BYTES: usize = 1 << 20;
+pub const MAX_TEXT_BYTES: usize = super::super::model::MAX_TYPED_TEXT_BYTES;
 
 /// The two unsigned 16-bit components encoded by the PIDDSI `Version` I4.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
