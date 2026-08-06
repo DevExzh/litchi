@@ -732,19 +732,13 @@ impl KeynoteDocument {
         Ok(self.semantic_document()?.snapshot())
     }
 
-    /// Get the underlying bundle
-    pub fn bundle(&self) -> &Bundle {
-        &self.state.bundle
-    }
-
-    /// Return a bounded, deterministic validation report for this snapshot.
-    pub fn validation_report(&self) -> crate::bundle::BundleValidationReport {
-        self.state.bundle.validation_report()
-    }
-
-    /// Validate this immutable snapshot without mutating it.
+    /// Validate this immutable snapshot without exposing archive internals.
+    ///
+    /// Validation is performed directly against the private parsed bundle and
+    /// returns the typed crate result. Callers can validate a document without
+    /// depending on archive or object-index representations.
     pub fn validate(&self) -> Result<()> {
-        self.validation_report().as_result()
+        self.state.bundle.validate()
     }
 
     /// Get document statistics after resolving the presentation slides.
