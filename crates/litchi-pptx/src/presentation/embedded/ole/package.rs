@@ -77,6 +77,7 @@ pub fn load_slide(
                 show_as_icon: value.show_as_icon,
                 preview_width: value.preview_width,
                 preview_height: value.preview_height,
+                anchor: value.anchor,
                 mode: value.mode,
                 relationship_id: value.relationship_id,
                 kind,

@@ -75,6 +75,7 @@ pub struct Object {
     pub(crate) show_as_icon: Option<bool>,
     pub(crate) preview_width: Option<u32>,
     pub(crate) preview_height: Option<u32>,
+    pub(crate) anchor: Option<Frame>,
     pub(crate) mode: Mode,
     pub(crate) relationship_id: Option<String>,
     pub(crate) kind: Option<Kind>,
@@ -112,6 +113,10 @@ impl Object {
     }
     pub fn preview_height(&self) -> Option<u32> {
         self.preview_height
+    }
+    /// DrawingML position and extent of the owning graphic frame, in EMUs.
+    pub fn anchor(&self) -> Option<Frame> {
+        self.anchor
     }
     pub fn mode(&self) -> Mode {
         self.mode

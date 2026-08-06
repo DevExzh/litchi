@@ -1,4 +1,4 @@
-use super::model::Mode;
+use super::model::{Frame, Mode};
 use crate::Result;
 use crate::presentation::embedded::{
     MAX_XML_ATTRIBUTES, MAX_XML_BYTES, MAX_XML_DEPTH, PML, REL, STRICT_PML, STRICT_REL, bounded,
@@ -166,6 +166,7 @@ pub(crate) struct Parsed {
     pub(crate) show_as_icon: Option<bool>,
     pub(crate) preview_width: Option<u32>,
     pub(crate) preview_height: Option<u32>,
+    pub(crate) anchor: Option<Frame>,
     pub(crate) mode: Mode,
     pub(crate) relationship_id: Option<String>,
     pub(crate) preview_relationship_id: Option<String>,
@@ -202,6 +203,10 @@ fn parse_frame(frame: &Node) -> Result<Option<Parsed>> {
         .map(|value| value.parse().map_err(|_| invalid("invalid OLE shape ID")))
         .transpose()?;
     let shape_name = non_visual.and_then(|node| attr(node, "name", false).map(str::to_owned));
+    let anchor = child(frame, "xfrm")
+        .map(parse_anchor)
+        .transpose()?
+        .flatten();
     let mode = if let Some(embed) = child(object, "embed") {
         if child(object, "link").is_some() {
             return Err(invalid("OLE object contains both embed and link"));
@@ -245,10 +250,32 @@ fn parse_frame(frame: &Node) -> Result<Option<Parsed>> {
                     .map_err(|_| invalid("invalid OLE preview height"))
             })
             .transpose()?,
+        anchor,
         mode: mode.0,
         relationship_id: mode.1,
         preview_relationship_id: preview,
     }))
+}
+
+fn parse_anchor(node: &Node) -> Result<Option<Frame>> {
+    let Some(off) = child(node, "off") else {
+        return Ok(None);
+    };
+    let Some(ext) = child(node, "ext") else {
+        return Ok(None);
+    };
+    let parse = |node: &Node, name: &str| {
+        attr(node, name, false)
+            .ok_or_else(|| invalid(format!("missing OLE anchor attribute '{name}'")))?
+            .parse::<i64>()
+            .map_err(|_| invalid(format!("invalid OLE anchor attribute '{name}'")))
+    };
+    Ok(Some(Frame::new(
+        parse(off, "x")?,
+        parse(off, "y")?,
+        parse(ext, "cx")?,
+        parse(ext, "cy")?,
+    )))
 }
 
 fn child<'a>(node: &'a Node, local: &str) -> Option<&'a Node> {
