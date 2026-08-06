@@ -105,7 +105,7 @@
 //! let doc = Document::open("spreadsheet.numbers")?;
 //! let structured = doc.extract_structured_data()?;
 //!
-//! for table in &structured.tables {
+//! for table in structured.tables() {
 //!     let csv = table.to_csv();
 //!     println!("Table: {}\n{}", table.name(), csv);
 //! }
