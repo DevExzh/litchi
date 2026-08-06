@@ -18,7 +18,7 @@ pub mod geometry;
 pub mod model3d;
 pub mod text;
 pub mod theme;
-pub mod xfrm;
+pub mod transform;
 
 use thiserror::Error;
 
