@@ -423,6 +423,10 @@ impl Worksheet {
         self.data.kind
     }
 
+    pub(crate) fn part_uri(&self) -> &PackURI {
+        &self.data.part_uri
+    }
+
     /// Retained visibility state.
     pub fn visibility(&self) -> &Visibility {
         &self.data.visibility
@@ -488,6 +492,13 @@ impl Worksheet {
     /// Parse ignored-error declarations.
     pub fn ignored_errors(&self) -> Result<Option<crate::ignored_errors::IgnoredErrors>> {
         worksheet::ignored_errors(self)
+    }
+
+    /// Parse this worksheet's inert smart-tag annotations.
+    ///
+    /// The metadata is never resolved to an action provider or executed.
+    pub fn smart_tags(&self) -> Result<Option<crate::smart_tags::Collection>> {
+        worksheet::smart_tags(self)
     }
 
     /// Parse the optional named-sheet-view relationship.

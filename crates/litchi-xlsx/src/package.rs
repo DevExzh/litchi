@@ -126,6 +126,38 @@ impl Package {
         crate::task_panes::Transaction::new(&mut self.0, conformance)
     }
 
+    /// Read one worksheet's inert smart-tag annotations by semantic selector.
+    pub fn smart_tags<'a>(
+        &self,
+        sheet: impl Into<crate::workbook::Selector<'a>>,
+    ) -> Result<Option<crate::smart_tags::Collection>> {
+        let workbook = self.workbook()?;
+        let worksheet = workbook
+            .sheet(sheet)?
+            .ok_or_else(|| invalid("worksheet selector did not match a sheet"))?;
+        worksheet.smart_tags()
+    }
+
+    /// Start an atomic smart-tag transaction for a semantic worksheet.
+    pub fn edit_smart_tags<'a>(
+        &mut self,
+        sheet: impl Into<crate::workbook::Selector<'a>>,
+    ) -> Result<crate::smart_tags::Transaction<'_>> {
+        let worksheet = {
+            let workbook = self.workbook()?;
+            let worksheet = workbook
+                .sheet(sheet)?
+                .ok_or_else(|| invalid("worksheet selector did not match a sheet"))?;
+            if worksheet.kind() != crate::workbook::WorksheetKind::Worksheet {
+                return Err(crate::Error::NotWorksheet {
+                    sheet: worksheet.name().to_owned(),
+                });
+            }
+            worksheet.part_uri().clone()
+        };
+        crate::smart_tags::Transaction::new(&mut self.0, worksheet)
+    }
+
     /// Atomically save the package to a filesystem path.
     pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
         writer::save(&self.0, path)

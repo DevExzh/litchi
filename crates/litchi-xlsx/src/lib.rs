@@ -54,6 +54,7 @@ pub mod sheet_view;
 pub mod slicer;
 #[allow(dead_code, unreachable_pub, unused_imports)]
 mod slicer_cache;
+pub mod smart_tags;
 pub mod sort;
 pub mod style;
 pub mod table;

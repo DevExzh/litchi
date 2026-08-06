@@ -43,6 +43,7 @@ query, macro, chart, pivot, or external content is executed.
 | Merged cells | ✅ | ✅ | ✅ | Merge ranges have checked read and CRUD operations, including lookup by worksheet name. |
 | Scenarios and what-if data | ✅ | ✅ | ✅ | Scenario metadata and supported package relationships have typed CRUD; Excel's what-if calculation is not performed. |
 | Ignored errors and cell watches | ✅ | ✅ | ✅ | Ignored-error ranges and worksheet cell-watch entries have bounded parse/write support. |
+| Cell smart tags | 🟡 | ✅ | ✅ | The layered `smart_tags::{model,codec,package,validation,transaction}` owner provides inert typed annotations, checked cell references, strict Office type/property bounds, source-preserving worksheet edits, and semantic package selection. Action providers and smart-tag execution are intentionally unsupported. |
 | Phonetic properties | ✅ | ✅ | ✅ | Worksheet phonetic properties and supported attributes are typed; phonetic layout/conversion is not a renderer. |
 
 ## Worksheet interaction and presentation

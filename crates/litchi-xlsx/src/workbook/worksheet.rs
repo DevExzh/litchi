@@ -129,6 +129,11 @@ pub(crate) fn ignored_errors(
     crate::ignored_errors::parse_worksheet_ignored_errors(xml(sheet)?)
 }
 
+/// Parse inert worksheet smart-tag annotations.
+pub(crate) fn smart_tags(sheet: &Worksheet) -> Result<Option<crate::smart_tags::Collection>> {
+    crate::smart_tags::parse(xml(sheet)?)
+}
+
 /// Parse the worksheet's named-sheet-view relationship, when present.
 pub(crate) fn named_sheet_views(
     sheet: &Worksheet,
