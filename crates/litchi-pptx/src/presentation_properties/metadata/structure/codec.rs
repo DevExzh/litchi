@@ -38,12 +38,12 @@ pub fn store(package: &mut OpcPackage, value: &Graph) -> Result<()> {
     validate_graph(package, value)?;
     let presentation_name = package.main_document_part()?.partname().clone();
     let original = package.get_part(&presentation_name)?.blob().to_vec();
-    let (p_namespace, r_namespace) = document_namespaces(&original);
-    let custom_xml =
-        write_custom_shows(&value.custom_shows, &value.slides, p_namespace, r_namespace)?;
-    let mut staged = patch_custom_shows(&original, custom_xml.as_bytes())?;
-    let section_xml = write_section_extension(&value.sections, p_namespace)?;
-    staged = patch_sections(&staged, section_xml.as_bytes(), p_namespace)?;
+    let original_graph = parse_structure_blob(package, &original, true)?;
+    let staged = rewrite(&original, &original_graph, value)?;
+
+    if staged == original {
+        return Ok(());
+    }
 
     let reparsed = parse_structure_blob(package, &staged, true)?;
     if reparsed.slides != value.slides
@@ -55,6 +55,77 @@ pub fn store(package: &mut OpcPackage, value: &Graph) -> Result<()> {
     package.unsign();
     package.get_part_mut(&presentation_name)?.set_blob(staged);
     Ok(())
+}
+
+/// Rewrite only the changed structure owners in one validated presentation
+/// document. The slide relationship graph is intentionally immutable here;
+/// slide insertion and removal belong to the presentation package facade.
+pub(crate) fn rewrite(source: &[u8], original: &Graph, value: &Graph) -> Result<Vec<u8>> {
+    validate_detached_graph(original, value)?;
+    if equivalent_graph(original, value) {
+        return Ok(source.to_vec());
+    }
+
+    let (p_namespace, r_namespace) = document_namespaces(source);
+    let mut staged = source.to_vec();
+    if original.custom_shows.shows != value.custom_shows.shows {
+        let custom_xml =
+            write_custom_shows(&value.custom_shows, &value.slides, p_namespace, r_namespace)?;
+        staged = patch_custom_shows(&staged, custom_xml.as_bytes())?;
+    }
+    if original.sections != value.sections {
+        let section_xml = write_section_extension(&value.sections, p_namespace)?;
+        staged = patch_sections(&staged, section_xml.as_bytes(), p_namespace)?;
+    }
+
+    let reparsed = parse_detached(&staged, &value.slides)?;
+    if !equivalent_graph(&reparsed, value) {
+        return Err(invalid("staged presentation structure did not round-trip"));
+    }
+    Ok(staged)
+}
+
+/// Parse a rewritten presentation against its already validated relationship
+/// topology without needing to reopen any slide part.
+pub(crate) fn parse_detached(xml: &[u8], slides: &[Reference]) -> Result<Graph> {
+    if xml.len() > MAX_BYTES {
+        return Err(invalid("presentation structure exceeds 8 MiB"));
+    }
+    let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
+    let (raw_slides, raw_shows) = parse_core(processed.as_ref())?;
+    let expected_slides = slides
+        .iter()
+        .map(|slide| (slide.slide_id, slide.relationship_id.clone()))
+        .collect::<Vec<_>>();
+    if raw_slides != expected_slides {
+        return Err(invalid(
+            "presentation slide relationship topology changed in a structure transaction",
+        ));
+    }
+    let custom_shows = resolve_custom_shows(raw_shows, slides, true)?;
+    let graph = Graph {
+        slides: slides.to_vec(),
+        custom_shows,
+        sections: SectionList::from_xml(xml)?,
+    };
+    validate_graph_shape(&graph)?;
+    Ok(graph)
+}
+
+/// Validate detached edits against the source's immutable slide graph.
+pub(crate) fn validate_detached_graph(original: &Graph, value: &Graph) -> Result<()> {
+    if value.slides != original.slides {
+        return Err(invalid(
+            "presentation slide ordering and relationship topology are immutable in a structure transaction",
+        ));
+    }
+    validate_graph_shape(value)
+}
+
+pub(crate) fn equivalent_graph(left: &Graph, right: &Graph) -> bool {
+    left.slides == right.slides
+        && left.custom_shows.shows == right.custom_shows.shows
+        && left.sections == right.sections
 }
 
 pub fn find_custom_show(package: &OpcPackage, id: u32) -> Result<Option<Show>> {
@@ -345,6 +416,23 @@ fn parse_structure_blob(
             part_name: target.to_string(),
         });
     }
+    let custom_shows = resolve_custom_shows(raw_shows, &slides, strict_references)?;
+    let graph = Graph {
+        slides,
+        custom_shows,
+        sections: SectionList::from_xml(xml)?,
+    };
+    if strict_references {
+        validate_graph(package, &graph)?;
+    }
+    Ok(graph)
+}
+
+fn resolve_custom_shows(
+    raw_shows: Vec<RawShow>,
+    slides: &[Reference],
+    strict_references: bool,
+) -> Result<ShowList> {
     let rel_to_id = slides
         .iter()
         .map(|slide| (slide.relationship_id.as_str(), slide.slide_id))
@@ -364,15 +452,7 @@ fn parse_structure_blob(
         }
         custom_shows.add(show);
     }
-    let graph = Graph {
-        slides,
-        custom_shows,
-        sections: SectionList::from_xml(xml)?,
-    };
-    if strict_references {
-        validate_graph(package, &graph)?;
-    }
-    Ok(graph)
+    Ok(custom_shows)
 }
 
 #[derive(Default)]
@@ -536,21 +616,8 @@ fn required_qualified<'a>(values: &'a [(String, String)], local: &str) -> Result
 }
 
 fn validate_graph(package: &OpcPackage, graph: &Graph) -> Result<()> {
-    let mut slide_ids = HashSet::new();
-    let mut rel_ids = HashSet::new();
-    let mut part_names = HashSet::new();
-    for slide in &graph.slides {
-        if slide.slide_id < 256 || !slide_ids.insert(slide.slide_id) {
-            return Err(invalid("invalid or duplicate presentation slide ID"));
-        }
-        if !rel_ids.insert(slide.relationship_id.as_str())
-            || !part_names.insert(slide.part_name.as_str())
-        {
-            return Err(invalid(
-                "duplicate presentation slide relationship or target",
-            ));
-        }
-    }
+    validate_graph_shape(graph)?;
+
     let presentation = package.main_document_part()?;
     for slide in &graph.slides {
         let relationship = presentation
@@ -567,6 +634,25 @@ fn validate_graph(package: &OpcPackage, graph: &Graph) -> Result<()> {
             || relationship.target_partname()?.as_str() != slide.part_name
         {
             return Err(invalid("presentation slide relationship mismatch"));
+        }
+    }
+    Ok(())
+}
+
+fn validate_graph_shape(graph: &Graph) -> Result<()> {
+    let mut slide_ids = HashSet::new();
+    let mut rel_ids = HashSet::new();
+    let mut part_names = HashSet::new();
+    for slide in &graph.slides {
+        if slide.slide_id < 256 || !slide_ids.insert(slide.slide_id) {
+            return Err(invalid("invalid or duplicate presentation slide ID"));
+        }
+        if !rel_ids.insert(slide.relationship_id.as_str())
+            || !part_names.insert(slide.part_name.as_str())
+        {
+            return Err(invalid(
+                "duplicate presentation slide relationship or target",
+            ));
         }
     }
     let mut show_ids = HashSet::new();
