@@ -116,6 +116,7 @@ litchi-iwa          = { version = "0.0.1", path = "crates/litchi-iwa" }
 litchi-iwa-archive  = { version = "0.0.1", path = "crates/litchi-iwa-archive" }
 litchi-iwa-common   = { version = "0.0.1", path = "crates/litchi-iwa-common" }
 litchi-iwa-core     = { version = "0.0.1", path = "crates/litchi-iwa-core" }
+litchi-iwa-detect   = { version = "0.0.1", path = "crates/litchi-iwa-detect" }
 litchi-iwa-graph    = { version = "0.0.1", path = "crates/litchi-iwa-graph" }
 litchi-iwa-index    = { version = "0.0.1", path = "crates/litchi-iwa-index" }
 litchi-iwa-package  = { version = "0.0.1", path = "crates/litchi-iwa-package" }

@@ -85,6 +85,7 @@
       "litchi-iwa-archive",
       "litchi-iwa-common",
       "litchi-iwa-core",
+      "litchi-iwa-detect",
       "litchi-iwa-graph",
       "litchi-iwa-index",
       "litchi-iwa-package",
@@ -102,6 +103,12 @@
     ],
     "litchi-iwa-common": [],
     "litchi-iwa-core": [
+      "litchi-iwa-protos"
+    ],
+    "litchi-iwa-detect": [
+      "litchi-iwa-archive",
+      "litchi-iwa-common",
+      "litchi-iwa-core",
       "litchi-iwa-protos"
     ],
     "litchi-iwa-graph": [],
@@ -305,6 +312,7 @@
     "litchi-iwa-archive",
     "litchi-iwa-common",
     "litchi-iwa-core",
+    "litchi-iwa-detect",
     "litchi-iwa-graph",
     "litchi-iwa-index",
     "litchi-iwa-package",
