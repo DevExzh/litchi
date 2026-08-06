@@ -10,6 +10,52 @@ pub const NOSTREAM: u32 = u32::MAX;
 /// The greatest regular CFB directory identifier accepted by `[MS-CFB]`.
 pub const MAX_REGULAR_SID: u32 = 0xFFFF_FFFA;
 
+/// Resource bounds for a captured directory catalog.
+///
+/// The catalog owns only directory metadata.  It never reads or retains CFB
+/// sectors, but names and producer-supplied child projections are still
+/// bounded before they are cloned into a source-preserving snapshot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    /// Maximum number of top-level directory entries in the catalog.
+    pub max_entries: usize,
+    /// Maximum UTF-8 byte length of one retained directory name or CLSID.
+    pub max_name_bytes: usize,
+    /// Maximum aggregate UTF-8 bytes retained by names and raw CLSIDs.
+    pub max_total_bytes: usize,
+    /// Maximum number of recursively supplied raw child entries.
+    pub max_raw_children: usize,
+    /// Maximum nesting depth of recursively supplied raw child entries.
+    pub max_raw_depth: usize,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            max_entries: 65_536,
+            max_name_bytes: 256,
+            max_total_bytes: 64 * 1024 * 1024,
+            max_raw_children: 65_536,
+            max_raw_depth: 64,
+        }
+    }
+}
+
+impl Limits {
+    pub(crate) fn validate(self) -> Result<(), OleError> {
+        if self.max_entries == 0
+            || self.max_name_bytes == 0
+            || self.max_total_bytes == 0
+            || self.max_raw_depth == 0
+        {
+            return Err(OleError::InvalidFormat(
+                "CFB directory catalog limits must be non-zero".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// A checked CFB directory stream identifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Sid(u32);
@@ -72,6 +118,12 @@ pub struct Links {
 }
 
 impl Links {
+    /// Creates checked containment links from optional directory SIDs.
+    #[must_use]
+    pub const fn new(left: Option<Sid>, right: Option<Sid>, child: Option<Sid>) -> Self {
+        Self { left, right, child }
+    }
+
     /// The left sibling, if present.
     #[must_use]
     pub const fn left(self) -> Option<Sid> {
@@ -88,6 +140,24 @@ impl Links {
     #[must_use]
     pub const fn child(self) -> Option<Sid> {
         self.child
+    }
+
+    /// Returns these links with a different left sibling.
+    #[must_use]
+    pub const fn with_left(self, left: Option<Sid>) -> Self {
+        Self { left, ..self }
+    }
+
+    /// Returns these links with a different right sibling.
+    #[must_use]
+    pub const fn with_right(self, right: Option<Sid>) -> Self {
+        Self { right, ..self }
+    }
+
+    /// Returns these links with a different first child.
+    #[must_use]
+    pub const fn with_child(self, child: Option<Sid>) -> Self {
+        Self { child, ..self }
     }
 
     pub(crate) const fn from_raw(
@@ -139,6 +209,42 @@ impl Metadata {
 
     pub(crate) const fn with_class_id(self, class_id: Option<Guid>) -> Self {
         Self { class_id, ..self }
+    }
+
+    /// Replaces the storage or root class identifier in a transaction draft.
+    pub const fn set_class_id(&mut self, class_id: Option<Guid>) -> &mut Self {
+        self.class_id = class_id;
+        self
+    }
+
+    /// Replaces the object kind in a transaction draft.
+    pub const fn set_kind(&mut self, kind: EntryKind) -> &mut Self {
+        self.kind = kind;
+        self
+    }
+
+    /// Replaces the red-black-tree containment links in a transaction draft.
+    pub const fn set_links(&mut self, links: Links) -> &mut Self {
+        self.links = links;
+        self
+    }
+
+    /// Replaces the starting FAT or MiniFAT sector in a transaction draft.
+    pub const fn set_start_sector(&mut self, start_sector: u32) -> &mut Self {
+        self.start_sector = start_sector;
+        self
+    }
+
+    /// Replaces the parsed CFB stream size in a transaction draft.
+    pub const fn set_stream_size(&mut self, stream_size: u64) -> &mut Self {
+        self.stream_size = stream_size;
+        self
+    }
+
+    /// Replaces MiniFAT placement in a transaction draft.
+    pub const fn set_uses_mini_stream(&mut self, uses_mini_stream: bool) -> &mut Self {
+        self.uses_mini_stream = uses_mini_stream;
+        self
     }
 
     pub(crate) const fn staged_storage(class_id: Option<Guid>) -> Self {

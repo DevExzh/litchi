@@ -6,13 +6,21 @@
 //! It carries directory identity and containment links without exposing the
 //! container's mutable internals or activating any OLE payload.
 
+mod catalog;
 mod codec;
 mod model;
+mod patch;
+mod snapshot;
+mod transaction;
 mod validation;
 
 #[cfg(test)]
 mod tests;
 
-pub use model::{EntryKind, Links, MAX_REGULAR_SID, Metadata, NOSTREAM, Sid};
+pub use catalog::{Catalog, Entry};
+pub use model::{EntryKind, Limits, Links, MAX_REGULAR_SID, Metadata, NOSTREAM, Sid};
+pub use patch::{Change, Patch};
+pub use snapshot::Snapshot;
+pub use transaction::{Commit, Revision, Transaction, update};
 
 pub(crate) use codec::{decode, format_class_id};
