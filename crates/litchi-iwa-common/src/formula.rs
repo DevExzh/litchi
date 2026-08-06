@@ -11,22 +11,98 @@
     reason = "Formula-prefixed names keep the shared public vocabulary explicit at call sites"
 )]
 
+/// Failure returned when a floating-point semantic scalar is not finite.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("semantic scalar must be finite")]
+pub struct FiniteF64Error;
+
+/// A compact finite `f64` used by allocation-free semantic values.
+///
+/// The inner value is private so public enums cannot be constructed with NaN
+/// or infinity. Use [`FiniteF64::new`] or [`TryFrom<f64>`] at an input
+/// boundary, and [`FiniteF64::get`] when a native `f64` is required.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[repr(transparent)]
+pub struct FiniteF64(f64);
+
+impl FiniteF64 {
+    /// Construct a finite semantic scalar.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FiniteF64Error`] for NaN or either infinity.
+    pub const fn new(value: f64) -> Result<Self, FiniteF64Error> {
+        if value.is_finite() {
+            Ok(Self(value))
+        } else {
+            Err(FiniteF64Error)
+        }
+    }
+
+    /// Return the finite scalar as a native `f64`.
+    #[must_use]
+    pub const fn get(self) -> f64 {
+        self.0
+    }
+}
+
+impl TryFrom<f64> for FiniteF64 {
+    type Error = FiniteF64Error;
+
+    fn try_from(value: f64) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
+
+impl From<FiniteF64> for f64 {
+    fn from(value: FiniteF64) -> Self {
+        value.get()
+    }
+}
+
 /// A typed display cache stored alongside a native formula reference.
 #[derive(Debug, Clone, PartialEq)]
 pub enum FormulaCachedValue {
     /// A finite numeric result.
-    Number(f64),
+    Number(FiniteF64),
     /// A textual result.
     Text(String),
     /// A Boolean result.
     Boolean(bool),
     /// An iWork date represented in Apple-epoch seconds.
-    Date(f64),
+    Date(FiniteF64),
     /// An iWork duration represented in seconds.
-    Duration(f64),
+    Duration(FiniteF64),
 }
 
 impl FormulaCachedValue {
+    /// Construct a finite numeric formula result.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FiniteF64Error`] for NaN or either infinity.
+    pub fn number(value: f64) -> Result<Self, FiniteF64Error> {
+        FiniteF64::new(value).map(Self::Number)
+    }
+
+    /// Construct a finite iWork date formula result.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FiniteF64Error`] for NaN or either infinity.
+    pub fn date(value: f64) -> Result<Self, FiniteF64Error> {
+        FiniteF64::new(value).map(Self::Date)
+    }
+
+    /// Construct a finite iWork duration formula result.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FiniteF64Error`] for NaN or either infinity.
+    pub fn duration(value: f64) -> Result<Self, FiniteF64Error> {
+        FiniteF64::new(value).map(Self::Duration)
+    }
+
     /// Convert the formula cache into a value owned by a concrete cell model.
     ///
     /// The target type is deliberately generic: the neutral formula leaf does
@@ -366,6 +442,8 @@ impl FormulaExpression {
 
 #[cfg(test)]
 mod tests {
+    use std::mem::size_of;
+
     use super::*;
 
     #[derive(Debug, PartialEq)]
@@ -378,13 +456,13 @@ mod tests {
     }
 
     impl From<FormulaCachedValue> for TestCellValue {
-        fn from(value: FormulaCachedValue) -> Self {
-            match value {
-                FormulaCachedValue::Number(value) => Self::Number(value),
-                FormulaCachedValue::Text(value) => Self::Text(value),
-                FormulaCachedValue::Boolean(value) => Self::Boolean(value),
-                FormulaCachedValue::Date(value) => Self::Date(value),
-                FormulaCachedValue::Duration(value) => Self::Duration(value),
+        fn from(cached: FormulaCachedValue) -> Self {
+            match cached {
+                FormulaCachedValue::Number(number) => Self::Number(number.get()),
+                FormulaCachedValue::Text(text) => Self::Text(text),
+                FormulaCachedValue::Boolean(boolean) => Self::Boolean(boolean),
+                FormulaCachedValue::Date(date) => Self::Date(date.get()),
+                FormulaCachedValue::Duration(duration) => Self::Duration(duration.get()),
             }
         }
     }
@@ -392,7 +470,9 @@ mod tests {
     #[test]
     fn cached_values_convert_through_the_concrete_cell_boundary() {
         assert_eq!(
-            FormulaCachedValue::Number(3.5).into_value::<TestCellValue>(),
+            FormulaCachedValue::number(3.5)
+                .expect("finite formula number")
+                .into_value::<TestCellValue>(),
             TestCellValue::Number(3.5)
         );
         assert_eq!(
@@ -404,13 +484,29 @@ mod tests {
             TestCellValue::Boolean(true)
         );
         assert_eq!(
-            FormulaCachedValue::Date(12.0).into_value::<TestCellValue>(),
+            FormulaCachedValue::date(12.0)
+                .expect("finite formula date")
+                .into_value::<TestCellValue>(),
             TestCellValue::Date(12.0)
         );
         assert_eq!(
-            FormulaCachedValue::Duration(4.5).into_value::<TestCellValue>(),
+            FormulaCachedValue::duration(4.5)
+                .expect("finite formula duration")
+                .into_value::<TestCellValue>(),
             TestCellValue::Duration(4.5)
         );
+    }
+
+    #[test]
+    fn finite_scalars_reject_non_finite_input_and_remain_compact() {
+        assert_eq!(size_of::<FiniteF64>(), size_of::<f64>());
+        assert_eq!(FiniteF64::new(3.5).map(FiniteF64::get), Ok(3.5));
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert_eq!(FiniteF64::new(value), Err(FiniteF64Error));
+        }
+        assert!(FormulaCachedValue::number(f64::NAN).is_err());
+        assert!(FormulaCachedValue::date(f64::INFINITY).is_err());
+        assert!(FormulaCachedValue::duration(f64::NEG_INFINITY).is_err());
     }
 
     #[test]

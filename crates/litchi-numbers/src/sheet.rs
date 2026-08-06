@@ -233,7 +233,10 @@ mod tests {
         let mut table_builder = TableBuilder::new("Table 1", Dimensions::new(2, 3));
         assert!(
             table_builder
-                .set(Position::new(1, 1), Value::Number(42.0))
+                .set(
+                    Position::new(1, 1),
+                    Value::number(42.0).expect("finite test number"),
+                )
                 .is_ok()
         );
         let table = table_builder

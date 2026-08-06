@@ -4,6 +4,8 @@ use std::collections::BTreeMap;
 
 use std::fmt;
 
+use super::FiniteF64;
+
 const BNC_VERSION: u8 = 5;
 const BNC_PREFIX_LEN: usize = 8;
 const BNC_HEADER_LEN: usize = 12;
@@ -147,10 +149,10 @@ pub enum StoredValue {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CachedScalar {
-    Number(f64),
+    Number(FiniteF64),
     Boolean(bool),
-    Date(f64),
-    Duration(f64),
+    Date(FiniteF64),
+    Duration(FiniteF64),
     Unsupported(u8),
 }
 
@@ -160,7 +162,8 @@ impl BncCell {
     /// # Errors
     ///
     /// Returns an error when the cell is truncated, uses an unsupported
-    /// version, or contains an unknown field flag.
+    /// version, contains an unknown field flag, or decodes a non-finite
+    /// scalar.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < BNC_HEADER_LEN {
             return Err(Error::ParseError(
@@ -203,11 +206,13 @@ impl BncCell {
             cursor = end;
         }
 
-        Ok(Self {
+        let cell = Self {
             prefix,
             fields,
             tail: data[cursor..].to_vec(),
-        })
+        };
+        cell.validate_finite_scalar()?;
+        Ok(cell)
     }
 
     /// Creates the smallest writable BNC cell.
@@ -369,14 +374,14 @@ impl BncCell {
     ///
     /// # Errors
     ///
-    /// Returns an error when a numeric field has an invalid byte width or a
-    /// decimal128 field cannot be decoded.
+    /// Returns an error when a numeric field has an invalid byte width, a
+    /// decimal128 field cannot be decoded, or a scalar is non-finite.
     pub fn cached_scalar(&self) -> Result<Option<CachedScalar>> {
         let scalar = match self.prefix[1] {
             CELL_TYPE_NUMBER | CELL_TYPE_RICH_TEXT_OR_NUMBER | CELL_TYPE_ALTERNATE_NUMBER => self
                 .fields
                 .get(&DECIMAL_FLAG)
-                .map(|value| read_decimal128_le(value).map(CachedScalar::Number))
+                .map(|value| decode_decimal128_le(value).map(CachedScalar::Number))
                 .or_else(|| {
                     self.fields
                         .get(&NUMBER_FLAG)
@@ -394,7 +399,9 @@ impl BncCell {
             CELL_TYPE_BOOLEAN => self
                 .fields
                 .get(&NUMBER_FLAG)
-                .map(|value| read_f64_le(value).map(|number| CachedScalar::Boolean(number != 0.0)))
+                .map(|value| {
+                    read_f64_le(value).map(|number| CachedScalar::Boolean(number.get() != 0.0))
+                })
                 .transpose()?
                 .or(Some(CachedScalar::Unsupported(CELL_TYPE_BOOLEAN))),
             CELL_TYPE_DURATION => self
@@ -729,7 +736,7 @@ impl BncCell {
                     | CachedScalar::Duration(value),
                 ),
             ) => {
-                self.set_boolean(value != 0.0);
+                self.set_boolean(value.get() != 0.0);
             },
             (CellDataFormatKind::Checkbox, None) => self.set_boolean(false),
             (CellDataFormatKind::StarRating, None) => self.set_number(0.0)?,
@@ -749,10 +756,10 @@ impl BncCell {
             ) => self.replace_value(
                 CELL_TYPE_NUMBER,
                 DECIMAL_FLAG,
-                decimal128_le(value)?.to_vec(),
+                decimal128_le(value.get())?.to_vec(),
             ),
             (CellDataFormatKind::Duration, Some(CachedScalar::Number(days))) => {
-                self.set_duration(spreadsheet_days_to_seconds(days)?)?;
+                self.set_duration(spreadsheet_days_to_seconds(days.get())?)?;
             },
             (
                 CellDataFormatKind::NumberOrPercentage
@@ -765,7 +772,7 @@ impl BncCell {
                 self.replace_value(
                     CELL_TYPE_NUMBER,
                     DECIMAL_FLAG,
-                    decimal128_le(seconds / SECONDS_PER_DAY)?.to_vec(),
+                    decimal128_le(seconds.get() / SECONDS_PER_DAY)?.to_vec(),
                 );
             },
             _ => return Ok(()),
@@ -861,13 +868,29 @@ impl BncCell {
             )
         })
     }
+
+    fn validate_finite_scalar(&self) -> Result<()> {
+        if let Some(value) = self.fields.get(&DECIMAL_FLAG) {
+            decode_decimal128_le(value)?;
+        }
+        if let Some(value) = self.fields.get(&NUMBER_FLAG) {
+            read_f64_le(value)?;
+        }
+        if let Some(value) = self.fields.get(&DATE_FLAG) {
+            read_f64_le(value)?;
+        }
+        Ok(())
+    }
 }
 
-fn read_f64_le(data: &[u8]) -> Result<f64> {
+fn read_f64_le(data: &[u8]) -> Result<FiniteF64> {
     let bytes: [u8; 8] = data
         .try_into()
         .map_err(|_error| Error::ParseError("Expected an eight-byte Numbers field".to_owned()))?;
-    Ok(f64::from_le_bytes(bytes))
+    let value = f64::from_le_bytes(bytes);
+    FiniteF64::new(value).map_err(|_error| {
+        Error::ParseError("Numbers BNC scalar field must contain a finite value".to_owned())
+    })
 }
 
 fn spreadsheet_days_to_seconds(days: f64) -> Result<f64> {
@@ -884,8 +907,13 @@ fn spreadsheet_days_to_seconds(days: f64) -> Result<f64> {
 ///
 /// # Errors
 ///
-/// Returns an error when `data` is not exactly one decimal128 value.
+/// Returns an error when `data` is not exactly one decimal128 value or the
+/// decoded result is non-finite.
 pub fn read_decimal128_le(data: &[u8]) -> Result<f64> {
+    decode_decimal128_le(data).map(FiniteF64::get)
+}
+
+fn decode_decimal128_le(data: &[u8]) -> Result<FiniteF64> {
     if data.len() != 16 {
         return Err(Error::ParseError(
             "Expected a sixteen-byte Numbers decimal128 field".to_owned(),
@@ -901,7 +929,10 @@ pub fn read_decimal128_le(data: &[u8]) -> Result<f64> {
     } else {
         coefficient
     };
-    Ok(signed_coefficient * 10f64.powi(i32::from(exponent) - DECIMAL128_EXPONENT_BIAS))
+    let value = signed_coefficient * 10f64.powi(i32::from(exponent) - DECIMAL128_EXPONENT_BIAS);
+    FiniteF64::new(value).map_err(|_error| {
+        Error::ParseError("Numbers BNC decimal128 field must decode to a finite value".to_owned())
+    })
 }
 
 /// Encode the finite `f64`'s shortest round-tripping decimal spelling into
@@ -984,6 +1015,10 @@ pub fn decimal128_le(value: f64) -> Result<[u8; 16]> {
 mod tests {
     use super::*;
 
+    fn finite(value: f64) -> FiniteF64 {
+        FiniteF64::new(value).expect("finite test scalar")
+    }
+
     #[test]
     fn changes_value_without_changing_style_fields() {
         let original = hex("050300000000000008100200040000000500000001000000");
@@ -1005,6 +1040,32 @@ mod tests {
         data.extend_from_slice(&0x8000_0000u32.to_le_bytes());
         assert!(BncCell::parse(&data).is_err());
         assert!(BncCell::minimal().set_number(f64::NAN).is_err());
+
+        let mut non_finite_binary = vec![5, 2, 0, 0, 0, 0, 0, 0];
+        non_finite_binary.extend_from_slice(&NUMBER_FLAG.to_le_bytes());
+        non_finite_binary.extend_from_slice(&f64::NAN.to_le_bytes());
+        assert!(BncCell::parse(&non_finite_binary).is_err());
+
+        let mut non_finite_decimal = vec![5, 2, 0, 0, 0, 0, 0, 0];
+        non_finite_decimal.extend_from_slice(&DECIMAL_FLAG.to_le_bytes());
+        let mut decimal128_overflow = [0; 16];
+        decimal128_overflow[14] = 0xff;
+        decimal128_overflow[15] = 0x7f;
+        non_finite_decimal.extend_from_slice(&decimal128_overflow);
+        assert!(BncCell::parse(&non_finite_decimal).is_err());
+        assert!(read_decimal128_le(&decimal128_overflow).is_err());
+
+        for (cell_type, field) in [
+            (CELL_TYPE_DATE, DATE_FLAG),
+            (CELL_TYPE_BOOLEAN, NUMBER_FLAG),
+            (CELL_TYPE_DURATION, NUMBER_FLAG),
+            (CELL_TYPE_TEXT, NUMBER_FLAG),
+        ] {
+            let mut non_finite = vec![5, cell_type, 0, 0, 0, 0, 0, 0];
+            non_finite.extend_from_slice(&field.to_le_bytes());
+            non_finite.extend_from_slice(&f64::INFINITY.to_le_bytes());
+            assert!(BncCell::parse(&non_finite).is_err());
+        }
     }
 
     #[test]
@@ -1036,7 +1097,7 @@ mod tests {
         assert_eq!(cell.stored_value(), StoredValue::Formula(17));
         assert_eq!(
             cell.cached_scalar().unwrap(),
-            Some(CachedScalar::Number(42.5))
+            Some(CachedScalar::Number(finite(42.5)))
         );
         assert_eq!(cell.comment_identifier(), Some(9));
         assert_eq!(cell.fields[&0x001000], 5u32.to_le_bytes());
@@ -1127,7 +1188,7 @@ mod tests {
         assert_eq!(cell.conditional_style_applied_rule(), Some(15));
         assert_eq!(
             cell.cached_scalar().unwrap(),
-            Some(CachedScalar::Number(-5.0))
+            Some(CachedScalar::Number(finite(-5.0)))
         );
     }
 
@@ -1234,7 +1295,7 @@ mod tests {
         assert_eq!(automatic.secondary_format_identifier(), None);
         assert_eq!(
             automatic.cached_scalar().unwrap(),
-            Some(CachedScalar::Duration(3_723.5))
+            Some(CachedScalar::Duration(finite(3_723.5)))
         );
         assert_eq!(automatic.encode(), native_automatic);
 
@@ -1246,7 +1307,7 @@ mod tests {
         assert_eq!(converted.secondary_format_identifier(), Some(1));
         assert_eq!(
             converted.cached_scalar().unwrap(),
-            Some(CachedScalar::Duration(-106_660_800.0))
+            Some(CachedScalar::Duration(finite(-106_660_800.0)))
         );
         assert_eq!(converted.encode(), native_converted);
 
@@ -1258,7 +1319,7 @@ mod tests {
         assert_eq!(number.stored_value(), StoredValue::Duration);
         assert_eq!(
             number.cached_scalar().unwrap(),
-            Some(CachedScalar::Duration(129_600.0))
+            Some(CachedScalar::Duration(finite(129_600.0)))
         );
         assert_eq!(number.explicit_format_flags(), EXPLICIT_DURATION_FORMAT);
         assert_eq!(number.format_identifier(), Some(9));
@@ -1270,7 +1331,7 @@ mod tests {
         assert_eq!(number.stored_value(), StoredValue::Number);
         assert_eq!(
             number.cached_scalar().unwrap(),
-            Some(CachedScalar::Number(1.5))
+            Some(CachedScalar::Number(finite(1.5)))
         );
 
         number.set_formula_reference(12);
@@ -1280,7 +1341,7 @@ mod tests {
         assert_eq!(number.stored_value(), StoredValue::Formula(12));
         assert_eq!(
             number.cached_scalar().unwrap(),
-            Some(CachedScalar::Duration(129_600.0))
+            Some(CachedScalar::Duration(finite(129_600.0)))
         );
         number
             .set_data_format_identifier(1, CellDataFormatKind::NumberOrPercentage, None)
@@ -1288,7 +1349,7 @@ mod tests {
         assert_eq!(number.stored_value(), StoredValue::Formula(12));
         assert_eq!(
             number.cached_scalar().unwrap(),
-            Some(CachedScalar::Number(1.5))
+            Some(CachedScalar::Number(finite(1.5)))
         );
     }
 
@@ -1343,7 +1404,7 @@ mod tests {
         assert_eq!(three.stored_value(), StoredValue::Number);
         assert_eq!(
             three.cached_scalar().unwrap(),
-            Some(CachedScalar::Number(3.0))
+            Some(CachedScalar::Number(finite(3.0)))
         );
         assert_eq!(three.explicit_format_flags(), EXPLICIT_DECIMAL_FORMAT);
         assert_eq!(three.cell_format_kind(), Some(STAR_RATING_CELL_FORMAT_KIND));
@@ -1357,7 +1418,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             empty.cached_scalar().unwrap(),
-            Some(CachedScalar::Number(0.0))
+            Some(CachedScalar::Number(finite(0.0)))
         );
         assert_eq!(empty.format_identifier(), Some(11));
         empty.clear_explicit_format();
@@ -1373,7 +1434,7 @@ mod tests {
         assert_eq!(number.stored_value(), StoredValue::Number);
         assert_eq!(
             number.cached_scalar().unwrap(),
-            Some(CachedScalar::Number(25.0))
+            Some(CachedScalar::Number(finite(25.0)))
         );
         assert_eq!(number.explicit_format_flags(), EXPLICIT_DECIMAL_FORMAT);
         assert_eq!(number.cell_format_kind(), Some(DECIMAL_CELL_FORMAT_KIND));
@@ -1389,7 +1450,7 @@ mod tests {
         assert_eq!(currency.stored_value(), StoredValue::Number);
         assert_eq!(
             currency.cached_scalar().unwrap(),
-            Some(CachedScalar::Number(25.0))
+            Some(CachedScalar::Number(finite(25.0)))
         );
         assert_eq!(currency.explicit_format_flags(), EXPLICIT_CURRENCY_FORMAT);
         assert_eq!(currency.cell_format_kind(), Some(CURRENCY_CELL_FORMAT_KIND));
@@ -1409,7 +1470,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             empty.cached_scalar().unwrap(),
-            Some(CachedScalar::Number(10.0))
+            Some(CachedScalar::Number(finite(10.0)))
         );
         assert_eq!(empty.control_cell_spec_identifier(), Some(4));
         empty

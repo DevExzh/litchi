@@ -7,6 +7,7 @@ pub mod wire;
 use std::fmt;
 
 use litchi_iwa_common::formula::FormulaCachedValue;
+pub use litchi_iwa_common::formula::{FiniteF64, FiniteF64Error};
 
 /// Seconds between the Unix epoch and Apple's 2001-01-01 UTC epoch.
 pub const APPLE_EPOCH_UNIX_OFFSET_SECONDS: f64 = 978_307_200.0;
@@ -20,13 +21,13 @@ pub enum Value {
     /// User-entered text.
     Text(String),
     /// Numeric value.
-    Number(f64),
+    Number(FiniteF64),
     /// Boolean value.
     Boolean(bool),
     /// Seconds since Apple's 2001-01-01 UTC epoch.
-    Date(f64),
+    Date(FiniteF64),
     /// Duration in seconds.
-    Duration(f64),
+    Duration(FiniteF64),
     /// Formula source or rendered formula expression.
     Formula(String),
     /// Producer-reported cell error text.
@@ -34,17 +35,51 @@ pub enum Value {
 }
 
 impl Value {
+    /// Constructs a finite numeric value.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FiniteF64Error`] when `value` is NaN or infinite.
+    pub fn number(value: f64) -> Result<Self, FiniteF64Error> {
+        FiniteF64::new(value).map(Self::Number)
+    }
+
+    /// Constructs a finite Apple-epoch date value.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FiniteF64Error`] when `value` is NaN or infinite.
+    pub fn date(value: f64) -> Result<Self, FiniteF64Error> {
+        FiniteF64::new(value).map(Self::Date)
+    }
+
+    /// Constructs a finite duration measured in seconds.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FiniteF64Error`] when `value` is NaN or infinite.
+    pub fn duration(value: f64) -> Result<Self, FiniteF64Error> {
+        FiniteF64::new(value).map(Self::Duration)
+    }
+
     /// Constructs a Numbers date from Unix epoch seconds.
-    #[must_use]
-    pub fn date_from_unix_seconds(unix_seconds: f64) -> Self {
-        Self::Date(unix_seconds - APPLE_EPOCH_UNIX_OFFSET_SECONDS)
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FiniteF64Error`] when the converted Apple-epoch value is not
+    /// finite.
+    pub fn date_from_unix_seconds(unix_seconds: f64) -> Result<Self, FiniteF64Error> {
+        Self::date(unix_seconds - APPLE_EPOCH_UNIX_OFFSET_SECONDS)
     }
 
     /// Converts a Numbers date to Unix epoch seconds.
     #[must_use]
     pub fn date_as_unix_seconds(&self) -> Option<f64> {
         match self {
-            Self::Date(seconds) => Some(seconds + APPLE_EPOCH_UNIX_OFFSET_SECONDS),
+            Self::Date(seconds) => {
+                let unix_seconds = seconds.get() + APPLE_EPOCH_UNIX_OFFSET_SECONDS;
+                unix_seconds.is_finite().then_some(unix_seconds)
+            },
             Self::Empty
             | Self::Text(_)
             | Self::Number(_)
@@ -82,7 +117,9 @@ impl Value {
         match self {
             Self::Empty => String::new(),
             Self::Text(value) | Self::Formula(value) => value.clone(),
-            Self::Number(value) | Self::Date(value) | Self::Duration(value) => value.to_string(),
+            Self::Number(value) | Self::Date(value) | Self::Duration(value) => {
+                value.get().to_string()
+            },
             Self::Boolean(value) => value.to_string(),
             Self::Error(value) => format!("ERROR: {value}"),
         }
@@ -92,8 +129,11 @@ impl Value {
     #[must_use]
     pub fn as_number(&self) -> Option<f64> {
         match self {
-            Self::Number(value) | Self::Date(value) | Self::Duration(value) => Some(*value),
-            Self::Text(value) => value.parse().ok(),
+            Self::Number(value) | Self::Date(value) | Self::Duration(value) => Some(value.get()),
+            Self::Text(value) => value
+                .parse::<f64>()
+                .ok()
+                .filter(|parsed| parsed.is_finite()),
             Self::Boolean(value) => Some(if *value { 1.0 } else { 0.0 }),
             Self::Empty | Self::Formula(_) | Self::Error(_) => None,
         }
@@ -104,7 +144,7 @@ impl Value {
     pub fn as_boolean(&self) -> Option<bool> {
         match self {
             Self::Boolean(value) => Some(*value),
-            Self::Number(value) => Some(*value != 0.0),
+            Self::Number(value) => Some(value.get() != 0.0),
             Self::Text(value) => {
                 if value.eq_ignore_ascii_case("true")
                     || value.eq_ignore_ascii_case("yes")
@@ -223,7 +263,8 @@ mod tests {
         assert!(empty.is_empty());
         assert_eq!(empty.cell_type(), Type::Empty);
 
-        let date = Value::date_from_unix_seconds(APPLE_EPOCH_UNIX_OFFSET_SECONDS + 123.5);
+        let date = Value::date_from_unix_seconds(APPLE_EPOCH_UNIX_OFFSET_SECONDS + 123.5)
+            .expect("finite date should construct");
         assert_eq!(date.cell_type(), Type::Date);
         assert_eq!(
             date.date_as_unix_seconds(),
@@ -248,9 +289,23 @@ mod tests {
 
     #[test]
     fn updates_are_typed_and_clear_explicitly() {
-        let update = Update::new(2, 3, Value::Number(42.0));
+        let update = Update::new(
+            2,
+            3,
+            Value::number(42.0).expect("finite number should construct"),
+        );
         assert_eq!(update.row, 2);
         assert_eq!(update.column, 3);
         assert_eq!(Update::clear(2, 3).value, Value::Empty);
+    }
+
+    #[test]
+    fn scalar_constructors_reject_non_finite_input() {
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(Value::number(value).is_err());
+            assert!(Value::date(value).is_err());
+            assert!(Value::duration(value).is_err());
+            assert!(Value::date_from_unix_seconds(value).is_err());
+        }
     }
 }

@@ -6,10 +6,10 @@
 //! tables retain one immutable boxed slice. No dense grid is allocated by the
 //! semantic model.
 
-/// Checked row, column, and point-size values.
-pub mod dimension;
 /// Compact, archive-free cell coordinates and A1 selectors.
 pub mod coordinate;
+/// Checked row, column, and point-size values.
+pub mod dimension;
 /// Checked, bounded plans for applying multiple cell mutations.
 pub mod edit;
 /// Checked, archive-free table sort semantics.
@@ -950,12 +950,16 @@ fn write_csv_field(output: &mut String, value: &str) {
 mod tests {
     use super::*;
 
+    fn number(value: f64) -> Value {
+        Value::number(value).expect("finite test number")
+    }
+
     #[test]
     fn compact_sparse_cells_are_sorted_and_replaced_without_duplicates() {
         let mut table = Builder::new("Test", Dimensions::new(4, 4));
-        assert!(table.set(Position::new(2, 1), Value::Number(2.0)).is_ok());
-        assert!(table.set(Position::new(0, 3), Value::Number(1.0)).is_ok());
-        assert!(table.set(Position::new(2, 1), Value::Number(3.0)).is_ok());
+        assert!(table.set(Position::new(2, 1), number(2.0)).is_ok());
+        assert!(table.set(Position::new(0, 3), number(1.0)).is_ok());
+        assert!(table.set(Position::new(2, 1), number(3.0)).is_ok());
 
         let table = table.finish();
         assert!(table.is_ok());
@@ -968,7 +972,7 @@ mod tests {
             .map(Cell::position)
             .collect();
         assert_eq!(positions, [Position::new(0, 3), Position::new(2, 1)]);
-        assert_eq!(table.get(Position::new(2, 1)), Some(&Value::Number(3.0)));
+        assert_eq!(table.get(Position::new(2, 1)), Some(&number(3.0)));
         assert_eq!(table.cell_count(), 2);
         assert_eq!(
             table.iter_cells().map(Cell::position).collect::<Vec<_>>(),
@@ -981,12 +985,12 @@ mod tests {
         let mut builder = Builder::new("Test", Dimensions::new(2, 2));
         assert!(
             builder
-                .push(Cell::new(Position::new(1, 1), Value::Number(2.0)))
+                .push(Cell::new(Position::new(1, 1), number(2.0)))
                 .is_ok()
         );
         assert!(
             builder
-                .push(Cell::new(Position::new(0, 0), Value::Number(1.0)))
+                .push(Cell::new(Position::new(0, 0), number(1.0)))
                 .is_ok()
         );
         let table = builder.finish();
@@ -1000,7 +1004,7 @@ mod tests {
         );
         assert!(
             duplicate
-                .push(Cell::new(Position::new(0, 0), Value::Number(1.0)))
+                .push(Cell::new(Position::new(0, 0), number(1.0)))
                 .is_ok()
         );
         assert!(matches!(
@@ -1060,7 +1064,7 @@ mod tests {
                 .set(Position::new(0, 0), Value::Text("A, B".to_owned()))
                 .is_ok()
         );
-        assert!(builder.set(Position::new(1, 1), Value::Number(2.0)).is_ok());
+        assert!(builder.set(Position::new(1, 1), number(2.0)).is_ok());
         let table = builder
             .finish()
             .unwrap_or_else(|error| panic!("unexpected table error: {error}"));
@@ -1116,7 +1120,7 @@ mod tests {
     fn builder_preserves_values_when_a1_parsing_fails() {
         let mut builder = Builder::new("Test", Dimensions::new(1, 1));
         let rejected = builder
-            .set_a1("A0", Value::Number(7.0))
+            .set_a1("A0", number(7.0))
             .err()
             .unwrap_or_else(|| panic!("invalid A1 address was accepted"));
         assert!(matches!(
@@ -1127,6 +1131,6 @@ mod tests {
             }
         ));
         let (_error, value) = rejected.into_parts();
-        assert_eq!(value, Value::Number(7.0));
+        assert_eq!(value, number(7.0));
     }
 }

@@ -144,8 +144,6 @@ pub enum Error {
         resource: &'static str,
         amount: usize,
     },
-    /// A finite-valued cell was supplied with a non-finite payload.
-    NonFiniteValue { kind: Type },
     /// Formula and error values require format-owned construction context.
     UnsupportedValue { kind: Type },
 }
@@ -175,12 +173,6 @@ impl fmt::Display for Error {
                     "table edit allocation failed for {resource}: {amount}"
                 )
             },
-            Self::NonFiniteValue { kind } => {
-                write!(
-                    formatter,
-                    "table edit cannot store non-finite {kind:?} values"
-                )
-            },
             Self::UnsupportedValue { kind } => write!(
                 formatter,
                 "table edit value kind {} requires format-owned construction",
@@ -197,30 +189,12 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 fn validate_value(value: &Value) -> Result<()> {
     match value {
-        Value::Empty | Value::Text(_) | Value::Boolean(_) => Ok(()),
-        Value::Number(number) => {
-            if number.is_finite() {
-                Ok(())
-            } else {
-                Err(Error::NonFiniteValue { kind: Type::Number })
-            }
-        },
-        Value::Date(date) => {
-            if date.is_finite() {
-                Ok(())
-            } else {
-                Err(Error::NonFiniteValue { kind: Type::Date })
-            }
-        },
-        Value::Duration(duration) => {
-            if duration.is_finite() {
-                Ok(())
-            } else {
-                Err(Error::NonFiniteValue {
-                    kind: Type::Duration,
-                })
-            }
-        },
+        Value::Empty
+        | Value::Text(_)
+        | Value::Boolean(_)
+        | Value::Number(_)
+        | Value::Date(_)
+        | Value::Duration(_) => Ok(()),
         Value::Formula(_) | Value::Error(_) => Err(Error::UnsupportedValue {
             kind: value.cell_type(),
         }),
@@ -243,7 +217,10 @@ mod tests {
     #[test]
     fn collects_unique_updates_and_releases_owned_parts() {
         let batch = Batch::collect(
-            [Update::new(2, 3, Value::Number(42.0)), Update::clear(0, 1)],
+            [
+                Update::new(2, 3, Value::number(42.0).expect("finite test number")),
+                Update::clear(0, 1),
+            ],
             Budget::new(2),
         )
         .unwrap_or_else(|error| panic!("unexpected batch failure: {error}"));
@@ -270,7 +247,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_unsupported_and_non_finite_values() {
+    fn rejects_unsupported_values_and_requires_finite_scalar_construction() {
         let formula = Batch::collect(
             [Update::new(0, 0, Value::Formula("SUM(A1)".to_owned()))],
             Budget::new(1),
@@ -282,10 +259,6 @@ mod tests {
             })
         ));
 
-        let number = Batch::collect([Update::new(0, 0, Value::Number(f64::NAN))], Budget::new(1));
-        assert!(matches!(
-            number,
-            Err(Error::NonFiniteValue { kind: Type::Number })
-        ));
+        assert!(crate::cell::FiniteF64::new(f64::NAN).is_err());
     }
 }
