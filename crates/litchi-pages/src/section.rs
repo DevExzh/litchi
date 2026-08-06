@@ -289,20 +289,24 @@ impl Opaque {
 }
 
 /// A logical Pages document section.
+#[allow(
+    clippy::struct_field_names,
+    reason = "The focused Section API names its semantic kind section_type"
+)]
 #[derive(Debug, Clone)]
 pub struct Section {
     /// Zero-based section index.
-    pub index: usize,
+    index: usize,
     /// Semantic kind of the section.
-    pub section_type: SectionType,
+    section_type: SectionType,
     /// Optional section heading.
-    pub heading: Option<String>,
+    heading: Option<Box<str>>,
     /// Paragraph values extracted from the section.
-    pub paragraphs: Vec<String>,
+    paragraphs: Box<[String]>,
     /// Rich-text storages belonging to the section.
-    pub text_storages: Vec<Storage>,
+    text_storages: Box<[Storage]>,
     /// Number of pages represented by the section, when known.
-    pub page_count: Option<usize>,
+    page_count: Option<usize>,
 }
 
 impl Section {
@@ -313,10 +317,52 @@ impl Section {
             index,
             section_type,
             heading: None,
-            paragraphs: Vec::new(),
-            text_storages: Vec::new(),
+            paragraphs: Box::new([]),
+            text_storages: Box::new([]),
             page_count: None,
         }
+    }
+
+    /// Starts a detached builder for a section at `index`.
+    #[must_use]
+    pub fn builder(index: usize, section_type: SectionType) -> Builder {
+        Builder::new(index, section_type)
+    }
+
+    /// Returns the zero-based position in the semantic document.
+    #[must_use]
+    pub const fn index(&self) -> usize {
+        self.index
+    }
+
+    /// Returns the semantic kind of the section.
+    #[must_use]
+    pub const fn section_type(&self) -> SectionType {
+        self.section_type
+    }
+
+    /// Returns the optional section heading.
+    #[must_use]
+    pub fn heading(&self) -> Option<&str> {
+        self.heading.as_deref()
+    }
+
+    /// Borrows paragraph values in source order.
+    #[must_use]
+    pub fn paragraphs(&self) -> &[String] {
+        &self.paragraphs
+    }
+
+    /// Borrows rich-text storages in source order without copying them.
+    #[must_use]
+    pub fn text_storages(&self) -> &[Storage] {
+        &self.text_storages
+    }
+
+    /// Returns the known page count, when present.
+    #[must_use]
+    pub const fn page_count(&self) -> Option<usize> {
+        self.page_count
     }
 
     /// Returns all non-empty text values in document order.
@@ -328,7 +374,7 @@ impl Section {
                 .saturating_add(self.text_storages.len()),
         );
         if let Some(heading) = &self.heading {
-            all.push(heading.clone());
+            all.push(heading.to_string());
         }
         all.extend(self.paragraphs.iter().cloned());
 
@@ -391,6 +437,65 @@ impl Section {
             if !storage.is_empty() {
                 append_value(output, &mut first, storage.text());
             }
+        }
+    }
+}
+
+/// A detached, mutable builder for an immutable section.
+#[derive(Debug)]
+pub struct Builder {
+    index: usize,
+    section_type: SectionType,
+    heading: Option<Box<str>>,
+    paragraphs: Vec<String>,
+    text_storages: Vec<Storage>,
+    page_count: Option<usize>,
+}
+
+impl Builder {
+    /// Creates an empty section builder at `index`.
+    #[must_use]
+    pub fn new(index: usize, section_type: SectionType) -> Self {
+        Self {
+            index,
+            section_type,
+            heading: None,
+            paragraphs: Vec::new(),
+            text_storages: Vec::new(),
+            page_count: None,
+        }
+    }
+
+    /// Sets or clears the section heading.
+    pub fn set_heading(&mut self, heading: Option<String>) {
+        self.heading = heading.map(String::into_boxed_str);
+    }
+
+    /// Appends one paragraph in source order.
+    pub fn push_paragraph(&mut self, paragraph: String) {
+        self.paragraphs.push(paragraph);
+    }
+
+    /// Appends one rich-text storage in source order.
+    pub fn push_text_storage(&mut self, storage: Storage) {
+        self.text_storages.push(storage);
+    }
+
+    /// Sets or clears the known page count.
+    pub fn set_page_count(&mut self, page_count: Option<usize>) {
+        self.page_count = page_count;
+    }
+
+    /// Finishes the detached builder as an immutable section snapshot.
+    #[must_use]
+    pub fn build(self) -> Section {
+        Section {
+            index: self.index,
+            section_type: self.section_type,
+            heading: self.heading,
+            paragraphs: self.paragraphs.into_boxed_slice(),
+            text_storages: self.text_storages.into_boxed_slice(),
+            page_count: self.page_count,
         }
     }
 }
@@ -502,18 +607,32 @@ mod tests {
 
     #[test]
     fn section_creation_and_text() {
-        let mut section = Section::new(0, SectionType::Body);
-        assert_eq!(section.index, 0);
-        assert_eq!(section.section_type, SectionType::Body);
-        assert!(section.is_empty());
+        let empty = Section::new(0, SectionType::Body);
+        assert_eq!(empty.index(), 0);
+        assert_eq!(empty.section_type(), SectionType::Body);
+        assert_eq!(empty.page_count(), None);
+        assert!(empty.is_empty());
 
-        section.heading = Some("Introduction".to_owned());
-        section.paragraphs.push("First paragraph".to_owned());
-        section
-            .text_storages
-            .push(Storage::from_text("Storage text".to_owned()));
+        let mut builder = Section::builder(0, SectionType::Body);
+        builder.set_heading(Some("Introduction".to_owned()));
+        builder.push_paragraph("First paragraph".to_owned());
+        builder.push_text_storage(Storage::from_text("Storage text".to_owned()));
+        builder.set_page_count(Some(3));
+        let section = builder.build();
 
         assert!(!section.is_empty());
+        assert_eq!(section.section_type(), SectionType::Body);
+        assert_eq!(section.page_count(), Some(3));
+        assert_eq!(section.heading(), Some("Introduction"));
+        assert_eq!(section.paragraphs(), ["First paragraph"]);
+        assert_eq!(
+            section
+                .text_storages()
+                .iter()
+                .map(Storage::text)
+                .collect::<Vec<_>>(),
+            ["Storage text"]
+        );
         assert_eq!(
             section.all_text(),
             ["Introduction", "First paragraph", "Storage text"]

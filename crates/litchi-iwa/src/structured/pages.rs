@@ -25,7 +25,7 @@ pub(super) fn extract(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec
         return Ok(Vec::new());
     };
 
-    let mut section = Section::new(0, SectionType::Body);
+    let mut section_builder = Section::builder(0, SectionType::Body);
     if let Some(reference) = document.body_storage {
         let object = object_index
             .resolve_ref_id(bundle, reference.identifier)?
@@ -50,9 +50,9 @@ pub(super) fn extract(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec
             })?;
         let text = storage.text.concat();
         if !text.is_empty() {
-            section.paragraphs.push(text);
+            section_builder.push_paragraph(text);
         }
     }
 
-    Ok(vec![section])
+    Ok(vec![section_builder.build()])
 }

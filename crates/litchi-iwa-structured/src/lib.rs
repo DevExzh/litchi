@@ -248,10 +248,10 @@ impl StructuredData {
             }
         }
         for (expected, section) in sections.iter().enumerate() {
-            if section.index != expected {
+            if section.index() != expected {
                 return Err(Error::InvalidSectionIndex {
                     expected,
-                    actual: section.index,
+                    actual: section.index(),
                 });
             }
         }
@@ -291,13 +291,13 @@ impl StructuredData {
             }
         }
         for section in &sections {
-            if let Some(heading) = &section.heading {
+            if let Some(heading) = section.heading() {
                 text_bytes = checked_text_add(text_bytes, heading.len(), max_text_bytes)?;
             }
-            for paragraph in &section.paragraphs {
+            for paragraph in section.paragraphs() {
                 text_bytes = checked_text_add(text_bytes, paragraph.len(), max_text_bytes)?;
             }
-            for storage in &section.text_storages {
+            for storage in section.text_storages() {
                 text_bytes = checked_text_add(text_bytes, storage.len(), max_text_bytes)?;
             }
         }
@@ -452,13 +452,13 @@ fn append_slide_text(output: &mut Vec<String>, slide: &Slide) {
 }
 
 fn append_section_text(output: &mut Vec<String>, section: &Section) {
-    if let Some(heading) = &section.heading {
-        output.push(heading.clone());
+    if let Some(heading) = section.heading() {
+        output.push(heading.to_owned());
     }
-    output.extend(section.paragraphs.iter().cloned());
+    output.extend(section.paragraphs().iter().cloned());
     output.extend(
         section
-            .text_storages
+            .text_storages()
             .iter()
             .filter(|storage| !storage.is_empty())
             .map(|storage| storage.text().to_owned()),
@@ -497,8 +497,9 @@ mod tests {
         slide_builder.set_title(Some("Title".to_owned()));
         slide_builder.push_text("Body".to_owned());
         let slide = slide_builder.build();
-        let mut section = Section::new(0, litchi_pages::SectionType::Body);
-        section.heading = Some("Heading".to_owned());
+        let mut section_builder = Section::builder(0, litchi_pages::SectionType::Body);
+        section_builder.set_heading(Some("Heading".to_owned()));
+        let section = section_builder.build();
 
         let data = StructuredData::from_parts(vec![table], vec![slide], vec![section])
             .unwrap_or_else(|error| panic!("semantic values should be valid: {error}"));
@@ -508,10 +509,7 @@ mod tests {
         assert_eq!(data.section_count(), 1);
         assert_eq!(data.table(0).map(Table::name), Some("Data"));
         assert_eq!(data.slide(0).map(Slide::title), Some(Some("Title")));
-        assert_eq!(
-            data.section(0).and_then(|value| value.heading.as_deref()),
-            Some("Heading")
-        );
+        assert_eq!(data.section(0).and_then(Section::heading), Some("Heading"));
         assert!(data.table(1).is_none());
         assert!(data.slide(1).is_none());
         assert!(data.section(1).is_none());
@@ -523,12 +521,7 @@ mod tests {
             data.iter_slides().map(Slide::index).collect::<Vec<_>>(),
             [0]
         );
-        assert_eq!(
-            data.iter_sections()
-                .map(|value| value.index)
-                .collect::<Vec<_>>(),
-            [0]
-        );
+        assert_eq!(data.iter_sections().map(Section::index).collect::<Vec<_>>(), [0]);
         assert_eq!(data.all_text(), ["Table: Data", "Title", "Body", "Heading"]);
     }
 
@@ -543,7 +536,7 @@ mod tests {
             })
         ));
 
-        let invalid_section = Section::new(1, litchi_pages::SectionType::Body);
+        let invalid_section = Section::builder(1, litchi_pages::SectionType::Body).build();
         assert!(matches!(
             StructuredData::from_parts(Vec::new(), Vec::new(), vec![invalid_section]),
             Err(Error::InvalidSectionIndex {

@@ -121,9 +121,11 @@ impl Body {
     }
 
     fn into_section(self) -> Section {
-        let mut section = Section::new(0, SectionType::Body);
-        section.text_storages = self.text_storages.into_vec();
-        section
+        let mut builder = Section::builder(0, SectionType::Body);
+        for storage in self.text_storages {
+            builder.push_text_storage(storage);
+        }
+        builder.build()
     }
 }
 
@@ -225,10 +227,10 @@ impl Document {
 
         let mut text_len = 0usize;
         for (expected, section) in sections.iter().enumerate() {
-            if section.index != expected {
+            if section.index() != expected {
                 return Err(Error::InvalidSectionIndex {
                     expected,
-                    actual: section.index,
+                    actual: section.index(),
                 });
             }
             text_len = text_len
@@ -323,11 +325,9 @@ mod tests {
         let oversized = Body::with_max_text_bytes(vec![Storage::from_text("12345".to_owned())], 4);
         assert!(matches!(oversized, Err(Error::TextTooLarge { limit: 4 })));
 
-        let mut section = Section::new(1, SectionType::Body);
-        section
-            .text_storages
-            .push(Storage::from_text("body".to_owned()));
-        let invalid = Document::from_sections(vec![section]);
+        let mut section_builder = Section::builder(1, SectionType::Body);
+        section_builder.push_text_storage(Storage::from_text("body".to_owned()));
+        let invalid = Document::from_sections(vec![section_builder.build()]);
         assert!(matches!(
             invalid,
             Err(Error::InvalidSectionIndex {

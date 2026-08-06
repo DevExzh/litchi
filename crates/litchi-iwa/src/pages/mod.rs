@@ -21,8 +21,8 @@
 //! let sections = doc.sections()?;
 //!
 //! for section in sections {
-//!     println!("Section: {:?}", section.heading);
-//!     for para in &section.paragraphs {
+//!     println!("Section: {:?}", section.heading());
+//!     for para in section.paragraphs() {
 //!         println!("  {}", para);
 //!     }
 //! }

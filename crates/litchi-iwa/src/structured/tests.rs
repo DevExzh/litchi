@@ -95,10 +95,11 @@ fn keynote_slide_creation_preserves_leaf_text_order() {
 
 #[test]
 fn pages_section_creation_preserves_leaf_text_order() {
-    let mut section = litchi_pages::Section::new(0, litchi_pages::SectionType::Body);
-    section.heading = Some("Chapter 1".to_owned());
-    section.paragraphs.push("First paragraph.".to_owned());
-    section.paragraphs.push("Second paragraph.".to_owned());
+    let mut section_builder = litchi_pages::Section::builder(0, litchi_pages::SectionType::Body);
+    section_builder.set_heading(Some("Chapter 1".to_owned()));
+    section_builder.push_paragraph("First paragraph.".to_owned());
+    section_builder.push_paragraph("Second paragraph.".to_owned());
+    let section = section_builder.build();
 
     assert_eq!(
         section.all_text(),
@@ -113,8 +114,9 @@ fn structured_text_aggregation_does_not_change_order() {
     slide_builder.set_title(Some("Title".to_owned()));
     slide_builder.push_text("Body".to_owned());
     let slide = slide_builder.build();
-    let mut section = litchi_pages::Section::new(0, litchi_pages::SectionType::Body);
-    section.heading = Some("Heading".to_owned());
+    let mut section_builder = litchi_pages::Section::builder(0, litchi_pages::SectionType::Body);
+    section_builder.set_heading(Some("Heading".to_owned()));
+    let section = section_builder.build();
 
     let data = StructuredData::from_parts(vec![table], vec![slide], vec![section])
         .expect("structured semantic values should form a valid snapshot");
@@ -123,7 +125,7 @@ fn structured_text_aggregation_does_not_change_order() {
     assert_eq!(data.summary(), "Tables: 1, Slides: 1, Sections: 1");
     assert_eq!(data.table(0).map(litchi_numbers::Table::name), Some("Data"));
     assert_eq!(data.slide(0).map(litchi_keynote::Slide::index), Some(0));
-    assert_eq!(data.section(0).map(|value| value.index), Some(0));
+    assert_eq!(data.section(0).map(litchi_pages::Section::index), Some(0));
     assert!(data.table(1).is_none());
     assert!(data.slide(1).is_none());
     assert!(data.section(1).is_none());

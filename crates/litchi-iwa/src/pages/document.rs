@@ -276,7 +276,7 @@ impl PagesDocument {
     /// let sections = doc.sections()?;
     ///
     /// for section in sections {
-    ///     println!("Section {}: {}", section.index, section.section_type.name());
+    ///     println!("Section {}: {}", section.index(), section.section_type().name());
     ///     println!("{}", section.plain_text());
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
