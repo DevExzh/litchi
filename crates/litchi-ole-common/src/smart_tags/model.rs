@@ -9,6 +9,8 @@ pub struct Limits {
     pub max_strings: usize,
     pub max_bags: usize,
     pub max_properties: usize,
+    /// Maximum serialized size of one complete property-bag payload.
+    pub max_bytes: usize,
 }
 
 impl Default for Limits {
@@ -18,6 +20,7 @@ impl Default for Limits {
             max_strings: 1_000_000,
             max_bags: 1_000_000,
             max_properties: 4_000_000,
+            max_bytes: 64 * 1024 * 1024,
         }
     }
 }

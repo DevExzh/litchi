@@ -101,3 +101,148 @@ fn serializes_store_and_bags_exactly_and_refuses_lossy_ansi() {
     unrepresentable.strings[0].value = "bad\0value".to_string();
     assert!(unrepresentable.to_bytes_with_bags(&bags).is_err());
 }
+
+#[test]
+fn snapshot_retains_exact_source_and_all_bags_for_a_noop() {
+    let mut data = store_and_bag();
+    data.extend_from_slice(&7u16.to_le_bytes());
+    data.extend_from_slice(&0u16.to_le_bytes());
+    data.extend_from_slice(&0u16.to_le_bytes());
+
+    let snapshot = Snapshot::parse(&data, Ansi::WINDOWS_1252, Limits::default()).unwrap();
+    assert_eq!(snapshot.bytes(), data.as_slice());
+    assert_eq!(snapshot.bags().len(), 2);
+    assert_eq!(snapshot.resolved_property(0, 0), Some(("city", "Paris")));
+    assert_eq!(snapshot.store().strings[0].value, "city");
+
+    let commit = snapshot.edit().commit().unwrap();
+    assert!(!commit.changed());
+    assert!(commit.patch().is_noop());
+    assert!(commit.patch().change().is_none());
+    assert_eq!(commit.snapshot().bytes(), data.as_slice());
+    assert_eq!(commit.patch().apply(&snapshot).unwrap(), snapshot);
+}
+
+#[test]
+fn typed_property_edits_preserve_unknown_strings_and_other_bags() {
+    let mut data = store_and_bag();
+    data.extend_from_slice(&7u16.to_le_bytes());
+    data.extend_from_slice(&1u16.to_le_bytes());
+    data.extend_from_slice(&0u16.to_le_bytes());
+    data.extend_from_slice(&0u32.to_le_bytes());
+    data.extend_from_slice(&1u32.to_le_bytes());
+
+    let snapshot = Snapshot::parse(&data, Ansi::WINDOWS_1252, Limits::default()).unwrap();
+    let mut transaction = snapshot.edit();
+    transaction
+        .set_property_value(
+            0,
+            0,
+            PropertyBagString {
+                value: "Rome".to_string(),
+                encoding: PropertyBagStringEncoding::Ansi,
+            },
+        )
+        .unwrap();
+    let commit = transaction.commit().unwrap();
+    assert!(commit.changed());
+    assert_eq!(
+        commit.snapshot().resolved_property(0, 0),
+        Some(("city", "Rome"))
+    );
+    assert_eq!(
+        commit.snapshot().resolved_property(1, 0),
+        Some(("city", "Rome"))
+    );
+    assert_eq!(commit.snapshot().store().strings[0].value, "city");
+    assert_eq!(commit.snapshot().bags().len(), 2);
+    assert_eq!(
+        commit.patch().inverse().apply(commit.snapshot()).unwrap(),
+        snapshot
+    );
+}
+
+#[test]
+fn stale_sources_and_invalid_or_oversized_edits_are_rejected_atomically() {
+    let data = store_and_bag();
+    let snapshot = Snapshot::parse(&data, Ansi::WINDOWS_1252, Limits::default()).unwrap();
+
+    let mut changed = snapshot.edit();
+    changed
+        .set_property_value(
+            0,
+            0,
+            PropertyBagString {
+                value: "Rome".to_string(),
+                encoding: PropertyBagStringEncoding::Ansi,
+            },
+        )
+        .unwrap();
+    let changed = changed.commit().unwrap();
+    assert!(changed.patch().apply(&snapshot).is_ok());
+    assert!(changed.patch().apply(changed.snapshot()).is_err());
+
+    let before_store = snapshot.store().clone();
+    let before_bags = snapshot.bags().to_vec();
+    let mut invalid = snapshot.edit();
+    assert!(
+        invalid
+            .set_property_value(
+                0,
+                0,
+                PropertyBagString {
+                    value: "東京".to_string(),
+                    encoding: PropertyBagStringEncoding::Ansi,
+                },
+            )
+            .is_err()
+    );
+    assert!(
+        invalid
+            .set_property(
+                0,
+                99,
+                Property {
+                    key_index: 0,
+                    value_index: 0
+                }
+            )
+            .is_err()
+    );
+    assert_eq!(invalid.store(), &before_store);
+    assert_eq!(invalid.bags(), before_bags.as_slice());
+
+    let limits = Limits {
+        max_bytes: data.len() + 1,
+        ..Limits::default()
+    };
+    let bounded = Snapshot::parse(&data, Ansi::WINDOWS_1252, limits).unwrap();
+    let before = (bounded.store().clone(), bounded.bags().to_vec());
+    let oversized = "x".repeat(64);
+    let mut oversized_edit = bounded.edit();
+    assert!(
+        oversized_edit
+            .set_property_value(
+                0,
+                0,
+                PropertyBagString {
+                    value: oversized,
+                    encoding: PropertyBagStringEncoding::Utf16,
+                },
+            )
+            .is_err()
+    );
+    assert_eq!(oversized_edit.store(), &before.0);
+    assert_eq!(oversized_edit.bags(), before.1.as_slice());
+}
+
+#[test]
+fn snapshot_enforces_exact_bag_count_and_source_size() {
+    let data = store_and_bag();
+    assert!(Snapshot::parse_bags(&data, 0, Ansi::WINDOWS_1252, Limits::default()).is_err());
+    let limits = Limits {
+        max_bytes: data.len() - 1,
+        ..Limits::default()
+    };
+    assert!(Snapshot::parse(&data, Ansi::WINDOWS_1252, limits).is_err());
+}
