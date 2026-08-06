@@ -1,14 +1,179 @@
 //! Logical RealTimeData record assembly and prefix reconstruction.
 
 use super::codec::{
-    FRT_HEADER_LEN, MAX_LOGICAL_PAYLOAD_BYTES, MAX_STRING_CHARACTERS, MAX_TOPIC_SEGMENTS,
-    MIN_PREFIXED_TOPIC_SEGMENTS, MIN_TOPIC_SEGMENTS, Payload, REAL_TIME_DATA_RECORD_TYPE,
-    RTD_E_ITEM_LEN, RTD_OPER_BOOLEAN, RTD_OPER_ERROR, RTD_OPER_INTEGER, RTD_OPER_LONG_TEXT,
-    RTD_OPER_NUMBER, RTD_OPER_SHORT_TEXT, biff_char_count, invalid, join_segments, parse_rtd_oper,
-    parse_segmented_topic, read_u16, read_u32, write_chars, write_segmented_topic,
+    CONTINUE_FRT_RECORD_TYPE, FRT_HEADER_LEN, MAX_LOGICAL_PAYLOAD_BYTES, MAX_STRING_CHARACTERS,
+    MAX_TOPIC_SEGMENTS, MIN_PREFIXED_TOPIC_SEGMENTS, MIN_TOPIC_SEGMENTS, Payload,
+    REAL_TIME_DATA_RECORD_TYPE, RTD_E_ITEM_LEN, RTD_OPER_BOOLEAN, RTD_OPER_ERROR, RTD_OPER_INTEGER,
+    RTD_OPER_LONG_TEXT, RTD_OPER_NUMBER, RTD_OPER_SHORT_TEXT, biff_char_count, invalid,
+    join_segments, parse_rtd_oper, parse_segmented_topic, read_u16, read_u32, write_chars,
+    write_segmented_topic,
 };
-use super::model::{Cell, Record, Value};
+use super::model::{Cell, Record, UnknownRecord, Value};
+use super::validation::{RecordSpan, frame_logical_payload, replace_range, scan_records};
 use crate::error::{Error, Result};
+
+#[derive(Debug, Clone, Copy)]
+struct RealTimeDataSpan {
+    first_record: usize,
+    end_record: usize,
+}
+
+/// The workbook-global BIFF record owner for real-time data.
+///
+/// The owner keeps the complete record order and only interprets a
+/// `RealTimeData` record together with its immediately following `ContinueFrt`
+/// records.  Every other record remains an opaque source span, which lets the
+/// detached editor preserve producer-specific records without normalizing the
+/// surrounding workbook globals stream.
+#[derive(Debug, Clone)]
+pub(crate) struct Package {
+    records: Vec<RecordSpan>,
+    real_time_data: Vec<Record>,
+    real_time_data_spans: Vec<RealTimeDataSpan>,
+    unknown_records: Vec<usize>,
+}
+
+impl Package {
+    pub(crate) fn parse(bytes: &[u8]) -> Result<Self> {
+        let records = scan_records(bytes)?;
+        let mut real_time_data = Vec::new();
+        let mut real_time_data_spans = Vec::new();
+        let mut unknown_records = Vec::new();
+        let mut previous_topic = None;
+        let mut record_index = 0usize;
+
+        while record_index < records.len() {
+            let record = records[record_index];
+            if record.record_type != REAL_TIME_DATA_RECORD_TYPE {
+                unknown_records.push(record_index);
+                record_index += 1;
+                continue;
+            }
+
+            let first_record = record_index;
+            let mut end_record = record_index
+                .checked_add(1)
+                .ok_or_else(|| invalid("RealTimeData record span overflows"))?;
+            let logical_len = records[first_record]
+                .payload_end
+                .checked_sub(records[first_record].payload_start)
+                .ok_or_else(|| invalid("RealTimeData payload span is inverted"))?;
+            let mut logical_payload = Vec::new();
+            logical_payload
+                .try_reserve(logical_len)
+                .map_err(|_| Error::Allocation("assembling RealTimeData records"))?;
+            logical_payload.extend_from_slice(record.payload(bytes));
+            while let Some(continuation) = records.get(end_record) {
+                if continuation.record_type != CONTINUE_FRT_RECORD_TYPE {
+                    break;
+                }
+                let continuation_len = continuation
+                    .payload_end
+                    .checked_sub(continuation.payload_start)
+                    .ok_or_else(|| invalid("ContinueFrt payload span is inverted"))?;
+                logical_payload
+                    .try_reserve(continuation_len)
+                    .map_err(|_| Error::Allocation("assembling RealTimeData continuations"))?;
+                logical_payload.extend_from_slice(continuation.payload(bytes));
+                end_record = end_record
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("RealTimeData continuation span overflows"))?;
+            }
+
+            let parsed = Record::parse(&logical_payload, previous_topic.as_deref())?;
+            previous_topic = Some(parsed.topic.clone());
+            real_time_data.push(parsed);
+            real_time_data_spans.push(RealTimeDataSpan {
+                first_record,
+                end_record,
+            });
+            record_index = end_record;
+        }
+
+        Ok(Self {
+            records,
+            real_time_data,
+            real_time_data_spans,
+            unknown_records,
+        })
+    }
+
+    pub(crate) fn real_time_data(&self) -> &[Record] {
+        &self.real_time_data
+    }
+
+    pub(crate) fn unknown_record_count(&self) -> usize {
+        self.unknown_records.len()
+    }
+
+    pub(crate) fn unknown_records<'a>(
+        &'a self,
+        bytes: &'a [u8],
+    ) -> impl Iterator<Item = UnknownRecord<'a>> + 'a {
+        self.unknown_records.iter().map(move |&record_index| {
+            let record = self.records[record_index];
+            UnknownRecord::new(record.record_type, record.payload(bytes))
+        })
+    }
+
+    pub(crate) fn replace_real_time_data(
+        &self,
+        bytes: &[u8],
+        index: usize,
+        value: &Record,
+    ) -> Result<Vec<u8>> {
+        let span = self.real_time_data_spans.get(index).ok_or_else(|| {
+            Error::UnsafeEdit(format!(
+                "RealTimeData index {index} is outside the source collection"
+            ))
+        })?;
+        let payload = value.to_payload()?;
+        let replacement = frame_logical_payload(
+            &payload,
+            REAL_TIME_DATA_RECORD_TYPE,
+            CONTINUE_FRT_RECORD_TYPE,
+        )?;
+        let start = self.records[span.first_record].record_start;
+        let end = self.records[span.end_record - 1].payload_end;
+        replace_range(bytes, start, end, &replacement)
+    }
+
+    pub(crate) fn insert_real_time_data(
+        &self,
+        bytes: &[u8],
+        index: usize,
+        value: &Record,
+    ) -> Result<Vec<u8>> {
+        if index > self.real_time_data.len() {
+            return Err(Error::UnsafeEdit(format!(
+                "RealTimeData insertion index {index} is outside the source collection"
+            )));
+        }
+        let payload = value.to_payload()?;
+        let replacement = frame_logical_payload(
+            &payload,
+            REAL_TIME_DATA_RECORD_TYPE,
+            CONTINUE_FRT_RECORD_TYPE,
+        )?;
+        let start = if let Some(span) = self.real_time_data_spans.get(index) {
+            self.records[span.first_record].record_start
+        } else {
+            bytes.len()
+        };
+        replace_range(bytes, start, start, &replacement)
+    }
+
+    pub(crate) fn remove_real_time_data(&self, bytes: &[u8], index: usize) -> Result<Vec<u8>> {
+        let span = self.real_time_data_spans.get(index).ok_or_else(|| {
+            Error::UnsafeEdit(format!(
+                "RealTimeData index {index} is outside the source collection"
+            ))
+        })?;
+        let start = self.records[span.first_record].record_start;
+        let end = self.records[span.end_record - 1].payload_end;
+        replace_range(bytes, start, end, &[])
+    }
+}
 
 impl Record {
     /// Parse one logical `RealTimeData` payload: the record body with any

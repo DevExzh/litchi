@@ -5,6 +5,7 @@ use super::codec::{
     RTD_OPER_INTEGER, RTD_OPER_LONG_TEXT, RTD_OPER_NUMBER, RTD_OPER_SHORT_TEXT, read_u16, read_u32,
 };
 use super::model::{Cell, Record, Value};
+use super::{CONTINUE_FRT_RECORD_TYPE, Snapshot};
 
 /// Build an FrtHeader for the RealTimeData record type.
 fn frt_header() -> Vec<u8> {
@@ -35,6 +36,57 @@ fn rtd_cell(row: u16, column: u16, sheet_index: u16) -> [u8; 6] {
     cell[2..4].copy_from_slice(&column.to_le_bytes());
     cell[4..6].copy_from_slice(&sheet_index.to_le_bytes());
     cell
+}
+
+fn biff_record(record_type: u16, payload: &[u8]) -> Vec<u8> {
+    let payload_len = u16::try_from(payload.len()).expect("test payload fits BIFF8");
+    let mut record = Vec::with_capacity(4 + payload.len());
+    record.extend_from_slice(&record_type.to_le_bytes());
+    record.extend_from_slice(&payload_len.to_le_bytes());
+    record.extend_from_slice(payload);
+    record
+}
+
+fn framed_rtd(value: &Record, chunk_size: usize) -> Vec<u8> {
+    let payload = value.to_payload().expect("valid RTD test value");
+    let mut stream = Vec::new();
+    for (index, chunk) in payload.chunks(chunk_size).enumerate() {
+        let record_type = if index == 0 {
+            REAL_TIME_DATA_RECORD_TYPE
+        } else {
+            CONTINUE_FRT_RECORD_TYPE
+        };
+        stream.extend_from_slice(&biff_record(record_type, chunk));
+    }
+    stream
+}
+
+fn source_stream() -> Vec<u8> {
+    let first = Record {
+        common_prefix_len: 0,
+        topic_segments: vec!["PROG.ID".to_string(), String::new(), "STOCK".to_string()],
+        topic: "PROG.IDSTOCK".to_string(),
+        value: Value::Integer(7),
+        cells: vec![Cell {
+            row: 1,
+            column: 2,
+            sheet_index: 0,
+        }],
+    };
+    let second = Record {
+        common_prefix_len: 7,
+        topic_segments: vec![String::new(), "BOND".to_string(), "X".to_string()],
+        topic: "PROG.IDBONDX".to_string(),
+        value: Value::Text("102".to_string()),
+        cells: Vec::new(),
+    };
+
+    let mut stream = biff_record(0x7777, &[0xAA, 0xBB, 0xCC]);
+    stream.extend_from_slice(&framed_rtd(&first, 20));
+    stream.extend_from_slice(&biff_record(0x8888, &[0x11, 0x22]));
+    stream.extend_from_slice(&framed_rtd(&second, 8_224));
+    stream.extend_from_slice(&biff_record(0x000A, &[]));
+    stream
 }
 
 #[test]
@@ -406,4 +458,136 @@ fn segmented_topic_cch_covers_count_prefixes_and_empty_segments() {
     let parsed = Record::parse(&payload, None).expect("parse");
     assert_eq!(parsed, value);
     assert_eq!(parsed.to_payload().unwrap(), payload);
+}
+
+#[test]
+fn stream_snapshot_noop_is_exact_and_exposes_opaque_records() {
+    let bytes = source_stream();
+    let snapshot = Snapshot::parse(bytes.clone()).expect("parse source stream");
+
+    assert_eq!(snapshot.finish(), bytes);
+    assert_eq!(snapshot.records().len(), 2);
+    let unknown = snapshot
+        .unknown_records()
+        .map(|record| (record.record_type(), record.payload().to_vec()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        unknown,
+        vec![
+            (0x7777, vec![0xAA, 0xBB, 0xCC]),
+            (0x8888, vec![0x11, 0x22]),
+            (0x000A, vec![])
+        ]
+    );
+
+    let commit = snapshot.edit().commit().expect("no-op commit");
+    assert!(!commit.changed());
+    assert!(commit.patch().is_noop());
+    assert_eq!(commit.patch().source_fingerprint(), snapshot.fingerprint());
+    assert_eq!(commit.snapshot().bytes(), bytes.as_slice());
+}
+
+#[test]
+fn stream_transaction_edits_typed_value_and_preserves_unknown_bytes() {
+    let bytes = source_stream();
+    let snapshot = Snapshot::parse(bytes).expect("parse source stream");
+    let unknown_before = snapshot
+        .unknown_records()
+        .map(|record| (record.record_type(), record.payload().to_vec()))
+        .collect::<Vec<_>>();
+
+    let mut transaction = snapshot.edit();
+    transaction
+        .set_value(0, Value::Number(58.25))
+        .expect("stage value");
+    let commit = transaction.commit().expect("commit value");
+    assert!(commit.changed());
+    assert_eq!(commit.snapshot().records()[0].value, Value::Number(58.25));
+    assert_eq!(commit.snapshot().records().len(), 2);
+    let unknown_after = commit
+        .snapshot()
+        .unknown_records()
+        .map(|record| (record.record_type(), record.payload().to_vec()))
+        .collect::<Vec<_>>();
+    assert_eq!(unknown_after, unknown_before);
+
+    let applied = commit.patch().apply(&snapshot).expect("apply patch");
+    assert_eq!(applied, *commit.snapshot());
+    let reverted = commit
+        .patch()
+        .inverse()
+        .apply(&applied)
+        .expect("apply inverse");
+    assert_eq!(reverted.bytes(), snapshot.bytes());
+}
+
+#[test]
+fn stream_transaction_is_failure_atomic_and_rejects_stale_sources() {
+    let bytes = source_stream();
+    let snapshot = Snapshot::parse(bytes.clone()).expect("parse source stream");
+    let mut transaction = snapshot.edit();
+    let before = transaction.snapshot().expect("candidate snapshot").finish();
+
+    assert!(transaction.set_value(99, Value::Integer(1)).is_err());
+    assert!(
+        transaction
+            .replace(
+                0,
+                Record {
+                    common_prefix_len: 0,
+                    topic_segments: vec!["only".to_string()],
+                    topic: "only".to_string(),
+                    value: Value::Integer(1),
+                    cells: Vec::new(),
+                },
+            )
+            .is_err()
+    );
+    assert_eq!(transaction.snapshot().unwrap().finish(), before);
+
+    let mut transaction = snapshot.edit();
+    transaction.set_value(0, Value::Integer(9)).unwrap();
+    let commit = transaction.commit().unwrap();
+    let mut stale_bytes = snapshot.bytes().to_vec();
+    let marker = stale_bytes
+        .windows(3)
+        .position(|window| window == [0xAA, 0xBB, 0xCC])
+        .expect("opaque marker");
+    stale_bytes[marker] ^= 1;
+    let stale = Snapshot::parse(stale_bytes).expect("parse stale source");
+    let stale_before = stale.finish();
+    assert!(commit.patch().apply(&stale).is_err());
+    assert_eq!(stale.finish(), stale_before);
+}
+
+#[test]
+fn removing_prefix_owner_is_atomic_and_insertions_are_bounded() {
+    let snapshot = Snapshot::parse(source_stream()).expect("parse source stream");
+    let mut removal = snapshot.edit();
+    let before = removal.snapshot().unwrap().finish();
+    assert!(removal.remove(0).is_err());
+    assert_eq!(removal.snapshot().unwrap().finish(), before);
+
+    let inserted = Record {
+        common_prefix_len: 0,
+        topic_segments: vec!["P".to_string(), "S".to_string(), "NEW".to_string()],
+        topic: "PSNEW".to_string(),
+        value: Value::Boolean(true),
+        cells: Vec::new(),
+    };
+    let mut transaction = snapshot.edit();
+    transaction.push(inserted.clone()).unwrap();
+    let commit = transaction.commit().unwrap();
+    assert_eq!(commit.snapshot().records().len(), 3);
+    assert_eq!(commit.snapshot().records()[2], inserted);
+}
+
+#[test]
+fn stream_framing_bounds_are_checked_before_interpretation() {
+    let mut oversized = Vec::new();
+    oversized.extend_from_slice(&0x7777u16.to_le_bytes());
+    oversized.extend_from_slice(&8_225u16.to_le_bytes());
+    oversized.extend(std::iter::repeat_n(0xA5, 8_225));
+    assert!(Snapshot::parse(oversized).is_err());
+    assert!(Snapshot::parse([0x77, 0x77, 0x01]).is_err());
 }

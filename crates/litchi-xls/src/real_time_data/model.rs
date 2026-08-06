@@ -65,3 +65,35 @@ pub struct Record {
     /// The cells subscribed to this topic (`rgRTDE`).
     pub cells: Vec<Cell>,
 }
+
+/// An opaque BIFF8 record not owned by the real-time-data grammar.
+///
+/// The payload borrows the source snapshot, so exposing unknown records does
+/// not duplicate their bytes.  The source-preserving editor keeps their
+/// framing and payload bytes unchanged when an RTD record is edited.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UnknownRecord<'a> {
+    record_type: u16,
+    payload: &'a [u8],
+}
+
+impl<'a> UnknownRecord<'a> {
+    pub(crate) const fn new(record_type: u16, payload: &'a [u8]) -> Self {
+        Self {
+            record_type,
+            payload,
+        }
+    }
+
+    /// The BIFF record type (`rt`).
+    #[must_use]
+    pub const fn record_type(self) -> u16 {
+        self.record_type
+    }
+
+    /// The exact opaque BIFF payload.
+    #[must_use]
+    pub const fn payload(self) -> &'a [u8] {
+        self.payload
+    }
+}
