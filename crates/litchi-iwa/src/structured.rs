@@ -38,11 +38,12 @@ pub(crate) fn extract_sections(
 
 /// Extract all supported structured data from one document snapshot.
 pub(crate) fn extract_all(bundle: &Bundle, object_index: &ObjectIndex) -> Result<StructuredData> {
-    Ok(StructuredData {
-        tables: extract_tables(bundle, object_index)?,
-        slides: extract_slides(bundle, object_index)?,
-        sections: extract_sections(bundle, object_index)?,
-    })
+    StructuredData::from_parts(
+        extract_tables(bundle, object_index)?,
+        extract_slides(bundle, object_index)?,
+        extract_sections(bundle, object_index)?,
+    )
+    .map_err(|error| crate::Error::InvalidFormat(format!("invalid structured snapshot: {error}")))
 }
 
 #[cfg(test)]

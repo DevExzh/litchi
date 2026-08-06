@@ -116,12 +116,15 @@ fn structured_text_aggregation_does_not_change_order() {
     let mut section = litchi_pages::Section::new(0, litchi_pages::SectionType::Body);
     section.heading = Some("Heading".to_owned());
 
-    let data = StructuredData {
-        tables: vec![table],
-        slides: vec![slide],
-        sections: vec![section],
-    };
+    let data = StructuredData::from_parts(vec![table], vec![slide], vec![section])
+        .expect("structured semantic values should form a valid snapshot");
 
     assert_eq!(data.all_text(), ["Table: Data", "Title", "Body", "Heading"]);
     assert_eq!(data.summary(), "Tables: 1, Slides: 1, Sections: 1");
+    assert_eq!(data.table(0).map(litchi_numbers::Table::name), Some("Data"));
+    assert_eq!(data.slide(0).map(litchi_keynote::Slide::index), Some(0));
+    assert_eq!(data.section(0).map(|value| value.index), Some(0));
+    assert!(data.table(1).is_none());
+    assert!(data.slide(1).is_none());
+    assert!(data.section(1).is_none());
 }
