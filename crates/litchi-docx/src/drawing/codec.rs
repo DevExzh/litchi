@@ -1,11 +1,15 @@
 //! Streaming WordprocessingML drawing inventory decoder.
 
-use super::model::{Anchor, AnchorId, Kind, Object};
+use super::model::{Anchor, AnchorId, Kind, LegacyAnchor, LegacyAnchorKind, Object};
+use super::validation::{parse_anchor_id_text, parse_word2010_anchor_id};
 use crate::error::{Error, Result};
+use crate::namespace::is_wordprocessing_namespace;
 use litchi_core::unit::EMUS_PER_INCH;
 use litchi_drawingml::geom::Preset;
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::ResolveResult;
+use quick_xml::reader::NsReader;
 use smallvec::SmallVec;
 
 /// Parse drawing objects from a paragraph XML slice.
@@ -158,6 +162,135 @@ pub(crate) fn parse(xml_bytes: &[u8]) -> Result<SmallVec<[Object; 4]>> {
     Ok(objects)
 }
 
+/// Parse legacy Word `w:object` and `w:pict` anchors from a paragraph XML
+/// slice. Only the checked `anchorId` metadata is projected; child VML, OLE,
+/// and image content remains inert.
+pub(crate) fn parse_legacy(xml_bytes: &[u8]) -> Result<SmallVec<[LegacyAnchor; 4]>> {
+    let mut reader = NsReader::from_reader(xml_bytes);
+    let mut fragment_prefix = None;
+    let mut depth = 0usize;
+    let mut nodes = 0usize;
+    let mut active = None;
+    let mut anchors = SmallVec::new();
+
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        if matches!(event, Event::Start(_) | Event::Empty(_)) {
+            nodes = nodes.checked_add(1).ok_or_else(|| {
+                Error::InvalidFormat("legacy drawing element counter overflow".to_string())
+            })?;
+            if nodes > 1_000_000 {
+                return Err(Error::InvalidFormat(
+                    "Word XML exceeds 1000000 elements".to_string(),
+                ));
+            }
+        }
+
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("legacy drawing XML nesting is too deep".to_string())
+                })?;
+                if depth > 128 {
+                    return Err(Error::InvalidFormat(
+                        "legacy drawing XML nesting exceeds 128".to_string(),
+                    ));
+                }
+                if fragment_prefix.is_none() && !matches!(namespace, ResolveResult::Bound(_)) {
+                    fragment_prefix = Some(
+                        element
+                            .name()
+                            .prefix()
+                            .map(|prefix| prefix.into_inner().to_vec()),
+                    );
+                }
+                if active.is_none()
+                    && is_word_element(&namespace, &fragment_prefix)
+                    && let Some(kind) = legacy_kind(element.local_name().as_ref())
+                {
+                    let resolver = reader.resolver().clone();
+                    let anchor_id =
+                        parse_word2010_anchor_id(&element, &resolver, reader.decoder())?;
+                    active = Some((kind, anchor_id, depth));
+                }
+            },
+            Event::Empty(element) => {
+                if !matches!(namespace, ResolveResult::Bound(_)) && fragment_prefix.is_none() {
+                    fragment_prefix = Some(
+                        element
+                            .name()
+                            .prefix()
+                            .map(|prefix| prefix.into_inner().to_vec()),
+                    );
+                }
+                if is_word_element(&namespace, &fragment_prefix)
+                    && let Some(kind) = legacy_kind(element.local_name().as_ref())
+                {
+                    let resolver = reader.resolver().clone();
+                    let anchor_id =
+                        parse_word2010_anchor_id(&element, &resolver, reader.decoder())?;
+                    anchors.push(LegacyAnchor::from_parts(kind, anchor_id));
+                }
+            },
+            Event::End(_) => {
+                if active
+                    .as_ref()
+                    .is_some_and(|(_, _, start_depth)| *start_depth == depth)
+                {
+                    let (kind, anchor_id, _) = active.take().ok_or_else(|| {
+                        Error::InvalidFormat("missing legacy drawing anchor".to_string())
+                    })?;
+                    anchors.push(LegacyAnchor::from_parts(kind, anchor_id));
+                }
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("invalid legacy drawing XML nesting".to_string())
+                })?;
+            },
+            Event::Eof => {
+                if active.is_some() || depth != 0 {
+                    return Err(Error::InvalidFormat(
+                        "unterminated legacy drawing XML".to_string(),
+                    ));
+                }
+                break;
+            },
+            _ => {},
+        }
+    }
+
+    Ok(anchors)
+}
+
+#[inline]
+fn legacy_kind(local_name: &[u8]) -> Option<LegacyAnchorKind> {
+    match local_name {
+        b"object" => Some(LegacyAnchorKind::Object),
+        b"pict" => Some(LegacyAnchorKind::Picture),
+        _ => None,
+    }
+}
+
+fn is_word_element(
+    namespace: &ResolveResult<'_>,
+    fragment_prefix: &Option<Option<Vec<u8>>>,
+) -> bool {
+    if is_wordprocessing_namespace(namespace) {
+        return true;
+    }
+    match namespace {
+        ResolveResult::Unknown(prefix) => {
+            fragment_prefix
+                .as_ref()
+                .and_then(|prefix| prefix.as_deref())
+                == Some(prefix.as_slice())
+        },
+        ResolveResult::Unbound => fragment_prefix == &Some(None),
+        ResolveResult::Bound(_) => false,
+    }
+}
+
 fn parse_anchor_id(element: &BytesStart<'_>) -> Result<Option<AnchorId>> {
     let mut value = None;
     for attribute in element.attributes() {
@@ -178,28 +311,12 @@ fn parse_anchor_id(element: &BytesStart<'_>) -> Result<Option<AnchorId>> {
         let text = std::str::from_utf8(&attribute.value).map_err(|error| {
             Error::InvalidFormat(format!("DrawingML anchorId is not UTF-8: {error}"))
         })?;
-        if text.len() != 8 || !text.bytes().all(is_ascii_hex_digit) {
-            return Err(Error::InvalidFormat(format!(
-                "invalid DrawingML anchorId '{text}'; expected eight hexadecimal digits"
-            )));
-        }
-        let parsed = u32::from_str_radix(text, 16).map_err(|error| {
-            Error::InvalidFormat(format!("invalid DrawingML anchorId '{text}': {error}"))
-        })?;
-        value = Some(AnchorId::new(parsed).ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "DrawingML anchorId '{text}' is outside the nonzero, below-0x80000000 range"
-            ))
-        })?);
+        value = Some(parse_anchor_id_text(text)?);
     }
     Ok(value)
 }
 
 #[inline]
-fn is_ascii_hex_digit(value: u8) -> bool {
-    value.is_ascii_digit() || matches!(value, b'a'..=b'f' | b'A'..=b'F')
-}
-
 fn parse_preset(element: &BytesStart<'_>) -> Result<Preset> {
     let value = strict_attribute(element, b"prst")?.ok_or_else(|| {
         Error::InvalidFormat("DrawingML prstGeom is missing required prst".to_string())

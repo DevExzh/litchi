@@ -1,6 +1,6 @@
 //! Paragraph content adapters for drawings, revisions, and Office Math.
 
-use crate::drawing::{Object, parse};
+use crate::drawing::{LegacyAnchor, Object, parse, parse_legacy};
 use crate::error::{Error, Result};
 use crate::image::{InlineImage, parse_inline_images};
 use crate::math::OfficeMath;
@@ -103,6 +103,17 @@ impl Paragraph {
     #[inline]
     pub fn drawing_objects(&self) -> Result<SmallVec<[Object; 4]>> {
         parse(self.xml_bytes())
+    }
+
+    /// Extract legacy Word object and picture anchors from this paragraph.
+    ///
+    /// The returned entries expose only the typed `[MS-DOCX]` 2.2.6
+    /// `w14:anchorId` metadata and whether the source element was `w:object`
+    /// or `w:pict`. VML, OLE, image payloads, and layout are intentionally
+    /// inert and are not interpreted.
+    #[inline]
+    pub fn legacy_anchors(&self) -> Result<SmallVec<[LegacyAnchor; 4]>> {
+        parse_legacy(self.xml_bytes())
     }
 
     /// Extract all tracked changes (revisions) from this paragraph.

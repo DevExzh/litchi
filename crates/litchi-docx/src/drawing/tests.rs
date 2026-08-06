@@ -1,6 +1,6 @@
 //! Regression tests for the layered drawing inventory owner.
 
-use super::{Anchor, AnchorId, Kind, Object, parse};
+use super::{Anchor, AnchorId, Kind, LegacyAnchorKind, Object, parse, parse_legacy};
 use litchi_drawingml::geom::Preset;
 
 #[test]
@@ -134,6 +134,58 @@ fn rejects_invalid_anchor_ids() {
             "accepted invalid anchorId {value}"
         );
     }
+}
+
+#[test]
+fn parses_legacy_object_and_picture_anchor_ids_in_document_order() {
+    let xml = br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"
+        xmlns:v="urn:schemas-microsoft-com:vml">
+        <w:r><w:object w14:anchorId="0000002a"><v:shape/></w:object></w:r>
+        <w:r><w:pict w14:anchorId="7fffffff"><v:shape/></w:pict></w:r>
+    </w:p>"#;
+
+    let anchors = parse_legacy(xml).unwrap();
+    assert_eq!(anchors.len(), 2);
+    assert_eq!(anchors[0].kind(), LegacyAnchorKind::Object);
+    assert_eq!(anchors[0].anchor_id(), AnchorId::new(0x2a));
+    assert_eq!(anchors[1].kind(), LegacyAnchorKind::Picture);
+    assert_eq!(anchors[1].anchor_id(), AnchorId::new(0x7fff_ffff));
+}
+
+#[test]
+fn legacy_anchor_parser_is_namespace_and_range_strict() {
+    let invalid_values = ["00000000", "80000000", "0000001", "0000000G"];
+    for value in invalid_values {
+        let xml = format!(
+            r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w:pict w14:anchorId="{value}"/></w:p>"#
+        );
+        assert!(parse_legacy(xml.as_bytes()).is_err(), "accepted {value}");
+    }
+
+    let wrong_namespace = br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:not-word-2010"><w:object x:anchorId="00000001"/></w:p>"#;
+    assert!(parse_legacy(wrong_namespace).is_err());
+
+    let unqualified = br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pict anchorId="00000001"/></w:p>"#;
+    assert!(parse_legacy(unqualified).is_err());
+
+    let duplicate_namespace = br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:a="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:b="http://schemas.microsoft.com/office/word/2010/wordml"><w:object a:anchorId="00000001" b:anchorId="00000002"/></w:p>"#;
+    assert!(parse_legacy(duplicate_namespace).is_err());
+}
+
+#[test]
+fn paragraph_legacy_anchor_api_is_typed_and_inert() {
+    let paragraph = crate::paragraph::Paragraph::new(
+        br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:foreign="urn:foreign"><w:r><w:pict w14:anchorId="00000009"><foreign:payload/></w:pict></w:r></w:p>"#.to_vec(),
+    );
+    let anchors = paragraph.legacy_anchors().unwrap();
+    assert_eq!(
+        anchors.as_slice(),
+        &[super::LegacyAnchor::from_parts(
+            LegacyAnchorKind::Picture,
+            AnchorId::new(9),
+        )]
+    );
 }
 
 #[test]

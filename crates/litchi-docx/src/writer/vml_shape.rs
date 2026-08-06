@@ -12,6 +12,7 @@
 //! Everything is inert metadata: VML has no relationships, scripts, or
 //! executable content.
 
+use crate::drawing::{AnchorId, append_word2010_anchor_id};
 use crate::error::{Error, Result};
 use crate::textbox::{TextBoxParagraph, TextBoxRun};
 use litchi_core::unit::{EMUS_PER_INCH, EMUS_PER_PT};
@@ -105,6 +106,8 @@ pub struct MutableVmlShape {
     pub(crate) stroke_color: Option<String>,
     /// The optional `v:textbox` story as paragraphs with runs.
     pub(crate) paragraphs: Vec<TextBoxParagraph>,
+    /// Optional Word 2010 identifier on the enclosing `w:pict` element.
+    pub(crate) anchor_id: Option<AnchorId>,
 }
 
 impl MutableVmlShape {
@@ -124,6 +127,7 @@ impl MutableVmlShape {
             fill_color: None,
             stroke_color: None,
             paragraphs: Vec::new(),
+            anchor_id: None,
         })
     }
 
@@ -146,6 +150,23 @@ impl MutableVmlShape {
     /// document).
     pub fn id(&self) -> &str {
         &self.id
+    }
+
+    /// Return the optional Word 2010 identifier on the enclosing picture.
+    pub fn anchor_id(&self) -> Option<AnchorId> {
+        self.anchor_id
+    }
+
+    /// Set the checked Word 2010 identifier on the enclosing `w:pict`.
+    pub fn set_anchor_id(&mut self, anchor_id: AnchorId) -> &mut Self {
+        self.anchor_id = Some(anchor_id);
+        self
+    }
+
+    /// Remove the Word 2010 identifier from the enclosing picture.
+    pub fn clear_anchor_id(&mut self) -> &mut Self {
+        self.anchor_id = None;
+        self
     }
 
     /// Set an explicit VML shape ID instead of accepting the allocated one.
@@ -241,9 +262,11 @@ impl MutableVmlShape {
         let element = self.kind.element_name();
         write!(
             xml,
-            r#"<w:pict xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">"#
+            r#"<w:pict xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office""#
         )
         .map_err(|error| Error::Xml(error.to_string()))?;
+        append_word2010_anchor_id(xml, self.anchor_id)?;
+        xml.push('>');
         if self.kind == VmlShapeKind::Line {
             write!(
                 xml,
@@ -292,6 +315,7 @@ fn normalize_color(color: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::drawing::AnchorId;
     use crate::textbox::{TextBoxAnchor, TextBoxBodyProperties, load_text_boxes};
 
     fn shape_document_xml(shape: &MutableVmlShape) -> String {
@@ -333,6 +357,31 @@ mod tests {
         assert_eq!(parsed.name.as_deref(), Some("_x0000_s1025"));
         assert_eq!(parsed.text(), "legacy box");
         assert_eq!(parsed.paragraphs[0].runs[0].bold, Some(true));
+    }
+
+    #[test]
+    fn authors_checked_legacy_picture_anchor_id() {
+        let mut shape = MutableVmlShape::rectangle();
+        identified(&mut shape);
+        let anchor_id = AnchorId::new(0x7fff_ffff).unwrap();
+        shape.set_anchor_id(anchor_id);
+        assert_eq!(shape.anchor_id(), Some(anchor_id));
+
+        let mut xml = String::new();
+        shape.to_xml(&mut xml).unwrap();
+        assert!(
+            xml.contains(r#"xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml""#)
+        );
+        assert!(xml.contains(r#"mc:Ignorable="w14" w14:anchorId="7fffffff""#));
+
+        let fragment = format!(
+            r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{xml}</w:p>"#
+        );
+        let anchors = crate::paragraph::Paragraph::new(fragment.into_bytes())
+            .legacy_anchors()
+            .unwrap();
+        assert_eq!(anchors.len(), 1);
+        assert_eq!(anchors[0].anchor_id(), Some(anchor_id));
     }
 
     #[test]

@@ -132,7 +132,7 @@ family has no typed model even if an untouched part can remain in a package-pres
 | SDT web-extension links (webExtensionsLinked, webExtensionCreated) | 🟡 | 🟡 | 🟡 | Web-extension package graphs are typed separately, but these SDT-to-add-in behaviors are not a semantic host integration |
 | Paragraph/table extension identifiers (paraId, textId) and noSpellErr | 🟡 | ✅ | 🟡 | paraId participates in modern-comment identity graphs; there is no general paragraph textId or noSpellErr editing model |
 | Conflict revision markup (conflictIns, conflictDel, and custom XML conflict ranges) | ❌ | ❌ | ❌ | [MS-DOCX] 2.2.5 conflict families are not represented by the ordinary tracked-revision model |
-| anchorId on object and pict | 🟡 | ✅ | ❌ | Paragraph drawing inventories expose the checked Word 2010 `AnchorId` from `wp:inline`/`wp:anchor`; `w:object`/`w:pict` authoring and generic drawing serialization remain outside this owner |
+| anchorId on object and pict | ✅ | ✅ | ✅ | `[MS-DOCX]` 2.2.6 legacy-anchor inventories distinguish `w:object` and `w:pict` and validate the Word 2010 `AnchorId` range shared with `[MS-DOCX]` 2.6.2.1 and `[MS-ODRAWXML]` 2.18.2.1; `MutableOleObject` and `MutableVmlShape` author checked `w14:anchorId` values with a local `mc:Ignorable` declaration. OLE, VML, image payloads, layout, and rendering remain inert |
 | Um Al-Qura umalqura calendar extension | ❌ | ❌ | ❌ | [MS-DOCX] 2.2.7 is not a typed calendar or date-rendering model |
 | sectPr footnoteColumns | ❌ | ❌ | ❌ | The Word 2012 multi-column footnote layout extension is not exposed; ordinary note numbering and placement remain supported |
 | pPr collapsed | ❌ | ❌ | ❌ | Collapsed paragraph display state is not modeled |
@@ -160,4 +160,4 @@ family has no typed model even if an untouched part can remain in a package-pres
 
 - crates/litchi-docx/src/package.rs owns package graphs, parts, relationships, properties, mail merge, custom XML, glossary, web settings, encryption, and save modes.
 - crates/litchi-docx/src/document.rs, paragraph.rs, table.rs, section.rs, styles.rs, and numbering/ own the main typed WordprocessingML model.
-- crates/litchi-docx/src/field/, content_control.rs, revision.rs, comment.rs, modern_comments/, custom_xml.rs, alt/, drawing.rs, textbox.rs, chart.rs, smartart.rs, math.rs, font/, and writer/ provide feature-specific APIs and bounded codecs.
+- crates/litchi-docx/src/field/, content_control.rs, revision.rs, comment.rs, modern_comments/, custom_xml.rs, alt/, drawing/, textbox.rs, chart.rs, smartart.rs, math.rs, font/, and writer/ provide feature-specific APIs and bounded codecs.

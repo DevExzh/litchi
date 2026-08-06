@@ -12,7 +12,17 @@ pub enum Anchor {
     Floating,
 }
 
-/// The checked Word 2010 identifier carried by a DrawingML anchor.
+/// The legacy WordprocessingML element carrying a drawing or embedded object.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum LegacyAnchorKind {
+    /// An embedded or linked object carried by `w:object`.
+    Object,
+    /// A legacy VML or fallback picture carried by `w:pict`.
+    Picture,
+}
+
+/// The checked Word 2010 identifier carried by a DrawingML or legacy drawing
+/// anchor.
 ///
 /// Word stores this value as eight hexadecimal ASCII digits.  The zero and
 /// high-bit ranges are reserved by `[MS-DOCX]` and `[MS-ODRAWXML]`, so the
@@ -35,6 +45,35 @@ impl AnchorId {
     #[inline]
     pub const fn get(self) -> u32 {
         self.0
+    }
+}
+
+/// A typed inventory entry for a legacy Word object or picture.
+///
+/// This is deliberately metadata-only. The inventory records the
+/// `[MS-DOCX]` 2.2.6 `anchorId` without interpreting VML, OLE, or image
+/// payloads and without attempting layout or rendering.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct LegacyAnchor {
+    kind: LegacyAnchorKind,
+    anchor_id: Option<AnchorId>,
+}
+
+impl LegacyAnchor {
+    /// Return whether the entry came from `w:object` or `w:pict`.
+    #[inline]
+    pub fn kind(self) -> LegacyAnchorKind {
+        self.kind
+    }
+
+    /// Return the checked Word 2010 identifier, when one was authored.
+    #[inline]
+    pub fn anchor_id(self) -> Option<AnchorId> {
+        self.anchor_id
+    }
+
+    pub(crate) const fn from_parts(kind: LegacyAnchorKind, anchor_id: Option<AnchorId>) -> Self {
+        Self { kind, anchor_id }
     }
 }
 
